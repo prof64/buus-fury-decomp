@@ -1,9 +1,11 @@
 # Buu's Fury lockstep harness: the simulator's player against the emulator, frame by frame
 
 The harness runs the same scenario in the real game (headless mGBA, `tools/emu`) and in the battle simulator and
-compares every frame: position, facing, the animation actually shown (raw index, frame index and the ROM frame
-record), the player's state object, HP, EP, form, the RNG state and every sound call (PlaySfx / StopSfx / PlaySong).
-It reports the first frame where they differ.
+compares every game tick: position, facing, the animation actually shown (raw index, frame index and the ROM frame
+record), the player's state object, HP, EP, form, the RNG state and every sound call (PlaySfx / StopSfx / PlaySong);
+in the enemy scenarios also the enemy's position, facing and HP and every ComputeDamage result. It reports the first
+frame where they differ. Lag frames (video frames on which the game logic did not run: the frame counter
+`0x03000F94` did not advance - frequent in the forest) are recorded and skipped by the simulator (no step, no input).
 
 ```
 .venv/bin/python tools/battle/lockstep/record.py [NAME_GLOB ...] [--print]   # emulator -> data/battle/buu_lockstep/fNN.json
@@ -39,7 +41,18 @@ f02_skill15: first divergence at frame 262 (sfx); input: keys 0x0 (segment frame
 A scenario is a dict (`scenarios.py`): `name`, `form` (0..53), `input` = `[[keys, frames], ...]` (`'A+RIGHT'`, `''` =
 none), optional `hits` = attack messages injected at the start of a frame (`{at, dir, atk, mult, str, pow}`),
 `skills` (the record's skill list, slot 0 selected), `skill_level`, `hp` / `ep` / `maxep` / `ss` / `ss3`, `stats`,
-`pos`, `dir`, `arena` (`htc` = Hyperbolic Time Chamber 6-9, empty floor; `crater` = Giant Crater 8-71, has cliffs).
+`pos`, `dir`, `arena` (`htc` = Hyperbolic Time Chamber 6-9, empty floor; `crater` = Giant Crater 8-71, has cliffs;
+`forest` = Southwest Forest 8-3), `enemy` = `{type, at: [dx, dy], hp, aggro, dummy}`.
+
+**Enemy scenarios** (`*_vs_*`, Southwest Forest, player at (100, 192) facing right): the area's first enemy spawn record
+(ROM `0x0807ACBC`) is patched to the enemy at the player + `at` (the other three records are parked at 0x7000). By
+default the enemy is a **target dummy**: a Majin Fighter (0x44) whose aggro test (state 0x14B IfPlayerWithin2 r2, ROM
+`0x087043F8 + 0xC`) is patched to -1 and whose on-hit tree (state table `0x0870F514` entry 0x14B, aux pointer) is the
+ApplyDamage node `0x086FDA00` alone: hits only take HP, no reaction, no AI change, no RNG of its own. The simulator
+patches its decoded AI the same way while the trace runs (`patchScenario`). This isolates the player's attack objects:
+every message they send, its box, timing, multiplier and attack type show up as the enemy's HP per frame, the damage
+log and the RNG. `real: True` scenarios (`f02_vs_enemy_*`) use unpatched enemies that wait far away during the setup
+and are placed at frame 0 (their animation and creation stamps copied).
 
 Setup (emulator): `buu_snakeway_start.ss`, the character / form / stats / skills written into the record, warp
 (`re/buu/warp.py`) to the arena, position and facing written, 30 idle frames. Frame 0 values the simulator copies:
@@ -57,9 +70,12 @@ the crater's cliff), `ko` (HP 1, one hit, 300 frames). Per skill of the characte
 60; Super Saiyan: transform and revert, `ssdrain` (maxEP 40: the gauge runs out). Extras: Saiyaman, SS3, skill levels
 1 / 2, Energy Blast refire, beam until 0 EP, low HP beep, 1300 idle frames (bored animation).
 
-Trace file: `{source, form, traces: [{name, scenario, input, init, states, rows, sfx}]}`; `rows` are run-length
-encoded `[n, x, y, dx, dy, dir, raw, frame, state, hp, ep, form, rom, rng]` (n frames, position advancing by dx, dy);
-`sfx` = `[frame, 'play', id, vol] | [frame, 'stop', id] | [frame, 'song', id]`.
+Trace file: `{source, form, traces: [{name, scenario, input, init, states, rows, sfx, erows?, lag?}]}`; `rows` are
+run-length encoded `[n, x, y, dx, dy, dir, raw, frame, state, hp, ep, form, rom, rng]` (n frames, position advancing by
+dx, dy); `sfx` = `[frame, 'play', id, vol] | [frame, 'stop', id] | [frame, 'song', id] | [frame, 'dmg', target,
+damage]` (ComputeDamage `0x0800EABE`: target 0 player, 1 the enemy); `erows` = `[n, x, y, dx, dy, dir, hp<<10]`;
+`lag` = the lag frames. `init` also holds the hittable flag (+0x1CC), the cutscene fusion's countdown (form object
++0x10) and the fusion partner's record.
 
 Comparison rules: a sprite without the animation (the game reads a null or foreign def slot: raw -1 / 0 or no frame
 record) only compares state / position / timing; when the def was swapped under a running animation (the KO's death
@@ -92,8 +108,9 @@ A sprite without the animation reads a null slot: 0 frames, so one-shot states e
 9's punch lasts 1 frame, form 12 has no hurt state).
 
 **Base states** (`player.ts`): idle control `0x08013022` (R + guard animation -> block; >1024 idle frames -> bored;
-d-pad press twice within 20 frames (single key) -> dash, the facing is not changed; d-pad held -> facing L, R, U, D in
-that order then walk; A -> melee, else B -> skill, also on the frame the walk starts); walk `0x080131BA` (horizontal
+d-pad press twice within 20 frames (single key) -> dash, the facing is not changed; d-pad held -> walk, the facing
+taken from the newly *pressed* keys L, R, U, D in that order (a key held since before keeps the old facing for the
+first walk frame); A -> melee, else B -> skill, also on the frame the walk starts); walk `0x080131BA` (horizontal
 try-move then vertical, facing table `0x083C348C`; no d-pad -> idle; then A / B); dash `0x08012DEE` (whole-footprint
 test; blocked -> hurt state with raw 10 + sound 59 + screen shake (8, 100); the other d-pad keys add the walk speed);
 melee `0x08012A24` (one message to every object; any accepted -> sound 48 + rand(2), a critical -> shake (15, 75);
@@ -108,8 +125,17 @@ Screen shakes (`0x0800797C`) draw two `next()` per period from the game RNG.
 **Forms**: Super Saiyan / SS3 (`0x0804E2B0`, the singleton `0x03002BBC` shares it): no EP paid, sound 54, 16 frames
 per animation frame (176 for Goku), the gauge fills to maxEP·tick / (16·nframes); at the end SS cooldown = 0x37FFF,
 form = up, the SS form object plays 54, SetAnim(0) whose exit stops 54. Revert (skill again / empty gauge): not
-hittable, 16 per frame, form = down, gauges 0. Gauges drain only with the form objects `0x03001B68/6C/78/80/8C` (an
+hittable, 16 per frame, form = down, gauges 0. Gauges drain only with the form objects `0x03001B68/6C/78/80` (an
 empty gauge at an overflow reverts; 7, 8, 17, 30, 37, 38 never run out). Saiyaman: shift-2 one-shot into form 14 / 10.
+Story Trunks 24 / 25 (form objects `0x03001B88` / `0x03001B8C`, updates `0x0800E592` / `0x0800E5F4`): no regen, gauges
+or cooldown; a countdown (form 24: 120 + rand(180), form 25: 240 + rand(120), drawn after the idle's rand(255) when the
+object is built at the end of a transformation) runs first in the player update; once negative, SetAnim(23)
+(transform up) / SetAnim(24) (revert) every frame the player is not already in that state - interrupting anything, KO
+included (the player is then idle at HP 0). Cutscene fusions 32 / 33 / 42 / 43 (object `0x03001B64`): idle without
+control and not hittable; after the regen a countdown (300 at construction); negative -> the defuse script s014: no
+controller / control for 297 frames, the state tick frozen at +90..+94, at +85 the partner's record takes over
+(Trunks / Goku: form, HP, EP, skills; SetAnim(0) + the NPC's rand(255)), x -50 per frame +95..+174, snapped to
+start - 16 px at +175, rand(255) at +295, control again at +297. The death script blocks the player update at KO + 199.
 
 **Skills** (`player.ts` updSkill / skillTick, specs from the state code): Energy Blast (frame 1 + shot at tick 16,
 queued B refires at 40), beams (charge 24 ticks, B read from 24, drain acc += D·factor >> 4, frame ((t >> 3) & 1) + 1;
@@ -122,8 +148,46 @@ Kamikaze Ghost (ghost at 16, committed at 40, respawn while held), Dragon Fist (
 0.375 px per frame until tick 90, 5 EP per frame, launch on release / tick 300 / EP 0: stop 32 + sound 23), Energy
 Punch (B read from tick 8, until tick 59), Energy Sword (charge 80 frames, 90-frame swing steerable at half walk
 speed), Instant Transmission (target pick freezes the world: modal loop; teleport sequence 60 frames per target,
-sound 31, EP 40 / 80 / 480). Hit-side details of the attack objects that the traces cannot see (no enemies in the
-arena) keep the models fitted to the measured runs (`tests/battle/buu_moves.test.ts`).
+sound 31, EP 40 / 80 / 480).
+
+**Attack objects** (verified against the target dummy, `*_vs_*`): every message goes to every object (0x08011C0C)
+unless noted "first receiver" (0x08011C70); the enemy accepts a message whose box strictly overlaps its body box
+(def+0x10 + 16 * dir at the integer position) - no per-target limit, it takes every overlapping message.
+* Punch: PUNCH_RECT `0x083C344C`, once. Energy Blast (`0x0804B454`): spawned at the hand point `0x0800FF44` (the body
+  box: down (cx, y), up (cx, cy), left (x0, cy), right (x1, cy) - per form), 3 px per tick, 16 x 16 box centred.
+  Burning Attack launches from the same point.
+* Beams 15 / 16 / 6 / 1 / 3 (`KameBeam`, class `0x080206B8`): at the fire position, len 8; head box +-8: wall -> stop;
+  head message accepted -> hit effect (when now - next > 0: next = now + 3 + rand(5), sound 48 + rand(2), explosion with
+  rand(32) x2 + rand(0x4000)), no growth; else +3 px while the head box overlaps the camera; then always the body
+  message (position..head +6). Released: moves 3 px, len -3 per tick, gone at len < 0 (stop 32 + 33).
+* Final Flash (`0x08036FA2`): at player + `0x0871DF9C`, length from the constructor's 24 px wall squares (+8 each),
+  scale +0x20 per tick, half width 8 * scale >> 8, one message per tick; accepted: the same throttled sound.
+* Flame Kamehameha links (`0x0802DB6C`): lv + 3 links 16 px apart (each spawns the next at its tick 8); per link per
+  tick one message to the first receiver with the previous tick's record box; accepted: 48 + rand(2).
+* Big Bang ball (`0x08037480`): at player + `0x0871DD9C`; flight 0.5 px per tick; every 4th tick one message, record
+  box centre +- size[f], mult (charge * 0x5762 + 0xFFFF) >> 16, flies on; explodes only at a wall / on an Energy Blast
+  (one message x 81 * charge, stop 32, sound 23, 7 harmless explosions); off camera on its far side: stop 32.
+* Masenko: cursor d (Lv1/2 +-2 bouncing 16..70/100, Lv3 d-pad), the ball's 43-tick lob (vx = dx * d * 0x5F4 >> 8,
+  vy - 0x200 + 0x20 per tick), one message at the landing tick with the flight record box (sound 48 + rand(3)).
+* Ultra Volleyball wave (`0x080384C2`): box origin..origin + dir * len (+2), len 8 +4 per tick to 48 then moves 4 px;
+  accepted / wall / 240 ticks -> retracts.
+* Energy Punch (`0x0801B296`): every tick 8..59 while held, the melee rect (Lv3: `0x0871DF30`), x62 / x144 / x226.
+* Energy Sword: every swing frame one message to the first receiver (x10, sub 15), accepted -> 48 + rand(2).
+* Dragon Fist (`DragonFistFx`, chain `0x08038AD8`): 6 segments, root -> head each tick, middle segments eased toward
+  their neighbours, the head steered by the d-pad (+-57 / +-33), every segment sends one message (x0.32, sub 18) until
+  the launch (one x2.5 message with the head box); the player's control shifts the chain (v = 0x60 or 0, +0x20 per
+  segment) below tick 90; a cancel explodes it at once, head first.
+* Instant Transmission onto a target: arrive below the target (x0 + x1) / 2 - 8, y1 + 8, facing up, one punch at
+  t = 24 (melee x1.5), 60 frames per target.
+
+**Player hit reaction** (every attack type the same; `f02_hurt_kinds` injects sub 0..18 and a 0-multiplier hit,
+`f02_hurt_block` blocked / shielded hits): not hittable (+0x1CC = 0) -> the message is not accepted; else ComputeDamage
+(melee: crit chance + rand(26), energy: rand(26) - also when blocked or in i-frames), the 12-frame flash and a
+ceil(damage / 1024) popup for every accepted hit (0 included); damage 0 -> nothing else; blocked from the front ->
+pushed back 2 px; else facing = dir ^ 1, the hurt state (24 ticks, resists 0, 0.75 px per frame back); thorns: the
+melee attacker takes (damage * thorns) >> 8. Enemies placed with the map update after the player (the player object is
+added after the area's actors; the object list `0x08011A1E` updates newest first), so their melee lands after the
+player's update.
 
 **Sounds**: the player emits the exact driver calls (`audioEvent('sfx' | 'sfx_stop' | 'song')`, `audio/bus.ts`); the
 director plays them with one voice per call and StopSfx stopping every voice of the id. Music: the arena map's own
@@ -132,22 +196,27 @@ Tournament ring #313 / area 7-7) - `boss_music_types` in `data/buu/audio.json`. 
 while 0 < HP <= maxHP / 5, > 60 frames apart. No sound for blocking, being hit (the attacker's code plays its own),
 KO (song 8 200 frames later), level up 36.
 
-## Coverage (lockstep, 576 traces)
+## Coverage (lockstep, 633 traces)
 
-All scenarios of every form pass except the known divergences below. Forms (sim id: game name): 0..8 Goku / SS Goku /
+All scenarios of every form pass except the known divergences below (`KNOWN` in the test, 17 skipped), including the
+story forms 24 / 25, the cutscene fusions and 49 target-dummy scenarios (every skill of one form per character, the
+levelled ones at Lv2 / Lv3, steering, Instant Transmission Lv1 / Lv3). Forms (sim id: game name): 0..8 Goku / SS Goku /
 SS3 Goku (incl. halo / Other World variants), 9..18 Gohan (Teen Gohan, Mystic Gohan, Great Saiyaman, Gohan, SS Teen
 Gohan, SS Gohan), 19..20 Goten, 21..25 Trunks, 26..30 Vegeta, 31..38 Gotenks, 39..40 Vegito, 41..44 Gogeta, 46..53
 Android 18, Hercule, Krillin, Piccolo, Pikkon, Tien, Videl, Yamcha.
 
 ## Known divergences (not modelled)
 
-* Story forms 24 / 25 (Trunks): their form objects (`0x03001B88` / `0x03001B8C`, updates `0x0800E592` / `0x0800E5F4`)
-  count down and transform / revert on their own.
-* Cutscene fusions 32 / 33 / 42 / 43: not hittable; the fusion ends after 113 frames into another character's record.
 * NPC-sprite forms: Trunks 23 (dash / punch / Flame Kamehameha) and Android 18's punch read garbage def slots (IWRAM /
   OAM addresses), so their lengths depend on RAM contents.
 * Great Saiyaman 14 + Super Saiyan: the game's canUse passes (up 255 != down 10) and the transformation reads form 255.
-* Big Bang: the fired ball's flight / lifetime is the projectile model's (it leaves ~26 frames early, so its stop 32
-  comes early); the game ball lives 156 frames in the empty arena.
-* Not covered by traces (no enemies in the arena): Instant Transmission with targets (decoded and checked in the
-  emulator on the forest save state), enemy hold states, candy, hits taken during skills other than the Kamehameha.
+* Cutscene fusion `ssdrain` (32 / 33): ~150 frames after the defuse the idle blink comes one tick late (unexplained; the
+  other defuse traces match).
+* Kamikaze Ghost (`f31_vs_skill13`): the ghost's homing (`0x08038F2C`) aims at the nearest enemy using the sprite frame
+  boxes (`0x0800FE34`: frame record +4..+7) and moves `speed` along the dominant axis; not ported (the sim's ghost homes
+  in on the body centre).
+* Real enemies attacking (`f02_vs_enemy_*`): enemy-side AI / animation fidelity (e.g. the walk -> idle switch when a
+  chase stops) diverges after the first ~10..90 frames; the AI composites now follow the game (a finished Sequence wraps
+  without re-entering its first child, the root is not restarted, StandStill's enter is SetAnim(0)).
+* Player special holds (candy, stone, freeze, mummy wraps, Enzyme latch, vampire, bear hug, grapple), flames' no-hurt
+  hits and the dark sphere's circle test are decoded (work/ls/agentG) but not yet ported or lockstep-recorded.

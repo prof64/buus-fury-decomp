@@ -95,11 +95,88 @@ def extra():
     return out
 
 
+# enemy scenarios: a passive Majin Fighter (aggro off, HP raised) in the Southwest Forest's open band, the player at
+# VS_POS facing right; `at` = the enemy footprint's offset from the player's
+VS_POS = [100, 192]
+VS_HP = 30000
+
+
+def vs(f, kind, inp, at=(24, 0), **kw):
+    en = dict(type=kw.pop('etype', 0x44), at=list(at))
+    hp = kw.pop('ehp', VS_HP)
+    if hp is not None:
+        en['hp'] = hp
+    if kw.pop('real', False):
+        en.update(aggro=True, dummy=False)
+    return base(f, 'vs_' + kind, inp, arena='forest', pos=kw.pop('pos', VS_POS), dir=kw.pop('dir', 3), enemy=en, **kw)
+
+
+def reactions():
+    """the player's reaction to hits: every attack type injected (sub 0..18, 30 frames apart), a 0-multiplier hit, hits
+    while blocking / shielding, and real enemies attacking (their own AI, not patched)"""
+    out = []
+    hits = [{'at': 10 + 30 * i, 'dir': 2, 'atk': i} for i in range(19)] + [{'at': 600, 'dir': 2, 'atk': 2, 'mult': 0}]
+    out.append(base(2, 'hurt_kinds', [['', 640]], hits=hits))
+    out.append(base(2, 'hurt_block', [['', 5], ['R', 60], ['R+B', 60], ['', 40]],
+                    hits=[{'at': 20, 'dir': 2, 'atk': 2}, {'at': 30, 'dir': 0, 'atk': 4}, {'at': 100, 'dir': 2, 'atk': 4}, {'at': 140, 'dir': 2, 'atk': 2}]))
+    # real enemies attacking the player (enemy at the player + at; the player faces it): melee, bullet, bomb, beam,
+    # flames, area, a spawned hand
+    for kind, t, at in (('melee', 0x44, (24, 0)), ('gun', 0x2C, (60, 0)), ('bomb', 8, (60, 0)), ('beam', 0x3C, (70, 0)),
+                        ('flames', 1, (40, 0)), ('mini', 0x38, (30, 0)), ('hand', 0x33, (60, -40))):
+        out.append(vs(2, 'enemy_' + kind, [['', 240]], at=at, etype=t, real=True, ehp=None))
+    return out
+
+
+# enemy distance per skill (footprint offset along the facing): melee-range skills close, the rest at 64 px
+VS_DIST = {8: 18, 9: 20, 5: 40}
+# one form per character for the enemy scenarios (base forms; Final Flash / Big Bang as Vegeta, the sword as Vegito)
+VS_FORMS = [2, 10, 19, 21, 26, 31, 39, 41]
+# levelled skills: also at Lv2 / Lv3
+VS_LEVELS = {8: (1, 2), 15: (2,), 6: (2,), 16: (2,), 17: (1, 2), 2: (2,), 10: (2,), 11: (2,), 4: (2,)}
+VS_SKILL_INPUT = [['', 5], ['B', 1], ['', 100], ['B', 130], ['', 150]]
+
+
+def versus(f):
+    ci = form_char(f)
+    # punches into the enemy (adjacent: footprint centres 16 px apart, the aggro test r2 = 0 stays false), a combo, and
+    # never walking through it (centres equal -> the patched aggro test passes)
+    out = [vs(f, 'punch', [['', 5], ['A', 1], ['', 25], ['A', 1], ['', 6], ['A', 1], ['', 6], ['A', 1], ['', 40], ['LEFT', 6], ['RIGHT', 1],
+                           ['A', 1], ['', 30], ['A', 20], ['', 60]], at=(16, 0))]
+    for sk in CHAR_SKILLS.get(ci, [7]):
+        if sk in (20, 22, 18):
+            continue
+        s = [sk] + [x for x in CHAR_SKILLS[ci] if x != sk]
+        at = (VS_DIST.get(sk, 64), 0)
+        out.append(vs(f, 'skill%d' % sk, VS_SKILL_INPUT, at=at, skills=s))
+        for lv in VS_LEVELS.get(sk, ()):
+            out.append(vs(f, 'skill%d_lv%d' % (sk, lv + 1), VS_SKILL_INPUT, at=at, skills=s, skill_level=lv))
+    return out
+
+
+def versus_extra():
+    out = []
+    # Dragon Fist steered (head up then down) and released early; Energy Sword steered toward the enemy
+    out.append(vs(41, 'skill5_steer', [['', 5], ['B', 30], ['B+UP', 20], ['B+DOWN', 30], ['', 60]], at=(40, 0), skills=[5, 7]))
+    out.append(vs(39, 'skill9_walk', [['', 5], ['B', 90], ['', 10], ['RIGHT', 40], ['', 120]], at=(40, 0), skills=[9, 7]))
+    # Instant Transmission onto the enemy, Lv1 / Lv3
+    out.append(vs(2, 'skill14_lv3', [['', 5], ['B', 1], ['', 60], ['A', 1], ['', 200]], at=(64, 0), skills=[14, 7], skill_level=2))
+    # Big Bang: short charge (fizzle) and a full charge into the enemy at 120 px
+    out.append(vs(26, 'skill2_tap', [['', 5], ['B', 8], ['', 80]], at=(64, 0), skills=[2, 7]))
+    out.append(vs(26, 'skill2_far', [['', 5], ['B', 200], ['', 260]], at=(120, 0), skills=[2, 7], skill_level=2))
+    # Masenko Lv3 aimed with the d-pad
+    out.append(vs(10, 'skill17_aim', [['', 5], ['B', 20], ['B+RIGHT', 30], ['', 80]], at=(80, 0), skills=[17, 7], skill_level=2))
+    return out
+
+
 def all_scenarios():
     out = []
     for f in FORMS:
         out += generic(f)
         out += skills(f)
+    for f in VS_FORMS:
+        out += versus(f)
+    out += versus_extra()
+    out += reactions()
     return out + extra()
 
 

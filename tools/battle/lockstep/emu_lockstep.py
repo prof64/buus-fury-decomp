@@ -82,7 +82,19 @@ STATE_NAMES = {
     0x0804DFC0: 'skill18r',   # Saiyaman: back to form 10
 }
 # map per scenario: world, map (the simulator arena with the same map)
-MAPS = {'htc': (6, 9), 'crater': (8, 71)}
+MAPS = {'htc': (6, 9), 'crater': (8, 71), 'forest': (8, 3)}
+# enemy scenarios: the Southwest Forest (8-3) spawns 4 Majin Fighters (type 0x44) from these ROM records (spawn record
+# +8 type, +0xC / +0xE position = footprint top-left); the first is patched to the scenario's enemy, the others are
+# moved to (0x7000, 0x7000) where they stand idle (no RNG draws, off every grid the player touches)
+FOREST_RECORDS = [0x0807ACBC, 0x0807ACDC, 0x0807ACFC, 0x0807AD1C]
+MAJIN_AGGRO = 0x087043F8 + 0xC  # Majin Fighter state 0x14B IfPlayerWithin2 r2 (10000 = 100 px), signed compare dist2 <= r2: -1 = never aggro
+# target dummy: state 0x14B's on-hit (aux) tree (state table 0x0870F514: [root, aux] per state) -> the ApplyDamage node
+# 0x086FDA00 alone: hits only take HP (no reaction state, no knockback, no AI change, no animation change)
+STATE_TABLE = 0x0870F514
+APPLY_DAMAGE_NODE = 0x086FDA00
+ENEMY_LIST = 0x03001BB0
+FRAME_COUNTER = 0x03000F94  # +1 per game logic frame (not on lag frames)
+COMPUTE_DAMAGE_RET = 0x0800EABE  # ComputeDamage: r0 = final damage (1/1024 HP), r4 = hit struct, r6 = target
 
 
 def keymask(s):
@@ -147,17 +159,74 @@ def setup(scn):
         for i in range(len(sk)):
             e.w8(rec + 0x2E + 2 * i, scn.get('skill_level', 0))
             e.w8(rec + 0x2F + 2 * i, scn.get('skill_level', 0))
-    wm = MAPS[scn.get('arena', 'htc')]
-    ok = warp(e, wm[0], wm[1], 104, 152, frames=240)
+    x, y = scn.get('pos', [160, 150])
+    en = scn.get('enemy')
+    if en:
+        setup_enemy_records(e, en, x, y)
+    wm = MAPS[scn.get('arena', 'forest' if en else 'htc')]
+    ok = warp(e, wm[0], wm[1], x if en else 104, y if en else 152, frames=240)
     assert ok, 'warp failed'
     p = e.r32(PLAYER)
-    x, y = scn.get('pos', [160, 150])
     e.w32(p + 0x1A0, x << 8)
     e.w32(p + 0x1A4, y << 8)
     e.w8(p + 0x10, scn.get('dir', 0))
+    if en:
+        o = tracked_enemy(e)
+        assert o, 'enemy did not spawn'
+        if 'hp' in en:
+            e.w32(o + 0x28C, en['hp'] << 10)
+        if 'dir' in en:
+            e.w8(o + 0x10, en['dir'])
     e.set_keys(0)
     e.run(scn.get('settle', 30))
+    if en and en.get('dummy', True) is False:
+        # a real enemy waited far away (its initial AI state, nothing near to react to): placed now, at frame 0
+        o = tracked_enemy(e)
+        dx, dy = en.get('at', [40, 0])
+        e.w32(o + 0x1A0, (x + dx) << 8)
+        e.w32(o + 0x1A4, (y + dy) << 8)
     return e
+
+
+def setup_enemy_records(e, en, px, py):
+    """patch the forest's spawn records (ROM) before the warp: enemy `type` at the player's position + `at`"""
+    t = en.get('type', 0x44)
+    if not en.get('aggro', False):
+        e.w32(MAJIN_AGGRO, 0xFFFFFFFF)
+    if en.get('dummy', True):
+        e.w32(STATE_TABLE + 8 * 0x14B + 4, APPLY_DAMAGE_NODE)
+    tgt = FOREST_RECORDS[0]
+    if t != 0x44:
+        from forcespawn import own_record
+        src = own_record(t)
+        if src is not None:
+            for off in (0x10, 0x14, 0x18, 0x1C):
+                e.w32(tgt + off, u32(src + off))
+        e.w32(tgt + 8, t)
+    dx, dy = en.get('at', [40, 0])
+    # a real enemy spawns far away (FAR) and is placed at frame 0; the dummy spawns in place
+    far = en.get('dummy', True) is False
+    e.w16(tgt + 0xC, FAR if far else px + dx)
+    e.w16(tgt + 0xE, FAR if far else py + dy)
+    for r in FOREST_RECORDS[1:]:
+        e.w16(r + 0xC, 0x7000)
+        e.w16(r + 0xE, 0x7000)
+
+
+def enemy_objs(e):
+    n = e.r32(ENEMY_LIST)
+    return [e.r32(ENEMY_LIST + 4 + 4 * i) for i in range(min(n, 64))]
+
+
+FAR = 0x6800  # where a real enemy waits before frame 0 (the others are parked at 0x7000)
+
+
+def tracked_enemy(e):
+    """the scenario's enemy: the first one not parked at 0x7000"""
+    for o in enemy_objs(e):
+        if (e.r32(o + 0x1A0) >> 8) < 0x6C00:
+            return o
+    return 0
 
 
 def snapshot(e):
@@ -182,6 +251,15 @@ def row(e):
         'ep': struct.unpack('<h', struct.pack('<H', e.r16(rec + 0x1A)))[0],
         'rng': e.r32(RNG),
     }
+
+
+def erow(e, o):
+    """the scenario's enemy: footprint position 24.8, facing, HP << 10"""
+    return {'x': s32v(e.r32(o + 0x1A0)), 'y': s32v(e.r32(o + 0x1A4)), 'dir': e.r8(o + 0x10), 'hp': e.r32(o + 0x28C)}
+
+
+def s32v(v):
+    return v - (1 << 32) if v & 0x80000000 else v
 
 
 def write_hit(e, hit):
@@ -210,9 +288,13 @@ def write_hit(e, hit):
 
 
 class SoundLog:
-    def __init__(self, e):
+    """sound driver calls, plus (dmg=True) every ComputeDamage result: ['dmg', target, damage] with target 0 = the
+    player, 1 = the scenario's enemy, -1 = another object"""
+    def __init__(self, e, dmg=False, enemy=0):
         self.e = e
-        self.ids = [e.breakpoint(a) for a in (PLAY_SFX, STOP_SFX, STOP_ALL, STOP_MATCH, PLAY_SONG)]
+        self.enemy = enemy
+        addrs = (PLAY_SFX, STOP_SFX, STOP_ALL, STOP_MATCH, PLAY_SONG) + ((COMPUTE_DAMAGE_RET,) if dmg else ())
+        self.ids = [e.breakpoint(a) for a in addrs]
 
     def collect(self):
         out = []
@@ -221,7 +303,10 @@ class SoundLog:
                 continue
             a = h['addr'] & ~1
             r = h['regs']
-            if a == PLAY_SFX:
+            if a == COMPUTE_DAMAGE_RET:
+                tgt = 0 if r[6] == self.e.r32(PLAYER) else 1 if r[6] == self.enemy else -1
+                out.append(['dmg', tgt, r[0]])
+            elif a == PLAY_SFX:
                 out.append(['play', (r[1] - SFX_TABLE) // 12, r[2] & 0xFF])
             elif a == STOP_SFX:
                 out.append(['stop', (r[1] - SFX_TABLE) // 12])
@@ -253,7 +338,19 @@ def record(scn):
                    'resist': [e.r8(p + 0x1B8), e.r8(p + 0x1B9)], 'foot': [e.r8(p + 0x19C), e.r8(p + 0x19D)],
                    'regen': e.r32(ctl + 0xC), 'ssacc': e.r32(ctl + 0x14), 'cooldown': e.r32(rec + 4),
                    'idlecnt': e.r32(0x03002B48),  # the idle state's frame counter (1024 -> bored animation)
-                   'camera': [e.r32(e.r32(0x080707E8)), e.r32(e.r32(0x080707E8) + 4)]}  # 22.10 camera (0x080077EC)
+                   'camera': [e.r32(e.r32(0x080707E8)), e.r32(e.r32(0x080707E8) + 4)],  # 22.10 camera (0x080077EC)
+                   # +0x1CC hittable (the cutscene fusions keep the 0 of the area entry), ctl+0x10 the fusion countdown
+                   'hittable': e.r8(p + 0x1CC), 'ctl10': e.r32(ctl + 0x10)}
+    # fusions: the cutscene variants (controller 0x03001B64) split into the partner's record after their countdown
+    ci = e.r8(GD)
+    partner = {5: 3, 7: 0}.get(ci)
+    if partner is not None:
+        r2 = REC0 + 0x68 * partner
+        init['partner'] = {
+            'char': partner, 'form': e.r8(r2 + 0x14), 'hp': e.r16(r2 + 0x16), 'maxHp': e.r16(r2 + 0x18), 'ep': e.r16(r2 + 0x1A),
+            'maxEp': e.r16(r2 + 0x1C), 'base': [e.r8(r2 + 0x28 + i) for i in range(4)], 'skills': [e.r8(r2 + 0x0D + i) for i in range(e.r8(r2 + 0x0C))],
+            'slot': e.r8(r2 + 0x15), 'levels': [e.r8(r2 + 0x2E + 2 * i) for i in range(e.r8(r2 + 0x0C))], 'ssGauge': e.r16(r2 + 0x1E),
+            'ss3Gauge': e.r16(r2 + 0x20), 'equip': [e.r32(r2 + 0x3C + 4 * i) for i in range(4)], 'cooldown': e.r32(r2 + 4)}
     # the HUD's low-HP beep timestamp (HUD object +0x10 vs the frame counter 0x03000F94; 0x0800BA4A): peek one frame
     st = e.save()
     bp = e.breakpoint(0x0800BA06)
@@ -263,7 +360,15 @@ def record(scn):
     e.load(st)
     if hud:
         init['obj']['beepAge'] = (e.r32(0x03000F94) - e.r32(hud[0] + 0x10)) & 0xFFFFFFFF
-    snd = SoundLog(e)
+    eo = tracked_enemy(e) if scn.get('enemy') else 0
+    if eo:
+        init['enemy'] = erow(e, eo)
+        fc = e.r32(FRAME_COUNTER)
+        init['enemy'].update({'type': (e.r32(eo + 0x224) - 0x08711274) // 28, 'foot': [e.r8(eo + 0x19C), e.r8(eo + 0x19D)],
+                              # animation (raw / frame / tick) and the frame stamps +0x1E8 / +0x1EC as ages
+                              'raw': anim_raw(e, eo), 'frame': e.r8(eo + 0x11), 'tick': e.r16(eo + 0x12),
+                              'mark1Age': (fc - e.r32(eo + 0x1E8)) & 0xFFFFFFFF, 'mark2Age': (fc - e.r32(eo + 0x1EC)) & 0xFFFFFFFF})
+    snd = SoundLog(e, dmg=bool(eo), enemy=eo)
     hits = {h['at']: h for h in scn.get('hits', [])}
     frames = []
     inputs = [[keymask(k), n] for k, n in scn['input']]
@@ -272,15 +377,21 @@ def record(scn):
         for _ in range(n):
             f += 1
             e.set_keys(keys)
+            fc = e.r32(FRAME_COUNTER)
             if f in hits:
                 write_hit(e, hits[f])
                 call(e, PLAYER_MSG, (e.r32(PLAYER), 0, MSG, 0))
             else:
                 e.run(1)
             r = row(e)
+            # a lag frame: the game logic did not run (the frame counter did not advance)
+            if e.r32(FRAME_COUNTER) == fc and f not in hits:
+                r['lag'] = True
             s = snd.collect()
             if s:
                 r['sfx'] = s
+            if eo:
+                r['enemy'] = erow(e, eo)
             frames.append(r)
     e.set_keys(0)
     return {'name': scn['name'], 'scenario': scn, 'input': inputs, 'init': init, 'frames': frames}

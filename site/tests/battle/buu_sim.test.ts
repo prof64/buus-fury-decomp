@@ -8,8 +8,8 @@ import type { Enemy } from '../../src/battle/rulesets/buu/enemy'
 
 /** place enemy 0 so that its body centre is `dx`,`dy` px from the player's body centre */
 function place(s: BuuSim, dx: number, dy = 0, e: Enemy = s.enemies[0]) {
-  const [pcx, pcy] = s.player.center()
-  const [ecx, ecy] = e.center()
+  const [pcx, pcy] = s.player.footCenter()
+  const [ecx, ecy] = e.footCenter()
   e.x += (pcx + dx - ecx) << 8
   e.y += (pcy + dy - ecy) << 8
 }
@@ -59,8 +59,9 @@ describe('player', () => {
     }
     expect(hurtAt).toBeGreaterThan(0)
     expect(s.player.stats.resM).toBe(0)
-    // the hit frame counts (the hurt state ticks in it: emulator lockstep f02_hurt, hurt at frame 10, idle at 33)
-    s.run(22)
+    // the player updates before the enemies (object list order), so the punch lands after the player's update and the
+    // hurt state ticks from the next frame: 24 frames (emulator lockstep f02_vs_punch: hit at frame 140, idle at 164)
+    s.run(23)
     expect(s.player.state).toBe('hurt')
     s.run(1)
     expect(s.player.state).toBe('idle')

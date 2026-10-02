@@ -23,7 +23,8 @@ SCRIPTS = 0x0879B704
 DEPTH = 0x03001034
 PARAMS = 0x03001030
 GLOBALS = 0x03001058
-HOOKS = (RUNNER, ENTER, FETCH, END)
+SCENE_RUN, SCENE_STEP = 0x08012588, 0x08012538   # run_scene(header, params); tick: r1 = header[state], r4 = scene
+HOOKS = (RUNNER, ENTER, FETCH, END, SCENE_RUN, SCENE_STEP)
 NATIVE_OPS = {0x02, 0x03, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A}
 OPNAME = {0x02: 'native', 0x03: 'set', 0x15: 'inc', 0x16: 'preinc', 0x17: 'postinc', 0x18: 'dec',
           0x19: 'predec', 0x1A: 'postdec'}
@@ -117,6 +118,25 @@ class Tracer:
                     ev['loops'] = lp
                 self.events.append(ev)
                 self.pending[it] = ev
+        elif pc == SCENE_RUN:
+            hdr = e.reg(0)
+            self.events.append({'ev': 'scene', 'frame': fr, 'header': hex(hdr), 'scene': header_index().get(hdr),
+                                'lr': hex(e.reg(14)), 'params': hex(e.reg(1)),
+                                'P': [s32v(e.r32(e.reg(1) + 4 * i)) for i in range(4)] if e.reg(1) else None})
+        elif pc == SCENE_STEP:
+            sc, w = e.reg(4), e.reg(1)
+            hdr = e.r32(sc)
+            ev = {'ev': 'step', 'frame': fr, 'scene_obj': hex(sc), 'header': hex(hdr),
+                  'scene': header_index().get(hdr), 'state': e.r16(sc + 8), 'entry': hex(w)}
+            if w >= 0x10000:
+                ev['kind'] = e.r8(w + 2)
+                ev['next'] = e.r16(w)
+                ev['arg'] = e.r8(w + 3)
+                if ev['kind'] in (5, 6):
+                    ev['text_ref'] = hex(e.r32(w + 4))
+            else:
+                ev['exit'] = w
+            self.events.append(ev)
         elif pc == END:
             it = e.reg(4)
             self.finish(it)
@@ -171,6 +191,40 @@ class Tracer:
         p = out / f'{name}.json'
         p.write_text(json.dumps(doc, indent=0))
         return p
+
+
+def traced_call(tr, func, r=(0, 0, 0, 0), keyfn=lambda f: 0, max_frames=6000):
+    """emutools.call, but the injected frame (and, if the callee blocks in a nested main loop, every following
+    frame until it returns) is traced. The stub / hook stay installed until the mailbox reports the return.
+    Returns (r0, frames)."""
+    from emutools import STUB, ARGS, HOOK_SITE, HOOK_TARGET, MAILBOX, _bl
+    e = tr.e
+    blob = (ROOT / 'work' / 'buu' / 'stub.bin').read_bytes()
+    for i in range(0, len(blob), 2):
+        e.w16(STUB + i, blob[i] | (blob[i + 1] << 8))
+    vals = list(r) + [0, 0, 0, 0] + [func | 1, HOOK_TARGET | 1]
+    for i, v in enumerate(vals):
+        e.w32(ARGS + 4 * i, v)
+    hi, lo = _bl(HOOK_SITE, STUB)
+    o1, o2 = e.r16(HOOK_SITE), e.r16(HOOK_SITE + 2)
+    e.w32(MAILBOX, 0xDEADBEEF)
+    e.w16(HOOK_SITE, hi); e.w16(HOOK_SITE + 2, lo)
+    n = 0
+    restored = False
+    while n < max_frames:
+        e.set_keys(keyfn(n))
+        tr.step_frame()
+        tr.vm_frames += 1
+        n += 1
+        if not restored:
+            # the hook fired once the frame ran; restore the call site so nested main loops do not re-enter
+            e.w16(HOOK_SITE, o1); e.w16(HOOK_SITE + 2, o2)
+            restored = True
+        if e.r32(MAILBOX) != 0xDEADBEEF:
+            break
+    for i in range(0, len(blob), 2):
+        e.w16(STUB + i, u16(STUB + i))
+    return e.r32(MAILBOX), n
 
 
 if __name__ == '__main__':

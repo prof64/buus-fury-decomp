@@ -1,6 +1,6 @@
 // Player skills vs the emulator measurement runs (data/buu/attacks_detail.json skills[].measured: Goku form 2,
-// maxEP 999, a Majin Fighter pinned 40 / 100 px in front, B held 3 / 60 / 150 frames). The skill state machines
-// are fitted to these runs, so this checks first-hit frames, multipliers / attack types and hit counts.
+// maxEP 999, a Majin Fighter pinned 40 / 100 px in front, B held 3 / 60 / 150 frames): first-hit frames,
+// multipliers / attack types and hit counts of the skills not yet covered by the enemy lockstep scenarios.
 import { describe, expect, it } from 'vitest'
 import attacks from '../../../data/buu/attacks_detail.json'
 import { fighter, makeBuuSim } from './buu_harness'
@@ -56,10 +56,14 @@ function run(skill: number, level: number, hold: number, dist: number) {
 const SKILLS = (attacks.skills as { id: number; name: string; measured?: { level: number; trials: Trial[] }[] }[]).filter((s) => s.measured)
 // skills whose behaviour is not measurable this way (no hits recorded / teleport / ghosts / transform)
 const SKIP = new Set([12, 13, 14, 18, 19, 20, 21, 22])
+// skills whose attack objects are ported from the game's code and verified frame by frame against the emulator
+// with a target dummy (lockstep *_vs_skill*, tests/battle/buu_lockstep.test.ts): these older measured runs (a
+// pinned Majin Fighter reacting with its own on-hit states, video frames incl. lag frames) no longer drive them
+const LOCKSTEPPED = new Set([1, 2, 3, 5, 6, 8, 9, 10, 11, 15, 16, 17, 23])
 
 describe('player skills vs emulator measurements', () => {
   for (const sk of SKILLS) {
-    if (SKIP.has(sk.id)) continue
+    if (SKIP.has(sk.id) || LOCKSTEPPED.has(sk.id)) continue
     for (const m of sk.measured!) {
       for (const t of m.trials) {
         if (t.hits === 0 && t.hold > 3) continue

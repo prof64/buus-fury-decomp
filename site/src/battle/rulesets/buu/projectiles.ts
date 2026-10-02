@@ -6,13 +6,14 @@
 
 import { DIR_VEC, overlaps, type Dir, type Rect } from '../../core/geom'
 import type { Renderer } from '../../core/renderer'
+import { BTN } from '../../core/input'
 import type { Entity, World } from '../../core/world'
 import { broadcast, type Actor, type HitMsg, type Receiver } from './actor'
 import type { BuuCtx } from './context'
 import { ATK, type AttackType } from './damage'
 import { audioEvent } from '../../audio/bus'
-import { Debris, type BeamGfx, drawRec, drawRecAddr, FxAnim } from './fx'
-import { drawFinalFlash, drawRecAdd, GHOST_SLOTS } from './skillfx'
+import { Debris, type BeamGfx, drawRec, drawRecAddr, FxAnim, recGeomAt } from './fx'
+import { drawFinalFlash, drawRecAdd, drawVolleyPieces, GHOST_SLOTS } from './skillfx'
 
 export type Team = 0 | 1 | 2
 
@@ -434,6 +435,138 @@ export class GrowBeam extends Shot {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
+/** the player's beam (class 0x080206B8, vtable 0x0804AEF8, update 0x0802084C, stop 0x0802082A, destructor 0x08020768):
+ *  Kamehameha 15 / Kamekameha 16 / Electric Kamehameha 6 / Banshee 1 / Big Bang Kamehameha 3. The object sits at the
+ *  fire position (player + BEAM_POS[..].fire), length 8 from the construction. Each firing tick: head = position +
+ *  dir * len, head box = head +- 8; a projectile wall under the head box -> stopped, no head message; else the head
+ *  message (every object, the level's mult / attack sub, dir = facing): accepted -> the hit effect (below) and the
+ *  head stays (stopped); not accepted -> len += 3 if the head box strictly overlaps the camera rect. Then always the
+ *  body message: the box from the position to the head expanded by 6 (result ignored), so a target touching both
+ *  takes two hits per tick. Released (state 2): the position moves 3 px per tick along the facing and len -= 3, no
+ *  hits; removed once len < 0 (destructor: stop 32 + sound 33). Hit effect (head hits only): when now - next > 0,
+ *  next = now + 3 + rand(5), sound 48 + rand(2) and an explosion at head + 4 * dir + (rand(32) - 16, rand(32) - 16),
+ *  rate 0x1000 + rand(0x4000); `next` starts at the construction (the skill press). Verified frame by frame against the
+ *  emulator (tools/battle/LOCKSTEP.md, *_vs_skill15 / 16 / 6 / 1 / 3). */
+export class KameBeam extends Shot {
+  len = 8
+  done = false
+  atk: AttackType
+  mult: number
+  color: [string, string]
+  gfx: BeamGfx | null
+  /** obj+0x18: tick counter that selects the piece variants (phase = vt >> 2) */
+  vt = 0
+  /** obj+0x11: the head was stopped by an accepted hit or a wall -> impact piece */
+  stopped = false
+  /** obj+0x14: frame of the next hit effect */
+  next: number
+  constructor(ctx: BuuCtx, owner: Actor, dir: Dir, x: number, y: number, built: number, o: { atk: AttackType; mult: number; color: [string, string]; gfx: BeamGfx | null }) {
+    super(ctx, owner, dir, 1, x << 8, y << 8)
+    this.atk = o.atk
+    this.mult = o.mult
+    this.color = o.color
+    this.gfx = o.gfx
+    this.next = built
+    this.kind = 'beam'
+  }
+  head(): [number, number] {
+    const [dx, dy] = DIR_VEC[this.dir]
+    return [this.px + dx * this.len, this.py + dy * this.len]
+  }
+  headRect(): Rect {
+    const [hx, hy] = this.head()
+    return { x0: hx - 8, y0: hy - 8, x1: hx + 8, y1: hy + 8 }
+  }
+  /** the body box: position .. head, expanded by 6 */
+  rect(): Rect {
+    const [hx, hy] = this.head()
+    return { x0: Math.min(this.px, hx) - 6, y0: Math.min(this.py, hy) - 6, x1: Math.max(this.px, hx) + 6, y1: Math.max(this.py, hy) + 6 }
+  }
+  update(w: World) {
+    this.t++
+    this.vt++
+    const [dx, dy] = DIR_VEC[this.dir]
+    if (this.done) {
+      this.x += dx * 3 * 256
+      this.y += dy * 3 * 256
+      this.len -= 3
+      if (this.len < 0) this.removed = true
+      return
+    }
+    const hr = this.headRect()
+    if (this.inWall(w, hr)) this.stopped = true
+    else if (this.hit(w, hr, this.atk, this.mult, false)) {
+      this.stopped = true
+      this.hitFx(w)
+    } else if (overlaps(hr, w.camera)) this.len += 3
+    this.hit(w, this.rect(), this.atk, this.mult, false)
+  }
+  private hitFx(w: World) {
+    if (w.frame - this.next <= 0) return
+    this.next = w.frame + 3 + w.rng.rand(5, 'beam hit fx delay')
+    audioEvent('sfx', { id: 48 + w.rng.rand(2, 'beam hit sfx'), vol: 64 })
+    const [hx, hy] = this.head()
+    const [dx, dy] = DIR_VEC[this.dir]
+    const ex = hx + dx * 4 + w.rng.rand(32, 'beam hit fx x') - 16
+    const ey = hy + dy * 4 + w.rng.rand(32, 'beam hit fx y') - 16
+    this.ctx.explosion(w, ex, ey, 0x1000 + w.rng.rand(0x4000, 'beam hit fx rate'))
+  }
+  stop() {
+    this.done = true
+  }
+  draw(r: Renderer) {
+    if (this.gfx) this.gfx.draw(r, this.dir, this.px, this.py, this.len, this.vt, !this.done, this.stopped)
+  }
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+/** Ultra Volleyball Attack wave (Gotenks skill 23, update 0x080384C2): origin at the player + VOLLEY_POS (the spawn
+ *  tick), length 8. Each tick (state 0): box = origin .. origin + dir * len, expanded by 2; a projectile wall under it
+ *  -> state 1, else one message to every object (x1.0, attack sub 16 = power 0, dir = facing): accepted -> state 1;
+ *  not accepted -> len += 4 up to 48, then the origin moves 4 px per tick; after 240 ticks -> state 1. State 1: the
+ *  origin moves 4 px and len -= 4 per tick, removed at len <= 0. Lockstep f31_vs_skill23. */
+export class VolleyWave extends Shot {
+  len = 8
+  done = false
+  n = 0
+  constructor(ctx: BuuCtx, owner: Actor, dir: Dir, x: number, y: number) {
+    super(ctx, owner, dir, 1, x << 8, y << 8)
+    this.kind = 'volley'
+  }
+  rect(): Rect {
+    const [dx, dy] = DIR_VEC[this.dir]
+    const hx = this.px + dx * this.len
+    const hy = this.py + dy * this.len
+    return { x0: Math.min(this.px, hx) - 2, y0: Math.min(this.py, hy) - 2, x1: Math.max(this.px, hx) + 2, y1: Math.max(this.py, hy) + 2 }
+  }
+  update(w: World) {
+    this.t++
+    const [dx, dy] = DIR_VEC[this.dir]
+    if (this.done) {
+      this.x += dx * 4 * 256
+      this.y += dy * 4 * 256
+      this.len -= 4
+      if (this.len <= 0) this.removed = true
+      return
+    }
+    const r = this.rect()
+    if (this.inWall(w, r) || this.hit(w, r, ATK[16], 0x400, false)) {
+      this.done = true
+      return
+    }
+    if (this.len < 0x30) this.len += 4
+    else {
+      this.x += dx * 4 * 256
+      this.y += dy * 4 * 256
+    }
+    if (++this.n > 0xf0) this.done = true
+  }
+  draw(r: Renderer) {
+    drawVolleyPieces(r, this.ctx.data.sprites, this.dir, this.px, this.py, this.len)
+  }
+}
+
+// ---------------------------------------------------------------------------------------------------------------
 /** instant beam (class 0x08036FA2, Majin Vegeta / Yakon; player Final Flash): 24 px wide, extends from the origin
  *  to the wall in 8 px steps, one hit per frame while the target overlaps. */
 export class FullBeam extends Shot {
@@ -451,8 +584,13 @@ export class FullBeam extends Shot {
   scale = 0
   private ending = false
   private vis: [number, number] | null = null
-  constructor(ctx: BuuCtx, owner: Actor, dir: Dir, team: Team, x: number, y: number, o: { atk: AttackType; mult: number; life: number; width?: number; color?: [string, string]; table?: number; visPos?: [number, number][]; hits?: [number, number] }) {
+  constructor(ctx: BuuCtx, owner: Actor, dir: Dir, team: Team, x: number, y: number, o: { atk: AttackType; mult: number; life: number; width?: number; color?: [string, string]; table?: number; visPos?: [number, number][]; hits?: [number, number]; game?: { built: number } }) {
     super(ctx, owner, dir, team, x << 8, y << 8)
+    if (o.game) {
+      this.game = true
+      this.next = o.game.built
+      this.scale = 0x20
+    }
     this.atk = o.atk
     this.mult = o.mult
     this.life = o.life
@@ -472,8 +610,47 @@ export class FullBeam extends Shot {
     if (dx) return { x0: Math.min(this.px, x1), y0: this.py - h, x1: Math.max(this.px, x1), y1: this.py + h }
     return { x0: this.px - h, y0: Math.min(this.py, y1), x1: this.px + h, y1: Math.max(this.py, y1) }
   }
+  /** the player's Final Flash (the game's update 0x0803710C): length from the constructor's wall probe (square
+   *  position +- 12, len 8, + 8 per free square), scale +0x20 per tick to 0x100, half width 8 * scale >> 8, one message
+   *  per tick to every object; an accepted one when now - next > 0: next = now + 3 + rand(5), sound 48 + rand(2).
+   *  Released: no hits, scale -0x20 per tick, removed after 8 ticks (destructor: stop 32) */
+  game = false
+  next = 0
+  private endT = 0
+  private gameUpdate(w: World) {
+    if (this.t === 1) {
+      const [dx, dy] = DIR_VEC[this.dir]
+      let L = 8
+      for (let k = 0; k < 256; k++) {
+        const cx = this.px + dx * 8 * k
+        const cy = this.py + dy * 8 * k
+        if (this.inWall(w, { x0: cx - 12, y0: cy - 12, x1: cx + 12, y1: cy + 12 })) break
+        L += 8
+      }
+      this.len = L
+      const o = this.visPos?.[this.dir]
+      this.vis = o ? [this.owner.px + o[0], this.owner.py + o[1]] : [this.px, this.py]
+    }
+    if (this.ending || this.t > this.life) {
+      this.ending = true
+      this.scale = Math.max(0, this.scale - 0x20)
+      if (++this.endT >= 8) this.removed = true
+      return
+    }
+    if (this.scale < 0x100) this.scale += 0x20
+    const hw = (8 * this.scale) >> 8
+    const [dx, dy] = DIR_VEC[this.dir]
+    const ex = this.px + dx * this.len
+    const ey = this.py + dy * this.len
+    const r = { x0: Math.min(this.px, ex) - hw, y0: Math.min(this.py, ey) - hw, x1: Math.max(this.px, ex) + hw, y1: Math.max(this.py, ey) + hw }
+    if (this.hit(w, r, this.atk, this.mult, false) && w.frame - this.next > 0) {
+      this.next = w.frame + 3 + w.rng.rand(5, 'final flash hit delay')
+      audioEvent('sfx', { id: 48 + w.rng.rand(2, 'final flash hit sfx'), vol: 64 })
+    }
+  }
   update(w: World) {
     this.t++
+    if (this.game) return this.gameUpdate(w)
     // 8 px steps until the next step is a projectile-wall tile
     if (this.t === 1) {
       this.len = this.wallDist(w, this.px, this.py, 8, 400)
@@ -546,59 +723,70 @@ export class AreaHit extends Shot {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-/** Big Bang ball (0x08037480): grows while B is held; released after >= 60 frames it moves 0.58 px/frame and
- *  explodes on contact (17-24 hits measured). Multiplier from the charged EP (fitted: mult = EP*0.284, INFERRED).
- *  Graphics (update 0x08037650): ball definition 0x0876ACC0 + 16 * level = {lo, hi, record table, -}; record
- *  table + dir*120 + 12*f where f (obj+0x58) follows the tick counter u (obj+0x54): while charging u++, f =
- *  (u >> 3) + ((u >> 1) & 1) for u < 16, at u = 16 u jumps to 96 and f = (u >> 5) + ((u >> 3) & 1); once f >= lo it is
- *  lo (lo = hi) or lo + ((u >> 2) mod (hi - lo)) (Lv3 cycles 7..9, also in flight). On contact or a wall it explodes
- *  (0x0803756E): one area hit, then 60 ticks during which every 8th tick spawns a damaging explosion 0x0801952C at a
- *  random point of the box centre +- size*3/2 (sizes 0x0876AD04 by f). */
+/** Big Bang ball (class 0x08037480, vtable 0x0804A26C, update 0x08037650, launch 0x080378A0, explode 0x0803756E,
+ *  destructor 0x0803750E, handler 0x080378F4). Charging at the player + BIGBANG_POS; graphics: ball definition
+ *  0x0876ACC0 + 16 * level = {lo, hi, record table, -}; record table + dir*120 + 12*f where f (obj+0x58) follows the
+ *  tick counter u (obj+0x54): while charging u++, f = (u >> 3) + ((u >> 1) & 1) for u < 16, at u = 16 u jumps to 96 and
+ *  f = (u >> 5) + ((u >> 3) & 1); once f >= lo it is lo (lo = hi) or lo + ((u >> 2) mod (hi - lo)). Launched (state 1):
+ *  per tick the frame update, a move of 0.5 px along the facing, u++; removed once its record box (the hit box,
+ *  per direction) has left the camera rect on the far side (destructor: stop 32); on every tick with (u & 3) == 0 one
+ *  message to every object: record-box centre +- BB_SIZE[f], mult (charge * 0x5762 + 0xFFFF) >> 16, attack sub 13
+ *  (accepted: sound 48 + rand(2)) - the ball flies on through the target. It explodes only at a projectile wall (the
+ *  centre +- 4) or on an Energy Blast message overlapping its box and the centre +- size * 3/4: stop 32, one message
+ *  centre +- 3 * size / 2 with mult 81 * charge, sound 23, then 60 ticks of harmless explosions (BigBangBoom). */
 const BB_DEF: [number, number, number][] = [[4, 4, 0x08764e00], [6, 6, 0x08764e00], [7, 10, 0x0876aae0]]
 const BB_SIZE = [4, 6, 8, 12, 16, 24, 28, 32, 32, 32]
-/** record boxes (ox, oy, w, h) by f (identical for every direction) */
+/** record boxes (ox, oy, w, h) by f facing down (fallback when the record geometry is not loaded) */
 const BB_REC: [number, number, number, number][] = [[8, 4, 16, 16], [8, 2, 16, 16], [8, 0, 16, 16], [16, 4, 32, 32], [16, 0, 32, 32], [32, 8, 64, 64], [32, 4, 64, 64], [32, 0, 64, 64], [32, 0, 64, 64], [32, 0, 64, 64]]
-/** ball position relative to the player position while charging, per facing (re/buu/fx_objpos.py) */
+/** ball position relative to the player position while charging, per facing (0x0871DD9C) */
 export const BIGBANG_POS: [number, number][] = [[2, 2], [12, -22], [-5, -6], [21, -6]]
 
 export class BigBangBall extends Shot {
   charge256 = 0
-  /** extra radius from holding past 60 frames (fitted to the hold-150 runs: +0 / +0.36 / +0.48 px per frame) */
-  grow = 0
   launched = false
-  boom = 0
   /** skill level 0..2 (ball definition) */
   lv: number
   /** obj+0x54 tick counter and obj+0x58 frame */
   u = 0
   f = 0
-  /** graphics position - hit position (the hits use the fitted muzzle, the graphics the game's ball position) */
-  visOff: [number, number] = [0, 0]
   constructor(ctx: BuuCtx, owner: Actor, dir: Dir, x: number, y: number, lv = 0) {
     super(ctx, owner, dir, 1, x, y)
     this.kind = 'bigbang'
     this.lv = Math.max(0, Math.min(2, lv))
   }
+  get charge() {
+    return this.charge256 >> 8
+  }
   get mult() {
-    return Math.max(1, Math.floor((this.charge256 * 73) / 65536))
+    return Math.floor((this.charge * 0x5762 + 0xffff) / 65536)
   }
-  get radius() {
-    return 9 + Math.min(44, Math.floor(this.grow))
+  private geom(): [number, number, number, number] {
+    const g = recGeomAt(this.ctx.data.sprites, BB_DEF[this.lv][2] + this.dir * 120 + 12 * this.f)
+    return g ? [g[0], g[1], g[2], g[3]] : BB_REC[this.f] ?? BB_REC[0]
   }
-  /** hit / contact box: the fitted radius (the record boxes BB_REC do not reproduce the measured contact frames at
-   *  100 px for Lv2 / Lv3) */
-  rect() {
-    const r = this.radius
-    return centered(this.px, this.py, r * 2, r * 2)
+  /** the record box */
+  rect(): Rect {
+    const [ox, oy, w, h] = this.geom()
+    return { x0: this.px - ox, y0: this.py - oy, x1: this.px - ox + w, y1: this.py - oy + h }
   }
   private cap() {
     const [lo, hi] = BB_DEF[this.lv]
     if (this.f >= lo) this.f = hi === lo ? lo : lo + ((this.u >> 2) % (hi - lo))
   }
-  /** centre of the current record box */
+  /** centre of the record box */
   center(): [number, number] {
-    const [ox, oy, w, h] = BB_REC[this.f] ?? BB_REC[0]
-    return [this.px - ox + (w >> 1), this.py - oy + (h >> 1)]
+    const r = this.rect()
+    return [(r.x0 + r.x1) >> 1, (r.y0 + r.y1) >> 1]
+  }
+  private around(s: number): Rect {
+    const [cx, cy] = this.center()
+    return { x0: cx - s, y0: cy - s, x1: cx + s, y1: cy + s }
+  }
+  /** past the camera edge on the side it flies to (0x08019B7C) */
+  private gone(w: World): boolean {
+    const r = this.rect()
+    const c = w.camera
+    return this.dir === 0 ? r.y0 >= c.y1 : this.dir === 1 ? r.y1 <= c.y0 : this.dir === 2 ? r.x1 <= c.x0 : r.x0 >= c.x1
   }
   update(w: World) {
     this.t++
@@ -613,35 +801,46 @@ export class BigBangBall extends Shot {
       return
     }
     this.cap()
-    this.u++
     const [dx, dy] = DIR_VEC[this.dir]
-    this.x += dx * 148
-    this.y += dy * 148
-    if (this.offCamera(w)) {
+    this.x += dx * 128
+    this.y += dy * 128
+    this.u++
+    if (this.gone(w)) {
       this.removed = true
+      audioEvent('sfx_stop', { id: 32 })
       return
     }
-    // probe: any enemy body overlapping -> explode; a projectile wall explodes it too (0x08037742)
-    const probe = this.ctx.liveEnemies().some((e) => e.hittable && overlaps(e.bodyBox(), this.rect()))
-    if (probe || this.inWall(w)) {
-      this.removed = true
-      const sz = (this.radius + 15) * 2
-      w.add(new AreaHit(this.ctx, this.owner, this.dir, 1, centered(this.px, this.py, sz, sz), { life: 110, every: 5, atk: ATK[13], mult: this.mult, color: ['#e0f8ff', '#40a0ff'] }))
-      // 0x0803756E: the explosions spread over the record box centre +- size * 3/2 (sizes by frame)
-      const [cx, cy] = this.center()
-      const s = (BB_SIZE[this.f] * 3) >> 1
-      w.add(new BigBangBoom(this.ctx, cx + this.visOff[0] - s, cy + this.visOff[1] - s, s))
+    if (this.inWall(w, this.around(4))) return this.explode(w)
+    if ((this.u & 3) === 0 && this.hit(w, this.around(BB_SIZE[this.f]), ATK[13], this.mult, false)) {
+      audioEvent('sfx', { id: 48 + w.rng.rand(2, 'big bang hit sfx'), vol: 64 })
     }
+  }
+  explode(w: World) {
+    if (this.removed) return
+    this.removed = true
+    audioEvent('sfx_stop', { id: 32 })
+    const s = (BB_SIZE[this.f] * 3) >> 1
+    this.hit(w, this.around(s), ATK[13], 81 * this.charge, false)
+    audioEvent('sfx', { id: 23, vol: 64 })
+    const [cx, cy] = this.center()
+    w.add(new BigBangBoom(this.ctx, cx - s, cy - s, s))
+  }
+  /** an Energy Blast message (attack sub 4, another object) overlapping the box and the centre +- size * 3/4 */
+  onMessage(w: World, msg: HitMsg): boolean {
+    if (!this.launched || this.removed || msg.atk.sub !== 4 || msg.source === this) return false
+    if (!overlaps(msg.rect, this.rect()) || !overlaps(msg.rect, this.around((BB_SIZE[this.f] * 3) >> 2))) return false
+    this.explode(w)
+    return true
   }
   draw(r: Renderer) {
     const [, , table] = BB_DEF[this.lv]
-    drawRecAddr(r, this.ctx.data.sprites, table + this.dir * 120 + 12 * this.f, this.px + this.visOff[0], this.py + this.visOff[1])
+    drawRecAddr(r, this.ctx.data.sprites, table + this.dir * 120 + 12 * this.f, this.px, this.py)
   }
 }
 
 /** Big Bang explosion phase (state 2 of 0x08037650): 60 ticks; when the countdown is a multiple of 8 (56 .. 8) an
  *  explosion 0x08712FDC (0x0801952C: rate 0x1000 + rand(0x1000), prio 0x38) appears at (x0 + rand(2s), y0 + rand(2s)).
- *  Visual only here (the sim's damage is the AreaHit above). */
+ *  Harmless (the damage is the ball's one explosion message). */
 export class BigBangBoom implements Entity {
   id = 0
   kind = 'bigbangboom'
@@ -675,13 +874,15 @@ export class BigBangBoom implements Entity {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-/** Masenko (skill 17). The game: a cursor object (ctor 0x08021594, record 0x0872509C) at the body-box centre +
- *  dir * dist and a ball object (class 0x08021280, shared with Super Buu's lobbed ball) charging at MASENKO_MUZZLE;
- *  on release the ball is launched (0x08021452) on a 43-tick arc (vy starts -0x200 and gains 0x20 per tick) and
- *  blasts once (atk sub 7). The game's cursor (Lv1/Lv2: +-2 px/tick bouncing between 16 and 70 / 100; Lv3 d-pad)
- *  does not reproduce the measured hits (only at 40 px, never at 100), so the sim keeps the fitted cursor (24 px,
- *  +0.5 px/frame while held, max 48) and the measured release -> hit delay (51 frames, lag included); the ball's
- *  visible arc (the game's shape) ends on the cursor over the last 43 ticks. */
+/** Masenko (skill 17): a cursor object (ctor 0x08021594, update 0x0802163A, record 0x0872509C) at the body-box centre
+ *  + dir * d and a ball object (class 0x08021280, update 0x0802133A) charging at MASENKO_MUZZLE, both from the press.
+ *  Cursor (updates before the player's control): d starts at 0; Lv1 / Lv2 d += step (+-2) per tick, step -2 once
+ *  d >= max (70 up / down, 100 left / right), +2 again when d < 16; Lv3 the d-pad toward the facing adds 2, away
+ *  subtracts 2, clamped to 16..max. The B release launches the ball (0x08021452; facing up 8 px higher first):
+ *  vx = dx * d * 0x5F4 >> 8, vy = (dy * d * 0x5F4 >> 8) - 0x200 (+0x20 per tick); a = 0x2000, b = 0x200, per tick
+ *  b -= 0x20, a += b: when a < 0 (the 43rd flight tick) one message to every object with the flight record's box at
+ *  that point (mult 3687 / 11060 / 16589, attack sub 7; accepted: sound 48 + rand(3)), then the blast records for
+ *  4 ticks each, no further damage. Lockstep *_vs_skill17*. */
 export const MASENKO_MUZZLE: [number, number][] = [[8, -24], [8, -24], [10, -24], [6, -24]]
 /** level definitions 0x0872A690 (12 bytes): sparkle record (fx_08721164 index), blast table, blast records, half size */
 const MASENKO_LV = [
@@ -689,11 +890,11 @@ const MASENKO_LV = [
   { spark: 9, blast: 0x0872a60c, n: 5, half: 16 },
   { spark: 12, blast: 0x0872a648, n: 6, half: 32 },
 ]
-const MASENKO_DELAY = 51
-const MASENKO_FLIGHT = 43
+const MASENKO_SPARK = 0x08721164
 
 export class MasenkoCursor extends Shot {
-  dist = 24
+  d = 0
+  step = 2
   released = -1
   mult: number
   lv: number
@@ -704,10 +905,13 @@ export class MasenkoCursor extends Shot {
     this.lv = Math.max(0, Math.min(2, lv))
     this.kind = 'masenko'
   }
+  get max() {
+    return this.dir < 2 ? 70 : 100
+  }
   pos(): [number, number] {
     const [cx, cy] = this.owner.center()
     const [dx, dy] = DIR_VEC[this.dir]
-    return [cx + dx * this.dist, cy + dy * this.dist]
+    return [cx + dx * this.d, cy + dy * this.d]
   }
   rect() {
     const [x, y] = this.pos()
@@ -719,24 +923,28 @@ export class MasenkoCursor extends Shot {
       const [mx, my] = MASENKO_MUZZLE[this.dir]
       this.ball = w.add(new MasenkoBall(this.ctx, this.owner, this.dir, this, (this.owner.px + mx) << 8, (this.owner.py + my) << 8))
     }
-    if (this.released < 0) {
-      this.dist = Math.min(48, this.dist + 0.5)
-      const [x, y] = this.pos()
-      this.x = x << 8
-      this.y = y << 8
-      return
+    if (this.released >= 0) return
+    if (this.lv < 2) {
+      this.d += this.step
+      if (this.d >= this.max) this.step = -2
+      else if (this.step < 0 && this.d < 16) this.step = 2
+    } else {
+      const toward = [BTN.DOWN, BTN.UP, BTN.LEFT, BTN.RIGHT][this.dir]
+      const away = [BTN.UP, BTN.DOWN, BTN.RIGHT, BTN.LEFT][this.dir]
+      if (w.input.held & toward) this.d += 2
+      else if (w.input.held & away) this.d -= 2
+      this.d = Math.max(16, Math.min(this.max, this.d))
     }
-    const since = this.t - this.released
-    if (since === MASENKO_DELAY - MASENKO_FLIGHT) this.ball?.launch(...this.pos())
-    if (since >= MASENKO_DELAY) {
-      this.removed = true
-      const [x, y] = this.pos()
-      this.ball?.blast(x, y)
-      w.add(new AreaHit(this.ctx, this.owner, this.dir, 1, centered(x, y, 32, 32), { life: 16, every: 100, atk: ATK[7], mult: this.mult, color: ['#fff8d0', '#ffe040'] }))
-    }
+    const [x, y] = this.pos()
+    this.x = x << 8
+    this.y = y << 8
   }
+  /** the B release: the ball flies (the cursor is gone) */
   release() {
-    if (this.released < 0) this.released = this.t
+    if (this.released >= 0) return
+    this.released = this.t
+    this.removed = true
+    this.ball?.launch(this.d)
   }
   draw(r: Renderer) {
     if (this.released >= 0) return
@@ -745,52 +953,53 @@ export class MasenkoCursor extends Shot {
   }
 }
 
-/** Masenko ball (class 0x08021280): charge sparkles fx_08721164 spark + k (k = (t >> 3) & 3, 3 -> 1), flight
- *  spark + 1 + ((t >> 3) & 1) on the game's arc (vy starts -0x200 and gains 0x20 per tick, 43 ticks; here from the
- *  muzzle to the target), then the blast records blast + (t >> 2), 4 ticks each. Visual only (hit: AreaHit). */
 export class MasenkoBall extends Shot {
   cursor: MasenkoCursor
   phase: 'charge' | 'fly' | 'blast' = 'charge'
-  /** flight: start, target (24.8) and tick */
-  from: [number, number] = [0, 0]
-  to: [number, number] = [0, 0]
-  ft = 0
+  vx = 0
+  vy = 0
+  a = 0
+  b = 0
   tb = 0
   constructor(ctx: BuuCtx, owner: Actor, dir: Dir, cursor: MasenkoCursor, x: number, y: number) {
     super(ctx, owner, dir, 1, x, y)
     this.cursor = cursor
     this.kind = 'masenkoball'
   }
-  rect() {
-    return centered(this.px, this.py, 8, 8)
+  private flightRec() {
+    return MASENKO_SPARK + 12 * (MASENKO_LV[this.cursor.lv].spark + 1 + ((this.t >> 3) & 1))
   }
-  launch(tx: number, ty: number) {
+  rect() {
+    const g = recGeomAt(this.ctx.data.sprites, this.flightRec())
+    if (!g) return centered(this.px, this.py, 16, 16)
+    return { x0: this.px - g[0], y0: this.py - g[1], x1: this.px - g[0] + g[2], y1: this.py - g[1] + g[3] }
+  }
+  launch(d: number) {
     if (this.dir === 1) this.y -= 8 << 8
-    this.from = [this.x, this.y]
-    this.to = [tx << 8, ty << 8]
-    this.ft = 0
+    const [dx, dy] = DIR_VEC[this.dir]
+    this.vx = (dx * d * 0x5f4) >> 8
+    this.vy = ((dy * d * 0x5f4) >> 8) - 0x200
+    this.a = 0x2000
+    this.b = 0x200
     this.phase = 'fly'
   }
-  blast(x: number, y: number) {
-    this.x = x << 8
-    this.y = y << 8
-    this.phase = 'blast'
-    this.tb = 0
-  }
-  update() {
+  update(w: World) {
     this.t++
     if (this.phase === 'charge') {
-      if (this.cursor.removed) this.removed = true
+      if (this.cursor.removed && this.cursor.released < 0) this.removed = true
       return
     }
     if (this.phase === 'fly') {
-      // linear from -> to plus the game's vertical arc minus its straight part (sum of vy, vy0 = -0x200, +0x20/tick)
-      const n = MASENKO_FLIGHT
-      const k = Math.min(n, ++this.ft)
-      const arc = (i: number) => -0x200 * i + (0x20 * i * (i + 1)) / 2
-      const bend = arc(k) - (arc(n) * k) / n
-      this.x = Math.round(this.from[0] + ((this.to[0] - this.from[0]) * k) / n)
-      this.y = Math.round(this.from[1] + ((this.to[1] - this.from[1]) * k) / n + bend)
+      this.x += this.vx
+      this.y += this.vy
+      this.vy += 0x20
+      this.b -= 0x20
+      this.a += this.b
+      if (this.a < 0) {
+        if (this.hit(w, this.rect(), ATK[7], this.cursor.mult, false)) audioEvent('sfx', { id: 48 + w.rng.rand(3, 'masenko hit sfx'), vol: 64 })
+        this.phase = 'blast'
+        this.tb = 0
+      }
       return
     }
     this.tb++

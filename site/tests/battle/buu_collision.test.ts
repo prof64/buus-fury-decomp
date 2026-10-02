@@ -254,9 +254,11 @@ describe('knockback in a running battle', () => {
     const x0 = e.x
     let hit = false
     let maxX = x0
-    s.run(30, (f) => (f === 1 ? BTN.A : 0))
+    for (let f = 0; f < 30; f++) {
+      s.run(1, () => (f === 1 ? BTN.A : 0))
+      maxX = Math.max(maxX, e.x)
+    }
     hit = s.w.log.some((l) => /player .* -> Majin Fighter/.test(l.text))
-    maxX = Math.max(maxX, e.x)
     expect(hit).toBe(true)
     expect(maxX - x0).toBeGreaterThan(4 << 8)
   })

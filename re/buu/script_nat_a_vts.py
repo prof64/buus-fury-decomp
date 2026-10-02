@@ -20,9 +20,9 @@ for k, v in VTS.items():
     for i in range(6):
         t = (v + s32(v + 4 * i)) & 0xFFFFFFFF
         out.append(f'  +{4*i:02x} -> {t:08x}')
-    for i in (2, 3, 4):
+    for i in (1, 2, 3):
         t = (v + s32(v + 4 * i)) & 0xFFFFFFFF
-        if 0x08000000 <= t < 0x08800000:
+        if 0x08000000 <= t < 0x08800000 and (t & ~1) not in (0x0804febc, 0x0804fb94, 0x0804ed14):
             out.append(f'--- method +{4*i:02x} {t:08x}')
             out += fn(t, 120)
 (WORK / 'script' / 'nat_a_cmds.txt').write_text('\n'.join(out))

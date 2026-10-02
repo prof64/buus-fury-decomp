@@ -4,6 +4,7 @@
 import { loadData } from '../../../data'
 import { SpriteBank, type SpriteEntityJson, type SpriteSet } from '../../core/sprites'
 import { parseCollision, type CollisionGrid } from './collision'
+import type { EAnimRule } from './eanim'
 
 type J = Record<string, any> // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -113,6 +114,8 @@ export interface EnemyType {
   spawns: { world: number; map: number; x: number; y: number }[]
   database: string
   placeholderGfx?: boolean
+  /** animation state rules per raw index (data/battle/buu_enemy_anim_sim.json; eanim.ts) */
+  anim?: Record<string, EAnimRule>
 }
 
 export interface AiNodeJ {
@@ -199,7 +202,7 @@ function playerAnimTiming(ents: SpriteEntityJson[], forms: J[], timing: J | unde
   })
 }
 
-export function buildBuuData(src: { characters: J; levels: J; moves: J; items: J; enemies: J; ai: J; bosses: J; attacks: J; sprites: J; formulas: J; extra: J; collision?: J; formNames?: J; animTiming?: J }): BuuData {
+export function buildBuuData(src: { characters: J; levels: J; moves: J; items: J; enemies: J; ai: J; bosses: J; attacks: J; sprites: J; formulas: J; extra: J; collision?: J; formNames?: J; animTiming?: J; enemyAnim?: J }): BuuData {
   const { characters, levels, moves, items, enemies, ai, bosses, attacks, sprites, formulas, extra, collision } = src
   const ents = playerAnimTiming(sprites.entities as SpriteEntityJson[], characters.forms as J[], src.animTiming)
   const bank = new SpriteBank(ents.filter((e) => e.category !== 'portrait'))
@@ -312,6 +315,7 @@ export function buildBuuData(src: { characters: J; levels: J; moves: J; items: J
       deathParam: d.param,
       spawns: (e.spawn_points ?? []).map((s: J) => ({ world: s.world, map: s.map, x: s.x, y: s.y })),
       database: e.database?.[0]?.description ?? '',
+      anim: src.enemyAnim?.types?.['0x' + e.type.toString(16).toUpperCase().padStart(2, '0')],
     }
   })
   // variants without graphics borrow the graphics of a type with the same name / the next type (spawned by bosses)
@@ -371,11 +375,11 @@ export function loadBuu(): Promise<BuuData> {
   if (!loaded) {
     loaded = (async () => {
       const names = ['characters', 'levels', 'moves', 'items', 'enemies', 'enemy_ai', 'bosses', 'attacks_detail', 'sprites', 'formulas'] as const
-      const [vals, extra, collision, formNames, animTiming] = await Promise.all([Promise.all(names.map((n) => loadData('buu', n))), loadData('battle', 'buu_ai_extra'), loadData('battle', 'buu_collision'), loadData('battle', 'buu_form_names'), loadData('battle', 'buu_anim_timing')])
+      const [vals, extra, collision, formNames, animTiming, enemyAnim] = await Promise.all([Promise.all(names.map((n) => loadData('buu', n))), loadData('battle', 'buu_ai_extra'), loadData('battle', 'buu_collision'), loadData('battle', 'buu_form_names'), loadData('battle', 'buu_anim_timing'), loadData('battle', 'buu_enemy_anim_sim')])
       const v = Object.fromEntries(names.map((n, i) => [n, vals[i]])) as Record<string, J>
       return buildBuuData({
         characters: v.characters, levels: v.levels, moves: v.moves, items: v.items, enemies: v.enemies, ai: v.enemy_ai,
-        bosses: v.bosses, attacks: v.attacks_detail, sprites: v.sprites, formulas: v.formulas, extra: extra as J, collision: collision as J, formNames: formNames as J, animTiming: animTiming as J,
+        bosses: v.bosses, attacks: v.attacks_detail, sprites: v.sprites, formulas: v.formulas, extra: extra as J, collision: collision as J, formNames: formNames as J, animTiming: animTiming as J, enemyAnim: enemyAnim as J,
       })
     })()
   }

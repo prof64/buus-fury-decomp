@@ -84,15 +84,23 @@ export function computeDamageRaw(
   return { crit, raw, dmg }
 }
 
+/** observer of every ComputeDamage (tests: the lockstep harness logs the results per frame) */
+let damageObserver: ((defender: CombatStats, res: DamageResult, atk: AttackType, mult: number) => void) | null = null
+export function setDamageObserver(f: typeof damageObserver) {
+  damageObserver = f
+}
+
 /** attacker/defender form: picks STR/END/resist by kind; `blocking` must already include the frontal test */
 export function computeDamage(atk: AttackType, mult: number, attacker: CombatStats, defender: CombatStats, blocking: boolean, rng: Rng): DamageResult {
   const melee = atk.kind === 0
-  return computeDamageRaw(
+  const res = computeDamageRaw(
     atk.kind, atk.sub, atk.power, mult,
     melee ? attacker.STR : attacker.POW, attacker.critBonus,
     melee ? defender.END : defender.END2, melee ? defender.resM : defender.resE,
     blocking, defender.blockFactor, rng,
   )
+  damageObserver?.(defender, res, atk, mult)
+  return res
 }
 
 /** HP loss with the 1/1024 remainder carried (player 0x08010BF2) */

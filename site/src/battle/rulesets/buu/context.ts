@@ -139,8 +139,10 @@ export class BuuCtx {
     return this.enemies.filter((e) => !e.removed && !e.defeated)
   }
 
-  damagePopup(w: World, target: Actor, dmg: number, crit: boolean, toPlayer: boolean) {
-    if (!this.opts.popups || dmg <= 0) return
+  /** the damage number (player: 0x0800E8E6, 16 frames, rising 0.5 px per frame; a hit less than 8 frames after the
+   *  popup's creation adds to it) */
+  damagePopup(w: World, target: Actor, dmg: number, crit: boolean, toPlayer: boolean, zero = false) {
+    if (!this.opts.popups || dmg < 0 || (dmg === 0 && !zero)) return
     const b = target.bodyBox()
     const x = (b.x0 + b.x1) >> 1
     const y = b.y0 - 6
@@ -148,13 +150,11 @@ export class BuuCtx {
     const color = crit ? '#ffd23f' : toPlayer ? '#ff6060' : '#ffffff'
     if (prev && w.frame - prev.frame < 8 && prev.p.age < prev.p.life && w.popups.includes(prev.p)) {
       prev.value += dmg
-      prev.p.text = String(prev.value)
-      prev.p.age = 0
+      prev.p.text = String(Math.ceil(prev.value))
       if (crit) prev.p.color = color
-      prev.frame = w.frame
       return
     }
-    w.popup(String(dmg), x, y, color, 40)
+    w.popup(String(Math.ceil(dmg)), x, y, color, toPlayer ? 16 : 40)
     this.lastPopup.set(target, { frame: w.frame, p: w.popups[w.popups.length - 1], value: dmg })
   }
 }

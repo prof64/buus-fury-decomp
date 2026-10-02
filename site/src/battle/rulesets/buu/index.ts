@@ -78,7 +78,7 @@ const PRESETS: Preset[] = [
   { id: 'janemba', name: 'Janemba -> Super Janemba (HFIL)', note: 'hand strikes, airborne summons of Mini-Janembas; then Super Janemba (teleports, energy wave)', phases: [{ enemy: 't51', count: 1 }, { enemy: 't122', count: 1 }], arena: 'hfil' },
   { id: 'broly', name: 'Broly (Volcano Summit)', note: 'charged punch, jump smash; landing on a rock stuns him', phases: [{ enemy: 't10', count: 1 }], arena: 'volcano' },
   { id: 'babidi_ship', name: "Babidi's ship: PuiPui -> Yakon -> Dabura", phases: [{ enemy: 't96', count: 1 }, { enemy: 't145', count: 1 }, { enemy: 't18', count: 1 }], arena: 'demon' },
-  { id: 'yakon', name: 'Yakon (use energy attacks!)', phases: [{ enemy: 't145', count: 1 }], arena: 'yakon' },
+  { id: 'yakon', name: 'Yakon (he absorbs energy: beam him in the pause after his punch combo)', phases: [{ enemy: 't145', count: 1 }], arena: 'yakon' },
   { id: 'dabura', name: 'Dabura (dark sphere, stone spit)', phases: [{ enemy: 't18', count: 1 }], arena: 'demon' },
   { id: 'majin_vegeta', name: 'Majin Vegeta (Final Flash)', phases: [{ enemy: 't70', count: 1 }], arena: 'canyon' },
   { id: 'tournament', name: 'World Tournament: Spopovich & Yamu', note: 'bear hug + EP drain', phases: [{ enemy: 't111+t147', count: 1 }], arena: 'stadium' },
@@ -501,6 +501,10 @@ export class BuuRuleset implements Ruleset {
       w.logEvent('info', `phase ${i + 1}: ${parts.map((p) => d.enemies[p.type]?.name).join(' + ')}`)
     }
     spawnPhase(0)
+    // the game's object list (0x08011A1E) updates newest first, and the player object is added after the area's
+    // actors: the player updates before the enemies placed at the start (objects spawned later update before it)
+    w.entities.splice(w.entities.indexOf(player), 1)
+    w.entities.push(player)
     const live = () => ctx.enemies.filter((e) => e.primary && !e.defeated && !e.removed)
     // story encounters whose boss takes no damage in the game (0x1A / 0x1B): win by surviving (simulator rule)
     const SURVIVE = 3600

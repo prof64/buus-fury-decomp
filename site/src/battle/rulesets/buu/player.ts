@@ -8,7 +8,7 @@
 // in moves.json / attacks_detail.json (first-hit frames, hit counts, EP spent) and marked INFERRED where guessed.
 
 import { BTN, DPAD } from '../../core/input'
-import { DIR_VEC, overlaps, rectAt, type Dir, type Rect } from '../../core/geom'
+import { overlaps, rectAt, type Dir, type Rect } from '../../core/geom'
 import type { Entity, World } from '../../core/world'
 import type { Renderer } from '../../core/renderer'
 import { Actor, broadcast, hitsBody, type HitMsg } from './actor'
@@ -18,9 +18,9 @@ import type { BuuForm, EquipDef } from './data'
 import { recalcStats, levelOf, levelUp, xpGain, type BuuRecord, type EffStats } from './progression'
 import { audioEvent } from '../../audio/bus'
 import { BEAM_POS, BeamCharge, beamGfx, drawRec, drawRecAddr, LoopFx, RecObj } from './fx'
-import { BBK_FLARE_POS, BbkFlareFx, DragonFistFx, drawVolleyWave, ENERGY_PUNCH_POS, ENERGY_PUNCH_TABLE, EnergySwordFx, FINAL_FLASH_POS, FINAL_FLASH_TABLES, FLAME_CHARGE, FlameKameFx, GHOST_SPAWN, ItMarkersFx, SS_AURA } from './skillfx'
+import { BBK_FLARE_POS, BbkFlareFx, DragonFistFx, ENERGY_PUNCH_POS, ENERGY_PUNCH_TABLE, EnergySwordFx, FINAL_FLASH_POS, FINAL_FLASH_TABLES, FLAME_CHARGE, FlameKameFx, GHOST_SPAWN, ItMarkersFx, SS_AURA } from './skillfx'
 import { ANIM_RAW, ANIM_STATE, tickBored, tickIdle, tickLoop, tickOnce, type AnimPos } from './panim'
-import { BIGBANG_POS, AreaHit, BigBangBall, FullBeam, Ghost, GrowBeam, MasenkoCursor, StraightShot, kiBlast, VEL, KI_MUZZLE, BURNING_HOLD, burningFx, burningEnd, type Shot } from './projectiles'
+import { BIGBANG_POS, BigBangBall, FullBeam, Ghost, GrowBeam, KameBeam, MasenkoCursor, VolleyWave, StraightShot, kiBlast, VEL, BURNING_HOLD, burningFx, burningEnd, type Shot } from './projectiles'
 
 /** melee rects 0x083C344C (x0,y0,x1,y1 relative to the position; same for every form) */
 export const PUNCH_RECT = [
@@ -102,7 +102,7 @@ const SKILL_MULT: Record<number, number[]> = {
   4: [410, 820, 1649], // Burning Attack
   5: [328], // Dragon Fist
   6: [41, 164, 328], // Electric Kamehameha
-  8: [226, 226, 226], // Energy Punch
+  8: [62, 144, 226], // Energy Punch (0x0871DF90)
   9: [10240], // Energy Sword
   10: [41, 164, 328], // Final Flash
   11: [41, 164, 328], // Flame Kamehameha
@@ -146,6 +146,13 @@ export class Player extends Actor implements PlayerLike {
   hpAcc = new HpAcc()
   epAcc = 0
   regenTimer = 0
+  /** story Trunks forms 24 / 25: the form object's countdown (+0xC; form 24 transforms, form 25 reverts on expiry) */
+  storyCnt = 0
+  /** cutscene fusions (form object 0x03001B64): its countdown (+0x10, 300 at the construction) and the defuse script */
+  fusCnt = 300
+  defuse: { t: number; x0: number } | null = null
+  /** the partner's record that takes over at the defuse (the lockstep copies the game's; else a default) */
+  partner: { char: number; form: number; hp: number; maxHp: number; ep: number; maxEp: number; base: number[]; skills: number[]; slot: number; levels: number[]; ssGauge: number; ss3Gauge: number; cooldown: number } | null = null
   hpRegenAcc = 0
   dead = false
   heldBy: Actor | null = null
@@ -542,8 +549,13 @@ export class Player extends Actor implements PlayerLike {
     for (const g of this.ghostRng) if (g.at === w.frame) w.rng.rand(g.n, 'ghost')
     this.ghostRng = this.ghostRng.filter((g) => g.at > w.frame)
     // player update 0x08010BD2: form controller (regen, gauges), then the actor update 0x0800EF08: the state's
-    // tick, then the control of the state that is current after the tick
-    if (!this.dead) this.passive(w)
+    // tick, then the control of the state that is current after the tick. The death script (KO + 199) blocks the
+    // player update for a frame, then only the state tick runs. The story forms' controllers keep running at HP 0.
+    const sinceKo = this.koAt >= 0 ? w.frame - this.koAt : -1
+    if (sinceKo === 199) return this.syncAnim()
+    if (this.defuse) return this.defuseStep(w)
+    if (sinceKo < 199 && (!this.dead || this.storyForm())) this.passive(w)
+    if (this.defuse) return this.syncAnim()
     this.animTick(w)
     if (!this.dead) this.control(w)
     this.syncAnim()
@@ -647,11 +659,20 @@ export class Player extends Actor implements PlayerLike {
       this.fireBlast(w)
     } else this.setAnimId(w, 0)
   }
+  /** 0x0800FF44: the shot origin on the body box (0x0800FE78: def+0x10 + 16 * dir, at the integer position), centre c:
+   *  down (cx, position y), up (cx, cy), left (x0, cy), right (x1, cy) - per form (each sprite has its own box) */
+  handPoint(): [number, number] {
+    const b = this.bodyBox()
+    const cx = (b.x0 + b.x1) >> 1
+    const cy = (b.y0 + b.y1) >> 1
+    return this.facing === 0 ? [cx, this.py] : this.facing === 1 ? [cx, cy] : this.facing === 2 ? [b.x0, cy] : [b.x1, cy]
+  }
   /** 0x08019858 -> ki blast 0x080197B4 at the muzzle (its constructor picks the sound 20 + rand(2)) */
   private fireBlast(w: World) {
-    // the game's muzzle (object position at spawn, re/buu/fx_objpos.py)
-    const [ox, oy] = KI_MUZZLE[this.facing]
-    this.blast = kiBlast(this.ctx, this, this.facing, 1, (this.px + ox) << 8, (this.py + oy) << 8, undefined, undefined, w)
+    const [mx, my] = this.handPoint()
+    this.blast = kiBlast(this.ctx, this, this.facing, 1, mx << 8, my << 8, undefined, undefined, w)
+    // the player's blast (vtable 0x0804B454) tests a 16 x 16 box centred on its position (obj+0x28..+0x34, emulator)
+    this.blast.o.box = [8, 8, 16, 16]
     w.add(this.blast)
   }
 
@@ -734,7 +755,80 @@ export class Player extends Actor implements PlayerLike {
     if (this.skills.length) this.slot = (this.slot + 1) % this.skills.length
   }
 
+  /** story Trunks: form 24 (0x03001B88, update 0x0800E592) / 25 (0x03001B8C, 0x0800E5F4) */
+  storyForm(): boolean {
+    return this.form.controller === 0x3001b88 || this.form.controller === 0x3001b8c
+  }
+  /** the story form object: no regen, gauges or cooldown; countdown - 1, once negative SetAnim(23) (form 24: into
+   *  form 25) / SetAnim(24) (form 25: back to 24) every frame the player is not already in that state (0x08010D26) -
+   *  it interrupts any state, KO included */
+  private storyTick(w: World) {
+    if (--this.storyCnt >= 0) return
+    if (this.form.controller === 0x3001b88) {
+      if (this.gs !== 'ss_up') {
+        this.transformTo = this.form.up
+        this.setAnimId(w, 23)
+      }
+    } else if (this.gs !== 'ss_revert') this.setAnimId(w, 24)
+  }
+  /** the new form object at the end of a transformation / revert (0x0801064C, after SetAnim(0)): form 24's countdown
+   *  120 + rand(180) (ctor 0x0804F034), form 25's 240 + rand(120) (0x0804F004); the fusion's 300 */
+  private newFormObject(w: World) {
+    if (this.form.controller === 0x3001b88) this.storyCnt = 120 + w.rng.rand(180, 'form 24 countdown')
+    else if (this.form.controller === 0x3001b8c) this.storyCnt = 240 + w.rng.rand(120, 'form 25 countdown')
+    else if (this.form.controller === 0x3001b64) this.fusCnt = 300
+    if (this.dead && this.hp === 0) {
+      // a story form's transformation ending after a KO: the player is idle again (HP 0, hittable, controllable)
+      this.dead = false
+    }
+  }
+  /** the cutscene fusions' defuse (script s014 0x0877D028, run synchronously by the form object 0x0800E638 when its
+   *  countdown goes negative; t = frames since): only the state tick runs (not at t 90..94), t 85 the partner's
+   *  record takes over (form exit, SetAnim(0) without a tick, the NPC's rand(255)), t 95..174 x -= 50 per frame,
+   *  t 175 x = start - 16 px, t 295 the NPC's walk ends (rand(255)), t 297 the control runs again (the new form
+   *  object from the next frame) */
+  private defuseStep(w: World) {
+    const d = this.defuse!
+    d.t++
+    if (d.t === 85) {
+      this.swapToPartner(w)
+      w.rng.rand(255, 'defuse npc')
+    } else if (d.t < 90 || d.t > 94) this.animTick(w)
+    if (d.t >= 95 && d.t <= 174) this.x -= 50
+    if (d.t === 175) this.x = (d.x0 - 16) << 8
+    if (d.t === 295) w.rng.rand(255, 'defuse npc walk')
+    if (d.t >= 297) {
+      this.defuse = null
+      if (!this.dead) this.control(w)
+    }
+    this.syncAnim()
+  }
+  private swapToPartner(w: World) {
+    this.formExit()
+    const ch = this.form.char
+    const pr = this.partner ?? { char: ch === 7 ? 0 : 3, form: ch === 7 ? 2 : 21, hp: this.hp, maxHp: this.maxHp, ep: this.ep, maxEp: this.maxEp, base: [this.rec.STR, this.rec.POW, this.rec.END, this.rec.SPD], skills: this.skills, slot: 0, levels: [], ssGauge: 0, ss3Gauge: 0, cooldown: 0 }
+    const r = this.rec
+    r.hp = pr.hp
+    r.maxHp = pr.maxHp
+    r.ep = pr.ep
+    r.maxEp = pr.maxEp
+    ;[r.STR, r.POW, r.END, r.SPD] = pr.base
+    this.skills = pr.skills.length ? pr.skills : [7]
+    this.slot = pr.slot
+    this.skillLevel = pr.levels[0] ?? 0
+    this.ssGauge = pr.ssGauge
+    this.ss3Gauge = pr.ss3Gauge * 65536
+    this.ssCooldown = pr.cooldown
+    this.regenTimer = 0
+    this.applyForm(pr.form)
+    this.formEnter()
+    this.ap.raw = ANIM_RAW[0]
+    this.enterState(w, this.idleState())
+    w.logEvent('info', `defused -> form ${pr.form}`)
+  }
+
   private passive(w: World) {
+    if (this.storyForm()) return this.storyTick(w)
     // EP regen 0x0800E1D0: timer += 110, tick on overflow -> EP += maxEP*0x7AE>>16
     this.regenTimer += 110
     if (this.regenTimer >= 0x10000) {
@@ -756,7 +850,7 @@ export class Player extends Actor implements PlayerLike {
     // (SetAnim(24)). The SS cooldown (rec+4) falls only in the other forms (0x08013E06).
     // the story variants with the form objects 0x03001B7C / 0x03001B84 (Gohan 17, Vegeta 30, Gotenks 37 / 38, Goku 7
     // / 8) have no drain (emulator: the gauge never runs out)
-    const drains = [0x3001b68, 0x3001b6c, 0x3001b78, 0x3001b80, 0x3001b8c].includes(this.form.controller)
+    const drains = [0x3001b68, 0x3001b6c, 0x3001b78, 0x3001b80].includes(this.form.controller)
     if (this.gs !== 'ss_revert' && drains) {
       if (this.form.ss3) {
         this.ssAcc += 22 * this.maxEp + 0x3333
@@ -780,6 +874,13 @@ export class Player extends Actor implements PlayerLike {
       }
     }
     if (!this.form.ss && !this.form.ss3 && this.ssCooldown > 0) this.ssCooldown = Math.max(0, this.ssCooldown - (this.eff.ssCooldownRate >> 6))
+    // the cutscene fusion's form object (0x0800E638): after the regen its countdown; negative -> the defuse script
+    if (this.form.controller === 0x3001b64 && --this.fusCnt < 0) {
+      this.x = this.px << 8
+      this.y = this.py << 8
+      this.facing = 0
+      this.defuse = { t: 0, x0: this.px }
+    }
     // wraps: 8 new d-pad presses within 60 frames shake them off
     if (this.wraps > 0 && w.input.pressed & DPAD) {
       this.wrapPresses.push(w.frame)
@@ -825,10 +926,10 @@ export class Player extends Actor implements PlayerLike {
       this.lastDirFrame = w.frame
     }
     if (held & DPAD) {
-      if (held & BTN.LEFT) this.facing = 2
-      if (held & BTN.RIGHT) this.facing = 3
-      if (held & BTN.UP) this.facing = 1
-      if (held & BTN.DOWN) this.facing = 0
+      if (pressed & BTN.LEFT) this.facing = 2
+      if (pressed & BTN.RIGHT) this.facing = 3
+      if (pressed & BTN.UP) this.facing = 1
+      if (pressed & BTN.DOWN) this.facing = 0
       this.setAnimId(w, 1)
     }
     this.attackInput(w)
@@ -1073,9 +1174,9 @@ export class Player extends Actor implements PlayerLike {
         this.sfx(3)
         return
       case 2: {
-        // Big Bang ball 0x08037480 (sound 3) at the hands
-        const [mx, my] = this.muzzle(22)
-        s.proj = this.bigBang = w.add(new BigBangBall(this.ctx, this, this.facing, mx << 8, my << 8, lv))
+        // Big Bang ball 0x08037480 (sound 3) at the hands (player + 0x0871DD9C[dir])
+        const [bx, by] = BIGBANG_POS[this.facing]
+        s.proj = this.bigBang = w.add(new BigBangBall(this.ctx, this, this.facing, (this.px + bx) << 8, (this.py + by) << 8, lv))
         this.sfx(3)
         return
       }
@@ -1113,12 +1214,6 @@ export class Player extends Actor implements PlayerLike {
   /** RNG draws the Kamikaze ghosts make later on their own (ghost state change 24 frames after the spawn) */
   ghostRng: { at: number; n: number }[] = []
 
-  private muzzle(d = 16): [number, number] {
-    const [cx, cy] = this.center()
-    const [dx, dy] = DIR_VEC[this.facing]
-    return [cx + dx * d, cy + dy * d + (dx ? 2 : 0)]
-  }
-
   private endSkill(w: World) {
     const s = this.sk
     if (!s) return
@@ -1140,8 +1235,12 @@ export class Player extends Actor implements PlayerLike {
         if (s.proj && (s.proj as MasenkoCursor).released < 0) this.sfxStop(3)
         break
       case 5:
-        // 0x0801AB96: a dragon still out is cancelled (stop 32)
-        if (s.proj && !s.proj.removed) this.sfxStop(32)
+        // 0x0801AB96: a dragon still out is cancelled: stop 32, then every segment explodes at once (head first)
+        if (s.fx && !s.fx.removed && s.fx instanceof DragonFistFx) {
+          this.sfxStop(32)
+          s.fx.explode(w, true)
+          s.fx = null
+        }
         break
       case 9:
         // 0x0801B04A: the sword is removed: stop 3 while charging, 32 while swinging
@@ -1185,16 +1284,14 @@ export class Player extends Actor implements PlayerLike {
     audioEvent('skill_end')
     const p = s.proj
     if (p && !p.removed) {
-      if (p instanceof GrowBeam) p.stop()
+      if (p instanceof GrowBeam || p instanceof KameBeam) p.stop()
       else if (p instanceof BigBangBall && !p.launched) p.removed = true
       else if (p instanceof MasenkoCursor && p.released < 0) p.removed = true
-      else if (p instanceof AreaHit && p.kind === 'dragon') p.removed = true
       else if (p instanceof StraightShot && p.o.delay) p.removed = true
     }
     for (const g of s.ghosts ?? []) if (!g.free) g.removed = true
-    if (s.fx) s.fx.removed = true
+    if (s.fx && !(s.fx instanceof DragonFistFx)) s.fx.removed = true
     this.sk = null
-    void w
   }
 
   private updSkill(w: World) {
@@ -1243,8 +1340,9 @@ export class Player extends Actor implements PlayerLike {
           }
           this.sfxStop(3)
           this.sfx(32)
-          const speed = id === 3 ? 8.5 : 3.34
-          const beam = w.add(new GrowBeam(this.ctx, this, this.facing, 1, () => this.muzzle(16), { atk, mult, width: id === 1 ? 12 : 16, speed, maxLen: 240, color: BEAM_COLOR[id] ?? ['#fff', '#3bf'], gfx: bg, visPos: BEAM_POS[id === 1 ? 'banshee' : id === 3 ? 'bbk' : 'kame'].fire, game: true }))
+          // the beam object (projectiles.ts KameBeam) fires at the fire position; it was built at the press (tick 1)
+          const [fx, fy] = BEAM_POS[id === 1 ? 'banshee' : id === 3 ? 'bbk' : 'kame'].fire[this.facing]
+          const beam = w.add(new KameBeam(this.ctx, this, this.facing, this.px + fx, this.py + fy, w.frame - 23, { atk, mult, color: BEAM_COLOR[id] ?? ['#fff', '#3bf'], gfx: bg }))
           s.proj = beam
           this.beamEnd.push({ shot: beam, sfx: [['stop', 32], ['play', 33]] })
           if (id === 3) {
@@ -1283,11 +1381,8 @@ export class Player extends Actor implements PlayerLike {
           }
           this.sfxStop(3)
           this.sfx(32)
-          const beam = w.add(new GrowBeam(this.ctx, this, this.facing, 1, () => this.muzzle(16), { atk, mult, width: 16, speed: 2.14, maxLen: [64, 64, 96][lv], color: BEAM_COLOR[id] ?? ['#fff', '#3bf'], gfx: beamGfx(this.ctx, id, lv), visPos: BEAM_POS.kame.fire, startLen: -6 * 2.14 }))
-          s.proj = beam
-          // Flame Kamehameha: the game's link chain (visual); the fitted GrowBeam keeps the hits
-          beam.hidden = true
-          w.add(new FlameKameFx(this.ctx, this, this.facing, lv, () => !beam.removed && !beam.done))
+          const sk = s
+          s.proj = w.add(new FlameKameFx(this.ctx, this, this.facing, lv, () => this.sk === sk, { atk, mult })) as unknown as Shot
           return
         }
         this.drain(w, [107, 376, 1238][lv])
@@ -1309,9 +1404,10 @@ export class Player extends Actor implements PlayerLike {
         }
         if (t === 24) {
           if (!held) return end()
-          const [mx, my] = this.muzzle(14)
+          // the beam object (0x08036FA2) at player + 0x0871DF9C[dir] (FINAL_FLASH_POS), built now
+          const [fx, fy] = FINAL_FLASH_POS[this.facing]
           this.sfx(32)
-          s.proj = w.add(new FullBeam(this.ctx, this, this.facing, 1, mx, my, { atk, mult, life: 1 << 30, table: FINAL_FLASH_TABLES[Math.min(2, lv)], visPos: FINAL_FLASH_POS, hits: [6, 13] }))
+          s.proj = w.add(new FullBeam(this.ctx, this, this.facing, 1, this.px + fx, this.py + fy, { atk, mult, life: 1 << 30, table: FINAL_FLASH_TABLES[Math.min(2, lv)], visPos: FINAL_FLASH_POS, game: { built: w.frame } }))
           this.beamEnd.push({ shot: s.proj, sfx: [['stop', 32]] })
           this.sfxStop(3)
         }
@@ -1336,7 +1432,6 @@ export class Player extends Actor implements PlayerLike {
             ball.launched = true
             this.sfxStop(3)
             this.sfx(32)
-            this.beamEnd.push({ shot: ball, sfx: [['stop', 32]] })
           } else {
             ball.removed = true
             this.sfxStop(3)
@@ -1351,13 +1446,6 @@ export class Player extends Actor implements PlayerLike {
         ball.charge256 += d << 8
         this.spend(w, d, true)
         s.acc &= 0xff
-        if (s.t > 60) ball.grow += [0, 0.36, 0.48][lv]
-        // hits use the fitted muzzle; the ball is drawn at the game's position (BIGBANG_POS)
-        const [mx, my] = this.muzzle(22)
-        ball.x = mx << 8
-        ball.y = my << 8
-        const [bx, by] = BIGBANG_POS[this.facing]
-        ball.visOff = [this.px + bx - mx, this.py + by - my]
         return
       }
       case 4: {
@@ -1366,8 +1454,8 @@ export class Player extends Actor implements PlayerLike {
         const a = this.ap
         const t = (a.tick = (a.tick + 1) & 0xffff)
         if (t === 16) {
-          const [ox, oy] = KI_MUZZLE[this.facing]
-          ;(s.proj as StraightShot | null)?.launch((this.px + ox) << 8, (this.py + oy) << 8)
+          const [mx, my] = this.handPoint()
+          ;(s.proj as StraightShot | null)?.launch(mx << 8, my << 8)
           s.proj = null
           this.sfx(34)
           a.frame = 1
@@ -1383,18 +1471,17 @@ export class Player extends Actor implements PlayerLike {
         a.frame = t >> 4
         if (t === 16) {
           const [ox, oy] = VOLLEY_POS[this.facing]
-          const [vx, vy] = VEL(this.facing, 0x300)
-          const bank = this.ctx.data.sprites
-          w.add(new StraightShot(this.ctx, this, this.facing, 1, (this.px + ox) << 8, (this.py + oy) << 8, { vx, vy, box: [6, 6, 12, 12], atk: ATK[16], mult: 1024, color: ['#ffffff', '#f0a040'], radius: 5, name: 'volley', explode: false, fxDraw: (r, sh) => drawVolleyWave(r, bank, sh.dir, sh.px, sh.py, sh.t, sh.x0 >> 8, sh.y0 >> 8) }))
+          w.add(new VolleyWave(this.ctx, this, this.facing, this.px + ox, this.py + oy))
           this.sfx(34)
         }
         return
       }
       case 8: {
         // Energy Punch control 0x0801B296: frames tick >> 2 until tick 8 (B not read); then every frame up to tick 59
-        // while B is held: frame ((tick >> 2) & 1) + 2, one hit to every object (x62 / x144 / x226, attack sub 9) in
-        // the melee rect (Lv3: the larger rect 0x0871DF30) from the position before the step, and from Lv2 a step
-        // of 0.375 px along the facing; tick 60 or released -> idle
+        // while B is held: frame ((tick >> 2) & 1) + 2, one message to every object (x62 / x144 / x226 0x0871DF90,
+        // attack sub 9) in the melee rect 0x0871DEF0 (Lv3: the larger rect 0x0871DF30) from the position before the
+        // step, and from Lv2 a step of 0.375 px along the facing; tick 60 or released -> idle. The target accepts every
+        // overlapping message (no per-target limit; lockstep f19_vs_skill8*)
         const a = this.ap
         const t = (a.tick = (a.tick + 1) & 0xffff)
         if (t < 8) {
@@ -1408,11 +1495,9 @@ export class Player extends Actor implements PlayerLike {
           const sk = s
           s.fx = w.add(new RecObj(this.ctx.data.sprites, () => [this.px + ENERGY_PUNCH_POS[this.facing][0], this.py + ENERGY_PUNCH_POS[this.facing][1]], () => ENERGY_PUNCH_TABLE + 12 * (3 * this.facing + (this.ap.tick >= 56 ? 1 : 0)), () => this.sk === sk))
         }
-        // hits: the game sends a message every frame from tick 8 (rects 0x0871DEF0 / 0x0871DF30), but the measured runs
-        // (a pinned Majin Fighter) record 5 accepted hits on ticks 10..14, Lv3 only at 40 px: the accepted hits are
-        // modelled that way (fitted; the enemy-side acceptance is not decoded)
-        void ENERGY_PUNCH_RECT_L3
-        if (t >= 10 && t <= 14) broadcast(w, { team: 1, rect: this.frontRect([8, 16, 40][lv], 24), dir: this.facing, mult, atk, attacker: this, source: this })
+        // one message to every object (0x08011C0C) per frame, no sound / RNG: the rect from the position before the step
+        const r = (lv > 1 ? ENERGY_PUNCH_RECT_L3 : PUNCH_RECT)[this.facing]
+        broadcast(w, { team: 1, rect: rectAt(r, this.px, this.py), dir: this.facing, mult, atk, attacker: this, source: this })
         if (lv > 0) {
           const [vx, vy] = DASH_VEC[this.facing]
           if (this.fits(w, (this.x + vx * 0x60) >> 8, (this.y + vy * 0x60) >> 8)) {
@@ -1461,18 +1546,19 @@ export class Player extends Actor implements PlayerLike {
         const def = (this.facing === 3 ? [14, 13, 12, 11, 10, 17, 16, 15] : [10, 11, 12, 13, 14, 15, 16, 17])[a.frame - 2]
         const [ox, oy, bw, bh] = SWORD_BOX[def - 10]
         const rect = { x0: this.px - ox, y0: this.py - oy, x1: this.px - ox + bw, y1: this.py - oy + bh }
-        // the measured runs record one accepted strike per swing (INFERRED: the target's reaction blocks the rest)
-        if (!s.target && broadcast(w, { team: 1, rect, dir: [2, 0, 0, 0, 3, 1, 1, 1][def - 10] as Dir, mult: 0x2800, atk, attacker: this, source: this }, true)) {
-          s.target = 1
+        // every swing frame: one message to the first receiver (0x08011C70); every accepted frame plays 48 + rand(2)
+        if (broadcast(w, { team: 1, rect, dir: [2, 0, 0, 0, 3, 1, 1, 1][def - 10] as Dir, mult: 0x2800, atk, attacker: this, source: this }, true)) {
           this.sfx(48 + w.rng.rand(2, 'sword hit sfx'))
         }
         return
       }
       case 5: {
         // Dragon Fist control 0x0801ABBE (phase byte s.charged): before the dragon, tick++, released -> idle, tick 16 ->
-        // the 6-segment dragon (loop 32), frame tick >> 3. Dragon out: below tick 90 the player steps 0.375 px along
-        // the facing (the chain follows), 5 EP per frame (acc += factor * 80), and once B is released / tick 300 / EP
-        // 0 the dragon is launched (stop 32, sound 23); then 24 more ticks; frame ((tick >> 3) & 1) + 2
+        // the 6-segment dragon (loop 32), frame tick >> 3. Dragon out (its segments update and hit before this control,
+        // skillfx.ts DragonFistFx): below tick 90 the player steps 0.375 px along the facing if the footprint fits and
+        // the chain follows (0x08038E8A, v = 0x60 or 0 when blocked), 5 EP per frame (acc += factor * 80), and once B is
+        // released / tick 300 / EP 0 the dragon is launched (0x08038E42: one x2.5 message with the head's box; stop 32,
+        // sound 23); then 24 more ticks; frame ((tick >> 3) & 1) + 2
         const a = this.ap
         if (s.charged) {
           if (a.tick >= 24) return end()
@@ -1480,43 +1566,33 @@ export class Player extends Actor implements PlayerLike {
           a.frame = ((a.tick >> 3) & 1) + 2
           return
         }
-        if (!s.proj) {
+        if (!s.fx) {
           a.tick = (a.tick + 1) & 0xffff
           if (!held) return end()
           if (a.tick === 16) {
-            s.proj = w.add(new AreaHit(this.ctx, this, this.facing, 1, this.frontRect(8, 16), { life: 1 << 30, every: 1 << 30, atk, mult, color: ['#fffbd0', '#ffb020'] }))
-            s.proj.kind = 'dragon'
-            ;(s.proj as AreaHit).hidden = true
-            const sk = s
-            // the chain is steered until the launch; 24 frames later its segments vanish (6 puffs, rand(4096) each)
-            w.add(new DragonFistFx(this.ctx, this, this.facing, () => this.sk === sk && !sk.charged))
+            s.fx = w.add(new DragonFistFx(this.ctx, this, this.facing))
             this.sfx(32)
           }
           a.frame = a.tick >> 3
           return
         }
+        const df = s.fx as DragonFistFx
         if (a.tick < 90) {
           const [vx, vy] = DASH_VEC[this.facing]
+          let v = 0
           if (this.fits(w, (this.x + vx * 0x60) >> 8, (this.y + vy * 0x60) >> 8)) {
             this.x += vx * 0x60
             this.y += vy * 0x60
+            v = 0x60
           }
+          df.shift(v)
         }
-        // hits (fitted to the measured runs: 48 hits x3.28 on frames 21..35 from the press, head 24 px ahead growing 4 px
-        // per frame; the 6 segments' own messages and the launch hit x2.5 are not reproduced: INFERRED)
-        const [dx, dy] = DIR_VEC[this.facing]
-        const [cx, cy] = this.center()
-        const ar = s.proj as AreaHit
-        const reach = Math.min(56, 24 + 4 * Math.max(0, s.t - 20))
-        ar.box = { x0: cx + dx * reach - 10, y0: cy + dy * reach - 10, x1: cx + dx * reach + 10, y1: cy + dy * reach + 10 }
-        if (s.t >= 21 && s.t <= 35) for (let k = 0, n = 3 + (s.t % 7 === 0 ? 1 : 0); k < n; k++) ar.hit(w, ar.box, atk, mult, false)
         s.acc += this.eff.epCostFactor * 80
         this.spend(w, s.acc >> 8, true)
         s.acc &= 0xff
         if (!(held && a.tick < 300 && this.energyLeft() !== 0)) {
-          // launch 0x08038E42 (the dragon's own launch hit is not reproduced, see above)
-          ar.removed = true
-          s.proj = null
+          df.launch(w)
+          s.fx = null
           s.charged = true
           a.tick = 0
           this.sfxStop(32)
@@ -1565,9 +1641,7 @@ export class Player extends Actor implements PlayerLike {
             a.frame = 1
             this.sfxStop(3)
             this.sfx(34)
-            // measured: a tap (released before 10 frames) never hits at Lv1 / Lv2 (the blast fizzles; the sound plays)
-            if (c && lv < 2 && s.t < 10) c.removed = true
-            else c?.release()
+            c?.release()
           }
           return
         }
@@ -1631,6 +1705,7 @@ export class Player extends Actor implements PlayerLike {
     this.applyForm(to)
     this.formEnter()
     this.setAnimId(w, 0)
+    this.newFormObject(w)
     if (this.form.ss3) this.ss3Gauge = this.maxEp * 65536
     else if (this.form.ss) this.ssGauge = this.maxEp
     w.logEvent('info', `transformed -> form ${to}`)
@@ -1791,6 +1866,7 @@ export class Player extends Actor implements PlayerLike {
     this.applyForm(down)
     this.formEnter()
     this.setAnimId(w, 0)
+    this.newFormObject(w)
     w.logEvent('info', `reverted to form ${down}`)
   }
 
@@ -1852,6 +1928,8 @@ export class Player extends Actor implements PlayerLike {
     if (msg.team === 1 || this.dead) return false
     if (this.state === 'held' && this.holdKind === 'eat') return false
     if (!hitsBody(msg, this)) return false
+    // not hittable (+0x1CC: reverting, Instant Transmission, the cutscene fusions): the message is not accepted
+    if (!this.hittable) return false
     // message 0 (0x08010F40) -> ComputeDamage (block: blocking flag and (hit dir ^ 1) == facing; a full energy shield
     // and the hurt state make both resists 0) -> the reaction 0x080105FA
     const front = (msg.dir ^ 1) === this.facing
@@ -1865,16 +1943,18 @@ export class Player extends Actor implements PlayerLike {
     const before = this.hp
     const lost = dmg > 0 && this.hp > 0 ? this.hpAcc.take(dmg) : 0
     w.logEvent('damage', `${msg.attacker.kind === 'enemy' ? (msg.attacker as unknown as { label: string }).label : msg.attacker.kind} -> player: ${dmg}/1024${res.crit ? ' CRIT' : ''}${blocking ? ' blocked' : ''}${this.state === 'hurt' ? ' (i-frames)' : ''} = ${lost} HP`)
-    if (dmg === 0 || before === 0) return true
+    // 0x0800E8E6 runs for every accepted hit, 0 damage included: the 12-frame flash restarts, a ceil(damage / 1024)
+    // popup (a red 0 in the i-frames)
     this.flash = 12
+    this.ctx.damagePopup(w, this, Math.ceil(dmg / 1024), res.crit, true, true)
+    if (dmg === 0 || before === 0) return true
     w.stats.hitsTaken++
     if (lost > 0) {
       w.stats.damageTaken += Math.min(lost, this.hp)
-      this.ctx.damagePopup(w, this, lost, res.crit, true)
       this.hp = Math.max(0, this.hp - lost)
-      // thorns (record+0x5C): melee attackers take the thorns value (application INFERRED)
+      // thorns (player+0x1C4, record+0x5C): a melee attacker takes (damage * thorns) >> 8 (1/1024 HP), no reaction
       if (this.eff.thorns && msg.atk.kind === 0 && (msg.attacker as unknown as { takeDirect?: (w: World, n: number) => void }).takeDirect) {
-        ;(msg.attacker as unknown as { takeDirect: (w: World, n: number) => void }).takeDirect(w, this.eff.thorns)
+        ;(msg.attacker as unknown as { takeDirect: (w: World, n: number) => void }).takeDirect(w, ((dmg * this.eff.thorns) >> 8) / 1024)
       }
       this.afterHpChange(w)
       if (this.dead) return true
@@ -1951,9 +2031,13 @@ export class Player extends Actor implements PlayerLike {
 
   // ---- lockstep (tools/battle/LOCKSTEP.md) -------------------------------------------------------------------------
   /** copy the emulator's animation fields at frame 0 */
-  lockstepInit(raw: number, frame: number, tick: number) {
-    this.gs = this.idleState()
-    this.state = 'idle'
+  lockstepInit(raw: number, frame: number, tick: number, gs = 'idle') {
+    this.gs = gs === 'ss_up' || gs === 'ss_revert' ? gs : this.idleState()
+    this.state = this.coarse(this.gs)
+    if (this.gs === 'ss_up') {
+      this.transformTo = this.form.up
+      this.transformDone = false
+    }
     this.ap = { raw, frame, tick }
     this.syncAnim()
   }

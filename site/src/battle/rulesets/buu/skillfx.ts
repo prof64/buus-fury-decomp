@@ -3,13 +3,15 @@
 // hits stay with the fitted hit objects - except where noted. Positions are relative to the player position
 // (obj+0x1A0/0x1A4), per facing (down, up, left, right), as traced in the emulator.
 
-import { DIR_VEC, type Dir } from '../../core/geom'
+import { DIR_VEC, type Dir, type Rect } from '../../core/geom'
 import type { Renderer } from '../../core/renderer'
 import { BTN } from '../../core/input'
 import type { Entity, World } from '../../core/world'
-import type { Actor } from './actor'
+import { broadcast, type Actor } from './actor'
+import { ATK, type AttackType } from './damage'
 import type { BuuCtx } from './context'
 import { drawRec, drawRecAddr, drawRecAffine, drawRecFlipped, recGeomAt } from './fx'
+import { audioEvent } from '../../audio/bus'
 
 type Bank = BuuCtx['data']['sprites']
 
@@ -39,93 +41,128 @@ abstract class Vis implements Entity {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-/** Dragon Fist Explosion (chain builder 0x08038AD8, vtable 0x0804D1B8, table 0x0877AD10): 6 segments, root (index 5)
- *  at DF_ROOT, each child at its parent + dir * (6 - k) (0, 1, 3, 6, 10, 15 px along the facing). While active the
- *  segment k moves (0x60 + 0x20 * (5 - k)) / 256 px per tick (head 1 px/tick), middle segments ease toward the
- *  midpoint of their neighbours, the head is steered by the d-pad 3 px/tick (+-56 x, +-32 y). Records dir*4 + 0 body
- *  (32x32), + 1 head, dying head + 1 + (t >> 3) for 24 ticks, then every segment explodes (0x0801952C, root first). */
+/** Dragon Fist Explosion (chain builder 0x08038AD8, segment update 0x08038C32, vtable 0x0804D1B8, table 0x0877AD10):
+ *  6 segments (index 0 = root at DF_ROOT, 5 = head), each child created at the root + 1, 3, 6, 10, 15 px along the
+ *  facing. The segments update before the player (newer objects first), root -> head: a middle segment eases toward
+ *  the midpoint of its neighbours (x = (3x + ((parent.x + child.x) >> 1)) >> 2, the parent already updated this tick),
+ *  the head is steered by the d-pad (LEFT while the offset > -56: -3 px, else RIGHT while < 56: +3; UP > -32 / DOWN
+ *  < 32 the same: +-57 / +-33); each segment then tests its box (body 32 x 32 around the position, head 64 x 64 at
+ *  DF_HEAD) and, until the launch, sends one message (x0.32 = 328, attack sub 18, dir = facing) to every object. The
+ *  player's control moves the chain (shift: root by v, each child 0x20 more; v = 0x60, 0 when the player was
+ *  blocked; not from tick 90) and launches it (0x08038E42: one x2.5 message with the head's box, no more segment
+ *  messages); 24 ticks later every segment explodes (root first, rand(0x1000) each). A cancel (the state's exit with
+ *  the dragon out) explodes it at once, head first. Records dir*4 + 0 body, + 1 head, dying head + 1 + (t >> 3). */
 const DF_ROOT: [number, number][] = [[8, 16], [8, -32], [-8, -8], [24, -8]]
+const DF_OFFS = [0, 1, 3, 6, 10, 15]
+/** head box origin per facing (box = position - origin .. + 64) */
+const DF_HEAD: [number, number][] = [[32, 32], [32, 32], [40, 32], [24, 32]]
 const DF_TABLE = 0x0877ad10
+const DF_MULT = 328
+const DF_LAUNCH_MULT = 0xa00
 
 export class DragonFistFx extends Vis {
   ctx: BuuCtx
   owner: Actor
   dir: Dir
-  /** segment positions in 1/256 px, index 0 = head .. 5 = root */
+  /** segment positions in 1/256 px, index 0 = root .. 5 = head */
   seg: [number, number][] = []
+  /** the boxes of this tick's update */
+  boxes: Rect[] = []
   steer: [number, number] = [0, 0]
-  active: () => boolean
+  /** -1 flying (sending), >= 0 launched: ticks since the launch */
   dying = -1
-  constructor(ctx: BuuCtx, owner: Actor, dir: Dir, active: () => boolean) {
+  constructor(ctx: BuuCtx, owner: Actor, dir: Dir) {
     super()
     this.ctx = ctx
     this.owner = owner
     this.dir = dir
-    this.active = active
     this.kind = 'dragonfx'
     const [dx, dy] = DIR_VEC[dir]
     const [rx, ry] = DF_ROOT[dir]
-    let x = (owner.px + rx) << 8
-    let y = (owner.py + ry) << 8
-    const s: [number, number][] = []
-    s[5] = [x, y]
-    for (let k = 4; k >= 0; k--) {
-      x += dx * (6 - k) * 256
-      y += dy * (6 - k) * 256
-      s[k] = [x, y]
-    }
-    this.seg = s
+    const x = (owner.px + rx) << 8
+    const y = (owner.py + ry) << 8
+    this.seg = DF_OFFS.map((o) => [x + dx * o * 256, y + dy * o * 256])
+    this.boxes = this.seg.map((_, i) => this.box(i))
   }
   depth() {
-    return this.seg[0][1] >> 8
+    return this.seg[5][1] >> 8
+  }
+  box(i: number): Rect {
+    const x = this.seg[i][0] >> 8
+    const y = this.seg[i][1] >> 8
+    if (i < 5) return { x0: x - 16, y0: y - 16, x1: x + 16, y1: y + 16 }
+    const [ox, oy] = DF_HEAD[this.dir]
+    return { x0: x - ox, y0: y - oy, x1: x - ox + 64, y1: y - oy + 64 }
+  }
+  private msg(rect: Rect, mult: number) {
+    return { team: 1 as const, rect, dir: this.dir, mult, atk: ATK[18], attacker: this.owner, source: this }
   }
   update(w: World) {
     this.t++
-    if (this.dying < 0) {
-      if (!this.active()) {
-        // the launch frame counts: the segments vanish 24 frames after it (emulator: the 6 puffs' rand(4096) land on
-        // the frame the player returns to idle)
-        this.dying = 1
-        return
-      }
-      const [dx, dy] = DIR_VEC[this.dir]
-      for (let k = 0; k < 6; k++) {
-        const v = 0x60 + 0x20 * (5 - k)
-        this.seg[k][0] += dx * v
-        this.seg[k][1] += dy * v
-      }
-      for (let k = 1; k < 5; k++) {
-        const mx = (this.seg[k - 1][0] + this.seg[k + 1][0]) >> 1
-        const my = (this.seg[k - 1][1] + this.seg[k + 1][1]) >> 1
-        this.seg[k][0] = (3 * this.seg[k][0] + mx) >> 2
-        this.seg[k][1] = (3 * this.seg[k][1] + my) >> 2
-      }
-      const held = w.input.held
-      const sx = held & BTN.LEFT ? -3 : held & BTN.RIGHT ? 3 : 0
-      const sy = held & BTN.UP ? -3 : held & BTN.DOWN ? 3 : 0
-      const nx = Math.max(-56, Math.min(56, this.steer[0] + sx))
-      const ny = Math.max(-32, Math.min(32, this.steer[1] + sy))
-      this.seg[0][0] += (nx - this.steer[0]) << 8
-      this.seg[0][1] += (ny - this.steer[1]) << 8
-      this.steer = [nx, ny]
+    if (this.dying >= 0) {
+      if (++this.dying >= 24) this.explode(w, false)
       return
     }
-    if (++this.dying >= 24) {
-      // explode the chain, root first
-      const bank = this.ctx.data.sprites
-      for (let k = 5; k >= 0; k--) {
-        const rec = DF_TABLE + 12 * (this.dir * 4 + (k === 0 ? 3 : 0))
-        const [cx, cy] = recCentre(bank, rec, this.seg[k][0] >> 8, this.seg[k][1] >> 8)
-        this.ctx.explosion(w, cx, cy, 0x1000 + w.rng.rand(0x1000, 'dragon fist explosion rate'))
+    for (let i = 0; i < 6; i++) {
+      const s = this.seg[i]
+      if (i > 0 && i < 5) {
+        const p = this.seg[i - 1]
+        const c = this.seg[i + 1]
+        s[0] = (3 * s[0] + ((p[0] + c[0]) >> 1)) >> 2
+        s[1] = (3 * s[1] + ((p[1] + c[1]) >> 1)) >> 2
+      } else if (i === 5) {
+        const held = w.input.held
+        if (held & BTN.LEFT) {
+          if (this.steer[0] > -56) this.steerBy(-3, 0)
+        } else if (held & BTN.RIGHT) {
+          if (this.steer[0] < 56) this.steerBy(3, 0)
+        }
+        if (held & BTN.UP) {
+          if (this.steer[1] > -32) this.steerBy(0, -3)
+        } else if (held & BTN.DOWN) {
+          if (this.steer[1] < 32) this.steerBy(0, 3)
+        }
       }
-      this.removed = true
+      this.boxes[i] = this.box(i)
+      broadcast(w, this.msg(this.boxes[i], DF_MULT))
     }
+  }
+  private steerBy(dx: number, dy: number) {
+    this.steer[0] += dx
+    this.steer[1] += dy
+    this.seg[5][0] += dx << 8
+    this.seg[5][1] += dy << 8
+  }
+  /** 0x08038E8A (player control, tick < 90): root by v, each child 0x20 more along the facing */
+  shift(v: number) {
+    const [dx, dy] = DIR_VEC[this.dir]
+    for (let i = 0; i < 6; i++) {
+      this.seg[i][0] += dx * (v + 0x20 * i)
+      this.seg[i][1] += dy * (v + 0x20 * i)
+    }
+  }
+  /** 0x08038E42: one x2.5 message with the head's box of this tick, the segments stop sending */
+  launch(w: World) {
+    if (this.dying >= 0) return
+    this.dying = 0
+    broadcast(w, this.msg(this.boxes[5], DF_LAUNCH_MULT))
+  }
+  /** every segment explodes (rand(0x1000) each): root first at the end, head first on a cancel */
+  explode(w: World, cancel: boolean) {
+    const bank = this.ctx.data.sprites
+    for (let n = 0; n < 6; n++) {
+      const k = cancel ? 5 - n : n
+      const rec = DF_TABLE + 12 * (this.dir * 4 + (k === 5 ? 3 : 0))
+      const [cx, cy] = recCentre(bank, rec, this.seg[k][0] >> 8, this.seg[k][1] >> 8)
+      this.ctx.explosion(w, cx, cy, 0x1000 + w.rng.rand(0x1000, 'dragon fist explosion rate'))
+    }
+    this.removed = true
   }
   draw(r: Renderer) {
     const bank = this.ctx.data.sprites
-    const order = this.dir === 1 ? [0, 1, 2, 3, 4, 5] : [5, 4, 3, 2, 1, 0]
+    const order = this.dir === 1 ? [5, 4, 3, 2, 1, 0] : [0, 1, 2, 3, 4, 5]
     for (const k of order) {
-      const i = k ? 0 : this.dying < 0 ? 1 : 1 + Math.min(2, this.dying >> 3)
+      const i = k < 5 ? 0 : this.dying < 0 ? 1 : 1 + Math.min(2, this.dying >> 3)
       drawRecAddr(r, bank, DF_TABLE + 12 * (this.dir * 4 + i), this.seg[k][0] >> 8, this.seg[k][1] >> 8)
     }
   }
@@ -207,8 +244,15 @@ export function drawVolleyWave(r: Renderer, bank: Bank, dir: Dir, hx: number, hy
   // the origin never lies behind the spawn point (sx, sy): the wave grows out of the hands
   const run = (hx - sx) * dx + (hy - sy) * dy
   const len = Math.max(8, Math.min(48, 8 + 4 * t, run + 8))
-  const ox = hx - dx * (len - 8)
-  const oy = hy - dy * (len - 8)
+  drawVolleyPieces(r, bank, dir, hx - dx * (len - 8), hy - dy * (len - 8), len - 8)
+}
+
+/** the wave's pieces: tail record at the origin, middle records every 8 px, head record at origin + dir * len */
+export function drawVolleyPieces(r: Renderer, bank: Bank, dir: Dir, ox: number, oy: number, L: number) {
+  const [dx, dy] = DIR_VEC[dir]
+  const len = L + 8
+  const hx = ox + dx * L
+  const hy = oy + dy * L
   const base = VOLLEY_TABLE + 36 * dir
   drawRecAdd(r, bank, base, ox, oy)
   for (let k = 8; k < len - 9; k += 8) drawRecAdd(r, bank, base + 12, ox + dx * k, oy + dy * k)
@@ -263,7 +307,10 @@ export class BbkFlareFx extends Vis {
  *  FLAME_CHARGE, fx_08721164 record 12 + f, f = t >> 3, > 3 -> 2 + (f & 1)) until the fire tick; then level + 3 links,
  *  the first at FLAME_FIRST, each link spawning the next 16 px further at its tick 8. Link record dir*7 + f with
  *  f = t >> 2: non-last links cycle 2,1,2,3 from f = 4, the last link 4,5,6,5 from f = 7. The d-pad perpendicular to
- *  the facing shifts link i by (i+1)^2/2 px per tick, clamped to +-(i+1)^2. */
+ *  the facing shifts link i by (i+1)^2/2 px per tick, clamped to +-(i+1)^2. Hits (update 0x0802DC1A): every link
+ *  each tick sends one message to the first receiver (0x08011C70) with its box of the previous tick (the record box;
+ *  a new link's first tick: the facing-down frame-0 box), mult 41 / 164 / 328, attack sub 12; accepted: sound
+ *  48 + rand(2). All links vanish when the skill state ends. Lockstep *_vs_skill11*. */
 export const FLAME_CHARGE: [number, number][] = [[8, -2], [12, -2], [12, -2], [4, -2]]
 const FLAME_FIRST: [number, number][] = [[8, 16], [8, -32], [0, -6], [16, -6]]
 const FLAME_TABLE = 0x087568b4
@@ -273,22 +320,53 @@ export class FlameKameFx extends Vis {
   owner: Actor
   dir: Dir
   n: number
-  /** per link: [x, y, t, perpendicular shift] */
-  links: [number, number, number, number][] = []
+  atk: AttackType
+  mult: number
+  /** per link: position, tick, perpendicular shift, the box of the previous tick */
+  links: { x: number; y: number; t: number; s: number; box: Rect }[] = []
   alive: () => boolean
-  constructor(ctx: BuuCtx, owner: Actor, dir: Dir, lv: number, alive: () => boolean) {
+  constructor(ctx: BuuCtx, owner: Actor, dir: Dir, lv: number, alive: () => boolean, hit: { atk: AttackType; mult: number }) {
     super()
     this.ctx = ctx
     this.owner = owner
     this.dir = dir
     this.n = Math.min(2, lv) + 3
     this.alive = alive
+    this.atk = hit.atk
+    this.mult = hit.mult
     this.kind = 'flamekamefx'
     const [fx, fy] = FLAME_FIRST[dir]
-    this.links.push([owner.px + fx, owner.py + fy, 0, 0])
+    this.addLink(owner.px + fx, owner.py + fy)
+  }
+  private addLink(x: number, y: number) {
+    // the constructor's box: the facing-down frame-0 record
+    this.links.push({ x, y, t: 0, s: 0, box: this.recBox(FLAME_TABLE, x, y) })
+  }
+  private recBox(rec: number, x: number, y: number): Rect {
+    const g = recGeomAt(this.ctx.data.sprites, rec) ?? [4, 4, 8, 8]
+    return { x0: x - g[0], y0: y - g[1], x1: x - g[0] + g[2], y1: y - g[1] + g[3] }
+  }
+  private frame(i: number): number {
+    let f = this.links[i].t >> 2
+    if (i === this.n - 1) {
+      if (f >= 7) {
+        f = (f & 3) + 4
+        if (f === 7) f = 5
+      }
+    } else if (f >= 4) {
+      f &= 3
+      if (f === 0) f = 2
+    }
+    return f
+  }
+  private at(i: number): [number, number] {
+    const L = this.links[i]
+    const [dx] = DIR_VEC[this.dir]
+    const s = Math.trunc(L.s)
+    return [L.x + (dx ? 0 : s), L.y + (dx ? s : 0)]
   }
   depth() {
-    return this.links[0][1]
+    return this.links[0].y
   }
   update(w: World) {
     if (!this.alive()) {
@@ -298,31 +376,27 @@ export class FlameKameFx extends Vis {
     const [dx, dy] = DIR_VEC[this.dir]
     const held = w.input.held
     const perp = dx ? (held & BTN.UP ? -1 : held & BTN.DOWN ? 1 : 0) : held & BTN.LEFT ? -1 : held & BTN.RIGHT ? 1 : 0
-    for (let i = 0; i < this.links.length; i++) {
+    const n0 = this.links.length
+    // newest link first (the object list updates newer objects first); a link spawned now updates from the next tick
+    for (let i = n0 - 1; i >= 0; i--) {
       const L = this.links[i]
-      L[2]++
+      L.t++
       const m = (i + 1) * (i + 1)
-      L[3] = Math.max(-m, Math.min(m, L[3] + perp * (m / 2)))
-      if (L[2] === 8 && i === this.links.length - 1 && this.links.length < this.n) this.links.push([L[0] + dx * 16, L[1] + dy * 16, 0, 0])
+      L.s = Math.max(-m, Math.min(m, L.s + perp * (m / 2)))
+      if (L.t === 8 && i === n0 - 1 && this.links.length < this.n) this.addLink(L.x + dx * 16, L.y + dy * 16)
+      // one message to the first receiver, with the box of the previous tick (accepted: sound 48 + rand(2))
+      if (broadcast(w, { team: 1, rect: L.box, dir: this.dir, mult: this.mult, atk: this.atk, attacker: this.owner, source: this }, true)) {
+        audioEvent('sfx', { id: 48 + w.rng.rand(2, 'flame hit sfx'), vol: 64 })
+      }
+      const [x, y] = this.at(i)
+      L.box = this.recBox(FLAME_TABLE + 0x54 * this.dir + 12 * this.frame(i), x, y)
     }
   }
   draw(r: Renderer) {
-    const [dx] = DIR_VEC[this.dir]
     const bank = this.ctx.data.sprites
-    this.links.forEach((L, i) => {
-      let f = L[2] >> 2
-      const last = i === this.n - 1
-      if (last) {
-        if (f >= 7) {
-          f = (f & 3) + 4
-          if (f === 7) f = 5
-        }
-      } else if (f >= 4) {
-        f &= 3
-        if (f === 0) f = 2
-      }
-      const s = Math.trunc(L[3])
-      drawRecAddr(r, bank, FLAME_TABLE + 0x54 * this.dir + 12 * f, L[0] + (dx ? 0 : s), L[1] + (dx ? s : 0))
+    this.links.forEach((_, i) => {
+      const [x, y] = this.at(i)
+      drawRecAddr(r, bank, FLAME_TABLE + 0x54 * this.dir + 12 * this.frame(i), x, y)
     })
   }
 }

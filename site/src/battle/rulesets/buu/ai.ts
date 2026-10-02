@@ -65,7 +65,6 @@ export class AiController {
   private note(id: number) {
     this.history.push({ frame: this.w?.frame ?? 0, state: id })
     if (this.history.length > 24) this.history.shift()
-    this.e.stateStamp = this.w?.frame ?? 0
   }
   push(id: number) {
     if (this.stack.length >= 8) return
@@ -90,7 +89,6 @@ export class AiController {
     this.gen++
     const old = this.stack.pop()!
     old.rt.exit()
-    this.e.stateStamp = this.w.frame
   }
   reset(id: number) {
     for (const s of this.stack.reverse()) s.rt.exit()
@@ -101,12 +99,11 @@ export class AiController {
     const t = this.top()
     if (!t) return
     const g = this.gen
-    const r = t.rt.update()
-    // a finished root is restarted (the state's tree runs again)
-    if (r && g === this.gen && this.top() === t) {
-      t.rt.exit()
-      t.rt.enter()
-    }
+    // 0x0800AB0C ignores the root's result: a finished tree is not restarted (its composites keep their state;
+    // emulator: the Majin Fighter's 0x14C Sequence[StandStill, FacePlayer] is not re-entered, lockstep
+    // f02_vs_enemy_melee)
+    void g
+    t.rt.update()
   }
   /** on-hit: the top state's aux tree; returns true when the hit was taken (message accepted) */
   onHit(msg: HitMsg): number {
@@ -213,8 +210,11 @@ function onHit(n: AiNodeJ, c: AiController, msg: HitMsg): number {
       e.lastHitDir = msg.dir
       return 1
     case 'HealFraction':
+      // 0x0803A79C: amount = (s32)(dmg * frac) >> 16, a 32-bit product. With frac 100% (Yakon's energy absorb) that
+      // is the low 16 bits of the damage, sign-extended: a hit whose damage has bit 15 set (32..64 HP, mod 64)
+      // wraps negative and hurts instead of healing (re/buu/YAKON.md, VERIFIED)
       if (msg.mult === 0) return 1
-      e.heal(Math.floor(((msg.dmg ?? 0) * P(n, 'frac')) / 65536))
+      e.heal(Math.imul(msg.dmg ?? 0, P(n, 'frac')) >> 16)
       return 1
     case 'GlideToWaypoint':
       // 0x0803C08D: accepted only while the player swings (bats the ball back); each accepted hit plays one of
@@ -288,15 +288,23 @@ class Sequence extends Base {
     this.i = 0
     this.kids[0]?.enter()
   }
+  /** 0x08018F0C: a finished child exits and the next one enters; after the last the index wraps to 0 WITHOUT
+   *  entering the first child again (the next update runs it as it is) and the sequence reports done */
   update() {
-    if (this.i >= this.kids.length) return 1
+    if (this.i >= this.kids.length) {
+      this.i = 0
+      return 1
+    }
     const g = this.c.gen
     const r = this.kids[this.i].update()
     if (g !== this.c.gen) return 0
     if (!r) return 0
     this.kids[this.i].exit()
     this.i++
-    if (this.i >= this.kids.length) return 1
+    if (this.i >= this.kids.length) {
+      this.i = 0
+      return 1
+    }
     this.kids[this.i].enter()
     return 0
   }
@@ -618,7 +626,9 @@ export function create(n: AiNodeJ, c: AiController): RNode {
     case 'PartMirrorAnim':
       return new Act(n, c, () => !e.moving && e.setAnim('idle', false, true), () => false)
     case 'StandStill':
-      return new Instant(n, c, () => e.setAnim('idle', false, true))
+      // enter 0x0804E50C: SetAnim(0) (the idle state's enter draws its start tick, rand(255)); the update just succeeds
+      // (emulator: lockstep f02_vs_enemy_melee, the aggro frame)
+      return new Act(n, c, () => e.setAnim('idle', true, true), () => true)
     case 'FacePlayer':
       return new Instant(n, c, () => e.facePlayer())
     case 'Wait':
@@ -685,7 +695,8 @@ export function create(n: AiNodeJ, c: AiController): RNode {
     // enemy_ai.json: StepTowardPlayer (renamed in data.ts AI_RENAME): the game backs off, facing the player
     case 'BackOffFacingPlayer':
     case 'BackOffFacingPlayerThroughRocks':
-      return new Act(n, c, () => undefined, () => e.stepFromPlayer(speed, true))
+      // enter 0x08018CE0: SetAnimRaw(1) + state 0x03002B9C, the walk cycle played backwards (tick 0x08018C24)
+      return new Act(n, c, () => e.setAnim(1, true, true, { rule: 'reverse' }), () => e.stepFromPlayer(speed, true))
     case 'StepAwayFromPlayer':
       return new Act(n, c, () => undefined, () => e.stepFromPlayer(speed, false))
     case 'WalkToPlayer': {
@@ -813,10 +824,11 @@ export function create(n: AiNodeJ, c: AiController): RNode {
 
     // ---- melee --------------------------------------------------------------------------------------------------------
     case 'MeleeAttack':
-      // controller 0x03001B50: hit test once on the switch frame, 16-frame punch
+      // 0x0802A0C4: hit test once on the switch frame (an accepted hit plays its sound), then SetAnim(4 + rand(n)),
+      // n = the sprite's punch animations (create fn 0x0802A288); the punch state 0x03001B50 plays the swing sound
       return new Act(n, c, () => {
-        e.meleeStrike(0x400, true)
-        e.setAnim([4 + (e.w.frame % 3), 4], true, false)
+        if (e.meleeStrike(0x400, true)) e.meleeHitSfx()
+        e.setAnim(4 + e.w.rng.rand(e.punchAnims(), 'enemy punch anim'), true, false)
       }, (f) => f >= 16)
     case 'BioMechPunch':
       return new Act(n, c, () => {

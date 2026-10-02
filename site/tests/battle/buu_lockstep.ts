@@ -8,7 +8,9 @@ import { World } from '../../src/battle/core/world'
 import { DIR_NAMES, type Dir } from '../../src/battle/core/geom'
 import { BuuRng } from '../../src/battle/rulesets/buu/rng'
 import { buuRuleset } from '../../src/battle/rulesets/buu'
-import { ATK } from '../../src/battle/rulesets/buu/damage'
+import { ATK, setDamageObserver } from '../../src/battle/rulesets/buu/damage'
+import type { AiNodeJ } from '../../src/battle/rulesets/buu/data'
+import type { Enemy } from '../../src/battle/rulesets/buu/enemy'
 import { broadcast, type Actor } from '../../src/battle/rulesets/buu/actor'
 import { setAudioSink } from '../../src/battle/audio/bus'
 import type { BattleConfig, RulesetBattle } from '../../src/battle/core/ruleset'
@@ -39,13 +41,29 @@ export interface LsTrace {
     state: string
     rng: [number, number]
     rec: { char: number; form: number; hp: number; maxHp: number; ep: number; maxEp: number; base: number[]; eff: number[]; skills: number[]; slot: number; levels: number[]; ssGauge: number; ss3Gauge: number; equip: number[] }
-    obj: { walk: number; dash: number; stats: number[]; regen?: number; ssacc?: number; cooldown?: number; idlecnt?: number; camera?: [number, number]; beepAge?: number }
+    obj: { walk: number; dash: number; stats: number[]; regen?: number; ssacc?: number; cooldown?: number; idlecnt?: number; camera?: [number, number]; beepAge?: number; hittable?: number; ctl10?: number }
+    partner?: Player['partner']
+    /** enemy scenarios: the enemy at frame 0 (24.8 footprint position, facing, HP << 10, type, footprint) */
+    enemy?: { x: number; y: number; dir: number; hp: number; type: number; foot: [number, number]; raw?: number; frame?: number; tick?: number; mark1Age?: number; mark2Age?: number }
   }
   states: string[]
   /** [n, x, y, dx, dy, dir, raw, frame, state, hp, ep, form, rom] */
   rows: number[][]
-  /** [frame, kind, id?, vol?] */
+  /** [frame, kind, id?, vol?]; kind 'dmg': [frame, 'dmg', target (0 player, 1 the enemy, -1 other), damage 1/1024] */
   sfx: (string | number)[][]
+  /** enemy scenarios: [n, x, y, dx, dy, dir, hp] */
+  erows?: number[][]
+  /** lag frames: the game logic did not run (frame counter 0x03000F94 unchanged) */
+  lag?: number[]
+}
+
+export interface LsEnemyScn {
+  type: number
+  at: [number, number]
+  hp?: number
+  aggro?: boolean
+  /** default true: a target dummy (see patchDummy) */
+  dummy?: boolean
 }
 
 export interface LsRow {
@@ -62,6 +80,13 @@ export interface LsRow {
   /** RNG state word 0 (0x03004A5C): catches a draw too many / too few on the frame it happens */
   rng?: number
   sfx: string[]
+  /** ComputeDamage results of the frame: 'target:damage' */
+  dmg: string[]
+  /** enemy scenarios: the enemy's 24.8 position, facing and HP << 10 */
+  ex?: number
+  ey?: number
+  edir?: number
+  ehp?: number
 }
 
 export function loadTraces(filter?: string): LsTrace[] {
@@ -82,22 +107,84 @@ export function expand(t: LsTrace): LsRow[] {
   const out: LsRow[] = []
   for (const g of t.rows) {
     const [n, x, y, dx, dy, dir, raw, frame, st, hp, ep, form, rom, rng] = g
-    for (let i = 0; i < n; i++) out.push({ x: x + dx * i, y: y + dy * i, dir, raw, frame, state: t.states[st], hp, ep, form, rom, rng, sfx: [] })
+    for (let i = 0; i < n; i++) out.push({ x: x + dx * i, y: y + dy * i, dir, raw, frame, state: t.states[st], hp, ep, form, rom, rng, sfx: [], dmg: [] })
   }
   for (const s of t.sfx) {
     const r = out[(s[0] as number) - 1]
-    if (r) r.sfx.push(sfxKey(s.slice(1)))
+    if (!r) continue
+    if (s[1] === 'dmg') r.dmg.push(`${s[2]}:${s[3]}`)
+    else r.sfx.push(sfxKey(s.slice(1)))
+  }
+  if (t.erows) {
+    let i = 0
+    for (const [n, x, y, dx, dy, dir, hp] of t.erows) {
+      for (let k = 0; k < n; k++, i++) {
+        const r = out[i]
+        if (!r) break
+        r.ex = x + dx * k
+        r.ey = y + dy * k
+        r.edir = dir
+        r.ehp = hp
+      }
+    }
   }
   return out
 }
 
 const FIGHTER_OF_CHAR = ['goku', 'gohan', 'goten', 'trunks', 'vegeta', 'gotenks', 'vegito', 'gogeta']
 
+/** Majin Fighter state 0x14B's aggro test (IfPlayerWithin2 r2 = 10000 at ROM 0x087043F8 + 0xC): the emulator
+ *  scenarios patch it to -1 (never aggro: signed dist2 <= r2); the simulator patches its decoded node the same way while a trace runs */
+const MAJIN_AGGRO_NODE = '0x87043f8'
+function findNode(n: AiNodeJ, addr: string): AiNodeJ | null {
+  if (n.addr === addr) return n
+  for (const c of n.children ?? []) {
+    const r = findNode(c, addr)
+    if (r) return r
+  }
+  return null
+}
+function patchAggro(on: boolean): () => void {
+  const d = buuData()
+  const nodes: AiNodeJ[] = []
+  for (const root of d.states.values()) {
+    const n = findNode(root, MAJIN_AGGRO_NODE)
+    if (n && !nodes.includes(n)) nodes.push(n)
+  }
+  const old = nodes.map((n) => n.params!.r2.raw)
+  if (!on) for (const n of nodes) n.params!.r2.raw = -1
+  return () => nodes.forEach((n, i) => (n.params!.r2.raw = old[i]))
+}
+/** target dummy (emulator: state table 0x0870F514 entry 0x14B's aux pointer -> the ApplyDamage node 0x086FDA00): the
+ *  Majin Fighter's idle state takes hits as HP loss only (no reaction, knockback or AI change) */
+const APPLY_DAMAGE_NODE = '0x86fda00'
+function patchDummy(on: boolean): () => void {
+  const d = buuData()
+  const old = d.aux.get(0x14b)
+  if (on) {
+    let node: AiNodeJ | null = null
+    for (const root of d.aux.values()) node ??= findNode(root, APPLY_DAMAGE_NODE)
+    d.aux.set(0x14b, node!)
+  }
+  return () => d.aux.set(0x14b, old!)
+}
+/** the scenario's ROM patches applied to the simulator's decoded AI (restore with the returned function) */
+export function patchScenario(t: LsTrace): () => void {
+  const en = t.scenario.enemy as LsEnemyScn | undefined
+  const a = patchAggro(!en || !!en.aggro)
+  const b = patchDummy(!!en && en.dummy !== false)
+  return () => {
+    b()
+    a()
+  }
+}
+
 /** build the simulator at the trace's frame 0 */
-export function setupSim(t: LsTrace): { w: World; player: Player; battle: RulesetBattle } {
+export function setupSim(t: LsTrace): { w: World; player: Player; battle: RulesetBattle; enemy: Enemy | null } {
   const d = buuData()
   const rs = buuRuleset
   const ini = t.init
+  const en = t.scenario.enemy as LsEnemyScn | undefined
   // the record's form at frame 0 (an SS3 form with a small gauge may already have reverted while settling)
   const form = ini.rec.form ?? t.scenario.form
   const char = d.forms[t.scenario.form].char
@@ -109,8 +196,8 @@ export function setupSim(t: LsTrace): { w: World; player: Player; battle: Rulese
       form,
       options: { growth: 'average', autoSpend: 'none', skillLevel: String(ini.rec.levels[0] ?? 0), eq_body: String(eq[0]), eq_hands: String(eq[1]), eq_feet: String(eq[2]), eq_accessory: String(eq[3]) },
     }),
-    phases: [{ enemy: 't-1', count: 1 }],
-    arena: (t.scenario.arena as string | undefined) ?? 'htc',
+    phases: [{ enemy: en ? `t${ini.enemy?.type ?? en.type}` : 't-1', count: 1 }],
+    arena: (t.scenario.arena as string | undefined) ?? (en ? 'forest' : 'htc'),
     seed: 1,
     options: { popups: false },
   }
@@ -132,7 +219,12 @@ export function setupSim(t: LsTrace): { w: World; player: Player; battle: Rulese
   p.x = ini.x
   p.y = ini.y
   p.facing = ini.dir as Dir
-  p.lockstepInit(ini.raw, ini.frame, ini.tick)
+  p.lockstepInit(ini.raw, ini.frame, ini.tick, ini.state)
+  // the story Trunks form objects' countdown (+0xC), the cutscene fusion's (+0x10) and its partner's record
+  if (p.storyForm() && ini.obj.regen != null) p.storyCnt = ini.obj.regen | 0
+  if (p.form.controller === 0x3001b64 && ini.obj.ctl10 != null) p.fusCnt = ini.obj.ctl10 | 0
+  if (ini.partner) p.partner = ini.partner
+  if (ini.obj.hittable != null) p.hittable = !!ini.obj.hittable
   // the form controller's accumulators (player+0x22C object: +0xC EP regen, +0x14 SS / SS3 drain)
   if (ini.obj.regen != null) p.regenTimer = ini.obj.regen & 0xffff
   if (ini.obj.ssacc != null && (p.form.ss || p.form.ss3)) p.ssAcc = ini.obj.ssacc & 0xffff
@@ -140,21 +232,62 @@ export function setupSim(t: LsTrace): { w: World; player: Player; battle: Rulese
   if (ini.obj.idlecnt != null) p.sCnt = ini.obj.idlecnt
   if (ini.obj.camera) p.ctx.setCamera(ini.obj.camera[0] | 0, ini.obj.camera[1] | 0)
   if (ini.obj.beepAge != null) p.ctx.lastBeep = -ini.obj.beepAge
+  let enemy: Enemy | null = null
+  if (en && ini.enemy) {
+    enemy = w.entities.find((e) => e.kind === 'enemy') as Enemy
+    enemy.unmarkSelf()
+    enemy.x = ini.enemy.x
+    enemy.y = ini.enemy.y
+    enemy.markSelf()
+    enemy.facing = ini.enemy.dir as Dir
+    enemy.hp1024 = ini.enemy.hp
+    // its animation state and creation stamps (obj+0x1E8 / +0x1EC) at frame 0
+    const ie = ini.enemy
+    if (ie.raw != null && ie.raw > 0) {
+      const a = enemy.sprite?.anim(ie.raw)
+      if (a) enemy.anim = a
+      enemy.ea.pos = { raw: ie.raw, frame: ie.frame ?? 0, tick: ie.tick ?? 0 }
+      enemy.frameIdx = ie.frame ?? 0
+    }
+    if (ie.mark1Age != null && ie.mark1Age < 1e6) enemy.mark1 = -ie.mark1Age
+    if (ie.mark2Age != null && ie.mark2Age < 1e6) enemy.mark2 = -ie.mark2Age
+  }
   w.rng.setState(ini.rng)
-  return { w, player: p, battle }
+  return { w, player: p, battle, enemy }
 }
 
-function simRow(w: World, p: Player, sfx: string[]): LsRow {
+function simRow(w: World, p: Player, e: Enemy | null, sfx: string[], dmg: string[]): LsRow {
   const v = p.lockstepView()
-  return { x: p.x, y: p.y, dir: p.facing, raw: v.raw, frame: v.frame, state: v.state, hp: p.hp, ep: p.ep, form: p.form.id, rom: v.rom, rng: w.rng.getState()[0] >>> 0, sfx }
+  const r: LsRow = { x: p.x, y: p.y, dir: p.facing, raw: v.raw, frame: v.frame, state: v.state, hp: p.hp, ep: p.ep, form: p.form.id, rom: v.rom, rng: w.rng.getState()[0] >>> 0, sfx, dmg }
+  if (e) {
+    r.ex = e.x
+    r.ey = e.y
+    r.edir = e.facing
+    r.ehp = e.hp1024
+  }
+  return r
 }
 
 /** run the trace's inputs in the simulator -> one row per frame */
 export function replay(t: LsTrace): LsRow[] {
-  const { w, player, battle } = setupSim(t)
+  const restore = patchScenario(t)
+  try {
+    return replayIn(t)
+  } finally {
+    restore()
+    setDamageObserver(null)
+  }
+}
+
+function replayIn(t: LsTrace): LsRow[] {
+  const { w, player, battle, enemy } = setupSim(t)
   const hits = new Map((t.scenario.hits ?? []).map((h) => [h.at, h]))
   const out: LsRow[] = []
   let sfx: string[] = []
+  let dmg: string[] = []
+  setDamageObserver((def, res) => {
+    dmg.push(`${def === player.stats ? 0 : enemy && def === enemy.stats ? 1 : -1}:${res.dmg}`)
+  })
   setAudioSink((type, data) => {
     if (type === 'sfx') sfx.push(sfxKey(['play', data!.id!, data!.vol ?? 64]))
     else if (type === 'sfx_stop') sfx.push(sfxKey(['stop', data!.id!]))
@@ -163,10 +296,13 @@ export function replay(t: LsTrace): LsRow[] {
   })
   // the emulator injects hits at the start of the frame's game update: an entity at the end of the list (the world
   // updates last to first) does the same here, after World.step advanced the frame counter
+  // lag frames (the emulator's game logic did not run): no step, the input is not read
+  const lag = new Set(t.lag ?? [])
+  let f = 0
   const hook = {
     id: 0, kind: 'lockstep', removed: false, layer: 0, depth: () => 0, draw: () => undefined,
     update: (ww: World) => {
-      const h = hits.get(ww.frame)
+      const h = hits.get(f)
       if (h) injectHit(ww, player, h)
     },
   }
@@ -175,13 +311,19 @@ export function replay(t: LsTrace): LsRow[] {
     let prev = 0
     for (const [keys, n] of t.input) {
       for (let i = 0; i < n; i++) {
+        f++
         sfx = []
+        dmg = []
+        if (lag.has(f)) {
+          out.push(simRow(w, player, enemy, sfx, dmg))
+          continue
+        }
         const inp = { held: keys, pressed: keys & ~prev, released: prev & ~keys }
         battle.preStep?.(w, inp)
         w.step(inp)
         battle.postStep?.(w)
         prev = keys
-        out.push(simRow(w, player, sfx))
+        out.push(simRow(w, player, enemy, sfx, dmg))
       }
     }
   } finally {
@@ -209,7 +351,7 @@ export interface Divergence {
   got: LsRow
 }
 
-const FIELDS: (keyof LsRow)[] = ['state', 'raw', 'frame', 'dir', 'x', 'y', 'hp', 'ep', 'form', 'rom', 'sfx', 'rng']
+const FIELDS: (keyof LsRow)[] = ['state', 'raw', 'frame', 'dir', 'x', 'y', 'hp', 'ep', 'form', 'rom', 'sfx', 'dmg', 'ex', 'ey', 'edir', 'ehp', 'rng']
 
 export function compare(exp: LsRow[], got: LsRow[], skip: (keyof LsRow)[] = []): Divergence | null {
   for (let i = 0; i < exp.length; i++) {
@@ -228,8 +370,9 @@ export function compare(exp: LsRow[], got: LsRow[], skip: (keyof LsRow)[] = []):
       if (noAnim && (k === 'raw' || k === 'frame' || k === 'rom')) continue
       if (swapped && k === 'raw') continue
       if (k === 'rng' && e.rng == null) continue
-      const a = k === 'sfx' ? e.sfx.join(' ') : e[k]
-      const b = k === 'sfx' ? g.sfx.join(' ') : g[k]
+      if ((k === 'ex' || k === 'ey' || k === 'edir' || k === 'ehp' || k === 'dmg') && e.ex == null) continue
+      const a = k === 'sfx' ? e.sfx.join(' ') : k === 'dmg' ? [...e.dmg].sort().join(' ') : e[k]
+      const b = k === 'sfx' ? g.sfx.join(' ') : k === 'dmg' ? [...g.dmg].sort().join(' ') : g[k]
       if (a !== b) bad.push(k)
     }
     if (bad.length) return { frame: i + 1, fields: bad, exp: e, got: g }
@@ -238,7 +381,9 @@ export function compare(exp: LsRow[], got: LsRow[], skip: (keyof LsRow)[] = []):
 }
 
 const fmt = (r: LsRow) =>
-  `${r.state.padEnd(12)} raw ${String(r.raw).padStart(2)} f ${String(r.frame).padStart(2)} dir ${r.dir} pos ${(r.x / 256).toFixed(2)},${(r.y / 256).toFixed(2)} hp ${r.hp} ep ${r.ep} form ${r.form} rom ${r.rom.toString(16)} rng ${(r.rng ?? 0).toString(16).padStart(8, '0')} ${r.sfx.join(' ')}`
+  `${r.state.padEnd(12)} raw ${String(r.raw).padStart(2)} f ${String(r.frame).padStart(2)} dir ${r.dir} pos ${(r.x / 256).toFixed(2)},${(r.y / 256).toFixed(2)} hp ${r.hp} ep ${r.ep} form ${r.form} rom ${r.rom.toString(16)} rng ${(r.rng ?? 0).toString(16).padStart(8, '0')} ${r.sfx.join(' ')}` +
+  (r.ex != null ? ` | E ${(r.ex / 256).toFixed(2)},${(r.ey! / 256).toFixed(2)} d${r.edir} hp ${(r.ehp! / 1024).toFixed(2)}` : '') +
+  (r.dmg.length ? ` dmg ${r.dmg.join(' ')}` : '')
 
 /** human-readable report of the first divergence with `ctx` frames before it */
 export function report(t: LsTrace, exp: LsRow[], got: LsRow[], d: Divergence, ctx = 6): string {

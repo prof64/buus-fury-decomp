@@ -46,7 +46,31 @@ def encode(trace):
                     continue
         segs.append([1, r['x'], r['y'], 0, 0] + key)
     init = trace['init']
-    return {'name': trace['name'], 'scenario': trace['scenario'], 'input': trace['input'], 'init': init, 'states': states, 'rows': segs, 'sfx': sfx}
+    out = {'name': trace['name'], 'scenario': trace['scenario'], 'input': trace['input'], 'init': init, 'states': states, 'rows': segs, 'sfx': sfx}
+    lag = [i + 1 for i, r in enumerate(trace['frames']) if r.get('lag')]
+    if lag:
+        out['lag'] = lag
+    if trace['frames'] and 'enemy' in trace['frames'][0]:
+        out['erows'] = rle([[r['enemy']['x'], r['enemy']['y'], r['enemy']['dir'], r['enemy']['hp']] for r in trace['frames']])
+    return out
+
+
+def rle(vals):
+    """[[x, y, rest...]] -> [[n, x, y, dx, dy, rest...]] (position advancing by dx, dy per frame)"""
+    segs = []
+    for v in vals:
+        if segs:
+            g = segs[-1]
+            if g[5:] == v[2:]:
+                if g[0] == 1:
+                    g[3], g[4] = v[0] - g[1], v[1] - g[2]
+                    g[0] += 1
+                    continue
+                if v[0] - (g[1] + g[3] * (g[0] - 1)) == g[3] and v[1] - (g[2] + g[4] * (g[0] - 1)) == g[4]:
+                    g[0] += 1
+                    continue
+        segs.append([1, v[0], v[1], 0, 0] + v[2:])
+    return segs
 
 
 def show(trace):
@@ -54,9 +78,11 @@ def show(trace):
     for i, r in enumerate(trace['frames']):
         key = (r['raw'], r['frame'], r['state'], r['dir'], r['form'])
         s = r.get('sfx', '')
+        en = r.get('enemy')
+        es = ' | enemy %.2f,%.2f dir=%d hp=%.2f' % (en['x'] / 256, en['y'] / 256, en['dir'], en['hp'] / 1024) if en else ''
         if key != prev or s:
-            print('  %4d %-14s raw=%2d f=%2d t=%4d dir=%d pos=%.2f,%.2f hp=%d ep=%d form=%d %s' % (
-                i + 1, r['state'], r['raw'], r['frame'], r['tick'], r['dir'], r['x'] / 256, r['y'] / 256, r['hp'], r['ep'], r['form'], s))
+            print('  %4d %-14s raw=%2d f=%2d t=%4d dir=%d pos=%.2f,%.2f hp=%d ep=%d form=%d %s%s' % (
+                i + 1, r['state'], r['raw'], r['frame'], r['tick'], r['dir'], r['x'] / 256, r['y'] / 256, r['hp'], r['ep'], r['form'], s, es))
         prev = key
 
 

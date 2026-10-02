@@ -14,6 +14,7 @@ import { ATK, computeDamage, type AttackType } from './damage'
 import type { EnemyType } from './data'
 import { StraightShot, type GrowBeam } from './projectiles'
 import { audioEvent } from '../../audio/bus'
+import { EnemyAnim, setAnimRule, type EAnimRule } from './eanim'
 
 const GUN_MUZZLE = [[4, 4], [13, -24], [-8, -8], [24, -8]]
 const GUN_BOX: [number, number, number, number][] = [[3, 10, 8, 16], [3, 5, 8, 16], [5, 4, 16, 8], [10, 4, 16, 8]]
@@ -40,7 +41,8 @@ export class Enemy extends Actor implements EnemyLike {
   counter = 0
   mark1 = -100000
   mark2 = -100000
-  stateStamp = 0
+  /** obj+0x210: frame of the last Block exit (IfTimeInState counts from it; never set = long ago) */
+  stateStamp = -100000
   stunned = false
   lastHitDir: Dir = 0
   /** obj+0x294: the last accepted hit was critical (hit struct +0x10, written by ComputeDamage) - "launched" */
@@ -74,6 +76,14 @@ export class Enemy extends Actor implements EnemyLike {
   contactCd = 0
   partOffset: [number, number] | null = null
   scriptHits = 0
+  /** the game's animation timing (eanim.ts): obj+0x50 raw / +0x11 frame / +0x12 tick under the state rule */
+  ea = new EnemyAnim({
+    nframes: (raw) => this.sprite?.anim(raw)?.steps(this.facing).length ?? 0,
+    rand: (n, label) => (this.w ? this.w.rng.rand(n, label) : 0),
+    sfx: (id, vol) => audioEvent('sfx', { id, vol }),
+  })
+  /** the last one-shot ran out (its end callback fired) */
+  animEnded = false
   constructor(ctx: BuuCtx, type: EnemyType, label?: string) {
     super()
     this.ctx = ctx
@@ -103,8 +113,9 @@ export class Enemy extends Actor implements EnemyLike {
 
   start(w: World, state = this.type.ai) {
     this.w = w
-    // obj+0x1E8 / +0x1EC are stamped with the frame counter at creation (Janemba waits 240 f from its spawn)
-    this.mark1 = this.mark2 = this.stateStamp = w.frame
+    // obj+0x1E8 / +0x1EC are stamped with the frame counter at creation (Janemba waits 240 f from its spawn); obj+0x210
+    // (IfTimeInState) only by the Block node's exit: 0 at creation (emulator: still 0 after a spawn and state changes)
+    this.mark1 = this.mark2 = w.frame
     this.ai.push(state)
   }
 
@@ -138,15 +149,67 @@ export class Enemy extends Actor implements EnemyLike {
     }
   }
 
+  // ---- animation (tools/battle/ENEMY_ANIM.md) ---------------------------------------------------------------------
+  /** SetAnim / SetAnimRaw + SetState: the state rule for the raw comes from the type's recorded rules
+   *  (buu_enemy_anim_sim.json), else the enemy SetAnim table (0x080726B8); `rule` forces one (e.g. the back-off's
+   *  reversed walk). Re-entering restarts the state (idle draws a new start tick). */
+  setAnim(ref: number | string | (number | string)[], restart = true, loop?: boolean, rule?: EAnimRule) {
+    const prev = this.anim
+    super.setAnim(ref, restart, loop)
+    if (!this.anim || !this.ea) return
+    if (this.anim === prev && !restart && !rule) return
+    const raw = this.anim.raw
+    const r = rule ?? this.type.anim?.[String(raw)] ?? setAnimRule(raw) ?? { rule: loop === false ? 'once_stop' : 'loop', shift: 3, end: 'none' }
+    this.animEnded = false
+    this.ea.enter(raw, r)
+    this.frameIdx = this.ea.pos.frame
+  }
+  tickAnim() {
+    super.tickAnim()
+    if (!this.anim) return
+    // the state's tick (vtable +4) runs before the AI; a one-shot's end callback is SetAnim(0)
+    if (this.ea.tick() === 'idle') {
+      this.setAnim('idle', true, true)
+      this.animEnded = true
+    } else if (this.ea.pos.raw !== this.anim.raw) {
+      const a = this.sprite?.anim(this.ea.pos.raw)
+      if (a) this.anim = a
+    }
+    this.frameIdx = this.ea.pos.frame
+  }
+  animDone(): boolean {
+    if (!this.anim) return true
+    const k = this.ea.r.rule
+    if (k === 'once' || k === 'once_stop' || k === 'seq') return this.ea.done || this.animEnded
+    // looping states never end by themselves: keep the time-based answer the AI nodes expect
+    return this.animEnded || super.animDone()
+  }
+  /** MeleeAttack 0x0802A0C4: the number of punch animations (raw 5 / 6 / 7 present, create fn 0x0802A288) */
+  punchAnims(): number {
+    const s = this.sprite
+    if (!s) return 0
+    return s.anim(7) ? 3 : s.anim(6) ? 2 : s.anim(5) ? 1 : 0
+  }
+  /** the sound of an accepted melee hit on the player (0x0802A1D4): gfx 0x60 / 0xE5 / 0xDC -> 30, 0xEE / 0xF4 /
+   *  0xED -> 62, else 48 + rand(2) */
+  meleeHitSfx() {
+    const g = this.type.gfx
+    if (g === 0x60 || g === 0xe5 || g === 0xdc) audioEvent('sfx', { id: 30, vol: 64 })
+    else if (g === 0xee || g === 0xf4 || g === 0xed) audioEvent('sfx', { id: 62, vol: 64 })
+    else audioEvent('sfx', { id: 48 + this.w.rng.rand(2, 'enemy melee hit sfx'), vol: 64 })
+  }
+
   // ---- geometry helpers -------------------------------------------------------------------------------------
   playerAlive() {
     return !!this.player
   }
+  /** footprint centre to footprint centre (0x0800FDFA box: 24.8 position >> 8 + obj+0x19C / +0x19D; the distance
+   *  conditions 0x08029C90 / 0x08029BE0 compare dx*dx + dy*dy <= r2) */
   toPlayer(): [number, number] {
     const p = this.player
     if (!p) return [9999, 9999]
-    const [px, py] = p.center()
-    const [x, y] = this.center()
+    const [px, py] = p.footCenter()
+    const [x, y] = this.footCenter()
     return [px - x, py - y]
   }
   dist2() {
@@ -376,9 +439,7 @@ export class Enemy extends Actor implements EnemyLike {
    *  each frame until n is back to 0 or the sidestep is blocked (n = 0); while n != 0 no direct step is tried. */
   /** index of the shown animation step (the engine's obj+0x11 frame number) */
   animFrame(): number {
-    if (!this.anim) return 0
-    const step = this.anim.stepAt(this.facing, this.animT, this.animLoop)
-    return step ? this.anim.steps(this.facing).indexOf(step) : 0
+    return this.anim ? this.ea.pos.frame : 0
   }
   walkToPlayer(speed: number, st: { n: number }, animFrame = this.animFrame()): boolean {
     // obj+0x11 = current animation frame: no step on frames 1 and 4 of the walk cycle
@@ -824,9 +885,10 @@ export class Enemy extends Actor implements EnemyLike {
   /** ApplyDamage -> vfunc +0x58 (0x0800FA2A): HP -= the computed damage; true when this hit killed the enemy */
   takeHit(msg: HitMsg): boolean {
     const w = this.w
-    if (this.hp1024 <= 0) return true
+    // 0x0800FA2A: only HP == 0 counts as already dead; a negative HP (see heal) still takes the hit and dies
+    if (this.hp1024 === 0) return true
     const dmg = msg.dmg ?? 0
-    const before = this.hp
+    const before = Math.max(0, this.hp)
     this.hp1024 -= dmg
     const shown = before - Math.max(0, this.hp)
     if (dmg > 0) {
@@ -856,10 +918,14 @@ export class Enemy extends Actor implements EnemyLike {
       this.onDeath()
     }
   }
+  /** vfunc +0x60 (0x0800FA80): HP += ceil(n / 1024) whole HP, capped at max HP. No death check: a negative amount
+   *  (HealFraction's 32-bit wrap) can leave HP <= 0 with the enemy still alive until its next ApplyDamage. */
   heal(n1024: number) {
-    if (n1024 <= 0) return
-    this.hp1024 = Math.min(this.maxHp1024, this.hp1024 + n1024)
-    if (n1024 >= 1024) this.w.popup('+' + Math.round(n1024 / 1024), this.center()[0], this.bodyBox().y0 - 4, '#7f7', 30)
+    const add = ((n1024 + 0x3ff) >> 10) << 10
+    if (add === 0) return
+    this.hp1024 = Math.min(this.maxHp1024, this.hp1024 + add)
+    if (add > 0) this.w.popup('+' + add / 1024, this.center()[0], this.bodyBox().y0 - 4, '#7f7', 30)
+    else this.ctx.damagePopup(this.w, this, -add / 1024, false, false)
   }
   scriptedDefeat() {
     this.hp1024 = 0
