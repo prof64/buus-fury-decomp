@@ -9,6 +9,7 @@
     s = e.save(); e.load(s)    # save states (bytes)
     e.watch(0x02001000, 0x02001004, 'w'); e.run(60); e.hits()  # writes + regs (pc = r15)
     e.breakpoint(0x08001234); e.run(1); e.hits()                 # slow while set
+    e.set_volume(0x100); pcm = e.run_audio(60)   # int16 stereo @ e.audio_rate
 """
 import ctypes
 import os
@@ -89,6 +90,12 @@ def _load():
         L.emu_hits.restype = u32
         L.emu_clear_hits.argtypes = [P]
         L.emu_close.argtypes = [P]
+        L.emu_set_volume.argtypes = [P, ctypes.c_int]
+        L.emu_audio_rate.argtypes = [P]
+        L.emu_audio_rate.restype = ctypes.c_uint
+        L.emu_audio_clear.argtypes = [P]
+        L.emu_run_frames_audio.argtypes = [P, ctypes.c_int, ctypes.POINTER(ctypes.c_int16), u32]
+        L.emu_run_frames_audio.restype = u32
     return _lib
 
 
@@ -201,6 +208,26 @@ class Emu:
         if clear:
             self.L.emu_clear_hits(self.h)
         return out
+
+    # --- audio (opt-in: the core starts muted)
+    def set_volume(self, volume=0x100):
+        """0 = mute (default), 0x100 = full GBA mixer output."""
+        self.L.emu_set_volume(self.h, volume)
+
+    @property
+    def audio_rate(self):
+        """Output sample rate in Hz (depends on the game's SOUNDBIAS resolution)."""
+        return self.L.emu_audio_rate(self.h)
+
+    def audio_clear(self):
+        self.L.emu_audio_clear(self.h)
+
+    def run_audio(self, frames=1):
+        """Run frames and return the produced audio as interleaved stereo int16 bytes."""
+        cap = frames * 2200 + 4096
+        buf = (ctypes.c_int16 * (cap * 2))()
+        n = self.L.emu_run_frames_audio(self.h, frames, buf, cap)
+        return ctypes.string_at(buf, n * 4)
 
     def close(self):
         self.L.emu_close(self.h)

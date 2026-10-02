@@ -9,6 +9,8 @@
 #include <mgba/internal/arm/arm.h>
 #include <mgba/internal/arm/debugger/debugger.h>
 #include <mgba-util/vfs.h>
+#include <mgba-util/audio-buffer.h>
+#include <mgba/internal/gba/gba.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -169,6 +171,32 @@ const uint32_t* emu_video(struct Emu* emu) { return emu->video; }
 size_t emu_state_size(struct Emu* emu) { return emu->core->stateSize(emu->core); }
 int emu_save_state(struct Emu* emu, void* buf) { return emu->core->saveState(emu->core, buf); }
 int emu_load_state(struct Emu* emu, const void* buf) { return emu->core->loadState(emu->core, buf); }
+
+// --- audio capture (opt-in; default volume stays 0 so existing callers are unaffected)
+void emu_set_volume(struct Emu* emu, int volume) {
+	struct GBA* gba = emu->core->board;
+	gba->audio.masterVolume = volume;
+}
+
+unsigned emu_audio_rate(struct Emu* emu) { return emu->core->audioSampleRate(emu->core); }
+
+// Discards anything buffered so far.
+void emu_audio_clear(struct Emu* emu) { mAudioBufferClear(emu->core->getAudioBuffer(emu->core)); }
+
+// Runs n frames, draining the stereo int16 output after every frame into out
+// (interleaved L/R, capacity maxFrames stereo frames). Returns frames written.
+uint32_t emu_run_frames_audio(struct Emu* emu, int n, int16_t* out, uint32_t maxFrames) {
+	struct mAudioBuffer* buf = emu->core->getAudioBuffer(emu->core);
+	uint32_t got = 0;
+	for (int i = 0; i < n; ++i) {
+		emu_run_frames(emu, 1);
+		size_t avail = mAudioBufferAvailable(buf);
+		if (avail > maxFrames - got) avail = maxFrames - got;
+		got += mAudioBufferRead(buf, out + got * 2, avail);
+		mAudioBufferClear(buf);
+	}
+	return got;
+}
 
 void emu_close(struct Emu* emu) {
 	emu->core->deinit(emu->core);

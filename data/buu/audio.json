@@ -1,0 +1,2994 @@
+{
+ "game": "buu",
+ "generated_by": "tools/audio/rip_buu.py",
+ "format_doc": "tools/audio/AUDIO.md",
+ "engine": {
+  "name": "Webfoot custom tracker driver (not MP2K)",
+  "mix_rate": 15978.3,
+  "output": "stereo, DMA A = left, DMA B = right, 8-bit",
+  "song_table": "0x083BB78C",
+  "sfx_table": "0x083192A8",
+  "play_song": "0x0803F110",
+  "play_sfx": "0x0803E378",
+  "stop_sfx": "0x0803E302",
+  "stop_all_sfx": "0x0803E2EC",
+  "sfx_voices": 16,
+  "sfx_policy": "first free voice of 16, otherwise the request is dropped; no priority, no per-sound limit; volume 0..64, pan s8"
+ },
+ "render": {
+  "sample_rate": 32000,
+  "source_rate": 32768,
+  "gain_db": 2.29,
+  "codec": "mp3 128k",
+  "loop_note": "loop.start/loop.end in seconds of the file; the loop is periodic from start, so jumping end->start is seamless even with a few ms of decoder offset"
+ },
+ "arena_music": {
+  "crater": 1,
+  "volcano": 19,
+  "hfil": 18,
+  "wasteland": 27,
+  "demon": 1,
+  "canyon": 47,
+  "yakon": 1,
+  "crater2": 42,
+  "htc": 21,
+  "stadium": 50,
+  "forest": 28
+ },
+ "boss_music": 44,
+ "events": {
+  "melee_swing": {
+   "sfx": [
+    50,
+    51
+   ]
+  },
+  "hit": {
+   "sfx": [
+    48,
+    49
+   ]
+  },
+  "ki_blast": {
+   "sfx": [
+    20,
+    21
+   ]
+  },
+  "charge": {
+   "sfx": [
+    3
+   ],
+   "loop": true
+  },
+  "beam": {
+   "sfx": [
+    32
+   ],
+   "loop": true
+  },
+  "beam_end": {
+   "sfx": [
+    33
+   ]
+  },
+  "wave": {
+   "sfx": [
+    34
+   ]
+  },
+  "big_bang": {
+   "sfx": [
+    23
+   ]
+  },
+  "dragon_fist": {
+   "sfx": [
+    24
+   ]
+  },
+  "energy_punch": {
+   "sfx": [
+    47
+   ]
+  },
+  "volleyball": {
+   "sfx": [
+    46
+   ]
+  },
+  "transform": {
+   "sfx": [
+    54
+   ]
+  },
+  "dash": {
+   "sfx": [
+    59
+   ]
+  },
+  "level_up": {
+   "sfx": [
+    36
+   ]
+  },
+  "low_hp": {
+   "sfx": [
+    41
+   ],
+   "volume": 32
+  },
+  "menu": {
+   "sfx": [
+    40
+   ]
+  },
+  "cursor": {
+   "sfx": [
+    39
+   ]
+  }
+ },
+ "area_scripts": [
+  {
+   "areas": "3-1 Hercule City",
+   "script": "0x08076C2C"
+  },
+  {
+   "areas": "3-2 Hercule City",
+   "script": "0x08076C2C"
+  },
+  {
+   "areas": "3-3 Hercule City",
+   "script": "0x08076C2C"
+  }
+ ],
+ "music": [
+  {
+   "id": 0,
+   "name": "Song 00 (no play site found)",
+   "kind": "music",
+   "file": "assets/buu/audio/music/00_song_00_no_play_site_found.mp3",
+   "duration": 48.472,
+   "loop": {
+    "start": 19.57394,
+    "end": 47.47205,
+    "match": 0.9337
+   },
+   "ends": false,
+   "context": "",
+   "confidence": "none",
+   "areas": [],
+   "scripts": [],
+   "evidence": "no reference found (area table, script bytecode, native calls)",
+   "tempo": 130,
+   "channels": 6,
+   "header": "0x083BB78C"
+  },
+  {
+   "id": 1,
+   "name": "Babidi's Ship",
+   "kind": "music",
+   "file": "assets/buu/audio/music/01_babidi_s_ship.mp3",
+   "duration": 100.7759,
+   "loop": {
+    "start": 37.62164,
+    "end": 99.77594,
+    "match": 0.9959
+   },
+   "ends": false,
+   "context": "Inside Babidi's Ship (8-18..8-69), Yakon's Planet (8-40), Demon World (8-68), Giant Crater (8-71)",
+   "confidence": "high",
+   "areas": [
+    "8-18 Inside Babidi's Ship",
+    "8-19 Inside Babidi's Ship",
+    "8-20 Inside Babidi's Ship",
+    "8-21 Inside Babidi's Ship",
+    "8-22 Inside Babidi's Ship",
+    "8-23 Inside Babidi's Ship",
+    "8-24 Inside Babidi's Ship",
+    "8-25 Inside Babidi's Ship",
+    "8-26 Inside Babidi's Ship",
+    "8-27 Inside Babidi's Ship",
+    "8-28 Inside Babidi's Ship",
+    "8-29 Inside Babidi's Ship",
+    "8-30 Inside Babidi's Ship",
+    "8-31 Inside Babidi's Ship",
+    "8-32 Inside Babidi's Ship",
+    "8-33 Inside Babidi's Ship",
+    "8-34 Inside Babidi's Ship",
+    "8-35 Inside Babidi's Ship",
+    "8-36 Inside Babidi's Ship",
+    "8-37 Inside Babidi's Ship",
+    "8-38 Inside Babidi's Ship",
+    "8-39 Inside Babidi's Ship",
+    "8-40 Yakon's Planet",
+    "8-41 Inside Babidi's Ship",
+    "8-42 Inside Babidi's Ship",
+    "8-43 Inside Babidi's Ship",
+    "8-44 Inside Babidi's Ship",
+    "8-45 Inside Babidi's Ship",
+    "8-46 Inside Babidi's Ship",
+    "8-47 Inside Babidi's Ship",
+    "8-48 Inside Babidi's Ship",
+    "8-49 Inside Babidi's Ship",
+    "8-50 Inside Babidi's Ship",
+    "8-51 Inside Babidi's Ship",
+    "8-52 Inside Babidi's Ship",
+    "8-53 Inside Babidi's Ship",
+    "8-54 Inside Babidi's Ship",
+    "8-55 Inside Babidi's Ship",
+    "8-56 Inside Babidi's Ship",
+    "8-57 Inside Babidi's Ship",
+    "8-58 Inside Babidi's Ship",
+    "8-59 Inside Babidi's Ship",
+    "8-60 Inside Babidi's Ship",
+    "8-61 Inside Babidi's Ship",
+    "8-62 Inside Babidi's Ship",
+    "8-63 Inside Babidi's Ship",
+    "8-64 Inside Babidi's Ship",
+    "8-65 Inside Babidi's Ship",
+    "8-66 Inside Babidi's Ship",
+    "8-67 Inside Babidi's Ship",
+    "8-68 Demon World",
+    "8-69 Inside Babidi's Ship",
+    "8-71 Giant Crater"
+   ],
+   "scripts": [],
+   "evidence": "area table +0x24",
+   "tempo": 140,
+   "channels": 6,
+   "header": "0x083BB7A0"
+  },
+  {
+   "id": 2,
+   "name": "Song 02 (no play site found)",
+   "kind": "music",
+   "file": "assets/buu/audio/music/02_song_02_no_play_site_found.mp3",
+   "duration": 52.2357,
+   "loop": {
+    "start": 12.67993,
+    "end": 51.23572,
+    "match": 0.9987
+   },
+   "ends": false,
+   "context": "",
+   "confidence": "none",
+   "areas": [],
+   "scripts": [],
+   "evidence": "no reference found (area table, script bytecode, native calls)",
+   "tempo": 150,
+   "channels": 6,
+   "header": "0x083BB7B4"
+  },
+  {
+   "id": 3,
+   "name": "Bulma's Airship (0-15)",
+   "kind": "music",
+   "file": "assets/buu/audio/music/03_bulma_s_airship_0_15.mp3",
+   "duration": 133.1075,
+   "loop": {
+    "start": 71.23898,
+    "end": 132.10754,
+    "match": 0.9834
+   },
+   "ends": false,
+   "context": "area 0-15, an unnamed map next to Bulma's Airship",
+   "confidence": "medium",
+   "areas": [
+    "0-15 (Bulma's Airship)"
+   ],
+   "scripts": [],
+   "evidence": "area table +0x24",
+   "tempo": 130,
+   "channels": 6,
+   "header": "0x083BB7C8"
+  },
+  {
+   "id": 4,
+   "name": "Capsule Corporation",
+   "kind": "music",
+   "file": "assets/buu/audio/music/04_capsule_corporation.mp3",
+   "duration": 171.5438,
+   "loop": {
+    "start": 77.48962,
+    "end": 170.54382,
+    "match": 0.9839
+   },
+   "ends": false,
+   "context": "Capsule Corp interiors 4-21..4-31 (Lobby, Computer Room, Exhibit Hall, Gravity Chamber, Dr. Brief's Lab)",
+   "confidence": "high",
+   "areas": [
+    "4-21 Lobby",
+    "4-22 Computer Room",
+    "4-23 Exhibit Hall",
+    "4-24 Atrium",
+    "4-25 Gravity Chamber",
+    "4-26 Exhibit Hall",
+    "4-30 Capsule Room",
+    "4-31 Dr. Brief's Lab"
+   ],
+   "scripts": [],
+   "evidence": "area table +0x24",
+   "tempo": 110,
+   "channels": 4,
+   "header": "0x083BB7DC"
+  },
+  {
+   "id": 5,
+   "name": "Musuka Circus",
+   "kind": "music",
+   "file": "assets/buu/audio/music/05_musuka_circus.mp3",
+   "duration": 57.7327,
+   "loop": {
+    "start": 0.57651,
+    "end": 56.73267,
+    "match": 1.0
+   },
+   "ends": false,
+   "context": "Musuka Circus 3-14..3-19",
+   "confidence": "high",
+   "areas": [
+    "3-14 Musuka Circus",
+    "3-15 Musuka Circus",
+    "3-16 Musuka Circus",
+    "3-17 Musuka Circus",
+    "3-18 Musuka Circus",
+    "3-19 Musuka Circus"
+   ],
+   "scripts": [],
+   "evidence": "area table +0x24",
+   "tempo": 125,
+   "channels": 6,
+   "header": "0x083BB7F0"
+  },
+  {
+   "id": 6,
+   "name": "Town",
+   "kind": "music",
+   "file": "assets/buu/audio/music/06_town.mp3",
+   "duration": 65.299,
+   "loop": {
+    "start": 0.27618,
+    "end": 64.29901,
+    "match": 0.9999
+   },
+   "ends": false,
+   "context": "Hercule City, Hercule's Mansion, Orange Star High School, West City, Capsule Corporation, Bulma's House, Papaya Island; Hercule City 3-1..3-3 before story flags 26+27 (area music script); script #152 (Chapter 8 \"Janemba\" card)",
+   "confidence": "high",
+   "areas": [
+    "3-4 Hercule City",
+    "3-5 Hercule's Mansion",
+    "3-6 Hercule's Mansion",
+    "3-10 Orange Star High School",
+    "3-11 Orange Star High School",
+    "3-12 Orange Star High School",
+    "3-13 Orange Star High School",
+    "4-1 West City",
+    "4-20 Capsule Corporation",
+    "4-27 Bulma's House",
+    "7-1 Papaya Island",
+    "7-2 Papaya Island",
+    "7-3 Papaya Island"
+   ],
+   "scripts": [
+    152
+   ],
+   "evidence": "area table +0x24",
+   "tempo": 120,
+   "channels": 6,
+   "header": "0x083BB804"
+  },
+  {
+   "id": 7,
+   "name": "Song 07 (no play site found)",
+   "kind": "music",
+   "file": "assets/buu/audio/music/07_song_07_no_play_site_found.mp3",
+   "duration": 50.6339,
+   "loop": {
+    "start": 15.33664,
+    "end": 49.63391,
+    "match": 0.9904
+   },
+   "ends": false,
+   "context": "",
+   "confidence": "none",
+   "areas": [],
+   "scripts": [],
+   "evidence": "no reference found (area table, script bytecode, native calls)",
+   "tempo": 120,
+   "channels": 3,
+   "header": "0x083BB818"
+  },
+  {
+   "id": 8,
+   "name": "Song 08 (no play site found)",
+   "kind": "music",
+   "file": "assets/buu/audio/music/08_song_08_no_play_site_found.mp3",
+   "duration": 30.4581,
+   "loop": {
+    "start": 6.55807,
+    "end": 29.45813,
+    "match": 0.9962
+   },
+   "ends": false,
+   "context": "",
+   "confidence": "none",
+   "areas": [],
+   "scripts": [],
+   "evidence": "no reference found (area table, script bytecode, native calls)",
+   "tempo": 110,
+   "channels": 6,
+   "header": "0x083BB82C"
+  },
+  {
+   "id": 9,
+   "name": "Goku's House",
+   "kind": "music",
+   "file": "assets/buu/audio/music/09_goku_s_house.mp3",
+   "duration": 60.286,
+   "loop": {
+    "start": 0.26193,
+    "end": 59.28598,
+    "match": 0.9999
+   },
+   "ends": false,
+   "context": "Goku's House 2-1..2-5, East District 439 (2-8), Nataday Village (15-1, 15-33), area 0-16",
+   "confidence": "high",
+   "areas": [
+    "0-16 (Bulma's Airship)",
+    "2-1 Goku's House",
+    "2-2 Goku's House",
+    "2-3 Goku's House",
+    "2-4 Gohan and Goten's Room",
+    "2-5 Chi Chi's Room",
+    "2-8 East District 439",
+    "15-1 Nataday Village",
+    "15-33 Nataday Village"
+   ],
+   "scripts": [],
+   "evidence": "area table +0x24",
+   "tempo": 130,
+   "channels": 6,
+   "header": "0x083BB840"
+  },
+  {
+   "id": 10,
+   "name": "Song 10 (no play site found)",
+   "kind": "music",
+   "file": "assets/buu/audio/music/10_song_10_no_play_site_found.mp3",
+   "duration": 108.6061,
+   "loop": {
+    "start": 35.03653,
+    "end": 107.60614,
+    "match": 0.9961
+   },
+   "ends": false,
+   "context": "",
+   "confidence": "none",
+   "areas": [],
+   "scripts": [],
+   "evidence": "no reference found (area table, script bytecode, native calls)",
+   "tempo": 130,
+   "channels": 6,
+   "header": "0x083BB854"
+  },
+  {
+   "id": 11,
+   "name": "Song 11 (no play site found)",
+   "kind": "music",
+   "file": "assets/buu/audio/music/11_song_11_no_play_site_found.mp3",
+   "duration": 56.0966,
+   "loop": {
+    "start": 28.61432,
+    "end": 55.09656,
+    "match": 0.9661
+   },
+   "ends": false,
+   "context": "",
+   "confidence": "none",
+   "areas": [],
+   "scripts": [],
+   "evidence": "no reference found (area table, script bytecode, native calls)",
+   "tempo": 140,
+   "channels": 6,
+   "header": "0x083BB868"
+  },
+  {
+   "id": 12,
+   "name": "Airship",
+   "kind": "music",
+   "file": "assets/buu/audio/music/12_airship.mp3",
+   "duration": 61.7703,
+   "loop": {
+    "start": 12.70508,
+    "end": 60.77026,
+    "match": 0.9998
+   },
+   "ends": false,
+   "context": "Airship / Airship Interior / Control Room 12-1..12-28",
+   "confidence": "high",
+   "areas": [
+    "12-1 Airship",
+    "12-2 Airship",
+    "12-3 Airship",
+    "12-4 Airship Interior",
+    "12-5 Airship Interior",
+    "12-6 Airship Interior",
+    "12-7 Airship Interior",
+    "12-8 Airship Interior",
+    "12-9 Airship Interior",
+    "12-10 Airship Interior",
+    "12-11 Airship Interior",
+    "12-12 Airship Interior",
+    "12-13 Airship Interior",
+    "12-14 Airship Interior",
+    "12-15 Airship Interior",
+    "12-16 Airship Interior",
+    "12-17 Airship Interior",
+    "12-18 Airship Interior",
+    "12-19 Airship Interior",
+    "12-20 Airship Interior",
+    "12-21 Airship Interior",
+    "12-22 Airship Interior",
+    "12-23 Airship Interior",
+    "12-24 Airship Interior",
+    "12-25 Airship Interior",
+    "12-26 Airship Interior",
+    "12-27 Airship Interior",
+    "12-28 Control Room"
+   ],
+   "scripts": [],
+   "evidence": "area table +0x24",
+   "tempo": 160,
+   "channels": 6,
+   "header": "0x083BB87C"
+  },
+  {
+   "id": 13,
+   "name": "Song 13 (no play site found)",
+   "kind": "music",
+   "file": "assets/buu/audio/music/13_song_13_no_play_site_found.mp3",
+   "duration": 40.9245,
+   "loop": {
+    "start": 12.52734,
+    "end": 39.9245,
+    "match": 0.9998
+   },
+   "ends": false,
+   "context": "",
+   "confidence": "none",
+   "areas": [],
+   "scripts": [],
+   "evidence": "no reference found (area table, script bytecode, native calls)",
+   "tempo": 140,
+   "channels": 4,
+   "header": "0x083BB890"
+  },
+  {
+   "id": 14,
+   "name": "Song 14 (no play site found)",
+   "kind": "music",
+   "file": "assets/buu/audio/music/14_song_14_no_play_site_found.mp3",
+   "duration": 58.914,
+   "loop": {
+    "start": 32.27927,
+    "end": 57.91403,
+    "match": 0.9999
+   },
+   "ends": false,
+   "context": "",
+   "confidence": "none",
+   "areas": [],
+   "scripts": [],
+   "evidence": "no reference found (area table, script bytecode, native calls)",
+   "tempo": 100,
+   "channels": 4,
+   "header": "0x083BB8A4"
+  },
+  {
+   "id": 15,
+   "name": "Snakeway (Other World)",
+   "kind": "music",
+   "file": "assets/buu/audio/music/15_snakeway_other_world.mp3",
+   "duration": 127.4483,
+   "loop": {
+    "start": 65.78406,
+    "end": 126.44833,
+    "match": 0.9972
+   },
+   "ends": false,
+   "context": "Snakeway, Yemma's Office, Grand Kai's Mansion / Planet (1-10, 1-11), Cave of the Ancients; script #38 (Chapter 1 \"The Other World\" card), #25",
+   "confidence": "high",
+   "areas": [
+    "1-1 Snakeway",
+    "1-2 Snakeway",
+    "1-3 Yemma's Office",
+    "1-4 Yemma's Office",
+    "1-5 Snakeway",
+    "1-10 Grand Kai's Mansion",
+    "1-11 Grand Kai's Planet",
+    "1-16 Cave of the Ancients",
+    "1-17 Cave of the Ancients"
+   ],
+   "scripts": [
+    25,
+    38
+   ],
+   "evidence": "area table +0x24",
+   "tempo": 91,
+   "channels": 6,
+   "header": "0x083BB8B8"
+  },
+  {
+   "id": 16,
+   "name": "Song 16 (no play site found)",
+   "kind": "music",
+   "file": "assets/buu/audio/music/16_song_16_no_play_site_found.mp3",
+   "duration": 66.7692,
+   "loop": {
+    "start": 33.72101,
+    "end": 65.76923,
+    "match": 0.9955
+   },
+   "ends": false,
+   "context": "",
+   "confidence": "none",
+   "areas": [],
+   "scripts": [],
+   "evidence": "no reference found (area table, script bytecode, native calls)",
+   "tempo": 130,
+   "channels": 4,
+   "header": "0x083BB8CC"
+  },
+  {
+   "id": 17,
+   "name": "Z-Mart",
+   "kind": "music",
+   "file": "assets/buu/audio/music/17_z_mart.mp3",
+   "duration": 57.025,
+   "loop": {
+    "start": 23.96362,
+    "end": 56.02499,
+    "match": 0.991
+   },
+   "ends": false,
+   "context": "Z-Mart 0-91, 0-92, 0-94; script #17 (Chapter 7 \"Majin Buu\" card), #119",
+   "confidence": "high",
+   "areas": [
+    "0-91 Z-Mart",
+    "0-92 Z-Mart",
+    "0-94 Z-Mart"
+   ],
+   "scripts": [
+    17,
+    119
+   ],
+   "evidence": "area table +0x24",
+   "tempo": 140,
+   "channels": 6,
+   "header": "0x083BB8E0"
+  },
+  {
+   "id": 18,
+   "name": "HFIL",
+   "kind": "music",
+   "file": "assets/buu/audio/music/18_hfil.mp3",
+   "duration": 161.2592,
+   "loop": {
+    "start": 80.23062,
+    "end": 160.25916,
+    "match": 0.9627
+   },
+   "ends": false,
+   "context": "HFIL 18-1..18-14",
+   "confidence": "high",
+   "areas": [
+    "18-1 HFIL",
+    "18-2 HFIL",
+    "18-3 HFIL",
+    "18-4 HFIL",
+    "18-5 HFIL",
+    "18-6 HFIL",
+    "18-7 HFIL",
+    "18-8 HFIL",
+    "18-9 HFIL",
+    "18-10 HFIL",
+    "18-11 HFIL",
+    "18-12 HFIL",
+    "18-13 HFIL",
+    "18-14 HFIL"
+   ],
+   "scripts": [],
+   "evidence": "area table +0x24",
+   "tempo": 120,
+   "channels": 6,
+   "header": "0x083BB8F4"
+  },
+  {
+   "id": 19,
+   "name": "Northern Wilderness / Volcano",
+   "kind": "music",
+   "file": "assets/buu/audio/music/19_northern_wilderness_volcano.mp3",
+   "duration": 211.8208,
+   "loop": {
+    "start": 108.11154,
+    "end": 210.82083,
+    "match": 0.9954
+   },
+   "ends": false,
+   "context": "Northern Wilderness 15-2..15-18, Volcano 15-19..15-31, Volcano Summit (15-32, Broly), Diablo Desert Express 11-17..11-24, area 0-90",
+   "confidence": "high",
+   "areas": [
+    "0-90 (Stolen Airship)",
+    "11-17 Diablo Desert Express",
+    "11-18 Diablo Desert Express",
+    "11-19 Diablo Desert Express",
+    "11-20 Diablo Desert Express",
+    "11-21 Diablo Desert Express",
+    "11-22 Diablo Desert Express",
+    "11-23 Diablo Desert Express",
+    "11-24 Diablo Desert Express",
+    "15-2 Northern Wilderness",
+    "15-3 Northern Wilderness",
+    "15-4 Northern Wilderness",
+    "15-5 Northern Wilderness",
+    "15-6 Northern Wilderness",
+    "15-7 Northern Wilderness",
+    "15-8 Northern Wilderness",
+    "15-9 Northern Wilderness",
+    "15-10 Northern Wilderness",
+    "15-11 Northern Wilderness",
+    "15-12 Northern Wilderness",
+    "15-13 Northern Wilderness",
+    "15-14 Northern Wilderness",
+    "15-15 Northern Wilderness",
+    "15-16 Northern Wilderness",
+    "15-17 Northern Wilderness",
+    "15-18 Northern Wilderness",
+    "15-19 Volcano",
+    "15-20 Volcano",
+    "15-21 Volcano",
+    "15-22 Volcano",
+    "15-23 Volcano",
+    "15-24 Volcano",
+    "15-25 Volcano",
+    "15-26 Volcano",
+    "15-27 Volcano",
+    "15-28 Volcano",
+    "15-29 Volcano",
+    "15-30 Volcano",
+    "15-31 Volcano",
+    "15-32 Volcano Summit"
+   ],
+   "scripts": [],
+   "evidence": "area table +0x24",
+   "tempo": 128,
+   "channels": 8,
+   "header": "0x083BB908"
+  },
+  {
+   "id": 20,
+   "name": "Inside Buu",
+   "kind": "music",
+   "file": "assets/buu/audio/music/20_inside_buu.mp3",
+   "duration": 200.604,
+   "loop": {
+    "start": 7.46338,
+    "end": 199.60397,
+    "match": 0.9913
+   },
+   "ends": false,
+   "context": "Stomach 21-1..21-14, Intestines 21-15..21-25, Brain 21-26",
+   "confidence": "high",
+   "areas": [
+    "21-1 Stomach",
+    "21-2 Stomach",
+    "21-3 Stomach",
+    "21-4 Stomach",
+    "21-5 Stomach",
+    "21-6 Stomach",
+    "21-7 Stomach",
+    "21-8 Stomach",
+    "21-9 Stomach",
+    "21-10 Stomach",
+    "21-11 Stomach",
+    "21-12 Stomach",
+    "21-13 Stomach",
+    "21-14 Stomach",
+    "21-15 Intestines",
+    "21-16 Intestines",
+    "21-17 Intestines",
+    "21-18 Intestines",
+    "21-19 Intestines",
+    "21-20 Intestines",
+    "21-21 Intestines",
+    "21-22 Intestines",
+    "21-23 Intestines",
+    "21-24 Intestines",
+    "21-25 Intestines",
+    "21-26 Brain"
+   ],
+   "scripts": [],
+   "evidence": "area table +0x24",
+   "tempo": 65,
+   "channels": 3,
+   "header": "0x083BB91C"
+  },
+  {
+   "id": 21,
+   "name": "Kami's Lookout",
+   "kind": "music",
+   "file": "assets/buu/audio/music/21_kami_s_lookout.mp3",
+   "duration": 167.0788,
+   "loop": {
+    "start": 57.66782,
+    "end": 166.07883,
+    "match": 0.9831
+   },
+   "ends": false,
+   "context": "Kami's Lookout / Palace 6-1..6-5, 6-13..6-20, Hyperbolic Time Chamber 6-6..6-12",
+   "confidence": "high",
+   "areas": [
+    "6-1 Kami's Lookout",
+    "6-2 Kami's Palace",
+    "6-3 Kami's Palace",
+    "6-4 Kami's Palace",
+    "6-5 Kami's Palace",
+    "6-6 Hyperbolic Time Chamber",
+    "6-7 Hyperbolic Time Chamber",
+    "6-8 Hyperbolic Time Chamber",
+    "6-9 Hyperbolic Time Chamber",
+    "6-10 Hyperbolic Time Chamber",
+    "6-11 Hyperbolic Time Chamber",
+    "6-12 Hyperbolic Time Chamber",
+    "6-13 Kami's Lookout",
+    "6-14 Kami's Lookout",
+    "6-15 Kami's Lookout",
+    "6-20 Kami's Lookout"
+   ],
+   "scripts": [],
+   "evidence": "area table +0x24",
+   "tempo": 115,
+   "channels": 6,
+   "header": "0x083BB930"
+  },
+  {
+   "id": 22,
+   "name": "Song 22 (no play site found)",
+   "kind": "music",
+   "file": "assets/buu/audio/music/22_song_22_no_play_site_found.mp3",
+   "duration": 75.0817,
+   "loop": {
+    "start": 0.30164,
+    "end": 74.0817,
+    "match": 0.9999
+   },
+   "ends": false,
+   "context": "",
+   "confidence": "none",
+   "areas": [],
+   "scripts": [],
+   "evidence": "no reference found (area table, script bytecode, native calls)",
+   "tempo": 130,
+   "channels": 6,
+   "header": "0x083BB944"
+  },
+  {
+   "id": 23,
+   "name": "Scripted scene (script #460)",
+   "kind": "music",
+   "file": "assets/buu/audio/music/23_scripted_scene_script_460.mp3",
+   "duration": 51.103,
+   "loop": {
+    "start": 2.53653,
+    "end": 50.10303,
+    "match": 0.9935
+   },
+   "ends": false,
+   "context": "script #460 (also plays SFX 6 / 7)",
+   "confidence": "low",
+   "areas": [],
+   "scripts": [
+    460
+   ],
+   "evidence": "no reference found (area table, script bytecode, native calls)",
+   "tempo": 106,
+   "channels": 3,
+   "header": "0x083BB958"
+  },
+  {
+   "id": 24,
+   "name": "Fukurou Forest / Ninja Stronghold",
+   "kind": "music",
+   "file": "assets/buu/audio/music/24_fukurou_forest_ninja_stronghold.mp3",
+   "duration": 53.7914,
+   "loop": {
+    "start": 0.44843,
+    "end": 52.79141,
+    "match": 0.9999
+   },
+   "ends": false,
+   "context": "Fukurou Forest 13-1..13-3, Ninja Stronghold 13-32..13-53, outside Kyodai Pyramid 14-1, 14-2",
+   "confidence": "high",
+   "areas": [
+    "13-1 Fukurou Forest",
+    "13-2 Fukurou Forest",
+    "13-3 Fukurou Forest",
+    "13-32 Ninja Stronghold",
+    "13-33 Ninja Stronghold",
+    "13-34 Ninja Stronghold",
+    "13-36 Ninja Stronghold",
+    "13-37 Ninja Stronghold",
+    "13-38 Ninja Stronghold",
+    "13-39 Ninja Stronghold",
+    "13-40 Ninja Stronghold",
+    "13-41 Ninja Stronghold",
+    "13-42 Ninja Stronghold",
+    "13-43 Ninja Stronghold",
+    "13-44 Ninja Stronghold",
+    "13-45 Ninja Stronghold",
+    "13-46 Ninja Stronghold",
+    "13-47 Ninja Stronghold",
+    "13-48 Ninja Stronghold",
+    "13-49 Ninja Stronghold",
+    "13-50 Ninja Stronghold",
+    "13-51 Ninja Stronghold",
+    "13-52 Ninja Stronghold",
+    "13-53 Ninja Stronghold",
+    "14-1 Outside Kyodai Pyramid",
+    "14-2 Outside Kyodai Pyramid"
+   ],
+   "scripts": [],
+   "evidence": "area table +0x24",
+   "tempo": 110,
+   "channels": 6,
+   "header": "0x083BB96C"
+  },
+  {
+   "id": 25,
+   "name": "Other World Stadium",
+   "kind": "music",
+   "file": "assets/buu/audio/music/25_other_world_stadium.mp3",
+   "duration": 105.0331,
+   "loop": {
+    "start": 32.00739,
+    "end": 104.03308,
+    "match": 0.9809
+   },
+   "ends": false,
+   "context": "Other World Stadium (1-20); script #453 (warp to HFIL 18-90)",
+   "confidence": "high",
+   "areas": [
+    "1-20 Other World Stadium"
+   ],
+   "scripts": [
+    453
+   ],
+   "evidence": "area table +0x24",
+   "tempo": 120,
+   "channels": 6,
+   "header": "0x083BB980"
+  },
+  {
+   "id": 26,
+   "name": "Grand Kai's Planet",
+   "kind": "music",
+   "file": "assets/buu/audio/music/26_grand_kai_s_planet.mp3",
+   "duration": 118.0332,
+   "loop": {
+    "start": 22.77734,
+    "end": 117.03317,
+    "match": 1.0
+   },
+   "ends": false,
+   "context": "Grand Kai's Planet 1-12..1-15",
+   "confidence": "high",
+   "areas": [
+    "1-12 Grand Kai's Planet",
+    "1-13 Grand Kai's Planet",
+    "1-14 Grand Kai's Planet",
+    "1-15 Grand Kai's Planet"
+   ],
+   "scripts": [],
+   "evidence": "area table +0x24",
+   "tempo": 90,
+   "channels": 4,
+   "header": "0x083BB994"
+  },
+  {
+   "id": 27,
+   "name": "Pilaf's Castle / Barren Wasteland",
+   "kind": "music",
+   "file": "assets/buu/audio/music/27_pilaf_s_castle_barren_wasteland.mp3",
+   "duration": 65.3961,
+   "loop": {
+    "start": 0.37332,
+    "end": 64.39615,
+    "match": 0.9997
+   },
+   "ends": false,
+   "context": "Pilaf's Castle 10-1..10-31, Barren Wasteland 20-1..20-10 (Super Buu / Kid Buu)",
+   "confidence": "high",
+   "areas": [
+    "10-1 Pilaf's Castle",
+    "10-2 Pilaf's Castle",
+    "10-3 Pilaf's Castle",
+    "10-4 Pilaf's Castle",
+    "10-5 Pilaf's Castle",
+    "10-6 Pilaf's Castle",
+    "10-7 Pilaf's Castle",
+    "10-8 Pilaf's Castle",
+    "10-9 Pilaf's Castle",
+    "10-10 Pilaf's Castle",
+    "10-11 Pilaf's Castle",
+    "10-12 Pilaf's Castle",
+    "10-14 Pilaf's Castle",
+    "10-15 Pilaf's Castle",
+    "10-16 Pilaf's Castle",
+    "10-17 Pilaf's Castle",
+    "10-18 Pilaf's Castle",
+    "10-19 Pilaf's Castle",
+    "10-20 Pilaf's Castle",
+    "10-21 Pilaf's Castle",
+    "10-22 Pilaf's Castle",
+    "10-23 Pilaf's Castle",
+    "10-24 Pilaf's Castle",
+    "10-25 Pilaf's Castle",
+    "10-26 Pilaf's Castle",
+    "10-27 Pilaf's Castle",
+    "10-28 Pilaf's Castle",
+    "10-29 Pilaf's Castle",
+    "10-30 Pilaf's Castle",
+    "10-31 Pilaf's Castle",
+    "20-1 Barren Wasteland",
+    "20-2 Barren Wasteland",
+    "20-3 Barren Wasteland",
+    "20-4 Barren Wasteland",
+    "20-5 Barren Wasteland",
+    "20-6 Barren Wasteland",
+    "20-7 Barren Wasteland",
+    "20-8 Barren Wasteland",
+    "20-9 Barren Wasteland",
+    "20-10 Barren Wasteland"
+   ],
+   "scripts": [],
+   "evidence": "area table +0x24",
+   "tempo": 135,
+   "channels": 6,
+   "header": "0x083BB9A8"
+  },
+  {
+   "id": 28,
+   "name": "East District 439 / Southwest Forest",
+   "kind": "music",
+   "file": "assets/buu/audio/music/28_east_district_439_southwest_forest.mp3",
+   "duration": 111.7793,
+   "loop": {
+    "start": 0.27747,
+    "end": 110.77933,
+    "match": 1.0
+   },
+   "ends": false,
+   "context": "East District 439 2-9..2-90, Grandpa Gohan's Hut, Southwest Forest 8-1..8-16, Babidi's Ship entrance (8-17)",
+   "confidence": "high",
+   "areas": [
+    "2-9 East District 439",
+    "2-10 East District 439",
+    "2-11 East District 439",
+    "2-12 East District 439",
+    "2-13 East District 439",
+    "2-14 East District 439",
+    "2-15 East District 439",
+    "2-16 East District 439",
+    "2-17 East District 439",
+    "2-18 East District 439",
+    "2-19 East District 439",
+    "2-20 East District 439",
+    "2-33 East District 439",
+    "2-34 East District 439",
+    "2-35 East District 439",
+    "2-36 East District 439",
+    "2-37 East District 439",
+    "2-38 East District 439",
+    "2-39 East District 439",
+    "2-40 East District 439",
+    "2-41 East District 439",
+    "2-42 East District 439",
+    "2-43 East District 439",
+    "2-44 East District 439",
+    "2-45 East District 439",
+    "2-46 East District 439",
+    "2-47 Grandpa Gohan's Hut",
+    "2-90 East District 439",
+    "8-1 Southwest Forest",
+    "8-2 Southwest Forest",
+    "8-3 Southwest Forest",
+    "8-4 Southwest Forest",
+    "8-5 Southwest Forest",
+    "8-6 Southwest Forest",
+    "8-7 Southwest Forest",
+    "8-8 Southwest Forest",
+    "8-9 Southwest Forest",
+    "8-10 Southwest Forest",
+    "8-11 Southwest Forest",
+    "8-12 Southwest Forest",
+    "8-13 Southwest Forest",
+    "8-14 Southwest Forest",
+    "8-15 Southwest Forest",
+    "8-16 Southwest Forest",
+    "8-17 Babidi's Ship"
+   ],
+   "scripts": [],
+   "evidence": "area table +0x24",
+   "tempo": 110,
+   "channels": 4,
+   "header": "0x083BB9BC"
+  },
+  {
+   "id": 29,
+   "name": "Thieves Den / Hercule City (after Buu's attack)",
+   "kind": "music",
+   "file": "assets/buu/audio/music/29_thieves_den_hercule_city_after_buu_s_attack.mp3",
+   "duration": 166.536,
+   "loop": {
+    "start": 84.37796,
+    "end": 165.53604,
+    "match": 0.9865
+   },
+   "ends": false,
+   "context": "Thieves Den 9-1..9-8, Lighthouse 9-9 / 9-17; Hercule City 3-1..3-3 once story flags 26+27 are set (area music script); scripts #125, #131, #168",
+   "confidence": "high",
+   "areas": [
+    "9-1 Thieves Den",
+    "9-2 Thieves Den",
+    "9-3 Thieves Den",
+    "9-4 Thieves Den",
+    "9-5 Thieves Den",
+    "9-6 Thieves Den",
+    "9-7 Thieves Den",
+    "9-8 Thieves Den",
+    "9-9 Lighthouse",
+    "9-17 Lighthouse"
+   ],
+   "scripts": [
+    125,
+    131,
+    168
+   ],
+   "evidence": "area table +0x24",
+   "tempo": 130,
+   "channels": 6,
+   "header": "0x083BB9D0"
+  },
+  {
+   "id": 30,
+   "name": "Diablo Desert / Kyodai Pyramid",
+   "kind": "music",
+   "file": "assets/buu/audio/music/30_diablo_desert_kyodai_pyramid.mp3",
+   "duration": 93.5306,
+   "loop": {
+    "start": 15.62634,
+    "end": 92.53064,
+    "match": 0.9999
+   },
+   "ends": false,
+   "context": "Diablo Desert 11-1..11-16, Kyodai Pyramid 14-3..14-23, Totenhotep's Chamber 14-24, 14-25",
+   "confidence": "high",
+   "areas": [
+    "11-1 Diablo Desert",
+    "11-2 Diablo Desert",
+    "11-3 Diablo Desert",
+    "11-4 Diablo Desert",
+    "11-5 Diablo Desert",
+    "11-6 Diablo Desert",
+    "11-7 Diablo Desert",
+    "11-8 Diablo Desert",
+    "11-9 Diablo Desert",
+    "11-10 Diablo Desert",
+    "11-11 Diablo Desert",
+    "11-12 Diablo Desert",
+    "11-13 Diablo Desert",
+    "11-14 Diablo Desert",
+    "11-15 Diablo Desert",
+    "11-16 Diablo Desert",
+    "14-3 Kyodai Pyramid",
+    "14-4 Kyodai Pyramid",
+    "14-5 Kyodai Pyramid",
+    "14-6 Kyodai Pyramid",
+    "14-7 Kyodai Pyramid",
+    "14-8 Kyodai Pyramid",
+    "14-9 Kyodai Pyramid",
+    "14-10 Kyodai Pyramid",
+    "14-11 Kyodai Pyramid",
+    "14-12 Kyodai Pyramid",
+    "14-13 Kyodai Pyramid",
+    "14-14 Kyodai Pyramid",
+    "14-15 Kyodai Pyramid",
+    "14-16 Kyodai Pyramid",
+    "14-17 Kyodai Pyramid",
+    "14-18 Kyodai Pyramid",
+    "14-19 Kyodai Pyramid",
+    "14-20 Kyodai Pyramid",
+    "14-21 Kyodai Pyramid",
+    "14-22 Kyodai Pyramid",
+    "14-23 Kyodai Pyramid",
+    "14-24 Totenhotep's Chamber",
+    "14-25 Totenhotep's Chamber"
+   ],
+   "scripts": [],
+   "evidence": "area table +0x24",
+   "tempo": 125,
+   "channels": 6,
+   "header": "0x083BB9E4"
+  },
+  {
+   "id": 31,
+   "name": "Heaven",
+   "kind": "music",
+   "file": "assets/buu/audio/music/31_heaven.mp3",
+   "duration": 59.1472,
+   "loop": {
+    "start": 3.16068,
+    "end": 58.14725,
+    "match": 1.0
+   },
+   "ends": false,
+   "context": "Heaven (22-1)",
+   "confidence": "high",
+   "areas": [
+    "22-1 Heaven"
+   ],
+   "scripts": [],
+   "evidence": "area table +0x24",
+   "tempo": 96,
+   "channels": 6,
+   "header": "0x083BB9F8"
+  },
+  {
+   "id": 32,
+   "name": "Song 32 (no play site found)",
+   "kind": "music",
+   "file": "assets/buu/audio/music/32_song_32_no_play_site_found.mp3",
+   "duration": 132.3192,
+   "loop": {
+    "start": 31.34357,
+    "end": 131.31915,
+    "match": 0.9997
+   },
+   "ends": false,
+   "context": "",
+   "confidence": "none",
+   "areas": [],
+   "scripts": [],
+   "evidence": "no reference found (area table, script bytecode, native calls)",
+   "tempo": 135,
+   "channels": 6,
+   "header": "0x083BBA0C"
+  },
+  {
+   "id": 33,
+   "name": "Song 33 (no play site found)",
+   "kind": "music",
+   "file": "assets/buu/audio/music/33_song_33_no_play_site_found.mp3",
+   "duration": 48.6678,
+   "loop": {
+    "start": 13.34921,
+    "end": 47.66776,
+    "match": 0.9996
+   },
+   "ends": false,
+   "context": "",
+   "confidence": "none",
+   "areas": [],
+   "scripts": [],
+   "evidence": "no reference found (area table, script bytecode, native calls)",
+   "tempo": 110,
+   "channels": 6,
+   "header": "0x083BBA20"
+  },
+  {
+   "id": 34,
+   "name": "Hideout",
+   "kind": "music",
+   "file": "assets/buu/audio/music/34_hideout.mp3",
+   "duration": 47.5603,
+   "loop": {
+    "start": 0.25751,
+    "end": 46.5603,
+    "match": 0.9998
+   },
+   "ends": false,
+   "context": "Rogue Submarine (0-52), Stolen Airship (0-55), Z-Mart back rooms (0-93, 0-95), Thieves Den 9-10..9-16",
+   "confidence": "high",
+   "areas": [
+    "0-52 Rogue Submarine",
+    "0-55 Stolen Airship",
+    "0-93 Z-Mart",
+    "0-95 Z-Mart",
+    "9-10 Thieves Den",
+    "9-11 Thieves Den",
+    "9-12 Thieves Den",
+    "9-13 Thieves Den",
+    "9-14 Thieves Den",
+    "9-15 Thieves Den",
+    "9-16 Thieves Den"
+   ],
+   "scripts": [],
+   "evidence": "area table +0x24",
+   "tempo": 125,
+   "channels": 4,
+   "header": "0x083BBA34"
+  },
+  {
+   "id": 35,
+   "name": "Planet of the Kais",
+   "kind": "music",
+   "file": "assets/buu/audio/music/35_planet_of_the_kais.mp3",
+   "duration": 151.9408,
+   "loop": {
+    "start": 58.90799,
+    "end": 150.9408,
+    "match": 0.997
+   },
+   "ends": false,
+   "context": "Planet of the Kais 19-1..19-7, area 0-9; script #456 (warp to 19-3)",
+   "confidence": "high",
+   "areas": [
+    "0-9 (Bulma's Airship)",
+    "19-1 Planet of the Kais",
+    "19-2 Planet of the Kais",
+    "19-3 Planet of the Kais",
+    "19-4 Planet of the Kais",
+    "19-5 Planet of the Kais",
+    "19-6 Planet of the Kais",
+    "19-7 Planet of the Kais"
+   ],
+   "scripts": [
+    456
+   ],
+   "evidence": "area table +0x24",
+   "tempo": 120,
+   "channels": 6,
+   "header": "0x083BBA48"
+  },
+  {
+   "id": 36,
+   "name": "Story scene (script #4)",
+   "kind": "music",
+   "file": "assets/buu/audio/music/36_story_scene_script_4.mp3",
+   "duration": 16.4907,
+   "loop": {
+    "start": 5.23682,
+    "end": 15.49072,
+    "match": 0.9999
+   },
+   "ends": false,
+   "context": "script #4, started from native code 0x08005DEC (new-game / story setup)",
+   "confidence": "low",
+   "areas": [],
+   "scripts": [
+    4
+   ],
+   "evidence": "no reference found (area table, script bytecode, native calls)",
+   "tempo": 125,
+   "channels": 4,
+   "header": "0x083BBA5C"
+  },
+  {
+   "id": 37,
+   "name": "Story scene (script #516)",
+   "kind": "music",
+   "file": "assets/buu/audio/music/37_story_scene_script_516.mp3",
+   "duration": 10.2035,
+   "loop": {
+    "start": 0.86417,
+    "end": 9.20349,
+    "match": 0.9829
+   },
+   "ends": false,
+   "context": "script #516 (warp to area 0-96)",
+   "confidence": "low",
+   "areas": [],
+   "scripts": [
+    516
+   ],
+   "evidence": "no reference found (area table, script bytecode, native calls)",
+   "tempo": 115,
+   "channels": 4,
+   "header": "0x083BBA70"
+  },
+  {
+   "id": 38,
+   "name": "Hercule Cafe / Kame House",
+   "kind": "music",
+   "file": "assets/buu/audio/music/38_hercule_cafe_kame_house.mp3",
+   "duration": 149.9118,
+   "loop": {
+    "start": 74.57751,
+    "end": 148.91183,
+    "match": 0.9946
+   },
+   "ends": false,
+   "context": "Hercule Café 3-20..3-22, Hercule City 3-23, Roshi's Island (5-1), Kame House 5-2, 5-3",
+   "confidence": "high",
+   "areas": [
+    "3-20 Hercule Café",
+    "3-21 Hercule Café",
+    "3-22 Hercule Café",
+    "3-23 Hercule City",
+    "5-1 Roshi's Island",
+    "5-2 Kame House",
+    "5-3 Kame House"
+   ],
+   "scripts": [],
+   "evidence": "area table +0x24",
+   "tempo": 110,
+   "channels": 6,
+   "header": "0x083BBA84"
+  },
+  {
+   "id": 39,
+   "name": "Sparring match",
+   "kind": "music",
+   "file": "assets/buu/audio/music/39_sparring_match.mp3",
+   "duration": 49.1691,
+   "loop": {
+    "start": 3.51675,
+    "end": 48.16907,
+    "match": 0.9895
+   },
+   "ends": false,
+   "context": "script #215 (Kami's Lookout scene), #273 (World Tournament match vs Videl, 'You Lose!!' branch)",
+   "confidence": "medium",
+   "areas": [],
+   "scripts": [
+    215,
+    273
+   ],
+   "evidence": "no reference found (area table, script bytecode, native calls)",
+   "tempo": 130,
+   "channels": 4,
+   "header": "0x083BBA98"
+  },
+  {
+   "id": 40,
+   "name": "Song 40 (no play site found)",
+   "kind": "music",
+   "file": "assets/buu/audio/music/40_song_40_no_play_site_found.mp3",
+   "duration": 123.5834,
+   "loop": {
+    "start": 67.78906,
+    "end": 122.58337,
+    "match": 0.9352
+   },
+   "ends": false,
+   "context": "",
+   "confidence": "none",
+   "areas": [],
+   "scripts": [],
+   "evidence": "no reference found (area table, script bytecode, native calls)",
+   "tempo": 140,
+   "channels": 6,
+   "header": "0x083BBAAC"
+  },
+  {
+   "id": 41,
+   "name": "Song 41 (no play site found)",
+   "kind": "music",
+   "file": "assets/buu/audio/music/41_song_41_no_play_site_found.mp3",
+   "duration": 66.998,
+   "loop": {
+    "start": 40.18051,
+    "end": 65.99805,
+    "match": 0.7704
+   },
+   "ends": false,
+   "context": "",
+   "confidence": "none",
+   "areas": [],
+   "scripts": [],
+   "evidence": "no reference found (area table, script bytecode, native calls)",
+   "tempo": 142,
+   "channels": 6,
+   "header": "0x083BBAC0"
+  },
+  {
+   "id": 42,
+   "name": "Giant Crater (after the blast)",
+   "kind": "music",
+   "file": "assets/buu/audio/music/42_giant_crater_after_the_blast.mp3",
+   "duration": 44.9819,
+   "loop": {
+    "start": 1.32507,
+    "end": 43.98193,
+    "match": 0.9782
+   },
+   "ends": false,
+   "context": "Giant Crater 6-16 (Super Buu)",
+   "confidence": "high",
+   "areas": [
+    "6-16 Giant Crater"
+   ],
+   "scripts": [],
+   "evidence": "area table +0x24",
+   "tempo": 120,
+   "channels": 4,
+   "header": "0x083BBAD4"
+  },
+  {
+   "id": 43,
+   "name": "Song 43 (no play site found)",
+   "kind": "music",
+   "file": "assets/buu/audio/music/43_song_43_no_play_site_found.mp3",
+   "duration": 3.3806,
+   "loop": null,
+   "ends": true,
+   "context": "",
+   "confidence": "none",
+   "areas": [],
+   "scripts": [],
+   "evidence": "no reference found (area table, script bytecode, native calls)",
+   "tempo": 120,
+   "channels": 4,
+   "header": "0x083BBAE8"
+  },
+  {
+   "id": 44,
+   "name": "Boss battle",
+   "kind": "music",
+   "file": "assets/buu/audio/music/44_boss_battle.mp3",
+   "duration": 62.5243,
+   "loop": {
+    "start": 3.84607,
+    "end": 61.52429,
+    "match": 0.9997
+   },
+   "ends": false,
+   "context": "scripted fights: #26 (West City, spawns Majin Buu type 28), #58 (warp to Yemma's Office), #313 (World Tournament ring 7-6), #142, #305; World Tournament ring area 7-7",
+   "confidence": "medium",
+   "areas": [
+    "7-7 World Tournament Stadium"
+   ],
+   "scripts": [
+    26,
+    58,
+    142,
+    305,
+    313
+   ],
+   "evidence": "area table +0x24",
+   "tempo": 125,
+   "channels": 6,
+   "header": "0x083BBAFC"
+  },
+  {
+   "id": 45,
+   "name": "Title screen",
+   "kind": "music",
+   "file": "assets/buu/audio/music/45_title_screen.mp3",
+   "duration": 241.6462,
+   "loop": {
+    "start": 98.68771,
+    "end": 240.64624,
+    "match": 0.9547
+   },
+   "ends": false,
+   "context": "played by the boot code (0x080041CE, 0x0800540E)",
+   "confidence": "high",
+   "areas": [],
+   "scripts": [],
+   "evidence": "PlaySong call sites 0x080041CE and 0x0800540E pass song table entry 45",
+   "tempo": 108,
+   "channels": 4,
+   "header": "0x083BBB10"
+  },
+  {
+   "id": 46,
+   "name": "Song 46 (no play site found)",
+   "kind": "music",
+   "file": "assets/buu/audio/music/46_song_46_no_play_site_found.mp3",
+   "duration": 107.31,
+   "loop": {
+    "start": 45.8819,
+    "end": 106.30997,
+    "match": 0.9927
+   },
+   "ends": false,
+   "context": "",
+   "confidence": "none",
+   "areas": [],
+   "scripts": [],
+   "evidence": "no reference found (area table, script bytecode, native calls)",
+   "tempo": 125,
+   "channels": 6,
+   "header": "0x083BBB24"
+  },
+  {
+   "id": 47,
+   "name": "Rocky Canyon",
+   "kind": "music",
+   "file": "assets/buu/audio/music/47_rocky_canyon.mp3",
+   "duration": 89.9196,
+   "loop": {
+    "start": 24.362,
+    "end": 88.91956,
+    "match": 0.9965
+   },
+   "ends": false,
+   "context": "Rocky Canyon 8-70 (Majin Vegeta)",
+   "confidence": "high",
+   "areas": [
+    "8-70 Rocky Canyon"
+   ],
+   "scripts": [],
+   "evidence": "area table +0x24",
+   "tempo": 130,
+   "channels": 6,
+   "header": "0x083BBB38"
+  },
+  {
+   "id": 48,
+   "name": "Song 48 (no play site found)",
+   "kind": "music",
+   "file": "assets/buu/audio/music/48_song_48_no_play_site_found.mp3",
+   "duration": 64.7718,
+   "loop": {
+    "start": 36.10428,
+    "end": 63.77179,
+    "match": 0.9975
+   },
+   "ends": false,
+   "context": "",
+   "confidence": "none",
+   "areas": [],
+   "scripts": [],
+   "evidence": "no reference found (area table, script bytecode, native calls)",
+   "tempo": 130,
+   "channels": 3,
+   "header": "0x083BBB4C"
+  },
+  {
+   "id": 49,
+   "name": "Story scene (scripts #103, #143)",
+   "kind": "music",
+   "file": "assets/buu/audio/music/49_story_scene_scripts_103_143.mp3",
+   "duration": 10.4298,
+   "loop": {
+    "start": 2.05182,
+    "end": 9.42984,
+    "match": 0.9891
+   },
+   "ends": false,
+   "context": "script #103 (warp to West City 0-22), #143",
+   "confidence": "low",
+   "areas": [],
+   "scripts": [
+    103,
+    143
+   ],
+   "evidence": "no reference found (area table, script bytecode, native calls)",
+   "tempo": 130,
+   "channels": 3,
+   "header": "0x083BBB60"
+  },
+  {
+   "id": 50,
+   "name": "World Tournament",
+   "kind": "music",
+   "file": "assets/buu/audio/music/50_world_tournament.mp3",
+   "duration": 92.3239,
+   "loop": {
+    "start": 25.95529,
+    "end": 91.32394,
+    "match": 0.9998
+   },
+   "ends": false,
+   "context": "World Tournament Stadium 7-4..7-6",
+   "confidence": "high",
+   "areas": [
+    "7-4 World Tournament Stadium",
+    "7-5 World Tournament Stadium",
+    "7-6 World Tournament Stadium"
+   ],
+   "scripts": [],
+   "evidence": "area table +0x24",
+   "tempo": 125,
+   "channels": 6,
+   "header": "0x083BBB74"
+  },
+  {
+   "id": 51,
+   "name": "West City (ruins)",
+   "kind": "music",
+   "file": "assets/buu/audio/music/51_west_city_ruins.mp3",
+   "duration": 250.7079,
+   "loop": {
+    "start": 127.66443,
+    "end": 249.70795,
+    "match": 0.9955
+   },
+   "ends": false,
+   "context": "areas 0-50, 0-51 (West City)",
+   "confidence": "high",
+   "areas": [
+    "0-50 (West City)",
+    "0-51 (West City)"
+   ],
+   "scripts": [],
+   "evidence": "area table +0x24",
+   "tempo": 120,
+   "channels": 6,
+   "header": "0x083BBB88"
+  },
+  {
+   "id": 52,
+   "name": "Song 52 (no play site found)",
+   "kind": "music",
+   "file": "assets/buu/audio/music/52_song_52_no_play_site_found.mp3",
+   "duration": 62.6172,
+   "loop": {
+    "start": 32.44016,
+    "end": 61.61722,
+    "match": 0.9965
+   },
+   "ends": false,
+   "context": "",
+   "confidence": "none",
+   "areas": [],
+   "scripts": [],
+   "evidence": "no reference found (area table, script bytecode, native calls)",
+   "tempo": 120,
+   "channels": 5,
+   "header": "0x083BBB9C"
+  }
+ ],
+ "sfx": [
+  {
+   "id": 0,
+   "name": "Sound 00",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/00_sound_00.mp3",
+   "duration": 1.5007,
+   "loop": {
+    "start": 0.0,
+    "end": 0.75038
+   },
+   "trigger": "",
+   "confidence": "none",
+   "game_volume": 64,
+   "evidence": "",
+   "sample": {
+    "rom": "0x082B9BB0",
+    "rate": 8000,
+    "length": 6003,
+    "loop": true,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 1,
+   "name": "Sound 01",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/01_sound_01.mp3",
+   "duration": 0.7685,
+   "loop": null,
+   "trigger": "",
+   "confidence": "none",
+   "game_volume": 64,
+   "evidence": "",
+   "sample": {
+    "rom": "0x082BB323",
+    "rate": 8000,
+    "length": 6200,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 2,
+   "name": "Cutscene sound 02",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/02_cutscene_sound_02.mp3",
+   "duration": 1.7557,
+   "loop": null,
+   "trigger": "story scripts #338",
+   "confidence": "medium",
+   "game_volume": 64,
+   "evidence": "bytecode scan: push id; native 0x1F (PlaySfx)",
+   "sample": {
+    "rom": "0x082BCB5B",
+    "rate": 6779,
+    "length": 12000,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 3,
+   "name": "Ki charge (loop)",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/03_ki_charge_loop.mp3",
+   "duration": 1.7457,
+   "loop": {
+    "start": 0.7459,
+    "end": 1.24579
+   },
+   "trigger": "hold B with a beam / Big Bang / Masenko / Energy Sword / Final Flash / Flame Kamehameha: starts on the press, stopped on release or when the beam fires",
+   "confidence": "high",
+   "game_volume": 64,
+   "evidence": "breakpoint on PlaySfx 0x0803E378 while doing it in the emulator (work/audio/sfxtrace2.py, skillsfx.py) - beam object 0x08020764, Big Bang 0x08037502",
+   "sample": {
+    "rom": "0x082BFA3B",
+    "rate": 9630,
+    "length": 11997,
+    "loop": true,
+    "loop_start": 7183
+   }
+  },
+  {
+   "id": 4,
+   "name": "Cutscene sound 04",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/04_cutscene_sound_04.mp3",
+   "duration": 0.0311,
+   "loop": null,
+   "trigger": "story scripts #160",
+   "confidence": "medium",
+   "game_volume": 64,
+   "evidence": "bytecode scan: push id; native 0x1F (PlaySfx)",
+   "sample": {
+    "rom": "0x082C2918",
+    "rate": 8000,
+    "length": 368,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 5,
+   "name": "Sound 05",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/05_sound_05.mp3",
+   "duration": 0.1804,
+   "loop": null,
+   "trigger": "",
+   "confidence": "none",
+   "game_volume": 64,
+   "evidence": "",
+   "sample": {
+    "rom": "0x082C2A88",
+    "rate": 16000,
+    "length": 3020,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 6,
+   "name": "Cutscene sound 06",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/06_cutscene_sound_06.mp3",
+   "duration": 2.6561,
+   "loop": {
+    "start": 0.92888,
+    "end": 1.7925
+   },
+   "trigger": "story scripts #25, #460, #478",
+   "confidence": "medium",
+   "game_volume": 64,
+   "evidence": "bytecode scan: push id; native 0x1F (PlaySfx)",
+   "sample": {
+    "rom": "0x082C3654",
+    "rate": 8000,
+    "length": 14340,
+    "loop": true,
+    "loop_start": 7431
+   }
+  },
+  {
+   "id": 7,
+   "name": "Cutscene sound 07",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/07_cutscene_sound_07.mp3",
+   "duration": 1.0801,
+   "loop": null,
+   "trigger": "story scripts #460, #479",
+   "confidence": "medium",
+   "game_volume": 64,
+   "evidence": "bytecode scan: push id; native 0x1F (PlaySfx)",
+   "sample": {
+    "rom": "0x082C6E58",
+    "rate": 8000,
+    "length": 8912,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 8,
+   "name": "Cutscene sound 08",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/08_cutscene_sound_08.mp3",
+   "duration": 1.0774,
+   "loop": null,
+   "trigger": "story scripts #483, #484",
+   "confidence": "medium",
+   "game_volume": 64,
+   "evidence": "bytecode scan: push id; native 0x1F (PlaySfx)",
+   "sample": {
+    "rom": "0x082C9128",
+    "rate": 6437,
+    "length": 7000,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 9,
+   "name": "Sound 09",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/09_sound_09.mp3",
+   "duration": 2.3051,
+   "loop": null,
+   "trigger": "",
+   "confidence": "none",
+   "game_volume": 64,
+   "evidence": "",
+   "sample": {
+    "rom": "0x082CAC80",
+    "rate": 6771,
+    "length": 16000,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 10,
+   "name": "Sound 10",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/10_sound_10.mp3",
+   "duration": 0.4499,
+   "loop": null,
+   "trigger": "",
+   "confidence": "none",
+   "game_volume": 64,
+   "evidence": "",
+   "sample": {
+    "rom": "0x082CEB00",
+    "rate": 8001,
+    "length": 3701,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 11,
+   "name": "Sound 11",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/11_sound_11.mp3",
+   "duration": 0.3158,
+   "loop": null,
+   "trigger": "native code call site 0x0802B078",
+   "confidence": "low",
+   "game_volume": 64,
+   "evidence": "static call site",
+   "sample": {
+    "rom": "0x082CF975",
+    "rate": 8000,
+    "length": 2548,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 12,
+   "name": "Sound 12",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/12_sound_12.mp3",
+   "duration": 0.517,
+   "loop": null,
+   "trigger": "",
+   "confidence": "none",
+   "game_volume": 64,
+   "evidence": "",
+   "sample": {
+    "rom": "0x082D0369",
+    "rate": 7613,
+    "length": 4000,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 13,
+   "name": "Sound 13",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/13_sound_13.mp3",
+   "duration": 0.5807,
+   "loop": null,
+   "trigger": "",
+   "confidence": "none",
+   "game_volume": 64,
+   "evidence": "",
+   "sample": {
+    "rom": "0x082D1309",
+    "rate": 8000,
+    "length": 4800,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 14,
+   "name": "Sound 14",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/14_sound_14.mp3",
+   "duration": 0.465,
+   "loop": null,
+   "trigger": "",
+   "confidence": "none",
+   "game_volume": 64,
+   "evidence": "",
+   "sample": {
+    "rom": "0x082D25C9",
+    "rate": 10392,
+    "length": 5000,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 15,
+   "name": "Cutscene sound 15",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/15_cutscene_sound_15.mp3",
+   "duration": 0.6059,
+   "loop": null,
+   "trigger": "story scripts #57, #58, #518",
+   "confidence": "medium",
+   "game_volume": 64,
+   "evidence": "bytecode scan: push id; native 0x1F (PlaySfx)",
+   "sample": {
+    "rom": "0x082D3951",
+    "rate": 8000,
+    "length": 5000,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 16,
+   "name": "Cutscene sound 16",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/16_cutscene_sound_16.mp3",
+   "duration": 0.8684,
+   "loop": null,
+   "trigger": "story scripts #324, #327, #330 ...",
+   "confidence": "medium",
+   "game_volume": 64,
+   "evidence": "bytecode scan: push id; native 0x1F (PlaySfx)",
+   "sample": {
+    "rom": "0x082D4CD9",
+    "rate": 7954,
+    "length": 7000,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 17,
+   "name": "Cutscene sound 17",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/17_cutscene_sound_17.mp3",
+   "duration": 0.6485,
+   "loop": null,
+   "trigger": "story scripts #9, #412, #415 ...",
+   "confidence": "medium",
+   "game_volume": 64,
+   "evidence": "bytecode scan: push id; native 0x1F (PlaySfx)",
+   "sample": {
+    "rom": "0x082D6831",
+    "rate": 7473,
+    "length": 5000,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 18,
+   "name": "Sound 18",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/18_sound_18.mp3",
+   "duration": 0.5842,
+   "loop": null,
+   "trigger": "",
+   "confidence": "none",
+   "game_volume": 64,
+   "evidence": "",
+   "sample": {
+    "rom": "0x082D7BB9",
+    "rate": 7969,
+    "length": 4700,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 19,
+   "name": "Sound 19",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/19_sound_19.mp3",
+   "duration": 0.7012,
+   "loop": null,
+   "trigger": "native code call site 0x0802FC20",
+   "confidence": "low",
+   "game_volume": 64,
+   "evidence": "static call site",
+   "sample": {
+    "rom": "0x082D8E15",
+    "rate": 7097,
+    "length": 5000,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 20,
+   "name": "Energy blast A",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/20_energy_blast_a.mp3",
+   "duration": 0.7651,
+   "loop": null,
+   "trigger": "Energy Blast fired (random pick of 20/21)",
+   "confidence": "high",
+   "game_volume": 64,
+   "evidence": "breakpoint on PlaySfx 0x0803E378 while doing it in the emulator (work/audio/sfxtrace2.py, skillsfx.py) - ki blast 0x08019846 rand(2)",
+   "sample": {
+    "rom": "0x082DA19D",
+    "rate": 8000,
+    "length": 6271,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 21,
+   "name": "Energy blast B",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/21_energy_blast_b.mp3",
+   "duration": 0.6628,
+   "loop": null,
+   "trigger": "Energy Blast fired (random pick of 20/21)",
+   "confidence": "high",
+   "game_volume": 64,
+   "evidence": "breakpoint on PlaySfx 0x0803E378 while doing it in the emulator (work/audio/sfxtrace2.py, skillsfx.py) - ki blast 0x08019846 rand(2)",
+   "sample": {
+    "rom": "0x082DBA1C",
+    "rate": 8000,
+    "length": 5400,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 22,
+   "name": "Cutscene sound 22",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/22_cutscene_sound_22.mp3",
+   "duration": 1.3872,
+   "loop": {
+    "start": 0.22675,
+    "end": 0.807
+   },
+   "trigger": "story scripts #131, #143, #169",
+   "confidence": "medium",
+   "game_volume": 64,
+   "evidence": "bytecode scan: push id; native 0x1F (PlaySfx)",
+   "sample": {
+    "rom": "0x082DCF34",
+    "rate": 8000,
+    "length": 6456,
+    "loop": true,
+    "loop_start": 1814
+   }
+  },
+  {
+   "id": 23,
+   "name": "Big Bang release",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/23_big_bang_release.mp3",
+   "duration": 3.8139,
+   "loop": null,
+   "trigger": "Big Bang released after charging",
+   "confidence": "high",
+   "game_volume": 64,
+   "evidence": "breakpoint on PlaySfx 0x0803E378 while doing it in the emulator (work/audio/sfxtrace2.py, skillsfx.py) - 0x08037638",
+   "sample": {
+    "rom": "0x082DE86C",
+    "rate": 2614,
+    "length": 10000,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 24,
+   "name": "Dragon Fist Explosion",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/24_dragon_fist_explosion.mp3",
+   "duration": 1.9225,
+   "loop": null,
+   "trigger": "Dragon Fist Explosion activated",
+   "confidence": "high",
+   "game_volume": 64,
+   "evidence": "breakpoint on PlaySfx 0x0803E378 while doing it in the emulator (work/audio/sfxtrace2.py, skillsfx.py) - 0x0801AB94",
+   "sample": {
+    "rom": "0x082E0F7C",
+    "rate": 2598,
+    "length": 5000,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 25,
+   "name": "Hit without damage",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/25_hit_without_damage.mp3",
+   "duration": 0.1938,
+   "loop": null,
+   "trigger": "attack-type callback 0x08012FC4 when the hit result has no damage nibble",
+   "confidence": "low",
+   "game_volume": 32,
+   "evidence": "static call site 0x08012FE0 (volume 32)",
+   "sample": {
+    "rom": "0x082E2304",
+    "rate": 8000,
+    "length": 1604,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 26,
+   "name": "Cutscene sound 26",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/26_cutscene_sound_26.mp3",
+   "duration": 2.1913,
+   "loop": null,
+   "trigger": "story scripts #501, #502",
+   "confidence": "medium",
+   "game_volume": 64,
+   "evidence": "bytecode scan: push id; native 0x1F (PlaySfx)",
+   "sample": {
+    "rom": "0x082E2948",
+    "rate": 6369,
+    "length": 14000,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 27,
+   "name": "Sound 27",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/27_sound_27.mp3",
+   "duration": 2.5594,
+   "loop": null,
+   "trigger": "",
+   "confidence": "none",
+   "game_volume": 64,
+   "evidence": "",
+   "sample": {
+    "rom": "0x082E5FF8",
+    "rate": 8000,
+    "length": 20566,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 28,
+   "name": "Sound 28",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/28_sound_28.mp3",
+   "duration": 0.5314,
+   "loop": null,
+   "trigger": "native code call site 0x0801C96A, 0x08026582, 0x08026802",
+   "confidence": "low",
+   "game_volume": 64,
+   "evidence": "static call site",
+   "sample": {
+    "rom": "0x082EB04E",
+    "rate": 7312,
+    "length": 4000,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 29,
+   "name": "Cutscene sound 29",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/29_cutscene_sound_29.mp3",
+   "duration": 1.9087,
+   "loop": {
+    "start": 0.0,
+    "end": 0.95437
+   },
+   "trigger": "story scripts #4, #338",
+   "confidence": "medium",
+   "game_volume": 64,
+   "evidence": "bytecode scan: push id; native 0x1F (PlaySfx)",
+   "sample": {
+    "rom": "0x082EBFEE",
+    "rate": 8000,
+    "length": 7635,
+    "loop": true,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 30,
+   "name": "Hit impact (special attackers)",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/30_hit_impact_special_attackers.mp3",
+   "duration": 0.3162,
+   "loop": null,
+   "trigger": "hit spark 0x0802A1D4 when the attacker graphic is 0x60 / 0xE5 / 0xDC",
+   "confidence": "low",
+   "game_volume": 64,
+   "evidence": "static 0x0802A204",
+   "sample": {
+    "rom": "0x082EDDC1",
+    "rate": 16000,
+    "length": 5292,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 31,
+   "name": "Sound 31",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/31_sound_31.mp3",
+   "duration": 0.7347,
+   "loop": null,
+   "trigger": "native code call site 0x0801BB76",
+   "confidence": "low",
+   "game_volume": 64,
+   "evidence": "static call site",
+   "sample": {
+    "rom": "0x082EF26D",
+    "rate": 10093,
+    "length": 7500,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 32,
+   "name": "Beam fire (loop)",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/32_beam_fire_loop.mp3",
+   "duration": 1.4498,
+   "loop": {
+    "start": 0.51519,
+    "end": 0.9825
+   },
+   "trigger": "beam / Final Flash / Energy Sword / Flame Kamehameha / Dragon Fist body firing; stopped when it ends",
+   "confidence": "high",
+   "game_volume": 64,
+   "evidence": "breakpoint on PlaySfx 0x0803E378 while doing it in the emulator (work/audio/sfxtrace2.py, skillsfx.py) - beam object 0x08020828, stop 0x08020790",
+   "sample": {
+    "rom": "0x082F0FB9",
+    "rate": 10171,
+    "length": 9993,
+    "loop": true,
+    "loop_start": 5240
+   }
+  },
+  {
+   "id": 33,
+   "name": "Beam end",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/33_beam_end.mp3",
+   "duration": 0.2827,
+   "loop": null,
+   "trigger": "beam finishes",
+   "confidence": "high",
+   "game_volume": 64,
+   "evidence": "breakpoint on PlaySfx 0x0803E378 while doing it in the emulator (work/audio/sfxtrace2.py, skillsfx.py) - 0x080207A0",
+   "sample": {
+    "rom": "0x082F36C2",
+    "rate": 8333,
+    "length": 2500,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 34,
+   "name": "Energy wave release",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/34_energy_wave_release.mp3",
+   "duration": 0.8819,
+   "loop": null,
+   "trigger": "Burning Attack, Masenkoha release, Ultra Volleyball throw",
+   "confidence": "high",
+   "game_volume": 64,
+   "evidence": "breakpoint on PlaySfx 0x0803E378 while doing it in the emulator (work/audio/sfxtrace2.py, skillsfx.py) - 0x0802940A, 0x080214D8, 0x08038482",
+   "sample": {
+    "rom": "0x082F4086",
+    "rate": 11137,
+    "length": 10000,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 35,
+   "name": "Hit spark variant",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/35_hit_spark_variant.mp3",
+   "duration": 0.4831,
+   "loop": null,
+   "trigger": "hit spark object 0x0802A3A0",
+   "confidence": "low",
+   "game_volume": 64,
+   "evidence": "static 0x0802A3A0",
+   "sample": {
+    "rom": "0x082F6796",
+    "rate": 6094,
+    "length": 3000,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 36,
+   "name": "Level up",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/36_level_up.mp3",
+   "duration": 1.5199,
+   "loop": null,
+   "trigger": "level gained (bytecode script #3: push 36, native 0x1F)",
+   "confidence": "high",
+   "game_volume": 64,
+   "evidence": "breakpoint on PlaySfx 0x0803E378 while doing it in the emulator (work/audio/sfxtrace2.py, skillsfx.py) - killing an enemy with XP set one below the next level",
+   "sample": {
+    "rom": "0x082F734E",
+    "rate": 6544,
+    "length": 10000,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 37,
+   "name": "Cutscene sound 37",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/37_cutscene_sound_37.mp3",
+   "duration": 1.6374,
+   "loop": null,
+   "trigger": "story scripts #102, #103, #342 ...",
+   "confidence": "medium",
+   "game_volume": 64,
+   "evidence": "bytecode scan: push id; native 0x1F (PlaySfx)",
+   "sample": {
+    "rom": "0x082F9A5E",
+    "rate": 8000,
+    "length": 13236,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 38,
+   "name": "Sound 38",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/38_sound_38.mp3",
+   "duration": 0.149,
+   "loop": null,
+   "trigger": "native code call site 0x08031D68, 0x080337AE",
+   "confidence": "low",
+   "game_volume": 64,
+   "evidence": "static call site",
+   "sample": {
+    "rom": "0x082FCE12",
+    "rate": 6172,
+    "length": 1000,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 39,
+   "name": "Menu cursor",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/39_menu_cursor.mp3",
+   "duration": 0.0067,
+   "loop": null,
+   "trigger": "cursor moves in the pause / status menus",
+   "confidence": "high",
+   "game_volume": 64,
+   "evidence": "breakpoint on PlaySfx 0x0803E378 while doing it in the emulator (work/audio/sfxtrace2.py, skillsfx.py) - 0x08006032",
+   "sample": {
+    "rom": "0x082FD1FA",
+    "rate": 8000,
+    "length": 54,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 40,
+   "name": "Menu confirm",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/40_menu_confirm.mp3",
+   "duration": 0.0733,
+   "loop": null,
+   "trigger": "pause (START), menu select (A), cycle skill (L)",
+   "confidence": "high",
+   "game_volume": 64,
+   "evidence": "breakpoint on PlaySfx 0x0803E378 while doing it in the emulator (work/audio/sfxtrace2.py, skillsfx.py) - 0x0800535E pause, 0x0800B994 skill cycle, 0x0801E622 menu A",
+   "sample": {
+    "rom": "0x082FD230",
+    "rate": 8000,
+    "length": 781,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 41,
+   "name": "Low HP warning",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/41_low_hp_warning.mp3",
+   "duration": 0.1484,
+   "loop": null,
+   "trigger": "repeats about every 70 frames while HP is low (also the \"can't\" buzz)",
+   "confidence": "high",
+   "game_volume": 32,
+   "evidence": "breakpoint on PlaySfx 0x0803E378 while doing it in the emulator (work/audio/sfxtrace2.py, skillsfx.py) - 0x0800BA6E, volume 32",
+   "sample": {
+    "rom": "0x082FD53D",
+    "rate": 8000,
+    "length": 1298,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 42,
+   "name": "Cutscene sound 42",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/42_cutscene_sound_42.mp3",
+   "duration": 0.1482,
+   "loop": null,
+   "trigger": "story scripts #38, #66, #91 ...",
+   "confidence": "medium",
+   "game_volume": 64,
+   "evidence": "bytecode scan: push id; native 0x1F (PlaySfx)",
+   "sample": {
+    "rom": "0x082FDA4F",
+    "rate": 6600,
+    "length": 1000,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 43,
+   "name": "Sound 43",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/43_sound_43.mp3",
+   "duration": 1.0997,
+   "loop": {
+    "start": 0.0,
+    "end": 0.54988
+   },
+   "trigger": "",
+   "confidence": "none",
+   "game_volume": 64,
+   "evidence": "",
+   "sample": {
+    "rom": "0x082FDE37",
+    "rate": 8000,
+    "length": 4399,
+    "loop": true,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 44,
+   "name": "Sound 44",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/44_sound_44.mp3",
+   "duration": 0.1485,
+   "loop": null,
+   "trigger": "native code call site 0x08017EF0",
+   "confidence": "low",
+   "game_volume": 64,
+   "evidence": "static call site",
+   "sample": {
+    "rom": "0x082FEF66",
+    "rate": 6220,
+    "length": 1000,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 45,
+   "name": "Sound 45",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/45_sound_45.mp3",
+   "duration": 0.5629,
+   "loop": null,
+   "trigger": "native code call site 0x0802BC8C",
+   "confidence": "low",
+   "game_volume": 64,
+   "evidence": "static call site",
+   "sample": {
+    "rom": "0x082FF34E",
+    "rate": 6129,
+    "length": 3500,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 46,
+   "name": "Volleyball bounce",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/46_volleyball_bounce.mp3",
+   "duration": 0.9688,
+   "loop": null,
+   "trigger": "Ultra Volleyball Attack ball hit",
+   "confidence": "high",
+   "game_volume": 64,
+   "evidence": "breakpoint on PlaySfx 0x0803E378 while doing it in the emulator (work/audio/sfxtrace2.py, skillsfx.py) - 0x0803C8B6",
+   "sample": {
+    "rom": "0x083000FA",
+    "rate": 8000,
+    "length": 7766,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 47,
+   "name": "Energy Punch",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/47_energy_punch.mp3",
+   "duration": 0.4282,
+   "loop": null,
+   "trigger": "Energy Punch activated",
+   "confidence": "high",
+   "game_volume": 64,
+   "evidence": "breakpoint on PlaySfx 0x0803E378 while doing it in the emulator (work/audio/sfxtrace2.py, skillsfx.py) - 0x0801B278",
+   "sample": {
+    "rom": "0x08301F50",
+    "rate": 16000,
+    "length": 7040,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 48,
+   "name": "Hit impact A",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/48_hit_impact_a.mp3",
+   "duration": 0.2581,
+   "loop": null,
+   "trigger": "a hit lands: player melee, enemy melee, energy blast, beam ticks (random pick of 48/49)",
+   "confidence": "high",
+   "game_volume": 64,
+   "evidence": "breakpoint on PlaySfx 0x0803E378 while doing it in the emulator (work/audio/sfxtrace2.py, skillsfx.py) - 0x08012AA4 player melee, 0x0802A258 hit spark, 0x080199E0 blast, 0x080209D6 beam",
+   "sample": {
+    "rom": "0x08303AD0",
+    "rate": 7279,
+    "length": 2000,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 49,
+   "name": "Hit impact B",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/49_hit_impact_b.mp3",
+   "duration": 0.4061,
+   "loop": null,
+   "trigger": "same as 48 (random pick of 48/49)",
+   "confidence": "high",
+   "game_volume": 64,
+   "evidence": "breakpoint on PlaySfx 0x0803E378 while doing it in the emulator (work/audio/sfxtrace2.py, skillsfx.py)",
+   "sample": {
+    "rom": "0x083042A0",
+    "rate": 6901,
+    "length": 3000,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 50,
+   "name": "Melee swing A",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/50_melee_swing_a.mp3",
+   "duration": 0.132,
+   "loop": null,
+   "trigger": "every punch (player A press or enemy punch), random pick of 50/51",
+   "confidence": "high",
+   "game_volume": 64,
+   "evidence": "breakpoint on PlaySfx 0x0803E378 while doing it in the emulator (work/audio/sfxtrace2.py, skillsfx.py) - 0x0800DF1A attack-type callback",
+   "sample": {
+    "rom": "0x08304E58",
+    "rate": 6628,
+    "length": 1000,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 51,
+   "name": "Melee swing B",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/51_melee_swing_b.mp3",
+   "duration": 0.182,
+   "loop": null,
+   "trigger": "same as 50 (random pick of 50/51)",
+   "confidence": "high",
+   "game_volume": 64,
+   "evidence": "breakpoint on PlaySfx 0x0803E378 while doing it in the emulator (work/audio/sfxtrace2.py, skillsfx.py)",
+   "sample": {
+    "rom": "0x08305240",
+    "rate": 16000,
+    "length": 3005,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 52,
+   "name": "Sound 52",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/52_sound_52.mp3",
+   "duration": 0.6614,
+   "loop": null,
+   "trigger": "native code call site 0x0801CF2A, 0x0803D29A",
+   "confidence": "low",
+   "game_volume": 64,
+   "evidence": "static call site",
+   "sample": {
+    "rom": "0x08305DFD",
+    "rate": 7275,
+    "length": 5000,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 53,
+   "name": "Cutscene sound 53",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/53_cutscene_sound_53.mp3",
+   "duration": 2.0238,
+   "loop": null,
+   "trigger": "story scripts #412..#422, #483",
+   "confidence": "medium",
+   "game_volume": 64,
+   "evidence": "bytecode scan: push id; native 0x1F (PlaySfx)",
+   "sample": {
+    "rom": "0x08307185",
+    "rate": 8000,
+    "length": 17230,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 54,
+   "name": "Super Saiyan transform",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/54_super_saiyan_transform.mp3",
+   "duration": 1.4467,
+   "loop": {
+    "start": 0.0,
+    "end": 0.72337
+   },
+   "trigger": "Super Saiyan skill (and when the form ends)",
+   "confidence": "high",
+   "game_volume": 64,
+   "evidence": "breakpoint on PlaySfx 0x0803E378 while doing it in the emulator (work/audio/sfxtrace2.py, skillsfx.py) - 0x0801C414, 0x0800E3CC",
+   "sample": {
+    "rom": "0x0830B4D3",
+    "rate": 8000,
+    "length": 5787,
+    "loop": true,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 55,
+   "name": "Cutscene sound 55",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/55_cutscene_sound_55.mp3",
+   "duration": 0.0588,
+   "loop": null,
+   "trigger": "story scripts #103, #330",
+   "confidence": "medium",
+   "game_volume": 64,
+   "evidence": "bytecode scan: push id; native 0x1F (PlaySfx)",
+   "sample": {
+    "rom": "0x0830CB6E",
+    "rate": 8000,
+    "length": 546,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 56,
+   "name": "Sound 56",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/56_sound_56.mp3",
+   "duration": 0.9857,
+   "loop": null,
+   "trigger": "",
+   "confidence": "none",
+   "game_volume": 64,
+   "evidence": "",
+   "sample": {
+    "rom": "0x0830CD90",
+    "rate": 5987,
+    "length": 6000,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 57,
+   "name": "Cutscene sound 57",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/57_cutscene_sound_57.mp3",
+   "duration": 0.9522,
+   "loop": null,
+   "trigger": "story scripts #330, #415",
+   "confidence": "medium",
+   "game_volume": 64,
+   "evidence": "bytecode scan: push id; native 0x1F (PlaySfx)",
+   "sample": {
+    "rom": "0x0830E500",
+    "rate": 8000,
+    "length": 7698,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 58,
+   "name": "Sound 58",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/58_sound_58.mp3",
+   "duration": 0.6505,
+   "loop": null,
+   "trigger": "",
+   "confidence": "none",
+   "game_volume": 64,
+   "evidence": "",
+   "sample": {
+    "rom": "0x08310312",
+    "rate": 7996,
+    "length": 5280,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 59,
+   "name": "Dash",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/59_dash.mp3",
+   "duration": 0.5653,
+   "loop": null,
+   "trigger": "double-tap dash starts",
+   "confidence": "high",
+   "game_volume": 64,
+   "evidence": "breakpoint on PlaySfx 0x0803E378 while doing it in the emulator (work/audio/sfxtrace2.py, skillsfx.py) - 0x08012F5E",
+   "sample": {
+    "rom": "0x083117B2",
+    "rate": 5145,
+    "length": 3000,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 60,
+   "name": "Sound 60",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/60_sound_60.mp3",
+   "duration": 2.3517,
+   "loop": {
+    "start": 0.0,
+    "end": 1.17588
+   },
+   "trigger": "",
+   "confidence": "none",
+   "game_volume": 64,
+   "evidence": "",
+   "sample": {
+    "rom": "0x0831236A",
+    "rate": 8000,
+    "length": 9407,
+    "loop": true,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 61,
+   "name": "Sound 61",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/61_sound_61.mp3",
+   "duration": 0.3266,
+   "loop": null,
+   "trigger": "native code call site 0x0802C128",
+   "confidence": "low",
+   "game_volume": 64,
+   "evidence": "static call site",
+   "sample": {
+    "rom": "0x08314829",
+    "rate": 10197,
+    "length": 3700,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 62,
+   "name": "Hit impact (special attackers 2)",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/62_hit_impact_special_attackers_2.mp3",
+   "duration": 0.6345,
+   "loop": null,
+   "trigger": "hit spark 0x0802A1D4 when the attacker graphic is 0xEE / 0xF4 / 0xED",
+   "confidence": "low",
+   "game_volume": 64,
+   "evidence": "static 0x0802A236",
+   "sample": {
+    "rom": "0x0831569D",
+    "rate": 16000,
+    "length": 10368,
+    "loop": false,
+    "loop_start": 0
+   }
+  },
+  {
+   "id": 63,
+   "name": "Enemy loop sound",
+   "kind": "sfx",
+   "file": "assets/buu/audio/sfx/63_enemy_loop_sound.mp3",
+   "duration": 1.4925,
+   "loop": {
+    "start": 0.0,
+    "end": 0.74627
+   },
+   "trigger": "looping enemy effect, stopped per instance (0x0803E32C)",
+   "confidence": "low",
+   "game_volume": 64,
+   "evidence": "static 0x08023FF4, 0x0802E224",
+   "sample": {
+    "rom": "0x08317F1D",
+    "rate": 6700,
+    "length": 5000,
+    "loop": true,
+    "loop_start": 0
+   }
+  }
+ ]
+}
