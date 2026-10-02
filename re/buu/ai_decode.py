@@ -174,7 +174,17 @@ for _fn in (0x08029D15, 0x08029C65, 0x0802A09F, 0x0802B7C7, 0x0802D091, 0x0802A2
 UNIT_DESC = {
     'dist2': 'squared px (radius = sqrt)', 'frames': 'frames (1/60 s)', 'prob16': 'probability p/65536 per frame',
     'speed256': '1/256 px per frame', 'frac16': 'fraction p/65536', 'count': 'integer', 'state': 'AI state id',
+    'px': 'pixels', 'enemy_type': 'enemy type index (0x08711274)', 'raw': 'raw value (meaning in sem)',
 }
+
+# boss / special node registries contributed by boss_nodes_*.py (same entry format as above)
+import importlib  # noqa: E402
+BOSS_GROUPS = ('buu', 'janemba', 'fighters', 'others', 'regular')
+for _g in BOSS_GROUPS:
+    try:
+        REGISTRY.update(importlib.import_module(f'boss_nodes_{_g}').REGISTRY)
+    except ImportError:
+        pass
 
 
 def convert(unit, v):
