@@ -70,6 +70,26 @@ export function useData<T = unknown>(game: string, name: string) {
   return useAsync(() => loadData(game, name) as Promise<T>, [game, name])
 }
 
+/** URL of a file under site/public (sprites.json paths look like "assets/log2/..."). */
+export function assetUrl(path: string | undefined): string {
+  if (!path) return ''
+  return import.meta.env.BASE_URL + path.replace(/^\//, '')
+}
+
+export function gameMeta(game: string) {
+  return GAMES.find((g) => g.id === game)
+}
+
+/** Loads several data files of one game at once; undefined until all are ready. */
+export function useDataSet<T extends Record<string, unknown>>(game: string, names: (keyof T & string)[]): T | undefined {
+  return useAsync(async () => {
+    const vals = await Promise.all(names.map((n) => loadData(game, n)))
+    const out: Record<string, unknown> = {}
+    names.forEach((n, i) => (out[n] = vals[i]))
+    return out as T
+  }, [game, names.join(',')])
+}
+
 /** Finds the main array of records inside a JSON file regardless of exact shape. */
 export function recordsOf(json: unknown): Record<string, unknown>[] {
   if (Array.isArray(json)) return json as Record<string, unknown>[]
