@@ -82,6 +82,20 @@ Only the feet matter: bodies overlap walls drawn above them freely.
   walk-animation frames 1 and 4 (obj+0x11); full step d*speed/max; blocked -> n = rand(32)-16 and sidestep `speed`
   on the minor axis |n| frames (blocked sidestep -> n = 0).
 
+**Knockback** (KnockbackSlide `0x08018BCA`, run by the shared on-hit reaction states 2, 3, 4 (K 16 / 4 / 16) and
+0xE / 0xF (K 36, the Majin Fighters') - the enemy_ai.json parameter `frames` is this K). The hit handler `0x0800FAFA`
+first stores obj+0x290 = hit dir, obj+0x294 = the hit was critical (hit struct +0x10, set by ComputeDamage),
+obj+0x298 = attack sub id 3.
+* enter `0x08018A08`: K x4 after a critical hit ("launch"); d = hit dir ^ 1 (the enemy turns to face the attacker);
+  s = (rand(64) + 96) * K >>> 7; velocity along the hit = table `0x086FDA20`[d] (-8, 8, 8, -8) * s, across it
+  (rand(0x8000) - 0x4000) * s >> 12 (1/256 px per frame); hurt anim 9 unless blocking (obj+0x1C8).
+* update `0x08018A92`: blocking -> guard anim 7 for 16 frames; otherwise until the hurt animation ends. Each frame free
+  the footprint, move, test the footprint rect on the enemy grid (vfunc +0x50); blocked -> move back and re-mark;
+  after a critical / sub-3 hit that ends the slide with a **wall splat**: a hit message (kind 1 = from the player's
+  side, attack sub 3 `0x086B80A0`, mult int(409.6f) = 409, attacker = the enemy, rect = its blocked footprint) to
+  everyone, the enemy itself unhittable meanwhile (obj+0x1CC = 0). A fighter hit by a splat gets obj+0x298 = 1 and can
+  splat into the next wall itself (chain). The player's hurt state is separate code (the node never runs on Goku).
+
 **Projectiles** (projectile grid): each shot's update tests its box with `0x08009324(box, [0x03001A50])` (bullet
 `0x08027562` and the other classes) and explodes when blocked or outside 0..2048; beams extend to the first wall.
 
@@ -133,14 +147,16 @@ two: the World Tournament stadium 7-6 (composite x = world x - 16) and HFIL 18-1
 
 * `collision.ts` keeps the walk + projectile grids of the arena map and a private enemy grid; `Actor.fits` = arena
   bounds (the bounding box of the walkable region around the arena's spawn point) and the grid test. Player: walk
-  grid with `0x08012960`; enemies: enemy grid with marks (freeing restores the terrain value instead of setting the
-  tile passable, so an enemy pushed onto a wall cannot open a hole); projectiles: projectile grid.
+  grid with `0x08012960`; enemies: enemy grid with marks (freeing sets the tiles passable like the game, holes in
+  walls under an enemy that stood on them included); projectiles: projectile grid.
 * Detached (INFERRED mapping of the controllers): Janemba body parts, worm segments, the enemy holding the player,
   airborne enemies (height offset), defeated enemies.
 * Objects that mark tiles at load in the game (NPCs, Broly's rocks are separate entities here, breakables) are not
   placed; the grids are bare terrain.
 * Also verified (`gen_buu_step_traces.py`, 5 runs, 240..600 frames, node update called per frame, RNG state per
   frame): back-off (2 runs), step-away, wander, walk-to: position, facing, return value and detour counter.
-* Not traced against the emulator: projectile explosions on the projectile grid, knock-back (KnockbackSlide
-  0x08018A08 / 0x08018A92 uses the hit direction, launch state and other box tests: not ported), AlignWithPlayer,
-  CirclePlayer, the corner cases of overlapping enemies.
+* Knockback (`gen_buu_knockback_traces.py`, 11 cases caught call by call: punches in the 4 directions, an Energy
+  Blast, punches next to / into the tree trunk (guarding fighters), critical punches in the open and into the trunk,
+  a critical punch whose wall splat hits a second fighter): velocity, every position, slide length, splat damage.
+* Not traced against the emulator: projectile explosions on the projectile grid, AlignWithPlayer, CirclePlayer, the
+  player's own hurt knock-back.

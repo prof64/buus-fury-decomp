@@ -113,18 +113,24 @@ export class BuuCollision {
     for (let ty = ty0; ty < ty1; ty++) for (let tx = tx0; tx < tx1; tx++) g[ty * this.w + tx] = value
   }
 
-  /** put the terrain (walk grid) value back on every tile under the box (enemy unmark) */
-  restore(l: Layer, x0: number, y0: number, x1: number, y1: number) {
+  /** copy of the tiles under the box (same clipping as mark) */
+  save(l: Layer, x0: number, y0: number, x1: number, y1: number): number[] {
     const g = this.grid(l)
+    const out: number[] = []
+    this.each(x0, y0, x1, y1, (i) => out.push(g[i]))
+    return out
+  }
+  load(l: Layer, x0: number, y0: number, x1: number, y1: number, v: number[]) {
+    const g = this.grid(l)
+    let k = 0
+    this.each(x0, y0, x1, y1, (i) => (g[i] = v[k++]))
+  }
+  private each(x0: number, y0: number, x1: number, y1: number, f: (i: number) => void) {
     const tx0 = Math.max(0, x0 >> 3)
     const ty0 = Math.max(0, y0 >> 3)
-    const tx1 = Math.min(this.w, (x1 + 7) >> 3)
-    const ty1 = Math.min(this.h, (y1 + 7) >> 3)
-    for (let ty = ty0; ty < ty1; ty++)
-      for (let tx = tx0; tx < tx1; tx++) {
-        const i = ty * this.w + tx
-        g[i] = this.walk[i]
-      }
+    const tx1 = Math.min(this.w, x1 >= 2048 ? 256 : (x1 + 7) >> 3)
+    const ty1 = Math.min(this.h, y1 >= 2048 ? 256 : (y1 + 7) >> 3)
+    for (let ty = ty0; ty < ty1; ty++) for (let tx = tx0; tx < tx1; tx++) f(ty * this.w + tx)
   }
 
   /** nearest position (8 px spiral around x, y) where a w x h footprint is free on `l`, inside `inside` and with its

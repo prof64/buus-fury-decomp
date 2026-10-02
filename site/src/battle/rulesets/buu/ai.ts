@@ -8,7 +8,7 @@
 import { DIR_VEC, facingToward, overlaps, type Dir } from '../../core/geom'
 import type { HitMsg } from './actor'
 import type { AiNodeJ } from './data'
-import type { Enemy } from './enemy'
+import type { Enemy, KnockState } from './enemy'
 import { ATK } from './damage'
 import { PathMover } from './path'
 import {
@@ -29,7 +29,6 @@ export const NODE_NOTES: Record<string, string> = {
   VolleyballLaunch: 'launched ball flight not decoded: 4 px/frame for 30 frames, hits other enemies',
   InlineScript: 'bytecode not run (scripted escape / cutscene)',
   RunScript: 'cutscene scripts are not run',
-  KnockbackSlide: 'reaction constant K not tabulated: K = 256 (~1 px/frame, matches the measured 15 px / 15 f)',
 }
 
 export interface RNode {
@@ -764,21 +763,14 @@ export function create(n: AiNodeJ, c: AiController): RNode {
         e.moveBy(e.w, a.data.vx, a.data.vy)
         return f >= 48
       })
-    case 'KnockbackSlide':
-      return new Act(n, c, (a) => {
-        const k = ((e.w.rng.rand(64, 'knockback') + 96) * 256) >> 7
-        const [dx, dy] = DIR_VEC[e.lastHitDir]
-        a.data.vx = dx * k
-        a.data.vy = dy * k
-        e.setAnim(9, true, false)
-      }, (f, a) => {
-        e.moveBy(e.w, a.data.vx, a.data.vy)
-        if (f >= P(n, 'frames')) {
-          e.setAnim('idle', true, true)
-          return true
-        }
-        return false
+    case 'KnockbackSlide': {
+      // the parameter enemy_ai.json calls `frames` is the knockback constant K (node +0x0C): 16, 4 or 36
+      const kb: KnockState = { vx: 0, vy: 0, n: 16, anim: null }
+      // (cosmetic: back to the idle pose afterwards; the game's underlying state sets its own animation)
+      return new Act(n, c, () => e.knockStart(P(n, 'frames'), kb), () => e.knockStep(kb), () => {
+        if (kb.anim && e.anim === kb.anim) e.setAnim('idle', true, true)
       })
+    }
     case 'LungeStep':
       return new Act(n, c, () => {
         e.facePlayer()

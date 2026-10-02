@@ -6,6 +6,8 @@ import { describe, expect, it } from 'vitest'
 import traces from '../../../data/battle/buu_collision_traces.json'
 import pathTraces from '../../../data/battle/buu_path_traces.json'
 import stepTraces from '../../../data/battle/buu_step_traces.json'
+import kbTraces from '../../../data/battle/buu_knockback_traces.json'
+import type { KnockState } from '../../src/battle/rulesets/buu/enemy'
 import { PathMover } from '../../src/battle/rulesets/buu/path'
 import { buuData, fighter, makeBuuSim } from './buu_harness'
 import { BTN } from '../../src/battle/core/input'
@@ -178,6 +180,86 @@ describe('enemy step nodes vs emulator (node update called every frame, Southwes
       }
     })
   }
+})
+
+interface KbRun {
+  name: string
+  start: [number, number]
+  footprint: [number, number]
+  marked: [number, number][]
+  holes: [number, number][]
+  enter: { rng: [number, number]; K: number; hitDir: number; crit: number; sub3: number; blocking: number; face: number }
+  updates: { frame: number; pos: [number, number]; rng: [number, number]; otherHp: number }[]
+  other: { at: [number, number]; hp_before: number; hp_after_splat: number | null } | null
+}
+
+describe('enemy knockback (KnockbackSlide 0x08018A08 / 0x08018A92) vs emulator', () => {
+  for (const r of (kbTraces as unknown as { runs: KbRun[] }).runs) {
+    it(`${r.name}: K ${r.enter.K}, hit dir ${r.enter.hitDir}${r.enter.crit ? ', critical' : ''}${r.enter.blocking ? ', blocking' : ''}, ${r.updates.length} updates`, () => {
+      const s = makeBuuSim({ enemy: 't68', count: r.other ? 2 : 1, arena: 'forest', fighter: fighter() })
+      const [e, o] = s.enemies
+      for (const x of s.enemies) {
+        x.update = () => undefined
+        x.unmarkSelf()
+      }
+      const col = e.ctx.col!
+      for (const [tx, ty] of r.marked) col.enemy[ty * col.w + tx] = 0
+      for (const [tx, ty] of r.holes) col.enemy[ty * col.w + tx] = 1
+      expect([e.footW, e.footH]).toEqual(r.footprint)
+      if (o && r.other) {
+        o.x = r.other.at[0] << 8
+        o.y = r.other.at[1] << 8
+        // its HP when the slide's last update starts (the player's punch may have hit it too)
+        o.hp1024 = r.updates[r.updates.length - 1].otherHp
+      }
+      e.x = r.start[0]
+      e.y = r.start[1]
+      e.markSelf()
+      e.lastHitDir = r.enter.hitDir as 0 | 1 | 2 | 3
+      e.critHit = !!r.enter.crit
+      e.splatHit = !!r.enter.sub3
+      e.blocking = !!r.enter.blocking
+      s.w.rng.setState([r.enter.rng[0] | 0, r.enter.rng[1] | 0])
+      const kb: KnockState = { vx: 0, vy: 0, n: 16, anim: null }
+      e.knockStart(r.enter.K, kb)
+      expect(e.facing).toBe(r.enter.hitDir ^ 1)
+      let done = -1
+      for (let i = 0; i < r.updates.length + 4 && done < 0; i++) {
+        const u = r.updates[i]
+        if (u) {
+          expect([e.x, e.y], `update ${i}: sim (${e.x / 256}, ${e.y / 256}) game (${u.pos[0] / 256}, ${u.pos[1] / 256})`).toEqual(u.pos)
+          s.w.rng.setState([u.rng[0] | 0, u.rng[1] | 0])
+        }
+        // Enemy.update order: anim tick, then the AI (the slide update); the hit (enter) comes earlier in the same frame
+        e.tickAnim()
+        if (e.knockStep(kb)) done = i
+      }
+      // the game's last caught update is the one that ends the slide
+      expect(done).toBe(r.updates.length - 1)
+      if (o && r.other) expect(o.hp1024, 'wall splat damage to the fighter at the wall').toBe(r.other.hp_after_splat ?? r.updates[r.updates.length - 1].otherHp)
+    })
+  }
+})
+
+describe('knockback in a running battle', () => {
+  it('a punched Majin Fighter slides away from Goku (reaction state, K 36) and stops sliding', () => {
+    const s = makeBuuSim({ enemy: 't68', arena: 'htc', fighter: fighter() })
+    const e = s.enemies[0]
+    s.player.rec.hp = s.player.rec.maxHp = 99999
+    e.unmarkSelf()
+    e.x = s.player.x + (18 << 8)
+    e.y = s.player.y
+    e.markSelf()
+    s.player.facing = 3
+    const x0 = e.x
+    let hit = false
+    let maxX = x0
+    s.run(30, (f) => (f === 1 ? BTN.A : 0))
+    hit = s.w.log.some((l) => /player .* -> Majin Fighter/.test(l.text))
+    maxX = Math.max(maxX, e.x)
+    expect(hit).toBe(true)
+    expect(maxX - x0).toBeGreaterThan(4 << 8)
+  })
 })
 
 describe('enemies and projectiles on the grids', () => {

@@ -155,7 +155,9 @@ recovery 16 frames; dashing into a wall plays the hurt animation and pushes back
 (`bump`); the step nodes move `speed` on the major axis (velocity = d × speed / max(|dx|, |dy|)). The node enemy_ai.json calls
 StepTowardPlayer (0x08018C3A) moves away from the player while facing it: the simulator names it BackOffFacingPlayer
 (`data.ts` AI_RENAME); it, StepAwayFromPlayer, Wander and WalkToPlayer are replayed frame by frame against emulator
-recordings (`tools/battle/gen_buu_step_traces.py`, `data/battle/buu_step_traces.json`).
+recordings (`tools/battle/gen_buu_step_traces.py`, `data/battle/buu_step_traces.json`). Enemy knockback
+(KnockbackSlide 0x08018A08 / 0x08018A92: x4 after a critical hit, enemy-grid wall test, wall splat hit) is replayed
+against 11 emulator cases (`gen_buu_knockback_traces.py`).
 Not modelled: the game's lag frames (busy scenes skip logic frames on the GBA).
 
 Map collision (tools/battle/COLLISION.md): arenas use the real map grids from the ROM map headers

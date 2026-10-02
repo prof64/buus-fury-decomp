@@ -18,6 +18,14 @@ import { audioEvent } from '../../audio/bus'
 const GUN_MUZZLE = [[4, 4], [13, -24], [-8, -8], [24, -8]]
 const GUN_BOX: [number, number, number, number][] = [[3, 10, 8, 16], [3, 5, 8, 16], [5, 4, 16, 8], [10, 4, 16, 8]]
 const WAVE_MUZZLE = { soldier: [[2, 8], [9, -28], [-16, -11], [24, -11]], turret: [[4, 4], [4, -25], [-13, -14], [22, -13]] }
+/** 0x086FDA20: knockback sign per direction index (hit dir ^ 1) */
+const KB_SIGN = [-8, 8, 8, -8]
+export interface KnockState {
+  vx: number
+  vy: number
+  n: number
+  anim: unknown
+}
 const DIAG = [[-316, 316], [316, -316], [-316, -316], [316, 316]]
 
 export class Enemy extends Actor implements EnemyLike {
@@ -35,6 +43,10 @@ export class Enemy extends Actor implements EnemyLike {
   stateStamp = 0
   stunned = false
   lastHitDir: Dir = 0
+  /** obj+0x294: the last accepted hit was critical (hit struct +0x10, written by ComputeDamage) - "launched" */
+  critHit = false
+  /** obj+0x298: the last accepted hit used attack sub id 3 (a wall-splat hit) */
+  splatHit = false
   vx = 0
   vy = 0
   moving = false
@@ -213,12 +225,12 @@ export class Enemy extends Actor implements EnemyLike {
     this.marked = [this.px, this.py, this.px + this.footW, this.py + this.footH]
     c.mark('enemy', ...this.marked, 0)
   }
-  /** vfunc +0x48(1): free the marked tiles (the game sets them passable; here they get the terrain value back, so a
-   *  footprint pushed onto a wall tile cannot open a hole in the grid) */
+  /** vfunc +0x48(1): set the marked tiles passable - also terrain tiles under a footprint that overlapped a wall: the
+   *  game's hole quirk (emulator-verified: a fighter knocked out of a tree trunk slides through it) */
   unmarkSelf() {
     const c = this.ctx.col
     if (!c || !this.marked) return
-    c.restore('enemy', ...this.marked)
+    c.mark('enemy', ...this.marked, 1)
     this.marked = null
   }
   /** keep the marks on the current footprint (positions set directly: spawns, teleports, followers) */
@@ -233,9 +245,12 @@ export class Enemy extends Actor implements EnemyLike {
     const c = this.ctx.col
     if (!c || !this.attached()) return true
     const m = this.marked
-    if (m) c.restore('enemy', ...m)
+    if (!m) return c.test('enemy', x, y, x + this.footW, y + this.footH)
+    // test with the own marks lifted (a test-only peek: the tiles get their previous values back)
+    const saved = c.save('enemy', ...m)
+    c.mark('enemy', ...m, 1)
     const ok = c.test('enemy', x, y, x + this.footW, y + this.footH)
-    if (m) c.mark('enemy', ...m, 0)
+    c.load('enemy', ...m, saved)
     return ok
   }
   /** enemy step (ChasePlayer's step 0x0803B9xx, the back-off / step-away steps 0x08018C3A / 0x0801CBA1): unmark, try the full move, else only
@@ -267,6 +282,62 @@ export class Enemy extends Actor implements EnemyLike {
     this.moving = true
     return this.moveBy(this.w, Math.round(vx), Math.round(vy))
   }
+  // ---- knockback (KnockbackSlide 0x08018BCA; reaction states 2, 3, 4, 0xE, 0xF of the shared on-hit trees) ----------
+  /** enter 0x08018A08: K = node +0x0C (x4 after a critical hit); d = hit dir ^ 1 (the enemy turns to face the
+   *  attacker); s = (rand(64) + 96) * K >>> 7; velocity along the hit direction = table 0x086FDA20[d] (-8, 8, 8, -8) * s,
+   *  across it (rand(0x8000) - 0x4000) * s >> 12; hurt anim 9 unless blocking (obj+0x1C8) */
+  knockStart(K: number, kb: KnockState) {
+    const w = this.w
+    kb.n = 16
+    if (this.critHit) K *= 4
+    const d = (this.lastHitDir ^ 1) as Dir
+    const s = ((w.rng.rand(64, 'knockback') + 96) * K) >>> 7
+    const main = KB_SIGN[d] * s
+    const perp = ((w.rng.rand(0x8000, 'knockback side') - 0x4000) * s) >> 12
+    if (d >> 1) {
+      kb.vx = main
+      kb.vy = perp
+    } else {
+      kb.vx = perp
+      kb.vy = main
+    }
+    this.facing = d
+    kb.anim = null
+    if (!this.blocking) {
+      this.setAnim(9, true, false)
+      kb.anim = this.anim ?? null
+    }
+  }
+  /** update 0x08018A92: blocking -> guard anim 7, 16 frames; else until the hurt anim ends. Each frame free the
+   *  footprint's tiles, move by the velocity, test the footprint rect on the enemy grid (vfunc +0x50); blocked ->
+   *  move back, and after a critical (or sub-3) hit: wall splat - a hit (attack sub 3, x409/1024, attacker = this enemy,
+   *  rect = the blocked footprint) to the other actors, this enemy unhittable meanwhile; the slide then ends.
+   *  true = finished */
+  knockStep(kb: KnockState): boolean {
+    if (this.blocking) {
+      if (!this.anim || this.anim.raw !== 8) this.setAnim(7, false, true)
+      if (--kb.n === 0) return true
+    } else if (!kb.anim || this.anim !== kb.anim || this.animDone()) return true
+    const w = this.w
+    this.unmarkSelf()
+    this.x += kb.vx
+    this.y += kb.vy
+    if (this.fits(w, this.px, this.py)) {
+      this.markSelf()
+      return false
+    }
+    const rect: Rect = { x0: this.px, y0: this.py, x1: this.px + this.footW, y1: this.py + this.footH }
+    this.x -= kb.vx
+    this.y -= kb.vy
+    this.markSelf()
+    if (!this.critHit && !this.splatHit) return false
+    const was = this.hittable
+    this.hittable = false
+    broadcast(w, { team: 1, rect, dir: this.lastHitDir, mult: 409, atk: ATK[3], attacker: this, source: this })
+    this.hittable = was
+    return true
+  }
+
   /** footprint-rect centre (0x0800FDFA rect: (x0 + x1) >> 1) */
   private static fc(a: Actor): [number, number] {
     return [(a.px * 2 + a.footW) >> 1, (a.py * 2 + a.footH) >> 1]
@@ -736,6 +807,9 @@ export class Enemy extends Actor implements EnemyLike {
     if (msg.attacker.kind === 'player') audioEvent('hit')
     if (res.dmg > 0 && msg.attacker.kind === 'player') (msg.attacker as unknown as { onDealt?: (w: World, m: HitMsg, d: number) => void }).onDealt?.(w, msg, res.dmg)
     this.lastHitDir = msg.dir
+    // 0x0800FC62: obj+0x294 = the crit flag, obj+0x298 = (attack sub == 3), then the on-hit tree
+    this.critHit = !!res.crit
+    this.splatHit = msg.atk.sub === 3
     this.ai.onHit(msg)
     return true
   }

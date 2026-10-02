@@ -295,9 +295,9 @@ export function buildBuuData(src: { characters: J; levels: J; moves: J; items: J
   }
   const states = new Map<number, AiNodeJ>()
   for (const [k, v] of Object.entries(ai.states as Record<string, J>)) states.set(parseInt(k, 16), renameAi(v.tree))
-  for (const [k, v] of Object.entries(extra.reactions as Record<string, AiNodeJ>)) if (!states.has(parseInt(k, 16))) states.set(parseInt(k, 16), v)
+  for (const [k, v] of Object.entries(extra.reactions as Record<string, AiNodeJ>)) if (!states.has(parseInt(k, 16))) states.set(parseInt(k, 16), renameAi(v))
   const aux = new Map<number, AiNodeJ>()
-  for (const [k, v] of Object.entries(extra.aux as Record<string, AiNodeJ>)) aux.set(parseInt(k, 16), v)
+  for (const [k, v] of Object.entries(extra.aux as Record<string, AiNodeJ>)) aux.set(parseInt(k, 16), renameAi(v))
   const maps = new Map<string, { composite: string; size: [number, number] }>()
   for (const m of sprites.maps as J[]) if (m.composite && m.size) maps.set(m.map, { composite: m.composite, size: m.size })
   return {
