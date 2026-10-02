@@ -324,7 +324,7 @@ impl Renderer {
                     let t = d.ground[((wy >> 3) * (gw >> 3) + (wx >> 3)) as usize] as usize;
                     let ix = ts.tiles.get(t * 64 + ((wy & 7) * 8 + (wx & 7)) as usize).copied().unwrap_or(0);
                     if ix != 0 {
-                        let c = ts.palette.get(ix as usize).copied().unwrap_or(0) | 0xFF00_0000;
+                        let c = (ts.palette.get(ix as usize).copied().unwrap_or(0) & 0xFF_FFFF) | (ix as u32) << 24;
                         self.put(py * w + px, c, layer, 0);
                     }
                 }
@@ -353,7 +353,7 @@ impl Renderer {
                     let ty = if e & 0x800 != 0 { 7 - (my & 7) } else { my & 7 };
                     let ix = ts.tiles.get(t * 64 + (ty * 8 + tx) as usize).copied().unwrap_or(0);
                     if ix != 0 {
-                        let c = ts.palette.get(ix as usize).copied().unwrap_or(0) | 0xFF00_0000;
+                        let c = (ts.palette.get(ix as usize).copied().unwrap_or(0) & 0xFF_FFFF) | (ix as u32) << 24;
                         self.put(py * w + px, c, layer, 0);
                     }
                 }
@@ -375,7 +375,7 @@ impl Renderer {
                 if ix == 0 {
                     continue;
                 }
-                let c = ts.palette.get(ix as usize).copied().unwrap_or(0) | 0xFF00_0000;
+                let c = (ts.palette.get(ix as usize).copied().unwrap_or(0) & 0xFF_FFFF) | (ix as u32) << 24;
                 for px in 0..w {
                     let sx = px as i32 - ox;
                     if sx < 0 || sx >= lw {
@@ -420,7 +420,7 @@ impl Renderer {
                     }
                     let c = o.tex[(ty * o.w + tx) as usize];
                     if c >> 24 != 0 {
-                        self.put(syy as usize * self.w + sxx as usize, c, crate::L_OBJ, 0);
+                        self.put(syy as usize * self.w + sxx as usize, c & 0xFF_FFFF, crate::L_OBJ, 0);
                     }
                 }
             }

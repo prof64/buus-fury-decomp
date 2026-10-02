@@ -1,0 +1,13 @@
+{
+  "$extends": "forms/00_goku.json",
+  "id": "54_shadow_goku",
+  "index": 54,
+  "name": "Shadow Goku",
+  "upper_name": "SHADOW GOKU",
+  "char_index": 9,
+  "character": "shadow_goku",
+  "gfx_id": 909,
+  "transform_up": 255,
+  "transform_down": 255,
+  "measured_bonus": { "STR": 4, "POW": 6, "END": 0, "END_energy": 0, "walk_speed": 0, "dash_speed": 0, "note": "mod: form bonus" }
+}

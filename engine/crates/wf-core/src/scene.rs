@@ -887,10 +887,15 @@ pub struct AreaOp {
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Prop {
     pub id: i32,
+    /// position in 1/256 px (prop +0x24 / +0x28); the area's prop rect moves with it (+0x2C)
     pub x: i32,
     pub y: i32,
     pub visible: bool,
     pub frame: i32,
+    /// prop_jump_to's vertical speed (1/256 px per frame)
+    pub vy: i32,
+    /// the area load this prop belongs to (`Field.loads`)
+    pub load: u32,
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -931,6 +936,10 @@ pub struct Scene {
     pub offstage: Vec<crate::world::Entity>,
     /// enemies whose AI InlineScript node waits for its script (the host calls `ai_script_done`)
     pub ai_wait: Vec<EntityId>,
+    /// the area-name banner (object 0x0800BF34): its text and frames since its first draw (0..=238)
+    pub banner: Option<(String, u32)>,
+    /// the last area name id shown (RAM 0x03001984, kept across loads)
+    pub banner_last: i64,
 }
 
 impl Default for Scene {
@@ -960,6 +969,8 @@ impl Default for Scene {
             chaining: false,
             offstage: Vec::new(),
             ai_wait: Vec::new(),
+            banner: None,
+            banner_last: 0,
             keys: [InputFrame::default(); MAX_PLAYERS],
         }
     }
@@ -992,6 +1003,7 @@ pub fn enqueue(w: &mut World, owner: Owner, cmd: Cmd) -> bool {
         return false;
     }
     begin_wait(w, WaitMode::All);
+    sync_props(w);
     true
 }
 
@@ -1211,10 +1223,11 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
                 let (px, py) = actor_pos(w, i);
                 let (nn, ssx, ssy) = step_math(*x - px, *y - py, *speed, 8);
                 (*n, *sx, *sy, *t) = (nn, ssx, ssy, 0);
+                crate::fieldnpc::script_move_mark(w, i, false);
                 if let Some(a) = actor_mut(w, i) {
-                    if *x != px || *y != py {
-                        a.facing = facing_toward(*x - px, *y - py);
-                    }
+                    // the facing from the whole-pixel difference; none (a sub-pixel walk) faces down (story
+                    // playthrough: Yemma's s048 walk_to(0, 232, 360) from y 360.625)
+                    a.facing = if *x == px && *y == py { 0 } else { facing_toward(*x - px, *y - py) };
                 }
                 set_state(w, i, *state);
             }
@@ -1321,7 +1334,13 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
             *t = 0;
         }
         Cmd::Shake { intensity, frames, t } => {
+            // the shake object (0x0804A720) is updated in the frame it is created: its first tick (and RNG
+            // draws) happen now; later ticks in the world update (story playthrough, Yemma's s048)
+            let mut others = std::mem::take(&mut w.g.shakes);
             w.shake(*frames, *intensity);
+            w.tick_shakes();
+            others.append(&mut w.g.shakes);
+            w.g.shakes = others;
             *t = 0;
         }
         Cmd::ItemGet { item, t } => {
@@ -1343,7 +1362,7 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
             if let Some(i) = i {
                 let (x, y) = actor_pos(w, i);
                 let owner = w.ents[i].id;
-                w.scene.visuals.push(Visual { kind: VisualKind::Emote(*emote), x, y: y - 32, owner, t: 0, life: EMOTE_LEN });
+                w.scene.visuals.push(Visual { kind: VisualKind::Emote(*emote), x, y: y - 32, owner, t: 0, life: emote_len(*emote) });
             }
         }
         Cmd::Beam { kind, dir, t, .. } => {
@@ -1411,23 +1430,25 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
         Cmd::PropSetPos { x, y } => {
             if let Owner::Prop(p) = owner {
                 let pr = prop_mut(w, p);
-                pr.x = *x;
-                pr.y = *y;
+                pr.x = *x << 8;
+                pr.y = *y << 8;
             }
         }
         Cmd::PropMoveTo { x, y, speed, n, t, sx, sy } => {
             if let Owner::Prop(p) = owner {
                 let pr = prop_mut(w, p).clone();
-                let (nn, ssx, ssy) = step_math(*x - pr.x, *y - pr.y, *speed, 8);
+                let (nn, ssx, ssy) = step_math(*x - (pr.x >> 8), *y - (pr.y >> 8), *speed, 8);
                 (*n, *sx, *sy, *t) = (nn, ssx, ssy, 0);
             }
         }
         Cmd::PropJumpTo { x, y, t, vx, vy } => {
+            // 0x0804DD08: vx = dx * 0x5D3 >> 8, vy0 = (dy * 0x5D3 - 0xBA60 >> 8) - 0x200 (1/256 px), gravity 0x20
             if let Owner::Prop(p) = owner {
                 let pr = prop_mut(w, p).clone();
-                *vx = ((*x - pr.x) * 0x5D3) >> 8;
-                *vy = (((*y - pr.y) * 0x5D3 - 0xBA60) >> 8) - 0x200;
+                *vx = ((*x - (pr.x >> 8)) * 0x5D3) >> 8;
+                *vy = (((*y - (pr.y >> 8)) * 0x5D3 - 0xBA60) >> 8) - 0x200;
                 *t = 0;
+                prop_mut(w, p).vy = *vy;
             }
         }
         Cmd::PropPoof { t, .. } => *t = 0,
@@ -1534,6 +1555,7 @@ fn update_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) -> bool {
             }
             if *t >= *n {
                 set_state(w, i, 0);
+                crate::fieldnpc::script_move_mark(w, i, true);
                 return true;
             }
             false
@@ -1600,12 +1622,12 @@ fn update_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) -> bool {
             }
             false
         }
-        Cmd::Emote { wait, t, .. } => {
+        Cmd::Emote { wait, t, emote } => {
             if !*wait {
                 return true;
             }
             *t += 1;
-            *t >= EMOTE_LEN
+            *t >= emote_len(*emote)
         }
         Cmd::Beam { frames, t, kind, .. } => {
             *t += 1;
@@ -1676,27 +1698,31 @@ fn update_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) -> bool {
                 *t += 1;
                 let pr = prop_mut(w, p);
                 if *t >= *n {
-                    pr.x = *x;
-                    pr.y = *y;
+                    pr.x = *x << 8;
+                    pr.y = *y << 8;
                     return true;
                 }
-                pr.x += *sx >> 8;
-                pr.y += *sy >> 8;
+                pr.x += *sx;
+                pr.y += *sy;
                 return false;
             }
             true
         }
-        Cmd::PropJumpTo { x, y, t, .. } => {
+        Cmd::PropJumpTo { x, y, t, vx, .. } => {
             *t += 1;
-            if *t >= 44 {
-                if let Owner::Prop(p) = owner {
-                    let pr = prop_mut(w, p);
-                    pr.x = *x;
-                    pr.y = *y;
+            if let Owner::Prop(p) = owner {
+                let pr = prop_mut(w, p);
+                if *t >= 44 {
+                    pr.x = *x << 8;
+                    pr.y = *y << 8;
+                    return true;
                 }
-                return true;
+                pr.x += *vx;
+                pr.y += pr.vy;
+                pr.vy += 0x20;
+                return false;
             }
-            false
+            *t >= 44
         }
         Cmd::PropPoof { vanish, t } => {
             *t += 1;
@@ -1754,8 +1780,15 @@ fn face_toward(w: &mut World, i: Option<usize>, target: EntityId) {
     }
 }
 
-/// emote balloon length (0x08016304; `emote_wait` measured 24 + 1 frames)
+/// emote balloon length (0x08016304; `emote_wait` measured 24 + 1 frames for emote 2)
 pub const EMOTE_LEN: i32 = 24;
+
+/// the balloon's length per emote: its graphics size (table 0x086B8128: u32 count, u32 bytes) / 8 frames (emote 2:
+/// 0xC0 -> 24, measured; emote 4: 0x180 -> 48, measured in the story playthrough, Yemma's s048)
+pub fn emote_len(emote: i32) -> i32 {
+    const BYTES: [i32; 5] = [0x140, 0x100, 0xC0, 0x100, 0x180];
+    BYTES.get(emote as usize).map(|b| b / 8).unwrap_or(EMOTE_LEN)
+}
 
 /// a player playing a frame range (`play_anim_frames`): the scene copy ticks in the player's update and is shown
 /// as a pose of the player's own state (called by player.rs after its state tick)
@@ -1781,25 +1814,72 @@ pub fn player_frames_tick(w: &mut World, i: usize) {
 
 /// nearest of the 20 tint presets (table 0x08752EEC: RGBA keys); (0,0,0,0)-like keys restore
 pub fn tint_preset(r: i32, g: i32, b: i32, a: i32) -> Option<u8> {
-    const KEYS: [(i32, i32, i32, i32); 4] = [(0, 0, 0, 0), (255, 255, 255, 255), (255, 0, 0, 0), (0, 0, 255, 0)];
-    let best = KEYS
+    // table 0x08752EEC: 20 entries {RGBA key, palette}; the first nearest key (squared distance) wins; a key
+    // without a palette (alpha 0 rows) restores the sprite's own colours. The index is the entry (the view's
+    // palette `tint_<index>`).
+    const KEYS: [(i32, i32, i32, i32, bool); 20] = [
+        (0, 0, 0, 0, false),
+        (0, 0, 0, 64, true),
+        (0, 0, 0, 128, true),
+        (0, 0, 0, 192, true),
+        (255, 0, 0, 0, false),
+        (255, 0, 0, 64, true),
+        (255, 0, 0, 128, true),
+        (255, 0, 0, 192, true),
+        (255, 255, 255, 0, false),
+        (255, 255, 255, 32, true),
+        (255, 255, 255, 64, true),
+        (255, 255, 255, 96, true),
+        (255, 255, 255, 128, true),
+        (255, 255, 255, 192, true),
+        (255, 255, 255, 255, true),
+        (128, 255, 128, 0, false),
+        (128, 255, 128, 32, true),
+        (128, 255, 128, 64, true),
+        (128, 255, 128, 96, true),
+        (128, 255, 128, 128, true),
+    ];
+    let (best, k) = KEYS
         .iter()
         .enumerate()
         .min_by_key(|(_, k)| {
             let d = |p: i32, q: i32| (p - q) * (p - q);
             d(r, k.0) + d(g, k.1) + d(b, k.2) + d(a, k.3)
         })
-        .map(|(i, _)| i as u8)
-        .unwrap_or(0);
-    (best != 0).then_some(best)
+        .expect("table");
+    k.4.then_some(best as u8)
 }
 
+/// the script's handle on map prop `id` of the current area (seeded from `Field.props`: position = the rect's top-left)
 fn prop_mut(w: &mut World, id: i32) -> &mut Prop {
+    let load = w.field.as_ref().map(|f| f.loads).unwrap_or(0);
+    w.scene.props.retain(|p| p.load == load);
     if let Some(k) = w.scene.props.iter().position(|p| p.id == id) {
         return &mut w.scene.props[k];
     }
-    w.scene.props.push(Prop { id, x: 0, y: 0, visible: true, frame: 0 });
+    let (x, y, visible) = w
+        .field
+        .as_ref()
+        .and_then(|f| f.props.get(id.max(0) as usize))
+        .map(|p| (p.rect.x0 << 8, p.rect.y0 << 8, p.visible))
+        .unwrap_or((0, 0, true));
+    w.scene.props.push(Prop { id, x, y, visible, frame: 0, vy: 0, load });
     w.scene.props.last_mut().unwrap()
+}
+
+/// the script props onto the area's map props (drawn and solid from `Field.props`): visibility, and the rect moved
+/// by the position change
+pub fn sync_props(w: &mut World) {
+    let Some(f) = w.field.as_mut() else { return };
+    for p in &w.scene.props {
+        if p.load != f.loads {
+            continue;
+        }
+        let Some(r) = f.props.get_mut(p.id.max(0) as usize) else { continue };
+        r.visible = p.visible;
+        let (dx, dy) = ((p.x >> 8) - r.rect.x0, (p.y >> 8) - r.rect.y0);
+        r.rect = Rect::new(r.rect.x0 + dx, r.rect.y0 + dy, r.rect.x1 + dx, r.rect.y1 + dy);
+    }
 }
 
 /// `become_map_object`: the field layer spawns area object `index` at the stand-in's place
@@ -1824,6 +1904,7 @@ fn become_map_object(w: &mut World, index: i32, x: i32, y: i32, dir: Dir) -> Opt
 /// the frame's music events (any source: area loads, scripts) keep `Scene.song` current; called at the end of the
 /// frame (`Session::step_post`) and after a session is created
 pub fn note_events(w: &mut World) {
+    banner_step(w);
     for e in &w.events {
         match e {
             crate::world::Event::Song { id } => w.scene.song = *id,
@@ -1862,6 +1943,38 @@ pub fn bring_back(w: &mut World) {
     w.ents.extend(back);
 }
 
+/// the area banner after a frame (docs/frontend.md §7): the shown one ages and goes after t = 238; a load deletes
+/// it, and starts one when the new area's name id differs from the last one shown and is not 0 (the 3D world map
+/// only records the id). Called with the music bookkeeping at the end of the frame / after a session is created.
+pub fn banner_step(w: &mut World) {
+    if let Some((_, t)) = w.scene.banner.as_mut() {
+        *t += 1;
+        if *t > 238 {
+            w.scene.banner = None;
+        }
+    }
+    let loads: Vec<crate::field::AreaId> = w
+        .events
+        .iter()
+        .filter_map(|e| match e {
+            crate::world::Event::Field(crate::field::FieldEvent::AreaEnter { area, .. }) => Some(*area),
+            _ => None,
+        })
+        .collect();
+    let Some(fd) = w.data.field.clone() else { return };
+    for area in loads {
+        w.scene.banner = None;
+        let Some(a) = fd.area(area.world, area.area) else { continue };
+        let three_d = a.maps.iter().any(|m| fd.maps.get(m).is_some_and(|m| m.three_d));
+        if three_d {
+            w.scene.banner_last = a.name_id;
+        } else if a.name_id != 0 && a.name_id != w.scene.banner_last {
+            w.scene.banner_last = a.name_id;
+            w.scene.banner = Some((a.banner.clone(), 0));
+        }
+    }
+}
+
 /// `play_music`: start a song unless it is already playing
 pub fn play_song(w: &mut World, id: i32) {
     let playing = w.scene.song == id || w.events.iter().rev().find_map(|e| match e {
@@ -1898,6 +2011,7 @@ pub fn tick(w: &mut World) {
     tick_menu(w);
     tick_visuals(w);
     tick_tracks(w);
+    sync_props(w);
     // dropped owners
     let gone: Vec<usize> = (0..w.scene.tracks.len())
         .filter(|&k| matches!(w.scene.tracks[k].owner, Owner::Entity(id) if !w.alive(id)) && w.scene.tracks[k].queue.is_empty())

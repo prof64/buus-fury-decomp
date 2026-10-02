@@ -1,0 +1,11 @@
+{
+  "from": "icons/skills/skill_07.png",
+  "recolor": {
+    "#ffb529": "#29b5ff",
+    "#ffff4a": "#94ffff",
+    "#ffd600": "#00d6ff",
+    "#ffad00": "#0090e0",
+    "#ffff00": "#a0ffff",
+    "#ff6300": "#0050ff"
+  }
+}

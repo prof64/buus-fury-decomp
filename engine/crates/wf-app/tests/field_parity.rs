@@ -153,6 +153,27 @@ fn keys(kind: &str, t: &Value) -> Vec<u16> {
     out
 }
 
+/// every animation's [frame, countdown] after `t` ticks (the RAM records of 0x03001A68)
+fn state_of(anims: &[wf_content::map::TileAnim], t: u32) -> Vec<[i32; 2]> {
+    anims
+        .iter()
+        .enumerate()
+        .map(|(k, a)| {
+            let (f, at) = a.after_ticks(k, t);
+            let cd = if at == 0 && f == 0 { k as i64 + 1 - t as i64 } else { at as i64 + a.durations[f].max(1) as i64 - t as i64 };
+            [f as i32, cd as i32]
+        })
+        .collect()
+}
+
+/// a tick count since the load that leaves every animation in the captured [frame, countdown] state
+fn ticks_for(anims: &[wf_content::map::TileAnim], st: &[[i32; 2]]) -> Option<u32> {
+    if anims.is_empty() || anims.len() != st.len() {
+        return None;
+    }
+    (0..200_000u32).find(|&t| state_of(anims, t) == st)
+}
+
 #[test]
 fn field_frames_match_emulator() {
     let dir = std::env::var("WF_FIELD_DIR").map(PathBuf::from).unwrap_or_else(|_| wf_rom::testutil::repo_root().join("work/frontend/field"));
@@ -160,7 +181,7 @@ fn field_frames_match_emulator() {
         return;
     }
     let Some(rom) = wf_rom::testutil::rom() else { return };
-    let opts = wf_extract::Options { only: ["tables", "sprites", "effects", "items", "maps", "ui", "world"].map(String::from).to_vec() };
+    let opts = wf_extract::Options { only: ["tables", "sprites", "effects", "items", "maps", "ui", "world", "scripts"].map(String::from).to_vec() };
     let (c, _) = wf_extract::extract_rom(&rom, &opts, &mut |_| {});
     let packs = Packs::new(vec![Box::new(MemSource(c.files)) as Box<dyn FileSource>]).unwrap();
     let data = wf_app::battle::game_data(&packs).unwrap();
@@ -175,6 +196,15 @@ fn field_frames_match_emulator() {
         let t: Value = serde_json::from_slice(&std::fs::read(dir.join(format!("{name}.json"))).unwrap()).unwrap();
         let kind = name.split('_').next().unwrap().to_string();
         let mut s = session(&data, &kind, &t, &base);
+        let mut story = if kind == "objects" && std::env::var("NO_SCRIPTS").is_err() {
+            let mut st = session(&data, &kind, &t, &base);
+            st.world.scene.banner = None;
+            let mut sim = wf_app::story::StorySim::with_session(&packs, st).expect("story");
+            sim.skip_area_banner();
+            Some(sim)
+        } else {
+            None
+        };
         let ks = keys(&kind, &t);
         let frames = t["frames"].as_array().unwrap();
         let (mut exact, mut total, mut worst) = (0, 0, (0usize, 0usize));
@@ -183,13 +213,26 @@ fn field_frames_match_emulator() {
         let mut v = RenderView::default();
         let mut shown = wf_app::story::ShownCamera::default();
         let lag = false;
+        // wf-core's own presentation (Session::view: OBJ latency, banner, fades, tile timers) without the
+        // frontend's stand-ins
+        let core_only = std::env::var("FRONTEND_PATCH").is_err();
         let env_n = |k: &str| std::env::var(k).ok().and_then(|v| v.parse::<usize>().ok()).unwrap_or(0);
         // defaults = what StorySim does: the OBJ layer shows the previous frame's build
-        let spr_lag = std::env::var("SPR_LAG").ok().and_then(|v| v.parse().ok()).unwrap_or(1usize);
+        // wf-core's view already shows the previous frame's OBJ build (view::Presenter): no extra lag by default
+        let spr_lag = std::env::var("SPR_LAG").ok().and_then(|v| v.parse().ok()).unwrap_or(0usize);
         let cam_lag = env_n("CAM_LAG");
         let sprite_cam_old = std::env::var("SPR_CAM_OLD").is_ok();
+        // traces that start mid-area: the camera was still settling when the recording began (not part of the
+        // core's start state) — use the captured camera (map object +0x28 / +0x2C) for those
+        let ram_cams: Option<Vec<[i32; 2]>> =
+            std::fs::read(dir.join(&name).join("cams.json")).ok().and_then(|b| serde_json::from_slice(&b).ok());
+        let cam_off: isize = std::env::var("CAM_OFF").ok().and_then(|v| v.parse().ok()).unwrap_or(-1);
+        let ram_anims: Option<Vec<Vec<[i32; 2]>>> =
+            std::fs::read(dir.join(&name).join("tile_anims.json")).ok().and_then(|b| serde_json::from_slice(&b).ok());
+        let (mut tick_mismatch, mut first_mismatch) = (0usize, None);
+        let mut bad_frames: Vec<(usize, usize)> = vec![];
         let mut video_since_load: u32 = s.world.frame.saturating_sub(s.world.field.as_ref().map(|f| f.entered).unwrap_or(0));
-        let mut hist: Vec<(Vec<wf_view::SpriteDraw>, Vec<wf_view::CameraView>)> = vec![];
+        let mut hist: Vec<(wf_app::story::ObjLayer, Vec<wf_view::CameraView>)> = vec![];
         let mut banner = wf_app::story::BannerTracker::new(&packs);
         // the recordings that start mid-area (npc / objects) began long after that area's banner
         if kind != "objects" {
@@ -200,33 +243,69 @@ fn field_frames_match_emulator() {
             quiet.clear();
             banner = wf_app::story::BannerTracker::new(&packs);
             banner.remember_current(&s.world);
+            // the recording starts long after the area's banner (wf-core starts one at the load)
+            s.world.scene.banner = None;
+        }
+        banner.t_offset = std::env::var("BANNER_OFF").ok().and_then(|v| v.parse().ok()).unwrap_or(0);
+        let mut prev_anim: Option<wf_view::DialogAnim> = None;
+        if let Ok(v) = std::env::var("DLG_OPEN") {
+            wf_app::story::DIALOG_OPEN_OFF.store(v.parse().unwrap(), std::sync::atomic::Ordering::Relaxed);
+        }
+        if let Ok(v) = std::env::var("DLG_CLOSE") {
+            wf_app::story::DIALOG_CLOSE_OFF.store(v.parse().unwrap(), std::sync::atomic::Ordering::Relaxed);
         }
         for fr in frames {
             let f = i(&fr["f"]) as usize;
             if fr["logic"].as_bool().unwrap_or(true) {
                 shown.before_step(&s.world);
-                Sim::step(&mut s, &[ks.get(f).copied().unwrap_or(0)], &mut ev);
+                prev_anim = wf_app::story::dialog_anim(&s.world);
+                match story.as_mut() {
+                    Some(st) => {
+                        Sim::step(st, &[ks.get(f).copied().unwrap_or(0)], &mut ev);
+                        s.world = st.session.world.clone();
+                    }
+                    None => Sim::step(&mut s, &[ks.get(f).copied().unwrap_or(0)], &mut ev),
+                }
                 banner.step(&s.world.events.clone());
             }
             let Some(emu) = load_png(&dir.join(&name).join(format!("{f:04}.png"))) else { continue };
-            s.view(&mut v);
-            wf_app::story::patch_view(&s.world, &mut v);
-            banner.apply(&mut v);
+            match story.as_ref() {
+                Some(st) => st.view(&mut v),
+                None => s.view(&mut v),
+            }
+            // the dialogue animation is not in wf-core's view yet: the frontend's stand-in, from the state before the
+            // step (the box is an OBJ: one frame late like the rest of the OBJ layer)
+            if v.dialog_anim.is_none() {
+                v.dialog_anim = prev_anim;
+            }
+            if !core_only {
+                wf_app::story::patch_view(&s.world, &mut v);
+                banner.apply(&mut v);
+            }
             if lag {
                 shown.apply(&mut v);
             }
             // history of (sprites, cameras) per logic frame: the screen may show older builds
             if fr["logic"].as_bool().unwrap_or(true) {
-                hist.push((v.sprites.clone(), v.cameras.clone()));
+                hist.push((wf_app::story::ObjLayer::of(&v), v.cameras.clone()));
             }
             if spr_lag > 0 && hist.len() > spr_lag {
-                v.sprites = hist[hist.len() - 1 - spr_lag].0.clone();
+                hist[hist.len() - 1 - spr_lag].0.apply(&mut v);
                 // sprites were placed with that frame's camera: shift them into the current camera's frame
                 let (old, cur) = (hist[hist.len() - 1 - spr_lag].1[0], v.cameras[0]);
                 if sprite_cam_old {
                     for sp in v.sprites.iter_mut() {
+                        let _ = &sp;
                         sp.x += cur.x - old.x;
                         sp.y += cur.y - old.y;
+                    }
+                }
+            }
+            if kind == "objects" {
+                if let Some(c) = ram_cams.as_ref().and_then(|c| c.get((f as isize + cam_off).max(0) as usize)) {
+                    if let Some(v0) = v.cameras.first_mut() {
+                        v0.x = c[0];
+                        v0.y = c[1];
                     }
                 }
             }
@@ -239,7 +318,27 @@ fn field_frames_match_emulator() {
             } else {
                 video_since_load += 1;
             }
-            if let (Ok(p), Some(m)) = (std::env::var("PHASE").or_else(|_| Ok::<_, ()>("video1".into())), v.map.as_mut()) {
+            // the map's animation ticks: from the captured RAM state when available (traces that start mid-area),
+            // else what the frontend derives (story::patch_view)
+            let ram_ticks = ram_anims.as_ref().and_then(|ra| ra.get(f)).and_then(|st| {
+                let m = v.map.as_ref()?;
+                let map = r.map(&packs, &m.id)?;
+                ticks_for(&map.tileset.anims, st)
+            });
+            if let (Some(_), Some(m), Some(st)) = (ram_ticks, v.map.as_ref(), ram_anims.as_ref().and_then(|ra| ra.get(f))) {
+                let map = r.map(&packs, &m.id).unwrap();
+                if state_of(&map.tileset.anims, m.anim_frame) != *st {
+                    let t = ram_ticks.unwrap();
+                    tick_mismatch += 1;
+                    if first_mismatch.is_none() {
+                        first_mismatch = Some((f, m.anim_frame, t));
+                    }
+                }
+            }
+            if let (Some(t), Some(m), true) = (ram_ticks, v.map.as_mut(), std::env::var("RAM_TICKS").is_ok() || kind == "objects") {
+                m.anim_frame = t;
+            }
+            if let (Ok(p), Some(m)) = (std::env::var("PHASE"), v.map.as_mut()) {
                 m.anim_frame = if p == "core" {
                     s.world.frame
                 } else if let Some(c) = p.strip_prefix("video") {
@@ -264,8 +363,11 @@ fn field_frames_match_emulator() {
                 worst = (f, d);
             }
             diffs.push(d);
+            if d > 0 {
+                bad_frames.push((f, d));
+            }
             if let Some(o) = &out {
-                if f % 30 == 0 || d > 0 && d == worst.1 {
+                if f % 30 == 0 || d > 0 && (d == worst.1 || std::env::var("SAVE_BAD").is_ok()) {
                     std::fs::create_dir_all(o.join(&name)).unwrap();
                     let dimg: Vec<u32> = fb.iter().zip(&emu).map(|(a, b)| if a & 0xFFFFFF == b & 0xFFFFFF { (a >> 2) & 0x3F3F3F | 0xFF00_0000 } else { 0xFFFF_00FF }).collect();
                     save(&o.join(&name).join(format!("{f:04}.png")), &[&emu, &fb, &dimg]);
@@ -274,8 +376,25 @@ fn field_frames_match_emulator() {
         }
         diffs.sort();
         let med = diffs.get(diffs.len() / 2).copied().unwrap_or(0);
-        let line = format!("{name:34} frames {total:5}  exact {exact:5}  median diff {med:6} px  worst {} px @ {}", worst.1, worst.0);
+        let line = format!(
+            "{name:34} frames {total:5}  exact {exact:5}  median diff {med:6} px  worst {} px @ {}  tile-timer mismatches {tick_mismatch} first {first_mismatch:?}",
+            worst.1, worst.0
+        );
         println!("{line}");
+        if std::env::var("LIST_BAD").is_ok() {
+            // runs of differing frames: (first, last, max px)
+            let mut runs: Vec<(usize, usize, usize)> = vec![];
+            for &(f, d) in &bad_frames {
+                match runs.last_mut() {
+                    Some(r) if r.1 + 1 == f => {
+                        r.1 = f;
+                        r.2 = r.2.max(d);
+                    }
+                    _ => runs.push((f, f, d)),
+                }
+            }
+            println!("  differing runs {runs:?}");
+        }
         summary.push((name, total, exact));
         if !r.errors.is_empty() {
             println!("  content errors: {:?}", r.errors);

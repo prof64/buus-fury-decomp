@@ -5,7 +5,7 @@
 //! tools/battle/LOCKSTEP.md). Reference: site/src/battle/rulesets/buu/player.ts + panim.ts.
 
 use crate::actor::Actor;
-use crate::content::{AnimRef, Equip};
+use crate::content::{AnimRef, Equip, SkillEngine};
 use crate::damage::{atk, compute_damage, CombatStats, HpAcc};
 use crate::fx::{self, Alive, Fx};
 use crate::geom::{overlaps, Dir, Rect, DIR_VEC};
@@ -80,6 +80,14 @@ fn skill_sub(id: i32) -> u8 {
         23 => 16,
         _ => 1,
     }
+}
+/// a skill's damage multiplier: the content's `engine.damage` (mods), else the built-in table of its behaviour
+fn skill_mult_of(w: &World, real: i32, lv: i32) -> i32 {
+    w.data.skill_engine(real).and_then(|e| SkillEngine::pick(&e.damage, lv)).unwrap_or_else(|| skill_mult(w.data.skill_kind(real), lv))
+}
+/// a skill's attack sub-type: the content's `engine.attack_sub` (mods), else the built-in one of its behaviour
+fn skill_sub_of(w: &World, real: i32) -> u8 {
+    w.data.skill_engine(real).and_then(|e| e.attack_sub).unwrap_or_else(|| skill_sub(w.data.skill_kind(real)))
 }
 const SWORD_BOX: [[i32; 4]; 8] = [[39, 10, 32, 8], [29, 2, 32, 32], [-4, 0, 8, 32], [-13, 2, 32, 32], [-23, 10, 32, 8], [-12, 46, 32, 32], [-4, 46, 8, 32], [28, 46, 32, 32]];
 const VOLLEY_POS: [(i32, i32); 4] = [(10, 8), (10, -20), (-8, -8), (24, -8)];
@@ -548,13 +556,19 @@ impl Player {
     }
     fn skill_cost(&self, w: &World, id: i32) -> i32 {
         let Some(s) = w.data.skills.get(&id) else { return 0 };
+        let lv = self.skill_lv(w, id);
+        if let Some(c) = s.engine.as_ref().and_then(|e| SkillEngine::pick(&e.cost, lv)) {
+            return c;
+        }
+        let real = id;
+        let id = w.data.skill_kind(real);
         if id == 7 {
             return ((self.rec.max_ep as i64 * 0xccd + 65535) >> 16) as i32;
         }
         if matches!(id, 20 | 22 | 18 | 12) {
             return if id == 20 { 10 } else { 0 };
         }
-        s.costs.get((self.skill_lv(w, id) as usize).min(s.costs.len().saturating_sub(1))).copied().unwrap_or(s.min_ep)
+        s.costs.get((lv as usize).min(s.costs.len().saturating_sub(1))).copied().unwrap_or(s.min_ep)
     }
 }
 
@@ -1401,14 +1415,18 @@ fn tick_blast(w: &mut World, i: usize) {
         pl.ap.tick = (pl.ap.tick + 1) & 0xffff;
         pl.ap.tick
     };
-    if t < 40 {
-        if t == 16 {
+    // a modded skill on the Energy Blast behaviour may move the shot frame / the refire window
+    let real = pr(w, i).sk.as_ref().map(|s| s.id).unwrap_or(7);
+    let eng = w.data.skill_engine(real);
+    let (fire, recovery) = (eng.and_then(|e| e.fire_frame).unwrap_or(16), eng.and_then(|e| e.recovery).unwrap_or(40));
+    if t < recovery {
+        if t == fire {
             p(w, i).ap.frame = 1;
             fire_blast(w, i);
         }
         return;
     }
-    let cost = pr(w, i).skill_cost(w, 7);
+    let cost = pr(w, i).skill_cost(w, real);
     let refire = pr(w, i).sk.as_ref().is_some_and(|s| s.refire);
     if refire && pr(w, i).can_afford(w, cost) {
         if let Some(s) = p(w, i).sk.as_mut() {
@@ -1417,7 +1435,7 @@ fn tick_blast(w: &mut World, i: usize) {
         spend(w, i, cost, false);
         let pl = p(w, i);
         pl.ap.frame = 3 - pl.ap.frame;
-        pl.ap.tick = 16;
+        pl.ap.tick = fire;
         fire_blast(w, i);
     } else {
         set_anim_id(w, i, 0);
@@ -1427,11 +1445,24 @@ fn fire_blast(w: &mut World, i: usize) {
     let (mx, my) = pr(w, i).hand_point();
     let dir = pr(w, i).a.facing;
     let me = w.ents[i].id;
-    let id = shots::ki_blast(w, me, dir, 1, mx << 8, my << 8, atk(4), 1024, true);
+    let real = pr(w, i).sk.as_ref().map(|s| s.id).unwrap_or(7);
+    let (a, mult) = if w.data.skill_engine(real).is_none() { (atk(4), 1024) } else { (atk(skill_sub_of(w, real)), skill_mult_of(w, real, pr(w, i).skill_lv(w, real))) };
+    let eng = w.data.skill_engine(real).cloned();
+    let id = shots::ki_blast(w, me, dir, 1, mx << 8, my << 8, a, mult, true);
     // the player's blast (vtable 0x0804B454) tests a 16 x 16 box centred on its position
     if let Some(k) = w.find(id) {
         if let ShotKind::Straight(o) = &mut w.shot(k).kind {
             o.b = [8, 8, 16, 16];
+            if let Some(e) = &eng {
+                if let Some((bw, bh)) = e.hit_box {
+                    o.b = [bw / 2, bh / 2, bw, bh];
+                }
+                if let Some(v) = e.speed {
+                    let (dx, dy) = DIR_VEC[dir as usize];
+                    o.vx = dx * v;
+                    o.vy = dy * v;
+                }
+            }
         }
     }
     p(w, i).blast = id;
@@ -1779,7 +1810,11 @@ fn ctl_idle(w: &mut World, i: usize) {
     if try_block(w, i) {
         return;
     }
-    p(w, i).s_cnt += 1;
+    // the boredom counter does not run while an event holds the player (story playthrough: Grand Kai's
+    // Mansion s068, 1100+ frames of dialog with Goku idle)
+    if w.scene.depth == 0 {
+        p(w, i).s_cnt += 1;
+    }
     if pr(w, i).s_cnt > 1024 {
         if pr(w, i).has_anim(w, 9) {
             set_anim_id(w, i, 8);
@@ -2009,6 +2044,13 @@ pub fn can_use_skill(w: &World, i: usize, id: i32) -> bool {
     if w.g.candy > 0 {
         return false;
     }
+    let real = id;
+    let id = w.data.skill_kind(real);
+    if let Some(c) = w.data.skill_engine(real).and_then(|e| SkillEngine::pick(&e.check, pl.skill_lv(w, real))) {
+        if !pl.can_afford(w, c) {
+            return false;
+        }
+    }
     let f = pl.form_ref(w);
     match id {
         12 | 19 | 21 => false,
@@ -2033,25 +2075,28 @@ pub fn can_use_skill(w: &World, i: usize, id: i32) -> bool {
             if pl.big_bang != 0 && w.alive(pl.big_bang) {
                 return false;
             }
-            pl.can_afford(w, [10, 33, 100][pl.skill_lv(w, 2).min(2) as usize])
+            pl.can_afford(w, [10, 33, 100][pl.skill_lv(w, real).min(2) as usize])
         }
+        _ if w.data.skill_engine(real).is_some_and(|e| !e.check.is_empty()) => true,
         _ => match skill_check(id) {
-            Some(c) => pl.can_afford(w, c[(pl.skill_lv(w, id) as usize).min(c.len() - 1)]),
-            None => pl.can_afford(w, pl.skill_cost(w, id)),
+            Some(c) => pl.can_afford(w, c[(pl.skill_lv(w, real) as usize).min(c.len() - 1)]),
+            None => pl.can_afford(w, pl.skill_cost(w, real)),
         },
     }
 }
 
 pub fn start_skill(w: &mut World, i: usize) {
-    let id = pr(w, i).skill();
-    if !can_use_skill(w, i, id) {
+    let real = pr(w, i).skill();
+    if !can_use_skill(w, i, real) {
         return;
     }
-    w.events.push(Event::SkillStart { id });
-    let lv = pr(w, i).skill_lv(w, id);
-    let mult = skill_mult(id, lv);
+    w.events.push(Event::SkillStart { id: real });
+    // `id` = the behaviour (state machine) the skill runs: its own id, or a mod skill's `engine.base`
+    let id = w.data.skill_kind(real);
+    let lv = pr(w, i).skill_lv(w, real);
+    let mult = skill_mult_of(w, real, lv);
     if [4, 5, 7, 8, 13, 17, 23].contains(&id) {
-        let c = pr(w, i).skill_cost(w, id);
+        let c = pr(w, i).skill_cost(w, real);
         spend(w, i, c, false);
     }
     if id == 3 {
@@ -2078,7 +2123,7 @@ pub fn start_skill(w: &mut World, i: usize) {
         let pl = p(w, i);
         pl.state = PState::Skill;
         pl.t = 0;
-        pl.sk = Some(SkillInst { id, serial, held: true, release: -1, ..Default::default() });
+        pl.sk = Some(SkillInst { id: real, serial, held: true, release: -1, ..Default::default() });
     }
     if let Some(raw) = skill_raw(id) {
         p(w, i).ap.raw = raw;
@@ -2088,6 +2133,14 @@ pub fn start_skill(w: &mut World, i: usize) {
         *p(w, i) = c;
         skill_enter(w, i, id, lv, mult);
         return;
+    }
+    if let Some(e) = w.data.skill_engine(real).filter(|e| !e.anim.is_empty()) {
+        let names: Vec<&'static str> = e.anim.clone();
+        if !names.is_empty() {
+            let refs: Vec<AnimRef> = names.into_iter().map(AnimRef::Name).collect();
+            set_anim_named(w, i, &refs, true);
+            return;
+        }
     }
     let refs: &[AnimRef] = match id {
         7 | 4 | 23 => &[AnimRef::Name("kiblast")],
@@ -2109,7 +2162,7 @@ fn sk_mut(w: &mut World, i: usize) -> Option<&mut SkillInst> {
 /// what each skill state's enter creates (the objects' constructors play the charge sound 3)
 fn skill_enter(w: &mut World, i: usize, id: i32, lv: i32, mult: i32) {
     let me = w.ents[i].id;
-    let a = atk(skill_sub(id));
+    let a = atk(skill_sub_of(w, pr(w, i).sk.as_ref().map(|s| s.id).unwrap_or(id)));
     let facing = pr(w, i).a.facing;
     let serial = pr(w, i).sk.as_ref().map(|s| s.serial).unwrap_or(0);
     match id {
@@ -2160,7 +2213,7 @@ fn end_skill(w: &mut World, i: usize) {
         Body::Shot(s) => Some((k, s.kind.clone())),
         _ => None,
     });
-    match s.id {
+    match w.data.skill_kind(s.id) {
         15 | 16 | 6 | 1 | 3 => {
             if s.proj == 0 {
                 sfx_stop(w, 3);
@@ -2290,10 +2343,11 @@ fn upd_skill(w: &mut World, i: usize) {
         }
     }
     let s = pr(w, i).sk.clone().unwrap();
-    let id = s.id;
-    let lv = pr(w, i).skill_lv(w, id);
-    let mult = skill_mult(id, lv);
-    let a = atk(skill_sub(id));
+    let real = s.id;
+    let id = w.data.skill_kind(real);
+    let lv = pr(w, i).skill_lv(w, real);
+    let mult = skill_mult_of(w, real, lv);
+    let a = atk(skill_sub_of(w, real));
     let held = held_now;
     let me = w.ents[i].id;
     let facing = pr(w, i).a.facing;
@@ -2351,6 +2405,7 @@ fn upd_skill(w: &mut World, i: usize) {
                 }
             }
             let d = if id == 1 || id == 3 { 1174 } else if id == 6 { [128, 427, 1707][lv as usize] } else { [107, 384, 1280][lv as usize] };
+            let d = w.data.skill_engine(real).and_then(|e| SkillEngine::pick(&e.drain, lv)).unwrap_or(d);
             drain(w, i, d);
             if pr(w, i).energy_left(w) == 0 {
                 return set_state_idle(w, i);

@@ -1,0 +1,142 @@
+#!/usr/bin/env python3
+"""Generates the Hidden Grove map (mod-authored layout) for the `new-area` example mod.
+
+Writes maps/mod_hidden_grove/{map.json, collision.json} next to this script's parent. The map only *references*
+tiles of the base pack's Southwest Forest tileset by number (`../tilesets/b39594a26835bd49.json`); no tile pixels
+or ROM layouts are copied. Re-run after editing the layout below:
+
+    python3 tools/make_grove.py            # rewrite the map files
+    python3 tools/make_grove.py --preview <content/base> out.png   # optional: render it with Pillow
+"""
+import base64, json, os, sys, zlib
+
+W, H = 40, 30          # tiles (8 px): 320 x 240 px
+HERE = os.path.dirname(os.path.abspath(__file__))
+OUT = os.path.join(HERE, '..', 'maps', 'mod_hidden_grove')
+TILESET = 'b39594a26835bd49'
+
+# the forest tileset's grass run (tile numbers + 1 = Tiled gids) and dirt / flower / rock tiles
+GRASS = [121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 135, 136, 137, 138, 139]
+DIRT = [83, 84, 85, 86, 87, 88, 89]
+FLOWERS = [73, 74, 75, 77, 78, 79]
+ROCKS = [101, 102, 103, 104, 105, 106]
+FOLIAGE = [17, 18, 19, 20, 21, 22, 26, 27, 28, 29, 30, 31, 36, 37, 38, 39, 40, 41]
+
+# layout: '#' foliage wall, '.' grass, ':' dirt, '*' flowers on grass, 'o' rock (blocks), 'E' exit gap (grass)
+LAYOUT = [
+    "########################################",
+    "########################################",
+    "###....................................#",
+    "##......*.............*...........*....#",
+    "##..........::::::.....................#",
+    "##.........::::::::::.......o..........#",
+    "##....o...::::::::::::.................#",
+    "##........::::::::::::.......*.........#",
+    "##.....*...::::::::::..................#",
+    "##..........::::::::...........o.......#",
+    "##.....................................#",
+    "##...............*.....................#",
+    "##.......................::::::........#",
+    "##....o.................::::::::.......#",
+    "##.....................::::::::::..*...#",
+    "##.........*............::::::::.......#",
+    "##.......................::::::........#",
+    "##.....................................#",
+    "##....*.............o..................#",
+    "##.................................*...#",
+    "##.....::::............................#",
+    "##....::::::.................o.........#",
+    "##.....::::.........*..................#",
+    "##.....................................#",
+    "##...........*.........................#",
+    "##.....................................#",
+    "###################EEEE#################",
+    "###################EEEE#################",
+    "###################EEEE#################",
+    "###################EEEE#################",
+]
+assert len(LAYOUT) == H and all(len(r) == W for r in LAYOUT)
+
+
+def pick(lst, x, y):
+    return lst[(x * 7 + y * 13 + (x * y) % 5) % len(lst)]
+
+
+def layers():
+    bg3, bg0 = [], []
+    for y, row in enumerate(LAYOUT):
+        for x, c in enumerate(row):
+            ground = GRASS[(x + 3 * y) % len(GRASS)]
+            top = 0
+            if c == ':':
+                ground = pick(DIRT, x, y)
+            elif c == '#':
+                ground = pick(FOLIAGE, x, y)
+            elif c == '*':
+                top = pick(FLOWERS, x, y)
+            elif c == 'o':
+                top = pick(ROCKS, x, y)
+            bg3.append(ground)
+            bg0.append(top)
+    return bg3, bg0
+
+
+def layer(lid, name, gids, bg, priority):
+    raw = b''.join(g.to_bytes(4, 'little') for g in gids)
+    return {
+        "type": "tilelayer", "id": lid, "name": name, "x": 0, "y": 0, "width": W, "height": H,
+        "opacity": 1, "visible": True, "encoding": "base64", "compression": "zlib",
+        "data": base64.b64encode(zlib.compress(raw, 9)).decode(),
+        "properties": [
+            {"name": "bg", "type": "int", "value": bg},
+            {"name": "priority", "type": "int", "value": priority},
+            {"name": "kind", "type": "string", "value": "tilemap"},
+        ],
+    }
+
+
+def main():
+    bg3, bg0 = layers()
+    m = {
+        "type": "map", "version": "1.10", "tiledversion": "1.10.2", "orientation": "orthogonal",
+        "renderorder": "right-down", "infinite": False, "width": W, "height": H, "tilewidth": 8, "tileheight": 8,
+        "nextlayerid": 3, "nextobjectid": 1,
+        "tilesets": [{"firstgid": 1, "source": f"../tilesets/{TILESET}.json"}],
+        "layers": [layer(1, "bg3", bg3, 3, 3), layer(2, "bg0", bg0, 0, 2)],
+        "properties": [
+            {"name": "id", "type": "string", "value": "mod_hidden_grove"},
+            {"name": "world_w_px", "type": "int", "value": W * 8},
+            {"name": "world_h_px", "type": "int", "value": H * 8},
+            {"name": "camera_max_x", "type": "int", "value": W * 8 - 240},
+            {"name": "camera_max_y", "type": "int", "value": H * 8 - 160},
+            {"name": "note", "type": "string", "value": "generated by tools/make_grove.py (mod-authored layout; tiles referenced by number)"},
+        ],
+    }
+    os.makedirs(OUT, exist_ok=True)
+    with open(os.path.join(OUT, 'map.json'), 'w') as f:
+        json.dump(m, f, indent=1)
+        f.write('\n')
+    rows = [''.join('.' if c in '.:*E' else '#' for c in r) for r in LAYOUT]
+    with open(os.path.join(OUT, 'collision.json'), 'w') as f:
+        json.dump({"format": "rows: '.' open, '#' wall, '~' blocks walking only (engine/docs/modding.md)", "rows": rows}, f, indent=1)
+        f.write('\n')
+    if len(sys.argv) > 3 and sys.argv[1] == '--preview':
+        preview(sys.argv[2], sys.argv[3], bg3, bg0)
+
+
+def preview(base, out, bg3, bg0):
+    from PIL import Image
+    ts = Image.open(os.path.join(base, 'maps', 'tilesets', TILESET + '.png')).convert('RGBA')
+    img = Image.new('RGBA', (W * 8, H * 8), (0, 0, 0, 255))
+    for layer_g in (bg3, bg0):
+        for i, g in enumerate(layer_g):
+            if g <= 1:
+                continue
+            t = g - 1
+            tile = ts.crop(((t % 16) * 8, (t // 16) * 8, (t % 16) * 8 + 8, (t // 16) * 8 + 8))
+            img.alpha_composite(tile, ((i % W) * 8, (i // W) * 8))
+    img.resize((W * 16, H * 16), Image.NEAREST).save(out)
+
+
+if __name__ == '__main__':
+    main()

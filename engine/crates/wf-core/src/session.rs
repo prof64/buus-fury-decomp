@@ -30,6 +30,8 @@ pub struct Session {
     /// script's RNG draws and natives (drops, flags, warps) land where the game runs them. None = scripts only leave as
     /// events (the host runs them after the step).
     pub hook: Option<FieldHook>,
+    /// the screen's one-frame lags (field sessions through `Sim`; `view::Presenter`)
+    pub presenter: crate::view::Presenter,
 }
 
 pub type FieldHook = Box<dyn FnMut(&mut World, &crate::field::FieldEvent) + Send>;
@@ -38,13 +40,13 @@ impl Session {
     pub fn new(data: Arc<GameData>, config: BattleConfig) -> Session {
         let mut world = battle::create(Arc::clone(&data), &config);
         crate::scene::note_events(&mut world);
-        Session { data, world, config, prev: [0; MAX_PLAYERS], outcome: Outcome::Running, hook: None }
+        Session { data, world, config, prev: [0; MAX_PLAYERS], outcome: Outcome::Running, hook: None, presenter: Default::default() }
     }
     /// a field session (the overworld game): new game or saved story, start area
     pub fn new_field(data: Arc<GameData>, config: crate::field::FieldConfig) -> Session {
         let mut world = crate::field::create(Arc::clone(&data), &config);
         crate::scene::note_events(&mut world);
-        Session { data, world, config: BattleConfig::default(), prev: [0; MAX_PLAYERS], outcome: Outcome::Running, hook: None }
+        Session { data, world, config: BattleConfig::default(), prev: [0; MAX_PLAYERS], outcome: Outcome::Running, hook: None, presenter: Default::default() }
     }
     /// a field session with the script host's hook attached from the start: the first area's load scripts (on-enter:
     /// gates / doors / bridges through open_area / block_area, 48 area variants) run before frame 0

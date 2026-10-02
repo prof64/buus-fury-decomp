@@ -291,7 +291,8 @@ impl Ui {
     /// runs through the icon OBJ too).
     pub fn hud(&mut self, packs: &Packs, h: &HudView) -> Vec<u32> {
         let (w, hh) = (self.frame.w as usize, self.frame.h as usize);
-        let argb = |pal: &[u32], c: u8| if c == 0 { 0 } else { pal.get(c as usize).copied().unwrap_or(0) | 0xFF00_0000 };
+        // top byte = OBJ palette index (every HUD picture / icon is indexed in OBJ palette order); 0 = transparent
+        let argb = |pal: &[u32], c: u8| if c == 0 { 0 } else { (pal.get(c as usize).copied().unwrap_or(0) & 0xFF_FFFF) | (c as u32) << 24 };
         let mut out: Vec<u32> = self.frame.idx.iter().map(|&c| argb(&self.frame.palette, c)).collect();
         if let Some(s) = h.skill {
             if let Some(ic) = self.icon(packs, s, h.skill_alt).cloned() {
@@ -341,6 +342,11 @@ impl Ui {
 
     /// The 160x64 dialogue surface (ARGB) for page `dialog.page`; `None` past the last page.
     pub fn dialog(&self, dv: &DialogView) -> Option<Vec<u32>> {
+        self.dialog_typed(dv, None)
+    }
+
+    /// Like [`Ui::dialog`], drawing only the first `typed` visible characters of the page (typewriter).
+    pub fn dialog_typed(&self, dv: &DialogView, typed: Option<u32>) -> Option<Vec<u32>> {
         let st = self.styles.get(dv.style as usize).or(self.styles.first())?;
         let text = units(&dv.text);
         let mut pages = Vec::new();
@@ -356,13 +362,70 @@ impl Ui {
         let n = page.len() as i32;
         let mut y = st.y + 7 * (st.max_lines as i32 - n);
         let mut color = self.text_color;
+        let mut left = typed.unwrap_or(u32::MAX);
         for (line, lw) in page {
+            // lines keep their full-width centring while they type in
             let x = st.x + (st.wrap as i32 - *lw as i32) / 2;
-            self.dialog_font.draw_line(&mut idx, w, h, line, x, y, &mut color);
+            let mut shown: Vec<u16> = Vec::with_capacity(line.len());
+            let mut k = 0;
+            if line.len() >= 2 && line[0] == '-' as u16 && line[1] == ' ' as u16 {
+                shown.extend_from_slice(&line[..2]);
+                k = 2;
+            }
+            while k < line.len() {
+                if line[k] == 8 {
+                    shown.extend_from_slice(&line[k..(k + 2).min(line.len())]);
+                    k += 2;
+                    continue;
+                }
+                if left == 0 {
+                    break;
+                }
+                left -= 1;
+                shown.push(line[k]);
+                k += 1;
+            }
+            self.dialog_font.draw_line(&mut idx, w, h, &shown, x, y, &mut color);
             y += self.line_h;
         }
         let pal = &st.image.palette;
-        Some(idx.iter().map(|&c| if c == 0 { 0 } else { pal.get(c as usize).copied().unwrap_or(0) | 0xFF00_0000 }).collect())
+        Some(idx.iter().map(|&c| if c == 0 { 0 } else { (pal.get(c as usize).copied().unwrap_or(0) & 0xFF_FFFF) | (c as u32) << 24 }).collect())
+    }
+
+    /// The box zooming about its centre: the three OBJs (64 + 64 + 32 wide) at scale `n`/8, each an affine OBJ with
+    /// PA = PD = 2048 / n around its own centre, the OBJ centres pulled toward the box centre (emulator OAM).
+    pub fn scale_box(full: &[u32], n: u32) -> Vec<u32> {
+        let n = n.clamp(1, 8) as i32;
+        if n == 8 {
+            return full.to_vec();
+        }
+        let (bw, bh) = (160i32, 64i32);
+        let pa = 2048 / n;
+        let mut out = vec![0u32; (bw * bh) as usize];
+        for (x0, w) in [(0i32, 64i32), (64, 64), (128, 32)] {
+            let cx = x0 + w / 2;
+            let sx0 = bw / 2 + (cx - bw / 2) * n / 8 - w / 2;
+            for j in 0..bh {
+                let ty = ((pa * (j - bh / 2)) >> 8) + bh / 2;
+                if !(0..bh).contains(&ty) {
+                    continue;
+                }
+                for i in 0..w {
+                    let tx = ((pa * (i - w / 2)) >> 8) + w / 2;
+                    if !(0..w).contains(&tx) {
+                        continue;
+                    }
+                    let (ox, oy) = (sx0 + i, j);
+                    if (0..bw).contains(&ox) {
+                        let c = full[(ty * bw + x0 + tx) as usize];
+                        if c >> 24 != 0 {
+                            out[(oy * bw + ox) as usize] = c;
+                        }
+                    }
+                }
+            }
+        }
+        out
     }
 
     pub fn dialog_y(pos: DialogPos) -> i32 {

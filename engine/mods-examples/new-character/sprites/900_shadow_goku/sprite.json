@@ -1,0 +1,9 @@
+{
+  "$extends": "sprites/106_goku/sprite.json",
+  "id": "900_shadow_goku",
+  "sprite_index": 900,
+  "name": "Shadow Goku",
+  "category": "player",
+  "name_confidence": "mod",
+  "notes": "new-character example mod: Goku's frames and animations, recoloured sheet (sheet.png.derive.json)"
+}

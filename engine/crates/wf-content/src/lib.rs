@@ -261,7 +261,9 @@ impl Packs {
             return Some(src);
         }
         image::recolor_png(&src, &map).ok()
-    }&self, path: &str) -> Result<String> {
+    }
+
+    pub fn read_str(&self, path: &str) -> Result<String> {
         let b = self.read(path).ok_or_else(|| Error(format!("missing content file {path}")))?;
         String::from_utf8(b).map_err(|_| Error(format!("{path}: not UTF-8")))
     }
@@ -354,6 +356,31 @@ mod tests {
         assert_eq!(a, serde_json::json!({"x":5,"y":{"z":3}}));
         assert!(p.read("b.json").is_none());
         assert!(p.read("sprites/s/sprite.json").is_none());
+    }
+
+    #[test]
+    fn extends_and_derive() {
+        let px = |c: [u8; 4]| crate::image::encode_rgba(2, 1, &[c, [0, 0, 0, 0]].concat()).unwrap();
+        let mut base = MemSource::default();
+        base.0.insert("pack.json".into(), br#"{"id":"base"}"#.to_vec());
+        base.0.insert("s/a/sprite.json".into(), br#"{"id":"a","n":1,"o":{"x":1,"y":2}}"#.to_vec());
+        base.0.insert("s/a/sheet.png".into(), px([10, 20, 30, 255]));
+        let m = mem(&[
+            ("pack.json", r#"{"id":"m"}"#),
+            ("s/b/sprite.json", r#"{"$extends":"s/a/sprite.json","id":"b","o":{"y":5}}"#),
+            ("s/b/sheet.png.derive.json", r##"{"from":"s/a/sheet.png","recolor":{"#0a141e":"#ff0000"}}"##),
+            ("s/a/sheet.png.derive.json", r##"{"recolor":{"#0a141e":"#00ff00"}}"##),
+            ("i/x.png.derive.json", r#"{"from":"s/a/sprite.json"}"#),
+        ]);
+        let p = Packs::new(vec![Box::new(base), m]).unwrap();
+        let b: serde_json::Value = p.json("s/b/sprite.json").unwrap();
+        assert_eq!(b, serde_json::json!({"id":"b","n":1,"o":{"x":1,"y":5}}));
+        // derived from the merged (in-place recolored) a: the red map no longer matches, green stays
+        let img = crate::image::decode_rgba(&p.read("s/a/sheet.png").unwrap()).unwrap();
+        assert_eq!(img.px[0], 0xFF00_FF00);
+        assert_eq!(img.px[1] >> 24, 0);
+        assert_eq!(p.read("i/x.png").unwrap(), p.read("s/a/sprite.json").unwrap());
+        assert!(p.list().contains(&"s/b/sheet.png".to_string()));
     }
 
     #[test]

@@ -254,8 +254,12 @@ pub fn run_deferred(w: &mut World) {
 fn break_done(w: &mut World, id: EntityId) {
     let Some(k) = w.find(id) else { return };
     let Body::Breakable(b) = &w.ents[k].body else { return };
-    let (obj, bx, dir) = (b.obj, b.bx, b.last_dir);
+    let (obj, bx, dir, prop) = (b.obj, b.bx, b.last_dir, b.prop);
     w.ents[k].removed = true;
+    // the bound map prop goes with it (it was still drawn: frontend objects_breakable_drops_8_1)
+    if let Some(p) = w.field.as_mut().and_then(|f| f.props.get_mut(prop.max(0) as usize)) {
+        p.visible = false;
+    }
     if let Some(c) = w.col.as_mut() {
         c.mark_both(bx, 1);
     }

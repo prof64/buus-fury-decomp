@@ -1,0 +1,6 @@
+{
+  "id": "balance-tweak",
+  "name": "Balance tweak: tougher Majin Fighters, cheaper and stronger Energy Blast",
+  "format_version": 1,
+  "depends": ["base"]
+}

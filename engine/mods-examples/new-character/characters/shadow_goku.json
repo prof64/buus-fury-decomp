@@ -1,0 +1,23 @@
+{
+  "id": "shadow_goku",
+  "index": 9,
+  "name": "Shadow Goku",
+  "new_game": {
+    "level": 60,
+    "hp": 120,
+    "ep": 130,
+    "STR": 22,
+    "POW": 34,
+    "END": 22,
+    "SPD": 56,
+    "form": 54,
+    "skills": [7, 15, 14],
+    "xp": 2200
+  },
+  "growth": {
+    "raw_u32": [262144, 327680, 384, 1024, 320, 262144, 160, 1536],
+    "note": "mod: less HP growth than Goku, more EP (same formulas as characters/*.json)"
+  },
+  "forms": [54],
+  "form_ids": ["54_shadow_goku"]
+}

@@ -48,7 +48,8 @@ fn actor_draw(w: &World, id: u32, a: &crate::actor::Actor, step: Option<(u16, bo
         }
         out.sprites.push(SpriteDraw { entity: id, sheet: format!("sprites/{}", sp.id), frame: FrameSel::Frame { index, flip }, x: a.px(), y: a.py() + a.z, priority: 3, mirror: false, effect });
     }
-    if let Some(sh) = &sp.shadow {
+    // a 0 x 0 header shadow is no shadow (Yemma's office NPCs requested effects/shadow_0x0)
+    if let Some(sh) = sp.shadow.as_ref().filter(|sh| sh.as_str() != "shadow_0x0") {
         out.sprites.push(SpriteDraw { entity: id, sheet: format!("effects/{sh}"), frame: FrameSel::Frame { index: 0, flip: false }, x: a.px(), y: a.py(), priority: 3, mirror: false, effect: SpriteEffect::None });
     }
 }
@@ -71,7 +72,42 @@ pub fn render_view(w: &World, out: &mut RenderView) {
         None => w.data.areas.get(&w.arena.map).map(|a| a.0.clone()).unwrap_or_default(),
     };
     let mode7 = w.field.as_ref().and_then(|f| f.flight.as_ref().map(|fl| wf_view::Mode7View { x: fl.cam[0], y: fl.cam[1], height: fl.cam[2], heading: fl.cam[3], pitch: fl.cam[4], label: f.label.map(|l| l as i32) }));
-    out.map = Some(MapView { id: map_id, anim_frame: w.frame, shake: w.g.shake_off, mode7 });
+    // tile animations run on the map's own timers, which start at the area load (field_parity)
+    let anim_frame = w.field.as_ref().map(|f| w.frame.saturating_sub(f.entered)).unwrap_or(w.frame);
+    out.map = Some(MapView { id: map_id, anim_frame, shake: w.g.shake_off, mode7: mode7.clone() });
+    // the area transition's palette fade (field FadeOut k -> level 8k, FadeIn k -> 256 - 8k; 0x08006D98 / 0x08006DD6)
+    if let Some(f) = w.field.as_ref() {
+        let level = match f.mode {
+            crate::field::Mode::FadeOut { k, .. } => (8 * k).clamp(0, 256),
+            crate::field::Mode::FadeIn { k } => (256 - 8 * k).clamp(0, 256),
+            crate::field::Mode::Normal => 0,
+        };
+        if level > 0 {
+            out.palette_fade = Some(wf_view::PaletteFade { level: level as u16, target: 0 });
+        }
+    }
+    // the world map: script prop visibility against the content's flags, the mini-map box (spawn_box); the BG
+    // camera and the flyer come from `Presenter` / the renderer
+    if let (Some(f), Some(_)) = (w.field.as_ref(), mode7.as_ref()) {
+        let md = w.data.field.as_ref().and_then(|d| d.maps.get(&f.map));
+        let mut wm = wf_view::WorldMapView::default();
+        for (k, p) in f.props.iter().enumerate() {
+            let def = md.and_then(|m| m.props.get(k)).map(|d| d.visible).unwrap_or(true);
+            if p.visible && !def {
+                wm.props_shown.push(k as u16);
+            } else if !p.visible && def {
+                wm.props_hidden.push(k as u16);
+            }
+        }
+        wm.minimap_box = w.scene.visuals.iter().rev().find_map(|v| match v.kind {
+            crate::scene::VisualKind::Box { w: bw, h: bh } => Some([v.x, v.y, bw, bh]),
+            _ => None,
+        });
+        out.world_map = Some(wm);
+    }
+    if let Some((text, t)) = w.scene.banner.as_ref().filter(|b| b.1 <= 238) {
+        out.banner = Some(wf_view::BannerView { text: text.clone(), t: *t });
+    }
     let mut order: Vec<usize> = (0..w.ents.len()).filter(|&i| !w.ents[i].removed).collect();
     order.sort_by_key(|&i| draw_key(w, i));
     // field: the debris chips, the item-get icon (front-most), then the props after the actors (behind them)
@@ -222,7 +258,8 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                 ss3: (p.ss3_gauge >> 16) as i32,
                 xp72,
                 skill: (skill > 0).then_some(skill as u8),
-                skill_alt: !crate::player::can_use_skill(w, pi, skill),
+                // areas without combat (towns, offices) grey the icon out (emulator HUD)
+                skill_alt: !crate::player::can_use_skill(w, pi, skill) || w.field.as_ref().is_some_and(|f| !f.combat),
                 hidden: w.scene.hud_hidden,
             });
         }
@@ -243,6 +280,37 @@ pub fn sim_events(w: &World, out: &mut Vec<SimEvent>) {
     }
 }
 
+/// The screen's timing around a step (verified frame by frame against the emulator, docs/frontend.md): the picture
+/// shows the previous frame's OBJ build (sprites, HUD, banner, dialogue box: shadow OAM / OBJ tiles are copied at
+/// the next VBlank) over the current BG scroll and palette; on the 3D world map the ground's scanline table was
+/// built from the camera before the step (`WorldMapView.bg_camera`). Call `before_step` before every step and
+/// `apply` after `render_view`.
+#[derive(Clone, Debug, Default)]
+pub struct Presenter {
+    prev: Option<(Vec<SpriteDraw>, Vec<HudView>, Option<wf_view::BannerView>, Option<wf_view::DialogView>)>,
+    prev_mode7: Option<wf_view::Mode7View>,
+}
+
+impl Presenter {
+    pub fn before_step(&mut self, w: &World) {
+        let mut v = RenderView::default();
+        render_view(w, &mut v);
+        self.prev_mode7 = v.map.as_ref().and_then(|m| m.mode7.clone());
+        self.prev = Some((v.sprites, v.hud, v.banner, v.dialog));
+    }
+    pub fn apply(&self, out: &mut RenderView) {
+        if let Some((sprites, hud, banner, dialog)) = &self.prev {
+            out.sprites = sprites.clone();
+            out.hud = hud.clone();
+            out.banner = banner.clone();
+            out.dialog = dialog.clone();
+        }
+        if let (Some(wm), Some(c)) = (out.world_map.as_mut(), self.prev_mode7.clone()) {
+            wm.bg_camera = Some(c);
+        }
+    }
+}
+
 impl Sim for Session {
     fn step(&mut self, inputs: &[u16], events: &mut Vec<SimEvent>) {
         if self.world.frame == 0 {
@@ -252,11 +320,17 @@ impl Sim for Session {
                 None => AudioEvent::StopSong,
             }));
         }
+        if self.world.field.is_some() {
+            self.presenter.before_step(&self.world);
+        }
         Session::step(self, inputs);
         sim_events(&self.world, events);
     }
     fn view(&self, out: &mut RenderView) {
         render_view(&self.world, out);
+        if self.world.field.is_some() {
+            self.presenter.apply(out);
+        }
     }
     fn frame(&self) -> u64 {
         self.world.frame as u64

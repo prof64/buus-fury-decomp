@@ -1,0 +1,6 @@
+{
+  "id": "new-skill",
+  "name": "New skill: Rapid Blast (Goku)",
+  "format_version": 1,
+  "depends": ["base"]
+}

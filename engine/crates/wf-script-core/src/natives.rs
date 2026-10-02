@@ -343,7 +343,18 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
             h.w.scene.cam.mode = scene::CamMode::Player;
             h.w.scene.cam.scroll = None;
             if h.w.field.is_some() {
-                wf_core::field::warp(h.w, wd, m, v, x, y, n == 0x76);
+                if n == 0x77 {
+                    // the immediate warp: the player goes idle first (vt+0x28(0): 1 x rand(255)), then EnterArea
+                    // re-creates it facing down (story playthrough: s061 -> Grand Kai's Mansion)
+                    for s in 0..h.w.players.len() {
+                        if let Some(i) = h.w.player_idx(s) {
+                            wf_core::player::set_idle(h.w, i);
+                        }
+                    }
+                    wf_core::field::load_area(h.w, wf_core::field::AreaId { world: wd, area: m, variant: v }, x, y, Some(0));
+                } else {
+                    wf_core::field::warp(h.w, wd, m, v, x, y, true);
+                }
                 if n == 0x76 {
                     return block(h.s, Pending::Transition);
                 }
@@ -413,8 +424,7 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
         0x88 => block(h.s, Pending::Frames { left: arg(a, 0), result: None }),
         0x89 => block(h.s, Pending::Button),
         0x8b => {
-            // TODO(field): re-create the area's triggers whose condition holds (0x08008AA0); field.rs has no
-            // public API for it yet
+            wf_core::field::refresh_triggers(h.w);
             unit()
         }
         0x8c => {
@@ -534,7 +544,7 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
             unit()
         }
         0xad => {
-            // TODO(field): re-create the area's breakables whose condition holds (0x08008AFE)
+            wf_core::field::respawn_breakables(h.w);
             unit()
         }
         0xae => {

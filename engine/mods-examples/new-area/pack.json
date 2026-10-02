@@ -1,0 +1,6 @@
+{
+  "id": "new-area",
+  "name": "Hidden Grove: a new field area behind the Southwest Forest, with a hermit to talk to",
+  "format_version": 1,
+  "depends": ["base"]
+}

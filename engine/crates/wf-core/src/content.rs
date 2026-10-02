@@ -254,6 +254,101 @@ pub struct Skill {
     pub max_level: i32,
     pub costs: Vec<i32>,
     pub min_ep: i32,
+    /// mod parameters (`skills/<id>.json` `engine`); None for the game's own skills unless a mod patches them
+    pub engine: Option<SkillEngine>,
+}
+
+/// A skill's simulation parameters a content file may set (`skills/<id>.json` → `"engine": {...}`). Every field
+/// is optional: what is not given keeps the built-in value of the behaviour (`base`). Levels index the arrays
+/// (the last entry repeats).
+#[derive(Clone, Debug, Default)]
+pub struct SkillEngine {
+    /// the built-in skill whose state machine runs this one (default: the skill's own id)
+    pub base: Option<i32>,
+    /// EP needed to start, per level
+    pub check: Vec<i32>,
+    /// EP spent on activation (and per refire for the Energy Blast family), per level
+    pub cost: Vec<i32>,
+    /// damage multiplier in 1/1024, per level
+    pub damage: Vec<i32>,
+    /// attack sub-type (the reaction / resist class, 0x0800E9D8's sub)
+    pub attack_sub: Option<u8>,
+    /// Energy Blast family: frame of the shot (16), frames until a refire / the end (40), shot speed in 1/256 px
+    /// per frame (768), shot hit box (w, h) centred on it (16, 16)
+    pub fire_frame: Option<i32>,
+    pub recovery: Option<i32>,
+    pub speed: Option<i32>,
+    pub hit_box: Option<(i32, i32)>,
+    /// beams: EP drain per frame (1/256 EP), per level
+    pub drain: Vec<i32>,
+    /// start animation (names tried in order; default: the base skill's). Interned once per content load.
+    pub anim: Vec<&'static str>,
+}
+
+impl SkillEngine {
+    pub fn pick(v: &[i32], lv: i32) -> Option<i32> {
+        if v.is_empty() {
+            return None;
+        }
+        Some(v[(lv.max(0) as usize).min(v.len() - 1)])
+    }
+}
+
+fn int_list(v: &Value) -> Vec<i32> {
+    match v {
+        Value::Array(a) => a.iter().map(|x| int(x) as i32).collect(),
+        Value::Null => vec![],
+        x => vec![int(x) as i32],
+    }
+}
+
+fn skill_engine(e: &Value) -> Option<SkillEngine> {
+    if !e.is_object() {
+        return None;
+    }
+    let opt = |k: &str| e.get(k).filter(|v| !v.is_null()).map(|v| int(v) as i32);
+    Some(SkillEngine {
+        base: opt("base"),
+        check: int_list(&e["check"]),
+        cost: int_list(&e["cost"]),
+        damage: int_list(&e["damage"]),
+        attack_sub: opt("attack_sub").map(|v| v as u8),
+        fire_frame: opt("fire_frame"),
+        recovery: opt("recovery"),
+        speed: opt("speed"),
+        hit_box: e["hit_box"].as_array().filter(|a| a.len() >= 2).map(|a| (int(&a[0]) as i32, int(&a[1]) as i32)),
+        drain: int_list(&e["drain"]),
+        anim: e["anim"].as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(|s| &*Box::leak(s.to_string().into_boxed_str()))).collect()).unwrap_or_default(),
+    })
+}
+
+/// A battle fighter choice (`battle/fighters/<id>.json`; the game's own come from [`crate::battle::FIGHTERS`]).
+#[derive(Clone, Debug, PartialEq)]
+pub struct FighterDef {
+    pub id: String,
+    pub name: String,
+    /// the character record (`characters/*.json` `index`) the stats and growth come from
+    pub character: i32,
+    /// a fusion: the two characters whose records are fused
+    pub fusion: Option<(i32, i32)>,
+    /// forms the fighter may take (`forms/*.json` `index`); the first is not special, `default_form` is
+    pub forms: Vec<i32>,
+    pub default_form: i32,
+    /// skill list (None = the character's new-game skills)
+    pub skills: Option<Vec<i32>>,
+}
+
+/// A battle arena (`battle/arenas/<id>.json`; the game's own come from [`crate::battle::ARENAS`]).
+#[derive(Clone, Debug, PartialEq)]
+pub struct ArenaDef {
+    pub id: String,
+    pub name: String,
+    /// map key "world-area" (collision from `maps/area_WW_AAA/`)
+    pub map: String,
+    /// the player's spawn point (px)
+    pub spawn: (i32, i32),
+    /// fallback bounds when the map has no collision [x0, y0, x1, y1]
+    pub bounds: [i32; 4],
 }
 
 #[derive(Clone, Debug, Default)]
@@ -318,6 +413,10 @@ pub struct GameData {
     /// the field game's static content (areas, map objects, all maps' collision on demand, supplies); None when the
     /// pack has no `world/` category
     pub field: Option<Arc<crate::fieldcontent::FieldData>>,
+    /// battle fighters: the built-in list, then `battle/fighters/*.json` (same id replaces, new ids appended)
+    pub fighters: Vec<FighterDef>,
+    /// battle arenas: the built-in list, then `battle/arenas/*.json`
+    pub arenas: Vec<ArenaDef>,
 }
 
 #[derive(Debug)]
@@ -449,7 +548,7 @@ impl GameData {
             };
             let min_ep = ep.get("canuse_min_ep").filter(|v| !v.is_null()).map(|v| int(v) as i32).unwrap_or(costs.first().copied().unwrap_or(0));
             let id = geti(&s, "skill") as i32;
-            skills.insert(id, Skill { id, name: gets(&s, "name"), max_level: geti(&s, "max_level") as i32, costs, min_ep });
+            skills.insert(id, Skill { id, name: gets(&s, "name"), max_level: geti(&s, "max_level") as i32, costs, min_ep, engine: skill_engine(&s["engine"]) });
         }
         let mut equipment = Vec::new();
         for p in files_under(&all, "equipment/", ".json") {
@@ -615,18 +714,40 @@ impl GameData {
                 areas.insert(key, (map, x["song"].as_u64().map(|v| v as u16)));
             }
         }
-        let mut d = GameData { sprites, records, record_frames, areas, effects, enemies, states, aux, chars, forms, skills, equipment, xp_table, maps: BTreeMap::new(), anim: crate::eanim::AnimRules::load(ENEMY_ANIM), field: crate::fieldcontent::FieldData::load(src, &all)?.map(Arc::new) };
+        let (fighters, arenas) = battle_defs(src, &all)?;
+        let mut d = GameData { sprites, records, record_frames, areas, effects, enemies, states, aux, chars, forms, skills, equipment, xp_table, maps: BTreeMap::new(), anim: crate::eanim::AnimRules::load(ENEMY_ANIM), field: crate::fieldcontent::FieldData::load(src, &all)?.map(Arc::new), fighters, arenas };
         for m in ARENA_MAPS {
             d.load_map(src, m)?;
+        }
+        // arenas added by content (their maps' collision)
+        let extra: Vec<String> = d.arenas.iter().map(|a| a.map.clone()).filter(|m| !d.maps.contains_key(m)).collect();
+        for m in extra {
+            d.load_map(src, &m)?;
         }
         Ok(d)
     }
 
-    /// load one map's collision ("world-map", e.g. "8-71")
+    pub fn fighter(&self, id: &str) -> Option<&FighterDef> {
+        self.fighters.iter().find(|f| f.id == id)
+    }
+    pub fn arena(&self, id: &str) -> Option<&ArenaDef> {
+        self.arenas.iter().find(|a| a.id == id)
+    }
+    /// the skill state machine a skill runs (`engine.base`, default its own id)
+    pub fn skill_kind(&self, id: i32) -> i32 {
+        self.skills.get(&id).and_then(|s| s.engine.as_ref()).and_then(|e| e.base).unwrap_or(id)
+    }
+    pub fn skill_engine(&self, id: i32) -> Option<&SkillEngine> {
+        self.skills.get(&id).and_then(|s| s.engine.as_ref())
+    }
+
+    /// load one map's collision ("world-map", e.g. "8-71", or a map directory id such as "mod_cave")
     pub fn load_map(&mut self, src: &dyn ContentSource, map: &str) -> Result<(), LoadError> {
-        let (w, m) = map.split_once('-').ok_or_else(|| LoadError(format!("bad map id {map}")))?;
-        let dir = format!("maps/area_{:02}_{:03}", w.parse::<i32>().unwrap_or(0), m.parse::<i32>().unwrap_or(0));
-        let c = json(src, &format!("{dir}/collision.json"))?;
+        let dir = match map.split_once('-').and_then(|(w, m)| Some((w.parse::<i32>().ok()?, m.parse::<i32>().ok()?))) {
+            Some((w, m)) => format!("maps/area_{w:02}_{m:03}"),
+            None => format!("maps/{map}"),
+        };
+        let c = rows_collision(json(src, &format!("{dir}/collision.json"))?);
         let cw = geti(&c, "width").max(1) as usize;
         let ch = geti(&c, "height").max(1) as usize;
         let walk = unrle_grid(&gets(&c, "walk"), cw, ch);
@@ -803,6 +924,114 @@ fn resolve_enemy_gfx(en: &mut [EnemyType], sprites: &BTreeMap<i32, Sprite>) {
             }
         }
     }
+}
+
+/// the built-in fighters / arenas, then the content's `battle/fighters/*.json` / `battle/arenas/*.json`
+fn battle_defs(src: &dyn ContentSource, all: &[String]) -> Result<(Vec<FighterDef>, Vec<ArenaDef>), LoadError> {
+    let mut fighters: Vec<FighterDef> = crate::battle::FIGHTERS
+        .iter()
+        .map(|f| FighterDef { id: f.0.to_string(), name: f.0.to_string(), character: f.1, fusion: f.2, forms: f.3.to_vec(), default_form: f.4, skills: if f.1 == 8 { Some(vec![7]) } else { None } })
+        .collect();
+    let mut arenas: Vec<ArenaDef> =
+        crate::battle::ARENAS.iter().map(|a| ArenaDef { id: a.0.to_string(), name: a.2.to_string(), map: a.1.to_string(), spawn: a.3, bounds: a.4 }).collect();
+    for p in files_under(all, "battle/fighters/", ".json") {
+        if p.ends_with("index.json") {
+            continue;
+        }
+        let v = json(src, &p)?;
+        let id = v["id"].as_str().map(String::from).unwrap_or_else(|| p["battle/fighters/".len()..p.len() - 5].to_string());
+        let old = fighters.iter().position(|f| f.id == id);
+        let prev = old.map(|k| fighters[k].clone());
+        let forms = v.get("forms").map(int_list).or_else(|| prev.as_ref().map(|f| f.forms.clone())).unwrap_or_default();
+        let f = FighterDef {
+            name: v["name"].as_str().map(String::from).or_else(|| prev.as_ref().map(|f| f.name.clone())).unwrap_or_else(|| id.clone()),
+            character: v.get("character").map(|x| int(x) as i32).or(prev.as_ref().map(|f| f.character)).unwrap_or(0),
+            fusion: v["fusion"].as_array().filter(|a| a.len() == 2).map(|a| (int(&a[0]) as i32, int(&a[1]) as i32)).or(prev.as_ref().and_then(|f| f.fusion)),
+            default_form: v.get("default_form").map(|x| int(x) as i32).or(prev.as_ref().map(|f| f.default_form)).or(forms.first().copied()).unwrap_or(0),
+            skills: v.get("skills").filter(|x| !x.is_null()).map(int_list).or(prev.as_ref().and_then(|f| f.skills.clone())),
+            forms,
+            id,
+        };
+        if f.forms.is_empty() {
+            return Err(LoadError(format!("{p}: a fighter needs \"forms\"")));
+        }
+        match old {
+            Some(k) => fighters[k] = f,
+            None => fighters.push(f),
+        }
+    }
+    for p in files_under(all, "battle/arenas/", ".json") {
+        if p.ends_with("index.json") {
+            continue;
+        }
+        let v = json(src, &p)?;
+        let id = v["id"].as_str().map(String::from).unwrap_or_else(|| p["battle/arenas/".len()..p.len() - 5].to_string());
+        let sp = &v["spawn"];
+        let b = int_list(&v["bounds"]);
+        let a = ArenaDef {
+            name: v["name"].as_str().unwrap_or(&id).to_string(),
+            map: v["map"].as_str().ok_or_else(|| LoadError(format!("{p}: an arena needs \"map\"")))?.to_string(),
+            spawn: (int(&sp[0]) as i32, int(&sp[1]) as i32),
+            bounds: if b.len() == 4 { [b[0], b[1], b[2], b[3]] } else { [0, 0, 2048, 2048] },
+            id,
+        };
+        match arenas.iter().position(|x| x.id == a.id) {
+            Some(k) => arenas[k] = a,
+            None => arenas.push(a),
+        }
+    }
+    Ok((fighters, arenas))
+}
+
+/// `collision.json` in the mod-friendly row form (`"rows": ["##..", ...]`: '.' open, '#' wall, '~' blocks
+/// walking but not shots) converted to the extractor's run-length form; other files are returned unchanged
+pub(crate) fn rows_collision(c: Value) -> Value {
+    let Some(rows) = c["rows"].as_array() else { return c };
+    let rows: Vec<&str> = rows.iter().filter_map(|r| r.as_str()).collect();
+    let w = rows.iter().map(|r| r.len()).max().unwrap_or(1).max(1);
+    let h = rows.len().max(1);
+    let grid = |open: &dyn Fn(u8) -> bool| -> String {
+        let mut flat = vec![0u8; w * h];
+        for (y, r) in rows.iter().enumerate() {
+            for (x, ch) in r.bytes().enumerate() {
+                flat[y * w + x] = open(ch) as u8;
+            }
+        }
+        rle_b64(&flat)
+    };
+    serde_json::json!({ "width": w, "height": h, "walk": grid(&|ch| ch == b'.'), "shot": grid(&|ch| ch == b'.' || ch == b'~') })
+}
+
+/// the extractor's grid encoding: run lengths (first run blocked) as LEB128, base64
+fn rle_b64(flat: &[u8]) -> String {
+    let mut bytes = Vec::new();
+    let (mut cur, mut i) = (0u8, 0usize);
+    while i < flat.len() {
+        let mut n = 0usize;
+        while i < flat.len() && flat[i] == cur {
+            n += 1;
+            i += 1;
+        }
+        loop {
+            let b = (n & 0x7f) as u8;
+            n >>= 7;
+            if n == 0 {
+                bytes.push(b);
+                break;
+            }
+            bytes.push(b | 0x80);
+        }
+        cur ^= 1;
+    }
+    const T: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut s = String::new();
+    for c in bytes.chunks(3) {
+        let v = (c[0] as u32) << 16 | (*c.get(1).unwrap_or(&0) as u32) << 8 | *c.get(2).unwrap_or(&0) as u32;
+        for k in 0..=c.len() {
+            s.push(T[(v >> (18 - 6 * k)) as usize & 63] as char);
+        }
+    }
+    s
 }
 
 fn b64(s: &str) -> Vec<u8> {

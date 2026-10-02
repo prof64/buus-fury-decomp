@@ -12,6 +12,8 @@
 //! forward, P pause, N frame advance, -/= speed, [ ] seek, Home start, F6-F9 load / Shift+F6-F9 save state, F10
 //! replays, B take over, I input display, F4 training overlay, G ghost; rebindable in `<data dir>/hotkeys.json`.
 //! Headless: `--replay FILE` verifies and plays a recording, `--record FILE` writes the run's recording.
+//! Mods (engine/docs/modding.md): every folder in `<content>/mods/` loads; `--mod DIR` (repeatable) adds a mod
+//! folder from anywhere (e.g. `--mod engine/mods-examples/new-skill`), `--no-mods` loads only those given.
 
 use std::num::NonZeroU32;
 use std::path::{Path, PathBuf};
@@ -29,7 +31,7 @@ use wf_app::control::Control;
 use wf_app::hotkeys::{Hotkeys, Mods};
 use wf_app::input::{Bindings, KeyState};
 use wf_app::replay_menu::ReplayMenu;
-use wf_app::wf_content::{DirSource, FileSource, Packs};
+use wf_app::wf_content::Packs;
 use wf_app::wf_render::{font, ViewMode};
 use wf_app::{blit_scaled, App};
 use wf_view::AudioEvent;
@@ -65,6 +67,10 @@ struct Args {
     demo: bool,
     /// `--story [W-A]`: story mode (field + scripts) from a new game at area W-A (default 1-1)
     story: Option<String>,
+    /// `--mod DIR` (repeatable): extra mod folders, loaded with `<content>/mods/*`
+    mods: Vec<PathBuf>,
+    /// `--no-mods`: ignore `<content>/mods/` (only `--mod` folders load)
+    no_mods: bool,
     arena: String,
     enemy: String,
     count: u32,
@@ -106,6 +112,8 @@ fn parse_args() -> Args {
         show_online: None,
         demo: false,
         story: None,
+        mods: Vec::new(),
+        no_mods: false,
         arena: "forest".into(),
         enemy: "t68".into(),
         count: 1,
@@ -184,6 +192,8 @@ fn parse_args() -> Args {
             "--replay" => a.replay = Some(PathBuf::from(next(&mut i))),
             "--record" => a.record = Some(PathBuf::from(next(&mut i))),
             "--shot" => a.shot = Some(PathBuf::from(next(&mut i))),
+            "--mod" => a.mods.push(PathBuf::from(next(&mut i))),
+            "--no-mods" => a.no_mods = true,
             "-h" | "--help" => {
                 println!("{}", include_str!("main.rs").lines().take(4).map(|l| l.trim_start_matches("//! ")).collect::<Vec<_>>().join("\n"));
                 println!("{}", wf_net::cli::HELP);
@@ -303,16 +313,17 @@ fn make_app(a: &Args, packs: Packs) -> Result<App, String> {
     App::battle(packs, cfg)
 }
 
-fn load_packs(content: &Path) -> wf_app::wf_content::Result<Packs> {
-    let mut src: Vec<Box<dyn FileSource>> = vec![Box::new(DirSource(content.join("base")))];
-    if let Ok(rd) = std::fs::read_dir(content.join("mods")) {
-        let mut mods: Vec<PathBuf> = rd.flatten().map(|e| e.path()).filter(|p| p.is_dir()).collect();
-        mods.sort();
-        for m in mods {
-            src.push(Box::new(DirSource(m)));
-        }
+fn load_packs(a: &Args) -> wf_app::wf_content::Result<Packs> {
+    let mut mods = if a.no_mods { Vec::new() } else { wf_app::mods::mod_dirs(&a.content.join("mods")) };
+    mods.extend(a.mods.iter().cloned());
+    let packs = wf_app::mods::load(&a.content.join("base"), &mods)?;
+    if packs.packs.len() > 1 {
+        eprintln!("content: {}", wf_app::mods::describe(&packs).join(", "));
     }
-    Packs::new(src)
+    for w in &packs.warnings {
+        eprintln!("content: {w}");
+    }
+    Ok(packs)
 }
 
 fn start_audio(packs: &Packs) -> Result<(cpal::Stream, mpsc::Sender<AudioEvent>), String> {
@@ -412,7 +423,7 @@ impl Shell {
     }
 
     fn boot(&mut self) {
-        let packs = match load_packs(&self.args.content) {
+        let packs = match load_packs(&self.args) {
             Ok(p) => p,
             Err(e) => {
                 self.phase = Phase::Failed(e.to_string());
@@ -870,7 +881,7 @@ fn headless(a: &Args) -> Result<(), String> {
             }
         }
     }
-    let packs = load_packs(&a.content).map_err(|e| e.to_string())?;
+    let packs = load_packs(&a).map_err(|e| e.to_string())?;
     if a.net.active() {
         // headless netplay / sync test: real-time match with the --input script (or --net-random-input), JSON result
         let cfg = wf_app::battle::config(&a.arena, &a.enemy, a.count, &a.fighter, a.form, a.level, a.players, a.seed);

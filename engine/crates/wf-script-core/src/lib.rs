@@ -118,6 +118,14 @@ pub struct HostState {
     /// timed stat boost (GD+0x4DC..0x4F0): frames, str, pow, end, spd, special
     pub boost: [i32; 6],
     pub pending: Option<Pending>,
+    /// the thread is resuming from a command wait (`Pending::Director`) this frame: an event that ends now exits at
+    /// the top of the frame in the game (before the objects update)
+    #[serde(default)]
+    pub from_wait: bool,
+    /// the newest entity when the outermost event started: older objects update after the event's scene object
+    /// (the world updates newest first), so only they see a release at the top of the frame
+    #[serde(default)]
+    pub event_watermark: EntityId,
 }
 
 /// compatibility name (older tests / docs)
@@ -244,12 +252,20 @@ impl Host for CoreHost<'_> {
         match call {
             // run_scene: the scene object's first step runs a frame after its creation; players lose their input
             SceneCall::Enter { .. } => {
+                if self.w.scene.depth == 0 {
+                    self.s.event_watermark = self.w.ents.iter().map(|e| e.id).max().unwrap_or(0);
+                }
                 begin_event(self.w);
                 self.s.pending = Some(Pending::Frames { left: 1, result: None });
                 Ok(NativeResult::Block)
             }
             SceneCall::Exit { .. } => {
                 end_event(self.w);
+                // the event ended straight out of a command wait: in the game the wait loop returned at the top of
+                // this frame, so the field's NPCs already ran this frame's update unfrozen
+                if self.s.from_wait && self.w.scene.depth == 0 {
+                    release_field_npcs(self.w, self.s.event_watermark);
+                }
                 Ok(NativeResult::Done(None))
             }
         }
@@ -301,6 +317,20 @@ pub fn end_event(w: &mut World) {
     }
 }
 
+/// the field NPCs' catch-up update after an event released the field at the top of the frame (see `from_wait`):
+/// those older than the event (updated after its scene object in the game)
+fn release_field_npcs(w: &mut World, watermark: EntityId) {
+    if w.field.is_none() {
+        return;
+    }
+    for i in (0..w.ents.len()).rev() {
+        let id = w.ents[i].id;
+        if !w.ents[i].removed && matches!(&w.ents[i].body, wf_core::world::Body::Npc(n) if n.behaviour.is_some()) && !scene::is_puppet(w, id) && id <= watermark {
+            wf_core::fieldnpc::release_update(w, i);
+        }
+    }
+}
+
 /// Per-frame poll of the pending action, after the World stepped. `Some(result)` = resume the thread now with
 /// `result`; `None` = still waiting. Also ticks the script timers (call every frame).
 pub fn poll(w: &mut World, s: &mut HostState) -> Option<Option<i32>> {
@@ -313,6 +343,7 @@ pub fn poll(w: &mut World, s: &mut HostState) -> Option<Option<i32>> {
     if s.boost[0] > 0 {
         s.boost[0] -= 1;
     }
+    s.from_wait = false;
     if matches!(s.pending, Some(Pending::Phases { .. })) {
         let r = natives::poll_phases(w, s);
         if r.is_some() {
@@ -326,7 +357,11 @@ pub fn poll(w: &mut World, s: &mut HostState) -> Option<Option<i32>> {
             (*left <= 0).then_some(*result)
         }
         Pending::Button => (w.scene.keys[0].pressed & A != 0).then_some(None),
-        Pending::Director => scene::wait_done(w).then_some(None),
+        Pending::Director => {
+            let done = scene::wait_done(w);
+            s.from_wait = done;
+            done.then_some(None)
+        }
         Pending::Fade => scene::fade_done(w).then_some(None),
         Pending::Scroll => scene::scroll_done(w).then_some(None),
         Pending::Dialog { choice } => {

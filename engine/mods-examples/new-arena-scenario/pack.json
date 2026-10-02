@@ -1,0 +1,6 @@
+{
+  "id": "new-arena-scenario",
+  "name": "Tournament of Fury: three champions back to back, with an announcer and a prize",
+  "format_version": 1,
+  "depends": ["base"]
+}

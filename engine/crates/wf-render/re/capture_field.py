@@ -33,10 +33,24 @@ _run = emu_mod.Emu.run
 def run(self, frames=1):
     for _ in range(frames):
         _run(self, 1)
-        SHOTS[self.frame] = (self.pixels(), self.oam(), self.r32(0x03001C34))
+        SHOTS[self.frame] = (self.pixels(), self.oam(), tile_anims(self), [self.r32(0x030019A4 + 0x28), self.r32(0x030019A4 + 0x2C)])
 
 
 emu_mod.Emu.run = run
+
+ANIMS = 0x03001A68  # map tile-animation manager (tick 0x08009CC2): +4 count, +8 records {s16 frame, s16 countdown, ptr}
+
+
+def tile_anims(e):
+    n = e.r32(ANIMS + 4)
+    if n > 64:
+        return []
+    out = []
+    for k in range(n):
+        a = ANIMS + 8 + 8 * k
+        fr, cd = e.r16(a), e.r16(a + 2)
+        out.append([fr - 0x10000 if fr >= 0x8000 else fr, cd - 0x10000 if cd >= 0x8000 else cd])
+    return out
 
 
 def main():
@@ -64,10 +78,18 @@ def main():
         d = OUT / f'{kind}_{name}'
         d.mkdir(exist_ok=True)
         oams = []
+        anims = []
+        cams = []
         for k, fr in enumerate(frames):
-            px, oam, _ = SHOTS[fr]
+            px, oam, an, cam = SHOTS[fr]
+            cams.append([c - (1 << 32) if c >= 1 << 31 else c for c in cam])
             Image.frombytes('RGB', (240, 160), px).save(d / f'{k:04d}.png')
             oams.append(oam.hex())
+            anims.append(an)
+        # the map's tile-animation records after each video frame ([frame, countdown] per animation)
+        (d / 'tile_anims.json').write_text(json.dumps(anims))
+        # the map object's camera ints (+0x28 / +0x2C of 0x030019A4: what the object draw uses) after each frame
+        (d / 'cams.json').write_text(json.dumps(cams))
         # OAM after each frame (= the build the *next* frame shows: shadow OAM is copied at VBlank)
         (d / 'oam.json').write_text(json.dumps(oams))
         (OUT / f'{kind}_{name}.json').write_text(json.dumps(t, separators=(',', ':')))

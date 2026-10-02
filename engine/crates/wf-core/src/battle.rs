@@ -30,11 +30,11 @@ pub const ARENAS: &[(&str, &str, &str, (i32, i32), [i32; 4])] = &[
     ("village", "15-1", "Nataday Village", (200, 304), [96, 120, 760, 560]),
     ("kamehouse", "5-1", "Kame House island", (160, 472), [72, 368, 648, 560]),
 ];
-fn arena_for_map(map: &str) -> Option<&'static str> {
+fn arena_for_map<'a>(d: &'a GameData, map: &str) -> Option<&'a str> {
     if map == "20-5" {
         return Some("wasteland");
     }
-    ARENAS.iter().find(|a| a.1 == map).map(|a| a.0)
+    d.arenas.iter().find(|a| a.map == map).map(|a| a.id.as_str())
 }
 
 /// (id, record character, fusion parts, forms, default form)
@@ -150,7 +150,7 @@ fn parse_enemy_id(s: &str) -> Vec<(i32, bool)> {
 
 /// a fighter's record + skills at a level (index.ts build())
 pub fn build_record(d: &GameData, f: &FighterSetup) -> (Record, Vec<i32>, Vec<i32>) {
-    let fd = FIGHTERS.iter().find(|x| x.0 == f.fighter).unwrap_or(&FIGHTERS[0]);
+    let fd = d.fighter(&f.fighter).unwrap_or(&d.fighters[0]);
     let mode = match f.growth.as_str() {
         "rolled" => GrowthMode::Rolled,
         "min" => GrowthMode::Min,
@@ -159,7 +159,7 @@ pub fn build_record(d: &GameData, f: &FighterSetup) -> (Record, Vec<i32>, Vec<i3
     };
     let lv = f.level.clamp(50, 200);
     let ch = |i: i32| d.chars.iter().find(|c| c.index == i).expect("character");
-    let mut rec = match fd.2 {
+    let mut rec = match fd.fusion {
         Some((a, b)) => {
             let ra = record_at_level(ch(a), lv, &d.xp_table, mode, f.growth_seed);
             let rb = record_at_level(ch(b), lv, &d.xp_table, mode, f.growth_seed + 1);
@@ -168,7 +168,7 @@ pub fn build_record(d: &GameData, f: &FighterSetup) -> (Record, Vec<i32>, Vec<i3
             r.points = (ra.points + rb.points) / 2;
             r
         }
-        None => record_at_level(ch(fd.1), lv, &d.xp_table, mode, f.growth_seed),
+        None => record_at_level(ch(fd.character), lv, &d.xp_table, mode, f.growth_seed),
     };
     let mut free = rec.points;
     let mut spent = [0i32; 4];
@@ -198,18 +198,18 @@ pub fn build_record(d: &GameData, f: &FighterSetup) -> (Record, Vec<i32>, Vec<i3
     rec.end = 255.min(rec.end + spent[2]);
     rec.spd = 255.min(rec.spd + spent[3]);
     rec.points = free;
-    let skills = if fd.1 == 8 { vec![7] } else { ch(fd.1).skills.clone() };
-    (rec, skills, fd.3.to_vec())
+    let skills = fd.skills.clone().unwrap_or_else(|| ch(fd.character).skills.clone());
+    (rec, skills, fd.forms.clone())
 }
 
 pub fn arena_runtime(d: &GameData, id: &str) -> (ArenaRt, Option<(i32, i32)>) {
-    let a = ARENAS.iter().find(|a| a.0 == id).unwrap_or(&ARENAS[0]);
-    let map = d.maps.get(a.1);
-    let mut bounds = Rect::new(a.4[0], a.4[1], a.4[2], a.4[3]);
+    let a = d.arena(id).unwrap_or(&d.arenas[0]);
+    let map = d.maps.get(&a.map);
+    let mut bounds = Rect::new(a.bounds[0], a.bounds[1], a.bounds[2], a.bounds[3]);
     let mut region = None;
     let mut view = None;
     if let Some(m) = map {
-        if let Some((mask, b)) = walk_region(m, a.3 .0, a.3 .1) {
+        if let Some((mask, b)) = walk_region(m, a.spawn.0, a.spawn.1) {
             bounds = b;
             region = Some(Arc::new(mask));
         }
@@ -217,7 +217,7 @@ pub fn arena_runtime(d: &GameData, id: &str) -> (ArenaRt, Option<(i32, i32)>) {
             view = Some(Rect::new(0, 0, m.world_w, m.world_h));
         }
     }
-    (ArenaRt { id: a.0.to_string(), map: a.1.to_string(), bounds, region, view }, Some(a.3))
+    (ArenaRt { id: a.id.clone(), map: a.map.clone(), bounds, region, view }, Some(a.spawn))
 }
 
 /// spawn an enemy of `ty` at px (x, y); parent = 0 for none; start: None = the type's AI state, Some(-1) = no AI
@@ -279,8 +279,8 @@ pub fn create(data: Arc<GameData>, cfg: &BattleConfig) -> World {
     let b = w.arena.bounds;
     for (slot, f) in cfg.players.iter().enumerate().take(MAX_PLAYERS) {
         let (rec, skills, forms) = build_record(&data, f);
-        let fd = FIGHTERS.iter().find(|x| x.0 == f.fighter).unwrap_or(&FIGHTERS[0]);
-        let form = if forms.contains(&f.form) { f.form } else { fd.4 };
+        let fd = data.fighter(&f.fighter).unwrap_or(&data.fighters[0]);
+        let form = if forms.contains(&f.form) { f.form } else { fd.default_form };
         let mut pl = Player::new(&w, PlayerInit { slot: slot as u8, form, rec, equip: f.equip, skills, skill_level: f.skill_level, sel: 0, holy_water: f.holy_water, forms_allowed: forms });
         let (sx, sy) = match (&w.col, spawn) {
             (Some(c), Some((x, y))) => {
@@ -323,7 +323,7 @@ fn spawn_phase(w: &mut World, ph: usize) {
     for &(ty, primary) in &parts {
         let Some(t) = w.data.enemy(ty).cloned() else { continue };
         for _ in 0..n {
-            let sp = t.spawns.iter().find(|s| arena_for_map(&format!("{}-{}", s.0, s.1)) == Some(w.arena.id.as_str()) && s.2 > 0 && s.3 > 0);
+            let sp = t.spawns.iter().find(|s| arena_for_map(&w.data, &format!("{}-{}", s.0, s.1)) == Some(w.arena.id.as_str()) && s.2 > 0 && s.3 > 0);
             let (x, y) = match sp {
                 Some(s) if n == 1 && s.2 >= b.x0 && s.2 < b.x1 && s.3 >= b.y0 && s.3 < b.y1 && (s.2 - ppx).abs() > 60 => (s.2, s.3),
                 _ => {

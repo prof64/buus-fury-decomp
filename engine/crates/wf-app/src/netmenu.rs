@@ -159,8 +159,24 @@ impl Default for OnlineMenu {
     }
 }
 
-fn fighters() -> Vec<(&'static str, &'static [i32])> {
-    wf_net::wf_core::battle::FIGHTERS.iter().filter(|f| !f.0.starts_with('f')).map(|f| (f.0, f.3)).collect()
+/// fighters added by content mods (`battle/fighters/*.json`), set when the shells load game data ([`set_roster`])
+static ROSTER: std::sync::Mutex<Vec<(String, Vec<i32>)>> = std::sync::Mutex::new(Vec::new());
+
+/// the lobby's fighter list: the game's fighters, then the content's own (mods) - call after loading game data
+pub fn set_roster(d: &wf_net::wf_core::content::GameData) {
+    let builtin: Vec<&str> = wf_net::wf_core::battle::FIGHTERS.iter().map(|f| f.0).collect();
+    let extra = d.fighters.iter().filter(|f| !builtin.contains(&f.id.as_str())).map(|f| (f.id.clone(), f.forms.clone())).collect();
+    if let Ok(mut r) = ROSTER.lock() {
+        *r = extra;
+    }
+}
+
+fn fighters() -> Vec<(String, Vec<i32>)> {
+    let mut v: Vec<(String, Vec<i32>)> = wf_net::wf_core::battle::FIGHTERS.iter().filter(|f| !f.0.starts_with('f')).map(|f| (f.0.to_string(), f.3.to_vec())).collect();
+    if let Ok(r) = ROSTER.lock() {
+        v.extend(r.iter().cloned());
+    }
+    v
 }
 
 fn cap(s: &str) -> String {
@@ -238,13 +254,13 @@ impl OnlineMenu {
                 let fs = fighters();
                 let i = wrap(self.fighter_idx() as i32 + d, fs.len() as i32) as usize;
                 let p = &mut self.prefs;
-                p.fighter = fs[i].0.into();
+                p.fighter = fs[i].0.clone();
                 p.form = fs[i].1[0];
                 return self.fighter_changed();
             }
             Row::Form => {
                 let fs = fighters();
-                let forms = fs[self.fighter_idx()].1;
+                let forms = &fs[self.fighter_idx()].1;
                 let k = forms.iter().position(|&f| f == self.prefs.form).unwrap_or(0) as i32;
                 self.prefs.form = forms[wrap(k + d, forms.len() as i32) as usize];
                 return self.fighter_changed();
@@ -406,7 +422,7 @@ impl OnlineMenu {
         let p = &self.prefs;
         let fs = fighters();
         let fi = self.fighter_idx();
-        let forms = fs[fi].1;
+        let forms = &fs[fi].1;
         let fk = forms.iter().position(|&f| f == p.form).unwrap_or(0);
         let t = |s: &str| s.to_string();
         match row {
@@ -415,7 +431,7 @@ impl OnlineMenu {
             Row::Watch => (t("Watch a room"), String::new()),
             Row::Rejoin => (t("Rejoin last match"), String::new()),
             Row::Name => (t("Name"), if p.name.is_empty() { t("(random)") } else { p.name.clone() }),
-            Row::Fighter => (t("Fighter"), format!("< {} >", cap(fs[fi].0))),
+            Row::Fighter => (t("Fighter"), format!("< {} >", cap(&fs[fi].0))),
             Row::Form => (t("Form"), format!("< {} ({}/{}) >", p.form, fk + 1, forms.len())),
             Row::Server => (t("Server"), p.signal.clone()),
             Row::Close => (t("Close"), String::new()),

@@ -3,7 +3,7 @@
 //! (decoded on demand at area load: 429 maps x 128 KB would be 55 MB resident) and the supply table (`items/`).
 //! Plain data behind `GameData::field`; nothing here is simulation state.
 
-use crate::content::{int, unrle_grid, ContentSource, LoadError, MapCollision};
+use crate::content::{int, rows_collision, unrle_grid, ContentSource, LoadError, MapCollision};
 use crate::geom::{Dir, Rect};
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -165,6 +165,9 @@ pub struct AreaDef {
     /// the area's placed objects in list order (lists 0..4)
     pub objects: Vec<ObjDef>,
     pub rom: u32,
+    /// the area-name banner: name string id (area table +0xC, 0 = none) and its text (maps `areas.json`)
+    pub name_id: i64,
+    pub banner: String,
 }
 
 #[derive(Clone, Debug)]
@@ -360,6 +363,33 @@ fn list_ref(v: &Value) -> ObjRef {
     ObjRef::List(int(&v["list"]) as u8, int(&v["index"]) as u16)
 }
 
+/// the area list an object type lives in (wf-world: 0 triggers, 1 actors, 2 breakables, 3 items, 4 map sprites)
+fn list_of_type(ty: &str) -> u8 {
+    match ty {
+        "enemy" | "npc" => 1,
+        "breakable" => 2,
+        "item" => 3,
+        "map_sprite" => 4,
+        _ => 0,
+    }
+}
+
+/// parse objects appended to `have` (mod content may leave out `list`: the type's list, next free index)
+fn objs_after(have: &[ObjDef], list: &[Value]) -> Vec<ObjDef> {
+    let mut out: Vec<ObjDef> = Vec::new();
+    for v in list {
+        let at = if v.get("list").is_some_and(|l| l.is_object()) {
+            list_ref(&v["list"])
+        } else {
+            let l = list_of_type(v["type"].as_str().unwrap_or(""));
+            let n = have.iter().chain(out.iter()).filter(|o| matches!(o.at, ObjRef::List(k, _) if k == l)).count();
+            ObjRef::List(l, n as u16)
+        };
+        out.push(obj(v, at));
+    }
+    out
+}
+
 fn read_json(src: &dyn ContentSource, path: &str) -> Option<Value> {
     src.read(path).and_then(|b| serde_json::from_slice(&b).ok())
 }
@@ -372,8 +402,10 @@ impl FieldData {
         // songs from the maps category's areas.json
         let mut songs: BTreeMap<String, Song> = BTreeMap::new();
         let mut combat: BTreeMap<String, bool> = BTreeMap::new();
+        let mut banners: BTreeMap<String, (i64, String)> = BTreeMap::new();
         if let Some(a) = read_json(src, "areas.json") {
             for x in a["areas"].as_array().into_iter().flatten() {
+                banners.insert(x["key"].as_str().unwrap_or("").to_string(), (x["name_string_id"].as_i64().unwrap_or(0), x["name"].as_str().unwrap_or("").to_string()));
                 let s = match &x["song"] {
                     Value::Null => Song::None,
                     Value::Object(o) => Song::Script(o.get("script").and_then(|s| s.as_str()).unwrap_or("").to_string()),
@@ -397,6 +429,8 @@ impl FieldData {
                 combat: combat.get(&key).copied().unwrap_or(true),
                 objects: Vec::new(),
                 rom: hexs(&x["rom"]),
+                name_id: banners.get(&key).map(|b| b.0).unwrap_or(0),
+                banner: banners.get(&key).map(|b| b.1.clone()).unwrap_or_default(),
                 key,
             };
             fd.areas.insert((a.world, a.area), a);
@@ -410,7 +444,7 @@ impl FieldData {
                 let Some(ad) = fd.areas.values_mut().find(|x| x.key == key) else { continue };
                 // the objects belong to the area (every map of a multi-variant area lists the same ones): first wins
                 if ad.objects.is_empty() {
-                    ad.objects = a["objects"].as_array().into_iter().flatten().map(|v| obj(v, list_ref(&v["list"]))).collect();
+                    ad.objects = objs_after(&[], a["objects"].as_array().map(|v| v.as_slice()).unwrap_or(&[]));
                 }
             }
             let exits = o["map_triggers"].as_array().into_iter().flatten().map(|v| obj(v, list_ref(&v["list"]))).collect();
@@ -430,7 +464,7 @@ impl FieldData {
                 })
                 .collect();
             let (mut walk, mut shot, mut cw, mut ch) = (String::new(), String::new(), 1, 1);
-            if let Some(c) = read_json(src, &format!("{dir}/collision.json")) {
+            if let Some(c) = read_json(src, &format!("{dir}/collision.json")).map(rows_collision) {
                 walk = c["walk"].as_str().unwrap_or("").to_string();
                 shot = c["shot"].as_str().unwrap_or("").to_string();
                 cw = int(&c["width"]).max(1) as usize;
@@ -460,6 +494,57 @@ impl FieldData {
                 cmax = ((ww - 240).max(0), (wh - 160).max(0));
             }
             fd.maps.insert(id.clone(), MapDef { id, start_pos: sp, exits, props, walk, shot, cw, ch, world_w: ww, world_h: wh, camera_max: cmax, three_d });
+        }
+        // per-area files (mods): `world/areas/<W-A>.json` adds an area or changes one (fields given replace,
+        // `objects` replaces the object list, `add_objects` appends to it)
+        for p in all.iter().filter(|p| p.starts_with("world/areas/") && p.ends_with(".json")) {
+            let Some(x) = read_json(src, p) else { return Err(LoadError(format!("{p}: not JSON"))) };
+            let key = x["key"].as_str().map(String::from).unwrap_or_else(|| p["world/areas/".len()..p.len() - 5].to_string());
+            let (w, ar) = key.split_once('-').and_then(|(a, b)| Some((a.parse::<i32>().ok()?, b.parse::<i32>().ok()?))).ok_or_else(|| LoadError(format!("{p}: area key must be \"world-area\"")))?;
+            let a = fd.areas.entry((w, ar)).or_insert_with(|| AreaDef {
+                world: w,
+                area: ar,
+                key: key.clone(),
+                name: None,
+                maps: Vec::new(),
+                variant_selector: 0,
+                on_enter: None,
+                on_leave: None,
+                song: Song::None,
+                combat: true,
+                objects: Vec::new(),
+                rom: 0,
+                name_id: 0,
+                banner: String::new(),
+            });
+            let script = |v: &Value| v.as_str().map(String::from).or_else(|| v["script"].as_str().map(String::from));
+            if let Some(n) = x["name"].as_str() {
+                a.name = Some(n.to_string());
+            }
+            if let Some(m) = x["maps"].as_array() {
+                a.maps = m.iter().filter_map(|m| m.as_str().map(String::from)).collect();
+            }
+            if x.get("on_enter").is_some() {
+                a.on_enter = script(&x["on_enter"]);
+            }
+            if x.get("on_leave").is_some() {
+                a.on_leave = script(&x["on_leave"]);
+            }
+            match x.get("song") {
+                Some(Value::Null) => a.song = Song::None,
+                Some(v @ Value::Number(_)) => a.song = Song::Id(int(v) as i32),
+                _ => {}
+            }
+            if let Some(c) = x["combat"].as_bool() {
+                a.combat = c;
+            }
+            if let Some(o) = x["objects"].as_array() {
+                a.objects = objs_after(&[], o);
+            }
+            if let Some(o) = x["add_objects"].as_array() {
+                let more = objs_after(&a.objects, o);
+                a.objects.extend(more);
+            }
         }
         for p in all.iter().filter(|p| p.starts_with("items/") && p.ends_with(".json") && !p.ends_with("index.json")) {
             let Some(it) = read_json(src, p) else { continue };

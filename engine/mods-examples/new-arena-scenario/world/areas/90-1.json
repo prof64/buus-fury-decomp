@@ -1,0 +1,40 @@
+{
+  "key": "90-1",
+  "name": "Tournament of Fury",
+  "maps": ["area_08_071"],
+  "song": 1,
+  "combat": true,
+  "on_enter": "mod_tof_enter",
+  "objects": [
+    {
+      "type": "enemy",
+      "comment": "round 1 (spawned by s901; condition 'value 1' = never placed by the area load)",
+      "condition": { "value": 1 },
+      "enemy_type": 21,
+      "pos": [300, 216],
+      "sprite_index": 0,
+      "on_defeat": { "event": "s902" },
+      "behaviour": []
+    },
+    {
+      "type": "enemy",
+      "comment": "round 2",
+      "condition": { "value": 1 },
+      "enemy_type": 123,
+      "pos": [300, 200],
+      "sprite_index": 0,
+      "on_defeat": { "event": "s903" },
+      "behaviour": []
+    },
+    {
+      "type": "enemy",
+      "comment": "round 3",
+      "condition": { "value": 1 },
+      "enemy_type": 101,
+      "pos": [300, 232],
+      "sprite_index": 0,
+      "on_defeat": { "event": "s904" },
+      "behaviour": []
+    }
+  ]
+}

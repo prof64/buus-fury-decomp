@@ -172,22 +172,25 @@ fn darken(a: u32, evy: u32, m: BlendMath) -> u32 {
 fn load_orig_palette(packs: &Packs) -> HashMap<u32, u32> {
     let mut m = HashMap::new();
     if let Ok(j) = packs.value("maps/palette.json") {
-        for v in j["rgb888"].as_array().into_iter().flatten() {
+        // key: expanded colour | half << 24 (0 = BG 0..255, 1 = OBJ 256..511); `0xFF` << 24 = either half
+        for (i, v) in j["rgb888"].as_array().into_iter().flatten().enumerate() {
             let Some(o) = v.as_str().and_then(|s| u32::from_str_radix(s.trim_start_matches('#'), 16).ok()) else { continue };
-            let mut e = 0xFF00_0000;
+            let mut e = 0;
             for sh in [16, 8, 0] {
                 let c5 = ((o >> sh) & 0xFF) >> 3;
                 e |= ((c5 << 3) | (c5 >> 2)) << sh;
             }
-            m.entry(e).or_insert(o);
+            m.entry(e | ((i as u32 / 256) << 24)).or_insert(o);
+            // by palette entry: 0x02 << 24 | half << 8 | index
+            m.insert(0x0200_0000 | i as u32, o);
+            m.entry(e | 0xFF00_0000).or_insert(o);
         }
     }
     m
 }
 
 /// the fade routine `0x08007074`: `(c * (256 - level) + target * level) >> 11` per channel (BGR555), expanded
-fn palette_fade(e: u32, orig: &HashMap<u32, u32>, level: u32, target: u32) -> u32 {
-    let o = orig.get(&(e | 0xFF00_0000)).copied().unwrap_or(e & 0xFF_FFFF);
+fn palette_fade(o: u32, level: u32, target: u32) -> u32 {
     let l = level.min(256);
     let mut out = 0xFF00_0000;
     for sh in [16, 8, 0] {
@@ -324,7 +327,8 @@ impl Renderer {
         let (ox, oy) = ((w as i32 - GBA_W) / 2, (h as i32 - GBA_H) / 2);
         if let Some(Some(u)) = &mut self.ui {
             if self.draw_hud {
-                if let Some(hv) = view.hud.get(player).filter(|h| !h.hidden && view.dialog.is_none()) {
+                // the game keeps the HUD up behind text boxes; cutscenes hide it (`HudView.hidden`)
+                if let Some(hv) = view.hud.get(player).filter(|h| !h.hidden) {
                     // anchored to the view's top-left corner (= the GBA position in the classic view)
                     screen.push((ui::HUD_PRIORITY, ui::HUD_POS.0, ui::HUD_POS.1, 80, 16, u.hud(packs, hv)));
                 }
@@ -341,7 +345,9 @@ impl Renderer {
                 }
             }
             if let Some(dv) = &view.dialog {
-                if let Some(px) = u.dialog(dv) {
+                let anim = view.dialog_anim.unwrap_or_default();
+                let hidden = anim.scale == 0xFF;
+                if let Some(px) = u.dialog_typed(dv, anim.typed).filter(|_| !hidden).map(|full| if anim.scale == 0 { full } else { ui::Ui::scale_box(&full, anim.scale as u32) }) {
                     // horizontally centred; top / bottom anchored to the view edges, middle centred
                     let y = match dv.position {
                         wf_view::DialogPos::Top => ui::Ui::dialog_y(dv.position),
@@ -393,11 +399,20 @@ impl Renderer {
                 self.orig_pal = Some(load_orig_palette(packs));
             }
             let orig = self.orig_pal.as_ref().unwrap();
-            let mut cache: HashMap<u32, u32> = HashMap::new();
-            let mut f = |e: u32| -> u32 { *cache.entry(e).or_insert_with(|| palette_fade(e, orig, pf.level as u32, pf.target)) };
+            let mut cache: HashMap<u64, u32> = HashMap::new();
+            // the colour's palette entry when known (top byte), else the first entry of the layer's half (OBJ
+            // pixels: OBJ half, BG pixels: BG half) with that colour
+            let mut f = |e: u32, layer: u8| -> u32 {
+                let half = (layer == L_OBJ) as u32;
+                *cache.entry((half as u64) << 40 | e as u64).or_insert_with(|| {
+                    let by_index = (e >> 24 != 0).then(|| orig.get(&(0x0200_0000 | (half << 8) | (e >> 24)))).flatten();
+                    let o = by_index.or_else(|| orig.get(&((e & 0xFF_FFFF) | (half << 24)))).or_else(|| orig.get(&((e & 0xFF_FFFF) | 0xFF00_0000))).copied();
+                    palette_fade(o.unwrap_or(e & 0xFF_FFFF), pf.level as u32, pf.target)
+                })
+            };
             for i in 0..w * h {
-                self.top[i] = f(self.top[i]);
-                self.bot[i] = f(self.bot[i]);
+                self.top[i] = f(self.top[i], self.top_l[i]);
+                self.bot[i] = f(self.bot[i], self.bot_l[i]);
             }
         }
         for i in 0..w * h {
@@ -420,7 +435,7 @@ impl Renderer {
             if fade != 0 {
                 c = darken(c, fade, bm);
             }
-            self.fb[i] = c;
+            self.fb[i] = c | 0xFF00_0000;
         }
 
         if self.draw_hud && matches!(self.ui, Some(None)) {
@@ -430,6 +445,8 @@ impl Renderer {
     }
 
     #[inline]
+    /// `c` = RGB in the low 24 bits; the top byte carries the colour's palette index within the layer's half
+    /// (BG 0..255 / OBJ 256..511), 0 = unknown — palette fades use it to find the original RGB888 exactly.
     fn put(&mut self, i: usize, c: u32, layer: u8, b: u16) {
         self.bot[i] = self.top[i];
         self.bot_l[i] = self.top_l[i];
@@ -449,8 +466,15 @@ impl Renderer {
         for (i, r) in self.remap.iter_mut().enumerate() {
             *r = i as u32;
         }
-        for a in &ts.anims {
-            let k = a.frame_at(anim_frame);
+        // `anim_frame` = logic frames since the area load (the map's animation ticks). Overlapping animations: the
+        // tile shows the most recent upload (ties: header order, as the tick loop uploads)
+        let mut order: Vec<(u32, usize, usize)> = ts.anims.iter().enumerate().map(|(k, a)| {
+            let (f, at) = a.after_ticks(k, anim_frame);
+            (at, k, f)
+        }).collect();
+        order.sort();
+        for &(_, ai, k) in &order {
+            let a = &ts.anims[ai];
             for (i, &src) in a.src[k].iter().enumerate() {
                 if let Some(r) = self.remap.get_mut((a.dest + i as u32) as usize) {
                     *r = src;
@@ -502,7 +526,7 @@ impl Renderer {
                             let c = col + k;
                             let ix = row[if fh { 7 - c } else { c }];
                             if ix != 0 {
-                                let colr = ts.palette.get(ix as usize).copied().unwrap_or(0) | 0xFF00_0000;
+                                let colr = (ts.palette.get(ix as usize).copied().unwrap_or(0) & 0xFF_FFFF) | (ix as u32) << 24;
                                 self.put(o + k, colr, layer, 0);
                             }
                         }
@@ -556,7 +580,8 @@ impl Renderer {
                 if c >> 24 == 0 {
                     continue;
                 }
-                let c = if white { 0xFFFF_FFFF } else { c | 0xFF00_0000 };
+                // sheets are RGBA (palette swaps applied): the palette index is unknown (alpha 0, see `put`)
+                let c = if white { 0x00FF_FFFF } else { c & 0xFF_FFFF };
                 self.put(sy as usize * self.w + sx as usize, c, L_OBJ, b);
             }
         }

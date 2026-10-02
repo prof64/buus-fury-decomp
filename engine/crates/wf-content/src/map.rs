@@ -80,6 +80,33 @@ impl TileAnim {
     pub fn period(&self) -> u32 {
         self.durations.iter().map(|d| (*d).max(1)).sum()
     }
+    /// The game's timer (`0x08009B80` init, tick `0x08009CC2` once per logic frame): animation `k` of the map
+    /// (0-based, header order) starts on frame 0 with countdown `k + 1`; each tick counts down, at 0 the next frame
+    /// is uploaded and the countdown becomes that frame's duration. Returns (frame shown, tick of its upload; 0 =
+    /// the load) after `ticks` ticks since the load.
+    pub fn after_ticks(&self, k: usize, ticks: u32) -> (usize, u32) {
+        let n = self.durations.len();
+        let first = k as u32 + 1;
+        if n <= 1 || ticks < first {
+            return (0, 0);
+        }
+        // from tick `first` on: frame 1, 2, ..., n-1, 0, 1, ... each for its duration
+        let p = self.period();
+        let mut t = (ticks - first) % p.max(1);
+        let base = ticks - t;
+        let mut f = 1 % n;
+        let mut at = 0;
+        loop {
+            let d = self.durations[f].max(1);
+            if t < d {
+                return (f, base + at);
+            }
+            t -= d;
+            at += d;
+            f = (f + 1) % n;
+        }
+    }
+
     pub fn frame_at(&self, t: u32) -> usize {
         let p = self.period();
         if p == 0 {
@@ -301,6 +328,21 @@ impl Collision {
     pub fn load(packs: &Packs, id: &str) -> Result<Collision> {
         let path = format!("maps/{id}/collision.json");
         let j: Value = packs.json(&path)?;
+        if let Some(rows) = j["rows"].as_array() {
+            // mod-friendly form: one string per tile row, '.' open, '#' wall, '~' blocks walking but not shots
+            let rows: Vec<&str> = rows.iter().filter_map(|r| r.as_str()).collect();
+            let w = rows.iter().map(|r| r.len()).max().unwrap_or(0) as u32;
+            let h = rows.len() as u32;
+            let (mut walk, mut shot) = (vec![0u8; (w * h) as usize], vec![0u8; (w * h) as usize]);
+            for (y, r) in rows.iter().enumerate() {
+                for (x, c) in r.bytes().enumerate() {
+                    let k = y * w as usize + x;
+                    walk[k] = (c == b'.') as u8;
+                    shot[k] = (c == b'.' || c == b'~') as u8;
+                }
+            }
+            return Ok(Collision { w, h, walk, shot, walk_bounds: [0, 0, w as i32, h as i32] });
+        }
         let w = j["width"].as_u64().unwrap_or(256) as u32;
         let h = j["height"].as_u64().unwrap_or(256) as u32;
         let grid = |k: &str| -> Result<Vec<u8>> {

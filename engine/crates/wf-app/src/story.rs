@@ -54,7 +54,7 @@ pub struct StorySim {
     shown: ShownCamera,
     /// the OBJ layer shows the previous frame's build (OAM is copied at the next VBlank; verified per frame
     /// against the emulator in field_parity): the sprites as they were before this step
-    prev_sprites: Option<Vec<wf_view::SpriteDraw>>,
+    prev_obj: Option<ObjLayer>,
     /// show the previous frame's camera (off: wf-core's field camera already matches the screen, field_parity)
     pub lag_camera: bool,
 }
@@ -85,11 +85,35 @@ impl StorySim {
         if files.is_empty() {
             return Err("this content has no scripts/ (re-extract with the current extractor)".into());
         }
-        let stepped = files.iter().filter(|(_, src)| src.contains("fn step_0()")).map(|(p, _)| p.clone()).collect();
         let cfg = FieldConfig { world: area.0, area: area.1, chars, rng: wf_core::battle::RngInit::Seed(seed), ..Default::default() };
-        let mut session = Session::new_field(Arc::clone(&data), cfg);
+        let session = Session::new_field(Arc::clone(&data), cfg);
+        Self::with_session(packs, session)
+    }
+
+    /// The session started mid-area (harnesses): no area banner for the current area.
+    pub fn skip_area_banner(&mut self) {
+        self.banner.cur = None;
+        self.banner.remember_current(&self.session.world);
+        self.session.world.scene.banner = None;
+    }
+
+    /// Story mode around an existing field session (tests / harnesses that build the session themselves).
+    pub fn with_session(packs: &Packs, mut session: Session) -> Result<StorySim, String> {
+        if let Ok(f) = wf_render::ui::Font::load(packs, "dialog") {
+            wf_script_core::text::set_dialog_font((0..256u16).map(|c| f.advance(c)).collect());
+        }
+        let files: BTreeMap<String, String> = packs
+            .list()
+            .into_iter()
+            .filter(|p| p.starts_with("scripts/") && p.ends_with(".rhai"))
+            .filter_map(|p| packs.read(&p).and_then(|b| String::from_utf8(b).ok()).map(|s| (p, s)))
+            .collect();
+        if files.is_empty() {
+            return Err("this content has no scripts/ (re-extract with the current extractor)".into());
+        }
+        let stepped = files.iter().filter(|(_, src)| src.contains("fn step_0()")).map(|(p, _)| p.clone()).collect();
         wf_core::field::attach_host(&mut session.world, true);
-        let spare = Session::new_field(data, FieldConfig { world: area.0, area: area.1, ..Default::default() }).world;
+        let spare = session.world.clone();
         let host = SharedHost(std::rc::Rc::new(std::cell::RefCell::new(CoreState { world: spare, story: HostState::default() })));
         let rt = Runtime::new(&files, Box::new(host.clone()))?;
         let mut s = StorySim {
@@ -108,7 +132,7 @@ impl StorySim {
             banner: BannerTracker::new(packs),
             shown: ShownCamera::default(),
             lag_camera: false,
-            prev_sprites: None,
+            prev_obj: None,
         };
         // the first area's load scripts (gates, doors, bridges) before frame 0
         let evs: Vec<Event> = s.session.world.events.clone();
@@ -200,13 +224,47 @@ impl StorySim {
     }
 }
 
+impl StorySim {
+    /// the state's own picture (before the OBJ-layer lag)
+    fn view_now(&self, out: &mut RenderView) {
+        wf_core::view::render_view(&self.session.world, out);
+        patch_view(&self.session.world, out);
+        self.banner.apply(out);
+    }
+}
+
+/// Everything the game draws as OBJs (sprites, HUD, area banner, dialogue box). The picture shows the previous
+/// frame's OBJ build (shadow OAM / OBJ tiles are copied at the next VBlank) over the current frame's BG scroll and
+/// palette — verified frame by frame against the emulator (field_parity).
+#[derive(Clone, Debug, Default)]
+pub struct ObjLayer {
+    pub sprites: Vec<wf_view::SpriteDraw>,
+    pub hud: Vec<wf_view::HudView>,
+    pub banner: Option<wf_view::BannerView>,
+    pub dialog: Option<wf_view::DialogView>,
+    pub dialog_anim: Option<wf_view::DialogAnim>,
+}
+
+impl ObjLayer {
+    pub fn of(v: &RenderView) -> ObjLayer {
+        ObjLayer { sprites: v.sprites.clone(), hud: v.hud.clone(), banner: v.banner.clone(), dialog: v.dialog.clone(), dialog_anim: v.dialog_anim }
+    }
+    pub fn apply(&self, out: &mut RenderView) {
+        out.sprites = self.sprites.clone();
+        out.hud = self.hud.clone();
+        out.banner = self.banner.clone();
+        out.dialog = self.dialog.clone();
+        out.dialog_anim = self.dialog_anim;
+    }
+}
+
 impl Sim for StorySim {
     fn step(&mut self, inputs: &[Buttons], events: &mut Vec<SimEvent>) {
         events.append(&mut self.init_events);
         self.shown.before_step(&self.session.world);
         let mut pre = RenderView::default();
-        wf_core::view::render_view(&self.session.world, &mut pre);
-        self.prev_sprites = Some(pre.sprites);
+        self.view_now(&mut pre);
+        self.prev_obj = Some(ObjLayer::of(&pre));
         let mut frames = [InputFrame::default(); MAX_PLAYERS];
         for (k, f) in frames.iter_mut().enumerate() {
             let h = inputs.get(k).copied().unwrap_or(0);
@@ -214,10 +272,10 @@ impl Sim for StorySim {
             self.prev[k] = h;
         }
         self.session.step_world(frames);
-        // scripts the frame started, then the blocked one resumes when its wait is over
+        // the blocked script resumes when its wait is over, then the scripts this frame's update started (NPC talk)
+        // start; the trigger check's events start right after step_post (an event's first node runs a frame later:
+        // the story playthrough lockstep, wf-script-core tests/playthrough.rs)
         let evs: Vec<Event> = self.session.world.events.clone();
-        self.collect(&evs);
-        self.run_queue();
         if self.running {
             let mut hs = std::mem::take(&mut self.hs);
             let r = poll(&mut self.session.world, &mut hs);
@@ -228,23 +286,24 @@ impl Sim for StorySim {
                 self.run_queue();
             }
         }
+        self.collect(&evs);
+        self.run_queue();
         let k = self.session.world.events.len();
         let post: Vec<Event> = self.session.step_post()[k..].to_vec();
         self.collect(&post);
+        self.run_queue();
         let all = self.session.world.events.clone();
         self.banner.step(&all);
         wf_core::view::sim_events(&self.session.world, events);
     }
 
     fn view(&self, out: &mut RenderView) {
-        wf_core::view::render_view(&self.session.world, out);
-        patch_view(&self.session.world, out);
-        self.banner.apply(out);
+        self.view_now(out);
         if self.lag_camera {
             self.shown.apply(out);
         }
-        if let Some(p) = &self.prev_sprites {
-            out.sprites = p.clone();
+        if let Some(p) = &self.prev_obj {
+            p.apply(out);
         }
     }
     fn frame(&self) -> u64 {
@@ -261,7 +320,32 @@ impl Sim for StorySim {
 /// Frontend-side completions of wf-core's view (until the core's `render_view` provides them): the area
 /// transition palette fade (field mode FadeOut / FadeIn: brightness 256 -> 0 by 8 per frame, `0x08006D98` /
 /// `0x08006DD6`).
+/// The dialogue box animation from the core's dialog state (open zoom over the 7 `DIALOG_OPEN` frames, close zoom,
+/// typewriter), measured against the emulator's OAM (affine PA = 2048 / scale) and screen.
+pub fn dialog_anim(w: &World) -> Option<wf_view::DialogAnim> {
+    use wf_core::scene::DialogPhase as P;
+    let d = w.scene.dialog.as_ref()?;
+    let (o, c) = (DIALOG_OPEN_OFF.load(std::sync::atomic::Ordering::Relaxed), DIALOG_CLOSE_OFF.load(std::sync::atomic::Ordering::Relaxed));
+    let (scale, typed) = match d.phase {
+        P::Opening => ((d.t + o).clamp(1, 8), Some(0)),
+        P::Shown => (8, Some(d.typed.max(0) as u32)),
+        P::Closing => (8 - (d.t + c), None),
+        P::Closed => return None,
+    };
+    if scale < 1 {
+        return Some(wf_view::DialogAnim { scale: 0xFF, typed });
+    }
+    Some(wf_view::DialogAnim { scale: scale.min(8) as u8, typed })
+}
+
+/// calibration of [`dialog_anim`] (field_parity)
+pub static DIALOG_OPEN_OFF: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(1);
+pub static DIALOG_CLOSE_OFF: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(0);
+
 pub fn patch_view(w: &World, out: &mut RenderView) {
+    if out.dialog_anim.is_none() {
+        out.dialog_anim = dialog_anim(w);
+    }
     if out.palette_fade.is_none() {
         if let Some(f) = w.field.as_ref() {
             let level = match f.mode {
@@ -306,7 +390,7 @@ impl ShownCamera {
 }
 
 /// frames between the core's load frame and the map animation timers' start (measured, field_parity)
-pub const ANIM_PHASE: u32 = 1;
+pub const ANIM_PHASE: u32 = 0;
 
 /// The area-name banner (docs/frontend.md §7) kept by the frontend until wf-core's view provides it: started when
 /// an area load finishes with a name id different from the last one shown (not 0; the world map only records it),
@@ -317,6 +401,8 @@ pub struct BannerTracker {
     last_id: i64,
     cur: Option<(String, u32)>,
     loaded: bool,
+    /// added to `t` when drawing (calibration)
+    pub t_offset: i32,
 }
 
 impl BannerTracker {
@@ -349,6 +435,9 @@ impl BannerTracker {
                     self.last_id = id;
                 } else if id != 0 && id != self.last_id {
                     self.last_id = id;
+                    if std::env::var("DEBUG_BANNER").is_ok() {
+                        eprintln!("banner start {key} id {id} last {}", self.last_id);
+                    }
                     self.cur = Some((name, 0));
                     self.loaded = true;
                 }
@@ -365,7 +454,10 @@ impl BannerTracker {
     pub fn apply(&self, out: &mut RenderView) {
         if out.banner.is_none() {
             if let Some((text, t)) = &self.cur {
-                out.banner = Some(wf_view::BannerView { text: text.clone(), t: *t });
+                let t = (*t as i64 + self.t_offset as i64).max(0) as u32;
+                if t <= 238 {
+                    out.banner = Some(wf_view::BannerView { text: text.clone(), t });
+                }
             }
         }
     }

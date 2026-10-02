@@ -944,6 +944,45 @@ pub fn spawn_map_object(w: &mut World, at: ObjRef, force: bool) -> Option<Entity
     spawn_object(w, &o)
 }
 
+/// script `refresh_map_triggers` (0x8B, 0x08008AA0(area, 0)): clear the trigger list and re-create the area's
+/// triggers whose condition holds now, then the map's exits (the load's order). Used after story flags change.
+/// (The game also re-registers the map layout's props; their script-set visibility is kept here.)
+pub fn refresh_triggers(w: &mut World) {
+    let fd = field_data(w);
+    let Some(f) = w.field.as_mut() else { return };
+    let (world, area, map) = (f.area.world, f.area.area, f.map.clone());
+    f.triggers.clear();
+    let Some(a) = fd.area(world, area) else { return };
+    let exits = fd.maps.get(&map).map(|m| m.exits.clone()).unwrap_or_default();
+    let list: Vec<ObjDef> = a.objects.iter().filter(|o| list_of(o) == 0).cloned().chain(exits).collect();
+    for o in &list {
+        if cond_holds(w, &o.cond) {
+            spawn_object(w, o);
+        }
+    }
+}
+
+/// script `respawn_breakables` (0xAD, 0x08008AFE): every breakable of the area whose condition holds now and that does
+/// not exist is created
+pub fn respawn_breakables(w: &mut World) {
+    let fd = field_data(w);
+    let Some(f) = w.field.as_ref() else { return };
+    let Some(a) = fd.area(f.area.world, f.area.area) else { return };
+    for o in a.objects.iter().filter(|o| matches!(o.kind, ObjKind::Breakable { .. })) {
+        let exists = w.ents.iter().any(|e| !e.removed && matches!(&e.body, Body::Breakable(b) if b.obj == o.at));
+        if !exists && cond_holds(w, &o.cond) {
+            // its map prop shows again (a break hid it)
+            if let ObjKind::Breakable { prop, .. } = &o.kind {
+                let vis = fd.maps.get(&w.field.as_ref().unwrap().map).and_then(|m| m.props.get(*prop as usize)).map(|p| p.visible).unwrap_or(true);
+                if let Some(p) = w.field.as_mut().and_then(|f| f.props.get_mut(*prop as usize)) {
+                    p.visible = vis;
+                }
+            }
+            spawn_object(w, o);
+        }
+    }
+}
+
 /// a script / event holds the field (no trigger or talk fires while set; map NPCs freeze, animations tick)
 pub fn set_busy(w: &mut World, busy: bool) {
     let frame = w.frame;

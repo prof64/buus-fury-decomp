@@ -1,0 +1,14 @@
+{
+  "key": "8-3",
+  "add_objects": [
+    {
+      "type": "exit",
+      "comment": "walking up into the forest's top-right alcove leads to the Hidden Grove (90-2)",
+      "condition": { "always": true },
+      "rect": { "x": 424, "y": 16, "w": 48, "h": 12 },
+      "activation": { "mode": "touch" },
+      "to": { "world": 90, "area": 2, "variant": 1, "x": 160, "y": 200, "facing": "up" },
+      "push": "up"
+    }
+  ]
+}

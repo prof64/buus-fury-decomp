@@ -66,6 +66,19 @@ pub struct RenderView {
     /// World-map (mode 7) extras the renderer cannot derive from `MapView.mode7` alone; `None` = defaults (see
     /// [`WorldMapView`]).
     pub world_map: Option<WorldMapView>,
+    /// The dialogue box's animation (open / close zoom, typewriter); `None` = fully open, all text shown.
+    pub dialog_anim: Option<DialogAnim>,
+}
+
+/// The dialogue box OBJs zoom about the box centre while opening / closing (affine PA = PD = 2048 / scale) and
+/// the text types in one visible character per frame (`wf_script_core::text::typing` counts).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub struct DialogAnim {
+    /// 1..=8 (8 = full size)
+    pub scale: u8,
+    /// visible characters of the current page drawn so far (colour pairs and an option's "- " take none);
+    /// `None` = all
+    pub typed: Option<u32>,
 }
 
 /// Exact world-map presentation state (docs/frontend.md "World map"). Every field is optional; without it the
@@ -148,6 +161,7 @@ impl RenderView {
         self.palette_fade = None;
         self.banner = None;
         self.world_map = None;
+        self.dialog_anim = None;
     }
 }
 

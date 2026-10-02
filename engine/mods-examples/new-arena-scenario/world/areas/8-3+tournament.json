@@ -1,0 +1,14 @@
+{
+  "key": "8-3",
+  "add_objects": [
+    {
+      "type": "npc",
+      "comment": "the tournament announcer, standing near the forest entrance; talking to him runs event s900",
+      "condition": { "always": true },
+      "pos": [488, 472],
+      "sprite_index": 18,
+      "talk": { "event": "s900" },
+      "behaviour": []
+    }
+  ]
+}

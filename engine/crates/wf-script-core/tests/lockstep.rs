@@ -527,7 +527,7 @@ fn replay(f: &Fixture, name: &str, doc: &Value, rt: Rt) -> Report {
     let mut rep = Report::default();
     let Built { world, mut map } = build_world(f, doc);
     let mut scripted = Scripted { initial: world.ents.iter().map(|e| e.id).collect(), ..Default::default() };
-    let mut sess = Session { data: f.data.clone(), world, config: Default::default(), prev: [0; MAX_PLAYERS], outcome: wf_core::battle::Outcome::Running, hook: None };
+    let mut sess = Session { data: f.data.clone(), world, config: Default::default(), prev: [0; MAX_PLAYERS], outcome: wf_core::battle::Outcome::Running, hook: None, presenter: Default::default() };
     // the area load's song / sounds belong to the frame before the recording
     sess.world.events.clear();
     let mut hs = HostState::default();

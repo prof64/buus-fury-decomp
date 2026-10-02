@@ -416,6 +416,26 @@ pub fn update(w: &mut World, i: usize) {
     mirror(npc(w, i));
 }
 
+/// a map NPC's footprint on the walk grid (marked by the NPC itself): a script command moving it lifts the mark at
+/// its start and sets it where the NPC stops (story playthrough: the Yemma office ogre's walk_to frees the door)
+pub fn script_move_mark(w: &mut World, i: usize, set: bool) {
+    if !matches!(&w.ents[i].body, Body::Npc(n) if n.behaviour.is_some()) {
+        return;
+    }
+    let f = foot(npc_ref(w, i));
+    mark(w, f, if set { 0 } else { 1 });
+}
+
+/// the rest of this frame's update for an NPC whose event ended before the world update in the game but after it
+/// here (an event whose last action was a command wait: the nested wait loop returns at the top of the frame, the
+/// event exits, then the objects update): the runner and the second animation tick (the busy update already
+/// ticked once; story playthrough, the Yemma office ogre s055)
+pub fn release_update(w: &mut World, i: usize) {
+    runner(w, i);
+    anim_tick(w, i);
+    mirror(npc(w, i));
+}
+
 /// an animation tick alone (the load's last non-logic frames)
 pub fn tick_only(w: &mut World, i: usize) {
     anim_tick(w, i);

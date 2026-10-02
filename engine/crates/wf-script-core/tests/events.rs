@@ -259,7 +259,7 @@ fn bindings_are_honest() {
                             break;
                         }
                         let held = if frames % 2 == 0 { A } else { wf_core::input::B };
-                        let mut sess = Session { data: f.data.clone(), world: w, config: BattleConfig::default(), prev: [0; 4], outcome: wf_core::battle::Outcome::Running, hook: None };
+                        let mut sess = Session { data: f.data.clone(), world: w, config: BattleConfig::default(), prev: [0; 4], outcome: wf_core::battle::Outcome::Running, hook: None, presenter: Default::default() };
                         let mut inputs = [InputFrame::default(); 4];
                         inputs[0] = InputFrame::from_held(held, 0);
                         sess.step_frames(inputs);

@@ -1,0 +1,19 @@
+{
+  "map": "mod_hidden_grove",
+  "format": "engine/docs/world.md (map header part only; the area's objects are in world/areas/90-2.json)",
+  "start_pos": [168, 196],
+  "map_triggers": [
+    {
+      "type": "exit",
+      "comment": "the path at the bottom leads back to the forest alcove (8-3, top right)",
+      "list": { "map_header": 0 },
+      "condition": { "always": true },
+      "rect": { "x": 152, "y": 224, "w": 32, "h": 16 },
+      "activation": { "mode": "touch" },
+      "to": { "world": 8, "area": 3, "variant": 1, "x": 440, "y": 40, "facing": "down" },
+      "push": "down"
+    }
+  ],
+  "props": [],
+  "areas": []
+}

@@ -98,9 +98,19 @@ pub fn item_icons(rom: &Rom, out: &mut Content) {
         let r = SKILLS + 0x18 * id;
         for (k, suffix) in [(4u32, ""), (8, "_alt")] {
             let g = rom.u32(r + k);
-            let im = obj_image(rom.bytes(g, 0x200), 32, 16, 8, &pal, None, 0);
+            // indexed with the whole OBJ palette in palette-RAM order (index = OBJ colour, 0 transparent): the
+            // frontend's palette fades need the colour index, not just the RGB (several OBJ entries share an RGB)
+            let data = rom.bytes(g, 0x200);
+            let mut idx = vec![0u8; 32 * 16];
+            for t in 0..8usize {
+                let ti = wf_rom::gfx::tile_indices(data, t, 8, 0);
+                let (ox, oy) = ((t % 4) * 8, (t / 4) * 8);
+                for i in 0..64 {
+                    idx[(oy + i / 8) * 32 + ox + i % 8] = ti[i];
+                }
+            }
             let path = format!("icons/skills/skill_{id:02}{suffix}.png");
-            out.put(&path, im.to_png());
+            out.put(&path, wf_rom::gfx::encode_png_indexed(32, 16, &idx, &pal, true));
             index.push(json!({"kind": "skill", "index": id, "variant": if suffix.is_empty() {"normal"} else {"alt"},
                               "png": path, "rom": {"record": hx(r), "gfx": hx(g)}}));
         }

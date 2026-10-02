@@ -21,9 +21,11 @@ impl ContentSource for PacksSource<'_> {
     }
 }
 
-/// Game data for the core, loaded once per content set.
+/// Game data for the core, loaded once per content set (also registers modded fighters for the lobby menu).
 pub fn game_data(packs: &Packs) -> Result<Arc<GameData>, String> {
-    GameData::load(&PacksSource(packs)).map(Arc::new).map_err(|e| e.to_string())
+    let d = GameData::load(&PacksSource(packs)).map(Arc::new).map_err(|e| e.to_string())?;
+    crate::netmenu::set_roster(&d);
+    Ok(d)
 }
 
 /// A battle session (`arena` names / enemy ids as in `wf_core::battle`, e.g. arena `forest`, enemy `t68`).

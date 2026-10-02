@@ -87,7 +87,14 @@ Buu: step 0.3–1.3 µs, clone snapshot 1.3–1.6 µs, restore 1.1–1.8 µs, ha
 * **Multiplayer rules beyond the original** (documented divergences only when N > 1): enemy targets per slot; candy /
   sphere / waypoint stay world globals as in the game; the screen-shake task runs from player 0.
 * **Mods.** Everything comes through `ContentSource`; a layered pack source (the frontend's `wf-content`) can feed
-  `GameData::load` directly.
+  `GameData::load` directly. Data-driven for mods (docs/modding.md; with no mods every value is the built-in one):
+  `GameData.fighters` / `arenas` (the `battle::FIGHTERS` / `ARENAS` tables, then `battle/fighters|arenas/*.json`;
+  `build_record`, `arena_runtime`, spawn placement read these), `Skill.engine` (`skills/*.json` `engine`: `base`
+  behaviour, `check`, `cost`, `damage`, `attack_sub`, `drain`, `anim`, Energy Blast frame data; `player.rs`
+  dispatches on `GameData::skill_kind(id)` and reads the parameters through `skill_mult_of` / `skill_sub_of` /
+  `skill_cost`, so a new skill id runs a built-in state machine with its own numbers), `FieldData` area files
+  (`world/areas/*.json`: new areas, overrides, `add_objects` with automatic list indices), collision in row form,
+  arena maps by folder id. All of it is static `GameData` (not hashed or snapshotted).
 
 ## 5. Content
 
@@ -164,6 +171,14 @@ Two agents extend `World` concurrently; keep changes additive and re-read before
 `Session::step_post` (cameras). `Scene.song` follows the frame's music events at the end of `step_post` (byte
 snapshots carry no events). AI `RunScript` / `InlineScript` nodes emit `FieldEvent::Run { cause: Cause::Ai }`
 (`CNode.script` = header address / inline bytecode address).
+
+**Round 2 (script host agent)**: view — `render_view` now provides the area banner (`Scene.banner`, rule of
+docs/frontend.md §7), the field transition palette fade, the tile-animation timer from the area load, the greyed
+skill icon in non-combat areas, and `RenderView.world_map` (script prop visibility, spawn_box mini-map box);
+`view::Presenter` gives the one-frame OBJ lag and the world map's older BG camera (`Session.presenter`, used by
+`impl Sim for Session` in field sessions; wf-app's `patch_view` / `BannerTracker` / `ObjLayer` are now
+redundant). Field — a broken breakable hides its map prop; `field::refresh_triggers`, `respawn_breakables`,
+`load_area_with(.., objects)`; `Cause::Ai`, `Cause::LevelUp`. Player — `Player.boost` (the timed buff's values).
 
 ## 10. Field game (`story.rs`, `fieldcontent.rs`, `field.rs`, `fieldnpc.rs`, `fieldobj.rs`)
 

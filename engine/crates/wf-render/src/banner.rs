@@ -77,7 +77,8 @@ impl Banner {
             for x in 0..W {
                 let c = src[ty as usize * W + x];
                 if c != 0 {
-                    out[y as usize * W + x] = pal.get(c as usize).copied().unwrap_or(0) | 0xFF00_0000;
+                    // top byte = OBJ palette index (the strip's colours are OBJ palette entries)
+                    out[y as usize * W + x] = (pal.get(c as usize).copied().unwrap_or(0) & 0xFF_FFFF) | (c as u32) << 24;
                 }
             }
         }

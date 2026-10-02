@@ -171,6 +171,17 @@ pub fn content_id(d: &GameData) -> String {
         m.shot.hash(&mut h);
     }
     d.states.len().hash(&mut h);
+    // content mods can add / change (engine/docs/modding.md): battle fighters and arenas, sprites, field areas
+    format!("{:?}{:?}", d.fighters, d.arenas).hash(&mut h);
+    for (k, s) in &d.sprites {
+        k.hash(&mut h);
+        s.id.hash(&mut h);
+        format!("{:?}{:?}{:?}", s.body, s.foot, s.anims.iter().map(|a| (a.raw, a.dirs.iter().map(|d| d.iter().map(|st| (st.frame, st.dur)).collect::<Vec<_>>()).collect::<Vec<_>>())).collect::<Vec<_>>()).hash(&mut h);
+    }
+    if let Some(f) = &d.field {
+        format!("{:?}", f.areas).hash(&mut h);
+        f.maps.keys().for_each(|k| k.hash(&mut h));
+    }
     format!("{:016x}", h.finish())
 }
 

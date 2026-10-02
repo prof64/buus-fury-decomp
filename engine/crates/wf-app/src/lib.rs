@@ -10,6 +10,7 @@ pub mod control;
 pub mod demo;
 pub mod hotkeys;
 pub mod input;
+pub mod mods;
 pub mod netmenu;
 pub mod overlay;
 pub mod rebind;
