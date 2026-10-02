@@ -1,0 +1,17 @@
+#!/bin/sh
+# Launches the buu-battle MCP server (stdio, headless, muted).
+# Binary: $WF_MCP, else <repo>/engine/target/release/wf-mcp (plugin used in place), else `wf-mcp` on PATH
+# (cargo install --path engine/crates/wf-mcp). ROM: $WF_ROM, else <repo>/roms/buu.gba; content is extracted once
+# into the cache (~/Library/Caches/wf-buu/agent or ~/.cache/wf-buu/agent), after which the ROM is not read again.
+here=$(cd "$(dirname "$0")" && pwd)
+repo=$(cd "$here/../../.." 2>/dev/null && pwd)
+bin="$WF_MCP"
+if [ -z "$bin" ] && [ -x "$repo/engine/target/release/wf-mcp" ]; then bin="$repo/engine/target/release/wf-mcp"; fi
+if [ -z "$bin" ]; then bin=$(command -v wf-mcp 2>/dev/null); fi
+if [ -z "$bin" ] || [ ! -x "$bin" ]; then
+  echo "buu-battle: wf-mcp not found. Build it: (cd engine && cargo build --release -p wf-mcp), or set WF_MCP=/path/to/wf-mcp" >&2
+  exit 1
+fi
+if [ -z "$WF_ROM" ] && [ -f "$repo/roms/buu.gba" ]; then export WF_ROM="$repo/roms/buu.gba"; fi
+export WF_AGENT=1
+exec "$bin" "$@"

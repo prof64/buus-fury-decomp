@@ -1,5 +1,10 @@
 # agent/ - LLM agents playing the Buu's Fury battle simulator
 
+**Current version: the Rust core.** `plugin/` is the Claude Code plugin (MCP server `engine/crates/wf-mcp` + the
+`buu-battle` skill + example Rhai controllers); install steps in [plugin/README.md](plugin/README.md), design,
+performance and play results in [DESIGN-rust.md](DESIGN-rust.md). Everything below describes the earlier
+TypeScript prototype (kept for reference).
+
 Prototype of an agent interface (MCP server + Claude Code skill) over the TypeScript simulator in
 `site/src/battle/`, built to learn what works before the interface is rebuilt on the Rust core. Design notes and
 play-test findings: [DESIGN.md](DESIGN.md).

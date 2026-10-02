@@ -1,0 +1,11 @@
+{
+  "name": "legacy-of-goku-x",
+  "owner": { "name": "prof64" },
+  "plugins": [
+    {
+      "name": "buu-battle",
+      "source": "./plugin",
+      "description": "Play Dragon Ball Z: Buu's Fury headlessly through an MCP server over the deterministic Rust core."
+    }
+  ]
+}
