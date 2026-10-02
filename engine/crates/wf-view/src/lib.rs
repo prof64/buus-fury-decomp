@@ -137,8 +137,16 @@ pub struct DialogView {
     /// Box style (0 = 4 lines, 1 = 2 lines).
     pub style: u8,
     pub page: u16,
-    /// Box placement (the text's position code `!` top, `@` middle, `#` bottom).
+    /// Box placement (the text's position code `!` top, `@` middle, `#` bottom; else from the speaker, see
+    /// `docs/ui.md` §3).
     pub position: DialogPos,
+    /// Speaker portrait: the `portrait_index` of `portraits/index.json` (already resolved from the text node's
+    /// `arg`: 1..6 = the leader's form slot, >= 8 = arg - 8). `None` = plain centred box. With a portrait the box
+    /// and the 64x64 portrait share the screen's 224-px span and the text is left / top aligned (unless it starts
+    /// with `^`).
+    pub portrait: Option<u16>,
+    /// The portrait sits left of the box (else right).
+    pub portrait_left: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]

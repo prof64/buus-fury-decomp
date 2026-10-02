@@ -5146,6 +5146,7 @@ dependencies = [
  "wf-content",
  "wf-core",
  "wf-extract",
+ "wf-modscript",
  "wf-net",
  "wf-render",
  "wf-replay",
@@ -5232,6 +5233,22 @@ dependencies = [
  "wf-extract",
  "wf-render",
  "wf-view",
+]
+
+[[package]]
+name = "wf-modcheck"
+version = "0.1.0"
+dependencies = [
+ "wf-app",
+ "wf-core",
+]
+
+[[package]]
+name = "wf-modscript"
+version = "0.1.0"
+dependencies = [
+ "rhai",
+ "wf-core",
 ]
 
 [[package]]

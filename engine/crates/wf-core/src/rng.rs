@@ -4,6 +4,9 @@
 
 use serde::{Deserialize, Serialize};
 
+/// diagnostics: print every generator call with its caller (lockstep harnesses switch it on for chosen frames)
+pub static TRACE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 pub struct Rng {
     pub a: u32,
@@ -34,18 +37,24 @@ impl Rng {
         r1.wrapping_sub(r0)
     }
     #[inline]
+    #[track_caller]
     pub fn next(&mut self) -> u32 {
         self.calls = self.calls.wrapping_add(1);
+        if TRACE.load(std::sync::atomic::Ordering::Relaxed) {
+            eprintln!("      rng call at {}", std::panic::Location::caller());
+        }
         self.step()
     }
     /// 0..n-1
     #[inline]
+    #[track_caller]
     pub fn rand(&mut self, n: u32) -> i32 {
         let v = self.next();
         (((v & 0xffff) as u64 * n as u64) >> 16) as i32
     }
     /// probability p / 65536
     #[inline]
+    #[track_caller]
     pub fn chance(&mut self, p: i64) -> bool {
         let v = self.next();
         ((v & 0xffff) as i64) < p

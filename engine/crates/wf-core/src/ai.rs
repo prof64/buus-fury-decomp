@@ -69,6 +69,8 @@ kinds!(
     StunHold, DeathBlink, ShockStun, VolleyballTransform, VolleyballRestore, VolleyballLaunch,
     // on-hit only
     IfAttack, ApplyDamage, IfHitFromFront, SetHitDir, HealFraction, FreezeHelperHit, ShieldHit,
+    // mods (modkit.rs): a condition / action node whose code is a Rhai function (`call`: "file.rhai:fn")
+    ModCondition, ModAction,
 );
 
 /// node names whose content label does not match what the game does (emulator-verified): 0x08018E29 moves AWAY
@@ -133,6 +135,9 @@ pub struct CNode {
     pub kids: Vec<u16>,
     /// RunScript: the queued event's header address (def+0xC); InlineScript: the inline bytecode (def+0xC)
     pub script: u32,
+    /// ModCondition / ModAction: the hook (`"scripts/ai/x.rhai:fn"`) and its integer arguments (`args`)
+    pub call: String,
+    pub args: Vec<i32>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -166,7 +171,7 @@ fn push_node(out: &mut Vec<CNode>, v: &Value, all: Option<&BTreeMap<u16, Value>>
             return push_node(out, t, Some(all), depth + 1);
         }
         let idx = out.len() as u16;
-        out.push(CNode { k: K::Never, name: format!("missing state 0x{st:x}"), addr: 0, p, kids: vec![], script: 0 });
+        out.push(CNode { k: K::Never, name: format!("missing state 0x{st:x}"), addr: 0, p, kids: vec![], script: 0, call: String::new(), args: vec![] });
         return idx;
     }
     let idx = out.len() as u16;
@@ -177,7 +182,9 @@ fn push_node(out: &mut Vec<CNode>, v: &Value, all: Option<&BTreeMap<u16, Value>>
         "InlineScript" if addr != 0 => addr + 0xC,
         _ => 0,
     };
-    out.push(CNode { k: K::from_name(name), name: name.to_string(), addr, p, kids: vec![], script });
+    let call = v.get("call").and_then(|x| x.as_str()).unwrap_or("").to_string();
+    let args = v.get("args").and_then(|x| x.as_array()).map(|a| a.iter().map(|x| crate::content::int(x) as i32).collect()).unwrap_or_default();
+    out.push(CNode { k: K::from_name(name), name: name.to_string(), addr, p, kids: vec![], script, call, args });
     let mut kids = Vec::new();
     for c in v.get("children").and_then(|x| x.as_array()).into_iter().flatten() {
         kids.push(push_node(out, c, all, depth));
@@ -192,7 +199,7 @@ pub fn compile_behaviour(id: u16, all: &BTreeMap<u16, Value>) -> BehTree {
         push_node(&mut nodes, v, Some(all), 0);
     }
     if nodes.is_empty() {
-        nodes.push(CNode { k: K::Never, name: format!("missing state 0x{id:x}"), addr: 0, p: Params::default(), kids: vec![], script: 0 });
+        nodes.push(CNode { k: K::Never, name: format!("missing state 0x{id:x}"), addr: 0, p: Params::default(), kids: vec![], script: 0, call: String::new(), args: vec![] });
     }
     BehTree { state: id, nodes }
 }

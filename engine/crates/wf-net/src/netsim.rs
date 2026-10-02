@@ -182,6 +182,13 @@ pub fn content_id(d: &GameData) -> String {
         format!("{:?}", f.areas).hash(&mut h);
         f.maps.keys().for_each(|k| k.hash(&mut h));
     }
+    // scripted mod content (modkit): projectile kinds and the hook scripts (nothing for the base game)
+    if !d.projectiles.is_empty() {
+        format!("{:?}", d.projectiles).hash(&mut h);
+    }
+    if let Some(hk) = &d.hooks {
+        hk.digest().hash(&mut h);
+    }
     format!("{:016x}", h.finish())
 }
 

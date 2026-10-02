@@ -1,0 +1,13 @@
+[package]
+name = "wf-modcheck"
+description = "native == wasm check of modded games: the same scripted-mod scenarios run in both, digest of every frame's state hash"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wf-app = { path = "../wf-app" }
+wf-core = { path = "../wf-core" }

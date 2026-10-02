@@ -129,6 +129,9 @@ draw rules in `docs/world.md` §6): `coin_0`..`coin_3` (4 cels each), `field_ite
 equipment index), `field_labels` (level-sign numbers), `props_<map id>` (frame k = map prop k).
 
 ### `portraits/<id>.png` — 64×64 dialogue portraits (155), `index.json` with `portrait_index`, name.
+Index 0 is transparent (an OBJ). The renderer finds portrait N by `index.json` (`png`), else by a file named
+`portraits/portrait_NNN*.png` — a mod adds a portrait by shipping e.g. `portraits/portrait_160_my_hero.png` (64×64,
+alpha = transparent) and using node `box` 8 + 160; `name` is metadata (the game draws no speaker names).
 
 ### `icons/` — `supply/NNN.png`, `equipment/NNN.png` (16×16; NNN = item index used by `items/`, `equipment/`),
 `skills/skill_NN.png` / `skill_NN_alt.png` (32×16, NN = skill id), `index.json`.

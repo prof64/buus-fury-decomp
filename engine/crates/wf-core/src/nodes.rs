@@ -189,7 +189,7 @@ fn is_cond(k: K) -> bool {
             | IfPlayerInFront | IfPlayerInZone | IfPlayerInRoomZone | IfPlayerBlastIncoming | IfPlayerInLineOfFire | IfContactHit
             | IfMeleeHit | IfContactExplode | IfLandedOnRock | IfPlayerPetrified | IfPlayerNotPetrified | IfSphereDestroyed
             | IfPlayerNearAndHittable | IfLastKidBuu | IfChildCount | IfLatchOverlap | IfButtonMashed | IfPlayerOnTop
-            | IfPartnerHolding | IfUnknown
+            | IfPartnerHolding | IfUnknown | ModCondition
     )
 }
 
@@ -470,6 +470,10 @@ fn cond(w: &mut World, c: &C, n: u16) -> bool {
         K::IfPartnerHolding => {
             let g = w.data.anim.generic["0x03001B30"];
             w.live_enemies().into_iter().find(|&o| matches!(w.en_ref(o).ty, 0x6d..=0x70)).is_some_and(|o| w.en_ref(o).ea.rule == g && is_anim_id(w, o, 0x12))
+        }
+        K::ModCondition => {
+            let node = &c.tree.nodes[n as usize];
+            crate::modkit::ai_hook(w, i, &node.call, &node.args, 0) != 0
         }
         _ => false,
     }
@@ -1079,6 +1083,11 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
     let speed = par(c, n, P::Speed, 0) as i32;
     match kind(c, n) {
         K::Never => false,
+        // a mod action: the hook returns 0 while running, non-zero when done
+        K::ModAction => {
+            let node = &c.tree.nodes[n as usize];
+            crate::modkit::ai_hook(w, i, &node.call, &node.args, f) != 0
+        }
         K::GotoState => {
             let st = par(c, n, P::State, 0) as u16;
             replace_top(w, i, st);
@@ -1152,7 +1161,13 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             true
         }
         K::FacePlayer => {
-            en::face_player(w, i);
+            // field: the game's routine (0x0801599C, 24.8 difference, ties horizontal); battles keep the footprint-
+            // pixel rule the TypeScript cross-check pins (tests/cross_ts.rs) until it is re-verified there
+            if w.field.is_some() {
+                en::face_player_exact(w, i);
+            } else {
+                en::face_player(w, i);
+            }
             true
         }
         K::Wait => f as i64 >= par(c, n, P::Frames, 0),

@@ -478,6 +478,10 @@ pub fn interact(w: &mut World, pi: usize) -> bool {
             set_anim(w, k, 0, true);
             mirror(npc(w, k));
             start_event(w);
+            // the talk scene's speaker anchor (`0x08017D44`): player - NPC, 24.8 (text box side / top-bottom)
+            let (nx, ny) = (npc(w, k).a.x, npc(w, k).a.y);
+            let pa = &w.pl_ref(pi).a;
+            w.scene.talk_anchor = [pa.x - nx, pa.y - ny];
             w.events.push(Event::Field(FieldEvent::Run { run: Callback::Event(format!("s{ev:03}")), cause: Cause::Talk { npc: id }, slot }));
             return true;
         }
@@ -489,6 +493,7 @@ pub fn interact(w: &mut World, pi: usize) -> bool {
 /// an event starts (`0x0801246E`): message 0xF to every object, last to first (walking map NPCs go idle); with a
 /// script host attached the field is busy until the host clears it
 pub fn start_event(w: &mut World) {
+    w.scene.talk_anchor = crate::scene::NO_ANCHOR;
     for k in (0..w.ents.len()).rev() {
         match &w.ents[k].body {
             Body::Npc(n) if n.behaviour.as_ref().is_some_and(|b| b.anim == 1) => {
@@ -496,6 +501,9 @@ pub fn start_event(w: &mut World) {
                 mirror(npc(w, k));
             }
             Body::Player(p) if p.gs == crate::player::Gs::Walk => crate::player::set_idle(w, k),
+            // a walking enemy stops: idle state (story playthrough: a fighter walking when the level-up hook starts
+            // goes idle with a fresh idle tick; a hurt one keeps its state)
+            Body::Enemy(e) if !e.defeated => crate::enemy::stop_msg(w, k),
             _ => {}
         }
     }

@@ -87,8 +87,9 @@ map **variant** (it reaches `0x080089A0`), not a facing.
   Ref (event node kinds 5, 6) = `bank | offset << 6 | length << 21` (UTF-16 units) — loader `0x08012230`.
 * Event nodes `{u16 next, u8 kind, u8 arg}` (handler table `0x080728AC`): 0 bytecode, 1 inline text, 2 printf text
   (format ptr +4, args bytecode +8), 3 choice (inline, `-` options), 4 compressed bytecode, 5 bank text, 6 bank text +
-  printf args, 7 goto. For text nodes `arg` = speaker (`0x08012012`): 0 / 7 none, 1..6 the current player's portrait
-  slot (form table `0x086B82EC` +0xF), ≥ 8 portrait `arg − 8` (`0x086F395C`).
+  printf args, 7 goto. For text nodes `arg` = speaker (`0x08012012`): 0 none, 7 none + the 2-line box style, 1..6 the
+  current player's portrait slot (form table `0x086B82EC` +0xF), ≥ 8 portrait `arg − 8` (`0x086F395C`); the box's
+  top / bottom and portrait side follow the talk anchor (player − NPC), `docs/ui.md` §3. No speaker name is drawn.
 * Control codes: `\n`, `0x0B` new box, `0x08 n` colour (7 highlight, 2 normal), `0xA0` nbsp, `%s`/`%d`; a first
   character `!` / `@` / `#` puts the box at y 40 / 80 / 120 and is not drawn. Fonts / glyphs: [ui.md](ui.md).
 

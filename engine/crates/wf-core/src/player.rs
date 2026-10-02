@@ -10,7 +10,7 @@ use crate::damage::{atk, compute_damage, CombatStats, HpAcc};
 use crate::fx::{self, Alive, Fx};
 use crate::geom::{overlaps, Dir, Rect, DIR_VEC};
 use crate::input::{self as btn, InputFrame, DPAD};
-use crate::progression::{level_of, level_up, recalc_stats, xp_gain, EffStats, Record};
+use crate::progression::{level_of, level_up, xp_gain, EffStats, Record};
 use crate::shots::{self, ShotKind, StraightOpts};
 use crate::world::{broadcast, Body, EntityId, Event, HitMsg, World};
 use serde::{Deserialize, Serialize};
@@ -1391,6 +1391,16 @@ fn anim_tick(w: &mut World, i: usize) {
             }
         }
         Gs::Skill(14) => {}
+        // a scripted mod skill: its animation loops (or plays once and holds) at the skill's rate
+        Gs::Skill(crate::modkit::SCRIPT_GS) => {
+            let (looping, shift) = crate::modkit::anim_mode(w, i);
+            if looping {
+                tick_loop(&mut a, n, shift);
+            } else if tick_once(&mut a, n, shift) {
+                a.frame = (n - 1).max(0);
+            }
+            end(w, a)
+        }
         Gs::Skill(7) => tick_blast(w, i),
         Gs::Skill(2) => {
             let pl = p(w, i);
@@ -2051,6 +2061,9 @@ pub fn can_use_skill(w: &World, i: usize, id: i32) -> bool {
             return false;
         }
     }
+    if id == crate::modkit::SCRIPTED {
+        return crate::modkit::skill_ready(w, i, real);
+    }
     let f = pl.form_ref(w);
     match id {
         12 | 19 | 21 => false,
@@ -2094,6 +2107,9 @@ pub fn start_skill(w: &mut World, i: usize) {
     // `id` = the behaviour (state machine) the skill runs: its own id, or a mod skill's `engine.base`
     let id = w.data.skill_kind(real);
     let lv = pr(w, i).skill_lv(w, real);
+    if id == crate::modkit::SCRIPTED {
+        return crate::modkit::skill_start(w, i, real, lv);
+    }
     let mult = skill_mult_of(w, real, lv);
     if [4, 5, 7, 8, 13, 17, 23].contains(&id) {
         let c = pr(w, i).skill_cost(w, real);
@@ -2214,6 +2230,7 @@ fn end_skill(w: &mut World, i: usize) {
         _ => None,
     });
     match w.data.skill_kind(s.id) {
+        crate::modkit::SCRIPTED => crate::modkit::skill_end(w, i),
         15 | 16 | 6 | 1 | 3 => {
             if s.proj == 0 {
                 sfx_stop(w, 3);
@@ -2345,6 +2362,9 @@ fn upd_skill(w: &mut World, i: usize) {
     let s = pr(w, i).sk.clone().unwrap();
     let real = s.id;
     let id = w.data.skill_kind(real);
+    if id == crate::modkit::SCRIPTED {
+        return crate::modkit::skill_update(w, i, held_now);
+    }
     let lv = pr(w, i).skill_lv(w, real);
     let mult = skill_mult_of(w, real, lv);
     let a = atk(skill_sub_of(w, real));
@@ -3297,4 +3317,59 @@ pub fn lockstep_view(w: &World, i: usize) -> (String, i32, i32, u32) {
     let rom = a.dirs[pl.a.facing as usize & 3].get(pl.ap.frame.max(0) as usize).map(|s| s.rom).unwrap_or(0);
     let rom = if pl.ap.frame < 0 { 0 } else { rom };
     (state, a.canon_raw, pl.ap.frame, rom)
+}
+
+// ---- mod hooks (modkit.rs): the player operations a scripted skill uses ----------------------------------------------
+
+pub(crate) fn mod_can_afford(w: &World, i: usize, cost: i32) -> bool {
+    pr(w, i).can_afford(w, cost)
+}
+pub(crate) fn mod_spend(w: &mut World, i: usize, cost: i32) {
+    spend(w, i, cost, false)
+}
+pub(crate) fn mod_drain(w: &mut World, i: usize, per256: i32) {
+    drain(w, i, per256)
+}
+pub(crate) fn mod_energy_left(w: &World, i: usize) -> i64 {
+    pr(w, i).energy_left(w)
+}
+pub(crate) fn mod_skill_cost(w: &World, i: usize, id: i32) -> i32 {
+    pr(w, i).skill_cost(w, id)
+}
+pub(crate) fn mod_skill_lv(w: &World, i: usize, id: i32) -> i32 {
+    pr(w, i).skill_lv(w, id)
+}
+/// enter the scripted skill state (Gs::Skill(SCRIPT_GS)) with a fresh skill instance
+pub(crate) fn mod_enter_skill(w: &mut World, i: usize, real: i32) {
+    enter_state(w, i, Gs::Skill(crate::modkit::SCRIPT_GS));
+    let serial = w.next_serial();
+    let pl = p(w, i);
+    pl.state = PState::Skill;
+    pl.t = 0;
+    pl.sk = Some(SkillInst { id: real, serial, held: true, release: -1, ..Default::default() });
+}
+pub(crate) fn mod_set_anim(w: &mut World, i: usize, names: &[&'static str]) {
+    let refs: Vec<AnimRef> = names.iter().map(|n| AnimRef::Name(*n)).collect();
+    set_anim_named(w, i, &refs, true);
+}
+/// show the animation `raw` from its first cel
+pub(crate) fn mod_set_anim_raw(w: &mut World, i: usize, raw: i32) {
+    let pl = p(w, i);
+    pl.ap.raw = raw;
+    pl.ap.tick = 0;
+    pl.ap.frame = 0;
+    let mut c = pr(w, i).clone();
+    c.sync_anim(w);
+    *p(w, i) = c;
+}
+/// a scripted skill's play-once animation has reached its end
+pub(crate) fn mod_anim_done(w: &World, i: usize) -> bool {
+    let (looping, shift) = crate::modkit::anim_mode(w, i);
+    !looping && (pr(w, i).ap.tick >> shift) >= pr(w, i).anim_n(w)
+}
+pub(crate) fn mod_to_idle(w: &mut World, i: usize) {
+    set_state_idle(w, i)
+}
+pub(crate) fn mod_fits(w: &World, i: usize, x: i32, y: i32) -> bool {
+    fits(w, i, x, y)
 }

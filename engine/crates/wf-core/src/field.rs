@@ -136,7 +136,8 @@ pub struct Field {
     /// drop scripts waiting for the death effect (SelfDestruct: the effect object runs the type's drop script after
     /// `death_param` frames): (due frame, enemy, type, x, y)
     #[serde(default)]
-    pub pending_drops: Vec<(u32, EntityId, i32, i32, i32)>,
+    /// (due frame, enemy, type, loot x, loot y, loot vx, loot vy)
+    pub pending_drops: Vec<(u32, EntityId, i32, i32, i32, i32, i32)>,
     /// the area allows combat (area record +8): 0 = A only talks / interacts
     pub combat: bool,
     /// calls queued for a later frame (breakables' break callbacks)
@@ -155,6 +156,21 @@ pub struct Field {
     pub patrols: Vec<crate::fieldpatrol::Patrol>,
     /// placed enemies alive: (entity, object, last position px)
     pub placed: Vec<(EntityId, ObjRef, i32, i32)>,
+    /// per placed enemy, its loot block while alive (footprint centre, 1 px per frame along the last hit): what its
+    /// death's deferred drop object stores (the entity can be gone when the defeat is noticed)
+    pub placed_loot: Vec<(EntityId, i32, i32, i32, i32)>,
+    /// kill XP waiting for the next frame's update (player entity, enemy XP)
+    pub xp_due: Vec<(EntityId, i64)>,
+    /// a level-up hook started at the start of this frame's update: it runs inline (a nested loop), nothing else
+    /// updates this frame
+    pub held: bool,
+    /// the running event holds an interrupted frame (`held`): when it ends, that frame's remaining updates run in
+    /// the frame it ends (story playthrough: the fighters move in the frame the level-up popup closes)
+    pub held_event: bool,
+    pub resume_held: bool,
+    /// between the frame's start (deferred calls) and the objects' update: objects created now get their first
+    /// update in this frame's world update
+    pub pre_update: bool,
     /// frame of the last area load
     pub entered: u32,
     /// number of area loads (touch_once triggers survive only within one)
@@ -265,6 +281,12 @@ fn new_field() -> Field {
         label: None,
         flight: None,
         placed: vec![],
+        placed_loot: vec![],
+        xp_due: vec![],
+        held: false,
+        held_event: false,
+        resume_held: false,
+        pre_update: false,
         entered: 0,
         loads: 0,
     }
@@ -460,6 +482,7 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
         f.combat = a.combat;
         f.props = m.props.iter().map(|p| PropRt { rect: p.rect, visible: p.visible, dx: 0 }).collect();
         f.placed.clear();
+        f.placed_loot.clear();
         f.triggers.clear();
         f.deferred.clear();
         f.debris.clear();
@@ -610,12 +633,16 @@ pub fn camera(w: &mut World, slot: usize) {
     let tx = ((a.px() * 2 + a.foot_w) >> 1) - 120;
     let ty = ((a.py() * 2 + a.foot_h) >> 1) - 84;
     let max = w.field.as_ref().map(|f| f.camera_max).unwrap_or((0, 0));
+    // a screen shake replaces the camera controller (the shake object 0x0804A720 takes the mode's camera slot):
+    // the follow does not run while it lasts (story playthrough: the camera holds for a strong hit's 15-frame shake)
+    let shaking = w.camera_held_by_shake();
     let c = &mut w.cameras[slot];
     c.shown = c.rect;
     if !c.init {
         c.x = tx << 10;
         c.y = ty << 10;
         c.init = true;
+    } else if shaking {
     } else {
         c.x += (((tx << 10) - c.x) * 3) >> 6;
         c.y += (((ty << 10) - c.y) * 9) >> 7;
@@ -635,7 +662,32 @@ pub fn pre_step(w: &mut World) {
     if w.field.as_ref().is_some_and(|f| f.item_get.is_some() || f.busy) {
         w.input = Default::default();
     }
+    if let Some(f) = w.field.as_mut() {
+        f.pre_update = true;
+    }
     crate::fieldobj::run_deferred(w);
+    run_due_drops(w);
+    // the death effects' kill XP (their first update: new objects update first); a level-up runs hook #3 inline,
+    // holding the rest of the frame (the event starts now; story playthrough: the other objects neither move nor
+    // animate in that frame)
+    if let Some(f) = w.field.as_mut() {
+        f.held = false;
+    }
+    let due = w.field.as_mut().map(|f| std::mem::take(&mut f.xp_due)).unwrap_or_default();
+    for (pid, exp) in due {
+        if let Some(pi) = w.find(pid) {
+            let n = w.events.len();
+            crate::player::gain_xp(w, pi, exp);
+            let leveled = w.events[n..].iter().any(|e| matches!(e, Event::Field(FieldEvent::Run { cause: Cause::LevelUp { .. }, .. })));
+            if leveled {
+                crate::fieldnpc::start_event(w);
+                if let Some(f) = w.field.as_mut() {
+                    f.held = true;
+                    f.held_event = true;
+                }
+            }
+        }
+    }
 }
 
 /// a map NPC's update (scene.rs dispatches `Body::Npc` with a behaviour here)
@@ -657,9 +709,10 @@ pub fn area_obj(w: &World, obj: ObjRef) -> Option<ObjDef> {
     trigger_def(w, obj)
 }
 
-/// the world never freezes in the field: fades update every object
-pub fn frozen(_w: &World) -> bool {
-    false
+/// the world never freezes in the field (fades update every object), except for the frame an inline level-up hook
+/// took over
+pub fn frozen(w: &World) -> bool {
+    w.field.as_ref().is_some_and(|f| f.held)
 }
 
 fn begin_fade_in(w: &mut World) {
@@ -680,6 +733,20 @@ fn begin_fade_in(w: &mut World) {
 /// after the entity update: the trigger check, the fade timeline, cameras, placed enemies' defeats, story sync,
 /// play time
 pub fn post_step(w: &mut World) {
+    // the death effect whose update runs an inline hook is suspended with it: its drop countdown waits (story
+    // playthrough: the coins drop 7 frames after the level-up popup closes, 8 updates after the KO)
+    if let Some(f) = w.field.as_mut().filter(|f| f.held_event) {
+        for d in f.pending_drops.iter_mut() {
+            d.0 += 1;
+        }
+    }
+    // an inline hook's event ended this frame: the update it interrupted completes now
+    if w.field.as_ref().is_some_and(|f| f.resume_held) {
+        if let Some(f) = w.field.as_mut() {
+            f.resume_held = false;
+        }
+        w.step_entities();
+    }
     let mode = w.field.as_ref().map(|f| f.mode.clone()).unwrap_or(Mode::Normal);
     crate::fieldobj::item_get_step(w);
     crate::fieldobj::debris_step(w);
@@ -765,6 +832,7 @@ pub fn trigger_self(w: &mut World, i: usize) {
 fn defeats(w: &mut World) {
     let placed = w.field.as_ref().map(|f| f.placed.clone()).unwrap_or_default();
     let mut keep = Vec::with_capacity(placed.len());
+    let mut loot_keep = Vec::with_capacity(placed.len());
     let fd = field_data(w);
     let area = w.field.as_ref().map(|f| (f.area.world, f.area.area)).unwrap_or_default();
     for (id, obj, lx, ly) in placed {
@@ -772,9 +840,24 @@ fn defeats(w: &mut World) {
             Some((_, e)) if !e.defeated => {
                 let (x, y) = (e.a.px(), e.a.py());
                 keep.push((id, obj, x, y));
+                let (cx, cy) = (e.a.center().0, e.a.py() + e.a.foot_h);
+                let v = crate::geom::DIR_VEC[e.last_hit_dir as usize & 3];
+                loot_keep.push((id, cx, cy, v.0 << 8, v.1 << 8));
             }
             other => {
                 let (x, y) = other.map(|(_, e)| (e.a.px(), e.a.py())).unwrap_or((lx, ly));
+                // the death's deferred drop object (0x0800F62C copies it to the loot block 0x03001010): the footprint's
+                // centre x and bottom y (position + 8, 8) and 1 px per frame along the killing hit (story playthrough: (188, 210)
+                // and (201, 230) for fighters last at (179.8, 202.8) / (193.99, 222.7), velocity (256, 0) punched
+                // rightwards)
+                let (fx, fy, fvx, fvy) = match other {
+                    Some((_, e)) => {
+                        let (cx, cy) = (e.a.center().0, e.a.py() + e.a.foot_h);
+                        let v = crate::geom::DIR_VEC[e.last_hit_dir as usize & 3];
+                        (cx, cy, v.0 << 8, v.1 << 8)
+                    }
+                    None => w.field.as_ref().and_then(|f| f.placed_loot.iter().find(|l| l.0 == id)).map(|l| (l.1, l.2, l.3, l.4)).unwrap_or((lx, ly, 0, 0)),
+                };
                 let def = fd.area(area.0, area.1).and_then(|a| a.objects.iter().find(|o| o.at == obj));
                 let (ty, cb) = match def.map(|d| &d.kind) {
                     Some(ObjKind::Enemy { ty, on_defeat, .. }) => (*ty, on_defeat.clone()),
@@ -789,7 +872,7 @@ fn defeats(w: &mut World) {
                 if ds != 0 {
                     let due = w.frame + delay;
                     if let Some(f) = w.field.as_mut() {
-                        f.pending_drops.push((due, id, ty, x, y));
+                        f.pending_drops.push((due, id, ty, fx, fy, fvx, fvy));
                     }
                 }
                 if let Some(run) = cb {
@@ -800,23 +883,30 @@ fn defeats(w: &mut World) {
     }
     if let Some(f) = w.field.as_mut() {
         f.placed = keep;
+        f.placed_loot = loot_keep;
     }
-    // death effects whose delay is over run the type's drop script (loot position = where the enemy died)
-    let frame = w.frame;
-    let due: Vec<(u32, EntityId, i32, i32, i32)> = w.field.as_ref().map(|f| f.pending_drops.iter().copied().filter(|d| d.0 <= frame).collect()).unwrap_or_default();
+    let alive: Vec<EntityId> = w.enemies.iter().copied().filter(|&id| w.find(id).is_some()).collect();
+    w.enemies = alive;
+}
+
+/// death effects whose delay is over run the type's drop script (loot position = where the enemy died); at the start
+/// of the world update (the effect objects' update; story playthrough: the drop script's draws come before the
+/// enemies' AI)
+fn run_due_drops(w: &mut World) {
+    // the frame number this update will have (the entities' update advances it)
+    let frame = w.frame + 1;
+    let due: Vec<(u32, EntityId, i32, i32, i32, i32, i32)> = w.field.as_ref().map(|f| f.pending_drops.iter().copied().filter(|d| d.0 <= frame).collect()).unwrap_or_default();
     if !due.is_empty() {
         if let Some(f) = w.field.as_mut() {
             f.pending_drops.retain(|d| d.0 > frame);
         }
-        for (_, id, ty, x, y) in due {
+        for (_, id, ty, x, y, vx, vy) in due {
             let ds = w.data.enemy(ty).map(|t| t.drop_script).unwrap_or(0);
-            crate::fieldobj::set_loot(w, x, y, 0, 0);
+            crate::fieldobj::set_loot(w, x, y, vx, vy);
             let run = Callback::Script(format!("inline_0x{ds:08X}"));
             w.events.push(Event::Field(FieldEvent::Run { run, cause: Cause::Defeat { entity: id, ty, x, y }, slot: 0 }));
         }
     }
-    let alive: Vec<EntityId> = w.enemies.iter().copied().filter(|&id| w.find(id).is_some()).collect();
-    w.enemies = alive;
 }
 
 /// input mask of a push direction (`0x080707D8`): down, up, left, right
@@ -1029,8 +1119,16 @@ pub fn set_busy(w: &mut World, busy: bool) {
         }
         if !busy && f.busy {
             f.event_ended = true;
+            if f.held_event {
+                f.held_event = false;
+                f.resume_held = true;
+            }
         }
         f.busy = busy;
+    }
+    if !busy {
+        // the event's scene object is gone: later scenes carry no talk anchor
+        w.scene.talk_anchor = crate::scene::NO_ANCHOR;
     }
 }
 

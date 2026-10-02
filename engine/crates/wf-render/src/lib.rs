@@ -330,7 +330,11 @@ impl Renderer {
                 // the game keeps the HUD up behind text boxes; cutscenes hide it (`HudView.hidden`)
                 if let Some(hv) = view.hud.get(player).filter(|h| !h.hidden) {
                     // anchored to the view's top-left corner (= the GBA position in the classic view)
-                    screen.push((ui::HUD_PRIORITY, ui::HUD_POS.0, ui::HUD_POS.1, 80, 16, u.hud(packs, hv)));
+                    // (`ui/layout.json` may move / re-anchor / hide it; the game's place by default)
+                    if !u.layout.hud_hidden {
+                        let (hx, hy) = u.layout.hud_at(w as i32, h as i32);
+                        screen.push((u.layout.hud_priority, hx, hy, 80, 16, u.hud(packs, hv)));
+                    }
                 }
             }
             if let Some(bv) = &view.banner {
@@ -340,21 +344,27 @@ impl Renderer {
                 if let Some(Some(b)) = &mut self.banner {
                     if let Some(px) = b.frame(&bv.text, bv.t) {
                         // horizontally centred, bottom-anchored (32 px above the view's bottom edge, as on the GBA)
-                        screen.push((banner::PRIORITY, ox, h as i32 - (GBA_H - banner::Y), banner::W, banner::H, px));
+                        // (a layout's banner in the upper half anchors to the top edge instead)
+                        let by = u.layout.banner_y;
+                        let y = if by < GBA_H / 2 { by } else { h as i32 - (GBA_H - by) };
+                        screen.push((banner::PRIORITY, ox, y, banner::W, banner::H, px));
                     }
                 }
             }
             if let Some(dv) = &view.dialog {
                 let anim = view.dialog_anim.unwrap_or_default();
                 let hidden = anim.scale == 0xFF;
-                if let Some(px) = u.dialog_typed(dv, anim.typed).filter(|_| !hidden).map(|full| if anim.scale == 0 { full } else { ui::Ui::scale_box(&full, anim.scale as u32) }) {
+                // the box (+ portrait) span; zooming while it opens / closes
+                let span = if hidden { None } else { u.dialog_span(packs, dv, anim.typed) };
+                if let Some((sw, full, pieces)) = span {
+                    let px = if anim.scale == 0 { full } else { ui::Ui::scale_span(&full, sw, &pieces, anim.scale as u32) };
                     // horizontally centred; top / bottom anchored to the view edges, middle centred
                     let y = match dv.position {
                         wf_view::DialogPos::Top => ui::Ui::dialog_y(dv.position),
                         wf_view::DialogPos::Middle => oy + ui::Ui::dialog_y(dv.position),
                         wf_view::DialogPos::Bottom => h as i32 - (GBA_H - ui::Ui::dialog_y(dv.position)),
                     };
-                    screen.push((ui::DIALOG_PRIORITY, ox + ui::DIALOG_X, y, 160, 64, px));
+                    screen.push((ui::DIALOG_PRIORITY, ox + ui::DIALOG_CX - sw as i32 / 2, y, sw, 64, px));
                 }
             }
         }

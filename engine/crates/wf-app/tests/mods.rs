@@ -323,6 +323,8 @@ fn new_area_is_reachable_and_its_npc_talks() {
     let mut v = RenderView::default();
     s.view(&mut v);
     assert_eq!(v.map.as_ref().map(|m| m.id.as_str()), Some("mod_hidden_grove"));
+    // the area-name banner of a new area: its `name` (no game string id needed)
+    assert_eq!(v.banner.as_ref().map(|b| b.text.as_str()), Some("Hidden Grove"), "banner shown");
     render_ok(&p, &v);
     // collision from the row form: the hermit's grove is walled in
     let x0 = w(&s).pl_ref(player(w(&s))).a.px();
@@ -341,13 +343,13 @@ fn new_area_is_reachable_and_its_npc_talks() {
 
 #[test]
 fn all_example_mods_together_are_deterministic() {
-    let all = ["balance-tweak", "new-skill", "new-character", "new-arena-scenario", "new-area"];
+    let all = ["balance-tweak", "new-skill", "new-character", "new-arena-scenario", "new-area", "scripted-skills", "new-boss", "new-party-member"];
     let Some(p) = packs(&all) else { return };
     let d = data(&p);
     let objs = &d.field.as_ref().unwrap().area(8, 3).unwrap().objects;
     let base = packs(&[]).unwrap();
     let base_objs = data(&base).field.as_ref().unwrap().area(8, 3).unwrap().objects.len();
-    assert_eq!(objs.len(), base_objs + 2, "both mods appended to 8-3 (announcer + grove exit)");
+    assert_eq!(objs.len(), base_objs + 3, "three mods appended to 8-3 (announcer + grove exit + Tien)");
     let go = |p: &Packs| {
         let mut s = story(p, (8, 3));
         let mut ev = vec![];
@@ -360,7 +362,7 @@ fn all_example_mods_together_are_deterministic() {
     };
     assert_eq!(go(&p), go(&p));
     // battle with every mod: the new fighter with the new skill, snapshot / restore replays identically
-    let cfg = BattleConfig { players: vec![wf_core::battle::FighterSetup { fighter: "shadow_goku".into(), form: 54, ..Default::default() }, Default::default()], ..wf_app::battle::config("crater", "t68", 2, "goku", None, None, 2, 3) };
+    let cfg = BattleConfig { players: vec![wf_core::battle::FighterSetup { fighter: "shadow_goku".into(), form: 54, ..Default::default() }, Default::default()], ..wf_app::battle::config("crater", "t68+t150", 2, "goku", None, None, 2, 3) };
     let mut s = wf_app::battle::session(&p, cfg).unwrap();
     let keys = |f: u32| [if f % 40 < 2 { btn::B } else { btn::RIGHT }, if f % 30 < 2 { btn::B } else { btn::LEFT }];
     for f in 0..120 {
@@ -380,4 +382,270 @@ fn all_example_mods_together_are_deterministic() {
     // the lobby / replay content fingerprints tell modded content apart
     assert_ne!(wf_net::netsim::content_id(&d), wf_net::netsim::content_id(&data(&base)));
     assert_ne!(wf_app::battle::content_id(&p).mods_hash, wf_app::battle::content_id(&base).mods_hash);
+}
+
+// ---- scripted content (modkit: Rhai hooks, projectile kinds, AI nodes, story party) ------------------------------
+
+fn mod_shots(w: &World) -> Vec<wf_core::modkit::ModShot> {
+    w.ents
+        .iter()
+        .filter(|e| !e.removed)
+        .filter_map(|e| match &e.body {
+            Body::Mod(m) => Some((**m).clone()),
+            _ => None,
+        })
+        .collect()
+}
+
+/// the selected skill held for `hold` frames, then released; `frames` frames in all. Returns the events and the
+/// most mod projectiles in flight at once
+fn hold_b(s: &mut Session, hold: u32, frames: u32) -> (Vec<Event>, usize) {
+    let mut all = vec![];
+    let mut most = 0;
+    for f in 0..frames {
+        let ev = s.step(&[if f < hold { btn::B } else { 0 }]).to_vec();
+        most = most.max(mod_shots(&s.world).iter().filter(|m| m.dead < 0).count());
+        all.extend(ev);
+    }
+    (all, most)
+}
+
+#[test]
+fn scripted_skills_homing_volley_and_teleport_strike() {
+    let Some(p) = packs(&["scripted-skills"]) else { return };
+    let d = data(&p);
+    assert_eq!(d.skill_kind(25), wf_core::modkit::SCRIPTED);
+    assert!(d.hooks.is_some(), "the skill scripts are attached");
+    assert_eq!(d.chars[0].skills[..2], [25, 26]);
+    // Homing Volley: the enemy stands off the firing line (70 px right, 40 px down): the orbs must turn to hit it
+    let mut s = battle(&p, "goku", "t68");
+    let me = s.world.ents[player(&s.world)].id;
+    {
+        let w = &mut s.world;
+        let ei = w.find(w.enemies[0]).unwrap();
+        w.en(ei).a.x += 14 << 8;
+        w.en(ei).a.y += 40 << 8;
+    }
+    let ep0 = s.world.pl_ref(player(&s.world)).rec.ep;
+    let (ev, most) = hold_b(&mut s, 40, 200);
+    assert!(ev.contains(&Event::SkillStart { id: 25 }));
+    assert!(!ev.iter().any(|e| matches!(e, Event::Info { .. })), "no script errors: {ev:?}");
+    assert_eq!(most, 3, "three orbs gathered and fired");
+    let hits = ev.iter().filter(|e| matches!(e, Event::Damage { attacker, .. } if *attacker == me)).count();
+    assert!(hits >= 2, "homing orbs hit the off-line enemy: {hits}");
+    assert_eq!(ep0 - s.world.pl_ref(player(&s.world)).rec.ep, 10 + 2 * 6, "start cost + two extra orbs");
+    // the cooldown (30 frames): right after the end the skill cannot start, 30 frames later it can
+    let mut s = battle(&p, "goku", "t68");
+    let mut f = 0;
+    while !s.step(&[if f < 10 { btn::B } else { 0 }]).contains(&Event::SkillEnd) {
+        f += 1;
+        assert!(f < 200, "the volley ends");
+    }
+    assert!(!wf_core::player::can_use_skill(&s.world, player(&s.world), 25), "cooling down");
+    for _ in 0..30 {
+        s.step(&[0]);
+    }
+    assert!(wf_core::player::can_use_skill(&s.world, player(&s.world), 25), "ready again");
+
+    // Teleport Strike: from 56 px left of the enemy to its far side, facing it, and the blow lands
+    let mut s = battle(&p, "goku", "t68");
+    let pi = player(&s.world);
+    s.world.pl(pi).sel = 1;
+    let ex = s.world.en_ref(s.world.find(s.world.enemies[0]).unwrap()).a.px();
+    let (ev, _) = hold_b(&mut s, 2, 40);
+    assert!(ev.contains(&Event::SkillStart { id: 26 }));
+    let pl = s.world.pl_ref(player(&s.world));
+    assert!(pl.a.px() > ex, "reappeared behind the enemy: {} vs {ex}", pl.a.px());
+    assert_eq!(pl.a.facing, 2, "facing back toward it");
+    assert!(ev.iter().any(|e| matches!(e, Event::Damage { attacker, .. } if *attacker == me)), "the strike hits");
+
+    // rollback safety: byte snapshot with orbs in flight and a skill running, restore, identical continuation
+    let mut s = battle(&p, "goku", "t68");
+    let keys = |f: u32| if f % 90 < 30 { btn::B } else if f % 90 < 45 { btn::DOWN } else { 0 };
+    for f in 0..50 {
+        s.step(&[keys(f)]);
+    }
+    assert!(!mod_shots(&s.world).is_empty() || !s.world.modk.skills.is_empty());
+    let snap = s.snapshot_bytes();
+    let mut h = vec![];
+    for f in 50..300 {
+        s.step(&[keys(f)]);
+        h.push(s.world.state_hash());
+    }
+    assert!(s.restore_bytes(&snap), "restore");
+    for (k, f) in (50..300).enumerate() {
+        s.step(&[keys(f)]);
+        assert_eq!(s.world.state_hash(), h[k], "frame {f}");
+    }
+    // drawn with their own (derived) sheet, no missing content
+    let mut s = battle(&p, "goku", "t68");
+    hold_b(&mut s, 30, 38);
+    let mut v = RenderView::default();
+    Sim::view(&s, &mut v);
+    assert!(v.sprites.iter().any(|sp| sp.sheet == "effects/mod_orb"), "the orbs are drawn");
+    assert_eq!(v.hud.first().and_then(|h| h.skill), Some(25));
+    render_ok(&p, &v);
+}
+
+#[test]
+fn new_boss_changes_phase_and_fires_homing_orbs() {
+    let Some(p) = packs(&["new-boss"]) else { return };
+    let d = data(&p);
+    let t = d.enemy(150).expect("enemy type 150");
+    assert_eq!((t.name.as_str(), t.hp, t.ai, t.sprite), ("Shadow Brute", 900, 0x2000, Some(901)));
+    assert!(d.anim.types.contains_key(&150), "animates like the Majin Fighter (anim_as)");
+    let mut s = wf_app::battle::session(&p, wf_app::battle::config("forest", "t150", 1, "goku", None, None, 1, 11)).unwrap();
+    let brute = |s: &Session| {
+        let i = s.world.find(s.world.enemies[0]).unwrap();
+        s.world.en_ref(i).clone()
+    };
+    let me = s.world.ents[player(&s.world)].id;
+    let bid = s.world.enemies[0];
+    // a sturdy Goku: he only stands there for the whole fight
+    {
+        let pi = player(&s.world);
+        let pl = s.world.pl(pi);
+        pl.rec.max_hp = 30000;
+        pl.rec.hp = 30000;
+    }
+    let mut states = std::collections::BTreeSet::new();
+    for _ in 0..240 {
+        let ev = s.step(&[0]).to_vec();
+        assert!(!ev.iter().any(|e| matches!(e, Event::Info { .. })), "no script errors: {ev:?}");
+        states.extend(brute(&s).ai.top_state());
+    }
+    assert!(states.iter().all(|&st| st == 0x2000 || st == 0x2002 || st < 0x2000), "phase 1 only: {states:x?}");
+    assert!(states.contains(&0x2000));
+    // half its HP gone: the scripted condition starts the roar, which ends in phase 2 with some HP back
+    {
+        let i = s.world.find(bid).unwrap();
+        s.world.en(i).hp1024 = 400 << 10;
+    }
+    let mut roared = false;
+    for _ in 0..80 {
+        s.step(&[0]);
+        roared |= brute(&s).ai.top_state() == Some(0x2003);
+    }
+    assert!(roared, "the roar state ran");
+    assert_eq!(s.world.modk.vars.iter().find(|v| v.0 == bid).map(|v| v.1[0]), Some(1), "phase variable set");
+    assert_eq!(brute(&s).hp1024 >> 10, 400 + 900 / 8, "healed by an eighth");
+    // phase 2: volleys of dark orbs aimed at the player; they hurt
+    let (mut orbs, mut hurt) = (0, 0);
+    for _ in 0..400 {
+        let ev = s.step(&[0]).to_vec();
+        orbs = orbs.max(mod_shots(&s.world).iter().filter(|m| m.def == "brute_orb" && m.team == 0 && m.owner == bid).count());
+        hurt += ev.iter().filter(|e| matches!(e, Event::Damage { target, attacker, .. } if *target == me && *attacker == bid)).count();
+    }
+    assert!(orbs >= 3, "a volley of three: {orbs}");
+    assert!(hurt >= 1, "the player was hit");
+    // drawn: the recoloured sprite and the orbs
+    let mut v = RenderView::default();
+    Sim::view(&s, &mut v);
+    assert!(v.sprites.iter().any(|sp| sp.sheet == "sprites/901_shadow_brute"));
+    render_ok(&p, &v);
+    // rollback: byte snapshot in phase 2, identical continuation
+    let snap = s.snapshot_bytes();
+    let mut h = vec![];
+    for f in 0..300u32 {
+        s.step(&[if f % 50 < 3 { btn::A } else { btn::RIGHT }]);
+        h.push(s.world.state_hash());
+    }
+    assert!(s.restore_bytes(&snap));
+    for f in 0..300u32 {
+        s.step(&[if f % 50 < 3 { btn::A } else { btn::RIGHT }]);
+        assert_eq!(s.world.state_hash(), h[f as usize], "frame {f}");
+    }
+}
+
+#[test]
+fn new_party_member_joins_and_takes_the_lead() {
+    let Some(p) = packs(&["new-party-member"]) else { return };
+    let d = data(&p);
+    let c = d.chars.iter().find(|c| c.index == 10).expect("character 10");
+    assert_eq!((c.name.as_str(), c.form, c.in_party), ("Tien", 56, false));
+    assert_eq!(d.form(56).map(|f| (f.char_, f.gfx)), Some((10, 264)));
+    let mut s = story(&p, (8, 3));
+    assert_eq!(w(&s).story.chars.len(), 11, "the story records grow to the new index");
+    assert_eq!(w(&s).story.party(), vec![0], "not in the party at a new game");
+    run(&mut s, 60, 0, |_| false);
+    let (nx, ny, _) = npcs(&s).into_iter().find(|n| n.2 == Some(920)).expect("Tien stands in 8-3");
+    // talk from below, accept the switch (choice 0)
+    place(&mut s, nx, ny + 18, 1);
+    assert!(run(&mut s, 1500, btn::A, |s| s.world().story.current == 10 && !s.world().field.as_ref().unwrap().busy), "Tien joined and leads");
+    assert_eq!(w(&s).story.party(), vec![0, 10]);
+    assert!(w(&s).story.flag(1110));
+    let pl = w(&s).pl_ref(player(w(&s))).clone();
+    assert_eq!((pl.form, pl.a.sprite, pl.skills.clone()), (56, Some(255), vec![8, 7]));
+    assert_eq!(pl.rec.max_hp, 150);
+    assert_eq!(pl.equip, [0, 44, 77, 112]);
+    // levels up with his own growth; the story record follows the fighter
+    let pi = player(w(&s));
+    let lv0 = pl.rec.level;
+    wf_core::player::gain_xp(wm(&mut s), pi, 40_000);
+    run(&mut s, 2, 0, |_| false);
+    let pl = w(&s).pl_ref(player(w(&s))).clone();
+    assert!(pl.rec.level > lv0, "levelled up");
+    assert!(pl.rec.max_hp > 150 + (pl.rec.level - lv0) * 5, "HP growth of characters/tien.json: {}", pl.rec.max_hp);
+    assert_eq!(w(&s).story.chars[10].rec, pl.rec, "record written back");
+    // he fights: Energy Punch (skill 8) is selected and starts
+    let mut started = false;
+    let mut ev = vec![];
+    for f in 0..40u32 {
+        ev.clear();
+        s.step(&[if f < 3 { btn::B } else { 0 }], &mut ev);
+        started |= w(&s).events.contains(&Event::SkillStart { id: 8 });
+    }
+    assert!(started, "Tien's skill starts");
+    let mut v = RenderView::default();
+    s.view(&mut v);
+    assert!(v.sprites.iter().any(|sp| sp.sheet == "sprites/255_tien"));
+    render_ok(&p, &v);
+}
+
+/// the box around the pixels the HUD changes (frame rendered with and without it)
+fn hud_box(p: &Packs, v: &RenderView, w: usize, h: usize) -> (usize, usize, usize, usize, Vec<u32>) {
+    let mut r = wf_render::Renderer::new();
+    r.draw_hud = true;
+    let with = r.render(p, v, 0, w, h).to_vec();
+    assert!(r.errors.is_empty(), "{:?}", r.errors);
+    r.draw_hud = false;
+    let without = r.render(p, v, 0, w, h).to_vec();
+    let (mut x0, mut y0, mut x1, mut y1) = (w, h, 0, 0);
+    for y in 0..h {
+        for x in 0..w {
+            if with[y * w + x] != without[y * w + x] {
+                (x0, y0, x1, y1) = (x0.min(x), y0.min(y), x1.max(x + 1), y1.max(y + 1));
+            }
+        }
+    }
+    (x0, y0, x1, y1, with)
+}
+
+#[test]
+fn hud_layout_moves_the_hud_and_swaps_icons() {
+    let (Some(base), Some(p)) = (packs(&[]), packs(&["hud-layout"])) else { return };
+    let view = |p: &Packs| {
+        let mut s = battle(p, "goku", "t68");
+        s.step(&[0]);
+        let mut v = RenderView::default();
+        Sim::view(&s, &mut v);
+        v
+    };
+    let (vb, vm) = (view(&base), view(&p));
+    // the game's place: (8, 8) in the GBA screen and the top-left of the PC view
+    let b = hud_box(&base, &vb, 240, 160);
+    assert!(b.0 >= 8 && b.1 >= 8 && b.2 <= 88 && b.3 <= 24, "base HUD at (8, 8): {:?}", (b.0, b.1, b.2, b.3));
+    // the mod's: bottom-right corner, 8 px in, in both views
+    for (w, h) in [(240usize, 160usize), (480, 320)] {
+        let m = hud_box(&p, &vm, w, h);
+        assert!(m.0 >= w - 88 && m.1 >= h - 24 && m.2 <= w - 8 && m.3 <= h - 8, "mod HUD bottom-right in {w}x{h}: {:?}", (m.0, m.1, m.2, m.3));
+    }
+    // the selected skill (Energy Blast, 7) uses the mod's icon file; skills without one fall back to the game's
+    let ui = wf_render::ui::Layout::load(&p);
+    assert_eq!(ui.icon_files.get(&7).map(|s| s.as_str()), Some("icons/hud_mod/energy_blast.png"));
+    assert!(p.read("icons/hud_mod/energy_blast.png").is_some() && p.read("icons/hud_mod/energy_blast_alt.png").is_some());
+    let (mb, mm) = (hud_box(&base, &vb, 240, 160), hud_box(&p, &vm, 240, 160));
+    let icon = |r: &(usize, usize, usize, usize, Vec<u32>)| (0..16).flat_map(|y| (0..16).map(move |x| (x, y))).map(|(x, y)| r.4[(r.1 + y) * 240 + r.0 + x]).collect::<Vec<u32>>();
+    assert_ne!(icon(&mb), icon(&mm), "recoloured icon");
+    assert_eq!(wf_render::ui::Layout::load(&base), wf_render::ui::Layout::default(), "no layout file: the game's");
 }

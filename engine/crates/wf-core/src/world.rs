@@ -168,6 +168,9 @@ pub struct Globals {
     pub last_beep: i64,
     pub shakes: Vec<Shake>,
     pub shake_off: (i32, i32),
+    /// a shake ended in this frame's update: the camera slot is still held for the frame (field cameras)
+    #[serde(default)]
+    pub shake_ended: bool,
     /// the game's frame counter 0x03000F94 at frame 0 (`clock` = fc0 + frame; nodes that test the counter itself,
     /// e.g. VampireGrab's drain every 16 ticks)
     #[serde(default)]
@@ -729,6 +732,13 @@ impl World {
     pub fn shake(&mut self, duration: i32, intensity: i32) {
         self.g.shakes.push(Shake { left: duration, intensity, period: (100 - intensity) / 16 + 1, cnt: 1 });
     }
+    /// the field camera does not follow while a shake holds its slot, nor in the frame the shake ended (story
+    /// playthrough: a 15-frame hit shake holds the camera 16 frames); consumes the end mark
+    pub fn camera_held_by_shake(&mut self) -> bool {
+        let held = !self.g.shakes.is_empty() || self.g.shake_ended;
+        self.g.shake_ended = false;
+        held
+    }
     /// shake tasks: every `period` frames two RNG draws pick the offset ((next - 0x8000) * intensity) >> 19
     pub fn tick_shakes(&mut self) {
         let mut shakes = std::mem::take(&mut self.g.shakes);
@@ -736,6 +746,7 @@ impl World {
             s.left -= 1;
             if s.left == 0 {
                 self.g.shake_off = (0, 0);
+                self.g.shake_ended = true;
                 continue;
             }
             s.cnt -= 1;

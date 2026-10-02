@@ -292,7 +292,7 @@ pub fn run(packs: &Packs, work: &Path, out: Option<&Path>, only: &[String]) -> V
                 }
             }
         }
-        let dialog = dialog_scene.then(|| DialogView { text: "normal...".into(), style: 0, page: 0, position: DialogPos::Top });
+        let dialog = dialog_scene.then(|| DialogView { text: "normal...".into(), style: 0, page: 0, position: DialogPos::Top, ..Default::default() });
         let s = Scene { af, map: map.clone(), cam, player, hud: (!dialog_scene).then(|| best_hud.1.clone()), dialog };
         let fb = r.render(packs, &view(&s, packs), 0, 240, 160).to_vec();
         let total = diff(&fb, &emu, None, &[]);

@@ -804,6 +804,9 @@ pub struct Dialog {
     pub t: i32,
     /// set when the box closed: the choice result (-1 cancelled) or 0
     pub result: Option<i32>,
+    /// the portrait sits left of the box (`0x08012012`, see [`speaker_layout`])
+    #[serde(default)]
+    pub portrait_left: bool,
 }
 
 /// the first character appears this many frames after the box is created; the event continues this many frames
@@ -940,7 +943,18 @@ pub struct Scene {
     pub banner: Option<(String, u32)>,
     /// the last area name id shown (RAM 0x03001984, kept across loads)
     pub banner_last: i64,
+    /// the running event's speaker anchor (scene object +0xC / +0x10, ctor `0x0801246E`): a map NPC's talk event
+    /// (`0x08017D44`) passes player - NPC (24.8), every other event (-1, -1). Places text boxes ([`speaker_layout`])
+    #[serde(default = "no_anchor")]
+    pub talk_anchor: [i32; 2],
 }
+
+fn no_anchor() -> [i32; 2] {
+    NO_ANCHOR
+}
+
+/// the anchor of events not started by a talk (`0x080707C0` / `0x080728A4`)
+pub const NO_ANCHOR: [i32; 2] = [-1, -1];
 
 impl Default for Scene {
     fn default() -> Self {
@@ -972,6 +986,7 @@ impl Default for Scene {
             banner: None,
             banner_last: 0,
             keys: [InputFrame::default(); MAX_PLAYERS],
+            talk_anchor: NO_ANCHOR,
         }
     }
 }
@@ -2233,7 +2248,10 @@ pub fn camera(w: &mut World) -> bool {
         CamMode::Follow(id) => {
             let c = &mut w.cameras[0];
             c.shown = c.rect;
-            follow_step(w, id);
+            // a screen shake takes the mode's camera slot while it lasts (field.rs camera)
+            if !w.camera_held_by_shake() {
+                follow_step(w, id);
+            }
             true
         }
     }
@@ -2335,7 +2353,15 @@ pub fn fade_black(w: &World) -> u8 {
 /// skipped spaces / new lines / option markers ride along; computed by the host with the dialogue font). A page
 /// whose lines start with '-' is a choice (options = those lines).
 pub fn open_text(w: &mut World, text: &str, text_ref: u32, portrait: u8, kind: u8, typing: Vec<u16>) {
-    let (pos, body) = split_pos(text);
+    let (mut pos, body) = split_pos(text);
+    let mut portrait_left = false;
+    // text boxes place themselves by speaker; the menu / message window (kind 3) is another object
+    if kind != 3 {
+        let prefix = (body.len() != text.len()).then_some(pos);
+        // nested scenes (run_scene natives, depth > 1) are built with (-1, -1)
+        let anchor = if w.scene.depth <= 1 { w.scene.talk_anchor } else { NO_ANCHOR };
+        (pos, portrait_left) = speaker_layout(prefix, portrait, anchor);
+    }
     let last = body.split('\u{b}').last().unwrap_or("");
     let options = last.lines().filter(|l| l.trim_start().starts_with('-')).count() as i32;
     let pages = (typing.len().max(1)) as u16;
@@ -2354,7 +2380,34 @@ pub fn open_text(w: &mut World, text: &str, text_ref: u32, portrait: u8, kind: u
         phase: DialogPhase::Opening,
         t: 0,
         result: None,
+        portrait_left,
     });
+}
+
+/// A text box's placement and portrait side from its prefix, the node `arg` and the event's speaker anchor
+/// (`0x08012012`, VERIFIED on Yemma's Office talks from each side and the intro): a prefix (`!` / `@` / `#`) wins;
+/// else `arg` 0 → bottom; `arg` 1 → bottom when anchor y >= 0 (else top), portrait left when anchor x < 0; any
+/// other `arg` → bottom when anchor y < 0 (else top), portrait left when anchor x >= 0. So a talk from below the
+/// NPC opens at the top, and the portrait is on the NPC's side; cutscenes ((-1, -1)) open at the bottom with the
+/// portrait right.
+pub fn speaker_layout(prefix: Option<BoxPos>, arg: u8, anchor: [i32; 2]) -> (BoxPos, bool) {
+    let (mut pos, mut left) = (BoxPos::Top, false);
+    match arg {
+        0 => pos = BoxPos::Bottom,
+        1 => {
+            if anchor[1] >= 0 {
+                pos = BoxPos::Bottom;
+            }
+            left = anchor[0] < 0;
+        }
+        _ => {
+            if anchor[1] < 0 {
+                pos = BoxPos::Bottom;
+            }
+            left = anchor[0] >= 0;
+        }
+    }
+    (prefix.unwrap_or(pos), left)
 }
 
 /// open a choice window (event node kind 3: lines starting with '-' are the options)
@@ -2488,10 +2541,12 @@ fn tick_menu(w: &mut World) {
     let held = w.scene.keys[0].held;
     let shop: Vec<ShopItem> = w.scene.shop.clone();
     let zenie = w.story.zenie as i64;
+    // the character menu's slots: the game's nine records, more when mods add story characters
+    let nchars = w.story.chars.len().max(crate::story::CHARS) as i32;
     let mut black: Option<i32> = None;
     let mut sound: Option<i32> = None;
     if let Some(m) = w.scene.menu.as_mut() {
-        menu_step(m, k, held, &shop, zenie, &mut black, &mut sound);
+        menu_step(m, k, held, &shop, zenie, nchars, &mut black, &mut sound);
     }
     if let Some(b) = black {
         w.scene.screen.black = b;
@@ -2502,7 +2557,8 @@ fn tick_menu(w: &mut World) {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn menu_step(m: &mut Menu, k: u16, held: u16, shop: &[ShopItem], zenie: i64, black: &mut Option<i32>, sound: &mut Option<i32>) {
+#[allow(clippy::too_many_arguments)]
+fn menu_step(m: &mut Menu, k: u16, held: u16, shop: &[ShopItem], zenie: i64, nchars: i32, black: &mut Option<i32>, sound: &mut Option<i32>) {
     m.t += 1;
     // the screen change: MENU_FADE frames to black, the menu screen; on leaving, the world is restored (black for
     // one frame, two frames after the closing press) and fades in over MENU_FADE frames (measured on the shop)
@@ -2539,7 +2595,7 @@ fn menu_step(m: &mut Menu, k: u16, held: u16, shop: &[ShopItem], zenie: i64, bla
         MenuKind::ShopBuy | MenuKind::ShopSell { .. } | MenuKind::Character => {
             let n = match m.kind {
                 MenuKind::ShopBuy => (shop.len() as i32).max(1),
-                MenuKind::Character => 9,
+                MenuKind::Character => nchars,
                 _ => 64,
             };
             if k & DOWN != 0 {

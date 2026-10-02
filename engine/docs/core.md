@@ -95,6 +95,14 @@ Buu: step 0.3–1.3 µs, clone snapshot 1.3–1.6 µs, restore 1.1–1.8 µs, ha
   `skill_cost`, so a new skill id runs a built-in state machine with its own numbers), `FieldData` area files
   (`world/areas/*.json`: new areas, overrides, `add_objects` with automatic list indices), collision in row form,
   arena maps by folder id. All of it is static `GameData` (not hashed or snapshotted).
+  **Scripted mod content** (`modkit.rs`, docs/modding.md §4b/§4c): `GameData.projectiles` (`projectiles/*.json`),
+  `GameData.hooks` (`Arc<dyn modkit::ModHooks>`, the Rhai backend `wf-modscript`, attached by the frontend's
+  `wf_app::battle::load_data`), skills with `engine.script` (kind `modkit::SCRIPTED`, player state
+  `Gs::Skill(SCRIPT_GS)`), AI nodes `ModCondition` / `ModAction` (`CNode.call` / `args`), enemy types beyond the dense
+  table (`GameData::enemy` falls back to a search; `anim_as`), story characters 9+ (`Story.chars` grows), area
+  banners of mod areas. Runtime state: `Body::Mod(ModShot)` entities and `World.modk: ModState` (skill timers,
+  cooldowns, per-actor script variables; snapshotted, hashed only when non-empty). A hook is a pure function of a
+  `Ctx` returning commands the core executes; nothing runs without mod content.
 
 ## 5. Content
 

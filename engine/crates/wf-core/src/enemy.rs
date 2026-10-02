@@ -361,6 +361,12 @@ pub fn update(w: &mut World, i: usize) {
     if crate::scene::puppet_update(w, i) {
         return;
     }
+    // while an event holds the field only the animation ticks (like the map NPCs; story playthrough: the
+    // fighters a cutscene hands over with become_map_object start their AI when the event ends)
+    if w.field.as_ref().is_some_and(|f| f.busy) {
+        tick_anim(w, i);
+        return;
+    }
     // the player's death script (0x08799D0C) blocks every object update at KO + 199; from KO + 200 an enemy only runs
     // its state tick (caller 0x0800F5E0: no AI)
     let ko_at = if w.players.len() == 1 { ctx_player(w, i).map(|pi| w.pl_ref(pi).ko_at).unwrap_or(-1) } else { -1 };
@@ -631,6 +637,25 @@ pub fn face_player(w: &mut World, i: usize) {
     }
     let (dx, dy) = to_player(w, i);
     w.en(i).a.facing = facing_toward(dx, dy);
+}
+/// FacePlayer node 0x0801D047 -> 0x0801599C (the cutscene face_actor routine): the 24.8 position difference, the
+/// dominant axis with ties horizontal, no turn when equal (story playthrough: a fighter turns 2 frames later than the
+/// footprint-pixel rule)
+pub fn face_player_exact(w: &mut World, i: usize) {
+    let Some(pi) = player(w, i) else { return };
+    let (dx, dy) = (w.pl_ref(pi).a.x - w.en_ref(i).a.x, w.pl_ref(pi).a.y - w.en_ref(i).a.y);
+    let d = if dx.abs() >= dy.abs() {
+        match dx.signum() {
+            1 => 3,
+            -1 => 2,
+            _ => return,
+        }
+    } else if dy > 0 {
+        0
+    } else {
+        1
+    };
+    w.en(i).a.facing = d;
 }
 pub fn muzzle(w: &World, i: usize, d: i32) -> (i32, i32) {
     let a = &w.en_ref(i).a;
@@ -1860,8 +1885,26 @@ fn on_death(w: &mut World, i: usize) {
         e.a.blocking = false;
     }
     w.stats.kills += 1;
+    // a placed field enemy's loot block as its death leaves it (footprint centre x / bottom y, the killing hit's
+    // direction; field.rs defeats)
+    {
+        let e = w.en_ref(i);
+        let (cx, cy) = (e.a.center().0, e.a.py() + e.a.foot_h);
+        let v = crate::geom::DIR_VEC[e.last_hit_dir as usize & 3];
+        if let Some(l) = w.field.as_mut().and_then(|f| f.placed_loot.iter_mut().find(|l| l.0 == me)) {
+            *l = (me, cx, cy, v.0 << 8, v.1 << 8);
+        }
+    }
     let exp = w.data.enemy(ty).map(|t| t.exp).unwrap_or(0);
-    if let Some(pi) = ctx_player(w, i) {
+    if let (Some(f), Some(pi)) = (w.field.is_some().then_some(()), ctx_player(w, i)) {
+        // field: the death effect object gives the kill XP on its first update, at the start of the next frame's
+        // update (story playthrough: the level-up rolls come the frame after the KO)
+        let _ = f;
+        let pid = w.ents[pi].id;
+        if let Some(f) = w.field.as_mut() {
+            f.xp_due.push((pid, exp));
+        }
+    } else if let Some(pi) = ctx_player(w, i) {
         player::gain_xp(w, pi, exp);
     }
     for k in 0..w.ents.len() {
@@ -1888,6 +1931,9 @@ pub fn die(w: &mut World, i: usize, explode: bool) {
         let rate = 0x1000 + w.rng.rand(0x1000);
         crate::fx::explosion(w, cx, cy, rate);
     }
+    // the object's destruction frees its enemy-grid cells (removed entities are not re-synced: story playthrough, a
+    // fighter's path re-plan went around a dead one)
+    unmark_self(w, i);
     w.ents[i].removed = true;
 }
 

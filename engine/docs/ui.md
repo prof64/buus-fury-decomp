@@ -69,8 +69,28 @@ fitting space; a too-long line is cut with `..` (`0x0803DCC4`).
 Styles (`0x08071730`, 20 bytes: `max_lines, wrap_width, x, y, image`): style 0 = 4 lines, wrap 144, text at (8, 15),
 image `0x08071758`; style 1 = 2 lines, wrap 128, (16, 30), image `0x08071A6C`. Images: webfoot-LZ 160×64 8bpp.
 Layout (`0x0800AEF6`): lines from the line fitter; each line centred `x = style.x + (wrap − width) / 2`; the block is
-centred vertically, first pen y = `style.y + 7·(max_lines − lines)`, +15 per line; colour 2. Box placement by the
-text's first character (`!` top, `@` middle, `#` bottom, see `docs/world.md`); OBJs are alpha-blended.
+centred vertically, first pen y = `style.y + 7·(max_lines − lines)`, +14 per line (`0x0800AF9C`); colour 2. Box
+placement by the text's first character (`!` top, `@` middle, `#` bottom, see `docs/world.md`); OBJs are
+alpha-blended. The box object is centred on (120, y): y = 40 / 80 / 120 (OBJ y 8 / 48 / 88).
+
+**Speaker / portrait** (`0x08012012` → ctor `0x0800B188(…, style, portrait, side)`; VERIFIED emulator OAM + pixels):
+* Node `arg`: 0 → no portrait; 7 → no portrait, **style 1** (2-line box); 1..6 → portrait `form[+0xF + arg]` − 8 of the
+  leader's current form (`forms/*.json` `portrait_or_anim_bytes[arg − 1]`; global table `0x086F393C`); ≥ 8 →
+  portrait arg − 8 (`portraits/index.json` portrait_index). The game draws **no speaker name**: names are part of
+  the text where a line has one ("GREGORY: …"); `index.json` `name` is metadata only.
+* Placement without a prefix, from the scene's anchor (scene object +0xC, ctor `0x0801246E`): a map NPC's talk
+  (`0x08017D44`) passes player − NPC (24.8), every other scene (−1, −1). arg 0 → bottom; arg 1 → bottom if
+  anchor y ≥ 0 else top, portrait left if anchor x < 0; other args → bottom if anchor y < 0 else top, portrait left
+  if anchor x ≥ 0 (talking from below opens the box at the top, the portrait on the NPC's side; cutscenes: bottom,
+  portrait right). A prefix still wins.
+* Picture: the 64×64 8bpp portrait (index 0 transparent) is a 4th affine OBJ beside the 3 box OBJs; the four span
+  224 px centred on x 120: portrait right = box OBJs at x 8 / 72 / 136, portrait 168; left = portrait 8, box
+  72 / 136 / 200. Same priority 0 and zoom as the box (each OBJ about its own centre, centres pulled toward
+  (120, y); OAM order box 0..2, portrait).
+* Text (`+0x28` centring flag = no portrait, or the text starts with `^`, consumed `0x0800B16A`): not centred —
+  lines at `style.x`, first pen y `style.y` (top aligned), +14 per line; a line starting `-` (an option; the `-`
+  and following spaces are skipped, `0x0800AE00`) is fitted to wrap − 0x14 and drawn at x + 0x14, where the choice
+  cursor (`0x080178C8`, 16×16, blinking) goes.
 
 ## 4. HUD — draw routine `0x0800B99C..0x0800BCC0` (every frame)
 
@@ -127,6 +147,11 @@ References in `crates/wf-ui/tests/data/` come from `re/buu/ui/make_refs.py` (emu
   identical outside the runtime menu box.
 * Dialogue: the 160×64 surface of the intro's last page ("normal...") — box picture + text laid out by the rules of §3
   from the full sentence (wrap, paging, centring) — **identical** (0 / 10 240 px).
+* Dialogue with portraits (`cargo test -p wf-app --test dialog_portrait_parity`, captures
+  `crates/wf-render/re/capture_dialog_portrait.py`, BG VRAM cleared): 36 frames — intro narration (1..4 centred
+  lines, top / bottom), intro cutscene lines (arg 2 = Goku's form slot, arg 87 = King Kai; portrait right, bottom),
+  Yemma's Office talks from below / above / the left (top-left, bottom-right, top-right) and a Yes / No choice,
+  fully typed and mid open-zoom (portrait OBJ) — **0 px** differ; wf-core's placement rule matches every one.
 * HUD: the 0x500-byte OBJ tile buffer **identical** to VRAM (frame + gauges from the character values).
 * Map screen: BG3 + BG0 frame with L / R **identical** to VRAM; world-map tiles identical (SHA-1).
 * Menu: procedural panel frame identical on all 4 816 frame pixels of the Status page (page content differs, as
@@ -140,6 +165,6 @@ References in `crates/wf-ui/tests/data/` come from `re/buu/ui/make_refs.py` (emu
   found, positions not tabulated.
 * Area-map pages of the map screen (tile + map blob pairs `0x08733040..0x0874F058`, records like `0x08733AE4`) are
   not decoded; nor the outline script.
-* Title-screen menu overlay and the dialogue portrait / speaker-name variant (wrap − 0x14) are documented, not rendered.
+* Title-screen menu overlay is documented, not rendered. The choice cursor arrow (`0x080178C8`) is not rendered.
 * Emote strip names are visual; their frame timing is in the (unexplored) emote object.
 * Buu's Fury has no scouter / encyclopedia screen; the Journal is the quest log.

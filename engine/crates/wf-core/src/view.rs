@@ -221,18 +221,23 @@ pub fn render_view(w: &World, out: &mut RenderView) {
     out.fade_black = crate::scene::fade_black(w);
     if let Some(d) = &w.scene.dialog {
         if d.phase != crate::scene::DialogPhase::Closed {
+            let text_box = d.kind != 3;
             out.dialog = Some(wf_view::DialogView {
                 text: d.text.clone(),
-                style: 0,
+                // arg 7: the 2-line style (0x08012012 -> 0x0800B188 style index)
+                style: (text_box && d.portrait == 7) as u8,
                 page: d.page,
                 position: match d.pos {
                     crate::scene::BoxPos::Top => wf_view::DialogPos::Top,
                     crate::scene::BoxPos::Middle => wf_view::DialogPos::Middle,
                     crate::scene::BoxPos::Bottom => wf_view::DialogPos::Bottom,
                 },
+                portrait: if text_box { dialog_portrait(w, d.portrait) } else { None },
+                portrait_left: d.portrait_left,
             });
         }
     }
+    out.dialog_anim = dialog_anim(w);
     for s in 0..w.players.len() {
         let c = w.cameras[s.min(crate::world::MAX_PLAYERS - 1)].shown;
         out.cameras.push(CameraView { x: c.x0, y: c.y0 });
@@ -289,7 +294,8 @@ pub fn sim_events(w: &World, out: &mut Vec<SimEvent>) {
 /// `apply` after `render_view`.
 #[derive(Clone, Debug, Default)]
 pub struct Presenter {
-    prev: Option<(Vec<SpriteDraw>, Vec<HudView>, Option<wf_view::BannerView>, Option<wf_view::DialogView>)>,
+    #[allow(clippy::type_complexity)]
+    prev: Option<(Vec<SpriteDraw>, Vec<HudView>, Option<wf_view::BannerView>, Option<wf_view::DialogView>, Option<wf_view::DialogAnim>)>,
     prev_mode7: Option<wf_view::Mode7View>,
 }
 
@@ -298,19 +304,64 @@ impl Presenter {
         let mut v = RenderView::default();
         render_view(w, &mut v);
         self.prev_mode7 = v.map.as_ref().and_then(|m| m.mode7.clone());
-        self.prev = Some((v.sprites, v.hud, v.banner, v.dialog));
+        self.prev = Some((v.sprites, v.hud, v.banner, v.dialog, v.dialog_anim));
+    }
+    /// the session started mid-area (harnesses): nothing of the previous build to show
+    pub fn reset(&mut self) {
+        *self = Presenter::default();
     }
     pub fn apply(&self, out: &mut RenderView) {
-        if let Some((sprites, hud, banner, dialog)) = &self.prev {
+        if let Some((sprites, hud, banner, dialog, anim)) = &self.prev {
             out.sprites = sprites.clone();
             out.hud = hud.clone();
             out.banner = banner.clone();
             out.dialog = dialog.clone();
+            // the box OBJs are a frame late; the text surface is redrawn and uploaded every frame (the typewriter
+            // shows the current count)
+            let typed = out.dialog_anim.and_then(|a| a.typed);
+            out.dialog_anim = anim.map(|mut a| {
+                if a.typed.is_some() {
+                    a.typed = typed.or(a.typed);
+                }
+                a
+            });
         }
         if let (Some(wm), Some(c)) = (out.world_map.as_mut(), self.prev_mode7.clone()) {
             wm.bg_camera = Some(c);
         }
     }
+}
+
+/// The dialogue box animation from the dialog state (measured against the emulator's OAM, affine PA = 2048 /
+/// scale, and screen; wf-app field_parity): the open zoom over the `DIALOG_OPEN` frames (scale = t + 2, 1..8),
+/// the typewriter while shown, the close zoom (8 - t).
+/// a text node's `arg` as a `portraits/` portrait_index (`0x08012012`): 0 / 7 none; 1..6 the leader's form slot
+/// (`Form::portraits[arg - 1]`, global table index = portrait + 8); >= 8 portrait arg - 8
+pub fn dialog_portrait(w: &World, arg: u8) -> Option<u16> {
+    let global = match arg {
+        0 | 7 => return None,
+        1..=6 => {
+            let form = w.player_idx(0).map(|i| w.pl_ref(i).form).or_else(|| w.story.chars.get(w.story.current.max(0) as usize).map(|c| c.form))?;
+            w.data.form(form)?.portraits[arg as usize - 1]
+        }
+        a => a,
+    };
+    global.checked_sub(8).map(u16::from)
+}
+
+pub fn dialog_anim(w: &World) -> Option<wf_view::DialogAnim> {
+    use crate::scene::DialogPhase as P;
+    let d = w.scene.dialog.as_ref()?;
+    let (scale, typed) = match d.phase {
+        P::Opening => ((d.t + 2).clamp(1, 8), Some(0)),
+        P::Shown => (8, Some(d.typed.max(0) as u32)),
+        P::Closing => (8 - d.t, None),
+        P::Closed => return None,
+    };
+    if scale < 1 {
+        return Some(wf_view::DialogAnim { scale: 0xFF, typed });
+    }
+    Some(wf_view::DialogAnim { scale: scale.min(8) as u8, typed })
 }
 
 impl Sim for Session {

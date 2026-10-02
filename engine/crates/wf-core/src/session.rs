@@ -79,14 +79,30 @@ impl Session {
     /// A script host resumes its blocked scripts after this and before [`Session::step_post`] (the game resumes a
     /// script from its wait mode before the frame's camera update; `wf-script-core` docs).
     pub fn step_world(&mut self, inputs: [InputFrame; MAX_PLAYERS]) {
+        self.step_begin(inputs);
+        self.step_update();
+    }
+    /// the frame's start: input, the cutscene input mask, the field's deferred calls (breakables, the death effects'
+    /// drop scripts and kill XP). A script host runs the `FieldEvent::Run`s this leaves before [`Session::step_update`]
+    /// (the game runs them inside these calls, before the objects' update).
+    pub fn step_begin(&mut self, inputs: [InputFrame; MAX_PLAYERS]) {
         let w = &mut self.world;
         w.events.clear();
+        w.g.shake_ended = false;
         w.input = inputs;
         crate::scene::pre_step(w);
         if w.field.is_some() {
             crate::field::pre_step(w);
             Self::run_hook(&mut self.hook, &mut self.world, 0);
-            let w = &mut self.world;
+        }
+    }
+    /// the objects' update and the cutscene systems (second part of [`Session::step_world`])
+    pub fn step_update(&mut self) {
+        let w = &mut self.world;
+        if let Some(f) = w.field.as_mut() {
+            f.pre_update = false;
+        }
+        if w.field.is_some() {
             if !crate::field::frozen(w) && !crate::scene::frozen(w) {
                 battle::pre_step(w);
                 w.step_entities();
@@ -94,6 +110,7 @@ impl Session {
             crate::scene::tick(w);
             return;
         }
+        let w = &mut self.world;
         if !crate::scene::frozen(w) {
             battle::pre_step(w);
             w.step_entities();

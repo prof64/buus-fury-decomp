@@ -1,0 +1,8 @@
+{
+  "from": "icons/skills/skill_14_alt.png",
+  "recolor": {
+    "#2121ff": "#ff2121",
+    "#1852f7": "#f75218",
+    "#ffd600": "#ffff60"
+  }
+}

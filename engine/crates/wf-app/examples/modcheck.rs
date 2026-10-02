@@ -98,6 +98,75 @@ fn main() {
     for c in &d.chars {
         check_skills(&packs, &d, &format!("character {}", c.name), &c.skills, &mut errors);
     }
+    // mod projectiles: their sheet and cels
+    for (id, pd) in &d.projectiles {
+        match sprite::Sheet::load(&packs, &pd.sheet) {
+            Err(e) => errors.push(format!("projectile {id}: sheet {}: {e}", pd.sheet)),
+            Ok(sh) => {
+                if let Some(a) = &pd.anim {
+                    if sh.def.anim(a).is_none() {
+                        errors.push(format!("projectile {id}: {} has no animation {a}", pd.sheet));
+                    }
+                }
+                let n = sh.def.frames.len();
+                if pd.frames.iter().flatten().chain(&pd.end_frames).any(|&c| c as usize >= n) {
+                    errors.push(format!("projectile {id}: a cel beyond the sheet's {n} frames"));
+                }
+            }
+        }
+        if pd.anim.is_none() && pd.frames.iter().all(|f| f.is_empty()) {
+            errors.push(format!("projectile {id}: neither `anim` nor `frames`"));
+        }
+        println!("projectile {id}: sheet {}", pd.sheet);
+    }
+    // AI trees of mod files: node kinds the engine knows, scripted nodes' functions exist
+    let mod_states: BTreeSet<u16> = packs.packs[1..]
+        .iter()
+        .flat_map(|p| p.src.list())
+        .filter_map(|f| f.strip_prefix("ai/state_").and_then(|x| x.strip_suffix(".json")).and_then(|x| u16::from_str_radix(x, 16).ok()))
+        .collect();
+    for (st, t) in d.states.iter().chain(d.aux.iter()).filter(|(st, _)| mod_states.contains(st)) {
+        for n in &t.nodes {
+            if n.k == wf_core::ai::K::Never {
+                errors.push(format!("AI state 0x{st:x}: unknown node {}", n.name));
+            }
+            if matches!(n.k, wf_core::ai::K::ModCondition | wf_core::ai::K::ModAction) {
+                match n.call.split_once(':') {
+                    Some((f, func)) if d.hooks.as_ref().is_some_and(|h| h.has(f, func)) => {}
+                    _ => errors.push(format!("AI state 0x{st:x}: {} call {:?} is not a function of a script (file.rhai:fn)", n.name, n.call)),
+                }
+            }
+        }
+    }
+    // enemy types added by mods: AI state, sprite
+    for e in d.enemies.iter().filter(|e| e.ty >= 150) {
+        if !d.states.contains_key(&e.ai) {
+            errors.push(format!("enemy type {} ({}): no AI state 0x{:x}", e.ty, e.name, e.ai));
+        }
+        match e.sprite.and_then(|s| d.sprite(s)) {
+            None => errors.push(format!("enemy type {} ({}): no sprite for gfx {:?}", e.ty, e.name, e.gfx)),
+            Some(s) => {
+                if let Err(err) = sprite::Sheet::load(&packs, &format!("sprites/{}", s.id)) {
+                    errors.push(format!("enemy type {}: sprite sheet: {err}", e.ty));
+                }
+            }
+        }
+        println!("enemy type {} ({}): AI 0x{:x}, sprite {:?}", e.ty, e.name, e.ai, e.sprite);
+    }
+    // story characters added by mods: forms with sprites
+    for c in d.chars.iter().filter(|c| c.index >= 9) {
+        for &fm in c.forms.iter().chain(std::iter::once(&c.form)) {
+            match d.form(fm) {
+                None => errors.push(format!("character {} ({}): no form {fm}", c.index, c.name)),
+                Some(f) if f.char_ != c.index => errors.push(format!("character {}: form {fm} belongs to character {}", c.index, f.char_)),
+                Some(f) => {
+                    if !(0..=3).any(|k| d.sprite(f.gfx - 9 - k).is_some()) {
+                        errors.push(format!("character {}: form {fm}: no sprite for gfx {}", c.index, f.gfx));
+                    }
+                }
+            }
+        }
+    }
     for a in &d.arenas {
         if !d.maps.contains_key(&a.map) {
             errors.push(format!("arena {}: map {} not loaded", a.id, a.map));
@@ -191,7 +260,13 @@ fn check_skills(packs: &Packs, d: &wf_core::content::GameData, what: &str, skill
             errors.push(format!("{what}: skill {s} has no skills/*.json"));
         }
         let k = d.skill_kind(s);
-        if k != s && !(1..=23).contains(&k) {
+        if k == wf_core::modkit::SCRIPTED {
+            let sc = d.skill_engine(s).and_then(|e| e.script.clone()).unwrap_or_default();
+            let h = d.hooks.as_ref();
+            if !["on_start", "on_frame"].iter().any(|f| h.is_some_and(|h| h.has(&sc, f))) {
+                errors.push(format!("skill {s}: script {sc} defines neither on_start nor on_frame"));
+            }
+        } else if k != s && !(1..=23).contains(&k) {
             errors.push(format!("skill {s}: engine.base {k} is not a built-in skill (1..23)"));
         }
         for alt in ["", "_alt"] {

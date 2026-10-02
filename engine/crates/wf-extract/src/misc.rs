@@ -1,6 +1,7 @@
 //! Portraits, supply / equipment icons and skill icons.
 //!
-//! * Portraits: table `0x086F395C`, 155 × webfoot-LZ 64×64 linear 8bpp (OBJ palette) → `portraits/<id>.png`.
+//! * Portraits: table `0x086F395C`, 155 × webfoot-LZ 64×64 linear 8bpp (OBJ palette, index 0 transparent) →
+//!   `portraits/<id>.png`.
 //! * Supplies `0x083BD2F8` (83 × 52 B, +4 u16 name id), equipment `0x086F82EC` (162 × 44 B, +0 u16 name id):
 //!   the first webfoot-LZ blob pointer in the record is a 16×16 linear 8bpp icon → `icons/{supply,equipment}/NNN.png`.
 //! * Skills `0x0871DAF8` + 0x18·id (ids 1..23): +4 / +8 raw 8bpp 4×2-tile OBJ icons (normal / alternate) →
@@ -46,7 +47,8 @@ pub fn portraits(rom: &Rom, out: &mut Content, names: &Names) {
                 continue;
             }
         };
-        let im = linear_image(&d, 64, 64, &pal, true);
+        // an 8bpp OBJ: index 0 is transparent (the dialogue box shows the screen through it, VERIFIED emulator)
+        let im = linear_image(&d, 64, 64, &pal, false);
         let (name, conf) = names.portrait(i as usize);
         let id = match &name {
             Some(n) => format!("portrait_{i:03}_{}", slugify(n)),

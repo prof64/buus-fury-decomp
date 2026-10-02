@@ -111,8 +111,11 @@ impl Story {
         let mut s = Story::default();
         let n_sup = d.field.as_ref().map(|f| f.supplies.iter().map(|x| x.index + 1).max().unwrap_or(0)).unwrap_or(0) as usize;
         s.supplies = vec![0; n_sup.max(SUPPLIES)];
+        // mods may add story characters after the game's nine (characters/*.json `index` 9+)
+        let n = d.chars.iter().map(|c| c.index + 1).max().unwrap_or(0).max(CHARS as i32) as usize;
+        s.chars.resize(n.min(64), CharState::default());
         for c in &d.chars {
-            if c.index < 0 || c.index as usize >= CHARS {
+            if c.index < 0 || c.index as usize >= s.chars.len() {
                 continue;
             }
             s.chars[c.index as usize] = CharState {
@@ -121,9 +124,9 @@ impl Story {
                 skill_levels: vec![0; c.skills.len()],
                 skills: c.skills.clone(),
                 sel: 0,
-                equip: [0, 44, 77, 112],
+                equip: c.equip.unwrap_or([0, 44, 77, 112]),
                 ss_cooldown: 0,
-                flags: 0,
+                flags: c.in_party as u8,
             };
         }
         s.chars[0].flags |= 1;
@@ -190,7 +193,7 @@ impl Story {
         }
     }
     pub fn party(&self) -> Vec<i32> {
-        (0..CHARS as i32).filter(|&c| self.chars[c as usize].in_party()).collect()
+        (0..self.chars.len() as i32).filter(|&c| self.chars[c as usize].in_party()).collect()
     }
 }
 

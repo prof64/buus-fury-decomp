@@ -308,9 +308,12 @@ pub fn drop_zenie(w: &mut World, size: i32) -> Option<EntityId> {
     let y0 = (y >> 8) + yoff;
     let p = Pickup { kind: PickupKind::Zenie(size), x, y, vx, vy, z: 0, vz: 0x80, t: 0, landed: false, phase, bx: [x0, y0, x0 + bw, y0 + bh], solid: None };
     let id = w.add(Body::Pickup(Box::new(p)));
-    // the first physics step in the frame it spawns (deferred calls run at the start of the world update)
-    if let Some(k) = w.find(id) {
-        pickup_update(w, k);
+    // the first physics step in the frame it spawns: the world update gives it when it is created before that
+    // update (deferred calls, drop scripts at the frame's start), else now
+    if !w.field.as_ref().is_some_and(|f| f.pre_update) {
+        if let Some(k) = w.find(id) {
+            pickup_update(w, k);
+        }
     }
     Some(id)
 }
@@ -323,8 +326,10 @@ pub fn drop_item(w: &mut World, item: i32) -> Option<EntityId> {
     let (x, y) = ((lx - 8) << 8, (ly - 16) << 8);
     let p = Pickup { kind, x, y, vx, vy, z: 0x2000, vz: 0x800, t: 0, landed: false, phase: 0, bx: [lx - 8, ly - 16, lx + 8, ly], solid: None };
     let id = w.add(Body::Pickup(Box::new(p)));
-    if let Some(k) = w.find(id) {
-        pickup_update(w, k);
+    if !w.field.as_ref().is_some_and(|f| f.pre_update) {
+        if let Some(k) = w.find(id) {
+            pickup_update(w, k);
+        }
     }
     Some(id)
 }
@@ -341,7 +346,10 @@ pub fn pickup_update(w: &mut World, i: usize) {
             if p.t < 60 {
                 let (nx, ny) = (p.x + p.vx, p.y + p.vy);
                 let (ddx, ddy) = ((nx >> 8) - (p.x >> 8), (ny >> 8) - (p.y >> 8));
-                if ddx == 0 && ddy == 0 || walk_free(w, [p.bx[0] + ddx, p.bx[1] + ddy, p.bx[2] + ddx, p.bx[3] + ddy]) {
+                // 0x0801809E: the step is kept only when it reaches a new pixel (and the box there is free); a step
+                // within the pixel is dropped, so a coin slower than 1 px per frame that starts on a whole pixel never
+                // moves (story playthrough: 3 of the fighters' 4 coins stay where they dropped)
+                if (ddx != 0 || ddy != 0) && walk_free(w, [p.bx[0] + ddx, p.bx[1] + ddy, p.bx[2] + ddx, p.bx[3] + ddy]) {
                     p.x = nx;
                     p.y = ny;
                     p.bx = [p.bx[0] + ddx, p.bx[1] + ddy, p.bx[2] + ddx, p.bx[3] + ddy];
@@ -397,9 +405,9 @@ pub fn coin_check(w: &mut World, px: i32, py: i32, slot: u8) -> bool {
             continue;
         }
         let Body::Pickup(p) = &w.ents[k].body else { continue };
-        // a coin is collectable once it landed (story playthrough: the fighters' coins on Grand Kai's planet are
-        // not picked up in the air)
-        if !matches!(p.kind, PickupKind::Zenie(_)) || !p.landed {
+        // the coin's touch trigger (rect = its box grown by 19 / 11 / 4 / 4, moved with it) holds from its creation
+        // (story playthrough: a coin dropped next to the player is collected in its first frame, in the air)
+        if !matches!(p.kind, PickupKind::Zenie(_)) {
             continue;
         }
         let r = p.coin_rect();

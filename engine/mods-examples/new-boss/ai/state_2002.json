@@ -1,0 +1,14 @@
+{
+  "id": "state_2002",
+  "state": 8194,
+  "note": "Shadow Brute: one punch, a pause, back to the current phase (the script knows which)",
+  "tree": {
+    "name": "Sequence",
+    "children": [
+      {"name": "MeleeAttack"},
+      {"name": "Wait", "params": {"frames": {"raw": 18}}},
+      {"name": "ModAction", "call": "hooks/ai/brute.rhai:back_to_phase"}
+    ]
+  },
+  "aux": {"name": "SubState", "params": {"state": {"raw": 12}}}
+}

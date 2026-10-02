@@ -150,7 +150,14 @@ fn sprites_effects_portraits_items_match_python() {
             ("effects", compare_entity(&c, py, &format!("effects/{my_id}"), "effect.json"))
         } else if cat == "portrait" {
             let p = c.assets.join(py["frames"][0]["png"].as_str().unwrap());
-            let mine = c.content.get(&format!("portraits/{id}.png")).map(|b| decode_png(b).unwrap());
+            // the reference keeps index 0 opaque (palette entry 0 = black); ours makes it transparent (an OBJ)
+            let mine = c.content.get(&format!("portraits/{id}.png")).map(|b| {
+                let mut im = decode_png(b).unwrap();
+                for px in im.px.iter_mut().filter(|px| px[3] == 0) {
+                    *px = [0, 0, 0, 255];
+                }
+                im
+            });
             let ok = matches!((&mine, load_png(&p)), (Some(m), Some(r)) if same_pixels(&trimmed(m), &r));
             ("portraits", if ok { vec![] } else { vec![format!("{id}: portrait differs/missing")] })
         } else if cat == "item" {

@@ -228,6 +228,10 @@ pub struct Character {
     pub xp: i64,
     pub growth: [i64; 8],
     pub forms: Vec<i32>,
+    /// story mode (mods): equipment slots at a new game (default the game's [0, 44, 77, 112]) and whether the
+    /// character starts in the party (`new_game.equip`, `new_game.in_party`)
+    pub equip: Option<[i32; 4]>,
+    pub in_party: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -249,6 +253,9 @@ pub struct Form {
     pub ss3: bool,
     pub fusion: bool,
     pub controller: u32,
+    /// dialogue portraits of this form (form table +0x10..+0x15, `portrait_or_anim_bytes`): text node `arg` 1..6
+    /// shows `portraits[arg - 1] - 8` (`portraits/index.json` portrait_index; `0x08012012`)
+    pub portraits: [u8; 6],
 }
 
 #[derive(Clone, Debug)]
@@ -520,6 +527,8 @@ impl GameData {
                 xp: geti(ng, "xp"),
                 growth,
                 forms: c["forms"].as_array().map(|a| a.iter().map(|x| int(x) as i32).collect()).unwrap_or_default(),
+                equip: ng["equip"].as_array().filter(|a| a.len() == 4).map(|a| [int(&a[0]) as i32, int(&a[1]) as i32, int(&a[2]) as i32, int(&a[3]) as i32]),
+                in_party: ng["in_party"].as_bool().unwrap_or(false),
             });
         }
         chars.sort_by_key(|c| c.index);
@@ -549,6 +558,13 @@ impl GameData {
                 ss3: flags & 2 != 0,
                 fusion: flags & 4 != 0,
                 controller: int(&f["controller_slot"]) as u32,
+                portraits: {
+                    let mut p = [0u8; 6];
+                    for (k, v) in f["portrait_or_anim_bytes"].as_array().into_iter().flatten().take(6).enumerate() {
+                        p[k] = int(v) as u8;
+                    }
+                    p
+                },
             });
         }
         forms.sort_by_key(|f| f.id);

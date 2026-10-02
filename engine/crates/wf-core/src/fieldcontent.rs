@@ -394,6 +394,15 @@ fn read_json(src: &dyn ContentSource, path: &str) -> Option<Value> {
     src.read(path).and_then(|b| serde_json::from_slice(&b).ok())
 }
 
+/// a banner name id for a mod area's text (FNV-1a, above the game's string ids)
+fn mod_name_id(text: &str) -> i64 {
+    let mut h: u32 = 0x811c_9dc5;
+    for b in text.bytes() {
+        h = (h ^ b as u32).wrapping_mul(0x0100_0193);
+    }
+    0x4000_0000 | (h & 0x3fff_ffff) as i64
+}
+
 impl FieldData {
     /// None when the pack has no world category (`world/areas.json`)
     pub fn load(src: &dyn ContentSource, all: &[String]) -> Result<Option<FieldData>, LoadError> {
@@ -501,6 +510,7 @@ impl FieldData {
             let Some(x) = read_json(src, p) else { return Err(LoadError(format!("{p}: not JSON"))) };
             let key = x["key"].as_str().map(String::from).unwrap_or_else(|| p["world/areas/".len()..p.len() - 5].to_string());
             let (w, ar) = key.split_once('-').and_then(|(a, b)| Some((a.parse::<i32>().ok()?, b.parse::<i32>().ok()?))).ok_or_else(|| LoadError(format!("{p}: area key must be \"world-area\"")))?;
+            let fresh = !fd.areas.contains_key(&(w, ar));
             let a = fd.areas.entry((w, ar)).or_insert_with(|| AreaDef {
                 world: w,
                 area: ar,
@@ -520,6 +530,21 @@ impl FieldData {
             let script = |v: &Value| v.as_str().map(String::from).or_else(|| v["script"].as_str().map(String::from));
             if let Some(n) = x["name"].as_str() {
                 a.name = Some(n.to_string());
+            }
+            // the area-name banner: `"banner": "text"` (or a new area's `name`), `"banner": false` = none. Mod banners
+            // get a name id from their text, so areas sharing a name show it once, like the game's string ids
+            match x.get("banner") {
+                Some(Value::String(t)) => {
+                    a.banner = t.clone();
+                    a.name_id = mod_name_id(t);
+                }
+                Some(Value::Bool(false)) => a.name_id = 0,
+                _ => {
+                    if let (true, Some(n)) = (fresh, x["name"].as_str()) {
+                        a.banner = n.to_string();
+                        a.name_id = mod_name_id(n);
+                    }
+                }
             }
             if let Some(m) = x["maps"].as_array() {
                 a.maps = m.iter().filter_map(|m| m.as_str().map(String::from)).collect();

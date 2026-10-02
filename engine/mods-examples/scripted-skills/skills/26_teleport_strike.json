@@ -1,0 +1,20 @@
+{
+  "id": "26_teleport_strike",
+  "skill": 26,
+  "name": "Teleport Strike",
+  "description": "Press the B Button to vanish and reappear behind the nearest enemy with a heavy blow.",
+  "max_level": null,
+  "ep": {
+    "rule": "mod skill: 25 EP"
+  },
+  "engine": {
+    "script": "hooks/skills/teleport_strike.rhai",
+    "check": [25],
+    "cost": [25],
+    "damage": [2048],
+    "attack_sub": 2,
+    "cooldown": 45,
+    "anim": ["meditate", "special_charge"],
+    "anim_shift": 2
+  }
+}

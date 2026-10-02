@@ -184,11 +184,16 @@ lifetime (frame 65 of objects_item_8_57); camera freeze during the breakable hit
   experience line — it runs through the icon OBJ too). Screen OBJs at (8, 8), priority 1, anchored to the view's
   top-left. `HudView` carries `hp/hp_max/ep/ep_max/ss/ss3/xp72/skill/skill_alt/hidden`; hidden while a dialogue
   box is open.
-* Dialogue: `RenderView.dialog = DialogView { text, style, page, position }`; the renderer runs the game's line
-  fitter (`0x0803DE6A`), pages by the style's line count and lays the page out like `0x0800AEF6` with the
-  `dialog` font into the 160x64 box picture; 3 OBJs at x 40, priority 0. y = 8 for top boxes (emulator OAM);
-  middle / bottom use 48 / 88 (not yet confirmed on a capture) and anchor to the view's centre / bottom edge in
-  the zoomed-out view.
+* Dialogue: `RenderView.dialog = DialogView { text, style, page, position, portrait, portrait_left }`; the renderer
+  runs the game's line fitter (`0x0803DE6A`), pages by the style's line count and lays the page out like
+  `0x0800AEF6` with the `dialog` font into the 160x64 box picture (lines 14 px apart); 3 OBJs at x 40, priority 0;
+  y = 8 top / 88 bottom (emulator OAM; middle 48), anchored to the view's centre / bottom edge in the zoomed-out
+  view. `portrait` (a `portraits/` portrait_index) adds the 64x64 portrait OBJ beside the box — the 224-px span
+  centred on x 120, left / right by `portrait_left` — and switches to the left / top-aligned text layout with
+  indented `-` options (`docs/ui.md` §3); the open / close zoom covers all four OBJs. wf-core fills it from the
+  text node's arg (`view::dialog_portrait`: 1..6 = the leader form's `portraits` slot, ≥ 8 = arg − 8; 7 = style 1)
+  and places the box with `scene::speaker_layout` (prefix, else arg + the talk anchor `Scene.talk_anchor`, set by
+  a map-NPC talk to player − NPC).
 * Without `ui/` content (old caches) the placeholder HUD is drawn.
 * **Area-name banner** (`wf_render::banner`, content `ui/banner.json` + `ui/images/banner.png` + `fonts/small`):
   `RenderView.banner = Some(BannerView { text, t })`. The 240x16 strip (background picture, name centred at
@@ -215,6 +220,7 @@ player frame from the captured animation step, halo, shadow, HUD) and diff it:
 |---|---|
 | 10 Southwest Forest scenes: idle, walking, under tree tops (BG0 priority 2 blended over the OBJ with EVA 12) | **0 px** differ, whole frame |
 | intro dialogue box ("normal...", style 0, top) | **0 px** |
+| dialogue with portraits: intro narration + cutscene, NPC talks from 3 sides, a choice; typed out + open zoom (`re/capture_dialog_portrait.py`, `tests/dialog_portrait_parity.rs`, 36 frames) | **0 px** |
 | Snake Way (3), forest fight | 0 px outside the other actors' OBJs (NPCs / enemies are not rebuilt by the tool) |
 | HUD (all scenes) | 0 px |
 | area-name banner, forest 8-3 -> 8-2 (`re/banner_capture.py`, `tests/banner_parity.rs`): surface vs OBJ VRAM; screen rows 128..144 every frame t = 31..238 (hold + collapse) and after | **0 px** |
@@ -272,7 +278,9 @@ When `MapView.mode7` is set (area 0-50), the renderer draws the game's mode-1 pi
 * wf-core's view: no halo / attachment draws (forms with a halo show without it), no selected-skill icon, SS /
   SS3 gauges or experience steps in `HudView` (fields exist), camera is the post-update camera (one frame ahead of
   the game's screen), beam pieces not drawn (their note).
-* Dialogue middle / bottom y and the portrait / speaker-name variant are unverified / not rendered.
+* Dialogue: middle y unverified; the choice cursor arrow (`0x080178C8`) and the box surface's fill-in during the
+  opening zoom (black / partly striped interior) are not drawn; nested `run_scene` scenes inside a talk event use
+  (−1, −1) by `Scene.depth` > 1 (not traced); the centred layout still draws an option's `- ` (the game skips it).
 * Fog / wrap overlay layers and semi-transparent OBJs have no emulator scene yet (no save state on such a map).
 * Mod `index.json` regeneration is not done by the loader (listing works via `files.json` / directory walk).
 * Gamepad buttons are rebindable only through `bindings.json` (the screen rebinds keys).

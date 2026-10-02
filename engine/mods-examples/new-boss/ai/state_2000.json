@@ -1,0 +1,30 @@
+{
+  "id": "state_2000",
+  "state": 8192,
+  "note": "Shadow Brute, phase 1: chase and punch (the game's node kinds); a scripted condition (hooks/ai/brute.rhai) switches to the roar state once HP falls below half. On hit: the game's standard reaction (state 0x00C).",
+  "tree": {
+    "name": "Selector",
+    "children": [
+      {
+        "name": "ModCondition",
+        "call": "hooks/ai/brute.rhai:phase_two_due",
+        "children": [{"name": "GotoState", "params": {"state": {"raw": 8195}}}]
+      },
+      {
+        "name": "IfPlayerWithin",
+        "params": {"r2": {"raw": 2500}},
+        "children": [
+          {
+            "name": "Chance",
+            "params": {"p": {"raw": 7864}},
+            "children": [
+              {"name": "IfPlayerInMeleeRange", "children": [{"name": "GotoState", "params": {"state": {"raw": 8194}}}]}
+            ]
+          }
+        ]
+      },
+      {"name": "ChasePlayer", "params": {"speed": {"raw": 170}}}
+    ]
+  },
+  "aux": {"name": "SubState", "params": {"state": {"raw": 12}}}
+}

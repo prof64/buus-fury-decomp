@@ -11,7 +11,8 @@
 //! sounds, text boxes opening. The verdict is the first frame where anything differs: everything before it is the
 //! continuous matched span (`MIN_MATCHED`).
 //!
-//! `PLAYTHROUGH_VERBOSE=N` prints the first N divergences, `PLAYTHROUGH_RESYNC=1` restarts the RNG from the
+//! `PLAYTHROUGH_VERBOSE=N` prints the first N divergences, `PLAYTHROUGH_RNG=a..b` prints every RNG call (caller) in
+//! those frames, `PLAYTHROUGH_RESYNC=1` restarts the RNG from the
 //! recording every logic frame (diagnosis only), `PLAYTHROUGH_TRACE=from..to` prints the host / scene state.
 
 use serde_json::Value;
@@ -527,7 +528,18 @@ fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Value) -
     let mut prev_held = 0u16;
     let mut lf_prev = i(&doc["init"]["lf"]);
     let mut presented = 0usize;
+    let rng_trace: Option<(usize, usize)> = std::env::var("PLAYTHROUGH_RNG").ok().and_then(|v| {
+        let (a, b) = v.split_once("..")?;
+        Some((a.parse().ok()?, b.parse().ok()?))
+    });
     for (k, fr) in frames.iter().enumerate() {
+        if let Some((a, b)) = rng_trace {
+            let on = (a..=b).contains(&k);
+            if on {
+                eprintln!("  -- frame {k} rng calls:");
+            }
+            wf_core::rng::TRACE.store(on, std::sync::atomic::Ordering::Relaxed);
+        }
         let keys = i(&fr["keys"]) as u16;
         let lf = i(&fr["lf"]);
         let logic = k == 0 || lf != lf_prev;
@@ -547,11 +559,22 @@ fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Value) -
                     sess.world.rng.set_state([i(&r[0]) as u32, i(&r[1]) as u32]);
                 }
             }
-            sess.step_world(inputs);
-            // the running script resumes from its wait, then the scripts the update started (NPC talk) start: an
-            // event's scene object steps its first node in the next frame (Host::scene Enter blocks a frame)
-            let evs: Vec<Event> = sess.world.events.clone();
-            host.resume_blocked(&mut sess.world, k);
+            // the frame's start (deferred calls: drop scripts, kill XP): their scripts run before the objects' update
+            sess.step_begin(inputs);
+            let pre: Vec<Event> = sess.world.events.clone();
+            host.collect(&pre);
+            let before = host.started.len();
+            host.run_queue(&mut sess.world, k);
+            let fresh = host.started.len() > before;
+            let n0 = sess.world.events.len();
+            sess.step_update();
+            // the running script resumes from its wait (not one this frame's start began: its first wait counts from
+            // the next frame), then the scripts the update started (NPC talk) start: an event's scene object steps
+            // its first node in the next frame (Host::scene Enter blocks a frame)
+            let evs: Vec<Event> = sess.world.events[n0..].to_vec();
+            if !fresh {
+                host.resume_blocked(&mut sess.world, k);
+            }
             host.collect(&evs);
             host.run_queue(&mut sess.world, k);
             // the trigger check (post step) starts its event in this frame too
@@ -565,11 +588,22 @@ fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Value) -
                 let w = &sess.world;
                 let steps: Vec<String> = fr["steps"].as_array().into_iter().flatten().map(|s| s.to_string()).collect();
                 let p = w.player_idx(0).map(|pi| (w.pl_ref(pi).a.x, w.pl_ref(pi).a.y, w.pl_ref(pi).a.facing, w.pl_ref(pi).gs.name()));
-                let picks: Vec<(i32, i32, i32, bool, [i32; 4])> = w.ents.iter().filter_map(|e| match &e.body {
-                    Body::Pickup(pk) => Some((pk.x, pk.y, pk.z, pk.landed, pk.coin_rect())),
+                let picks: Vec<(i32, i32, i32, i32, i32, bool, [i32; 4])> = w.ents.iter().filter_map(|e| match &e.body {
+                    Body::Pickup(pk) => Some((pk.x, pk.y, pk.vx, pk.vy, pk.z, pk.landed, pk.coin_rect())),
                     _ => None,
                 }).collect();
+                let ens: Vec<String> = w.ents.iter().filter_map(|e| match &e.body {
+                    Body::Enemy(en) => Some(format!("{}:{:?} f{} st{:?} ({},{}) anim {:?} mv {}", e.id, en.a.sprite, en.a.facing, en.ai.stack.iter().map(|s| format!("{:x}", s.state)).collect::<Vec<_>>(), en.a.x, en.a.y, en.ea, en.moving)),
+                    _ => None,
+                }).collect();
+                if !ens.is_empty() {
+                    eprintln!("    enemies {ens:?}");
+                }
+                if !w.g.shakes.is_empty() {
+                    eprintln!("    shakes {:?} cam {:?}", w.g.shakes, (w.cameras[0].x, w.cameras[0].y));
+                }
                 if !picks.is_empty() {
+                    eprintln!("    loot {:?}", w.field.as_ref().map(|f| f.loot));
                     eprintln!("    pickups {picks:?}");
                 }
                 eprintln!(

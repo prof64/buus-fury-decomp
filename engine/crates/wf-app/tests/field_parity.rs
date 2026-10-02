@@ -221,17 +221,8 @@ fn field_frames_match_emulator() {
         let mut diffs = vec![];
         let mut ev = vec![];
         let mut v = RenderView::default();
-        let mut shown = wf_app::story::ShownCamera::default();
-        let lag = false;
-        // wf-core's own presentation (Session::view: OBJ latency, banner, fades, tile timers) without the
-        // frontend's stand-ins
-        let core_only = std::env::var("FRONTEND_PATCH").is_err();
-        let env_n = |k: &str| std::env::var(k).ok().and_then(|v| v.parse::<usize>().ok()).unwrap_or(0);
-        // defaults = what StorySim does: the OBJ layer shows the previous frame's build
-        // wf-core's view already shows the previous frame's OBJ build (view::Presenter): no extra lag by default
-        let spr_lag = std::env::var("SPR_LAG").ok().and_then(|v| v.parse().ok()).unwrap_or(0usize);
-        let cam_lag = env_n("CAM_LAG");
-        let sprite_cam_old = std::env::var("SPR_CAM_OLD").is_ok();
+        // wf-core's own presentation (view::Presenter: OBJ latency; render_view: banner, fades, tile timers, greyed
+        // icon, dialogue animation)
         // traces that start mid-area: the camera was still settling when the recording began (not part of the
         // core's start state) — use the captured camera (map object +0x28 / +0x2C) for those
         let ram_cams: Option<Vec<Vec<i32>>> =
@@ -242,36 +233,14 @@ fn field_frames_match_emulator() {
         let (mut tick_mismatch, mut first_mismatch) = (0usize, None);
         let mut bad_frames: Vec<(usize, usize)> = vec![];
         let mut video_since_load: u32 = s.world.frame.saturating_sub(s.world.field.as_ref().map(|f| f.entered).unwrap_or(0));
-        let mut hist: Vec<(wf_app::story::ObjLayer, Vec<wf_view::CameraView>)> = vec![];
-        let mut banner = wf_app::story::BannerTracker::new(&packs);
-        // the recordings that start mid-area (npc / objects) began long after that area's banner
-        if kind != "objects" {
-            banner.step(&s.world.events.clone());
-        } else {
-            let mut quiet = s.world.events.clone();
-            banner.step(&quiet);
-            quiet.clear();
-            banner = wf_app::story::BannerTracker::new(&packs);
-            banner.remember_current(&s.world);
+        if kind == "objects" {
             // the recording starts long after the area's banner (wf-core starts one at the load)
             s.world.scene.banner = None;
-        }
-        banner.t_offset = std::env::var("BANNER_OFF").ok().and_then(|v| v.parse().ok()).unwrap_or(0);
-        let mut prev_anim: Option<wf_view::DialogAnim> = None;
-        if let Ok(v) = std::env::var("DLG_OPEN") {
-            wf_app::story::DIALOG_OPEN_OFF.store(v.parse().unwrap(), std::sync::atomic::Ordering::Relaxed);
-        }
-        if let Ok(v) = std::env::var("TYPED_OFF") {
-            wf_app::story::TYPED_OFF.store(v.parse().unwrap(), std::sync::atomic::Ordering::Relaxed);
-        }
-        if let Ok(v) = std::env::var("DLG_CLOSE") {
-            wf_app::story::DIALOG_CLOSE_OFF.store(v.parse().unwrap(), std::sync::atomic::Ordering::Relaxed);
+            s.presenter.reset();
         }
         for fr in frames {
             let f = i(&fr["f"]) as usize;
             if fr["logic"].as_bool().unwrap_or(true) {
-                shown.before_step(&s.world);
-                prev_anim = wf_app::story::dialog_anim(&s.world);
                 match story.as_mut() {
                     Some(st) => {
                         Sim::step(st, &[ks.get(f).copied().unwrap_or(0)], &mut ev);
@@ -279,7 +248,6 @@ fn field_frames_match_emulator() {
                     }
                     None => Sim::step(&mut s, &[ks.get(f).copied().unwrap_or(0)], &mut ev),
                 }
-                banner.step(&s.world.events.clone());
             }
             // traces that start mid-area: the camera was still easing when the recording began (not part of the
             // core's start state): after the first step, give the core the game's camera (22.10) and let it run
@@ -305,50 +273,13 @@ fn field_frames_match_emulator() {
                 Some(st) => st.view(&mut v),
                 None => s.view(&mut v),
             }
-            // the dialogue animation is not in wf-core's view yet: the frontend's stand-in, from the state before the
-            // step (the box is an OBJ: one frame late like the rest of the OBJ layer)
-            if v.dialog_anim.is_none() {
-                v.dialog_anim = prev_anim;
-            }
-            // the text surface is uploaded every frame: the typewriter count is the current one
-            if let (Some(a), Some(now)) = (v.dialog_anim.as_mut(), wf_app::story::dialog_anim(&s.world)) {
-                a.typed = now.typed;
-            }
-            if !core_only {
-                wf_app::story::patch_view(&s.world, &mut v);
-                banner.apply(&mut v);
-            }
-            if lag {
-                shown.apply(&mut v);
-            }
-            // history of (sprites, cameras) per logic frame: the screen may show older builds
-            if fr["logic"].as_bool().unwrap_or(true) {
-                hist.push((wf_app::story::ObjLayer::of(&v), v.cameras.clone()));
-            }
-            if spr_lag > 0 && hist.len() > spr_lag {
-                hist[hist.len() - 1 - spr_lag].0.apply(&mut v);
-                // sprites were placed with that frame's camera: shift them into the current camera's frame
-                let (old, cur) = (hist[hist.len() - 1 - spr_lag].1[0], v.cameras[0]);
-                if sprite_cam_old {
-                    for sp in v.sprites.iter_mut() {
-                        let _ = &sp;
-                        sp.x += cur.x - old.x;
-                        sp.y += cur.y - old.y;
-                    }
-                }
-            }
-
-            if cam_lag > 0 && hist.len() > cam_lag {
-                let c = hist[hist.len() - 1 - cam_lag].1.clone();
-                v.cameras = c;
-            }
             if fr["logic"].as_bool().unwrap_or(true) && s.world.events.iter().any(|e| matches!(e, wf_core::world::Event::Field(wf_core::field::FieldEvent::AreaEnter { .. }))) {
                 video_since_load = 0;
             } else {
                 video_since_load += 1;
             }
             // the map's animation ticks: from the captured RAM state when available (traces that start mid-area),
-            // else what the frontend derives (story::patch_view)
+            // else what wf-core's view derives
             let ram_ticks = ram_anims.as_ref().and_then(|ra| ra.get(f)).and_then(|st| {
                 let m = v.map.as_ref()?;
                 let map = r.map(&packs, &m.id)?;

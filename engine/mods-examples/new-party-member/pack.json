@@ -1,0 +1,6 @@
+{
+  "id": "new-party-member",
+  "name": "Story party member: Tien joins the party (character 10)",
+  "format_version": 1,
+  "depends": ["base"]
+}

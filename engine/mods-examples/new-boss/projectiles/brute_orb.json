@@ -1,0 +1,21 @@
+{
+  "id": "brute_orb",
+  "sheet": "effects/mod_dark_orb",
+  "frames": [[0, 1], [4, 5], [8], [9, 10]],
+  "rate": 4,
+  "end_frames": [12],
+  "end_time": 8,
+  "speed": 384,
+  "accel": 8,
+  "max_speed": 768,
+  "homing": 10,
+  "homing_range": 240,
+  "homing_delay": 10,
+  "life": 150,
+  "hit_box": [12, 12],
+  "wall": "explode",
+  "damage": 900,
+  "attack_sub": 4,
+  "explode": {"radius": 12, "damage": 300, "fx": true, "on_expire": true},
+  "sfx_spawn": 4
+}

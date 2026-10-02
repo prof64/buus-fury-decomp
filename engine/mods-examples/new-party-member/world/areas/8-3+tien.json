@@ -1,0 +1,14 @@
+{
+  "key": "8-3",
+  "add_objects": [
+    {
+      "type": "npc",
+      "comment": "Tien (sprite 255 = script sprite id 264) near the forest's start; talking runs event s920 until he has joined",
+      "condition": { "flag_clear": 1110 },
+      "pos": [392, 500],
+      "sprite_index": 264,
+      "talk": { "event": "s920" },
+      "behaviour": []
+    }
+  ]
+}
