@@ -1,0 +1,1227 @@
+{
+ "source": "tools/battle/gen_vectors.py (headless mGBA, LoG2 USA)",
+ "damage": [
+  {
+   "state": "log2_map12.ss",
+   "rng": [
+    1677360396,
+    1869312495
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 7,
+   "DEF": 53,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 7,
+   "dmg": 7
+  },
+  {
+   "state": "log2_map12.ss",
+   "rng": [
+    4059533362,
+    158497345
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 7,
+   "DEF": 53,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 7,
+   "dmg": 7
+  },
+  {
+   "state": "log2_map12.ss",
+   "rng": [
+    1713186511,
+    2338890817
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 40,
+   "DEF": 3,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 78,
+   "dmg": 78
+  },
+  {
+   "state": "log2_pl_goku.ss",
+   "rng": [
+    858336588,
+    2522878961
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 62,
+   "DEF": 3,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 170,
+   "dmg": 170
+  },
+  {
+   "state": "log2_pl_goku.ss",
+   "rng": [
+    32000036,
+    2230646095
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 62,
+   "DEF": 3,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 161,
+   "dmg": 161
+  },
+  {
+   "state": "log2_pl_goku.ss",
+   "rng": [
+    311845006,
+    1434979751
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 62,
+   "DEF": 3,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 170,
+   "dmg": 170
+  },
+  {
+   "state": "log2_pl_goku.ss",
+   "rng": [
+    258102318,
+    3969466890
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 7,
+   "DEF": 47,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 8,
+   "dmg": 8
+  },
+  {
+   "state": "log2_pl_goku.ss",
+   "rng": [
+    3498205131,
+    1328173972
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 7,
+   "DEF": 47,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 8,
+   "dmg": 8
+  },
+  {
+   "state": "log2_pl_goku.ss",
+   "rng": [
+    3903029562,
+    1216081861
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 62,
+   "DEF": 3,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 160,
+   "dmg": 160
+  },
+  {
+   "state": "log2_pl_goku.ss",
+   "rng": [
+    1812175347,
+    2033654738
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 62,
+   "DEF": 3,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 169,
+   "dmg": 169
+  },
+  {
+   "state": "log2_pl_goku.ss",
+   "rng": [
+    1772739084,
+    2390739484
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 7,
+   "DEF": 47,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 7,
+   "dmg": 7
+  },
+  {
+   "state": "log2_pl_goku.ss",
+   "rng": [
+    392405042,
+    347639515
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 7,
+   "DEF": 47,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 7,
+   "dmg": 7
+  },
+  {
+   "state": "log2_pl_goku.ss",
+   "rng": [
+    253340115,
+    3500184401
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 7,
+   "DEF": 47,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 7,
+   "dmg": 7
+  },
+  {
+   "state": "log2_pl_goku.ss",
+   "rng": [
+    1721804285,
+    487959134
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 62,
+   "DEF": 3,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 172,
+   "dmg": 172
+  },
+  {
+   "state": "log2_pl_goku.ss",
+   "rng": [
+    3075732968,
+    639962086
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 62,
+   "DEF": 3,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 163,
+   "dmg": 163
+  },
+  {
+   "state": "log2_pl_goku.ss",
+   "rng": [
+    636700730,
+    1278351180
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 62,
+   "DEF": 3,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 168,
+   "dmg": 168
+  },
+  {
+   "state": "log2_pl_goku.ss",
+   "rng": [
+    3143709472,
+    966184687
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 62,
+   "DEF": 3,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 170,
+   "dmg": 170
+  },
+  {
+   "state": "log2_pl_goku.ss",
+   "rng": [
+    3627715190,
+    2605469452
+   ],
+   "type": 1,
+   "id": 3,
+   "power": 1024,
+   "S": 65,
+   "DEF": 3,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 185,
+   "dmg": 185
+  },
+  {
+   "state": "log2_pl_goku.ss",
+   "rng": [
+    1374540057,
+    3754964372
+   ],
+   "type": 1,
+   "id": 3,
+   "power": 1024,
+   "S": 65,
+   "DEF": 3,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 182,
+   "dmg": 182
+  },
+  {
+   "state": "log2_pl_goku.ss",
+   "rng": [
+    1827812877,
+    2655674956
+   ],
+   "type": 1,
+   "id": 3,
+   "power": 1024,
+   "S": 65,
+   "DEF": 3,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 175,
+   "dmg": 175
+  },
+  {
+   "state": "log2_pl_goku.ss",
+   "rng": [
+    865410198,
+    3390235591
+   ],
+   "type": 1,
+   "id": 3,
+   "power": 1024,
+   "S": 65,
+   "DEF": 3,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 181,
+   "dmg": 181
+  },
+  {
+   "state": "log2_pl_goku.ss",
+   "rng": [
+    311845006,
+    1434979751
+   ],
+   "type": 1,
+   "id": 3,
+   "power": 1024,
+   "S": 65,
+   "DEF": 3,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 187,
+   "dmg": 187
+  },
+  {
+   "state": "log2_pl_goku.ss",
+   "rng": [
+    3816834817,
+    2197273882
+   ],
+   "type": 1,
+   "id": 3,
+   "power": 1024,
+   "S": 65,
+   "DEF": 3,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 178,
+   "dmg": 178
+  },
+  {
+   "state": "log2_pl_goku.ss",
+   "rng": [
+    3619311605,
+    892481435
+   ],
+   "type": 1,
+   "id": 3,
+   "power": 1024,
+   "S": 65,
+   "DEF": 3,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 185,
+   "dmg": 185
+  },
+  {
+   "state": "log2_pl_goku.ss",
+   "rng": [
+    2512958965,
+    1029184094
+   ],
+   "type": 1,
+   "id": 3,
+   "power": 1024,
+   "S": 65,
+   "DEF": 3,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 185,
+   "dmg": 185
+  },
+  {
+   "state": "log2_pl_vegeta.ss",
+   "rng": [
+    858336588,
+    2522878961
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 46,
+   "DEF": 3,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 101,
+   "dmg": 101
+  },
+  {
+   "state": "log2_pl_vegeta.ss",
+   "rng": [
+    32000036,
+    2230646095
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 46,
+   "DEF": 3,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 96,
+   "dmg": 96
+  },
+  {
+   "state": "log2_pl_vegeta.ss",
+   "rng": [
+    311845006,
+    1434979751
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 46,
+   "DEF": 3,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 101,
+   "dmg": 101
+  },
+  {
+   "state": "log2_pl_vegeta.ss",
+   "rng": [
+    258102318,
+    3969466890
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 7,
+   "DEF": 60,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 6,
+   "dmg": 6
+  },
+  {
+   "state": "log2_pl_vegeta.ss",
+   "rng": [
+    3498205131,
+    1328173972
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 7,
+   "DEF": 60,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 6,
+   "dmg": 6
+  },
+  {
+   "state": "log2_pl_vegeta.ss",
+   "rng": [
+    3903029562,
+    1216081861
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 46,
+   "DEF": 3,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 95,
+   "dmg": 95
+  },
+  {
+   "state": "log2_pl_vegeta.ss",
+   "rng": [
+    1812175347,
+    2033654738
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 46,
+   "DEF": 3,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 101,
+   "dmg": 101
+  },
+  {
+   "state": "log2_pl_vegeta.ss",
+   "rng": [
+    1772739084,
+    2390739484
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 7,
+   "DEF": 60,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 6,
+   "dmg": 6
+  },
+  {
+   "state": "log2_pl_vegeta.ss",
+   "rng": [
+    392405042,
+    347639515
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 7,
+   "DEF": 60,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 6,
+   "dmg": 6
+  },
+  {
+   "state": "log2_pl_vegeta.ss",
+   "rng": [
+    253340115,
+    3500184401
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 7,
+   "DEF": 60,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 6,
+   "dmg": 6
+  },
+  {
+   "state": "log2_pl_vegeta.ss",
+   "rng": [
+    1721804285,
+    487959134
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 46,
+   "DEF": 3,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 102,
+   "dmg": 102
+  },
+  {
+   "state": "log2_pl_vegeta.ss",
+   "rng": [
+    3075732968,
+    639962086
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 46,
+   "DEF": 3,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 97,
+   "dmg": 97
+  },
+  {
+   "state": "log2_pl_trunks.ss",
+   "rng": [
+    3627715190,
+    2605469452
+   ],
+   "type": 1,
+   "id": 3,
+   "power": 1024,
+   "S": 58,
+   "DEF": 3,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 149,
+   "dmg": 149
+  },
+  {
+   "state": "log2_pl_trunks.ss",
+   "rng": [
+    1374540057,
+    3754964372
+   ],
+   "type": 1,
+   "id": 3,
+   "power": 1024,
+   "S": 58,
+   "DEF": 3,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 146,
+   "dmg": 146
+  },
+  {
+   "state": "log2_pl_trunks.ss",
+   "rng": [
+    1827812877,
+    2655674956
+   ],
+   "type": 1,
+   "id": 3,
+   "power": 1024,
+   "S": 58,
+   "DEF": 3,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 141,
+   "dmg": 141
+  },
+  {
+   "state": "log2_pl_trunks.ss",
+   "rng": [
+    865410198,
+    3390235591
+   ],
+   "type": 1,
+   "id": 3,
+   "power": 1024,
+   "S": 58,
+   "DEF": 3,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 146,
+   "dmg": 146
+  },
+  {
+   "state": "log2_pl_trunks.ss",
+   "rng": [
+    311845006,
+    1434979751
+   ],
+   "type": 1,
+   "id": 3,
+   "power": 1024,
+   "S": 58,
+   "DEF": 3,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 150,
+   "dmg": 150
+  },
+  {
+   "state": "log2_pl_trunks.ss",
+   "rng": [
+    3816834817,
+    2197273882
+   ],
+   "type": 1,
+   "id": 3,
+   "power": 1024,
+   "S": 58,
+   "DEF": 3,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 143,
+   "dmg": 143
+  },
+  {
+   "state": "log2_pl_gohan.ss",
+   "rng": [
+    858336588,
+    2522878961
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 56,
+   "DEF": 3,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 141,
+   "dmg": 141
+  },
+  {
+   "state": "log2_pl_gohan.ss",
+   "rng": [
+    32000036,
+    2230646095
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 56,
+   "DEF": 3,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 133,
+   "dmg": 133
+  },
+  {
+   "state": "log2_pl_gohan.ss",
+   "rng": [
+    311845006,
+    1434979751
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 56,
+   "DEF": 3,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 140,
+   "dmg": 140
+  },
+  {
+   "state": "log2_pl_gohan.ss",
+   "rng": [
+    258102318,
+    3969466890
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 7,
+   "DEF": 71,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 5,
+   "dmg": 5
+  },
+  {
+   "state": "log2_pl_gohan.ss",
+   "rng": [
+    3498205131,
+    1328173972
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 7,
+   "DEF": 71,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 5,
+   "dmg": 5
+  },
+  {
+   "state": "log2_pl_gohan.ss",
+   "rng": [
+    3903029562,
+    1216081861
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 56,
+   "DEF": 3,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 132,
+   "dmg": 132
+  },
+  {
+   "state": "log2_pl_gohan.ss",
+   "rng": [
+    1812175347,
+    2033654738
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 56,
+   "DEF": 3,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 140,
+   "dmg": 140
+  },
+  {
+   "state": "log2_pl_gohan.ss",
+   "rng": [
+    1772739084,
+    2390739484
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 7,
+   "DEF": 71,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 5,
+   "dmg": 5
+  },
+  {
+   "state": "log2_pl_gohan.ss",
+   "rng": [
+    392405042,
+    347639515
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 7,
+   "DEF": 71,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 5,
+   "dmg": 5
+  },
+  {
+   "state": "log2_pl_gohan.ss",
+   "rng": [
+    253340115,
+    3500184401
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 7,
+   "DEF": 71,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 5,
+   "dmg": 5
+  },
+  {
+   "state": "log2_pl_hercule.ss",
+   "rng": [
+    3627715190,
+    2605469452
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 18,
+   "DEF": 3,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 31,
+   "dmg": 31
+  },
+  {
+   "state": "log2_pl_hercule.ss",
+   "rng": [
+    2151739866,
+    2912580433
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 18,
+   "DEF": 3,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 32,
+   "dmg": 32
+  },
+  {
+   "state": "log2_pl_hercule.ss",
+   "rng": [
+    2335014592,
+    4222581922
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 7,
+   "DEF": 26,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 10,
+   "dmg": 10
+  },
+  {
+   "state": "log2_pl_hercule.ss",
+   "rng": [
+    3199116256,
+    3035471467
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 7,
+   "DEF": 26,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 10,
+   "dmg": 10
+  },
+  {
+   "state": "log2_pl_hercule.ss",
+   "rng": [
+    1153675629,
+    1821941150
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 7,
+   "DEF": 26,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 9,
+   "dmg": 9
+  },
+  {
+   "state": "log2_pl_hercule.ss",
+   "rng": [
+    1772739084,
+    2390739484
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 7,
+   "DEF": 26,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 9,
+   "dmg": 9
+  },
+  {
+   "state": "log2_pl_hercule.ss",
+   "rng": [
+    392405042,
+    347639515
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 18,
+   "DEF": 3,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 31,
+   "dmg": 31
+  },
+  {
+   "state": "log2_pl_hercule.ss",
+   "rng": [
+    253340115,
+    3500184401
+   ],
+   "type": 0,
+   "id": 2,
+   "power": 1024,
+   "S": 7,
+   "DEF": 26,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 9,
+   "dmg": 9
+  },
+  {
+   "state": "log2_pl_piccolo.ss",
+   "rng": [
+    3627715190,
+    2605469452
+   ],
+   "type": 1,
+   "id": 3,
+   "power": 1024,
+   "S": 55,
+   "DEF": 3,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 136,
+   "dmg": 136
+  },
+  {
+   "state": "log2_pl_piccolo.ss",
+   "rng": [
+    1374540057,
+    3754964372
+   ],
+   "type": 1,
+   "id": 3,
+   "power": 1024,
+   "S": 55,
+   "DEF": 3,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 133,
+   "dmg": 133
+  },
+  {
+   "state": "log2_pl_piccolo.ss",
+   "rng": [
+    1827812877,
+    2655674956
+   ],
+   "type": 1,
+   "id": 3,
+   "power": 1024,
+   "S": 55,
+   "DEF": 3,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 128,
+   "dmg": 128
+  },
+  {
+   "state": "log2_pl_piccolo.ss",
+   "rng": [
+    865410198,
+    3390235591
+   ],
+   "type": 1,
+   "id": 3,
+   "power": 1024,
+   "S": 55,
+   "DEF": 3,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 132,
+   "dmg": 132
+  },
+  {
+   "state": "log2_pl_piccolo.ss",
+   "rng": [
+    311845006,
+    1434979751
+   ],
+   "type": 1,
+   "id": 3,
+   "power": 1024,
+   "S": 55,
+   "DEF": 3,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 137,
+   "dmg": 137
+  },
+  {
+   "state": "log2_pl_piccolo.ss",
+   "rng": [
+    3816834817,
+    2197273882
+   ],
+   "type": 1,
+   "id": 3,
+   "power": 1024,
+   "S": 55,
+   "DEF": 3,
+   "MULT": 128,
+   "scale": 1024,
+   "crit": 0,
+   "raw": 130,
+   "dmg": 130
+  }
+ ],
+ "levelup": [
+  {
+   "char": 1,
+   "old_level": 40,
+   "new_level": 41,
+   "rng": [
+    996209374,
+    2156006575
+   ],
+   "before": {
+    "hp": 1048,
+    "max_hp": 1055,
+    "ep": 137,
+    "max_ep": 137,
+    "STR": 10354,
+    "POW": 14259,
+    "END": 13760
+   },
+   "after": {
+    "hp": 1118,
+    "max_hp": 1118,
+    "ep": 141,
+    "max_ep": 141,
+    "STR": 10582,
+    "POW": 14661,
+    "END": 14070
+   }
+  },
+  {
+   "char": 1,
+   "old_level": 41,
+   "new_level": 42,
+   "rng": [
+    996209374,
+    2156006575
+   ],
+   "before": {
+    "hp": 1048,
+    "max_hp": 1055,
+    "ep": 137,
+    "max_ep": 137,
+    "STR": 10354,
+    "POW": 14259,
+    "END": 13760
+   },
+   "after": {
+    "hp": 1118,
+    "max_hp": 1118,
+    "ep": 141,
+    "max_ep": 141,
+    "STR": 10582,
+    "POW": 14661,
+    "END": 14070
+   }
+  },
+  {
+   "char": 1,
+   "old_level": 42,
+   "new_level": 43,
+   "rng": [
+    996209374,
+    2156006575
+   ],
+   "before": {
+    "hp": 1048,
+    "max_hp": 1055,
+    "ep": 137,
+    "max_ep": 137,
+    "STR": 10354,
+    "POW": 14259,
+    "END": 13760
+   },
+   "after": {
+    "hp": 1118,
+    "max_hp": 1118,
+    "ep": 141,
+    "max_ep": 141,
+    "STR": 10582,
+    "POW": 14661,
+    "END": 14070
+   }
+  }
+ ]
+}
