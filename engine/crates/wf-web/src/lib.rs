@@ -190,7 +190,7 @@ pub unsafe extern "C" fn wf_app_init(cfg_ptr: *const u8, cfg_len: usize) -> u32 
     // the real battle (wf-core) unless {"demo": true} / an `area` is asked for
     let demo = cfg["demo"].as_bool().unwrap_or(false) || cfg["area"].is_string();
     // {"net": true}: the online match / sync test prepared by wf_net_lobby (net.rs)
-    let made = if let Some(sim) = net::take_sim(&cfg) {
+    let made = if let Some(sim) = net::take_sim(&cfg, &packs) {
         sim.map(|s| App::new(packs, s))
     } else if demo {
         App::demo(packs, &dc).map_err(|e| e.to_string())

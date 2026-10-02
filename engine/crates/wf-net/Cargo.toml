@@ -1,0 +1,34 @@
+[package]
+name = "wf-net"
+description = "Online multiplayer: rollback netcode (GGPO-style, transport-agnostic, no clock inside) over the deterministic wf-core session, lobby by room code, spectators, desync detection, sync test; WebRTC transport via Matchbox (native) or the browser (wf-web)"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[features]
+default = []
+# native WebRTC data channels through a Matchbox signaling server (matchbox_socket + webrtc-rs on tokio)
+webrtc = ["dep:matchbox_socket", "dep:tokio"]
+# the `wf-signal` signaling server binary (matchbox_signaling)
+server = ["dep:matchbox_signaling", "dep:tokio"]
+
+[dependencies]
+wf-core = { path = "../wf-core" }
+wf-view = { path = "../wf-view" }
+wf-replay = { path = "../wf-replay" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+matchbox_socket = { version = "0.14", optional = true }
+matchbox_signaling = { version = "0.14", optional = true }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "net", "signal"], optional = true }
+
+[dev-dependencies]
+wf-rom = { workspace = true }
+wf-extract = { path = "../wf-extract" }
+
+[[bin]]
+name = "wf-signal"
+path = "src/bin/wf-signal.rs"
+required-features = ["server"]

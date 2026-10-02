@@ -2,6 +2,7 @@
 // (render + input on the main thread, the sound driver in an AudioWorklet). See engine/docs/frontend.md.
 import { openStore } from './store.js';
 import { tar, untar, CATEGORIES } from './tar.js';
+import { startNet } from './net.js';
 
 const EXTRACTOR_URL = new URL('../wf_wasm.wasm', import.meta.url).href;
 const GAME_URL = new URL('wf_web.wasm', import.meta.url).href;
@@ -208,6 +209,13 @@ async function boot(baseTarBytes) {
   for (const k of ['arena', 'enemy', 'fighter']) if (qs.get(k)) cfg[k] = qs.get(k);
   for (const k of ['count', 'form', 'level', 'seed']) if (qs.get(k)) cfg[k] = Number(qs.get(k));
   const t1 = performance.now();
+  // online (?net, net.js): lobby first; the match then runs as the app's simulation
+  let net = null;
+  if (qs.has('net')) {
+    net = await startNet({ x, mem: () => mem, withStr, str }, qs);
+    if (!net) return;
+    cfg.net = true;
+  }
   if (withStr(JSON.stringify(cfg), (p, n) => x.wf_app_init(p, n)) !== 0) {
     show('rom');
     $('romerr').textContent = `Could not start: ${str()}`;
@@ -276,7 +284,7 @@ async function boot(baseTarBytes) {
 
   // stage + loop
   $('stage').hidden = false;
-  show(qs.has('autostart') ? '' : 'start');
+  show(qs.has('autostart') || net ? '' : 'start');
   const canvas = $('screen');
   const g = canvas.getContext('2d', { alpha: false });
   let running = false;
@@ -318,7 +326,7 @@ async function boot(baseTarBytes) {
     })();
   };
   $('start').onclick = start;
-  if (qs.has('autostart')) start();
+  if (qs.has('autostart') || net) start();
 
   function pollPads() {
     const pads = navigator.getGamepads ? navigator.getGamepads() : [];
@@ -340,7 +348,11 @@ async function boot(baseTarBytes) {
     const W = Math.floor(innerWidth * dpr);
     const H = Math.floor(innerHeight * dpr);
     x.wf_app_set_clock(Date.now() / 1000);
-    x.wf_app_frame(W, H, 0);
+    x.wf_app_frame(W, H, net ? net.slot() : 0);
+    if (net) {
+      net.pump();
+      net.draw();
+    }
     replays.pump();
     const w = x.wf_fb_w();
     const h = x.wf_fb_h();

@@ -233,7 +233,7 @@ pub extern "C" fn wf_net_slot() -> i32 {
 }
 
 /// For `wf_app_init` with `"net": true`: the prepared match (or sync test) as the app's simulation.
-pub(crate) fn take_sim(cfg: &serde_json::Value) -> Option<Result<Box<dyn Sim>, String>> {
+pub(crate) fn take_sim(cfg: &serde_json::Value, packs: &Packs) -> Option<Result<Box<dyn Sim>, String>> {
     if cfg["net"].as_bool() != Some(true) {
         return None;
     }
@@ -244,6 +244,24 @@ pub(crate) fn take_sim(cfg: &serde_json::Value) -> Option<Result<Box<dyn Sim>, S
             return Ok(Box::new(wf_net::cli::synctest_sim(&n.args, n.data.clone(), &n.battle, d)) as Box<dyn Sim>);
         }
         let l = n.lobby.take().ok_or("the match was already started")?;
-        l.into_sim(n.data.clone()).map(|s| Box::new(s) as Box<dyn Sim>)
+        let mut s = l.into_sim(n.data.clone())?;
+        s.content = wf_app::battle::content_id(packs);
+        s.created = cfg["now"].as_f64().unwrap_or(0.0) as u64;
+        Ok(Box::new(s) as Box<dyn Sim>)
     }))
+}
+
+/// The running match as a `.wfr` replay (wf-replay format) in the string buffer; returns its length (0 = no
+/// match). `upto` >= 0 cuts it at that state (a desync frame), -1 = everything confirmed so far.
+#[no_mangle]
+pub extern "C" fn wf_net_replay(upto: i32) -> u32 {
+    let b = super::with_game(|g| g.app.sim.as_any().and_then(|a| a.downcast_ref::<wf_net::NetSim>()).map(|s| s.replay((upto >= 0).then_some(upto)).to_bytes())).flatten();
+    match b {
+        Some(b) => {
+            let n = b.len() as u32;
+            STR.with(|s| *s.borrow_mut() = b);
+            n
+        }
+        None => 0,
+    }
 }

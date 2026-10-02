@@ -272,7 +272,13 @@ fn make_app(a: &Args, packs: Packs) -> Result<App, String> {
         let data = wf_app::battle::game_data(&packs)?;
         let sim: Box<dyn wf_view::Sim> = match a.net.mode {
             wf_net::cli::NetMode::SyncTest(d) => Box::new(wf_net::cli::synctest_sim(&a.net, data, &cfg, d)),
-            _ => Box::new(wf_net::cli::connect_blocking(&a.net, data, &cfg)?),
+            _ => {
+                let mut net = a.net.clone();
+                net.record_dir.get_or_insert_with(|| a.data.join("replays").display().to_string());
+                let mut s = wf_net::cli::connect_blocking(&net, data, &cfg)?;
+                s.content = wf_app::battle::content_id(&packs);
+                Box::new(s)
+            }
         };
         return Ok(App::new(packs, sim));
     }
@@ -818,7 +824,9 @@ fn headless(a: &Args) -> Result<(), String> {
         let cfg = wf_app::battle::config(&a.arena, &a.enemy, a.count, &a.fighter, a.form, a.level, a.players, a.seed);
         let data = wf_app::battle::game_data(&packs)?;
         let script = wf_net::cli::parse_script(&a.input);
-        return wf_net::cli::run_headless(&a.net, data, &cfg, a.frames.unwrap_or(3600), &script).map(|_| ());
+        let mut net = a.net.clone();
+        net.record_dir.get_or_insert_with(|| a.data.join("replays").display().to_string());
+        return wf_net::cli::run_headless(&net, data, &cfg, a.frames.unwrap_or(3600), &script, wf_app::battle::content_id(&packs)).map(|_| ());
     }
     let bank = wf_app::wf_content::audio::load_bank(&packs).ok().map(|b| &*Box::leak(Box::new(b)));
     let mut app = make_app(a, packs)?;

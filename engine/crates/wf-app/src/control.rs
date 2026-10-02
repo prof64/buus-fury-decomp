@@ -546,7 +546,12 @@ impl Control {
             Some(s) => s.data.clone(),
             None => battle::game_data(&app.packs)?,
         };
-        Ok(CoreSim(Session::new(data, cfg)))
+        let mut s = Session::new(data, cfg);
+        // online PvP recordings (wf-net) carry the rule set next to the battle config
+        if config["pvp"].as_bool() == Some(true) {
+            wf_core::battle::set_pvp(&mut s.world, true);
+        }
+        Ok(CoreSim(s))
     }
 
     /// Replace the app's sim (new config): stop sounds, re-render, music if not starting at frame 0.
