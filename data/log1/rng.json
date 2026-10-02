@@ -1,0 +1,41 @@
+{
+ "main": {
+  "code": "0x08005CA8",
+  "state": {
+   "a": "0x0300098C",
+   "b": "0x03000990"
+  },
+  "seed": "zero at boot (never seeded); advances only when gameplay code calls it",
+  "step": [
+   "a = (a + 0x02CBBC71) ^ b",
+   "b = (rotl32(b, 3) + 0x0632D80F) ^ a  (uses NEW a)"
+  ],
+  "output": "rand(n) = asr32(int32(((a*b) & 0xFFFF) * (n+1)), 16)  -> [0, n]; negative if product >= 2^31",
+  "python": "re/log1/model.py Rng"
+ },
+ "secondary": {
+  "code": "0x0800A6F4 (raw), 0x0800A714 rand2(n), 0x0800A724 chance(p)",
+  "state": {
+   "a": "0x03003D24",
+   "b": "0x03003D28"
+  },
+  "step": "same recurrence as main",
+  "raw_output": "a*b (32-bit)",
+  "rand2": "((raw >> 16) * n) >> 16 -> [0, n-1]",
+  "chance": "(raw >> 16) < p",
+  "advances": "at least once per frame (0x0800A724 is called every frame), so it depends on timing"
+ },
+ "uses": {
+  "main": [
+   "defense roll rand(10000)",
+   "enemy melee/ki rand",
+   "aggro timer rand(900)",
+   "AI path timer rand(60)+30",
+   "AI wander, flee 6% roll, ki-blast 2% roll, dormant wake rand(65535)<200"
+  ],
+  "secondary": [
+   "player punch damage rand2(128)",
+   "misc visual/sfx rolls"
+  ]
+ }
+}
