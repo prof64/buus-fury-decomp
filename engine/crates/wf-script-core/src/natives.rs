@@ -1004,7 +1004,9 @@ fn load_scene(w: &mut World, s: &mut HostState, world: i32, map: i32, variant: i
     }
     if w.field.is_some() {
         let to = wf_core::field::AreaId { world, area: map, variant };
-        wf_core::field::load_area(w, to, x + 112, y + 76, None);
+        // a cutscene scene has no player object (0x08009030): the players wait offstage
+        scene::send_offstage(w);
+        wf_core::field::load_area_with(w, to, x + 112, y + 76, None, objects);
     } else {
         s.area = (world, map, variant);
         w.scene.requests.push(scene::Request::LoadScene { world, map, variant, x, y, objects });
@@ -1020,6 +1022,7 @@ fn return_to_field(w: &mut World, s: &mut HostState) {
     };
     if w.field.is_some() {
         let to = wf_core::field::AreaId { world: f.area.0, area: f.area.1, variant: f.area.2 };
+        scene::bring_back(w);
         wf_core::field::load_area(w, to, f.x, f.y, Some(f.facing));
     } else {
         s.area = f.area;

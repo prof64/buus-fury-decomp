@@ -876,7 +876,7 @@ pub struct Prop {
 
 // ---------------------------------------------------------------------------------------------------------------
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, Hash, Serialize, Deserialize)]
 pub struct Scene {
     pub tracks: Vec<Track>,
     pub director: Director,
@@ -907,6 +907,9 @@ pub struct Scene {
     pub chaining: bool,
     /// the frame's raw input (script queries read it even while the players' input is masked)
     pub keys: [InputFrame; MAX_PLAYERS],
+    /// the player objects while a cutscene scene is loaded (load_scene 0x72-0x74 builds the map with no player
+    /// object, 0x08009030); `return_to_field` / a warp brings them back
+    pub offstage: Vec<crate::world::Entity>,
 }
 
 impl Default for Scene {
@@ -934,6 +937,7 @@ impl Default for Scene {
             freeze: false,
             song: -1,
             chaining: false,
+            offstage: Vec::new(),
             keys: [InputFrame::default(); MAX_PLAYERS],
         }
     }
@@ -1141,8 +1145,16 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
     let i = owner_index(w, owner);
     match cmd {
         Cmd::PlayAnim { anim } => {
-            if let (Some(i), true) = (i, *anim != 0) {
-                set_state(w, i, *anim);
+            // anim 0 (idle) completes at once; it restarts the idle state only on an actor not already idle
+            // (a held pose / other state goes back to idle, with the idle's random tick)
+            let not_idle = |w: &World, i: usize| {
+                !matches!(w.ents[i].body, Body::Player(_))
+                    && scene_anim(w, i).is_some_and(|a| a.raw != ActAnim::of(0).raw || a.mode != AnimMode::Table)
+            };
+            if let Some(i) = i {
+                if *anim != 0 || not_idle(w, i) {
+                    set_state(w, i, *anim);
+                }
             }
         }
         Cmd::SetAnim { anim } => {
@@ -1322,7 +1334,11 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
                 }
                 set_pose(w, i, beam_anim(*kind), 0);
                 if matches!(kind, BeamKind::Beam | BeamKind::BeamAlt | BeamKind::Blast) {
+                    // the beam object 0x080206B8 charging: the charge effect (table 0x0877B200[dir]: charge
+                    // position, record 55/56) and sound 3
                     w.sfx(3, 64);
+                    let owner = w.ents[i].id;
+                    crate::fx::beam_charge(w, owner, BEAM_CHARGE, crate::fx::BeamSet::Other);
                 }
             }
         }
@@ -1432,6 +1448,21 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
 }
 
 /// the actor state a beam command holds: 17 (raw 19) for the Kamehameha / wave beam, 3 (raw 4) for the others
+/// the beam object's charge position per facing (0x0877B200)
+const BEAM_CHARGE: [(i32, i32); 4] = [(8, -2), (12, -2), (12, -2), (4, -2)];
+
+/// remove the actor's beam charge effect; true when there was one
+fn remove_charge(w: &mut World, owner: crate::world::EntityId) -> bool {
+    let mut any = false;
+    for e in w.ents.iter_mut() {
+        if !e.removed && matches!(&e.body, Body::Fx(f) if matches!(**f, crate::fx::Fx::BeamCharge { owner: o, .. } if o == owner)) {
+            e.removed = true;
+            any = true;
+        }
+    }
+    any
+}
+
 fn beam_anim(kind: BeamKind) -> i32 {
     match kind {
         BeamKind::Wave | BeamKind::Beam => 17,
@@ -1572,18 +1603,44 @@ fn update_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) -> bool {
                     }
                 }
             } else if *t == 24 {
+                // 0x080207D2: the beam fires at the fire position (table +0x30: (8,16) (8,-16) (-16,-6) (32,-6)); it
+                // grows 3 px per tick while its head is on screen and retracts 3 px per tick after the command
+                // (destructor: stop 32, sound 33) - the player's beam class (shots::KameBeam)
                 if let Some(i) = i {
                     set_pose(w, i, beam_anim(kind), if kind == BeamKind::Beam { 2 } else { 1 });
-                    let (x, y) = actor_pos(w, i);
                     let owner = w.ents[i].id;
-                    let dir = w.actor(i).map(|a| a.facing as i32).unwrap_or(0);
-                    w.scene.visuals.push(Visual { kind: VisualKind::Beam { kind, dir }, x, y, owner, t: 0, life: (*frames - 24).max(1) + BEAM_LINGER });
+                    remove_charge(w, owner);
+                    let a = w.actor(i).expect("actor");
+                    let dir = a.facing;
+                    let (fx0, fy0) = crate::shots::BEAM_POS_KAME_FIRE[dir as usize];
+                    let (x, y) = (a.px() + fx0, a.py() + fy0);
+                    let mut shot = crate::shots::kame_beam(owner, dir, x, y, w.frame as i64 - 23, crate::damage::atk(5), 328, true);
+                    if let crate::shots::ShotKind::Kame(k) = &mut shot.kind {
+                        k.sounds = true;
+                    }
+                    crate::shots::add(w, shot);
                 }
                 w.sfx_stop(3);
                 w.sfx(32, 64);
+            } else if *t > 24 && *t < *frames && kind == BeamKind::Beam {
+                // firing: the pose alternates cels 2 / 1 every 8 ticks
+                if let Some(i) = i {
+                    set_pose(w, i, beam_anim(kind), 2 - (((*t - 24) >> 3) & 1));
+                }
             }
             if *t >= *frames {
                 if let Some(i) = i {
+                    // 0x0802082A: still charging -> the charge goes (stop 3); firing -> the beam retracts
+                    let owner = w.ents[i].id;
+                    if remove_charge(w, owner) {
+                        w.sfx_stop(3);
+                    }
+                    let shots: Vec<usize> = (0..w.ents.len())
+                        .filter(|&k| !w.ents[k].removed && matches!(&w.ents[k].body, Body::Shot(s) if s.owner == owner && matches!(s.kind, crate::shots::ShotKind::Kame(_))))
+                        .collect();
+                    for k in shots {
+                        crate::shots::beam_stop(w, k);
+                    }
                     set_state(w, i, 0);
                 }
                 return true;
@@ -1756,6 +1813,26 @@ pub fn note_events(w: &mut World) {
     }
 }
 
+/// a cutscene scene load: the player objects leave the world (kept here unchanged)
+pub fn send_offstage(w: &mut World) {
+    let players = w.players.clone();
+    let mut k = 0;
+    while k < w.ents.len() {
+        if players.contains(&w.ents[k].id) && matches!(w.ents[k].body, Body::Player(_)) {
+            let e = w.ents.remove(k);
+            w.scene.offstage.push(e);
+        } else {
+            k += 1;
+        }
+    }
+}
+
+/// the players come back (before the field area they return to is loaded)
+pub fn bring_back(w: &mut World) {
+    let back = std::mem::take(&mut w.scene.offstage);
+    w.ents.extend(back);
+}
+
 /// `play_music`: start a song unless it is already playing
 pub fn play_song(w: &mut World, id: i32) {
     let playing = w.scene.song == id || w.events.iter().rev().find_map(|e| match e {
@@ -1878,12 +1955,7 @@ fn tick_visuals(w: &mut World) {
         }
     }
     // a fired beam's effect object ends with its sound changing (32 -> 33)
-    let ended_beam = w.scene.visuals.iter().any(|v| v.life == 0 && matches!(v.kind, VisualKind::Beam { kind: BeamKind::Beam | BeamKind::BeamAlt | BeamKind::Blast, .. }));
     w.scene.visuals.retain(|v| v.life != 0);
-    if ended_beam {
-        w.sfx_stop(32);
-        w.sfx(33, 64);
-    }
 }
 
 // ---------------------------------------------------------------------------------------------------------------

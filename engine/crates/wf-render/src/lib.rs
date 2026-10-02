@@ -13,6 +13,7 @@
 pub mod banner;
 pub mod font;
 pub mod mode7;
+pub mod mode7_draw;
 pub mod ui;
 
 use std::collections::HashMap;
@@ -102,6 +103,9 @@ pub struct Renderer {
     /// The area-name banner (`ui/banner.json`); `Some(None)` = content missing.
     banner: Option<Option<banner::Banner>>,
     pub blend_math: BlendMath,
+    /// world-map data per map id (mode7.rs)
+    mode7: HashMap<String, Option<Arc<wf_content::mode7::Mode7Data>>>,
+    strings: Option<Vec<String>>,
 }
 
 impl Default for Renderer {
@@ -215,6 +219,8 @@ impl Renderer {
             orig_pal: None,
             banner: None,
             blend_math: BlendMath::default(),
+            mode7: HashMap::new(),
+            strings: None,
         }
     }
 
@@ -300,6 +306,12 @@ impl Renderer {
             objs.push((s.priority.min(3), i, sheet, fi, flip ^ s.mirror));
         }
 
+        // the world map (mode 7): its own BGs and OBJs; the view's sprites are world-space and not drawn
+        let m7 = self.mode7_prepare(packs, view);
+        if m7.is_some() {
+            objs.clear();
+        }
+
         // screen-space OBJs (HUD, dialogue box): (priority, x, y, w, h, ARGB)
         let mut screen: Vec<(u8, i32, i32, usize, usize, Vec<u32>)> = Vec::new();
         if self.ui.is_none() {
@@ -342,6 +354,9 @@ impl Renderer {
         }
 
         for prio in (0..4u8).rev() {
+            if let Some(f) = &m7 {
+                self.draw_mode7_bgs(f, prio, ox, oy);
+            }
             if let Some((m, af, shake)) = &map {
                 // BGs of this priority, higher BG index further back
                 let mut bgs: Vec<usize> = (0..m.layers.len()).filter(|&i| m.layers[i].priority == prio).collect();
@@ -356,6 +371,9 @@ impl Renderer {
                     let s = &view.sprites[*i];
                     self.draw_obj(sheet, *fi, *flip, s.x - vx, s.y - vy, s.effect);
                 }
+            }
+            if let Some(f) = &m7 {
+                self.draw_mode7_objs(f, prio, ox, oy);
             }
             for (p, x, y, sw, sh, px) in &screen {
                 if *p == prio {

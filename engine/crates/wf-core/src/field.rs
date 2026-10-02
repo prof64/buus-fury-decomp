@@ -401,6 +401,15 @@ fn list_of(o: &ObjDef) -> i32 {
 /// unload the current area and load `to` with the leader at (x, y) px (footprint top-left): EnterArea `0x08008D44` +
 /// LoadArea `0x08008B30`
 pub fn load_area(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<Dir>) {
+    // players offstage during a cutscene scene come back for any real area load (warp, exit, return_to_field)
+    crate::scene::bring_back(w);
+    load_area_with(w, to, x, y, facing, true);
+}
+
+/// the area load with `objects` = false: the map's conditional objects are not spawned (script load_scene
+/// 0x74 `load_scene_fade_noobj`, 0x08009030 first flag 0). A cutscene scene load calls this after
+/// `scene::send_offstage` (no player object: no player re-creation, no draws).
+pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<Dir>, objects: bool) {
     let fd = field_data(w);
     let Some(a) = fd.area(to.world, to.area) else { return };
     let variant = resolve_variant(a, to.variant);
@@ -449,13 +458,13 @@ pub fn load_area(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<Dir>)
     // 4. map sprites, breakables, items (forward, conditions), then the trigger list (map header triggers, area
     // triggers; scanned area first), the song, the actors
     for list in [4, 2, 3] {
-        for o in a.objects.iter().filter(|o| list_of(o) == list) {
+        for o in a.objects.iter().filter(|o| objects && list_of(o) == list) {
             if cond_holds(w, &o.cond) {
                 spawn_object(w, o);
             }
         }
     }
-    for o in a.objects.iter().filter(|o| list_of(o) == 0).chain(m.exits.iter()) {
+    for o in a.objects.iter().filter(|o| objects && list_of(o) == 0).chain(m.exits.iter()) {
         if cond_holds(w, &o.cond) {
             spawn_object(w, o);
         }
@@ -463,7 +472,7 @@ pub fn load_area(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<Dir>)
     if let Some(s) = song_of(a) {
         w.events.push(Event::Song { id: s });
     }
-    for o in a.objects.iter().filter(|o| list_of(o) == 1) {
+    for o in a.objects.iter().filter(|o| objects && list_of(o) == 1) {
         if cond_holds(w, &o.cond) {
             spawn_object(w, o);
         }

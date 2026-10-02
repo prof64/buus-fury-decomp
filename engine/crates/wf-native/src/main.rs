@@ -448,7 +448,7 @@ impl Shell {
                     let _ = std::fs::write(&bpath, b.to_json());
                     b
                 });
-                let mut ctl = Control::new(&mut app, load_hotkeys(&self.args.data), now_unix());
+                let ctl = Control::new(&mut app, load_hotkeys(&self.args.data), now_unix());
                 let a = &self.args;
                 let local = wf_app::battle::config(&a.arena, &a.enemy, a.count, &a.fighter, a.form, a.level, a.players, a.seed);
                 let mut online = online::Online::new(a.net.clone(), &a.data, local, a.signal_given);
@@ -457,7 +457,6 @@ impl Shell {
                 } else if a.online {
                     online.toggle(&mut app);
                 }
-                let _ = &mut ctl;
                 self.phase = Phase::Ready(Box::new(Running {
                     online,
                     ctl,
