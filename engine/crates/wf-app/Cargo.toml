@@ -1,0 +1,19 @@
+[package]
+name = "wf-app"
+description = "Portable frontend core: fixed-step loop around a Sim, per-player cameras/viewports, input bindings, the audio engine (wf-audio driver + resampler), the demo world"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+wf-view = { path = "../wf-view" }
+wf-content = { path = "../wf-content" }
+wf-render = { path = "../wf-render" }
+wf-audio = { path = "../wf-audio" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+png = { workspace = true }
+wf-rom = { workspace = true }
+wf-extract = { path = "../wf-extract" }

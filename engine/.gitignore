@@ -1,2 +1,4 @@
 /target
 /content
+/web/wf_wasm.wasm
+/web/app/wf_web.wasm

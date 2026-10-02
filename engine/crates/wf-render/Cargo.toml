@@ -1,0 +1,10 @@
+[package]
+name = "wf-render"
+description = "Software GBA-style compositor: RenderView + content -> pixel-exact framebuffer for any viewport size (no GPU, no platform deps)"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+wf-view = { path = "../wf-view" }
+wf-content = { path = "../wf-content" }
