@@ -124,9 +124,10 @@ describe('player movement (emulator traces, Snakeway, new-game Goku SPD 50: walk
     expect(back - first).toBe(16)
   })
   it('dashing into a wall: hurt animation, pushed back 0.75 px per frame for 23 frames, then walking again', () => {
-    const s = quiet()
-    const b = s.w.arena.bounds
-    s.player.x = (b.x0 + 20) << 8
+    // Giant Crater: open floor right of the left cliff (wall tiles end at x = 72 on this row)
+    const s = quiet('crater')
+    s.player.x = 92 << 8
+    s.player.y = 184 << 8
     const t = trace(s, [[0, 1], [BTN.LEFT, 2], [0, 2], [BTN.LEFT, 60]])
     const hit = t.findIndex((f) => f.st === 'bump')
     expect(hit).toBeGreaterThan(0)

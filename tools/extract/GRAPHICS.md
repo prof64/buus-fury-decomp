@@ -164,6 +164,10 @@ input/state selects (LoG2 Piccolo/Trunks, Buu Goku), applied per shared engine c
   +0x20/+0x24/+0x28 three BG planes as `u32[w*h]` → 30×20 raw screens (0x4B0 bytes); +0x2C palette}.
   Rendered after forcing `load_map(map, default entrance)` (`0x08001FA8`) at boot.
 * Output per map: `composite.png`, per-layer `bgN.png`, `screenshot.png`, and per-tileset sheets.
+* Buu collision: each map header (found through its field resources at header + 0x14 + 4·bg) points at a walk grid
+  (+0x34) and a projectile grid (+0x38), webfoot-LZ 256x256 bits of 8x8 tiles (1 = passable). Format, how actors and
+  shots test them, enemy path finding and the two composites that are offset from the world grid (7-6, 18-14):
+  `tools/battle/COLLISION.md` (extractor `tools/battle/buu_collision.py` -> `data/battle/buu_collision.json`).
 
 ## 7. sprites.json
 

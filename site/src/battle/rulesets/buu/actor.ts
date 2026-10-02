@@ -135,9 +135,14 @@ export abstract class Actor implements Entity, Receiver {
     return !this.anim || this.animT >= this.animLength()
   }
 
+  /** map collision for a footprint at (x, y) px (player: walk grid, enemies: enemy grid); default: none */
+  passable(_w: World, _x: number, _y: number): boolean {
+    return true
+  }
+  /** footprint (x, y) .. (x + footW, y + footH) inside the arena bounds and on passable tiles */
   fits(w: World, x: number, y: number): boolean {
     const b = w.arena.bounds
-    return x >= b.x0 && y >= b.y0 && x + this.footW <= b.x1 && y + this.footH <= b.y1
+    return x >= b.x0 && y >= b.y0 && x + this.footW <= b.x1 && y + this.footH <= b.y1 && this.passable(w, x, y)
   }
   /** collision try-move (vfunc +0x54): per axis */
   moveBy(w: World, vx: number, vy: number): boolean {

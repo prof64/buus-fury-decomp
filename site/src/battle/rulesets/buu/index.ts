@@ -8,6 +8,7 @@ import type {
 import type { ArenaRuntime, World } from '../../core/world'
 import { GBA_H, GBA_W } from '../../core/renderer'
 import { Actor } from './actor'
+import { BuuCollision, CollisionOverlay, walkRegion } from './collision'
 import { BuuCtx } from './context'
 import { loadBuu, type BuuData, type BuuForm, type EquipDef } from './data'
 import { Enemy } from './enemy'
@@ -16,22 +17,27 @@ import { Player } from './player'
 import { fuse, recalcStats, recordAtLevel, type BuuRecord, type GrowthMode } from './progression'
 import { BuuRng } from './rng'
 
-const ARENAS: (ArenaChoice & { map: string })[] = [
-  { id: 'crater', map: '8-71', name: 'Giant Crater', image: '', size: [0, 0], bounds: { x0: 56, y0: 72, x1: 424, y1: 360 } },
-  { id: 'volcano', map: '15-32', name: 'Volcano Summit', image: '', size: [0, 0], bounds: { x0: 40, y0: 96, x1: 440, y1: 376 } },
-  { id: 'hfil', map: '18-14', name: 'HFIL', image: '', size: [0, 0], bounds: { x0: 24, y0: 80, x1: 300, y1: 304 } },
-  { id: 'wasteland', map: '20-7', name: 'Barren Wasteland', image: '', size: [0, 0], bounds: { x0: 40, y0: 72, x1: 440, y1: 420 } },
-  { id: 'demon', map: '8-68', name: 'Demon World', image: '', size: [0, 0], bounds: { x0: 96, y0: 76, x1: 400, y1: 330 } },
-  { id: 'canyon', map: '8-70', name: 'Rocky Canyon', image: '', size: [0, 0], bounds: { x0: 88, y0: 168, x1: 470, y1: 400 } },
-  { id: 'yakon', map: '8-40', name: "Yakon's Planet", image: '', size: [0, 0], bounds: { x0: 72, y0: 92, x1: 380, y1: 390 } },
-  { id: 'crater2', map: '6-16', name: 'Giant Crater (after the blast)', image: '', size: [0, 0], bounds: { x0: 56, y0: 72, x1: 424, y1: 360 } },
-  { id: 'htc', map: '6-9', name: 'Hyperbolic Time Chamber', image: '', size: [0, 0], bounds: { x0: 72, y0: 64, x1: 328, y1: 240 } },
-  { id: 'stadium', map: '7-6', name: 'World Tournament Stadium', image: '', size: [0, 0], bounds: { x0: 216, y0: 256, x1: 472, y1: 516 } },
-  { id: 'forest', map: '8-3', name: 'Southwest Forest', image: '', size: [0, 0], bounds: { x0: 40, y0: 40, x1: 520, y1: 520 } },
-  // large open maps for the PC view (walls = the open ground, picked on the map renders; buildings are not solid)
-  { id: 'plateau', map: '19-3', name: 'Rocky Plateau (720x560)', image: '', size: [0, 0], bounds: { x0: 40, y0: 200, x1: 660, y1: 432 } },
-  { id: 'village', map: '15-1', name: 'Nataday Village (800x720)', image: '', size: [0, 0], bounds: { x0: 96, y0: 120, x1: 760, y1: 560 } },
-  { id: 'kamehouse', map: '5-1', name: 'Kame House island (720x640)', image: '', size: [0, 0], bounds: { x0: 72, y0: 368, x1: 648, y1: 560 } },
+// `spawn` = the player's starting footprint (world px, on walkable ground); with the map's collision the arena bounds
+// become the bounding box of the walkable region around it (the tiles do the rest); `bounds` is the fallback when a
+// map has no collision data. Maps 7-6 and 18-14 have their composite offset from the world grid (`origin`, measured by
+// tools/battle/buu_collision.py --origins).
+type BuuArena = ArenaChoice & { map: string; spawn: [number, number]; region?: Uint8Array | null }
+const ARENAS: BuuArena[] = [
+  { id: 'crater', map: '8-71', name: 'Giant Crater', image: '', size: [0, 0], spawn: [96, 216], bounds: { x0: 56, y0: 72, x1: 424, y1: 360 } },
+  { id: 'volcano', map: '15-32', name: 'Volcano Summit', image: '', size: [0, 0], spawn: [80, 216], bounds: { x0: 40, y0: 96, x1: 440, y1: 376 } },
+  { id: 'hfil', map: '18-14', name: 'HFIL', image: '', size: [0, 0], spawn: [64, 248], bounds: { x0: 24, y0: 80, x1: 300, y1: 304 } },
+  { id: 'wasteland', map: '20-7', name: 'Barren Wasteland', image: '', size: [0, 0], spawn: [88, 232], bounds: { x0: 40, y0: 72, x1: 440, y1: 420 } },
+  { id: 'demon', map: '8-68', name: 'Demon World', image: '', size: [0, 0], spawn: [120, 184], bounds: { x0: 96, y0: 76, x1: 400, y1: 330 } },
+  { id: 'canyon', map: '8-70', name: 'Rocky Canyon', image: '', size: [0, 0], spawn: [120, 280], bounds: { x0: 88, y0: 168, x1: 470, y1: 400 } },
+  { id: 'yakon', map: '8-40', name: "Yakon's Planet", image: '', size: [0, 0], spawn: [112, 200], bounds: { x0: 72, y0: 92, x1: 380, y1: 390 } },
+  { id: 'crater2', map: '6-16', name: 'Giant Crater (after the blast)', image: '', size: [0, 0], spawn: [96, 216], bounds: { x0: 56, y0: 72, x1: 424, y1: 360 } },
+  { id: 'htc', map: '6-9', name: 'Hyperbolic Time Chamber', image: '', size: [0, 0], spawn: [104, 152], bounds: { x0: 72, y0: 64, x1: 328, y1: 240 } },
+  { id: 'stadium', map: '7-6', name: 'World Tournament Stadium', image: '', size: [0, 0], spawn: [264, 384], bounds: { x0: 232, y0: 256, x1: 488, y1: 512 } },
+  { id: 'forest', map: '8-3', name: 'Southwest Forest', image: '', size: [0, 0], spawn: [96, 248], bounds: { x0: 40, y0: 40, x1: 520, y1: 520 } },
+  // large maps for the PC view
+  { id: 'plateau', map: '19-3', name: 'Rocky Plateau (720x560)', image: '', size: [0, 0], spawn: [240, 280], bounds: { x0: 40, y0: 200, x1: 660, y1: 432 } },
+  { id: 'village', map: '15-1', name: 'Nataday Village (800x720)', image: '', size: [0, 0], spawn: [200, 304], bounds: { x0: 96, y0: 120, x1: 760, y1: 560 } },
+  { id: 'kamehouse', map: '5-1', name: 'Kame House island (720x640)', image: '', size: [0, 0], spawn: [160, 472], bounds: { x0: 72, y0: 368, x1: 648, y1: 560 } },
 ]
 const ARENA_FOR_MAP: Record<string, string> = Object.fromEntries(ARENAS.map((a) => [a.map, a.id]))
 ARENA_FOR_MAP['20-5'] = 'wasteland'
@@ -123,13 +129,7 @@ export class BuuRuleset implements Ruleset {
     if (this.d) return
     this.d = await loadBuu()
     Actor.bank = this.d.sprites
-    for (const a of ARENAS) {
-      const m = this.d.maps.get(a.map)
-      if (m) {
-        a.image = m.composite
-        a.size = m.size
-      }
-    }
+    this.prepareArenas()
     const sheets = new Set<string>()
     for (const f of this.d.forms) {
       const s = this.d.sprites.index(f.gfx - 9)
@@ -224,8 +224,31 @@ export class BuuRuleset implements Ruleset {
     })]
   }
 
+  private arenasFor: BuuData | null = null
+  /** arena images, composite origins and (with collision) bounds = the walkable region around the spawn point */
+  private prepareArenas() {
+    if (this.arenasFor === this.d) return
+    this.arenasFor = this.d
+    for (const a of ARENAS) {
+      const m = this.d.maps.get(a.map)
+      if (m) {
+        a.image = m.composite
+        a.size = m.size
+      }
+      const o = this.d.origins.get(a.map)
+      if (o) a.origin = o
+      const g = this.d.collision.get(a.map)
+      const reg = g ? walkRegion(g, a.spawn[0], a.spawn[1]) : null
+      if (reg) {
+        a.bounds = reg.bounds
+        a.region = reg.mask
+      }
+    }
+  }
+
   arenas(): ArenaChoice[] {
-    return ARENAS.map(({ map, ...a }) => ({ ...a, note: `map ${map}` }))
+    this.prepareArenas()
+    return ARENAS.map(({ map, spawn: _s, region: _r, ...a }) => ({ ...a, note: `map ${map}` }))
   }
   presets(): PresetChoice[] {
     return PRESETS
@@ -367,8 +390,9 @@ export class BuuRuleset implements Ruleset {
     return this.d.sprites
   }
   arenaRuntime(id: string): ArenaRuntime {
+    this.prepareArenas()
     const a = ARENAS.find((x) => x.id === id) ?? ARENAS[0]
-    return { id: a.id, name: a.name, image: a.image, size: a.size, bounds: a.bounds, view: a.view }
+    return { id: a.id, name: a.name, image: a.image, size: a.size, origin: a.origin, bounds: a.bounds, view: a.view }
   }
 
   createBattle(cfg: BattleConfig, w: World): RulesetBattle {
@@ -389,8 +413,19 @@ export class BuuRuleset implements Ruleset {
       formsAllowed: fd.forms,
     })
     const b = w.arena.bounds
-    player.x = (b.x0 + 32) << 8
-    player.y = ((b.y0 + b.y1) >> 1) << 8
+    const arena = ARENAS.find((a) => a.id === w.arena.id)
+    const grid = arena && this.d.collision.get(arena.map)
+    ctx.col = grid ? new BuuCollision(grid) : null
+    if (ctx.col) w.add(new CollisionOverlay(ctx.col))
+    const region = ctx.col ? arena?.region ?? null : null
+    if (arena && ctx.col) {
+      const [sx, sy] = ctx.col.freeSpot('walk', arena.spawn[0], arena.spawn[1], player.footW, player.footH, b, region)
+      player.x = sx << 8
+      player.y = sy << 8
+    } else {
+      player.x = (b.x0 + 32) << 8
+      player.y = ((b.y0 + b.y1) >> 1) << 8
+    }
     player.facing = 3
     ctx.player = player
     w.add(player)
@@ -404,6 +439,12 @@ export class BuuRuleset implements Ruleset {
       e.x = x << 8
       e.y = y << 8
       e.clampInside(ww)
+      // on walkable ground, clear of the other enemies' marked footprints (nearest free spot)
+      if (ctx.col && !parent) {
+        const [fx, fy] = ctx.col.freeSpot('enemy', e.px, e.py, e.footW, e.footH, ww.arena.bounds, region)
+        e.x = fx << 8
+        e.y = fy << 8
+      }
       if (parent) {
         e.parentE = parent
         parent.children.push(e)
@@ -411,6 +452,7 @@ export class BuuRuleset implements Ruleset {
       ww.add(e)
       ctx.enemies.push(e)
       e.w = ww
+      e.markSelf()
       if (start !== -1) e.start(ww, start ?? t.ai)
       return e
     }
@@ -437,7 +479,7 @@ export class BuuRuleset implements Ruleset {
             y = sp.y
           } else {
             x = Math.min(b.x1 - 40, player.px + 120 + Math.floor(k / 4) * 30)
-            y = ((b.y0 + b.y1) >> 1) + ((k % 4) - (Math.min(n * parts.length, 4) - 1) / 2) * 34
+            y = (ctx.col ? player.py : (b.y0 + b.y1) >> 1) + ((k % 4) - (Math.min(n * parts.length, 4) - 1) / 2) * 34
           }
           const e = spawnEnemy(w, part.type, x, Math.round(y))
           if (e) {
@@ -489,6 +531,10 @@ export class BuuRuleset implements Ruleset {
     camInit = false // snap again on the first frame (setups / tests may move the player after createBattle)
 
     const battle: RulesetBattle = {
+      preStep() {
+        // enemy grid marks follow positions set outside the enemy step (spawns, teleports, deaths)
+        if (ctx.col) for (const e of ctx.enemies as Enemy[]) e.syncMark()
+      },
       postStep(w2) {
         camera(w2)
         if (!live().length && phase < cfg.phases.length - 1 && !player.dead) {

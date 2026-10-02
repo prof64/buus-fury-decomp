@@ -17,7 +17,8 @@ interface Trial {
 }
 
 function run(skill: number, level: number, hold: number, dist: number) {
-  const s = makeBuuSim({ enemy: 't68', arena: 'forest', fighter: fighter({ options: { ...fighter().options, skillLevel: String(level) } }) })
+  // an open floor (the forest's trees are projectile walls)
+  const s = makeBuuSim({ enemy: 't68', arena: 'htc', fighter: fighter({ options: { ...fighter().options, skillLevel: String(level) } }) })
   const p = s.player
   p.rec.ep = p.rec.maxEp = 999
   p.skills = [skill]

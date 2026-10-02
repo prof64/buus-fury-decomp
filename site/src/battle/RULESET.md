@@ -139,6 +139,8 @@ obstacles not placed.
 | `enemy.ts` | HP <<10, hit handler 0x0800FAFA (ComputeDamage on every accepted hit, then the aux tree whose ApplyDamage takes the HP), melee box 0x0802A0C4, HeavyStrike, death node (type +0x14 word +8), Kid Buu split / merge, Janemba parts / hands, worm segments, summons | notes §8b, bosses.json |
 | `projectiles.ts` | ki blast, growing beams (0x080206B8), instant beam (0x08036FA2), bullets / rifle / shells / shuriken / wraps / spit, energy wave, flames, bombs, Buu stretch arm, candy beam, Super Buu ball, Super Janemba wave, dark sphere, grapple arm, Broly's rocks, Big Bang / Masenko / Kamikaze ghosts | bosses.json projectiles |
 | `hud.ts` | captured HUD (hud.png) + skill icons from the ROM (tools/battle/extract_buu_icons.py) | ui captures |
+| `collision.ts` | the map's walk / projectile / enemy grids (8x8 tiles, box test 0x08009324, marks 0x08009930), arena walkable region, hitbox-view overlay | tools/battle/COLLISION.md, data/battle/buu_collision.json |
+| `path.ts` | enemy path follower of ChasePlayer / MoveToPoint / WanderToRandomPoint: plan 0x0803B6EA (Bresenham line), wall-follow 0x0803B4FC, step 0x0803B934, re-plan every 8 frames | COLLISION.md §4 |
 
 The aux (on-hit) trees and the reaction states 0x00..0x11 are not in enemy_ai.json; `tools/battle/gen_buu_ai_extra.py`
 decodes them from the ROM into `data/battle/buu_ai_extra.json`. Bosses whose aux trees have no ApplyDamage take no
@@ -151,12 +153,21 @@ OBJ of the halo forms (`attach` offsets) drawn by `Actor.draw`; camera 0x080077E
 distance to the footprint centre per frame and clamps to the map; walking starts one frame after the press; punch
 recovery 16 frames; dashing into a wall plays the hurt animation and pushes back 192/256 px per frame for 23 frames
 (`bump`); StepTowardPlayer 0x08018C3A moves `speed` on the major axis (velocity = d × speed / max(|dx|, |dy|)).
-Not modelled: the game's lag frames (busy scenes skip logic frames on the GBA), map collision tiles.
+Not modelled: the game's lag frames (busy scenes skip logic frames on the GBA).
+
+Map collision (tools/battle/COLLISION.md): arenas use the real map grids from the ROM map headers
+(`data/battle/buu_collision.json`). The player's footprint (position .. + header shadow size) is tested on the walk
+grid with the walk try-move 0x08012960 (one axis at a time, corner snapping within 2 px of a tile edge); enemies test
+the enemy grid, on which every enemy marks its own footprint (enemies block each other, the player walks through
+them); shots explode on the projectile grid. The arena bounds are the bounding box of the walkable region around the
+arena's spawn point; spawns go to the nearest free spot. Verified frame by frame against emulator walks into cliffs /
+rocks and against the game's path follower (`tests/battle/buu_collision.test.ts`). The hitbox view shows the grids
+(magenta walls, orange enemy marks, cyan projectile-only walls).
 
 Fitted / inferred (marked in the code): skill state machines are fitted to the measured runs (first-hit frames,
-hit counts, EP), beam hit rate near / far, Big Bang multiplier = 0.284 x charged EP, path-finding replaced by
-straight moves, some table-driven offsets (candy beam, formation slots), energy shield effect, thorns, SS cooldown
-start value, transform not interruptible, arena walls as rectangles, cutscene scripts not run.
+hit counts, EP), beam hit rate near / far, Big Bang multiplier = 0.284 x charged EP, some table-driven offsets (candy beam, formation slots), energy shield effect, thorns, SS cooldown
+start value, transform not interruptible, cutscene scripts not run, which controller states detach an enemy from the
+enemy grid, map objects that mark tiles at load (NPCs, breakables) not placed.
 
 ## Tests and tools
 
@@ -184,9 +195,14 @@ start value, transform not interruptible, arena walls as rectangles, cutscene sc
   measurement runs (first-hit frame, multiplier, attack type, hit count); `buu_sim.test.ts` — aggro radii (100 /
   88 / 72 px), chase / wander speeds, Majin Fighter melee damage, HeavyStrike reach + timing, vampire drain,
   Blister spawns, invulnerable story Buus, Janemba timeline, Super Janemba wave damage, Kid Buu split,
-  Spopovich + Yamu drain; `buu_smoke.test.ts` — all 150 types / presets / fighters' skills run.
+  Spopovich + Yamu drain; `buu_smoke.test.ts` — all 150 types / presets / fighters' skills run;
+  `buu_collision.test.ts` — collision data for every arena, 7 emulator walks into walls and 3 emulator path-follower
+  runs replayed frame by frame (positions, waypoints), enemy marks, a ki blast stopped by a cliff.
 * `tools/battle/gen_buu_vectors.py`, `gen_buu_enemy_hits.py`, `gen_buu_ai_extra.py`, `extract_buu_icons.py`,
   `buu_boss_hp_check.py` — Buu vectors, enemy hit table, aux trees, HUD icons, boss damage check (emulator).
+* `tools/battle/buu_collision.py` (map grids of every map -> `data/battle/buu_collision.json`; `--check` vs RAM,
+  `--origins` composite offsets), `gen_buu_collision_traces.py`, `gen_buu_path_traces.py` (emulator traces for the
+  collision test); format and addresses in `tools/battle/COLLISION.md`.
 * `tools/battle/play.py` — drives the running page through `chrome-devtools-axi` (start a setup, inject
   button sequences frame-exactly, screenshot). `window.__battle` exposes the live `BattleSession`.
   `BT_GAME=log1|buu` picks the ruleset, `BT_URL` / `BT_SESSION` another dev server / browser session.

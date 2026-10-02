@@ -16,7 +16,8 @@ function place(s: BuuSim, dx: number, dy = 0, e: Enemy = s.enemies[0]) {
 const god = (s: BuuSim) => {
   s.player.rec.hp = s.player.rec.maxHp = 99999
 }
-function sim(enemy: string, arena = 'forest', seed = 1) {
+// default arena: the Time Chamber's open floor (no walls near the fighters)
+function sim(enemy: string, arena = 'htc', seed = 1) {
   const s = makeBuuSim({ enemy, arena, seed, fighter: fighter() })
   // put the player in the middle of the arena
   const b = s.w.arena.bounds
@@ -101,8 +102,8 @@ describe('enemy AI vs emulator', () => {
     expect(Math.abs(mode - 153)).toBeLessThanOrEqual(1)
   })
   it('Ghost wanders at 0.5 px/frame', () => {
-    const s = sim('t32')
-    place(s, 200, 0)
+    const s = sim('t32', 'crater')
+    place(s, 120, 0)
     const e = s.enemies[0]
     let moved = 0
     let frames = 0

@@ -196,6 +196,67 @@ export class Enemy extends Actor implements EnemyLike {
     return overlaps(cor, b.rect())
   }
 
+  // ---- map collision (enemy grid, map object +0xB0) ---------------------------------------------------------------
+  /** tiles this enemy marked blocked on the enemy grid (obj+0x291 == 0 "attached"), x0 y0 x1 y1 px */
+  marked: [number, number, number, number] | null = null
+  /** on the enemy grid (obj+0x291 == 0). Detach 0x0800F924 is called by the worm body (0x0802D76C, its segments
+   *  replay the head's steps without a test), the grab / hug controller (anim 0x11, 0x0804E53C) and the anim 0x13
+   *  controller (0x0804E938, rise / vanish); Attach 0x0800F954 when those end. Modelled: body parts, worm segments,
+   *  the enemy holding the player, airborne (height offset), defeated (INFERRED mapping of the controllers) */
+  attached(): boolean {
+    return !this.part && !this.prev && !this.defeated && !this.removed && this.z === 0 && this.ctx.player?.heldBy !== this
+  }
+  /** vfunc +0x48(0) = 0x0800F740(enemy, 0): mark the footprint's tiles blocked */
+  markSelf() {
+    const c = this.ctx.col
+    if (!c || this.marked || !this.attached()) return
+    this.marked = [this.px, this.py, this.px + this.footW, this.py + this.footH]
+    c.mark('enemy', ...this.marked, 0)
+  }
+  /** vfunc +0x48(1): free the marked tiles (the game sets them passable; here they get the terrain value back, so a
+   *  footprint pushed onto a wall tile cannot open a hole in the grid) */
+  unmarkSelf() {
+    const c = this.ctx.col
+    if (!c || !this.marked) return
+    c.restore('enemy', ...this.marked)
+    this.marked = null
+  }
+  /** keep the marks on the current footprint (positions set directly: spawns, teleports, followers) */
+  syncMark() {
+    const m = this.marked
+    if (m && this.attached() && m[0] === this.px && m[1] === this.py) return
+    this.unmarkSelf()
+    this.markSelf()
+  }
+  /** vfunc +0x54 = 0x0800F9EE(enemy, pos): footprint on the enemy grid; a detached enemy (obj+0x291 != 0) always fits */
+  passable(_w: World, x: number, y: number): boolean {
+    const c = this.ctx.col
+    if (!c || !this.attached()) return true
+    const m = this.marked
+    if (m) c.restore('enemy', ...m)
+    const ok = c.test('enemy', x, y, x + this.footW, y + this.footH)
+    if (m) c.mark('enemy', ...m, 0)
+    return ok
+  }
+  /** enemy step (ChasePlayer's step 0x0803B9xx, StepTowardPlayer 0x08018C3A): unmark, try the full move, else only
+   *  the x part (fx), else only the y part (fy), re-mark. true = the full move was taken */
+  tryMove(vx: number, vy: number, fx = vx, fy = vy): boolean {
+    const w = this.w
+    this.unmarkSelf()
+    let ok = false
+    if (this.fits(w, (this.x + vx) >> 8, (this.y + vy) >> 8)) {
+      this.x += vx
+      this.y += vy
+      ok = true
+    } else if (fx && this.fits(w, (this.x + fx) >> 8, this.py)) this.x += fx
+    else if (fy && this.fits(w, this.px, (this.y + fy) >> 8)) this.y += fy
+    this.markSelf()
+    return ok
+  }
+  moveBy(_w: World, vx: number, vy: number): boolean {
+    return this.tryMove(vx, vy)
+  }
+
   // ---- movement -------------------------------------------------------------------------------------------------
   walkBy(vx: number, vy: number): boolean {
     if (!vx && !vy) return true
@@ -216,7 +277,9 @@ export class Enemy extends Actor implements EnemyLike {
     if (!m) return true
     this.facing = facingToward(dx, dy)
     if (m <= stop) return true
-    this.walkBy(Math.trunc((dx * speed) / m), Math.trunc((dy * speed) / m))
+    // blocked: 0x08018C3A falls back to a full-speed step on x, then on y (sign of d; d = 0 counts as positive)
+    this.moving = true
+    this.tryMove(Math.trunc((dx * speed) / m), Math.trunc((dy * speed) / m), dx >= 0 ? speed : -speed, dy >= 0 ? speed : -speed)
     return false
   }
   /** normalised move toward the player; true when within `stop` px (centre distance) */
@@ -249,10 +312,12 @@ export class Enemy extends Actor implements EnemyLike {
     if (Math.abs(dx) <= 8 && Math.abs(dy) <= 8) return true
     const d = Math.hypot(dx, dy)
     this.facing = facingToward(dx, dy)
+    const [ox, oy] = [this.x, this.y]
     if (!this.walkBy((dx * speed) / d, (dy * speed) / d)) {
-      // blocked by the arena edge: the target is unreachable here -> accept the closest point
+      // blocked by the arena edge or a wall: the target is unreachable here -> accept the closest point
       const b = this.w.arena.bounds
       if (x < b.x0 || y < b.y0 || x + this.footW > b.x1 || y + this.footH > b.y1) return true
+      if (this.x === ox && this.y === oy) return true
     }
     return false
   }

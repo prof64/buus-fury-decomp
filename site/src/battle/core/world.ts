@@ -26,9 +26,11 @@ export interface Entity {
 export interface ArenaRuntime {
   id: string
   name: string
-  /** background image (map composite) drawn at world origin */
+  /** background image (map composite), its top-left drawn at world `origin` (default 0, 0) */
   image: string
   size: [number, number]
+  /** world position of the image's top-left pixel (maps whose composite is offset from the world grid) */
+  origin?: [number, number]
   /** walkable rectangle in world px: an entity's collision box must stay inside */
   bounds: Rect
   /** part of the image the camera may show (fully painted background); default: the whole image */
@@ -145,7 +147,8 @@ export class World {
   viewRect(): Rect | null {
     if (this.arena.view) return this.arena.view
     const [mw, mh] = this.arena.size
-    return mw > 0 && mh > 0 ? { x0: 0, y0: 0, x1: mw, y1: mh } : null
+    const [ox, oy] = this.arena.origin ?? [0, 0]
+    return mw > 0 && mh > 0 ? { x0: ox, y0: oy, x1: ox + mw, y1: oy + mh } : null
   }
 
   /** Centre the logical GBA camera on a point, clamped to the arena (plus a margin of scenery) and the painted view. */
@@ -176,7 +179,7 @@ export class World {
     }
     r.beginFrame('#000')
     const bg = imageNow(this.arena.image)
-    if (bg) r.ctx.drawImage(bg, -r.camX, -r.camY)
+    if (bg) r.ctx.drawImage(bg, (this.arena.origin?.[0] ?? 0) - r.camX, (this.arena.origin?.[1] ?? 0) - r.camY)
     const sorted = this.entities
       .filter((e) => !e.removed)
       .sort((a, b) => a.layer - b.layer || a.depth() - b.depth() || a.id - b.id)

@@ -237,7 +237,7 @@ export function SetupScreen({ rs, state, onChange, onStart, onGame }: { rs: Rule
                   className="bt-arena-img"
                   style={{
                     backgroundImage: `url(${import.meta.env.BASE_URL + a.image})`,
-                    backgroundPosition: `-${a.bounds.x0 + (a.bounds.x1 - a.bounds.x0) / 2 - 80}px -${a.bounds.y0 + (a.bounds.y1 - a.bounds.y0) / 2 - 50}px`,
+                    backgroundPosition: `-${a.bounds.x0 + (a.bounds.x1 - a.bounds.x0) / 2 - 80 - (a.origin?.[0] ?? 0)}px -${a.bounds.y0 + (a.bounds.y1 - a.bounds.y0) / 2 - 50 - (a.origin?.[1] ?? 0)}px`,
                   }}
                 />
                 <span>{a.name}</span>

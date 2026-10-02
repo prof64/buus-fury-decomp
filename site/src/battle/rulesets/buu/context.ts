@@ -5,6 +5,7 @@
 import type { SpriteSet } from '../../core/sprites'
 import type { Popup, World } from '../../core/world'
 import { Effect, type Actor } from './actor'
+import type { BuuCollision } from './collision'
 import type { BuuData, EnemyType } from './data'
 
 export interface PlayerLike extends Actor {
@@ -65,10 +66,14 @@ export class BuuCtx {
   waypoint = 0
   /** 0x03003228 TeleportChain4 counter */
   teleChain = 0
+  /** 0x030032E5: re-plan phase handed to the next path follower (path.ts), +1 & 7 each time */
+  pathStagger = 0
   /** spawn an enemy of `type` at integer px (set by index.ts) */
   spawnEnemy: (w: World, type: number, x: number, y: number, parent?: EnemyLike | null, startState?: number) => EnemyLike | null = () => null
   private lastPopup = new Map<Actor, { frame: number; p: Popup; value: number }>()
 
+  /** map collision of the arena (null = open arena, bounds only) */
+  col: BuuCollision | null = null
   readonly data: BuuData
   readonly opts: BuuOptions
   constructor(data: BuuData, opts: BuuOptions) {

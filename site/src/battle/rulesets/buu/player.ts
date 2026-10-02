@@ -413,6 +413,43 @@ export class Player extends Actor implements PlayerLike {
   }
   hurtDir: Dir = 0
 
+  /** the player tests the map's walk grid (map object +0xA8) with its footprint (obj+0x19C size) */
+  passable(_w: World, x: number, y: number): boolean {
+    const c = this.ctx.col
+    return !c || c.test('walk', x, y, x + this.footW, y + this.footH)
+  }
+
+  /** walking try-move 0x08012960(player, new 24.8 pos, flags): take the new position if the footprint fits; else
+   *  slide around a corner: flags & 1 (vertical step) snaps x to the nearest multiple of 8 when x is within 2 px
+   *  of it, flags & 2 (horizontal step) does the same for y. Both coordinates come from the first test that fits. */
+  walkTry(w: World, vx: number, vy: number, flags: 1 | 2) {
+    const nx24 = this.x + vx
+    const ny24 = this.y + vy
+    let nx = nx24 >> 8
+    const ny = ny24 >> 8
+    if (this.fits(w, nx, ny)) {
+      this.x = nx24
+      this.y = ny24
+      return
+    }
+    let x24 = nx24
+    if (flags & 1 && ((nx & 7) < 2 || (nx & 7) > 5)) {
+      const sx = (nx + 4) & ~7
+      if (this.fits(w, sx, ny)) {
+        this.x = x24 = sx << 8
+        this.y = ny24
+        nx = sx
+      }
+    }
+    if (flags & 2 && ((ny & 7) < 2 || (ny & 7) > 5)) {
+      const sy = (ny + 4) & ~7
+      if (this.fits(w, nx, sy)) {
+        this.x = x24
+        this.y = sy << 8
+      }
+    }
+  }
+
   fits(w: World, x: number, y: number): boolean {
     if (!super.fits(w, x, y)) return false
     for (const e of w.entities) {
@@ -495,18 +532,19 @@ export class Player extends Actor implements PlayerLike {
     if (starting) this.setState(w, 'walk')
     const sp = starting ? 0 : this.walkSpeed()
     let combo = 0
+    // walk state 0x08013230: horizontal step first (try-move flags 2), then vertical (flags 1)
     if (held & BTN.LEFT) {
-      if (sp) this.moveBy(w, -sp, 0)
+      if (sp) this.walkTry(w, -sp, 0, 2)
       combo = 1
     } else if (held & BTN.RIGHT) {
-      if (sp) this.moveBy(w, sp, 0)
+      if (sp) this.walkTry(w, sp, 0, 2)
       combo = 2
     }
     if (held & BTN.UP) {
-      if (sp) this.moveBy(w, 0, -sp)
+      if (sp) this.walkTry(w, 0, -sp, 1)
       combo += 3
     } else if (held & BTN.DOWN) {
-      if (sp) this.moveBy(w, 0, sp)
+      if (sp) this.walkTry(w, 0, sp, 1)
       combo += 6
     }
     this.facing = FACE_TBL[combo][this.facing] as Dir

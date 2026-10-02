@@ -57,10 +57,28 @@ export abstract class Shot implements Entity, Receiver {
   offCamera(w: World) {
     return !overlaps(this.rect(), w.camera)
   }
-  /** projectile passability: the arena rectangle (+ margin for walls drawn above the floor) */
-  inWall(w: World) {
+  /** wall test of every shot update: 0x08009324(box, map +0xAC) = any 8x8 tile under the box blocked on the map's
+   *  projectile grid (or the box outside 0..2048). Arenas without collision data: the arena rectangle + a margin. */
+  inWall(w: World, r: Rect = this.rect()) {
+    const c = this.ctx.col
+    if (c) return !c.testRect('shot', r)
     const b = w.arena.bounds
     return this.px < b.x0 - 8 || this.px > b.x1 + 8 || this.py < b.y0 - 40 || this.py > b.y1 + 8
+  }
+  /** px from (x, y) along `dir` (`step` px at a time, at most `max`) before the next step's point is a projectile
+   *  wall (beams that extend to the wall) */
+  wallDist(w: World, x: number, y: number, step: number, max: number): number {
+    const [dx, dy] = DIR_VEC[this.dir]
+    const c = this.ctx.col
+    const b = w.arena.bounds
+    let L = 0
+    while (L < max) {
+      const nx = x + dx * (L + step)
+      const ny = y + dy * (L + step)
+      if (c ? !c.test('shot', nx, ny, nx + 1, ny + 1) : nx < b.x0 - 16 || nx > b.x1 + 16 || ny < b.y0 - 40 || ny > b.y1 + 16) break
+      L += step
+    }
+    return L
   }
   onMessage(_w: World, _msg: HitMsg): boolean {
     return false
@@ -232,11 +250,8 @@ export class GrowBeam extends Shot {
       return
     }
     this.len = Math.min(this.maxLen, this.len + this.speed)
-    // stop at the arena edge
-    const b = w.arena.bounds
-    const [dx, dy] = DIR_VEC[this.dir]
-    const lim = dx > 0 ? b.x1 + 16 - mx : dx < 0 ? mx - b.x0 + 16 : dy > 0 ? b.y1 + 16 - my : my - b.y0 + 40
-    this.len = Math.min(this.len, Math.max(0, lim))
+    // stop at the first projectile-wall tile ahead (INFERRED: the beam head uses the same grid as the shots)
+    this.len = Math.min(this.len, this.wallDist(w, mx, my, 1, Math.ceil(this.len)))
     // measured hit rates: ~1.6 hits/frame on a target 40 px away, ~0.83 at 100 px (moves.json runs) - modelled as
     // a near part (first 44 px from the muzzle: 2 / 1 hits on alternate frames) and a far part (5 of 6 frames)
     const full = this.rect()
@@ -299,19 +314,8 @@ export class FullBeam extends Shot {
   }
   update(w: World) {
     this.t++
-    if (this.t === 1) {
-      const b = w.arena.bounds
-      const [dx, dy] = DIR_VEC[this.dir]
-      let L = 0
-      // 8 px steps until the next step leaves the walkable area (wall tiles)
-      while (L < 400) {
-        const nx = this.px + dx * (L + 8)
-        const ny = this.py + dy * (L + 8)
-        if (nx < b.x0 - 16 || nx > b.x1 + 16 || ny < b.y0 - 40 || ny > b.y1 + 16) break
-        L += 8
-      }
-      this.len = L
-    }
+    // 8 px steps until the next step is a projectile-wall tile
+    if (this.t === 1) this.len = this.wallDist(w, this.px, this.py, 8, 400)
     if (this.t > this.life) {
       this.removed = true
       return
@@ -564,8 +568,7 @@ export class EnergyWave extends Shot {
     }
     const hx = this.px + dx * this.len
     const hy = this.py + dy * this.len
-    const b = w.arena.bounds
-    if (this.t > 240 || hx < b.x0 - 8 || hx > b.x1 + 8 || hy < b.y0 - 40 || hy > b.y1 + 8 || this.offCamera(w)) {
+    if (this.t > 240 || this.inWall(w, { x0: hx - 4, y0: hy - 4, x1: hx + 4, y1: hy + 4 }) || this.offCamera(w)) {
       this.mode = 1
       return
     }

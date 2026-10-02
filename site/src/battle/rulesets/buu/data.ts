@@ -1,8 +1,9 @@
-// Loads the reverse-engineered Buu's Fury tables (data/buu/*.json + data/battle/buu_ai_extra.json) and shapes them
+// Loads the reverse-engineered Buu's Fury tables (data/buu/*.json + data/battle/buu_ai_extra.json + buu_collision.json) and shapes them
 // for the simulator. Numbers come from the JSON; anything the data does not give is marked where it is used.
 
 import { loadData } from '../../../data'
 import { SpriteBank, type SpriteEntityJson, type SpriteSet } from '../../core/sprites'
+import { parseCollision, type CollisionGrid } from './collision'
 
 type J = Record<string, any> // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -131,6 +132,10 @@ export interface BuuData {
   attacks: J
   sprites: SpriteBank
   maps: Map<string, { composite: string; size: [number, number] }>
+  /** walk / projectile tile grids per map id ("world-map") */
+  collision: Map<string, CollisionGrid>
+  /** world position of each map composite's top-left pixel (measured; default 0, 0) */
+  origins: Map<string, [number, number]>
   portraits: Map<number, string>
   formulas: J
 }
@@ -143,8 +148,8 @@ function enemyName(e: J): string {
 
 const FUSION_FLAG = 0x04
 
-export function buildBuuData(src: { characters: J; levels: J; moves: J; items: J; enemies: J; ai: J; bosses: J; attacks: J; sprites: J; formulas: J; extra: J }): BuuData {
-  const { characters, levels, moves, items, enemies, ai, bosses, attacks, sprites, formulas, extra } = src
+export function buildBuuData(src: { characters: J; levels: J; moves: J; items: J; enemies: J; ai: J; bosses: J; attacks: J; sprites: J; formulas: J; extra: J; collision?: J }): BuuData {
+  const { characters, levels, moves, items, enemies, ai, bosses, attacks, sprites, formulas, extra, collision } = src
   const ents = sprites.entities as SpriteEntityJson[]
   const bank = new SpriteBank(ents.filter((e) => e.category !== 'portrait'))
   const portraits = new Map<number, string>()
@@ -295,6 +300,8 @@ export function buildBuuData(src: { characters: J; levels: J; moves: J; items: J
     attacks,
     sprites: bank,
     maps,
+    collision: parseCollision(collision),
+    origins: new Map(Object.entries((collision?.maps ?? {}) as Record<string, J>).filter(([, v]) => v.origin).map(([k, v]) => [k, v.origin as [number, number]])),
     portraits,
     formulas,
   }
@@ -306,11 +313,11 @@ export function loadBuu(): Promise<BuuData> {
   if (!loaded) {
     loaded = (async () => {
       const names = ['characters', 'levels', 'moves', 'items', 'enemies', 'enemy_ai', 'bosses', 'attacks_detail', 'sprites', 'formulas'] as const
-      const [vals, extra] = await Promise.all([Promise.all(names.map((n) => loadData('buu', n))), loadData('battle', 'buu_ai_extra')])
+      const [vals, extra, collision] = await Promise.all([Promise.all(names.map((n) => loadData('buu', n))), loadData('battle', 'buu_ai_extra'), loadData('battle', 'buu_collision')])
       const v = Object.fromEntries(names.map((n, i) => [n, vals[i]])) as Record<string, J>
       return buildBuuData({
         characters: v.characters, levels: v.levels, moves: v.moves, items: v.items, enemies: v.enemies, ai: v.enemy_ai,
-        bosses: v.bosses, attacks: v.attacks_detail, sprites: v.sprites, formulas: v.formulas, extra: extra as J,
+        bosses: v.bosses, attacks: v.attacks_detail, sprites: v.sprites, formulas: v.formulas, extra: extra as J, collision: collision as J,
       })
     })()
   }

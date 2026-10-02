@@ -10,12 +10,12 @@ import type { HitMsg } from './actor'
 import type { AiNodeJ } from './data'
 import type { Enemy } from './enemy'
 import { ATK } from './damage'
+import { PathMover } from './path'
 import {
   Bomb, CandyBeam, DarkSphere, EnergyWave, Flame, FullBeam, GrappleArm, GrowBeam, Rock, SJWave, StraightShot, StretchArm, SuperBall, VEL, kiBlast,
 } from './projectiles'
 
 export const NODE_NOTES: Record<string, string> = {
-  ChasePlayer: 'path-finding replaced by a straight normalised move (arenas are open rectangles)',
   IfPlayerInZone: 'sniper zone rectangle not decoded: true within 160 px',
   IfPlayerInRoomZone: 'vampire lair region not decoded: always true',
   VampireSummon: 'spawns the puff effect only (the spawned object is the 0x086FD9D0 effect run)',
@@ -659,12 +659,28 @@ export function create(n: AiNodeJ, c: AiController): RNode {
 
     // ---- movement -------------------------------------------------------------------------------------------------------
     case 'ChasePlayer':
-    case 'ChasePlayerThroughRocks':
-      // pathfinding (0x0802A09F) replaced by the direct step of StepTowardPlayer
-      return new Act(n, c, () => undefined, () => {
-        e.stepToward(speed, 2)
+    case 'ChasePlayerThroughRocks': {
+      // 0x0802A00C / 0x0802A028: goal = the player's position, path-follow it (path.ts); within 2 px of it the
+      // enemy stands (idle anim) - the node never finishes by itself
+      const path = new PathMover(speed)
+      return new Act(n, c, () => {
+        const p = e.player
+        if (!p) return
+        path.gx = p.x
+        path.gy = p.y
+        path.enter(e)
+      }, () => {
+        const p = e.player
+        if (!p) return false
+        path.gx = p.x
+        path.gy = p.y
+        const dx = path.gx - e.x
+        const dy = path.gy - e.y
+        if ((Math.imul(dx, dx) >> 8) + (Math.imul(dy, dy) >> 8) <= 0x400) return false
+        path.update(e)
         return false
       })
+    }
     case 'StepTowardPlayer':
     case 'StepTowardPlayerThroughRocks':
       return new Act(n, c, () => undefined, () => {
@@ -692,13 +708,41 @@ export function create(n: AiNodeJ, c: AiController): RNode {
         e.walkBy(dx * speed, dy * speed)
         return false
       })
-    case 'MoveToPoint':
-      return new Act(n, c, () => undefined, () => e.moveToPoint(P(n, 'x'), P(n, 'y'), speed))
-    case 'WanderToRandomPoint':
-      return new Act(n, c, (a) => {
-        a.data.x = 96 + e.w.rng.rand(296, 'wander point')
-        a.data.y = 112 + e.w.rng.rand(240, 'wander point')
-      }, (_f, a) => e.moveToPoint(a.data.x, a.data.y, 0x100))
+    case 'MoveToPoint': {
+      // ctor 0x0802E104 (goal = the map point), enter 0x0803BB00, update 0x0802E0A8: path-follow, finished within
+      // 8 px of the point on both axes
+      const path = new PathMover(speed)
+      return new Act(n, c, () => {
+        path.gx = P(n, 'x') << 8
+        path.gy = P(n, 'y') << 8
+        path.enter(e)
+      }, () => {
+        path.update(e)
+        return Math.abs(path.gx - e.x) < 0x800 && Math.abs(path.gy - e.y) < 0x800
+      })
+    }
+    case 'WanderToRandomPoint': {
+      // ctor 0x0803BD64 (speed 0xB3), enter 0x0803BC2C: random points x = 96 + rand(294), y = 112 + rand(240) until
+      // one is passable (vfunc +0x54) and at least sqrt(80) px away; update 0x0803BCAA = MoveToPoint's
+      const path = new PathMover(0xb3)
+      return new Act(n, c, () => {
+        path.counter = 0 // not set by this enter (pool memory): re-plan on the first update
+        for (let i = 0; i < 1000; i++) {
+          const gx = (0x60 + e.w.rng.rand(0x126, 'wander point')) << 8
+          const gy = (0x70 + e.w.rng.rand(0xf0, 'wander point')) << 8
+          if (!e.passable(e.w, gx >> 8, gy >> 8)) continue
+          const dx = gx - e.x
+          const dy = gy - e.y
+          if ((Math.imul(dx, dx) >> 8) + (Math.imul(dy, dy) >> 8) < 0x5000) continue
+          path.gx = gx
+          path.gy = gy
+          break
+        }
+      }, () => {
+        path.update(e)
+        return Math.abs(path.gx - e.x) < 0x800 && Math.abs(path.gy - e.y) < 0x800
+      })
+    }
     case 'CirclePlayer':
       return new Act(n, c, () => undefined, () => {
         e.facePlayer()
