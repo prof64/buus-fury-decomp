@@ -70,7 +70,7 @@ game's object list) → `battle::post_step` (cameras, HUD beep, phases) → outc
   u64): ~13 µs. Same value native and wasm (checked: `tests/session.rs` + `web/core_check.mjs`).
 
 Benchmark (`--example bench`, Apple M-series, release): 3600 frames of 4 / 12 Majin Fighters, Janemba with parts, Kid
-Buu: step 0.3–1.1 µs, clone snapshot 1.3–1.6 µs, restore 1.1–1.8 µs, hash 11–15 µs, bytes 26–30 µs.
+Buu: step 0.3–1.3 µs, clone snapshot 1.3–1.6 µs, restore 1.1–1.8 µs, hash 11–15 µs, bytes 26–30 µs.
 
 ## 4. Seams
 
