@@ -101,6 +101,33 @@ pub unsafe extern "C" fn wf_core_reset(ptr: *const u8, len: usize) -> u32 {
     0
 }
 
+/// a field session (`wf_core::field::FieldConfig` JSON; empty = new game in Southwest Forest). Needs a pack with the
+/// `world` (+ `items`, `scripts`) categories.
+///
+/// # Safety
+/// `ptr` must point at `len` bytes (or be null with `len` 0).
+#[no_mangle]
+pub unsafe extern "C" fn wf_core_reset_field(ptr: *const u8, len: usize) -> u32 {
+    let Some(d) = DATA.with(|x| x.borrow().clone()) else { return 1 };
+    if d.field.is_none() {
+        set_result(b"content has no world/ category".to_vec());
+        return 3;
+    }
+    let cfg: wf_core::field::FieldConfig = if len == 0 || ptr.is_null() {
+        Default::default()
+    } else {
+        match serde_json::from_slice(unsafe { std::slice::from_raw_parts(ptr, len) }) {
+            Ok(c) => c,
+            Err(e) => {
+                set_result(e.to_string().into_bytes());
+                return 2;
+            }
+        }
+    };
+    SESSION.with(|s| *s.borrow_mut() = Some(Session::new_field(d, cfg)));
+    0
+}
+
 /// # Safety
 /// `keys` must point at `n` u16 values.
 #[no_mangle]

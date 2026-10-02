@@ -348,6 +348,9 @@ fn spawn_phase(w: &mut World, ph: usize) {
 /// camera 0x080077EC: eases toward the footprint centre (screen point 120, 84) by 3/64 horizontally and 9/128
 /// vertically per frame (22.10), clamped to the map
 pub fn camera(w: &mut World, slot: usize) {
+    if slot == 0 && crate::scene::camera(w) {
+        return;
+    }
     let Some(pi) = w.player_idx(slot) else { return };
     let a = &w.pl_ref(pi).a;
     let tx = ((a.px() * 2 + a.foot_w) >> 1) - 120;
@@ -437,6 +440,21 @@ pub fn post_step(w: &mut World) {
     w.enemies = keep;
 }
 
+/// Multiplayer PvP rule set (never in the original; off by default, so single-player and co-op are untouched):
+/// players' attacks also hit the other players through the same message / ComputeDamage pipeline as enemy
+/// attacks (`player::on_message`); the outcome becomes "last fighter standing" ([`pvp_winner`]).
+pub fn set_pvp(w: &mut World, on: bool) {
+    w.opts.pvp = on;
+}
+
+/// PvP: the slot of the last player standing once the match is decided (None while running / all down)
+pub fn pvp_winner(w: &World) -> Option<usize> {
+    if !w.opts.pvp || outcome(w) != Outcome::Won {
+        return None;
+    }
+    w.players.iter().position(|&id| w.find(id).is_some_and(|i| !w.pl_ref(i).dead))
+}
+
 const INVULNERABLE: [i32; 2] = [0x1a, 0x1b];
 const SURVIVE: u32 = 3600;
 
@@ -445,6 +463,12 @@ pub fn outcome(w: &World) -> Outcome {
     if !players.is_empty() && players.iter().all(|&i| w.pl_ref(i).dead) {
         let ko = players.iter().map(|&i| w.pl_ref(i).ko_at).max().unwrap_or(-1);
         return if ko < 0 || w.frame as i64 - ko >= 200 { Outcome::Lost } else { Outcome::Running };
+    }
+    if w.opts.pvp {
+        // last fighter standing (200 frames after the last KO, like the loss); enemies, if any, do not count
+        let alive = players.iter().filter(|&&i| !w.pl_ref(i).dead).count();
+        let ko = players.iter().map(|&i| w.pl_ref(i).ko_at).max().unwrap_or(-1);
+        return if players.len() > 1 && alive <= 1 && ko >= 0 && w.frame as i64 - ko >= 200 { Outcome::Won } else { Outcome::Running };
     }
     let live = live_primary(w);
     if w.battle.phase + 1 >= w.battle.phases.len() {

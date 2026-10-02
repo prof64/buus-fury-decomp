@@ -30,7 +30,10 @@ fn draw_key(w: &World, i: usize) -> (i32, i32, u32) {
             Fx::ItMarkers { .. } => (3, 0),
             _ => (1, 0),
         },
-        Body::Injector(_) => (9, 0),
+        Body::Injector(_) | Body::Breakable(_) => (9, 0),
+        Body::Pickup(p) => (0, p.y),
+        Body::MapSprite(m) => (0, m.y),
+        Body::Npc(n) => (0, n.a.py()),
     };
     (layer, depth, e.id)
 }
@@ -63,7 +66,10 @@ fn effect(id: u32, run: u32, index: i32, x: i32, y: i32, out: &mut RenderView) {
 pub fn render_view(w: &World, out: &mut RenderView) {
     out.clear();
     out.frame = w.frame as u64;
-    let map_id = w.data.areas.get(&w.arena.map).map(|a| a.0.clone()).unwrap_or_default();
+    let map_id = match &w.field {
+        Some(f) => f.map.clone(),
+        None => w.data.areas.get(&w.arena.map).map(|a| a.0.clone()).unwrap_or_default(),
+    };
     out.map = Some(MapView { id: map_id, anim_frame: w.frame, shake: w.g.shake_off });
     let mut order: Vec<usize> = (0..w.ents.len()).filter(|&i| !w.ents[i].removed).collect();
     order.sort_by_key(|&i| draw_key(w, i));
@@ -73,9 +79,14 @@ pub fn render_view(w: &World, out: &mut RenderView) {
         let id = e.id;
         match &e.body {
             Body::Player(p) => {
-                let step = p.a.sprite.and_then(|s| w.data.sprite(s)).and_then(|sp| sp.anim_raw(p.ap.raw).or_else(|| sp.anim_raw(1))).and_then(|a| {
+                // a script's puppet plays the scene animation instead of the player state's
+                let (raw, frame) = match crate::scene::scene_anim(w, i) {
+                    Some(a) => (a.raw, a.frame),
+                    None => (p.ap.raw, p.ap.frame),
+                };
+                let step = p.a.sprite.and_then(|s| w.data.sprite(s)).and_then(|sp| sp.anim_raw(raw).or_else(|| sp.anim_raw(1))).and_then(|a| {
                     let st = a.steps(p.a.facing);
-                    st.get((p.ap.frame.max(0) as usize).min(st.len().saturating_sub(1))).map(|s| (s.frame, s.flip, s.attach))
+                    st.get((frame.max(0) as usize).min(st.len().saturating_sub(1))).map(|s| (s.frame, s.flip, s.attach))
                 });
                 if p.a.alpha > 0 {
                     actor_draw(w, id, &p.a, step, out);
@@ -143,7 +154,30 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                     _ => {}
                 }
             }
-            Body::Injector(_) => {}
+            Body::Npc(n) => {
+                let step = n.a.sprite.and_then(|s| w.data.sprite(s)).and_then(|sp| sp.anim_raw(n.anim.raw).or_else(|| sp.anim_raw(1))).and_then(|a| {
+                    let st = a.steps(n.a.facing);
+                    st.get((n.anim.frame.max(0) as usize).min(st.len().saturating_sub(1))).map(|s| (s.frame, s.flip, s.attach))
+                });
+                actor_draw(w, id, &n.a, step, out);
+            }
+            Body::Injector(_) | Body::Breakable(_) | Body::Pickup(_) | Body::MapSprite(_) => {}
+        }
+    }
+    // cutscene presentation: fade, dialog box
+    out.fade_black = crate::scene::fade_black(w);
+    if let Some(d) = &w.scene.dialog {
+        if d.phase != crate::scene::DialogPhase::Closed {
+            out.dialog = Some(wf_view::DialogView {
+                text: d.text.clone(),
+                style: 0,
+                page: d.page,
+                position: match d.pos {
+                    crate::scene::BoxPos::Top => wf_view::DialogPos::Top,
+                    crate::scene::BoxPos::Middle => wf_view::DialogPos::Middle,
+                    crate::scene::BoxPos::Bottom => wf_view::DialogPos::Bottom,
+                },
+            });
         }
     }
     for s in 0..w.players.len() {
@@ -174,7 +208,7 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                 xp72,
                 skill: (skill > 0).then_some(skill as u8),
                 skill_alt: !crate::player::can_use_skill(w, pi, skill),
-                hidden: false,
+                hidden: w.scene.hud_hidden,
             });
         }
     }
@@ -187,6 +221,8 @@ pub fn sim_events(w: &World, out: &mut Vec<SimEvent>) {
             Event::Sfx { id, vol } => out.push(SimEvent::Audio(AudioEvent::PlaySfx { id: *id as u8, volume: (*vol).clamp(0, 64) as u8, pan: 0 })),
             Event::SfxStop { id } => out.push(SimEvent::Audio(AudioEvent::StopSfx(*id as u8))),
             Event::Song { id } => out.push(SimEvent::Audio(AudioEvent::PlaySong(*id as u16))),
+            Event::SfxStopAll => out.push(SimEvent::Audio(AudioEvent::StopAllSfx)),
+            Event::SongStop => out.push(SimEvent::Audio(AudioEvent::StopSong)),
             _ => {}
         }
     }

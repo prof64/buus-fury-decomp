@@ -126,3 +126,103 @@ What the reference does not model is not modelled here either: boss defeat cutsc
 controllers whose length the game decides (shield / charge), the INFERRED nodes listed in `nodes::NODE_NOTES`. The view
 adapter draws actors, shadows, halos, effects and most projectile records; beam piece chains, the Final Flash affine
 pieces and the dark sphere disc are not drawn yet.
+
+## 9. Coordination (in progress, 2026-10-02)
+
+Two agents extend `World` concurrently; keep changes additive and re-read before editing.
+
+* **Cutscene systems** (script-host work, module `scene.rs`, field `World.scene: scene::Scene`): per-entity command
+  tracks + the camera track, the director wait, script camera control (follow / pan / set), screen effects (fades,
+  flashes, mosaic, tints, BG layer / blend state, HUD visibility), dialog flow (text boxes, pages, choices, menus),
+  boss bar, title text, scene requests (warps / scene loads / menus / title / credits, consumed by the field layer
+  or the session). **`Body::Npc(Box<scene::Npc>)`** = a scripted actor (the game's NPC class created by
+  `0x0801111C`, used by `spawn_actor`, `change_sprite`, and cutscene stand-ins). Field NPC behaviour (wander,
+  talk check) should extend `scene::Npc` (e.g. a `behaviour` field) instead of adding a second NPC body kind.
+  Touches outside `scene.rs`: `world.rs` (variant, field, update dispatch, hash), `battle.rs::post_step` (script
+  camera before the follow camera), `view.rs` (Npc draw, dialog, fade), `lib.rs`.
+* **Field state** (flags, inventory, party, areas / warps, map NPCs, pickups, triggers): the field agent. The
+  scene layer only *requests* warps / scene loads (`Scene.requests`) and leaves area loading to the field code.
+  Field agent's footprint: see §10 (modules `story.rs`, `fieldcontent.rs`, `field.rs`, `fieldnpc.rs`,
+  `fieldobj.rs`; `World.story`, `World.field`; `Body::Pickup / Breakable / MapSprite`; map NPCs are `scene::Npc`
+  with `behaviour: Some(field::Behaviour)`).
+
+## 10. Field game (`story.rs`, `fieldcontent.rs`, `field.rs`, `fieldnpc.rs`, `fieldobj.rs`)
+
+Buu's Fury fights in the field: a field session is the same `World` with `World.field = Some(..)`; players and enemies
+are the battle entities, the area's objects are added around them. Mechanics: re/buu/notes.md §11 and the "Field: ..."
+sections; ground truth `data/field/*.json` (recorders `tools/field/rec_*.py`).
+
+**Persistent state** `World.story: story::Story` (GameData `0x03001068`, layout `data/field/gamestate_layout.json`):
+story flags (143 bytes, bit `f & 7` of byte `f >> 3`), script words `l` (0x03001020) and VM globals `g` (0x03001058),
+`game_bits`, `variant_byte`, supply counts (u8[83], cap 255), the equipment list (cap 250), zenie, the nine
+`CharState`s (record, form, skills + levels, selected skill, equipment slots, SS cooldown, flags bit 0 = in party),
+`current` character, 40 quest slots (the game stores no quest progress: its conditions are flag scripts), play time in
+frames. `Story::new_game(data)`; active fighters write their record back every field frame (`sync_from_players`). In
+battle mode it is `Story::default()` and unused.
+
+**Content** `GameData.field: Option<Arc<FieldData>>` (None without the pack's `world/` category): areas (maps per
+variant, song, combat byte, on-enter / on-leave, objects in list order), maps (header exits, props, start position,
+camera limits; collision decoded at area load), supplies, and the bytecode of the 115 spawn-condition scripts.
+
+**Session**: `Session::new_field(data, FieldConfig { world, area, variant, pos, facing, chars, story, rng, xp, arrive })`
+(`arrive` = start like an exit arrival: the load's RNG draws then the 32-frame fade-in); `Session::step` as in
+battle. `Session.hook: Option<FieldHook>` = the script host's synchronous callback, invoked for every
+`FieldEvent::Run` right after the phase that produced it (deferred calls at the start of the world update; triggers,
+defeats, item-get ends after it), so loot scripts / trigger scripts draw RNG and spawn drops where the game does.
+wasm: `wf_core_reset_field(json)`.
+
+**Frame** (field): `scene::pre_step` → `field::pre_step` (an event / item-get holds the players' input; deferred
+calls due) → enemy grid marks → `World::step_entities` (every mode; the world updates during fades) → `scene::tick` →
+`field::post_step`: item-get timer, then by `Field.mode`: `Normal` → the trigger check (`0x080126D4`); `FadeOut{k}`
+(32 frames, the player autowalking 0.5 px/frame, then idle + load in the same frame) / `FadeIn{k}` (32 frames, autowalk,
+idle at the end); cameras (script camera first, then `field::camera`: the battle ease with the game's integer-part
+clamp to `camera_max`); placed enemies' defeats; story sync; play time.
+
+**Area load** `field::load_area(w, AreaId, x, y, facing)` (EnterArea `0x08008D44`): everything but the players goes;
+map + collision; camera snap `(x - 112, y - 76) << 10`; map sprites, breakables, items; the trigger list (area
+triggers, then map-header exits, in scan order); song; actors (enemies and NPCs, one rand(255) each); on-leave /
+on-enter as `Run` events; the players re-created at the destination (2 x rand(255) each, after the actors in the list,
+so they update first). Conditions: always / never / flag set / clear / set-consume / bytecode (`story::eval_condition`).
+Enemies respawn on every load unless a flag gates them.
+
+**Triggers**: point = player footprint top-left (integer px), `x0 <= px < x1`; first match fires, one per frame; no
+check while busy / item-get / fading or at HP 0. Activations: touch (every frame inside), touch_once, A (pressed),
+A + facing, on-entry (`0x08007791`), UP-held-once, A-once, altitude (no field altitude exists: the world-map player
+only). Exits need the push key held; door: dest = def (x, y), facing = high nibble or push; edge: player - (x0, y0) +
+(x, y), facing = push. Coins' touch triggers are scanned first.
+
+**A press** (player melee hook): in combat areas the hit first; nothing accepted → interact message (talk NPC footprint
+or A pickup under the facing box) → an A trigger under the point; any of them suppresses the punch. Areas with combat
+byte 0 never send the hit and do not punch (INFERRED). Talk: NPC faces the player, SetAnim(0), event start (walking
+NPCs and players go idle), `Run { Event(sNNN), Talk }`.
+
+**Map NPCs** (`fieldnpc.rs`): `scene::Npc` + `Behaviour` (step runner `0x0800A95A`: stand, wait, face_player,
+walk_to, wander / wander_rect variants; idle / walk animation; talk NPCs mark their footprint on the walk + enemy
+grids, so `Collision.walk` is a per-World copy-on-write grid). While the field is busy (event, host attached) only
+their animations tick.
+
+**Objects** (`fieldobj.rs`): breakables (HP, attack mask, solid box, 23-frame shake with rand(5)/rand(3), break =
+explosion + a call 16 frames later: loot position / velocity, grid restored, `Run { on_break, Break }`); coins
+(`drop_zenie(size)`: 5 draws, 60 frames of bounce, 600 frames life, touch pickup, SFX 44); dropped items
+(`drop_item(i)`, negative = equipment: 4 draws, bounce until landed, A pickup); map items (solid, A pickup); item-get
+(SFX 45, 61 frames holding the players; equipment counted at once, supplies and the item's event after it).
+
+**Events**: `Event::Field(FieldEvent::{AreaEnter, AreaLeave, Run { run: Callback, cause: Cause, slot }, Collected,
+Defeated, ConditionUnknown, Transition})`. **Host API**: `field::warp`, `load_area`, `spawn_map_object(ObjRef,
+force)`, `set_busy` / `attach_host` (blocking events hold the field until the host clears it), `fieldobj::set_loot /
+drop_zenie / drop_item`, `fieldnpc::start_event`. **Observation**: `Observation.field` (area, objects with rects and
+exit destinations, inventory, party, play time).
+
+**Verification** (`tests/field_lockstep.rs`, emulator recordings): transitions (door / edge exits, round trip, arrival
+facing; load RNG, autowalk, fades, camera, enemy positions) 4 traces; NPCs 10 traces (wander / wander_rect / walk_to /
+wait / talk / blocking / crowds, 11k frames: positions, facing, animation frame, RNG); objects 6 traces (touch_once
+event trigger, A script trigger, save point, map item + item-get, breakable break + loot call, dropped supply /
+equipment physics and A pickups). Known divergences: `transitions_forest_up_exit` from frame 257 (the battle sim's
+enemy walk→idle one frame early, inherited from the reference), `npc_capsule_walk` from 136 (4-20 v2 live collision ≠
+content). `tests/field.rs`: conditions, exits, determinism + clone / byte snapshots, story.
+
+**Gaps**: breakable boxes approximate the prop graphic's pixel bounds (prop rect lower half, 1 px inset); dropped
+items' collision sub-box (icon pixels) likewise; coin scatter verified only through the loot script (needs the
+script host); enemies' def behaviour (`RunMotionController` node) not run; enemy loot position INFERRED (their position,
+no velocity); debris chips and prop / pickup / map-sprite graphics are not drawn by the view; map-screen visited bits
+(table `0x0874CA24`) not set; the world map 0-50 flying player is not modelled; no variant selector exists in the ROM.

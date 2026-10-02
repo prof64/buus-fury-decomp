@@ -35,6 +35,14 @@ pub enum Body {
     Hand(Box<Hand>),
     /// harness hook: scheduled attack messages injected at the start of a frame (lockstep / tests)
     Injector(Box<Injector>),
+    /// field: an item on the ground (map item or loot drop)
+    Pickup(Box<crate::fieldobj::Pickup>),
+    /// field: a breakable map prop
+    Breakable(Box<crate::fieldobj::Breakable>),
+    /// field: a bobbing map sprite
+    MapSprite(Box<crate::fieldobj::MapSprite>),
+    /// a scripted actor (cutscene actors, `spawn_actor`, `change_sprite`; scene.rs)
+    Npc(Box<crate::scene::Npc>),
 }
 
 #[derive(Clone, Debug, Hash, Serialize, Deserialize)]
@@ -54,6 +62,10 @@ impl Entity {
             Body::Rock { .. } => "rock",
             Body::Hand(_) => "hand",
             Body::Injector(_) => "injector",
+            Body::Pickup(_) => "pickup",
+            Body::Breakable(_) => "breakable",
+            Body::MapSprite(_) => "map_sprite",
+            Body::Npc(_) => "npc",
         }
     }
 }
@@ -89,6 +101,10 @@ pub enum Event {
     /// PlaySfx(id, volume 0..64)
     Sfx { id: i32, vol: i32 },
     SfxStop { id: i32 },
+    /// StopAllSfx 0x0803E2EC (script native 0x22)
+    SfxStopAll,
+    /// the music sequencer stopped (script native 0x24)
+    SongStop,
     Song { id: i32 },
     /// a player attack connected (the reference's 'hit' cue)
     Hit,
@@ -97,6 +113,8 @@ pub enum Event {
     /// a ComputeDamage result (target entity, 1/1024 HP)
     Damage { target: EntityId, attacker: EntityId, dmg: i64, crit: bool },
     Info { text: String },
+    /// field game: area changes, scripts to run, pickups, defeated placed enemies (field.rs)
+    Field(crate::field::FieldEvent),
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -146,10 +164,14 @@ pub struct Globals {
 pub struct Collision {
     pub map: Arc<MapCollision>,
     pub enemy: Vec<u8>,
+    /// the live walk grid once something marked it (field: talk NPCs, breakables, map items; copy-on-write of
+    /// `map.walk`); None = the map's static grid
+    pub walk: Option<Vec<u8>>,
 }
 impl Hash for Collision {
     fn hash<H: Hasher>(&self, h: &mut H) {
-        self.enemy.hash(h)
+        self.enemy.hash(h);
+        self.walk.hash(h);
     }
 }
 
@@ -163,11 +185,11 @@ pub enum Layer {
 impl Collision {
     pub fn new(map: Arc<MapCollision>) -> Collision {
         let enemy = map.walk.clone();
-        Collision { map, enemy }
+        Collision { map, enemy, walk: None }
     }
     fn grid(&self, l: Layer) -> &[u8] {
         match l {
-            Layer::Walk => &self.map.walk,
+            Layer::Walk => self.walk.as_deref().unwrap_or(&self.map.walk),
             Layer::Shot => &self.map.shot,
             Layer::Enemy => &self.enemy,
         }
@@ -210,6 +232,24 @@ impl Collision {
                 self.enemy[ty as usize * GRID + tx as usize] = value;
             }
         }
+    }
+    /// 0x08009930 on the walk grid (copy-on-write of the map's grid)
+    pub fn mark_walk(&mut self, r: [i32; 4], value: u8) {
+        let (tx0, ty0, tx1, ty1) = Self::span(r[0], r[1], r[2], r[3]);
+        if tx0 >= tx1 || ty0 >= ty1 {
+            return;
+        }
+        let g = self.walk.get_or_insert_with(|| self.map.walk.clone());
+        for ty in ty0..ty1 {
+            for tx in tx0..tx1 {
+                g[ty as usize * GRID + tx as usize] = value;
+            }
+        }
+    }
+    /// mark both the walk grid and the enemy layer (the field objects' blocking marks)
+    pub fn mark_both(&mut self, r: [i32; 4], value: u8) {
+        self.mark_walk(r, value);
+        self.mark_enemy(r, value);
     }
     pub fn save_enemy(&self, r: [i32; 4]) -> Vec<u8> {
         let (tx0, ty0, tx1, ty1) = Self::span(r[0], r[1], r[2], r[3]);
@@ -370,11 +410,29 @@ pub struct World {
     pub serial: u32,
     pub opts: Options,
     pub battle: crate::battle::BattleState,
+    /// persistent game state (flags, inventory, party records, play time); default in battle mode
+    pub story: crate::story::Story,
+    /// the field game (area, transitions); None = battle mode
+    pub field: Option<Box<crate::field::Field>>,
+    /// cutscene systems: command tracks, director, script camera, screen effects, dialog, menus (scene.rs)
+    pub scene: crate::scene::Scene,
 }
 
-#[derive(Clone, Debug, Default, Hash, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Options {
     pub xp: bool,
+    /// multiplayer rule set beyond the original: players' attacks hit other players (`battle::set_pvp`)
+    #[serde(default)]
+    pub pvp: bool,
+}
+impl Hash for Options {
+    fn hash<H: Hasher>(&self, h: &mut H) {
+        self.xp.hash(h);
+        // only hashed when on: single-player / co-op hashes stay what they were
+        if self.pvp {
+            self.pvp.hash(h);
+        }
+    }
 }
 
 impl Hash for World {
@@ -395,6 +453,9 @@ impl Hash for World {
         self.serial.hash(h);
         self.opts.hash(h);
         self.battle.hash(h);
+        self.story.hash(h);
+        self.field.hash(h);
+        self.scene.hash(h);
     }
 }
 
@@ -450,6 +511,9 @@ impl World {
             serial: 0,
             opts: Options::default(),
             battle: Default::default(),
+            story: Default::default(),
+            field: None,
+            scene: Default::default(),
         }
     }
 
@@ -540,6 +604,7 @@ impl World {
             Body::Player(p) => Some(&p.a),
             Body::Enemy(e) => Some(&e.a),
             Body::Hand(h) => Some(&h.a),
+            Body::Npc(n) => Some(&n.a),
             _ => None,
         }
     }
@@ -624,6 +689,10 @@ impl World {
             Body::Shot(_) => crate::shots::update(self, i),
             Body::Fx(_) => crate::fx::update(self, i),
             Body::Rock { .. } => {}
+            Body::Pickup(_) => crate::fieldobj::pickup_update(self, i),
+            Body::Breakable(_) => crate::fieldobj::breakable_update(self, i),
+            Body::MapSprite(_) => crate::fieldobj::map_sprite_update(self, i),
+            Body::Npc(_) => crate::scene::npc_update(self, i),
             Body::Hand(_) => crate::enemy::hand_update(self, i),
             Body::Injector(_) => {
                 let (hits, pid) = match &self.ents[i].body {
@@ -684,6 +753,7 @@ pub fn deliver(w: &mut World, k: usize, msg: &mut HitMsg) -> bool {
         Body::Player(_) => crate::player::on_message(w, k, msg),
         Body::Enemy(_) => crate::enemy::on_message(w, k, msg),
         Body::Shot(_) => crate::shots::on_message(w, k, msg),
+        Body::Breakable(_) => crate::fieldobj::breakable_message(w, k, msg),
         _ => false,
     }
 }

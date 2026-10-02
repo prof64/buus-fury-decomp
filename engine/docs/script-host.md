@@ -401,3 +401,20 @@ Counts: **MISSING** 136, VM 16, core 33, story 63
     missing one errors.
 * Builds and passes in the engine workspace (`cargo test -p wf-script-core`). While wf-core is mid-edit,
   `engine/experiments/wf-script-core-dev` builds the adapter against the last committed wf-core (copied, gitignored).
+
+## 10. Field core status (field agent, 2026-10-02; details docs/core.md §10)
+
+Answers to §7: (1) persistent state is `World.story` (flags, l/g words, supplies, equipment, zenie, 9 `CharState`s,
+party flags, quests, play time); (2) placed-enemy defeats leave `FieldEvent::Defeated` + `Run { on_defeat, Defeat }`
+with the loot position set; (3) `Body::Pickup` (coins, dropped items, map items) with the game's physics and
+collection — the drop natives call `fieldobj::set_loot / drop_zenie / drop_item`; (6) `field::warp`, `load_area`,
+`spawn_map_object(ObjRef, force)`; trigger / talk / pickup / break / defeat / on-enter / on-leave scripts leave as
+`FieldEvent::Run { run: Callback::{Script, Event}, cause, slot }`. A host can run them synchronously through
+`Session.hook` (called where the game runs the script; needed for exact RNG, e.g. loot); otherwise after the step.
+Blocking events: call `field::attach_host(w, true)`; event triggers / save points / talk then set `Field.busy`
+(players get no input, triggers and map NPC behaviours pause, their animations tick) until `field::set_busy(w,
+false)`. Spawn conditions are evaluated by the core itself (`story::eval_condition`, all 115 condition scripts).
+Note for harnesses that delete the area's objects after `Session::new_field` (e.g. `tests/lockstep.rs`
+`build_world`): talk NPCs, breakables and map items mark the walk grid / enemy layer when created — reset
+`w.col.as_mut().unwrap().walk = None` and the enemy layer (`enemy = map.walk.clone()`) too, or the removed objects
+keep blocking.

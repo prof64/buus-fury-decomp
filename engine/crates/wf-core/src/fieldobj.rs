@@ -1,0 +1,464 @@
+//! Field objects with their own physics / rules: breakable props, coins, dropped items, map item pickups, the item-get
+//! presentation, bobbing map sprites, deferred calls, and the loot natives' core side (`drop_zenie` / `drop_item` /
+//! `drop_equipment` at the loot position). Spec: re/buu/notes.md "Field: triggers, breakables, pickups, game state";
+//! ground truth data/field/objects_*.json.
+
+use crate::fieldcontent::{Callback, ObjKind, ObjRef};
+use crate::field::{Cause, FieldEvent};
+use crate::geom::DIR_VEC;
+use crate::world::{Body, EntityId, Event, HitMsg, World};
+use serde::{Deserialize, Serialize};
+
+/// what a pickup gives
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum PickupKind {
+    /// a coin of size 0..3 (5 / 25 / 50 / 100 zenie)
+    Zenie(i32),
+    Supply(i32),
+    Equipment(i32),
+    /// a placed map item (area list 3): item (>= 0 supply, < 0 equipment) + the def's on-pickup event
+    MapItem { obj: ObjRef, item: i32 },
+}
+
+pub const COIN_VALUE: [i32; 4] = [5, 25, 50, 100];
+
+/// coins (`0x08017F5A`), dropped items (`0x0800D30E`) and map items (`0x0800DCDC`)
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct Pickup {
+    pub kind: PickupKind,
+    /// 24.8: coins = the loot point, items = the 16x16 box's top-left
+    pub x: i32,
+    pub y: i32,
+    pub vx: i32,
+    pub vy: i32,
+    /// height (coins 24.8, items 22.10) and its speed
+    pub z: i32,
+    pub vz: i32,
+    /// frames alive
+    pub t: i32,
+    pub landed: bool,
+    /// coin animation phase (the constructor's raw next())
+    pub phase: u32,
+    /// the box (px): coins' pickup box, items' 16x16 icon box
+    pub bx: [i32; 4],
+    /// map items: the box written blocked into the walk + enemy grids
+    pub solid: Option<[i32; 4]>,
+}
+
+impl Pickup {
+    /// picked up with the A-press interact message (items); coins are touch triggers
+    pub fn by_a(&self) -> bool {
+        !matches!(self.kind, PickupKind::Zenie(_))
+    }
+    pub fn rect(&self) -> [i32; 4] {
+        self.bx
+    }
+    /// a coin's touch rect (trigger `0x0804A0C0`): (x0 - 19, y0 - 11, x1 + 4, y1 + 4)
+    pub fn coin_rect(&self) -> [i32; 4] {
+        [self.bx[0] - 19, self.bx[1] - 11, self.bx[2] + 4, self.bx[3] + 4]
+    }
+}
+
+/// a breakable map prop (`0x0800C65E`): def +5 HP, +6 attack-type mask
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct Breakable {
+    pub obj: ObjRef,
+    pub prop: i32,
+    /// the solid / hit box (px)
+    pub bx: [i32; 4],
+    pub hp: i32,
+    pub mask: i32,
+    pub last_dir: u8,
+    /// shake timer (23 frames per hit) and the display offset
+    pub shake: i32,
+    pub dx: i32,
+    pub dy: i32,
+    /// broken: waiting for its deferred callback
+    pub broken: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct MapSprite {
+    pub x: i32,
+    pub y: i32,
+    pub sprite: i32,
+    pub params: [i32; 3],
+    pub t: i32,
+}
+
+/// a call queued for later (world +0x610), run at the start of the world update of frame `at`
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum Deferred {
+    /// a breakable's break callback (`0x0800C628`)
+    Break { at: u32, entity: EntityId },
+}
+
+/// the blocking item-get presentation (ItemGet command, 60 frames, SFX 45)
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct ItemGet {
+    pub left: i32,
+    pub slot: u8,
+    /// a supply counted when it ends
+    pub supply: Option<i32>,
+    /// then run (map items' "You found ..." event)
+    pub then: Option<(Callback, Cause)>,
+}
+
+fn ov(a: [i32; 4], b: [i32; 4]) -> bool {
+    a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3]
+}
+
+fn walk_free(w: &World, r: [i32; 4]) -> bool {
+    w.col.as_ref().is_none_or(|c| c.test(crate::world::Layer::Walk, r[0], r[1], r[2], r[3]))
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// creation from the area lists
+
+/// a breakable: the box is the prop's lower half (the game takes the bounding box of the prop graphic's non-zero
+/// pixels, then its lower half; the pixels are not in the content pack: 1 px inset per side approximates the 32-px
+/// props), written blocked into both grids
+pub fn spawn_breakable(w: &mut World, o: &crate::fieldcontent::ObjDef) -> Option<EntityId> {
+    let ObjKind::Breakable { prop, param_a, hits, .. } = &o.kind else { return None };
+    let r = w.field.as_ref().and_then(|f| f.props.get(*prop as usize)).map(|p| p.rect)?;
+    let bx = [r.x0 + 1, (r.y0 + r.y1) >> 1, r.x1 - 1, r.y1];
+    if let Some(c) = w.col.as_mut() {
+        c.mark_both(bx, 0);
+    }
+    Some(w.add(Body::Breakable(Box::new(Breakable { obj: o.at, prop: *prop, bx, hp: (*param_a).max(1), mask: *hits, last_dir: 0, shake: 0, dx: 0, dy: 0, broken: false }))))
+}
+
+/// a map item (16x16 at the def position; (x, y+8)..(x+16, y+16) blocked on both grids)
+pub fn spawn_map_item(w: &mut World, o: &crate::fieldcontent::ObjDef) -> Option<EntityId> {
+    let ObjKind::Item { item, x, y, .. } = &o.kind else { return None };
+    let solid = [*x, y + 8, x + 16, y + 16];
+    if let Some(c) = w.col.as_mut() {
+        c.mark_both(solid, 0);
+    }
+    Some(w.add(Body::Pickup(Box::new(Pickup {
+        kind: PickupKind::MapItem { obj: o.at, item: *item },
+        x: x << 8,
+        y: y << 8,
+        vx: 0,
+        vy: 0,
+        z: 0,
+        vz: 0,
+        t: 0,
+        landed: true,
+        phase: 0,
+        bx: [*x, *y, x + 16, y + 16],
+        solid: Some(solid),
+    }))))
+}
+
+pub fn spawn_map_sprite(w: &mut World, o: &crate::fieldcontent::ObjDef) -> Option<EntityId> {
+    let ObjKind::MapSprite { x, y, sprite, params } = &o.kind else { return None };
+    Some(w.add(Body::MapSprite(Box::new(MapSprite { x: *x, y: *y, sprite: *sprite, params: *params, t: 0 }))))
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// breakables
+
+/// message 0 (an attack): needs a solid prop, mult != 0, a strict box overlap and the attack type in the mask
+pub fn breakable_message(w: &mut World, k: usize, msg: &mut HitMsg) -> bool {
+    if msg.team != 1 || msg.mult == 0 {
+        return false;
+    }
+    let Body::Breakable(b) = &mut w.ents[k].body else { return false };
+    if b.broken || !ov(b.bx, [msg.rect.x0, msg.rect.y0, msg.rect.x1, msg.rect.y1]) {
+        return false;
+    }
+    if b.mask & ((1 << msg.atk.kind) | (1 << msg.atk.sub)) == 0 {
+        return false;
+    }
+    b.last_dir = msg.dir;
+    b.hp -= 1;
+    // the melee's crit slot is not written for breakables: every recorded hit shook the screen (15, 75)
+    msg.crit = true;
+    if b.hp > 0 {
+        b.shake = 23;
+        return true;
+    }
+    b.broken = true;
+    let bx = b.bx;
+    let id = w.ents[k].id;
+    let rate = 0x1000 + w.rng.rand(0x1000);
+    crate::fx::explosion(w, (bx[0] + bx[2]) >> 1, (bx[1] + bx[3]) >> 1, rate);
+    let at = w.frame + 16;
+    if let Some(f) = w.field.as_mut() {
+        f.deferred.push(Deferred::Break { at, entity: id });
+    }
+    true
+}
+
+pub fn breakable_update(w: &mut World, i: usize) {
+    let Body::Breakable(b) = &w.ents[i].body else { return };
+    if b.shake <= 0 {
+        return;
+    }
+    let t = b.shake - 1;
+    let (mut dx, mut dy) = (0, 0);
+    if t != 0 && t & 2 == 0 {
+        dx = w.rng.rand(5) - 2;
+        dy = w.rng.rand(3) - 1;
+    }
+    if let Body::Breakable(b) = &mut w.ents[i].body {
+        b.shake = t;
+        if t == 0 {
+            b.dx = 0;
+            b.dy = 0;
+        } else if t & 2 == 0 {
+            b.dx = dx;
+            b.dy = dy;
+        }
+    }
+}
+
+/// the deferred calls due this frame (start of the world update)
+pub fn run_deferred(w: &mut World) {
+    let now = w.frame + 1;
+    let due: Vec<Deferred> = match w.field.as_mut() {
+        Some(f) => {
+            let (due, keep): (Vec<_>, Vec<_>) = f.deferred.drain(..).partition(|d| match d {
+                Deferred::Break { at, .. } => *at <= now,
+            });
+            f.deferred = keep;
+            due
+        }
+        None => return,
+    };
+    for d in due {
+        match d {
+            Deferred::Break { entity, .. } => break_done(w, entity),
+        }
+    }
+}
+
+/// `0x0800C628`: loot position (centre x, bottom y), loot velocity = the last hit direction << 8, the grids under the
+/// box walkable again, the breakable gone, then the def's callback (usually the loot script s497)
+fn break_done(w: &mut World, id: EntityId) {
+    let Some(k) = w.find(id) else { return };
+    let Body::Breakable(b) = &w.ents[k].body else { return };
+    let (obj, bx, dir) = (b.obj, b.bx, b.last_dir);
+    w.ents[k].removed = true;
+    if let Some(c) = w.col.as_mut() {
+        c.mark_both(bx, 1);
+    }
+    let (x, y) = ((bx[0] + bx[2]) >> 1, bx[3]);
+    let v = DIR_VEC[dir as usize & 3];
+    set_loot(w, x, y, v.0 << 8, v.1 << 8);
+    let cb = crate::field::area_obj(w, obj).and_then(|o| match o.kind {
+        ObjKind::Breakable { on_break, .. } => on_break,
+        _ => None,
+    });
+    if let Some(run) = cb {
+        w.events.push(Event::Field(FieldEvent::Run { run, cause: Cause::Break { obj, x, y }, slot: 0 }));
+    }
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// loot (the script host calls these for the drop natives)
+
+/// the loot position / velocity (`0x03001010` / `0x03001018`) the next drops use
+pub fn set_loot(w: &mut World, x: i32, y: i32, vx: i32, vy: i32) {
+    if let Some(f) = w.field.as_mut() {
+        f.loot = (x, y, vx, vy);
+    }
+}
+
+fn scatter(w: &mut World, vx: i32, vy: i32) -> (i32, i32) {
+    let a = w.rng.rand(256) - 128;
+    let b = w.rng.rand(256) - 128;
+    let mut x = vx + ((a * vy) >> 8);
+    let mut y = vy + ((b * vx) >> 8);
+    x = (x * (w.rng.rand(64) + 0xE0)) >> 8;
+    y = (y * (w.rng.rand(64) + 0xE0)) >> 8;
+    (x, y)
+}
+
+/// `drop_zenie(size)` (`0x08018346`): a coin at the loot position (5 RNG draws)
+pub fn drop_zenie(w: &mut World, size: i32) -> Option<EntityId> {
+    let (lx, ly, lvx, lvy) = w.field.as_ref()?.loot;
+    let size = size.clamp(0, 3);
+    let phase = w.rng.next();
+    let (vx, vy) = scatter(w, lvx, lvy);
+    let big = size & 1 == 1;
+    let (sw, bw, bh, yoff) = if big { (16, 10, 4, -6) } else { (8, 4, 2, -7) };
+    let (x, y) = (lx << 8, ly << 8);
+    let x0 = (x >> 8) - sw / 2;
+    let y0 = (y >> 8) + yoff;
+    let p = Pickup { kind: PickupKind::Zenie(size), x, y, vx, vy, z: 0, vz: 0x80, t: 0, landed: false, phase, bx: [x0, y0, x0 + bw, y0 + bh], solid: None };
+    let id = w.add(Body::Pickup(Box::new(p)));
+    // the first physics step in the frame it spawns (deferred calls run at the start of the world update)
+    if let Some(k) = w.find(id) {
+        pickup_update(w, k);
+    }
+    Some(id)
+}
+
+/// `drop_item(i)` / `drop_equipment(e)` (`0x0800D30E`): item >= 0 supply, < 0 equipment (4 RNG draws)
+pub fn drop_item(w: &mut World, item: i32) -> Option<EntityId> {
+    let (lx, ly, lvx, lvy) = w.field.as_ref()?.loot;
+    let (vx, vy) = scatter(w, lvx, lvy);
+    let kind = if item >= 0 { PickupKind::Supply(item) } else { PickupKind::Equipment(-item) };
+    let (x, y) = ((lx - 8) << 8, (ly - 16) << 8);
+    let p = Pickup { kind, x, y, vx, vy, z: 0x2000, vz: 0x800, t: 0, landed: false, phase: 0, bx: [lx - 8, ly - 16, lx + 8, ly], solid: None };
+    let id = w.add(Body::Pickup(Box::new(p)));
+    if let Some(k) = w.find(id) {
+        pickup_update(w, k);
+    }
+    Some(id)
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// pickups
+
+pub fn pickup_update(w: &mut World, i: usize) {
+    let Body::Pickup(p) = &w.ents[i].body else { return };
+    let mut p = (**p).clone();
+    p.t += 1;
+    match p.kind {
+        PickupKind::Zenie(_) => {
+            if p.t < 60 {
+                let (nx, ny) = (p.x + p.vx, p.y + p.vy);
+                let (ddx, ddy) = ((nx >> 8) - (p.x >> 8), (ny >> 8) - (p.y >> 8));
+                if ddx == 0 && ddy == 0 || walk_free(w, [p.bx[0] + ddx, p.bx[1] + ddy, p.bx[2] + ddx, p.bx[3] + ddy]) {
+                    p.x = nx;
+                    p.y = ny;
+                    p.bx = [p.bx[0] + ddx, p.bx[1] + ddy, p.bx[2] + ddx, p.bx[3] + ddy];
+                }
+                p.vz -= 4;
+                p.z += p.vz;
+                if p.z <= 0 {
+                    p.z = -p.z;
+                    p.vz = 0x80;
+                }
+            } else {
+                p.z = 0;
+                p.landed = true;
+            }
+            if p.t >= 600 {
+                w.ents[i].removed = true;
+            }
+        }
+        PickupKind::Supply(_) | PickupKind::Equipment(_) if !p.landed => {
+            let (nx, ny) = (p.x + p.vx, p.y + p.vy);
+            let (ddx, ddy) = ((nx >> 8) - (p.x >> 8), (ny >> 8) - (p.y >> 8));
+            // collision sub-box inside the 16x16 icon (from the icon's pixels in the game; lower half here)
+            let sub = [p.bx[0] + ddx, p.bx[1] + 8 + ddy, p.bx[2] + ddx, p.bx[3] + ddy];
+            if ddx == 0 && ddy == 0 || walk_free(w, sub) {
+                p.x = nx;
+                p.y = ny;
+                p.bx = [p.bx[0] + ddx, p.bx[1] + ddy, p.bx[2] + ddx, p.bx[3] + ddy];
+            }
+            p.vz -= 0x80;
+            p.z += p.vz;
+            if p.z < 0 {
+                p.z = (-p.z) >> 1;
+                p.vz = (-p.vz) >> 1;
+                if p.vz < 0x200 {
+                    p.z = 0;
+                    p.landed = true;
+                }
+            }
+        }
+        _ => {}
+    }
+    if let Body::Pickup(q) = &mut w.ents[i].body {
+        **q = p;
+    }
+}
+
+/// the coins' touch triggers sit at the end of the trigger list (scanned first): the first coin (newest first) whose
+/// rect holds the point is collected; true = a trigger fired this frame
+pub fn coin_check(w: &mut World, px: i32, py: i32, slot: u8) -> bool {
+    for k in (0..w.ents.len()).rev() {
+        if w.ents[k].removed {
+            continue;
+        }
+        let Body::Pickup(p) = &w.ents[k].body else { continue };
+        if !matches!(p.kind, PickupKind::Zenie(_)) {
+            continue;
+        }
+        let r = p.coin_rect();
+        if r[0] <= px && px < r[2] && r[1] <= py && py < r[3] {
+            collect(w, k, slot);
+            return true;
+        }
+    }
+    false
+}
+
+/// collect pickup entity `k`: coins add their value (SFX 44); equipment goes into the list at once, supplies count
+/// after the 60-frame item-get; map items restore the grids and run their event after the item-get
+pub fn collect(w: &mut World, k: usize, slot: u8) {
+    let Body::Pickup(p) = &w.ents[k].body else { return };
+    let (kind, solid) = (p.kind, p.solid);
+    w.ents[k].removed = true;
+    if let Some(s) = solid {
+        if let Some(c) = w.col.as_mut() {
+            c.mark_both(s, 1);
+        }
+    }
+    let mut then = None;
+    let item = match kind {
+        PickupKind::Zenie(size) => {
+            w.story.add_zenie(COIN_VALUE[size.clamp(0, 3) as usize] as i64);
+            w.sfx(44, 64);
+            w.events.push(Event::Field(FieldEvent::Collected { kind, slot }));
+            return;
+        }
+        PickupKind::Supply(i) => i,
+        PickupKind::Equipment(e) => -e,
+        PickupKind::MapItem { obj, item } => {
+            then = crate::field::area_obj(w, obj).and_then(|o| match o.kind {
+                ObjKind::Item { on_pickup, .. } => on_pickup.map(|cb| (cb, Cause::Pickup { obj })),
+                _ => None,
+            });
+            item
+        }
+    };
+    let supply = if item >= 0 {
+        Some(item)
+    } else {
+        w.story.add_equipment(-item);
+        None
+    };
+    w.sfx(45, 64);
+    if let Some(f) = w.field.as_mut() {
+        f.item_get = Some(ItemGet { left: 61, slot, supply, then });
+    }
+    w.events.push(Event::Field(FieldEvent::Collected { kind, slot }));
+}
+
+/// the item-get presentation's frame (blocking: the players get no input, no trigger check); at its end the supply
+/// counts and the map item's event runs
+pub fn item_get_step(w: &mut World) {
+    let Some(f) = w.field.as_mut() else { return };
+    let Some(g) = f.item_get.as_mut() else { return };
+    g.left -= 1;
+    if g.left > 0 {
+        return;
+    }
+    if g.left == 0 {
+        // the presentation ends: the player leaves the hold pose (SetAnim(0)); the count and the event follow a frame later
+        let slot = g.slot as usize;
+        if let Some(pi) = w.player_idx(slot) {
+            crate::player::set_idle(w, pi);
+        }
+        return;
+    }
+    let g = f.item_get.take().unwrap();
+    if let Some(s) = g.supply {
+        w.story.add_supply(s, 1);
+    }
+    if let Some((run, cause)) = g.then {
+        w.events.push(Event::Field(FieldEvent::Run { run, cause, slot: g.slot }));
+    }
+}
+
+pub fn map_sprite_update(w: &mut World, i: usize) {
+    if let Body::MapSprite(m) = &mut w.ents[i].body {
+        m.t += 1;
+    }
+}

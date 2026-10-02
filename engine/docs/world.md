@@ -128,3 +128,16 @@ edges reaching 423 of 452 areas; 2783 text lines (all 196 386 bank units referen
 * `region` triggers, `message_trigger` values, map_sprite params, breakable +5, wander step semantics, prop graphics
   (props are exported as data, not rendered).
 * Talk events whose speaker is "the current player" depend on who is playing (slot 1..6 of the form's set).
+
+## 5. Field RE corrections (2026-10-02, re/buu/notes.md "Field: ..." sections; used by wf-core `field*.rs`)
+
+* **breakable**: def +5 = **HP** (exported `param_a`), +6 u16 = **attack-type mask** (exported `hits`; a hit counts
+  when `mask & ((1 << kind) | (1 << sub))`), not a hit count.
+* **npc** `sprite_index` is the **script sprite id** (content sprite index + 9, as `spawn_actor`); enemies' def
+  sprite is unused (the type's gfx decides).
+* Trigger activations exported as `unknown`: `0x08007791` = touch **on entry** (not matched in the previous check
+  pass), `0x080071A7` = UP held then removed, `0x0802266F` = A pressed then removed.
+* The trigger list is scanned last to first: area triggers in exported order, then the map header's; coins'
+  pickup triggers (appended at runtime) come first.
+* Area record +8 (`areas.json` `rom.word08`) = the **combat** byte (0 in towns: A only talks / interacts).
+* No area has a variant selector (+0x28 = 0 everywhere): variant 0 always means 1.

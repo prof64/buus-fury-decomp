@@ -122,12 +122,15 @@ pub enum Gs {
     SsRevert,
     Skill(u8),
     Skill18r,
+    /// field transitions: the autowalk state (0x08010D7C, state 0x03002B54)
+    AutoWalk,
 }
 impl Gs {
     pub fn name(self) -> String {
         match self {
             Gs::Idle | Gs::Idle2 => "idle".into(),
             Gs::Walk => "walk".into(),
+            Gs::AutoWalk => "autowalk".into(),
             Gs::Dash => "dash".into(),
             Gs::Bored => "bored".into(),
             Gs::Punch => "punch".into(),
@@ -621,6 +624,37 @@ fn set_anim_named(w: &mut World, i: usize, refs: &[AnimRef], restart: bool) {
     *p(w, i) = c;
 }
 
+/// field: the autowalk state of an exit / area arrival (0x08010D7C): not hittable, the walk animation
+pub fn start_autowalk(w: &mut World, i: usize) {
+    p(w, i).ap.raw = ANIM_RAW[1];
+    enter_state(w, i, Gs::AutoWalk);
+    p(w, i).a.hittable = false;
+}
+/// the end of a fade: the player goes idle (SetAnim(0): idle enter, 1 x rand(255))
+pub fn set_idle(w: &mut World, i: usize) {
+    set_anim_id(w, i, 0);
+}
+
+/// scripts: SetAnim(id) with a script anim id (table 0x08072670 applied by ANIM_RAW / ANIM_STATE)
+pub fn script_set_anim(w: &mut World, i: usize, id: usize) {
+    set_anim_id(w, i, id.min(ANIM_RAW.len() - 1));
+}
+
+/// scripts: `set_pose` (vfunc +0x30): the static pose state (0x03001B00) holding anim `id` on cel `frame`
+pub fn script_pose(w: &mut World, i: usize, id: usize, frame: i32) {
+    let raw = ANIM_RAW[id.min(ANIM_RAW.len() - 1)];
+    enter_state(w, i, Gs::Hold);
+    let pl = p(w, i);
+    pl.ap.raw = raw;
+    pl.ap.frame = frame;
+    pl.ap.tick = 0;
+}
+
+/// scripts: the state's animation has finished (vfunc +0x34): back in idle, or holding
+pub fn script_anim_done(w: &World, i: usize) -> bool {
+    matches!(pr(w, i).gs, Gs::Idle | Gs::Idle2 | Gs::Hold | Gs::Hold0)
+}
+
 /// SetAnim(id) (vfunc +0x28 0x0800ECF0)
 fn set_anim_id(w: &mut World, i: usize, id: usize) {
     p(w, i).ap.raw = ANIM_RAW[id];
@@ -629,7 +663,7 @@ fn set_anim_id(w: &mut World, i: usize, id: usize) {
 }
 fn coarse(pl: &Player, gs: Gs) -> PState {
     match gs {
-        Gs::Walk => PState::Walk,
+        Gs::Walk | Gs::AutoWalk => PState::Walk,
         Gs::Dash => PState::Dash,
         Gs::Punch => PState::Punch,
         Gs::Block => PState::Block,
@@ -900,7 +934,8 @@ pub fn update(w: &mut World, i: usize) {
         return;
     }
     anim_tick(w, i);
-    if !pr(w, i).dead {
+    // a script commanding the player (scene.rs puppet): the states it sets run, the controller does not
+    if !pr(w, i).dead && !crate::scene::is_puppet(w, w.ents[i].id) {
         control(w, i);
     }
     let mut pl = pr(w, i).clone();
@@ -970,7 +1005,7 @@ fn anim_tick(w: &mut World, i: usize) {
             tick_idle(&mut a, n);
             end(w, a)
         }
-        Gs::Walk | Gs::LoopB | Gs::LoopC => {
+        Gs::Walk | Gs::LoopB | Gs::LoopC | Gs::AutoWalk => {
             tick_loop(&mut a, n, 3);
             end(w, a)
         }
@@ -1220,6 +1255,14 @@ fn control(w: &mut World, i: usize) {
         Gs::Hurt => return ctl_knock(w, i),
         Gs::Skill(14) => return ctl_it(w, i),
         Gs::Skill(18) | Gs::Skill18r => return,
+        Gs::AutoWalk => {
+            // +0x80 subpx per frame along the facing (0x083C34B0), no collision, input ignored
+            let pl = p(w, i);
+            let (dx, dy) = crate::geom::DIR_VEC[pl.a.facing as usize & 3];
+            pl.a.x += dx * 0x80;
+            pl.a.y += dy * 0x80;
+            return;
+        }
         _ => {}
     }
     match pr(w, i).state {
@@ -1622,7 +1665,13 @@ fn melee(w: &mut World, i: usize) {
     let rect = Rect::at(PUNCH_RECT[a.facing as usize], a.px(), a.py());
     let me = w.ents[i].id;
     let mut m = HitMsg { team: 1, rect, dir: a.facing, mult: 0x400, atk: atk(2), attacker: me, att_stats: a.stats, att_is_player: true, source: me, crit: false, raw: 0, dmg: 0 };
-    let any = broadcast(w, &mut m, false);
+    // field: areas without combat (area record +8 = 0) send no hit; a hit nobody accepted becomes the interact
+    // message (talk, A pickups), then the A-trigger test — any of them suppresses the punch (field.rs / fieldnpc.rs)
+    let combat = w.field.as_ref().is_none_or(|f| f.combat);
+    let any = combat && broadcast(w, &mut m, false);
+    if w.field.is_some() && !any && (crate::fieldnpc::interact(w, i) || !combat) {
+        return;
+    }
     if any {
         let s = 48 + w.rng.rand(2);
         sfx(w, s, 64);
@@ -2715,10 +2764,16 @@ fn upd_held(w: &mut World, i: usize) {
 
 // ---- damage ---------------------------------------------------------------------------------------------------------------
 
+/// PvP rule set (`World::opts.pvp`, multiplayer only, not in the original game): another player's attack (melee,
+/// skills, its shots and effects: attacker = that player) is accepted like an enemy attack, same damage pipeline
+fn pvp_hit(w: &World, i: usize, msg: &HitMsg) -> bool {
+    w.opts.pvp && msg.att_is_player && msg.attacker != w.ents[i].id && w.find(msg.attacker).is_some_and(|k| matches!(w.ents[k].body, Body::Player(_)))
+}
+
 pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
     {
         let pl = pr(w, i);
-        if msg.team == 1 || pl.dead {
+        if (msg.team == 1 && !pvp_hit(w, i, msg)) || pl.dead {
             return false;
         }
         if pl.state == PState::Held && pl.hold_kind == Some(HoldKind::Eat) {
@@ -2742,6 +2797,13 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
     msg.raw = res.raw;
     msg.dmg = dmg;
     w.events.push(Event::Damage { target: w.ents[i].id, attacker: msg.attacker, dmg, crit: res.crit });
+    if msg.team == 1 {
+        // PvP: the attacker's hit cue and on-hit hooks, as when it hits an enemy
+        w.events.push(Event::Hit);
+        if let Some(ai) = w.find(msg.attacker).filter(|_| dmg > 0) {
+            on_dealt(w, ai, msg, dmg);
+        }
+    }
     let before = pr(w, i).rec.hp;
     let lost = if dmg > 0 && before > 0 { p(w, i).hp_acc.take(dmg) } else { 0 };
     // 0x0800E8E6 runs for every accepted hit, 0 damage included: the 12-frame flash restarts

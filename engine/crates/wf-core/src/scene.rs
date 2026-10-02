@@ -1,0 +1,2218 @@
+//! Cutscene systems: what Buu's Fury scripts drive (spec `re/buu/SCRIPT.md` part B, host `docs/script-host.md`),
+//! as plain World data (`World.scene`, `Body::Npc`), stepped by the frame and snapshotted / hashed with the World.
+//!
+//! * **Scripted actors** (`Body::Npc`, the game's NPC class `0x0801111C` used by `spawn_actor` / `change_sprite`)
+//!   and **puppets** (players and enemies a script commands): the actor animation state machine of the game (state
+//!   id → raw anim `state + 1`, per-state timing from the state objects `0x0807273C`, ends in idle / hold / loop).
+//! * **Command tracks** (`actor+0x18C`, B3.2): one queue per actor plus the camera track; commands start, update
+//!   once per frame and report done; a finished head is popped and the next one starts in the same tick; a track
+//!   that popped its last command still reports busy for that tick (the game's tick returns 2), so a lone instant
+//!   command keeps a blocking native busy for 2 frames. Tracks only run while a director wait mode runs.
+//! * **Director** (`0x03002BAC`, B3.3): batch flag, `wait_for_actor` group, the wait mode (all tracks / the group +
+//!   camera) whose completion resumes the script.
+//! * **Camera control**: follow another actor, modal scrolls, queued pans / sets (the default stays the player
+//!   camera `battle::camera`).
+//! * **Screen**: fades (black / white / mosaic / flash), palette flashes, BG layer visibility / priority / blend
+//!   targets / alpha, HUD visibility, boss bar, title text, timer HUD, destination label, markers, radar.
+//! * **Dialog** (text boxes with pages, choices with the result kept for `get_menu_result`, box positions) and
+//!   **menus** (shop buy / sell, save, character switch, mini-games, credits) as deterministic input-driven state.
+//! * **Requests** the session / frontend acts on (return to title, credits, sleep, scene loads in battle mode).
+//!
+//! Frame order (`Session::step_frames`): [`pre_step`] (raw input kept for script queries; players' input masked
+//! while an event graph runs) → entities (Npc / puppet animation ticks) → [`tick`] (screen effects, dialog, menus,
+//! command tracks) → cameras ([`camera`] before the player camera) → the script host polls and resumes.
+//! Every timing here is checked against emulator recordings (`data/script_lockstep`, test
+//! `wf-script-core/tests/lockstep.rs`).
+
+use crate::actor::Actor;
+use crate::content::GameData;
+use crate::geom::{facing_toward, Dir, Rect};
+use crate::input::{InputFrame, A, B, DOWN, LEFT, RIGHT, UP};
+use crate::world::{Body, EntityId, World, GBA_H, GBA_W, MAX_PLAYERS};
+use serde::{Deserialize, Serialize};
+
+/// script sprite id = content sprite index + 9 (the game's gfx id; `0x08000158`)
+pub const SPRITE_BASE: i32 = 9;
+
+// ---------------------------------------------------------------------------------------------------------------
+// actor animation state machine (state objects 0x0807273C; script anim id -> state id table 0x08072670)
+//
+// The same generic state objects drive every actor (player.rs ports them for the player: `Gs`, `anim_tick`);
+// scripted actors use this copy: the tick counts up from the state's start, the cel follows from it.
+
+/// script anim id -> actor state id (`0x08072670`); raw anim = state + 1
+pub fn anim_state(anim: i32) -> i32 {
+    const T: [i32; 25] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x0a, 0x0b];
+    T.get(anim.max(0) as usize).copied().unwrap_or(anim)
+}
+
+/// how a state ticks (the state objects' vtable +4, see player.rs `anim_tick`)
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TickKind {
+    /// idle: 2 cels blink (cel 1 while tick & 0xFF > 0xF0), else 8 ticks per cel
+    Idle,
+    /// loops, 1 << 3 ticks per cel (walk, dash, ...); `sound`: dash's SFX 25 every 16 ticks
+    Loop { sound: bool },
+    /// once, 1 << shift ticks per cel, then idle (`hold`: stays on the last cel)
+    Once { shift: i32, hold: bool },
+    /// the bored state (32 ticks per cel, loops from cel 2)
+    Bored,
+    /// frozen
+    Hold,
+}
+
+/// the state kind of a script anim id (player.rs ANIM_STATE)
+pub fn tick_kind(id: i32) -> TickKind {
+    match id {
+        0 => TickKind::Idle,
+        2 => TickKind::Loop { sound: true },
+        1 | 10 | 11 | 13 | 14 | 15 => TickKind::Loop { sound: false },
+        3 | 9 => TickKind::Once { shift: 3, hold: false },
+        4..=6 => TickKind::Once { shift: 2, hold: false },
+        7 => TickKind::Hold,
+        8 => TickKind::Bored,
+        16 => TickKind::Once { shift: 5, hold: true },
+        _ => TickKind::Once { shift: 4, hold: false },
+    }
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum AnimMode {
+    /// the state's own tick
+    #[default]
+    Table,
+    /// `set_pose` / held cels of a command: frozen on a cel
+    Pose,
+    /// `play_anim_frames`: cels 0..last, each `each` frames, restart at `loop_start`, `loops` passes (0 = forever)
+    Frames { each: i32, loops: i32, loop_start: i32, last: i32, pass: i32 },
+}
+
+/// an actor's animation as the game keeps it (obj+0x50 anim, +0x11 cel, +0x12 tick)
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct ActAnim {
+    /// raw anim index (state + 1; 1 = idle)
+    pub raw: i32,
+    pub frame: i32,
+    pub tick: i32,
+    /// script anim id of the state
+    pub id: i32,
+    pub mode: AnimMode,
+    /// a one-shot animation reached its end (`play_anim` done)
+    pub ended: bool,
+}
+
+/// what an animation tick asks the world to do
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AnimOut {
+    None,
+    /// the once-state ended: SetAnim(0) (idle enter: tick = rand(255))
+    ToIdle,
+    /// SFX (id, volume)
+    Sfx(i32, i32),
+}
+
+impl ActAnim {
+    pub fn idle() -> ActAnim {
+        ActAnim { raw: 1, ..Default::default() }
+    }
+    /// SetAnim(id) without the enter side effects (see [`set_state`])
+    pub fn of(id: i32) -> ActAnim {
+        ActAnim { raw: anim_state(id) + 1, id, ..Default::default() }
+    }
+    fn cels(&self, d: &GameData, sprite: Option<i32>, dir: Dir) -> i32 {
+        sprite.and_then(|s| d.sprite(s)).and_then(|sp| sp.anim_raw(self.raw)).map(|a| a.steps(dir).len() as i32).unwrap_or(0)
+    }
+    /// one frame of the state's tick
+    pub fn tick(&mut self, d: &GameData, sprite: Option<i32>, dir: Dir) -> AnimOut {
+        let n = self.cels(d, sprite, dir).max(1);
+        match self.mode.clone() {
+            AnimMode::Pose => AnimOut::None,
+            AnimMode::Frames { each, loops, loop_start, last, pass } => {
+                self.tick += 1;
+                let each = each.max(1);
+                let last = last.max(1);
+                let ls = loop_start.clamp(0, last - 1);
+                let mut c = self.tick / each;
+                let mut pass = pass;
+                if c >= last {
+                    let rest = c - last;
+                    let span = (last - ls).max(1);
+                    pass = 1 + rest / span;
+                    c = ls + rest % span;
+                    if loops > 0 && pass >= loops {
+                        self.ended = true;
+                        c = last - 1;
+                    }
+                }
+                self.frame = c;
+                self.mode = AnimMode::Frames { each, loops, loop_start, last, pass };
+                AnimOut::None
+            }
+            AnimMode::Table => {
+                self.tick = (self.tick + 1) & 0xffff;
+                match tick_kind(self.id) {
+                    TickKind::Idle => {
+                        if n == 2 {
+                            self.frame = ((self.tick & 0xff) > 0xf0) as i32;
+                        } else {
+                            self.frame = (self.tick >> 3) & 0xff;
+                            if self.frame >= n {
+                                self.frame = 0;
+                                self.tick = 0;
+                            }
+                        }
+                        AnimOut::None
+                    }
+                    TickKind::Loop { sound } => {
+                        let mut f = self.tick >> 3;
+                        if f >= n {
+                            self.tick = 0;
+                            f = 0;
+                        }
+                        self.frame = f;
+                        if sound && self.tick & 15 == 0 {
+                            AnimOut::Sfx(25, 32)
+                        } else {
+                            AnimOut::None
+                        }
+                    }
+                    TickKind::Once { shift, hold } => {
+                        if self.ended {
+                            return AnimOut::None;
+                        }
+                        let f = self.tick >> shift;
+                        if f >= n {
+                            self.ended = true;
+                            if hold {
+                                self.mode = AnimMode::Pose;
+                                return AnimOut::None;
+                            }
+                            return AnimOut::ToIdle;
+                        }
+                        self.frame = f;
+                        AnimOut::None
+                    }
+                    TickKind::Bored => {
+                        let f = self.tick >> 5;
+                        if f >= n {
+                            self.tick = 0x40;
+                            self.frame = 2;
+                        } else {
+                            self.frame = f;
+                        }
+                        AnimOut::None
+                    }
+                    TickKind::Hold => AnimOut::None,
+                }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// scripted actors
+
+/// A scripted actor (the game's NPC class, vtable 0x0804CEF4 for `spawn_actor`; map NPCs use the same object
+/// layout). Field NPC behaviour (wander, talk) is the field layer's (`docs/core.md` §9).
+#[derive(Clone, Debug, Hash, Serialize, Deserialize)]
+pub struct Npc {
+    pub a: Actor,
+    /// script sprite id (>= 10; content sprite index + 9)
+    pub sprite_id: i32,
+    /// map placement tag (negative actor ids address it as -(tag + 1)); None = spawned by a script
+    pub tag: Option<i32>,
+    pub anim: ActAnim,
+    /// `tint` preset (index into the 20 presets of 0x08752EEC, `None` = own palette)
+    pub tint: Option<u8>,
+    /// `set_attachment` record (kind, variant) and offset
+    pub attach: Option<[i32; 4]>,
+    /// `set_actor_speed` (actor+0x180 = v << 10) and `set_actor_byte8`
+    pub speed: i32,
+    pub byte8: i32,
+    /// item held up by `show_item_get` (item id; negative = equipment)
+    pub hold_item: Option<i32>,
+    /// talk event (`sNNN` number) of a map NPC
+    pub talk: Option<i32>,
+    /// field NPC behaviour (field.rs: map placement steps, the game's idle / walk animation, grid marks); None =
+    /// only scripts move it
+    #[serde(default)]
+    pub behaviour: Option<crate::field::Behaviour>,
+}
+
+impl Npc {
+    pub fn new(d: &GameData, sprite_id: i32, x: i32, y: i32, dir: Dir) -> Npc {
+        let mut a = Actor::default();
+        a.set_sprite(d, Some(sprite_id - SPRITE_BASE));
+        a.x = x << 8;
+        a.y = y << 8;
+        a.facing = dir;
+        Npc { a, sprite_id, tag: None, anim: ActAnim::idle(), tint: None, attach: None, speed: 0, byte8: 0x38, hold_item: None, talk: None, behaviour: None }
+    }
+}
+
+/// spawn a scripted actor (`spawn_actor`: facing down, idle)
+pub fn spawn_npc(w: &mut World, sprite_id: i32, x: i32, y: i32, dir: Dir) -> EntityId {
+    let n = Npc::new(&w.data, sprite_id, x, y, dir);
+    w.add(Body::Npc(Box::new(n)))
+}
+
+pub fn npc_update(w: &mut World, i: usize) {
+    if matches!(&w.ents[i].body, Body::Npc(n) if n.behaviour.is_some()) && !is_puppet(w, w.ents[i].id) {
+        return crate::field::npc_update(w, i);
+    }
+    let d = w.data.clone();
+    let out = if let Body::Npc(n) = &mut w.ents[i].body {
+        let (s, f) = (n.a.sprite, n.a.facing);
+        let o = n.anim.tick(&d, s, f);
+        n.a.tick_anim();
+        o
+    } else {
+        AnimOut::None
+    };
+    anim_out(w, i, out);
+}
+
+fn anim_out(w: &mut World, i: usize, out: AnimOut) {
+    match out {
+        AnimOut::None => {}
+        AnimOut::ToIdle => set_state(w, i, 0),
+        AnimOut::Sfx(id, vol) => w.sfx(id, vol),
+    }
+}
+
+/// A player / enemy under script control. Players keep their own state machine (player.rs: the states the
+/// commands set tick, the controller is off); enemies play `anim` instead of their own update.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct Puppet {
+    pub id: EntityId,
+    pub anim: ActAnim,
+}
+
+pub fn is_puppet(w: &World, id: EntityId) -> bool {
+    w.scene.puppets.iter().any(|p| p.id == id)
+}
+
+fn make_puppet(w: &mut World, i: usize) {
+    let id = w.ents[i].id;
+    if !is_puppet(w, id) {
+        w.scene.puppets.push(Puppet { id, anim: ActAnim::idle() });
+    }
+}
+
+/// called at the top of the enemy update: true = the enemy is a puppet this frame (its update is done)
+pub fn puppet_update(w: &mut World, i: usize) -> bool {
+    let id = w.ents[i].id;
+    if !matches!(w.ents[i].body, Body::Enemy(_)) {
+        return false;
+    }
+    let Some(k) = w.scene.puppets.iter().position(|p| p.id == id) else { return false };
+    let (s, f) = match w.actor(i) {
+        Some(a) => (a.sprite, a.facing),
+        None => return false,
+    };
+    let d = w.data.clone();
+    let out = w.scene.puppets[k].anim.tick(&d, s, f);
+    if let Body::Enemy(e) = &mut w.ents[i].body {
+        e.a.tick_anim();
+    }
+    anim_out(w, i, out);
+    true
+}
+
+/// the animation the game shows for entity `i` (raw, cel): players their state's, Npcs / enemy puppets the scene's
+pub fn shown_anim(w: &World, i: usize) -> Option<(i32, i32)> {
+    match &w.ents[i].body {
+        Body::Npc(n) => Some((n.anim.raw, n.anim.frame)),
+        Body::Player(p) => Some((p.ap.raw, p.ap.frame)),
+        _ => w.scene.puppets.iter().find(|p| p.id == w.ents[i].id).map(|p| (p.anim.raw, p.anim.frame)),
+    }
+}
+
+/// the scene animation of an Npc / enemy puppet
+pub fn scene_anim(w: &World, i: usize) -> Option<&ActAnim> {
+    match &w.ents[i].body {
+        Body::Npc(n) => Some(&n.anim),
+        _ => w.scene.puppets.iter().find(|p| p.id == w.ents[i].id).map(|p| &p.anim),
+    }
+}
+
+fn anim_mut(w: &mut World, i: usize) -> Option<&mut ActAnim> {
+    let id = w.ents[i].id;
+    let npc = matches!(w.ents[i].body, Body::Npc(_));
+    if !npc {
+        make_puppet(w, i);
+    }
+    if npc {
+        match &mut w.ents[i].body {
+            Body::Npc(n) => Some(&mut n.anim),
+            _ => None,
+        }
+    } else {
+        w.scene.puppets.iter_mut().find(|p| p.id == id).map(|p| &mut p.anim)
+    }
+}
+
+fn actor_mut(w: &mut World, i: usize) -> Option<&mut Actor> {
+    match &mut w.ents[i].body {
+        Body::Player(p) => Some(&mut p.a),
+        Body::Enemy(e) => Some(&mut e.a),
+        Body::Npc(n) => Some(&mut n.a),
+        Body::Hand(h) => Some(&mut h.a),
+        _ => None,
+    }
+}
+
+/// SetAnim(id) (actor vtable +0x28) with a script anim id, including the state's enter (idle: a random tick, one
+/// RNG draw; punches: SFX 50 + rand(2))
+pub fn set_state(w: &mut World, i: usize, id: i32) {
+    if matches!(w.ents[i].body, Body::Player(_)) {
+        make_puppet(w, i);
+        crate::player::script_set_anim(w, i, id.clamp(0, 24) as usize);
+        return;
+    }
+    let mut a = ActAnim::of(id);
+    match id {
+        0 => a.tick = w.rng.rand(255),
+        4..=6 => {
+            let s = 50 + w.rng.rand(2);
+            w.sfx(s, 64);
+        }
+        _ => {}
+    }
+    if let Some(m) = anim_mut(w, i) {
+        *m = a;
+    }
+}
+
+/// SetPose (vtable +0x30): state `id`'s animation frozen on `frame`
+pub fn set_pose(w: &mut World, i: usize, id: i32, frame: i32) {
+    if matches!(w.ents[i].body, Body::Player(_)) {
+        make_puppet(w, i);
+        crate::player::script_pose(w, i, id.clamp(0, 24) as usize, frame);
+        return;
+    }
+    let a = ActAnim { frame, mode: AnimMode::Pose, ..ActAnim::of(id) };
+    if let Some(m) = anim_mut(w, i) {
+        *m = a;
+    }
+}
+
+fn set_frames(w: &mut World, i: usize, id: i32, mode: AnimMode) {
+    let player = matches!(w.ents[i].body, Body::Player(_));
+    let a = ActAnim { mode, ..ActAnim::of(id) };
+    if let Some(m) = anim_mut(w, i) {
+        *m = a;
+    }
+    if player {
+        // the player has no frame-range controller state of its own: it runs on the scene copy, shown as a pose
+        crate::player::script_pose(w, i, id.clamp(0, 24) as usize, 0);
+    }
+}
+
+/// the state's animation finished (vtable +0x34)
+pub fn anim_done(w: &World, i: usize) -> bool {
+    match &w.ents[i].body {
+        Body::Player(_) => crate::player::script_anim_done(w, i),
+        _ => scene_anim(w, i).is_none_or(|a| a.ended || a.id == 0),
+    }
+}
+
+/// end every puppet (the scene released its actors: players / enemies resume their own update)
+pub fn release_puppets(w: &mut World) {
+    w.scene.puppets.clear();
+}
+
+/// the actor's script sprite id (players / enemies: their sprite index + 9)
+pub fn sprite_id(w: &World, i: usize) -> Option<i32> {
+    match &w.ents[i].body {
+        Body::Npc(n) => Some(n.sprite_id),
+        // the player object's sprite def is its form's (gfx id), even where the content lacks that sheet
+        Body::Player(p) => w.data.form(p.form).map(|f| f.gfx),
+        _ => w.actor(i).and_then(|a| a.sprite).map(|s| s + SPRITE_BASE),
+    }
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// commands and tracks
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum Owner {
+    Entity(EntityId),
+    Camera,
+    /// a map prop (`prop_*` natives; the field layer's props)
+    Prop(i32),
+}
+
+/// One queued command (B3.5; class names after the natives that create them).
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum Cmd {
+    /// 0x4A actor_wait, 0x68 prop_wait
+    Wait { left: i32 },
+    /// 0x3C play_anim (anim 0: instant)
+    PlayAnim { anim: i32 },
+    /// 0x3D set_anim
+    SetAnim { anim: i32 },
+    /// 0x51 set_pose
+    SetPose { anim: i32, frame: i32 },
+    /// 0x59 play_anim_frames
+    PlayAnimFrames { anim: i32, each: i32, loops: i32, wait: bool, loop_start: i32, last: i32 },
+    /// 0x53 face
+    Face { dir: i32 },
+    /// 0x47 face_actor (holds: stays the track's head)
+    FaceActor { target: EntityId },
+    /// 0x44 walk_to (state 0xF), 0x50 move_to (state 2), 0x60 / 0x61 walk (state 1), 0x5F walk_to_actor;
+    /// straight line at speed/100 px per frame (step math 0x080192CE), snapped at the end
+    MoveTo { x: i32, y: i32, speed: i32, state: i32, target: Option<(EntityId, i32, i32)>, n: i32, t: i32, sx: i32, sy: i32 },
+    /// 0x49 glide_to: as MoveTo without animation or facing change
+    GlideTo { x: i32, y: i32, speed: i32, n: i32, t: i32, sx: i32, sy: i32 },
+    /// 0x45 jump_to: 8 crouch frames, `air` frames of arc, 8 landing frames
+    JumpTo { x: i32, y: i32, air: i32, t: i32, sx: i32, vy: i32 },
+    /// 0x5D set_pos
+    SetPos { x: i32, y: i32 },
+    /// 0x3F puff / 0x40 puff_offset (box centre + offset), 0x48 puff_at / 0x65 prop_effect_at (absolute)
+    Puff { x: i32, y: i32, absolute: bool },
+    /// 0x43 hit_flash
+    HitFlash,
+    /// 0x52 tint
+    Tint { r: i32, g: i32, b: i32, a: i32 },
+    /// 0x4D remove_actor
+    Remove,
+    /// 0x4E change_sprite
+    ChangeSprite { sprite: i32 },
+    /// 0x4F become_map_object
+    BecomeMapObject { index: i32 },
+    /// 0x4B queue_sfx
+    Sfx { id: i32 },
+    /// 0x4C screen_flash
+    ScreenFlash { r: i32, g: i32, b: i32, frames: i32, t: i32 },
+    /// 0x57 shake_screen
+    Shake { intensity: i32, frames: i32, t: i32 },
+    /// 0x58 show_item_get / 0x80 give_item / 0x93 give_equipment (60 frames)
+    ItemGet { item: i32, t: i32 },
+    /// 0x5A emote_wait / 0x5B emote
+    Emote { emote: i32, wait: bool, t: i32 },
+    /// 0x3B fire_wave_beam, 0x46 fire_beam, 0x5C fire_beam_alt, 0x5E fire_blast
+    Beam { kind: BeamKind, dir: i32, frames: i32, t: i32 },
+    /// 0x3E fire_ball_at, 0x41 shoot_at_actor, 0x42 shoot_at
+    Shoot { kind: ShootKind, x: i32, y: i32, speed: i32, t: i32, n: i32 },
+    /// 0x54 set_actor_speed, 0x56 set_actor_byte8, 0x55 set_attachment
+    SetSpeed { v: i32 },
+    SetByte8 { v: i32 },
+    SetAttachment { kind: i32, variant: i32, dx: i32, dy: i32 },
+    /// props: 0x62 poof, 0x63/0x64 hide/show, 0x66 move, 0x67 jump, 0x69 set pos
+    PropPoof { vanish: bool, t: i32 },
+    PropShow { on: bool },
+    PropMoveTo { x: i32, y: i32, speed: i32, n: i32, t: i32, sx: i32, sy: i32 },
+    PropJumpTo { x: i32, y: i32, t: i32, vx: i32, vy: i32 },
+    PropSetPos { x: i32, y: i32 },
+    /// camera track: 0x6A follow + wait, 0x6B pan, 0x6C release + wait, 0x6D / 0x6E params, 0x6F / 0x70 set
+    CamFollowWait { target: EntityId, left: i32 },
+    CamPanTo { x: i32, y: i32, speed: i32, n: i32, t: i32, sx: i32, sy: i32 },
+    CamReleaseWait { left: i32 },
+    CamParam { which: i32, v: i32 },
+    CamSet { x: i32, y: i32, z: Option<i32> },
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum BeamKind {
+    Wave,
+    Beam,
+    BeamAlt,
+    Blast,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ShootKind {
+    /// 0x3E: pink energy ball thrown toward a point
+    Ball,
+    /// 0x41 / 0x42: ki blast
+    Blast,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct Track {
+    pub owner: Owner,
+    pub queue: Vec<Cmd>,
+    /// the head has been started (msg 0x0D)
+    pub started: bool,
+    /// the head finished and holds (FaceActor)
+    pub holding: bool,
+}
+
+/// the director's wait mode (run_mode on WaitAll 0x0804C0C4 or the group 0x0804DEEC)
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum WaitMode {
+    All,
+    Group(Vec<Owner>),
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct Director {
+    /// `begin_parallel` open
+    pub batch: bool,
+    /// `wait_for_actor` group of the open batch
+    pub group: Vec<Owner>,
+    /// the wait mode running (the script is blocked on it)
+    pub wait: Option<WaitMode>,
+    /// the wait finished this frame (the host resumes the script)
+    pub done: bool,
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// camera control
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum CamMode {
+    /// the player camera (battle::camera)
+    #[default]
+    Player,
+    /// a follow object on another actor (0x33 camera_follow / 0x6A)
+    Follow(EntityId),
+    /// released (0x34 / 0x6C / any set or pan): the camera stays where it is
+    Fixed,
+}
+
+/// modal scroll (0x31 camera_center_on / 0x32 camera_scroll_to): mover 0x08015B68
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct Scroll {
+    pub tx: i32,
+    pub ty: i32,
+    pub sx: i32,
+    pub sy: i32,
+    pub n: i32,
+    pub t: i32,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct CamCtl {
+    pub mode: CamMode,
+    pub scroll: Option<Scroll>,
+    /// camera+8 / +0xC (0x6D / 0x6E; meaning unknown, kept)
+    pub param8: i32,
+    pub param12: i32,
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// screen
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum FadeKind {
+    /// 0x78 / 0x79 (and scene loads, warps)
+    Black,
+    /// 0x7A / 0x7B
+    White,
+    /// 0x7C / 0x7D
+    Mosaic,
+    /// 0x7E flash_white (to white and back)
+    Flash,
+}
+
+/// a running modal screen effect
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct Fade {
+    pub kind: FadeKind,
+    /// true = toward the effect (out), false = back to normal (in)
+    pub out: bool,
+    pub t: i32,
+    pub len: i32,
+}
+
+/// palette flash of `screen_flash` (0x4C): toward (r, g, b) and back over `len` frames
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct PalFlash {
+    pub rgb: (u8, u8, u8),
+    pub t: i32,
+    pub len: i32,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct Layers {
+    /// BG0..3 visible (DISPCNT bits 8..11)
+    pub visible: [bool; 4],
+    /// BGxCNT priority set by scripts (None = the map's)
+    pub priority: [Option<u8>; 4],
+    /// BLDCNT target bits set by scripts (bit0 first target, bit1 second target; None = the map's)
+    pub blend: [Option<u8>; 4],
+    /// BLDALPHA (eva, evb) in 1/16 (None = the map's)
+    pub alpha: Option<(u8, u8)>,
+    /// `set_bg_offset`: added to a BG layer's scroll (px)
+    pub offset: [(i32, i32); 4],
+}
+
+impl Default for Layers {
+    fn default() -> Self {
+        Layers { visible: [true; 4], priority: [None; 4], blend: [None; 4], alpha: None, offset: [(0, 0); 4] }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct Screen {
+    pub fade: Option<Fade>,
+    /// the level an effect left behind: 0 normal .. 16 full (black / white / mosaic)
+    pub black: i32,
+    pub white: i32,
+    pub mosaic: i32,
+    pub flash: Option<PalFlash>,
+    pub layers: Layers,
+}
+
+impl Default for Screen {
+    fn default() -> Self {
+        Screen { fade: None, black: 0, white: 0, mosaic: 0, flash: None, layers: Layers::default() }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct BossBar {
+    pub entity: EntityId,
+    pub a: i32,
+    pub b: i32,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct TitleText {
+    pub string: i32,
+    pub x: i32,
+    pub y: i32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum TimerHud {
+    Countdown,
+    Stopwatch,
+}
+
+/// presentation objects scripts create (markers 0x9E/0x9F, box 0xA0, map markers 0xEC, energy sphere 0xF4,
+/// radar blips 0xAC, emote balloons, item icons, beams, balls)
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct Visual {
+    pub kind: VisualKind,
+    pub x: i32,
+    pub y: i32,
+    pub owner: EntityId,
+    pub t: i32,
+    /// frames left (-1 = until removed)
+    pub life: i32,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum VisualKind {
+    MarkerA,
+    MarkerB,
+    Box { w: i32, h: i32 },
+    MapMarker { highlight: bool },
+    EnergySphere,
+    Emote(i32),
+    ItemIcon(i32),
+    Beam { kind: BeamKind, dir: i32 },
+    Ball,
+    KiBlast,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct Radar {
+    pub targets: Vec<(i32, i32)>,
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// dialog and menus
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum BoxPos {
+    Top,
+    Middle,
+    #[default]
+    Bottom,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum DialogPhase {
+    Opening,
+    Shown,
+    Closing,
+    Closed,
+}
+
+/// one text box (event node kinds 5 / 6 / 1 / 2) or choice window (kind 3)
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct Dialog {
+    /// text without the placement prefix (`\n`, `\u{b}` page breaks, `\u{8}`+n colours)
+    pub text: String,
+    /// bank text reference (0 = inline / formatted text)
+    pub text_ref: u32,
+    pub portrait: u8,
+    /// node kind (5 / 6 text, 3 choice)
+    pub kind: u8,
+    pub pos: BoxPos,
+    pub page: u16,
+    pub pages: u16,
+    /// choice window: number of options, cursor
+    pub options: i32,
+    pub cursor: i32,
+    pub phase: DialogPhase,
+    pub t: i32,
+    /// set when the box closed: the choice result (-1 cancelled) or 0
+    pub result: Option<i32>,
+}
+
+/// frames the box takes to open / close (dialog object 0x0800AD00; measured on the intro and NPC talk)
+pub const DIALOG_OPEN: i32 = 1;
+pub const DIALOG_CLOSE: i32 = 1;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum MenuKind {
+    /// 0xCE open_shop_buy
+    ShopBuy,
+    /// 0xCF open_shop_sell(percent)
+    ShopSell { percent: i32 },
+    /// 0x8C save_menu
+    Save,
+    /// 0x8D character_menu
+    Character,
+    /// 0xA7 watch_this_game(level)
+    WatchThis { level: i32 },
+    /// 0xC6 run_power_struggle
+    PowerStruggle,
+    /// 0xC7 run_punch_minigame(mode)
+    Punch { mode: i32 },
+    /// 0xD1 run_credits
+    Credits,
+}
+
+/// a modal menu / mini-game screen (deterministic: driven only by the leader's input)
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct Menu {
+    pub kind: MenuKind,
+    pub cursor: i32,
+    pub t: i32,
+    /// mini-game gauge / progress
+    pub gauge: i32,
+    /// fade in / out frames of the screen change
+    pub fade: i32,
+    pub closing: bool,
+    pub result: Option<i32>,
+    /// items bought / sold (shop), for the host to apply to the inventory
+    pub log: Vec<(i32, i32)>,
+}
+
+/// shop entry (`shop_add_item`): category 0 supply / 1 equipment, item, price, flag
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct ShopItem {
+    pub category: i32,
+    pub item: i32,
+    pub price: i32,
+    pub flag: i32,
+}
+
+/// things for the session / frontend (not World state changes the core can do itself)
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum Request {
+    ReturnToTitle,
+    Credits,
+    Sleep,
+    /// battle mode has no field: scene loads / warps are reported (field mode handles them in field.rs)
+    LoadScene { world: i32, map: i32, variant: i32, x: i32, y: i32, objects: bool },
+    Warp { world: i32, map: i32, variant: i32, x: i32, y: i32 },
+    SaveField,
+    ReturnToField,
+    /// engine broadcasts with unknown receivers (0xC9, 0xDC, 0xF0)
+    Broadcast { msg: i32, a: i32, b: i32 },
+}
+
+/// a collision override (`open_area` / `block_area`): re-applied when a byte snapshot is restored
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct AreaOp {
+    pub rect: [i32; 4],
+    /// true: walk + shot grids; false: the third grid (+0xAC)
+    pub main: bool,
+    pub open: bool,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct Prop {
+    pub id: i32,
+    pub x: i32,
+    pub y: i32,
+    pub visible: bool,
+    pub frame: i32,
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct Scene {
+    pub tracks: Vec<Track>,
+    pub director: Director,
+    pub puppets: Vec<Puppet>,
+    pub cam: CamCtl,
+    pub screen: Screen,
+    pub hud_hidden: bool,
+    pub boss_bar: Option<BossBar>,
+    pub title: Option<TitleText>,
+    pub timer_hud: Option<TimerHud>,
+    /// destination label set (0xD9) and its 32 entries (0xDA)
+    pub dest_label: Option<(i32, Vec<i32>)>,
+    pub radar: Option<Radar>,
+    pub visuals: Vec<Visual>,
+    pub dialog: Option<Dialog>,
+    pub menu: Option<Menu>,
+    pub shop: Vec<ShopItem>,
+    pub requests: Vec<Request>,
+    pub area_ops: Vec<AreaOp>,
+    pub props: Vec<Prop>,
+    /// event graphs running (run_event nesting, 0x03002A5C): players get no input while > 0
+    pub depth: u32,
+    /// a modal mode that does not run the world update is up (camera scroll, mosaic)
+    pub freeze: bool,
+    /// the frame's raw input (script queries read it even while the players' input is masked)
+    pub keys: [InputFrame; MAX_PLAYERS],
+}
+
+impl Default for Scene {
+    fn default() -> Self {
+        Scene {
+            tracks: Vec::new(),
+            director: Director::default(),
+            puppets: Vec::new(),
+            cam: CamCtl::default(),
+            screen: Screen::default(),
+            hud_hidden: false,
+            boss_bar: None,
+            title: None,
+            timer_hud: None,
+            dest_label: None,
+            radar: None,
+            visuals: Vec::new(),
+            dialog: None,
+            menu: None,
+            shop: Vec::new(),
+            requests: Vec::new(),
+            area_ops: Vec::new(),
+            props: Vec::new(),
+            depth: 0,
+            freeze: false,
+            keys: [InputFrame::default(); MAX_PLAYERS],
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// enqueue / director
+
+fn track_index(w: &mut World, owner: Owner) -> usize {
+    if let Some(k) = w.scene.tracks.iter().position(|t| t.owner == owner) {
+        return k;
+    }
+    w.scene.tracks.push(Track { owner, queue: Vec::new(), started: false, holding: false });
+    w.scene.tracks.len() - 1
+}
+
+/// Enqueue a command on an owner's track (`0x0801936A`). Outside a batch the director starts the wait-all mode
+/// at once (the caller blocks until [`wait_done`]); inside a batch the command waits for `end_parallel`.
+/// Returns true when the caller must block.
+pub fn enqueue(w: &mut World, owner: Owner, cmd: Cmd) -> bool {
+    let k = track_index(w, owner);
+    w.scene.tracks[k].queue.push(cmd);
+    if w.scene.director.batch {
+        return false;
+    }
+    begin_wait(w, WaitMode::All);
+    true
+}
+
+/// a command whose actor resolved to nothing (deleted by the game): outside a batch the wait mode still runs
+pub fn enqueue_none(w: &mut World) {
+    begin_wait(w, WaitMode::All);
+}
+
+/// `begin_parallel`
+pub fn begin_batch(w: &mut World) {
+    w.scene.director.batch = true;
+    w.scene.director.group.clear();
+}
+
+/// `wait_for_actor`
+pub fn batch_group(w: &mut World, owner: Owner) {
+    if !w.scene.director.group.contains(&owner) {
+        w.scene.director.group.push(owner);
+    }
+}
+
+/// `end_parallel`: run the batch (group or all) and block until it is idle
+pub fn commit(w: &mut World) {
+    let group = std::mem::take(&mut w.scene.director.group);
+    w.scene.director.batch = false;
+    let mode = if group.is_empty() { WaitMode::All } else { WaitMode::Group(group) };
+    begin_wait(w, mode);
+}
+
+fn in_mode(mode: &WaitMode, o: Owner) -> bool {
+    match mode {
+        WaitMode::All => true,
+        WaitMode::Group(g) => o == Owner::Camera || g.contains(&o),
+    }
+}
+
+/// enter a wait mode: start every head the mode covers (msg 0x0D)
+fn begin_wait(w: &mut World, mode: WaitMode) {
+    for k in 0..w.scene.tracks.len() {
+        if !in_mode(&mode, w.scene.tracks[k].owner) {
+            continue;
+        }
+        if !w.scene.tracks[k].started && !w.scene.tracks[k].queue.is_empty() {
+            start_head(w, k);
+        }
+    }
+    w.scene.director.wait = Some(mode);
+    w.scene.director.done = false;
+}
+
+/// the wait mode finished this frame: the host resumes the script (clears the flag)
+pub fn wait_done(w: &mut World) -> bool {
+    if w.scene.director.done {
+        w.scene.director.done = false;
+        true
+    } else {
+        false
+    }
+}
+
+/// is anything still queued for this owner
+pub fn track_busy(w: &World, owner: Owner) -> bool {
+    w.scene.tracks.iter().any(|t| t.owner == owner && !t.queue.is_empty() && !t.holding)
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// command semantics
+
+fn owner_index(w: &World, o: Owner) -> Option<usize> {
+    match o {
+        Owner::Entity(id) => w.find(id).filter(|&i| !w.ents[i].removed),
+        _ => None,
+    }
+}
+
+/// step math 0x080192CE: frames = (100 * isqrt((dx² + dy²) << 16) / speed >> 8) + 1, step = (d << shift) / frames
+pub fn step_math(dx: i32, dy: i32, speed: i32, shift: u32) -> (i32, i32, i32) {
+    if dx == 0 && dy == 0 {
+        return (1, 0, 0);
+    }
+    let d2 = (dx as i64 * dx as i64 + dy as i64 * dy as i64) << 16;
+    let s = crate::fixed::isqrt(d2);
+    let n = ((100 * s) / speed.max(1) as i64 >> 8) as i32 + 1;
+    let n = n.max(1);
+    (n, (((dx as i64) << shift) / n as i64) as i32, (((dy as i64) << shift) / n as i64) as i32)
+}
+
+fn actor_pos(w: &World, i: usize) -> (i32, i32) {
+    w.actor(i).map(|a| (a.px(), a.py())).unwrap_or((0, 0))
+}
+
+/// the actor's bounding-box centre (0x0800FDFA)
+pub fn box_center(w: &World, i: usize) -> (i32, i32) {
+    w.actor(i).map(|a| a.center()).unwrap_or((0, 0))
+}
+
+/// commands whose start refreshes the actor / camera (vtable +0x3C / +0x40, 0x0802ED98): the refresh ticks the
+/// track, so they are done and popped within the start (set_pos and the camera sets take 1 frame, not 2)
+fn done_at_start(cmd: &Cmd) -> bool {
+    matches!(cmd, Cmd::SetPos { .. } | Cmd::CamSet { .. } | Cmd::CamParam { .. })
+}
+
+fn start_head(w: &mut World, k: usize) {
+    loop {
+        let Some(t) = w.scene.tracks.get_mut(k) else { return };
+        t.started = true;
+        t.holding = false;
+        let owner = t.owner;
+        let Some(mut cmd) = t.queue.first().cloned() else { return };
+        start_cmd(w, owner, &mut cmd);
+        let Some(t) = w.scene.tracks.get_mut(k) else { return };
+        if done_at_start(&cmd) {
+            if !t.queue.is_empty() {
+                t.queue.remove(0);
+            }
+            t.started = false;
+            if t.queue.is_empty() {
+                return;
+            }
+            continue;
+        }
+        if let Some(c) = t.queue.first_mut() {
+            *c = cmd;
+        }
+        return;
+    }
+}
+
+/// the player camera's update (field or battle) once, outside the frame (a refresh)
+fn camera_refresh(w: &mut World) {
+    if w.field.is_some() {
+        crate::field::camera(w, 0);
+    } else {
+        crate::battle::camera(w, 0);
+    }
+}
+
+/// a fired beam's lingering effect object outlives the command by 8 frames (then its sound changes)
+const BEAM_LINGER: i32 = 8;
+
+fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
+    let i = owner_index(w, owner);
+    match cmd {
+        Cmd::PlayAnim { anim } => {
+            if let (Some(i), true) = (i, *anim != 0) {
+                set_state(w, i, *anim);
+            }
+        }
+        Cmd::SetAnim { anim } => {
+            if let Some(i) = i {
+                set_state(w, i, *anim);
+            }
+        }
+        Cmd::SetPose { anim, frame } => {
+            if let Some(i) = i {
+                set_pose(w, i, *anim, *frame);
+            }
+        }
+        Cmd::PlayAnimFrames { anim, each, loops, loop_start, last, .. } => {
+            if let Some(i) = i {
+                set_frames(w, i, *anim, AnimMode::Frames { each: *each, loops: *loops, loop_start: *loop_start, last: *last, pass: 0 });
+            }
+        }
+        Cmd::Face { dir } => {
+            if let Some(a) = i.and_then(|i| actor_mut(w, i)) {
+                a.facing = (*dir & 3) as Dir;
+            }
+        }
+        Cmd::FaceActor { target } => face_toward(w, i, *target),
+        Cmd::MoveTo { x, y, speed, state, target, n, t, sx, sy } => {
+            if let Some(i) = i {
+                if let Some((tid, dx, dy)) = *target {
+                    if let Some(ti) = w.find(tid) {
+                        let (tx, ty) = actor_pos(w, ti);
+                        *x = tx + dx;
+                        *y = ty + dy;
+                    }
+                }
+                let (px, py) = actor_pos(w, i);
+                let (nn, ssx, ssy) = step_math(*x - px, *y - py, *speed, 8);
+                (*n, *sx, *sy, *t) = (nn, ssx, ssy, 0);
+                if let Some(a) = actor_mut(w, i) {
+                    if *x != px || *y != py {
+                        a.facing = facing_toward(*x - px, *y - py);
+                    }
+                }
+                set_state(w, i, *state);
+            }
+        }
+        Cmd::GlideTo { x, y, speed, n, t, sx, sy } => {
+            if let Some(i) = i {
+                let (px, py) = actor_pos(w, i);
+                let (nn, ssx, ssy) = step_math(*x - px, *y - py, *speed, 8);
+                (*n, *sx, *sy, *t) = (nn, ssx, ssy, 0);
+            }
+        }
+        Cmd::JumpTo { x, y, air, t, sx, vy } => {
+            if let Some(i) = i {
+                let (px, py) = actor_pos(w, i);
+                let a = (*air).max(1);
+                *sx = ((*x - px) << 8) / a;
+                // y velocity (1/256 px): gravity 8 is added before each step
+                *vy = ((*y - py) << 8) / a - (8 * a) / 2;
+                *t = 0;
+                if let Some(ac) = actor_mut(w, i) {
+                    if *x != px || *y != py {
+                        ac.facing = facing_toward(*x - px, *y - py);
+                    }
+                }
+                // crouch: state 14's first cel (msg 0xE, 0)
+                set_pose(w, i, 14, 0);
+            }
+        }
+        Cmd::SetPos { x, y } => {
+            if let Some(i) = i {
+                if let Some(a) = actor_mut(w, i) {
+                    a.x = *x << 8;
+                    a.y = *y << 8;
+                }
+                if w.players.first() == Some(&w.ents[i].id) && w.scene.cam.mode == CamMode::Player {
+                    camera_refresh(w);
+                }
+            }
+        }
+        Cmd::Puff { x, y, absolute } => {
+            if let Some(i) = i {
+                let (cx, cy) = if *absolute {
+                    (*x, *y)
+                } else {
+                    let (bx, by) = box_center(w, i);
+                    (bx + *x, by + *y)
+                };
+                crate::fx::puff(w, cx, cy, 0x1000);
+            } else if *absolute && matches!(owner, Owner::Prop(_)) {
+                crate::fx::puff(w, *x, *y, 0x1000);
+            }
+        }
+        Cmd::HitFlash => {
+            if let Some(a) = i.and_then(|i| actor_mut(w, i)) {
+                a.flash = 12;
+            }
+        }
+        Cmd::Tint { r, g, b, a } => {
+            let preset = tint_preset(*r, *g, *b, *a);
+            if let Some(i) = i {
+                if let Body::Npc(n) = &mut w.ents[i].body {
+                    n.tint = preset;
+                }
+            }
+        }
+        Cmd::Remove => {
+            if let Some(i) = i {
+                w.ents[i].removed = true;
+                if w.scene.boss_bar.as_ref().is_some_and(|b| b.entity == w.ents[i].id) {
+                    w.scene.boss_bar = None;
+                }
+            }
+        }
+        Cmd::ChangeSprite { sprite } => {
+            if let Some(i) = i {
+                let (px, py) = actor_pos(w, i);
+                let dir = w.actor(i).map(|a| a.facing).unwrap_or(0);
+                let id = spawn_npc(w, *sprite, px, py, 0);
+                let _ = dir;
+                let old = w.ents[i].id;
+                w.ents[i].removed = true;
+                // the remaining queued commands move to the new actor (0x080192BA)
+                if let Some(t) = w.scene.tracks.iter_mut().find(|t| t.owner == Owner::Entity(old)) {
+                    t.owner = Owner::Entity(id);
+                }
+            }
+        }
+        Cmd::BecomeMapObject { index } => {
+            if let Some(i) = i {
+                let (px, py) = actor_pos(w, i);
+                let dir = w.actor(i).map(|a| a.facing).unwrap_or(0);
+                w.ents[i].removed = true;
+                become_map_object(w, *index, px, py, dir);
+            }
+        }
+        Cmd::Sfx { id } => w.sfx(*id, 64),
+        Cmd::ScreenFlash { r, g, b, frames, t } => {
+            let len = (*frames).max(2);
+            w.scene.screen.flash = Some(PalFlash { rgb: (*r as u8, *g as u8, *b as u8), t: 0, len });
+            *t = 0;
+        }
+        Cmd::Shake { intensity, frames, t } => {
+            w.shake(*frames, *intensity);
+            *t = 0;
+        }
+        Cmd::ItemGet { item, t } => {
+            *t = 0;
+            w.sfx(45, 64);
+            if let Some(i) = i {
+                // the hold-up pose: state 13's second cel
+                set_pose(w, i, 13, 1);
+                if let Body::Npc(n) = &mut w.ents[i].body {
+                    n.hold_item = Some(*item);
+                }
+                let (x, y) = actor_pos(w, i);
+                let owner = w.ents[i].id;
+                w.scene.visuals.push(Visual { kind: VisualKind::ItemIcon(*item), x, y: y - 32, owner, t: 0, life: 60 });
+            }
+        }
+        Cmd::Emote { emote, t, .. } => {
+            *t = 0;
+            if let Some(i) = i {
+                let (x, y) = actor_pos(w, i);
+                let owner = w.ents[i].id;
+                w.scene.visuals.push(Visual { kind: VisualKind::Emote(*emote), x, y: y - 32, owner, t: 0, life: EMOTE_LEN });
+            }
+        }
+        Cmd::Beam { kind, dir, t, .. } => {
+            *t = 0;
+            if let Some(i) = i {
+                if let Some(a) = actor_mut(w, i) {
+                    a.facing = (*dir & 3) as Dir;
+                }
+                set_pose(w, i, beam_anim(*kind), 0);
+                if matches!(kind, BeamKind::Beam | BeamKind::BeamAlt | BeamKind::Blast) {
+                    w.sfx(3, 64);
+                }
+            }
+        }
+        Cmd::Shoot { kind, x, y, speed, t, n } => {
+            *t = 0;
+            if let Some(i) = i {
+                let (cx, cy) = box_center(w, i);
+                match kind {
+                    ShootKind::Blast => {
+                        // the shoot state (raw 4) runs by itself; the blast flies to the point
+                        set_state(w, i, 3);
+                        w.sfx(21, 64);
+                        let (nn, _, _) = step_math(*x - cx, *y - cy, *speed, 8);
+                        *n = nn;
+                    }
+                    ShootKind::Ball => {
+                        // the throw state (raw 21); TODO: the ball's flight time (0x0802E444) is fixed here
+                        set_state(w, i, 19);
+                        *n = 29;
+                    }
+                }
+            }
+        }
+        Cmd::SetSpeed { v } => {
+            if let Some(i) = i {
+                if let Body::Npc(n) = &mut w.ents[i].body {
+                    n.speed = *v << 10;
+                }
+            }
+        }
+        Cmd::SetByte8 { v } => {
+            if let Some(i) = i {
+                if let Body::Npc(n) = &mut w.ents[i].body {
+                    n.byte8 = *v;
+                }
+            }
+        }
+        Cmd::SetAttachment { kind, variant, dx, dy } => {
+            if let Some(i) = i {
+                if let Body::Npc(n) = &mut w.ents[i].body {
+                    n.attach = if *kind == 0 && *variant == 0 { None } else { Some([*kind, *variant, *dx, *dy]) };
+                }
+            }
+        }
+        Cmd::PropShow { on } => {
+            if let Owner::Prop(p) = owner {
+                prop_mut(w, p).visible = *on;
+            }
+        }
+        Cmd::PropSetPos { x, y } => {
+            if let Owner::Prop(p) = owner {
+                let pr = prop_mut(w, p);
+                pr.x = *x;
+                pr.y = *y;
+            }
+        }
+        Cmd::PropMoveTo { x, y, speed, n, t, sx, sy } => {
+            if let Owner::Prop(p) = owner {
+                let pr = prop_mut(w, p).clone();
+                let (nn, ssx, ssy) = step_math(*x - pr.x, *y - pr.y, *speed, 8);
+                (*n, *sx, *sy, *t) = (nn, ssx, ssy, 0);
+            }
+        }
+        Cmd::PropJumpTo { x, y, t, vx, vy } => {
+            if let Owner::Prop(p) = owner {
+                let pr = prop_mut(w, p).clone();
+                *vx = ((*x - pr.x) * 0x5D3) >> 8;
+                *vy = (((*y - pr.y) * 0x5D3 - 0xBA60) >> 8) - 0x200;
+                *t = 0;
+            }
+        }
+        Cmd::PropPoof { t, .. } => *t = 0,
+        Cmd::CamFollowWait { target, .. } => follow(w, *target),
+        Cmd::CamReleaseWait { .. } => {
+            w.scene.cam.mode = CamMode::Fixed;
+        }
+        Cmd::CamPanTo { x, y, speed, n, t, sx, sy } => {
+            w.scene.cam.mode = CamMode::Fixed;
+            let c = &w.cameras[0];
+            let (cx, cy) = (c.x >> 10, c.y >> 10);
+            let (tx, ty) = clamp_cam(w, *x, *y);
+            let (nn, ssx, ssy) = step_math(tx - cx, ty - cy, *speed, 8);
+            (*n, *sx, *sy, *t) = (nn, ssx << 2, ssy << 2, 0);
+            *x = tx;
+            *y = ty;
+            // the pan's first step is applied at once
+            cam_step(w, *sx, *sy);
+            *t = 1;
+        }
+        Cmd::CamParam { which, v } => {
+            w.scene.cam.mode = CamMode::Fixed;
+            if *which == 8 {
+                w.scene.cam.param8 = *v;
+            } else {
+                w.scene.cam.param12 = *v;
+            }
+        }
+        Cmd::CamSet { x, y, z } => {
+            w.scene.cam.mode = CamMode::Fixed;
+            if let Some(z) = z {
+                w.scene.cam.param8 = *z;
+            }
+            crate::battle::set_camera(w, 0, *x << 10, *y << 10);
+        }
+        Cmd::Wait { .. } => {}
+    }
+}
+
+/// the actor state a beam command holds: 17 (raw 19) for the Kamehameha / wave beam, 3 (raw 4) for the others
+fn beam_anim(kind: BeamKind) -> i32 {
+    match kind {
+        BeamKind::Wave | BeamKind::Beam => 17,
+        BeamKind::BeamAlt | BeamKind::Blast => 3,
+    }
+}
+
+/// one update of the head; true = done
+fn update_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) -> bool {
+    let i = owner_index(w, owner);
+    match cmd {
+        Cmd::Wait { left } | Cmd::CamFollowWait { left, .. } | Cmd::CamReleaseWait { left } => {
+            *left -= 1;
+            *left == 0
+        }
+        Cmd::PlayAnim { anim } => {
+            if *anim == 0 {
+                return true;
+            }
+            match i {
+                Some(i) => anim_done(w, i),
+                None => true,
+            }
+        }
+        Cmd::PlayAnimFrames { wait, .. } => {
+            if !*wait {
+                return true;
+            }
+            match i {
+                Some(i) => {
+                    if scene_anim(w, i).is_none_or(|a| a.ended) {
+                        set_state(w, i, 0);
+                        return true;
+                    }
+                    false
+                }
+                None => true,
+            }
+        }
+        Cmd::FaceActor { target } => {
+            face_toward(w, i, *target);
+            true
+        }
+        Cmd::MoveTo { x, y, n, t, sx, sy, .. } => {
+            let Some(i) = i else { return true };
+            *t += 1;
+            if let Some(a) = actor_mut(w, i) {
+                if *t >= *n {
+                    a.x = *x << 8;
+                    a.y = *y << 8;
+                } else {
+                    a.x += *sx;
+                    a.y += *sy;
+                }
+            }
+            if *t >= *n {
+                set_state(w, i, 0);
+                return true;
+            }
+            false
+        }
+        Cmd::GlideTo { x, y, n, t, sx, sy, .. } => {
+            let Some(i) = i else { return true };
+            *t += 1;
+            if let Some(a) = actor_mut(w, i) {
+                if *t >= *n {
+                    a.x = *x << 8;
+                    a.y = *y << 8;
+                } else {
+                    a.x += *sx;
+                    a.y += *sy;
+                }
+            }
+            *t >= *n
+        }
+        Cmd::JumpTo { air, t, sx, vy, .. } => {
+            let Some(i) = i else { return true };
+            *t += 1;
+            let a = (*air).max(1);
+            if *t >= 8 && *t < 8 + a {
+                *vy += 8;
+                let v = *vy;
+                if let Some(ac) = actor_mut(w, i) {
+                    ac.x += *sx;
+                    ac.y += v;
+                }
+                set_pose(w, i, 14, if *t - 8 < a / 2 { 1 } else { 2 });
+            }
+            if *t == 8 + a {
+                set_pose(w, i, 14, 0);
+            }
+            if *t >= a + 16 {
+                set_state(w, i, 0);
+                return true;
+            }
+            false
+        }
+        Cmd::ScreenFlash { t, frames, .. } => {
+            *t += 1;
+            *t >= (*frames).max(2)
+        }
+        Cmd::Shake { t, frames, .. } => {
+            *t += 1;
+            *t >= *frames
+        }
+        Cmd::ItemGet { t, .. } => {
+            *t += 1;
+            if *t >= 60 {
+                if let Some(i) = i {
+                    set_state(w, i, 0);
+                    if let Body::Npc(n) = &mut w.ents[i].body {
+                        n.hold_item = None;
+                    }
+                }
+                return true;
+            }
+            false
+        }
+        Cmd::Emote { wait, t, .. } => {
+            if !*wait {
+                return true;
+            }
+            *t += 1;
+            *t >= EMOTE_LEN
+        }
+        Cmd::Beam { frames, t, kind, .. } => {
+            *t += 1;
+            let kind = *kind;
+            if kind == BeamKind::Wave {
+                if let Some(i) = i {
+                    if *t < *frames {
+                        set_pose(w, i, 17, (*t >> 3).min(2));
+                    }
+                    if *t == 16 {
+                        let (x, y) = actor_pos(w, i);
+                        let owner = w.ents[i].id;
+                        let dir = w.actor(i).map(|a| a.facing as i32).unwrap_or(0);
+                        w.scene.visuals.push(Visual { kind: VisualKind::Beam { kind, dir }, x, y, owner, t: 0, life: (*frames - 16).max(1) });
+                    }
+                }
+            } else if *t == 24 {
+                if let Some(i) = i {
+                    set_pose(w, i, beam_anim(kind), if kind == BeamKind::Beam { 2 } else { 1 });
+                    let (x, y) = actor_pos(w, i);
+                    let owner = w.ents[i].id;
+                    let dir = w.actor(i).map(|a| a.facing as i32).unwrap_or(0);
+                    w.scene.visuals.push(Visual { kind: VisualKind::Beam { kind, dir }, x, y, owner, t: 0, life: (*frames - 24).max(1) + BEAM_LINGER });
+                }
+                w.sfx_stop(3);
+                w.sfx(32, 64);
+            }
+            if *t >= *frames {
+                if let Some(i) = i {
+                    set_state(w, i, 0);
+                }
+                return true;
+            }
+            false
+        }
+        Cmd::Shoot { t, n, .. } => {
+            *t += 1;
+            *t >= *n
+        }
+        Cmd::PropMoveTo { x, y, n, t, sx, sy, .. } => {
+            if let Owner::Prop(p) = owner {
+                *t += 1;
+                let pr = prop_mut(w, p);
+                if *t >= *n {
+                    pr.x = *x;
+                    pr.y = *y;
+                    return true;
+                }
+                pr.x += *sx >> 8;
+                pr.y += *sy >> 8;
+                return false;
+            }
+            true
+        }
+        Cmd::PropJumpTo { x, y, t, .. } => {
+            *t += 1;
+            if *t >= 44 {
+                if let Owner::Prop(p) = owner {
+                    let pr = prop_mut(w, p);
+                    pr.x = *x;
+                    pr.y = *y;
+                }
+                return true;
+            }
+            false
+        }
+        Cmd::PropPoof { vanish, t } => {
+            *t += 1;
+            let steps = if *vanish { 8 } else { 5 };
+            if *t >= steps * 8 {
+                if *vanish {
+                    if let Owner::Prop(p) = owner {
+                        prop_mut(w, p).visible = false;
+                    }
+                }
+                return true;
+            }
+            false
+        }
+        Cmd::CamPanTo { x, y, n, t, sx, sy, .. } => {
+            if *t >= *n {
+                return true;
+            }
+            *t += 1;
+            if *t >= *n {
+                cam_put(w, *x << 10, *y << 10);
+            } else {
+                cam_step(w, *sx, *sy);
+            }
+            false
+        }
+        _ => true,
+    }
+}
+
+fn hold_cmd(cmd: &Cmd) -> bool {
+    matches!(cmd, Cmd::FaceActor { .. })
+}
+
+fn face_toward(w: &mut World, i: Option<usize>, target: EntityId) {
+    let (Some(i), Some(ti)) = (i, w.find(target)) else { return };
+    let (x, y) = actor_pos(w, i);
+    let (tx, ty) = actor_pos(w, ti);
+    if let Some(a) = actor_mut(w, i) {
+        if tx != x || ty != y {
+            a.facing = facing_toward(tx - x, ty - y);
+        }
+    }
+}
+
+/// emote balloon length (0x08016304; `emote_wait` measured 24 + 1 frames)
+pub const EMOTE_LEN: i32 = 24;
+
+/// the scene copy of the animation of the players that play a frame range (`play_anim_frames`) is written into
+/// the player's own state each frame
+fn sync_player_frames(w: &mut World) {
+    for k in 0..w.scene.puppets.len() {
+        let p = w.scene.puppets[k].clone();
+        if !matches!(p.anim.mode, AnimMode::Frames { .. }) {
+            continue;
+        }
+        let Some(i) = w.find(p.id) else { continue };
+        if !matches!(w.ents[i].body, Body::Player(_)) {
+            continue;
+        }
+        let (s, f) = w.actor(i).map(|a| (a.sprite, a.facing)).unwrap_or((None, 0));
+        let d = w.data.clone();
+        let mut a = p.anim.clone();
+        a.tick(&d, s, f);
+        w.scene.puppets[k].anim = a.clone();
+        crate::player::script_pose(w, i, a.id.clamp(0, 24) as usize, a.frame);
+    }
+}
+
+/// nearest of the 20 tint presets (table 0x08752EEC: RGBA keys); (0,0,0,0)-like keys restore
+pub fn tint_preset(r: i32, g: i32, b: i32, a: i32) -> Option<u8> {
+    const KEYS: [(i32, i32, i32, i32); 4] = [(0, 0, 0, 0), (255, 255, 255, 255), (255, 0, 0, 0), (0, 0, 255, 0)];
+    let best = KEYS
+        .iter()
+        .enumerate()
+        .min_by_key(|(_, k)| {
+            let d = |p: i32, q: i32| (p - q) * (p - q);
+            d(r, k.0) + d(g, k.1) + d(b, k.2) + d(a, k.3)
+        })
+        .map(|(i, _)| i as u8)
+        .unwrap_or(0);
+    (best != 0).then_some(best)
+}
+
+fn prop_mut(w: &mut World, id: i32) -> &mut Prop {
+    if let Some(k) = w.scene.props.iter().position(|p| p.id == id) {
+        return &mut w.scene.props[k];
+    }
+    w.scene.props.push(Prop { id, x: 0, y: 0, visible: true, frame: 0 });
+    w.scene.props.last_mut().unwrap()
+}
+
+/// `become_map_object`: the field layer spawns area object `index` at the stand-in's place
+fn become_map_object(w: &mut World, index: i32, x: i32, y: i32, dir: Dir) {
+    if w.field.is_none() {
+        return;
+    }
+    // area +0x14: the actor list (list 1)
+    let at = crate::fieldcontent::ObjRef::List(1, index as u16);
+    if let Some(id) = crate::field::spawn_map_object(w, at, true) {
+        if let Some(i) = w.find(id) {
+            if let Some(a) = actor_mut(w, i) {
+                a.x = x << 8;
+                a.y = y << 8;
+                a.facing = dir;
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// per frame
+
+/// start of the frame: keep the raw input for the scripts; players get none while an event graph runs, a modal
+/// fade / dialog / menu is up, or the director waits
+pub fn pre_step(w: &mut World) {
+    w.scene.keys = w.input;
+    if w.scene.depth > 0 || w.scene.menu.is_some() {
+        for s in 0..w.players.len().min(MAX_PLAYERS) {
+            w.input[s] = InputFrame::default();
+        }
+    }
+}
+
+/// after the entities: screen effects, dialog, menus, visuals, then the command tracks of the running wait mode
+pub fn tick(w: &mut World) {
+    sync_player_frames(w);
+    tick_screen(w);
+    tick_dialog(w);
+    tick_menu(w);
+    tick_visuals(w);
+    tick_tracks(w);
+    // dropped owners
+    let gone: Vec<usize> = (0..w.scene.tracks.len())
+        .filter(|&k| matches!(w.scene.tracks[k].owner, Owner::Entity(id) if !w.alive(id)) && w.scene.tracks[k].queue.is_empty())
+        .collect();
+    for k in gone.into_iter().rev() {
+        w.scene.tracks.remove(k);
+    }
+    let live: Vec<bool> = w.scene.puppets.iter().map(|p| w.find(p.id).is_some()).collect();
+    let mut it = live.into_iter();
+    w.scene.puppets.retain(|_| it.next().unwrap_or(false));
+}
+
+fn tick_tracks(w: &mut World) {
+    let Some(mode) = w.scene.director.wait.clone() else { return };
+    let mut all_idle = true;
+    let mut k = 0;
+    while k < w.scene.tracks.len() {
+        let owner = w.scene.tracks[k].owner;
+        if !in_mode(&mode, owner) {
+            k += 1;
+            continue;
+        }
+        if !tick_track(w, k) {
+            all_idle = false;
+        }
+        k += 1;
+    }
+    if all_idle {
+        w.scene.director.wait = None;
+        w.scene.director.done = true;
+    }
+}
+
+/// the actor message 0x0C tick (0x080193AE): true = idle
+fn tick_track(w: &mut World, k: usize) -> bool {
+    if w.scene.tracks[k].queue.is_empty() {
+        return true;
+    }
+    let owner = w.scene.tracks[k].owner;
+    // commands of an actor that no longer exists are dropped (the game deletes them)
+    if let Owner::Entity(id) = owner {
+        if !w.alive(id) {
+            w.scene.tracks[k].queue.clear();
+            return true;
+        }
+    }
+    if !w.scene.tracks[k].started {
+        start_head(w, k);
+    }
+    let mut cmd = w.scene.tracks[k].queue[0].clone();
+    let done = update_cmd(w, owner, &mut cmd);
+    // the command may have moved its track (change_sprite moves the queue to the new actor)
+    let owner = if w.scene.tracks.get(k).is_some_and(|t| t.owner == owner) { owner } else { w.scene.tracks.get(k).map(|t| t.owner).unwrap_or(owner) };
+    let Some(k) = w.scene.tracks.iter().position(|t| t.owner == owner) else { return true };
+    if let Some(c) = w.scene.tracks[k].queue.first_mut() {
+        *c = cmd.clone();
+    }
+    if !done {
+        return false;
+    }
+    if w.scene.tracks[k].queue.len() == 1 && hold_cmd(&cmd) {
+        w.scene.tracks[k].holding = true;
+        return true;
+    }
+    w.scene.tracks[k].queue.remove(0);
+    w.scene.tracks[k].started = false;
+    w.scene.tracks[k].holding = false;
+    if !w.scene.tracks[k].queue.is_empty() {
+        start_head(w, k);
+    }
+    false
+}
+
+fn tick_visuals(w: &mut World) {
+    for v in w.scene.visuals.iter_mut() {
+        v.t += 1;
+        if v.life > 0 {
+            v.life -= 1;
+        }
+    }
+    w.scene.visuals.retain(|v| v.life != 0);
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// camera
+
+/// the camera clamp in 22.10: field areas use their camera_max (0..=max px), battle arenas the view rect
+fn cam_clamp(w: &World, x: i32, y: i32) -> (i32, i32) {
+    if let Some(f) = w.field.as_ref() {
+        let c = |v: i32, max: i32| if v < 0 { 0 } else if (v >> 10) > max { max << 10 } else { v };
+        return (c(x, f.camera_max.0), c(y, f.camera_max.1));
+    }
+    match w.arena.view {
+        Some(v) => ((v.x0 << 10).max(x.min(v.x0.max(v.x1 - GBA_W) << 10)), (v.y0 << 10).max(y.min(v.y0.max(v.y1 - GBA_H) << 10))),
+        None => (x, y),
+    }
+}
+
+/// pixel clamp of a camera target (pans)
+fn clamp_cam(w: &World, x: i32, y: i32) -> (i32, i32) {
+    let (cx, cy) = cam_clamp(w, x << 10, y << 10);
+    (cx >> 10, cy >> 10)
+}
+
+fn cam_put(w: &mut World, x: i32, y: i32) {
+    let (x, y) = cam_clamp(w, x, y);
+    let c = &mut w.cameras[0];
+    c.x = x;
+    c.y = y;
+    c.init = true;
+    let (cx, cy) = (x >> 10, y >> 10);
+    c.rect = Rect::new(cx, cy, cx + GBA_W, cy + GBA_H);
+}
+
+fn cam_step(w: &mut World, sx: i32, sy: i32) {
+    let c = &w.cameras[0];
+    let (x, y) = (c.x + sx, c.y + sy);
+    cam_put(w, x, y);
+}
+
+/// `camera_center_on` (0x31) / `camera_scroll_to` (0x32): the camera mover (0x08015B68) steps the top-left toward
+/// (x, y) px, `speed` px per frame on the dominant axis (n = dominant / speed + 1 steps of (d << 10) / n, clamped
+/// every step, no final snap); the first step happens in the frame it starts. The world is frozen meanwhile (the
+/// scroll mode does not run the world update). The host blocks until [`scroll_done`].
+pub fn start_scroll(w: &mut World, x: i32, y: i32, speed: i32) {
+    let c = &w.cameras[0];
+    let (dx, dy) = (x - (c.x >> 10), y - (c.y >> 10));
+    let n = dx.abs().max(dy.abs()) / speed.max(1) + 1;
+    let (sx, sy) = ((dx << 10) / n, (dy << 10) / n);
+    w.scene.cam.mode = CamMode::Fixed;
+    w.scene.cam.scroll = Some(Scroll { tx: x, ty: y, sx, sy, n, t: 0 });
+    w.scene.freeze = true;
+    scroll_step(w);
+}
+
+fn scroll_step(w: &mut World) {
+    let Some(s) = w.scene.cam.scroll.clone() else { return };
+    if s.t >= s.n {
+        // arrived: the mode ends this frame
+        w.scene.cam.scroll = Some(Scroll { t: s.n + 1, ..s });
+        w.scene.freeze = false;
+        return;
+    }
+    cam_step(w, s.sx, s.sy);
+    w.scene.cam.scroll = Some(Scroll { t: s.t + 1, ..s });
+}
+
+/// the modal scroll arrived (clears it)
+pub fn scroll_done(w: &mut World) -> bool {
+    match &w.scene.cam.scroll {
+        Some(s) if s.t > s.n => {
+            w.scene.cam.scroll = None;
+            true
+        }
+        None => true,
+        _ => false,
+    }
+}
+
+/// the camera target of `camera_center_on`: the actor's box centre (0x0800FDFA: the footprint centre) - (120, 80)
+pub fn center_on(w: &World, i: usize) -> (i32, i32) {
+    let (cx, cy) = w.actor(i).map(|a| a.fc()).unwrap_or((0, 0));
+    (cx - 120, cy - 80)
+}
+
+/// one step of the follow object (0x0804D300): the player camera's easing (3/64, 9/128) toward another actor
+fn follow_step(w: &mut World, id: EntityId) {
+    let Some(i) = w.find(id).filter(|&i| !w.ents[i].removed) else { return };
+    let a = w.actor(i).cloned().unwrap_or_default();
+    let tx = ((a.px() * 2 + a.foot_w) >> 1) - 120;
+    let ty = ((a.py() * 2 + a.foot_h) >> 1) - 84;
+    let c = &w.cameras[0];
+    let x = c.x + ((((tx << 10) - c.x) * 3) >> 6);
+    let y = c.y + ((((ty << 10) - c.y) * 9) >> 7);
+    cam_put(w, x, y);
+}
+
+/// `camera_follow` / `camera_follow_wait`: the follow object takes the camera and steps once at once
+pub fn follow(w: &mut World, id: EntityId) {
+    w.scene.cam.mode = CamMode::Follow(id);
+    w.scene.cam.scroll = None;
+    follow_step(w, id);
+}
+
+/// player-0 camera under script control. Returns true when the script owns the camera this frame (the caller
+/// skips the player camera).
+pub fn camera(w: &mut World) -> bool {
+    if w.scene.cam.scroll.is_some() {
+        let c = &mut w.cameras[0];
+        c.shown = c.rect;
+        scroll_step(w);
+        return true;
+    }
+    match w.scene.cam.mode.clone() {
+        CamMode::Player => false,
+        CamMode::Fixed => {
+            let c = &mut w.cameras[0];
+            c.shown = c.rect;
+            true
+        }
+        CamMode::Follow(id) => {
+            let c = &mut w.cameras[0];
+            c.shown = c.rect;
+            follow_step(w, id);
+            true
+        }
+    }
+}
+
+/// the world update is suspended (modal camera scroll, mosaic): only the camera / screen run
+pub fn frozen(w: &World) -> bool {
+    w.scene.freeze
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// screen effects
+
+/// start a modal screen effect; the host blocks until [`fade_done`]
+pub fn start_fade(w: &mut World, kind: FadeKind, out: bool, frames: i32) {
+    let len = match kind {
+        FadeKind::Flash => 2 * frames.max(2),
+        _ => frames.max(1),
+    };
+    w.scene.screen.fade = Some(Fade { kind, out, t: 0, len });
+    // the mosaic modes do not run the world update
+    if kind == FadeKind::Mosaic {
+        w.scene.freeze = true;
+    }
+}
+
+pub fn fade_done(w: &World) -> bool {
+    w.scene.screen.fade.is_none()
+}
+
+fn tick_screen(w: &mut World) {
+    if let Some(f) = w.scene.screen.flash.as_mut() {
+        f.t += 1;
+        if f.t >= f.len {
+            w.scene.screen.flash = None;
+        }
+    }
+    let Some(mut f) = w.scene.screen.fade.clone() else { return };
+    f.t += 1;
+    let lvl = (16 * f.t.min(f.len) / f.len.max(1)).clamp(0, 16);
+    let s = &mut w.scene.screen;
+    match (f.kind, f.out) {
+        (FadeKind::Black, true) => s.black = lvl,
+        (FadeKind::Black, false) => s.black = 16 - lvl,
+        (FadeKind::White, true) => s.white = lvl,
+        (FadeKind::White, false) => s.white = 16 - lvl,
+        (FadeKind::Mosaic, true) => s.mosaic = lvl,
+        (FadeKind::Mosaic, false) => s.mosaic = 16 - lvl,
+        (FadeKind::Flash, _) => {
+            let half = f.len / 2;
+            s.white = if f.t <= half { 16 * f.t / half.max(1) } else { 16 * (f.len - f.t).max(0) / half.max(1) };
+        }
+    }
+    if f.t >= f.len {
+        if f.kind == FadeKind::Flash {
+            s.white = 0;
+        }
+        s.fade = None;
+        if f.kind == FadeKind::Mosaic {
+            w.scene.freeze = false;
+        }
+    } else {
+        s.fade = Some(f);
+    }
+}
+
+/// brightness toward black 0..16 shown this frame (`RenderView::fade_black`)
+pub fn fade_black(w: &World) -> u8 {
+    w.scene.screen.black.clamp(0, 16) as u8
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// dialog
+
+/// open a text box (event text node); `text` keeps its placement prefix (`!` top, `@` middle, `#` bottom)
+pub fn open_text(w: &mut World, text: &str, text_ref: u32, portrait: u8, kind: u8) {
+    let (pos, body) = split_pos(text);
+    let pages = body.split('\u{b}').count().max(1) as u16;
+    w.scene.dialog = Some(Dialog { text: body.to_string(), text_ref, portrait, kind, pos, page: 0, pages, options: 0, cursor: 0, phase: DialogPhase::Opening, t: 0, result: None });
+}
+
+/// open a choice window (event node kind 3: lines starting with '-' are the options)
+pub fn open_choice(w: &mut World, text: &str, portrait: u8) {
+    let (pos, body) = split_pos(text);
+    let options = body.lines().filter(|l| l.starts_with('-')).count().max(1) as i32;
+    w.scene.dialog = Some(Dialog { text: body.to_string(), text_ref: 0, portrait, kind: 3, pos, page: 0, pages: 1, options, cursor: 0, phase: DialogPhase::Opening, t: 0, result: None });
+}
+
+fn split_pos(text: &str) -> (BoxPos, &str) {
+    match text.chars().next() {
+        Some('!') => (BoxPos::Top, &text[1..]),
+        Some('@') => (BoxPos::Middle, &text[1..]),
+        Some('#') => (BoxPos::Bottom, &text[1..]),
+        _ => (BoxPos::Bottom, text),
+    }
+}
+
+/// the box closed: its result (choice index, -1 cancelled, 0 text) — clears it
+pub fn dialog_result(w: &mut World) -> Option<i32> {
+    match &w.scene.dialog {
+        Some(d) if d.phase == DialogPhase::Closed => {
+            let r = d.result;
+            w.scene.dialog = None;
+            r.or(Some(0))
+        }
+        _ => None,
+    }
+}
+
+fn tick_dialog(w: &mut World) {
+    let k = w.scene.keys[0].pressed;
+    let Some(d) = w.scene.dialog.as_mut() else { return };
+    d.t += 1;
+    match d.phase {
+        DialogPhase::Opening => {
+            if d.t >= DIALOG_OPEN {
+                d.phase = DialogPhase::Shown;
+                d.t = 0;
+            }
+        }
+        DialogPhase::Shown => {
+            if d.kind == 3 {
+                if k & DOWN != 0 {
+                    d.cursor = (d.cursor + 1) % d.options;
+                }
+                if k & UP != 0 {
+                    d.cursor = (d.cursor + d.options - 1) % d.options;
+                }
+                if k & A != 0 {
+                    d.result = Some(d.cursor);
+                    d.phase = DialogPhase::Closing;
+                    d.t = 0;
+                }
+            } else if k & A != 0 {
+                if d.page + 1 < d.pages {
+                    d.page += 1;
+                    d.t = 0;
+                } else {
+                    d.result = Some(0);
+                    d.phase = DialogPhase::Closing;
+                    d.t = 0;
+                }
+            }
+        }
+        DialogPhase::Closing => {
+            if d.t >= DIALOG_CLOSE {
+                d.phase = DialogPhase::Closed;
+            }
+        }
+        DialogPhase::Closed => {}
+    }
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// menus and mini-games (deterministic models; the host applies purchases / sales / switches it reads from `log`)
+
+/// screen fade of the menu changes (quick fade 0x0805058C / 0x08050568)
+pub const MENU_FADE: i32 = 16;
+
+pub fn open_menu(w: &mut World, kind: MenuKind) {
+    w.scene.menu = Some(Menu { kind, cursor: 0, t: 0, gauge: 0, fade: MENU_FADE, closing: false, result: None, log: Vec::new() });
+}
+
+/// the menu closed: (result, log) — clears it
+pub fn menu_result(w: &mut World) -> Option<(i32, Vec<(i32, i32)>)> {
+    match &w.scene.menu {
+        Some(m) if m.result.is_some() && m.closing && m.fade <= 0 => {
+            let r = (m.result.unwrap_or(-1), m.log.clone());
+            w.scene.menu = None;
+            Some(r)
+        }
+        _ => None,
+    }
+}
+
+fn tick_menu(w: &mut World) {
+    let k = w.scene.keys[0].pressed;
+    let held = w.scene.keys[0].held;
+    let shop_len = w.scene.shop.len() as i32;
+    let zenie = w.story.zenie as i64;
+    let Some(m) = w.scene.menu.as_mut() else { return };
+    m.t += 1;
+    if m.fade > 0 {
+        m.fade -= 1;
+        return;
+    }
+    if m.closing {
+        return;
+    }
+    let close = |m: &mut Menu, r: i32| {
+        m.result = Some(r);
+        m.closing = true;
+        m.fade = MENU_FADE;
+    };
+    match m.kind {
+        MenuKind::ShopBuy | MenuKind::ShopSell { .. } | MenuKind::Character => {
+            let n = match m.kind {
+                MenuKind::ShopBuy => shop_len.max(1),
+                MenuKind::Character => 9,
+                _ => 64,
+            };
+            if k & DOWN != 0 {
+                m.cursor = (m.cursor + 1) % n;
+            }
+            if k & UP != 0 {
+                m.cursor = (m.cursor + n - 1) % n;
+            }
+            if k & A != 0 {
+                match m.kind {
+                    MenuKind::Character => close(m, m.cursor),
+                    MenuKind::ShopBuy => {
+                        let _ = zenie;
+                        m.log.push((m.cursor, 1));
+                    }
+                    _ => m.log.push((m.cursor, -1)),
+                }
+            }
+            if k & B != 0 {
+                close(m, -1);
+            }
+        }
+        MenuKind::Save => {
+            if k & A != 0 {
+                close(m, 1);
+            } else if k & B != 0 {
+                close(m, 0);
+            }
+        }
+        MenuKind::WatchThis { level } => {
+            // a fixed-length button sequence: each correct press (A / B / L / R / dpad edge) advances the gauge
+            if k != 0 {
+                m.gauge += 1;
+            }
+            if m.gauge >= 4 + level.max(0) {
+                close(m, 1);
+            } else if m.t > 600 {
+                close(m, 0);
+            }
+        }
+        MenuKind::PowerStruggle | MenuKind::Punch { .. } => {
+            if k & A != 0 {
+                m.gauge += 4;
+            }
+            if m.t % 8 == 0 {
+                m.gauge -= 1;
+            }
+            if m.gauge >= 100 {
+                close(m, 1);
+            } else if m.gauge < -100 || m.t > 1800 {
+                close(m, 0);
+            }
+        }
+        MenuKind::Credits => {
+            if m.t >= CREDITS_LEN || (held & A != 0 && k & B != 0) {
+                close(m, 0);
+            }
+        }
+    }
+    let _ = (LEFT, RIGHT);
+}
+
+/// length of the staff credits mode (0x080335BC)
+pub const CREDITS_LEN: i32 = 3600;
+
+// ---------------------------------------------------------------------------------------------------------------
+// collision overrides
+
+/// `open_area` / `block_area` (+ `_alt`): set / clear the 8x8 tiles of [x0>>3, (x1+7)>>3) x [y0>>3, (y1+7)>>3)
+pub fn set_area(w: &mut World, rect: [i32; 4], main: bool, open: bool) {
+    w.scene.area_ops.push(AreaOp { rect, main, open });
+    apply_area(w, rect, main, open);
+}
+
+fn apply_area(w: &mut World, r: [i32; 4], main: bool, open: bool) {
+    let Some(col) = w.col.as_mut() else { return };
+    let g = crate::content::GRID as i32;
+    let (tx0, ty0, tx1, ty1) = ((r[0] >> 3).max(0), (r[1] >> 3).max(0), ((r[2] + 7) >> 3).min(g), ((r[3] + 7) >> 3).min(g));
+    let v = open as u8;
+    if main {
+        let m = std::sync::Arc::make_mut(&mut col.map);
+        for ty in ty0..ty1 {
+            for tx in tx0..tx1 {
+                let k = (ty * g + tx) as usize;
+                m.walk[k] = v;
+                m.shot[k] = v;
+                // the field's live walk grid (talk NPC / prop marks, `Collision.walk`) shadows the map's
+                if let Some(wk) = col.walk.as_mut() {
+                    wk[k] = v;
+                }
+            }
+        }
+        // the enemy layer starts from the walk grid
+        for ty in ty0..ty1 {
+            for tx in tx0..tx1 {
+                col.enemy[(ty * g + tx) as usize] = v;
+            }
+        }
+    }
+}
+
+/// re-apply the collision overrides after the static grids were re-attached (byte snapshot restore)
+pub fn reapply_areas(w: &mut World) {
+    for op in w.scene.area_ops.clone() {
+        apply_area(w, op.rect, op.main, op.open);
+    }
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// queries
+
+/// screen rect queries 0xCB / 0xCC: a w x h rect centred on the actor's box centre, clamped to the camera / map
+pub fn screen_rect_at(w: &World, i: usize, rw: i32, rh: i32) -> (i32, i32) {
+    let (cx, cy) = box_center(w, i);
+    let c = w.cameras[0].rect;
+    let x = (cx - rw / 2).clamp(c.x0, (c.x1 - rw).max(c.x0));
+    let y = (cy - rh / 2).clamp(c.y0, (c.y1 - rh).max(c.y0));
+    (x, y)
+}
+
+/// the game's sine table 0x087B6EEC (256 entries per turn, 16.16; truncated, so not `sin()` rounded)
+pub const SIN_TABLE: [i32; 256] = [
+    0, 1608, 3215, 4821, 6423, 8022, 9616, 11204, 12785, 14359, 15923, 17479, 19024, 20557, 22078, 23586,
+    25079, 26557, 28020, 29465, 30893, 32302, 33692, 35061, 36409, 37736, 39039, 40319, 41575, 42806, 44011, 45189,
+    46340, 47464, 48558, 49624, 50660, 51665, 52639, 53581, 54491, 55368, 56212, 57022, 57797, 58538, 59243, 59913,
+    60547, 61144, 61705, 62228, 62714, 63162, 63571, 63943, 64276, 64571, 64826, 65043, 65220, 65358, 65457, 65516,
+    65536, 65516, 65457, 65358, 65220, 65043, 64826, 64571, 64276, 63943, 63571, 63162, 62714, 62228, 61705, 61144,
+    60547, 59913, 59243, 58538, 57797, 57022, 56212, 55368, 54491, 53581, 52639, 51665, 50660, 49624, 48558, 47464,
+    46340, 45189, 44011, 42806, 41575, 40319, 39039, 37736, 36409, 35061, 33692, 32302, 30893, 29465, 28020, 26557,
+    25079, 23586, 22078, 20557, 19024, 17479, 15923, 14359, 12785, 11204, 9616, 8022, 6423, 4821, 3215, 1608,
+    0, -1608, -3215, -4821, -6423, -8022, -9616, -11204, -12785, -14359, -15923, -17479, -19024, -20557, -22078, -23586,
+    -25079, -26557, -28020, -29465, -30893, -32302, -33692, -35061, -36409, -37736, -39039, -40319, -41575, -42806, -44011, -45189,
+    -46340, -47464, -48558, -49624, -50660, -51665, -52639, -53581, -54491, -55368, -56212, -57022, -57797, -58538, -59243, -59913,
+    -60547, -61144, -61705, -62228, -62714, -63162, -63571, -63943, -64276, -64571, -64826, -65043, -65220, -65358, -65457, -65516,
+    -65536, -65516, -65457, -65358, -65220, -65043, -64826, -64571, -64276, -63943, -63571, -63162, -62714, -62228, -61705, -61144,
+    -60547, -59913, -59243, -58538, -57797, -57022, -56212, -55368, -54491, -53581, -52639, -51665, -50660, -49624, -48558, -47464,
+    -46340, -45189, -44011, -42806, -41575, -40319, -39039, -37736, -36409, -35061, -33692, -32302, -30893, -29465, -28020, -26557,
+    -25079, -23586, -22078, -20557, -19024, -17479, -15923, -14359, -12785, -11204, -9616, -8022, -6423, -4821, -3215, -1608,
+];
+
+/// `sin_scale(radius, angle)` = radius * sin_table[angle & 0xFF] >> 16 (`cos_scale`: angle + 64)
+pub fn sin_scale(radius: i32, angle: i32) -> i32 {
+    (radius.wrapping_mul(SIN_TABLE[(angle & 0xff) as usize])) >> 16
+}
+

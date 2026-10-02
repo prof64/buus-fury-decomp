@@ -97,6 +97,94 @@ pub struct Observation {
     pub arena: ArenaObs,
     pub rng: [u32; 2],
     pub candy: i32,
+    /// field game state (None in battle mode)
+    pub field: Option<FieldObs>,
+}
+
+/// a field object an agent can interact with (trigger rects, pickups, breakables)
+#[derive(Clone, Debug, Serialize)]
+pub struct FieldObjObs {
+    pub id: u32,
+    pub kind: &'static str,
+    /// "exit" / "edge_exit" / "script" / "event" / "save_point" / ... for triggers, the activation for triggers
+    pub what: String,
+    pub rect: [i32; 4],
+    /// exits: destination "world-area"
+    pub to: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct FieldObs {
+    pub area: String,
+    pub name: Option<String>,
+    pub variant: i32,
+    pub map: String,
+    pub transition: bool,
+    pub busy: bool,
+    pub objects: Vec<FieldObjObs>,
+    pub zenie: u32,
+    pub supplies: Vec<(i32, i32)>,
+    pub equipment: Vec<i32>,
+    pub party: Vec<i32>,
+    pub play_frames: u64,
+}
+
+fn field_obs(w: &World) -> Option<FieldObs> {
+    use crate::fieldcontent::{ObjKind, ObjRef, TriggerKind};
+    let f = w.field.as_ref()?;
+    let fd = w.data.field.as_ref()?;
+    let a = fd.area(f.area.world, f.area.area);
+    let m = fd.maps.get(&f.map);
+    let mut objects = Vec::new();
+    for t in &f.triggers {
+        let def = match t.obj {
+            ObjRef::Header(_) => m.and_then(|m| m.exits.iter().find(|o| o.at == t.obj)),
+            _ => a.and_then(|a| a.objects.iter().find(|o| o.at == t.obj)),
+        };
+        let (what, to) = match def.map(|d| &d.kind) {
+            Some(ObjKind::Trigger { kind, .. }) => match kind {
+                TriggerKind::Exit { to, .. } => ("exit".to_string(), Some(format!("{}-{}", to.world, to.area))),
+                TriggerKind::EdgeExit { to, .. } => ("edge_exit".to_string(), Some(format!("{}-{}", to.world, to.area))),
+                TriggerKind::Script(s) => (format!("script {s}"), None),
+                TriggerKind::Event(s) => (format!("event {s}"), None),
+                TriggerKind::SavePoint(_) => ("save_point".to_string(), None),
+                TriggerKind::Message { .. } => ("message".to_string(), None),
+                TriggerKind::Region => ("region".to_string(), None),
+                TriggerKind::Unknown(_) => ("unknown".to_string(), None),
+            },
+            _ => ("?".to_string(), None),
+        };
+        let r = t.rect;
+        objects.push(FieldObjObs { id: 0, kind: "trigger", what: format!("{what} ({:?})", t.act), rect: [r.x0, r.y0, r.x1, r.y1], to });
+    }
+    for e in &w.ents {
+        if e.removed {
+            continue;
+        }
+        match &e.body {
+            Body::Pickup(p) => objects.push(FieldObjObs { id: e.id, kind: "pickup", what: format!("{:?}", p.kind), rect: p.bx, to: None }),
+            Body::Breakable(b) => {
+                let r = b.bx;
+                objects.push(FieldObjObs { id: e.id, kind: "breakable", what: format!("hp {} mask {}", b.hp, b.mask), rect: r, to: None });
+            }
+            _ => {}
+        }
+    }
+    let st = &w.story;
+    Some(FieldObs {
+        area: f.key.clone(),
+        name: a.and_then(|a| a.name.clone()),
+        variant: f.area.variant,
+        map: f.map.clone(),
+        transition: f.mode != crate::field::Mode::Normal,
+        busy: f.busy,
+        objects,
+        zenie: st.zenie,
+        supplies: st.supplies.iter().enumerate().filter(|(_, &n)| n > 0).map(|(i, &n)| (i as i32, n as i32)).collect(),
+        equipment: st.equipment.clone(),
+        party: st.party(),
+        play_frames: st.play_frames,
+    })
 }
 
 fn actor_obs(id: u32, kind: &'static str, a: &crate::actor::Actor) -> ActorObs {
@@ -198,5 +286,6 @@ pub fn observe(w: &World, player: usize) -> Observation {
         arena: ArenaObs { id: w.arena.id.clone(), map: w.arena.map.clone(), bounds: [b.x0, b.y0, b.x1, b.y1], walk_window: walk, window_origin: (tx0 * 8, ty0 * 8), window_tiles: (tw, th) },
         rng: w.rng.state(),
         candy: w.g.candy,
+        field: field_obs(w),
     }
 }

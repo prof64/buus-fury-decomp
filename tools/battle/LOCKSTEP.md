@@ -298,3 +298,12 @@ Hercule, Krillin, Piccolo, Pikkon, Tien, Videl, Yamcha.
 * Not reached by the recordings (inferred, unverified): message 0xF on non-walk states (no-op), MummyWrapBurst's
   spawn origin, HeavyStrike's exact reach, the Buu fragment's height bob and the candy-beam / vampire animation frames
   (cosmetic).
+
+## Field scenarios (overworld)
+
+The field game has its own recorders under `tools/field/` (same emulator helpers, frame 0 = the first logic frame
+after an area load, lag frames recorded and skipped): `rec_transitions.py` (exits / edge exits / round trips →
+`data/field/transitions_*.json`), `rec_npc.py` (map NPC behaviours and talk → `npc_*.json`; `npc_model.py` is the
+Python spec), `rec_objects.py` (triggers, save points, breakables, drops, map items → `objects_*.json`). They are
+replayed against the Rust core by `engine/crates/wf-core/tests/field_lockstep.rs` (`cargo test -p wf-core --test
+field_lockstep`); mechanics in re/buu/notes.md §11 and the "Field: ..." sections, API in engine/docs/core.md §10.

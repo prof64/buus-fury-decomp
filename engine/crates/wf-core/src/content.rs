@@ -90,6 +90,8 @@ pub struct AnimStep {
     pub flip: bool,
     /// position of the attachment (halo) relative to the entity position
     pub attach: Option<(i32, i32)>,
+    /// the frame record's box (record +4..+7: ox, oy, w, h relative to the integer position; 0x0800FE34)
+    pub fbox: Option<[i32; 4]>,
 }
 
 #[derive(Clone, Debug)]
@@ -145,7 +147,7 @@ pub struct Sprite {
     /// raw index -> first animation with it
     pub by_raw: BTreeMap<i32, u16>,
     pub by_name: BTreeMap<String, u16>,
-    /// body (hurt) box per direction [x0, y0, x1, y1] (zero-width entries replaced by the default)
+    /// body (hurt) box per direction [x0, y0, x1, y1] (an empty entry stays empty: unhittable from that side)
     pub body: [[i32; 4]; 4],
     /// collision footprint (w, h)
     pub foot: (i32, i32),
@@ -303,6 +305,9 @@ pub struct GameData {
     pub maps: BTreeMap<String, Arc<MapCollision>>,
     /// enemy animation state rules (eanim.rs)
     pub anim: crate::eanim::AnimRules,
+    /// the field game's static content (areas, map objects, all maps' collision on demand, supplies); None when the
+    /// pack has no `world/` category
+    pub field: Option<Arc<crate::fieldcontent::FieldData>>,
 }
 
 #[derive(Debug)]
@@ -600,7 +605,7 @@ impl GameData {
                 areas.insert(key, (map, x["song"].as_u64().map(|v| v as u16)));
             }
         }
-        let mut d = GameData { sprites, records, record_frames, areas, effects, enemies, states, aux, chars, forms, skills, equipment, xp_table, maps: BTreeMap::new(), anim: crate::eanim::AnimRules::load(ENEMY_ANIM) };
+        let mut d = GameData { sprites, records, record_frames, areas, effects, enemies, states, aux, chars, forms, skills, equipment, xp_table, maps: BTreeMap::new(), anim: crate::eanim::AnimRules::load(ENEMY_ANIM), field: crate::fieldcontent::FieldData::load(src, &all)?.map(Arc::new) };
         for m in ARENA_MAPS {
             d.load_map(src, m)?;
         }
@@ -684,7 +689,7 @@ fn parse_sprite(s: &Value, index: i32, timing: Option<&Value>) -> Sprite {
                                 dur = int(e);
                             }
                         }
-                        AnimStep { frame: geti(st, "frame") as u16, dur: dur.max(1) as u32, rom: int(&st["rom"]) as u32, flip: st["flip"].as_bool().unwrap_or(false), attach: st["attach"].as_array().filter(|a| a.len() >= 2).map(|a| (int(&a[0]) as i32, int(&a[1]) as i32)) }
+                        AnimStep { frame: geti(st, "frame") as u16, dur: dur.max(1) as u32, rom: int(&st["rom"]) as u32, flip: st["flip"].as_bool().unwrap_or(false), attach: st["attach"].as_array().filter(|a| a.len() >= 2).map(|a| (int(&a[0]) as i32, int(&a[1]) as i32)), fbox: st["box"].as_array().filter(|a| a.len() >= 4).map(|a| [int(&a[0]) as i32, int(&a[1]) as i32, int(&a[2]) as i32, int(&a[3]) as i32]) }
                     })
                     .collect()
             });
@@ -718,7 +723,9 @@ fn parse_sprite(s: &Value, index: i32, timing: Option<&Value>) -> Sprite {
             if let Some(a) = b.and_then(|v| v.as_array()) {
                 if a.len() >= 4 {
                     let r = [int(&a[0]) as i32, int(&a[1]) as i32, int(&a[2]) as i32, int(&a[3]) as i32];
-                    body[i] = if r[2] - r[0] > 0 { r } else { [0, -22, 16, 8] };
+                    // an empty rect stays empty (0x0800FE78: nothing hits that facing, e.g. the Enzyme's body exists
+                    // only facing down); only a sprite without any box keeps the default
+                    body[i] = r;
                 }
             }
         }
@@ -812,7 +819,7 @@ fn b64(s: &str) -> Vec<u8> {
 }
 
 /// run lengths (LEB128) over w*h tiles, first run blocked -> a 256 x 256 grid (outside w x h blocked)
-fn unrle_grid(s: &str, w: usize, h: usize) -> Vec<u8> {
+pub(crate) fn unrle_grid(s: &str, w: usize, h: usize) -> Vec<u8> {
     let b = b64(s);
     let n = w * h;
     let mut flat = vec![0u8; n];

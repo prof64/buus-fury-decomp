@@ -282,6 +282,9 @@ pub fn ctx_player(w: &World, i: usize) -> Option<usize> {
 // ---- update ----------------------------------------------------------------------------------------------------
 
 pub fn update(w: &mut World, i: usize) {
+    if crate::scene::puppet_update(w, i) {
+        return;
+    }
     tick_anim(w, i);
     {
         let e = w.en(i);

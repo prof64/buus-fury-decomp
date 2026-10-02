@@ -58,7 +58,7 @@ SimEvent::Audio(PlaySong | StopSong | PlaySfx{id, volume, pan} | StopSfx | StopA
 * **Netcode / rollback**: inputs are plain `u16` per player per frame; the step is the only mutation; `state_hash`
   for desync detection, `snapshot/restore` for rollback. Render and audio consume outputs only, so re-simulating
   frames during rollback just drops their events (or diffs them).
-* **Replays**: (seed, content hash, per-frame inputs) → identical states, views and events. `Session` (below) runs them
+* **Replays** (implemented: `wf-replay` + `wf_app::control`, see `docs/replays.md` for rewind, save states, ghosts, training overlays and keys): (seed, content hash, per-frame inputs) → identical states, views and events. `Session` (below) runs them
   headless; the audio log makes sound verifiable.
 * **Multiplayer view**: every local player gets its own viewport from `cameras[p]` of the shared view
   (`App::render(player, w, h)`); split screen = several renders.

@@ -24,17 +24,40 @@ pub fn json(name: &str) -> serde_json::Value {
 }
 
 fn content_dir() -> PathBuf {
-    if let Ok(d) = std::env::var("WF_CONTENT") {
+    extracted("wf-core-content", &["tables", "sprites", "effects", "maps"])
+}
+
+/// the field tests need the world objects, items and script bytecode too (`WF_FIELD_CONTENT` overrides)
+fn field_content_dir() -> PathBuf {
+    if let Ok(d) = std::env::var("WF_FIELD_CONTENT") {
         return PathBuf::from(d);
     }
-    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("wf-core-content");
+    extracted("wf-core-field-content", &["tables", "sprites", "effects", "maps", "world", "items", "scripts"])
+}
+
+pub fn field_data() -> Arc<GameData> {
+    static D: OnceLock<Arc<GameData>> = OnceLock::new();
+    D.get_or_init(|| {
+        let src = DirSource { root: field_content_dir() };
+        Arc::new(GameData::load(&src).expect("load content"))
+    })
+    .clone()
+}
+
+fn extracted(name: &str, only: &[&str]) -> PathBuf {
+    if name == "wf-core-content" {
+        if let Ok(d) = std::env::var("WF_CONTENT") {
+            return PathBuf::from(d);
+        }
+    }
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(name);
     let marker = dir.join(".complete");
     if marker.exists() {
         return dir;
     }
     let rom = repo().join("roms/buu.gba");
     let bytes = std::fs::read(&rom).unwrap_or_else(|e| panic!("ROM {}: {e} (set WF_CONTENT to an extracted content/base)", rom.display()));
-    let opts = wf_extract::Options { only: ["tables", "sprites", "effects", "maps"].iter().map(|s| s.to_string()).collect() };
+    let opts = wf_extract::Options { only: only.iter().map(|s| s.to_string()).collect() };
     let (content, _) = wf_extract::extract(bytes, &opts).expect("extract");
     for (path, data) in &content.files {
         let rel = path.strip_prefix("base/").unwrap_or(path);
