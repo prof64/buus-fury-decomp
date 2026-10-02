@@ -208,6 +208,8 @@ pub struct EnemyType {
     pub spawns: Vec<(i32, i32, i32, i32)>,
     /// the type's drop script (def +0x18, bytecode address; 0 = none): run when a placed field enemy is defeated
     pub drop_script: u32,
+    /// mods: a new type animates like this type (its recorded animation rules), default its own
+    pub anim_as: Option<i32>,
 }
 
 #[derive(Clone, Debug)]
@@ -285,6 +287,13 @@ pub struct SkillEngine {
     pub drain: Vec<i32>,
     /// start animation (names tried in order; default: the base skill's). Interned once per content load.
     pub anim: Vec<&'static str>,
+    /// a scripted behaviour (modkit.rs): the Rhai file whose hooks (`on_start`, `on_frame`, `on_release`, `on_hit`,
+    /// `on_end`) run the skill; the skill's kind is then [`crate::modkit::SCRIPTED`] instead of a built-in one
+    pub script: Option<String>,
+    /// frames after the end before the skill can start again (scripted skills)
+    pub cooldown: Option<i32>,
+    /// scripted skills: the start animation's frame rate (frames per cel = 1 << shift, default 3)
+    pub anim_shift: Option<i32>,
 }
 
 impl SkillEngine {
@@ -321,6 +330,9 @@ fn skill_engine(e: &Value) -> Option<SkillEngine> {
         hit_box: e["hit_box"].as_array().filter(|a| a.len() >= 2).map(|a| (int(&a[0]) as i32, int(&a[1]) as i32)),
         drain: int_list(&e["drain"]),
         anim: e["anim"].as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(|s| &*Box::leak(s.to_string().into_boxed_str()))).collect()).unwrap_or_default(),
+        script: e["script"].as_str().map(String::from),
+        cooldown: opt("cooldown"),
+        anim_shift: opt("anim_shift"),
     })
 }
 
@@ -419,6 +431,11 @@ pub struct GameData {
     pub fighters: Vec<FighterDef>,
     /// battle arenas: the built-in list, then `battle/arenas/*.json`
     pub arenas: Vec<ArenaDef>,
+    /// mod projectile / effect kinds (`projectiles/*.json`, modkit.rs); empty for the base game
+    pub projectiles: BTreeMap<String, crate::modkit::ProjDef>,
+    /// the script hooks of mod content (skills, projectiles, AI nodes), attached by the frontend after loading
+    /// (`wf-modscript`); None = no scripted content
+    pub hooks: Option<Arc<dyn crate::modkit::ModHooks>>,
 }
 
 #[derive(Debug)]
@@ -683,6 +700,7 @@ impl GameData {
                     death_param: dp,
                     spawns: e["spawn_points"].as_array().map(|a| a.iter().map(|s| (geti(s, "world") as i32, geti(s, "map") as i32, geti(s, "x") as i32, geti(s, "y") as i32)).collect()).unwrap_or_default(),
                     drop_script: e["drop_script"].as_str().and_then(|s| u32::from_str_radix(s.trim_start_matches("0x"), 16).ok()).unwrap_or(0),
+                    anim_as: e.get("anim_as").filter(|v| !v.is_null()).map(|v| int(v) as i32),
                 }
             })
             .collect();
@@ -718,7 +736,14 @@ impl GameData {
             }
         }
         let (fighters, arenas) = battle_defs(src, &all)?;
-        let mut d = GameData { sprites, records, record_frames, areas, effects, enemies, states, aux, chars, forms, skills, equipment, xp_table, maps: BTreeMap::new(), anim: crate::eanim::AnimRules::load(ENEMY_ANIM), field: crate::fieldcontent::FieldData::load(src, &all)?.map(Arc::new), fighters, arenas };
+        let mut d = GameData { sprites, records, record_frames, areas, effects, enemies, states, aux, chars, forms, skills, equipment, xp_table, maps: BTreeMap::new(), anim: crate::eanim::AnimRules::load(ENEMY_ANIM), field: crate::fieldcontent::FieldData::load(src, &all)?.map(Arc::new), fighters, arenas, projectiles: crate::modkit::load_projectiles(src, &all)?, hooks: None };
+        // new enemy types animate like the type they name (`anim_as`)
+        let borrow: Vec<(i32, i32)> = d.enemies.iter().filter_map(|e| e.anim_as.map(|b| (e.ty, b))).collect();
+        for (ty, base) in borrow {
+            if let Some(m) = d.anim.types.get(&base).cloned() {
+                d.anim.types.insert(ty, m);
+            }
+        }
         for m in ARENA_MAPS {
             d.load_map(src, m)?;
         }
@@ -738,7 +763,11 @@ impl GameData {
     }
     /// the skill state machine a skill runs (`engine.base`, default its own id)
     pub fn skill_kind(&self, id: i32) -> i32 {
-        self.skills.get(&id).and_then(|s| s.engine.as_ref()).and_then(|e| e.base).unwrap_or(id)
+        let e = self.skills.get(&id).and_then(|s| s.engine.as_ref());
+        if e.is_some_and(|e| e.script.is_some()) {
+            return crate::modkit::SCRIPTED;
+        }
+        e.and_then(|e| e.base).unwrap_or(id)
     }
     pub fn skill_engine(&self, id: i32) -> Option<&SkillEngine> {
         self.skills.get(&id).and_then(|s| s.engine.as_ref())
@@ -783,7 +812,8 @@ impl GameData {
         if ty < 0 {
             return None;
         }
-        self.enemies.get(ty as usize).filter(|e| e.ty == ty)
+        // the game's types are a dense table; types added by mods may leave gaps
+        self.enemies.get(ty as usize).filter(|e| e.ty == ty).or_else(|| self.enemies.iter().find(|e| e.ty == ty))
     }
     /// effect / OBJ record geometry by ROM address
     pub fn record(&self, addr: u32) -> Option<[i32; 4]> {

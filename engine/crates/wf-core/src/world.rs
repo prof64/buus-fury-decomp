@@ -43,6 +43,8 @@ pub enum Body {
     MapSprite(Box<crate::fieldobj::MapSprite>),
     /// a scripted actor (cutscene actors, `spawn_actor`, `change_sprite`; scene.rs)
     Npc(Box<crate::scene::Npc>),
+    /// a mod projectile / effect (`projectiles/*.json`, modkit.rs)
+    Mod(Box<crate::modkit::ModShot>),
 }
 
 #[derive(Clone, Debug, Hash, Serialize, Deserialize)]
@@ -66,6 +68,7 @@ impl Entity {
             Body::Breakable(_) => "breakable",
             Body::MapSprite(_) => "map_sprite",
             Body::Npc(_) => "npc",
+            Body::Mod(_) => "mod",
         }
     }
 }
@@ -495,6 +498,8 @@ pub struct World {
     pub field: Option<Box<crate::field::Field>>,
     /// cutscene systems: command tracks, director, script camera, screen effects, dialog, menus (scene.rs)
     pub scene: crate::scene::Scene,
+    /// mod runtime state: scripted skills, cooldowns, AI script variables (modkit.rs; empty without mods)
+    pub modk: crate::modkit::ModState,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -535,6 +540,8 @@ impl Hash for World {
         self.story.hash(h);
         self.field.hash(h);
         self.scene.hash(h);
+        // hashes nothing while empty (games without scripted mod content)
+        self.modk.hash(h);
     }
 }
 
@@ -593,6 +600,7 @@ impl World {
             story: Default::default(),
             field: None,
             scene: Default::default(),
+            modk: Default::default(),
         }
     }
 
@@ -772,6 +780,7 @@ impl World {
             Body::Breakable(_) => crate::fieldobj::breakable_update(self, i),
             Body::MapSprite(_) => crate::fieldobj::map_sprite_update(self, i),
             Body::Npc(_) => crate::scene::npc_update(self, i),
+            Body::Mod(_) => crate::modkit::shot_update(self, i),
             Body::Hand(_) => crate::enemy::hand_update(self, i),
             Body::Injector(_) => {
                 let (hits, pid, ai) = match &self.ents[i].body {

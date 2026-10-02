@@ -133,6 +133,10 @@ pub struct Field {
     pub busy_since: u32,
     /// the event ended this frame (NPC animations tick once more)
     pub event_ended: bool,
+    /// drop scripts waiting for the death effect (SelfDestruct: the effect object runs the type's drop script after
+    /// `death_param` frames): (due frame, enemy, type, x, y)
+    #[serde(default)]
+    pub pending_drops: Vec<(u32, EntityId, i32, i32, i32)>,
     /// the area allows combat (area record +8): 0 = A only talks / interacts
     pub combat: bool,
     /// calls queued for a later frame (breakables' break callbacks)
@@ -250,6 +254,7 @@ fn new_field() -> Field {
         busy_since: 0,
         checks: 0,
         event_ended: false,
+        pending_drops: Vec::new(),
         combat: true,
         host: false,
         deferred: vec![],
@@ -778,12 +783,14 @@ fn defeats(w: &mut World) {
                 // the dying enemy sets the loot position (0x03001010) for its drop script; INFERRED: its position, no velocity
                 crate::fieldobj::set_loot(w, x, y, 0, 0);
                 w.events.push(Event::Field(FieldEvent::Defeated { entity: id, ty, x, y }));
-                // the type's drop script (def +0x18; story playthrough: the first fighters on Grand Kai's planet drop
-                // coins through it)
-                let ds = w.data.enemy(ty).map(|t| t.drop_script).unwrap_or(0);
+                // the type's drop script (def +0x18), run by the death effect after its delay (SelfDestruct param:
+                // story playthrough, the fighters on Grand Kai's planet drop 4 coins 8 frames after the KO)
+                let (ds, delay) = w.data.enemy(ty).map(|t| (t.drop_script, if t.death_name == "SelfDestruct" { t.death_param as u32 } else { 0 })).unwrap_or((0, 0));
                 if ds != 0 {
-                    let run = Callback::Script(format!("inline_0x{ds:08X}"));
-                    w.events.push(Event::Field(FieldEvent::Run { run, cause: Cause::Defeat { entity: id, ty, x, y }, slot: 0 }));
+                    let due = w.frame + delay;
+                    if let Some(f) = w.field.as_mut() {
+                        f.pending_drops.push((due, id, ty, x, y));
+                    }
                 }
                 if let Some(run) = cb {
                     w.events.push(Event::Field(FieldEvent::Run { run, cause: Cause::Defeat { entity: id, ty, x, y }, slot: 0 }));
@@ -793,6 +800,20 @@ fn defeats(w: &mut World) {
     }
     if let Some(f) = w.field.as_mut() {
         f.placed = keep;
+    }
+    // death effects whose delay is over run the type's drop script (loot position = where the enemy died)
+    let frame = w.frame;
+    let due: Vec<(u32, EntityId, i32, i32, i32)> = w.field.as_ref().map(|f| f.pending_drops.iter().copied().filter(|d| d.0 <= frame).collect()).unwrap_or_default();
+    if !due.is_empty() {
+        if let Some(f) = w.field.as_mut() {
+            f.pending_drops.retain(|d| d.0 > frame);
+        }
+        for (_, id, ty, x, y) in due {
+            let ds = w.data.enemy(ty).map(|t| t.drop_script).unwrap_or(0);
+            crate::fieldobj::set_loot(w, x, y, 0, 0);
+            let run = Callback::Script(format!("inline_0x{ds:08X}"));
+            w.events.push(Event::Field(FieldEvent::Run { run, cause: Cause::Defeat { entity: id, ty, x, y }, slot: 0 }));
+        }
     }
     let alive: Vec<EntityId> = w.enemies.iter().copied().filter(|&id| w.find(id).is_some()).collect();
     w.enemies = alive;

@@ -32,7 +32,7 @@ use wf_script_core::{poll, CoreState, HostState, SharedHost};
 use wf_script_rhai::{Runtime, Status, UnitRef};
 
 /// frames of `opening.json` that must match continuously (the verdict)
-const MIN_MATCHED: usize = 0;
+const MIN_MATCHED: usize = 14870;
 
 fn repo() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..")
@@ -565,6 +565,13 @@ fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Value) -
                 let w = &sess.world;
                 let steps: Vec<String> = fr["steps"].as_array().into_iter().flatten().map(|s| s.to_string()).collect();
                 let p = w.player_idx(0).map(|pi| (w.pl_ref(pi).a.x, w.pl_ref(pi).a.y, w.pl_ref(pi).a.facing, w.pl_ref(pi).gs.name()));
+                let picks: Vec<(i32, i32, i32, bool, [i32; 4])> = w.ents.iter().filter_map(|e| match &e.body {
+                    Body::Pickup(pk) => Some((pk.x, pk.y, pk.z, pk.landed, pk.coin_rect())),
+                    _ => None,
+                }).collect();
+                if !picks.is_empty() {
+                    eprintln!("    pickups {picks:?}");
+                }
                 eprintln!(
                     "  t{k} logic {logic} keys {keys:x} run {} depth {} dialog {:?} busy {:?} pending {:?} p {:?} game p {} rng {:08x?} game {} steps {:?}",
                     host.running,

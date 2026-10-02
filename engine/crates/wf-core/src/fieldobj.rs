@@ -397,7 +397,9 @@ pub fn coin_check(w: &mut World, px: i32, py: i32, slot: u8) -> bool {
             continue;
         }
         let Body::Pickup(p) = &w.ents[k].body else { continue };
-        if !matches!(p.kind, PickupKind::Zenie(_)) {
+        // a coin is collectable once it landed (story playthrough: the fighters' coins on Grand Kai's planet are
+        // not picked up in the air)
+        if !matches!(p.kind, PickupKind::Zenie(_)) || !p.landed {
             continue;
         }
         let r = p.coin_rect();

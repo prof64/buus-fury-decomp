@@ -34,6 +34,7 @@ fn draw_key(w: &World, i: usize) -> (i32, i32, u32) {
         Body::Pickup(p) => (0, p.bx[3]),
         Body::MapSprite(m) => (0, m.y),
         Body::Npc(n) => (0, n.a.py()),
+        Body::Mod(m) => (1, m.y >> 8),
     };
     (layer, depth, e.id)
 }
@@ -211,6 +212,7 @@ pub fn render_view(w: &World, out: &mut RenderView) {
             Body::Pickup(p) => crate::fieldview::pickup(w, id, p, out),
             Body::MapSprite(m) => crate::fieldview::map_sprite(w, id, m, out),
             Body::Injector(_) | Body::Breakable(_) => {}
+            Body::Mod(m) => crate::modkit::draw(w, id, m, out),
         }
     }
     // field: the map props (and breakables) and level signs behind the actors

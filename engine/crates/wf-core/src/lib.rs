@@ -23,6 +23,7 @@ pub mod fieldworld;
 pub mod fx;
 pub mod geom;
 pub mod input;
+pub mod modkit;
 pub mod nodes;
 pub mod path;
 pub mod player;

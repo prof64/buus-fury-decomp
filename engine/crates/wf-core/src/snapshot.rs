@@ -35,6 +35,7 @@ struct WorldSer {
     scene: crate::scene::Scene,
     field: Option<Box<crate::field::Field>>,
     walk_layer: Option<Vec<u8>>,
+    modk: crate::modkit::ModState,
 }
 
 pub fn to_bytes(w: &World) -> Vec<u8> {
@@ -60,6 +61,7 @@ pub fn to_bytes(w: &World) -> Vec<u8> {
         scene: w.scene.clone(),
         field: w.field.clone(),
         walk_layer: w.col.as_ref().and_then(|c| c.walk.clone()),
+        modk: w.modk.clone(),
     };
     postcard::to_allocvec(&s).unwrap_or_default()
 }
@@ -105,6 +107,7 @@ pub fn from_bytes(data: &Arc<GameData>, bytes: &[u8]) -> Option<World> {
     w.scene = s.scene;
     crate::scene::reapply_areas(&mut w);
     w.field = s.field;
+    w.modk = s.modk;
     for e in w.ents.iter_mut() {
         if let Body::Enemy(en) = &mut e.body {
             for st in en.ai.stack.iter_mut() {
