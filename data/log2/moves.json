@@ -717,328 +717,1083 @@
   "0x32": "Sword Blast",
   "0x33": "Spirit Bomb"
  },
+ "player_attacks_doc": "Per-attack simulator records for moves.json (imported by extract_moves.py).\n\nStatic values come from ROM tables / code constants (address cited, tag DISASM); measured values come from\nre/log2/pl_measurements.json (produced by pl_measure_all.py + pl_measure_compact.py on save states\nwork/states/log2_pl_*.ss: Lv40 characters on map 12 vs class-53 snakes; tag VERIFIED).\n\nConventions for every record:\n  * coordinates are pixels relative to the player's integer position (entity+0x158>>8, +0x15C>>8); +x right, +y down.\n  * rects are [x0, y0, x1, y1]; a hit happens when rect overlaps the target hurtbox (strict <).\n  * facings: down, up, left, right (entity+0x10 = 0,1,2,3).\n  * frames: frame 0 = the frame the button is pressed (state entered the same frame).\n  * 'player_vulnerable': whether enemy attacks can damage the player during the move. The player is only\n    protected when its damage multipliers (+0x163/+0x164) are 0 (hurt/revert states) or entity+0x168 == 0\n    (special-melee release; checked in the player message handler at 0x08008A5C).\n",
+ "player_attacks": [
+  {
+   "name": "Punch (A)",
+   "characters": "all (Hercule weaker by stats only)",
+   "input": "tap A",
+   "player_state": "0x28/0x29/0x2A (random)",
+   "attack_table_id": 2,
+   "power": 1024,
+   "type": "melee",
+   "scale": 1024,
+   "ep": null,
+   "timing": {
+    "startup_frames": 0,
+    "active_frames": 1,
+    "total_state_frames": 16,
+    "recovery_frames": 16,
+    "note": "hit resolves on the press frame (0x08007DE8); next A accepted after the 16-frame anim (VERIFIED)"
+   },
+   "hitbox_rect_by_facing": {
+    "down": [
+     0,
+     0,
+     16,
+     16
+    ],
+    "up": [
+     0,
+     -24,
+     16,
+     0
+    ],
+    "left": [
+     -8,
+     -24,
+     0,
+     8
+    ],
+    "right": [
+     16,
+     -24,
+     24,
+     8
+    ]
+   },
+   "hitbox_measured": {
+    "down": [
+     0,
+     0,
+     16,
+     16
+    ],
+    "up": [
+     0,
+     -24,
+     16,
+     0
+    ],
+    "left": [
+     -8,
+     -24,
+     0,
+     8
+    ],
+    "right": [
+     16,
+     -24,
+     24,
+     8
+    ]
+   },
+   "hits": {
+    "count": 1,
+    "targets": "every enemy overlapping the rect"
+   },
+   "projectile": null,
+   "player_vulnerable": true,
+   "stun_sent": null,
+   "knockback_given": {
+    "enemy_total_push_px": [
+     16.47,
+     -1.82
+    ],
+    "enemy_entered_generic_hurt_state_frame": 2,
+    "note": "measured on a free snake (class 53); push direction = away from the player; the push itself is the enemy-side hurt reaction (generic actor state 0x02 @0x03002128, ~31 frames) - see Part C"
+   },
+   "evidence": "VERIFIED: punch_r_free, punch_d/u/l"
+  },
+  {
+   "name": "Charged special melee (Super Kick / Spin Punch(Whirlspin) / Two-Handed Smash / Cross Slash / Flurry Punch)",
+   "characters": "Gohan, Piccolo, Vegeta, Trunks, Goku (needs flag bit2)",
+   "input": "punch, keep A held, release when charged",
+   "player_state": "0x27",
+   "attack_table_id": 4,
+   "power": 1536,
+   "type": "melee",
+   "scale": 1024,
+   "ep": null,
+   "timing": {
+    "charge": "after the 16-frame punch: form.charge_anim_quads*4 frames + 16-frame countdown (0x0800839A); releasing earlier cancels",
+    "min_hold_frames_from_press": "16 + 4*charge_anim_quads + 16 (=32 for most forms; VERIFIED cancel at 30, works at 110)",
+    "release": "hits on attack-anim frames k*4 for bits k of form.hit_quads_mask, counted from the release; ends after form.anim_len_quads*4 frames",
+    "measured": {
+     "Goku/Gohan/Vegeta (mask 0x18, len 6)": "release f112 -> hits f119-123 and f127, state ends f135 (23 f)",
+     "Trunks (mask 0x60, len 7)": "hits f123,f127, ends f131",
+     "Piccolo (mask 0x1E, no lunge)": "4 hits f115,f119,f123,f127, ends f135"
+    }
+   },
+   "lunge": "form+0x0C px/f (1.0 for most, 0 for Piccolo/Hercule) along facing during the release (VERIFIED: player x +16 px over the swing)",
+   "hitbox_rect_by_facing": {
+    "down": [
+     0,
+     0,
+     16,
+     16
+    ],
+    "up": [
+     0,
+     -16,
+     16,
+     0
+    ],
+    "left": [
+     -8,
+     -24,
+     0,
+     8
+    ],
+    "right": [
+     16,
+     -24,
+     24,
+     8
+    ]
+   },
+   "hitbox_measured": {
+    "right": [
+     16,
+     -24,
+     24,
+     8
+    ],
+    "down": [
+     0,
+     0,
+     16,
+     16
+    ]
+   },
+   "hits": {
+    "count": "popcount(form.hit_quads_mask): 2 (most), 4 (Piccolo)",
+    "rehit_interval_frames": 4,
+    "targets": "all overlapping"
+   },
+   "per_form": "characters.json forms[].special_melee",
+   "player_vulnerable": "charging: yes; release: no (entity+0x168=0, 0x080083FA..0x08008565; DISASM + measured flag)",
+   "projectile": null,
+   "stun_sent": null,
+   "evidence": "VERIFIED: spmelee_goku/_gohan/_vegeta/_trunks/_piccolo_imm/_goku_d/_goku_short"
+  },
+  {
+   "name": "Energy blast (basic ki blast)",
+   "characters": "all except Hercule (slot 3)",
+   "input": "B (tap again within the window to rapid-fire)",
+   "player_state": "0x22",
+   "attack_table_id": 3,
+   "power": 1024,
+   "type": "energy",
+   "scale": 1024,
+   "ep": {
+    "start": 2,
+    "min": 2,
+    "per_extra_shot": 2
+   },
+   "timing": {
+    "startup_frames": 8,
+    "refire_period_frames": 16,
+    "total_state_frames": 24,
+    "recovery_frames_after_last_shot": 16,
+    "rapid_fire_measured": "shots at f10,26,42,58 for taps every 6 f (blast_rapid)"
+   },
+   "projectile": {
+    "vtable": "0x08024CBC",
+    "speed_px_per_frame": 3.0,
+    "size": [
+     16,
+     16
+    ],
+    "spawn_pos_by_facing": {
+     "down": [
+      8.0,
+      0.0
+     ],
+     "up": [
+      8.0,
+      -8.0
+     ],
+     "left": [
+      -2.0,
+      -8.0
+     ],
+     "right": [
+      18.0,
+      -8.0
+     ]
+    },
+    "rect_by_facing_at_spawn": {
+     "down": [
+      0,
+      -8,
+      16,
+      8
+     ],
+     "up": [
+      0,
+      -16,
+      16,
+      0
+     ],
+     "left": [
+      -10,
+      -16,
+      6,
+      0
+     ],
+     "right": [
+      10,
+      -16,
+      26,
+      0
+     ]
+    },
+    "lifetime": "until the rect leaves the camera view (0x08013C8E) - 40 frames / ~117 px to the screen edge in the test map",
+    "on_hit": "stops at the first target and plays a 15-frame impact (no further damage)"
+   },
+   "hits": {
+    "count": 1,
+    "pierce": false
+   },
+   "player_vulnerable": true,
+   "stun_sent": null,
+   "knockback_given": {
+    "enemy_total_push_px": [
+     7.62,
+     1.01
+    ],
+    "enemy_entered_generic_hurt_state_frame": 12,
+    "note": "measured on a free snake (class 53); push direction = away from the player; the push itself is the enemy-side hurt reaction (generic actor state 0x02 @0x03002128, ~31 frames) - see Part C"
+   },
+   "evidence": "VERIFIED: blast_r_pierce (2nd enemy not hit), blast_d/u/l, blast_free, blast_rapid"
+  },
+  {
+   "name": "Masenko Ball",
+   "characters": "Gohan (slot 0)",
+   "input": "hold B to charge range, release to throw",
+   "player_state": "0x2D",
+   "attack_table_id": 7,
+   "power": 2048,
+   "type": "energy",
+   "scale": "min(2*C+256, 2048), C=clamp(-180+30*frames_held, 255, 1024)",
+   "ep": {
+    "start": 4,
+    "min": 4,
+    "drain": null
+   },
+   "timing": {
+    "ball_spawns_frame": 0,
+    "launch": "on B release",
+    "flight_frames_after_release": 36,
+    "state_ends_frames_after_release": 32,
+    "measured": {
+     "tap": "explodes f38 (scale 766)",
+     "hold30": "explodes f67 (scale 1696)"
+    }
+   },
+   "projectile": {
+    "vtable": "0x08024CE8",
+    "ctor": "0x080139BC",
+    "spawn_offset_table_rom": "0x086E374C (dx,dy,anim per facing)",
+    "spawn_offset_by_facing": {
+     "down": [
+      12,
+      4,
+      39
+     ],
+     "up": [
+      12,
+      6,
+      40
+     ],
+     "left": [
+      10,
+      4,
+      39
+     ],
+     "right": [
+      6,
+      4,
+      39
+     ]
+    },
+    "spawn_pos_measured": {
+     "right": [
+      6.0,
+      -4.0
+     ],
+     "down": [
+      12.0,
+      -4.0
+     ]
+    },
+    "size": "8x8 in flight",
+    "velocity": "horizontal C/256 px/f along facing; vertical arc vy0=-2 px/f, +0.125 px/f per frame",
+    "range_px": "~36*C/256 (34 px tap, 136 px max)"
+   },
+   "explosion": {
+    "rect_size": [
+     16,
+     16
+    ],
+    "rect_measured_right": [
+     32,
+     -8,
+     48,
+     8
+    ],
+    "duration": "single hit frame",
+    "targets": "all overlapping"
+   },
+   "hits": {
+    "count": 1,
+    "pierce": "n/a (explodes at the end of the arc, passes over enemies before that)"
+   },
+   "player_vulnerable": true,
+   "stun_sent": null,
+   "evidence": "VERIFIED: masenko_tap (3 enemies hit by one 16x16 blast), masenko_hold30, masenko_d"
+  },
+  {
+   "name": "Kamehameha",
+   "characters": "Goku (slot 0), Gohan (slot 1)",
+   "input": "hold B (charge 24 f, then beam while held)",
+   "player_state": "0x30",
+   "attack_table_id": 10,
+   "power": 64,
+   "type": "energy",
+   "scale": 1024,
+   "ep": {
+    "start": 2,
+    "min": 12,
+    "drain": "86/256 EP per frame while the beam is out (~1 EP / 3 f), 0x080152A6"
+   },
+   "timing": {
+    "charge_frames": 24,
+    "cancel": "B released before frame 24 -> no beam",
+    "beam_until": "B released or EP 0",
+    "first_hit_frame_measured": 26,
+    "recovery_frames": 0
+   },
+   "beam": {
+    "object_ctor": "0x080143A8",
+    "head_box": [
+     16,
+     16
+    ],
+    "grow_px_per_frame": 3,
+    "head_rect_measured": {
+     "right": [
+      35,
+      -14,
+      51,
+      2
+     ],
+     "down": [
+      0,
+      19,
+      16,
+      35
+     ]
+    },
+    "behaviour": "head advances 3 px/f until it overlaps an enemy, a wall or the screen edge, then stays; only the head box deals damage"
+   },
+   "hits": {
+    "rehit_interval_frames": 1,
+    "pierce": false,
+    "note": "hits the first enemy every frame (2nd enemy behind never hit); sometimes 2 hits/frame when two beam segments overlap"
+   },
+   "player_vulnerable": true,
+   "stun_sent": "continuous: target is re-hit every frame so it stays in its hurt state",
+   "knockback_given": {
+    "enemy_total_push_px": [
+     20.41,
+     -1.48
+    ],
+    "enemy_entered_generic_hurt_state_frame": 27,
+    "note": "measured on a free snake (class 53); push direction = away from the player; the push itself is the enemy-side hurt reaction (generic actor state 0x02 @0x03002128, ~31 frames) - see Part C"
+   },
+   "evidence": "VERIFIED: kame_r_2, kame_d, kame_free"
+  },
+  {
+   "name": "Special Beam Cannon",
+   "characters": "Piccolo (slot 0)",
+   "input": "hold B",
+   "player_state": "0x31",
+   "attack_table_id": 11,
+   "power": 102,
+   "type": "energy",
+   "scale": 1024,
+   "ep": {
+    "start": 2,
+    "min": 8,
+    "drain": "34/256 EP per frame (~1 EP / 7.5 f), 0x080153F8"
+   },
+   "timing": {
+    "charge_frames": 24,
+    "first_hit_frame_measured": 25,
+    "beam_until": "B released or EP 0"
+   },
+   "beam": {
+    "object_ctor": "0x080157E0",
+    "thickness_px": 12,
+    "grow_px_per_frame": 3,
+    "rect_measured": {
+     "right_first": [
+      26,
+      -14,
+      54,
+      -2
+     ],
+     "right_last": [
+      26,
+      -14,
+      147,
+      -2
+     ],
+     "down_first": [
+      2,
+      14,
+      14,
+      42
+     ]
+    },
+    "behaviour": "one long rect from the muzzle to the tip; tip grows 3 px/f and is not stopped by enemies"
+   },
+   "hits": {
+    "rehit_interval_frames": 1,
+    "pierce": true,
+    "note": "every enemy inside the beam is hit every frame (VERIFIED: 2nd enemy 30 px behind hit from f39)"
+   },
+   "player_vulnerable": true,
+   "stun_sent": "continuous re-hit",
+   "evidence": "VERIFIED: sbc_r_2, sbc_d"
+  },
+  {
+   "name": "Scatter Shot",
+   "characters": "Piccolo (slot 1)",
+   "input": "tap B",
+   "player_state": "0x2C",
+   "attack_table_id": 6,
+   "power": 1280,
+   "type": "energy",
+   "scale": 1024,
+   "ep": {
+    "start": 12,
+    "min": 12
+   },
+   "timing": {
+    "startup_frames": 16,
+    "total_state_frames": 48,
+    "recovery_frames": 32
+   },
+   "projectile": {
+    "vtable": "0x08024D14",
+    "count": 3,
+    "size": [
+     16,
+     16
+    ],
+    "table_rom": "0x086E362C (per facing 3 x [dx,dy,vx,vy,param,anim], 24.8 velocities)",
+    "pellets_by_facing": {
+     "down": [
+      [
+       6,
+       8,
+       -384,
+       665,
+       1024,
+       4
+      ],
+      [
+       10,
+       8,
+       384,
+       665,
+       1024,
+       5
+      ],
+      [
+       8,
+       8,
+       0,
+       768,
+       512,
+       0
+      ]
+     ],
+     "up": [
+      [
+       6,
+       -16,
+       -384,
+       -665,
+       1024,
+       6
+      ],
+      [
+       10,
+       -16,
+       384,
+       -665,
+       1024,
+       7
+      ],
+      [
+       8,
+       -16,
+       0,
+       -768,
+       512,
+       1
+      ]
+     ],
+     "left": [
+      [
+       -8,
+       -6,
+       -665,
+       -384,
+       1024,
+       8
+      ],
+      [
+       -8,
+       -10,
+       -665,
+       384,
+       1024,
+       9
+      ],
+      [
+       -8,
+       -8,
+       -768,
+       0,
+       512,
+       2
+      ]
+     ],
+     "right": [
+      [
+       24,
+       -6,
+       665,
+       -384,
+       1024,
+       10
+      ],
+      [
+       24,
+       -10,
+       665,
+       384,
+       1024,
+       11
+      ],
+      [
+       24,
+       -8,
+       768,
+       0,
+       512,
+       3
+      ]
+     ]
+    },
+    "measured_right": [
+     {
+      "spawn": [
+       24.0,
+       -6.0
+      ],
+      "step": [
+       2.598,
+       -1.5
+      ]
+     },
+     {
+      "spawn": [
+       24.0,
+       -10.0
+      ],
+      "step": [
+       2.598,
+       1.5
+      ]
+     },
+     {
+      "spawn": [
+       24.0,
+       -8.0
+      ],
+      "step": [
+       3.0,
+       0.0
+      ]
+     }
+    ],
+    "speed": "centre 3.0 px/f; sides (2.598, +-1.5) px/f (30 deg spread)",
+    "lifetime": "until off-screen or hit"
+   },
+   "hits": {
+    "count": "up to 3 (one per pellet)",
+    "pierce": false
+   },
+   "player_vulnerable": true,
+   "stun_sent": null,
+   "evidence": "VERIFIED: scatter_r, scatter_d"
+  },
+  {
+   "name": "Big Bang",
+   "characters": "Vegeta (slot 0)",
+   "input": "hold B to charge, release to fire",
+   "player_state": "0x2E",
+   "attack_table_id": 8,
+   "power": 49152,
+   "type": "energy",
+   "scale": "32 + frames held (stops growing at EP 0)",
+   "ep": {
+    "start": 10,
+    "min": 20,
+    "drain": "1 EP every 4 frames while held"
+   },
+   "timing": {
+    "launch": "on release",
+    "recovery_frames_after_release": 32,
+    "measured": {
+     "tap": "explodes f4 on an enemy 40 px away (scale 33)",
+     "hold40": "explodes f56 (scale 72)"
+    }
+   },
+   "projectile": {
+    "vtable": "0x080241B0",
+    "ctor": "0x08013E48",
+    "spawn_offset_by_facing": {
+     "down": [
+      4,
+      -4,
+      39
+     ],
+     "up": [
+      12,
+      -4,
+      40
+     ],
+     "left": [
+      10,
+      -4,
+      39
+     ],
+     "right": [
+      6,
+      -4,
+      39
+     ]
+    },
+    "velocity_by_facing_24p8": {
+     "down": [
+      0,
+      512
+     ],
+     "up": [
+      0,
+      -512
+     ],
+     "left": [
+      -512,
+      0
+     ],
+     "right": [
+      512,
+      0
+     ]
+    },
+    "speed_px_per_frame": 2.0,
+    "initial_jump_px": 16,
+    "size": "grows while charging: 8x8 -> 16x16 -> 32x32 (sprite tiers)",
+    "probe_box": "24x24 around the ball each frame (msg type 2)",
+    "lifetime": "until it touches an enemy/wall or leaves the screen"
+   },
+   "explosion": {
+    "rect_size": [
+     64,
+     64
+    ],
+    "rect": "ball position +-32",
+    "rect_measured": [
+     -8,
+     -36,
+     56,
+     28
+    ],
+    "duration_frames": 16,
+    "targets": "all enemies in the box, once"
+   },
+   "hits": {
+    "count": 1,
+    "pierce": false
+   },
+   "player_vulnerable": true,
+   "stun_sent": null,
+   "evidence": "VERIFIED: bigbang_tap (3 enemies in blast), bigbang_hold40 (enemy 32+ px outside box not hit), bigbang_d"
+  },
+  {
+   "name": "Energy Punch",
+   "characters": "Vegeta (slot 1)",
+   "input": "tap B",
+   "player_state": "0x2B",
+   "attack_table_id": 5,
+   "power": 1536,
+   "type": "melee",
+   "scale": 1024,
+   "ep": {
+    "start": 4,
+    "min": 4
+   },
+   "timing": {
+    "startup_frames": 0,
+    "total_state_frames": 16
+   },
+   "hitbox_rect_by_facing": {
+    "down": [
+     0,
+     0,
+     16,
+     16
+    ],
+    "up": [
+     0,
+     -24,
+     16,
+     0
+    ],
+    "left": [
+     -8,
+     -24,
+     0,
+     8
+    ],
+    "right": [
+     16,
+     -24,
+     24,
+     8
+    ]
+   },
+   "hitbox_measured": {
+    "right": [
+     16,
+     -24,
+     24,
+     8
+    ]
+   },
+   "hits": {
+    "count": 1
+   },
+   "player_vulnerable": true,
+   "evidence": "VERIFIED: epunch_r"
+  },
+  {
+   "name": "Burning Attack",
+   "characters": "Trunks (slot 0)",
+   "input": "B (hold to keep the bolt charging in front, release to fire)",
+   "player_state": "0x2F",
+   "attack_table_id": 9,
+   "power": 64,
+   "type": "energy",
+   "scale": 1024,
+   "ep": {
+    "start": 6,
+    "min": 6
+   },
+   "timing": {
+    "launch": "on B release",
+    "recovery_frames_after_release": 32
+   },
+   "projectile": {
+    "vtable": "0x0802507C",
+    "ctor": "0x080141B4",
+    "spawn_offset_by_facing": {
+     "down": [
+      4,
+      -4,
+      39
+     ],
+     "up": [
+      12,
+      -4,
+      40
+     ],
+     "left": [
+      10,
+      -4,
+      39
+     ],
+     "right": [
+      6,
+      -4,
+      39
+     ]
+    },
+    "velocity_by_facing_24p8": {
+     "down": [
+      0,
+      640
+     ],
+     "up": [
+      0,
+      -640
+     ],
+     "left": [
+      -640,
+      0
+     ],
+     "right": [
+      640,
+      0
+     ]
+    },
+    "speed_px_per_frame": 2.5,
+    "initial_jump_px": 10,
+    "size": "8x8 while held, 32x32 when flying",
+    "hit_rect_measured": {
+     "right": [
+      2,
+      -20,
+      34,
+      12
+     ],
+     "down": [
+      -12,
+      -8,
+      20,
+      24
+     ]
+    },
+    "lifetime": "until a target/wall/off-screen; after a hit it fades 16 frames"
+   },
+   "hits": {
+    "count": 1,
+    "pierce": false,
+    "note": "2nd enemy behind not hit"
+   },
+   "player_vulnerable": true,
+   "stun_sent": "attack id 9 (tiny damage); on the test snake it caused the normal 31-frame hurt state - any special stun is enemy-AI specific (Part C)",
+   "knockback_given": {
+    "enemy_total_push_px": [
+     14.53,
+     0.85
+    ],
+    "enemy_entered_generic_hurt_state_frame": 4,
+    "note": "measured on a free snake (class 53); push direction = away from the player; the push itself is the enemy-side hurt reaction (generic actor state 0x02 @0x03002128, ~31 frames) - see Part C"
+   },
+   "evidence": "VERIFIED: burning_tap, burning_hold30, burning_free, burning_d"
+  },
+  {
+   "name": "Sword Blast",
+   "characters": "Trunks (slot 1)",
+   "input": "tap B",
+   "player_state": "0x32",
+   "attack_table_ids": [
+    12,
+    13
+   ],
+   "power": {
+    "swing (id 12, melee)": 1024,
+    "wave (id 13, energy)": 3072
+   },
+   "scale": 1024,
+   "ep": {
+    "start": 5,
+    "min": 5
+   },
+   "timing": {
+    "swing_hit_frame": 0,
+    "wave_spawn_frame": 8,
+    "total_state_frames": 33
+   },
+   "swing": {
+    "rect_measured": {
+     "right": [
+      16,
+      -16,
+      32,
+      8
+     ]
+    }
+   },
+   "projectile": {
+    "vtable": "0x08024B24",
+    "speed_px_per_frame": 3.5,
+    "size": "8x16 (horizontal) / 16x8 (vertical)",
+    "spawn_pos_measured": {
+     "right": [
+      26.0,
+      -4.0
+     ],
+     "down": [
+      8.0,
+      12.0
+     ]
+    },
+    "lifetime": "until hit or off-screen (33 f to the screen edge in the far test)"
+   },
+   "hits": {
+    "count": "swing 1 + wave 1",
+    "pierce": false,
+    "note": "wave stopped at the first enemy (enemies at 60/90 px not hit)"
+   },
+   "player_vulnerable": true,
+   "evidence": "VERIFIED: swordblast_r, swordblast_d"
+  },
+  {
+   "name": "Spirit Bomb",
+   "characters": "Goku (slot 1)",
+   "input": "hold B to grow, release to throw",
+   "player_state": "0x33",
+   "attack_table_id": 14,
+   "power": 40960,
+   "type": "energy",
+   "scale": "size = 5 + frames from press until the throw (throw = 8 f after release)",
+   "ep": {
+    "start": 10,
+    "min": 20,
+    "drain": "1 EP every 4 frames while held (growth stops at EP 0)"
+   },
+   "timing": {
+    "throw_frames_after_release": 8,
+    "state_ends": "~24 f after release (measured: release f42 -> state end f66)"
+   },
+   "projectile": {
+    "vtable": "0x08024AF8",
+    "ctor": "0x080165EC",
+    "spawn_offset": [
+     8,
+     -24
+    ],
+    "throw_velocity_by_facing_24p8": {
+     "down": [
+      0,
+      256
+     ],
+     "up": [
+      0,
+      -256
+     ],
+     "left": [
+      -256,
+      0
+     ],
+     "right": [
+      256,
+      0
+     ]
+    },
+    "speed_px_per_frame": 1.0,
+    "size": "8x8 -> 16x16 (size>=64) -> 32x32 (sprite tier min(4,size>>6))"
+   },
+   "explosion": {
+    "rect": "bomb rect expanded by its own width/height on every side (3x the bomb box): 24x24 small, 48x48 at size>=64",
+    "rect_measured": {
+     "size23": [
+      35,
+      -18,
+      59,
+      6
+     ],
+     "size53": [
+      75,
+      -18,
+      99,
+      6
+     ],
+     "size143": [
+      59,
+      -30,
+      107,
+      18
+     ]
+    },
+    "targets": "all in the box"
+   },
+   "hits": {
+    "count": 1,
+    "pierce": false
+   },
+   "player_vulnerable": true,
+   "stun_sent": "if size >= 128 (0x08016726): attack id 15 (power 0) to the whole map -> enemies enter stun state @0x03002230 for 324 frames (VERIFIED on snakes); msg 0x13 broadcast at the throw",
+   "evidence": "VERIFIED: spirit_hold10/40/130, spirit_free, spirit_stun_long"
+  },
+  {
+   "name": "Hercule special",
+   "characters": "Hercule (all slots)",
+   "input": "tap B",
+   "player_state": "0x05",
+   "attack_table_id": 15,
+   "power": 0,
+   "type": "energy",
+   "scale": 0,
+   "ep": {
+    "start": 6,
+    "min": 6
+   },
+   "timing": {
+    "total_state_frames": 32
+   },
+   "effect": "sends attack id 15 with rect (0,0)-(2048,2048) to every entity: no damage, stun (state 0x03002230, 324 f on snakes)",
+   "player_vulnerable": true,
+   "evidence": "VERIFIED: hercule_sp (rect/ids); stun duration from spirit_stun_long"
+  },
+  {
+   "name": "Transform / revert (move types 11, 12)",
+   "input": "B with slot 2 selected",
+   "player_state": "0x23 / 0x25 / 0x24",
+   "ep": {
+    "start": 10,
+    "min": 10
+   },
+   "timing": {
+    "transform_frames": "~165 (0x23) / 64 (0x25 Piccolo)",
+    "revert_frames": "40-80"
+   },
+   "player_vulnerable": "during transform: yes; during revert 0x24: no (mults 0)",
+   "evidence": "VERIFIED: pl_transform.py runs"
+  }
+ ],
+ "measurements_file": "re/log2/pl_measurements.json (raw per-run measurements; regenerate with pl_measure_all.py + pl_measure_compact.py)",
  "enemy_attacks": [
   {
-   "description": "boss beam/projectile (INFERRED)",
-   "used_by_classes": [
-    {
-     "class_id": 21,
-     "names": [
-      "Cell, \"Perfect\""
-     ]
-    },
-    {
-     "class_id": 22,
-     "names": [
-      "Cell, \"Perfect\""
-     ]
-    },
-    {
-     "class_id": 23,
-     "names": [
-      "Cell, \"Perfect\""
-     ]
-    },
-    {
-     "class_id": 24,
-     "names": [
-      "Cell, \"Perfect\""
-     ]
-    },
-    {
-     "class_id": 25,
-     "names": [
-      "Cell, \"Perfect\""
-     ]
-    },
-    {
-     "class_id": 76,
-     "names": [
-      "Cell, \"Nonperfect\""
-     ]
-    },
-    {
-     "class_id": 78,
-     "names": [
-      "Cell, \"Perfect\""
-     ]
-    },
-    {
-     "class_id": 79,
-     "names": [
-      "Cell, \"Perfect\""
-     ]
-    }
-   ]
-  },
-  {
-   "description": "boss special (INFERRED)",
-   "used_by_classes": [
-    {
-     "class_id": 31,
-     "names": [
-      "Destroyer"
-     ]
-    },
-    {
-     "class_id": 32,
-     "names": [
-      "Destroyer"
-     ]
-    },
-    {
-     "class_id": 33,
-     "names": [
-      "Destroyer"
-     ]
-    }
-   ]
-  },
-  {
-   "description": "boss special melee (INFERRED)",
-   "used_by_classes": [
-    {
-     "class_id": 60,
-     "names": [
-      "Cell"
-     ]
-    },
-    {
-     "class_id": 76,
-     "names": [
-      "Cell, \"Nonperfect\""
-     ]
-    }
-   ]
-  },
-  {
-   "description": "boss special projectile (INFERRED)",
-   "used_by_classes": [
-    {
-     "class_id": 44,
-     "names": [
-      "General Tao"
-     ]
-    }
-   ]
-  },
-  {
-   "description": "charge/dash (attack id 2 on contact)",
-   "used_by_classes": [
-    {
-     "class_id": 58,
-     "names": [
-      "Hawk"
-     ]
-    },
-    {
-     "class_id": 80,
-     "names": [
-      "Pterodactyl"
-     ]
-    },
-    {
-     "class_id": 84,
-     "names": [
-      "Hawk"
-     ]
-    },
-    {
-     "class_id": 88,
-     "names": [
-      "Pterodactyl"
-     ]
-    },
-    {
-     "class_id": 107,
-     "names": [
-      "Hawk"
-     ]
-    }
-   ]
-  },
-  {
-   "description": "energy ball projectile (attack id 1, energy 1024; POW-based)",
-   "used_by_classes": [
-    {
-     "class_id": 12,
-     "names": [
-      "Warlord's Henchman"
-     ]
-    },
-    {
-     "class_id": 51,
-     "names": [
-      "Warlord's Henchman"
-     ]
-    },
-    {
-     "class_id": 85,
-     "names": [
-      "Warlord's Henchman"
-     ]
-    }
-   ]
-  },
-  {
-   "description": "ki blast projectile (attack id 3, energy 1024; POW-based)",
-   "used_by_classes": [
-    {
-     "class_id": 3,
-     "names": [
-      "Android 17"
-     ]
-    },
-    {
-     "class_id": 4,
-     "names": [
-      "Android 18"
-     ]
-    },
-    {
-     "class_id": 5,
-     "names": [
-      "Android 19"
-     ]
-    },
-    {
-     "class_id": 6,
-     "names": [
-      "Android 20"
-     ]
-    },
-    {
-     "class_id": 7,
-     "names": [
-      "Android 20"
-     ]
-    },
-    {
-     "class_id": 21,
-     "names": [
-      "Cell, \"Perfect\""
-     ]
-    },
-    {
-     "class_id": 22,
-     "names": [
-      "Cell, \"Perfect\""
-     ]
-    },
-    {
-     "class_id": 23,
-     "names": [
-      "Cell, \"Perfect\""
-     ]
-    },
-    {
-     "class_id": 24,
-     "names": [
-      "Cell, \"Perfect\""
-     ]
-    },
-    {
-     "class_id": 25,
-     "names": [
-      "Cell, \"Perfect\""
-     ]
-    },
-    {
-     "class_id": 26,
-     "names": [
-      "Cell Junior"
-     ]
-    },
-    {
-     "class_id": 29,
-     "names": [
-      "Cooler"
-     ]
-    },
-    {
-     "class_id": 41,
-     "names": null
-    },
-    {
-     "class_id": 44,
-     "names": [
-      "General Tao"
-     ]
-    },
-    {
-     "class_id": 60,
-     "names": [
-      "Cell"
-     ]
-    },
-    {
-     "class_id": 64,
-     "names": [
-      "Krillin"
-     ]
-    },
-    {
-     "class_id": 76,
-     "names": [
-      "Cell, \"Nonperfect\""
-     ]
-    },
-    {
-     "class_id": 78,
-     "names": [
-      "Cell, \"Perfect\""
-     ]
-    },
-    {
-     "class_id": 79,
-     "names": [
-      "Cell, \"Perfect\""
-     ]
-    },
-    {
-     "class_id": 98,
-     "names": [
-      "Tien"
-     ]
-    },
-    {
-     "class_id": 106,
-     "names": [
-      "Yamcha"
-     ]
-    }
-   ]
-  },
-  {
-   "description": "lobbed arcing projectile (attack id 1)",
-   "used_by_classes": [
-    {
-     "class_id": 9,
-     "names": [
-      "Tiger Bandit"
-     ]
-    },
-    {
-     "class_id": 10,
-     "names": [
-      "Tiger Bandit"
-     ]
-    }
-   ]
-  },
-  {
-   "description": "melee strike (attack id 2, melee, power 1024; STR-based)",
+   "key": "melee_strike",
+   "node": "MeleeStrike 0x0801be8b",
+   "attack_id": 2,
+   "type": "melee",
+   "power": 1024,
+   "scale": 1024,
+   "stat": "STR",
+   "team": 0,
+   "hitbox": "instant check on the first frame of the strike state against the player hurt rect: horizontal (|dx|>|dy|): y from own hurt-rect centre to bottom+3, x from own centre to right edge+3 (player to the right) or left edge-4 to centre; vertical: x = own collision box, y from hurt-rect top to bottom-6 (down) or to collision-box top (up) (0x0801bd2c)",
+   "startup_frames": 0,
+   "active_frames": 1,
+   "recovery": "strike anim (anim state 6+rand(variants)) + the Wait that follows in the AI (e.g. 30 f for ai 8)",
+   "measured": {
+    "snake_class53": "damage on the state-entry frame; strike state 47 f = 17 f anim + Wait 30"
+   },
+   "evidence": "VERIFIED(disasm+emu)",
+   "attack_table_entry": {
+    "id": 2,
+    "addr": "0x86db2dc",
+    "type": "melee",
+    "type_byte": 0,
+    "id_byte": 2,
+    "power": 1024
+   },
    "used_by_classes": [
     {
      "class_id": 1,
      "names": [
       "Alligator"
-     ]
-    },
-    {
-     "class_id": 2,
-     "names": [
-      "Android 16"
      ]
     },
     {
@@ -1102,10 +1857,6 @@
      ]
     },
     {
-     "class_id": 15,
-     "names": null
-    },
-    {
      "class_id": 16,
      "names": [
       "T-Rex"
@@ -1115,25 +1866,6 @@
      "class_id": 17,
      "names": [
       "Wolf"
-     ]
-    },
-    {
-     "class_id": 18,
-     "names": [
-      "Bulma"
-     ]
-    },
-    {
-     "class_id": 19,
-     "names": [
-      "Butterfly",
-      "Squirrel"
-     ]
-    },
-    {
-     "class_id": 20,
-     "names": [
-      "Cat"
      ]
     },
     {
@@ -1173,27 +1905,9 @@
      ]
     },
     {
-     "class_id": 27,
-     "names": [
-      "Chiaotzu"
-     ]
-    },
-    {
-     "class_id": 28,
-     "names": [
-      "Chi-Chi"
-     ]
-    },
-    {
      "class_id": 29,
      "names": [
       "Cooler"
-     ]
-    },
-    {
-     "class_id": 30,
-     "names": [
-      "Dende"
      ]
     },
     {
@@ -1212,18 +1926,6 @@
      "class_id": 33,
      "names": [
       "Destroyer"
-     ]
-    },
-    {
-     "class_id": 34,
-     "names": [
-      "Dog"
-     ]
-    },
-    {
-     "class_id": 35,
-     "names": [
-      "Dr. Briefs"
      ]
     },
     {
@@ -1255,47 +1957,15 @@
      "names": null
     },
     {
-     "class_id": 42,
-     "names": [
-      "Frieza"
-     ]
-    },
-    {
-     "class_id": 43,
-     "names": null
-    },
-    {
      "class_id": 44,
      "names": [
       "General Tao"
      ]
     },
     {
-     "class_id": 45,
-     "names": [
-      "Ninja"
-     ]
-    },
-    {
      "class_id": 47,
      "names": [
       "Scorpion"
-     ]
-    },
-    {
-     "class_id": 48,
-     "names": [
-      "Snake"
-     ]
-    },
-    {
-     "class_id": 49,
-     "names": null
-    },
-    {
-     "class_id": 50,
-     "names": [
-      "Wolf"
      ]
     },
     {
@@ -1317,25 +1987,9 @@
      ]
     },
     {
-     "class_id": 56,
-     "names": [
-      "Warthog"
-     ]
-    },
-    {
      "class_id": 57,
      "names": [
       "Wolf"
-     ]
-    },
-    {
-     "class_id": 59,
-     "names": [
-      "Human",
-      "Maron",
-      "Mayor",
-      "Mrs. Briefs",
-      "Turtle"
      ]
     },
     {
@@ -1345,33 +1999,9 @@
      ]
     },
     {
-     "class_id": 61,
-     "names": [
-      "Kami"
-     ]
-    },
-    {
-     "class_id": 62,
-     "names": [
-      "King Cold"
-     ]
-    },
-    {
-     "class_id": 63,
-     "names": [
-      "Korin"
-     ]
-    },
-    {
      "class_id": 64,
      "names": [
       "Krillin"
-     ]
-    },
-    {
-     "class_id": 68,
-     "names": [
-      "Master Roshi"
      ]
     },
     {
@@ -1393,18 +2023,6 @@
      ]
     },
     {
-     "class_id": 72,
-     "names": [
-      "Mr. Popo"
-     ]
-    },
-    {
-     "class_id": 73,
-     "names": [
-      "Namek"
-     ]
-    },
-    {
      "class_id": 74,
      "names": [
       "Wolf"
@@ -1423,12 +2041,6 @@
      ]
     },
     {
-     "class_id": 77,
-     "names": [
-      "Oolong"
-     ]
-    },
-    {
      "class_id": 78,
      "names": [
       "Cell, \"Perfect\""
@@ -1441,12 +2053,6 @@
      ]
     },
     {
-     "class_id": 81,
-     "names": [
-      "Puar"
-     ]
-    },
-    {
      "class_id": 83,
      "names": [
       "Snake"
@@ -1456,12 +2062,6 @@
      "class_id": 86,
      "names": [
       "Ninja"
-     ]
-    },
-    {
-     "class_id": 89,
-     "names": [
-      "Saber-Toothed Tiger"
      ]
     },
     {
@@ -1483,26 +2083,6 @@
      ]
     },
     {
-     "class_id": 93,
-     "names": null
-    },
-    {
-     "class_id": 95,
-     "names": null
-    },
-    {
-     "class_id": 96,
-     "names": [
-      "T-Rex"
-     ]
-    },
-    {
-     "class_id": 97,
-     "names": [
-      "Triceratops"
-     ]
-    },
-    {
      "class_id": 98,
      "names": [
       "Tien"
@@ -1512,12 +2092,6 @@
      "class_id": 99,
      "names": [
       "T-Rex"
-     ]
-    },
-    {
-     "class_id": 100,
-     "names": [
-      "Triceratops"
      ]
     },
     {
@@ -1545,27 +2119,94 @@
      ]
     },
     {
-     "class_id": 105,
-     "names": [
-      "Yajirobe"
-     ]
-    },
-    {
      "class_id": 106,
      "names": [
       "Yamcha"
-     ]
-    },
-    {
-     "class_id": 108,
-     "names": [
-      "Scorpion"
      ]
     }
    ]
   },
   {
-   "description": "pounce (attack id 2 on contact)",
+   "key": "contact_damage",
+   "node": "ContactDamage 0x0801b991",
+   "attack_id": 2,
+   "type": "melee",
+   "power": 1024,
+   "scale": 1024,
+   "stat": "STR",
+   "rule": "player overlaps the enemy attack box -> hit; then no further contact hit for 48 frames (frame counter 0x03000e20)",
+   "used_by": "only ai 15 (class 94 Triceratops herd)",
+   "evidence": "VERIFIED(disasm+emu)",
+   "attack_table_entry": {
+    "id": 2,
+    "addr": "0x86db2dc",
+    "type": "melee",
+    "type_byte": 0,
+    "id_byte": 2,
+    "power": 1024
+   },
+   "used_by_classes": [
+    {
+     "class_id": 94,
+     "names": [
+      "Triceratops"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "charge",
+   "node": "Charge 0x0801c7f3",
+   "attack_id": 2,
+   "type": "melee",
+   "rule": "dash at speed px/f along the initial direction to the player; first contact hits (once); ends after passing the player by the overshoot distance",
+   "used_by": "hawks (1.5 px/f, 56 px), pterodactyls (2.0, 64)",
+   "evidence": "VERIFIED(disasm)",
+   "attack_table_entry": {
+    "id": 2,
+    "addr": "0x86db2dc",
+    "type": "melee",
+    "type_byte": 0,
+    "id_byte": 2,
+    "power": 1024
+   },
+   "used_by_classes": [
+    {
+     "class_id": 58,
+     "names": [
+      "Hawk"
+     ]
+    },
+    {
+     "class_id": 80,
+     "names": [
+      "Pterodactyl"
+     ]
+    },
+    {
+     "class_id": 88,
+     "names": [
+      "Pterodactyl"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "pounce",
+   "node": "Pounce 0x0801d255",
+   "attack_id": 2,
+   "type": "melee",
+   "rule": "leap toward the player at speed up to range px (sfx 0x81), single contact hit",
+   "used_by": "T-Rex/Triceratops King (2.0 px/f, 72 px), triceratops/warthog (1.2, 56)",
+   "evidence": "VERIFIED(disasm), timings INFERRED",
+   "attack_table_entry": {
+    "id": 2,
+    "addr": "0x86db2dc",
+    "type": "melee",
+    "type_byte": 0,
+    "id_byte": 2,
+    "power": 1024
+   },
    "used_by_classes": [
     {
      "class_id": 11,
@@ -1580,31 +2221,15 @@
      ]
     },
     {
-     "class_id": 49,
-     "names": null
-    },
-    {
      "class_id": 54,
      "names": [
       "Triceratops"
      ]
     },
     {
-     "class_id": 56,
-     "names": [
-      "Warthog"
-     ]
-    },
-    {
      "class_id": 99,
      "names": [
       "T-Rex"
-     ]
-    },
-    {
-     "class_id": 100,
-     "names": [
-      "Triceratops"
      ]
     },
     {
@@ -1622,7 +2247,499 @@
    ]
   },
   {
-   "description": "projectile volley (attack id 3, INFERRED)",
+   "key": "ki_blast",
+   "projectile": "ki_blast",
+   "attack_id": 3,
+   "stat": "POW",
+   "used_by": "fighter AIs 21/29/80/98/116/129/138/148 (ShootKiBlast)",
+   "projectile_params": {
+    "key": "ki_blast",
+    "ctor": "0x0800e8b0",
+    "vtable": "0x08024cbc",
+    "size": 84,
+    "spawned_by": "ShootKiBlast node 0x0801bc6f: anim object 0x03002224 (vtable 0x08025a70), 32-frame anim, spawn at anim frame 16 via 0x0800ead8 (pool check)",
+    "speed_px_per_frame": 3.0,
+    "velocity_table": "0x0840e554",
+    "velocity_by_facing": {
+     "down": [
+      0.0,
+      3.0
+     ],
+     "up": [
+      0.0,
+      -3.0
+     ],
+     "left": [
+      -3.0,
+      0.0
+     ],
+     "right": [
+      3.0,
+      0.0
+     ]
+    },
+    "hitbox": {
+     "w": 16,
+     "h": 16,
+     "anchor": "centred on projectile position",
+     "frame_table": "0x0840e47c"
+    },
+    "attack_id": 3,
+    "power": 1024,
+    "scale": 1024,
+    "team": "owner+0x16c (0 for enemies)",
+    "aim": "straight along shooter facing (shooter first faces the player and usually aligns via AlignWithPlayer); no homing",
+    "lifetime": "until it leaves the 240x160 camera view (0x08013c22), hits a wall (0x08005d6c) or hits a target; then 16-frame explosion (frame 0x0840e53c)",
+    "pierce": false,
+    "cancel_rules": "destroyed when overlapped by a player energy attack (onMessage 0x0800ea3b: query type 0 with attack type byte 1)",
+    "sfx": "fire: rand(2)+0x0d; hit: rand(3)+0x22",
+    "measured": {
+     "speed": 3.0,
+     "spawn_after_state_entry_frames": 16,
+     "typical_life_to_hit_at_100px": "41-48 f",
+     "evidence": "bs_watch/bs_measure (Android 17/18/19/20, Cooler, Cell Jr, Yamcha, Krillin, Tien, Tao, Cells)"
+    },
+    "evidence": "VERIFIED(disasm+emu)"
+   },
+   "attack_table_entry": {
+    "id": 3,
+    "addr": "0x86db2e4",
+    "type": "energy",
+    "type_byte": 1,
+    "id_byte": 3,
+    "power": 1024
+   },
+   "used_by_classes": [
+    {
+     "class_id": 3,
+     "names": [
+      "Android 17"
+     ]
+    },
+    {
+     "class_id": 4,
+     "names": [
+      "Android 18"
+     ]
+    },
+    {
+     "class_id": 5,
+     "names": [
+      "Android 19"
+     ]
+    },
+    {
+     "class_id": 6,
+     "names": [
+      "Android 20"
+     ]
+    },
+    {
+     "class_id": 7,
+     "names": [
+      "Android 20"
+     ]
+    },
+    {
+     "class_id": 21,
+     "names": [
+      "Cell, \"Perfect\""
+     ]
+    },
+    {
+     "class_id": 22,
+     "names": [
+      "Cell, \"Perfect\""
+     ]
+    },
+    {
+     "class_id": 23,
+     "names": [
+      "Cell, \"Perfect\""
+     ]
+    },
+    {
+     "class_id": 24,
+     "names": [
+      "Cell, \"Perfect\""
+     ]
+    },
+    {
+     "class_id": 25,
+     "names": [
+      "Cell, \"Perfect\""
+     ]
+    },
+    {
+     "class_id": 26,
+     "names": [
+      "Cell Junior"
+     ]
+    },
+    {
+     "class_id": 29,
+     "names": [
+      "Cooler"
+     ]
+    },
+    {
+     "class_id": 41,
+     "names": null
+    },
+    {
+     "class_id": 44,
+     "names": [
+      "General Tao"
+     ]
+    },
+    {
+     "class_id": 60,
+     "names": [
+      "Cell"
+     ]
+    },
+    {
+     "class_id": 64,
+     "names": [
+      "Krillin"
+     ]
+    },
+    {
+     "class_id": 76,
+     "names": [
+      "Cell, \"Nonperfect\""
+     ]
+    },
+    {
+     "class_id": 78,
+     "names": [
+      "Cell, \"Perfect\""
+     ]
+    },
+    {
+     "class_id": 79,
+     "names": [
+      "Cell, \"Perfect\""
+     ]
+    },
+    {
+     "class_id": 98,
+     "names": [
+      "Tien"
+     ]
+    },
+    {
+     "class_id": 106,
+     "names": [
+      "Yamcha"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "energy_ball",
+   "projectile": "energy_ball",
+   "attack_id": 1,
+   "stat": "POW",
+   "used_by": "ai 11 Warlord henchmen (ShootEnergyBall)",
+   "projectile_params": {
+    "key": "energy_ball",
+    "ctor": "0x080160c0",
+    "vtable": "0x08024258",
+    "size": 76,
+    "spawned_by": "ShootEnergyBall node 0x0801bb6d: anim object 0x03002218 (vtable 0x080251b4), 32-frame anim, spawn at anim frame 8 (pool >= 0x80)",
+    "speed_px_per_frame": 1.75,
+    "velocity_table": "0x086e5ba8",
+    "velocity_by_facing": {
+     "down": [
+      0.0,
+      1.75
+     ],
+     "up": [
+      0.0,
+      -1.75
+     ],
+     "left": [
+      -1.75,
+      0.0
+     ],
+     "right": [
+      1.75,
+      0.0
+     ]
+    },
+    "hitbox": {
+     "by_facing": {
+      "down": {
+       "origin_offset": [
+        8,
+        14
+       ],
+       "w": 16,
+       "h": 16
+      },
+      "up": {
+       "origin_offset": [
+        8,
+        2
+       ],
+       "w": 16,
+       "h": 16
+      },
+      "left": {
+       "origin_offset": [
+        2,
+        8
+       ],
+       "w": 16,
+       "h": 16
+      },
+      "right": {
+       "origin_offset": [
+        14,
+        8
+       ],
+       "w": 16,
+       "h": 16
+      }
+     },
+     "note": "rect = position - origin_offset, size w x h (0x08013bf4)"
+    },
+    "attack_id": 1,
+    "power": 1024,
+    "scale": 1024,
+    "team": 0,
+    "aim": "straight along facing; no homing",
+    "lifetime": "until outside the camera rect, wall hit (explodes, effect 0x08016124) or target hit (explodes)",
+    "pierce": false,
+    "cancel_rules": "destroyed by a player energy attack overlap (type 0) or by player attack ids 8 / 14 (type 2 query)",
+    "measured": {
+     "speed": 1.75,
+     "spawn_after_state_entry_frames": 8,
+     "rect": "16x16",
+     "evidence": "bs_watch class 85 henchman"
+    },
+    "evidence": "VERIFIED(disasm+emu)"
+   },
+   "attack_table_entry": {
+    "id": 1,
+    "addr": "0x86db2d4",
+    "type": "energy",
+    "type_byte": 1,
+    "id_byte": 1,
+    "power": 1024
+   },
+   "used_by_classes": [
+    {
+     "class_id": 12,
+     "names": [
+      "Warlord's Henchman"
+     ]
+    },
+    {
+     "class_id": 51,
+     "names": [
+      "Warlord's Henchman"
+     ]
+    },
+    {
+     "class_id": 85,
+     "names": [
+      "Warlord's Henchman"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "thrown_star",
+   "projectile": "thrown_star",
+   "attack_id": 1,
+   "stat": "POW",
+   "used_by": "ai 52 ninjas",
+   "projectile_params": {
+    "key": "thrown_star",
+    "ctor": "0x0801a0b0",
+    "vtable": "0x08024f0c",
+    "size": 76,
+    "spawned_by": "ThrowProjectile node 0x0801cf73: anim object 0x03002270 (vtable 0x080256d8), spawn at anim frame 8",
+    "speed_px_per_frame": 1.75,
+    "velocity_table": "0x086fe06c",
+    "velocity_by_facing": {
+     "down": [
+      0.0,
+      1.75
+     ],
+     "up": [
+      0.0,
+      -1.75
+     ],
+     "left": [
+      -1.75,
+      0.0
+     ],
+     "right": [
+      1.75,
+      0.0
+     ]
+    },
+    "hitbox": {
+     "w": 8,
+     "h": 8,
+     "origin_offset": [
+      4,
+      4
+     ],
+     "frame_table": "0x086fe048",
+     "note": "2-frame spin anim, toggles every 8 frames"
+    },
+    "attack_id": 1,
+    "power": 1024,
+    "scale": 1024,
+    "team": 0,
+    "aim": "straight along facing",
+    "lifetime": "until outside camera rect, wall (vanishes, no explosion) or target hit",
+    "pierce": false,
+    "cancel_rules": "same as energy_ball",
+    "measured": {
+     "speed": 1.75,
+     "rect": "8x8",
+     "evidence": "bs_special ninja_throw"
+    },
+    "evidence": "VERIFIED(disasm+emu)"
+   },
+   "attack_table_entry": {
+    "id": 1,
+    "addr": "0x86db2d4",
+    "type": "energy",
+    "type_byte": 1,
+    "id_byte": 1,
+    "power": 1024
+   },
+   "used_by_classes": [
+    {
+     "class_id": 75,
+     "names": [
+      "Ninja"
+     ]
+    },
+    {
+     "class_id": 86,
+     "names": [
+      "Ninja"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "lob_rock",
+   "projectile": "lob_rock",
+   "attack_id": 1,
+   "stat": "POW",
+   "used_by": "ai 45 tiger bandits",
+   "projectile_params": {
+    "key": "lob_rock",
+    "ctor": "0x0801ccc8",
+    "vtable": "0x08024204",
+    "size": 84,
+    "spawned_by": "LobProjectile node 0x0801cca9 (anim 0x0300226c/0x08024bxx): 32-frame anim, spawn at anim frame 16 at self + offset table 0x086ff8a8[facing]",
+    "ballistics": "ground velocity = (player centre - self centre) along the facing axis only (other axis zeroed) * 0x71d >> 8 (1/256 px per frame) -> lands near the player after ~35 frames; height z starts at 8 px with vz 2 px/f, gravity 0x20/256 px/f^2 (0x0801cdfc)",
+    "hitbox": {
+     "w": 16,
+     "h": 16,
+     "note": "rect of the rock at landing"
+    },
+    "attack_id": 1,
+    "power": 1024,
+    "scale": 1024,
+    "team": 2,
+    "aim": "targets the player position at throw time along the facing axis",
+    "lifetime": "until landing (z<0): broadcasts one hit (team 2: also hurts enemies), explosion + 4 debris (0x0801cd32)",
+    "pierce": false,
+    "measured": {
+     "airtime_frames": 35,
+     "ground_speed_px_per_frame": "1.95-2.9 (accelerating as drawn; includes height)",
+     "evidence": "bs_watch class 9 tiger bandit at 70 px"
+    },
+    "evidence": "VERIFIED(disasm+emu)"
+   },
+   "attack_table_entry": {
+    "id": 1,
+    "addr": "0x86db2d4",
+    "type": "energy",
+    "type_byte": 1,
+    "id_byte": 1,
+    "power": 1024
+   },
+   "used_by_classes": [
+    {
+     "class_id": 9,
+     "names": [
+      "Tiger Bandit"
+     ]
+    },
+    {
+     "class_id": 10,
+     "names": [
+      "Tiger Bandit"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "laser",
+   "projectile": "laser",
+   "attack_id": 3,
+   "stat": "POW",
+   "used_by": "ai 106 ladybug robots",
+   "projectile_params": {
+    "key": "laser",
+    "ctor": "0x0801e224",
+    "vtable": "0x08024e5c",
+    "size": 56,
+    "spawned_by": "LaserBeam node 0x0801e145 (param = max length px)",
+    "growth_px_per_frame": 8,
+    "max_length": "node param (64 for ladybugs)",
+    "muzzle_offsets": {
+     "down": [
+      0,
+      8
+     ],
+     "up": [
+      0,
+      -8
+     ],
+     "left": [
+      -8,
+      0
+     ],
+     "right": [
+      8,
+      0
+     ]
+    },
+    "hitbox": "segment from muzzle to tip widened by 4 px each side",
+    "attack_id": 3,
+    "power": 1024,
+    "scale": 1024,
+    "team": 0,
+    "hits": "at most one hit per laser (+0x12 flag)",
+    "lifetime": "60-frame anim then retracts 8 px/f; object ~68 frames",
+    "pierce": true,
+    "measured": {
+     "hit_after_start_frames": "2-5",
+     "lifetime": 68,
+     "evidence": "bs_special ladybug_laser"
+    },
+    "evidence": "VERIFIED(disasm+emu)"
+   },
+   "attack_table_entry": {
+    "id": 3,
+    "addr": "0x86db2e4",
+    "type": "energy",
+    "type_byte": 1,
+    "id_byte": 3,
+    "power": 1024
+   },
    "used_by_classes": [
     {
      "class_id": 65,
@@ -1645,39 +2762,244 @@
    ]
   },
   {
-   "description": "thrown projectile (attack id 1, INFERRED)",
+   "key": "beam",
+   "projectile": "boss_beam",
+   "attack_id": 10,
+   "stat": "POW",
+   "used_by": "Cell Nonperfect/Perfect (states 120/142), General Tao (131)",
+   "projectile_params": {
+    "key": "boss_beam",
+    "ctor": "0x080143a8",
+    "vtable": "0x08024acc",
+    "spawned_by": "BeamAttack 0x0801e77b (Cell Nonperfect data 0x08704788 / Perfect 0x087047d4) and BeamAttackTao 0x0801e5c1 (data 0x08703914)",
+    "note": "the player Kamehameha beam class reused (see moves.json Kamehameha): head grows 3 px/f, 16x16 box at the head broadcast every frame",
+    "attack_id": 10,
+    "power": 64,
+    "scale": 12288,
+    "team": 0,
+    "duration_frames": 90,
+    "effective_hit_rate": "once per player invulnerability window (measured every 32 frames)",
+    "measured": {
+     "cell_nonperfect_dmg_on_END53": "24-36 per hit (formula with S=POW 41, power 64, scale 12288 predicts 24-36)",
+     "tao_dmg_on_END53": "48-60",
+     "interval_frames": 32,
+     "evidence": "bs_special cellnp_beam / tao_special"
+    },
+    "evidence": "VERIFIED(disasm+emu)"
+   },
+   "attack_table_entry": {
+    "id": 10,
+    "addr": "0x86db31c",
+    "type": "energy",
+    "type_byte": 1,
+    "id_byte": 10,
+    "power": 64
+   },
    "used_by_classes": [
     {
-     "class_id": 45,
+     "class_id": 21,
      "names": [
-      "Ninja"
+      "Cell, \"Perfect\""
      ]
     },
     {
-     "class_id": 75,
+     "class_id": 22,
      "names": [
-      "Ninja"
+      "Cell, \"Perfect\""
      ]
     },
     {
-     "class_id": 86,
+     "class_id": 23,
      "names": [
-      "Ninja"
+      "Cell, \"Perfect\""
+     ]
+    },
+    {
+     "class_id": 24,
+     "names": [
+      "Cell, \"Perfect\""
+     ]
+    },
+    {
+     "class_id": 25,
+     "names": [
+      "Cell, \"Perfect\""
+     ]
+    },
+    {
+     "class_id": 44,
+     "names": [
+      "General Tao"
+     ]
+    },
+    {
+     "class_id": 76,
+     "names": [
+      "Cell, \"Nonperfect\""
+     ]
+    },
+    {
+     "class_id": 78,
+     "names": [
+      "Cell, \"Perfect\""
+     ]
+    },
+    {
+     "class_id": 79,
+     "names": [
+      "Cell, \"Perfect\""
      ]
     }
    ]
   },
   {
-   "description": "touch damage (attack id 2; 48f cooldown)",
+   "key": "spray",
+   "projectile": "spray_particle",
+   "attack_id": 3,
+   "stat": "POW",
+   "used_by": "Destroyer robots (state 94)",
+   "projectile_params": {
+    "key": "spray_particle",
+    "ctor": "0x0801dcfc",
+    "vtable": "0x080250a8",
+    "size": 88,
+    "spawned_by": "SprayAttack 0x0801dcdb (Destroyer): 1 particle per frame from anim frame 4 to 127 (pool >= 0x500 and < 124 live)",
+    "speed_px_per_frame": 2.0,
+    "velocity_table": "0x08703250",
+    "velocity_by_facing": {
+     "down": [
+      0.0,
+      2.0
+     ],
+     "up": [
+      0.0,
+      -2.0
+     ],
+     "left": [
+      -2.0,
+      0.0
+     ],
+     "right": [
+      2.0,
+      0.0
+     ]
+    },
+    "jitter": "+-(rand(192)-96)/256 px/f on both axes",
+    "mouth_offsets": {
+     "down": [
+      40,
+      16
+     ],
+     "up": [
+      8,
+      -48
+     ],
+     "left": [
+      -16,
+      -12
+     ],
+     "right": [
+      64,
+      -12
+     ]
+    },
+    "hitbox": {
+     "w": 16,
+     "h": 16,
+     "anchor": "centred"
+    },
+    "lifetime_frames": 20,
+    "attack_id": 3,
+    "power": 1024,
+    "scale": 51,
+    "team": "direct to player",
+    "hits": "once per particle; applied directly: no hitstun, no player i-frames",
+    "measured": {
+     "damage_per_particle_on_END53": 2,
+     "hits_per_frame": "~0.5-1",
+     "evidence": "bs_special destroyer_spray"
+    },
+    "evidence": "VERIFIED(disasm+emu)"
+   },
+   "attack_table_entry": {
+    "id": 3,
+    "addr": "0x86db2e4",
+    "type": "energy",
+    "type_byte": 1,
+    "id_byte": 3,
+    "power": 1024
+   },
    "used_by_classes": [
     {
-     "class_id": 94,
+     "class_id": 31,
      "names": [
-      "Triceratops"
+      "Destroyer"
+     ]
+    },
+    {
+     "class_id": 32,
+     "names": [
+      "Destroyer"
+     ]
+    },
+    {
+     "class_id": 33,
+     "names": [
+      "Destroyer"
      ]
     }
    ]
+  },
+  {
+   "key": "drain_grab",
+   "node": "DrainGrab 0x0801dbb3",
+   "attack_id": 2,
+   "type": "melee",
+   "stat": "STR",
+   "rule": "player held 240 frames (mash A: -16 extra frames per press); hit at frame 8 (scale 256) then every 16 f (scale 128); Cell heals by damage dealt",
+   "used_by": "Cell imperfect (state 89), Cell Nonperfect (state 127)",
+   "evidence": "VERIFIED(disasm+emu)",
+   "attack_table_entry": {
+    "id": 2,
+    "addr": "0x86db2dc",
+    "type": "melee",
+    "type_byte": 0,
+    "id_byte": 2,
+    "power": 1024
+   },
+   "used_by_classes": [
+    {
+     "class_id": 60,
+     "names": [
+      "Cell"
+     ]
+    },
+    {
+     "class_id": 76,
+     "names": [
+      "Cell, \"Nonperfect\""
+     ]
+    }
+   ]
+  },
+  {
+   "key": "self_destruct",
+   "node": "SelfDestructBurst 0x0801ca43",
+   "attack_id": 3,
+   "team": 2,
+   "rule": "Eggbot death: flash, 40-frame pose, 32x32 burst (team 2) then explode",
+   "used_by": "Eggbots (death node 0x086d5694)",
+   "evidence": "VERIFIED(disasm)",
+   "attack_table_entry": {
+    "id": 3,
+    "addr": "0x86db2e4",
+    "type": "energy",
+    "type_byte": 1,
+    "id_byte": 3,
+    "power": 1024
+   },
+   "used_by_classes": []
   }
  ],
- "enemy_attacks_note": "Enemies use attack table 0x086db2cc ids 1 (energy 1024), 2 (melee 1024), 3 (energy 1024); damage to the player uses the shared formula 0x0800f910 with S = enemy STR (melee) or POW (energy) and the player END/multipliers."
+ "enemy_attacks_note": "Enemies use attack table 0x086db2cc ids 1 (energy 1024), 2 (melee 1024), 3 (energy 1024); damage to the player uses the shared formula 0x0800f910 with S = enemy STR (melee) or POW (energy) and the player END/multipliers. Touching an enemy does NOT hurt the player except: class 94 triceratops (ContactDamage, 48-frame cooldown) and enemies in a Charge/Pounce dash. All other melee damage comes from MeleeStrike (instant hit on the first frame of the strike state; box = own hurt rect extended 3-4 px toward the player) or the Cell drain grab. VERIFIED: snake at 14 px only damaged the player on strike-state entry frames."
 }

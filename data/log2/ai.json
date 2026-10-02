@@ -227,12 +227,12 @@
   },
   {
    "fn": "0x801e145",
-   "name": "ProjectileVolley",
+   "name": "LaserBeam",
    "params": [
     "p"
    ],
-   "semantics": "Boss/flyer special: spawns projectiles (0x0801e2a0/0x0801e224, gfx data 0x08703294); attack id 3 (energy 1024).",
-   "evidence": "INFERRED"
+   "semantics": "Faces player, plays a 60-frame anim (0x080249a8) and creates a laser object (ctor 0x0801e224, vtable 0x08024e5c): from the muzzle (offset table 0x08703294+0xc by facing) the beam grows 8 px/frame up to param px, the hit area is the segment origin->tip widened +-4 px, it hits at most once, attack id 3 (energy 1024, scale 1024, team 0); after 60 frames it retracts 8 px/frame. Ladybug robots, param 64.",
+   "evidence": "VERIFIED(disasm+emu: hit 2-5 f after start, object lifetime 68 f)"
   },
   {
    "fn": "0x801a7df",
@@ -337,9 +337,9 @@
   },
   {
    "fn": "0x801ca43",
-   "name": "FireKiBlast",
+   "name": "SelfDestructBurst",
    "params": [],
-   "semantics": "Spawns a straight projectile (0x080135e0, gfx 0x086e1590) with attack id 3 (energy 1024) toward facing; sfx.",
+   "semantics": "Eggbot death node: spawns an explosion effect (0x080135e0, gfx 0x086e1590) and broadcasts one hit with rect = own centre +-16 px (32x32), team 2 (hurts player AND enemies), attack id 3 (energy 1024, scale 1024); sfx.",
    "evidence": "VERIFIED(disasm)"
   },
   {
@@ -362,8 +362,8 @@
    "fn": "0x801cf73",
    "name": "ThrowProjectile",
    "params": [],
-   "semantics": "Faces player; anim object 0x03002270: at frame 8 spawns projectile 0x0801a0b0 (attack id 1 INFERRED). Used by Ninjas.",
-   "evidence": "INFERRED"
+   "semantics": "Faces player; anim object 0x03002270 (vtable 0x080256d8): at frame 8 spawns thrown-star projectile 0x0801a0b0 (vtable 0x08024f0c; attack id 1 energy 1024, 1.75 px/f, 8x8). Used by Ninjas.",
+   "evidence": "VERIFIED(disasm+emu)"
   },
   {
    "fn": "0x801c82d",
@@ -381,39 +381,39 @@
   },
   {
    "fn": "0x801dbb3",
-   "name": "BossSpecialMelee",
+   "name": "DrainGrab",
    "params": [
     "raw"
    ],
-   "semantics": "Boss special melee (data 0x08701e1c, attack id 2). Used by Cell forms / fighters (states 89,127).",
-   "evidence": "INFERRED"
+   "semantics": "Cell drain grab (data 0x08701e1c). Enter: if a player exists, the player gets anim object 0x0300227c (vtable 0x080251e0: held 240 frames; each new A press subtracts 16 extra frames) and Cell gets 0x03002280 (vtable 0x08024bb4): at frame 8 one hit (attack id 2 melee, scale 256 = 1/4), then every 16 frames a hit with scale 128 (1/8); hits are applied directly (0x0800f910 + player vtable+0x40) and Cell heals by the damage dealt (vtable+0x3c). No range check in the node. Ends when the player is released (+8-frame wind-down). Used in states 89 (Cell) and 127 (Cell Nonperfect).",
+   "evidence": "VERIFIED(disasm+emu: hold 240 f, 8 then 4 dmg every 16 f; first hit crit 17)"
   },
   {
    "fn": "0x801dcdb",
-   "name": "BossSpecialDirect",
+   "name": "SprayAttack",
    "params": [
     "raw"
    ],
-   "semantics": "Boss special that calls the damage function 0x0800f910 directly (data 0x08701e4c; attack id 3). Used by Destroyer robots (state 94).",
-   "evidence": "INFERRED"
+   "semantics": "Destroyer energy spray (data 0x08701e4c): faces player, 128-frame anim 0x03002288 (vtable 0x080254c4, sfx 0xBD); from frame 4 one particle per frame (ctor 0x0801dcfc, vtable 0x080250a8, pool permitting) at the mouth offset (table 0x08701e28+4 by facing), velocity 2 px/f along facing +-0.375 px/f random jitter on both axes, life 20 frames, 16x16 hit box; each particle hits the player once with attack id 3 at scale 51 (~1/20) applied directly (no hitstun, no i-frames).",
+   "evidence": "VERIFIED(disasm+emu: 2-4 dmg every 1-2 frames, no player hit anim)"
   },
   {
    "fn": "0x801e5c1",
-   "name": "BossSpecialProjectile",
+   "name": "BeamAttackTao",
    "params": [
     "raw"
    ],
-   "semantics": "Boss special projectile (data 0x08703914; attack id 3). Used by General Tao (state 131).",
-   "evidence": "INFERRED"
+   "semantics": "General Tao beam (data 0x08703914): 90-frame anim; spawns the player beam class (ctor 0x080143a8, vtable 0x08024acc; offset table 0x087038d0) with scale 0x3000 (12x), attack id 10 (energy power 0x40) per frame; the player is hit once per invulnerability window.",
+   "evidence": "VERIFIED(disasm+emu: hits every 32 f, 48-60 dmg on END 53)"
   },
   {
    "fn": "0x801e77b",
-   "name": "BossBeam",
+   "name": "BeamAttack",
    "params": [
     "raw"
    ],
-   "semantics": "Boss special projectile/beam (gfx 0x086e3458/0x086e35d8). Used by Cell Nonperfect/Perfect (states 120,142).",
-   "evidence": "INFERRED"
+   "semantics": "Cell beam (data 0x08704788 Nonperfect / 0x087047d4 Perfect): same as BeamAttackTao (player beam class 0x080143a8, scale 0x3000, attack id 10 power 0x40, 90-frame anim).",
+   "evidence": "VERIFIED(disasm+emu: Cell NP hits every 32 f, 24-36 dmg = formula S=POW 41, power 64, scale 12288)"
   },
   {
    "fn1": "0x801a6e1",
@@ -2996,7 +2996,7 @@
      },
      {
       "addr": "0x86ff894",
-      "type": "FireKiBlast"
+      "type": "SelfDestructBurst"
      },
      {
       "addr": "0x86d2b5c",
@@ -3019,7 +3019,7 @@
     "Sequence() @0x86d2b7c",
     "  HitFlash() @0x86ff484",
     "  WaitPose(frames=40) @0x86d2b4c",
-    "  FireKiBlast() @0x86ff894",
+    "  SelfDestructBurst() @0x86ff894",
     "  PlaySound(param=20) @0x86d2b5c",
     "  DeathExplode(data=0x8, param=134329919) @0x86d2b6c",
     "-- on hit:",
@@ -5737,7 +5737,7 @@
     "children": [
      {
       "addr": "0x8701e1c",
-      "type": "BossSpecialMelee",
+      "type": "DrainGrab",
       "data": "0x30026bc"
      },
      {
@@ -5753,7 +5753,7 @@
    },
    "text": [
     "Sequence() @0x86d3b44",
-    "  BossSpecialMelee(data=0x30026bc) @0x8701e1c",
+    "  DrainGrab(data=0x30026bc) @0x8701e1c",
     "  GotoState(state=90) @0x86d3b04",
     "-- on hit:",
     "  ClassDefaultState() @0x86ff4c4"
@@ -6001,7 +6001,7 @@
     "children": [
      {
       "addr": "0x8701e4c",
-      "type": "BossSpecialDirect",
+      "type": "SprayAttack",
       "data": "0x0"
      },
      {
@@ -6022,7 +6022,7 @@
    },
    "text": [
     "Sequence() @0x86d3cb0",
-    "  BossSpecialDirect(data=0x0) @0x8701e4c",
+    "  SprayAttack(data=0x0) @0x8701e4c",
     "  Wait(frames=16) @0x86d20e8",
     "  GotoState(state=92) @0x86d3bac",
     "-- on hit:",
@@ -7003,7 +7003,7 @@
     "children": [
      {
       "addr": "0x86d4250",
-      "type": "ProjectileVolley",
+      "type": "LaserBeam",
       "param": 64
      },
      {
@@ -7047,7 +7047,7 @@
    },
    "text": [
     "Sequence() @0x86d429c",
-    "  ProjectileVolley(param=64) @0x86d4250",
+    "  LaserBeam(param=64) @0x86d4250",
     "  FlyerAnimB() @0x86ff5a8",
     "  Wait(frames=30) @0x86d1fc4",
     "  RaceFirst() @0x86d4284",
@@ -7728,7 +7728,7 @@
     "children": [
      {
       "addr": "0x8704788",
-      "type": "BossBeam",
+      "type": "BeamAttack",
       "data": "0xfffffff8"
      },
      {
@@ -7763,7 +7763,7 @@
    },
    "text": [
     "Sequence() @0x86d4670",
-    "  BossBeam(data=0xfffffff8) @0x8704788",
+    "  BeamAttack(data=0xfffffff8) @0x8704788",
     "  RaceFirst() @0x86d4640",
     "    Chance(p_65536=16384, percent_per_frame=25.0) @0x86d462c",
     "      GotoState(state=117) @0x86d4514",
@@ -8219,7 +8219,7 @@
     "children": [
      {
       "addr": "0x8701e1c",
-      "type": "BossSpecialMelee",
+      "type": "DrainGrab",
       "data": "0x30026bc"
      },
      {
@@ -8235,7 +8235,7 @@
    },
    "text": [
     "Sequence() @0x86d4944",
-    "  BossSpecialMelee(data=0x30026bc) @0x8701e1c",
+    "  DrainGrab(data=0x30026bc) @0x8701e1c",
     "  GotoState(state=128) @0x86d4904",
     "-- on hit:",
     "  ClassDefaultState() @0x86ff4c4"
@@ -8431,7 +8431,7 @@
     "children": [
      {
       "addr": "0x8703914",
-      "type": "BossSpecialProjectile",
+      "type": "BeamAttackTao",
       "data": "0x0"
      },
      {
@@ -8466,7 +8466,7 @@
    },
    "text": [
     "Sequence() @0x86d4ab8",
-    "  BossSpecialProjectile(data=0x0) @0x8703914",
+    "  BeamAttackTao(data=0x0) @0x8703914",
     "  RaceFirst() @0x86d4aa0",
     "    Chance(p_65536=16384, percent_per_frame=25.0) @0x86d4a8c",
     "      GotoState(state=130) @0x86d4994",
@@ -9145,7 +9145,7 @@
     "children": [
      {
       "addr": "0x87047d4",
-      "type": "BossBeam",
+      "type": "BeamAttack",
       "data": "0x18"
      },
      {
@@ -9180,7 +9180,7 @@
    },
    "text": [
     "Sequence() @0x86d4e80",
-    "  BossBeam(data=0x18) @0x87047d4",
+    "  BeamAttack(data=0x18) @0x87047d4",
     "  RaceFirst() @0x86d4e50",
     "    Chance(p_65536=16384, percent_per_frame=25.0) @0x86d4e3c",
     "      GotoState(state=139) @0x86d4d34",

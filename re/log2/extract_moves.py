@@ -6,6 +6,7 @@ Behavioural constants are embedded with the ROM address of the instruction that 
 """
 import json, os, re, struct
 from common import ROM, u8, u16, u32, s32, ROOT, dis
+import pl_attacks
 
 ATK = 0x086DB2CC
 MOVETYPES = 0x081D9900
@@ -158,6 +159,9 @@ def build():
                             note='target hurtbox = actor descriptor rect, overlap test x0<hx1 && hx0<x1 && y0<hy1 && hy0<y1'),
         'special_melee': SPECIAL_MELEE,
         'player_states': {hex(k): v for k, v in sorted(STATES.items())},
+        'player_attacks_doc': pl_attacks.__doc__,
+        'player_attacks': pl_attacks.build(),
+        'measurements_file': 're/log2/pl_measurements.json (raw per-run measurements; regenerate with pl_measure_all.py + pl_measure_compact.py)',
         'enemy_attacks': [],
     }
 

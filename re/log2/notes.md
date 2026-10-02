@@ -226,10 +226,23 @@ Record *i* at `0x03000E9C + 28*i` (pointer to 0x03000E90 lives at ROM 0x083B5354
 
 Initial records: ROM 0x081D9548 (6×28 B, DMA'd by 0x08003C24 on new game). At start only flag
 0x40 (slot 3 = basic energy blast) is set; everything else is unlocked by story scripts.
-Unlock script opcodes (VM opcode table 0x083B5D28, interpreter 0x080092E4; opcode numbering =
-table index, INFERRED): 0x4F set bit0, 0x5B clear bit0, 0x50 set bit1, 0x51 clear bit1,
-0x52 set bit5 (slot 2 = transformation), **0x53 `learn(char, n)` sets bit (4<<n)**
-(n=0 special melee, n=1..4 slots 0..3) — handlers 0x0800A9B6..0x0800AA7C (DISASM).
+Unlock script builtins (event-script VM 0x080092E4; `02 xx` = call builtin xx from table 0x083B5D28;
+args pushed with `1D n v1..vn` zigzag varints): 0x4F set bit0, 0x5B clear bit0, 0x50 set bit1, 0x51 clear
+bit1, 0x52 unlockTransform (bit5 = slot 2), **0x53 `learn(char, n)` sets bit (4<<n)** (n=0 special melee,
+n=1..4 slots 0..3) — handlers 0x0800A9B6..0x0800AA7C (DISASM). No level-based unlocks exist.
+Learn calls found in the script data (`pl_unlocks.py`; `characters.json → move_unlocks`; located by
+nearby dialogue, DISASM):
+
+| script addr | unlock | context |
+|---|---|---|
+| 0x083B8637 / 0x083B868F | Gohan Masenko Ball, Piccolo Special Beam Cannon | "Three years later..." (start of Gohan's chapter) |
+| 0x083CE4CB / 60B / 75B (dup 0x083E34B3..) | Gohan Super Kick, Piccolo Spin Punch, Vegeta Two-Handed Smash | "X now has the ... Technique!" |
+| 0x083D1FD7 / FDD | Vegeta transform + Big Bang | "You are now playing as Vegeta." |
+| 0x083DB64D / 653 | Gohan transform + Kamehameha | "GOKU: Hey, look who I brought home for dinner!" |
+| 0x083DBC46..C5E | Goku transform, Flurry Punch, Kamehameha, Spirit Bomb | "Okay, here goes... / That should do it!" |
+| 0x083DDF1F / F25 | Trunks Sword Blast, Vegeta Energy Punch | journal update / "Vegeta has achieved Level %d!" |
+| 0x083DF2DB..2E7 | Trunks transform, Cross Slash, Burning Attack | Trunks joins |
+| 0x083E0D6D / D75 | Piccolo Scatter Shot + power-up (slot 2) | "I must go." / journal update |
 The debug Map Test (0x08005C0A) sets bits 0,1,2,3,4,5 for chars 0-4 and sets every char's exp to Lv40.
 
 #### Player entity (EWRAM object, pointer at `0x03001FA8`) — VERIFIED unless noted
@@ -369,7 +382,9 @@ Per move (all VERIFIED with `pl_battery.py`; constants DISASM with addresses):
   until it touches a target/wall/screen edge; every frame a 16×16 box at the head is hit with
   attack id 10 (0x40) / 11 (0x66). EP drains through a fractional accumulator: Kamehameha +0x56/256 per
   frame (≈1 EP/3 f), SBC +0x22/256 (≈1 EP/7.5 f). Ends on release or EP 0. Measured ~10 and ~12
-  damage per frame-hit at POW 65/55 vs END 3. SBC "passes through enemies" per its description (INFERRED).
+  damage per frame-hit at POW 65/55 vs END 3. Kamehameha only damages through its 16×16 head and stops at the
+  first enemy; SBC is one 12-px-thick rect from the muzzle to the tip that keeps growing and hits **every**
+  enemy inside it every frame (pierce VERIFIED with two enemies, `sbc_r_2`).
 * **Scatter Shot (0x2C)**: at counter 16 spawns 3 pellets (class vt 0x08024D14, ctor 0x080137C4)
   from table 0x086E362C (per facing 3×24 B: dx, dy, vx, vy (24.8), param, anim): centre 3.0 px/f
   straight, sides (2.6, ±1.5) px/f. Each pellet attack id 6 (0x500). State lasts 48 f.
@@ -488,11 +503,44 @@ Level-up: 0x08003CA0 (stat += min·n + rand((max−min+1)·n), cap 100; maxHP ×
 maxEP +2..4 per level; full heal). Max level 50; exp table 0x081D9834.
 
 ---------------------------------------------------------------------------------------------------
+### 9. Per-attack simulator data (VERIFIED unless noted) — `moves.json → player_attacks`
+Measured with `pl_measure.py` / `pl_measure_all.py` (45 runs; raw → `re/log2/pl_measurements.json` via
+`pl_measure_compact.py`): Lv40 characters on map 12 against class-53 snakes pinned at chosen offsets; every
+damage call is captured by single-stepping into 0x0800F910 (hit-message rect = msg base+4, base = r1−0x14).
+Coordinates relative to the player's integer position, facing right unless noted; f0 = press frame.
+
+| attack | startup → first hit/spawn | hitbox / projectile | speed | hits | pierce | EP | vulnerable |
+|---|---|---|---|---|---|---|---|
+| Punch | 0 (press frame); 16 f anim | rect per facing (R: 16,−24,24,8; D: 0,0,16,16; U: 0,−24,16,0; L: −8,−24,0,8) | — | 1 | all in rect | — | yes |
+| Special melee | release ≥32 f after press; hits at release+~11/+15 (Goku), 4 hits every 4 f (Piccolo) | rect table 0x083B5208 (same geometry as punch) moving with a 1 px/f lunge | lunge 1 px/f | 2 (4 Piccolo) | all in rect | — | charging yes, release **no** (+0x168=0) |
+| Energy blast | shot at +8 f, refire every 16 f | 16×16, spawns (18,−8) R / (8,0) D | 3.0 | 1 | no (stops, 15-f impact) | 2 per shot | yes |
+| Masenko | flies on release, explodes 36 f later | 8×8 ball, 16×16 blast | C/256 px/f horizontal, arc | 1 per enemy in blast | blast hits all overlapping | 4 | yes |
+| Kamehameha | 24-f charge, first hit +26 f | 16×16 head, grows 3 px/f until contact | — | every frame | no | 2 + 86/256 per f | yes |
+| SBC | 24-f charge, first hit +25 f | 12-px-thick rect muzzle→tip (starts (26,−14)), tip +3 px/f | — | every frame | **yes** | 2 + 34/256 per f | yes |
+| Scatter Shot | pellets at +16 f, state 48 f | 3×16×16 from table 0x086E362C | 3.0 centre, (2.6,±1.5) sides | up to 3 | no | 12 | yes |
+| Big Bang | on release | ball 8→16→32 px while charging; probe 24×24; blast 64×64 (ball ±32), 16 f | 2.0 (+16 px jump) | 1 per enemy in blast | blast | 10 + 1/4 f held | yes |
+| Energy Punch | 0 | punch rects | — | 1 | — | 4 | yes |
+| Burning Attack | on release | 8×8 held → 32×32 flying | 2.5 (+10 px jump) | 1 | no | 6 | yes |
+| Sword Blast | swing 0 (16×24 rect (16,−16,32,8)), wave +8 f | wave 8×16 (16×8 vertical) | 3.5 | 1+1 | no | 5 | yes |
+| Spirit Bomb | throw 8 f after release | bomb 8→16→32 px; blast = bomb box ×3 (24×24 small, 48×48 at size≥64) | 1.0 | 1 per enemy in blast | blast | 10 + 1/4 f held | yes |
+| Hercule special | 0 | whole map (0,0,2048,2048), power 0 | — | all enemies | — | 6 | yes |
+
+* **Stuns sent**: attack id 15 (power 0) — Hercule special always, Spirit Bomb only when size ≥ 128
+  (0x08016726) — puts enemies into stun state @0x03002230 for **324 frames** (snakes; VERIFIED
+  `spirit_stun_long`). Attack id 9 (Burning Attack) produced only the normal hurt reaction on the snake
+  (a special stun, if any, is enemy-class specific — Part C). msg 0x13 is broadcast at the Spirit Bomb throw.
+* **Knockback given** (measured on a free snake, enemy-side reaction): every damaging hit puts the enemy in
+  the generic hurt state (@0x03002128) for ~31 f and pushes it away from the player: punch 16.5 px,
+  blast 7.6 px, Burning Attack 14.5 px; Kamehameha keeps it pinned/pushed (20 px over 95 f).
+* **Recovery**: projectile moves keep the player locked in the move state until it ends (blast 24 f,
+  Scatter 48 f, Masenko/Big Bang/Burning 32 f after release, Sword Blast 33 f); beams end the frame B is
+  released.
+
 ### Open gaps
-* Exact effect of attack ids 9/15 and msg 0x13 on enemies (stun duration) — enemy side.
-* SBC piercing not tested with two targets; beam max length is "until screen edge" (not a constant).
+* Exact AI reaction to attack id 9 and msg 0x13 per enemy class (enemy side, Part C).
+* Beam maximum length is "until screen edge/wall" (no constant cap found).
 * Form aux graphics ids (+0x02/+0x03) and the meaning of record flag bit1 not decoded.
-* Which story scripts issue the learn opcodes (needs the script decoder).
+* Map/event that owns each learn script is identified only by nearby dialogue.
 * Idle state 0x0E (after 1024 frames) contents not examined.
 
 
@@ -701,8 +749,9 @@ Enemy update (vtable slot 2, `0x0800e5a4`): base movement/animation (`0x0800772a
 Enemy onMessage (slot 9, `0x0800e5b8`): message 0 = attack query from the player side: if hit packet team byte
 is 1 (player) or 2 (everyone), entity+0x168 != 0 and the packet rect overlaps the enemy hurt rect →
 damage calc `0x0800f910` → AI on-hit dispatch `0x0801ab2a`. Message 0x14 = scouter scan. (team byte 0 =
-hostile-to-player attacks: enemy MeleeStrike/ContactDamage send team 0 directly to the player; enemy
-FireKiBlast uses team 2 so it can also hit other enemies — INFERRED from the packet byte.)
+hostile-to-player attacks: enemy MeleeStrike/ContactDamage and enemy projectiles use team 0 (projectiles copy
+owner+0x16c, which is 0 for enemies); the Eggbot SelfDestructBurst and the lobbed rock explicitly use team 2 and so
+also hurt other enemies — VERIFIED(disasm).)
 takeHit (slot 14, `0x0800e485`): `HP -= hit.damage`; if HP <= 0 → HP = 0, call class death node fn2.
 
 ### 4. AI engine — VERIFIED(disasm), behaviour VERIFIED in emulator for wolf/snake
@@ -742,10 +791,10 @@ Attacks: **MeleeStrike** `0x0801be8b` [anim variants] (instant hit on enter: box
 player, attack id 2, sfx rand(3)+0x22, anim 6+rand(n), done when anim ends), **ContactDamage** `0x0801b991`
 (touch, 48-frame cooldown, id 2), **Charge** `0x0801c7f3` [spd, overshoot px] (dash, contact id 2),
 **Pounce** `0x0801d255` [spd, range], **ShootEnergyBall** `0x0801bb6d` (32f anim, projectile at frame 8, id 1),
-**ShootKiBlast** `0x0801bc6f` (32f anim, projectile at frame 16, id 3), **FireKiBlast** `0x0801ca43`,
-**LobProjectile** `0x0801cca9` (arcing, gravity 0x20/frame², id 1), **ThrowProjectile** `0x0801cf73` (ninja, INFERRED id 1),
-**ProjectileVolley** `0x0801e145` (ladybug robots), boss specials `0x0801dbb3`, `0x0801dcdb`, `0x0801e5c1`,
-`0x0801e77b` (INFERRED semantics).
+**ShootKiBlast** `0x0801bc6f` (32f anim, projectile at frame 16, id 3), **SelfDestructBurst** `0x0801ca43`,
+**LobProjectile** `0x0801cca9` (arcing, gravity 0x20/frame², id 1), **ThrowProjectile** `0x0801cf73` (ninja, id 1),
+**LaserBeam** `0x0801e145` (ladybug robots), boss specials **DrainGrab** `0x0801dbb3`, **SprayAttack** `0x0801dcdb`,
+**BeamAttackTao** `0x0801e5c1`, **BeamAttack** `0x0801e77b` (all decoded in §13–§14).
 Reactions / visuals: **Knockback** `0x0801a947` [p], **KnockbackInvulnerable** `0x0801acb7` [p], **FacePlayer**
 `0x0801c0d7`, **SetIdleAnim** `0x0801c085`, **HitFlash** `0x0801bca9`, **StunAnim** `0x0801bcf1`,
 **ClearAnim** `0x0801bd17`, **GlowFlash** `0x0801c5a3`, **Succeed** `0x0801bb89`, **Nop** `0x0801a825`.
@@ -796,20 +845,20 @@ damage, melee did normal damage (−82) and caused knockback.
 * **ai 52 "ninja"**: within 60 → like 45 but align 0.9 px/f, special = ThrowProjectile, rush 1.2 px/f.
 * **ai 32/38 "flyers"** (hawks / pterodactyls): hop/fly anim, seen 48/72 → circle (face, 3 %/f) and Charge
   1.5 px/f (56 px overshoot) / 2.0 px/f (64 px); flee at < 40/48 px; chase 1.0 when > 88 px.
-* **ai 106 "ladybug robot"**: seen 60 → align 0.7, ProjectileVolley (param 64), flee/hover 0.7.
+* **ai 106 "ladybug robot"**: seen 60 → align 0.7, LaserBeam (max 64 px), flee/hover 0.7.
 * **ai 149 "alligator"**: seen 72 → chase 0.7, melee (box B) 10 %/f.
-* **ai 91 "Destroyer robot"**: within 88 → special (0x08701e4c, INFERRED energy attack) / mid-range align &
+* **ai 91 "Destroyer robot"**: within 88 → SprayAttack (0x08701e4c, 128-frame particle spray) / mid-range align &
   5 %/f special, close melee (0.4–0.8 px/f approach).
 * **ai 21 "fighter"** (Android 17/18, Cell Jr, Cooler, Yamcha) and **ai 29** (Android 19/20 = ai 21 + absorb):
   within 88 → melee mode (24/25: approach 0.5→1.0 px/f, 4 %/f or 50 %/f in range → state 26: MeleeStrike (3 anim
   variants) then 25 % repeat combo / 25 % → 28 / else 27 back-off); beyond 72 px → ranged mode (22: align 0.5,
   5 %/f → 23 ShootKiBlast (id 3), then 25 % stay ranged / 75 % close in at 1.2 px/f).
 * **ai 98 "sparring"** (Krillin, Tien): like 21 with chase 0.5/1.0.
-* **ai 80 "Cell (imperfect)"**: fighter + state 85 (35 %/f at <24 px) → BossSpecialMelee (0x08701e1c).
-* **ai 116 "Cell Nonperfect"**: fighter with 50 % choice between ShootKiBlast and BossBeam (0x08704788), plus
-  BossSpecialMelee in close range; uses hit handler 113.
-* **ai 129 "General Tao"**: fighter; ranged choice 40 % BossSpecialProjectile (0x08703914) / 60 % ShootKiBlast.
-* **ai 138 / 148 "Perfect Cell"**: fighter; ranged 50 % ShootKiBlast / 50 % BossBeam (0x087047d4); melee combos.
+* **ai 80 "Cell (imperfect)"**: fighter + state 85 (player not within 24 px: 35 % DrainGrab (0x08701e1c) / 65 % strike).
+* **ai 116 "Cell Nonperfect"**: fighter with 50 % choice between ShootKiBlast and BeamAttack (0x08704788), plus
+  DrainGrab in close range; uses hit handler 113.
+* **ai 129 "General Tao"**: fighter; ranged choice 40 % BeamAttackTao (0x08703914) / 60 % ShootKiBlast.
+* **ai 138 / 148 "Perfect Cell"**: fighter; ranged 50 % ShootKiBlast / 50 % BeamAttack (0x087047d4); melee combos.
 * **ai 15** (class 94 triceratops): Patrol + ContactDamage, invulnerable (above).
 * **ai 30/31** (class 36, 1 HP, 1 exp, map 119): on hit takes damage and Knockback(0) (INFERRED: breakable/punchable object).
 * **ai 0**: Nop (classes 13, 46, 52, 82, 87; none spawned).
@@ -839,7 +888,7 @@ damage, melee did normal damage (−82) and caused knockback.
   | `0x083feb28` | 7 | unconditional: r<5 HBS, r<20 HBM, r<35 EBS, r<50 EBM |
   | `0x083fe538` | 6 | unconditional: r<3 HBL, r<6 EBL, r<15 HBM, r<25 EBM, r<40 HBS, r<60 EBS |
 
-  Boss/story spawns have unique scripts (cutscenes, flags) that use richer opcodes not decoded here.
+  Boss/story spawns run cutscene sequences instead (engine 0x0800b4ae) — decoded in §15.
   Effects of the orbs (amounts) are in the items notes.
 
 ### 9. Bosses and scripted fights
@@ -867,10 +916,10 @@ HP/stats from the class table:
 | Perfect Cell (Cell Games, Gohan) | 22–25 | 325 (14/3) | 6500 ×4, 8230 | 50/55/60, 60/59/65 | 138 |
 | Cell Junior ×3 | 26 | 325 (14/3) | 4990 | 46/50/46 | 21 |
 
-Exp 0 for all of these except the sparring partners (600/1200/2500) and Triceratops King (1500).
-Fight phases/transitions (e.g. the five Cell rows) are driven by the per-spawn event scripts (listed in
-`enemies.json → spawns[].death_script`), not by the AI tables; not decoded (INFERRED).
-Android 16, Frieza, King Cold and other named rows have no spawns (story NPCs).
+Exp 0 for all of these except the sparring partners (600/1200/2500) and Triceratops King (1500); the real
+rewards come from the death cutscenes (`giveExp`, see §15). Fight phases are decoded in §15 / `bosses.json`.
+Android 16, Frieza, King Cold and other named rows have no spawns (story NPCs). Class 41 (gfx 48 = Frieza, map 14)
+is the "Frieza" of Gohan's opening nightmare (HP 130).
 
 ### 10. Where enemies appear (maps.json) — VERIFIED
 
@@ -891,14 +940,99 @@ Other object factories: `0x0800b711` NPC (245), `0x0800d6df` walking NPC (197).
   input locked).
 
 ### 12. Open gaps
-* Boss fight scripts (phases, Cell Games transitions, drops/rewards) — script VM opcodes beyond the drop subset
-  are not decoded.
-* Exact semantics of boss special nodes `0x0801dbb3`, `0x0801dcdb`, `0x0801e5c1`, `0x0801e77b` and
-  `ProjectileVolley` (projectile speeds/counts) — INFERRED.
-* Enemy projectile objects (speed, lifetime, hit size) — vtables 0x08024258, 0x0800e8b0, 0x080135e0, 0x0801ccc8,
-  0x0801a0b0 not decoded in detail.
-* Attack ids 9 and 15 → which player moves (moves agent); waypoint kinds other than walk-to.
-* Ai 15 / class 94: whether it is meant as an indestructible obstacle (behaviour verified, intent inferred).
+* Cutscene actor/camera commands (cutscene cmd ≥ 2) and about half of the ~160 script builtins are only
+  catalogued, not named; they don't affect combat. The pre-fight cutscenes that first activate condition-1 bosses
+  were located by scanning (`bs_scan_spawn.py`) but are not tied to their maps in `bosses.json`.
+* Which player character fights phases that are not preceded by an `setActiveCharacter` in a death cutscene
+  (e.g. Cell Games class 21/22, Cell Nonperfect) comes from pre-fight cutscenes — not traced.
+* Boss beam head growth/hitbox use the player Kamehameha class (see Part B); its geometry was not re-measured for
+  the boss variants (only damage cadence/amount).
+* Strike-animation lengths per enemy gfx (recovery after MeleeStrike) are only measured for the snake (17 f);
+  others need the graphics agent's animation tables.
+* Waypoint kinds other than walk-to; ai 15 / class 94 intent (indestructible obstacle: behaviour verified).
+
+### 13. Enemy projectiles — `enemies.json → projectiles` (extractor `en_attacks.py`)
+
+All derive from the projectile base `0x08013bc0` (fields: +0x14 direction = owner facing, +0x15 team = owner+0x16c
+(0 for enemies), +0x18 frame data `[s8 dx, s8 dy, u8 w, u8 h, ...]`, +0x1c owner, +0x20/+0x24 position 24.8,
++0x28..+0x34 hit rect = position − (dx,dy) .. + (w,h), `0x08013bf4`). Vtable layout: +0x24 onMessage, +0x28 update.
+Off-screen test `0x08013c22` (camera view 240×160), wall test `0x08005d6c`. Hits are broadcast with `0x08006e0a`
+(message 0 → player/enemies check the rect against their hurt rect). Measured with the arena harness
+(`bs_arena.py`/`bs_watch.py`: force-spawn any class on quiet map 13 by patching objdef `0x083ee440` in the emulated
+cartridge, Lv40 Piccolo STR 40 / POW 55 / END 53 standing still).
+
+| key | ctor / vtable | spawned by (frame) | speed | hitbox | attack | team | ends | evidence |
+|---|---|---|---|---|---|---|---|---|
+| ki_blast | `0x0800e8b0` / `0x08024cbc` | ShootKiBlast anim frame 16 | 3.0 px/f (table `0x0840e554`) | 16×16 centred | id 3 (1024) | 0 | camera exit, wall or hit → 16 f explosion; cancelled by overlapping player energy attack | VERIFIED |
+| energy_ball | `0x080160c0` / `0x08024258` | ShootEnergyBall anim frame 8 | 1.75 (`0x086e5ba8`) | 16×16 with facing offset (`0x086e5dc8`) | id 1 | 0 | camera exit / wall / hit; cancelled by player energy or attack ids 8/14 | VERIFIED |
+| thrown_star | `0x0801a0b0` / `0x08024f0c` | ThrowProjectile anim frame 8 | 1.75 (`0x086fe06c`) | 8×8 | id 1 | 0 | camera exit / wall / hit | VERIFIED |
+| lob_rock | `0x0801ccc8` / `0x08024204` | LobProjectile anim frame 16 | ground vel = Δ(player−self) along facing axis × 0x71d/256 per frame; z0 8 px, vz 2 px/f, g 0x20/256 | 16×16 at landing | id 1 | **2** | lands after ~35 f (measured), one hit + explosion/debris | VERIFIED |
+| laser | `0x0801e224` / `0x08024e5c` | LaserBeam node | grows 8 px/f to param (64) | segment ±4 px | id 3 | 0 | 60 f then retract 8 px/f (≈68 f); one hit max | VERIFIED |
+| boss_beam | `0x080143a8` / `0x08024acc` | BeamAttack / BeamAttackTao | player Kamehameha beam (head 3 px/f) | 16×16 head box per frame | id 10 (power 0x40) × scale 0x3000 | 0 | 90-frame anim | VERIFIED: hits every 32 f (player i-frames), Cell NP 24–36, Tao 48–60 |
+| spray_particle | `0x0801dcfc` / `0x080250a8` | SprayAttack frames 4–127, 1/frame | 2 px/f ± rand jitter 0.375 | 16×16 centred | id 3 × scale 51 (≈1/20) | direct | 20 f; one hit per particle, no hitstun / no i-frames | VERIFIED: 2–4 dmg every 1–2 f |
+
+No enemy projectile homes; all fly along the shooter's facing (the AI aligns/faces first). None pierce except
+the laser/beam (persistent). Fire cadence comes from the AI chances (e.g. ai 11: aligned → 5 %/f → shot, then
+16 f wait; fighters: 5 %/f when aligned, ~58–67 f mean interval at 100 px measured).
+
+### 14. Boss special attacks — VERIFIED (disasm + forced in the arena with `bs_special.py`, which patches the
+AI chance/radius params in the emulated ROM to force the branch)
+
+* **DrainGrab** `0x0801dbb3` (Cell imperfect state 89, Cell Nonperfect state 127): the player is put in anim
+  `0x0300227c` (held, `0x080251e0`: 240 frames, each newly pressed A removes 16 extra frames) and Cell in
+  `0x03002280` (`0x08024bb4`). At hold frame 8: hit with attack id 2 (melee, Cell STR) at scale 256 (¼), then every
+  16 frames a hit at scale 128 (⅛), applied directly; Cell heals by each hit's damage. The node has no range check
+  (in ai 80 it is only chosen from state 85, i.e. after the melee-range approach, when the player is not within
+  24 px: 35 % grab / 65 % strike). Measured: 8 then 4 damage per tick (first tick crit 17), released after 240 f.
+* **SprayAttack** `0x0801dcdb` (Destroyer state 94, chosen whenever the player is within 88 px): 128-frame spray,
+  one particle per frame from frame 4 (see `spray_particle`), mouth offsets `0x08701e28` by facing; each particle
+  2 damage on END 53, applied without hitstun or invulnerability, i.e. continuous damage while in the stream.
+* **BeamAttack** `0x0801e77b` (Cell Nonperfect state 120 / Perfect states 142) and **BeamAttackTao**
+  `0x0801e5c1` (Tao state 131): 90-frame beam using the player Kamehameha object with scale 0x3000; measured
+  one hit per 32 frames while the player stands in it.
+* **LaserBeam** `0x0801e145` (ladybug state 109) and **SelfDestructBurst** `0x0801ca43` (Eggbot death: flash, 40 f
+  pose, 32×32 team-2 burst, explode) — see §13 / `ai.json`.
+
+### 15. Boss fights and phases — `bosses.json` (extractor `extract_bosses.py`, chain decoder `bs_chain.py`)
+
+Phase model (VERIFIED by disassembly of all node types): no AI node reads the boss's HP, so a class row never
+changes behaviour at an HP threshold. Multi-phase fights are chains of spawn defs: when a phase reaches 0 HP its
+death cutscene (spawn def +0x14 = `[0x080106b3, sequence*]`, cutscene engine `0x0800b4ae`; steps `[u16 next, u8 cmd]`,
+cmd 0 = VM script, cmd 1 = dialogue) runs, then spawns the next spawn def with builtin `0x54
+spawnMapObject(idx)` (`0x0800c73a`) or converts a cutscene actor into it with `0x68
+replaceActorWithMapObject(actor, idx)` (`0x0800c75c`). Other decoded builtins: `0x1b/0x1c` set/clear story flag,
+`0x45`/`0x28` wait n frames, `0x46` set active character (`0x0800a680`), `0x8b` giveExp, `0x26/0x27` change map,
+`0x21` camera follow, `0x56` player control on/off, setters `0xd/0xf` = player HP/EP (HP/EP refill).
+Script opcode `0x1d n v1..vn` pushes n zig-zag varints (decoder `bs_vm.py`).
+
+| fight | phases (class @ map/object) → next | player char (from cutscenes) | notes |
+|---|---|---|---|
+| Cell Games | 21 @324 → (map change) 22 @325/0 → 23 @325/5 → Cell Jr 26 @8 → 26 @9 → 26 @10 → 24 @11 → 25 @12 | 23: Gohan; Jr #1 Piccolo, #2 Vegeta, #3 Trunks; 24: Gohan | each Cell Jr death: +50000 exp and character switch; 25 has HP 8230, STR/POW/END 60/59/65 |
+| Semi-perfect → Perfect Cell | 76 @302 → (map 303→304, HP/EP refill) 78 @304/4 → 79 @304/1 | 78: Trunks (`setActiveCharacter(3)`) | 76 death +30000 exp; 79 death +40000 exp |
+| Android 17 | 3 @296 → (map) 3 @297 (cond 0) … 3 @298/0 → actor → 3 @298/4 | — | final death +15000 exp |
+| Android 18 | 4 @251 | then Piccolo | +8000 exp |
+| Android 19 / 20 | 5 @191; 6 @195; 7 @215/229/242 | — | +3500 / +5000 / +7000 exp; energy absorb |
+| General Tao | 44 @46 | — | +50000 exp, Dragon Ball |
+| Cooler, sparring, Triceratops King, Newman, nightmare Frieza | single phase | — | rewards in `bosses.json` |
+
+Boss invulnerability: only the generic wall-knockback window (KnockbackInvulnerable 48/40) and while not spawned.
+Heals: Android 19/20 absorb energy hits (+20 % of raw damage, no damage); Cell drain grab heals Cell. No teleport
+node exists. Cell Juniors are not AI summons but three sequential spawn defs. Measured cadence/damage per boss
+(30 px and 100 px start, 900 frames) is in `bosses.json → phases[].measured` (`bs_measure.py`), e.g. Perfect Cell
+class 25 at 100 px: 14 hits, mean interval 57.8 f, 60–94 damage to Lv40 Piccolo; Cooler 186–203 per ki blast.
+
+### 16. Contact and melee rules (simulator) — VERIFIED
+
+* Body contact does **not** damage the player, except class 94 triceratops (ContactDamage: overlap → hit, then
+  48-frame cooldown on the frame counter `0x03000e20`) and enemies in a Charge/Pounce dash (single hit).
+  Snake at 14 px only damaged the player on strike-state entry frames.
+* MeleeStrike: zero wind-up — the hit check happens on the first frame of the strike state (AI chance rolls act as
+  the wind-up); hit box = own hurt rect half toward the player extended 3–4 px (horizontal: y from hurt centre to
+  bottom+3, x from centre to right+3 or left−4 to centre; vertical: x = collision box, y = hurt top .. bottom−6
+  (down) or .. collision-box top (up)) (`0x0801bd2c`). Recovery = strike anim (anim 6+rand(variants); snake 17 f)
+  + the AI's following Wait (ai 8: 30 f; fighters: combo/back-off states).
+* Hurtboxes per class/gfx: `enemies.json → classes[].graphics[].hurtbox_by_facing` (descriptor+0xc+16·facing,
+  checked against emulator for wolf/snake) and `collision_box_wh`.
 
 
 # Part D — Items, regen, progression, RNG
@@ -1120,8 +1254,8 @@ chance(p) = (rng() & 0xffff) < p                ; 0x0802142e
 
 # Consolidated open gaps
 
-* Boss phase/transition scripts and bosses' unique death scripts (script VM `0x080092E4`, opcode table `0x083B5C00`) — only the subset used by drops is decoded.
-* Boss special-attack AI nodes `0x0801DBB3`, `0x0801DCDB`, `0x0801E5C1`, `0x0801E77B` partly understood; enemy projectile objects (speed/lifetime/hitbox) not fully decoded.
+* Boss fight chains decoded (Part C §15); remaining: pre-fight activation cutscenes not tied to maps, cutscene actor commands (cmd ≥ 2) and ~half of the script builtins unnamed.
+* Boss beams reuse the player Kamehameha object: geometry not re-measured for bosses; per-gfx strike-animation lengths (enemy melee recovery) only measured for the snake.
 * Which story scripts unlock which moves (flags set only by script opcodes 0x4F–0x53, 0x5B).
 * Not run in emulator: Health/Energy Bonus pickups (10/20/30%), Golden Capsule, Album, Sleep heal, transformation-mode regen/drain, wall-knockback i-frames, SBC piercing two targets.
 * Undecoded: record flag bit1, form table bytes +2/+3, item table +1 flag, quest/journal table, idle state 0x0E.

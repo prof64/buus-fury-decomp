@@ -44,7 +44,7 @@ CAT={
  0x0801b991:('ContactDamage',[],'Touch damage: every frame, if >48 frames since last hit and the player overlaps the enemy attack box, hit the player with attack id 2 (melee 1024).','VERIFIED(disasm)'),
  0x0801c7f3:('Charge',['spd','p'],'Dash at spd/256 px/f along the initial direction to the player; on contact hits with attack id 2; ends after passing the player by more than p px (or blocked).','VERIFIED(disasm)'),
  0x0801d255:('Pounce',['spd','p'],'Leap toward player at spd (sfx 0x81), contact hit with attack id 2, ends after max distance p.','VERIFIED(disasm), details INFERRED'),
- 0x0801e145:('ProjectileVolley',['p'],'Boss/flyer special: spawns projectiles (0x0801e2a0/0x0801e224, gfx data 0x08703294); attack id 3 (energy 1024).','INFERRED'),
+ 0x0801e145:('LaserBeam',['p'],'Faces player, plays a 60-frame anim (0x080249a8) and creates a laser object (ctor 0x0801e224, vtable 0x08024e5c): from the muzzle (offset table 0x08703294+0xc by facing) the beam grows 8 px/frame up to param px, the hit area is the segment origin->tip widened +-4 px, it hits at most once, attack id 3 (energy 1024, scale 1024, team 0); after 60 frames it retracts 8 px/frame. Ladybug robots, param 64.','VERIFIED(disasm+emu: hit 2-5 f after start, object lifetime 68 f)'),
  0x0801a7df:('DeathExplode',['raw','p'],'Death node (class +0x14): fn2 0x0801a74d awards exp (0x0800e4d2), queues on-death event (0x0800e39c -> spawn on-death script), explosion effect (0x0800fa1c, size 0x28) and random death sfx (rand(2)+0x1f).','VERIFIED(disasm)'),
  0x0801a825:('Nop',[],'Does nothing forever (static runtime 0x0300220c). As a death node (0x086ff3c4) its fn2 0x0801a82d awards exp and queues the on-death event without explosion.','VERIFIED(disasm)'),
  0x0801a98d:('Patrol',[],'Follows the spawn waypoints (entity+0x190, 0x0800d156): cycles through the waypoint list; walk-to waypoints move at param/256 px/f.','VERIFIED(disasm+emu: wolf waypoint param 140 -> 0.547px/f)'),
@@ -59,16 +59,16 @@ CAT={
  0x0801c085:('SetIdleAnim',[],'Sets body anim state 0 (idle) via vtable slot 0x28.','VERIFIED(disasm)'),
  0x0801c0d7:('FacePlayer',[],'Turns to face the player (0x0800df98) and completes; on-hit: turn to face the attacker.','VERIFIED(disasm)'),
  0x0801c5a3:('GlowFlash',[],'On-hit/visual: attaches a 12-frame palette-cycle anim object (vtable 0x08024a14, table 0x086fdfbc).','VERIFIED(disasm)'),
- 0x0801ca43:('FireKiBlast',[],'Spawns a straight projectile (0x080135e0, gfx 0x086e1590) with attack id 3 (energy 1024) toward facing; sfx.','VERIFIED(disasm)'),
+ 0x0801ca43:('SelfDestructBurst',[],'Eggbot death node: spawns an explosion effect (0x080135e0, gfx 0x086e1590) and broadcasts one hit with rect = own centre +-16 px (32x32), team 2 (hurts player AND enemies), attack id 3 (energy 1024, scale 1024); sfx.','VERIFIED(disasm)'),
  0x0801ca85:('PlaySound',['p'],'Plays sound effect id p.','VERIFIED(disasm)'),
  0x0801cca9:('LobProjectile',[],'Faces player and lobs an arcing projectile (0x0801ccc8: gravity 0x20/frame) that hits with attack id 1 (energy 1024) on landing.','VERIFIED(disasm)'),
- 0x0801cf73:('ThrowProjectile',[],'Faces player; anim object 0x03002270: at frame 8 spawns projectile 0x0801a0b0 (attack id 1 INFERRED). Used by Ninjas.','INFERRED'),
+ 0x0801cf73:('ThrowProjectile',[],'Faces player; anim object 0x03002270 (vtable 0x080256d8): at frame 8 spawns thrown-star projectile 0x0801a0b0 (vtable 0x08024f0c; attack id 1 energy 1024, 1.75 px/f, 8x8). Used by Ninjas.','VERIFIED(disasm+emu)'),
  0x0801c82d:('FlyerAnimA',[],'Flyer (hawk/pterodactyl/ladybug) anim helper (static runtime 0x03002258).','INFERRED'),
  0x0801c85b:('FlyerAnimB',[],'Flyer anim helper (static runtime 0x0300225c, enter 0x0801c835 sets walk/fly anim).','INFERRED'),
- 0x0801dbb3:('BossSpecialMelee',['raw'],'Boss special melee (data 0x08701e1c, attack id 2). Used by Cell forms / fighters (states 89,127).','INFERRED'),
- 0x0801dcdb:('BossSpecialDirect',['raw'],'Boss special that calls the damage function 0x0800f910 directly (data 0x08701e4c; attack id 3). Used by Destroyer robots (state 94).','INFERRED'),
- 0x0801e5c1:('BossSpecialProjectile',['raw'],'Boss special projectile (data 0x08703914; attack id 3). Used by General Tao (state 131).','INFERRED'),
- 0x0801e77b:('BossBeam',['raw'],'Boss special projectile/beam (gfx 0x086e3458/0x086e35d8). Used by Cell Nonperfect/Perfect (states 120,142).','INFERRED'),
+ 0x0801dbb3:('DrainGrab',['raw'],'Cell drain grab (data 0x08701e1c). Enter: if a player exists, the player gets anim object 0x0300227c (vtable 0x080251e0: held 240 frames; each new A press subtracts 16 extra frames) and Cell gets 0x03002280 (vtable 0x08024bb4): at frame 8 one hit (attack id 2 melee, scale 256 = 1/4), then every 16 frames a hit with scale 128 (1/8); hits are applied directly (0x0800f910 + player vtable+0x40) and Cell heals by the damage dealt (vtable+0x3c). No range check in the node. Ends when the player is released (+8-frame wind-down). Used in states 89 (Cell) and 127 (Cell Nonperfect).','VERIFIED(disasm+emu: hold 240 f, 8 then 4 dmg every 16 f; first hit crit 17)'),
+ 0x0801dcdb:('SprayAttack',['raw'],'Destroyer energy spray (data 0x08701e4c): faces player, 128-frame anim 0x03002288 (vtable 0x080254c4, sfx 0xBD); from frame 4 one particle per frame (ctor 0x0801dcfc, vtable 0x080250a8, pool permitting) at the mouth offset (table 0x08701e28+4 by facing), velocity 2 px/f along facing +-0.375 px/f random jitter on both axes, life 20 frames, 16x16 hit box; each particle hits the player once with attack id 3 at scale 51 (~1/20) applied directly (no hitstun, no i-frames).','VERIFIED(disasm+emu: 2-4 dmg every 1-2 frames, no player hit anim)'),
+ 0x0801e5c1:('BeamAttackTao',['raw'],'General Tao beam (data 0x08703914): 90-frame anim; spawns the player beam class (ctor 0x080143a8, vtable 0x08024acc; offset table 0x087038d0) with scale 0x3000 (12x), attack id 10 (energy power 0x40) per frame; the player is hit once per invulnerability window.','VERIFIED(disasm+emu: hits every 32 f, 48-60 dmg on END 53)'),
+ 0x0801e77b:('BeamAttack',['raw'],'Cell beam (data 0x08704788 Nonperfect / 0x087047d4 Perfect): same as BeamAttackTao (player beam class 0x080143a8, scale 0x3000, attack id 10 power 0x40, 90-frame anim).','VERIFIED(disasm+emu: Cell NP hits every 32 f, 24-36 dmg = formula S=POW 41, power 64, scale 12288)'),
 }
 MSG={
  0x0801a6e1:('ApplyDamage',[],'On hit: if hit.scale!=0, store hit direction in entity+0x18d and call entity vtable+0x38 (enemy takeHit 0x0800e485: HP -= hit.damage; death node when HP<=0).','VERIFIED(disasm+emu)'),
@@ -127,9 +127,9 @@ def summarize(st_list, start):
         stun_on_attack_ids=set(),energy_absorb=False,uses_patrol=False,aggro_radius_px=None,aggro_requires_facing=None)
     ATT={'MeleeStrike':'melee strike (attack id 2, melee, power 1024; STR-based)','ContactDamage':'touch damage (attack id 2; 48f cooldown)',
          'Charge':'charge/dash (attack id 2 on contact)','Pounce':'pounce (attack id 2 on contact)','ShootEnergyBall':'energy ball projectile (attack id 1, energy 1024; POW-based)',
-         'ShootKiBlast':'ki blast projectile (attack id 3, energy 1024; POW-based)','FireKiBlast':'ki blast projectile (attack id 3)','LobProjectile':'lobbed arcing projectile (attack id 1)',
-         'ThrowProjectile':'thrown projectile (attack id 1, INFERRED)','ProjectileVolley':'projectile volley (attack id 3, INFERRED)','BossSpecialMelee':'boss special melee (INFERRED)',
-         'BossSpecialDirect':'boss special (INFERRED)','BossSpecialProjectile':'boss special projectile (INFERRED)','BossBeam':'boss beam/projectile (INFERRED)'}
+         'ShootKiBlast':'ki blast projectile (attack id 3, energy 1024; POW-based)','SelfDestructBurst':'self-destruct burst on death (attack id 3, team 2)','LobProjectile':'lobbed arcing projectile (attack id 1)',
+         'ThrowProjectile':'thrown projectile (attack id 1)','LaserBeam':'laser beam (attack id 3)','DrainGrab':'drain grab (attack id 2 at 1/4 then 1/8 every 16 f, heals self)',
+         'SprayAttack':'energy spray particles (attack id 3 at ~1/20 per particle)','BeamAttackTao':'beam (attack id 10 power 64, scale 12x)','BeamAttack':'beam (attack id 10 power 64, scale 12x)'}
     first=st_list[start]['behaviour']
     if first['type'] in ('IfPlayerSeen','IfPlayerWithin'):
         info['aggro_radius_px']=first.get('radius_px'); info['aggro_requires_facing']=(first['type']=='IfPlayerSeen')

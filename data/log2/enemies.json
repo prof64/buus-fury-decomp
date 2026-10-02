@@ -139,6 +139,456 @@
  "enemy_attack_note": "Enemies use attack table 0x086db2cc ids 1 (energy 1024), 2 (melee 1024), 3 (energy 1024); damage to the player uses the shared formula 0x0800f910 with S = enemy STR (melee) or POW (energy) and the player END/multipliers.",
  "scouter_db": "0x86f8e40",
  "graphics_ptr_table": "0x83b4e74",
+ "projectiles": [
+  {
+   "key": "ki_blast",
+   "ctor": "0x0800e8b0",
+   "vtable": "0x08024cbc",
+   "size": 84,
+   "spawned_by": "ShootKiBlast node 0x0801bc6f: anim object 0x03002224 (vtable 0x08025a70), 32-frame anim, spawn at anim frame 16 via 0x0800ead8 (pool check)",
+   "speed_px_per_frame": 3.0,
+   "velocity_table": "0x0840e554",
+   "velocity_by_facing": {
+    "down": [
+     0.0,
+     3.0
+    ],
+    "up": [
+     0.0,
+     -3.0
+    ],
+    "left": [
+     -3.0,
+     0.0
+    ],
+    "right": [
+     3.0,
+     0.0
+    ]
+   },
+   "hitbox": {
+    "w": 16,
+    "h": 16,
+    "anchor": "centred on projectile position",
+    "frame_table": "0x0840e47c"
+   },
+   "attack_id": 3,
+   "power": 1024,
+   "scale": 1024,
+   "team": "owner+0x16c (0 for enemies)",
+   "aim": "straight along shooter facing (shooter first faces the player and usually aligns via AlignWithPlayer); no homing",
+   "lifetime": "until it leaves the 240x160 camera view (0x08013c22), hits a wall (0x08005d6c) or hits a target; then 16-frame explosion (frame 0x0840e53c)",
+   "pierce": false,
+   "cancel_rules": "destroyed when overlapped by a player energy attack (onMessage 0x0800ea3b: query type 0 with attack type byte 1)",
+   "sfx": "fire: rand(2)+0x0d; hit: rand(3)+0x22",
+   "measured": {
+    "speed": 3.0,
+    "spawn_after_state_entry_frames": 16,
+    "typical_life_to_hit_at_100px": "41-48 f",
+    "evidence": "bs_watch/bs_measure (Android 17/18/19/20, Cooler, Cell Jr, Yamcha, Krillin, Tien, Tao, Cells)"
+   },
+   "evidence": "VERIFIED(disasm+emu)"
+  },
+  {
+   "key": "energy_ball",
+   "ctor": "0x080160c0",
+   "vtable": "0x08024258",
+   "size": 76,
+   "spawned_by": "ShootEnergyBall node 0x0801bb6d: anim object 0x03002218 (vtable 0x080251b4), 32-frame anim, spawn at anim frame 8 (pool >= 0x80)",
+   "speed_px_per_frame": 1.75,
+   "velocity_table": "0x086e5ba8",
+   "velocity_by_facing": {
+    "down": [
+     0.0,
+     1.75
+    ],
+    "up": [
+     0.0,
+     -1.75
+    ],
+    "left": [
+     -1.75,
+     0.0
+    ],
+    "right": [
+     1.75,
+     0.0
+    ]
+   },
+   "hitbox": {
+    "by_facing": {
+     "down": {
+      "origin_offset": [
+       8,
+       14
+      ],
+      "w": 16,
+      "h": 16
+     },
+     "up": {
+      "origin_offset": [
+       8,
+       2
+      ],
+      "w": 16,
+      "h": 16
+     },
+     "left": {
+      "origin_offset": [
+       2,
+       8
+      ],
+      "w": 16,
+      "h": 16
+     },
+     "right": {
+      "origin_offset": [
+       14,
+       8
+      ],
+      "w": 16,
+      "h": 16
+     }
+    },
+    "note": "rect = position - origin_offset, size w x h (0x08013bf4)"
+   },
+   "attack_id": 1,
+   "power": 1024,
+   "scale": 1024,
+   "team": 0,
+   "aim": "straight along facing; no homing",
+   "lifetime": "until outside the camera rect, wall hit (explodes, effect 0x08016124) or target hit (explodes)",
+   "pierce": false,
+   "cancel_rules": "destroyed by a player energy attack overlap (type 0) or by player attack ids 8 / 14 (type 2 query)",
+   "measured": {
+    "speed": 1.75,
+    "spawn_after_state_entry_frames": 8,
+    "rect": "16x16",
+    "evidence": "bs_watch class 85 henchman"
+   },
+   "evidence": "VERIFIED(disasm+emu)"
+  },
+  {
+   "key": "thrown_star",
+   "ctor": "0x0801a0b0",
+   "vtable": "0x08024f0c",
+   "size": 76,
+   "spawned_by": "ThrowProjectile node 0x0801cf73: anim object 0x03002270 (vtable 0x080256d8), spawn at anim frame 8",
+   "speed_px_per_frame": 1.75,
+   "velocity_table": "0x086fe06c",
+   "velocity_by_facing": {
+    "down": [
+     0.0,
+     1.75
+    ],
+    "up": [
+     0.0,
+     -1.75
+    ],
+    "left": [
+     -1.75,
+     0.0
+    ],
+    "right": [
+     1.75,
+     0.0
+    ]
+   },
+   "hitbox": {
+    "w": 8,
+    "h": 8,
+    "origin_offset": [
+     4,
+     4
+    ],
+    "frame_table": "0x086fe048",
+    "note": "2-frame spin anim, toggles every 8 frames"
+   },
+   "attack_id": 1,
+   "power": 1024,
+   "scale": 1024,
+   "team": 0,
+   "aim": "straight along facing",
+   "lifetime": "until outside camera rect, wall (vanishes, no explosion) or target hit",
+   "pierce": false,
+   "cancel_rules": "same as energy_ball",
+   "measured": {
+    "speed": 1.75,
+    "rect": "8x8",
+    "evidence": "bs_special ninja_throw"
+   },
+   "evidence": "VERIFIED(disasm+emu)"
+  },
+  {
+   "key": "lob_rock",
+   "ctor": "0x0801ccc8",
+   "vtable": "0x08024204",
+   "size": 84,
+   "spawned_by": "LobProjectile node 0x0801cca9 (anim 0x0300226c/0x08024bxx): 32-frame anim, spawn at anim frame 16 at self + offset table 0x086ff8a8[facing]",
+   "ballistics": "ground velocity = (player centre - self centre) along the facing axis only (other axis zeroed) * 0x71d >> 8 (1/256 px per frame) -> lands near the player after ~35 frames; height z starts at 8 px with vz 2 px/f, gravity 0x20/256 px/f^2 (0x0801cdfc)",
+   "hitbox": {
+    "w": 16,
+    "h": 16,
+    "note": "rect of the rock at landing"
+   },
+   "attack_id": 1,
+   "power": 1024,
+   "scale": 1024,
+   "team": 2,
+   "aim": "targets the player position at throw time along the facing axis",
+   "lifetime": "until landing (z<0): broadcasts one hit (team 2: also hurts enemies), explosion + 4 debris (0x0801cd32)",
+   "pierce": false,
+   "measured": {
+    "airtime_frames": 35,
+    "ground_speed_px_per_frame": "1.95-2.9 (accelerating as drawn; includes height)",
+    "evidence": "bs_watch class 9 tiger bandit at 70 px"
+   },
+   "evidence": "VERIFIED(disasm+emu)"
+  },
+  {
+   "key": "laser",
+   "ctor": "0x0801e224",
+   "vtable": "0x08024e5c",
+   "size": 56,
+   "spawned_by": "LaserBeam node 0x0801e145 (param = max length px)",
+   "growth_px_per_frame": 8,
+   "max_length": "node param (64 for ladybugs)",
+   "muzzle_offsets": {
+    "down": [
+     0,
+     8
+    ],
+    "up": [
+     0,
+     -8
+    ],
+    "left": [
+     -8,
+     0
+    ],
+    "right": [
+     8,
+     0
+    ]
+   },
+   "hitbox": "segment from muzzle to tip widened by 4 px each side",
+   "attack_id": 3,
+   "power": 1024,
+   "scale": 1024,
+   "team": 0,
+   "hits": "at most one hit per laser (+0x12 flag)",
+   "lifetime": "60-frame anim then retracts 8 px/f; object ~68 frames",
+   "pierce": true,
+   "measured": {
+    "hit_after_start_frames": "2-5",
+    "lifetime": 68,
+    "evidence": "bs_special ladybug_laser"
+   },
+   "evidence": "VERIFIED(disasm+emu)"
+  },
+  {
+   "key": "boss_beam",
+   "ctor": "0x080143a8",
+   "vtable": "0x08024acc",
+   "spawned_by": "BeamAttack 0x0801e77b (Cell Nonperfect data 0x08704788 / Perfect 0x087047d4) and BeamAttackTao 0x0801e5c1 (data 0x08703914)",
+   "note": "the player Kamehameha beam class reused (see moves.json Kamehameha): head grows 3 px/f, 16x16 box at the head broadcast every frame",
+   "attack_id": 10,
+   "power": 64,
+   "scale": 12288,
+   "team": 0,
+   "duration_frames": 90,
+   "effective_hit_rate": "once per player invulnerability window (measured every 32 frames)",
+   "measured": {
+    "cell_nonperfect_dmg_on_END53": "24-36 per hit (formula with S=POW 41, power 64, scale 12288 predicts 24-36)",
+    "tao_dmg_on_END53": "48-60",
+    "interval_frames": 32,
+    "evidence": "bs_special cellnp_beam / tao_special"
+   },
+   "evidence": "VERIFIED(disasm+emu)"
+  },
+  {
+   "key": "spray_particle",
+   "ctor": "0x0801dcfc",
+   "vtable": "0x080250a8",
+   "size": 88,
+   "spawned_by": "SprayAttack 0x0801dcdb (Destroyer): 1 particle per frame from anim frame 4 to 127 (pool >= 0x500 and < 124 live)",
+   "speed_px_per_frame": 2.0,
+   "velocity_table": "0x08703250",
+   "velocity_by_facing": {
+    "down": [
+     0.0,
+     2.0
+    ],
+    "up": [
+     0.0,
+     -2.0
+    ],
+    "left": [
+     -2.0,
+     0.0
+    ],
+    "right": [
+     2.0,
+     0.0
+    ]
+   },
+   "jitter": "+-(rand(192)-96)/256 px/f on both axes",
+   "mouth_offsets": {
+    "down": [
+     40,
+     16
+    ],
+    "up": [
+     8,
+     -48
+    ],
+    "left": [
+     -16,
+     -12
+    ],
+    "right": [
+     64,
+     -12
+    ]
+   },
+   "hitbox": {
+    "w": 16,
+    "h": 16,
+    "anchor": "centred"
+   },
+   "lifetime_frames": 20,
+   "attack_id": 3,
+   "power": 1024,
+   "scale": 51,
+   "team": "direct to player",
+   "hits": "once per particle; applied directly: no hitstun, no player i-frames",
+   "measured": {
+    "damage_per_particle_on_END53": 2,
+    "hits_per_frame": "~0.5-1",
+    "evidence": "bs_special destroyer_spray"
+   },
+   "evidence": "VERIFIED(disasm+emu)"
+  }
+ ],
+ "enemy_attacks": [
+  {
+   "key": "melee_strike",
+   "node": "MeleeStrike 0x0801be8b",
+   "attack_id": 2,
+   "type": "melee",
+   "power": 1024,
+   "scale": 1024,
+   "stat": "STR",
+   "team": 0,
+   "hitbox": "instant check on the first frame of the strike state against the player hurt rect: horizontal (|dx|>|dy|): y from own hurt-rect centre to bottom+3, x from own centre to right edge+3 (player to the right) or left edge-4 to centre; vertical: x = own collision box, y from hurt-rect top to bottom-6 (down) or to collision-box top (up) (0x0801bd2c)",
+   "startup_frames": 0,
+   "active_frames": 1,
+   "recovery": "strike anim (anim state 6+rand(variants)) + the Wait that follows in the AI (e.g. 30 f for ai 8)",
+   "measured": {
+    "snake_class53": "damage on the state-entry frame; strike state 47 f = 17 f anim + Wait 30"
+   },
+   "evidence": "VERIFIED(disasm+emu)"
+  },
+  {
+   "key": "contact_damage",
+   "node": "ContactDamage 0x0801b991",
+   "attack_id": 2,
+   "type": "melee",
+   "power": 1024,
+   "scale": 1024,
+   "stat": "STR",
+   "rule": "player overlaps the enemy attack box -> hit; then no further contact hit for 48 frames (frame counter 0x03000e20)",
+   "used_by": "only ai 15 (class 94 Triceratops herd)",
+   "evidence": "VERIFIED(disasm+emu)"
+  },
+  {
+   "key": "charge",
+   "node": "Charge 0x0801c7f3",
+   "attack_id": 2,
+   "type": "melee",
+   "rule": "dash at speed px/f along the initial direction to the player; first contact hits (once); ends after passing the player by the overshoot distance",
+   "used_by": "hawks (1.5 px/f, 56 px), pterodactyls (2.0, 64)",
+   "evidence": "VERIFIED(disasm)"
+  },
+  {
+   "key": "pounce",
+   "node": "Pounce 0x0801d255",
+   "attack_id": 2,
+   "type": "melee",
+   "rule": "leap toward the player at speed up to range px (sfx 0x81), single contact hit",
+   "used_by": "T-Rex/Triceratops King (2.0 px/f, 72 px), triceratops/warthog (1.2, 56)",
+   "evidence": "VERIFIED(disasm), timings INFERRED"
+  },
+  {
+   "key": "ki_blast",
+   "projectile": "ki_blast",
+   "attack_id": 3,
+   "stat": "POW",
+   "used_by": "fighter AIs 21/29/80/98/116/129/138/148 (ShootKiBlast)"
+  },
+  {
+   "key": "energy_ball",
+   "projectile": "energy_ball",
+   "attack_id": 1,
+   "stat": "POW",
+   "used_by": "ai 11 Warlord henchmen (ShootEnergyBall)"
+  },
+  {
+   "key": "thrown_star",
+   "projectile": "thrown_star",
+   "attack_id": 1,
+   "stat": "POW",
+   "used_by": "ai 52 ninjas"
+  },
+  {
+   "key": "lob_rock",
+   "projectile": "lob_rock",
+   "attack_id": 1,
+   "stat": "POW",
+   "used_by": "ai 45 tiger bandits"
+  },
+  {
+   "key": "laser",
+   "projectile": "laser",
+   "attack_id": 3,
+   "stat": "POW",
+   "used_by": "ai 106 ladybug robots"
+  },
+  {
+   "key": "beam",
+   "projectile": "boss_beam",
+   "attack_id": 10,
+   "stat": "POW",
+   "used_by": "Cell Nonperfect/Perfect (states 120/142), General Tao (131)"
+  },
+  {
+   "key": "spray",
+   "projectile": "spray_particle",
+   "attack_id": 3,
+   "stat": "POW",
+   "used_by": "Destroyer robots (state 94)"
+  },
+  {
+   "key": "drain_grab",
+   "node": "DrainGrab 0x0801dbb3",
+   "attack_id": 2,
+   "type": "melee",
+   "stat": "STR",
+   "rule": "player held 240 frames (mash A: -16 extra frames per press); hit at frame 8 (scale 256) then every 16 f (scale 128); Cell heals by damage dealt",
+   "used_by": "Cell imperfect (state 89), Cell Nonperfect (state 127)",
+   "evidence": "VERIFIED(disasm+emu)"
+  },
+  {
+   "key": "self_destruct",
+   "node": "SelfDestructBurst 0x0801ca43",
+   "attack_id": 3,
+   "team": 2,
+   "rule": "Eggbot death: flash, 40-frame pose, 32x32 burst (team 2) then explode",
+   "used_by": "Eggbots (death node 0x086d5694)",
+   "evidence": "VERIFIED(disasm)"
+  }
+ ],
+ "contact_and_melee_rules": "Touching an enemy does NOT hurt the player except: class 94 triceratops (ContactDamage, 48-frame cooldown) and enemies in a Charge/Pounce dash. All other melee damage comes from MeleeStrike (instant hit on the first frame of the strike state; box = own hurt rect extended 3-4 px toward the player) or the Cell drain grab. VERIFIED: snake at 14 px only damaged the player on strike-state entry frames.",
  "classes": [
   {
    "id": 0,
@@ -219,6 +669,9 @@
     "aggro_requires_facing": null
    },
    "attacks": [],
+   "attack_keys": [],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -444,6 +897,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -1109,6 +1567,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -1245,6 +1708,14 @@
     "ki blast projectile (attack id 3, energy 1024; POW-based)",
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "ki_blast",
+    "melee_strike"
+   ],
+   "projectiles": [
+    "ki_blast"
+   ],
+   "body_contact_damage": "no",
    "death_node": "0x86ff3c4",
    "death_behaviour": "exp award + on-death event, no explosion (bosses/scripted)",
    "graphics": [
@@ -1455,6 +1926,14 @@
     "ki blast projectile (attack id 3, energy 1024; POW-based)",
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "ki_blast",
+    "melee_strike"
+   ],
+   "projectiles": [
+    "ki_blast"
+   ],
+   "body_contact_damage": "no",
    "death_node": "0x86ff3c4",
    "death_behaviour": "exp award + on-death event, no explosion (bosses/scripted)",
    "graphics": [
@@ -1613,6 +2092,14 @@
     "ki blast projectile (attack id 3, energy 1024; POW-based)",
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "ki_blast",
+    "melee_strike"
+   ],
+   "projectiles": [
+    "ki_blast"
+   ],
+   "body_contact_damage": "no",
    "death_node": "0x86ff3c4",
    "death_behaviour": "exp award + on-death event, no explosion (bosses/scripted)",
    "graphics": [
@@ -1771,6 +2258,14 @@
     "ki blast projectile (attack id 3, energy 1024; POW-based)",
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "ki_blast",
+    "melee_strike"
+   ],
+   "projectiles": [
+    "ki_blast"
+   ],
+   "body_contact_damage": "no",
    "death_node": "0x86ff3c4",
    "death_behaviour": "exp award + on-death event, no explosion (bosses/scripted)",
    "graphics": [
@@ -1964,6 +2459,14 @@
     "ki blast projectile (attack id 3, energy 1024; POW-based)",
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "ki_blast",
+    "melee_strike"
+   ],
+   "projectiles": [
+    "ki_blast"
+   ],
+   "body_contact_damage": "no",
    "death_node": "0x86ff3c4",
    "death_behaviour": "exp award + on-death event, no explosion (bosses/scripted)",
    "graphics": [
@@ -2135,6 +2638,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -2718,6 +3226,14 @@
     "lobbed arcing projectile (attack id 1)",
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "lob_rock",
+    "melee_strike"
+   ],
+   "projectiles": [
+    "lob_rock"
+   ],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -3767,6 +4283,14 @@
     "lobbed arcing projectile (attack id 1)",
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "lob_rock",
+    "melee_strike"
+   ],
+   "projectiles": [
+    "lob_rock"
+   ],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -4115,6 +4639,12 @@
     "melee strike (attack id 2, melee, power 1024; STR-based)",
     "pounce (attack id 2 on contact)"
    ],
+   "attack_keys": [
+    "melee_strike",
+    "pounce"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "only while dashing (Charge/Pounce)",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -4256,6 +4786,13 @@
    "attacks": [
     "energy ball projectile (attack id 1, energy 1024; POW-based)"
    ],
+   "attack_keys": [
+    "energy_ball"
+   ],
+   "projectiles": [
+    "energy_ball"
+   ],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -4645,6 +5182,9 @@
     "aggro_requires_facing": null
    },
    "attacks": [],
+   "attack_keys": [],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [],
@@ -4721,6 +5261,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -4927,6 +5472,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [],
@@ -5019,6 +5569,12 @@
     "melee strike (attack id 2, melee, power 1024; STR-based)",
     "pounce (attack id 2 on contact)"
    ],
+   "attack_keys": [
+    "melee_strike",
+    "pounce"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "only while dashing (Charge/Pounce)",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -5261,6 +5817,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -5748,6 +6309,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -5903,6 +6469,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -6050,6 +6621,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -6164,7 +6740,7 @@
      ]
     },
     "attacks": [
-     "boss beam/projectile (INFERRED)",
+     "beam (attack id 10 power 64, scale 12x)",
      "ki blast projectile (attack id 3, energy 1024; POW-based)",
      "melee strike (attack id 2, melee, power 1024; STR-based)"
     ],
@@ -6185,10 +6761,20 @@
     "aggro_requires_facing": false
    },
    "attacks": [
-    "boss beam/projectile (INFERRED)",
+    "beam (attack id 10 power 64, scale 12x)",
     "ki blast projectile (attack id 3, energy 1024; POW-based)",
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "beam",
+    "ki_blast",
+    "melee_strike"
+   ],
+   "projectiles": [
+    "boss_beam",
+    "ki_blast"
+   ],
+   "body_contact_damage": "no",
    "death_node": "0x86ff3c4",
    "death_behaviour": "exp award + on-death event, no explosion (bosses/scripted)",
    "graphics": [
@@ -6323,7 +6909,7 @@
      ]
     },
     "attacks": [
-     "boss beam/projectile (INFERRED)",
+     "beam (attack id 10 power 64, scale 12x)",
      "ki blast projectile (attack id 3, energy 1024; POW-based)",
      "melee strike (attack id 2, melee, power 1024; STR-based)"
     ],
@@ -6344,10 +6930,20 @@
     "aggro_requires_facing": false
    },
    "attacks": [
-    "boss beam/projectile (INFERRED)",
+    "beam (attack id 10 power 64, scale 12x)",
     "ki blast projectile (attack id 3, energy 1024; POW-based)",
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "beam",
+    "ki_blast",
+    "melee_strike"
+   ],
+   "projectiles": [
+    "boss_beam",
+    "ki_blast"
+   ],
+   "body_contact_damage": "no",
    "death_node": "0x86ff3c4",
    "death_behaviour": "exp award + on-death event, no explosion (bosses/scripted)",
    "graphics": [
@@ -6482,7 +7078,7 @@
      ]
     },
     "attacks": [
-     "boss beam/projectile (INFERRED)",
+     "beam (attack id 10 power 64, scale 12x)",
      "ki blast projectile (attack id 3, energy 1024; POW-based)",
      "melee strike (attack id 2, melee, power 1024; STR-based)"
     ],
@@ -6503,10 +7099,20 @@
     "aggro_requires_facing": false
    },
    "attacks": [
-    "boss beam/projectile (INFERRED)",
+    "beam (attack id 10 power 64, scale 12x)",
     "ki blast projectile (attack id 3, energy 1024; POW-based)",
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "beam",
+    "ki_blast",
+    "melee_strike"
+   ],
+   "projectiles": [
+    "boss_beam",
+    "ki_blast"
+   ],
+   "body_contact_damage": "no",
    "death_node": "0x86ff3c4",
    "death_behaviour": "exp award + on-death event, no explosion (bosses/scripted)",
    "graphics": [
@@ -6641,7 +7247,7 @@
      ]
     },
     "attacks": [
-     "boss beam/projectile (INFERRED)",
+     "beam (attack id 10 power 64, scale 12x)",
      "ki blast projectile (attack id 3, energy 1024; POW-based)",
      "melee strike (attack id 2, melee, power 1024; STR-based)"
     ],
@@ -6662,10 +7268,20 @@
     "aggro_requires_facing": false
    },
    "attacks": [
-    "boss beam/projectile (INFERRED)",
+    "beam (attack id 10 power 64, scale 12x)",
     "ki blast projectile (attack id 3, energy 1024; POW-based)",
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "beam",
+    "ki_blast",
+    "melee_strike"
+   ],
+   "projectiles": [
+    "boss_beam",
+    "ki_blast"
+   ],
+   "body_contact_damage": "no",
    "death_node": "0x86ff3c4",
    "death_behaviour": "exp award + on-death event, no explosion (bosses/scripted)",
    "graphics": [
@@ -6800,7 +7416,7 @@
      ]
     },
     "attacks": [
-     "boss beam/projectile (INFERRED)",
+     "beam (attack id 10 power 64, scale 12x)",
      "ki blast projectile (attack id 3, energy 1024; POW-based)",
      "melee strike (attack id 2, melee, power 1024; STR-based)"
     ],
@@ -6821,10 +7437,20 @@
     "aggro_requires_facing": false
    },
    "attacks": [
-    "boss beam/projectile (INFERRED)",
+    "beam (attack id 10 power 64, scale 12x)",
     "ki blast projectile (attack id 3, energy 1024; POW-based)",
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "beam",
+    "ki_blast",
+    "melee_strike"
+   ],
+   "projectiles": [
+    "boss_beam",
+    "ki_blast"
+   ],
+   "body_contact_damage": "no",
    "death_node": "0x86ff3c4",
    "death_behaviour": "exp award + on-death event, no explosion (bosses/scripted)",
    "graphics": [
@@ -6981,6 +7607,14 @@
     "ki blast projectile (attack id 3, energy 1024; POW-based)",
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "ki_blast",
+    "melee_strike"
+   ],
+   "projectiles": [
+    "ki_blast"
+   ],
+   "body_contact_damage": "no",
    "death_node": "0x86d5654",
    "death_behaviour": "DeathExplode variant (param 0x40) (Cell Junior)",
    "graphics": [
@@ -7149,6 +7783,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -7261,6 +7900,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -7397,6 +8041,14 @@
     "ki blast projectile (attack id 3, energy 1024; POW-based)",
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "ki_blast",
+    "melee_strike"
+   ],
+   "projectiles": [
+    "ki_blast"
+   ],
+   "body_contact_damage": "no",
    "death_node": "0x86ff3c4",
    "death_behaviour": "exp award + on-death event, no explosion (bosses/scripted)",
    "graphics": [
@@ -7532,6 +8184,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -7635,7 +8292,7 @@
      ]
     },
     "attacks": [
-     "boss special (INFERRED)",
+     "energy spray particles (attack id 3 at ~1/20 per particle)",
      "melee strike (attack id 2, melee, power 1024; STR-based)"
     ],
     "waits": [
@@ -7656,9 +8313,17 @@
     "aggro_requires_facing": false
    },
    "attacks": [
-    "boss special (INFERRED)",
+    "energy spray particles (attack id 3 at ~1/20 per particle)",
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike",
+    "spray"
+   ],
+   "projectiles": [
+    "spray_particle"
+   ],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -7875,7 +8540,7 @@
      ]
     },
     "attacks": [
-     "boss special (INFERRED)",
+     "energy spray particles (attack id 3 at ~1/20 per particle)",
      "melee strike (attack id 2, melee, power 1024; STR-based)"
     ],
     "waits": [
@@ -7896,9 +8561,17 @@
     "aggro_requires_facing": false
    },
    "attacks": [
-    "boss special (INFERRED)",
+    "energy spray particles (attack id 3 at ~1/20 per particle)",
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike",
+    "spray"
+   ],
+   "projectiles": [
+    "spray_particle"
+   ],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -8188,7 +8861,7 @@
      ]
     },
     "attacks": [
-     "boss special (INFERRED)",
+     "energy spray particles (attack id 3 at ~1/20 per particle)",
      "melee strike (attack id 2, melee, power 1024; STR-based)"
     ],
     "waits": [
@@ -8209,9 +8882,17 @@
     "aggro_requires_facing": false
    },
    "attacks": [
-    "boss special (INFERRED)",
+    "energy spray particles (attack id 3 at ~1/20 per particle)",
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike",
+    "spray"
+   ],
+   "projectiles": [
+    "spray_particle"
+   ],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -8415,6 +9096,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -8527,6 +9213,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -8602,6 +9293,9 @@
     "aggro_requires_facing": null
    },
    "attacks": [],
+   "attack_keys": [],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d5664",
    "death_behaviour": "special death node (class 36)",
    "graphics": [
@@ -8734,6 +9428,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d5694",
    "death_behaviour": "composite death node (Eggbot robots: two children then explode)",
    "graphics": [
@@ -9546,6 +10245,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d5694",
    "death_behaviour": "composite death node (Eggbot robots: two children then explode)",
    "graphics": [
@@ -9852,6 +10556,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d5694",
    "death_behaviour": "composite death node (Eggbot robots: two children then explode)",
    "graphics": [
@@ -10101,6 +10810,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d5694",
    "death_behaviour": "composite death node (Eggbot robots: two children then explode)",
    "graphics": [
@@ -10390,6 +11104,14 @@
     "ki blast projectile (attack id 3, energy 1024; POW-based)",
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "ki_blast",
+    "melee_strike"
+   ],
+   "projectiles": [
+    "ki_blast"
+   ],
+   "body_contact_damage": "no",
    "death_node": "0x86ff3c4",
    "death_behaviour": "exp award + on-death event, no explosion (bosses/scripted)",
    "graphics": [
@@ -10522,6 +11244,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -10624,6 +11351,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [],
@@ -10702,7 +11434,7 @@
      ]
     },
     "attacks": [
-     "boss special projectile (INFERRED)",
+     "beam (attack id 10 power 64, scale 12x)",
      "ki blast projectile (attack id 3, energy 1024; POW-based)",
      "melee strike (attack id 2, melee, power 1024; STR-based)"
     ],
@@ -10723,10 +11455,20 @@
     "aggro_requires_facing": false
    },
    "attacks": [
-    "boss special projectile (INFERRED)",
+    "beam (attack id 10 power 64, scale 12x)",
     "ki blast projectile (attack id 3, energy 1024; POW-based)",
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "beam",
+    "ki_blast",
+    "melee_strike"
+   ],
+   "projectiles": [
+    "boss_beam",
+    "ki_blast"
+   ],
+   "body_contact_damage": "no",
    "death_node": "0x86ff3c4",
    "death_behaviour": "exp award + on-death event, no explosion (bosses/scripted)",
    "graphics": [
@@ -10851,7 +11593,7 @@
     },
     "attacks": [
      "melee strike (attack id 2, melee, power 1024; STR-based)",
-     "thrown projectile (attack id 1, INFERRED)"
+     "thrown projectile (attack id 1)"
     ],
     "waits": [
      16,
@@ -10872,8 +11614,16 @@
    },
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)",
-    "thrown projectile (attack id 1, INFERRED)"
+    "thrown projectile (attack id 1)"
    ],
+   "attack_keys": [
+    "melee_strike",
+    "thrown_star"
+   ],
+   "projectiles": [
+    "thrown_star"
+   ],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -10948,6 +11698,9 @@
     "aggro_requires_facing": null
    },
    "attacks": [],
+   "attack_keys": [],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [],
@@ -11024,6 +11777,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -11234,6 +11992,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -11352,6 +12115,12 @@
     "melee strike (attack id 2, melee, power 1024; STR-based)",
     "pounce (attack id 2 on contact)"
    ],
+   "attack_keys": [
+    "melee_strike",
+    "pounce"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "only while dashing (Charge/Pounce)",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [],
@@ -11441,6 +12210,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -11559,6 +12333,13 @@
    "attacks": [
     "energy ball projectile (attack id 1, energy 1024; POW-based)"
    ],
+   "attack_keys": [
+    "energy_ball"
+   ],
+   "projectiles": [
+    "energy_ball"
+   ],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -11859,6 +12640,9 @@
     "aggro_requires_facing": null
    },
    "attacks": [],
+   "attack_keys": [],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [],
@@ -11935,6 +12719,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -12375,6 +13164,12 @@
     "melee strike (attack id 2, melee, power 1024; STR-based)",
     "pounce (attack id 2 on contact)"
    ],
+   "attack_keys": [
+    "melee_strike",
+    "pounce"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "only while dashing (Charge/Pounce)",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -12789,6 +13584,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -13000,6 +13800,12 @@
     "melee strike (attack id 2, melee, power 1024; STR-based)",
     "pounce (attack id 2 on contact)"
    ],
+   "attack_keys": [
+    "melee_strike",
+    "pounce"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "only while dashing (Charge/Pounce)",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -13125,6 +13931,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -13431,6 +14242,11 @@
    "attacks": [
     "charge/dash (attack id 2 on contact)"
    ],
+   "attack_keys": [
+    "charge"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "only while dashing (Charge/Pounce)",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -13921,6 +14737,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -14877,7 +15698,7 @@
      ]
     },
     "attacks": [
-     "boss special melee (INFERRED)",
+     "drain grab (attack id 2 at 1/4 then 1/8 every 16 f, heals self)",
      "ki blast projectile (attack id 3, energy 1024; POW-based)",
      "melee strike (attack id 2, melee, power 1024; STR-based)"
     ],
@@ -14898,10 +15719,19 @@
     "aggro_requires_facing": false
    },
    "attacks": [
-    "boss special melee (INFERRED)",
+    "drain grab (attack id 2 at 1/4 then 1/8 every 16 f, heals self)",
     "ki blast projectile (attack id 3, energy 1024; POW-based)",
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "drain_grab",
+    "ki_blast",
+    "melee_strike"
+   ],
+   "projectiles": [
+    "ki_blast"
+   ],
+   "body_contact_damage": "no",
    "death_node": "0x86ff3c4",
    "death_behaviour": "exp award + on-death event, no explosion (bosses/scripted)",
    "graphics": [
@@ -15034,6 +15864,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -15146,6 +15981,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -15258,6 +16098,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -15393,6 +16238,14 @@
     "ki blast projectile (attack id 3, energy 1024; POW-based)",
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "ki_blast",
+    "melee_strike"
+   ],
+   "projectiles": [
+    "ki_blast"
+   ],
+   "body_contact_damage": "no",
    "death_node": "0x86ff3c4",
    "death_behaviour": "exp award + on-death event, no explosion (bosses/scripted)",
    "graphics": [
@@ -15516,7 +16369,7 @@
      ]
     },
     "attacks": [
-     "projectile volley (attack id 3, INFERRED)"
+     "laser beam (attack id 3)"
     ],
     "waits": [
      30,
@@ -15535,8 +16388,15 @@
     "aggro_requires_facing": true
    },
    "attacks": [
-    "projectile volley (attack id 3, INFERRED)"
+    "laser beam (attack id 3)"
    ],
+   "attack_keys": [
+    "laser"
+   ],
+   "projectiles": [
+    "laser"
+   ],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -16235,7 +17095,7 @@
      ]
     },
     "attacks": [
-     "projectile volley (attack id 3, INFERRED)"
+     "laser beam (attack id 3)"
     ],
     "waits": [
      30,
@@ -16254,8 +17114,15 @@
     "aggro_requires_facing": true
    },
    "attacks": [
-    "projectile volley (attack id 3, INFERRED)"
+    "laser beam (attack id 3)"
    ],
+   "attack_keys": [
+    "laser"
+   ],
+   "projectiles": [
+    "laser"
+   ],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -16711,7 +17578,7 @@
      ]
     },
     "attacks": [
-     "projectile volley (attack id 3, INFERRED)"
+     "laser beam (attack id 3)"
     ],
     "waits": [
      30,
@@ -16730,8 +17597,15 @@
     "aggro_requires_facing": true
    },
    "attacks": [
-    "projectile volley (attack id 3, INFERRED)"
+    "laser beam (attack id 3)"
    ],
+   "attack_keys": [
+    "laser"
+   ],
+   "projectiles": [
+    "laser"
+   ],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -17205,6 +18079,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -17317,6 +18196,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -17786,6 +18670,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -18165,6 +19054,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -18574,6 +19468,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -18686,6 +19585,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -18811,6 +19715,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -18935,7 +19844,7 @@
     },
     "attacks": [
      "melee strike (attack id 2, melee, power 1024; STR-based)",
-     "thrown projectile (attack id 1, INFERRED)"
+     "thrown projectile (attack id 1)"
     ],
     "waits": [
      16,
@@ -18956,8 +19865,16 @@
    },
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)",
-    "thrown projectile (attack id 1, INFERRED)"
+    "thrown projectile (attack id 1)"
    ],
+   "attack_keys": [
+    "melee_strike",
+    "thrown_star"
+   ],
+   "projectiles": [
+    "thrown_star"
+   ],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -19405,8 +20322,8 @@
      ]
     },
     "attacks": [
-     "boss beam/projectile (INFERRED)",
-     "boss special melee (INFERRED)",
+     "beam (attack id 10 power 64, scale 12x)",
+     "drain grab (attack id 2 at 1/4 then 1/8 every 16 f, heals self)",
      "ki blast projectile (attack id 3, energy 1024; POW-based)",
      "melee strike (attack id 2, melee, power 1024; STR-based)"
     ],
@@ -19427,11 +20344,22 @@
     "aggro_requires_facing": false
    },
    "attacks": [
-    "boss beam/projectile (INFERRED)",
-    "boss special melee (INFERRED)",
+    "beam (attack id 10 power 64, scale 12x)",
+    "drain grab (attack id 2 at 1/4 then 1/8 every 16 f, heals self)",
     "ki blast projectile (attack id 3, energy 1024; POW-based)",
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "beam",
+    "drain_grab",
+    "ki_blast",
+    "melee_strike"
+   ],
+   "projectiles": [
+    "boss_beam",
+    "ki_blast"
+   ],
+   "body_contact_damage": "no",
    "death_node": "0x86ff3c4",
    "death_behaviour": "exp award + on-death event, no explosion (bosses/scripted)",
    "graphics": [
@@ -19564,6 +20492,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -19684,7 +20617,7 @@
      ]
     },
     "attacks": [
-     "boss beam/projectile (INFERRED)",
+     "beam (attack id 10 power 64, scale 12x)",
      "ki blast projectile (attack id 3, energy 1024; POW-based)",
      "melee strike (attack id 2, melee, power 1024; STR-based)"
     ],
@@ -19705,10 +20638,20 @@
     "aggro_requires_facing": false
    },
    "attacks": [
-    "boss beam/projectile (INFERRED)",
+    "beam (attack id 10 power 64, scale 12x)",
     "ki blast projectile (attack id 3, energy 1024; POW-based)",
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "beam",
+    "ki_blast",
+    "melee_strike"
+   ],
+   "projectiles": [
+    "boss_beam",
+    "ki_blast"
+   ],
+   "body_contact_damage": "no",
    "death_node": "0x86ff3c4",
    "death_behaviour": "exp award + on-death event, no explosion (bosses/scripted)",
    "graphics": [
@@ -19849,7 +20792,7 @@
      ]
     },
     "attacks": [
-     "boss beam/projectile (INFERRED)",
+     "beam (attack id 10 power 64, scale 12x)",
      "ki blast projectile (attack id 3, energy 1024; POW-based)",
      "melee strike (attack id 2, melee, power 1024; STR-based)"
     ],
@@ -19870,10 +20813,20 @@
     "aggro_requires_facing": false
    },
    "attacks": [
-    "boss beam/projectile (INFERRED)",
+    "beam (attack id 10 power 64, scale 12x)",
     "ki blast projectile (attack id 3, energy 1024; POW-based)",
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "beam",
+    "ki_blast",
+    "melee_strike"
+   ],
+   "projectiles": [
+    "boss_beam",
+    "ki_blast"
+   ],
+   "body_contact_damage": "no",
    "death_node": "0x86ff3c4",
    "death_behaviour": "exp award + on-death event, no explosion (bosses/scripted)",
    "graphics": [
@@ -20017,6 +20970,11 @@
    "attacks": [
     "charge/dash (attack id 2 on contact)"
    ],
+   "attack_keys": [
+    "charge"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "only while dashing (Charge/Pounce)",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -20248,6 +21206,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -20322,6 +21285,9 @@
     "aggro_requires_facing": null
    },
    "attacks": [],
+   "attack_keys": [],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [],
@@ -20398,6 +21364,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -20836,6 +21807,11 @@
    "attacks": [
     "charge/dash (attack id 2 on contact)"
    ],
+   "attack_keys": [
+    "charge"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "only while dashing (Charge/Pounce)",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -20954,6 +21930,13 @@
    "attacks": [
     "energy ball projectile (attack id 1, energy 1024; POW-based)"
    ],
+   "attack_keys": [
+    "energy_ball"
+   ],
+   "projectiles": [
+    "energy_ball"
+   ],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -21889,7 +22872,7 @@
     },
     "attacks": [
      "melee strike (attack id 2, melee, power 1024; STR-based)",
-     "thrown projectile (attack id 1, INFERRED)"
+     "thrown projectile (attack id 1)"
     ],
     "waits": [
      16,
@@ -21910,8 +22893,16 @@
    },
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)",
-    "thrown projectile (attack id 1, INFERRED)"
+    "thrown projectile (attack id 1)"
    ],
+   "attack_keys": [
+    "melee_strike",
+    "thrown_star"
+   ],
+   "projectiles": [
+    "thrown_star"
+   ],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -23327,6 +24318,9 @@
     "aggro_requires_facing": null
    },
    "attacks": [],
+   "attack_keys": [],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [],
@@ -23414,6 +24408,11 @@
    "attacks": [
     "charge/dash (attack id 2 on contact)"
    ],
+   "attack_keys": [
+    "charge"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "only while dashing (Charge/Pounce)",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -23643,6 +24642,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -23755,6 +24759,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -24016,6 +25025,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -24284,6 +25298,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -24798,6 +25817,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [],
@@ -24850,6 +25874,11 @@
    "attacks": [
     "touch damage (attack id 2; 48f cooldown)"
    ],
+   "attack_keys": [
+    "contact_damage"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "yes: ContactDamage (48 f cooldown)",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -25521,6 +26550,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86ff3c4",
    "death_behaviour": "exp award + on-death event, no explosion (bosses/scripted)",
    "graphics": [],
@@ -25597,6 +26631,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86ff3c4",
    "death_behaviour": "exp award + on-death event, no explosion (bosses/scripted)",
    "graphics": [
@@ -25709,6 +26748,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86ff3c4",
    "death_behaviour": "exp award + on-death event, no explosion (bosses/scripted)",
    "graphics": [
@@ -25844,6 +26888,14 @@
     "ki blast projectile (attack id 3, energy 1024; POW-based)",
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "ki_blast",
+    "melee_strike"
+   ],
+   "projectiles": [
+    "ki_blast"
+   ],
+   "body_contact_damage": "no",
    "death_node": "0x86ff3c4",
    "death_behaviour": "exp award + on-death event, no explosion (bosses/scripted)",
    "graphics": [
@@ -25992,6 +27044,12 @@
     "melee strike (attack id 2, melee, power 1024; STR-based)",
     "pounce (attack id 2 on contact)"
    ],
+   "attack_keys": [
+    "melee_strike",
+    "pounce"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "only while dashing (Charge/Pounce)",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -26240,6 +27298,12 @@
     "melee strike (attack id 2, melee, power 1024; STR-based)",
     "pounce (attack id 2 on contact)"
    ],
+   "attack_keys": [
+    "melee_strike",
+    "pounce"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "only while dashing (Charge/Pounce)",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -26368,6 +27432,12 @@
     "melee strike (attack id 2, melee, power 1024; STR-based)",
     "pounce (attack id 2 on contact)"
    ],
+   "attack_keys": [
+    "melee_strike",
+    "pounce"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "only while dashing (Charge/Pounce)",
    "death_node": "0x86ff3c4",
    "death_behaviour": "exp award + on-death event, no explosion (bosses/scripted)",
    "graphics": [
@@ -26514,6 +27584,12 @@
     "melee strike (attack id 2, melee, power 1024; STR-based)",
     "pounce (attack id 2 on contact)"
    ],
+   "attack_keys": [
+    "melee_strike",
+    "pounce"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "only while dashing (Charge/Pounce)",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -27140,6 +28216,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -27474,6 +28555,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -27684,6 +28770,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -27820,6 +28911,14 @@
     "ki blast projectile (attack id 3, energy 1024; POW-based)",
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "ki_blast",
+    "melee_strike"
+   ],
+   "projectiles": [
+    "ki_blast"
+   ],
+   "body_contact_damage": "no",
    "death_node": "0x86ff3c4",
    "death_behaviour": "exp award + on-death event, no explosion (bosses/scripted)",
    "graphics": [
@@ -27964,6 +29063,11 @@
    "attacks": [
     "charge/dash (attack id 2 on contact)"
    ],
+   "attack_keys": [
+    "charge"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "only while dashing (Charge/Pounce)",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [
@@ -28076,6 +29180,11 @@
    "attacks": [
     "melee strike (attack id 2, melee, power 1024; STR-based)"
    ],
+   "attack_keys": [
+    "melee_strike"
+   ],
+   "projectiles": [],
+   "body_contact_damage": "no",
    "death_node": "0x86d2b6c",
    "death_behaviour": "DeathExplode: exp award + on-death event + explosion effect + death sfx",
    "graphics": [

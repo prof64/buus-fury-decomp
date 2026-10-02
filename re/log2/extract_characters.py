@@ -131,6 +131,20 @@ def chars():
                         forms=[f for f in range(22) if [0,0,0,0,0,0,1,1,2,2,2,2,3,3,3,3,3,3,3,4,4,5][f] == c]))
     return out
 
+def unlocks():
+    import pl_unlocks
+    res = pl_unlocks.scan()
+    learn = [d for d in res if d['fn'] == 'learn']
+    near = lambda d: any(abs(int(d['addr'], 16) - int(l['addr'], 16)) <= 16 for l in learn)
+    keep = [d for d in res if d['fn'] == 'learn' or (d['fn'] == 'unlockTransform' and near(d))]
+    return {
+        'mechanism': 'event-script builtin 0x53 learn(char, n): record flags |= 4<<n (n 0 special melee, 1 slot0, 2 slot1, 3 slot2, 4 slot3); '
+                     'builtin 0x52 unlockTransform(char) sets bit5 (slot 2). Script VM 0x080092E4: op 0x1D n varints = push zigzag args, op 0x02 xx = call builtin xx (table 0x083B5D28). '
+                     'Found by scanning script data 0x083B6000-0x083F0000 for the call bytes (DISASM; locations labelled by nearby dialogue). '
+                     'At new game only slot 3 (basic blast) is unlocked; no level-based unlocks exist (no other code writes these bits).',
+        'calls': [{k: d[k] for k in ('addr', 'fn', 'char', 'args', 'unlocks', 'move', 'text_before', 'text_after') if k in d} for d in keep],
+    }
+
 def build():
     exptab = [u32(EXPTAB + 4 * i) for i in range(50)]
     return {
@@ -172,6 +186,7 @@ def build():
         'characters': chars(),
         'forms': forms(),
         'forms_rom': hex(FORMS),
+        'move_unlocks': unlocks(),
     }
 
 if __name__ == '__main__':

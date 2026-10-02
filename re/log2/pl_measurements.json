@@ -1,0 +1,15525 @@
+{
+"bigbang_d": {
+"state_file": "log2_pl_vegeta.ss",
+"slot": 0,
+"input": "W:2 B:1 W:80",
+"facing": 0,
+"enemies_pinned": true,
+"player_states": [
+[
+0,
+0
+],
+[
+2,
+46
+],
+[
+34,
+0
+]
+],
+"player_mults_vuln": [
+[
+0,
+[
+0,
+0
+],
+1
+]
+],
+"ep_changes": [
+[
+2,
+989
+]
+],
+"projectiles": [
+{
+"vtable": "0x80241b0",
+"spawn_frame": 2,
+"frames_alive": 3,
+"frames_moving": 2,
+"spawn_pos_rel": [
+4.0,
+-4.0
+],
+"end_pos_rel": [
+4.0,
+14.0
+],
+"first_step": [
+0.0,
+16.0
+],
+"steady_step": [
+0.0,
+2.0
+],
+"rect_sizes": [
+[
+8,
+8
+],
+[
+32,
+32
+]
+],
+"spawn_rect_rel": [
+0,
+-8,
+8,
+0
+],
+"last_rect_rel": [
+-12,
+-10,
+20,
+22
+]
+}
+],
+"hits": [
+{
+"frame": 4,
+"enemy": 0,
+"attack_id": 8,
+"power": 49152,
+"scale": 33,
+"dmg": 244,
+"crit": 0,
+"rect_rel": [
+-28,
+-18,
+36,
+46
+],
+"rect_size": [
+64,
+64
+]
+}
+],
+"enemies": [
+{
+"offset": [
+0,
+40
+],
+"state_changes": [
+[
+1,
+"0x3001f34"
+],
+[
+4,
+"0x3002128"
+],
+[
+35,
+"0x3001f34"
+],
+[
+51,
+"0x3001f30"
+]
+],
+"moved_px": null
+}
+]
+},
+"bigbang_hold40": {
+"state_file": "log2_pl_vegeta.ss",
+"slot": 0,
+"input": "W:2 B:40 W:90",
+"facing": 3,
+"enemies_pinned": true,
+"player_states": [
+[
+0,
+0
+],
+[
+2,
+46
+],
+[
+73,
+0
+]
+],
+"player_mults_vuln": [
+[
+0,
+[
+0,
+0
+],
+1
+]
+],
+"ep_changes": [
+[
+2,
+989
+],
+[
+3,
+988
+],
+[
+7,
+987
+],
+[
+11,
+986
+],
+[
+15,
+985
+],
+[
+19,
+984
+],
+[
+23,
+983
+],
+[
+27,
+982
+],
+[
+31,
+981
+],
+[
+35,
+980
+],
+[
+39,
+979
+]
+],
+"projectiles": [
+{
+"vtable": "0x80241b0",
+"spawn_frame": 2,
+"frames_alive": 55,
+"frames_moving": 54,
+"spawn_pos_rel": [
+6.0,
+-4.0
+],
+"end_pos_rel": [
+50.0,
+-4.0
+],
+"first_step": [
+0.0,
+0.0
+],
+"steady_step": [
+0.0,
+0.0
+],
+"rect_sizes": [
+[
+8,
+8
+],
+[
+16,
+16
+],
+[
+32,
+32
+]
+],
+"spawn_rect_rel": [
+2,
+-8,
+10,
+0
+],
+"last_rect_rel": [
+26,
+-20,
+58,
+12
+]
+}
+],
+"hits": [
+{
+"frame": 56,
+"enemy": 0,
+"attack_id": 8,
+"power": 49152,
+"scale": 72,
+"dmg": 512,
+"crit": 0,
+"rect_rel": [
+18,
+-36,
+82,
+28
+],
+"rect_size": [
+64,
+64
+]
+},
+{
+"frame": 56,
+"enemy": 1,
+"attack_id": 8,
+"power": 49152,
+"scale": 72,
+"dmg": 527,
+"crit": 0,
+"rect_rel": [
+18,
+-36,
+82,
+28
+],
+"rect_size": [
+64,
+64
+]
+}
+],
+"enemies": [
+{
+"offset": [
+70,
+0
+],
+"state_changes": [
+[
+56,
+"0x3002128"
+],
+[
+87,
+"0x3001f34"
+],
+[
+89,
+"0x3001f30"
+]
+],
+"moved_px": null
+},
+{
+"offset": [
+70,
+31
+],
+"state_changes": [
+[
+56,
+"0x3002128"
+],
+[
+87,
+"0x3001f34"
+],
+[
+89,
+"0x3001f30"
+]
+],
+"moved_px": null
+},
+{
+"offset": [
+102,
+0
+],
+"state_changes": [
+[
+1,
+"0x3001f34"
+]
+],
+"moved_px": null
+}
+]
+},
+"bigbang_tap": {
+"state_file": "log2_pl_vegeta.ss",
+"slot": 0,
+"input": "W:2 B:1 W:80",
+"facing": 3,
+"enemies_pinned": true,
+"player_states": [
+[
+0,
+0
+],
+[
+2,
+46
+],
+[
+34,
+0
+]
+],
+"player_mults_vuln": [
+[
+0,
+[
+128,
+128
+],
+1
+]
+],
+"ep_changes": [
+[
+2,
+989
+]
+],
+"projectiles": [
+{
+"vtable": "0x80241b0",
+"spawn_frame": 2,
+"frames_alive": 3,
+"frames_moving": 2,
+"spawn_pos_rel": [
+6.0,
+-4.0
+],
+"end_pos_rel": [
+24.0,
+-4.0
+],
+"first_step": [
+16.0,
+0.0
+],
+"steady_step": [
+2.0,
+0.0
+],
+"rect_sizes": [
+[
+8,
+8
+],
+[
+32,
+32
+]
+],
+"spawn_rect_rel": [
+2,
+-8,
+10,
+0
+],
+"last_rect_rel": [
+0,
+-20,
+32,
+12
+]
+}
+],
+"hits": [
+{
+"frame": 4,
+"enemy": 0,
+"attack_id": 8,
+"power": 49152,
+"scale": 33,
+"dmg": 234,
+"crit": 0,
+"rect_rel": [
+-8,
+-36,
+56,
+28
+],
+"rect_size": [
+64,
+64
+]
+},
+{
+"frame": 4,
+"enemy": 1,
+"attack_id": 8,
+"power": 49152,
+"scale": 33,
+"dmg": 241,
+"crit": 0,
+"rect_rel": [
+-8,
+-36,
+56,
+28
+],
+"rect_size": [
+64,
+64
+]
+},
+{
+"frame": 4,
+"enemy": 2,
+"attack_id": 8,
+"power": 49152,
+"scale": 33,
+"dmg": 241,
+"crit": 0,
+"rect_rel": [
+-8,
+-36,
+56,
+28
+],
+"rect_size": [
+64,
+64
+]
+}
+],
+"enemies": [
+{
+"offset": [
+40,
+0
+],
+"state_changes": [
+[
+1,
+"0x3001f34"
+],
+[
+4,
+"0x3002128"
+],
+[
+35,
+"0x3001f34"
+],
+[
+46,
+"0x3001f30"
+]
+],
+"moved_px": null
+},
+{
+"offset": [
+40,
+30
+],
+"state_changes": [
+[
+4,
+"0x3002128"
+],
+[
+35,
+"0x3001f34"
+],
+[
+37,
+"0x3001f30"
+]
+],
+"moved_px": null
+},
+{
+"offset": [
+40,
+-34
+],
+"state_changes": [
+[
+4,
+"0x3002128"
+],
+[
+35,
+"0x3001f34"
+],
+[
+37,
+"0x3001f30"
+]
+],
+"moved_px": null
+}
+]
+},
+"blast_d": {
+"state_file": "log2_pl_goku.ss",
+"slot": 3,
+"input": "W:2 B:1 W:60",
+"facing": 0,
+"enemies_pinned": true,
+"player_states": [
+[
+0,
+0
+],
+[
+2,
+34
+],
+[
+26,
+0
+]
+],
+"player_mults_vuln": [
+[
+0,
+[
+0,
+0
+],
+1
+]
+],
+"ep_changes": [
+[
+2,
+997
+]
+],
+"projectiles": [
+{
+"vtable": "0x8024cbc",
+"spawn_frame": 10,
+"frames_alive": 22,
+"frames_moving": 6,
+"spawn_pos_rel": [
+8.0,
+0.0
+],
+"end_pos_rel": [
+8.0,
+18.0
+],
+"first_step": [
+0.0,
+3.0
+],
+"steady_step": [
+0.0,
+3.0
+],
+"rect_sizes": [
+[
+16,
+16
+]
+],
+"spawn_rect_rel": [
+0,
+-8,
+16,
+8
+],
+"last_rect_rel": [
+0,
+10,
+16,
+26
+]
+}
+],
+"hits": [
+{
+"frame": 16,
+"enemy": 0,
+"attack_id": 3,
+"power": 1024,
+"scale": 1024,
+"dmg": 184,
+"crit": 0,
+"rect_rel": [
+0,
+10,
+16,
+26
+],
+"rect_size": [
+16,
+16
+]
+}
+],
+"enemies": [
+{
+"offset": [
+0,
+50
+],
+"state_changes": [
+[
+16,
+"0x3002128"
+],
+[
+47,
+"0x3001f34"
+],
+[
+49,
+"0x3001f30"
+]
+],
+"moved_px": null
+}
+]
+},
+"blast_free": {
+"state_file": "log2_pl_goku.ss",
+"slot": 3,
+"input": "W:2 B:1 W:60",
+"facing": 3,
+"enemies_pinned": false,
+"player_states": [
+[
+0,
+0
+],
+[
+2,
+34
+],
+[
+26,
+0
+]
+],
+"player_mults_vuln": [
+[
+0,
+[
+0,
+0
+],
+1
+]
+],
+"ep_changes": [
+[
+2,
+997
+]
+],
+"projectiles": [
+{
+"vtable": "0x8024cbc",
+"spawn_frame": 10,
+"frames_alive": 18,
+"frames_moving": 2,
+"spawn_pos_rel": [
+18.0,
+-8.0
+],
+"end_pos_rel": [
+24.0,
+-8.0
+],
+"first_step": [
+3.0,
+0.0
+],
+"steady_step": [
+0.0,
+0.0
+],
+"rect_sizes": [
+[
+16,
+16
+]
+],
+"spawn_rect_rel": [
+10,
+-16,
+26,
+0
+],
+"last_rect_rel": [
+16,
+-16,
+32,
+0
+]
+}
+],
+"hits": [
+{
+"frame": 12,
+"enemy": 0,
+"attack_id": 3,
+"power": 1024,
+"scale": 1024,
+"dmg": 186,
+"crit": 0,
+"rect_rel": [
+16,
+-16,
+32,
+0
+],
+"rect_size": [
+16,
+16
+]
+}
+],
+"enemies": [
+{
+"offset": [
+40,
+0
+],
+"state_changes": [
+[
+1,
+"0x3001f34"
+],
+[
+12,
+"0x3002128"
+],
+[
+43,
+"0x3001f34"
+],
+[
+45,
+"0x3001f30"
+],
+[
+49,
+"0x3001f34"
+]
+],
+"moved_px": [
+7.62,
+1.01
+]
+}
+]
+},
+"blast_l": {
+"state_file": "log2_pl_goku.ss",
+"slot": 3,
+"input": "W:2 B:1 W:60",
+"facing": 2,
+"enemies_pinned": true,
+"player_states": [
+[
+0,
+0
+],
+[
+2,
+34
+],
+[
+26,
+0
+]
+],
+"player_mults_vuln": [
+[
+0,
+[
+0,
+0
+],
+1
+]
+],
+"ep_changes": [
+[
+2,
+997
+]
+],
+"projectiles": [
+{
+"vtable": "0x8024cbc",
+"spawn_frame": 10,
+"frames_alive": 21,
+"frames_moving": 5,
+"spawn_pos_rel": [
+-2.0,
+-8.0
+],
+"end_pos_rel": [
+-17.0,
+-8.0
+],
+"first_step": [
+-3.0,
+0.0
+],
+"steady_step": [
+0.0,
+0.0
+],
+"rect_sizes": [
+[
+16,
+16
+]
+],
+"spawn_rect_rel": [
+-10,
+-16,
+6,
+0
+],
+"last_rect_rel": [
+-25,
+-16,
+-9,
+0
+]
+}
+],
+"hits": [
+{
+"frame": 15,
+"enemy": 0,
+"attack_id": 3,
+"power": 1024,
+"scale": 1024,
+"dmg": 179,
+"crit": 0,
+"rect_rel": [
+-25,
+-16,
+-9,
+0
+],
+"rect_size": [
+16,
+16
+]
+}
+],
+"enemies": [
+{
+"offset": [
+-50,
+0
+],
+"state_changes": [
+[
+1,
+"0x3001f34"
+],
+[
+15,
+"0x3002128"
+],
+[
+46,
+"0x3001f34"
+],
+[
+48,
+"0x3001f30"
+]
+],
+"moved_px": null
+}
+]
+},
+"blast_r_pierce": {
+"state_file": "log2_pl_goku.ss",
+"slot": 3,
+"input": "W:2 B:1 W:60",
+"facing": 3,
+"enemies_pinned": true,
+"player_states": [
+[
+0,
+0
+],
+[
+2,
+34
+],
+[
+26,
+0
+]
+],
+"player_mults_vuln": [
+[
+0,
+[
+0,
+0
+],
+1
+]
+],
+"ep_changes": [
+[
+2,
+997
+]
+],
+"projectiles": [
+{
+"vtable": "0x8024cbc",
+"spawn_frame": 10,
+"frames_alive": 18,
+"frames_moving": 2,
+"spawn_pos_rel": [
+18.0,
+-8.0
+],
+"end_pos_rel": [
+24.0,
+-8.0
+],
+"first_step": [
+3.0,
+0.0
+],
+"steady_step": [
+0.0,
+0.0
+],
+"rect_sizes": [
+[
+16,
+16
+]
+],
+"spawn_rect_rel": [
+10,
+-16,
+26,
+0
+],
+"last_rect_rel": [
+16,
+-16,
+32,
+0
+]
+}
+],
+"hits": [
+{
+"frame": 12,
+"enemy": 0,
+"attack_id": 3,
+"power": 1024,
+"scale": 1024,
+"dmg": 175,
+"crit": 0,
+"rect_rel": [
+16,
+-16,
+32,
+0
+],
+"rect_size": [
+16,
+16
+]
+}
+],
+"enemies": [
+{
+"offset": [
+40,
+0
+],
+"state_changes": [
+[
+1,
+"0x3001f34"
+],
+[
+12,
+"0x3002128"
+],
+[
+43,
+"0x3001f34"
+]
+],
+"moved_px": null
+},
+{
+"offset": [
+70,
+0
+],
+"state_changes": [],
+"moved_px": null
+}
+]
+},
+"blast_rapid": {
+"state_file": "log2_pl_goku.ss",
+"slot": 3,
+"input": "W:2 B:1,W:5*10 W:40",
+"facing": 3,
+"enemies_pinned": true,
+"player_states": [
+[
+0,
+0
+],
+[
+2,
+34
+],
+[
+74,
+0
+]
+],
+"player_mults_vuln": [
+[
+0,
+[
+128,
+128
+],
+1
+]
+],
+"ep_changes": [
+[
+2,
+997
+],
+[
+26,
+995
+],
+[
+42,
+993
+],
+[
+58,
+991
+]
+],
+"projectiles": [
+{
+"vtable": "0x8024cbc",
+"spawn_frame": 10,
+"frames_alive": 80,
+"frames_moving": 79,
+"spawn_pos_rel": [
+18.0,
+-8.0
+],
+"end_pos_rel": [
+135.0,
+-8.0
+],
+"first_step": [
+3.0,
+0.0
+],
+"steady_step": [
+3.0,
+0.0
+],
+"rect_sizes": [
+[
+16,
+16
+]
+],
+"spawn_rect_rel": [
+10,
+-16,
+26,
+0
+],
+"last_rect_rel": [
+127,
+-16,
+143,
+0
+]
+},
+{
+"vtable": "0x8024cbc",
+"spawn_frame": 26,
+"frames_alive": 40,
+"frames_moving": 39,
+"spawn_pos_rel": [
+18.0,
+-8.0
+],
+"end_pos_rel": [
+135.0,
+-8.0
+],
+"first_step": [
+3.0,
+0.0
+],
+"steady_step": [
+3.0,
+0.0
+],
+"rect_sizes": [
+[
+16,
+16
+]
+],
+"spawn_rect_rel": [
+10,
+-16,
+26,
+0
+],
+"last_rect_rel": [
+127,
+-16,
+143,
+0
+]
+},
+{
+"vtable": "0x8024cbc",
+"spawn_frame": 42,
+"frames_alive": 40,
+"frames_moving": 39,
+"spawn_pos_rel": [
+18.0,
+-8.0
+],
+"end_pos_rel": [
+135.0,
+-8.0
+],
+"first_step": [
+3.0,
+0.0
+],
+"steady_step": [
+3.0,
+0.0
+],
+"rect_sizes": [
+[
+16,
+16
+]
+],
+"spawn_rect_rel": [
+10,
+-16,
+26,
+0
+],
+"last_rect_rel": [
+127,
+-16,
+143,
+0
+]
+}
+],
+"hits": [],
+"enemies": [
+{
+"offset": [
+200,
+0
+],
+"state_changes": [],
+"moved_px": null
+}
+]
+},
+"blast_u": {
+"state_file": "log2_pl_goku.ss",
+"slot": 3,
+"input": "W:2 B:1 W:60",
+"facing": 1,
+"enemies_pinned": true,
+"player_states": [
+[
+0,
+0
+],
+[
+2,
+34
+],
+[
+26,
+0
+]
+],
+"player_mults_vuln": [
+[
+0,
+[
+0,
+0
+],
+1
+]
+],
+"ep_changes": [
+[
+2,
+997
+]
+],
+"projectiles": [
+{
+"vtable": "0x8024cbc",
+"spawn_frame": 10,
+"frames_alive": 25,
+"frames_moving": 9,
+"spawn_pos_rel": [
+8.0,
+-8.0
+],
+"end_pos_rel": [
+8.0,
+-35.0
+],
+"first_step": [
+0.0,
+-3.0
+],
+"steady_step": [
+0.0,
+-3.0
+],
+"rect_sizes": [
+[
+16,
+16
+]
+],
+"spawn_rect_rel": [
+0,
+-16,
+16,
+0
+],
+"last_rect_rel": [
+0,
+-43,
+16,
+-27
+]
+}
+],
+"hits": [
+{
+"frame": 19,
+"enemy": 0,
+"attack_id": 3,
+"power": 1024,
+"scale": 1024,
+"dmg": 184,
+"crit": 0,
+"rect_rel": [
+0,
+-43,
+16,
+-27
+],
+"rect_size": [
+16,
+16
+]
+}
+],
+"enemies": [
+{
+"offset": [
+0,
+-50
+],
+"state_changes": [
+[
+19,
+"0x3002128"
+],
+[
+50,
+"0x3001f34"
+],
+[
+52,
+"0x3001f30"
+]
+],
+"moved_px": null
+}
+]
+},
+"burning_d": {
+"state_file": "log2_pl_trunks.ss",
+"slot": 0,
+"input": "W:2 B:1 W:80",
+"facing": 0,
+"enemies_pinned": true,
+"player_states": [
+[
+0,
+0
+],
+[
+2,
+47
+],
+[
+34,
+0
+]
+],
+"player_mults_vuln": [
+[
+0,
+[
+0,
+0
+],
+1
+]
+],
+"ep_changes": [
+[
+2,
+993
+]
+],
+"projectiles": [
+{
+"vtable": "0x802507c",
+"spawn_frame": 2,
+"frames_alive": 18,
+"frames_moving": 2,
+"spawn_pos_rel": [
+4.0,
+-4.0
+],
+"end_pos_rel": [
+4.0,
+8.5
+],
+"first_step": [
+0.0,
+10.0
+],
+"steady_step": [
+0.0,
+0.0
+],
+"rect_sizes": [
+[
+8,
+8
+],
+[
+32,
+32
+]
+],
+"spawn_rect_rel": [
+0,
+-8,
+8,
+0
+],
+"last_rect_rel": [
+-12,
+-8,
+20,
+24
+]
+}
+],
+"hits": [
+{
+"frame": 4,
+"enemy": 0,
+"attack_id": 9,
+"power": 64,
+"scale": 1024,
+"dmg": 9,
+"crit": 0,
+"rect_rel": [
+-12,
+-8,
+20,
+24
+],
+"rect_size": [
+32,
+32
+]
+}
+],
+"enemies": [
+{
+"offset": [
+0,
+40
+],
+"state_changes": [
+[
+1,
+"0x3001f34"
+],
+[
+4,
+"0x3002128"
+],
+[
+35,
+"0x3001f34"
+]
+],
+"moved_px": null
+}
+]
+},
+"burning_free": {
+"state_file": "log2_pl_trunks.ss",
+"slot": 0,
+"input": "W:2 B:1 W:120",
+"facing": 3,
+"enemies_pinned": false,
+"player_states": [
+[
+0,
+0
+],
+[
+2,
+47
+],
+[
+34,
+0
+]
+],
+"player_mults_vuln": [
+[
+0,
+[
+0,
+0
+],
+1
+]
+],
+"ep_changes": [
+[
+2,
+993
+]
+],
+"projectiles": [
+{
+"vtable": "0x802507c",
+"spawn_frame": 2,
+"frames_alive": 18,
+"frames_moving": 2,
+"spawn_pos_rel": [
+6.0,
+-4.0
+],
+"end_pos_rel": [
+18.5,
+-4.0
+],
+"first_step": [
+10.0,
+0.0
+],
+"steady_step": [
+0.0,
+0.0
+],
+"rect_sizes": [
+[
+8,
+8
+],
+[
+32,
+32
+]
+],
+"spawn_rect_rel": [
+2,
+-8,
+10,
+0
+],
+"last_rect_rel": [
+2,
+-20,
+34,
+12
+]
+}
+],
+"hits": [
+{
+"frame": 4,
+"enemy": 0,
+"attack_id": 9,
+"power": 64,
+"scale": 1024,
+"dmg": 9,
+"crit": 0,
+"rect_rel": [
+2,
+-20,
+34,
+12
+],
+"rect_size": [
+32,
+32
+]
+}
+],
+"enemies": [
+{
+"offset": [
+40,
+0
+],
+"state_changes": [
+[
+1,
+"0x3001f34"
+],
+[
+4,
+"0x3002128"
+],
+[
+35,
+"0x3001f34"
+]
+],
+"moved_px": [
+14.53,
+0.85
+]
+}
+]
+},
+"burning_hold30": {
+"state_file": "log2_pl_trunks.ss",
+"slot": 0,
+"input": "W:2 B:30 W:80",
+"facing": 3,
+"enemies_pinned": true,
+"player_states": [
+[
+0,
+0
+],
+[
+2,
+47
+],
+[
+63,
+0
+]
+],
+"player_mults_vuln": [
+[
+0,
+[
+0,
+0
+],
+1
+]
+],
+"ep_changes": [
+[
+2,
+993
+]
+],
+"projectiles": [
+{
+"vtable": "0x802507c",
+"spawn_frame": 2,
+"frames_alive": 54,
+"frames_moving": 38,
+"spawn_pos_rel": [
+6.0,
+-4.0
+],
+"end_pos_rel": [
+36.0,
+-4.0
+],
+"first_step": [
+0.0,
+0.0
+],
+"steady_step": [
+0.0,
+0.0
+],
+"rect_sizes": [
+[
+8,
+8
+],
+[
+16,
+16
+],
+[
+32,
+32
+]
+],
+"spawn_rect_rel": [
+2,
+-8,
+10,
+0
+],
+"last_rect_rel": [
+20,
+-20,
+52,
+12
+]
+}
+],
+"hits": [
+{
+"frame": 40,
+"enemy": 0,
+"attack_id": 9,
+"power": 64,
+"scale": 1024,
+"dmg": 9,
+"crit": 0,
+"rect_rel": [
+20,
+-20,
+52,
+12
+],
+"rect_size": [
+32,
+32
+]
+}
+],
+"enemies": [
+{
+"offset": [
+60,
+0
+],
+"state_changes": [
+[
+40,
+"0x3002128"
+],
+[
+71,
+"0x3001f34"
+]
+],
+"moved_px": null
+}
+]
+},
+"burning_tap": {
+"state_file": "log2_pl_trunks.ss",
+"slot": 0,
+"input": "W:2 B:1 W:80",
+"facing": 3,
+"enemies_pinned": true,
+"player_states": [
+[
+0,
+0
+],
+[
+2,
+47
+],
+[
+34,
+0
+]
+],
+"player_mults_vuln": [
+[
+0,
+[
+0,
+0
+],
+1
+]
+],
+"ep_changes": [
+[
+2,
+993
+]
+],
+"projectiles": [
+{
+"vtable": "0x802507c",
+"spawn_frame": 2,
+"frames_alive": 18,
+"frames_moving": 2,
+"spawn_pos_rel": [
+6.0,
+-4.0
+],
+"end_pos_rel": [
+18.5,
+-4.0
+],
+"first_step": [
+10.0,
+0.0
+],
+"steady_step": [
+0.0,
+0.0
+],
+"rect_sizes": [
+[
+8,
+8
+],
+[
+32,
+32
+]
+],
+"spawn_rect_rel": [
+2,
+-8,
+10,
+0
+],
+"last_rect_rel": [
+2,
+-20,
+34,
+12
+]
+}
+],
+"hits": [
+{
+"frame": 4,
+"enemy": 0,
+"attack_id": 9,
+"power": 64,
+"scale": 1024,
+"dmg": 8,
+"crit": 0,
+"rect_rel": [
+2,
+-20,
+34,
+12
+],
+"rect_size": [
+32,
+32
+]
+}
+],
+"enemies": [
+{
+"offset": [
+40,
+0
+],
+"state_changes": [
+[
+1,
+"0x3001f34"
+],
+[
+4,
+"0x3002128"
+],
+[
+35,
+"0x3001f34"
+]
+],
+"moved_px": null
+},
+{
+"offset": [
+70,
+0
+],
+"state_changes": [],
+"moved_px": null
+}
+]
+},
+"epunch_r": {
+"state_file": "log2_pl_vegeta.ss",
+"slot": 1,
+"input": "W:2 B:1 W:30",
+"facing": 3,
+"enemies_pinned": true,
+"player_states": [
+[
+0,
+0
+],
+[
+2,
+43
+],
+[
+18,
+0
+]
+],
+"player_mults_vuln": [
+[
+0,
+[
+0,
+0
+],
+1
+]
+],
+"ep_changes": [
+[
+2,
+995
+]
+],
+"projectiles": [],
+"hits": [
+{
+"frame": 2,
+"enemy": 0,
+"attack_id": 5,
+"power": 1536,
+"scale": 1024,
+"dmg": 150,
+"crit": 0,
+"rect_rel": [
+16,
+-24,
+24,
+8
+],
+"rect_size": [
+8,
+32
+]
+}
+],
+"enemies": [
+{
+"offset": [
+14,
+0
+],
+"state_changes": [
+[
+1,
+"0x3001f34"
+],
+[
+2,
+"0x3002128"
+]
+],
+"moved_px": null
+}
+]
+},
+"hercule_punch": {
+"state_file": "log2_pl_hercule.ss",
+"slot": 0,
+"input": "W:2 A:1 W:30",
+"facing": 3,
+"enemies_pinned": true,
+"player_states": [
+[
+0,
+0
+],
+[
+2,
+41
+],
+[
+18,
+0
+]
+],
+"player_mults_vuln": [
+[
+0,
+[
+0,
+0
+],
+1
+]
+],
+"ep_changes": [],
+"projectiles": [],
+"hits": [
+{
+"frame": 2,
+"enemy": 0,
+"attack_id": 2,
+"power": 1024,
+"scale": 1024,
+"dmg": 30,
+"crit": 0,
+"rect_rel": [
+16,
+-24,
+24,
+8
+],
+"rect_size": [
+8,
+32
+]
+}
+],
+"enemies": [
+{
+"offset": [
+14,
+0
+],
+"state_changes": [
+[
+2,
+"0x3002128"
+]
+],
+"moved_px": null
+}
+]
+},
+"hercule_sp": {
+"state_file": "log2_pl_hercule.ss",
+"slot": 0,
+"input": "W:2 B:1 W:60",
+"facing": 3,
+"enemies_pinned": false,
+"player_states": [
+[
+0,
+0
+],
+[
+2,
+5
+],
+[
+34,
+0
+]
+],
+"player_mults_vuln": [
+[
+0,
+[
+0,
+0
+],
+1
+]
+],
+"ep_changes": [
+[
+2,
+993
+]
+],
+"projectiles": [],
+"hits": [
+{
+"frame": 2,
+"enemy": 0,
+"attack_id": 15,
+"power": 0,
+"scale": 0,
+"dmg": 0,
+"crit": 0,
+"rect_rel": [
+0,
+0,
+2048,
+2048
+],
+"rect_size": [
+2048,
+2048
+]
+},
+{
+"frame": 2,
+"enemy": 1,
+"attack_id": 15,
+"power": 0,
+"scale": 0,
+"dmg": 0,
+"crit": 0,
+"rect_rel": [
+0,
+0,
+2048,
+2048
+],
+"rect_size": [
+2048,
+2048
+]
+}
+],
+"enemies": [
+{
+"offset": [
+40,
+0
+],
+"state_changes": [],
+"moved_px": [
+0.0,
+0.0
+]
+},
+{
+"offset": [
+-200,
+0
+],
+"state_changes": [],
+"moved_px": [
+0.0,
+0.0
+]
+}
+]
+},
+"kame_d": {
+"state_file": "log2_pl_goku.ss",
+"slot": 0,
+"input": "W:2 B:60 W:40",
+"facing": 0,
+"enemies_pinned": true,
+"player_states": [
+[
+0,
+0
+],
+[
+2,
+48
+],
+[
+62,
+0
+]
+],
+"player_mults_vuln": [
+[
+0,
+[
+0,
+0
+],
+1
+]
+],
+"ep_changes": [
+[
+2,
+997
+],
+[
+28,
+996
+],
+[
+31,
+995
+],
+[
+34,
+994
+],
+[
+37,
+993
+],
+[
+40,
+992
+],
+[
+43,
+991
+],
+[
+46,
+990
+],
+[
+49,
+989
+],
+[
+52,
+988
+],
+[
+55,
+987
+],
+[
+58,
+986
+],
+[
+61,
+985
+]
+],
+"projectiles": [],
+"hits": [
+{
+"frame": 28,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+0,
+19,
+16,
+35
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 29,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+0,
+19,
+16,
+35
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 30,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+0,
+19,
+16,
+35
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 31,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+0,
+19,
+16,
+35
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 32,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+0,
+19,
+16,
+35
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 33,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+0,
+19,
+16,
+35
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 34,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+0,
+19,
+16,
+35
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 35,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+0,
+19,
+16,
+35
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 36,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+0,
+19,
+16,
+35
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 37,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+0,
+19,
+16,
+35
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 38,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+0,
+19,
+16,
+35
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 39,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+0,
+19,
+16,
+35
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 40,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+0,
+19,
+16,
+35
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 41,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+0,
+19,
+16,
+35
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 42,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+0,
+19,
+16,
+35
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 43,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+0,
+19,
+16,
+35
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 44,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+0,
+19,
+16,
+35
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 45,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+0,
+19,
+16,
+35
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 46,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+0,
+19,
+16,
+35
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 47,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+0,
+19,
+16,
+35
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 48,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+0,
+19,
+16,
+35
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 49,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+0,
+19,
+16,
+35
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 50,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+0,
+19,
+16,
+35
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 51,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+0,
+19,
+16,
+35
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 52,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+0,
+19,
+16,
+35
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 53,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+0,
+19,
+16,
+35
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 54,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+0,
+19,
+16,
+35
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 55,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+0,
+19,
+16,
+35
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 56,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+0,
+19,
+16,
+35
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 57,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+0,
+19,
+16,
+35
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 58,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+0,
+19,
+16,
+35
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 59,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+0,
+19,
+16,
+35
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 60,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+0,
+19,
+16,
+35
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 61,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+0,
+19,
+16,
+35
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 62,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+0,
+19,
+16,
+35
+],
+"rect_size": [
+16,
+16
+]
+}
+],
+"enemies": [
+{
+"offset": [
+0,
+60
+],
+"state_changes": [
+[
+28,
+"0x3002128"
+],
+[
+93,
+"0x3001f34"
+],
+[
+95,
+"0x3001f30"
+]
+],
+"moved_px": null
+}
+]
+},
+"kame_free": {
+"state_file": "log2_pl_goku.ss",
+"slot": 0,
+"input": "W:2 B:120 W:60",
+"facing": 3,
+"enemies_pinned": false,
+"player_states": [
+[
+0,
+0
+],
+[
+2,
+48
+],
+[
+122,
+0
+]
+],
+"player_mults_vuln": [
+[
+0,
+[
+0,
+0
+],
+1
+]
+],
+"ep_changes": [
+[
+2,
+997
+],
+[
+28,
+996
+],
+[
+31,
+995
+],
+[
+34,
+994
+],
+[
+37,
+993
+],
+[
+40,
+992
+],
+[
+43,
+991
+],
+[
+46,
+990
+],
+[
+49,
+989
+],
+[
+52,
+988
+],
+[
+55,
+987
+],
+[
+58,
+986
+],
+[
+61,
+985
+],
+[
+64,
+984
+],
+[
+67,
+983
+],
+[
+70,
+982
+],
+[
+73,
+981
+],
+[
+76,
+980
+],
+[
+79,
+979
+],
+[
+82,
+978
+],
+[
+85,
+977
+],
+[
+88,
+976
+],
+[
+91,
+975
+],
+[
+94,
+974
+],
+[
+97,
+973
+],
+[
+100,
+972
+],
+[
+103,
+971
+],
+[
+106,
+970
+],
+[
+109,
+969
+],
+[
+112,
+968
+],
+[
+115,
+967
+],
+[
+118,
+966
+],
+[
+121,
+965
+]
+],
+"projectiles": [],
+"hits": [
+{
+"frame": 27,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+32,
+-14,
+48,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 27,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+26,
+-12,
+46,
+0
+],
+"rect_size": [
+20,
+12
+]
+},
+{
+"frame": 28,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+32,
+-14,
+48,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 28,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+26,
+-12,
+46,
+0
+],
+"rect_size": [
+20,
+12
+]
+},
+{
+"frame": 29,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+32,
+-14,
+48,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 29,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+26,
+-12,
+46,
+0
+],
+"rect_size": [
+20,
+12
+]
+},
+{
+"frame": 30,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+32,
+-14,
+48,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 30,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+26,
+-12,
+46,
+0
+],
+"rect_size": [
+20,
+12
+]
+},
+{
+"frame": 31,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+32,
+-14,
+48,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 31,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+26,
+-12,
+46,
+0
+],
+"rect_size": [
+20,
+12
+]
+},
+{
+"frame": 32,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+32,
+-14,
+48,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 32,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+26,
+-12,
+46,
+0
+],
+"rect_size": [
+20,
+12
+]
+},
+{
+"frame": 33,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+32,
+-14,
+48,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 33,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+26,
+-12,
+46,
+0
+],
+"rect_size": [
+20,
+12
+]
+},
+{
+"frame": 34,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+32,
+-14,
+48,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 34,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+26,
+-12,
+46,
+0
+],
+"rect_size": [
+20,
+12
+]
+},
+{
+"frame": 35,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+32,
+-14,
+48,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 35,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+26,
+-12,
+46,
+0
+],
+"rect_size": [
+20,
+12
+]
+},
+{
+"frame": 36,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+32,
+-14,
+48,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 36,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+26,
+-12,
+46,
+0
+],
+"rect_size": [
+20,
+12
+]
+},
+{
+"frame": 37,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+32,
+-14,
+48,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 37,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+26,
+-12,
+46,
+0
+],
+"rect_size": [
+20,
+12
+]
+},
+{
+"frame": 38,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+32,
+-14,
+48,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 38,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+26,
+-12,
+46,
+0
+],
+"rect_size": [
+20,
+12
+]
+},
+{
+"frame": 39,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+32,
+-14,
+48,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 39,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+26,
+-12,
+46,
+0
+],
+"rect_size": [
+20,
+12
+]
+},
+{
+"frame": 40,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+32,
+-14,
+48,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 40,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+26,
+-12,
+46,
+0
+],
+"rect_size": [
+20,
+12
+]
+},
+{
+"frame": 41,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+32,
+-14,
+48,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 41,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+26,
+-12,
+46,
+0
+],
+"rect_size": [
+20,
+12
+]
+},
+{
+"frame": 42,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+32,
+-14,
+48,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 42,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+26,
+-12,
+46,
+0
+],
+"rect_size": [
+20,
+12
+]
+},
+{
+"frame": 43,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+32,
+-14,
+48,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 44,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+32,
+-14,
+48,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 45,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+32,
+-14,
+48,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 46,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+32,
+-14,
+48,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 48,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 48,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+26,
+-12,
+49,
+0
+],
+"rect_size": [
+23,
+12
+]
+},
+{
+"frame": 49,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 50,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 51,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 52,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 54,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+38,
+-14,
+54,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 54,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+26,
+-12,
+52,
+0
+],
+"rect_size": [
+26,
+12
+]
+},
+{
+"frame": 55,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+38,
+-14,
+54,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 56,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+38,
+-14,
+54,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 57,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+38,
+-14,
+54,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 58,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+38,
+-14,
+54,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 60,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+41,
+-14,
+57,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 60,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+26,
+-12,
+55,
+0
+],
+"rect_size": [
+29,
+12
+]
+},
+{
+"frame": 61,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+41,
+-14,
+57,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 62,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+41,
+-14,
+57,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 63,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+41,
+-14,
+57,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 64,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+41,
+-14,
+57,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 65,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+41,
+-14,
+57,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 67,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+44,
+-14,
+60,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 67,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+26,
+-12,
+58,
+0
+],
+"rect_size": [
+32,
+12
+]
+},
+{
+"frame": 68,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+44,
+-14,
+60,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 69,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+44,
+-14,
+60,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 70,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+44,
+-14,
+60,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 71,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+44,
+-14,
+60,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 73,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+47,
+-14,
+63,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 73,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+26,
+-12,
+61,
+0
+],
+"rect_size": [
+35,
+12
+]
+},
+{
+"frame": 74,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+47,
+-14,
+63,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 75,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+47,
+-14,
+63,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 76,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+47,
+-14,
+63,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 77,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+47,
+-14,
+63,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 78,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+47,
+-14,
+63,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 80,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+50,
+-14,
+66,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 80,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+26,
+-12,
+64,
+0
+],
+"rect_size": [
+38,
+12
+]
+},
+{
+"frame": 81,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+50,
+-14,
+66,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 82,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+50,
+-14,
+66,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 83,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+50,
+-14,
+66,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 84,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+50,
+-14,
+66,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 86,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+53,
+-14,
+69,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 86,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+26,
+-12,
+67,
+0
+],
+"rect_size": [
+41,
+12
+]
+},
+{
+"frame": 87,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+53,
+-14,
+69,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 88,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+53,
+-14,
+69,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 89,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+53,
+-14,
+69,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 90,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+53,
+-14,
+69,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 92,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+56,
+-14,
+72,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 92,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+26,
+-12,
+70,
+0
+],
+"rect_size": [
+44,
+12
+]
+},
+{
+"frame": 93,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+56,
+-14,
+72,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 94,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+56,
+-14,
+72,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 95,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+56,
+-14,
+72,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 96,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+56,
+-14,
+72,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 98,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+59,
+-14,
+75,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 98,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+26,
+-12,
+73,
+0
+],
+"rect_size": [
+47,
+12
+]
+},
+{
+"frame": 99,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+59,
+-14,
+75,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 100,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+59,
+-14,
+75,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 101,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+59,
+-14,
+75,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 102,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+59,
+-14,
+75,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 104,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+62,
+-14,
+78,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 104,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+26,
+-12,
+76,
+0
+],
+"rect_size": [
+50,
+12
+]
+},
+{
+"frame": 105,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+62,
+-14,
+78,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 106,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+62,
+-14,
+78,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 107,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+62,
+-14,
+78,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 108,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+62,
+-14,
+78,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 110,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+65,
+-14,
+81,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 110,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+26,
+-12,
+79,
+0
+],
+"rect_size": [
+53,
+12
+]
+},
+{
+"frame": 111,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+65,
+-14,
+81,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 111,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+26,
+-12,
+79,
+0
+],
+"rect_size": [
+53,
+12
+]
+},
+{
+"frame": 112,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+65,
+-14,
+81,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 113,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+65,
+-14,
+81,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 114,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+65,
+-14,
+81,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 115,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+65,
+-14,
+81,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 117,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+68,
+-14,
+84,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 117,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+26,
+-12,
+82,
+0
+],
+"rect_size": [
+56,
+12
+]
+},
+{
+"frame": 118,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+68,
+-14,
+84,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 119,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+68,
+-14,
+84,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 120,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+68,
+-14,
+84,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 121,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+68,
+-14,
+84,
+2
+],
+"rect_size": [
+16,
+16
+]
+}
+],
+"enemies": [
+{
+"offset": [
+60,
+0
+],
+"state_changes": [
+[
+13,
+"0x3001f34"
+],
+[
+27,
+"0x3002128"
+],
+[
+152,
+"0x3001f34"
+],
+[
+154,
+"0x3001f30"
+]
+],
+"moved_px": [
+20.41,
+-1.48
+]
+}
+]
+},
+"kame_r_2": {
+"state_file": "log2_pl_goku.ss",
+"slot": 0,
+"input": "W:2 B:120 W:60",
+"facing": 3,
+"enemies_pinned": true,
+"player_states": [
+[
+0,
+0
+],
+[
+2,
+48
+],
+[
+122,
+0
+]
+],
+"player_mults_vuln": [
+[
+0,
+[
+128,
+128
+],
+1
+]
+],
+"ep_changes": [
+[
+2,
+997
+],
+[
+28,
+996
+],
+[
+31,
+995
+],
+[
+34,
+994
+],
+[
+37,
+993
+],
+[
+40,
+992
+],
+[
+43,
+991
+],
+[
+46,
+990
+],
+[
+49,
+989
+],
+[
+52,
+988
+],
+[
+55,
+987
+],
+[
+58,
+986
+],
+[
+61,
+985
+],
+[
+64,
+984
+],
+[
+67,
+983
+],
+[
+70,
+982
+],
+[
+73,
+981
+],
+[
+76,
+980
+],
+[
+79,
+979
+],
+[
+82,
+978
+],
+[
+85,
+977
+],
+[
+88,
+976
+],
+[
+91,
+975
+],
+[
+94,
+974
+],
+[
+97,
+973
+],
+[
+100,
+972
+],
+[
+103,
+971
+],
+[
+106,
+970
+],
+[
+109,
+969
+],
+[
+112,
+968
+],
+[
+115,
+967
+],
+[
+118,
+966
+],
+[
+121,
+965
+]
+],
+"projectiles": [],
+"hits": [
+{
+"frame": 28,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 29,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 30,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 31,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 32,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 33,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 34,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 35,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 36,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 37,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 38,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 39,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 40,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 41,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 42,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 43,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 44,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 45,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 46,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 47,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 48,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 49,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 50,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 51,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 52,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 53,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 54,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 55,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 56,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 57,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 58,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 59,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 60,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 61,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 62,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 63,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 64,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 65,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 66,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 67,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 68,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 69,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 70,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 71,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 72,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 73,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 74,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 75,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 76,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 77,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 78,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 79,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 80,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 81,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 82,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 83,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 84,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 85,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 86,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 87,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 88,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 89,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 90,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 91,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 92,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 93,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 94,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 95,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 96,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 97,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 98,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 99,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 100,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 101,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 102,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 103,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 104,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 105,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 106,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 107,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 108,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 109,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 110,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 111,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 112,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 113,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 114,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 115,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 116,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 117,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 118,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 119,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 120,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 121,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 11,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 122,
+"enemy": 0,
+"attack_id": 10,
+"power": 64,
+"scale": 1024,
+"dmg": 10,
+"crit": 0,
+"rect_rel": [
+35,
+-14,
+51,
+2
+],
+"rect_size": [
+16,
+16
+]
+}
+],
+"enemies": [
+{
+"offset": [
+60,
+0
+],
+"state_changes": [
+[
+28,
+"0x3002128"
+],
+[
+153,
+"0x3001f34"
+],
+[
+155,
+"0x3001f30"
+]
+],
+"moved_px": null
+},
+{
+"offset": [
+90,
+0
+],
+"state_changes": [
+[
+1,
+"0x3001f34"
+]
+],
+"moved_px": null
+}
+]
+},
+"masenko_d": {
+"state_file": "log2_pl_gohan.ss",
+"slot": 0,
+"input": "W:2 B:1 W:60",
+"facing": 0,
+"enemies_pinned": true,
+"player_states": [
+[
+0,
+0
+],
+[
+2,
+45
+],
+[
+34,
+0
+]
+],
+"player_mults_vuln": [
+[
+0,
+[
+0,
+0
+],
+1
+]
+],
+"ep_changes": [
+[
+2,
+995
+]
+],
+"projectiles": [
+{
+"vtable": "0x8024ce8",
+"spawn_frame": 2,
+"frames_alive": 36,
+"frames_moving": 35,
+"spawn_pos_rel": [
+12.0,
+-4.0
+],
+"end_pos_rel": [
+12.0,
+31.992
+],
+"first_step": [
+0.0,
+0.0
+],
+"steady_step": [
+0.0,
+-0.504
+],
+"rect_sizes": [
+[
+8,
+8
+],
+[
+16,
+16
+]
+],
+"spawn_rect_rel": [
+8,
+-8,
+16,
+0
+],
+"last_rect_rel": [
+4,
+23,
+20,
+39
+]
+}
+],
+"hits": [
+{
+"frame": 38,
+"enemy": 0,
+"attack_id": 7,
+"power": 2048,
+"scale": 766,
+"dmg": 241,
+"crit": 0,
+"rect_rel": [
+4,
+27,
+20,
+43
+],
+"rect_size": [
+16,
+16
+]
+}
+],
+"enemies": [
+{
+"offset": [
+0,
+34
+],
+"state_changes": [
+[
+1,
+"0x3001f34"
+],
+[
+38,
+"0x3002128"
+]
+],
+"moved_px": null
+}
+]
+},
+"masenko_hold30": {
+"state_file": "log2_pl_gohan.ss",
+"slot": 0,
+"input": "W:2 B:30 W:60",
+"facing": 3,
+"enemies_pinned": true,
+"player_states": [
+[
+0,
+0
+],
+[
+2,
+45
+],
+[
+63,
+0
+]
+],
+"player_mults_vuln": [
+[
+0,
+[
+0,
+0
+],
+1
+]
+],
+"ep_changes": [
+[
+2,
+995
+]
+],
+"projectiles": [
+{
+"vtable": "0x8024ce8",
+"spawn_frame": 2,
+"frames_alive": 65,
+"frames_moving": 64,
+"spawn_pos_rel": [
+6.0,
+-4.0
+],
+"end_pos_rel": [
+101.625,
+-1.875
+],
+"first_step": [
+0.0,
+0.0
+],
+"steady_step": [
+0.0,
+0.0
+],
+"rect_sizes": [
+[
+8,
+8
+],
+[
+16,
+16
+]
+],
+"spawn_rect_rel": [
+2,
+-8,
+10,
+0
+],
+"last_rect_rel": [
+93,
+-10,
+109,
+6
+]
+}
+],
+"hits": [
+{
+"frame": 67,
+"enemy": 0,
+"attack_id": 7,
+"power": 2048,
+"scale": 1696,
+"dmg": 533,
+"crit": 0,
+"rect_rel": [
+96,
+-8,
+112,
+8
+],
+"rect_size": [
+16,
+16
+]
+}
+],
+"enemies": [
+{
+"offset": [
+110,
+0
+],
+"state_changes": [
+[
+1,
+"0x3001f34"
+],
+[
+67,
+"0x3002128"
+]
+],
+"moved_px": null
+}
+]
+},
+"masenko_tap": {
+"state_file": "log2_pl_gohan.ss",
+"slot": 0,
+"input": "W:2 B:1 W:60",
+"facing": 3,
+"enemies_pinned": true,
+"player_states": [
+[
+0,
+0
+],
+[
+2,
+45
+],
+[
+34,
+0
+]
+],
+"player_mults_vuln": [
+[
+0,
+[
+0,
+0
+],
+1
+]
+],
+"ep_changes": [
+[
+2,
+995
+]
+],
+"projectiles": [
+{
+"vtable": "0x8024ce8",
+"spawn_frame": 2,
+"frames_alive": 36,
+"frames_moving": 35,
+"spawn_pos_rel": [
+6.0,
+-4.0
+],
+"end_pos_rel": [
+39.867,
+-1.875
+],
+"first_step": [
+0.0,
+0.0
+],
+"steady_step": [
+0.996,
+-1.5
+],
+"rect_sizes": [
+[
+8,
+8
+],
+[
+16,
+16
+]
+],
+"spawn_rect_rel": [
+2,
+-8,
+10,
+0
+],
+"last_rect_rel": [
+31,
+-10,
+47,
+6
+]
+}
+],
+"hits": [
+{
+"frame": 38,
+"enemy": 0,
+"attack_id": 7,
+"power": 2048,
+"scale": 766,
+"dmg": 231,
+"crit": 0,
+"rect_rel": [
+32,
+-8,
+48,
+8
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 38,
+"enemy": 1,
+"attack_id": 7,
+"power": 2048,
+"scale": 766,
+"dmg": 239,
+"crit": 0,
+"rect_rel": [
+32,
+-8,
+48,
+8
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 38,
+"enemy": 2,
+"attack_id": 7,
+"power": 2048,
+"scale": 766,
+"dmg": 247,
+"crit": 0,
+"rect_rel": [
+32,
+-8,
+48,
+8
+],
+"rect_size": [
+16,
+16
+]
+}
+],
+"enemies": [
+{
+"offset": [
+34,
+0
+],
+"state_changes": [
+[
+1,
+"0x3001f34"
+],
+[
+27,
+"0x3001f30"
+],
+[
+38,
+"0x3002128"
+]
+],
+"moved_px": null
+},
+{
+"offset": [
+20,
+0
+],
+"state_changes": [
+[
+1,
+"0x3001f34"
+],
+[
+38,
+"0x3002128"
+]
+],
+"moved_px": null
+},
+{
+"offset": [
+48,
+0
+],
+"state_changes": [
+[
+38,
+"0x3002128"
+]
+],
+"moved_px": null
+}
+]
+},
+"punch_d": {
+"state_file": "log2_pl_goku.ss",
+"slot": 3,
+"input": "W:2 A:1 W:30",
+"facing": 0,
+"enemies_pinned": true,
+"player_states": [
+[
+0,
+0
+],
+[
+2,
+41
+],
+[
+18,
+0
+]
+],
+"player_mults_vuln": [
+[
+0,
+[
+0,
+0
+],
+1
+]
+],
+"ep_changes": [],
+"projectiles": [],
+"hits": [
+{
+"frame": 2,
+"enemy": 0,
+"attack_id": 2,
+"power": 1024,
+"scale": 1024,
+"dmg": 161,
+"crit": 0,
+"rect_rel": [
+0,
+0,
+16,
+16
+],
+"rect_size": [
+16,
+16
+]
+}
+],
+"enemies": [
+{
+"offset": [
+0,
+14
+],
+"state_changes": [
+[
+1,
+"0x3001f34"
+],
+[
+2,
+"0x3002128"
+]
+],
+"moved_px": null
+}
+]
+},
+"punch_l": {
+"state_file": "log2_pl_goku.ss",
+"slot": 3,
+"input": "W:2 A:1 W:30",
+"facing": 2,
+"enemies_pinned": true,
+"player_states": [
+[
+0,
+0
+],
+[
+2,
+41
+],
+[
+18,
+0
+]
+],
+"player_mults_vuln": [
+[
+0,
+[
+0,
+0
+],
+1
+]
+],
+"ep_changes": [],
+"projectiles": [],
+"hits": [
+{
+"frame": 2,
+"enemy": 0,
+"attack_id": 2,
+"power": 1024,
+"scale": 1024,
+"dmg": 161,
+"crit": 0,
+"rect_rel": [
+-8,
+-24,
+0,
+8
+],
+"rect_size": [
+8,
+32
+]
+}
+],
+"enemies": [
+{
+"offset": [
+-14,
+0
+],
+"state_changes": [
+[
+1,
+"0x3001f34"
+],
+[
+2,
+"0x3002128"
+]
+],
+"moved_px": null
+}
+]
+},
+"punch_r_free": {
+"state_file": "log2_pl_goku.ss",
+"slot": 3,
+"input": "W:2 A:1 W:60",
+"facing": 3,
+"enemies_pinned": false,
+"player_states": [
+[
+0,
+0
+],
+[
+2,
+41
+],
+[
+18,
+0
+]
+],
+"player_mults_vuln": [
+[
+0,
+[
+128,
+128
+],
+1
+]
+],
+"ep_changes": [],
+"projectiles": [],
+"hits": [
+{
+"frame": 2,
+"enemy": 0,
+"attack_id": 2,
+"power": 1024,
+"scale": 1024,
+"dmg": 161,
+"crit": 0,
+"rect_rel": [
+16,
+-24,
+24,
+8
+],
+"rect_size": [
+8,
+32
+]
+}
+],
+"enemies": [
+{
+"offset": [
+14,
+0
+],
+"state_changes": [
+[
+1,
+"0x3001f34"
+],
+[
+2,
+"0x3002128"
+],
+[
+33,
+"0x3001f34"
+]
+],
+"moved_px": [
+16.47,
+-1.82
+]
+}
+]
+},
+"punch_u": {
+"state_file": "log2_pl_goku.ss",
+"slot": 3,
+"input": "W:2 A:1 W:30",
+"facing": 1,
+"enemies_pinned": true,
+"player_states": [
+[
+0,
+0
+],
+[
+2,
+41
+],
+[
+18,
+0
+]
+],
+"player_mults_vuln": [
+[
+0,
+[
+0,
+0
+],
+1
+]
+],
+"ep_changes": [],
+"projectiles": [],
+"hits": [
+{
+"frame": 2,
+"enemy": 0,
+"attack_id": 2,
+"power": 1024,
+"scale": 1024,
+"dmg": 161,
+"crit": 0,
+"rect_rel": [
+0,
+-24,
+16,
+0
+],
+"rect_size": [
+16,
+24
+]
+}
+],
+"enemies": [
+{
+"offset": [
+0,
+-14
+],
+"state_changes": [
+[
+1,
+"0x3001f34"
+],
+[
+2,
+"0x3002128"
+]
+],
+"moved_px": null
+}
+]
+},
+"sbc_d": {
+"state_file": "log2_pl_piccolo.ss",
+"slot": 0,
+"input": "W:2 B:60 W:40",
+"facing": 0,
+"enemies_pinned": true,
+"player_states": [
+[
+0,
+0
+],
+[
+2,
+49
+],
+[
+62,
+0
+]
+],
+"player_mults_vuln": [
+[
+0,
+[
+0,
+0
+],
+1
+]
+],
+"ep_changes": [
+[
+2,
+997
+],
+[
+33,
+996
+],
+[
+41,
+995
+],
+[
+48,
+994
+],
+[
+56,
+993
+]
+],
+"projectiles": [],
+"hits": [
+{
+"frame": 27,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+2,
+14,
+14,
+42
+],
+"rect_size": [
+12,
+28
+]
+},
+{
+"frame": 28,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+2,
+14,
+14,
+45
+],
+"rect_size": [
+12,
+31
+]
+},
+{
+"frame": 29,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+2,
+14,
+14,
+48
+],
+"rect_size": [
+12,
+34
+]
+},
+{
+"frame": 30,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+2,
+14,
+14,
+51
+],
+"rect_size": [
+12,
+37
+]
+},
+{
+"frame": 31,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+2,
+14,
+14,
+54
+],
+"rect_size": [
+12,
+40
+]
+},
+{
+"frame": 32,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+2,
+14,
+14,
+57
+],
+"rect_size": [
+12,
+43
+]
+},
+{
+"frame": 33,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+2,
+14,
+14,
+60
+],
+"rect_size": [
+12,
+46
+]
+},
+{
+"frame": 34,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+2,
+14,
+14,
+63
+],
+"rect_size": [
+12,
+49
+]
+},
+{
+"frame": 35,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+2,
+14,
+14,
+66
+],
+"rect_size": [
+12,
+52
+]
+},
+{
+"frame": 36,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+2,
+14,
+14,
+69
+],
+"rect_size": [
+12,
+55
+]
+},
+{
+"frame": 37,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+2,
+14,
+14,
+72
+],
+"rect_size": [
+12,
+58
+]
+},
+{
+"frame": 38,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+2,
+14,
+14,
+75
+],
+"rect_size": [
+12,
+61
+]
+},
+{
+"frame": 39,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+2,
+14,
+14,
+78
+],
+"rect_size": [
+12,
+64
+]
+},
+{
+"frame": 40,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+2,
+14,
+14,
+81
+],
+"rect_size": [
+12,
+67
+]
+},
+{
+"frame": 41,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+2,
+14,
+14,
+84
+],
+"rect_size": [
+12,
+70
+]
+},
+{
+"frame": 42,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+2,
+14,
+14,
+87
+],
+"rect_size": [
+12,
+73
+]
+},
+{
+"frame": 43,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+2,
+14,
+14,
+90
+],
+"rect_size": [
+12,
+76
+]
+},
+{
+"frame": 44,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+2,
+14,
+14,
+93
+],
+"rect_size": [
+12,
+79
+]
+},
+{
+"frame": 45,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+2,
+14,
+14,
+96
+],
+"rect_size": [
+12,
+82
+]
+},
+{
+"frame": 46,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+2,
+14,
+14,
+99
+],
+"rect_size": [
+12,
+85
+]
+},
+{
+"frame": 47,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+2,
+14,
+14,
+99
+],
+"rect_size": [
+12,
+85
+]
+},
+{
+"frame": 48,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+2,
+14,
+14,
+99
+],
+"rect_size": [
+12,
+85
+]
+},
+{
+"frame": 49,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+2,
+14,
+14,
+99
+],
+"rect_size": [
+12,
+85
+]
+},
+{
+"frame": 50,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+2,
+14,
+14,
+99
+],
+"rect_size": [
+12,
+85
+]
+},
+{
+"frame": 51,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+2,
+14,
+14,
+99
+],
+"rect_size": [
+12,
+85
+]
+},
+{
+"frame": 52,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+2,
+14,
+14,
+99
+],
+"rect_size": [
+12,
+85
+]
+},
+{
+"frame": 53,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+2,
+14,
+14,
+99
+],
+"rect_size": [
+12,
+85
+]
+},
+{
+"frame": 54,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+2,
+14,
+14,
+99
+],
+"rect_size": [
+12,
+85
+]
+},
+{
+"frame": 55,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+2,
+14,
+14,
+99
+],
+"rect_size": [
+12,
+85
+]
+},
+{
+"frame": 56,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+2,
+14,
+14,
+99
+],
+"rect_size": [
+12,
+85
+]
+},
+{
+"frame": 57,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+2,
+14,
+14,
+99
+],
+"rect_size": [
+12,
+85
+]
+},
+{
+"frame": 58,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+2,
+14,
+14,
+99
+],
+"rect_size": [
+12,
+85
+]
+},
+{
+"frame": 59,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+2,
+14,
+14,
+99
+],
+"rect_size": [
+12,
+85
+]
+},
+{
+"frame": 60,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+2,
+14,
+14,
+99
+],
+"rect_size": [
+12,
+85
+]
+},
+{
+"frame": 61,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+2,
+14,
+14,
+99
+],
+"rect_size": [
+12,
+85
+]
+},
+{
+"frame": 62,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+2,
+14,
+14,
+99
+],
+"rect_size": [
+12,
+85
+]
+}
+],
+"enemies": [
+{
+"offset": [
+0,
+60
+],
+"state_changes": [
+[
+27,
+"0x3002128"
+],
+[
+93,
+"0x3001f34"
+],
+[
+95,
+"0x3001f30"
+]
+],
+"moved_px": null
+}
+]
+},
+"sbc_r_2": {
+"state_file": "log2_pl_piccolo.ss",
+"slot": 0,
+"input": "W:2 B:120 W:60",
+"facing": 3,
+"enemies_pinned": true,
+"player_states": [
+[
+0,
+0
+],
+[
+2,
+49
+],
+[
+122,
+0
+]
+],
+"player_mults_vuln": [
+[
+0,
+[
+128,
+128
+],
+1
+]
+],
+"ep_changes": [
+[
+2,
+997
+],
+[
+33,
+996
+],
+[
+41,
+995
+],
+[
+48,
+994
+],
+[
+56,
+993
+],
+[
+63,
+992
+],
+[
+71,
+991
+],
+[
+78,
+990
+],
+[
+86,
+989
+],
+[
+93,
+988
+],
+[
+101,
+987
+],
+[
+108,
+986
+],
+[
+116,
+985
+]
+],
+"projectiles": [],
+"hits": [
+{
+"frame": 27,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+54,
+-2
+],
+"rect_size": [
+28,
+12
+]
+},
+{
+"frame": 28,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+57,
+-2
+],
+"rect_size": [
+31,
+12
+]
+},
+{
+"frame": 29,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+60,
+-2
+],
+"rect_size": [
+34,
+12
+]
+},
+{
+"frame": 30,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+63,
+-2
+],
+"rect_size": [
+37,
+12
+]
+},
+{
+"frame": 31,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+66,
+-2
+],
+"rect_size": [
+40,
+12
+]
+},
+{
+"frame": 32,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+69,
+-2
+],
+"rect_size": [
+43,
+12
+]
+},
+{
+"frame": 33,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+72,
+-2
+],
+"rect_size": [
+46,
+12
+]
+},
+{
+"frame": 34,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+75,
+-2
+],
+"rect_size": [
+49,
+12
+]
+},
+{
+"frame": 35,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+78,
+-2
+],
+"rect_size": [
+52,
+12
+]
+},
+{
+"frame": 36,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+81,
+-2
+],
+"rect_size": [
+55,
+12
+]
+},
+{
+"frame": 37,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+84,
+-2
+],
+"rect_size": [
+58,
+12
+]
+},
+{
+"frame": 38,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+87,
+-2
+],
+"rect_size": [
+61,
+12
+]
+},
+{
+"frame": 39,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+90,
+-2
+],
+"rect_size": [
+64,
+12
+]
+},
+{
+"frame": 39,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+90,
+-2
+],
+"rect_size": [
+64,
+12
+]
+},
+{
+"frame": 40,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+93,
+-2
+],
+"rect_size": [
+67,
+12
+]
+},
+{
+"frame": 40,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+93,
+-2
+],
+"rect_size": [
+67,
+12
+]
+},
+{
+"frame": 41,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+96,
+-2
+],
+"rect_size": [
+70,
+12
+]
+},
+{
+"frame": 41,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+96,
+-2
+],
+"rect_size": [
+70,
+12
+]
+},
+{
+"frame": 42,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+99,
+-2
+],
+"rect_size": [
+73,
+12
+]
+},
+{
+"frame": 42,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+99,
+-2
+],
+"rect_size": [
+73,
+12
+]
+},
+{
+"frame": 43,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+102,
+-2
+],
+"rect_size": [
+76,
+12
+]
+},
+{
+"frame": 43,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+102,
+-2
+],
+"rect_size": [
+76,
+12
+]
+},
+{
+"frame": 44,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+105,
+-2
+],
+"rect_size": [
+79,
+12
+]
+},
+{
+"frame": 44,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+105,
+-2
+],
+"rect_size": [
+79,
+12
+]
+},
+{
+"frame": 45,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+108,
+-2
+],
+"rect_size": [
+82,
+12
+]
+},
+{
+"frame": 45,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+108,
+-2
+],
+"rect_size": [
+82,
+12
+]
+},
+{
+"frame": 46,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+111,
+-2
+],
+"rect_size": [
+85,
+12
+]
+},
+{
+"frame": 46,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+111,
+-2
+],
+"rect_size": [
+85,
+12
+]
+},
+{
+"frame": 47,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+114,
+-2
+],
+"rect_size": [
+88,
+12
+]
+},
+{
+"frame": 47,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+114,
+-2
+],
+"rect_size": [
+88,
+12
+]
+},
+{
+"frame": 48,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+117,
+-2
+],
+"rect_size": [
+91,
+12
+]
+},
+{
+"frame": 48,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+117,
+-2
+],
+"rect_size": [
+91,
+12
+]
+},
+{
+"frame": 49,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+120,
+-2
+],
+"rect_size": [
+94,
+12
+]
+},
+{
+"frame": 49,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+120,
+-2
+],
+"rect_size": [
+94,
+12
+]
+},
+{
+"frame": 50,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+123,
+-2
+],
+"rect_size": [
+97,
+12
+]
+},
+{
+"frame": 50,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+123,
+-2
+],
+"rect_size": [
+97,
+12
+]
+},
+{
+"frame": 51,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+126,
+-2
+],
+"rect_size": [
+100,
+12
+]
+},
+{
+"frame": 51,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+126,
+-2
+],
+"rect_size": [
+100,
+12
+]
+},
+{
+"frame": 52,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+129,
+-2
+],
+"rect_size": [
+103,
+12
+]
+},
+{
+"frame": 52,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+129,
+-2
+],
+"rect_size": [
+103,
+12
+]
+},
+{
+"frame": 53,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+132,
+-2
+],
+"rect_size": [
+106,
+12
+]
+},
+{
+"frame": 53,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+132,
+-2
+],
+"rect_size": [
+106,
+12
+]
+},
+{
+"frame": 54,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+135,
+-2
+],
+"rect_size": [
+109,
+12
+]
+},
+{
+"frame": 54,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+135,
+-2
+],
+"rect_size": [
+109,
+12
+]
+},
+{
+"frame": 55,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+138,
+-2
+],
+"rect_size": [
+112,
+12
+]
+},
+{
+"frame": 55,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+138,
+-2
+],
+"rect_size": [
+112,
+12
+]
+},
+{
+"frame": 56,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+141,
+-2
+],
+"rect_size": [
+115,
+12
+]
+},
+{
+"frame": 56,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+141,
+-2
+],
+"rect_size": [
+115,
+12
+]
+},
+{
+"frame": 57,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+144,
+-2
+],
+"rect_size": [
+118,
+12
+]
+},
+{
+"frame": 57,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+144,
+-2
+],
+"rect_size": [
+118,
+12
+]
+},
+{
+"frame": 58,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 58,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 59,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 59,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 60,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 60,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 61,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 61,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 62,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 62,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 63,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 63,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 64,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 64,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 65,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 65,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 66,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 66,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 67,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 67,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 68,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 68,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 69,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 69,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 70,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 70,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 71,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 71,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 72,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 72,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 73,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 73,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 74,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 74,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 75,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 75,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 76,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 76,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 77,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 77,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 78,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 78,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 79,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 79,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 80,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 80,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 81,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 81,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 82,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 82,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 83,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 83,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 84,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 84,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 85,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 85,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 86,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 86,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 87,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 87,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 88,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 88,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 89,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 89,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 90,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 90,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 91,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 91,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 92,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 92,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 93,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 93,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 94,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 94,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 95,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 95,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 96,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 96,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 97,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 97,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 98,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 98,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 99,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 99,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 100,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 100,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 101,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 101,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 102,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 102,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 103,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 103,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 104,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 104,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 105,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 105,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 106,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 106,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 107,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 107,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 108,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 108,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 109,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 109,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 110,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 110,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 111,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 111,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 112,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 112,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 113,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 113,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 114,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 114,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 115,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 115,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 116,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 116,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 117,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 117,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 118,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 118,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 119,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 119,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 120,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 120,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 121,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 121,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 122,
+"enemy": 0,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 12,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+},
+{
+"frame": 122,
+"enemy": 1,
+"attack_id": 11,
+"power": 102,
+"scale": 1024,
+"dmg": 13,
+"crit": 0,
+"rect_rel": [
+26,
+-14,
+147,
+-2
+],
+"rect_size": [
+121,
+12
+]
+}
+],
+"enemies": [
+{
+"offset": [
+60,
+0
+],
+"state_changes": [
+[
+27,
+"0x3002128"
+],
+[
+153,
+"0x3001f34"
+],
+[
+155,
+"0x3001f30"
+]
+],
+"moved_px": null
+},
+{
+"offset": [
+90,
+0
+],
+"state_changes": [
+[
+1,
+"0x3001f34"
+],
+[
+39,
+"0x3002128"
+],
+[
+153,
+"0x3001f34"
+],
+[
+155,
+"0x3001f30"
+]
+],
+"moved_px": null
+}
+]
+},
+"scatter_d": {
+"state_file": "log2_pl_piccolo.ss",
+"slot": 1,
+"input": "W:2 B:1 W:70",
+"facing": 0,
+"enemies_pinned": true,
+"player_states": [
+[
+0,
+0
+],
+[
+2,
+44
+],
+[
+51,
+0
+]
+],
+"player_mults_vuln": [
+[
+0,
+[
+0,
+0
+],
+1
+]
+],
+"ep_changes": [
+[
+2,
+987
+]
+],
+"projectiles": [
+{
+"vtable": "0x8024d14",
+"spawn_frame": 18,
+"frames_alive": 8,
+"frames_moving": 7,
+"spawn_pos_rel": [
+6.0,
+8.0
+],
+"end_pos_rel": [
+-4.5,
+26.184
+],
+"first_step": [
+-1.5,
+2.598
+],
+"steady_step": [
+-1.5,
+2.598
+],
+"rect_sizes": [
+[
+16,
+16
+]
+],
+"spawn_rect_rel": [
+-3,
+-4,
+13,
+12
+],
+"last_rect_rel": [
+-14,
+14,
+2,
+30
+]
+},
+{
+"vtable": "0x8024d14",
+"spawn_frame": 18,
+"frames_alive": 8,
+"frames_moving": 7,
+"spawn_pos_rel": [
+10.0,
+8.0
+],
+"end_pos_rel": [
+20.5,
+26.184
+],
+"first_step": [
+1.5,
+2.598
+],
+"steady_step": [
+1.5,
+2.598
+],
+"rect_sizes": [
+[
+16,
+16
+]
+],
+"spawn_rect_rel": [
+3,
+-4,
+19,
+12
+],
+"last_rect_rel": [
+13,
+14,
+29,
+30
+]
+},
+{
+"vtable": "0x8024d14",
+"spawn_frame": 18,
+"frames_alive": 7,
+"frames_moving": 6,
+"spawn_pos_rel": [
+8.0,
+8.0
+],
+"end_pos_rel": [
+8.0,
+26.0
+],
+"first_step": [
+0.0,
+3.0
+],
+"steady_step": [
+0.0,
+3.0
+],
+"rect_sizes": [
+[
+16,
+16
+]
+],
+"spawn_rect_rel": [
+0,
+4,
+16,
+20
+],
+"last_rect_rel": [
+0,
+22,
+16,
+38
+]
+}
+],
+"hits": [
+{
+"frame": 25,
+"enemy": 0,
+"attack_id": 6,
+"power": 1280,
+"scale": 1024,
+"dmg": 169,
+"crit": 0,
+"rect_rel": [
+0,
+21,
+16,
+37
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 26,
+"enemy": 0,
+"attack_id": 6,
+"power": 1280,
+"scale": 1024,
+"dmg": 166,
+"crit": 0,
+"rect_rel": [
+14,
+20,
+30,
+36
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 26,
+"enemy": 0,
+"attack_id": 6,
+"power": 1280,
+"scale": 1024,
+"dmg": 163,
+"crit": 0,
+"rect_rel": [
+-14,
+20,
+2,
+36
+],
+"rect_size": [
+16,
+16
+]
+}
+],
+"enemies": [
+{
+"offset": [
+0,
+60
+],
+"state_changes": [
+[
+25,
+"0x3002128"
+],
+[
+57,
+"0x3001f34"
+],
+[
+59,
+"0x3001f30"
+]
+],
+"moved_px": null
+},
+{
+"offset": [
+-30,
+60
+],
+"state_changes": [],
+"moved_px": null
+},
+{
+"offset": [
+30,
+60
+],
+"state_changes": [],
+"moved_px": null
+}
+]
+},
+"scatter_r": {
+"state_file": "log2_pl_piccolo.ss",
+"slot": 1,
+"input": "W:2 B:1 W:70",
+"facing": 3,
+"enemies_pinned": true,
+"player_states": [
+[
+0,
+0
+],
+[
+2,
+44
+],
+[
+51,
+0
+]
+],
+"player_mults_vuln": [
+[
+0,
+[
+0,
+0
+],
+1
+]
+],
+"ep_changes": [
+[
+2,
+987
+]
+],
+"projectiles": [
+{
+"vtable": "0x8024d14",
+"spawn_frame": 18,
+"frames_alive": 8,
+"frames_moving": 7,
+"spawn_pos_rel": [
+24.0,
+-6.0
+],
+"end_pos_rel": [
+42.184,
+-16.5
+],
+"first_step": [
+2.598,
+-1.5
+],
+"steady_step": [
+2.598,
+-1.5
+],
+"rect_sizes": [
+[
+16,
+16
+]
+],
+"spawn_rect_rel": [
+12,
+-14,
+28,
+2
+],
+"last_rect_rel": [
+30,
+-25,
+46,
+-9
+]
+},
+{
+"vtable": "0x8024d14",
+"spawn_frame": 18,
+"frames_alive": 8,
+"frames_moving": 7,
+"spawn_pos_rel": [
+24.0,
+-10.0
+],
+"end_pos_rel": [
+42.184,
+0.5
+],
+"first_step": [
+2.598,
+1.5
+],
+"steady_step": [
+2.598,
+1.5
+],
+"rect_sizes": [
+[
+16,
+16
+]
+],
+"spawn_rect_rel": [
+12,
+-18,
+28,
+-2
+],
+"last_rect_rel": [
+30,
+-8,
+46,
+8
+]
+},
+{
+"vtable": "0x8024d14",
+"spawn_frame": 18,
+"frames_alive": 7,
+"frames_moving": 6,
+"spawn_pos_rel": [
+24.0,
+-8.0
+],
+"end_pos_rel": [
+42.0,
+-8.0
+],
+"first_step": [
+3.0,
+0.0
+],
+"steady_step": [
+3.0,
+0.0
+],
+"rect_sizes": [
+[
+16,
+16
+]
+],
+"spawn_rect_rel": [
+12,
+-16,
+28,
+0
+],
+"last_rect_rel": [
+30,
+-16,
+46,
+0
+]
+}
+],
+"hits": [
+{
+"frame": 25,
+"enemy": 0,
+"attack_id": 6,
+"power": 1280,
+"scale": 1024,
+"dmg": 169,
+"crit": 0,
+"rect_rel": [
+37,
+-16,
+53,
+0
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 26,
+"enemy": 0,
+"attack_id": 6,
+"power": 1280,
+"scale": 1024,
+"dmg": 166,
+"crit": 0,
+"rect_rel": [
+36,
+-6,
+52,
+10
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 26,
+"enemy": 0,
+"attack_id": 6,
+"power": 1280,
+"scale": 1024,
+"dmg": 163,
+"crit": 0,
+"rect_rel": [
+36,
+-26,
+52,
+-10
+],
+"rect_size": [
+16,
+16
+]
+}
+],
+"enemies": [
+{
+"offset": [
+60,
+0
+],
+"state_changes": [
+[
+25,
+"0x3002128"
+],
+[
+57,
+"0x3001f34"
+],
+[
+59,
+"0x3001f30"
+]
+],
+"moved_px": null
+},
+{
+"offset": [
+60,
+-30
+],
+"state_changes": [],
+"moved_px": null
+},
+{
+"offset": [
+60,
+30
+],
+"state_changes": [],
+"moved_px": null
+}
+]
+},
+"spirit_free": {
+"state_file": "log2_pl_goku.ss",
+"slot": 1,
+"input": "W:2 B:40 W:200",
+"facing": 3,
+"enemies_pinned": false,
+"player_states": [
+[
+0,
+0
+],
+[
+2,
+51
+],
+[
+66,
+0
+]
+],
+"player_mults_vuln": [
+[
+0,
+[
+0,
+0
+],
+1
+]
+],
+"ep_changes": [
+[
+2,
+989
+],
+[
+3,
+988
+],
+[
+7,
+987
+],
+[
+11,
+986
+],
+[
+15,
+985
+],
+[
+19,
+984
+],
+[
+23,
+983
+],
+[
+27,
+982
+],
+[
+31,
+981
+],
+[
+35,
+980
+],
+[
+39,
+979
+]
+],
+"projectiles": [
+{
+"vtable": "0x8024af8",
+"spawn_frame": 2,
+"frames_alive": 66,
+"frames_moving": 65,
+"spawn_pos_rel": [
+8.0,
+-24.0
+],
+"end_pos_rel": [
+35.0,
+-6.0
+],
+"first_step": [
+0.0,
+0.0
+],
+"steady_step": [
+0.0,
+0.0
+],
+"rect_sizes": [
+[
+8,
+8
+],
+[
+16,
+16
+]
+],
+"spawn_rect_rel": [
+1,
+-31,
+9,
+-23
+],
+"last_rect_rel": [
+31,
+-10,
+39,
+-2
+]
+}
+],
+"hits": [
+{
+"frame": 68,
+"enemy": 0,
+"attack_id": 14,
+"power": 40960,
+"scale": 53,
+"dmg": 364,
+"crit": 0,
+"rect_rel": [
+24,
+-18,
+48,
+6
+],
+"rect_size": [
+24,
+24
+]
+}
+],
+"enemies": [
+{
+"offset": [
+100,
+0
+],
+"state_changes": [
+[
+68,
+"0x3002128"
+],
+[
+99,
+"0x3001f34"
+],
+[
+101,
+"0x3001f30"
+],
+[
+118,
+"0x3001f34"
+],
+[
+226,
+"0x3001f30"
+]
+],
+"moved_px": [
+-36.16,
+-5.81
+]
+}
+]
+},
+"spirit_hold10": {
+"state_file": "log2_pl_goku.ss",
+"slot": 1,
+"input": "W:2 B:10 W:200",
+"facing": 3,
+"enemies_pinned": true,
+"player_states": [
+[
+0,
+0
+],
+[
+2,
+51
+],
+[
+36,
+0
+]
+],
+"player_mults_vuln": [
+[
+0,
+[
+0,
+0
+],
+1
+]
+],
+"ep_changes": [
+[
+2,
+989
+],
+[
+3,
+988
+],
+[
+7,
+987
+],
+[
+11,
+986
+]
+],
+"projectiles": [
+{
+"vtable": "0x8024af8",
+"spawn_frame": 2,
+"frames_alive": 47,
+"frames_moving": 46,
+"spawn_pos_rel": [
+8.0,
+-24.0
+],
+"end_pos_rel": [
+46.0,
+-6.0
+],
+"first_step": [
+0.0,
+0.0
+],
+"steady_step": [
+0.0,
+0.0
+],
+"rect_sizes": [
+[
+8,
+8
+],
+[
+16,
+16
+]
+],
+"spawn_rect_rel": [
+1,
+-31,
+9,
+-23
+],
+"last_rect_rel": [
+42,
+-10,
+50,
+-2
+]
+}
+],
+"hits": [
+{
+"frame": 49,
+"enemy": 0,
+"attack_id": 14,
+"power": 40960,
+"scale": 23,
+"dmg": 164,
+"crit": 0,
+"rect_rel": [
+35,
+-18,
+59,
+6
+],
+"rect_size": [
+24,
+24
+]
+},
+{
+"frame": 49,
+"enemy": 1,
+"attack_id": 14,
+"power": 40960,
+"scale": 23,
+"dmg": 162,
+"crit": 0,
+"rect_rel": [
+35,
+-18,
+59,
+6
+],
+"rect_size": [
+24,
+24
+]
+}
+],
+"enemies": [
+{
+"offset": [
+60,
+0
+],
+"state_changes": [
+[
+49,
+"0x3002128"
+],
+[
+80,
+"0x3001f34"
+],
+[
+82,
+"0x3001f30"
+]
+],
+"moved_px": null
+},
+{
+"offset": [
+60,
+20
+],
+"state_changes": [
+[
+49,
+"0x3002128"
+],
+[
+80,
+"0x3001f34"
+],
+[
+82,
+"0x3001f30"
+]
+],
+"moved_px": null
+}
+]
+},
+"spirit_hold130": {
+"state_file": "log2_pl_goku.ss",
+"slot": 1,
+"input": "W:2 B:130 W:250",
+"facing": 3,
+"enemies_pinned": true,
+"player_states": [
+[
+0,
+0
+],
+[
+2,
+51
+],
+[
+156,
+0
+]
+],
+"player_mults_vuln": [
+[
+0,
+[
+0,
+0
+],
+1
+]
+],
+"ep_changes": [
+[
+2,
+989
+],
+[
+3,
+988
+],
+[
+7,
+987
+],
+[
+11,
+986
+],
+[
+15,
+985
+],
+[
+19,
+984
+],
+[
+23,
+983
+],
+[
+27,
+982
+],
+[
+31,
+981
+],
+[
+35,
+980
+],
+[
+39,
+979
+],
+[
+43,
+978
+],
+[
+47,
+977
+],
+[
+51,
+976
+],
+[
+55,
+975
+],
+[
+59,
+974
+],
+[
+63,
+973
+],
+[
+67,
+972
+],
+[
+71,
+971
+],
+[
+75,
+970
+],
+[
+79,
+969
+],
+[
+83,
+968
+],
+[
+87,
+967
+],
+[
+91,
+966
+],
+[
+95,
+965
+],
+[
+99,
+964
+],
+[
+103,
+963
+],
+[
+107,
+962
+],
+[
+111,
+961
+],
+[
+115,
+960
+],
+[
+119,
+959
+],
+[
+123,
+958
+],
+[
+127,
+957
+],
+[
+131,
+956
+],
+[
+265,
+985
+]
+],
+"projectiles": [
+{
+"vtable": "0x8024af8",
+"spawn_frame": 2,
+"frames_alive": 203,
+"frames_moving": 202,
+"spawn_pos_rel": [
+8.0,
+-24.0
+],
+"end_pos_rel": [
+82.0,
+-6.0
+],
+"first_step": [
+0.0,
+0.0
+],
+"steady_step": [
+0.0,
+0.0
+],
+"rect_sizes": [
+[
+8,
+8
+],
+[
+16,
+16
+],
+[
+32,
+32
+]
+],
+"spawn_rect_rel": [
+1,
+-31,
+9,
+-23
+],
+"last_rect_rel": [
+74,
+-14,
+90,
+2
+]
+}
+],
+"hits": [
+{
+"frame": 205,
+"enemy": 0,
+"attack_id": 14,
+"power": 40960,
+"scale": 143,
+"dmg": 1056,
+"crit": 0,
+"rect_rel": [
+59,
+-30,
+107,
+18
+],
+"rect_size": [
+48,
+48
+]
+},
+{
+"frame": 205,
+"enemy": 1,
+"attack_id": 14,
+"power": 40960,
+"scale": 143,
+"dmg": 976,
+"crit": 0,
+"rect_rel": [
+59,
+-30,
+107,
+18
+],
+"rect_size": [
+48,
+48
+]
+},
+{
+"frame": 205,
+"enemy": 0,
+"attack_id": 15,
+"power": 0,
+"scale": 0,
+"dmg": 0,
+"crit": 0,
+"rect_rel": [
+0,
+0,
+2048,
+2048
+],
+"rect_size": [
+2048,
+2048
+]
+},
+{
+"frame": 205,
+"enemy": 1,
+"attack_id": 15,
+"power": 0,
+"scale": 0,
+"dmg": 0,
+"crit": 0,
+"rect_rel": [
+0,
+0,
+2048,
+2048
+],
+"rect_size": [
+2048,
+2048
+]
+},
+{
+"frame": 205,
+"enemy": 2,
+"attack_id": 15,
+"power": 0,
+"scale": 0,
+"dmg": 0,
+"crit": 0,
+"rect_rel": [
+0,
+0,
+2048,
+2048
+],
+"rect_size": [
+2048,
+2048
+]
+}
+],
+"enemies": [
+{
+"offset": [
+100,
+0
+],
+"state_changes": [
+[
+1,
+"0x3001f34"
+],
+[
+205,
+"0x3002230"
+]
+],
+"moved_px": null
+},
+{
+"offset": [
+100,
+40
+],
+"state_changes": [
+[
+1,
+"0x3001f34"
+],
+[
+205,
+"0x3002230"
+]
+],
+"moved_px": null
+},
+{
+"offset": [
+40,
+-60
+],
+"state_changes": [
+[
+1,
+"0x3001f34"
+],
+[
+205,
+"0x3002230"
+]
+],
+"moved_px": null
+}
+]
+},
+"spirit_hold40": {
+"state_file": "log2_pl_goku.ss",
+"slot": 1,
+"input": "W:2 B:40 W:200",
+"facing": 3,
+"enemies_pinned": true,
+"player_states": [
+[
+0,
+0
+],
+[
+2,
+51
+],
+[
+66,
+0
+]
+],
+"player_mults_vuln": [
+[
+0,
+[
+128,
+128
+],
+1
+]
+],
+"ep_changes": [
+[
+2,
+989
+],
+[
+3,
+988
+],
+[
+7,
+987
+],
+[
+11,
+986
+],
+[
+15,
+985
+],
+[
+19,
+984
+],
+[
+23,
+983
+],
+[
+27,
+982
+],
+[
+31,
+981
+],
+[
+35,
+980
+],
+[
+39,
+979
+]
+],
+"projectiles": [
+{
+"vtable": "0x8024af8",
+"spawn_frame": 2,
+"frames_alive": 117,
+"frames_moving": 116,
+"spawn_pos_rel": [
+8.0,
+-24.0
+],
+"end_pos_rel": [
+86.0,
+-6.0
+],
+"first_step": [
+0.0,
+0.0
+],
+"steady_step": [
+0.0,
+0.0
+],
+"rect_sizes": [
+[
+8,
+8
+],
+[
+16,
+16
+]
+],
+"spawn_rect_rel": [
+1,
+-31,
+9,
+-23
+],
+"last_rect_rel": [
+82,
+-10,
+90,
+-2
+]
+}
+],
+"hits": [
+{
+"frame": 119,
+"enemy": 0,
+"attack_id": 14,
+"power": 40960,
+"scale": 53,
+"dmg": 364,
+"crit": 0,
+"rect_rel": [
+75,
+-18,
+99,
+6
+],
+"rect_size": [
+24,
+24
+]
+}
+],
+"enemies": [
+{
+"offset": [
+100,
+0
+],
+"state_changes": [
+[
+1,
+"0x3001f34"
+],
+[
+119,
+"0x3002128"
+],
+[
+150,
+"0x3001f34"
+],
+[
+152,
+"0x3001f30"
+]
+],
+"moved_px": null
+},
+{
+"offset": [
+100,
+30
+],
+"state_changes": [],
+"moved_px": null
+},
+{
+"offset": [
+130,
+0
+],
+"state_changes": [],
+"moved_px": null
+}
+]
+},
+"spirit_stun_long": {
+"state_file": "log2_pl_goku.ss",
+"slot": 1,
+"input": "W:2 B:130 W:1100",
+"facing": 3,
+"enemies_pinned": true,
+"player_states": [
+[
+0,
+0
+],
+[
+2,
+51
+],
+[
+156,
+0
+],
+[
+1181,
+14
+]
+],
+"player_mults_vuln": [
+[
+0,
+[
+0,
+0
+],
+1
+]
+],
+"ep_changes": [
+[
+2,
+989
+],
+[
+3,
+988
+],
+[
+7,
+987
+],
+[
+11,
+986
+],
+[
+15,
+985
+],
+[
+19,
+984
+],
+[
+23,
+983
+],
+[
+27,
+982
+],
+[
+31,
+981
+],
+[
+35,
+980
+],
+[
+39,
+979
+],
+[
+43,
+978
+],
+[
+47,
+977
+],
+[
+51,
+976
+],
+[
+55,
+975
+],
+[
+59,
+974
+],
+[
+63,
+973
+],
+[
+67,
+972
+],
+[
+71,
+971
+],
+[
+75,
+970
+],
+[
+79,
+969
+],
+[
+83,
+968
+],
+[
+87,
+967
+],
+[
+91,
+966
+],
+[
+95,
+965
+],
+[
+99,
+964
+],
+[
+103,
+963
+],
+[
+107,
+962
+],
+[
+111,
+961
+],
+[
+115,
+960
+],
+[
+119,
+959
+],
+[
+123,
+958
+],
+[
+127,
+957
+],
+[
+131,
+956
+],
+[
+264,
+985
+],
+[
+860,
+999
+]
+],
+"projectiles": [
+{
+"vtable": "0x8024af8",
+"spawn_frame": 2,
+"frames_alive": 203,
+"frames_moving": 202,
+"spawn_pos_rel": [
+8.0,
+-24.0
+],
+"end_pos_rel": [
+82.0,
+-6.0
+],
+"first_step": [
+0.0,
+0.0
+],
+"steady_step": [
+0.0,
+0.0
+],
+"rect_sizes": [
+[
+8,
+8
+],
+[
+16,
+16
+],
+[
+32,
+32
+]
+],
+"spawn_rect_rel": [
+1,
+-31,
+9,
+-23
+],
+"last_rect_rel": [
+74,
+-14,
+90,
+2
+]
+}
+],
+"hits": [
+{
+"frame": 205,
+"enemy": 0,
+"attack_id": 14,
+"power": 40960,
+"scale": 143,
+"dmg": 1048,
+"crit": 0,
+"rect_rel": [
+59,
+-30,
+107,
+18
+],
+"rect_size": [
+48,
+48
+]
+},
+{
+"frame": 205,
+"enemy": 0,
+"attack_id": 15,
+"power": 0,
+"scale": 0,
+"dmg": 0,
+"crit": 0,
+"rect_rel": [
+0,
+0,
+2048,
+2048
+],
+"rect_size": [
+2048,
+2048
+]
+},
+{
+"frame": 205,
+"enemy": 1,
+"attack_id": 15,
+"power": 0,
+"scale": 0,
+"dmg": 0,
+"crit": 0,
+"rect_rel": [
+0,
+0,
+2048,
+2048
+],
+"rect_size": [
+2048,
+2048
+]
+}
+],
+"enemies": [
+{
+"offset": [
+100,
+0
+],
+"state_changes": [
+[
+1,
+"0x3001f34"
+],
+[
+205,
+"0x3002230"
+],
+[
+529,
+"0x3001f30"
+]
+],
+"moved_px": null
+},
+{
+"offset": [
+-60,
+40
+],
+"state_changes": [
+[
+205,
+"0x3002230"
+],
+[
+529,
+"0x3001f30"
+]
+],
+"moved_px": null
+}
+]
+},
+"spmelee_gohan": {
+"state_file": "log2_pl_gohan.ss",
+"slot": 3,
+"input": "W:2 A:110 W:60",
+"facing": 3,
+"enemies_pinned": true,
+"player_states": [
+[
+0,
+0
+],
+[
+2,
+41
+],
+[
+18,
+39
+],
+[
+135,
+0
+]
+],
+"player_mults_vuln": [
+[
+0,
+[
+128,
+128
+],
+1
+],
+[
+112,
+[
+128,
+128
+],
+0
+],
+[
+135,
+[
+128,
+128
+],
+1
+]
+],
+"ep_changes": [],
+"projectiles": [],
+"hits": [
+{
+"frame": 2,
+"enemy": 0,
+"attack_id": 2,
+"power": 1024,
+"scale": 1024,
+"dmg": 133,
+"crit": 0,
+"rect_rel": [
+16,
+-24,
+24,
+8
+],
+"rect_size": [
+8,
+32
+]
+},
+{
+"frame": 119,
+"enemy": 0,
+"attack_id": 4,
+"power": 1536,
+"scale": 1024,
+"dmg": 202,
+"crit": 0,
+"rect_rel": [
+16,
+-24,
+24,
+8
+],
+"rect_size": [
+8,
+32
+]
+},
+{
+"frame": 127,
+"enemy": 0,
+"attack_id": 4,
+"power": 1536,
+"scale": 1024,
+"dmg": 196,
+"crit": 0,
+"rect_rel": [
+16,
+-24,
+24,
+8
+],
+"rect_size": [
+8,
+32
+]
+}
+],
+"enemies": [
+{
+"offset": [
+26,
+0
+],
+"state_changes": [
+[
+1,
+"0x3001f34"
+],
+[
+2,
+"0x3002128"
+],
+[
+33,
+"0x3001f34"
+],
+[
+73,
+"0x3001f30"
+],
+[
+119,
+"0x3002128"
+],
+[
+158,
+"0x3001f34"
+]
+],
+"moved_px": null
+}
+]
+},
+"spmelee_goku": {
+"state_file": "log2_pl_goku.ss",
+"slot": 3,
+"input": "W:2 A:110 W:60",
+"facing": 3,
+"enemies_pinned": true,
+"player_states": [
+[
+0,
+0
+],
+[
+2,
+41
+],
+[
+18,
+39
+],
+[
+135,
+0
+]
+],
+"player_mults_vuln": [
+[
+0,
+[
+128,
+128
+],
+1
+],
+[
+112,
+[
+128,
+128
+],
+0
+],
+[
+135,
+[
+128,
+128
+],
+1
+]
+],
+"ep_changes": [],
+"projectiles": [],
+"hits": [
+{
+"frame": 2,
+"enemy": 0,
+"attack_id": 2,
+"power": 1024,
+"scale": 1024,
+"dmg": 161,
+"crit": 0,
+"rect_rel": [
+16,
+-24,
+24,
+8
+],
+"rect_size": [
+8,
+32
+]
+},
+{
+"frame": 123,
+"enemy": 0,
+"attack_id": 4,
+"power": 1536,
+"scale": 1024,
+"dmg": 243,
+"crit": 0,
+"rect_rel": [
+16,
+-24,
+24,
+8
+],
+"rect_size": [
+8,
+32
+]
+},
+{
+"frame": 127,
+"enemy": 0,
+"attack_id": 4,
+"power": 1536,
+"scale": 1024,
+"dmg": 237,
+"crit": 0,
+"rect_rel": [
+16,
+-24,
+24,
+8
+],
+"rect_size": [
+8,
+32
+]
+}
+],
+"enemies": [
+{
+"offset": [
+26,
+0
+],
+"state_changes": [
+[
+1,
+"0x3001f34"
+],
+[
+2,
+"0x3002128"
+],
+[
+33,
+"0x3001f34"
+],
+[
+73,
+"0x3001f30"
+],
+[
+123,
+"0x3002128"
+],
+[
+158,
+"0x3001f34"
+]
+],
+"moved_px": null
+}
+]
+},
+"spmelee_goku_d": {
+"state_file": "log2_pl_goku.ss",
+"slot": 3,
+"input": "W:2 A:110 W:60",
+"facing": 0,
+"enemies_pinned": true,
+"player_states": [
+[
+0,
+0
+],
+[
+2,
+41
+],
+[
+18,
+39
+],
+[
+135,
+0
+]
+],
+"player_mults_vuln": [
+[
+0,
+[
+0,
+0
+],
+1
+],
+[
+112,
+[
+0,
+0
+],
+0
+],
+[
+135,
+[
+0,
+0
+],
+1
+]
+],
+"ep_changes": [],
+"projectiles": [],
+"hits": [
+{
+"frame": 2,
+"enemy": 0,
+"attack_id": 2,
+"power": 1024,
+"scale": 1024,
+"dmg": 161,
+"crit": 0,
+"rect_rel": [
+0,
+0,
+16,
+16
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 123,
+"enemy": 0,
+"attack_id": 4,
+"power": 1536,
+"scale": 1024,
+"dmg": 244,
+"crit": 0,
+"rect_rel": [
+0,
+0,
+16,
+16
+],
+"rect_size": [
+16,
+16
+]
+},
+{
+"frame": 127,
+"enemy": 0,
+"attack_id": 4,
+"power": 1536,
+"scale": 1024,
+"dmg": 245,
+"crit": 0,
+"rect_rel": [
+0,
+0,
+16,
+16
+],
+"rect_size": [
+16,
+16
+]
+}
+],
+"enemies": [
+{
+"offset": [
+0,
+26
+],
+"state_changes": [
+[
+1,
+"0x3001f34"
+],
+[
+2,
+"0x3002128"
+],
+[
+33,
+"0x3001f34"
+],
+[
+73,
+"0x3001f30"
+],
+[
+74,
+"0x3002108"
+],
+[
+90,
+"0x3001f34"
+],
+[
+91,
+"0x3002244"
+],
+[
+114,
+"0x3001f34"
+],
+[
+123,
+"0x3002128"
+],
+[
+158,
+"0x3001f34"
+]
+],
+"moved_px": null
+}
+]
+},
+"spmelee_goku_short": {
+"state_file": "log2_pl_goku.ss",
+"slot": 3,
+"input": "W:2 A:30 W:60",
+"facing": 3,
+"enemies_pinned": true,
+"player_states": [
+[
+0,
+0
+],
+[
+2,
+41
+],
+[
+18,
+39
+],
+[
+32,
+0
+]
+],
+"player_mults_vuln": [
+[
+0,
+[
+0,
+0
+],
+1
+]
+],
+"ep_changes": [],
+"projectiles": [],
+"hits": [
+{
+"frame": 2,
+"enemy": 0,
+"attack_id": 2,
+"power": 1024,
+"scale": 1024,
+"dmg": 161,
+"crit": 0,
+"rect_rel": [
+16,
+-24,
+24,
+8
+],
+"rect_size": [
+8,
+32
+]
+}
+],
+"enemies": [
+{
+"offset": [
+26,
+0
+],
+"state_changes": [
+[
+1,
+"0x3001f34"
+],
+[
+2,
+"0x3002128"
+],
+[
+33,
+"0x3001f34"
+],
+[
+72,
+"0x3001f30"
+]
+],
+"moved_px": null
+}
+]
+},
+"spmelee_piccolo": {
+"state_file": "log2_pl_piccolo.ss",
+"slot": 3,
+"input": "W:2 A:110 W:60",
+"facing": 3,
+"enemies_pinned": true,
+"player_states": [
+[
+0,
+0
+],
+[
+2,
+41
+],
+[
+18,
+39
+],
+[
+74,
+32
+],
+[
+106,
+0
+]
+],
+"player_mults_vuln": [
+[
+0,
+[
+128,
+128
+],
+1
+],
+[
+74,
+[
+0,
+0
+],
+1
+],
+[
+106,
+[
+128,
+128
+],
+1
+]
+],
+"ep_changes": [],
+"projectiles": [],
+"hits": [
+{
+"frame": 2,
+"enemy": 0,
+"attack_id": 2,
+"power": 1024,
+"scale": 1024,
+"dmg": 78,
+"crit": 0,
+"rect_rel": [
+16,
+-24,
+24,
+8
+],
+"rect_size": [
+8,
+32
+]
+}
+],
+"enemies": [
+{
+"offset": [
+26,
+0
+],
+"state_changes": [
+[
+1,
+"0x3001f34"
+],
+[
+2,
+"0x3002128"
+],
+[
+33,
+"0x3001f34"
+],
+[
+73,
+"0x3001f30"
+],
+[
+74,
+"0x3002108"
+],
+[
+90,
+"0x3001f34"
+],
+[
+91,
+"0x3002244"
+],
+[
+105,
+"0x3001f34"
+],
+[
+124,
+"0x3001f30"
+]
+],
+"moved_px": null
+}
+]
+},
+"spmelee_piccolo_imm": {
+"state_file": "log2_pl_piccolo.ss",
+"slot": 3,
+"input": "W:2 A:110 W:60",
+"facing": 3,
+"enemies_pinned": true,
+"player_states": [
+[
+0,
+0
+],
+[
+2,
+41
+],
+[
+18,
+39
+],
+[
+135,
+0
+]
+],
+"player_mults_vuln": [
+[
+0,
+[
+0,
+0
+],
+1
+],
+[
+112,
+[
+0,
+0
+],
+0
+],
+[
+135,
+[
+0,
+0
+],
+1
+]
+],
+"ep_changes": [],
+"projectiles": [],
+"hits": [
+{
+"frame": 2,
+"enemy": 0,
+"attack_id": 2,
+"power": 1024,
+"scale": 1024,
+"dmg": 78,
+"crit": 0,
+"rect_rel": [
+16,
+-24,
+24,
+8
+],
+"rect_size": [
+8,
+32
+]
+},
+{
+"frame": 115,
+"enemy": 0,
+"attack_id": 4,
+"power": 1536,
+"scale": 1024,
+"dmg": 119,
+"crit": 0,
+"rect_rel": [
+16,
+-24,
+24,
+8
+],
+"rect_size": [
+8,
+32
+]
+},
+{
+"frame": 119,
+"enemy": 0,
+"attack_id": 4,
+"power": 1536,
+"scale": 1024,
+"dmg": 116,
+"crit": 0,
+"rect_rel": [
+16,
+-24,
+24,
+8
+],
+"rect_size": [
+8,
+32
+]
+},
+{
+"frame": 123,
+"enemy": 0,
+"attack_id": 4,
+"power": 1536,
+"scale": 1024,
+"dmg": 121,
+"crit": 0,
+"rect_rel": [
+16,
+-24,
+24,
+8
+],
+"rect_size": [
+8,
+32
+]
+},
+{
+"frame": 127,
+"enemy": 0,
+"attack_id": 4,
+"power": 1536,
+"scale": 1024,
+"dmg": 114,
+"crit": 0,
+"rect_rel": [
+16,
+-24,
+24,
+8
+],
+"rect_size": [
+8,
+32
+]
+}
+],
+"enemies": [
+{
+"offset": [
+26,
+0
+],
+"state_changes": [
+[
+1,
+"0x3001f34"
+],
+[
+2,
+"0x3002128"
+],
+[
+33,
+"0x3001f34"
+],
+[
+73,
+"0x3001f30"
+],
+[
+74,
+"0x3002108"
+],
+[
+90,
+"0x3001f34"
+],
+[
+91,
+"0x3002244"
+],
+[
+115,
+"0x3002128"
+],
+[
+158,
+"0x3001f34"
+]
+],
+"moved_px": null
+}
+]
+},
+"spmelee_trunks": {
+"state_file": "log2_pl_trunks.ss",
+"slot": 3,
+"input": "W:2 A:110 W:60",
+"facing": 3,
+"enemies_pinned": true,
+"player_states": [
+[
+0,
+0
+],
+[
+2,
+41
+],
+[
+18,
+39
+],
+[
+131,
+0
+]
+],
+"player_mults_vuln": [
+[
+0,
+[
+128,
+128
+],
+1
+],
+[
+112,
+[
+128,
+128
+],
+0
+],
+[
+131,
+[
+128,
+128
+],
+1
+]
+],
+"ep_changes": [],
+"projectiles": [],
+"hits": [
+{
+"frame": 2,
+"enemy": 0,
+"attack_id": 2,
+"power": 1024,
+"scale": 1024,
+"dmg": 113,
+"crit": 0,
+"rect_rel": [
+16,
+-24,
+24,
+8
+],
+"rect_size": [
+8,
+32
+]
+},
+{
+"frame": 123,
+"enemy": 0,
+"attack_id": 4,
+"power": 1536,
+"scale": 1024,
+"dmg": 171,
+"crit": 0,
+"rect_rel": [
+16,
+-24,
+24,
+8
+],
+"rect_size": [
+8,
+32
+]
+},
+{
+"frame": 127,
+"enemy": 0,
+"attack_id": 4,
+"power": 1536,
+"scale": 1024,
+"dmg": 167,
+"crit": 0,
+"rect_rel": [
+16,
+-24,
+24,
+8
+],
+"rect_size": [
+8,
+32
+]
+}
+],
+"enemies": [
+{
+"offset": [
+26,
+0
+],
+"state_changes": [
+[
+1,
+"0x3001f34"
+],
+[
+2,
+"0x3002128"
+],
+[
+33,
+"0x3001f34"
+],
+[
+73,
+"0x3001f30"
+],
+[
+123,
+"0x3002128"
+],
+[
+158,
+"0x3001f34"
+]
+],
+"moved_px": null
+}
+]
+},
+"spmelee_vegeta": {
+"state_file": "log2_pl_vegeta.ss",
+"slot": 3,
+"input": "W:2 A:110 W:60",
+"facing": 3,
+"enemies_pinned": true,
+"player_states": [
+[
+0,
+0
+],
+[
+2,
+41
+],
+[
+18,
+39
+],
+[
+135,
+0
+]
+],
+"player_mults_vuln": [
+[
+0,
+[
+128,
+128
+],
+1
+],
+[
+112,
+[
+128,
+128
+],
+0
+],
+[
+135,
+[
+128,
+128
+],
+1
+]
+],
+"ep_changes": [],
+"projectiles": [],
+"hits": [
+{
+"frame": 2,
+"enemy": 0,
+"attack_id": 2,
+"power": 1024,
+"scale": 1024,
+"dmg": 96,
+"crit": 0,
+"rect_rel": [
+16,
+-24,
+24,
+8
+],
+"rect_size": [
+8,
+32
+]
+},
+{
+"frame": 123,
+"enemy": 0,
+"attack_id": 4,
+"power": 1536,
+"scale": 1024,
+"dmg": 145,
+"crit": 0,
+"rect_rel": [
+16,
+-24,
+24,
+8
+],
+"rect_size": [
+8,
+32
+]
+},
+{
+"frame": 127,
+"enemy": 0,
+"attack_id": 4,
+"power": 1536,
+"scale": 1024,
+"dmg": 141,
+"crit": 0,
+"rect_rel": [
+16,
+-24,
+24,
+8
+],
+"rect_size": [
+8,
+32
+]
+}
+],
+"enemies": [
+{
+"offset": [
+26,
+0
+],
+"state_changes": [
+[
+1,
+"0x3001f34"
+],
+[
+2,
+"0x3002128"
+],
+[
+33,
+"0x3001f34"
+],
+[
+73,
+"0x3001f30"
+],
+[
+123,
+"0x3002128"
+],
+[
+158,
+"0x3001f34"
+]
+],
+"moved_px": null
+}
+]
+},
+"swordblast_d": {
+"state_file": "log2_pl_trunks.ss",
+"slot": 1,
+"input": "W:2 B:1 W:60",
+"facing": 0,
+"enemies_pinned": true,
+"player_states": [
+[
+0,
+0
+],
+[
+2,
+50
+],
+[
+35,
+0
+]
+],
+"player_mults_vuln": [
+[
+0,
+[
+0,
+0
+],
+1
+]
+],
+"ep_changes": [
+[
+2,
+994
+]
+],
+"projectiles": [
+{
+"vtable": "0x8024b24",
+"spawn_frame": 10,
+"frames_alive": 6,
+"frames_moving": 5,
+"spawn_pos_rel": [
+8.0,
+12.0
+],
+"end_pos_rel": [
+8.0,
+29.5
+],
+"first_step": [
+0.0,
+3.5
+],
+"steady_step": [
+0.0,
+3.5
+],
+"rect_sizes": [
+[
+16,
+8
+]
+],
+"spawn_rect_rel": [
+0,
+8,
+16,
+16
+],
+"last_rect_rel": [
+0,
+25,
+16,
+33
+]
+}
+],
+"hits": [
+{
+"frame": 16,
+"enemy": 0,
+"attack_id": 13,
+"power": 3072,
+"scale": 1024,
+"dmg": 445,
+"crit": 0,
+"rect_rel": [
+0,
+29,
+16,
+37
+],
+"rect_size": [
+16,
+8
+]
+}
+],
+"enemies": [
+{
+"offset": [
+0,
+60
+],
+"state_changes": [
+[
+16,
+"0x3002128"
+],
+[
+47,
+"0x3001f34"
+],
+[
+49,
+"0x3001f30"
+]
+],
+"moved_px": null
+}
+]
+},
+"swordblast_r": {
+"state_file": "log2_pl_trunks.ss",
+"slot": 1,
+"input": "W:2 B:1 W:60",
+"facing": 3,
+"enemies_pinned": true,
+"player_states": [
+[
+0,
+0
+],
+[
+2,
+50
+],
+[
+35,
+0
+]
+],
+"player_mults_vuln": [
+[
+0,
+[
+128,
+128
+],
+1
+]
+],
+"ep_changes": [
+[
+2,
+994
+]
+],
+"projectiles": [
+{
+"vtable": "0x8024b24",
+"spawn_frame": 10,
+"frames_alive": 1,
+"frames_moving": 0,
+"spawn_pos_rel": [
+26.0,
+-4.0
+],
+"end_pos_rel": [
+26.0,
+-4.0
+],
+"first_step": null,
+"steady_step": null,
+"rect_sizes": [
+[
+8,
+16
+]
+],
+"spawn_rect_rel": [
+22,
+-12,
+30,
+4
+],
+"last_rect_rel": [
+22,
+-12,
+30,
+4
+]
+}
+],
+"hits": [
+{
+"frame": 2,
+"enemy": 0,
+"attack_id": 12,
+"power": 1024,
+"scale": 1024,
+"dmg": 118,
+"crit": 0,
+"rect_rel": [
+16,
+-16,
+32,
+8
+],
+"rect_size": [
+16,
+24
+]
+},
+{
+"frame": 11,
+"enemy": 0,
+"attack_id": 13,
+"power": 3072,
+"scale": 1024,
+"dmg": 437,
+"crit": 0,
+"rect_rel": [
+25,
+-12,
+33,
+4
+],
+"rect_size": [
+8,
+16
+]
+}
+],
+"enemies": [
+{
+"offset": [
+16,
+0
+],
+"state_changes": [
+[
+1,
+"0x3001f34"
+],
+[
+2,
+"0x3002128"
+],
+[
+42,
+"0x3001f34"
+]
+],
+"moved_px": null
+},
+{
+"offset": [
+60,
+0
+],
+"state_changes": [],
+"moved_px": null
+},
+{
+"offset": [
+90,
+0
+],
+"state_changes": [
+[
+1,
+"0x3001f34"
+]
+],
+"moved_px": null
+}
+]
+}
+}

@@ -2156,5 +2156,294 @@
    }
   }
  ],
- "forms_rom": "0x81d967c"
+ "forms_rom": "0x81d967c",
+ "move_unlocks": {
+  "mechanism": "event-script builtin 0x53 learn(char, n): record flags |= 4<<n (n 0 special melee, 1 slot0, 2 slot1, 3 slot2, 4 slot3); builtin 0x52 unlockTransform(char) sets bit5 (slot 2). Script VM 0x080092E4: op 0x1D n varints = push zigzag args, op 0x02 xx = call builtin xx (table 0x083B5D28). Found by scanning script data 0x083B6000-0x083F0000 for the call bytes (DISASM; locations labelled by nearby dialogue). At new game only slot 3 (basic blast) is unlocked; no level-based unlocks exist (no other code writes these bits).",
+  "calls": [
+   {
+    "addr": "0x83b8637",
+    "fn": "learn",
+    "char": "Gohan",
+    "args": [
+     0,
+     1
+    ],
+    "unlocks": "slot 0",
+    "move": "Masenko Ball",
+    "text_before": "@^Three years later...",
+    "text_after": ""
+   },
+   {
+    "addr": "0x83b868f",
+    "fn": "learn",
+    "char": "Piccolo",
+    "args": [
+     1,
+     1
+    ],
+    "unlocks": "slot 0",
+    "move": "Special Beam Cannon",
+    "text_before": "@^Three years later...",
+    "text_after": ""
+   },
+   {
+    "addr": "0x83ce4cb",
+    "fn": "learn",
+    "char": "Gohan",
+    "args": [
+     0,
+     0
+    ],
+    "unlocks": "special melee",
+    "move": "Super Kick",
+    "text_before": "",
+    "text_after": "@^Gohan now has the Super Kick Technique!"
+   },
+   {
+    "addr": "0x83ce60b",
+    "fn": "learn",
+    "char": "Piccolo",
+    "args": [
+     1,
+     0
+    ],
+    "unlocks": "special melee",
+    "move": "Whirlspin/Spin Punch",
+    "text_before": "an now has the Super Kick Technique!",
+    "text_after": "@^Piccolo now has the Spin Punch Technique!"
+   },
+   {
+    "addr": "0x83ce75b",
+    "fn": "learn",
+    "char": "Vegeta",
+    "args": [
+     2,
+     0
+    ],
+    "unlocks": "special melee",
+    "move": "Two-Handed Smash",
+    "text_before": " Spin Punch Technique!",
+    "text_after": "@^Vegeta now has the Two Handed Smash Technique!"
+   },
+   {
+    "addr": "0x83d1fd7",
+    "fn": "unlockTransform",
+    "char": "Vegeta",
+    "args": [
+     2
+    ],
+    "text_before": "@^You are now playing as Vegeta.",
+    "text_after": ""
+   },
+   {
+    "addr": "0x83d1fdd",
+    "fn": "learn",
+    "char": "Vegeta",
+    "args": [
+     2,
+     1
+    ],
+    "unlocks": "slot 0",
+    "move": "Big Bang",
+    "text_before": "@^You are now playing as Vegeta.",
+    "text_after": ""
+   },
+   {
+    "addr": "0x83db64d",
+    "fn": "unlockTransform",
+    "char": "Gohan",
+    "args": [
+     0
+    ],
+    "text_before": "",
+    "text_after": "?GOKU: Hey, look who I brought home for dinner!"
+   },
+   {
+    "addr": "0x83db653",
+    "fn": "learn",
+    "char": "Gohan",
+    "args": [
+     0,
+     2
+    ],
+    "unlocks": "slot 1",
+    "move": "Kamehameha",
+    "text_before": "",
+    "text_after": "?GOKU: Hey, look who I brought home for dinner!"
+   },
+   {
+    "addr": "0x83dbc46",
+    "fn": "unlockTransform",
+    "char": "Goku",
+    "args": [
+     4
+    ],
+    "text_before": ".Okay, here goes...",
+    "text_after": ".That should do it!"
+   },
+   {
+    "addr": "0x83dbc52",
+    "fn": "learn",
+    "char": "Goku",
+    "args": [
+     4,
+     0
+    ],
+    "unlocks": "special melee",
+    "move": "Flurry Punch",
+    "text_before": ".Okay, here goes...",
+    "text_after": ".That should do it!"
+   },
+   {
+    "addr": "0x83dbc58",
+    "fn": "learn",
+    "char": "Goku",
+    "args": [
+     4,
+     1
+    ],
+    "unlocks": "slot 0",
+    "move": "Kamehameha",
+    "text_before": ".Okay, here goes...",
+    "text_after": ".That should do it!"
+   },
+   {
+    "addr": "0x83dbc5e",
+    "fn": "learn",
+    "char": "Goku",
+    "args": [
+     4,
+     2
+    ],
+    "unlocks": "slot 1",
+    "move": "Spirit Bomb",
+    "text_before": ".Okay, here goes...",
+    "text_after": ".That should do it!"
+   },
+   {
+    "addr": "0x83ddf1f",
+    "fn": "learn",
+    "char": "Trunks",
+    "args": [
+     3,
+     2
+    ],
+    "unlocks": "slot 1",
+    "move": "Sword Blast",
+    "text_before": "@^Journal Updated!",
+    "text_after": "@^Vegeta has achieved Level %d!"
+   },
+   {
+    "addr": "0x83ddf25",
+    "fn": "learn",
+    "char": "Vegeta",
+    "args": [
+     2,
+     2
+    ],
+    "unlocks": "slot 1",
+    "move": "Energy Punch",
+    "text_before": "^Journal Updated!",
+    "text_after": "@^Vegeta has achieved Level %d!"
+   },
+   {
+    "addr": "0x83df2db",
+    "fn": "unlockTransform",
+    "char": "Trunks",
+    "args": [
+     3
+    ],
+    "text_before": "",
+    "text_after": ""
+   },
+   {
+    "addr": "0x83df2e1",
+    "fn": "learn",
+    "char": "Trunks",
+    "args": [
+     3,
+     0
+    ],
+    "unlocks": "special melee",
+    "move": "Cross Slash",
+    "text_before": "",
+    "text_after": ""
+   },
+   {
+    "addr": "0x83df2e7",
+    "fn": "learn",
+    "char": "Trunks",
+    "args": [
+     3,
+     1
+    ],
+    "unlocks": "slot 0",
+    "move": "Burning Attack",
+    "text_before": "",
+    "text_after": ""
+   },
+   {
+    "addr": "0x83e0d6d",
+    "fn": "learn",
+    "char": "Piccolo",
+    "args": [
+     1,
+     2
+    ],
+    "unlocks": "slot 1",
+    "move": "Scatter Shot",
+    "text_before": "^@I must go.",
+    "text_after": "@^Journal Updated"
+   },
+   {
+    "addr": "0x83e0d75",
+    "fn": "unlockTransform",
+    "char": "Piccolo",
+    "args": [
+     1
+    ],
+    "text_before": "^@I must go.",
+    "text_after": "@^Journal Updated"
+   },
+   {
+    "addr": "0x83e34b3",
+    "fn": "learn",
+    "char": "Gohan",
+    "args": [
+     0,
+     0
+    ],
+    "unlocks": "special melee",
+    "move": "Super Kick",
+    "text_before": "",
+    "text_after": "@^Gohan now has the Super Kick Technique!"
+   },
+   {
+    "addr": "0x83e35f3",
+    "fn": "learn",
+    "char": "Piccolo",
+    "args": [
+     1,
+     0
+    ],
+    "unlocks": "special melee",
+    "move": "Whirlspin/Spin Punch",
+    "text_before": "an now has the Super Kick Technique!",
+    "text_after": "@^Piccolo now has the Spin Punch Technique!"
+   },
+   {
+    "addr": "0x83e3743",
+    "fn": "learn",
+    "char": "Vegeta",
+    "args": [
+     2,
+     0
+    ],
+    "unlocks": "special melee",
+    "move": "Two-Handed Smash",
+    "text_before": " Spin Punch Technique!",
+    "text_after": "@^Vegeta now has the Two Handed Smash Technique!"
+   }
+  ]
+ }
 }

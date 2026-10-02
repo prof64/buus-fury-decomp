@@ -18,6 +18,7 @@ from en_lib import *
 from extract_ai import states as ai_states, summarize
 from extract_maps import maps as map_list
 from en_script import drop_rules
+from en_attacks import projectiles, ATTACKS, AI_SPECIALS, attack_keys
 import json, os
 OUTDIR=ROOT+'data/log2/'
 GFX_PTR_TBL=0x083b4e74
@@ -71,6 +72,10 @@ def main():
             damage_taken_note=f"incoming dmg *= (128-{r['END']})/128 then *= {r['melee_taken_mult']}/128 (melee) or {r['energy_taken_mult']}/128 (energy)",
             ai_state=r['ai_state'], ai_summary=summ,
             attacks=summ['attacks'],
+            attack_keys=attack_keys(st, summ['states']),
+            projectiles=sorted(set(a['projectile'] for a in ATTACKS if a['key'] in attack_keys(st, summ['states']) and 'projectile' in a)),
+            body_contact_damage=('yes: ContactDamage (48 f cooldown)' if 'contact_damage' in attack_keys(st, summ['states']) else
+                                 'only while dashing (Charge/Pounce)' if set(attack_keys(st, summ['states']))&{'charge','pounce'} else 'no'),
             death_node=r['death_node'], death_behaviour=DEATH.get(int(r['death_node'],16),'unknown'),
             graphics=[gfx_ref(g) for g in gfx],
             spawn_count=len(sp), spawns=sp,
@@ -88,6 +93,11 @@ def main():
              enemy_attack_note=('Enemies use attack table 0x086db2cc ids 1 (energy 1024), 2 (melee 1024), 3 (energy 1024); damage to the player '
                  'uses the shared formula 0x0800f910 with S = enemy STR (melee) or POW (energy) and the player END/multipliers.'),
              scouter_db=hex(DB_TBL), graphics_ptr_table=hex(GFX_PTR_TBL),
+             projectiles=projectiles(), enemy_attacks=ATTACKS,
+             contact_and_melee_rules=('Touching an enemy does NOT hurt the player except: class 94 triceratops (ContactDamage, 48-frame '
+                 'cooldown) and enemies in a Charge/Pounce dash. All other melee damage comes from MeleeStrike (instant hit on the first '
+                 'frame of the strike state; box = own hurt rect extended 3-4 px toward the player) or the Cell drain grab. VERIFIED: '
+                 'snake at 14 px only damaged the player on strike-state entry frames.'),
              classes=out)
     os.makedirs(OUTDIR,exist_ok=True)
     json.dump(doc,open(OUTDIR+'enemies.json','w'),indent=1)
