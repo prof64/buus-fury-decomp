@@ -1,0 +1,24 @@
+{
+  "name": "buu-agent-mcp",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "MCP server that lets LLM agents play the Buu's Fury battle simulator (prototype; imports the TS sim from ../../site/src)",
+  "scripts": {
+    "build": "node build.mjs",
+    "typecheck": "../../site/node_modules/.bin/tsc -p tsconfig.json",
+    "start": "node dist/src/server.mjs",
+    "bridge": "node dist/scripts/daemon.mjs",
+    "selftest": "node build.mjs && node dist/scripts/selftest.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.0",
+    "pngjs": "^7.0.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "@types/pngjs": "^6.0.5",
+    "esbuild": "^0.28.2"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "buu-battle": {
+      "command": "node",
+      "args": ["agent/mcp/dist/src/server.mjs"],
+      "env": { "BUU_REPO": "." }
+    }
+  }
+}
