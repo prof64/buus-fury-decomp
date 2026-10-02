@@ -198,7 +198,11 @@ async function boot(baseTarBytes) {
   try {
     bindings = JSON.parse(localStorage.getItem('wf.bindings'));
   } catch {}
-  const cfg = { players: Number(qs.get('players') || 1), bindings };
+  let hotkeys = null;
+  try {
+    hotkeys = JSON.parse(localStorage.getItem('wf.hotkeys'));
+  } catch {}
+  const cfg = { players: Number(qs.get('players') || 1), bindings, hotkeys, now: Date.now() / 1000 };
   // real battle by default (?arena=forest&enemy=t68&count=1&fighter=goku&seed=1); ?demo or ?area=8-3 = demo world
   if (qs.has('demo') || qs.has('area')) Object.assign(cfg, { demo: true, area: qs.get('area') || '8-3' });
   for (const k of ['arena', 'enemy', 'fighter']) if (qs.get(k)) cfg[k] = qs.get(k);
@@ -210,6 +214,15 @@ async function boot(baseTarBytes) {
     return;
   }
   timings.init_ms = Math.round(performance.now() - t1);
+  const blob = () => new Uint8Array(mem.buffer, x.wf_blob_ptr(), x.wf_blob_len()).slice();
+  const withBytes = (b, f) => {
+    const p = x.wf_alloc(b.length);
+    new Uint8Array(mem.buffer, p, b.length).set(b);
+    const r = f(p, b.length);
+    x.wf_dealloc(p, b.length);
+    return r;
+  };
+  const replays = replaysUi();
 
   // settings that live in the browser
   const prefs = (() => {
@@ -326,7 +339,9 @@ async function boot(baseTarBytes) {
     const dpr = window.devicePixelRatio || 1;
     const W = Math.floor(innerWidth * dpr);
     const H = Math.floor(innerHeight * dpr);
+    x.wf_app_set_clock(Date.now() / 1000);
     x.wf_app_frame(W, H, 0);
+    replays.pump();
     const w = x.wf_fb_w();
     const h = x.wf_fb_h();
     const s = x.wf_fb_scale();
@@ -371,7 +386,22 @@ async function boot(baseTarBytes) {
 
   // input
   let rebinding = null;
+  let rebindingHot = null;
+  const MODKEYS = ['ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight', 'AltLeft', 'AltRight', 'MetaLeft', 'MetaRight'];
   addEventListener('keydown', (e) => {
+    if (rebindingHot) {
+      e.preventDefault();
+      if (MODKEYS.includes(e.code)) return;
+      const act = rebindingHot;
+      rebindingHot = null;
+      if (e.code !== 'Escape') {
+        const combo = `${e.ctrlKey || e.metaKey ? 'Ctrl+' : ''}${e.altKey ? 'Alt+' : ''}${e.shiftKey ? 'Shift+' : ''}${e.code}`;
+        withStr(act, (ap, al) => withStr(combo, (cp, cl) => x.wf_app_rebind_hotkey(ap, al, cp, cl)));
+      }
+      saveHotkeys();
+      renderHotkeys();
+      return;
+    }
     if (rebinding) {
       e.preventDefault();
       const btn = rebinding;
@@ -382,7 +412,8 @@ async function boot(baseTarBytes) {
       return;
     }
     if (e.code === 'Escape') {
-      toggleSettings();
+      if (replays.open()) replays.close();
+      else toggleSettings();
       return;
     }
     if (e.code === 'F3') {
@@ -395,9 +426,26 @@ async function boot(baseTarBytes) {
       start();
       return;
     }
-    if (withStr(e.code, (p, n) => x.wf_app_key(p, n, 1, 0))) e.preventDefault();
+    if (replays.open()) {
+      if (e.code === 'F10') replays.close();
+      return;
+    }
+    if (settingsOpen()) return;
+    const mods = (e.shiftKey ? 1 : 0) | (e.ctrlKey || e.metaKey ? 2 : 0) | (e.altKey ? 4 : 0);
+    if (withStr(e.code, (p, n) => x.wf_app_key2(p, n, 1, 0, mods, e.repeat ? 1 : 0))) e.preventDefault();
   });
-  addEventListener('keyup', (e) => withStr(e.code, (p, n) => x.wf_app_key(p, n, 0, 0)));
+  addEventListener('keyup', (e) => withStr(e.code, (p, n) => x.wf_app_key2(p, n, 0, 0, 0, 0)));
+  // the live recording is saved every 30 s and when the page goes away
+  addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      x.wf_app_finalize();
+      replays.pump();
+    }
+  });
+  addEventListener('pagehide', () => {
+    x.wf_app_finalize();
+    replays.pump();
+  });
   addEventListener('blur', () => x.wf_app_blur());
 
   // settings panel
@@ -409,9 +457,43 @@ async function boot(baseTarBytes) {
     x.wf_app_blur();
     if (open) {
       renderBinds();
+      renderHotkeys();
       renderMods();
     }
   }
+  function saveHotkeys() {
+    x.wf_app_hotkeys();
+    try {
+      localStorage.setItem('wf.hotkeys', JSON.stringify(JSON.parse(str()).config));
+    } catch {}
+  }
+  const keyLabel = (c) => c.replace(/(^|\+)(Key|Digit)/g, '$1').replace('Backquote', '`').replace('BracketLeft', '[').replace('BracketRight', ']').replace('Minus', '-').replace('Equal', '=');
+  function renderHotkeys() {
+    x.wf_app_hotkeys();
+    const h = JSON.parse(str());
+    $('hotkeys').replaceChildren(
+      ...h.actions.map(([name, label, combos]) => {
+        const row = document.createElement('div');
+        row.className = 'row';
+        const l = document.createElement('span');
+        l.innerHTML = `<b>${label}</b> <span class="keys">${combos.map(keyLabel).join(', ') || '—'}</span>`;
+        const btn = document.createElement('button');
+        btn.textContent = rebindingHot === name ? 'Press keys…' : 'Rebind';
+        if (rebindingHot === name) btn.className = 'wait';
+        btn.onclick = () => {
+          rebindingHot = name;
+          renderHotkeys();
+        };
+        row.append(l, btn);
+        return row;
+      }),
+    );
+  }
+  $('resethot').onclick = () => {
+    withStr('', (ap, al) => withStr('', (cp, cl) => x.wf_app_rebind_hotkey(ap, al, cp, cl)));
+    saveHotkeys();
+    renderHotkeys();
+  };
   $('hudbtn').onclick = toggleSettings;
   $('close').onclick = toggleSettings;
   $('mode').onchange = (e) => {
@@ -514,5 +596,183 @@ async function boot(baseTarBytes) {
     for (const k of await store.keys('')) await store.del(k);
     location.reload();
   };
-  window.wf = { x, packs, timings, toggleSettings };
+  window.wf = { x, packs, timings, toggleSettings, replays, status: () => (x.wf_app_status(), JSON.parse(str())) };
+
+  // ---------------------------------------------------------------- replays, save states (engine/docs/replays.md)
+  // Storage: replays/<id>.wfr automatic recordings (newest N kept), kept/<id>.wfr kept + imported, states/slot<N>.wfs.
+  function replaysUi() {
+    let pumping = false;
+    let wasPaused = false;
+    const keepN = () => {
+      x.wf_app_hotkeys();
+      return JSON.parse(str()).config.keep_replays || 50;
+    };
+    const toast = (m) => withStr(m, (p, n) => x.wf_app_toast(p, n));
+    const download = (bytes, name) => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' }));
+      a.download = name;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    };
+    async function saveReplay(id, bytes) {
+      const kept = await store.get(`kept/${id}.wfr`);
+      await store.put(`${kept ? 'kept' : 'replays'}/${id}.wfr`, bytes);
+      const auto = (await store.keys('replays/')).sort();
+      const n = keepN();
+      for (const k of auto.slice(0, Math.max(0, auto.length - n))) await store.del(k);
+    }
+    // drain the game's requests; buffers are read before any await (later calls overwrite them)
+    let pumped = Promise.resolve();
+    function pump() {
+      if (!pumping) pumped = drain();
+      return pumped;
+    }
+    async function drain() {
+      pumping = true;
+      try {
+        for (let k = x.wf_app_next_request(); k; k = x.wf_app_next_request()) {
+          const meta = JSON.parse(str() || '{}');
+          const bytes = k === 1 || k === 2 ? blob() : null;
+          if (k === 1) await saveReplay(meta.id, bytes);
+          else if (k === 2) await store.put(`states/slot${meta.slot}.wfs`, bytes);
+          else if (k === 3) {
+            const b = await store.get(`states/slot${meta.slot}.wfs`);
+            if (!b) toast(`State slot ${meta.slot} is empty`);
+            else if (withBytes(b, (p, n) => x.wf_app_load_state(p, n))) toast(str());
+          } else if (k === 4) show();
+        }
+      } catch (e) {
+        console.error('replays', e);
+      } finally {
+        pumping = false;
+      }
+    }
+    async function list() {
+      const out = [];
+      for (const [dir, kept] of [['kept/', true], ['replays/', false]]) {
+        for (const key of await store.keys(dir)) {
+          const b = await store.get(key);
+          if (!b || withBytes(b, (p, n) => x.wf_app_replay_info(p, n))) continue;
+          const id = key.slice(dir.length).replace(/\.wfr$/, '');
+          if (!out.some((r) => r.id === id)) out.push({ id, key, kept, size: b.length, header: JSON.parse(str()) });
+        }
+      }
+      return out.sort((a, b) => (a.id < b.id ? 1 : -1));
+    }
+    const fmt = (h) => {
+      const s = h.frames / 59.7275;
+      const d = h.created ? new Date(h.created * 1000).toLocaleString() : '';
+      return `${d} · ${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}${h.outcome ? ' · ' + h.outcome : ''}${h.branch ? ' · branch of ' + h.branch.parent : ''}`;
+    };
+    async function render() {
+      const items = await list();
+      $('replaylist').replaceChildren(
+        ...(items.length
+          ? items.map((r) => {
+              const row = document.createElement('div');
+              row.className = 'row';
+              const l = document.createElement('span');
+              l.innerHTML = `<b>${r.header.title || r.id}</b>${r.kept ? ' ★' : ''}<br><span class="muted">${fmt(r.header)} · ${(r.size / 1024).toFixed(1)} KB</span>`;
+              const btns = document.createElement('span');
+              btns.className = 'btns';
+              const b = (t, f, cls) => {
+                const e = document.createElement('button');
+                e.textContent = t;
+                if (cls) e.className = cls;
+                e.onclick = f;
+                btns.append(e);
+              };
+              const bytes = () => store.get(r.key);
+              b('Play', async () => {
+                const by = await bytes();
+                if (withStr(r.id, (ip, il) => withBytes(by, (p, n) => x.wf_app_play_replay(ip, il, p, n, 0)))) $('replayinfo').textContent = str();
+                else close();
+              });
+              b('Ghost', async () => {
+                const by = await bytes();
+                if (withStr(r.id, (ip, il) => withBytes(by, (p, n) => x.wf_app_play_replay(ip, il, p, n, 1)))) $('replayinfo').textContent = str();
+                else close();
+              });
+              b('Verify', async () => {
+                const by = await bytes();
+                const bad = withBytes(by, (p, n) => x.wf_app_verify(p, n));
+                $('replayinfo').textContent = `${r.id}: ${bad ? str() : JSON.parse(str()).text}`;
+              });
+              b(r.kept ? 'Unkeep' : 'Keep', async () => {
+                const by = await bytes();
+                await store.put(`${r.kept ? 'replays' : 'kept'}/${r.id}.wfr`, by);
+                await store.del(r.key);
+                render();
+              });
+              b('Download', async () => download(await bytes(), `${r.id}.wfr`));
+              b('Delete', async () => {
+                await store.del(r.key);
+                render();
+              }, 'danger');
+              row.append(l, btns);
+              return row;
+            })
+          : [Object.assign(document.createElement('p'), { className: 'muted', textContent: 'No recordings yet: every fight is recorded automatically.' })]),
+      );
+      return items;
+    }
+    function show() {
+      if (open()) return;
+      x.wf_app_status();
+      wasPaused = JSON.parse(str()).paused;
+      x.wf_app_set_paused(1);
+      x.wf_app_blur();
+      $('replays').classList.add('on');
+      $('replayinfo').textContent = '';
+      // the current recording was queued by the request: save it first so it is listed
+      setTimeout(() => pump().then(render), 0);
+    }
+    function close() {
+      $('replays').classList.remove('on');
+      x.wf_app_set_paused(wasPaused ? 1 : 0);
+    }
+    const open = () => $('replays').classList.contains('on');
+    async function upload(files) {
+      for (const f of files) {
+        const by = new Uint8Array(await f.arrayBuffer());
+        if (withBytes(by, (p, n) => x.wf_app_replay_info(p, n))) {
+          $('replayinfo').textContent = `${f.name}: ${str()}`;
+          continue;
+        }
+        const norm = blob();
+        await store.put(`kept/${f.name.replace(/\.(wfr|json)$/i, '')}-import.wfr`, norm);
+      }
+      render();
+    }
+    $('replaysclose').onclick = close;
+    $('replaysbtn').onclick = () => (open() ? close() : show());
+    $('replayup').onclick = () => $('replaypick').click();
+    $('replaypick').onchange = (e) => upload([...e.target.files]);
+    $('replaycur').onclick = () => {
+      if (x.wf_app_current_replay()) {
+        $('replayinfo').textContent = 'Nothing is being recorded (a replay is playing).';
+        return;
+      }
+      const meta = JSON.parse(str());
+      download(blob(), `${meta.id}.wfr`);
+    };
+    // playback scrubber
+    const scrub = $('scrub');
+    setInterval(() => {
+      if (!running) return;
+      x.wf_app_status();
+      const st = JSON.parse(str());
+      const on = st.mode === 'playback';
+      scrub.style.display = on ? 'block' : 'none';
+      $('replaysbtn').style.display = st.enabled ? 'block' : 'none';
+      if (on && document.activeElement !== scrub) {
+        scrub.min = st.start;
+        scrub.max = st.end;
+        scrub.value = st.frame;
+      }
+    }, 250);
+    scrub.oninput = () => x.wf_app_seek(Number(scrub.value));
+    return { pump, show, close, open, list, render, upload, download };
+  }
 }

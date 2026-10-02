@@ -11,6 +11,7 @@ wf-content = { path = "../wf-content" }
 wf-render = { path = "../wf-render" }
 wf-audio = { path = "../wf-audio" }
 wf-core = { path = "../wf-core" }
+wf-replay = { path = "../wf-replay" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 

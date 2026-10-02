@@ -6,9 +6,13 @@
 
 pub mod audio;
 pub mod battle;
+pub mod control;
 pub mod demo;
+pub mod hotkeys;
 pub mod input;
+pub mod overlay;
 pub mod rebind;
+pub mod replay_menu;
 pub mod session;
 
 use wf_content::Packs;
@@ -17,6 +21,7 @@ use wf_view::{AudioEvent, Buttons, RenderView, Sim, SimEvent, GBA_FPS};
 
 pub use wf_content;
 pub use wf_render;
+pub use wf_replay;
 pub use wf_view;
 
 /// Frame pacing.
@@ -89,7 +94,7 @@ impl App {
     /// Start a real battle (`wf-core`) on `cfg`.
     pub fn battle(packs: Packs, cfg: battle::BattleConfig) -> Result<App, String> {
         let s = battle::session(&packs, cfg)?;
-        Ok(App::new(packs, Box::new(s)))
+        Ok(App::new(packs, Box::new(battle::CoreSim(s))))
     }
 
     /// One simulation step with the current inputs.

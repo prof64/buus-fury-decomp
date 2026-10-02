@@ -8,6 +8,10 @@
 //! Keys: mGBA defaults (arrows, X = A, Z = B, A = L, S = R, Enter = Start, Backspace = Select), rebindable in
 //! `<data dir>/wf-buu/bindings.json`; Esc pause, F1 PC / classic view, F2 zoom, F3 stats (window title), F11
 //! fullscreen. Gamepads via gilrs.
+//! Replays / rewind / save states / training (`wf_app::control`, docs/replays.md): hold ` rewind, hold Tab fast
+//! forward, P pause, N frame advance, -/= speed, [ ] seek, Home start, F6-F9 load / Shift+F6-F9 save state, F10
+//! replays, B take over, I input display, F4 training overlay, G ghost; rebindable in `<data dir>/hotkeys.json`.
+//! Headless: `--replay FILE` verifies and plays a recording, `--record FILE` writes the run's recording.
 
 use std::num::NonZeroU32;
 use std::path::{Path, PathBuf};
@@ -15,10 +19,15 @@ use std::rc::Rc;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
+mod replays;
+
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use wf_app::audio::AudioEngine;
 use wf_app::demo::DemoConfig;
+use wf_app::control::Control;
+use wf_app::hotkeys::{Hotkeys, Mods};
 use wf_app::input::{Bindings, KeyState};
+use wf_app::replay_menu::ReplayMenu;
 use wf_app::wf_content::{DirSource, FileSource, Packs};
 use wf_app::wf_render::{font, ViewMode};
 use wf_app::{blit_scaled, App};
@@ -58,6 +67,12 @@ struct Args {
     form: Option<i32>,
     level: Option<i32>,
     seed: u32,
+    /// headless: play (and verify) this recording instead of `--input`
+    replay: Option<PathBuf>,
+    /// headless: write the run's recording here
+    record: Option<PathBuf>,
+    /// online multiplayer / sync test (`--net-*`, wf_net::cli::HELP)
+    net: wf_net::cli::NetArgs,
 }
 
 fn parse_args() -> Args {
@@ -87,6 +102,9 @@ fn parse_args() -> Args {
         form: None,
         level: None,
         seed: 1,
+        replay: None,
+        record: None,
+        net: Default::default(),
     };
     if a.headless {
         a.mute = true;
@@ -142,10 +160,16 @@ fn parse_args() -> Args {
             "--realtime" => a.realtime = true,
             "--show-controls" => a.show_controls = true,
             "--frames" => a.frames = next(&mut i).parse().ok(),
+            "--replay" => a.replay = Some(PathBuf::from(next(&mut i))),
+            "--record" => a.record = Some(PathBuf::from(next(&mut i))),
             "--shot" => a.shot = Some(PathBuf::from(next(&mut i))),
             "-h" | "--help" => {
                 println!("{}", include_str!("main.rs").lines().take(4).map(|l| l.trim_start_matches("//! ")).collect::<Vec<_>>().join("\n"));
+                println!("{}", wf_net::cli::HELP);
                 std::process::exit(0);
+            }
+            s if s.starts_with("--net") || matches!(s, "--pvp" | "--pvp-enemies" | "--signal" | "--room") => {
+                a.net.flag(s, &mut || next(&mut i));
             }
             s => a.rom = Some(PathBuf::from(s)),
         }
@@ -243,6 +267,15 @@ fn make_app(a: &Args, packs: Packs) -> Result<App, String> {
         return App::demo(packs, &cfg).map_err(|e| e.to_string());
     }
     let cfg = wf_app::battle::config(&a.arena, &a.enemy, a.count, &a.fighter, a.form, a.level, a.players, a.seed);
+    if a.net.active() {
+        // online match (lobby blocks until it starts) or the local sync test: wf-net's Sims, rendered as usual
+        let data = wf_app::battle::game_data(&packs)?;
+        let sim: Box<dyn wf_view::Sim> = match a.net.mode {
+            wf_net::cli::NetMode::SyncTest(d) => Box::new(wf_net::cli::synctest_sim(&a.net, data, &cfg, d)),
+            _ => Box::new(wf_net::cli::connect_blocking(&a.net, data, &cfg)?),
+        };
+        return Ok(App::new(packs, sim));
+    }
     App::battle(packs, cfg)
 }
 
@@ -305,6 +338,25 @@ struct Running {
     /// F5: in-game controls screen
     menu: wf_app::rebind::RebindMenu,
     bindings_path: PathBuf,
+    /// replays, rewind, save states, training tools
+    ctl: Control,
+    replay_menu: ReplayMenu,
+    store: replays::Store,
+    mods: Mods,
+}
+
+fn now_unix() -> u64 {
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)
+}
+
+fn load_hotkeys(data: &Path) -> Hotkeys {
+    let p = data.join("hotkeys.json");
+    std::fs::read_to_string(&p).ok().and_then(|s| Hotkeys::from_json(&s)).unwrap_or_else(|| {
+        let h = Hotkeys::default();
+        let _ = std::fs::create_dir_all(data);
+        let _ = std::fs::write(&p, h.to_json());
+        h
+    })
 }
 
 enum Phase {
@@ -370,7 +422,12 @@ impl Shell {
                     let _ = std::fs::write(&bpath, b.to_json());
                     b
                 });
+                let ctl = Control::new(&mut app, load_hotkeys(&self.args.data), now_unix());
                 self.phase = Phase::Ready(Box::new(Running {
+                    ctl,
+                    replay_menu: ReplayMenu::default(),
+                    store: replays::Store::new(&self.args.data),
+                    mods: Mods::default(),
                     app,
                     keys: KeyState::default(),
                     bindings,
@@ -483,7 +540,9 @@ impl Shell {
                 } else if let Some(inp) = r.app.inputs.first_mut() {
                     *inp = r.keys.buttons(&r.bindings);
                 }
-                if r.app.advance(dt, &|| 0.0) > 0 {
+                r.ctl.now_unix = now_unix();
+                let live = r.app.inputs.clone();
+                if r.ctl.advance(&mut r.app, dt, &live) > 0 {
                     r.keys.consumed();
                 }
                 if let Some((_, tx)) = &r.audio {
@@ -500,7 +559,11 @@ impl Shell {
                     r.app.take_audio();
                 }
                 let t0 = Instant::now();
-                let f = r.app.render(0, ww, wh);
+                // netplay: the local player's camera
+                let net = wf_net::netsim::current_status();
+                let me = net.as_ref().and_then(|s| s.borrow().local_slot).unwrap_or(0);
+                let f = r.ctl.render(&mut r.app, me, ww, wh);
+                replays::service(&r.store, &mut r.ctl, &mut r.app, &mut r.replay_menu);
                 r.app.stats.last_render_ms = t0.elapsed().as_secs_f64() * 1e3;
                 r.fps.0 += 1;
                 if r.fps.1.elapsed() >= Duration::from_millis(500) {
@@ -526,6 +589,15 @@ impl Shell {
                 }
                 let (vw, vh) = (f.view_w as usize, f.view_h as usize);
                 r.menu.draw(&r.app.packs, &mut r.app.renderer.fb, vw, vh, &r.bindings);
+                r.replay_menu.draw(&r.app.packs, &mut r.app.renderer.fb, vw, vh);
+                // netplay overlay: connection line, desync / disconnect alerts, result
+                if let Some(s) = &net {
+                    for (k, (t, alert)) in s.borrow().overlay().iter().enumerate() {
+                        let y = vh as i32 - 12 - font::LINE * k as i32;
+                        font::fill_rect(&mut r.app.renderer.fb, vw, vh, 2, y - 1, font::text_width(t) + 4, font::LINE + 1, 0xFF00_0000);
+                        font::draw_text(&mut r.app.renderer.fb, vw, vh, 4, y, t, if *alert { 0xFFFF_5A40 } else { 0xFFE8_E8E8 });
+                    }
+                }
                 (vw, vh, f.scale as usize, false)
             }
             Phase::NeedRom(err) => {
@@ -592,9 +664,31 @@ impl ApplicationHandler for Shell {
 
     fn window_event(&mut self, el: &ActiveEventLoop, _id: WindowId, ev: WindowEvent) {
         match ev {
-            WindowEvent::CloseRequested => el.exit(),
+            WindowEvent::CloseRequested => {
+                if let Phase::Ready(r) = &mut self.phase {
+                    r.ctl.finalize(&r.app);
+                    replays::service(&r.store, &mut r.ctl, &mut r.app, &mut r.replay_menu);
+                }
+                el.exit()
+            }
+            WindowEvent::ModifiersChanged(m) => {
+                if let Phase::Ready(r) = &mut self.phase {
+                    let s = m.state();
+                    r.mods = Mods { shift: s.shift_key(), ctrl: s.control_key() || s.super_key(), alt: s.alt_key() };
+                }
+            }
             WindowEvent::RedrawRequested => self.redraw(),
             WindowEvent::DroppedFile(p) => {
+                // a dropped replay file: import it and play it
+                if let Phase::Ready(r) = &mut self.phase {
+                    if p.extension().is_some_and(|x| x == "wfr" || x == "json") {
+                        let res = r.store.import(&p).and_then(|id| std::fs::read(r.store.path(&id)).map_err(|e| e.to_string()).and_then(|b| r.ctl.play_replay(&mut r.app, &id, &b)));
+                        if let Err(e) = res {
+                            r.ctl.toast(e);
+                        }
+                    }
+                    return;
+                }
                 if matches!(self.phase, Phase::NeedRom(_)) {
                     match std::fs::read(&p) {
                         Ok(b) => self.begin_extract(b),
@@ -626,6 +720,14 @@ impl ApplicationHandler for Shell {
                     return;
                 }
                 let Phase::Ready(r) = &mut self.phase else { return };
+                if r.replay_menu.open {
+                    if down {
+                        let cmd = r.replay_menu.key(&format!("{code:?}"));
+                        replays::command(&r.store, &mut r.ctl, &mut r.app, &mut r.replay_menu, cmd);
+                    }
+                    r.keys.clear();
+                    return;
+                }
                 if down && (code == KeyCode::F5 || r.menu.open) {
                     let name = format!("{code:?}");
                     if code == KeyCode::F5 && !r.menu.waiting {
@@ -643,6 +745,15 @@ impl ApplicationHandler for Shell {
                     return;
                 }
                 if r.menu.open {
+                    return;
+                }
+                // replay / rewind / save state hotkeys (never a key bound to a GBA button without modifiers)
+                let name = format!("{code:?}");
+                let bound = r.bindings.key(&name) != 0;
+                if r.ctl.key(&mut r.app, &name, r.mods, down, event.repeat, bound) {
+                    if !down {
+                        r.keys.set(&name, false);
+                    }
                     return;
                 }
                 if down && !event.repeat {
@@ -702,6 +813,13 @@ fn headless(a: &Args) -> Result<(), String> {
         }
     }
     let packs = load_packs(&a.content).map_err(|e| e.to_string())?;
+    if a.net.active() {
+        // headless netplay / sync test: real-time match with the --input script (or --net-random-input), JSON result
+        let cfg = wf_app::battle::config(&a.arena, &a.enemy, a.count, &a.fighter, a.form, a.level, a.players, a.seed);
+        let data = wf_app::battle::game_data(&packs)?;
+        let script = wf_net::cli::parse_script(&a.input);
+        return wf_net::cli::run_headless(&a.net, data, &cfg, a.frames.unwrap_or(3600), &script).map(|_| ());
+    }
     let bank = wf_app::wf_content::audio::load_bank(&packs).ok().map(|b| &*Box::leak(Box::new(b)));
     let mut app = make_app(a, packs)?;
     app.mode = a.mode;
@@ -731,14 +849,45 @@ fn headless(a: &Args) -> Result<(), String> {
         Some(addr) => Some(spectator::serve(addr).map_err(|e| format!("spectator on {addr}: {e}"))?),
         None => None,
     };
-    let frames = a.frames.unwrap_or(if spect.is_some() { u64::MAX } else { 120 });
+    // replays: record this run, or play (and verify) a recording instead of the input script
+    let mut ctl = Control::new(&mut s.app, Hotkeys::default(), now_unix());
+    let mut replay_end = None;
+    if let Some(p) = &a.replay {
+        let b = std::fs::read(p).map_err(|e| format!("{}: {e}", p.display()))?;
+        let t = Instant::now();
+        let rep = ctl.verify(&s.app, &b)?;
+        eprintln!(
+            "verify {}: {} ({} frames, {} checkpoints, final state {:016x}) in {:.1} ms",
+            p.display(),
+            match rep.divergence {
+                Some(d) => d.to_string(),
+                None if rep.ok => "OK".into(),
+                None => "could not start".into(),
+            },
+            rep.frames,
+            rep.checkpoints,
+            rep.final_hash,
+            t.elapsed().as_secs_f64() * 1e3
+        );
+        let id = p.file_stem().unwrap_or_default().to_string_lossy().into_owned();
+        ctl.play_replay(&mut s.app, &id, &b)?;
+        replay_end = Some(wf_app::control::parse_replay(&b)?.end_frame());
+    }
+    let frames = a.frames.or(replay_end).unwrap_or(if spect.is_some() { u64::MAX } else { 120 });
     let realtime = a.realtime || spect.is_some();
     let period = Duration::from_secs_f64(1.0 / wf_view::GBA_FPS);
     let t1 = Instant::now();
     let mut next = Instant::now();
     let mut f = 0u64;
     while f < frames {
-        s.step(&[script.get(f as usize).copied().unwrap_or(0)]);
+        let inp = [script.get(f as usize).copied().unwrap_or(0)];
+        if !ctl.enabled {
+            s.step(&inp); // demo world: no recording
+        } else if ctl.step(&mut s.app, &inp) {
+            s.after_step();
+        } else {
+            break; // end of the replay
+        }
         f += 1;
         if let Some(sp) = &spect {
             sp.serve_pending(&mut s);
@@ -775,6 +924,12 @@ fn headless(a: &Args) -> Result<(), String> {
     if let Some(p) = &a.shot {
         std::fs::write(p, shot.ppm(1)).map_err(|e| e.to_string())?;
         eprintln!("wrote {}", p.display());
+    }
+    if let Some(p) = &a.record {
+        let (_, r) = ctl.current_replay(&s.app).ok_or("this simulation does not record (demo world?)")?;
+        let b = r.to_bytes();
+        std::fs::write(p, &b).map_err(|e| e.to_string())?;
+        eprintln!("recorded {} frames into {} ({} bytes)", r.inputs.len(), p.display(), b.len());
     }
     Ok(())
 }

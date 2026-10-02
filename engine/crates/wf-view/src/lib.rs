@@ -242,4 +242,8 @@ pub trait Sim {
     fn players(&self) -> usize {
         1
     }
+    /// The concrete simulation, for tools that understand it (training overlays, ghosts); `None` = opaque.
+    fn as_any(&self) -> Option<&dyn std::any::Any> {
+        None
+    }
 }

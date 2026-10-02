@@ -91,6 +91,12 @@ impl Session {
             *v = inputs.get(i).copied().unwrap_or(0);
         }
         self.app.step();
+        self.after_step();
+    }
+
+    /// Log + feed the audio of a step taken directly on `self.app` (e.g. through `control::Control::step`) and
+    /// clock the muted driver by one frame.
+    pub fn after_step(&mut self) {
         let f = self.app.sim.frame();
         for e in self.app.take_audio() {
             self.audio_log.push((f, e));

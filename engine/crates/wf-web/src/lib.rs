@@ -12,7 +12,14 @@
 
 use std::cell::RefCell;
 
+use std::collections::VecDeque;
+
+/// online multiplayer (wf-net): lobby + rollback session behind `wf_net_*` exports
+mod net;
+
 use wf_app::audio::AudioEngine;
+use wf_app::control::{Control, Request};
+use wf_app::hotkeys::{Action, Hotkeys, Mods};
 use wf_app::demo::DemoConfig;
 use wf_app::input::{Bindings, KeyState};
 use wf_app::wf_content::{FileSource, Packs};
@@ -87,6 +94,9 @@ struct Game {
     fb_scale: u32,
     audio: Vec<i32>,
     last_ms: f64,
+    /// replays, rewind, save states, training tools (see engine/docs/replays.md)
+    ctl: Control,
+    requests: VecDeque<Request>,
 }
 
 thread_local! {
@@ -94,6 +104,27 @@ thread_local! {
     static AUDIO: RefCell<Option<AudioEngine>> = const { RefCell::new(None) };
     static AUDIO_BUF: RefCell<Vec<f32>> = const { RefCell::new(Vec::new()) };
     static STR: RefCell<Vec<u8>> = const { RefCell::new(Vec::new()) };
+    static BLOB: RefCell<Vec<u8>> = const { RefCell::new(Vec::new()) };
+}
+
+fn set_blob(b: Vec<u8>) {
+    BLOB.with(|x| *x.borrow_mut() = b);
+}
+
+#[no_mangle]
+pub extern "C" fn wf_blob_ptr() -> *const u8 {
+    BLOB.with(|b| b.borrow().as_ptr())
+}
+#[no_mangle]
+pub extern "C" fn wf_blob_len() -> usize {
+    BLOB.with(|b| b.borrow().len())
+}
+
+unsafe fn arg_bytes(ptr: *const u8, len: usize) -> Vec<u8> {
+    if ptr.is_null() || len == 0 {
+        return Vec::new();
+    }
+    unsafe { std::slice::from_raw_parts(ptr, len) }.to_vec()
 }
 
 fn set_str(s: &str) {
@@ -158,7 +189,10 @@ pub unsafe extern "C" fn wf_app_init(cfg_ptr: *const u8, cfg_len: usize) -> u32 
     }
     // the real battle (wf-core) unless {"demo": true} / an `area` is asked for
     let demo = cfg["demo"].as_bool().unwrap_or(false) || cfg["area"].is_string();
-    let made = if demo {
+    // {"net": true}: the online match / sync test prepared by wf_net_lobby (net.rs)
+    let made = if let Some(sim) = net::take_sim(&cfg) {
+        sim.map(|s| App::new(packs, s))
+    } else if demo {
         App::demo(packs, &dc).map_err(|e| e.to_string())
     } else {
         let s = |k: &str, d: &str| cfg[k].as_str().unwrap_or(d).to_string();
@@ -174,7 +208,7 @@ pub unsafe extern "C" fn wf_app_init(cfg_ptr: *const u8, cfg_len: usize) -> u32 
         );
         App::battle(packs, bc)
     };
-    let app = match made {
+    let mut app = match made {
         Ok(a) => a,
         Err(e) => {
             set_str(&e);
@@ -182,6 +216,8 @@ pub unsafe extern "C" fn wf_app_init(cfg_ptr: *const u8, cfg_len: usize) -> u32 
         }
     };
     let bindings = serde_json::from_value(cfg["bindings"].clone()).unwrap_or_default();
+    let hotkeys: Hotkeys = serde_json::from_value(cfg["hotkeys"].clone()).unwrap_or_default();
+    let ctl = Control::new(&mut app, hotkeys, cfg["now"].as_f64().unwrap_or(0.0) as u64);
     let n = dc.players;
     GAME.with(|g| {
         *g.borrow_mut() = Some(Game {
@@ -195,6 +231,8 @@ pub unsafe extern "C" fn wf_app_init(cfg_ptr: *const u8, cfg_len: usize) -> u32 
             fb_scale: 1,
             audio: Vec::new(),
             last_ms: unsafe { now_ms() },
+            ctl,
+            requests: VecDeque::new(),
         })
     });
     0
@@ -260,12 +298,17 @@ pub extern "C" fn wf_app_frame(win_w: u32, win_h: u32, player: u32) -> u32 {
         for (i, inp) in g.app.inputs.iter_mut().enumerate() {
             *inp = g.keys.get(i).map(|k| k.buttons(&g.bindings)).unwrap_or(0) | g.pads.get(i).copied().unwrap_or(0);
         }
-        let steps = g.app.advance(dt, &|| unsafe { now_ms() });
+        let live = g.app.inputs.clone();
+        let t0 = unsafe { now_ms() };
+        let steps = g.ctl.advance(&mut g.app, dt, &live);
+        if steps > 0 {
+            g.app.stats.last_step_ms = (unsafe { now_ms() } - t0) / steps as f64;
+        }
         if steps > 0 {
             g.keys.iter_mut().for_each(|k| k.consumed());
         }
         let t0 = unsafe { now_ms() };
-        let f = g.app.render(player as usize, win_w, win_h);
+        let f = g.ctl.render(&mut g.app, player as usize, win_w, win_h);
         g.app.stats.last_render_ms = unsafe { now_ms() } - t0;
         let fb = &g.app.renderer.fb;
         g.rgba.resize(fb.len() * 4, 0);
@@ -423,4 +466,250 @@ pub extern "C" fn wf_audio_render(frames: u32) -> *const f32 {
         });
         buf.as_ptr()
     })
+}
+
+// ---------------------------------------------------------------- replays, rewind, save states, training
+
+/// Keyboard event with modifiers (bit 0 shift, 1 ctrl/meta, 2 alt) and key repeat. Returns 0 = not used,
+/// 1 = a game button, 2 = a hotkey (replays / rewind / save states / training). Releases always reach the game.
+///
+/// # Safety
+/// `ptr`/`len` must describe readable memory.
+#[no_mangle]
+pub unsafe extern "C" fn wf_app_key2(ptr: *const u8, len: usize, down: u32, player: u32, mods: u32, repeat: u32) -> u32 {
+    let code = unsafe { arg_str(ptr, len) };
+    with_game(|g| {
+        let bound = g.bindings.key(&code) != 0;
+        if g.ctl.key(&mut g.app, &code, Mods::from_bits(mods), down != 0, repeat != 0, bound) {
+            if down == 0 {
+                if let Some(k) = g.keys.get_mut(player as usize) {
+                    k.set(&code, false);
+                }
+            }
+            return 2;
+        }
+        if let Some(k) = g.keys.get_mut(player as usize) {
+            k.set(&code, down != 0);
+        }
+        bound as u32
+    })
+    .unwrap_or(0)
+}
+
+/// Wall clock (Unix seconds) for recording metadata.
+#[no_mangle]
+pub extern "C" fn wf_app_set_clock(unix: f64) {
+    with_game(|g| g.ctl.now_unix = unix as u64);
+}
+
+/// Next host request: 0 none; 1 save replay (string = `{"id", "header"}`, blob = file); 2 save state (string =
+/// `{"slot"}`, blob = file); 3 load state (string = `{"slot"}`: answer with `wf_app_load_state`); 4 open the
+/// replay browser.
+#[no_mangle]
+pub extern "C" fn wf_app_next_request() -> u32 {
+    with_game(|g| {
+        let more = g.ctl.take_requests();
+        g.requests.extend(more);
+        match g.requests.pop_front() {
+            None => 0,
+            Some(Request::SaveReplay { id, bytes, header }) => {
+                set_str(&serde_json::json!({"id": id, "header": header}).to_string());
+                set_blob(bytes);
+                1
+            }
+            Some(Request::SaveState { slot, bytes }) => {
+                set_str(&serde_json::json!({"slot": slot}).to_string());
+                set_blob(bytes);
+                2
+            }
+            Some(Request::LoadState { slot }) => {
+                set_str(&serde_json::json!({"slot": slot}).to_string());
+                3
+            }
+            Some(Request::OpenReplays) => {
+                g.ctl.finalize(&g.app);
+                4
+            }
+        }
+    })
+    .unwrap_or(0)
+}
+
+fn result(r: Result<(), String>) -> u32 {
+    match r {
+        Ok(()) => 0,
+        Err(e) => {
+            set_str(&e);
+            1
+        }
+    }
+}
+
+/// Load a save state file. 0 = ok, 1 = error text in the string buffer.
+///
+/// # Safety
+/// `ptr`/`len` must describe readable memory.
+#[no_mangle]
+pub unsafe extern "C" fn wf_app_load_state(ptr: *const u8, len: usize) -> u32 {
+    let b = unsafe { arg_bytes(ptr, len) };
+    with_game(|g| result(g.ctl.load_state(&mut g.app, &b))).unwrap_or(1)
+}
+
+/// Show a message in the game view (host-side errors: empty slot, storage failures).
+///
+/// # Safety
+/// `ptr`/`len` must describe readable memory.
+#[no_mangle]
+pub unsafe extern "C" fn wf_app_toast(ptr: *const u8, len: usize) {
+    let m = unsafe { arg_str(ptr, len) };
+    with_game(|g| g.ctl.toast(m));
+}
+
+/// Play a replay file (`ghost` != 0: run it as a ghost next to the current session). 0 = ok, 1 = error text.
+///
+/// # Safety
+/// Pointers must describe readable memory.
+#[no_mangle]
+pub unsafe extern "C" fn wf_app_play_replay(idp: *const u8, idl: usize, ptr: *const u8, len: usize, ghost: u32) -> u32 {
+    let (id, b) = unsafe { (arg_str(idp, idl), arg_bytes(ptr, len)) };
+    with_game(|g| {
+        if ghost != 0 {
+            result(g.ctl.set_ghost(&g.app, &id, &b))
+        } else {
+            g.keys.iter_mut().for_each(|k| k.clear());
+            result(g.ctl.play_replay(&mut g.app, &id, &b))
+        }
+    })
+    .unwrap_or(1)
+}
+
+/// Verify a replay headless against this build: JSON report in the string buffer (0), or an error (1).
+///
+/// # Safety
+/// `ptr`/`len` must describe readable memory.
+#[no_mangle]
+pub unsafe extern "C" fn wf_app_verify(ptr: *const u8, len: usize) -> u32 {
+    let b = unsafe { arg_bytes(ptr, len) };
+    with_game(|g| match g.ctl.verify(&g.app, &b) {
+        Ok(r) => {
+            let mut v = serde_json::to_value(&r).unwrap_or_default();
+            v["text"] = match r.divergence {
+                Some(d) => d.to_string(),
+                None if r.ok => format!("OK: {} frames, {} checkpoints match", r.frames, r.checkpoints),
+                None => "could not start".into(),
+            }
+            .into();
+            set_str(&v.to_string());
+            0
+        }
+        Err(e) => {
+            set_str(&e);
+            1
+        }
+    })
+    .unwrap_or(1)
+}
+
+/// Header JSON of a replay file in any supported form (string buffer) and the normalised binary file (blob
+/// buffer). 0 = ok, 1 = error text.
+///
+/// # Safety
+/// `ptr`/`len` must describe readable memory.
+#[no_mangle]
+pub unsafe extern "C" fn wf_app_replay_info(ptr: *const u8, len: usize) -> u32 {
+    let b = unsafe { arg_bytes(ptr, len) };
+    match wf_app::control::parse_replay(&b) {
+        Ok(r) => {
+            let bytes = r.to_bytes();
+            let h = wf_app::wf_replay::Replay::peek_header(&bytes).map(|h| serde_json::to_string(&h).unwrap_or_default()).unwrap_or_default();
+            set_str(&h);
+            set_blob(bytes);
+            0
+        }
+        Err(e) => {
+            set_str(&e);
+            1
+        }
+    }
+}
+
+/// The live recording now: blob = file, string = `{"id", "header"}`. 0 = ok, 1 = nothing recorded (playback).
+#[no_mangle]
+pub extern "C" fn wf_app_current_replay() -> u32 {
+    with_game(|g| match g.ctl.current_replay(&g.app) {
+        Some((id, r)) => {
+            let bytes = r.to_bytes();
+            set_str(&serde_json::json!({"id": id, "header": wf_app::wf_replay::Replay::peek_header(&bytes).ok()}).to_string());
+            set_blob(bytes);
+            0
+        }
+        None => 1,
+    })
+    .unwrap_or(1)
+}
+
+/// Queue the live recording for saving (page hide / unload).
+#[no_mangle]
+pub extern "C" fn wf_app_finalize() {
+    with_game(|g| g.ctl.finalize(&g.app));
+}
+
+/// Run an action by name (`pause`, `frame_advance`, `take_over`, `save_state_1`, ... see `hotkeys::Action`).
+///
+/// # Safety
+/// `ptr`/`len` must describe readable memory.
+#[no_mangle]
+pub unsafe extern "C" fn wf_app_action(ptr: *const u8, len: usize) -> u32 {
+    let name = unsafe { arg_str(ptr, len) };
+    let Some(a) = Action::parse(&name) else { return 0 };
+    with_game(|g| {
+        g.ctl.act(&mut g.app, a);
+        1
+    })
+    .unwrap_or(0)
+}
+
+/// Seek to a frame (playback scrubbing); returns the frame reached.
+#[no_mangle]
+pub extern "C" fn wf_app_seek(frame: f64) -> f64 {
+    with_game(|g| g.ctl.seek(&mut g.app, frame.max(0.0) as u64) as f64).unwrap_or(0.0)
+}
+
+#[no_mangle]
+pub extern "C" fn wf_app_clear_ghost() {
+    with_game(|g| g.ctl.clear_ghost());
+}
+
+/// Status JSON in the string buffer (mode, frame, range, speed, flags, desync, ghost).
+#[no_mangle]
+pub extern "C" fn wf_app_status() {
+    let s = with_game(|g| g.ctl.status_json(&g.app)).unwrap_or_default();
+    set_str(&s);
+}
+
+/// Hotkeys in the string buffer: `{"config": Hotkeys, "actions": [[name, label, [combos]], ...]}`.
+#[no_mangle]
+pub extern "C" fn wf_app_hotkeys() {
+    let s = with_game(|g| {
+        let acts: Vec<_> = Action::all().into_iter().map(|a| serde_json::json!([a.name(), a.label(), g.ctl.hotkeys.keys_for(a)])).collect();
+        serde_json::json!({"config": g.ctl.hotkeys, "actions": acts}).to_string()
+    })
+    .unwrap_or_default();
+    set_str(&s);
+}
+
+/// Rebind action `action` (name) to `combo` (`Shift+F6`); an empty action resets all hotkeys to the defaults.
+///
+/// # Safety
+/// Pointers must describe readable memory.
+#[no_mangle]
+pub unsafe extern "C" fn wf_app_rebind_hotkey(ap: *const u8, al: usize, cp: *const u8, cl: usize) {
+    let (a, c) = unsafe { (arg_str(ap, al), arg_str(cp, cl)) };
+    with_game(|g| {
+        if a.is_empty() {
+            g.ctl.hotkeys = Hotkeys::default();
+        } else if let Some(a) = Action::parse(&a) {
+            g.ctl.hotkeys.rebind(a, &c);
+        }
+    });
 }
