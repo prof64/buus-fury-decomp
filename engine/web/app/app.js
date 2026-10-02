@@ -1,7 +1,7 @@
 // Browser shell: ROM drop -> verify -> extract in a worker -> cache (OPFS / IndexedDB) -> run the game wasm
 // (render + input on the main thread, the sound driver in an AudioWorklet). See engine/docs/frontend.md.
 import { openStore } from './store.js';
-import { tar, untar } from './tar.js';
+import { tar, untar, CATEGORIES } from './tar.js';
 
 const EXTRACTOR_URL = new URL('../wf_wasm.wasm', import.meta.url).href;
 const GAME_URL = new URL('wf_web.wasm', import.meta.url).href;
@@ -87,7 +87,8 @@ function extract(rom, extractorId) {
 // ------------------------------------------------------------------ boot
 
 const extractorBytes = await fetchBytes(EXTRACTOR_URL);
-const extractorId = hex(await crypto.subtle.digest('SHA-256', extractorBytes));
+// cache key: the extractor binary + the category list the worker extracts
+const extractorId = hex(await crypto.subtle.digest('SHA-256', new Uint8Array([...extractorBytes, ...enc.encode(CATEGORIES.join(','))])));
 const meta = await readMeta();
 let baseTar = null;
 if (meta.extractor === extractorId) baseTar = await store.get('content/base.tar');
@@ -197,7 +198,11 @@ async function boot(baseTarBytes) {
   try {
     bindings = JSON.parse(localStorage.getItem('wf.bindings'));
   } catch {}
-  const cfg = { area: qs.get('area') || '8-3', players: Number(qs.get('players') || 1), bindings };
+  const cfg = { players: Number(qs.get('players') || 1), bindings };
+  // real battle by default (?arena=forest&enemy=t68&count=1&fighter=goku&seed=1); ?demo or ?area=8-3 = demo world
+  if (qs.has('demo') || qs.has('area')) Object.assign(cfg, { demo: true, area: qs.get('area') || '8-3' });
+  for (const k of ['arena', 'enemy', 'fighter']) if (qs.get(k)) cfg[k] = qs.get(k);
+  for (const k of ['count', 'form', 'level', 'seed']) if (qs.get(k)) cfg[k] = Number(qs.get(k));
   const t1 = performance.now();
   if (withStr(JSON.stringify(cfg), (p, n) => x.wf_app_init(p, n)) !== 0) {
     show('rom');

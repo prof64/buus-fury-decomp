@@ -5,8 +5,10 @@
 //! forward the audio events it collects to their audio thread ([`audio::AudioEngine`]).
 
 pub mod audio;
+pub mod battle;
 pub mod demo;
 pub mod input;
+pub mod rebind;
 pub mod session;
 
 use wf_content::Packs;
@@ -82,6 +84,12 @@ impl App {
     pub fn demo(packs: Packs, cfg: &demo::DemoConfig) -> wf_content::Result<App> {
         let w = demo::DemoWorld::new(&packs, cfg)?;
         Ok(App::new(packs, Box::new(w)))
+    }
+
+    /// Start a real battle (`wf-core`) on `cfg`.
+    pub fn battle(packs: Packs, cfg: battle::BattleConfig) -> Result<App, String> {
+        let s = battle::session(&packs, cfg)?;
+        Ok(App::new(packs, Box::new(s)))
     }
 
     /// One simulation step with the current inputs.

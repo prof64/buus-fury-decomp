@@ -11,3 +11,5 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 wf-rom.workspace = true
 wf-extract = { path = "../wf-extract" }
+wf-core = { path = "../wf-core" }
+serde_json.workspace = true

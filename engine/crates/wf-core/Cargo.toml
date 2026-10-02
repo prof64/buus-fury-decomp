@@ -1,0 +1,16 @@
+[package]
+name = "wf-core"
+description = "Deterministic Buu's Fury battle simulation core (fixed-point, rollback-ready, agent interface)"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+serde_json.workspace = true
+serde.workspace = true
+postcard = { version = "1", default-features = false, features = ["alloc"] }
+wf-view = { path = "../wf-view" }
+
+[dev-dependencies]
+wf-rom.workspace = true
+wf-extract = { path = "../wf-extract" }

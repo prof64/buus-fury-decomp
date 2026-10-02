@@ -49,6 +49,15 @@ struct Args {
     input: String,
     spectate: Option<String>,
     realtime: bool,
+    show_controls: bool,
+    demo: bool,
+    arena: String,
+    enemy: String,
+    count: u32,
+    fighter: String,
+    form: Option<i32>,
+    level: Option<i32>,
+    seed: u32,
 }
 
 fn parse_args() -> Args {
@@ -69,6 +78,15 @@ fn parse_args() -> Args {
         input: String::new(),
         spectate: None,
         realtime: false,
+        show_controls: false,
+        demo: false,
+        arena: "forest".into(),
+        enemy: "t68".into(),
+        count: 1,
+        fighter: "goku".into(),
+        form: None,
+        level: None,
+        seed: 1,
     };
     if a.headless {
         a.mute = true;
@@ -86,7 +104,18 @@ fn parse_args() -> Args {
                 a.data = PathBuf::from(next(&mut i));
                 a.content = a.data.join("content");
             }
-            "--area" => a.area = next(&mut i),
+            "--area" => {
+                a.area = next(&mut i);
+                a.demo = true;
+            }
+            "--demo" => a.demo = true,
+            "--arena" => a.arena = next(&mut i),
+            "--enemy" => a.enemy = next(&mut i),
+            "--count" => a.count = next(&mut i).parse().unwrap_or(1),
+            "--fighter" => a.fighter = next(&mut i),
+            "--form" => a.form = next(&mut i).parse().ok(),
+            "--level" => a.level = next(&mut i).parse().ok(),
+            "--seed" => a.seed = next(&mut i).parse().unwrap_or(1),
             "--players" => a.players = next(&mut i).parse().unwrap_or(1),
             "--gba" => a.mode = ViewMode::Gba { scale: 0 },
             "--zoom" => a.mode = ViewMode::Pc { zoom: next(&mut i).parse().unwrap_or(0) },
@@ -103,6 +132,7 @@ fn parse_args() -> Args {
                 }
             }
             "--input" => a.input = next(&mut i),
+            "--input-file" => a.input = std::fs::read_to_string(next(&mut i)).unwrap_or_default().trim().to_string(),
             "--window" => a.headless = false,
             "--spectate" => {
                 a.spectate = Some(next(&mut i));
@@ -110,6 +140,7 @@ fn parse_args() -> Args {
                 a.mute = true;
             }
             "--realtime" => a.realtime = true,
+            "--show-controls" => a.show_controls = true,
             "--frames" => a.frames = next(&mut i).parse().ok(),
             "--shot" => a.shot = Some(PathBuf::from(next(&mut i))),
             "-h" | "--help" => {
@@ -205,6 +236,16 @@ fn spawn_extract(rom: Vec<u8>, content: PathBuf, data: PathBuf) -> mpsc::Receive
     rx
 }
 
+/// The simulation: `wf-core`'s battle by default, the frontend demo world with `--demo`.
+fn make_app(a: &Args, packs: Packs) -> Result<App, String> {
+    if a.demo {
+        let cfg = DemoConfig { area: a.area.clone(), players: a.players, ..Default::default() };
+        return App::demo(packs, &cfg).map_err(|e| e.to_string());
+    }
+    let cfg = wf_app::battle::config(&a.arena, &a.enemy, a.count, &a.fighter, a.form, a.level, a.players, a.seed);
+    App::battle(packs, cfg)
+}
+
 fn load_packs(content: &Path) -> wf_app::wf_content::Result<Packs> {
     let mut src: Vec<Box<dyn FileSource>> = vec![Box::new(DirSource(content.join("base")))];
     if let Ok(rd) = std::fs::read_dir(content.join("mods")) {
@@ -261,6 +302,9 @@ struct Running {
     muted: Option<AudioEngine>,
     stats: bool,
     fps: (u32, Instant, f64),
+    /// F5: in-game controls screen
+    menu: wf_app::rebind::RebindMenu,
+    bindings_path: PathBuf,
 }
 
 enum Phase {
@@ -316,8 +360,7 @@ impl Shell {
         } else {
             None
         };
-        let cfg = DemoConfig { area: self.args.area.clone(), players: self.args.players, ..Default::default() };
-        match App::demo(packs, &cfg) {
+        match make_app(&self.args, packs) {
             Ok(mut app) => {
                 app.mode = self.args.mode;
                 let bpath = self.args.data.join("bindings.json");
@@ -335,10 +378,12 @@ impl Shell {
                     audio,
                     muted,
                     stats: false,
+                    menu: Default::default(),
+                    bindings_path: bpath.clone(),
                     fps: (0, Instant::now(), 0.0),
                 }));
             }
-            Err(e) => self.phase = Phase::Failed(e.to_string()),
+            Err(e) => self.phase = Phase::Failed(e),
         }
     }
 
@@ -479,7 +524,9 @@ impl Shell {
                         std::process::exit(0);
                     }
                 }
-                (f.view_w as usize, f.view_h as usize, f.scale as usize, false)
+                let (vw, vh) = (f.view_w as usize, f.view_h as usize);
+                r.menu.draw(&r.app.packs, &mut r.app.renderer.fb, vw, vh, &r.bindings);
+                (vw, vh, f.scale as usize, false)
             }
             Phase::NeedRom(err) => {
                 let mut l = vec![
@@ -579,6 +626,25 @@ impl ApplicationHandler for Shell {
                     return;
                 }
                 let Phase::Ready(r) = &mut self.phase else { return };
+                if down && (code == KeyCode::F5 || r.menu.open) {
+                    let name = format!("{code:?}");
+                    if code == KeyCode::F5 && !r.menu.waiting {
+                        r.menu.toggle();
+                    } else {
+                        match r.menu.key(&name, &mut r.bindings) {
+                            wf_app::rebind::MenuResult::Changed => {
+                                let _ = std::fs::write(&r.bindings_path, r.bindings.to_json());
+                            }
+                            wf_app::rebind::MenuResult::Closed | wf_app::rebind::MenuResult::None => {}
+                        }
+                    }
+                    r.app.paused = r.menu.open;
+                    r.keys.clear();
+                    return;
+                }
+                if r.menu.open {
+                    return;
+                }
                 if down && !event.repeat {
                     match code {
                         KeyCode::Escape => r.app.paused = !r.app.paused,
@@ -637,8 +703,7 @@ fn headless(a: &Args) -> Result<(), String> {
     }
     let packs = load_packs(&a.content).map_err(|e| e.to_string())?;
     let bank = wf_app::wf_content::audio::load_bank(&packs).ok().map(|b| &*Box::leak(Box::new(b)));
-    let cfg = DemoConfig { area: a.area.clone(), players: a.players, ..Default::default() };
-    let mut app = App::demo(packs, &cfg).map_err(|e| e.to_string())?;
+    let mut app = make_app(a, packs)?;
     app.mode = a.mode;
     let mut s = wf_app::session::Session::new(app, bank);
     eprintln!("content ready + world loaded in {:.0} ms (headless, muted)", t0.elapsed().as_secs_f64() * 1e3);
@@ -688,7 +753,15 @@ fn headless(a: &Args) -> Result<(), String> {
     let step_ms = t1.elapsed().as_secs_f64() * 1e3 / frames.max(1) as f64;
     let (ww, wh) = a.size;
     let t2 = Instant::now();
-    let shot = s.screenshot(0, ww, wh);
+    let mut shot = s.screenshot(0, ww, wh);
+    if a.show_controls {
+        let mut m = wf_app::rebind::RebindMenu::default();
+        m.toggle();
+        m.cursor = 4;
+        m.waiting = true;
+        let b = std::fs::read_to_string(a.data.join("bindings.json")).ok().and_then(|s| Bindings::from_json(&s)).unwrap_or_default();
+        m.draw(&s.app.packs, &mut shot.px, shot.w as usize, shot.h as usize, &b);
+    }
     eprintln!(
         "{frames} steps ({step_ms:.4} ms/step), render {}x{} @{}x: {:.2} ms, state {:016x}, sfx voices busy {}, audio log {:?}",
         shot.w,

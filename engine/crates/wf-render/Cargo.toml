@@ -8,3 +8,4 @@ license.workspace = true
 [dependencies]
 wf-view = { path = "../wf-view" }
 wf-content = { path = "../wf-content" }
+serde_json = { workspace = true }

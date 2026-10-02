@@ -12,4 +12,5 @@ wf-maps = { path = "../wf-maps" }
 wf-tables = { path = "../wf-tables" }
 wf-ui = { path = "../wf-ui" }
 wf-world = { path = "../wf-world" }
+wf-script = { path = "../wf-script" }
 serde_json.workspace = true

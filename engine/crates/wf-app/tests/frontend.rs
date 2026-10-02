@@ -31,7 +31,7 @@ fn content_bank_plays_like_rom_bank() {
 
 #[test]
 fn demo_is_deterministic_and_render_is_pure() {
-    let Some(p) = packs("tables,sprites,effects,maps") else { return };
+    let Some(p) = packs("tables,sprites,effects,items,maps,ui") else { return };
     let script = |f: u32| match f % 200 {
         0..=49 => b::RIGHT,
         50..=99 => b::DOWN | b::LEFT,

@@ -1,6 +1,9 @@
 // Minimal ustar reader / writer: one content pack <-> one blob (what we cache in OPFS / IndexedDB).
 import { untar as untarBase } from '../extract.js';
 
+/** Extraction categories, in order (keep in sync with wf_extract::CATEGORIES). Part of the content cache key. */
+export const CATEGORIES = ['tables', 'sprites', 'effects', 'portraits', 'items', 'maps', 'audio', 'ui', 'world'];
+
 /** Map<path, Uint8Array> from a ustar archive; strips a leading `base/` (the extractor's prefix). */
 export function untar(buf) {
   return untarBase(buf);

@@ -2,9 +2,8 @@
 //   post {rom: Uint8Array (transferred), wasmUrl}  ->  {type:'progress', done, total, category, ms}
 //                                                   ->  {type:'done', tar, ms, files, bytes} | {type:'error', message}
 import { loadExtractor } from '../extract.js';
-import { tar } from './tar.js';
+import { tar, CATEGORIES } from './tar.js';
 
-const CATEGORIES = ['tables', 'sprites', 'effects', 'portraits', 'items', 'maps', 'audio'];
 
 self.onmessage = async (e) => {
   const { rom, wasmUrl } = e.data;

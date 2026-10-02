@@ -156,10 +156,28 @@ pub unsafe extern "C" fn wf_app_init(cfg_ptr: *const u8, cfg_len: usize) -> u32 
     if let Some(n) = cfg["players"].as_u64() {
         dc.players = n.clamp(1, 4) as usize;
     }
-    let app = match App::demo(packs, &dc) {
+    // the real battle (wf-core) unless {"demo": true} / an `area` is asked for
+    let demo = cfg["demo"].as_bool().unwrap_or(false) || cfg["area"].is_string();
+    let made = if demo {
+        App::demo(packs, &dc).map_err(|e| e.to_string())
+    } else {
+        let s = |k: &str, d: &str| cfg[k].as_str().unwrap_or(d).to_string();
+        let bc = wf_app::battle::config(
+            &s("arena", "forest"),
+            &s("enemy", "t68"),
+            cfg["count"].as_u64().unwrap_or(1) as u32,
+            &s("fighter", "goku"),
+            cfg["form"].as_i64().map(|v| v as i32),
+            cfg["level"].as_i64().map(|v| v as i32),
+            dc.players,
+            cfg["seed"].as_u64().unwrap_or(1) as u32,
+        );
+        App::battle(packs, bc)
+    };
+    let app = match made {
         Ok(a) => a,
         Err(e) => {
-            set_str(&e.to_string());
+            set_str(&e);
             return 1;
         }
     };

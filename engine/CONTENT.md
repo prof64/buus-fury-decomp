@@ -5,7 +5,7 @@ SHA-1 `e65738e9d67688309f09811a54f495523ec9aada`); the extractor turns it into p
 and mods are more packs layered on top. No emulator is involved at any point.
 
 ```
-wf-extract <buus_fury.gba> <content dir> [--only tables,sprites,effects,portraits,items,maps,audio,ui,world]
+wf-extract <buus_fury.gba> <content dir> [--only tables,sprites,effects,portraits,items,maps,audio,ui,world,scripts]
 ```
 
 * Native: `cargo run --release -p wf-cli -- roms/buu.gba content/` writes `content/base/`.
@@ -19,7 +19,10 @@ wf-extract <buus_fury.gba> <content dir> [--only tables,sprites,effects,portrait
 Crates: `wf-rom` (ROM verification, bus-address reads, Webfoot LZ, string table, GBA graphics + PNG, the
 `Content` sink), `wf-tables` (mechanics), `wf-maps` (maps, tilesets, collision), `wf-audio` (sound driver +
 synthesizer), `wf-ui` (fonts, dialogue boxes, HUD, menus, title screens), `wf-world` (map objects, area
-graph, dialogue text), `wf-extract` (sprites, effects, portraits, icons; orchestration), `wf-cli`, `wf-wasm`.
+graph, dialogue text), `wf-extract` (sprites, effects, portraits, icons; orchestration), `wf-cli`, `wf-wasm`,
+`wf-script` (story/event bytecode: loader, exact interpreter, decompiler to Rhai — `scripts/events/sNNN.rhai`,
+`scripts/inline/inline_0xADDR.rhai`, `scripts/index.json`, `scripts/bytecode.json`; extractor category `scripts`) and `wf-script-rhai`
+(the scripting runtime) — see [`docs/scripting.md`](docs/scripting.md).
 
 ## 1. Directory layout
 
@@ -43,6 +46,8 @@ content/
     world/areas.json, world/graph.json   areas (on-enter scripts, variants) and the area graph (exits + script warps)
     ui/fonts/ images/ buttons/ hud/ mapscreen/ menu/ + *.json   fonts (atlas + metrics), boxes, HUD, menus, screens
     audio/index.json, driver.json, instruments.json, songs/song_NN.json, sfx/sfx_NN.json, samples/sample_NNN.wav
+    scripts/events/sNNN.rhai, scripts/inline/inline_0xADDR.rhai   decompiled story/event scripts (Rhai; ids as in objects.json)
+    scripts/index.json, scripts/bytecode.json   script index (purpose, referrers) and the original bytecode + event graphs
   mods/
     <mod name>/                ← same layout, only the files the mod changes or adds
       pack.json                  {"id", "name", "format_version": 1, "depends": ["base"], "load_after": [...]}
@@ -50,7 +55,7 @@ content/
 
 Details per category: tables → [`docs/tables.md`](docs/tables.md), maps → [`docs/maps.md`](docs/maps.md),
 world (objects, graph, text) → [`docs/world.md`](docs/world.md), ui → [`docs/ui.md`](docs/ui.md),
-audio → [`docs/audio.md`](docs/audio.md); sprites / effects / portraits / icons → §3 below.
+audio → [`docs/audio.md`](docs/audio.md), scripts → [`docs/scripting.md`](docs/scripting.md); sprites / effects / portraits / icons → §3 below.
 
 ## 2. Ids, units, load order and overrides
 

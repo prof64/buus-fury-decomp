@@ -11,6 +11,8 @@
 
 use std::cell::RefCell;
 
+pub mod core_api;
+
 thread_local! {
     static RESULT: RefCell<Vec<u8>> = const { RefCell::new(Vec::new()) };
 }
@@ -37,7 +39,11 @@ pub unsafe extern "C" fn wf_extract(ptr: *mut u8, len: usize, only_ptr: *const u
         only: only.split(',').filter(|s| !s.is_empty()).map(String::from).collect(),
     };
     let (status, out) = match wf_extract::extract(rom, &opts) {
-        Ok((content, _)) => (0, tar(&content)),
+        Ok((content, _)) => {
+            let t = tar(&content);
+            core_api::remember(content);
+            (0, t)
+        }
         Err(e @ wf_extract::Error::WrongRom(_)) => (1, e.to_string().into_bytes()),
         Err(e) => (2, e.to_string().into_bytes()),
     };

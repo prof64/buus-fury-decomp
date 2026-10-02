@@ -55,6 +55,29 @@ pub struct RenderView {
     pub hud: Vec<HudView>,
     /// Screen brightness fade: 0 = normal, 16 = black (GBA BLDY semantics, applied after composition).
     pub fade_black: u8,
+    /// The dialogue box, if one is open (drawn above everything, like the game's priority-0 OBJs).
+    pub dialog: Option<DialogView>,
+}
+
+/// An open dialogue box (`ui/dialog.json`): the renderer word-wraps `text` with the game's line fitter, pages it
+/// by the style's line count and draws page `page`.
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct DialogView {
+    /// Text as the game stores it: `\n` new line, `\u{b}` page break, `\u{8}` + char(n) = colour n.
+    pub text: String,
+    /// Box style (0 = 4 lines, 1 = 2 lines).
+    pub style: u8,
+    pub page: u16,
+    /// Box placement (the text's position code `!` top, `@` middle, `#` bottom).
+    pub position: DialogPos,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum DialogPos {
+    Top,
+    Middle,
+    #[default]
+    Bottom,
 }
 
 impl RenderView {
@@ -65,6 +88,7 @@ impl RenderView {
         self.cameras.clear();
         self.hud.clear();
         self.fade_black = 0;
+        self.dialog = None;
     }
 }
 
@@ -133,6 +157,17 @@ pub struct HudView {
     pub hp_max: i32,
     pub ep: i32,
     pub ep_max: i32,
+    /// Super Saiyan / SS3 gauges (character record +0x1E / +0x20), drawn in the EP bar.
+    pub ss: i32,
+    pub ss3: i32,
+    /// Experience line steps 0..72 (`0x0801363E(player, 72)`).
+    pub xp72: u8,
+    /// Selected skill id (icon `icons/skills/skill_NN.png`), `None` = empty slot.
+    pub skill: Option<u8>,
+    /// Use the `_alt` icon (not enough EP for the skill).
+    pub skill_alt: bool,
+    /// The game hides the HUD during dialogue / cut-scenes.
+    pub hidden: bool,
 }
 
 /// Non-state outputs of a step, in emission order.

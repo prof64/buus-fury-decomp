@@ -11,6 +11,7 @@
 //! blending.
 
 pub mod font;
+pub mod ui;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -92,6 +93,9 @@ pub struct Renderer {
     /// Content problems (missing sheet / map), each reported once.
     pub errors: Vec<String>,
     pub draw_hud: bool,
+    /// The game's UI (`ui/` content); `Some(None)` = not available (placeholder HUD is drawn instead).
+    ui: Option<Option<ui::Ui>>,
+    pub blend_math: BlendMath,
 }
 
 impl Default for Renderer {
@@ -105,26 +109,51 @@ fn c5(c: u32, sh: u32) -> u32 {
     (c >> sh) & 0xFF
 }
 
-/// GBA alpha blend on 5-bit channels, output expanded like the PNGs (`c5 << 3 | c5 >> 2`).
+/// How blended colours are computed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum BlendMath {
+    /// Like mGBA (the reference the parity tests compare against): channels expanded to 8 bits
+    /// (`c5 << 3 | c5 >> 2`) first, `min(255, (a * eva + b * evb) >> 4)`.
+    #[default]
+    Mgba,
+    /// The GBA PPU: 5-bit channels, `min(31, (a * eva + b * evb) >> 4)`, then expanded.
+    Hardware,
+}
+
+/// GBA alpha blend; inputs are expanded 8-bit colours (`c5 << 3 | c5 >> 2`).
 #[inline]
-fn blend(a: u32, b: u32, eva: u32, evb: u32) -> u32 {
+fn blend(a: u32, b: u32, eva: u32, evb: u32, m: BlendMath) -> u32 {
     let mut out = 0xFF00_0000;
     for sh in [16, 8, 0] {
-        let x = c5(a, sh) >> 3;
-        let y = c5(b, sh) >> 3;
-        let v = ((x * eva + y * evb) >> 4).min(31);
-        out |= ((v << 3) | (v >> 2)) << sh;
+        let v = match m {
+            BlendMath::Mgba => ((c5(a, sh) * eva + c5(b, sh) * evb) >> 4).min(255),
+            BlendMath::Hardware => {
+                let v = (((c5(a, sh) >> 3) * eva + (c5(b, sh) >> 3) * evb) >> 4).min(31);
+                (v << 3) | (v >> 2)
+            }
+        };
+        out |= v << sh;
     }
     out
 }
 
+/// BLDY brightness decrease.
 #[inline]
-fn darken(a: u32, evy: u32) -> u32 {
+fn darken(a: u32, evy: u32, m: BlendMath) -> u32 {
     let mut out = 0xFF00_0000;
     for sh in [16, 8, 0] {
-        let x = c5(a, sh) >> 3;
-        let v = x - ((x * evy) >> 4);
-        out |= ((v << 3) | (v >> 2)) << sh;
+        let v = match m {
+            BlendMath::Mgba => {
+                let x = c5(a, sh);
+                x - ((x * evy) >> 4)
+            }
+            BlendMath::Hardware => {
+                let x = c5(a, sh) >> 3;
+                let v = x - ((x * evy) >> 4);
+                (v << 3) | (v >> 2)
+            }
+        };
+        out |= v << sh;
     }
     out
 }
@@ -145,6 +174,8 @@ impl Renderer {
             h: 0,
             errors: Vec::new(),
             draw_hud: true,
+            ui: None,
+            blend_math: BlendMath::default(),
         }
     }
 
@@ -230,6 +261,36 @@ impl Renderer {
             objs.push((s.priority.min(3), i, sheet, fi, flip ^ s.mirror));
         }
 
+        // screen-space OBJs (HUD, dialogue box): (priority, x, y, w, h, ARGB)
+        let mut screen: Vec<(u8, i32, i32, usize, usize, Vec<u32>)> = Vec::new();
+        if self.ui.is_none() {
+            let u = ui::Ui::load(packs);
+            if let Err(e) = &u {
+                self.errors.push(format!("ui: {e} (placeholder HUD)"));
+            }
+            self.ui = Some(u.ok());
+        }
+        let (ox, oy) = ((w as i32 - GBA_W) / 2, (h as i32 - GBA_H) / 2);
+        if let Some(Some(u)) = &mut self.ui {
+            if self.draw_hud {
+                if let Some(hv) = view.hud.get(player).filter(|h| !h.hidden && view.dialog.is_none()) {
+                    // anchored to the view's top-left corner (= the GBA position in the classic view)
+                    screen.push((ui::HUD_PRIORITY, ui::HUD_POS.0, ui::HUD_POS.1, 80, 16, u.hud(packs, hv)));
+                }
+            }
+            if let Some(dv) = &view.dialog {
+                if let Some(px) = u.dialog(dv) {
+                    // horizontally centred; top / bottom anchored to the view edges, middle centred
+                    let y = match dv.position {
+                        wf_view::DialogPos::Top => ui::Ui::dialog_y(dv.position),
+                        wf_view::DialogPos::Middle => oy + ui::Ui::dialog_y(dv.position),
+                        wf_view::DialogPos::Bottom => h as i32 - (GBA_H - ui::Ui::dialog_y(dv.position)),
+                    };
+                    screen.push((ui::DIALOG_PRIORITY, ox + ui::DIALOG_X, y, 160, 64, px));
+                }
+            }
+        }
+
         for prio in (0..4u8).rev() {
             if let Some((m, af, shake)) = &map {
                 // BGs of this priority, higher BG index further back
@@ -246,12 +307,18 @@ impl Renderer {
                     self.draw_obj(sheet, *fi, *flip, s.x - vx, s.y - vy, s.effect);
                 }
             }
+            for (p, x, y, sw, sh, px) in &screen {
+                if *p == prio {
+                    self.draw_argb(px, *sw, *sh, *x, *y);
+                }
+            }
         }
 
         // blending + output
         let (bld, eva, evb) = map.as_ref().map(|(m, _, _)| (m.bldcnt as u32, m.eva as u32, m.evb as u32)).unwrap_or((0, 16, 0));
         let mode = (bld >> 6) & 3;
         let fade = view.fade_black.min(16) as u32;
+        let bm = self.blend_math;
         for i in 0..w * h {
             let tl = self.top_l[i];
             let mut c = self.top[i];
@@ -261,21 +328,21 @@ impl Renderer {
                 let b = self.top_b[i];
                 if b == 0xFFFF {
                     if second {
-                        c = blend(c, self.bot[i], eva.min(16), evb.min(16));
+                        c = blend(c, self.bot[i], eva.min(16), evb.min(16), bm);
                     }
                 } else {
-                    c = blend(c, self.bot[i], (b & 0xFF) as u32, (b >> 8) as u32);
+                    c = blend(c, self.bot[i], (b & 0xFF) as u32, (b >> 8) as u32, bm);
                 }
             } else if mode == 1 && (bld & (1 << tl)) != 0 && second {
-                c = blend(c, self.bot[i], eva.min(16), evb.min(16));
+                c = blend(c, self.bot[i], eva.min(16), evb.min(16), bm);
             }
             if fade != 0 {
-                c = darken(c, fade);
+                c = darken(c, fade, bm);
             }
             self.fb[i] = c;
         }
 
-        if self.draw_hud {
+        if self.draw_hud && matches!(self.ui, Some(None)) {
             self.draw_hud(view, player);
         }
         &self.fb
@@ -361,6 +428,24 @@ impl Renderer {
                     }
                 }
                 px += run;
+            }
+        }
+    }
+
+    /// An opaque-where-alpha OBJ already in ARGB at screen (x, y).
+    fn draw_argb(&mut self, px: &[u32], sw: usize, sh: usize, x: i32, y: i32) {
+        for j in 0..sh {
+            let yy = y + j as i32;
+            if yy < 0 || yy >= self.h as i32 {
+                continue;
+            }
+            for i in 0..sw {
+                let xx = x + i as i32;
+                let c = px[j * sw + i];
+                if xx < 0 || xx >= self.w as i32 || c >> 24 == 0 {
+                    continue;
+                }
+                self.put(yy as usize * self.w + xx as usize, c, L_OBJ, 0);
             }
         }
     }

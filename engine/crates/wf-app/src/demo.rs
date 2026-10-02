@@ -53,6 +53,9 @@ struct Walker {
     /// camera, 22.10 fixed point
     cam_x: i32,
     cam_y: i32,
+    /// camera on screen this frame: the game writes BG scroll / OAM before its camera update, so the picture
+    /// shows the previous frame's camera (verified against the emulator)
+    shown: (i32, i32),
 }
 
 pub struct DemoWorld {
@@ -75,6 +78,7 @@ pub struct DemoWorld {
     ep: i32,
     walkers: Vec<Walker>,
     has_dash_anim: bool,
+    skill: Option<u8>,
 }
 
 impl DemoWorld {
@@ -111,6 +115,7 @@ impl DemoWorld {
                     prev: 0,
                     cam_x: 0,
                     cam_y: 0,
+                    shown: (0, 0),
                 }
             })
             .collect();
@@ -134,9 +139,11 @@ impl DemoWorld {
             ep: ng["ep"].as_i64().unwrap_or(100) as i32,
             walkers,
             has_dash_anim: def.anim("dash").is_some(),
+            skill: ng["skills"][0].as_u64().map(|s| s as u8),
         };
         for i in 0..w.walkers.len() {
             w.camera(i, true);
+            w.walkers[i].shown = (w.walkers[i].cam_x >> 10, w.walkers[i].cam_y >> 10);
         }
         Ok(w)
     }
@@ -309,6 +316,7 @@ impl Sim for DemoWorld {
         }
         for i in 0..self.walkers.len() {
             self.step_walker(i, inputs.get(i).copied().unwrap_or(0), events);
+            self.walkers[i].shown = (self.walkers[i].cam_x >> 10, self.walkers[i].cam_y >> 10);
             self.camera(i, false);
         }
         self.frame += 1;
@@ -353,8 +361,8 @@ impl Sim for DemoWorld {
             }
         }
         for w in &self.walkers {
-            out.cameras.push(CameraView { x: w.cam_x >> 10, y: w.cam_y >> 10 });
-            out.hud.push(HudView { name: self.name.clone(), level: self.level, hp: self.hp, hp_max: self.hp, ep: self.ep, ep_max: self.ep });
+            out.cameras.push(CameraView { x: w.shown.0, y: w.shown.1 });
+            out.hud.push(HudView { name: self.name.clone(), level: self.level, hp: self.hp, hp_max: self.hp, ep: self.ep, ep_max: self.ep, xp72: 0, skill: self.skill, ..Default::default() });
         }
         let _ = GBA_W;
     }
