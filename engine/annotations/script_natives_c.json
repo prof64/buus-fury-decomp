@@ -1,0 +1,1914 @@
+[
+ {
+  "id": 168,
+  "hex": "0xA8",
+  "handler": "0x08002EE3",
+  "pops": 5,
+  "pushes": 0,
+  "args": [
+   "fused_char",
+   "fusion_kind",
+   "member_a",
+   "member_b",
+   "seconds"
+  ],
+  "name": "fuse_characters",
+  "category": "party",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "0x0801375E",
+  "semantics": "Build fusion character record rec(fused) from rec(member_a)/rec(member_b): rec+2 = form_char(member_b) | form_char(member_a)<<4 | fusion_kind<<8 (fusion components); maxHP/HP/maxEP/EP/stats = (a+b)*0x9A>>8 (60% of the sum); rec(fused)+8 = seconds*60 frames (or -1 if seconds == -1 = permanent); rec(fused)+0 |= 3 (unlocked+active); rec(member_a/b)+0 &= ~1 (members unavailable while fused).",
+  "status": "VERIFIED",
+  "evidence": "emulator: fuse_characters(5,0,2,3,300) wrote GD+0x700 (rec5): +0 02->03, +2 = 0x23, +8 = 18000, stats = 60% of sums; used by the fusion-dance script #13 and #476/#501",
+  "uses": 6,
+  "used_in": [
+   "#13",
+   "#476",
+   "#501"
+  ]
+ },
+ {
+  "id": 169,
+  "hex": "0xA9",
+  "handler": "0x0800262B",
+  "pops": 3,
+  "pushes": 0,
+  "args": [
+   "item_slot",
+   "x",
+   "y"
+  ],
+  "name": "spawn_map_item_at",
+  "category": "map",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "0x080090E6 -> 0x0800DCDC",
+  "semantics": "If item_slot < current map header byte 6: create the map's item pickup #item_slot (map +0x1C list; def+4 = item id, >=0 supply / <0 equipment; pickup vtable 0x0804C508) at pixel (x, y) and add it to the world.",
+  "status": "INFERRED",
+  "evidence": "asm: 0x080090E6 indexes area->map +0x1C, 0x0800DCDC builds a pickup from the supply (0x083BD2F8) or equipment (0x086F82EC) table; #398 spawn_map_item_at(0,160,178) after an event",
+  "uses": 3,
+  "used_in": [
+   "#365",
+   "#398",
+   "#420"
+  ]
+ },
+ {
+  "id": 170,
+  "hex": "0xAA",
+  "handler": "0x08002669",
+  "pops": 1,
+  "pushes": 0,
+  "args": [
+   "item_slot"
+  ],
+  "name": "spawn_map_item",
+  "category": "map",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "0x080090E6 -> 0x0800DCDC",
+  "semantics": "Same as spawn_map_item_at but the position/extra args are the globals 0x03001010/0x03001018 (normally 0 = the pickup's own placement).",
+  "status": "INFERRED",
+  "evidence": "asm only; no uses in table scripts",
+  "uses": 0,
+  "used_in": []
+ },
+ {
+  "id": 171,
+  "hex": "0xAB",
+  "handler": "0x08002F73",
+  "pops": 0,
+  "pushes": 0,
+  "args": [],
+  "name": "show_radar",
+  "category": "screen",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "0x0802B9A8 (+ ROM header checksum)",
+  "semantics": "Anti-tamper check: sum bytes 0x08000000..0x0800009F (mod 256) != 0x33 -> [0x03001004] = 1 (read by native 0xF6). Then create the radar HUD entity (vtable 0x0804B400, OBJ tiles from 0x08753008; top-left semicircle) and add it to the world. The radar accepts targets through world message 0x1B (native 0xAC) and resets on message 0x0B.",
+  "status": "VERIFIED",
+  "evidence": "emulator: semicircle radar appears top-left; with the genuine ROM 0xF6 still returns 0",
+  "uses": 0,
+  "used_in": []
+ },
+ {
+  "id": 172,
+  "hex": "0xAC",
+  "handler": "0x08002FA9",
+  "pops": 2,
+  "pushes": 0,
+  "args": [
+   "x",
+   "y"
+  ],
+  "name": "radar_add_target",
+  "category": "screen",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "broadcast(world, 0x1B, {x, y})",
+  "semantics": "Broadcast world message 0x1B with (x, y); the radar entity appends the point to its target list (+0x1C count, 8-byte entries) and shows a blip.",
+  "status": "INFERRED",
+  "evidence": "asm of radar handler 0x0802BC21; blip seen in emulator",
+  "uses": 0,
+  "used_in": []
+ },
+ {
+  "id": 173,
+  "hex": "0xAD",
+  "handler": "0x08002FD9",
+  "pops": 0,
+  "pushes": 0,
+  "args": [],
+  "name": "respawn_conditional_map_objects",
+  "category": "map",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "0x08008AFE",
+  "semantics": "For each conditional object def of the current map (map +0x18 list, count map byte 5): if its condition (0x08004784, story-flag test) now holds, spawn it (0x0800C7E2). Used after setting story flags so NPCs/objects appear without reloading the map.",
+  "status": "INFERRED",
+  "evidence": "asm; #413/#418 call it right after set_flag natives",
+  "uses": 2,
+  "used_in": [
+   "#413",
+   "#418"
+  ]
+ },
+ {
+  "id": 174,
+  "hex": "0xAE",
+  "handler": "0x08002FE5",
+  "pops": 1,
+  "pushes": 0,
+  "args": [
+   "seconds"
+  ],
+  "name": "start_countdown",
+  "category": "screen",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "GD+1 |= 4; GD+0x4D4 = seconds*60",
+  "semantics": "Start the countdown timer: GD byte 1 bit 2 = running, GD+0x4D4 = remaining frames (seconds*60), decremented by the game loop.",
+  "status": "VERIFIED",
+  "evidence": "emulator: start_countdown(10) + show_countdown_hud shows 09:93, 09:58 ... counting down",
+  "uses": 3,
+  "used_in": [
+   "#387",
+   "#389",
+   "#460"
+  ]
+ },
+ {
+  "id": 175,
+  "hex": "0xAF",
+  "handler": "0x0800300D",
+  "pops": 0,
+  "pushes": 0,
+  "args": [],
+  "name": "stop_countdown",
+  "category": "screen",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "GD+1 &= ~4",
+  "semantics": "Stop the countdown timer (clear GD byte 1 bit 2).",
+  "status": "INFERRED",
+  "evidence": "asm",
+  "uses": 0,
+  "used_in": []
+ },
+ {
+  "id": 176,
+  "hex": "0xB0",
+  "handler": "0x0800301B",
+  "pops": 0,
+  "pushes": 0,
+  "args": [],
+  "name": "show_countdown_hud",
+  "category": "screen",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "0x0802FCA0(0, 0) + world_add",
+  "semantics": "Create the timer HUD entity (vtable 0x0804BACC) in countdown mode (shows GD+0x4D4 as SS:hh, top-right).",
+  "status": "VERIFIED",
+  "evidence": "emulator (see start_countdown)",
+  "uses": 3,
+  "used_in": [
+   "#387",
+   "#389",
+   "#460"
+  ]
+ },
+ {
+  "id": 177,
+  "hex": "0xB1",
+  "handler": "0x0800337D",
+  "pops": 0,
+  "pushes": 0,
+  "args": [],
+  "name": "hide_timer_hud",
+  "category": "screen",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "broadcast(world, 0x1C, 0)",
+  "semantics": "Broadcast message 0x1C: the timer HUD entity (handler 0x0802FEEF) removes itself.",
+  "status": "VERIFIED",
+  "evidence": "asm of the timer HUD handler; identical handler body to 0xBD",
+  "uses": 2,
+  "used_in": [
+   "#461",
+   "#463"
+  ]
+ },
+ {
+  "id": 178,
+  "hex": "0xB2",
+  "handler": "0x08003031",
+  "pops": 3,
+  "pushes": 0,
+  "args": [
+   "string_id",
+   "x",
+   "y"
+  ],
+  "name": "show_title_text",
+  "category": "screen",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "0x0802BFBC -> 0x0802BECC + world_add",
+  "semantics": "Create a big outlined title-text entity for string table entry string_id, centred at (x, y) (e.g. \"Match 2 Fight!\"). Removed by 0xEF.",
+  "status": "VERIFIED",
+  "evidence": "emulator: show_title_text(1525,120,65) shows \"MATCH 2 FIGHT!\"",
+  "uses": 12,
+  "used_in": [
+   "#289",
+   "#290",
+   "#291",
+   "#292",
+   "#293",
+   "#295",
+   "#296",
+   "#297",
+   "#298",
+   "#299",
+   "#516"
+  ]
+ },
+ {
+  "id": 179,
+  "hex": "0xB3",
+  "handler": "0x08000751",
+  "pops": 2,
+  "pushes": 1,
+  "args": [
+   "radius",
+   "angle"
+  ],
+  "name": "sin_scale",
+  "category": "math",
+  "kind": "query",
+  "blocking": false,
+  "engine_fn": "sine table 0x087B6EEC",
+  "semantics": "Push (radius * sin_table[angle & 0xFF]) >> 16 (angle in 1/256 turns, table is 16.16).",
+  "status": "VERIFIED",
+  "evidence": "emulator: sin_scale(1000,64) = 1000",
+  "uses": 3,
+  "used_in": [
+   "#133",
+   "#303",
+   "#362"
+  ]
+ },
+ {
+  "id": 180,
+  "hex": "0xB4",
+  "handler": "0x08000783",
+  "pops": 2,
+  "pushes": 1,
+  "args": [
+   "radius",
+   "angle"
+  ],
+  "name": "cos_scale",
+  "category": "math",
+  "kind": "query",
+  "blocking": false,
+  "engine_fn": "sine table 0x087B6EEC",
+  "semantics": "Push (radius * sin_table[(angle + 64) & 0xFF]) >> 16.",
+  "status": "VERIFIED",
+  "evidence": "emulator: cos_scale(1000,64) = 0, cos_scale(1000,0) = 1000",
+  "uses": 0,
+  "used_in": []
+ },
+ {
+  "id": 181,
+  "hex": "0xB5",
+  "handler": "0x080030DB",
+  "pops": 1,
+  "pushes": 0,
+  "args": [
+   "graph"
+  ],
+  "name": "run_scene",
+  "category": "script",
+  "kind": "modal",
+  "blocking": true,
+  "engine_fn": "0x08012588 (thread 0x0801246E, step runner 0x080124F8, kind table 0x080728AC)",
+  "semantics": "run resource-table entry `graph` as a full event graph (all node kinds: bytecode, dialog, choice, goto) with the current parameter block, inside a modal game loop; returns when the graph reaches an END step. The END value is discarded. Broadcasts world message 0x0F at start and 0x10 at end; nesting count at 0x03002A5C, cancel flag 0x03002A58.",
+  "status": "VERIFIED",
+  "evidence": "emulator: run_scene2(516,1462,1463) shows the \"Chapter 7 / Majin Buu\" title card and returns after 466 frames; run_scene(37) shows the kind-5 dialog \"The game will not run on this hardware.\"",
+  "uses": 18,
+  "used_in": [
+   "#101",
+   "#116",
+   "#152",
+   "#193",
+   "#205",
+   "#238",
+   "#260",
+   "#262",
+   "#275",
+   "#304",
+   "#345",
+   "#346",
+   "#454",
+   "#458",
+   "#459",
+   "#460",
+   "#513",
+   "#515"
+  ]
+ },
+ {
+  "id": 182,
+  "hex": "0xB6",
+  "handler": "0x080030F9",
+  "pops": 2,
+  "pushes": 0,
+  "args": [
+   "graph",
+   "p0"
+  ],
+  "name": "run_scene1",
+  "category": "script",
+  "kind": "modal",
+  "blocking": true,
+  "engine_fn": "0x08012588 (thread 0x0801246E, step runner 0x080124F8, kind table 0x080728AC)",
+  "semantics": "Write P0 = p0 into the CURRENT parameter block (visible to the caller afterwards), then run resource-table entry `graph` as a full event graph (all node kinds: bytecode, dialog, choice, goto) with the current parameter block, inside a modal game loop; returns when the graph reaches an END step. The END value is discarded. Broadcasts world message 0x0F at start and 0x10 at end; nesting count at 0x03002A5C, cancel flag 0x03002A58.",
+  "status": "VERIFIED",
+  "evidence": "emulator: run_scene2(516,1462,1463) shows the \"Chapter 7 / Majin Buu\" title card and returns after 466 frames; run_scene(37) shows the kind-5 dialog \"The game will not run on this hardware.\"",
+  "uses": 4,
+  "used_in": [
+   "#458",
+   "#459",
+   "#460",
+   "#463"
+  ]
+ },
+ {
+  "id": 183,
+  "hex": "0xB7",
+  "handler": "0x08003127",
+  "pops": 3,
+  "pushes": 0,
+  "args": [
+   "graph",
+   "p0",
+   "p1"
+  ],
+  "name": "run_scene2",
+  "category": "script",
+  "kind": "modal",
+  "blocking": true,
+  "engine_fn": "0x08012588 (thread 0x0801246E, step runner 0x080124F8, kind table 0x080728AC)",
+  "semantics": "Write P0 = p0, P1 = p1 into the CURRENT parameter block (visible to the caller afterwards), then run resource-table entry `graph` as a full event graph (all node kinds: bytecode, dialog, choice, goto) with the current parameter block, inside a modal game loop; returns when the graph reaches an END step. The END value is discarded. Broadcasts world message 0x0F at start and 0x10 at end; nesting count at 0x03002A5C, cancel flag 0x03002A58.",
+  "status": "VERIFIED",
+  "evidence": "emulator: run_scene2(516,1462,1463) shows the \"Chapter 7 / Majin Buu\" title card and returns after 466 frames; run_scene(37) shows the kind-5 dialog \"The game will not run on this hardware.\"",
+  "uses": 12,
+  "used_in": [
+   "#103",
+   "#130",
+   "#152",
+   "#17",
+   "#190",
+   "#25",
+   "#314",
+   "#337",
+   "#345",
+   "#38",
+   "#478",
+   "#58"
+  ]
+ },
+ {
+  "id": 184,
+  "hex": "0xB8",
+  "handler": "0x08003165",
+  "pops": 4,
+  "pushes": 0,
+  "args": [
+   "graph",
+   "p0",
+   "p1",
+   "p2"
+  ],
+  "name": "run_scene3",
+  "category": "script",
+  "kind": "modal",
+  "blocking": true,
+  "engine_fn": "0x08012588 (thread 0x0801246E, step runner 0x080124F8, kind table 0x080728AC)",
+  "semantics": "Write P0 = p0, P1 = p1, P2 = p2 into the CURRENT parameter block (visible to the caller afterwards), then run resource-table entry `graph` as a full event graph (all node kinds: bytecode, dialog, choice, goto) with the current parameter block, inside a modal game loop; returns when the graph reaches an END step. The END value is discarded. Broadcasts world message 0x0F at start and 0x10 at end; nesting count at 0x03002A5C, cancel flag 0x03002A58.",
+  "status": "VERIFIED",
+  "evidence": "emulator: run_scene2(516,1462,1463) shows the \"Chapter 7 / Majin Buu\" title card and returns after 466 frames; run_scene(37) shows the kind-5 dialog \"The game will not run on this hardware.\"",
+  "uses": 3,
+  "used_in": [
+   "#216",
+   "#227",
+   "#451"
+  ]
+ },
+ {
+  "id": 185,
+  "hex": "0xB9",
+  "handler": "0x080031C9",
+  "pops": 5,
+  "pushes": 0,
+  "args": [
+   "graph",
+   "p0",
+   "p1",
+   "p2",
+   "p3"
+  ],
+  "name": "run_scene4",
+  "category": "script",
+  "kind": "modal",
+  "blocking": true,
+  "engine_fn": "0x08012588 (thread 0x0801246E, step runner 0x080124F8, kind table 0x080728AC)",
+  "semantics": "Write P0 = p0, P1 = p1, P2 = p2, P3 = p3 into the CURRENT parameter block (visible to the caller afterwards), then run resource-table entry `graph` as a full event graph (all node kinds: bytecode, dialog, choice, goto) with the current parameter block, inside a modal game loop; returns when the graph reaches an END step. The END value is discarded. Broadcasts world message 0x0F at start and 0x10 at end; nesting count at 0x03002A5C, cancel flag 0x03002A58.",
+  "status": "VERIFIED",
+  "evidence": "emulator: run_scene2(516,1462,1463) shows the \"Chapter 7 / Majin Buu\" title card and returns after 466 frames; run_scene(37) shows the kind-5 dialog \"The game will not run on this hardware.\"",
+  "uses": 16,
+  "used_in": [
+   "#218",
+   "#219",
+   "#227",
+   "#233",
+   "#451",
+   "#452",
+   "#469",
+   "#485",
+   "#508",
+   "#509"
+  ]
+ },
+ {
+  "id": 186,
+  "hex": "0xBA",
+  "handler": "0x080032C3",
+  "pops": 2,
+  "pushes": 1,
+  "args": [
+   "first_flag",
+   "count"
+  ],
+  "name": "get_flag_bits",
+  "category": "flag",
+  "kind": "query",
+  "blocking": false,
+  "engine_fn": "0x08004364 per bit",
+  "semantics": "Push the integer whose bit i = story flag (first_flag + i), i < count.",
+  "status": "VERIFIED",
+  "evidence": "emulator: set_flag_bits(293,13,1234) then get_flag_bits(293,13) = 1234; used for record times (#164)",
+  "uses": 23,
+  "used_in": [
+   "#164",
+   "#170",
+   "#171",
+   "#189",
+   "#230",
+   "#506",
+   "#515"
+  ]
+ },
+ {
+  "id": 187,
+  "hex": "0xBB",
+  "handler": "0x08003311",
+  "pops": 3,
+  "pushes": 0,
+  "args": [
+   "first_flag",
+   "count",
+   "value"
+  ],
+  "name": "set_flag_bits",
+  "category": "flag",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "0x08004380 / 0x08004396 per bit",
+  "semantics": "value clamped to 0..2^count-1; story flag (first_flag + i) = bit i of value.",
+  "status": "VERIFIED",
+  "evidence": "emulator: set_flag_bits(293,13,1234) wrote GD+0x79/0x7A",
+  "uses": 15,
+  "used_in": [
+   "#163",
+   "#164",
+   "#170",
+   "#189",
+   "#230",
+   "#506",
+   "#508",
+   "#509"
+  ]
+ },
+ {
+  "id": 188,
+  "hex": "0xBC",
+  "handler": "0x08003367",
+  "pops": 0,
+  "pushes": 0,
+  "args": [],
+  "name": "show_stopwatch_hud",
+  "category": "screen",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "0x0802FCA0(0, 1) + world_add",
+  "semantics": "Create the timer HUD entity in stopwatch mode (shows GD+0x4D8 counting up).",
+  "status": "VERIFIED",
+  "evidence": "emulator: with start_stopwatch the HUD counts 00:00 -> 03:01",
+  "uses": 1,
+  "used_in": [
+   "#163"
+  ]
+ },
+ {
+  "id": 189,
+  "hex": "0xBD",
+  "handler": "0x0800337D",
+  "pops": 0,
+  "pushes": 0,
+  "args": [],
+  "name": "hide_timer_hud",
+  "category": "screen",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "broadcast(world, 0x1C, 0)",
+  "semantics": "Same handler body as 0xB1 (separate table entry).",
+  "status": "VERIFIED",
+  "evidence": "asm identical to 0xB1",
+  "uses": 4,
+  "used_in": [
+   "#164",
+   "#165",
+   "#166",
+   "#167"
+  ]
+ },
+ {
+  "id": 190,
+  "hex": "0xBE",
+  "handler": "0x0800338D",
+  "pops": 0,
+  "pushes": 0,
+  "args": [],
+  "name": "reset_stopwatch",
+  "category": "screen",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "GD+0x4D8 = 0",
+  "semantics": "Stopwatch frames = 0.",
+  "status": "VERIFIED",
+  "evidence": "emulator",
+  "uses": 1,
+  "used_in": [
+   "#163"
+  ]
+ },
+ {
+  "id": 191,
+  "hex": "0xBF",
+  "handler": "0x0800339D",
+  "pops": 0,
+  "pushes": 0,
+  "args": [],
+  "name": "start_stopwatch",
+  "category": "screen",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "GD+1 |= 0x10",
+  "semantics": "Stopwatch running (game loop increments GD+0x4D8 each frame).",
+  "status": "VERIFIED",
+  "evidence": "emulator: counting only starts after this native",
+  "uses": 1,
+  "used_in": [
+   "#163"
+  ]
+ },
+ {
+  "id": 192,
+  "hex": "0xC0",
+  "handler": "0x080033AB",
+  "pops": 0,
+  "pushes": 0,
+  "args": [],
+  "name": "stop_stopwatch",
+  "category": "screen",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "GD+1 &= ~0x10",
+  "semantics": "Stop the stopwatch.",
+  "status": "INFERRED",
+  "evidence": "asm; #164-#167 call it before reading the time",
+  "uses": 4,
+  "used_in": [
+   "#164",
+   "#165",
+   "#166",
+   "#167"
+  ]
+ },
+ {
+  "id": 193,
+  "hex": "0xC1",
+  "handler": "0x080033B9",
+  "pops": 0,
+  "pushes": 1,
+  "args": [],
+  "name": "get_stopwatch",
+  "category": "screen",
+  "kind": "query",
+  "blocking": false,
+  "engine_fn": "GD+0x4D8",
+  "semantics": "Push stopwatch frames.",
+  "status": "VERIFIED",
+  "evidence": "asm + #164 stores it into record-time flag bits",
+  "uses": 1,
+  "used_in": [
+   "#164"
+  ]
+ },
+ {
+  "id": 194,
+  "hex": "0xC2",
+  "handler": "0x080033D3",
+  "pops": 1,
+  "pushes": 0,
+  "args": [
+   "amount"
+  ],
+  "name": "give_xp",
+  "category": "party",
+  "kind": "immediate",
+  "blocking": "conditional",
+  "engine_fn": "0x08013914(rec(cur), amount)",
+  "semantics": "Give XP to the current character (same routine as kill XP); level-ups run their popups/levelling inline and block the script while shown.",
+  "status": "VERIFIED",
+  "evidence": "emulator: give_xp(1000) blocked (level-up), HP/EP/XP of rec(cur) changed",
+  "uses": 0,
+  "used_in": []
+ },
+ {
+  "id": 195,
+  "hex": "0xC3",
+  "handler": "0x080033EB",
+  "pops": 0,
+  "pushes": 1,
+  "args": [],
+  "name": "get_xp",
+  "category": "party",
+  "kind": "query",
+  "blocking": false,
+  "engine_fn": "rec(cur)+0x24",
+  "semantics": "Push XP of the current character.",
+  "status": "VERIFIED",
+  "evidence": "emulator: 2200 in buu_snakeway_start",
+  "uses": 0,
+  "used_in": []
+ },
+ {
+  "id": 196,
+  "hex": "0xC4",
+  "handler": "0x0800340F",
+  "pops": 0,
+  "pushes": 0,
+  "args": [],
+  "name": "set_game_bit_20",
+  "category": "screen",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "GD+1 |= 0x20",
+  "semantics": "Set GameData byte 1 bit 5 (set together with the stopwatch in the race script #163; cleared by 0xC5).",
+  "status": "INFERRED",
+  "evidence": "asm",
+  "uses": 1,
+  "used_in": [
+   "#163"
+  ]
+ },
+ {
+  "id": 197,
+  "hex": "0xC5",
+  "handler": "0x0800341D",
+  "pops": 0,
+  "pushes": 0,
+  "args": [],
+  "name": "clear_game_bit_20",
+  "category": "screen",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "GD+1 &= ~0x20",
+  "semantics": "Clear GameData byte 1 bit 5.",
+  "status": "INFERRED",
+  "evidence": "asm",
+  "uses": 4,
+  "used_in": [
+   "#164",
+   "#165",
+   "#166",
+   "#167"
+  ]
+ },
+ {
+  "id": 198,
+  "hex": "0xC6",
+  "handler": "0x0800342B",
+  "pops": 0,
+  "pushes": 0,
+  "args": [],
+  "name": "run_power_struggle",
+  "category": "battle",
+  "kind": "modal",
+  "blocking": true,
+  "engine_fn": "run_mode(vtable 0x0804B5D8)",
+  "semantics": "Run the button-mash power-struggle gauge mini-game (bar at the bottom of the screen) as a modal mode; used in the Spirit Bomb vs Kid Buu finale (#463/#464).",
+  "status": "VERIFIED",
+  "evidence": "emulator: gauge bar appears, script stays blocked",
+  "uses": 2,
+  "used_in": [
+   "#463",
+   "#464"
+  ]
+ },
+ {
+  "id": 199,
+  "hex": "0xC7",
+  "handler": "0x08003451",
+  "pops": 1,
+  "pushes": 1,
+  "args": [
+   "mode"
+  ],
+  "name": "run_punch_minigame",
+  "category": "battle",
+  "kind": "modal",
+  "blocking": true,
+  "engine_fn": "0x08030384(0, mode) + run_mode",
+  "semantics": "Run the \"Press A Button To Punch\" gauge mini-game as a modal mode; push (mode result - 1).",
+  "status": "VERIFIED",
+  "evidence": "emulator: run_punch_minigame(1) shows the prompt and returns after 93 frames of mashing A",
+  "uses": 0,
+  "used_in": []
+ },
+ {
+  "id": 200,
+  "hex": "0xC8",
+  "handler": "0x080006FF",
+  "pops": 0,
+  "pushes": 1,
+  "args": [],
+  "name": "get_level",
+  "category": "party",
+  "kind": "query",
+  "blocking": false,
+  "engine_fn": "0x080135D2(rec(cur))",
+  "semantics": "Push the level (50..200) of the current character from its XP.",
+  "status": "VERIFIED",
+  "evidence": "emulator: 60",
+  "uses": 12,
+  "used_in": [
+   "#3",
+   "#324",
+   "#455",
+   "#473",
+   "#508",
+   "#509",
+   "#517",
+   "#518"
+  ]
+ },
+ {
+  "id": 201,
+  "hex": "0xC9",
+  "handler": "0x0800347B",
+  "pops": 0,
+  "pushes": 0,
+  "args": [],
+  "name": "broadcast_1f",
+  "category": "system",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "broadcast(world, 0x1F, 0)",
+  "semantics": "Broadcast world message 0x1F (receiver not identified).",
+  "status": "INFERRED",
+  "evidence": "asm; no uses",
+  "uses": 0,
+  "used_in": []
+ },
+ {
+  "id": 202,
+  "hex": "0xCA",
+  "handler": "0x0800348B",
+  "pops": 0,
+  "pushes": 0,
+  "args": [],
+  "name": "heal_party",
+  "category": "party",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "rec(0..8): HP = maxHP, EP = maxEP",
+  "semantics": "For all 9 character records: HP = maxHP, EP = maxEP; if rec+0x13 bit 0, also 0x08013C66 (refresh the live player).",
+  "status": "INFERRED",
+  "evidence": "asm (no change on an already full party in the emulator)",
+  "uses": 0,
+  "used_in": []
+ },
+ {
+  "id": 203,
+  "hex": "0xCB",
+  "handler": "0x080034B9",
+  "pops": 3,
+  "pushes": 1,
+  "args": [
+   "actor",
+   "w",
+   "h"
+  ],
+  "name": "screen_rect_x_at_actor",
+  "category": "camera",
+  "kind": "query",
+  "blocking": false,
+  "engine_fn": "0x080001C6, 0x0800FDFA, 0x08009816(camera)",
+  "semantics": "Centre a w x h rectangle on the actor's bounding-box centre, clamp it to the camera/map bounds; push its left x (used to place fusion-dance / cutscene props on screen).",
+  "status": "INFERRED",
+  "evidence": "asm; #13 fusion dance",
+  "uses": 11,
+  "used_in": [
+   "#13",
+   "#235",
+   "#436",
+   "#452",
+   "#474",
+   "#475",
+   "#476",
+   "#477",
+   "#501",
+   "#503"
+  ]
+ },
+ {
+  "id": 204,
+  "hex": "0xCC",
+  "handler": "0x08003557",
+  "pops": 3,
+  "pushes": 1,
+  "args": [
+   "actor",
+   "w",
+   "h"
+  ],
+  "name": "screen_rect_y_at_actor",
+  "category": "camera",
+  "kind": "query",
+  "blocking": false,
+  "engine_fn": "0x080001C6, 0x0800FDFA, 0x08009816(camera)",
+  "semantics": "As 0xCB but pushes the rectangle's top y.",
+  "status": "INFERRED",
+  "evidence": "asm",
+  "uses": 11,
+  "used_in": [
+   "#13",
+   "#235",
+   "#436",
+   "#452",
+   "#474",
+   "#475",
+   "#476",
+   "#477",
+   "#501",
+   "#503"
+  ]
+ },
+ {
+  "id": 205,
+  "hex": "0xCD",
+  "handler": "0x080035F5",
+  "pops": 4,
+  "pushes": 0,
+  "args": [
+   "category",
+   "item",
+   "price",
+   "flag"
+  ],
+  "name": "shop_add_item",
+  "category": "shop",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "0x08031808 (list 0x03003174)",
+  "semantics": "Append a shop entry {u8 category (0 supply, 1 equipment), u8 flag, u16 item, u32 price} to the shop list (count at 0x03003174, 8-byte entries) consumed by the buy screen 0xCE.",
+  "status": "VERIFIED",
+  "evidence": "shop graphs #28.. build the list (prices scaled by P0 percent) then call 0xCE; buy screen verified",
+  "uses": 249,
+  "used_in": [
+   "#257",
+   "#258",
+   "#259",
+   "#28",
+   "#30",
+   "#31",
+   "#33",
+   "#34",
+   "#36"
+  ]
+ },
+ {
+  "id": 206,
+  "hex": "0xCE",
+  "handler": "0x08003627",
+  "pops": 0,
+  "pushes": 0,
+  "args": [],
+  "name": "open_shop_buy",
+  "category": "shop",
+  "kind": "modal",
+  "blocking": true,
+  "engine_fn": "run_mode(0x0805058C fade) ; 0x080315B0 buy screen ; fades",
+  "semantics": "Fade out, run the shop BUY screen over the list from 0xCD (modal), restore the world (0x08011DB4/0x08011E0E, camera 0x0800938C), fade in. Blocks until the player leaves the shop.",
+  "status": "VERIFIED",
+  "evidence": "emulator: \"Buy x1 / Cancel / ZENIE\" screen",
+  "uses": 19,
+  "used_in": [
+   "#257",
+   "#258",
+   "#259",
+   "#28",
+   "#30",
+   "#31",
+   "#33",
+   "#34",
+   "#36"
+  ]
+ },
+ {
+  "id": 207,
+  "hex": "0xCF",
+  "handler": "0x0800365F",
+  "pops": 1,
+  "pushes": 0,
+  "args": [
+   "price_percent"
+  ],
+  "name": "open_shop_sell",
+  "category": "shop",
+  "kind": "modal",
+  "blocking": true,
+  "engine_fn": "0x08031E84(0, price_percent)",
+  "semantics": "As 0xCE but the SELL screen; items sell for price*price_percent/100 (shops pass 50).",
+  "status": "VERIFIED",
+  "evidence": "emulator: \"Sell x1 / Cancel\" screen with RqLvl column",
+  "uses": 6,
+  "used_in": [
+   "#28",
+   "#30",
+   "#31",
+   "#33",
+   "#34",
+   "#36"
+  ]
+ },
+ {
+  "id": 208,
+  "hex": "0xD0",
+  "handler": "0x080036A5",
+  "pops": 1,
+  "pushes": 0,
+  "args": [
+   "form"
+  ],
+  "name": "set_form",
+  "category": "party",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "0x0801712C, 0x08010692, 0x0801711C",
+  "semantics": "Transform the current character: leave the old form (0x0801712C(form def)), rec(cur)+0x14 = form, refresh the player entity (0x08010692), enter the new form (0x0801711C).",
+  "status": "VERIFIED",
+  "evidence": "emulator: set_form(1) changed GD+0x50C 2 -> 1",
+  "uses": 12,
+  "used_in": [
+   "#103",
+   "#191",
+   "#227",
+   "#228",
+   "#26",
+   "#27",
+   "#344",
+   "#451",
+   "#452",
+   "#457",
+   "#458",
+   "#463"
+  ]
+ },
+ {
+  "id": 209,
+  "hex": "0xD1",
+  "handler": "0x08003725",
+  "pops": 0,
+  "pushes": 0,
+  "args": [],
+  "name": "run_credits",
+  "category": "system",
+  "kind": "modal",
+  "blocking": true,
+  "engine_fn": "0x080335BC(0, 1) + run_mode",
+  "semantics": "Run the staff-credits sequence (Webfoot Technologies, Jeffrey Lim, ...) as a modal mode.",
+  "status": "VERIFIED",
+  "evidence": "emulator: credits roll",
+  "uses": 1,
+  "used_in": [
+   "#312"
+  ]
+ },
+ {
+  "id": 210,
+  "hex": "0xD2",
+  "handler": "0x08003735",
+  "pops": 0,
+  "pushes": 1,
+  "args": [],
+  "name": "a_pressed",
+  "category": "system",
+  "kind": "query",
+  "blocking": false,
+  "engine_fn": "[0x03003300]+4 bit 0",
+  "semantics": "Push 1 if the A button was newly pressed this frame (input manager 0x03003300: +4 = keys pressed this frame, +6 = released).",
+  "status": "VERIFIED",
+  "evidence": "emulator: input halfwords observed",
+  "uses": 1,
+  "used_in": [
+   "#464"
+  ]
+ },
+ {
+  "id": 211,
+  "hex": "0xD3",
+  "handler": "0x080006AD",
+  "pops": 1,
+  "pushes": 1,
+  "args": [
+   "char"
+  ],
+  "name": "form_name_ptr",
+  "category": "party",
+  "kind": "query",
+  "blocking": false,
+  "engine_fn": "string table[form_def(rec(char)+0x14)+2]",
+  "semantics": "Push a POINTER to the UTF-16 name of the character's current form (for %s in formatted dialog).",
+  "status": "VERIFIED",
+  "evidence": "emulator: form_name_ptr(0) pushed 0x0805A8F8 (a ROM string pointer)",
+  "uses": 6,
+  "used_in": [
+   "#171"
+  ]
+ },
+ {
+  "id": 212,
+  "hex": "0xD4",
+  "handler": "0x0800374D",
+  "pops": 0,
+  "pushes": 0,
+  "args": [],
+  "name": "sleep_mode",
+  "category": "system",
+  "kind": "modal",
+  "blocking": true,
+  "engine_fn": "0x0803FA38",
+  "semantics": "GBA sleep: disable interrupts except keypad, SWI 3 (Stop) until the wake key combo, then wait for release.",
+  "status": "INFERRED",
+  "evidence": "asm: writes IE/KEYCNT 0xC304 then svc #3",
+  "uses": 1,
+  "used_in": [
+   "#7"
+  ]
+ },
+ {
+  "id": 213,
+  "hex": "0xD5",
+  "handler": "0x080029D9",
+  "pops": 1,
+  "pushes": 1,
+  "args": [
+   "item"
+  ],
+  "name": "is_equipped",
+  "category": "equip",
+  "kind": "query",
+  "blocking": false,
+  "engine_fn": "rec(cur)+0x3C+4*slot(item)",
+  "semantics": "Push 1 if equipment `item` is in its slot (equipment table 0x086F82EC + 0x2C*item + 0x14 = slot) on the current character.",
+  "status": "VERIFIED",
+  "evidence": "notes \u00a76 (VERIFIED equipment/supply behaviour)",
+  "uses": 52,
+  "used_in": [
+   "#2",
+   "#28",
+   "#3",
+   "#30",
+   "#31",
+   "#33",
+   "#348",
+   "#349",
+   "#355",
+   "#362",
+   "#521",
+   "equip40",
+   "supply0",
+   "supply1",
+   "supply10",
+   "supply11",
+   "supply12",
+   "supply13",
+   "supply14",
+   "supply15"
+  ]
+ },
+ {
+  "id": 214,
+  "hex": "0xD6",
+  "handler": "0x08003227",
+  "pops": 1,
+  "pushes": 0,
+  "args": [
+   "script"
+  ],
+  "name": "run_script",
+  "category": "script",
+  "kind": "immediate",
+  "blocking": "conditional",
+  "engine_fn": "0x08004098",
+  "semantics": "Synchronously run ONLY node 0 of resource entry `script` (must be kind 0 or 4, else assertion) with the CURRENT parameter block (shared P0..P3) and shared globals G0..G3; its return value is discarded. Blocks only if the callee blocks.",
+  "status": "VERIFIED",
+  "evidence": "notes \u00a77 loot (VERIFIED: 60/60 kills reproduced)",
+  "uses": 1,
+  "used_in": [
+   "#14"
+  ]
+ },
+ {
+  "id": 215,
+  "hex": "0xD7",
+  "handler": "0x0800324B",
+  "pops": 2,
+  "pushes": 0,
+  "args": [
+   "script",
+   "p0"
+  ],
+  "name": "run_script1",
+  "category": "script",
+  "kind": "immediate",
+  "blocking": "conditional",
+  "engine_fn": "0x08004098",
+  "semantics": "P0 = p0 in the CURRENT parameter block, then run_script(script).",
+  "status": "VERIFIED",
+  "evidence": "loot #497 -> #496/#499/#500",
+  "uses": 10,
+  "used_in": [
+   "#497",
+   "#498",
+   "#510"
+  ]
+ },
+ {
+  "id": 216,
+  "hex": "0xD8",
+  "handler": "0x0800327F",
+  "pops": 3,
+  "pushes": 0,
+  "args": [
+   "script",
+   "p0",
+   "p1"
+  ],
+  "name": "run_script2",
+  "category": "script",
+  "kind": "immediate",
+  "blocking": "conditional",
+  "engine_fn": "0x08004098",
+  "semantics": "P0 = p0, P1 = p1 in the CURRENT parameter block, then run_script(script).",
+  "status": "VERIFIED",
+  "evidence": "loot (enemy drop entry)",
+  "uses": 0,
+  "used_in": []
+ },
+ {
+  "id": 217,
+  "hex": "0xD9",
+  "handler": "0x080038B5",
+  "pops": 1,
+  "pushes": 0,
+  "args": [
+   "set"
+  ],
+  "name": "show_destination_label",
+  "category": "screen",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "0x0803643C(0, set) + world_add",
+  "semantics": "Create a destination-label HUD entity (vtable 0x0804BAF4) for label set `set` (table 0x0875A73C+8); its 32 entries are filled by 0xDA.",
+  "status": "INFERRED",
+  "evidence": "asm; #511 (travel menu: HFIL, Heaven, Earth, Grand Kai's Planet, ...)",
+  "uses": 1,
+  "used_in": [
+   "#511"
+  ]
+ },
+ {
+  "id": 218,
+  "hex": "0xDA",
+  "handler": "0x080038D5",
+  "pops": 2,
+  "pushes": 0,
+  "args": [
+   "index",
+   "string_id"
+  ],
+  "name": "set_destination_label",
+  "category": "screen",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "broadcast(world, 0x23, {index, string_id})",
+  "semantics": "Broadcast message 0x23: the label entity stores string_id at entry index and redraws if it is the current one.",
+  "status": "INFERRED",
+  "evidence": "asm of handler 0x08036915; #511",
+  "uses": 6,
+  "used_in": [
+   "#511"
+  ]
+ },
+ {
+  "id": 219,
+  "hex": "0xDB",
+  "handler": "0x08003755",
+  "pops": 1,
+  "pushes": 0,
+  "args": [
+   "enable"
+  ],
+  "name": "set_area_flag_c",
+  "category": "map",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "[0x0300197C+0xC] = enable != 0",
+  "semantics": "Set the area manager's +0xC flag (meaning not identified).",
+  "status": "INFERRED",
+  "evidence": "asm; no uses",
+  "uses": 0,
+  "used_in": []
+ },
+ {
+  "id": 220,
+  "hex": "0xDC",
+  "handler": "0x08001E01",
+  "pops": 2,
+  "pushes": 0,
+  "args": [
+   "id",
+   "value"
+  ],
+  "name": "set_entity_value",
+  "category": "system",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "0x08011C70(world, 8, id)",
+  "semantics": "Find the first world entity that answers message 8 with `id`; set its +0x18 = value and +4 = +0x30 + value.",
+  "status": "INFERRED",
+  "evidence": "asm; no uses",
+  "uses": 0,
+  "used_in": []
+ },
+ {
+  "id": 221,
+  "hex": "0xDD",
+  "handler": "0x08003775",
+  "pops": 0,
+  "pushes": 1,
+  "args": [],
+  "name": "party_xp_total",
+  "category": "party",
+  "kind": "query",
+  "blocking": false,
+  "engine_fn": "sum rec(0..4)+0x24",
+  "semantics": "Push the summed XP of character records 0..4.",
+  "status": "VERIFIED",
+  "evidence": "emulator: 85400; used by the ending/credits #312",
+  "uses": 1,
+  "used_in": [
+   "#312"
+  ]
+ },
+ {
+  "id": 222,
+  "hex": "0xDE",
+  "handler": "0x080037A7",
+  "pops": 1,
+  "pushes": 1,
+  "args": [
+   "string_id"
+  ],
+  "name": "string_ptr",
+  "category": "query",
+  "kind": "query",
+  "blocking": false,
+  "engine_fn": "string table 0x0806BCE8",
+  "semantics": "Push a POINTER to string table entry string_id (for %s formatting).",
+  "status": "VERIFIED",
+  "evidence": "emulator: string_ptr(541) pushed the pointer of \"Earth\"",
+  "uses": 1,
+  "used_in": [
+   "#312"
+  ]
+ },
+ {
+  "id": 223,
+  "hex": "0xDF",
+  "handler": "0x080037C5",
+  "pops": 1,
+  "pushes": 0,
+  "args": [
+   "n"
+  ],
+  "name": "eq_add_hp_regen",
+  "category": "equip",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "eqacc+0x10 (u16) += n*0x445 >> 8",
+  "semantics": "Equipment-effect accumulator (0x03002B5C, filled while an equipment effect script runs during stat recalculation): eqacc+0x10 (u16) += n*0x445 >> 8 (HP regeneration per frame /256).",
+  "status": "VERIFIED",
+  "evidence": "items.json equipment effect scripts decoded and checked in-game (notes \u00a76)",
+  "uses": 1,
+  "used_in": [
+   "equip42"
+  ]
+ },
+ {
+  "id": 224,
+  "hex": "0xE0",
+  "handler": "0x080037E1",
+  "pops": 1,
+  "pushes": 0,
+  "args": [
+   "n"
+  ],
+  "name": "eq_add_thorns",
+  "category": "equip",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "eqacc+0x08 (u16) += n*0xA4 >> 6",
+  "semantics": "Equipment-effect accumulator (0x03002B5C, filled while an equipment effect script runs during stat recalculation): eqacc+0x08 (u16) += n*0xA4 >> 6 (thorns damage).",
+  "status": "VERIFIED",
+  "evidence": "items.json equipment effect scripts decoded and checked in-game (notes \u00a76)",
+  "uses": 1,
+  "used_in": [
+   "equip20"
+  ]
+ },
+ {
+  "id": 225,
+  "hex": "0xE1",
+  "handler": "0x080037FD",
+  "pops": 1,
+  "pushes": 0,
+  "args": [
+   "n"
+  ],
+  "name": "eq_add_end",
+  "category": "equip",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "eqacc+0x1C += n; eqacc+0x20 += n",
+  "semantics": "Equipment-effect accumulator (0x03002B5C, filled while an equipment effect script runs during stat recalculation): eqacc+0x1C += n; eqacc+0x20 += n (END (melee) and END (energy)).",
+  "status": "VERIFIED",
+  "evidence": "items.json equipment effect scripts decoded and checked in-game (notes \u00a76)",
+  "uses": 2,
+  "used_in": [
+   "equip153",
+   "equip40"
+  ]
+ },
+ {
+  "id": 226,
+  "hex": "0xE2",
+  "handler": "0x08003819",
+  "pops": 1,
+  "pushes": 0,
+  "args": [
+   "n"
+  ],
+  "name": "eq_add_pow",
+  "category": "equip",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "eqacc+0x18 += n",
+  "semantics": "Equipment-effect accumulator (0x03002B5C, filled while an equipment effect script runs during stat recalculation): eqacc+0x18 += n (POW).",
+  "status": "VERIFIED",
+  "evidence": "items.json equipment effect scripts decoded and checked in-game (notes \u00a76)",
+  "uses": 2,
+  "used_in": [
+   "equip153",
+   "equip40"
+  ]
+ },
+ {
+  "id": 227,
+  "hex": "0xE3",
+  "handler": "0x0800382F",
+  "pops": 1,
+  "pushes": 0,
+  "args": [
+   "n"
+  ],
+  "name": "eq_add_spd",
+  "category": "equip",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "eqacc+0x24 += n",
+  "semantics": "Equipment-effect accumulator (0x03002B5C, filled while an equipment effect script runs during stat recalculation): eqacc+0x24 += n (SPD).",
+  "status": "VERIFIED",
+  "evidence": "items.json equipment effect scripts decoded and checked in-game (notes \u00a76)",
+  "uses": 1,
+  "used_in": [
+   "equip153"
+  ]
+ },
+ {
+  "id": 228,
+  "hex": "0xE4",
+  "handler": "0x08003845",
+  "pops": 1,
+  "pushes": 0,
+  "args": [
+   "n"
+  ],
+  "name": "eq_add_str",
+  "category": "equip",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "eqacc+0x14 += n",
+  "semantics": "Equipment-effect accumulator (0x03002B5C, filled while an equipment effect script runs during stat recalculation): eqacc+0x14 += n (STR).",
+  "status": "VERIFIED",
+  "evidence": "items.json equipment effect scripts decoded and checked in-game (notes \u00a76)",
+  "uses": 2,
+  "used_in": [
+   "equip153",
+   "equip40"
+  ]
+ },
+ {
+  "id": 229,
+  "hex": "0xE5",
+  "handler": "0x0800385B",
+  "pops": 0,
+  "pushes": 0,
+  "args": [],
+  "name": "eq_halve_block_damage",
+  "category": "equip",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "eqacc+0x0C (u16) /= 2",
+  "semantics": "Equipment-effect accumulator (0x03002B5C, filled while an equipment effect script runs during stat recalculation): eqacc+0x0C (u16) /= 2 (damage taken while blocking).",
+  "status": "VERIFIED",
+  "evidence": "items.json equipment effect scripts decoded and checked in-game (notes \u00a76)",
+  "uses": 1,
+  "used_in": [
+   "equip16"
+  ]
+ },
+ {
+  "id": 230,
+  "hex": "0xE6",
+  "handler": "0x0800386D",
+  "pops": 0,
+  "pushes": 0,
+  "args": [],
+  "name": "eq_halve_energy_cost",
+  "category": "equip",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "eqacc+0x01 (u8) /= 2",
+  "semantics": "Equipment-effect accumulator (0x03002B5C, filled while an equipment effect script runs during stat recalculation): eqacc+0x01 (u8) /= 2 (EP cost of energy attacks).",
+  "status": "VERIFIED",
+  "evidence": "items.json equipment effect scripts decoded and checked in-game (notes \u00a76)",
+  "uses": 1,
+  "used_in": [
+   "equip34"
+  ]
+ },
+ {
+  "id": 231,
+  "hex": "0xE7",
+  "handler": "0x0800387F",
+  "pops": 0,
+  "pushes": 0,
+  "args": [],
+  "name": "eq_halve_energy_block_cost",
+  "category": "equip",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "eqacc+0x02 (u8) /= 2",
+  "semantics": "Equipment-effect accumulator (0x03002B5C, filled while an equipment effect script runs during stat recalculation): eqacc+0x02 (u8) /= 2 (EP cost of blocking energy).",
+  "status": "VERIFIED",
+  "evidence": "items.json equipment effect scripts decoded and checked in-game (notes \u00a76)",
+  "uses": 2,
+  "used_in": [
+   "equip21",
+   "equip60"
+  ]
+ },
+ {
+  "id": 232,
+  "hex": "0xE8",
+  "handler": "0x08003891",
+  "pops": 0,
+  "pushes": 0,
+  "args": [],
+  "name": "eq_scale_ss_cooldown",
+  "category": "equip",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "eqacc+0x0E (u16) = x*7 >> 3",
+  "semantics": "Equipment-effect accumulator (0x03002B5C, filled while an equipment effect script runs during stat recalculation): eqacc+0x0E (u16) = x*7 >> 3 (Super Saiyan drain/cooldown rate).",
+  "status": "VERIFIED",
+  "evidence": "items.json equipment effect scripts decoded and checked in-game (notes \u00a76)",
+  "uses": 4,
+  "used_in": [
+   "equip101",
+   "equip140",
+   "equip35",
+   "equip63"
+  ]
+ },
+ {
+  "id": 233,
+  "hex": "0xE9",
+  "handler": "0x08003905",
+  "pops": 3,
+  "pushes": 0,
+  "args": [
+   "char",
+   "skill",
+   "level"
+  ],
+  "name": "set_skill_level",
+  "category": "party",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "0x08013B54(rec(char), skill, level)",
+  "semantics": "Find `skill` in the character's known-skill list (rec+0x0D.., count rec+0x0C) and set both level bytes (rec+0x2E+2i, +0x2F+2i) = level; asserts (0x0803DF14) if the skill is not known.",
+  "status": "VERIFIED",
+  "evidence": "notes \u00a73 (\"skill levels are set by story scripts (native -> 0x08013B54)\"); #3 graphs print \"Goku learned Kamehameha Level 2!\"",
+  "uses": 6,
+  "used_in": [
+   "#214",
+   "#3",
+   "#314"
+  ]
+ },
+ {
+  "id": 234,
+  "hex": "0xEA",
+  "handler": "0x0800393D",
+  "pops": 2,
+  "pushes": 1,
+  "args": [
+   "char",
+   "skill"
+  ],
+  "name": "get_skill_level",
+  "category": "party",
+  "kind": "query",
+  "blocking": false,
+  "engine_fn": "0x08013BCC(rec(char), skill)",
+  "semantics": "Push the level byte (rec+0x2F+2i) of a known skill; asserts and pushes 0 if unknown.",
+  "status": "INFERRED",
+  "evidence": "asm; #3",
+  "uses": 4,
+  "used_in": [
+   "#3"
+  ]
+ },
+ {
+  "id": 235,
+  "hex": "0xEB",
+  "handler": "0x08003979",
+  "pops": 0,
+  "pushes": 0,
+  "args": [],
+  "name": "set_game_bit_40",
+  "category": "system",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "GD+1 |= 0x40",
+  "semantics": "Set GameData byte 1 bit 6.",
+  "status": "VERIFIED",
+  "evidence": "emulator: GD+1 0x02 -> 0x42; meaning not identified; no uses",
+  "uses": 0,
+  "used_in": []
+ },
+ {
+  "id": 236,
+  "hex": "0xEC",
+  "handler": "0x08003987",
+  "pops": 3,
+  "pushes": 0,
+  "args": [
+   "x",
+   "y",
+   "highlight"
+  ],
+  "name": "add_map_marker",
+  "category": "map",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "0x08026DE4(0, {x-4, y-4}, highlight != 0) + world_add",
+  "semantics": "Create a small blinking marker entity (vtable 0x0804D634) centred at (x, y); highlight selects the current-location style. Used by the world-map screen script #15 (one marker per unlocked area).",
+  "status": "VERIFIED",
+  "evidence": "emulator: red/orange blinking dots at the given points",
+  "uses": 13,
+  "used_in": [
+   "#15"
+  ]
+ },
+ {
+  "id": 237,
+  "hex": "0xED",
+  "handler": "0x080039E5",
+  "pops": 1,
+  "pushes": 1,
+  "args": [
+   "char"
+  ],
+  "name": "get_stat_points",
+  "category": "party",
+  "kind": "query",
+  "blocking": false,
+  "engine_fn": "rec(char)+0x2C",
+  "semantics": "Push unspent stat points.",
+  "status": "VERIFIED",
+  "evidence": "emulator: add_stat_points then get_stat_points = 5",
+  "uses": 1,
+  "used_in": [
+   "#3"
+  ]
+ },
+ {
+  "id": 238,
+  "hex": "0xEE",
+  "handler": "0x08003A15",
+  "pops": 2,
+  "pushes": 0,
+  "args": [
+   "char",
+   "n"
+  ],
+  "name": "add_stat_points",
+  "category": "party",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "rec(char)+0x2C += n (u16)",
+  "semantics": "Give unspent stat points.",
+  "status": "VERIFIED",
+  "evidence": "emulator: GD+0x524 0 -> 5",
+  "uses": 1,
+  "used_in": [
+   "#3"
+  ]
+ },
+ {
+  "id": 239,
+  "hex": "0xEF",
+  "handler": "0x08003071",
+  "pops": 0,
+  "pushes": 0,
+  "args": [],
+  "name": "hide_title_text",
+  "category": "screen",
+  "kind": "modal",
+  "blocking": true,
+  "engine_fn": "broadcast(world, 0x27, 0); run_mode(vtable 0x08049978, 1)",
+  "semantics": "Broadcast message 0x27 (title-text entities remove themselves) and run a 1-frame modal wait so the removal is drawn before the script continues.",
+  "status": "VERIFIED",
+  "evidence": "emulator: returned after 1 frame; #289-#298 tournament banners",
+  "uses": 10,
+  "used_in": [
+   "#289",
+   "#290",
+   "#291",
+   "#292",
+   "#293",
+   "#295",
+   "#296",
+   "#297",
+   "#298",
+   "#299"
+  ]
+ },
+ {
+  "id": 240,
+  "hex": "0xF0",
+  "handler": "0x08003A4F",
+  "pops": 2,
+  "pushes": 0,
+  "args": [
+   "actor",
+   "value"
+  ],
+  "name": "set_actor_field_1a8",
+  "category": "actor",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "0x080001C6(actor)+0x1A8 = value << 10",
+  "semantics": "Write actor object +0x1A8 = value<<10 (field not identified).",
+  "status": "INFERRED",
+  "evidence": "asm; no uses",
+  "uses": 0,
+  "used_in": []
+ },
+ {
+  "id": 241,
+  "hex": "0xF1",
+  "handler": "0x08002A23",
+  "pops": 2,
+  "pushes": 0,
+  "args": [
+   "char",
+   "slot"
+  ],
+  "name": "unequip_slot",
+  "category": "equip",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "0x08004544(GD, char, slot)",
+  "semantics": "If the slot does not hold its default item (0x080555B8[slot]), move the equipped item back to the inventory (GD+0xE4 list, entries: top nibble = owner+1, low 28 bits = equipment id) and put the default back.",
+  "status": "INFERRED",
+  "evidence": "asm; emulator no-op on default slots; #362",
+  "uses": 1,
+  "used_in": [
+   "#362"
+  ]
+ },
+ {
+  "id": 242,
+  "hex": "0xF2",
+  "handler": "0x08003A75",
+  "pops": 5,
+  "pushes": 0,
+  "args": [
+   "seconds",
+   "str",
+   "pow",
+   "end",
+   "spd"
+  ],
+  "name": "boost_stats",
+  "category": "party",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "seconds == 0: rec(cur)+0x28..0x2B += ; else GD+0x4DC.. ; 0x0801064C",
+  "semantics": "seconds == 0: permanently add to the current character's base STR/POW/END/SPD (u8). Otherwise timed buff: GD+0x4DC = seconds*60 frames, GD+0x4E0/4E4/4E8/4EC = str/pow/end/spd, GD+0x4F0 = 0 (applied by 0x080046AE during stat recalculation); then refresh the player (0x0801064C).",
+  "status": "VERIFIED",
+  "evidence": "emulator: boost_stats(30,25,25,25,25) = Holy Water (supply #20): GD+0x4DC = 1799 after 1 frame, effective stats +25; boost_stats(0,1,2,3,4) raised base stats",
+  "uses": 2,
+  "used_in": [
+   "#455",
+   "supply20"
+  ]
+ },
+ {
+  "id": 243,
+  "hex": "0xF3",
+  "handler": "0x08003B49",
+  "pops": 2,
+  "pushes": 0,
+  "args": [
+   "char",
+   "level"
+  ],
+  "name": "level_up_to",
+  "category": "party",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "0x080135D2, 0x08013678, 0x080135BC",
+  "semantics": "level clamped to 200; if the character's level is lower: apply level-up growth from current to target (0x08013678) and set XP to the target level threshold (0x080135BC).",
+  "status": "INFERRED",
+  "evidence": "asm; #455",
+  "uses": 1,
+  "used_in": [
+   "#455"
+  ]
+ },
+ {
+  "id": 244,
+  "hex": "0xF4",
+  "handler": "0x08003B95",
+  "pops": 4,
+  "pushes": 0,
+  "args": [
+   "x",
+   "y",
+   "radius",
+   "param"
+  ],
+  "name": "show_energy_sphere",
+  "category": "screen",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "0x0803A84A(0, 0, {x, y}, radius, param, 1) -> BG effect slot 0 (0x0800927E)",
+  "semantics": "Create the large BG-layer sphere effect (vtable 0x080493B4, 0x830 bytes) at (x, y) with radius and a parameter, replacing BG-effect slot 0. Used by the Spirit Bomb finale (#461-#463, #480).",
+  "status": "VERIFIED",
+  "evidence": "emulator: show_energy_sphere(144,100,48,80) draws a large pale sphere on a BG layer",
+  "uses": 17,
+  "used_in": [
+   "#461",
+   "#462",
+   "#463",
+   "#480"
+  ]
+ },
+ {
+  "id": 245,
+  "hex": "0xF5",
+  "handler": "0x0800389F",
+  "pops": 1,
+  "pushes": 0,
+  "args": [
+   "n"
+  ],
+  "name": "eq_add_crit",
+  "category": "equip",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "eqacc+0x00 (u8) += n",
+  "semantics": "Equipment-effect accumulator: critical-hit chance percent += n.",
+  "status": "VERIFIED",
+  "evidence": "items.json (Charge Gloves: +5%)",
+  "uses": 3,
+  "used_in": [
+   "equip104",
+   "equip110",
+   "equip61"
+  ]
+ },
+ {
+  "id": 246,
+  "hex": "0xF6",
+  "handler": "0x08003BEB",
+  "pops": 0,
+  "pushes": 1,
+  "args": [],
+  "name": "is_tampered",
+  "category": "system",
+  "kind": "query",
+  "blocking": false,
+  "engine_fn": "[0x03001004]",
+  "semantics": "Push the anti-tamper flag set by 0xAB (ROM header checksum mismatch). Script #101 then runs the dialog graph #37 \"The game will not run on this hardware.\"",
+  "status": "VERIFIED",
+  "evidence": "emulator: 0 on the genuine ROM",
+  "uses": 2,
+  "used_in": [
+   "#101",
+   "#518"
+  ]
+ },
+ {
+  "id": 247,
+  "hex": "0xF7",
+  "handler": "0x08003BFD",
+  "pops": 1,
+  "pushes": 0,
+  "args": [
+   "seconds"
+  ],
+  "name": "start_timed_special",
+  "category": "party",
+  "kind": "immediate",
+  "blocking": false,
+  "engine_fn": "GD+0x4DC = seconds*60; GD+0x4E0..0x4EC = 0; GD+0x4F0 = 1; 0x0801064C",
+  "semantics": "Timed buff with no stat bonuses but GD+0x4F0 = 1, which stat recalculation (0x080046AE) copies into the record byte +0x67 (special flag; effect not identified).",
+  "status": "VERIFIED",
+  "evidence": "emulator: start_timed_special(10) -> GD+0x4DC = 599, GD+0x4F0 = 1, rec0+0x67 = 1; used by graph #0",
+  "uses": 1,
+  "used_in": [
+   "#0"
+  ]
+ }
+]

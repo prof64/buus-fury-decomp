@@ -16,3 +16,6 @@ __pycache__/
 re/buu/ui/out/
 re/buu/ui/ws/
 work/ls/
+engine/experiments/*/target/
+engine/experiments/*/crates/
+engine/experiments/*/annotations/

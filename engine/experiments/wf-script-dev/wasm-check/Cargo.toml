@@ -1,0 +1,12 @@
+[package]
+name = "wasm-check"
+description = "Native-vs-wasm determinism check for wf-script + wf-script-rhai (run.mjs)"
+edition.workspace = true
+version.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wf-script-rhai = { path = "../crates/wf-script-rhai" }

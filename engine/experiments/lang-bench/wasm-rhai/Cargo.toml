@@ -1,0 +1,15 @@
+[package]
+name = "wasm-rhai"
+edition.workspace = true
+version.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+host = { path = "../host" }
+rt-rhai = { path = "../rt-rhai" }
+
+[features]
+slim = ["rt-rhai/slim"]

@@ -1,0 +1,7070 @@
+[
+{
+"addr": "0x08072974",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 12 (world 0 map 16) @0x0808E580"
+]
+},
+{
+"addr": "0x08072A48",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 19 (world 0 map 50) @0x0808E708"
+]
+},
+{
+"addr": "0x08072CA0",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition",
+"map_object_condition"
+],
+"where": [
+"area 19 (world 0 map 50) @0x0808E708 list0[28] rec 0x0807376C",
+"area 19 (world 0 map 50) @0x0808E708 list0[29] rec 0x08073780",
+"area 19 (world 0 map 50) @0x0808E708 list1[0] rec 0x08072CB4"
+]
+},
+{
+"addr": "0x08072D04",
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+],
+"where": [
+"area 19 (world 0 map 50) @0x0808E708 list1[1] rec 0x08072D18"
+]
+},
+{
+"addr": "0x08072D68",
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+],
+"where": [
+"area 19 (world 0 map 50) @0x0808E708 list1[2] rec 0x08072D7C"
+]
+},
+{
+"addr": "0x08072DC8",
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+],
+"where": [
+"area 19 (world 0 map 50) @0x0808E708 list1[3] rec 0x08072DDC"
+]
+},
+{
+"addr": "0x08072E1C",
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+],
+"where": [
+"area 19 (world 0 map 50) @0x0808E708 list1[4] rec 0x08072E30"
+]
+},
+{
+"addr": "0x08072E78",
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+],
+"where": [
+"area 19 (world 0 map 50) @0x0808E708 list1[5] rec 0x08072E8C"
+]
+},
+{
+"addr": "0x08072EE4",
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+],
+"where": [
+"area 19 (world 0 map 50) @0x0808E708 list1[6] rec 0x08072EF8"
+]
+},
+{
+"addr": "0x08072F48",
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+],
+"where": [
+"area 19 (world 0 map 50) @0x0808E708 list1[7] rec 0x08072F5C"
+]
+},
+{
+"addr": "0x08072FA8",
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+],
+"where": [
+"area 19 (world 0 map 50) @0x0808E708 list1[8] rec 0x08072FBC"
+]
+},
+{
+"addr": "0x08072FFC",
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+],
+"where": [
+"area 19 (world 0 map 50) @0x0808E708 list1[9] rec 0x08073010"
+]
+},
+{
+"addr": "0x08073058",
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+],
+"where": [
+"area 19 (world 0 map 50) @0x0808E708 list1[10] rec 0x0807306C"
+]
+},
+{
+"addr": "0x08073094",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition"
+],
+"where": [
+"area 19 (world 0 map 50) @0x0808E708 list1[11] rec 0x080730B4"
+]
+},
+{
+"addr": "0x08073104",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 19 (world 0 map 50) @0x0808E708 list0[0] rec 0x08073148"
+]
+},
+{
+"addr": "0x08073170",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 19 (world 0 map 50) @0x0808E708 list0[2] rec 0x080731B8",
+"area 19 (world 0 map 50) @0x0808E708 list0[3] rec 0x080731CC"
+]
+},
+{
+"addr": "0x080731F4",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 19 (world 0 map 50) @0x0808E708 list0[5] rec 0x0807323C",
+"area 19 (world 0 map 50) @0x0808E708 list0[6] rec 0x08073250"
+]
+},
+{
+"addr": "0x08073278",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 19 (world 0 map 50) @0x0808E708 list0[8] rec 0x080732BC"
+]
+},
+{
+"addr": "0x080732E4",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 19 (world 0 map 50) @0x0808E708 list0[10] rec 0x08073378",
+"area 19 (world 0 map 50) @0x0808E708 list0[11] rec 0x0807338C"
+]
+},
+{
+"addr": "0x080732EE",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 19 (world 0 map 50) @0x0808E708 list0[10] rec 0x08073378"
+]
+},
+{
+"addr": "0x080733A0",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 19 (world 0 map 50) @0x0808E708 list0[12] rec 0x080733FC"
+]
+},
+{
+"addr": "0x08073424",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 19 (world 0 map 50) @0x0808E708 list0[14] rec 0x0807346C"
+]
+},
+{
+"addr": "0x08073494",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 19 (world 0 map 50) @0x0808E708 list0[16] rec 0x080734DC"
+]
+},
+{
+"addr": "0x08073504",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 19 (world 0 map 50) @0x0808E708 list0[18] rec 0x0807354C"
+]
+},
+{
+"addr": "0x08073574",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 19 (world 0 map 50) @0x0808E708 list0[20] rec 0x080735B8"
+]
+},
+{
+"addr": "0x080735E0",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 19 (world 0 map 50) @0x0808E708 list0[22] rec 0x08073624"
+]
+},
+{
+"addr": "0x0807364C",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 19 (world 0 map 50) @0x0808E708 list0[24] rec 0x08073694"
+]
+},
+{
+"addr": "0x080736BC",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 19 (world 0 map 50) @0x0808E708 list0[26] rec 0x08073704"
+]
+},
+{
+"addr": "0x0807372C",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 19 (world 0 map 50) @0x0808E708 list0[28] rec 0x0807376C"
+]
+},
+{
+"addr": "0x08073794",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 19 (world 0 map 50) @0x0808E708 list0[30] rec 0x08073800",
+"area 19 (world 0 map 50) @0x0808E708 list0[33] rec 0x08073854"
+]
+},
+{
+"addr": "0x08073799",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 19 (world 0 map 50) @0x0808E708 list0[30] rec 0x08073800"
+]
+},
+{
+"addr": "0x08073814",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 19 (world 0 map 50) @0x0808E708 list0[31] rec 0x08073820"
+]
+},
+{
+"addr": "0x08073834",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 19 (world 0 map 50) @0x0808E708 list0[32] rec 0x08073840"
+]
+},
+{
+"addr": "0x08073994",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 20 (world 0 map 51) @0x0808E740"
+]
+},
+{
+"addr": "0x080739A8",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 20 (world 0 map 51) @0x0808E740 list0[0] rec 0x080739C4"
+]
+},
+{
+"addr": "0x080739D8",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 20 (world 0 map 51) @0x0808E740 list0[1] rec 0x080739F4"
+]
+},
+{
+"addr": "0x08073A08",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 20 (world 0 map 51) @0x0808E740 list0[2] rec 0x08073A24"
+]
+},
+{
+"addr": "0x08073A38",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 20 (world 0 map 51) @0x0808E740 list0[3] rec 0x08073A54"
+]
+},
+{
+"addr": "0x08073A68",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 20 (world 0 map 51) @0x0808E740 list0[4] rec 0x08073A84"
+]
+},
+{
+"addr": "0x08073A98",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 20 (world 0 map 51) @0x0808E740 list0[5] rec 0x08073AB4"
+]
+},
+{
+"addr": "0x08073AFC",
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+],
+"where": [
+"area 21 (world 0 map 52) @0x0808E778 list1[0] rec 0x08073B10",
+"area 21 (world 0 map 52) @0x0808E778 list1[1] rec 0x08073B38",
+"area 21 (world 0 map 52) @0x0808E778 list1[2] rec 0x08073B60",
+"area 21 (world 0 map 52) @0x0808E778 list1[3] rec 0x08073B88"
+]
+},
+{
+"addr": "0x08073D9C",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 21 (world 0 map 52) @0x0808E778 list0[0] rec 0x08073E04"
+]
+},
+{
+"addr": "0x08073E18",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 21 (world 0 map 52) @0x0808E778 list0[1] rec 0x08073E44"
+]
+},
+{
+"addr": "0x08073E58",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 21 (world 0 map 52) @0x0808E778 list0[2] rec 0x08073E84"
+]
+},
+{
+"addr": "0x08073E98",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 21 (world 0 map 52) @0x0808E778 list0[3] rec 0x08073EC4"
+]
+},
+{
+"addr": "0x08073EFC",
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+],
+"where": [
+"area 22 (world 0 map 55) @0x0808E7B0 list1[0] rec 0x08073F20",
+"area 22 (world 0 map 55) @0x0808E7B0 list1[1] rec 0x08073F48",
+"area 22 (world 0 map 55) @0x0808E7B0 list1[2] rec 0x08073F70",
+"area 22 (world 0 map 55) @0x0808E7B0 list1[3] rec 0x08073F98"
+]
+},
+{
+"addr": "0x080741AC",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 22 (world 0 map 55) @0x0808E7B0 list0[0] rec 0x08074214"
+]
+},
+{
+"addr": "0x08074228",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 22 (world 0 map 55) @0x0808E7B0 list0[1] rec 0x08074254"
+]
+},
+{
+"addr": "0x08074268",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 22 (world 0 map 55) @0x0808E7B0 list0[2] rec 0x08074294"
+]
+},
+{
+"addr": "0x080742A8",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 22 (world 0 map 55) @0x0808E7B0 list0[3] rec 0x080742D4"
+]
+},
+{
+"addr": "0x0807457C",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 31 (world 0 map 98) @0x0808E9A8"
+]
+},
+{
+"addr": "0x08074D2C",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition"
+],
+"where": [
+"area 33 (world 1 map 1) @0x0808EA18 list1[3] rec 0x08074D38",
+"area 33 (world 1 map 1) @0x0808EA18 list1[4] rec 0x08074D54",
+"area 33 (world 1 map 1) @0x0808EA18 list1[5] rec 0x08074D70",
+"area 33 (world 1 map 1) @0x0808EA18 list1[6] rec 0x08074D8C"
+]
+},
+{
+"addr": "0x08074E80",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 34 (world 1 map 2) @0x0808EA50"
+]
+},
+{
+"addr": "0x08074F44",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition"
+],
+"where": [
+"area 35 (world 1 map 3) @0x0808EA88 list1[5] rec 0x08074F50"
+]
+},
+{
+"addr": "0x080751C8",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 37 (world 1 map 5) @0x0808EAF8"
+]
+},
+{
+"addr": "0x080751F8",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 37 (world 1 map 5) @0x0808EAF8 list0[0] rec 0x08075204"
+]
+},
+{
+"addr": "0x08075218",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 37 (world 1 map 5) @0x0808EAF8 list0[1] rec 0x08075220"
+]
+},
+{
+"addr": "0x08075234",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 37 (world 1 map 5) @0x0808EAF8 list0[2] rec 0x08075240"
+]
+},
+{
+"addr": "0x0807526C",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 38 (world 1 map 10) @0x0808EB30"
+]
+},
+{
+"addr": "0x0807527C",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition",
+"map_object_condition"
+],
+"where": [
+"area 38 (world 1 map 10) @0x0808EB30 list0[0] rec 0x0807535C",
+"area 38 (world 1 map 10) @0x0808EB30 list1[0] rec 0x08075290"
+]
+},
+{
+"addr": "0x08075394",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 38 (world 1 map 10) @0x0808EB30 list0[3] rec 0x0807539C"
+]
+},
+{
+"addr": "0x080753D0",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 39 (world 1 map 11) @0x0808EB68"
+]
+},
+{
+"addr": "0x08075550",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition"
+],
+"where": [
+"area 39 (world 1 map 11) @0x0808EB68 list1[10] rec 0x08075564"
+]
+},
+{
+"addr": "0x080758FC",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 43 (world 1 map 15) @0x0808EC48"
+]
+},
+{
+"addr": "0x080759C0",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 43 (world 1 map 15) @0x0808EC48 list0[2] rec 0x080759FC",
+"area 43 (world 1 map 15) @0x0808EC48 list0[3] rec 0x08075A10"
+]
+},
+{
+"addr": "0x080759CA",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 43 (world 1 map 15) @0x0808EC48 list0[2] rec 0x080759FC"
+]
+},
+{
+"addr": "0x08075A4C",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 44 (world 1 map 16) @0x0808EC80"
+]
+},
+{
+"addr": "0x08075AC0",
+"purpose": "quest_flag_logic",
+"refs": [
+"list2_callback"
+],
+"where": [
+"area 44 (world 1 map 16) @0x0808EC80 list2[0] rec 0x08075ACC"
+]
+},
+{
+"addr": "0x08075AE0",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 45 (world 1 map 17) @0x0808ECB8"
+]
+},
+{
+"addr": "0x08075B54",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 45 (world 1 map 17) @0x0808ECB8 list0[3] rec 0x08075B58"
+]
+},
+{
+"addr": "0x08075DC8",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition"
+],
+"where": [
+"area 47 (world 2 map 1) @0x0808ED28 list1[0] rec 0x08075E3C"
+]
+},
+{
+"addr": "0x08075EAC",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition",
+"map_object_condition"
+],
+"where": [
+"area 48 (world 2 map 2) @0x0808ED60 list0[1] rec 0x08075F40",
+"area 48 (world 2 map 2) @0x0808ED60 list1[0] rec 0x08075EB8",
+"area 48 (world 2 map 2) @0x0808ED60 list1[1] rec 0x08075ED8",
+"area 110 (world 4 map 27) @0x0808FAF0 list1[1] rec 0x08078C08"
+]
+},
+{
+"addr": "0x08075F20",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 48 (world 2 map 2) @0x0808ED60 list0[0] rec 0x08075F2C"
+]
+},
+{
+"addr": "0x08075F68",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 49 (world 2 map 3) @0x0808ED98 list0[0] rec 0x08075F74",
+"area 51 (world 2 map 5) @0x0808EE08 list0[0] rec 0x08075FD4",
+"area 221 (world 9 map 11) @0x08091338 list0[1] rec 0x0807F82C"
+]
+},
+{
+"addr": "0x08075F94",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 50 (world 2 map 4) @0x0808EDD0 list0[0] rec 0x08075FA4"
+]
+},
+{
+"addr": "0x08075FC0",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 51 (world 2 map 5) @0x0808EE08"
+]
+},
+{
+"addr": "0x0807600C",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 52 (world 2 map 8) @0x0808EE40"
+]
+},
+{
+"addr": "0x08076098",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 52 (world 2 map 8) @0x0808EE40 list0[1] rec 0x080760A4",
+"area 117 (world 6 map 2) @0x0808FC78 list0[0] rec 0x08079104",
+"area 119 (world 6 map 4) @0x0808FCE8 list0[0] rec 0x08079128",
+"area 221 (world 9 map 11) @0x08091338 list0[0] rec 0x0807F818"
+]
+},
+{
+"addr": "0x080760B8",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 52 (world 2 map 8) @0x0808EE40 list0[2] rec 0x080760C4"
+]
+},
+{
+"addr": "0x080760D8",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 52 (world 2 map 8) @0x0808EE40 list0[3] rec 0x080760E4"
+]
+},
+{
+"addr": "0x08076108",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 52 (world 2 map 8) @0x0808EE40 list0[5] rec 0x0807613C"
+]
+},
+{
+"addr": "0x080765B0",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 64 (world 2 map 20) @0x0808F0E0"
+]
+},
+{
+"addr": "0x08076694",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 65 (world 2 map 33) @0x0808F118"
+]
+},
+{
+"addr": "0x080766B0",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 65 (world 2 map 33) @0x0808F118 list0[0] rec 0x080766E0"
+]
+},
+{
+"addr": "0x080768B8",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 71 (world 2 map 39) @0x0808F268 list0[0] rec 0x080768EC"
+]
+},
+{
+"addr": "0x08076900",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 71 (world 2 map 39) @0x0808F268 list0[1] rec 0x0807690C"
+]
+},
+{
+"addr": "0x08076A84",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 78 (world 2 map 46) @0x0808F3F0"
+]
+},
+{
+"addr": "0x08076AFC",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 79 (world 2 map 47) @0x0808F428"
+]
+},
+{
+"addr": "0x08076B0C",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 79 (world 2 map 47) @0x0808F428 list0[0] rec 0x08076B14"
+]
+},
+{
+"addr": "0x08076B30",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 80 (world 2 map 90) @0x0808F460"
+]
+},
+{
+"addr": "0x08076B58",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition"
+],
+"where": [
+"area 80 (world 2 map 90) @0x0808F460 list1[0] rec 0x08076B64"
+]
+},
+{
+"addr": "0x08076BD4",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 80 (world 2 map 90) @0x0808F460 list0[0] rec 0x08076C08"
+]
+},
+{
+"addr": "0x08076C2C",
+"purpose": "area_selector",
+"refs": [
+"area_music"
+],
+"where": [
+"area 81 (world 3 map 1) @0x0808F498",
+"area 82 (world 3 map 2) @0x0808F4D0",
+"area 83 (world 3 map 3) @0x0808F508"
+]
+},
+{
+"addr": "0x08076C3F",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 81 (world 3 map 1) @0x0808F498"
+]
+},
+{
+"addr": "0x08076D48",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition",
+"map_object_condition"
+],
+"where": [
+"area 81 (world 3 map 1) @0x0808F498 list0[2] rec 0x08076E60",
+"area 81 (world 3 map 1) @0x0808F498 list1[8] rec 0x08076D5C",
+"area 81 (world 3 map 1) @0x0808F498 list1[9] rec 0x08076D7C"
+]
+},
+{
+"addr": "0x08076E74",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition",
+"map_object_condition"
+],
+"where": [
+"area 81 (world 3 map 1) @0x0808F498 list0[3] rec 0x08076E80",
+"area 82 (world 3 map 2) @0x0808F4D0 list1[14] rec 0x080770F0"
+]
+},
+{
+"addr": "0x08076ECC",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 82 (world 3 map 2) @0x0808F4D0"
+]
+},
+{
+"addr": "0x08076EE4",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition",
+"map_object_condition"
+],
+"where": [
+"area 82 (world 3 map 2) @0x0808F4D0 list0[0] rec 0x0807714C",
+"area 82 (world 3 map 2) @0x0808F4D0 list1[0] rec 0x08076EF0",
+"area 82 (world 3 map 2) @0x0808F4D0 list1[1] rec 0x08076F08",
+"area 82 (world 3 map 2) @0x0808F4D0 list1[2] rec 0x08076F20"
+]
+},
+{
+"addr": "0x08076F68",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition"
+],
+"where": [
+"area 82 (world 3 map 2) @0x0808F4D0 list1[5] rec 0x08076F74",
+"area 82 (world 3 map 2) @0x0808F4D0 list1[6] rec 0x08076F94",
+"area 82 (world 3 map 2) @0x0808F4D0 list1[7] rec 0x08076FB4",
+"area 82 (world 3 map 2) @0x0808F4D0 list1[8] rec 0x08076FD4"
+]
+},
+{
+"addr": "0x0807700C",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition"
+],
+"where": [
+"area 82 (world 3 map 2) @0x0808F4D0 list1[10] rec 0x08077028",
+"area 82 (world 3 map 2) @0x0808F4D0 list1[11] rec 0x08077054",
+"area 82 (world 3 map 2) @0x0808F4D0 list1[12] rec 0x08077090",
+"area 82 (world 3 map 2) @0x0808F4D0 list1[13] rec 0x080770D0"
+]
+},
+{
+"addr": "0x0807716C",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition",
+"map_object_condition"
+],
+"where": [
+"area 83 (world 3 map 3) @0x0808F508 list0[2] rec 0x0807756C",
+"area 83 (world 3 map 3) @0x0808F508 list1[0] rec 0x08077178",
+"area 83 (world 3 map 3) @0x0808F508 list1[1] rec 0x08077190",
+"area 83 (world 3 map 3) @0x0808F508 list1[2] rec 0x080771A8"
+]
+},
+{
+"addr": "0x08077330",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition",
+"map_object_condition"
+],
+"where": [
+"area 83 (world 3 map 3) @0x0808F508 list0[0] rec 0x08077538",
+"area 83 (world 3 map 3) @0x0808F508 list1[14] rec 0x0807733C",
+"area 83 (world 3 map 3) @0x0808F508 list1[15] rec 0x0807735C",
+"area 83 (world 3 map 3) @0x0808F508 list1[16] rec 0x0807737C"
+]
+},
+{
+"addr": "0x080773BC",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition"
+],
+"where": [
+"area 83 (world 3 map 3) @0x0808F508 list1[18] rec 0x08077410",
+"area 83 (world 3 map 3) @0x0808F508 list1[19] rec 0x08077488",
+"area 83 (world 3 map 3) @0x0808F508 list1[20] rec 0x080774C8"
+]
+},
+{
+"addr": "0x0807754C",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 83 (world 3 map 3) @0x0808F508 list0[1] rec 0x08077558"
+]
+},
+{
+"addr": "0x080775A0",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 86 (world 3 map 6) @0x0808F5B0"
+]
+},
+{
+"addr": "0x080775D0",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 87 (world 3 map 10) @0x0808F5E8"
+]
+},
+{
+"addr": "0x08077608",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition"
+],
+"where": [
+"area 88 (world 3 map 11) @0x0808F620 list1[0] rec 0x0807761C",
+"area 88 (world 3 map 11) @0x0808F620 list1[1] rec 0x08077640",
+"area 88 (world 3 map 11) @0x0808F620 list1[2] rec 0x08077664",
+"area 88 (world 3 map 11) @0x0808F620 list1[3] rec 0x08077688"
+]
+},
+{
+"addr": "0x080776DC",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 88 (world 3 map 11) @0x0808F620 list0[0] rec 0x080776E8"
+]
+},
+{
+"addr": "0x080776FC",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 88 (world 3 map 11) @0x0808F620 list0[1] rec 0x08077708"
+]
+},
+{
+"addr": "0x08077930",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 90 (world 3 map 13) @0x0808F690 list0[0] rec 0x08077944"
+]
+},
+{
+"addr": "0x08077958",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 90 (world 3 map 13) @0x0808F690 list0[1] rec 0x08077960"
+]
+},
+{
+"addr": "0x08077974",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 90 (world 3 map 13) @0x0808F690 list0[2] rec 0x0807797C"
+]
+},
+{
+"addr": "0x08077990",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 90 (world 3 map 13) @0x0808F690 list0[3] rec 0x080779A8"
+]
+},
+{
+"addr": "0x080779E4",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 90 (world 3 map 13) @0x0808F690 list0[6] rec 0x080779F8"
+]
+},
+{
+"addr": "0x08077A88",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 91 (world 3 map 14) @0x0808F6C8 list0[0] rec 0x08077A94"
+]
+},
+{
+"addr": "0x08077D88",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition"
+],
+"where": [
+"area 96 (world 3 map 19) @0x0808F7E0 list1[3] rec 0x08077D94"
+]
+},
+{
+"addr": "0x08077DC0",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 97 (world 3 map 20) @0x0808F818"
+]
+},
+{
+"addr": "0x08077E4C",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 97 (world 3 map 20) @0x0808F818 list0[1] rec 0x08077E54"
+]
+},
+{
+"addr": "0x08077E68",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 97 (world 3 map 20) @0x0808F818 list0[2] rec 0x08077E70"
+]
+},
+{
+"addr": "0x08077E84",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 97 (world 3 map 20) @0x0808F818 list0[3] rec 0x08077E90"
+]
+},
+{
+"addr": "0x08077EA4",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 97 (world 3 map 20) @0x0808F818 list0[4] rec 0x08077EAC"
+]
+},
+{
+"addr": "0x08077EC0",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 97 (world 3 map 20) @0x0808F818 list0[5] rec 0x08077ECC"
+]
+},
+{
+"addr": "0x08077F10",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 98 (world 3 map 21) @0x0808F850"
+]
+},
+{
+"addr": "0x08077F90",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 98 (world 3 map 21) @0x0808F850 list0[0] rec 0x08077F98"
+]
+},
+{
+"addr": "0x08077FAC",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 98 (world 3 map 21) @0x0808F850 list0[1] rec 0x08077FB4"
+]
+},
+{
+"addr": "0x08077FC8",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 98 (world 3 map 21) @0x0808F850 list0[2] rec 0x08077FD0"
+]
+},
+{
+"addr": "0x08077FE4",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 98 (world 3 map 21) @0x0808F850 list0[3] rec 0x08077FF0"
+]
+},
+{
+"addr": "0x08078004",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 98 (world 3 map 21) @0x0808F850 list0[4] rec 0x0807800C"
+]
+},
+{
+"addr": "0x08078020",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 98 (world 3 map 21) @0x0808F850 list0[5] rec 0x08078028"
+]
+},
+{
+"addr": "0x0807803C",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 98 (world 3 map 21) @0x0808F850 list0[6] rec 0x08078044"
+]
+},
+{
+"addr": "0x08078058",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 98 (world 3 map 21) @0x0808F850 list0[7] rec 0x08078060"
+]
+},
+{
+"addr": "0x08078074",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 98 (world 3 map 21) @0x0808F850 list0[8] rec 0x0807807C"
+]
+},
+{
+"addr": "0x08078090",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 98 (world 3 map 21) @0x0808F850 list0[9] rec 0x08078098"
+]
+},
+{
+"addr": "0x080780FC",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 99 (world 3 map 22) @0x0808F888"
+]
+},
+{
+"addr": "0x08078188",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 99 (world 3 map 22) @0x0808F888 list0[0] rec 0x08078190"
+]
+},
+{
+"addr": "0x080781A4",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 99 (world 3 map 22) @0x0808F888 list0[1] rec 0x080781AC"
+]
+},
+{
+"addr": "0x080781C0",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 99 (world 3 map 22) @0x0808F888 list0[2] rec 0x080781C8"
+]
+},
+{
+"addr": "0x080781DC",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 99 (world 3 map 22) @0x0808F888 list0[3] rec 0x080781E4"
+]
+},
+{
+"addr": "0x080781F8",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 99 (world 3 map 22) @0x0808F888 list0[4] rec 0x08078200"
+]
+},
+{
+"addr": "0x08078214",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 99 (world 3 map 22) @0x0808F888 list0[5] rec 0x0807821C"
+]
+},
+{
+"addr": "0x08078230",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 99 (world 3 map 22) @0x0808F888 list0[6] rec 0x0807823C"
+]
+},
+{
+"addr": "0x08078250",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 99 (world 3 map 22) @0x0808F888 list0[7] rec 0x08078258"
+]
+},
+{
+"addr": "0x0807826C",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 99 (world 3 map 22) @0x0808F888 list0[8] rec 0x08078274"
+]
+},
+{
+"addr": "0x08078288",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 99 (world 3 map 22) @0x0808F888 list0[9] rec 0x08078290"
+]
+},
+{
+"addr": "0x080782FC",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 102 (world 4 map 1) @0x0808F930"
+]
+},
+{
+"addr": "0x08078310",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition"
+],
+"where": [
+"area 102 (world 4 map 1) @0x0808F930 list1[0] rec 0x0807831C",
+"area 103 (world 4 map 20) @0x0808F968 list1[0] rec 0x0807858C"
+]
+},
+{
+"addr": "0x080784DC",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 102 (world 4 map 1) @0x0808F930 list0[0] rec 0x080784E8"
+]
+},
+{
+"addr": "0x08078538",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 103 (world 4 map 20) @0x0808F968"
+]
+},
+{
+"addr": "0x0807853D",
+"purpose": "map_event",
+"refs": [
+"area_on_leave"
+],
+"where": [
+"area 103 (world 4 map 20) @0x0808F968"
+]
+},
+{
+"addr": "0x08078678",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 103 (world 4 map 20) @0x0808F968 list0[0] rec 0x08078684"
+]
+},
+{
+"addr": "0x08078698",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 103 (world 4 map 20) @0x0808F968 list0[1] rec 0x080786A4"
+]
+},
+{
+"addr": "0x0807874C",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 104 (world 4 map 21) @0x0808F9A0 list0[2] rec 0x08078758"
+]
+},
+{
+"addr": "0x08078814",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 107 (world 4 map 24) @0x0808FA48",
+"area 408 (world 19 map 1) @0x08093C20"
+]
+},
+{
+"addr": "0x08078854",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 109 (world 4 map 26) @0x0808FAB8"
+]
+},
+{
+"addr": "0x0807894C",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 109 (world 4 map 26) @0x0808FAB8 list0[0] rec 0x08078958",
+"area 109 (world 4 map 26) @0x0808FAB8 list0[15] rec 0x08078B2C"
+]
+},
+{
+"addr": "0x0807896C",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 109 (world 4 map 26) @0x0808FAB8 list0[1] rec 0x08078978"
+]
+},
+{
+"addr": "0x0807898C",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 109 (world 4 map 26) @0x0808FAB8 list0[2] rec 0x08078998"
+]
+},
+{
+"addr": "0x080789AC",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 109 (world 4 map 26) @0x0808FAB8 list0[3] rec 0x080789B8"
+]
+},
+{
+"addr": "0x080789CC",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 109 (world 4 map 26) @0x0808FAB8 list0[4] rec 0x080789D8"
+]
+},
+{
+"addr": "0x080789EC",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 109 (world 4 map 26) @0x0808FAB8 list0[5] rec 0x080789F8"
+]
+},
+{
+"addr": "0x08078A0C",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 109 (world 4 map 26) @0x0808FAB8 list0[6] rec 0x08078A18"
+]
+},
+{
+"addr": "0x08078A2C",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 109 (world 4 map 26) @0x0808FAB8 list0[7] rec 0x08078A38"
+]
+},
+{
+"addr": "0x08078A4C",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 109 (world 4 map 26) @0x0808FAB8 list0[8] rec 0x08078A58"
+]
+},
+{
+"addr": "0x08078A6C",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 109 (world 4 map 26) @0x0808FAB8 list0[9] rec 0x08078A78"
+]
+},
+{
+"addr": "0x08078A8C",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 109 (world 4 map 26) @0x0808FAB8 list0[10] rec 0x08078A98"
+]
+},
+{
+"addr": "0x08078AAC",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 109 (world 4 map 26) @0x0808FAB8 list0[11] rec 0x08078AB8"
+]
+},
+{
+"addr": "0x08078ACC",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 109 (world 4 map 26) @0x0808FAB8 list0[12] rec 0x08078AD8"
+]
+},
+{
+"addr": "0x08078AEC",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 109 (world 4 map 26) @0x0808FAB8 list0[13] rec 0x08078AF8"
+]
+},
+{
+"addr": "0x08078B0C",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 109 (world 4 map 26) @0x0808FAB8 list0[14] rec 0x08078B18"
+]
+},
+{
+"addr": "0x08078BC4",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition"
+],
+"where": [
+"area 110 (world 4 map 27) @0x0808FAF0 list1[0] rec 0x08078BE4"
+]
+},
+{
+"addr": "0x08078C9C",
+"purpose": "map_event",
+"refs": [
+"area_on_leave"
+],
+"where": [
+"area 112 (world 4 map 31) @0x0808FB60"
+]
+},
+{
+"addr": "0x08078D04",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition"
+],
+"where": [
+"area 113 (world 5 map 1) @0x0808FB98 list1[0] rec 0x08078D20",
+"area 113 (world 5 map 1) @0x0808FB98 list1[1] rec 0x08078D3C",
+"area 113 (world 5 map 1) @0x0808FB98 list1[2] rec 0x08078D60",
+"area 113 (world 5 map 1) @0x0808FB98 list1[3] rec 0x08078D8C"
+]
+},
+{
+"addr": "0x08078DB8",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 113 (world 5 map 1) @0x0808FB98 list0[0] rec 0x08078DC4"
+]
+},
+{
+"addr": "0x08078DD8",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 113 (world 5 map 1) @0x0808FB98 list0[1] rec 0x08078DE4"
+]
+},
+{
+"addr": "0x08078E44",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 116 (world 6 map 1) @0x0808FC40"
+]
+},
+{
+"addr": "0x08078E74",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition"
+],
+"where": [
+"area 116 (world 6 map 1) @0x0808FC40 list1[1] rec 0x08078E84"
+]
+},
+{
+"addr": "0x08078ECC",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition"
+],
+"where": [
+"area 116 (world 6 map 1) @0x0808FC40 list1[3] rec 0x08078EDC"
+]
+},
+{
+"addr": "0x08078EF8",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition",
+"map_object_condition"
+],
+"where": [
+"area 116 (world 6 map 1) @0x0808FC40 list0[0] rec 0x08078FA0",
+"area 116 (world 6 map 1) @0x0808FC40 list1[4] rec 0x08078F04"
+]
+},
+{
+"addr": "0x08078FB4",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 116 (world 6 map 1) @0x0808FC40 list0[1] rec 0x08078FC0"
+]
+},
+{
+"addr": "0x08078FD4",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 116 (world 6 map 1) @0x0808FC40 list0[2] rec 0x0807901C"
+]
+},
+{
+"addr": "0x08079030",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 116 (world 6 map 1) @0x0808FC40 list0[3] rec 0x0807907C"
+]
+},
+{
+"addr": "0x08079090",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 116 (world 6 map 1) @0x0808FC40 list0[4] rec 0x080790A0"
+]
+},
+{
+"addr": "0x080790B4",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 116 (world 6 map 1) @0x0808FC40 list0[5] rec 0x080790C0"
+]
+},
+{
+"addr": "0x08079144",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 120 (world 6 map 5) @0x0808FD20"
+]
+},
+{
+"addr": "0x08079164",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 120 (world 6 map 5) @0x0808FD20 list0[0] rec 0x0807917C"
+]
+},
+{
+"addr": "0x08079190",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 120 (world 6 map 5) @0x0808FD20 list0[1] rec 0x080791C0"
+]
+},
+{
+"addr": "0x080791E4",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 121 (world 6 map 6) @0x0808FD58"
+]
+},
+{
+"addr": "0x0807921C",
+"purpose": "quest_flag_logic",
+"refs": [
+"list2_callback"
+],
+"where": [
+"area 122 (world 6 map 7) @0x0808FD90 list2[0] rec 0x08079228",
+"area 122 (world 6 map 7) @0x0808FD90 list2[0] rec 0x08079228",
+"area 122 (world 6 map 7) @0x0808FD90 list2[1] rec 0x08079238",
+"area 122 (world 6 map 7) @0x0808FD90 list2[1] rec 0x08079238"
+]
+},
+{
+"addr": "0x080792A8",
+"purpose": "quest_flag_logic",
+"refs": [
+"list2_callback"
+],
+"where": [
+"area 122 (world 6 map 7) @0x0808FD90 list2[8] rec 0x080792C0"
+]
+},
+{
+"addr": "0x080793C0",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 124 (world 6 map 9) @0x0808FE00"
+]
+},
+{
+"addr": "0x080793CC",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition"
+],
+"where": [
+"area 124 (world 6 map 9) @0x0808FE00 list1[0] rec 0x080793D4"
+]
+},
+{
+"addr": "0x080793F0",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition"
+],
+"where": [
+"area 124 (world 6 map 9) @0x0808FE00 list1[1] rec 0x080793F8"
+]
+},
+{
+"addr": "0x080794D0",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 128 (world 6 map 13) @0x0808FEE0"
+]
+},
+{
+"addr": "0x08079524",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 128 (world 6 map 13) @0x0808FEE0 list0[0] rec 0x0807957C"
+]
+},
+{
+"addr": "0x08079590",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 128 (world 6 map 13) @0x0808FEE0 list0[1] rec 0x08079648"
+]
+},
+{
+"addr": "0x0807965C",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 128 (world 6 map 13) @0x0808FEE0 list0[2] rec 0x08079714"
+]
+},
+{
+"addr": "0x08079728",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 128 (world 6 map 13) @0x0808FEE0 list0[3] rec 0x080797E0"
+]
+},
+{
+"addr": "0x080797F4",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 128 (world 6 map 13) @0x0808FEE0 list0[4] rec 0x080798AC"
+]
+},
+{
+"addr": "0x080798E8",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 129 (world 6 map 14) @0x0808FF18"
+]
+},
+{
+"addr": "0x080798F8",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 129 (world 6 map 14) @0x0808FF18 list0[0] rec 0x08079900"
+]
+},
+{
+"addr": "0x0807997C",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 132 (world 6 map 20) @0x0808FFC0"
+]
+},
+{
+"addr": "0x080799A4",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 132 (world 6 map 20) @0x0808FFC0 list0[1] rec 0x080799B4"
+]
+},
+{
+"addr": "0x080799C8",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 132 (world 6 map 20) @0x0808FFC0 list0[2] rec 0x080799D8"
+]
+},
+{
+"addr": "0x080799EC",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 132 (world 6 map 20) @0x0808FFC0 list0[3] rec 0x080799FC"
+]
+},
+{
+"addr": "0x08079A10",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 132 (world 6 map 20) @0x0808FFC0 list0[4] rec 0x08079A20"
+]
+},
+{
+"addr": "0x08079A34",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 132 (world 6 map 20) @0x0808FFC0 list0[5] rec 0x08079A44"
+]
+},
+{
+"addr": "0x08079A58",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 132 (world 6 map 20) @0x0808FFC0 list0[6] rec 0x08079A68"
+]
+},
+{
+"addr": "0x08079A90",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 132 (world 6 map 20) @0x0808FFC0 list0[8] rec 0x08079A98",
+"area 400 (world 18 map 9) @0x08093A60 list0[0] rec 0x0808C490"
+]
+},
+{
+"addr": "0x08079C14",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 133 (world 7 map 1) @0x0808FFF8 list0[0] rec 0x08079C20"
+]
+},
+{
+"addr": "0x08079C70",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 134 (world 7 map 2) @0x08090030"
+]
+},
+{
+"addr": "0x08079CF8",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition"
+],
+"where": [
+"area 134 (world 7 map 2) @0x08090030 list1[1] rec 0x08079D04",
+"area 134 (world 7 map 2) @0x08090030 list1[2] rec 0x08079D1C",
+"area 134 (world 7 map 2) @0x08090030 list1[5] rec 0x08079DBC",
+"area 134 (world 7 map 2) @0x08090030 list1[6] rec 0x08079DE8"
+]
+},
+{
+"addr": "0x08079D34",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition"
+],
+"where": [
+"area 134 (world 7 map 2) @0x08090030 list1[3] rec 0x08079D54"
+]
+},
+{
+"addr": "0x08079D70",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition"
+],
+"where": [
+"area 134 (world 7 map 2) @0x08090030 list1[4] rec 0x08079D90"
+]
+},
+{
+"addr": "0x0807A014",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition",
+"map_object_condition"
+],
+"where": [
+"area 134 (world 7 map 2) @0x08090030 list0[3] rec 0x0807A1CC",
+"area 134 (world 7 map 2) @0x08090030 list1[19] rec 0x0807A020"
+]
+},
+{
+"addr": "0x0807A0DC",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 134 (world 7 map 2) @0x08090030 list0[0] rec 0x0807A0F8"
+]
+},
+{
+"addr": "0x0807A10C",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 134 (world 7 map 2) @0x08090030 list0[1] rec 0x0807A118"
+]
+},
+{
+"addr": "0x0807A12C",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 134 (world 7 map 2) @0x08090030 list0[2] rec 0x0807A1B8"
+]
+},
+{
+"addr": "0x0807A142",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 134 (world 7 map 2) @0x08090030 list0[2] rec 0x0807A1B8"
+]
+},
+{
+"addr": "0x0807A3CC",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition"
+],
+"where": [
+"area 135 (world 7 map 3) @0x08090068 list1[9] rec 0x0807A3E4"
+]
+},
+{
+"addr": "0x0807A464",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition"
+],
+"where": [
+"area 137 (world 7 map 5) @0x080900D8 list1[0] rec 0x0807A47C"
+]
+},
+{
+"addr": "0x0807AAAC",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 140 (world 8 map 1) @0x08090180 list0[0] rec 0x0807AABC"
+]
+},
+{
+"addr": "0x0807AAF0",
+"purpose": "quest_flag_logic",
+"refs": [
+"list2_callback"
+],
+"where": [
+"area 140 (world 8 map 1) @0x08090180 list2[0] rec 0x0807AAFC",
+"area 140 (world 8 map 1) @0x08090180 list2[0] rec 0x0807AAFC",
+"area 140 (world 8 map 1) @0x08090180 list2[1] rec 0x0807AB0C",
+"area 142 (world 8 map 3) @0x080901F0 list2[0] rec 0x0807AE78"
+]
+},
+{
+"addr": "0x0807AB24",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 141 (world 8 map 2) @0x080901B8"
+]
+},
+{
+"addr": "0x0807AB9C",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 141 (world 8 map 2) @0x080901B8 list0[0] rec 0x0807ABCC"
+]
+},
+{
+"addr": "0x0807ABE0",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 141 (world 8 map 2) @0x080901B8 list0[1] rec 0x0807AC1C"
+]
+},
+{
+"addr": "0x0807ABEA",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 141 (world 8 map 2) @0x080901B8 list0[1] rec 0x0807AC1C"
+]
+},
+{
+"addr": "0x0807AC30",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 141 (world 8 map 2) @0x080901B8 list0[2] rec 0x0807AC74"
+]
+},
+{
+"addr": "0x0807AC45",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 141 (world 8 map 2) @0x080901B8 list0[2] rec 0x0807AC74"
+]
+},
+{
+"addr": "0x0807AD3C",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition"
+],
+"where": [
+"area 142 (world 8 map 3) @0x080901F0 list1[4] rec 0x0807AD48",
+"area 142 (world 8 map 3) @0x080901F0 list1[5] rec 0x0807AD68",
+"area 142 (world 8 map 3) @0x080901F0 list1[6] rec 0x0807AD88",
+"area 142 (world 8 map 3) @0x080901F0 list1[7] rec 0x0807ADA8"
+]
+},
+{
+"addr": "0x0807AFE8",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 144 (world 8 map 5) @0x08090260"
+]
+},
+{
+"addr": "0x0807B1C8",
+"purpose": "quest_flag_logic",
+"refs": [
+"list2_callback"
+],
+"where": [
+"area 144 (world 8 map 5) @0x08090260 list2[0] rec 0x0807B1D4",
+"area 144 (world 8 map 5) @0x08090260 list2[0] rec 0x0807B1D4",
+"area 144 (world 8 map 5) @0x08090260 list2[1] rec 0x0807B1E4"
+]
+},
+{
+"addr": "0x0807B3B0",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 146 (world 8 map 7) @0x080902D0"
+]
+},
+{
+"addr": "0x0807B3C7",
+"purpose": "map_event",
+"refs": [
+"area_on_leave"
+],
+"where": [
+"area 146 (world 8 map 7) @0x080902D0",
+"area 310 (world 13 map 1) @0x080926B0"
+]
+},
+{
+"addr": "0x0807B580",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 146 (world 8 map 7) @0x080902D0 list0[0] rec 0x0807B5A8"
+]
+},
+{
+"addr": "0x0807B980",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 149 (world 8 map 10) @0x08090378"
+]
+},
+{
+"addr": "0x0807BDE8",
+"purpose": "spawn_condition",
+"refs": [
+"list3_condition"
+],
+"where": [
+"area 151 (world 8 map 12) @0x080903E8 list3[0] rec 0x0807BDFC"
+]
+},
+{
+"addr": "0x0807C044",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 155 (world 8 map 16) @0x080904C8"
+]
+},
+{
+"addr": "0x0807C0AC",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition"
+],
+"where": [
+"area 155 (world 8 map 16) @0x080904C8 list1[0] rec 0x0807C0BC"
+]
+},
+{
+"addr": "0x0807C0D8",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition"
+],
+"where": [
+"area 155 (world 8 map 16) @0x080904C8 list1[1] rec 0x0807C0E8"
+]
+},
+{
+"addr": "0x0807C104",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition"
+],
+"where": [
+"area 155 (world 8 map 16) @0x080904C8 list1[2] rec 0x0807C114"
+]
+},
+{
+"addr": "0x0807C130",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition"
+],
+"where": [
+"area 155 (world 8 map 16) @0x080904C8 list1[3] rec 0x0807C13C"
+]
+},
+{
+"addr": "0x0807C19C",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 155 (world 8 map 16) @0x080904C8 list0[1] rec 0x0807C208"
+]
+},
+{
+"addr": "0x0807C1B0",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 155 (world 8 map 16) @0x080904C8 list0[1] rec 0x0807C208"
+]
+},
+{
+"addr": "0x0807C21C",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 155 (world 8 map 16) @0x080904C8 list0[2] rec 0x0807C228"
+]
+},
+{
+"addr": "0x0807C254",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 156 (world 8 map 17) @0x08090500"
+]
+},
+{
+"addr": "0x0807C2A4",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 156 (world 8 map 17) @0x08090500 list0[2] rec 0x0807C2CC"
+]
+},
+{
+"addr": "0x0807C2E0",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 156 (world 8 map 17) @0x08090500 list0[3] rec 0x0807C334"
+]
+},
+{
+"addr": "0x0807C348",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 156 (world 8 map 17) @0x08090500 list0[4] rec 0x0807C378"
+]
+},
+{
+"addr": "0x0807C38C",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 156 (world 8 map 17) @0x08090500 list0[5] rec 0x0807C3A0"
+]
+},
+{
+"addr": "0x0807C396",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 156 (world 8 map 17) @0x08090500 list0[5] rec 0x0807C3A0"
+]
+},
+{
+"addr": "0x0807C4BC",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 158 (world 8 map 19) @0x08090570",
+"area 161 (world 8 map 22) @0x08090618",
+"area 168 (world 8 map 29) @0x080907A0",
+"area 171 (world 8 map 32) @0x08090848"
+]
+},
+{
+"addr": "0x0807C56C",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 158 (world 8 map 19) @0x08090570 list0[0] rec 0x0807C59C",
+"area 161 (world 8 map 22) @0x08090618 list0[4] rec 0x0807C8F4",
+"area 168 (world 8 map 29) @0x080907A0 list0[3] rec 0x0807CF68",
+"area 171 (world 8 map 32) @0x08090848 list0[4] rec 0x0807D230"
+]
+},
+{
+"addr": "0x0807C5CC",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 159 (world 8 map 20) @0x080905A8"
+]
+},
+{
+"addr": "0x0807C5F4",
+"purpose": "cutscene",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 159 (world 8 map 20) @0x080905A8 list0[1] rec 0x0807C690"
+]
+},
+{
+"addr": "0x0807C6B4",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 160 (world 8 map 21) @0x080905E0",
+"area 170 (world 8 map 31) @0x08090810",
+"area 187 (world 8 map 48) @0x08090BC8",
+"area 192 (world 8 map 53) @0x08090CE0"
+]
+},
+{
+"addr": "0x0807C790",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 160 (world 8 map 21) @0x080905E0 list0[2] rec 0x0807C7C0",
+"area 170 (world 8 map 31) @0x08090810 list0[2] rec 0x0807D144",
+"area 174 (world 8 map 35) @0x080908F0 list0[1] rec 0x0807D488",
+"area 187 (world 8 map 48) @0x08090BC8 list0[2] rec 0x0807DF9C"
+]
+},
+{
+"addr": "0x0807C958",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 162 (world 8 map 23) @0x08090650"
+]
+},
+{
+"addr": "0x0807C980",
+"purpose": "cutscene",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 162 (world 8 map 23) @0x08090650 list0[1] rec 0x0807CA1C"
+]
+},
+{
+"addr": "0x0807CB14",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 164 (world 8 map 25) @0x080906C0"
+]
+},
+{
+"addr": "0x0807CB3C",
+"purpose": "cutscene",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 164 (world 8 map 25) @0x080906C0 list0[1] rec 0x0807CBD8"
+]
+},
+{
+"addr": "0x0807CBFC",
+"purpose": "cutscene",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 165 (world 8 map 26) @0x080906F8"
+]
+},
+{
+"addr": "0x0807CCB4",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 165 (world 8 map 26) @0x080906F8 list0[2] rec 0x0807CCE4",
+"area 177 (world 8 map 38) @0x08090998 list0[2] rec 0x0807D7F8",
+"area 205 (world 8 map 66) @0x08090FB8 list0[2] rec 0x0807EF54"
+]
+},
+{
+"addr": "0x0807CD3C",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 166 (world 8 map 27) @0x08090730"
+]
+},
+{
+"addr": "0x0807CDAC",
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+],
+"where": [
+"area 166 (world 8 map 27) @0x08090730 list1[4] rec 0x0807CDF4"
+]
+},
+{
+"addr": "0x0807CF9C",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 169 (world 8 map 30) @0x080907D8"
+]
+},
+{
+"addr": "0x0807CFC4",
+"purpose": "cutscene",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 169 (world 8 map 30) @0x080907D8 list0[1] rec 0x0807D05C"
+]
+},
+{
+"addr": "0x0807D440",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 174 (world 8 map 35) @0x080908F0"
+]
+},
+{
+"addr": "0x0807D49C",
+"purpose": "cutscene",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 174 (world 8 map 35) @0x080908F0 list0[2] rec 0x0807D534"
+]
+},
+{
+"addr": "0x0807D658",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 176 (world 8 map 37) @0x08090960"
+]
+},
+{
+"addr": "0x0807D680",
+"purpose": "cutscene",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 176 (world 8 map 37) @0x08090960 list0[1] rec 0x0807D71C"
+]
+},
+{
+"addr": "0x0807D740",
+"purpose": "cutscene",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 177 (world 8 map 38) @0x08090998"
+]
+},
+{
+"addr": "0x0807DC1C",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 183 (world 8 map 44) @0x08090AE8"
+]
+},
+{
+"addr": "0x0807DC44",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 183 (world 8 map 44) @0x08090AE8 list0[1] rec 0x0807DC50"
+]
+},
+{
+"addr": "0x0807DDF8",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 186 (world 8 map 47) @0x08090B90"
+]
+},
+{
+"addr": "0x0807DE38",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 186 (world 8 map 47) @0x08090B90 list0[1] rec 0x0807DE68"
+]
+},
+{
+"addr": "0x0807DE7C",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 186 (world 8 map 47) @0x08090B90 list0[2] rec 0x0807DE88"
+]
+},
+{
+"addr": "0x0807E1E4",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 190 (world 8 map 51) @0x08090C70"
+]
+},
+{
+"addr": "0x0807E2D8",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 190 (world 8 map 51) @0x08090C70 list0[4] rec 0x0807E304",
+"area 195 (world 8 map 56) @0x08090D88 list0[2] rec 0x0807E6C0",
+"area 199 (world 8 map 60) @0x08090E68 list0[2] rec 0x0807E9A0"
+]
+},
+{
+"addr": "0x0807E378",
+"purpose": "spawn_condition",
+"refs": [
+"list3_condition"
+],
+"where": [
+"area 191 (world 8 map 52) @0x08090CA8 list3[0] rec 0x0807E384"
+]
+},
+{
+"addr": "0x0807E620",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 195 (world 8 map 56) @0x08090D88"
+]
+},
+{
+"addr": "0x0807E8B8",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 199 (world 8 map 60) @0x08090E68"
+]
+},
+{
+"addr": "0x0807EAF4",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 202 (world 8 map 63) @0x08090F10"
+]
+},
+{
+"addr": "0x0807EB34",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 202 (world 8 map 63) @0x08090F10 list0[1] rec 0x0807EBD4"
+]
+},
+{
+"addr": "0x0807EBE8",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 202 (world 8 map 63) @0x08090F10 list0[2] rec 0x0807EC88"
+]
+},
+{
+"addr": "0x0807EC9C",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 202 (world 8 map 63) @0x08090F10 list0[3] rec 0x0807ED3C"
+]
+},
+{
+"addr": "0x0807EE44",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 204 (world 8 map 65) @0x08090F80"
+]
+},
+{
+"addr": "0x0807EE6C",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 204 (world 8 map 65) @0x08090F80 list0[1] rec 0x0807EE78"
+]
+},
+{
+"addr": "0x0807EE9C",
+"purpose": "cutscene",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 205 (world 8 map 66) @0x08090FB8"
+]
+},
+{
+"addr": "0x0807F128",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 209 (world 8 map 70) @0x08091098"
+]
+},
+{
+"addr": "0x0807F1E8",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 209 (world 8 map 70) @0x08091098 list0[0] rec 0x0807F1F4"
+]
+},
+{
+"addr": "0x0807F2B0",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 211 (world 9 map 1) @0x08091108"
+]
+},
+{
+"addr": "0x0807F2D8",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 211 (world 9 map 1) @0x08091108 list0[0] rec 0x0807F2F0"
+]
+},
+{
+"addr": "0x0807F314",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 211 (world 9 map 1) @0x08091108 list0[2] rec 0x0807F348"
+]
+},
+{
+"addr": "0x0807F618",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 220 (world 9 map 10) @0x08091300"
+]
+},
+{
+"addr": "0x0807F674",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 221 (world 9 map 11) @0x08091338"
+]
+},
+{
+"addr": "0x0807F840",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 221 (world 9 map 11) @0x08091338 list0[2] rec 0x0807F84C"
+]
+},
+{
+"addr": "0x0807F8F8",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 225 (world 9 map 15) @0x08091418"
+]
+},
+{
+"addr": "0x0807FA04",
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+],
+"where": [
+"area 225 (world 9 map 15) @0x08091418 list1[7] rec 0x0807FA1C"
+]
+},
+{
+"addr": "0x0807FA9C",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 228 (world 10 map 1) @0x080914C0"
+]
+},
+{
+"addr": "0x0807FB1C",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 228 (world 10 map 1) @0x080914C0 list0[0] rec 0x0807FB2C"
+]
+},
+{
+"addr": "0x0807FB50",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 228 (world 10 map 1) @0x080914C0 list0[2] rec 0x0807FB98"
+]
+},
+{
+"addr": "0x0807FBAC",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 228 (world 10 map 1) @0x080914C0 list0[3] rec 0x0807FBEC"
+]
+},
+{
+"addr": "0x0807FBB6",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 228 (world 10 map 1) @0x080914C0 list0[3] rec 0x0807FBEC"
+]
+},
+{
+"addr": "0x0807FC00",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 228 (world 10 map 1) @0x080914C0 list0[4] rec 0x0807FC44"
+]
+},
+{
+"addr": "0x0807FC15",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 228 (world 10 map 1) @0x080914C0 list0[4] rec 0x0807FC44"
+]
+},
+{
+"addr": "0x0807FCBC",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition"
+],
+"where": [
+"area 229 (world 10 map 2) @0x080914F8 list1[1] rec 0x0807FCC8",
+"area 230 (world 10 map 3) @0x08091530 list1[2] rec 0x0807FD58",
+"area 230 (world 10 map 3) @0x08091530 list1[3] rec 0x0807FD78",
+"area 231 (world 10 map 4) @0x08091568 list1[1] rec 0x0807FE14"
+]
+},
+{
+"addr": "0x08080014",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 233 (world 10 map 6) @0x080915D8"
+]
+},
+{
+"addr": "0x08080174",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 233 (world 10 map 6) @0x080915D8 list0[0] rec 0x080801B4"
+]
+},
+{
+"addr": "0x080801D0",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 234 (world 10 map 7) @0x08091610"
+]
+},
+{
+"addr": "0x08080640",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition",
+"map_object_condition"
+],
+"where": [
+"area 240 (world 10 map 14) @0x08091760 list0[0] rec 0x08080860",
+"area 240 (world 10 map 14) @0x08091760 list1[0] rec 0x0808065C"
+]
+},
+{
+"addr": "0x0808064B",
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+],
+"where": [
+"area 240 (world 10 map 14) @0x08091760 list1[0] rec 0x0808065C"
+]
+},
+{
+"addr": "0x0808067C",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition",
+"map_object_condition"
+],
+"where": [
+"area 240 (world 10 map 14) @0x08091760 list0[1] rec 0x080808F4",
+"area 240 (world 10 map 14) @0x08091760 list1[1] rec 0x08080698"
+]
+},
+{
+"addr": "0x08080687",
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+],
+"where": [
+"area 240 (world 10 map 14) @0x08091760 list1[1] rec 0x08080698"
+]
+},
+{
+"addr": "0x080807E0",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 240 (world 10 map 14) @0x08091760 list0[0] rec 0x08080860"
+]
+},
+{
+"addr": "0x08080874",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 240 (world 10 map 14) @0x08091760 list0[1] rec 0x080808F4"
+]
+},
+{
+"addr": "0x08080930",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 241 (world 10 map 15) @0x08091798"
+]
+},
+{
+"addr": "0x08080A48",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 241 (world 10 map 15) @0x08091798 list0[0] rec 0x08080A8C"
+]
+},
+{
+"addr": "0x08080AA8",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 242 (world 10 map 16) @0x080917D0"
+]
+},
+{
+"addr": "0x08080BE4",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 242 (world 10 map 16) @0x080917D0 list0[0] rec 0x08080C28"
+]
+},
+{
+"addr": "0x08080C44",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 243 (world 10 map 17) @0x08091808"
+]
+},
+{
+"addr": "0x08080DBC",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 243 (world 10 map 17) @0x08091808 list0[0] rec 0x08080E00"
+]
+},
+{
+"addr": "0x08080E3C",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 244 (world 10 map 18) @0x08091840"
+]
+},
+{
+"addr": "0x08080F9C",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 244 (world 10 map 18) @0x08091840 list0[0] rec 0x08080FE0"
+]
+},
+{
+"addr": "0x08080FFC",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 245 (world 10 map 19) @0x08091878"
+]
+},
+{
+"addr": "0x0808103C",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 246 (world 10 map 20) @0x080918B0"
+]
+},
+{
+"addr": "0x080813F0",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 252 (world 10 map 26) @0x08091A00"
+]
+},
+{
+"addr": "0x08081508",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 252 (world 10 map 26) @0x08091A00 list0[0] rec 0x0808154C"
+]
+},
+{
+"addr": "0x080816D4",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 254 (world 10 map 28) @0x08091A70"
+]
+},
+{
+"addr": "0x080817EC",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 254 (world 10 map 28) @0x08091A70 list0[0] rec 0x08081830"
+]
+},
+{
+"addr": "0x08081968",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 257 (world 10 map 31) @0x08091B18"
+]
+},
+{
+"addr": "0x080819E4",
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+],
+"where": [
+"area 257 (world 10 map 31) @0x08091B18 list1[3] rec 0x08081A04"
+]
+},
+{
+"addr": "0x08081A74",
+"purpose": "spawn_condition",
+"refs": [
+"list3_condition"
+],
+"where": [
+"area 257 (world 10 map 31) @0x08091B18 list3[0] rec 0x08081A80"
+]
+},
+{
+"addr": "0x08081AB8",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 258 (world 11 map 1) @0x08091B50"
+]
+},
+{
+"addr": "0x08081B48",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition"
+],
+"where": [
+"area 258 (world 11 map 1) @0x08091B50 list1[0] rec 0x08081B54",
+"area 258 (world 11 map 1) @0x08091B50 list1[1] rec 0x08081B74",
+"area 258 (world 11 map 1) @0x08091B50 list1[2] rec 0x08081B94"
+]
+},
+{
+"addr": "0x08081BE0",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 258 (world 11 map 1) @0x08091B50 list0[0] rec 0x08081BF0"
+]
+},
+{
+"addr": "0x08081C04",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 258 (world 11 map 1) @0x08091B50 list0[1] rec 0x08081C38"
+]
+},
+{
+"addr": "0x08081C4C",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 258 (world 11 map 1) @0x08091B50 list0[2] rec 0x08081C8C"
+]
+},
+{
+"addr": "0x08081C56",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 258 (world 11 map 1) @0x08091B50 list0[2] rec 0x08081C8C"
+]
+},
+{
+"addr": "0x08081CA0",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 258 (world 11 map 1) @0x08091B50 list0[3] rec 0x08081CE8"
+]
+},
+{
+"addr": "0x08081CB5",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 258 (world 11 map 1) @0x08091B50 list0[3] rec 0x08081CE8"
+]
+},
+{
+"addr": "0x08081D48",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 259 (world 11 map 2) @0x08091B88"
+]
+},
+{
+"addr": "0x08081DC0",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition"
+],
+"where": [
+"area 259 (world 11 map 2) @0x08091B88 list1[3] rec 0x08081DCC",
+"area 259 (world 11 map 2) @0x08091B88 list1[4] rec 0x08081DEC",
+"area 260 (world 11 map 3) @0x08091BC0 list1[1] rec 0x08081F28",
+"area 260 (world 11 map 3) @0x08091BC0 list1[2] rec 0x08081F48"
+]
+},
+{
+"addr": "0x08081E68",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 259 (world 11 map 2) @0x08091B88 list0[0] rec 0x08081EA8"
+]
+},
+{
+"addr": "0x08082010",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 261 (world 11 map 4) @0x08091BF8"
+]
+},
+{
+"addr": "0x08082148",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 261 (world 11 map 4) @0x08091BF8 list0[0] rec 0x08082188"
+]
+},
+{
+"addr": "0x080821F4",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 262 (world 11 map 5) @0x08091C30"
+]
+},
+{
+"addr": "0x080823A8",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 262 (world 11 map 5) @0x08091C30 list0[0] rec 0x080823E8"
+]
+},
+{
+"addr": "0x08082854",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 266 (world 11 map 9) @0x08091D10"
+]
+},
+{
+"addr": "0x080829F8",
+"purpose": "spawn_condition",
+"refs": [
+"list2_condition"
+],
+"where": [
+"area 266 (world 11 map 9) @0x08091D10 list2[0] rec 0x08082A0C"
+]
+},
+{
+"addr": "0x08082A05",
+"purpose": "quest_flag_logic",
+"refs": [
+"list2_callback"
+],
+"where": [
+"area 266 (world 11 map 9) @0x08091D10 list2[0] rec 0x08082A0C"
+]
+},
+{
+"addr": "0x08082A20",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 267 (world 11 map 10) @0x08091D48"
+]
+},
+{
+"addr": "0x08082B34",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 267 (world 11 map 10) @0x08091D48 list0[0] rec 0x08082B74"
+]
+},
+{
+"addr": "0x08082EB0",
+"purpose": "cutscene",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 270 (world 11 map 13) @0x08091DF0 list0[1] rec 0x08082F20"
+]
+},
+{
+"addr": "0x0808308C",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 272 (world 11 map 15) @0x08091E60"
+]
+},
+{
+"addr": "0x08083194",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 273 (world 11 map 16) @0x08091E98"
+]
+},
+{
+"addr": "0x080831A8",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 273 (world 11 map 16) @0x08091E98 list0[0] rec 0x080831BC"
+]
+},
+{
+"addr": "0x080832B4",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 274 (world 11 map 17) @0x08091ED0 list0[0] rec 0x08083300"
+]
+},
+{
+"addr": "0x08083328",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 274 (world 11 map 17) @0x08091ED0 list0[2] rec 0x08083350"
+]
+},
+{
+"addr": "0x080834C4",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 275 (world 11 map 18) @0x08091F08 list0[0] rec 0x080834EC"
+]
+},
+{
+"addr": "0x08083500",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 275 (world 11 map 18) @0x08091F08 list0[1] rec 0x08083528"
+]
+},
+{
+"addr": "0x08083628",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 276 (world 11 map 19) @0x08091F40 list0[0] rec 0x08083650"
+]
+},
+{
+"addr": "0x08083664",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 276 (world 11 map 19) @0x08091F40 list0[1] rec 0x0808368C"
+]
+},
+{
+"addr": "0x080836B0",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 277 (world 11 map 20) @0x08091F78"
+]
+},
+{
+"addr": "0x0808372C",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 277 (world 11 map 20) @0x08091F78 list0[0] rec 0x0808373C"
+]
+},
+{
+"addr": "0x08083750",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 277 (world 11 map 20) @0x08091F78 list0[1] rec 0x08083778"
+]
+},
+{
+"addr": "0x0808378C",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 277 (world 11 map 20) @0x08091F78 list0[2] rec 0x08083804"
+]
+},
+{
+"addr": "0x08083978",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 278 (world 11 map 21) @0x08091FB0 list0[0] rec 0x080839D8"
+]
+},
+{
+"addr": "0x08083D88",
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+],
+"where": [
+"area 281 (world 11 map 24) @0x08092058 list1[14] rec 0x08083DA4"
+]
+},
+{
+"addr": "0x08083E00",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 282 (world 12 map 1) @0x08092090",
+"area 283 (world 12 map 2) @0x080920C8",
+"area 284 (world 12 map 3) @0x08092100",
+"area 285 (world 12 map 4) @0x08092138"
+]
+},
+{
+"addr": "0x08083E10",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 282 (world 12 map 1) @0x08092090 list0[0] rec 0x08083E2C"
+]
+},
+{
+"addr": "0x08083EC8",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 283 (world 12 map 2) @0x080920C8 list0[0] rec 0x08083ED4"
+]
+},
+{
+"addr": "0x08083F3C",
+"purpose": "cutscene",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 284 (world 12 map 3) @0x08092100 list0[0] rec 0x08083FF4"
+]
+},
+{
+"addr": "0x08084014",
+"purpose": "cutscene",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 285 (world 12 map 4) @0x08092138 list0[0] rec 0x080840C4"
+]
+},
+{
+"addr": "0x08084174",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 286 (world 12 map 5) @0x08092170 list0[0] rec 0x0808417C"
+]
+},
+{
+"addr": "0x08084198",
+"purpose": "cutscene",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 287 (world 12 map 6) @0x080921A8"
+]
+},
+{
+"addr": "0x080841FC",
+"purpose": "cutscene",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 287 (world 12 map 6) @0x080921A8 list0[0] rec 0x08084270",
+"area 295 (world 12 map 14) @0x08092368 list0[0] rec 0x08084958",
+"area 305 (world 12 map 24) @0x08092598 list0[0] rec 0x08085000"
+]
+},
+{
+"addr": "0x08084284",
+"purpose": "cutscene",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 287 (world 12 map 6) @0x080921A8 list0[1] rec 0x080842F8",
+"area 295 (world 12 map 14) @0x08092368 list0[1] rec 0x0808496C",
+"area 305 (world 12 map 24) @0x08092598 list0[1] rec 0x08085014"
+]
+},
+{
+"addr": "0x080843B0",
+"purpose": "cutscene",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 288 (world 12 map 7) @0x080921E0 list0[0] rec 0x08084458"
+]
+},
+{
+"addr": "0x0808446C",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 288 (world 12 map 7) @0x080921E0 list0[1] rec 0x08084474"
+]
+},
+{
+"addr": "0x08084508",
+"purpose": "cutscene",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 289 (world 12 map 8) @0x08092218 list0[0] rec 0x080845AC"
+]
+},
+{
+"addr": "0x08084718",
+"purpose": "cutscene",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 292 (world 12 map 11) @0x080922C0 list0[0] rec 0x080847A0"
+]
+},
+{
+"addr": "0x080847C0",
+"purpose": "cutscene",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 293 (world 12 map 12) @0x080922F8 list0[0] rec 0x08084844"
+]
+},
+{
+"addr": "0x080848D0",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 294 (world 12 map 13) @0x08092330 list0[0] rec 0x080848D8"
+]
+},
+{
+"addr": "0x080848F4",
+"purpose": "cutscene",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 295 (world 12 map 14) @0x08092368"
+]
+},
+{
+"addr": "0x08084A24",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 296 (world 12 map 15) @0x080923A0 list0[0] rec 0x08084A2C"
+]
+},
+{
+"addr": "0x08084B04",
+"purpose": "cutscene",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 298 (world 12 map 17) @0x08092410 list0[0] rec 0x08084B8C"
+]
+},
+{
+"addr": "0x08084BAC",
+"purpose": "cutscene",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 299 (world 12 map 18) @0x08092448 list0[0] rec 0x08084C30"
+]
+},
+{
+"addr": "0x08084DC0",
+"purpose": "cutscene",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 302 (world 12 map 21) @0x080924F0 list0[0] rec 0x08084E48"
+]
+},
+{
+"addr": "0x08084E68",
+"purpose": "cutscene",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 303 (world 12 map 22) @0x08092528 list0[0] rec 0x08084EEC"
+]
+},
+{
+"addr": "0x08084F78",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 304 (world 12 map 23) @0x08092560 list0[0] rec 0x08084F80"
+]
+},
+{
+"addr": "0x08084F9C",
+"purpose": "cutscene",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 305 (world 12 map 24) @0x08092598"
+]
+},
+{
+"addr": "0x0808503C",
+"purpose": "cutscene",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 306 (world 12 map 25) @0x080925D0 list0[0] rec 0x080850E4"
+]
+},
+{
+"addr": "0x080850F8",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 306 (world 12 map 25) @0x080925D0 list0[1] rec 0x08085100"
+]
+},
+{
+"addr": "0x08085224",
+"purpose": "cutscene",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 307 (world 12 map 26) @0x08092608 list0[0] rec 0x080852C8"
+]
+},
+{
+"addr": "0x080852E8",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 308 (world 12 map 27) @0x08092640 list0[0] rec 0x08085374"
+]
+},
+{
+"addr": "0x080852F7",
+"purpose": "cutscene",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 308 (world 12 map 27) @0x08092640 list0[0] rec 0x08085374"
+]
+},
+{
+"addr": "0x080853E8",
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+],
+"where": [
+"area 309 (world 12 map 28) @0x08092678 list1[1] rec 0x080854E0"
+]
+},
+{
+"addr": "0x08085534",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 309 (world 12 map 28) @0x08092678 list0[0] rec 0x080855F0"
+]
+},
+{
+"addr": "0x08085543",
+"purpose": "cutscene",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 309 (world 12 map 28) @0x08092678 list0[0] rec 0x080855F0"
+]
+},
+{
+"addr": "0x08085628",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 310 (world 13 map 1) @0x080926B0"
+]
+},
+{
+"addr": "0x0808566C",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 310 (world 13 map 1) @0x080926B0 list0[0] rec 0x08085678"
+]
+},
+{
+"addr": "0x0808569C",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 310 (world 13 map 1) @0x080926B0 list0[2] rec 0x080856D4"
+]
+},
+{
+"addr": "0x080856A6",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 310 (world 13 map 1) @0x080926B0 list0[2] rec 0x080856D4"
+]
+},
+{
+"addr": "0x080856E8",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 310 (world 13 map 1) @0x080926B0 list0[3] rec 0x08085724"
+]
+},
+{
+"addr": "0x080856F7",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 310 (world 13 map 1) @0x080926B0 list0[3] rec 0x08085724"
+]
+},
+{
+"addr": "0x08085738",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 310 (world 13 map 1) @0x080926B0 list0[4] rec 0x08085770"
+]
+},
+{
+"addr": "0x08085742",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 310 (world 13 map 1) @0x080926B0 list0[4] rec 0x08085770"
+]
+},
+{
+"addr": "0x0808584C",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition"
+],
+"where": [
+"area 313 (world 13 map 32) @0x08092758 list1[2] rec 0x08085858",
+"area 313 (world 13 map 32) @0x08092758 list1[3] rec 0x08085878",
+"area 313 (world 13 map 32) @0x08092758 list1[4] rec 0x08085898",
+"area 314 (world 13 map 33) @0x08092790 list1[3] rec 0x080859A8"
+]
+},
+{
+"addr": "0x0808593C",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition"
+],
+"where": [
+"area 314 (world 13 map 33) @0x08092790 list1[0] rec 0x08085948",
+"area 314 (world 13 map 33) @0x08092790 list1[1] rec 0x08085968",
+"area 314 (world 13 map 33) @0x08092790 list1[2] rec 0x08085988"
+]
+},
+{
+"addr": "0x08085AB0",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 314 (world 13 map 33) @0x08092790 list0[0] rec 0x08085ABC"
+]
+},
+{
+"addr": "0x0808679C",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 325 (world 13 map 45) @0x080929F8"
+]
+},
+{
+"addr": "0x080867D4",
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+],
+"where": [
+"area 325 (world 13 map 45) @0x080929F8 list1[0] rec 0x080867EC",
+"area 325 (world 13 map 45) @0x080929F8 list1[1] rec 0x08086814",
+"area 325 (world 13 map 45) @0x080929F8 list1[2] rec 0x0808683C"
+]
+},
+{
+"addr": "0x0808685C",
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+],
+"where": [
+"area 325 (world 13 map 45) @0x080929F8 list1[3] rec 0x08086874",
+"area 325 (world 13 map 45) @0x080929F8 list1[4] rec 0x0808689C"
+]
+},
+{
+"addr": "0x080868BC",
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+],
+"where": [
+"area 325 (world 13 map 45) @0x080929F8 list1[5] rec 0x080868D4",
+"area 325 (world 13 map 45) @0x080929F8 list1[6] rec 0x080868FC"
+]
+},
+{
+"addr": "0x08086938",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 325 (world 13 map 45) @0x080929F8 list0[0] rec 0x08086944"
+]
+},
+{
+"addr": "0x08087360",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 333 (world 13 map 53) @0x08092BB8"
+]
+},
+{
+"addr": "0x080873B8",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 333 (world 13 map 53) @0x08092BB8 list0[0] rec 0x080873C4"
+]
+},
+{
+"addr": "0x080873E0",
+"purpose": "quest_flag_logic",
+"refs": [
+"list2_callback"
+],
+"where": [
+"area 333 (world 13 map 53) @0x08092BB8 list2[0] rec 0x080873E8"
+]
+},
+{
+"addr": "0x08087418",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 334 (world 14 map 1) @0x08092BF0"
+]
+},
+{
+"addr": "0x08087498",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 334 (world 14 map 1) @0x08092BF0 list0[0] rec 0x080874A8"
+]
+},
+{
+"addr": "0x080874BC",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 334 (world 14 map 1) @0x08092BF0 list0[1] rec 0x08087504"
+]
+},
+{
+"addr": "0x08087518",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 334 (world 14 map 1) @0x08092BF0 list0[2] rec 0x08087558"
+]
+},
+{
+"addr": "0x08087522",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 334 (world 14 map 1) @0x08092BF0 list0[2] rec 0x08087558"
+]
+},
+{
+"addr": "0x0808756C",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 334 (world 14 map 1) @0x08092BF0 list0[3] rec 0x080875B4"
+]
+},
+{
+"addr": "0x08087581",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 334 (world 14 map 1) @0x08092BF0 list0[3] rec 0x080875B4"
+]
+},
+{
+"addr": "0x08087638",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition"
+],
+"where": [
+"area 335 (world 14 map 2) @0x08092C28 list1[1] rec 0x0808764C"
+]
+},
+{
+"addr": "0x08087668",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition"
+],
+"where": [
+"area 335 (world 14 map 2) @0x08092C28 list1[2] rec 0x08087680"
+]
+},
+{
+"addr": "0x0808769C",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition"
+],
+"where": [
+"area 335 (world 14 map 2) @0x08092C28 list1[3] rec 0x080876B4"
+]
+},
+{
+"addr": "0x080876D0",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition"
+],
+"where": [
+"area 335 (world 14 map 2) @0x08092C28 list1[4] rec 0x080876E8"
+]
+},
+{
+"addr": "0x08087704",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition"
+],
+"where": [
+"area 335 (world 14 map 2) @0x08092C28 list1[5] rec 0x0808771C"
+]
+},
+{
+"addr": "0x08087738",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition"
+],
+"where": [
+"area 335 (world 14 map 2) @0x08092C28 list1[6] rec 0x08087744",
+"area 335 (world 14 map 2) @0x08092C28 list1[7] rec 0x08087764",
+"area 335 (world 14 map 2) @0x08092C28 list1[8] rec 0x08087784",
+"area 335 (world 14 map 2) @0x08092C28 list1[9] rec 0x080877A4"
+]
+},
+{
+"addr": "0x08087890",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 335 (world 14 map 2) @0x08092C28 list0[1] rec 0x080878B4"
+]
+},
+{
+"addr": "0x08087E18",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 338 (world 14 map 5) @0x08092CD0 list0[0] rec 0x08087E3C",
+"area 338 (world 14 map 5) @0x08092CD0 list0[1] rec 0x08087E6C",
+"area 338 (world 14 map 5) @0x08092CD0 list0[2] rec 0x08087E9C",
+"area 338 (world 14 map 5) @0x08092CD0 list0[3] rec 0x08087ECC"
+]
+},
+{
+"addr": "0x08087E22",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 338 (world 14 map 5) @0x08092CD0 list0[0] rec 0x08087E3C"
+]
+},
+{
+"addr": "0x08087E50",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 338 (world 14 map 5) @0x08092CD0 list0[1] rec 0x08087E6C"
+]
+},
+{
+"addr": "0x08087E80",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 338 (world 14 map 5) @0x08092CD0 list0[2] rec 0x08087E9C"
+]
+},
+{
+"addr": "0x08087EB0",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 338 (world 14 map 5) @0x08092CD0 list0[3] rec 0x08087ECC"
+]
+},
+{
+"addr": "0x08087EE0",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 338 (world 14 map 5) @0x08092CD0 list0[4] rec 0x08087EFC"
+]
+},
+{
+"addr": "0x08087F10",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 338 (world 14 map 5) @0x08092CD0 list0[5] rec 0x08087F2C"
+]
+},
+{
+"addr": "0x08088090",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 339 (world 14 map 6) @0x08092D08 list0[2] rec 0x080880C0"
+]
+},
+{
+"addr": "0x080880D4",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 339 (world 14 map 6) @0x08092D08 list0[3] rec 0x080880EC"
+]
+},
+{
+"addr": "0x08088100",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 339 (world 14 map 6) @0x08092D08 list0[4] rec 0x08088118"
+]
+},
+{
+"addr": "0x08088154",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 340 (world 14 map 7) @0x08092D40",
+"area 354 (world 14 map 21) @0x08093050"
+]
+},
+{
+"addr": "0x08088C2C",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 349 (world 14 map 16) @0x08092F38"
+]
+},
+{
+"addr": "0x08088D44",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 350 (world 14 map 17) @0x08092F70"
+]
+},
+{
+"addr": "0x08089154",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 352 (world 14 map 19) @0x08092FE0"
+]
+},
+{
+"addr": "0x08089484",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 355 (world 14 map 22) @0x08093088"
+]
+},
+{
+"addr": "0x08089624",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 357 (world 14 map 24) @0x080930F8"
+]
+},
+{
+"addr": "0x08089768",
+"purpose": "spawn_condition",
+"refs": [
+"list3_condition"
+],
+"where": [
+"area 357 (world 14 map 24) @0x080930F8 list3[0] rec 0x08089774"
+]
+},
+{
+"addr": "0x08089790",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 358 (world 14 map 25) @0x08093130"
+]
+},
+{
+"addr": "0x0808986C",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 359 (world 15 map 1) @0x08093168"
+]
+},
+{
+"addr": "0x0808999C",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 359 (world 15 map 1) @0x08093168 list0[0] rec 0x080899AC"
+]
+},
+{
+"addr": "0x080899D4",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 359 (world 15 map 1) @0x08093168 list0[2] rec 0x08089A04"
+]
+},
+{
+"addr": "0x080899DE",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 359 (world 15 map 1) @0x08093168 list0[2] rec 0x08089A04"
+]
+},
+{
+"addr": "0x08089A18",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 359 (world 15 map 1) @0x08093168 list0[3] rec 0x08089A4C"
+]
+},
+{
+"addr": "0x08089A22",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 359 (world 15 map 1) @0x08093168 list0[3] rec 0x08089A4C"
+]
+},
+{
+"addr": "0x08089A60",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 359 (world 15 map 1) @0x08093168 list0[4] rec 0x08089A9C"
+]
+},
+{
+"addr": "0x08089A75",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 359 (world 15 map 1) @0x08093168 list0[4] rec 0x08089A9C"
+]
+},
+{
+"addr": "0x08089B6C",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition"
+],
+"where": [
+"area 360 (world 15 map 2) @0x080931A0 list1[3] rec 0x08089B78",
+"area 360 (world 15 map 2) @0x080931A0 list1[4] rec 0x08089B98",
+"area 360 (world 15 map 2) @0x080931A0 list1[5] rec 0x08089BB8",
+"area 360 (world 15 map 2) @0x080931A0 list1[6] rec 0x08089BD8"
+]
+},
+{
+"addr": "0x0808AE30",
+"purpose": "cutscene",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 377 (world 15 map 19) @0x08093558"
+]
+},
+{
+"addr": "0x0808AEC0",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 377 (world 15 map 19) @0x08093558 list0[0] rec 0x0808AF00"
+]
+},
+{
+"addr": "0x0808B5CC",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 383 (world 15 map 25) @0x080936A8"
+]
+},
+{
+"addr": "0x0808B670",
+"purpose": "quest_flag_logic",
+"refs": [
+"list2_callback"
+],
+"where": [
+"area 383 (world 15 map 25) @0x080936A8 list2[0] rec 0x0808B678"
+]
+},
+{
+"addr": "0x0808BD34",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 390 (world 15 map 32) @0x08093830"
+]
+},
+{
+"addr": "0x0808BDF4",
+"purpose": "spawn_condition",
+"refs": [
+"list3_condition"
+],
+"where": [
+"area 390 (world 15 map 32) @0x08093830 list3[0] rec 0x0808BE08"
+]
+},
+{
+"addr": "0x0808BE20",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 391 (world 15 map 33) @0x08093868"
+]
+},
+{
+"addr": "0x0808BE54",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 391 (world 15 map 33) @0x08093868 list0[0] rec 0x0808BE60"
+]
+},
+{
+"addr": "0x0808BE74",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 391 (world 15 map 33) @0x08093868 list0[1] rec 0x0808BE80"
+]
+},
+{
+"addr": "0x0808BECC",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 392 (world 18 map 1) @0x080938A0 list0[0] rec 0x0808BED4"
+]
+},
+{
+"addr": "0x0808BF08",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 393 (world 18 map 2) @0x080938D8"
+]
+},
+{
+"addr": "0x0808BFAC",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 393 (world 18 map 2) @0x080938D8 list0[0] rec 0x0808BFE4"
+]
+},
+{
+"addr": "0x0808C070",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 395 (world 18 map 4) @0x08093948"
+]
+},
+{
+"addr": "0x0808C0D4",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 396 (world 18 map 5) @0x08093980"
+]
+},
+{
+"addr": "0x0808C18C",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 396 (world 18 map 5) @0x08093980 list0[1] rec 0x0808C19C",
+"area 398 (world 18 map 7) @0x080939F0 list0[0] rec 0x0808C2E8",
+"area 401 (world 18 map 10) @0x08093A98 list0[6] rec 0x0808C7C0"
+]
+},
+{
+"addr": "0x0808C350",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 400 (world 18 map 9) @0x08093A60"
+]
+},
+{
+"addr": "0x0808C4C8",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 401 (world 18 map 10) @0x08093A98"
+]
+},
+{
+"addr": "0x0808C5E0",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 401 (world 18 map 10) @0x08093A98 list0[1] rec 0x0808C714"
+]
+},
+{
+"addr": "0x0808C728",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 401 (world 18 map 10) @0x08093A98 list0[2] rec 0x0808C744"
+]
+},
+{
+"addr": "0x0808C758",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 401 (world 18 map 10) @0x08093A98 list0[3] rec 0x0808C774"
+]
+},
+{
+"addr": "0x0808C788",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 401 (world 18 map 10) @0x08093A98 list0[4] rec 0x0808C798",
+"area 401 (world 18 map 10) @0x08093A98 list0[5] rec 0x0808C7AC"
+]
+},
+{
+"addr": "0x0808C7D4",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 401 (world 18 map 10) @0x08093A98 list0[7] rec 0x0808C7E4"
+]
+},
+{
+"addr": "0x0808C7F8",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 401 (world 18 map 10) @0x08093A98 list0[8] rec 0x0808C808",
+"area 401 (world 18 map 10) @0x08093A98 list0[9] rec 0x0808C81C"
+]
+},
+{
+"addr": "0x0808C880",
+"purpose": "quest_flag_logic",
+"refs": [
+"list2_callback"
+],
+"where": [
+"area 401 (world 18 map 10) @0x08093A98 list2[0] rec 0x0808C89C"
+]
+},
+{
+"addr": "0x0808C938",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition"
+],
+"where": [
+"area 402 (world 18 map 11) @0x08093AD0 list1[3] rec 0x0808C944"
+]
+},
+{
+"addr": "0x0808CA18",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 403 (world 18 map 12) @0x08093B08"
+]
+},
+{
+"addr": "0x0808CA64",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 403 (world 18 map 12) @0x08093B08 list0[0] rec 0x0808CA94"
+]
+},
+{
+"addr": "0x0808CAB8",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 404 (world 18 map 13) @0x08093B40"
+]
+},
+{
+"addr": "0x0808CB1C",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 404 (world 18 map 13) @0x08093B40 list0[1] rec 0x0808CB28"
+]
+},
+{
+"addr": "0x0808CB4C",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 405 (world 18 map 14) @0x08093B78"
+]
+},
+{
+"addr": "0x0808CB5C",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition",
+"map_object_condition"
+],
+"where": [
+"area 405 (world 18 map 14) @0x08093B78 list0[0] rec 0x0808CBEC",
+"area 405 (world 18 map 14) @0x08093B78 list1[0] rec 0x0808CB70"
+]
+},
+{
+"addr": "0x0808CC14",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 408 (world 19 map 1) @0x08093C20 list0[0] rec 0x0808CC1C"
+]
+},
+{
+"addr": "0x0808CD08",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 412 (world 19 map 5) @0x08093D00"
+]
+},
+{
+"addr": "0x0808CD2C",
+"purpose": "cutscene",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 412 (world 19 map 5) @0x08093D00 list0[0] rec 0x0808CD80"
+]
+},
+{
+"addr": "0x0808CE04",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 415 (world 20 map 1) @0x08093DA8 list0[0] rec 0x0808CE10"
+]
+},
+{
+"addr": "0x0808CE48",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition",
+"map_object_condition"
+],
+"where": [
+"area 416 (world 20 map 2) @0x08093DE0 list0[2] rec 0x0808CFF4",
+"area 416 (world 20 map 2) @0x08093DE0 list1[0] rec 0x0808CE5C",
+"area 416 (world 20 map 2) @0x08093DE0 list1[1] rec 0x0808CE74",
+"area 416 (world 20 map 2) @0x08093DE0 list1[5] rec 0x0808CF24"
+]
+},
+{
+"addr": "0x0808CE8C",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition"
+],
+"where": [
+"area 416 (world 20 map 2) @0x08093DE0 list1[2] rec 0x0808CEA4"
+]
+},
+{
+"addr": "0x0808CEBC",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition"
+],
+"where": [
+"area 416 (world 20 map 2) @0x08093DE0 list1[3] rec 0x0808CED4"
+]
+},
+{
+"addr": "0x0808CEEC",
+"purpose": "spawn_condition",
+"refs": [
+"actor_spawn_condition"
+],
+"where": [
+"area 416 (world 20 map 2) @0x08093DE0 list1[4] rec 0x0808CF04"
+]
+},
+{
+"addr": "0x0808CFE8",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 416 (world 20 map 2) @0x08093DE0 list0[2] rec 0x0808CFF4"
+]
+},
+{
+"addr": "0x0808D090",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 418 (world 20 map 4) @0x08093E50"
+]
+},
+{
+"addr": "0x0808D194",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 418 (world 20 map 4) @0x08093E50 list0[0] rec 0x0808D1C4"
+]
+},
+{
+"addr": "0x0808D1D8",
+"purpose": "spawn_condition",
+"refs": [
+"map_object_condition"
+],
+"where": [
+"area 418 (world 20 map 4) @0x08093E50 list0[1] rec 0x0808D214"
+]
+},
+{
+"addr": "0x0808D1E2",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 418 (world 20 map 4) @0x08093E50 list0[1] rec 0x0808D214"
+]
+},
+{
+"addr": "0x0808D36C",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 420 (world 20 map 6) @0x08093EC0"
+]
+},
+{
+"addr": "0x0808D600",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 425 (world 21 map 1) @0x08093FD8 list0[0] rec 0x0808D610"
+]
+},
+{
+"addr": "0x0808D624",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 425 (world 21 map 1) @0x08093FD8 list0[1] rec 0x0808D634"
+]
+},
+{
+"addr": "0x0808D750",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 428 (world 21 map 4) @0x08094080"
+]
+},
+{
+"addr": "0x0808D77C",
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+],
+"where": [
+"area 428 (world 21 map 4) @0x08094080 list1[0] rec 0x0808D790"
+]
+},
+{
+"addr": "0x0808D86C",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 430 (world 21 map 6) @0x080940F0"
+]
+},
+{
+"addr": "0x0808D894",
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+],
+"where": [
+"area 430 (world 21 map 6) @0x080940F0 list1[0] rec 0x0808D8AC"
+]
+},
+{
+"addr": "0x0808D8CC",
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+],
+"where": [
+"area 430 (world 21 map 6) @0x080940F0 list1[1] rec 0x0808D8E0"
+]
+},
+{
+"addr": "0x0808D98C",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 432 (world 21 map 8) @0x08094160"
+]
+},
+{
+"addr": "0x0808D9AC",
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+],
+"where": [
+"area 432 (world 21 map 8) @0x08094160 list1[0] rec 0x0808D9C4"
+]
+},
+{
+"addr": "0x0808D9E4",
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+],
+"where": [
+"area 432 (world 21 map 8) @0x08094160 list1[1] rec 0x0808D9FC"
+]
+},
+{
+"addr": "0x0808DB04",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 435 (world 21 map 11) @0x08094208"
+]
+},
+{
+"addr": "0x0808DB74",
+"purpose": "quest_flag_logic",
+"refs": [
+"list2_callback"
+],
+"where": [
+"area 435 (world 21 map 11) @0x08094208 list2[0] rec 0x0808DB88"
+]
+},
+{
+"addr": "0x0808DB98",
+"purpose": "quest_flag_logic",
+"refs": [
+"list2_callback"
+],
+"where": [
+"area 435 (world 21 map 11) @0x08094208 list2[1] rec 0x0808DBAC"
+]
+},
+{
+"addr": "0x0808DBBC",
+"purpose": "quest_flag_logic",
+"refs": [
+"list2_callback"
+],
+"where": [
+"area 435 (world 21 map 11) @0x08094208 list2[2] rec 0x0808DBD0"
+]
+},
+{
+"addr": "0x0808DBF0",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 437 (world 21 map 13) @0x08094278"
+]
+},
+{
+"addr": "0x0808DC0C",
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+],
+"where": [
+"area 437 (world 21 map 13) @0x08094278 list1[0] rec 0x0808DC20"
+]
+},
+{
+"addr": "0x0808DC40",
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+],
+"where": [
+"area 437 (world 21 map 13) @0x08094278 list1[1] rec 0x0808DC58"
+]
+},
+{
+"addr": "0x0808DC80",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 438 (world 21 map 14) @0x080942B0"
+]
+},
+{
+"addr": "0x0808DEE0",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 443 (world 21 map 19) @0x080943C8"
+]
+},
+{
+"addr": "0x0808DF28",
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+],
+"where": [
+"area 443 (world 21 map 19) @0x080943C8 list1[2] rec 0x0808DF58"
+]
+},
+{
+"addr": "0x0808DFA0",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 444 (world 21 map 20) @0x08094400"
+]
+},
+{
+"addr": "0x0808DFB4",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 445 (world 21 map 21) @0x08094438"
+]
+},
+{
+"addr": "0x0808DFE4",
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+],
+"where": [
+"area 445 (world 21 map 21) @0x08094438 list1[1] rec 0x0808E018"
+]
+},
+{
+"addr": "0x0808E05C",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 446 (world 21 map 22) @0x08094470"
+]
+},
+{
+"addr": "0x0808E06C",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 447 (world 21 map 23) @0x080944A8"
+]
+},
+{
+"addr": "0x0808E09C",
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+],
+"where": [
+"area 447 (world 21 map 23) @0x080944A8 list1[1] rec 0x0808E0CC"
+]
+},
+{
+"addr": "0x0808E110",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 448 (world 21 map 24) @0x080944E0"
+]
+},
+{
+"addr": "0x0808E13C",
+"purpose": "map_event",
+"refs": [
+"area_on_enter"
+],
+"where": [
+"area 450 (world 21 map 26) @0x08094550"
+]
+},
+{
+"addr": "0x0808E2A4",
+"purpose": "map_event",
+"refs": [
+"map_script_trigger"
+],
+"where": [
+"area 451 (world 22 map 1) @0x08094588 list0[0] rec 0x0808E2AC"
+]
+},
+{
+"addr": "0x083BBBB0",
+"purpose": "item_use",
+"refs": [
+"item_use"
+],
+"where": [
+"supply 0 @0x083BD2F8"
+]
+},
+{
+"addr": "0x083BBBD1",
+"purpose": "item_use",
+"refs": [
+"item_use"
+],
+"where": [
+"supply 1 @0x083BD32C"
+]
+},
+{
+"addr": "0x083BBBF2",
+"purpose": "item_use",
+"refs": [
+"item_use"
+],
+"where": [
+"supply 2 @0x083BD360"
+]
+},
+{
+"addr": "0x083BBC13",
+"purpose": "item_use",
+"refs": [
+"item_use"
+],
+"where": [
+"supply 3 @0x083BD394"
+]
+},
+{
+"addr": "0x083BBC34",
+"purpose": "item_use",
+"refs": [
+"item_use"
+],
+"where": [
+"supply 4 @0x083BD3C8"
+]
+},
+{
+"addr": "0x083BBC55",
+"purpose": "item_use",
+"refs": [
+"item_use"
+],
+"where": [
+"supply 5 @0x083BD3FC"
+]
+},
+{
+"addr": "0x083BBC78",
+"purpose": "item_use",
+"refs": [
+"item_use"
+],
+"where": [
+"supply 6 @0x083BD430"
+]
+},
+{
+"addr": "0x083BBC9B",
+"purpose": "item_use",
+"refs": [
+"item_use"
+],
+"where": [
+"supply 7 @0x083BD464"
+]
+},
+{
+"addr": "0x083BBCBE",
+"purpose": "item_use",
+"refs": [
+"item_use"
+],
+"where": [
+"supply 8 @0x083BD498"
+]
+},
+{
+"addr": "0x083BBCE1",
+"purpose": "item_use",
+"refs": [
+"item_use"
+],
+"where": [
+"supply 9 @0x083BD4CC"
+]
+},
+{
+"addr": "0x083BBD04",
+"purpose": "item_use",
+"refs": [
+"item_use"
+],
+"where": [
+"supply 10 @0x083BD500"
+]
+},
+{
+"addr": "0x083BBD21",
+"purpose": "item_use",
+"refs": [
+"item_use"
+],
+"where": [
+"supply 11 @0x083BD534"
+]
+},
+{
+"addr": "0x083BBD3E",
+"purpose": "item_use",
+"refs": [
+"item_use"
+],
+"where": [
+"supply 12 @0x083BD568"
+]
+},
+{
+"addr": "0x083BBD5B",
+"purpose": "item_use",
+"refs": [
+"item_use"
+],
+"where": [
+"supply 13 @0x083BD59C"
+]
+},
+{
+"addr": "0x083BBD78",
+"purpose": "item_use",
+"refs": [
+"item_use"
+],
+"where": [
+"supply 14 @0x083BD5D0"
+]
+},
+{
+"addr": "0x083BBD95",
+"purpose": "item_use",
+"refs": [
+"item_use"
+],
+"where": [
+"supply 15 @0x083BD604"
+]
+},
+{
+"addr": "0x083BBDB3",
+"purpose": "item_use",
+"refs": [
+"item_use"
+],
+"where": [
+"supply 16 @0x083BD638"
+]
+},
+{
+"addr": "0x083BBDD2",
+"purpose": "item_use",
+"refs": [
+"item_use"
+],
+"where": [
+"supply 17 @0x083BD66C"
+]
+},
+{
+"addr": "0x083BBDF1",
+"purpose": "item_use",
+"refs": [
+"item_use"
+],
+"where": [
+"supply 18 @0x083BD6A0"
+]
+},
+{
+"addr": "0x083BBE10",
+"purpose": "item_use",
+"refs": [
+"item_use"
+],
+"where": [
+"supply 19 @0x083BD6D4"
+]
+},
+{
+"addr": "0x083BBE2F",
+"purpose": "item_use",
+"refs": [
+"item_use"
+],
+"where": [
+"supply 20 @0x083BD708"
+]
+},
+{
+"addr": "0x083BBE3D",
+"purpose": "item_use",
+"refs": [
+"item_use"
+],
+"where": [
+"supply 21 @0x083BD73C"
+]
+},
+{
+"addr": "0x083BBE4E",
+"purpose": "item_use",
+"refs": [
+"item_use"
+],
+"where": [
+"supply 24 @0x083BD7D8"
+]
+},
+{
+"addr": "0x086F3BC8",
+"purpose": "equipment_effect",
+"refs": [
+"equipment_effect"
+],
+"where": [
+"equipment 16 @0x086F85AC"
+]
+},
+{
+"addr": "0x086F3BCB",
+"purpose": "equipment_effect",
+"refs": [
+"equipment_effect"
+],
+"where": [
+"equipment 20 @0x086F865C"
+]
+},
+{
+"addr": "0x086F3BD0",
+"purpose": "equipment_effect",
+"refs": [
+"equipment_effect"
+],
+"where": [
+"equipment 21 @0x086F8688"
+]
+},
+{
+"addr": "0x086F3BD3",
+"purpose": "equipment_effect",
+"refs": [
+"equipment_effect"
+],
+"where": [
+"equipment 34 @0x086F88C4"
+]
+},
+{
+"addr": "0x086F3BD6",
+"purpose": "equipment_effect",
+"refs": [
+"equipment_effect"
+],
+"where": [
+"equipment 35 @0x086F88F0"
+]
+},
+{
+"addr": "0x086F3BD9",
+"purpose": "equipment_effect",
+"refs": [
+"equipment_effect"
+],
+"where": [
+"equipment 40 @0x086F89CC"
+]
+},
+{
+"addr": "0x086F3BF2",
+"purpose": "equipment_effect",
+"refs": [
+"equipment_effect"
+],
+"where": [
+"equipment 42 @0x086F8A24"
+]
+},
+{
+"addr": "0x086F3BF7",
+"purpose": "equipment_effect",
+"refs": [
+"equipment_effect"
+],
+"where": [
+"equipment 60 @0x086F8D3C"
+]
+},
+{
+"addr": "0x086F3BFA",
+"purpose": "equipment_effect",
+"refs": [
+"equipment_effect"
+],
+"where": [
+"equipment 61 @0x086F8D68"
+]
+},
+{
+"addr": "0x086F3BFF",
+"purpose": "equipment_effect",
+"refs": [
+"equipment_effect"
+],
+"where": [
+"equipment 63 @0x086F8DC0"
+]
+},
+{
+"addr": "0x086F3C02",
+"purpose": "equipment_effect",
+"refs": [
+"equipment_effect"
+],
+"where": [
+"equipment 101 @0x086F9448"
+]
+},
+{
+"addr": "0x086F3C05",
+"purpose": "equipment_effect",
+"refs": [
+"equipment_effect"
+],
+"where": [
+"equipment 104 @0x086F94CC"
+]
+},
+{
+"addr": "0x086F3C0A",
+"purpose": "equipment_effect",
+"refs": [
+"equipment_effect"
+],
+"where": [
+"equipment 110 @0x086F95D4"
+]
+},
+{
+"addr": "0x086F3C0F",
+"purpose": "equipment_effect",
+"refs": [
+"equipment_effect"
+],
+"where": [
+"equipment 140 @0x086F9AFC"
+]
+},
+{
+"addr": "0x086F3C12",
+"purpose": "equipment_effect",
+"refs": [
+"equipment_effect"
+],
+"where": [
+"equipment 153 @0x086F9D38"
+]
+},
+{
+"addr": "0x0870EA28",
+"purpose": "boss_fight",
+"refs": [
+"ai_inline_script"
+],
+"where": [
+"AI node InlineScript def 0x0870EA1C (Vegeta 0x88)"
+]
+},
+{
+"addr": "0x08720340",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 0 \"Go to King Yemma's Castle\" @0x08720564"
+]
+},
+{
+"addr": "0x08720343",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 0 \"Go to King Yemma's Castle\" @0x08720564"
+]
+},
+{
+"addr": "0x08720348",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 0 \"Go to King Yemma's Castle\" @0x08720564"
+]
+},
+{
+"addr": "0x0872034B",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 1 \"Train with Other World Fighters\" @0x08720574"
+]
+},
+{
+"addr": "0x0872034E",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 1 \"Train with Other World Fighters\" @0x08720574"
+]
+},
+{
+"addr": "0x08720353",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 1 \"Train with Other World Fighters\" @0x08720574"
+]
+},
+{
+"addr": "0x08720358",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 2 \"Go to the Other World Tournament\" @0x08720584"
+]
+},
+{
+"addr": "0x0872035B",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 2 \"Go to the Other World Tournament\" @0x08720584"
+]
+},
+{
+"addr": "0x08720360",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 2 \"Go to the Other World Tournament\" @0x08720584"
+]
+},
+{
+"addr": "0x08720365",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 3 \"Go to your class at Orange Star High School\" @0x08720594"
+]
+},
+{
+"addr": "0x08720368",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 3 \"Go to your class at Orange Star High School\" @0x08720594"
+]
+},
+{
+"addr": "0x0872036D",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 3 \"Go to your class at Orange Star High School\" @0x08720594"
+]
+},
+{
+"addr": "0x08720372",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 4 \"Fly to West City and talk to Bulma\" @0x087205A4"
+]
+},
+{
+"addr": "0x08720375",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 4 \"Fly to West City and talk to Bulma\" @0x087205A4"
+]
+},
+{
+"addr": "0x0872037A",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 4 \"Fly to West City and talk to Bulma\" @0x087205A4"
+]
+},
+{
+"addr": "0x0872037F",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 5 \"Fight Crime in Hercule City\" @0x087205B4"
+]
+},
+{
+"addr": "0x08720382",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 5 \"Fight Crime in Hercule City\" @0x087205B4"
+]
+},
+{
+"addr": "0x08720387",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 5 \"Fight Crime in Hercule City\" @0x087205B4"
+]
+},
+{
+"addr": "0x0872038C",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 6 \"Defeat the Red Shark Gang and Save the Mayor\" @0x087205C4"
+]
+},
+{
+"addr": "0x0872038F",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 6 \"Defeat the Red Shark Gang and Save the Mayor\" @0x087205C4"
+]
+},
+{
+"addr": "0x08720394",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 6 \"Defeat the Red Shark Gang and Save the Mayor\" @0x087205C4"
+]
+},
+{
+"addr": "0x08720399",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 7 \"Save Chobi from the Circus\" @0x087205D4"
+]
+},
+{
+"addr": "0x0872039C",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 7 \"Save Chobi from the Circus\" @0x087205D4"
+]
+},
+{
+"addr": "0x087203A1",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 7 \"Save Chobi from the Circus\" @0x087205D4"
+]
+},
+{
+"addr": "0x087203A6",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 8 \"Tell Your Mother That Goku's Coming Back\" @0x087205E4"
+]
+},
+{
+"addr": "0x087203A9",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 8 \"Tell Your Mother That Goku's Coming Back\" @0x087205E4"
+]
+},
+{
+"addr": "0x087203AE",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 8 \"Tell Your Mother That Goku's Coming Back\" @0x087205E4"
+]
+},
+{
+"addr": "0x087203B3",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 9 \"Tell Piccolo and Dende That Goku's Coming Back\" @0x087205F4"
+]
+},
+{
+"addr": "0x087203B8",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 9 \"Tell Piccolo and Dende That Goku's Coming Back\" @0x087205F4"
+]
+},
+{
+"addr": "0x087203BD",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 9 \"Tell Piccolo and Dende That Goku's Coming Back\" @0x087205F4"
+]
+},
+{
+"addr": "0x087203C2",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 10 \"Tell Bulma and Vegeta That Goku's Coming Back\" @0x08720604"
+]
+},
+{
+"addr": "0x087203C7",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 10 \"Tell Bulma and Vegeta That Goku's Coming Back\" @0x08720604"
+]
+},
+{
+"addr": "0x087203CC",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 10 \"Tell Bulma and Vegeta That Goku's Coming Back\" @0x08720604"
+]
+},
+{
+"addr": "0x087203D1",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 11 \"Tell Master Roshi and Krillin That Goku's Coming Back\" @0x08720614"
+]
+},
+{
+"addr": "0x087203D6",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 11 \"Tell Master Roshi and Krillin That Goku's Coming Back\" @0x08720614"
+]
+},
+{
+"addr": "0x087203DB",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 11 \"Tell Master Roshi and Krillin That Goku's Coming Back\" @0x08720614"
+]
+},
+{
+"addr": "0x087203E0",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 12 \"Meet Goten in the eastern forest to train.\" @0x08720624"
+]
+},
+{
+"addr": "0x087203E3",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 12 \"Meet Goten in the eastern forest to train.\" @0x08720624"
+]
+},
+{
+"addr": "0x087203E8",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 12 \"Meet Goten in the eastern forest to train.\" @0x08720624"
+]
+},
+{
+"addr": "0x087203ED",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 13 \"Meet Bulma to go to the World Tournament\" @0x08720634"
+]
+},
+{
+"addr": "0x087203F0",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 13 \"Meet Bulma to go to the World Tournament\" @0x08720634"
+]
+},
+{
+"addr": "0x087203F5",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 13 \"Meet Bulma to go to the World Tournament\" @0x08720634"
+]
+},
+{
+"addr": "0x087203FA",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 14 \"Register for the World Tournament\" @0x08720644"
+]
+},
+{
+"addr": "0x087203FD",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 14 \"Register for the World Tournament\" @0x08720644"
+]
+},
+{
+"addr": "0x08720402",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 14 \"Register for the World Tournament\" @0x08720644"
+]
+},
+{
+"addr": "0x08720407",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 15 \"Go to Kami's Lookout and get a Senzu Bean from Korrin\" @0x08720654"
+]
+},
+{
+"addr": "0x0872040A",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 15 \"Go to Kami's Lookout and get a Senzu Bean from Korrin\" @0x08720654"
+]
+},
+{
+"addr": "0x0872040F",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 15 \"Go to Kami's Lookout and get a Senzu Bean from Korrin\" @0x08720654"
+]
+},
+{
+"addr": "0x08720414",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 16 \"Find Babidi's Spaceship\" @0x08720664"
+]
+},
+{
+"addr": "0x08720417",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 16 \"Find Babidi's Spaceship\" @0x08720664"
+]
+},
+{
+"addr": "0x0872041C",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 16 \"Find Babidi's Spaceship\" @0x08720664"
+]
+},
+{
+"addr": "0x08720421",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 17 \"Enter Babidi's Ship and Defeat Dabura\" @0x08720674"
+]
+},
+{
+"addr": "0x08720426",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 17 \"Enter Babidi's Ship and Defeat Dabura\" @0x08720674"
+]
+},
+{
+"addr": "0x08720429",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 17 \"Enter Babidi's Ship and Defeat Dabura\" @0x08720674"
+]
+},
+{
+"addr": "0x0872042E",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 18 \"Destroy Babidi's Spaceship\" @0x08720684"
+]
+},
+{
+"addr": "0x08720431",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 18 \"Destroy Babidi's Spaceship\" @0x08720684"
+]
+},
+{
+"addr": "0x08720436",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 18 \"Destroy Babidi's Spaceship\" @0x08720684"
+]
+},
+{
+"addr": "0x0872043B",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 19 \"Go To Kami's Lookout\" @0x08720694"
+]
+},
+{
+"addr": "0x0872043E",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 19 \"Go To Kami's Lookout\" @0x08720694"
+]
+},
+{
+"addr": "0x08720443",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 19 \"Go To Kami's Lookout\" @0x08720694"
+]
+},
+{
+"addr": "0x08720448",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 20 \"Get the Dragon Radar from Bulma\" @0x087206A4"
+]
+},
+{
+"addr": "0x0872044B",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 20 \"Get the Dragon Radar from Bulma\" @0x087206A4"
+]
+},
+{
+"addr": "0x08720450",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 20 \"Get the Dragon Radar from Bulma\" @0x087206A4"
+]
+},
+{
+"addr": "0x08720455",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 21 \"Find The Dragon Balls\" @0x087206B4"
+]
+},
+{
+"addr": "0x08720458",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 21 \"Find The Dragon Balls\" @0x087206B4"
+]
+},
+{
+"addr": "0x0872045D",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 21 \"Find The Dragon Balls\" @0x087206B4"
+]
+},
+{
+"addr": "0x08720462",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 22 \"Find Vegeta in HFIL\" @0x087206C4"
+]
+},
+{
+"addr": "0x08720465",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 22 \"Find Vegeta in HFIL\" @0x087206C4"
+]
+},
+{
+"addr": "0x0872046A",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 22 \"Find Vegeta in HFIL\" @0x087206C4"
+]
+},
+{
+"addr": "0x0872046F",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 23 \"Defeat Janemba\" @0x087206D4"
+]
+},
+{
+"addr": "0x08720472",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 23 \"Defeat Janemba\" @0x087206D4"
+]
+},
+{
+"addr": "0x08720477",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 23 \"Defeat Janemba\" @0x087206D4"
+]
+},
+{
+"addr": "0x0872047C",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 24 \"Pull the Z-Sword from the rock\" @0x087206E4"
+]
+},
+{
+"addr": "0x0872047F",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 24 \"Pull the Z-Sword from the rock\" @0x087206E4"
+]
+},
+{
+"addr": "0x08720484",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 24 \"Pull the Z-Sword from the rock\" @0x087206E4"
+]
+},
+{
+"addr": "0x08720489",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 25 \"Take a nap at Kami's Lookout\" @0x087206F4"
+]
+},
+{
+"addr": "0x0872048C",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 25 \"Take a nap at Kami's Lookout\" @0x087206F4"
+]
+},
+{
+"addr": "0x08720491",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 25 \"Take a nap at Kami's Lookout\" @0x087206F4"
+]
+},
+{
+"addr": "0x08720496",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 26 \"Get the Scouter Upgrade from Dr. Brief at Capsule Corp\" @0x08720704"
+]
+},
+{
+"addr": "0x08720499",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 26 \"Get the Scouter Upgrade from Dr. Brief at Capsule Corp\" @0x08720704"
+]
+},
+{
+"addr": "0x0872049E",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 26 \"Get the Scouter Upgrade from Dr. Brief at Capsule Corp\" @0x08720704"
+]
+},
+{
+"addr": "0x087204A3",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 27 \"Save Goten and Trunks from Super Buu.\" @0x08720714"
+]
+},
+{
+"addr": "0x087204A6",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 27 \"Save Goten and Trunks from Super Buu.\" @0x08720714"
+]
+},
+{
+"addr": "0x087204AB",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 27 \"Save Goten and Trunks from Super Buu.\" @0x08720714"
+]
+},
+{
+"addr": "0x087204B0",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 28 \"Find Dende\" @0x08720724"
+]
+},
+{
+"addr": "0x087204B3",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 28 \"Find Dende\" @0x08720724"
+]
+},
+{
+"addr": "0x087204B8",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 28 \"Find Dende\" @0x08720724"
+]
+},
+{
+"addr": "0x087204BD",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 29 \"Go back and defeat Super Buu\" @0x08720734"
+]
+},
+{
+"addr": "0x087204C0",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 29 \"Go back and defeat Super Buu\" @0x08720734"
+]
+},
+{
+"addr": "0x087204C5",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 29 \"Go back and defeat Super Buu\" @0x08720734"
+]
+},
+{
+"addr": "0x087204CA",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 30 \"Find Gohan, Goten, Trunks, and Piccolo\" @0x08720744"
+]
+},
+{
+"addr": "0x087204CD",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 30 \"Find Gohan, Goten, Trunks, and Piccolo\" @0x08720744"
+]
+},
+{
+"addr": "0x087204DC",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 30 \"Find Gohan, Goten, Trunks, and Piccolo\" @0x08720744"
+]
+},
+{
+"addr": "0x087204E1",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 31 \"Escape from Buu\" @0x08720754"
+]
+},
+{
+"addr": "0x087204E4",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 31 \"Escape from Buu\" @0x08720754"
+]
+},
+{
+"addr": "0x087204E9",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 31 \"Escape from Buu\" @0x08720754"
+]
+},
+{
+"addr": "0x087204EE",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 32 \"Go to the Barren Wastelands and Defeat Kid Buu\" @0x08720764"
+]
+},
+{
+"addr": "0x087204F1",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 32 \"Go to the Barren Wastelands and Defeat Kid Buu\" @0x08720764"
+]
+},
+{
+"addr": "0x087204F6",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 32 \"Go to the Barren Wastelands and Defeat Kid Buu\" @0x08720764"
+]
+},
+{
+"addr": "0x087204FB",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 33 \"Get a root beer for the Lighthouse Keeper\" @0x08720774"
+]
+},
+{
+"addr": "0x087204FE",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 33 \"Get a root beer for the Lighthouse Keeper\" @0x08720774"
+]
+},
+{
+"addr": "0x08720504",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 33 \"Get a root beer for the Lighthouse Keeper\" @0x08720774"
+]
+},
+{
+"addr": "0x0872050A",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 34 \"Get a turkey for the Lighthouse Keeper\" @0x08720784"
+]
+},
+{
+"addr": "0x0872050D",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 34 \"Get a turkey for the Lighthouse Keeper\" @0x08720784"
+]
+},
+{
+"addr": "0x08720513",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 34 \"Get a turkey for the Lighthouse Keeper\" @0x08720784"
+]
+},
+{
+"addr": "0x08720519",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 35 \"Get Hercule-ade for the Lighthouse Keeper\" @0x08720794"
+]
+},
+{
+"addr": "0x0872051C",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 35 \"Get Hercule-ade for the Lighthouse Keeper\" @0x08720794"
+]
+},
+{
+"addr": "0x08720522",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 35 \"Get Hercule-ade for the Lighthouse Keeper\" @0x08720794"
+]
+},
+{
+"addr": "0x08720528",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 36 \"Get an elixir for the Lighthouse Keeper\" @0x087207A4"
+]
+},
+{
+"addr": "0x0872052B",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 36 \"Get an elixir for the Lighthouse Keeper\" @0x087207A4"
+]
+},
+{
+"addr": "0x08720531",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 36 \"Get an elixir for the Lighthouse Keeper\" @0x087207A4"
+]
+},
+{
+"addr": "0x08720537",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 37 \"Get a dinosaur tail for the Lighthouse Keeper\" @0x087207B4"
+]
+},
+{
+"addr": "0x0872053A",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 37 \"Get a dinosaur tail for the Lighthouse Keeper\" @0x087207B4"
+]
+},
+{
+"addr": "0x08720540",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 37 \"Get a dinosaur tail for the Lighthouse Keeper\" @0x087207B4"
+]
+},
+{
+"addr": "0x08720546",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 38 \"Get a super elixir for the Lighthouse Keeper\" @0x087207C4"
+]
+},
+{
+"addr": "0x08720549",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 38 \"Get a super elixir for the Lighthouse Keeper\" @0x087207C4"
+]
+},
+{
+"addr": "0x0872054F",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 38 \"Get a super elixir for the Lighthouse Keeper\" @0x087207C4"
+]
+},
+{
+"addr": "0x08720555",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 39 \"Defeat Airship Bandits and take the bandanas they drop to the Ninja\" @0x087207D4"
+]
+},
+{
+"addr": "0x08720558",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 39 \"Defeat Airship Bandits and take the bandanas they drop to the Ninja\" @0x087207D4"
+]
+},
+{
+"addr": "0x0872055E",
+"purpose": "quest_log",
+"refs": [
+"quest_log_condition"
+],
+"where": [
+"quest 39 \"Defeat Airship Bandits and take the bandanas they drop to the Ninja\" @0x087207D4"
+]
+}
+]

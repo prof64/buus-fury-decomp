@@ -1,0 +1,146 @@
+[
+ {
+  "id": 0,
+  "handler": "0x8000219",
+  "name": "G0",
+  "semantics": "word 0x03001058 = value",
+  "status": "VERIFIED",
+  "uses": 109
+ },
+ {
+  "id": 1,
+  "handler": "0x8000231",
+  "name": "G1",
+  "semantics": "word 0x0300105C = value",
+  "status": "VERIFIED",
+  "uses": 56
+ },
+ {
+  "id": 2,
+  "handler": "0x8000249",
+  "name": "G2",
+  "semantics": "word 0x03001060 = value",
+  "status": "VERIFIED",
+  "uses": 46
+ },
+ {
+  "id": 3,
+  "handler": "0x8000261",
+  "name": "G3",
+  "semantics": "word 0x03001064 = value",
+  "status": "VERIFIED",
+  "uses": 174
+ },
+ {
+  "id": 4,
+  "handler": "0x8000267",
+  "name": "P0",
+  "semantics": "[[0x03001030]+0] = value (current parameter block)",
+  "status": "VERIFIED",
+  "uses": 60
+ },
+ {
+  "id": 5,
+  "handler": "0x8000283",
+  "name": "P1",
+  "semantics": "[[0x03001030]+4] = value (current parameter block)",
+  "status": "VERIFIED",
+  "uses": 106
+ },
+ {
+  "id": 6,
+  "handler": "0x800029f",
+  "name": "P2",
+  "semantics": "[[0x03001030]+8] = value (current parameter block)",
+  "status": "VERIFIED",
+  "uses": 21
+ },
+ {
+  "id": 7,
+  "handler": "0x80002bb",
+  "name": "P3",
+  "semantics": "[[0x03001030]+12] = value (current parameter block)",
+  "status": "VERIFIED",
+  "uses": 9
+ },
+ {
+  "id": 8,
+  "handler": "0x80002d7",
+  "name": "L0",
+  "semantics": "word 0x03001020 = value",
+  "status": "VERIFIED",
+  "uses": 0
+ },
+ {
+  "id": 9,
+  "handler": "0x80002ef",
+  "name": "L1",
+  "semantics": "word 0x03001024 = value",
+  "status": "VERIFIED",
+  "uses": 0
+ },
+ {
+  "id": 10,
+  "handler": "0x8000307",
+  "name": "L2",
+  "semantics": "word 0x03001028 = value",
+  "status": "VERIFIED",
+  "uses": 0
+ },
+ {
+  "id": 11,
+  "handler": "0x800031f",
+  "name": "L3",
+  "semantics": "word 0x0300102C = value",
+  "status": "VERIFIED",
+  "uses": 1
+ },
+ {
+  "id": 12,
+  "handler": "0x080003FD",
+  "name": "hp",
+  "semantics": "Active character HP = clamp(value, 0, maxHP) (s16 rec+0x16). If the player object exists: value <= 0 calls player->vtable[+0x7C] (knock-out) and the record comes from player->vtable[+0x80]; if rec+0x13 bit0 (fusion) 0x08013C66 syncs the components.",
+  "status": "VERIFIED",
+  "uses": 7
+ },
+ {
+  "id": 13,
+  "handler": "0x08000479",
+  "name": "max_hp",
+  "semantics": "Sets BOTH HP and max HP (rec+0x16, +0x18) = value; fusion sync as above.",
+  "status": "VERIFIED",
+  "uses": 0
+ },
+ {
+  "id": 14,
+  "handler": "0x0800051B",
+  "name": "energy",
+  "semantics": "clamp(value, 0, maxEP) into the form's energy slot (SS3 gauge +0x20 / SS gauge +0x1E / EP +0x1A, same rule as get_energy).",
+  "status": "VERIFIED",
+  "uses": 4
+ },
+ {
+  "id": 15,
+  "handler": "0x0800058F",
+  "name": "max_ep",
+  "semantics": "Sets BOTH EP and max EP (rec+0x1A, +0x1C) = value.",
+  "status": "VERIFIED",
+  "uses": 0
+ },
+ {
+  "id": 16,
+  "handler": "0x080005C5",
+  "name": "zenie",
+  "semantics": "Zenie (0x0300155C) = max(value, 0).",
+  "status": "VERIFIED",
+  "uses": 1
+ },
+ {
+  "id": 17,
+  "handler": "0x080003F7",
+  "name": "variant_byte",
+  "semantics": "byte 0x03002BB0 = value (see native 0x11).",
+  "status": "VERIFIED",
+  "uses": 0
+ }
+]

@@ -1,0 +1,4 @@
+# Boa pulls rand -> getrandom 0.4, which has no default backend on wasm32-unknown-unknown.
+# "unsupported" makes OS randomness an error at runtime (Math.random is never used: determinism).
+[target.wasm32-unknown-unknown]
+rustflags = ["--cfg", 'getrandom_backend="unsupported"']
