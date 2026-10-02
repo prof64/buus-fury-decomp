@@ -401,7 +401,8 @@ fn runner(w: &mut World, i: usize) {
 /// a map NPC's update (vt+8 `0x08011192`): the runner, then the animation tick. While an event holds the field only
 /// the animation ticks (not in the frame the event started); the frame it ends ticks once more before the update.
 pub fn update(w: &mut World, i: usize) {
-    let (busy, since, ended) = w.field.as_ref().map(|f| (f.busy, f.busy_since, f.event_ended)).unwrap_or((false, 0, false));
+    // a load waiting for its on-enter script holds the map NPCs like an event (story playthrough: Grand Kai's 1-15)
+    let (busy, since, ended) = w.field.as_ref().map(|f| (f.busy || f.arrival.is_some(), f.busy_since, f.event_ended)).unwrap_or((false, 0, false));
     if busy {
         if since != w.frame {
             anim_tick(w, i);

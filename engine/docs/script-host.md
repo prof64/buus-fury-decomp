@@ -417,6 +417,23 @@ Counts: VM 16, core 32, field 22, partial 13, scene 112, story 53
     draw on an area load is its idle tick; map NPCs with a behaviour come under script control and get their
     animation back on release; a load inside an event keeps the field held; the real beam object.
 * `wf-script` emulator traces and the Rhai differential tests still pass.
+* `tests/playthrough.rs` (story playthrough, recorder `tools/story_playthrough/`, data
+  `data/story_playthrough/opening.json`: New Game -> the first boss, 19,508 frames played by the real game):
+  **frames 0-18,826 continuous exact** (every actor, camera, fade, RNG, sounds, text, zenie; no state copied after
+  frame 0), through the first fights, two level-ups and into the first boss's defeat scene. Host order per frame
+  (also wf-app `StorySim`): `Session::step_begin` -> run the scripts it queued (drop scripts, kill-XP level-up,
+  defeat scenes; a script started there takes its first wait from the next frame) -> `step_update` -> resume the
+  blocked script -> start the update's scripts -> `step_post` -> start the trigger check's scripts. Hosts call
+  `scene::ai_script_done` (Cause::Ai) and `field::finish_arrival` (Cause::AreaEnter) when those scripts end.
+  Round-3 core rules found with it: loot = footprint centre x / bottom y + 1 px per frame along the killing hit,
+  taken at the death; a coin keeps a step only when it reaches a new pixel; coins are collectable in the air;
+  kill XP / level-up hook #3 and on-defeat scenes run at the next frame's start and hold the rest of that frame
+  (the nested loop), the held update completes when the event ends, the death effect's drop countdown pauses
+  meanwhile; enemies only animate while an event holds the field and walking ones stop at its start (message
+  0xF); a dead enemy frees its grid cells; FacePlayer = 0x0801599C (24.8 difference, ties horizontal; field only);
+  the step-away walk overrides any animation; a shake takes the camera slot (follow holds, plus one frame);
+  an area load whose on-enter script blocks waits for it (players offstage, screen black, NPCs held).
+  Next divergence: frame 18,826, the boss (Olibu, death node Idle) idles at the KO in the game.
 
 ## 10. Field core status (field agent, 2026-10-02; details docs/core.md §10)
 

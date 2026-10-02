@@ -2223,6 +2223,21 @@ pub fn follow(w: &mut World, id: EntityId) {
     w.scene.cam.scroll = None;
 }
 
+/// the follow camera's step of a frame whose target was out of the world during the camera step (an area load waiting
+/// for its on-enter script: field::finish_arrival)
+pub fn follow_owed(w: &mut World) {
+    if let (CamMode::Follow(id), None) = (w.scene.cam.mode.clone(), w.scene.cam.scroll.as_ref()) {
+        if !w.camera_held_by_shake() {
+            follow_step(w, id);
+        }
+    }
+}
+
+/// the script owns player 0's camera (no step: `camera` steps it)
+pub fn camera_owned(w: &World) -> bool {
+    w.scene.cam.scroll.is_some() || !matches!(w.scene.cam.mode, CamMode::Player)
+}
+
 /// player-0 camera under script control. Returns true when the script owns the camera this frame (the caller
 /// skips the player camera).
 pub fn camera(w: &mut World) -> bool {

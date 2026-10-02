@@ -33,7 +33,7 @@ use wf_script_core::{poll, CoreState, HostState, SharedHost};
 use wf_script_rhai::{Runtime, Status, UnitRef};
 
 /// frames of `opening.json` that must match continuously (the verdict)
-const MIN_MATCHED: usize = 14870;
+const MIN_MATCHED: usize = 18826;
 
 fn repo() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..")
@@ -259,8 +259,11 @@ impl Host {
     }
     fn finish(&mut self, w: &mut World, st: Result<Status, String>) {
         if !matches!(st, Ok(Status::Blocked)) {
-            if let Some(Cause::Ai { entity }) = self.cause.take() {
-                scene::ai_script_done(w, entity);
+            match self.cause.take() {
+                Some(Cause::Ai { entity }) => scene::ai_script_done(w, entity),
+                // the load waits for its on-enter script
+                Some(Cause::AreaEnter) => wf_core::field::finish_arrival(w),
+                _ => {}
             }
         }
         match st {
@@ -587,7 +590,7 @@ fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Value) -
             if (a..=b).contains(&k) {
                 let w = &sess.world;
                 let steps: Vec<String> = fr["steps"].as_array().into_iter().flatten().map(|s| s.to_string()).collect();
-                let p = w.player_idx(0).map(|pi| (w.pl_ref(pi).a.x, w.pl_ref(pi).a.y, w.pl_ref(pi).a.facing, w.pl_ref(pi).gs.name()));
+                let p = w.player_idx(0).map(|pi| (w.pl_ref(pi).a.x, w.pl_ref(pi).a.y, w.pl_ref(pi).a.facing, w.pl_ref(pi).gs.name(), (w.pl_ref(pi).ap.raw, w.pl_ref(pi).ap.frame, w.pl_ref(pi).ap.tick)));
                 let picks: Vec<(i32, i32, i32, i32, i32, bool, [i32; 4])> = w.ents.iter().filter_map(|e| match &e.body {
                     Body::Pickup(pk) => Some((pk.x, pk.y, pk.vx, pk.vy, pk.z, pk.landed, pk.coin_rect())),
                     _ => None,
@@ -599,6 +602,7 @@ fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Value) -
                 if !ens.is_empty() {
                     eprintln!("    enemies {ens:?}");
                 }
+                eprintln!("    field mode {:?} arrival {:?}", w.field.as_ref().map(|f| f.mode.clone()), w.field.as_ref().map(|f| f.arrival.is_some()));
                 if !w.g.shakes.is_empty() {
                     eprintln!("    shakes {:?} cam {:?}", w.g.shakes, (w.cameras[0].x, w.cameras[0].y));
                 }

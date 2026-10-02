@@ -964,9 +964,14 @@ pub fn step_from_player(w: &mut World, i: usize, speed: i32, face_toward: bool) 
     if m == 0 {
         return false;
     }
-    // the back-off runs under its own reversed-walk state (set by its enter): its step makes no SetAnim(1)
+    // the back-off runs under its own reversed-walk state (set by its enter): its step makes no SetAnim(1). The
+    // step-away's step SetAnim(1)s unless walking, whatever plays (story playthrough: a fighter's hurt animation
+    // gives way to the walk in the step's frame)
     if !face_toward {
         w.en(i).moving = true;
+        if !w.en_ref(i).walking() {
+            set_anim(w, i, &[nm("walk")], true, Some(true));
+        }
     }
     let vx = -((dx as i64 * speed as i64) / m as i64) as i32;
     let vy = -((dy as i64 * speed as i64) / m as i64) as i32;

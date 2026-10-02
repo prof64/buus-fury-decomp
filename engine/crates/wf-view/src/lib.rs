@@ -68,6 +68,94 @@ pub struct RenderView {
     pub world_map: Option<WorldMapView>,
     /// The dialogue box's animation (open / close zoom, typewriter); `None` = fully open, all text shown.
     pub dialog_anim: Option<DialogAnim>,
+    /// A full-screen screen drawn by code (pause menu pages, shop, save / load, character switch, title, game
+    /// over, credits, mini-games, map screen): when set the renderer shows only this (plus `palette_fade` /
+    /// `fade_black`), not the map, sprites, HUD or dialogue.
+    pub menu: Option<MenuView>,
+}
+
+/// A screen the game draws by code into 8bpp surfaces (see `engine/docs/ui.md` "Menus"). Everything is in the
+/// GBA's 240x160 screen; colours are indices of the UI palette (`ui/palette.json`, `0x0805652C`, loaded into both
+/// palette halves) unless `palette` overrides entries.
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct MenuView {
+    /// BG layers, drawn back to front (equal priority: later on top); index 0 of a layer is transparent.
+    pub layers: Vec<MenuLayer>,
+    /// OBJ sprites in OAM order (index 0 on top among equal priorities).
+    pub objs: Vec<MenuObj>,
+    /// palette entries replacing the UI palette's: (index 0..512, 0xRRGGBB); 256.. = OBJ half
+    pub palette: Vec<(u16, u32)>,
+    /// backdrop colour index (palette entry shown where every layer is transparent)
+    pub backdrop: u16,
+}
+
+/// One background: a `w` x `h` 8bpp surface built from `ops` (in order), shown at screen (x, y).
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct MenuLayer {
+    pub w: u16,
+    pub h: u16,
+    pub x: i32,
+    pub y: i32,
+    pub priority: u8,
+    pub ops: Vec<MenuOp>,
+}
+
+/// The game's software drawing primitives (re/buu/menu, `engine/docs/ui.md`).
+#[derive(Clone, Debug, PartialEq)]
+pub enum MenuOp {
+    /// `0x08004F1C`: rows alternate colour 0x01 / 0x30 starting with 0x01.
+    Background { x: i32, y: i32, w: i32, rows: i32 },
+    /// `0x08004F50`: the bevelled yellow panel with its 3-px shadow; rect (x0, y0)-(x1, y1).
+    Panel { x0: i32, y0: i32, x1: i32, y1: i32 },
+    /// fill (x0, y0)-(x1, y1) (exclusive) with a colour
+    Fill { x0: i32, y0: i32, x1: i32, y1: i32, colour: u8 },
+    /// a single pixel
+    Pixel { x: i32, y: i32, colour: u8 },
+    /// one line of text, already aligned: glyph cells start at pen x, their top at `y - 12`; 0x0008 n codes switch
+    /// the colour; `shadow` = the glyph routine `0x0803F5A4` (each glyph also sets colour `shadow` where its pixels
+    /// shifted by (+1, +1) fall and it has none), else `0x0803F444`. Pixels outside `clip` (x0, y0, x1, y1) stay.
+    Text { font: MenuFont, x: i32, y: i32, colour: u8, shadow: Option<u8>, clip: [i32; 4], text: Vec<u16> },
+    /// frame `frame` of a content picture (`path` = an indexed PNG in the pack, e.g. `ui/menu/button_a.png`; frames
+    /// side by side, `fw` x `fh` each) copied to (x, y) (`0x0803F922`: index 0 skipped when `key0`)
+    Image { path: String, frame: u16, fw: u16, fh: u16, x: i32, y: i32, key0: bool },
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum MenuFont {
+    Small,
+    Dialog,
+    Digits,
+    #[default]
+    Menu,
+    Bold,
+}
+
+impl MenuFont {
+    pub fn id(self) -> &'static str {
+        match self {
+            MenuFont::Small => "small",
+            MenuFont::Dialog => "dialog",
+            MenuFont::Digits => "digits",
+            MenuFont::Menu => "menu",
+            MenuFont::Bold => "bold",
+        }
+    }
+}
+
+/// An OBJ of a menu screen: frame `frame` of the indexed picture `path` (frames side by side, `fw` x `fh`).
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct MenuObj {
+    pub path: String,
+    pub frame: u16,
+    pub fw: u16,
+    pub fh: u16,
+    pub x: i32,
+    pub y: i32,
+    pub priority: u8,
+    pub hflip: bool,
+    pub vflip: bool,
+    /// palette bank offset added to the picture's indices (OBJ half = 256)
+    pub pal: u16,
 }
 
 /// The dialogue box OBJs zoom about the box centre while opening / closing (affine PA = PD = 2048 / scale) and
@@ -170,6 +258,7 @@ impl RenderView {
         self.banner = None;
         self.world_map = None;
         self.dialog_anim = None;
+        self.menu = None;
     }
 }
 

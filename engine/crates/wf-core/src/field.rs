@@ -98,6 +98,19 @@ pub struct PropRt {
     pub dx: i32,
 }
 
+/// the rest of an area load after its on-enter script (`load_area_with`)
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct Arrival {
+    pub to: AreaId,
+    pub x: i32,
+    pub y: i32,
+    pub facing: Option<Dir>,
+    /// the exit's fade-in follows the load (begin_fade_in)
+    pub fade_in: bool,
+    /// the frame of the load (a script that did not block finishes in it: the frame's camera step is owed)
+    pub frame: u32,
+}
+
 /// the run mode of the field loop
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Mode {
@@ -161,6 +174,9 @@ pub struct Field {
     pub placed_loot: Vec<(EntityId, i32, i32, i32, i32)>,
     /// kill XP waiting for the next frame's update (player entity, enemy XP)
     pub xp_due: Vec<(EntityId, i64)>,
+    /// on-defeat callbacks of placed enemies, run at the start of the next frame's update (the dying enemy's death
+    /// handler runs there; story playthrough: the first boss's defeat scene starts the frame after the KO)
+    pub defeat_runs: Vec<(Callback, Cause)>,
     /// a level-up hook started at the start of this frame's update: it runs inline (a nested loop), nothing else
     /// updates this frame
     pub held: bool,
@@ -171,6 +187,10 @@ pub struct Field {
     /// between the frame's start (deferred calls) and the objects' update: objects created now get their first
     /// update in this frame's world update
     pub pre_update: bool,
+    /// an area load waiting for its on-enter script (the game runs it inside EnterArea, before the player objects
+    /// exist: a blocking command in it suspends the load; story playthrough, Grand Kai's planet 1-15 `prop_show`).
+    /// The host calls `finish_arrival` when the script is over.
+    pub arrival: Option<Arrival>,
     /// frame of the last area load
     pub entered: u32,
     /// number of area loads (touch_once triggers survive only within one)
@@ -283,10 +303,12 @@ fn new_field() -> Field {
         placed: vec![],
         placed_loot: vec![],
         xp_due: vec![],
+        defeat_runs: vec![],
         held: false,
         held_event: false,
         resume_held: false,
         pre_update: false,
+        arrival: None,
         entered: 0,
         loads: 0,
     }
@@ -529,7 +551,59 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
     }
     if let Some(sc) = &a.on_enter {
         w.events.push(Event::Field(FieldEvent::Run { run: Callback::Script(sc.clone()), cause: Cause::AreaEnter, slot: 0 }));
+        // with a script host the rest of the load waits for the script (the players stay out of the world). Not
+        // while an event holds the field: its host runs one script at a time, and the event waits for this load
+        // (the game nests the on-enter script; scripts that block on load are not known inside events yet)
+        if w.field.as_ref().is_some_and(|f| f.host && !f.busy) && w.scene.depth == 0 && objects {
+            crate::scene::send_offstage(w);
+            if let Some(f) = w.field.as_mut() {
+                f.arrival = Some(Arrival { to, x, y, facing, fade_in: false, frame: w.frame });
+            }
+            return;
+        }
     }
+    arrive(w, to, x, y, facing);
+}
+
+/// the area's on-enter script is over: the load's remaining part (the players, the world map flyer, AreaEnter); an
+/// exit's fade-in starts. No-op without a pending arrival.
+pub fn finish_arrival(w: &mut World) {
+    let Some(ar) = w.field.as_mut().and_then(|f| f.arrival.take()) else { return };
+    crate::scene::bring_back(w);
+    arrive(w, ar.to, ar.x, ar.y, ar.facing);
+    if ar.fade_in {
+        begin_fade_in(w);
+        // a script that blocked finishes as its host resumes it, before this frame's field step: the fade-in's
+        // first step is the next frame's (story playthrough 1-15: black for two frames after the player appears)
+        if ar.frame != w.frame {
+            if let Some(f) = w.field.as_mut() {
+                f.mode = Mode::FadeIn { k: -1 };
+            }
+        }
+    }
+    // finished in the load's own frame (the script did not block): the frame's player cameras run now, as they did
+    // with the players in the world
+    if ar.frame == w.frame {
+        let scripted = crate::scene::camera_owned(w);
+        if scripted {
+            // a follow camera found no target in the frame's camera step
+            crate::scene::follow_owed(w);
+        }
+        for s in 0..w.players.len() {
+            if s == 0 && (scripted || crate::fieldworld::flying(w)) {
+                continue;
+            }
+            camera(w, s);
+        }
+    }
+}
+
+fn arrive(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<Dir>) {
+    let fd = field_data(w);
+    let Some(a) = fd.area(to.world, to.area) else { return };
+    let variant = to.variant;
+    let Some(m) = fd.map_of(a, variant) else { return };
+    let players = w.players.clone();
     // the player objects at the destination (leader first; partners next to it), after the actors in the list: they
     // update before them. Each new player draws 2 x rand(255).
     for (slot, &pid) in players.iter().enumerate() {
@@ -664,15 +738,28 @@ pub fn pre_step(w: &mut World) {
     }
     if let Some(f) = w.field.as_mut() {
         f.pre_update = true;
+        f.held = false;
     }
     crate::fieldobj::run_deferred(w);
+    let runs = w.field.as_mut().map(|f| std::mem::take(&mut f.defeat_runs)).unwrap_or_default();
+    let any = !runs.is_empty();
+    for (run, cause) in runs {
+        w.events.push(Event::Field(FieldEvent::Run { run, cause, slot: 0 }));
+    }
+    // the defeat callback's scene runs inside the death handler (a nested loop): the rest of the frame is held, like
+    // the level-up hook below (story playthrough: the player's punch does not animate in the frame the boss's
+    // defeat scene starts)
+    if any && w.field.as_ref().is_some_and(|f| f.host) {
+        crate::fieldnpc::start_event(w);
+        if let Some(f) = w.field.as_mut() {
+            f.held = true;
+            f.held_event = true;
+        }
+    }
     run_due_drops(w);
     // the death effects' kill XP (their first update: new objects update first); a level-up runs hook #3 inline,
     // holding the rest of the frame (the event starts now; story playthrough: the other objects neither move nor
     // animate in that frame)
-    if let Some(f) = w.field.as_mut() {
-        f.held = false;
-    }
     let due = w.field.as_mut().map(|f| std::mem::take(&mut f.xp_due)).unwrap_or_default();
     for (pid, exp) in due {
         if let Some(pi) = w.find(pid) {
@@ -752,6 +839,8 @@ pub fn post_step(w: &mut World) {
     crate::fieldobj::debris_step(w);
     match mode {
         Mode::Normal => trigger_check(w),
+        // the load is waiting for its on-enter script: the screen stays black
+        Mode::FadeOut { .. } if w.field.as_ref().is_some_and(|f| f.arrival.is_some()) => {}
         Mode::FadeOut { k, to, x, y, facing } => {
             let k = k + 1;
             if k >= FADE {
@@ -762,7 +851,16 @@ pub fn post_step(w: &mut World) {
                     }
                 }
                 load_area(w, to, x, y, facing);
-                begin_fade_in(w);
+                // a load waiting for its on-enter script fades in when it completes (finish_arrival)
+                match w.field.as_mut().and_then(|f| f.arrival.as_mut()) {
+                    Some(ar) => {
+                        ar.fade_in = true;
+                        if let Some(f) = w.field.as_mut() {
+                            f.mode = Mode::FadeOut { k, to, x, y, facing };
+                        }
+                    }
+                    None => begin_fade_in(w),
+                }
             } else if let Some(f) = w.field.as_mut() {
                 f.mode = Mode::FadeOut { k, to, x, y, facing };
             }
@@ -876,7 +974,9 @@ fn defeats(w: &mut World) {
                     }
                 }
                 if let Some(run) = cb {
-                    w.events.push(Event::Field(FieldEvent::Run { run, cause: Cause::Defeat { entity: id, ty, x, y }, slot: 0 }));
+                    if let Some(f) = w.field.as_mut() {
+                        f.defeat_runs.push((run, Cause::Defeat { entity: id, ty, x, y }));
+                    }
                 }
             }
         }

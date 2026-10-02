@@ -128,14 +128,16 @@ game's walk rules and camera, no enemies (useful for any map).
 `buus-fury --story [W-A]` / `?story[=W-A]` starts a new game in the field at area W-A (default 1-1 Snakeway): a
 `wf-core` field session (areas, exits / warps, NPCs, pickups, breakables, enemies, the world map) whose scripts run
 on the script host (`wf-script-core`) through the Rhai runtime (`wf-script-rhai`) from the content pack's
-`scripts/*.rhai` (moddable; no ROM at runtime). Per frame: `Session::step_world`, then the frame's `FieldEvent::Run`
-scripts (area on-enter / on-leave, triggers, talk, pickups, defeats) start one at a time and a blocked one resumes
-when `wf_script_core::poll` says so, then `Session::step_post`. Load scripts run right after their load instead of
-inside it (the core's hook must be `Send`, the Rhai runtime is not): only RNG draws inside load scripts could differ.
+`scripts/*.rhai` (moddable; no ROM at runtime). Per frame: `Session::step_begin` (deferred calls: drop scripts, kill
+XP, defeat scenes) and the scripts it queued, `Session::step_update`, then the blocked script resumes when
+`wf_script_core::poll` says so and the frame's other `FieldEvent::Run` scripts (talk, pickups) start, then
+`Session::step_post` and the trigger check's scripts. An area load whose on-enter script blocks waits for it
+(`field::finish_arrival`, the host calls it). Same order as the story playthrough lockstep (docs/script-host.md).
 
-The game's presentation timing (all measured frame by frame against the emulator; wf-core's `Session::view`
-now provides these through `view::Presenter` / `render_view`, `story::patch_view` / `ObjLayer` remain as
-frontend stand-ins for `StorySim`, which drives `render_view` directly):
+The game's presentation timing (all measured frame by frame against the emulator) is wf-core's: `render_view`
+(palette fade, banner, tile timer, greyed icon, dialogue animation, world-map props / box) and `view::Presenter`
+(the one-frame OBJ lag, the world map's older BG camera). `StorySim` and `Session`'s `Sim` use them; the frontend
+has no stand-ins left:
 * **palette fade** of area transitions (`RenderView.palette_fade`): the fade routine's math on the original RGB888
   palette (`maps/palette.json`) — FadeOut k -> level 8k, FadeIn k -> 256 - 8k. The renderer resolves each pixel's
   palette entry exactly: BG tiles, UI pictures and the (now indexed, OBJ-palette-ordered) skill icons carry their
@@ -148,10 +150,10 @@ frontend stand-ins for `StorySim`, which drives `render_view` directly):
   overlapping animations show the most recent upload (`TileAnim::after_ticks`, `anim_frame` = logic frames since
   the load). Verified against the captured RAM records (0x03001A68) on every frame of every trace.
 * **skill icon greyed** (`_alt`) in areas without combat; **area banner** (§7; a load removes a banner).
-* **dialogue box animation** (`RenderView.dialog_anim`, not yet in wf-core's view): the three box OBJs zoom about
+* **dialogue box animation** (`RenderView.dialog_anim`, `wf_core::view::dialog_anim`): the three box OBJs zoom about
   the box centre while opening / closing (affine PA = PD = 2048 / n, n = 2..8 over the 7 opening frames, 7..1
   when closing; OBJ 0 on top where the zoomed rectangles overlap) and the text types one visible character per
-  frame (`wf_script_core::text::typing` counts). `story::dialog_anim` maps the core's dialog phase / t / typed.
+  frame (`wf_script_core::text::typing` counts).
 * the HUD stays up behind text boxes (cutscenes hide it through `HudView.hidden`).
 
 **Field parity** (`crates/wf-app/tests/field_parity.rs`; captures `crates/wf-render/re/capture_field.py`: the
@@ -166,16 +168,16 @@ that start mid-area get the game's camera (22.10) after their first step.
 | objects_item_8_57 (map item, item-get, "You got a Switch!" box) | 392 | 390 | frame 0 (trace start); frame 65: the item-get icon one frame too long (core) |
 | npc_westcity_idle | 900 | 895 | 9-10, 21-22, 30: palette written mid-scanout (below) |
 | transitions_forest_roundtrip (fades, banner, two loads) | 390 | 384 | 6 fade frames: palette written mid-scanout (7-50 px) |
-| transitions_hercule_edge_up | 210 | 176 | 58-80: a wandering NPC the core does not place; fade frames as above |
-| objects_breakable_drops_8_1 | 470 | 357 | 5-114: the game freezes its camera during the rock's hit-stop (shake on the BG ints), the core keeps easing |
+| transitions_hercule_edge_up | 210 | 176 | the Hercule City wanderer is placed now (the test extracts scripts: spawn conditions); remaining: fade frames as above |
+| objects_breakable_drops_8_1 | 470 | 391 | the camera holds during a shake now (the shake object takes the camera slot) and the broken rock's prop is hidden |
 
 Not modelled (render timing below frame granularity): on some fade frames the palette RAM write overlaps the
 scanout — scanlines above the write point (rows 0..~60, or a few rows of one OBJ colour) still show the previous
 fade level; when that happens depends on the CPU time of the frame, which the emulator knows and the
 frame-level sim does not. Same class as the world map's late HBlank lines (§9b).
 
-For the story / core agents: `dialog_anim` belongs in `render_view` (phase/t/typed are core state); item-get icon
-lifetime (frame 65 of objects_item_8_57); camera freeze during the breakable hit-stop; the Hercule City wanderer.
+Done in wf-core (2026-10-02): `dialog_anim` in `render_view`, the camera hold during shakes, the Hercule City
+wanderer, the broken rock's prop. Open: item-get icon lifetime (frame 65 of objects_item_8_57).
 
 ## 7. Game UI: HUD and dialogue box (`wf_render::ui`, content `ui/`)
 

@@ -658,8 +658,10 @@ Native **0x95(char)** switches the played character (reloads the player sprite) 
   zero-terminated. A text ref `r`: bank = `r & 0x3F`, start = `((r >> 6) & 0x7FFF) · 2` bytes, length =
   `r >> 21` UTF-16 units. The 1534-entry string table `0x0806BCE8` (zero-terminated) holds UI/item text.
 - **Box placement prefix** (first character, consumed; `0x08012012`): `!` → narration box at y=40, `@` →
-  system box at y=80, `#` → bottom box (y=120); none → placed by speaker/portrait.
-- **Portrait `arg`**: 0 = none; 7 = none (alternate side); 1–6 = expression slot of the **current player
+  system box at y=80, `#` → bottom box (y=120); none → placed by speaker/portrait: arg 0 bottom; else from the
+  scene's anchor (map-NPC talk `0x08017D44`: player − NPC; other scenes (−1, −1)): arg ≥ 2 bottom if anchor
+  y < 0 else top, portrait left if anchor x ≥ 0 (arg 1 mirrored). VERIFIED (engine/docs/ui.md §3).
+- **Portrait `arg`**: 0 = none; 7 = none, 2-line box style 1 (VERIFIED disasm: style index = arg == 7); 1–6 = expression slot of the **current player
   character's** portrait set (`char_def[+0xF + arg]`, i.e. "Goku smiling" when you play Goku); ≥ 8 = global
   portrait index into `0x086F393C` (e.g. 144/145 = Vegeta). Speaker names are part of the text
   ("GREGORY: …").

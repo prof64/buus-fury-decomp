@@ -157,8 +157,11 @@ impl StorySim {
 
     fn finish(&mut self, st: Result<Status, String>) {
         if !matches!(st, Ok(Status::Blocked)) {
-            if let Some(Cause::Ai { entity }) = self.cause.take() {
-                wf_core::scene::ai_script_done(&mut self.session.world, entity);
+            match self.cause.take() {
+                Some(Cause::Ai { entity }) => wf_core::scene::ai_script_done(&mut self.session.world, entity),
+                // the load waits for its on-enter script (field::finish_arrival)
+                Some(Cause::AreaEnter) => wf_core::field::finish_arrival(&mut self.session.world),
+                _ => {}
             }
         }
         match st {
@@ -224,12 +227,21 @@ impl Sim for StorySim {
             *f = InputFrame::from_held(h, self.prev[k]);
             self.prev[k] = h;
         }
-        self.session.step_world(frames);
+        // the frame's start (deferred calls: drop scripts, kill XP, defeat scenes) runs its scripts before the
+        // objects' update; a script started there takes its first wait from the next frame
+        self.session.step_begin(frames);
+        let pre: Vec<Event> = self.session.world.events.clone();
+        let was_running = self.running;
+        self.collect(&pre);
+        self.run_queue();
+        let fresh = !was_running && self.running;
+        let n0 = self.session.world.events.len();
+        self.session.step_update();
         // the blocked script resumes when its wait is over, then the scripts this frame's update started (NPC talk)
         // start; the trigger check's events start right after step_post (an event's first node runs a frame later:
         // the story playthrough lockstep, wf-script-core tests/playthrough.rs)
-        let evs: Vec<Event> = self.session.world.events.clone();
-        if self.running {
+        let evs: Vec<Event> = self.session.world.events[n0..].to_vec();
+        if self.running && !fresh {
             let mut hs = std::mem::take(&mut self.hs);
             let r = poll(&mut self.session.world, &mut hs);
             self.hs = hs;
