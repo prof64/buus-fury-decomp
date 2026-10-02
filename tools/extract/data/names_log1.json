@@ -1,0 +1,961 @@
+{
+ "anim_sets": {
+  "log1": {
+   "0": "idle",
+   "1": "walk",
+   "2": "death",
+   "3": "melee1",
+   "4": "melee2",
+   "5": "ki",
+   "6": "excited",
+   "7": "sad",
+   "8": "transform",
+   "9": "super_saiyan",
+   "10": "monkey",
+   "11": "monster",
+   "12": "raditz",
+   "13": "bubbles",
+   "14": "flying",
+   "15": "bored",
+   "16": "mallet",
+   "17": "anim17",
+   "18": "anim18"
+  },
+  "projectile": {
+   "0": "fly",
+   "1": "charge",
+   "2": "vanish"
+  }
+ },
+ "anim_set_note": "LoG1 animation names are the ROM strings at 0x08010F08 (entity state == animation row)",
+ "set_timing": {
+  "log1": {
+   "0": {
+    "durations": [
+     113,
+     15
+    ],
+    "source": "measured (frame 0 random ~113-327, blink 15)",
+    "lock": true
+   },
+   "1": {
+    "default": 8,
+    "source": "measured"
+   },
+   "2": {
+    "default": 16,
+    "loop": false,
+    "source": "measured"
+   },
+   "3": {
+    "default": 4,
+    "loop": false,
+    "source": "notes: Melee1 = 16 frames"
+   },
+   "4": {
+    "default": 4,
+    "loop": false,
+    "source": "measured"
+   },
+   "5": {
+    "default": 8,
+    "loop": false,
+    "source": "measured"
+   },
+   "14": {
+    "default": 8,
+    "source": "measured"
+   },
+   "15": {
+    "default": 16,
+    "source": "measured"
+   }
+  },
+  "projectile": {
+   "2": {
+    "default": 3,
+    "loop": false,
+    "source": "re/log1: vanish lasts 24 anim ticks over 9 frames"
+   }
+  }
+ },
+ "entities": {
+  "0": {
+   "name": "Army Guy / King Yemma",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: armyguy1, kingyema",
+   "slug": "000_armyguy1"
+  },
+  "1": {
+   "name": "Army Guy 2",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: armyguy2, armyguy4",
+   "slug": "001_armyguy2"
+  },
+  "2": {
+   "name": "Army Guy 3",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: armyguy3",
+   "slug": "002_armyguy3"
+  },
+  "3": {
+   "name": "Boy",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: boy1, boy2",
+   "slug": "003_boy1"
+  },
+  "4": {
+   "name": "Namekian Boy",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: namekboy",
+   "slug": "004_namekboy"
+  },
+  "5": {
+   "name": "Bubbles",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: bubbles",
+   "slug": "005_bubbles"
+  },
+  "6": {
+   "name": "Bulma",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: bulma",
+   "slug": "006_bulma"
+  },
+  "7": {
+   "name": "Burter",
+   "category": "boss",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: burter",
+   "slug": "007_burter"
+  },
+  "8": {
+   "name": "Capsule Corp. Nut",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: capslnut",
+   "slug": "008_capslnut"
+  },
+  "9": {
+   "name": "Chiaotzu",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: chaitzu",
+   "slug": "009_chaitzu"
+  },
+  "10": {
+   "name": "Chi-Chi",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: chichi",
+   "slug": "010_chichi"
+  },
+  "11": {
+   "name": "Police Chief",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: chief",
+   "slug": "011_chief"
+  },
+  "12": {
+   "name": "Citizen 1",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: citizen1, citizen5",
+   "slug": "012_citizen1"
+  },
+  "13": {
+   "name": "Citizen 2",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: citizen2, citizen6",
+   "slug": "013_citizen2"
+  },
+  "14": {
+   "name": "Citizen 3",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: citizen3, citizen7",
+   "slug": "014_citizen3"
+  },
+  "15": {
+   "name": "Citizen 4",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: citizen4",
+   "slug": "015_citizen4"
+  },
+  "16": {
+   "name": "Cop",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: cop1, cop2, cop3, cop4",
+   "slug": "016_cop1"
+  },
+  "17": {
+   "name": "Crab",
+   "category": "enemy",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: crab",
+   "slug": "017_crab"
+  },
+  "18": {
+   "name": "Dende",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: dende",
+   "slug": "018_dende"
+  },
+  "19": {
+   "name": "Devil 1",
+   "category": "enemy",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: devil1",
+   "slug": "019_devil1"
+  },
+  "20": {
+   "name": "Devil 2",
+   "category": "enemy",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: devil2",
+   "slug": "020_devil2"
+  },
+  "21": {
+   "name": "Doctor",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: doctor",
+   "slug": "021_doctor"
+  },
+  "22": {
+   "name": "Father",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: father",
+   "slug": "022_father"
+  },
+  "23": {
+   "name": "Frieza (1st form)",
+   "category": "boss",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: frieza1",
+   "slug": "023_frieza1"
+  },
+  "24": {
+   "name": "Frieza (2nd form)",
+   "category": "boss",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: frieza2",
+   "slug": "024_frieza2"
+  },
+  "25": {
+   "name": "Frieza (3rd form)",
+   "category": "boss",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: frieza3",
+   "slug": "025_frieza3"
+  },
+  "26": {
+   "name": "Frieza (final form)",
+   "category": "boss",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: frieza4",
+   "slug": "026_frieza4"
+  },
+  "27": {
+   "name": "Captain Ginyu",
+   "category": "boss",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: ginyu",
+   "slug": "027_ginyu"
+  },
+  "28": {
+   "name": "Girl",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: girl1, girl2",
+   "slug": "028_girl1"
+  },
+  "29": {
+   "name": "Gohan (1)",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: gohan1",
+   "slug": "029_gohan1"
+  },
+  "30": {
+   "name": "Gohan (2)",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: gohan2",
+   "slug": "030_gohan2"
+  },
+  "31": {
+   "name": "Gohan (3)",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: gohan3",
+   "slug": "031_gohan3"
+  },
+  "32": {
+   "name": "Goku",
+   "category": "player",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: goku",
+   "slug": "032_goku"
+  },
+  "33": {
+   "name": "Goku (mallet)",
+   "category": "player",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: gokumallet",
+   "slug": "033_gokumallet"
+  },
+  "34": {
+   "name": "Gregory",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: gregory",
+   "slug": "034_gregory"
+  },
+  "35": {
+   "name": "Frieza Henchman 1",
+   "category": "enemy",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: hench1, hench5",
+   "slug": "035_hench1"
+  },
+  "36": {
+   "name": "Frieza Henchman 2",
+   "category": "enemy",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: hench2, hench4",
+   "slug": "036_hench2"
+  },
+  "37": {
+   "name": "Frieza Henchman 3",
+   "category": "enemy",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: hench3",
+   "slug": "037_hench3"
+  },
+  "38": {
+   "name": "Frieza Henchman 6",
+   "category": "enemy",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: hench6",
+   "slug": "038_hench6"
+  },
+  "39": {
+   "name": "Frieza Henchman 7",
+   "category": "enemy",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: hench7",
+   "slug": "039_hench7"
+  },
+  "40": {
+   "name": "Frieza Henchman 8",
+   "category": "enemy",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: hench8",
+   "slug": "040_hench8"
+  },
+  "41": {
+   "name": "Jeice",
+   "category": "boss",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: jeice",
+   "slug": "041_jeice"
+  },
+  "42": {
+   "name": "Kami",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: kami",
+   "slug": "042_kami"
+  },
+  "43": {
+   "name": "King Kai",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: kingkai",
+   "slug": "043_kingkai"
+  },
+  "44": {
+   "name": "Kitty",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: kitty",
+   "slug": "044_kitty"
+  },
+  "45": {
+   "name": "Korin",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: korrin",
+   "slug": "045_korrin"
+  },
+  "46": {
+   "name": "Krillin",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: krillin1",
+   "slug": "046_krillin1"
+  },
+  "47": {
+   "name": "Krillin (2)",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: krillin2",
+   "slug": "047_krillin2"
+  },
+  "48": {
+   "name": "Unlabelled sprite 48",
+   "category": "npc",
+   "anim_set": "log1",
+   "confidence": "low"
+  },
+  "49": {
+   "name": "Mother",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: mother1, mother3",
+   "slug": "049_mother1"
+  },
+  "50": {
+   "name": "Mother 2",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: mother2",
+   "slug": "050_mother2"
+  },
+  "51": {
+   "name": "Mr. Popo",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: popo",
+   "slug": "051_popo"
+  },
+  "52": {
+   "name": "Nail",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: nail",
+   "slug": "052_nail"
+  },
+  "53": {
+   "name": "Namekian",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: namekian1, namekian3",
+   "slug": "053_namekian1"
+  },
+  "54": {
+   "name": "Namekian 2",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: namekian2, namekian4",
+   "slug": "054_namekian2"
+  },
+  "55": {
+   "name": "Grand Elder Guru",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: guru",
+   "slug": "055_guru"
+  },
+  "56": {
+   "name": "Nappa",
+   "category": "boss",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: nappa",
+   "slug": "056_nappa"
+  },
+  "57": {
+   "name": "Nurse",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: nurse",
+   "slug": "057_nurse"
+  },
+  "58": {
+   "name": "Old Man",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: oldman",
+   "slug": "058_oldman"
+  },
+  "59": {
+   "name": "Oozaru (1)",
+   "category": "boss",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: oozaru1",
+   "slug": "059_oozaru1"
+  },
+  "60": {
+   "name": "Oozaru (2)",
+   "category": "boss",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: oozaru2",
+   "slug": "060_oozaru2"
+  },
+  "61": {
+   "name": "Piccolo",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: piccolo",
+   "slug": "061_piccolo"
+  },
+  "62": {
+   "name": "Pterodactyl",
+   "category": "enemy",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: ptero1, ptero2, ptero3",
+   "slug": "062_ptero1"
+  },
+  "63": {
+   "name": "Puar",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: puar",
+   "slug": "063_puar"
+  },
+  "64": {
+   "name": "Snake Queen",
+   "category": "enemy",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: snkqueen",
+   "slug": "064_snkqueen"
+  },
+  "65": {
+   "name": "Raditz",
+   "category": "boss",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: raditz",
+   "slug": "065_raditz"
+  },
+  "66": {
+   "name": "Recoome",
+   "category": "boss",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: recoome",
+   "slug": "066_recoome"
+  },
+  "67": {
+   "name": "Robber",
+   "category": "enemy",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: robber1, robber2, robber3",
+   "slug": "067_robber1"
+  },
+  "68": {
+   "name": "Master Roshi",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: roshi",
+   "slug": "068_roshi"
+  },
+  "69": {
+   "name": "Snake",
+   "category": "enemy",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: snake",
+   "slug": "069_snake"
+  },
+  "70": {
+   "name": "Spirit",
+   "category": "enemy",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: spirit1, spirit2, spirit3, spirit4, spirit5",
+   "slug": "070_spirit1"
+  },
+  "71": {
+   "name": "Squirrel",
+   "category": "enemy",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: squirrel",
+   "slug": "071_squirrel"
+  },
+  "72": {
+   "name": "Super Saiyan Goku",
+   "category": "player",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: ssgoku",
+   "slug": "072_ssgoku"
+  },
+  "73": {
+   "name": "Tien",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: tien",
+   "slug": "073_tien"
+  },
+  "74": {
+   "name": "Boy 3",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: boy3",
+   "slug": "074_boy3"
+  },
+  "75": {
+   "name": "T-Rex",
+   "category": "enemy",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: trex, trex2",
+   "slug": "075_trex"
+  },
+  "76": {
+   "name": "Turtle",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: turtle",
+   "slug": "076_turtle"
+  },
+  "77": {
+   "name": "Assistant",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: assist1",
+   "slug": "077_assist1"
+  },
+  "78": {
+   "name": "Assistant 2",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: assist2, assist3",
+   "slug": "078_assist2"
+  },
+  "79": {
+   "name": "Vegeta",
+   "category": "boss",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: vegeta1",
+   "slug": "079_vegeta1"
+  },
+  "80": {
+   "name": "Vegeta (2)",
+   "category": "boss",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: vegeta2, vegeta3",
+   "slug": "080_vegeta2"
+  },
+  "81": {
+   "name": "Wise Man",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: wiseman",
+   "slug": "081_wiseman"
+  },
+  "82": {
+   "name": "Wolf",
+   "category": "enemy",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: wolf",
+   "slug": "082_wolf"
+  },
+  "83": {
+   "name": "Yamcha",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "log1",
+   "notes": "ROM sprite labels: yamcha",
+   "slug": "083_yamcha"
+  },
+  "84": {
+   "name": "Unlabelled sprite 84",
+   "category": "npc",
+   "anim_set": "log1",
+   "confidence": "low"
+  },
+  "85": {
+   "name": "Unlabelled sprite 85",
+   "category": "npc",
+   "anim_set": "log1",
+   "confidence": "low"
+  },
+  "86": {
+   "name": "Ki Blast (large)",
+   "category": "projectile",
+   "confidence": "high",
+   "anim_set": "projectile",
+   "notes": "projectile sprite def (re/log1/extract_moves.py)",
+   "slug": "086_ki_blast"
+  },
+  "87": {
+   "name": "Ki Blast (medium)",
+   "category": "projectile",
+   "confidence": "high",
+   "anim_set": "projectile",
+   "notes": "projectile sprite def (re/log1/extract_moves.py)",
+   "slug": "087_ki_blast_medium"
+  },
+  "88": {
+   "name": "Ki Blast (small)",
+   "category": "projectile",
+   "confidence": "high",
+   "anim_set": "projectile",
+   "notes": "projectile sprite def (re/log1/extract_moves.py)",
+   "slug": "088_ki_blast_small"
+  },
+  "89": {
+   "name": "Kamehameha",
+   "category": "projectile",
+   "confidence": "high",
+   "anim_set": "projectile",
+   "notes": "projectile sprite def (re/log1/extract_moves.py)",
+   "slug": "089_kamehameha"
+  },
+  "90": {
+   "name": "Solar Flare",
+   "category": "projectile",
+   "confidence": "high",
+   "anim_set": "projectile",
+   "notes": "projectile sprite def (re/log1/extract_moves.py)",
+   "slug": "090_solar_flare"
+  },
+  "91": {
+   "name": "Vegeta Ki Blast",
+   "category": "projectile",
+   "confidence": "high",
+   "anim_set": "projectile",
+   "notes": "projectile sprite def (re/log1/extract_moves.py)",
+   "slug": "091_vegeta_ki_blast"
+  }
+ },
+ "portraits": {
+  "0": {
+   "name": "Dende",
+   "confidence": "medium"
+  },
+  "1": {
+   "name": "Devil 1",
+   "confidence": "medium"
+  },
+  "2": {
+   "name": "Devil 2",
+   "confidence": "medium"
+  },
+  "3": {
+   "name": "Doctor",
+   "confidence": "medium"
+  },
+  "4": {
+   "name": "Father",
+   "confidence": "medium"
+  },
+  "5": {
+   "name": "Frieza (1st form)",
+   "confidence": "medium"
+  },
+  "6": {
+   "name": "Frieza (2nd form)",
+   "confidence": "medium"
+  },
+  "7": {
+   "name": "Frieza (3rd form)",
+   "confidence": "medium"
+  },
+  "8": {
+   "name": "Frieza (final form)",
+   "confidence": "medium"
+  },
+  "9": {
+   "name": "Captain Ginyu",
+   "confidence": "medium"
+  },
+  "12": {
+   "name": "Frieza Henchman",
+   "confidence": "medium"
+  },
+  "16": {
+   "name": "Frieza Henchman (2)",
+   "confidence": "medium"
+  },
+  "17": {
+   "name": "Frieza Henchman (3)",
+   "confidence": "medium"
+  },
+  "18": {
+   "name": "Girl",
+   "confidence": "medium"
+  },
+  "20": {
+   "name": "Girl (2)",
+   "confidence": "medium"
+  },
+  "21": {
+   "name": "Gohan",
+   "confidence": "medium"
+  },
+  "22": {
+   "name": "Gohan (2)",
+   "confidence": "medium"
+  },
+  "23": {
+   "name": "Goku",
+   "confidence": "medium"
+  },
+  "25": {
+   "name": "Gregory",
+   "confidence": "medium"
+  },
+  "26": {
+   "name": "Grand Elder Guru",
+   "confidence": "medium"
+  },
+  "27": {
+   "name": "Jeice",
+   "confidence": "medium"
+  },
+  "28": {
+   "name": "Kami",
+   "confidence": "medium"
+  },
+  "29": {
+   "name": "King Kai",
+   "confidence": "medium"
+  },
+  "30": {
+   "name": "King Yemma",
+   "confidence": "medium"
+  },
+  "31": {
+   "name": "Kitty",
+   "confidence": "medium"
+  },
+  "32": {
+   "name": "Korin",
+   "confidence": "medium"
+  },
+  "33": {
+   "name": "Krillin",
+   "confidence": "medium"
+  },
+  "34": {
+   "name": "Krillin (2)",
+   "confidence": "medium"
+  },
+  "35": {
+   "name": "Mother",
+   "confidence": "medium"
+  },
+  "36": {
+   "name": "Old Man (glasses)",
+   "confidence": "medium"
+  },
+  "38": {
+   "name": "Nail",
+   "confidence": "medium"
+  },
+  "39": {
+   "name": "Namekian",
+   "confidence": "medium"
+  },
+  "43": {
+   "name": "Namekian (2)",
+   "confidence": "medium"
+  },
+  "44": {
+   "name": "Nappa",
+   "confidence": "medium"
+  },
+  "45": {
+   "name": "Nurse",
+   "confidence": "medium"
+  },
+  "46": {
+   "name": "Old Man",
+   "confidence": "medium"
+  }
+ },
+ "portraits_note": "portrait table appears alphabetical by character label; names assigned visually"
+}

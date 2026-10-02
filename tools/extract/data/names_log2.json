@@ -1,0 +1,2026 @@
+{
+ "anim_sets": {
+  "fighter": {
+   "0": "idle",
+   "1": "walk",
+   "2": "hurt",
+   "3": "knockdown",
+   "4": "stunned",
+   "5": "kiblast",
+   "6": "attack3",
+   "7": "attack2",
+   "8": "attack1",
+   "9": "transform",
+   "10": "special_pose",
+   "11": "victory",
+   "12": "ko",
+   "13": "dash",
+   "14": "meditate",
+   "15": "special_15",
+   "16": "charge_attack",
+   "17": "spirit",
+   "18": "special_beam",
+   "19": "special_2",
+   "20": "knockback",
+   "21": "alt_form",
+   "22": "alt_pose"
+  },
+  "enemy": {
+   "0": "idle",
+   "1": "walk",
+   "2": "hurt",
+   "3": "knockdown",
+   "4": "stunned",
+   "5": "kiblast",
+   "6": "attack1",
+   "7": "attack2",
+   "8": "attack3",
+   "9": "transform",
+   "10": "special_10",
+   "11": "victory",
+   "12": "ko",
+   "18": "destroyed",
+   "19": "special_19"
+  },
+  "npc": {
+   "0": "idle",
+   "1": "walk",
+   "2": "turn",
+   "3": "special_3",
+   "4": "react",
+   "15": "cry"
+  }
+ },
+ "set_timing": {
+  "fighter": {
+   "0": {
+    "durations": [
+     120,
+     15
+    ],
+    "source": "measured (frame 0 random ~60-320, blink 15)"
+   },
+   "1": {
+    "default": 8,
+    "source": "measured"
+   },
+   "2": {
+    "default": 8,
+    "source": "measured"
+   },
+   "3": {
+    "default": 16,
+    "loop": false,
+    "source": "measured"
+   },
+   "4": {
+    "default": 8,
+    "source": "default"
+   },
+   "5": {
+    "durations": [
+     5,
+     16,
+     16
+    ],
+    "loop": false,
+    "source": "measured"
+   },
+   "6": {
+    "durations": [
+     1,
+     4,
+     4,
+     4
+    ],
+    "loop": false,
+    "source": "measured"
+   },
+   "7": {
+    "durations": [
+     1,
+     4,
+     4,
+     4
+    ],
+    "loop": false,
+    "source": "measured"
+   },
+   "8": {
+    "durations": [
+     1,
+     4,
+     4,
+     4
+    ],
+    "loop": false,
+    "source": "measured"
+   },
+   "9": {
+    "default": 8,
+    "loop": false,
+    "source": "default"
+   },
+   "11": {
+    "default": 16,
+    "loop": false,
+    "source": "default"
+   },
+   "12": {
+    "default": 8,
+    "source": "measured"
+   },
+   "14": {
+    "durations": [
+     32,
+     32,
+     32,
+     15,
+     241
+    ],
+    "source": "measured"
+   },
+   "16": {
+    "durations": [
+     3,
+     4,
+     4,
+     4,
+     4,
+     4,
+     4
+    ],
+    "loop": false,
+    "source": "measured (frame 0 held while charging)"
+   },
+   "17": {
+    "default": 64,
+    "source": "measured"
+   },
+   "18": {
+    "default": 6,
+    "loop": false,
+    "source": "default"
+   },
+   "19": {
+    "default": 6,
+    "loop": false,
+    "source": "default"
+   },
+   "20": {
+    "default": 4,
+    "source": "default"
+   }
+  },
+  "enemy": {
+   "0": {
+    "durations": [
+     120,
+     15
+    ],
+    "source": "measured"
+   },
+   "1": {
+    "default": 8,
+    "source": "measured"
+   },
+   "2": {
+    "default": 8,
+    "source": "measured"
+   },
+   "3": {
+    "default": 16,
+    "loop": false,
+    "source": "measured"
+   },
+   "5": {
+    "durations": [
+     5,
+     16,
+     16
+    ],
+    "loop": false,
+    "source": "default (player value)"
+   },
+   "6": {
+    "default": 4,
+    "loop": false,
+    "source": "measured"
+   },
+   "7": {
+    "default": 4,
+    "loop": false,
+    "source": "measured"
+   },
+   "8": {
+    "default": 4,
+    "loop": false,
+    "source": "measured"
+   },
+   "12": {
+    "default": 8,
+    "source": "default"
+   }
+  },
+  "npc": {
+   "0": {
+    "durations": [
+     120,
+     15
+    ],
+    "source": "measured"
+   },
+   "1": {
+    "default": 8,
+    "source": "measured"
+   }
+  }
+ },
+ "entities": {
+  "7": {
+   "name": "Alligator",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Alligator",
+   "notes": "(visual guess was \"Saibaman\")"
+  },
+  "8": {
+   "name": "Android 16",
+   "category": "boss",
+   "anim_set": "fighter",
+   "confidence": "high",
+   "scouter_name": "Android 16",
+   "scouter_portrait_id": 26
+  },
+  "9": {
+   "name": "Android 17",
+   "category": "boss",
+   "anim_set": "fighter",
+   "confidence": "high",
+   "scouter_name": "Android 17",
+   "scouter_portrait_id": 28
+  },
+  "10": {
+   "name": "Android 17 (cutscene)",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "medium"
+  },
+  "11": {
+   "name": "Android 18",
+   "category": "boss",
+   "anim_set": "fighter",
+   "confidence": "high",
+   "scouter_name": "Android 18",
+   "scouter_portrait_id": 29
+  },
+  "12": {
+   "name": "Android 19",
+   "category": "boss",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Android 19",
+   "scouter_portrait_id": 30,
+   "notes": "(visual guess was \"Masked Bandit (white)\")"
+  },
+  "13": {
+   "name": "Android 20 (alt)",
+   "category": "boss",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Android 20",
+   "scouter_portrait_id": 31,
+   "notes": "(visual guess was \"Masked Bandit (black)\")"
+  },
+  "14": {
+   "name": "Android 20",
+   "category": "boss",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Android 20",
+   "scouter_portrait_id": 32,
+   "notes": "(visual guess was \"Turbaned Bandit\")"
+  },
+  "15": {
+   "name": "Android 20 (cutscene)",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "low"
+  },
+  "16": {
+   "name": "Man in Suit",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "low"
+  },
+  "17": {
+   "name": "Tiger Bandit (orange)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Tiger Bandit"
+  },
+  "18": {
+   "name": "Tiger Bandit (purple)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Tiger Bandit"
+  },
+  "19": {
+   "name": "Tiger Bandit (red)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Tiger Bandit"
+  },
+  "20": {
+   "name": "Small Bird",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "low"
+  },
+  "21": {
+   "name": "Boy (brown hair)",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "low",
+   "notes": " scouter: \"Human\"",
+   "scouter_name": "Human",
+   "scouter_portrait_id": 33
+  },
+  "22": {
+   "name": "Boy (brown hair, red)",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "low",
+   "notes": " scouter: \"Human\"",
+   "scouter_name": "Human",
+   "scouter_portrait_id": 34
+  },
+  "23": {
+   "name": "Bulma",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "high",
+   "scouter_name": "Bulma",
+   "scouter_portrait_id": 36
+  },
+  "24": {
+   "name": "Bulma (alt)",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "high",
+   "scouter_name": "Bulma",
+   "scouter_portrait_id": 36
+  },
+  "25": {
+   "name": "Butterfly",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "high",
+   "scouter_name": "Butterfly"
+  },
+  "26": {
+   "name": "Cat",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "high",
+   "scouter_name": "Cat",
+   "scouter_portrait_id": 37,
+   "notes": "(visual guess was \"Small Orange Critter\")"
+  },
+  "27": {
+   "name": "Cell (swollen self-destruct)",
+   "category": "boss",
+   "confidence": "high"
+  },
+  "28": {
+   "name": "Cell",
+   "category": "boss",
+   "anim_set": "fighter",
+   "confidence": "high",
+   "scouter_name": "Cell",
+   "scouter_portrait_id": 38,
+   "notes": "(visual guess was \"Imperfect Cell\")"
+  },
+  "29": {
+   "name": "Cell, \"Nonperfect\"",
+   "category": "boss",
+   "anim_set": "fighter",
+   "confidence": "high",
+   "scouter_name": "Cell, \"Nonperfect\"",
+   "scouter_portrait_id": 39,
+   "notes": "(visual guess was \"Semi-Perfect Cell\")"
+  },
+  "30": {
+   "name": "Cell, \"Perfect\"",
+   "category": "boss",
+   "anim_set": "fighter",
+   "confidence": "high",
+   "scouter_name": "Cell, \"Perfect\"",
+   "scouter_portrait_id": 40,
+   "notes": "(visual guess was \"Perfect Cell\")"
+  },
+  "31": {
+   "name": "Cell Junior",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Cell Junior",
+   "notes": "(visual guess was \"Blue Armored Soldier\")"
+  },
+  "32": {
+   "name": "Chiaotzu",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "high",
+   "scouter_name": "Chiaotzu",
+   "scouter_portrait_id": 42,
+   "notes": "(visual guess was \"Chi-Chi\")"
+  },
+  "33": {
+   "name": "Chi-Chi",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "high",
+   "scouter_name": "Chi-Chi",
+   "scouter_portrait_id": 43,
+   "notes": "(visual guess was \"Chi-Chi (alt)\")"
+  },
+  "34": {
+   "name": "Cooler",
+   "category": "boss",
+   "anim_set": "fighter",
+   "confidence": "high",
+   "scouter_name": "Cooler",
+   "scouter_portrait_id": 44,
+   "notes": "(visual guess was \"Spiked Frieza-race Warrior\")"
+  },
+  "35": {
+   "name": "Boy (blue cap)",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "low",
+   "notes": " scouter: \"Human\"",
+   "scouter_name": "Human",
+   "scouter_portrait_id": 45
+  },
+  "36": {
+   "name": "Dende",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "high",
+   "scouter_name": "Dende",
+   "scouter_portrait_id": 46,
+   "notes": "(visual guess was \"Namekian Child\")"
+  },
+  "37": {
+   "name": "Destroyer (red)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Destroyer",
+   "notes": "(visual guess was \"Skull Battle Robot (red)\")"
+  },
+  "38": {
+   "name": "Destroyer (gold)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Destroyer",
+   "notes": "(visual guess was \"Skull Battle Robot (gold)\")"
+  },
+  "39": {
+   "name": "Destroyer (green)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Destroyer",
+   "notes": "(visual guess was \"Skull Battle Robot (green)\")"
+  },
+  "40": {
+   "name": "Dog",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "high",
+   "scouter_name": "Dog",
+   "scouter_portrait_id": 47,
+   "notes": "(visual guess was \"Small Blue Creature\")"
+  },
+  "41": {
+   "name": "Dr. Briefs",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "high",
+   "scouter_name": "Dr. Briefs",
+   "scouter_portrait_id": 48
+  },
+  "42": {
+   "name": "Punching Bag",
+   "category": "npc",
+   "confidence": "low"
+  },
+  "43": {
+   "name": "Egg",
+   "category": "item",
+   "anims": {
+    "0": "idle",
+    "3": "hatch"
+   },
+   "confidence": "low"
+  },
+  "44": {
+   "name": "Eggbot (red eye)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Eggbot",
+   "notes": "(visual guess was \"Patrol Robot (red eye)\")"
+  },
+  "45": {
+   "name": "Eggbot (blue eye)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Eggbot",
+   "notes": "(visual guess was \"Patrol Robot (blue eye)\")"
+  },
+  "46": {
+   "name": "Eggbot (orange)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Eggbot",
+   "notes": "(visual guess was \"Patrol Robot (orange)\")"
+  },
+  "47": {
+   "name": "Eggbot (green eye)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Eggbot",
+   "notes": "(visual guess was \"Patrol Robot (green eye)\")"
+  },
+  "48": {
+   "name": "Frieza",
+   "category": "boss",
+   "anim_set": "fighter",
+   "confidence": "high",
+   "scouter_name": "Frieza",
+   "scouter_portrait_id": 49,
+   "notes": "(visual guess was \"Frieza (final form)\")"
+  },
+  "49": {
+   "name": "Mecha Frieza",
+   "category": "boss",
+   "anim_set": "fighter",
+   "confidence": "low"
+  },
+  "50": {
+   "name": "General Tao",
+   "category": "boss",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "General Tao",
+   "scouter_portrait_id": 53,
+   "notes": "(visual guess was \"Red Swordsman\")"
+  },
+  "51": {
+   "name": "Girl (brown hair)",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "low",
+   "notes": " scouter: \"Human\"",
+   "scouter_name": "Human",
+   "scouter_portrait_id": 54
+  },
+  "52": {
+   "name": "Girl (blonde)",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "low",
+   "notes": " scouter: \"Human\"",
+   "scouter_name": "Human",
+   "scouter_portrait_id": 55
+  },
+  "53": {
+   "name": "Gohan",
+   "category": "player",
+   "anim_set": "fighter",
+   "confidence": "high"
+  },
+  "54": {
+   "name": "Super Saiyan Gohan (cutscene)",
+   "category": "npc",
+   "anim_set": "fighter",
+   "confidence": "medium"
+  },
+  "55": {
+   "name": "Gohan (Saiyan armor)",
+   "category": "player",
+   "anim_set": "fighter",
+   "confidence": "medium"
+  },
+  "56": {
+   "name": "Gohan (Saiyan armor, can transform)",
+   "category": "player",
+   "anim_set": "fighter",
+   "confidence": "medium"
+  },
+  "57": {
+   "name": "Gohan (green outfit)",
+   "category": "player",
+   "anim_set": "fighter",
+   "confidence": "low"
+  },
+  "58": {
+   "name": "Super Saiyan Gohan (armor)",
+   "category": "player",
+   "anim_set": "fighter",
+   "confidence": "medium"
+  },
+  "59": {
+   "name": "Super Saiyan Gohan",
+   "category": "player",
+   "anim_set": "fighter",
+   "confidence": "medium"
+  },
+  "60": {
+   "name": "Goku",
+   "category": "player",
+   "anim_set": "fighter",
+   "confidence": "high",
+   "scouter_name": "Goku",
+   "scouter_portrait_id": 63
+  },
+  "61": {
+   "name": "Super Saiyan Goku",
+   "category": "player",
+   "anim_set": "fighter",
+   "confidence": "high"
+  },
+  "62": {
+   "name": "Goku (cutscene)",
+   "category": "npc",
+   "anim_set": "fighter",
+   "confidence": "low"
+  },
+  "63": {
+   "name": "Hawk (brown)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Hawk"
+  },
+  "64": {
+   "name": "Hawk (gold)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Hawk"
+  },
+  "65": {
+   "name": "Hawk (red)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Hawk"
+  },
+  "66": {
+   "name": "Alien Soldier A",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "low"
+  },
+  "67": {
+   "name": "Alien Soldier B",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "low"
+  },
+  "68": {
+   "name": "Alien Soldier A (2)",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "low"
+  },
+  "69": {
+   "name": "Alien Soldier B (2)",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "low"
+  },
+  "70": {
+   "name": "Alien Soldier A (3)",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "low"
+  },
+  "71": {
+   "name": "Alien Soldier B (3)",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "low"
+  },
+  "72": {
+   "name": "Hercule",
+   "category": "npc",
+   "anim_set": "fighter",
+   "confidence": "high",
+   "scouter_name": "Hercule",
+   "scouter_portrait_id": 67,
+   "notes": "(visual guess was \"Hercule (Mr. Satan)\")"
+  },
+  "73": {
+   "name": "Kami",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "high",
+   "scouter_name": "Kami",
+   "scouter_portrait_id": 69
+  },
+  "74": {
+   "name": "King Cold",
+   "category": "boss",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "King Cold",
+   "scouter_portrait_id": 70
+  },
+  "75": {
+   "name": "Korin",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "high",
+   "scouter_name": "Korin",
+   "scouter_portrait_id": 72,
+   "notes": "(visual guess was \"Ghost / Girl\")"
+  },
+  "76": {
+   "name": "Krillin",
+   "category": "npc",
+   "anim_set": "fighter",
+   "confidence": "high",
+   "scouter_name": "Krillin",
+   "scouter_portrait_id": 73
+  },
+  "77": {
+   "name": "Ladybug (red)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "anims": {
+    "18": "destroyed"
+   },
+   "confidence": "high",
+   "scouter_name": "Ladybug",
+   "notes": "(visual guess was \"Beetle (red)\")"
+  },
+  "78": {
+   "name": "Ladybug (blue)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Ladybug",
+   "notes": "(visual guess was \"Beetle (blue)\")"
+  },
+  "79": {
+   "name": "Ladybug (green)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Ladybug",
+   "notes": "(visual guess was \"Beetle (green)\")"
+  },
+  "80": {
+   "name": "Farmer Boy",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "low",
+   "notes": " scouter: \"Human\"",
+   "scouter_name": "Human",
+   "scouter_portrait_id": 74
+  },
+  "81": {
+   "name": "Townsman (grey)",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "low",
+   "notes": " scouter: \"Human\"",
+   "scouter_name": "Human",
+   "scouter_portrait_id": 41
+  },
+  "82": {
+   "name": "Townsman (green)",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "low",
+   "notes": " scouter: \"Human\"",
+   "scouter_name": "Human",
+   "scouter_portrait_id": 75
+  },
+  "83": {
+   "name": "Townsman (blonde)",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "low",
+   "notes": " scouter: \"Human\"",
+   "scouter_name": "Human",
+   "scouter_portrait_id": 76
+  },
+  "84": {
+   "name": "Townsman (orange)",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "low",
+   "notes": " scouter: \"Human\"",
+   "scouter_name": "Human",
+   "scouter_portrait_id": 77
+  },
+  "85": {
+   "name": "Townsman (green pants)",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "low",
+   "notes": " scouter: \"Human\"",
+   "scouter_name": "Human",
+   "scouter_portrait_id": 78
+  },
+  "86": {
+   "name": "Townsman (yellow)",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "low",
+   "notes": " scouter: \"Human\"",
+   "scouter_name": "Human",
+   "scouter_portrait_id": 78
+  },
+  "87": {
+   "name": "Maron",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "high",
+   "scouter_name": "Maron",
+   "scouter_portrait_id": 79,
+   "notes": "(visual guess was \"Launch (blue hair)\")"
+  },
+  "88": {
+   "name": "Master Roshi",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "high",
+   "scouter_name": "Master Roshi",
+   "scouter_portrait_id": 80
+  },
+  "89": {
+   "name": "Mayor",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "high",
+   "scouter_name": "Mayor",
+   "scouter_portrait_id": 81,
+   "notes": "(visual guess was \"Businessman\")"
+  },
+  "90": {
+   "name": "Kuma Mercenary (brown)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Kuma Mercenary",
+   "notes": "(visual guess was \"Bear Thief (brown)\")"
+  },
+  "91": {
+   "name": "Kuma Mercenary (blue)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Kuma Mercenary",
+   "notes": "(visual guess was \"Bear Thief (blue)\")"
+  },
+  "92": {
+   "name": "Kuma Mercenary (red)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Kuma Mercenary",
+   "notes": "(visual guess was \"Bear Thief (red)\")"
+  },
+  "93": {
+   "name": "Mr. Popo",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "high",
+   "scouter_name": "Mr. Popo",
+   "scouter_portrait_id": 82,
+   "notes": "(visual guess was \"Old Man (red)\")"
+  },
+  "94": {
+   "name": "Mrs. Briefs",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "high",
+   "scouter_name": "Mrs. Briefs",
+   "scouter_portrait_id": 83,
+   "notes": "(visual guess was \"Launch (blonde)\")"
+  },
+  "95": {
+   "name": "Namek",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "high",
+   "scouter_name": "Namek",
+   "scouter_portrait_id": 85,
+   "notes": "(visual guess was \"Namekian\")"
+  },
+  "96": {
+   "name": "Ninja (purple)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Ninja"
+  },
+  "97": {
+   "name": "Ninja (orange)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Ninja"
+  },
+  "98": {
+   "name": "Ninja (red)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Ninja"
+  },
+  "99": {
+   "name": "Old Man (blue)",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "low",
+   "notes": " scouter: \"Human\"",
+   "scouter_name": "Human",
+   "scouter_portrait_id": 87
+  },
+  "100": {
+   "name": "Old Man (red vest)",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "low",
+   "notes": " scouter: \"Human\"",
+   "scouter_name": "Human",
+   "scouter_portrait_id": 68
+  },
+  "101": {
+   "name": "Old Woman",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "low",
+   "notes": " scouter: \"Human\"",
+   "scouter_name": "Human",
+   "scouter_portrait_id": 88
+  },
+  "102": {
+   "name": "Oolong",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "high",
+   "scouter_name": "Oolong",
+   "scouter_portrait_id": 89
+  },
+  "103": {
+   "name": "Piccolo",
+   "category": "player",
+   "anim_set": "fighter",
+   "confidence": "high",
+   "notes": "player sprite used by the debug MAP TEST; animation timing measured on this entity",
+   "scouter_name": "Piccolo",
+   "scouter_portrait_id": 90
+  },
+  "104": {
+   "name": "Piccolo (no cape)",
+   "category": "player",
+   "anim_set": "fighter",
+   "confidence": "high"
+  },
+  "105": {
+   "name": "Pterodactyl (blue)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Pterodactyl"
+  },
+  "106": {
+   "name": "Pterodactyl (red)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Pterodactyl"
+  },
+  "107": {
+   "name": "Puar",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "high",
+   "scouter_name": "Puar",
+   "scouter_portrait_id": 91
+  },
+  "108": {
+   "name": "Saber-Toothed Tiger (gold)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Saber-Toothed Tiger",
+   "notes": "(visual guess was \"Sabertooth (gold)\")"
+  },
+  "109": {
+   "name": "Saber-Toothed Tiger (grey)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Saber-Toothed Tiger",
+   "notes": "(visual guess was \"Sabertooth (grey)\")"
+  },
+  "110": {
+   "name": "Saber-Toothed Tiger (red)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Saber-Toothed Tiger",
+   "notes": "(visual guess was \"Sabertooth (red)\")"
+  },
+  "111": {
+   "name": "Scientist",
+   "category": "npc",
+   "anim_set": "fighter",
+   "confidence": "medium",
+   "notes": " scouter: \"Human\"",
+   "scouter_name": "Human",
+   "scouter_portrait_id": 92
+  },
+  "112": {
+   "name": "Scorpion (yellow)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Scorpion"
+  },
+  "113": {
+   "name": "Scorpion (red)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Scorpion"
+  },
+  "114": {
+   "name": "Scorpion (white)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Scorpion"
+  },
+  "115": {
+   "name": "Snake (purple)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Snake",
+   "notes": "(visual guess was \"Cobra (purple)\")"
+  },
+  "116": {
+   "name": "Snake (blue)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Snake",
+   "notes": "(visual guess was \"Cobra (blue)\")"
+  },
+  "117": {
+   "name": "Snake (gold)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Snake",
+   "notes": "(visual guess was \"Cobra (gold)\")"
+  },
+  "118": {
+   "name": "Snake (green)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Snake",
+   "notes": "(visual guess was \"Cobra (green)\")"
+  },
+  "119": {
+   "name": "Snake (red)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Snake",
+   "notes": "(visual guess was \"Cobra (red)\")"
+  },
+  "120": {
+   "name": "Squirrel",
+   "category": "enemy",
+   "anim_set": "npc",
+   "confidence": "high",
+   "scouter_name": "Squirrel"
+  },
+  "121": {
+   "name": "Tien",
+   "category": "npc",
+   "anim_set": "fighter",
+   "confidence": "high",
+   "scouter_name": "Tien",
+   "scouter_portrait_id": 95
+  },
+  "122": {
+   "name": "T-Rex (brown)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "T-Rex",
+   "notes": "(visual guess was \"Horned Dinosaur (brown)\")"
+  },
+  "123": {
+   "name": "T-Rex (black)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "T-Rex",
+   "notes": "(visual guess was \"Horned Dinosaur (black)\")"
+  },
+  "124": {
+   "name": "T-Rex (blue)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "T-Rex",
+   "notes": "(visual guess was \"Horned Dinosaur (blue)\")"
+  },
+  "125": {
+   "name": "Triceratops",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Triceratops",
+   "notes": "(visual guess was \"Baby Triceratops\")"
+  },
+  "126": {
+   "name": "Baby Triceratops (2)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "low"
+  },
+  "127": {
+   "name": "Triceratops King",
+   "category": "boss",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Triceratops King",
+   "scouter_portrait_id": 96,
+   "notes": "(visual guess was \"Triceratops\")"
+  },
+  "128": {
+   "name": "Future Trunks (armor, sword)",
+   "category": "player",
+   "anim_set": "fighter",
+   "confidence": "medium"
+  },
+  "129": {
+   "name": "Future Trunks (long hair)",
+   "category": "player",
+   "anim_set": "fighter",
+   "confidence": "medium"
+  },
+  "130": {
+   "name": "Super Saiyan Trunks",
+   "category": "player",
+   "anim_set": "fighter",
+   "confidence": "medium"
+  },
+  "131": {
+   "name": "Future Trunks (cutscene)",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "medium"
+  },
+  "132": {
+   "name": "Future Trunks (alt)",
+   "category": "player",
+   "anim_set": "fighter",
+   "confidence": "medium"
+  },
+  "133": {
+   "name": "Super Saiyan Trunks (alt)",
+   "category": "player",
+   "anim_set": "fighter",
+   "confidence": "medium"
+  },
+  "134": {
+   "name": "Super Saiyan Trunks (alt 2)",
+   "category": "player",
+   "anim_set": "fighter",
+   "confidence": "medium"
+  },
+  "135": {
+   "name": "Future Trunks (jacket, prologue)",
+   "category": "player",
+   "anim_set": "fighter",
+   "confidence": "high",
+   "notes": "prologue player; idle/walk/attack timing measured"
+  },
+  "136": {
+   "name": "Turtle",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "high",
+   "scouter_name": "Turtle",
+   "scouter_portrait_id": 104,
+   "notes": "(visual guess was \"Monkey\")"
+  },
+  "137": {
+   "name": "Vegeta",
+   "category": "player",
+   "anim_set": "fighter",
+   "confidence": "high",
+   "scouter_name": "Vegeta",
+   "scouter_portrait_id": 106
+  },
+  "138": {
+   "name": "Vegeta (alt)",
+   "category": "player",
+   "anim_set": "fighter",
+   "confidence": "high"
+  },
+  "139": {
+   "name": "Super Saiyan Vegeta",
+   "category": "player",
+   "anim_set": "fighter",
+   "confidence": "high"
+  },
+  "140": {
+   "name": "Super Saiyan Vegeta (alt)",
+   "category": "player",
+   "anim_set": "fighter",
+   "confidence": "high"
+  },
+  "141": {
+   "name": "Warlord's Henchman (red cap)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Warlord's Henchman",
+   "notes": "(visual guess was \"Gunner Soldier (red cap)\")"
+  },
+  "142": {
+   "name": "Warlord's Henchman (blue cap)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Warlord's Henchman",
+   "notes": "(visual guess was \"Gunner Soldier (blue cap)\")"
+  },
+  "143": {
+   "name": "Warlord's Henchman (green cap)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Warlord's Henchman",
+   "notes": "(visual guess was \"Gunner Soldier (green cap)\")"
+  },
+  "144": {
+   "name": "Warthog (tan)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Warthog",
+   "notes": "(visual guess was \"Wild Boar (tan)\")"
+  },
+  "145": {
+   "name": "Warthog (white)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Warthog",
+   "notes": "(visual guess was \"Wild Boar (white)\")"
+  },
+  "146": {
+   "name": "Wolf (brown)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Wolf",
+   "notes": "(visual guess was \"Bear (brown)\")"
+  },
+  "147": {
+   "name": "Wolf",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Wolf",
+   "notes": "(visual guess was \"Tiger\")"
+  },
+  "148": {
+   "name": "Wolf (grey)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Wolf"
+  },
+  "149": {
+   "name": "Wolf (white)",
+   "category": "enemy",
+   "anim_set": "enemy",
+   "confidence": "high",
+   "scouter_name": "Wolf"
+  },
+  "150": {
+   "name": "Kid (orange hair)",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "low",
+   "notes": " scouter: \"Human\"",
+   "scouter_name": "Human",
+   "scouter_portrait_id": 108
+  },
+  "151": {
+   "name": "Kid (pink)",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "low",
+   "notes": " scouter: \"Human\"",
+   "scouter_name": "Human",
+   "scouter_portrait_id": 109
+  },
+  "152": {
+   "name": "Kid (blonde)",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "low",
+   "notes": " scouter: \"Human\"",
+   "scouter_name": "Human",
+   "scouter_portrait_id": 110
+  },
+  "153": {
+   "name": "Kid (red hair)",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "low",
+   "notes": " scouter: \"Human\"",
+   "scouter_name": "Human",
+   "scouter_portrait_id": 111
+  },
+  "154": {
+   "name": "Woman (brown hair)",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "low",
+   "notes": " scouter: \"Human\"",
+   "scouter_name": "Human",
+   "scouter_portrait_id": 112
+  },
+  "155": {
+   "name": "Yajirobe",
+   "category": "npc",
+   "anim_set": "npc",
+   "confidence": "high",
+   "scouter_name": "Yajirobe",
+   "scouter_portrait_id": 113,
+   "notes": "(visual guess was \"Yamcha\")"
+  },
+  "156": {
+   "name": "Yamcha",
+   "category": "npc",
+   "anim_set": "fighter",
+   "confidence": "high",
+   "scouter_name": "Yamcha",
+   "scouter_portrait_id": 114,
+   "notes": "(visual guess was \"Goku (alt)\")"
+  }
+ },
+ "portraits": {
+  "0": {
+   "name": "Gohan (scarf)",
+   "confidence": "medium"
+  },
+  "1": {
+   "name": "Gohan",
+   "confidence": "medium"
+  },
+  "2": {
+   "name": "Gohan (Saiyan armor)",
+   "confidence": "medium"
+  },
+  "3": {
+   "name": "Gohan (Saiyan armor, alt)",
+   "confidence": "medium"
+  },
+  "4": {
+   "name": "Super Saiyan Gohan",
+   "confidence": "medium"
+  },
+  "5": {
+   "name": "Super Saiyan Gohan (alt)",
+   "confidence": "medium"
+  },
+  "6": {
+   "name": "Goku",
+   "confidence": "medium"
+  },
+  "7": {
+   "name": "Super Saiyan Goku",
+   "confidence": "medium"
+  },
+  "8": {
+   "name": "Hercule",
+   "confidence": "medium"
+  },
+  "9": {
+   "name": "Piccolo (turban)",
+   "confidence": "medium"
+  },
+  "10": {
+   "name": "Piccolo",
+   "confidence": "medium"
+  },
+  "11": {
+   "name": "Future Trunks",
+   "confidence": "medium"
+  },
+  "12": {
+   "name": "Future Trunks (long hair)",
+   "confidence": "medium"
+  },
+  "13": {
+   "name": "Super Saiyan Trunks",
+   "confidence": "medium"
+  },
+  "14": {
+   "name": "Super Saiyan Trunks (alt)",
+   "confidence": "medium"
+  },
+  "15": {
+   "name": "Future Trunks (jacket)",
+   "confidence": "medium"
+  },
+  "16": {
+   "name": "Vegeta",
+   "confidence": "medium"
+  },
+  "17": {
+   "name": "Super Saiyan Vegeta",
+   "confidence": "medium"
+  },
+  "18": {
+   "name": "Android 16",
+   "confidence": "high",
+   "scouter_name": "Android 16"
+  },
+  "19": {
+   "name": "Android 16 (damaged head)",
+   "confidence": "medium"
+  },
+  "20": {
+   "name": "Android 17",
+   "confidence": "high",
+   "scouter_name": "Android 17"
+  },
+  "21": {
+   "name": "Android 18",
+   "confidence": "high",
+   "scouter_name": "Android 18"
+  },
+  "22": {
+   "name": "Android 19",
+   "confidence": "high",
+   "scouter_name": "Android 19"
+  },
+  "23": {
+   "name": "Android 20",
+   "confidence": "high",
+   "scouter_name": "Android 20"
+  },
+  "24": {
+   "name": "Android 20 (alt)",
+   "confidence": "high",
+   "scouter_name": "Android 20"
+  },
+  "25": {
+   "name": "Boy",
+   "confidence": "medium"
+  },
+  "26": {
+   "name": "Boy (alt)",
+   "confidence": "medium"
+  },
+  "27": {
+   "name": "Alligator",
+   "confidence": "medium"
+  },
+  "28": {
+   "name": "Bulma",
+   "confidence": "high",
+   "scouter_name": "Bulma"
+  },
+  "29": {
+   "name": "Cat",
+   "confidence": "high",
+   "scouter_name": "Cat"
+  },
+  "30": {
+   "name": "Cell",
+   "confidence": "high",
+   "scouter_name": "Cell"
+  },
+  "31": {
+   "name": "Cell (Nonperfect)",
+   "confidence": "high",
+   "scouter_name": "Cell, \"Nonperfect\""
+  },
+  "32": {
+   "name": "Perfect Cell",
+   "confidence": "high",
+   "scouter_name": "Cell, \"Perfect\""
+  },
+  "33": {
+   "name": "Man",
+   "confidence": "medium"
+  },
+  "34": {
+   "name": "Chiaotzu",
+   "confidence": "high",
+   "scouter_name": "Chiaotzu"
+  },
+  "35": {
+   "name": "Chi-Chi",
+   "confidence": "high",
+   "scouter_name": "Chi-Chi"
+  },
+  "36": {
+   "name": "Cooler",
+   "confidence": "high",
+   "scouter_name": "Cooler"
+  },
+  "37": {
+   "name": "Policeman",
+   "confidence": "medium"
+  },
+  "38": {
+   "name": "Dende",
+   "confidence": "high",
+   "scouter_name": "Dende"
+  },
+  "39": {
+   "name": "Dog",
+   "confidence": "high",
+   "scouter_name": "Dog"
+  },
+  "40": {
+   "name": "Dr. Briefs",
+   "confidence": "high",
+   "scouter_name": "Dr. Briefs"
+  },
+  "41": {
+   "name": "Frieza",
+   "confidence": "high",
+   "scouter_name": "Frieza"
+  },
+  "42": {
+   "name": "Mecha Frieza",
+   "confidence": "medium"
+  },
+  "43": {
+   "name": "Man (glasses)",
+   "confidence": "medium"
+  },
+  "44": {
+   "name": "Hooded figure",
+   "confidence": "medium"
+  },
+  "45": {
+   "name": "General Tao",
+   "confidence": "high",
+   "scouter_name": "General Tao"
+  },
+  "46": {
+   "name": "Girl",
+   "confidence": "medium"
+  },
+  "47": {
+   "name": "Girl (alt)",
+   "confidence": "medium"
+  },
+  "48": {
+   "name": "Gohan (young)",
+   "confidence": "medium"
+  },
+  "49": {
+   "name": "Super Saiyan Gohan",
+   "confidence": "medium"
+  },
+  "50": {
+   "name": "Gohan (armor)",
+   "confidence": "medium"
+  },
+  "51": {
+   "name": "Gohan (armor, alt)",
+   "confidence": "medium"
+  },
+  "52": {
+   "name": "Gohan (armor, alt 2)",
+   "confidence": "medium"
+  },
+  "53": {
+   "name": "Super Saiyan Gohan (armor)",
+   "confidence": "medium"
+  },
+  "54": {
+   "name": "Super Saiyan Gohan (alt)",
+   "confidence": "medium"
+  },
+  "55": {
+   "name": "Goku",
+   "confidence": "high",
+   "scouter_name": "Goku"
+  },
+  "56": {
+   "name": "Goku (halo)",
+   "confidence": "medium"
+  },
+  "57": {
+   "name": "Super Saiyan Goku",
+   "confidence": "medium"
+  },
+  "58": {
+   "name": "Goku (young)",
+   "confidence": "medium"
+  },
+  "59": {
+   "name": "Hercule",
+   "confidence": "high",
+   "scouter_name": "Hercule"
+  },
+  "60": {
+   "name": "Old Man",
+   "confidence": "medium"
+  },
+  "61": {
+   "name": "Kami",
+   "confidence": "high",
+   "scouter_name": "Kami"
+  },
+  "62": {
+   "name": "King Cold",
+   "confidence": "high",
+   "scouter_name": "King Cold"
+  },
+  "63": {
+   "name": "King Kai",
+   "confidence": "medium"
+  },
+  "64": {
+   "name": "Korin",
+   "confidence": "high",
+   "scouter_name": "Korin"
+  },
+  "65": {
+   "name": "Krillin",
+   "confidence": "high",
+   "scouter_name": "Krillin"
+  },
+  "66": {
+   "name": "Man",
+   "confidence": "medium"
+  },
+  "67": {
+   "name": "Boy (blonde)",
+   "confidence": "medium"
+  },
+  "68": {
+   "name": "Man (stout)",
+   "confidence": "medium"
+  },
+  "69": {
+   "name": "Boy (brown hair)",
+   "confidence": "medium"
+  },
+  "70": {
+   "name": "Man (moustache)",
+   "confidence": "medium"
+  },
+  "71": {
+   "name": "Maron",
+   "confidence": "high",
+   "scouter_name": "Maron"
+  },
+  "72": {
+   "name": "Master Roshi",
+   "confidence": "high",
+   "scouter_name": "Master Roshi"
+  },
+  "73": {
+   "name": "Mayor",
+   "confidence": "high",
+   "scouter_name": "Mayor"
+  },
+  "74": {
+   "name": "Mr. Popo",
+   "confidence": "high",
+   "scouter_name": "Mr. Popo"
+  },
+  "75": {
+   "name": "Mrs. Briefs",
+   "confidence": "high",
+   "scouter_name": "Mrs. Briefs"
+  },
+  "76": {
+   "name": "Bandit Boss",
+   "confidence": "medium"
+  },
+  "77": {
+   "name": "Namek",
+   "confidence": "high",
+   "scouter_name": "Namek"
+  },
+  "78": {
+   "name": "Scientist",
+   "confidence": "medium"
+  },
+  "79": {
+   "name": "Old Man (blue)",
+   "confidence": "medium"
+  },
+  "80": {
+   "name": "Old Woman",
+   "confidence": "medium"
+  },
+  "81": {
+   "name": "Oolong",
+   "confidence": "high",
+   "scouter_name": "Oolong"
+  },
+  "82": {
+   "name": "Piccolo (turban)",
+   "confidence": "high",
+   "scouter_name": "Piccolo"
+  },
+  "83": {
+   "name": "Puar",
+   "confidence": "high",
+   "scouter_name": "Puar"
+  },
+  "84": {
+   "name": "Scientist (alt)",
+   "confidence": "medium"
+  },
+  "85": {
+   "name": "Shenron",
+   "confidence": "medium"
+  },
+  "86": {
+   "name": "Piccolo",
+   "confidence": "medium"
+  },
+  "87": {
+   "name": "Tien",
+   "confidence": "high",
+   "scouter_name": "Tien"
+  },
+  "88": {
+   "name": "Triceratops King",
+   "confidence": "high",
+   "scouter_name": "Triceratops King"
+  },
+  "89": {
+   "name": "Triceratops King (crying)",
+   "confidence": "medium"
+  },
+  "90": {
+   "name": "Future Trunks",
+   "confidence": "medium"
+  },
+  "91": {
+   "name": "Future Trunks (long hair)",
+   "confidence": "medium"
+  },
+  "92": {
+   "name": "Future Trunks (long hair, alt)",
+   "confidence": "medium"
+  },
+  "93": {
+   "name": "Super Saiyan Trunks",
+   "confidence": "medium"
+  },
+  "94": {
+   "name": "Super Saiyan Trunks (alt)",
+   "confidence": "medium"
+  },
+  "95": {
+   "name": "Trunks (jacket)",
+   "confidence": "medium"
+  },
+  "96": {
+   "name": "Turtle",
+   "confidence": "high",
+   "scouter_name": "Turtle"
+  },
+  "97": {
+   "name": "Man (glasses, alt)",
+   "confidence": "medium"
+  },
+  "98": {
+   "name": "Vegeta",
+   "confidence": "high",
+   "scouter_name": "Vegeta"
+  },
+  "99": {
+   "name": "Super Saiyan Vegeta",
+   "confidence": "medium"
+  },
+  "100": {
+   "name": "Girl (orange hair)",
+   "confidence": "medium"
+  },
+  "101": {
+   "name": "Girl (pigtails)",
+   "confidence": "medium"
+  },
+  "102": {
+   "name": "Girl (blonde)",
+   "confidence": "medium"
+  },
+  "103": {
+   "name": "Girl (red hair)",
+   "confidence": "medium"
+  },
+  "104": {
+   "name": "Woman (brown hair)",
+   "confidence": "medium"
+  },
+  "105": {
+   "name": "Yajirobe",
+   "confidence": "high",
+   "scouter_name": "Yajirobe"
+  },
+  "106": {
+   "name": "Yamcha",
+   "confidence": "high",
+   "scouter_name": "Yamcha"
+  }
+ },
+ "portraits_note": "portrait index = scouter portrait_id - 8 (verified on Goku, Piccolo, Krillin, Chi-Chi, General Tao)",
+ "effects": {
+  "0840E47C": {
+   "name": "Ki Blast (4 directions + impact)",
+   "category": "projectile",
+   "confidence": "high"
+  },
+  "086AF614": {
+   "name": "Dust Explosion",
+   "category": "effect",
+   "confidence": "medium"
+  },
+  "086DBC60": {
+   "name": "Fire Burst (small)",
+   "category": "effect",
+   "confidence": "medium"
+  },
+  "086DD884": {
+   "name": "Flame Burst",
+   "category": "effect",
+   "confidence": "low"
+  },
+  "086DD8F0": {
+   "name": "Fireball (small)",
+   "category": "projectile",
+   "confidence": "low"
+  },
+  "086DD914": {
+   "name": "Fireballs (8 directions)",
+   "category": "projectile",
+   "confidence": "medium"
+  },
+  "086DE634": {
+   "name": "Shockwave Ring",
+   "category": "effect",
+   "confidence": "medium"
+  },
+  "086DE8A4": {
+   "name": "Energy Orb Charge (yellow)",
+   "category": "effect",
+   "confidence": "medium"
+  },
+  "086DEB6C": {
+   "name": "Energy Orb Charge (cyan)",
+   "category": "effect",
+   "confidence": "medium"
+  },
+  "086E0B90": {
+   "name": "Large Ki Ball (4 directions)",
+   "category": "projectile",
+   "confidence": "medium"
+  },
+  "086E1590": {
+   "name": "White Ring Burst",
+   "category": "effect",
+   "confidence": "medium"
+  },
+  "086E272C": {
+   "name": "Spark Burst",
+   "category": "effect",
+   "confidence": "medium"
+  },
+  "086E29B4": {
+   "name": "Energy Orb Charge (blue)",
+   "category": "effect",
+   "confidence": "medium"
+  },
+  "086E3458": {
+   "name": "Energy Beam (blue) - head/body/tail per direction",
+   "category": "projectile",
+   "confidence": "medium"
+  },
+  "086E3B48": {
+   "name": "Hit Spark",
+   "category": "effect",
+   "confidence": "medium"
+  },
+  "086E4560": {
+   "name": "Energy Beam (pink, spiral) - head/body/tail per direction",
+   "category": "projectile",
+   "confidence": "medium"
+  },
+  "086E53DC": {
+   "name": "Slash Sparkle",
+   "category": "effect",
+   "confidence": "low"
+  },
+  "086E5B0C": {
+   "name": "Sonic Rings",
+   "category": "effect",
+   "confidence": "low"
+  },
+  "086E5DC8": {
+   "name": "Missile",
+   "category": "projectile",
+   "confidence": "medium"
+  },
+  "086F77D4": {
+   "name": "Ki Charge Orbs",
+   "category": "effect",
+   "confidence": "low"
+  },
+  "086F78CC": {
+   "name": "Small Energy Dots",
+   "category": "effect",
+   "confidence": "low"
+  },
+  "086FE048": {
+   "name": "Sparkles",
+   "category": "effect",
+   "confidence": "low"
+  },
+  "086FF09C": {
+   "name": "Smoke Explosion",
+   "category": "effect",
+   "confidence": "medium"
+  },
+  "086FFBFC": {
+   "name": "Bomb",
+   "category": "projectile",
+   "confidence": "medium"
+  },
+  "08703164": {
+   "name": "Fire Explosion (down)",
+   "category": "effect",
+   "confidence": "medium"
+  },
+  "087031A0": {
+   "name": "Fire Explosion (up)",
+   "category": "effect",
+   "confidence": "medium"
+  },
+  "087031DC": {
+   "name": "Fire Explosion (left)",
+   "category": "effect",
+   "confidence": "medium"
+  },
+  "08703218": {
+   "name": "Fire Explosion (right)",
+   "category": "effect",
+   "confidence": "medium"
+  },
+  "08703B60": {
+   "name": "Energy Orb Charge (orange)",
+   "category": "effect",
+   "confidence": "medium"
+  },
+  "08704604": {
+   "name": "Energy Beam (yellow) - head/body/tail per direction",
+   "category": "projectile",
+   "confidence": "medium"
+  }
+ }
+}

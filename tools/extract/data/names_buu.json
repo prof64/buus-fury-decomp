@@ -1,0 +1,2489 @@
+{
+ "anim_sets": {
+  "fighter": {
+   "1": "idle",
+   "2": "walk",
+   "3": "dash",
+   "4": "kiblast",
+   "5": "attack1",
+   "6": "attack2",
+   "7": "attack3",
+   "8": "guard",
+   "9": "meditate",
+   "10": "hurt",
+   "11": "transform",
+   "12": "special_12",
+   "13": "react",
+   "14": "victory",
+   "15": "throw",
+   "16": "ko",
+   "17": "knockback",
+   "18": "knockdown",
+   "19": "special_charge",
+   "20": "special_release",
+   "21": "special_21",
+   "22": "special_beam",
+   "23": "special_23"
+  },
+  "enemy": {
+   "1": "idle",
+   "2": "walk",
+   "5": "attack1",
+   "6": "attack2",
+   "7": "attack3",
+   "8": "guard",
+   "10": "hurt",
+   "13": "react",
+   "16": "ko",
+   "18": "knockdown",
+   "19": "special",
+   "20": "special_2",
+   "21": "special_3"
+  },
+  "npc": {
+   "1": "idle",
+   "2": "walk",
+   "13": "react"
+  }
+ },
+ "anim_set_note": "Buu's Fury anim index 0 is always empty; fighter indices from emulator observation of Goku (B ki blast -> 4, A combo -> 5/6/7, R guard -> 8, idle meditate -> 9, getting hit -> 10)",
+ "set_timing": {
+  "fighter": {
+   "1": {
+    "durations": [
+     120,
+     15
+    ],
+    "source": "measured (frame 0 random, blink 15)",
+    "lock": true
+   },
+   "2": {
+    "default": 8,
+    "source": "measured"
+   },
+   "4": {
+    "durations": [
+     13,
+     24,
+     24
+    ],
+    "loop": false,
+    "source": "measured"
+   },
+   "5": {
+    "durations": [
+     1,
+     4,
+     4,
+     4
+    ],
+    "loop": false,
+    "source": "measured"
+   },
+   "6": {
+    "durations": [
+     1,
+     4,
+     4,
+     4
+    ],
+    "loop": false,
+    "source": "measured"
+   },
+   "7": {
+    "durations": [
+     1,
+     4,
+     4,
+     4
+    ],
+    "loop": false,
+    "source": "measured"
+   },
+   "9": {
+    "durations": [
+     32,
+     32,
+     32,
+     32
+    ],
+    "source": "measured"
+   },
+   "18": {
+    "default": 32,
+    "loop": false,
+    "source": "measured"
+   }
+  },
+  "enemy": {
+   "1": {
+    "durations": [
+     120,
+     15
+    ],
+    "source": "measured (frame 0 random, blink 15)",
+    "lock": true
+   },
+   "2": {
+    "default": 8,
+    "source": "measured"
+   }
+  },
+  "npc": {
+   "1": {
+    "durations": [
+     120,
+     15
+    ],
+    "source": "measured (frame 0 random, blink 15)",
+    "lock": true
+   },
+   "2": {
+    "default": 8,
+    "source": "measured"
+   }
+  }
+ },
+ "entities": {
+  "1": {
+   "name": "Hovering Drone",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "2": {
+   "name": "Babidi Spaceship Pod",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "3": {
+   "name": "Alien Announcer",
+   "category": "npc",
+   "confidence": "medium",
+   "anim_set": "npc"
+  },
+  "4": {
+   "name": "Kai (purple hair)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "5": {
+   "name": "Swordsman",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "6": {
+   "name": "Robed Elder",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "7": {
+   "name": "Blonde Fighter",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "8": {
+   "name": "Destroyer (cyan)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "9": {
+   "name": "Man (sunglasses)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "10": {
+   "name": "Dr. Brief",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "11": {
+   "name": "Dr. Brief (2)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "12": {
+   "name": "Dr. Brief (3)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "13": {
+   "name": "Dr. Brief (4)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "14": {
+   "name": "Ghost Fighter (blue)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "15": {
+   "name": "Ghost Fighter (blue, 2)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "16": {
+   "name": "Majin Soldier",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "17": {
+   "name": "Laser Turret",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "18": {
+   "name": "Baba",
+   "category": "npc",
+   "confidence": "medium",
+   "anim_set": "npc"
+  },
+  "19": {
+   "name": "Swamp Monster",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "20": {
+   "name": "Small Creature",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "21": {
+   "name": "Mud Man",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "22": {
+   "name": "Spopovich",
+   "category": "boss",
+   "confidence": "low",
+   "anim_set": "fighter"
+  },
+  "23": {
+   "name": "Brain Cell",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "24": {
+   "name": "Blood Cell",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "25": {
+   "name": "Majin Fighter (green)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "26": {
+   "name": "Knight (red)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "27": {
+   "name": "Boy (blue)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "28": {
+   "name": "Boy (green)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "29": {
+   "name": "Broly",
+   "category": "boss",
+   "confidence": "high",
+   "anim_set": "fighter"
+  },
+  "30": {
+   "name": "Thug (\"HUGE\" shirt)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "31": {
+   "name": "Monkey",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "32": {
+   "name": "Boy (teal hair)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "33": {
+   "name": "Caped Demon",
+   "category": "boss",
+   "confidence": "low",
+   "anim_set": "fighter"
+  },
+  "34": {
+   "name": "Majin Buu",
+   "category": "boss",
+   "confidence": "high",
+   "anim_set": "fighter"
+  },
+  "35": {
+   "name": "Ghost",
+   "category": "enemy",
+   "confidence": "medium",
+   "anim_set": "enemy"
+  },
+  "36": {
+   "name": "Buu Fragment",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "37": {
+   "name": "Buu Fragment (2)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "38": {
+   "name": "Kid Buu",
+   "category": "boss",
+   "confidence": "medium",
+   "anim_set": "fighter"
+  },
+  "39": {
+   "name": "Buu Cocoon",
+   "category": "boss",
+   "confidence": "low",
+   "anim_set": "fighter"
+  },
+  "40": {
+   "name": "Super Buu",
+   "category": "boss",
+   "confidence": "high",
+   "anim_set": "fighter"
+  },
+  "41": {
+   "name": "Super Buu (2)",
+   "category": "boss",
+   "confidence": "high",
+   "anim_set": "fighter"
+  },
+  "42": {
+   "name": "Super Buu (Gotenks absorbed)",
+   "category": "boss",
+   "confidence": "medium",
+   "anim_set": "fighter"
+  },
+  "43": {
+   "name": "Super Buu (Gohan absorbed)",
+   "category": "boss",
+   "confidence": "medium",
+   "anim_set": "fighter"
+  },
+  "44": {
+   "name": "Super Buu (Gohan absorbed, 2)",
+   "category": "boss",
+   "confidence": "medium",
+   "anim_set": "fighter"
+  },
+  "45": {
+   "name": "Cupcake",
+   "category": "item",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "46": {
+   "name": "Chocolate Bar",
+   "category": "item",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "47": {
+   "name": "Cake Slice",
+   "category": "item",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "48": {
+   "name": "Fruit Bowl",
+   "category": "item",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "50": {
+   "name": "Shell Brute",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "51": {
+   "name": "Thug",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "52": {
+   "name": "Thug (2)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "53": {
+   "name": "Thug (3)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "54": {
+   "name": "Thug (4)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "55": {
+   "name": "Thug (5)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "56": {
+   "name": "Chi-Chi",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "57": {
+   "name": "Goten (NPC)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "58": {
+   "name": "Caged Creature",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "59": {
+   "name": "Death Machine (blue)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "60": {
+   "name": "Policeman",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "61": {
+   "name": "Bandit (green)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "62": {
+   "name": "Mummy",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "63": {
+   "name": "Mage",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "64": {
+   "name": "Pikkon",
+   "category": "player",
+   "confidence": "medium",
+   "anim_set": "fighter"
+  },
+  "65": {
+   "name": "Pikkon (NPC)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "66": {
+   "name": "Dabura?",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "67": {
+   "name": "Destroyer (gold)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "68": {
+   "name": "Dende",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "69": {
+   "name": "Destroyer (red)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "70": {
+   "name": "Destroyer (red, 2)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "71": {
+   "name": "Old Man",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "72": {
+   "name": "Grand Kai?",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "73": {
+   "name": "Purple Imp",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "75": {
+   "name": "Brown Fighter",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "76": {
+   "name": "Golden Fighter",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "77": {
+   "name": "Shield Soldier",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "78": {
+   "name": "Small Sprout",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "79": {
+   "name": "Blonde Kid",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "80": {
+   "name": "Pot",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "81": {
+   "name": "Small Animal",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "82": {
+   "name": "Namekian Elder",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "83": {
+   "name": "Namekian Elder (2)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "84": {
+   "name": "Boy (blue cap)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "85": {
+   "name": "Ghost Puff (white)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "86": {
+   "name": "Ghost Puff (pink)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "87": {
+   "name": "Ghost (green hat)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "88": {
+   "name": "Ghost (pink, green hat)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "89": {
+   "name": "Genie (blue)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "90": {
+   "name": "Genie (blue, 2)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "91": {
+   "name": "Monk",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "92": {
+   "name": "Girl",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "94": {
+   "name": "Super Saiyan Teen Gohan",
+   "category": "player",
+   "confidence": "medium",
+   "anim_set": "fighter"
+  },
+  "95": {
+   "name": "Teen Gohan (NPC)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "96": {
+   "name": "Teen Gohan (NPC, 2)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "97": {
+   "name": "Gohan (suit)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "98": {
+   "name": "Teen Gohan",
+   "category": "player",
+   "confidence": "medium",
+   "anim_set": "fighter"
+  },
+  "99": {
+   "name": "Gohan (NPC)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "100": {
+   "name": "Gohan (NPC, 2)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "101": {
+   "name": "Goten",
+   "category": "player",
+   "confidence": "low",
+   "anim_set": "fighter"
+  },
+  "102": {
+   "name": "Great Saiyaman",
+   "category": "player",
+   "confidence": "medium",
+   "anim_set": "fighter"
+  },
+  "103": {
+   "name": "Gohan",
+   "category": "player",
+   "confidence": "low",
+   "anim_set": "fighter"
+  },
+  "104": {
+   "name": "Super Saiyan Gohan",
+   "category": "player",
+   "confidence": "medium",
+   "anim_set": "fighter"
+  },
+  "105": {
+   "name": "Super Saiyan Gohan (2)",
+   "category": "player",
+   "confidence": "low",
+   "anim_set": "fighter"
+  },
+  "106": {
+   "name": "Goku",
+   "category": "player",
+   "confidence": "high",
+   "anim_set": "fighter"
+  },
+  "107": {
+   "name": "Goku (Other World)",
+   "category": "player",
+   "confidence": "low",
+   "anim_set": "fighter"
+  },
+  "109": {
+   "name": "Super Saiyan Goku",
+   "category": "player",
+   "confidence": "high",
+   "anim_set": "fighter"
+  },
+  "111": {
+   "name": "Super Saiyan 3 Goku",
+   "category": "player",
+   "confidence": "high",
+   "anim_set": "fighter"
+  },
+  "113": {
+   "name": "Thug (\"HUGE\")",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "114": {
+   "name": "Mystic Gohan",
+   "category": "player",
+   "confidence": "low",
+   "anim_set": "fighter"
+  },
+  "115": {
+   "name": "Super Saiyan Goten",
+   "category": "player",
+   "confidence": "low",
+   "anim_set": "fighter"
+  },
+  "116": {
+   "name": "Goku (NPC)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "117": {
+   "name": "Gotenks",
+   "category": "player",
+   "confidence": "medium",
+   "anim_set": "fighter"
+  },
+  "118": {
+   "name": "Gotenks (NPC)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "119": {
+   "name": "Gotenks (NPC, 2)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "120": {
+   "name": "Super Saiyan Gotenks",
+   "category": "player",
+   "confidence": "medium",
+   "anim_set": "fighter"
+  },
+  "121": {
+   "name": "Super Saiyan 3 Gotenks",
+   "category": "player",
+   "confidence": "medium",
+   "anim_set": "fighter"
+  },
+  "122": {
+   "name": "Kibito",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "123": {
+   "name": "Robot (red)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "124": {
+   "name": "Bomber (red)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "125": {
+   "name": "Bomb (red)",
+   "category": "effect",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "126": {
+   "name": "Small Bug",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "127": {
+   "name": "Fighter (orange cap)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "128": {
+   "name": "Bandit (camo)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "129": {
+   "name": "Hercule",
+   "category": "player",
+   "confidence": "low",
+   "anim_set": "fighter"
+  },
+  "130": {
+   "name": "Policeman (2)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "131": {
+   "name": "Gunman",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "132": {
+   "name": "Ninja (brown)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "133": {
+   "name": "Mage (2)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "134": {
+   "name": "Android 18",
+   "category": "player",
+   "confidence": "low",
+   "anim_set": "fighter"
+  },
+  "135": {
+   "name": "Woman (red)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "136": {
+   "name": "Laser Turret (grey)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "137": {
+   "name": "Janemba",
+   "category": "boss",
+   "confidence": "medium",
+   "anim_set": "fighter"
+  },
+  "138": {
+   "name": "Janemba Hand",
+   "category": "enemy",
+   "confidence": "medium",
+   "anim_set": "enemy"
+  },
+  "139": {
+   "name": "Janemba Hand (2)",
+   "category": "enemy",
+   "confidence": "medium",
+   "anim_set": "enemy"
+  },
+  "140": {
+   "name": "Janemba (back)",
+   "category": "boss",
+   "confidence": "low",
+   "anim_set": "fighter"
+  },
+  "141": {
+   "name": "Portal",
+   "category": "effect",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "142": {
+   "name": "Portal (2)",
+   "category": "effect",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "143": {
+   "name": "Mini-Janemba",
+   "category": "enemy",
+   "confidence": "medium",
+   "anim_set": "enemy"
+  },
+  "144": {
+   "name": "Mini-Janemba (2)",
+   "category": "enemy",
+   "confidence": "medium",
+   "anim_set": "enemy"
+  },
+  "145": {
+   "name": "Super Janemba",
+   "category": "boss",
+   "confidence": "medium",
+   "anim_set": "fighter"
+  },
+  "146": {
+   "name": "Videl (NPC)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "147": {
+   "name": "Gold Vault Door",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "148": {
+   "name": "Ghost (blue flame)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "149": {
+   "name": "Imp (red)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "150": {
+   "name": "Imp (purple)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "151": {
+   "name": "Boy (green)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "153": {
+   "name": "Clown",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "154": {
+   "name": "King Yemma",
+   "category": "npc",
+   "confidence": "medium",
+   "anim_set": "npc"
+  },
+  "155": {
+   "name": "Death Machine (gold)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "156": {
+   "name": "Ghost (small)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "157": {
+   "name": "Gohan (young)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "158": {
+   "name": "Laser Turret (blue)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "159": {
+   "name": "Demon Warrior (red)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "160": {
+   "name": "Lightning",
+   "category": "effect",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "161": {
+   "name": "Ice Fighter",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "162": {
+   "name": "Turbaned Fighter",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "163": {
+   "name": "Shield Soldier (2)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "164": {
+   "name": "Samurai",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "165": {
+   "name": "Samurai (2)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "166": {
+   "name": "Shield Soldier (purple)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "167": {
+   "name": "Shield Soldier (purple, 2)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "168": {
+   "name": "Majin Soldier (2)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "169": {
+   "name": "Golem",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "170": {
+   "name": "Villager (green)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "171": {
+   "name": "Villager (blue)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "172": {
+   "name": "Villager (pink)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "174": {
+   "name": "Purple Lizard Brute",
+   "category": "boss",
+   "confidence": "low",
+   "anim_set": "fighter"
+  },
+  "175": {
+   "name": "Bomber",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "176": {
+   "name": "Villager (red)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "177": {
+   "name": "Monk (bald)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "178": {
+   "name": "Bomber (gold)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "179": {
+   "name": "Bomb (silver)",
+   "category": "effect",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "180": {
+   "name": "Mage (blue)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "181": {
+   "name": "Bomber (green)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "182": {
+   "name": "Death Machine (grey)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "183": {
+   "name": "Villager",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "184": {
+   "name": "Villager (2)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "185": {
+   "name": "Villager (3)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "186": {
+   "name": "Mummy (2)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "187": {
+   "name": "Mummy (3)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "188": {
+   "name": "Namekian",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "189": {
+   "name": "Namekian (2)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "190": {
+   "name": "Ninja (purple)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "191": {
+   "name": "Ninja (purple, 2)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "192": {
+   "name": "Ninja (green)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "193": {
+   "name": "Vampire",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "194": {
+   "name": "Bat",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "195": {
+   "name": "Man (blue)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "196": {
+   "name": "Woman",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "197": {
+   "name": "Blonde Fighter (gold)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "198": {
+   "name": "Blonde Fighter (gold, 2)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "199": {
+   "name": "Pig",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "200": {
+   "name": "Cyborg (blue)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "201": {
+   "name": "Cyborg (blue, 2)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "202": {
+   "name": "Cyborg (red)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "203": {
+   "name": "Cyborg (blue, 3)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "204": {
+   "name": "Cyborg (pink)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "205": {
+   "name": "Cyborg (blue, 4)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "206": {
+   "name": "Cyborg (green)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "207": {
+   "name": "Cyborg (blue, 5)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "208": {
+   "name": "Ox King",
+   "category": "npc",
+   "confidence": "medium",
+   "anim_set": "npc"
+  },
+  "209": {
+   "name": "Boy (black hair)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "210": {
+   "name": "Ghost Puff (pink, 2)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "211": {
+   "name": "Ghost (pink)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "212": {
+   "name": "Gingerbread Golem",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "213": {
+   "name": "Piccolo",
+   "category": "player",
+   "confidence": "medium",
+   "anim_set": "fighter"
+  },
+  "214": {
+   "name": "Child",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "215": {
+   "name": "Mini-Fighter (green)",
+   "category": "player",
+   "confidence": "low",
+   "anim_set": "fighter"
+  },
+  "216": {
+   "name": "Mini-Fighter (green, 2)",
+   "category": "player",
+   "confidence": "low",
+   "anim_set": "fighter"
+  },
+  "217": {
+   "name": "Sumo Fighter",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "218": {
+   "name": "Lantern",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "219": {
+   "name": "Ghost Puff (cyan)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "220": {
+   "name": "Ghost (cyan)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "221": {
+   "name": "Bomber (orange)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "222": {
+   "name": "Bomb (orange)",
+   "category": "effect",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "223": {
+   "name": "Villager (purple)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "224": {
+   "name": "Villager (cyan)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "225": {
+   "name": "Knight Destroyer",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "226": {
+   "name": "Warrior (orange)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "227": {
+   "name": "Man (blue hat)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "228": {
+   "name": "Shinobi (black)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "229": {
+   "name": "Shinobi (red)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "230": {
+   "name": "Old Man (2)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "231": {
+   "name": "Death Machine (blue, 2)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "232": {
+   "name": "Ninja (black)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "233": {
+   "name": "Blonde Woman",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "234": {
+   "name": "Ninja (red)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "235": {
+   "name": "Golem (gold)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "236": {
+   "name": "Demon (blue)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "237": {
+   "name": "Gunman (2)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "238": {
+   "name": "Thug (red)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "239": {
+   "name": "Boy (green, 2)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "240": {
+   "name": "Wisp",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "241": {
+   "name": "Pink Creature",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "242": {
+   "name": "Ice Crystal",
+   "category": "effect",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "243": {
+   "name": "Spopovich (powered)",
+   "category": "boss",
+   "confidence": "low",
+   "anim_set": "fighter"
+  },
+  "244": {
+   "name": "Blue Crystal",
+   "category": "effect",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "245": {
+   "name": "Bio Mech (silver)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "246": {
+   "name": "Imp (purple, 2)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "247": {
+   "name": "Golden Soldier",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "248": {
+   "name": "Shield Soldier (gold)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "249": {
+   "name": "Imp Fighter",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "250": {
+   "name": "Grey Vault Door",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "251": {
+   "name": "Goblin",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "252": {
+   "name": "Man (brown)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "253": {
+   "name": "Man (blue, 2)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "254": {
+   "name": "Thug (\"HUGE\", 2)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "255": {
+   "name": "Bald Monk",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "256": {
+   "name": "Flame",
+   "category": "effect",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "257": {
+   "name": "Flame (2)",
+   "category": "effect",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "258": {
+   "name": "Flame (3)",
+   "category": "effect",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "259": {
+   "name": "Flame (4)",
+   "category": "effect",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "260": {
+   "name": "Trunks",
+   "category": "player",
+   "confidence": "medium",
+   "anim_set": "fighter"
+  },
+  "261": {
+   "name": "Super Saiyan Trunks",
+   "category": "player",
+   "confidence": "medium",
+   "anim_set": "fighter"
+  },
+  "262": {
+   "name": "Trunks (NPC)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "263": {
+   "name": "Bio Mech (orange)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "264": {
+   "name": "Uub",
+   "category": "player",
+   "confidence": "low",
+   "anim_set": "fighter"
+  },
+  "265": {
+   "name": "Vampire (blue)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "266": {
+   "name": "Vampire (green)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "267": {
+   "name": "Bat (blue)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "268": {
+   "name": "Bat (green)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "269": {
+   "name": "Villager (blonde)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "270": {
+   "name": "Vegeta",
+   "category": "player",
+   "confidence": "high",
+   "anim_set": "fighter"
+  },
+  "272": {
+   "name": "Vegeta (NPC)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "273": {
+   "name": "Super Saiyan Vegeta",
+   "category": "player",
+   "confidence": "high",
+   "anim_set": "fighter"
+  },
+  "275": {
+   "name": "Vegito",
+   "category": "player",
+   "confidence": "medium",
+   "anim_set": "fighter"
+  },
+  "276": {
+   "name": "Super Saiyan Vegito",
+   "category": "player",
+   "confidence": "medium",
+   "anim_set": "fighter"
+  },
+  "277": {
+   "name": "Videl (NPC, 2)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "278": {
+   "name": "Videl",
+   "category": "player",
+   "confidence": "medium",
+   "anim_set": "fighter"
+  },
+  "279": {
+   "name": "Vampire (red)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "280": {
+   "name": "Bat (red)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "281": {
+   "name": "Golden Orb",
+   "category": "item",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "282": {
+   "name": "Green Vault Door",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "283": {
+   "name": "Clown (2)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "284": {
+   "name": "Girl (pink)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "285": {
+   "name": "Girl (green)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "286": {
+   "name": "Boy (blonde)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "287": {
+   "name": "Orb (red eye)",
+   "category": "effect",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "288": {
+   "name": "Orb (white)",
+   "category": "effect",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "289": {
+   "name": "Orb (small)",
+   "category": "effect",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "290": {
+   "name": "Yamcha?",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "291": {
+   "name": "Yakon",
+   "category": "boss",
+   "confidence": "medium",
+   "anim_set": "fighter"
+  },
+  "292": {
+   "name": "Mini-Yakon",
+   "category": "enemy",
+   "confidence": "medium",
+   "anim_set": "enemy"
+  },
+  "293": {
+   "name": "Man (orange)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc"
+  },
+  "294": {
+   "name": "Bald Fighter",
+   "category": "boss",
+   "confidence": "low",
+   "anim_set": "fighter"
+  },
+  "295": {
+   "name": "Zombie (blue)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "296": {
+   "name": "Zombie (blue, 2)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  },
+  "297": {
+   "name": "Imp (green)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy"
+  }
+ },
+ "portraits": {
+  "0": {
+   "name": "Alien Announcer",
+   "confidence": "medium"
+  },
+  "1": {
+   "name": "Android 18",
+   "confidence": "medium"
+  },
+  "2": {
+   "name": "Announcer",
+   "confidence": "medium"
+  },
+  "3": {
+   "name": "Baba",
+   "confidence": "medium"
+  },
+  "4": {
+   "name": "Babidi",
+   "confidence": "medium"
+  },
+  "5": {
+   "name": "Bee (dog)",
+   "confidence": "medium"
+  },
+  "6": {
+   "name": "Boy (cap)",
+   "confidence": "medium"
+  },
+  "7": {
+   "name": "Chobi",
+   "confidence": "medium"
+  },
+  "8": {
+   "name": "Broly",
+   "confidence": "medium"
+  },
+  "9": {
+   "name": "Bulma",
+   "confidence": "medium"
+  },
+  "10": {
+   "name": "Bald elder",
+   "confidence": "medium"
+  },
+  "11": {
+   "name": "Chiaotzu",
+   "confidence": "medium"
+  },
+  "12": {
+   "name": "Chi-Chi",
+   "confidence": "medium"
+  },
+  "13": {
+   "name": "Policeman",
+   "confidence": "medium"
+  },
+  "14": {
+   "name": "Mohawk fighter (green)",
+   "confidence": "medium"
+  },
+  "15": {
+   "name": "Mohawk fighter (orange)",
+   "confidence": "medium"
+  },
+  "16": {
+   "name": "Dabura",
+   "confidence": "medium"
+  },
+  "17": {
+   "name": "Dende",
+   "confidence": "medium"
+  },
+  "18": {
+   "name": "Dr. Brief",
+   "confidence": "medium"
+  },
+  "19": {
+   "name": "Round creature",
+   "confidence": "medium"
+  },
+  "20": {
+   "name": "Elder Kai",
+   "confidence": "medium"
+  },
+  "21": {
+   "name": "Erasa",
+   "confidence": "medium"
+  },
+  "22": {
+   "name": "Villager woman (straw hat)",
+   "confidence": "medium"
+  },
+  "23": {
+   "name": "Soldier",
+   "confidence": "medium"
+  },
+  "24": {
+   "name": "Ornate demon",
+   "confidence": "medium"
+  },
+  "25": {
+   "name": "Girl",
+   "confidence": "medium"
+  },
+  "26": {
+   "name": "Super Saiyan Gogeta",
+   "confidence": "medium"
+  },
+  "27": {
+   "name": "Super Saiyan Gogeta (2)",
+   "confidence": "medium"
+  },
+  "39": {
+   "name": "Great Saiyaman",
+   "confidence": "medium"
+  },
+  "47": {
+   "name": "Goku",
+   "confidence": "medium"
+  },
+  "48": {
+   "name": "Goku (2)",
+   "confidence": "medium"
+  },
+  "49": {
+   "name": "Goku (3)",
+   "confidence": "medium"
+  },
+  "50": {
+   "name": "Goku (4)",
+   "confidence": "medium"
+  },
+  "51": {
+   "name": "Super Saiyan Goku",
+   "confidence": "medium"
+  },
+  "52": {
+   "name": "Super Saiyan Goku (2)",
+   "confidence": "medium"
+  },
+  "53": {
+   "name": "Super Saiyan 3 Goku",
+   "confidence": "medium"
+  },
+  "54": {
+   "name": "Goten",
+   "confidence": "medium"
+  },
+  "55": {
+   "name": "Goten (2)",
+   "confidence": "medium"
+  },
+  "56": {
+   "name": "Goten (3)",
+   "confidence": "medium"
+  },
+  "57": {
+   "name": "Super Saiyan Goten",
+   "confidence": "medium"
+  },
+  "58": {
+   "name": "Super Saiyan Goten (2)",
+   "confidence": "medium"
+  },
+  "60": {
+   "name": "Gotenks",
+   "confidence": "medium"
+  },
+  "61": {
+   "name": "Gotenks (2)",
+   "confidence": "medium"
+  },
+  "62": {
+   "name": "Gotenks (3)",
+   "confidence": "medium"
+  },
+  "63": {
+   "name": "Super Saiyan Gotenks",
+   "confidence": "medium"
+  },
+  "64": {
+   "name": "Super Saiyan Gotenks (2)",
+   "confidence": "medium"
+  },
+  "65": {
+   "name": "Super Saiyan 3 Gotenks",
+   "confidence": "medium"
+  },
+  "66": {
+   "name": "Grand Kai",
+   "confidence": "medium"
+  },
+  "67": {
+   "name": "Grand Kai (2)",
+   "confidence": "medium"
+  },
+  "68": {
+   "name": "Hercule",
+   "confidence": "medium"
+  },
+  "69": {
+   "name": "Mayor",
+   "confidence": "medium"
+  },
+  "70": {
+   "name": "Jewel",
+   "confidence": "medium"
+  },
+  "71": {
+   "name": "Woman (glasses)",
+   "confidence": "medium"
+  },
+  "72": {
+   "name": "Janemba",
+   "confidence": "medium"
+  },
+  "73": {
+   "name": "Super Janemba",
+   "confidence": "medium"
+  },
+  "74": {
+   "name": "Android 18 (2)",
+   "confidence": "medium"
+  },
+  "75": {
+   "name": "Kibito",
+   "confidence": "medium"
+  },
+  "76": {
+   "name": "Supreme Kai",
+   "confidence": "medium"
+  },
+  "77": {
+   "name": "Kid Buu",
+   "confidence": "medium"
+  },
+  "78": {
+   "name": "Killa",
+   "confidence": "medium"
+  },
+  "79": {
+   "name": "King Kai",
+   "confidence": "medium"
+  },
+  "80": {
+   "name": "Ox King",
+   "confidence": "medium"
+  },
+  "81": {
+   "name": "Korin",
+   "confidence": "medium"
+  },
+  "82": {
+   "name": "Krillin",
+   "confidence": "medium"
+  },
+  "83": {
+   "name": "Majin Buu (angry)",
+   "confidence": "medium"
+  },
+  "84": {
+   "name": "Majin Buu",
+   "confidence": "medium"
+  },
+  "85": {
+   "name": "Villager",
+   "confidence": "medium"
+  },
+  "86": {
+   "name": "Man (glasses)",
+   "confidence": "medium"
+  },
+  "87": {
+   "name": "Man (moustache)",
+   "confidence": "medium"
+  },
+  "88": {
+   "name": "Marron",
+   "confidence": "medium"
+  },
+  "89": {
+   "name": "Master Roshi",
+   "confidence": "medium"
+  },
+  "90": {
+   "name": "Man (glasses, 2)",
+   "confidence": "medium"
+  },
+  "91": {
+   "name": "Mr. Popo",
+   "confidence": "medium"
+  },
+  "92": {
+   "name": "Mrs. Brief",
+   "confidence": "medium"
+  },
+  "93": {
+   "name": "Namekian",
+   "confidence": "medium"
+  },
+  "94": {
+   "name": "Old man",
+   "confidence": "medium"
+  },
+  "95": {
+   "name": "Villager (2)",
+   "confidence": "medium"
+  },
+  "96": {
+   "name": "Olibu",
+   "confidence": "medium"
+  },
+  "97": {
+   "name": "Oolong",
+   "confidence": "medium"
+  },
+  "98": {
+   "name": "Other World fighter",
+   "confidence": "medium"
+  },
+  "99": {
+   "name": "Other World fighter (2)",
+   "confidence": "medium"
+  },
+  "100": {
+   "name": "Other World fighter (3)",
+   "confidence": "medium"
+  },
+  "101": {
+   "name": "Other World fighter (4)",
+   "confidence": "medium"
+  },
+  "102": {
+   "name": "Viking",
+   "confidence": "medium"
+  },
+  "103": {
+   "name": "Child",
+   "confidence": "medium"
+  },
+  "104": {
+   "name": "Piccolo",
+   "confidence": "medium"
+  },
+  "105": {
+   "name": "Pikkon",
+   "confidence": "medium"
+  },
+  "106": {
+   "name": "Emperor Pilaf",
+   "confidence": "medium"
+  },
+  "107": {
+   "name": "Pintar?",
+   "confidence": "low"
+  },
+  "108": {
+   "name": "Dragon monster",
+   "confidence": "medium"
+  },
+  "109": {
+   "name": "Fighter (headband)",
+   "confidence": "medium"
+  },
+  "110": {
+   "name": "Puar",
+   "confidence": "medium"
+  },
+  "111": {
+   "name": "Pui Pui",
+   "confidence": "medium"
+  },
+  "112": {
+   "name": "Village Priest",
+   "confidence": "medium"
+  },
+  "113": {
+   "name": "Sharpner",
+   "confidence": "medium"
+  },
+  "114": {
+   "name": "Shenron",
+   "confidence": "medium"
+  },
+  "115": {
+   "name": "Scientist",
+   "confidence": "medium"
+  },
+  "116": {
+   "name": "Flying Nimbus",
+   "confidence": "medium"
+  },
+  "117": {
+   "name": "Round pink figure",
+   "confidence": "medium"
+  },
+  "118": {
+   "name": "Spopovich",
+   "confidence": "medium"
+  },
+  "119": {
+   "name": "Super Buu",
+   "confidence": "medium"
+  },
+  "120": {
+   "name": "Super Buu (roar)",
+   "confidence": "medium"
+  },
+  "121": {
+   "name": "Super Buu (2)",
+   "confidence": "medium"
+  },
+  "122": {
+   "name": "Super Buu (3)",
+   "confidence": "medium"
+  },
+  "123": {
+   "name": "Supreme Kai (2)",
+   "confidence": "medium"
+  },
+  "124": {
+   "name": "Horned fighter",
+   "confidence": "medium"
+  },
+  "125": {
+   "name": "Man",
+   "confidence": "medium"
+  },
+  "126": {
+   "name": "Girl (blue hair)",
+   "confidence": "medium"
+  },
+  "127": {
+   "name": "Tien",
+   "confidence": "medium"
+  },
+  "128": {
+   "name": "Trunks",
+   "confidence": "medium"
+  },
+  "129": {
+   "name": "Trunks (2)",
+   "confidence": "medium"
+  },
+  "130": {
+   "name": "Trunks (3)",
+   "confidence": "medium"
+  },
+  "131": {
+   "name": "Super Saiyan Trunks",
+   "confidence": "medium"
+  },
+  "132": {
+   "name": "Super Saiyan Trunks (2)",
+   "confidence": "medium"
+  },
+  "133": {
+   "name": "Trunks (4)",
+   "confidence": "medium"
+  },
+  "134": {
+   "name": "Uub",
+   "confidence": "medium"
+  },
+  "135": {
+   "name": "Blonde fighter",
+   "confidence": "medium"
+  },
+  "136": {
+   "name": "Vegeta",
+   "confidence": "medium"
+  },
+  "137": {
+   "name": "Vegeta (2)",
+   "confidence": "medium"
+  },
+  "138": {
+   "name": "Super Saiyan Vegeta",
+   "confidence": "medium"
+  },
+  "139": {
+   "name": "Vegeta (3)",
+   "confidence": "medium"
+  },
+  "140": {
+   "name": "Majin Vegeta",
+   "confidence": "medium"
+  },
+  "141": {
+   "name": "Majin Vegeta (2)",
+   "confidence": "medium"
+  },
+  "142": {
+   "name": "Vegito",
+   "confidence": "medium"
+  },
+  "143": {
+   "name": "Super Saiyan Vegito",
+   "confidence": "medium"
+  },
+  "144": {
+   "name": "Videl",
+   "confidence": "medium"
+  },
+  "145": {
+   "name": "Videl (short hair)",
+   "confidence": "medium"
+  },
+  "146": {
+   "name": "West Kai?",
+   "confidence": "low"
+  },
+  "147": {
+   "name": "Woman",
+   "confidence": "medium"
+  },
+  "148": {
+   "name": "Woman (blonde)",
+   "confidence": "medium"
+  },
+  "149": {
+   "name": "Yajirobe",
+   "confidence": "medium"
+  },
+  "150": {
+   "name": "Yakon?",
+   "confidence": "low"
+  },
+  "151": {
+   "name": "Yamcha",
+   "confidence": "medium"
+  },
+  "152": {
+   "name": "Spopovich (angry)",
+   "confidence": "medium"
+  },
+  "153": {
+   "name": "Yemma's Assistant",
+   "confidence": "medium"
+  },
+  "154": {
+   "name": "Yemma's Assistant (2)",
+   "confidence": "medium"
+  },
+  "28": {
+   "name": "Gohan",
+   "confidence": "medium"
+  },
+  "29": {
+   "name": "Gohan",
+   "confidence": "medium"
+  },
+  "30": {
+   "name": "Gohan",
+   "confidence": "medium"
+  },
+  "31": {
+   "name": "Gohan",
+   "confidence": "medium"
+  },
+  "32": {
+   "name": "Gohan",
+   "confidence": "medium"
+  },
+  "33": {
+   "name": "Gohan",
+   "confidence": "medium"
+  },
+  "34": {
+   "name": "Gohan",
+   "confidence": "medium"
+  },
+  "35": {
+   "name": "Gohan",
+   "confidence": "medium"
+  },
+  "36": {
+   "name": "Gohan",
+   "confidence": "medium"
+  },
+  "37": {
+   "name": "Gohan",
+   "confidence": "medium"
+  },
+  "38": {
+   "name": "Gohan",
+   "confidence": "medium"
+  },
+  "40": {
+   "name": "Gohan",
+   "confidence": "medium"
+  },
+  "41": {
+   "name": "Gohan",
+   "confidence": "medium"
+  },
+  "42": {
+   "name": "Gohan",
+   "confidence": "medium"
+  },
+  "43": {
+   "name": "Super Saiyan Gohan",
+   "confidence": "medium"
+  },
+  "44": {
+   "name": "Super Saiyan Gohan",
+   "confidence": "medium"
+  },
+  "45": {
+   "name": "Super Saiyan Gohan",
+   "confidence": "medium"
+  },
+  "59": {
+   "name": "Gohan (alt)",
+   "confidence": "medium"
+  }
+ }
+}
