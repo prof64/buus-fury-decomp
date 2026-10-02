@@ -189,14 +189,18 @@ fn line_angle(d: &Mode7Data, line: usize) -> i32 {
     if line < n {
         return d.line_angle[line];
     }
-    let (a, b) = (d.line_angle[n - 2], d.line_angle[n - 1]);
-    b + (b - a) * (line - n + 1) as i32
+    // past the GBA picture (zoomed-out views only): the table is atan((line - 80) / f); continue it with the
+    // focal length that reproduces its last entry
+    let turn = 262_144.0f64 / std::f64::consts::TAU;
+    let last = d.line_angle[n - 1] as f64 / turn;
+    let f = (n as f64 - 1.0 - 80.0) / last.tan();
+    (((line as f64 - 80.0) / f).atan() * turn).round() as i32
 }
 fn line_cos(d: &Mode7Data, line: usize) -> i32 {
     if line < d.line_cos.len() {
         return d.line_cos[line];
     }
-    interp(&d.sin, line_angle(d, line).wrapping_add(64 << 10)) >> 6
+    interp(&d.sin, line_angle(d, line).wrapping_add(64 << 10))
 }
 
 /// Flyer position (x, y in 24.8, z in 22.10) from the camera it produced (`0x08034124` inverted): the eye is

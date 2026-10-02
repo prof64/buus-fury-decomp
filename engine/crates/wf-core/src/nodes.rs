@@ -1099,11 +1099,21 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             true
         }
         K::Succeed | K::SelfMessage11 => true,
-        // the script seam: the host runs it (`FieldEvent::Run`, cause `Ai`); RunScript returns 1 at once
+        // the script seam: the host runs it (`FieldEvent::Run`, cause `Ai`). RunScript queues an event and returns 1
+        // at once. InlineScript runs its bytecode inside the update (0x08004038): its blocking natives run nested
+        // frames, so the node returns 1 only once the script is over - with a script host attached the node waits
+        // until the host reports the end (`scene::ai_script_done`)
         K::RunScript | K::InlineScript => {
             let sc = c.tree.nodes[n as usize].script;
+            let inline = matches!(c.tree.nodes[n as usize].k, K::InlineScript);
+            if r.d[0] == 1 {
+                return !w.scene.ai_wait.contains(&me);
+            }
             if sc != 0 && r.d[0] == 0 {
                 r.d[0] = 1;
+                if inline && w.field.as_ref().is_some_and(|f| f.host) {
+                    w.scene.ai_wait.push(me);
+                }
                 let run = if matches!(c.tree.nodes[n as usize].k, K::RunScript) {
                     crate::fieldcontent::Callback::Event(format!("header_0x{sc:08X}"))
                 } else {
@@ -1114,6 +1124,7 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                     cause: crate::field::Cause::Ai { entity: me },
                     slot: 0,
                 }));
+                return !w.scene.ai_wait.contains(&me);
             }
             true
         }

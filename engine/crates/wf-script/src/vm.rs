@@ -158,6 +158,10 @@ pub enum NativeResult {
     Done(Option<i32>),
     /// The action spans frames (the GBA ran a nested main loop). Resume with the result.
     Block,
+    /// The native runs a whole event inline before the caller continues (an engine hook the game calls from
+    /// inside the native, e.g. give_xp's level-up popup #3); like `run_event`, sharing the caller's param block.
+    /// Only for natives that may block (queued actions in the Rhai runtime).
+    RunEvent(u16),
 }
 
 /// Context handed to the host for one native call.
@@ -439,7 +443,8 @@ impl Thread {
 
     fn host_node(&mut self, host: &mut dyn Host, call: NodeCall) -> Result<bool, VmError> {
         match host.node(call).map_err(VmError::Host)? {
-            NativeResult::Done(_) => {
+            // nodes never run an event inline
+            NativeResult::Done(_) | NativeResult::RunEvent(_) => {
                 self.node_done(None);
                 Ok(false)
             }
@@ -681,6 +686,17 @@ impl Thread {
                     NativeResult::Block => {
                         self.pending = Some(Pending::Native { native: n, pushes });
                         return Ok(true);
+                    }
+                    NativeResult::RunEvent(idx) => {
+                        let ev = set.events.get(&idx).ok_or(VmError::NoEvent(idx as u32))?;
+                        self.acts.push(Act::Event(EventAct {
+                            header: ev.header,
+                            event: Some(idx),
+                            node: 0,
+                            params: pi,
+                            in_node: false,
+                            entered: false,
+                        }));
                     }
                 }
             }

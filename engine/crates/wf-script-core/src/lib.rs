@@ -179,8 +179,11 @@ pub fn current_form(w: &World, c: i32) -> Option<i32> {
     w.data.chars.iter().find(|x| x.index == c).map(|x| x.form)
 }
 
+/// the game's object list has the newest object first (`0x080001C6` returns the first match): our entity list is
+/// oldest first, so the newest matching entity wins (boss_defeat: commands after a second `spawn_actor(89)` go
+/// to the new explosion)
 fn first_with_sprite(w: &World, sprite: i32) -> Option<usize> {
-    (0..w.ents.len()).find(|&i| !w.ents[i].removed && scene::sprite_id(w, i) == Some(sprite))
+    (0..w.ents.len()).rev().find(|&i| !w.ents[i].removed && scene::sprite_id(w, i) == Some(sprite))
 }
 
 /// Resolve a script actor id (`0x080001C6`): 0 leader; 1..8 the first object showing character id-1's current

@@ -186,8 +186,24 @@ impl Packs {
     /// The merged file at `path`: the last pack that has it wins; a later `<path>.delete` (or a `.delete`
     /// marker on any parent directory, e.g. `sprites/106_goku.delete`) removes it; for `x.json`, later packs'
     /// `x.patch.json` are merge-patched onto it.
+    ///
+    /// Derived content (mods reuse base files by path, never copying ROM-derived bytes):
+    /// * `<path>.derive.json` = `{"from": "<other path>", "recolor": {"#rrggbb": "#rrggbb", ...}}` stands for a
+    ///   file at `path` made from another merged file: a copy, or for PNGs a palette remap (indexed PNGs: palette
+    ///   entries; RGBA PNGs: exact pixel colours, alpha kept). `from` = `path` itself means the earlier packs'
+    ///   version (an in-place recolor).
+    /// * A JSON file whose top-level object has `"$extends": "<other path>"` is that file merge-patched with the
+    ///   rest of the object (RFC 7396), e.g. a new sprite / form / skill / character built from a base one.
     pub fn read(&self, path: &str) -> Option<Vec<u8>> {
+        self.read_at(path, 0)
+    }
+
+    fn read_at(&self, path: &str, depth: u32) -> Option<Vec<u8>> {
+        if depth > 8 {
+            return None;
+        }
         let patch = path.strip_suffix(".json").map(|s| format!("{s}.patch.json"));
+        let derive = format!("{path}.derive.json");
         let mut cur: Option<Vec<u8>> = None;
         for p in &self.packs {
             if p.src.exists(&format!("{path}.delete"))
@@ -197,6 +213,10 @@ impl Packs {
             }
             if let Some(b) = p.src.read(path) {
                 cur = Some(b);
+            } else if let Some(d) = p.src.read(&derive) {
+                if let Some(b) = self.derive(path, &d, cur.take(), depth) {
+                    cur = Some(b);
+                }
             } else if let (Some(pp), Some(c)) = (&patch, &cur) {
                 if let Some(pb) = p.src.read(pp) {
                     if let (Ok(mut doc), Ok(pv)) =
@@ -208,10 +228,40 @@ impl Packs {
                 }
             }
         }
+        if path.ends_with(".json") {
+            if let Some(b) = &cur {
+                if b.windows(10).any(|w| w == b"\"$extends\"") {
+                    return self.extend(b, depth);
+                }
+            }
+        }
         cur
     }
 
-    pub fn read_str(&self, path: &str) -> Result<String> {
+    /// `{"$extends": "<path>", ...rest}` -> the merged file at `<path>` with `rest` merge-patched onto it
+    fn extend(&self, b: &[u8], depth: u32) -> Option<Vec<u8>> {
+        let mut doc: serde_json::Value = serde_json::from_slice(b).ok()?;
+        let Some(ext) = doc.as_object_mut().and_then(|o| o.remove("$extends")) else { return Some(b.to_vec()) };
+        let ext = ext.as_str()?.to_string();
+        let mut base: serde_json::Value = serde_json::from_slice(&self.read_at(&ext, depth + 1)?).ok()?;
+        merge_patch(&mut base, &doc);
+        serde_json::to_vec(&base).ok()
+    }
+
+    /// a `<path>.derive.json` file: copy / recolor another merged file (`prev` = the earlier packs' `path`)
+    fn derive(&self, path: &str, spec: &[u8], prev: Option<Vec<u8>>, depth: u32) -> Option<Vec<u8>> {
+        let spec: serde_json::Value = serde_json::from_slice(spec).ok()?;
+        let from = spec["from"].as_str().unwrap_or(path);
+        let src = if from == path { prev? } else { self.read_at(from, depth + 1)? };
+        let map: Vec<(u32, u32)> = spec["recolor"]
+            .as_object()
+            .map(|o| o.iter().filter_map(|(k, v)| Some((parse_rgb(k)?, parse_rgb(v.as_str()?)?))).collect())
+            .unwrap_or_default();
+        if map.is_empty() || !src.starts_with(b"\x89PNG") {
+            return Some(src);
+        }
+        image::recolor_png(&src, &map).ok()
+    }&self, path: &str) -> Result<String> {
         let b = self.read(path).ok_or_else(|| Error(format!("missing content file {path}")))?;
         String::from_utf8(b).map_err(|_| Error(format!("{path}: not UTF-8")))
     }
@@ -234,6 +284,8 @@ impl Packs {
                     all.retain(|x: &String| x != d && !x.starts_with(&format!("{d}/")));
                 } else if let Some(s) = f.strip_suffix(".patch.json") {
                     all.insert(format!("{s}.json"));
+                } else if let Some(s) = f.strip_suffix(".derive.json") {
+                    all.insert(s.to_string());
                 } else {
                     all.insert(f);
                 }
@@ -241,6 +293,15 @@ impl Packs {
         }
         all.into_iter().collect()
     }
+}
+
+/// `"#rrggbb"` / `"rrggbb"` -> 0xRRGGBB
+pub fn parse_rgb(s: &str) -> Option<u32> {
+    let h = s.trim().trim_start_matches('#');
+    if h.len() != 6 {
+        return None;
+    }
+    u32::from_str_radix(h, 16).ok()
 }
 
 /// RFC 7396 JSON Merge Patch.

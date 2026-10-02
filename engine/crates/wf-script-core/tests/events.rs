@@ -167,6 +167,46 @@ fn ai_script_nodes_resolve_to_scripts() {
     assert!(f.files.contains_key("scripts/inline/inline_0x0870EA28.rhai"), "inline AI script not exported");
 }
 
+/// Vegeta 0x88 (training NPC): with the player close its AI runs the inline script 0x0870EA28 once and the node
+/// waits (the game runs the script inside the update: its blocking natives run nested frames) until the host
+/// reports the end
+#[test]
+fn ai_inline_script_node_waits_for_the_script() {
+    let Some(f) = fixture() else { return };
+    let mut s = Session::new_field(f.data.clone(), wf_core::field::FieldConfig { world: 1, area: 1, variant: 1, ..Default::default() });
+    wf_core::field::attach_host(&mut s.world, true);
+    // Vegeta at the arena's left edge, the player 30 px to his right: he backs off into the edge, the step-away
+    // node ends and the InlineScript node runs
+    let pi = s.world.player_idx(0).unwrap();
+    let py = s.world.pl_ref(pi).a.py();
+    let ei = wf_core::battle::spawn_enemy(&mut s.world, 0x88, -64, py, 0, None).expect("Vegeta 0x88");
+    let vx = s.world.actor(ei).map(|a| a.x).unwrap();
+    s.world.pl(pi).a.x = vx + (30 << 8);
+    let vid = s.world.ents[ei].id;
+    let mut runs = 0;
+    let mut started = None;
+    for k in 0..600 {
+        s.step(&[0]);
+        for e in &s.world.events {
+            if let Event::Field(wf_core::field::FieldEvent::Run { run, cause: wf_core::field::Cause::Ai { entity }, .. }) = e {
+                assert_eq!(*entity, vid);
+                assert_eq!(run, &wf_core::fieldcontent::Callback::Script("inline_0x0870EA28".into()));
+                runs += 1;
+                started.get_or_insert(k);
+            }
+        }
+        if started.is_some_and(|f| k > f + 120) {
+            break;
+        }
+    }
+    assert!(started.is_some(), "the AI never reached its InlineScript node");
+    assert_eq!(runs, 1, "the node must not restart its script while it waits");
+    assert!(s.world.scene.ai_wait.contains(&vid));
+    wf_core::scene::ai_script_done(&mut s.world, vid);
+    s.step(&[0]);
+    assert!(s.world.scene.ai_wait.is_empty());
+}
+
 #[test]
 fn npc_talk_event_shows_text_and_waits_for_a() {
     let Some(f) = fixture() else { return };
@@ -229,6 +269,11 @@ fn bindings_are_honest() {
                             break;
                         }
                     }
+                }
+                // an inline engine hook (give_xp's level-up #3): the event must exist
+                Ok(wf_script::vm::NativeResult::RunEvent(ev)) => {
+                    assert!(f.set.events.contains_key(ev), "0x{n:02x} runs missing event {ev}");
+                    assert!(!sig.pushes, "0x{n:02x} runs an event but pushes a result");
                 }
                 Err(e) => panic!("0x{n:02x} {} (field {field}): {e}", wf_script_core::binding::name(n)),
             }

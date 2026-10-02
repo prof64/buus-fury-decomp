@@ -294,6 +294,8 @@ pub struct Player {
     pub ss3_gauge: i64,
     pub ss_cooldown: i32,
     pub holy_left: i32,
+    /// the timed buff's STR / POW / END / SPD while `holy_left` > 0 (Holy Water: +25 each; script `boost_stats`)
+    pub boost: [i32; 4],
     pub last_dir_key: u16,
     pub last_dir_frame: i64,
     pub walk: i32,
@@ -373,6 +375,7 @@ impl Player {
             ss3_gauge: 0,
             ss_cooldown: 0,
             holy_left: if init.holy_water { 1800 } else { 0 },
+            boost: crate::progression::HOLY_WATER,
             last_dir_key: 0,
             last_dir_frame: -1000,
             walk: 0,
@@ -473,7 +476,7 @@ impl Player {
     /// RecalcStats 0x08013C66 + the form bonuses
     pub fn refresh_stats(&mut self, w: &World) {
         let eq = self.equips(w);
-        self.eff = recalc_stats(&self.rec, &eq, self.holy_left > 0);
+        self.eff = crate::progression::recalc_stats_with(&self.rec, &eq, (self.holy_left > 0).then_some(self.boost));
         let b = w.data.form(self.form).expect("form");
         let e = self.eff;
         self.a.stats = CombatStats { str_: e.str_ + b.b_str, pow: e.pow + b.b_pow, end: e.end + b.b_end, end2: e.end2 + b.b_end2, res_m: self.resist, res_e: self.resist, crit_bonus: e.crit_pct * 656, block_factor: e.block_factor };
@@ -1110,8 +1113,42 @@ pub fn gain_xp(w: &mut World, i: usize, exp: i64) {
         }
         p(w, i).rec.level = nl;
         refresh(w, i);
-        sfx(w, 36, 64);
+        // the level-up hook #3 plays the jingle (sound 36) and shows the popups: with a script host attached it runs
+        // there; without one the jingle alone stands in
+        if w.field.as_ref().is_some_and(|f| f.host) {
+            let entity = w.ents[i].id;
+            w.events.push(crate::world::Event::Field(crate::field::FieldEvent::Run {
+                run: crate::fieldcontent::Callback::Event("s003".into()),
+                cause: crate::field::Cause::LevelUp { entity },
+                slot: pr(w, i).slot,
+            }));
+        } else {
+            sfx(w, 36, 64);
+        }
     }
+}
+
+/// `give_xp` (0xC2): the kill-XP routine without the hook (the script native runs hook #3 inline itself); true when
+/// a level was gained
+pub fn gain_xp_levels(w: &mut World, i: usize, exp: i64) -> bool {
+    let before = pr(w, i).rec.level;
+    let host = w.field.as_ref().map(|f| f.host);
+    if let Some(f) = w.field.as_mut() {
+        f.host = false;
+    }
+    let n = w.events.len();
+    gain_xp(w, i, exp);
+    if let (Some(f), Some(h)) = (w.field.as_mut(), host) {
+        f.host = h;
+    }
+    let up = pr(w, i).rec.level > before;
+    if up {
+        // the jingle comes from the hook
+        if let Some(k) = (n..w.events.len()).rev().find(|&k| matches!(w.events[k], crate::world::Event::Sfx { id: 36, .. })) {
+            w.events.remove(k);
+        }
+    }
+    up
 }
 
 // ---- update -----------------------------------------------------------------------------------------------------------

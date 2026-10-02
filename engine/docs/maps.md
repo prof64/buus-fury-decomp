@@ -66,7 +66,8 @@ map uses the BG half unchanged (verified in palette RAM for 8-3, 0-1, 18-14 at f
 | tilemap (1439 layers) | `0x08008087` → layer object vtable `0x08049410` | +4/+8 s32 scroll rate x/y (1/1024), +0xC/+0x10 s32 offset (1/1024 px), +0x14/+0x15 u8 chunk cols/rows, +0x18 `ptr[cols·rows]` → webfoot-LZ 0x800-byte chunks of 32×32 screen entries | `0x08007E84`: scroll = `(camera · rate + offset + shake) >> 10`; chunks streamed into the 32×32 hardware ring |
 | empty (226) | `0x08007A41` | — | BG off |
 | wrap (41) | `0x0800897B` → vtable `0x080498B0` | +4 rate (used for both axes), +0xC/+0x10 offset, +0x14/+0x18 s32 velocity (1/1024 px per frame), +0x1C → one 0x800-byte chunk | `0x08008924`: `camera·rate + offset + velocity·frame`, the 256×256 screen wraps (fog / clouds / water overlays) |
-| other (2, map 0-50 only) | `0x08007B63`, `0x080088BD` | special (affine / scripted) | not rendered (`unsupported_layers`) |
+| panorama (1, map 0-50 BG1) | `0x08007B63` → `0x08007A60`, vtable `0x08049604` | +4 / +8 → two webfoot-LZ 0x800-byte 32×32 screens | `0x08007B26`: hofs = (heading << 3) >> 10, columns from both screens (`0x08007AB4`); exported to `mode7.json` (World map below) |
+| mode-7 ground (1, map 0-50 BG2) | `0x080088BD` → `0x080080C0`, vtable `0x08049C84` | +4 / +5 u8 chunk cols / rows (14 × 10), +8 `ptr[]` → webfoot-LZ 32×32 tile-byte chunks | per-scanline affine table `0x080086D8`, written by the HBlank IRQ `0x080080BE`; exported to `mode7.json` |
 
 ## 2. Output (paths relative to the content pack root)
 
@@ -103,6 +104,25 @@ camera, so COLLISION.md had to measure `origin` for the World Tournament stadium
 [0, 0]). Check: the ROM-derived content crop of 7-6 starts at world (16, 0), exactly the measured origin; 18-14's
 offset came from its 1.2× parallax BG0 aligned at the capture camera (not a world offset).
 
+### World map (`maps/area_00_050/mode7.json`, `wf-maps/src/worldmap.rs`)
+
+Area 0-50 is the only header with +0x3C != 0 (display mode 1, DISPCNT `0x1741`: BG0-2 + OBJ). Its two special layers
+and the screen pieces the renderer needs:
+
+| key | content |
+|---|---|
+| `ground` | `bg`, `priority`, `width_tiles` × `height_tiles` (448 × 320 = 3584 × 2560 px), `tiles` = base64 u8 VRAM tile index per 8×8 world tile (row-major; 8bpp tiles of the map's tileset, affine BG: no flips) |
+| `panorama` | `bg`, `priority`, `chunks` = two base64 32×32 text screens (u16 entries: tile, hflip 0x400, vflip 0x800), scroll rule |
+| `tables` | `sin` (s32[256], `0x087B6EEC`), `csc` (65536 / sin, `0x087B72EC`), `line_angle` (s16[160] per-scanline pitch offset, `0x08071420`), `line_cos` (u16[160], `0x08071560`) |
+| `label` | `mode7_label.png` (240×16 bar, webfoot-LZ `0x0807248C`, OBJ palette), font `small`, pen (120, 11) centred, colour 2; OBJs at y 136, priority 1 |
+| `marker` | `mode7_marker.png` (8×8, `0x0874EA00`), the mini-map box of the map script's `spawn_box` (0-50: 160, 0, 240, 56) and the placement rule |
+
+Billboards are the 94 header props of `objects.json` (record +0x16 = height class: 0x28 → z 110 px, 0x3C → on the
+ground, else 60 px; ctor `0x0800CB14`, update `0x0800CBA8`, draw `0x0800CC6C`). The camera / projection / scanline
+formulas are documented in `crates/wf-render/src/mode7.rs` and engine/docs/frontend.md §9b. Every on-screen ground
+sample equals the world tile at its true position (the game streams 256 px chunks of the frustum into its 512 px
+ring), verified against VRAM.
+
 ## 3. Parity (`cargo test -p wf-maps`, run `--nocapture` for the summary)
 
 * **Collision: 418 / 418 maps identical** to `data/battle/buu_collision.json` (walk + shot, inside its clip rectangle;
@@ -127,8 +147,7 @@ offset came from its 1.2× parallax BG0 aligned at the capture camera (not a wor
 
 ## 4. Not covered / open
 
-* Map 0-50 (mode 1 cutscene map): BG1 (`0x08007B63`) and BG2 (`0x080088BD`, affine) are special layer kinds and are
-  not rendered; BG0 is.
+* Map 0-50: the composite / bgN PNGs contain BG0 only (the ground and sky are drawn per frame from `mode7.json`).
 * Header +0x24/+0x28 rectangles, +0x2C minimap blob, +0x30, +0x40, +0x44 and area +0x08/+0x28 are recorded raw,
   not interpreted. Area objects (NPCs, triggers, exits) are not exported here.
 * Blending (BLDCNT/EVA/EVB) is exported as properties; composites draw overlays opaquely like the old renders.

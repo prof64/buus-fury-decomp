@@ -24,6 +24,7 @@ STATE = str(ROOT / 'work' / 'buu' / 'wm_start.ss')
 MAPOBJ = 0x030019A4
 PLAYER = 0x03001C34
 OBJW = 0x03001C4C
+SHADOW_OAM = 0x03003498
 K = {'R': KEY.RIGHT, 'L': KEY.LEFT, 'U': KEY.UP, 'D': KEY.DOWN, 'A': KEY.A, 'B': KEY.B, '_': 0}
 
 SCENES = {
@@ -81,13 +82,21 @@ def run(name, script):
         steps += [keys] * int(item[len(k):] or 1)
     prev = prev2 = cam(e)
     fprev = flyer(e)
+    hist = []
     for keys in steps:
         prev2 = prev
         prev = cam(e)
         fprev = flyer(e)
         e.set_keys(keys)
         e.run(1)
+        hist = (hist + [{'cam': cam(e), 'flyer': flyer(e), 'shadow_oam': e.read(SHADOW_OAM, 1024).hex()}])[-4:]
     e.set_keys(0)
+    t = e.r32(MAPOBJ + 0xA8)
+    table = []
+    for v in range(56, 160):
+        pa, pb, pc, pd = struct.unpack('<hhhh', e.read(t + 16 * v, 8))
+        x, y = struct.unpack('<ii', e.read(t + 16 * v + 8, 8))
+        table.append([(pa & 0xFFFF) | ((pb & 0xFFFF) << 16), (pc & 0xFFFF) | ((pd & 0xFFFF) << 16), x, y])
     p = e.r32(PLAYER)
     info = {
         'script': script,
@@ -98,6 +107,8 @@ def run(name, script):
         'flyer_prev': fprev,
         'bldcnt': e.r16(0x04000050), 'bldalpha': e.r16(0x04000052), 'dispcnt': e.r16(0x04000000),
         'oam': e.oam().hex(),
+        'history': hist,
+        'table': table,
     }
     for o in objects(e):
         vt = e.r32(o)

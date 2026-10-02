@@ -368,6 +368,10 @@ impl Runtime {
                                 t.blocked = Some(a);
                                 return Ok(Status::Blocked);
                             }
+                            NativeResult::RunEvent(event) => {
+                                t.last = None;
+                                t.frames.push(Frame::Event { event, node: 0, params: p, in_node: false, entered: false });
+                            }
                         }
                     }
                     Act::SetVar { var, value, params } => {
@@ -387,11 +391,16 @@ impl Runtime {
                                 t.blocked = Some(a);
                                 return Ok(Status::Blocked);
                             }
+                            NativeResult::RunEvent(event) => {
+                                t.last = None;
+                                let p = *params;
+                                t.frames.push(Frame::Event { event, node: 0, params: p, in_node: false, entered: false });
+                            }
                         }
                     }
                     Act::Scene { .. } => {}
                     Act::Node(n) => match host.node(n.clone())? {
-                        NativeResult::Done(_) => {
+                        NativeResult::Done(_) | NativeResult::RunEvent(_) => {
                             if let Some(Frame::Event { in_node, .. }) = t.frames.last_mut() {
                                 *in_node = false;
                             }
@@ -678,7 +687,7 @@ fn bind_api(e: &mut Engine, ctx: &Rc<RefCell<Ctx>>, lib: &Rc<RefCell<Option<Rc<L
                 NativeResult::Done(_) if !query => Ok(Dynamic::UNIT),
                 NativeResult::Done(None) => err(format!("query 0x{n:02x} returned nothing")),
                 NativeResult::Block => err(format!("native 0x{n:02x} blocked where it must be instant")),
-                _ => unreachable!(),
+                _ => err(format!("native 0x{n:02x} ran an event where it must be instant")),
             }
         });
     }
@@ -711,6 +720,7 @@ fn bind_api(e: &mut Engine, ctx: &Rc<RefCell<Ctx>>, lib: &Rc<RefCell<Option<Rc<L
                 (ExtKind::Query, _) => err(format!("query `{name}` returned nothing")),
                 (_, NativeResult::Done(_)) => Ok(Dynamic::UNIT),
                 (_, NativeResult::Block) => err(format!("`{name}` blocked where it must be instant")),
+                (_, NativeResult::RunEvent(_)) => err(format!("`{name}` ran an event where it must be instant")),
             }
         });
         let _ = ext_info(name);

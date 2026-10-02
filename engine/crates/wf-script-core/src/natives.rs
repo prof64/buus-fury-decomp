@@ -587,8 +587,11 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
         }
         0xc1 => done(h.s.timers.stopwatch),
         0xc2 => {
+            // the kill-XP routine; a level-up runs the level-up hook #3 inline (blocks the script while shown)
             let i = lead(h.w, n)?;
-            wf_core::player::gain_xp(h.w, i, arg(a, 0) as i64);
+            if wf_core::player::gain_xp_levels(h.w, i, arg(a, 0) as i64) {
+                return Ok(NativeResult::RunEvent(3));
+            }
             unit()
         }
         0xc4 | 0xc5 | 0xeb => {
@@ -778,14 +781,16 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
             let i = lead(h.w, n)?;
             let mut p = h.w.pl_ref(i).clone();
             if arg(a, 0) == 0 {
-                p.rec.str_ += arg(a, 1);
-                p.rec.pow += arg(a, 2);
-                p.rec.end += arg(a, 3);
-                p.rec.spd += arg(a, 4);
+                // the record's base stats are bytes (rec+0x28..0x2B): the add wraps
+                p.rec.str_ = (p.rec.str_ + arg(a, 1)) & 0xff;
+                p.rec.pow = (p.rec.pow + arg(a, 2)) & 0xff;
+                p.rec.end = (p.rec.end + arg(a, 3)) & 0xff;
+                p.rec.spd = (p.rec.spd + arg(a, 4)) & 0xff;
             } else {
+                // the timed buff (GD+0x4DC frames, +0x4E0..0x4EC values): one global buff, replaced
                 h.s.boost = [arg(a, 0) * 60, arg(a, 1), arg(a, 2), arg(a, 3), arg(a, 4), 0];
-                // TODO(core): EffStats applies only the fixed Holy Water bonus; arbitrary timed values need a field
                 p.holy_left = arg(a, 0) * 60;
+                p.boost = [arg(a, 1), arg(a, 2), arg(a, 3), arg(a, 4)];
             }
             p.refresh_stats(h.w);
             *h.w.pl(i) = p;
@@ -829,7 +834,15 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
         }
         0xf6 => done(0),
         0xf7 => {
+            // the timed buff with no stat bonus and the special flag (GD+0x4F0 = 1 -> record byte +0x67, whose
+            // effect is not identified: kept in HostState.boost[5])
             h.s.boost = [arg(a, 0) * 60, 0, 0, 0, 0, 1];
+            let i = lead(h.w, n)?;
+            let mut p = h.w.pl_ref(i).clone();
+            p.holy_left = arg(a, 0) * 60;
+            p.boost = [0; 4];
+            p.refresh_stats(h.w);
+            *h.w.pl(i) = p;
             unit()
         }
         _ => Err(format!("native 0x{n:02x} out of table")),

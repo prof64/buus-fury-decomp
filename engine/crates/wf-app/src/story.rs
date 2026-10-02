@@ -43,6 +43,8 @@ pub struct StorySim {
     stepped: std::collections::BTreeSet<String>,
     queue: VecDeque<Job>,
     running: bool,
+    /// why the running script started (an enemy AI node waits for its script's end)
+    cause: Option<Cause>,
     prev: [u16; MAX_PLAYERS],
     /// scripts that failed to compile / run (shown by the shells' logs)
     pub errors: Vec<String>,
@@ -99,6 +101,7 @@ impl StorySim {
             stepped,
             queue: VecDeque::new(),
             running: false,
+            cause: None,
             prev: [0; MAX_PLAYERS],
             errors: Vec::new(),
             init_events: Vec::new(),
@@ -139,6 +142,11 @@ impl StorySim {
     }
 
     fn finish(&mut self, st: Result<Status, String>) {
+        if !matches!(st, Ok(Status::Blocked)) {
+            if let Some(Cause::Ai { entity }) = self.cause.take() {
+                wf_core::scene::ai_script_done(&mut self.session.world, entity);
+            }
+        }
         match st {
             Ok(Status::Blocked) => self.running = true,
             Ok(Status::Finished) => {
@@ -167,6 +175,7 @@ impl StorySim {
             }
             self.globals.g = self.session.world.story.g;
             self.rt.set_globals(self.globals.clone());
+            self.cause = Some(job.cause.clone());
             match &job.run {
                 Callback::Script(id) => {
                     let path = format!("scripts/inline/{id}.rhai");

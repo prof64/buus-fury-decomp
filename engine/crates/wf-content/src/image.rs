@@ -93,3 +93,69 @@ pub fn decode_indexed(bytes: &[u8]) -> Result<Indexed> {
     }
     Ok(Indexed { w, h, idx, palette })
 }
+
+/// Palette remap of a PNG (`map` = (0xRRGGBB from, 0xRRGGBB to)): an indexed PNG keeps its pixels and gets its
+/// palette entries rewritten (the format tilesets need); any other PNG is decoded to RGBA, every pixel whose RGB
+/// equals a `from` colour gets the `to` colour (alpha kept), and it is re-encoded as RGBA.
+pub fn recolor_png(bytes: &[u8], map: &[(u32, u32)]) -> Result<Vec<u8>> {
+    let remap = |rgb: u32| map.iter().find(|(f, _)| *f == rgb & 0xFF_FFFF).map(|(_, t)| *t).unwrap_or(rgb & 0xFF_FFFF);
+    if decode_indexed(bytes).is_ok() {
+        // rewrite the PLTE chunk in place (CRC recomputed); everything else is kept byte for byte
+        let mut out = bytes[..8].to_vec();
+        let mut i = 8;
+        while i + 12 <= bytes.len() {
+            let len = u32::from_be_bytes([bytes[i], bytes[i + 1], bytes[i + 2], bytes[i + 3]]) as usize;
+            let end = i + 12 + len;
+            if end > bytes.len() {
+                return err("png: truncated chunk");
+            }
+            let ty = &bytes[i + 4..i + 8];
+            if ty == b"PLTE" {
+                let mut data = bytes[i + 8..i + 8 + len].to_vec();
+                for c in data.chunks_exact_mut(3) {
+                    let t = remap(u32::from_be_bytes([0, c[0], c[1], c[2]]));
+                    c.copy_from_slice(&t.to_be_bytes()[1..]);
+                }
+                out.extend_from_slice(&bytes[i..i + 8]);
+                out.extend_from_slice(&data);
+                out.extend_from_slice(&crc32(&[ty, &data[..]].concat()).to_be_bytes());
+            } else {
+                out.extend_from_slice(&bytes[i..end]);
+            }
+            i = end;
+        }
+        return Ok(out);
+    }
+    let img = decode_rgba(bytes)?;
+    let mut raw = Vec::with_capacity(img.px.len() * 4);
+    for &p in &img.px {
+        let t = if p >> 24 == 0 { p } else { (p & 0xFF00_0000) | remap(p) };
+        let [a, r, g, b] = t.to_be_bytes();
+        raw.extend_from_slice(&[r, g, b, a]);
+    }
+    encode_rgba(img.w, img.h, &raw)
+}
+
+/// RGBA8 PNG encoding.
+pub fn encode_rgba(w: u32, h: u32, rgba: &[u8]) -> Result<Vec<u8>> {
+    let mut out = Vec::new();
+    {
+        let mut e = png::Encoder::new(&mut out, w, h);
+        e.set_color(png::ColorType::Rgba);
+        e.set_depth(png::BitDepth::Eight);
+        let mut wr = e.write_header().map_err(|e| Error(format!("png: {e}")))?;
+        wr.write_image_data(rgba).map_err(|e| Error(format!("png: {e}")))?;
+    }
+    Ok(out)
+}
+
+fn crc32(data: &[u8]) -> u32 {
+    let mut c = 0xFFFF_FFFFu32;
+    for &b in data {
+        c ^= b as u32;
+        for _ in 0..8 {
+            c = if c & 1 != 0 { 0xEDB8_8320 ^ (c >> 1) } else { c >> 1 };
+        }
+    }
+    !c
+}

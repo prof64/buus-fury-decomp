@@ -855,5 +855,6 @@ fn micro_scenarios_match_the_game() {
 
 #[test]
 fn full_cutscenes_match_the_game() {
-    run_dir("", false);
+    // strict since every full cutscene matches (2026-10-02); background objects (bg_*) stay informational
+    run_dir("", true);
 }

@@ -11,6 +11,7 @@ use wf_view::{FrameSel, RenderView};
 
 use crate::mode7::{billboard, div, flyer_from_camera, Camera3d, HORIZON_LINE};
 use crate::Renderer;
+use wf_view::GBA_H;
 
 /// One OBJ of the world-map frame (GBA screen coordinates of the 240x160 picture).
 #[derive(Clone, Debug)]
@@ -108,6 +109,11 @@ impl Renderer {
         };
         self.mode7.insert(id.to_string(), d.clone());
         d
+    }
+
+    /// The world-map OBJs the renderer would place for a view, in OAM order (tools / tests).
+    pub fn mode7_objs(&mut self, packs: &Packs, view: &RenderView) -> Vec<M7Obj> {
+        self.mode7_prepare(packs, view).map(|f| f.objs).unwrap_or_default()
     }
 
     /// Prepare the world-map frame (None on 2D maps).
@@ -244,8 +250,11 @@ impl Renderer {
         let ox = sx - hb[0] / 2;
         let oy = sy - hb[1] / 2;
         let s = (depth.wrapping_mul(0x222) >> 17).max(0x80);
-        let m = Some([s, 0, 0, s]);
         let step = def.animations.values().flat_map(|a| a.directions.values().flatten()).find(|st| st.frame as usize == frame && st.flip == flip).cloned();
+        // 0x0800F012: a frame whose first piece is h-flipped mirrors the whole group through PA = -scale (affine
+        // OBJs ignore the flip bits; halo, pieces and shadow share the matrix)
+        let mirror = step.as_ref().and_then(|st| st.objs.first()).is_some_and(|o| o[5] & 0x1000 != 0);
+        let m = Some([if mirror { -s } else { s }, 0, 0, s]);
         let mut out = Vec::new();
         if let Some(st) = &step {
             // halo attachment: 16x8 8bpp affine double, before the body
@@ -294,6 +303,10 @@ impl Renderer {
             let layer = d.ground_bg;
             for py in 0..h {
                 let line = py as i32 - oy;
+                // zoomed-out views: nothing above the GBA picture (only sky); below it the scanline angles continue
+                if line < 0 {
+                    continue;
+                }
                 let (pa, pc, x0, y0) = if line >= HORIZON_LINE as i32 {
                     f.bg_cam.scanline(&d, line as usize)
                 } else {
@@ -323,7 +336,12 @@ impl Renderer {
             let r2 = ((hofs >> 8) & 1) as usize;
             let layer = d.pano_bg;
             for py in 0..h {
-                let my = (py as i32 - oy) & 255;
+                let line = py as i32 - oy;
+                // zoomed-out views: the sky map's top row continues above the picture; below it nothing
+                if line >= GBA_H {
+                    continue;
+                }
+                let my = line.max(0) & 255;
                 let row = (my >> 3) as usize;
                 for px in 0..w {
                     let mx = (px as i32 - ox + hofs) & 255;
@@ -341,6 +359,31 @@ impl Renderer {
                 }
             }
         }
+        // zoomed-out views: BG0's horizon haze (a fixed 240 px picture that also holds the mini-map) continues
+        // sideways with its left column, drawn here (same priority, BG0 is the front BG) outside its own columns
+        if let Some(l0) = map.layers.iter().find(|l| l.bg == 0 && l.priority == prio && l.rate_x == 0) {
+            let lw = (l0.w_tiles * 8) as i32;
+            for py in 0..h {
+                let ly = py as i32 - oy;
+                if !(0..GBA_H).contains(&ly) {
+                    continue;
+                }
+                let Some((t, fh, fv)) = l0.tile(0, (ly >> 3) as u32) else { continue };
+                let r = if fv { 7 - (ly & 7) } else { ly & 7 };
+                let cx = if fh { 7 } else { 0 };
+                let ix = ts.tiles.get(t as usize * 64 + (r * 8 + cx) as usize).copied().unwrap_or(0);
+                if ix == 0 {
+                    continue;
+                }
+                let c = ts.palette.get(ix as usize).copied().unwrap_or(0) | 0xFF00_0000;
+                for px in 0..w {
+                    let sx = px as i32 - ox;
+                    if sx < 0 || sx >= lw {
+                        self.put(py * w + px, c, 0, 0);
+                    }
+                }
+            }
+        }
     }
 
     /// The world-map OBJs of priority `prio`, last OAM entry first.
@@ -352,6 +395,8 @@ impl Renderer {
             let (bw, bh) = if o.double { (2 * o.w, 2 * o.h) } else { (o.w, o.h) };
             let x = if o.x >= 240 { o.x - 512 } else { o.x };
             let y = if o.y >= 160 { o.y - 256 } else { o.y };
+            // the bottom label stays at the bottom edge of zoomed-out views
+            let oy = if o.affine.is_none() && o.w == 240 { self.h as i32 - GBA_H } else { oy };
             for j in 0..bh {
                 let syy = y + j + oy;
                 if syy < 0 || syy >= self.h as i32 {

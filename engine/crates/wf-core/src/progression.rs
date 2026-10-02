@@ -132,6 +132,15 @@ pub struct EffStats {
 }
 
 pub fn recalc_stats(rec: &Record, equip: &[Option<&Equip>], holy_water: bool) -> EffStats {
+    recalc_stats_with(rec, equip, holy_water.then_some(HOLY_WATER))
+}
+
+/// the timed buff Holy Water gives (GD+0x4E0..0x4EC: STR / POW / END / SPD)
+pub const HOLY_WATER: [i32; 4] = [25, 25, 25, 25];
+
+/// RecalcStats with the running timed buff (`boost_stats` 0xF2 / Holy Water: GD+0x4DC frames left, GD+0x4E0..0x4EC
+/// the STR / POW / END / SPD bonuses, applied by 0x080046AE)
+pub fn recalc_stats_with(rec: &Record, equip: &[Option<&Equip>], boost: Option<[i32; 4]>) -> EffStats {
     let mut s = EffStats {
         str_: rec.str_,
         pow: rec.pow,
@@ -190,12 +199,12 @@ pub fn recalc_stats(rec: &Record, equip: &[Option<&Equip>], holy_water: bool) ->
             s.spd += 50;
         }
     }
-    if holy_water {
-        s.str_ += 25;
-        s.pow += 25;
-        s.end += 25;
-        s.end2 += 25;
-        s.spd += 25;
+    if let Some([bs, bp, be, bd]) = boost {
+        s.str_ += bs;
+        s.pow += bp;
+        s.end += be;
+        s.end2 += be;
+        s.spd += bd;
     }
     s.str_ = s.str_.max(0);
     s.pow = s.pow.max(0);

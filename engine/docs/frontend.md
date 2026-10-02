@@ -214,6 +214,41 @@ to pick a GBA button, Enter then the new key (Esc cancels), "Reset to defaults",
 the screen, so a bad binding cannot lock you out. Saved to `<data>/bindings.json`. Headless preview:
 `buus-fury --headless --show-controls --shot out.ppm`. (The web shell keeps its HTML settings panel.)
 
+## 9b. World map (mode 7) — `wf_render::mode7` / `mode7_draw`
+
+When `MapView.mode7` is set (area 0-50), the renderer draws the game's mode-1 picture itself from content
+(`maps/area_00_050/mode7.json` + `objects.json` props, docs/maps.md "World map"):
+
+* **BG2 ground**: per scanline 56..159 the parameters of `0x080086D8` (pitch + per-line angle → csc / cos
+  tables → distance; heading rotation; `pa / pc / x / y` exactly as the table in RAM); lines above use the
+  values left by the last IRQ write (all -1). Samples read the world tile map at their true position.
+* **BG1 sky**: hofs = (heading << 3) >> 10, columns taken from the two panorama chunks like `0x08007AB4`.
+* **BG0** haze + mini-map outline: an ordinary fixed map layer; blending BLDCNT 0x1641 (BG0 over BG1/BG2/OBJ,
+  EVA 6, EVB 16) like every map.
+* **3D camera** (`0x0802ED98`): quaternions heading × 90° × pitch (1 << 15) → 1024-scale view matrix, far
+  distance, ground bounding box; **projection** `0x0802F1C6` (BIOS-Div rounding). Verified against RAM for 480
+  recorded frames (matrix, rotation, far, bbox all identical; tables identical).
+* **OBJs** in OAM order: mini-map marker (affine, rotated by the heading, priority 0), the bottom label (bar picture
+  + `small` font, centred over all code units, colour 2 with a colour-1 shadow at (+1, +1)), then the flyer group
+  (halo, pieces, shadow sharing one matrix: scale `depth * 0x222 >> 17`, PA negated when the frame's first piece is
+  h-flipped) and the billboards (scale `depth * 10 >> 12`, culled by the bounding box), nearest first, at most 16
+  affine matrices per frame.
+* View data: `MapView.mode7` = the camera the OBJs are projected with; `RenderView.world_map` (optional) adds the
+  camera the BG table was built from (`bg_camera`), the exact flyer (position, frame), script prop visibility and
+  the mini-map box. Without it the flyer is derived from the camera (exact inversion of `0x08034124`) and found
+  among the view's sprites (the player sprite; other sprites are ignored on the world map).
+* Timing (emulator captures): the BG table is built from an earlier camera than the OBJs, and the flyer's frame
+  graphics (VRAM tiles, uploaded immediately) can be newer than its OAM entry (copied at the next VBlank) — the
+  simulation should fill `world_map.bg_camera` / `flyer` accordingly.
+* Zoomed-out PC view: the GBA picture is centred; the ground continues below it (scanline angles extended with
+  atan), the sky's top row above it, BG0's haze sideways with its left column; the label sits on the bottom edge.
+* Parity (`tests/emulator_parity.rs` `world_map_matches_emulator`, captures from
+  `crates/wf-render/re/capture_worldmap.py` in `work/frontend_wm/`): 12 scenes (start, cruise, turns, climb,
+  high / low altitude, reverse, far east / north / west, spin) — ground, sky, haze, mini-map, marker, label,
+  billboards, flyer, halo and shadow pixel-identical; the only differences are 0–2 whole scanlines in some
+  frames where the HBlank IRQ ran late (the line shows its neighbour's affine parameters; sound-DMA timing, not
+  modelled) and one capture taken mid label-tile upload.
+
 ## 10. Gaps
 
 * wf-core's view: no halo / attachment draws (forms with a halo show without it), no selected-skill icon, SS /
@@ -223,3 +258,6 @@ the screen, so a bad binding cannot lock you out. Saved to `<data>/bindings.json
 * Fog / wrap overlay layers and semi-transparent OBJs have no emulator scene yet (no save state on such a map).
 * Mod `index.json` regeneration is not done by the loader (listing works via `files.json` / directory walk).
 * Gamepad buttons are rebindable only through `bindings.json` (the screen rebinds keys).
+* World map: wf-core does not fill `RenderView.world_map` yet (bg camera one frame older, exact flyer + frame, prop
+  visibility from `prop_show` / `prop_hide`, the `spawn_box` mini-map rect, the story destination markers
+  `spawn_marker_a/b` — the latter are not drawn at all); HBlank-IRQ scanline jitter is not modelled.

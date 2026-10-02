@@ -1,5 +1,5 @@
 //! Check the world-map camera math against emulator recordings (headless): `cargo run -p wf-app --example
-//! mode7_check -- <content dir> <rows.json> [oam.json]`. rows.json: per frame `m` = the map object's words
+//! mode7_check -- <content dir> <rec.json> <rec.json>`. rec.json: per frame `m` = the map object words
 //! (0x030019A4..) and `tabs` (BG2 scanline tables); oam.json: `m` + `oam` (shadow OAM hex) + `fl` (flyer).
 //! Recorders: crates/wf-render/re/wm_record.py.
 

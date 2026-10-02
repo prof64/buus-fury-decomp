@@ -53,6 +53,9 @@ pub enum Cause {
     /// an enemy AI node queued a script (RunScript: `run` = `header_0xADDR`, the event whose header is ADDR;
     /// InlineScript: `inline_0xADDR`)
     Ai { entity: EntityId },
+    /// a level-up (kill XP): the engine's level-up hook, event #3 ("%s has reached level %d!", stat points,
+    /// skills learned), run where the game runs it inline
+    LevelUp { entity: EntityId },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -222,6 +225,7 @@ fn renew_player(w: &World, old: &Player) -> Player {
     p.ss3_gauge = old.ss3_gauge;
     p.ss_cooldown = old.ss_cooldown;
     p.holy_left = old.holy_left;
+    p.boost = old.boost;
     p.regen_timer = old.regen_timer;
     p.hp_regen_acc = old.hp_regen_acc;
     p.hp_acc = old.hp_acc.clone();
@@ -417,6 +421,8 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
     let to = AreaId { variant, ..to };
     let from = w.field.as_ref().map(|f| f.area).unwrap_or_default();
     let had_area = w.field.as_ref().is_some_and(|f| f.loads > 0);
+    // a load inside a running event (script warp / scene load) keeps the field held until the event ends
+    let keep_busy = w.scene.depth > 0 && w.field.as_ref().is_some_and(|f| f.busy);
     // every object goes; the players are re-created below (same entity ids)
     let players = w.players.clone();
     w.ents.retain(|e| players.contains(&e.id));
@@ -448,7 +454,7 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
         f.patrols.clear();
         f.item_get = None;
         f.mode = Mode::Normal;
-        f.busy = false;
+        f.busy = keep_busy;
         f.entered = w.frame;
         f.loads += 1;
     }
@@ -500,8 +506,13 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
         p.a.y = sy << 8;
         p.a.facing = facing.unwrap_or(old.a.facing);
         w.ents.push(crate::world::Entity { id: pid, removed: false, body: Body::Player(Box::new(p)) });
+        // the idle state is entered twice; the second draw is the idle tick that stays (intro lockstep: the
+        // player's blink after the warp)
         w.rng.rand(255);
-        w.rng.rand(255);
+        let tick = w.rng.rand(255);
+        if let Some(Body::Player(p)) = w.ents.last_mut().map(|e| &mut e.body) {
+            p.ap.tick = tick;
+        }
     }
     // the 3D world map: the flying player (z 60, heading north, speed 0)
     if m.three_d {

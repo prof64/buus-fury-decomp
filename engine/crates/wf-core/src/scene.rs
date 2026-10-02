@@ -354,7 +354,9 @@ pub fn scene_anim(w: &World, i: usize) -> Option<&ActAnim> {
 fn anim_mut(w: &mut World, i: usize) -> Option<&mut ActAnim> {
     let id = w.ents[i].id;
     let npc = matches!(w.ents[i].body, Body::Npc(_));
-    if !npc {
+    // a map NPC with a field behaviour comes under script control (its behaviour pauses until the event ends;
+    // its animation stays in `Npc.anim`)
+    if !npc || matches!(&w.ents[i].body, Body::Npc(n) if n.behaviour.is_some()) {
         make_puppet(w, i);
     }
     if npc {
@@ -441,6 +443,23 @@ pub fn release_puppets(w: &mut World) {
         .iter()
         .map(|p| matches!(p.anim.mode, AnimMode::Frames { .. }) && w.find(p.id).is_some_and(|i| matches!(w.ents[i].body, Body::Player(_))))
         .collect();
+    // map NPCs go back to their field behaviour with the animation the script left (one animation state in the
+    // game: obj+0x50 / +0x11 / +0x12)
+    for (p, &k) in w.scene.puppets.iter().zip(keep.iter()) {
+        if k {
+            continue;
+        }
+        let Some(i) = w.ents.iter().position(|e| e.id == p.id) else { continue };
+        if let Body::Npc(n) = &mut w.ents[i].body {
+            let (raw, tick, frame) = (n.anim.raw, n.anim.tick, n.anim.frame);
+            if let Some(b) = n.behaviour.as_mut() {
+                b.anim = (raw - 1).clamp(0, 255) as u8;
+                b.raw = raw;
+                b.tick = tick;
+                b.frame = frame;
+            }
+        }
+    }
     let mut it = keep.into_iter();
     w.scene.puppets.retain(|_| it.next().unwrap_or(false));
 }
@@ -910,6 +929,8 @@ pub struct Scene {
     /// the player objects while a cutscene scene is loaded (load_scene 0x72-0x74 builds the map with no player
     /// object, 0x08009030); `return_to_field` / a warp brings them back
     pub offstage: Vec<crate::world::Entity>,
+    /// enemies whose AI InlineScript node waits for its script (the host calls `ai_script_done`)
+    pub ai_wait: Vec<EntityId>,
 }
 
 impl Default for Scene {
@@ -938,6 +959,7 @@ impl Default for Scene {
             song: -1,
             chaining: false,
             offstage: Vec::new(),
+            ai_wait: Vec::new(),
             keys: [InputFrame::default(); MAX_PLAYERS],
         }
     }
@@ -1138,8 +1160,6 @@ pub fn camera_update(w: &mut World) {
     }
 }
 
-/// a fired beam's lingering effect object outlives the command by 8 frames (then its sound changes)
-const BEAM_LINGER: i32 = 8;
 
 fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
     let i = owner_index(w, owner);
@@ -1810,6 +1830,15 @@ pub fn note_events(w: &mut World) {
             crate::world::Event::SongStop => w.scene.song = -1,
             _ => {}
         }
+    }
+}
+
+/// the script an enemy's AI node started (`Cause::Ai`) is over: its node completes, and the actors it commanded
+/// go back to their own updates (no event ends for an AI script, so nothing else releases them)
+pub fn ai_script_done(w: &mut World, entity: EntityId) {
+    w.scene.ai_wait.retain(|&e| e != entity);
+    if w.scene.depth == 0 {
+        release_puppets(w);
     }
 }
 

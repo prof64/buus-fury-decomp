@@ -109,7 +109,7 @@ pub fn binding(n: u8) -> Binding {
         0xb2 => b(Scene, "scene.title"),
         0xb3 | 0xb4 => b(Core, "scene::SIN_TABLE (0x087B6EEC)"),
         0xb5..=0xb9 | 0xd6..=0xd8 => b(Vm, "run_event / run_script"),
-        0xc2 => b(Partial, "player::gain_xp; the level-up popup (hook #3 run inline by the game) is not started"),
+        0xc2 => b(Core, "player::gain_xp_levels; a level-up runs hook #3 inline (NativeResult::RunEvent); kill XP in the field queues #3 (Cause::LevelUp)"),
         0xc3 | 0xc8 => b(Core, "leader Player.rec.xp / level"),
         0xc4 | 0xc5 | 0xeb | 0xdb => b(Story, "World.story.game_bits"),
         0xc9 | 0xdc => b(Partial, "engine broadcast with an unknown receiver: scene::Request::Broadcast"),
