@@ -28,6 +28,8 @@ export type AudioEventType =
   // exact driver calls (the player's states emit these at the game's call sites, verified by the lockstep harness)
   | 'sfx' // PlaySfx 0x0803E378: {id, vol}
   | 'sfx_stop' // StopSfx 0x0803E302: {id}
+  | 'sfx_stop_match' // StopMatching 0x0803E32C: {id} (stops the voices playing that effect)
+  | 'sfx_stop_all' // StopAll 0x0803E2EC
   | 'song' // PlaySong 0x0803F110: {id}
 
 export type AudioSink = (type: AudioEventType, data?: AudioEventData) => void

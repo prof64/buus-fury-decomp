@@ -16,8 +16,6 @@ const KNOWN: [RegExp, string][] = [
   [/^f23_(bump|move|punch|skill11)$/, 'Trunks form 23 uses an NPC sprite: its dash / punch / skill animation slots are garbage pointers'],
   [/^f46_punch$/, 'Android 18 (NPC sprite): the punch animations are garbage pointers (OAM), the game reads their length from OAM'],
   [/^f14_(skill20|ssdrain)$/, 'game bug: Super Saiyan as Great Saiyaman (up 255 != down 10) transforms into form 255'],
-  [/^f02_vs_enemy_/, 'real enemies attacking (their own AI): enemy-side fidelity - movement / animation switches of the AI nodes (e.g. the walk -> idle switch when a chase stops) - diverges after the first frames; the player-side reaction to every attack kind is covered by f02_hurt_kinds / f02_hurt_block'],
-  [/^f31_vs_skill13$/, 'Kamikaze Ghost homing (0x08038F2C) aims with the sprite frame boxes (0x0800FE34: the frame record +4..+7) of the ghost and the target, not modelled'],
 ]
 
 describe('lockstep vs emulator', () => {

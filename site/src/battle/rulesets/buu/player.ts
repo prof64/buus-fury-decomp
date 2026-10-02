@@ -11,7 +11,7 @@ import { BTN, DPAD } from '../../core/input'
 import { overlaps, rectAt, type Dir, type Rect } from '../../core/geom'
 import type { Entity, World } from '../../core/world'
 import type { Renderer } from '../../core/renderer'
-import { Actor, broadcast, hitsBody, type HitMsg } from './actor'
+import { Actor, broadcast, hitsBody, SIN256, type HitMsg } from './actor'
 import type { BuuCtx, HoldKind, PlayerLike } from './context'
 import { ATK, computeDamage, HpAcc } from './damage'
 import type { BuuForm, EquipDef } from './data'
@@ -23,6 +23,9 @@ import { ANIM_RAW, ANIM_STATE, tickBored, tickIdle, tickLoop, tickOnce, type Ani
 import { BIGBANG_POS, BigBangBall, FullBeam, Ghost, GrowBeam, KameBeam, MasenkoCursor, VolleyWave, StraightShot, kiBlast, VEL, BURNING_HOLD, burningFx, burningEnd, type Shot } from './projectiles'
 
 /** melee rects 0x083C344C (x0,y0,x1,y1 relative to the position; same for every form) */
+/** Dabura's stone state (vtable 0x0804AB34), named like the emulator's lockstep rows */
+const STONE = 'vt_0804AB34'
+
 export const PUNCH_RECT = [
   [0, 0, 16, 16],
   [0, -24, 16, 0],
@@ -162,7 +165,6 @@ export class Player extends Actor implements PlayerLike {
   holdLast = 0
   blast: StraightShot | null = null
   wraps = 0
-  wrapPresses: number[] = []
   /** SS gauge (rec+0x1E) and SS3 gauge (+0x20) in 1/65536 EP */
   ssGauge = 0
   ssAcc = 0
@@ -311,18 +313,50 @@ export class Player extends Actor implements PlayerLike {
     return this.state === 'punch' || this.state === 'skill' || this.state === 'dash'
   }
   charging() {
+    // the state's vfunc +0x1C (IfInPlayerBeamLine 0x08029B30). Ki Blast (state vtable 0x0804DC14): 0x0804FA30 =
+    // state byte +4 (the refire request: B pressed again, control 0x0801AFE2) or anim tick < 16, i.e. until the
+    // blast leaves the hand (lockstep f02_vs_hold_stone: Dabura's guard 0x75 / 0x77). Other skills: INFERRED any
+    // skill state.
+    if (this.gs === 'skill7') return !!this.sk?.refire || this.ap.tick < 16
     return this.state === 'skill'
   }
   isStone() {
-    return this.holdKind === 'stone'
+    // IfPlayerPetrified 0x0803AE65: the player's current animation is the stone pose (raw 22)
+    return this.gs === STONE || this.holdKind === 'stone'
   }
+
+  // ---- Dabura's stone (special hold; lockstep f02_vs_hold_stone) ----------------------------------------------------
+  // The spit's accepted hit (0x0802E60A, after the normal hit: damage and reaction) does SetAnimRaw(0x15) (raw 22)
+  // + SetState(new state, vtable 0x0804AB34). Enter 0x0802E354: state+8 = 150; anim tick 0; a counter object
+  // (vtable 0x08049D74, +4 = 150) replaces the player's controller obj+0x224 (0x08010BB8). Its damage reaction
+  // (+0xC, 0x0802E348) is counter -= damage >> 10 instead of the hurt state (HP is still lost). Tick (+4): none.
+  // Control (+8, 0x0802E384): a newly pressed A / B / d-pad key (mask 0xF3) -> counter -= 5; frame = counter < 75
+  // (cracked); counter <= 0 -> a puff at the body centre (rate 0x1000 + rand(0x1000), pool room >= 0x400) and
+  // SetAnim(0). No timer. Exit 0x0802E42E: the default controller 0x03001C3C back. A new spit while petrified
+  // builds a new state (counter 150 again).
+  stoneHp = 0
+  petrify(w: World) {
+    if (this.dead) return
+    this.ap.raw = 22
+    this.enterState(w, STONE)
+    this.stoneHp = 150
+  }
+  private ctlStone(w: World) {
+    if (w.input.pressed & 0xf3) this.stoneHp -= 5
+    this.ap.frame = 75 > this.stoneHp ? 1 : 0
+    if (this.stoneHp > 0) return
+    this.ctx.puffRng(w, ...this.center())
+    this.setAnimId(w, 0)
+  }
+  // ---- end stone ---------------------------------------------------------------------------------------------------
   isCandy() {
     return this.ctx.candy > 0
   }
   swinging() {
     return this.state === 'punch'
   }
-  hold(w: World, by: import('./actor').Actor, kind: HoldKind, frames: number) {
+  /** `raw`: the animation the holder shows (frame 0); default the hurt animation's first frame (raw 10) */
+  hold(w: World, by: import('./actor').Actor, kind: HoldKind, frames: number, raw = 10) {
     if (this.dead) return
     this.endSkill(w)
     this.heldBy = by
@@ -336,7 +370,7 @@ export class Player extends Actor implements PlayerLike {
     this.blocking = false
     // INFERRED: the enemies' hold controllers are not decoded; the hurt animation's first frame is shown
     if (kind === 'eat') this.alpha = 0
-    else this.ap.raw = 10
+    else this.ap.raw = raw
     this.ap.frame = 0
   }
   release(w: World) {
@@ -347,6 +381,152 @@ export class Player extends Actor implements PlayerLike {
     this.holdKind = null
     this.alpha = 1
     this.setAnimId(w, 0)
+  }
+  // [H] generic infrastructure for the enemies' holds that drive the player's state directly
+  /** 0x0800ED18(player, 0x03001B00): the hold state (frame kept, no tick, no control) */
+  enterHold(w: World) {
+    if (this.dead) return
+    this.endSkill(w)
+    this.enterState(w, 'hold')
+  }
+  /** SetAnim(0) (vfunc +0x28 0x0800ECF0 with id 0) */
+  toIdle(w: World) {
+    if (this.dead) return
+    this.setAnimId(w, 0)
+  }
+  /** SetAnimRaw(raw - 1) (0x0800ECDA), frame = `frame`, then SetState(0x03001B00) (BearHug enter 0x0802C4C9) */
+  holdPose(w: World, raw: number, frame: number) {
+    if (this.dead) return
+    this.endSkill(w)
+    this.ap.raw = raw
+    this.ap.frame = frame
+    this.enterState(w, 'hold')
+  }
+  get poseFrame() {
+    return this.ap.frame
+  }
+  set poseFrame(f: number) {
+    this.ap.frame = f
+  }
+
+  // [H] ---- Majin Buu's candy (beam 0x080287AD, candy states 0x0804BE60 / 0x0804B7AC / 0x0804C2CC, eat 0x0802AF11) -----
+  /** the shown sprite def is 0x36 (the sweets, sprite index 45) instead of the form's (SetDef 0x0800EDF8) */
+  candyDef = false
+  /** candy hop: the move code kept in the walk state (+4): 1 / 2 left / right + 3 / 6 up / down */
+  candyCode = 0
+  /** the player object is out of the world (Majin Buu's eat, tick 8 .. 119): no update, no hits, not drawn */
+  gone = false
+  /** the beam's accepted hit 0x08028862: SetDef(0x36), a new candy idle state (SetAnimRaw(0) + SetState), frame
+   *  rand(3), candy timer 0x03002FE4 = 300 */
+  candyHit(w: World) {
+    if (this.dead) return
+    this.endSkill(w)
+    this.candyDef = true
+    this.ap.raw = 1
+    this.enterState(w, 'candy')
+    this.ap.frame = w.rng.rand(3, 'candy sweet')
+    this.ctx.candy = 300
+    w.logEvent('info', 'player turned into candy (300 f)')
+  }
+  /** eat controller t 0: SetDef(0x36), the candy-eat state (enter 0x0804EAD5: tick 0, position = (x, y), KO flag 0) */
+  candyEat(w: World, x: number, y: number) {
+    this.candyDef = true
+    this.ap.raw = 1
+    this.enterState(w, 'candy_eat')
+    this.z = 0
+    this.x = x
+    this.y = y
+  }
+  /** eat t 8: the player object leaves the world (0x08011944); the candy-eat state's destructor (0x0804F69D) clears
+   *  the candy timer */
+  candyGone(_w: World) {
+    this.gone = true
+    this.ctx.candy = 0
+  }
+  /** eat t 120: the new player object (0x080109AA(0, position, the form's def, 1)): facing down, the form's def, a new
+   *  idle state (SetAnimRaw(0) + SetState, the idle enter's rand(255)); the KO flag -> KO (INFERRED: the message
+   *  vfunc +0x5C with multiplier 0x400 is taken as the KO) */
+  candyRespawn(w: World, x: number, y: number, ko: boolean) {
+    this.gone = false
+    this.candyDef = false
+    this.x = x
+    this.y = y
+    this.z = 0
+    this.facing = 0
+    this.flash = 0
+    // the constructor: an idle start tick (0x0800DFBE) and SetAnim(0) into the idle singleton 0x03002B44 (its enter
+    // draws again), then the eat's own new idle state 0x0804C790 (SetAnimRaw(0) + SetState: a third rand(255))
+    w.rng.rand(255, 'new player idle tick')
+    w.rng.rand(255, 'new player idle 0x03002B44')
+    this.ap.raw = 1
+    this.enterState(w, 'idle')
+    if (ko) {
+      this.hp = 0
+      this.afterHpChange(w)
+    }
+  }
+  /** candy idle control 0x08028390: timer 0 -> the form's def, SetAnim(0); a held d-pad key -> facing (left 2,
+   *  right 3, up 1, down 0; the later one wins), a new candy walk state (SetAnimRaw(0)); then timer > 0 -> - 1 */
+  private ctlCandy(w: World) {
+    const held = w.input.held
+    if (this.ctx.candy === 0) {
+      this.candyDef = false
+      return this.setAnimId(w, 0)
+    }
+    if (held & DPAD) {
+      if (held & BTN.LEFT) this.facing = 2
+      if (held & BTN.RIGHT) this.facing = 3
+      if (held & BTN.UP) this.facing = 1
+      if (held & BTN.DOWN) this.facing = 0
+      this.ap.raw = 1
+      this.enterState(w, 'candy_walk')
+    }
+    // [H] the candy timer 0x03002FE4 counts down in the candy states' controls only (ctlCandy / ctlCandyWalk)
+  }
+  /** candy walk control 0x080284C0 (t = obj+0x12): at t 0 the timer 0 -> the form's def, SetAnim(0) (nothing more);
+   *  no d-pad -> a new candy idle state; else a walk-speed step (left / right first, try-move flags 2, then up / down,
+   *  flags 1) and its move code kept; t 8..120 repeat the kept code's steps; then t = (t + 8) & 0x7F, timer > 0 -> - 1.
+   *  The facing never changes here. */
+  private ctlCandyWalk(w: World) {
+    const held = w.input.held
+    const a = this.ap
+    const sp = this.walkSpeed()
+    if (a.tick === 0) {
+      if (this.ctx.candy === 0) {
+        this.candyDef = false
+        this.z = 0
+        return this.setAnimId(w, 0)
+      }
+      if (!(held & DPAD)) {
+        this.ap.raw = 1
+        this.enterState(w, 'candy')
+      } else {
+        let code = 0
+        if (held & BTN.LEFT) {
+          this.walkTry(w, -sp, 0, 2)
+          code = 1
+        } else if (held & BTN.RIGHT) {
+          this.walkTry(w, sp, 0, 2)
+          code = 2
+        }
+        if (held & BTN.UP) {
+          this.walkTry(w, 0, -sp, 1)
+          code += 3
+        } else if (held & BTN.DOWN) {
+          this.walkTry(w, 0, sp, 1)
+          code += 6
+        }
+        this.candyCode = code
+      }
+    } else {
+      const c = this.candyCode
+      if (c === 1 || c === 4 || c === 7) this.walkTry(w, -sp, 0, 2)
+      if (c === 2 || c === 5 || c === 8) this.walkTry(w, sp, 0, 2)
+      if (c === 3 || c === 4 || c === 5) this.walkTry(w, 0, -sp, 1)
+      if (c === 6 || c === 7 || c === 8) this.walkTry(w, 0, sp, 1)
+    }
+    a.tick = (a.tick + 8) & 0x7f
+    if (this.ctx.candy > 0) this.ctx.candy--
   }
   /** Actor.setAnim for the skill code: the named animation (raw index n+1 / name) becomes obj+0x50 */
   setAnim(ref: number | string | (number | string)[], restart = true, _loop?: boolean) {
@@ -456,6 +636,15 @@ export class Player extends Actor implements PlayerLike {
         break
       case 'hold':
         break
+      // [H] candy states: enter t = 0 (0x0804EA21 / 0x0804E921 / 0x0804EAD5), the frame kept
+      case 'candy':
+      case 'candy_eat':
+        a.tick = 0
+        break
+      case 'candy_walk':
+        a.tick = 0
+        this.candyCode = 0
+        break
       case 'punch':
         // 0x0800DEE8: swing sound 50 + rand(2)
         a.tick = a.frame = 0
@@ -520,6 +709,14 @@ export class Player extends Actor implements PlayerLike {
         return gs.startsWith('skill') ? 'skill' : 'idle'
     }
   }
+  /** ---- mummy bandages (projectiles.ts MummyWrap): every live bandage's update runs 0x0802D8E6 - the form controller's
+   *  stat reset (0x0800E074: resists 128, so the hurt state's i-frames end) and walk / dash -48 per stuck bandage;
+   *  the shake-off is the bandages' own (0x08040284(input, d-pad, 8, 60)) */
+  wrapStats(stuck: number) {
+    this.resist = 128
+    this.refreshStats()
+    this.wraps = stuck
+  }
   setResist(v: number) {
     if (this.resist === v) return
     this.resist = v
@@ -540,6 +737,8 @@ export class Player extends Actor implements PlayerLike {
       this.syncAnim()
       return
     }
+    // [H] eaten (out of the world): nothing of the player runs
+    if (this.gone) return
     if (this.flash > 0) this.flash--
     this.t++
     this.shieldTick()
@@ -552,7 +751,15 @@ export class Player extends Actor implements PlayerLike {
     // tick, then the control of the state that is current after the tick. The death script (KO + 199) blocks the
     // player update for a frame, then only the state tick runs. The story forms' controllers keep running at HP 0.
     const sinceKo = this.koAt >= 0 ? w.frame - this.koAt : -1
-    if (sinceKo === 199) return this.syncAnim()
+    if (sinceKo === 199) {
+      // the death script's loop runs from here on: no other object is updated any more (no enemy AI / RNG draws
+      // from KO + 199 to the end of the recording; lockstep f02_vs_enemy_t23 / t28 / t5a)
+      w.modal = [this]
+      // ... and every actor gets message 0xF (0x0800F44A: the current state's vfunc +0x10; the walk state's
+      // 0x0800E050 is SetAnim(0), idle's does nothing; lockstep f02_vs_enemy_t13: rand(255) of a walking enemy)
+      for (const e of this.ctx.enemies) if (!e.removed) (e as unknown as { stopMsg?: () => void }).stopMsg?.()
+      return this.syncAnim()
+    }
     if (this.defuse) return this.defuseStep(w)
     if (sinceKo < 199 && (!this.dead || this.storyForm())) this.passive(w)
     if (this.defuse) return this.syncAnim()
@@ -603,6 +810,14 @@ export class Player extends Actor implements PlayerLike {
       case 'hold':
       case 'hold0':
       case 'block':
+      case STONE:
+        return
+      // [H] candy idle / eat ticks do nothing; the hop tick 0x080284AB: height obj+0x176 = -sin(t) >> 13
+      case 'candy':
+      case 'candy_eat':
+        return
+      case 'candy_walk':
+        this.z = -SIN256[a.tick & 0xff] >> 13
         return
       case 'skill20':
       case 'ss_up':
@@ -678,6 +893,7 @@ export class Player extends Actor implements PlayerLike {
 
   /** the state's control (vtable +8) */
   private control(w: World) {
+    if (this.gs === STONE) return this.ctlStone(w)
     if (this.state === 'held') return this.updHeld(w)
     switch (this.gs) {
       case 'idle':
@@ -696,6 +912,13 @@ export class Player extends Actor implements PlayerLike {
         return this.ctlIT(w)
       case 'skill18':
       case 'skill18r':
+        return
+      // [H] candy
+      case 'candy':
+        return this.ctlCandy(w)
+      case 'candy_walk':
+        return this.ctlCandyWalk(w)
+      case 'candy_eat':
         return
     }
     if (this.state === 'skill') return this.updSkill(w)
@@ -880,16 +1103,6 @@ export class Player extends Actor implements PlayerLike {
       this.y = this.py << 8
       this.facing = 0
       this.defuse = { t: 0, x0: this.px }
-    }
-    // wraps: 8 new d-pad presses within 60 frames shake them off
-    if (this.wraps > 0 && w.input.pressed & DPAD) {
-      this.wrapPresses.push(w.frame)
-      this.wrapPresses = this.wrapPresses.filter((f) => w.frame - f < 60)
-      if (this.wrapPresses.length >= 8) {
-        this.wraps = 0
-        this.wrapPresses = []
-        w.logEvent('info', 'mummy wraps shaken off')
-      }
     }
   }
 
@@ -1271,7 +1484,7 @@ export class Player extends Actor implements PlayerLike {
         ;(s.ghosts ?? []).forEach((g, i) => {
           if (i < committed) {
             g.free = true
-            g.wait = 1
+            g.wait = 0
           } else {
             g.removed = true
             w.rng.rand(4096, 'ghost puff')
@@ -1624,8 +1837,7 @@ export class Player extends Actor implements PlayerLike {
         if (t === 16) {
           const [gx, gy] = GHOST_SPAWN[this.facing]
           const g = new Ghost(this.ctx, this, this.facing, (this.px + gx) << 8, (this.py + gy) << 8, s.ghosts.length)
-          w.rng.rand(255, 'ghost spawn')
-          this.ghostRng.push({ at: w.frame + 24, n: 255 })
+          g.init(w)
           s.ghosts.push(w.add(g))
         }
         return
@@ -1886,13 +2098,8 @@ export class Player extends Actor implements PlayerLike {
     if (by && by.removed) return this.release(w)
     switch (k) {
       case 'vampire':
-        // escape: frames with A/B/d-pad held count, > 10 frames without input resets, > 8 releases
-        if (w.input.held & (BTN.A | BTN.B | DPAD)) {
-          if (w.frame - this.holdLast > 10) this.holdCount = 0
-          this.holdCount++
-          this.holdLast = w.frame
-        }
-        if (this.holdCount > 8) return this.release(w)
+        // ---- vampire grab: the held state 0x03001B00 does nothing itself; the escape count, the drain and the
+        // vampire's position are the VampireGrab node's (ai.ts, update 0x08033A2A); the player stays in place
         break
       case 'hug':
         if (mash(DPAD, 4, 90)) return this.release(w)
@@ -1910,7 +2117,8 @@ export class Player extends Actor implements PlayerLike {
         }
         break
     }
-    if (by && (k === 'vampire' || k === 'latch' || k === 'hug')) {
+    // (the vampire is not pinned: VampireGrab's enter moves the vampire next to the player, 0x0803399E)
+    if (by && (k === 'latch' || k === 'hug')) {
       // pinned next to the holder
       const [bx, byy] = by.footCenter()
       const nx = bx - 8 + (k === 'hug' ? 8 : 0)
@@ -1925,9 +2133,14 @@ export class Player extends Actor implements PlayerLike {
 
   // ---- damage ------------------------------------------------------------------------------------------------
   onMessage(w: World, msg: HitMsg): boolean {
-    if (msg.team === 1 || this.dead) return false
+    if (msg.team === 1) return false
     if (this.state === 'held' && this.holdKind === 'eat') return false
+    // [H] the eaten player is not in the world
+    if (this.gone) return false
     if (!hitsBody(msg, this)) return false
+    // KO: 0x08010F74 skips ComputeDamage (+0x1CC clear) but still returns 1 for a box overlapping the body - an enemy
+    // energy wave hitting the KO'd player puffs and fades (lockstep f02_vs_enemy_t30)
+    if (this.dead) return true
     // not hittable (+0x1CC: reverting, Instant Transmission, the cutscene fusions): the message is not accepted
     if (!this.hittable) return false
     // message 0 (0x08010F40) -> ComputeDamage (block: blocking flag and (hit dir ^ 1) == facing; a full energy shield
@@ -1959,7 +2172,17 @@ export class Player extends Actor implements PlayerLike {
       this.afterHpChange(w)
       if (this.dead) return true
     }
+    // stone: the counter's reaction 0x0802E348 replaces the hurt state
+    if (this.gs === STONE) {
+      this.stoneHp -= dmg >> 10
+      return true
+    }
     if (this.state === 'held') return true
+    if (msg.noReact) {
+      // the flames skip the reaction; in the transformation singleton (SetAnim(23)) they call SetAnim(0)
+      if (this.gs === 'ss_up') this.setAnimId(w, 0)
+      return true
+    }
     // 0x080107FC: blocked from the front -> pushed back 2 px; else turn to the attacker and the hurt state (raw 10)
     if (blocking) {
       const [bx, by] = BLOCK_PUSH[this.facing]
@@ -1991,16 +2214,24 @@ export class Player extends Actor implements PlayerLike {
       }
       this.ap.raw = 18
       this.enterState(w, 'ko')
-      this.koAt = w.frame
+      // the death script (started here) first runs on the next frame: the script runner comes before the object
+      // updates, whichever object dealt the KO (lockstep f02_vs_enemy_t23 / t83 melee, t13 flames, t5e: song 8 at
+      // KO + 201 ticks; the emulator's injected hits land before the script runner - buu_lockstep.ts injectHit)
+      this.koAt = w.frame + 1
     }
   }
   koAt = -1
 
   draw(r: Renderer, w: World) {
-    if (this.ctx.candy > 0 && !this.dead) {
-      // candy (0x080286D4 hit): the player's sprite is def 45 (three sweets), frame rand(3) picked on the hit
+    if (this.gone) return
+    if (this.candyDef) {
+      // [H] candy (beam hit 0x08028862): the player's def is 0x36 (sprite 45, three sweets), raw 1, the frame obj+0x11
       const sweets = this.ctx.data.sprites.index(45)
-      this.drawAs(r, w, sweets, sweets?.anim(1), this.ctx.candyFrame)
+      this.drawAs(r, w, sweets, sweets?.anim(1), this.ap.frame)
+      return
+    }
+    if (this.gs === STONE) {
+      this.drawAs(r, w, this.sprite, this.sprite?.anim(22), this.ap.frame)
       return
     }
     if (this.holdKind === 'stone') {
@@ -2042,12 +2273,16 @@ export class Player extends Actor implements PlayerLike {
     this.syncAnim()
   }
   /** what the lockstep compares: state name, raw animation (-1 when the sprite lacks it), frame, ROM frame record */
-  lockstepView(): { state: string; raw: number; frame: number; rom: number } {
-    const a = this.sprite?.anim(this.ap.raw)
+  lockstepView(): { state: string; raw: number; frame: number; rom: number; x?: number; y?: number; dir?: number } {
+    // [H] eaten: the recorder finds no player object (state 'gone', everything 0)
+    if (this.gone) return { state: 'gone', raw: 0, frame: 0, rom: 0, x: 0, y: 0, dir: 0 }
+    // [H] candy: the def is 0x36 (sprite 45)
+    const spr = this.candyDef ? this.ctx.data.sprites.index(45) : this.sprite
+    const a = spr?.anim(this.ap.raw)
     const state = this.gs === 'idle2' ? 'idle' : this.gs
     if (!a) return { state, raw: -1, frame: this.ap.frame, rom: 0 }
     type J ={ raw_index: number; directions: Record<string, { rom?: string }[]> }
-    const anims = this.sprite!.json.animations as unknown as Record<string, J>
+    const anims = spr!.json.animations as unknown as Record<string, J>
     const j = anims[a.name]
     const d = j.directions[['down', 'up', 'left', 'right'][this.facing]] ?? j.directions.any
     const s = d?.[this.ap.frame]

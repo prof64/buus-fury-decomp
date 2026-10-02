@@ -6,16 +6,18 @@
 // details are inferred (tables not decoded, cosmetic nodes).
 
 import { DIR_VEC, facingToward, overlaps, type Dir } from '../../core/geom'
-import type { HitMsg } from './actor'
+import { SIN256, type HitMsg } from './actor'
 import type { AiNodeJ } from './data'
 import type { Enemy, KnockState } from './enemy'
 import { ATK } from './damage'
 import { PathMover } from './path'
 import {
-  Bomb, CandyBeam, DarkSphere, EnergyWave, Flame, FullBeam, GrappleArm, GrowBeam, Rock, SJWave, StraightShot, StretchArm, SuperBall, VEL, kiBlast,
+  Bomb, CandyBeam, DarkSphere, EnergyWave, Flame, FullBeam, GrappleArm, KameBeam, Rock, SJWave, StraightShot, StretchArm, SuperBall, VEL, kiBlast,
 } from './projectiles'
-import { BEAM_POS, BeamCharge, BeamGfx } from './fx'
+import { BeamGfx } from './fx'
 import { FINAL_FLASH_TABLES } from './skillfx'
+import { audioEvent } from '../../audio/bus'
+import { ENEMY_SETANIM, GENERIC_STATES } from './eanim'
 
 export const NODE_NOTES: Record<string, string> = {
   IfPlayerInZone: 'sniper zone rectangle not decoded: true within 160 px',
@@ -24,7 +26,6 @@ export const NODE_NOTES: Record<string, string> = {
   MoveToFormationA: 'formation offset tables 0x0877AE80/0x0877AECC not decoded: ring of 8 slots at 40/24 px',
   GhostAnimA: 'cosmetic appear/vanish animation',
   TankDrive: 'turn helpers not decoded: axis-aligned drive toward the player at 0.5 px/frame',
-  CandyBeam: 'beam offsets for facings other than right are mirrored guesses',
   EnergyBarrage: 'barrage flight path not decoded: short 4 px/frame shots, 12 frames',
   IfUnknown: 'condition 0x0804EE25 not decoded: false',
   ShockStun: 'electric-shock stun length not decoded: 48 frames',
@@ -284,20 +285,19 @@ class Sequence extends Base {
   get active() {
     return this.kids[this.i]
   }
+  /** 0x08018EF6: enters the child at the current index (the index is not reset: a re-entered sequence resumes) */
   enter() {
-    this.i = 0
-    this.kids[0]?.enter()
+    this.kids[this.i]?.enter()
   }
   /** 0x08018F0C: a finished child exits and the next one enters; after the last the index wraps to 0 WITHOUT
-   *  entering the first child again (the next update runs it as it is) and the sequence reports done */
+   *  entering the first child again (the next update runs it as it is) and the sequence reports done. A state change
+   *  inside does not stop the evaluation (the replaced tree finishes its update) */
   update() {
     if (this.i >= this.kids.length) {
       this.i = 0
       return 1
     }
-    const g = this.c.gen
     const r = this.kids[this.i].update()
-    if (g !== this.c.gen) return 0
     if (!r) return 0
     this.kids[this.i].exit()
     this.i++
@@ -308,9 +308,9 @@ class Sequence extends Base {
     this.kids[this.i].enter()
     return 0
   }
+  /** 0x08018F74: exits the current child (the index is kept) */
   exit() {
     if (this.i < this.kids.length) this.kids[this.i].exit()
-    this.i = this.kids.length
   }
 }
 
@@ -328,10 +328,8 @@ class Selector extends Base {
     for (const k of this.kids) k.enter()
   }
   update() {
-    const g = this.c.gen
     for (let i = 0; i < this.kids.length; i++) {
       const r = this.kids[i].update()
-      if (g !== this.c.gen) return 0
       if (r) {
         this.last = i
         return 1
@@ -344,9 +342,10 @@ class Selector extends Base {
   }
 }
 
+/** ParallelAll (vtable 0x0804BDA8: update 0x08019108) / ParallelAny (0x0804B6D0: 0x08019162): every child is
+ *  updated on every update, finished or not; the result is the AND / OR of their results. Enter / exit: all children */
 class Parallel extends Base {
   kids: RNode[]
-  done: boolean[] = []
   private any: boolean
   constructor(n: AiNodeJ, c: AiController, any: boolean) {
     super(n, c)
@@ -357,26 +356,18 @@ class Parallel extends Base {
     return this.kids[0]
   }
   enter() {
-    this.done = this.kids.map(() => false)
     for (const k of this.kids) k.enter()
   }
   update() {
-    const g = this.c.gen
-    for (let i = 0; i < this.kids.length; i++) {
-      if (this.done[i]) continue
-      const r = this.kids[i].update()
-      if (g !== this.c.gen) return 0
-      if (r) {
-        this.done[i] = true
-        this.kids[i].exit()
-        if (this.any) return 1
-      }
+    let r = this.any ? 0 : 1
+    for (const k of this.kids) {
+      const v = k.update() ? 1 : 0
+      r = this.any ? r | v : r & v
     }
-    return this.done.every(Boolean) ? 1 : 0
+    return r
   }
   exit() {
-    this.kids.forEach((k, i) => !this.done[i] && k.exit())
-    this.done = this.kids.map(() => true)
+    for (const k of this.kids) k.exit()
   }
 }
 
@@ -407,22 +398,17 @@ class Cond extends Base {
         this.kid.enter()
         this.on = true
       }
-      const g = this.c.gen
-      const r = this.kid.update()
-      if (g !== this.c.gen) return 0
-      if (r) {
-        this.kid.exit()
-        this.on = false
-      }
-      return r
+      // 0x080342AF: the child's result is returned; a finished child is not exited (it runs on while the
+      // condition holds)
+      return this.kid.update()
     }
     if (this.on && this.kid) this.kid.exit()
     this.on = false
     return 0
   }
+  /** 0x08034307: exits the running child (the flag is reset by the next enter) */
   exit() {
     if (this.on && this.kid) this.kid.exit()
-    this.on = false
   }
 }
 
@@ -479,12 +465,77 @@ function timed(n: AiNodeJ, c: AiController, anim: number | (string | number)[], 
     (f) => {
       events[f]?.()
       if (f >= len) {
-        c.e.setAnim('idle', true, true)
+        // one SetAnim(0) at the end: the controller's own end (the recorded sequence, this frame's anim tick) or here
+        if (c.e.anim?.name !== 'idle' || !c.e.animEnded) c.e.setAnim('idle', true, true)
         return true
       }
       return false
     },
   )
+}
+
+/** CandyBeam origin offsets (px from the footprint position) by facing: 0x08752E48, gfx 0x2B 0x08752E28 */
+const CANDY_OFF: [number, number][] = [[12, -8], [14, -38], [-16, -34], [40, -34]]
+const CANDY_OFF_2B: [number, number][] = [[12, -8], [14, -38], [-16, -24], [40, -24]]
+/** VampireGrab: the vampire stands at the player's position minus this offset (px) by its facing (0x08759334) */
+const VAMPIRE_GRAB_OFF: [number, number][] = [[0, 16], [0, -16], [-16, 0], [16, 0]]
+
+// [H] ---- helpers of the hold nodes (BearHug / EnergyDrain) ------------------------------------------------------------
+const DPAD_MASK = 0xf0
+/** 0x0800EEB0(obj, id) / vfunc +0x34: the actor shows SetAnim(id)'s animation (raw 0x08072670[id] + 1) */
+function isAnimId(e: Enemy, id: number): boolean {
+  return e.anim?.raw === ENEMY_SETANIM[id]?.raw
+}
+/** straight-line mover (0x0800A1D4: base 0x08009D24, vtable 0x0804B308; SetAnim(1) on creation): ticks n =
+ *  max(|dx|, |dy|) (24.8) / speed (truncating, 0 -> 1, velocity 0), velocity = d / n (truncating), facing on the
+ *  dominant axis. Step 0x0800A01D: move by the velocity; the new footprint blocked -> back, SetAnim(0) unless already;
+ *  else SetAnim(1) unless already walking, face the stored direction, n - 1; 0 -> exactly at the target, arrived */
+class LineMover {
+  e: Enemy
+  tx: number
+  ty: number
+  vx = 0
+  vy = 0
+  n: number
+  dir: Dir
+  constructor(e: Enemy, tx: number, ty: number, speed: number) {
+    this.e = e
+    this.tx = tx
+    this.ty = ty
+    const dx = (tx << 8) - e.x
+    const dy = (ty << 8) - e.y
+    const ax = Math.abs(dx)
+    const ay = Math.abs(dy)
+    this.dir = ax >= ay ? (dx >= 0 ? 3 : 2) : dy >= 0 ? 0 : 1
+    this.n = Math.trunc(((ax >= ay ? ax : ay) << 8) / speed) >> 8
+    if (this.n) {
+      this.vx = Math.trunc((dx << 8) / (this.n << 8))
+      this.vy = Math.trunc((dy << 8) / (this.n << 8))
+    } else this.n = 1
+    e.facing = this.dir
+    e.setAnim('walk', true, true)
+  }
+  update(): boolean {
+    const e = this.e
+    e.unmarkSelf()
+    const ok = e.fits(e.w, (e.x + this.vx) >> 8, (e.y + this.vy) >> 8)
+    if (!ok) {
+      e.markSelf()
+      if (!isAnimId(e, 0)) e.setAnim('idle', true, true)
+      return false
+    }
+    e.x += this.vx
+    e.y += this.vy
+    if (!isAnimId(e, 1)) e.setAnim('walk', true, true)
+    e.facing = this.dir
+    e.markSelf()
+    if (--this.n) return false
+    e.unmarkSelf()
+    e.x = this.tx << 8
+    e.y = this.ty << 8
+    e.markSelf()
+    return true
+  }
 }
 
 export function create(n: AiNodeJ, c: AiController): RNode {
@@ -601,20 +652,42 @@ export function create(n: AiNodeJ, c: AiController): RNode {
     case 'IfLatchOverlap':
       return new Cond(n, c, () => {
         const p = e.player
-        if (!p || p.heldBy || e.facing !== 0) return false
+        // 0x08037B96 (vtable 0x0804B0F8): a pure overlap test (no hold on the player: several enzymes can latch)
+        if (!p || e.facing !== 0) return false
         const pb = p.bodyBox()
         const eb = e.bodyBox()
         return overlaps({ x0: pb.x0 + 6, y0: pb.y0, x1: pb.x1 - 6, y1: pb.y1 }, { x0: eb.x0, y0: eb.y1 - 8, x1: eb.x0 + 7, y1: eb.y1 - 1 })
       })
-    case 'IfButtonMashed':
-      return new Cond(n, c, () => !!e.player && e.player.heldBy !== e)
+    case 'IfButtonMashed': {
+      // create 0x080363FA (vtable 0x0804A6D0; built with the state's tree): count +0x10 = 0, stamp +0xC = now - gap - 1.
+      // Condition 0x080363C4: a new A/B/d-pad press this frame (input 0x03003300 +4 & 0xF3) -> stamp = now, count + 1,
+      // true once count > presses; no press and now - stamp > gap -> count = 0 (lockstep f02_vs_hold_latch)
+      const presses = P(n, 'presses')
+      const gap = P(n, 'gap')
+      let count = 0
+      let stamp = e.ctx.clock(e.w) - gap - 1
+      return new Cond(n, c, () => {
+        const now = e.ctx.clock(e.w)
+        if (e.ctx.pressed & 0xf3) {
+          stamp = now
+          return ++count > presses
+        }
+        if (now - stamp > gap) count = 0
+        return false
+      })
+    }
     case 'IfPlayerOnTop':
       return new Cond(n, c, () => {
         const [dx, dy] = e.toPlayer()
         return Math.abs(dx) < 16 && Math.abs(dy) < 16
       })
     case 'IfPartnerHolding':
-      return new Cond(n, c, () => e.ctx.liveEnemies().some((o) => [0x6d, 0x6e, 0x6f, 0x70].includes(o.type.type) && e.ctx.player?.heldBy === o))
+      // [H] 0x0802F945: the first world object of class 0xFC (Spopovich) is in 0x03001B30 (the end of GrabWindup)
+      // showing anim id 0x12's animation (raw 20, 0x0800EEB0)
+      return new Cond(n, c, () => {
+        const spo = e.ctx.liveEnemies().find((o) => [0x6d, 0x6e, 0x6f, 0x70].includes(o.type.type)) as Enemy | undefined
+        return !!spo && spo.ea.r === GENERIC_STATES['0x03001B30'] && isAnimId(spo, 0x12)
+      })
     case 'IfUnknown':
       return new Cond(n, c, () => false)
 
@@ -622,13 +695,20 @@ export function create(n: AiNodeJ, c: AiController): RNode {
     case 'Succeed':
       return new Instant(n, c, () => undefined)
     case 'Idle':
+      // node 0x080716F4 (vtable 0x08049A1C): enter no-op, update returns 0 - no animation change
+      return new Act(n, c, () => undefined, () => false)
     case 'RunMotionController':
     case 'PartMirrorAnim':
       return new Act(n, c, () => !e.moving && e.setAnim('idle', false, true), () => false)
     case 'StandStill':
-      // enter 0x0804E50C: SetAnim(0) (the idle state's enter draws its start tick, rand(255)); the update just succeeds
-      // (emulator: lockstep f02_vs_enemy_melee, the aggro frame)
-      return new Act(n, c, () => e.setAnim('idle', true, true), () => true)
+      // enter 0x0804E50C: SetAnim(0) (the idle state's enter draws its start tick, rand(255)) (emulator: lockstep
+      // f02_vs_enemy_melee, the aggro frame); update 0x08019240: unless IsAnim(0) (vfunc +0x34) SetAnim(0) again,
+      // then succeed (lockstep f02_vs_enemy_t5b: a Sequence [StandStill, FacePlayer] resumed after a ChasePlayer walk
+      // frame re-idles in the update)
+      return new Act(n, c, () => e.setAnim('idle', true, true), () => {
+        if (!e.isAnim(0)) e.setAnim('idle', true, true)
+        return true
+      })
     case 'FacePlayer':
       return new Instant(n, c, () => e.facePlayer())
     case 'Wait':
@@ -687,7 +767,12 @@ export function create(n: AiNodeJ, c: AiController): RNode {
         path.gy = p.y
         const dx = path.gx - e.x
         const dy = path.gy - e.y
-        if ((Math.imul(dx, dx) >> 8) + (Math.imul(dy, dy) >> 8) <= 0x400) return false
+        if ((Math.imul(dx, dx) >> 8) + (Math.imul(dy, dy) >> 8) <= 0x400) {
+          // 0x0802A086: within range the update calls vfunc +0x28 = SetAnim(0) on EVERY update (the idle enter draws
+          // rand(255) each frame; lockstep f02_vs_enemy_t18, Enzyme)
+          e.setAnim('idle', true, true)
+          return false
+        }
         path.update(e)
         return false
       })
@@ -704,7 +789,7 @@ export function create(n: AiNodeJ, c: AiController): RNode {
       return new Act(n, c, () => (st.n = 0), () => e.walkToPlayer(speed, st))
     }
     case 'FlyToPlayer':
-      return new Act(n, c, () => undefined, () => e.moveToward(speed, 8, false, true))
+      return new Act(n, c, () => undefined, () => e.flyToPlayer(speed))
     case 'AlignWithPlayer':
     case 'LineUpForShot':
       return new Act(n, c, () => undefined, () => e.align(speed || 0x73))
@@ -749,23 +834,40 @@ export function create(n: AiNodeJ, c: AiController): RNode {
       })
     }
     case 'CirclePlayer':
-      return new Act(n, c, () => undefined, () => {
-        e.facePlayer()
-        const [dx, dy] = DIR_VEC[e.facing]
-        e.walkBy(-dy * speed, dx * speed)
-        return false
-      })
+      return new Act(n, c, () => undefined, () => e.circlePlayer(speed))
     case 'HoverDrift':
-      return new Act(n, c, () => undefined, () => {
+      // update 0x08031004 (vtable 0x0804CB80): a pending hit impulse (+-0x400 along the hit dir, the reaction above)
+      // is clamped to +-128 on x, else on y; then per axis: d = player centre - own centre; d > 0 ? (v < 128: v +=
+      // 38) : (v > -128: v -= 38) - no clamp after, so |v| reaches 152 (38 = int(38.4f)); facing by the larger of
+      // |vx| / |vy| (ties: y); pos + v, blocked -> x only, then y only. The velocity lives in the node (+4 / +8): a
+      // re-entered state starts from 0 (lockstep f02_vs_enemy_t48, after the BackStep state 0x172).
+      return new Act(n, c, () => {
+        e.vx = 0
+        e.vy = 0
+      }, () => {
+        if (Math.abs(e.vx) > 0x200 || Math.abs(e.vy) > 0x200) {
+          if (e.vx > 128) e.vx = 128
+          else if (e.vx < -128) e.vx = -128
+          else e.vy = Math.max(-128, Math.min(128, e.vy))
+        }
         const [dx, dy] = e.toPlayer()
-        e.vx = Math.max(-128, Math.min(128, e.vx + Math.sign(dx) * 38))
-        e.vy = Math.max(-128, Math.min(128, e.vy + Math.sign(dy) * 38))
-        e.facePlayer()
+        if (dx > 0) {
+          if (e.vx < 128) e.vx += 38
+        } else if (e.vx > -128) e.vx -= 38
+        if (dy > 0) {
+          if (e.vy < 128) e.vy += 38
+        } else if (e.vy > -128) e.vy -= 38
+        e.facing = Math.abs(e.vx) > Math.abs(e.vy) ? (e.vx > 0 ? 3 : 2) : e.vy > 0 ? 0 : 1
         e.walkBy(e.vx, e.vy)
         return false
       })
     case 'BackStep':
+      // node vtable 0x0804CFDC. Enter 0x08031388 first runs vfunc +0x10 = 0x0803125C, a bump hit: face the player on
+      // the dominant axis, standard melee x1.0 (0x086B8098) with the strikeRect box, accepted -> sound 48 + rand(2)
+      // (lockstep f02_vs_enemy_t48); then the hop velocity below. Update 0x080313EA: counter 48 decremented first,
+      // 0 -> finished without moving (47 moves); SetAnimRaw(1) + state 0x03002B9C unless already in it.
       return new Act(n, c, (a) => {
+        if (e.meleeStrike(0x400, true)) audioEvent('sfx', { id: 48 + e.w.rng.rand(2, 'enemy melee hit sfx'), vol: 64 })
         const s = ((e.w.rng.rand(64, 'backstep') + 96) * P(n, 'k', 16)) >> 7
         const [dx, dy] = DIR_VEC[e.facing]
         const side = ((e.w.rng.rand(32768, 'backstep side') - 16384) * s) >> 12
@@ -773,25 +875,30 @@ export function create(n: AiNodeJ, c: AiController): RNode {
         a.data.vy = -dy * 8 * s + (dy ? 0 : side)
         e.setAnim(1, true, true)
       }, (f, a) => {
+        if (f >= 48) return true
         e.moveBy(e.w, a.data.vx, a.data.vy)
-        return f >= 48
+        return false
       })
     case 'KnockbackSlide': {
       // the parameter enemy_ai.json calls `frames` is the knockback constant K (node +0x0C): 16, 4 or 36
       const kb: KnockState = { vx: 0, vy: 0, n: 16, anim: null }
-      // (cosmetic: back to the idle pose afterwards; the game's underlying state sets its own animation)
-      return new Act(n, c, () => e.knockStart(P(n, 'frames'), kb), () => e.knockStep(kb), () => {
-        if (kb.anim && e.anim === kb.anim) e.setAnim('idle', true, true)
-      })
+      // node vtable 0x0804A138: the exit (0x0804F570) does nothing - an interrupted slide leaves the hurt animation
+      // running (its own end callback SetAnim(0)s; lockstep f02_vs_hold_vampire: no rand(255) when a hit's GotoState
+      // replaces the slide)
+      return new Act(n, c, () => e.knockStart(P(n, 'frames'), kb), () => e.knockStep(kb))
     }
     case 'LungeStep':
+      // singleton 0x03003288: enter 0x08037A42 = SetAnimHold(4, 0) (vfunc +0x30: raw 5, hold state, frame 0; not the
+      // punch state: no swing sound, no rand); update 0x08037A56: while anim 4 shows (0x0800EEB0) step 4 px in the
+      // current facing (table 0x0876BA40, no re-aim) if the new position is passable (vfunc +0x54); never finishes
+      // (always 0: the Selector falls through to its next children)
       return new Act(n, c, () => {
-        e.facePlayer()
-        e.setAnim(4, true, false)
-      }, (f) => {
+        e.setAnim(4, true, false, { rule: 'hold' })
+      }, () => {
+        if (e.ea.pos.raw !== 5) return false
         const [dx, dy] = DIR_VEC[e.facing]
         e.moveBy(e.w, dx * 1024, dy * 1024)
-        return f >= 16
+        return false
       })
     case 'FollowMajinBuu':
       return new Act(n, c, () => undefined, () => {
@@ -807,14 +914,81 @@ export function create(n: AiNodeJ, c: AiController): RNode {
         }
         return false
       })
-    case 'TankDrive':
-      return new Act(n, c, () => undefined, () => {
+    case 'TankDrive': {
+      // node 0x08049E20: enter 0x08032824 (turn timer +4 = 0), update 0x08032A64 (never finishes). d = the player's
+      // footprint centre - own; a = the minor axis' direction toward the player, b = the major axis' one. Unless
+      // |dx| <= 1 or |dy| <= 1: probe(a) -> drive(a), else probe(b) -> drive(b), else (and when aligned) turn(b).
+      // turn 0x0803282A: facing == dir -> ok; timer running -> no; else SetAnim(0) unless idle (vfunc +0x34 / +0x28),
+      // timer = 60, and the opposite direction is refused (facing kept: a tank never turns around directly).
+      // drive 0x0803287E: turn ok -> 0.25 px in the facing (0x40), the footprint tested (vfunc +0x54): moved ->
+      // SetAnim(1) unless walking, blocked -> SetAnim(0) unless idle. probe 0x08032948: n = (|player pos - own pos|
+      // >> 8) / 8 on the axis (top-left positions; direction 1 measures x, a game quirk), n steps of 8 px along dir
+      // must all fit. Lockstep f02_vs_enemy_t7f: facing down, the player left-up -> probe(up) ok, turn refused.
+      const T = { timer: 0 }
+      const isAnim = (k: number) => (k === 0 ? e.anim?.name === 'idle' : e.anim?.name === 'walk')
+      const turn = (d: Dir) => {
+        if (e.facing === d) return true
+        if (T.timer) return false
+        if (!isAnim(0)) e.setAnim('idle', true, true)
+        T.timer = 60
+        if ((e.facing ^ 1) === d) return false
+        e.facing = d
+        return true
+      }
+      const probe = (d: Dir) => {
+        const p = e.player
+        if (!p) return false
+        const diff = d === 0 ? p.y - e.y : p.x - e.x
+        const steps = Math.trunc((Math.abs(diff) >> 8) / 8)
+        const [sx, sy] = DIR_VEC[d]
+        e.unmarkSelf()
+        let x = e.x
+        let y = e.y
+        let ok = true
+        for (let i = 0; i < steps; i++) {
+          x += sx * 0x800
+          y += sy * 0x800
+          if (!e.fits(e.w, x >> 8, y >> 8)) {
+            ok = false
+            break
+          }
+        }
+        e.markSelf()
+        return ok
+      }
+      const drive = (d: Dir) => {
+        if (!turn(d)) return
+        const [sx, sy] = DIR_VEC[e.facing]
+        e.unmarkSelf()
+        if (e.fits(e.w, (e.x + sx * 0x40) >> 8, (e.y + sy * 0x40) >> 8)) {
+          e.x += sx * 0x40
+          e.y += sy * 0x40
+          if (!isAnim(1)) e.setAnim('walk', true, true)
+        } else if (!isAnim(0)) e.setAnim('idle', true, true)
+        e.markSelf()
+      }
+      return new Act(n, c, () => (T.timer = 0), () => {
+        if (T.timer) T.timer--
+        if (!e.player) return false
         const [dx, dy] = e.toPlayer()
-        e.facing = facingToward(dx, dy)
-        const [fx, fy] = DIR_VEC[e.facing]
-        if (Math.abs(dx) + Math.abs(dy) > 24) e.walkBy(fx * 128, fy * 128)
+        let aligned = Math.abs(dx) <= 1 || Math.abs(dy) <= 1
+        let a: Dir, b: Dir
+        if (Math.abs(dx) < Math.abs(dy)) {
+          a = dx >= 0 ? 3 : 2
+          b = dy >= 0 ? 0 : 1
+        } else {
+          a = dy >= 0 ? 0 : 1
+          b = dx >= 0 ? 3 : 2
+        }
+        if (!aligned) {
+          if (probe(a)) drive(a)
+          else if (probe(b)) drive(b)
+          else aligned = true
+        }
+        if (aligned) turn(b)
         return false
       })
+    }
     case 'RandomStep':
       return new Act(n, c, (a) => (a.data.dir = e.w.rng.rand(4, 'random step')), (f, a) => {
         const [dx, dy] = DIR_VEC[a.data.dir as Dir]
@@ -829,37 +1003,91 @@ export function create(n: AiNodeJ, c: AiController): RNode {
       return new Act(n, c, () => {
         if (e.meleeStrike(0x400, true)) e.meleeHitSfx()
         e.setAnim(4 + e.w.rng.rand(e.punchAnims(), 'enemy punch anim'), true, false)
-      }, (f) => f >= 16)
+        // update 0x0802A276 = vfunc +0x34(0): done once the actor is back in the idle state (the punch state's end
+        // SetAnim(0): 4 * frames ticks, e.g. 12 for a 3-frame punch - lockstep f02_vs_enemy_t21 frame 255)
+      }, () => e.anim?.name === 'idle' && e.ea.r.rule === 'idle')
     case 'BioMechPunch':
-      return new Act(n, c, () => {
-        e.facePlayer()
-        e.setAnim(4, true, false)
-        e.meleeStrike(0x400, true)
-      }, (f) => f >= 16)
+      // create 0x0803CB14, controller vtable 0x0804C6B4: enter 0x0803C8F0 (counter +0x12 = 0); tick 0x0803C9F8: counter++,
+      // frame = counter < 16 ? 0 : ((counter - 16) >> 3) + 1; at counter 16 the hit 0x0803C8FC (standard melee x1.0,
+      // 0x086B8098; accepted -> sound 48 + rand(2) whatever the sprite); frame 4 (counter 40) ends the controller and the
+      // node (0x0803CAFE: done once the actor left the controller state)
+      return timed(n, c, 4, 40, { 16: () => { if (e.meleeStrike(0x400, false)) audioEvent('sfx', { id: 48 + e.w.rng.rand(2, 'enemy melee hit sfx'), vol: 64 }) } })
     case 'HeavyPunch':
-      return timed(n, c, [4, 5], 64, { 48: () => e.meleeStrike(0x600, true) })
-    case 'WindupMelee':
-      return timed(n, c, [4, 5], 48, { 32: () => e.meleeStrike(0x400, true) })
+      // enter 0x0803CB82: face the player, SetAnimRaw(4) + state 0x030032F4. State tick 0x0803CB50: frame 0 for 48
+      // ticks, then (tick - 48) >> 3; SetAnim(0) once that reaches the animation's frame count (48 + 8 * frames
+      // ticks). The strike (x1.5) at tick 48; an accepted hit plays 48 + rand(2) (0x0803CCFC, lockstep
+      // f02_vs_enemy_t0c / t24)
+      return new Act(n, c, (a) => {
+        e.facePlayer()
+        e.setAnim([4, 5], true, false)
+        a.data.len = 48 + 8 * (e.anim ? e.ea.host.nframes(e.anim.raw) : 2)
+      }, (f, a) => {
+        if (f === 48 && e.meleeStrike(0x600, true)) audioEvent('sfx', { id: 48 + e.w.rng.rand(2, 'heavy punch hit sfx'), vol: 64 })
+        if (f < a.data.len) return false
+        // one SetAnim(0): the type's recorded state rule may already have ended this tick
+        if (e.anim?.name !== 'idle' || !e.animEnded) e.setAnim('idle', true, true)
+        return true
+      })
+    case 'WindupMelee': {
+      // singleton 0x03003210: enter 0x0804E808 = SetAnimRaw(4) + SetState(0x03003214) (no facing change); update
+      // 0x08050034 = finished as soon as obj+0x14 is no longer that controller: a later node of the same tick (the old
+      // tree after the GotoState) that SetAnims ends the windup with no swing (lockstep f02_vs_enemy_t6b).
+      // Controller tick 0x08033CF0 (shift 3): counter c = ticks since the enter; frame 0 while c < 32 (the swing at 32:
+      // faces the player, hit x1.0, an accepted hit plays PlaySfx(62, vol 0x40) at 0x08033CE8), then frame
+      // ((c - 32) >> 3) + 1 up to frame n - 1, which is held 32 ticks: the end (vfunc +0x24 -> SetAnim(0)) at
+      // c = 64 + 8 * (n - 2) (n = the animation's frames; Skeleton: 4 -> 80)
+      let seq = 0
+      let len = 48
+      return new Act(n, c, () => {
+        e.setAnim([4, 5], true, false)
+        seq = e.animSeq
+        len = 64 + ((Math.max(2, e.ea.host.nframes(e.ea.pos.raw)) - 2) << 3)
+      }, (f) => {
+        if (e.animSeq !== seq) return true
+        if (f === 32 && e.meleeStrike(0x400, true)) audioEvent('sfx', { id: 62, vol: 64 })
+        if (f >= len) {
+          e.setAnim('idle', true, true)
+          return true
+        }
+        return false
+      })
+    }
     case 'HeavyStrike':
+      // create 0x0802F918; enter 0x0802F74C: player active -> vfunc +0x30(4) (wind-up pose: no SetAnim, no sound),
+      // armed, timer 60. Update 0x0802F8DA: timer-- ; at 0 the strike 0x0802F77C (sound 62, hit, hit sound) then
+      // vfunc +0x28(4) = SetAnim(4) (the punch state: swing 50 + rand(2)); finished once the actor is out of that
+      // state (its end SetAnim(0), before the AI) (lockstep f02_vs_enemy_t3e: GotoState 228, strike 288, idle 304)
       return new Act(n, c, (a) => {
         a.data.ok = e.player?.hittable ? 1 : 0
-        if (a.data.ok) e.setAnim(4, true, false)
+        if (a.data.ok) e.facePlayer()
       }, (f, a) => {
         if (!a.data.ok) return true
-        if (f === 58) e.heavyStrike()
-        return f >= 76
+        if (f === 60) {
+          e.heavyStrike()
+          e.setAnim(4, true, false)
+          return false
+        }
+        return f > 60 && e.anim?.name === 'idle'
       })
     case 'ChargedPunch':
       return new Act(n, c, () => {
         e.facePlayer()
         e.setAnim(18, true, true)
       }, (f) => {
+        // controller 0x03003278 (update 0x08036044): no animation change at the strike; at tick 0x8C the MeleeAttack
+        // hit (0x0802A0C4's turn + strike rect, x1.5) and on an accepted hit the sound 48 + rand(2) (after the
+        // damage roll); the controller's tick ends it at tick 148 with SetAnim(0) (one SetAnim(0): the recorded
+        // sequence may already have done it), the node finishes on that update (lockstep f02_vs_enemy_t0a, Broly:
+        // entered 365, hit 505, SetAnim(0) 513, next state 514)
         if (f === 140) {
-          e.setAnim(4, true, false)
           e.hittable = false
-          e.meleeStrike(0x600, false, true)
+          if (e.meleeStrike(0x600, true)) audioEvent('sfx', { id: 48 + e.w.rng.rand(2, 'charged punch hit sfx'), vol: 64 })
         }
-        return f >= 149
+        if (f >= 148) {
+          if (e.anim?.name !== 'idle' || !e.animEnded) e.setAnim('idle', true, true)
+          return true
+        }
+        return false
       }, () => (e.hittable = true))
     case 'MiniYakonLunge':
       return new Act(n, c, (a) => {
@@ -875,30 +1103,45 @@ export function create(n: AiNodeJ, c: AiController): RNode {
         if (!a.data.hit && e.contactHit()) a.data.hit = 1
         return f >= 24
       })
-    case 'DriftContact':
-      return new Act(n, c, (a) => {
-        const ang = (e.w.rng.rand(256, 'drift angle') / 256) * Math.PI * 2
-        const s = e.w.rng.rand(3, 'drift speed') + 1
-        a.data.vx = Math.round(Math.cos(ang) * s * 64)
-        a.data.vy = Math.round(Math.sin(ang) * s * 64)
-        a.data.back = 0
-      }, (_f, a) => {
-        const k = a.data.back > 0 ? -1 : 1
-        if (a.data.back > 0) a.data.back--
-        if (!e.moveBy(e.w, k * a.data.vx, k * a.data.vy)) {
-          a.data.vx = -a.data.vx
-          a.data.vy = -a.data.vy
+    case 'DriftContact': {
+      // node create 0x0802C69C (at the state's construction): s = rand(3) + 1, a = rand(256); v = (cos a, sin a) * s
+      // >> 10 (SIN256, 1/256 px per frame). Update 0x0802C6EC: after a contact, 16 frames back along -v; else pos += v (no
+      // collision test) and a kind-1 message (the player's footprint) with the body box, melee sub 2 x1.0, dir =
+      // facing: accepted -> 16 frames back. Lockstep f02_vs_enemy_t07.
+      const s3 = e.w.rng.rand(3, 'drift speed') + 1
+      const ang = e.w.rng.rand(256, 'drift angle')
+      const vx = (SIN256[(ang + 0x40) & 0xff] * s3) >> 10
+      const vy = (SIN256[ang] * s3) >> 10
+      let back = 0
+      return new Act(n, c, () => undefined, () => {
+        if (back > 0) {
+          back--
+          e.x -= vx
+          e.y -= vy
+          return false
         }
-        if (a.data.back <= 0 && e.contactHit()) a.data.back = 16
+        e.x += vx
+        e.y += vy
+        const p = e.player
+        if (p && p.onMessage(e.w, { team: 0, rect: e.bodyBox(), dir: e.facing, mult: 0x400, atk: ATK[2], attacker: e, source: e, foot: true })) back = 16
         return false
       })
+    }
 
     // ---- ranged -------------------------------------------------------------------------------------------------------
     case 'KiBlast':
       return timed(n, c, [3], 32, {
         16: () => {
-          const [mx, my] = e.muzzle(10)
-          e.w.add(kiBlast(e.ctx, e, e.facing, 0, mx << 8, my << 8, undefined, undefined, e.w))
+          // the player's spawner 0x08019858: origin 0x0800FF44 on the body box (down (cx, y), up (cx, cy), left (x0, cy),
+          // right (x1, cy)); the blast (vtable 0x0804B454) tests a 16 x 16 box centred on its position (lockstep
+          // f02_vs_enemy_t0a, Broly: spawned at (186, 174) with the enemy at (186, 190) facing left)
+          const b = e.bodyBox()
+          const cx = (b.x0 + b.x1) >> 1
+          const cy = (b.y0 + b.y1) >> 1
+          const [mx, my] = e.facing === 0 ? [cx, e.py] : e.facing === 1 ? [cx, cy] : e.facing === 2 ? [b.x0, cy] : [b.x1, cy]
+          const s = kiBlast(e.ctx, e, e.facing, 0, mx << 8, my << 8, undefined, undefined, e.w)
+          s.o.box = [8, 8, 16, 16]
+          e.w.add(s)
         },
       })
     case 'GunShot':
@@ -914,50 +1157,112 @@ export function create(n: AiNodeJ, c: AiController): RNode {
     case 'TankShoot':
       return new Instant(n, c, () => e.shot('shell'))
     case 'SoldierThrow':
-    case 'CyborgShot':
     case 'TurretFire': {
-      const fire = n.name === 'CyborgShot' ? 1 : 8
-      const len = n.name === 'TurretFire' ? 72 : n.name === 'SoldierThrow' ? 32 : 16
+      // motion controllers: SoldierThrow 0x080266D8 (state 0x03002FCC, SetAnimRaw(0x13), tick 0x08026618) and
+      // TurretFire 0x0802B684 (state 0x0300305C, SetAnimRaw(0x14), tick 0x0802B5EA); enter: face the player (event
+      // 0x0804AE70). Tick: the wave (0x0802A2EC) at tick 8 from the per-facing muzzle (0x0874CA6C / 0x08752E78);
+      // the soldier's ends at tick >= 32 once its wave is gone, the turret's at tick 72 (wave or not): SetAnim(0),
+      // and the node is finished (lockstep f02_vs_enemy_t45: entered 32, SetAnim(0) at 64; t40: 51 -> 123)
+      const soldier = n.name === 'SoldierThrow'
       return new Act(n, c, () => {
         e.facePlayer()
-        e.setAnim([18, 3], true, false)
+        e.setAnim(soldier ? [19, 3] : [20, 3], true, false, { rule: 'once_stop', shift: 3, end: 'none' })
       }, (f, a) => {
-        if (f === fire) a.data.wave = e.w.add(new EnergyWave(e.ctx, e, e.facing, ...e.muzzleFix(n.name === 'TurretFire' ? 'turret' : 'soldier'))).id
+        if (f === 8) a.data.wave = e.w.add(new EnergyWave(e.ctx, e, e.facing, ...e.muzzleFix(soldier ? 'soldier' : 'turret'))).id
         const live = e.w.entities.some((x) => x.id === a.data.wave && !x.removed)
-        return f >= len && !live
+        if (soldier ? f >= 32 && !live : f >= 72) {
+          e.setAnim('idle', true, true)
+          return true
+        }
+        return false
       })
     }
-    case 'TurretOpen':
-    case 'TurretClose':
-      return playAnim(n, c, n.name === 'TurretOpen' ? 19 : 18, false, 12)
-    case 'BombThrow':
-      return timed(n, c, [18, 4], 32, {
-        16: () => {
-          const p = e.player
-          if (!p) return
-          const [mx, my] = e.muzzle(8)
-          const [tx, ty] = p.footCenter()
-          e.w.add(new Bomb(e.ctx, e, e.facing, mx << 8, my << 8, tx, ty))
-        },
-      })
-    case 'FlameBreath':
+    case 'CyborgShot':
+      // create 0x0802F708; controller state 0x03003108 (enter 0x0802F6A8: face, SetAnimRaw(0x12)); tick 0x0802F5F8:
+      // counter++, < 16: frame = counter >> 3, counter 1 spawns the wave (0x0802A2EC); from 16 on, once the wave is no
+      // longer in the object list: SetAnim(0) (idle, rand(255)) and the node finishes (lockstep f02_vs_enemy_t11; the
+      // raw 18 animation itself never ends the controller)
       return new Act(n, c, () => {
         e.facePlayer()
-        e.setAnim([17, 4], true, true)
+        e.setAnim([18, 3], true, false, { rule: 'once', shift: 3, end: 'hold' })
+      }, (f, a) => {
+        if (f === 1) a.data.wave = e.w.add(new EnergyWave(e.ctx, e, e.facing, ...e.muzzleFix('soldier'))).id
+        if (f < 16 || e.w.entities.some((x) => x.id === a.data.wave && !x.removed)) return false
+        e.setAnim(0, true, true)
+        return true
+      })
+    case 'TurretOpen':
+    case 'TurretClose':
+      // 0x0802B701 / 0x0802B8B5: SetAnimRaw(0x13 / 0x12) under the one-shot state 0x03001B30 (8 ticks a frame, the
+      // last frame kept); finished on the update that sees the anim frame (obj+0x11) at 3 (lockstep
+      // f02_vs_enemy_t40: open entered at 1, the next state at 25; close entered at 26, the next state at 51)
+      return new Act(n, c, () => e.setAnim(n.name === 'TurretOpen' ? 19 : 18, true, false, { rule: 'once_stop', shift: 3, end: 'none' }), () => e.ea.pos.frame >= 3)
+    case 'BombThrow': {
+      // controller 0x0203DD04 (SetAnimRaw(0x12)): the bomb at tick 16, SetAnim(0) at 24 (lockstep f02_vs_enemy_bomb).
+      // Enter 0x08026A26 (after facing the player): d = the player's position - own (top-left px), the component
+      // across the facing zeroed, each clamped to +-128; the controller keeps v = d * 0x71D >> 8. Tick 0x08026994 at
+      // 16: the bomb from the position + 0x0874CAD4[dir] (lockstep f02_vs_enemy_t2b)
+      const BOMB_MUZZLE = [[12, -8], [12, -8], [16, -16], [0, -16]]
+      const d = { x: 0, y: 0 }
+      const t = timed(n, c, [18, 4], 24, {
+        16: () => {
+          const [ox, oy] = BOMB_MUZZLE[e.facing]
+          e.w.add(new Bomb(e.ctx, e, e.facing, (e.px + ox) << 8, (e.py + oy) << 8, d.x, d.y))
+        },
+      })
+      const enter = t.enter.bind(t)
+      t.enter = () => {
+        enter()
+        const p = e.player
+        const cl = (v: number) => Math.max(-128, Math.min(128, v))
+        d.x = p && e.facing >= 2 ? cl(p.px - e.px) : 0
+        d.y = p && e.facing < 2 ? cl(p.py - e.py) : 0
+      }
+      return t
+    }
+    case 'FlameBreath':
+      return new Act(n, c, () => {
+        // enter 0x08023FA8: SetAnimRaw(0x12) (raw 19) under the flame controller 0x03002FA8 (no swing), sound 63
+        e.facePlayer()
+        e.setAnim(18, true, true, { rule: 'hold' })
+        audioEvent('sfx', { id: 63, vol: 64 })
       }, (f) => {
+        // the controller 0x03002FA8 spawns a flame every tick 4..127; at 128 it ends: SetAnim(0) and the sound 63
+        // stopped (0x0803E32C) (lockstep f02_vs_enemy_flames)
         if (f >= 4 && f < 128) {
           const NOZ = [[46, 10], [16, -48], [-6, -12], [74, -12]]
           const [ox, oy] = NOZ[e.facing]
           e.w.add(new Flame(e.ctx, e, e.facing, (e.px + ox) << 8, (e.py + oy) << 8, e.w))
         }
+        if (f === 128) {
+          e.setAnim('idle', true, true)
+          audioEvent('sfx_stop_match', { id: 63 })
+        }
         return f >= 128
       })
     case 'GrappleArm':
-      return timed(n, c, [4], 60, {
-        28: () => {
-          const [mx, my] = e.muzzle(8)
-          e.w.add(new GrappleArm(e.ctx, e, e.facing, mx << 8, my << 8))
-        },
+      // enter 0x08037E2D: face the player (0x0801599C), SetAnimRaw(0x12) (raw 19), controller 0x03003294 (enter
+      // 0x08037D58 t = 0); finished when the enemy leaves the controller (update 0x08037E7B). Controller tick
+      // 0x08037D64 (before the AI): t++; t < 24 frame (t >> 2) & 1, < 28 frame 2, < 32 frame 3; t 28 spawns the arm
+      // (0x08037EA8) at the integer position + 0x0876CCB4[dir], kept in 0x03003298; from t 32 SetAnim(0) once the arm
+      // is no longer in the world list
+      return new Act(n, c, (a) => {
+        e.facePlayer()
+        e.setAnim(18, true, true, { rule: 'hold' })
+        a.data.arm = -1
+      }, (t, a) => {
+        if (t < 32) {
+          const fr = t < 24 ? (t >> 2) & 1 : t < 28 ? 2 : 3
+          e.frameIdx = e.ea.pos.frame = fr
+          if (t === 28) {
+            const O = [[7, 16], [-12, -56], [-24, -20], [48, -20]][e.facing]
+            a.data.arm = e.w.add(new GrappleArm(e.ctx, e, e.facing, (e.px + O[0]) << 8, (e.py + O[1]) << 8)).id
+          }
+          return false
+        }
+        if (e.w.entities.some((x) => x.id === a.data.arm && !x.removed)) return false
+        e.setAnim('idle', true, true)
+        return true
       })
     case 'EnergyBarrage':
       return new Act(n, c, () => {
@@ -986,44 +1291,47 @@ export function create(n: AiNodeJ, c: AiController): RNode {
         return f >= 301
       })
     case 'KidBuuKamehameha':
+      // motion controller (vtable 0x0804C690): enter builds the player's beam class 0x080206B8 (KameBeam, Kamehameha
+      // Lv1: x0.04, sub 5; sound 3) at the position + 0x0875928C[dir]; its control fires the beam at tick 8 (stop 3,
+      // sound 32) and counts; its tick ends the state once tick > 90 (SetAnim(0), the exit stops the beam: it
+      // retracts, stop 32 + sound 33 when gone). Lockstep f02_vs_enemy_beam.
       return new Act(n, c, (a) => {
         e.facePlayer()
         e.setAnim(3, true, false)
-        a.data.beam = 0
-      }, (f, a) => {
-        // the player's beam class with Kamehameha level 0 (0x0871DA68): charge sparkle, then the 0x0871D168 pieces
+        const OFF = [[16, 20], [16, -4], [-12, 2], [44, 2]]
+        const [ox, oy] = OFF[e.facing]
         const gfx = new BeamGfx(e.ctx.fx('buu_beam_kamehameha_1'), e.ctx.fx('fx_08721164'))
-        if (f === 1) {
-          const cp = BEAM_POS.kame.charge
-          a.data.charge = e.w.add(new BeamCharge(gfx, () => [e.px + cp[e.facing][0], e.py + cp[e.facing][1]])).id
-        }
-        if (f === 8) {
-          for (const x of e.w.entities) if (x.id === a.data.charge) x.removed = true
-          const OFF = [[8, -2], [12, -2], [12, -2], [4, -2]]
-          const [ox, oy] = OFF[e.facing]
-          const [dx, dy] = DIR_VEC[e.facing]
-          const b = new GrowBeam(e.ctx, e, e.facing, 0, () => {
-            const [cx, cy] = e.center()
-            return [cx + ox - 8 + dx * 12, cy + oy + dy * 12]
-          }, { atk: ATK[5], mult: 41, width: 20, speed: 3, maxLen: 80, color: ['#ffe8ff', '#ff70d0'], gfx, visPos: BEAM_POS.kame.fire })
-          a.data.beam = e.w.add(b).id
-          e.beam = b
-        }
-        if (f >= 90) {
+        const b = new KameBeam(e.ctx, e, e.facing, e.px + ox, e.py + oy, e.w.frame, { atk: ATK[5], mult: 41, color: ['#ffe8ff', '#ff70d0'], gfx, team: 0, sounds: true })
+        a.data.beam = e.w.add(b).id
+        e.beam = b
+        audioEvent('sfx', { id: 3, vol: 64 })
+      }, (f) => {
+        if (f === 9) (e.beam as KameBeam | null)?.fire()
+        if (f >= 91) {
+          e.setAnim('idle', true, true)
           e.beam?.stop()
           e.beam = null
           return true
         }
         return false
-      }, (a) => {
-        for (const x of e.w.entities) if (x.id === a.data.charge) x.removed = true
+      }, () => {
         e.beam?.stop()
         e.beam = null
       })
+    // ---- Dabura's stone spit (state 0x7C; lockstep f02_vs_hold_stone) ----------------------------------------------
+    // AimAtPlayer = node 0x030030D4: enter 0x0804E684 SetAnimRaw(0x14) + controller 0x030030D0 (its tick 0x0802DF44
+    // only picks the head pose obj+0x11 from the position deltas; the facing obj+0x10 is NOT changed), update
+    // 0x0804FFAC returns 1 at once.
+    // StoneSpit = node 0x030030CC: enter 0x0804E958 SetAnimRaw(0x14) + controller 0x030030C8, whose tick 0x0802DE7C
+    // spits at tick 0 (the frame after the enter; enemy.ts spitCtl); update 0x080500A4: done once the
+    // controller tick (+0x12) is > 8 (the 9th update). Neither calls SetAnim(0).
     case 'StoneSpit':
-      return timed(n, c, [19], 16, { 1: () => e.shot('spit') })
+      return new Act(n, c, () => {
+        e.setAnim(20, true, true, { rule: 'hold' })
+        e.spitCtl = 0
+      }, (f) => f >= 9)
     case 'AimAtPlayer':
-      return timed(n, c, [19], 8, {})
+      return new Act(n, c, () => e.setAnim(20, true, true, { rule: 'hold' }), () => true)
 
     // ---- teleports -----------------------------------------------------------------------------------------------------
     case 'NinjaTeleport':
@@ -1068,163 +1376,312 @@ export function create(n: AiNodeJ, c: AiController): RNode {
 
     // ---- grabs / holds --------------------------------------------------------------------------------------------------
     case 'VampireGrab':
+      // ---- vampire grab (node vtable 0x0804AB04) ----------------------------------------------------------------
+      // enter 0x0803399E: escape count = 0; the player shows raw 10 frame 0, faces the vampire's facing ^ 1 and
+      // enters the held state 0x03001B00; the VAMPIRE moves (the player stays): pos = player pos - table 0x08759334
+      // [facing] ((0,16) (0,-16) (-16,0) (16,0) px for down / up / left / right); vampire SetAnimRaw(0x12) + its own
+      // state (vtable 0x0804C3CC: frames 0..3, then 2 / 3 looping).
+      // update 0x08033A2A: done when there is no player, the player's HP <= 0 or the player left 0x03001B00. Keys
+      // [0x03003300]+4 & 0xF3 (A/B/d-pad held) -> stamp, count + 1, count > 8 -> player SetAnim(0), done; no keys for
+      // > 10 frames -> count 0. Frame counter 0x03000F94 & 15 == 0 -> player vfunc +0x5C (HP -= POW << 10, no formula)
+      // and vampire vfunc +0x60 (heals POW << 10). Done when the player's HP <= 0.
+      // exit 0x08033AF6: obj+0x294 (crit) = 0, obj+0x290 (hit dir) = facing ^ 1 (the KnockbackSlide that follows
+      // slides the vampire backwards), SetAnim(9)
       return new Act(n, c, (a) => {
         const p = e.player
-        a.data.ok = p && !p.dead && !p.heldBy ? 1 : 0
-        if (a.data.ok) {
-          p!.hold(e.w, e, 'vampire', 0)
-          e.setAnim(17, true, true)
-        }
+        a.data.n = 0
+        a.data.t = 0
+        if (!p) return
+        p.hold(e.w, e, 'vampire', 0)
+        p.facing = (e.facing ^ 1) as Dir
+        const [ox, oy] = VAMPIRE_GRAB_OFF[e.facing]
+        e.unmarkSelf()
+        e.x = p.x - (ox << 8)
+        e.y = p.y - (oy << 8)
+        e.markSelf()
+        e.setAnim(18, true, true, { rule: 'loop', shift: 3 })
       }, (_f, a) => {
         const p = e.player
-        if (!a.data.ok || !p || p.dead || p.heldBy !== e) return true
-        if ((e.w.frame & 15) === 0) {
-          const d = p.loseHp(e.w, e.stats.POW)
-          e.heal(d * 1024)
+        if (!p || p.hp <= 0 || p.heldBy !== e) return true
+        const now = e.ctx.clock(e.w)
+        if (e.w.input.held & 0xf3) {
+          a.data.t = now
+          if (++a.data.n > 8) {
+            p.release(e.w)
+            return true
+          }
+        } else if (now - a.data.t > 10) a.data.n = 0
+        if ((now & 15) === 0) {
+          p.loseHp(e.w, e.stats.POW)
+          e.heal(e.stats.POW * 1024)
         }
-        return false
+        return p.hp <= 0
       }, () => {
         const p = e.player
         if (p && p.heldBy === e) p.release(e.w)
+        e.critHit = false
+        e.lastHitDir = (e.facing ^ 1) as Dir
+        e.setAnim(9, true, false)
       })
     case 'LatchDrain':
-      return new Act(n, c, () => {
+      // Enzyme latch (node singleton 0x03002FE8, vtable 0x0804AA94). Enter 0x080298D8: SetAnimRaw(1) + SetState(a new
+      // controller, vtable 0x0804C314, shift 3: enter 0x08029860 keeps the offset enzyme - player, tick 0x0800DEB0
+      // (loop), think 0x080298A2: enzyme position = player position + offset). The player is NOT held (it keeps its
+      // own states and inputs). Update 0x08029902: no player / player +0x1CC == 0 / HP <= 0 -> finished; the frame
+      // counter & 63 == 0 -> player vfunc +0x5C(0x400) (1 HP, no formula); exit: nothing (lockstep f02_vs_hold_latch)
+      return new Act(n, c, () => e.latchEnter(), () => {
         const p = e.player
-        if (p && !p.heldBy) p.hold(e.w, e, 'latch', 0)
-        e.setAnim(0, true, true)
-      }, () => {
-        const p = e.player
-        if (!p || p.dead || p.heldBy !== e) return true
-        if ((e.w.frame & 63) === 0) p.loseHp(e.w, 1)
+        if (!p || p.dead || p.hp <= 0) return true
+        if ((e.ctx.clock(e.w) & 63) === 0) p.loseHp(e.w, 1)
         return false
-      }, () => {
-        const p = e.player
-        if (p && p.heldBy === e) p.release(e.w)
       })
     case 'GrabWindup':
-      return playAnim(n, c, 17, false, 12)
+      // [H] enter 0x0802C465: face the player (0x0801599C), SetAnimRaw(0x12) (raw 19) under the play-once controller
+      // 0x0300308C (frame t >> 3; its end 0x0804FC8D: SetAnimRaw(0x13) (raw 20) under 0x03001B30); update 0x0805004D:
+      // finished once the enemy is in 0x03001B30
+      return new Act(n, c, (a) => {
+        e.facePlayer()
+        e.setAnim(18, true, true, { rule: 'hold' })
+        a.data.n = e.anim?.raw === 19 ? Math.max(1, ...e.anim.dirs.map((d) => d.length)) : 0
+      }, (t, a) => {
+        if (t >> 3 < a.data.n) {
+          e.frameIdx = e.ea.pos.frame = t >> 3
+          return false
+        }
+        e.setAnim(19, true, false, GENERIC_STATES['0x03001B30'])
+        return true
+      })
     case 'BearHug':
+      // [H] Spopovich's bear hug (node vtable 0x0804B1E0). Enter 0x0802C4C9: keep the player's position, SetAnimRaw(0x14)
+      // (raw 21) frame 0 under 0x03001B00 (frozen) at Spopovich + (8, -16) (globals 0x03003098 / 0x0300309C, set once);
+      // partner = the first world object of class 0x130 (Yamu, 0x08011C70 message 5). Update 0x0802C645: no partner ->
+      // finished (the player stays frozen until hit: game bug). Phase 0 (0x0802C565): the partner showing SetAnim(9)'s
+      // animation (vfunc +0x34, Yamu's drain done) -> release; the partner showing anim id 0x11 (0x0800EEB0, Yamu
+      // draining) -> the presses are ignored; else a d-pad press toggles the player's frame (obj+0x11 ^= 1) and each
+      // 0x08040284(mask 0xF0, 20 presses, 90 frames) success counts; the 5th releases. Release: the player back at the
+      // kept position, player SetAnim(0), Spopovich SetAnim(9), phase 1: 60 more ticks, then finished
       return new Act(n, c, (a) => {
         const p = e.player
-        const yamu = e.ctx.liveEnemies().some((o) => o.type.type === 0x93)
-        a.data.ok = p && !p.dead && !p.heldBy && yamu ? 1 : 0
-        if (a.data.ok) {
-          p!.hold(e.w, e, 'hug', 0)
-          e.setAnim(17, true, true)
-        }
-      }, (f, a) => {
+        a.data.phase = 0
+        a.data.cnt = 0
+        a.data.mash = 0
+        const yamu = e.ctx.liveEnemies().find((o) => o.type.type === 0x93 || o.type.type === 0x94)
+        a.data.partner = yamu ? yamu.id : -1
+        if (!p || p.dead) return
+        a.data.sx = p.x
+        a.data.sy = p.y
+        p.holdPose(e.w, 21, 0)
+        p.x = e.x + (8 << 8)
+        p.y = e.y - (16 << 8)
+      }, (_f, a) => {
         const p = e.player
-        if (!a.data.ok) return f >= 2
-        if (!a.data.rel && (!p || p.heldBy !== e || e.drainDone)) {
-          a.data.rel = f
-          if (p && p.heldBy === e) p.release(e.w)
-          e.drainDone = false
+        const yamu = e.ctx.liveEnemies().find((o) => o.id === a.data.partner) as Enemy | undefined
+        if (!yamu) return true
+        if (a.data.phase === 1) return a.data.cnt-- === 0
+        const release = () => {
+          if (p) {
+            p.x = a.data.sx
+            p.y = a.data.sy
+            p.toIdle(e.w)
+          }
+          e.setAnim(9, true, false)
+          a.data.phase = 1
+          a.data.cnt = 60
         }
-        return !!a.data.rel && f - a.data.rel >= 60
-      }, () => {
-        const p = e.player
-        if (p && p.heldBy === e) p.release(e.w)
+        if (isAnimId(yamu, 9)) {
+          release()
+          return false
+        }
+        if (isAnimId(yamu, 0x11) || !p) return false
+        const ctx = e.ctx
+        if (ctx.pressed & DPAD_MASK) p.poseFrame ^= 1
+        if (ctx.pressRun(DPAD_MASK, 20, 90, e.w) && ++a.data.mash === 5) release()
+        return false
       })
-    case 'EnergyDrain':
+    case 'EnergyDrain': {
+      let mover: LineMover | null = null
+      // [H] Yamu's drain (node vtable 0x0804A178, enter 0x0802FC53, update 0x0802FC5D). Phase 0 (0x0802FA70): until a
+      // spot is found (0x0802F9A0: partner = the first object of class 0xFC (Spopovich), none -> finished; the spot
+      // Spopovich + (40, 1) when Yamu is right of it, else / if blocked + (-40, 1)) a straight-line mover there
+      // (0x0800A1D4, speed 0x100); every tick: Spopovich showing SetAnim(9)'s animation -> finished; the mover's step
+      // (0x0800A01D); arrived -> face Spopovich's side, phase 1, SetAnimRaw(0x12) under 0x03003118, the target EP =
+      // EP - maxEP / 4 (0 when EP <= maxEP / 4). Phase 1 (0x0802FB9C): EP == target -> Yamu SetAnim(9), phase 2 (60
+      // ticks); else the byte counter +0x20 + 1: every 8th EP - 1, every 32nd sound 19. The counter is not initialised:
+      // the node's fresh heap memory reads 0x6D (emulator), so the first EP loss is 3 ticks after the arrival
       return new Act(n, c, (a) => {
         a.data.phase = 0
-        a.data.lost = 0
-      }, (f, a) => {
+        a.data.found = 0
+        a.data.cnt = 0x6d
+        a.data.partner = -1
+        mover = null
+      }, (_f, a) => {
         const p = e.player
-        if (!p || p.dead) return true
-        if (a.data.phase === 0) {
-          if (e.moveToward(0x100, 16, true)) a.data.phase = 1
-          if (!p.heldBy) return true
-          return false
-        }
+        if (a.data.phase === 2) return (a.data.cnt = (a.data.cnt - 1) & 0xff) === 0xff
         if (a.data.phase === 1) {
-          if (!p.heldBy) return true
-          if (f % 8 === 0 && p.ep > p.maxEp / 4 && a.data.lost < p.maxEp / 4) {
-            p.loseEp(1)
-            a.data.lost++
-          } else if (a.data.lost >= p.maxEp / 4 || p.ep <= p.maxEp / 4) {
-            const spo = e.ctx.liveEnemies().find((o) => p.heldBy === o) as Enemy | undefined
-            if (spo) spo.drainDone = true
+          if (!p) return false
+          if (p.ep === a.data.target) {
+            e.setAnim(9, true, false)
             a.data.phase = 2
-            a.data.at = f
+            a.data.cnt = 60
+            return false
           }
+          a.data.cnt = (a.data.cnt + 1) & 0xff
+          if ((a.data.cnt & 7) === 0) p.ep -= 1
+          if ((a.data.cnt & 31) === 0) audioEvent('sfx', { id: 19, vol: 64 })
           return false
         }
-        return f - a.data.at >= 60
+        if (!a.data.found) {
+          const spo = e.ctx.liveEnemies().find((o) => [0x6d, 0x6e, 0x6f, 0x70].includes(o.type.type)) as Enemy | undefined
+          a.data.partner = spo ? spo.id : -1
+          if (!spo) return true
+          e.unmarkSelf()
+          let tx = 0
+          let ty = spo.y + 0x100
+          if (e.x > spo.x && e.fits(e.w, (spo.x + (40 << 8)) >> 8, ty >> 8)) tx = spo.x + (40 << 8)
+          else if (e.fits(e.w, (spo.x - (40 << 8)) >> 8, ty >> 8)) tx = spo.x - (40 << 8)
+          else ty = -1
+          e.markSelf()
+          if (ty >= 0) {
+            a.data.found = 1
+            mover = new LineMover(e, tx >> 8, ty >> 8, 0x100)
+          }
+        }
+        const spo = e.ctx.liveEnemies().find((o) => o.id === a.data.partner) as Enemy | undefined
+        if (spo && isAnimId(spo, 9)) return true
+        if (!a.data.found || !mover) return false
+        if (!mover.update()) return false
+        e.facing = spo && e.x > spo.x ? 2 : 3
+        a.data.phase = 1
+        mover = null
+        e.setAnim(18, true, true, { rule: 'hold' })
+        a.data.target = p && p.ep > p.maxEp >> 2 ? p.ep - (p.maxEp >> 2) : 0
+        return false
       })
+    }
     case 'FreezePlayer':
+      // ---- Buu fragment freeze (node vtable 0x0804AA3C) ---------------------------------------------------------
+      // enter 0x080305AA: player frame 0, SetAnimRaw(0) (raw 1), SetState(0x03001B00) (held), message handler
+      // 0x03003144 (hits do full damage, no hurt reaction); the fragment's freeze state (enemy.ts freezeEnter).
+      // update 0x0804FF94: done once the fragment left 0x0300314C (the escape in its think SetAnim(0)s it).
+      // exit 0x080305E2: player SetAnim(0) and handler 0x03001C3C - after an escape the player enters idle a second
+      // time (two rand(255))
       return new Act(n, c, () => {
-        e.ctx.player?.hold(e.w, e, 'freeze', 0)
-        e.setAnim(17, true, false)
-      }, (f) => f >= 48, () => {
         const p = e.player
-        if (p && p.heldBy === e) p.release(e.w)
+        if (p) p.hold(e.w, e, 'freeze', 0, 1)
+        e.freezeEnter()
+      }, () => e.stateHook?.name !== 'freeze', () => {
+        const p = e.player
+        if (!p || p.dead) return
+        if (p.heldBy === e) p.release(e.w)
+        else p.setAnimId(e.w, 0)
       })
     case 'EatCandy':
-      return new Act(n, c, (a) => {
-        const p = e.player
+      // [H] enter 0x0802B19D: face the player, SetAnimRaw(0x14) (raw 21) under controller 0x0300303C (finished when
+      // the enemy leaves it, update 0x0802B1EB). Controller tick 0x0802AF11 (t = obj+0x12 before the + 1):
+      //   t 0: keep the player's position (0x03003044 / 48), the player's def 0x36 and a candy-eat state (0x0804C2CC)
+      //     placing it at the enemy position + 0x08752DF8[dir]
+      //   t 8: the player object leaves the world (0x08011944; its state's destructor clears the candy timer)
+      //   t 24..111 every 8th: d = min(POW >> 2, HP); HP - d (0 -> 1 and the KO flag 0x03003038); the enemy heals d
+      //     (vfunc +0x60); every 32nd sound 11
+      //   t 120: a new player object (0x080109AA) at the kept position (whole pixels), facing down, the form's def,
+      //     idle; the KO flag -> KO
+      //   t 160: SetAnim(0)
+      //   frames: t >> 3 below 24, 3 + ((t + 8) >> 3 & 1) below 112, 5 + ((t - 112) >> 3) below 128
+      return new Act(n, c, () => {
         e.facePlayer()
-        e.setAnim(19, true, true)
-        a.data.ok = p && !p.dead ? 1 : 0
-        if (a.data.ok) p!.hold(e.w, e, 'eat', 0)
-      }, (f, a) => {
+        e.setAnim(20, true, true, { rule: 'hold' })
+      }, (t, a) => {
         const p = e.player
-        if (!a.data.ok || !p) return true
-        if (f >= 24 && f <= 111 && f % 8 === 0) {
-          const d = Math.min(e.stats.POW >> 2, p.hp)
-          const lost = p.loseHp(e.w, d, 1)
-          e.heal(lost * 1024)
+        if (t === 1 && p) {
+          a.data.sx = p.x
+          a.data.sy = p.y
+          a.data.ko = 0
+          const O = [[-8, -20], [-8, -20], [-8, -20], [48, -20]][e.facing]
+          p.candyEat(e.w, (e.px + O[0]) << 8, (e.py + O[1]) << 8)
         }
-        if (f >= 120) {
-          e.ctx.candy = 0
-          p.release(e.w)
+        if (t < 24) {
+          if (t === 8 && p) p.candyGone(e.w)
+          e.frameIdx = e.ea.pos.frame = t >> 3
+        } else if (t < 112) {
+          e.frameIdx = e.ea.pos.frame = 3 + (((t + 8) >> 3) & 1)
+          if ((t & 7) === 0 && p) {
+            let d = e.stats.POW >> 2
+            if (p.hp <= d) d = p.hp
+            p.hp -= d
+            if (p.hp === 0) {
+              p.hp = 1
+              a.data.ko = 1
+            }
+            e.heal(d * 1024)
+          }
+          if ((t & 31) === 0) audioEvent('sfx', { id: 11, vol: 64 })
+        } else if (t < 128) {
+          e.frameIdx = e.ea.pos.frame = 5 + ((t - 112) >> 3)
+          if (t === 120 && p) p.candyRespawn(e.w, (a.data.sx >> 8) << 8, (a.data.sy >> 8) << 8, !!a.data.ko)
+        } else if (t >= 160) {
+          e.setAnim('idle', true, true)
           return true
         }
         return false
-      }, () => {
-        const p = e.player
-        if (p && p.heldBy === e) {
-          e.ctx.candy = 0
-          p.release(e.w)
-        }
       })
 
     // ---- Buu --------------------------------------------------------------------------------------------------------
     case 'BuuStretchPunch':
+      // [H] enter 0x0802ACB3: the player HP > 0 and hittable -> face the player, SetAnimRaw(0x13) (raw 20) under
+      // controller 0x03003004 (finished when the enemy leaves it). Controller tick 0x0802AB1D: t++; frame 0 below 8,
+      // 1 + ((t + 8) >> 3 & 1) below 56, 3 + ((t - 56) >> 3) below 72; t 64 spawns the arm (0x08028C04) at the integer
+      // position + 0x08752D6C[dir] for def 0x2B, else + 0x08752D8C (10 px higher sideways), kept in 0x03003008, and
+      // plays sound 8; from t 72 SetAnim(0) once the arm is gone from the world
       return new Act(n, c, (a) => {
         const p = e.player
         a.data.ok = p && p.hp > 0 && p.hittable ? 1 : 0
+        a.data.arm = -1
         if (a.data.ok) {
           e.facePlayer()
-          e.setAnim(19, true, true)
+          e.setAnim(19, true, true, { rule: 'hold' })
         }
-      }, (f, a) => {
+      }, (t, a) => {
         if (!a.data.ok) return true
-        if (f === 64) {
-          const OFF = [[9, 16], [15, -56], [-24, -16], [48, -16]]
-          const [ox, oy] = OFF[e.facing]
-          a.data.arm = e.w.add(new StretchArm(e.ctx, e, e.facing, ox, oy + (e.type.gfx === 0x2b ? -10 : 0))).id
+        if (t < 72) {
+          e.frameIdx = e.ea.pos.frame = t < 8 ? 0 : t < 56 ? 1 + (((t + 8) >> 3) & 1) : 3 + ((t - 56) >> 3)
+          if (t === 64) {
+            const O = e.type.gfx === 0x2b ? [[9, 16], [15, -56], [-24, -16], [48, -16]] : [[9, 16], [15, -56], [-24, -26], [48, -26]]
+            const [ox, oy] = O[e.facing]
+            a.data.arm = e.w.add(new StretchArm(e.ctx, e, e.facing, e.px + ox, e.py + oy)).id
+            audioEvent('sfx', { id: 8, vol: 64 })
+          }
+          return false
         }
-        if (f >= 72) return !e.w.entities.some((x) => x.id === a.data.arm && !x.removed)
-        return false
+        if (e.w.entities.some((x) => x.id === a.data.arm && !x.removed)) return false
+        e.setAnim('idle', true, true)
+        return true
       })
     case 'CandyBeam':
+      // [H] enter 0x0802B333: the player HP > 0 and hittable -> face the player, SetAnimRaw(0x12) (raw 19) under
+      // controller 0x0300304C; finished when the enemy is not in it (update 0x0802B3A3). Controller tick 0x0802B221:
+      // t++; below 32 frame t >> 3, t 16 spawns the beam (0x080286D4) at the integer position + 0x08752E28[dir]
+      // for def 0x2B, else + 0x08752E48 (y 10 px higher sideways), kept in 0x03003050; from t 32 SetAnim(0) once it is gone from the world
       return new Act(n, c, (a) => {
         const p = e.player
         a.data.ok = p && p.hp > 0 && p.hittable ? 1 : 0
+        a.data.beam = -1
         if (a.data.ok) {
           e.facePlayer()
-          e.setAnim(18, true, false)
+          e.setAnim(18, true, true, { rule: 'hold' })
         }
-      }, (f, a) => {
+      }, (t, a) => {
         if (!a.data.ok) return true
-        if (f === 16) {
-          const OFF = [[16, 8], [16, -50], [-8, -26], [40, -26]]
-          const [ox, oy] = OFF[e.facing]
-          a.data.beam = e.w.add(new CandyBeam(e.ctx, e, e.facing, ox, oy)).id
+        if (t < 32) {
+          e.frameIdx = e.ea.pos.frame = t >> 3
+          if (t === 16) {
+            const [ox, oy] = (e.type.gfx === 0x2b ? CANDY_OFF_2B : CANDY_OFF)[e.facing]
+            a.data.beam = e.w.add(new CandyBeam(e.ctx, e, e.facing, e.px + ox, e.py + oy)).id
+          }
+          return false
         }
-        if (f >= 32) return !e.w.entities.some((x) => x.id === a.data.beam && !x.removed)
-        return false
+        if (e.w.entities.some((x) => x.id === a.data.beam && !x.removed)) return false
+        e.setAnim('idle', true, true)
+        return true
       })
     case 'AbsorbStance':
       return new Act(n, c, () => e.setAnim(20, true, false), (f) => f >= 8)
@@ -1265,7 +1722,9 @@ export function create(n: AiNodeJ, c: AiController): RNode {
         },
       }, false)
     case 'KidBuuSplitAnim':
-      return wait(n, c, 55, 11, false)
+      // SetAnimRaw(0xC) under the one-shot state 0x03001B30; the node finishes on the 56th update (lockstep
+      // f02_vs_enemy_beam: entered at 172, the split state at 229)
+      return wait(n, c, 56, 11, false)
     case 'KidBuuSplit':
       return new Instant(n, c, () => e.kidBuuSplit())
     case 'KidBuuMerge':
@@ -1284,9 +1743,16 @@ export function create(n: AiNodeJ, c: AiController): RNode {
       return new Instant(n, c, () => e.janembaParts())
     case 'JanembaHandStrikeA':
     case 'JanembaHandStrikeB':
+      // the part's controller is set by the node's first update; the hand (an enemy, type 0x36) on its 16th tick
+      // (lockstep f02_vs_enemy_hand: part controller at 5, hand at 21)
       return new Act(n, c, () => e.setAnim(17, true, false), (f) => {
-        if (f === 16) e.handStrike(n.name === 'JanembaHandStrikeA')
-        return f >= 57
+        if (f === 17) e.handStrike(n.name === 'JanembaHandStrikeA')
+        if (f >= 57) {
+          // the part's controller ends (SetAnim(0) on the arm part: its idle enter draws rand(255)); the node is done
+          e.w.rng.rand(255, 'janemba arm idle tick')
+          return true
+        }
+        return false
       })
     case 'JanembaAscend':
       return new Act(n, c, () => e.setAnim(18, true, true), (f) => {
@@ -1309,40 +1775,60 @@ export function create(n: AiNodeJ, c: AiController): RNode {
       })
     case 'WaitMinisDefeated':
       return new Act(n, c, () => undefined, () => !e.ctx.liveEnemies().some((o) => o.type.type === 0x38))
-    case 'MiniHopToward':
+    case 'MiniHopToward': {
+      // node 0x03003230 (enter 0x0803467A: SetAnimRaw(0x12), hop controller 0x0300322C (tick +8 per frame, wraps at
+      // 0x100), aim; update 0x080346FC: at tick 0 re-aim with chance(0x4000); tick > 0x80: try the whole step
+      // 0x087593F8[dir] * 0x80 >> 8 (+-0.5 px per axis), no sliding). Aim: the diagonal toward the player from the
+      // footprint centres (dx > 0: dy > 0 -> 0, dy < 0 -> 3; dx < 0: dy > 0 -> 2, dy < 0 -> 1; a zero keeps the facing)
+      const aim = () => {
+        const [dx, dy] = e.toPlayer()
+        if (dx > 0 && dy > 0) e.facing = 0
+        else if (dx > 0 && dy < 0) e.facing = 3
+        else if (dx < 0 && dy > 0) e.facing = 2
+        else if (dx < 0 && dy < 0) e.facing = 1
+      }
+      return new Act(n, c, (a) => {
+        a.data.ph = 0
+        e.setAnim(18, true, true)
+        aim()
+      }, (_f, a) => {
+        a.data.ph = (a.data.ph + 8) & 0xff
+        const air = a.data.ph > 0x80
+        e.z = a.data.ph >= 0x80 ? -Math.round(Math.sin(((a.data.ph - 0x80) / 128) * Math.PI) * 8) : 0
+        if (a.data.ph === 0 && e.w.rng.chance(0x4000, 'mini re-aim')) aim()
+        if (air) {
+          const V = [[128, 128], [-128, -128], [-128, 128], [128, -128]]
+          const [vx, vy] = V[e.facing]
+          e.tryMove(vx, vy, 0, 0)
+        }
+        return false
+      })
+    }
     case 'MiniHopFlee':
       return new Act(n, c, (a) => (a.data.ph = 0), (_f, a) => {
         a.data.ph = (a.data.ph + 8) & 0xff
         const air = a.data.ph >= 0x80
         e.z = air ? -Math.round(Math.sin(((a.data.ph - 0x80) / 128) * Math.PI) * 8) : 0
-        if (a.data.ph === 0) {
-          if (n.name === 'MiniHopToward') {
-            if (e.w.rng.chance(0x4000, 'mini re-aim')) {
-              const [dx, dy] = e.toPlayer()
-              a.data.d = dx >= 0 ? (dy >= 0 ? 0 : 3) : dy >= 0 ? 2 : 1
-            }
-          } else e.facePlayer()
-        }
+        if (a.data.ph === 0) e.facePlayer()
         if (air) {
-          if (n.name === 'MiniHopToward') {
-            const V = [[128, 128], [-128, -128], [-128, 128], [128, -128]]
-            const [vx, vy] = V[a.data.d ?? 0]
-            e.moveBy(e.w, vx, vy)
-          } else {
-            const [dx, dy] = e.toPlayer()
-            const m = Math.max(1, Math.hypot(dx, dy))
-            e.moveBy(e.w, -Math.round((dx / m) * 128), -Math.round((dy / m) * 128))
-          }
+          const [dx, dy] = e.toPlayer()
+          const m = Math.max(1, Math.hypot(dx, dy))
+          e.moveBy(e.w, -Math.round((dx / m) * 128), -Math.round((dy / m) * 128))
         }
         return false
       })
     case 'MiniRollAttack':
       return new Act(n, c, (a) => {
         e.setAnim(17, true, true)
+        // controller 0x03003248 enter 0x08034CF8: the diagonal toward the player from the footprint centres (dx > 0:
+        // dy > 0 -> 0 else 3; dx <= 0: dy > 0 -> 2 else 1), velocity 0x0875947C[dir] * 0x80 >> 8 = +-1.5 px per axis
         const [dx, dy] = e.toPlayer()
-        a.data.vx = Math.sign(dx) * 384
-        a.data.vy = Math.sign(dy) * 384
+        e.facing = (dx > 0 ? (dy > 0 ? 0 : 3) : dy > 0 ? 2 : 1) as Dir
+        const V = [[384, 384], [-384, -384], [-384, 384], [384, -384]]
+        a.data.vx = V[e.facing][0]
+        a.data.vy = V[e.facing][1]
       }, (f, a) => {
+        // update 0x08034DE8: the controller's tick +8 per frame; 0x81..0xFF try-move, 0x100 one hit (body box, sub 0)
         if (f > 16 && f < 32) e.moveBy(e.w, a.data.vx, a.data.vy)
         if (f === 32) {
           e.areaHit(e.bodyBox(), ATK[0], 0x400)
@@ -1421,7 +1907,9 @@ export function create(n: AiNodeJ, c: AiController): RNode {
     case 'RecoverAnim':
       return playAnim(n, c, 19, false, 8)
     case 'PlayAnim0':
-      return wait(n, c, 80, 0)
+      // node vtable 0x0804A110: enter 0x0804E5E8 installs the fragment state 0x03003158 (enemy.ts fragEnter); update
+      // 0x0804FF0C: done once the actor left that state; exit 0x0804F570 nothing
+      return new Act(n, c, () => e.fragEnter(), () => e.stateHook?.name !== 'fragment')
     case 'PlayAnim12':
     case 'PlayAnim12b':
     case 'PlayAnim12Swarm':
@@ -1470,7 +1958,16 @@ export function create(n: AiNodeJ, c: AiController): RNode {
         return false
       })
     case 'MechTransform':
-      return playAnim(n, c, 19, false, 12)
+      // create 0x080315A4 (singleton 0x03003170, vtable 0x0804CB90): enter SetAnimRaw(0x15) under the one-shot state
+      // 0x03001B30 (once_stop, 8 ticks per frame); update 0x080314DC: running while the actor is in that state, then
+      // swap the paired graphics set (Enemy.swapGfx), SetAnim(0) (idle, rand(255)) and finish (lockstep
+      // f02_vs_enemy_t48)
+      return new Act(n, c, () => e.setAnim(20, true, false), () => {
+        if (!e.animDone()) return false
+        e.swapGfx()
+        e.setAnim(0, true, true)
+        return true
+      })
     case 'RaiseShield':
     case 'LowerShield':
     case 'ShieldBreak':
@@ -1494,7 +1991,9 @@ export function create(n: AiNodeJ, c: AiController): RNode {
         return e.moveToPoint(px + Math.round(Math.cos(a) * r) - (e.footW >> 1), py + Math.round(Math.sin(a) * r) - (e.footH >> 1), 0x100)
       })
     case 'WormSpawnBody':
-      return new Instant(n, c, () => e.wormSpawnBody())
+      // the segments are created by the node's enter 0x0802CBD4 (in the GotoState), the update just finishes
+      // (lockstep f02_vs_enemy_t8e: the 5 constructors' rand(255) run inside the injected GotoState)
+      return new Act(n, c, () => e.wormSpawnBody(), () => true)
     case 'WormHeadMove':
       return new Act(n, c, () => undefined, () => {
         e.wormHeadStep()

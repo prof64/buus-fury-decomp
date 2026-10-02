@@ -461,6 +461,8 @@ export class BuuRuleset implements Ruleset {
       ww.add(e)
       ctx.enemies.push(e)
       e.w = ww
+      // the enemy constructor's SetAnim(0): the idle state's enter draws its start tick (rand(255))
+      e.setAnim('idle', true, true)
       e.markSelf()
       if (start !== -1) e.start(ww, start ?? t.ai)
       return e
@@ -553,7 +555,9 @@ export class BuuRuleset implements Ruleset {
     }
 
     const battle: RulesetBattle = {
-      preStep() {
+      preStep(w2, inp) {
+        // the input object 0x03003300 (0x0804023C) records this frame's presses (stamped with the frame counter)
+        ctx.noteInput(ctx.fc0 + w2.frame + 1, inp.pressed)
         // enemy grid marks follow positions set outside the enemy step (spawns, teleports, deaths)
         if (ctx.col) for (const e of ctx.enemies as Enemy[]) e.syncMark()
       },

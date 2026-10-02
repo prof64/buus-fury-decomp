@@ -15,6 +15,8 @@ export interface PlayerLike extends Actor {
   ep: number
   maxEp: number
   dead: boolean
+  /** the frame of the KO (-1: none); the death script freezes the world at KO + 199 (Enemy.update) */
+  koAt?: number
   /** player is in a hurt/hold state that the AI must not grab again */
   heldBy: Actor | null
   /** current state is an attack / charging state (IfPlayerAttackingMe, IfInPlayerBeamLine) */
@@ -23,14 +25,35 @@ export interface PlayerLike extends Actor {
   /** the player's live Energy Blast projectile (IfPlayerBlastIncoming, 0x03001B94 current projectile) */
   blast: { removed: boolean; rect(): { x0: number; y0: number; x1: number; y1: number }; dir: number } | null
   /** forced states driven by enemies */
-  hold(w: World, by: Actor, kind: HoldKind, frames: number): void
+  hold(w: World, by: Actor, kind: HoldKind, frames: number, raw?: number): void
   release(w: World): void
+  /** [H] generic: SetState(0x03001B00) through 0x0800ED18 (the hold state: frame kept, no tick, no control) */
+  enterHold(w: World): void
+  /** [H] generic: SetAnim(0) (vfunc +0x28 with 0): the idle state */
+  toIdle(w: World): void
+  /** [H] generic: SetAnimRaw(raw - 1) (0x0800ECDA), frame obj+0x11 = frame, SetState(0x03001B00) (frozen pose) */
+  holdPose(w: World, raw: number, frame: number): void
+  /** [H] generic: the shown frame obj+0x11 (read / written by the hold code) */
+  poseFrame: number
+  /** [H] candy: the candy beam's accepted hit (0x08028862) */
+  candyHit(w: World): void
+  /** [H] candy: Majin Buu's eat (controller 0x0300303C) */
+  candyEat(w: World, x: number, y: number): void
+  candyGone(w: World): void
+  candyRespawn(w: World, x: number, y: number, ko: boolean): void
+  /** SetAnim(id) (vfunc +0x28) */
+  setAnimId(w: World, id: number): void
   /** HP loss bypassing the formula (vampire / enzyme / eat), never below `floor` */
   loseHp(w: World, n: number, floor?: number): number
   loseEp(n: number): void
   isStone(): boolean
+  /** Dabura's spit landed: the player's stone state (vtable 0x0804AB34) */
+  petrify?(w: World): void
   isCandy(): boolean
   wraps: number
+  /** a mummy bandage's stat reapply (0x0802D8E6, while hittable): the form stats (resists 128), walk / dash speed
+   *  -48 per stuck bandage */
+  wrapStats(stuck: number): void
   gainXp(w: World, exp: number): void
   /** current animation is "slot 0x13" (bat-the-ball swing) - INFERRED: a melee swing */
   swinging(): boolean
@@ -59,8 +82,6 @@ export class BuuCtx {
   enemies: EnemyLike[] = []
   /** global 0x03002FE4: candy frames left (> 0 = the player is candy) */
   candy = 0
-  /** frame of sprite 45 (three sweets) the candy-ed player shows: rand(3) on the candy-beam hit */
-  candyFrame = 0
   /** 0x0300302C */
   buuPacified = 0
   /** 0x030032E4: 0 active, 1 destroyed, 2 fading, 3 expired */
@@ -69,6 +90,8 @@ export class BuuCtx {
   waypoint = 0
   /** 0x03003228 TeleportChain4 counter */
   teleChain = 0
+  /** 0x030030BC: the next stuck bandage's slot (0..7) */
+  wrapSlot = 0
   /** 0x030032E5: re-plan phase handed to the next path follower (path.ts), +1 & 7 each time */
   pathStagger = 0
   /** spawn an enemy of `type` at integer px (set by index.ts) */
@@ -77,6 +100,36 @@ export class BuuCtx {
 
   /** map collision of the arena (null = open arena, bounds only) */
   col: BuuCollision | null = null
+  /** the game's frame counter 0x03000F94 (+1 per logic frame) at w.frame 0: nodes that test the counter itself
+   *  (VampireGrab's drain every 16 frames) read w.frame + fc0 (lockstep harness: the recording's counter) */
+  fc0 = 0
+  /** the frame counter 0x03000F94 now (fc0 + the frame) */
+  clock(w: World): number {
+    return this.fc0 + w.frame
+  }
+  /** the input object 0x03003300 (update 0x0804023C, once per logic frame): +4 the keys newly pressed this frame;
+   *  a 64-entry ring of press events (+8 keys, +0x88 frame counter) */
+  pressed = 0
+  presses: { keys: number; at: number }[] = []
+  noteInput(at: number, pressed: number) {
+    this.pressed = pressed
+    if (!pressed) return
+    this.presses.push({ keys: pressed, at })
+    if (this.presses.length > 64) this.presses.shift()
+  }
+  /** 0x08040284(input, mask, n, window): a press this frame and, walking the ring back from the newest event (at most
+   *  64), the last n events with a `mask` key all stamped >= now - window */
+  pressRun(mask: number, n: number, window: number, w: World): boolean {
+    if (!this.pressed) return false
+    const start = this.clock(w) - window
+    for (let i = this.presses.length - 1; i >= 0 && n > 0; i--) {
+      const ev = this.presses[i]
+      if (!(ev.keys & mask)) continue
+      if (ev.at < start) return false
+      n--
+    }
+    return n === 0
+  }
   /** HUD +0x10: frame of the last low-HP beep (0x0800BA4A) */
   lastBeep = -1000
   /** set the camera's 22.10 position (index.ts camera; lockstep harness) */

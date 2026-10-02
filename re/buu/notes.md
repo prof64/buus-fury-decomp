@@ -1220,3 +1220,260 @@ hits the fitted models).
 | `buu_swforest3.ss` | warped to Southwest Forest (8,3) with 4 Majin Fighters |
 | `buu_fight_swforest.ss` | enemies pulled next to Goku; used by combat and loot verification |
 | `buu_menus.ss` | menus |
+
+## 11. Field: area loading and transitions
+
+Tools: `tools/field/common_field.py` (helpers, recorder), `tools/field/rec_transitions.py` → `data/field/transitions_*.json`.
+
+**State.** World state `0x0300197C` (= `[0x080707D0]`): +0 u8 world, +1 u8 area, +2 u8 map variant, +4 area record
+(`0x0808E2E0 + 0x38·i`), +8 u16 name id of the last area entered (banner), +0xC = (area+8 != 0), +0x10 area-load
+counter. Object world `0x03001C4C`: +4 u32 count + object pointers, updated **last to first** (`0x08011A1E`, vfunc
++8), +0x610 deferred deletes. Trigger list `0x03002A64` (`[0x080707E0]`): u32 count + pointers, +0xC4 check counter,
++0xD0 enabled. Area record: +0 world, +1 area, +3/+4/+5/+6/+7 counts (triggers, actors, breakables, items, map
+sprites), **+0xC name string id** (`areas.json` "name_string_id"), +0x10/+0x14/+0x18/+0x1C/+0x20 lists, **+0x24
+song** (id, or bytecode returning it; 0xFF = stop), +0x28 variant selector, +0x2C map list, +0x30 on-enter, +0x34
+on-leave. VERIFIED (recordings).
+
+**Per frame** (normal mode): `0x0800965C` (BG scroll with last frame's camera) → `0x08006E3C`: object update
+(`0x08011A1E`), **trigger check** (`0x080126D4`), GameData timers / scripts (`0x0800425C`), pause → then the camera
+object (`0x080077EC`, ease 3/64, 9/128). Camera clamp `0x08009744`: x, y < 0 → 0; `(v >> 10) > max` → `max << 10`
+(max = map +0x9C/+0x9E = `camera_max_x/y`): the **integer** part is compared, so a camera up to 1023/1024 px past the
+max is kept (trace: x 0.537 px at max 0). VERIFIED.
+
+**Trigger check** `0x080126D4(list, player)`: only when the list is enabled, a player exists and its HP != 0.
+Point = player position integer px (`x >> 8`, `y >> 8`, the footprint top-left). Triggers are tested from the
+list's end: hit = `x0 <= px < x1 && y0 <= py < y1` (x 112 hits the exit 64..113, 113 does not: VERIFIED), then the
+activation object's test (vfunc +8); on true its fire (vfunc +4 → trigger vfunc +4) runs and the scan **stops**
+(one trigger per frame). List order: map-header triggers in **reverse** exported order, then area triggers (+0x10,
+created last to first): the scan therefore tests the area triggers in exported order, then the map triggers in
+exported order. Activation `touch` (`0x08007768`) = always true while inside (the exit fires every frame the push
+key is held inside the rect); `touch_once` removes the trigger after firing unless an area load happened meanwhile.
+
+**Exit / edge exit fire** (`0x080075AC` / `0x080071F8`): needs `held & mask` (+0x11 = `[0x080707D8 + dir]`: down
+0x80, up 0x40, left 0x20, right 0x10) — HELD, not pressed (VERIFIED: walking into the rect with the key held fires
+on the first frame inside; standing inside fires the frame the key goes down). Then: old player facing = push dir
+(trigger +0x10 low nibble), fade-out mode (`0x08006D98`: brightness 256, step 8) which puts the player into
+**autowalk** (`0x08010D7C`: not hittable +0x1CC = 0, walk animation, state `0x03002B54` vtable `0x0804E00C`:
++0x80 subpx per frame along the facing, `0x083C34B0`, **no collision**, input ignored), `run_mode`. A fade frame
+runs: BG scroll, **object update** (whole world), brightness ∓8, camera update — **no trigger check, no scripts**.
+32 frames; at the end of the 32nd the mode's destructor sets the player idle (`vfunc +0x28(p, 0)`: idle enter =
+1 × rand(255)) and, in the same video frame, `EnterArea(ws, world, area, &dest, variant, 1)` (`0x08008D44`).
+* door `exit`: dest = (def +0x14, +0x16) exactly (new player footprint top-left, integer px).
+* `edge_exit`: dest = player px − (x0, y0) + (dx, dy) (integer px; the 24.8 fraction is lost).
+* After the load: door: facing = hi nibble − 1 if the hi nibble of def +0x10 is set, else the push dir; edge exit:
+  facing = +0x10 (the push dir). Then the fade-in mode (`0x08006DD6`, brightness 0 → 256 by 8: 32 logic frames,
+  player autowalks again 16 px) and, at its end, the player goes idle (1 × rand(255)). If the old player answered
+  vfunc +0x34(2) (INFERRED: flying), the new one gets +0x230 (height) and vfunc +0x28(2).
+* If `0x03001A34` (camera struct `0x030019A4` +0x90) != 0 (script-driven camera / cutscene mode, INFERRED) no facing/fade-in: a 4-step fade object instead.
+
+**Timeline in logic frames** (VERIFIED, 4 recordings; A = the frame the trigger fires): A: normal frame (player
+walked into the rect, state becomes autowalk at the end of A, no autowalk step yet); A+1..A+32 fade-out (32
+autowalk steps of 0.5 px, world updating; A+32 ends with the old player's idle draw and the load); then N video
+frames without logic (frame counter `0x03000F94` stalls: 20–48 measured, depends on the map; the player object
+exists for the last 1–2 of them); F0..F0+31 fade-in (autowalk 16 px from dest, world updating; idle draw at the
+end of F0+31); F0+32 first normal frame (a held d-pad: idle → walk, the first movement on F0+33).
+
+**EnterArea** (`0x08008D44`): ws+0/+1 = world/area; camera = (dest.x − 112, dest.y − 76) << 10 clamped as above
+(snap, VERIFIED: 3-3 arrival (117,312) → camera (5, 160)); `LoadArea` (`0x08008B30`):
+1. old area's on-leave (+0x34) is remembered; ws+4 = area; ws+0xC; variant = arg if != 0, else area +0x28 == 0 →
+   1, else run the selector bytecode (`0x080089A0`); ws+2 = variant;
+2. map-screen bits: table `0x0874CA24` (55 entries: +0x14 count, +0x18 → `{u8 world, u8 area, u16 bit}`); the
+   first entry matching (world, area) sets bit `bit` at GD+0x8D, i.e. **story flag 0x1C0 + bit** (`0x08004A88`);
+3. map load (`0x0800953E`, map = area +0x2C [variant − 1]): BG, collision, the camera snap;
+4. objects, in this order (each appended to the object world, so later = updated earlier):
+   map sprites (+0x20, forward), breakables (+0x18, forward, condition def+0), items (+0x1C, forward,
+   condition def+0), then the trigger list is cleared and refilled (map header triggers via `0x08012664`, area
+   triggers +0x10 last to first, condition word +0), **song** (+0x24: PlaySong unless the driver already plays
+   that song; 0xFF stops), actors (+0x14, forward, condition def+4; enemies and NPCs);
+5. old on-leave bytecode, then the new on-enter (+0x30) — both before the player exists.
+Back in EnterArea: the player is created at dest (`0x080109AA`), then the HUD (`0x0800B854`, when GameData+1 bit 1, INFERRED),
+then, if the area's name id (+0xC) differs from ws+8, the name banner object (`0x0800BF34`, vtable `0x0804B528`
+in the list) and ws+8 = name id. Object list after a load: [breakables…, items…, actors…, player, HUD, banner?].
+Conditions (`0x08004784`): 0 always; 1..0xFFFF never; 0x1xxxx flag set; 0x2xxxx clear; 0x3xxxx set → clear it
+and create (else not); otherwise a pointer to bytecode returning a bool. Flag f = bit f&7 of GD+0x55+(f>>3).
+
+**RNG during a load** (VERIFIED, every recording): exactly one rand(255) (idle enter `0x0800DFBE`) per actor
+created (enemies and NPCs, creation order), then two for the new player; breakables, items, triggers, HUD, banner
+draw nothing. Plus the old player's idle draw at the end of the fade-out and the new player's at the end of the
+fade-in. Everything else is the world's own updates during the fades.
+
+**Persistence / respawn** (VERIFIED, `buu_swforest3.ss`: 3 Majin Fighters killed, out to 8-6 and back): every
+area object (actors, drops, breakables, items, triggers, HUD, player) is destroyed by the load and the area's
+lists are re-evaluated from the ROM definitions: the killed enemies are back. Only story flags persist (enemy sets
+gated by flags such as 163/164). An unrelated text/sprite object (vtable `0x0804C070`, created by the kills) survived.
+
+Recordings (`data/field/transitions_*.json`, from `buu_snakeway_start.ss` via the converted Snakeway trigger, see
+`warp.py`): `forest_up_exit` (8-3 → 8-6 door), `forest_roundtrip` (8-3 → 8-6 → 8-3), `hercule_edge_up` (3-2 → 3-3
+edge exit), `thieves_door_facing` (9-8 → 9-9, arrival facing nibble = up). Frame 0 = the first logic frame after
+the warp's load (the first fade-in frame).
+
+
+## Field: NPC actors and behaviours (VERIFIED: `tools/field/npc_model.py` replays every `data/field/npc_*.json` exactly)
+
+Recorder `tools/field/rec_npc.py` (warp from `buu_snakeway_start.ss`, frame 0 = first logic frame after the load;
+per frame: RNG, every RNG call with its caller, player, NPC x/y/facing/raw/anim frame, the talking NPC); model
+`tools/field/npc_model.py` = the spec below in Python (10 traces, 11 400 frames, positions / facing / anim frame /
+RNG equal on every frame). `npc_order.py`, `npc_talkprobe.py`, `npc_grid.py` are the probes.
+
+**Objects.** Plain NPC ctor `0x080111A9` (def +8 x,y, +0xC sprite, +0x10 behaviour list, vtable `0x0804CEF4`, 0x1BC B);
+talk NPC `0x08017DA3` → `0x08017C1C` (def +8 x,y, +0xC event header, +0x10 sprite, +0x14 behaviour; vtable
+`0x0804C92C`, 0x1D4 B, event at obj+0x1D0). Behaviour list is **inline in the def**: `u32 n` + n step-record
+pointers; runner at obj+0x1B0 `{cur step, s8 index (init -1), list}`. Footprint = sprite header w,h (obj+0x19C/D;
+e.g. 16x8, some sprites 0x0). x/y obj+0x1A0/4 (24.8), facing obj+0x10 (0 down 1 up 2 left 3 right).
+Creation (area loader, def order): base actor ctor SetAnim(0) → **rand(255)** per NPC; the player's creation adds
+two more rand(255) after the area's NPCs. Talk NPCs then mark their footprint **blocked (0) on the walk grid
+(map obj `0x030019A4`+0xA8) and the enemy layer (+0xB0)**; plain NPCs never mark. (The live grids are bitmaps,
+32 bytes per row, bit tx&7 of byte ty*32 + tx>>3; content grid + these marks = the live grid at frame 0.)
+Mark / test = `0x08009930` / `0x08009324` (tile span x0>>3 .. (x1+7)>>3).
+Update (vt+8 `0x08011192`): behaviour runner, then the actor update `0x0800EF08` (controller, state tick).
+Object list `0x03001C50` updates **last to first** (NPCs in def order, the player after them → the player updates
+first and the NPCs see its new position).
+Animation = the player's state singletons with the NPC table `0x080727C8`: SetAnim(0) idle `0x03001B0C` (enter:
+tick = rand(255), frame 0; tick: +1, 2-frame anims blink (frame 1 while (tick & 255) > 240), else frame = tick >> 3,
+wrap to frame 0 / tick 0 at nframes); SetAnim(1) walk `0x03001B58` (enter tick 0 frame 0; tick: +1, frame = tick >> 3,
+wrap to 0). raw = table `0x08072670`[id] + 1 (sprites with identical anim structs alias: raw 2 shows as raw 1).
+
+**Runner** `0x0800A95A`: `loop { if cur: if !cur.update(): break; cur.destroy(); idx += 1; if idx >= n: idx = 0;
+cur = create(list[idx]) }` (a new step updates in the frame it is created; steps that finish chain in one frame).
+
+**Steps** (record = `{create fn, params}`; "anim(k)" = SetAnim(k) unless already in it, `vt+0x34` check):
+* stand `0x0800A26F`: singleton, never finishes.
+* wait `0x0800A223` {s16 frames, u8 facing}: anim(0); facing = rec+6; count = frames; update: count -= 1, done when
+  count < 0 (frames + 1 updates).
+* face_player `0x0800A8E9` {count} (+ `0x0800A90F` = same with SetAnim(1)): SetAnim(0) forced; update: d = player.x -
+  x, player.y - y (24.8); facing = |dx| >= |dy| ? (dx > 0 ? right : left) : (dy > 0 ? down : up); count -= 1; done < 0.
+* walk_to `0x0800A1AF` (NPC, vt `0x0804B964`) {s16 tx, ty, u16 speed} init `0x08009D24`: dx = tx<<8 - x, dy;
+  dir = |dx| >= |dy| ? (dx >= 0 ? 3 : 2) : (dy >= 0 ? 0 : 1); facing = dir (at once); n = u16((major<<8) / speed >> 8)
+  (major = max(|dx|,|dy|), 24.8); n == 0 → v = 0, n = 1; else vx = (dx<<8) / (n<<8), vy likewise (C division).
+  Update `0x08009E54`: old = foot; pos += v; new = foot; if player: pa = player foot tile-aligned outward
+  (x0&~7, y0&~7, (x1+7)&~7, (y1+7)&~7); pa overlaps old or new (strict) → undo, return 0. mark(old, 1) both grids;
+  !test(new, walk) → mark(old, 0) both, anim(0), undo, return 0. anim(1); facing = dir; mark(new, 0) both; n -= 1;
+  n == 0 → mark(foot,1), pos = target, mark(foot,0), done.
+* walk_to `0x0800A1D5` (enemy, vt `0x0804B308`, update `0x0800A01C`): same init + SetAnim(1) forced; update without the
+  player test, marks / test through the enemy's vt+0x4C (mark enemy layer, skipped if enemy+0x291) / vt+0x50 (test
+  enemy layer; +0x291 → free) / vt+0x48 (mark own foot).
+* wander (base ctor `0x0800A278`, update `0x0800A2A8`, never finishes) {speed}: ctor SetAnim(0) forced;
+  dist = ((speed*32 + 0x7FF) & ~0x7FF) >> 8 px, frames = (round + speed - 1) / speed, chance = speed << 4, left = 0.
+  Update: if left == 0 and chance(p) [(next & 0xFFFF) < p]: old = foot; d = rand(5); if d < 4: facing = d;
+  v = (0, ±speed) / (±speed, 0) and step (0, ±dist) / (±dist, 0) by facing; target = (x>>8, y>>8) + step;
+  new = old + step; if check(new): left = frames, dir = facing, anim(1). Then if left != 0: pos += v; facing = dir;
+  left -= 1; left == 0 → pos = target<<8, end(), anim(0); else anim(1).
+  Variants (ctor fn → check / end): `0x0800A75B` talk NPC: player foot overlaps new → no; mark(old,1); ok =
+  test(new, walk); mark(ok ? new : old, 0) (both grids; the NPC occupies its destination during the walk); end:
+  mark(new,1), mark(foot,0). `0x0800A7A1` talk NPC rect {speed, u16 x0,y0,x1,y1}: rect must contain new (x0 <= new.x0,
+  y0 <= new.y0, x1 >= new.x1, y1 >= new.y1), then as talk. `0x0800A7DF` plain: test(new, walk) only, no marks.
+  `0x0800A811` plain rect: rect + test(new, walk), chance = speed << 7. `0x0800A82D` enemy: enemy-layer marks via
+  vt+0x4C/0x50 (end: vt+0x4C(new,1), vt+0x48(0)). `0x0800A85F` enemy rect: = plain rect (`0x0800A4A4`).
+  The rand(5) facing change stays even when the move is refused.
+
+**Field enemies.** Their def +0x18 behaviour list goes to a runner at enemy+0x22C but only runs while the AI executes
+node `0x080299A3` RunMotionController (wf-core treats it as idle); e.g. the 14-9 pyramid patrols (type 77).
+
+**Talk.** A pressed → melee `0x08012A24`: if the area's combat byte (area record +8 → `0x03001988`) is 0, only a
+talk message; else a hit broadcast first and, if no object accepted it, the talk message, then the A triggers
+(`0x080127AE`), then the punch. Talk message = kind 3 sent with `0x08011C70` (objects **last to first**, stops at
+the first acceptor) with box = player (x>>8, y>>8) + `0x083C340C`[facing]: down (0,0,16,24), up (0,-16,16,8),
+left (-16,-8,16,8), right (0,-8,32,8). A talk NPC accepts (`0x08017CE2`) when it has an event and its footprint
+overlaps the box (strict): facing = player.facing ^ 1; SetAnim(0) forced (rand); `0x0801246E` starts the event and
+**broadcasts message 0xF to every object** (last to first): actors in the walk state go idle (walk state vt+0x10 =
+SetAnim(0) → rand(255)); `[0x03001BAC]` = the NPC; `run_mode 0x0803D8A0` runs the event as a nested loop inside the
+player's update. While it runs no behaviour runner runs (positions frozen, no RNG), but every NPC's animation
+ticks once per logic frame (not in the start frame). The frame the event ends ticks the animations once more,
+returns into the player update and then updates the rest of the list normally (runners + ticks).
+
+## Field: triggers, breakables, pickups, game state
+
+Ground truth: `tools/field/rec_objects.py` → `data/field/objects_*.json` (format in the script docstring; summary
+`tools/field/obj_show.py`). Layout table: `data/field/gamestate_layout.json`. Probes: `re/buu/obj_*.py`.
+
+**Trigger check** (`0x080126D4(list 0x03002A64, player)`, called by the field main loop `0x08006E3C` right
+after the world update, once per field frame). Skipped when list+0xD0 (enabled) = 0 or the player's record HP
+(+0x16) = 0. list+0xC4 += 1. Point = (x >> 8, y >> 8) of the player (footprint top-left). Triggers are scanned
+**last to first**; a trigger matches when `x0 <= px < x1 && y0 <= py < y1` (trigger +4/+6/+8/+0xA s16; objects.json
+rect = {x0, y0, x1 - x0, y1 - y0}) **and** its test's condition (test vtable +8) is true; the first match is
+activated (test vtable +4) and the scan stops (one trigger per frame). VERIFIED (snakeway s039 fires on the
+frame x >> 8 reaches 361). Tests (getter → singleton): touch `0x0300195C` always true (fires every frame while
+inside); touch_once `0x03001960` activate, then remove the trigger unless list+0xC8 changed during the activation;
+`0x08007791` (fresh test per trigger) "on entry": true when list+0xC4 != last+1, stores last = +0xC4 (i.e. not
+matched on the previous pass); A button `0x03001938` = input `0x03003300`+4 (pressed edge) bit A; A facing
+`0x0300193C/44/4C/54` (dir 1/0/2/3) = A pressed edge and player byte +0x10 (facing) == dir; `0x080071A7`
+(`0x03001918`) = held (input +2) & UP, then removed like touch_once; `0x0802266F` (`0x03002F4C`) = A pressed edge,
+then removed; altitude `0x08034355/6F` = lo<<10 < [actor+0x1A8] < hi<<10 (exclusive), only the world-map player
+has altitude. No trigger checks run while an event / blocking script runs (nested loops: the counter +0xC4 is
+frozen, VERIFIED); a touch_once trigger is removed when its activation returns. The A press in the field (melee
+`0x08012A24`): first the attack message (kind 0, melee box per facing `0x083C33F8+0x54+16·dir`); if nothing
+accepted it, message 3 "interact" with box `0x083C33F8+0x14+16·dir` = down (0,0,16,24), up (0,-16,16,8), left
+(-16,-8,16,8), right (0,-8,32,8) relative to (x>>8, y>>8) and msg+0x10 = the player (item pickups, NPC talk);
+if nothing accepted that, `0x080127AE` looks for an A trigger under the point (test vtable +0xC: true for the
+A tests) — any of the three suppresses the punch animation; activation itself is the per-frame check.
+Activations: script_trigger runs its bytecode (`0x08004038`, params = trigger+0x14) synchronously; event_trigger
+starts the event (`0x0801246E`) and runs it as a nested loop (`run_mode 0x0803D8A0`); save_point runs s011
+(`0x08012588(0x0877CE00)`, A button any facing); exits: see §11.
+
+**Flight**: the field player has no altitude. Only the world map 0-50 (entered through s515, e.g. the 8-1
+capsule trigger) has a flying player (class vt `0x0804E1B4`): z = obj+0x1A8 (22.10), starts 44, A = descend
+1 px/frame down to 15, B = climb 1 px/frame up to 120, UP/DOWN accelerate forward/back (~2.8 px/frame max),
+LEFT/RIGHT turn (measured, `obj_probe11.py`; INFERRED beyond that). The altitude triggers (all in 0-50): (0,16)
+= landed spots, (44,76) = cruising height.
+
+**Breakables** (`0x0800C7E2(def)`: broadcast message 8 with def+4 finds the prop, `0x0800C65E` builds the
+breakable, which replaces the prop in the object list). Def: +0 condition, +4 u8 prop index, +5 u8 **HP**
+(world.md "param_a"), +6 u16 **attack mask** (world.md "hits"), +8 callback pair. Object (0x30): +0xC HP, +0xE
+mask, +0x10 last hit dir, +0x14..+0x20 box, +0x24 shake timer, +0x28 def, +0x2C prop. Box = bounding box of the
+non-zero pixels of the prop's OBJ tiles (8bpp, read from VRAM), then y0 = (y0 + y1) >> 1 (lower half); 8-1 #0:
+(233,88)-(263,104), #1 (273,112)-(303,128); 8-57 (46,73)-(66,88). If prop+0x1C (solid) != 0 the box is written
+blocked (0) into the walk grid and the enemy grid (map+0xA8 / +0xB0, `0x08009930`). Hit (message 0): needs prop
+solid, msg mult (+0x18) != 0, box overlap (strict: b.x0 < m.x1 && m.x0 < b.x1 && b.y0 < m.y1 && m.y0 < b.y1)
+and `mask & ((1 << atk.kind) | (1 << atk.sub))` (attack type `0x086B8088` byte0 kind 0 melee / 1 energy, byte1
+sub; mask 3 = anything); accepted → returns 1 (the melee then plays hit sound 48+rand(2) and, in every hit
+recorded, a screen shake (15, 75): the melee's crit slot is not written for breakables — stack value, INFERRED
+consistent). `0x0800C912`: 4 debris chips (vt `0x08049F38`, no RNG; from centre−4 px, velocity (96,0) (−96,0)
+(0,64) (0,−64) 24.8, +1 / +2 per frame, 32 frames), then HP −= 1: HP > 0 → shake 23 frames; HP = 0 → prop+0x1C
+= 0, explosion fx (`0x0802A81C`, 1 draw rand(0x1000), only if ≥ 0x400 bytes free) and a deferred call in 16
+frames (world+0x610 list, processed at the **start** of the world update). Shake update (per frame, t = --timer):
+t = 0 → prop display rect restored; else if (t & 2) == 0: dx = rand(5) − 2, dy = rand(3) − 1 (display only, 2
+draws). Break callback (`0x0800C628`): loot_pos `0x03001010` = ((x0+x1) >> 1, y1), loot velocity `0x03001018` =
+dir vector (`0x0807268C`: down (0,1), up (0,−1), left (−1,0), right (1,0)) << 8, grid under the box set walkable
+(1) again, prop object put back in place of the breakable, then the def callback (usually s497 loot). VERIFIED
+by `objects_breakable_8_1` (HP 2: hits at f4 / f35, coins at f35+16, RNG per frame matches the model).
+
+**Coins** (`drop_zenie(size)` → `0x08018346(&loot_pos, size, &loot_vel)`; skipped unless ≥ 0x3000 bytes free and
+fewer than 40 triggers). Defs `[0x086FC250 + 4·size]`: size 0..3 = value 5 / 25 / 50 / 100, sprite w×h 8×8 / 16×16
+(sizes 1, 3 big), box w×h 4×2 / 10×4, y offset −7 / −6. Object `0x08017F5A` (vt `0x08049CC4`): RNG `next()` (+0x28,
+anim phase), then vx = vel.x + ((rand(256) − 128) · vel.y >> 8), vy = vel.y + ((rand(256) − 128) · vel.x >> 8),
+vx = vx · (rand(64) + 0xE0) >> 8, vy likewise (5 draws total); pos (24.8) = loot_pos << 8; box x0 = (x>>8) − w/2,
+y0 = (y>>8) + yoff, x1 = x0 + bw, y1 = y0 + bh; z = 0, vz = 0x80. Per frame while moving (< 60 frames): new =
+pos + vel; when the pixel position changes, the box moved by the delta must be free on the walk grid, else the
+coin does not move this frame (velocity kept); vz −= 4, z += vz, z ≤ 0 → z = −z, vz = 0x80; drawn at y − z>>8.
+From frame 60 on: z = 0, no motion. Age +1 per frame, removed after 600 frames. Pickup = a touch trigger
+(vt `0x0804A0C0`) appended to the trigger list (so checked before the area's triggers) with rect (x0 − 19, y0 − 11,
+x1 + 4, y1 + 4) following the box; activation: zenie += value, SFX 44 vol 64, coin and trigger removed. VERIFIED
+(`objects_breakable_8_1`: 8 coins of 5 Z, 7 collected).
+
+**Dropped items** (`drop_item(i)` / `drop_equipment(e)` → `0x0800D30E(0, i or −e, &loot_pos, &loot_vel)`, skipped
+unless ≥ 0x1000 bytes free, < 45 triggers and < 125 objects). Object vt `0x0804B428`, +0x48 item: 4 draws (the
+same scatter formula as coins, no `next()`), pos (24.8, +0x60/+0x64) = (loot_x − 8, loot_y − 16) << 8 = the
+top-left of the 16×16 pickup box (+0x18..+0x24 = pos >> 8 .. +16); z (+0x30, 22.10) = 0x2000, vz = 0x800. Per frame
+until landed: move as coins, testing a collision sub-box (+0x70..+0x7C, offsets inside the 16×16 icon computed from
+the icon's pixels by `0x0800DB64`: supply 5 (0,10)-(16,16), equipment 44 (1,8)-(15,15)) on the walk grid; vz −= 0x80, z += vz; z < 0 → z = (−z) >> 1, vz = (−vz) >> 1, and vz < 0x200 → z = 0, landed (no more
+motion). Pickup: the A-press interact message 3 overlapping the item box (strict overlap): item removed;
+supply → item-get presentation (ItemGet command, vt `0x0804C83C`: hold pose, icon, SFX 45 vol 64, 60 frames,
+**blocking**: the world keeps updating) and **after** it count += 1 (cap 255); equipment → appended to the
+equipment list **before** the 60-frame item-get. VERIFIED (`objects_breakable_drops_8_1`: supply 5 count +1 61
+frames after the A press; equipment 44 appended on the A frame). No supply has def byte0 bit1 (use at once) or
+bit2 (touch pickup), so all supplies and equipment are picked up with A.
+
+**Map item pickups** (area list +0x1C, ctor `0x0800DCDC`, vt `0x0804A314`; condition word as other objects):
+sprite 16×16 at the def position (x, y); solid box (x, y+8)..(x+16, y+16) written blocked into the walk + enemy
+grids. Pickup: interact message 3 overlapping the box → grids restored, removed, item given as above (supply:
+item-get 60 frames, then count + 1), then the def+0x10 callback (the "You found ..." event, e.g. s333). VERIFIED
+(`objects_item_8_57`: A at f4, count at f65, s333 at f65).
+
+**Persistent state** (`data/field/gamestate_layout.json`): GameData `0x03001068`, 0x8A8 bytes (new game
+`0x080042FC`): +0 current character, +1 bits (2 countdown, 4 stopwatch, 5 off-course watch, 6 game_bit_40), +2
+supplies u8[83], +0x55 story flags (143 bytes), +0xE4 equipment count + u32[250] list (low 28 bits id, high nibble
+equipped marker), +0x4D0 play-time base (play time = frame counter `0x03000F94` + base, INFERRED), +0x4D4
+countdown, +0x4D8 stopwatch (10-minute cap), +0x4DC Holy Water timer + bonuses, +0x4F0 timed special, +0x4F4
+zenie, +0x4F8 nine 0x68-byte character records (byte0 bit0 = in party). The per-frame GameData tick
+`0x0800425C` (main loop, after the trigger check) runs the countdown / stopwatch / Holy Water timers. The quest log
+has no stored progress (its 40×3 conditions are scripts over flags; INFERRED).

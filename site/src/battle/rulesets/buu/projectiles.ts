@@ -8,7 +8,9 @@ import { DIR_VEC, overlaps, type Dir, type Rect } from '../../core/geom'
 import type { Renderer } from '../../core/renderer'
 import { BTN } from '../../core/input'
 import type { Entity, World } from '../../core/world'
-import { broadcast, type Actor, type HitMsg, type Receiver } from './actor'
+import { broadcast, frameBoxOf, type Actor, type HitMsg, type Receiver } from './actor'
+import { EnemyAnim } from './eanim'
+import type { SpriteSet } from '../../core/sprites'
 import type { BuuCtx } from './context'
 import { ATK, type AttackType } from './damage'
 import { audioEvent } from '../../audio/bus'
@@ -131,6 +133,9 @@ export interface StraightOpts {
   /** the sound those picks choose: PlaySfx(base + the first draw) (ki blast: 20 / 48) */
   sfxSpawn?: number
   sfxHit?: number
+  /** the sound of the shot's destroy function (wall, accepted hit, shot down), before its explosion (rifle bullet
+   *  0x0802770C: 46) */
+  sfxEnd?: number
   /** pierce = keep flying after a hit (not used by the game's shots) */
   hitAll?: boolean
 }
@@ -202,6 +207,7 @@ export class StraightShot extends Shot {
       this.dead = 0
       return
     }
+    if (fx && this.o.sfxEnd != null) audioEvent('sfx', { id: this.o.sfxEnd, vol: 64 })
     if (fx && this.o.explode !== false) this.ctx.explosion(w, this.px, this.py)
     this.dead = 0
     this.removed = true
@@ -209,6 +215,7 @@ export class StraightShot extends Shot {
   onMessage(_w: World, msg: HitMsg): boolean {
     if (this.o.fragile && this.dead < 0 && msg.team === 1 && msg.atk.kind === 0 && msg.source !== this && overlaps(msg.rect, this.rect())) {
       this.removed = true
+      if (this.o.sfxEnd != null) audioEvent('sfx', { id: this.o.sfxEnd, vol: 64 })
       this.ctx.explosion(_w, this.px, this.py)
     }
     return false
@@ -225,6 +232,116 @@ export class StraightShot extends Shot {
       return
     }
 
+  }
+}
+
+// ---- mummy wraps --------------------------------------------------------------------------------------------------
+/** bandage velocities (24.8 per frame) by facing, straight and diagonal (0x08756B74: 16 bytes per facing) */
+const WRAP_VEL: [number, number, number, number][] = [[0, 448, -316, 316], [0, -448, 316, -316], [-448, 0, -316, -316], [448, 0, 316, 316]]
+/** a stuck bandage's offset above the player's position by slot (0x08756BB4) */
+const WRAP_SLOT_Y = [-2, -10, 2, 18, 6, 10, -6, 14]
+/** the bandage (builder 0x0802D79C, vtable 0x0804A830, update 0x0802D940, messages 0x0802DB10). The box is the
+ *  record's (0x08019B4E: records 0x087571F4 + 36 * (dir >> 1), diagonal + 0x48, frame t >> 3, t = 0..23).
+ *  Every update first reapplies the player's stats (0x0802D8E6: when the player is hittable, the form controller's
+ *  stat reset - resists back to 128 - then walk / dash speed -48 per stuck bandage, counted by message 0x25).
+ *  Flying: pos += velocity; a 4-frame stick delay counting down (0 -> stick 0x0802D826); off camera or in a
+ *  projectile wall -> removed; else a hit message (attack 0x086B8090 energy sub 1, x1.0, the bandage's facing) to the
+ *  actors: accepted -> if its box overlaps the player's body box: sound 48 + rand(2) and, with < 8 bandages stuck, the
+ *  4-frame delay, else it bursts (0x0802D89A: removed + explosion 0x08712FDC rate 0x2000 when the pool has room).
+ *  Stuck: follows the player at (+4, -slotY) (slot = global 0x030030BC, +1 & 7 per stick); 0x08040284(input, d-pad,
+ *  8, 60) (the last 8 d-pad presses within 60 frames, one now) -> removed. A flying bandage is destroyed by any other
+ *  object's hit message overlapping its box (0x0802DB10 message 0). */
+export class MummyWrap extends Shot {
+  vx: number
+  vy: number
+  diag: boolean
+  tick = 0
+  stuck = false
+  delay = 0
+  offX = 0
+  offY = 0
+  constructor(ctx: BuuCtx, owner: Actor, dir: Dir, x: number, y: number, diag: boolean) {
+    super(ctx, owner, dir, 0, x, y)
+    this.diag = diag
+    const v = WRAP_VEL[dir]
+    this.vx = diag ? v[2] : v[0]
+    this.vy = diag ? v[3] : v[1]
+    this.kind = 'wrap'
+  }
+  /** the record's box: straight vertical (dir 0 / 1) 16 x 8, horizontal 8 x 16, diagonal 16 x 16; stuck: 8 x 16 */
+  rect(): Rect {
+    const [ox, oy, w, h] = this.diag ? [8, 8, 16, 16] : this.stuck || this.dir >= 2 ? [4, 8, 8, 16] : [8, 4, 16, 8]
+    return { x0: this.px - ox, y0: this.py - oy, x1: this.px - ox + w, y1: this.py - oy + h }
+  }
+  private stuckCount(w: World): number {
+    return w.entities.filter((e) => e instanceof MummyWrap && !e.removed && e.stuck).length
+  }
+  /** 0x0802D8E6 */
+  private reapply(w: World) {
+    const p = this.ctx.player
+    if (!p || !p.hittable) return
+    p.wrapStats(this.stuckCount(w))
+  }
+  /** 0x0802D89A */
+  private burst(w: World) {
+    this.removed = true
+    this.ctx.explosion(w, this.px, this.py, 0x2000)
+  }
+  update(w: World) {
+    this.reapply(w)
+    const p = this.ctx.player
+    if (this.stuck) {
+      if (p) {
+        this.x = p.x - this.offX
+        this.y = p.y - this.offY
+      }
+      if (this.ctx.pressRun(0xf0, 8, 60, w)) {
+        this.removed = true
+        this.reapply(w)
+        return
+      }
+    } else {
+      this.x += this.vx
+      this.y += this.vy
+      if (++this.tick === 24) this.tick = 0
+    }
+    if (this.delay) {
+      if (--this.delay === 0) this.stick()
+    }
+    if (this.stuck || this.delay > 0) return
+    if (this.offCamera(w) || this.inWall(w)) {
+      this.removed = true
+      return
+    }
+    if (!this.hit(w, this.rect(), ATK[1], 1024)) return
+    if (p && overlaps(this.rect(), p.bodyBox())) {
+      audioEvent('sfx', { id: 48 + w.rng.rand(2, 'wrap hit sfx'), vol: 64 })
+      if (this.stuckCount(w) < 8) this.delay = 4
+      else this.burst(w)
+    } else this.burst(w)
+  }
+  /** 0x0802D826: at the player's position + (4, -slotY[slot]), slot = 0x030030BC (then + 1 & 7) */
+  private stick() {
+    const p = this.ctx.player
+    if (!p) return
+    const slot = this.ctx.wrapSlot
+    this.ctx.wrapSlot = (slot + 1) & 7
+    this.x = p.x + 0x400
+    this.y = p.y - (WRAP_SLOT_Y[slot] << 8)
+    this.stuck = true
+    this.offX = p.x - this.x
+    this.offY = p.y - this.y
+  }
+  onMessage(w: World, msg: HitMsg): boolean {
+    if (msg.source === this || this.stuck || this.removed || !overlaps(msg.rect, this.rect())) return false
+    this.burst(w)
+    return true
+  }
+  draw(r: Renderer) {
+    // stuck bandages are drawn by the player (player.ts, the wraps count)
+    if (this.stuck) return
+    const fx = this.ctx.fx('fx_087571f4')
+    if (fx) drawRec(r, fx, (this.diag ? 6 : 0) + 3 * (this.dir >> 1) + (this.tick >> 3), this.px, this.py)
   }
 }
 
@@ -460,14 +577,26 @@ export class KameBeam extends Shot {
   stopped = false
   /** obj+0x14: frame of the next hit effect */
   next: number
-  constructor(ctx: BuuCtx, owner: Actor, dir: Dir, x: number, y: number, built: number, o: { atk: AttackType; mult: number; color: [string, string]; gfx: BeamGfx | null }) {
-    super(ctx, owner, dir, 1, x << 8, y << 8)
+  /** charging (state 0, before fire()): no update; `sounds`: the object plays its own fire / end sounds (enemy use) */
+  charging: boolean
+  sounds: boolean
+  constructor(ctx: BuuCtx, owner: Actor, dir: Dir, x: number, y: number, built: number, o: { atk: AttackType; mult: number; color: [string, string]; gfx: BeamGfx | null; team?: Team; sounds?: boolean }) {
+    super(ctx, owner, dir, o.team ?? 1, x << 8, y << 8)
     this.atk = o.atk
     this.mult = o.mult
     this.color = o.color
     this.gfx = o.gfx
     this.next = built
+    this.sounds = !!o.sounds
+    this.charging = this.sounds
     this.kind = 'beam'
+  }
+  /** 0x080207D2: firing (stop 3, sound 32) */
+  fire() {
+    if (!this.charging) return
+    this.charging = false
+    audioEvent('sfx_stop', { id: 3 })
+    audioEvent('sfx', { id: 32, vol: 64 })
   }
   head(): [number, number] {
     const [dx, dy] = DIR_VEC[this.dir]
@@ -490,16 +619,26 @@ export class KameBeam extends Shot {
       this.x += dx * 3 * 256
       this.y += dy * 3 * 256
       this.len -= 3
-      if (this.len < 0) this.removed = true
+      if (this.len < 0) {
+        this.removed = true
+        // destructor 0x08020768: stop 32, sound 33
+        if (this.sounds) {
+          audioEvent('sfx_stop', { id: 32 })
+          audioEvent('sfx', { id: 33, vol: 64 })
+        }
+      }
       return
     }
+    if (this.charging) return
     const hr = this.headRect()
+    // the body box uses the head of this tick before any growth
+    const body = this.rect()
     if (this.inWall(w, hr)) this.stopped = true
     else if (this.hit(w, hr, this.atk, this.mult, false)) {
       this.stopped = true
       this.hitFx(w)
     } else if (overlaps(hr, w.camera)) this.len += 3
-    this.hit(w, this.rect(), this.atk, this.mult, false)
+    this.hit(w, body, this.atk, this.mult, false)
   }
   private hitFx(w: World) {
     if (w.frame - this.next <= 0) return
@@ -511,7 +650,13 @@ export class KameBeam extends Shot {
     const ey = hy + dy * 4 + w.rng.rand(32, 'beam hit fx y') - 16
     this.ctx.explosion(w, ex, ey, 0x1000 + w.rng.rand(0x4000, 'beam hit fx rate'))
   }
+  /** 0x0802082A: still charging -> removed (destructor: stop 3); firing -> retracts */
   stop() {
+    if (this.charging) {
+      this.removed = true
+      if (this.sounds) audioEvent('sfx_stop', { id: 3 })
+      return
+    }
     this.done = true
   }
   draw(r: Renderer) {
@@ -1018,32 +1163,56 @@ export class MasenkoBall extends Shot {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-/** Kamikaze ghost (skill 13): homes in on the closest enemy, explodes on contact. No hit was recorded in the
- *  emulator, so the blast (energy x2.0) is INFERRED. */
+/** Kamikaze ghost (skill 13): an actor (sprite 148) with its own animation state and AI. Created at the skill's tick 16
+ *  (constructor SetAnim(0): the idle enter draws rand(255); then the appear animation raw 19, once shift 3, whose end
+ *  is SetAnim(0) again: rand(255)); in formation it eases to its slot (pos += (slot - pos) >> 5). Released (committed
+ *  at the skill's end) it goes to AI state 0x11B: Selector [IfContactExplode (0x080390A0: one message to every object
+ *  with its frame box 0x0800FE34, energy sub 1 x4.0, dir = facing; accepted -> sound 48 + rand(2) and state 0x11C),
+ *  home in (0x08038F2C, speed 0x300: the nearest enemy by frame-box centres; facing toward it on the major axis;
+ *  within 4 px or no enemy -> state 0x11C; else SetAnim(1) and a step d * 0x300 / max(|dx|, |dy|)), state 0x11C].
+ *  State 0x11C (SelfDestruct): an explosion (rate 0x1000 + rand(0x1000)) and gone. Lockstep f31_vs_skill13. */
 export class Ghost extends Shot {
-  vx = 0
-  vy = 0
   free = false
-  /** frames between the release and the ghost's AI acting (its script starts on the next frame: emulator, the
-   *  explosion's rand(4096) lands 2 frames after the release) */
+  /** frames between the release and the AI state 0x11B running (the GotoState's tree updates from the next frame) */
   wait = 0
   /** formation slot (0..2, table 0x0871E024) */
   slot: number
-  /** animation clock: raw animation 19 (appearing) then 1 */
-  at = 0
+  /** the actor's animation (raw / frame / tick) under its state rule */
+  ea: EnemyAnim
+  facing: Dir
+  private boom = false
+  private sprite: SpriteSet | undefined
   constructor(ctx: BuuCtx, owner: Actor, dir: Dir, x: number, y: number, slot = 0) {
     super(ctx, owner, dir, 1, x, y)
     this.kind = 'ghost'
     this.slot = slot
+    this.facing = owner.facing
+    this.sprite = ctx.data.sprites.index(148)
+    this.ea = new EnemyAnim({
+      nframes: (raw) => this.sprite?.anim(raw)?.steps(this.facing).length ?? 0,
+      rand: (n, label) => (this.w ? this.w.rng.rand(n, label) : 0),
+      sfx: (id, vol) => audioEvent('sfx', { id, vol }),
+    })
+  }
+  private w: World | null = null
+  /** the constructor: SetAnim(0) (rand(255)), then the appear animation */
+  init(w: World) {
+    this.w = w
+    this.ea.enter(1, { rule: 'idle' })
+    this.ea.enter(19, { rule: 'once', shift: 3, end: 'idle' })
   }
   rect() {
-    return centered(this.px, this.py, 12, 12)
+    return frameBoxOf(this.sprite, this.ea.pos.raw, this.facing, this.ea.pos.frame, this.px, this.py) ?? centered(this.px, this.py, 12, 12)
   }
   update(w: World) {
+    this.w = w
     this.t++
-    this.at++
+    if (this.ea.tick() === 'idle') this.ea.enter(1, { rule: 'idle' })
     if (!this.free) {
-      // formation (0x0804DC80): pos += (target - pos) / 32 toward the player + slot offset
+      // formation (0x0804DC80): pos += (target - pos) / 32 toward the player + slot offset, once the appear animation
+      // has ended (emulator: the ghost holds its spawn point while showing raw 19)
+      this.facing = this.owner.facing
+      if (this.ea.pos.raw === 19) return
       const o = GHOST_SLOTS[this.owner.facing][Math.min(2, this.slot)]
       const tx = (this.owner.px + o[0]) << 8
       const ty = (this.owner.py + o[1]) << 8
@@ -1055,46 +1224,57 @@ export class Ghost extends Shot {
       this.wait--
       return
     }
-    const targets = this.ctx.liveEnemies().filter((e) => e.hittable)
-    if (!targets.length || this.t > 400) {
+    if (this.boom) {
+      // state 0x11C SelfDestruct
       this.removed = true
       this.ctx.explosion(w, this.px, this.py, 0x1000 + w.rng.rand(0x1000, 'ghost explosion rate'))
       return
     }
-    let best = targets[0]
-    let bd = Infinity
-    for (const e of targets) {
-      const [cx, cy] = e.center()
-      const d = (cx - this.px) ** 2 + (cy - this.py) ** 2
-      if (d < bd) {
-        bd = d
-        best = e
+    // IfContactExplode
+    if (this.hit(w, this.rect(), ATK[1], 0x1000, false)) {
+      audioEvent('sfx', { id: 48 + w.rng.rand(2, 'ghost hit sfx'), vol: 64 })
+      this.boom = true
+      return
+    }
+    // home in on the nearest enemy (enemy list order, frame-box centres, strict minimum)
+    const r = this.rect()
+    const gx = (r.x0 + r.x1) >> 1
+    const gy = (r.y0 + r.y1) >> 1
+    let best: [number, number] | null = null
+    let bd = 0x7fffffff
+    for (const e of this.ctx.enemies) {
+      if (e.removed || (e as unknown as { defeated?: boolean }).defeated) continue
+      const b = (e as unknown as Actor).frameBox()
+      const dx = ((b.x0 + b.x1) >> 1) - gx
+      const dy = ((b.y0 + b.y1) >> 1) - gy
+      const d2 = dx * dx + dy * dy
+      if (d2 < bd) {
+        bd = d2
+        best = [dx, dy]
       }
     }
-    const [cx, cy] = best.center()
-    const dx = cx - this.px
-    const dy = cy - this.py
-    const m = Math.max(1, Math.hypot(dx, dy))
-    this.vx = (this.vx * 7 + (dx / m) * 768) / 8
-    this.vy = (this.vy * 7 + (dy / m) * 768) / 8
-    this.x += Math.round(this.vx)
-    this.y += Math.round(this.vy)
-    if (overlaps(best.bodyBox(), this.rect())) {
-      this.removed = true
-      // the ghost's AI explodes it (0x0801952C, prio 0x38) at its box centre
-      this.ctx.explosion(w, this.px, this.py, 0x1000 + w.rng.rand(0x1000, 'ghost explosion rate'))
-      this.hit(w, centered(this.px, this.py, 32, 32), ATK[1], 2048, false)
+    if (!best) {
+      this.boom = true
+      return
     }
+    const [dx, dy] = best
+    const ax = Math.abs(dx)
+    const ay = Math.abs(dy)
+    this.facing = ax > ay ? (dx > 0 ? 3 : 2) : dy > 0 ? 0 : 1
+    const m = Math.max(ax, ay)
+    if (m < 4) {
+      this.boom = true
+      return
+    }
+    if (this.ea.pos.raw !== 2) this.ea.enter(2, { rule: 'loop', shift: 3 })
+    this.x += Math.trunc((dx * 0x300) / m)
+    this.y += Math.trunc((dy * 0x300) / m)
   }
   draw(r: Renderer) {
-    // enemy type 0x54 actor, sprite 148: raw animation 19 while appearing, then 1
-    const s = this.ctx.data.sprites.index(148)
+    const s = this.sprite
     if (!s) return
-    const appear = s.anim(19)
-    const idle = s.anim(1)
-    const al = appear ? appear.length(this.owner.facing) : 0
-    if (appear && this.at < al) s.draw(r.ctx, appear, this.owner.facing, r.sx(this.px), r.sy(this.py), this.at, { loop: false })
-    else s.draw(r.ctx, idle, this.owner.facing, r.sx(this.px), r.sy(this.py), this.at - al)
+    const a = s.anim(this.ea.pos.raw)
+    if (a) s.draw(r.ctx, a, this.facing, r.sx(this.px), r.sy(this.py), 0, { index: this.ea.pos.frame })
   }
 }
 
@@ -1106,9 +1286,13 @@ export class Ghost extends Shot {
 export class EnergyWave extends Shot {
   len = 8
   mode = 0
+  /** +0x1C: the flight counter (mode 0 updates without a hit) */
+  life = 0
   constructor(ctx: BuuCtx, owner: Actor, dir: Dir, x: number, y: number) {
     super(ctx, owner, dir, 0, x, y)
     this.kind = 'wave'
+    // ctor 0x0802A2EC: sound 35 (volume 0x40) (lockstep f02_vs_enemy_t40 / t45)
+    audioEvent('sfx', { id: 35, vol: 64 })
   }
   rect(): Rect {
     const [dx, dy] = DIR_VEC[this.dir]
@@ -1126,21 +1310,28 @@ export class EnergyWave extends Shot {
       if (this.len <= 0) this.removed = true
       return
     }
-    if (this.len < 48) this.len += 4
-    else {
-      this.x += dx * 4 * 256
-      this.y += dy * 4 * 256
-    }
+    // update 0x0802A3D2 mode 0: the segment box (position .. head = position + dir * len, +-4) with the CURRENT
+    // length: blocked on the projectile grid (0x08009324) -> mode 1; else the hit (0x08011C0C, energy x1.0)
+    // accepted -> puff at the head (rate 0x1000 + rand(0x1000)), mode 1; else grow 4 (len < 48) or move 4, and
+    // the counter +0x1C past 240 -> mode 1. (The test comes before the growth: a hit lands one frame after the
+    // box first reaches the player - lockstep f02_vs_enemy_t40 / t45.) No camera test.
     const hx = this.px + dx * this.len
     const hy = this.py + dy * this.len
-    if (this.t > 240 || this.inWall(w, { x0: hx - 4, y0: hy - 4, x1: hx + 4, y1: hy + 4 }) || this.offCamera(w)) {
+    if (this.inWall(w, this.rect())) {
       this.mode = 1
       return
     }
     if (this.hit(w, this.rect(), ATK[1], 1024)) {
       this.ctx.puffRng(w, hx, hy)
       this.mode = 1
+      return
     }
+    if (this.len < 48) this.len += 4
+    else {
+      this.x += dx * 4 * 256
+      this.y += dy * 4 * 256
+    }
+    if (++this.life > 240) this.mode = 1
   }
   onMessage(w: World, msg: HitMsg): boolean {
     // destroyed only by a head-on player attack overlapping the head +-12 px
@@ -1188,7 +1379,12 @@ export class Flame extends Shot {
       this.removed = true
       return
     }
-    if (!this.done && this.hit(w, this.rect(), ATK[4], 51)) this.done = true
+    // 0x080247C0: tests the player only (16 x 16 box, x0.05, sub 4), damage without a reaction, once per flame
+    const p = this.ctx.player
+    if (!this.done && p && !this.ownerDead()) {
+      const msg: HitMsg = { team: 0, rect: this.rect(), dir: this.dir, mult: 51, atk: ATK[4], attacker: this.owner, source: this, noReact: true }
+      if (p.onMessage(w, msg)) this.done = true
+    }
   }
   draw(r: Renderer) {
     const f = this.t >> 2
@@ -1200,152 +1396,155 @@ export class Flame extends Shot {
 export class Bomb extends Shot {
   vx: number
   vy: number
-  z = -8
-  vz = 2
   landed = -1
-  constructor(ctx: BuuCtx, owner: Actor, dir: Dir, x: number, y: number, tx: number, ty: number) {
+  /** (ddx, ddy): the thrower's aim offset (px, clamped, one axis; BombThrow) */
+  constructor(ctx: BuuCtx, owner: Actor, dir: Dir, x: number, y: number, ddx: number, ddy: number) {
     super(ctx, owner, dir, 0, x, y)
-    const cl = (v: number) => Math.max(-128, Math.min(128, v))
-    let ddx = cl(tx - (x >> 8))
-    let ddy = cl(ty - (y >> 8))
-    if (dir >= 2) ddy = 0
-    else ddx = 0
     this.vx = (ddx * 0x71d) >> 8
-    this.vy = (ddy * 0x71d) >> 8
+    this.vy = ((ddy * 0x71d) >> 8) - 0x200
     this.kind = 'bomb'
   }
   rect() {
     return centered(this.px, this.py, 16, 16)
   }
+  /** update (class 0x0804A2E8, 0x0801C80A): counter +1; counters 1..40 move: pos += v, vy += 0x20 (the throw arcs in
+   *  screen space, vy starts -0x200); at counter 71 it explodes: one message (16 x 16 box, energy x1.0), 4 debris, the
+   *  explosion 0x0801952C (rate 0x1000 + rand(0x1000)) and sound 24 (lockstep f02_vs_enemy_bomb) */
   update(w: World) {
     this.t++
-    if (this.landed < 0) {
+    if (this.t <= 40) {
       this.x += this.vx
       this.y += this.vy
-      this.z -= this.vz
-      this.vz -= 0.125
-      if (this.z >= 0 || this.t >= 40) {
-        this.z = 0
-        this.landed = this.t
-      }
+      this.vy += 0x20
+      if (this.t === 40) this.landed = this.t
       return
     }
-    if (this.t - this.landed >= 30) {
+    if (this.t >= 71) {
       this.removed = true
-      // 0x0801C750: 4 debris pieces + an explosion 0x0801952C (rate 0x1000 + rand(0x1000)) at the box centre
+      this.hit(w, this.rect(), ATK[1], 1024)
       for (let i = 0; i < 4; i++) w.add(new Debris(this.ctx.fx('buu_debris'), this.px, this.py, i))
       this.ctx.explosion(w, this.px, this.py, 0x1000 + w.rng.rand(0x1000, 'bomb explosion rate'))
-      this.hit(w, this.rect(), ATK[1], 1024)
+      audioEvent('sfx', { id: 24, vol: 64 })
     }
   }
   draw(r: Renderer) {
     let k = (this.t >> 2) & 3
     if (k === 3) k = 1
-    drawRecAddr(r, this.ctx.data.sprites, 0x0871e984 + 12 * k, this.px, this.py + Math.round(this.z))
+    drawRecAddr(r, this.ctx.data.sprites, 0x0871e984 + 12 * k, this.px, this.py)
   }
 }
 
-/** Buu stretch-arm hitbox (0x08028C04): length 8..32 (+4/f), then shrinks; one hit (melee sub 0, STR) */
+/** Buu stretch arm (class 0x0804CDD4, builder 0x08028C04, update 0x08028CF5). Fields: +0x1C/+0x20 origin (px),
+ *  +0x2C/+0x30 unit vector 0x0874EACC[dir], +0x34 length (8 at spawn), +0x10 phase:
+ *  0: head = origin + vector * len, box (hx - 8, hy - 8)..(hx + 8, hy + 8); a projectile-grid wall under it -> 1; a
+ *    kind-0 message to every object (0x08011C0C: melee type 0x086B8088, x1.0, dir, owner); accepted -> 1; else
+ *    len < 80 -> len + 4, else 1
+ *  1: len - 4; len <= 0 -> removed */
 export class StretchArm extends Shot {
-  ox: number
-  oy: number
-  hitDone = false
-  constructor(ctx: BuuCtx, owner: Actor, dir: Dir, ox: number, oy: number) {
-    super(ctx, owner, dir, 0, 0, 0)
-    this.ox = ox
-    this.oy = oy
+  len = 8
+  phase = 0
+  constructor(ctx: BuuCtx, owner: Actor, dir: Dir, x: number, y: number) {
+    super(ctx, owner, dir, 0, x << 8, y << 8)
     this.kind = 'stretch'
   }
-  length() {
-    return this.t <= 7 ? 4 + 4 * this.t : this.t === 8 ? 32 : Math.max(0, 32 - 4 * (this.t - 8))
+  head(): [number, number] {
+    const [dx, dy] = DIR_VEC[this.dir]
+    return [this.px + dx * this.len, this.py + dy * this.len]
   }
   rect(): Rect {
-    const x = this.owner.px + this.ox
-    const y = this.owner.py + this.oy
-    const L = this.length()
-    switch (this.dir) {
-      case 3:
-        return { x0: x, y0: y - 8, x1: x + L, y1: y + 8 }
-      case 2:
-        return { x0: x - L, y0: y - 8, x1: x, y1: y + 8 }
-      case 0:
-        return { x0: x - 8, y0: y, x1: x + 8, y1: y + L }
-      default:
-        return { x0: x - 8, y0: y - L, x1: x + 8, y1: y }
-    }
+    const [hx, hy] = this.head()
+    return { x0: hx - 8, y0: hy - 8, x1: hx + 8, y1: hy + 8 }
   }
   update(w: World) {
     this.t++
-    if (this.t > 15) {
-      this.removed = true
+    if (this.phase === 1) {
+      this.len -= 4
+      if (this.len <= 0) this.removed = true
       return
     }
-    if (!this.hitDone && this.hit(w, this.rect(), ATK[0], 1024)) this.hitDone = true
+    const box = this.rect()
+    if (this.inWall(w, box) || this.hit(w, box, ATK[0], 1024, false)) {
+      this.phase = 1
+      return
+    }
+    if (this.len < 80) this.len += 4
+    else this.phase = 1
   }
+  /** records 0x0874EFEC + 24 * dir: arm record 0 every 8 px to len - 1, the fist record 1 at dir * len */
   draw(r: Renderer) {
     const bank = this.ctx.data.sprites
     const base = 0x0874efec + 24 * this.dir
     const [dx, dy] = DIR_VEC[this.dir]
-    const x = this.owner.px + this.ox
-    const y = this.owner.py + this.oy
-    const L = this.length()
-    for (let k = 0; k < L - 1; k += 8) drawRecAdd(r, bank, base, x + dx * k, y + dy * k)
-    drawRecAdd(r, bank, base + 12, x + dx * L, y + dy * L)
+    for (let k = 0; k < this.len - 1; k += 8) drawRecAdd(r, bank, base, this.px + dx * k, this.py + dy * k)
+    const [hx, hy] = this.head()
+    drawRecAdd(r, bank, base + 12, hx, hy)
   }
 }
 
-/** Majin Buu candy beam (0x080286D4): 8 -> 40 px, 19 frames, energy x0 -> the player becomes candy (300 f) */
+/** Majin Buu candy beam (class 0x0804B3AC, builder 0x080286D4, update 0x080287AD). Fields: +0x20/+0x24 origin (px),
+ *  +0x38/+0x3C unit vector 0x0874EA94[dir], +0x40 length (8 at spawn), +0x1C tick counter, +0x10 phase:
+ *  0: head = origin + vector * len, box (hx - 8, hy - 8)..(hx + 8, hy + 8); a projectile-grid wall under it -> 1; a
+ *    kind-0 message to every object (0x08011C0C: energy type 0x086B8090, multiplier 0, dir, owner); accepted -> the
+ *    player turns into candy (Player.candyHit) and 1; else len < 64 -> len + 4, else the origin moves 4 px along;
+ *    counter + 1 > 240 -> 1
+ *  1: the origin moves 4 px along, len - 4; len <= 0 -> removed */
 export class CandyBeam extends Shot {
-  ox: number
-  oy: number
-  done = false
-  constructor(ctx: BuuCtx, owner: Actor, dir: Dir, ox: number, oy: number) {
-    super(ctx, owner, dir, 0, 0, 0)
-    this.ox = ox
-    this.oy = oy
+  len = 8
+  phase = 0
+  cnt = 0
+  constructor(ctx: BuuCtx, owner: Actor, dir: Dir, x: number, y: number) {
+    super(ctx, owner, dir, 0, x << 8, y << 8)
     this.kind = 'candybeam'
   }
-  rect(): Rect {
-    const x = this.owner.px + this.ox
-    const y = this.owner.py + this.oy
-    const head = Math.min(40, 8 + 4 * this.t)
-    const tail = Math.max(0, (this.t - 9) * 4)
+  head(): [number, number] {
     const [dx, dy] = DIR_VEC[this.dir]
-    const a = [x + dx * tail, y + dy * tail]
-    const b = [x + dx * head, y + dy * head]
-    return { x0: Math.min(a[0], b[0]) - 3, y0: Math.min(a[1], b[1]) - 3, x1: Math.max(a[0], b[0]) + 3, y1: Math.max(a[1], b[1]) + 3 }
+    return [this.px + dx * this.len, this.py + dy * this.len]
+  }
+  rect(): Rect {
+    const [hx, hy] = this.head()
+    return { x0: hx - 8, y0: hy - 8, x1: hx + 8, y1: hy + 8 }
+  }
+  private advance() {
+    const [dx, dy] = DIR_VEC[this.dir]
+    this.x += (dx * 4) << 8
+    this.y += (dy * 4) << 8
   }
   update(w: World) {
     this.t++
-    if (this.t > 19) {
-      this.removed = true
+    if (this.phase === 1) {
+      this.advance()
+      this.len -= 4
+      if (this.len <= 0) this.removed = true
       return
     }
-    if (!this.done && this.hit(w, this.rect(), ATK[1], 0)) {
-      this.done = true
-      const p = this.ctx.player
-      if (p && !p.dead) {
-        // the player's sprite becomes def 45 (three sweets) with frame rand(3); timer 0x03002FE4 = 301
-        this.ctx.candyFrame = w.rng.rand(3, 'candy sweet')
-        this.ctx.candy = 301
-        w.logEvent('info', 'player turned into candy (300 f)')
-      }
+    const box = this.rect()
+    if (this.inWall(w, box)) {
+      this.phase = 1
+      return
     }
+    if (!this.ownerDead() && this.hit(w, box, ATK[1], 0, false)) {
+      const p = this.ctx.player
+      if (p) p.candyHit(w)
+      this.phase = 1
+      return
+    }
+    if (this.len < 64) this.len += 4
+    else this.advance()
+    if (++this.cnt > 240) this.phase = 1
   }
-  /** muzzle record k (k = (t >> 2) & 1) at the origin while len < 64, body record 2 every 8 px, head record 3 + k at
-   *  dir * len; pieces at position + origin */
+  /** records 0x0874ED7C + 60 * dir: muzzle record k (k = (t >> 2) & 1) at the origin while growing, body record 2
+   *  every 8 px, head record 3 + k at dir * len; pieces at position + origin */
   draw(r: Renderer) {
     const bank = this.ctx.data.sprites
     const base = 0x0874ed7c + 60 * this.dir
     const [dx, dy] = DIR_VEC[this.dir]
-    const x = this.owner.px + this.ox
-    const y = this.owner.py + this.oy
-    const head = Math.min(40, 8 + 4 * this.t)
-    const tail = Math.max(0, (this.t - 9) * 4)
+    const x = this.px
+    const y = this.py
     const k = (this.t >> 2) & 1
-    if (tail === 0) drawRecAdd(r, bank, base + 12 * k, x, y)
-    for (let o = tail; o < head - 1; o += 8) drawRecAdd(r, bank, base + 24, x + dx * o, y + dy * o)
-    drawRecAdd(r, bank, base + 12 * (3 + k), x + dx * head, y + dy * head)
+    if (this.phase === 0 && this.len < 64) drawRecAdd(r, bank, base + 12 * k, x, y)
+    for (let o = 0; o < this.len - 1; o += 8) drawRecAdd(r, bank, base + 24, x + dx * o, y + dy * o)
+    const [hx, hy] = this.head()
+    drawRecAdd(r, bank, base + 12 * (3 + k), hx, hy)
   }
 }
 
@@ -1508,35 +1707,85 @@ export class DarkSphere extends Shot {
 
 /** Bio Mech grapple arm (0x0804B380): extends like a wave to 80 px, melee sub 0 x1.0 (STR); a hit holds the player
  *  and reels him in (INFERRED) */
+/** Bio Mech grapple arm (class 0x0804B380, builder 0x08037EA8, update 0x08037FB4; spawned by the GrappleArm node's
+ *  controller 0x03003294 at enemy position + 0x0876CCB4[dir]). Fields: +0x1C/+0x20 origin (px), +0x2C/+0x30 unit
+ *  vector 0x0876CCE8[dir], +0x3C length (8 at spawn), +0x34/+0x38 the grip (px), +0x10 phase:
+ *  0 extend: head = origin + vector * len; box (hx, hy - 12)..(hx + 32, hy + 12) (every direction); a projectile-grid
+ *    wall under the box -> 1; message kind 0 to every object (0x08011C0C: melee type 0x086B8088, x1.0, dir, owner);
+ *    accepted -> player HP > 0 ? grab : 1; not accepted -> len += 4 (len >= 80 -> 1)
+ *  grab: grip = head + 0x0876CD08[dir]; the player blocking (+0x1C8) and facing dir ^ 1 -> 1; the grip on the
+ *    walk grid (0x080097C2 with the player's footprint) -> player SetState(0x03001B00 hold, frame kept) at the grip,
+ *    phase 2; else 1
+ *  2 reel: grip -= vector * 4; fits -> the player there, else SetAnim(0) on the player and phase 1; then like 1
+ *  1 retract: len -= 4; len <= 0 -> (phase 2: the player SetAnim(0)) removed */
 export class GrappleArm extends Shot {
   len = 8
-  back = false
-  grabbed = false
+  phase = 0
+  gx = 0
+  gy = 0
   constructor(ctx: BuuCtx, owner: Actor, dir: Dir, x: number, y: number) {
     super(ctx, owner, dir, 0, x, y)
     this.kind = 'grapple'
   }
-  rect(): Rect {
+  head(): [number, number] {
     const [dx, dy] = DIR_VEC[this.dir]
-    const hx = this.px + dx * this.len
-    const hy = this.py + dy * this.len
-    return { x0: Math.min(this.px, hx) - 4, y0: Math.min(this.py, hy) - 4, x1: Math.max(this.px, hx) + 4, y1: Math.max(this.py, hy) + 4 }
+    return [this.px + dx * this.len, this.py + dy * this.len]
+  }
+  rect(): Rect {
+    const [hx, hy] = this.head()
+    return { x0: hx, y0: hy - 12, x1: hx + 32, y1: hy + 12 }
   }
   update(w: World) {
     this.t++
-    if (this.back) {
-      this.len -= 4
-      if (this.len <= 0) this.removed = true
+    const p = this.ctx.player
+    const [dx, dy] = DIR_VEC[this.dir]
+    if (this.phase === 0) {
+      const box = this.rect()
+      if (this.inWall(w, box)) {
+        this.phase = 1
+        return
+      }
+      if (!this.hit(w, box, ATK[0], 1024, false)) {
+        if (this.len >= 80) this.phase = 1
+        else this.len += 4
+        return
+      }
+      if (!p || p.hp <= 0) {
+        this.phase = 1
+        return
+      }
+      this.phase = 2
+      const [hx, hy] = this.head()
+      const G = [[8, 20], [8, 0], [-8, 16], [0, 16]][this.dir]
+      this.gx = hx + G[0]
+      this.gy = hy + G[1]
+      // a front block (blocking flag and facing the arm) stops the grab
+      if (p.blocking && p.facing === (this.dir ^ 1)) {
+        this.phase = 1
+        return
+      }
+      if (p.fits(w, this.gx, this.gy)) {
+        p.enterHold(w)
+        p.x = this.gx << 8
+        p.y = this.gy << 8
+      } else this.phase = 1
       return
     }
-    this.len += 4
-    if (this.len >= 80) this.back = true
-    if (this.hit(w, this.rect(), ATK[0], 1024)) {
-      this.back = true
-      this.grabbed = true
-      const p = this.ctx.player
-      if (p && !p.dead) p.hold(w, this.owner, 'grapple', 20)
+    if (this.phase === 2 && p) {
+      this.gx -= dx * 4
+      this.gy -= dy * 4
+      if (p.fits(w, this.gx, this.gy)) {
+        p.x = this.gx << 8
+        p.y = this.gy << 8
+      } else {
+        p.toIdle(w)
+        this.phase = 1
+      }
     }
+    this.len -= 4
+    if (this.len > 0) return
+    if (this.phase === 2) p?.toIdle(w)
+    this.removed = true
   }
   /** chain record 0 every 8 px to len - 1, the head at dir * len: open hand record 1, or while grabbing the closed
    *  hand records 2 (back) + 3 (front); pieces at position + origin */
@@ -1545,9 +1794,8 @@ export class GrappleArm extends Shot {
     const base = 0x0876dff8 + 48 * this.dir
     const [dx, dy] = DIR_VEC[this.dir]
     for (let k = 0; k < this.len - 1; k += 8) drawRecAdd(r, bank, base, this.px + dx * k, this.py + dy * k)
-    const hx = this.px + dx * this.len
-    const hy = this.py + dy * this.len
-    if (this.grabbed) {
+    const [hx, hy] = this.head()
+    if (this.phase === 2) {
       drawRecAdd(r, bank, base + 24, hx, hy)
       drawRecAdd(r, bank, base + 36, hx, hy)
     } else drawRecAdd(r, bank, base + 12, hx, hy)

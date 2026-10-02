@@ -21,6 +21,10 @@ export interface HitMsg {
   atk: AttackType
   attacker: Actor
   source?: unknown
+  /** damage only (ComputeDamage + 0x08010BF2): no reaction, no i-frames (the flames 0x080247C0) */
+  noReact?: boolean
+  /** message kind 1: tested against the receiver's footprint (0x0800FDFA) instead of its body box */
+  foot?: boolean
   crit?: boolean
   raw?: number
   dmg?: number
@@ -97,6 +101,25 @@ export abstract class Actor implements Entity, Receiver {
   footBox(): Rect {
     return { x0: this.px, y0: this.py, x1: this.px + this.footW, y1: this.py + this.footH }
   }
+  /** the ROM frame record of the frame shown (sprites.json step `rom`), 0 when unknown */
+  frameRecord(): number {
+    if (!this.sprite || !this.anim) return 0
+    const steps = this.anim.steps(this.facing)
+    if (!steps.length) return 0
+    const st = this.frameIdx != null ? this.anim.stepIndex(this.facing, this.frameIdx) : this.anim.stepAt(this.facing, this.animT, this.animLoop)
+    const i = st ? steps.indexOf(st) : -1
+    const j = this.sprite.json.animations[this.anim.name] as unknown as { directions: Record<string, { rom?: string }[] | undefined> } | undefined
+    const d = j?.directions[['down', 'up', 'left', 'right'][this.facing]] ?? j?.directions.any
+    const rom = i >= 0 ? d?.[i]?.rom : undefined
+    return rom ? parseInt(rom, 16) : 0
+  }
+  /** 0x0800FE34: the shown frame record's box (+4 s8 ox, +5 s8 oy, +6 w, +7 h) at the integer position; the body box
+   *  when the record is unknown */
+  frameBox(): Rect {
+    const b = FRAME_BOXES.get(this.frameRecord())
+    if (!b) return this.bodyBox()
+    return { x0: this.px + b[0], y0: this.py + b[1], x1: this.px + b[0] + b[2], y1: this.py + b[1] + b[3] }
+  }
   center(): [number, number] {
     const b = this.bodyBox()
     return [(b.x0 + b.x1) >> 1, (b.y0 + b.y1) >> 1]
@@ -110,7 +133,9 @@ export abstract class Actor implements Entity, Receiver {
     const hb = (s?.json.hitboxes as { body_per_direction?: { dir: string; x0: number; y0: number; x1: number; y1: number }[] } | undefined)?.body_per_direction
     if (hb && hb.length) {
       const by = (d: string) => hb.find((h) => h.dir === d) ?? hb[0]
-      const nz = (h: { x0: number; y0: number; x1: number; y1: number }) => (h.x1 - h.x0 > 0 ? [h.x0, h.y0, h.x1, h.y1] : [0, -22, 16, 8])
+      // an empty rect stays empty (0x0800FE78: the Enzyme's body exists only facing down - nothing hits it otherwise,
+      // lockstep f02_vs_hold_latch); only a sprite with no box at all gets the default
+      const nz = (h: { x0: number; y0: number; x1: number; y1: number }) => [h.x0, h.y0, h.x1, h.y1]
       this.body = ['down', 'up', 'left', 'right'].map((d) => nz(by(d)))
     }
     const hdr = (s?.json as unknown as { header?: { shadow?: number[] } } | undefined)?.header
@@ -212,9 +237,29 @@ export abstract class Actor implements Entity, Receiver {
   }
 }
 
-export function hitsBody(msg: HitMsg, a: Actor) {
-  return overlaps(msg.rect, a.bodyBox())
+/** the sprite frame records' boxes (data/battle/buu_frame_boxes.json: ROM address -> [ox, oy, w, h]) */
+let FRAME_BOXES: Map<number, [number, number, number, number]> = new Map()
+export function setFrameBoxes(j: { boxes?: Record<string, [number, number, number, number]> } | undefined) {
+  FRAME_BOXES = new Map(Object.entries(j?.boxes ?? {}).map(([k, v]) => [parseInt(k, 16), v]))
 }
+
+/** the frame record box of sprite `s`, animation `raw`, direction, frame index at (px, py); null when unknown */
+export function frameBoxOf(s: SpriteSet | undefined, raw: number, dir: Dir, frame: number, px: number, py: number): Rect | null {
+  const a = s?.anim(raw)
+  if (!s || !a) return null
+  const j = s.json.animations[a.name] as unknown as { directions: Record<string, { rom?: string }[] | undefined> } | undefined
+  const d = j?.directions[['down', 'up', 'left', 'right'][dir]] ?? j?.directions.any
+  const rom = d?.[Math.min(frame, (d?.length ?? 1) - 1)]?.rom
+  const b = rom ? FRAME_BOXES.get(parseInt(rom, 16)) : undefined
+  return b ? { x0: px + b[0], y0: py + b[1], x1: px + b[0] + b[2], y1: py + b[1] + b[3] } : null
+}
+
+export function hitsBody(msg: HitMsg, a: Actor) {
+  return overlaps(msg.rect, msg.foot ? a.footBox() : a.bodyBox())
+}
+
+/** the ROM's sine table 0x087B6EEC: 256 steps per turn, 1.0 = 0x10000 (= trunc(sin * 65536), all 256 checked) */
+export const SIN256: number[] = Array.from({ length: 256 }, (_, i) => Math.trunc(Math.sin((i * 2 * Math.PI) / 256) * 65536))
 
 /** visual-only effect: plays the frames of a sprite set once */
 export class Effect implements Entity {

@@ -108,6 +108,10 @@ def vs(f, kind, inp, at=(24, 0), **kw):
         en['hp'] = hp
     if kw.pop('real', False):
         en.update(aggro=True, dummy=False)
+    if 'state' in kw:
+        en['state'] = kw.pop('state')
+    if 'partner' in kw:
+        en['partner'] = kw.pop('partner')
     return base(f, 'vs_' + kind, inp, arena='forest', pos=kw.pop('pos', VS_POS), dir=kw.pop('dir', 3), enemy=en, **kw)
 
 
@@ -124,6 +128,55 @@ def reactions():
     for kind, t, at in (('melee', 0x44, (24, 0)), ('gun', 0x2C, (60, 0)), ('bomb', 8, (60, 0)), ('beam', 0x3C, (70, 0)),
                         ('flames', 1, (40, 0)), ('mini', 0x38, (30, 0)), ('hand', 0x33, (60, -40))):
         out.append(vs(2, 'enemy_' + kind, [['', 240]], at=at, etype=t, real=True, ehp=None))
+    return out
+
+
+# real enemies attacking an idle player, one per archetype and the main bosses: (type, offset of the enemy footprint)
+ENEMY_ARCHETYPES = [
+    (0x02, (48, 0)), (0x03, (48, 0)), (0x05, (90, 0)), (0x07, (48, 0)), (0x09, (40, 0)), (0x0C, (40, 0)), (0x0F, (40, 0)),
+    (0x10, (48, 0)), (0x11, (60, 0)), (0x13, (60, 0)), (0x14, (60, 0)), (0x18, (40, 0)), (0x20, (48, 0)), (0x21, (40, 0)),
+    (0x24, (40, 0)), (0x29, (60, 0)), (0x2B, (60, 0)), (0x2E, (60, 0)), (0x2F, (40, 0)), (0x30, (60, 0)), (0x3A, (70, 0)),
+    (0x3E, (48, 0)), (0x40, (70, 0)), (0x41, (48, 0)), (0x45, (40, 0)), (0x48, (60, 0)), (0x4B, (70, 0)), (0x4C, (60, 0)),
+    (0x4D, (80, 0)), (0x4E, (60, 0)), (0x52, (48, 0)), (0x58, (48, 0)), (0x59, (48, 0)), (0x5D, (48, 0)), (0x5E, (60, 0)),
+    (0x61, (40, 0)), (0x62, (40, 0)), (0x63, (40, 0)), (0x65, (48, 0)), (0x67, (40, 0)), (0x68, (48, 0)), (0x6A, (48, 0)),
+    (0x6B, (40, 0)), (0x6C, (80, 0)), (0x7F, (80, 0)), (0x83, (60, 0)), (0x85, (30, 0)), (0x8A, (48, 0)), (0x8C, (80, 0)),
+    (0x0E, (48, 0)),
+]
+BOSSES = [
+    (0x00, (80, 0)), (0x06, (80, 0)), (0x0A, (60, 0)), (0x12, (60, 0)), (0x1A, (80, 0)), (0x1C, (80, 0)), (0x23, (60, 0)),
+    (0x28, (60, 0)), (0x3F, (70, 0)), (0x46, (60, 0)), (0x50, (60, 0)), (0x5A, (60, 0)), (0x5B, (60, 0)), (0x60, (48, 0)),
+    (0x64, (70, 0)), (0x73, (60, 0)), (0x79, (60, 0)), (0x7A, (70, 0)), (0x81, (70, 0)), (0x8E, (80, 0)), (0x91, (60, 0)),
+]
+
+
+MASH = [['LEFT', 1], ['', 1], ['RIGHT', 1], ['', 1], ['A', 1], ['', 1], ['B', 1], ['', 1]]
+MASH_DPAD = [['LEFT', 1], ['', 1], ['RIGHT', 1], ['', 1]]
+
+
+def holds():
+    """the player's special holds by real enemies started in their grab / effect state at frame 1"""
+    out = []
+    # Bio Mech grapple (state 0x21, 90 px): the arm reels the player in
+    out.append(vs(2, 'hold_grapple', [['', 300]], at=(90, 0), etype=0x05, real=True, ehp=None, state=0x21))
+    # Majin Buu's candy beam (state 0xBB, 80 px): candy, hops with the d-pad, the eat
+    # Spopovich's bear hug with Yamu draining (types 0x6F + 0x93): mash the d-pad to escape
+    out.append(vs(2, 'hold_hug', [['', 120]] + MASH_DPAD * 60 + [['', 200]], at=(14, 0), etype=0x6F, real=True, ehp=None, state=0x22E,
+                  partner={'type': 0x93, 'at': [60, 24]}))
+    # Dabura's stone spit (state 0x7C), the Buu fragment's freeze (0x0E), mummy wraps (0x4D at 80 px), the Enzyme latch
+    # (0x18 at -8, +5), the vampire grab (0x85 at 30 px); then mash to escape
+    out.append(vs(2, 'hold_stone', [['', 120]] + MASH * 30 + [['', 200]], at=(80, 0), etype=0x12, real=True, ehp=None, state=0x7C))
+    out.append(vs(2, 'hold_freeze', [['', 150]] + MASH * 20 + [['', 200]], at=(48, 0), etype=0x0E, real=True, ehp=None))
+    out.append(vs(2, 'hold_wraps', [['', 200]] + MASH_DPAD * 30 + [['', 200]], at=(80, 0), etype=0x4D, real=True, ehp=None))
+    out.append(vs(2, 'hold_latch', [['', 200]] + MASH * 20 + [['', 200]], at=(7, -12), etype=0x18, real=True, ehp=None))
+    out.append(vs(2, 'hold_vampire', [['', 150]] + MASH * 20 + [['', 200]], at=(30, 0), etype=0x85, real=True, ehp=None))
+    out.append(vs(2, 'hold_candy', [['', 60], ['UP', 40], ['', 20], ['DOWN', 40], ['', 440]], at=(80, 0), etype=0x1A, real=True, ehp=None, state=0xBB))
+    return out
+
+
+def enemy_attacks():
+    out = []
+    for t, at in ENEMY_ARCHETYPES + BOSSES:
+        out.append(vs(2, 'enemy_t%02x' % t, [['', 600]], at=at, etype=t, real=True, ehp=None))
     return out
 
 
@@ -177,6 +230,8 @@ def all_scenarios():
         out += versus(f)
     out += versus_extra()
     out += reactions()
+    out += enemy_attacks()
+    out += holds()
     return out + extra()
 
 

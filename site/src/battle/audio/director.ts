@@ -70,7 +70,7 @@ export function attachBattleAudio(s: BattleSession): () => void {
       void audio.playSfx(game, data.id, data.vol ?? 64, key)
       return true
     }
-    if (type === 'sfx_stop' && data?.id != null) {
+    if ((type === 'sfx_stop' || type === 'sfx_stop_match') && data?.id != null) {
       for (const k of voices.get(data.id) ?? []) audio.stopLoop(k)
       voices.delete(data.id)
       return true

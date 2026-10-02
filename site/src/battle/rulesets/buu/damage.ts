@@ -52,6 +52,8 @@ export interface DamageResult {
   raw: number
   /** final damage in 1/1024 HP */
   dmg: number
+  /** the damage before the block factor (ComputeDamage stores it at hit+0x18, 0x0800EABE, then applies the block) */
+  unblocked?: number
 }
 
 const shr = (v: number, n: number) => Math.floor(v / 2 ** n)
@@ -80,8 +82,9 @@ export function computeDamageRaw(
   const r = rng.rand(26, 'dmg spread')
   const raw = shr((256 + r) * Y, 8) * A
   let dmg = shr(resist * raw + 127, 7)
+  const unblocked = dmg
   if (blocking && dmg) dmg = shr(dmg * blockFactor, 16)
-  return { crit, raw, dmg }
+  return { crit, raw, dmg, unblocked }
 }
 
 /** observer of every ComputeDamage (tests: the lockstep harness logs the results per frame) */
@@ -99,7 +102,9 @@ export function computeDamage(atk: AttackType, mult: number, attacker: CombatSta
     melee ? defender.END : defender.END2, melee ? defender.resM : defender.resE,
     blocking, defender.blockFactor, rng,
   )
-  damageObserver?.(defender, res, atk, mult)
+  // the observer sees the damage as ComputeDamage has it at 0x0800EABE (the lockstep breakpoint): before the block
+  // factor (lockstep f02_vs_hold_stone: Dabura blocking a ki blast, 53399 logged, 3337 taken)
+  damageObserver?.(defender, { ...res, dmg: res.unblocked ?? res.dmg }, atk, mult)
   return res
 }
 

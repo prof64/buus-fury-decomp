@@ -80,6 +80,9 @@ STATE_NAMES = {
     0x0804E334: 'skill14',    # Instant Transmission teleport sequence (after the target pick)
     0x0804D410: 'skill18',    # Saiyaman: change into form 14
     0x0804DFC0: 'skill18r',   # Saiyaman: back to form 10
+    0x0804BE60: 'candy',      # candy idle (Majin Buu's candy beam: def 0x36, frame rand(3))
+    0x0804B7AC: 'candy_walk', # candy hop (16 frames, the d-pad read at the hop start)
+    0x0804C2CC: 'candy_eat',  # grabbed by Majin Buu's eat
 }
 # map per scenario: world, map (the simulator arena with the same map)
 MAPS = {'htc': (6, 9), 'crater': (8, 71), 'forest': (8, 3)}
@@ -93,6 +96,7 @@ MAJIN_AGGRO = 0x087043F8 + 0xC  # Majin Fighter state 0x14B IfPlayerWithin2 r2 (
 STATE_TABLE = 0x0870F514
 APPLY_DAMAGE_NODE = 0x086FDA00
 ENEMY_LIST = 0x03001BB0
+AI_REPLACE = 0x0800AA4A  # (obj+0x238, state): replace the AI stack's top state
 FRAME_COUNTER = 0x03000F94  # +1 per game logic frame (not on lag frames)
 COMPUTE_DAMAGE_RET = 0x0800EABE  # ComputeDamage: r0 = final damage (1/1024 HP), r4 = hit struct, r6 = target
 
@@ -185,6 +189,11 @@ def setup(scn):
         dx, dy = en.get('at', [40, 0])
         e.w32(o + 0x1A0, (x + dx) << 8)
         e.w32(o + 0x1A4, (y + dy) << 8)
+        if en.get('partner'):
+            o2 = partner_enemy(e)
+            dx, dy = en['partner'].get('at', [40, 0])
+            e.w32(o2 + 0x1A0, (x + dx) << 8)
+            e.w32(o2 + 0x1A4, (y + dy) << 8)
     return e
 
 
@@ -204,11 +213,30 @@ def setup_enemy_records(e, en, px, py):
                 e.w32(tgt + off, u32(src + off))
         e.w32(tgt + 8, t)
     dx, dy = en.get('at', [40, 0])
-    # a real enemy spawns far away (FAR) and is placed at frame 0; the dummy spawns in place
+    # a real enemy spawns far away (FAR) and is placed at frame 0; the dummy spawns in place. Until frame 1 the real
+    # enemy's type starts in the inert state 0xC (its root is the Idle node 0x080716F4: no AI, no spawns); frame 1
+    # replaces it with the type's own initial state (step(): read from the ROM file)
     far = en.get('dummy', True) is False
+    if far:
+        e.w32(0x08711274 + 28 * t + 8, 0xC)
     e.w16(tgt + 0xC, FAR if far else px + dx)
     e.w16(tgt + 0xE, FAR if far else py + dy)
-    for r in FOREST_RECORDS[1:]:
+    rest = FOREST_RECORDS[1:]
+    pt = en.get('partner')
+    if pt:
+        # a second real enemy (e.g. Yamu with Spopovich) from the second record, also inert until its AI start
+        from forcespawn import own_record
+        r2 = FOREST_RECORDS[1]
+        src = own_record(pt['type'])
+        if src is not None:
+            for off in (0x10, 0x14, 0x18, 0x1C):
+                e.w32(r2 + off, u32(src + off))
+        e.w32(r2 + 8, pt['type'])
+        e.w32(0x08711274 + 28 * pt['type'] + 8, 0xC)
+        e.w16(r2 + 0xC, FAR + 0x40)
+        e.w16(r2 + 0xE, FAR)
+        rest = FOREST_RECORDS[2:]
+    for r in rest:
         e.w16(r + 0xC, 0x7000)
         e.w16(r + 0xE, 0x7000)
 
@@ -229,6 +257,12 @@ def tracked_enemy(e):
     return 0
 
 
+def partner_enemy(e):
+    """the scenario's second enemy: the second one not parked at 0x7000"""
+    os_ = [o for o in enemy_objs(e) if (e.r32(o + 0x1A0) >> 8) < 0x6C00]
+    return os_[1] if len(os_) > 1 else 0
+
+
 def snapshot(e):
     p = e.r32(PLAYER)
     ci = e.r8(GD)
@@ -236,8 +270,16 @@ def snapshot(e):
     return p, rec
 
 
+PLAYER_VTABLE = 0x0804C9F0
+
+
 def row(e):
     p, rec = snapshot(e)
+    if not p or e.r32(p) != PLAYER_VTABLE:
+        # the player object is gone (Majin Buu's eat removes it until a new one is created)
+        return {'x': 0, 'y': 0, 'dir': 0, 'raw': 0, 'frame': 0, 'tick': 0, 'state': 'gone', 'rom': 0, 'form': e.r8(rec + 0x14),
+                'hp': struct.unpack('<h', struct.pack('<H', e.r16(rec + 0x16)))[0],
+                'ep': struct.unpack('<h', struct.pack('<H', e.r16(rec + 0x1A)))[0], 'rng': e.r32(RNG)}
     st = e.r32(p + 0x14)
     raw = anim_raw(e, p)
     fr = e.r8(p + 0x11)
@@ -313,10 +355,30 @@ class SoundLog:
             elif a == STOP_ALL:
                 out.append(['stopall'])
             elif a == STOP_MATCH:
-                out.append(['stopmatch', r[1]])
+                out.append(['stopmatch', (r[1] - SFX_TABLE) // 12])
             elif a == PLAY_SONG:
                 out.append(['song', (r[1] - SONG_TABLE) // 20 if SONG_TABLE <= r[1] < SONG_TABLE + 53 * 20 else -1])
         return out
+
+
+def step(e, scn, f, hits, eo):
+    """run scenario frame f (keys already set): an injected hit, or a real enemy's fresh AI start at frame 1
+    (GotoState(initial state), 0x0800AA4A on obj+0x238, at the start of the frame's game update - the simulator resets
+    its AI the same way), or a plain frame"""
+    if f in hits:
+        write_hit(e, hits[f])
+        call(e, PLAYER_MSG, (e.r32(PLAYER), 0, MSG, 0))
+    elif f == 1 and eo and scn.get('enemy', {}).get('dummy', True) is False:
+        t = (e.r32(eo + 0x224) - 0x08711274) // 28
+        st = scn['enemy'].get('state', u32(0x08711274 + 28 * t + 8))
+        call(e, AI_REPLACE, (eo + 0x238, st, 0, 0))
+    elif f == 2 and eo and scn.get('enemy', {}).get('partner'):
+        # the partner's AI starts one frame later (one injected call per frame)
+        o2 = partner_enemy(e)
+        pt = scn['enemy']['partner']
+        call(e, AI_REPLACE, (o2 + 0x238, pt.get('state', u32(0x08711274 + 28 * pt['type'] + 8)), 0, 0))
+    else:
+        e.run(1)
 
 
 def record(scn):
@@ -368,6 +430,12 @@ def record(scn):
                               # animation (raw / frame / tick) and the frame stamps +0x1E8 / +0x1EC as ages
                               'raw': anim_raw(e, eo), 'frame': e.r8(eo + 0x11), 'tick': e.r16(eo + 0x12),
                               'mark1Age': (fc - e.r32(eo + 0x1E8)) & 0xFFFFFFFF, 'mark2Age': (fc - e.r32(eo + 0x1EC)) & 0xFFFFFFFF})
+    if eo and scn['enemy'].get('partner'):
+        o2 = partner_enemy(e)
+        init['enemy2'] = erow(e, o2)
+        init['enemy2'].update({'type': (e.r32(o2 + 0x224) - 0x08711274) // 28, 'raw': anim_raw(e, o2), 'frame': e.r8(o2 + 0x11),
+                               'tick': e.r16(o2 + 0x12), 'mark1Age': (fc - e.r32(o2 + 0x1E8)) & 0xFFFFFFFF,
+                               'mark2Age': (fc - e.r32(o2 + 0x1EC)) & 0xFFFFFFFF})
     snd = SoundLog(e, dmg=bool(eo), enemy=eo)
     hits = {h['at']: h for h in scn.get('hits', [])}
     frames = []
@@ -378,11 +446,7 @@ def record(scn):
             f += 1
             e.set_keys(keys)
             fc = e.r32(FRAME_COUNTER)
-            if f in hits:
-                write_hit(e, hits[f])
-                call(e, PLAYER_MSG, (e.r32(PLAYER), 0, MSG, 0))
-            else:
-                e.run(1)
+            step(e, scn, f, hits, eo)
             r = row(e)
             # a lag frame: the game logic did not run (the frame counter did not advance)
             if e.r32(FRAME_COUNTER) == fc and f not in hits:

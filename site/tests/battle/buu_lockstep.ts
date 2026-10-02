@@ -45,6 +45,7 @@ export interface LsTrace {
     partner?: Player['partner']
     /** enemy scenarios: the enemy at frame 0 (24.8 footprint position, facing, HP << 10, type, footprint) */
     enemy?: { x: number; y: number; dir: number; hp: number; type: number; foot: [number, number]; raw?: number; frame?: number; tick?: number; mark1Age?: number; mark2Age?: number }
+    enemy2?: { x: number; y: number; dir: number; hp: number; type: number; raw: number; frame?: number; tick?: number; mark1Age?: number; mark2Age?: number }
   }
   states: string[]
   /** [n, x, y, dx, dy, dir, raw, frame, state, hp, ep, form, rom] */
@@ -64,6 +65,10 @@ export interface LsEnemyScn {
   aggro?: boolean
   /** default true: a target dummy (see patchDummy) */
   dummy?: boolean
+  /** a real enemy's AI state at frame 1 (default: the type's initial state) */
+  state?: number
+  /** a second real enemy (its AI starts at frame 2) */
+  partner?: { type: number; at: [number, number]; state?: number }
 }
 
 export interface LsRow {
@@ -196,7 +201,7 @@ export function setupSim(t: LsTrace): { w: World; player: Player; battle: Rulese
       form,
       options: { growth: 'average', autoSpend: 'none', skillLevel: String(ini.rec.levels[0] ?? 0), eq_body: String(eq[0]), eq_hands: String(eq[1]), eq_feet: String(eq[2]), eq_accessory: String(eq[3]) },
     }),
-    phases: [{ enemy: en ? `t${ini.enemy?.type ?? en.type}` : 't-1', count: 1 }],
+    phases: [{ enemy: en ? `t${ini.enemy?.type ?? en.type}` + (ini.enemy2 ? `+t${ini.enemy2.type}` : '') : 't-1', count: 1 }],
     arena: (t.scenario.arena as string | undefined) ?? (en ? 'forest' : 'htc'),
     seed: 1,
     options: { popups: false },
@@ -232,6 +237,9 @@ export function setupSim(t: LsTrace): { w: World; player: Player; battle: Rulese
   if (ini.obj.idlecnt != null) p.sCnt = ini.obj.idlecnt
   if (ini.obj.camera) p.ctx.setCamera(ini.obj.camera[0] | 0, ini.obj.camera[1] | 0)
   if (ini.obj.beepAge != null) p.ctx.lastBeep = -ini.obj.beepAge
+  // the frame counter 0x03000F94 at frame 0: every f02_vs_enemy_tXX recording starts from the same setup, counter
+  // 9634 (read from the emulator after emu_lockstep.setup(); not stored in the traces yet -> record it as init.fc)
+  p.ctx.fc0 = (ini as { fc?: number }).fc ?? (ini.enemy ? 9634 : 0)
   let enemy: Enemy | null = null
   if (en && ini.enemy) {
     enemy = w.entities.find((e) => e.kind === 'enemy') as Enemy
@@ -251,6 +259,26 @@ export function setupSim(t: LsTrace): { w: World; player: Player; battle: Rulese
     }
     if (ie.mark1Age != null && ie.mark1Age < 1e6) enemy.mark1 = -ie.mark1Age
     if (ie.mark2Age != null && ie.mark2Age < 1e6) enemy.mark2 = -ie.mark2Age
+    const i2 = ini.enemy2
+    if (i2) {
+      const e2 = w.entities.find((x) => x.kind === 'enemy' && x !== enemy && (x as Enemy).type.type === i2.type) as Enemy
+      e2.unmarkSelf()
+      e2.x = i2.x
+      e2.y = i2.y
+      e2.markSelf()
+      e2.facing = i2.dir as Dir
+      e2.hp1024 = i2.hp
+      // [H] the emulator keeps the partner in the inert state 0xC (root: the Idle node) until its AI start at frame 2
+      if ((t.scenario.enemy as LsEnemyScn | undefined)?.partner) e2.ai.reset(0xc)
+      const a2 = i2.raw > 0 ? e2.sprite?.anim(i2.raw) : undefined
+      if (a2) {
+        e2.anim = a2
+        e2.ea.pos = { raw: i2.raw, frame: i2.frame ?? 0, tick: i2.tick ?? 0 }
+        e2.frameIdx = i2.frame ?? 0
+      }
+      if (i2.mark1Age != null && i2.mark1Age < 1e6) e2.mark1 = -i2.mark1Age
+      if (i2.mark2Age != null && i2.mark2Age < 1e6) e2.mark2 = -i2.mark2Age
+    }
   }
   w.rng.setState(ini.rng)
   return { w, player: p, battle, enemy }
@@ -258,7 +286,8 @@ export function setupSim(t: LsTrace): { w: World; player: Player; battle: Rulese
 
 function simRow(w: World, p: Player, e: Enemy | null, sfx: string[], dmg: string[]): LsRow {
   const v = p.lockstepView()
-  const r: LsRow = { x: p.x, y: p.y, dir: p.facing, raw: v.raw, frame: v.frame, state: v.state, hp: p.hp, ep: p.ep, form: p.form.id, rom: v.rom, rng: w.rng.getState()[0] >>> 0, sfx, dmg }
+  // [H] the view may override the position / facing (the eaten player: the recorder reports 0)
+  const r: LsRow = { x: v.x ?? p.x, y: v.y ?? p.y, dir: v.dir ?? p.facing, raw: v.raw, frame: v.frame, state: v.state, hp: p.hp, ep: p.ep, form: p.form.id, rom: v.rom, rng: w.rng.getState()[0] >>> 0, sfx, dmg }
   if (e) {
     r.ex = e.x
     r.ey = e.y
@@ -269,17 +298,20 @@ function simRow(w: World, p: Player, e: Enemy | null, sfx: string[], dmg: string
 }
 
 /** run the trace's inputs in the simulator -> one row per frame */
-export function replay(t: LsTrace): LsRow[] {
+export function replay(t: LsTrace, each?: FrameHook): LsRow[] {
   const restore = patchScenario(t)
   try {
-    return replayIn(t)
+    return replayIn(t, each)
   } finally {
     restore()
     setDamageObserver(null)
   }
 }
 
-function replayIn(t: LsTrace): LsRow[] {
+/** called after every replayed frame (debugging) */
+export type FrameHook = (f: number, sim: { w: World; player: Player; enemy: Enemy | null; lag: boolean }) => void
+
+function replayIn(t: LsTrace, each?: FrameHook): LsRow[] {
   const { w, player, battle, enemy } = setupSim(t)
   const hits = new Map((t.scenario.hits ?? []).map((h) => [h.at, h]))
   const out: LsRow[] = []
@@ -292,6 +324,7 @@ function replayIn(t: LsTrace): LsRow[] {
     if (type === 'sfx') sfx.push(sfxKey(['play', data!.id!, data!.vol ?? 64]))
     else if (type === 'sfx_stop') sfx.push(sfxKey(['stop', data!.id!]))
     else if (type === 'sfx_stop_all') sfx.push('stopall')
+    else if (type === 'sfx_stop_match') sfx.push(sfxKey(['stopmatch', data!.id!]))
     else if (type === 'song') sfx.push(sfxKey(['song', data!.id!]))
   })
   // the emulator injects hits at the start of the frame's game update: an entity at the end of the list (the world
@@ -304,6 +337,13 @@ function replayIn(t: LsTrace): LsRow[] {
     update: (ww: World) => {
       const h = hits.get(f)
       if (h) injectHit(ww, player, h)
+      // a real enemy starts its AI fresh at frame 1 (the emulator's injected GotoState(initial state))
+      else if (f === 1 && enemy && (t.scenario.enemy as LsEnemyScn).dummy === false) enemy.ai.replaceTop((t.scenario.enemy as LsEnemyScn).state ?? enemy.type.ai)
+      else if (f === 2 && enemy && (t.scenario.enemy as LsEnemyScn).partner) {
+        const pt = (t.scenario.enemy as LsEnemyScn).partner!
+        const e2 = ww.entities.find((x) => x.kind === 'enemy' && x !== enemy && (x as Enemy).type.type === pt.type) as Enemy | undefined
+        e2?.ai.replaceTop(pt.state ?? e2.type.ai)
+      }
     },
   }
   w.entities.push(hook as unknown as (typeof w.entities)[number])
@@ -316,6 +356,7 @@ function replayIn(t: LsTrace): LsRow[] {
         dmg = []
         if (lag.has(f)) {
           out.push(simRow(w, player, enemy, sfx, dmg))
+          each?.(f, { w, player, enemy, lag: true })
           continue
         }
         const inp = { held: keys, pressed: keys & ~prev, released: prev & ~keys }
@@ -324,6 +365,7 @@ function replayIn(t: LsTrace): LsRow[] {
         battle.postStep?.(w)
         prev = keys
         out.push(simRow(w, player, enemy, sfx, dmg))
+        each?.(f, { w, player, enemy, lag: false })
       }
     }
   } finally {
@@ -342,6 +384,8 @@ function injectHit(w: World, p: Player, h: LsHit) {
     stats: { STR: h.str ?? 30, POW: h.pow ?? 30, END: 0, END2: 0, resM: 128, resE: 128, critBonus: 0, blockFactor: 0x1000 },
   } as unknown as Actor
   broadcast(w, { team: 0, rect: { x0: px - 32, y0: py - 64, x1: px + 48, y1: py + 32 }, dir: (h.dir ?? 2) as Dir, mult: h.mult ?? 0x400, atk: ATK[h.atk ?? 2], attacker })
+  // the emulator injects before the frame's script phase: the death script counts from this frame (player.koAt)
+  if (p.dead && p.koAt === w.frame + 1) p.koAt = w.frame
 }
 
 export interface Divergence {
@@ -357,6 +401,9 @@ export function compare(exp: LsRow[], got: LsRow[], skip: (keyof LsRow)[] = []):
   for (let i = 0; i < exp.length; i++) {
     const e = exp[i]
     const g = got[i]
+    // game over: KO + 440 the game leaves the battle (the player object is freed: vtable 0, no frame record) - the
+    // rest of the recording is the game-over screen, nothing to compare (f02_vs_enemy_t5e / t13)
+    if (e.state === 'vt_00000000' && e.rom === 0 && e.hp === 0 && i > 0 && exp[i - 1].hp === 0) break
     if (!g) return { frame: i + 1, fields: ['missing'], exp: e, got: e }
     const bad: string[] = []
     // the sprite has no such animation (the game reads a null / foreign entry and shows nothing sensible): the

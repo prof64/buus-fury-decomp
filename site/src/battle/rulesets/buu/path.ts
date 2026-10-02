@@ -53,6 +53,7 @@ export class PathMover {
     if (this.counter === 0) this.replan(e)
     this.counter = (this.counter + 7) & 7
     this.step(e)
+    e.footstep(true)
   }
 
   /** 0x0803B6EA */
@@ -186,9 +187,15 @@ export class PathMover {
       e.facing = dy > 0 ? 0 : 1
     }
     if (!m) m = 1
-    e.moving = true
+    // 0x0803B9DA: SetAnim(1) right here unless IsAnim(1) (vfunc +0x34), whatever is showing: it replaces an attack
+    // controller a GotoState entered earlier in the same tick (lockstep f02_vs_enemy_t6b: ChasePlayer after
+    // GotoState(WindupMelee state) -> the windup's controller is gone, WindupMelee ends on its next update)
+    if (!e.isAnim(1)) e.setAnim(1, true, true)
     const vx = tdiv((dx * this.speed) << 8, m << 8)
     const vy = tdiv((dy * this.speed) << 8, m << 8)
     e.tryMove(vx, vy)
+    // 0x0803B9DA: SetAnim(1) unless vfunc +0x34(1) (the walk loop state is running - not the back-off's reversed walk
+    // showing the same animation; lockstep f02_vs_enemy_gun)
+    if (!e.walking()) e.setAnim(1, true, true)
   }
 }

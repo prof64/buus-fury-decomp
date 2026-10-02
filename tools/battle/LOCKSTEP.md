@@ -196,14 +196,97 @@ Tournament ring #313 / area 7-7) - `boss_music_types` in `data/buu/audio.json`. 
 while 0 < HP <= maxHP / 5, > 60 frames apart. No sound for blocking, being hit (the attacker's code plays its own),
 KO (song 8 200 frames later), level up 36.
 
-## Coverage (lockstep, 633 traces)
+## Semantic changes for ports (wf-core) - enemy AI and world
 
-All scenarios of every form pass except the known divergences below (`KNOWN` in the test, 17 skipped), including the
-story forms 24 / 25, the cutscene fusions and 49 target-dummy scenarios (every skill of one form per character, the
-levelled ones at Lv2 / Lv3, steering, Instant Transmission Lv1 / Lv3). Forms (sim id: game name): 0..8 Goku / SS Goku /
-SS3 Goku (incl. halo / Other World variants), 9..18 Gohan (Teen Gohan, Mystic Gohan, Great Saiyaman, Gohan, SS Teen
-Gohan, SS Gohan), 19..20 Goten, 21..25 Trunks, 26..30 Vegeta, 31..38 Gotenks, 39..40 Vegito, 41..44 Gogeta, 46..53
-Android 18, Hercule, Krillin, Piccolo, Pikkon, Tien, Videl, Yamcha.
+These change behaviour beyond single nodes; a port of the simulator should follow them:
+
+* **Object update order**: the world updates newest objects first (0x08011A1E walks its list from the end); the
+  player object is added after the area's enemies, so it updates before them; objects created later (shots,
+  summons) update before the player.
+* **AI composites** (`ai.ts`): Sequence (0x08018F0C) - a finished child exits and the next enters; after the last
+  the index wraps to 0 without re-entering the first child; enter enters the child at the *current* index; exit
+  exits it without resetting the index. Selector (0x08019192) - first non-zero child result. ParallelAll / Any
+  (0x08019108 / 0x08019162) - every child every update, AND / OR of the results, no per-child completion. Cond
+  (0x080342AF) - the child's result is returned and a finished child is not exited. A GotoState inside a tree does
+  not stop the running tree's update (the replaced tree finishes its evaluation); 0x0800AB0C ignores the root's
+  result (no restart).
+* **Distances** between footprint centres ((x0 + x1) >> 1 of the 0x0800FDFA box), `dist2 <= r2` (signed). The
+  player reference stays valid after a KO. IfTimeInState counts from obj+0x210, stamped only by Block's exit.
+* **Animations**: every enemy SetAnim(0) enters the idle state (enter draws rand(255)); enemies created mid-fight
+  draw it in their constructor; nothing switches walk -> idle when a movement stops (the next node's SetAnim does;
+  AlignWithPlayer's end and StandStill's enter SetAnim(0)); a sprite without the requested animation still runs the
+  node's controller (no idle, no rand); attack controllers end with exactly one SetAnim(0).
+* **Hit messages**: kind 1 (`foot`) tests the receiver's footprint; damage-only messages (`noReact`, the flames)
+  skip the reaction; not-hittable receivers do not accept.
+* **ROM sine table** 0x087B6EEC = trunc(sin(i * 2pi / 256) * 65536) (all 256 checked); frame record boxes
+  (`data/battle/buu_frame_boxes.json`, 0x0800FE34) for picture-based tests (ghost homing / contact).
+* **Player KO / game over**: the death script's clock starts the frame *after* the KO, whatever dealt it (the script
+  runner precedes the object updates; song 8 at KO + 201 ticks; an injected harness hit counts from its own frame).
+  At KO + 199 the script freezes every other object (no enemy AI / RNG from there on) and sends every actor message
+  0xF (0x0800F44A: the walk state's vfunc +0x10 = SetAnim(0), one rand(255); other states assumed no-op). From KO +
+  200 enemies only run their animation state tick. A KO'd player still accepts overlapping hit boxes (no damage), so a
+  wave hitting it puffs. The game frees the player object at KO + 440 (the harness stops comparing there).
+* **IsAnim(id)** (vfunc +0x34, 0x0800FAC6): the actor's state object is SetAnim(id)'s and the raw matches. Movement
+  nodes SetAnim(1) only unless IsAnim(1) (PathFollow 0x0803B9DA, AlignWithPlayer 0x0801CF6E), StandStill re-enters
+  idle unless IsAnim(0), ChasePlayer within 2 px SetAnim(0)s every tick (0x0802A086, rand(255) each time), stopWalk
+  SetAnim(0)s only when IsAnim(1) (the back-off's reversed walk is not).
+* **Enemy energy wave** (0x0802A2EC / update 0x0802A3D2, shared by Cyborg / turret / soldier): ctor plays sound 35;
+  each tick tests wall then hit at the *current* length, then grows 4 (to 48) or moves 4 px; > 240 ticks fades; no
+  camera test.
+* **Attack timings** (all verified): HeavyStrike strikes at tick 60 then SetAnim(4), ends back in idle;
+  BioMechPunch hits at tick 16, ends at 40; CyborgShot wave at tick 1, ends (SetAnim(0)) from tick 16 once its wave
+  is gone; HeavyPunch strike at 48, ends at 48 + 8 * frames; WindupMelee swing at 32, ends at 64 + 8 * (frames - 2),
+  aborted with no swing when another SetAnim replaces its controller in the same tick. CirclePlayer (0x0802F23A)
+  moves away on the major axis and toward on the minor; HoverDrift accumulates +-38 per tick per axis (reaching
+  +-152); BackStep bumps first then moves 47 times; MechTransform swaps the paired graphics set (smaller boxes).
+* **SetAnim(id)** (0x0800ECF0): the state object comes from the enemy table 0x080726B8 by *id*, only the raw from
+  the sprite def: SetAnim(0) is always the idle state (rand(255)), SetAnim(1) the walk loop, even when a type shows
+  that raw under another state too (Worm Body raw 1, Gunman raw 2). Nodes may install their own state object with
+  per-frame code (`Enemy.stateHook`: tick + think run before the AI; any SetAnim replaces it; IsAnim is false
+  under it) - the Buu fragment's PlayAnim0 (0x03003158, one IWRAM singleton shared by all fragments) and
+  FreezePlayer (0x0300314C).
+* **Input history** (0x0804023C / 0x08040284): a 64-entry ring of new presses stamped with the frame counter
+  0x03000F94; `pressRun(mask, n, window)` = a press this frame and the last n masked presses within the window.
+  Used by the freeze release (0xF3, 16, 90) and the mummy-wrap shake-off (d-pad, 8, 60). The frame counter's phase
+  (`ctx.fc0`, 9634 at frame 0 of every f02 scenario) matters for VampireGrab's drain (counter & 15 == 0).
+* **Holds**: VampireGrab (0x0804AB04) moves the *vampire* next to the player (0x08759334), escape = A/B/d-pad held
+  on > 8 frames each within 10 of the last, drain POW every 16 counter ticks, exit SetAnim(9) with hit dir = facing
+  ^ 1; KnockbackSlide's exit does nothing. Mummy wraps are real objects (builder 0x0802D79C, update 0x0802D940):
+  stick 4 frames after a hit (sound 48 + rand(2)) into slots 0x030030BC, each stuck wrap -48 walk / dash and
+  resists reset to 128 (0x0802D8E6), >= 8 stuck -> a new wrap bursts. Worm Head: segments spawned in the node's
+  enter (one rand(255) each); turn = rand(200) == 0 -> dir ^= 2, then rand(2) == 0 -> dir ^= 1. Super Buu's candy
+  beam (0x080287AC) grows 4 px to 64, slides, retracts on wall / hit / 240 frames; KiBlast is the player's blast
+  object (16 x 16) from the body-box point 0x0800FF44.
+* **More holds** (all verified by the hold recordings): Enzyme latch (LatchDrain 0x0804AA94) does *not* hold the
+  player - SetAnimRaw(1) + a controller that glues the enzyme at its entry offset, 1 HP every 64 counter ticks;
+  IfLatchOverlap is a pure overlap test (player body shrunk 6 px left / right vs the enzyme's 7 x 7 rect, which only
+  exists facing down); IfButtonMashed (0x080363C4) counts new A/B/d-pad presses, a gap > `gap` resets, true at
+  count > `presses`, state built with the tree. Bio Mech grapple arm (0x08037FB4): spawned at tick 28, box
+  (hx, hy-12)..(hx+32, hy+12), grows 4 to 80, a front block cancels, else the player is reeled 4 px / frame. Bear hug
+  (0x0802C4C9 / 0x0802C565): player at Spopovich + (8, -16) raw 21, d-pad presses toggle the frame, the 5th success of
+  0x08040284(0xF0, 20, 90) releases, Yamu's SetAnim(9) releases too; Yamu's EnergyDrain walks to Spopovich +- 40 px
+  (0x0800A1D4) and drains 1 EP / 8 ticks to EP - maxEP / 4 (counter starts at 0x6D, uninitialised heap). Candy: idle /
+  walk controllers (16-frame hops, the timer only ends at a hop boundary), EatCandy removes the player object at t8,
+  drains min(POW >> 2, HP) every 8th tick t24..111, a new player object at t120 (three rand(255)).
+* **Body rects**: an empty per-facing body rect stays empty (nothing can hit that facing) - only a sprite without any
+  box gets the default.
+* **Kamikaze Ghost** (`0x08038F2C`, state 0x11B): homes on the nearest enemy using the per-animation-frame sprite boxes
+  (frame record +4..+7, `buu_frame_boxes.json`), moving `speed` along the dominant axis.
+* **Lockstep harness**: lag frames skipped; a real enemy is inert (state 0xC) until frame 1, when its AI is set to
+  the scenario's state (default: the type's initial state) by an injected GotoState; a partner enemy at frame 2.
+
+## Coverage (lockstep, 712 traces)
+
+All scenarios pass except the known divergences below (`KNOWN` in the test, 9 skipped): every form, the story forms 24 /
+25, the cutscene fusions, 49 target-dummy scenarios (every skill of one form per character, the levelled ones at Lv2 /
+Lv3, steering, Instant Transmission Lv1 / Lv3, the Kamikaze Ghost's homing), the player's hurt reactions, the 7
+original real-enemy attacks (melee, gun, bomb, beam, flames, mini, hand) for their full length, 71 real-enemy
+recordings of 600 frames (`f02_vs_enemy_tXX`: one per enemy archetype - 50 - and the 21 main bosses, including KOs and
+the game-over freeze) and the 8 special holds (`f02_vs_hold_*`: grapple, bear hug + Yamu's drain, stone, freeze,
+mummy wraps, Enzyme latch, vampire, candy incl. being eaten). Forms (sim id: game name): 0..8 Goku / SS Goku / SS3 Goku
+(incl. halo / Other World variants), 9..18 Gohan (Teen Gohan, Mystic Gohan, Great Saiyaman, Gohan, SS Teen Gohan, SS
+Gohan), 19..20 Goten, 21..25 Trunks, 26..30 Vegeta, 31..38 Gotenks, 39..40 Vegito, 41..44 Gogeta, 46..53 Android 18,
+Hercule, Krillin, Piccolo, Pikkon, Tien, Videl, Yamcha.
 
 ## Known divergences (not modelled)
 
@@ -212,11 +295,6 @@ Android 18, Hercule, Krillin, Piccolo, Pikkon, Tien, Videl, Yamcha.
 * Great Saiyaman 14 + Super Saiyan: the game's canUse passes (up 255 != down 10) and the transformation reads form 255.
 * Cutscene fusion `ssdrain` (32 / 33): ~150 frames after the defuse the idle blink comes one tick late (unexplained; the
   other defuse traces match).
-* Kamikaze Ghost (`f31_vs_skill13`): the ghost's homing (`0x08038F2C`) aims at the nearest enemy using the sprite frame
-  boxes (`0x0800FE34`: frame record +4..+7) and moves `speed` along the dominant axis; not ported (the sim's ghost homes
-  in on the body centre).
-* Real enemies attacking (`f02_vs_enemy_*`): enemy-side AI / animation fidelity (e.g. the walk -> idle switch when a
-  chase stops) diverges after the first ~10..90 frames; the AI composites now follow the game (a finished Sequence wraps
-  without re-entering its first child, the root is not restarted, StandStill's enter is SetAnim(0)).
-* Player special holds (candy, stone, freeze, mummy wraps, Enzyme latch, vampire, bear hug, grapple), flames' no-hurt
-  hits and the dark sphere's circle test are decoded (work/ls/agentG) but not yet ported or lockstep-recorded.
+* Not reached by the recordings (inferred, unverified): message 0xF on non-walk states (no-op), MummyWrapBurst's
+  spawn origin, HeavyStrike's exact reach, the Buu fragment's height bob and the candy-beam / vampire animation frames
+  (cosmetic).

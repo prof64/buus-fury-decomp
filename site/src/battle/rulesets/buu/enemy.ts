@@ -11,23 +11,28 @@ import { Actor, broadcast, hitsBody, type HitMsg } from './actor'
 import { AiController } from './ai'
 import type { BuuCtx, EnemyLike, PlayerLike } from './context'
 import { ATK, computeDamage, type AttackType } from './damage'
-import type { EnemyType } from './data'
-import { StraightShot, type GrowBeam } from './projectiles'
+import { GFX_OFFSET, type EnemyType } from './data'
+import { MummyWrap, StraightShot, type GrowBeam, type KameBeam } from './projectiles'
 import { audioEvent } from '../../audio/bus'
-import { EnemyAnim, setAnimRule, type EAnimRule } from './eanim'
+import { ENEMY_SETANIM, EnemyAnim, setAnimRule, type EAnimRule } from './eanim'
 
 const GUN_MUZZLE = [[4, 4], [13, -24], [-8, -8], [24, -8]]
 const GUN_BOX: [number, number, number, number][] = [[3, 10, 8, 16], [3, 5, 8, 16], [5, 4, 16, 8], [10, 4, 16, 8]]
+const RIFLE_BOX: [number, number, number, number][] = [[8, 14, 16, 16], [8, 2, 16, 16], [2, 8, 16, 16], [14, 8, 16, 16]]
 const WAVE_MUZZLE = { soldier: [[2, 8], [9, -28], [-16, -11], [24, -11]], turret: [[4, 4], [4, -25], [-13, -14], [22, -13]] }
 /** 0x086FDA20: knockback sign per direction index (hit dir ^ 1) */
 const KB_SIGN = [-8, 8, 8, -8]
+/** the Buu fragment's state object 0x03003158 is one IWRAM singleton: its mode (+0xC) and its step (+4 / +8, 1/256
+ *  px) are shared by every fragment, like in the game */
+const FRAG = { mode: 0, vx: 0, vy: 0 }
 export interface KnockState {
   vx: number
   vy: number
   n: number
   anim: unknown
 }
-const DIAG = [[-316, 316], [316, -316], [-316, -316], [316, 316]]
+/** MummyWrapBurst spawn offsets by facing: straight (x, y), diagonal (x, y) (0x08756AA4) */
+const WRAP_BURST_OFF = [[0, 36, -12, 12], [0, -36, 12, -12], [-36, 0, -12, -12], [36, 0, 12, 12]]
 
 export class Enemy extends Actor implements EnemyLike {
   kind = 'enemy'
@@ -58,7 +63,7 @@ export class Enemy extends Actor implements EnemyLike {
   defeated = false
   ko = 0
   powered = false
-  beam: GrowBeam | null = null
+  beam: GrowBeam | KameBeam | null = null
   drainDone = false
   spawned = 0
   enzTimer = 120
@@ -84,6 +89,12 @@ export class Enemy extends Actor implements EnemyLike {
   })
   /** the last one-shot ran out (its end callback fired) */
   animEnded = false
+  /** the current animation runs under a node's own state object (a forced rule, e.g. the back-off's reversed walk
+   *  0x03002B9C), not the SetAnim table's: vfunc +0x34 (0x0800FAC6, "is SetAnim(id) showing") is false */
+  ownState = false
+  /** a node's own state object (SetState) with per-frame code: the game runs the state's tick (vtable +4) and its
+   *  think (+8) in the actor update before the AI tree; any SetAnim (a new SetState) replaces it */
+  stateHook: { name: string; run: () => void } | null = null
   constructor(ctx: BuuCtx, type: EnemyType, label?: string) {
     super()
     this.ctx = ctx
@@ -106,9 +117,10 @@ export class Enemy extends Actor implements EnemyLike {
   get maxHp() {
     return this.type.hp
   }
+  /** the player object ([0x03001B94]): still there after a KO (the AI's distance tests keep using its position) */
   get player(): PlayerLike | null {
     const p = this.ctx.player
-    return p && !p.dead ? p : null
+    return p ?? null
   }
 
   start(w: World, state = this.type.ai) {
@@ -119,9 +131,21 @@ export class Enemy extends Actor implements EnemyLike {
     this.ai.push(state)
   }
 
+  /** Dabura's spit controller 0x030030C8 (tick 0x0802DE7C): ticks since its SetState, -1 = not the current state.
+   *  It belongs to the animation state, not to the AI node: it spits on its first tick even when the AI has
+   *  changed state in between (lockstep f02_vs_hold_stone: StoneSpit entered by the old tree at 74, spit at 75) */
+  spitCtl = -1
   update(w: World) {
     this.w = w
+    // the player's death script (0x08799D0C) blocks every object update at KO + 199; from KO + 200 an enemy only
+    // runs its state tick (caller 0x0800F5E0: no AI) (lockstep f02_vs_enemy_t0c frames 540+)
+    const koAt = this.ctx.player?.koAt ?? -1
+    if (koAt >= 0 && w.frame - koAt >= 199) {
+      if (w.frame - koAt > 199) this.tickAnim()
+      return
+    }
     this.tickAnim()
+    if (this.spitCtl >= 0 && this.spitCtl++ === 0) this.shot('spit')
     if (this.contactCd > 0) this.contactCd--
     if (this.defeated) {
       this.ko++
@@ -142,10 +166,14 @@ export class Enemy extends Actor implements EnemyLike {
       return
     }
     this.moving = false
+    this.stateHook?.run()
     this.ai.tick()
     if (!this.anim || this.anim.name === 'idle' || this.anim.name === 'walk') {
-      if (this.moving && this.anim?.name !== 'walk') this.setAnim('walk', false, true)
-      else if (!this.moving && this.anim?.name === 'walk') this.setAnim('idle', false, true)
+      // a movement step SetAnim(1)s unless already walking (0x0803B9DA: vfunc +0x34 check); nothing switches back
+      // to idle when the movement stops - the next node's own SetAnim does (lockstep f02_vs_enemy_melee)
+      // (the back-off's reversed walk or a node's own state is another state object: the check fails and SetAnim(1)
+      // re-enters the walk)
+      if (this.moving && !this.walking()) this.setAnim('walk', true, true)
     }
   }
 
@@ -154,15 +182,42 @@ export class Enemy extends Actor implements EnemyLike {
    *  (buu_enemy_anim_sim.json), else the enemy SetAnim table (0x080726B8); `rule` forces one (e.g. the back-off's
    *  reversed walk). Re-entering restarts the state (idle draws a new start tick). */
   setAnim(ref: number | string | (number | string)[], restart = true, loop?: boolean, rule?: EAnimRule) {
+    this.spitCtl = -1
+    this.stateHook = null
     const prev = this.anim
+    const refs = (Array.isArray(ref) ? ref : [ref]).map((r) => (typeof r === 'number' ? r + 1 : r))
+    // the sprite lacks the requested animation: the game's state object still runs (no idle state, no rand(255));
+    // the idle animation is only shown (lockstep f02_vs_enemy_gun: GunShot on a sprite without raw 18)
+    const missing = !!this.sprite && !refs.includes('idle') && !refs.includes(1) && !this.sprite.pick(...refs)
     super.setAnim(ref, restart, loop)
     if (!this.anim || !this.ea) return
     if (this.anim === prev && !restart && !rule) return
     const raw = this.anim.raw
-    const r = rule ?? this.type.anim?.[String(raw)] ?? setAnimRule(raw) ?? { rule: loop === false ? 'once_stop' : 'loop', shift: 3, end: 'none' }
+    // SetAnim(id) 0x0800ECF0: the state object comes from the enemy table 0x080726B8 by id; only the raw depends on
+    // the sprite def. The recorded rules are keyed by raw, so a raw shown by two states keeps the first one recorded:
+    // SetAnim(0) is always the idle state 0x03001B0C (enter = rand(255); Worm Body: SetAnim(1) shows raw 1 too,
+    // lockstep f02_vs_enemy_t8e) and SetAnim(1) the walk loop 0x03001B58 (Gunman: raw 2 is also the back-off's
+    // reversed walk 0x03002B9C; vfunc +0x34(1) tests the state, lockstep f02_vs_enemy_gun / t73)
+    const plain = !rule && !missing
+    const byId = plain && (ref === 'idle' || ref === 0) ? ENEMY_SETANIM[0].r : plain && (ref === 'walk' || ref === 1) ? (this.type.anim?.['0x0804A1D0@0x03001B58'] ?? ENEMY_SETANIM[1].r) : null
+    const r = (missing ? ({ rule: 'hold' } as EAnimRule) : null) ?? rule ?? byId ?? this.type.anim?.[String(raw)] ?? setAnimRule(raw) ?? { rule: loop === false ? 'once_stop' : 'loop', shift: 3, end: 'none' }
     this.animEnded = false
+    this.ownState = !!rule
+    this.animSeq++
     this.ea.enter(raw, r)
     this.frameIdx = this.ea.pos.frame
+  }
+  /** +1 per state entered through setAnim (a node can tell its controller was replaced) */
+  animSeq = 0
+  /** vfunc +0x34 IsAnim(id) (0x0800FAC6): the state object (obj+0x14) is the SetAnim table's state for id
+   *  (0x080726B8) AND the raw is id's (0x0800EEB0); a forced state (`ownState`, e.g. the back-off's reversed walk) is not */
+  isAnim(id: number): boolean {
+    return !this.ownState && !this.stateHook && this.ea.pos.raw === id + 1
+  }
+  /** vfunc +0x34(1): the walk loop state 0x03001B58 is running (not the back-off's reversed walk 0x03002B9C showing
+   *  the same raw, nor a node's own state) */
+  walking(): boolean {
+    return this.isAnim(1)
   }
   tickAnim() {
     super.tickAnim()
@@ -183,6 +238,147 @@ export class Enemy extends Actor implements EnemyLike {
     if (k === 'once' || k === 'once_stop' || k === 'seq') return this.ea.done || this.animEnded
     // looping states never end by themselves: keep the time-based answer the AI nodes expect
     return this.animEnded || super.animDone()
+  }
+  /** SetAnimRaw 0x0800ECDA: obj+0x50 only (the state object and its frame / tick stay) */
+  setRaw(raw: number) {
+    this.ea.pos.raw = raw
+    const a = this.sprite?.anim(raw)
+    if (a) this.anim = a
+  }
+  /** SetState(a node's own state object): no tick of its own here (the hook runs it); frame / tick kept */
+  private useState(name: string, run: () => void) {
+    this.ea.enter(this.ea.pos.raw, { rule: 'keep' })
+    this.stateHook = { name, run }
+  }
+
+  /** LatchDrain's enter (0x080298D8): SetAnimRaw(1), SetState(controller 0x0804C314: loop, shift 3) whose think
+   *  (0x080298A2) glues the enzyme to the player at the offset kept by its enter (0x08029860) */
+  latchEnter() {
+    const p = this.player
+    this.setRaw(1)
+    this.ea.enter(1, { rule: 'loop', shift: 3 })
+    this.frameIdx = this.ea.pos.frame
+    if (!p) return
+    const ox = this.x - p.x
+    const oy = this.y - p.y
+    this.stateHook = {
+      name: 'latch',
+      run: () => {
+        const q = this.player
+        if (!q) return
+        this.unmarkSelf()
+        this.x = q.x + ox
+        this.y = q.y + oy
+        this.markSelf()
+      },
+    }
+  }
+
+  // ---- Buu fragment (type 0x0E): PlayAnim0 / FreezePlayer ------------------------------------------------------------
+  /** PlayAnim0 enter 0x0804E5E8: frame = tick = 0, SetAnimRaw(0), SetState(0x03003158) (vtable 0x0804B788), whose
+   *  enter 0x08030618 (tick = frame = 0) runs the think once */
+  fragEnter() {
+    this.ea.pos.frame = 0
+    this.ea.pos.tick = 0
+    this.setRaw(1)
+    this.useState('fragment', () => {
+      this.fragTick()
+      this.fragThink()
+    })
+    this.fragThink()
+  }
+  /** state tick 0x080307FA: mode 0 frame 0; mode 1 frame 1 at tick 0x30, 2 at 0x50; tick = (tick + 8) & 0x7F (a
+   *  16-frame cycle). (Not modelled: the height obj+0x176 = -sin(tick) >> 13 / >> 11 bob - cosmetic, and the game's
+   *  body box 0x0800FE78 ignores it.) */
+  private fragTick() {
+    const pos = this.ea.pos
+    const t = pos.tick
+    if (FRAG.mode === 0) pos.frame = 0
+    else if (FRAG.mode === 1) {
+      if (t === 0x30) pos.frame = 1
+      else if (t === 0x50) pos.frame = 2
+    }
+    pos.tick = (t + 8) & 0x7f
+    this.frameIdx = pos.frame
+  }
+  /** state think 0x08030630: at tick 0 pick the step: d = player footprint centre - own centre, step = sign(d) px per
+   *  axis (0 counts as negative); mode 1 (SetAnimRaw(0xE)) when the player is within 32 px on both axes in the step
+   *  direction, else mode 0 (tick = 0, SetAnimRaw(0)); frame = 0. Every frame: pos + step (x2 in mode 1) tried
+   *  through vfunc +0x54; body boxes (0x0800FE78) overlapping the player's -> state 0x03001BA4 (0x0800EE78: none,
+   *  the frame is kept) - PlayAnim0 finishes */
+  private fragThink() {
+    const p = this.player
+    if (!p) return
+    const pos = this.ea.pos
+    if (pos.tick === 0) {
+      const [pcx, pcy] = Enemy.fc(p as unknown as Actor)
+      const [ecx, ecy] = Enemy.fc(this)
+      const dx = pcx - ecx
+      const dy = pcy - ecy
+      FRAG.vx = dx > 0 ? 256 : -256
+      FRAG.vy = dy > 0 ? 256 : -256
+      const rx = pcx - (ecx + (dx > 0 ? 32 : -32))
+      const ry = pcy - (ecy + (dy > 0 ? 32 : -32))
+      const sx = rx > 0 ? 256 : -256
+      const sy = ry > 0 ? 256 : -256
+      FRAG.mode = (FRAG.vx * sx) >> 8 < 0 && (FRAG.vy * sy) >> 8 < 0 ? 1 : 0
+      pos.frame = 0
+      if (FRAG.mode === 1) this.setRaw(15)
+      else {
+        pos.tick = 0
+        this.setRaw(1)
+      }
+    }
+    const k = FRAG.mode ? 2 : 1
+    const nx = this.x + FRAG.vx * k
+    const ny = this.y + FRAG.vy * k
+    this.unmarkSelf()
+    if (this.fits(this.w, nx >> 8, ny >> 8)) {
+      this.x = nx
+      this.y = ny
+    }
+    this.markSelf()
+    const noZ = (a: Actor): Rect => {
+      const b = a.bodyBox()
+      return { x0: b.x0, y0: b.y0 - a.z, x1: b.x1, y1: b.y1 - a.z }
+    }
+    if (overlaps(noZ(this), noZ(p as unknown as Actor))) {
+      this.stateHook = null
+      this.ea.enter(this.ea.pos.raw, { rule: 'keep' })
+    }
+  }
+  /** FreezePlayer enter 0x080305AA (node vtable 0x0804AA3C), fragment side: SetAnimRaw(0x12) + SetState(0x0300314C)
+   *  (vtable 0x0804C284): enter 0x080304E4 tick = frame = 0, height 0, pos = the player's pos + (0, 1 px) */
+  freezeEnter() {
+    const p = this.player
+    this.setRaw(19)
+    this.ea.pos.frame = 0
+    this.ea.pos.tick = 0
+    if (p) {
+      this.unmarkSelf()
+      this.x = p.x
+      this.y = p.y + 256
+      this.markSelf()
+    }
+    this.useState('freeze', () => {
+      // tick 0x08030584: tick + 1; past 7 -> tick 0, frame + 1, past 5 -> 4 (frames 4 / 5 loop)
+      const pos = this.ea.pos
+      if (++pos.tick > 7) {
+        pos.tick = 0
+        if (++pos.frame > 5) pos.frame = 4
+      }
+      this.frameIdx = pos.frame
+      // think 0x08030538: a d-pad press this frame -> tick + 2; 0x08040284(input, 0xF3, 16, 90) (the last 16
+      // A/B/d-pad presses all within 90 frames, one of them now) -> player SetAnim(0), frame = tick = 0, SetAnim(0)
+      if (this.ctx.pressed & 0xf0) pos.tick += 2
+      if (this.ctx.pressRun(0xf3, 16, 90, this.w)) {
+        const pl = this.player
+        if (pl) (pl as unknown as { release(w: World): void }).release(this.w)
+        pos.frame = 0
+        pos.tick = 0
+        this.setAnim('idle', true, true)
+      }
+    })
   }
   /** MeleeAttack 0x0802A0C4: the number of punch animations (raw 5 / 6 / 7 present, create fn 0x0802A288) */
   punchAnims(): number {
@@ -222,6 +418,14 @@ export class Enemy extends Actor implements EnemyLike {
     const [dx, dy] = this.toPlayer()
     this.facing = facingToward(dx, dy)
   }
+  /** 0x0800FF44: the shot origin on the body box (0x0800FE78), centre c: down (cx, position y), up (cx, cy), left
+   *  (x0, cy), right (x1, cy) */
+  handPoint(): [number, number] {
+    const b = this.bodyBox()
+    const cx = (b.x0 + b.x1) >> 1
+    const cy = (b.y0 + b.y1) >> 1
+    return this.facing === 0 ? [cx, this.py] : this.facing === 1 ? [cx, cy] : this.facing === 2 ? [b.x0, cy] : [b.x1, cy]
+  }
   muzzle(d: number): [number, number] {
     const [cx, cy] = this.center()
     const [dx, dy] = DIR_VEC[this.facing]
@@ -234,9 +438,13 @@ export class Enemy extends Actor implements EnemyLike {
   inMeleeRange() {
     const p = this.player
     if (!p || !p.hittable) return false
-    if (!overlaps(p.bodyBox(), inflate(this.bodyBox(), 4))) return false
-    this.facePlayer()
-    return true
+    // 0x08029ED8: the body boxes (0x0800FE78) must overlap the enemy's box grown to x0 - 4 .. x1 + 3, y0 .. y1 - 6;
+    // then the enemy turns toward the player exactly like MeleeAttack (strikeRect) and the result is whether the
+    // player's body box overlaps that strike rect (the turn stays when it does not; lockstep f02_vs_enemy_t46)
+    const b = this.bodyBox()
+    if (!overlaps(p.bodyBox(), { x0: b.x0 - 4, y0: b.y0, x1: b.x1 + 3, y1: b.y1 - 6 })) return false
+    const r = this.strikeRect(true)
+    return !!r && overlaps(p.bodyBox(), r)
   }
   playerAttackingMe() {
     const p = this.player
@@ -428,6 +636,36 @@ export class Enemy extends Actor implements EnemyLike {
       this.facing = faceToward ? (dy < 0 ? 1 : 0) : dy > 0 ? 1 : 0
     }
     if (!m) return false
+    // the back-off runs under its own reversed-walk state (set by its enter): its step makes no SetAnim(1)
+    if (!faceToward) this.moving = true
+    this.tryMove(-Math.trunc((dx * speed) / m), -Math.trunc((dy * speed) / m), dx >= 0 ? -speed : speed, dy >= 0 ? -speed : speed)
+    return !this.stepped
+  }
+  /** CirclePlayer update 0x0802F23A (Cyborgs; vtable 0x0804B1A0): d = player footprint centre - own centre, m =
+   *  max(|dx|, |dy|); face the player on the major axis; the minor component of d is negated, then pos -= trunc(d' *
+   *  speed / m) like stepFromPlayer: away from the player on the major axis, toward it on the minor one (not an
+   *  orbit). Blocked -> one axis at full speed, then the other; nothing moved -> finished (1). m = 0 -> 0. Walk anim
+   *  (SetAnimRaw 1 + state 0x03003100) unless already walking. Lockstep f02_vs_enemy_t11. */
+  circlePlayer(speed: number): boolean {
+    const p = this.player
+    if (!p) return true
+    const [px, py] = Enemy.fc(p)
+    const [x, y] = Enemy.fc(this)
+    let dx = px - x
+    let dy = py - y
+    const adx = Math.abs(dx)
+    const ady = Math.abs(dy)
+    let m: number
+    if (adx > ady) {
+      m = adx
+      this.facing = dx < 0 ? 2 : 3
+      dy = -dy
+    } else {
+      m = ady
+      this.facing = dy < 0 ? 1 : 0
+      dx = -dx
+    }
+    if (!m) return false
     this.moving = true
     this.tryMove(-Math.trunc((dx * speed) / m), -Math.trunc((dy * speed) / m), dx >= 0 ? -speed : speed, dy >= 0 ? -speed : speed)
     return !this.stepped
@@ -512,6 +750,39 @@ export class Enemy extends Actor implements EnemyLike {
     } else this.facing = w.rng.rand(4, 'wander dir') as Dir
     this.markSelf()
   }
+  /** FlyToPlayer update 0x08034ED8 (vampires): d = player footprint centre - own centre, m = max(|dx|, |dy|); faces
+   *  the major axis (ties vertical) every update; m < 8 -> 0 (never finishes there); else SetAnim(1) unless walking,
+   *  pos + trunc(d * speed / m) tried through vfunc +0x54: placed -> 0, blocked -> 1 (finished) */
+  flyToPlayer(speed: number): boolean {
+    const p = this.player
+    if (!p) return false
+    const [px, py] = Enemy.fc(p)
+    const [x, y] = Enemy.fc(this)
+    const dx = px - x
+    const dy = py - y
+    const adx = Math.abs(dx)
+    const ady = Math.abs(dy)
+    let m: number
+    if (adx > ady) {
+      m = adx
+      this.facing = dx > 0 ? 3 : 2
+    } else {
+      m = ady
+      this.facing = dy > 0 ? 0 : 1
+    }
+    if (m < 8) return false
+    if (!this.walking()) this.setAnim(1, true, true)
+    const nx = this.x + Math.trunc((dx * speed) / m)
+    const ny = this.y + Math.trunc((dy * speed) / m)
+    this.unmarkSelf()
+    const ok = this.fits(this.w, nx >> 8, ny >> 8)
+    if (ok) {
+      this.x = nx
+      this.y = ny
+    }
+    this.markSelf()
+    return !ok
+  }
   /** normalised move toward the player; true when within `stop` px (centre distance) */
   moveToward(speed: number, stop: number, face: boolean, ignoreWalls = false): boolean {
     const p = this.player
@@ -546,29 +817,83 @@ export class Enemy extends Actor implements EnemyLike {
     return false
   }
   /** AlignWithPlayer: strafe on the minor axis by speed/256 px per frame; done when the minor offset < 3 px */
+  /** footstep sound 52 by sprite (def = gfx): gfx 0x4E / 0x11 / 0x4C on walk ticks 0 / 16 (the path follower 0x0803BB48
+   *  after its step, AlignWithPlayer 0x0801CEEC before its move); gfx 0xA4 / 0x44 / 0xBF on ticks 8 / 24 (path
+   *  follower only) */
+  footstep(path: boolean) {
+    const g = this.type.gfx
+    // the game's step SetAnim(1)s (0x0803B9DA) before this test: a first walking step counts as walk tick 0 (the
+    // simulator switches to the walk animation after the AI; lockstep f02_vs_enemy_t14)
+    const t = this.moving && this.anim?.name !== 'walk' ? 0 : this.ea.pos.tick
+    if ((g === 0x4e || g === 0x11 || g === 0x4c) && (t === 0 || t === 16)) audioEvent('sfx', { id: 52, vol: 64 })
+    else if (path && (g === 0xa4 || g === 0x44 || g === 0xbf) && (t === 8 || t === 24)) audioEvent('sfx', { id: 52, vol: 64 })
+  }
+  /** the shown graphics set (gfx id; MechTransform swaps it) */
+  gfxNow: number | null = null
+  /** MechTransform 0x080314DC: swap to the paired graphics set via 0x0800EDF8 (the def at obj+0x58: 0xBB / 0xBC,
+   *  0xE6 / 0xE7, 0x85 / 0x86). The ball sets have smaller body boxes (-5..20 x -18..7) - IfPlayerInMeleeRange and
+   *  the hurt box follow (lockstep f02_vs_enemy_t48); same footprint (shadow 16 x 8). */
+  swapGfx() {
+    const g = this.gfxNow ?? this.type.gfx
+    const PAIRS: Record<number, number> = { 0xbb: 0xbc, 0xbc: 0xbb, 0xe6: 0xe7, 0xe7: 0xe6, 0x85: 0x86, 0x86: 0x85 }
+    const to = g != null ? PAIRS[g] : undefined
+    if (to == null) return
+    const s = this.ctx.data.sprites.index(to - GFX_OFFSET)
+    if (!s) return
+    this.gfxNow = to
+    this.setSprite(s)
+  }
+  /** message 0xF (0x0800F44A, the death script's freeze): the current animation state's vfunc +0x10 - the walk state
+   *  (0x03003100) SetAnim(0)s (0x0800E050); other states: INFERRED nothing */
+  stopMsg() {
+    if (this.anim?.name === 'walk') this.setAnim(0, true, true)
+  }
+  /** a node that ends a movement: SetAnim(0) if the walk animation is showing (vfunc +0x34(1), 0x0801CE58) */
+  stopWalk() {
+    // vfunc +0x34(1) = 0x0800FAC6: the state object is SetAnim(1)'s (0x080726B8[1]) and the raw too (0x0800EEB0) -
+    // the back-off's reversed walk (state 0x03002B9C, same raw) is not "walking": no SetAnim(0) (lockstep
+    // f02_vs_enemy_t6c: AlignWithPlayer done at once after a back-off, no idle draw)
+    if (this.walking()) this.setAnim('idle', true, true)
+  }
+  /** AlignWithPlayer 0x0801CF6E: a step that fits SetAnims(1) unless IsAnim(1) (e.g. after a back-off's reversed walk:
+   *  lockstep f02_vs_enemy_t0a frame 43) */
+  private alignWalk() {
+    if (!this.isAnim(1)) this.setAnim('walk', true, true)
+  }
+  /** 0x0801CFA8: a blocked step ends the node with SetAnim(0) if walking (no walk is restarted after the AI) */
+  private alignBlocked() {
+    this.stopWalk()
+    this.moving = false
+    return true
+  }
   align(speed: number): boolean {
     if (!this.player) return false
     const [dx, dy] = this.toPlayer()
+    if (Math.abs(dx) > Math.abs(dy) ? Math.abs(dy) >= 3 : Math.abs(dx) >= 3) this.footstep(false)
     if (Math.abs(dx) > Math.abs(dy)) {
       if (Math.abs(dy) < 3) {
+        this.stopWalk()
         this.facing = dx > 0 ? 3 : 2
         return true
       }
       this.facing = dy > 0 ? 0 : 1
       if (!this.walkBy(0, Math.sign(dy) * speed)) {
         this.facing = dx > 0 ? 3 : 2
-        return true
+        return this.alignBlocked()
       }
+      this.alignWalk()
     } else {
       if (Math.abs(dx) < 3) {
+        this.stopWalk()
         this.facing = dy > 0 ? 0 : 1
         return true
       }
       this.facing = dx > 0 ? 3 : 2
       if (!this.walkBy(Math.sign(dx) * speed, 0)) {
         this.facing = dy > 0 ? 0 : 1
-        return true
+        return this.alignBlocked()
       }
+      this.alignWalk()
     }
     return false
   }
@@ -583,8 +908,13 @@ export class Enemy extends Actor implements EnemyLike {
     const [cx, cy] = this.center()
     let f = this.facing
     if (face) {
-      const [dx, dy] = this.toPlayer()
-      f = facingToward(dx, dy)
+      // 0x0802A0EE..0x0802A19A: the BODY box centres (0x0800FE78 of the player and of the enemy, the box of the
+      // facing before the turn), not the footprints: |dx| > |dy| -> dx > 0 ? right : left, else dy > 0 ? down : up
+      // (lockstep f02_vs_enemy_t46: Majin Vegeta 1.4 px right of the player on the same row turns down)
+      const [px, py] = p.center()
+      const dx = px - cx
+      const dy = py - cy
+      f = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 3 : 2) : dy > 0 ? 0 : 1
       this.facing = f
     }
     switch (f) {
@@ -592,10 +922,12 @@ export class Enemy extends Actor implements EnemyLike {
         return { x0: cx, y0: cy, x1: B.x1 + 3, y1: B.y1 + 3 }
       case 2:
         return { x0: B.x0 - 4, y0: cy, x1: cx, y1: B.y1 + 3 }
+      // vertical (0x0802A176): x from the footprint (0x0800FDFA), y from the body box: down = body y0 .. body y1 - 6,
+      // up = body y0 .. footprint y0
       case 0:
-        return { x0: F.x0, y0: F.y0, x1: F.x1, y1: F.y1 - 6 }
+        return { x0: F.x0, y0: B.y0, x1: F.x1, y1: B.y1 - 6 }
       default:
-        return { x0: B.x0, y0: B.y0, x1: B.x1, y1: cy }
+        return { x0: F.x0, y0: B.y0, x1: F.x1, y1: F.y0 }
     }
   }
   meleeStrike(mult: number, face: boolean, adjacent = false, atk: AttackType = ATK[2]): boolean {
@@ -612,16 +944,21 @@ export class Enemy extends Actor implements EnemyLike {
     return p.onMessage(this.w, { team: 0, rect, dir: this.facing, mult, atk, attacker: this, source: this })
   }
   /** HeavyStrike 0x0802F77C: rect from the body edge toward the player, reaching ~60 px (centre to centre) */
-  heavyStrike() {
+  heavyStrike(): boolean {
     const p = this.player
-    if (!p || !p.hittable) return
+    if (!p || !p.hittable) return false
+    // sound 62 first (0x0802F7B2), whether the hit lands or not
+    audioEvent('sfx', { id: 62, vol: 64 })
     this.facePlayer()
     const b = this.bodyBox()
     const [cx, cy] = this.center()
     // measured: hits at dx <= 60 px centre to centre, misses at 65 (Goku side-on body half-width 4)
     const R = 57
     const rect: Rect = this.facing === 3 ? { x0: cx, y0: b.y0, x1: cx + R, y1: b.y1 } : this.facing === 2 ? { x0: cx - R, y0: b.y0, x1: cx, y1: b.y1 } : this.facing === 0 ? { x0: b.x0, y0: cy, x1: b.x1, y1: cy + R } : { x0: b.x0, y0: cy - R, x1: b.x1, y1: cy }
-    p.onMessage(this.w, { team: 0, rect, dir: this.facing, mult: 0x400, atk: ATK[2], attacker: this, source: this })
+    // accepted -> the hit sound 48 + rand(2) (0x0802F8AC)
+    const ok = p.onMessage(this.w, { team: 0, rect, dir: this.facing, mult: 0x400, atk: ATK[2], attacker: this, source: this })
+    if (ok) audioEvent('sfx', { id: 48 + this.w.rng.rand(2, 'enemy melee hit sfx'), vol: 64 })
+    return true
   }
   /** contact damage (worm, blood cell, mini-yakon): standard melee x1.0 with the body box */
   contactHit(): boolean {
@@ -654,53 +991,70 @@ export class Enemy extends Actor implements EnemyLike {
     const at: [number, number] = [(this.px + mx) << 8, (this.py + my) << 8]
     const [cx, cy] = this.center()
     const [dx, dy] = DIR_VEC[f]
-    const mk = (dir: Dir, x: number, y: number, vx: number, vy: number, box: [number, number, number, number], extra: Partial<import('./projectiles').StraightOpts> = {}) =>
-      w.add(new StraightShot(this.ctx, this, dir, 0, x, y, { vx, vy, box, atk: ATK[1], mult: 1024, color: ['#ffffff', '#ff9040'], radius: 3, name: kind, ...extra }))
+    const mk = (dir: Dir, x: number, y: number, vx: number, vy: number, box: [number, number, number, number], extra: Partial<import('./projectiles').StraightOpts> = {}) => {
+      const sh = w.add(new StraightShot(this.ctx, this, dir, 0, x, y, { vx, vy, box, atk: ATK[1], mult: 1024, color: ['#ffffff', '#ff9040'], radius: 3, name: kind, ...extra }))
+      // the firing node's own sound (gun 0x080264EA / rifle 0x0802676A / tank 0x0801C900: sound 28) on the spawn frame
+      sh.spawnRng(w)
+      return sh
+    }
     switch (kind) {
       case 'gun':
         // gun bullet 0x080274B4: record dir + 4f, f = 0,1,2,1 every 4 ticks
-        mk(f, ...at, dx * 672, dy * 672, GUN_BOX[f], { fragile: true, radius: 2, color: ['#fff8c0', '#ffa020'], fx: { id: 'fx_0874e968', frame: (d, t) => d + 4 * [0, 1, 2, 1][(t >> 2) & 3] } })
+        mk(f, ...at, dx * 672, dy * 672, GUN_BOX[f], { sfxSpawn: 28, fragile: true, radius: 2, color: ['#fff8c0', '#ffa020'], fx: { id: 'fx_0874e968', frame: (d, t) => d + 4 * [0, 1, 2, 1][(t >> 2) & 3] } })
         break
       case 'rifle':
-        // rifle bullet 0x080276A8: record dir, smoke trail records 4-6 (rate 0x2AAA) every 4 ticks
-        mk(f, ...at, dx * 448, dy * 448, [8, 8, 16, 16], { fragile: true, color: ['#e0ffe0', '#40c040'], fx: { id: 'fx_0874e614', frame: (d) => d }, trail: { id: 'fx_0874e614', rec: 4, n: 3, rate: 0x2aaa } })
+        // rifle bullet 0x080276A8: record dir, smoke trail records 4-6 (rate 0x2AAA) every 4 ticks; box = the
+        // record's (0x0874E614 + 12 * dir: x - b0, y - b1, b2 x b3); an accepted hit plays 48 + rand(2), the destroy
+        // 0x0802770C sound 46 (lockstep f02_vs_enemy_t2e)
+        mk(f, ...at, dx * 448, dy * 448, RIFLE_BOX[f], { sfxSpawn: 28, rngHit: [2], sfxHit: 48, sfxEnd: 46, fragile: true, color: ['#e0ffe0', '#40c040'], fx: { id: 'fx_0874e614', frame: (d) => d }, trail: { id: 'fx_0874e614', rec: 4, n: 3, rate: 0x2aaa } })
         break
       case 'shell':
         // tank shell 0x0801C900: record dir, smoke trail records 4-6 (rate 0x2AAA) every 4 ticks
-        mk(f, (cx + dx * 12) << 8, (cy + dy * 12) << 8, dx * 448, dy * 448, [8, 8, 16, 16], { fragile: true, radius: 4, color: ['#ffd0d0', '#d03020'], fx: { id: 'fx_0871e630', frame: (d) => d }, trail: { id: 'fx_0871e630', rec: 4, n: 3, rate: 0x2aaa } })
+        mk(f, (cx + dx * 12) << 8, (cy + dy * 12) << 8, dx * 448, dy * 448, [8, 8, 16, 16], { sfxSpawn: 28, fragile: true, radius: 4, color: ['#ffd0d0', '#d03020'], fx: { id: 'fx_0871e630', frame: (d) => d }, trail: { id: 'fx_0871e630', rec: 4, n: 3, rate: 0x2aaa } })
         break
       case 'star':
-        mk(f, (cx + dx * 8) << 8, (cy + dy * 8) << 8, dx * 448, dy * 448, [4, 4, 8, 8], { fragile: true, explode: false, color: ['#ffffff', '#a0a0b0'], radius: 3, fx: { id: 'fx_08754a1c', frame: (_d, t) => (t >> 3) & 1 } })
+        // throw controller 0x0802C08A (tick 8 of 32): the star 0x0802C790 (vtable 0x0804BAA0) at the position (obj+0x1A0)
+        // + the muzzle table 0x087548F0 (= GUN_MUZZLE), velocity 0x0875497C; then PlaySfx(61, vol 0x40) (0x0802C128)
+        mk(f, ...at, dx * 448, dy * 448, [4, 4, 8, 8], { sfxSpawn: 61, fragile: true, explode: false, color: ['#ffffff', '#a0a0b0'], radius: 3, fx: { id: 'fx_08754a1c', frame: (_d, t) => (t >> 3) & 1 } })
         break
       case 'wrap':
       case 'burst': {
-        const wrapHit = () => {
-          const p = this.player
-          if (p && p.wraps < 8) p.wraps++
+        // MummyWrapShot controller 0x030030A8 (tick 0x0802D0DC): one straight bandage at the position + 0x08756A74
+        // [facing] (= GUN_MUZZLE; lockstep f02_vs_enemy_t59 / t4d / t81). MummyWrapBurst 0x030030B0 (0x0802D214): per
+        // facing one straight and one diagonal at the position + 0x08756AA4 [facing] (INFERRED: same origin convention
+        // as the single shot)
+        if (kind === 'wrap') {
+          w.add(new MummyWrap(this.ctx, this, f, ...(at as [number, number]), false))
+          break
         }
-        const dirs: Dir[] = kind === 'wrap' ? [f] : [0, 1, 2, 3]
-        for (const d of dirs) {
-          const [ddx, ddy] = DIR_VEC[d]
-          // bandage 0x0802D79C (fx_087571f4): straight records 3 * (dir >> 1) + (t mod 24) >> 3, diagonal + 6
-          mk(d, (cx + ddx * 8) << 8, (cy + ddy * 8) << 8, ddx * 448, ddy * 448, d >= 2 ? [8, 4, 16, 8] : [4, 8, 8, 16], { onHitPlayer: wrapHit, explode: false, color: ['#f0e8c8', '#b0a070'], fx: { id: 'fx_087571f4', frame: (dd, t) => 3 * (dd >> 1) + ((t % 24) >> 3) } })
-          if (kind === 'burst') mk(d, cx << 8, cy << 8, DIAG[d][0], DIAG[d][1], [8, 8, 16, 16], { onHitPlayer: wrapHit, explode: false, color: ['#f0e8c8', '#b0a070'], fx: { id: 'fx_087571f4', frame: (dd, t) => 6 + 3 * (dd >> 1) + ((t % 24) >> 3) } })
+        for (const d of [0, 1, 2, 3] as Dir[]) {
+          const o = WRAP_BURST_OFF[d]
+          w.add(new MummyWrap(this.ctx, this, d, (this.px + o[0]) << 8, (this.py + o[1]) << 8, false))
+          w.add(new MummyWrap(this.ctx, this, d, (this.px + o[2]) << 8, (this.py + o[3]) << 8, true))
         }
         break
       }
       case 'spit': {
+        // Dabura's spit: controller tick 0x0802DE7C -> ctor 0x0802E444 (vtable 0x0804AC5C). Origin = the enemy position
+        // + 0x087572C8[pose] (every pose: (0, -32)); target = the player's footprint centre (0x0800FDFA); velocity
+        // d * 512 / max(|dx|, |dy|) (pixel deltas, truncating division 0x08046E58); box = record 0x087579B8+ (8, 8, 16,
+        // 16); dir = the enemy's facing. Update 0x0802E568: move, removed off the area, else a message (ATK[1] x1.0,
+        // team 0); accepted -> the player's stone state (player.ts petrify) and the spit is removed (no explosion)
         const p = this.player
         if (!p) return
-        const [tx, ty] = p.center()
-        const ddx = tx - cx
-        const ddy = ty - cy
-        const m = Math.max(1, Math.abs(ddx), Math.abs(ddy))
-        // Dabura's spit 0x0802E444: one of 5 aim sectors (2 records each, toggling every 4 ticks) from the aim vector
+        const ox = this.px
+        const oy = this.py - 32
+        const [tx, ty] = p.footCenter()
+        const ddx = tx - ox
+        const ddy = ty - oy
+        const m = Math.max(Math.abs(ddx), Math.abs(ddy)) || 1
+        // one of 5 aim sectors (2 records each, toggling every 4 ticks) from the aim vector
         const sector = 2 * ddx < -5 * ddy ? 0 : 12 * ddx < -5 * ddy ? 2 : 2 * ddx > 5 * ddy ? 8 : 12 * ddx > 5 * ddy ? 6 : 4
-        mk(f, cx << 8, (cy - 4) << 8, Math.round((ddx * 512) / m), Math.round((ddy * 512) / m), [4, 4, 8, 8], {
+        mk(f, ox << 8, oy << 8, Math.trunc((ddx * 512) / m), Math.trunc((ddy * 512) / m), [8, 8, 16, 16], {
           color: ['#e0e0e0', '#707070'],
           explode: false,
           fx: { id: 'fx_087579b8', frame: (_d, t) => sector + ((t >> 2) & 1) },
-          onHitPlayer: (ww) => this.player?.hold(ww, this, 'stone', 297),
+          onHitPlayer: (ww) => this.player?.petrify?.(ww),
         })
         break
       }
@@ -741,14 +1095,27 @@ export class Enemy extends Actor implements EnemyLike {
     for (let i = 0; i < 16; i++) {
       const dx = w.rng.rand(192, 'split dx') - 96
       const dy = w.rng.rand(192, 'split dy') - 96
-      if (!this.fits(w, this.px + dx, this.py + dy) || !this.fits(w, this.px - dx, this.py - dy)) continue
-      this.ctx.puff(w, ...this.center())
-      const x0 = this.px
-      const y0 = this.py
-      this.x = (x0 + dx) << 8
-      this.y = (y0 + dy) << 8
+      // 0x08032BB8: d is in 1/256 px (the 24.8 position +- d; lockstep f02_vs_enemy_beam: 137.13 -> 137.22)
+      // 0x08009904: both footprints on walkable map tiles (the enemy marks are not tested)
+      const col = this.ctx.col
+      const ok = (x: number, y: number) => !col || col.test('walk', x, y, x + this.footW, y + this.footH)
+      if (!ok((this.x + dx) >> 8, (this.y + dy) >> 8) || !ok((this.x - dx) >> 8, (this.y - dy) >> 8)) continue
+      // the puff 0x086FD9D0, rate 0x1000 + rand(0x1000), at the sprite box centre
+      this.ctx.puffRng(w, ...this.center())
+      const x0 = this.x
+      const y0 = this.y
+      this.unmarkSelf()
+      this.x = x0 + dx
+      this.y = y0 + dy
+      this.markSelf()
       this.hp1024 = (this.hp1024 + 1024) >> 1
-      const copy = this.ctx.spawnEnemy(w, 0x3d, x0 - dx, y0 - dy, null, 0x12a) as Enemy | null
+      const copy = this.ctx.spawnEnemy(w, 0x3d, (x0 - dx) >> 8, (y0 - dy) >> 8, null, 0x12a) as Enemy | null
+      if (copy) {
+        copy.unmarkSelf()
+        copy.x = x0 - dx
+        copy.y = y0 - dy
+        copy.markSelf()
+      }
       if (copy) copy.hp1024 = this.hp1024
       w.logEvent('info', `Kid Buu splits: ${this.hp} + ${this.hp} HP`)
       return
@@ -787,6 +1154,8 @@ export class Enemy extends Actor implements EnemyLike {
     const p = this.player
     if (!p) return
     const t = this.ctx.data.enemies[0x36]
+    // an enemy object: its constructor's SetAnim(0) draws the idle start tick
+    this.w.rng.rand(255, 'hand idle tick')
     const h = new HandRise(this.ctx, t, p.px + (a ? 4 : -20), p.py, a ? 2 : 3)
     this.w.add(h)
   }
@@ -831,7 +1200,8 @@ export class Enemy extends Actor implements EnemyLike {
     const w = this.w
     if (w.rng.rand(200, 'worm turn') === 0) {
       let d = this.wormDir ^ 2
-      if (w.rng.rand(2, 'worm turn2')) d ^= 1
+      // 0x0802D546: the extra quarter turn when rand(2) == 0 (bne skips the eor)
+      if (w.rng.rand(2, 'worm turn2') === 0) d ^= 1
       this.wormDir = d as Dir
     }
     for (let k = 0; k < 4; k++) {
@@ -1028,8 +1398,14 @@ export class HandRise extends Actor {
     this.tickAnim()
     this.t++
     const p = this.ctx.player
-    if (!this.hit && p && !p.dead && this.t >= 16 && this.t <= 55) {
-      if (p.onMessage(w, { team: 0, rect: this.bodyBox(), dir: this.facing, mult: 0x400, atk: ATK[2], attacker: this, source: this })) this.hit = true
+    // the rising controller (0x0804C338) ends on tick 40 with SetAnim(0) (rand(255)); hits from tick 16
+    if (this.t === 40) w.rng.rand(255, 'hand idle tick')
+    if (!this.hit && p && !p.dead && this.t >= 16 && this.t < 40) {
+      if (p.onMessage(w, { team: 0, rect: this.bodyBox(), dir: this.facing, mult: 0x400, atk: ATK[2], attacker: this, source: this })) {
+        this.hit = true
+        // 0x0803A0F2: the hit sound 48 + rand(2)
+        audioEvent('sfx', { id: 48 + w.rng.rand(2, 'hand hit sfx'), vol: 64 })
+      }
     }
     this.alpha = this.t < 12 ? this.t / 12 : this.t > 50 ? Math.max(0, (57 - this.t) / 7) : 1
     if (this.t >= 57) this.removed = true

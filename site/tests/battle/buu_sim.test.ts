@@ -131,7 +131,7 @@ describe('enemy AI vs emulator', () => {
     for (const h of hits) expect(h).toBeGreaterThanOrEqual(17)
     for (const h of hits) expect(h).toBeLessThanOrEqual(29) // crit x1.5
   })
-  it("Pilaf's Guardian HeavyStrike reaches 60 px (centre to centre) but not 65; the strike lands 58 frames into its state", () => {
+  it("Pilaf's Guardian HeavyStrike reaches 60 px (centre to centre) but not 65; the strike lands 60 ticks into its state", () => {
     for (const [d, expectHit] of [
       [60, true],
       [65, false],
@@ -143,7 +143,8 @@ describe('enemy AI vs emulator', () => {
       const hit = s.w.log.some((l) => /Guardian -> player: [1-9]/.test(l.text))
       expect(hit, `at ${d} px`).toBe(expectHit)
     }
-    // full timing: let it walk in, the hit comes 58 frames after it enters the strike state 0x138
+    // full timing: let it walk in, the hit comes 60 ticks after it enters the strike state 0x138 (the node's timer 60;
+    // lockstep f02_vs_enemy_t3e / t4c, same HeavyStrike node: GotoState(0x138) 228, strike 288, no lag frame between)
     const s = sim('t63')
     god(s)
     place(s, 40)
@@ -154,7 +155,7 @@ describe('enemy AI vs emulator', () => {
       if (entered < 0 && s.enemies[0].ai.top().state === 0x138) entered = s.w.frame
       if (entered >= 0 && s.w.log.some((l) => /Guardian -> player/.test(l.text))) hitAt = s.w.frame
     }
-    expect(hitAt - entered).toBe(58)
+    expect(hitAt - entered).toBe(60)
   })
   it('Vampire grab: -POW HP every 16 frames, the vampire heals the same', () => {
     const s = sim('t133')
@@ -234,14 +235,15 @@ describe('bosses vs emulator', () => {
     for (const v of big.filter((x) => x < 200)) expect(v).toBeGreaterThanOrEqual(151)
   })
   it('Kid Buu splits: HP halved into a type 0x3D copy', () => {
+    // left of the player (100 px to the right is off the walkable ground: the split needs walkable tiles, 0x08009904)
     const s = sim('t60', 'wasteland')
     god(s)
-    place(s, 100)
+    place(s, -100)
     const e = s.enemies[0]
     let split = false
     for (let f = 0; f < 3000 && !split; f++) {
       s.run(1, () => 0)
-      place(s, 100)
+      place(s, -100)
       split = s.enemies.some((x) => x.type.type === 0x3d)
     }
     expect(split).toBe(true)
@@ -257,11 +259,13 @@ describe('bosses vs emulator', () => {
     const spo = s.enemies.find((e) => e.type.type === 0x6f)!
     place(s, 12, 0, spo)
     let hugged = false
+    // [H] the hug = the frozen hold state 0x03001B00 showing raw 21 (BearHug enter 0x0802C4C9)
+    const inHug = () => s.player.gs === 'hold' && s.player.ap.raw === 21
     for (let f = 0; f < 3000; f++) {
       s.run(1)
       place(s, 12, 0, spo)
-      if (s.player.holdKind === 'hug') hugged = true
-      if (hugged && s.player.holdKind !== 'hug') break
+      if (inHug()) hugged = true
+      if (hugged && !inHug()) break
     }
     expect(hugged).toBe(true)
     expect(400 - s.player.ep).toBeGreaterThanOrEqual(95)
