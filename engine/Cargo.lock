@@ -3242,6 +3242,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "wf-script-core"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "wf-core",
+ "wf-extract",
+ "wf-rom",
+ "wf-script",
+ "wf-script-rhai",
+]
+
+[[package]]
 name = "wf-script-rhai"
 version = "0.1.0"
 dependencies = [

@@ -78,6 +78,8 @@ pub struct InjectedHit {
 pub struct Injector {
     pub hits: Vec<InjectedHit>,
     pub player: EntityId,
+    /// the harness frame the hits are scheduled in (0 = the world frame); differs when the recording has lag frames
+    pub now: u32,
 }
 
 /// sounds and other presentation events of one frame (data; the sim never plays anything)
@@ -316,7 +318,10 @@ pub struct Camera {
     pub x: i32,
     pub y: i32,
     pub init: bool,
+    /// the logical camera the game logic uses this frame
     pub rect: Rect,
+    /// what the screen shows this frame: the previous frame's camera (the game displays the camera one frame late)
+    pub shown: Rect,
 }
 
 /// a hit message: box + hit struct {dir, mult, attack type, attacker} (notes §8b)
@@ -622,7 +627,10 @@ impl World {
             Body::Hand(_) => crate::enemy::hand_update(self, i),
             Body::Injector(_) => {
                 let (hits, pid) = match &self.ents[i].body {
-                    Body::Injector(j) => (j.hits.iter().filter(|h| h.at == self.frame).cloned().collect::<Vec<_>>(), j.player),
+                    Body::Injector(j) => {
+                        let now = if j.now != 0 { j.now } else { self.frame };
+                        (j.hits.iter().filter(|h| h.at == now).cloned().collect::<Vec<_>>(), j.player)
+                    }
                     _ => unreachable!(),
                 };
                 for h in hits {

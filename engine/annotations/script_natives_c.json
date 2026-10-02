@@ -44,8 +44,8 @@
   "blocking": false,
   "engine_fn": "0x080090E6 -> 0x0800DCDC",
   "semantics": "If item_slot < current map header byte 6: create the map's item pickup #item_slot (map +0x1C list; def+4 = item id, >=0 supply / <0 equipment; pickup vtable 0x0804C508) at pixel (x, y) and add it to the world.",
-  "status": "INFERRED",
-  "evidence": "asm: 0x080090E6 indexes area->map +0x1C, 0x0800DCDC builds a pickup from the supply (0x083BD2F8) or equipment (0x086F82EC) table; #398 spawn_map_item_at(0,160,178) after an event",
+  "status": "VERIFIED",
+  "evidence": "emulator (round 2, re/buu/script_v2_t*.py): in area (4,30) spawn_map_item_at(0,130,130): 128 RAM words vs none (02031564:01150000->01140000; 020319a8:000000f6->000000f5; 020319b4:001b0301->001e0301; 02031a14:000000ca->000000c9 (+124)) (v2_map_item_at.png); previously: asm: 0x080090E6 indexes area->map +0x1C, 0x0800DCDC builds a pickup from the supply (0x083BD2F8) or equipment (0x086F82EC) table; #398 spawn_map_item_at(0,160,178) after an event",
   "uses": 3,
   "used_in": [
    "#365",
@@ -68,8 +68,8 @@
   "blocking": false,
   "engine_fn": "0x080090E6 -> 0x0800DCDC",
   "semantics": "Same as spawn_map_item_at but the position/extra args are the globals 0x03001010/0x03001018 (normally 0 = the pickup's own placement).",
-  "status": "INFERRED",
-  "evidence": "asm only; no uses in table scripts",
+  "status": "VERIFIED",
+  "evidence": "emulator (round 2, re/buu/script_v2_t*.py): spawn_map_item(0): 115 RAM words vs none (v2_map_item.png); previously: asm only; no uses in table scripts",
   "uses": 0,
   "used_in": []
  },
@@ -107,8 +107,8 @@
   "blocking": false,
   "engine_fn": "broadcast(world, 0x1B, {x, y})",
   "semantics": "Broadcast world message 0x1B with (x, y); the radar entity appends the point to its target list (+0x1C count, 8-byte entries) and shows a blip.",
-  "status": "INFERRED",
-  "evidence": "asm of radar handler 0x0802BC21; blip seen in emulator",
+  "status": "VERIFIED",
+  "evidence": "emulator (round 2, re/buu/script_v2_t*.py): show_radar(); radar_add_target(300,300) vs show_radar() alone: 0203de8c:02020202->02020000; 0203de90:02020202->02000002; 0203de98:00000000->00000001; 0203de9c:00000001->0000012c; 0203dea0:00000000->0000012c; 03006b18:030001f4->0300014c; previously: asm of radar handler 0x0802BC21; blip seen in emulator",
   "uses": 0,
   "used_in": []
  },
@@ -119,19 +119,20 @@
   "pops": 0,
   "pushes": 0,
   "args": [],
-  "name": "respawn_conditional_map_objects",
+  "name": "respawn_breakables",
   "category": "map",
   "kind": "immediate",
   "blocking": false,
   "engine_fn": "0x08008AFE",
-  "semantics": "For each conditional object def of the current map (map +0x18 list, count map byte 5): if its condition (0x08004784, story-flag test) now holds, spawn it (0x0800C7E2). Used after setting story flags so NPCs/objects appear without reloading the map.",
-  "status": "INFERRED",
-  "evidence": "asm; #413/#418 call it right after set_flag natives",
+  "semantics": "0x08008AFE: for each breakable prop of the current area (area +0x18 list, count area byte 5) whose condition (def+0) holds now, create it (0x0800C7E2, bound to its map prop by def byte 4) unless it already exists.",
+  "status": "VERIFIED",
+  "evidence": "emulator (round 2, re/buu/script_v2_t*.py): area (1,16): breakable with condition \"flag 0x0B clear\"; entered with the flag set, then clear_flag(0x0B): with respawn_conditional_map_objects 70 RAM words differ from without (0202f310:00ee0000->00ed0000; 0202f960:00670001->00660001; 0202fb00:0203dee4->0203deac; 0203de64:001cf7b7->000ef7a9 (+66)); previously: asm; #413/#418 call it right after set_flag natives",
   "uses": 2,
   "used_in": [
    "#413",
    "#418"
-  ]
+  ],
+  "previous_name": "respawn_conditional_map_objects"
  },
  {
   "id": 174,
@@ -170,8 +171,8 @@
   "blocking": false,
   "engine_fn": "GD+1 &= ~4",
   "semantics": "Stop the countdown timer (clear GD byte 1 bit 2).",
-  "status": "INFERRED",
-  "evidence": "asm",
+  "status": "VERIFIED",
+  "evidence": "emulator (round 2, re/buu/script_v2_t*.py): start_countdown(30): GameData byte 1 = 0x6 running; with stop_countdown() = 0x2; RAM differs in 2 words; previously: asm",
   "uses": 0,
   "used_in": []
  },
@@ -616,8 +617,8 @@
   "blocking": false,
   "engine_fn": "GD+1 &= ~0x10",
   "semantics": "Stop the stopwatch.",
-  "status": "INFERRED",
-  "evidence": "asm; #164-#167 call it before reading the time",
+  "status": "VERIFIED",
+  "evidence": "emulator (round 2, re/buu/script_v2_t*.py): stopwatch running: GameData byte 1 = 0x12; after stop_stopwatch() = 0x2; get_stopwatch [0] vs [0]; RAM diff 02000150:ff000101->fefdfcfe; 02000154:fdfffffd->fcfdfe00; 02000158:03fffcfa->00ff00fe; 0200015c:feff0103->00fcfd00 (+59); previously: asm; #164-#167 call it before reading the time",
   "uses": 4,
   "used_in": [
    "#164",
@@ -697,8 +698,8 @@
   "blocking": false,
   "engine_fn": "GD+1 |= 0x20",
   "semantics": "Set GameData byte 1 bit 5 (set together with the stopwatch in the race script #163; cleared by 0xC5).",
-  "status": "INFERRED",
-  "evidence": "asm",
+  "status": "VERIFIED",
+  "evidence": "emulator (round 2, re/buu/script_v2_t*.py): GameData byte 1 after set_game_bit_20 = 0x22; previously: asm",
   "uses": 1,
   "used_in": [
    "#163"
@@ -717,8 +718,8 @@
   "blocking": false,
   "engine_fn": "GD+1 &= ~0x20",
   "semantics": "Clear GameData byte 1 bit 5.",
-  "status": "INFERRED",
-  "evidence": "asm",
+  "status": "VERIFIED",
+  "evidence": "emulator (round 2, re/buu/script_v2_t*.py): after set+clear = 0x02; previously: asm",
   "uses": 4,
   "used_in": [
    "#164",
@@ -809,7 +810,7 @@
   "engine_fn": "broadcast(world, 0x1F, 0)",
   "semantics": "Broadcast world message 0x1F (receiver not identified).",
   "status": "INFERRED",
-  "evidence": "asm; no uses",
+  "evidence": "emulator (round 2): no RAM effect in any available state (Snake Way, Yemma's Office, two South-West Forest fights): no entity there answers world message 0x1F; unused by table scripts; asm; no uses",
   "uses": 0,
   "used_in": []
  },
@@ -826,8 +827,8 @@
   "blocking": false,
   "engine_fn": "rec(0..8): HP = maxHP, EP = maxEP",
   "semantics": "For all 9 character records: HP = maxHP, EP = maxEP; if rec+0x13 bit 0, also 0x08013C66 (refresh the live player).",
-  "status": "INFERRED",
-  "evidence": "asm (no change on an already full party in the emulator)",
+  "status": "VERIFIED",
+  "evidence": "emulator (round 2, re/buu/script_v2_t*.py): all 9 records HP=3, EP=1 poked; after heal_party (hp,max,ep,max) = [(135, 135, 90, 90), (85, 85, 85, 85), (292, 292, 213, 213)]...; previously: asm (no change on an already full party in the emulator)",
   "uses": 0,
   "used_in": []
  },
@@ -848,8 +849,8 @@
   "blocking": false,
   "engine_fn": "0x080001C6, 0x0800FDFA, 0x08009816(camera)",
   "semantics": "Centre a w x h rectangle on the actor's bounding-box centre, clamp it to the camera/map bounds; push its left x (used to place fusion-dance / cutscene props on screen).",
-  "status": "INFERRED",
-  "evidence": "asm; #13 fusion dance",
+  "status": "VERIFIED",
+  "evidence": "emulator (round 2, re/buu/script_v2_t*.py): player anchor (144,152): rect 32x32 -> x 144, 64x16 -> x 128 (left = centre - w/2, centre x 160); previously: asm; #13 fusion dance",
   "uses": 11,
   "used_in": [
    "#13",
@@ -881,8 +882,8 @@
   "blocking": false,
   "engine_fn": "0x080001C6, 0x0800FDFA, 0x08009816(camera)",
   "semantics": "As 0xCB but pushes the rectangle's top y.",
-  "status": "INFERRED",
-  "evidence": "asm",
+  "status": "VERIFIED",
+  "evidence": "emulator (round 2, re/buu/script_v2_t*.py): rect 32x32 -> y 136, 64x16 -> y 144 (top = centre - h/2, centre y 152); previously: asm",
   "uses": 11,
   "used_in": [
    "#13",
@@ -1094,7 +1095,7 @@
   "engine_fn": "0x0803FA38",
   "semantics": "GBA sleep: disable interrupts except keypad, SWI 3 (Stop) until the wake key combo, then wait for release.",
   "status": "INFERRED",
-  "evidence": "asm: writes IE/KEYCNT 0xC304 then svc #3",
+  "evidence": "emulator (round 2): SWI Stop is entered but the headless core does not wake it with L+R+Select (still asleep after 200 frames); behaviour read from 0x0803FA38 only; asm: writes IE/KEYCNT 0xC304 then svc #3",
   "uses": 1,
   "used_in": [
    "#7"
@@ -1116,7 +1117,7 @@
   "engine_fn": "rec(cur)+0x3C+4*slot(item)",
   "semantics": "Push 1 if equipment `item` is in its slot (equipment table 0x086F82EC + 0x2C*item + 0x14 = slot) on the current character.",
   "status": "VERIFIED",
-  "evidence": "notes \u00a76 (VERIFIED equipment/supply behaviour)",
+  "evidence": "notes §6 (VERIFIED equipment/supply behaviour)",
   "uses": 52,
   "used_in": [
    "#2",
@@ -1157,7 +1158,7 @@
   "engine_fn": "0x08004098",
   "semantics": "Synchronously run ONLY node 0 of resource entry `script` (must be kind 0 or 4, else assertion) with the CURRENT parameter block (shared P0..P3) and shared globals G0..G3; its return value is discarded. Blocks only if the callee blocks.",
   "status": "VERIFIED",
-  "evidence": "notes \u00a77 loot (VERIFIED: 60/60 kills reproduced)",
+  "evidence": "notes §7 loot (VERIFIED: 60/60 kills reproduced)",
   "uses": 1,
   "used_in": [
    "#14"
@@ -1225,8 +1226,8 @@
   "blocking": false,
   "engine_fn": "0x0803643C(0, set) + world_add",
   "semantics": "Create a destination-label HUD entity (vtable 0x0804BAF4) for label set `set` (table 0x0875A73C+8); its 32 entries are filled by 0xDA.",
-  "status": "INFERRED",
-  "evidence": "asm; #511 (travel menu: HFIL, Heaven, Earth, Grand Kai's Planet, ...)",
+  "status": "VERIFIED",
+  "evidence": "emulator (round 2, re/buu/script_v2_t*.py): show_destination_label(0): 56 RAM words vs nothing (HUD entity created; v2_dest_label.png); previously: asm; #511 (travel menu: HFIL, Heaven, Earth, Grand Kai's Planet, ...)",
   "uses": 1,
   "used_in": [
    "#511"
@@ -1248,8 +1249,8 @@
   "blocking": false,
   "engine_fn": "broadcast(world, 0x23, {index, string_id})",
   "semantics": "Broadcast message 0x23: the label entity stores string_id at entry index and redraws if it is the current one.",
-  "status": "INFERRED",
-  "evidence": "asm of handler 0x08036915; #511",
+  "status": "VERIFIED",
+  "evidence": "emulator (round 2, re/buu/script_v2_t*.py): set_destination_label(0, string 100) after it: 0202d010:0061006e->03c0b7c6; 0202d014:0065006b->00000200; 0202d018:00570020->6e6e6e6e; 0202d01c:00790061->6e6e6e6e; 0202d020:0000002e->6e6e6e6e; 0202d024:00740020->6e6e6e6e (+204); previously: asm of handler 0x08036915; #511",
   "uses": 6,
   "used_in": [
    "#511"
@@ -1270,8 +1271,8 @@
   "blocking": false,
   "engine_fn": "[0x0300197C+0xC] = enable != 0",
   "semantics": "Set the area manager's +0xC flag (meaning not identified).",
-  "status": "INFERRED",
-  "evidence": "asm; no uses",
+  "status": "VERIFIED",
+  "evidence": "emulator (round 2, re/buu/script_v2_t*.py): area manager word 0x03001988 (=[0x08054FBC+0xC]+0xC): set_area_flag_c(1) -> 1, then (0) -> 0; previously: asm; no uses",
   "uses": 0,
   "used_in": []
  },
@@ -1291,8 +1292,8 @@
   "blocking": false,
   "engine_fn": "0x08011C70(world, 8, id)",
   "semantics": "Find the first world entity that answers message 8 with `id`; set its +0x18 = value and +4 = +0x30 + value.",
-  "status": "INFERRED",
-  "evidence": "asm; no uses",
+  "status": "VERIFIED",
+  "evidence": "emulator (round 2, re/buu/script_v2_t*.py): Yemma office, set_entity_value(0, 5): 0203df68:00000128->0000012d; 0203df7c:00000000->00000005; previously: asm; no uses",
   "uses": 0,
   "used_in": []
  },
@@ -1354,7 +1355,7 @@
   "engine_fn": "eqacc+0x10 (u16) += n*0x445 >> 8",
   "semantics": "Equipment-effect accumulator (0x03002B5C, filled while an equipment effect script runs during stat recalculation): eqacc+0x10 (u16) += n*0x445 >> 8 (HP regeneration per frame /256).",
   "status": "VERIFIED",
-  "evidence": "items.json equipment effect scripts decoded and checked in-game (notes \u00a76)",
+  "evidence": "items.json equipment effect scripts decoded and checked in-game (notes §6)",
   "uses": 1,
   "used_in": [
    "equip42"
@@ -1376,7 +1377,7 @@
   "engine_fn": "eqacc+0x08 (u16) += n*0xA4 >> 6",
   "semantics": "Equipment-effect accumulator (0x03002B5C, filled while an equipment effect script runs during stat recalculation): eqacc+0x08 (u16) += n*0xA4 >> 6 (thorns damage).",
   "status": "VERIFIED",
-  "evidence": "items.json equipment effect scripts decoded and checked in-game (notes \u00a76)",
+  "evidence": "items.json equipment effect scripts decoded and checked in-game (notes §6)",
   "uses": 1,
   "used_in": [
    "equip20"
@@ -1398,7 +1399,7 @@
   "engine_fn": "eqacc+0x1C += n; eqacc+0x20 += n",
   "semantics": "Equipment-effect accumulator (0x03002B5C, filled while an equipment effect script runs during stat recalculation): eqacc+0x1C += n; eqacc+0x20 += n (END (melee) and END (energy)).",
   "status": "VERIFIED",
-  "evidence": "items.json equipment effect scripts decoded and checked in-game (notes \u00a76)",
+  "evidence": "items.json equipment effect scripts decoded and checked in-game (notes §6)",
   "uses": 2,
   "used_in": [
    "equip153",
@@ -1421,7 +1422,7 @@
   "engine_fn": "eqacc+0x18 += n",
   "semantics": "Equipment-effect accumulator (0x03002B5C, filled while an equipment effect script runs during stat recalculation): eqacc+0x18 += n (POW).",
   "status": "VERIFIED",
-  "evidence": "items.json equipment effect scripts decoded and checked in-game (notes \u00a76)",
+  "evidence": "items.json equipment effect scripts decoded and checked in-game (notes §6)",
   "uses": 2,
   "used_in": [
    "equip153",
@@ -1444,7 +1445,7 @@
   "engine_fn": "eqacc+0x24 += n",
   "semantics": "Equipment-effect accumulator (0x03002B5C, filled while an equipment effect script runs during stat recalculation): eqacc+0x24 += n (SPD).",
   "status": "VERIFIED",
-  "evidence": "items.json equipment effect scripts decoded and checked in-game (notes \u00a76)",
+  "evidence": "items.json equipment effect scripts decoded and checked in-game (notes §6)",
   "uses": 1,
   "used_in": [
    "equip153"
@@ -1466,7 +1467,7 @@
   "engine_fn": "eqacc+0x14 += n",
   "semantics": "Equipment-effect accumulator (0x03002B5C, filled while an equipment effect script runs during stat recalculation): eqacc+0x14 += n (STR).",
   "status": "VERIFIED",
-  "evidence": "items.json equipment effect scripts decoded and checked in-game (notes \u00a76)",
+  "evidence": "items.json equipment effect scripts decoded and checked in-game (notes §6)",
   "uses": 2,
   "used_in": [
    "equip153",
@@ -1487,7 +1488,7 @@
   "engine_fn": "eqacc+0x0C (u16) /= 2",
   "semantics": "Equipment-effect accumulator (0x03002B5C, filled while an equipment effect script runs during stat recalculation): eqacc+0x0C (u16) /= 2 (damage taken while blocking).",
   "status": "VERIFIED",
-  "evidence": "items.json equipment effect scripts decoded and checked in-game (notes \u00a76)",
+  "evidence": "items.json equipment effect scripts decoded and checked in-game (notes §6)",
   "uses": 1,
   "used_in": [
    "equip16"
@@ -1507,7 +1508,7 @@
   "engine_fn": "eqacc+0x01 (u8) /= 2",
   "semantics": "Equipment-effect accumulator (0x03002B5C, filled while an equipment effect script runs during stat recalculation): eqacc+0x01 (u8) /= 2 (EP cost of energy attacks).",
   "status": "VERIFIED",
-  "evidence": "items.json equipment effect scripts decoded and checked in-game (notes \u00a76)",
+  "evidence": "items.json equipment effect scripts decoded and checked in-game (notes §6)",
   "uses": 1,
   "used_in": [
    "equip34"
@@ -1527,7 +1528,7 @@
   "engine_fn": "eqacc+0x02 (u8) /= 2",
   "semantics": "Equipment-effect accumulator (0x03002B5C, filled while an equipment effect script runs during stat recalculation): eqacc+0x02 (u8) /= 2 (EP cost of blocking energy).",
   "status": "VERIFIED",
-  "evidence": "items.json equipment effect scripts decoded and checked in-game (notes \u00a76)",
+  "evidence": "items.json equipment effect scripts decoded and checked in-game (notes §6)",
   "uses": 2,
   "used_in": [
    "equip21",
@@ -1548,7 +1549,7 @@
   "engine_fn": "eqacc+0x0E (u16) = x*7 >> 3",
   "semantics": "Equipment-effect accumulator (0x03002B5C, filled while an equipment effect script runs during stat recalculation): eqacc+0x0E (u16) = x*7 >> 3 (Super Saiyan drain/cooldown rate).",
   "status": "VERIFIED",
-  "evidence": "items.json equipment effect scripts decoded and checked in-game (notes \u00a76)",
+  "evidence": "items.json equipment effect scripts decoded and checked in-game (notes §6)",
   "uses": 4,
   "used_in": [
    "equip101",
@@ -1575,7 +1576,7 @@
   "engine_fn": "0x08013B54(rec(char), skill, level)",
   "semantics": "Find `skill` in the character's known-skill list (rec+0x0D.., count rec+0x0C) and set both level bytes (rec+0x2E+2i, +0x2F+2i) = level; asserts (0x0803DF14) if the skill is not known.",
   "status": "VERIFIED",
-  "evidence": "notes \u00a73 (\"skill levels are set by story scripts (native -> 0x08013B54)\"); #3 graphs print \"Goku learned Kamehameha Level 2!\"",
+  "evidence": "notes §3 (\"skill levels are set by story scripts (native -> 0x08013B54)\"); #3 graphs print \"Goku learned Kamehameha Level 2!\"",
   "uses": 6,
   "used_in": [
    "#214",
@@ -1599,8 +1600,8 @@
   "blocking": false,
   "engine_fn": "0x08013BCC(rec(char), skill)",
   "semantics": "Push the level byte (rec+0x2F+2i) of a known skill; asserts and pushes 0 if unknown.",
-  "status": "INFERRED",
-  "evidence": "asm; #3",
+  "status": "VERIFIED",
+  "evidence": "emulator (round 2, re/buu/script_v2_t*.py): Goku knows skills [7, 15, 14]; get_skill_level(0,7) = 0, after set_skill_level(0,7,3) = 3; rec+0x2E/+0x2F = [3, 3]; previously: asm; #3",
   "uses": 4,
   "used_in": [
    "#3"
@@ -1738,8 +1739,8 @@
   "blocking": false,
   "engine_fn": "0x080001C6(actor)+0x1A8 = value << 10",
   "semantics": "Write actor object +0x1A8 = value<<10 (field not identified).",
-  "status": "INFERRED",
-  "evidence": "asm; no uses",
+  "status": "VERIFIED",
+  "evidence": "emulator (round 2, re/buu/script_v2_t*.py): player +0x1A8 = 0x1c00 after set_actor_field_1a8(0,7); previously: asm; no uses",
   "uses": 0,
   "used_in": []
  },
@@ -1759,8 +1760,8 @@
   "blocking": false,
   "engine_fn": "0x08004544(GD, char, slot)",
   "semantics": "If the slot does not hold its default item (0x080555B8[slot]), move the equipped item back to the inventory (GD+0xE4 list, entries: top nibble = owner+1, low 28 bits = equipment id) and put the default back.",
-  "status": "INFERRED",
-  "evidence": "asm; emulator no-op on default slots; #362",
+  "status": "VERIFIED",
+  "evidence": "emulator (round 2, re/buu/script_v2_t*.py): Goku slot 2 = equipment 78, inventory entry 0x1000004e (owner Goku): after unequip_slot(0,2) slot = 0x4d (default 0x4d), entry = 0x4e (owner nibble cleared); previously: asm; emulator no-op on default slots; #362",
   "uses": 1,
   "used_in": [
    "#362"
@@ -1809,8 +1810,8 @@
   "blocking": false,
   "engine_fn": "0x080135D2, 0x08013678, 0x080135BC",
   "semantics": "level clamped to 200; if the character's level is lower: apply level-up growth from current to target (0x08013678) and set XP to the target level threshold (0x080135BC).",
-  "status": "INFERRED",
-  "evidence": "asm; #455",
+  "status": "VERIFIED",
+  "evidence": "emulator (round 2, re/buu/script_v2_t*.py): level/xp before [60, 2200], after level_up_to(0,80) [80, 78200] (get_level/get_xp); record bytes changed [('0x16', 135, 118), ('0x17', 0, 1), ('0x18', 135, 118), ('0x19', 0, 1), ('0x1a', 90, 198), ('0x1c', 90, 198), ('0x24', 152, 120), ('0x25', 8, 49), ('0x26', 0, 1), ('0x2c', 0, 60)]; previously: asm; #455",
   "uses": 1,
   "used_in": [
    "#455"

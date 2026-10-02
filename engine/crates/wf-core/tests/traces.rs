@@ -214,7 +214,7 @@ fn knockback_vs_emulator() {
                 assert_eq!((a.x, a.y), pair(&u["pos"]), "{} update {k}", r["name"]);
                 s.world.rng.set_state(u32pair(&u["rng"]));
             }
-            s.world.en(e).a.tick_anim();
+            wf_core::enemy::tick_anim(&mut s.world, e);
             if enemy::knock_step(&mut s.world, e, &mut kb) {
                 done = k as i64;
             }

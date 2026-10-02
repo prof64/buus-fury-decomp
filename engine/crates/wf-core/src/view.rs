@@ -35,10 +35,14 @@ fn draw_key(w: &World, i: usize) -> (i32, i32, u32) {
     (layer, depth, e.id)
 }
 
-fn actor_draw(w: &World, id: u32, a: &crate::actor::Actor, step: Option<(u16, bool)>, out: &mut RenderView) {
+fn actor_draw(w: &World, id: u32, a: &crate::actor::Actor, step: Option<(u16, bool, Option<(i32, i32)>)>, out: &mut RenderView) {
     let Some(sp) = a.sprite.and_then(|s| w.data.sprite(s)) else { return };
     let effect = if a.flash > 0 && a.flash & 2 != 0 { SpriteEffect::White } else if a.alpha < 256 { SpriteEffect::Blend { eva: (a.alpha.clamp(0, 256) >> 4) as u8, evb: (16 - (a.alpha.clamp(0, 256) >> 4)) as u8 } } else { SpriteEffect::None };
-    if let Some((index, flip)) = step {
+    if let Some((index, flip, attach)) = step {
+        // OAM order of an actor: halo, body, shadow
+        if let Some((hx, hy)) = attach {
+            out.sprites.push(SpriteDraw { entity: id, sheet: "effects/halo".into(), frame: FrameSel::Frame { index: 0, flip: false }, x: a.px() + hx, y: a.py() + a.z + hy, priority: 3, mirror: false, effect: SpriteEffect::None });
+        }
         out.sprites.push(SpriteDraw { entity: id, sheet: format!("sprites/{}", sp.id), frame: FrameSel::Frame { index, flip }, x: a.px(), y: a.py() + a.z, priority: 3, mirror: false, effect });
     }
     if let Some(sh) = &sp.shadow {
@@ -71,7 +75,7 @@ pub fn render_view(w: &World, out: &mut RenderView) {
             Body::Player(p) => {
                 let step = p.a.sprite.and_then(|s| w.data.sprite(s)).and_then(|sp| sp.anim_raw(p.ap.raw).or_else(|| sp.anim_raw(1))).and_then(|a| {
                     let st = a.steps(p.a.facing);
-                    st.get((p.ap.frame.max(0) as usize).min(st.len().saturating_sub(1))).map(|s| (s.frame, s.flip))
+                    st.get((p.ap.frame.max(0) as usize).min(st.len().saturating_sub(1))).map(|s| (s.frame, s.flip, s.attach))
                 });
                 if p.a.alpha > 0 {
                     actor_draw(w, id, &p.a, step, out);
@@ -80,14 +84,14 @@ pub fn render_view(w: &World, out: &mut RenderView) {
             Body::Enemy(n) => {
                 let step = n.a.sprite.and_then(|s| w.data.sprite(s)).and_then(|sp| n.a.anim.and_then(|k| sp.anims.get(k as usize))).and_then(|a| {
                     let looped = n.a.anim_loop.unwrap_or(a.looped);
-                    a.step_index_at(n.a.facing, n.a.anim_t, looped).map(|k| (a.steps(n.a.facing)[k].frame, a.steps(n.a.facing)[k].flip))
+                    a.step_index_at(n.a.facing, n.a.anim_t, looped).map(|k| (a.steps(n.a.facing)[k].frame, a.steps(n.a.facing)[k].flip, a.steps(n.a.facing)[k].attach))
                 });
                 if n.a.alpha > 0 {
                     actor_draw(w, id, &n.a, step, out);
                 }
             }
             Body::Hand(h) => {
-                let step = h.a.sprite.and_then(|s| w.data.sprite(s)).and_then(|sp| h.a.anim.and_then(|k| sp.anims.get(k as usize))).and_then(|a| a.step_index_at(h.a.facing, h.a.anim_t, false).map(|k| (a.steps(h.a.facing)[k].frame, a.steps(h.a.facing)[k].flip)));
+                let step = h.a.sprite.and_then(|s| w.data.sprite(s)).and_then(|sp| h.a.anim.and_then(|k| sp.anims.get(k as usize))).and_then(|a| a.step_index_at(h.a.facing, h.a.anim_t, false).map(|k| (a.steps(h.a.facing)[k].frame, a.steps(h.a.facing)[k].flip, None)));
                 actor_draw(w, id, &h.a, step, out);
             }
             Body::Rock { x, y, hp } => effect(id, 0x0875_f7ac, if *hp >= 2 { 0 } else { 1 }, *x, *y, out),
@@ -143,12 +147,35 @@ pub fn render_view(w: &World, out: &mut RenderView) {
         }
     }
     for s in 0..w.players.len() {
-        let c = w.camera(s);
+        let c = w.cameras[s.min(crate::world::MAX_PLAYERS - 1)].shown;
         out.cameras.push(CameraView { x: c.x0, y: c.y0 });
         if let Some(pi) = w.player_idx(s) {
             let p = w.pl_ref(pi);
             let name = w.data.form(p.form).map(|f| f.name.clone()).unwrap_or_default();
-            out.hud.push(HudView { name, level: p.rec.level.max(0) as u32, hp: p.hp(), hp_max: p.max_hp(), ep: p.ep(), ep_max: p.max_ep(), ..Default::default() });
+            // experience line: steps 0..72 between this level's total and the next (0x0801363E(player, 72))
+            let lv = p.rec.level;
+            let t = &w.data.xp_table;
+            let k = (lv - 50).max(0) as usize;
+            let xp72 = match (t.get(k), t.get(k + 1)) {
+                (Some(&a), Some(&b)) if b > a => (((p.rec.xp - a).clamp(0, b - a) * 72) / (b - a)) as u8,
+                (Some(_), None) => 72,
+                _ => 0,
+            };
+            let skill = p.skill();
+            out.hud.push(HudView {
+                name,
+                level: lv.max(0) as u32,
+                hp: p.hp(),
+                hp_max: p.max_hp(),
+                ep: p.ep(),
+                ep_max: p.max_ep(),
+                ss: p.ss_gauge,
+                ss3: (p.ss3_gauge >> 16) as i32,
+                xp72,
+                skill: (skill > 0).then_some(skill as u8),
+                skill_alt: !crate::player::can_use_skill(w, pi, skill),
+                hidden: false,
+            });
         }
     }
 }

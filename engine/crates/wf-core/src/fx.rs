@@ -3,7 +3,10 @@
 //! renderer draws them from this state (record ids / addresses, positions, ticks).
 
 use serde::{Deserialize, Serialize};
-use crate::geom::{Dir, DIR_VEC};
+use crate::geom::{Dir, Rect, DIR_VEC};
+use crate::world::{broadcast, HitMsg};
+
+const FLAME_TABLE: u32 = 0x0875_68b4;
 use crate::input;
 use crate::world::{Body, EntityId, World};
 
@@ -65,11 +68,14 @@ pub enum Fx {
     /// beam charge sparkle at owner + off[facing]
     BeamCharge { owner: EntityId, off: [(i32, i32); 4], set: BeamSet, t: i32 },
     /// Dragon Fist Explosion chain (6 segments, 1/256 px)
-    DragonFist { seg: [[i32; 2]; 6], steer: (i32, i32), dir: Dir, dying: i32, t: i32, alive: Alive },
+    /// Dragon Fist Explosion chain: segment 0 = root .. 5 = head (1/256 px), their boxes of the last update, the
+    /// head's steering offset, ticks since the launch (-1 flying)
+    DragonFist { owner: EntityId, seg: [[i32; 2]; 6], boxes: [Rect; 6], steer: (i32, i32), dir: Dir, dying: i32, t: i32 },
     EnergySword { owner: EntityId, slash: i32, t: i32, alive: Alive },
     BbkFlare { x: i32, y: i32, dir: Dir, t: i32, ended: bool, alive: Alive },
     /// Flame Kamehameha links [x, y, t, shift*2]
-    FlameKame { owner: EntityId, dir: Dir, n: i32, links: Vec<[i32; 4]>, alive: Alive },
+    /// Flame Kamehameha links [x, y, t, shift*2, box x0, y0, x1, y1 of the previous tick]; hits with attack `a` x `mult`
+    FlameKame { owner: EntityId, dir: Dir, n: i32, links: Vec<[i32; 8]>, alive: Alive, a: crate::damage::AttackType, mult: i32 },
     ItMarkers { t: i32, alive: Alive },
     /// Big Bang explosion phase (state 2 of 0x08037650): 60 ticks, an explosion every 8th (RNG)
     BigBangBoom { n: i32, x0: i32, y0: i32, s: i32 },
@@ -117,20 +123,75 @@ pub fn beam_charge(w: &mut World, owner: EntityId, off: [(i32, i32); 4], set: Be
 }
 
 const DF_ROOT: [(i32, i32); 4] = [(8, 16), (8, -32), (-8, -8), (24, -8)];
+const DF_OFFS: [i32; 6] = [0, 1, 3, 6, 10, 15];
+/// head box origin per facing (box = position - origin .. + 64)
+const DF_HEAD: [(i32, i32); 4] = [(32, 32), (32, 32), (40, 32), (24, 32)];
 const DF_TABLE: u32 = 0x0877_ad10;
-pub fn dragon_fist(owner_px: i32, owner_py: i32, dir: Dir, alive: Alive) -> Fx {
+const DF_MULT: i32 = 328;
+const DF_LAUNCH_MULT: i32 = 0xa00;
+
+fn df_box(seg: &[[i32; 2]; 6], k: usize, dir: Dir) -> Rect {
+    let (x, y) = (seg[k][0] >> 8, seg[k][1] >> 8);
+    if k < 5 {
+        return Rect::new(x - 16, y - 16, x + 16, y + 16);
+    }
+    let (ox, oy) = DF_HEAD[dir as usize];
+    Rect::new(x - ox, y - oy, x - ox + 64, y - oy + 64)
+}
+/// Dragon Fist Explosion (chain builder 0x08038AD8, segment update 0x08038C32): 6 segments from the root at DF_ROOT
+pub fn dragon_fist(w: &World, owner_px: i32, owner_py: i32, dir: Dir, owner: EntityId) -> Fx {
+    let _ = w;
     let (dx, dy) = DIR_VEC[dir as usize];
     let (rx, ry) = DF_ROOT[dir as usize];
-    let mut x = (owner_px + rx) << 8;
-    let mut y = (owner_py + ry) << 8;
+    let (x, y) = ((owner_px + rx) << 8, (owner_py + ry) << 8);
     let mut seg = [[0; 2]; 6];
-    seg[5] = [x, y];
-    for k in (0..=4).rev() {
-        x += dx * (6 - k as i32) * 256;
-        y += dy * (6 - k as i32) * 256;
-        seg[k] = [x, y];
+    for k in 0..6 {
+        seg[k] = [x + dx * DF_OFFS[k] * 256, y + dy * DF_OFFS[k] * 256];
     }
-    Fx::DragonFist { seg, steer: (0, 0), dir, dying: -1, t: 0, alive }
+    let boxes = std::array::from_fn(|k| df_box(&seg, k, dir));
+    Fx::DragonFist { owner, seg, boxes, steer: (0, 0), dir, dying: -1, t: 0 }
+}
+fn df_msg(w: &World, owner: EntityId, src: EntityId, rect: Rect, dir: Dir, mult: i32) -> HitMsg {
+    let stats = w.actor_by_id(owner).map(|a| a.stats).unwrap_or_default();
+    HitMsg { team: 1, rect, dir, mult, atk: crate::damage::atk(18), attacker: owner, att_stats: stats, att_is_player: true, source: src, crit: false, raw: 0, dmg: 0 }
+}
+/// 0x08038E8A (the player's control, tick < 90): root by v, each child 0x20 more along the facing
+pub fn dragon_shift(w: &mut World, i: usize, v: i32) {
+    if let Fx::DragonFist { seg, dir, .. } = fx_mut(w, i) {
+        let (dx, dy) = DIR_VEC[*dir as usize];
+        for (k, s) in seg.iter_mut().enumerate() {
+            s[0] += dx * (v + 0x20 * k as i32);
+            s[1] += dy * (v + 0x20 * k as i32);
+        }
+    }
+}
+/// 0x08038E42: one x2.5 message with the head's box of this tick; the segments stop sending
+pub fn dragon_launch(w: &mut World, i: usize) {
+    let Fx::DragonFist { owner, boxes, dir, dying, .. } = fx_mut(w, i).clone() else { return };
+    if dying >= 0 {
+        return;
+    }
+    if let Fx::DragonFist { dying, .. } = fx_mut(w, i) {
+        *dying = 0;
+    }
+    let mut m = df_msg(w, owner, w.ents[i].id, boxes[5], dir, DF_LAUNCH_MULT);
+    broadcast(w, &mut m, false);
+}
+/// every segment explodes (rand(0x1000) each): root first at the end, head first on a cancel
+pub fn dragon_explode(w: &mut World, i: usize, cancel: bool) {
+    let Fx::DragonFist { seg, dir, .. } = fx_mut(w, i).clone() else { return };
+    for n in 0..6 {
+        let k = if cancel { 5 - n } else { n };
+        let rec = DF_TABLE + 12 * (dir as u32 * 4 + if k == 5 { 3 } else { 0 });
+        let (x, y) = (seg[k][0] >> 8, seg[k][1] >> 8);
+        let (cx, cy) = match w.data.record(rec) {
+            Some(g) => (x - g[0] + (g[2] >> 1), y - g[1] + (g[3] >> 1)),
+            None => (x, y),
+        };
+        let rate = 0x1000 + w.rng.rand(0x1000);
+        explosion(w, cx, cy, rate);
+    }
+    w.ents[i].removed = true;
 }
 
 fn fx_mut(w: &mut World, i: usize) -> &mut Fx {
@@ -199,54 +260,61 @@ pub fn update(w: &mut World, i: usize) {
                 *t += 1;
             }
         }
-        Fx::DragonFist { mut seg, mut steer, dir, mut dying, mut t, alive: al } => {
-            t += 1;
-            if dying < 0 {
-                if !alive(w, al) {
-                    dying = 1;
-                } else {
-                    let (dx, dy) = DIR_VEC[dir as usize];
-                    for (k, s) in seg.iter_mut().enumerate() {
-                        let v = 0x60 + 0x20 * (5 - k as i32);
-                        s[0] += dx * v;
-                        s[1] += dy * v;
-                    }
-                    for k in 1..5 {
-                        let mx = (seg[k - 1][0] + seg[k + 1][0]) >> 1;
-                        let my = (seg[k - 1][1] + seg[k + 1][1]) >> 1;
-                        seg[k][0] = (3 * seg[k][0] + mx) >> 2;
-                        seg[k][1] = (3 * seg[k][1] + my) >> 2;
-                    }
-                    let held = w.input[0].held;
-                    let sx = if held & input::LEFT != 0 { -3 } else if held & input::RIGHT != 0 { 3 } else { 0 };
-                    let sy = if held & input::UP != 0 { -3 } else if held & input::DOWN != 0 { 3 } else { 0 };
-                    let nx = (steer.0 + sx).clamp(-56, 56);
-                    let ny = (steer.1 + sy).clamp(-32, 32);
-                    seg[0][0] += (nx - steer.0) << 8;
-                    seg[0][1] += (ny - steer.1) << 8;
-                    steer = (nx, ny);
+        Fx::DragonFist { owner, mut seg, mut boxes, mut steer, dir, dying, t, .. } => {
+            if dying >= 0 {
+                let d = dying + 1;
+                if let Fx::DragonFist { dying: d0, t: t0, .. } = fx_mut(w, i) {
+                    *d0 = d;
+                    *t0 = t + 1;
                 }
-            } else {
-                dying += 1;
-                if dying >= 24 {
-                    for k in (0..6).rev() {
-                        let rec = DF_TABLE + 12 * (dir as u32 * 4 + if k == 0 { 3 } else { 0 });
-                        let (x, y) = (seg[k][0] >> 8, seg[k][1] >> 8);
-                        let (cx, cy) = match w.data.record(rec) {
-                            Some(g) => (x - g[0] + (g[2] >> 1), y - g[1] + (g[3] >> 1)),
-                            None => (x, y),
-                        };
-                        let rate = 0x1000 + w.rng.rand(0x1000);
-                        explosion(w, cx, cy, rate);
-                    }
-                    w.ents[i].removed = true;
+                if d >= 24 {
+                    dragon_explode(w, i, false);
                 }
+                return;
             }
-            if let Fx::DragonFist { seg: s0, steer: s1, dying: d0, t: t0, .. } = fx_mut(w, i) {
-                *s0 = seg;
-                *s1 = steer;
-                *d0 = dying;
-                *t0 = t;
+            let held = w.find(owner).and_then(|k| match &w.ents[k].body {
+                Body::Player(p) => Some(w.input[p.slot as usize].held),
+                _ => None,
+            });
+            let held = held.unwrap_or(0);
+            let me = w.ents[i].id;
+            for k in 0..6 {
+                if k > 0 && k < 5 {
+                    let (p0, c0) = (seg[k - 1], seg[k + 1]);
+                    seg[k][0] = (3 * seg[k][0] + ((p0[0] + c0[0]) >> 1)) >> 2;
+                    seg[k][1] = (3 * seg[k][1] + ((p0[1] + c0[1]) >> 1)) >> 2;
+                } else if k == 5 {
+                    let mut sx = 0;
+                    let mut sy = 0;
+                    if held & input::LEFT != 0 {
+                        if steer.0 > -56 {
+                            sx = -3;
+                        }
+                    } else if held & input::RIGHT != 0 && steer.0 < 56 {
+                        sx = 3;
+                    }
+                    if held & input::UP != 0 {
+                        if steer.1 > -32 {
+                            sy = -3;
+                        }
+                    } else if held & input::DOWN != 0 && steer.1 < 32 {
+                        sy = 3;
+                    }
+                    steer.0 += sx;
+                    steer.1 += sy;
+                    seg[5][0] += sx << 8;
+                    seg[5][1] += sy << 8;
+                }
+                boxes[k] = df_box(&seg, k, dir);
+                // store before the message (a receiver may look at the chain)
+                if let Fx::DragonFist { seg: s0, boxes: b0, steer: st0, t: t0, .. } = fx_mut(w, i) {
+                    *s0 = seg;
+                    *b0 = boxes;
+                    *st0 = steer;
+                    *t0 = t + 1;
+                }
+                let mut m = df_msg(w, owner, me, boxes[k], dir, DF_MULT);
+                broadcast(w, &mut m, false);
             }
         }
         Fx::EnergySword { alive: al, .. } => {
@@ -274,41 +342,80 @@ pub fn update(w: &mut World, i: usize) {
                 }
             }
         }
-        Fx::FlameKame { alive: al, .. } => {
+        Fx::FlameKame { owner, dir, n, mut links, alive: al, a, mult } => {
             if !alive(w, al) {
                 w.ents[i].removed = true;
                 return;
             }
-            let held = w.input[0].held;
-            if let Fx::FlameKame { dir, n, links, .. } = fx_mut(w, i) {
-                let (dx, dy) = DIR_VEC[*dir as usize];
-                let perp = if dx != 0 {
-                    if held & input::UP != 0 {
-                        -1
-                    } else if held & input::DOWN != 0 {
-                        1
-                    } else {
-                        0
-                    }
-                } else if held & input::LEFT != 0 {
+            let held = w.find(owner).and_then(|k| match &w.ents[k].body {
+                Body::Player(p) => Some(w.input[p.slot as usize].held),
+                _ => None,
+            });
+            let held = held.unwrap_or(0);
+            let (dx, dy) = DIR_VEC[dir as usize];
+            let perp = if dx != 0 {
+                if held & input::UP != 0 {
                     -1
-                } else if held & input::RIGHT != 0 {
+                } else if held & input::DOWN != 0 {
                     1
                 } else {
                     0
-                };
-                let len = links.len();
-                for k in 0..len {
-                    let m = ((k + 1) * (k + 1)) as i32;
-                    let l = &mut links[k];
-                    l[2] += 1;
-                    // shift kept doubled (the reference adds m / 2)
-                    l[3] = (-2 * m).max((2 * m).min(l[3] + perp * m));
-                    if l[2] == 8 && k == len - 1 && (len as i32) < *n {
-                        let nl = [l[0] + dx * 16, l[1] + dy * 16, 0, 0];
-                        links.push(nl);
+                }
+            } else if held & input::LEFT != 0 {
+                -1
+            } else if held & input::RIGHT != 0 {
+                1
+            } else {
+                0
+            };
+            let me = w.ents[i].id;
+            let n0 = links.len();
+            // newest link first; a link spawned now updates from the next tick
+            for k in (0..n0).rev() {
+                let m = ((k + 1) * (k + 1)) as i32;
+                links[k][2] += 1;
+                links[k][3] = (-2 * m).max((2 * m).min(links[k][3] + perp * m));
+                if links[k][2] == 8 && k == n0 - 1 && (links.len() as i32) < n {
+                    let (x, y) = (links[k][0] + dx * 16, links[k][1] + dy * 16);
+                    let b = crate::player::flame_link_box(w, FLAME_TABLE, x, y);
+                    links.push([x, y, 0, 0, b.x0, b.y0, b.x1, b.y1]);
+                }
+                let l = links[k];
+                let rect = Rect::new(l[4], l[5], l[6], l[7]);
+                if let Fx::FlameKame { links: l0, .. } = fx_mut(w, i) {
+                    *l0 = links.clone();
+                }
+                let stats = w.actor_by_id(owner).map(|x| x.stats).unwrap_or_default();
+                let mut msg = HitMsg { team: 1, rect, dir, mult, atk: a, attacker: owner, att_stats: stats, att_is_player: true, source: me, crit: false, raw: 0, dmg: 0 };
+                if broadcast(w, &mut msg, true) {
+                    let s = 48 + w.rng.rand(2);
+                    w.sfx(s, 64);
+                }
+                // the box for the next tick: this tick's record at the shifted position
+                let mut f = links[k][2] >> 2;
+                if k as i32 == n - 1 {
+                    if f >= 7 {
+                        f = (f & 3) + 4;
+                        if f == 7 {
+                            f = 5;
+                        }
+                    }
+                } else if f >= 4 {
+                    f &= 3;
+                    if f == 0 {
+                        f = 2;
                     }
                 }
+                let sh = links[k][3] / 2;
+                let (x, y) = (links[k][0] + if dx != 0 { 0 } else { sh }, links[k][1] + if dx != 0 { sh } else { 0 });
+                let b = crate::player::flame_link_box(w, FLAME_TABLE + 0x54 * dir as u32 + 12 * f as u32, x, y);
+                links[k][4] = b.x0;
+                links[k][5] = b.y0;
+                links[k][6] = b.x1;
+                links[k][7] = b.y1;
+            }
+            if let Fx::FlameKame { links: l0, .. } = fx_mut(w, i) {
+                *l0 = links;
             }
         }
         Fx::ItMarkers { alive: al, .. } => {

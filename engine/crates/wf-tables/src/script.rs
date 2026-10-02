@@ -140,13 +140,21 @@ pub fn dis_bytes(b: &[u8], addr: u32, stop_at_end: bool) -> Vec<(u32, String)> {
     out
 }
 
-/// Code bytes of script `idx` of the script table: header → blob; blob byte 2 = 0 (raw code at +3) or
-/// 4 (webfoot-LZ compressed at +4).
+/// Code bytes of script `idx` (node 0 of event `idx`): header → node; node byte 2 = 0 (raw code at +3) or
+/// 4 (compressed at +4). The compressed form is a *headerless* Webfoot-LZ bit stream (no `type, size`
+/// container; the runner inflates it with `0x08049120` into a 0x800-byte buffer), so it is wrapped in a
+/// container header before decoding — matches the game's output (`wf-script` test `rom_scripts`).
 pub fn script_code(c: &Ctx, idx: u32) -> Vec<u8> {
     let hdr = c.u32(SCRIPTS + 4 * idx);
     let blob = c.u32(hdr);
     if c.u8(blob + 2) == 4 {
-        c.rom.lz(blob + 4).unwrap_or_default()
+        let start = wf_rom::Rom::off(blob + 4);
+        let end = (start + 0x4000).min(c.rom.len());
+        let mut buf = Vec::with_capacity(8 + end - start);
+        buf.extend_from_slice(&1u32.to_le_bytes());
+        buf.extend_from_slice(&0x800u32.to_le_bytes());
+        buf.extend_from_slice(&c.rom.data()[start..end]);
+        wf_rom::lz::decompress(&buf, 0).map(|(d, _)| d).unwrap_or_default()
     } else {
         c.bytes(blob + 3, 20000).to_vec()
     }
@@ -424,5 +432,15 @@ mod tests {
         // python: r = random.Random(1); [r.getrandbits(32) for _ in range(3)]
         let mut m = super::Mt::python(1);
         assert_eq!([m.next_u32(), m.next_u32(), m.next_u32()], [577090037, 2444712010, 3639700191]);
+    }
+
+    /// Compressed script #2 (per-hit hook) inflates like the game: `native 0x04; push 0; eq; jz …`.
+    #[test]
+    fn compressed_script_code_is_headerless_lz() {
+        let Some(rom) = wf_rom::testutil::rom() else { return };
+        let c = crate::util::Ctx::new(&rom);
+        let code = super::script_code(&c, 2);
+        assert_eq!(&code[..6], &[0x02, 0x04, 0x00, 0x00, 0x0b, 0x13]);
+        assert!(code.len() > 0xa0);
     }
 }

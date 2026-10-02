@@ -18,7 +18,7 @@ use std::collections::{BTreeMap, VecDeque};
 use std::rc::Rc;
 use wf_script::natives;
 use wf_script::steps::is_instant;
-use wf_script::vm::{Call, Globals, Host, NativeResult, NodeCall, ScriptKey};
+use wf_script::vm::{ext_info, Call, ExtCall, ExtKind, Globals, Host, NativeResult, NodeCall, ScriptKey, EXTENSIONS};
 
 type R<T> = Result<T, Box<EvalAltResult>>;
 
@@ -35,6 +35,16 @@ pub struct UnitRef {
     pub prefix: String,
     /// `main` (single handler) or `steps`.
     pub steps: bool,
+    /// Named entry function called with the triggering player (`on_talk(who)`), for mod handlers;
+    /// continuations are `<prefix>step_k(result)` as usual. None = `main()` / `step_0()`.
+    #[serde(default)]
+    pub entry: Option<String>,
+}
+
+impl UnitRef {
+    pub fn new(file: impl Into<String>, prefix: impl Into<String>, steps: bool) -> UnitRef {
+        UnitRef { file: file.into(), prefix: prefix.into(), steps, entry: None }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -77,6 +87,7 @@ pub enum Act {
     SetVar { var: u8, value: i32, params: usize },
     RunEvent { event: u16, params: usize },
     Node(NodeCall),
+    Ext { name: String, args: Vec<i32>, params: usize },
 }
 
 /// The complete state of one script thread — plain data.
@@ -95,6 +106,9 @@ pub struct ThreadState {
     pub event_result: Option<u16>,
     /// Text nodes whose argument code is running.
     pub text_node: Vec<u16>,
+    /// The player that triggered this thread (1-based; 0 = engine). Original scripts ignore it.
+    #[serde(default)]
+    pub who: i32,
     pub ops: u64,
 }
 
@@ -272,9 +286,23 @@ impl Runtime {
 
     /// Start a whole event.
     pub fn start_event(&self, event: u16, params: [i32; 4]) {
+        self.start_event_by(event, params, 0);
+    }
+
+    /// Start a whole event triggered by player `who` (1-based; NPC talk, trigger touch, on-defeat by).
+    pub fn start_event_by(&self, event: u16, params: [i32; 4], who: i32) {
         let mut c = self.ctx.borrow_mut();
-        c.t = ThreadState { params: vec![params], ..Default::default() };
+        c.t = ThreadState { params: vec![params], who, ..Default::default() };
         c.t.frames.push(Frame::Event { event, node: 0, params: 0, in_node: false });
+    }
+
+    /// Start a named handler `file::entry(who)` (mod scripts: `on_talk(who)`, `on_enter(who)`,
+    /// `on_defeat(by)`, …). It may continue with `return next(k)` → `step_k(result)` in the same file.
+    pub fn start_handler(&self, file: &str, entry: &str, who: i32, params: [i32; 4]) {
+        let mut c = self.ctx.borrow_mut();
+        c.t = ThreadState { params: vec![params], who, ..Default::default() };
+        let unit = UnitRef { file: file.to_string(), prefix: String::new(), steps: true, entry: Some(entry.to_string()) };
+        c.t.frames.push(Frame::Unit { unit, step: None, locals: vec![], params: 0, role: Role::Plain, done: None });
     }
 
     /// Deliver the result of the blocked action and continue.
@@ -325,6 +353,19 @@ impl Runtime {
                     }
                     Act::RunEvent { event, params } => {
                         t.frames.push(Frame::Event { event: *event, node: 0, params: *params, in_node: false });
+                    }
+                    Act::Ext { name, args, params } => {
+                        let who = t.who;
+                        let r = host
+                            .ext(ExtCall { name, args, who, params: &mut t.params[*params], globals })
+                            .map_err(|e| e.to_string())?;
+                        match r {
+                            NativeResult::Done(v) => t.last = v,
+                            NativeResult::Block => {
+                                t.blocked = Some(a);
+                                return Ok(Status::Blocked);
+                            }
+                        }
                     }
                     Act::Node(n) => match host.node(n.clone())? {
                         NativeResult::Done(_) => {
@@ -381,6 +422,10 @@ impl Runtime {
                 Frame::Unit { unit, step, .. } => {
                     drop(c);
                     let (fname, args): (String, Vec<Dynamic>) = match step {
+                        None if unit.entry.is_some() => {
+                            let who = self.ctx.borrow().t.who;
+                            (unit.entry.clone().unwrap(), vec![Dynamic::from_int(who)])
+                        }
                         None if unit.steps => (format!("{}step_0", unit.prefix), vec![]),
                         None => (format!("{}main", unit.prefix), vec![]),
                         Some(k) => {
@@ -420,14 +465,14 @@ impl Runtime {
                         GNode::Code { prefix, steps, next } => {
                             *cur = next;
                             *in_node = true;
-                            let unit = UnitRef { file: format!("s{event:03}"), prefix, steps };
+                            let unit = UnitRef::new(format!("s{event:03}"), prefix, steps);
                             c.t.frames.push(Frame::Unit { unit, step: None, locals: vec![], params, role: Role::EventNode, done: None });
                         }
                         GNode::SayArgs { prefix, steps, next, .. } => {
                             *cur = next;
                             *in_node = true;
                             c.t.text_node.push(node);
-                            let unit = UnitRef { file: format!("s{event:03}"), prefix, steps };
+                            let unit = UnitRef::new(format!("s{event:03}"), prefix, steps);
                             c.t.frames.push(Frame::Unit { unit, step: None, locals: vec![], params, role: Role::TextArgs, done: None });
                         }
                         GNode::Say { text, arg, next } => {
@@ -603,6 +648,39 @@ fn bind_api(e: &mut Engine, ctx: &Rc<RefCell<Ctx>>, lib: &Rc<RefCell<Option<Rc<L
             }
         });
     }
+    // the triggering player of this thread (plain thread data)
+    let c = ctx.clone();
+    e.register_fn("who", move || -> INT { c.borrow().t.who });
+    // multiplayer extensions (same query / instant / action rules as natives)
+    for &(name, arity, kind) in EXTENSIONS {
+        let c = ctx.clone();
+        let types = vec![TypeId::of::<INT>(); arity as usize];
+        e.register_raw_fn(name, types, move |_nc: NativeCallContext, args: &mut [&mut Dynamic]| -> R<Dynamic> {
+            let a: Vec<i32> = args.iter().map(|d| int_arg(d)).collect::<R<_>>()?;
+            let mut b = c.borrow_mut();
+            let (_, p, _) = b.t.cur_unit()?;
+            let now = kind == ExtKind::Query || (kind == ExtKind::Instant && b.t.queue.is_empty());
+            if !now {
+                b.t.queue.push_back(Act::Ext { name: name.to_string(), args: a, params: p });
+                return Ok(Dynamic::UNIT);
+            }
+            if kind == ExtKind::Query && !b.t.queue.is_empty() {
+                return err(format!("query `{name}` called while actions are queued; end the handler with `return next(k)` first"));
+            }
+            let Ctx { host, globals, t } = &mut *b;
+            let who = t.who;
+            let r = host
+                .ext(ExtCall { name, args: &a, who, params: &mut t.params[p], globals })
+                .map_err(|e| -> Box<EvalAltResult> { e.into() })?;
+            match (kind, r) {
+                (ExtKind::Query, NativeResult::Done(Some(v))) => Ok(Dynamic::from_int(v)),
+                (ExtKind::Query, _) => err(format!("query `{name}` returned nothing")),
+                (_, NativeResult::Done(_)) => Ok(Dynamic::UNIT),
+                (_, NativeResult::Block) => err(format!("`{name}` blocked where it must be instant")),
+            }
+        });
+        let _ = ext_info(name);
+    }
     // game-variable setters (8..17): instant
     for v in 8..natives::SETTER_COUNT as u8 {
         let c = ctx.clone();
@@ -641,7 +719,7 @@ fn run_script(nc: &NativeCallContext, c: &Rc<RefCell<Ctx>>, lib: &Rc<RefCell<Opt
         let Some(GNode::Code { prefix, steps, .. }) = g.get(&0) else {
             return err(format!("run_script({idx}): node 0 is not bytecode (the GBA asserts)"));
         };
-        let unit = UnitRef { file: format!("s{idx:03}"), prefix: prefix.clone(), steps: *steps };
+        let unit = UnitRef::new(format!("s{idx:03}"), prefix.clone(), *steps);
         b.t.frames.push(Frame::Unit { unit: unit.clone(), step: None, locals: vec![], params: p, role: Role::Plain, done: None });
         (p, unit)
     };

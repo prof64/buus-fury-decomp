@@ -37,12 +37,6 @@ struct C {
     tree: Arc<BehTree>,
 }
 
-fn valid(w: &World, c: &C) -> bool {
-    match &w.ents[c.i].body {
-        Body::Enemy(e) => e.ai.stack.get(c.lvl).is_some_and(|s| s.serial == c.serial),
-        _ => false,
-    }
-}
 fn rt<'a>(w: &'a mut World, c: &C, n: u16) -> Option<&'a mut NodeRt> {
     match &mut w.ents[c.i].body {
         Body::Enemy(e) => e.ai.stack.get_mut(c.lvl).filter(|s| s.serial == c.serial).map(|s| &mut s.rt[n as usize]),

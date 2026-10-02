@@ -183,6 +183,63 @@ pub trait Host {
     /// Text box / choice node. Usually blocks; the result value is ignored (a choice stores its selection
     /// host-side, read back by native 0x18).
     fn node(&mut self, call: NodeCall) -> Result<NativeResult, String>;
+    /// Remake extensions beyond the 248 originals (multiplayer API: `player_count`, `player(n)`,
+    /// `give_item_to(n, i)`, …; see [`EXTENSIONS`]). Original bytecode never calls these.
+    fn ext(&mut self, call: ExtCall<'_>) -> Result<NativeResult, String> {
+        Err(format!("extension `{}` not supported by this host", call.name))
+    }
+}
+
+/// A call to a remake extension.
+pub struct ExtCall<'a> {
+    pub name: &'a str,
+    pub args: &'a [i32],
+    /// The player that triggered the running handler (1-based; 0 = none / engine).
+    pub who: i32,
+    pub params: &'a mut [i32; 4],
+    pub globals: &'a mut Globals,
+}
+
+/// Kind of an extension function (same rules as natives: queries need an empty action queue).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ExtKind {
+    /// Returns a value, no effect.
+    Query,
+    /// Effect without a frame span (runs at once when the queue is empty, else queued).
+    Instant,
+    /// Effect that may span frames (queued; the host may block).
+    Action,
+}
+
+/// The multiplayer extension API: (name, arity, kind). Players are 1-based; `player(1)` is the leader, whose
+/// actor is the original actor 0. No function exposes the *local* peer (rollback determinism).
+pub const EXTENSIONS: &[(&str, u8, ExtKind)] = &[
+    ("player_count", 0, ExtKind::Query),
+    ("player", 1, ExtKind::Query),            // actor id of player n
+    ("player_of_actor", 1, ExtKind::Query),   // 1-based player index controlling actor id, 0 if none
+    ("player_character", 1, ExtKind::Query),  // character index played by player n
+    ("player_hp", 1, ExtKind::Query),
+    ("player_max_hp", 1, ExtKind::Query),
+    ("player_energy", 1, ExtKind::Query),
+    ("player_x", 1, ExtKind::Query),
+    ("player_y", 1, ExtKind::Query),
+    ("player_button", 2, ExtKind::Query),     // (n, button) held this frame: 0 A, 1 B, 2 L, 3 R, 4 start
+    ("player_pressed", 2, ExtKind::Query),    // (n, button) pressed this frame
+    ("player_alive", 1, ExtKind::Query),
+    ("set_player_hp", 2, ExtKind::Instant),
+    ("set_player_energy", 2, ExtKind::Instant),
+    ("set_player_character", 2, ExtKind::Instant),
+    ("give_item_to", 2, ExtKind::Action),     // (n, item): the pickup popup is per player
+    ("give_equipment_to", 2, ExtKind::Action),
+    ("give_xp_to", 2, ExtKind::Action),
+    ("revive_player", 1, ExtKind::Action),
+    ("warp_player", 6, ExtKind::Action),      // (n, world, map, variant, x, y)
+    ("gather_players", 2, ExtKind::Action),   // (x, y): bring every player next to (x, y) (cutscene start)
+    ("say_to", 3, ExtKind::Action),           // (n, speaker_portrait, string_id): text box for one player only
+];
+
+pub fn ext_info(name: &str) -> Option<(u8, ExtKind)> {
+    EXTENSIONS.iter().find(|e| e.0 == name).map(|e| (e.1, e.2))
 }
 
 impl Thread {

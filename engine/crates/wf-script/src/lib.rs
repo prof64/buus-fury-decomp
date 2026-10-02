@@ -11,6 +11,7 @@
 
 pub mod analysis;
 pub mod bytecode;
+pub mod content;
 pub mod decompile;
 pub mod export;
 pub mod ir;

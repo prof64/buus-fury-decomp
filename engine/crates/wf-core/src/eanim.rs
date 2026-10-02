@@ -134,6 +134,7 @@ pub fn generic_states() -> Vec<(&'static str, EAnimRule)> {
 pub const KEEP_VTABLES: [&str; 2] = ["0x0804985C", "0x0804A214"];
 
 /// all rules of the game data: fixed indices for the builtins, then the per-type recorded ones
+#[derive(Clone)]
 pub struct AnimRules {
     pub rules: Vec<EAnimRule>,
     /// SetAnim table by raw
@@ -152,7 +153,7 @@ pub struct AnimRules {
 impl AnimRules {
     pub fn load(sim_json: &str) -> AnimRules {
         let mut rules = Vec::new();
-        let mut push = |r: EAnimRule, rules: &mut Vec<EAnimRule>| {
+        let push = |r: EAnimRule, rules: &mut Vec<EAnimRule>| {
             rules.push(r);
             (rules.len() - 1) as u32
         };

@@ -226,6 +226,10 @@ pub struct FullBeam {
     pub ending: bool,
     pub vis: Option<(i32, i32)>,
     pub hit_win: Option<(i64, i64)>,
+    /// the player's Final Flash (the game's update 0x0803710C)
+    pub game: bool,
+    pub next: i64,
+    pub end_t: i32,
 }
 
 #[derive(Clone, Debug, Hash, Serialize, Deserialize)]
@@ -243,18 +247,17 @@ pub struct AreaHit {
 #[derive(Clone, Debug, Hash, Serialize, Deserialize)]
 pub struct BigBangBall {
     pub charge256: i64,
-    pub grow: F,
     pub launched: bool,
     pub lv: i32,
+    /// obj+0x54 tick counter and obj+0x58 frame
     pub u: i32,
     pub f: i32,
-    pub vis_off: (i32, i32),
 }
 
 #[derive(Clone, Debug, Hash, Serialize, Deserialize)]
 pub struct MasenkoCursor {
-    /// distance in half pixels (24 px .. 48 px, +0.5 px per frame)
-    pub dist2: i32,
+    pub d: i32,
+    pub step: i32,
     pub released: i64,
     pub mult: i32,
     pub lv: i32,
@@ -272,10 +275,26 @@ pub struct MasenkoBall {
     pub cursor: EntityId,
     pub lv: i32,
     pub phase: MPhase,
-    pub from: (i32, i32),
-    pub to: (i32, i32),
-    pub ft: i32,
+    pub vx: i32,
+    pub vy: i32,
+    pub a: i32,
+    pub b: i32,
     pub tb: i32,
+}
+
+#[derive(Clone, Debug, Hash, Serialize, Deserialize)]
+pub struct KameBeam {
+    pub len: i32,
+    pub done: bool,
+    pub a: AttackType,
+    pub mult: i32,
+    pub gfx: bool,
+    /// obj+0x18 piece-variant tick
+    pub vt: i32,
+    /// obj+0x11: the head was stopped (impact piece)
+    pub stopped: bool,
+    /// obj+0x14: frame of the next hit effect
+    pub next: i64,
 }
 
 #[derive(Clone, Debug, Hash, Serialize, Deserialize)]
@@ -295,6 +314,10 @@ pub enum ShotKind {
     FullBeam(Box<FullBeam>),
     AreaHit(Box<AreaHit>),
     BigBang(Box<BigBangBall>),
+    /// the player's beam family (KameBeam)
+    Kame(Box<KameBeam>),
+    /// Ultra Volleyball wave
+    Volley { len: i32, done: bool, n: i32 },
     MasenkoCursor(Box<MasenkoCursor>),
     MasenkoBall(Box<MasenkoBall>),
     Ghost(Box<Ghost>),
@@ -358,6 +381,8 @@ impl Shot {
                 }
             }
             ShotKind::BigBang(_) => "bigbang",
+            ShotKind::Kame(_) => "beam",
+            ShotKind::Volley { .. } => "volley",
             ShotKind::MasenkoCursor(_) => "masenko",
             ShotKind::MasenkoBall(_) => "masenkoball",
             ShotKind::Ghost(_) => "ghost",
@@ -451,7 +476,7 @@ pub fn grapple_arm(owner: EntityId, dir: Dir, x: i32, y: i32) -> Shot {
 }
 #[allow(clippy::too_many_arguments)]
 pub fn full_beam(owner: EntityId, dir: Dir, team: u8, x: i32, y: i32, a: AttackType, mult: i32, life: i64, table: Option<u8>, vis_pos: Option<[(i32, i32); 4]>, hits: Option<(i64, i64)>) -> Shot {
-    Shot::new(owner, dir, team, x << 8, y << 8, ShotKind::FullBeam(Box::new(FullBeam { len: 0, life, a, mult, width: 24, table, vis_pos, scale: 0, ending: false, vis: None, hit_win: hits })))
+    Shot::new(owner, dir, team, x << 8, y << 8, ShotKind::FullBeam(Box::new(FullBeam { len: 0, life, a, mult, width: 24, table, vis_pos, scale: 0, ending: false, vis: None, hit_win: hits, game: false, next: 0, end_t: 0 })))
 }
 pub fn area_hit(owner: EntityId, dir: Dir, team: u8, b: Rect, life: i64, every: i64, a: AttackType, mult: i32, grow: i32) -> Shot {
     let (cx, cy) = b.center();
@@ -505,14 +530,17 @@ pub fn grow_beam_f(w: &World, owner: EntityId, dir: Dir, team: u8, muzzle: Muzzl
 }
 
 pub fn beam_stop(w: &mut World, i: usize) {
-    if let ShotKind::GrowBeam(b) = &mut w.shot(i).kind {
-        b.done = true;
+    match &mut w.shot(i).kind {
+        ShotKind::GrowBeam(b) => b.done = true,
+        ShotKind::Kame(b) => b.done = true,
+        _ => {}
     }
 }
 pub fn beam_done(w: &World, i: usize) -> bool {
     match &w.ents[i].body {
         Body::Shot(s) => match &s.kind {
             ShotKind::GrowBeam(b) => b.done,
+            ShotKind::Kame(b) => b.done,
             _ => false,
         },
         _ => false,
@@ -570,12 +598,20 @@ pub fn rect(w: &World, i: usize) -> Rect {
             }
         }
         ShotKind::AreaHit(a) => a.b,
-        ShotKind::BigBang(b) => {
-            let r = 9 + 44.min(b.grow.0.floor() as i32);
-            centered(px, py, r * 2, r * 2)
+        ShotKind::BigBang(b) => bb_rect(w, s, b),
+        ShotKind::MasenkoCursor(c) => {
+            let (x, y) = masenko_pos(w, s.owner, s.dir, c.d);
+            centered(x, y, 16, 16)
         }
-        ShotKind::MasenkoCursor(c) => masenko_rect(w, s.owner, s.dir, c.dist2, 16),
-        ShotKind::MasenkoBall(_) => centered(px, py, 8, 8),
+        ShotKind::MasenkoBall(_) => masenko_flight_rect(w, i),
+        ShotKind::Kame(k) => {
+            let (hx, hy) = kame_head(s, k.len);
+            Rect::new(px.min(hx) - 6, py.min(hy) - 6, px.max(hx) + 6, py.max(hy) + 6)
+        }
+        ShotKind::Volley { len, .. } => {
+            let (hx, hy) = (px + dx * len, py + dy * len);
+            Rect::new(px.min(hx) - 2, py.min(hy) - 2, px.max(hx) + 2, py.max(hy) + 2)
+        }
         ShotKind::Ghost(_) => centered(px, py, 12, 12),
         ShotKind::EnergyWave { len, .. } | ShotKind::GrappleArm { len, .. } => {
             let (hx, hy) = (px + dx * len, py + dy * len);
@@ -621,20 +657,6 @@ pub fn rect(w: &World, i: usize) -> Rect {
     }
 }
 
-fn masenko_pos2(w: &World, owner: EntityId, dir: Dir, dist2: i32) -> (i32, i32) {
-    let (cx, cy) = w.actor_by_id(owner).map(|a| a.center()).unwrap_or((0, 0));
-    let (dx, dy) = DIR_VEC[dir as usize];
-    (cx * 2 + dx * dist2, cy * 2 + dy * dist2)
-}
-/// the reference's (possibly half-pixel) rect, as the integer rect that overlaps exactly the same integer rects
-fn masenko_rect(w: &World, owner: EntityId, dir: Dir, dist2: i32, size: i32) -> Rect {
-    let (x2, y2) = masenko_pos2(w, owner, dir, dist2);
-    let h2 = (size >> 1) * 2;
-    let fl = |v: i32| v.div_euclid(2);
-    let ce = |v: i32| (v + 1).div_euclid(2);
-    Rect::new(fl(x2 - h2), fl(y2 - h2), ce(x2 - h2 + size * 2), ce(y2 - h2 + size * 2))
-}
-
 fn off_camera(w: &World, i: usize) -> bool {
     !w.on_any_camera(&rect(w, i))
 }
@@ -678,6 +700,8 @@ pub fn update(w: &mut World, i: usize) {
         ShotKind::FullBeam(_) => full_update(w, i),
         ShotKind::AreaHit(_) => area_update(w, i),
         ShotKind::BigBang(_) => bigbang_update(w, i),
+        ShotKind::Kame(_) => kame_update(w, i),
+        ShotKind::Volley { .. } => volley_update(w, i),
         ShotKind::MasenkoCursor(_) => masenko_update(w, i),
         ShotKind::MasenkoBall(_) => masenko_ball_update(w, i),
         ShotKind::Ghost(_) => ghost_update(w, i),
@@ -1045,12 +1069,81 @@ fn grow_hit_fx(w: &mut World, i: usize) {
     fx::explosion(w, ex, ey, rate);
 }
 
+/// the player's Final Flash: the beam object at player + FINAL_FLASH_POS, built now (frame `built`)
+#[allow(clippy::too_many_arguments)]
+pub fn final_flash(owner: EntityId, dir: Dir, x: i32, y: i32, a: AttackType, mult: i32, table: u8, built: i64) -> Shot {
+    let mut s = full_beam(owner, dir, 1, x, y, a, mult, 1 << 30, Some(table), Some(FINAL_FLASH_POS), None);
+    if let ShotKind::FullBeam(b) = &mut s.kind {
+        b.game = true;
+        b.next = built;
+        b.scale = 0x20;
+    }
+    s
+}
+/// update 0x0803710C: length from the wall probe (square +- 12, 8 + 8 per free square), scale +0x20 per tick, half
+/// width 8 * scale >> 8, one message per tick; accepted with now - next > 0: next = now + 3 + rand(5), sound 48 +
+/// rand(2). Released: no hits, scale -0x20 per tick, removed after 8 ticks
+fn final_flash_update(w: &mut World, i: usize, t: i64) {
+    let (dir, owner, px, py) = (w.shot_ref(i).dir, w.shot_ref(i).owner, w.shot_ref(i).px(), w.shot_ref(i).py());
+    let (dx, dy) = DIR_VEC[dir as usize];
+    if t == 1 {
+        let mut l = 8;
+        for k in 0..256 {
+            let (cx, cy) = (px + dx * 8 * k, py + dy * 8 * k);
+            if in_wall(w, i, &Rect::new(cx - 12, cy - 12, cx + 12, cy + 12)) {
+                break;
+            }
+            l += 8;
+        }
+        let vis = w.actor_by_id(owner).map(|a| (a.px() + FINAL_FLASH_POS[dir as usize].0, a.py() + FINAL_FLASH_POS[dir as usize].1)).unwrap_or((px, py));
+        if let ShotKind::FullBeam(b) = &mut w.shot(i).kind {
+            b.len = l;
+            b.vis = Some(vis);
+        }
+    }
+    let b = match &w.shot_ref(i).kind {
+        ShotKind::FullBeam(b) => (**b).clone(),
+        _ => return,
+    };
+    if b.ending || t > b.life {
+        let mut rm = false;
+        if let ShotKind::FullBeam(x) = &mut w.shot(i).kind {
+            x.ending = true;
+            x.scale = 0.max(x.scale - 0x20);
+            x.end_t += 1;
+            rm = x.end_t >= 8;
+        }
+        if rm {
+            w.ents[i].removed = true;
+        }
+        return;
+    }
+    let scale = if b.scale < 0x100 { b.scale + 0x20 } else { b.scale };
+    if let ShotKind::FullBeam(x) = &mut w.shot(i).kind {
+        x.scale = scale;
+    }
+    let hw = (8 * scale) >> 8;
+    let (ex, ey) = (px + dx * b.len, py + dy * b.len);
+    let r = Rect::new(px.min(ex) - hw, py.min(ey) - hw, px.max(ex) + hw, py.max(ey) + hw);
+    if hit(w, i, r, b.a, b.mult, false) && w.frame as i64 - b.next > 0 {
+        let nf = w.frame as i64 + 3 + w.rng.rand(5) as i64;
+        if let ShotKind::FullBeam(x) = &mut w.shot(i).kind {
+            x.next = nf;
+        }
+        let sid = 48 + w.rng.rand(2);
+        w.sfx(sid, 64);
+    }
+}
+
 fn full_update(w: &mut World, i: usize) {
     let t = {
         let s = w.shot(i);
         s.t += 1;
         s.t
     };
+    if matches!(&w.shot_ref(i).kind, ShotKind::FullBeam(b) if b.game) {
+        return final_flash_update(w, i, t);
+    }
     let (dir, owner, px, py) = (w.shot_ref(i).dir, w.shot_ref(i).owner, w.shot_ref(i).px(), w.shot_ref(i).py());
     if t == 1 {
         let len = wall_dist(w, dir, px, py, 8, 400);
@@ -1125,23 +1218,44 @@ fn area_update(w: &mut World, i: usize) {
     }
 }
 
-const BB_DEF: [(i32, i32); 3] = [(4, 4), (6, 6), (7, 10)];
+const BB_DEF: [(i32, i32, u32); 3] = [(4, 4, 0x0876_4e00), (6, 6, 0x0876_4e00), (7, 10, 0x0876_aae0)];
 const BB_SIZE: [i32; 10] = [4, 6, 8, 12, 16, 24, 28, 32, 32, 32];
 const BB_REC: [[i32; 4]; 10] = [[8, 4, 16, 16], [8, 2, 16, 16], [8, 0, 16, 16], [16, 4, 32, 32], [16, 0, 32, 32], [32, 8, 64, 64], [32, 4, 64, 64], [32, 0, 64, 64], [32, 0, 64, 64], [32, 0, 64, 64]];
+/// ball position relative to the player position while charging, per facing (0x0871DD9C)
 pub const BIGBANG_POS: [(i32, i32); 4] = [(2, 2), (12, -22), (-5, -6), (21, -6)];
 
+/// Big Bang ball (class 0x08037480, update 0x08037650, launch 0x080378A0, explode 0x0803756E, handler 0x080378F4)
 pub fn big_bang(owner: EntityId, dir: Dir, x: i32, y: i32, lv: i32) -> Shot {
-    Shot::new(owner, dir, 1, x, y, ShotKind::BigBang(Box::new(BigBangBall { charge256: 0, grow: F(0.0), launched: false, lv: lv.clamp(0, 2), u: 0, f: 0, vis_off: (0, 0) })))
+    Shot::new(owner, dir, 1, x, y, ShotKind::BigBang(Box::new(BigBangBall { charge256: 0, launched: false, lv: lv.clamp(0, 2), u: 0, f: 0 })))
 }
 fn bb_cap(b: &mut BigBangBall) {
-    let (lo, hi) = BB_DEF[b.lv as usize];
+    let (lo, hi, _) = BB_DEF[b.lv as usize];
     if b.f >= lo {
         b.f = if hi == lo { lo } else { lo + ((b.u >> 2) % (hi - lo)) };
     }
 }
+/// the record box of the ball's current frame (falls back to the facing-down boxes)
+fn bb_rect(w: &World, s: &Shot, b: &BigBangBall) -> Rect {
+    let g = w.data.record(BB_DEF[b.lv as usize].2 + s.dir as u32 * 120 + 12 * b.f as u32).unwrap_or(BB_REC[(b.f as usize).min(9)]);
+    Rect::new(s.px() - g[0], s.py() - g[1], s.px() - g[0] + g[2], s.py() - g[1] + g[3])
+}
+fn bb_around(w: &World, i: usize, sz: i32) -> Rect {
+    let s = w.shot_ref(i);
+    let ShotKind::BigBang(b) = &s.kind else { return Rect::default() };
+    let (cx, cy) = bb_rect(w, s, b).center();
+    Rect::new(cx - sz, cy - sz, cx + sz, cy + sz)
+}
+fn owner_slot(w: &World, owner: EntityId) -> usize {
+    w.find(owner)
+        .and_then(|k| match &w.ents[k].body {
+            Body::Player(p) => Some(p.slot as usize),
+            _ => None,
+        })
+        .unwrap_or(0)
+}
 fn bigbang_update(w: &mut World, i: usize) {
     w.shot(i).t += 1;
-    let dir = w.shot_ref(i).dir;
+    let (dir, owner) = (w.shot_ref(i).dir, w.shot_ref(i).owner);
     let launched = matches!(&w.shot_ref(i).kind, ShotKind::BigBang(b) if b.launched);
     if !launched {
         if let ShotKind::BigBang(b) = &mut w.shot(i).kind {
@@ -1158,130 +1272,172 @@ fn bigbang_update(w: &mut World, i: usize) {
         }
         return;
     }
-    if let ShotKind::BigBang(b) = &mut w.shot(i).kind {
-        bb_cap(b);
-        b.u += 1;
-    }
     let (dx, dy) = DIR_VEC[dir as usize];
     {
         let s = w.shot(i);
-        s.x += dx * 148;
-        s.y += dy * 148;
+        if let ShotKind::BigBang(b) = &mut s.kind {
+            bb_cap(b);
+        }
+        s.x += dx * 128;
+        s.y += dy * 128;
+        if let ShotKind::BigBang(b) = &mut s.kind {
+            b.u += 1;
+        }
     }
-    if off_camera(w, i) {
-        w.ents[i].removed = true;
-        return;
-    }
-    let r = rect(w, i);
-    let probe = w.live_enemies().iter().any(|&e| w.en_ref(e).a.hittable && overlaps(&w.en_ref(e).a.body_box(), &r));
-    if probe || in_wall(w, i, &r) {
-        w.ents[i].removed = true;
+    // past the camera edge on the side it flies to (0x08019B7C)
+    let r = {
         let s = w.shot_ref(i);
         let ShotKind::BigBang(b) = &s.kind else { return };
-        let (px, py, owner) = (s.px(), s.py(), s.owner);
-        let radius = 9 + 44.min(b.grow.0.floor() as i32);
-        let sz = (radius + 15) * 2;
-        let mult = 1.max(((b.charge256 * 73) >> 16) as i32);
-        let rec = BB_REC.get(b.f as usize).copied().unwrap_or(BB_REC[0]);
-        let (cx, cy) = (px - rec[0] + (rec[2] >> 1), py - rec[1] + (rec[3] >> 1));
-        let sz2 = (BB_SIZE[(b.f as usize).min(9)] * 3) >> 1;
-        let vo = b.vis_off;
-        add(w, area_hit(owner, dir, 1, centered(px, py, sz, sz), 110, 5, atk(13), mult, 0));
-        fx::add(w, fx::Fx::BigBangBoom { n: 60, x0: cx + vo.0 - sz2, y0: cy + vo.1 - sz2, s: sz2 });
+        bb_rect(w, s, b)
+    };
+    let c = w.camera(owner_slot(w, owner));
+    let gone = match dir {
+        0 => r.y0 >= c.y1,
+        1 => r.y1 <= c.y0,
+        2 => r.x1 <= c.x0,
+        _ => r.x0 >= c.x1,
+    };
+    if gone {
+        w.ents[i].removed = true;
+        w.sfx_stop(32);
+        return;
+    }
+    let a4 = bb_around(w, i, 4);
+    if in_wall(w, i, &a4) {
+        return bigbang_explode(w, i);
+    }
+    let (u, f, charge) = match &w.shot_ref(i).kind {
+        ShotKind::BigBang(b) => (b.u, b.f, b.charge256 >> 8),
+        _ => return,
+    };
+    if u & 3 == 0 {
+        let around = bb_around(w, i, BB_SIZE[(f as usize).min(9)]);
+        let mult = ((charge * 0x5762 + 0xffff) >> 16) as i32;
+        if hit(w, i, around, atk(13), mult, false) {
+            let s = 48 + w.rng.rand(2);
+            w.sfx(s, 64);
+        }
     }
 }
+fn bigbang_explode(w: &mut World, i: usize) {
+    if w.ents[i].removed {
+        return;
+    }
+    w.ents[i].removed = true;
+    w.sfx_stop(32);
+    let (f, charge) = match &w.shot_ref(i).kind {
+        ShotKind::BigBang(b) => (b.f, b.charge256 >> 8),
+        _ => return,
+    };
+    let s = (BB_SIZE[(f as usize).min(9)] * 3) >> 1;
+    let around = bb_around(w, i, s);
+    hit(w, i, around, atk(13), (81 * charge) as i32, false);
+    w.sfx(23, 64);
+    let (cx, cy) = around.center();
+    fx::add(w, fx::Fx::BigBangBoom { n: 60, x0: cx - s, y0: cy - s, s });
+}
 
+/// Masenko (skill 17): the cursor (ctor 0x08021594, update 0x0802163A) at the body-box centre + dir * d and the ball
+/// (class 0x08021280, update 0x0802133A) charging at MASENKO_MUZZLE from the press; the B release launches the ball
 pub const MASENKO_MUZZLE: [(i32, i32); 4] = [(8, -24), (8, -24), (10, -24), (6, -24)];
-const MASENKO_DELAY: i64 = 51;
-const MASENKO_FLIGHT: i64 = 43;
+const MASENKO_SPARK: [i32; 3] = [9, 9, 12];
 const MASENKO_N: [i32; 3] = [4, 5, 6];
 
 pub fn masenko(owner: EntityId, dir: Dir, mult: i32, lv: i32) -> Shot {
-    Shot::new(owner, dir, 1, 0, 0, ShotKind::MasenkoCursor(Box::new(MasenkoCursor { dist2: 48, released: -1, mult, lv: lv.clamp(0, 2), ball: 0 })))
+    Shot::new(owner, dir, 1, 0, 0, ShotKind::MasenkoCursor(Box::new(MasenkoCursor { d: 0, step: 2, released: -1, mult, lv: lv.clamp(0, 2), ball: 0 })))
 }
+fn masenko_pos(w: &World, owner: EntityId, dir: Dir, d: i32) -> (i32, i32) {
+    let (cx, cy) = w.actor_by_id(owner).map(|a| a.center()).unwrap_or((0, 0));
+    let (dx, dy) = DIR_VEC[dir as usize];
+    (cx + dx * d, cy + dy * d)
+}
+/// the B release: the ball flies (the cursor is gone)
 pub fn masenko_release(w: &mut World, i: usize) {
     let t = w.shot_ref(i).t;
-    if let ShotKind::MasenkoCursor(c) = &mut w.shot(i).kind {
-        if c.released < 0 {
+    let dir = w.shot_ref(i).dir;
+    let (d, ball) = match &mut w.shot(i).kind {
+        ShotKind::MasenkoCursor(c) => {
+            if c.released >= 0 {
+                return;
+            }
             c.released = t;
+            (c.d, c.ball)
+        }
+        _ => return,
+    };
+    w.ents[i].removed = true;
+    if let Some(bi) = w.find(ball) {
+        let (dx, dy) = DIR_VEC[dir as usize];
+        let s = w.shot(bi);
+        if dir == 1 {
+            s.y -= 8 << 8;
+        }
+        if let ShotKind::MasenkoBall(b) = &mut s.kind {
+            b.vx = (dx * d * 0x5f4) >> 8;
+            b.vy = ((dy * d * 0x5f4) >> 8) - 0x200;
+            b.a = 0x2000;
+            b.b = 0x200;
+            b.phase = MPhase::Fly;
         }
     }
 }
 fn masenko_update(w: &mut World, i: usize) {
-    let t = {
-        let s = w.shot(i);
-        s.t += 1;
-        s.t
-    };
+    w.shot(i).t += 1;
     let (owner, dir) = (w.shot_ref(i).owner, w.shot_ref(i).dir);
     let c = match &w.shot_ref(i).kind {
         ShotKind::MasenkoCursor(c) => (**c).clone(),
         _ => return,
     };
-    let me = w.ents[i].id;
     if c.ball == 0 {
         let (mx, my) = MASENKO_MUZZLE[dir as usize];
         let (opx, opy) = w.actor_by_id(owner).map(|a| (a.px(), a.py())).unwrap_or((0, 0));
-        let ball = Shot::new(owner, dir, 1, (opx + mx) << 8, (opy + my) << 8, ShotKind::MasenkoBall(Box::new(MasenkoBall { cursor: me, lv: c.lv, phase: MPhase::Charge, from: (0, 0), to: (0, 0), ft: 0, tb: 0 })));
+        let me = w.ents[i].id;
+        let ball = Shot::new(owner, dir, 1, (opx + mx) << 8, (opy + my) << 8, ShotKind::MasenkoBall(Box::new(MasenkoBall { cursor: me, lv: c.lv, phase: MPhase::Charge, vx: 0, vy: 0, a: 0, b: 0, tb: 0 })));
         let id = add(w, ball);
         if let ShotKind::MasenkoCursor(x) = &mut w.shot(i).kind {
             x.ball = id;
         }
     }
-    let ball = match &w.shot_ref(i).kind {
-        ShotKind::MasenkoCursor(x) => x.ball,
-        _ => 0,
-    };
-    if c.released < 0 {
-        let d2 = 96.min(c.dist2 + 1);
-        if let ShotKind::MasenkoCursor(x) = &mut w.shot(i).kind {
-            x.dist2 = d2;
-        }
-        let (x2, y2) = masenko_pos2(w, owner, dir, d2);
-        let s = w.shot(i);
-        // x << 8 of a half pixel truncates toward zero (ToInt32)
-        s.x = (x2 / 2) << 8;
-        s.y = (y2 / 2) << 8;
+    if c.released >= 0 {
         return;
     }
-    let since = t - c.released;
-    let (x2, y2) = masenko_pos2(w, owner, dir, c.dist2);
-    if since == MASENKO_DELAY - MASENKO_FLIGHT {
-        if let Some(bi) = w.find(ball) {
-            if let ShotKind::MasenkoBall(b) = &mut w.shot(bi).kind {
-                let _ = b;
-            }
-            // launch: up-facing balls start 8 px higher; target = the cursor position (half-pixel exact in 1/512)
-            let s = w.shot(bi);
-            if dir == 1 {
-                s.y -= 8 << 8;
-            }
-            let from = (s.x, s.y);
-            if let ShotKind::MasenkoBall(b) = &mut s.kind {
-                b.from = from;
-                b.to = ((x2 / 2) << 8, (y2 / 2) << 8);
-                b.ft = 0;
-                b.phase = MPhase::Fly;
-            }
+    let max = if dir < 2 { 70 } else { 100 };
+    let (mut d, mut step) = (c.d, c.step);
+    if c.lv < 2 {
+        d += step;
+        if d >= max {
+            step = -2;
+        } else if step < 0 && d < 16 {
+            step = 2;
         }
+    } else {
+        use crate::input::{DOWN, LEFT, RIGHT, UP};
+        let held = w.input[owner_slot(w, owner)].held;
+        let toward = [DOWN, UP, LEFT, RIGHT][dir as usize];
+        let away = [UP, DOWN, RIGHT, LEFT][dir as usize];
+        if held & toward != 0 {
+            d += 2;
+        } else if held & away != 0 {
+            d -= 2;
+        }
+        d = d.clamp(16, max);
     }
-    if since >= MASENKO_DELAY {
-        w.ents[i].removed = true;
-        if let Some(bi) = w.find(ball) {
-            let s = w.shot(bi);
-            s.x = (x2 / 2) << 8;
-            s.y = (y2 / 2) << 8;
-            if let ShotKind::MasenkoBall(b) = &mut s.kind {
-                b.phase = MPhase::Blast;
-                b.tb = 0;
-            }
-        }
-        let r = masenko_rect(w, owner, dir, c.dist2, 32);
-        let (cx, cy) = r.center();
-        let mut a = area_hit(owner, dir, 1, r, 16, 100, atk(7), c.mult, 0);
-        a.x = cx << 8;
-        a.y = cy << 8;
-        add(w, a);
+    let (x, y) = masenko_pos(w, owner, dir, d);
+    let s = w.shot(i);
+    if let ShotKind::MasenkoCursor(x2) = &mut s.kind {
+        x2.d = d;
+        x2.step = step;
+    }
+    s.x = x << 8;
+    s.y = y << 8;
+}
+fn masenko_flight_rect(w: &World, i: usize) -> Rect {
+    let s = w.shot_ref(i);
+    let ShotKind::MasenkoBall(b) = &s.kind else { return Rect::default() };
+    let rec = 0x0872_1164 + 12 * (MASENKO_SPARK[b.lv as usize] + 1 + ((s.t as i32 >> 3) & 1)) as u32;
+    match w.data.record(rec) {
+        Some(g) => Rect::new(s.px() - g[0], s.py() - g[1], s.px() - g[0] + g[2], s.py() - g[1] + g[3]),
+        None => centered(s.px(), s.py(), 16, 16),
     }
 }
 fn masenko_ball_update(w: &mut World, i: usize) {
@@ -1292,22 +1448,44 @@ fn masenko_ball_update(w: &mut World, i: usize) {
     };
     match b.phase {
         MPhase::Charge => {
-            if w.is_removed(b.cursor) {
+            let gone = match w.find(b.cursor) {
+                None => true,
+                Some(ci) => w.ents[ci].removed && matches!(&w.shot_ref(ci).kind, ShotKind::MasenkoCursor(c) if c.released < 0),
+            };
+            // the cursor removed without a release (the skill ended): the charging ball goes too
+            let released = w.find(b.cursor).is_some_and(|ci| matches!(&w.shot_ref(ci).kind, ShotKind::MasenkoCursor(c) if c.released >= 0));
+            if gone && !released {
                 w.ents[i].removed = true;
             }
         }
         MPhase::Fly => {
-            let n = MASENKO_FLIGHT;
-            let k = n.min(b.ft as i64 + 1);
-            let arc = |j: i64| -0x200 * j + (0x20 * j * (j + 1)) / 2;
-            // exact rationals over 43 (never a rounding tie)
-            let x = crate::fixed::round_div(b.from.0 as i64 * n + (b.to.0 - b.from.0) as i64 * k, n);
-            let y = crate::fixed::round_div(b.from.1 as i64 * n + (b.to.1 - b.from.1) as i64 * k + arc(k) * n - arc(n) * k, n);
-            let s = w.shot(i);
-            s.x = x as i32;
-            s.y = y as i32;
-            if let ShotKind::MasenkoBall(bb) = &mut s.kind {
-                bb.ft = k as i32;
+            let mut nb = b.clone();
+            {
+                let s = w.shot(i);
+                s.x += nb.vx;
+                s.y += nb.vy;
+            }
+            nb.vy += 0x20;
+            nb.b -= 0x20;
+            nb.a += nb.b;
+            let fire = nb.a < 0;
+            if fire {
+                nb.phase = MPhase::Blast;
+                nb.tb = 0;
+            }
+            if let ShotKind::MasenkoBall(x) = &mut w.shot(i).kind {
+                **x = nb.clone();
+            }
+            if fire {
+                let r = masenko_flight_rect(w, i);
+                let mult = match w.find(b.cursor).map(|ci| &w.shot_ref(ci).kind) {
+                    Some(ShotKind::MasenkoCursor(c)) => c.mult,
+                    _ => [3687, 11060, 16589][b.lv as usize],
+                };
+                if hit(w, i, r, atk(7), mult, false) {
+                    let s = 48 + w.rng.rand(3);
+                    w.sfx(s, 64);
+                }
             }
         }
         MPhase::Blast => {
@@ -1319,6 +1497,128 @@ fn masenko_ball_update(w: &mut World, i: usize) {
                 w.ents[i].removed = true;
             }
         }
+    }
+}
+
+/// the player's beam (class 0x080206B8, update 0x0802084C): Kamehameha 15 / Kamekameha 16 / Electric 6 / Banshee 1 /
+/// Big Bang Kamehameha 3, at the fire position, length 8 from the construction. Each firing tick: the head box
+/// (head +- 8) on a projectile wall -> stopped; else the head message: accepted -> stopped + the hit effect, not
+/// accepted -> len += 3 while the head box overlaps the camera. Then always the body message (position .. head + 6).
+/// Released: moves 3 px per tick, len -= 3, removed once len < 0 (destructor sounds: the owner's beam_end).
+pub fn kame_beam(owner: EntityId, dir: Dir, x: i32, y: i32, built: i64, a: AttackType, mult: i32, gfx: bool) -> Shot {
+    Shot::new(owner, dir, 1, x << 8, y << 8, ShotKind::Kame(Box::new(KameBeam { len: 8, done: false, a, mult, gfx, vt: 0, stopped: false, next: built })))
+}
+fn kame_head(s: &Shot, len: i32) -> (i32, i32) {
+    let (dx, dy) = DIR_VEC[s.dir as usize];
+    (s.px() + dx * len, s.py() + dy * len)
+}
+fn kame_update(w: &mut World, i: usize) {
+    let b = match &w.shot_ref(i).kind {
+        ShotKind::Kame(b) => (**b).clone(),
+        _ => return,
+    };
+    let (dir, owner) = (w.shot_ref(i).dir, w.shot_ref(i).owner);
+    let (dx, dy) = DIR_VEC[dir as usize];
+    {
+        let s = w.shot(i);
+        s.t += 1;
+        if let ShotKind::Kame(k) = &mut s.kind {
+            k.vt += 1;
+        }
+    }
+    if b.done {
+        let s = w.shot(i);
+        s.x += dx * 3 * 256;
+        s.y += dy * 3 * 256;
+        let mut gone = false;
+        if let ShotKind::Kame(k) = &mut s.kind {
+            k.len -= 3;
+            gone = k.len < 0;
+        }
+        if gone {
+            w.ents[i].removed = true;
+        }
+        return;
+    }
+    let (hx, hy) = kame_head(w.shot_ref(i), b.len);
+    let hr = Rect::new(hx - 8, hy - 8, hx + 8, hy + 8);
+    if in_wall(w, i, &hr) {
+        if let ShotKind::Kame(k) = &mut w.shot(i).kind {
+            k.stopped = true;
+        }
+    } else if hit(w, i, hr, b.a, b.mult, false) {
+        if let ShotKind::Kame(k) = &mut w.shot(i).kind {
+            k.stopped = true;
+        }
+        let frame = w.frame as i64;
+        if frame - b.next > 0 {
+            let nf = frame + 3 + w.rng.rand(5) as i64;
+            if let ShotKind::Kame(k) = &mut w.shot(i).kind {
+                k.next = nf;
+            }
+            let sid = 48 + w.rng.rand(2);
+            w.sfx(sid, 64);
+            let ex = hx + dx * 4 + w.rng.rand(32) - 16;
+            let ey = hy + dy * 4 + w.rng.rand(32) - 16;
+            let rate = 0x1000 + w.rng.rand(0x4000);
+            fx::explosion(w, ex, ey, rate);
+        }
+    } else if overlaps(&hr, &w.camera(owner_slot(w, owner))) {
+        if let ShotKind::Kame(k) = &mut w.shot(i).kind {
+            k.len += 3;
+        }
+    }
+    let r = rect(w, i);
+    hit(w, i, r, b.a, b.mult, false);
+}
+
+/// Ultra Volleyball Attack wave (Gotenks skill 23, update 0x080384C2): box origin .. origin + dir * len expanded by 2;
+/// a wall or an accepted message ends it; else len += 4 up to 48, then the origin moves 4 px per tick; 240 ticks max
+pub fn volley_wave(owner: EntityId, dir: Dir, x: i32, y: i32) -> Shot {
+    Shot::new(owner, dir, 1, x << 8, y << 8, ShotKind::Volley { len: 8, done: false, n: 0 })
+}
+fn volley_update(w: &mut World, i: usize) {
+    let dir = w.shot_ref(i).dir;
+    let (dx, dy) = DIR_VEC[dir as usize];
+    w.shot(i).t += 1;
+    let ShotKind::Volley { done, .. } = w.shot_ref(i).kind else { return };
+    if done {
+        let s = w.shot(i);
+        s.x += dx * 4 * 256;
+        s.y += dy * 4 * 256;
+        let mut gone = false;
+        if let ShotKind::Volley { len, .. } = &mut s.kind {
+            *len -= 4;
+            gone = *len <= 0;
+        }
+        if gone {
+            w.ents[i].removed = true;
+        }
+        return;
+    }
+    let r = rect(w, i);
+    if in_wall(w, i, &r) || hit(w, i, r, atk(16), 0x400, false) {
+        if let ShotKind::Volley { done, .. } = &mut w.shot(i).kind {
+            *done = true;
+        }
+        return;
+    }
+    let s = w.shot(i);
+    let mut mv = false;
+    if let ShotKind::Volley { len, done, n } = &mut s.kind {
+        if *len < 0x30 {
+            *len += 4;
+        } else {
+            mv = true;
+        }
+        *n += 1;
+        if *n > 0xf0 {
+            *done = true;
+        }
+    }
+    if mv {
+        s.x += dx * 4 * 256;
+        s.y += dy * 4 * 256;
     }
 }
 
@@ -1600,6 +1900,18 @@ fn sphere_update(w: &mut World, i: usize) {
 pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
     let me = w.ents[i].id;
     match &w.shot_ref(i).kind {
+        // an Energy Blast message (attack sub 4, another object) overlapping the ball's box and its centre +- size*3/4
+        ShotKind::BigBang(b) => {
+            if !b.launched || msg.atk.sub != 4 || msg.source == me {
+                return false;
+            }
+            let sz = (BB_SIZE[(b.f as usize).min(9)] * 3) >> 2;
+            if !overlaps(&msg.rect, &rect(w, i)) || !overlaps(&msg.rect, &bb_around(w, i, sz)) {
+                return false;
+            }
+            bigbang_explode(w, i);
+            true
+        }
         ShotKind::Straight(o) => {
             if o.fragile && o.dead < 0 && msg.team == 1 && msg.atk.kind == 0 && msg.source != me && overlaps(&msg.rect, &rect(w, i)) {
                 w.ents[i].removed = true;

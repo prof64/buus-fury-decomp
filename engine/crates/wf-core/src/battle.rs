@@ -354,6 +354,7 @@ pub fn camera(w: &mut World, slot: usize) {
     let ty = ((a.py() * 2 + a.foot_h) >> 1) - 84;
     let view = w.arena.view;
     let c = &mut w.cameras[slot];
+    c.shown = if c.init { c.rect } else { Rect::default() };
     if !c.init {
         c.x = tx << 10;
         c.y = ty << 10;
@@ -368,6 +369,9 @@ pub fn camera(w: &mut World, slot: usize) {
     }
     let (cx, cy) = (c.x >> 10, c.y >> 10);
     c.rect = Rect::new(cx, cy, cx + GBA_W, cy + GBA_H);
+    if c.shown == Rect::default() {
+        c.shown = c.rect;
+    }
 }
 /// lockstep: copy the emulator's camera (22.10)
 pub fn set_camera(w: &mut World, slot: usize, x: i32, y: i32) {
@@ -377,6 +381,7 @@ pub fn set_camera(w: &mut World, slot: usize, x: i32, y: i32) {
     c.init = true;
     let (cx, cy) = (x >> 10, y >> 10);
     c.rect = Rect::new(cx, cy, cx + GBA_W, cy + GBA_H);
+    c.shown = c.rect;
 }
 
 fn live_primary(w: &World) -> Vec<EntityId> {

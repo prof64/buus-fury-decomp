@@ -1,0 +1,16 @@
+[package]
+name = "wf-script-core"
+description = "Script host adapter: runs Buu's Fury scripts (wf-script VM / wf-script-rhai) against the wf-core World. Dependency direction script -> core."
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+wf-core = { path = "../wf-core" }
+wf-script = { path = "../wf-script" }
+serde.workspace = true
+
+[dev-dependencies]
+wf-rom.workspace = true
+wf-extract = { path = "../wf-extract" }
+wf-script-rhai = { path = "../wf-script-rhai" }

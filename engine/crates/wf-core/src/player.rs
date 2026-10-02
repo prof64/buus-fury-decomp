@@ -55,7 +55,7 @@ fn skill_mult(id: i32, lv: i32) -> i32 {
         4 => &[410, 820, 1649],
         5 => &[328],
         6 | 10 | 11 | 15 | 16 => &[41, 164, 328],
-        8 => &[226, 226, 226],
+        8 => &[62, 144, 226],
         9 => &[10240],
         17 => &[3687, 11060, 16589],
         _ => &[1024],
@@ -86,7 +86,7 @@ const VOLLEY_POS: [(i32, i32); 4] = [(10, 8), (10, -20), (-8, -8), (24, -8)];
 const DASH_VEC: [(i32, i32); 4] = [(0, 1), (0, -1), (-1, 0), (1, 0)];
 const KNOCK_VEC: [(i32, i32); 4] = [(0, 192), (0, -192), (-192, 0), (192, 0)];
 const BLOCK_PUSH: [(i32, i32); 4] = [(0, -512), (0, 512), (512, 0), (-512, 0)];
-const KI_MUZZLE: [(i32, i32); 4] = [(8, 0), (8, -7), (5, -7), (13, -7)];
+const ENERGY_PUNCH_RECT_L3: [[i32; 4]; 4] = [[0, 0, 24, 28], [-4, -36, 20, 0], [-20, -24, 0, 8], [16, -24, 36, 8]];
 const BURNING_HOLD: [(i32, i32); 4] = [(8, -2), (12, -2), (19, -6), (-3, -6)];
 const BEAM_CHARGE_KAME: [(i32, i32); 4] = [(8, -2), (12, -2), (12, -2), (4, -2)];
 const BEAM_CHARGE_BANSHEE: [(i32, i32); 4] = [(2, 6), (13, -25), (-8, -6), (24, -6)];
@@ -224,6 +224,23 @@ pub struct ItRun {
     pub t: i32,
 }
 
+/// the partner record that takes over at a cutscene fusion's defuse
+#[derive(Clone, Debug, Default, Hash, Serialize, Deserialize)]
+pub struct Partner {
+    pub form: i32,
+    pub hp: i32,
+    pub max_hp: i32,
+    pub ep: i32,
+    pub max_ep: i32,
+    pub base: [i32; 4],
+    pub skills: Vec<i32>,
+    pub slot: usize,
+    pub level0: i32,
+    pub ss_gauge: i32,
+    pub ss3_gauge: i64,
+    pub cooldown: i32,
+}
+
 #[derive(Clone, Debug, Hash, Serialize, Deserialize)]
 pub struct Player {
     pub a: Actor,
@@ -278,6 +295,13 @@ pub struct Player {
     pub it: Option<ItRun>,
     pub ko_at: i64,
     pub dealt_before: i32,
+    /// story Trunks forms 24 / 25: the form object's countdown (+0xC)
+    pub story_cnt: i32,
+    /// cutscene fusions (form object 0x03001B64): countdown (+0x10, 300 at the construction)
+    pub fus_cnt: i32,
+    /// the defuse script: (frames since, start x px)
+    pub defuse: Option<(i32, i32)>,
+    pub partner: Option<Partner>,
 }
 
 pub struct PlayerInit {
@@ -346,6 +370,10 @@ impl Player {
             it: None,
             ko_at: -1,
             dealt_before: 0,
+            story_cnt: 0,
+            fus_cnt: 300,
+            defuse: None,
+            partner: None,
         };
         p.apply_form(w, init.form);
         p
@@ -376,6 +404,22 @@ impl Player {
     }
     pub fn swinging(&self) -> bool {
         self.state == PState::Punch
+    }
+    /// story Trunks: form 24 (0x03001B88) / 25 (0x03001B8C)
+    pub fn story_form(&self, w: &World) -> bool {
+        let c = self.form_ref(w).controller;
+        c == 0x3001b88 || c == 0x3001b8c
+    }
+    /// 0x0800FF44: the shot origin on the body box: down (cx, position y), up (cx, cy), left (x0, cy), right (x1, cy)
+    pub fn hand_point(&self) -> (i32, i32) {
+        let b = self.a.body_box();
+        let (cx, cy) = b.center();
+        match self.a.facing {
+            0 => (cx, self.a.py()),
+            1 => (cx, cy),
+            2 => (b.x0, cy),
+            _ => (b.x1, cy),
+        }
     }
     fn form_ref<'a>(&self, w: &'a World) -> &'a crate::content::Form {
         w.data.form(self.form).expect("form")
@@ -834,8 +878,26 @@ pub fn update(w: &mut World, i: usize) {
         }
     }
     p(w, i).ghost_rng = gr.into_iter().filter(|g| g.0 > frame).collect();
-    if !pr(w, i).dead {
+    // the death script (KO + 199) blocks the player update for a frame; the story forms' controllers run at HP 0
+    let ko = pr(w, i).ko_at;
+    let since_ko = if ko >= 0 { w.frame as i64 - ko } else { -1 };
+    if since_ko == 199 {
+        let mut pl = pr(w, i).clone();
+        pl.sync_anim(w);
+        *p(w, i) = pl;
+        return;
+    }
+    if pr(w, i).defuse.is_some() {
+        return defuse_step(w, i);
+    }
+    if since_ko < 199 && (!pr(w, i).dead || pr(w, i).story_form(w)) {
         passive(w, i);
+    }
+    if pr(w, i).defuse.is_some() {
+        let mut pl = pr(w, i).clone();
+        pl.sync_anim(w);
+        *p(w, i) = pl;
+        return;
     }
     anim_tick(w, i);
     if !pr(w, i).dead {
@@ -1021,12 +1083,127 @@ fn tick_blast(w: &mut World, i: usize) {
     }
 }
 fn fire_blast(w: &mut World, i: usize) {
-    let a = &pr(w, i).a;
-    let (ox, oy) = KI_MUZZLE[a.facing as usize];
-    let (dir, x, y) = (a.facing, (a.px() + ox) << 8, (a.py() + oy) << 8);
+    let (mx, my) = pr(w, i).hand_point();
+    let dir = pr(w, i).a.facing;
     let me = w.ents[i].id;
-    let id = shots::ki_blast(w, me, dir, 1, x, y, atk(4), 1024, true);
+    let id = shots::ki_blast(w, me, dir, 1, mx << 8, my << 8, atk(4), 1024, true);
+    // the player's blast (vtable 0x0804B454) tests a 16 x 16 box centred on its position
+    if let Some(k) = w.find(id) {
+        if let ShotKind::Straight(o) = &mut w.shot(k).kind {
+            o.b = [8, 8, 16, 16];
+        }
+    }
     p(w, i).blast = id;
+}
+
+/// the story form object: countdown - 1, once negative SetAnim(23) (form 24 -> 25) / SetAnim(24) (25 -> 24) every
+/// frame the player is not already in that state (0x08010D26)
+fn story_tick(w: &mut World, i: usize) {
+    p(w, i).story_cnt -= 1;
+    if pr(w, i).story_cnt >= 0 {
+        return;
+    }
+    let f = pr(w, i).form_ref(w).clone();
+    if f.controller == 0x3001b88 {
+        if pr(w, i).gs != Gs::SsUp {
+            p(w, i).transform_to = f.up;
+            set_anim_id(w, i, 23);
+        }
+    } else if pr(w, i).gs != Gs::SsRevert {
+        set_anim_id(w, i, 24);
+    }
+}
+/// the new form object after a transformation / revert (0x0801064C): form 24's countdown 120 + rand(180), form 25's
+/// 240 + rand(120), the fusion's 300
+fn new_form_object(w: &mut World, i: usize) {
+    let c = pr(w, i).form_ref(w).controller;
+    if c == 0x3001b88 {
+        let r = w.rng.rand(180);
+        p(w, i).story_cnt = 120 + r;
+    } else if c == 0x3001b8c {
+        let r = w.rng.rand(120);
+        p(w, i).story_cnt = 240 + r;
+    } else if c == 0x3001b64 {
+        p(w, i).fus_cnt = 300;
+    }
+    let pl = p(w, i);
+    if pl.dead && pl.rec.hp == 0 {
+        pl.dead = false;
+    }
+}
+/// the cutscene fusions' defuse (script s014, run by the form object when its countdown goes negative)
+fn defuse_step(w: &mut World, i: usize) {
+    let (t, x0) = {
+        let d = p(w, i).defuse.as_mut().unwrap();
+        d.0 += 1;
+        *d
+    };
+    if t == 85 {
+        swap_to_partner(w, i);
+        w.rng.rand(255);
+    } else if !(90..=94).contains(&t) {
+        anim_tick(w, i);
+    }
+    if (95..=174).contains(&t) {
+        p(w, i).a.x -= 50;
+    }
+    if t == 175 {
+        p(w, i).a.x = (x0 - 16) << 8;
+    }
+    if t == 295 {
+        w.rng.rand(255);
+    }
+    if t >= 297 {
+        p(w, i).defuse = None;
+        if !pr(w, i).dead {
+            control(w, i);
+        }
+    }
+    let mut pl = pr(w, i).clone();
+    pl.sync_anim(w);
+    *p(w, i) = pl;
+}
+fn swap_to_partner(w: &mut World, i: usize) {
+    form_exit(w, i);
+    let ch = pr(w, i).form_ref(w).char_;
+    let pr0 = pr(w, i).clone();
+    let partner = pr0.partner.clone().unwrap_or(Partner {
+        form: if ch == 7 { 2 } else { 21 },
+        hp: pr0.rec.hp,
+        max_hp: pr0.rec.max_hp,
+        ep: pr0.rec.ep,
+        max_ep: pr0.rec.max_ep,
+        base: [pr0.rec.str_, pr0.rec.pow, pr0.rec.end, pr0.rec.spd],
+        skills: pr0.skills.clone(),
+        slot: 0,
+        level0: 0,
+        ss_gauge: 0,
+        ss3_gauge: 0,
+        cooldown: 0,
+    });
+    {
+        let pl = p(w, i);
+        pl.rec.hp = partner.hp;
+        pl.rec.max_hp = partner.max_hp;
+        pl.rec.ep = partner.ep;
+        pl.rec.max_ep = partner.max_ep;
+        pl.rec.str_ = partner.base[0];
+        pl.rec.pow = partner.base[1];
+        pl.rec.end = partner.base[2];
+        pl.rec.spd = partner.base[3];
+        pl.skills = if partner.skills.is_empty() { vec![7] } else { partner.skills.clone() };
+        pl.sel = partner.slot;
+        pl.skill_level = partner.level0;
+        pl.ss_gauge = partner.ss_gauge;
+        pl.ss3_gauge = partner.ss3_gauge * 65536;
+        pl.ss_cooldown = partner.cooldown;
+        pl.regen_timer = 0;
+    }
+    apply_form(w, i, partner.form);
+    form_enter(w, i);
+    p(w, i).ap.raw = ANIM_RAW[0];
+    let gs = pr(w, i).idle_state(w);
+    enter_state(w, i, gs);
 }
 
 /// the state's control (vtable +8)
@@ -1131,6 +1308,9 @@ fn cycle_skill(w: &mut World, i: usize) {
 }
 
 fn passive(w: &mut World, i: usize) {
+    if pr(w, i).story_form(w) {
+        return story_tick(w, i);
+    }
     {
         let pl = p(w, i);
         pl.regen_timer += 110;
@@ -1157,7 +1337,7 @@ fn passive(w: &mut World, i: usize) {
         w.g.candy -= 1;
     }
     let f = pr(w, i).form_ref(w).clone();
-    let drains = [0x3001b68, 0x3001b6c, 0x3001b78, 0x3001b80, 0x3001b8c].contains(&f.controller);
+    let drains = [0x3001b68, 0x3001b6c, 0x3001b78, 0x3001b80].contains(&f.controller);
     if pr(w, i).gs != Gs::SsRevert && drains {
         if f.ss3 {
             let max_ep = pr(w, i).rec.max_ep;
@@ -1199,6 +1379,18 @@ fn passive(w: &mut World, i: usize) {
         let pl = p(w, i);
         if !f.ss && !f.ss3 && pl.ss_cooldown > 0 {
             pl.ss_cooldown = 0.max(pl.ss_cooldown - (pl.eff.ss_cooldown_rate >> 6));
+        }
+    }
+    // the cutscene fusion's form object (0x0800E638): after the regen its countdown; negative -> the defuse script
+    if f.controller == 0x3001b64 {
+        p(w, i).fus_cnt -= 1;
+        if pr(w, i).fus_cnt < 0 {
+            let pl = p(w, i);
+            pl.a.x = pl.a.px() << 8;
+            pl.a.y = pl.a.py() << 8;
+            pl.a.facing = 0;
+            let x0 = pl.a.px();
+            pl.defuse = Some((0, x0));
         }
     }
     let pressed = inp(w, i).pressed;
@@ -1263,16 +1455,16 @@ fn ctl_idle(w: &mut World, i: usize) {
     }
     if held & DPAD != 0 {
         let pl = p(w, i);
-        if held & btn::LEFT != 0 {
+        if pressed & btn::LEFT != 0 {
             pl.a.facing = 2;
         }
-        if held & btn::RIGHT != 0 {
+        if pressed & btn::RIGHT != 0 {
             pl.a.facing = 3;
         }
-        if held & btn::UP != 0 {
+        if pressed & btn::UP != 0 {
             pl.a.facing = 1;
         }
-        if held & btn::DOWN != 0 {
+        if pressed & btn::DOWN != 0 {
             pl.a.facing = 0;
         }
         set_anim_id(w, i, 1);
@@ -1462,7 +1654,7 @@ pub fn on_dealt(w: &mut World, i: usize, msg: &HitMsg, dmg: i64) {
     }
 }
 
-fn can_use_skill(w: &World, i: usize, id: i32) -> bool {
+pub fn can_use_skill(w: &World, i: usize, id: i32) -> bool {
     let pl = pr(w, i);
     if w.g.candy > 0 {
         return false;
@@ -1560,12 +1752,6 @@ pub fn start_skill(w: &mut World, i: usize) {
     set_anim_named(w, i, refs, true);
 }
 
-fn muzzle(w: &World, i: usize, d: i32) -> (i32, i32) {
-    let a = &pr(w, i).a;
-    let (cx, cy) = a.center();
-    let (dx, dy) = DIR_VEC[a.facing as usize];
-    (cx + dx * d, cy + dy * d + if dx != 0 { 2 } else { 0 })
-}
 fn sk_mut(w: &mut World, i: usize) -> Option<&mut SkillInst> {
     p(w, i).sk.as_mut()
 }
@@ -1579,8 +1765,9 @@ fn skill_enter(w: &mut World, i: usize, id: i32, lv: i32, mult: i32) {
     match id {
         15 | 16 | 6 | 1 | 3 | 10 | 11 => sfx(w, 3, 64),
         2 => {
-            let (mx, my) = muzzle(w, i, 22);
-            let bid = shots::add(w, shots::big_bang(me, facing, mx << 8, my << 8, lv));
+            let (bx, by) = shots::BIGBANG_POS[facing as usize];
+            let (px, py) = (pr(w, i).a.px(), pr(w, i).a.py());
+            let bid = shots::add(w, shots::big_bang(me, facing, (px + bx) << 8, (py + by) << 8, lv));
             p(w, i).big_bang = bid;
             if let Some(s) = sk_mut(w, i) {
                 s.proj = bid;
@@ -1644,8 +1831,15 @@ fn end_skill(w: &mut World, i: usize) {
             }
         }
         5 => {
-            if s.proj != 0 && w.alive(s.proj) {
+            // 0x0801AB96: a dragon still out is cancelled: stop 32, every segment explodes at once (head first)
+            if s.fx != 0 && w.alive(s.fx) {
                 sfx_stop(w, 32);
+                if let Some(k) = w.find(s.fx) {
+                    fx::dragon_explode(w, k, true);
+                }
+                if let Some(x) = sk_mut(w, i) {
+                    x.fx = 0;
+                }
             }
         }
         9 => sfx_stop(w, if s.charged { 32 } else { 3 }),
@@ -1705,10 +1899,9 @@ fn end_skill(w: &mut World, i: usize) {
     if s.proj != 0 && w.alive(s.proj) {
         if let Some((k, kind)) = shot_kind(w, s.proj) {
             match kind {
-                ShotKind::GrowBeam(_) => shots::beam_stop(w, k),
+                ShotKind::GrowBeam(_) | ShotKind::Kame(_) => shots::beam_stop(w, k),
                 ShotKind::BigBang(b) if !b.launched => w.ents[k].removed = true,
                 ShotKind::MasenkoCursor(c) if c.released < 0 => w.ents[k].removed = true,
-                ShotKind::AreaHit(a) if a.dragon => w.ents[k].removed = true,
                 ShotKind::Straight(o) if o.delay != 0 => w.ents[k].removed = true,
                 _ => {}
             }
@@ -1725,7 +1918,9 @@ fn end_skill(w: &mut World, i: usize) {
     }
     if s.fx != 0 {
         if let Some(k) = w.find(s.fx) {
-            w.ents[k].removed = true;
+            if !matches!(&w.ents[k].body, Body::Fx(f) if matches!(f.as_ref(), Fx::DragonFist { .. })) {
+                w.ents[k].removed = true;
+            }
         }
     }
     p(w, i).sk = None;
@@ -1786,7 +1981,7 @@ fn upd_skill(w: &mut World, i: usize) {
                 }
                 sfx_stop(w, 3);
                 sfx(w, 32, 64);
-                let speed = if id == 3 { 8.5 } else { 3.34 };
+                // the beam object (KameBeam) fires at the fire position; it was built at the press (tick 1)
                 let vis = if id == 1 {
                     shots::BEAM_POS_BANSHEE_FIRE
                 } else if id == 3 {
@@ -1794,8 +1989,9 @@ fn upd_skill(w: &mut World, i: usize) {
                 } else {
                     shots::BEAM_POS_KAME_FIRE
                 };
-                let b = shots::grow_beam_f(w, me, facing, 1, shots::Muzzle::Player16, a, mult, if id == 1 { 12 } else { 16 }, speed, 240.0, true, Some(vis), true, 0.0);
-                let bid = shots::add(w, b);
+                let (fx0, fy0) = vis[facing as usize];
+                let (px, py) = (pr(w, i).a.px(), pr(w, i).a.py());
+                let bid = shots::add(w, shots::kame_beam(me, facing, px + fx0, py + fy0, w.frame as i64 - 23, a, mult, true));
                 sk_mut(w, i).unwrap().proj = bid;
                 p(w, i).beam_end.push((bid, vec![(true, 32), (false, 33)]));
                 if id == 3 {
@@ -1836,15 +2032,12 @@ fn upd_skill(w: &mut World, i: usize) {
                 }
                 sfx_stop(w, 3);
                 sfx(w, 32, 64);
-                let mut b = shots::grow_beam_f(w, me, facing, 1, shots::Muzzle::Player16, a, mult, 16, 2.14, [64.0, 64.0, 96.0][lv as usize], false, Some(shots::BEAM_POS_KAME_FIRE), false, -6.0 * 2.14);
-                if let ShotKind::GrowBeam(g) = &mut b.kind {
-                    g.hidden = true;
-                }
-                let bid = shots::add(w, b);
-                sk_mut(w, i).unwrap().proj = bid;
                 let (ffx, ffy) = FLAME_FIRST[facing as usize];
                 let (px, py) = (pr(w, i).a.px(), pr(w, i).a.py());
-                fx::add(w, Fx::FlameKame { owner: me, dir: facing, n: lv.min(2) + 3, links: vec![[px + ffx, py + ffy, 0, 0]], alive: Alive::Beam { id: bid } });
+                let (x, y) = (px + ffx, py + ffy);
+                let b0 = flame_link_box(w, 0x0875_68b4, x, y);
+                let fid = fx::add(w, Fx::FlameKame { owner: me, dir: facing, n: lv.min(2) + 3, links: vec![[x, y, 0, 0, b0.x0, b0.y0, b0.x1, b0.y1]], alive: Alive::Skill { p: me, serial: s.serial }, a, mult });
+                sk_mut(w, i).unwrap().proj = fid;
                 return;
             }
             drain(w, i, [107, 376, 1238][lv as usize]);
@@ -1867,9 +2060,11 @@ fn upd_skill(w: &mut World, i: usize) {
                 if !held {
                     return set_state_idle(w, i);
                 }
-                let (mx, my) = muzzle(w, i, 14);
+                // the beam object (0x08036FA2) at player + 0x0871DF9C[dir], built now
+                let (ffx, ffy) = shots::FINAL_FLASH_POS[facing as usize];
+                let (px, py) = (pr(w, i).a.px(), pr(w, i).a.py());
                 sfx(w, 32, 64);
-                let bid = shots::add(w, shots::full_beam(me, facing, 1, mx, my, a, mult, 1 << 30, Some(lv.min(2) as u8), Some(shots::FINAL_FLASH_POS), Some((6, 13))));
+                let bid = shots::add(w, shots::final_flash(me, facing, px + ffx, py + ffy, a, mult, lv.min(2) as u8, w.frame as i64));
                 sk_mut(w, i).unwrap().proj = bid;
                 p(w, i).beam_end.push((bid, vec![(true, 32)]));
                 sfx_stop(w, 3);
@@ -1894,7 +2089,6 @@ fn upd_skill(w: &mut World, i: usize) {
                     }
                     sfx_stop(w, 3);
                     sfx(w, 32, 64);
-                    p(w, i).beam_end.push((s.proj, vec![(true, 32)]));
                 } else {
                     w.ents[bi].removed = true;
                     sfx_stop(w, 3);
@@ -1916,35 +2110,18 @@ fn upd_skill(w: &mut World, i: usize) {
                 sk.acc
             };
             let d = acc >> 8;
-            let st = sk_mut(w, i).unwrap().t;
             if let ShotKind::BigBang(b) = &mut w.shot(bi).kind {
                 b.charge256 += (d as i64) << 8;
             }
             spend(w, i, d, true);
             sk_mut(w, i).unwrap().acc &= 0xff;
-            if st > 60 {
-                let g = [0.0, 0.36, 0.48][lv as usize];
-                if let ShotKind::BigBang(b) = &mut w.shot(bi).kind {
-                    b.grow = shots::F(b.grow.0 + g);
-                }
-            }
-            let (mx, my) = muzzle(w, i, 22);
-            let (bx, by) = shots::BIGBANG_POS[facing as usize];
-            let (px, py) = (pr(w, i).a.px(), pr(w, i).a.py());
-            let sh = w.shot(bi);
-            sh.x = mx << 8;
-            sh.y = my << 8;
-            if let ShotKind::BigBang(b) = &mut sh.kind {
-                b.vis_off = (px + bx - mx, py + by - my);
-            }
         }
         4 => {
             let t = tick_up(w);
             if t == 16 {
-                let (ox, oy) = KI_MUZZLE[facing as usize];
-                let (px, py) = (pr(w, i).a.px(), pr(w, i).a.py());
+                let (mx, my) = pr(w, i).hand_point();
                 if let Some(k) = w.find(s.proj).filter(|_| s.proj != 0) {
-                    shots::launch(w, k, (px + ox) << 8, (py + oy) << 8);
+                    shots::launch(w, k, mx << 8, my << 8);
                 }
                 sk_mut(w, i).unwrap().proj = 0;
                 sfx(w, 34, 64);
@@ -1961,10 +2138,8 @@ fn upd_skill(w: &mut World, i: usize) {
             p(w, i).ap.frame = t >> 4;
             if t == 16 {
                 let (ox, oy) = VOLLEY_POS[facing as usize];
-                let (dx, dy) = DIR_VEC[facing as usize];
                 let (px, py) = (pr(w, i).a.px(), pr(w, i).a.py());
-                let o = StraightOpts { vx: dx * 0x300, vy: dy * 0x300, b: [6, 6, 12, 12], a: atk(16), mult: 1024, name: shots::SName::Volley, explode: false, ..Default::default() };
-                shots::add_straight(w, me, facing, 1, (px + ox) << 8, (py + oy) << 8, o);
+                shots::add(w, shots::volley_wave(me, facing, px + ox, py + oy));
                 sfx(w, 34, 64);
             }
         }
@@ -1982,8 +2157,12 @@ fn upd_skill(w: &mut World, i: usize) {
                 let f = fx::add(w, Fx::RecObj { what: fx::RecWhat::EnergyPunch, owner: me, t: 0, alive: Alive::Skill { p: me, serial: s.serial } });
                 sk_mut(w, i).unwrap().fx = f;
             }
-            if (10..=14).contains(&t) {
-                let rect = front_rect(w, i, [8, 16, 40][lv as usize], 24);
+            // one message to every object per frame (no sound / RNG): the melee rect (Lv3 the larger one) from the
+            // position before the step
+            {
+                let a0 = &pr(w, i).a;
+                let r = if lv > 1 { ENERGY_PUNCH_RECT_L3 } else { PUNCH_RECT }[facing as usize];
+                let rect = Rect::at(r, a0.px(), a0.py());
                 let st = pr(w, i).a.stats;
                 let mut m = HitMsg { team: 1, rect, dir: facing, mult, atk: a, attacker: me, att_stats: st, att_is_player: true, source: me, crit: false, raw: 0, dmg: 0 };
                 broadcast(w, &mut m, false);
@@ -2061,15 +2240,13 @@ fn upd_skill(w: &mut World, i: usize) {
             let [ox, oy, bw, bh] = SWORD_BOX[def - 10];
             let (px, py) = (pr(w, i).a.px(), pr(w, i).a.py());
             let rect = Rect::new(px - ox, py - oy, px - ox + bw, py - oy + bh);
-            if !pr(w, i).sk.as_ref().unwrap().target {
-                let st = pr(w, i).a.stats;
-                let dir = [2, 0, 0, 0, 3, 1, 1, 1][def - 10];
-                let mut m = HitMsg { team: 1, rect, dir, mult: 0x2800, atk: a, attacker: me, att_stats: st, att_is_player: true, source: me, crit: false, raw: 0, dmg: 0 };
-                if broadcast(w, &mut m, true) {
-                    sk_mut(w, i).unwrap().target = true;
-                    let r = 48 + w.rng.rand(2);
-                    sfx(w, r, 64);
-                }
+            // every swing frame: one message to the first receiver; every accepted frame plays 48 + rand(2)
+            let st = pr(w, i).a.stats;
+            let dir = [2, 0, 0, 0, 3, 1, 1, 1][def - 10];
+            let mut m = HitMsg { team: 1, rect, dir, mult: 0x2800, atk: a, attacker: me, att_stats: st, att_is_player: true, source: me, crit: false, raw: 0, dmg: 0 };
+            if broadcast(w, &mut m, true) {
+                let r = 48 + w.rng.rand(2);
+                sfx(w, r, 64);
             }
         }
         5 => {
@@ -2082,21 +2259,15 @@ fn upd_skill(w: &mut World, i: usize) {
                 p(w, i).ap.frame = ((t >> 3) & 1) + 2;
                 return;
             }
-            if s.proj == 0 {
+            if s.fx == 0 {
                 let t = tick_up(w);
                 if !held {
                     return set_state_idle(w, i);
                 }
                 if t == 16 {
-                    let r = front_rect(w, i, 8, 16);
-                    let mut sh = shots::area_hit(me, facing, 1, r, 1 << 30, 1 << 30, a, mult, 0);
-                    if let ShotKind::AreaHit(x) = &mut sh.kind {
-                        x.dragon = true;
-                    }
-                    let pid = shots::add(w, sh);
-                    sk_mut(w, i).unwrap().proj = pid;
                     let (px, py) = (pr(w, i).a.px(), pr(w, i).a.py());
-                    fx::add(w, fx::dragon_fist(px, py, facing, Alive::SkillUncharged { p: me, serial: s.serial }));
+                    let f = fx::add(w, fx::dragon_fist(w, px, py, facing, me));
+                    sk_mut(w, i).unwrap().fx = f;
                     sfx(w, 32, 64);
                 }
                 p(w, i).ap.frame = t >> 3;
@@ -2105,26 +2276,15 @@ fn upd_skill(w: &mut World, i: usize) {
             if tick < 90 {
                 let (vx, vy) = DASH_VEC[facing as usize];
                 let (x, y) = (pr(w, i).a.x, pr(w, i).a.y);
+                let mut v = 0;
                 if fits(w, i, (x + vx * 0x60) >> 8, (y + vy * 0x60) >> 8) {
                     let pl = p(w, i);
                     pl.a.x += vx * 0x60;
                     pl.a.y += vy * 0x60;
+                    v = 0x60;
                 }
-            }
-            let (dx, dy) = DIR_VEC[facing as usize];
-            let (cx, cy) = pr(w, i).a.center();
-            let st = s.t;
-            let reach = 56.min(24 + 4 * 0.max(st - 20));
-            let b = Rect::new(cx + dx * reach - 10, cy + dy * reach - 10, cx + dx * reach + 10, cy + dy * reach + 10);
-            if let Some(k) = w.find(s.proj) {
-                if let ShotKind::AreaHit(x) = &mut w.shot(k).kind {
-                    x.b = b;
-                }
-                if (21..=35).contains(&st) {
-                    let n = 3 + if st % 7 == 0 { 1 } else { 0 };
-                    for _ in 0..n {
-                        shots::hit(w, k, b, a, mult, false);
-                    }
+                if let Some(k) = w.find(s.fx) {
+                    fx::dragon_shift(w, k, v);
                 }
             }
             let f = pr(w, i).eff.ep_cost_factor;
@@ -2137,12 +2297,12 @@ fn upd_skill(w: &mut World, i: usize) {
             sk_mut(w, i).unwrap().acc &= 0xff;
             let tick = pr(w, i).ap.tick;
             if !(held && tick < 300 && pr(w, i).energy_left(w) != 0) {
-                if let Some(k) = w.find(s.proj) {
-                    w.ents[k].removed = true;
+                if let Some(k) = w.find(s.fx) {
+                    fx::dragon_launch(w, k);
                 }
                 {
                     let sk = sk_mut(w, i).unwrap();
-                    sk.proj = 0;
+                    sk.fx = 0;
                     sk.charged = true;
                 }
                 p(w, i).ap.tick = 0;
@@ -2192,11 +2352,7 @@ fn upd_skill(w: &mut World, i: usize) {
                     sfx_stop(w, 3);
                     sfx(w, 34, 64);
                     if let Some(k) = w.find(s.proj).filter(|_| s.proj != 0) {
-                        if lv < 2 && s.t < 10 {
-                            w.ents[k].removed = true;
-                        } else {
-                            shots::masenko_release(w, k);
-                        }
+                        shots::masenko_release(w, k);
                     }
                 }
                 return;
@@ -2211,6 +2367,13 @@ fn upd_skill(w: &mut World, i: usize) {
     }
 }
 
+/// a Flame Kamehameha link's record box at (x, y)
+pub fn flame_link_box(w: &World, rec: u32, x: i32, y: i32) -> Rect {
+    let g = w.data.record(rec).unwrap_or([4, 4, 8, 8]);
+    Rect::new(x - g[0], y - g[1], x - g[0] + g[2], y - g[1] + g[3])
+}
+
+#[allow(dead_code)]
 fn front_rect(w: &World, i: usize, reach: i32, thick: i32) -> Rect {
     let a = &pr(w, i).a;
     let b = a.body_box();
@@ -2285,6 +2448,7 @@ fn finish_transform(w: &mut World, i: usize) {
     apply_form(w, i, to);
     form_enter(w, i);
     set_anim_id(w, i, 0);
+    new_form_object(w, i);
     let f = pr(w, i).form_ref(w).clone();
     let pl = p(w, i);
     if f.ss3 {
@@ -2320,6 +2484,7 @@ fn finish_revert(w: &mut World, i: usize) {
     apply_form(w, i, f.down);
     form_enter(w, i);
     set_anim_id(w, i, 0);
+    new_form_object(w, i);
 }
 
 // ---- Instant Transmission ---------------------------------------------------------------------------------------------
@@ -2562,6 +2727,10 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
         if !overlaps(&msg.rect, &pl.a.body_box()) {
             return false;
         }
+        // not hittable (+0x1CC: reverting, Instant Transmission, the cutscene fusions): not accepted
+        if !pl.a.hittable {
+            return false;
+        }
     }
     let pl = pr(w, i);
     let front = (msg.dir ^ 1) == pl.a.facing;
@@ -2575,10 +2744,11 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
     w.events.push(Event::Damage { target: w.ents[i].id, attacker: msg.attacker, dmg, crit: res.crit });
     let before = pr(w, i).rec.hp;
     let lost = if dmg > 0 && before > 0 { p(w, i).hp_acc.take(dmg) } else { 0 };
+    // 0x0800E8E6 runs for every accepted hit, 0 damage included: the 12-frame flash restarts
+    p(w, i).a.flash = 12;
     if dmg == 0 || before == 0 {
         return true;
     }
-    p(w, i).a.flash = 12;
     w.stats.hits_taken += 1;
     if lost > 0 {
         let hp = pr(w, i).rec.hp as i64;
@@ -2645,11 +2815,19 @@ fn after_hp_change(w: &mut World, i: usize) {
 // ---- lockstep ---------------------------------------------------------------------------------------------------------------
 
 /// copy the emulator's animation fields at frame 0
-pub fn lockstep_init(w: &mut World, i: usize, raw: i32, frame: i32, tick: i32) {
-    let gs = pr(w, i).idle_state(w);
+pub fn lockstep_init(w: &mut World, i: usize, raw: i32, frame: i32, tick: i32, state: &str) {
+    let gs = match state {
+        "ss_up" => Gs::SsUp,
+        "ss_revert" => Gs::SsRevert,
+        _ => pr(w, i).idle_state(w),
+    };
     let mut pl = pr(w, i).clone();
     pl.gs = gs;
-    pl.state = PState::Idle;
+    pl.state = coarse(&pl, gs);
+    if gs == Gs::SsUp {
+        pl.transform_to = pl.form_ref(w).up;
+        pl.transform_done = false;
+    }
     pl.ap = AnimPos { raw, frame, tick };
     pl.sync_anim(w);
     *p(w, i) = pl;

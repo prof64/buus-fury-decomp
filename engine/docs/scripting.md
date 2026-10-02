@@ -117,19 +117,29 @@ reference table in `re/buu/SCRIPT.md` §6). Highlights by category:
 Actor ids: 0 = the player (leader), 1–8 party characters' current forms, ≥10 sprite id of a live object, −n =
 map placement n−1, 9 = the scene's special object.
 
-### 4.1 Multiplayer extensions (planned superset; host-implemented)
+### 4.1 Multiplayer API (implemented: `wf_script::vm::EXTENSIONS`, `Host::ext`)
 
-Original scripts address "the player" as actor 0. For co-op/PvP the API adds, without changing the originals:
+Original scripts address "the player" as actor 0; in multiplayer actor 0 is the **leader** (`player(1)`).
+Everything else is a superset the originals never call. Players are 1-based. No function exposes the local
+peer — a handler is told *who* triggered it, never "who am I".
 
-* `player_count()`, `player(n)` → actor id of player n (1-based; `player(1)` is actor 0's owner, the leader);
-* handlers receive the triggering player: `on_talk(who)`, `on_enter(who)`, `on_defeat(by)` (engine passes the
-  player index; originals ignore it);
-* per-player state queries: `player_hp(n)`, `player_character(n)`, `player_input_a(n)` (the original
-  `a_pressed()` reads the leader);
-* per-player effects: `give_item_to(n, item)`, `warp_player(n, …)`; story flags and globals stay shared.
+* **Triggering player**: the engine starts handlers with `Runtime::start_event_by(event, params, who)` or
+  `Runtime::start_handler(file, "on_talk", who, params)`; scripts read it with `who()` (or the entry
+  argument: `fn on_talk(who) { … }`). Conventions: `on_talk(who)`, `on_enter(who)`, `on_touch(who)`,
+  `on_defeat(by)`, `on_use(who)`. Extension actions carry `who` to the host.
+* **Queries**: `player_count()`, `player(n)` (actor id), `player_of_actor(actor)` (0 = none),
+  `player_character(n)`, `player_hp(n)`, `player_max_hp(n)`, `player_energy(n)`, `player_x(n)`, `player_y(n)`,
+  `player_alive(n)`, `player_button(n, b)` / `player_pressed(n, b)` (b: 0 A, 1 B, 2 L, 3 R, 4 Start; the
+  original `a_pressed()` reads the leader).
+* **Instant effects**: `set_player_hp(n, v)`, `set_player_energy(n, v)`, `set_player_character(n, c)`.
+* **Actions**: `give_item_to(n, item)`, `give_equipment_to(n, item)`, `give_xp_to(n, xp)`, `revive_player(n)`,
+  `warp_player(n, world, map, variant, x, y)`, `gather_players(x, y)` (cutscene start), `say_to(n, portrait,
+  string_id)` (a text box shown to one player).
+* Shared by all players: story flags, G0..G3, the event graph, inventory-less natives. Per-player in the host:
+  HP/EP/character/inventory when the game mode says so (the original natives act on the leader).
 
-Status: designed, not implemented yet — they will be a host extension call next to `Host::native` (native ids stay the 248 originals) and follow the same queue/query rules.
-No API exposes the local peer.
+Test: `crates/wf-script-rhai/tests/multiplayer.rs` (3 players, per-player effects carry `who`, a query behind
+queued actions is rejected, snapshot/restore mid-handler identical).
 
 ## 5. Decompiler output
 
@@ -153,4 +163,4 @@ No API exposes the local peer.
 | interpreter vs Rhai | 522 events + 377 node-0 runs + 774 inline/drop scripts = 1673 cases × 4 host seeds = 6692 runs | identical traces (2.35 M effects), 189 runs error identically on both sides (host-invented node indices / 0-count loops) |
 | rollback | snapshot at each block point, JSON round-trip, restore, re-run (Rhai and VM) | identical |
 | native vs wasm | digest of all events (VM + Rhai + one restore each) | identical (`engine/experiments/wf-script-dev/wasm-check`) |
-| emulator vs interpreter | 7 real-game traces replayed in the interpreter (natives, args, offsets, G/P, var writes, text nodes) | 92 roots, 824 host calls, 0 mismatches (`re/buu/SCRIPT.md` §7) |
+| emulator vs interpreter | 9 real-game traces replayed in the interpreter (natives, args, offsets, G/P, var writes, text nodes) | 97 roots, 845 host calls, 0 mismatches (`re/buu/SCRIPT.md` §7) |

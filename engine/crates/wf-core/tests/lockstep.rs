@@ -1,16 +1,21 @@
-//! Frame-by-frame lockstep of the player against the emulator (data/battle/buu_lockstep/*.json, recorded by
+//! Frame-by-frame lockstep against the emulator (data/battle/buu_lockstep/*.json, recorded by
 //! tools/battle/lockstep/record.py; format tools/battle/LOCKSTEP.md): the same start state and inputs; state, raw
-//! animation, frame, facing, 24.8 position, HP, EP, form, ROM frame record, RNG word and every sound call must match
-//! on every frame. The pass set must equal the reference simulator's (`LOCKSTEP_EXPECT=<file of names>` checks it;
-//! `LOCKSTEP=<substring>` runs a subset and prints the first divergence).
+//! animation, frame, facing, 24.8 position, HP, EP, form, ROM frame record, RNG word, every sound call and - in the enemy
+//! scenarios - the enemy's position / facing / HP and every ComputeDamage result must match on every frame. Lag frames
+//! (the game logic did not run) are skipped as the emulator did.
+//! `LOCKSTEP_EXPECT=<file of names>` checks the pass set against the reference simulator's; `LOCKSTEP=<substring>`
+//! runs a subset (known divergences included) and prints the first divergence.
 mod common;
 use common::{battle_data, data};
 use serde_json::Value;
+use std::sync::{Arc, OnceLock};
+use wf_core::ai::{BehTree, P};
 use wf_core::battle::{self, BattleConfig, FighterSetup, Phase, RngInit};
+use wf_core::content::GameData;
 use wf_core::input::InputFrame;
-use wf_core::player;
+use wf_core::player::{self, Partner};
 use wf_core::session::Session;
-use wf_core::world::{Body, Event, InjectedHit, Injector, World};
+use wf_core::world::{Body, EntityId, Event, InjectedHit, Injector, World};
 
 #[derive(Clone, Debug, PartialEq)]
 struct Row {
@@ -26,16 +31,16 @@ struct Row {
     rom: i64,
     rng: Option<i64>,
     sfx: Vec<String>,
+    dmg: Vec<String>,
+    e: Option<(i64, i64, i64, i64)>,
 }
 
 const FIGHTER_OF_CHAR: [&str; 8] = ["goku", "gohan", "goten", "trunks", "vegeta", "gotenks", "vegito", "gogeta"];
 
 /// scenarios whose divergence is understood and not modelled (the reference's KNOWN list)
 fn known(name: &str) -> bool {
-    let pre = |p: &[&str]| p.iter().any(|x| name.starts_with(x));
-    pre(&["f24_", "f25_", "f32_", "f33_", "f42_", "f43_"])
-        || ["f23_bump", "f23_move", "f23_punch", "f23_skill11", "f46_punch", "f14_skill20", "f14_ssdrain"].contains(&name)
-        || ["f26_skill2", "f27_skill2", "f28_skill2", "f29_skill2", "f30_skill2"].contains(&name)
+    ["f32_ssdrain", "f33_ssdrain", "f23_bump", "f23_move", "f23_punch", "f23_skill11", "f46_punch", "f14_skill20", "f14_ssdrain", "f31_vs_skill13"].contains(&name)
+        || name.starts_with("f02_vs_enemy_")
 }
 
 fn i(v: &Value) -> i64 {
@@ -48,26 +53,78 @@ fn expand(t: &Value) -> Vec<Row> {
     for g in t["rows"].as_array().unwrap() {
         let g: Vec<i64> = g.as_array().unwrap().iter().map(i).collect();
         for k in 0..g[0] {
-            out.push(Row { x: g[1] + g[3] * k, y: g[2] + g[4] * k, dir: g[5], raw: g[6], frame: g[7], state: states[g[8] as usize].clone(), hp: g[9], ep: g[10], form: g[11], rom: g[12], rng: g.get(13).copied(), sfx: vec![] });
+            out.push(Row { x: g[1] + g[3] * k, y: g[2] + g[4] * k, dir: g[5], raw: g[6], frame: g[7], state: states[g[8] as usize].clone(), hp: g[9], ep: g[10], form: g[11], rom: g[12], rng: g.get(13).copied(), sfx: vec![], dmg: vec![], e: None });
         }
     }
     for s in t["sfx"].as_array().unwrap() {
         let a = s.as_array().unwrap();
         let f = i(&a[0]) as usize;
+        let Some(r) = out.get_mut(f.wrapping_sub(1)) else { continue };
         if a[1].as_str() == Some("dmg") {
-            continue;
-        }
-        if let Some(r) = out.get_mut(f.wrapping_sub(1)) {
+            r.dmg.push(format!("{}:{}", i(&a[2]), i(&a[3])));
+        } else {
             r.sfx.push(a[1..].iter().map(|x| x.as_str().map(String::from).unwrap_or_else(|| x.to_string())).collect::<Vec<_>>().join(":"));
+        }
+    }
+    if let Some(er) = t["erows"].as_array() {
+        let mut k = 0;
+        for g in er {
+            let g: Vec<i64> = g.as_array().unwrap().iter().map(i).collect();
+            for j in 0..g[0] {
+                if let Some(r) = out.get_mut(k) {
+                    r.e = Some((g[1] + g[3] * j, g[2] + g[4] * j, g[5], g[6]));
+                }
+                k += 1;
+            }
         }
     }
     out
 }
 
-fn setup(t: &Value) -> Session {
-    let d = data();
+/// the scenarios' ROM patches applied to the decoded AI: the Majin Fighter's aggro test (IfPlayerWithin2 at ROM
+/// 0x087043F8) r2 = -1 (never) unless the scenario wants aggro; a target dummy: state 0x14B's on-hit tree replaced by
+/// the bare ApplyDamage node 0x086FDA00 (HP loss only, no reaction)
+fn patched(aggro: bool, dummy: bool) -> Arc<GameData> {
+    static CACHE: OnceLock<std::sync::Mutex<std::collections::BTreeMap<(bool, bool), Arc<GameData>>>> = OnceLock::new();
+    let c = CACHE.get_or_init(Default::default);
+    if let Some(d) = c.lock().unwrap().get(&(aggro, dummy)) {
+        return d.clone();
+    }
+    let mut d = (*data()).clone();
+    if !aggro {
+        for t in d.states.values_mut() {
+            if t.nodes.iter().any(|n| n.addr == 0x0870_43f8) {
+                let mut nt: BehTree = (**t).clone();
+                for n in nt.nodes.iter_mut().filter(|n| n.addr == 0x0870_43f8) {
+                    n.p.set(P::R2, -1);
+                }
+                *t = Arc::new(nt);
+            }
+        }
+    }
+    if dummy {
+        let node = d.aux.values().flat_map(|t| t.nodes.iter()).find(|n| n.addr == 0x086f_da00).cloned();
+        if let Some(mut n) = node {
+            n.kids.clear();
+            d.aux.insert(0x14b, Arc::new(BehTree { state: 0x14b, nodes: vec![n] }));
+        }
+    }
+    let d = Arc::new(d);
+    c.lock().unwrap().insert((aggro, dummy), d.clone());
+    d
+}
+
+struct Setup {
+    s: Session,
+    enemy: Option<EntityId>,
+    injector: EntityId,
+}
+
+fn setup(t: &Value) -> Setup {
     let ini = &t["init"];
     let rec = &ini["rec"];
+    let en = t["scenario"].get("enemy").filter(|v| !v.is_null());
+    let d = patched(en.is_none_or(|e| e["aggro"].as_bool().unwrap_or(false)), en.is_some_and(|e| e["dummy"].as_bool() != Some(false)));
     let scn_form = i(&t["scenario"]["form"]) as i32;
     let form = rec.get("form").map(i).unwrap_or(scn_form as i64) as i32;
     let ch = d.form(scn_form).unwrap().char_;
@@ -81,8 +138,9 @@ fn setup(t: &Value) -> Session {
         skill_level: *levels.first().unwrap_or(&0) as i32,
         ..Default::default()
     };
-    let arena = t["scenario"]["arena"].as_str().unwrap_or("htc").to_string();
-    let cfg = BattleConfig { arena, players: vec![fighter], phases: vec![Phase { enemy: "t-1".into(), count: 1 }], rng: RngInit::State(0, 0), xp: false };
+    let ety = ini.get("enemy").filter(|v| !v.is_null()).map(|e| i(&e["type"])).or_else(|| en.map(|e| i(&e["type"]))).unwrap_or(-1);
+    let arena = t["scenario"]["arena"].as_str().unwrap_or(if en.is_some() { "forest" } else { "htc" }).to_string();
+    let cfg = BattleConfig { arena, players: vec![fighter], phases: vec![Phase { enemy: format!("t{ety}"), count: 1 }], rng: RngInit::State(0, 0), xp: false };
     let mut s = Session::new(d, cfg);
     let w = &mut s.world;
     let pi = w.player_idx(0).unwrap();
@@ -110,34 +168,90 @@ fn setup(t: &Value) -> Session {
     p.a.y = i(&ini["y"]) as i32;
     p.a.facing = i(&ini["dir"]) as u8;
     *w.pl(pi) = p;
-    player::lockstep_init(w, pi, i(&ini["raw"]) as i32, i(&ini["frame"]) as i32, i(&ini["tick"]) as i32);
+    player::lockstep_init(w, pi, i(&ini["raw"]) as i32, i(&ini["frame"]) as i32, i(&ini["tick"]) as i32, ini["state"].as_str().unwrap_or("idle"));
     let obj = &ini["obj"];
-    let (ss, ss3) = {
+    let has = |k: &str| obj.get(k).filter(|v| !v.is_null()).cloned();
+    let (ss, ss3, ctl) = {
         let f = w.data.form(w.pl_ref(pi).form).unwrap();
-        (f.ss, f.ss3)
+        (f.ss, f.ss3, f.controller)
     };
+    let story = w.pl_ref(pi).story_form(w);
     {
         let p = w.pl(pi);
-        if let Some(v) = obj.get("regen").filter(|v| !v.is_null()) {
-            p.regen_timer = (i(v) & 0xffff) as i32;
+        if let (true, Some(v)) = (story, has("regen")) {
+            p.story_cnt = i(&v) as i32;
         }
-        if let Some(v) = obj.get("ssacc").filter(|v| !v.is_null()) {
-            if ss || ss3 {
-                p.ss_acc = (i(v) & 0xffff) as i32;
-            }
+        if let (true, Some(v)) = (ctl == 0x3001b64, has("ctl10")) {
+            p.fus_cnt = i(&v) as i32;
         }
-        if let Some(v) = obj.get("cooldown").filter(|v| !v.is_null()) {
-            p.ss_cooldown = i(v) as i32;
+        if let Some(pt) = ini.get("partner").filter(|v| !v.is_null()) {
+            let base: Vec<i32> = pt["base"].as_array().unwrap().iter().map(|x| i(x) as i32).collect();
+            p.partner = Some(Partner {
+                form: i(&pt["form"]) as i32,
+                hp: i(&pt["hp"]) as i32,
+                max_hp: i(&pt["maxHp"]) as i32,
+                ep: i(&pt["ep"]) as i32,
+                max_ep: i(&pt["maxEp"]) as i32,
+                base: [base[0], base[1], base[2], base[3]],
+                skills: pt["skills"].as_array().unwrap().iter().map(|x| i(x) as i32).collect(),
+                slot: i(&pt["slot"]) as usize,
+                level0: pt["levels"].as_array().and_then(|l| l.first()).map(i).unwrap_or(0) as i32,
+                ss_gauge: i(&pt["ssGauge"]) as i32,
+                ss3_gauge: i(&pt["ss3Gauge"]),
+                cooldown: i(&pt["cooldown"]) as i32,
+            });
         }
-        if let Some(v) = obj.get("idlecnt").filter(|v| !v.is_null()) {
-            p.s_cnt = i(v) as i32;
+        if let Some(v) = has("hittable") {
+            p.a.hittable = i(&v) != 0;
+        }
+        if let Some(v) = has("regen") {
+            p.regen_timer = (i(&v) & 0xffff) as i32;
+        }
+        if let (true, Some(v)) = (ss || ss3, has("ssacc")) {
+            p.ss_acc = (i(&v) & 0xffff) as i32;
+        }
+        if let Some(v) = has("cooldown") {
+            p.ss_cooldown = i(&v) as i32;
+        }
+        if let Some(v) = has("idlecnt") {
+            p.s_cnt = i(&v) as i32;
         }
     }
-    if let Some(c) = obj.get("camera").filter(|v| !v.is_null()) {
+    if let Some(c) = has("camera") {
         battle::set_camera(w, 0, i(&c[0]) as i32, i(&c[1]) as i32);
     }
-    if let Some(v) = obj.get("beepAge").filter(|v| !v.is_null()) {
-        w.g.last_beep = -i(v);
+    if let Some(v) = has("beepAge") {
+        w.g.last_beep = -i(&v);
+    }
+    let mut enemy = None;
+    if let (Some(_), Some(ie)) = (en, ini.get("enemy").filter(|v| !v.is_null())) {
+        if let Some(ei) = w.ents.iter().position(|e| matches!(e.body, Body::Enemy(_))) {
+            wf_core::enemy::unmark_self(w, ei);
+            {
+                let e = w.en(ei);
+                e.a.x = i(&ie["x"]) as i32;
+                e.a.y = i(&ie["y"]) as i32;
+            }
+            wf_core::enemy::mark_self(w, ei);
+            let dd = Arc::clone(&w.data);
+            let e = w.en(ei);
+            e.a.facing = i(&ie["dir"]) as u8;
+            e.hp1024 = i(&ie["hp"]);
+            let raw = ie.get("raw").map(i).unwrap_or(0) as i32;
+            if raw > 0 {
+                if let Some(&k) = e.a.sprite.and_then(|s| dd.sprite(s)).and_then(|s| s.by_raw.get(&raw)) {
+                    e.a.anim = Some(k);
+                }
+                e.ea.pos = player::AnimPos { raw, frame: ie.get("frame").map(i).unwrap_or(0) as i32, tick: ie.get("tick").map(i).unwrap_or(0) as i32 };
+            }
+            if let Some(a) = ie.get("mark1Age").map(i).filter(|&a| a < 1_000_000) {
+                e.mark1 = -a;
+            }
+            if let Some(a) = ie.get("mark2Age").map(i).filter(|&a| a < 1_000_000) {
+                e.mark2 = -a;
+            }
+            enemy = Some(w.ents[ei].id);
+        }
     }
     w.rng.set_state([ini["rng"][0].as_u64().unwrap() as u32, ini["rng"][1].as_u64().unwrap() as u32]);
     let hits: Vec<InjectedHit> = t["scenario"]["hits"]
@@ -156,38 +270,65 @@ fn setup(t: &Value) -> Session {
         })
         .unwrap_or_default();
     let pid = w.ents[pi].id;
-    w.add(Body::Injector(Box::new(Injector { hits, player: pid })));
-    s
+    let injector = w.add(Body::Injector(Box::new(Injector { hits, player: pid, now: 0 })));
+    Setup { s, enemy, injector }
 }
 
-fn row(w: &World, sfx: Vec<String>) -> Row {
+fn row(w: &World, sfx: Vec<String>, dmg: Vec<String>, enemy: Option<EntityId>) -> Row {
     let pi = w.player_idx(0).unwrap();
     let p = w.pl_ref(pi);
     let (state, raw, frame, rom) = player::lockstep_view(w, pi);
-    Row { x: p.a.x as i64, y: p.a.y as i64, dir: p.a.facing as i64, raw: raw as i64, frame: frame as i64, state, hp: p.hp() as i64, ep: p.ep() as i64, form: p.form as i64, rom: rom as i64, rng: Some(w.rng.a as i64), sfx }
+    let e = enemy.and_then(|id| w.enemy_by_id(id)).map(|(_, e)| (e.a.x as i64, e.a.y as i64, e.a.facing as i64, e.hp1024));
+    Row { x: p.a.x as i64, y: p.a.y as i64, dir: p.a.facing as i64, raw: raw as i64, frame: frame as i64, state, hp: p.hp() as i64, ep: p.ep() as i64, form: p.form as i64, rom: rom as i64, rng: Some(w.rng.a as i64), sfx, dmg, e }
 }
 
 fn replay(t: &Value) -> Vec<Row> {
-    let mut s = setup(t);
+    let Setup { mut s, enemy, injector } = setup(t);
+    let lag: std::collections::BTreeSet<u32> = t["lag"].as_array().map(|a| a.iter().map(|x| i(x) as u32).collect()).unwrap_or_default();
+    let pid = s.world.players[0];
+    // the last known enemy row (an enemy removed from the world keeps its last values in the reference)
+    let mut last_e = None;
     let mut out = Vec::new();
     let mut prev = 0u16;
+    let mut f = 0u32;
     for seg in t["input"].as_array().unwrap() {
         let keys = i(&seg[0]) as u16;
         for _ in 0..i(&seg[1]) {
+            f += 1;
+            if lag.contains(&f) {
+                let mut r = row(&s.world, vec![], vec![], enemy);
+                if r.e.is_none() {
+                    r.e = last_e;
+                }
+                out.push(r);
+                continue;
+            }
+            if let Some(k) = s.world.find(injector) {
+                if let Body::Injector(j) = &mut s.world.ents[k].body {
+                    j.now = f;
+                }
+            }
             let mut inp = [InputFrame::default(); 4];
             inp[0] = InputFrame::from_held(keys, prev);
             prev = keys;
-            let ev = s.step_frames(inp);
-            let sfx = ev
-                .iter()
-                .filter_map(|e| match e {
-                    Event::Sfx { id, vol } => Some(format!("play:{id}:{vol}")),
-                    Event::SfxStop { id } => Some(format!("stop:{id}")),
-                    Event::Song { id } => Some(format!("song:{id}")),
-                    _ => None,
-                })
-                .collect();
-            out.push(row(&s.world, sfx));
+            let ev = s.step_frames(inp).to_vec();
+            let mut sfx = vec![];
+            let mut dmg = vec![];
+            for e in &ev {
+                match e {
+                    Event::Sfx { id, vol } => sfx.push(format!("play:{id}:{vol}")),
+                    Event::SfxStop { id } => sfx.push(format!("stop:{id}")),
+                    Event::Song { id } => sfx.push(format!("song:{id}")),
+                    Event::Damage { target, dmg: d, .. } => dmg.push(format!("{}:{d}", if *target == pid { 0 } else if Some(*target) == enemy { 1 } else { -1 })),
+                    _ => {}
+                }
+            }
+            let mut r = row(&s.world, sfx, dmg, enemy);
+            if r.e.is_none() {
+                r.e = last_e;
+            }
+            last_e = r.e;
+            out.push(r);
         }
     }
     out
@@ -199,42 +340,31 @@ fn compare(exp: &[Row], got: &[Row]) -> Option<(usize, Vec<&'static str>)> {
         let no_anim = g.raw == -1 && (e.raw <= 0 || e.rom == 0);
         let swapped = e.raw == -1 && e.rom != 0 && e.rom == g.rom;
         let mut bad = vec![];
-        if e.state != g.state {
-            bad.push("state");
+        let mut chk = |c: bool, n: &'static str| {
+            if !c {
+                bad.push(n)
+            }
+        };
+        chk(e.state == g.state, "state");
+        chk(no_anim || swapped || e.raw == g.raw, "raw");
+        chk(no_anim || e.frame == g.frame, "frame");
+        chk(e.dir == g.dir, "dir");
+        chk(e.x == g.x, "x");
+        chk(e.y == g.y, "y");
+        chk(e.hp == g.hp, "hp");
+        chk(e.ep == g.ep, "ep");
+        chk(e.form == g.form, "form");
+        chk(no_anim || e.rom == g.rom, "rom");
+        chk(e.sfx.join(" ") == g.sfx.join(" "), "sfx");
+        if e.e.is_some() {
+            let mut a = e.dmg.clone();
+            let mut b = g.dmg.clone();
+            a.sort();
+            b.sort();
+            chk(a == b, "dmg");
+            chk(e.e == g.e, "enemy");
         }
-        if !no_anim && !swapped && e.raw != g.raw {
-            bad.push("raw");
-        }
-        if !no_anim && e.frame != g.frame {
-            bad.push("frame");
-        }
-        if e.dir != g.dir {
-            bad.push("dir");
-        }
-        if e.x != g.x {
-            bad.push("x");
-        }
-        if e.y != g.y {
-            bad.push("y");
-        }
-        if e.hp != g.hp {
-            bad.push("hp");
-        }
-        if e.ep != g.ep {
-            bad.push("ep");
-        }
-        if e.form != g.form {
-            bad.push("form");
-        }
-        if !no_anim && e.rom != g.rom {
-            bad.push("rom");
-        }
-        if e.sfx.join(" ") != g.sfx.join(" ") {
-            bad.push("sfx");
-        }
-        if e.rng.is_some() && e.rng != g.rng {
-            bad.push("rng");
-        }
+        chk(e.rng.is_none() || e.rng == g.rng, "rng");
         if !bad.is_empty() {
             return Some((k + 1, bad));
         }
@@ -262,10 +392,6 @@ fn lockstep_vs_emulator() {
                 skipped += 1;
                 continue;
             }
-            // enemy scenarios (added after the player harness) are covered by their own test
-            if !t["scenario"]["enemy"].is_null() {
-                continue;
-            }
             let exp = expand(t);
             let got = replay(t);
             frames += exp.len();
@@ -284,7 +410,7 @@ fn lockstep_vs_emulator() {
         }
     }
     eprintln!("lockstep: {} pass, {} fail, {} known-skipped, {frames} frames compared", pass.len(), fail.len(), skipped);
-    for f in fail.iter().take(40) {
+    for f in fail.iter().take(60) {
         eprintln!("  FAIL {f}");
     }
     if let Ok(p) = std::env::var("LOCKSTEP_EXPECT") {

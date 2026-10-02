@@ -88,6 +88,8 @@ pub struct AnimStep {
     /// ROM frame record (the lockstep compares it)
     pub rom: u32,
     pub flip: bool,
+    /// position of the attachment (halo) relative to the entity position
+    pub attach: Option<(i32, i32)>,
 }
 
 #[derive(Clone, Debug)]
@@ -278,6 +280,7 @@ pub struct MapCollision {
 
 pub const GRID: usize = 256;
 
+#[derive(Clone)]
 pub struct GameData {
     pub sprites: BTreeMap<i32, Sprite>,
     /// effect / OBJ records by ROM address: (ox, oy, w, h)
@@ -681,7 +684,7 @@ fn parse_sprite(s: &Value, index: i32, timing: Option<&Value>) -> Sprite {
                                 dur = int(e);
                             }
                         }
-                        AnimStep { frame: geti(st, "frame") as u16, dur: dur.max(1) as u32, rom: int(&st["rom"]) as u32, flip: st["flip"].as_bool().unwrap_or(false) }
+                        AnimStep { frame: geti(st, "frame") as u16, dur: dur.max(1) as u32, rom: int(&st["rom"]) as u32, flip: st["flip"].as_bool().unwrap_or(false), attach: st["attach"].as_array().filter(|a| a.len() >= 2).map(|a| (int(&a[0]) as i32, int(&a[1]) as i32)) }
                     })
                     .collect()
             });

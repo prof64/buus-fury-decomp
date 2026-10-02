@@ -91,7 +91,7 @@ fn node0_unit(set: &ScriptSet, ev: u16) -> Option<(ScriptId, UnitRef)> {
     let e = &set.events[&ev];
     let Some(Entry::Node(n)) = e.entries.get(&0) else { return None };
     let NodeBody::Code(_) = n.body else { return None };
-    Some((id, UnitRef { file: format!("s{ev:03}"), prefix: "n0_".into(), steps: false }))
+    Some((id, UnitRef::new(format!("s{ev:03}"), "n0_", false)))
 }
 
 #[test]
@@ -159,7 +159,7 @@ fn bytecode_and_rhai_agree_on_every_script() {
         for &s in &seeds {
             let p = [0, 0, 0, 0];
             let vm = run_vm(&set, Thread::new(*id, p), s, g0);
-            rt.start_unit(UnitRef { file: file.clone(), prefix: String::new(), steps }, p);
+            rt.start_unit(UnitRef::new(file.clone(), "", steps), p);
             let rh = run_rhai(&mut rt, &h, s, g0);
             check(format!("{file} seed {s}"), vm, rh);
         }

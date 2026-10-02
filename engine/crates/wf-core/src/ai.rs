@@ -131,7 +131,7 @@ pub struct CNode {
     pub kids: Vec<u16>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct BehTree {
     pub state: u16,
     pub nodes: Vec<CNode>,

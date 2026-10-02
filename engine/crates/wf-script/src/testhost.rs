@@ -8,7 +8,7 @@
 //!   `begin_parallel` batch is open; `end_parallel` blocks.
 
 use crate::natives;
-use crate::vm::{Call, Globals, Host, NativeResult, NodeCall};
+use crate::vm::{ext_info, Call, ExtCall, ExtKind, Globals, Host, NativeResult, NodeCall};
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -19,6 +19,7 @@ pub enum Effect {
     Set { var: u8, value: i32 },
     Text { text: String, arg: u8, args: Vec<i32> },
     Choice { text: String, arg: u8 },
+    Ext { name: String, args: Vec<i32>, who: i32 },
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -31,6 +32,8 @@ pub struct HostState {
     /// Value to deliver when the blocked call resumes.
     pub pending: Option<i32>,
     pub trace: Vec<Effect>,
+    /// Number of players answered by `player_count()` (0 = 1).
+    pub players: i32,
 }
 
 impl HostState {
@@ -154,5 +157,51 @@ impl Host for TestHost {
         }
         s.pending = None;
         Ok(NativeResult::Block)
+    }
+
+    fn ext(&mut self, call: ExtCall<'_>) -> Result<NativeResult, String> {
+        let mut s = self.0.borrow_mut();
+        let (arity, kind) = ext_info(call.name).ok_or_else(|| format!("unknown extension {}", call.name))?;
+        if call.args.len() != arity as usize {
+            return Err(format!("{}: {} args, expected {arity}", call.name, call.args.len()));
+        }
+        let n = s.players.max(1);
+        match kind {
+            ExtKind::Query => {
+                let v = match call.name {
+                    "player_count" => n,
+                    // actor ids: leader = 0 (as in the original), others 0x200 + n (host-defined)
+                    "player" => {
+                        let p = call.args[0];
+                        if !(1..=n).contains(&p) {
+                            -1
+                        } else if p == 1 {
+                            0
+                        } else {
+                            0x200 + p
+                        }
+                    }
+                    "player_of_actor" => match call.args[0] {
+                        0 => 1,
+                        a if a > 0x201 && a <= 0x200 + n => a - 0x200,
+                        _ => 0,
+                    },
+                    _ => {
+                        let mut h = s.seed ^ (s.effects << 24);
+                        for b in call.name.bytes().chain(call.args.iter().flat_map(|a| a.to_le_bytes())) {
+                            h = (h ^ b as u64).wrapping_mul(0x0100_0000_01b3);
+                        }
+                        ((h >> 33) % 3) as i32
+                    }
+                };
+                Ok(NativeResult::Done(Some(v)))
+            }
+            _ => {
+                s.effects += 1;
+                s.trace.push(Effect::Ext { name: call.name.to_string(), args: call.args.to_vec(), who: call.who });
+                s.pending = None;
+                Ok(if kind == ExtKind::Action { NativeResult::Block } else { NativeResult::Done(None) })
+            }
+        }
     }
 }
