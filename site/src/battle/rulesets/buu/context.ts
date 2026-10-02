@@ -5,6 +5,7 @@
 import type { SpriteSet } from '../../core/sprites'
 import type { Popup, World } from '../../core/world'
 import { Effect, type Actor } from './actor'
+import { FxAnim } from './fx'
 import type { BuuCollision } from './collision'
 import type { BuuData, EnemyType } from './data'
 
@@ -58,6 +59,8 @@ export class BuuCtx {
   enemies: EnemyLike[] = []
   /** global 0x03002FE4: candy frames left (> 0 = the player is candy) */
   candy = 0
+  /** frame of sprite 45 (three sweets) the candy-ed player shows: rand(3) on the candy-beam hit */
+  candyFrame = 0
   /** 0x0300302C */
   buuPacified = 0
   /** 0x030032E4: 0 active, 1 destroyed, 2 fading, 3 expired */
@@ -74,6 +77,34 @@ export class BuuCtx {
 
   /** map collision of the arena (null = open arena, bounds only) */
   col: BuuCollision | null = null
+  /** HUD +0x10: frame of the last low-HP beep (0x0800BA4A) */
+  lastBeep = -1000
+  /** set the camera's 22.10 position (index.ts camera; lockstep harness) */
+  setCamera: (x: number, y: number) => void = () => undefined
+  /** screen shakes 0x0800797C(duration, intensity) (task 0x080079BC) and the camera offset they set (px) */
+  shakes: { left: number; intensity: number; period: number; cnt: number }[] = []
+  shakeOff: [number, number] = [0, 0]
+  /** 0x0800797C: dash into a wall (8, 100), critical melee hit (15, 75) */
+  shake(duration: number, intensity: number) {
+    this.shakes.push({ left: duration, intensity, period: Math.trunc((100 - intensity) / 16) + 1, cnt: 1 })
+  }
+  /** the shake tasks run after the objects each frame (first in their creation frame): every `period` frames two
+   *  draws of the game RNG pick the offset ((next - 0x8000) * intensity) >> 19 per axis; at the end offset 0 */
+  tickShakes(w: World) {
+    for (const s of this.shakes) {
+      if (--s.left === 0) {
+        this.shakeOff = [0, 0]
+        continue
+      }
+      if (--s.cnt === 0) {
+        s.cnt = s.period
+        const dx = Math.imul(((w.rng.next('shake x') - 0x8000) | 0), s.intensity) >> 19
+        const dy = Math.imul(((w.rng.next('shake y') - 0x8000) | 0), s.intensity) >> 19
+        this.shakeOff = [dx, dy]
+      }
+    }
+    this.shakes = this.shakes.filter((s) => s.left > 0)
+  }
   readonly data: BuuData
   readonly opts: BuuOptions
   constructor(data: BuuData, opts: BuuOptions) {
@@ -87,11 +118,22 @@ export class BuuCtx {
   spawnFx(w: World, id: string, x: number, y: number, frames = [0, 1, 2, 3], dur = 4) {
     w.add(new Effect(this.fx(id), x, y, frames, dur))
   }
-  puff(w: World, x: number, y: number) {
-    this.spawnFx(w, 'fx_086fd9d0', x, y, [0, 1, 2, 3], 4)
+  /** generic animated effect object 0x0802A81C: records start..start+n-1 of fx run `id`, 0x10000 / rate ticks each */
+  fxAnim(w: World, id: string, x: number, y: number, start: number, n: number, rate: number): FxAnim {
+    return w.add(new FxAnim(this.fx(id), x, y, start, n, rate))
   }
-  explosion(w: World, x: number, y: number) {
-    this.spawnFx(w, 'fx_08712fdc', x, y, [0, 1, 2, 3], 6)
+  /** smoke puff 0x086FD9D0 (4 records; the game's spawn sites mostly use rate 0x1000 + rand(0x1000), prio 0x37) */
+  puff(w: World, x: number, y: number, rate = 0x1800) {
+    this.fxAnim(w, 'fx_086fd9d0', x, y, 0, 4, rate)
+  }
+  /** puff with the game's random rate 0x1000 + rand(0x1000) (one RNG call; sites verified in the emulator: ninja
+   *  teleport, shield break, energy-wave hit, Dabura's sphere destroyed, stone break-free) */
+  puffRng(w: World, x: number, y: number) {
+    this.puff(w, x, y, 0x1000 + w.rng.rand(0x1000, 'puff rate'))
+  }
+  /** explosion 0x08712FDC (4 records; projectile explosions use rate 0x2000 = 8 ticks per record, prio 0x38) */
+  explosion(w: World, x: number, y: number, rate = 0x2000) {
+    this.fxAnim(w, 'fx_08712fdc', x, y, 0, 4, rate)
   }
   liveEnemies() {
     return this.enemies.filter((e) => !e.removed && !e.defeated)

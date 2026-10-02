@@ -68,6 +68,8 @@ def run(game, maps=True):
         ents += misc_export.effects(game, defs)
         if game == 'buu':
             ents += misc_export.buu_overlays()
+            import buu_fx
+            ents += buu_fx.beams() + buu_fx.extra_runs() + buu_fx.bbk_flare()
         ents += misc_export.portraits(game)
         import items_export
         ents += items_export.export(game)

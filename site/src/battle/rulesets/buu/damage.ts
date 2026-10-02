@@ -26,10 +26,11 @@ export const ATK: AttackType[] = Array.from({ length: 19 }, (_, sub) => ({
   power: sub === 16 ? 0 : 1024,
 }))
 
+/** attack-type names; the skill ones are the game's skill names (moves.json, ROM text) */
 export const ATK_NAMES: Record<number, string> = {
-  0: 'melee', 1: 'energy', 2: 'punch', 3: 'melee (no crit)', 4: 'Energy Blast', 5: 'Kamehameha', 6: 'Electric Kamehameha', 7: 'Masenko',
-  8: 'Kamekameha', 9: 'Energy Punch', 10: 'Burning Attack', 11: 'Final Flash', 12: 'Flame Kamehameha', 13: 'Big Bang', 14: 'Banshee',
-  15: 'Energy Sword', 16: 'Volleyball', 17: 'Big Bang Kamehameha', 18: 'Dragon Fist',
+  0: 'melee', 1: 'energy', 2: 'punch', 3: 'melee (no crit)', 4: 'Energy Blast', 5: 'Kamehameha', 6: 'Electric Kamehameha', 7: 'Masenkoha',
+  8: 'Kamekameha', 9: 'Energy Punch', 10: 'Burning Attack', 11: 'Final Flash', 12: 'Flame Kamehameha', 13: 'Big Bang', 14: 'Banshee Blast',
+  15: 'Energy Sword', 16: 'Ultra Volleyball Attack', 17: 'Big Bang Kamehameha', 18: 'Dragon Fist Explosion',
 }
 
 export interface CombatStats {

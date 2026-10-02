@@ -59,7 +59,8 @@ describe('player', () => {
     }
     expect(hurtAt).toBeGreaterThan(0)
     expect(s.player.stats.resM).toBe(0)
-    s.run(23)
+    // the hit frame counts (the hurt state ticks in it: emulator lockstep f02_hurt, hurt at frame 10, idle at 33)
+    s.run(22)
     expect(s.player.state).toBe('hurt')
     s.run(1)
     expect(s.player.state).toBe('idle')

@@ -129,7 +129,8 @@ describe('player movement (emulator traces, Snakeway, new-game Goku SPD 50: walk
     s.player.x = 92 << 8
     s.player.y = 184 << 8
     const t = trace(s, [[0, 1], [BTN.LEFT, 2], [0, 2], [BTN.LEFT, 60]])
-    const hit = t.findIndex((f) => f.st === 'bump')
+    // the bump is the hurt state object (0x0804D75C) with the hurt animation (emulator lockstep f02_bump)
+    const hit = t.findIndex((f) => f.st === 'hurt')
     expect(hit).toBeGreaterThan(0)
     expect(t[hit].a).toBe('hurt')
     for (let i = 1; i <= 23; i++) expect(t[hit + i].x - t[hit + i - 1].x).toBe(0.75)

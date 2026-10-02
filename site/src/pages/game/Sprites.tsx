@@ -44,7 +44,7 @@ export function SpritesPage({ game }: { game: string }) {
     <div>
       <p className="lede">
         Every graphics entity decoded from the ROM: {sp.all.length} entries. Click one for the animation player, frame data, body
-        rectangles and ROM addresses. Names marked <i>low confidence</i> are visual guesses.
+        rectangles and ROM addresses. Names marked <i>?</i> (low confidence) are descriptive: the game has no text for them.
       </p>
       <div className="toolbar">
         <Search value={q} onChange={(v) => set('q', v)} placeholder="Search by name, id or ROM label…" />

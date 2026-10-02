@@ -169,6 +169,8 @@ arena's spawn point; spawns go to the nearest free spot. Verified frame by frame
 rocks and against the game's path follower (`tests/battle/buu_collision.test.ts`). The hitbox view shows the grids
 (magenta walls, orange enemy marks, cyan projectile-only walls).
 
+Player animation / states / sounds: the game's state objects (`panim.ts`: once / loop / idle / bored ticks, `player.ts`: SetAnim table, base states, forms, skills, exact sound calls), verified frame by frame against the emulator for every form by the lockstep harness (`tools/battle/LOCKSTEP.md`, `tests/battle/buu_lockstep.test.ts`).
+
 Fitted / inferred (marked in the code): skill state machines are fitted to the measured runs (first-hit frames,
 hit counts, EP), beam hit rate near / far, Big Bang multiplier = 0.284 x charged EP, some table-driven offsets (candy beam, formation slots), energy shield effect, thorns, SS cooldown
 start value, transform not interruptible, cutscene scripts not run, which controller states detach an enemy from the

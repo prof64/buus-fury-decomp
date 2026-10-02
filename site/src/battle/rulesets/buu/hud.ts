@@ -70,7 +70,9 @@ export function drawHud(r: Renderer, ctx: BuuCtx, p: Player, enemies: Enemy[], p
     const x = r.viewW - w - 8
     const y = 16
     const same = alive.filter((e) => e.type.type === target.type.type || (e.primary && target.primary))
-    const name = same.length > 1 ? `${target.label} x${same.length}` : target.label
+    // the game's own name (without our "(qualifier)"), as the scouter / database shows it
+    const label = target.type.gameName ?? target.label
+    const name = same.length > 1 ? `${label} x${same.length}` : label
     drawText(g, name.toUpperCase().slice(0, 21), x, y - 7, '#fff')
     if (phaseInfo) drawText(g, phaseInfo, x + w - textWidth(phaseInfo), y + 6, '#ffd23f')
     g.fillStyle = '#000'

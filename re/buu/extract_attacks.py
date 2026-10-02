@@ -80,9 +80,9 @@ def attack_types():
 
 
 SUB_NAMES = {2: 'melee punch', 3: 'melee (cannot crit)', 4: 'Energy Blast', 5: 'Kamehameha', 6: 'Electric Kamehameha',
-             7: 'Masenko', 8: 'Kamekameha', 9: 'Energy Punch', 10: 'Burning Attack', 11: 'Final Flash',
-             12: 'Flame Kamehameha', 13: 'Big Bang Attack', 14: 'Banshee', 15: 'Energy Sword',
-             16: 'Ultra Volleyball', 17: 'Big Bang Kamehameha', 18: 'Dragon Fist'}
+             7: 'Masenkoha', 8: 'Kamekameha', 9: 'Energy Punch', 10: 'Burning Attack', 11: 'Final Flash',
+             12: 'Flame Kamehameha', 13: 'Big Bang', 14: 'Banshee Blast', 15: 'Energy Sword',
+             16: 'Ultra Volleyball Attack', 17: 'Big Bang Kamehameha', 18: 'Dragon Fist Explosion'}   # game skill names
 
 
 def beam_defs():

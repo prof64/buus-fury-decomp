@@ -75,6 +75,8 @@ export abstract class Actor implements Entity, Receiver {
   anim: Anim | undefined
   animT = 0
   animLoop: boolean | undefined
+  /** code-driven frame index (obj+0x11, the player's state ticks: panim.ts); null = time-driven by animT */
+  frameIdx: number | null = null
   flash = 0
   alpha = 1
 
@@ -195,8 +197,9 @@ export abstract class Actor implements Entity, Receiver {
     // position on the ground (it does not follow the height offset).
     const sh = this.shadowSprite()
     if (sh && this.alpha > 0) sh.drawFrame(r.ctx, 0, r.sx(this.px) + this.shakeX, r.sy(this.py) + this.shakeY, false, { alpha: this.alpha })
-    this.sprite.draw(r.ctx, this.anim, this.facing, x, y, this.animT, { white, loop: this.animLoop, alpha: this.alpha })
-    const step = this.anim.stepAt(this.facing, this.animT, this.animLoop)
+    const fi = this.frameIdx
+    this.sprite.draw(r.ctx, this.anim, this.facing, x, y, this.animT, { white, loop: this.animLoop, alpha: this.alpha, index: fi ?? undefined })
+    const step = fi != null ? this.anim.stepIndex(this.facing, fi) : this.anim.stepAt(this.facing, this.animT, this.animLoop)
     if (step?.attach) {
       const halo = Actor.bank?.get('buu_halo')
       halo?.drawFrame(r.ctx, 0, x + step.attach[0], y + step.attach[1], false, { alpha: this.alpha })

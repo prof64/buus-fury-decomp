@@ -8,17 +8,19 @@
 // in moves.json / attacks_detail.json (first-hit frames, hit counts, EP spent) and marked INFERRED where guessed.
 
 import { BTN, DPAD } from '../../core/input'
-import { DIR_VEC, rectAt, type Dir, type Rect } from '../../core/geom'
-import type { World } from '../../core/world'
+import { DIR_VEC, overlaps, rectAt, type Dir, type Rect } from '../../core/geom'
+import type { Entity, World } from '../../core/world'
 import type { Renderer } from '../../core/renderer'
-import { drawText } from '../../core/pixelfont'
 import { Actor, broadcast, hitsBody, type HitMsg } from './actor'
 import type { BuuCtx, HoldKind, PlayerLike } from './context'
 import { ATK, computeDamage, HpAcc } from './damage'
 import type { BuuForm, EquipDef } from './data'
 import { recalcStats, levelOf, levelUp, xpGain, type BuuRecord, type EffStats } from './progression'
 import { audioEvent } from '../../audio/bus'
-import { AreaHit, BigBangBall, FullBeam, Ghost, GrowBeam, MasenkoCursor, StraightShot, kiBlast, VEL, type Shot } from './projectiles'
+import { BEAM_POS, BeamCharge, beamGfx, drawRec, drawRecAddr, LoopFx, RecObj } from './fx'
+import { BBK_FLARE_POS, BbkFlareFx, DragonFistFx, drawVolleyWave, ENERGY_PUNCH_POS, ENERGY_PUNCH_TABLE, EnergySwordFx, FINAL_FLASH_POS, FINAL_FLASH_TABLES, FLAME_CHARGE, FlameKameFx, GHOST_SPAWN, ItMarkersFx, SS_AURA } from './skillfx'
+import { ANIM_RAW, ANIM_STATE, tickBored, tickIdle, tickLoop, tickOnce, type AnimPos } from './panim'
+import { BIGBANG_POS, AreaHit, BigBangBall, FullBeam, Ghost, GrowBeam, MasenkoCursor, StraightShot, kiBlast, VEL, KI_MUZZLE, BURNING_HOLD, burningFx, burningEnd, type Shot } from './projectiles'
 
 /** melee rects 0x083C344C (x0,y0,x1,y1 relative to the position; same for every form) */
 export const PUNCH_RECT = [
@@ -39,8 +41,58 @@ const FACE_TBL = [
   [0, 0, 2, 2],
   [0, 0, 3, 3],
 ]
-/** beam drain table 0x0871E148 in 1/256 EP per frame (0.418 / 1.5 / 5 EP) */
-const BEAM_DRAIN = [107, 384, 1280]
+/** the raw animation each skill's activate sets (0x0800ECDA(player, raw - 1)), skill table 0x0871DAF8 +0x14 */
+const SKILL_RAW: Record<number, number> = { 1: 19, 2: 19, 3: 19, 4: 4, 5: 20, 6: 19, 7: 4, 8: 20, 9: 20, 10: 20, 11: 19, 13: 20, 15: 19, 16: 19, 17: 13, 23: 4 }
+/** canUse EP checks (EP >= cost * factor / 16): byte tables 0x0871DA98.. / u32 0x0871DAB0.. per level */
+const SKILL_CHECK: Record<number, number[]> = {
+  1: [200], 2: [10, 33, 100], 3: [12], 4: [35, 105, 420], 5: [300], 6: [15, 50, 150], 8: [25, 70, 290], 9: [350], 10: [15, 45, 140],
+  11: [15, 44, 145], 13: [160], 14: [40], 15: [15, 45, 150], 16: [15, 45, 150], 17: [50, 200, 800], 23: [350],
+}
+/** Energy Punch Lv3 hit rects 0x0871DF30 (relative to the position; Lv1/2 use the melee rects) */
+const ENERGY_PUNCH_RECT_L3 = [
+  [0, 0, 24, 28],
+  [-4, -36, 20, 0],
+  [-20, -24, 0, 8],
+  [16, -24, 36, 8],
+]
+/** Energy Sword strike boxes (defs 10..17: origin ox, oy and size; box = position - origin .. + size) */
+const SWORD_BOX = [
+  [39, 10, 32, 8],
+  [29, 2, 32, 32],
+  [-4, 0, 8, 32],
+  [-13, 2, 32, 32],
+  [-23, 10, 32, 8],
+  [-12, 46, 32, 32],
+  [-4, 46, 8, 32],
+  [28, 46, 32, 32],
+]
+/** Ultra Volleyball ball position (player position + 0x0871E1E0[dir]) */
+const VOLLEY_POS: [number, number][] = [[10, 8], [10, -20], [-8, -8], [24, -8]]
+/** dash direction table 0x0807268C (times the dash speed) */
+const DASH_VEC = [
+  [0, 1],
+  [0, -1],
+  [-1, 0],
+  [1, 0],
+]
+/** hurt / bump knockback 0x080725C0: position -= vector[facing] every frame (0.75 px) */
+const KNOCK_VEC = [
+  [0, 192],
+  [0, -192],
+  [-192, 0],
+  [192, 0],
+]
+/** blocked hit pushback 0x080727A0: position += vector[facing] once (2 px backwards) */
+const BLOCK_PUSH = [
+  [0, -512],
+  [0, 512],
+  [512, 0],
+  [-512, 0],
+]
+/** the energy shield graphics 0x087202E8 (record = power >> 3; 0..2 fade in, 3..6 loop) */
+const SHIELD_FX = 'fx_087202e8'
+/** stuck-bandage slots (0x08756BB4): y offsets above the player position */
+const WRAP_SLOT_Y = [-2, -10, 2, 18, 6, 10, -6, 14]
 
 export type PState = 'idle' | 'walk' | 'dash' | 'punch' | 'block' | 'shield' | 'hurt' | 'bump' | 'dying' | 'skill' | 'transform' | 'held'
 
@@ -90,7 +142,7 @@ export class Player extends Actor implements PlayerLike {
   state: PState = 'idle'
   t = 0
   /** skill scratch */
-  sk: { id: number; t: number; held: boolean; release: number; proj?: Shot | null; acc: number; refire?: boolean; ghosts?: Ghost[]; target?: number; charged?: boolean; charge?: number; hits?: number } | null = null
+  sk: { id: number; t: number; held: boolean; release: number; proj?: Shot | null; fx?: Entity | null; acc: number; refire?: boolean; ghosts?: Ghost[]; target?: number; charged?: boolean; charge?: number; hits?: number } | null = null
   hpAcc = new HpAcc()
   epAcc = 0
   regenTimer = 0
@@ -118,6 +170,16 @@ export class Player extends Actor implements PlayerLike {
   transformTo = -1
   formsAllowed: number[]
   punchAnim = 0
+  /** the game's state object at obj+0x14 (lockstep name, tools/battle/lockstep/emu_lockstep.py STATE_NAMES) */
+  gs = 'idle'
+  /** obj+0x50 animation (raw index) / +0x11 frame / +0x12 tick (panim.ts) */
+  ap: AnimPos = { raw: 1, frame: 0, tick: 0 }
+  /** state object scratch: idle +4 counter, block +4 shield EP accumulator */
+  sCnt = 0
+  /** energy shield object 0x0801DFE0 of the block state: +0x40 power (0..55), +0x44 active */
+  shield: { pow: number; on: boolean } | null = null
+  /** obj+0x1B8 / +0x1B9 (0 during hurt / a full shield) */
+  resist = 128
   constructor(ctx: BuuCtx, init: PlayerInit) {
     super()
     this.ctx = ctx
@@ -130,7 +192,7 @@ export class Player extends Actor implements PlayerLike {
     this.formsAllowed = init.formsAllowed
     this.holyLeft = init.holyWater ? 1800 : 0
     this.applyForm(init.form)
-    this.setAnim('idle', true, true)
+    this.syncAnim()
   }
 
   get hp() {
@@ -167,21 +229,20 @@ export class Player extends Actor implements PlayerLike {
     for (let k = 1; !spr && k <= 3; k++) spr = this.ctx.data.sprites.index(f.gfx - 9 - k)
     this.setSprite(spr)
     this.refreshStats()
-    if (this.anim) this.setAnim(this.anim.name, false)
+    this.syncAnim()
   }
   /** RecalcStats 0x08013C66 + apply to the player object 0x0800E074 + form bonuses */
   refreshStats() {
     this.eff = recalcStats(this.rec, this.equip, this.holyLeft > 0)
     const b = this.form.bonus
     const e = this.eff
-    const hurt = this.state === 'hurt'
     this.stats = {
       STR: e.STR + b.STR,
       POW: e.POW + b.POW,
       END: e.END + b.END,
       END2: e.END2 + b.END2,
-      resM: hurt ? 0 : 128,
-      resE: hurt ? 0 : 128,
+      resM: this.resist,
+      resE: this.resist,
       critBonus: e.critPct * 656,
       blockFactor: e.blockFactor,
     }
@@ -262,19 +323,33 @@ export class Player extends Actor implements PlayerLike {
     this.holdLeft = frames
     this.holdCount = 0
     this.holdLast = w.frame
+    this.enterState(w, 'hold')
     this.state = 'held'
     this.t = 0
     this.blocking = false
-    if (kind === 'stone') this.setAnim('hurt', true, false)
-    else if (kind === 'eat') this.alpha = 0
-    else this.setAnim(['hurt', 'knockback'], true, true)
+    // INFERRED: the enemies' hold controllers are not decoded; the hurt animation's first frame is shown
+    if (kind === 'eat') this.alpha = 0
+    else this.ap.raw = 10
+    this.ap.frame = 0
   }
   release(w: World) {
     if (this.state !== 'held') return
+    // breaking out of the stone: a puff at the body centre (rate 0x1000 + rand(0x1000))
+    if (this.holdKind === 'stone') this.ctx.puffRng(w, ...this.center())
     this.heldBy = null
     this.holdKind = null
     this.alpha = 1
-    this.setState(w, 'idle')
+    this.setAnimId(w, 0)
+  }
+  /** Actor.setAnim for the skill code: the named animation (raw index n+1 / name) becomes obj+0x50 */
+  setAnim(ref: number | string | (number | string)[], restart = true, _loop?: boolean) {
+    if (!this.sprite) return
+    const refs = (Array.isArray(ref) ? ref : [ref]).map((r) => (typeof r === 'number' ? r + 1 : r))
+    const a = this.sprite.pick(...refs)
+    if (!a) return
+    if (a.raw !== this.ap.raw || restart) this.ap.tick = this.ap.frame = 0
+    this.ap.raw = a.raw
+    this.syncAnim()
   }
   loseHp(w: World, n: number, floor = 0): number {
     if (this.dead || n <= 0) return 0
@@ -300,116 +375,310 @@ export class Player extends Actor implements PlayerLike {
       this.rec.level = nl
       this.refreshStats()
       w.popup('LEVEL UP!', this.px + 8, this.py - 34, '#8cf', 90)
-      audioEvent('level_up')
+      this.sfx(36) // level up: bytecode script #3 (push 36, native 0x1F)
       w.logEvent('info', `level ${old} -> ${nl} (+${(nl - old) * 3} stat points)`)
     }
   }
 
-  // ---- state machine ---------------------------------------------------------------------------------------
+  // ---- state machine (the game's player states; panim.ts, tools/battle/LOCKSTEP.md) --------------------------------
+  /** coarse state for the AI / skill code: 'idle' = SetAnim(0) (idle enter, random tick), others only relabel */
   setState(w: World, s: PState) {
-    const was = this.state
-    if (was === 'skill' && s !== 'skill') this.endSkill(w)
+    if (s === 'idle') return this.setAnimId(w, 0)
+    if (this.state === 'skill' && s !== 'skill') this.endSkill(w)
     this.state = s
     this.t = 0
+  }
+
+  /** nframes of the shown animation (anim struct +0); a sprite without the animation has a null entry: 0 frames
+   *  (one-shot states end on their first tick, emulator: Gohan form 9 / Krillin / Tien) */
+  animN(): number {
+    const a = this.sprite?.anim(this.ap.raw)
+    return a ? Math.max(1, ...a.dirs.map((d) => d.length)) : 0
+  }
+  hasAnim(raw: number) {
+    return !!this.sprite?.anim(raw)
+  }
+  /** the sprite shown = obj+0x50 / +0x11 */
+  syncAnim() {
+    const a = this.sprite?.anim(this.ap.raw) ?? this.sprite?.anim(1)
+    this.anim = a
+    this.frameIdx = this.sprite?.anim(this.ap.raw) ? this.ap.frame : 0
+  }
+  /** SetAnim(id) (vfunc +0x28 0x0800ECF0): the raw animation of the id + its state (0x0807273C; id 0 = idle) */
+  setAnimId(w: World, id: number) {
+    this.ap.raw = ANIM_RAW[id]
+    this.enterState(w, id === 0 ? this.idleState() : ANIM_STATE[id])
+  }
+  /** the form controller's idle state: 0x03002B44, or 0x03001B0C (no control) for the cutscene variants */
+  idleState(): string {
+    return this.form.controller === 0x3001b64 ? 'idle2' : 'idle'
+  }
+  /** SetState (0x0800ED18): exit the old state object, enter the new one */
+  enterState(w: World, gs: string) {
+    const old = this.gs
+    if (old === 'block') {
+      // 0x08012BA2: blocking off, the shield object removed
+      this.blocking = false
+      this.shield = null
+    } else if (old === 'hurt') this.setResist(128) // 0x08012D78
+    else if (old === 'skill20' || old === 'ss_up') {
+      // 0x0801C552: an unfinished transformation empties the gauge it was filling; the sound 54 stops
+      if (!this.transformDone) {
+        if (this.form.ss) this.ss3Gauge = 0
+        else this.ssGauge = 0
+      }
+      this.sfxStop(54)
+    }
+    if (this.state === 'skill' && !gs.startsWith('skill')) this.endSkill(w)
+    this.gs = gs
+    this.t = 0
     this.shakeX = this.shakeY = 0
-    this.blocking = s === 'block' || s === 'shield'
-    switch (s) {
+    const a = this.ap
+    switch (gs) {
       case 'idle':
-        this.setAnim('idle', was !== 'idle', true)
+        // 0x08012FE6: tick = rand(255) (0x0800DFBE), state counter 0, hittable, resists 128
+        a.tick = w.rng.rand(255, 'idle tick')
+        a.frame = 0
+        this.sCnt = 0
+        this.hittable = true
+        this.setResist(128)
         break
-      case 'walk':
-        this.setAnim('walk', was !== 'walk', true)
+      case 'idle2':
+        a.tick = w.rng.rand(255, 'idle tick')
+        a.frame = 0
         break
-      case 'dash':
-        this.setAnim(['dash', 'walk'], true, true)
+      case 'hold':
+        break
+      case 'punch':
+        // 0x0800DEE8: swing sound 50 + rand(2)
+        a.tick = a.frame = 0
+        this.sfx(50 + w.rng.rand(2, 'swing sfx'))
         break
       case 'block':
-      case 'shield':
-        this.setAnim('guard', false, true)
+        // 0x08012B90
+        a.tick = a.frame = 0
+        this.blocking = true
+        this.sCnt = 0
+        this.shield = null
         break
       case 'hurt':
-      case 'bump':
-        this.setAnim(['hurt', 'knockback'], true, false)
+        // 0x08012D64: i-frames (both resists 0)
+        a.tick = a.frame = 0
+        this.setResist(0)
         break
-      case 'dying':
-        this.setAnim(['knockdown', 'ko', 'hurt'], true, false)
-        this.dead = true
+      case 'skill20':
+      case 'ss_up':
+        // 0x0801C3EC: the transformation sound 54 (+ the aura effect object)
+        a.tick = a.frame = 0
+        this.transformDone = false
+        this.sfx(54)
+        break
+      case 'ss_revert':
+        // 0x0801C1F6: not hittable while reverting
+        a.tick = a.frame = 0
         this.hittable = false
         break
+      default:
+        a.tick = a.frame = 0
     }
-    if (was === 'hurt' || s === 'hurt') this.refreshStats()
+    this.state = this.coarse(gs)
+    if (this.state === 'dying') {
+      this.dead = true
+      this.hittable = false
+    }
+  }
+  private coarse(gs: string): PState {
+    switch (gs) {
+      case 'walk':
+        return 'walk'
+      case 'dash':
+        return 'dash'
+      case 'punch':
+        return 'punch'
+      case 'block':
+        return 'block'
+      case 'hurt':
+        return 'hurt'
+      case 'ko':
+        return 'dying'
+      case 'hold':
+        return this.dead ? 'dying' : this.state === 'skill' ? 'skill' : 'idle'
+      case 'ss_up':
+      case 'ss_revert':
+      case 'skill20':
+      case 'skill18':
+      case 'skill18r':
+        return 'transform'
+      default:
+        return gs.startsWith('skill') ? 'skill' : 'idle'
+    }
+  }
+  setResist(v: number) {
+    if (this.resist === v) return
+    this.resist = v
+    this.refreshStats()
+  }
+  /** a PlaySfx call of the game (0x0803E378): id, volume 0..64 */
+  sfx(id: number, vol = 64) {
+    audioEvent('sfx', { id, vol })
+  }
+  sfxStop(id: number) {
+    audioEvent('sfx_stop', { id })
   }
 
   update(w: World) {
-    this.tickAnim()
-    if (this.dead) return
-    this.t++
-    this.passive(w)
-    if (this.dead) return
-    const inp = w.input
-    // candy / stone: no actions (INFERRED for candy: the controller 0x0804BE60 is not decoded)
-    switch (this.state) {
-      case 'idle':
-      case 'walk':
-        if (this.ctx.candy > 0) return this.moveInput(w, false)
-        if (inp.held & BTN.R) return this.setState(w, inp.held & BTN.B && this.energyLeft() > 0 ? 'shield' : 'block')
-        if (inp.pressed & BTN.A) return this.melee(w)
-        if (inp.pressed & BTN.B) return this.startSkill(w)
-        if (inp.pressed & BTN.L) this.cycleSkill()
-        this.moveInput(w, true)
-        return
-      case 'dash':
-        return this.updDash(w)
-      case 'punch':
-        if (this.t >= 16) this.setState(w, 'idle')
-        return
-      case 'block':
-        if (!(inp.held & BTN.R)) return this.setState(w, 'idle')
-        if (inp.held & BTN.B && this.energyLeft() > 0) this.setState(w, 'shield')
-        return
-      case 'shield': {
-        if (!(inp.held & BTN.R)) return this.setState(w, 'idle')
-        if (!(inp.held & BTN.B)) return this.setState(w, 'block')
-        // 0x08012BC6: acc += rec+0x57 * 0x3277 >> 4; spend acc >> 16 (~0.197 EP/frame)
-        this.epAcc += (this.eff.epBlockFactor * 0x3277) >> 4
-        const n = this.epAcc >> 16
-        this.epAcc &= 0xffff
-        if (n) this.spend(w, n, true)
-        if (this.energyLeft() <= 0) this.setState(w, 'block')
-        return
-      }
-      case 'hurt': {
-        // 24-frame hurt state, both resists 0, ~17 px knockback
-        const [dx, dy] = DIR_VEC[this.hurtDir]
-        this.moveBy(w, dx * 182, dy * 182)
-        if (this.t > 24) this.setState(w, 'idle')
-        return
-      }
-      case 'bump': {
-        // dashed into a wall (emulator trace work/compare/emu_bump.py): hurt animation, pushed back 192/256 px per
-        // frame for 23 frames, no damage; the body shakes for the first 10 frames; then back to walk / idle
-        if (this.t >= 24) {
-          this.setState(w, 'idle')
-          return this.moveInput(w, true)
-        }
-        const [dx, dy] = DIR_VEC[this.facing]
-        this.moveBy(w, -dx * 192, -dy * 192)
-        if (this.t < 10) {
-          // INFERRED pattern (the game jitters the sprite by up to 4 px; the generator is not decoded): cosmetic only,
-          // does not draw from the game RNG
-          const h = Math.imul(w.frame + 1, 0x9e3779b1) >>> 0
-          this.shakeX = (h % 9) - 4
-          this.shakeY = ((h >>> 8) % 9) - 4
-        } else this.shakeX = this.shakeY = 0
-        return
-      }
-      case 'skill':
-        return this.updSkill(w)
-      case 'transform':
-        return this.updTransform(w)
-      case 'held':
-        return this.updHeld(w)
+    if (this.itSel) {
+      // Instant Transmission target pick: the game's modal loop (only the cursor runs)
+      this.itSelect(w)
+      this.syncAnim()
+      return
     }
+    if (this.flash > 0) this.flash--
+    this.t++
+    this.shieldTick()
+    // objects updated before the player this frame: a gone beam's destructor sounds, the ghosts' own RNG draws
+    for (const b of this.beamEnd) if (b.shot.removed) for (const [k, id] of b.sfx) k === 'stop' ? this.sfxStop(id) : this.sfx(id)
+    this.beamEnd = this.beamEnd.filter((b) => !b.shot.removed)
+    for (const g of this.ghostRng) if (g.at === w.frame) w.rng.rand(g.n, 'ghost')
+    this.ghostRng = this.ghostRng.filter((g) => g.at > w.frame)
+    // player update 0x08010BD2: form controller (regen, gauges), then the actor update 0x0800EF08: the state's
+    // tick, then the control of the state that is current after the tick
+    if (!this.dead) this.passive(w)
+    this.animTick(w)
+    if (!this.dead) this.control(w)
+    this.syncAnim()
+    // KO: the death script (0x08799D0C) starts the game-over song 8 200 frames later
+    if (this.koAt >= 0 && w.frame - this.koAt === 200) audioEvent('song', { id: 8 })
+    // the task list (screen shakes) runs after the objects; the player is the last object updated
+    this.ctx.tickShakes(w)
+    w.viewShake = this.ctx.shakeOff
+  }
+
+  /** the state's tick (vtable +4) */
+  private animTick(w: World) {
+    const a = this.ap
+    const n = this.animN()
+    switch (this.gs) {
+      case 'idle':
+      case 'idle2':
+        return tickIdle(a, n)
+      case 'walk':
+      case 'loop_b':
+      case 'loop_c':
+        return tickLoop(a, n, 3)
+      case 'dash':
+        // 0x08012FC4: loop, the dash sound 25 (volume 32) every 16 ticks
+        tickLoop(a, n, 3)
+        if ((a.tick & 15) === 0) this.sfx(25, 32)
+        return
+      case 'bored':
+        return tickBored(a, n)
+      case 'punch':
+        if (tickOnce(a, n, 2)) this.setAnimId(w, 0)
+        return
+      case 'once3':
+      case 'hurt':
+        if (tickOnce(a, n, 3)) this.setAnimId(w, 0)
+        return
+      case 'once4':
+        if (tickOnce(a, n, 4)) this.setAnimId(w, 0)
+        return
+      case 'ko':
+      case 'once_hold':
+        // 0x0800DED0: then the hold state (last frame kept)
+        if (tickOnce(a, n, 5)) this.enterState(w, 'hold')
+        return
+      case 'hold':
+      case 'hold0':
+      case 'block':
+        return
+      case 'skill20':
+      case 'ss_up':
+        if (tickOnce(a, n, 4)) this.finishTransform(w)
+        return
+      case 'ss_revert':
+        if (tickOnce(a, n, 4)) this.finishRevert(w)
+        return
+      case 'skill18':
+      case 'skill18r':
+        if (tickOnce(a, n, 2)) this.finishSaiyaman(w)
+        return
+      case 'skill14':
+        return
+      default:
+        return this.skillTick(w)
+    }
+  }
+
+  /** tick of the skill states (vtable +4 of each skill state) */
+  private skillTick(w: World) {
+    switch (this.gs) {
+      case 'skill7':
+        return this.tickBlast(w)
+      case 'skill2': {
+        // Big Bang tick 0x0801A80E: frame (t >> 3) & 1 while the ball is held; after the release idle past tick 16
+        const a = this.ap
+        const t = (a.tick = (a.tick + 1) & 0xffff)
+        if (!this.sk?.proj) {
+          if (t > 16) this.setAnimId(w, 0)
+        } else a.frame = (t >> 3) & 1
+        return
+      }
+    }
+  }
+  /** Energy Blast tick 0x0801AF3C: frame 1 + the shot at tick 16; at tick 40 a queued B press with enough EP pays
+   *  again, toggles frame 1 <-> 2, rewinds to tick 16 and fires; else SetAnim(0) */
+  private tickBlast(w: World) {
+    const a = this.ap
+    a.tick = (a.tick + 1) & 0xffff
+    if (a.tick < 40) {
+      if (a.tick === 16) {
+        a.frame = 1
+        this.fireBlast(w)
+      }
+      return
+    }
+    const cost = this.skillCost(7)
+    if (this.sk?.refire && this.canAfford(cost)) {
+      this.sk.refire = false
+      this.spend(w, cost)
+      a.frame = 3 - a.frame
+      a.tick = 16
+      this.fireBlast(w)
+    } else this.setAnimId(w, 0)
+  }
+  /** 0x08019858 -> ki blast 0x080197B4 at the muzzle (its constructor picks the sound 20 + rand(2)) */
+  private fireBlast(w: World) {
+    // the game's muzzle (object position at spawn, re/buu/fx_objpos.py)
+    const [ox, oy] = KI_MUZZLE[this.facing]
+    this.blast = kiBlast(this.ctx, this, this.facing, 1, (this.px + ox) << 8, (this.py + oy) << 8, undefined, undefined, w)
+    w.add(this.blast)
+  }
+
+  /** the state's control (vtable +8) */
+  private control(w: World) {
+    if (this.state === 'held') return this.updHeld(w)
+    switch (this.gs) {
+      case 'idle':
+        return this.ctlIdle(w)
+      case 'walk':
+        return this.ctlWalk(w)
+      case 'dash':
+        return this.ctlDash(w)
+      case 'bored':
+        return this.ctlBored(w)
+      case 'block':
+        return this.ctlBlock(w)
+      case 'hurt':
+        return this.ctlKnock(w)
+      case 'skill14':
+        return this.ctlIT(w)
+      case 'skill18':
+      case 'skill18r':
+        return
+    }
+    if (this.state === 'skill') return this.updSkill(w)
+    if (this.state === 'transform') return this.updTransform(w)
   }
   hurtDir: Dir = 0
 
@@ -482,20 +751,35 @@ export class Player extends Actor implements PlayerLike {
     }
     if (this.holyLeft > 0 && --this.holyLeft === 0) this.refreshStats()
     if (this.ctx.candy > 0) this.ctx.candy--
-    // SS gauge drain: acc += 0xCCD, -1 per overflow (20 frames); SS3: (22*maxEP + 0x3333) per frame in 1/65536
-    if (this.state !== 'transform') {
+    // gauges (form controllers 0x0800E3E6 SS / 0x0800E4C4 SS3; not while reverting): SS acc += 0xCCD, SS3 acc +=
+    // 22*maxEP + 0x3333; each overflow takes acc >> 16 from the gauge; an empty gauge at an overflow -> revert
+    // (SetAnim(24)). The SS cooldown (rec+4) falls only in the other forms (0x08013E06).
+    // the story variants with the form objects 0x03001B7C / 0x03001B84 (Gohan 17, Vegeta 30, Gotenks 37 / 38, Goku 7
+    // / 8) have no drain (emulator: the gauge never runs out)
+    const drains = [0x3001b68, 0x3001b6c, 0x3001b78, 0x3001b80, 0x3001b8c].includes(this.form.controller)
+    if (this.gs !== 'ss_revert' && drains) {
       if (this.form.ss3) {
-        this.ss3Gauge -= 22 * this.maxEp + 0x3333
-        if (this.ss3Gauge <= 0) this.revert(w)
+        this.ssAcc += 22 * this.maxEp + 0x3333
+        const n = this.ssAcc >> 16
+        if (n) {
+          const g = this.ss3Gauge >> 16
+          if (g > n) this.ss3Gauge = (g - n) * 65536
+          else if (this.hp !== 0) {
+            this.ss3Gauge = 0
+            this.revert(w)
+          }
+          this.ssAcc &= 0xffff
+        }
       } else if (this.form.ss) {
         this.ssAcc += 0xccd
-        if (this.ssAcc >= 0x10000) {
-          this.ssAcc -= 0x10000
-          this.ssGauge--
-          if (this.ssGauge <= 0) this.revert(w)
+        if (this.ssAcc >> 16) {
+          if (this.ssGauge !== 0) this.ssGauge--
+          else if (this.hp !== 0) this.revert(w)
+          this.ssAcc &= 0xffff
         }
-      } else if (this.ssCooldown > 0) this.ssCooldown = Math.max(0, this.ssCooldown - (this.eff.ssCooldownRate >> 6))
+      }
     }
+    if (!this.form.ss && !this.form.ss3 && this.ssCooldown > 0) this.ssCooldown = Math.max(0, this.ssCooldown - (this.eff.ssCooldownRate >> 6))
     // wraps: 8 new d-pad presses within 60 frames shake them off
     if (this.wraps > 0 && w.input.pressed & DPAD) {
       this.wrapPresses.push(w.frame)
@@ -508,73 +792,172 @@ export class Player extends Actor implements PlayerLike {
     }
   }
 
-  private moveInput(w: World, allowDash: boolean) {
+  /** A / B at the end of the idle, walk, dash and bored controls */
+  private attackInput(w: World) {
+    const p = w.input.pressed
+    if (p & BTN.A) return this.melee(w)
+    if (p & BTN.B) return this.startSkill(w)
+  }
+  /** R held and the sprite has the guard animation (anim id 7 = raw 8): block state (0x0804C744) */
+  private tryBlock(w: World): boolean {
+    if (!(w.input.held & BTN.R) || !this.hasAnim(8)) return false
+    this.ap.raw = 8
+    this.enterState(w, 'block')
+    return true
+  }
+
+  /** idle control 0x08013022 */
+  private ctlIdle(w: World) {
     const { held, pressed } = w.input
-    if (!(held & DPAD)) {
-      if (this.state !== 'idle') this.setState(w, 'idle')
-      return
+    if (this.ctx.candy > 0) return
+    if (pressed & BTN.L) this.cycleSkill()
+    if (this.tryBlock(w)) return
+    // after 1024 idle frames: the "bored" animation (anim id 8) if the sprite has it
+    if (++this.sCnt > 1024) {
+      if (this.hasAnim(9)) this.setAnimId(w, 8)
+      else this.sCnt = 0
     }
     const nd = pressed & DPAD
-    if (nd && allowDash) {
-      if (w.frame - this.lastDirFrame < 20 && (nd & -nd) === nd && this.lastDirKey & nd) {
-        this.lastDirKey = nd
-        this.lastDirFrame = w.frame
-        this.facing = nd & BTN.LEFT ? 2 : nd & BTN.RIGHT ? 3 : nd & BTN.UP ? 1 : 0
-        audioEvent('dash')
-        return this.setState(w, 'dash')
-      }
+    if (nd) {
+      // double tap: the same single d-pad key again within 20 frames -> dash (the dash keeps the facing)
+      if (w.frame - this.lastDirFrame < 20 && (nd & (nd - 1)) === 0 && this.lastDirKey & nd) return this.setAnimId(w, 2)
       this.lastDirKey = nd
       this.lastDirFrame = w.frame
     }
-    // idle -> walk: the frame that enters the walk state only sets the facing / animation; the walk state moves
-    // from the next frame on (emulator trace: x unchanged on the first held frame, then 5*SPD+102 every frame)
-    const starting = this.state !== 'walk'
-    if (starting) this.setState(w, 'walk')
-    const sp = starting ? 0 : this.walkSpeed()
-    let combo = 0
-    // walk state 0x08013230: horizontal step first (try-move flags 2), then vertical (flags 1)
-    if (held & BTN.LEFT) {
-      if (sp) this.walkTry(w, -sp, 0, 2)
-      combo = 1
-    } else if (held & BTN.RIGHT) {
-      if (sp) this.walkTry(w, sp, 0, 2)
-      combo = 2
+    if (held & DPAD) {
+      if (held & BTN.LEFT) this.facing = 2
+      if (held & BTN.RIGHT) this.facing = 3
+      if (held & BTN.UP) this.facing = 1
+      if (held & BTN.DOWN) this.facing = 0
+      this.setAnimId(w, 1)
     }
-    if (held & BTN.UP) {
-      if (sp) this.walkTry(w, 0, -sp, 1)
-      combo += 3
-    } else if (held & BTN.DOWN) {
-      if (sp) this.walkTry(w, 0, sp, 1)
-      combo += 6
-    }
-    this.facing = FACE_TBL[combo][this.facing] as Dir
+    this.attackInput(w)
   }
 
-  private updDash(w: World) {
+  /** walk control 0x080131BA: horizontal step first (try-move flags 2), then vertical (flags 1) */
+  private ctlWalk(w: World) {
     const { held, pressed } = w.input
-    if (!(this.lastDirKey & held)) return this.setState(w, 'idle')
-    if (pressed & BTN.A) return this.melee(w)
-    if (pressed & BTN.B) return this.startSkill(w)
-    const [dx, dy] = DIR_VEC[this.facing]
-    const sp = this.dashSpeed()
-    if (!this.moveBy(w, dx * sp, dy * sp)) return this.setState(w, 'bump')
-    const ws = this.walkSpeed()
-    if (dx) this.moveBy(w, 0, held & BTN.UP ? -ws : held & BTN.DOWN ? ws : 0)
-    else this.moveBy(w, held & BTN.LEFT ? -ws : held & BTN.RIGHT ? ws : 0, 0)
+    if (pressed & BTN.L) this.cycleSkill()
+    if (this.tryBlock(w)) return
+    if (held & DPAD) {
+      const sp = this.walkSpeed()
+      let combo = 0
+      if (held & BTN.LEFT) {
+        this.walkTry(w, -sp, 0, 2)
+        combo = 1
+      } else if (held & BTN.RIGHT) {
+        this.walkTry(w, sp, 0, 2)
+        combo = 2
+      }
+      if (held & BTN.UP) {
+        this.walkTry(w, 0, -sp, 1)
+        combo += 3
+      } else if (held & BTN.DOWN) {
+        this.walkTry(w, 0, sp, 1)
+        combo += 6
+      }
+      this.facing = FACE_TBL[combo][this.facing] as Dir
+    } else this.setAnimId(w, 0)
+    if (this.ctx.candy > 0) return
+    this.attackInput(w)
+  }
+
+  /** dash control 0x08012DEE: dash speed along the facing (whole-footprint test 0x080097EA); blocked -> the hurt
+   *  state with the hurt animation (bump) and sound 59; else the other d-pad keys add the walk speed */
+  private ctlDash(w: World) {
+    const { held } = w.input
+    const key = this.lastDirKey
+    if ((held & key) !== key) this.setAnimId(w, 0)
+    else {
+      const [vx, vy] = DASH_VEC[this.facing]
+      const sp = this.dashSpeed()
+      const nx = this.x + vx * sp
+      const ny = this.y + vy * sp
+      if (!this.fits(w, nx >> 8, ny >> 8)) {
+        this.ctx.shake(8, 100)
+        this.ap.raw = 10
+        this.enterState(w, 'hurt')
+        this.sfx(59)
+      } else {
+        this.x = nx
+        this.y = ny
+        const ws = this.walkSpeed()
+        let tx = nx
+        let ty = ny
+        if (held & BTN.UP && this.facing !== 1) ty -= ws
+        if (held & BTN.DOWN && this.facing !== 0) ty += ws
+        if (held & BTN.LEFT && this.facing !== 2) tx -= ws
+        if (held & BTN.RIGHT && this.facing !== 3) tx += ws
+        if (this.fits(w, tx >> 8, ty >> 8)) {
+          this.x = tx
+          this.y = ty
+        }
+      }
+    }
+    this.attackInput(w)
+  }
+
+  /** bored control 0x08012D8A */
+  private ctlBored(w: World) {
+    if (w.input.held & DPAD) this.setAnimId(w, 0)
+    this.attackInput(w)
+  }
+
+  /** hurt / bump control 0x0800DF1C: knocked back 0.75 px per frame against the facing */
+  private ctlKnock(w: World) {
+    const [kx, ky] = KNOCK_VEC[this.facing]
+    if (this.fits(w, (this.x - kx) >> 8, (this.y - ky) >> 8)) {
+      this.x -= kx
+      this.y -= ky
+    }
+  }
+
+  /** block control 0x08012BC6 + the energy shield object 0x0801DFE0 (update 0x0801E080) */
+  private ctlBlock(w: World) {
+    const { held, pressed } = w.input
+    const sh = this.shield
+    if (!sh) {
+      if (!(held & BTN.R)) return this.setAnimId(w, 0)
+      if (pressed & BTN.B && this.energyLeft() !== 0) this.shield = { pow: 0, on: true }
+      return
+    }
+    // EP: acc += rec+0x57 * 0x3277 >> 4, spend acc >> 16 every frame while the shield exists
+    this.sCnt += (this.eff.epBlockFactor * 0x3277) >> 4
+    this.spend(w, this.sCnt >> 16, true)
+    this.sCnt &= 0xffff
+    sh.on = this.energyLeft() !== 0 && !!(held & BTN.R) && !!(held & BTN.B)
+    if (sh.pow === 0 && !sh.on) {
+      if (held & BTN.R) this.shield = null
+      else this.setAnimId(w, 0)
+      return
+    }
+    // a full shield (power >= 24) makes both resists 0
+    this.setResist(sh.pow >= 24 ? 0 : 128)
+  }
+  /** shield object update (the object runs after the player: it is added to the world later) */
+  private shieldTick() {
+    const sh = this.shield
+    if (!sh) return
+    if (sh.on) {
+      if (++sh.pow >= 0x38) sh.pow = 0x18
+    } else if (sh.pow >= 0x18) sh.pow = 0x17
+    else if (sh.pow > 0) sh.pow--
   }
 
   // ---- melee -------------------------------------------------------------------------------------------------
-  /** 0x08012A24: one instant hit test (mult 0x400, attack 0x086B8098), then state 4 + rand(3); back to idle 16 frames later (emulator trace, work/compare/trace_dash.txt) */
+  /** 0x08012A24: one instant hit test (mult 0x400, attack 0x086B8098) to every object; a hit plays 48 + rand(2);
+   *  then (HP != 0) SetAnim(4 + rand(3)), whose punch state (shift 2, 16 frames) plays the swing sound */
   melee(w: World) {
-    audioEvent('melee_swing')
     const rect = rectAt(PUNCH_RECT[this.facing], this.px, this.py)
     const msg: HitMsg = { team: 1, rect, dir: this.facing, mult: 0x400, atk: ATK[2], attacker: this, source: this }
-    const hits = this.dealtBefore
-    broadcast(w, msg)
-    if (this.dealtBefore > hits) this.ctx.spawnFx(w, 'fx_086fd9d0', (rect.x0 + rect.x1) >> 1, (rect.y0 + rect.y1) >> 1, [0, 1], 3)
+    const any = broadcast(w, msg)
+    if (any) {
+      this.sfx(48 + w.rng.rand(2, 'hit sfx'))
+      if (msg.crit) this.ctx.shake(15, 75)
+    }
+    if (this.hp === 0) return
     this.punchAnim = w.rng.rand(3, 'punch anim')
-    this.setState(w, 'punch')
-    this.setAnim(['attack1', 'attack2', 'attack3'][this.punchAnim], true, false)
+    this.setAnimId(w, 4 + this.punchAnim)
   }
   /** count of damaging hits dealt (for the melee EP hook) */
   dealtBefore = 0
@@ -609,16 +992,31 @@ export class Player extends Actor implements PlayerLike {
       case 21:
         return false
       case 18:
-        return this.form.id === 10 || this.form.id === 14
+        // 0x0801A460: always (the skill is only in Gohan's list)
+        return true
+      case 14:
+        // 0x0801A216: the skills flag, the global 0x03002C04 (not modelled) and 40 EP
+        return this.canAfford(40)
       case 20:
-        if (this.inSS) return true
-        return this.form.up !== 255 && this.ssCooldown === 0 && this.ep >= this.scaled(10) && this.ctx.data.forms[this.form.up]?.ss
+        // 0x0801A4C4: a form with up == down cannot; SS3 cannot; SS can (reverts); else cooldown 0 and EP >= 10
+        if (this.form.up === this.form.down) return false
+        if (this.form.ss3) return false
+        if (this.form.ss) return true
+        return this.ssCooldown === 0 && this.canAfford(10)
       case 22:
-        return this.form.ss && !this.form.ss3 && this.form.up !== 255 && !!this.ctx.data.forms[this.form.up]?.ss3
+        // 0x0801A55E: SS3 can (reverts); SS with a form above and 10 EP (of the SS gauge)
+        if (this.form.ss3) return true
+        return this.form.ss && this.form.up !== 255 && this.canAfford(10)
+      case 2:
+        // 0x08019D78: only one Big Bang ball at a time (byte 0x03003284 counts the live balls)
+        if (this.bigBang && !this.bigBang.removed) return false
+        return this.canAfford(SKILL_CHECK[2][Math.min(this.skillLv(2), 2)])
       default:
+        if (SKILL_CHECK[id]) return this.canAfford(SKILL_CHECK[id][Math.min(this.skillLv(id), SKILL_CHECK[id].length - 1)])
         return this.canAfford(this.skillCost(id))
     }
   }
+  bigBang: BigBangBall | null = null
 
   startSkill(w: World) {
     const id = this.skill
@@ -629,20 +1027,28 @@ export class Player extends Actor implements PlayerLike {
     // costs paid on press (moves.json: "paid on press" / activation)
     if ([4, 5, 7, 8, 13, 17, 23].includes(id)) this.spend(w, this.skillCost(id))
     if (id === 3) this.spend(w, 2)
-    if (id === 20) {
-      if (this.inSS) return this.revert(w)
-      this.spend(w, 10)
-      return this.startTransform(w, this.form.up)
-    }
-    if (id === 22) return this.startTransform(w, this.form.up)
+    if (id === 20) return this.form.ss ? this.revert(w) : this.startTransform(w, this.form.up)
+    if (id === 22) return this.form.ss3 ? this.revert(w) : this.startTransform(w, this.form.up)
     if (id === 18) {
-      this.applyForm(this.form.id === 14 ? 10 : 14)
-      this.ctx.puff(w, this.center()[0], this.center()[1])
+      // Saiyaman activate 0x0801A464: a form with a form above -> the change state (raw 20) into form 14, else the
+      // way back (raw 12) into form 10 (both hardcoded); shift 2 one-shots, the end applies the form
+      this.ap.raw = this.form.up !== 255 ? 20 : 12
+      this.enterState(w, this.form.up !== 255 ? 'skill18' : 'skill18r')
       return
     }
+    if (id === 14) return this.startIT(w, lv)
+    this.enterState(w, 'skill' + id)
     this.state = 'skill'
     this.t = 0
     this.sk = { id, t: 0, held: true, release: -1, acc: 0, proj: null }
+    if (SKILL_RAW[id]) {
+      // the activate function's SetAnimRaw (0x0800ECDA) before the state's enter
+      this.ap.raw = SKILL_RAW[id]
+      this.syncAnim()
+      this.epAcc = 0
+      this.skillEnter(w, id, lv, mult)
+      return
+    }
     void mult
     const anim: Record<number, (string | number)[]> = {
       7: ['kiblast'], 4: ['kiblast'], 23: ['kiblast'], 2: ['special_charge', 'kiblast'], 17: ['special_charge', 'kiblast'], 9: ['special_charge', 'attack1'],
@@ -650,6 +1056,62 @@ export class Player extends Actor implements PlayerLike {
     }
     this.setAnim(anim[id] ?? ['special_beam', 'kiblast'], true, false)
   }
+
+  /** what each skill state's enter creates (the objects' constructors play the charge sound 3) */
+  private skillEnter(w: World, id: number, lv: number, mult: number) {
+    const s = this.sk!
+    const atk = ATK[SKILL_SUB[id] ?? 1]
+    switch (id) {
+      case 15:
+      case 16:
+      case 6:
+      case 1:
+      case 3:
+      case 10:
+      case 11:
+        // the beam object 0x080206B8 / Final Flash enter / Flame charge object: sound 3
+        this.sfx(3)
+        return
+      case 2: {
+        // Big Bang ball 0x08037480 (sound 3) at the hands
+        const [mx, my] = this.muzzle(22)
+        s.proj = this.bigBang = w.add(new BigBangBall(this.ctx, this, this.facing, mx << 8, my << 8, lv))
+        this.sfx(3)
+        return
+      }
+      case 17:
+        // Masenko beam (0x08021280, sound 3) + aim objects
+        s.proj = w.add(new MasenkoCursor(this.ctx, this, this.facing, mult, lv))
+        this.sfx(3)
+        return
+      case 5:
+        // Dragon Fist enter: sound 24
+        this.sfx(24)
+        return
+      case 8:
+        // Energy Punch enter: sound 47
+        this.sfx(47)
+        return
+      case 9: {
+        // Energy Sword enter: the sword object 0x08037C1C (charging) + sound 3
+        const sk = s
+        s.fx = w.add(new EnergySwordFx(this.ctx, this, () => this.sk === sk))
+        this.sfx(3)
+        return
+      }
+      case 4: {
+        // Burning Attack ball (class 0x08029384) in the hands: no movement, no hit test until launched
+        const [hx, hy] = BURNING_HOLD[this.facing]
+        const [vx, vy] = VEL(this.facing, 768)
+        s.proj = w.add(new StraightShot(this.ctx, this, this.facing, 1, (this.px + hx) << 8, (this.py + hy) << 8, { vx, vy, box: [7, 7, 14, 14], atk, mult, color: ['#fff6d0', '#e08020'], radius: 6, name: 'burning', delay: 1 << 30, fx: burningFx, fxEnd: burningEnd, rngHit: [2], sfxHit: 48 }))
+        return
+      }
+    }
+  }
+  /** fired beams still on screen: when one is gone, the sounds its destructor plays (stop 32 / sound 33) */
+  beamEnd: { shot: Entity; sfx: [string, number][] }[] = []
+  /** RNG draws the Kamikaze ghosts make later on their own (ghost state change 24 frames after the spawn) */
+  ghostRng: { at: number; n: number }[] = []
 
   private muzzle(d = 16): [number, number] {
     const [cx, cy] = this.center()
@@ -660,6 +1122,66 @@ export class Player extends Actor implements PlayerLike {
   private endSkill(w: World) {
     const s = this.sk
     if (!s) return
+    // the state's exit: objects still charging are removed (their destructors stop the charge sound 3)
+    switch (s.id) {
+      case 15:
+      case 16:
+      case 6:
+      case 1:
+      case 3:
+        // 0x0802082A: a beam still charging is removed (stop 3); a fired one retracts (beamEnd: stop 32 + 33)
+        if (!s.proj) this.sfxStop(3)
+        break
+      case 2:
+        // the ball still in the hands is removed (stop 3)
+        if (s.proj && !(s.proj as BigBangBall).launched) this.sfxStop(3)
+        break
+      case 17:
+        if (s.proj && (s.proj as MasenkoCursor).released < 0) this.sfxStop(3)
+        break
+      case 5:
+        // 0x0801AB96: a dragon still out is cancelled (stop 32)
+        if (s.proj && !s.proj.removed) this.sfxStop(32)
+        break
+      case 9:
+        // 0x0801B04A: the sword is removed: stop 3 while charging, 32 while swinging
+        this.sfxStop(s.charged ? 32 : 3)
+        break
+      case 10:
+        // 0x0801B4A4: the release path cleared the beam (it ends on its own: stop 32 8 frames later) -> stop 3;
+        // interrupted while firing -> the beam is removed now
+        if (s.proj && !s.proj.removed) {
+          s.proj.removed = true
+          this.beamEnd = this.beamEnd.filter((b) => b.shot !== s.proj)
+          this.sfxStop(32)
+          s.proj = null
+        } else this.sfxStop(3)
+        break
+      case 11:
+        // 0x0801B81A: the charge effect (stop 3) / the flame (stop 32) are removed at once
+        if (s.fx) this.sfxStop(3)
+        if (s.proj && !s.proj.removed) {
+          s.proj.removed = true
+          this.sfxStop(32)
+          s.proj = null
+        }
+        break
+      case 13: {
+        // 0x0801B880: committed ghosts attack; the others vanish in a puff (rand(4096))
+        const committed = s.charge ?? 0
+        ;(s.ghosts ?? []).forEach((g, i) => {
+          if (i < committed) {
+            g.free = true
+            g.wait = 1
+          } else {
+            g.removed = true
+            w.rng.rand(4096, 'ghost puff')
+          }
+        })
+        s.ghosts = []
+        break
+      }
+    }
     audioEvent('skill_end')
     const p = s.proj
     if (p && !p.removed) {
@@ -667,8 +1189,10 @@ export class Player extends Actor implements PlayerLike {
       else if (p instanceof BigBangBall && !p.launched) p.removed = true
       else if (p instanceof MasenkoCursor && p.released < 0) p.removed = true
       else if (p instanceof AreaHit && p.kind === 'dragon') p.removed = true
+      else if (p instanceof StraightShot && p.o.delay) p.removed = true
     }
     for (const g of s.ghosts ?? []) if (!g.free) g.removed = true
+    if (s.fx) s.fx.removed = true
     this.sk = null
     void w
   }
@@ -688,240 +1212,369 @@ export class Player extends Actor implements PlayerLike {
     const atk = ATK[SKILL_SUB[id] ?? 1]
     const end = () => this.setState(w, 'idle')
     switch (id) {
-      case 7: {
-        // Energy Blast: shot at state frame 16, idle at 48; B again once the timer reached 40 -> refire
-        if (w.input.pressed & BTN.B && s.t > 1) s.refire = true
-        if (s.t === 16) {
-          const [mx, my] = this.muzzle(10)
-          this.blast = kiBlast(this.ctx, this, this.facing, 1, mx << 8, my << 8)
-          audioEvent('ki_blast')
-          w.add(this.blast)
-        }
-        if (s.t >= 40 && s.refire && this.canAfford(this.skillCost(7))) {
-          this.spend(w, this.skillCost(7))
-          s.refire = false
-          s.t = 12
-          this.setAnim('kiblast', true, false)
-        }
-        if (s.t >= 48) end()
+      case 7:
+        // Energy Blast control 0x0801AFE2: a B press queues the next shot (fired by the tick, skillTick)
+        if (w.input.pressed & BTN.B) s.refire = true
         return
-      }
       case 15:
       case 16:
       case 6:
       case 1:
-      case 11:
       case 3: {
-        // beams: fire on frame 24 while B is held (24 for BBK's volley start ~26), drain per frame while held
-        const fire = id === 3 ? 26 : id === 11 ? 30 : 24
-        if (!s.proj) {
-          if (s.t < fire) return
-          if (!held) return s.t >= 30 ? end() : undefined
-          const speed = id === 11 ? 2.14 : id === 3 ? 8.5 : 3.34
-          const maxLen = id === 11 ? [64, 64, 96][lv] : 240
-          audioEvent('beam_fire')
-          s.proj = w.add(new GrowBeam(this.ctx, this, this.facing, 1, () => this.muzzle(16), { atk, mult, width: id === 1 ? 12 : lv === 0 ? 16 : 16, speed, maxLen, color: BEAM_COLOR[id] ?? ['#fff', '#3bf'] }))
-          this.setAnim(['special_beam', 'kiblast'], false, true)
+        // beam family control (Kamehameha 0x0801BE40, Kamekameha, Electric Kamehameha, Banshee 0x0801A6CC, Big Bang
+        // Kamehameha): the beam object exists from the press (charge, sound 3); B is not read before tick 24; at 24
+        // released -> idle (the charging beam is removed: stop 3), held -> the beam fires (stop 3, loop 32); from 24 on
+        // acc += drain * factor >> 4, spend acc >> 8 every frame; EP 0 or B released -> idle (the beam retracts: stop
+        // 32 + sound 33 when it is gone); frame ((tick >> 3) & 1) + 1 (Banshee without the + 1)
+        const a = this.ap
+        const bg = beamGfx(this.ctx, id, lv)
+        const t = (a.tick = (a.tick + 1) & 0xffff)
+        if (t === 1 && bg && !s.fx) {
+          // the beam object's charge state: the sparkle at the hands (BEAM_POS charge)
+          const cp = BEAM_POS[id === 1 ? 'banshee' : 'kame'].charge
+          s.fx = w.add(new BeamCharge(bg, () => [this.px + cp[this.facing][0], this.py + cp[this.facing][1]]))
+        }
+        if (t < 24) return
+        if (t === 24) {
+          if (!held) return end()
+          if (s.fx) {
+            s.fx.removed = true
+            s.fx = null
+          }
+          this.sfxStop(3)
+          this.sfx(32)
+          const speed = id === 3 ? 8.5 : 3.34
+          const beam = w.add(new GrowBeam(this.ctx, this, this.facing, 1, () => this.muzzle(16), { atk, mult, width: id === 1 ? 12 : 16, speed, maxLen: 240, color: BEAM_COLOR[id] ?? ['#fff', '#3bf'], gfx: bg, visPos: BEAM_POS[id === 1 ? 'banshee' : id === 3 ? 'bbk' : 'kame'].fire, game: true }))
+          s.proj = beam
+          this.beamEnd.push({ shot: beam, sfx: [['stop', 32], ['play', 33]] })
+          if (id === 3) {
+            const [fx, fy] = BBK_FLARE_POS[this.facing]
+            w.add(new BbkFlareFx(this.ctx, this.px + fx, this.py + fy, this.facing, () => !beam.removed && !beam.done))
+          }
+        }
+        const D = id === 1 || id === 3 ? 1174 : id === 6 ? [128, 427, 1707][lv] : [107, 384, 1280][lv]
+        this.drain(w, D)
+        if (this.energyLeft() === 0) return end()
+        a.frame = ((t >> 3) & 1) + (id === 1 ? 0 : 1)
+        if (!held) end()
+        return
+      }
+      case 11: {
+        // Flame Kamehameha control 0x0801B6B0: charge effect (sound 3) until tick 24; at 24 released -> idle, held ->
+        // stop 3, loop 32 and the flame object (no drain that frame); then drain, EP 0 / released -> idle, and the
+        // tick advances twice per frame: frame ((tick >> 3) & 1) + 1
+        const a = this.ap
+        const t = (a.tick = (a.tick + 1) & 0xffff)
+        if (t === 1 && !s.fx) {
+          // Flame Kamehameha charge: record object fx_08721164 12 + f (f = t >> 3, > 3 -> 2 + (f & 1))
+          const [cx, cy] = FLAME_CHARGE[this.facing]
+          const sk = s
+          s.fx = w.add(new RecObj(this.ctx.data.sprites, () => [this.px + cx, this.py + cy], (tt) => {
+            const f = tt >> 3
+            return 0x08721164 + 12 * (12 + (f > 3 ? 2 + (f & 1) : f))
+          }, () => this.sk === sk && this.ap.tick < 24))
+        }
+        if (t < 24) return
+        if (t === 24) {
+          if (!held) return end()
+          if (s.fx) {
+            s.fx.removed = true
+            s.fx = null
+          }
+          this.sfxStop(3)
+          this.sfx(32)
+          const beam = w.add(new GrowBeam(this.ctx, this, this.facing, 1, () => this.muzzle(16), { atk, mult, width: 16, speed: 2.14, maxLen: [64, 64, 96][lv], color: BEAM_COLOR[id] ?? ['#fff', '#3bf'], gfx: beamGfx(this.ctx, id, lv), visPos: BEAM_POS.kame.fire, startLen: -6 * 2.14 }))
+          s.proj = beam
+          // Flame Kamehameha: the game's link chain (visual); the fitted GrowBeam keeps the hits
+          beam.hidden = true
+          w.add(new FlameKameFx(this.ctx, this, this.facing, lv, () => !beam.removed && !beam.done))
           return
         }
-        if (!held) return end()
-        const per = id === 1 ? 1024 : id === 3 ? 1000 : BEAM_DRAIN[lv]
-        this.drain(w, per)
-        if (this.energyLeft() <= 0) end()
+        this.drain(w, [107, 376, 1238][lv])
+        if (this.energyLeft() === 0 || !held) return end()
+        a.tick = (a.tick + 1) & 0xffff
+        a.frame = ((a.tick >> 3) & 1) + 1
         return
       }
       case 10: {
-        // Final Flash: instant full beam, 8 hits from frame 31
-        if (s.t === 30) {
-          if (!held && s.release < 26) return end()
-          const [mx, my] = this.muzzle(14)
-          audioEvent('beam_fire')
-          s.proj = w.add(new FullBeam(this.ctx, this, this.facing, 1, mx, my, { atk, mult, life: 8 }))
+        // Final Flash control 0x0801B4EC: charge (sound 3 from the enter) with frames (t >> 2) & 1 (2 from t 20);
+        // released before 24 -> idle; at 24 the beam object (loop 32) + stop 3; then drain, EP 0 / released -> the
+        // beam ends (stop 32 8 frames later) + idle (exit: stop 3); frame ((t >> 3) & 1) + 3
+        const a = this.ap
+        const t = (a.tick = (a.tick + 1) & 0xffff)
+        if (t < 24) {
+          if (!held) return end()
+          a.frame = t < 20 ? (t >> 2) & 1 : 2
+          return
         }
-        if (s.t > 30 && s.t <= 40) this.drain(w, BEAM_DRAIN[lv])
-        if (s.t < 26 && !held) return end()
-        if (s.t >= 45) end()
+        if (t === 24) {
+          if (!held) return end()
+          const [mx, my] = this.muzzle(14)
+          this.sfx(32)
+          s.proj = w.add(new FullBeam(this.ctx, this, this.facing, 1, mx, my, { atk, mult, life: 1 << 30, table: FINAL_FLASH_TABLES[Math.min(2, lv)], visPos: FINAL_FLASH_POS, hits: [6, 13] }))
+          this.beamEnd.push({ shot: s.proj, sfx: [['stop', 32]] })
+          this.sfxStop(3)
+        }
+        this.drain(w, [107, 363, 1174][lv])
+        if (this.energyLeft() === 0 || !held) {
+          const fb = s.proj as FullBeam | null
+          if (fb) fb.life = fb.t
+          s.proj = null
+          return end()
+        }
+        a.frame = ((t >> 3) & 1) + 3
         return
       }
       case 2: {
-        // Big Bang: charge while held (EP into the ball), release >= 60 frames to fire, else it fizzles
-        if (!s.proj) {
-          const [mx, my] = this.muzzle(22)
-          s.proj = w.add(new BigBangBall(this.ctx, this, this.facing, mx << 8, my << 8))
-        }
-        const ball = s.proj as BigBangBall
-        if (s.release < 0) {
-          const rate = [43, 141, 427][lv] // 0.168 / 0.551 / 1.668 EP per frame in 1/256
-          if (s.t > 60) ball.grow += [0, 0.36, 0.48][lv]
-          if (this.energyLeft() > 0 && ball.charge256 < 1000 * 256) {
-            ball.charge256 += rate
-            this.drain(w, rate)
+        // Big Bang control 0x0801A83E (the tick 0x0801A80E sets the frame): while held, acc += rate[lv], the ball
+        // takes acc >> 8 EP (unscaled) up to 1000; release -> launched (fires if the tick reached 16, else fizzles:
+        // stop 3), tick 0; the tick fn goes idle 17 frames later
+        const ball = s.proj as BigBangBall | null
+        if (!ball) return
+        if (!held) {
+          if (this.ap.tick >= 16) {
+            ball.launched = true
+            this.sfxStop(3)
+            this.sfx(32)
+            this.beamEnd.push({ shot: ball, sfx: [['stop', 32]] })
+          } else {
+            ball.removed = true
+            this.sfxStop(3)
           }
-          const [mx, my] = this.muzzle(22)
-          ball.x = mx << 8
-          ball.y = my << 8
+          s.proj = null
+          this.ap.tick = 0
           return
         }
-        if (!ball.launched) {
-          if (s.release < 60) {
-            ball.removed = true
-            return end()
-          }
-          ball.launched = true
-          audioEvent('big_bang')
-          this.setAnim(['special_release', 'kiblast'], true, false)
-        }
-        if (s.t - s.release >= 20) {
-          this.sk!.proj = null
-          end()
-        }
+        if (ball.charge256 >> 8 >= 1000) return
+        s.acc += [43, 141, 427][lv]
+        const d = s.acc >> 8
+        ball.charge256 += d << 8
+        this.spend(w, d, true)
+        s.acc &= 0xff
+        if (s.t > 60) ball.grow += [0, 0.36, 0.48][lv]
+        // hits use the fitted muzzle; the ball is drawn at the game's position (BIGBANG_POS)
+        const [mx, my] = this.muzzle(22)
+        ball.x = mx << 8
+        ball.y = my << 8
+        const [bx, by] = BIGBANG_POS[this.facing]
+        ball.visOff = [this.px + bx - mx, this.py + by - my]
         return
       }
       case 4: {
-        // Burning Attack: one shot ~2.86 px/frame at frame 18, idle at 40
-        if (s.t === 18) {
-          const [mx, my] = this.muzzle(12)
-          const [vx, vy] = VEL(this.facing, 732)
-          w.add(new StraightShot(this.ctx, this, this.facing, 1, mx << 8, my << 8, { vx, vy, box: [7, 7, 14, 14], atk, mult, color: ['#fff6d0', '#e08020'], radius: 6, name: 'burning' }))
-          audioEvent('wave')
-        }
-        if (s.t >= 40) end()
+        // Burning Attack control 0x0801AAEC: the ball (class 0x08029384) waits in the hands from the press; at tick 16
+        // it is launched from the ki-blast muzzle (sound 34), frame 1; idle at tick 32
+        const a = this.ap
+        const t = (a.tick = (a.tick + 1) & 0xffff)
+        if (t === 16) {
+          const [ox, oy] = KI_MUZZLE[this.facing]
+          ;(s.proj as StraightShot | null)?.launch((this.px + ox) << 8, (this.py + oy) << 8)
+          s.proj = null
+          this.sfx(34)
+          a.frame = 1
+        } else if (t === 32) end()
         return
       }
       case 23: {
-        // Ultra Volleyball: shot at frame 13 (first hit f29 at 60 px), attack 16 (power 0)
-        if (s.t === 13) {
-          const [mx, my] = this.muzzle(14)
+        // Ultra Volleyball control 0x0801C63E: frame t >> 4; the ball at tick 16 (its constructor plays 34); idle
+        // after tick 32
+        const a = this.ap
+        const t = (a.tick = (a.tick + 1) & 0xffff)
+        if (t > 32) return end()
+        a.frame = t >> 4
+        if (t === 16) {
+          const [ox, oy] = VOLLEY_POS[this.facing]
           const [vx, vy] = VEL(this.facing, 0x300)
-          w.add(new StraightShot(this.ctx, this, this.facing, 1, mx << 8, my << 8, { vx, vy, box: [6, 6, 12, 12], atk: ATK[16], mult: 1024, color: ['#ffffff', '#f0a040'], radius: 5, name: 'volley' }))
-          audioEvent('wave')
+          const bank = this.ctx.data.sprites
+          w.add(new StraightShot(this.ctx, this, this.facing, 1, (this.px + ox) << 8, (this.py + oy) << 8, { vx, vy, box: [6, 6, 12, 12], atk: ATK[16], mult: 1024, color: ['#ffffff', '#f0a040'], radius: 5, name: 'volley', explode: false, fxDraw: (r, sh) => drawVolleyWave(r, bank, sh.dir, sh.px, sh.py, sh.t, sh.x0 >> 8, sh.y0 >> 8) }))
+          this.sfx(34)
         }
-        if (s.t >= 45) end()
         return
       }
       case 8: {
-        // Energy Punch: 5 hits (frames 10..14); reach by level (only Lv3 connected at 40 px in the emulator; INFERRED)
-        // released before the burst (frame 10) -> cancelled (measured: taps never hit, idle at frame 10)
-        if (s.release >= 0 && s.release < 10) return s.t >= 10 ? end() : undefined
-        if (s.t >= 10 && s.t <= 14) {
-          const reach = [8, 16, 40][lv]
-          const r = this.frontRect(reach, 24)
-          broadcast(w, { team: 1, rect: r, dir: this.facing, mult, atk, attacker: this, source: this })
+        // Energy Punch control 0x0801B296: frames tick >> 2 until tick 8 (B not read); then every frame up to tick 59
+        // while B is held: frame ((tick >> 2) & 1) + 2, one hit to every object (x62 / x144 / x226, attack sub 9) in
+        // the melee rect (Lv3: the larger rect 0x0871DF30) from the position before the step, and from Lv2 a step
+        // of 0.375 px along the facing; tick 60 or released -> idle
+        const a = this.ap
+        const t = (a.tick = (a.tick + 1) & 0xffff)
+        if (t < 8) {
+          a.frame = t >> 2
+          return
         }
-        if (s.t >= 18) end()
+        if (t >= 60 || !held) return end()
+        a.frame = ((t >> 2) & 1) + 2
+        if (t === 8 && lv > 1) {
+          // Lv3 only: record object 0x08762270 + 12 * (3 * dir + (tick >= 56 ? 1 : 0)) beside the player
+          const sk = s
+          s.fx = w.add(new RecObj(this.ctx.data.sprites, () => [this.px + ENERGY_PUNCH_POS[this.facing][0], this.py + ENERGY_PUNCH_POS[this.facing][1]], () => ENERGY_PUNCH_TABLE + 12 * (3 * this.facing + (this.ap.tick >= 56 ? 1 : 0)), () => this.sk === sk))
+        }
+        // hits: the game sends a message every frame from tick 8 (rects 0x0871DEF0 / 0x0871DF30), but the measured runs
+        // (a pinned Majin Fighter) record 5 accepted hits on ticks 10..14, Lv3 only at 40 px: the accepted hits are
+        // modelled that way (fitted; the enemy-side acceptance is not decoded)
+        void ENERGY_PUNCH_RECT_L3
+        if (t >= 10 && t <= 14) broadcast(w, { team: 1, rect: this.frontRect([8, 16, 40][lv], 24), dir: this.facing, mult, atk, attacker: this, source: this })
+        if (lv > 0) {
+          const [vx, vy] = DASH_VEC[this.facing]
+          if (this.fits(w, (this.x + vx * 0x60) >> 8, (this.y + vy * 0x60) >> 8)) {
+            this.x += vx * 0x60
+            this.y += vy * 0x60
+          }
+        }
         return
       }
       case 9: {
-        // Energy Sword: charge while held (4 EP on 5 of 6 frames ~3.3/f), full charge at 120 f (INFERRED);
-        // release after full charge -> one slash 3 frames later (x10.0); released earlier -> cancelled
-        if (s.release < 0) {
-          if (s.t % 6 !== 0) this.spend(w, 4)
-          if (s.t >= 120 && !s.charged) {
+        // Energy Sword control 0x0801B088. Phase 0: while B is held pay 4 (scaled) per frame (no EP check), tick++,
+        // frame (tick >> 2) & 1; released with the sword charged (80 updates) -> phase 1 (stop 3, loop 32), else idle.
+        // Phase 1: counter += 2 per frame, 90 frames; the d-pad steers at half the walk speed; frame
+        // ((c / 3) & 7) + 2 picks the sword's strike box (0x08037C72, x10.0, first receiver only; a hit: 48 + rand(2))
+        const a = this.ap
+        if (!s.fx) {
+          const sk = s
+          s.fx = w.add(new EnergySwordFx(this.ctx, this, () => this.sk === sk))
+        }
+        if (!s.charged) {
+          if (held) {
+            this.spend(w, 4)
+            a.tick = (a.tick + 1) & 0xffff
+            a.frame = (a.tick >> 2) & 1
+          } else if (s.t >= 80) {
             s.charged = true
-            this.flash = 12
-          }
-          if (this.energyLeft() <= 0) return end()
+            s.hits = 0
+            this.sfxStop(3)
+            this.sfx(32)
+            ;(s.fx as EnergySwordFx).startSlash()
+          } else end()
           return
         }
-        if (!s.charged) return end()
-        if (s.t - s.release === 3) {
-          this.setAnim(['attack3', 'attack1'], true, false)
-          audioEvent('beam_fire')
-          broadcast(w, { team: 1, rect: this.frontRect(40, 32), dir: this.facing, mult, atk, attacker: this, source: this })
+        const c = (s.hits = (s.hits ?? 0) + 1)
+        if (c >= 180) return end()
+        const { held: hk } = w.input
+        if (hk & DPAD) {
+          const hw = this.walkSpeed() >> 1
+          if (hk & BTN.LEFT) this.walkTry(w, -hw, 0, 2)
+          else if (hk & BTN.RIGHT) this.walkTry(w, hw, 0, 2)
+          if (hk & BTN.UP) this.walkTry(w, 0, -hw, 1)
+          else if (hk & BTN.DOWN) this.walkTry(w, 0, hw, 1)
         }
-        if (s.t - s.release >= 16) end()
+        s.hits = c + 1
+        a.frame = (Math.trunc(c / 3) & 7) + 2
+        const def = (this.facing === 3 ? [14, 13, 12, 11, 10, 17, 16, 15] : [10, 11, 12, 13, 14, 15, 16, 17])[a.frame - 2]
+        const [ox, oy, bw, bh] = SWORD_BOX[def - 10]
+        const rect = { x0: this.px - ox, y0: this.py - oy, x1: this.px - ox + bw, y1: this.py - oy + bh }
+        // the measured runs record one accepted strike per swing (INFERRED: the target's reaction blocks the rest)
+        if (!s.target && broadcast(w, { team: 1, rect, dir: [2, 0, 0, 0, 3, 1, 1, 1][def - 10] as Dir, mult: 0x2800, atk, attacker: this, source: this }, true)) {
+          s.target = 1
+          this.sfx(48 + w.rng.rand(2, 'sword hit sfx'))
+        }
         return
       }
       case 5: {
-        // Dragon Fist (fitted to the measured runs): released before the dragon appears -> cancelled (tap: idle at
-        // frame 3); the head appears at frame 20, 24 px ahead, grows 4 px/frame to 56 px (no hit at 100 px) and is
-        // steered with the d-pad; it lands 48 hits (x3.28) on frames 21..35 while it overlaps; 5 EP/frame for
-        // 8 frames on top of the 300 paid on the press
-        if (!s.held && s.t < 20) return end()
-        if (s.t === 20) {
-          s.charge = 24
-          s.proj = w.add(new AreaHit(this.ctx, this, this.facing, 1, this.frontRect(8, 16), { life: 20, every: 1000, atk, mult, color: ['#fffbd0', '#ffb020'] }))
-          s.proj.kind = 'dragon'
-          audioEvent('beam_fire')
-          s.hits = 0
+        // Dragon Fist control 0x0801ABBE (phase byte s.charged): before the dragon, tick++, released -> idle, tick 16 ->
+        // the 6-segment dragon (loop 32), frame tick >> 3. Dragon out: below tick 90 the player steps 0.375 px along
+        // the facing (the chain follows), 5 EP per frame (acc += factor * 80), and once B is released / tick 300 / EP
+        // 0 the dragon is launched (stop 32, sound 23); then 24 more ticks; frame ((tick >> 3) & 1) + 2
+        const a = this.ap
+        if (s.charged) {
+          if (a.tick >= 24) return end()
+          a.tick = (a.tick + 1) & 0xffff
+          a.frame = ((a.tick >> 3) & 1) + 2
+          return
         }
-        if (s.proj && !s.proj.removed && s.t >= 20) {
-          s.charge = Math.min(56, (s.charge ?? 24) + 4)
-          const a = s.proj as AreaHit
-          let off = 0
-          if (w.input.held & (this.facing >= 2 ? BTN.UP : BTN.LEFT)) off = -1
-          if (w.input.held & (this.facing >= 2 ? BTN.DOWN : BTN.RIGHT)) off = 1
-          const [dx, dy] = DIR_VEC[this.facing]
-          const [cx, cy] = this.center()
-          const hx = cx + dx * s.charge + (dx ? 0 : off * (s.t - 20))
-          const hy = cy + dy * s.charge + (dy ? 0 : off * (s.t - 20))
-          a.box = { x0: hx - 10, y0: hy - 10, x1: hx + 10, y1: hy + 10 }
-          if (s.t >= 21 && s.t <= 35) {
-            const n = 3 + (s.t % 7 === 0 ? 1 : 0)
-            for (let k = 0; k < n; k++) a.hit(w, a.box, atk, mult, false)
+        if (!s.proj) {
+          a.tick = (a.tick + 1) & 0xffff
+          if (!held) return end()
+          if (a.tick === 16) {
+            s.proj = w.add(new AreaHit(this.ctx, this, this.facing, 1, this.frontRect(8, 16), { life: 1 << 30, every: 1 << 30, atk, mult, color: ['#fffbd0', '#ffb020'] }))
+            s.proj.kind = 'dragon'
+            ;(s.proj as AreaHit).hidden = true
+            const sk = s
+            // the chain is steered until the launch; 24 frames later its segments vanish (6 puffs, rand(4096) each)
+            w.add(new DragonFistFx(this.ctx, this, this.facing, () => this.sk === sk && !sk.charged))
+            this.sfx(32)
           }
-          if (s.t >= 22 && s.t < 30) this.spend(w, 5)
+          a.frame = a.tick >> 3
+          return
         }
-        if (s.t >= 40) end()
+        if (a.tick < 90) {
+          const [vx, vy] = DASH_VEC[this.facing]
+          if (this.fits(w, (this.x + vx * 0x60) >> 8, (this.y + vy * 0x60) >> 8)) {
+            this.x += vx * 0x60
+            this.y += vy * 0x60
+          }
+        }
+        // hits (fitted to the measured runs: 48 hits x3.28 on frames 21..35 from the press, head 24 px ahead growing 4 px
+        // per frame; the 6 segments' own messages and the launch hit x2.5 are not reproduced: INFERRED)
+        const [dx, dy] = DIR_VEC[this.facing]
+        const [cx, cy] = this.center()
+        const ar = s.proj as AreaHit
+        const reach = Math.min(56, 24 + 4 * Math.max(0, s.t - 20))
+        ar.box = { x0: cx + dx * reach - 10, y0: cy + dy * reach - 10, x1: cx + dx * reach + 10, y1: cy + dy * reach + 10 }
+        if (s.t >= 21 && s.t <= 35) for (let k = 0, n = 3 + (s.t % 7 === 0 ? 1 : 0); k < n; k++) ar.hit(w, ar.box, atk, mult, false)
+        s.acc += this.eff.epCostFactor * 80
+        this.spend(w, s.acc >> 8, true)
+        s.acc &= 0xff
+        if (!(held && a.tick < 300 && this.energyLeft() !== 0)) {
+          // launch 0x08038E42 (the dragon's own launch hit is not reproduced, see above)
+          ar.removed = true
+          s.proj = null
+          s.charged = true
+          a.tick = 0
+          this.sfxStop(32)
+          this.sfx(23)
+        }
+        a.tick = (a.tick + 1) & 0xffff
+        a.frame = ((a.tick >> 3) & 1) + 2
         return
       }
       case 13: {
-        // Kamikaze Ghost: a ghost every 30 frames while held (max 5), released ghosts home in (INFERRED)
+        // Super Kamikaze Ghost control 0x0801B916: frames t >> 3; a ghost at tick 16 (max 3: its constructor draws
+        // rand(255)); from tick 40 the spawned ghosts are committed; B held -> frame 0 and, with < 3 ghosts and
+        // 160 EP (paid), tick 0 for the next one; released -> idle (exit: the committed ghosts attack)
+        const a = this.ap
         s.ghosts ??= []
-        if (s.release < 0) {
-          if ((s.t - 1) % 30 === 0 && s.ghosts.length < 5) {
-            const [cx, cy] = this.center()
-            const g = new Ghost(this.ctx, this, this.facing, (cx + (s.ghosts.length - 2) * 10) << 8, (cy - 22) << 8)
-            s.ghosts.push(w.add(g))
+        const t = (a.tick = (a.tick + 1) & 0xffff)
+        if (t >= 40) {
+          s.charge = Math.max(s.charge ?? 0, s.ghosts.length)
+          if (held) {
+            a.frame = 0
+            if (s.ghosts.length < 3 && this.canAfford(160)) {
+              this.spend(w, 160)
+              a.tick = 0
+            }
+          } else end()
+          return
+        }
+        a.frame = t >> 3
+        if (t === 16) {
+          const [gx, gy] = GHOST_SPAWN[this.facing]
+          const g = new Ghost(this.ctx, this, this.facing, (this.px + gx) << 8, (this.py + gy) << 8, s.ghosts.length)
+          w.rng.rand(255, 'ghost spawn')
+          this.ghostRng.push({ at: w.frame + 24, n: 255 })
+          s.ghosts.push(w.add(g))
+        }
+        return
+      }
+      case 17: {
+        // Masenko control 0x0801C16A: the beam + aim objects wait from the press (sound 3); the B release (edge)
+        // fires (tick 1, frame 1: stop 3, sound 34); idle 31 frames later. No hold limit, no drain.
+        const a = this.ap
+        const c = s.proj as MasenkoCursor | null
+        if (a.tick === 0) {
+          if (w.input.released & BTN.B) {
+            a.tick = 1
+            a.frame = 1
+            this.sfxStop(3)
+            this.sfx(34)
+            // measured: a tap (released before 10 frames) never hits at Lv1 / Lv2 (the blast fizzles; the sound plays)
+            if (c && lv < 2 && s.t < 10) c.removed = true
+            else c?.release()
           }
           return
         }
-        for (const g of s.ghosts) g.free = true
-        s.ghosts = []
-        if (s.t - s.release >= 10) end()
-        return
-      }
-      case 14: {
-        // Instant Transmission: hold -> pick an enemy with the d-pad; release -> appear beside it (INFERRED)
-        const targets = this.ctx.liveEnemies()
-        s.target ??= 0
-        if (w.input.pressed & DPAD) s.target++
-        if (s.release < 0) return
-        if (!targets.length || !this.canAfford(40)) return end()
-        const tgt = targets[s.target % targets.length]
-        this.spend(w, 40)
-        const [cx, cy] = this.center()
-        this.ctx.puff(w, cx, cy)
-        const side = tgt.facing === 3 ? -1 : 1
-        const nx = tgt.px + (tgt.footW >> 1) - 8 + side * (tgt.footW / 2 + 14)
-        const ny = tgt.py + (tgt.footH >> 1) - 4
-        if (this.fits(w, nx, ny)) {
-          this.x = nx << 8
-          this.y = ny << 8
-        }
-        this.facing = side > 0 ? 2 : 3
-        this.ctx.puff(w, this.center()[0], this.center()[1])
-        return end()
-      }
-      case 17: {
-        // Masenko (fitted): cursor 24 px ahead, +0.5 px/frame while held up to 48 px; the blast lands 51 frames after
-        // the release (hold 60 -> f111, hold 150 -> f203 measured). Taps fizzle at Lv1/Lv2 (idle at f42), Lv3 fires.
-        if (!s.proj) s.proj = w.add(new MasenkoCursor(this.ctx, this, this.facing, mult))
-        const c = s.proj as MasenkoCursor
-        if (s.release >= 0) {
-          if (s.release < 10 && lv < 2) {
-            c.removed = true
-            s.proj = null
-            if (s.t >= 42) end()
-            return
-          }
-          c.release()
-          if (s.t - s.release === 1) audioEvent('wave')
-          if (s.t - s.release === 1) this.setAnim(['throw', 'special_release', 'kiblast'], true, false)
-          if (s.t - s.release >= 51) {
-            s.proj = null
-            end()
-          }
+        a.tick = (a.tick + 1) & 0xffff
+        if (a.tick >= 32) {
+          s.proj = null
+          end()
         }
         return
       }
@@ -947,44 +1600,198 @@ export class Player extends Actor implements PlayerLike {
   }
 
   // ---- forms ---------------------------------------------------------------------------------------------------
+  /** Super Saiyan / SS3 activate (0x0801A512 / 0x0801A5BC): the transformation state (heap 0x0804E2B0, shift 4) with
+   *  the transformation animation (raw 11); no EP is paid (canUse only checks EP >= 10) */
   private startTransform(w: World, to: number) {
     if (to === 255 || !this.ctx.data.forms[to]) return
     this.transformTo = to
-    this.state = 'transform'
-    audioEvent('transform')
-    this.t = 0
+    this.ap.raw = 11
+    this.enterState(w, 'skill20')
     this.blocking = false
-    this.setAnim(['transform', 'meditate', 'special_charge'], true, true)
     w.logEvent('info', `transforming -> form ${to}`)
+    const [ax, ay] = this.center()
+    w.add(new LoopFx(this.ctx.fx(SS_AURA.id), ax, ay + 1, 0, SS_AURA.n, SS_AURA.rate, () => this.state === 'transform', 1))
   }
-  /** ~211-frame transform; the gauge fills to maxEP during it (0x0801C4F4) */
-  private updTransform(w: World) {
-    const LEN = 211
-    const to = this.ctx.data.forms[this.transformTo]
-    if (to?.ss3) this.ss3Gauge = Math.floor((this.maxEp * 65536 * this.t) / LEN)
-    else this.ssGauge = Math.floor((this.maxEp * this.t) / LEN)
-    if (this.t >= LEN) {
-      this.applyForm(this.transformTo)
-      audioEvent('transform_done')
-      if (this.form.ss3) this.ss3Gauge = this.maxEp * 65536
-      else this.ssGauge = this.maxEp
-      this.ctx.puff(w, this.center()[0], this.center()[1])
-      this.setState(w, 'idle')
+  /** transformation control 0x0801C4F4: the gauge fills to maxEP * tick / (16 * nframes) (the SS3 gauge when the
+   *  current form is SS) */
+  private updTransform(_w: World) {
+    if (this.gs !== 'skill20' && this.gs !== 'ss_up') return
+    const v = Math.floor((this.maxEp * this.ap.tick) / (this.animN() * 16 || 1)) & 0xffff
+    if (this.form.ss) this.ss3Gauge = v * 65536
+    else this.ssGauge = v
+  }
+  /** transformation end 0x0801C312: done; rec+4 (SS cooldown) = 0x37FFF; the form's exit (0x0801712C), form = up,
+   *  the new form's enter (0x0801711C: the aura sound 54 for the SS controllers), its graphics, SetAnim(0) (whose
+   *  exit of the transformation stops 54 again), then the new gauge full */
+  private finishTransform(w: World) {
+    this.transformDone = true
+    this.ssCooldown = 0x37fff
+    const to = this.form.up !== 255 ? this.form.up : this.transformTo
+    this.formExit()
+    this.applyForm(to)
+    this.formEnter()
+    this.setAnimId(w, 0)
+    if (this.form.ss3) this.ss3Gauge = this.maxEp * 65536
+    else if (this.form.ss) this.ssGauge = this.maxEp
+    w.logEvent('info', `transformed -> form ${to}`)
+  }
+  transformDone = false
+  /** the form objects (form +8) whose enter / exit play / stop the aura sound 54 (0x0800E3B2 / 0x0800E3CE) */
+  private auraForm() {
+    return [0x3001b68, 0x3001b6c, 0x3001b78, 0x3001b7c, 0x3001b80, 0x3001b84, 0x3001b8c].includes(this.form.controller)
+  }
+  private formEnter() {
+    if (this.auraForm()) this.sfx(54)
+  }
+  private formExit() {
+    if (this.auraForm()) this.sfxStop(54)
+  }
+  /** revert: SetAnim(24) (state 0x03002BB4, raw 12, shift 4, not hittable) whose end 0x0801C206 drops to the form
+   *  below (gauges 0) - from Super Saiyan (skill 20 again / empty gauge) or SS3 */
+  revert(w: World) {
+    if (this.form.down === 255 || this.dead) return
+    this.setAnimId(w, 24)
+  }
+  /** Saiyaman end: form 14 (from a form with a form above) or 10, hardcoded; no sound, gauge or cooldown change */
+  private finishSaiyaman(w: World) {
+    const to = this.gs === 'skill18' ? 14 : 10
+    this.formExit()
+    this.applyForm(to)
+    this.formEnter()
+    this.setAnimId(w, 0)
+  }
+
+  // ---- Instant Transmission ----------------------------------------------------------------------------------
+  /** target pick (activate 0x0801A23A): the hold state with raw 20 frame 0, n = min(level + 1, 3 / 2 / 1 by EP 600 /
+   *  120 / 40) picks among the enemies whose hurt box is on screen (max 16); then a modal loop (0x0803D8A0) freezes
+   *  the world while B is held: a cursor from the body centre (v = v * 3/4, +-256 per d-pad direction, clamped to the
+   *  camera) marks the candidate box it touches. Released: no pick -> idle, else the teleport state (0x0804E334). */
+  itSel: { n: number; cand: { e: Actor; picked: boolean }[]; picks: Actor[]; x: number; y: number; vx: number; vy: number; cursor: boolean } | null = null
+  it: { dir: Dir; idx: number; targets: Actor[]; origin: [number, number]; t: number } | null = null
+  private startIT(w: World, lv: number) {
+    this.ap.raw = 20
+    this.ap.frame = 0
+    this.enterState(w, 'hold')
+    this.state = 'skill'
+    const tier = this.canAfford(600) ? 3 : this.canAfford(120) ? 2 : this.canAfford(40) ? 1 : 0
+    const cam = w.camera
+    const cand = this.ctx
+      .liveEnemies()
+      .filter((e) => overlaps(e.bodyBox(), cam))
+      .slice(0, 16)
+      .map((e) => ({ e: e as Actor, picked: false }))
+    const [cx, cy] = this.center()
+    const sel = (this.itSel = { n: Math.min(lv + 1, tier), cand, picks: [] as Actor[], x: cx << 8, y: cy << 8, vx: 0, vy: 0, cursor: true })
+    const fx = w.add(new ItMarkersFx(this.ctx, () => (sel.cursor ? [sel.x >> 8, sel.y >> 8] : null), () => sel.picks.map((e) => e.center()), () => this.itSel === sel || (!!this.it && this.it.targets === sel.picks)))
+    w.modal = [this, fx]
+  }
+  private itSelect(w: World) {
+    const s = this.itSel!
+    if (!(w.input.held & BTN.B)) {
+      w.modal = null
+      this.itSel = null
+      if (!s.picks.length) return this.setAnimId(w, 0)
+      this.it = { dir: this.facing, idx: 0, targets: s.picks, origin: [this.px, this.py], t: -24 }
+      this.hittable = false
+      this.ap.raw = 20
+      this.enterState(w, 'skill14')
+      this.hittable = false
+      return
+    }
+    if (s.n > 0 && s.cursor) {
+      const px = s.x >> 8
+      const py = s.y >> 8
+      const c = s.cand.find((k) => {
+        const b = k.e.bodyBox()
+        return !k.picked && px >= b.x0 && px < b.x1 && py >= b.y0 && py < b.y1
+      })
+      if (c) {
+        c.picked = true
+        s.picks.push(c.e)
+        if (--s.n === 0) s.cursor = false
+      }
+    }
+    if (s.cursor) {
+      const h = w.input.held
+      s.vx = Math.trunc((s.vx * 3) / 4) + (h & BTN.RIGHT ? 256 : 0) - (h & BTN.LEFT ? 256 : 0)
+      s.vy = Math.trunc((s.vy * 3) / 4) + (h & BTN.DOWN ? 256 : 0) - (h & BTN.UP ? 256 : 0)
+      s.x += s.vx
+      s.y += s.vy
+      const cam = w.camera
+      if (s.x < cam.x0 << 8 || s.x > cam.x1 << 8) {
+        s.x = Math.max(cam.x0 << 8, Math.min(cam.x1 << 8, s.x))
+        s.vx = 0
+      }
+      if (s.y < cam.y0 << 8 || s.y > cam.y1 << 8) {
+        s.y = Math.max(cam.y0 << 8, Math.min(cam.y1 << 8, s.y))
+        s.vy = 0
+      }
     }
   }
-  /** revert to the base form; the SS cooldown (rec+4) starts (its start value is INFERRED: 600 frames) */
-  revert(w: World) {
-    let f = this.form
-    while ((f.ss || f.ss3) && f.down !== 255 && this.ctx.data.forms[f.down]) f = this.ctx.data.forms[f.down]
-    if (f.id === this.form.id) return
-    this.applyForm(f.id)
-    this.ssGauge = 0
-    this.ss3Gauge = 0
-    this.ssCooldown = 600 * 256
-    this.ctx.puff(w, this.center()[0], this.center()[1])
-    w.logEvent('info', `reverted to form ${f.id}`)
-    audioEvent('transform_done')
-    if (this.state === 'transform' || this.state === 'skill') this.setState(w, 'idle')
+  /** teleport sequence control (state 0x0804E334): per target 60 frames (raw 20: frames counting down, the jump
+   *  under the target facing up, the punch x1.5 at t 24, the punch frames); EP 40 / 80 / 480 + sound 31 per jump */
+  private ctlIT(w: World) {
+    const it = this.it
+    if (!it) return this.setAnimId(w, 0)
+    this.hittable = false
+    const a = this.ap
+    const t = ++it.t
+    if (t < 0) {
+      if (t === -23 && it.targets.length > it.idx) {
+        this.spend(w, [40, 80, 480][Math.min(2, it.idx)])
+        this.sfx(31)
+      }
+      a.raw = 20
+      a.frame = -t >> 3
+      return
+    }
+    if (t === 0) {
+      while (it.idx < it.targets.length && it.targets[it.idx].removed) it.idx++
+      if (it.idx >= it.targets.length) {
+        this.x = it.origin[0] << 8
+        this.y = it.origin[1] << 8
+        this.facing = it.dir
+        return
+      }
+      const e = it.targets[it.idx]
+      this.x = (((e.px * 2 + e.footW) >> 1) - 8) << 8
+      this.y = (e.py + e.footH + 8) << 8
+      this.facing = 1
+      return
+    }
+    if (t < 24) {
+      a.frame = (24 - t) >> 3
+      return
+    }
+    if (it.idx >= it.targets.length) {
+      this.it = null
+      return this.setAnimId(w, 0)
+    }
+    if (t === 24) {
+      const rect = rectAt(PUNCH_RECT[this.facing], this.px, this.py)
+      if (broadcast(w, { team: 1, rect, dir: this.facing, mult: 0x600, atk: ATK[2], attacker: this, source: this })) this.sfx(48 + w.rng.rand(2, 'it hit sfx'))
+    }
+    a.frame = (t - 24) >> 2
+    if (a.frame >= this.animN()) {
+      a.frame = 0
+      a.raw = 20
+      it.idx++
+      it.t = -24
+    }
+  }
+
+  private finishRevert(w: World) {
+    const down = this.form.down
+    if (down === 255 || !this.ctx.data.forms[down]) return this.setAnimId(w, 0)
+    if (this.form.ss || this.form.ss3) {
+      this.ssGauge = 0
+      this.ss3Gauge = 0
+    }
+    this.formExit()
+    this.applyForm(down)
+    this.formEnter()
+    this.setAnimId(w, 0)
+    w.logEvent('info', `reverted to form ${down}`)
   }
 
   // ---- held ------------------------------------------------------------------------------------------------------
@@ -1045,38 +1852,50 @@ export class Player extends Actor implements PlayerLike {
     if (msg.team === 1 || this.dead) return false
     if (this.state === 'held' && this.holdKind === 'eat') return false
     if (!hitsBody(msg, this)) return false
-    // block: R state and (hit dir ^ 1) == facing; energy shield (R+B) negates energy hits (INFERRED)
+    // message 0 (0x08010F40) -> ComputeDamage (block: blocking flag and (hit dir ^ 1) == facing; a full energy shield
+    // and the hurt state make both resists 0) -> the reaction 0x080105FA
     const front = (msg.dir ^ 1) === this.facing
     const blocking = this.blocking && front
     const res = computeDamage(msg.atk, msg.mult, msg.attacker.stats, this.stats, blocking, w.rng)
-    let dmg = res.dmg
-    if (this.state === 'shield' && msg.atk.kind === 1) dmg = 0
+    const dmg = res.dmg
     msg.crit = res.crit
     msg.raw = res.raw
     msg.dmg = dmg
-    const lost = this.hpAcc.take(dmg)
-    audioEvent('hurt', { melee: msg.atk.kind === 0 })
+    // 0x08010BF2: hit flash (12 frames) + damage number; HP in 1/1024 with the remainder carried; HP 0 -> KO
+    const before = this.hp
+    const lost = dmg > 0 && this.hp > 0 ? this.hpAcc.take(dmg) : 0
     w.logEvent('damage', `${msg.attacker.kind === 'enemy' ? (msg.attacker as unknown as { label: string }).label : msg.attacker.kind} -> player: ${dmg}/1024${res.crit ? ' CRIT' : ''}${blocking ? ' blocked' : ''}${this.state === 'hurt' ? ' (i-frames)' : ''} = ${lost} HP`)
-    if (dmg > 0) {
-      w.stats.hitsTaken++
-      if (lost > 0) {
-        w.stats.damageTaken += Math.min(lost, this.hp)
-        this.ctx.damagePopup(w, this, lost, res.crit, true)
-      }
+    if (dmg === 0 || before === 0) return true
+    this.flash = 12
+    w.stats.hitsTaken++
+    if (lost > 0) {
+      w.stats.damageTaken += Math.min(lost, this.hp)
+      this.ctx.damagePopup(w, this, lost, res.crit, true)
       this.hp = Math.max(0, this.hp - lost)
-      this.flash = 12
       // thorns (record+0x5C): melee attackers take the thorns value (application INFERRED)
       if (this.eff.thorns && msg.atk.kind === 0 && (msg.attacker as unknown as { takeDirect?: (w: World, n: number) => void }).takeDirect) {
         ;(msg.attacker as unknown as { takeDirect: (w: World, n: number) => void }).takeDirect(w, this.eff.thorns)
       }
       this.afterHpChange(w)
-      if (!this.dead && !blocking && this.state !== 'held' && this.state !== 'hurt' && this.state !== 'transform') {
-        this.hurtDir = msg.dir
-        this.setState(w, 'hurt')
-      }
+      if (this.dead) return true
     }
+    if (this.state === 'held') return true
+    // 0x080107FC: blocked from the front -> pushed back 2 px; else turn to the attacker and the hurt state (raw 10)
+    if (blocking) {
+      const [bx, by] = BLOCK_PUSH[this.facing]
+      if (this.fits(w, (this.x + bx) >> 8, (this.y + by) >> 8)) {
+        this.x += bx
+        this.y += by
+      }
+      return true
+    }
+    this.facing = (msg.dir ^ 1) as Dir
+    this.hurtDir = msg.dir
+    this.ap.raw = 10
+    this.enterState(w, 'hurt')
     return true
   }
+  /** KO (0x0801088A): state 'ko' (raw 18, shift 5, then hold); the death script plays song 8 200 frames later */
   private afterHpChange(w: World) {
     if (this.equip.some((e) => e?.id === 153)) this.refreshStats()
     if (this.hp <= 0 && !this.dead) {
@@ -1084,44 +1903,77 @@ export class Player extends Actor implements PlayerLike {
       this.heldBy = null
       this.holdKind = null
       this.alpha = 1
-      this.setState(w, 'dying')
+      // KO enter 0x08012D24: forms with flag 0x40 (the transformed ones) fall back to their base form (byte +0x17)
+      // through 0x0801712C, which stops the transformation sound 54; the sprite stays
+      if (this.form.flags & 0x40 && this.ctx.data.forms[this.form.down]) {
+        this.sfxStop(54)
+        this.form = this.ctx.data.forms[this.form.down]
+      }
+      this.ap.raw = 18
+      this.enterState(w, 'ko')
+      this.koAt = w.frame
     }
   }
+  koAt = -1
 
   draw(r: Renderer, w: World) {
     if (this.ctx.candy > 0 && !this.dead) {
-      // candy: drawn as a wrapped sweet (the game swaps the player graphics; INFERRED look)
-      const [cx, cy] = this.center()
-      const g = r.ctx
-      g.fillStyle = '#ff70c0'
-      g.fillRect(r.sx(cx) - 6, r.sy(cy) - 4, 12, 8)
-      g.fillStyle = '#ffe0f0'
-      g.fillRect(r.sx(cx) - 9, r.sy(cy) - 3, 3, 6)
-      g.fillRect(r.sx(cx) + 6, r.sy(cy) - 3, 3, 6)
+      // candy (0x080286D4 hit): the player's sprite is def 45 (three sweets), frame rand(3) picked on the hit
+      const sweets = this.ctx.data.sprites.index(45)
+      this.drawAs(r, w, sweets, sweets?.anim(1), this.ctx.candyFrame)
       return
     }
     if (this.holdKind === 'stone') {
-      super.draw(r, w)
-      const b = this.bodyBox()
-      r.ctx.globalAlpha = 0.6
-      r.ctx.fillStyle = '#909090'
-      r.ctx.fillRect(r.sx(b.x0), r.sy(b.y0), b.x1 - b.x0, b.y1 - b.y0)
-      r.ctx.globalAlpha = 1
+      // petrified: player animation 0x15 (raw 22, the stone pose), frame 0 (1 = cracked once the d-pad counter is
+      // below half; the sim does not count the presses)
+      this.drawAs(r, w, this.sprite, this.sprite?.anim(22), 0)
       return
     }
     super.draw(r, w)
-    if (this.state === 'shield') {
+    if (this.shield) {
+      // shield object 0x0801DFE0: record power >> 3 of 0x087202E8 at the body box centre (base draw 0x08019C44)
       const [cx, cy] = this.center()
-      r.ctx.globalAlpha = 0.35 + 0.15 * Math.sin(w.frame / 3)
-      r.ctx.strokeStyle = '#80e0ff'
-      r.ctx.lineWidth = 2
-      r.ctx.beginPath()
-      r.ctx.arc(r.sx(cx), r.sy(cy), 16, 0, Math.PI * 2)
-      r.ctx.stroke()
-      r.ctx.lineWidth = 1
-      r.ctx.globalAlpha = 1
+      drawRec(r, this.ctx.fx(SHIELD_FX), this.shield.pow >> 3, cx, cy)
     }
-    if (this.wraps > 0) drawText(r.ctx, `x${this.wraps}`, r.sx(this.px + 18), r.sy(this.py - 24), '#e0d0a0')
+    // bandages stuck on the player (0x0802D79C): record 0x08757218 at the player + (4, -slotY) (slots 0x08756BB4)
+    for (let i = 0; i < Math.min(8, this.wraps); i++) drawRecAddr(r, this.ctx.data.sprites, 0x08757218, this.px + 4, this.py - WRAP_SLOT_Y[i])
+  }
+
+  /** draw with another sprite / animation / frame (candy, stone pose), keeping shadow and position */
+  private drawAs(r: Renderer, w: World, sprite: Actor['sprite'], anim: Actor['anim'], frame: number) {
+    const save = [this.sprite, this.anim, this.frameIdx] as const
+    this.sprite = sprite
+    this.anim = anim
+    this.frameIdx = frame
+    super.draw(r, w)
+    ;[this.sprite, this.anim, this.frameIdx] = save
+  }
+
+  // ---- lockstep (tools/battle/LOCKSTEP.md) -------------------------------------------------------------------------
+  /** copy the emulator's animation fields at frame 0 */
+  lockstepInit(raw: number, frame: number, tick: number) {
+    this.gs = this.idleState()
+    this.state = 'idle'
+    this.ap = { raw, frame, tick }
+    this.syncAnim()
+  }
+  /** what the lockstep compares: state name, raw animation (-1 when the sprite lacks it), frame, ROM frame record */
+  lockstepView(): { state: string; raw: number; frame: number; rom: number } {
+    const a = this.sprite?.anim(this.ap.raw)
+    const state = this.gs === 'idle2' ? 'idle' : this.gs
+    if (!a) return { state, raw: -1, frame: this.ap.frame, rom: 0 }
+    type J ={ raw_index: number; directions: Record<string, { rom?: string }[]> }
+    const anims = this.sprite!.json.animations as unknown as Record<string, J>
+    const j = anims[a.name]
+    const d = j.directions[['down', 'up', 'left', 'right'][this.facing]] ?? j.directions.any
+    const s = d?.[this.ap.frame]
+    // the emulator names an animation by the first def slot holding the same struct: slots sharing one struct
+    // (e.g. Gohan's three punches) report the lowest raw index
+    const key = (x: J) => JSON.stringify(Object.values(x.directions).map((v) => v.map((q) => q.rom)))
+    const k = key(j)
+    let raw = this.ap.raw
+    for (const o of Object.values(anims)) if (o.raw_index < raw && key(o) === k) raw = o.raw_index
+    return { state, raw, frame: this.ap.frame, rom: s?.rom ? parseInt(s.rom, 16) : 0 }
   }
 
   debugLabel() {

@@ -16,7 +16,40 @@ from scriptdis import dis_script
 from spawns import scan as scan_spawns
 from loot import simulate
 
-REACTIONS = {0x08708920: 'standard (knockback + flinch, behaviour def 0x08708920)', 0x080716F4: 'none (does not flinch)'}
+# Display names. `name` stays the game's own text (Capsule Corp database row, or the ROM string named in
+# name_source); several types share one database name, so `display_name` adds the qualifier that tells them apart
+# (location / phase / behaviour, from bosses.json and the AI trees). Types the game never names get a descriptive
+# display name and display_name_source = 'descriptive'.
+QUALIFIED = {
+    0x04: 'Babidi (Giant Crater, script-placed)', 0x19: 'Babidi (West City)', 0x1d: 'Babidi (Giant Crater, with Majin Buu)',
+    0x0b: 'Broly (phase 2)',
+    0x1a: 'Majin Buu (Giant Crater, with Babidi)', 0x1b: 'Majin Buu (Giant Crater, 2nd encounter)',
+    0x1c: 'Majin Buu (West City)',
+    0x26: 'Goten (tag game)', 0x27: 'Goten (Time Chamber sparring)',
+    0x36: 'Janemba Hand (summoned by Janemba)',
+    0x3b: 'Human (World Tournament fighter)',
+    0x3d: 'Kid Buu (split copy)',
+    0x4f: 'Ninja (disguised)', 0x66: 'Shadow Warrior (disguised)', 0x69: 'Shinobi (disguised)',
+    0x6d: 'Spopovich (225 HP)', 0x6e: 'Spopovich (225 HP, 2)', 0x6f: 'Spopovich (bear hug, with Yamu)',
+    0x70: 'Spopovich (1855 HP, no bear hug)',
+    0x93: 'Yamu (EP drain, with Spopovich)', 0x94: 'Yamu (no EP drain)',
+    0x73: 'Super Buu (Time Chamber)', 0x74: 'Super Buu (two-phase)', 0x75: 'Super Buu (script-created)',
+    0x76: 'Super Buu (Gotenks absorbed)', 0x77: 'Super Buu (Gohan absorbed)', 0x78: 'Super Buu (Gohan absorbed, 0 XP)',
+    0x79: 'Super Buu (Brain)',
+    0x88: 'Vegeta (Gravity Chamber)', 0x89: 'Vegeta (Barren Wasteland)',
+}
+# types with no database row whose name is still in the ROM text: (string id, evidence)
+ROM_TEXT_NAMES = {0x84: (1140, 'string 1140 "Uub" (database text); the spawn gfx 273 is the Uub sprite')}
+# types the game never names (no database row, no text)
+DESCRIPTIVE = {
+    0x0d: 'Kamikaze ghost (Super Buu minion)', 0x0e: 'Buu fragment (freezes the player)', 0x1e: 'Unnamed fighter 0x1E (unused)',
+    0x22: 'Inert helper 0x22', 0x72: 'Inert helper 0x72', 0x7e: 'Inert helper 0x7E',
+    0x34: 'Janemba part (arm A)', 0x35: 'Janemba part (arm B)', 0x37: 'Janemba part (upper body)',
+    0x54: 'Dummy type 0x54 (unused)', 0x87: 'Unnamed fighter 0x87 (unused)', 0x8d: 'Floor trigger (not a fighter)',
+    0x90: 'Worm part 0x90 (unused)',
+}
+
+REACTIONS = {0x08708920:'standard (knockback + flinch, behaviour def 0x08708920)', 0x080716F4: 'none (does not flinch)'}
 
 
 def drop_params(addr):
@@ -91,6 +124,26 @@ def main(samples=20000):
                 break
         if not en['name'] and en['hp'] == 0:
             en['name_source'] = 'no HP: scripted/non-combat actor'
+    from strtab import S
+    for en in enemies:
+        t = en['type']
+        if not en['name'] and t in ROM_TEXT_NAMES:
+            sid, why = ROM_TEXT_NAMES[t]
+            en['name'] = S(sid)
+            en['name_source'] = why
+        if t in QUALIFIED:
+            en['display_name'], en['display_name_source'] = QUALIFIED[t], 'game name + qualifier'
+        elif t in DESCRIPTIVE:
+            en['display_name'], en['display_name_source'] = DESCRIPTIVE[t], 'descriptive'
+        elif en['name'] and en['name_source'] and en['name_source'].startswith('inferred'):
+            en['display_name'], en['display_name_source'] = en['name'], 'descriptive'
+        else:
+            en['display_name'], en['display_name_source'] = en['name'], 'game'
+    dup = defaultdict(list)
+    for en in enemies:
+        dup[en['display_name']].append(hex(en['type']))
+    clash = {k: v for k, v in dup.items() if len(v) > 1}
+    assert not clash, f'duplicate display names: {clash}'
     out = dict(
         meta=dict(generator='re/buu/extract_enemies.py', table=hex(ENEMY_TYPES),
                   layout={'+0x00': 'u32 XP reward (x player XP multiplier record+0x58/256, rounded up; 0x0800F80C)',

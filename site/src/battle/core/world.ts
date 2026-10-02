@@ -78,6 +78,10 @@ export class World {
   entities: Entity[] = []
   input: InputFrame = { held: 0, pressed: 0, released: 0 }
   camera: Rect = { x0: 0, y0: 0, x1: GBA_W, y1: GBA_H }
+  /** drawn view offset in px (a ruleset's screen shake) */
+  viewShake: [number, number] = [0, 0]
+  /** a modal loop of the game (e.g. Buu's Instant Transmission target pick): only these entities update */
+  modal: Entity[] | null = null
   popups: Popup[] = []
   log: DebugEvent[] = []
   debug: DebugFlags = { hitboxes: false, labels: false, log: false }
@@ -119,7 +123,7 @@ export class World {
     const n = this.entities.length
     for (let i = n - 1; i >= 0; i--) {
       const e = this.entities[i]
-      if (!e.removed) e.update(this)
+      if (!e.removed && (!this.modal || this.modal.includes(e))) e.update(this)
     }
     this.entities = this.entities.filter((e) => !e.removed)
     for (const p of this.popups) {
@@ -177,6 +181,9 @@ export class World {
       r.camX = clampSpan(r.camX, r.viewW, v.x0, v.x1)
       r.camY = clampSpan(r.camY, r.viewH, v.y0, v.y1)
     }
+    // screen shake set by the ruleset (drawing only; the logical camera stays put)
+    r.camX += this.viewShake[0]
+    r.camY += this.viewShake[1]
     r.beginFrame('#000')
     const bg = imageNow(this.arena.image)
     if (bg) r.ctx.drawImage(bg, (this.arena.origin?.[0] ?? 0) - r.camX, (this.arena.origin?.[1] ?? 0) - r.camY)

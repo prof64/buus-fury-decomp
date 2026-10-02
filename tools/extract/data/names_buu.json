@@ -149,1815 +149,2107 @@
    "name": "Hovering Drone",
    "category": "enemy",
    "confidence": "low",
-   "anim_set": "enemy"
+   "anim_set": "enemy",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "2": {
    "name": "Babidi Spaceship Pod",
    "category": "npc",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "3": {
    "name": "Alien Announcer",
    "category": "npc",
-   "confidence": "medium",
-   "anim_set": "npc"
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 1)"
   },
   "4": {
    "name": "Kai (purple hair)",
    "category": "npc",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "5": {
    "name": "Swordsman",
    "category": "npc",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "6": {
    "name": "Robed Elder",
    "category": "npc",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "7": {
-   "name": "Blonde Fighter",
-   "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "name": "Android 18",
+   "category": "player",
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (playable form 46)"
   },
   "8": {
-   "name": "Destroyer (cyan)",
+   "name": "Annihilator",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 3)"
   },
   "9": {
-   "name": "Man (sunglasses)",
+   "name": "Announcer",
    "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 4)"
   },
   "10": {
-   "name": "Dr. Brief",
+   "name": "Old man in suit",
    "category": "npc",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "11": {
-   "name": "Dr. Brief (2)",
+   "name": "Old man in suit (2)",
    "category": "npc",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "12": {
-   "name": "Dr. Brief (3)",
+   "name": "Old man in suit (3)",
    "category": "npc",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "13": {
-   "name": "Dr. Brief (4)",
+   "name": "Old man in suit (4)",
    "category": "npc",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "14": {
    "name": "Ghost Fighter (blue)",
    "category": "enemy",
    "confidence": "low",
-   "anim_set": "enemy"
+   "anim_set": "enemy",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "15": {
    "name": "Ghost Fighter (blue, 2)",
    "category": "enemy",
    "confidence": "low",
-   "anim_set": "enemy"
+   "anim_set": "enemy",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "16": {
-   "name": "Majin Soldier",
+   "name": "Assassin",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 5)"
   },
   "17": {
-   "name": "Laser Turret",
+   "name": "Atomizer",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 6)"
   },
   "18": {
    "name": "Baba",
    "category": "npc",
-   "confidence": "medium",
-   "anim_set": "npc"
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 7)"
   },
   "19": {
-   "name": "Swamp Monster",
+   "name": "Babidi",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 10, Capsule Corp database row 8, Capsule Corp database row 9)"
   },
   "20": {
    "name": "Small Creature",
    "category": "npc",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "21": {
    "name": "Mud Man",
    "category": "enemy",
    "confidence": "low",
-   "anim_set": "enemy"
+   "anim_set": "enemy",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "22": {
-   "name": "Spopovich",
-   "category": "boss",
-   "confidence": "low",
-   "anim_set": "fighter"
+   "name": "Bio Mech",
+   "category": "enemy",
+   "confidence": "high",
+   "anim_set": "fighter",
+   "notes": "name: game text (Capsule Corp database row 0, Capsule Corp database row 11)"
   },
   "23": {
-   "name": "Brain Cell",
+   "name": "Blister",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 12)"
   },
   "24": {
    "name": "Blood Cell",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 13)"
   },
   "25": {
-   "name": "Majin Fighter (green)",
+   "name": "Bomber",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 14)"
   },
   "26": {
-   "name": "Knight (red)",
+   "name": "Bones",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 15)"
   },
   "27": {
    "name": "Boy (blue)",
    "category": "npc",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive; the scouter calls this character \"Human\"; the scouter calls this character \"Human\""
   },
   "28": {
    "name": "Boy (green)",
    "category": "npc",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "29": {
    "name": "Broly",
    "category": "boss",
    "confidence": "high",
-   "anim_set": "fighter"
+   "anim_set": "fighter",
+   "notes": "name: game text (Capsule Corp database row 16, Capsule Corp database row 17)"
   },
   "30": {
-   "name": "Thug (\"HUGE\" shirt)",
+   "name": "Bruiser",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 18)"
   },
   "31": {
-   "name": "Monkey",
+   "name": "Bubbles",
    "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 19)"
   },
   "32": {
-   "name": "Boy (teal hair)",
+   "name": "Bulma",
    "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 20)"
   },
   "33": {
-   "name": "Caped Demon",
+   "name": "Evil Buu",
    "category": "boss",
    "confidence": "low",
-   "anim_set": "fighter"
+   "anim_set": "fighter",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "34": {
    "name": "Majin Buu",
    "category": "boss",
    "confidence": "high",
-   "anim_set": "fighter"
+   "anim_set": "fighter",
+   "notes": "name: game text (Capsule Corp database row 125, Capsule Corp database row 126, Capsule Corp database row 127)"
   },
   "35": {
-   "name": "Ghost",
+   "name": "Kamikaze ghost",
    "category": "enemy",
-   "confidence": "medium",
-   "anim_set": "enemy"
+   "confidence": "low",
+   "anim_set": "enemy",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "36": {
    "name": "Buu Fragment",
    "category": "enemy",
    "confidence": "low",
-   "anim_set": "enemy"
+   "anim_set": "enemy",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "37": {
    "name": "Buu Fragment (2)",
    "category": "enemy",
    "confidence": "low",
-   "anim_set": "enemy"
+   "anim_set": "enemy",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "38": {
    "name": "Kid Buu",
    "category": "boss",
-   "confidence": "medium",
-   "anim_set": "fighter"
+   "confidence": "high",
+   "anim_set": "fighter",
+   "notes": "name: game text (Capsule Corp database row 112, Capsule Corp database row 113)"
   },
   "39": {
    "name": "Buu Cocoon",
    "category": "boss",
    "confidence": "low",
-   "anim_set": "fighter"
+   "anim_set": "fighter",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "40": {
    "name": "Super Buu",
    "category": "boss",
    "confidence": "high",
-   "anim_set": "fighter"
+   "anim_set": "fighter",
+   "notes": "name: game text (Capsule Corp database row 184, Capsule Corp database row 185, Capsule Corp database row 186, Capsule Corp database row 187)"
   },
   "41": {
    "name": "Super Buu (2)",
    "category": "boss",
-   "confidence": "high",
-   "anim_set": "fighter"
+   "confidence": "low",
+   "anim_set": "fighter",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "42": {
    "name": "Super Buu (Gotenks absorbed)",
    "category": "boss",
-   "confidence": "medium",
-   "anim_set": "fighter"
+   "confidence": "high",
+   "anim_set": "fighter",
+   "notes": "name: game text (Capsule Corp database row 188)"
   },
   "43": {
    "name": "Super Buu (Gohan absorbed)",
    "category": "boss",
-   "confidence": "medium",
-   "anim_set": "fighter"
+   "confidence": "high",
+   "anim_set": "fighter",
+   "notes": "name: game text (Capsule Corp database row 189, Capsule Corp database row 190)"
   },
   "44": {
    "name": "Super Buu (Gohan absorbed, 2)",
    "category": "boss",
-   "confidence": "medium",
-   "anim_set": "fighter"
+   "confidence": "low",
+   "anim_set": "fighter",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "45": {
    "name": "Cupcake",
    "category": "item",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "46": {
    "name": "Chocolate Bar",
    "category": "item",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "47": {
    "name": "Cake Slice",
    "category": "item",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "48": {
    "name": "Fruit Bowl",
    "category": "item",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "49": {
    "name": "Shell Brute (halo)",
    "category": "enemy",
    "confidence": "low",
    "anim_set": "enemy",
-   "notes": "same animations as sprite 50 plus the halo attachment table (animation slot 0)"
+   "notes": "name: descriptive (no game name for this sprite); same animations as sprite 50 plus the halo attachment table (animation slot 0)"
   },
   "50": {
    "name": "Shell Brute",
    "category": "enemy",
    "confidence": "low",
-   "anim_set": "enemy"
+   "anim_set": "enemy",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "51": {
-   "name": "Thug",
+   "name": "Bald thug",
    "category": "enemy",
    "confidence": "low",
-   "anim_set": "enemy"
+   "anim_set": "enemy",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "52": {
-   "name": "Thug (2)",
+   "name": "Bald thug (2)",
    "category": "enemy",
    "confidence": "low",
-   "anim_set": "enemy"
+   "anim_set": "enemy",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "53": {
-   "name": "Thug (3)",
+   "name": "Bald thug (3)",
    "category": "enemy",
    "confidence": "low",
-   "anim_set": "enemy"
+   "anim_set": "enemy",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "54": {
-   "name": "Thug (4)",
+   "name": "Bald thug (4)",
    "category": "enemy",
    "confidence": "low",
-   "anim_set": "enemy"
+   "anim_set": "enemy",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "55": {
-   "name": "Thug (5)",
+   "name": "Bald thug (5)",
    "category": "enemy",
    "confidence": "low",
-   "anim_set": "enemy"
+   "anim_set": "enemy",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "56": {
-   "name": "Chi-Chi",
+   "name": "Chiaotzu",
    "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 21)"
   },
   "57": {
-   "name": "Goten (NPC)",
+   "name": "Chi-Chi",
    "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 22)"
   },
   "58": {
-   "name": "Caged Creature",
+   "name": "Chobi",
    "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 23)"
   },
   "59": {
    "name": "Death Machine (blue)",
    "category": "enemy",
    "confidence": "low",
-   "anim_set": "enemy"
+   "anim_set": "enemy",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "60": {
    "name": "Policeman",
    "category": "npc",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "61": {
-   "name": "Bandit (green)",
+   "name": "Criminal",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 24)"
   },
   "62": {
-   "name": "Mummy",
+   "name": "Cursed One",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 26)"
   },
   "63": {
-   "name": "Mage",
+   "name": "Cyborg",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 27)"
   },
   "64": {
-   "name": "Pikkon",
-   "category": "player",
-   "confidence": "medium",
-   "anim_set": "fighter"
+   "name": "Dabura",
+   "category": "boss",
+   "confidence": "high",
+   "anim_set": "fighter",
+   "notes": "name: game text (Capsule Corp database row 28)"
   },
   "65": {
    "name": "Pikkon (NPC)",
    "category": "npc",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "66": {
    "name": "Dabura?",
    "category": "npc",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "67": {
-   "name": "Destroyer (gold)",
+   "name": "Death Machine",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 30)"
   },
   "68": {
    "name": "Dende",
    "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 31)"
   },
   "69": {
-   "name": "Destroyer (red)",
+   "name": "Destroyer",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 32)"
   },
   "70": {
-   "name": "Destroyer (red, 2)",
+   "name": "Destroyer (2)",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 33)"
   },
   "71": {
-   "name": "Old Man",
+   "name": "Dr. Brief",
    "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 34)"
   },
   "72": {
    "name": "Grand Kai?",
    "category": "npc",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "73": {
    "name": "Purple Imp",
    "category": "npc",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "74": {
    "name": "Purple Imp (halo)",
    "category": "npc",
    "confidence": "low",
    "anim_set": "npc",
-   "notes": "same animations as sprite 73 plus the halo attachment table (animation slot 0)"
+   "notes": "name: descriptive (no game name for this sprite); same animations as sprite 73 plus the halo attachment table (animation slot 0)"
   },
   "75": {
-   "name": "Brown Fighter",
+   "name": "Elite Majin Fighter",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 35)"
   },
   "76": {
-   "name": "Golden Fighter",
+   "name": "Elite Majin Soldier",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 36, Capsule Corp database row 39)"
   },
   "77": {
-   "name": "Shield Soldier",
+   "name": "Elite Shield Soldier",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 37)"
   },
   "78": {
-   "name": "Small Sprout",
-   "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "name": "Enzyme",
+   "category": "enemy",
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 40)"
   },
   "79": {
-   "name": "Blonde Kid",
+   "name": "Erasa",
    "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 41)"
   },
   "80": {
    "name": "Pot",
    "category": "npc",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "81": {
    "name": "Small Animal",
    "category": "npc",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "82": {
    "name": "Namekian Elder",
    "category": "npc",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "83": {
    "name": "Namekian Elder (2)",
    "category": "npc",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "84": {
    "name": "Boy (blue cap)",
    "category": "npc",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "85": {
    "name": "Ghost Puff (white)",
    "category": "enemy",
    "confidence": "low",
-   "anim_set": "enemy"
+   "anim_set": "enemy",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "86": {
    "name": "Ghost Puff (pink)",
    "category": "enemy",
    "confidence": "low",
-   "anim_set": "enemy"
+   "anim_set": "enemy",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "87": {
-   "name": "Ghost (green hat)",
+   "name": "Ghost",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 46)"
   },
   "88": {
    "name": "Ghost (pink, green hat)",
    "category": "enemy",
    "confidence": "low",
-   "anim_set": "enemy"
+   "anim_set": "enemy",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "89": {
-   "name": "Genie (blue)",
+   "name": "Dabura (2)",
    "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 29)"
   },
   "90": {
    "name": "Genie (blue, 2)",
    "category": "npc",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "91": {
-   "name": "Monk",
-   "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "name": "Ghoul",
+   "category": "enemy",
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 47)"
   },
   "92": {
    "name": "Girl",
    "category": "npc",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "93": {
-   "name": "Super Saiyan Teen Gohan (halo)",
+   "name": "SS Gogeta (halo)",
    "category": "player",
-   "confidence": "medium",
+   "confidence": "high",
    "anim_set": "fighter",
-   "notes": "same animations as sprite 94 plus the halo attachment table (animation slot 0)"
+   "notes": "name: game text (playable form 41, playable form 44); same animations as sprite 94 plus the halo attachment table (animation slot 0)"
   },
   "94": {
-   "name": "Super Saiyan Teen Gohan",
+   "name": "SS Gogeta",
    "category": "player",
-   "confidence": "medium",
-   "anim_set": "fighter"
+   "confidence": "high",
+   "anim_set": "fighter",
+   "notes": "name: game text (qualified game name)"
   },
   "95": {
-   "name": "Teen Gohan (NPC)",
-   "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "name": "Gogeta",
+   "category": "player",
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (playable form 42)"
   },
   "96": {
-   "name": "Teen Gohan (NPC, 2)",
-   "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "name": "Gogeta (2)",
+   "category": "player",
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (playable form 43)"
   },
   "97": {
-   "name": "Gohan (suit)",
-   "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "name": "Gohan (form 9)",
+   "category": "player",
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (playable form 9)"
   },
   "98": {
-   "name": "Teen Gohan",
+   "name": "Gohan (form 10)",
    "category": "player",
-   "confidence": "medium",
-   "anim_set": "fighter"
+   "confidence": "high",
+   "anim_set": "fighter",
+   "notes": "name: game text (playable form 10)"
   },
   "99": {
-   "name": "Gohan (NPC)",
-   "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "name": "Gohan (form 11)",
+   "category": "player",
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (playable form 11)"
   },
   "100": {
-   "name": "Gohan (NPC, 2)",
-   "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "name": "Gohan (form 12)",
+   "category": "player",
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (playable form 12)"
   },
   "101": {
-   "name": "Goten",
+   "name": "Gohan (form 13)",
    "category": "player",
-   "confidence": "low",
-   "anim_set": "fighter"
+   "confidence": "high",
+   "anim_set": "fighter",
+   "notes": "name: game text (playable form 13)"
   },
   "102": {
    "name": "Great Saiyaman",
    "category": "player",
-   "confidence": "medium",
-   "anim_set": "fighter"
+   "confidence": "high",
+   "anim_set": "fighter",
+   "notes": "name: game text (playable form 14)"
   },
   "103": {
-   "name": "Gohan",
+   "name": "Gohan (form 15)",
    "category": "player",
-   "confidence": "low",
-   "anim_set": "fighter"
+   "confidence": "high",
+   "anim_set": "fighter",
+   "notes": "name: game text (playable form 15)"
   },
   "104": {
-   "name": "Super Saiyan Gohan",
+   "name": "SS Gohan (forms 16, 17)",
    "category": "player",
-   "confidence": "medium",
-   "anim_set": "fighter"
+   "confidence": "high",
+   "anim_set": "fighter",
+   "notes": "name: game text (playable form 16, playable form 17)"
   },
   "105": {
-   "name": "Super Saiyan Gohan (2)",
+   "name": "SS Gohan (form 18)",
    "category": "player",
-   "confidence": "low",
-   "anim_set": "fighter"
+   "confidence": "high",
+   "anim_set": "fighter",
+   "notes": "name: game text (playable form 18)"
   },
   "106": {
    "name": "Goku",
    "category": "player",
    "confidence": "high",
-   "anim_set": "fighter"
+   "anim_set": "fighter",
+   "notes": "name: game text (playable form 0)"
   },
   "107": {
    "name": "Goku (Other World)",
    "category": "player",
-   "confidence": "low",
-   "anim_set": "fighter"
+   "confidence": "high",
+   "anim_set": "fighter",
+   "notes": "name: game text (playable form 1)"
   },
   "108": {
    "name": "Goku (halo)",
    "category": "player",
    "confidence": "high",
    "anim_set": "fighter",
-   "notes": "same animations as sprite 106 plus the halo attachment table (animation slot 0)"
+   "notes": "name: game text (playable form 2); same animations as sprite 106 plus the halo attachment table (animation slot 0)"
   },
   "109": {
-   "name": "Super Saiyan Goku",
+   "name": "SS Goku",
    "category": "player",
    "confidence": "high",
-   "anim_set": "fighter"
+   "anim_set": "fighter",
+   "notes": "name: game text (playable form 3)"
   },
   "110": {
-   "name": "Super Saiyan Goku (halo)",
+   "name": "SS Goku (halo)",
    "category": "player",
    "confidence": "high",
    "anim_set": "fighter",
-   "notes": "same animations as sprite 109 plus the halo attachment table (animation slot 0)"
+   "notes": "name: game text (playable form 4); same animations as sprite 109 plus the halo attachment table (animation slot 0)"
   },
   "111": {
-   "name": "Super Saiyan 3 Goku",
-   "category": "player",
-   "confidence": "high",
-   "anim_set": "fighter"
-  },
-  "112": {
-   "name": "Super Saiyan 3 Goku (halo)",
+   "name": "SS3 Goku",
    "category": "player",
    "confidence": "high",
    "anim_set": "fighter",
-   "notes": "same animations as sprite 111 plus the halo attachment table (animation slot 0)"
+   "notes": "name: game text (playable form 5, playable form 8)"
+  },
+  "112": {
+   "name": "SS3 Goku (halo)",
+   "category": "player",
+   "confidence": "high",
+   "anim_set": "fighter",
+   "notes": "name: game text (playable form 6, playable form 7); same animations as sprite 111 plus the halo attachment table (animation slot 0)"
   },
   "113": {
-   "name": "Thug (\"HUGE\")",
+   "name": "Goon",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 64)"
   },
   "114": {
-   "name": "Mystic Gohan",
+   "name": "Goten",
    "category": "player",
-   "confidence": "low",
-   "anim_set": "fighter"
+   "confidence": "high",
+   "anim_set": "fighter",
+   "notes": "name: game text (playable form 19)"
   },
   "115": {
-   "name": "Super Saiyan Goten",
+   "name": "SS Goten",
    "category": "player",
-   "confidence": "low",
-   "anim_set": "fighter"
+   "confidence": "high",
+   "anim_set": "fighter",
+   "notes": "name: game text (playable form 20)"
   },
   "116": {
    "name": "Goku (NPC)",
    "category": "npc",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "117": {
    "name": "Gotenks",
    "category": "player",
-   "confidence": "medium",
-   "anim_set": "fighter"
+   "confidence": "high",
+   "anim_set": "fighter",
+   "notes": "name: game text (playable form 31, playable form 36)"
   },
   "118": {
-   "name": "Gotenks (NPC)",
-   "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "name": "Gotenks (form 32)",
+   "category": "player",
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (playable form 32)"
   },
   "119": {
-   "name": "Gotenks (NPC, 2)",
-   "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "name": "Gotenks (form 33)",
+   "category": "player",
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (playable form 33)"
   },
   "120": {
-   "name": "Super Saiyan Gotenks",
+   "name": "SS Gotenks",
    "category": "player",
-   "confidence": "medium",
-   "anim_set": "fighter"
+   "confidence": "high",
+   "anim_set": "fighter",
+   "notes": "name: game text (playable form 34, playable form 37)"
   },
   "121": {
-   "name": "Super Saiyan 3 Gotenks",
+   "name": "SS3 Gotenks",
    "category": "player",
-   "confidence": "medium",
-   "anim_set": "fighter"
+   "confidence": "high",
+   "anim_set": "fighter",
+   "notes": "name: game text (playable form 35, playable form 38)"
   },
   "122": {
-   "name": "Kibito",
+   "name": "Grand Kai",
    "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 75)"
   },
   "123": {
    "name": "Robot (red)",
    "category": "enemy",
    "confidence": "low",
-   "anim_set": "enemy"
+   "anim_set": "enemy",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "124": {
-   "name": "Bomber (red)",
+   "name": "Grand Mechanoid",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 76)"
   },
   "125": {
-   "name": "Bomb (red)",
+   "name": "Grand Mechanoid (ball)",
    "category": "effect",
-   "confidence": "low",
-   "anim_set": "npc"
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 77)"
   },
   "126": {
-   "name": "Small Bug",
+   "name": "Gregory",
    "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 78)"
   },
   "127": {
-   "name": "Fighter (orange cap)",
+   "name": "Grenadier",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 79)"
   },
   "128": {
-   "name": "Bandit (camo)",
+   "name": "Gunman",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 80, Capsule Corp database row 81)"
   },
   "129": {
    "name": "Hercule",
    "category": "player",
-   "confidence": "low",
-   "anim_set": "fighter"
+   "confidence": "high",
+   "anim_set": "fighter",
+   "notes": "name: game text (playable form 47)"
   },
   "130": {
-   "name": "Policeman (2)",
+   "name": "Mayor",
    "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 137)"
   },
   "131": {
-   "name": "Gunman",
+   "name": "Hessian",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 83)"
   },
   "132": {
-   "name": "Ninja (brown)",
+   "name": "Hooligan",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 84)"
   },
   "133": {
-   "name": "Mage (2)",
+   "name": "Hyper Cyborg",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 101)"
   },
   "134": {
-   "name": "Android 18",
+   "name": "Idasa",
    "category": "player",
-   "confidence": "low",
-   "anim_set": "fighter"
+   "confidence": "high",
+   "anim_set": "fighter",
+   "notes": "name: game text (Capsule Corp database row 102)"
   },
   "135": {
    "name": "Woman (red)",
    "category": "npc",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "136": {
-   "name": "Laser Turret (grey)",
+   "name": "Ion Cannon",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 103)"
   },
   "137": {
    "name": "Janemba",
    "category": "boss",
-   "confidence": "medium",
-   "anim_set": "fighter"
+   "confidence": "high",
+   "anim_set": "fighter",
+   "notes": "name: game text (Capsule Corp database row 104)"
   },
   "138": {
-   "name": "Janemba Hand",
+   "name": "Janemba arm",
    "category": "enemy",
-   "confidence": "medium",
-   "anim_set": "enemy"
+   "confidence": "low",
+   "anim_set": "enemy",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "139": {
-   "name": "Janemba Hand (2)",
+   "name": "Janemba arm (2)",
    "category": "enemy",
-   "confidence": "medium",
-   "anim_set": "enemy"
+   "confidence": "low",
+   "anim_set": "enemy",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "140": {
    "name": "Janemba (back)",
    "category": "boss",
-   "confidence": "low",
-   "anim_set": "fighter"
+   "confidence": "high",
+   "anim_set": "fighter",
+   "notes": "name: game text (enemy type 0x33)"
   },
   "141": {
-   "name": "Portal",
+   "name": "Janemba Hand (portal)",
    "category": "effect",
-   "confidence": "low",
-   "anim_set": "npc"
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 106)"
   },
   "142": {
-   "name": "Portal (2)",
-   "category": "effect",
-   "confidence": "low",
-   "anim_set": "npc"
+   "name": "Janemba Hand (portal, 2)",
+   "category": "enemy",
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 107)"
   },
   "143": {
    "name": "Mini-Janemba",
    "category": "enemy",
-   "confidence": "medium",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (qualified game name)"
   },
   "144": {
    "name": "Mini-Janemba (2)",
    "category": "enemy",
-   "confidence": "medium",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 105)"
   },
   "145": {
    "name": "Super Janemba",
    "category": "boss",
-   "confidence": "medium",
-   "anim_set": "fighter"
+   "confidence": "high",
+   "anim_set": "fighter",
+   "notes": "name: game text (Capsule Corp database row 191)"
   },
   "146": {
-   "name": "Videl (NPC)",
+   "name": "Jewl",
    "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 108)"
   },
   "147": {
-   "name": "Gold Vault Door",
-   "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "name": "Juggernaut",
+   "category": "enemy",
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 109)"
   },
   "148": {
    "name": "Ghost (blue flame)",
    "category": "enemy",
    "confidence": "low",
-   "anim_set": "enemy"
+   "anim_set": "enemy",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "149": {
-   "name": "Imp (red)",
-   "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "name": "Kibito",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 110)"
   },
   "150": {
-   "name": "Imp (purple)",
+   "name": "Kibitoshin",
    "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 111)"
   },
   "151": {
-   "name": "Boy (green)",
+   "name": "Killa",
    "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 114)"
   },
   "152": {
-   "name": "Clown (halo)",
+   "name": "King Kai (halo)",
    "category": "npc",
-   "confidence": "low",
+   "confidence": "high",
    "anim_set": "npc",
-   "notes": "same animations as sprite 153 plus the halo attachment table (animation slot 0)"
+   "notes": "name: game text (Capsule Corp database row 115); same animations as sprite 153 plus the halo attachment table (animation slot 0)"
   },
   "153": {
    "name": "Clown",
    "category": "npc",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "154": {
    "name": "King Yemma",
    "category": "npc",
-   "confidence": "medium",
-   "anim_set": "npc"
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 116)"
   },
   "155": {
-   "name": "Death Machine (gold)",
+   "name": "Knight Destroyer",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 117, Capsule Corp database row 118)"
   },
   "156": {
-   "name": "Ghost (small)",
+   "name": "Korin",
    "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 119)"
   },
   "157": {
-   "name": "Gohan (young)",
-   "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "name": "Krillin",
+   "category": "player",
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (playable form 48)"
   },
   "158": {
-   "name": "Laser Turret (blue)",
+   "name": "Laser Turret",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 121)"
   },
   "159": {
-   "name": "Demon Warrior (red)",
+   "name": "Lich",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 122)"
   },
   "160": {
    "name": "Lightning",
    "category": "effect",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "161": {
-   "name": "Ice Fighter",
+   "name": "Living Dead",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 123)"
   },
   "162": {
-   "name": "Turbaned Fighter",
+   "name": "Mad Bomber",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 124)"
   },
   "163": {
-   "name": "Shield Soldier (2)",
+   "name": "Elite Shield Soldier (2)",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 38)"
   },
   "164": {
-   "name": "Samurai",
+   "name": "Majin Fighter",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 128)"
   },
   "165": {
    "name": "Samurai (2)",
    "category": "enemy",
    "confidence": "low",
-   "anim_set": "enemy"
+   "anim_set": "enemy",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "166": {
-   "name": "Shield Soldier (purple)",
+   "name": "Majin Shield Soldier",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 130)"
   },
   "167": {
-   "name": "Shield Soldier (purple, 2)",
+   "name": "Majin Shield Soldier (2)",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 129)"
   },
   "168": {
-   "name": "Majin Soldier (2)",
+   "name": "Majin Soldier",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 131, Capsule Corp database row 132)"
   },
   "169": {
-   "name": "Golem",
+   "name": "Super Shield Soldier (2)",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 195)"
   },
   "170": {
    "name": "Villager (green)",
    "category": "npc",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "171": {
    "name": "Villager (blue)",
    "category": "npc",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "172": {
    "name": "Villager (pink)",
    "category": "npc",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "173": {
    "name": "Purple Lizard Brute (halo)",
    "category": "boss",
    "confidence": "low",
    "anim_set": "fighter",
-   "notes": "same animations as sprite 174 plus the halo attachment table (animation slot 0)"
+   "notes": "name: descriptive (no game name for this sprite); same animations as sprite 174 plus the halo attachment table (animation slot 0)"
   },
   "174": {
    "name": "Purple Lizard Brute",
    "category": "boss",
    "confidence": "low",
-   "anim_set": "fighter"
+   "anim_set": "fighter",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "175": {
-   "name": "Bomber",
+   "name": "Marauder",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 134)"
   },
   "176": {
-   "name": "Villager (red)",
+   "name": "Marron",
    "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 135)"
   },
   "177": {
-   "name": "Monk (bald)",
+   "name": "Master Roshi",
    "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 136)"
   },
   "178": {
-   "name": "Bomber (gold)",
+   "name": "Mechanoid",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 138)"
   },
   "179": {
-   "name": "Bomb (silver)",
+   "name": "Mechanoid (ball)",
    "category": "effect",
-   "confidence": "low",
-   "anim_set": "npc"
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 139)"
   },
   "180": {
-   "name": "Mage (blue)",
+   "name": "Mega Cyborg",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 140)"
   },
   "181": {
-   "name": "Bomber (green)",
+   "name": "Mercenary",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 141)"
   },
   "182": {
-   "name": "Death Machine (grey)",
+   "name": "Metal Hulk",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 142)"
   },
   "183": {
-   "name": "Villager",
+   "name": "Monk",
    "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 143)"
   },
   "184": {
-   "name": "Villager (2)",
+   "name": "Mr. Popo",
    "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 144)"
   },
   "185": {
-   "name": "Villager (3)",
+   "name": "Mrs. Brief",
    "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 145)"
   },
   "186": {
+   "name": "Mummy",
+   "category": "enemy",
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 146)"
+  },
+  "187": {
    "name": "Mummy (2)",
    "category": "enemy",
    "confidence": "low",
-   "anim_set": "enemy"
-  },
-  "187": {
-   "name": "Mummy (3)",
-   "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "anim_set": "enemy",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "188": {
    "name": "Namekian",
    "category": "npc",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "189": {
    "name": "Namekian (2)",
    "category": "npc",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "190": {
-   "name": "Ninja (purple)",
+   "name": "Ninja",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 147)"
   },
   "191": {
-   "name": "Ninja (purple, 2)",
+   "name": "Ninja (2)",
    "category": "enemy",
    "confidence": "low",
-   "anim_set": "enemy"
+   "anim_set": "enemy",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "192": {
-   "name": "Ninja (green)",
+   "name": "Ninja Boss",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 148)"
   },
   "193": {
-   "name": "Vampire",
+   "name": "Nosferatu",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 149)"
   },
   "194": {
-   "name": "Bat",
+   "name": "Nosferatu (bat)",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 150)"
   },
   "195": {
    "name": "Man (blue)",
    "category": "npc",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "196": {
    "name": "Woman",
    "category": "npc",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "197": {
-   "name": "Blonde Fighter (gold)",
+   "name": "Olibu",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 151)"
   },
   "198": {
    "name": "Blonde Fighter (gold, 2)",
    "category": "enemy",
    "confidence": "low",
-   "anim_set": "enemy"
+   "anim_set": "enemy",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "199": {
-   "name": "Pig",
+   "name": "Oolong",
    "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 152)"
   },
   "200": {
-   "name": "Cyborg (blue)",
+   "name": "Fighter (blue)",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 42)"
   },
   "201": {
-   "name": "Cyborg (blue, 2)",
+   "name": "Fighter (blue, 2)",
    "category": "enemy",
    "confidence": "low",
-   "anim_set": "enemy"
+   "anim_set": "enemy",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "202": {
-   "name": "Cyborg (red)",
+   "name": "Fighter (red)",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 43)"
   },
   "203": {
-   "name": "Cyborg (blue, 3)",
+   "name": "Fighter (blue, 3)",
    "category": "enemy",
    "confidence": "low",
-   "anim_set": "enemy"
+   "anim_set": "enemy",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "204": {
-   "name": "Cyborg (pink)",
+   "name": "Fighter (pink)",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 44)"
   },
   "205": {
-   "name": "Cyborg (blue, 4)",
+   "name": "Fighter (blue, 4)",
    "category": "enemy",
    "confidence": "low",
-   "anim_set": "enemy"
+   "anim_set": "enemy",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "206": {
-   "name": "Cyborg (green)",
+   "name": "Fighter (green)",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 45)"
   },
   "207": {
-   "name": "Cyborg (blue, 5)",
+   "name": "Fighter (blue, 5)",
    "category": "enemy",
    "confidence": "low",
-   "anim_set": "enemy"
+   "anim_set": "enemy",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "208": {
    "name": "Ox King",
    "category": "npc",
-   "confidence": "medium",
-   "anim_set": "npc"
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 153)"
   },
   "209": {
    "name": "Boy (black hair)",
    "category": "npc",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "210": {
    "name": "Ghost Puff (pink, 2)",
    "category": "enemy",
    "confidence": "low",
-   "anim_set": "enemy"
+   "anim_set": "enemy",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "211": {
-   "name": "Ghost (pink)",
+   "name": "Phantom",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 154)"
   },
   "212": {
-   "name": "Gingerbread Golem",
+   "name": "Pharoah",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 155, Capsule Corp database row 201)"
   },
   "213": {
    "name": "Piccolo",
    "category": "player",
-   "confidence": "medium",
-   "anim_set": "fighter"
+   "confidence": "high",
+   "anim_set": "fighter",
+   "notes": "name: game text (playable form 49)"
   },
   "214": {
-   "name": "Child",
+   "name": "Emperor Pilaf",
    "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 158)"
   },
   "215": {
-   "name": "Mini-Fighter (green)",
+   "name": "Pikkon",
    "category": "player",
-   "confidence": "low",
-   "anim_set": "fighter"
+   "confidence": "high",
+   "anim_set": "fighter",
+   "notes": "name: game text (playable form 50)"
   },
   "216": {
    "name": "Mini-Fighter (green, 2)",
    "category": "player",
    "confidence": "low",
-   "anim_set": "fighter"
+   "anim_set": "fighter",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "217": {
-   "name": "Sumo Fighter",
+   "name": "Pintar",
    "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 159)"
   },
   "218": {
    "name": "Lantern",
    "category": "npc",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "219": {
    "name": "Ghost Puff (cyan)",
    "category": "enemy",
    "confidence": "low",
-   "anim_set": "enemy"
+   "anim_set": "enemy",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "220": {
-   "name": "Ghost (cyan)",
+   "name": "Poltergeist",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 160)"
   },
   "221": {
-   "name": "Bomber (orange)",
+   "name": "Power Mechandoid",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 161)"
   },
   "222": {
-   "name": "Bomb (orange)",
+   "name": "Power Mechandoid (ball)",
    "category": "effect",
-   "confidence": "low",
-   "anim_set": "npc"
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 162)"
   },
   "223": {
-   "name": "Villager (purple)",
+   "name": "Village Priest",
    "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 163)"
   },
   "224": {
-   "name": "Villager (cyan)",
+   "name": "Puar",
    "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 164)"
   },
   "225": {
-   "name": "Knight Destroyer",
-   "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "name": "PuiPui",
+   "category": "boss",
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 165)"
   },
   "226": {
-   "name": "Warrior (orange)",
+   "name": "Rapscallion",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 166, Capsule Corp database row 25)"
   },
   "227": {
-   "name": "Man (blue hat)",
+   "name": "Musaka",
    "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 167)"
   },
   "228": {
-   "name": "Shinobi (black)",
+   "name": "Ronin",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 168)"
   },
   "229": {
-   "name": "Shinobi (red)",
+   "name": "Samurai",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 169)"
   },
   "230": {
-   "name": "Old Man (2)",
+   "name": "Scientist",
    "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 170)"
   },
   "231": {
-   "name": "Death Machine (blue, 2)",
+   "name": "Shadow Colossus",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 171)"
   },
   "232": {
-   "name": "Ninja (black)",
+   "name": "Shadow Warrior",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 172)"
   },
   "233": {
-   "name": "Blonde Woman",
+   "name": "Sharpner",
    "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 173)"
   },
   "234": {
-   "name": "Ninja (red)",
+   "name": "Shinobi",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 174)"
   },
   "235": {
-   "name": "Golem (gold)",
+   "name": "Shogun",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 175)"
   },
   "236": {
-   "name": "Demon (blue)",
+   "name": "Skeleton",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 176)"
   },
   "237": {
    "name": "Gunman (2)",
    "category": "enemy",
    "confidence": "low",
-   "anim_set": "enemy"
+   "anim_set": "enemy",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "238": {
-   "name": "Thug (red)",
+   "name": "Sniper",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 177)"
   },
   "239": {
    "name": "Boy (green, 2)",
    "category": "npc",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "240": {
-   "name": "Wisp",
+   "name": "Soul",
    "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 178)"
   },
   "241": {
    "name": "Pink Creature",
    "category": "npc",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "242": {
    "name": "Ice Crystal",
    "category": "effect",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "243": {
-   "name": "Spopovich (powered)",
+   "name": "Spopovich",
    "category": "boss",
-   "confidence": "low",
-   "anim_set": "fighter"
+   "confidence": "high",
+   "anim_set": "fighter",
+   "notes": "name: game text (Capsule Corp database row 179, Capsule Corp database row 180, Capsule Corp database row 181, Capsule Corp database row 182)"
   },
   "244": {
    "name": "Blue Crystal",
    "category": "effect",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "245": {
-   "name": "Bio Mech (silver)",
+   "name": "Super Bio Mech",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 183)"
   },
   "246": {
-   "name": "Imp (purple, 2)",
+   "name": "Super Majin Fighter",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 192)"
   },
   "247": {
-   "name": "Golden Soldier",
+   "name": "Super Majin Soldier",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 193, Capsule Corp database row 196)"
   },
   "248": {
-   "name": "Shield Soldier (gold)",
+   "name": "Super Shield Soldier",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 194)"
   },
   "249": {
-   "name": "Imp Fighter",
-   "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "name": "Supreme Kai",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 197)"
   },
   "250": {
-   "name": "Grey Vault Door",
-   "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "name": "Tank",
+   "category": "enemy",
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 198)"
   },
   "251": {
    "name": "Goblin",
    "category": "npc",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "252": {
    "name": "Man (brown)",
    "category": "npc",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive; the scouter calls this character \"Human\"; the scouter calls this character \"Human\""
   },
   "253": {
    "name": "Man (blue, 2)",
    "category": "npc",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "254": {
-   "name": "Thug (\"HUGE\", 2)",
+   "name": "Thug",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 199)"
   },
   "255": {
-   "name": "Bald Monk",
-   "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "name": "Tien",
+   "category": "player",
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (playable form 51)"
   },
   "256": {
    "name": "Flame",
    "category": "effect",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "257": {
    "name": "Flame (2)",
    "category": "effect",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "258": {
    "name": "Flame (3)",
    "category": "effect",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "259": {
    "name": "Flame (4)",
    "category": "effect",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "260": {
    "name": "Trunks",
    "category": "player",
-   "confidence": "medium",
-   "anim_set": "fighter"
+   "confidence": "high",
+   "anim_set": "fighter",
+   "notes": "name: game text (playable form 21, playable form 24)"
   },
   "261": {
-   "name": "Super Saiyan Trunks",
+   "name": "SS Trunks",
    "category": "player",
-   "confidence": "medium",
-   "anim_set": "fighter"
+   "confidence": "high",
+   "anim_set": "fighter",
+   "notes": "name: game text (playable form 22, playable form 25)"
   },
   "262": {
-   "name": "Trunks (NPC)",
-   "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "name": "Trunks (form 23)",
+   "category": "player",
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (playable form 23)"
   },
   "263": {
-   "name": "Bio Mech (orange)",
+   "name": "Ultra Bio Mech",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 205)"
   },
   "264": {
    "name": "Uub",
    "category": "player",
-   "confidence": "low",
-   "anim_set": "fighter"
+   "confidence": "high",
+   "anim_set": "fighter",
+   "notes": "name: game text (enemy type 0x84)"
   },
   "265": {
-   "name": "Vampire (blue)",
+   "name": "Vampire",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 206)"
   },
   "266": {
    "name": "Vampire (green)",
    "category": "enemy",
    "confidence": "low",
-   "anim_set": "enemy"
+   "anim_set": "enemy",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "267": {
-   "name": "Bat (blue)",
+   "name": "Vampire (bat)",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 207)"
   },
   "268": {
    "name": "Bat (green)",
    "category": "enemy",
    "confidence": "low",
-   "anim_set": "enemy"
+   "anim_set": "enemy",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "269": {
    "name": "Villager (blonde)",
    "category": "npc",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "270": {
    "name": "Vegeta",
    "category": "player",
    "confidence": "high",
-   "anim_set": "fighter"
+   "anim_set": "fighter",
+   "notes": "name: game text (playable form 26)"
   },
   "271": {
    "name": "Vegeta (halo)",
    "category": "player",
    "confidence": "high",
    "anim_set": "fighter",
-   "notes": "same animations as sprite 270 plus the halo attachment table (animation slot 0)"
+   "notes": "name: game text (playable form 27); same animations as sprite 270 plus the halo attachment table (animation slot 0)"
   },
   "272": {
    "name": "Vegeta (NPC)",
    "category": "npc",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "273": {
-   "name": "Super Saiyan Vegeta",
-   "category": "player",
-   "confidence": "high",
-   "anim_set": "fighter"
-  },
-  "274": {
-   "name": "Super Saiyan Vegeta (halo)",
+   "name": "SS Vegeta",
    "category": "player",
    "confidence": "high",
    "anim_set": "fighter",
-   "notes": "same animations as sprite 273 plus the halo attachment table (animation slot 0)"
+   "notes": "name: game text (playable form 28, playable form 30)"
+  },
+  "274": {
+   "name": "SS Vegeta (halo)",
+   "category": "player",
+   "confidence": "high",
+   "anim_set": "fighter",
+   "notes": "name: game text (playable form 29); same animations as sprite 273 plus the halo attachment table (animation slot 0)"
   },
   "275": {
    "name": "Vegito",
    "category": "player",
-   "confidence": "medium",
-   "anim_set": "fighter"
+   "confidence": "high",
+   "anim_set": "fighter",
+   "notes": "name: game text (playable form 39)"
   },
   "276": {
-   "name": "Super Saiyan Vegito",
+   "name": "SS Vegito",
    "category": "player",
-   "confidence": "medium",
-   "anim_set": "fighter"
+   "confidence": "high",
+   "anim_set": "fighter",
+   "notes": "name: game text (playable form 40)"
   },
   "277": {
-   "name": "Videl (NPC, 2)",
+   "name": "Videl (2)",
    "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 215)"
   },
   "278": {
    "name": "Videl",
    "category": "player",
-   "confidence": "medium",
-   "anim_set": "fighter"
+   "confidence": "high",
+   "anim_set": "fighter",
+   "notes": "name: game text (playable form 52)"
   },
   "279": {
-   "name": "Vampire (red)",
+   "name": "Vlad",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 216)"
   },
   "280": {
-   "name": "Bat (red)",
+   "name": "Vlad (bat)",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 217)"
   },
   "281": {
    "name": "Golden Orb",
    "category": "item",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "282": {
-   "name": "Green Vault Door",
-   "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "name": "War Machine",
+   "category": "enemy",
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 218)"
   },
   "283": {
-   "name": "Clown (2)",
+   "name": "West Kai",
    "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 219)"
   },
   "284": {
    "name": "Girl (pink)",
    "category": "npc",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "285": {
    "name": "Girl (green)",
    "category": "npc",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "286": {
    "name": "Boy (blonde)",
    "category": "npc",
    "confidence": "low",
-   "anim_set": "npc"
+   "anim_set": "npc",
+   "notes": "name: descriptive (no game name for this sprite)"
   },
   "287": {
-   "name": "Orb (red eye)",
-   "category": "effect",
-   "confidence": "low",
-   "anim_set": "npc"
+   "name": "Worm Head",
+   "category": "enemy",
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 221)"
   },
   "288": {
-   "name": "Orb (white)",
+   "name": "Worm Body",
    "category": "effect",
-   "confidence": "low",
-   "anim_set": "npc"
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 220)"
   },
   "289": {
-   "name": "Orb (small)",
+   "name": "Worm Tail",
    "category": "effect",
-   "confidence": "low",
-   "anim_set": "npc"
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 222)"
   },
   "290": {
-   "name": "Yamcha?",
+   "name": "Yajirobe",
    "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (Capsule Corp database row 223)"
   },
   "291": {
    "name": "Yakon",
    "category": "boss",
-   "confidence": "medium",
-   "anim_set": "fighter"
+   "confidence": "high",
+   "anim_set": "fighter",
+   "notes": "name: game text (Capsule Corp database row 224)"
   },
   "292": {
    "name": "Mini-Yakon",
    "category": "enemy",
-   "confidence": "medium",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 225)"
   },
   "293": {
-   "name": "Man (orange)",
-   "category": "npc",
-   "confidence": "low",
-   "anim_set": "npc"
+   "name": "Yamcha",
+   "category": "player",
+   "confidence": "high",
+   "anim_set": "npc",
+   "notes": "name: game text (playable form 53)"
   },
   "294": {
-   "name": "Bald Fighter",
+   "name": "Yamu",
    "category": "boss",
-   "confidence": "low",
-   "anim_set": "fighter"
+   "confidence": "high",
+   "anim_set": "fighter",
+   "notes": "name: game text (Capsule Corp database row 227, Capsule Corp database row 228)"
   },
   "295": {
-   "name": "Zombie (blue)",
-   "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "name": "Yemma's Assistant",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 229)"
   },
   "296": {
-   "name": "Zombie (blue, 2)",
-   "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "name": "Yemma's Assistant (2)",
+   "category": "npc",
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 230)"
   },
   "297": {
-   "name": "Imp (green)",
+   "name": "Zombie",
    "category": "enemy",
-   "confidence": "low",
-   "anim_set": "enemy"
+   "confidence": "high",
+   "anim_set": "enemy",
+   "notes": "name: game text (Capsule Corp database row 231)"
   }
  },
  "portraits": {
   "0": {
    "name": "Alien Announcer",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "1": {
    "name": "Android 18",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "2": {
    "name": "Announcer",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "3": {
    "name": "Baba",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "4": {
    "name": "Babidi",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "5": {
    "name": "Bee (dog)",
@@ -1973,11 +2265,13 @@
   },
   "8": {
    "name": "Broly",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "9": {
    "name": "Bulma",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "10": {
    "name": "Bald elder",
@@ -1985,35 +2279,42 @@
   },
   "11": {
    "name": "Chiaotzu",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "12": {
    "name": "Chi-Chi",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "13": {
    "name": "Policeman",
    "confidence": "medium"
   },
   "14": {
-   "name": "Mohawk fighter (green)",
-   "confidence": "medium"
+   "name": "Criminal",
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "15": {
-   "name": "Mohawk fighter (orange)",
-   "confidence": "medium"
+   "name": "Criminal (2)",
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "16": {
    "name": "Dabura",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "17": {
    "name": "Dende",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "18": {
    "name": "Dr. Brief",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "19": {
    "name": "Round creature",
@@ -2025,7 +2326,8 @@
   },
   "21": {
    "name": "Erasa",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "22": {
    "name": "Villager woman (straw hat)",
@@ -2036,28 +2338,108 @@
    "confidence": "medium"
   },
   "24": {
-   "name": "Ornate demon",
-   "confidence": "medium"
+   "name": "Dabura",
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "25": {
    "name": "Girl",
    "confidence": "medium"
   },
   "26": {
-   "name": "Super Saiyan Gogeta",
-   "confidence": "medium"
+   "name": "SS Gogeta",
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "27": {
-   "name": "Super Saiyan Gogeta (2)",
+   "name": "SS Gogeta (2)",
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
+  },
+  "28": {
+   "name": "Gohan",
    "confidence": "medium"
+  },
+  "29": {
+   "name": "Gohan",
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
+  },
+  "30": {
+   "name": "Gohan",
+   "confidence": "medium"
+  },
+  "31": {
+   "name": "Gohan",
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
+  },
+  "32": {
+   "name": "Gohan",
+   "confidence": "medium"
+  },
+  "33": {
+   "name": "Gohan",
+   "confidence": "medium"
+  },
+  "34": {
+   "name": "Gohan",
+   "confidence": "medium"
+  },
+  "35": {
+   "name": "Gohan",
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
+  },
+  "36": {
+   "name": "Gohan",
+   "confidence": "medium"
+  },
+  "37": {
+   "name": "Gohan",
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
+  },
+  "38": {
+   "name": "Gohan",
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "39": {
    "name": "Great Saiyaman",
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
+  },
+  "40": {
+   "name": "Gohan",
+   "confidence": "medium"
+  },
+  "41": {
+   "name": "Gohan",
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
+  },
+  "42": {
+   "name": "Gohan",
+   "confidence": "medium"
+  },
+  "43": {
+   "name": "SS Gohan",
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
+  },
+  "44": {
+   "name": "Super Saiyan Gohan",
+   "confidence": "medium"
+  },
+  "45": {
+   "name": "Super Saiyan Gohan",
    "confidence": "medium"
   },
   "47": {
    "name": "Goku",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "48": {
    "name": "Goku (2)",
@@ -2065,7 +2447,8 @@
   },
   "49": {
    "name": "Goku (3)",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "50": {
    "name": "Goku (4)",
@@ -2076,40 +2459,52 @@
    "confidence": "medium"
   },
   "52": {
-   "name": "Super Saiyan Goku (2)",
-   "confidence": "medium"
+   "name": "SS Goku (2)",
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "53": {
-   "name": "Super Saiyan 3 Goku",
-   "confidence": "medium"
+   "name": "SS3 Goku",
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "54": {
    "name": "Goten",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "55": {
    "name": "Goten (2)",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "56": {
    "name": "Goten (3)",
    "confidence": "medium"
   },
   "57": {
-   "name": "Super Saiyan Goten",
-   "confidence": "medium"
+   "name": "SS Goten",
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "58": {
-   "name": "Super Saiyan Goten (2)",
+   "name": "SS Goten (2)",
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
+  },
+  "59": {
+   "name": "Gohan (alt)",
    "confidence": "medium"
   },
   "60": {
    "name": "Gotenks",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "61": {
    "name": "Gotenks (2)",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "62": {
    "name": "Gotenks (3)",
@@ -2120,16 +2515,19 @@
    "confidence": "medium"
   },
   "64": {
-   "name": "Super Saiyan Gotenks (2)",
-   "confidence": "medium"
+   "name": "SS Gotenks (2)",
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "65": {
-   "name": "Super Saiyan 3 Gotenks",
-   "confidence": "medium"
+   "name": "SS3 Gotenks",
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "66": {
    "name": "Grand Kai",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "67": {
    "name": "Grand Kai (2)",
@@ -2137,15 +2535,18 @@
   },
   "68": {
    "name": "Hercule",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "69": {
    "name": "Mayor",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "70": {
-   "name": "Jewel",
-   "confidence": "medium"
+   "name": "Idasa",
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "71": {
    "name": "Woman (glasses)",
@@ -2153,51 +2554,63 @@
   },
   "72": {
    "name": "Janemba",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "73": {
    "name": "Super Janemba",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "74": {
-   "name": "Android 18 (2)",
-   "confidence": "medium"
+   "name": "Jewl",
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "75": {
    "name": "Kibito",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "76": {
-   "name": "Supreme Kai",
-   "confidence": "medium"
+   "name": "Kibitoshin",
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "77": {
    "name": "Kid Buu",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "78": {
    "name": "Killa",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "79": {
    "name": "King Kai",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "80": {
-   "name": "Ox King",
-   "confidence": "medium"
+   "name": "King Yemma",
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "81": {
    "name": "Korin",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "82": {
    "name": "Krillin",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "83": {
    "name": "Majin Buu (angry)",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "84": {
    "name": "Majin Buu",
@@ -2217,23 +2630,28 @@
   },
   "88": {
    "name": "Marron",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "89": {
    "name": "Master Roshi",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "90": {
-   "name": "Man (glasses, 2)",
-   "confidence": "medium"
+   "name": "Monk",
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "91": {
    "name": "Mr. Popo",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "92": {
    "name": "Mrs. Brief",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "93": {
    "name": "Namekian",
@@ -2249,31 +2667,38 @@
   },
   "96": {
    "name": "Olibu",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "97": {
    "name": "Oolong",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "98": {
    "name": "Other World fighter",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "99": {
    "name": "Other World fighter (2)",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "100": {
    "name": "Other World fighter (3)",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "101": {
    "name": "Other World fighter (4)",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "102": {
-   "name": "Viking",
-   "confidence": "medium"
+   "name": "Ox King",
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "103": {
    "name": "Child",
@@ -2281,43 +2706,52 @@
   },
   "104": {
    "name": "Piccolo",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "105": {
    "name": "Pikkon",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "106": {
    "name": "Emperor Pilaf",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "107": {
    "name": "Pintar?",
-   "confidence": "low"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "108": {
    "name": "Dragon monster",
    "confidence": "medium"
   },
   "109": {
-   "name": "Fighter (headband)",
-   "confidence": "medium"
+   "name": "Village Priest",
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "110": {
    "name": "Puar",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "111": {
-   "name": "Pui Pui",
-   "confidence": "medium"
+   "name": "PuiPui",
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "112": {
-   "name": "Village Priest",
-   "confidence": "medium"
+   "name": "Scientist",
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "113": {
    "name": "Sharpner",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "114": {
    "name": "Shenron",
@@ -2328,8 +2762,9 @@
    "confidence": "medium"
   },
   "116": {
-   "name": "Flying Nimbus",
-   "confidence": "medium"
+   "name": "Soul",
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "117": {
    "name": "Round pink figure",
@@ -2337,11 +2772,13 @@
   },
   "118": {
    "name": "Spopovich",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "119": {
    "name": "Super Buu",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "120": {
    "name": "Super Buu (roar)",
@@ -2349,7 +2786,8 @@
   },
   "121": {
    "name": "Super Buu (2)",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "122": {
    "name": "Super Buu (3)",
@@ -2357,7 +2795,8 @@
   },
   "123": {
    "name": "Supreme Kai (2)",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "124": {
    "name": "Horned fighter",
@@ -2373,15 +2812,18 @@
   },
   "127": {
    "name": "Tien",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "128": {
    "name": "Trunks",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "129": {
    "name": "Trunks (2)",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "130": {
    "name": "Trunks (3)",
@@ -2392,12 +2834,14 @@
    "confidence": "medium"
   },
   "132": {
-   "name": "Super Saiyan Trunks (2)",
-   "confidence": "medium"
+   "name": "SS Trunks (2)",
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "133": {
    "name": "Trunks (4)",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "134": {
    "name": "Uub",
@@ -2409,19 +2853,22 @@
   },
   "136": {
    "name": "Vegeta",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "137": {
    "name": "Vegeta (2)",
    "confidence": "medium"
   },
   "138": {
-   "name": "Super Saiyan Vegeta",
-   "confidence": "medium"
+   "name": "SS Vegeta",
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "139": {
    "name": "Vegeta (3)",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "140": {
    "name": "Majin Vegeta",
@@ -2429,27 +2876,33 @@
   },
   "141": {
    "name": "Majin Vegeta (2)",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "142": {
    "name": "Vegito",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "143": {
-   "name": "Super Saiyan Vegito",
-   "confidence": "medium"
+   "name": "SS Vegito",
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "144": {
    "name": "Videl",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "145": {
    "name": "Videl (short hair)",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "146": {
    "name": "West Kai?",
-   "confidence": "low"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "147": {
    "name": "Woman",
@@ -2461,99 +2914,270 @@
   },
   "149": {
    "name": "Yajirobe",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "150": {
    "name": "Yakon?",
-   "confidence": "low"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "151": {
    "name": "Yamcha",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "152": {
-   "name": "Spopovich (angry)",
-   "confidence": "medium"
+   "name": "Yamu",
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "153": {
    "name": "Yemma's Assistant",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
   },
   "154": {
    "name": "Yemma's Assistant (2)",
-   "confidence": "medium"
+   "confidence": "high",
+   "source": "Capsule Corp database / playable form portrait"
+  }
+ },
+ "effects": {
+  "086FD9D0": {
+   "name": "Smoke puff",
+   "confidence": "high",
+   "notes": "generic effect 0x0802A81C, 4 records, rate 0x1000 + rand(0x1000) at most sites"
   },
-  "28": {
-   "name": "Gohan",
-   "confidence": "medium"
+  "08712FDC": {
+   "name": "Explosion",
+   "confidence": "high",
+   "notes": "generic effect 0x0802A81C, 4 records; rate 0x2000 (projectiles) or 0x1000 + rand(0x1000) (0x0801952C: deaths, Big Bang, Dragon Fist, beams)"
   },
-  "29": {
-   "name": "Gohan",
-   "confidence": "medium"
+  "0871370C": {
+   "name": "Energy Blast",
+   "confidence": "high",
+   "notes": "ki blast 0x080197B4 (player and enemies): records dir*4 + f (f = t >> 3, then 2/3), record 16 = spark shown 16 ticks at a wall / hit"
   },
-  "30": {
-   "name": "Gohan",
-   "confidence": "medium"
+  "0871E630": {
+   "name": "Tank shell",
+   "confidence": "high",
+   "notes": "class 0x0801C900: records 0-3 by direction, 4-6 smoke trail (rate 0x2AAA every 4 ticks)"
   },
-  "31": {
-   "name": "Gohan",
-   "confidence": "medium"
+  "0871E984": {
+   "name": "Bomb",
+   "confidence": "high",
+   "notes": "class 0x0801C6E4 (Bomber, Grenadier, Mad Bomber): k = (t >> 2) & 3, 3 -> 1"
   },
-  "32": {
-   "name": "Gohan",
-   "confidence": "medium"
+  "087202E8": {
+   "name": "Energy shield",
+   "confidence": "high",
+   "notes": "R+B shield 0x0801DFE0: record = c >> 3 (grow 0-2, loop 3-6, shrink), drawn on even ticks"
   },
-  "33": {
-   "name": "Gohan",
-   "confidence": "medium"
+  "08721164": {
+   "name": "Beam charge sparkles",
+   "confidence": "high",
+   "notes": "state-0 sparkle of the beam object: 0-2 Kamekameha, 3-5 Kamehameha / Electric / Big Bang Kamehameha, 6-8 Banshee Blast, 9-11 Masenkoha Lv1-2, 12-14 Lv3 beams / Masenkoha Lv3 / Flame Kamehameha / Super Buu ball"
   },
-  "34": {
-   "name": "Gohan",
-   "confidence": "medium"
+  "0872509C": {
+   "name": "Masenkoha cursor",
+   "confidence": "high",
+   "notes": "cursor 0x08021594, centred 16x16"
   },
-  "35": {
-   "name": "Gohan",
-   "confidence": "medium"
+  "0872A5DC": {
+   "name": "Masenkoha blast",
+   "confidence": "high",
+   "notes": "Lv1 records 0-3, Lv2 4-8, Lv3 / Super Buu ball 9-14; 4 ticks each"
   },
-  "36": {
-   "name": "Gohan",
-   "confidence": "medium"
+  "0872BF04": {
+   "name": "Instant Transmission markers",
+   "confidence": "high",
+   "notes": "groups of 4 (rec = group + ((t >> 2) & 3)): 0-3 cursor, 4-7 target, 8-11 unused; drawn twice (normal + vertically flipped) as a 32x32 ring"
   },
-  "37": {
-   "name": "Gohan",
-   "confidence": "medium"
+  "0872D6C4": {
+   "name": "Flame (down)",
+   "confidence": "high",
+   "notes": "records 1-4 of the down flame; full table fx_0872d6b8"
   },
-  "38": {
-   "name": "Gohan",
-   "confidence": "medium"
+  "0872D700": {
+   "name": "Flame (up)",
+   "confidence": "high",
+   "notes": "records 1-4 of the up flame; full table fx_0872d6b8"
   },
-  "40": {
-   "name": "Gohan",
-   "confidence": "medium"
+  "0872D73C": {
+   "name": "Flame (left)",
+   "confidence": "high",
+   "notes": "records 1-4 of the left flame; full table fx_0872d6b8"
   },
-  "41": {
-   "name": "Gohan",
-   "confidence": "medium"
+  "0872D778": {
+   "name": "Flame (right)",
+   "confidence": "high",
+   "notes": "records 1-4 of the right flame; full table fx_0872d6b8"
   },
-  "42": {
-   "name": "Gohan",
-   "confidence": "medium"
+  "0874E614": {
+   "name": "Rifle bullet",
+   "confidence": "high",
+   "notes": "class 0x080276A8 (Hessian, Marauder, Mercenary): records 0-3 by direction, 4-6 smoke trail"
   },
-  "43": {
-   "name": "Super Saiyan Gohan",
-   "confidence": "medium"
+  "0874E968": {
+   "name": "Gun bullet",
+   "confidence": "high",
+   "notes": "class 0x080274B4 (Assassin, Gunman, Sniper): record dir + 4f, f = 0,1,2,1 every 4 ticks"
   },
-  "44": {
-   "name": "Super Saiyan Gohan",
-   "confidence": "medium"
+  "0874ED7C": {
+   "name": "Candy beam",
+   "confidence": "high",
+   "notes": "Majin Buu 0x080286D4: 5 records per direction (muzzle 0/1, body 2, head 3/4)"
   },
-  "45": {
-   "name": "Super Saiyan Gohan",
-   "confidence": "medium"
+  "0874EFEC": {
+   "name": "Stretch arm",
+   "confidence": "high",
+   "notes": "Majin Buu / Super Buu 0x08028C04: 2 records per direction (arm, fist)"
   },
-  "59": {
-   "name": "Gohan (alt)",
-   "confidence": "medium"
+  "087501EC": {
+   "name": "Burning Attack",
+   "confidence": "high",
+   "notes": "class 0x08029384: records (t >> 3) & 1 in flight, 2/3 at the end (16 ticks)"
+  },
+  "0875043C": {
+   "name": "Energy wave",
+   "confidence": "high",
+   "notes": "enemy wave 0x0802A2EC: 3 records per direction (muzzle 0/1, body 2)"
+  },
+  "087520D4": {
+   "name": "Super Saiyan swirl",
+   "confidence": "high",
+   "notes": "transform effect when script flag 0x03002BB0 is set: 7 records, rate 0xC88"
+  },
+  "08752D28": {
+   "name": "Super Saiyan aura",
+   "confidence": "high",
+   "notes": "transform aura: 3 records looping at rate 0x4000"
+  },
+  "08754A1C": {
+   "name": "Shuriken",
+   "confidence": "high",
+   "notes": "class 0x0802C790 (Ninja, Shadow Warrior, Shinobi): record (t >> 3) & 1"
+  },
+  "087568B4": {
+   "name": "Flame Kamehameha",
+   "confidence": "high",
+   "notes": "links 0x0802DB6C: 7 records per direction (0x54 bytes)"
+  },
+  "0875723C": {
+   "name": "Mummy bandage (diagonal)",
+   "confidence": "high",
+   "notes": "records 6-11 of fx_087571f4"
+  },
+  "087579B8": {
+   "name": "Dabura spit",
+   "confidence": "high",
+   "notes": "class 0x0802E444: 5 aim sectors x 2 frames"
+  },
+  "08759620": {
+   "name": "Mini-Yakon lunge",
+   "confidence": "high",
+   "notes": "object around 0x08035670 (vtable 0x0804C098)"
+  },
+  "0875A6A8": {
+   "name": "Super Janemba energy wave",
+   "confidence": "high",
+   "notes": "class 0x080359D4: record = direction"
+  },
+  "0875F7AC": {
+   "name": "Broly floor rock",
+   "confidence": "high",
+   "notes": "class 0x08036A44: 0 intact, 1 cracked, 2 broken, 3-5 regrowing"
+  },
+  "0875FE2C": {
+   "name": "Final Flash (weak)",
+   "confidence": "high",
+   "notes": "class 0x08036FA2 table 0: start 2*dir, body 2*dir + 1"
+  },
+  "08760A8C": {
+   "name": "Final Flash (medium)",
+   "confidence": "high",
+   "notes": "class 0x08036FA2 table 1"
+  },
+  "087616EC": {
+   "name": "Final Flash",
+   "confidence": "high",
+   "notes": "class 0x08036FA2 table 2 (player Lv3, Majin Vegeta, Yakon)"
+  },
+  "08762270": {
+   "name": "Energy Punch aura",
+   "confidence": "high",
+   "notes": "Energy Punch Lv3 record object: 3 records per direction"
+  },
+  "08764E00": {
+   "name": "Big Bang ball (down)",
+   "confidence": "high",
+   "notes": "ball 0x08037480 Lv1/Lv2: record f (0..6)"
+  },
+  "08764E78": {
+   "name": "Big Bang ball (up)",
+   "confidence": "high",
+   "notes": "ball 0x08037480 Lv1/Lv2"
+  },
+  "08764EF0": {
+   "name": "Big Bang ball (left)",
+   "confidence": "high",
+   "notes": "ball 0x08037480 Lv1/Lv2"
+  },
+  "08764F68": {
+   "name": "Big Bang ball (right)",
+   "confidence": "high",
+   "notes": "ball 0x08037480 Lv1/Lv2"
+  },
+  "0876AAE0": {
+   "name": "Big Bang ball (Lv3)",
+   "confidence": "high",
+   "notes": "ball 0x08037480 Lv3: record dir*10 + f (7..9 cycling)"
+  },
+  "0876CBD8": {
+   "name": "Energy Sword",
+   "confidence": "high",
+   "notes": "class 0x08037C1C: charge 0-4 (right 5-9), slash 10-17"
+  },
+  "0876DFF8": {
+   "name": "Grapple arm",
+   "confidence": "high",
+   "notes": "Bio Mech 0x08037EA8: 4 records per direction (chain, open hand, closed back / front)"
+  },
+  "0876E264": {
+   "name": "Ultra Volleyball Attack wave",
+   "confidence": "high",
+   "notes": "class 0x080383D4: 3 records per direction (tail, body, head)"
+  },
+  "08770CF4": {
+   "name": "Big Bang Kamehameha ball + flare (down)",
+   "confidence": "high",
+   "notes": "records 0-1 ball, 2-5 flare (down)"
+  },
+  "08770D48": {
+   "name": "Big Bang Kamehameha flare (up)",
+   "confidence": "high",
+   "notes": "flare records + mirror piece"
+  },
+  "08770D84": {
+   "name": "Big Bang Kamehameha flare (left)",
+   "confidence": "high",
+   "notes": "flare records + mirror piece"
+  },
+  "08770DC0": {
+   "name": "Big Bang Kamehameha flare (right)",
+   "confidence": "high",
+   "notes": "flare records + mirror piece"
+  },
+  "0877AD10": {
+   "name": "Dragon Fist Explosion",
+   "confidence": "high",
+   "notes": "segment chain 0x08038AD8: 4 records per direction (body, head, head dying 2-3)"
+  },
+  "0877B4F8": {
+   "name": "Red beam charge",
+   "confidence": "high",
+   "notes": "charge sparkles of the red story beam 0x0877C41C"
   }
  }
 }

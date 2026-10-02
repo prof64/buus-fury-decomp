@@ -93,3 +93,9 @@ Not found: no SFX for block, enemy KO or player death (none fired in those trace
 - `director.ts` — per battle: arena music = the arena map's song (`arena_music` in the catalog), or the scripted
   battle theme (song 44, used by the story's boss-fight scripts) when a phase has a boss; low-HP beep; pause sound.
 - Dashboard: `#/g/buu/audio` lists every track and effect with gapless loop playback.
+- Exact driver calls: the Buu player emits `audioEvent('sfx' | 'sfx_stop' | 'song', {id, vol})` at the frames the
+  game calls PlaySfx `0x0803E378` / StopSfx `0x0803E302` / PlaySong `0x0803F110` (dash step 25 vol 32, dash into a
+  wall 59, swing 50/51, melee hit 48/49, aura 54, beam stop 32 + end 33, KO -> song 8 after 200 frames, HUD
+  low-HP beep 41 vol 32 every > 60 frames while HP <= maxHP / 5); the director plays one voice per call and a stop
+  ends every voice of the id. Verified by the lockstep traces (`tools/battle/LOCKSTEP.md`). Battle theme 44 only
+  for the arenas in `boss_music_types` (scripts that play it), else the map's song.

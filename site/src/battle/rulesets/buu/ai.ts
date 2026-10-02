@@ -14,6 +14,8 @@ import { PathMover } from './path'
 import {
   Bomb, CandyBeam, DarkSphere, EnergyWave, Flame, FullBeam, GrappleArm, GrowBeam, Rock, SJWave, StraightShot, StretchArm, SuperBall, VEL, kiBlast,
 } from './projectiles'
+import { BEAM_POS, BeamCharge, BeamGfx } from './fx'
+import { FINAL_FLASH_TABLES } from './skillfx'
 
 export const NODE_NOTES: Record<string, string> = {
   IfPlayerInZone: 'sniper zone rectangle not decoded: true within 160 px',
@@ -884,7 +886,7 @@ export function create(n: AiNodeJ, c: AiController): RNode {
       return timed(n, c, [3], 32, {
         16: () => {
           const [mx, my] = e.muzzle(10)
-          e.w.add(kiBlast(e.ctx, e, e.facing, 0, mx << 8, my << 8))
+          e.w.add(kiBlast(e.ctx, e, e.facing, 0, mx << 8, my << 8, undefined, undefined, e.w))
         },
       })
     case 'GunShot':
@@ -953,7 +955,8 @@ export function create(n: AiNodeJ, c: AiController): RNode {
         if (f <= 48) {
           const [mx, my] = e.muzzle(10)
           const [vx, vy] = VEL(e.facing, 1024)
-          e.w.add(new StraightShot(e.ctx, e, e.facing, 0, mx << 8, my << 8, { vx, vy, box: [4, 4, 8, 8], atk: ATK[4], mult: 51, color: ['#ffffff', '#ffd060'], radius: 2, life: 12, explode: false, name: 'barrage' }))
+          // Pikkon's barrage uses the flame class 0x080246B4 (records 0x0872D6B8 + 60*dir + 12*(t >> 2))
+          e.w.add(new StraightShot(e.ctx, e, e.facing, 0, mx << 8, my << 8, { vx, vy, box: [4, 4, 8, 8], atk: ATK[4], mult: 51, color: ['#ffffff', '#ffd060'], radius: 2, life: 12, explode: false, name: 'barrage', fx: { id: 'fx_0872d6b8', frame: (d, t) => 5 * d + Math.min(4, t >> 2) } }))
         }
         return f >= 48
       })
@@ -961,12 +964,13 @@ export function create(n: AiNodeJ, c: AiController): RNode {
       return timed(n, c, [19, 3], 180, {
         24: () => {
           const [mx, my] = e.muzzle(14)
-          e.w.add(new FullBeam(e.ctx, e, e.facing, 0, mx, my, { atk: ATK[11], mult: 328, life: 156 }))
+          // the player's Final Flash class 0x08036FA2 with table 2 (0x087616EC)
+          e.w.add(new FullBeam(e.ctx, e, e.facing, 0, mx, my, { atk: ATK[11], mult: 328, life: 156, table: FINAL_FLASH_TABLES[2] }))
         },
       })
     case 'MouthBeamDown':
       return new Act(n, c, () => e.setAnim(19, true, true), (f) => {
-        if (f === 32) e.w.add(new FullBeam(e.ctx, e, 0, 0, e.px + 32, e.py - 16, { atk: ATK[11], mult: 328, life: 253 }))
+        if (f === 32) e.w.add(new FullBeam(e.ctx, e, 0, 0, e.px + 32, e.py - 16, { atk: ATK[11], mult: 328, life: 253, table: FINAL_FLASH_TABLES[2] }))
         return f >= 301
       })
     case 'KidBuuKamehameha':
@@ -975,14 +979,21 @@ export function create(n: AiNodeJ, c: AiController): RNode {
         e.setAnim(3, true, false)
         a.data.beam = 0
       }, (f, a) => {
+        // the player's beam class with Kamehameha level 0 (0x0871DA68): charge sparkle, then the 0x0871D168 pieces
+        const gfx = new BeamGfx(e.ctx.fx('buu_beam_kamehameha_1'), e.ctx.fx('fx_08721164'))
+        if (f === 1) {
+          const cp = BEAM_POS.kame.charge
+          a.data.charge = e.w.add(new BeamCharge(gfx, () => [e.px + cp[e.facing][0], e.py + cp[e.facing][1]])).id
+        }
         if (f === 8) {
+          for (const x of e.w.entities) if (x.id === a.data.charge) x.removed = true
           const OFF = [[8, -2], [12, -2], [12, -2], [4, -2]]
           const [ox, oy] = OFF[e.facing]
           const [dx, dy] = DIR_VEC[e.facing]
           const b = new GrowBeam(e.ctx, e, e.facing, 0, () => {
             const [cx, cy] = e.center()
             return [cx + ox - 8 + dx * 12, cy + oy + dy * 12]
-          }, { atk: ATK[5], mult: 41, width: 20, speed: 3, maxLen: 80, color: ['#ffe8ff', '#ff70d0'] })
+          }, { atk: ATK[5], mult: 41, width: 20, speed: 3, maxLen: 80, color: ['#ffe8ff', '#ff70d0'], gfx, visPos: BEAM_POS.kame.fire })
           a.data.beam = e.w.add(b).id
           e.beam = b
         }
@@ -992,7 +1003,8 @@ export function create(n: AiNodeJ, c: AiController): RNode {
           return true
         }
         return false
-      }, () => {
+      }, (a) => {
+        for (const x of e.w.entities) if (x.id === a.data.charge) x.removed = true
         e.beam?.stop()
         e.beam = null
       })
@@ -1452,7 +1464,7 @@ export function create(n: AiNodeJ, c: AiController): RNode {
     case 'ShieldBreak':
       return new Instant(n, c, () => {
         e.shield = n.name === 'RaiseShield' ? 1 : n.name === 'LowerShield' ? 0 : -1
-        if (n.name === 'ShieldBreak') e.ctx.puff(e.w, ...e.center())
+        if (n.name === 'ShieldBreak') e.ctx.puffRng(e.w, ...e.center())
       })
     case 'GhostAnimA':
     case 'GhostAnimB':
@@ -1501,12 +1513,13 @@ export function create(n: AiNodeJ, c: AiController): RNode {
     case 'VolleyballTransform':
       return new Instant(n, c, () => {
         e.volleyball = true
-        e.ctx.puff(e.w, ...e.center())
+        // explosion 0x0801952C (prio 0x37) at the box centre: rate 0x1000 + rand(0x1000)
+        e.ctx.explosion(e.w, ...e.center(), 0x1000 + e.w.rng.rand(0x1000, 'volleyball explosion rate'))
       })
     case 'VolleyballRestore':
       return new Instant(n, c, () => {
         e.volleyball = false
-        e.ctx.puff(e.w, ...e.center())
+        e.ctx.explosion(e.w, ...e.center(), 0x1000 + e.w.rng.rand(0x1000, 'volleyball explosion rate'))
       })
     case 'VolleyballLaunch':
       return new Act(n, c, () => undefined, (f) => {

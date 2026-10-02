@@ -18,14 +18,18 @@ interface HpLike {
   maxHp?: number
 }
 
+/** the arena map's own song (area record +0x24): the game keeps the area music for its boss fights, except the few
+ *  story fights whose script plays the battle theme (catalog boss_music_types: Majin Buu at West City, the World
+ *  Tournament ring); a catalog without that list falls back to "any boss" */
 function pickMusic(s: BattleSession, cat: AudioCatalog): number | null {
-  const enemies = s.ruleset.enemies()
-  const isBoss = (id: string) =>
-    id
-      .split(/[+~]/)
-      .filter(Boolean)
-      .some((t) => enemies.find((e) => e.id === t || e.id === '~' + t)?.group === 'Boss')
-  if (s.cfg.phases.some((p) => isBoss(p.enemy)) && cat.boss_music != null) return cat.boss_music
+  const types = cat.boss_music_types
+  const ids = s.cfg.phases.flatMap((p) => p.enemy.split(/[+~]/).filter(Boolean))
+  if (types && cat.boss_music != null) {
+    if (ids.some((t) => types.includes(Number(t.replace(/^t/, ''))))) return cat.boss_music
+  } else {
+    const enemies = s.ruleset.enemies()
+    if (ids.some((t) => enemies.find((e) => e.id === t || e.id === '~' + t)?.group === 'Boss') && cat.boss_music != null) return cat.boss_music
+  }
   return cat.arena_music[s.cfg.arena] ?? null
 }
 
@@ -50,8 +54,37 @@ export function attachBattleAudio(s: BattleSession): () => void {
     void audio.playSfx(game, id, vol, loopKey)
   }
 
+  // exact driver calls (sfx / sfx_stop / song, emitted by the Buu ruleset at the game's call sites): every play
+  // gets its own key so that StopSfx(id) stops every voice of that effect, like the driver (0x0803E302)
+  const voices = new Map<number, string[]>()
+  let serial = 0
+  let lastImpactFrame = -1
+  const exact = (type: AudioEventType, data?: AudioEventData): boolean => {
+    if (!cat) return true
+    if (type === 'sfx' && data?.id != null) {
+      const key = `sfx:${data.id}:${serial++}`
+      const list = (voices.get(data.id) ?? []).slice(-15)
+      list.push(key)
+      voices.set(data.id, list)
+      if (data.id === 48 || data.id === 49) lastImpactFrame = s.world.frame
+      void audio.playSfx(game, data.id, data.vol ?? 64, key)
+      return true
+    }
+    if (type === 'sfx_stop' && data?.id != null) {
+      for (const k of voices.get(data.id) ?? []) audio.stopLoop(k)
+      voices.delete(data.id)
+      return true
+    }
+    if (type === 'song' && data?.id != null) {
+      void audio.playMusic(game, data.id)
+      return true
+    }
+    return false
+  }
+
   const sink = (type: AudioEventType, data?: AudioEventData) => {
     if (!cat) return
+    if (exact(type, data)) return
     switch (type) {
       case 'melee_swing':
       case 'dash':
@@ -60,9 +93,10 @@ export function attachBattleAudio(s: BattleSession): () => void {
         play(type)
         break
       case 'hit':
-        // one impact per game frame (beams / Flame Kamehameha land several hits a frame); the Dragon Fist's
-        // area hits make no impact sound in the game
-        if (s.world.frame === lastHitFrame || skill === 5) break
+        // fallback for attacks whose object does not emit its own impact sound yet: one impact per game frame
+        // (beams / Flame Kamehameha land several hits a frame), none when the attacker already played 48 / 49; the
+        // Dragon Fist's area hits make no impact sound in the game
+        if (s.world.frame === lastHitFrame || s.world.frame === lastImpactFrame || skill === 5) break
         lastHitFrame = s.world.frame
         play('hit')
         break
@@ -78,10 +112,13 @@ export function attachBattleAudio(s: BattleSession): () => void {
         if (data?.melee) play('melee_swing')
         break
       case 'skill_start':
+        // the Buu player emits its skills' exact sounds (sfx events); this only tracks the skill
         skill = data?.id ?? -1
-        if (CHARGE.has(skill)) play('charge', 'charge')
-        else if (skill === 5) play('dragon_fist')
-        else if (skill === 8) play('energy_punch')
+        if (game !== 'buu') {
+          if (CHARGE.has(skill)) play('charge', 'charge')
+          else if (skill === 5) play('dragon_fist')
+          else if (skill === 8) play('energy_punch')
+        }
         break
       case 'beam_fire':
         audio.stopLoop('charge')
@@ -97,6 +134,10 @@ export function attachBattleAudio(s: BattleSession): () => void {
         play('big_bang')
         break
       case 'skill_end':
+        if (game === 'buu') {
+          skill = -1
+          break
+        }
         audio.stopLoop('charge')
         if (beamOn) {
           audio.stopLoop('beam')
@@ -114,22 +155,26 @@ export function attachBattleAudio(s: BattleSession): () => void {
     cat = c
     const m = pickMusic(s, c)
     if (m != null) void audio.playMusic(game, m)
-    const ids = new Set(Object.values(c.events).flatMap((e) => e.sfx))
+    // the battle sounds: the event table plus everything the Buu player emits as exact driver calls
+    const ids = new Set([...Object.values(c.events).flatMap((e) => e.sfx), 3, 20, 21, 23, 24, 25, 31, 32, 33, 34, 36, 41, 46, 47, 48, 49, 50, 51, 54, 59])
     audio.preload(c.sfx.filter((x) => ids.has(x.id)).map((x) => x.file))
   })
 
-  // per displayed frame: pause toggles (menu sound) and the low-HP beep, timed in game frames
+  // per displayed frame: pause toggles (menu sound). The low-HP beep is the ruleset's (Buu: HUD 0x0800BA3A emits
+  // sound 41 at volume 32 itself); for a ruleset that does not, the beep is timed here in game frames.
   let raf = 0
+  const ownBeep = game === 'buu'
   const tick = () => {
     raf = requestAnimationFrame(tick)
     if (!cat) return
     if (s.paused !== wasPaused) {
       wasPaused = s.paused
       audio.stopAllSfx()
+      voices.clear()
       beamOn = false
       play('menu')
     }
-    if (s.paused || s.outcome !== 'running') return
+    if (s.paused || s.outcome !== 'running' || ownBeep) return
     const p = s.world.entities.find((e) => e.kind === 'player') as unknown as HpLike | undefined
     const f = s.world.frame
     if (p && p.hp != null && p.maxHp != null && p.hp > 0 && 5 * p.hp <= p.maxHp && f - lastBeep > 60) {

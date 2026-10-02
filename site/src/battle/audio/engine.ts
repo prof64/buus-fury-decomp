@@ -37,6 +37,8 @@ export interface AudioCatalog {
   sfx: SfxEntry[]
   arena_music: Record<string, number>
   boss_music: number
+  /** enemy types whose story fight plays boss_music (the others keep the area's own song) */
+  boss_music_types?: number[]
   events: Record<string, { sfx: number[]; loop?: boolean; volume?: number }>
 }
 

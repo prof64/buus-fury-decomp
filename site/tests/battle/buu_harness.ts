@@ -12,6 +12,8 @@ import sprites from '../../../data/buu/sprites.json'
 import formulas from '../../../data/buu/formulas.json'
 import extra from '../../../data/battle/buu_ai_extra.json'
 import collision from '../../../data/battle/buu_collision.json'
+import formNames from '../../../data/battle/buu_form_names.json'
+import animTiming from '../../../data/battle/buu_anim_timing.json'
 import { buildBuuData, type BuuData } from '../../src/battle/rulesets/buu/data'
 import { buuRuleset } from '../../src/battle/rulesets/buu'
 import { World } from '../../src/battle/core/world'
@@ -23,7 +25,7 @@ import type { Enemy } from '../../src/battle/rulesets/buu/enemy'
 let data: BuuData | null = null
 export function buuData(): BuuData {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  if (!data) data = buildBuuData({ characters, levels, moves, items, enemies, ai, bosses, attacks, sprites, formulas, extra, collision } as any)
+  if (!data) data = buildBuuData({ characters, levels, moves, items, enemies, ai, bosses, attacks, sprites, formulas, extra, collision, formNames, animTiming } as any)
   buuRuleset.d = data
   return data
 }

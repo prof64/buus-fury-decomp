@@ -15,12 +15,16 @@ PORTRAIT_ALT_PAL = {'log2': (range(0, 18), 0x81D4F50)}
 
 def single_entity(game, slug, name, category, frames, subdir, extra=None, conf='low', durations=4, loop=True,
                   anim_name='default'):
-    """frames: list of (img, ox, oy, rom). Builds an entity with one animation over all frames."""
+    """frames: list of (img, ox, oy, rom) or (img, ox, oy, rom, obj). Builds an entity with one animation over all
+    frames; `obj` (record geometry [ox, oy, w, h, hflip, vflip]) is kept on the step."""
     B = EntityBuilder(game, slug, subdir)
     seq = []
-    for im, ox, oy, rom in frames:
+    for im, ox, oy, rom, *obj in frames:
         fi, flip = B.add(im, ox, oy, rom)
-        seq.append({'frame': fi, 'duration_frames': durations, 'flip': flip, 'rom': rom})
+        st = {'frame': fi, 'duration_frames': durations, 'flip': flip, 'rom': rom}
+        if obj:
+            st['obj'] = obj[0]
+        seq.append(st)
     sheet, recs = B.write()
     e = {'id': slug, 'name': name, 'category': category, 'name_confidence': conf, 'sheet': sheet, 'frames': recs,
          'animations': {anim_name: {'raw_index': 0, 'loop': loop, 'timing_source': 'default',
@@ -42,19 +46,23 @@ def effects(game, defs):
                     for fl in a['dirs']:
                         known.update(fl)
     N = names.load(game)
-    fx_names = N.d.get('effects', {})
+    fx_names = dict(N.d.get('effects', {}))
+    if game == 'buu':
+        import buu_fx
+        fx_names = {**buu_fx.run_names(), **fx_names}
     out = []
     for ri, run in enumerate(scan(game, known)):
         key = f'{run[0]["addr"]:08X}'
         info = fx_names.get(key, {})
         name = info.get('name', f'Effect {key}')
-        slug = info.get('slug') or f'fx_{key.lower()}' + ('_' + names.slugify(info['name']) if 'name' in info else '')
+        # ids stay fx_<first record address> (the battle simulator and the dashboard refer to them by address)
+        slug = info.get('slug') or f'fx_{key.lower()}'
         frames = []
         for r in run:
             im = obj_image(raw_gfx(R, r), r['W'], r['H'], r['bpp'], pal)
             o = {'dx': -r['ox'], 'dy': -r['oy'], 'W': r['W'], 'H': r['H'], 'hflip': r['hflip'], 'vflip': r['vflip']}
             im, ox, oy = compose([o], [im])
-            frames.append((im, ox, oy, hx(r['addr'])))
+            frames.append((im, ox, oy, hx(r['addr']), [r['ox'], r['oy'], r['W'], r['H'], r['hflip'], r['vflip']]))
         if 'name' not in info:
             name = f'Effect {key} ({_colour_word(frames)}, {run[0]["W"]}x{run[0]["H"]}, {len(run)} frames)'
         e = single_entity(game, slug, name, info.get('category', 'effect'), frames, 'effects',

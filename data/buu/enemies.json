@@ -86,7 +86,9 @@
      "record": "0x80854e0"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Airship Warlord",
+   "display_name_source": "game"
   },
   {
    "type": 1,
@@ -186,7 +188,9 @@
      "record": "0x808c1c4"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Annihilator",
+   "display_name_source": "game"
   },
   {
    "type": 2,
@@ -430,7 +434,9 @@
      "record": "0x808a7c4"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Assassin",
+   "display_name_source": "game"
   },
   {
    "type": 3,
@@ -725,7 +731,9 @@
      "record": "0x8084d44"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Atomizer",
+   "display_name_source": "game"
   },
   {
    "type": 4,
@@ -800,7 +808,9 @@
      "record": "0x807f280"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Babidi (Giant Crater, script-placed)",
+   "display_name_source": "game name + qualifier"
   },
   {
    "type": 5,
@@ -978,7 +988,9 @@
      "record": "0x8085188"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Bio Mech",
+   "display_name_source": "game"
   },
   {
    "type": 6,
@@ -1149,7 +1161,9 @@
      "record": "0x808dc58"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Blister",
+   "display_name_source": "game"
   },
   {
    "type": 7,
@@ -1588,7 +1602,9 @@
      "record": "0x808deb4"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Blood Cell",
+   "display_name_source": "game"
   },
   {
    "type": 8,
@@ -1842,7 +1858,9 @@
      "record": "0x8077cd4"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Bomber",
+   "display_name_source": "game"
   },
   {
    "type": 9,
@@ -2230,7 +2248,9 @@
      "record": "0x808afcc"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Bones",
+   "display_name_source": "game"
   },
   {
    "type": 10,
@@ -2290,7 +2310,9 @@
      "record": "0x808bd6c"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Broly",
+   "display_name_source": "game"
   },
   {
    "type": 11,
@@ -2329,7 +2351,9 @@
    },
    "spawns": [],
    "spawn_points": [],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Broly (phase 2)",
+   "display_name_source": "game name + qualifier"
   },
   {
    "type": 12,
@@ -2543,7 +2567,9 @@
      "record": "0x808b068"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Bruiser",
+   "display_name_source": "game"
   },
   {
    "type": 13,
@@ -2595,7 +2621,9 @@
      "record": "0x8074610"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Kamikaze ghost (Super Buu minion)",
+   "display_name_source": "descriptive"
   },
   {
    "type": 14,
@@ -2672,7 +2700,9 @@
      "record": "0x8074630"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Buu fragment (freezes the player)",
+   "display_name_source": "descriptive"
   },
   {
    "type": 15,
@@ -3173,7 +3203,9 @@
      "record": "0x8077cf4"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Criminal",
+   "display_name_source": "game"
   },
   {
    "type": 16,
@@ -3468,7 +3500,9 @@
      "record": "0x808b600"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Cursed One",
+   "display_name_source": "game"
   },
   {
    "type": 17,
@@ -3694,7 +3728,9 @@
      "record": "0x8085148"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Cyborg",
+   "display_name_source": "game"
   },
   {
    "type": 18,
@@ -3769,7 +3805,9 @@
      "record": "0x807f08c"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Dabura",
+   "display_name_source": "game"
   },
   {
    "type": 19,
@@ -4136,7 +4174,9 @@
      "record": "0x808d0e0"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Death Machine",
+   "display_name_source": "game"
   },
   {
    "type": 20,
@@ -4500,7 +4540,9 @@
      "record": "0x808b914"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Destroyer",
+   "display_name_source": "game"
   },
   {
    "type": 21,
@@ -4798,7 +4840,9 @@
      "record": "0x808a5a0"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Elite Majin Fighter",
+   "display_name_source": "game"
   },
   {
    "type": 22,
@@ -5027,7 +5071,9 @@
      "record": "0x8089ce8"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Elite Majin Soldier",
+   "display_name_source": "game"
   },
   {
    "type": 23,
@@ -5126,7 +5172,9 @@
      "record": "0x807bf2c"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Elite Shield Soldier",
+   "display_name_source": "game"
   },
   {
    "type": 24,
@@ -5186,7 +5234,9 @@
      "record": "0x80746b0"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Enzyme",
+   "display_name_source": "game"
   },
   {
    "type": 25,
@@ -5261,7 +5311,9 @@
      "record": "0x80729f4"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Babidi (West City)",
+   "display_name_source": "game name + qualifier"
   },
   {
    "type": 26,
@@ -5321,7 +5373,9 @@
      "record": "0x807f260"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Majin Buu (Giant Crater, with Babidi)",
+   "display_name_source": "game name + qualifier"
   },
   {
    "type": 27,
@@ -5396,7 +5450,9 @@
      "record": "0x807f240"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Majin Buu (Giant Crater, 2nd encounter)",
+   "display_name_source": "game name + qualifier"
   },
   {
    "type": 28,
@@ -5486,7 +5542,9 @@
      "record": "0x80729bc"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Majin Buu (West City)",
+   "display_name_source": "game name + qualifier"
   },
   {
    "type": 29,
@@ -5546,7 +5604,9 @@
      "record": "0x807f218"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Babidi (Giant Crater, with Majin Buu)",
+   "display_name_source": "game name + qualifier"
   },
   {
    "type": 30,
@@ -5593,7 +5653,9 @@
    },
    "spawns": [],
    "spawn_points": [],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Unnamed fighter 0x1E (unused)",
+   "display_name_source": "descriptive"
   },
   {
    "type": 31,
@@ -5624,7 +5686,9 @@
    },
    "spawns": [],
    "spawn_points": [],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Ghost (variant)",
+   "display_name_source": "descriptive"
   },
   {
    "type": 32,
@@ -5874,7 +5938,9 @@
      "record": "0x8088dd8"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Ghost",
+   "display_name_source": "game"
   },
   {
    "type": 33,
@@ -6283,7 +6349,9 @@
      "record": "0x808b9ec"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Ghoul",
+   "display_name_source": "game"
   },
   {
    "type": 34,
@@ -6314,7 +6382,9 @@
    },
    "spawns": [],
    "spawn_points": [],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Inert helper 0x22",
+   "display_name_source": "descriptive"
   },
   {
    "type": 35,
@@ -6374,7 +6444,9 @@
      "record": "0x808e018"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Gohan",
+   "display_name_source": "game"
   },
   {
    "type": 36,
@@ -6642,7 +6714,9 @@
      "record": "0x8083ad4"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Goon",
+   "display_name_source": "game"
   },
   {
    "type": 37,
@@ -6735,7 +6809,9 @@
      "record": "0x807a798"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Goten",
+   "display_name_source": "game"
   },
   {
    "type": 38,
@@ -6795,7 +6871,9 @@
      "record": "0x8076ba8"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Goten (tag game)",
+   "display_name_source": "game name + qualifier"
   },
   {
    "type": 39,
@@ -6855,7 +6933,9 @@
      "record": "0x807941c"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Goten (Time Chamber sparring)",
+   "display_name_source": "game name + qualifier"
   },
   {
    "type": 40,
@@ -6915,7 +6995,9 @@
      "record": "0x808df58"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Gotenks",
+   "display_name_source": "game"
   },
   {
    "type": 41,
@@ -7085,7 +7167,9 @@
      "record": "0x8083da4"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Grand Mechanoid",
+   "display_name_source": "game"
   },
   {
    "type": 42,
@@ -7141,7 +7225,9 @@
    },
    "spawns": [],
    "spawn_points": [],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Grand Mechanoid (variant)",
+   "display_name_source": "descriptive"
   },
   {
    "type": 43,
@@ -7397,7 +7483,9 @@
      "record": "0x808ab9c"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Grenadier",
+   "display_name_source": "game"
   },
   {
    "type": 44,
@@ -7638,7 +7726,9 @@
      "record": "0x8077cb4"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Gunman",
+   "display_name_source": "game"
   },
   {
    "type": 45,
@@ -7698,7 +7788,9 @@
      "record": "0x807a7d8"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Hercule",
+   "display_name_source": "game"
   },
   {
    "type": 46,
@@ -7969,7 +8061,9 @@
      "record": "0x8083c68"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Hessian",
+   "display_name_source": "game"
   },
   {
    "type": 47,
@@ -8661,7 +8755,9 @@
      "record": "0x808b4c8"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Hooligan",
+   "display_name_source": "game"
   },
   {
    "type": 48,
@@ -9775,7 +9871,9 @@
      "record": "0x808d488"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Hyper Cyborg",
+   "display_name_source": "game"
   },
   {
    "type": 49,
@@ -9835,7 +9933,9 @@
      "record": "0x807a748"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Idasa",
+   "display_name_source": "game"
   },
   {
    "type": 50,
@@ -9935,7 +10035,9 @@
      "record": "0x808107c"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Ion Cannon",
+   "display_name_source": "game"
   },
   {
    "type": 51,
@@ -9995,7 +10097,9 @@
      "record": "0x808cb70"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Janemba",
+   "display_name_source": "game"
   },
   {
    "type": 52,
@@ -10026,7 +10130,9 @@
    },
    "spawns": [],
    "spawn_points": [],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Janemba part (arm A)",
+   "display_name_source": "descriptive"
   },
   {
    "type": 53,
@@ -10057,7 +10163,9 @@
    },
    "spawns": [],
    "spawn_points": [],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Janemba part (arm B)",
+   "display_name_source": "descriptive"
   },
   {
    "type": 54,
@@ -10117,7 +10225,9 @@
      "record": "0x8074730"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Janemba Hand (summoned by Janemba)",
+   "display_name_source": "game name + qualifier"
   },
   {
    "type": 55,
@@ -10148,7 +10258,9 @@
    },
    "spawns": [],
    "spawn_points": [],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Janemba part (upper body)",
+   "display_name_source": "descriptive"
   },
   {
    "type": 56,
@@ -10208,7 +10320,9 @@
      "record": "0x8074710"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Mini-Janemba",
+   "display_name_source": "game"
   },
   {
    "type": 57,
@@ -10448,7 +10562,9 @@
      "record": "0x808cae8"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Janemba Hand",
+   "display_name_source": "game"
   },
   {
    "type": 58,
@@ -10608,7 +10724,9 @@
      "record": "0x8089ea8"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Juggernaut",
+   "display_name_source": "game"
   },
   {
    "type": 59,
@@ -10740,7 +10858,9 @@
      "record": "0x807aa30"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Human (World Tournament fighter)",
+   "display_name_source": "game name + qualifier"
   },
   {
    "type": 60,
@@ -10842,7 +10962,9 @@
      "record": "0x808ccd4"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Kid Buu",
+   "display_name_source": "game"
   },
   {
    "type": 61,
@@ -10881,7 +11003,9 @@
    },
    "spawns": [],
    "spawn_points": [],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Kid Buu (split copy)",
+   "display_name_source": "game name + qualifier"
   },
   {
    "type": 62,
@@ -11056,7 +11180,9 @@
      "record": "0x808b894"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Knight Destroyer",
+   "display_name_source": "game"
   },
   {
    "type": 63,
@@ -11116,7 +11242,9 @@
      "record": "0x80819a4"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Pilaf's Guardian",
+   "display_name_source": "game"
   },
   {
    "type": 64,
@@ -11462,7 +11590,9 @@
      "record": "0x80849b4"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Laser Turret",
+   "display_name_source": "game"
   },
   {
    "type": 65,
@@ -11880,7 +12010,9 @@
      "record": "0x808c434"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Lich",
+   "display_name_source": "game"
   },
   {
    "type": 66,
@@ -12523,7 +12655,9 @@
      "record": "0x808c9a0"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Living Dead",
+   "display_name_source": "game"
   },
   {
    "type": 67,
@@ -12827,7 +12961,9 @@
      "record": "0x8083c08"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Mad Bomber",
+   "display_name_source": "game"
   },
   {
    "type": 68,
@@ -13581,7 +13717,9 @@
      "record": "0x807edd4"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Majin Fighter",
+   "display_name_source": "game"
   },
   {
    "type": 69,
@@ -14092,7 +14230,9 @@
      "record": "0x807ea44"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Majin Soldier",
+   "display_name_source": "game"
   },
   {
    "type": 70,
@@ -14194,7 +14334,9 @@
      "record": "0x807f1b8"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Majin Vegeta",
+   "display_name_source": "game"
   },
   {
    "type": 71,
@@ -14402,7 +14544,9 @@
      "record": "0x808aac0"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Marauder",
+   "display_name_source": "game"
   },
   {
    "type": 72,
@@ -14602,7 +14746,9 @@
      "record": "0x80853c8"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Mechanoid",
+   "display_name_source": "game"
   },
   {
    "type": 73,
@@ -14658,7 +14804,9 @@
    },
    "spawns": [],
    "spawn_points": [],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Mechanoid (variant)",
+   "display_name_source": "descriptive"
   },
   {
    "type": 74,
@@ -14722,7 +14870,9 @@
    },
    "spawns": [],
    "spawn_points": [],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Mega Cyborg",
+   "display_name_source": "game"
   },
   {
    "type": 75,
@@ -14944,7 +15094,9 @@
      "record": "0x8077c94"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Mercenary",
+   "display_name_source": "game"
   },
   {
    "type": 76,
@@ -15308,7 +15460,9 @@
      "record": "0x808d294"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Metal Hulk",
+   "display_name_source": "game"
   },
   {
    "type": 77,
@@ -15816,7 +15970,9 @@
      "record": "0x80893b8"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Mummy",
+   "display_name_source": "game"
   },
   {
    "type": 78,
@@ -16156,7 +16312,9 @@
      "record": "0x808704c"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Ninja",
+   "display_name_source": "game"
   },
   {
    "type": 79,
@@ -16278,7 +16436,9 @@
      "record": "0x8086bf0"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Ninja (disguised)",
+   "display_name_source": "game name + qualifier"
   },
   {
    "type": 80,
@@ -16338,7 +16498,9 @@
      "record": "0x8087394"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Ninja Boss",
+   "display_name_source": "game"
   },
   {
    "type": 81,
@@ -16369,7 +16531,9 @@
    },
    "spawns": [],
    "spawn_points": [],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Ninja Boss (variant)",
+   "display_name_source": "descriptive"
   },
   {
    "type": 82,
@@ -16653,7 +16817,9 @@
      "record": "0x808c308"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Nosferatu",
+   "display_name_source": "game"
   },
   {
    "type": 83,
@@ -16709,7 +16875,9 @@
    },
    "spawns": [],
    "spawn_points": [],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Nosferatu (variant)",
+   "display_name_source": "descriptive"
   },
   {
    "type": 84,
@@ -16740,7 +16908,9 @@
    },
    "spawns": [],
    "spawn_points": [],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Dummy type 0x54 (unused)",
+   "display_name_source": "descriptive"
   },
   {
    "type": 85,
@@ -16815,7 +16985,9 @@
      "record": "0x8075970"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Olibu",
+   "display_name_source": "game"
   },
   {
    "type": 86,
@@ -17002,7 +17174,9 @@
      "record": "0x80758a0"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Fighter",
+   "display_name_source": "game"
   },
   {
    "type": 87,
@@ -17033,7 +17207,9 @@
    },
    "spawns": [],
    "spawn_points": [],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Phantom (variant)",
+   "display_name_source": "descriptive"
   },
   {
    "type": 88,
@@ -17268,7 +17444,9 @@
      "record": "0x808b314"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Phantom",
+   "display_name_source": "game"
   },
   {
    "type": 89,
@@ -17851,7 +18029,9 @@
      "record": "0x80896b0"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Pharoah",
+   "display_name_source": "game"
   },
   {
    "type": 90,
@@ -17911,7 +18091,9 @@
      "record": "0x808e0cc"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Piccolo",
+   "display_name_source": "game"
   },
   {
    "type": 91,
@@ -17995,7 +18177,9 @@
      "record": "0x8075c84"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Pikkon",
+   "display_name_source": "game"
   },
   {
    "type": 92,
@@ -18026,7 +18210,9 @@
    },
    "spawns": [],
    "spawn_points": [],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Poltergeist (variant)",
+   "display_name_source": "descriptive"
   },
   {
    "type": 93,
@@ -18324,7 +18510,9 @@
      "record": "0x808c578"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Poltergeist",
+   "display_name_source": "game"
   },
   {
    "type": 94,
@@ -18640,7 +18828,9 @@
      "record": "0x808d394"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Power Mechandoid",
+   "display_name_source": "game"
   },
   {
    "type": 95,
@@ -18695,7 +18885,9 @@
    },
    "spawns": [],
    "spawn_points": [],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Power Mechandoid (variant)",
+   "display_name_source": "descriptive"
   },
   {
    "type": 96,
@@ -18770,7 +18962,9 @@
      "record": "0x807cdf4"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "PuiPui",
+   "display_name_source": "game"
   },
   {
    "type": 97,
@@ -19149,7 +19343,9 @@
      "record": "0x808abbc"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Rapscallion",
+   "display_name_source": "game"
   },
   {
    "type": 98,
@@ -19462,7 +19658,9 @@
      "record": "0x808bbd4"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Ronin",
+   "display_name_source": "game"
   },
   {
    "type": 99,
@@ -19985,7 +20183,9 @@
      "record": "0x8087218"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Samurai",
+   "display_name_source": "game"
   },
   {
    "type": 100,
@@ -20176,7 +20376,9 @@
      "record": "0x808d160"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Shadow Colossus",
+   "display_name_source": "game"
   },
   {
    "type": 101,
@@ -20891,7 +21093,9 @@
      "record": "0x808bc74"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Shadow Warrior",
+   "display_name_source": "game"
   },
   {
    "type": 102,
@@ -21058,7 +21262,9 @@
      "record": "0x80868d4"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Shadow Warrior (disguised)",
+   "display_name_source": "game name + qualifier"
   },
   {
    "type": 103,
@@ -21403,7 +21609,9 @@
      "record": "0x807ea84"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Majin Shield Soldier",
+   "display_name_source": "game"
   },
   {
    "type": 104,
@@ -21764,7 +21972,9 @@
      "record": "0x808a114"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Shinobi",
+   "display_name_source": "game"
   },
   {
    "type": 105,
@@ -21901,7 +22111,9 @@
      "record": "0x808a134"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Shinobi (disguised)",
+   "display_name_source": "game name + qualifier"
   },
   {
    "type": 106,
@@ -22736,7 +22948,9 @@
      "record": "0x808bc54"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Shogun",
+   "display_name_source": "game"
   },
   {
    "type": 107,
@@ -23067,7 +23281,9 @@
      "record": "0x808a944"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Skeleton",
+   "display_name_source": "game"
   },
   {
    "type": 108,
@@ -23362,7 +23578,9 @@
      "record": "0x8083cc8"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Sniper",
+   "display_name_source": "game"
   },
   {
    "type": 109,
@@ -23437,7 +23655,9 @@
      "record": "0x807a800"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Spopovich (225 HP)",
+   "display_name_source": "game name + qualifier"
   },
   {
    "type": 110,
@@ -23512,7 +23732,9 @@
      "record": "0x807a828"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Spopovich (225 HP, 2)",
+   "display_name_source": "game name + qualifier"
   },
   {
    "type": 111,
@@ -23587,7 +23809,9 @@
      "record": "0x807a850"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Spopovich (bear hug, with Yamu)",
+   "display_name_source": "game name + qualifier"
   },
   {
    "type": 112,
@@ -23662,7 +23886,9 @@
      "record": "0x807a8c8"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Spopovich (1855 HP, no bear hug)",
+   "display_name_source": "game name + qualifier"
   },
   {
    "type": 113,
@@ -23726,7 +23952,9 @@
    },
    "spawns": [],
    "spawn_points": [],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Super Bio Mech",
+   "display_name_source": "game"
   },
   {
    "type": 114,
@@ -23757,7 +23985,9 @@
    },
    "spawns": [],
    "spawn_points": [],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Inert helper 0x72",
+   "display_name_source": "descriptive"
   },
   {
    "type": 115,
@@ -23841,7 +24071,9 @@
      "record": "0x807948c"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Super Buu (Time Chamber)",
+   "display_name_source": "game name + qualifier"
   },
   {
    "type": 116,
@@ -23940,7 +24172,9 @@
      "record": "0x8079954"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Super Buu (two-phase)",
+   "display_name_source": "game name + qualifier"
   },
   {
    "type": 117,
@@ -24000,7 +24234,9 @@
      "record": "0x8074b50"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Super Buu (script-created)",
+   "display_name_source": "game name + qualifier"
   },
   {
    "type": 118,
@@ -24075,7 +24311,9 @@
      "record": "0x808d254"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Super Buu (Gotenks absorbed)",
+   "display_name_source": "game name + qualifier"
   },
   {
    "type": 119,
@@ -24135,7 +24373,9 @@
      "record": "0x808d440"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Super Buu (Gohan absorbed)",
+   "display_name_source": "game name + qualifier"
   },
   {
    "type": 120,
@@ -24195,7 +24435,9 @@
      "record": "0x808d468"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Super Buu (Gohan absorbed, 0 XP)",
+   "display_name_source": "game name + qualifier"
   },
   {
    "type": 121,
@@ -24270,7 +24512,9 @@
      "record": "0x808e168"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Super Buu (Brain)",
+   "display_name_source": "game name + qualifier"
   },
   {
    "type": 122,
@@ -24354,7 +24598,9 @@
      "record": "0x808cbc0"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Super Janemba",
+   "display_name_source": "game"
   },
   {
    "type": 123,
@@ -24781,7 +25027,9 @@
      "record": "0x8089208"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Super Majin Fighter",
+   "display_name_source": "game"
   },
   {
    "type": 124,
@@ -25106,7 +25354,9 @@
      "record": "0x80893f8"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Super Majin Soldier",
+   "display_name_source": "game"
   },
   {
    "type": 125,
@@ -25364,7 +25614,9 @@
      "record": "0x808955c"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Super Shield Soldier",
+   "display_name_source": "game"
   },
   {
    "type": 126,
@@ -25395,7 +25647,9 @@
    },
    "spawns": [],
    "spawn_points": [],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Inert helper 0x7E",
+   "display_name_source": "descriptive"
   },
   {
    "type": 127,
@@ -25509,7 +25763,9 @@
      "record": "0x8077a60"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Tank",
+   "display_name_source": "game"
   },
   {
    "type": 128,
@@ -25666,7 +25922,9 @@
      "record": "0x8077d68"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Thug",
+   "display_name_source": "game"
   },
   {
    "type": 129,
@@ -25726,7 +25984,9 @@
      "record": "0x8089650"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Pharoah Totenhotep",
+   "display_name_source": "game"
   },
   {
    "type": 130,
@@ -25786,7 +26046,9 @@
      "record": "0x8079444"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Trunks",
+   "display_name_source": "game"
   },
   {
    "type": 131,
@@ -26156,7 +26418,9 @@
      "record": "0x808d3d4"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Ultra Bio Mech",
+   "display_name_source": "game"
   },
   {
    "type": 132,
@@ -26174,8 +26438,8 @@
    "byte_13": 0,
    "hit_reaction": "none (does not flinch)",
    "drop_script": "0x0",
-   "name": null,
-   "name_source": null,
+   "name": "Uub",
+   "name_source": "string 1140 \"Uub\" (database text); the spawn gfx 273 is the Uub sprite",
    "database": [],
    "gfx_ids": [
     273
@@ -26208,7 +26472,9 @@
      "record": "0x807a8a0"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Uub",
+   "display_name_source": "game"
   },
   {
    "type": 133,
@@ -26339,7 +26605,9 @@
      "record": "0x8081710"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Vampire",
+   "display_name_source": "game"
   },
   {
    "type": 134,
@@ -26395,7 +26663,9 @@
    },
    "spawns": [],
    "spawn_points": [],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Vampire (variant)",
+   "display_name_source": "descriptive"
   },
   {
    "type": 135,
@@ -26426,7 +26696,9 @@
    },
    "spawns": [],
    "spawn_points": [],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Unnamed fighter 0x87 (unused)",
+   "display_name_source": "descriptive"
   },
   {
    "type": 136,
@@ -26486,7 +26758,9 @@
      "record": "0x8078830"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Vegeta (Gravity Chamber)",
+   "display_name_source": "game name + qualifier"
   },
   {
    "type": 137,
@@ -26546,7 +26820,9 @@
      "record": "0x808d4a8"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Vegeta (Barren Wasteland)",
+   "display_name_source": "game name + qualifier"
   },
   {
    "type": 138,
@@ -26815,7 +27091,9 @@
      "record": "0x808b7d4"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Vlad",
+   "display_name_source": "game"
   },
   {
    "type": 139,
@@ -26871,7 +27149,9 @@
    },
    "spawns": [],
    "spawn_points": [],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Vlad (variant)",
+   "display_name_source": "descriptive"
   },
   {
    "type": 140,
@@ -27001,7 +27281,9 @@
      "record": "0x808bd8c"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "War Machine",
+   "display_name_source": "game"
   },
   {
    "type": 141,
@@ -27158,7 +27440,9 @@
      "record": "0x80730b4"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Floor trigger (not a fighter)",
+   "display_name_source": "descriptive"
   },
   {
    "type": 142,
@@ -27306,7 +27590,9 @@
      "record": "0x808dcdc"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Worm Head",
+   "display_name_source": "game"
   },
   {
    "type": 143,
@@ -27352,7 +27638,9 @@
    },
    "spawns": [],
    "spawn_points": [],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Worm Body",
+   "display_name_source": "game"
   },
   {
    "type": 144,
@@ -27383,7 +27671,9 @@
    },
    "spawns": [],
    "spawn_points": [],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Worm part 0x90 (unused)",
+   "display_name_source": "descriptive"
   },
   {
    "type": 145,
@@ -27443,7 +27733,9 @@
      "record": "0x807d914"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Yakon",
+   "display_name_source": "game"
   },
   {
    "type": 146,
@@ -27528,7 +27820,9 @@
      "record": "0x8074950"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Mini-Yakon",
+   "display_name_source": "game"
   },
   {
    "type": 147,
@@ -27603,7 +27897,9 @@
      "record": "0x807a878"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Yamu (EP drain, with Spopovich)",
+   "display_name_source": "game name + qualifier"
   },
   {
    "type": 148,
@@ -27678,7 +27974,9 @@
      "record": "0x807a8f0"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Yamu (no EP drain)",
+   "display_name_source": "game name + qualifier"
   },
   {
    "type": 149,
@@ -27763,7 +28061,9 @@
      "record": "0x8074970"
     }
    ],
-   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)"
+   "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+   "display_name": "Zombie",
+   "display_name_source": "game"
   }
  ]
 }

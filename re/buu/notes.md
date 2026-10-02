@@ -436,7 +436,13 @@ Evidence:
 - drop script pointer
 
 Names come from the bestiary database link, or failing that a matching graphics id; unnamed variants are
-marked inferred. Spawns: 1559 placements found by scanning the map object scripts (`spawns.py`).
+marked inferred. Type 0x84 has no database row; its spawn gfx 273 is the Uub sprite and the ROM text has
+"Uub" (string 1140), so it is named Uub. Several types share one database name (4 × Spopovich, 7 × Super Buu, 3 ×
+Babidi ...): `display_name` adds the qualifier that tells them apart (area name from the area table, phase or
+behaviour), and types the game never names get a descriptive `display_name` (`display_name_source:
+'descriptive'`). The database is also the game's name list for sprites: row gfx id − 9 = sprite index
+(`sprite_names.py` / `portrait_names.py` apply it to tools/extract/data/names_buu.json; rows named "Human" are the
+game's own placeholder). Spawns: 1559 placements found by scanning the map object scripts (`spawns.py`).
 
 ### Behaviour trees (enemy_ai.json via extract_ai.py / ai_decode.py)
 
@@ -1142,6 +1148,59 @@ encounter/cutscene hook is INFERRED.
 - Pikkon barrage projectile path and hitbox.
 - Which script starts each cond-1 encounter, and what the rec+0x14 hook does.
 - Blood Cell wall behaviour (no collision test seen in its update).
+
+## 8c. Effect graphics (projectiles, beams, auras)
+
+Every effect / projectile OBJ is a 12-byte frame record (`s8 ox, s8 oy, u8 w, u8 h, u16 attr0, u16 attr1, u32 raw 8bpp
+gfx`), exported in ROM order as `fx_<first record>` in data/buu/sprites.json (names: tools/extract/data/names_buu.json
+`effects`). Tools: `fxcap.py` (OAM tiles -> matching record, per frame), `fx_skill.py` (trace a player skill),
+`fx_objpos.py` / `fx_beampos.py` (object positions per facing), `fx_sheet.py` (contact sheet), `fx_refs.py` /
+`litusers.py` (who uses a table), `fx_cmp_batch.py` / `fx_cmp_enemy.py` (emulator vs sim pictures in work/compare/fx/).
+Positions below are relative to the player position (obj+0x1A0) per facing (down, up, left, right). Ticks are logic
+ticks (0x03000F94); the emulator drops ~15 % of frames under load, which the frame-measured fits absorb.
+
+**Draw conventions.** Base projectile draw 0x08019C44 and the generic effect: OBJ top-left = position - (ox, oy).
+Beam pieces (0x08020CF4), energy wave, candy beam, stretch arm, grapple arm, volleyball wave and the BBK flare:
+top-left = position + offset + (ox, oy). No semi-transparency or affine except Final Flash (scale-in/out) and
+Dabura's sphere (BG layer blend). Priority byte +8: (b >> 4) & 3 = OAM priority (0x37/0x38 -> 3; IT markers 8 -> 0).
+
+**Generic effect 0x0802A81C**(obj, &xy, records, n, rate, _, prio): acc += rate per tick, record += acc >> 16,
+acc &= 0xFFFF, removed after n records. Explosion 0x08712FDC: projectiles rate 0x2000 (8 ticks/record);
+0x0801952C = explosion with rate 0x1000 + rand(0x1000) (deaths, Big Bang, Dragon Fist, ghosts, bombs; its object is a
+damaging variant, vtable 0x0804A2C0). Puff 0x086FD9D0: rate 0x1000 + rand(0x1000) (ninja teleport, shield break,
+energy-wave hit, Dabura's sphere destroyed at centre +-50, stone break-free). Melee hits, block, dash: no effect object.
+
+| object | records / frame rule | notes |
+|---|---|---|
+| ki blast 0x080197B4 (player + enemies) | 0x0871370C + 48 dir + 12 f, f = t >> 3, > 3 -> 2 + (f & 1); wall / hit: record 16 for 16 ticks | ctor rand(2) sfx, hit rand(2); muzzle (8,0) (8,-7) (5,-7) (13,-7) |
+| beam 0x080206B8 (Kamehameha, Kamekameha, Electric, Banshee, BBK, Kid Buu) | level def {step_v, step_h, mult, flags, mode, sub, charge rec, pieces}; pieces per dir (0xC0): 0 start, 3/4/5 body 8/16/32, 6 2nd body gfx, 7 head, 10 impact, 13 tail; flags 1/2/4/8 add mirrored start/tail/head/impact | VRAM slots refilled every 4 ticks (mode 0/1/2, see tools/extract/buu_fx.py); charge (state 0) record charge + 1 + ((t >> 2) & 1) after t 4; retract: position +3/tick, len -3; hit: every 3 + rand(5) ticks rand(2) sfx + explosion at head + 4 dir + (rand 32 - 16)^2, rate 0x1000 + rand(0x4000); charge pos (8,-2) (12,-2) (12,-2) (4,-2), fire (8,16) (8,-16) (-16,-6) (32,-6) (BBK (8,48) (8,-64) (-48,-6) (64,-6); Banshee charge (2,6) (13,-25) (-8,-6) (24,-6)) |
+| Big Bang ball 0x08037480 | def 0x0876ACC0 + 16 lv {lo, hi, table}; record table + 120 dir + 12 f; charging f = (u >> 3) + ((u >> 1) & 1) (u < 16), u 16 -> 96, f = (u >> 5) + ((u >> 3) & 1), capped lo / cycling lo..hi-1 | contact / wall: one hit, then 60 ticks with an explosion every 8 (7) at box centre +- size*3/2 (sizes 4,6,8,12,16,24,28,32..) |
+| Burning Attack 0x08029384 | 0x087501EC (t >> 3) & 1; end 2 + ((t >> 3) & 1) for 16 ticks | held in the hands from the press at (8,-2) (12,-2) (19,-6) (-3,-6), launched from the ki muzzle at 3 px/tick |
+| Masenkoha 0x08021280 + cursor 0x08021594 | sparkle fx_08721164 9 (Lv3 12) + k, k = (t >> 3) & 3 (3 -> 1); flight +1 + ((t >> 3) & 1); blast 0x0872A5DC / A60C / A648, 4 ticks each; cursor 0x0872509C | muzzle (8,-24) (8,-24) (10,-24) (6,-24); 43-tick arc, vy0 -0x200, +0x20/tick |
+| Final Flash 0x08036FA2 (player, Majin Vegeta, Yakon) | tables 0x0875FE2C / 0x08760A8C / 0x087616EC: start 2 dir, body 2 dir + 1 at 16 + 32k | scale 0x20 -> 0x100 (+0x20/tick), end -0x20/tick; affine below 0x100 (pa, pd) = down (inv, -0x80), up (inv, 0x100), left (-0x80, inv), right (0x100, inv); origin (8,0) (8,-16) (-8,-6) (24,-6) |
+| Dragon Fist Explosion 0x08038AD8 | 0x0877AD10 + 12 (4 dir + {0 body, 1 head, 2/3 dying}) | 6 segments from (8,16) (8,-32) (-8,-8) (24,-8), +0x60..0x100/256 px per tick, head d-pad 3 px/tick; end: 24 dying ticks, 6 explosions root first |
+| Energy Sword 0x08037C1C | 0x0876CBD8: charge base + (t >> 4) (base 0, right 5), full at 80; slash 10 + k (right [14,13,12,11,10,17,16,15][k]) | at the player position |
+| Ultra Volleyball wave 0x080383D4 | 0x0876E264 + 36 dir: tail, body every 8, head at len - 8; len 8 -> 48 (+4/tick) | struck enemy: sprite 281 raw anim 1 frame 0 facing right for 300 ticks, explosion (rand rate) in and out |
+| BBK flare 0x08038886 | flare 0x08770D0C + 60 dir + 12k (k = (t >> 2) & 3) + mirror record 4, ball 0x08770CF4 + 12 ((t >> 2) & 1) | at (8,16) (8,-32) (-16,-6) (32,-6) |
+| Flame Kamehameha 0x0802DB6C | 0x087568B4 + 0x54 dir + 12 f (f = t >> 2; non-last 2,1,2,3 cycle; last 4,5,6,5) | charge record object fx_08721164 12 + f; level + 3 links 16 px apart from (8,16) (8,-32) (0,-6) (16,-6) |
+| Kamikaze ghost | actors of type 0x54, sprite 148 (raw anim 19, then 1) | spawn (6,1) (-4,-8) (-16,-6) (16,-6), formation 0x0871E024, contact explosion (rand rate) |
+| Energy Punch Lv3 | record object 0x08762270 + 12 (3 dir + (tick >= 56)) | at (13,8) (0,-19) (-8,-3) (24,-3) from tick 8 |
+| Super Saiyan transform | aura 0x08752D28, 3 records looping at rate 0x4000 at box centre + (0,1); scripted variant 0x087520D4 (7 records, rate 0xC88) | |
+| IT markers 0x080222E0 | 0x0872BF04 + 12 ((t >> 2) & 3) (cursor), 0x0872BF34 (targets); drawn at P - (16,16) and vflipped at P - (16,0) | |
+| shield 0x0801DFE0 | 0x087202E8 record c >> 3 | flickers (even ticks) |
+| gun bullet / rifle / tank shell | 0x0874E968 dir + 4 [0,1,2,1][(t >> 2) & 3]; 0x0874E614 dir + smoke 4-6; 0x0871E630 dir + smoke 4-6 (rate 0x2AAA every 4 ticks at pos - 8 vel) | explosion rate 0x2000 |
+| shuriken / bandage / flame / spit | 0x08754A1C (t >> 3) & 1; 0x087571F4 3 (dir >> 1) + (t mod 24) >> 3 (+6 diagonal), stuck 0x08757218 at (4, -slotY) slots 0x08756BB4; 0x0872D6B8 + 60 dir + 12 (t >> 2); 0x087579B8 aim sector (5) x 2 | |
+| energy wave / candy beam / stretch arm / grapple | 0x0875043C + 36 dir (muzzle 0/1, body 2); 0x0874ED7C + 60 dir (muzzle k, body 2, head 3 + k); 0x0874EFEC + 24 dir (arm, fist); 0x0876DFF8 + 48 dir (chain, open, closed back/front) | candy player: sprite 45 frame rand(3), timer 301 |
+| bomb 0x0801C6E4 | 0x0871E984 (t >> 2) & 3, 3 -> 1 | 4 debris (raw 0x08072500) + explosion (rand rate) |
+| Super Buu ball | the Masenkoha class with Lv3 data | |
+| Super Janemba wave / Broly rocks | 0x0875A6A8 dir; 0x0875F7AC 0 intact, 1 cracked | |
+| Dabura sphere 0x0803AEA8 | BG0 disc of colour 0x7FFF above the sprites, BLDALPHA 8/8; fade EVA = (((128 - r) * 50) >> 6) * 656 >> 12, EVB 16 | |
+| stone | player raw anim 22 (frame 1 cracked) | break-free puff |
+
+Not reproduced exactly in the sim (fits kept for the hit timing): Masenkoha cursor movement (the game's cursor bounces
+16..70 / 100 px at 2 px/tick, but the measured hits only fit the old 24..48 px cursor), Big Bang contact box (fitted
+radius), Dragon Fist / Flame Kamehameha / Final Flash / Energy Sword hit objects (the graphics follow the game, the
+hits the fitted models).
 
 ## 9. Gaps / open questions
 

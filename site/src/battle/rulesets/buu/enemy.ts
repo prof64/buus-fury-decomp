@@ -597,13 +597,16 @@ export class Enemy extends Actor implements EnemyLike {
       w.add(new StraightShot(this.ctx, this, dir, 0, x, y, { vx, vy, box, atk: ATK[1], mult: 1024, color: ['#ffffff', '#ff9040'], radius: 3, name: kind, ...extra }))
     switch (kind) {
       case 'gun':
-        mk(f, ...at, dx * 672, dy * 672, GUN_BOX[f], { fragile: true, radius: 2, color: ['#fff8c0', '#ffa020'], fx: { id: 'fx_0874e968', frame: (d, t) => d + 4 * ((t >> 2) % 3) } })
+        // gun bullet 0x080274B4: record dir + 4f, f = 0,1,2,1 every 4 ticks
+        mk(f, ...at, dx * 672, dy * 672, GUN_BOX[f], { fragile: true, radius: 2, color: ['#fff8c0', '#ffa020'], fx: { id: 'fx_0874e968', frame: (d, t) => d + 4 * [0, 1, 2, 1][(t >> 2) & 3] } })
         break
       case 'rifle':
-        mk(f, ...at, dx * 448, dy * 448, [8, 8, 16, 16], { fragile: true, color: ['#e0ffe0', '#40c040'], fx: { id: 'fx_0874e614', frame: (d) => [0, 1, 2, 2][d], flip: (d) => d === 3 } })
+        // rifle bullet 0x080276A8: record dir, smoke trail records 4-6 (rate 0x2AAA) every 4 ticks
+        mk(f, ...at, dx * 448, dy * 448, [8, 8, 16, 16], { fragile: true, color: ['#e0ffe0', '#40c040'], fx: { id: 'fx_0874e614', frame: (d) => d }, trail: { id: 'fx_0874e614', rec: 4, n: 3, rate: 0x2aaa } })
         break
       case 'shell':
-        mk(f, (cx + dx * 12) << 8, (cy + dy * 12) << 8, dx * 448, dy * 448, [8, 8, 16, 16], { fragile: true, radius: 4, color: ['#ffd0d0', '#d03020'], fx: { id: 'fx_0871e630', frame: (d) => [0, 1, 2, 2][d], flip: (d) => d === 3 } })
+        // tank shell 0x0801C900: record dir, smoke trail records 4-6 (rate 0x2AAA) every 4 ticks
+        mk(f, (cx + dx * 12) << 8, (cy + dy * 12) << 8, dx * 448, dy * 448, [8, 8, 16, 16], { fragile: true, radius: 4, color: ['#ffd0d0', '#d03020'], fx: { id: 'fx_0871e630', frame: (d) => d }, trail: { id: 'fx_0871e630', rec: 4, n: 3, rate: 0x2aaa } })
         break
       case 'star':
         mk(f, (cx + dx * 8) << 8, (cy + dy * 8) << 8, dx * 448, dy * 448, [4, 4, 8, 8], { fragile: true, explode: false, color: ['#ffffff', '#a0a0b0'], radius: 3, fx: { id: 'fx_08754a1c', frame: (_d, t) => (t >> 3) & 1 } })
@@ -617,8 +620,9 @@ export class Enemy extends Actor implements EnemyLike {
         const dirs: Dir[] = kind === 'wrap' ? [f] : [0, 1, 2, 3]
         for (const d of dirs) {
           const [ddx, ddy] = DIR_VEC[d]
-          mk(d, (cx + ddx * 8) << 8, (cy + ddy * 8) << 8, ddx * 448, ddy * 448, d >= 2 ? [8, 4, 16, 8] : [4, 8, 8, 16], { onHitPlayer: wrapHit, explode: false, color: ['#f0e8c8', '#b0a070'] })
-          if (kind === 'burst') mk(d, cx << 8, cy << 8, DIAG[d][0], DIAG[d][1], [8, 8, 16, 16], { onHitPlayer: wrapHit, explode: false, color: ['#f0e8c8', '#b0a070'] })
+          // bandage 0x0802D79C (fx_087571f4): straight records 3 * (dir >> 1) + (t mod 24) >> 3, diagonal + 6
+          mk(d, (cx + ddx * 8) << 8, (cy + ddy * 8) << 8, ddx * 448, ddy * 448, d >= 2 ? [8, 4, 16, 8] : [4, 8, 8, 16], { onHitPlayer: wrapHit, explode: false, color: ['#f0e8c8', '#b0a070'], fx: { id: 'fx_087571f4', frame: (dd, t) => 3 * (dd >> 1) + ((t % 24) >> 3) } })
+          if (kind === 'burst') mk(d, cx << 8, cy << 8, DIAG[d][0], DIAG[d][1], [8, 8, 16, 16], { onHitPlayer: wrapHit, explode: false, color: ['#f0e8c8', '#b0a070'], fx: { id: 'fx_087571f4', frame: (dd, t) => 6 + 3 * (dd >> 1) + ((t % 24) >> 3) } })
         }
         break
       }
@@ -629,8 +633,12 @@ export class Enemy extends Actor implements EnemyLike {
         const ddx = tx - cx
         const ddy = ty - cy
         const m = Math.max(1, Math.abs(ddx), Math.abs(ddy))
+        // Dabura's spit 0x0802E444: one of 5 aim sectors (2 records each, toggling every 4 ticks) from the aim vector
+        const sector = 2 * ddx < -5 * ddy ? 0 : 12 * ddx < -5 * ddy ? 2 : 2 * ddx > 5 * ddy ? 8 : 12 * ddx > 5 * ddy ? 6 : 4
         mk(f, cx << 8, (cy - 4) << 8, Math.round((ddx * 512) / m), Math.round((ddy * 512) / m), [4, 4, 8, 8], {
           color: ['#e0e0e0', '#707070'],
+          explode: false,
+          fx: { id: 'fx_087579b8', frame: (_d, t) => sector + ((t >> 2) & 1) },
           onHitPlayer: (ww) => this.player?.hold(ww, this, 'stone', 297),
         })
         break
@@ -646,10 +654,10 @@ export class Enemy extends Actor implements EnemyLike {
       const dy = w.rng.rand(201, 'teleport dy') - 100
       if (Math.max(Math.abs(dx), Math.abs(dy)) < 70) continue
       if (!this.fits(w, this.px + dx, this.py + dy)) continue
-      this.ctx.puff(w, ...this.center())
+      this.ctx.puffRng(w, ...this.center())
       this.x += dx << 8
       this.y += dy << 8
-      this.ctx.puff(w, ...this.center())
+      this.ctx.puffRng(w, ...this.center())
       return
     }
   }
@@ -893,32 +901,23 @@ export class Enemy extends Actor implements EnemyLike {
       this.defeated = true
       this.w.stats.kills++
     }
-    if (explode) this.ctx.explosion(this.w, ...this.center())
+    // 0x08018960: explosion 0x0801952C at the body-box centre, rate 0x1000 + rand(0x1000)
+    if (explode) this.ctx.explosion(this.w, ...this.center(), 0x1000 + this.w.rng.rand(0x1000, 'death explosion rate'))
     this.removed = true
   }
 
   draw(r: Renderer, w: World) {
-    // the real ground shadow (sprite header) is drawn by Actor.draw; this soft one only marks airborne / hovering
-    // objects whose sprite has none
-    if ((this.z < -4 || this.type.type === 0x4 || this.type.type === 0x19 || this.type.type === 0x1d) && !this.shadowSprite()) {
-      const g = r.ctx
-      g.fillStyle = 'rgba(0,0,0,0.35)'
-      g.beginPath()
-      g.ellipse(r.sx(this.px + (this.footW >> 1)), r.sy(this.py + (this.footH >> 1)), this.footW >> 1, this.footH >> 1, 0, 0, Math.PI * 2)
-      g.fill()
-    }
+    // ground shadows: only the sprite header's shadow OBJ (Actor.draw); the game draws none for the others
     if (this.volleyball) {
-      const [cx, cy] = this.center()
-      const g = r.ctx
-      g.fillStyle = '#f8f8f0'
-      g.beginPath()
-      g.arc(r.sx(cx), r.sy(cy + 6), 9, 0, Math.PI * 2)
-      g.fill()
-      g.strokeStyle = '#d04040'
-      g.stroke()
-      g.beginPath()
-      g.arc(r.sx(cx) - 4, r.sy(cy + 6), 9, -0.6, 0.6)
-      g.stroke()
+      // 0x0803C830: the struck enemy shows sprite def 281, raw animation 1, frame 0, facing right
+      const orb = this.ctx.data.sprites.index(281)
+      const save = [this.sprite, this.anim, this.frameIdx, this.facing] as const
+      this.sprite = orb
+      this.anim = orb?.anim(1)
+      this.frameIdx = 0
+      this.facing = 3
+      super.draw(r, w)
+      ;[this.sprite, this.anim, this.frameIdx, this.facing] = save
       return
     }
     super.draw(r, w)

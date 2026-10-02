@@ -26,9 +26,11 @@ function run(skill: number, level: number, hold: number, dist: number) {
   const e = s.enemies[0]
   e.hp1024 = e.maxHp1024 = 1e12
   e.ai.tick = () => undefined
-  const b = s.w.arena.bounds
-  p.x = ((b.x0 + 60) << 8)
-  p.y = (((b.y0 + b.y1) >> 1) << 8)
+  // on the chamber's floor (its walkable region spans the whole 400 x 400 map, but the clouds left of x = 100 are
+  // projectile walls that stop the beams)
+  void s.w.arena.bounds
+  p.x = 160 << 8
+  p.y = 150 << 8
   p.facing = 3
   const pin = () => {
     e.x = p.x + (dist << 8)

@@ -30,7 +30,12 @@ export interface BuuChar {
 
 export interface BuuForm {
   id: number
+  /** the character's name (form +2) */
   name: string
+  /** the game's name for this look (Dojo roster names, data/battle/buu_form_names.json): 'SS Goku', 'Mystic Gohan' */
+  label: string
+  /** the upper-case name of the HUD / status screen (form +4) */
+  hud: string
   char: number
   flags: number
   gfx: number
@@ -42,6 +47,8 @@ export interface BuuForm {
   ss: boolean
   ss3: boolean
   fusion: boolean
+  /** the form controller object (0x03001B60.. : SS gauge, idle state, fusion timer ...) */
+  controller: number
 }
 
 export interface SkillDef {
@@ -86,6 +93,10 @@ export interface EnemyType {
   type: number
   name: string
   named: boolean
+  /** the game has no name for this type: `name` is ours */
+  descriptiveName: boolean
+  /** the game's own text for this type (database / ROM string), null when it has none */
+  gameName: string | null
   hp: number
   exp: number
   ai: number
@@ -154,17 +165,43 @@ function renameAi(n: AiNodeJ): AiNodeJ {
   return { ...n, ...(to ? { name: to, dataName: n.name } : {}), ...(children ? { children } : {}) }
 }
 
+/** enemies.json display_name: the game's own name (+ the qualifier that tells same-named types apart), or a
+ *  descriptive name for types the game never names (display_name_source 'descriptive') */
 function enemyName(e: J): string {
-  if (e.name && e.name_source === 'database') return e.name
-  if (e.name) return e.name
-  return `Unnamed type 0x${e.type.toString(16).toUpperCase()}`
+  return e.display_name ?? e.name ?? `Type 0x${e.type.toString(16).toUpperCase()}`
 }
 
 const FUSION_FLAG = 0x04
 
-export function buildBuuData(src: { characters: J; levels: J; moves: J; items: J; enemies: J; ai: J; bosses: J; attacks: J; sprites: J; formulas: J; extra: J; collision?: J }): BuuData {
+/** the game's frame durations of the player's animations (data/battle/buu_anim_timing.json `durations`, from the
+ *  state each SetAnim id runs) on the sprites the forms use: sprite previews show the real timing (the battle itself
+ *  runs the state machines, panim.ts) */
+function playerAnimTiming(ents: SpriteEntityJson[], forms: J[], timing: J | undefined): SpriteEntityJson[] {
+  const dur = timing?.durations as Record<string, { each?: number; two_frame?: number[]; other?: number; loop: boolean }> | undefined
+  if (!dur) return ents
+  const ids = new Set(forms.map((f) => (f.gfx_id as number) - 9))
+  return ents.map((e) => {
+    if (e.sprite_index == null || !ids.has(e.sprite_index)) return e
+    const animations = Object.fromEntries(
+      Object.entries(e.animations).map(([k, a]) => {
+        const d = dur[String(a.raw_index)]
+        if (!d) return [k, a]
+        const directions = Object.fromEntries(
+          Object.entries(a.directions).map(([dk, steps]) => [
+            dk,
+            (steps ?? []).map((s, i, arr) => ({ ...s, duration_frames: d.two_frame && arr.length === 2 ? d.two_frame[i] : (d.each ?? d.other ?? s.duration_frames) })),
+          ]),
+        )
+        return [k, { ...a, loop: d.loop, timing_source: 'game state code (data/battle/buu_anim_timing.json)', directions }]
+      }),
+    )
+    return { ...e, animations }
+  })
+}
+
+export function buildBuuData(src: { characters: J; levels: J; moves: J; items: J; enemies: J; ai: J; bosses: J; attacks: J; sprites: J; formulas: J; extra: J; collision?: J; formNames?: J; animTiming?: J }): BuuData {
   const { characters, levels, moves, items, enemies, ai, bosses, attacks, sprites, formulas, extra, collision } = src
-  const ents = sprites.entities as SpriteEntityJson[]
+  const ents = playerAnimTiming(sprites.entities as SpriteEntityJson[], characters.forms as J[], src.animTiming)
   const bank = new SpriteBank(ents.filter((e) => e.category !== 'portrait'))
   const portraits = new Map<number, string>()
   for (const e of ents as (SpriteEntityJson & { portrait_index?: number })[]) if (e.category === 'portrait' && e.portrait_index != null) portraits.set(e.portrait_index, e.sheet)
@@ -185,11 +222,15 @@ export function buildBuuData(src: { characters: J; levels: J; moves: J; items: J
     growth: c.growth.raw_u32,
     forms: c.forms,
   }))
+  const names = (src.formNames?.forms ?? {}) as Record<string, { name: string; hud: string }>
   const forms: BuuForm[] = (characters.forms as J[]).map((f) => {
     const mb = f.measured_bonus
+    const gn = names[String(f.index)]
     return {
       id: f.index,
       name: f.name || chars[f.char_index]?.name || `form ${f.index}`,
+      label: gn?.name || f.name || chars[f.char_index]?.name || `form ${f.index}`,
+      hud: gn?.hud || f.upper_name || '',
       char: f.char_index,
       flags: f.flags,
       gfx: f.gfx_id,
@@ -201,6 +242,7 @@ export function buildBuuData(src: { characters: J; levels: J; moves: J; items: J
       ss: !!(f.flags & 1),
       ss3: !!(f.flags & 2),
       fusion: !!(f.flags & FUSION_FLAG),
+      controller: parseInt(String(f.controller_slot), 16),
     }
   })
   const skills = new Map<number, SkillDef>()
@@ -254,6 +296,8 @@ export function buildBuuData(src: { characters: J; levels: J; moves: J; items: J
       type: e.type,
       name: enemyName(e),
       named: !!e.name,
+      descriptiveName: e.display_name_source === 'descriptive' || !e.name,
+      gameName: e.display_name_source === 'descriptive' ? null : (e.name ?? null),
       hp: e.hp,
       exp: e.exp,
       ai: e.ai_state,
@@ -327,11 +371,11 @@ export function loadBuu(): Promise<BuuData> {
   if (!loaded) {
     loaded = (async () => {
       const names = ['characters', 'levels', 'moves', 'items', 'enemies', 'enemy_ai', 'bosses', 'attacks_detail', 'sprites', 'formulas'] as const
-      const [vals, extra, collision] = await Promise.all([Promise.all(names.map((n) => loadData('buu', n))), loadData('battle', 'buu_ai_extra'), loadData('battle', 'buu_collision')])
+      const [vals, extra, collision, formNames, animTiming] = await Promise.all([Promise.all(names.map((n) => loadData('buu', n))), loadData('battle', 'buu_ai_extra'), loadData('battle', 'buu_collision'), loadData('battle', 'buu_form_names'), loadData('battle', 'buu_anim_timing')])
       const v = Object.fromEntries(names.map((n, i) => [n, vals[i]])) as Record<string, J>
       return buildBuuData({
         characters: v.characters, levels: v.levels, moves: v.moves, items: v.items, enemies: v.enemies, ai: v.enemy_ai,
-        bosses: v.bosses, attacks: v.attacks_detail, sprites: v.sprites, formulas: v.formulas, extra: extra as J, collision: collision as J,
+        bosses: v.bosses, attacks: v.attacks_detail, sprites: v.sprites, formulas: v.formulas, extra: extra as J, collision: collision as J, formNames: formNames as J, animTiming: animTiming as J,
       })
     })()
   }

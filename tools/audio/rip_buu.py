@@ -26,7 +26,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from buu_sound import (ROOT, ROM, PLAYER, VOICES, SONG_TABLE, SFX_TABLE, N_SONGS, N_SFX, PLAY_SONG,  # noqa: E402
                        PLAY_SFX, STOP_ALL_SFX, MIX_RATE, Harness, song_entry, sfx_entry)
-from names_buu import SONGS, SFX, ARENA_MUSIC, BOSS_MUSIC, EVENTS  # noqa: E402
+from names_buu import SONGS, SFX, ARENA_MUSIC, BOSS_MUSIC, BOSS_MUSIC_TYPES, EVENTS  # noqa: E402
 
 VERSION = 7
 CACHE = ROOT / 'work' / 'audio' / 'cache'
@@ -436,7 +436,7 @@ def write_outputs(rom, cdir, songs_meta, sfx_meta):
         'render': {'sample_rate': 32000, 'source_rate': rate, 'gain_db': round(float(gain), 2), 'codec': f'mp3 {BITRATE}',
                    'loop_note': 'loop.start/loop.end in seconds of the file; the loop is periodic from start, so '
                                 'jumping end->start is seamless even with a few ms of decoder offset'},
-        'arena_music': ARENA_MUSIC, 'boss_music': BOSS_MUSIC, 'events': EVENTS,
+        'arena_music': ARENA_MUSIC, 'boss_music': BOSS_MUSIC, 'boss_music_types': BOSS_MUSIC_TYPES, 'events': EVENTS,
         'area_scripts': [{'areas': l, 'script': f'0x{s:08X}'} for l, s in area_scripts],
         'music': music, 'sfx': sfx,
     }

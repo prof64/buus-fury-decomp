@@ -135,8 +135,12 @@ export function buuEnemies(json: J, sp?: SpriteIndex): EnemyVM[] {
     const boss = !!e.name && e.drop_script === '0x0' && /^none/.test(e.hit_reaction ?? '') && e.hp >= 1000 && (BUU_BOSS.test(e.name) || spawns <= 5)
     return {
       key: String(e.type),
-      name: e.name ?? `Unnamed type 0x${e.type.toString(16).toUpperCase()}`,
-      sub: e.name_source && e.name_source !== 'database' ? `name from ${e.name_source}` : undefined,
+      // display_name: the game's name (+ qualifier for same-named types) or a descriptive one (marked)
+      name: e.display_name ?? e.name ?? `Type 0x${e.type.toString(16).toUpperCase()}`,
+      sub: e.display_name_source === 'descriptive' || !e.name
+        ? 'descriptive name (the game has none)'
+        : e.name_source && e.name_source !== 'database' ? `game name "${e.name}" from ${e.name_source}`
+        : e.display_name && e.display_name !== e.name ? `game name "${e.name}"` : undefined,
       idLabel: `type 0x${e.type.toString(16).toUpperCase()} (${e.type})`,
       rom: e.address,
       hp: e.hp,

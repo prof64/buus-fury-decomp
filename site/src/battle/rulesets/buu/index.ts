@@ -16,6 +16,7 @@ import { drawHud, HUD } from './hud'
 import { Player } from './player'
 import { fuse, recalcStats, recordAtLevel, type BuuRecord, type GrowthMode } from './progression'
 import { BuuRng } from './rng'
+import { audioEvent } from '../../audio/bus'
 
 // `spawn` = the player's starting footprint (world px, on walkable ground); with the map's collision the arena bounds
 // become the bounding box of the walkable region around it (the tiles do the rest); `bounds` is the fallback when a
@@ -76,7 +77,7 @@ const PRESETS: Preset[] = [
   { id: 'kid_buu', name: 'Kid Buu', note: 'splits in two when you keep your distance, merges back after 1800 frames', phases: [{ enemy: 't60', count: 1 }], arena: 'wasteland' },
   { id: 'janemba', name: 'Janemba -> Super Janemba (HFIL)', note: 'hand strikes, airborne summons of Mini-Janembas; then Super Janemba (teleports, energy wave)', phases: [{ enemy: 't51', count: 1 }, { enemy: 't122', count: 1 }], arena: 'hfil' },
   { id: 'broly', name: 'Broly (Volcano Summit)', note: 'charged punch, jump smash; landing on a rock stuns him', phases: [{ enemy: 't10', count: 1 }], arena: 'volcano' },
-  { id: 'babidi_ship', name: "Babidi's ship: Pui Pui -> Yakon -> Dabura", phases: [{ enemy: 't96', count: 1 }, { enemy: 't145', count: 1 }, { enemy: 't18', count: 1 }], arena: 'demon' },
+  { id: 'babidi_ship', name: "Babidi's ship: PuiPui -> Yakon -> Dabura", phases: [{ enemy: 't96', count: 1 }, { enemy: 't145', count: 1 }, { enemy: 't18', count: 1 }], arena: 'demon' },
   { id: 'yakon', name: 'Yakon (use energy attacks!)', phases: [{ enemy: 't145', count: 1 }], arena: 'yakon' },
   { id: 'dabura', name: 'Dabura (dark sphere, stone spit)', phases: [{ enemy: 't18', count: 1 }], arena: 'demon' },
   { id: 'majin_vegeta', name: 'Majin Vegeta (Final Flash)', phases: [{ enemy: 't70', count: 1 }], arena: 'canyon' },
@@ -89,7 +90,7 @@ const PRESETS: Preset[] = [
   { id: 'guardian', name: "Pilaf's Guardian", phases: [{ enemy: 't63', count: 1 }], arena: 'forest' },
   { id: 'warlord', name: 'Airship Warlord', phases: [{ enemy: 't0', count: 1 }], arena: 'forest' },
   { id: 'blister', name: 'Blister (spawns Enzymes)', phases: [{ enemy: 't6', count: 1 }], arena: 'crater' },
-  { id: 'worm', name: 'Worm (head + 5 segments)', phases: [{ enemy: 't142', count: 1 }], arena: 'crater' },
+  { id: 'worm', name: 'Worm Head (+ 5 Worm Body segments)', phases: [{ enemy: 't142', count: 1 }], arena: 'crater' },
   { id: 'majin_fighters', name: 'Southwest Forest: 4 Majin Fighters', phases: [{ enemy: 't68', count: 4 }], arena: 'forest' },
 ]
 
@@ -100,20 +101,21 @@ const INVULNERABLE = new Set([0x1a, 0x1b])
 const SLOTS = ['body', 'hands', 'feet', 'accessory'] as const
 const STAT_KEYS = ['STR', 'POW', 'END', 'SPD'] as const
 
-function formLabel(d: BuuData, f: BuuForm): string {
-  const charName = f.name
+/** form names in the game's own style (character-select / Dojo text: "SS Goku", "SS3 Gotenks", "Great Saiyaman"),
+ *  plus the variant that tells same-looking forms apart */
+function formLabel(_d: BuuData, f: BuuForm): string {
+  // the game's own name for the look (Dojo roster strings 116..147: 'SS Goku', 'Teen Gohan', 'Mystic Gohan', 'Great
+  // Saiyaman', 'SS Gogeta' ... - data/battle/buu_form_names.json), else the character's name
+  if (f.id === 14) return 'Great Saiyaman · form 14'
+  const base = f.label || `${f.ss3 ? 'SS3 ' : f.ss ? 'SS ' : ''}${f.name}`
   const tags: string[] = []
-  if (f.id === 14) return 'Great Saiyaman'
-  if (f.ss3) tags.push('Super Saiyan 3')
-  else if (f.ss) tags.push('Super Saiyan')
   if ([2, 4, 6].includes(f.id)) tags.push('halo')
   if (f.id === 1) tags.push('Other World')
   if (f.id === 7 || f.id === 8) tags.push('no transform flag')
   if (f.id === 24) tags.push('slow (speed / 4)')
   if (f.id === 25) tags.push('+64 speed')
   if (f.fusion && (f.flags & 0x20)) tags.push('timed fusion')
-  const spr = d.sprites.index(f.gfx - 9)
-  return `${tags.length ? tags.join(', ') : spr?.json.category === 'player' ? spr.json.name : charName} · form ${f.id}`
+  return `${base}${tags.length ? ` (${tags.join(', ')})` : ''} · form ${f.id}`
 }
 
 function parseEnemyId(id: string): { type: number; primary: boolean }[] {
@@ -137,6 +139,12 @@ export class BuuRuleset implements Ruleset {
     }
     for (const id of ['fx_086fd9d0', 'fx_08712fdc', 'buu_halo', 'buu_shadow_4x2', 'buu_shadow_10x4', 'buu_shadow_16x6', 'buu_shadow_24x10']) {
       const s = this.d.sprites.get(id)
+      if (s) sheets.add(s.json.sheet)
+    }
+    // every effect sheet (fx_<addr> runs, beam piece sets, debris): projectiles and effects draw the game's records
+    for (const [, s] of this.d.sprites.byId) if (s.json.category === 'effect') sheets.add(s.json.sheet)
+    for (const i of [45, 148, 281]) {
+      const s = this.d.sprites.index(i)
       if (s) sheets.add(s.json.sheet)
     }
     const icons = [...this.d.skills.values()].flatMap((s) => [s.icon, s.iconDim])
@@ -204,6 +212,7 @@ export class BuuRuleset implements Ruleset {
     return [...groups, ...d.enemies.map((e) => {
       const group = HELPER_TYPES.has(e.type) || e.hp === 0 ? 'Helper / part' : BOSS_TYPES.has(e.type) ? 'Boss' : e.spawns.length ? 'Enemy' : 'Unused / variant'
       const tags: string[] = []
+      if (e.descriptiveName) tags.push('descriptive name (none in the game)')
       if (!e.sprite) tags.push('no graphics')
       if (e.placeholderGfx) tags.push('placeholder sprite')
       if (e.resM < 128) tags.push(`melee x${(e.resM / 128).toFixed(2)}`)
@@ -529,6 +538,15 @@ export class BuuRuleset implements Ruleset {
     }
     camera(w)
     camInit = false // snap again on the first frame (setups / tests may move the player after createBattle)
+    // the lockstep harness copies the emulator's camera (22.10 position of [0x080707E8]) at frame 0
+    ctx.setCamera = (x: number, y: number) => {
+      camX = x
+      camY = y
+      camInit = true
+      const cx = camX >> 10
+      const cy = camY >> 10
+      w.camera = { x0: cx, y0: cy, x1: cx + GBA_W, y1: cy + GBA_H }
+    }
 
     const battle: RulesetBattle = {
       preStep() {
@@ -537,6 +555,11 @@ export class BuuRuleset implements Ruleset {
       },
       postStep(w2) {
         camera(w2)
+        // HUD 0x0800BA3A: low-HP beep (sound 41, volume 32) when 0 < HP <= maxHP / 5, more than 60 frames apart
+        if (player.hp !== 0 && 5 * player.hp <= player.maxHp && w2.frame - ctx.lastBeep > 60) {
+          ctx.lastBeep = w2.frame
+          audioEvent('sfx', { id: 41, vol: 32 })
+        }
         if (!live().length && phase < cfg.phases.length - 1 && !player.dead) {
           if (!nextPhaseAt) {
             nextPhaseAt = w2.frame + 120
@@ -554,8 +577,10 @@ export class BuuRuleset implements Ruleset {
         const sv = surviveLeft()
         drawHud(r, ctx, player, ctx.enemies as Enemy[], [cfg.phases.length > 1 ? `${phase + 1}/${cfg.phases.length}` : '', sv >= 0 ? `SURVIVE ${Math.ceil(sv / 60)}` : ''].filter(Boolean).join(' '))
       },
-      outcome() {
-        if (player.dead) return 'lost'
+      outcome(w2) {
+        // the KO plays out first: knockdown animation, then the death script starts the game-over song 200 frames
+        // after the KO (player.ts afterHpChange) - the battle ends there
+        if (player.dead) return player.koAt < 0 || w2.frame - player.koAt >= 200 ? 'lost' : 'running'
         if (phase >= cfg.phases.length - 1 && (!live().length || surviveLeft() === 0)) return 'won'
         return 'running'
       },
