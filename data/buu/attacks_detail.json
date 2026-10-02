@@ -1,0 +1,5383 @@
+{
+ "melee": {
+  "fn": "0x08012A24",
+  "rect_table": "0x83c344c",
+  "rects_rel_player": [
+   {
+    "facing": "down",
+    "x0": 0,
+    "y0": 0,
+    "x1": 16,
+    "y1": 16
+   },
+   {
+    "facing": "up",
+    "x0": 0,
+    "y0": -24,
+    "x1": 16,
+    "y1": 0
+   },
+   {
+    "facing": "left",
+    "x0": -8,
+    "y0": -24,
+    "x1": 0,
+    "y1": 8
+   },
+   {
+    "facing": "right",
+    "x0": 16,
+    "y0": -24,
+    "x1": 24,
+    "y1": 8
+   }
+  ],
+  "hit_mult": 1024,
+  "attack_type": "0x086B8098 (melee sub 2)",
+  "next_state": "4 + rand(3) (three swing animations, same logic)",
+  "recovery_frames": 17,
+  "status": "verified",
+  "note": "One instant hitbox per swing, same rect for every form; a new A press is accepted once back in idle.",
+  "forms": [
+   {
+    "form": 0,
+    "name": "Goku",
+    "melee_anims": [
+     "0x85104e8",
+     "0x850f68c",
+     "0x851131c"
+    ],
+    "recovery_frames": 17,
+    "walk_256ths": 352,
+    "dash_256ths": 672,
+    "status": "measured"
+   },
+   {
+    "form": 1,
+    "name": "Goku",
+    "melee_anims": [
+     "0x85198fc",
+     "0x851a77c"
+    ],
+    "recovery_frames": 17,
+    "walk_256ths": 352,
+    "dash_256ths": 672,
+    "status": "measured"
+   },
+   {
+    "form": 2,
+    "name": "Goku",
+    "melee_anims": [
+     "0x85104e8",
+     "0x850f68c",
+     "0x851131c"
+    ],
+    "recovery_frames": 17,
+    "walk_256ths": 352,
+    "dash_256ths": 672,
+    "status": "measured"
+   },
+   {
+    "form": 3,
+    "name": "Goku",
+    "melee_anims": [
+     "0x85208b8",
+     "0x8520734",
+     "0x852188c"
+    ],
+    "recovery_frames": 17,
+    "walk_256ths": 480,
+    "dash_256ths": 800,
+    "status": "measured"
+   },
+   {
+    "form": 4,
+    "name": "Goku",
+    "melee_anims": [
+     "0x85208b8",
+     "0x8520734",
+     "0x852188c"
+    ],
+    "recovery_frames": 17,
+    "walk_256ths": 480,
+    "dash_256ths": 800,
+    "status": "measured"
+   },
+   {
+    "form": 5,
+    "name": "Goku",
+    "melee_anims": [
+     "0x852c568",
+     "0x852c3e4",
+     "0x852d6f8"
+    ],
+    "recovery_frames": 17,
+    "walk_256ths": 544,
+    "dash_256ths": 864,
+    "status": "measured"
+   },
+   {
+    "form": 6,
+    "name": "Goku",
+    "melee_anims": [
+     "0x852c568",
+     "0x852c3e4",
+     "0x852d6f8"
+    ],
+    "recovery_frames": 17,
+    "walk_256ths": 544,
+    "dash_256ths": 864,
+    "status": "measured"
+   },
+   {
+    "form": 7,
+    "name": "Goku",
+    "melee_anims": [
+     "0x852c568",
+     "0x852c3e4",
+     "0x852d6f8"
+    ],
+    "recovery_frames": 17,
+    "walk_256ths": 544,
+    "dash_256ths": 864,
+    "status": "measured"
+   },
+   {
+    "form": 8,
+    "name": "Goku",
+    "melee_anims": [
+     "0x852c568",
+     "0x852c3e4",
+     "0x852d6f8"
+    ],
+    "recovery_frames": 17,
+    "walk_256ths": 544,
+    "dash_256ths": 864,
+    "status": "measured"
+   },
+   {
+    "form": 9,
+    "name": "Gohan",
+    "melee_anims": [],
+    "recovery_frames": null,
+    "walk_256ths": 362,
+    "dash_256ths": 682,
+    "status": "probe failed (form not usable from this warp state)"
+   },
+   {
+    "form": 10,
+    "name": "Gohan",
+    "melee_anims": [
+     "0x84cdc14",
+     "0x84ce994"
+    ],
+    "recovery_frames": 17,
+    "walk_256ths": 362,
+    "dash_256ths": 682,
+    "status": "measured"
+   },
+   {
+    "form": 11,
+    "name": "Gohan",
+    "melee_anims": [],
+    "recovery_frames": null,
+    "walk_256ths": 362,
+    "dash_256ths": 682,
+    "status": "probe failed (form not usable from this warp state)"
+   },
+   {
+    "form": 12,
+    "name": "Gohan",
+    "melee_anims": [
+     "0x84da940"
+    ],
+    "recovery_frames": null,
+    "walk_256ths": 362,
+    "dash_256ths": 682,
+    "status": "probe failed (form not usable from this warp state)"
+   },
+   {
+    "form": 13,
+    "name": "Gohan",
+    "melee_anims": [
+     "0x84de020",
+     "0x84dee18"
+    ],
+    "recovery_frames": 17,
+    "walk_256ths": 362,
+    "dash_256ths": 682,
+    "status": "measured"
+   },
+   {
+    "form": 14,
+    "name": "Gohan",
+    "melee_anims": [
+     "0x84e7d10",
+     "0x84e8e80"
+    ],
+    "recovery_frames": 17,
+    "walk_256ths": 490,
+    "dash_256ths": 810,
+    "status": "measured"
+   },
+   {
+    "form": 15,
+    "name": "Gohan",
+    "melee_anims": [
+     "0x84f26fc",
+     "0x84f34b0"
+    ],
+    "recovery_frames": 17,
+    "walk_256ths": 362,
+    "dash_256ths": 682,
+    "status": "measured"
+   },
+   {
+    "form": 16,
+    "name": "Gohan",
+    "melee_anims": [
+     "0x84fc938",
+     "0x84fd8b4"
+    ],
+    "recovery_frames": 17,
+    "walk_256ths": 490,
+    "dash_256ths": 810,
+    "status": "measured"
+   },
+   {
+    "form": 17,
+    "name": "Gohan",
+    "melee_anims": [
+     "0x84fc938",
+     "0x84fd8b4"
+    ],
+    "recovery_frames": 17,
+    "walk_256ths": 490,
+    "dash_256ths": 810,
+    "status": "measured"
+   },
+   {
+    "form": 18,
+    "name": "Gohan",
+    "melee_anims": [
+     "0x8505490",
+     "0x8506444"
+    ],
+    "recovery_frames": 17,
+    "walk_256ths": 490,
+    "dash_256ths": 810,
+    "status": "measured"
+   },
+   {
+    "form": 19,
+    "name": "Goten",
+    "melee_anims": [
+     "0x8535f1c",
+     "0x8536b70"
+    ],
+    "recovery_frames": 17,
+    "walk_256ths": 377,
+    "dash_256ths": 697,
+    "status": "measured"
+   },
+   {
+    "form": 20,
+    "name": "Goten",
+    "melee_anims": [
+     "0x8540664",
+     "0x85414e4"
+    ],
+    "recovery_frames": 17,
+    "walk_256ths": 505,
+    "dash_256ths": 825,
+    "status": "measured"
+   },
+   {
+    "form": 21,
+    "name": "Trunks",
+    "melee_anims": [
+     "0x864205c",
+     "0x8642f5c"
+    ],
+    "recovery_frames": 17,
+    "walk_256ths": 377,
+    "dash_256ths": 697,
+    "status": "measured"
+   },
+   {
+    "form": 22,
+    "name": "Trunks",
+    "melee_anims": [
+     "0x864c964",
+     "0x864d930"
+    ],
+    "recovery_frames": 17,
+    "walk_256ths": 505,
+    "dash_256ths": 825,
+    "status": "measured"
+   },
+   {
+    "form": 23,
+    "name": "Trunks",
+    "melee_anims": [
+     "0x5b5d5b5b"
+    ],
+    "recovery_frames": null,
+    "walk_256ths": 791609391,
+    "dash_256ths": 791555630,
+    "status": "probe failed (form not usable from this warp state)"
+   },
+   {
+    "form": 24,
+    "name": "Trunks",
+    "melee_anims": [
+     "0x8644894",
+     "0x864c964",
+     "0x864d930",
+     "0x864205c",
+     "0x8642f5c"
+    ],
+    "recovery_frames": null,
+    "walk_256ths": 94,
+    "dash_256ths": 174,
+    "status": "probe failed (form not usable from this warp state)"
+   },
+   {
+    "form": 25,
+    "name": "Trunks",
+    "melee_anims": [
+     "0x864c964",
+     "0x864d930",
+     "0x8642f5c",
+     "0x864205c"
+    ],
+    "recovery_frames": null,
+    "walk_256ths": 441,
+    "dash_256ths": 761,
+    "status": "probe failed (form not usable from this warp state)"
+   },
+   {
+    "form": 26,
+    "name": "Vegeta",
+    "melee_anims": [
+     "0x8660a20",
+     "0x866089c",
+     "0x8661784"
+    ],
+    "recovery_frames": 17,
+    "walk_256ths": 327,
+    "dash_256ths": 647,
+    "status": "measured"
+   },
+   {
+    "form": 27,
+    "name": "Vegeta",
+    "melee_anims": [
+     "0x8660a20",
+     "0x866089c",
+     "0x8661784"
+    ],
+    "recovery_frames": 17,
+    "walk_256ths": 327,
+    "dash_256ths": 647,
+    "status": "measured"
+   },
+   {
+    "form": 28,
+    "name": "Vegeta",
+    "melee_anims": [
+     "0x866ca64",
+     "0x866c8e0",
+     "0x866d9c4"
+    ],
+    "recovery_frames": 17,
+    "walk_256ths": 455,
+    "dash_256ths": 775,
+    "status": "measured"
+   },
+   {
+    "form": 29,
+    "name": "Vegeta",
+    "melee_anims": [
+     "0x866ca64",
+     "0x866c8e0",
+     "0x866d9c4"
+    ],
+    "recovery_frames": 17,
+    "walk_256ths": 455,
+    "dash_256ths": 775,
+    "status": "measured"
+   },
+   {
+    "form": 30,
+    "name": "Vegeta",
+    "melee_anims": [
+     "0x866ca64",
+     "0x866c8e0",
+     "0x866d9c4"
+    ],
+    "recovery_frames": 17,
+    "walk_256ths": 455,
+    "dash_256ths": 775,
+    "status": "measured"
+   },
+   {
+    "form": 31,
+    "name": "Gotenks",
+    "melee_anims": [
+     "0x854b934",
+     "0x854c83c"
+    ],
+    "recovery_frames": 17,
+    "walk_256ths": 327,
+    "dash_256ths": 647,
+    "status": "measured"
+   },
+   {
+    "form": 32,
+    "name": "Gotenks",
+    "melee_anims": [
+     "0x85524d4",
+     "0x863ec48"
+    ],
+    "recovery_frames": null,
+    "walk_256ths": 377,
+    "dash_256ths": 697,
+    "status": "probe failed (form not usable from this warp state)"
+   },
+   {
+    "form": 33,
+    "name": "Gotenks",
+    "melee_anims": [
+     "0x8552bc4",
+     "0x863ec48"
+    ],
+    "recovery_frames": null,
+    "walk_256ths": 377,
+    "dash_256ths": 697,
+    "status": "probe failed (form not usable from this warp state)"
+   },
+   {
+    "form": 34,
+    "name": "Gotenks",
+    "melee_anims": [
+     "0x8556b40",
+     "0x8557a9c"
+    ],
+    "recovery_frames": 17,
+    "walk_256ths": 455,
+    "dash_256ths": 775,
+    "status": "measured"
+   },
+   {
+    "form": 35,
+    "name": "Gotenks",
+    "melee_anims": [
+     "0x8561320",
+     "0x8562468"
+    ],
+    "recovery_frames": 17,
+    "walk_256ths": 519,
+    "dash_256ths": 839,
+    "status": "measured"
+   },
+   {
+    "form": 36,
+    "name": "Gotenks",
+    "melee_anims": [
+     "0x854b934",
+     "0x854c83c"
+    ],
+    "recovery_frames": 17,
+    "walk_256ths": 327,
+    "dash_256ths": 647,
+    "status": "measured"
+   },
+   {
+    "form": 37,
+    "name": "Gotenks",
+    "melee_anims": [
+     "0x8556b40",
+     "0x8557a9c"
+    ],
+    "recovery_frames": 17,
+    "walk_256ths": 455,
+    "dash_256ths": 775,
+    "status": "measured"
+   },
+   {
+    "form": 38,
+    "name": "Gotenks",
+    "melee_anims": [
+     "0x8561320",
+     "0x8562468"
+    ],
+    "recovery_frames": 17,
+    "walk_256ths": 519,
+    "dash_256ths": 839,
+    "status": "measured"
+   },
+   {
+    "form": 39,
+    "name": "Vegito",
+    "melee_anims": [
+     "0x867838c",
+     "0x86793d4"
+    ],
+    "recovery_frames": 17,
+    "walk_256ths": 327,
+    "dash_256ths": 647,
+    "status": "measured"
+   },
+   {
+    "form": 40,
+    "name": "Vegito",
+    "melee_anims": [
+     "0x867838c",
+     "0x86793d4"
+    ],
+    "recovery_frames": 17,
+    "walk_256ths": 455,
+    "dash_256ths": 775,
+    "status": "measured"
+   },
+   {
+    "form": 41,
+    "name": "Gogeta",
+    "melee_anims": [
+     "0x84bf588",
+     "0x84be544",
+     "0x84c063c"
+    ],
+    "recovery_frames": 17,
+    "walk_256ths": 327,
+    "dash_256ths": 647,
+    "status": "measured"
+   },
+   {
+    "form": 42,
+    "name": "Gogeta",
+    "melee_anims": [
+     "0x84c6698",
+     "0x850c1dc"
+    ],
+    "recovery_frames": null,
+    "walk_256ths": 352,
+    "dash_256ths": 672,
+    "status": "probe failed (form not usable from this warp state)"
+   },
+   {
+    "form": 43,
+    "name": "Gogeta",
+    "melee_anims": [
+     "0x84c6d64",
+     "0x850c1dc"
+    ],
+    "recovery_frames": null,
+    "walk_256ths": 352,
+    "dash_256ths": 672,
+    "status": "probe failed (form not usable from this warp state)"
+   },
+   {
+    "form": 44,
+    "name": "Gogeta",
+    "melee_anims": [
+     "0x84bf588",
+     "0x84be544",
+     "0x84c063c"
+    ],
+    "recovery_frames": 17,
+    "walk_256ths": 327,
+    "dash_256ths": 647,
+    "status": "measured"
+   },
+   {
+    "form": 45,
+    "name": "",
+    "melee_anims": [
+     "0xd2403a55",
+     "0x7f7f7f7f"
+    ],
+    "recovery_frames": null,
+    "walk_256ths": 2139062143,
+    "dash_256ths": 2139062143,
+    "status": "probe failed (form not usable from this warp state)"
+   },
+   {
+    "form": 46,
+    "name": "Android 18",
+    "melee_anims": [
+     "0xb0a0908"
+    ],
+    "recovery_frames": null,
+    "walk_256ths": 327,
+    "dash_256ths": 647,
+    "status": "probe failed (form not usable from this warp state)"
+   },
+   {
+    "form": 47,
+    "name": "Hercule",
+    "melee_anims": [
+     "0x8571564",
+     "0x857222c"
+    ],
+    "recovery_frames": 17,
+    "walk_256ths": 327,
+    "dash_256ths": 647,
+    "status": "measured"
+   },
+   {
+    "form": 48,
+    "name": "Krillin",
+    "melee_anims": [
+     "0x85adf20"
+    ],
+    "recovery_frames": null,
+    "walk_256ths": 327,
+    "dash_256ths": 647,
+    "status": "probe failed (form not usable from this warp state)"
+   },
+   {
+    "form": 49,
+    "name": "Piccolo",
+    "melee_anims": [
+     "0x85f0f34",
+     "0x85f2128"
+    ],
+    "recovery_frames": 17,
+    "walk_256ths": 327,
+    "dash_256ths": 647,
+    "status": "measured"
+   },
+   {
+    "form": 50,
+    "name": "Pikkon",
+    "melee_anims": [
+     "0x85f9e4c",
+     "0x85fadb8"
+    ],
+    "recovery_frames": 17,
+    "walk_256ths": 327,
+    "dash_256ths": 647,
+    "status": "measured"
+   },
+   {
+    "form": 51,
+    "name": "Tien",
+    "melee_anims": [],
+    "recovery_frames": null,
+    "walk_256ths": 327,
+    "dash_256ths": 647,
+    "status": "probe failed (form not usable from this warp state)"
+   },
+   {
+    "form": 52,
+    "name": "Videl",
+    "melee_anims": [
+     "0x8681518",
+     "0x86822b4"
+    ],
+    "recovery_frames": 17,
+    "walk_256ths": 327,
+    "dash_256ths": 647,
+    "status": "measured"
+   },
+   {
+    "form": 53,
+    "name": "Yamcha",
+    "melee_anims": [],
+    "recovery_frames": null,
+    "walk_256ths": 327,
+    "dash_256ths": 647,
+    "status": "probe failed (form not usable from this warp state)"
+   }
+  ]
+ },
+ "block": {
+  "button": "R",
+  "state": 7,
+  "damage_factor": "obj+0x1C0 = 0x1000 -> 1/16 damage",
+  "frontal_only": true,
+  "status": "verified"
+ },
+ "energy_block": {
+  "button": "R+B",
+  "fn": "0x0801DFE0",
+  "update": "0x08012BC6",
+  "drain": "acc += rec[+0x57]*0x3277>>4 per frame, spend acc>>16 (~0.197 EP/frame at factor 16)",
+  "ends": "B released (back to block) / R released / EP 0",
+  "status": "inferred"
+ },
+ "dash": {
+  "field_walk": "player+0x238",
+  "field_dash": "player+0x23C",
+  "formula": "walk 5*SPD+102, dash +320 (SS +128)",
+  "units": "1/256 px per frame",
+  "status": "measured"
+ },
+ "attack_types": [
+  {
+   "addr": "0x86b8088",
+   "kind": "melee",
+   "sub": 0,
+   "power": 1024
+  },
+  {
+   "addr": "0x86b8090",
+   "kind": "energy",
+   "sub": 1,
+   "power": 1024
+  },
+  {
+   "addr": "0x86b8098",
+   "kind": "melee",
+   "sub": 2,
+   "power": 1024
+  },
+  {
+   "addr": "0x86b80a0",
+   "kind": "melee",
+   "sub": 3,
+   "power": 1024
+  },
+  {
+   "addr": "0x86b80a8",
+   "kind": "energy",
+   "sub": 4,
+   "power": 1024
+  },
+  {
+   "addr": "0x86b80b0",
+   "kind": "energy",
+   "sub": 5,
+   "power": 1024
+  },
+  {
+   "addr": "0x86b80b8",
+   "kind": "energy",
+   "sub": 6,
+   "power": 1024
+  },
+  {
+   "addr": "0x86b80c0",
+   "kind": "energy",
+   "sub": 7,
+   "power": 1024
+  },
+  {
+   "addr": "0x86b80c8",
+   "kind": "energy",
+   "sub": 8,
+   "power": 1024
+  },
+  {
+   "addr": "0x86b80d0",
+   "kind": "energy",
+   "sub": 9,
+   "power": 1024
+  },
+  {
+   "addr": "0x86b80d8",
+   "kind": "energy",
+   "sub": 10,
+   "power": 1024
+  },
+  {
+   "addr": "0x86b80e0",
+   "kind": "energy",
+   "sub": 11,
+   "power": 1024
+  },
+  {
+   "addr": "0x86b80e8",
+   "kind": "energy",
+   "sub": 12,
+   "power": 1024
+  },
+  {
+   "addr": "0x86b80f0",
+   "kind": "energy",
+   "sub": 13,
+   "power": 1024
+  },
+  {
+   "addr": "0x86b80f8",
+   "kind": "energy",
+   "sub": 14,
+   "power": 1024
+  },
+  {
+   "addr": "0x86b8100",
+   "kind": "energy",
+   "sub": 15,
+   "power": 1024
+  },
+  {
+   "addr": "0x86b8108",
+   "kind": "energy",
+   "sub": 16,
+   "power": 0
+  },
+  {
+   "addr": "0x86b8110",
+   "kind": "energy",
+   "sub": 17,
+   "power": 1024
+  },
+  {
+   "addr": "0x86b8118",
+   "kind": "energy",
+   "sub": 18,
+   "power": 1024
+  }
+ ],
+ "attack_sub_names": {
+  "2": "melee punch",
+  "3": "melee (cannot crit)",
+  "4": "Energy Blast",
+  "5": "Kamehameha",
+  "6": "Electric Kamehameha",
+  "7": "Masenko",
+  "8": "Kamekameha",
+  "9": "Energy Punch",
+  "10": "Burning Attack",
+  "11": "Final Flash",
+  "12": "Flame Kamehameha",
+  "13": "Big Bang Attack",
+  "14": "Banshee",
+  "15": "Energy Sword",
+  "16": "Ultra Volleyball",
+  "17": "Big Bang Kamehameha",
+  "18": "Dragon Fist"
+ },
+ "hit_struct": {
+  "+0x00": "u32 direction",
+  "+0x04": "u32 damage multiplier (0x400 = 1.0)",
+  "+0x08": "attack-type* (0x086B8088 table)",
+  "+0x0C": "attacker obj*",
+  "+0x10": "crit flag",
+  "+0x14": "raw damage",
+  "+0x18": "final damage"
+ },
+ "ki_blast": {
+  "ctor": "0x080197B4",
+  "dir_table": "0x8719c40",
+  "velocity_px_per_frame": [
+   {
+    "facing": "down",
+    "vx": 0.0,
+    "vy": 3.0
+   },
+   {
+    "facing": "up",
+    "vx": 0.0,
+    "vy": -3.0
+   },
+   {
+    "facing": "left",
+    "vx": -3.0,
+    "vy": 0.0
+   },
+   {
+    "facing": "right",
+    "vx": 3.0,
+    "vy": 0.0
+   }
+  ],
+  "mult": 1024,
+  "cost": "5% max EP",
+  "refire": "B again once state timer >= 40",
+  "status": "verified"
+ },
+ "beams": {
+  "ctor": "0x080206B8",
+  "obj_size": 84,
+  "obj_vtable": "0x0804AEF8",
+  "dir_table": "0x0871E0F8",
+  "level_defs": [
+   {
+    "addr": "0x871da68",
+    "level": 0,
+    "w": 32,
+    "h": 32,
+    "mult": 41,
+    "unk4": 0,
+    "attack_sub": 5,
+    "gfx": "0x8721188",
+    "anim": "0x871d168",
+    "drain_ep_per_frame": 0.418
+   },
+   {
+    "addr": "0x871da78",
+    "level": 1,
+    "w": 16,
+    "h": 16,
+    "mult": 164,
+    "unk4": 0,
+    "attack_sub": 5,
+    "gfx": "0x8721188",
+    "anim": "0x871d468",
+    "drain_ep_per_frame": 1.5
+   },
+   {
+    "addr": "0x871da88",
+    "level": 2,
+    "w": 16,
+    "h": 16,
+    "mult": 328,
+    "unk4": 8,
+    "attack_sub": 5,
+    "gfx": "0x87211f4",
+    "anim": "0x871d768",
+    "drain_ep_per_frame": 5.0
+   }
+  ],
+  "drain_table": "0x871e148",
+  "fire_frame": 24,
+  "drain_formula": "acc += drain[lv]*rec[+0x56]/16; SpendEP(acc>>8); acc &= 0xFF",
+  "used_by": [
+   15,
+   16
+  ],
+  "status": "verified"
+ },
+ "big_bang": {
+  "enter": "0x0801A7C0",
+  "ball_ctor": "0x08037480",
+  "ball_defs": "0x0876ACC0",
+  "charge_rate": [
+   0.168,
+   0.551,
+   1.668
+  ],
+  "charge_cap": 1000,
+  "min_age_frames": 60,
+  "mult": "~0.35 x EP charged",
+  "ball_speed_px_per_frame": 0.58,
+  "status": "measured"
+ },
+ "skills": [
+  {
+   "id": 1,
+   "name": "Banshee Blast",
+   "table_addr": "0x871db10",
+   "raw": "ff000000d84a7108d84c7108200521052b9d0108439d0108",
+   "max_level": 255,
+   "kind": "beam (hold B)",
+   "cost": {
+    "fixed": 200,
+    "note": "minimum to start; drains ~3.6 EP/frame while held"
+   },
+   "state_class": {
+    "vtable": "0x804de7c",
+    "fns": [
+     "0x801a665",
+     "0x804e4e1",
+     "0x801a6cd",
+     "0x801a6bb",
+     "0x801a7af"
+    ],
+    "slots": "enter, update, input, destroy, misc",
+    "status": "verified"
+   },
+   "measured": [
+    {
+     "level": 0,
+     "trials": [
+      {
+       "hold": 3,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 30,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 3,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 30,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 119,
+       "idle_frame": 60,
+       "hits": 50,
+       "first_hit": 31,
+       "last_hit": 60,
+       "mults": [
+        1640
+       ],
+       "subs": [
+        14
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 123,
+       "idle_frame": 60,
+       "hits": 10,
+       "first_hit": 49,
+       "last_hit": 60,
+       "mults": [
+        1640
+       ],
+       "subs": [
+        14
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 439,
+       "idle_frame": 150,
+       "hits": 192,
+       "first_hit": 31,
+       "last_hit": 150,
+       "mults": [
+        1640
+       ],
+       "subs": [
+        14
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 458,
+       "idle_frame": 150,
+       "hits": 84,
+       "first_hit": 49,
+       "last_hit": 150,
+       "mults": [
+        1640
+       ],
+       "subs": [
+        14
+       ],
+       "form_after": 2
+      }
+     ],
+     "status": "measured",
+     "setup": "Goku form 2, maxEP 999, enemy pinned 40/100 px in front, hold B 3/60/150 f"
+    }
+   ]
+  },
+  {
+   "id": 2,
+   "name": "Big Bang",
+   "table_addr": "0x871db28",
+   "raw": "02000000d84e7108d850710822052305799d0108a99d0108",
+   "max_level": 2,
+   "kind": "charged ball (hold B, release to fire, >=60 frames or it fizzles)",
+   "cost": {
+    "levels": [
+     10,
+     33,
+     100
+    ],
+    "addr": "0x871da98",
+    "note": "minimum to start; charge spends more"
+   },
+   "state_class": {
+    "vtable": "0x804d05c",
+    "fns": [
+     "0x801a7c1",
+     "0x801a80f",
+     "0x801a83f",
+     "0x801a8b1",
+     "0x801a8cf"
+    ],
+    "slots": "enter, update, input, destroy, misc",
+    "status": "verified"
+   },
+   "measured": [
+    {
+     "level": 0,
+     "trials": [
+      {
+       "hold": 3,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 25,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 3,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 25,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 8,
+       "idle_frame": 80,
+       "hits": 23,
+       "first_hit": 62,
+       "last_hit": 169,
+       "mults": [
+        3
+       ],
+       "subs": [
+        13
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 8,
+       "idle_frame": 80,
+       "hits": 17,
+       "first_hit": 167,
+       "last_hit": 247,
+       "mults": [
+        3
+       ],
+       "subs": [
+        13
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 20,
+       "idle_frame": 172,
+       "hits": 23,
+       "first_hit": 154,
+       "last_hit": 264,
+       "mults": [
+        7
+       ],
+       "subs": [
+        13
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 20,
+       "idle_frame": 171,
+       "hits": 9,
+       "first_hit": 258,
+       "last_hit": 298,
+       "mults": [
+        7
+       ],
+       "subs": [
+        13
+       ],
+       "form_after": 2
+      }
+     ],
+     "status": "measured",
+     "setup": "Goku form 2, maxEP 999, enemy pinned 40/100 px in front, hold B 3/60/150 f"
+    },
+    {
+     "level": 1,
+     "trials": [
+      {
+       "hold": 3,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 1,
+       "idle_frame": 25,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 3,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 1,
+       "idle_frame": 25,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 26,
+       "idle_frame": 80,
+       "hits": 23,
+       "first_hit": 62,
+       "last_hit": 169,
+       "mults": [
+        9
+       ],
+       "subs": [
+        13
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 26,
+       "idle_frame": 80,
+       "hits": 17,
+       "first_hit": 167,
+       "last_hit": 247,
+       "mults": [
+        9
+       ],
+       "subs": [
+        13
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 68,
+       "idle_frame": 172,
+       "hits": 23,
+       "first_hit": 154,
+       "last_hit": 264,
+       "mults": [
+        24
+       ],
+       "subs": [
+        13
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 68,
+       "idle_frame": 171,
+       "hits": 20,
+       "first_hit": 203,
+       "last_hit": 297,
+       "mults": [
+        24
+       ],
+       "subs": [
+        13
+       ],
+       "form_after": 2
+      }
+     ],
+     "status": "measured",
+     "setup": "Goku form 2, maxEP 999, enemy pinned 40/100 px in front, hold B 3/60/150 f"
+    },
+    {
+     "level": 2,
+     "trials": [
+      {
+       "hold": 3,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 3,
+       "idle_frame": 25,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 3,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 3,
+       "idle_frame": 25,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 81,
+       "idle_frame": 80,
+       "hits": 23,
+       "first_hit": 62,
+       "last_hit": 169,
+       "mults": [
+        28
+       ],
+       "subs": [
+        13
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 81,
+       "idle_frame": 80,
+       "hits": 17,
+       "first_hit": 167,
+       "last_hit": 247,
+       "mults": [
+        28
+       ],
+       "subs": [
+        13
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 206,
+       "idle_frame": 172,
+       "hits": 23,
+       "first_hit": 154,
+       "last_hit": 264,
+       "mults": [
+        71
+       ],
+       "subs": [
+        13
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 206,
+       "idle_frame": 171,
+       "hits": 24,
+       "first_hit": 183,
+       "last_hit": 297,
+       "mults": [
+        71
+       ],
+       "subs": [
+        13
+       ],
+       "form_after": 2
+      }
+     ],
+     "status": "measured",
+     "setup": "Goku form 2, maxEP 999, enemy pinned 40/100 px in front, hold B 3/60/150 f"
+    }
+   ]
+  },
+  {
+   "id": 3,
+   "name": "Big Bang Kamehameha",
+   "table_addr": "0x871db40",
+   "raw": "ff000000d8527108d856710824052505e19d0108f99d0108",
+   "max_level": 255,
+   "kind": "rapid ki volley (hold B)",
+   "cost": {
+    "fixed": 12,
+    "note": "minimum 12 to start, 2 per volley"
+   },
+   "state_class": {
+    "vtable": "0x804e244",
+    "fns": [
+     "0x801a8f1",
+     "0x804e4e1",
+     "0x801a965",
+     "0x801a947",
+     "0x801aa7f"
+    ],
+    "slots": "enter, update, input, destroy, misc",
+    "status": "verified"
+   },
+   "measured": [
+    {
+     "level": 0,
+     "trials": [
+      {
+       "hold": 3,
+       "dist": 40,
+       "press_cost": 2,
+       "ep_total": 2,
+       "idle_frame": 30,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 3,
+       "dist": 100,
+       "press_cost": 2,
+       "ep_total": 2,
+       "idle_frame": 30,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 40,
+       "press_cost": 2,
+       "ep_total": 116,
+       "idle_frame": 60,
+       "hits": 59,
+       "first_hit": 31,
+       "last_hit": 73,
+       "mults": [
+        164,
+        1024
+       ],
+       "subs": [
+        17
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 100,
+       "press_cost": 2,
+       "ep_total": 121,
+       "idle_frame": 60,
+       "hits": 20,
+       "first_hit": 38,
+       "last_hit": 60,
+       "mults": [
+        164
+       ],
+       "subs": [
+        17
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 40,
+       "press_cost": 2,
+       "ep_total": 437,
+       "idle_frame": 150,
+       "hits": 194,
+       "first_hit": 31,
+       "last_hit": 155,
+       "mults": [
+        164,
+        1024
+       ],
+       "subs": [
+        17
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 100,
+       "press_cost": 2,
+       "ep_total": 464,
+       "idle_frame": 150,
+       "hits": 96,
+       "first_hit": 38,
+       "last_hit": 150,
+       "mults": [
+        164
+       ],
+       "subs": [
+        17
+       ],
+       "form_after": 2
+      }
+     ],
+     "status": "measured",
+     "setup": "Goku form 2, maxEP 999, enemy pinned 40/100 px in front, hold B 3/60/150 f"
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "name": "Burning Attack",
+   "table_addr": "0x871db58",
+   "raw": "02000000d8547108d8587108260527052b9e0108539e0108",
+   "max_level": 2,
+   "kind": "single projectile",
+   "cost": {
+    "levels": [
+     35,
+     105,
+     420
+    ],
+    "addr": "0x871dab0",
+    "note": "paid on press"
+   },
+   "state_class": {
+    "vtable": "0x804df18",
+    "fns": [
+     "0x801aa91",
+     "0x801aaeb",
+     "0x801aaed",
+     "0x801ab3f",
+     "0x801ab5d"
+    ],
+    "slots": "enter, update, input, destroy, misc",
+    "status": "verified"
+   },
+   "measured": [
+    {
+     "level": 0,
+     "trials": [
+      {
+       "hold": 3,
+       "dist": 40,
+       "press_cost": 35,
+       "ep_total": 35,
+       "idle_frame": 40,
+       "hits": 1,
+       "first_hit": 27,
+       "last_hit": 27,
+       "mults": [
+        410
+       ],
+       "subs": [
+        10
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 3,
+       "dist": 100,
+       "press_cost": 35,
+       "ep_total": 35,
+       "idle_frame": 40,
+       "hits": 1,
+       "first_hit": 48,
+       "last_hit": 48,
+       "mults": [
+        410
+       ],
+       "subs": [
+        10
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 40,
+       "press_cost": 35,
+       "ep_total": 35,
+       "idle_frame": 40,
+       "hits": 1,
+       "first_hit": 27,
+       "last_hit": 27,
+       "mults": [
+        410
+       ],
+       "subs": [
+        10
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 100,
+       "press_cost": 35,
+       "ep_total": 35,
+       "idle_frame": 40,
+       "hits": 1,
+       "first_hit": 48,
+       "last_hit": 48,
+       "mults": [
+        410
+       ],
+       "subs": [
+        10
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 40,
+       "press_cost": 35,
+       "ep_total": 35,
+       "idle_frame": 40,
+       "hits": 1,
+       "first_hit": 27,
+       "last_hit": 27,
+       "mults": [
+        410
+       ],
+       "subs": [
+        10
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 100,
+       "press_cost": 35,
+       "ep_total": 35,
+       "idle_frame": 40,
+       "hits": 1,
+       "first_hit": 48,
+       "last_hit": 48,
+       "mults": [
+        410
+       ],
+       "subs": [
+        10
+       ],
+       "form_after": 2
+      }
+     ],
+     "status": "measured",
+     "setup": "Goku form 2, maxEP 999, enemy pinned 40/100 px in front, hold B 3/60/150 f"
+    },
+    {
+     "level": 1,
+     "trials": [
+      {
+       "hold": 3,
+       "dist": 40,
+       "press_cost": 105,
+       "ep_total": 105,
+       "idle_frame": 40,
+       "hits": 1,
+       "first_hit": 27,
+       "last_hit": 27,
+       "mults": [
+        820
+       ],
+       "subs": [
+        10
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 3,
+       "dist": 100,
+       "press_cost": 105,
+       "ep_total": 105,
+       "idle_frame": 40,
+       "hits": 1,
+       "first_hit": 48,
+       "last_hit": 48,
+       "mults": [
+        820
+       ],
+       "subs": [
+        10
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 40,
+       "press_cost": 105,
+       "ep_total": 105,
+       "idle_frame": 40,
+       "hits": 1,
+       "first_hit": 27,
+       "last_hit": 27,
+       "mults": [
+        820
+       ],
+       "subs": [
+        10
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 100,
+       "press_cost": 105,
+       "ep_total": 105,
+       "idle_frame": 40,
+       "hits": 1,
+       "first_hit": 48,
+       "last_hit": 48,
+       "mults": [
+        820
+       ],
+       "subs": [
+        10
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 40,
+       "press_cost": 105,
+       "ep_total": 105,
+       "idle_frame": 40,
+       "hits": 1,
+       "first_hit": 27,
+       "last_hit": 27,
+       "mults": [
+        820
+       ],
+       "subs": [
+        10
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 100,
+       "press_cost": 105,
+       "ep_total": 105,
+       "idle_frame": 40,
+       "hits": 1,
+       "first_hit": 48,
+       "last_hit": 48,
+       "mults": [
+        820
+       ],
+       "subs": [
+        10
+       ],
+       "form_after": 2
+      }
+     ],
+     "status": "measured",
+     "setup": "Goku form 2, maxEP 999, enemy pinned 40/100 px in front, hold B 3/60/150 f"
+    },
+    {
+     "level": 2,
+     "trials": [
+      {
+       "hold": 3,
+       "dist": 40,
+       "press_cost": 420,
+       "ep_total": 420,
+       "idle_frame": 40,
+       "hits": 1,
+       "first_hit": 27,
+       "last_hit": 27,
+       "mults": [
+        1649
+       ],
+       "subs": [
+        10
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 3,
+       "dist": 100,
+       "press_cost": 420,
+       "ep_total": 420,
+       "idle_frame": 40,
+       "hits": 1,
+       "first_hit": 48,
+       "last_hit": 48,
+       "mults": [
+        1649
+       ],
+       "subs": [
+        10
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 40,
+       "press_cost": 420,
+       "ep_total": 420,
+       "idle_frame": 40,
+       "hits": 1,
+       "first_hit": 27,
+       "last_hit": 27,
+       "mults": [
+        1649
+       ],
+       "subs": [
+        10
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 100,
+       "press_cost": 420,
+       "ep_total": 420,
+       "idle_frame": 40,
+       "hits": 1,
+       "first_hit": 48,
+       "last_hit": 48,
+       "mults": [
+        1649
+       ],
+       "subs": [
+        10
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 40,
+       "press_cost": 420,
+       "ep_total": 420,
+       "idle_frame": 40,
+       "hits": 1,
+       "first_hit": 27,
+       "last_hit": 27,
+       "mults": [
+        1649
+       ],
+       "subs": [
+        10
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 100,
+       "press_cost": 420,
+       "ep_total": 420,
+       "idle_frame": 40,
+       "hits": 1,
+       "first_hit": 48,
+       "last_hit": 48,
+       "mults": [
+        1649
+       ],
+       "subs": [
+        10
+       ],
+       "form_after": 2
+      }
+     ],
+     "status": "measured",
+     "setup": "Goku form 2, maxEP 999, enemy pinned 40/100 px in front, hold B 3/60/150 f"
+    }
+   ]
+  },
+  {
+   "id": 5,
+   "name": "Dragon Fist Explosion",
+   "table_addr": "0x871db70",
+   "raw": "ff000000d85a7108d85c7108280529059f9e0108b99e0108",
+   "max_level": 255,
+   "kind": "dash-through rush (player becomes the hitbox)",
+   "cost": {
+    "fixed": 300,
+    "note": "paid on press"
+   },
+   "state_class": {
+    "vtable": "0x804d9b0",
+    "fns": [
+     "0x801ab7d",
+     "0x804e4e1",
+     "0x801abbf",
+     "0x801ab97",
+     "0x801ad97"
+    ],
+    "slots": "enter, update, input, destroy, misc",
+    "status": "verified"
+   },
+   "measured": [
+    {
+     "level": 0,
+     "trials": [
+      {
+       "hold": 3,
+       "dist": 40,
+       "press_cost": 300,
+       "ep_total": 300,
+       "idle_frame": 3,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 3,
+       "dist": 100,
+       "press_cost": 300,
+       "ep_total": 300,
+       "idle_frame": 3,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 40,
+       "press_cost": 300,
+       "ep_total": 340,
+       "idle_frame": null,
+       "hits": 48,
+       "first_hit": 21,
+       "last_hit": 35,
+       "mults": [
+        328
+       ],
+       "subs": [
+        18
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 100,
+       "press_cost": 300,
+       "ep_total": 340,
+       "idle_frame": null,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 40,
+       "press_cost": 300,
+       "ep_total": 340,
+       "idle_frame": null,
+       "hits": 48,
+       "first_hit": 21,
+       "last_hit": 35,
+       "mults": [
+        328
+       ],
+       "subs": [
+        18
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 100,
+       "press_cost": 300,
+       "ep_total": 340,
+       "idle_frame": null,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      }
+     ],
+     "status": "measured",
+     "setup": "Goku form 2, maxEP 999, enemy pinned 40/100 px in front, hold B 3/60/150 f"
+    }
+   ]
+  },
+  {
+   "id": 6,
+   "name": "Electric Kamehameha",
+   "table_addr": "0x871db88",
+   "raw": "02000000d87e7108d88071082a052b05ef9e0108159f0108",
+   "max_level": 2,
+   "kind": "beam (hold B)",
+   "cost": {
+    "levels": [
+     15,
+     50,
+     150
+    ],
+    "addr": "0x871da9b",
+    "note": "minimum to start; beam drains while held"
+   },
+   "state_class": {
+    "vtable": "0x804e2d8",
+    "fns": [
+     "0x801ada9",
+     "0x804e4e1",
+     "0x801ae33",
+     "0x801ae21",
+     "0x801af1d"
+    ],
+    "slots": "enter, update, input, destroy, misc",
+    "status": "verified"
+   },
+   "measured": [
+    {
+     "level": 0,
+     "trials": [
+      {
+       "hold": 3,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 30,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 3,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 30,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 13,
+       "idle_frame": 60,
+       "hits": 50,
+       "first_hit": 31,
+       "last_hit": 60,
+       "mults": [
+        41
+       ],
+       "subs": [
+        6
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 13,
+       "idle_frame": 60,
+       "hits": 10,
+       "first_hit": 49,
+       "last_hit": 60,
+       "mults": [
+        41
+       ],
+       "subs": [
+        6
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 47,
+       "idle_frame": 150,
+       "hits": 192,
+       "first_hit": 31,
+       "last_hit": 150,
+       "mults": [
+        41
+       ],
+       "subs": [
+        6
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 49,
+       "idle_frame": 150,
+       "hits": 84,
+       "first_hit": 49,
+       "last_hit": 150,
+       "mults": [
+        41
+       ],
+       "subs": [
+        6
+       ],
+       "form_after": 2
+      }
+     ],
+     "status": "measured",
+     "setup": "Goku form 2, maxEP 999, enemy pinned 40/100 px in front, hold B 3/60/150 f"
+    },
+    {
+     "level": 1,
+     "trials": [
+      {
+       "hold": 3,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 30,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 3,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 30,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 43,
+       "idle_frame": 60,
+       "hits": 50,
+       "first_hit": 31,
+       "last_hit": 60,
+       "mults": [
+        164
+       ],
+       "subs": [
+        6
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 45,
+       "idle_frame": 60,
+       "hits": 10,
+       "first_hit": 49,
+       "last_hit": 60,
+       "mults": [
+        164
+       ],
+       "subs": [
+        6
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 160,
+       "idle_frame": 150,
+       "hits": 192,
+       "first_hit": 31,
+       "last_hit": 150,
+       "mults": [
+        164
+       ],
+       "subs": [
+        6
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 167,
+       "idle_frame": 150,
+       "hits": 84,
+       "first_hit": 49,
+       "last_hit": 150,
+       "mults": [
+        164
+       ],
+       "subs": [
+        6
+       ],
+       "form_after": 2
+      }
+     ],
+     "status": "measured",
+     "setup": "Goku form 2, maxEP 999, enemy pinned 40/100 px in front, hold B 3/60/150 f"
+    },
+    {
+     "level": 2,
+     "trials": [
+      {
+       "hold": 3,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 30,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 3,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 30,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 173,
+       "idle_frame": 60,
+       "hits": 50,
+       "first_hit": 31,
+       "last_hit": 60,
+       "mults": [
+        328
+       ],
+       "subs": [
+        6
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 180,
+       "idle_frame": 60,
+       "hits": 10,
+       "first_hit": 49,
+       "last_hit": 60,
+       "mults": [
+        328
+       ],
+       "subs": [
+        6
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 640,
+       "idle_frame": 150,
+       "hits": 192,
+       "first_hit": 31,
+       "last_hit": 150,
+       "mults": [
+        328
+       ],
+       "subs": [
+        6
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 667,
+       "idle_frame": 150,
+       "hits": 84,
+       "first_hit": 49,
+       "last_hit": 150,
+       "mults": [
+        328
+       ],
+       "subs": [
+        6
+       ],
+       "form_after": 2
+      }
+     ],
+     "status": "measured",
+     "setup": "Goku form 2, maxEP 999, enemy pinned 40/100 px in front, hold B 3/60/150 f"
+    }
+   ]
+  },
+  {
+   "id": 7,
+   "name": "Energy Blast",
+   "table_addr": "0x871dba0",
+   "raw": "ff000000d85e7108d86071082c052d054b9f0108739f0108",
+   "max_level": 255,
+   "kind": "ki blast projectile (refire with B after 40 frames)",
+   "cost": {
+    "fixed": "5% of max EP",
+    "note": "ceil(maxEP*0xCCD/65536) per shot"
+   },
+   "state_class": {
+    "vtable": "0x804dc14",
+    "fns": [
+     "0x801af2f",
+     "0x801af3d",
+     "0x801afe3",
+     "0x801b003",
+     "0x804fcb9"
+    ],
+    "slots": "enter, update, input, destroy, misc",
+    "status": "verified"
+   },
+   "measured": [
+    {
+     "level": 0,
+     "trials": [
+      {
+       "hold": 3,
+       "dist": 40,
+       "press_cost": 50,
+       "ep_total": 50,
+       "idle_frame": 48,
+       "hits": 1,
+       "first_hit": 25,
+       "last_hit": 25,
+       "mults": [
+        1024
+       ],
+       "subs": [
+        4
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 3,
+       "dist": 100,
+       "press_cost": 50,
+       "ep_total": 50,
+       "idle_frame": 48,
+       "hits": 1,
+       "first_hit": 48,
+       "last_hit": 48,
+       "mults": [
+        1024
+       ],
+       "subs": [
+        4
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 40,
+       "press_cost": 50,
+       "ep_total": 50,
+       "idle_frame": 48,
+       "hits": 1,
+       "first_hit": 25,
+       "last_hit": 25,
+       "mults": [
+        1024
+       ],
+       "subs": [
+        4
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 100,
+       "press_cost": 50,
+       "ep_total": 50,
+       "idle_frame": 48,
+       "hits": 1,
+       "first_hit": 48,
+       "last_hit": 48,
+       "mults": [
+        1024
+       ],
+       "subs": [
+        4
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 40,
+       "press_cost": 50,
+       "ep_total": 50,
+       "idle_frame": 48,
+       "hits": 1,
+       "first_hit": 25,
+       "last_hit": 25,
+       "mults": [
+        1024
+       ],
+       "subs": [
+        4
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 100,
+       "press_cost": 50,
+       "ep_total": 50,
+       "idle_frame": 48,
+       "hits": 1,
+       "first_hit": 48,
+       "last_hit": 48,
+       "mults": [
+        1024
+       ],
+       "subs": [
+        4
+       ],
+       "form_after": 2
+      }
+     ],
+     "status": "measured",
+     "setup": "Goku form 2, maxEP 999, enemy pinned 40/100 px in front, hold B 3/60/150 f"
+    }
+   ]
+  },
+  {
+   "id": 8,
+   "name": "Energy Punch",
+   "table_addr": "0x871dbb8",
+   "raw": "02000000d8627108d86471082e052f05ed9f010815a00108",
+   "max_level": 2,
+   "kind": "short-range multi-hit burst",
+   "cost": {
+    "levels": [
+     25,
+     70,
+     290
+    ],
+    "addr": "0x871dac8",
+    "note": "paid on press"
+   },
+   "state_class": {
+    "vtable": "0x804dc38",
+    "fns": [
+     "0x801b25b",
+     "0x804e4e1",
+     "0x801b297",
+     "0x801b27b",
+     "0x801b471"
+    ],
+    "slots": "enter, update, input, destroy, misc",
+    "status": "verified"
+   },
+   "measured": [
+    {
+     "level": 0,
+     "trials": [
+      {
+       "hold": 3,
+       "dist": 40,
+       "press_cost": 25,
+       "ep_total": 25,
+       "idle_frame": 10,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 3,
+       "dist": 100,
+       "press_cost": 25,
+       "ep_total": 25,
+       "idle_frame": 10,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 40,
+       "press_cost": 25,
+       "ep_total": 25,
+       "idle_frame": null,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 100,
+       "press_cost": 25,
+       "ep_total": 25,
+       "idle_frame": null,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 40,
+       "press_cost": 25,
+       "ep_total": 25,
+       "idle_frame": null,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 100,
+       "press_cost": 25,
+       "ep_total": 25,
+       "idle_frame": null,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      }
+     ],
+     "status": "measured",
+     "setup": "Goku form 2, maxEP 999, enemy pinned 40/100 px in front, hold B 3/60/150 f"
+    },
+    {
+     "level": 1,
+     "trials": [
+      {
+       "hold": 3,
+       "dist": 40,
+       "press_cost": 70,
+       "ep_total": 70,
+       "idle_frame": 10,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 3,
+       "dist": 100,
+       "press_cost": 70,
+       "ep_total": 70,
+       "idle_frame": 10,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 40,
+       "press_cost": 70,
+       "ep_total": 70,
+       "idle_frame": null,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 100,
+       "press_cost": 70,
+       "ep_total": 70,
+       "idle_frame": null,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 40,
+       "press_cost": 70,
+       "ep_total": 70,
+       "idle_frame": null,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 100,
+       "press_cost": 70,
+       "ep_total": 70,
+       "idle_frame": null,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      }
+     ],
+     "status": "measured",
+     "setup": "Goku form 2, maxEP 999, enemy pinned 40/100 px in front, hold B 3/60/150 f"
+    },
+    {
+     "level": 2,
+     "trials": [
+      {
+       "hold": 3,
+       "dist": 40,
+       "press_cost": 290,
+       "ep_total": 290,
+       "idle_frame": 10,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 3,
+       "dist": 100,
+       "press_cost": 290,
+       "ep_total": 290,
+       "idle_frame": 10,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 40,
+       "press_cost": 290,
+       "ep_total": 290,
+       "idle_frame": null,
+       "hits": 5,
+       "first_hit": 10,
+       "last_hit": 14,
+       "mults": [
+        226
+       ],
+       "subs": [
+        9
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 100,
+       "press_cost": 290,
+       "ep_total": 290,
+       "idle_frame": null,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 40,
+       "press_cost": 290,
+       "ep_total": 290,
+       "idle_frame": null,
+       "hits": 5,
+       "first_hit": 10,
+       "last_hit": 14,
+       "mults": [
+        226
+       ],
+       "subs": [
+        9
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 100,
+       "press_cost": 290,
+       "ep_total": 290,
+       "idle_frame": null,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      }
+     ],
+     "status": "measured",
+     "setup": "Goku form 2, maxEP 999, enemy pinned 40/100 px in front, hold B 3/60/150 f"
+    }
+   ]
+  },
+  {
+   "id": 9,
+   "name": "Energy Sword",
+   "table_addr": "0x871dbd0",
+   "raw": "ff000000d8667108d86871083005310565a001087fa00108",
+   "max_level": 255,
+   "kind": "charge (hold B) then single melee-range slash on release",
+   "cost": {
+    "fixed": 350,
+    "note": "minimum; drains ~3.3 EP/frame while charging"
+   },
+   "state_class": {
+    "vtable": "0x804dc5c",
+    "fns": [
+     "0x801b00b",
+     "0x801b087",
+     "0x801b089",
+     "0x801b04b",
+     "0x801b249"
+    ],
+    "slots": "enter, update, input, destroy, misc",
+    "status": "verified"
+   },
+   "measured": [
+    {
+     "level": 0,
+     "trials": [
+      {
+       "hold": 3,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 8,
+       "idle_frame": 3,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 3,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 8,
+       "idle_frame": 3,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 196,
+       "idle_frame": 60,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 196,
+       "idle_frame": 60,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 492,
+       "idle_frame": null,
+       "hits": 1,
+       "first_hit": 153,
+       "last_hit": 153,
+       "mults": [
+        10240
+       ],
+       "subs": [
+        15
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 492,
+       "idle_frame": null,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      }
+     ],
+     "status": "measured",
+     "setup": "Goku form 2, maxEP 999, enemy pinned 40/100 px in front, hold B 3/60/150 f"
+    }
+   ]
+  },
+  {
+   "id": 10,
+   "name": "Final Flash",
+   "table_addr": "0x871dbe8",
+   "raw": "02000000d86a7108d86c710832053305aba00108d1a00108",
+   "max_level": 2,
+   "kind": "instant full-screen beam",
+   "cost": {
+    "levels": [
+     15,
+     45,
+     140
+    ],
+    "addr": "0x871da9e",
+    "note": "minimum to start"
+   },
+   "state_class": {
+    "vtable": "0x804d9d4",
+    "fns": [
+     "0x801b483",
+     "0x804e4e1",
+     "0x801b4ed",
+     "0x801b4a5",
+     "0x801b627"
+    ],
+    "slots": "enter, update, input, destroy, misc",
+    "status": "verified"
+   },
+   "measured": [
+    {
+     "level": 0,
+     "trials": [
+      {
+       "hold": 3,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 3,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 3,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 3,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 3,
+       "idle_frame": null,
+       "hits": 8,
+       "first_hit": 31,
+       "last_hit": 40,
+       "mults": [
+        41
+       ],
+       "subs": [
+        11
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 3,
+       "idle_frame": null,
+       "hits": 8,
+       "first_hit": 31,
+       "last_hit": 40,
+       "mults": [
+        41
+       ],
+       "subs": [
+        11
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 3,
+       "idle_frame": null,
+       "hits": 8,
+       "first_hit": 31,
+       "last_hit": 40,
+       "mults": [
+        41
+       ],
+       "subs": [
+        11
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 3,
+       "idle_frame": null,
+       "hits": 8,
+       "first_hit": 31,
+       "last_hit": 40,
+       "mults": [
+        41
+       ],
+       "subs": [
+        11
+       ],
+       "form_after": 2
+      }
+     ],
+     "status": "measured",
+     "setup": "Goku form 2, maxEP 999, enemy pinned 40/100 px in front, hold B 3/60/150 f"
+    },
+    {
+     "level": 1,
+     "trials": [
+      {
+       "hold": 3,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 3,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 3,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 3,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 12,
+       "idle_frame": null,
+       "hits": 8,
+       "first_hit": 31,
+       "last_hit": 40,
+       "mults": [
+        164
+       ],
+       "subs": [
+        11
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 12,
+       "idle_frame": null,
+       "hits": 8,
+       "first_hit": 31,
+       "last_hit": 40,
+       "mults": [
+        164
+       ],
+       "subs": [
+        11
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 12,
+       "idle_frame": null,
+       "hits": 8,
+       "first_hit": 31,
+       "last_hit": 40,
+       "mults": [
+        164
+       ],
+       "subs": [
+        11
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 12,
+       "idle_frame": null,
+       "hits": 8,
+       "first_hit": 31,
+       "last_hit": 40,
+       "mults": [
+        164
+       ],
+       "subs": [
+        11
+       ],
+       "form_after": 2
+      }
+     ],
+     "status": "measured",
+     "setup": "Goku form 2, maxEP 999, enemy pinned 40/100 px in front, hold B 3/60/150 f"
+    },
+    {
+     "level": 2,
+     "trials": [
+      {
+       "hold": 3,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 3,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 3,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 3,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 41,
+       "idle_frame": null,
+       "hits": 8,
+       "first_hit": 31,
+       "last_hit": 40,
+       "mults": [
+        328
+       ],
+       "subs": [
+        11
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 41,
+       "idle_frame": null,
+       "hits": 8,
+       "first_hit": 31,
+       "last_hit": 40,
+       "mults": [
+        328
+       ],
+       "subs": [
+        11
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 41,
+       "idle_frame": null,
+       "hits": 8,
+       "first_hit": 31,
+       "last_hit": 40,
+       "mults": [
+        328
+       ],
+       "subs": [
+        11
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 41,
+       "idle_frame": null,
+       "hits": 8,
+       "first_hit": 31,
+       "last_hit": 40,
+       "mults": [
+        328
+       ],
+       "subs": [
+        11
+       ],
+       "form_after": 2
+      }
+     ],
+     "status": "measured",
+     "setup": "Goku form 2, maxEP 999, enemy pinned 40/100 px in front, hold B 3/60/150 f"
+    }
+   ]
+  },
+  {
+   "id": 11,
+   "name": "Flame Kamehameha",
+   "table_addr": "0x871dc00",
+   "raw": "02000000d86e7108d87071083405350509a101082fa10108",
+   "max_level": 2,
+   "kind": "beam (hold B), short range",
+   "cost": {
+    "levels": [
+     15,
+     44,
+     145
+    ],
+    "addr": "0x871daa1",
+    "note": "minimum to start; beam drains while held"
+   },
+   "state_class": {
+    "vtable": "0x804e088",
+    "fns": [
+     "0x801b639",
+     "0x801b819",
+     "0x801b6b1",
+     "0x801b81b",
+     "0x801b863"
+    ],
+    "slots": "enter, update, input, destroy, misc",
+    "status": "verified"
+   },
+   "measured": [
+    {
+     "level": 0,
+     "trials": [
+      {
+       "hold": 3,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 30,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 3,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 30,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 10,
+       "idle_frame": 60,
+       "hits": 24,
+       "first_hit": 41,
+       "last_hit": 60,
+       "mults": [
+        41
+       ],
+       "subs": [
+        12
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 10,
+       "idle_frame": 60,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 37,
+       "idle_frame": 151,
+       "hits": 160,
+       "first_hit": 41,
+       "last_hit": 151,
+       "mults": [
+        41
+       ],
+       "subs": [
+        12
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 41,
+       "idle_frame": 150,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      }
+     ],
+     "status": "measured",
+     "setup": "Goku form 2, maxEP 999, enemy pinned 40/100 px in front, hold B 3/60/150 f"
+    },
+    {
+     "level": 1,
+     "trials": [
+      {
+       "hold": 3,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 30,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 3,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 30,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 35,
+       "idle_frame": 60,
+       "hits": 24,
+       "first_hit": 41,
+       "last_hit": 60,
+       "mults": [
+        164
+       ],
+       "subs": [
+        12
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 38,
+       "idle_frame": 60,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 137,
+       "idle_frame": 150,
+       "hits": 218,
+       "first_hit": 41,
+       "last_hit": 150,
+       "mults": [
+        164
+       ],
+       "subs": [
+        12
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 145,
+       "idle_frame": 150,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      }
+     ],
+     "status": "measured",
+     "setup": "Goku form 2, maxEP 999, enemy pinned 40/100 px in front, hold B 3/60/150 f"
+    },
+    {
+     "level": 2,
+     "trials": [
+      {
+       "hold": 3,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 30,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 3,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 30,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 116,
+       "idle_frame": 60,
+       "hits": 24,
+       "first_hit": 41,
+       "last_hit": 60,
+       "mults": [
+        328
+       ],
+       "subs": [
+        12
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 125,
+       "idle_frame": 60,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 415,
+       "idle_frame": 150,
+       "hits": 150,
+       "first_hit": 41,
+       "last_hit": 150,
+       "mults": [
+        328
+       ],
+       "subs": [
+        12
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 468,
+       "idle_frame": 150,
+       "hits": 66,
+       "first_hit": 69,
+       "last_hit": 150,
+       "mults": [
+        328
+       ],
+       "subs": [
+        12
+       ],
+       "form_after": 2
+      }
+     ],
+     "status": "measured",
+     "setup": "Goku form 2, maxEP 999, enemy pinned 40/100 px in front, hold B 3/60/150 f"
+    }
+   ]
+  },
+  {
+   "id": 12,
+   "name": "Fusion Dance",
+   "table_addr": "0x871dc18",
+   "raw": "ff000000d8727108d87471083605370569a101089fa10108",
+   "max_level": 255,
+   "kind": "Fusion Dance (needs partner)",
+   "cost": null,
+   "measured": []
+  },
+  {
+   "id": 13,
+   "name": "Super Kamikaze Ghost Attack",
+   "table_addr": "0x871dc30",
+   "raw": "ff000000d8767108d878710838053905c1a10108e5a10108",
+   "max_level": 255,
+   "kind": "Kamikaze Ghost (homing ghosts)",
+   "cost": {
+    "fixed": 160,
+    "note": "paid on press"
+   },
+   "state_class": {
+    "vtable": "0x804dc80",
+    "fns": [
+     "0x801b875",
+     "0x801b915",
+     "0x801b917",
+     "0x801b881",
+     "0x801ba99"
+    ],
+    "slots": "enter, update, input, destroy, misc",
+    "status": "verified"
+   },
+   "measured": [
+    {
+     "level": 0,
+     "trials": [
+      {
+       "hold": 3,
+       "dist": 40,
+       "press_cost": 160,
+       "ep_total": 160,
+       "idle_frame": null,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 3,
+       "dist": 100,
+       "press_cost": 160,
+       "ep_total": 160,
+       "idle_frame": null,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 40,
+       "press_cost": 160,
+       "ep_total": 160,
+       "idle_frame": null,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 100,
+       "press_cost": 160,
+       "ep_total": 160,
+       "idle_frame": null,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 40,
+       "press_cost": 160,
+       "ep_total": 160,
+       "idle_frame": null,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 100,
+       "press_cost": 160,
+       "ep_total": 160,
+       "idle_frame": null,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      }
+     ],
+     "status": "measured",
+     "setup": "Goku form 2, maxEP 999, enemy pinned 40/100 px in front, hold B 3/60/150 f"
+    }
+   ]
+  },
+  {
+   "id": 14,
+   "name": "Instant Transmission",
+   "table_addr": "0x871dc48",
+   "raw": "02000000d87a7108d87c71083a053b0517a201083ba20108",
+   "max_level": 2,
+   "kind": "Instant Transmission (teleport)",
+   "cost": {
+    "fixed": 40
+   },
+   "measured": [
+    {
+     "level": 0,
+     "trials": [
+      {
+       "hold": 3,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 3,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 3,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 3,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 60,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 60,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 150,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 150,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      }
+     ],
+     "status": "measured",
+     "setup": "Goku form 2, maxEP 999, enemy pinned 40/100 px in front, hold B 3/60/150 f"
+    },
+    {
+     "level": 1,
+     "trials": [
+      {
+       "hold": 3,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 3,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 3,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 3,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 60,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 60,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 150,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 150,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      }
+     ],
+     "status": "measured",
+     "setup": "Goku form 2, maxEP 999, enemy pinned 40/100 px in front, hold B 3/60/150 f"
+    },
+    {
+     "level": 2,
+     "trials": [
+      {
+       "hold": 3,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 3,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 3,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 3,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 60,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 60,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 150,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 150,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      }
+     ],
+     "status": "measured",
+     "setup": "Goku form 2, maxEP 999, enemy pinned 40/100 px in front, hold B 3/60/150 f"
+    }
+   ]
+  },
+  {
+   "id": 15,
+   "name": "Kamehameha",
+   "table_addr": "0x871dc60",
+   "raw": "02000000d87e7108d88071083c053d0535a301085ba30108",
+   "max_level": 2,
+   "kind": "beam (hold B)",
+   "cost": {
+    "levels": [
+     15,
+     45,
+     150
+    ],
+    "addr": "0x871daa4",
+    "note": "minimum to start; beam drains while held"
+   },
+   "state_class": {
+    "vtable": "0x804d9f8",
+    "fns": [
+     "0x801bdd5",
+     "0x804e4e1",
+     "0x801be41",
+     "0x801be2f",
+     "0x801bf2d"
+    ],
+    "slots": "enter, update, input, destroy, misc",
+    "status": "verified"
+   },
+   "measured": [
+    {
+     "level": 0,
+     "trials": [
+      {
+       "hold": 3,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 30,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 3,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 30,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 10,
+       "idle_frame": 60,
+       "hits": 50,
+       "first_hit": 31,
+       "last_hit": 60,
+       "mults": [
+        41
+       ],
+       "subs": [
+        5
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 11,
+       "idle_frame": 60,
+       "hits": 10,
+       "first_hit": 49,
+       "last_hit": 60,
+       "mults": [
+        41
+       ],
+       "subs": [
+        5
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 40,
+       "idle_frame": 150,
+       "hits": 192,
+       "first_hit": 31,
+       "last_hit": 150,
+       "mults": [
+        41
+       ],
+       "subs": [
+        5
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 42,
+       "idle_frame": 150,
+       "hits": 84,
+       "first_hit": 49,
+       "last_hit": 150,
+       "mults": [
+        41
+       ],
+       "subs": [
+        5
+       ],
+       "form_after": 2
+      }
+     ],
+     "status": "measured",
+     "setup": "Goku form 2, maxEP 999, enemy pinned 40/100 px in front, hold B 3/60/150 f"
+    },
+    {
+     "level": 1,
+     "trials": [
+      {
+       "hold": 3,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 30,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 3,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 30,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 39,
+       "idle_frame": 60,
+       "hits": 50,
+       "first_hit": 31,
+       "last_hit": 60,
+       "mults": [
+        164
+       ],
+       "subs": [
+        5
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 40,
+       "idle_frame": 60,
+       "hits": 10,
+       "first_hit": 49,
+       "last_hit": 60,
+       "mults": [
+        164
+       ],
+       "subs": [
+        5
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 143,
+       "idle_frame": 150,
+       "hits": 192,
+       "first_hit": 31,
+       "last_hit": 150,
+       "mults": [
+        164
+       ],
+       "subs": [
+        5
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 149,
+       "idle_frame": 150,
+       "hits": 84,
+       "first_hit": 49,
+       "last_hit": 150,
+       "mults": [
+        164
+       ],
+       "subs": [
+        5
+       ],
+       "form_after": 2
+      }
+     ],
+     "status": "measured",
+     "setup": "Goku form 2, maxEP 999, enemy pinned 40/100 px in front, hold B 3/60/150 f"
+    },
+    {
+     "level": 2,
+     "trials": [
+      {
+       "hold": 3,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 30,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 3,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 30,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 130,
+       "idle_frame": 60,
+       "hits": 50,
+       "first_hit": 31,
+       "last_hit": 60,
+       "mults": [
+        328
+       ],
+       "subs": [
+        5
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 135,
+       "idle_frame": 60,
+       "hits": 10,
+       "first_hit": 49,
+       "last_hit": 60,
+       "mults": [
+        328
+       ],
+       "subs": [
+        5
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 480,
+       "idle_frame": 150,
+       "hits": 192,
+       "first_hit": 31,
+       "last_hit": 150,
+       "mults": [
+        328
+       ],
+       "subs": [
+        5
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 500,
+       "idle_frame": 150,
+       "hits": 84,
+       "first_hit": 49,
+       "last_hit": 150,
+       "mults": [
+        328
+       ],
+       "subs": [
+        5
+       ],
+       "form_after": 2
+      }
+     ],
+     "status": "measured",
+     "setup": "Goku form 2, maxEP 999, enemy pinned 40/100 px in front, hold B 3/60/150 f"
+    }
+   ]
+  },
+  {
+   "id": 16,
+   "name": "Kamekameha",
+   "table_addr": "0x871dc78",
+   "raw": "02000000d87e7108d88071083e053f0591a30108b7a30108",
+   "max_level": 2,
+   "kind": "beam (hold B)",
+   "cost": {
+    "levels": [
+     15,
+     45,
+     150
+    ],
+    "addr": "0x871daa7",
+    "note": "minimum to start; beam drains while held"
+   },
+   "state_class": {
+    "vtable": "0x804da1c",
+    "fns": [
+     "0x801bf3f",
+     "0x804e4e1",
+     "0x801bfad",
+     "0x801bf9b",
+     "0x801c0a9"
+    ],
+    "slots": "enter, update, input, destroy, misc",
+    "status": "verified"
+   },
+   "measured": [
+    {
+     "level": 0,
+     "trials": [
+      {
+       "hold": 3,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 30,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 3,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 30,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 10,
+       "idle_frame": 60,
+       "hits": 50,
+       "first_hit": 31,
+       "last_hit": 60,
+       "mults": [
+        41
+       ],
+       "subs": [
+        8
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 11,
+       "idle_frame": 60,
+       "hits": 10,
+       "first_hit": 49,
+       "last_hit": 60,
+       "mults": [
+        41
+       ],
+       "subs": [
+        8
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 40,
+       "idle_frame": 150,
+       "hits": 192,
+       "first_hit": 31,
+       "last_hit": 150,
+       "mults": [
+        41
+       ],
+       "subs": [
+        8
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 42,
+       "idle_frame": 150,
+       "hits": 84,
+       "first_hit": 49,
+       "last_hit": 150,
+       "mults": [
+        41
+       ],
+       "subs": [
+        8
+       ],
+       "form_after": 2
+      }
+     ],
+     "status": "measured",
+     "setup": "Goku form 2, maxEP 999, enemy pinned 40/100 px in front, hold B 3/60/150 f"
+    },
+    {
+     "level": 1,
+     "trials": [
+      {
+       "hold": 3,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 30,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 3,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 30,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 39,
+       "idle_frame": 60,
+       "hits": 50,
+       "first_hit": 31,
+       "last_hit": 60,
+       "mults": [
+        164
+       ],
+       "subs": [
+        8
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 40,
+       "idle_frame": 60,
+       "hits": 10,
+       "first_hit": 49,
+       "last_hit": 60,
+       "mults": [
+        164
+       ],
+       "subs": [
+        8
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 143,
+       "idle_frame": 150,
+       "hits": 192,
+       "first_hit": 31,
+       "last_hit": 150,
+       "mults": [
+        164
+       ],
+       "subs": [
+        8
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 149,
+       "idle_frame": 150,
+       "hits": 84,
+       "first_hit": 49,
+       "last_hit": 150,
+       "mults": [
+        164
+       ],
+       "subs": [
+        8
+       ],
+       "form_after": 2
+      }
+     ],
+     "status": "measured",
+     "setup": "Goku form 2, maxEP 999, enemy pinned 40/100 px in front, hold B 3/60/150 f"
+    },
+    {
+     "level": 2,
+     "trials": [
+      {
+       "hold": 3,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 30,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 3,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 30,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 130,
+       "idle_frame": 60,
+       "hits": 50,
+       "first_hit": 31,
+       "last_hit": 60,
+       "mults": [
+        328
+       ],
+       "subs": [
+        8
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 135,
+       "idle_frame": 60,
+       "hits": 10,
+       "first_hit": 49,
+       "last_hit": 60,
+       "mults": [
+        328
+       ],
+       "subs": [
+        8
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 480,
+       "idle_frame": 150,
+       "hits": 192,
+       "first_hit": 31,
+       "last_hit": 150,
+       "mults": [
+        328
+       ],
+       "subs": [
+        8
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 500,
+       "idle_frame": 150,
+       "hits": 84,
+       "first_hit": 49,
+       "last_hit": 150,
+       "mults": [
+        328
+       ],
+       "subs": [
+        8
+       ],
+       "form_after": 2
+      }
+     ],
+     "status": "measured",
+     "setup": "Goku form 2, maxEP 999, enemy pinned 40/100 px in front, hold B 3/60/150 f"
+    }
+   ]
+  },
+  {
+   "id": 17,
+   "name": "Masenkoha",
+   "table_addr": "0x871dc90",
+   "raw": "02000000d8827108d884710840054105eda3010815a40108",
+   "max_level": 2,
+   "kind": "charged blast, fires after a fixed wind-up",
+   "cost": {
+    "levels": [
+     50,
+     200,
+     800
+    ],
+    "addr": "0x871dae0",
+    "note": "paid on press"
+   },
+   "state_class": {
+    "vtable": "0x804d080",
+    "fns": [
+     "0x801c0bb",
+     "0x801c169",
+     "0x801c16b",
+     "0x801c1cd",
+     "0x804fcb9"
+    ],
+    "slots": "enter, update, input, destroy, misc",
+    "status": "verified"
+   },
+   "measured": [
+    {
+     "level": 0,
+     "trials": [
+      {
+       "hold": 3,
+       "dist": 40,
+       "press_cost": 50,
+       "ep_total": 50,
+       "idle_frame": 42,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 3,
+       "dist": 100,
+       "press_cost": 50,
+       "ep_total": 50,
+       "idle_frame": 42,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 40,
+       "press_cost": 50,
+       "ep_total": 50,
+       "idle_frame": 97,
+       "hits": 1,
+       "first_hit": 111,
+       "last_hit": 111,
+       "mults": [
+        3687
+       ],
+       "subs": [
+        7
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 100,
+       "press_cost": 50,
+       "ep_total": 50,
+       "idle_frame": 97,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 40,
+       "press_cost": 50,
+       "ep_total": 50,
+       "idle_frame": 187,
+       "hits": 1,
+       "first_hit": 203,
+       "last_hit": 203,
+       "mults": [
+        3687
+       ],
+       "subs": [
+        7
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 100,
+       "press_cost": 50,
+       "ep_total": 50,
+       "idle_frame": 189,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      }
+     ],
+     "status": "measured",
+     "setup": "Goku form 2, maxEP 999, enemy pinned 40/100 px in front, hold B 3/60/150 f"
+    },
+    {
+     "level": 1,
+     "trials": [
+      {
+       "hold": 3,
+       "dist": 40,
+       "press_cost": 200,
+       "ep_total": 200,
+       "idle_frame": 42,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 3,
+       "dist": 100,
+       "press_cost": 200,
+       "ep_total": 200,
+       "idle_frame": 42,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 40,
+       "press_cost": 200,
+       "ep_total": 200,
+       "idle_frame": 97,
+       "hits": 1,
+       "first_hit": 111,
+       "last_hit": 111,
+       "mults": [
+        11060
+       ],
+       "subs": [
+        7
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 100,
+       "press_cost": 200,
+       "ep_total": 200,
+       "idle_frame": 97,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 40,
+       "press_cost": 200,
+       "ep_total": 200,
+       "idle_frame": 187,
+       "hits": 1,
+       "first_hit": 203,
+       "last_hit": 203,
+       "mults": [
+        11060
+       ],
+       "subs": [
+        7
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 100,
+       "press_cost": 200,
+       "ep_total": 200,
+       "idle_frame": 189,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      }
+     ],
+     "status": "measured",
+     "setup": "Goku form 2, maxEP 999, enemy pinned 40/100 px in front, hold B 3/60/150 f"
+    },
+    {
+     "level": 2,
+     "trials": [
+      {
+       "hold": 3,
+       "dist": 40,
+       "press_cost": 800,
+       "ep_total": 800,
+       "idle_frame": 42,
+       "hits": 1,
+       "first_hit": 58,
+       "last_hit": 58,
+       "mults": [
+        16589
+       ],
+       "subs": [
+        7
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 3,
+       "dist": 100,
+       "press_cost": 800,
+       "ep_total": 800,
+       "idle_frame": 42,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 40,
+       "press_cost": 800,
+       "ep_total": 800,
+       "idle_frame": 97,
+       "hits": 1,
+       "first_hit": 111,
+       "last_hit": 111,
+       "mults": [
+        16589
+       ],
+       "subs": [
+        7
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 100,
+       "press_cost": 800,
+       "ep_total": 800,
+       "idle_frame": 97,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 40,
+       "press_cost": 800,
+       "ep_total": 800,
+       "idle_frame": 187,
+       "hits": 1,
+       "first_hit": 203,
+       "last_hit": 203,
+       "mults": [
+        16589
+       ],
+       "subs": [
+        7
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 100,
+       "press_cost": 800,
+       "ep_total": 800,
+       "idle_frame": 189,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      }
+     ],
+     "status": "measured",
+     "setup": "Goku form 2, maxEP 999, enemy pinned 40/100 px in front, hold B 3/60/150 f"
+    }
+   ]
+  },
+  {
+   "id": 18,
+   "name": "Saiyaman",
+   "table_addr": "0x871dca8",
+   "raw": "ff000000d8867108d88871084205430561a4010865a40108",
+   "max_level": 255,
+   "kind": "transform -> Great Saiyaman (form 14)",
+   "cost": null,
+   "state_class": {
+    "vtable": "0x804d410",
+    "fns": [
+     "0x800de61",
+     "0x800de6d",
+     "0x804fead",
+     "0x801c62d",
+     "0x804fcb9"
+    ],
+    "slots": "enter, update, input, destroy, misc",
+    "status": "verified"
+   },
+   "measured": [
+    {
+     "level": 0,
+     "trials": [
+      {
+       "hold": 3,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 15,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 14
+      },
+      {
+       "hold": 3,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 15,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 14
+      },
+      {
+       "hold": 60,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 15,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 14
+      },
+      {
+       "hold": 60,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 15,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 14
+      },
+      {
+       "hold": 150,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 15,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 14
+      },
+      {
+       "hold": 150,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 15,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 14
+      }
+     ],
+     "status": "measured",
+     "setup": "Goku form 2, maxEP 999, enemy pinned 40/100 px in front, hold B 3/60/150 f"
+    }
+   ]
+  },
+  {
+   "id": 19,
+   "name": "Saiyaman",
+   "table_addr": "0x871dcc0",
+   "raw": "ff000000d8867108d888710842054305259d0108299d0108",
+   "max_level": 255,
+   "kind": null,
+   "cost": null,
+   "measured": []
+  },
+  {
+   "id": 20,
+   "name": "Super Saiyan",
+   "table_addr": "0x871dcd8",
+   "raw": "ff000000d88a7108d88c710844054505c5a4010813a50108",
+   "max_level": 255,
+   "kind": "transform -> Super Saiyan",
+   "cost": {
+    "fixed": 10,
+    "note": "then runs on the SS gauge (rec+0x1E), 1 per 20 frames"
+   },
+   "measured": [
+    {
+     "level": 0,
+     "trials": [
+      {
+       "hold": 3,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 211,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 4
+      },
+      {
+       "hold": 3,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 213,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 4
+      },
+      {
+       "hold": 60,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 211,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 4
+      },
+      {
+       "hold": 60,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 213,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 4
+      },
+      {
+       "hold": 150,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 211,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 4
+      },
+      {
+       "hold": 150,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": 213,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 4
+      }
+     ],
+     "status": "measured",
+     "setup": "Goku form 2, maxEP 999, enemy pinned 40/100 px in front, hold B 3/60/150 f"
+    }
+   ]
+  },
+  {
+   "id": 21,
+   "name": "Super Saiyan",
+   "table_addr": "0x871dcf0",
+   "raw": "ff000000d88a7108d88c710844054505259d0108299d0108",
+   "max_level": 255,
+   "kind": null,
+   "cost": null,
+   "measured": []
+  },
+  {
+   "id": 22,
+   "name": "Super Saiyan 3",
+   "table_addr": "0x871dd08",
+   "raw": "ff000000d88e7108d8907108460547055fa50108bda50108",
+   "max_level": 255,
+   "kind": "transform -> Super Saiyan 3",
+   "cost": null,
+   "measured": [
+    {
+     "level": 0,
+     "trials": [
+      {
+       "hold": 3,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": null,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 3,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": null,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": null,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": null,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 40,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": null,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 100,
+       "press_cost": 0,
+       "ep_total": 0,
+       "idle_frame": null,
+       "hits": 0,
+       "first_hit": null,
+       "last_hit": null,
+       "mults": [],
+       "subs": [],
+       "form_after": 2
+      }
+     ],
+     "status": "measured",
+     "setup": "Goku form 2, maxEP 999, enemy pinned 40/100 px in front, hold B 3/60/150 f"
+    }
+   ]
+  },
+  {
+   "id": 23,
+   "name": "Ultra Volleyball Attack",
+   "table_addr": "0x871dd20",
+   "raw": "ff000000d8927108d8947108480549050ba6010825a60108",
+   "max_level": 255,
+   "kind": "thrown ball, status effect",
+   "cost": {
+    "fixed": 350,
+    "note": "paid on press"
+   },
+   "state_class": {
+    "vtable": "0x804dfe8",
+    "fns": [
+     "0x801c635",
+     "0x801c63d",
+     "0x801c63f",
+     "0x801c6c9",
+     "0x801c6d1"
+    ],
+    "slots": "enter, update, input, destroy, misc",
+    "status": "verified"
+   },
+   "measured": [
+    {
+     "level": 0,
+     "trials": [
+      {
+       "hold": 3,
+       "dist": 40,
+       "press_cost": 350,
+       "ep_total": 350,
+       "idle_frame": 41,
+       "hits": 1,
+       "first_hit": 21,
+       "last_hit": 21,
+       "mults": [
+        1024
+       ],
+       "subs": [
+        16
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 3,
+       "dist": 100,
+       "press_cost": 350,
+       "ep_total": 350,
+       "idle_frame": 41,
+       "hits": 1,
+       "first_hit": 41,
+       "last_hit": 41,
+       "mults": [
+        1024
+       ],
+       "subs": [
+        16
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 40,
+       "press_cost": 350,
+       "ep_total": 350,
+       "idle_frame": 41,
+       "hits": 1,
+       "first_hit": 21,
+       "last_hit": 21,
+       "mults": [
+        1024
+       ],
+       "subs": [
+        16
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 60,
+       "dist": 100,
+       "press_cost": 350,
+       "ep_total": 350,
+       "idle_frame": 41,
+       "hits": 1,
+       "first_hit": 41,
+       "last_hit": 41,
+       "mults": [
+        1024
+       ],
+       "subs": [
+        16
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 40,
+       "press_cost": 350,
+       "ep_total": 350,
+       "idle_frame": 41,
+       "hits": 1,
+       "first_hit": 21,
+       "last_hit": 21,
+       "mults": [
+        1024
+       ],
+       "subs": [
+        16
+       ],
+       "form_after": 2
+      },
+      {
+       "hold": 150,
+       "dist": 100,
+       "press_cost": 350,
+       "ep_total": 350,
+       "idle_frame": 41,
+       "hits": 1,
+       "first_hit": 41,
+       "last_hit": 41,
+       "mults": [
+        1024
+       ],
+       "subs": [
+        16
+       ],
+       "form_after": 2
+      }
+     ],
+     "status": "measured",
+     "setup": "Goku form 2, maxEP 999, enemy pinned 40/100 px in front, hold B 3/60/150 f"
+    }
+   ]
+  }
+ ]
+}

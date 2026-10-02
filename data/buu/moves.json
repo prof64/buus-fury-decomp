@@ -1,0 +1,7240 @@
+{
+ "meta": {
+  "generator": "re/buu/extract_moves.py",
+  "skill_table": "0x871daf8",
+  "cost_table": "0x871da98",
+  "attack_type_table": "0x86b8088",
+  "skill_entry_layout": {
+   "+0x00": "u32 max upgrade level (2) or 0xFF (not upgradable)",
+   "+0x04/+0x08": "ptr icons",
+   "+0x0C": "u16 name string",
+   "+0x0E": "u16 description string",
+   "+0x10": "ptr canUse(record) -> bool",
+   "+0x14": "ptr activate(record, player)"
+  },
+  "damage": "see formulas.json damage; mult is per hit (1024 = x1.0), energy moves use POW and the target END2"
+ },
+ "melee": {
+  "input": "A (pressed edge) from idle/walk state (0x08013022 / 0x080131BA) -> 0x08012A24",
+  "hit": "instant hit test on press: hit struct {dir, mult=0x400, attack type 0x086B8098 (melee sub 2), attacker} vs enemies overlapping the facing rect",
+  "rects_relative_to_player_pos": {
+   "down": [
+    0,
+    0,
+    16,
+    16
+   ],
+   "up": [
+    0,
+    -24,
+    16,
+    0
+   ],
+   "left": [
+    -8,
+    -24,
+    0,
+    8
+   ],
+   "right": [
+    16,
+    -24,
+    24,
+    8
+   ]
+  },
+  "rect_format": "x0, y0, x1, y1 (player pos x = left edge of the 16-px body, y = feet)",
+  "after": "player state 4/5/6 (random 4+rand(3)) = one of three punch/kick animations; Goku: 17 frames each before idle (VERIFIED emu, t_punchtime.py); next A only accepted in idle/walk",
+  "damage_type": {
+   "sub": 2,
+   "address": "0x86b8098",
+   "kind": 0,
+   "kind_name": "melee",
+   "id_byte": 2,
+   "power": 1024
+  },
+  "ep_gain_on_hit": "+1 EP per melee hit that deals damage (script #2; Armor of Light +2, Talisman of Light +1 more, Armor of Darkness / Vampire Cape: +1 HP instead)",
+  "crit": "chance (82*STR + crit_bonus)/65536 per melee hit unless attack sub == 3; crit = power*1.5",
+  "status": "VERIFIED (disasm + emu)"
+ },
+ "skills": [
+  {
+   "id": 1,
+   "address": "0x871db10",
+   "name": "Banshee Blast",
+   "description": "Hold the B Button to emit 5 thin, powerful beams of energy, one from each finger.",
+   "max_level": null,
+   "can_use_fn": "0x8019d2b",
+   "activate_fn": "0x8019d43",
+   "icon": "0x8714ad8",
+   "icon2": "0x8714cd8",
+   "ep": {
+    "canuse_min_ep": 200,
+    "rule": "needs EP >= 200 to start; drains while the beam is held",
+    "ep_cost_scaled_by": "record+0x56/16 (Dragon Armor halves); while SS/SS3 the cost is taken from the SS/SS3 gauge"
+   },
+   "measured": {
+    "setup": "Goku (STR/POW 27) vs Majin Fighter (END 31) 60 px below (dist field), maxEP 999; patterns: tap = B for 3 frames, holdN = B held N frames, mash = B 3/12 frames; frames counted from the first frame of input; VERIFIED (emu)",
+    "by_level": {
+     "0": {
+      "damage_multipliers": [
+       1640
+      ],
+      "attack_type_subs": [
+       [
+        1,
+        14
+       ]
+      ],
+      "first_hit_frame": 35,
+      "runs": [
+       {
+        "pattern": "tap",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "hold60",
+        "dist": 60,
+        "hits": 42,
+        "first_hit": 35,
+        "last_hit": 60,
+        "total_damage": 2304.9,
+        "ep_spent": 85,
+        "ep_events": [
+         [
+          31,
+          4
+         ],
+         [
+          32,
+          5
+         ],
+         [
+          33,
+          4
+         ],
+         [
+          34,
+          5
+         ],
+         [
+          36,
+          4
+         ],
+         [
+          38,
+          5
+         ],
+         [
+          39,
+          5
+         ],
+         [
+          40,
+          4
+         ],
+         [
+          41,
+          5
+         ],
+         [
+          42,
+          4
+         ],
+         [
+          43,
+          5
+         ],
+         [
+          44,
+          5
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 60,
+        "hits": 188,
+        "first_hit": 35,
+        "last_hit": 152,
+        "total_damage": 10347.61,
+        "ep_spent": 420,
+        "ep_events": [
+         [
+          31,
+          4
+         ],
+         [
+          32,
+          5
+         ],
+         [
+          33,
+          4
+         ],
+         [
+          34,
+          5
+         ],
+         [
+          36,
+          4
+         ],
+         [
+          38,
+          5
+         ],
+         [
+          39,
+          5
+         ],
+         [
+          40,
+          4
+         ],
+         [
+          41,
+          5
+         ],
+         [
+          42,
+          4
+         ],
+         [
+          43,
+          5
+         ],
+         [
+          44,
+          5
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "id": 2,
+   "address": "0x871db28",
+   "name": "Big Bang",
+   "description": "Press the B Button and release to emit a large ball of energy that explodes on contact.  Hold the B Button longer to make the attack stronger.",
+   "max_level": 2,
+   "can_use_fn": "0x8019d79",
+   "activate_fn": "0x8019da9",
+   "icon": "0x8714ed8",
+   "icon2": "0x87150d8",
+   "ep": {
+    "rule": "needs EP >= cost[level]; charge-and-release",
+    "ep_cost_by_level": [
+     10,
+     33,
+     100
+    ],
+    "cost_table_address": "0x871da98",
+    "ep_cost_scaled_by": "record+0x56/16 (Dragon Armor halves); while SS/SS3 the cost is taken from the SS/SS3 gauge"
+   },
+   "measured": {
+    "setup": "Goku (STR/POW 27) vs Majin Fighter (END 31) 60 px below (dist field), maxEP 999; patterns: tap = B for 3 frames, holdN = B held N frames, mash = B 3/12 frames; frames counted from the first frame of input; VERIFIED (emu)",
+    "by_level": {
+     "0": {
+      "damage_multipliers": [
+       3,
+       7
+      ],
+      "attack_type_subs": [
+       [
+        1,
+        13
+       ]
+      ],
+      "first_hit_frame": 72,
+      "runs": [
+       {
+        "pattern": "tap",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "hold60",
+        "dist": 60,
+        "hits": 31,
+        "first_hit": 72,
+        "last_hit": 220,
+        "total_damage": 3.44,
+        "ep_spent": 0,
+        "ep_events": [
+         [
+          9,
+          1
+         ],
+         [
+          16,
+          1
+         ],
+         [
+          23,
+          1
+         ],
+         [
+          31,
+          1
+         ],
+         [
+          39,
+          1
+         ],
+         [
+          45,
+          1
+         ],
+         [
+          52,
+          1
+         ],
+         [
+          59,
+          1
+         ],
+         [
+          106,
+          -8
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 60,
+        "hits": 20,
+        "first_hit": 163,
+        "last_hit": 256,
+        "total_damage": 5.2,
+        "ep_spent": 6,
+        "ep_events": [
+         [
+          9,
+          1
+         ],
+         [
+          16,
+          1
+         ],
+         [
+          23,
+          1
+         ],
+         [
+          31,
+          1
+         ],
+         [
+          39,
+          1
+         ],
+         [
+          45,
+          1
+         ],
+         [
+          52,
+          1
+         ],
+         [
+          59,
+          1
+         ],
+         [
+          66,
+          1
+         ],
+         [
+          73,
+          1
+         ],
+         [
+          79,
+          1
+         ],
+         [
+          86,
+          1
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       }
+      ]
+     },
+     "1": {
+      "damage_multipliers": [
+       9,
+       24
+      ],
+      "attack_type_subs": [
+       [
+        1,
+        13
+       ]
+      ],
+      "first_hit_frame": 72,
+      "runs": [
+       {
+        "pattern": "tap",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": [
+         [
+          3,
+          1
+         ],
+         [
+          101,
+          -1
+         ]
+        ]
+       },
+       {
+        "pattern": "hold60",
+        "dist": 60,
+        "hits": 31,
+        "first_hit": 72,
+        "last_hit": 220,
+        "total_damage": 9.21,
+        "ep_spent": 0,
+        "ep_events": [
+         [
+          3,
+          1
+         ],
+         [
+          6,
+          1
+         ],
+         [
+          9,
+          1
+         ],
+         [
+          11,
+          1
+         ],
+         [
+          13,
+          1
+         ],
+         [
+          14,
+          1
+         ],
+         [
+          18,
+          1
+         ],
+         [
+          20,
+          1
+         ],
+         [
+          22,
+          1
+         ],
+         [
+          24,
+          1
+         ],
+         [
+          26,
+          1
+         ],
+         [
+          29,
+          1
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 60,
+        "hits": 22,
+        "first_hit": 153,
+        "last_hit": 258,
+        "total_damage": 17.77,
+        "ep_spent": 39,
+        "ep_events": [
+         [
+          3,
+          1
+         ],
+         [
+          6,
+          1
+         ],
+         [
+          9,
+          1
+         ],
+         [
+          11,
+          1
+         ],
+         [
+          13,
+          1
+         ],
+         [
+          14,
+          1
+         ],
+         [
+          18,
+          1
+         ],
+         [
+          20,
+          1
+         ],
+         [
+          22,
+          1
+         ],
+         [
+          24,
+          1
+         ],
+         [
+          26,
+          1
+         ],
+         [
+          29,
+          1
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 2,
+        "ep_events": [
+         [
+          3,
+          1
+         ],
+         [
+          51,
+          1
+         ],
+         [
+          87,
+          1
+         ],
+         [
+          104,
+          -3
+         ],
+         [
+          111,
+          1
+         ],
+         [
+          135,
+          1
+         ]
+        ]
+       }
+      ]
+     },
+     "2": {
+      "damage_multipliers": [
+       28,
+       71
+      ],
+      "attack_type_subs": [
+       [
+        1,
+        13
+       ]
+      ],
+      "first_hit_frame": 72,
+      "runs": [
+       {
+        "pattern": "tap",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": [
+         [
+          2,
+          1
+         ],
+         [
+          3,
+          2
+         ],
+         [
+          101,
+          -3
+         ]
+        ]
+       },
+       {
+        "pattern": "hold60",
+        "dist": 60,
+        "hits": 31,
+        "first_hit": 72,
+        "last_hit": 220,
+        "total_damage": 29.47,
+        "ep_spent": 52,
+        "ep_events": [
+         [
+          2,
+          1
+         ],
+         [
+          3,
+          2
+         ],
+         [
+          4,
+          2
+         ],
+         [
+          6,
+          1
+         ],
+         [
+          8,
+          2
+         ],
+         [
+          9,
+          2
+         ],
+         [
+          10,
+          1
+         ],
+         [
+          11,
+          2
+         ],
+         [
+          12,
+          2
+         ],
+         [
+          13,
+          1
+         ],
+         [
+          14,
+          2
+         ],
+         [
+          16,
+          2
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 60,
+        "hits": 22,
+        "first_hit": 153,
+        "last_hit": 258,
+        "total_damage": 53.25,
+        "ep_spent": 179,
+        "ep_events": [
+         [
+          2,
+          1
+         ],
+         [
+          3,
+          2
+         ],
+         [
+          4,
+          2
+         ],
+         [
+          6,
+          1
+         ],
+         [
+          8,
+          2
+         ],
+         [
+          9,
+          2
+         ],
+         [
+          10,
+          1
+         ],
+         [
+          11,
+          2
+         ],
+         [
+          12,
+          2
+         ],
+         [
+          13,
+          1
+         ],
+         [
+          14,
+          2
+         ],
+         [
+          16,
+          2
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 6,
+        "ep_events": [
+         [
+          2,
+          1
+         ],
+         [
+          3,
+          2
+         ],
+         [
+          50,
+          1
+         ],
+         [
+          51,
+          2
+         ],
+         [
+          86,
+          1
+         ],
+         [
+          87,
+          2
+         ],
+         [
+          104,
+          -9
+         ],
+         [
+          110,
+          1
+         ],
+         [
+          111,
+          2
+         ],
+         [
+          134,
+          1
+         ],
+         [
+          135,
+          2
+         ]
+        ]
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "id": 3,
+   "address": "0x871db40",
+   "name": "Big Bang Kamehameha",
+   "description": "Hold the B Button to create a large ball of energy, followed by a long beam.  ",
+   "max_level": null,
+   "can_use_fn": "0x8019de1",
+   "activate_fn": "0x8019df9",
+   "icon": "0x87152d8",
+   "icon2": "0x87156d8",
+   "ep": {
+    "canuse_min_ep": 12,
+    "spend_per_tick": 2,
+    "rule": "needs EP >= 12; activate spends 2; drains while held",
+    "ep_cost_scaled_by": "record+0x56/16 (Dragon Armor halves); while SS/SS3 the cost is taken from the SS/SS3 gauge"
+   },
+   "measured": {
+    "setup": "Goku (STR/POW 27) vs Majin Fighter (END 31) 60 px below (dist field), maxEP 999; patterns: tap = B for 3 frames, holdN = B held N frames, mash = B 3/12 frames; frames counted from the first frame of input; VERIFIED (emu)",
+    "by_level": {
+     "0": {
+      "damage_multipliers": [
+       164
+      ],
+      "attack_type_subs": [
+       [
+        1,
+        17
+       ]
+      ],
+      "first_hit_frame": 31,
+      "runs": [
+       {
+        "pattern": "tap",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": [
+         [
+          1,
+          2
+         ],
+         [
+          104,
+          -2
+         ]
+        ]
+       },
+       {
+        "pattern": "hold60",
+        "dist": 60,
+        "hits": 50,
+        "first_hit": 31,
+        "last_hit": 60,
+        "total_damage": 276.47,
+        "ep_spent": 92,
+        "ep_events": [
+         [
+          1,
+          2
+         ],
+         [
+          31,
+          4
+         ],
+         [
+          32,
+          5
+         ],
+         [
+          33,
+          4
+         ],
+         [
+          34,
+          5
+         ],
+         [
+          36,
+          4
+         ],
+         [
+          38,
+          5
+         ],
+         [
+          39,
+          5
+         ],
+         [
+          40,
+          4
+         ],
+         [
+          41,
+          5
+         ],
+         [
+          42,
+          4
+         ],
+         [
+          43,
+          5
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 60,
+        "hits": 192,
+        "first_hit": 31,
+        "last_hit": 150,
+        "total_damage": 1058.19,
+        "ep_spent": 417,
+        "ep_events": [
+         [
+          1,
+          2
+         ],
+         [
+          31,
+          4
+         ],
+         [
+          32,
+          5
+         ],
+         [
+          33,
+          4
+         ],
+         [
+          34,
+          5
+         ],
+         [
+          36,
+          4
+         ],
+         [
+          38,
+          5
+         ],
+         [
+          39,
+          5
+         ],
+         [
+          40,
+          4
+         ],
+         [
+          41,
+          5
+         ],
+         [
+          42,
+          4
+         ],
+         [
+          43,
+          5
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 4,
+        "ep_events": [
+         [
+          1,
+          2
+         ],
+         [
+          38,
+          2
+         ],
+         [
+          73,
+          2
+         ],
+         [
+          105,
+          -6
+         ],
+         [
+          109,
+          2
+         ],
+         [
+          146,
+          2
+         ]
+        ]
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "id": 4,
+   "address": "0x871db58",
+   "name": "Burning Attack",
+   "description": "Press the B Button to shoot a spiked ball of chrono-energy which stuns enemies on contact.  Hold the B Button longer to increase stun time.",
+   "max_level": 2,
+   "can_use_fn": "0x8019e2b",
+   "activate_fn": "0x8019e53",
+   "icon": "0x87154d8",
+   "icon2": "0x87158d8",
+   "ep": {
+    "rule": "needs EP >= cost[level]",
+    "ep_cost_by_level": [
+     35,
+     105,
+     420
+    ],
+    "cost_table_address": "0x871dab0",
+    "ep_cost_scaled_by": "record+0x56/16 (Dragon Armor halves); while SS/SS3 the cost is taken from the SS/SS3 gauge"
+   },
+   "measured": {
+    "setup": "Goku (STR/POW 27) vs Majin Fighter (END 31) 60 px below (dist field), maxEP 999; patterns: tap = B for 3 frames, holdN = B held N frames, mash = B 3/12 frames; frames counted from the first frame of input; VERIFIED (emu)",
+    "by_level": {
+     "0": {
+      "damage_multipliers": [
+       410
+      ],
+      "attack_type_subs": [
+       [
+        1,
+        10
+       ]
+      ],
+      "first_hit_frame": 33,
+      "runs": [
+       {
+        "pattern": "tap",
+        "dist": 60,
+        "hits": 1,
+        "first_hit": 33,
+        "last_hit": 33,
+        "total_damage": 13.95,
+        "ep_spent": 6,
+        "ep_events": [
+         [
+          1,
+          35
+         ],
+         [
+          101,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "hold60",
+        "dist": 60,
+        "hits": 1,
+        "first_hit": 33,
+        "last_hit": 33,
+        "total_damage": 13.95,
+        "ep_spent": 6,
+        "ep_events": [
+         [
+          1,
+          35
+         ],
+         [
+          101,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 60,
+        "hits": 1,
+        "first_hit": 33,
+        "last_hit": 33,
+        "total_damage": 13.95,
+        "ep_spent": 6,
+        "ep_events": [
+         [
+          1,
+          35
+         ],
+         [
+          101,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 60,
+        "hits": 4,
+        "first_hit": 33,
+        "last_hit": 175,
+        "total_damage": 54.48,
+        "ep_spent": 111,
+        "ep_events": [
+         [
+          1,
+          35
+         ],
+         [
+          49,
+          35
+         ],
+         [
+          97,
+          35
+         ],
+         [
+          106,
+          -29
+         ],
+         [
+          145,
+          35
+         ]
+        ]
+       }
+      ]
+     },
+     "1": {
+      "damage_multipliers": [
+       820
+      ],
+      "attack_type_subs": [
+       [
+        1,
+        10
+       ]
+      ],
+      "first_hit_frame": 33,
+      "runs": [
+       {
+        "pattern": "tap",
+        "dist": 60,
+        "hits": 1,
+        "first_hit": 33,
+        "last_hit": 33,
+        "total_damage": 27.91,
+        "ep_spent": 76,
+        "ep_events": [
+         [
+          1,
+          105
+         ],
+         [
+          101,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "hold60",
+        "dist": 60,
+        "hits": 1,
+        "first_hit": 33,
+        "last_hit": 33,
+        "total_damage": 27.91,
+        "ep_spent": 76,
+        "ep_events": [
+         [
+          1,
+          105
+         ],
+         [
+          101,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 60,
+        "hits": 1,
+        "first_hit": 33,
+        "last_hit": 33,
+        "total_damage": 27.91,
+        "ep_spent": 76,
+        "ep_events": [
+         [
+          1,
+          105
+         ],
+         [
+          101,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 60,
+        "hits": 4,
+        "first_hit": 33,
+        "last_hit": 175,
+        "total_damage": 108.99,
+        "ep_spent": 391,
+        "ep_events": [
+         [
+          1,
+          105
+         ],
+         [
+          49,
+          105
+         ],
+         [
+          97,
+          105
+         ],
+         [
+          106,
+          -29
+         ],
+         [
+          145,
+          105
+         ]
+        ]
+       }
+      ]
+     },
+     "2": {
+      "damage_multipliers": [
+       1649
+      ],
+      "attack_type_subs": [
+       [
+        1,
+        10
+       ]
+      ],
+      "first_hit_frame": 33,
+      "runs": [
+       {
+        "pattern": "tap",
+        "dist": 60,
+        "hits": 1,
+        "first_hit": 33,
+        "last_hit": 33,
+        "total_damage": 56.15,
+        "ep_spent": 391,
+        "ep_events": [
+         [
+          1,
+          420
+         ],
+         [
+          101,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "hold60",
+        "dist": 60,
+        "hits": 1,
+        "first_hit": 33,
+        "last_hit": 33,
+        "total_damage": 56.15,
+        "ep_spent": 391,
+        "ep_events": [
+         [
+          1,
+          420
+         ],
+         [
+          101,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 60,
+        "hits": 1,
+        "first_hit": 33,
+        "last_hit": 33,
+        "total_damage": 56.15,
+        "ep_spent": 391,
+        "ep_events": [
+         [
+          1,
+          420
+         ],
+         [
+          101,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 60,
+        "hits": 2,
+        "first_hit": 33,
+        "last_hit": 80,
+        "total_damage": 109.81,
+        "ep_spent": 811,
+        "ep_events": [
+         [
+          1,
+          420
+         ],
+         [
+          49,
+          420
+         ],
+         [
+          105,
+          -29
+         ]
+        ]
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "id": 5,
+   "address": "0x871db70",
+   "name": "Dragon Fist Explosion",
+   "description": "Hold the B Button to create a giant dragon of pure energy.  Use the +Control Pad to control the dragon's head.  Release the B Button to make the dragon bite.",
+   "max_level": null,
+   "can_use_fn": "0x8019e9f",
+   "activate_fn": "0x8019eb9",
+   "icon": "0x8715ad8",
+   "icon2": "0x8715cd8",
+   "ep": {
+    "canuse_min_ep": 300,
+    "spend": 300,
+    "rule": "spends 300 on activation, then drains while steering the dragon",
+    "ep_cost_scaled_by": "record+0x56/16 (Dragon Armor halves); while SS/SS3 the cost is taken from the SS/SS3 gauge"
+   },
+   "measured": {
+    "setup": "Goku (STR/POW 27) vs Majin Fighter (END 31) 60 px below (dist field), maxEP 999; patterns: tap = B for 3 frames, holdN = B held N frames, mash = B 3/12 frames; frames counted from the first frame of input; VERIFIED (emu)",
+    "by_level": {
+     "0": {
+      "damage_multipliers": [
+       328
+      ],
+      "attack_type_subs": [
+       [
+        1,
+        18
+       ]
+      ],
+      "first_hit_frame": 21,
+      "runs": [
+       {
+        "pattern": "tap",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 271,
+        "ep_events": [
+         [
+          1,
+          300
+         ],
+         [
+          103,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "hold60",
+        "dist": 60,
+        "hits": 23,
+        "first_hit": 21,
+        "last_hit": 30,
+        "total_damage": 254.87,
+        "ep_spent": 340,
+        "ep_events": [
+         [
+          1,
+          300
+         ],
+         [
+          22,
+          5
+         ],
+         [
+          23,
+          5
+         ],
+         [
+          24,
+          5
+         ],
+         [
+          25,
+          5
+         ],
+         [
+          27,
+          5
+         ],
+         [
+          28,
+          5
+         ],
+         [
+          30,
+          5
+         ],
+         [
+          31,
+          5
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 60,
+        "hits": 23,
+        "first_hit": 21,
+        "last_hit": 30,
+        "total_damage": 254.87,
+        "ep_spent": 340,
+        "ep_events": [
+         [
+          1,
+          300
+         ],
+         [
+          22,
+          5
+         ],
+         [
+          23,
+          5
+         ],
+         [
+          24,
+          5
+         ],
+         [
+          25,
+          5
+         ],
+         [
+          27,
+          5
+         ],
+         [
+          28,
+          5
+         ],
+         [
+          30,
+          5
+         ],
+         [
+          31,
+          5
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 871,
+        "ep_events": [
+         [
+          1,
+          300
+         ],
+         [
+          13,
+          300
+         ],
+         [
+          26,
+          300
+         ],
+         [
+          108,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "tap",
+        "dist": 20,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 271,
+        "ep_events": [
+         [
+          1,
+          300
+         ],
+         [
+          103,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "tap",
+        "dist": 40,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 271,
+        "ep_events": [
+         [
+          1,
+          300
+         ],
+         [
+          104,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "hold60",
+        "dist": 20,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 271,
+        "ep_events": [
+         [
+          1,
+          300
+         ],
+         [
+          103,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "hold60",
+        "dist": 40,
+        "hits": 48,
+        "first_hit": 21,
+        "last_hit": 35,
+        "total_damage": 528.1,
+        "ep_spent": 340,
+        "ep_events": [
+         [
+          1,
+          300
+         ],
+         [
+          22,
+          5
+         ],
+         [
+          24,
+          5
+         ],
+         [
+          26,
+          5
+         ],
+         [
+          28,
+          5
+         ],
+         [
+          30,
+          5
+         ],
+         [
+          32,
+          5
+         ],
+         [
+          34,
+          5
+         ],
+         [
+          36,
+          5
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 20,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 271,
+        "ep_events": [
+         [
+          1,
+          300
+         ],
+         [
+          103,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 40,
+        "hits": 48,
+        "first_hit": 21,
+        "last_hit": 35,
+        "total_damage": 528.1,
+        "ep_spent": 340,
+        "ep_events": [
+         [
+          1,
+          300
+         ],
+         [
+          22,
+          5
+         ],
+         [
+          24,
+          5
+         ],
+         [
+          26,
+          5
+         ],
+         [
+          28,
+          5
+         ],
+         [
+          30,
+          5
+         ],
+         [
+          32,
+          5
+         ],
+         [
+          34,
+          5
+         ],
+         [
+          36,
+          5
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 20,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 871,
+        "ep_events": [
+         [
+          1,
+          300
+         ],
+         [
+          37,
+          300
+         ],
+         [
+          49,
+          300
+         ],
+         [
+          108,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 40,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 871,
+        "ep_events": [
+         [
+          1,
+          300
+         ],
+         [
+          13,
+          300
+         ],
+         [
+          26,
+          300
+         ],
+         [
+          108,
+          -29
+         ]
+        ]
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "id": 6,
+   "address": "0x871db88",
+   "name": "Electric Kamehameha",
+   "description": "Hold the B Button to emit a long beam of energy.  Enemies hit by this beam can become electrically charged.",
+   "max_level": 2,
+   "can_use_fn": "0x8019eef",
+   "activate_fn": "0x8019f15",
+   "icon": "0x8717ed8",
+   "icon2": "0x87180d8",
+   "ep": {
+    "rule": "needs EP >= cost[level]; drains while held",
+    "ep_cost_by_level": [
+     15,
+     50,
+     150
+    ],
+    "cost_table_address": "0x871da9b",
+    "ep_cost_scaled_by": "record+0x56/16 (Dragon Armor halves); while SS/SS3 the cost is taken from the SS/SS3 gauge"
+   },
+   "measured": {
+    "setup": "Goku (STR/POW 27) vs Majin Fighter (END 31) 60 px below (dist field), maxEP 999; patterns: tap = B for 3 frames, holdN = B held N frames, mash = B 3/12 frames; frames counted from the first frame of input; VERIFIED (emu)",
+    "by_level": {
+     "0": {
+      "damage_multipliers": [
+       41
+      ],
+      "attack_type_subs": [
+       [
+        1,
+        6
+       ]
+      ],
+      "first_hit_frame": 35,
+      "runs": [
+       {
+        "pattern": "tap",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "hold60",
+        "dist": 60,
+        "hits": 42,
+        "first_hit": 35,
+        "last_hit": 60,
+        "total_damage": 58.11,
+        "ep_spent": 0,
+        "ep_events": [
+         [
+          32,
+          1
+         ],
+         [
+          34,
+          1
+         ],
+         [
+          38,
+          1
+         ],
+         [
+          40,
+          1
+         ],
+         [
+          42,
+          1
+         ],
+         [
+          44,
+          1
+         ],
+         [
+          48,
+          1
+         ],
+         [
+          50,
+          1
+         ],
+         [
+          52,
+          1
+         ],
+         [
+          54,
+          1
+         ],
+         [
+          58,
+          1
+         ],
+         [
+          60,
+          1
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 60,
+        "hits": 188,
+        "first_hit": 35,
+        "last_hit": 152,
+        "total_damage": 260.57,
+        "ep_spent": 20,
+        "ep_events": [
+         [
+          32,
+          1
+         ],
+         [
+          34,
+          1
+         ],
+         [
+          38,
+          1
+         ],
+         [
+          40,
+          1
+         ],
+         [
+          42,
+          1
+         ],
+         [
+          44,
+          1
+         ],
+         [
+          48,
+          1
+         ],
+         [
+          50,
+          1
+         ],
+         [
+          52,
+          1
+         ],
+         [
+          54,
+          1
+         ],
+         [
+          58,
+          1
+         ],
+         [
+          60,
+          1
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       }
+      ]
+     },
+     "1": {
+      "damage_multipliers": [
+       164
+      ],
+      "attack_type_subs": [
+       [
+        1,
+        6
+       ]
+      ],
+      "first_hit_frame": 35,
+      "runs": [
+       {
+        "pattern": "tap",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "hold60",
+        "dist": 60,
+        "hits": 42,
+        "first_hit": 35,
+        "last_hit": 60,
+        "total_damage": 231.23,
+        "ep_spent": 12,
+        "ep_events": [
+         [
+          31,
+          1
+         ],
+         [
+          32,
+          2
+         ],
+         [
+          33,
+          2
+         ],
+         [
+          34,
+          1
+         ],
+         [
+          36,
+          2
+         ],
+         [
+          38,
+          2
+         ],
+         [
+          39,
+          1
+         ],
+         [
+          40,
+          2
+         ],
+         [
+          41,
+          2
+         ],
+         [
+          42,
+          1
+         ],
+         [
+          43,
+          2
+         ],
+         [
+          44,
+          2
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 60,
+        "hits": 188,
+        "first_hit": 35,
+        "last_hit": 152,
+        "total_damage": 1038.15,
+        "ep_spent": 134,
+        "ep_events": [
+         [
+          31,
+          1
+         ],
+         [
+          32,
+          2
+         ],
+         [
+          33,
+          2
+         ],
+         [
+          34,
+          1
+         ],
+         [
+          36,
+          2
+         ],
+         [
+          38,
+          2
+         ],
+         [
+          39,
+          1
+         ],
+         [
+          40,
+          2
+         ],
+         [
+          41,
+          2
+         ],
+         [
+          42,
+          1
+         ],
+         [
+          43,
+          2
+         ],
+         [
+          44,
+          2
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       }
+      ]
+     },
+     "2": {
+      "damage_multipliers": [
+       328
+      ],
+      "attack_type_subs": [
+       [
+        1,
+        6
+       ]
+      ],
+      "first_hit_frame": 35,
+      "runs": [
+       {
+        "pattern": "tap",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "hold60",
+        "dist": 60,
+        "hits": 42,
+        "first_hit": 35,
+        "last_hit": 60,
+        "total_damage": 461.79,
+        "ep_spent": 137,
+        "ep_events": [
+         [
+          31,
+          6
+         ],
+         [
+          32,
+          7
+         ],
+         [
+          33,
+          7
+         ],
+         [
+          34,
+          6
+         ],
+         [
+          36,
+          7
+         ],
+         [
+          38,
+          7
+         ],
+         [
+          39,
+          6
+         ],
+         [
+          40,
+          7
+         ],
+         [
+          41,
+          7
+         ],
+         [
+          42,
+          6
+         ],
+         [
+          43,
+          7
+         ],
+         [
+          44,
+          7
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 60,
+        "hits": 188,
+        "first_hit": 35,
+        "last_hit": 152,
+        "total_damage": 2073.05,
+        "ep_spent": 624,
+        "ep_events": [
+         [
+          31,
+          6
+         ],
+         [
+          32,
+          7
+         ],
+         [
+          33,
+          7
+         ],
+         [
+          34,
+          6
+         ],
+         [
+          36,
+          7
+         ],
+         [
+          38,
+          7
+         ],
+         [
+          39,
+          6
+         ],
+         [
+          40,
+          7
+         ],
+         [
+          41,
+          7
+         ],
+         [
+          42,
+          6
+         ],
+         [
+          43,
+          7
+         ],
+         [
+          44,
+          7
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "id": 7,
+   "address": "0x871dba0",
+   "name": "Energy Blast",
+   "description": "Press the B Button to shoot out a concentrated missile of internal energy.  Press the B Button multiple times to shoot out many blasts.",
+   "max_level": null,
+   "can_use_fn": "0x8019f4b",
+   "activate_fn": "0x8019f73",
+   "icon": "0x8715ed8",
+   "icon2": "0x87160d8",
+   "ep": {
+    "percent_of_max_ep": 5,
+    "rule": "cost = ceil(maxEP*0xCCD/65536) (5%) per shot; activation + each refire",
+    "ep_cost_scaled_by": "record+0x56/16 (Dragon Armor halves); while SS/SS3 the cost is taken from the SS/SS3 gauge"
+   },
+   "measured": {
+    "setup": "Goku (STR/POW 27) vs Majin Fighter (END 31) 60 px below (dist field), maxEP 999; patterns: tap = B for 3 frames, holdN = B held N frames, mash = B 3/12 frames; frames counted from the first frame of input; VERIFIED (emu)",
+    "by_level": {
+     "0": {
+      "damage_multipliers": [
+       1024
+      ],
+      "attack_type_subs": [
+       [
+        1,
+        4
+       ]
+      ],
+      "first_hit_frame": 33,
+      "runs": [
+       {
+        "pattern": "tap",
+        "dist": 60,
+        "hits": 1,
+        "first_hit": 33,
+        "last_hit": 33,
+        "total_damage": 32.69,
+        "ep_spent": 21,
+        "ep_events": [
+         [
+          1,
+          50
+         ],
+         [
+          104,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "hold60",
+        "dist": 60,
+        "hits": 1,
+        "first_hit": 33,
+        "last_hit": 33,
+        "total_damage": 32.69,
+        "ep_spent": 21,
+        "ep_events": [
+         [
+          1,
+          50
+         ],
+         [
+          104,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 60,
+        "hits": 1,
+        "first_hit": 33,
+        "last_hit": 33,
+        "total_damage": 32.69,
+        "ep_spent": 21,
+        "ep_events": [
+         [
+          1,
+          50
+         ],
+         [
+          104,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 60,
+        "hits": 6,
+        "first_hit": 33,
+        "last_hit": 178,
+        "total_damage": 203.36,
+        "ep_spent": 271,
+        "ep_events": [
+         [
+          1,
+          50
+         ],
+         [
+          51,
+          50
+         ],
+         [
+          79,
+          50
+         ],
+         [
+          108,
+          -29
+         ],
+         [
+          109,
+          50
+         ],
+         [
+          138,
+          50
+         ],
+         [
+          166,
+          50
+         ]
+        ]
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "id": 8,
+   "address": "0x871dbb8",
+   "name": "Energy Punch",
+   "description": "Press the B Button to throw a mighty punch, enhanced with energy.  ",
+   "max_level": 2,
+   "can_use_fn": "0x8019fed",
+   "activate_fn": "0x801a015",
+   "icon": "0x87162d8",
+   "icon2": "0x87164d8",
+   "ep": {
+    "rule": "needs/spends cost[level]",
+    "ep_cost_by_level": [
+     25,
+     70,
+     290
+    ],
+    "cost_table_address": "0x871dac8",
+    "ep_cost_scaled_by": "record+0x56/16 (Dragon Armor halves); while SS/SS3 the cost is taken from the SS/SS3 gauge"
+   },
+   "measured": {
+    "setup": "Goku (STR/POW 27) vs Majin Fighter (END 31) 60 px below (dist field), maxEP 999; patterns: tap = B for 3 frames, holdN = B held N frames, mash = B 3/12 frames; frames counted from the first frame of input; VERIFIED (emu)",
+    "by_level": {
+     "0": {
+      "damage_multipliers": [],
+      "attack_type_subs": [],
+      "first_hit_frame": null,
+      "runs": [
+       {
+        "pattern": "tap",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": [
+         [
+          1,
+          25
+         ],
+         [
+          103,
+          -25
+         ]
+        ]
+       },
+       {
+        "pattern": "hold60",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 25,
+        "ep_events": [
+         [
+          1,
+          25
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 25,
+        "ep_events": [
+         [
+          1,
+          25
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 271,
+        "ep_events": [
+         [
+          1,
+          25
+         ],
+         [
+          13,
+          25
+         ],
+         [
+          25,
+          25
+         ],
+         [
+          38,
+          25
+         ],
+         [
+          49,
+          25
+         ],
+         [
+          61,
+          25
+         ],
+         [
+          73,
+          25
+         ],
+         [
+          85,
+          25
+         ],
+         [
+          97,
+          25
+         ],
+         [
+          107,
+          -29
+         ],
+         [
+          109,
+          25
+         ],
+         [
+          121,
+          25
+         ]
+        ]
+       },
+       {
+        "pattern": "tap",
+        "dist": 20,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": [
+         [
+          1,
+          25
+         ],
+         [
+          101,
+          -25
+         ]
+        ]
+       },
+       {
+        "pattern": "tap",
+        "dist": 40,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": [
+         [
+          1,
+          25
+         ],
+         [
+          104,
+          -25
+         ]
+        ]
+       },
+       {
+        "pattern": "hold60",
+        "dist": 20,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": [
+         [
+          1,
+          25
+         ],
+         [
+          101,
+          -25
+         ]
+        ]
+       },
+       {
+        "pattern": "hold60",
+        "dist": 40,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 25,
+        "ep_events": [
+         [
+          1,
+          25
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 20,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": [
+         [
+          1,
+          25
+         ],
+         [
+          101,
+          -25
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 40,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 25,
+        "ep_events": [
+         [
+          1,
+          25
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 20,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 146,
+        "ep_events": [
+         [
+          1,
+          25
+         ],
+         [
+          37,
+          25
+         ],
+         [
+          49,
+          25
+         ],
+         [
+          85,
+          25
+         ],
+         [
+          101,
+          -29
+         ],
+         [
+          121,
+          25
+         ],
+         [
+          133,
+          25
+         ],
+         [
+          145,
+          25
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 40,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 296,
+        "ep_events": [
+         [
+          1,
+          25
+         ],
+         [
+          13,
+          25
+         ],
+         [
+          25,
+          25
+         ],
+         [
+          38,
+          25
+         ],
+         [
+          49,
+          25
+         ],
+         [
+          61,
+          25
+         ],
+         [
+          73,
+          25
+         ],
+         [
+          85,
+          25
+         ],
+         [
+          97,
+          25
+         ],
+         [
+          107,
+          -29
+         ],
+         [
+          109,
+          25
+         ],
+         [
+          121,
+          25
+         ]
+        ]
+       }
+      ]
+     },
+     "1": {
+      "damage_multipliers": [],
+      "attack_type_subs": [],
+      "first_hit_frame": null,
+      "runs": [
+       {
+        "pattern": "tap",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 41,
+        "ep_events": [
+         [
+          1,
+          70
+         ],
+         [
+          103,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "hold60",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 70,
+        "ep_events": [
+         [
+          1,
+          70
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 70,
+        "ep_events": [
+         [
+          1,
+          70
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 811,
+        "ep_events": [
+         [
+          1,
+          70
+         ],
+         [
+          13,
+          70
+         ],
+         [
+          25,
+          70
+         ],
+         [
+          38,
+          70
+         ],
+         [
+          49,
+          70
+         ],
+         [
+          61,
+          70
+         ],
+         [
+          73,
+          70
+         ],
+         [
+          85,
+          70
+         ],
+         [
+          97,
+          70
+         ],
+         [
+          107,
+          -29
+         ],
+         [
+          109,
+          70
+         ],
+         [
+          121,
+          70
+         ]
+        ]
+       },
+       {
+        "pattern": "tap",
+        "dist": 20,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 41,
+        "ep_events": [
+         [
+          1,
+          70
+         ],
+         [
+          101,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "tap",
+        "dist": 40,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 41,
+        "ep_events": [
+         [
+          1,
+          70
+         ],
+         [
+          104,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "hold60",
+        "dist": 20,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 41,
+        "ep_events": [
+         [
+          1,
+          70
+         ],
+         [
+          101,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "hold60",
+        "dist": 40,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 70,
+        "ep_events": [
+         [
+          1,
+          70
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 20,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 41,
+        "ep_events": [
+         [
+          1,
+          70
+         ],
+         [
+          101,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 40,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 70,
+        "ep_events": [
+         [
+          1,
+          70
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 20,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 461,
+        "ep_events": [
+         [
+          1,
+          70
+         ],
+         [
+          37,
+          70
+         ],
+         [
+          49,
+          70
+         ],
+         [
+          85,
+          70
+         ],
+         [
+          101,
+          -29
+         ],
+         [
+          121,
+          70
+         ],
+         [
+          133,
+          70
+         ],
+         [
+          145,
+          70
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 40,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 881,
+        "ep_events": [
+         [
+          1,
+          70
+         ],
+         [
+          13,
+          70
+         ],
+         [
+          25,
+          70
+         ],
+         [
+          38,
+          70
+         ],
+         [
+          49,
+          70
+         ],
+         [
+          61,
+          70
+         ],
+         [
+          73,
+          70
+         ],
+         [
+          85,
+          70
+         ],
+         [
+          97,
+          70
+         ],
+         [
+          107,
+          -29
+         ],
+         [
+          109,
+          70
+         ],
+         [
+          121,
+          70
+         ]
+        ]
+       }
+      ]
+     },
+     "2": {
+      "damage_multipliers": [
+       226
+      ],
+      "attack_type_subs": [
+       [
+        1,
+        9
+       ]
+      ],
+      "first_hit_frame": 10,
+      "runs": [
+       {
+        "pattern": "tap",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 261,
+        "ep_events": [
+         [
+          1,
+          290
+         ],
+         [
+          103,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "hold60",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 290,
+        "ep_events": [
+         [
+          1,
+          290
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 290,
+        "ep_events": [
+         [
+          1,
+          290
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 841,
+        "ep_events": [
+         [
+          1,
+          290
+         ],
+         [
+          13,
+          290
+         ],
+         [
+          25,
+          290
+         ],
+         [
+          107,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "tap",
+        "dist": 20,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 261,
+        "ep_events": [
+         [
+          1,
+          290
+         ],
+         [
+          101,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "tap",
+        "dist": 40,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 261,
+        "ep_events": [
+         [
+          1,
+          290
+         ],
+         [
+          104,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "hold60",
+        "dist": 20,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 261,
+        "ep_events": [
+         [
+          1,
+          290
+         ],
+         [
+          101,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "hold60",
+        "dist": 40,
+        "hits": 5,
+        "first_hit": 10,
+        "last_hit": 14,
+        "total_damage": 37.81,
+        "ep_spent": 290,
+        "ep_events": [
+         [
+          1,
+          290
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 20,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 261,
+        "ep_events": [
+         [
+          1,
+          290
+         ],
+         [
+          101,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 40,
+        "hits": 5,
+        "first_hit": 10,
+        "last_hit": 14,
+        "total_damage": 37.81,
+        "ep_spent": 290,
+        "ep_events": [
+         [
+          1,
+          290
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 20,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 841,
+        "ep_events": [
+         [
+          1,
+          290
+         ],
+         [
+          37,
+          290
+         ],
+         [
+          49,
+          290
+         ],
+         [
+          101,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 40,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 841,
+        "ep_events": [
+         [
+          1,
+          290
+         ],
+         [
+          13,
+          290
+         ],
+         [
+          25,
+          290
+         ],
+         [
+          103,
+          -29
+         ]
+        ]
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "id": 9,
+   "address": "0x871dbd0",
+   "name": "Energy Sword",
+   "description": "Hold the B Button to create a glowing sword of energy.  When fully charged, continue holding the B Button to spin around, and press the +Control Pad to move.",
+   "max_level": null,
+   "can_use_fn": "0x801a065",
+   "activate_fn": "0x801a07f",
+   "icon": "0x87166d8",
+   "icon2": "0x87168d8",
+   "ep": {
+    "canuse_min_ep": 350,
+    "rule": "needs EP >= 350 (0x15E); drains 4 EP every other frame while charging",
+    "ep_cost_scaled_by": "record+0x56/16 (Dragon Armor halves); while SS/SS3 the cost is taken from the SS/SS3 gauge"
+   },
+   "measured": {
+    "setup": "Goku (STR/POW 27) vs Majin Fighter (END 31) 60 px below (dist field), maxEP 999; patterns: tap = B for 3 frames, holdN = B held N frames, mash = B 3/12 frames; frames counted from the first frame of input; VERIFIED (emu)",
+    "by_level": {
+     "0": {
+      "damage_multipliers": [
+       10240
+      ],
+      "attack_type_subs": [
+       [
+        1,
+        15
+       ]
+      ],
+      "first_hit_frame": 153,
+      "runs": [
+       {
+        "pattern": "tap",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": [
+         [
+          2,
+          4
+         ],
+         [
+          3,
+          4
+         ],
+         [
+          103,
+          -8
+         ]
+        ]
+       },
+       {
+        "pattern": "hold60",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 167,
+        "ep_events": [
+         [
+          2,
+          4
+         ],
+         [
+          3,
+          4
+         ],
+         [
+          4,
+          4
+         ],
+         [
+          6,
+          4
+         ],
+         [
+          8,
+          4
+         ],
+         [
+          9,
+          4
+         ],
+         [
+          10,
+          4
+         ],
+         [
+          11,
+          4
+         ],
+         [
+          12,
+          4
+         ],
+         [
+          13,
+          4
+         ],
+         [
+          14,
+          4
+         ],
+         [
+          16,
+          4
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 467,
+        "ep_events": [
+         [
+          2,
+          4
+         ],
+         [
+          3,
+          4
+         ],
+         [
+          4,
+          4
+         ],
+         [
+          6,
+          4
+         ],
+         [
+          8,
+          4
+         ],
+         [
+          9,
+          4
+         ],
+         [
+          10,
+          4
+         ],
+         [
+          11,
+          4
+         ],
+         [
+          12,
+          4
+         ],
+         [
+          13,
+          4
+         ],
+         [
+          14,
+          4
+         ],
+         [
+          16,
+          4
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 39,
+        "ep_events": [
+         [
+          2,
+          4
+         ],
+         [
+          3,
+          4
+         ],
+         [
+          14,
+          4
+         ],
+         [
+          38,
+          4
+         ],
+         [
+          50,
+          4
+         ],
+         [
+          51,
+          4
+         ],
+         [
+          63,
+          4
+         ],
+         [
+          74,
+          4
+         ],
+         [
+          75,
+          4
+         ],
+         [
+          86,
+          4
+         ],
+         [
+          87,
+          4
+         ],
+         [
+          98,
+          4
+         ]
+        ]
+       },
+       {
+        "pattern": "tap",
+        "dist": 20,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": [
+         [
+          2,
+          4
+         ],
+         [
+          3,
+          4
+         ],
+         [
+          101,
+          -8
+         ]
+        ]
+       },
+       {
+        "pattern": "tap",
+        "dist": 40,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": [
+         [
+          2,
+          4
+         ],
+         [
+          3,
+          4
+         ],
+         [
+          104,
+          -8
+         ]
+        ]
+       },
+       {
+        "pattern": "hold60",
+        "dist": 20,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": [
+         [
+          2,
+          4
+         ],
+         [
+          3,
+          4
+         ],
+         [
+          101,
+          -8
+         ]
+        ]
+       },
+       {
+        "pattern": "hold60",
+        "dist": 40,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 167,
+        "ep_events": [
+         [
+          2,
+          4
+         ],
+         [
+          3,
+          4
+         ],
+         [
+          4,
+          4
+         ],
+         [
+          6,
+          4
+         ],
+         [
+          8,
+          4
+         ],
+         [
+          9,
+          4
+         ],
+         [
+          10,
+          4
+         ],
+         [
+          11,
+          4
+         ],
+         [
+          12,
+          4
+         ],
+         [
+          13,
+          4
+         ],
+         [
+          14,
+          4
+         ],
+         [
+          16,
+          4
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 20,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": [
+         [
+          2,
+          4
+         ],
+         [
+          3,
+          4
+         ],
+         [
+          101,
+          -8
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 40,
+        "hits": 1,
+        "first_hit": 153,
+        "last_hit": 153,
+        "total_damage": 335.84,
+        "ep_spent": 467,
+        "ep_events": [
+         [
+          2,
+          4
+         ],
+         [
+          3,
+          4
+         ],
+         [
+          4,
+          4
+         ],
+         [
+          6,
+          4
+         ],
+         [
+          8,
+          4
+         ],
+         [
+          9,
+          4
+         ],
+         [
+          10,
+          4
+         ],
+         [
+          11,
+          4
+         ],
+         [
+          12,
+          4
+         ],
+         [
+          13,
+          4
+         ],
+         [
+          14,
+          4
+         ],
+         [
+          16,
+          4
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 20,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 12,
+        "ep_events": [
+         [
+          2,
+          4
+         ],
+         [
+          3,
+          4
+         ],
+         [
+          39,
+          4
+         ],
+         [
+          50,
+          4
+         ],
+         [
+          51,
+          4
+         ],
+         [
+          62,
+          4
+         ],
+         [
+          101,
+          -24
+         ],
+         [
+          110,
+          4
+         ],
+         [
+          111,
+          4
+         ],
+         [
+          122,
+          4
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 40,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 39,
+        "ep_events": [
+         [
+          2,
+          4
+         ],
+         [
+          3,
+          4
+         ],
+         [
+          14,
+          4
+         ],
+         [
+          38,
+          4
+         ],
+         [
+          50,
+          4
+         ],
+         [
+          51,
+          4
+         ],
+         [
+          63,
+          4
+         ],
+         [
+          74,
+          4
+         ],
+         [
+          75,
+          4
+         ],
+         [
+          87,
+          4
+         ],
+         [
+          98,
+          4
+         ],
+         [
+          99,
+          4
+         ]
+        ]
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "id": 10,
+   "address": "0x871dbe8",
+   "name": "Final Flash",
+   "description": "Hold the B Button to emit a long beam of energy which travels across land instantly.",
+   "max_level": 2,
+   "can_use_fn": "0x801a0ab",
+   "activate_fn": "0x801a0d1",
+   "icon": "0x8716ad8",
+   "icon2": "0x8716cd8",
+   "ep": {
+    "rule": "needs EP >= cost[level]",
+    "ep_cost_by_level": [
+     15,
+     45,
+     140
+    ],
+    "cost_table_address": "0x871da9e",
+    "ep_cost_scaled_by": "record+0x56/16 (Dragon Armor halves); while SS/SS3 the cost is taken from the SS/SS3 gauge"
+   },
+   "measured": {
+    "setup": "Goku (STR/POW 27) vs Majin Fighter (END 31) 60 px below (dist field), maxEP 999; patterns: tap = B for 3 frames, holdN = B held N frames, mash = B 3/12 frames; frames counted from the first frame of input; VERIFIED (emu)",
+    "by_level": {
+     "0": {
+      "damage_multipliers": [
+       41
+      ],
+      "attack_type_subs": [
+       [
+        1,
+        11
+       ]
+      ],
+      "first_hit_frame": 31,
+      "runs": [
+       {
+        "pattern": "tap",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "hold60",
+        "dist": 60,
+        "hits": 8,
+        "first_hit": 31,
+        "last_hit": 40,
+        "total_damage": 10.95,
+        "ep_spent": 3,
+        "ep_events": [
+         [
+          33,
+          1
+         ],
+         [
+          36,
+          1
+         ],
+         [
+          40,
+          1
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 60,
+        "hits": 8,
+        "first_hit": 31,
+        "last_hit": 40,
+        "total_damage": 10.95,
+        "ep_spent": 3,
+        "ep_events": [
+         [
+          33,
+          1
+         ],
+         [
+          36,
+          1
+         ],
+         [
+          40,
+          1
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       }
+      ]
+     },
+     "1": {
+      "damage_multipliers": [
+       164
+      ],
+      "attack_type_subs": [
+       [
+        1,
+        11
+       ]
+      ],
+      "first_hit_frame": 31,
+      "runs": [
+       {
+        "pattern": "tap",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "hold60",
+        "dist": 60,
+        "hits": 8,
+        "first_hit": 31,
+        "last_hit": 40,
+        "total_damage": 43.75,
+        "ep_spent": 12,
+        "ep_events": [
+         [
+          31,
+          1
+         ],
+         [
+          32,
+          1
+         ],
+         [
+          33,
+          2
+         ],
+         [
+          34,
+          1
+         ],
+         [
+          36,
+          2
+         ],
+         [
+          38,
+          1
+         ],
+         [
+          39,
+          1
+         ],
+         [
+          40,
+          2
+         ],
+         [
+          41,
+          1
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 60,
+        "hits": 8,
+        "first_hit": 31,
+        "last_hit": 40,
+        "total_damage": 43.75,
+        "ep_spent": 12,
+        "ep_events": [
+         [
+          31,
+          1
+         ],
+         [
+          32,
+          1
+         ],
+         [
+          33,
+          2
+         ],
+         [
+          34,
+          1
+         ],
+         [
+          36,
+          2
+         ],
+         [
+          38,
+          1
+         ],
+         [
+          39,
+          1
+         ],
+         [
+          40,
+          2
+         ],
+         [
+          41,
+          1
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       }
+      ]
+     },
+     "2": {
+      "damage_multipliers": [
+       328
+      ],
+      "attack_type_subs": [
+       [
+        1,
+        11
+       ]
+      ],
+      "first_hit_frame": 31,
+      "runs": [
+       {
+        "pattern": "tap",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "hold60",
+        "dist": 60,
+        "hits": 8,
+        "first_hit": 31,
+        "last_hit": 40,
+        "total_damage": 87.43,
+        "ep_spent": 41,
+        "ep_events": [
+         [
+          31,
+          4
+         ],
+         [
+          32,
+          5
+         ],
+         [
+          33,
+          4
+         ],
+         [
+          34,
+          5
+         ],
+         [
+          36,
+          4
+         ],
+         [
+          38,
+          5
+         ],
+         [
+          39,
+          5
+         ],
+         [
+          40,
+          4
+         ],
+         [
+          41,
+          5
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 60,
+        "hits": 8,
+        "first_hit": 31,
+        "last_hit": 40,
+        "total_damage": 87.43,
+        "ep_spent": 41,
+        "ep_events": [
+         [
+          31,
+          4
+         ],
+         [
+          32,
+          5
+         ],
+         [
+          33,
+          4
+         ],
+         [
+          34,
+          5
+         ],
+         [
+          36,
+          4
+         ],
+         [
+          38,
+          5
+         ],
+         [
+          39,
+          5
+         ],
+         [
+          40,
+          4
+         ],
+         [
+          41,
+          5
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "id": 11,
+   "address": "0x871dc00",
+   "name": "Flame Kamehameha",
+   "description": "Hold the B Button to emit a chain of energy flames.  While holding the B Button, press the +Control Pad to move the flames like a whip.",
+   "max_level": 2,
+   "can_use_fn": "0x801a109",
+   "activate_fn": "0x801a12f",
+   "icon": "0x8716ed8",
+   "icon2": "0x87170d8",
+   "ep": {
+    "rule": "needs EP >= cost[level]; drains while held",
+    "ep_cost_by_level": [
+     15,
+     44,
+     145
+    ],
+    "cost_table_address": "0x871daa1",
+    "ep_cost_scaled_by": "record+0x56/16 (Dragon Armor halves); while SS/SS3 the cost is taken from the SS/SS3 gauge"
+   },
+   "measured": {
+    "setup": "Goku (STR/POW 27) vs Majin Fighter (END 31) 60 px below (dist field), maxEP 999; patterns: tap = B for 3 frames, holdN = B held N frames, mash = B 3/12 frames; frames counted from the first frame of input; VERIFIED (emu)",
+    "by_level": {
+     "0": {
+      "damage_multipliers": [
+       41
+      ],
+      "attack_type_subs": [
+       [
+        1,
+        12
+       ]
+      ],
+      "first_hit_frame": 49,
+      "runs": [
+       {
+        "pattern": "tap",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "hold60",
+        "dist": 60,
+        "hits": 10,
+        "first_hit": 49,
+        "last_hit": 60,
+        "total_damage": 13.69,
+        "ep_spent": 0,
+        "ep_events": [
+         [
+          34,
+          1
+         ],
+         [
+          38,
+          1
+         ],
+         [
+          41,
+          1
+         ],
+         [
+          43,
+          1
+         ],
+         [
+          45,
+          1
+         ],
+         [
+          48,
+          1
+         ],
+         [
+          50,
+          1
+         ],
+         [
+          53,
+          1
+         ],
+         [
+          56,
+          1
+         ],
+         [
+          59,
+          1
+         ],
+         [
+          106,
+          -10
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 60,
+        "hits": 82,
+        "first_hit": 49,
+        "last_hit": 150,
+        "total_damage": 113.14,
+        "ep_spent": 15,
+        "ep_events": [
+         [
+          34,
+          1
+         ],
+         [
+          38,
+          1
+         ],
+         [
+          41,
+          1
+         ],
+         [
+          43,
+          1
+         ],
+         [
+          45,
+          1
+         ],
+         [
+          48,
+          1
+         ],
+         [
+          50,
+          1
+         ],
+         [
+          53,
+          1
+         ],
+         [
+          56,
+          1
+         ],
+         [
+          59,
+          1
+         ],
+         [
+          62,
+          1
+         ],
+         [
+          64,
+          1
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       }
+      ]
+     },
+     "1": {
+      "damage_multipliers": [
+       164
+      ],
+      "attack_type_subs": [
+       [
+        1,
+        12
+       ]
+      ],
+      "first_hit_frame": 49,
+      "runs": [
+       {
+        "pattern": "tap",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "hold60",
+        "dist": 60,
+        "hits": 12,
+        "first_hit": 49,
+        "last_hit": 60,
+        "total_damage": 66.28,
+        "ep_spent": 9,
+        "ep_events": [
+         [
+          32,
+          1
+         ],
+         [
+          33,
+          1
+         ],
+         [
+          34,
+          2
+         ],
+         [
+          36,
+          1
+         ],
+         [
+          38,
+          2
+         ],
+         [
+          39,
+          1
+         ],
+         [
+          40,
+          2
+         ],
+         [
+          41,
+          1
+         ],
+         [
+          42,
+          2
+         ],
+         [
+          43,
+          1
+         ],
+         [
+          44,
+          2
+         ],
+         [
+          45,
+          1
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 60,
+        "hits": 156,
+        "first_hit": 49,
+        "last_hit": 150,
+        "total_damage": 859.14,
+        "ep_spent": 114,
+        "ep_events": [
+         [
+          32,
+          1
+         ],
+         [
+          33,
+          1
+         ],
+         [
+          34,
+          2
+         ],
+         [
+          36,
+          1
+         ],
+         [
+          38,
+          2
+         ],
+         [
+          39,
+          1
+         ],
+         [
+          40,
+          2
+         ],
+         [
+          41,
+          1
+         ],
+         [
+          42,
+          2
+         ],
+         [
+          43,
+          1
+         ],
+         [
+          44,
+          2
+         ],
+         [
+          45,
+          1
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       }
+      ]
+     },
+     "2": {
+      "damage_multipliers": [
+       328
+      ],
+      "attack_type_subs": [
+       [
+        1,
+        12
+       ]
+      ],
+      "first_hit_frame": 49,
+      "runs": [
+       {
+        "pattern": "tap",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "hold60",
+        "dist": 60,
+        "hits": 12,
+        "first_hit": 49,
+        "last_hit": 60,
+        "total_damage": 132.26,
+        "ep_spent": 96,
+        "ep_events": [
+         [
+          32,
+          4
+         ],
+         [
+          33,
+          5
+         ],
+         [
+          34,
+          5
+         ],
+         [
+          36,
+          5
+         ],
+         [
+          38,
+          5
+         ],
+         [
+          39,
+          5
+         ],
+         [
+          40,
+          4
+         ],
+         [
+          41,
+          5
+         ],
+         [
+          42,
+          5
+         ],
+         [
+          43,
+          5
+         ],
+         [
+          44,
+          5
+         ],
+         [
+          45,
+          5
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 60,
+        "hits": 176,
+        "first_hit": 49,
+        "last_hit": 150,
+        "total_damage": 1935.88,
+        "ep_spent": 377,
+        "ep_events": [
+         [
+          32,
+          4
+         ],
+         [
+          33,
+          5
+         ],
+         [
+          34,
+          5
+         ],
+         [
+          36,
+          5
+         ],
+         [
+          38,
+          5
+         ],
+         [
+          39,
+          5
+         ],
+         [
+          40,
+          4
+         ],
+         [
+          41,
+          5
+         ],
+         [
+          42,
+          5
+         ],
+         [
+          43,
+          5
+         ],
+         [
+          44,
+          5
+         ],
+         [
+          45,
+          5
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "id": 12,
+   "address": "0x871dc18",
+   "name": "Fusion Dance",
+   "description": "Press the B Button to begin the Fusion Dance sequence.  Watch carefully, then press the button indicated when it is highlighted.  ",
+   "max_level": null,
+   "can_use_fn": "0x801a169",
+   "activate_fn": "0x801a19f",
+   "icon": "0x87172d8",
+   "icon2": "0x87174d8",
+   "ep": {
+    "rule": "Fusion Dance: requires a fusion partner/conditions (0x03002C04 == 0, form flags); no EP",
+    "ep_cost_scaled_by": "record+0x56/16 (Dragon Armor halves); while SS/SS3 the cost is taken from the SS/SS3 gauge"
+   },
+   "measured": {
+    "setup": "Goku (STR/POW 27) vs Majin Fighter (END 31) 60 px below (dist field), maxEP 999; patterns: tap = B for 3 frames, holdN = B held N frames, mash = B 3/12 frames; frames counted from the first frame of input; VERIFIED (emu)",
+    "by_level": {
+     "0": {
+      "damage_multipliers": [],
+      "attack_type_subs": [],
+      "first_hit_frame": null,
+      "runs": [
+       {
+        "pattern": "tap",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "hold60",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "hold150",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "mash",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "tap",
+        "dist": 20,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "tap",
+        "dist": 40,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "hold60",
+        "dist": 20,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "hold60",
+        "dist": 40,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "hold150",
+        "dist": 20,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "hold150",
+        "dist": 40,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "mash",
+        "dist": 20,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "mash",
+        "dist": 40,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "id": 13,
+   "address": "0x871dc30",
+   "name": "Super Kamikaze Ghost Attack",
+   "description": "Hold the B Button to create small ghost replicas.  Let go of the B Button to release the ghosts, which attack the closest enemy and explode on contact.",
+   "max_level": null,
+   "can_use_fn": "0x801a1c1",
+   "activate_fn": "0x801a1e5",
+   "icon": "0x87176d8",
+   "icon2": "0x87178d8",
+   "ep": {
+    "canuse_min_ep": 160,
+    "spend": 160,
+    "rule": "spends 160",
+    "ep_cost_scaled_by": "record+0x56/16 (Dragon Armor halves); while SS/SS3 the cost is taken from the SS/SS3 gauge"
+   },
+   "measured": {
+    "setup": "Goku (STR/POW 27) vs Majin Fighter (END 31) 60 px below (dist field), maxEP 999; patterns: tap = B for 3 frames, holdN = B held N frames, mash = B 3/12 frames; frames counted from the first frame of input; VERIFIED (emu)",
+    "by_level": {
+     "0": {
+      "damage_multipliers": [],
+      "attack_type_subs": [],
+      "first_hit_frame": null,
+      "runs": [
+       {
+        "pattern": "tap",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 160,
+        "ep_events": [
+         [
+          1,
+          160
+         ]
+        ]
+       },
+       {
+        "pattern": "hold60",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 160,
+        "ep_events": [
+         [
+          1,
+          160
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 160,
+        "ep_events": [
+         [
+          1,
+          160
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 160,
+        "ep_events": [
+         [
+          1,
+          160
+         ]
+        ]
+       },
+       {
+        "pattern": "tap",
+        "dist": 20,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 131,
+        "ep_events": [
+         [
+          1,
+          160
+         ],
+         [
+          101,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "tap",
+        "dist": 40,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 160,
+        "ep_events": [
+         [
+          1,
+          160
+         ]
+        ]
+       },
+       {
+        "pattern": "hold60",
+        "dist": 20,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 131,
+        "ep_events": [
+         [
+          1,
+          160
+         ],
+         [
+          101,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "hold60",
+        "dist": 40,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 160,
+        "ep_events": [
+         [
+          1,
+          160
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 20,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 131,
+        "ep_events": [
+         [
+          1,
+          160
+         ],
+         [
+          101,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 40,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 160,
+        "ep_events": [
+         [
+          1,
+          160
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 20,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 611,
+        "ep_events": [
+         [
+          1,
+          160
+         ],
+         [
+          37,
+          160
+         ],
+         [
+          85,
+          160
+         ],
+         [
+          103,
+          -29
+         ],
+         [
+          121,
+          160
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 40,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 160,
+        "ep_events": [
+         [
+          1,
+          160
+         ]
+        ]
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "id": 14,
+   "address": "0x871dc48",
+   "name": "Instant Transmission",
+   "description": "Hold the B Button to bring up the cursor.  Use the +Control Pad to select an item, enemy, or switch.  Release the B Button to teleport there and back.",
+   "max_level": 2,
+   "can_use_fn": "0x801a217",
+   "activate_fn": "0x801a23b",
+   "icon": "0x8717ad8",
+   "icon2": "0x8717cd8",
+   "ep": {
+    "canuse_min_ep": 40,
+    "rule": "needs EP >= 40 (Instant Transmission); 0x03002C04 must be 0",
+    "ep_cost_scaled_by": "record+0x56/16 (Dragon Armor halves); while SS/SS3 the cost is taken from the SS/SS3 gauge"
+   },
+   "measured": {
+    "setup": "Goku (STR/POW 27) vs Majin Fighter (END 31) 60 px below (dist field), maxEP 999; patterns: tap = B for 3 frames, holdN = B held N frames, mash = B 3/12 frames; frames counted from the first frame of input; VERIFIED (emu)",
+    "by_level": {
+     "0": {
+      "damage_multipliers": [],
+      "attack_type_subs": [],
+      "first_hit_frame": null,
+      "runs": [
+       {
+        "pattern": "tap",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "hold60",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "hold150",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "mash",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       }
+      ]
+     },
+     "1": {
+      "damage_multipliers": [],
+      "attack_type_subs": [],
+      "first_hit_frame": null,
+      "runs": [
+       {
+        "pattern": "tap",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "hold60",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "hold150",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "mash",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       }
+      ]
+     },
+     "2": {
+      "damage_multipliers": [],
+      "attack_type_subs": [],
+      "first_hit_frame": null,
+      "runs": [
+       {
+        "pattern": "tap",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "hold60",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "hold150",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "mash",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "id": 15,
+   "address": "0x871dc60",
+   "name": "Kamehameha",
+   "description": "Hold the B Button to emit a long beam of energy.",
+   "max_level": 2,
+   "can_use_fn": "0x801a335",
+   "activate_fn": "0x801a35b",
+   "icon": "0x8717ed8",
+   "icon2": "0x87180d8",
+   "ep": {
+    "rule": "needs EP >= cost[level]; drains while held",
+    "ep_cost_by_level": [
+     15,
+     45,
+     150
+    ],
+    "cost_table_address": "0x871daa4",
+    "ep_cost_scaled_by": "record+0x56/16 (Dragon Armor halves); while SS/SS3 the cost is taken from the SS/SS3 gauge"
+   },
+   "measured": {
+    "setup": "Goku (STR/POW 27) vs Majin Fighter (END 31) 60 px below (dist field), maxEP 999; patterns: tap = B for 3 frames, holdN = B held N frames, mash = B 3/12 frames; frames counted from the first frame of input; VERIFIED (emu)",
+    "by_level": {
+     "0": {
+      "damage_multipliers": [
+       41
+      ],
+      "attack_type_subs": [
+       [
+        1,
+        5
+       ]
+      ],
+      "first_hit_frame": 35,
+      "runs": [
+       {
+        "pattern": "tap",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "hold60",
+        "dist": 60,
+        "hits": 42,
+        "first_hit": 35,
+        "last_hit": 60,
+        "total_damage": 58.11,
+        "ep_spent": 0,
+        "ep_events": [
+         [
+          33,
+          1
+         ],
+         [
+          36,
+          1
+         ],
+         [
+          40,
+          1
+         ],
+         [
+          42,
+          1
+         ],
+         [
+          44,
+          1
+         ],
+         [
+          49,
+          1
+         ],
+         [
+          51,
+          1
+         ],
+         [
+          54,
+          1
+         ],
+         [
+          58,
+          1
+         ],
+         [
+          60,
+          1
+         ],
+         [
+          106,
+          -10
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 60,
+        "hits": 188,
+        "first_hit": 35,
+        "last_hit": 152,
+        "total_damage": 260.57,
+        "ep_spent": 14,
+        "ep_events": [
+         [
+          33,
+          1
+         ],
+         [
+          36,
+          1
+         ],
+         [
+          40,
+          1
+         ],
+         [
+          42,
+          1
+         ],
+         [
+          44,
+          1
+         ],
+         [
+          49,
+          1
+         ],
+         [
+          51,
+          1
+         ],
+         [
+          54,
+          1
+         ],
+         [
+          58,
+          1
+         ],
+         [
+          60,
+          1
+         ],
+         [
+          63,
+          1
+         ],
+         [
+          66,
+          1
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       }
+      ]
+     },
+     "1": {
+      "damage_multipliers": [
+       164
+      ],
+      "attack_type_subs": [
+       [
+        1,
+        5
+       ]
+      ],
+      "first_hit_frame": 35,
+      "runs": [
+       {
+        "pattern": "tap",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "hold60",
+        "dist": 60,
+        "hits": 42,
+        "first_hit": 35,
+        "last_hit": 60,
+        "total_damage": 231.23,
+        "ep_spent": 8,
+        "ep_events": [
+         [
+          31,
+          1
+         ],
+         [
+          32,
+          2
+         ],
+         [
+          33,
+          1
+         ],
+         [
+          34,
+          2
+         ],
+         [
+          36,
+          1
+         ],
+         [
+          38,
+          2
+         ],
+         [
+          39,
+          1
+         ],
+         [
+          40,
+          2
+         ],
+         [
+          41,
+          1
+         ],
+         [
+          42,
+          2
+         ],
+         [
+          43,
+          1
+         ],
+         [
+          44,
+          2
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 60,
+        "hits": 188,
+        "first_hit": 35,
+        "last_hit": 152,
+        "total_damage": 1038.15,
+        "ep_spent": 118,
+        "ep_events": [
+         [
+          31,
+          1
+         ],
+         [
+          32,
+          2
+         ],
+         [
+          33,
+          1
+         ],
+         [
+          34,
+          2
+         ],
+         [
+          36,
+          1
+         ],
+         [
+          38,
+          2
+         ],
+         [
+          39,
+          1
+         ],
+         [
+          40,
+          2
+         ],
+         [
+          41,
+          1
+         ],
+         [
+          42,
+          2
+         ],
+         [
+          43,
+          1
+         ],
+         [
+          44,
+          2
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       }
+      ]
+     },
+     "2": {
+      "damage_multipliers": [
+       328
+      ],
+      "attack_type_subs": [
+       [
+        1,
+        5
+       ]
+      ],
+      "first_hit_frame": 35,
+      "runs": [
+       {
+        "pattern": "tap",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "hold60",
+        "dist": 60,
+        "hits": 42,
+        "first_hit": 35,
+        "last_hit": 60,
+        "total_damage": 461.79,
+        "ep_spent": 96,
+        "ep_events": [
+         [
+          31,
+          5
+         ],
+         [
+          32,
+          5
+         ],
+         [
+          33,
+          5
+         ],
+         [
+          34,
+          5
+         ],
+         [
+          36,
+          5
+         ],
+         [
+          38,
+          5
+         ],
+         [
+          39,
+          5
+         ],
+         [
+          40,
+          5
+         ],
+         [
+          41,
+          5
+         ],
+         [
+          42,
+          5
+         ],
+         [
+          43,
+          5
+         ],
+         [
+          44,
+          5
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 60,
+        "hits": 188,
+        "first_hit": 35,
+        "last_hit": 152,
+        "total_damage": 2073.05,
+        "ep_spent": 461,
+        "ep_events": [
+         [
+          31,
+          5
+         ],
+         [
+          32,
+          5
+         ],
+         [
+          33,
+          5
+         ],
+         [
+          34,
+          5
+         ],
+         [
+          36,
+          5
+         ],
+         [
+          38,
+          5
+         ],
+         [
+          39,
+          5
+         ],
+         [
+          40,
+          5
+         ],
+         [
+          41,
+          5
+         ],
+         [
+          42,
+          5
+         ],
+         [
+          43,
+          5
+         ],
+         [
+          44,
+          5
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "id": 16,
+   "address": "0x871dc78",
+   "name": "Kamekameha",
+   "description": "Mispronounced by Goten.  Hold the B Button to emit a long beam of energy.",
+   "max_level": 2,
+   "can_use_fn": "0x801a391",
+   "activate_fn": "0x801a3b7",
+   "icon": "0x8717ed8",
+   "icon2": "0x87180d8",
+   "ep": {
+    "rule": "needs EP >= cost[level]; drains while held",
+    "ep_cost_by_level": [
+     15,
+     45,
+     150
+    ],
+    "cost_table_address": "0x871daa7",
+    "ep_cost_scaled_by": "record+0x56/16 (Dragon Armor halves); while SS/SS3 the cost is taken from the SS/SS3 gauge"
+   },
+   "measured": {
+    "setup": "Goku (STR/POW 27) vs Majin Fighter (END 31) 60 px below (dist field), maxEP 999; patterns: tap = B for 3 frames, holdN = B held N frames, mash = B 3/12 frames; frames counted from the first frame of input; VERIFIED (emu)",
+    "by_level": {
+     "0": {
+      "damage_multipliers": [
+       41
+      ],
+      "attack_type_subs": [
+       [
+        1,
+        8
+       ]
+      ],
+      "first_hit_frame": 35,
+      "runs": [
+       {
+        "pattern": "tap",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "hold60",
+        "dist": 60,
+        "hits": 42,
+        "first_hit": 35,
+        "last_hit": 60,
+        "total_damage": 58.11,
+        "ep_spent": 0,
+        "ep_events": [
+         [
+          33,
+          1
+         ],
+         [
+          36,
+          1
+         ],
+         [
+          40,
+          1
+         ],
+         [
+          42,
+          1
+         ],
+         [
+          44,
+          1
+         ],
+         [
+          49,
+          1
+         ],
+         [
+          51,
+          1
+         ],
+         [
+          54,
+          1
+         ],
+         [
+          58,
+          1
+         ],
+         [
+          60,
+          1
+         ],
+         [
+          106,
+          -10
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 60,
+        "hits": 188,
+        "first_hit": 35,
+        "last_hit": 152,
+        "total_damage": 260.57,
+        "ep_spent": 14,
+        "ep_events": [
+         [
+          33,
+          1
+         ],
+         [
+          36,
+          1
+         ],
+         [
+          40,
+          1
+         ],
+         [
+          42,
+          1
+         ],
+         [
+          44,
+          1
+         ],
+         [
+          49,
+          1
+         ],
+         [
+          51,
+          1
+         ],
+         [
+          54,
+          1
+         ],
+         [
+          58,
+          1
+         ],
+         [
+          60,
+          1
+         ],
+         [
+          63,
+          1
+         ],
+         [
+          66,
+          1
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       }
+      ]
+     },
+     "1": {
+      "damage_multipliers": [
+       164
+      ],
+      "attack_type_subs": [
+       [
+        1,
+        8
+       ]
+      ],
+      "first_hit_frame": 35,
+      "runs": [
+       {
+        "pattern": "tap",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "hold60",
+        "dist": 60,
+        "hits": 42,
+        "first_hit": 35,
+        "last_hit": 60,
+        "total_damage": 231.23,
+        "ep_spent": 8,
+        "ep_events": [
+         [
+          31,
+          1
+         ],
+         [
+          32,
+          2
+         ],
+         [
+          33,
+          1
+         ],
+         [
+          34,
+          2
+         ],
+         [
+          36,
+          1
+         ],
+         [
+          38,
+          2
+         ],
+         [
+          39,
+          1
+         ],
+         [
+          40,
+          2
+         ],
+         [
+          41,
+          1
+         ],
+         [
+          42,
+          2
+         ],
+         [
+          43,
+          1
+         ],
+         [
+          44,
+          2
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 60,
+        "hits": 188,
+        "first_hit": 35,
+        "last_hit": 152,
+        "total_damage": 1038.15,
+        "ep_spent": 118,
+        "ep_events": [
+         [
+          31,
+          1
+         ],
+         [
+          32,
+          2
+         ],
+         [
+          33,
+          1
+         ],
+         [
+          34,
+          2
+         ],
+         [
+          36,
+          1
+         ],
+         [
+          38,
+          2
+         ],
+         [
+          39,
+          1
+         ],
+         [
+          40,
+          2
+         ],
+         [
+          41,
+          1
+         ],
+         [
+          42,
+          2
+         ],
+         [
+          43,
+          1
+         ],
+         [
+          44,
+          2
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       }
+      ]
+     },
+     "2": {
+      "damage_multipliers": [
+       328
+      ],
+      "attack_type_subs": [
+       [
+        1,
+        8
+       ]
+      ],
+      "first_hit_frame": 35,
+      "runs": [
+       {
+        "pattern": "tap",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "hold60",
+        "dist": 60,
+        "hits": 42,
+        "first_hit": 35,
+        "last_hit": 60,
+        "total_damage": 461.79,
+        "ep_spent": 96,
+        "ep_events": [
+         [
+          31,
+          5
+         ],
+         [
+          32,
+          5
+         ],
+         [
+          33,
+          5
+         ],
+         [
+          34,
+          5
+         ],
+         [
+          36,
+          5
+         ],
+         [
+          38,
+          5
+         ],
+         [
+          39,
+          5
+         ],
+         [
+          40,
+          5
+         ],
+         [
+          41,
+          5
+         ],
+         [
+          42,
+          5
+         ],
+         [
+          43,
+          5
+         ],
+         [
+          44,
+          5
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 60,
+        "hits": 188,
+        "first_hit": 35,
+        "last_hit": 152,
+        "total_damage": 2073.05,
+        "ep_spent": 461,
+        "ep_events": [
+         [
+          31,
+          5
+         ],
+         [
+          32,
+          5
+         ],
+         [
+          33,
+          5
+         ],
+         [
+          34,
+          5
+         ],
+         [
+          36,
+          5
+         ],
+         [
+          38,
+          5
+         ],
+         [
+          39,
+          5
+         ],
+         [
+          40,
+          5
+         ],
+         [
+          41,
+          5
+         ],
+         [
+          42,
+          5
+         ],
+         [
+          43,
+          5
+         ],
+         [
+          44,
+          5
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "id": 17,
+   "address": "0x871dc90",
+   "name": "Masenkoha",
+   "description": "Hold the B Button to make a cursor appear in front of the player.  Upon releasing the B Button, a large ball of energy will be thrown at the cursor's location.",
+   "max_level": 2,
+   "can_use_fn": "0x801a3ed",
+   "activate_fn": "0x801a415",
+   "icon": "0x87182d8",
+   "icon2": "0x87184d8",
+   "ep": {
+    "rule": "needs/spends cost[level] (Masenko)",
+    "ep_cost_by_level": [
+     50,
+     200,
+     800
+    ],
+    "cost_table_address": "0x871dae0",
+    "ep_cost_scaled_by": "record+0x56/16 (Dragon Armor halves); while SS/SS3 the cost is taken from the SS/SS3 gauge"
+   },
+   "measured": {
+    "setup": "Goku (STR/POW 27) vs Majin Fighter (END 31) 60 px below (dist field), maxEP 999; patterns: tap = B for 3 frames, holdN = B held N frames, mash = B 3/12 frames; frames counted from the first frame of input; VERIFIED (emu)",
+    "by_level": {
+     "0": {
+      "damage_multipliers": [
+       3687
+      ],
+      "attack_type_subs": [
+       [
+        1,
+        7
+       ]
+      ],
+      "first_hit_frame": 111,
+      "runs": [
+       {
+        "pattern": "tap",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 21,
+        "ep_events": [
+         [
+          1,
+          50
+         ],
+         [
+          104,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "hold60",
+        "dist": 60,
+        "hits": 1,
+        "first_hit": 111,
+        "last_hit": 111,
+        "total_damage": 126.91,
+        "ep_spent": 21,
+        "ep_events": [
+         [
+          1,
+          50
+         ],
+         [
+          105,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 21,
+        "ep_events": [
+         [
+          1,
+          50
+         ],
+         [
+          105,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 171,
+        "ep_events": [
+         [
+          1,
+          50
+         ],
+         [
+          49,
+          50
+         ],
+         [
+          97,
+          50
+         ],
+         [
+          105,
+          -29
+         ],
+         [
+          145,
+          50
+         ]
+        ]
+       }
+      ]
+     },
+     "1": {
+      "damage_multipliers": [
+       11060
+      ],
+      "attack_type_subs": [
+       [
+        1,
+        7
+       ]
+      ],
+      "first_hit_frame": 111,
+      "runs": [
+       {
+        "pattern": "tap",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 171,
+        "ep_events": [
+         [
+          1,
+          200
+         ],
+         [
+          104,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "hold60",
+        "dist": 60,
+        "hits": 1,
+        "first_hit": 111,
+        "last_hit": 111,
+        "total_damage": 380.7,
+        "ep_spent": 171,
+        "ep_events": [
+         [
+          1,
+          200
+         ],
+         [
+          105,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 171,
+        "ep_events": [
+         [
+          1,
+          200
+         ],
+         [
+          105,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 771,
+        "ep_events": [
+         [
+          1,
+          200
+         ],
+         [
+          49,
+          200
+         ],
+         [
+          97,
+          200
+         ],
+         [
+          105,
+          -29
+         ],
+         [
+          145,
+          200
+         ]
+        ]
+       }
+      ]
+     },
+     "2": {
+      "damage_multipliers": [
+       16589
+      ],
+      "attack_type_subs": [
+       [
+        1,
+        7
+       ]
+      ],
+      "first_hit_frame": 58,
+      "runs": [
+       {
+        "pattern": "tap",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 771,
+        "ep_events": [
+         [
+          1,
+          800
+         ],
+         [
+          106,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "hold60",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 771,
+        "ep_events": [
+         [
+          1,
+          800
+         ],
+         [
+          105,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 771,
+        "ep_events": [
+         [
+          1,
+          800
+         ],
+         [
+          105,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 771,
+        "ep_events": [
+         [
+          1,
+          800
+         ],
+         [
+          106,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "tap",
+        "dist": 20,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 771,
+        "ep_events": [
+         [
+          1,
+          800
+         ],
+         [
+          101,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "tap",
+        "dist": 40,
+        "hits": 1,
+        "first_hit": 58,
+        "last_hit": 58,
+        "total_damage": 554.49,
+        "ep_spent": 771,
+        "ep_events": [
+         [
+          1,
+          800
+         ],
+         [
+          106,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "hold60",
+        "dist": 20,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 771,
+        "ep_events": [
+         [
+          1,
+          800
+         ],
+         [
+          101,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "hold60",
+        "dist": 40,
+        "hits": 1,
+        "first_hit": 111,
+        "last_hit": 111,
+        "total_damage": 560.69,
+        "ep_spent": 771,
+        "ep_events": [
+         [
+          1,
+          800
+         ],
+         [
+          105,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 20,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 771,
+        "ep_events": [
+         [
+          1,
+          800
+         ],
+         [
+          101,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 40,
+        "hits": 1,
+        "first_hit": 203,
+        "last_hit": 203,
+        "total_damage": 566.88,
+        "ep_spent": 771,
+        "ep_events": [
+         [
+          1,
+          800
+         ],
+         [
+          105,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 20,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 771,
+        "ep_events": [
+         [
+          1,
+          800
+         ],
+         [
+          101,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 40,
+        "hits": 1,
+        "first_hit": 58,
+        "last_hit": 58,
+        "total_damage": 554.49,
+        "ep_spent": 771,
+        "ep_events": [
+         [
+          1,
+          800
+         ],
+         [
+          106,
+          -29
+         ]
+        ]
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "id": 18,
+   "address": "0x871dca8",
+   "name": "Saiyaman",
+   "description": "Press the B Button to turn into the Great Saiyaman.  Press the B Button again to turn back into Gohan.",
+   "max_level": null,
+   "can_use_fn": "0x801a461",
+   "activate_fn": "0x801a465",
+   "icon": "0x87186d8",
+   "icon2": "0x87188d8",
+   "ep": {
+    "rule": "Saiyaman: toggles Great Saiyaman form (always usable)",
+    "ep_cost_scaled_by": "record+0x56/16 (Dragon Armor halves); while SS/SS3 the cost is taken from the SS/SS3 gauge"
+   },
+   "measured": {
+    "setup": "Goku (STR/POW 27) vs Majin Fighter (END 31) 60 px below (dist field), maxEP 999; patterns: tap = B for 3 frames, holdN = B held N frames, mash = B 3/12 frames; frames counted from the first frame of input; VERIFIED (emu)",
+    "by_level": {
+     "0": {
+      "damage_multipliers": [],
+      "attack_type_subs": [],
+      "first_hit_frame": null,
+      "runs": [
+       {
+        "pattern": "tap",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "hold60",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "hold150",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "mash",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "id": 19,
+   "address": "0x871dcc0",
+   "name": "Saiyaman",
+   "description": "Press the B Button to turn into the Great Saiyaman.  Press the B Button again to turn back into Gohan.",
+   "max_level": null,
+   "can_use_fn": "0x8019d25",
+   "activate_fn": "0x8019d29",
+   "icon": "0x87186d8",
+   "icon2": "0x87188d8",
+   "ep": {
+    "rule": "unused slot (duplicate Saiyaman entry, canUse returns 0)",
+    "ep_cost_scaled_by": "record+0x56/16 (Dragon Armor halves); while SS/SS3 the cost is taken from the SS/SS3 gauge"
+   },
+   "measured": {
+    "setup": "Goku (STR/POW 27) vs Majin Fighter (END 31) 60 px below (dist field), maxEP 999; patterns: tap = B for 3 frames, holdN = B held N frames, mash = B 3/12 frames; frames counted from the first frame of input; VERIFIED (emu)",
+    "by_level": {
+     "0": {
+      "damage_multipliers": [],
+      "attack_type_subs": [],
+      "first_hit_frame": null,
+      "runs": [
+       {
+        "pattern": "tap",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "hold60",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "hold150",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "mash",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "id": 20,
+   "address": "0x871dcd8",
+   "name": "Super Saiyan",
+   "description": "Press the B Button to transform into a Super Saiyan.",
+   "max_level": null,
+   "can_use_fn": "0x801a4c5",
+   "activate_fn": "0x801a513",
+   "icon": "0x8718ad8",
+   "icon2": "0x8718cd8",
+   "ep": {
+    "canuse_min_ep": 10,
+    "rule": "Super Saiyan: needs EP >= 10 and record+4 (SS cooldown) == 0; second press reverts",
+    "ep_cost_scaled_by": "record+0x56/16 (Dragon Armor halves); while SS/SS3 the cost is taken from the SS/SS3 gauge"
+   },
+   "measured": {
+    "setup": "Goku (STR/POW 27) vs Majin Fighter (END 31) 60 px below (dist field), maxEP 999; patterns: tap = B for 3 frames, holdN = B held N frames, mash = B 3/12 frames; frames counted from the first frame of input; VERIFIED (emu)",
+    "by_level": {
+     "0": {
+      "damage_multipliers": [],
+      "attack_type_subs": [],
+      "first_hit_frame": null,
+      "runs": [
+       {
+        "pattern": "tap",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "hold60",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "hold150",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "mash",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "id": 21,
+   "address": "0x871dcf0",
+   "name": "Super Saiyan",
+   "description": "Press the B Button to transform into a Super Saiyan.",
+   "max_level": null,
+   "can_use_fn": "0x8019d25",
+   "activate_fn": "0x8019d29",
+   "icon": "0x8718ad8",
+   "icon2": "0x8718cd8",
+   "ep": {
+    "rule": "unused slot (duplicate SS entry)",
+    "ep_cost_scaled_by": "record+0x56/16 (Dragon Armor halves); while SS/SS3 the cost is taken from the SS/SS3 gauge"
+   },
+   "measured": {
+    "setup": "Goku (STR/POW 27) vs Majin Fighter (END 31) 60 px below (dist field), maxEP 999; patterns: tap = B for 3 frames, holdN = B held N frames, mash = B 3/12 frames; frames counted from the first frame of input; VERIFIED (emu)",
+    "by_level": {
+     "0": {
+      "damage_multipliers": [],
+      "attack_type_subs": [],
+      "first_hit_frame": null,
+      "runs": [
+       {
+        "pattern": "tap",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "hold60",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "hold150",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "mash",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "id": 22,
+   "address": "0x871dd08",
+   "name": "Super Saiyan 3",
+   "description": "Press the B Button to transform into a Super Saiyan 3.  You must already be a Super Sayian to use this technique.",
+   "max_level": null,
+   "can_use_fn": "0x801a55f",
+   "activate_fn": "0x801a5bd",
+   "icon": "0x8718ed8",
+   "icon2": "0x87190d8",
+   "ep": {
+    "rule": "Super Saiyan 3: must already be SS (form flag 0x01) - see canUse 0x0801A55F",
+    "ep_cost_scaled_by": "record+0x56/16 (Dragon Armor halves); while SS/SS3 the cost is taken from the SS/SS3 gauge"
+   },
+   "measured": {
+    "setup": "Goku (STR/POW 27) vs Majin Fighter (END 31) 60 px below (dist field), maxEP 999; patterns: tap = B for 3 frames, holdN = B held N frames, mash = B 3/12 frames; frames counted from the first frame of input; VERIFIED (emu)",
+    "by_level": {
+     "0": {
+      "damage_multipliers": [],
+      "attack_type_subs": [],
+      "first_hit_frame": null,
+      "runs": [
+       {
+        "pattern": "tap",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "hold60",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "hold150",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       },
+       {
+        "pattern": "mash",
+        "dist": 60,
+        "hits": 0,
+        "first_hit": null,
+        "last_hit": null,
+        "total_damage": 0,
+        "ep_spent": 0,
+        "ep_events": []
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "id": 23,
+   "address": "0x871dd20",
+   "name": "Ultra Volleyball Attack",
+   "description": "Press the B Button to emit a beam that turns enemies into giant volleyballs. ",
+   "max_level": null,
+   "can_use_fn": "0x801a60b",
+   "activate_fn": "0x801a625",
+   "icon": "0x87192d8",
+   "icon2": "0x87194d8",
+   "ep": {
+    "canuse_min_ep": 350,
+    "spend": 350,
+    "rule": "Ultra Volleyball: spends 350 (0x15E)",
+    "ep_cost_scaled_by": "record+0x56/16 (Dragon Armor halves); while SS/SS3 the cost is taken from the SS/SS3 gauge"
+   },
+   "measured": {
+    "setup": "Goku (STR/POW 27) vs Majin Fighter (END 31) 60 px below (dist field), maxEP 999; patterns: tap = B for 3 frames, holdN = B held N frames, mash = B 3/12 frames; frames counted from the first frame of input; VERIFIED (emu)",
+    "by_level": {
+     "0": {
+      "damage_multipliers": [
+       1024
+      ],
+      "attack_type_subs": [
+       [
+        1,
+        16
+       ]
+      ],
+      "first_hit_frame": 29,
+      "runs": [
+       {
+        "pattern": "tap",
+        "dist": 60,
+        "hits": 1,
+        "first_hit": 29,
+        "last_hit": 29,
+        "total_damage": 0.0,
+        "ep_spent": 321,
+        "ep_events": [
+         [
+          1,
+          350
+         ],
+         [
+          105,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "hold60",
+        "dist": 60,
+        "hits": 1,
+        "first_hit": 29,
+        "last_hit": 29,
+        "total_damage": 0.0,
+        "ep_spent": 321,
+        "ep_events": [
+         [
+          1,
+          350
+         ],
+         [
+          105,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "hold150",
+        "dist": 60,
+        "hits": 1,
+        "first_hit": 29,
+        "last_hit": 29,
+        "total_damage": 0.0,
+        "ep_spent": 321,
+        "ep_events": [
+         [
+          1,
+          350
+         ],
+         [
+          105,
+          -29
+         ]
+        ]
+       },
+       {
+        "pattern": "mash",
+        "dist": 60,
+        "hits": 2,
+        "first_hit": 29,
+        "last_hit": 77,
+        "total_damage": 0.0,
+        "ep_spent": 671,
+        "ep_events": [
+         [
+          1,
+          350
+         ],
+         [
+          49,
+          350
+         ],
+         [
+          107,
+          -29
+         ]
+        ]
+       }
+      ]
+     }
+    }
+   }
+  }
+ ],
+ "attack_types": [
+  {
+   "sub": 0,
+   "address": "0x86b8088",
+   "kind": 0,
+   "kind_name": "melee",
+   "id_byte": 0,
+   "power": 1024
+  },
+  {
+   "sub": 1,
+   "address": "0x86b8090",
+   "kind": 1,
+   "kind_name": "energy",
+   "id_byte": 1,
+   "power": 1024
+  },
+  {
+   "sub": 2,
+   "address": "0x86b8098",
+   "kind": 0,
+   "kind_name": "melee",
+   "id_byte": 2,
+   "power": 1024
+  },
+  {
+   "sub": 3,
+   "address": "0x86b80a0",
+   "kind": 0,
+   "kind_name": "melee",
+   "id_byte": 3,
+   "power": 1024
+  },
+  {
+   "sub": 4,
+   "address": "0x86b80a8",
+   "kind": 1,
+   "kind_name": "energy",
+   "id_byte": 4,
+   "power": 1024
+  },
+  {
+   "sub": 5,
+   "address": "0x86b80b0",
+   "kind": 1,
+   "kind_name": "energy",
+   "id_byte": 5,
+   "power": 1024
+  },
+  {
+   "sub": 6,
+   "address": "0x86b80b8",
+   "kind": 1,
+   "kind_name": "energy",
+   "id_byte": 6,
+   "power": 1024
+  },
+  {
+   "sub": 7,
+   "address": "0x86b80c0",
+   "kind": 1,
+   "kind_name": "energy",
+   "id_byte": 7,
+   "power": 1024
+  },
+  {
+   "sub": 8,
+   "address": "0x86b80c8",
+   "kind": 1,
+   "kind_name": "energy",
+   "id_byte": 8,
+   "power": 1024
+  },
+  {
+   "sub": 9,
+   "address": "0x86b80d0",
+   "kind": 1,
+   "kind_name": "energy",
+   "id_byte": 9,
+   "power": 1024
+  },
+  {
+   "sub": 10,
+   "address": "0x86b80d8",
+   "kind": 1,
+   "kind_name": "energy",
+   "id_byte": 10,
+   "power": 1024
+  },
+  {
+   "sub": 11,
+   "address": "0x86b80e0",
+   "kind": 1,
+   "kind_name": "energy",
+   "id_byte": 11,
+   "power": 1024
+  },
+  {
+   "sub": 12,
+   "address": "0x86b80e8",
+   "kind": 1,
+   "kind_name": "energy",
+   "id_byte": 12,
+   "power": 1024
+  },
+  {
+   "sub": 13,
+   "address": "0x86b80f0",
+   "kind": 1,
+   "kind_name": "energy",
+   "id_byte": 13,
+   "power": 1024
+  },
+  {
+   "sub": 14,
+   "address": "0x86b80f8",
+   "kind": 1,
+   "kind_name": "energy",
+   "id_byte": 14,
+   "power": 1024
+  },
+  {
+   "sub": 15,
+   "address": "0x86b8100",
+   "kind": 1,
+   "kind_name": "energy",
+   "id_byte": 15,
+   "power": 1024
+  },
+  {
+   "sub": 16,
+   "address": "0x86b8108",
+   "kind": 1,
+   "kind_name": "energy",
+   "id_byte": 16,
+   "power": 0
+  },
+  {
+   "sub": 17,
+   "address": "0x86b8110",
+   "kind": 1,
+   "kind_name": "energy",
+   "id_byte": 17,
+   "power": 1024
+  }
+ ],
+ "skill_levels": {
+  "storage": "record+0x2E+2*slot (and +0x2F)",
+  "values": "0..2 shown as Level1..Level3",
+  "set_by": "script native (0x08003936 -> 0x08013B54) i.e. story/trainer scripts; not by use (no writes observed while using skills)",
+  "selected": "record+0x15 (cycled by 0x08013B34)"
+ }
+}
