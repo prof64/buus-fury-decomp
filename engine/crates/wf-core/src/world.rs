@@ -830,7 +830,12 @@ impl World {
 pub fn broadcast(w: &mut World, msg: &mut HitMsg, first: bool) -> bool {
     let n = w.ents.len();
     let mut any = false;
-    for k in 0..n {
+    // the field game delivers newest object first (story playthrough: Goku's punch on two fighters, game list
+    // [player, hud, 209, 211] -> 211 hit first); battles keep the order the TS-sim cross-check pins
+    // (TODO(core): verify the battle order against the game itself)
+    let field = w.field.is_some();
+    for j in 0..n {
+        let k = if field { n - 1 - j } else { j };
         if k >= w.ents.len() || w.ents[k].removed {
             continue;
         }

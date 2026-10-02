@@ -196,7 +196,17 @@ fn field_frames_match_emulator() {
         let t: Value = serde_json::from_slice(&std::fs::read(dir.join(format!("{name}.json"))).unwrap()).unwrap();
         let kind = name.split('_').next().unwrap().to_string();
         let mut s = session(&data, &kind, &t, &base);
-        let mut story = if kind == "objects" && std::env::var("NO_SCRIPTS").is_err() {
+        // the breakable-drops recording patched the rock's on-break bytecode to drop_item(5); drop_item(-44)
+        // (rec_objects.py): the same stand-in host as wf-core's field lockstep, no script host
+        if name == "objects_breakable_drops_8_1" {
+            s.hook = Some(Box::new(|w, fe| {
+                if let wf_core::field::FieldEvent::Run { cause: wf_core::field::Cause::Break { .. }, .. } = fe {
+                    wf_core::fieldobj::drop_item(w, 5);
+                    wf_core::fieldobj::drop_item(w, -44);
+                }
+            }));
+        }
+        let mut story = if kind == "objects" && name != "objects_breakable_drops_8_1" && std::env::var("NO_SCRIPTS").is_err() {
             let mut st = session(&data, &kind, &t, &base);
             st.world.scene.banner = None;
             let mut sim = wf_app::story::StorySim::with_session(&packs, st).expect("story");
@@ -224,7 +234,7 @@ fn field_frames_match_emulator() {
         let sprite_cam_old = std::env::var("SPR_CAM_OLD").is_ok();
         // traces that start mid-area: the camera was still settling when the recording began (not part of the
         // core's start state) — use the captured camera (map object +0x28 / +0x2C) for those
-        let ram_cams: Option<Vec<[i32; 2]>> =
+        let ram_cams: Option<Vec<Vec<i32>>> =
             std::fs::read(dir.join(&name).join("cams.json")).ok().and_then(|b| serde_json::from_slice(&b).ok());
         let cam_off: isize = std::env::var("CAM_OFF").ok().and_then(|v| v.parse().ok()).unwrap_or(-1);
         let ram_anims: Option<Vec<Vec<[i32; 2]>>> =
@@ -251,6 +261,9 @@ fn field_frames_match_emulator() {
         if let Ok(v) = std::env::var("DLG_OPEN") {
             wf_app::story::DIALOG_OPEN_OFF.store(v.parse().unwrap(), std::sync::atomic::Ordering::Relaxed);
         }
+        if let Ok(v) = std::env::var("TYPED_OFF") {
+            wf_app::story::TYPED_OFF.store(v.parse().unwrap(), std::sync::atomic::Ordering::Relaxed);
+        }
         if let Ok(v) = std::env::var("DLG_CLOSE") {
             wf_app::story::DIALOG_CLOSE_OFF.store(v.parse().unwrap(), std::sync::atomic::Ordering::Relaxed);
         }
@@ -268,6 +281,25 @@ fn field_frames_match_emulator() {
                 }
                 banner.step(&s.world.events.clone());
             }
+            // traces that start mid-area: the camera was still easing when the recording began (not part of the
+            // core's start state): after the first step, give the core the game's camera (22.10) and let it run
+            if f == 0 && kind == "objects" && cam_off <= 0 {
+                if let Some(c) = ram_cams.as_ref().and_then(|c| c.first()).filter(|c| c.len() >= 4) {
+                    let w = match story.as_mut() {
+                        Some(st) => &mut st.session.world,
+                        None => &mut s.world,
+                    };
+                    let cam = &mut w.cameras[0];
+                    cam.x = c[2];
+                    cam.y = c[3];
+                    cam.init = true;
+                    cam.rect = wf_core::geom::Rect { x0: c[2] >> 10, y0: c[3] >> 10, x1: (c[2] >> 10) + 240, y1: (c[3] >> 10) + 160 };
+                    cam.shown = wf_core::geom::Rect { x0: c[0], y0: c[1], x1: c[0] + 240, y1: c[1] + 160 };
+                    if story.is_some() {
+                        s.world = story.as_ref().unwrap().session.world.clone();
+                    }
+                }
+            }
             let Some(emu) = load_png(&dir.join(&name).join(format!("{f:04}.png"))) else { continue };
             match story.as_ref() {
                 Some(st) => st.view(&mut v),
@@ -277,6 +309,10 @@ fn field_frames_match_emulator() {
             // step (the box is an OBJ: one frame late like the rest of the OBJ layer)
             if v.dialog_anim.is_none() {
                 v.dialog_anim = prev_anim;
+            }
+            // the text surface is uploaded every frame: the typewriter count is the current one
+            if let (Some(a), Some(now)) = (v.dialog_anim.as_mut(), wf_app::story::dialog_anim(&s.world)) {
+                a.typed = now.typed;
             }
             if !core_only {
                 wf_app::story::patch_view(&s.world, &mut v);
@@ -301,14 +337,7 @@ fn field_frames_match_emulator() {
                     }
                 }
             }
-            if kind == "objects" {
-                if let Some(c) = ram_cams.as_ref().and_then(|c| c.get((f as isize + cam_off).max(0) as usize)) {
-                    if let Some(v0) = v.cameras.first_mut() {
-                        v0.x = c[0];
-                        v0.y = c[1];
-                    }
-                }
-            }
+
             if cam_lag > 0 && hist.len() > cam_lag {
                 let c = hist[hist.len() - 1 - cam_lag].1.clone();
                 v.cameras = c;
@@ -352,6 +381,10 @@ fn field_frames_match_emulator() {
                 let w = &s.world;
                 let pl = w.pl_ref(w.player_idx(0).unwrap());
                 println!("player raw {} frame {} tick {:?} facing {} pos {} {}", pl.ap.raw, pl.ap.frame, pl.ap.tick, pl.a.facing, pl.a.x, pl.a.y);
+            }
+            if std::env::var("CAMDBG").ok().as_deref() == Some(name.as_str()) && f < 40 {
+                let w = &s.world;
+                println!("f{f} view cam {:?} core x {} y {} shown {:?} cap {:?}", v.cameras, w.cameras[0].x, w.cameras[0].y, (w.cameras[0].shown.x0, w.cameras[0].shown.y0), ram_cams.as_ref().and_then(|c| c.get(f)));
             }
             let fb = r.render(&packs, &v, 0, 240, 160).to_vec();
             let d = fb.iter().zip(&emu).filter(|(a, b)| *a & 0xFFFFFF != *b & 0xFFFFFF).count();

@@ -206,6 +206,8 @@ pub struct EnemyType {
     pub death_name: String,
     pub death_param: i64,
     pub spawns: Vec<(i32, i32, i32, i32)>,
+    /// the type's drop script (def +0x18, bytecode address; 0 = none): run when a placed field enemy is defeated
+    pub drop_script: u32,
 }
 
 #[derive(Clone, Debug)]
@@ -680,6 +682,7 @@ impl GameData {
                     death_name: dn,
                     death_param: dp,
                     spawns: e["spawn_points"].as_array().map(|a| a.iter().map(|s| (geti(s, "world") as i32, geti(s, "map") as i32, geti(s, "x") as i32, geti(s, "y") as i32)).collect()).unwrap_or_default(),
+                    drop_script: e["drop_script"].as_str().and_then(|s| u32::from_str_radix(s.trim_start_matches("0x"), 16).ok()).unwrap_or(0),
                 }
             })
             .collect();

@@ -33,7 +33,7 @@ _run = emu_mod.Emu.run
 def run(self, frames=1):
     for _ in range(frames):
         _run(self, 1)
-        SHOTS[self.frame] = (self.pixels(), self.oam(), tile_anims(self), [self.r32(0x030019A4 + 0x28), self.r32(0x030019A4 + 0x2C)])
+        SHOTS[self.frame] = (self.pixels(), self.oam(), tile_anims(self), [self.r32(0x030019A4 + 0x28), self.r32(0x030019A4 + 0x2C), self.r32(self.r32(0x080707E8)), self.r32(self.r32(0x080707E8) + 4)])
 
 
 emu_mod.Emu.run = run
@@ -88,7 +88,8 @@ def main():
             anims.append(an)
         # the map's tile-animation records after each video frame ([frame, countdown] per animation)
         (d / 'tile_anims.json').write_text(json.dumps(anims))
-        # the map object's camera ints (+0x28 / +0x2C of 0x030019A4: what the object draw uses) after each frame
+        # after each frame: the map object's camera ints (+0x28 / +0x2C of 0x030019A4: what the object draw uses)
+        # and the camera object's 22.10 position ([0x080707E8], what the camera update eases)
         (d / 'cams.json').write_text(json.dumps(cams))
         # OAM after each frame (= the build the *next* frame shows: shadow OAM is copied at VBlank)
         (d / 'oam.json').write_text(json.dumps(oams))

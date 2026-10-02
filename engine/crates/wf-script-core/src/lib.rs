@@ -232,6 +232,9 @@ pub fn count_actors(w: &World, s: &HostState, id: i32) -> i32 {
 
 impl Host for CoreHost<'_> {
     fn native(&mut self, call: Call<'_>) -> Result<NativeResult, String> {
+        // any native between a wait's end and the event's exit: the exit no longer happens at the top of the frame
+        // (story playthrough: s073 end_parallel -> camera_follow -> exit, no NPC catch-up)
+        self.s.from_wait = false;
         let r = natives::call(self, &call);
         // the VM's globals are World state too (they persist across scripts and snapshot with the world)
         self.w.story.g = call.globals.g;

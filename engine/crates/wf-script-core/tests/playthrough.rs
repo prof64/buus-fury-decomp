@@ -445,10 +445,10 @@ fn compare(w: &World, fr: &Value, es: &[String], map: &mut BTreeMap<usize, Entit
     }
     // entities with a sprite the game does not show (extra objects)
     let shown: Vec<EntityId> = fr["actors"].as_array().into_iter().flatten().filter_map(|a| map.get(&Row(a).k()).copied()).collect();
-    for e in w.ents.iter().filter(|e| !e.removed) {
+    for (ei, e) in w.ents.iter().enumerate().filter(|(_, e)| !e.removed) {
         let is_actor = matches!(e.body, Body::Npc(_) | Body::Player(_) | Body::Enemy(_));
         if is_actor && !shown.contains(&e.id) {
-            rep.bad(k, "extra", format!("entity {} ({}) not in the game", e.id, if matches!(e.body, Body::Npc(_)) { "npc" } else if matches!(e.body, Body::Player(_)) { "player" } else { "enemy" }));
+            rep.bad(k, "extra", format!("entity {} sprite {:?} ({}) not in the game", e.id, scene::sprite_id(w, ei), if matches!(e.body, Body::Npc(_)) { "npc" } else if matches!(e.body, Body::Player(_)) { "player" } else { "enemy" }));
             break;
         }
     }

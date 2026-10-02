@@ -286,3 +286,11 @@ items' collision sub-box (icon pixels) likewise; coin scatter verified only thro
 script host); enemies' def behaviour (`RunMotionController` node) not run; enemy loot position INFERRED (their position,
 no velocity); debris chips and prop / pickup / map-sprite graphics are not drawn by the view; map-screen visited bits
 (table `0x0874CA24`) not set; no variant selector exists in the ROM. Round 2 remaining: the area-name banner and the world map's 94 billboard props are not drawn; the mode-7 ground must be rendered by the frontend from `MapView.mode7`; debris motion past the start INFERRED; the event freeze after an encounter / landing is the host's.
+
+**Frontend requests (field render parity, docs/frontend.md §6 "Field parity")**: (1) put the dialogue box
+animation in `render_view` — `RenderView.dialog_anim` (`wf_view::DialogAnim { scale 1..8, typed }`; the mapping the
+frontend uses meanwhile is `wf_app::story::dialog_anim`: Opening t -> scale min(t + 2, 8) with typed 0, Shown ->
+8 / `typed`, Closing t -> 8 - t, hidden below 1; OBJ-lagged like the box, `typed` from the current state); (2) the
+item-get icon is drawn one frame longer than the game (objects_item_8_57 frame 65); (3) the camera keeps easing
+during the breakable hit-stop, the game holds it (objects_breakable_drops_8_1 frames 4..18); (4) Hercule City 3-3's
+wandering NPC is not placed (transitions_hercule_edge_up frames 58..80).

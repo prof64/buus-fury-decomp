@@ -133,31 +133,49 @@ scripts (area on-enter / on-leave, triggers, talk, pickups, defeats) start one a
 when `wf_script_core::poll` says so, then `Session::step_post`. Load scripts run right after their load instead of
 inside it (the core's hook must be `Send`, the Rhai runtime is not): only RNG draws inside load scripts could differ.
 
-Frontend-side completions of the core's view (`story::patch_view`, until `wf_core::view` provides them; all
-measured against the emulator):
-* **palette fade** of area transitions (`RenderView.palette_fade`, the fade routine's math on the original RGB888
-  palette `maps/palette.json`): field mode FadeOut k -> level 8k, FadeIn k -> 256 - 8k;
-* **OBJ layer one frame late**: the picture shows the previous frame's sprite build (shadow OAM is copied at the
-  next VBlank) over the current frame's BG scroll — the view's sprites are those from before the step;
-* **tile animations** run on the map's timers since the area load (`anim_frame = frame - Field.entered + 1`);
-* **skill icon greyed** (`_alt`) in areas without combat (`Field.combat == false`);
-* **area banner** (`BannerTracker`): the rule of §7 (a new load also removes a banner still showing).
+The game's presentation timing (all measured frame by frame against the emulator; wf-core's `Session::view`
+now provides these through `view::Presenter` / `render_view`, `story::patch_view` / `ObjLayer` remain as
+frontend stand-ins for `StorySim`, which drives `render_view` directly):
+* **palette fade** of area transitions (`RenderView.palette_fade`): the fade routine's math on the original RGB888
+  palette (`maps/palette.json`) — FadeOut k -> level 8k, FadeIn k -> 256 - 8k. The renderer resolves each pixel's
+  palette entry exactly: BG tiles, UI pictures and the (now indexed, OBJ-palette-ordered) skill icons carry their
+  index in the colour's top byte; RGBA sprite sheets fall back to the first OBJ entry with that colour.
+* **OBJ layer one frame late**: sprites, HUD, banner and dialogue box show the previous frame's build (shadow OAM
+  / OBJ tiles are copied at the next VBlank) over the current BG scroll; the text surface is re-uploaded every
+  frame, so the typewriter count is the current one.
+* **tile animations**: the map's tick routine (`0x08009B80` init, `0x08009CC2` tick, once per logic frame, not on
+  load frames): animation k (header order) shows frame 0 with countdown k + 1, then each frame for its duration;
+  overlapping animations show the most recent upload (`TileAnim::after_ticks`, `anim_frame` = logic frames since
+  the load). Verified against the captured RAM records (0x03001A68) on every frame of every trace.
+* **skill icon greyed** (`_alt`) in areas without combat; **area banner** (§7; a load removes a banner).
+* **dialogue box animation** (`RenderView.dialog_anim`, not yet in wf-core's view): the three box OBJs zoom about
+  the box centre while opening / closing (affine PA = PD = 2048 / n, n = 2..8 over the 7 opening frames, 7..1
+  when closing; OBJ 0 on top where the zoomed rectangles overlap) and the text types one visible character per
+  frame (`wf_script_core::text::typing` counts). `story::dialog_anim` maps the core's dialog phase / t / typed.
+* the HUD stays up behind text boxes (cutscenes hide it through `HudView.hidden`).
 
-**Field parity** (`crates/wf-app/tests/field_parity.rs`, captures `crates/wf-render/re/capture_field.py`: the
-field recorders' traces re-run with the emulator screen + OAM of every video frame, git-ignored work/frontend/field/):
+**Field parity** (`crates/wf-app/tests/field_parity.rs`; captures `crates/wf-render/re/capture_field.py`: the
+field recorders' traces re-run with the emulator screen, OAM, tile-animation records and cameras of every video
+frame, git-ignored work/frontend/field/). Objects traces run the game's scripts through story mode (item-get
+text) except the drops trace, whose recording patched the on-break bytecode (the lockstep's stand-in hook); traces
+that start mid-area get the game's camera (22.10) after their first step.
 
-| trace | frames | exact | median diff | remaining |
-|---|---|---|---|---|
-| npc_yemma_crowd (King Yemma's office, NPC crowd) | 1200 | 1169 | 0 px | a few arrival frames |
-| npc_westcity_idle (West City, NPCs) | 900 | 176 | 3 px | tile-animation phase on some frames |
-| objects_item_8_57 (map item pickup, item-get pose) | 392 | 281 | 0 px | water tile phase at the start (the trace starts mid-area) |
-| transitions_forest_roundtrip (8-3 -> 8-6 -> 8-3 with fades + banner) | 390 | 93 | 234 px | grass tile-animation phase after loads |
-| transitions_hercule_edge_up (3-2 -> 3-3) | 210 | 51 | 325 px | a wandering NPC of 3-3 the core does not place |
-| objects_breakable_drops_8_1 | 470 | 0 | 1333 px | the broken rock stays drawn; drops need the script host (not run in this test) |
+| trace | frames | exact | remaining differences |
+|---|---|---|---|
+| npc_yemma_crowd (King Yemma's office) | 1200 | **1200** | — |
+| objects_item_8_57 (map item, item-get, "You got a Switch!" box) | 392 | 390 | frame 0 (trace start); frame 65: the item-get icon one frame too long (core) |
+| npc_westcity_idle | 900 | 895 | 9-10, 21-22, 30: palette written mid-scanout (below) |
+| transitions_forest_roundtrip (fades, banner, two loads) | 390 | 384 | 6 fade frames: palette written mid-scanout (7-50 px) |
+| transitions_hercule_edge_up | 210 | 176 | 58-80: a wandering NPC the core does not place; fade frames as above |
+| objects_breakable_drops_8_1 | 470 | 357 | 5-114: the game freezes its camera during the rock's hit-stop (shake on the BG ints), the core keeps easing |
 
-For the core agent: `render_view` should provide the palette fade, the one-frame OBJ lag, the map animation timer,
-the greyed icon and the banner (then `patch_view` becomes a no-op); a broken breakable's prop is still drawn;
-`effects/shadow_0x0` is requested for a sprite without a shadow (Yemma's office).
+Not modelled (render timing below frame granularity): on some fade frames the palette RAM write overlaps the
+scanout — scanlines above the write point (rows 0..~60, or a few rows of one OBJ colour) still show the previous
+fade level; when that happens depends on the CPU time of the frame, which the emulator knows and the
+frame-level sim does not. Same class as the world map's late HBlank lines (§9b).
+
+For the story / core agents: `dialog_anim` belongs in `render_view` (phase/t/typed are core state); item-get icon
+lifetime (frame 65 of objects_item_8_57); camera freeze during the breakable hit-stop; the Hercule City wanderer.
 
 ## 7. Game UI: HUD and dialogue box (`wf_render::ui`, content `ui/`)
 

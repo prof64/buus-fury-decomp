@@ -362,6 +362,15 @@ pub fn spawn_object(w: &mut World, o: &ObjDef) -> Option<EntityId> {
             // the constructor first (spawn_enemy: its SetAnim(0) idle enter draws rand(255); the patrol runner from def
             // +0x18), the AI's first state after it
             let i = spawn_enemy(w, *ty, *x, *y, 0, Some(-1))?;
+            // the placement's own graphics (ctor 0x0800FD55 takes the def's sprite: the same enemy type shows
+            // different fighters, story playthrough Grand Kai's planet 1-12)
+            if let ObjKind::Enemy { sprite, .. } = &o.kind {
+                let content = *sprite - crate::scene::SPRITE_BASE;
+                if *sprite > 0 && w.data.sprite(content).is_some() && w.en_ref(i).a.sprite != Some(content) {
+                    let d = w.data.clone();
+                    w.en(i).a.set_sprite(&d, Some(content));
+                }
+            }
             // the world map (3584 x 2560, beyond the 2048-px grids): placed exactly at the def position
             if w.field.as_ref().is_some_and(|f| f.camera_max.0 > 2048 || f.camera_max.1 > 2048) || w.data.field.as_ref().and_then(|d| w.field.as_ref().and_then(|f| d.maps.get(&f.map))).is_some_and(|m| m.three_d) {
                 let e = w.en(i);
@@ -769,6 +778,13 @@ fn defeats(w: &mut World) {
                 // the dying enemy sets the loot position (0x03001010) for its drop script; INFERRED: its position, no velocity
                 crate::fieldobj::set_loot(w, x, y, 0, 0);
                 w.events.push(Event::Field(FieldEvent::Defeated { entity: id, ty, x, y }));
+                // the type's drop script (def +0x18; story playthrough: the first fighters on Grand Kai's planet drop
+                // coins through it)
+                let ds = w.data.enemy(ty).map(|t| t.drop_script).unwrap_or(0);
+                if ds != 0 {
+                    let run = Callback::Script(format!("inline_0x{ds:08X}"));
+                    w.events.push(Event::Field(FieldEvent::Run { run, cause: Cause::Defeat { entity: id, ty, x, y }, slot: 0 }));
+                }
                 if let Some(run) = cb {
                     w.events.push(Event::Field(FieldEvent::Run { run, cause: Cause::Defeat { entity: id, ty, x, y }, slot: 0 }));
                 }

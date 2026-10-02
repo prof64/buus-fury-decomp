@@ -402,10 +402,12 @@ impl Ui {
         let (bw, bh) = (160i32, 64i32);
         let pa = 2048 / n;
         let mut out = vec![0u32; (bw * bh) as usize];
-        for (x0, w) in [(0i32, 64i32), (64, 64), (128, 32)] {
+        // OAM order: OBJ 0 (left) on top where the zoomed rectangles overlap -> draw it last
+        for (x0, w) in [(128i32, 32i32), (64, 64), (0, 64)] {
             let cx = x0 + w / 2;
             let sx0 = bw / 2 + (cx - bw / 2) * n / 8 - w / 2;
             for j in 0..bh {
+                // GBA affine OBJ: texel = (PA * (pixel - half)) >> 8 + half (floor)
                 let ty = ((pa * (j - bh / 2)) >> 8) + bh / 2;
                 if !(0..bh).contains(&ty) {
                     continue;

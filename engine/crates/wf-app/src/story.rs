@@ -305,6 +305,10 @@ impl Sim for StorySim {
         if let Some(p) = &self.prev_obj {
             p.apply(out);
         }
+        // the text surface is redrawn and uploaded every frame: the typewriter shows the current count
+        if let (Some(a), Some(now)) = (out.dialog_anim.as_mut(), dialog_anim(&self.session.world)) {
+            a.typed = now.typed;
+        }
     }
     fn frame(&self) -> u64 {
         self.session.world.frame as u64
@@ -328,7 +332,7 @@ pub fn dialog_anim(w: &World) -> Option<wf_view::DialogAnim> {
     let (o, c) = (DIALOG_OPEN_OFF.load(std::sync::atomic::Ordering::Relaxed), DIALOG_CLOSE_OFF.load(std::sync::atomic::Ordering::Relaxed));
     let (scale, typed) = match d.phase {
         P::Opening => ((d.t + o).clamp(1, 8), Some(0)),
-        P::Shown => (8, Some(d.typed.max(0) as u32)),
+        P::Shown => (8, Some((d.typed + TYPED_OFF.load(std::sync::atomic::Ordering::Relaxed)).max(0) as u32)),
         P::Closing => (8 - (d.t + c), None),
         P::Closed => return None,
     };
@@ -339,7 +343,8 @@ pub fn dialog_anim(w: &World) -> Option<wf_view::DialogAnim> {
 }
 
 /// calibration of [`dialog_anim`] (field_parity)
-pub static DIALOG_OPEN_OFF: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(1);
+pub static DIALOG_OPEN_OFF: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(2);
+pub static TYPED_OFF: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(0);
 pub static DIALOG_CLOSE_OFF: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(0);
 
 pub fn patch_view(w: &World, out: &mut RenderView) {

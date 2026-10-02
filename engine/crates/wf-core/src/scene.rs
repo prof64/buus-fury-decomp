@@ -1145,8 +1145,11 @@ fn start_head(w: &mut World, k: usize) {
         let owner = t.owner;
         let Some(mut cmd) = t.queue.first().cloned() else { return };
         start_cmd(w, owner, &mut cmd);
+        // an instant command reached by a track's pop-and-start keeps the track for this tick; the next command
+        // starts in the next one (story playthrough: s073 walk_to -> set_pos -> face(206, 2))
+        let chained = w.scene.chaining;
         let Some(t) = w.scene.tracks.get_mut(k) else { return };
-        if done_at_start(&cmd) {
+        if done_at_start(&cmd) && !chained {
             if !t.queue.is_empty() {
                 t.queue.remove(0);
             }
@@ -2063,6 +2066,11 @@ fn tick_track(w: &mut World, k: usize) -> bool {
     }
     if !w.scene.tracks[k].started {
         start_head(w, k);
+    }
+    // a held command (face_actor left at the head) no longer updates: the actor keeps the facing it got
+    // (story playthrough: s084, Goku does not follow Pikkon's later walk)
+    if w.scene.tracks[k].holding {
+        return true;
     }
     let mut cmd = w.scene.tracks[k].queue[0].clone();
     let done = update_cmd(w, owner, &mut cmd);
