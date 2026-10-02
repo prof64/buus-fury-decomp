@@ -1,0 +1,809 @@
+{
+ "source": "LoG2 ROM; extract_levels.py",
+ "max_level": 50,
+ "exp_table": {
+  "addr": "0x81d9834",
+  "desc": "u32 x50: total exp required for level L is exp_table[L-1]; level = 1 + max i with exp >= table[i] (0x08004214)"
+ },
+ "levels": [
+  {
+   "level": 1,
+   "total_exp": 0,
+   "exp_to_next": 50,
+   "award_min": 0,
+   "award_max": 25
+  },
+  {
+   "level": 2,
+   "total_exp": 50,
+   "exp_to_next": 100,
+   "award_min": 0,
+   "award_max": 50
+  },
+  {
+   "level": 3,
+   "total_exp": 150,
+   "exp_to_next": 175,
+   "award_min": 1,
+   "award_max": 87
+  },
+  {
+   "level": 4,
+   "total_exp": 325,
+   "exp_to_next": 275,
+   "award_min": 2,
+   "award_max": 137
+  },
+  {
+   "level": 5,
+   "total_exp": 600,
+   "exp_to_next": 400,
+   "award_min": 3,
+   "award_max": 200
+  },
+  {
+   "level": 6,
+   "total_exp": 1000,
+   "exp_to_next": 550,
+   "award_min": 4,
+   "award_max": 275
+  },
+  {
+   "level": 7,
+   "total_exp": 1550,
+   "exp_to_next": 725,
+   "award_min": 5,
+   "award_max": 362
+  },
+  {
+   "level": 8,
+   "total_exp": 2275,
+   "exp_to_next": 925,
+   "award_min": 7,
+   "award_max": 462
+  },
+  {
+   "level": 9,
+   "total_exp": 3200,
+   "exp_to_next": 1150,
+   "award_min": 8,
+   "award_max": 575
+  },
+  {
+   "level": 10,
+   "total_exp": 4350,
+   "exp_to_next": 1425,
+   "award_min": 11,
+   "award_max": 712
+  },
+  {
+   "level": 11,
+   "total_exp": 5775,
+   "exp_to_next": 1775,
+   "award_min": 13,
+   "award_max": 887
+  },
+  {
+   "level": 12,
+   "total_exp": 7550,
+   "exp_to_next": 2675,
+   "award_min": 20,
+   "award_max": 1337
+  },
+  {
+   "level": 13,
+   "total_exp": 10225,
+   "exp_to_next": 3275,
+   "award_min": 25,
+   "award_max": 1637
+  },
+  {
+   "level": 14,
+   "total_exp": 13500,
+   "exp_to_next": 4025,
+   "award_min": 31,
+   "award_max": 2012
+  },
+  {
+   "level": 15,
+   "total_exp": 17525,
+   "exp_to_next": 4925,
+   "award_min": 38,
+   "award_max": 2462
+  },
+  {
+   "level": 16,
+   "total_exp": 22450,
+   "exp_to_next": 6025,
+   "award_min": 47,
+   "award_max": 3012
+  },
+  {
+   "level": 17,
+   "total_exp": 28475,
+   "exp_to_next": 7275,
+   "award_min": 56,
+   "award_max": 3637
+  },
+  {
+   "level": 18,
+   "total_exp": 35750,
+   "exp_to_next": 8675,
+   "award_min": 67,
+   "award_max": 4337
+  },
+  {
+   "level": 19,
+   "total_exp": 44425,
+   "exp_to_next": 10325,
+   "award_min": 80,
+   "award_max": 5162
+  },
+  {
+   "level": 20,
+   "total_exp": 54750,
+   "exp_to_next": 12225,
+   "award_min": 95,
+   "award_max": 6112
+  },
+  {
+   "level": 21,
+   "total_exp": 66975,
+   "exp_to_next": 14425,
+   "award_min": 112,
+   "award_max": 7212
+  },
+  {
+   "level": 22,
+   "total_exp": 81400,
+   "exp_to_next": 17425,
+   "award_min": 136,
+   "award_max": 8712
+  },
+  {
+   "level": 23,
+   "total_exp": 98825,
+   "exp_to_next": 20925,
+   "award_min": 163,
+   "award_max": 10462
+  },
+  {
+   "level": 24,
+   "total_exp": 119750,
+   "exp_to_next": 25000,
+   "award_min": 195,
+   "award_max": 12500
+  },
+  {
+   "level": 25,
+   "total_exp": 144750,
+   "exp_to_next": 30500,
+   "award_min": 238,
+   "award_max": 15250
+  },
+  {
+   "level": 26,
+   "total_exp": 175250,
+   "exp_to_next": 37625,
+   "award_min": 293,
+   "award_max": 18812
+  },
+  {
+   "level": 27,
+   "total_exp": 212875,
+   "exp_to_next": 46125,
+   "award_min": 360,
+   "award_max": 23062
+  },
+  {
+   "level": 28,
+   "total_exp": 259000,
+   "exp_to_next": 55625,
+   "award_min": 434,
+   "award_max": 27812
+  },
+  {
+   "level": 29,
+   "total_exp": 314625,
+   "exp_to_next": 68125,
+   "award_min": 532,
+   "award_max": 34062
+  },
+  {
+   "level": 30,
+   "total_exp": 382750,
+   "exp_to_next": 84875,
+   "award_min": 663,
+   "award_max": 42437
+  },
+  {
+   "level": 31,
+   "total_exp": 467625,
+   "exp_to_next": 104900,
+   "award_min": 819,
+   "award_max": 52450
+  },
+  {
+   "level": 32,
+   "total_exp": 572525,
+   "exp_to_next": 129375,
+   "award_min": 1010,
+   "award_max": 64687
+  },
+  {
+   "level": 33,
+   "total_exp": 701900,
+   "exp_to_next": 153875,
+   "award_min": 1202,
+   "award_max": 76937
+  },
+  {
+   "level": 34,
+   "total_exp": 855775,
+   "exp_to_next": 189625,
+   "award_min": 1481,
+   "award_max": 94812
+  },
+  {
+   "level": 35,
+   "total_exp": 1045400,
+   "exp_to_next": 225375,
+   "award_min": 1760,
+   "award_max": 112687
+  },
+  {
+   "level": 36,
+   "total_exp": 1270775,
+   "exp_to_next": 261125,
+   "award_min": 2040,
+   "award_max": 130562
+  },
+  {
+   "level": 37,
+   "total_exp": 1531900,
+   "exp_to_next": 321125,
+   "award_min": 2508,
+   "award_max": 160562
+  },
+  {
+   "level": 38,
+   "total_exp": 1853025,
+   "exp_to_next": 392875,
+   "award_min": 3069,
+   "award_max": 196437
+  },
+  {
+   "level": 39,
+   "total_exp": 2245900,
+   "exp_to_next": 481875,
+   "award_min": 3764,
+   "award_max": 240937
+  },
+  {
+   "level": 40,
+   "total_exp": 2727775,
+   "exp_to_next": 607735,
+   "award_min": 4747,
+   "award_max": 303867
+  },
+  {
+   "level": 41,
+   "total_exp": 3335510,
+   "exp_to_next": 754875,
+   "award_min": 5897,
+   "award_max": 377437
+  },
+  {
+   "level": 42,
+   "total_exp": 4090385,
+   "exp_to_next": 939875,
+   "award_min": 7342,
+   "award_max": 469937
+  },
+  {
+   "level": 43,
+   "total_exp": 5030260,
+   "exp_to_next": 1165625,
+   "award_min": 9106,
+   "award_max": 582812
+  },
+  {
+   "level": 44,
+   "total_exp": 6195885,
+   "exp_to_next": 1450625,
+   "award_min": 11333,
+   "award_max": 725312
+  },
+  {
+   "level": 45,
+   "total_exp": 7646510,
+   "exp_to_next": 1795700,
+   "award_min": 14028,
+   "award_max": 897850
+  },
+  {
+   "level": 46,
+   "total_exp": 9442210,
+   "exp_to_next": 2221475,
+   "award_min": 17355,
+   "award_max": 1110737
+  },
+  {
+   "level": 47,
+   "total_exp": 11663685,
+   "exp_to_next": 2856500,
+   "award_min": 22316,
+   "award_max": 1428250
+  },
+  {
+   "level": 48,
+   "total_exp": 14520185,
+   "exp_to_next": 3618250,
+   "award_min": 28267,
+   "award_max": 1809125
+  },
+  {
+   "level": 49,
+   "total_exp": 18138435,
+   "exp_to_next": 4826670,
+   "award_min": 37708,
+   "award_max": 2413335
+  },
+  {
+   "level": 50,
+   "total_exp": 22965105,
+   "exp_to_next": null,
+   "award_min": null,
+   "award_max": null
+  }
+ ],
+ "record_layout": {
+  "base": "party 0x03000e90; record i at 0x03000e9c + 28*i (i: 0 Gohan,1 Piccolo,2 Vegeta,3 Trunks,4 Goku,5 Hercule); active index = byte at 0x03000e90",
+  "fields": {
+   "+0 s16": "HP",
+   "+2 s16": "maxHP",
+   "+4 s16": "EP",
+   "+6 s16": "maxEP",
+   "+8 u8": "form id (row of 0x081d967c; player agent)",
+   "+9 u8": "selected special slot",
+   "+0xa u16": "STR 8.8 fixed",
+   "+0xc u16": "POW 8.8",
+   "+0xe u16": "END 8.8",
+   "+0x10 u32": "exp",
+   "+0x14 u32": "flags: bit0 = character unlocked/selectable (Switch list, status list); bit1 = counted by 0x08003e1e (INFERRED in-party); bits3..6 = special slots 0..3 usable",
+   "+0x18 u8[4]": "move-type ids per slot (table 0x081d9900)"
+  }
+ },
+ "characters": [
+  {
+   "index": 0,
+   "name": "Gohan",
+   "record_rom": "0x81d9548",
+   "initial": {
+    "hp": 85,
+    "max_hp": 85,
+    "ep": 20,
+    "max_ep": 20,
+    "form_id": 3,
+    "selected_slot": 3,
+    "STR_raw": 768,
+    "POW_raw": 1280,
+    "END_raw": 768,
+    "STR": 3.0,
+    "POW": 5.0,
+    "END": 3.0,
+    "exp": 40,
+    "flags": "0x40",
+    "move_slots": [
+     4,
+     3,
+     12,
+     2
+    ]
+   },
+   "growth_rom": "0x81d95f0",
+   "growth_per_level_raw": {
+    "STR": [
+     318,
+     518
+    ],
+    "POW": [
+     302,
+     502
+    ],
+    "END": [
+     256,
+     456
+    ]
+   },
+   "growth_per_level": {
+    "STR": [
+     1.2421875,
+     2.0234375
+    ],
+    "POW": [
+     1.1796875,
+     1.9609375
+    ],
+    "END": [
+     1.0,
+     1.78125
+    ]
+   },
+   "growth_avg_per_level": {
+    "STR": 1.6328125,
+    "POW": 1.5703125,
+    "END": 1.390625
+   }
+  },
+  {
+   "index": 1,
+   "name": "Piccolo",
+   "record_rom": "0x81d9564",
+   "initial": {
+    "hp": 95,
+    "max_hp": 95,
+    "ep": 20,
+    "max_ep": 20,
+    "form_id": 6,
+    "selected_slot": 3,
+    "STR_raw": 1024,
+    "POW_raw": 1024,
+    "END_raw": 1280,
+    "STR": 4.0,
+    "POW": 4.0,
+    "END": 5.0,
+    "exp": 0,
+    "flags": "0x40",
+    "move_slots": [
+     9,
+     8,
+     11,
+     2
+    ]
+   },
+   "growth_rom": "0x81d95fc",
+   "growth_per_level_raw": {
+    "STR": [
+     224,
+     424
+    ],
+    "POW": [
+     245,
+     445
+    ],
+    "END": [
+     208,
+     408
+    ]
+   },
+   "growth_per_level": {
+    "STR": [
+     0.875,
+     1.65625
+    ],
+    "POW": [
+     0.95703125,
+     1.73828125
+    ],
+    "END": [
+     0.8125,
+     1.59375
+    ]
+   },
+   "growth_avg_per_level": {
+    "STR": 1.265625,
+    "POW": 1.34765625,
+    "END": 1.203125
+   }
+  },
+  {
+   "index": 2,
+   "name": "Vegeta",
+   "record_rom": "0x81d9580",
+   "initial": {
+    "hp": 105,
+    "max_hp": 105,
+    "ep": 20,
+    "max_ep": 20,
+    "form_id": 8,
+    "selected_slot": 3,
+    "STR_raw": 1536,
+    "POW_raw": 1024,
+    "END_raw": 1536,
+    "STR": 6.0,
+    "POW": 4.0,
+    "END": 6.0,
+    "exp": 0,
+    "flags": "0x40",
+    "move_slots": [
+     0,
+     7,
+     12,
+     2
+    ]
+   },
+   "growth_rom": "0x81d9608",
+   "growth_per_level_raw": {
+    "STR": [
+     234,
+     434
+    ],
+    "POW": [
+     219,
+     419
+    ],
+    "END": [
+     245,
+     445
+    ]
+   },
+   "growth_per_level": {
+    "STR": [
+     0.9140625,
+     1.6953125
+    ],
+    "POW": [
+     0.85546875,
+     1.63671875
+    ],
+    "END": [
+     0.95703125,
+     1.73828125
+    ]
+   },
+   "growth_avg_per_level": {
+    "STR": 1.3046875,
+    "POW": 1.24609375,
+    "END": 1.34765625
+   }
+  },
+  {
+   "index": 3,
+   "name": "Trunks",
+   "record_rom": "0x81d959c",
+   "initial": {
+    "hp": 110,
+    "max_hp": 110,
+    "ep": 20,
+    "max_ep": 20,
+    "form_id": 18,
+    "selected_slot": 3,
+    "STR_raw": 1536,
+    "POW_raw": 768,
+    "END_raw": 1024,
+    "STR": 6.0,
+    "POW": 3.0,
+    "END": 4.0,
+    "exp": 0,
+    "flags": "0x40",
+    "move_slots": [
+     1,
+     13,
+     12,
+     2
+    ]
+   },
+   "growth_rom": "0x81d9614",
+   "growth_per_level_raw": {
+    "STR": [
+     287,
+     487
+    ],
+    "POW": [
+     172,
+     372
+    ],
+    "END": [
+     182,
+     382
+    ]
+   },
+   "growth_per_level": {
+    "STR": [
+     1.12109375,
+     1.90234375
+    ],
+    "POW": [
+     0.671875,
+     1.453125
+    ],
+    "END": [
+     0.7109375,
+     1.4921875
+    ]
+   },
+   "growth_avg_per_level": {
+    "STR": 1.51171875,
+    "POW": 1.0625,
+    "END": 1.1015625
+   }
+  },
+  {
+   "index": 4,
+   "name": "Goku",
+   "record_rom": "0x81d95b8",
+   "initial": {
+    "hp": 100,
+    "max_hp": 100,
+    "ep": 20,
+    "max_ep": 20,
+    "form_id": 19,
+    "selected_slot": 3,
+    "STR_raw": 1280,
+    "POW_raw": 1792,
+    "END_raw": 1536,
+    "STR": 5.0,
+    "POW": 7.0,
+    "END": 6.0,
+    "exp": 0,
+    "flags": "0x40",
+    "move_slots": [
+     3,
+     10,
+     12,
+     2
+    ]
+   },
+   "growth_rom": "0x81d9620",
+   "growth_per_level_raw": {
+    "STR": [
+     255,
+     455
+    ],
+    "POW": [
+     255,
+     455
+    ],
+    "END": [
+     198,
+     398
+    ]
+   },
+   "growth_per_level": {
+    "STR": [
+     0.99609375,
+     1.77734375
+    ],
+    "POW": [
+     0.99609375,
+     1.77734375
+    ],
+    "END": [
+     0.7734375,
+     1.5546875
+    ]
+   },
+   "growth_avg_per_level": {
+    "STR": 1.38671875,
+    "POW": 1.38671875,
+    "END": 1.1640625
+   }
+  },
+  {
+   "index": 5,
+   "name": "Hercule",
+   "record_rom": "0x81d95d4",
+   "initial": {
+    "hp": 50,
+    "max_hp": 50,
+    "ep": 20,
+    "max_ep": 20,
+    "form_id": 21,
+    "selected_slot": 3,
+    "STR_raw": 2048,
+    "POW_raw": 256,
+    "END_raw": 1536,
+    "STR": 8.0,
+    "POW": 1.0,
+    "END": 6.0,
+    "exp": 0,
+    "flags": "0x40",
+    "move_slots": [
+     6,
+     6,
+     6,
+     6
+    ]
+   },
+   "growth_rom": "0x81d962c",
+   "growth_per_level_raw": {
+    "STR": [
+     64,
+     192
+    ],
+    "POW": [
+     64,
+     192
+    ],
+    "END": [
+     64,
+     192
+    ]
+   },
+   "growth_per_level": {
+    "STR": [
+     0.25,
+     0.75
+    ],
+    "POW": [
+     0.25,
+     0.75
+    ],
+    "END": [
+     0.25,
+     0.75
+    ]
+   },
+   "growth_avg_per_level": {
+    "STR": 0.5,
+    "POW": 0.5,
+    "END": 0.5
+   }
+  }
+ ],
+ "level_up": {
+  "function": "0x08003ca0(party, idx, oldLevel, newLevel)",
+  "verified": true,
+  "stat_growth": "for each of STR,POW,END: stat += min*n + rand((max-min+1)*n), n = newLevel-oldLevel; stat = min(stat, 0x6400 (100.0)). One RNG call per stat (in STR,POW,END order) regardless of n.",
+  "hp_growth": "per level gained (loop old..new-1): maxHP += (maxHP * (rand(0x51f) + 0xe14)) >> 16  [x1.0550 .. x1.0750]; HP = maxHP",
+  "ep_growth": "per level gained (same loop, after HP roll): maxEP += rand(3) + 2  [+2..+4]; EP = maxEP",
+  "rng_order": "rand(STR) rand(POW) rand(END) then per level: rand(0x51f) rand(3)",
+  "message": "script 0x083b6524 \"%s has achieved Level %d!\" + \"Attribute Bonus\" with the integer stat deltas stored at 0x03001fc1..3",
+  "note": "non-active characters never gain exp from kills; story scripts can force a level with script op 0x0800ac0x (set level of char to N if lower: runs 0x08003ca0 then sets exp=table[N-1]); debug Map Test sets every character to level 40 the same way"
+ },
+ "exp_award": {
+  "function": "0x0800e4d2 (enemy death)",
+  "verified": true,
+  "rule": "E = enemyClass.exp (row+0). If E==0: nothing. If E>5 and active level < 50: span = table[L]-table[L-1]; if (span>>7) > E: E = span>>7; elif (span>>1) < E: E = span>>1. (E<=5 is awarded raw.) Level-50 characters get nothing. The amount is queued as a message object (vtable 0x080245b0) and applied to the ACTIVE character only via 0x08003d58.",
+  "example": "Piccolo L40 killing a Snake (class 53, exp 13): span=607735, min=607735>>7=4747 -> +4747 exp (VERIFIED in emulator)"
+ },
+ "regen": {
+  "mechanism": "Player \"power mode\" objects (5 handlers, pointer table built at 0x080232e4 into 0x030021e0; the active one is player+0x180, chosen by the last field of the form table 0x081d967c). Each mode accumulates acc(player+0x184) += step every frame (independent of input/movement) and fires when acc crosses 0x10000 (acc &= 0xffff).",
+  "modes": [
+   {
+    "mode": 0,
+    "handler": "0x08017029",
+    "step": 110,
+    "period_frames": 595.7818181818182,
+    "effect": "active char: EP += maxEP*0x7ae>>16 (3.0%); every OTHER character (all 6 records except active): HP += maxHP*0xccd>>16 and EP += maxEP*0xccd>>16 (5%), clamped",
+    "stats": "entity STR/POW/END = record>>8, dmg-taken mults 128/128",
+    "verified": true,
+    "measured": "Piccolo maxEP 137: EP 10->14->18 at 596-frame intervals (frames 2739, 3335)"
+   },
+   {
+    "mode": 1,
+    "handler": "0x0801710f",
+    "step": 3277,
+    "period_frames": 20.0,
+    "effect": "active HP += maxHP*0x290>>16 (1.0%) every 20 frames; no EP change",
+    "stats": "STR=POW=END=100 fixed"
+   },
+   {
+    "mode": 2,
+    "handler": "0x080171e5",
+    "step": 1639,
+    "period_frames": 39.98535692495424,
+    "effect": "EP -= 1 every ~40 frames; at EP 0 (and HP>0) reverts (player state 0x24)",
+    "stats": "STR+15, POW+10, END+15"
+   },
+   {
+    "mode": 3,
+    "handler": "0x08017307",
+    "step": 3277,
+    "period_frames": 20.0,
+    "effect": "EP -= 1 every 20 frames; reverts at EP 0",
+    "stats": "STR+10, POW+10, END+10"
+   },
+   {
+    "mode": 4,
+    "handler": "0x08017401",
+    "step": 3277,
+    "period_frames": 20.0,
+    "effect": "HP += maxHP*0x290>>16 (1%) and EP -= 1 every 20 frames; reverts at EP 0",
+    "stats": "STR/POW/END from record"
+   }
+  ],
+  "note": "No natural HP regen for the active character in normal mode. Transform semantics (which form uses which mode) belong to the player-moves notes; modes 1-4 are INFERRED from disassembly only. Script ops 0xe9-0xec (0x0800b0a1..) set active HP/maxHP/EP/maxEP and 0xb7/0xb8 set any char HP/EP (used by story scripts, e.g. healing events)."
+ }
+}

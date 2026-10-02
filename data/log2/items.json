@@ -1,0 +1,8800 @@
+{
+ "source": "LoG2 ROM; extract_items.py",
+ "item_table": {
+  "addr": "0x86ade24",
+  "count": 50,
+  "stride": 56,
+  "fields": {
+   "+0 u8": "stored_in_inventory (0 = consumed immediately on pickup: Health/Energy bonus orbs)",
+   "+1 u8": "flag (1 for Golden Cap. #17, Missing Nameks, Dragon Balls) - INFERRED collectible/quest marker",
+   "+2 u8": "show \"obtained\" popup on pickup (0x0800fb74)",
+   "+3 u8": "max count carried (pickup refused when count >= max)",
+   "+4 u16": "name string id (table 0x080e2840)",
+   "+6 u16": "description string id",
+   "+8..+0x2f": "two sprite descriptors (w,h,flags,gfx ptr) + palette/tiles ptrs",
+   "+0x30 fn": "use(itemId) -> nonzero if used (count decremented by menu)",
+   "+0x34 fn": "pickup(itemId): 0x0800f3f1 add-to-inventory / 0x0800f441 popup only"
+  }
+ },
+ "inventory_ram": {
+  "addr": "0x3000fbb",
+  "desc": "u8 count per item id at party(0x03000e90)+0x12b+id (VERIFIED: Items menu + use test)"
+ },
+ "pickup_object": {
+  "ctor": "0x08011802",
+  "vtable": "0x08024c90",
+  "physics": "spawned with height=0x2000 (1/1024 px units, drawn y -= height>>10), vz=0x800; each frame vz-=0x80, height+=vz; on hitting ground height=-h/2, vz=-vz/2; settles when vz<0x80, then collectible",
+  "collect": "touching the player calls item.pickup_fn (+0x34)",
+  "despawn": "temporary pickups (stored_in_inventory==0 && no popup) are registered with a watcher (0x0801177c) that removes them when the area is left (INFERRED); persisted >=3000 frames on screen (VERIFIED)"
+ },
+ "items": [
+  {
+   "id": 0,
+   "rom_addr": "0x86ade24",
+   "name": "Senzu Bean",
+   "description": "Restores Health and Energy",
+   "name_string_id": 90,
+   "desc_string_id": 91,
+   "stored_in_inventory": true,
+   "flag_b1": 0,
+   "show_pickup_popup": true,
+   "max_count": 3,
+   "gfx_ptrs": [
+    "0x86d0640",
+    "0x86cdf40",
+    "0x86ccccc"
+   ],
+   "sprite_w": 16,
+   "sprite_h": 16,
+   "use_fn": "0x800f6e9",
+   "pickup_fn": "0x800f3f1",
+   "effect": {
+    "kind": "full_restore",
+    "text": "HP=maxHP and EP=maxEP of active character; refused (not consumed) if both already full"
+   }
+  },
+  {
+   "id": 1,
+   "rom_addr": "0x86ade5c",
+   "name": "Golden Cap.",
+   "description": "Use to enter the World Map",
+   "name_string_id": 148,
+   "desc_string_id": 149,
+   "stored_in_inventory": true,
+   "flag_b1": 0,
+   "show_pickup_popup": true,
+   "max_count": 1,
+   "gfx_ptrs": [
+    "0x86d00c0",
+    "0x86cda00",
+    "0x86cc090"
+   ],
+   "sprite_w": 16,
+   "sprite_h": 16,
+   "use_fn": "0x800f73d",
+   "pickup_fn": "0x800f3f1",
+   "effect": {
+    "kind": "world_map",
+    "text": "runs script 0x083b6c50 (World Map / Golden Capsule ship); returns 2"
+   }
+  },
+  {
+   "id": 2,
+   "rom_addr": "0x86ade94",
+   "name": "STR Cap. +1",
+   "description": "Raises Strength by 1",
+   "name_string_id": 60,
+   "desc_string_id": 61,
+   "stored_in_inventory": true,
+   "flag_b1": 0,
+   "show_pickup_popup": true,
+   "max_count": 99,
+   "gfx_ptrs": [
+    "0x86d0c0c",
+    "0x86cdf8c",
+    "0x86ccd88"
+   ],
+   "sprite_w": 16,
+   "sprite_h": 16,
+   "use_fn": "0x800f45b",
+   "pickup_fn": "0x800f3f1",
+   "effect": {
+    "kind": "stat_up",
+    "stat": "STR",
+    "record_offset": 10,
+    "amount": 1,
+    "raw_add": 256,
+    "text": "record.STR += 1<<8 (8.8 fixed point, i.e. +1.0), clamped to 0x6400 (100.0); refused (not consumed) if stat already at cap (>= 0x6400); then player entity stats refreshed (0x080086a2)"
+   }
+  },
+  {
+   "id": 3,
+   "rom_addr": "0x86adecc",
+   "name": "STR Cap. +3",
+   "description": "Raises Strength by 3",
+   "name_string_id": 62,
+   "desc_string_id": 63,
+   "stored_in_inventory": true,
+   "flag_b1": 0,
+   "show_pickup_popup": true,
+   "max_count": 99,
+   "gfx_ptrs": [
+    "0x86d0c78",
+    "0x86cdff8",
+    "0x86cce74"
+   ],
+   "sprite_w": 16,
+   "sprite_h": 16,
+   "use_fn": "0x800f45b",
+   "pickup_fn": "0x800f3f1",
+   "effect": {
+    "kind": "stat_up",
+    "stat": "STR",
+    "record_offset": 10,
+    "amount": 3,
+    "raw_add": 768,
+    "text": "record.STR += 3<<8 (8.8 fixed point, i.e. +3.0), clamped to 0x6400 (100.0); refused (not consumed) if stat already at cap (>= 0x6400); then player entity stats refreshed (0x080086a2)"
+   }
+  },
+  {
+   "id": 4,
+   "rom_addr": "0x86adf04",
+   "name": "STR Cap. +5",
+   "description": "Raises Strength by 5",
+   "name_string_id": 64,
+   "desc_string_id": 65,
+   "stored_in_inventory": true,
+   "flag_b1": 0,
+   "show_pickup_popup": true,
+   "max_count": 99,
+   "gfx_ptrs": [
+    "0x86d0ce4",
+    "0x86ce068",
+    "0x86ccf6c"
+   ],
+   "sprite_w": 16,
+   "sprite_h": 16,
+   "use_fn": "0x800f45b",
+   "pickup_fn": "0x800f3f1",
+   "effect": {
+    "kind": "stat_up",
+    "stat": "STR",
+    "record_offset": 10,
+    "amount": 5,
+    "raw_add": 1280,
+    "text": "record.STR += 5<<8 (8.8 fixed point, i.e. +5.0), clamped to 0x6400 (100.0); refused (not consumed) if stat already at cap (>= 0x6400); then player entity stats refreshed (0x080086a2)"
+   }
+  },
+  {
+   "id": 5,
+   "rom_addr": "0x86adf3c",
+   "name": "PWR Cap. +1",
+   "description": "Raises Power by 1",
+   "name_string_id": 66,
+   "desc_string_id": 67,
+   "stored_in_inventory": true,
+   "flag_b1": 0,
+   "show_pickup_popup": true,
+   "max_count": 99,
+   "gfx_ptrs": [
+    "0x86d040c",
+    "0x86cdca4",
+    "0x86cc6cc"
+   ],
+   "sprite_w": 16,
+   "sprite_h": 16,
+   "use_fn": "0x800f4c3",
+   "pickup_fn": "0x800f3f1",
+   "effect": {
+    "kind": "stat_up",
+    "stat": "POW",
+    "record_offset": 12,
+    "amount": 1,
+    "raw_add": 256,
+    "text": "record.POW += 1<<8 (8.8 fixed point, i.e. +1.0), clamped to 0x6400 (100.0); refused (not consumed) if stat already at cap (== 0x6400); then player entity stats refreshed (0x080086a2)"
+   }
+  },
+  {
+   "id": 6,
+   "rom_addr": "0x86adf74",
+   "name": "PWR Cap. +3",
+   "description": "Raises Power by 3",
+   "name_string_id": 68,
+   "desc_string_id": 69,
+   "stored_in_inventory": true,
+   "flag_b1": 0,
+   "show_pickup_popup": true,
+   "max_count": 99,
+   "gfx_ptrs": [
+    "0x86d0478",
+    "0x86cdd10",
+    "0x86cc7b8"
+   ],
+   "sprite_w": 16,
+   "sprite_h": 16,
+   "use_fn": "0x800f4c3",
+   "pickup_fn": "0x800f3f1",
+   "effect": {
+    "kind": "stat_up",
+    "stat": "POW",
+    "record_offset": 12,
+    "amount": 3,
+    "raw_add": 768,
+    "text": "record.POW += 3<<8 (8.8 fixed point, i.e. +3.0), clamped to 0x6400 (100.0); refused (not consumed) if stat already at cap (== 0x6400); then player entity stats refreshed (0x080086a2)"
+   }
+  },
+  {
+   "id": 7,
+   "rom_addr": "0x86adfac",
+   "name": "PWR Cap. +5",
+   "description": "Raises Power by 5",
+   "name_string_id": 70,
+   "desc_string_id": 71,
+   "stored_in_inventory": true,
+   "flag_b1": 0,
+   "show_pickup_popup": true,
+   "max_count": 99,
+   "gfx_ptrs": [
+    "0x86d04e4",
+    "0x86cdd80",
+    "0x86cc8b0"
+   ],
+   "sprite_w": 16,
+   "sprite_h": 16,
+   "use_fn": "0x800f4c3",
+   "pickup_fn": "0x800f3f1",
+   "effect": {
+    "kind": "stat_up",
+    "stat": "POW",
+    "record_offset": 12,
+    "amount": 5,
+    "raw_add": 1280,
+    "text": "record.POW += 5<<8 (8.8 fixed point, i.e. +5.0), clamped to 0x6400 (100.0); refused (not consumed) if stat already at cap (== 0x6400); then player entity stats refreshed (0x080086a2)"
+   }
+  },
+  {
+   "id": 8,
+   "rom_addr": "0x86adfe4",
+   "name": "END Cap. +1",
+   "description": "Raises Endurance by 1",
+   "name_string_id": 72,
+   "desc_string_id": 73,
+   "stored_in_inventory": true,
+   "flag_b1": 0,
+   "show_pickup_popup": true,
+   "max_count": 99,
+   "gfx_ptrs": [
+    "0x86cfd48",
+    "0x86cd814",
+    "0x86cbba4"
+   ],
+   "sprite_w": 16,
+   "sprite_h": 16,
+   "use_fn": "0x800f52b",
+   "pickup_fn": "0x800f3f1",
+   "effect": {
+    "kind": "stat_up",
+    "stat": "END",
+    "record_offset": 14,
+    "amount": 1,
+    "raw_add": 256,
+    "text": "record.END += 1<<8 (8.8 fixed point, i.e. +1.0), clamped to 0x6400 (100.0); refused (not consumed) if stat already at cap (== 0x6400); then player entity stats refreshed (0x080086a2)"
+   }
+  },
+  {
+   "id": 9,
+   "rom_addr": "0x86ae01c",
+   "name": "END Cap. +3",
+   "description": "Raises Endurance by 3",
+   "name_string_id": 74,
+   "desc_string_id": 75,
+   "stored_in_inventory": true,
+   "flag_b1": 0,
+   "show_pickup_popup": true,
+   "max_count": 99,
+   "gfx_ptrs": [
+    "0x86cfdb4",
+    "0x86cd880",
+    "0x86cbc90"
+   ],
+   "sprite_w": 16,
+   "sprite_h": 16,
+   "use_fn": "0x800f52b",
+   "pickup_fn": "0x800f3f1",
+   "effect": {
+    "kind": "stat_up",
+    "stat": "END",
+    "record_offset": 14,
+    "amount": 3,
+    "raw_add": 768,
+    "text": "record.END += 3<<8 (8.8 fixed point, i.e. +3.0), clamped to 0x6400 (100.0); refused (not consumed) if stat already at cap (== 0x6400); then player entity stats refreshed (0x080086a2)"
+   }
+  },
+  {
+   "id": 10,
+   "rom_addr": "0x86ae054",
+   "name": "END Cap. +5",
+   "description": "Raises Endurance by 5",
+   "name_string_id": 76,
+   "desc_string_id": 77,
+   "stored_in_inventory": true,
+   "flag_b1": 0,
+   "show_pickup_popup": true,
+   "max_count": 99,
+   "gfx_ptrs": [
+    "0x86cfe24",
+    "0x86cd8f0",
+    "0x86cbd7c"
+   ],
+   "sprite_w": 16,
+   "sprite_h": 16,
+   "use_fn": "0x800f52b",
+   "pickup_fn": "0x800f3f1",
+   "effect": {
+    "kind": "stat_up",
+    "stat": "END",
+    "record_offset": 14,
+    "amount": 5,
+    "raw_add": 1280,
+    "text": "record.END += 5<<8 (8.8 fixed point, i.e. +5.0), clamped to 0x6400 (100.0); refused (not consumed) if stat already at cap (== 0x6400); then player entity stats refreshed (0x080086a2)"
+   }
+  },
+  {
+   "id": 11,
+   "rom_addr": "0x86ae08c",
+   "name": "HealthBonusSmall",
+   "description": "HealthBonusSmall Description",
+   "name_string_id": 78,
+   "desc_string_id": 79,
+   "stored_in_inventory": false,
+   "flag_b1": 0,
+   "show_pickup_popup": false,
+   "max_count": 99,
+   "gfx_ptrs": [
+    "0x86d0260",
+    "0x0",
+    "0x0"
+   ],
+   "sprite_w": 16,
+   "sprite_h": 16,
+   "use_fn": "0x800f593",
+   "pickup_fn": "0x800f3f1",
+   "effect": {
+    "kind": "heal_hp",
+    "formula": "HP = min(maxHP, HP + (maxHP*0x199a >> 16))",
+    "fraction": 0.1
+   }
+  },
+  {
+   "id": 12,
+   "rom_addr": "0x86ae0c4",
+   "name": "HealthBonusMedium",
+   "description": "HealthBonusMedium Description",
+   "name_string_id": 80,
+   "desc_string_id": 81,
+   "stored_in_inventory": false,
+   "flag_b1": 0,
+   "show_pickup_popup": false,
+   "max_count": 99,
+   "gfx_ptrs": [
+    "0x86d01ec",
+    "0x0",
+    "0x0"
+   ],
+   "sprite_w": 16,
+   "sprite_h": 16,
+   "use_fn": "0x800f593",
+   "pickup_fn": "0x800f3f1",
+   "effect": {
+    "kind": "heal_hp",
+    "formula": "HP = min(maxHP, HP + (maxHP*0x3334 >> 16))",
+    "fraction": 0.2
+   }
+  },
+  {
+   "id": 13,
+   "rom_addr": "0x86ae0fc",
+   "name": "HealthBonusLarge",
+   "description": "HealthBonusLarge Description",
+   "name_string_id": 82,
+   "desc_string_id": 83,
+   "stored_in_inventory": false,
+   "flag_b1": 0,
+   "show_pickup_popup": false,
+   "max_count": 99,
+   "gfx_ptrs": [
+    "0x86d0188",
+    "0x0",
+    "0x0"
+   ],
+   "sprite_w": 16,
+   "sprite_h": 16,
+   "use_fn": "0x800f593",
+   "pickup_fn": "0x800f3f1",
+   "effect": {
+    "kind": "heal_hp",
+    "formula": "HP = min(maxHP, HP + (maxHP*0x4ccd >> 16))",
+    "fraction": 0.3
+   }
+  },
+  {
+   "id": 14,
+   "rom_addr": "0x86ae134",
+   "name": "EnergyBonusSmall",
+   "description": "EnergyBonusSmall Description",
+   "name_string_id": 84,
+   "desc_string_id": 85,
+   "stored_in_inventory": false,
+   "flag_b1": 0,
+   "show_pickup_popup": false,
+   "max_count": 99,
+   "gfx_ptrs": [
+    "0x86cff10",
+    "0x0",
+    "0x0"
+   ],
+   "sprite_w": 16,
+   "sprite_h": 16,
+   "use_fn": "0x800f639",
+   "pickup_fn": "0x800f3f1",
+   "effect": {
+    "kind": "restore_ep",
+    "formula": "EP = min(maxEP, EP + (maxEP*0x199a >> 16))",
+    "fraction": 0.1
+   }
+  },
+  {
+   "id": 15,
+   "rom_addr": "0x86ae16c",
+   "name": "EnergyBonusMedium",
+   "description": "EnergyBonusMedium Description",
+   "name_string_id": 86,
+   "desc_string_id": 87,
+   "stored_in_inventory": false,
+   "flag_b1": 0,
+   "show_pickup_popup": false,
+   "max_count": 99,
+   "gfx_ptrs": [
+    "0x86cfed4",
+    "0x0",
+    "0x0"
+   ],
+   "sprite_w": 16,
+   "sprite_h": 16,
+   "use_fn": "0x800f639",
+   "pickup_fn": "0x800f3f1",
+   "effect": {
+    "kind": "restore_ep",
+    "formula": "EP = min(maxEP, EP + (maxEP*0x3334 >> 16))",
+    "fraction": 0.2
+   }
+  },
+  {
+   "id": 16,
+   "rom_addr": "0x86ae1a4",
+   "name": "EnergyBonusLarge",
+   "description": "EnergyBonusLarge Description",
+   "name_string_id": 88,
+   "desc_string_id": 89,
+   "stored_in_inventory": false,
+   "flag_b1": 0,
+   "show_pickup_popup": false,
+   "max_count": 99,
+   "gfx_ptrs": [
+    "0x86cfe7c",
+    "0x0",
+    "0x0"
+   ],
+   "sprite_w": 16,
+   "sprite_h": 16,
+   "use_fn": "0x800f639",
+   "pickup_fn": "0x800f3f1",
+   "effect": {
+    "kind": "restore_ep",
+    "formula": "EP = min(maxEP, EP + (maxEP*0x4ccd >> 16))",
+    "fraction": 0.3
+   }
+  },
+  {
+   "id": 17,
+   "rom_addr": "0x86ae1dc",
+   "name": "Golden Cap.",
+   "description": "A mysterious Capsule",
+   "name_string_id": 92,
+   "desc_string_id": 93,
+   "stored_in_inventory": true,
+   "flag_b1": 1,
+   "show_pickup_popup": true,
+   "max_count": 25,
+   "gfx_ptrs": [
+    "0x86d00c0",
+    "0x86cda00",
+    "0x86cc090"
+   ],
+   "sprite_w": 16,
+   "sprite_h": 16,
+   "use_fn": null,
+   "pickup_fn": "0x800f3f1",
+   "effect": {
+    "kind": "none",
+    "text": "not usable from the menu (key/quest/collectible item)"
+   }
+  },
+  {
+   "id": 18,
+   "rom_addr": "0x86ae214",
+   "name": "Album",
+   "description": "Eyes of the Lion",
+   "name_string_id": 94,
+   "desc_string_id": 95,
+   "stored_in_inventory": true,
+   "flag_b1": 0,
+   "show_pickup_popup": true,
+   "max_count": 1,
+   "gfx_ptrs": [
+    "0x86cff40",
+    "0x86cd948",
+    "0x86cbe4c"
+   ],
+   "sprite_w": 16,
+   "sprite_h": 16,
+   "use_fn": "0x800f72d",
+   "pickup_fn": "0x800f3f1",
+   "effect": {
+    "kind": "open_album",
+    "text": "opens the Album screen (menu object 0x081d4cd0)"
+   }
+  },
+  {
+   "id": 19,
+   "rom_addr": "0x86ae24c",
+   "name": "Club Sand.",
+   "description": "Hercule's favorite sandwich",
+   "name_string_id": 96,
+   "desc_string_id": 97,
+   "stored_in_inventory": true,
+   "flag_b1": 0,
+   "show_pickup_popup": true,
+   "max_count": 1,
+   "gfx_ptrs": [
+    "0x86d0364",
+    "0x86cdc04",
+    "0x86cc568"
+   ],
+   "sprite_w": 16,
+   "sprite_h": 16,
+   "use_fn": null,
+   "pickup_fn": "0x800f3f1",
+   "effect": {
+    "kind": "none",
+    "text": "not usable from the menu (key/quest/collectible item)"
+   }
+  },
+  {
+   "id": 20,
+   "rom_addr": "0x86ae284",
+   "name": "Newspaper",
+   "description": "Today's paper",
+   "name_string_id": 98,
+   "desc_string_id": 99,
+   "stored_in_inventory": true,
+   "flag_b1": 0,
+   "show_pickup_popup": true,
+   "max_count": 1,
+   "gfx_ptrs": [
+    "0x86d0304",
+    "0x86cdba0",
+    "0x86cc460"
+   ],
+   "sprite_w": 16,
+   "sprite_h": 16,
+   "use_fn": null,
+   "pickup_fn": "0x800f3f1",
+   "effect": {
+    "kind": "none",
+    "text": "not usable from the menu (key/quest/collectible item)"
+   }
+  },
+  {
+   "id": 21,
+   "rom_addr": "0x86ae2bc",
+   "name": "Cookie",
+   "description": "Cookie from Mrs. Briefs",
+   "name_string_id": 100,
+   "desc_string_id": 101,
+   "stored_in_inventory": true,
+   "flag_b1": 0,
+   "show_pickup_popup": true,
+   "max_count": 99,
+   "gfx_ptrs": [
+    "0x86cf938",
+    "0x86cd380",
+    "0x86cb08c"
+   ],
+   "sprite_w": 16,
+   "sprite_h": 16,
+   "use_fn": "0x800f593",
+   "pickup_fn": "0x800f3f1",
+   "effect": {
+    "kind": "heal_hp",
+    "formula": "HP = min(maxHP, HP + 5)"
+   }
+  },
+  {
+   "id": 22,
+   "rom_addr": "0x86ae2f4",
+   "name": "Scouter",
+   "description": "Information device",
+   "name_string_id": 102,
+   "desc_string_id": 103,
+   "stored_in_inventory": true,
+   "flag_b1": 0,
+   "show_pickup_popup": true,
+   "max_count": 1,
+   "gfx_ptrs": [
+    "0x86d053c",
+    "0x86cddd8",
+    "0x86cc990"
+   ],
+   "sprite_w": 16,
+   "sprite_h": 16,
+   "use_fn": null,
+   "pickup_fn": "0x800f3f1",
+   "effect": {
+    "kind": "none",
+    "text": "not usable from the menu (key/quest/collectible item)"
+   }
+  },
+  {
+   "id": 23,
+   "rom_addr": "0x86ae32c",
+   "name": "Scouter Note",
+   "description": "Take this to Circuit Shack for Bulma",
+   "name_string_id": 104,
+   "desc_string_id": 105,
+   "stored_in_inventory": true,
+   "flag_b1": 0,
+   "show_pickup_popup": true,
+   "max_count": 1,
+   "gfx_ptrs": [
+    "0x86cefe4",
+    "0x86cdee4",
+    "0x86ccba4"
+   ],
+   "sprite_w": 16,
+   "sprite_h": 16,
+   "use_fn": null,
+   "pickup_fn": "0x800f3f1",
+   "effect": {
+    "kind": "none",
+    "text": "not usable from the menu (key/quest/collectible item)"
+   }
+  },
+  {
+   "id": 24,
+   "rom_addr": "0x86ae364",
+   "name": "Scouter Part",
+   "description": "Bulma needs this part for the scouter",
+   "name_string_id": 106,
+   "desc_string_id": 107,
+   "stored_in_inventory": true,
+   "flag_b1": 0,
+   "show_pickup_popup": true,
+   "max_count": 1,
+   "gfx_ptrs": [
+    "0x86d05b0",
+    "0x86cde50",
+    "0x86cca9c"
+   ],
+   "sprite_w": 16,
+   "sprite_h": 16,
+   "use_fn": null,
+   "pickup_fn": "0x800f3f1",
+   "effect": {
+    "kind": "none",
+    "text": "not usable from the menu (key/quest/collectible item)"
+   }
+  },
+  {
+   "id": 25,
+   "rom_addr": "0x86ae39c",
+   "name": "Scouter Part",
+   "description": "Bulma needs this part for the scouter",
+   "name_string_id": 108,
+   "desc_string_id": 109,
+   "stored_in_inventory": true,
+   "flag_b1": 0,
+   "show_pickup_popup": true,
+   "max_count": 1,
+   "gfx_ptrs": [
+    "0x86d05b0",
+    "0x86cde50",
+    "0x86cca9c"
+   ],
+   "sprite_w": 16,
+   "sprite_h": 16,
+   "use_fn": null,
+   "pickup_fn": "0x800f3f1",
+   "effect": {
+    "kind": "none",
+    "text": "not usable from the menu (key/quest/collectible item)"
+   }
+  },
+  {
+   "id": 26,
+   "rom_addr": "0x86ae3d4",
+   "name": "Apt. A Card",
+   "description": "WC Apartments A Access",
+   "name_string_id": 110,
+   "desc_string_id": 111,
+   "stored_in_inventory": true,
+   "flag_b1": 0,
+   "show_pickup_popup": true,
+   "max_count": 1,
+   "gfx_ptrs": [
+    "0x86cf7b8",
+    "0x86cd200",
+    "0x86cacac"
+   ],
+   "sprite_w": 16,
+   "sprite_h": 16,
+   "use_fn": null,
+   "pickup_fn": "0x800f3f1",
+   "effect": {
+    "kind": "none",
+    "text": "not usable from the menu (key/quest/collectible item)"
+   }
+  },
+  {
+   "id": 27,
+   "rom_addr": "0x86ae40c",
+   "name": "Apt. B Card",
+   "description": "WC Apartments B Access",
+   "name_string_id": 112,
+   "desc_string_id": 113,
+   "stored_in_inventory": true,
+   "flag_b1": 0,
+   "show_pickup_popup": true,
+   "max_count": 1,
+   "gfx_ptrs": [
+    "0x86cf800",
+    "0x86cd248",
+    "0x86cad74"
+   ],
+   "sprite_w": 16,
+   "sprite_h": 16,
+   "use_fn": null,
+   "pickup_fn": "0x800f3f1",
+   "effect": {
+    "kind": "none",
+    "text": "not usable from the menu (key/quest/collectible item)"
+   }
+  },
+  {
+   "id": 28,
+   "rom_addr": "0x86ae444",
+   "name": "Missing Nameks",
+   "description": "Find all 7 missing Nameks",
+   "name_string_id": 114,
+   "desc_string_id": 115,
+   "stored_in_inventory": true,
+   "flag_b1": 1,
+   "show_pickup_popup": false,
+   "max_count": 7,
+   "gfx_ptrs": [
+    "0x0",
+    "0x0",
+    "0x0"
+   ],
+   "sprite_w": 16,
+   "sprite_h": 16,
+   "use_fn": null,
+   "pickup_fn": "0x800f3f1",
+   "effect": {
+    "kind": "none",
+    "text": "not usable from the menu (key/quest/collectible item)"
+   }
+  },
+  {
+   "id": 29,
+   "rom_addr": "0x86ae47c",
+   "name": "Dragon Ball 1",
+   "description": "Find the seven Dragon Balls",
+   "name_string_id": 116,
+   "desc_string_id": 117,
+   "stored_in_inventory": true,
+   "flag_b1": 1,
+   "show_pickup_popup": true,
+   "max_count": 1,
+   "gfx_ptrs": [
+    "0x86cf988",
+    "0x86cd3cc",
+    "0x86cb168"
+   ],
+   "sprite_w": 16,
+   "sprite_h": 16,
+   "use_fn": null,
+   "pickup_fn": "0x800f3f1",
+   "effect": {
+    "kind": "none",
+    "text": "not usable from the menu (key/quest/collectible item)"
+   }
+  },
+  {
+   "id": 30,
+   "rom_addr": "0x86ae4b4",
+   "name": "Dragon Ball 2",
+   "description": "Find the seven Dragon Balls",
+   "name_string_id": 118,
+   "desc_string_id": 119,
+   "stored_in_inventory": true,
+   "flag_b1": 1,
+   "show_pickup_popup": true,
+   "max_count": 1,
+   "gfx_ptrs": [
+    "0x86cfa0c",
+    "0x86cd450",
+    "0x86cb2a0"
+   ],
+   "sprite_w": 16,
+   "sprite_h": 16,
+   "use_fn": null,
+   "pickup_fn": "0x800f3f1",
+   "effect": {
+    "kind": "none",
+    "text": "not usable from the menu (key/quest/collectible item)"
+   }
+  },
+  {
+   "id": 31,
+   "rom_addr": "0x86ae4ec",
+   "name": "Dragon Ball 3",
+   "description": "Find the seven Dragon Balls",
+   "name_string_id": 120,
+   "desc_string_id": 121,
+   "stored_in_inventory": true,
+   "flag_b1": 1,
+   "show_pickup_popup": true,
+   "max_count": 1,
+   "gfx_ptrs": [
+    "0x86cfa90",
+    "0x86cd4d4",
+    "0x86cb3e4"
+   ],
+   "sprite_w": 16,
+   "sprite_h": 16,
+   "use_fn": null,
+   "pickup_fn": "0x800f3f1",
+   "effect": {
+    "kind": "none",
+    "text": "not usable from the menu (key/quest/collectible item)"
+   }
+  },
+  {
+   "id": 32,
+   "rom_addr": "0x86ae524",
+   "name": "Dragon Ball 4",
+   "description": "Find the seven Dragon Balls",
+   "name_string_id": 122,
+   "desc_string_id": 123,
+   "stored_in_inventory": true,
+   "flag_b1": 1,
+   "show_pickup_popup": true,
+   "max_count": 1,
+   "gfx_ptrs": [
+    "0x86cfb18",
+    "0x86cd55c",
+    "0x86cb530"
+   ],
+   "sprite_w": 16,
+   "sprite_h": 16,
+   "use_fn": null,
+   "pickup_fn": "0x800f3f1",
+   "effect": {
+    "kind": "none",
+    "text": "not usable from the menu (key/quest/collectible item)"
+   }
+  },
+  {
+   "id": 33,
+   "rom_addr": "0x86ae55c",
+   "name": "Dragon Ball 5",
+   "description": "Find the seven Dragon Balls",
+   "name_string_id": 124,
+   "desc_string_id": 125,
+   "stored_in_inventory": true,
+   "flag_b1": 1,
+   "show_pickup_popup": true,
+   "max_count": 1,
+   "gfx_ptrs": [
+    "0x86cfba4",
+    "0x86cd5e8",
+    "0x86cb67c"
+   ],
+   "sprite_w": 16,
+   "sprite_h": 16,
+   "use_fn": null,
+   "pickup_fn": "0x800f3f1",
+   "effect": {
+    "kind": "none",
+    "text": "not usable from the menu (key/quest/collectible item)"
+   }
+  },
+  {
+   "id": 34,
+   "rom_addr": "0x86ae594",
+   "name": "Dragon Ball 6",
+   "description": "Find the seven Dragon Balls",
+   "name_string_id": 126,
+   "desc_string_id": 127,
+   "stored_in_inventory": true,
+   "flag_b1": 1,
+   "show_pickup_popup": true,
+   "max_count": 1,
+   "gfx_ptrs": [
+    "0x86cfc30",
+    "0x86cd670",
+    "0x86cb7d8"
+   ],
+   "sprite_w": 16,
+   "sprite_h": 16,
+   "use_fn": null,
+   "pickup_fn": "0x800f3f1",
+   "effect": {
+    "kind": "none",
+    "text": "not usable from the menu (key/quest/collectible item)"
+   }
+  },
+  {
+   "id": 35,
+   "rom_addr": "0x86ae5cc",
+   "name": "Dragon Ball 7",
+   "description": "Find the seven Dragon Balls",
+   "name_string_id": 128,
+   "desc_string_id": 129,
+   "stored_in_inventory": true,
+   "flag_b1": 1,
+   "show_pickup_popup": true,
+   "max_count": 1,
+   "gfx_ptrs": [
+    "0x86cfcc0",
+    "0x86cd700",
+    "0x86cb938"
+   ],
+   "sprite_w": 16,
+   "sprite_h": 16,
+   "use_fn": null,
+   "pickup_fn": "0x800f3f1",
+   "effect": {
+    "kind": "none",
+    "text": "not usable from the menu (key/quest/collectible item)"
+   }
+  },
+  {
+   "id": 36,
+   "rom_addr": "0x86ae604",
+   "name": "Grandpa's Key",
+   "description": "The key to Grandpa Gohan's house",
+   "name_string_id": 130,
+   "desc_string_id": 131,
+   "stored_in_inventory": true,
+   "flag_b1": 0,
+   "show_pickup_popup": true,
+   "max_count": 1,
+   "gfx_ptrs": [
+    "0x86d0128",
+    "0x86cda68",
+    "0x86cc174"
+   ],
+   "sprite_w": 16,
+   "sprite_h": 16,
+   "use_fn": null,
+   "pickup_fn": "0x800f3f1",
+   "effect": {
+    "kind": "none",
+    "text": "not usable from the menu (key/quest/collectible item)"
+   }
+  },
+  {
+   "id": 37,
+   "rom_addr": "0x86ae63c",
+   "name": "Mathbook",
+   "description": "Gohan's mathbook",
+   "name_string_id": 132,
+   "desc_string_id": 133,
+   "stored_in_inventory": true,
+   "flag_b1": 0,
+   "show_pickup_popup": true,
+   "max_count": 1,
+   "gfx_ptrs": [
+    "0x86d029c",
+    "0x86cdb38",
+    "0x86cc3b0"
+   ],
+   "sprite_w": 16,
+   "sprite_h": 16,
+   "use_fn": null,
+   "pickup_fn": "0x800f3f1",
+   "effect": {
+    "kind": "none",
+    "text": "not usable from the menu (key/quest/collectible item)"
+   }
+  },
+  {
+   "id": 38,
+   "rom_addr": "0x86ae674",
+   "name": "Rune",
+   "description": "Ancient stone rune of the dinosaurs",
+   "name_string_id": 134,
+   "desc_string_id": 135,
+   "stored_in_inventory": true,
+   "flag_b1": 0,
+   "show_pickup_popup": true,
+   "max_count": 1,
+   "gfx_ptrs": [
+    "0x86d0d3c",
+    "0x86ce0c0",
+    "0x86cd04c"
+   ],
+   "sprite_w": 16,
+   "sprite_h": 16,
+   "use_fn": null,
+   "pickup_fn": "0x800f3f1",
+   "effect": {
+    "kind": "none",
+    "text": "not usable from the menu (key/quest/collectible item)"
+   }
+  },
+  {
+   "id": 39,
+   "rom_addr": "0x86ae6ac",
+   "name": "City Key",
+   "description": "Return this to the Mayor",
+   "name_string_id": 136,
+   "desc_string_id": 137,
+   "stored_in_inventory": true,
+   "flag_b1": 0,
+   "show_pickup_popup": true,
+   "max_count": 1,
+   "gfx_ptrs": [
+    "0x86cf8c8",
+    "0x86cd310",
+    "0x86caf90"
+   ],
+   "sprite_w": 16,
+   "sprite_h": 16,
+   "use_fn": null,
+   "pickup_fn": "0x800f3f1",
+   "effect": {
+    "kind": "none",
+    "text": "not usable from the menu (key/quest/collectible item)"
+   }
+  },
+  {
+   "id": 40,
+   "rom_addr": "0x86ae6e4",
+   "name": "Blue Card",
+   "description": "Capsule Corp. Access",
+   "name_string_id": 138,
+   "desc_string_id": 139,
+   "stored_in_inventory": true,
+   "flag_b1": 0,
+   "show_pickup_popup": true,
+   "max_count": 1,
+   "gfx_ptrs": [
+    "0x86ce160",
+    "0x86cd168",
+    "0x86cab58"
+   ],
+   "sprite_w": 16,
+   "sprite_h": 16,
+   "use_fn": null,
+   "pickup_fn": "0x800f3f1",
+   "effect": {
+    "kind": "none",
+    "text": "not usable from the menu (key/quest/collectible item)"
+   }
+  },
+  {
+   "id": 41,
+   "rom_addr": "0x86ae71c",
+   "name": "Red Card",
+   "description": "Capsule Corp. Access",
+   "name_string_id": 140,
+   "desc_string_id": 141,
+   "stored_in_inventory": true,
+   "flag_b1": 0,
+   "show_pickup_popup": true,
+   "max_count": 1,
+   "gfx_ptrs": [
+    "0x86cf76c",
+    "0x86cd1b4",
+    "0x86cac04"
+   ],
+   "sprite_w": 16,
+   "sprite_h": 16,
+   "use_fn": null,
+   "pickup_fn": "0x800f3f1",
+   "effect": {
+    "kind": "none",
+    "text": "not usable from the menu (key/quest/collectible item)"
+   }
+  },
+  {
+   "id": 42,
+   "rom_addr": "0x86ae754",
+   "name": "Autograph",
+   "description": "'Your Hero, Hercule'",
+   "name_string_id": 142,
+   "desc_string_id": 143,
+   "stored_in_inventory": true,
+   "flag_b1": 0,
+   "show_pickup_popup": true,
+   "max_count": 1,
+   "gfx_ptrs": [
+    "0x86cec24",
+    "0x86cdac8",
+    "0x86cc240"
+   ],
+   "sprite_w": 16,
+   "sprite_h": 16,
+   "use_fn": null,
+   "pickup_fn": "0x800f3f1",
+   "effect": {
+    "kind": "none",
+    "text": "not usable from the menu (key/quest/collectible item)"
+   }
+  },
+  {
+   "id": 43,
+   "rom_addr": "0x86ae78c",
+   "name": "Fish",
+   "description": "Korin's favorite snack",
+   "name_string_id": 144,
+   "desc_string_id": 145,
+   "stored_in_inventory": true,
+   "flag_b1": 0,
+   "show_pickup_popup": true,
+   "max_count": 3,
+   "gfx_ptrs": [
+    "0x86cffac",
+    "0x86cd9b4",
+    "0x86cbf70"
+   ],
+   "sprite_w": 32,
+   "sprite_h": 32,
+   "use_fn": null,
+   "pickup_fn": "0x800f3f1",
+   "effect": {
+    "kind": "none",
+    "text": "not usable from the menu (key/quest/collectible item)"
+   }
+  },
+  {
+   "id": 44,
+   "rom_addr": "0x86ae7c4",
+   "name": "Bait",
+   "description": "Quality fishing bait",
+   "name_string_id": 146,
+   "desc_string_id": 147,
+   "stored_in_inventory": true,
+   "flag_b1": 0,
+   "show_pickup_popup": true,
+   "max_count": 1,
+   "gfx_ptrs": [
+    "0x86cf848",
+    "0x86cd290",
+    "0x86cae48"
+   ],
+   "sprite_w": 16,
+   "sprite_h": 16,
+   "use_fn": null,
+   "pickup_fn": "0x800f3f1",
+   "effect": {
+    "kind": "none",
+    "text": "not usable from the menu (key/quest/collectible item)"
+   }
+  },
+  {
+   "id": 45,
+   "rom_addr": "0x86ae7fc",
+   "name": "Dragon Radar",
+   "description": "Reveals the Dragon Ball locations",
+   "name_string_id": 150,
+   "desc_string_id": 151,
+   "stored_in_inventory": true,
+   "flag_b1": 0,
+   "show_pickup_popup": true,
+   "max_count": 1,
+   "gfx_ptrs": [
+    "0x0",
+    "0x86cd788",
+    "0x86cba98"
+   ],
+   "sprite_w": 16,
+   "sprite_h": 16,
+   "use_fn": null,
+   "pickup_fn": "0x800f3f1",
+   "effect": {
+    "kind": "none",
+    "text": "not usable from the menu (key/quest/collectible item)"
+   }
+  },
+  {
+   "id": 46,
+   "rom_addr": "0x86ae834",
+   "name": "***",
+   "description": "***",
+   "name_string_id": 0,
+   "desc_string_id": 0,
+   "stored_in_inventory": false,
+   "flag_b1": 0,
+   "show_pickup_popup": true,
+   "max_count": 1,
+   "gfx_ptrs": [
+    "0x86d068c",
+    "0x0",
+    "0x0"
+   ],
+   "sprite_w": 32,
+   "sprite_h": 64,
+   "use_fn": null,
+   "pickup_fn": "0x800f441",
+   "effect": {
+    "kind": "none",
+    "text": "not usable from the menu (key/quest/collectible item)"
+   }
+  },
+  {
+   "id": 47,
+   "rom_addr": "0x86ae86c",
+   "name": "***",
+   "description": "***",
+   "name_string_id": 0,
+   "desc_string_id": 0,
+   "stored_in_inventory": false,
+   "flag_b1": 0,
+   "show_pickup_popup": true,
+   "max_count": 1,
+   "gfx_ptrs": [
+    "0x86d07dc",
+    "0x0",
+    "0x0"
+   ],
+   "sprite_w": 32,
+   "sprite_h": 64,
+   "use_fn": null,
+   "pickup_fn": "0x800f441",
+   "effect": {
+    "kind": "none",
+    "text": "not usable from the menu (key/quest/collectible item)"
+   }
+  },
+  {
+   "id": 48,
+   "rom_addr": "0x86ae8a4",
+   "name": "***",
+   "description": "***",
+   "name_string_id": 0,
+   "desc_string_id": 0,
+   "stored_in_inventory": false,
+   "flag_b1": 0,
+   "show_pickup_popup": true,
+   "max_count": 1,
+   "gfx_ptrs": [
+    "0x86d0950",
+    "0x0",
+    "0x0"
+   ],
+   "sprite_w": 32,
+   "sprite_h": 64,
+   "use_fn": null,
+   "pickup_fn": "0x800f441",
+   "effect": {
+    "kind": "none",
+    "text": "not usable from the menu (key/quest/collectible item)"
+   }
+  },
+  {
+   "id": 49,
+   "rom_addr": "0x86ae8dc",
+   "name": "***",
+   "description": "***",
+   "name_string_id": 0,
+   "desc_string_id": 0,
+   "stored_in_inventory": false,
+   "flag_b1": 0,
+   "show_pickup_popup": true,
+   "max_count": 1,
+   "gfx_ptrs": [
+    "0x86d0ab0",
+    "0x0",
+    "0x0"
+   ],
+   "sprite_w": 32,
+   "sprite_h": 64,
+   "use_fn": null,
+   "pickup_fn": "0x800f441",
+   "effect": {
+    "kind": "none",
+    "text": "not usable from the menu (key/quest/collectible item)"
+   }
+  }
+ ],
+ "drop_tables": [
+  {
+   "id": 0,
+   "uses": 418,
+   "example_script": "0x83ee120",
+   "roll": "L0 = rand(100)",
+   "prefix_ops": [],
+   "rows": [
+    {
+     "roll_lt": 2,
+     "item": 13,
+     "item_name": "HealthBonusLarge",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 7,
+     "item": 12,
+     "item_name": "HealthBonusMedium",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 20,
+     "item": 11,
+     "item_name": "HealthBonusSmall",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 23,
+     "item": 16,
+     "item_name": "EnergyBonusLarge",
+     "condition": "EP != maxEP"
+    },
+    {
+     "roll_lt": 28,
+     "item": 15,
+     "item_name": "EnergyBonusMedium",
+     "condition": "EP != maxEP"
+    },
+    {
+     "roll_lt": 50,
+     "item": 14,
+     "item_name": "EnergyBonusSmall",
+     "condition": "EP != maxEP"
+    }
+   ]
+  },
+  {
+   "id": 1,
+   "uses": 59,
+   "example_script": "0x83eede4",
+   "roll": "L0 = rand(100)",
+   "prefix_ops": [],
+   "rows": [
+    {
+     "roll_lt": 2,
+     "item": 13,
+     "item_name": "HealthBonusLarge",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 9,
+     "item": 12,
+     "item_name": "HealthBonusMedium",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 20,
+     "item": 11,
+     "item_name": "HealthBonusSmall",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 23,
+     "item": 16,
+     "item_name": "EnergyBonusLarge",
+     "condition": "EP != maxEP"
+    },
+    {
+     "roll_lt": 28,
+     "item": 15,
+     "item_name": "EnergyBonusMedium",
+     "condition": "EP != maxEP"
+    },
+    {
+     "roll_lt": 50,
+     "item": 14,
+     "item_name": "EnergyBonusSmall",
+     "condition": "EP != maxEP"
+    }
+   ]
+  },
+  {
+   "id": 2,
+   "uses": 1,
+   "example_script": "0x83f0294",
+   "roll": "L0 = rand(100)",
+   "prefix_ops": [
+    "push 167",
+    "call 0x1b"
+   ],
+   "rows": [
+    {
+     "roll_lt": 2,
+     "item": 13,
+     "item_name": "HealthBonusLarge",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 7,
+     "item": 12,
+     "item_name": "HealthBonusMedium",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 20,
+     "item": 11,
+     "item_name": "HealthBonusSmall",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 23,
+     "item": 16,
+     "item_name": "EnergyBonusLarge",
+     "condition": "EP != maxEP"
+    },
+    {
+     "roll_lt": 28,
+     "item": 15,
+     "item_name": "EnergyBonusMedium",
+     "condition": "EP != maxEP"
+    },
+    {
+     "roll_lt": 50,
+     "item": 14,
+     "item_name": "EnergyBonusSmall",
+     "condition": "EP != maxEP"
+    }
+   ]
+  },
+  {
+   "id": 3,
+   "uses": 1,
+   "example_script": "0x83f0340",
+   "roll": "L0 = rand(100)",
+   "prefix_ops": [
+    "push 168",
+    "call 0x1b"
+   ],
+   "rows": [
+    {
+     "roll_lt": 2,
+     "item": 13,
+     "item_name": "HealthBonusLarge",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 7,
+     "item": 12,
+     "item_name": "HealthBonusMedium",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 20,
+     "item": 11,
+     "item_name": "HealthBonusSmall",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 23,
+     "item": 16,
+     "item_name": "EnergyBonusLarge",
+     "condition": "EP != maxEP"
+    },
+    {
+     "roll_lt": 28,
+     "item": 15,
+     "item_name": "EnergyBonusMedium",
+     "condition": "EP != maxEP"
+    },
+    {
+     "roll_lt": 50,
+     "item": 14,
+     "item_name": "EnergyBonusSmall",
+     "condition": "EP != maxEP"
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "uses": 1,
+   "example_script": "0x83f03ec",
+   "roll": "L0 = rand(100)",
+   "prefix_ops": [
+    "push 169",
+    "call 0x1b"
+   ],
+   "rows": [
+    {
+     "roll_lt": 2,
+     "item": 13,
+     "item_name": "HealthBonusLarge",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 7,
+     "item": 12,
+     "item_name": "HealthBonusMedium",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 20,
+     "item": 11,
+     "item_name": "HealthBonusSmall",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 23,
+     "item": 16,
+     "item_name": "EnergyBonusLarge",
+     "condition": "EP != maxEP"
+    },
+    {
+     "roll_lt": 28,
+     "item": 15,
+     "item_name": "EnergyBonusMedium",
+     "condition": "EP != maxEP"
+    },
+    {
+     "roll_lt": 50,
+     "item": 14,
+     "item_name": "EnergyBonusSmall",
+     "condition": "EP != maxEP"
+    }
+   ]
+  },
+  {
+   "id": 5,
+   "uses": 1,
+   "example_script": "0x83f0498",
+   "roll": "L0 = rand(100)",
+   "prefix_ops": [
+    "push 170",
+    "call 0x1b"
+   ],
+   "rows": [
+    {
+     "roll_lt": 2,
+     "item": 13,
+     "item_name": "HealthBonusLarge",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 7,
+     "item": 12,
+     "item_name": "HealthBonusMedium",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 20,
+     "item": 11,
+     "item_name": "HealthBonusSmall",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 23,
+     "item": 16,
+     "item_name": "EnergyBonusLarge",
+     "condition": "EP != maxEP"
+    },
+    {
+     "roll_lt": 28,
+     "item": 15,
+     "item_name": "EnergyBonusMedium",
+     "condition": "EP != maxEP"
+    },
+    {
+     "roll_lt": 50,
+     "item": 14,
+     "item_name": "EnergyBonusSmall",
+     "condition": "EP != maxEP"
+    }
+   ]
+  },
+  {
+   "id": 6,
+   "uses": 1,
+   "example_script": "0x83f06d4",
+   "roll": "L0 = rand(100)",
+   "prefix_ops": [
+    "push 172",
+    "call 0x1b"
+   ],
+   "rows": [
+    {
+     "roll_lt": 2,
+     "item": 13,
+     "item_name": "HealthBonusLarge",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 7,
+     "item": 12,
+     "item_name": "HealthBonusMedium",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 20,
+     "item": 11,
+     "item_name": "HealthBonusSmall",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 23,
+     "item": 16,
+     "item_name": "EnergyBonusLarge",
+     "condition": "EP != maxEP"
+    },
+    {
+     "roll_lt": 28,
+     "item": 15,
+     "item_name": "EnergyBonusMedium",
+     "condition": "EP != maxEP"
+    },
+    {
+     "roll_lt": 50,
+     "item": 14,
+     "item_name": "EnergyBonusSmall",
+     "condition": "EP != maxEP"
+    }
+   ]
+  },
+  {
+   "id": 7,
+   "uses": 1,
+   "example_script": "0x83f0780",
+   "roll": "L0 = rand(100)",
+   "prefix_ops": [
+    "push 173",
+    "call 0x1b"
+   ],
+   "rows": [
+    {
+     "roll_lt": 2,
+     "item": 13,
+     "item_name": "HealthBonusLarge",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 7,
+     "item": 12,
+     "item_name": "HealthBonusMedium",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 20,
+     "item": 11,
+     "item_name": "HealthBonusSmall",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 23,
+     "item": 16,
+     "item_name": "EnergyBonusLarge",
+     "condition": "EP != maxEP"
+    },
+    {
+     "roll_lt": 28,
+     "item": 15,
+     "item_name": "EnergyBonusMedium",
+     "condition": "EP != maxEP"
+    },
+    {
+     "roll_lt": 50,
+     "item": 14,
+     "item_name": "EnergyBonusSmall",
+     "condition": "EP != maxEP"
+    }
+   ]
+  },
+  {
+   "id": 8,
+   "uses": 1,
+   "example_script": "0x83f082c",
+   "roll": "L0 = rand(100)",
+   "prefix_ops": [
+    "push 174",
+    "call 0x1b"
+   ],
+   "rows": [
+    {
+     "roll_lt": 2,
+     "item": 13,
+     "item_name": "HealthBonusLarge",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 7,
+     "item": 12,
+     "item_name": "HealthBonusMedium",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 20,
+     "item": 11,
+     "item_name": "HealthBonusSmall",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 23,
+     "item": 16,
+     "item_name": "EnergyBonusLarge",
+     "condition": "EP != maxEP"
+    },
+    {
+     "roll_lt": 28,
+     "item": 15,
+     "item_name": "EnergyBonusMedium",
+     "condition": "EP != maxEP"
+    },
+    {
+     "roll_lt": 50,
+     "item": 14,
+     "item_name": "EnergyBonusSmall",
+     "condition": "EP != maxEP"
+    }
+   ]
+  },
+  {
+   "id": 9,
+   "uses": 1,
+   "example_script": "0x83f08d8",
+   "roll": "L0 = rand(100)",
+   "prefix_ops": [
+    "push 175",
+    "call 0x1b"
+   ],
+   "rows": [
+    {
+     "roll_lt": 2,
+     "item": 13,
+     "item_name": "HealthBonusLarge",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 7,
+     "item": 12,
+     "item_name": "HealthBonusMedium",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 20,
+     "item": 11,
+     "item_name": "HealthBonusSmall",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 23,
+     "item": 16,
+     "item_name": "EnergyBonusLarge",
+     "condition": "EP != maxEP"
+    },
+    {
+     "roll_lt": 28,
+     "item": 15,
+     "item_name": "EnergyBonusMedium",
+     "condition": "EP != maxEP"
+    },
+    {
+     "roll_lt": 50,
+     "item": 14,
+     "item_name": "EnergyBonusSmall",
+     "condition": "EP != maxEP"
+    }
+   ]
+  },
+  {
+   "id": 10,
+   "uses": 1,
+   "example_script": "0x83f0b40",
+   "roll": "L0 = rand(100)",
+   "prefix_ops": [
+    "push 177",
+    "call 0x1b"
+   ],
+   "rows": [
+    {
+     "roll_lt": 2,
+     "item": 13,
+     "item_name": "HealthBonusLarge",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 7,
+     "item": 12,
+     "item_name": "HealthBonusMedium",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 20,
+     "item": 11,
+     "item_name": "HealthBonusSmall",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 23,
+     "item": 16,
+     "item_name": "EnergyBonusLarge",
+     "condition": "EP != maxEP"
+    },
+    {
+     "roll_lt": 28,
+     "item": 15,
+     "item_name": "EnergyBonusMedium",
+     "condition": "EP != maxEP"
+    },
+    {
+     "roll_lt": 50,
+     "item": 14,
+     "item_name": "EnergyBonusSmall",
+     "condition": "EP != maxEP"
+    }
+   ]
+  },
+  {
+   "id": 11,
+   "uses": 1,
+   "example_script": "0x83f0bec",
+   "roll": "L0 = rand(100)",
+   "prefix_ops": [
+    "push 178",
+    "call 0x1b"
+   ],
+   "rows": [
+    {
+     "roll_lt": 2,
+     "item": 13,
+     "item_name": "HealthBonusLarge",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 7,
+     "item": 12,
+     "item_name": "HealthBonusMedium",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 20,
+     "item": 11,
+     "item_name": "HealthBonusSmall",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 23,
+     "item": 16,
+     "item_name": "EnergyBonusLarge",
+     "condition": "EP != maxEP"
+    },
+    {
+     "roll_lt": 28,
+     "item": 15,
+     "item_name": "EnergyBonusMedium",
+     "condition": "EP != maxEP"
+    },
+    {
+     "roll_lt": 50,
+     "item": 14,
+     "item_name": "EnergyBonusSmall",
+     "condition": "EP != maxEP"
+    }
+   ]
+  },
+  {
+   "id": 12,
+   "uses": 1,
+   "example_script": "0x83f0c98",
+   "roll": "L0 = rand(100)",
+   "prefix_ops": [
+    "push 179",
+    "call 0x1b"
+   ],
+   "rows": [
+    {
+     "roll_lt": 2,
+     "item": 13,
+     "item_name": "HealthBonusLarge",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 7,
+     "item": 12,
+     "item_name": "HealthBonusMedium",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 20,
+     "item": 11,
+     "item_name": "HealthBonusSmall",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 23,
+     "item": 16,
+     "item_name": "EnergyBonusLarge",
+     "condition": "EP != maxEP"
+    },
+    {
+     "roll_lt": 28,
+     "item": 15,
+     "item_name": "EnergyBonusMedium",
+     "condition": "EP != maxEP"
+    },
+    {
+     "roll_lt": 50,
+     "item": 14,
+     "item_name": "EnergyBonusSmall",
+     "condition": "EP != maxEP"
+    }
+   ]
+  },
+  {
+   "id": 13,
+   "uses": 1,
+   "example_script": "0x83f0d44",
+   "roll": "L0 = rand(100)",
+   "prefix_ops": [
+    "push 180",
+    "call 0x1b"
+   ],
+   "rows": [
+    {
+     "roll_lt": 2,
+     "item": 13,
+     "item_name": "HealthBonusLarge",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 7,
+     "item": 12,
+     "item_name": "HealthBonusMedium",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 20,
+     "item": 11,
+     "item_name": "HealthBonusSmall",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 23,
+     "item": 16,
+     "item_name": "EnergyBonusLarge",
+     "condition": "EP != maxEP"
+    },
+    {
+     "roll_lt": 28,
+     "item": 15,
+     "item_name": "EnergyBonusMedium",
+     "condition": "EP != maxEP"
+    },
+    {
+     "roll_lt": 50,
+     "item": 14,
+     "item_name": "EnergyBonusSmall",
+     "condition": "EP != maxEP"
+    }
+   ]
+  },
+  {
+   "id": 14,
+   "uses": 14,
+   "example_script": "0x83f14e8",
+   "table": null
+  },
+  {
+   "id": 15,
+   "uses": 114,
+   "example_script": "0x83f4ee8",
+   "roll": "L0 = rand(100)",
+   "prefix_ops": [],
+   "rows": [
+    {
+     "roll_lt": 2,
+     "item": 13,
+     "item_name": "HealthBonusLarge",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 15,
+     "item": 12,
+     "item_name": "HealthBonusMedium",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 20,
+     "item": 11,
+     "item_name": "HealthBonusSmall",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 23,
+     "item": 16,
+     "item_name": "EnergyBonusLarge",
+     "condition": "EP != maxEP"
+    },
+    {
+     "roll_lt": 28,
+     "item": 15,
+     "item_name": "EnergyBonusMedium",
+     "condition": "EP != maxEP"
+    },
+    {
+     "roll_lt": 50,
+     "item": 14,
+     "item_name": "EnergyBonusSmall",
+     "condition": "EP != maxEP"
+    }
+   ]
+  },
+  {
+   "id": 16,
+   "uses": 6,
+   "example_script": "0x83fe538",
+   "roll": "L0 = rand(100)",
+   "prefix_ops": [],
+   "rows": [
+    {
+     "roll_lt": 3,
+     "item": 13,
+     "item_name": "HealthBonusLarge",
+     "condition": null
+    },
+    {
+     "roll_lt": 6,
+     "item": 16,
+     "item_name": "EnergyBonusLarge",
+     "condition": null
+    },
+    {
+     "roll_lt": 15,
+     "item": 12,
+     "item_name": "HealthBonusMedium",
+     "condition": null
+    },
+    {
+     "roll_lt": 25,
+     "item": 15,
+     "item_name": "EnergyBonusMedium",
+     "condition": null
+    },
+    {
+     "roll_lt": 40,
+     "item": 11,
+     "item_name": "HealthBonusSmall",
+     "condition": null
+    },
+    {
+     "roll_lt": 60,
+     "item": 14,
+     "item_name": "EnergyBonusSmall",
+     "condition": null
+    }
+   ]
+  },
+  {
+   "id": 17,
+   "uses": 7,
+   "example_script": "0x83feb28",
+   "roll": "L0 = rand(100)",
+   "prefix_ops": [],
+   "rows": [
+    {
+     "roll_lt": 5,
+     "item": 11,
+     "item_name": "HealthBonusSmall",
+     "condition": null
+    },
+    {
+     "roll_lt": 20,
+     "item": 12,
+     "item_name": "HealthBonusMedium",
+     "condition": null
+    },
+    {
+     "roll_lt": 35,
+     "item": 14,
+     "item_name": "EnergyBonusSmall",
+     "condition": null
+    },
+    {
+     "roll_lt": 50,
+     "item": 15,
+     "item_name": "EnergyBonusMedium",
+     "condition": null
+    }
+   ]
+  },
+  {
+   "id": 18,
+   "uses": 7,
+   "example_script": "0x83ffaf4",
+   "roll": "L0 = rand(100)",
+   "prefix_ops": [],
+   "rows": [
+    {
+     "roll_lt": 2,
+     "item": 13,
+     "item_name": "HealthBonusLarge",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 7,
+     "item": 12,
+     "item_name": "HealthBonusMedium",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 20,
+     "item": 11,
+     "item_name": "HealthBonusSmall",
+     "condition": "HP != maxHP"
+    },
+    {
+     "roll_lt": 40,
+     "item": 16,
+     "item_name": "EnergyBonusLarge",
+     "condition": "EP != maxEP"
+    },
+    {
+     "roll_lt": 60,
+     "item": 15,
+     "item_name": "EnergyBonusMedium",
+     "condition": "EP != maxEP"
+    },
+    {
+     "roll_lt": 80,
+     "item": 14,
+     "item_name": "EnergyBonusSmall",
+     "condition": "EP != maxEP"
+    }
+   ]
+  }
+ ],
+ "drop_rules": "Each enemy spawn def (+0x14) points at [on_death_fn, script]. on_death_fn 0x0801069b runs the script with the script VM (0x080092e4) when the enemy dies: L0=rand(100); then rows are tested in order, first match drops the item at the enemy position (sub-op 0x57 -> 0x0800aba5 -> pickup ctor 0x08011802). A row whose condition fails falls through to the next row (so e.g. L0<2 with full HP can still yield the EP row). 0x08010699 = no drop; 0x080106b3 = scripted event instead of drops.",
+ "spawns": [
+  {
+   "map_index": 12,
+   "map_ids": "0206",
+   "spawn_def": "0x83ee1a0",
+   "enemy_class": 53,
+   "gfx_id": 118,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 12,
+   "map_ids": "0206",
+   "spawn_def": "0x83ee1fc",
+   "enemy_class": 17,
+   "gfx_id": 146,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 12,
+   "map_ids": "0206",
+   "spawn_def": "0x83ee248",
+   "enemy_class": 53,
+   "gfx_id": 118,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 12,
+   "map_ids": "0206",
+   "spawn_def": "0x83ee2d4",
+   "enemy_class": 17,
+   "gfx_id": 146,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 13,
+   "map_ids": "0207",
+   "spawn_def": "0x83ee440",
+   "enemy_class": 17,
+   "gfx_id": 146,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 13,
+   "map_ids": "0207",
+   "spawn_def": "0x83ee470",
+   "enemy_class": 17,
+   "gfx_id": 146,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 13,
+   "map_ids": "0207",
+   "spawn_def": "0x83ee4a0",
+   "enemy_class": 17,
+   "gfx_id": 146,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 13,
+   "map_ids": "0207",
+   "spawn_def": "0x83ee4e0",
+   "enemy_class": 53,
+   "gfx_id": 118,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 13,
+   "map_ids": "0207",
+   "spawn_def": "0x83ee524",
+   "enemy_class": 53,
+   "gfx_id": 118,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 13,
+   "map_ids": "0207",
+   "spawn_def": "0x83ee568",
+   "enemy_class": 53,
+   "gfx_id": 118,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 13,
+   "map_ids": "0207",
+   "spawn_def": "0x83ee5ac",
+   "enemy_class": 53,
+   "gfx_id": 118,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 13,
+   "map_ids": "0207",
+   "spawn_def": "0x83ee5f0",
+   "enemy_class": 53,
+   "gfx_id": 118,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 14,
+   "map_ids": "0208",
+   "spawn_def": "0x83ee770",
+   "enemy_class": 41,
+   "gfx_id": 48,
+   "on_death_fn": "0x80106b3",
+   "death_script": null
+  },
+  {
+   "map_index": 22,
+   "map_ids": "021a",
+   "spawn_def": "0x83eee78",
+   "enemy_class": 75,
+   "gfx_id": 96,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 22,
+   "map_ids": "021a",
+   "spawn_def": "0x83eeea8",
+   "enemy_class": 75,
+   "gfx_id": 96,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 22,
+   "map_ids": "021a",
+   "spawn_def": "0x83eeed8",
+   "enemy_class": 75,
+   "gfx_id": 96,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 22,
+   "map_ids": "021a",
+   "spawn_def": "0x83eef08",
+   "enemy_class": 75,
+   "gfx_id": 96,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 22,
+   "map_ids": "021a",
+   "spawn_def": "0x83eef38",
+   "enemy_class": 75,
+   "gfx_id": 96,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 22,
+   "map_ids": "021a",
+   "spawn_def": "0x83eef68",
+   "enemy_class": 75,
+   "gfx_id": 96,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 22,
+   "map_ids": "021a",
+   "spawn_def": "0x83eefa8",
+   "enemy_class": 12,
+   "gfx_id": 142,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 22,
+   "map_ids": "021a",
+   "spawn_def": "0x83eefec",
+   "enemy_class": 12,
+   "gfx_id": 142,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 23,
+   "map_ids": "021b",
+   "spawn_def": "0x83ef0b0",
+   "enemy_class": 75,
+   "gfx_id": 96,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 23,
+   "map_ids": "021b",
+   "spawn_def": "0x83ef0e0",
+   "enemy_class": 75,
+   "gfx_id": 96,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 23,
+   "map_ids": "021b",
+   "spawn_def": "0x83ef110",
+   "enemy_class": 75,
+   "gfx_id": 96,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 23,
+   "map_ids": "021b",
+   "spawn_def": "0x83ef140",
+   "enemy_class": 75,
+   "gfx_id": 96,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 23,
+   "map_ids": "021b",
+   "spawn_def": "0x83ef170",
+   "enemy_class": 75,
+   "gfx_id": 96,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 24,
+   "map_ids": "021c",
+   "spawn_def": "0x83ef24c",
+   "enemy_class": 75,
+   "gfx_id": 96,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 24,
+   "map_ids": "021c",
+   "spawn_def": "0x83ef27c",
+   "enemy_class": 75,
+   "gfx_id": 96,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 24,
+   "map_ids": "021c",
+   "spawn_def": "0x83ef2ac",
+   "enemy_class": 75,
+   "gfx_id": 96,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 24,
+   "map_ids": "021c",
+   "spawn_def": "0x83ef2dc",
+   "enemy_class": 75,
+   "gfx_id": 96,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 24,
+   "map_ids": "021c",
+   "spawn_def": "0x83ef30c",
+   "enemy_class": 75,
+   "gfx_id": 96,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 26,
+   "map_ids": "021e",
+   "spawn_def": "0x83ef4c0",
+   "enemy_class": 67,
+   "gfx_id": 79,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 26,
+   "map_ids": "021e",
+   "spawn_def": "0x83ef4f0",
+   "enemy_class": 67,
+   "gfx_id": 79,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 26,
+   "map_ids": "021e",
+   "spawn_def": "0x83ef520",
+   "enemy_class": 67,
+   "gfx_id": 79,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 27,
+   "map_ids": "021f",
+   "spawn_def": "0x83ef588",
+   "enemy_class": 12,
+   "gfx_id": 142,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 28,
+   "map_ids": "0220",
+   "spawn_def": "0x83ef630",
+   "enemy_class": 12,
+   "gfx_id": 142,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 28,
+   "map_ids": "0220",
+   "spawn_def": "0x83ef674",
+   "enemy_class": 12,
+   "gfx_id": 142,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 28,
+   "map_ids": "0220",
+   "spawn_def": "0x83ef6b8",
+   "enemy_class": 12,
+   "gfx_id": 142,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 28,
+   "map_ids": "0220",
+   "spawn_def": "0x83ef6fc",
+   "enemy_class": 12,
+   "gfx_id": 142,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 28,
+   "map_ids": "0220",
+   "spawn_def": "0x83ef740",
+   "enemy_class": 12,
+   "gfx_id": 142,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 28,
+   "map_ids": "0220",
+   "spawn_def": "0x83ef784",
+   "enemy_class": 12,
+   "gfx_id": 142,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 29,
+   "map_ids": "0221",
+   "spawn_def": "0x83ef950",
+   "enemy_class": 67,
+   "gfx_id": 79,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 29,
+   "map_ids": "0221",
+   "spawn_def": "0x83ef980",
+   "enemy_class": 67,
+   "gfx_id": 79,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 29,
+   "map_ids": "0221",
+   "spawn_def": "0x83ef9b0",
+   "enemy_class": 67,
+   "gfx_id": 79,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 31,
+   "map_ids": "0223",
+   "spawn_def": "0x83efaa4",
+   "enemy_class": 86,
+   "gfx_id": 98,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 31,
+   "map_ids": "0223",
+   "spawn_def": "0x83efad4",
+   "enemy_class": 86,
+   "gfx_id": 98,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 31,
+   "map_ids": "0223",
+   "spawn_def": "0x83efb04",
+   "enemy_class": 86,
+   "gfx_id": 98,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 31,
+   "map_ids": "0223",
+   "spawn_def": "0x83efb34",
+   "enemy_class": 86,
+   "gfx_id": 98,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 32,
+   "map_ids": "0224",
+   "spawn_def": "0x83efb80",
+   "enemy_class": 86,
+   "gfx_id": 98,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 32,
+   "map_ids": "0224",
+   "spawn_def": "0x83efbb0",
+   "enemy_class": 86,
+   "gfx_id": 98,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 32,
+   "map_ids": "0224",
+   "spawn_def": "0x83efbe0",
+   "enemy_class": 86,
+   "gfx_id": 98,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 32,
+   "map_ids": "0224",
+   "spawn_def": "0x83efc10",
+   "enemy_class": 86,
+   "gfx_id": 96,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 33,
+   "map_ids": "0225",
+   "spawn_def": "0x83efc5c",
+   "enemy_class": 86,
+   "gfx_id": 98,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 33,
+   "map_ids": "0225",
+   "spawn_def": "0x83efc8c",
+   "enemy_class": 86,
+   "gfx_id": 98,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 33,
+   "map_ids": "0225",
+   "spawn_def": "0x83efcbc",
+   "enemy_class": 86,
+   "gfx_id": 98,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 33,
+   "map_ids": "0225",
+   "spawn_def": "0x83efcec",
+   "enemy_class": 86,
+   "gfx_id": 98,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 34,
+   "map_ids": "0226",
+   "spawn_def": "0x83efd30",
+   "enemy_class": 86,
+   "gfx_id": 98,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 34,
+   "map_ids": "0226",
+   "spawn_def": "0x83efd60",
+   "enemy_class": 86,
+   "gfx_id": 98,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 34,
+   "map_ids": "0226",
+   "spawn_def": "0x83efd90",
+   "enemy_class": 86,
+   "gfx_id": 98,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 34,
+   "map_ids": "0226",
+   "spawn_def": "0x83efdc0",
+   "enemy_class": 86,
+   "gfx_id": 98,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 35,
+   "map_ids": "0227",
+   "spawn_def": "0x83efe38",
+   "enemy_class": 66,
+   "gfx_id": 78,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 35,
+   "map_ids": "0227",
+   "spawn_def": "0x83efeac",
+   "enemy_class": 86,
+   "gfx_id": 98,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 36,
+   "map_ids": "0228",
+   "spawn_def": "0x83effa0",
+   "enemy_class": 66,
+   "gfx_id": 78,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 36,
+   "map_ids": "0228",
+   "spawn_def": "0x83f0010",
+   "enemy_class": 86,
+   "gfx_id": 98,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 37,
+   "map_ids": "0229",
+   "spawn_def": "0x83f0110",
+   "enemy_class": 66,
+   "gfx_id": 78,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 37,
+   "map_ids": "0229",
+   "spawn_def": "0x83f0184",
+   "enemy_class": 86,
+   "gfx_id": 98,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 38,
+   "map_ids": "022a",
+   "spawn_def": "0x83f0318",
+   "enemy_class": 86,
+   "gfx_id": 98,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f0294",
+   "drop_table_id": 2
+  },
+  {
+   "map_index": 38,
+   "map_ids": "022a",
+   "spawn_def": "0x83f03c4",
+   "enemy_class": 86,
+   "gfx_id": 98,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f0340",
+   "drop_table_id": 3
+  },
+  {
+   "map_index": 38,
+   "map_ids": "022a",
+   "spawn_def": "0x83f0470",
+   "enemy_class": 86,
+   "gfx_id": 98,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f03ec",
+   "drop_table_id": 4
+  },
+  {
+   "map_index": 38,
+   "map_ids": "022a",
+   "spawn_def": "0x83f051c",
+   "enemy_class": 86,
+   "gfx_id": 98,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f0498",
+   "drop_table_id": 5
+  },
+  {
+   "map_index": 38,
+   "map_ids": "022a",
+   "spawn_def": "0x83f054c",
+   "enemy_class": 86,
+   "gfx_id": 98,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 39,
+   "map_ids": "022b",
+   "spawn_def": "0x83f0758",
+   "enemy_class": 86,
+   "gfx_id": 98,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f06d4",
+   "drop_table_id": 6
+  },
+  {
+   "map_index": 39,
+   "map_ids": "022b",
+   "spawn_def": "0x83f0804",
+   "enemy_class": 86,
+   "gfx_id": 98,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f0780",
+   "drop_table_id": 7
+  },
+  {
+   "map_index": 39,
+   "map_ids": "022b",
+   "spawn_def": "0x83f08b0",
+   "enemy_class": 86,
+   "gfx_id": 98,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f082c",
+   "drop_table_id": 8
+  },
+  {
+   "map_index": 39,
+   "map_ids": "022b",
+   "spawn_def": "0x83f095c",
+   "enemy_class": 86,
+   "gfx_id": 98,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f08d8",
+   "drop_table_id": 9
+  },
+  {
+   "map_index": 39,
+   "map_ids": "022b",
+   "spawn_def": "0x83f098c",
+   "enemy_class": 86,
+   "gfx_id": 98,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 40,
+   "map_ids": "022c",
+   "spawn_def": "0x83f0bc4",
+   "enemy_class": 86,
+   "gfx_id": 98,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f0b40",
+   "drop_table_id": 10
+  },
+  {
+   "map_index": 40,
+   "map_ids": "022c",
+   "spawn_def": "0x83f0c70",
+   "enemy_class": 86,
+   "gfx_id": 98,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f0bec",
+   "drop_table_id": 11
+  },
+  {
+   "map_index": 40,
+   "map_ids": "022c",
+   "spawn_def": "0x83f0d1c",
+   "enemy_class": 86,
+   "gfx_id": 98,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f0c98",
+   "drop_table_id": 12
+  },
+  {
+   "map_index": 40,
+   "map_ids": "022c",
+   "spawn_def": "0x83f0dc8",
+   "enemy_class": 86,
+   "gfx_id": 98,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f0d44",
+   "drop_table_id": 13
+  },
+  {
+   "map_index": 40,
+   "map_ids": "022c",
+   "spawn_def": "0x83f0df8",
+   "enemy_class": 86,
+   "gfx_id": 98,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 41,
+   "map_ids": "022d",
+   "spawn_def": "0x83f0ff0",
+   "enemy_class": 40,
+   "gfx_id": 47,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 41,
+   "map_ids": "022d",
+   "spawn_def": "0x83f1020",
+   "enemy_class": 40,
+   "gfx_id": 47,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 41,
+   "map_ids": "022d",
+   "spawn_def": "0x83f1050",
+   "enemy_class": 40,
+   "gfx_id": 47,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 42,
+   "map_ids": "022e",
+   "spawn_def": "0x83f1090",
+   "enemy_class": 40,
+   "gfx_id": 47,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 42,
+   "map_ids": "022e",
+   "spawn_def": "0x83f10c0",
+   "enemy_class": 40,
+   "gfx_id": 47,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 42,
+   "map_ids": "022e",
+   "spawn_def": "0x83f10f0",
+   "enemy_class": 40,
+   "gfx_id": 47,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 43,
+   "map_ids": "022f",
+   "spawn_def": "0x83f1130",
+   "enemy_class": 33,
+   "gfx_id": 39,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 44,
+   "map_ids": "0230",
+   "spawn_def": "0x83f1168",
+   "enemy_class": 33,
+   "gfx_id": 39,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 45,
+   "map_ids": "0231",
+   "spawn_def": "0x83f11a0",
+   "enemy_class": 40,
+   "gfx_id": 47,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 45,
+   "map_ids": "0231",
+   "spawn_def": "0x83f11d0",
+   "enemy_class": 40,
+   "gfx_id": 47,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 46,
+   "map_ids": "0232",
+   "spawn_def": "0x83f1250",
+   "enemy_class": 44,
+   "gfx_id": 50,
+   "on_death_fn": "0x80106b3",
+   "death_script": null
+  },
+  {
+   "map_index": 49,
+   "map_ids": "0301",
+   "spawn_def": "0x83f1590",
+   "enemy_class": 65,
+   "gfx_id": 77,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f14e8",
+   "drop_table_id": 14
+  },
+  {
+   "map_index": 49,
+   "map_ids": "0301",
+   "spawn_def": "0x83f1680",
+   "enemy_class": 65,
+   "gfx_id": 77,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f15d8",
+   "drop_table_id": 14
+  },
+  {
+   "map_index": 49,
+   "map_ids": "0301",
+   "spawn_def": "0x83f1764",
+   "enemy_class": 65,
+   "gfx_id": 77,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f16bc",
+   "drop_table_id": 14
+  },
+  {
+   "map_index": 50,
+   "map_ids": "0302",
+   "spawn_def": "0x83f1858",
+   "enemy_class": 8,
+   "gfx_id": 17,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 50,
+   "map_ids": "0302",
+   "spawn_def": "0x83f18bc",
+   "enemy_class": 8,
+   "gfx_id": 17,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 50,
+   "map_ids": "0302",
+   "spawn_def": "0x83f1908",
+   "enemy_class": 8,
+   "gfx_id": 17,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 50,
+   "map_ids": "0302",
+   "spawn_def": "0x83f194c",
+   "enemy_class": 8,
+   "gfx_id": 17,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 51,
+   "map_ids": "0303",
+   "spawn_def": "0x83f19e8",
+   "enemy_class": 8,
+   "gfx_id": 17,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 51,
+   "map_ids": "0303",
+   "spawn_def": "0x83f1a34",
+   "enemy_class": 65,
+   "gfx_id": 77,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 51,
+   "map_ids": "0303",
+   "spawn_def": "0x83f1a90",
+   "enemy_class": 8,
+   "gfx_id": 17,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 51,
+   "map_ids": "0303",
+   "spawn_def": "0x83f1adc",
+   "enemy_class": 65,
+   "gfx_id": 77,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 55,
+   "map_ids": "0307",
+   "spawn_def": "0x83f1fb8",
+   "enemy_class": 8,
+   "gfx_id": 17,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 55,
+   "map_ids": "0307",
+   "spawn_def": "0x83f201c",
+   "enemy_class": 8,
+   "gfx_id": 17,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 55,
+   "map_ids": "0307",
+   "spawn_def": "0x83f2068",
+   "enemy_class": 8,
+   "gfx_id": 17,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 55,
+   "map_ids": "0307",
+   "spawn_def": "0x83f20ac",
+   "enemy_class": 8,
+   "gfx_id": 17,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 58,
+   "map_ids": "030a",
+   "spawn_def": "0x83f2620",
+   "enemy_class": 10,
+   "gfx_id": 19,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 59,
+   "map_ids": "030b",
+   "spawn_def": "0x83f2688",
+   "enemy_class": 86,
+   "gfx_id": 98,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 59,
+   "map_ids": "030b",
+   "spawn_def": "0x83f26b8",
+   "enemy_class": 86,
+   "gfx_id": 98,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 59,
+   "map_ids": "030b",
+   "spawn_def": "0x83f26e8",
+   "enemy_class": 86,
+   "gfx_id": 98,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 59,
+   "map_ids": "030b",
+   "spawn_def": "0x83f2718",
+   "enemy_class": 86,
+   "gfx_id": 98,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 59,
+   "map_ids": "030b",
+   "spawn_def": "0x83f2748",
+   "enemy_class": 51,
+   "gfx_id": 143,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 59,
+   "map_ids": "030b",
+   "spawn_def": "0x83f2778",
+   "enemy_class": 51,
+   "gfx_id": 143,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 59,
+   "map_ids": "030b",
+   "spawn_def": "0x83f27a8",
+   "enemy_class": 51,
+   "gfx_id": 143,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 60,
+   "map_ids": "030c",
+   "spawn_def": "0x83f28c4",
+   "enemy_class": 51,
+   "gfx_id": 143,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 60,
+   "map_ids": "030c",
+   "spawn_def": "0x83f28f4",
+   "enemy_class": 51,
+   "gfx_id": 143,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 62,
+   "map_ids": "030e",
+   "spawn_def": "0x83f29d8",
+   "enemy_class": 51,
+   "gfx_id": 143,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 62,
+   "map_ids": "030e",
+   "spawn_def": "0x83f2a08",
+   "enemy_class": 51,
+   "gfx_id": 143,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 62,
+   "map_ids": "030e",
+   "spawn_def": "0x83f2a38",
+   "enemy_class": 51,
+   "gfx_id": 143,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 98,
+   "map_ids": "0433",
+   "spawn_def": "0x83f4f84",
+   "enemy_class": 69,
+   "gfx_id": 90,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 98,
+   "map_ids": "0433",
+   "spawn_def": "0x83f4fe8",
+   "enemy_class": 69,
+   "gfx_id": 90,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 98,
+   "map_ids": "0433",
+   "spawn_def": "0x83f5034",
+   "enemy_class": 69,
+   "gfx_id": 90,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 98,
+   "map_ids": "0433",
+   "spawn_def": "0x83f5078",
+   "enemy_class": 69,
+   "gfx_id": 90,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 98,
+   "map_ids": "0433",
+   "spawn_def": "0x83f50bc",
+   "enemy_class": 69,
+   "gfx_id": 90,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 99,
+   "map_ids": "0434",
+   "spawn_def": "0x83f51d8",
+   "enemy_class": 69,
+   "gfx_id": 90,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 99,
+   "map_ids": "0434",
+   "spawn_def": "0x83f525c",
+   "enemy_class": 69,
+   "gfx_id": 90,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 99,
+   "map_ids": "0434",
+   "spawn_def": "0x83f52e0",
+   "enemy_class": 69,
+   "gfx_id": 90,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 100,
+   "map_ids": "0435",
+   "spawn_def": "0x83f5380",
+   "enemy_class": 69,
+   "gfx_id": 90,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 100,
+   "map_ids": "0435",
+   "spawn_def": "0x83f53b0",
+   "enemy_class": 69,
+   "gfx_id": 90,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 100,
+   "map_ids": "0435",
+   "spawn_def": "0x83f53e0",
+   "enemy_class": 69,
+   "gfx_id": 90,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 100,
+   "map_ids": "0435",
+   "spawn_def": "0x83f5410",
+   "enemy_class": 69,
+   "gfx_id": 90,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 100,
+   "map_ids": "0435",
+   "spawn_def": "0x83f5440",
+   "enemy_class": 69,
+   "gfx_id": 90,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 100,
+   "map_ids": "0435",
+   "spawn_def": "0x83f5470",
+   "enemy_class": 69,
+   "gfx_id": 90,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 100,
+   "map_ids": "0435",
+   "spawn_def": "0x83f54a0",
+   "enemy_class": 69,
+   "gfx_id": 90,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 101,
+   "map_ids": "0436",
+   "spawn_def": "0x83f55b0",
+   "enemy_class": 69,
+   "gfx_id": 90,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 101,
+   "map_ids": "0436",
+   "spawn_def": "0x83f5614",
+   "enemy_class": 69,
+   "gfx_id": 90,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 101,
+   "map_ids": "0436",
+   "spawn_def": "0x83f5650",
+   "enemy_class": 65,
+   "gfx_id": 77,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 101,
+   "map_ids": "0436",
+   "spawn_def": "0x83f5680",
+   "enemy_class": 65,
+   "gfx_id": 77,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 102,
+   "map_ids": "0437",
+   "spawn_def": "0x83f56f8",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 103,
+   "map_ids": "0438",
+   "spawn_def": "0x83f5a70",
+   "enemy_class": 94,
+   "gfx_id": 125,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 103,
+   "map_ids": "0438",
+   "spawn_def": "0x83f5b14",
+   "enemy_class": 94,
+   "gfx_id": 125,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 103,
+   "map_ids": "0438",
+   "spawn_def": "0x83f5bb8",
+   "enemy_class": 94,
+   "gfx_id": 125,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 103,
+   "map_ids": "0438",
+   "spawn_def": "0x83f5c5c",
+   "enemy_class": 94,
+   "gfx_id": 125,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 103,
+   "map_ids": "0438",
+   "spawn_def": "0x83f5cf4",
+   "enemy_class": 94,
+   "gfx_id": 125,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 103,
+   "map_ids": "0438",
+   "spawn_def": "0x83f5d94",
+   "enemy_class": 94,
+   "gfx_id": 125,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 103,
+   "map_ids": "0438",
+   "spawn_def": "0x83f5e38",
+   "enemy_class": 94,
+   "gfx_id": 125,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 104,
+   "map_ids": "0439",
+   "spawn_def": "0x83f5fb0",
+   "enemy_class": 94,
+   "gfx_id": 125,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 104,
+   "map_ids": "0439",
+   "spawn_def": "0x83f5ff4",
+   "enemy_class": 94,
+   "gfx_id": 125,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 104,
+   "map_ids": "0439",
+   "spawn_def": "0x83f6038",
+   "enemy_class": 94,
+   "gfx_id": 125,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 104,
+   "map_ids": "0439",
+   "spawn_def": "0x83f607c",
+   "enemy_class": 94,
+   "gfx_id": 125,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 104,
+   "map_ids": "0439",
+   "spawn_def": "0x83f60c0",
+   "enemy_class": 94,
+   "gfx_id": 125,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 104,
+   "map_ids": "0439",
+   "spawn_def": "0x83f6104",
+   "enemy_class": 94,
+   "gfx_id": 125,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 104,
+   "map_ids": "0439",
+   "spawn_def": "0x83f6160",
+   "enemy_class": 94,
+   "gfx_id": 125,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 104,
+   "map_ids": "0439",
+   "spawn_def": "0x83f61c4",
+   "enemy_class": 94,
+   "gfx_id": 125,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 104,
+   "map_ids": "0439",
+   "spawn_def": "0x83f6228",
+   "enemy_class": 94,
+   "gfx_id": 125,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 104,
+   "map_ids": "0439",
+   "spawn_def": "0x83f628c",
+   "enemy_class": 94,
+   "gfx_id": 125,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 104,
+   "map_ids": "0439",
+   "spawn_def": "0x83f62f0",
+   "enemy_class": 94,
+   "gfx_id": 125,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 104,
+   "map_ids": "0439",
+   "spawn_def": "0x83f6354",
+   "enemy_class": 94,
+   "gfx_id": 125,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 105,
+   "map_ids": "043a",
+   "spawn_def": "0x83f63d0",
+   "enemy_class": 101,
+   "gfx_id": 127,
+   "on_death_fn": "0x80106b3",
+   "death_script": null
+  },
+  {
+   "map_index": 106,
+   "map_ids": "043b",
+   "spawn_def": "0x83f6490",
+   "enemy_class": 94,
+   "gfx_id": 125,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 106,
+   "map_ids": "043b",
+   "spawn_def": "0x83f64d4",
+   "enemy_class": 94,
+   "gfx_id": 125,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 106,
+   "map_ids": "043b",
+   "spawn_def": "0x83f6518",
+   "enemy_class": 94,
+   "gfx_id": 125,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 106,
+   "map_ids": "043b",
+   "spawn_def": "0x83f655c",
+   "enemy_class": 94,
+   "gfx_id": 125,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 106,
+   "map_ids": "043b",
+   "spawn_def": "0x83f65a0",
+   "enemy_class": 94,
+   "gfx_id": 125,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 106,
+   "map_ids": "043b",
+   "spawn_def": "0x83f65e4",
+   "enemy_class": 94,
+   "gfx_id": 125,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 106,
+   "map_ids": "043b",
+   "spawn_def": "0x83f6640",
+   "enemy_class": 94,
+   "gfx_id": 125,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 106,
+   "map_ids": "043b",
+   "spawn_def": "0x83f66a4",
+   "enemy_class": 94,
+   "gfx_id": 125,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 106,
+   "map_ids": "043b",
+   "spawn_def": "0x83f6708",
+   "enemy_class": 94,
+   "gfx_id": 125,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 106,
+   "map_ids": "043b",
+   "spawn_def": "0x83f6754",
+   "enemy_class": 94,
+   "gfx_id": 125,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 106,
+   "map_ids": "043b",
+   "spawn_def": "0x83f6798",
+   "enemy_class": 94,
+   "gfx_id": 125,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 106,
+   "map_ids": "043b",
+   "spawn_def": "0x83f67dc",
+   "enemy_class": 94,
+   "gfx_id": 125,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 106,
+   "map_ids": "043b",
+   "spawn_def": "0x83f6838",
+   "enemy_class": 94,
+   "gfx_id": 125,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 106,
+   "map_ids": "043b",
+   "spawn_def": "0x83f689c",
+   "enemy_class": 94,
+   "gfx_id": 125,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 106,
+   "map_ids": "043b",
+   "spawn_def": "0x83f6900",
+   "enemy_class": 94,
+   "gfx_id": 125,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 107,
+   "map_ids": "043c",
+   "spawn_def": "0x83f697c",
+   "enemy_class": 39,
+   "gfx_id": 46,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 107,
+   "map_ids": "043c",
+   "spawn_def": "0x83f69ac",
+   "enemy_class": 39,
+   "gfx_id": 46,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 107,
+   "map_ids": "043c",
+   "spawn_def": "0x83f69dc",
+   "enemy_class": 39,
+   "gfx_id": 46,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 109,
+   "map_ids": "043e",
+   "spawn_def": "0x83f6a68",
+   "enemy_class": 32,
+   "gfx_id": 38,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f6a38",
+   "drop_table_id": 14
+  },
+  {
+   "map_index": 110,
+   "map_ids": "043f",
+   "spawn_def": "0x83f6aa0",
+   "enemy_class": 39,
+   "gfx_id": 46,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 110,
+   "map_ids": "043f",
+   "spawn_def": "0x83f6ad0",
+   "enemy_class": 39,
+   "gfx_id": 46,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 110,
+   "map_ids": "043f",
+   "spawn_def": "0x83f6b00",
+   "enemy_class": 39,
+   "gfx_id": 46,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 112,
+   "map_ids": "0447",
+   "spawn_def": "0x83f6c30",
+   "enemy_class": 65,
+   "gfx_id": 77,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 112,
+   "map_ids": "0447",
+   "spawn_def": "0x83f6ce4",
+   "enemy_class": 85,
+   "gfx_id": 141,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 112,
+   "map_ids": "0447",
+   "spawn_def": "0x83f6dd0",
+   "enemy_class": 85,
+   "gfx_id": 141,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 112,
+   "map_ids": "0447",
+   "spawn_def": "0x83f6ec4",
+   "enemy_class": 85,
+   "gfx_id": 141,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 112,
+   "map_ids": "0447",
+   "spawn_def": "0x83f6f78",
+   "enemy_class": 85,
+   "gfx_id": 141,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 112,
+   "map_ids": "0447",
+   "spawn_def": "0x83f7010",
+   "enemy_class": 85,
+   "gfx_id": 141,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 112,
+   "map_ids": "0447",
+   "spawn_def": "0x83f7070",
+   "enemy_class": 65,
+   "gfx_id": 77,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 113,
+   "map_ids": "0448",
+   "spawn_def": "0x83f7164",
+   "enemy_class": 85,
+   "gfx_id": 141,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 113,
+   "map_ids": "0448",
+   "spawn_def": "0x83f71d8",
+   "enemy_class": 85,
+   "gfx_id": 141,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 113,
+   "map_ids": "0448",
+   "spawn_def": "0x83f7284",
+   "enemy_class": 85,
+   "gfx_id": 141,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 113,
+   "map_ids": "0448",
+   "spawn_def": "0x83f7310",
+   "enemy_class": 85,
+   "gfx_id": 141,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 113,
+   "map_ids": "0448",
+   "spawn_def": "0x83f7384",
+   "enemy_class": 85,
+   "gfx_id": 141,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 113,
+   "map_ids": "0448",
+   "spawn_def": "0x83f73f8",
+   "enemy_class": 85,
+   "gfx_id": 141,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 113,
+   "map_ids": "0448",
+   "spawn_def": "0x83f744c",
+   "enemy_class": 65,
+   "gfx_id": 77,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 113,
+   "map_ids": "0448",
+   "spawn_def": "0x83f7490",
+   "enemy_class": 65,
+   "gfx_id": 77,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 113,
+   "map_ids": "0448",
+   "spawn_def": "0x83f74ec",
+   "enemy_class": 65,
+   "gfx_id": 77,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 113,
+   "map_ids": "0448",
+   "spawn_def": "0x83f7544",
+   "enemy_class": 8,
+   "gfx_id": 17,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 113,
+   "map_ids": "0448",
+   "spawn_def": "0x83f75a4",
+   "enemy_class": 8,
+   "gfx_id": 17,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 114,
+   "map_ids": "0449",
+   "spawn_def": "0x83f76c0",
+   "enemy_class": 85,
+   "gfx_id": 141,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 114,
+   "map_ids": "0449",
+   "spawn_def": "0x83f775c",
+   "enemy_class": 85,
+   "gfx_id": 141,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 114,
+   "map_ids": "0449",
+   "spawn_def": "0x83f77f8",
+   "enemy_class": 85,
+   "gfx_id": 141,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 115,
+   "map_ids": "044a",
+   "spawn_def": "0x83f78b4",
+   "enemy_class": 85,
+   "gfx_id": 141,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 115,
+   "map_ids": "044a",
+   "spawn_def": "0x83f7948",
+   "enemy_class": 85,
+   "gfx_id": 141,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 116,
+   "map_ids": "044b",
+   "spawn_def": "0x83f79b0",
+   "enemy_class": 85,
+   "gfx_id": 141,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 116,
+   "map_ids": "044b",
+   "spawn_def": "0x83f79f4",
+   "enemy_class": 85,
+   "gfx_id": 141,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 116,
+   "map_ids": "044b",
+   "spawn_def": "0x83f7a38",
+   "enemy_class": 85,
+   "gfx_id": 141,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 116,
+   "map_ids": "044b",
+   "spawn_def": "0x83f7a7c",
+   "enemy_class": 85,
+   "gfx_id": 141,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 116,
+   "map_ids": "044b",
+   "spawn_def": "0x83f7ac0",
+   "enemy_class": 85,
+   "gfx_id": 141,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 116,
+   "map_ids": "044b",
+   "spawn_def": "0x83f7b04",
+   "enemy_class": 85,
+   "gfx_id": 141,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 117,
+   "map_ids": "044c",
+   "spawn_def": "0x83f7c24",
+   "enemy_class": 85,
+   "gfx_id": 141,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f7b88",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 117,
+   "map_ids": "044c",
+   "spawn_def": "0x83f7c68",
+   "enemy_class": 85,
+   "gfx_id": 141,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f7b88",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 117,
+   "map_ids": "044c",
+   "spawn_def": "0x83f7cac",
+   "enemy_class": 85,
+   "gfx_id": 141,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f7b88",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 117,
+   "map_ids": "044c",
+   "spawn_def": "0x83f7ce0",
+   "enemy_class": 85,
+   "gfx_id": 141,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f7b88",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 117,
+   "map_ids": "044c",
+   "spawn_def": "0x83f7db4",
+   "enemy_class": 85,
+   "gfx_id": 141,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f7d18",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 117,
+   "map_ids": "044c",
+   "spawn_def": "0x83f7df8",
+   "enemy_class": 85,
+   "gfx_id": 141,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f7b88",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 117,
+   "map_ids": "044c",
+   "spawn_def": "0x83f7e3c",
+   "enemy_class": 85,
+   "gfx_id": 141,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f7b88",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 117,
+   "map_ids": "044c",
+   "spawn_def": "0x83f7e8c",
+   "enemy_class": 65,
+   "gfx_id": 77,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f7b88",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 117,
+   "map_ids": "044c",
+   "spawn_def": "0x83f7ec4",
+   "enemy_class": 8,
+   "gfx_id": 17,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f7b88",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 117,
+   "map_ids": "044c",
+   "spawn_def": "0x83f7ef4",
+   "enemy_class": 8,
+   "gfx_id": 17,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f7b88",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 117,
+   "map_ids": "044c",
+   "spawn_def": "0x83f7f24",
+   "enemy_class": 8,
+   "gfx_id": 17,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f7b88",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 119,
+   "map_ids": "044e",
+   "spawn_def": "0x83f8260",
+   "enemy_class": 36,
+   "gfx_id": 42,
+   "on_death_fn": "0x8010699",
+   "death_script": null
+  },
+  {
+   "map_index": 123,
+   "map_ids": "0452",
+   "spawn_def": "0x83f8394",
+   "enemy_class": 65,
+   "gfx_id": 77,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 123,
+   "map_ids": "0452",
+   "spawn_def": "0x83f83e8",
+   "enemy_class": 65,
+   "gfx_id": 77,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 124,
+   "map_ids": "0453",
+   "spawn_def": "0x83f843c",
+   "enemy_class": 8,
+   "gfx_id": 17,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 124,
+   "map_ids": "0453",
+   "spawn_def": "0x83f8480",
+   "enemy_class": 8,
+   "gfx_id": 17,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 127,
+   "map_ids": "0456",
+   "spawn_def": "0x83f8558",
+   "enemy_class": 53,
+   "gfx_id": 118,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 127,
+   "map_ids": "0456",
+   "spawn_def": "0x83f859c",
+   "enemy_class": 53,
+   "gfx_id": 118,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 127,
+   "map_ids": "0456",
+   "spawn_def": "0x83f85e0",
+   "enemy_class": 53,
+   "gfx_id": 118,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 129,
+   "map_ids": "0458",
+   "spawn_def": "0x83f8680",
+   "enemy_class": 53,
+   "gfx_id": 118,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 129,
+   "map_ids": "0458",
+   "spawn_def": "0x83f86c4",
+   "enemy_class": 53,
+   "gfx_id": 118,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 129,
+   "map_ids": "0458",
+   "spawn_def": "0x83f8708",
+   "enemy_class": 53,
+   "gfx_id": 118,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 129,
+   "map_ids": "0458",
+   "spawn_def": "0x83f874c",
+   "enemy_class": 53,
+   "gfx_id": 118,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 129,
+   "map_ids": "0458",
+   "spawn_def": "0x83f8790",
+   "enemy_class": 53,
+   "gfx_id": 118,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 129,
+   "map_ids": "0458",
+   "spawn_def": "0x83f87ec",
+   "enemy_class": 17,
+   "gfx_id": 146,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 129,
+   "map_ids": "0458",
+   "spawn_def": "0x83f8850",
+   "enemy_class": 17,
+   "gfx_id": 146,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 132,
+   "map_ids": "045b",
+   "spawn_def": "0x83f89e4",
+   "enemy_class": 17,
+   "gfx_id": 146,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 132,
+   "map_ids": "045b",
+   "spawn_def": "0x83f8a28",
+   "enemy_class": 17,
+   "gfx_id": 146,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 133,
+   "map_ids": "045c",
+   "spawn_def": "0x83f8aec",
+   "enemy_class": 17,
+   "gfx_id": 146,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 133,
+   "map_ids": "045c",
+   "spawn_def": "0x83f8b50",
+   "enemy_class": 17,
+   "gfx_id": 146,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 134,
+   "map_ids": "045d",
+   "spawn_def": "0x83f8bd4",
+   "enemy_class": 17,
+   "gfx_id": 146,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 134,
+   "map_ids": "045d",
+   "spawn_def": "0x83f8c20",
+   "enemy_class": 53,
+   "gfx_id": 118,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 134,
+   "map_ids": "045d",
+   "spawn_def": "0x83f8c70",
+   "enemy_class": 17,
+   "gfx_id": 146,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 134,
+   "map_ids": "045d",
+   "spawn_def": "0x83f8cb8",
+   "enemy_class": 53,
+   "gfx_id": 118,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 135,
+   "map_ids": "045e",
+   "spawn_def": "0x83f8dc8",
+   "enemy_class": 65,
+   "gfx_id": 77,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 135,
+   "map_ids": "045e",
+   "spawn_def": "0x83f8e1c",
+   "enemy_class": 65,
+   "gfx_id": 77,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 136,
+   "map_ids": "045f",
+   "spawn_def": "0x83f8e74",
+   "enemy_class": 8,
+   "gfx_id": 17,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 136,
+   "map_ids": "045f",
+   "spawn_def": "0x83f8eb8",
+   "enemy_class": 8,
+   "gfx_id": 17,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 137,
+   "map_ids": "0460",
+   "spawn_def": "0x83f8f34",
+   "enemy_class": 17,
+   "gfx_id": 146,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 137,
+   "map_ids": "0460",
+   "spawn_def": "0x83f8f98",
+   "enemy_class": 17,
+   "gfx_id": 146,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 137,
+   "map_ids": "0460",
+   "spawn_def": "0x83f8ffc",
+   "enemy_class": 17,
+   "gfx_id": 146,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 137,
+   "map_ids": "0460",
+   "spawn_def": "0x83f9060",
+   "enemy_class": 17,
+   "gfx_id": 146,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 138,
+   "map_ids": "0461",
+   "spawn_def": "0x83f9144",
+   "enemy_class": 17,
+   "gfx_id": 146,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 138,
+   "map_ids": "0461",
+   "spawn_def": "0x83f91c8",
+   "enemy_class": 17,
+   "gfx_id": 146,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 138,
+   "map_ids": "0461",
+   "spawn_def": "0x83f924c",
+   "enemy_class": 17,
+   "gfx_id": 146,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 139,
+   "map_ids": "0462",
+   "spawn_def": "0x83f9314",
+   "enemy_class": 17,
+   "gfx_id": 146,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 155,
+   "map_ids": "060b",
+   "spawn_def": "0x83fa71c",
+   "enemy_class": 74,
+   "gfx_id": 146,
+   "on_death_fn": "0x80106b3",
+   "death_script": null
+  },
+  {
+   "map_index": 172,
+   "map_ids": "063d",
+   "spawn_def": "0x83fb574",
+   "enemy_class": 29,
+   "gfx_id": 34,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83fb3c8",
+   "drop_table_id": 14
+  },
+  {
+   "map_index": 175,
+   "map_ids": "0646",
+   "spawn_def": "0x83fb724",
+   "enemy_class": 106,
+   "gfx_id": 156,
+   "on_death_fn": "0x80106b3",
+   "death_script": null
+  },
+  {
+   "map_index": 175,
+   "map_ids": "0646",
+   "spawn_def": "0x83fb754",
+   "enemy_class": 64,
+   "gfx_id": 76,
+   "on_death_fn": "0x80106b3",
+   "death_script": null
+  },
+  {
+   "map_index": 175,
+   "map_ids": "0646",
+   "spawn_def": "0x83fb784",
+   "enemy_class": 98,
+   "gfx_id": 121,
+   "on_death_fn": "0x80106b3",
+   "death_script": null
+  },
+  {
+   "map_index": 177,
+   "map_ids": "0701",
+   "spawn_def": "0x83fbf00",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 177,
+   "map_ids": "0701",
+   "spawn_def": "0x83fbf44",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 177,
+   "map_ids": "0701",
+   "spawn_def": "0x83fbf88",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 177,
+   "map_ids": "0701",
+   "spawn_def": "0x83fbfcc",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 177,
+   "map_ids": "0701",
+   "spawn_def": "0x83fc010",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 178,
+   "map_ids": "0702",
+   "spawn_def": "0x83fc0c8",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 179,
+   "map_ids": "0703",
+   "spawn_def": "0x83fc180",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 179,
+   "map_ids": "0703",
+   "spawn_def": "0x83fc224",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 180,
+   "map_ids": "0704",
+   "spawn_def": "0x83fc2cc",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 180,
+   "map_ids": "0704",
+   "spawn_def": "0x83fc310",
+   "enemy_class": 66,
+   "gfx_id": 78,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 180,
+   "map_ids": "0704",
+   "spawn_def": "0x83fc354",
+   "enemy_class": 66,
+   "gfx_id": 78,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 181,
+   "map_ids": "0705",
+   "spawn_def": "0x83fc3a8",
+   "enemy_class": 66,
+   "gfx_id": 78,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 181,
+   "map_ids": "0705",
+   "spawn_def": "0x83fc3ec",
+   "enemy_class": 66,
+   "gfx_id": 78,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 182,
+   "map_ids": "0706",
+   "spawn_def": "0x83fc494",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 182,
+   "map_ids": "0706",
+   "spawn_def": "0x83fc558",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 183,
+   "map_ids": "0707",
+   "spawn_def": "0x83fc624",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 184,
+   "map_ids": "0708",
+   "spawn_def": "0x83fc738",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 186,
+   "map_ids": "070a",
+   "spawn_def": "0x83fc940",
+   "enemy_class": 65,
+   "gfx_id": 77,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83fc884",
+   "drop_table_id": 14
+  },
+  {
+   "map_index": 186,
+   "map_ids": "070a",
+   "spawn_def": "0x83fca24",
+   "enemy_class": 65,
+   "gfx_id": 77,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83fc968",
+   "drop_table_id": 14
+  },
+  {
+   "map_index": 186,
+   "map_ids": "070a",
+   "spawn_def": "0x83fcb08",
+   "enemy_class": 65,
+   "gfx_id": 77,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83fca4c",
+   "drop_table_id": 14
+  },
+  {
+   "map_index": 186,
+   "map_ids": "070a",
+   "spawn_def": "0x83fcbec",
+   "enemy_class": 65,
+   "gfx_id": 77,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83fcb30",
+   "drop_table_id": 14
+  },
+  {
+   "map_index": 186,
+   "map_ids": "070a",
+   "spawn_def": "0x83fccd0",
+   "enemy_class": 65,
+   "gfx_id": 77,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83fcc14",
+   "drop_table_id": 14
+  },
+  {
+   "map_index": 186,
+   "map_ids": "070a",
+   "spawn_def": "0x83fcdb4",
+   "enemy_class": 65,
+   "gfx_id": 77,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83fccf8",
+   "drop_table_id": 14
+  },
+  {
+   "map_index": 186,
+   "map_ids": "070a",
+   "spawn_def": "0x83fce98",
+   "enemy_class": 65,
+   "gfx_id": 77,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83fcddc",
+   "drop_table_id": 14
+  },
+  {
+   "map_index": 187,
+   "map_ids": "070b",
+   "spawn_def": "0x83fcf40",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 187,
+   "map_ids": "070b",
+   "spawn_def": "0x83fcfd4",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 187,
+   "map_ids": "070b",
+   "spawn_def": "0x83fd074",
+   "enemy_class": 66,
+   "gfx_id": 78,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 188,
+   "map_ids": "070c",
+   "spawn_def": "0x83fd104",
+   "enemy_class": 85,
+   "gfx_id": 141,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 188,
+   "map_ids": "070c",
+   "spawn_def": "0x83fd148",
+   "enemy_class": 85,
+   "gfx_id": 141,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 189,
+   "map_ids": "070d",
+   "spawn_def": "0x83fd220",
+   "enemy_class": 85,
+   "gfx_id": 141,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 190,
+   "map_ids": "070e",
+   "spawn_def": "0x83fd2a8",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 190,
+   "map_ids": "070e",
+   "spawn_def": "0x83fd304",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 191,
+   "map_ids": "070f",
+   "spawn_def": "0x83fd3bc",
+   "enemy_class": 5,
+   "gfx_id": 12,
+   "on_death_fn": "0x80106b3",
+   "death_script": null
+  },
+  {
+   "map_index": 195,
+   "map_ids": "0713",
+   "spawn_def": "0x83fd7a8",
+   "enemy_class": 6,
+   "gfx_id": 14,
+   "on_death_fn": "0x80106b3",
+   "death_script": null
+  },
+  {
+   "map_index": 196,
+   "map_ids": "0714",
+   "spawn_def": "0x83fd8bc",
+   "enemy_class": 103,
+   "gfx_id": 114,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 196,
+   "map_ids": "0714",
+   "spawn_def": "0x83fd908",
+   "enemy_class": 103,
+   "gfx_id": 114,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 196,
+   "map_ids": "0714",
+   "spawn_def": "0x83fd964",
+   "enemy_class": 103,
+   "gfx_id": 114,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 196,
+   "map_ids": "0714",
+   "spawn_def": "0x83fd9c8",
+   "enemy_class": 90,
+   "gfx_id": 113,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 197,
+   "map_ids": "0715",
+   "spawn_def": "0x83fda64",
+   "enemy_class": 103,
+   "gfx_id": 114,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 197,
+   "map_ids": "0715",
+   "spawn_def": "0x83fdaac",
+   "enemy_class": 103,
+   "gfx_id": 114,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 198,
+   "map_ids": "0716",
+   "spawn_def": "0x83fdb14",
+   "enemy_class": 83,
+   "gfx_id": 115,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 198,
+   "map_ids": "0716",
+   "spawn_def": "0x83fdb78",
+   "enemy_class": 83,
+   "gfx_id": 115,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 198,
+   "map_ids": "0716",
+   "spawn_def": "0x83fdbf4",
+   "enemy_class": 83,
+   "gfx_id": 115,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 199,
+   "map_ids": "0717",
+   "spawn_def": "0x83fdc80",
+   "enemy_class": 103,
+   "gfx_id": 114,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 199,
+   "map_ids": "0717",
+   "spawn_def": "0x83fdcc4",
+   "enemy_class": 103,
+   "gfx_id": 114,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 199,
+   "map_ids": "0717",
+   "spawn_def": "0x83fdd08",
+   "enemy_class": 103,
+   "gfx_id": 114,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 200,
+   "map_ids": "0718",
+   "spawn_def": "0x83fdd5c",
+   "enemy_class": 90,
+   "gfx_id": 113,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 200,
+   "map_ids": "0718",
+   "spawn_def": "0x83fddac",
+   "enemy_class": 83,
+   "gfx_id": 115,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 200,
+   "map_ids": "0718",
+   "spawn_def": "0x83fde0c",
+   "enemy_class": 83,
+   "gfx_id": 115,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 200,
+   "map_ids": "0718",
+   "spawn_def": "0x83fde58",
+   "enemy_class": 83,
+   "gfx_id": 115,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 200,
+   "map_ids": "0718",
+   "spawn_def": "0x83fdeb4",
+   "enemy_class": 83,
+   "gfx_id": 115,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 201,
+   "map_ids": "0719",
+   "spawn_def": "0x83fdf24",
+   "enemy_class": 83,
+   "gfx_id": 115,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 201,
+   "map_ids": "0719",
+   "spawn_def": "0x83fdf6c",
+   "enemy_class": 90,
+   "gfx_id": 113,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 201,
+   "map_ids": "0719",
+   "spawn_def": "0x83fdfbc",
+   "enemy_class": 103,
+   "gfx_id": 114,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 201,
+   "map_ids": "0719",
+   "spawn_def": "0x83fe004",
+   "enemy_class": 103,
+   "gfx_id": 114,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 202,
+   "map_ids": "071a",
+   "spawn_def": "0x83fe0ac",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 202,
+   "map_ids": "071a",
+   "spawn_def": "0x83fe0f4",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 202,
+   "map_ids": "071a",
+   "spawn_def": "0x83fe138",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 202,
+   "map_ids": "071a",
+   "spawn_def": "0x83fe1dc",
+   "enemy_class": 90,
+   "gfx_id": 113,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 202,
+   "map_ids": "071a",
+   "spawn_def": "0x83fe2a0",
+   "enemy_class": 90,
+   "gfx_id": 113,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 202,
+   "map_ids": "071a",
+   "spawn_def": "0x83fe34c",
+   "enemy_class": 90,
+   "gfx_id": 113,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 202,
+   "map_ids": "071a",
+   "spawn_def": "0x83fe3a8",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 202,
+   "map_ids": "071a",
+   "spawn_def": "0x83fe3ec",
+   "enemy_class": 99,
+   "gfx_id": 122,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 204,
+   "map_ids": "0802",
+   "spawn_def": "0x83fe594",
+   "enemy_class": 102,
+   "gfx_id": 144,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83fe538",
+   "drop_table_id": 16
+  },
+  {
+   "map_index": 204,
+   "map_ids": "0802",
+   "spawn_def": "0x83fe5c4",
+   "enemy_class": 102,
+   "gfx_id": 144,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83fe538",
+   "drop_table_id": 16
+  },
+  {
+   "map_index": 204,
+   "map_ids": "0802",
+   "spawn_def": "0x83fe5f4",
+   "enemy_class": 102,
+   "gfx_id": 144,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83fe538",
+   "drop_table_id": 16
+  },
+  {
+   "map_index": 204,
+   "map_ids": "0802",
+   "spawn_def": "0x83fe624",
+   "enemy_class": 102,
+   "gfx_id": 144,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83fe538",
+   "drop_table_id": 16
+  },
+  {
+   "map_index": 204,
+   "map_ids": "0802",
+   "spawn_def": "0x83fe654",
+   "enemy_class": 102,
+   "gfx_id": 144,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83fe538",
+   "drop_table_id": 16
+  },
+  {
+   "map_index": 204,
+   "map_ids": "0802",
+   "spawn_def": "0x83fe684",
+   "enemy_class": 102,
+   "gfx_id": 144,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83fe538",
+   "drop_table_id": 16
+  },
+  {
+   "map_index": 204,
+   "map_ids": "0802",
+   "spawn_def": "0x83fe6b4",
+   "enemy_class": 102,
+   "gfx_id": 144,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 205,
+   "map_ids": "0803",
+   "spawn_def": "0x83fe764",
+   "enemy_class": 102,
+   "gfx_id": 144,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 205,
+   "map_ids": "0803",
+   "spawn_def": "0x83fe7b8",
+   "enemy_class": 102,
+   "gfx_id": 144,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 205,
+   "map_ids": "0803",
+   "spawn_def": "0x83fe80c",
+   "enemy_class": 102,
+   "gfx_id": 144,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 205,
+   "map_ids": "0803",
+   "spawn_def": "0x83fe854",
+   "enemy_class": 102,
+   "gfx_id": 144,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 206,
+   "map_ids": "0804",
+   "spawn_def": "0x83fe93c",
+   "enemy_class": 57,
+   "gfx_id": 148,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 206,
+   "map_ids": "0804",
+   "spawn_def": "0x83fe980",
+   "enemy_class": 57,
+   "gfx_id": 148,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 206,
+   "map_ids": "0804",
+   "spawn_def": "0x83fe9c4",
+   "enemy_class": 57,
+   "gfx_id": 148,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 207,
+   "map_ids": "0805",
+   "spawn_def": "0x83fea24",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 207,
+   "map_ids": "0805",
+   "spawn_def": "0x83fea78",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 207,
+   "map_ids": "0805",
+   "spawn_def": "0x83feacc",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 208,
+   "map_ids": "0806",
+   "spawn_def": "0x83feb6c",
+   "enemy_class": 57,
+   "gfx_id": 148,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83feb28",
+   "drop_table_id": 17
+  },
+  {
+   "map_index": 208,
+   "map_ids": "0806",
+   "spawn_def": "0x83febc0",
+   "enemy_class": 57,
+   "gfx_id": 148,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83feb28",
+   "drop_table_id": 17
+  },
+  {
+   "map_index": 208,
+   "map_ids": "0806",
+   "spawn_def": "0x83fec14",
+   "enemy_class": 57,
+   "gfx_id": 148,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83feb28",
+   "drop_table_id": 17
+  },
+  {
+   "map_index": 208,
+   "map_ids": "0806",
+   "spawn_def": "0x83fec5c",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83feb28",
+   "drop_table_id": 17
+  },
+  {
+   "map_index": 208,
+   "map_ids": "0806",
+   "spawn_def": "0x83feca0",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83feb28",
+   "drop_table_id": 17
+  },
+  {
+   "map_index": 208,
+   "map_ids": "0806",
+   "spawn_def": "0x83fece4",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83feb28",
+   "drop_table_id": 17
+  },
+  {
+   "map_index": 209,
+   "map_ids": "0807",
+   "spawn_def": "0x83fedc8",
+   "enemy_class": 83,
+   "gfx_id": 115,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 209,
+   "map_ids": "0807",
+   "spawn_def": "0x83fee20",
+   "enemy_class": 83,
+   "gfx_id": 115,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 209,
+   "map_ids": "0807",
+   "spawn_def": "0x83fee80",
+   "enemy_class": 83,
+   "gfx_id": 115,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 209,
+   "map_ids": "0807",
+   "spawn_def": "0x83feecc",
+   "enemy_class": 102,
+   "gfx_id": 144,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 209,
+   "map_ids": "0807",
+   "spawn_def": "0x83fef10",
+   "enemy_class": 102,
+   "gfx_id": 144,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 209,
+   "map_ids": "0807",
+   "spawn_def": "0x83fef54",
+   "enemy_class": 102,
+   "gfx_id": 144,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 209,
+   "map_ids": "0807",
+   "spawn_def": "0x83fef98",
+   "enemy_class": 102,
+   "gfx_id": 144,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 209,
+   "map_ids": "0807",
+   "spawn_def": "0x83feff4",
+   "enemy_class": 14,
+   "gfx_id": 116,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 209,
+   "map_ids": "0807",
+   "spawn_def": "0x83ff04c",
+   "enemy_class": 14,
+   "gfx_id": 116,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 209,
+   "map_ids": "0807",
+   "spawn_def": "0x83ff0ac",
+   "enemy_class": 14,
+   "gfx_id": 116,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 210,
+   "map_ids": "0808",
+   "spawn_def": "0x83ff16c",
+   "enemy_class": 58,
+   "gfx_id": 63,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 210,
+   "map_ids": "0808",
+   "spawn_def": "0x83ff210",
+   "enemy_class": 58,
+   "gfx_id": 63,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 210,
+   "map_ids": "0808",
+   "spawn_def": "0x83ff2b4",
+   "enemy_class": 58,
+   "gfx_id": 63,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 211,
+   "map_ids": "0809",
+   "spawn_def": "0x83ff344",
+   "enemy_class": 102,
+   "gfx_id": 144,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 211,
+   "map_ids": "0809",
+   "spawn_def": "0x83ff388",
+   "enemy_class": 102,
+   "gfx_id": 144,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 211,
+   "map_ids": "0809",
+   "spawn_def": "0x83ff3d8",
+   "enemy_class": 102,
+   "gfx_id": 144,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 211,
+   "map_ids": "0809",
+   "spawn_def": "0x83ff42c",
+   "enemy_class": 102,
+   "gfx_id": 144,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 211,
+   "map_ids": "0809",
+   "spawn_def": "0x83ff480",
+   "enemy_class": 102,
+   "gfx_id": 144,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 212,
+   "map_ids": "080a",
+   "spawn_def": "0x83ff5c8",
+   "enemy_class": 31,
+   "gfx_id": 37,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 214,
+   "map_ids": "080c",
+   "spawn_def": "0x83ff77c",
+   "enemy_class": 58,
+   "gfx_id": 63,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 214,
+   "map_ids": "080c",
+   "spawn_def": "0x83ff800",
+   "enemy_class": 58,
+   "gfx_id": 63,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 214,
+   "map_ids": "080c",
+   "spawn_def": "0x83ff89c",
+   "enemy_class": 58,
+   "gfx_id": 63,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 215,
+   "map_ids": "080d",
+   "spawn_def": "0x83ff970",
+   "enemy_class": 7,
+   "gfx_id": 14,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ff938",
+   "drop_table_id": 14
+  },
+  {
+   "map_index": 215,
+   "map_ids": "080d",
+   "spawn_def": "0x83ff9d4",
+   "enemy_class": 83,
+   "gfx_id": 115,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 215,
+   "map_ids": "080d",
+   "spawn_def": "0x83ffa48",
+   "enemy_class": 83,
+   "gfx_id": 115,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 215,
+   "map_ids": "080d",
+   "spawn_def": "0x83ffabc",
+   "enemy_class": 83,
+   "gfx_id": 115,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 215,
+   "map_ids": "080d",
+   "spawn_def": "0x83ffb74",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ffaf4",
+   "drop_table_id": 18
+  },
+  {
+   "map_index": 215,
+   "map_ids": "080d",
+   "spawn_def": "0x83ffba4",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ffaf4",
+   "drop_table_id": 18
+  },
+  {
+   "map_index": 215,
+   "map_ids": "080d",
+   "spawn_def": "0x83ffbd4",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ffaf4",
+   "drop_table_id": 18
+  },
+  {
+   "map_index": 215,
+   "map_ids": "080d",
+   "spawn_def": "0x83ffc04",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ffaf4",
+   "drop_table_id": 18
+  },
+  {
+   "map_index": 215,
+   "map_ids": "080d",
+   "spawn_def": "0x83ffc34",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ffaf4",
+   "drop_table_id": 18
+  },
+  {
+   "map_index": 215,
+   "map_ids": "080d",
+   "spawn_def": "0x83ffc64",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ffaf4",
+   "drop_table_id": 18
+  },
+  {
+   "map_index": 215,
+   "map_ids": "080d",
+   "spawn_def": "0x83ffc94",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ffaf4",
+   "drop_table_id": 18
+  },
+  {
+   "map_index": 217,
+   "map_ids": "080f",
+   "spawn_def": "0x83ffe28",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 217,
+   "map_ids": "080f",
+   "spawn_def": "0x83ffe58",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 217,
+   "map_ids": "080f",
+   "spawn_def": "0x83ffe88",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 217,
+   "map_ids": "080f",
+   "spawn_def": "0x83ffec8",
+   "enemy_class": 54,
+   "gfx_id": 125,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 217,
+   "map_ids": "080f",
+   "spawn_def": "0x83fff0c",
+   "enemy_class": 54,
+   "gfx_id": 125,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 217,
+   "map_ids": "080f",
+   "spawn_def": "0x83fff50",
+   "enemy_class": 54,
+   "gfx_id": 125,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 217,
+   "map_ids": "080f",
+   "spawn_def": "0x83fff94",
+   "enemy_class": 54,
+   "gfx_id": 125,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 217,
+   "map_ids": "080f",
+   "spawn_def": "0x83fffd8",
+   "enemy_class": 54,
+   "gfx_id": 125,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 218,
+   "map_ids": "0810",
+   "spawn_def": "0x8400114",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 218,
+   "map_ids": "0810",
+   "spawn_def": "0x8400170",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 218,
+   "map_ids": "0810",
+   "spawn_def": "0x84001ec",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 218,
+   "map_ids": "0810",
+   "spawn_def": "0x8400258",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 218,
+   "map_ids": "0810",
+   "spawn_def": "0x84002bc",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 220,
+   "map_ids": "0812",
+   "spawn_def": "0x8400550",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 220,
+   "map_ids": "0812",
+   "spawn_def": "0x8400594",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 220,
+   "map_ids": "0812",
+   "spawn_def": "0x84005d8",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 221,
+   "map_ids": "0813",
+   "spawn_def": "0x8400634",
+   "enemy_class": 54,
+   "gfx_id": 125,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 221,
+   "map_ids": "0813",
+   "spawn_def": "0x8400678",
+   "enemy_class": 54,
+   "gfx_id": 125,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 221,
+   "map_ids": "0813",
+   "spawn_def": "0x84006d4",
+   "enemy_class": 54,
+   "gfx_id": 125,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 221,
+   "map_ids": "0813",
+   "spawn_def": "0x8400738",
+   "enemy_class": 54,
+   "gfx_id": 125,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 223,
+   "map_ids": "0815",
+   "spawn_def": "0x84007dc",
+   "enemy_class": 54,
+   "gfx_id": 125,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 224,
+   "map_ids": "0816",
+   "spawn_def": "0x8400828",
+   "enemy_class": 16,
+   "gfx_id": 124,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 225,
+   "map_ids": "0817",
+   "spawn_def": "0x84008e4",
+   "enemy_class": 88,
+   "gfx_id": 106,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 225,
+   "map_ids": "0817",
+   "spawn_def": "0x8400938",
+   "enemy_class": 88,
+   "gfx_id": 106,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 226,
+   "map_ids": "0818",
+   "spawn_def": "0x840098c",
+   "enemy_class": 16,
+   "gfx_id": 124,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 227,
+   "map_ids": "0819",
+   "spawn_def": "0x8400a5c",
+   "enemy_class": 16,
+   "gfx_id": 124,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 227,
+   "map_ids": "0819",
+   "spawn_def": "0x8400aa8",
+   "enemy_class": 54,
+   "gfx_id": 126,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 227,
+   "map_ids": "0819",
+   "spawn_def": "0x8400aec",
+   "enemy_class": 54,
+   "gfx_id": 126,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 227,
+   "map_ids": "0819",
+   "spawn_def": "0x8400b30",
+   "enemy_class": 54,
+   "gfx_id": 126,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 228,
+   "map_ids": "081a",
+   "spawn_def": "0x8400bec",
+   "enemy_class": 88,
+   "gfx_id": 106,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 229,
+   "map_ids": "081b",
+   "spawn_def": "0x8400c6c",
+   "enemy_class": 85,
+   "gfx_id": 141,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 229,
+   "map_ids": "081b",
+   "spawn_def": "0x8400cb0",
+   "enemy_class": 85,
+   "gfx_id": 141,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 229,
+   "map_ids": "081b",
+   "spawn_def": "0x8400cf4",
+   "enemy_class": 85,
+   "gfx_id": 141,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 229,
+   "map_ids": "081b",
+   "spawn_def": "0x8400d28",
+   "enemy_class": 7,
+   "gfx_id": 14,
+   "on_death_fn": "0x80106b3",
+   "death_script": null
+  },
+  {
+   "map_index": 230,
+   "map_ids": "081c",
+   "spawn_def": "0x8400e68",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 230,
+   "map_ids": "081c",
+   "spawn_def": "0x8400eac",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 230,
+   "map_ids": "081c",
+   "spawn_def": "0x8400ef0",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 230,
+   "map_ids": "081c",
+   "spawn_def": "0x8400f34",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 230,
+   "map_ids": "081c",
+   "spawn_def": "0x8400f78",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 231,
+   "map_ids": "081d",
+   "spawn_def": "0x8401048",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 231,
+   "map_ids": "081d",
+   "spawn_def": "0x840108c",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 231,
+   "map_ids": "081d",
+   "spawn_def": "0x84010d0",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 231,
+   "map_ids": "081d",
+   "spawn_def": "0x8401114",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 231,
+   "map_ids": "081d",
+   "spawn_def": "0x8401158",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 231,
+   "map_ids": "081d",
+   "spawn_def": "0x840119c",
+   "enemy_class": 9,
+   "gfx_id": 18,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 232,
+   "map_ids": "081e",
+   "spawn_def": "0x8401270",
+   "enemy_class": 32,
+   "gfx_id": 38,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 232,
+   "map_ids": "081e",
+   "spawn_def": "0x84012b4",
+   "enemy_class": 32,
+   "gfx_id": 38,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 233,
+   "map_ids": "081f",
+   "spawn_def": "0x840131c",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 233,
+   "map_ids": "081f",
+   "spawn_def": "0x840134c",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 233,
+   "map_ids": "081f",
+   "spawn_def": "0x840137c",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 233,
+   "map_ids": "081f",
+   "spawn_def": "0x84013ac",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 233,
+   "map_ids": "081f",
+   "spawn_def": "0x84013dc",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 233,
+   "map_ids": "081f",
+   "spawn_def": "0x840140c",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 233,
+   "map_ids": "081f",
+   "spawn_def": "0x840143c",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 236,
+   "map_ids": "0822",
+   "spawn_def": "0x84017dc",
+   "enemy_class": 83,
+   "gfx_id": 115,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 236,
+   "map_ids": "0822",
+   "spawn_def": "0x8401830",
+   "enemy_class": 83,
+   "gfx_id": 115,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 236,
+   "map_ids": "0822",
+   "spawn_def": "0x8401884",
+   "enemy_class": 83,
+   "gfx_id": 115,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 236,
+   "map_ids": "0822",
+   "spawn_def": "0x84018bc",
+   "enemy_class": 102,
+   "gfx_id": 144,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 236,
+   "map_ids": "0822",
+   "spawn_def": "0x84018ec",
+   "enemy_class": 102,
+   "gfx_id": 144,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83feb28",
+   "drop_table_id": 17
+  },
+  {
+   "map_index": 236,
+   "map_ids": "0822",
+   "spawn_def": "0x840191c",
+   "enemy_class": 102,
+   "gfx_id": 144,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 236,
+   "map_ids": "0822",
+   "spawn_def": "0x840194c",
+   "enemy_class": 102,
+   "gfx_id": 144,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 236,
+   "map_ids": "0822",
+   "spawn_def": "0x840197c",
+   "enemy_class": 102,
+   "gfx_id": 144,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 236,
+   "map_ids": "0822",
+   "spawn_def": "0x84019ac",
+   "enemy_class": 102,
+   "gfx_id": 144,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 236,
+   "map_ids": "0822",
+   "spawn_def": "0x84019dc",
+   "enemy_class": 102,
+   "gfx_id": 144,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 237,
+   "map_ids": "0823",
+   "spawn_def": "0x8401a98",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 237,
+   "map_ids": "0823",
+   "spawn_def": "0x8401adc",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 237,
+   "map_ids": "0823",
+   "spawn_def": "0x8401b20",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 237,
+   "map_ids": "0823",
+   "spawn_def": "0x8401b64",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 237,
+   "map_ids": "0823",
+   "spawn_def": "0x8401bc0",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 242,
+   "map_ids": "0828",
+   "spawn_def": "0x8402338",
+   "enemy_class": 7,
+   "gfx_id": 14,
+   "on_death_fn": "0x80106b3",
+   "death_script": null
+  },
+  {
+   "map_index": 242,
+   "map_ids": "0828",
+   "spawn_def": "0x8402368",
+   "enemy_class": 85,
+   "gfx_id": 141,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 242,
+   "map_ids": "0828",
+   "spawn_def": "0x8402398",
+   "enemy_class": 85,
+   "gfx_id": 141,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 242,
+   "map_ids": "0828",
+   "spawn_def": "0x84023c8",
+   "enemy_class": 85,
+   "gfx_id": 141,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 242,
+   "map_ids": "0828",
+   "spawn_def": "0x84023f8",
+   "enemy_class": 85,
+   "gfx_id": 141,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 242,
+   "map_ids": "0828",
+   "spawn_def": "0x8402428",
+   "enemy_class": 85,
+   "gfx_id": 141,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 242,
+   "map_ids": "0828",
+   "spawn_def": "0x8402458",
+   "enemy_class": 85,
+   "gfx_id": 141,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 243,
+   "map_ids": "0829",
+   "spawn_def": "0x84024e4",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 243,
+   "map_ids": "0829",
+   "spawn_def": "0x8402514",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 243,
+   "map_ids": "0829",
+   "spawn_def": "0x8402544",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 243,
+   "map_ids": "0829",
+   "spawn_def": "0x8402574",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 243,
+   "map_ids": "0829",
+   "spawn_def": "0x84025a4",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 243,
+   "map_ids": "0829",
+   "spawn_def": "0x84025d4",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 243,
+   "map_ids": "0829",
+   "spawn_def": "0x8402604",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 243,
+   "map_ids": "0829",
+   "spawn_def": "0x8402634",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 244,
+   "map_ids": "082a",
+   "spawn_def": "0x8402704",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 244,
+   "map_ids": "082a",
+   "spawn_def": "0x8402734",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 244,
+   "map_ids": "082a",
+   "spawn_def": "0x8402764",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 244,
+   "map_ids": "082a",
+   "spawn_def": "0x8402794",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 244,
+   "map_ids": "082a",
+   "spawn_def": "0x84027c4",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 244,
+   "map_ids": "082a",
+   "spawn_def": "0x84027f4",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 244,
+   "map_ids": "082a",
+   "spawn_def": "0x8402824",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 245,
+   "map_ids": "082b",
+   "spawn_def": "0x84028cc",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 245,
+   "map_ids": "082b",
+   "spawn_def": "0x84028fc",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 245,
+   "map_ids": "082b",
+   "spawn_def": "0x840292c",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 245,
+   "map_ids": "082b",
+   "spawn_def": "0x840295c",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 245,
+   "map_ids": "082b",
+   "spawn_def": "0x840298c",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 245,
+   "map_ids": "082b",
+   "spawn_def": "0x84029bc",
+   "enemy_class": 66,
+   "gfx_id": 78,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 245,
+   "map_ids": "082b",
+   "spawn_def": "0x84029ec",
+   "enemy_class": 66,
+   "gfx_id": 78,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 245,
+   "map_ids": "082b",
+   "spawn_def": "0x8402a1c",
+   "enemy_class": 66,
+   "gfx_id": 78,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 246,
+   "map_ids": "082c",
+   "spawn_def": "0x8402ac4",
+   "enemy_class": 8,
+   "gfx_id": 17,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 246,
+   "map_ids": "082c",
+   "spawn_def": "0x8402b08",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 246,
+   "map_ids": "082c",
+   "spawn_def": "0x8402b4c",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 246,
+   "map_ids": "082c",
+   "spawn_def": "0x8402bc0",
+   "enemy_class": 8,
+   "gfx_id": 17,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 246,
+   "map_ids": "082c",
+   "spawn_def": "0x8402c14",
+   "enemy_class": 8,
+   "gfx_id": 17,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 246,
+   "map_ids": "082c",
+   "spawn_def": "0x8402c58",
+   "enemy_class": 8,
+   "gfx_id": 17,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 249,
+   "map_ids": "082f",
+   "spawn_def": "0x8402f98",
+   "enemy_class": 31,
+   "gfx_id": 37,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 249,
+   "map_ids": "082f",
+   "spawn_def": "0x8402fc8",
+   "enemy_class": 31,
+   "gfx_id": 37,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 250,
+   "map_ids": "0830",
+   "spawn_def": "0x84030f4",
+   "enemy_class": 66,
+   "gfx_id": 78,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 250,
+   "map_ids": "0830",
+   "spawn_def": "0x8403124",
+   "enemy_class": 66,
+   "gfx_id": 78,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 250,
+   "map_ids": "0830",
+   "spawn_def": "0x8403154",
+   "enemy_class": 66,
+   "gfx_id": 78,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 250,
+   "map_ids": "0830",
+   "spawn_def": "0x8403184",
+   "enemy_class": 66,
+   "gfx_id": 78,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 250,
+   "map_ids": "0830",
+   "spawn_def": "0x84031b4",
+   "enemy_class": 66,
+   "gfx_id": 78,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 251,
+   "map_ids": "0831",
+   "spawn_def": "0x84033a4",
+   "enemy_class": 4,
+   "gfx_id": 11,
+   "on_death_fn": "0x80106b3",
+   "death_script": null
+  },
+  {
+   "map_index": 253,
+   "map_ids": "0833",
+   "spawn_def": "0x8403838",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 253,
+   "map_ids": "0833",
+   "spawn_def": "0x8403868",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 253,
+   "map_ids": "0833",
+   "spawn_def": "0x8403898",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 253,
+   "map_ids": "0833",
+   "spawn_def": "0x84038c8",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 253,
+   "map_ids": "0833",
+   "spawn_def": "0x84038f8",
+   "enemy_class": 37,
+   "gfx_id": 44,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 253,
+   "map_ids": "0833",
+   "spawn_def": "0x8403928",
+   "enemy_class": 66,
+   "gfx_id": 78,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 253,
+   "map_ids": "0833",
+   "spawn_def": "0x8403958",
+   "enemy_class": 66,
+   "gfx_id": 78,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 253,
+   "map_ids": "0833",
+   "spawn_def": "0x8403988",
+   "enemy_class": 66,
+   "gfx_id": 78,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 270,
+   "map_ids": "0a03",
+   "spawn_def": "0x84048a8",
+   "enemy_class": 71,
+   "gfx_id": 92,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 270,
+   "map_ids": "0a03",
+   "spawn_def": "0x84048ec",
+   "enemy_class": 71,
+   "gfx_id": 92,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 270,
+   "map_ids": "0a03",
+   "spawn_def": "0x8404930",
+   "enemy_class": 71,
+   "gfx_id": 92,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 270,
+   "map_ids": "0a03",
+   "spawn_def": "0x8404974",
+   "enemy_class": 71,
+   "gfx_id": 92,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 270,
+   "map_ids": "0a03",
+   "spawn_def": "0x84049b8",
+   "enemy_class": 71,
+   "gfx_id": 92,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 270,
+   "map_ids": "0a03",
+   "spawn_def": "0x84049fc",
+   "enemy_class": 66,
+   "gfx_id": 78,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 270,
+   "map_ids": "0a03",
+   "spawn_def": "0x8404a58",
+   "enemy_class": 66,
+   "gfx_id": 78,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 271,
+   "map_ids": "0a04",
+   "spawn_def": "0x8404af8",
+   "enemy_class": 71,
+   "gfx_id": 92,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 271,
+   "map_ids": "0a04",
+   "spawn_def": "0x8404b30",
+   "enemy_class": 71,
+   "gfx_id": 92,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 271,
+   "map_ids": "0a04",
+   "spawn_def": "0x8404b70",
+   "enemy_class": 71,
+   "gfx_id": 92,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 272,
+   "map_ids": "0a05",
+   "spawn_def": "0x8404ca0",
+   "enemy_class": 38,
+   "gfx_id": 45,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 273,
+   "map_ids": "0a06",
+   "spawn_def": "0x8404d98",
+   "enemy_class": 38,
+   "gfx_id": 45,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 273,
+   "map_ids": "0a06",
+   "spawn_def": "0x8404dfc",
+   "enemy_class": 38,
+   "gfx_id": 45,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 273,
+   "map_ids": "0a06",
+   "spawn_def": "0x8404e48",
+   "enemy_class": 38,
+   "gfx_id": 45,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 273,
+   "map_ids": "0a06",
+   "spawn_def": "0x8404e8c",
+   "enemy_class": 38,
+   "gfx_id": 45,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 274,
+   "map_ids": "0a07",
+   "spawn_def": "0x8404f24",
+   "enemy_class": 71,
+   "gfx_id": 92,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 274,
+   "map_ids": "0a07",
+   "spawn_def": "0x8404f68",
+   "enemy_class": 71,
+   "gfx_id": 92,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 274,
+   "map_ids": "0a07",
+   "spawn_def": "0x8404fac",
+   "enemy_class": 71,
+   "gfx_id": 92,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 274,
+   "map_ids": "0a07",
+   "spawn_def": "0x8404ff0",
+   "enemy_class": 71,
+   "gfx_id": 92,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 274,
+   "map_ids": "0a07",
+   "spawn_def": "0x8405034",
+   "enemy_class": 71,
+   "gfx_id": 92,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 276,
+   "map_ids": "0a09",
+   "spawn_def": "0x840528c",
+   "enemy_class": 71,
+   "gfx_id": 92,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 276,
+   "map_ids": "0a09",
+   "spawn_def": "0x84052d0",
+   "enemy_class": 71,
+   "gfx_id": 92,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 277,
+   "map_ids": "0a0a",
+   "spawn_def": "0x8405338",
+   "enemy_class": 38,
+   "gfx_id": 45,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 277,
+   "map_ids": "0a0a",
+   "spawn_def": "0x840539c",
+   "enemy_class": 38,
+   "gfx_id": 45,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 277,
+   "map_ids": "0a0a",
+   "spawn_def": "0x84053e8",
+   "enemy_class": 38,
+   "gfx_id": 45,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 278,
+   "map_ids": "0a0b",
+   "spawn_def": "0x840543c",
+   "enemy_class": 12,
+   "gfx_id": 142,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 278,
+   "map_ids": "0a0b",
+   "spawn_def": "0x8405480",
+   "enemy_class": 12,
+   "gfx_id": 142,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 278,
+   "map_ids": "0a0b",
+   "spawn_def": "0x84054c4",
+   "enemy_class": 12,
+   "gfx_id": 142,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 278,
+   "map_ids": "0a0b",
+   "spawn_def": "0x8405508",
+   "enemy_class": 12,
+   "gfx_id": 142,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 280,
+   "map_ids": "0a0d",
+   "spawn_def": "0x84055fc",
+   "enemy_class": 38,
+   "gfx_id": 45,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 281,
+   "map_ids": "0a0e",
+   "spawn_def": "0x8405660",
+   "enemy_class": 31,
+   "gfx_id": 37,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 282,
+   "map_ids": "0a0f",
+   "spawn_def": "0x84056c8",
+   "enemy_class": 71,
+   "gfx_id": 92,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 287,
+   "map_ids": "0a14",
+   "spawn_def": "0x84058a4",
+   "enemy_class": 60,
+   "gfx_id": 28,
+   "on_death_fn": "0x80106b3",
+   "death_script": null
+  },
+  {
+   "map_index": 288,
+   "map_ids": "0a16",
+   "spawn_def": "0x8405974",
+   "enemy_class": 99,
+   "gfx_id": 37,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 289,
+   "map_ids": "0a1e",
+   "spawn_def": "0x8405a2c",
+   "enemy_class": 47,
+   "gfx_id": 112,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 289,
+   "map_ids": "0a1e",
+   "spawn_def": "0x8405a5c",
+   "enemy_class": 47,
+   "gfx_id": 112,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 289,
+   "map_ids": "0a1e",
+   "spawn_def": "0x8405a8c",
+   "enemy_class": 47,
+   "gfx_id": 112,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 290,
+   "map_ids": "0a1f",
+   "spawn_def": "0x8405acc",
+   "enemy_class": 91,
+   "gfx_id": 119,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 290,
+   "map_ids": "0a1f",
+   "spawn_def": "0x8405afc",
+   "enemy_class": 91,
+   "gfx_id": 119,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 291,
+   "map_ids": "0a20",
+   "spawn_def": "0x8405b38",
+   "enemy_class": 91,
+   "gfx_id": 119,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 291,
+   "map_ids": "0a20",
+   "spawn_def": "0x8405b68",
+   "enemy_class": 91,
+   "gfx_id": 119,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 292,
+   "map_ids": "0a21",
+   "spawn_def": "0x8405bc0",
+   "enemy_class": 91,
+   "gfx_id": 119,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 292,
+   "map_ids": "0a21",
+   "spawn_def": "0x8405bf0",
+   "enemy_class": 91,
+   "gfx_id": 119,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 292,
+   "map_ids": "0a21",
+   "spawn_def": "0x8405c20",
+   "enemy_class": 32,
+   "gfx_id": 38,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83eede4",
+   "drop_table_id": 1
+  },
+  {
+   "map_index": 296,
+   "map_ids": "0b04",
+   "spawn_def": "0x8406494",
+   "enemy_class": 3,
+   "gfx_id": 9,
+   "on_death_fn": "0x80106b3",
+   "death_script": null
+  },
+  {
+   "map_index": 297,
+   "map_ids": "0b05",
+   "spawn_def": "0x840657c",
+   "enemy_class": 3,
+   "gfx_id": 9,
+   "on_death_fn": "0x8010699",
+   "death_script": null
+  },
+  {
+   "map_index": 298,
+   "map_ids": "0b06",
+   "spawn_def": "0x8406654",
+   "enemy_class": 3,
+   "gfx_id": 9,
+   "on_death_fn": "0x80106b3",
+   "death_script": null
+  },
+  {
+   "map_index": 298,
+   "map_ids": "0b06",
+   "spawn_def": "0x84066e4",
+   "enemy_class": 3,
+   "gfx_id": 9,
+   "on_death_fn": "0x80106b3",
+   "death_script": null
+  },
+  {
+   "map_index": 300,
+   "map_ids": "0c02",
+   "spawn_def": "0x840685c",
+   "enemy_class": 1,
+   "gfx_id": 7,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 300,
+   "map_ids": "0c02",
+   "spawn_def": "0x840688c",
+   "enemy_class": 1,
+   "gfx_id": 7,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 300,
+   "map_ids": "0c02",
+   "spawn_def": "0x84068bc",
+   "enemy_class": 1,
+   "gfx_id": 7,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 300,
+   "map_ids": "0c02",
+   "spawn_def": "0x84068ec",
+   "enemy_class": 1,
+   "gfx_id": 7,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 300,
+   "map_ids": "0c02",
+   "spawn_def": "0x840691c",
+   "enemy_class": 1,
+   "gfx_id": 7,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 300,
+   "map_ids": "0c02",
+   "spawn_def": "0x840694c",
+   "enemy_class": 1,
+   "gfx_id": 7,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 300,
+   "map_ids": "0c02",
+   "spawn_def": "0x840697c",
+   "enemy_class": 1,
+   "gfx_id": 7,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 300,
+   "map_ids": "0c02",
+   "spawn_def": "0x84069ac",
+   "enemy_class": 1,
+   "gfx_id": 7,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 300,
+   "map_ids": "0c02",
+   "spawn_def": "0x84069dc",
+   "enemy_class": 1,
+   "gfx_id": 7,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 300,
+   "map_ids": "0c02",
+   "spawn_def": "0x8406a0c",
+   "enemy_class": 1,
+   "gfx_id": 7,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 300,
+   "map_ids": "0c02",
+   "spawn_def": "0x8406a3c",
+   "enemy_class": 1,
+   "gfx_id": 7,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 300,
+   "map_ids": "0c02",
+   "spawn_def": "0x8406a6c",
+   "enemy_class": 1,
+   "gfx_id": 7,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 301,
+   "map_ids": "0c03",
+   "spawn_def": "0x8406bb0",
+   "enemy_class": 67,
+   "gfx_id": 79,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 301,
+   "map_ids": "0c03",
+   "spawn_def": "0x8406be0",
+   "enemy_class": 67,
+   "gfx_id": 79,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 301,
+   "map_ids": "0c03",
+   "spawn_def": "0x8406c10",
+   "enemy_class": 1,
+   "gfx_id": 7,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 301,
+   "map_ids": "0c03",
+   "spawn_def": "0x8406c40",
+   "enemy_class": 1,
+   "gfx_id": 7,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 301,
+   "map_ids": "0c03",
+   "spawn_def": "0x8406c70",
+   "enemy_class": 1,
+   "gfx_id": 7,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 301,
+   "map_ids": "0c03",
+   "spawn_def": "0x8406ca0",
+   "enemy_class": 1,
+   "gfx_id": 7,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 301,
+   "map_ids": "0c03",
+   "spawn_def": "0x8406cd0",
+   "enemy_class": 1,
+   "gfx_id": 7,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 301,
+   "map_ids": "0c03",
+   "spawn_def": "0x8406d00",
+   "enemy_class": 1,
+   "gfx_id": 7,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 302,
+   "map_ids": "0c04",
+   "spawn_def": "0x8406e10",
+   "enemy_class": 76,
+   "gfx_id": 29,
+   "on_death_fn": "0x80106b3",
+   "death_script": null
+  },
+  {
+   "map_index": 304,
+   "map_ids": "0c06",
+   "spawn_def": "0x8406f78",
+   "enemy_class": 79,
+   "gfx_id": 30,
+   "on_death_fn": "0x80106b3",
+   "death_script": null
+  },
+  {
+   "map_index": 304,
+   "map_ids": "0c06",
+   "spawn_def": "0x8406ff0",
+   "enemy_class": 78,
+   "gfx_id": 30,
+   "on_death_fn": "0x80106b3",
+   "death_script": null
+  },
+  {
+   "map_index": 305,
+   "map_ids": "0c0a",
+   "spawn_def": "0x84070e0",
+   "enemy_class": 92,
+   "gfx_id": 108,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 305,
+   "map_ids": "0c0a",
+   "spawn_def": "0x8407124",
+   "enemy_class": 92,
+   "gfx_id": 108,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 305,
+   "map_ids": "0c0a",
+   "spawn_def": "0x8407168",
+   "enemy_class": 92,
+   "gfx_id": 108,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 305,
+   "map_ids": "0c0a",
+   "spawn_def": "0x84071ac",
+   "enemy_class": 92,
+   "gfx_id": 108,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 305,
+   "map_ids": "0c0a",
+   "spawn_def": "0x84071e0",
+   "enemy_class": 1,
+   "gfx_id": 7,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 305,
+   "map_ids": "0c0a",
+   "spawn_def": "0x8407210",
+   "enemy_class": 1,
+   "gfx_id": 7,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 305,
+   "map_ids": "0c0a",
+   "spawn_def": "0x8407240",
+   "enemy_class": 1,
+   "gfx_id": 7,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 305,
+   "map_ids": "0c0a",
+   "spawn_def": "0x8407270",
+   "enemy_class": 1,
+   "gfx_id": 7,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 305,
+   "map_ids": "0c0a",
+   "spawn_def": "0x84072a0",
+   "enemy_class": 1,
+   "gfx_id": 7,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 305,
+   "map_ids": "0c0a",
+   "spawn_def": "0x84072d0",
+   "enemy_class": 1,
+   "gfx_id": 7,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 305,
+   "map_ids": "0c0a",
+   "spawn_def": "0x8407300",
+   "enemy_class": 1,
+   "gfx_id": 7,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 306,
+   "map_ids": "0c0b",
+   "spawn_def": "0x84073e4",
+   "enemy_class": 80,
+   "gfx_id": 105,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 306,
+   "map_ids": "0c0b",
+   "spawn_def": "0x8407420",
+   "enemy_class": 1,
+   "gfx_id": 7,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 306,
+   "map_ids": "0c0b",
+   "spawn_def": "0x8407450",
+   "enemy_class": 1,
+   "gfx_id": 7,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 306,
+   "map_ids": "0c0b",
+   "spawn_def": "0x8407480",
+   "enemy_class": 1,
+   "gfx_id": 7,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 306,
+   "map_ids": "0c0b",
+   "spawn_def": "0x84074b0",
+   "enemy_class": 92,
+   "gfx_id": 108,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 306,
+   "map_ids": "0c0b",
+   "spawn_def": "0x84074e0",
+   "enemy_class": 92,
+   "gfx_id": 108,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 306,
+   "map_ids": "0c0b",
+   "spawn_def": "0x8407510",
+   "enemy_class": 92,
+   "gfx_id": 108,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 307,
+   "map_ids": "0c0c",
+   "spawn_def": "0x84075a4",
+   "enemy_class": 67,
+   "gfx_id": 79,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 307,
+   "map_ids": "0c0c",
+   "spawn_def": "0x84075d4",
+   "enemy_class": 67,
+   "gfx_id": 79,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 307,
+   "map_ids": "0c0c",
+   "spawn_def": "0x8407604",
+   "enemy_class": 67,
+   "gfx_id": 79,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 307,
+   "map_ids": "0c0c",
+   "spawn_def": "0x8407634",
+   "enemy_class": 1,
+   "gfx_id": 7,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 307,
+   "map_ids": "0c0c",
+   "spawn_def": "0x8407664",
+   "enemy_class": 1,
+   "gfx_id": 7,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 307,
+   "map_ids": "0c0c",
+   "spawn_def": "0x8407694",
+   "enemy_class": 1,
+   "gfx_id": 7,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 307,
+   "map_ids": "0c0c",
+   "spawn_def": "0x84076c4",
+   "enemy_class": 1,
+   "gfx_id": 7,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 307,
+   "map_ids": "0c0c",
+   "spawn_def": "0x84076f4",
+   "enemy_class": 1,
+   "gfx_id": 7,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 307,
+   "map_ids": "0c0c",
+   "spawn_def": "0x8407734",
+   "enemy_class": 92,
+   "gfx_id": 108,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 307,
+   "map_ids": "0c0c",
+   "spawn_def": "0x8407778",
+   "enemy_class": 92,
+   "gfx_id": 108,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 307,
+   "map_ids": "0c0c",
+   "spawn_def": "0x84077bc",
+   "enemy_class": 92,
+   "gfx_id": 108,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 307,
+   "map_ids": "0c0c",
+   "spawn_def": "0x8407800",
+   "enemy_class": 92,
+   "gfx_id": 108,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 307,
+   "map_ids": "0c0c",
+   "spawn_def": "0x8407844",
+   "enemy_class": 92,
+   "gfx_id": 108,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 308,
+   "map_ids": "0c0d",
+   "spawn_def": "0x84078dc",
+   "enemy_class": 80,
+   "gfx_id": 105,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 308,
+   "map_ids": "0c0d",
+   "spawn_def": "0x8407920",
+   "enemy_class": 80,
+   "gfx_id": 105,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 308,
+   "map_ids": "0c0d",
+   "spawn_def": "0x8407964",
+   "enemy_class": 80,
+   "gfx_id": 105,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 309,
+   "map_ids": "0c0e",
+   "spawn_def": "0x84079dc",
+   "enemy_class": 1,
+   "gfx_id": 7,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 309,
+   "map_ids": "0c0e",
+   "spawn_def": "0x8407a0c",
+   "enemy_class": 1,
+   "gfx_id": 7,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 309,
+   "map_ids": "0c0e",
+   "spawn_def": "0x8407a3c",
+   "enemy_class": 1,
+   "gfx_id": 7,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 309,
+   "map_ids": "0c0e",
+   "spawn_def": "0x8407a6c",
+   "enemy_class": 1,
+   "gfx_id": 7,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 309,
+   "map_ids": "0c0e",
+   "spawn_def": "0x8407a9c",
+   "enemy_class": 1,
+   "gfx_id": 7,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 309,
+   "map_ids": "0c0e",
+   "spawn_def": "0x8407adc",
+   "enemy_class": 92,
+   "gfx_id": 108,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 309,
+   "map_ids": "0c0e",
+   "spawn_def": "0x8407b20",
+   "enemy_class": 92,
+   "gfx_id": 108,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 309,
+   "map_ids": "0c0e",
+   "spawn_def": "0x8407b64",
+   "enemy_class": 92,
+   "gfx_id": 108,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 309,
+   "map_ids": "0c0e",
+   "spawn_def": "0x8407ba8",
+   "enemy_class": 92,
+   "gfx_id": 108,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 309,
+   "map_ids": "0c0e",
+   "spawn_def": "0x8407bec",
+   "enemy_class": 92,
+   "gfx_id": 108,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 310,
+   "map_ids": "0c0f",
+   "spawn_def": "0x8407cc8",
+   "enemy_class": 92,
+   "gfx_id": 108,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 310,
+   "map_ids": "0c0f",
+   "spawn_def": "0x8407cf8",
+   "enemy_class": 92,
+   "gfx_id": 108,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 310,
+   "map_ids": "0c0f",
+   "spawn_def": "0x8407d28",
+   "enemy_class": 92,
+   "gfx_id": 108,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 310,
+   "map_ids": "0c0f",
+   "spawn_def": "0x8407d58",
+   "enemy_class": 92,
+   "gfx_id": 108,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 310,
+   "map_ids": "0c0f",
+   "spawn_def": "0x8407d88",
+   "enemy_class": 92,
+   "gfx_id": 108,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 310,
+   "map_ids": "0c0f",
+   "spawn_def": "0x8407db8",
+   "enemy_class": 92,
+   "gfx_id": 108,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 310,
+   "map_ids": "0c0f",
+   "spawn_def": "0x8407de8",
+   "enemy_class": 92,
+   "gfx_id": 108,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 310,
+   "map_ids": "0c0f",
+   "spawn_def": "0x8407e18",
+   "enemy_class": 92,
+   "gfx_id": 108,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 314,
+   "map_ids": "0d02",
+   "spawn_def": "0x84081c0",
+   "enemy_class": 70,
+   "gfx_id": 91,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 314,
+   "map_ids": "0d02",
+   "spawn_def": "0x84081f0",
+   "enemy_class": 70,
+   "gfx_id": 91,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 314,
+   "map_ids": "0d02",
+   "spawn_def": "0x8408220",
+   "enemy_class": 70,
+   "gfx_id": 91,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 314,
+   "map_ids": "0d02",
+   "spawn_def": "0x8408250",
+   "enemy_class": 70,
+   "gfx_id": 91,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 315,
+   "map_ids": "0d03",
+   "spawn_def": "0x84082a8",
+   "enemy_class": 10,
+   "gfx_id": 19,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 315,
+   "map_ids": "0d03",
+   "spawn_def": "0x84082d8",
+   "enemy_class": 10,
+   "gfx_id": 19,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 315,
+   "map_ids": "0d03",
+   "spawn_def": "0x8408308",
+   "enemy_class": 10,
+   "gfx_id": 19,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 315,
+   "map_ids": "0d03",
+   "spawn_def": "0x8408338",
+   "enemy_class": 10,
+   "gfx_id": 19,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 315,
+   "map_ids": "0d03",
+   "spawn_def": "0x8408368",
+   "enemy_class": 70,
+   "gfx_id": 91,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 315,
+   "map_ids": "0d03",
+   "spawn_def": "0x8408398",
+   "enemy_class": 70,
+   "gfx_id": 91,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 315,
+   "map_ids": "0d03",
+   "spawn_def": "0x84083c8",
+   "enemy_class": 70,
+   "gfx_id": 91,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 315,
+   "map_ids": "0d03",
+   "spawn_def": "0x84083f8",
+   "enemy_class": 70,
+   "gfx_id": 91,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 315,
+   "map_ids": "0d03",
+   "spawn_def": "0x8408428",
+   "enemy_class": 70,
+   "gfx_id": 91,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 316,
+   "map_ids": "0d04",
+   "spawn_def": "0x84084ec",
+   "enemy_class": 10,
+   "gfx_id": 19,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 316,
+   "map_ids": "0d04",
+   "spawn_def": "0x840851c",
+   "enemy_class": 10,
+   "gfx_id": 19,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 316,
+   "map_ids": "0d04",
+   "spawn_def": "0x840854c",
+   "enemy_class": 10,
+   "gfx_id": 19,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83f4ee8",
+   "drop_table_id": 15
+  },
+  {
+   "map_index": 317,
+   "map_ids": "0d05",
+   "spawn_def": "0x840863c",
+   "enemy_class": 70,
+   "gfx_id": 91,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 317,
+   "map_ids": "0d05",
+   "spawn_def": "0x840866c",
+   "enemy_class": 70,
+   "gfx_id": 91,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 317,
+   "map_ids": "0d05",
+   "spawn_def": "0x840869c",
+   "enemy_class": 70,
+   "gfx_id": 91,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 317,
+   "map_ids": "0d05",
+   "spawn_def": "0x84086cc",
+   "enemy_class": 70,
+   "gfx_id": 91,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 318,
+   "map_ids": "0d06",
+   "spawn_def": "0x840879c",
+   "enemy_class": 67,
+   "gfx_id": 79,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 318,
+   "map_ids": "0d06",
+   "spawn_def": "0x84087cc",
+   "enemy_class": 67,
+   "gfx_id": 79,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 318,
+   "map_ids": "0d06",
+   "spawn_def": "0x84087fc",
+   "enemy_class": 67,
+   "gfx_id": 79,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 320,
+   "map_ids": "0d08",
+   "spawn_def": "0x84088a8",
+   "enemy_class": 104,
+   "gfx_id": 149,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 320,
+   "map_ids": "0d08",
+   "spawn_def": "0x84088d8",
+   "enemy_class": 55,
+   "gfx_id": 109,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 320,
+   "map_ids": "0d08",
+   "spawn_def": "0x8408908",
+   "enemy_class": 104,
+   "gfx_id": 149,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 320,
+   "map_ids": "0d08",
+   "spawn_def": "0x8408938",
+   "enemy_class": 55,
+   "gfx_id": 109,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 320,
+   "map_ids": "0d08",
+   "spawn_def": "0x8408968",
+   "enemy_class": 104,
+   "gfx_id": 149,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 321,
+   "map_ids": "0d09",
+   "spawn_def": "0x84089d8",
+   "enemy_class": 70,
+   "gfx_id": 91,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 321,
+   "map_ids": "0d09",
+   "spawn_def": "0x8408a08",
+   "enemy_class": 70,
+   "gfx_id": 91,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 321,
+   "map_ids": "0d09",
+   "spawn_def": "0x8408a38",
+   "enemy_class": 70,
+   "gfx_id": 91,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 322,
+   "map_ids": "0d0a",
+   "spawn_def": "0x8408b28",
+   "enemy_class": 11,
+   "gfx_id": 123,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x8408b10",
+   "drop_table_id": 14
+  },
+  {
+   "map_index": 322,
+   "map_ids": "0d0a",
+   "spawn_def": "0x8408b58",
+   "enemy_class": 16,
+   "gfx_id": 124,
+   "on_death_fn": "0x801069b",
+   "death_script": "0x83ee120",
+   "drop_table_id": 0
+  },
+  {
+   "map_index": 324,
+   "map_ids": "0e02",
+   "spawn_def": "0x8408e4c",
+   "enemy_class": 21,
+   "gfx_id": 30,
+   "on_death_fn": "0x80106b3",
+   "death_script": null
+  },
+  {
+   "map_index": 325,
+   "map_ids": "0e03",
+   "spawn_def": "0x8408f18",
+   "enemy_class": 22,
+   "gfx_id": 30,
+   "on_death_fn": "0x80106b3",
+   "death_script": null
+  },
+  {
+   "map_index": 325,
+   "map_ids": "0e03",
+   "spawn_def": "0x8408fc8",
+   "enemy_class": 23,
+   "gfx_id": 30,
+   "on_death_fn": "0x80106b3",
+   "death_script": null
+  },
+  {
+   "map_index": 325,
+   "map_ids": "0e03",
+   "spawn_def": "0x8409038",
+   "enemy_class": 26,
+   "gfx_id": 31,
+   "on_death_fn": "0x80106b3",
+   "death_script": null
+  },
+  {
+   "map_index": 325,
+   "map_ids": "0e03",
+   "spawn_def": "0x8409068",
+   "enemy_class": 26,
+   "gfx_id": 31,
+   "on_death_fn": "0x80106b3",
+   "death_script": null
+  },
+  {
+   "map_index": 325,
+   "map_ids": "0e03",
+   "spawn_def": "0x8409098",
+   "enemy_class": 26,
+   "gfx_id": 31,
+   "on_death_fn": "0x80106b3",
+   "death_script": null
+  },
+  {
+   "map_index": 325,
+   "map_ids": "0e03",
+   "spawn_def": "0x84090c8",
+   "enemy_class": 24,
+   "gfx_id": 30,
+   "on_death_fn": "0x80106b3",
+   "death_script": null
+  },
+  {
+   "map_index": 325,
+   "map_ids": "0e03",
+   "spawn_def": "0x84090f8",
+   "enemy_class": 25,
+   "gfx_id": 30,
+   "on_death_fn": "0x80106b3",
+   "death_script": null
+  }
+ ]
+}
