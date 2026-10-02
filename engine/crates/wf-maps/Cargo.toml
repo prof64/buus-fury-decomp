@@ -1,0 +1,12 @@
+[package]
+name = "wf-maps"
+description = "Buu's Fury maps from ROM: areas, map headers, BG layers, tilesets, palettes, collision grids"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+wf-rom.workspace = true
+serde_json.workspace = true
+# zlib for Tiled's base64+zlib layer data (already in the tree via png)
+miniz_oxide = "0.8"

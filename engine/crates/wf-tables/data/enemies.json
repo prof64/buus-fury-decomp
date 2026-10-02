@@ -1,0 +1,90 @@
+{
+ "meta": {
+  "generator": "re/buu/extract_enemies.py",
+  "table": "0x8711274",
+  "layout": {
+   "+0x00": "u32 XP reward (x player XP multiplier record+0x58/256, rounded up; 0x0800F80C)",
+   "+0x04": "u32 max HP (stored as HP<<10 at obj+0x28C)",
+   "+0x08": "u32 initial AI state id (table 0x0870F514)",
+   "+0x0C": "u8 level-ish byte (not read by spawn/damage/death code; display only?) [INFERRED]",
+   "+0x0D": "u8 STR (obj+0x1B0)",
+   "+0x0E": "u8 POW (obj+0x1B2)",
+   "+0x0F": "u8 END (obj+0x1B4 and +0x1B6)",
+   "+0x10": "u8 melee resist (obj+0x1B8, 128 = x1.0)",
+   "+0x11": "u8 energy resist (obj+0x1B9)",
+   "+0x12,+0x13": "u8 unknown",
+   "+0x14": "ptr hit-reaction behaviour (0x08708920 standard knockback, 0x080716F4 none)",
+   "+0x18": "ptr drop script (bytecode) or 0"
+  },
+  "enemy_object": {
+   "+0x1A0/+0x1A4/+0x1A8": "s32 x/y/z (24.8)",
+   "+0x1B0..+0x1B9": "combat stats (as player)",
+   "+0x224": "type entry ptr",
+   "+0x228": "spawn-record per-spawn ptr",
+   "+0x238": "AI state stack",
+   "+0x28C": "HP (22.10 fixed)",
+   "list": "IWRAM 0x03001BB0 = count, 0x03001BB4.. = enemy pointers"
+  },
+  "status": "stats VERIFIED (disasm + emu: HP 500, XP 1225 for type 0x44); names via database link VERIFIED; loot SIMULATED from ROM bytecode"
+ },
+ "stats_note": "STR/POW feed the attack factor, END is used for both melee and energy defense (obj+0x1B4 = obj+0x1B6)",
+ "qualified": {
+  "4": "Babidi (Giant Crater, script-placed)",
+  "25": "Babidi (West City)",
+  "29": "Babidi (Giant Crater, with Majin Buu)",
+  "11": "Broly (phase 2)",
+  "26": "Majin Buu (Giant Crater, with Babidi)",
+  "27": "Majin Buu (Giant Crater, 2nd encounter)",
+  "28": "Majin Buu (West City)",
+  "38": "Goten (tag game)",
+  "39": "Goten (Time Chamber sparring)",
+  "54": "Janemba Hand (summoned by Janemba)",
+  "59": "Human (World Tournament fighter)",
+  "61": "Kid Buu (split copy)",
+  "79": "Ninja (disguised)",
+  "102": "Shadow Warrior (disguised)",
+  "105": "Shinobi (disguised)",
+  "109": "Spopovich (225 HP)",
+  "110": "Spopovich (225 HP, 2)",
+  "111": "Spopovich (bear hug, with Yamu)",
+  "112": "Spopovich (1855 HP, no bear hug)",
+  "147": "Yamu (EP drain, with Spopovich)",
+  "148": "Yamu (no EP drain)",
+  "115": "Super Buu (Time Chamber)",
+  "116": "Super Buu (two-phase)",
+  "117": "Super Buu (script-created)",
+  "118": "Super Buu (Gotenks absorbed)",
+  "119": "Super Buu (Gohan absorbed)",
+  "120": "Super Buu (Gohan absorbed, 0 XP)",
+  "121": "Super Buu (Brain)",
+  "136": "Vegeta (Gravity Chamber)",
+  "137": "Vegeta (Barren Wasteland)"
+ },
+ "descriptive": {
+  "13": "Kamikaze ghost (Super Buu minion)",
+  "14": "Buu fragment (freezes the player)",
+  "30": "Unnamed fighter 0x1E (unused)",
+  "34": "Inert helper 0x22",
+  "114": "Inert helper 0x72",
+  "126": "Inert helper 0x7E",
+  "52": "Janemba part (arm A)",
+  "53": "Janemba part (arm B)",
+  "55": "Janemba part (upper body)",
+  "84": "Dummy type 0x54 (unused)",
+  "135": "Unnamed fighter 0x87 (unused)",
+  "141": "Floor trigger (not a fighter)",
+  "144": "Worm part 0x90 (unused)"
+ },
+ "rom_text_names": {
+  "132": {
+   "string_id": 1140,
+   "evidence": "string 1140 \"Uub\" (database text); the spawn gfx 273 is the Uub sprite"
+  }
+ },
+ "reactions": {
+  "141592864": "standard (knockback + flinch, behaviour def 0x08708920)",
+  "134682356": "none (does not flinch)"
+ },
+ "loot_samples": 20000,
+ "loot_seed": 1
+}

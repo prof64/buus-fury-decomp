@@ -1,0 +1,1324 @@
+{
+ "source": "data/buu/audio.json (tools/audio/names_buu.py): names from the area table, story scripts and emulator breakpoints on PlaySfx; curated, not ROM data",
+ "songs": {
+  "0": {
+   "name": "Song 00 (no play site found)",
+   "context": "",
+   "confidence": "none",
+   "areas": [],
+   "ends": false
+  },
+  "1": {
+   "name": "Babidi's Ship",
+   "context": "Inside Babidi's Ship (8-18..8-69), Yakon's Planet (8-40), Demon World (8-68), Giant Crater (8-71)",
+   "confidence": "high",
+   "areas": [
+    "8-18 Inside Babidi's Ship",
+    "8-19 Inside Babidi's Ship",
+    "8-20 Inside Babidi's Ship",
+    "8-21 Inside Babidi's Ship",
+    "8-22 Inside Babidi's Ship",
+    "8-23 Inside Babidi's Ship",
+    "8-24 Inside Babidi's Ship",
+    "8-25 Inside Babidi's Ship",
+    "8-26 Inside Babidi's Ship",
+    "8-27 Inside Babidi's Ship",
+    "8-28 Inside Babidi's Ship",
+    "8-29 Inside Babidi's Ship",
+    "8-30 Inside Babidi's Ship",
+    "8-31 Inside Babidi's Ship",
+    "8-32 Inside Babidi's Ship",
+    "8-33 Inside Babidi's Ship",
+    "8-34 Inside Babidi's Ship",
+    "8-35 Inside Babidi's Ship",
+    "8-36 Inside Babidi's Ship",
+    "8-37 Inside Babidi's Ship",
+    "8-38 Inside Babidi's Ship",
+    "8-39 Inside Babidi's Ship",
+    "8-40 Yakon's Planet",
+    "8-41 Inside Babidi's Ship",
+    "8-42 Inside Babidi's Ship",
+    "8-43 Inside Babidi's Ship",
+    "8-44 Inside Babidi's Ship",
+    "8-45 Inside Babidi's Ship",
+    "8-46 Inside Babidi's Ship",
+    "8-47 Inside Babidi's Ship",
+    "8-48 Inside Babidi's Ship",
+    "8-49 Inside Babidi's Ship",
+    "8-50 Inside Babidi's Ship",
+    "8-51 Inside Babidi's Ship",
+    "8-52 Inside Babidi's Ship",
+    "8-53 Inside Babidi's Ship",
+    "8-54 Inside Babidi's Ship",
+    "8-55 Inside Babidi's Ship",
+    "8-56 Inside Babidi's Ship",
+    "8-57 Inside Babidi's Ship",
+    "8-58 Inside Babidi's Ship",
+    "8-59 Inside Babidi's Ship",
+    "8-60 Inside Babidi's Ship",
+    "8-61 Inside Babidi's Ship",
+    "8-62 Inside Babidi's Ship",
+    "8-63 Inside Babidi's Ship",
+    "8-64 Inside Babidi's Ship",
+    "8-65 Inside Babidi's Ship",
+    "8-66 Inside Babidi's Ship",
+    "8-67 Inside Babidi's Ship",
+    "8-68 Demon World",
+    "8-69 Inside Babidi's Ship",
+    "8-71 Giant Crater"
+   ],
+   "ends": false
+  },
+  "2": {
+   "name": "Song 02 (no play site found)",
+   "context": "",
+   "confidence": "none",
+   "areas": [],
+   "ends": false
+  },
+  "3": {
+   "name": "Bulma's Airship (0-15)",
+   "context": "area 0-15, an unnamed map next to Bulma's Airship",
+   "confidence": "medium",
+   "areas": [
+    "0-15 (Bulma's Airship)"
+   ],
+   "ends": false
+  },
+  "4": {
+   "name": "Capsule Corporation",
+   "context": "Capsule Corp interiors 4-21..4-31 (Lobby, Computer Room, Exhibit Hall, Gravity Chamber, Dr. Brief's Lab)",
+   "confidence": "high",
+   "areas": [
+    "4-21 Lobby",
+    "4-22 Computer Room",
+    "4-23 Exhibit Hall",
+    "4-24 Atrium",
+    "4-25 Gravity Chamber",
+    "4-26 Exhibit Hall",
+    "4-30 Capsule Room",
+    "4-31 Dr. Brief's Lab"
+   ],
+   "ends": false
+  },
+  "5": {
+   "name": "Musuka Circus",
+   "context": "Musuka Circus 3-14..3-19",
+   "confidence": "high",
+   "areas": [
+    "3-14 Musuka Circus",
+    "3-15 Musuka Circus",
+    "3-16 Musuka Circus",
+    "3-17 Musuka Circus",
+    "3-18 Musuka Circus",
+    "3-19 Musuka Circus"
+   ],
+   "ends": false
+  },
+  "6": {
+   "name": "Town",
+   "context": "Hercule City, Hercule's Mansion, Orange Star High School, West City, Capsule Corporation, Bulma's House, Papaya Island; Hercule City 3-1..3-3 before story flags 26+27 (area music script); script #152 (Chapter 8 \"Janemba\" card)",
+   "confidence": "high",
+   "areas": [
+    "3-4 Hercule City",
+    "3-5 Hercule's Mansion",
+    "3-6 Hercule's Mansion",
+    "3-10 Orange Star High School",
+    "3-11 Orange Star High School",
+    "3-12 Orange Star High School",
+    "3-13 Orange Star High School",
+    "4-1 West City",
+    "4-20 Capsule Corporation",
+    "4-27 Bulma's House",
+    "7-1 Papaya Island",
+    "7-2 Papaya Island",
+    "7-3 Papaya Island"
+   ],
+   "ends": false
+  },
+  "7": {
+   "name": "Song 07 (no play site found)",
+   "context": "",
+   "confidence": "none",
+   "areas": [],
+   "ends": false
+  },
+  "8": {
+   "name": "Song 08 (no play site found)",
+   "context": "",
+   "confidence": "none",
+   "areas": [],
+   "ends": false
+  },
+  "9": {
+   "name": "Goku's House",
+   "context": "Goku's House 2-1..2-5, East District 439 (2-8), Nataday Village (15-1, 15-33), area 0-16",
+   "confidence": "high",
+   "areas": [
+    "0-16 (Bulma's Airship)",
+    "2-1 Goku's House",
+    "2-2 Goku's House",
+    "2-3 Goku's House",
+    "2-4 Gohan and Goten's Room",
+    "2-5 Chi Chi's Room",
+    "2-8 East District 439",
+    "15-1 Nataday Village",
+    "15-33 Nataday Village"
+   ],
+   "ends": false
+  },
+  "10": {
+   "name": "Song 10 (no play site found)",
+   "context": "",
+   "confidence": "none",
+   "areas": [],
+   "ends": false
+  },
+  "11": {
+   "name": "Song 11 (no play site found)",
+   "context": "",
+   "confidence": "none",
+   "areas": [],
+   "ends": false
+  },
+  "12": {
+   "name": "Airship",
+   "context": "Airship / Airship Interior / Control Room 12-1..12-28",
+   "confidence": "high",
+   "areas": [
+    "12-1 Airship",
+    "12-2 Airship",
+    "12-3 Airship",
+    "12-4 Airship Interior",
+    "12-5 Airship Interior",
+    "12-6 Airship Interior",
+    "12-7 Airship Interior",
+    "12-8 Airship Interior",
+    "12-9 Airship Interior",
+    "12-10 Airship Interior",
+    "12-11 Airship Interior",
+    "12-12 Airship Interior",
+    "12-13 Airship Interior",
+    "12-14 Airship Interior",
+    "12-15 Airship Interior",
+    "12-16 Airship Interior",
+    "12-17 Airship Interior",
+    "12-18 Airship Interior",
+    "12-19 Airship Interior",
+    "12-20 Airship Interior",
+    "12-21 Airship Interior",
+    "12-22 Airship Interior",
+    "12-23 Airship Interior",
+    "12-24 Airship Interior",
+    "12-25 Airship Interior",
+    "12-26 Airship Interior",
+    "12-27 Airship Interior",
+    "12-28 Control Room"
+   ],
+   "ends": false
+  },
+  "13": {
+   "name": "Song 13 (no play site found)",
+   "context": "",
+   "confidence": "none",
+   "areas": [],
+   "ends": false
+  },
+  "14": {
+   "name": "Song 14 (no play site found)",
+   "context": "",
+   "confidence": "none",
+   "areas": [],
+   "ends": false
+  },
+  "15": {
+   "name": "Snakeway (Other World)",
+   "context": "Snakeway, Yemma's Office, Grand Kai's Mansion / Planet (1-10, 1-11), Cave of the Ancients; script #38 (Chapter 1 \"The Other World\" card), #25",
+   "confidence": "high",
+   "areas": [
+    "1-1 Snakeway",
+    "1-2 Snakeway",
+    "1-3 Yemma's Office",
+    "1-4 Yemma's Office",
+    "1-5 Snakeway",
+    "1-10 Grand Kai's Mansion",
+    "1-11 Grand Kai's Planet",
+    "1-16 Cave of the Ancients",
+    "1-17 Cave of the Ancients"
+   ],
+   "ends": false
+  },
+  "16": {
+   "name": "Song 16 (no play site found)",
+   "context": "",
+   "confidence": "none",
+   "areas": [],
+   "ends": false
+  },
+  "17": {
+   "name": "Z-Mart",
+   "context": "Z-Mart 0-91, 0-92, 0-94; script #17 (Chapter 7 \"Majin Buu\" card), #119",
+   "confidence": "high",
+   "areas": [
+    "0-91 Z-Mart",
+    "0-92 Z-Mart",
+    "0-94 Z-Mart"
+   ],
+   "ends": false
+  },
+  "18": {
+   "name": "HFIL",
+   "context": "HFIL 18-1..18-14",
+   "confidence": "high",
+   "areas": [
+    "18-1 HFIL",
+    "18-2 HFIL",
+    "18-3 HFIL",
+    "18-4 HFIL",
+    "18-5 HFIL",
+    "18-6 HFIL",
+    "18-7 HFIL",
+    "18-8 HFIL",
+    "18-9 HFIL",
+    "18-10 HFIL",
+    "18-11 HFIL",
+    "18-12 HFIL",
+    "18-13 HFIL",
+    "18-14 HFIL"
+   ],
+   "ends": false
+  },
+  "19": {
+   "name": "Northern Wilderness / Volcano",
+   "context": "Northern Wilderness 15-2..15-18, Volcano 15-19..15-31, Volcano Summit (15-32, Broly), Diablo Desert Express 11-17..11-24, area 0-90",
+   "confidence": "high",
+   "areas": [
+    "0-90 (Stolen Airship)",
+    "11-17 Diablo Desert Express",
+    "11-18 Diablo Desert Express",
+    "11-19 Diablo Desert Express",
+    "11-20 Diablo Desert Express",
+    "11-21 Diablo Desert Express",
+    "11-22 Diablo Desert Express",
+    "11-23 Diablo Desert Express",
+    "11-24 Diablo Desert Express",
+    "15-2 Northern Wilderness",
+    "15-3 Northern Wilderness",
+    "15-4 Northern Wilderness",
+    "15-5 Northern Wilderness",
+    "15-6 Northern Wilderness",
+    "15-7 Northern Wilderness",
+    "15-8 Northern Wilderness",
+    "15-9 Northern Wilderness",
+    "15-10 Northern Wilderness",
+    "15-11 Northern Wilderness",
+    "15-12 Northern Wilderness",
+    "15-13 Northern Wilderness",
+    "15-14 Northern Wilderness",
+    "15-15 Northern Wilderness",
+    "15-16 Northern Wilderness",
+    "15-17 Northern Wilderness",
+    "15-18 Northern Wilderness",
+    "15-19 Volcano",
+    "15-20 Volcano",
+    "15-21 Volcano",
+    "15-22 Volcano",
+    "15-23 Volcano",
+    "15-24 Volcano",
+    "15-25 Volcano",
+    "15-26 Volcano",
+    "15-27 Volcano",
+    "15-28 Volcano",
+    "15-29 Volcano",
+    "15-30 Volcano",
+    "15-31 Volcano",
+    "15-32 Volcano Summit"
+   ],
+   "ends": false
+  },
+  "20": {
+   "name": "Inside Buu",
+   "context": "Stomach 21-1..21-14, Intestines 21-15..21-25, Brain 21-26",
+   "confidence": "high",
+   "areas": [
+    "21-1 Stomach",
+    "21-2 Stomach",
+    "21-3 Stomach",
+    "21-4 Stomach",
+    "21-5 Stomach",
+    "21-6 Stomach",
+    "21-7 Stomach",
+    "21-8 Stomach",
+    "21-9 Stomach",
+    "21-10 Stomach",
+    "21-11 Stomach",
+    "21-12 Stomach",
+    "21-13 Stomach",
+    "21-14 Stomach",
+    "21-15 Intestines",
+    "21-16 Intestines",
+    "21-17 Intestines",
+    "21-18 Intestines",
+    "21-19 Intestines",
+    "21-20 Intestines",
+    "21-21 Intestines",
+    "21-22 Intestines",
+    "21-23 Intestines",
+    "21-24 Intestines",
+    "21-25 Intestines",
+    "21-26 Brain"
+   ],
+   "ends": false
+  },
+  "21": {
+   "name": "Kami's Lookout",
+   "context": "Kami's Lookout / Palace 6-1..6-5, 6-13..6-20, Hyperbolic Time Chamber 6-6..6-12",
+   "confidence": "high",
+   "areas": [
+    "6-1 Kami's Lookout",
+    "6-2 Kami's Palace",
+    "6-3 Kami's Palace",
+    "6-4 Kami's Palace",
+    "6-5 Kami's Palace",
+    "6-6 Hyperbolic Time Chamber",
+    "6-7 Hyperbolic Time Chamber",
+    "6-8 Hyperbolic Time Chamber",
+    "6-9 Hyperbolic Time Chamber",
+    "6-10 Hyperbolic Time Chamber",
+    "6-11 Hyperbolic Time Chamber",
+    "6-12 Hyperbolic Time Chamber",
+    "6-13 Kami's Lookout",
+    "6-14 Kami's Lookout",
+    "6-15 Kami's Lookout",
+    "6-20 Kami's Lookout"
+   ],
+   "ends": false
+  },
+  "22": {
+   "name": "Song 22 (no play site found)",
+   "context": "",
+   "confidence": "none",
+   "areas": [],
+   "ends": false
+  },
+  "23": {
+   "name": "Scripted scene (script #460)",
+   "context": "script #460 (also plays SFX 6 / 7)",
+   "confidence": "low",
+   "areas": [],
+   "ends": false
+  },
+  "24": {
+   "name": "Fukurou Forest / Ninja Stronghold",
+   "context": "Fukurou Forest 13-1..13-3, Ninja Stronghold 13-32..13-53, outside Kyodai Pyramid 14-1, 14-2",
+   "confidence": "high",
+   "areas": [
+    "13-1 Fukurou Forest",
+    "13-2 Fukurou Forest",
+    "13-3 Fukurou Forest",
+    "13-32 Ninja Stronghold",
+    "13-33 Ninja Stronghold",
+    "13-34 Ninja Stronghold",
+    "13-36 Ninja Stronghold",
+    "13-37 Ninja Stronghold",
+    "13-38 Ninja Stronghold",
+    "13-39 Ninja Stronghold",
+    "13-40 Ninja Stronghold",
+    "13-41 Ninja Stronghold",
+    "13-42 Ninja Stronghold",
+    "13-43 Ninja Stronghold",
+    "13-44 Ninja Stronghold",
+    "13-45 Ninja Stronghold",
+    "13-46 Ninja Stronghold",
+    "13-47 Ninja Stronghold",
+    "13-48 Ninja Stronghold",
+    "13-49 Ninja Stronghold",
+    "13-50 Ninja Stronghold",
+    "13-51 Ninja Stronghold",
+    "13-52 Ninja Stronghold",
+    "13-53 Ninja Stronghold",
+    "14-1 Outside Kyodai Pyramid",
+    "14-2 Outside Kyodai Pyramid"
+   ],
+   "ends": false
+  },
+  "25": {
+   "name": "Other World Stadium",
+   "context": "Other World Stadium (1-20); script #453 (warp to HFIL 18-90)",
+   "confidence": "high",
+   "areas": [
+    "1-20 Other World Stadium"
+   ],
+   "ends": false
+  },
+  "26": {
+   "name": "Grand Kai's Planet",
+   "context": "Grand Kai's Planet 1-12..1-15",
+   "confidence": "high",
+   "areas": [
+    "1-12 Grand Kai's Planet",
+    "1-13 Grand Kai's Planet",
+    "1-14 Grand Kai's Planet",
+    "1-15 Grand Kai's Planet"
+   ],
+   "ends": false
+  },
+  "27": {
+   "name": "Pilaf's Castle / Barren Wasteland",
+   "context": "Pilaf's Castle 10-1..10-31, Barren Wasteland 20-1..20-10 (Super Buu / Kid Buu)",
+   "confidence": "high",
+   "areas": [
+    "10-1 Pilaf's Castle",
+    "10-2 Pilaf's Castle",
+    "10-3 Pilaf's Castle",
+    "10-4 Pilaf's Castle",
+    "10-5 Pilaf's Castle",
+    "10-6 Pilaf's Castle",
+    "10-7 Pilaf's Castle",
+    "10-8 Pilaf's Castle",
+    "10-9 Pilaf's Castle",
+    "10-10 Pilaf's Castle",
+    "10-11 Pilaf's Castle",
+    "10-12 Pilaf's Castle",
+    "10-14 Pilaf's Castle",
+    "10-15 Pilaf's Castle",
+    "10-16 Pilaf's Castle",
+    "10-17 Pilaf's Castle",
+    "10-18 Pilaf's Castle",
+    "10-19 Pilaf's Castle",
+    "10-20 Pilaf's Castle",
+    "10-21 Pilaf's Castle",
+    "10-22 Pilaf's Castle",
+    "10-23 Pilaf's Castle",
+    "10-24 Pilaf's Castle",
+    "10-25 Pilaf's Castle",
+    "10-26 Pilaf's Castle",
+    "10-27 Pilaf's Castle",
+    "10-28 Pilaf's Castle",
+    "10-29 Pilaf's Castle",
+    "10-30 Pilaf's Castle",
+    "10-31 Pilaf's Castle",
+    "20-1 Barren Wasteland",
+    "20-2 Barren Wasteland",
+    "20-3 Barren Wasteland",
+    "20-4 Barren Wasteland",
+    "20-5 Barren Wasteland",
+    "20-6 Barren Wasteland",
+    "20-7 Barren Wasteland",
+    "20-8 Barren Wasteland",
+    "20-9 Barren Wasteland",
+    "20-10 Barren Wasteland"
+   ],
+   "ends": false
+  },
+  "28": {
+   "name": "East District 439 / Southwest Forest",
+   "context": "East District 439 2-9..2-90, Grandpa Gohan's Hut, Southwest Forest 8-1..8-16, Babidi's Ship entrance (8-17)",
+   "confidence": "high",
+   "areas": [
+    "2-9 East District 439",
+    "2-10 East District 439",
+    "2-11 East District 439",
+    "2-12 East District 439",
+    "2-13 East District 439",
+    "2-14 East District 439",
+    "2-15 East District 439",
+    "2-16 East District 439",
+    "2-17 East District 439",
+    "2-18 East District 439",
+    "2-19 East District 439",
+    "2-20 East District 439",
+    "2-33 East District 439",
+    "2-34 East District 439",
+    "2-35 East District 439",
+    "2-36 East District 439",
+    "2-37 East District 439",
+    "2-38 East District 439",
+    "2-39 East District 439",
+    "2-40 East District 439",
+    "2-41 East District 439",
+    "2-42 East District 439",
+    "2-43 East District 439",
+    "2-44 East District 439",
+    "2-45 East District 439",
+    "2-46 East District 439",
+    "2-47 Grandpa Gohan's Hut",
+    "2-90 East District 439",
+    "8-1 Southwest Forest",
+    "8-2 Southwest Forest",
+    "8-3 Southwest Forest",
+    "8-4 Southwest Forest",
+    "8-5 Southwest Forest",
+    "8-6 Southwest Forest",
+    "8-7 Southwest Forest",
+    "8-8 Southwest Forest",
+    "8-9 Southwest Forest",
+    "8-10 Southwest Forest",
+    "8-11 Southwest Forest",
+    "8-12 Southwest Forest",
+    "8-13 Southwest Forest",
+    "8-14 Southwest Forest",
+    "8-15 Southwest Forest",
+    "8-16 Southwest Forest",
+    "8-17 Babidi's Ship"
+   ],
+   "ends": false
+  },
+  "29": {
+   "name": "Thieves Den / Hercule City (after Buu's attack)",
+   "context": "Thieves Den 9-1..9-8, Lighthouse 9-9 / 9-17; Hercule City 3-1..3-3 once story flags 26+27 are set (area music script); scripts #125, #131, #168",
+   "confidence": "high",
+   "areas": [
+    "9-1 Thieves Den",
+    "9-2 Thieves Den",
+    "9-3 Thieves Den",
+    "9-4 Thieves Den",
+    "9-5 Thieves Den",
+    "9-6 Thieves Den",
+    "9-7 Thieves Den",
+    "9-8 Thieves Den",
+    "9-9 Lighthouse",
+    "9-17 Lighthouse"
+   ],
+   "ends": false
+  },
+  "30": {
+   "name": "Diablo Desert / Kyodai Pyramid",
+   "context": "Diablo Desert 11-1..11-16, Kyodai Pyramid 14-3..14-23, Totenhotep's Chamber 14-24, 14-25",
+   "confidence": "high",
+   "areas": [
+    "11-1 Diablo Desert",
+    "11-2 Diablo Desert",
+    "11-3 Diablo Desert",
+    "11-4 Diablo Desert",
+    "11-5 Diablo Desert",
+    "11-6 Diablo Desert",
+    "11-7 Diablo Desert",
+    "11-8 Diablo Desert",
+    "11-9 Diablo Desert",
+    "11-10 Diablo Desert",
+    "11-11 Diablo Desert",
+    "11-12 Diablo Desert",
+    "11-13 Diablo Desert",
+    "11-14 Diablo Desert",
+    "11-15 Diablo Desert",
+    "11-16 Diablo Desert",
+    "14-3 Kyodai Pyramid",
+    "14-4 Kyodai Pyramid",
+    "14-5 Kyodai Pyramid",
+    "14-6 Kyodai Pyramid",
+    "14-7 Kyodai Pyramid",
+    "14-8 Kyodai Pyramid",
+    "14-9 Kyodai Pyramid",
+    "14-10 Kyodai Pyramid",
+    "14-11 Kyodai Pyramid",
+    "14-12 Kyodai Pyramid",
+    "14-13 Kyodai Pyramid",
+    "14-14 Kyodai Pyramid",
+    "14-15 Kyodai Pyramid",
+    "14-16 Kyodai Pyramid",
+    "14-17 Kyodai Pyramid",
+    "14-18 Kyodai Pyramid",
+    "14-19 Kyodai Pyramid",
+    "14-20 Kyodai Pyramid",
+    "14-21 Kyodai Pyramid",
+    "14-22 Kyodai Pyramid",
+    "14-23 Kyodai Pyramid",
+    "14-24 Totenhotep's Chamber",
+    "14-25 Totenhotep's Chamber"
+   ],
+   "ends": false
+  },
+  "31": {
+   "name": "Heaven",
+   "context": "Heaven (22-1)",
+   "confidence": "high",
+   "areas": [
+    "22-1 Heaven"
+   ],
+   "ends": false
+  },
+  "32": {
+   "name": "Song 32 (no play site found)",
+   "context": "",
+   "confidence": "none",
+   "areas": [],
+   "ends": false
+  },
+  "33": {
+   "name": "Song 33 (no play site found)",
+   "context": "",
+   "confidence": "none",
+   "areas": [],
+   "ends": false
+  },
+  "34": {
+   "name": "Hideout",
+   "context": "Rogue Submarine (0-52), Stolen Airship (0-55), Z-Mart back rooms (0-93, 0-95), Thieves Den 9-10..9-16",
+   "confidence": "high",
+   "areas": [
+    "0-52 Rogue Submarine",
+    "0-55 Stolen Airship",
+    "0-93 Z-Mart",
+    "0-95 Z-Mart",
+    "9-10 Thieves Den",
+    "9-11 Thieves Den",
+    "9-12 Thieves Den",
+    "9-13 Thieves Den",
+    "9-14 Thieves Den",
+    "9-15 Thieves Den",
+    "9-16 Thieves Den"
+   ],
+   "ends": false
+  },
+  "35": {
+   "name": "Planet of the Kais",
+   "context": "Planet of the Kais 19-1..19-7, area 0-9; script #456 (warp to 19-3)",
+   "confidence": "high",
+   "areas": [
+    "0-9 (Bulma's Airship)",
+    "19-1 Planet of the Kais",
+    "19-2 Planet of the Kais",
+    "19-3 Planet of the Kais",
+    "19-4 Planet of the Kais",
+    "19-5 Planet of the Kais",
+    "19-6 Planet of the Kais",
+    "19-7 Planet of the Kais"
+   ],
+   "ends": false
+  },
+  "36": {
+   "name": "Story scene (script #4)",
+   "context": "script #4, started from native code 0x08005DEC (new-game / story setup)",
+   "confidence": "low",
+   "areas": [],
+   "ends": false
+  },
+  "37": {
+   "name": "Story scene (script #516)",
+   "context": "script #516 (warp to area 0-96)",
+   "confidence": "low",
+   "areas": [],
+   "ends": false
+  },
+  "38": {
+   "name": "Hercule Cafe / Kame House",
+   "context": "Hercule Café 3-20..3-22, Hercule City 3-23, Roshi's Island (5-1), Kame House 5-2, 5-3",
+   "confidence": "high",
+   "areas": [
+    "3-20 Hercule Café",
+    "3-21 Hercule Café",
+    "3-22 Hercule Café",
+    "3-23 Hercule City",
+    "5-1 Roshi's Island",
+    "5-2 Kame House",
+    "5-3 Kame House"
+   ],
+   "ends": false
+  },
+  "39": {
+   "name": "Sparring match",
+   "context": "script #215 (Kami's Lookout scene), #273 (World Tournament match vs Videl, 'You Lose!!' branch)",
+   "confidence": "medium",
+   "areas": [],
+   "ends": false
+  },
+  "40": {
+   "name": "Song 40 (no play site found)",
+   "context": "",
+   "confidence": "none",
+   "areas": [],
+   "ends": false
+  },
+  "41": {
+   "name": "Song 41 (no play site found)",
+   "context": "",
+   "confidence": "none",
+   "areas": [],
+   "ends": false
+  },
+  "42": {
+   "name": "Giant Crater (after the blast)",
+   "context": "Giant Crater 6-16 (Super Buu)",
+   "confidence": "high",
+   "areas": [
+    "6-16 Giant Crater"
+   ],
+   "ends": false
+  },
+  "43": {
+   "name": "Song 43 (no play site found)",
+   "context": "",
+   "confidence": "none",
+   "areas": [],
+   "ends": true
+  },
+  "44": {
+   "name": "Boss battle",
+   "context": "scripted fights: #26 (West City, spawns Majin Buu type 28), #58 (warp to Yemma's Office), #313 (World Tournament ring 7-6), #142, #305; World Tournament ring area 7-7",
+   "confidence": "medium",
+   "areas": [
+    "7-7 World Tournament Stadium"
+   ],
+   "ends": false
+  },
+  "45": {
+   "name": "Title screen",
+   "context": "played by the boot code (0x080041CE, 0x0800540E)",
+   "confidence": "high",
+   "areas": [],
+   "ends": false
+  },
+  "46": {
+   "name": "Song 46 (no play site found)",
+   "context": "",
+   "confidence": "none",
+   "areas": [],
+   "ends": false
+  },
+  "47": {
+   "name": "Rocky Canyon",
+   "context": "Rocky Canyon 8-70 (Majin Vegeta)",
+   "confidence": "high",
+   "areas": [
+    "8-70 Rocky Canyon"
+   ],
+   "ends": false
+  },
+  "48": {
+   "name": "Song 48 (no play site found)",
+   "context": "",
+   "confidence": "none",
+   "areas": [],
+   "ends": false
+  },
+  "49": {
+   "name": "Story scene (scripts #103, #143)",
+   "context": "script #103 (warp to West City 0-22), #143",
+   "confidence": "low",
+   "areas": [],
+   "ends": false
+  },
+  "50": {
+   "name": "World Tournament",
+   "context": "World Tournament Stadium 7-4..7-6",
+   "confidence": "high",
+   "areas": [
+    "7-4 World Tournament Stadium",
+    "7-5 World Tournament Stadium",
+    "7-6 World Tournament Stadium"
+   ],
+   "ends": false
+  },
+  "51": {
+   "name": "West City (ruins)",
+   "context": "areas 0-50, 0-51 (West City)",
+   "confidence": "high",
+   "areas": [
+    "0-50 (West City)",
+    "0-51 (West City)"
+   ],
+   "ends": false
+  },
+  "52": {
+   "name": "Song 52 (no play site found)",
+   "context": "",
+   "confidence": "none",
+   "areas": [],
+   "ends": false
+  }
+ },
+ "sfx": {
+  "0": {
+   "name": "Sound 00",
+   "trigger": "",
+   "confidence": "none",
+   "game_volume": 64
+  },
+  "1": {
+   "name": "Sound 01",
+   "trigger": "",
+   "confidence": "none",
+   "game_volume": 64
+  },
+  "2": {
+   "name": "Cutscene sound 02",
+   "trigger": "story scripts #338",
+   "confidence": "medium",
+   "game_volume": 64
+  },
+  "3": {
+   "name": "Ki charge (loop)",
+   "trigger": "hold B with a beam / Big Bang / Masenko / Energy Sword / Final Flash / Flame Kamehameha: starts on the press, stopped on release or when the beam fires",
+   "confidence": "high",
+   "game_volume": 64
+  },
+  "4": {
+   "name": "Cutscene sound 04",
+   "trigger": "story scripts #160",
+   "confidence": "medium",
+   "game_volume": 64
+  },
+  "5": {
+   "name": "Sound 05",
+   "trigger": "",
+   "confidence": "none",
+   "game_volume": 64
+  },
+  "6": {
+   "name": "Cutscene sound 06",
+   "trigger": "story scripts #25, #460, #478",
+   "confidence": "medium",
+   "game_volume": 64
+  },
+  "7": {
+   "name": "Cutscene sound 07",
+   "trigger": "story scripts #460, #479",
+   "confidence": "medium",
+   "game_volume": 64
+  },
+  "8": {
+   "name": "Cutscene sound 08",
+   "trigger": "story scripts #483, #484",
+   "confidence": "medium",
+   "game_volume": 64
+  },
+  "9": {
+   "name": "Sound 09",
+   "trigger": "",
+   "confidence": "none",
+   "game_volume": 64
+  },
+  "10": {
+   "name": "Sound 10",
+   "trigger": "",
+   "confidence": "none",
+   "game_volume": 64
+  },
+  "11": {
+   "name": "Sound 11",
+   "trigger": "native code call site 0x0802B078",
+   "confidence": "low",
+   "game_volume": 64
+  },
+  "12": {
+   "name": "Sound 12",
+   "trigger": "",
+   "confidence": "none",
+   "game_volume": 64
+  },
+  "13": {
+   "name": "Sound 13",
+   "trigger": "",
+   "confidence": "none",
+   "game_volume": 64
+  },
+  "14": {
+   "name": "Sound 14",
+   "trigger": "",
+   "confidence": "none",
+   "game_volume": 64
+  },
+  "15": {
+   "name": "Cutscene sound 15",
+   "trigger": "story scripts #57, #58, #518",
+   "confidence": "medium",
+   "game_volume": 64
+  },
+  "16": {
+   "name": "Cutscene sound 16",
+   "trigger": "story scripts #324, #327, #330 ...",
+   "confidence": "medium",
+   "game_volume": 64
+  },
+  "17": {
+   "name": "Cutscene sound 17",
+   "trigger": "story scripts #9, #412, #415 ...",
+   "confidence": "medium",
+   "game_volume": 64
+  },
+  "18": {
+   "name": "Sound 18",
+   "trigger": "",
+   "confidence": "none",
+   "game_volume": 64
+  },
+  "19": {
+   "name": "Sound 19",
+   "trigger": "native code call site 0x0802FC20",
+   "confidence": "low",
+   "game_volume": 64
+  },
+  "20": {
+   "name": "Energy blast A",
+   "trigger": "Energy Blast fired (random pick of 20/21)",
+   "confidence": "high",
+   "game_volume": 64
+  },
+  "21": {
+   "name": "Energy blast B",
+   "trigger": "Energy Blast fired (random pick of 20/21)",
+   "confidence": "high",
+   "game_volume": 64
+  },
+  "22": {
+   "name": "Cutscene sound 22",
+   "trigger": "story scripts #131, #143, #169",
+   "confidence": "medium",
+   "game_volume": 64
+  },
+  "23": {
+   "name": "Big Bang release",
+   "trigger": "Big Bang released after charging",
+   "confidence": "high",
+   "game_volume": 64
+  },
+  "24": {
+   "name": "Dragon Fist Explosion",
+   "trigger": "Dragon Fist Explosion activated",
+   "confidence": "high",
+   "game_volume": 64
+  },
+  "25": {
+   "name": "Hit without damage",
+   "trigger": "attack-type callback 0x08012FC4 when the hit result has no damage nibble",
+   "confidence": "low",
+   "game_volume": 32
+  },
+  "26": {
+   "name": "Cutscene sound 26",
+   "trigger": "story scripts #501, #502",
+   "confidence": "medium",
+   "game_volume": 64
+  },
+  "27": {
+   "name": "Sound 27",
+   "trigger": "",
+   "confidence": "none",
+   "game_volume": 64
+  },
+  "28": {
+   "name": "Sound 28",
+   "trigger": "native code call site 0x0801C96A, 0x08026582, 0x08026802",
+   "confidence": "low",
+   "game_volume": 64
+  },
+  "29": {
+   "name": "Cutscene sound 29",
+   "trigger": "story scripts #4, #338",
+   "confidence": "medium",
+   "game_volume": 64
+  },
+  "30": {
+   "name": "Hit impact (special attackers)",
+   "trigger": "hit spark 0x0802A1D4 when the attacker graphic is 0x60 / 0xE5 / 0xDC",
+   "confidence": "low",
+   "game_volume": 64
+  },
+  "31": {
+   "name": "Sound 31",
+   "trigger": "native code call site 0x0801BB76",
+   "confidence": "low",
+   "game_volume": 64
+  },
+  "32": {
+   "name": "Beam fire (loop)",
+   "trigger": "beam / Final Flash / Energy Sword / Flame Kamehameha / Dragon Fist body firing; stopped when it ends",
+   "confidence": "high",
+   "game_volume": 64
+  },
+  "33": {
+   "name": "Beam end",
+   "trigger": "beam finishes",
+   "confidence": "high",
+   "game_volume": 64
+  },
+  "34": {
+   "name": "Energy wave release",
+   "trigger": "Burning Attack, Masenkoha release, Ultra Volleyball throw",
+   "confidence": "high",
+   "game_volume": 64
+  },
+  "35": {
+   "name": "Hit spark variant",
+   "trigger": "hit spark object 0x0802A3A0",
+   "confidence": "low",
+   "game_volume": 64
+  },
+  "36": {
+   "name": "Level up",
+   "trigger": "level gained (bytecode script #3: push 36, native 0x1F)",
+   "confidence": "high",
+   "game_volume": 64
+  },
+  "37": {
+   "name": "Cutscene sound 37",
+   "trigger": "story scripts #102, #103, #342 ...",
+   "confidence": "medium",
+   "game_volume": 64
+  },
+  "38": {
+   "name": "Sound 38",
+   "trigger": "native code call site 0x08031D68, 0x080337AE",
+   "confidence": "low",
+   "game_volume": 64
+  },
+  "39": {
+   "name": "Menu cursor",
+   "trigger": "cursor moves in the pause / status menus",
+   "confidence": "high",
+   "game_volume": 64
+  },
+  "40": {
+   "name": "Menu confirm",
+   "trigger": "pause (START), menu select (A), cycle skill (L)",
+   "confidence": "high",
+   "game_volume": 64
+  },
+  "41": {
+   "name": "Low HP warning",
+   "trigger": "repeats about every 70 frames while HP is low (also the \"can't\" buzz)",
+   "confidence": "high",
+   "game_volume": 32
+  },
+  "42": {
+   "name": "Cutscene sound 42",
+   "trigger": "story scripts #38, #66, #91 ...",
+   "confidence": "medium",
+   "game_volume": 64
+  },
+  "43": {
+   "name": "Sound 43",
+   "trigger": "",
+   "confidence": "none",
+   "game_volume": 64
+  },
+  "44": {
+   "name": "Sound 44",
+   "trigger": "native code call site 0x08017EF0",
+   "confidence": "low",
+   "game_volume": 64
+  },
+  "45": {
+   "name": "Sound 45",
+   "trigger": "native code call site 0x0802BC8C",
+   "confidence": "low",
+   "game_volume": 64
+  },
+  "46": {
+   "name": "Volleyball bounce",
+   "trigger": "Ultra Volleyball Attack ball hit",
+   "confidence": "high",
+   "game_volume": 64
+  },
+  "47": {
+   "name": "Energy Punch",
+   "trigger": "Energy Punch activated",
+   "confidence": "high",
+   "game_volume": 64
+  },
+  "48": {
+   "name": "Hit impact A",
+   "trigger": "a hit lands: player melee, enemy melee, energy blast, beam ticks (random pick of 48/49)",
+   "confidence": "high",
+   "game_volume": 64
+  },
+  "49": {
+   "name": "Hit impact B",
+   "trigger": "same as 48 (random pick of 48/49)",
+   "confidence": "high",
+   "game_volume": 64
+  },
+  "50": {
+   "name": "Melee swing A",
+   "trigger": "every punch (player A press or enemy punch), random pick of 50/51",
+   "confidence": "high",
+   "game_volume": 64
+  },
+  "51": {
+   "name": "Melee swing B",
+   "trigger": "same as 50 (random pick of 50/51)",
+   "confidence": "high",
+   "game_volume": 64
+  },
+  "52": {
+   "name": "Sound 52",
+   "trigger": "native code call site 0x0801CF2A, 0x0803D29A",
+   "confidence": "low",
+   "game_volume": 64
+  },
+  "53": {
+   "name": "Cutscene sound 53",
+   "trigger": "story scripts #412..#422, #483",
+   "confidence": "medium",
+   "game_volume": 64
+  },
+  "54": {
+   "name": "Super Saiyan transform",
+   "trigger": "Super Saiyan skill (and when the form ends)",
+   "confidence": "high",
+   "game_volume": 64
+  },
+  "55": {
+   "name": "Cutscene sound 55",
+   "trigger": "story scripts #103, #330",
+   "confidence": "medium",
+   "game_volume": 64
+  },
+  "56": {
+   "name": "Sound 56",
+   "trigger": "",
+   "confidence": "none",
+   "game_volume": 64
+  },
+  "57": {
+   "name": "Cutscene sound 57",
+   "trigger": "story scripts #330, #415",
+   "confidence": "medium",
+   "game_volume": 64
+  },
+  "58": {
+   "name": "Sound 58",
+   "trigger": "",
+   "confidence": "none",
+   "game_volume": 64
+  },
+  "59": {
+   "name": "Dash",
+   "trigger": "double-tap dash starts",
+   "confidence": "high",
+   "game_volume": 64
+  },
+  "60": {
+   "name": "Sound 60",
+   "trigger": "",
+   "confidence": "none",
+   "game_volume": 64
+  },
+  "61": {
+   "name": "Sound 61",
+   "trigger": "native code call site 0x0802C128",
+   "confidence": "low",
+   "game_volume": 64
+  },
+  "62": {
+   "name": "Hit impact (special attackers 2)",
+   "trigger": "hit spark 0x0802A1D4 when the attacker graphic is 0xEE / 0xF4 / 0xED",
+   "confidence": "low",
+   "game_volume": 64
+  },
+  "63": {
+   "name": "Enemy loop sound",
+   "trigger": "looping enemy effect, stopped per instance (0x0803E32C)",
+   "confidence": "low",
+   "game_volume": 64
+  }
+ },
+ "arena_music": {
+  "crater": 1,
+  "volcano": 19,
+  "hfil": 18,
+  "wasteland": 27,
+  "demon": 1,
+  "canyon": 47,
+  "yakon": 1,
+  "crater2": 42,
+  "htc": 21,
+  "stadium": 50,
+  "forest": 28
+ },
+ "boss_music": 44,
+ "events": {
+  "melee_swing": {
+   "sfx": [
+    50,
+    51
+   ]
+  },
+  "hit": {
+   "sfx": [
+    48,
+    49
+   ]
+  },
+  "ki_blast": {
+   "sfx": [
+    20,
+    21
+   ]
+  },
+  "charge": {
+   "sfx": [
+    3
+   ],
+   "loop": true
+  },
+  "beam": {
+   "sfx": [
+    32
+   ],
+   "loop": true
+  },
+  "beam_end": {
+   "sfx": [
+    33
+   ]
+  },
+  "wave": {
+   "sfx": [
+    34
+   ]
+  },
+  "big_bang": {
+   "sfx": [
+    23
+   ]
+  },
+  "dragon_fist": {
+   "sfx": [
+    24
+   ]
+  },
+  "energy_punch": {
+   "sfx": [
+    47
+   ]
+  },
+  "volleyball": {
+   "sfx": [
+    46
+   ]
+  },
+  "transform": {
+   "sfx": [
+    54
+   ]
+  },
+  "dash": {
+   "sfx": [
+    59
+   ]
+  },
+  "level_up": {
+   "sfx": [
+    36
+   ]
+  },
+  "low_hp": {
+   "sfx": [
+    41
+   ],
+   "volume": 32
+  },
+  "menu": {
+   "sfx": [
+    40
+   ]
+  },
+  "cursor": {
+   "sfx": [
+    39
+   ]
+  }
+ }
+}

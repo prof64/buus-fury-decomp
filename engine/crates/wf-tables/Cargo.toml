@@ -1,0 +1,10 @@
+[package]
+name = "wf-tables"
+description = "Buu's Fury game-mechanics tables from ROM: characters, forms, skills, attacks, enemies, AI, bosses, items, levels"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+wf-rom.workspace = true
+serde_json.workspace = true

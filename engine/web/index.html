@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ROM Extractor</title>
+<style>
+  :root { --bg: #f6f5f2; --fg: #1d1d1b; --muted: #6b6a66; --line: #d9d6cf; --accent: #2f5fd0; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #161615; --fg: #ecebe7; --muted: #9a988f; --line: #33322f; --accent: #7aa2ff; } }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 system-ui, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 32px 16px; }
+  #drop { border: 2px dashed var(--line); border-radius: 12px; padding: 48px 16px; text-align: center; color: var(--muted); }
+  #drop.over { border-color: var(--accent); color: var(--fg); }
+  pre { white-space: pre-wrap; font-size: 13px; }
+  img.pix { image-rendering: pixelated; max-width: 100%; background: repeating-conic-gradient(#8883 0 25%, transparent 0 50%) 0 0/16px 16px; }
+  button { font: inherit; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Bring your own ROM</h1>
+  <p>Drop your <b>Dragon Ball Z: Buu's Fury (USA)</b> ROM here. Everything is extracted locally in your browser;
+     nothing is uploaded.</p>
+  <div id="drop">Drop the .gba file here, or <input type="file" id="pick" accept=".gba"></div>
+  <pre id="log"></pre>
+  <div id="preview"></div>
+</main>
+<script type="module">
+import { loadExtractor } from './extract.js';
+const log = (s) => (document.getElementById('log').textContent += s + '\n');
+const ex = await loadExtractor(fetch('wf_wasm.wasm'));
+async function run(file) {
+  document.getElementById('log').textContent = '';
+  const rom = new Uint8Array(await file.arrayBuffer());
+  const t0 = performance.now();
+  let files;
+  try { files = ex.extract(rom); } catch (e) { log(String(e.message || e)); return; }
+  log(`${files.size} files in ${((performance.now() - t0) / 1000).toFixed(2)} s`);
+  const pack = JSON.parse(new TextDecoder().decode(files.get('pack.json')));
+  log(JSON.stringify(pack.files_per_category));
+  const sheet = files.get('sprites/106_goku/sheet.png') || [...files.entries()].find(([k]) => k.endsWith('sheet.png'))[1];
+  const img = document.createElement('img');
+  img.className = 'pix';
+  img.src = URL.createObjectURL(new Blob([sheet], { type: 'image/png' }));
+  document.getElementById('preview').replaceChildren(img);
+}
+const drop = document.getElementById('drop');
+drop.ondragover = (e) => { e.preventDefault(); drop.classList.add('over'); };
+drop.ondragleave = () => drop.classList.remove('over');
+drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove('over'); run(e.dataTransfer.files[0]); };
+document.getElementById('pick').onchange = (e) => run(e.target.files[0]);
+</script>
+</body>
+</html>

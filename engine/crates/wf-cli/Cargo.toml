@@ -1,0 +1,15 @@
+[package]
+name = "wf-cli"
+description = "Native CLI: wf-extract <rom> <outdir>"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "wf-extract"
+path = "src/main.rs"
+
+[dependencies]
+wf-rom.workspace = true
+wf-extract = { path = "../wf-extract" }
+serde_json.workspace = true

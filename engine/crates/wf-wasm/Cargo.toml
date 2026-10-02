@@ -1,0 +1,13 @@
+[package]
+name = "wf-wasm"
+description = "Browser build of the extractor: plain extern \"C\" API, no wasm-bindgen (see engine/web/)"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wf-rom.workspace = true
+wf-extract = { path = "../wf-extract" }

@@ -1,0 +1,13 @@
+[package]
+name = "wf-extract"
+description = "Buu's Fury base-content extractor: ROM bytes -> moddable content tree (no emulator)"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+wf-rom.workspace = true
+wf-audio = { path = "../wf-audio" }
+wf-maps = { path = "../wf-maps" }
+wf-tables = { path = "../wf-tables" }
+serde_json.workspace = true
