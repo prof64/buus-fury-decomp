@@ -31,7 +31,7 @@ fn draw_key(w: &World, i: usize) -> (i32, i32, u32) {
             _ => (1, 0),
         },
         Body::Injector(_) | Body::Breakable(_) => (9, 0),
-        Body::Pickup(p) => (0, p.y),
+        Body::Pickup(p) => (0, p.bx[3]),
         Body::MapSprite(m) => (0, m.y),
         Body::Npc(n) => (0, n.a.py()),
     };
@@ -70,9 +70,12 @@ pub fn render_view(w: &World, out: &mut RenderView) {
         Some(f) => f.map.clone(),
         None => w.data.areas.get(&w.arena.map).map(|a| a.0.clone()).unwrap_or_default(),
     };
-    out.map = Some(MapView { id: map_id, anim_frame: w.frame, shake: w.g.shake_off });
+    let mode7 = w.field.as_ref().and_then(|f| f.flight.as_ref().map(|fl| wf_view::Mode7View { x: fl.cam[0], y: fl.cam[1], height: fl.cam[2], heading: fl.cam[3], pitch: fl.cam[4], label: f.label.map(|l| l as i32) }));
+    out.map = Some(MapView { id: map_id, anim_frame: w.frame, shake: w.g.shake_off, mode7 });
     let mut order: Vec<usize> = (0..w.ents.len()).filter(|&i| !w.ents[i].removed).collect();
     order.sort_by_key(|&i| draw_key(w, i));
+    // field: the debris chips, the item-get icon (front-most), then the props after the actors (behind them)
+    crate::fieldview::front(w, out);
     // OAM order: front-most first
     for &i in order.iter().rev() {
         let e = &w.ents[i];
@@ -84,12 +87,17 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                     Some(a) => (a.raw, a.frame),
                     None => (p.ap.raw, p.ap.frame),
                 };
-                let step = p.a.sprite.and_then(|s| w.data.sprite(s)).and_then(|sp| sp.anim_raw(raw).or_else(|| sp.anim_raw(1))).and_then(|a| {
-                    let st = a.steps(p.a.facing);
+                // Majin Buu's candy: the def is 0x36 (sprite 45, the sweets); eaten: not in the world
+                let mut a = std::borrow::Cow::Borrowed(&p.a);
+                if p.candy_def {
+                    a.to_mut().sprite = Some(45);
+                }
+                let step = a.sprite.and_then(|s| w.data.sprite(s)).and_then(|sp| sp.anim_raw(raw).or_else(|| sp.anim_raw(1))).and_then(|an| {
+                    let st = an.steps(a.facing);
                     st.get((frame.max(0) as usize).min(st.len().saturating_sub(1))).map(|s| (s.frame, s.flip, s.attach))
                 });
-                if p.a.alpha > 0 {
-                    actor_draw(w, id, &p.a, step, out);
+                if p.a.alpha > 0 && !p.gone {
+                    actor_draw(w, id, &a, step, out);
                 }
             }
             Body::Enemy(n) => {
@@ -143,13 +151,16 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                             record(w, id, 0x0872_d6b8 + 60 * d as u32 + 12 * (t >> 2) as u32, x, y, out);
                         }
                     }
-                    ShotKind::Bomb { z8, .. } => {
+                    ShotKind::Bomb { .. } => {
                         let mut k = (t >> 2) & 3;
                         if k == 3 {
                             k = 1;
                         }
-                        record(w, id, 0x0871_e984 + 12 * k as u32, x, y + (z8 >> 3), out);
+                        record(w, id, 0x0871_e984 + 12 * k as u32, x, y, out);
                     }
+                    // a flying mummy bandage (records 0x087571F4: straight 3 * (dir >> 1) + tick >> 3, diagonal + 6); stuck
+                    // ones are drawn with the player
+                    ShotKind::Wrap(m) if !m.stuck => effect(id, 0x0875_71f4, (if m.diag { 6 } else { 0 }) + 3 * (d >> 1) + (m.tick >> 3), x, y, out),
                     ShotKind::SjWave => record(w, id, 0x0875_a6a8 + 12 * d as u32, x, y, out),
                     _ => {}
                 }
@@ -161,9 +172,13 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                 });
                 actor_draw(w, id, &n.a, step, out);
             }
-            Body::Injector(_) | Body::Breakable(_) | Body::Pickup(_) | Body::MapSprite(_) => {}
+            Body::Pickup(p) => crate::fieldview::pickup(w, id, p, out),
+            Body::MapSprite(m) => crate::fieldview::map_sprite(w, id, m, out),
+            Body::Injector(_) | Body::Breakable(_) => {}
         }
     }
+    // field: the map props (and breakables) and level signs behind the actors
+    crate::fieldview::props(w, out);
     // cutscene presentation: fade, dialog box
     out.fade_black = crate::scene::fade_black(w);
     if let Some(d) = &w.scene.dialog {

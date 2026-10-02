@@ -7,10 +7,11 @@ use crate::content::AnimRef;
 use crate::damage::atk;
 use crate::enemy::{self as en, set_anim, KnockState, ShotType};
 use crate::fixed::{round_div_sqrt, HOP_ARC8};
+use crate::eanim::RuleKind;
 use crate::geom::{facing_toward, overlaps, Rect, DIR_VEC};
 use crate::player::{self, HoldKind};
 use crate::shots;
-use crate::tables::{DRIFT_COS, DRIFT_SIN, RING24, RING40};
+use crate::tables::{RING24, RING40, SIN256};
 use crate::world::{Body, HitMsg, World};
 use std::sync::Arc;
 
@@ -39,12 +40,16 @@ struct C {
 
 fn rt<'a>(w: &'a mut World, c: &C, n: u16) -> Option<&'a mut NodeRt> {
     match &mut w.ents[c.i].body {
-        Body::Enemy(e) => e.ai.stack.get_mut(c.lvl).filter(|s| s.serial == c.serial).map(|s| &mut s.rt[n as usize]),
+        Body::Enemy(e) => {
+            let ai = &mut e.ai;
+            if ai.stack.get(c.lvl).is_some_and(|s| s.serial == c.serial) {
+                return Some(&mut ai.stack[c.lvl].rt[n as usize]);
+            }
+            // replaced / popped during this evaluation: the tree finishes its update on its own runtime
+            ai.orphans.iter_mut().find(|s| s.serial == c.serial).map(|s| &mut s.rt[n as usize])
+        }
         _ => None,
     }
-}
-fn gen(w: &World, i: usize) -> u32 {
-    w.en_ref(i).ai.gen
 }
 fn kids(c: &C, n: u16) -> &[u16] {
     &c.tree.nodes[n as usize].kids
@@ -70,10 +75,33 @@ fn ctx_top(w: &World, i: usize) -> Option<C> {
     let s = &e.ai.stack[lvl];
     Some(C { i, lvl, serial: s.serial, tree: Arc::clone(&s.tree) })
 }
-fn build(w: &mut World, id: u16) -> StackEntry {
+/// a state's tree is built (the reference's `create` of every node, in tree order): the nodes that do work at
+/// creation (DriftContact's velocity draws, IfButtonMashed's counter state)
+fn build(w: &mut World, i: usize, id: u16) -> StackEntry {
     let tree = w.data.states.get(&id).cloned().unwrap_or_else(|| Arc::new(crate::ai::compile_behaviour(id, &Default::default())));
     let serial = w.next_serial();
-    StackEntry { state: id, serial, rt: new_rt(&tree), tree }
+    let mut rt = new_rt(&tree);
+    for (k, n) in tree.nodes.iter().enumerate() {
+        match n.k {
+            // node create 0x0802C69C: s = rand(3) + 1, a = rand(256); v = (cos a, sin a) * s >> 10 (1/256 px)
+            K::DriftContact => {
+                let s3 = w.rng.rand(3) + 1;
+                let ang = w.rng.rand(256) as usize;
+                rt[k].d[0] = (SIN256[(ang + 0x40) & 0xff] * s3) >> 10;
+                rt[k].d[1] = (SIN256[ang] * s3) >> 10;
+                rt[k].d[2] = 0;
+            }
+            // create 0x080363FA: count +0x10 = 0, stamp +0xC = now - gap - 1
+            K::IfButtonMashed => {
+                let gap = n.p.g(P::Gap) as i32;
+                rt[k].d[3] = 0;
+                rt[k].d[4] = w.g.clock(w.frame) as i32 - gap - 1;
+            }
+            _ => {}
+        }
+    }
+    let _ = i;
+    StackEntry { state: id, serial, rt, tree }
 }
 /// (the reference's history log; the state stamp obj+0x210 is only written by the Block node's exit)
 fn note(_w: &mut World, _i: usize) {}
@@ -82,7 +110,7 @@ pub fn push(w: &mut World, i: usize, id: u16) {
         return;
     }
     w.en(i).ai.gen += 1;
-    let s = build(w, id);
+    let s = build(w, i, id);
     w.en(i).ai.stack.push(s);
     note(w, i);
     if let Some(c) = ctx_top(w, i) {
@@ -97,9 +125,11 @@ pub fn replace_top(w: &mut World, i: usize, id: u16) {
     if let Some(c) = ctx_top(w, i) {
         exit(w, &c, 0);
     }
-    let s = build(w, id);
-    if let Some(last) = w.en(i).ai.stack.last_mut() {
-        *last = s;
+    let s = build(w, i, id);
+    let ai = &mut w.en(i).ai;
+    if let Some(last) = ai.stack.last_mut() {
+        let old = std::mem::replace(last, s);
+        ai.orphans.push(old);
     }
     note(w, i);
     if let Some(c) = ctx_top(w, i) {
@@ -115,7 +145,8 @@ pub fn pop(w: &mut World, i: usize) {
         exit(w, &c, 0);
         let e = w.en(i);
         if e.ai.stack.last().is_some_and(|s| s.serial == c.serial) {
-            e.ai.stack.pop();
+            let old = e.ai.stack.pop().unwrap();
+            e.ai.orphans.push(old);
         }
     }
     note(w, i);
@@ -125,12 +156,15 @@ pub fn reset(w: &mut World, i: usize, id: u16) {
         exit(w, &c, 0);
         let e = w.en(i);
         if e.ai.stack.last().is_some_and(|s| s.serial == c.serial) {
-            e.ai.stack.pop();
+            let old = e.ai.stack.pop().unwrap();
+            e.ai.orphans.push(old);
         } else {
             break;
         }
     }
-    w.en(i).ai.stack.clear();
+    let e = w.en(i);
+    let rest: Vec<_> = e.ai.stack.drain(..).collect();
+    e.ai.orphans.extend(rest);
     push(w, i, id);
 }
 /// one AI frame: the top state's tree (0x0800AB0C ignores the root's result: a finished tree is not restarted, its
@@ -138,6 +172,10 @@ pub fn reset(w: &mut World, i: usize, id: u16) {
 pub fn tick(w: &mut World, i: usize) {
     let Some(c) = ctx_top(w, i) else { return };
     update(w, &c, 0);
+    // the replaced trees' runtimes are only addressable while their evaluation runs
+    if let Body::Enemy(e) = &mut w.ents[i].body {
+        e.ai.orphans.clear();
+    }
 }
 
 // ---- composites ----------------------------------------------------------------------------------------------------
@@ -157,23 +195,14 @@ fn is_cond(k: K) -> bool {
 
 fn enter(w: &mut World, c: &C, n: u16) {
     match kind(c, n) {
+        // 0x08018EF6: enters the child at the current index (the index is not reset: a re-entered sequence resumes)
         K::Sequence => {
-            if let Some(r) = rt(w, c, n) {
-                r.i = 0;
-            }
-            if let Some(&k0) = kids(c, n).first() {
-                enter(w, c, k0);
-            }
-        }
-        K::Selector => {
-            for &k in kids(c, n).to_vec().iter() {
+            let cur = rt(w, c, n).map(|r| r.i).unwrap_or(0) as usize;
+            if let Some(&k) = kids(c, n).get(cur) {
                 enter(w, c, k);
             }
         }
-        K::ParallelAll | K::ParallelAny => {
-            if let Some(r) = rt(w, c, n) {
-                r.done = 0;
-            }
+        K::Selector | K::ParallelAll | K::ParallelAny => {
             for &k in kids(c, n).to_vec().iter() {
                 enter(w, c, k);
             }
@@ -195,7 +224,10 @@ fn enter(w: &mut World, c: &C, n: u16) {
         _ => {
             let Some(r) = rt(w, c, n) else { return };
             r.f = 0;
-            r.d = [0; 8];
+            // DriftContact keeps what its create drew (and its back-off count) across enters
+            if kind(c, n) != K::DriftContact {
+                r.d = [0; 8];
+            }
             let mut r = *r;
             leaf_enter(w, c, n, &mut r);
             if let Some(x) = rt(w, c, n) {
@@ -207,42 +239,26 @@ fn enter(w: &mut World, c: &C, n: u16) {
 
 fn exit(w: &mut World, c: &C, n: u16) {
     match kind(c, n) {
+        // 0x08018F74: exits the current child (the index is kept)
         K::Sequence => {
             let i = rt(w, c, n).map(|r| r.i).unwrap_or(0) as usize;
             let ks = kids(c, n).to_vec();
             if i < ks.len() {
                 exit(w, c, ks[i]);
             }
-            if let Some(r) = rt(w, c, n) {
-                r.i = ks.len() as i32;
-            }
         }
-        K::Selector => {
+        K::Selector | K::ParallelAll | K::ParallelAny => {
             for &k in kids(c, n).to_vec().iter() {
                 exit(w, c, k);
             }
         }
-        K::ParallelAll | K::ParallelAny => {
-            let done = rt(w, c, n).map(|r| r.done).unwrap_or(0);
-            let ks = kids(c, n).to_vec();
-            for (j, &k) in ks.iter().enumerate() {
-                if done & (1 << j) == 0 {
-                    exit(w, c, k);
-                }
-            }
-            if let Some(r) = rt(w, c, n) {
-                r.done = if ks.len() >= 64 { u64::MAX } else { (1u64 << ks.len()) - 1 };
-            }
-        }
+        // 0x08034307: exits the running child (the flag is reset by the next enter)
         k if is_cond(k) => {
             let on = rt(w, c, n).map(|r| r.on).unwrap_or(false);
             if on {
                 if let Some(&k0) = kids(c, n).first() {
                     exit(w, c, k0);
                 }
-            }
-            if let Some(r) = rt(w, c, n) {
-                r.on = false;
             }
         }
         _ => {
@@ -257,21 +273,19 @@ fn exit(w: &mut World, c: &C, n: u16) {
 }
 
 fn update(w: &mut World, c: &C, n: u16) -> i32 {
-    let i = c.i;
     match kind(c, n) {
+        // 0x08018F0C: a finished child exits and the next one enters; after the last the index wraps to 0 without
+        // entering the first child again. A state change inside does not stop the evaluation
         K::Sequence => {
             let ks = kids(c, n).to_vec();
             let Some(cur) = rt(w, c, n).map(|r| r.i as usize) else { return 0 };
-            // 0x08018F0C: after the last child the index wraps to 0 without entering the first child again
             if cur >= ks.len() {
                 if let Some(x) = rt(w, c, n) {
                     x.i = 0;
                 }
                 return 1;
             }
-            let g = gen(w, i);
-            let r = update(w, c, ks[cur]);
-            if g != gen(w, i) || r == 0 {
+            if update(w, c, ks[cur]) == 0 {
                 return 0;
             }
             exit(w, c, ks[cur]);
@@ -285,44 +299,27 @@ fn update(w: &mut World, c: &C, n: u16) -> i32 {
             enter(w, c, ks[ni]);
             0
         }
+        // 0x08019192: the first non-zero child result
         K::Selector => {
-            let g = gen(w, i);
             for &k in kids(c, n).to_vec().iter() {
-                let r = update(w, c, k);
-                if g != gen(w, i) {
-                    return 0;
-                }
-                if r != 0 {
+                if update(w, c, k) != 0 {
                     return 1;
                 }
             }
             0
         }
+        // ParallelAll 0x08019108 / ParallelAny 0x08019162: every child on every update, AND / OR of the results
         K::ParallelAll | K::ParallelAny => {
             let any = kind(c, n) == K::ParallelAny;
-            let g = gen(w, i);
-            let ks = kids(c, n).to_vec();
-            for (j, &k) in ks.iter().enumerate() {
-                if rt(w, c, n).map(|r| r.done & (1 << j) != 0).unwrap_or(true) {
-                    continue;
-                }
-                let r = update(w, c, k);
-                if g != gen(w, i) {
-                    return 0;
-                }
-                if r != 0 {
-                    if let Some(x) = rt(w, c, n) {
-                        x.done |= 1 << j;
-                    }
-                    exit(w, c, k);
-                    if any {
-                        return 1;
-                    }
-                }
+            let mut r = if any { 0 } else { 1 };
+            for &k in kids(c, n).to_vec().iter() {
+                let v = (update(w, c, k) != 0) as i32;
+                r = if any { r | v } else { r & v };
             }
-            let all = if ks.len() >= 64 { u64::MAX } else { (1u64 << ks.len()) - 1 };
-            (rt(w, c, n).map(|r| r.done & all == all).unwrap_or(false)) as i32
+            r
         }
+        // 0x080342AF: the child's result is returned; a finished child is not exited (it runs on while the
+        // condition holds)
         k if is_cond(k) => {
             if cond(w, c, n) {
                 let Some(&kid) = kids(c, n).first() else { return 1 };
@@ -333,18 +330,7 @@ fn update(w: &mut World, c: &C, n: u16) -> i32 {
                         x.on = true;
                     }
                 }
-                let g = gen(w, i);
-                let r = update(w, c, kid);
-                if g != gen(w, i) {
-                    return 0;
-                }
-                if r != 0 {
-                    exit(w, c, kid);
-                    if let Some(x) = rt(w, c, n) {
-                        x.on = false;
-                    }
-                }
-                return r;
+                return update(w, c, kid);
             }
             let on = rt(w, c, n).map(|r| r.on).unwrap_or(false);
             if on {
@@ -441,21 +427,41 @@ fn cond(w: &mut World, c: &C, n: u16) -> bool {
             let Some(pi) = en::player(w, i) else { return false };
             let p = w.pl_ref(pi);
             let e = &w.en_ref(i).a;
-            if p.held_by != 0 || e.facing != 0 {
+            // 0x08037B96: a pure overlap test (no hold on the player: several enzymes can latch)
+            if e.facing != 0 {
                 return false;
             }
             let pb = p.a.body_box();
             let eb = e.body_box();
             overlaps(&Rect::new(pb.x0 + 6, pb.y0, pb.x1 - 6, pb.y1), &Rect::new(eb.x0, eb.y1 - 8, eb.x0 + 7, eb.y1 - 1))
         }
-        K::IfButtonMashed => en::player(w, i).is_some_and(|pi| w.pl_ref(pi).held_by != w.ents[i].id),
+        // condition 0x080363C4: a new A/B/d-pad press this frame -> stamp = now, count + 1, true once count > presses;
+        // no press and now - stamp > gap -> count = 0 (state built with the tree: d[3] count, d[4] stamp)
+        K::IfButtonMashed => {
+            let presses = par(c, n, P::Presses, 0) as i32;
+            let gap = par(c, n, P::Gap, 0) as i32;
+            let now = w.g.clock(w.frame) as i32;
+            let slot = w.en_ref(i).target as usize;
+            let pressed = w.g.pressed(slot) & 0xf3 != 0;
+            let Some(r) = rt(w, c, n) else { return false };
+            if pressed {
+                r.d[4] = now;
+                r.d[3] += 1;
+                return r.d[3] > presses;
+            }
+            if now - r.d[4] > gap {
+                r.d[3] = 0;
+            }
+            false
+        }
         K::IfPlayerOnTop => {
             let (dx, dy) = en::to_player(w, i);
             dx.abs() < 16 && dy.abs() < 16
         }
+        // 0x0802F945: the first Spopovich is in 0x03001B30 (the end of GrabWindup) showing anim id 0x12's animation
         K::IfPartnerHolding => {
-            let held = en::ctx_player(w, i).map(|pi| w.pl_ref(pi).held_by).unwrap_or(0);
-            held != 0 && w.live_enemies().iter().any(|&o| matches!(w.en_ref(o).ty, 0x6d..=0x70) && w.ents[o].id == held)
+            let g = w.data.anim.generic["0x03001B30"];
+            w.live_enemies().into_iter().find(|&o| matches!(w.en_ref(o).ty, 0x6d..=0x70)).is_some_and(|o| w.en_ref(o).ea.rule == g && is_anim_id(w, o, 0x12))
         }
         _ => false,
     }
@@ -475,10 +481,102 @@ fn timed_enter(w: &mut World, i: usize, anim: &[AnimRef], face: bool) {
 }
 fn timed_end(w: &mut World, i: usize, f: i32, len: i32) -> bool {
     if f >= len {
-        set_anim(w, i, &[nm("idle")], true, Some(true));
+        one_idle(w, i);
         return true;
     }
     false
+}
+/// one SetAnim(0) at a controller's end: unless the state's own end (the recorded sequence, this frame's anim tick)
+/// already did it
+fn one_idle(w: &mut World, i: usize) {
+    let d = Arc::clone(&w.data);
+    let e = w.en_ref(i);
+    if e.a.anim_name(&d) != Some("idle") || !e.anim_ended {
+        set_anim(w, i, &[nm("idle")], true, Some(true));
+    }
+}
+/// enemy SetAnim id -> raw (0x08072670 + 1)
+const SETANIM_RAW: [i32; 23] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 19, 20, 21, 22, 23, 24];
+/// 0x0800EEB0(obj, id): the actor shows SetAnim(id)'s animation (the shown raw)
+fn is_anim_id(w: &World, i: usize, id: usize) -> bool {
+    let raw = w.en_ref(i).a.anim_raw(&w.data);
+    raw.is_some() && raw == SETANIM_RAW.get(id).copied()
+}
+fn set_anim_r(w: &mut World, i: usize, refs: &[AnimRef], looped: bool, rule: u32) {
+    en::set_anim_rule(w, i, refs, true, Some(looped), Some(rule));
+}
+fn melee_sfx(w: &mut World) {
+    let s = 48 + w.rng.rand(2);
+    w.sfx(s, 64);
+}
+fn alive_ent(w: &World, id: i32) -> bool {
+    id != 0 && w.find(id as u32).is_some_and(|k| !w.ents[k].removed)
+}
+/// the straight-line mover 0x0800A1D4 (base 0x08009D24; SetAnim(1) on creation): n = max(|dx|, |dy|) / speed ticks,
+/// velocity d / n, facing on the dominant axis; kept in the node's path record (wx / wy target px, speed / budget
+/// velocity, valid n, counter dir)
+fn line_mover(w: &mut World, i: usize, tx: i32, ty: i32, speed: i32) -> PathRt {
+    let (ex, ey) = (w.en_ref(i).a.x, w.en_ref(i).a.y);
+    let dx = (tx << 8) - ex;
+    let dy = (ty << 8) - ey;
+    let (ax, ay) = (dx.abs(), dy.abs());
+    let dir = if ax >= ay {
+        if dx >= 0 {
+            3
+        } else {
+            2
+        }
+    } else if dy >= 0 {
+        0
+    } else {
+        1
+    };
+    let mut n = (((if ax >= ay { ax } else { ay }).wrapping_shl(8)) / speed) >> 8;
+    let (mut vx, mut vy) = (0, 0);
+    if n != 0 {
+        vx = dx.wrapping_shl(8) / n.wrapping_shl(8);
+        vy = dy.wrapping_shl(8) / n.wrapping_shl(8);
+    } else {
+        n = 1;
+    }
+    w.en(i).a.facing = dir;
+    set_anim(w, i, &[nm("walk")], true, Some(true));
+    PathRt { speed: vx, budget: vy, wx: tx, wy: ty, valid: n, counter: dir as i32, gx: 0, gy: 0 }
+}
+/// step 0x0800A01D: blocked -> SetAnim(0) unless already; else move, SetAnim(1) unless walking, face, n - 1; 0 ->
+/// exactly at the target, arrived
+fn line_mover_step(w: &mut World, i: usize, m: &mut PathRt) -> bool {
+    en::unmark_self(w, i);
+    let (x, y) = (w.en_ref(i).a.x, w.en_ref(i).a.y);
+    if !en::fits(w, i, (x + m.speed) >> 8, (y + m.budget) >> 8) {
+        en::mark_self(w, i);
+        if !is_anim_id(w, i, 0) {
+            set_anim(w, i, &[nm("idle")], true, Some(true));
+        }
+        return false;
+    }
+    {
+        let a = &mut w.en(i).a;
+        a.x += m.speed;
+        a.y += m.budget;
+    }
+    if !is_anim_id(w, i, 1) {
+        set_anim(w, i, &[nm("walk")], true, Some(true));
+    }
+    w.en(i).a.facing = m.counter as u8;
+    en::mark_self(w, i);
+    m.valid -= 1;
+    if m.valid != 0 {
+        return false;
+    }
+    en::unmark_self(w, i);
+    {
+        let a = &mut w.en(i).a;
+        a.x = m.wx << 8;
+        a.y = m.wy << 8;
+    }
+    en::mark_self(w, i);
+    true
 }
 fn kb_of(r: &NodeRt) -> KnockState {
     KnockState { vx: r.d[0], vy: r.d[1], n: r.d[2], anim: r.d[3] }
@@ -490,13 +588,16 @@ fn kb_set(r: &mut NodeRt, k: &KnockState) {
     r.d[3] = k.anim;
 }
 
-const KIDBUU_CHARGE: [(i32, i32); 4] = [(8, -2), (12, -2), (12, -2), (4, -2)];
 
 fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
     let i = c.i;
     let frame = w.frame as i64;
     match kind(c, n) {
-        K::Idle | K::RunMotionController | K::PartMirrorAnim => {
+        // node 0x080716F4: enter no-op, update 0 - no animation change
+        K::Idle => {}
+        // RunMotionController with a field patrol runner (0x080299A3): enter is a nop (fieldpatrol.rs)
+        K::RunMotionController if crate::fieldpatrol::has(w, i) => {}
+        K::RunMotionController | K::PartMirrorAnim => {
             if !w.en_ref(i).moving {
                 set_anim(w, i, &[nm("idle")], false, Some(true));
             }
@@ -547,7 +648,18 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
                 break;
             }
         }
+        // HoverDrift's velocity lives in the node: a re-entered state starts from 0
+        K::HoverDrift => {
+            let e = w.en(i);
+            e.vx = 0;
+            e.vy = 0;
+        }
+        // enter 0x08031388: first a bump hit (0x0803125C: face, standard melee x1.0, accepted -> 48 + rand(2)), then
+        // the hop velocity
         K::BackStep => {
+            if en::melee_strike(w, i, 0x400, true, false, atk(2)) {
+                melee_sfx(w);
+            }
             let s = ((w.rng.rand(64) + 96) * par(c, n, P::K, 16) as i32) >> 7;
             let (dx, dy) = DIR_VEC[w.en_ref(i).a.facing as usize];
             let side = ((w.rng.rand(32768) - 16384) * s) >> 12;
@@ -560,9 +672,10 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             en::knock_start(w, i, par(c, n, P::Frames, 0) as i32, &mut kb);
             kb_set(r, &kb);
         }
+        // enter 0x08037A42 = SetAnimHold(4, 0): raw 5 under the hold state, frame 0 (no swing, no rand)
         K::LungeStep => {
-            en::face_player(w, i);
-            set_anim(w, i, &[an(4)], true, Some(false));
+            let h = w.data.anim.hold;
+            set_anim_r(w, i, &[an(4)], false, h);
         }
         K::RandomStep => r.d[0] = w.rng.rand(4),
         K::MeleeAttack => {
@@ -574,16 +687,30 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             let k = 4 + w.rng.rand(n);
             set_anim(w, i, &[an(k)], true, Some(false));
         }
-        K::BioMechPunch => {
-            en::face_player(w, i);
-            set_anim(w, i, &[an(4)], true, Some(false));
-            en::melee_strike(w, i, 0x400, true, false, atk(2));
+        K::BioMechPunch => timed_enter(w, i, &[an(4)], true),
+        // enter 0x0803CB82: face, SetAnimRaw(4) + state 0x030032F4; ends at 48 + 8 * frames
+        K::HeavyPunch => {
+            timed_enter(w, i, &[an(4), an(5)], true);
+            let d = Arc::clone(&w.data);
+            let e = w.en_ref(i);
+            let nf = e.a.anim_raw(&d).and_then(|raw| e.a.sprite.and_then(|s| d.sprite(s)).and_then(|s| s.anim_raw(raw))).map(|a| a.steps(e.a.facing).len() as i32);
+            r.d[0] = 48 + 8 * nf.unwrap_or(2);
         }
-        K::HeavyPunch | K::WindupMelee => timed_enter(w, i, &[an(4), an(5)], true),
+        // singleton 0x03003210: enter 0x0804E808 = SetAnimRaw(4) + SetState(0x03003214) (no facing change); finished as
+        // soon as the actor left that controller; the end at 64 + 8 * (frames - 2)
+        K::WindupMelee => {
+            set_anim(w, i, &[an(4), an(5)], true, Some(false));
+            let d = Arc::clone(&w.data);
+            let e = w.en_ref(i);
+            let nf = e.a.sprite.and_then(|s| d.sprite(s)).and_then(|s| s.anim_raw(e.ea.pos.raw)).map(|a| a.steps(e.a.facing).len() as i32).unwrap_or(0);
+            r.d[0] = e.anim_seq as i32;
+            r.d[1] = 64 + ((nf.max(2) - 2) << 3);
+        }
+        // enter 0x0802F74C: player active -> the wind-up pose (no SetAnim), armed, timer 60
         K::HeavyStrike => {
             r.d[0] = en::player(w, i).is_some_and(|pi| w.pl_ref(pi).a.hittable) as i32;
             if r.d[0] != 0 {
-                set_anim(w, i, &[an(4)], true, Some(false));
+                en::face_player(w, i);
             }
         }
         K::ChargedPunch => {
@@ -597,41 +724,85 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
                 set_anim(w, i, &[an(4)], true, Some(false));
             }
         }
-        K::DriftContact => {
-            let ang = w.rng.rand(256) as usize;
-            let s = w.rng.rand(3) as usize;
-            r.d[0] = DRIFT_COS[s][ang] as i32;
-            r.d[1] = DRIFT_SIN[s][ang] as i32;
-            r.d[2] = 0;
-        }
+        K::DriftContact => {}
         K::KiBlast => timed_enter(w, i, &[an(3)], true),
         K::GunShot | K::RifleShot | K::MummyWrapShot => timed_enter(w, i, &[an(17), an(3)], true),
         K::MummyWrapBurst => timed_enter(w, i, &[an(17), an(3)], false),
         K::NinjaStarThrow => timed_enter(w, i, &[an(18), an(4)], true),
-        K::SoldierThrow | K::CyborgShot | K::TurretFire => {
+        // SoldierThrow 0x080266D8 (SetAnimRaw(0x13)) / TurretFire 0x0802B684 (SetAnimRaw(0x14)): face the player
+        K::SoldierThrow | K::TurretFire => {
             en::face_player(w, i);
-            set_anim(w, i, &[an(18), an(3)], true, Some(false));
+            let r0 = w.data.anim.once_stop3;
+            let a = if kind(c, n) == K::SoldierThrow { 19 } else { 20 };
+            set_anim_r(w, i, &[an(a), an(3)], false, r0);
         }
-        K::TurretOpen => set_anim(w, i, &[an(19)], true, Some(false)),
-        K::TurretClose => set_anim(w, i, &[an(18)], true, Some(false)),
-        K::BombThrow => timed_enter(w, i, &[an(18), an(4)], true),
+        // controller state 0x03003108 (enter 0x0802F6A8: face, SetAnimRaw(0x12))
+        K::CyborgShot => {
+            en::face_player(w, i);
+            let r0 = w.data.anim.once_hold3;
+            set_anim_r(w, i, &[an(18), an(3)], false, r0);
+        }
+        // 0x0802B701 / 0x0802B8B5: SetAnimRaw(0x13 / 0x12) under the one-shot state 0x03001B30
+        K::TurretOpen | K::TurretClose => {
+            let r0 = w.data.anim.once_stop3;
+            set_anim_r(w, i, &[an(if kind(c, n) == K::TurretOpen { 19 } else { 18 })], false, r0);
+        }
+        // enter 0x08026A26 (after facing): d = the player's position - own, the component across the facing zeroed,
+        // each clamped to +-128
+        K::BombThrow => {
+            timed_enter(w, i, &[an(18), an(4)], true);
+            if let Some(pi) = en::player(w, i) {
+                let (ppx, ppy) = (w.pl_ref(pi).a.px(), w.pl_ref(pi).a.py());
+                let a = &w.en_ref(i).a;
+                r.d[0] = if a.facing >= 2 { (ppx - a.px()).clamp(-128, 128) } else { 0 };
+                r.d[1] = if a.facing < 2 { (ppy - a.py()).clamp(-128, 128) } else { 0 };
+            }
+        }
+        // enter 0x08023FA8: SetAnimRaw(0x12) under the flame controller 0x03002FA8 (no swing), sound 63
         K::FlameBreath => {
             en::face_player(w, i);
-            set_anim(w, i, &[an(17), an(4)], true, Some(true));
+            let h = w.data.anim.hold;
+            set_anim_r(w, i, &[an(18)], true, h);
+            w.sfx(63, 64);
         }
-        K::GrappleArm => timed_enter(w, i, &[an(4)], true),
+        // enter 0x08037E2D: face, SetAnimRaw(0x12) under controller 0x03003294
+        K::GrappleArm => {
+            en::face_player(w, i);
+            let h = w.data.anim.hold;
+            set_anim_r(w, i, &[an(18)], true, h);
+        }
         K::EnergyBarrage => {
             en::face_player(w, i);
             set_anim(w, i, &[an(3)], true, Some(true));
         }
         K::FinalFlash => timed_enter(w, i, &[an(19), an(3)], true),
         K::MouthBeamDown => set_anim(w, i, &[an(19)], true, Some(true)),
+        // the player's beam class 0x080206B8 (Kamehameha Lv1: x0.04, sub 5; sound 3) at the position + 0x0875928C[dir]
         K::KidBuuKamehameha => {
             en::face_player(w, i);
             set_anim(w, i, &[an(3)], true, Some(false));
-            r.d[0] = 0;
+            const OFF: [(i32, i32); 4] = [(16, 20), (16, -4), (-12, 2), (44, 2)];
+            let a = &w.en_ref(i).a;
+            let (ox, oy) = OFF[a.facing as usize];
+            let (dir, x, y) = (a.facing, a.px() + ox, a.py() + oy);
+            let me = w.ents[i].id;
+            let built = w.frame as i64;
+            let id = shots::add(w, shots::kame_beam_enemy(me, dir, x, y, built, atk(5), 41));
+            r.d[0] = id as i32;
+            w.en(i).beam = id;
+            w.sfx(3, 64);
         }
-        K::StoneSpit | K::AimAtPlayer => timed_enter(w, i, &[an(19)], true),
+        // StoneSpit = node 0x030030CC: SetAnimRaw(0x14) + controller 0x030030C8 (it spits on its first tick, enemy.rs)
+        K::StoneSpit => {
+            let h = w.data.anim.hold;
+            set_anim_r(w, i, &[an(20)], true, h);
+            w.en(i).spit_ctl = 0;
+        }
+        // AimAtPlayer = node 0x030030D4: SetAnimRaw(0x14) + controller 0x030030D0 (head pose only), done at once
+        K::AimAtPlayer => {
+            let h = w.data.anim.hold;
+            set_anim_r(w, i, &[an(20)], true, h);
+        }
         K::TeleportNearPlayer => {
             r.d[0] = w.rng.rand(4);
             set_anim(w, i, &[an(17)], true, Some(false));
@@ -641,61 +812,79 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             r.d[0] = w.en_ref(i).a.x;
             r.d[1] = w.en_ref(i).a.y;
         }
+        // enter 0x0803399E: the player shows raw 10 frame 0, faces the vampire's facing ^ 1, held; the VAMPIRE moves next
+        // to the player (pos = player pos - 0x08759334[facing]); vampire SetAnimRaw(0x12) + its own loop state
         K::VampireGrab => {
-            let ok = en::player(w, i).filter(|&pi| w.pl_ref(pi).held_by == 0);
-            r.d[0] = ok.is_some() as i32;
-            if let Some(pi) = ok {
-                en::hold_player(w, i, pi, HoldKind::Vampire, 0);
-                set_anim(w, i, &[an(17)], true, Some(true));
-            }
-        }
-        K::LatchDrain => {
-            if let Some(pi) = en::player(w, i) {
-                if w.pl_ref(pi).held_by == 0 {
-                    en::hold_player(w, i, pi, HoldKind::Latch, 0);
-                }
-            }
-            set_anim(w, i, &[an(0)], true, Some(true));
-        }
-        K::GrabWindup => set_anim(w, i, &[an(17)], true, Some(false)),
-        K::BearHug => {
-            let yamu = w.live_enemies().iter().any(|&o| w.en_ref(o).ty == 0x93);
-            let ok = en::player(w, i).filter(|&pi| w.pl_ref(pi).held_by == 0 && yamu);
-            r.d[0] = ok.is_some() as i32;
-            if let Some(pi) = ok {
-                en::hold_player(w, i, pi, HoldKind::Hug, 0);
-                set_anim(w, i, &[an(17)], true, Some(true));
-            }
-        }
-        K::EnergyDrain => {
             r.d[0] = 0;
             r.d[1] = 0;
-        }
-        K::FreezePlayer => {
-            if let Some(pi) = en::ctx_player(w, i) {
-                en::hold_player(w, i, pi, HoldKind::Freeze, 0);
+            let Some(pi) = en::player(w, i) else { return };
+            en::hold_player(w, i, pi, HoldKind::Vampire, 0);
+            const OFF: [(i32, i32); 4] = [(0, 16), (0, -16), (-16, 0), (16, 0)];
+            let f = w.en_ref(i).a.facing;
+            w.pl(pi).a.facing = f ^ 1;
+            let (ox, oy) = OFF[f as usize];
+            let (px, py) = (w.pl_ref(pi).a.x, w.pl_ref(pi).a.y);
+            en::unmark_self(w, i);
+            {
+                let a = &mut w.en(i).a;
+                a.x = px - (ox << 8);
+                a.y = py - (oy << 8);
             }
-            set_anim(w, i, &[an(17)], true, Some(false));
+            en::mark_self(w, i);
+            let l = w.data.anim.loop3;
+            set_anim_r(w, i, &[an(18)], true, l);
         }
-        K::EatCandy => {
-            let p = en::player(w, i);
+        // enter 0x080298D8: SetAnimRaw(1) + a controller that glues the enzyme to the player (not held)
+        K::LatchDrain => en::latch_enter(w, i),
+        // enter 0x0802C465: face, SetAnimRaw(0x12) under the play-once controller 0x0300308C (frame t >> 3)
+        K::GrabWindup => {
             en::face_player(w, i);
-            set_anim(w, i, &[an(19)], true, Some(true));
-            r.d[0] = p.is_some() as i32;
-            if let Some(pi) = p {
-                en::hold_player(w, i, pi, HoldKind::Eat, 0);
-            }
+            let h = w.data.anim.hold;
+            set_anim_r(w, i, &[an(18)], true, h);
+            let d = Arc::clone(&w.data);
+            let e = w.en_ref(i);
+            let nf = e.a.sprite.and_then(|s| d.sprite(s)).and_then(|s| s.anim_raw(19)).filter(|_| e.a.anim_raw(&d) == Some(19)).map(|a| a.nframes());
+            r.d[0] = nf.unwrap_or(0);
         }
+        // enter 0x0802C4C9: keep the player's position, SetAnimRaw(0x14) frame 0 under 0x03001B00 at Spopovich + (8, -16);
+        // partner = the first Yamu
+        K::BearHug => {
+            let yamu = w.live_enemies().into_iter().find(|&o| matches!(w.en_ref(o).ty, 0x93 | 0x94));
+            r.d[3] = yamu.map(|o| w.ents[o].id as i32).unwrap_or(0);
+            let Some(pi) = en::player(w, i).filter(|&pi| !w.pl_ref(pi).dead) else { return };
+            r.d[4] = w.pl_ref(pi).a.x;
+            r.d[5] = w.pl_ref(pi).a.y;
+            player::hold_pose(w, pi, 21, 0);
+            let (ex, ey) = (w.en_ref(i).a.x, w.en_ref(i).a.y);
+            let p = w.pl(pi);
+            p.a.x = ex + (8 << 8);
+            p.a.y = ey - (16 << 8);
+        }
+        // Yamu's drain: the counter is uninitialised heap memory (reads 0x6D)
+        K::EnergyDrain => r.d[2] = 0x6d,
+        // enter 0x080305AA: player frame 0, raw 1, held; the fragment's freeze state
+        K::FreezePlayer => {
+            if let Some(pi) = en::player(w, i) {
+                let me = w.ents[i].id;
+                player::hold_raw(w, pi, me, HoldKind::Freeze, 0, 1);
+            }
+            en::freeze_enter(w, i);
+        }
+        // enter 0x0802B19D: face, SetAnimRaw(0x14) under controller 0x0300303C
+        K::EatCandy => {
+            en::face_player(w, i);
+            let h = w.data.anim.hold;
+            set_anim_r(w, i, &[an(20)], true, h);
+        }
+        // enter 0x0802ACB3 / 0x0802B333: the player HP > 0 and hittable -> face, SetAnimRaw(0x13 / 0x12) under the
+        // node's controller
         K::BuuStretchPunch | K::CandyBeam => {
             let ok = en::player(w, i).is_some_and(|pi| w.pl_ref(pi).hp() > 0 && w.pl_ref(pi).a.hittable);
             r.d[0] = ok as i32;
             if ok {
                 en::face_player(w, i);
-                if kind(c, n) == K::BuuStretchPunch {
-                    set_anim(w, i, &[an(19)], true, Some(true));
-                } else {
-                    set_anim(w, i, &[an(18)], true, Some(false));
-                }
+                let h = w.data.anim.hold;
+                set_anim_r(w, i, &[an(if kind(c, n) == K::BuuStretchPunch { 19 } else { 18 })], true, h);
             }
         }
         K::AbsorbStance => set_anim(w, i, &[an(20)], true, Some(false)),
@@ -731,12 +920,32 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             r.d[0] = -1;
             set_anim(w, i, &[an(18)], true, Some(true));
         }
-        K::MiniHopToward | K::MiniHopFlee | K::Hop => r.d[0] = 0,
+        // node 0x03003230 (enter 0x0803467A: SetAnimRaw(0x12), the hop controller, aim)
+        K::MiniHopToward => {
+            r.d[0] = 0;
+            set_anim(w, i, &[an(18)], true, Some(true));
+            mini_aim(w, i);
+        }
+        K::MiniHopFlee | K::Hop => r.d[0] = 0,
+        // controller 0x03003248 enter 0x08034CF8: the diagonal toward the player, velocity 0x0875947C[dir] (+-1.5 px)
         K::MiniRollAttack => {
             set_anim(w, i, &[an(17)], true, Some(true));
             let (dx, dy) = en::to_player(w, i);
-            r.d[0] = dx.signum() * 384;
-            r.d[1] = dy.signum() * 384;
+            let f: u8 = if dx > 0 {
+                if dy > 0 {
+                    0
+                } else {
+                    3
+                }
+            } else if dy > 0 {
+                2
+            } else {
+                1
+            };
+            w.en(i).a.facing = f;
+            const V: [(i32, i32); 4] = [(384, 384), (-384, -384), (-384, 384), (384, -384)];
+            r.d[0] = V[f as usize].0;
+            r.d[1] = V[f as usize].1;
         }
         K::HandAmbush => {
             if let Some(pi) = en::player(w, i) {
@@ -755,8 +964,11 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
         K::JumpSmash => set_anim(w, i, &[an(18)], true, Some(true)),
         K::FinishLandingAnim => set_anim(w, i, &[nm("idle")], true, Some(true)),
         K::StunnedAnim | K::StunnedAnim21 | K::PlayAnimHold => set_anim(w, i, &[an(20)], true, Some(true)),
-        K::RecoverAnim | K::MechTransform => set_anim(w, i, &[an(19)], true, Some(false)),
-        K::PlayAnim0 => set_anim(w, i, &[an(0)], true, Some(true)),
+        K::RecoverAnim => set_anim(w, i, &[an(19)], true, Some(false)),
+        // create 0x080315A4: SetAnimRaw(0x15) under the one-shot state 0x03001B30
+        K::MechTransform => set_anim(w, i, &[an(20)], true, Some(false)),
+        // enter 0x0804E5E8 installs the fragment state 0x03003158
+        K::PlayAnim0 => en::frag_enter(w, i),
         K::PlayAnim12 | K::PlayAnim12b | K::PlayAnim12Swarm | K::PlayAnim12Yakon | K::PlayAnim12Yakon2 | K::GhostAnimA | K::GhostAnimB => set_anim(w, i, &[an(17)], true, Some(false)),
         K::PlayAnim13 | K::PlayAnim13Yakon | K::PlayAnimOnce => set_anim(w, i, &[an(18)], true, Some(false)),
         K::PlayAnimTimed => set_anim(w, i, &[an(19)], true, Some(true)),
@@ -776,12 +988,30 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             w.en(i).stunned = true;
             set_anim(w, i, &[an(9)], true, Some(true));
         }
+        // the segments are created by the node's enter 0x0802CBD4 (inside the GotoState)
+        K::WormSpawnBody => en::worm_spawn_body(w, i),
         _ => {}
     }
     let _ = frame;
 }
+/// MiniHopToward's aim: the diagonal toward the player from the footprint centres (a zero keeps the facing)
+fn mini_aim(w: &mut World, i: usize) {
+    let (dx, dy) = en::to_player(w, i);
+    let f = if dx > 0 && dy > 0 {
+        0
+    } else if dx > 0 && dy < 0 {
+        3
+    } else if dx < 0 && dy > 0 {
+        2
+    } else if dx < 0 && dy < 0 {
+        1
+    } else {
+        return;
+    };
+    w.en(i).a.facing = f;
+}
 
-fn leaf_exit(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
+fn leaf_exit(w: &mut World, c: &C, n: u16, _r: &mut NodeRt) {
     let i = c.i;
     let me = w.ents[i].id;
     let release_if_held = |w: &mut World| {
@@ -791,31 +1021,32 @@ fn leaf_exit(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             }
         }
     };
+    if kind(c, n) == K::RunMotionController {
+        crate::fieldpatrol::pause(w, i);
+    }
     match kind(c, n) {
         K::Block => {
             w.en(i).a.blocking = false;
             let f = w.frame as i64;
             w.en(i).state_stamp = f;
         }
-        K::KnockbackSlide => {
-            let kb = kb_of(r);
-            if kb.anim != 0 && w.en_ref(i).a.anim.map(|a| a as i32 + 1) == Some(kb.anim) {
-                set_anim(w, i, &[nm("idle")], true, Some(true));
-            }
-        }
         K::ChargedPunch => w.en(i).a.hittable = true,
-        K::KidBuuKamehameha => {
-            if let Some(k) = w.find(r.d[1] as u32) {
-                w.ents[k].removed = true;
-            }
-            stop_enemy_beam(w, i);
+        K::KidBuuKamehameha => stop_enemy_beam(w, i),
+        // exit 0x08033AF6: crit = 0, hit dir = facing ^ 1 (the KnockbackSlide that follows slides it backwards), SetAnim(9)
+        K::VampireGrab => {
+            release_if_held(w);
+            let e = w.en(i);
+            e.crit_hit = false;
+            e.last_hit_dir = e.a.facing ^ 1;
+            set_anim(w, i, &[an(9)], true, Some(false));
         }
-        K::VampireGrab | K::LatchDrain | K::BearHug | K::FreezePlayer => release_if_held(w),
-        K::EatCandy => {
-            if let Some(pi) = en::player(w, i) {
+        // exit 0x080305E2: player SetAnim(0) (after an escape: a second time)
+        K::FreezePlayer => {
+            if let Some(pi) = en::player(w, i).filter(|&pi| !w.pl_ref(pi).dead) {
                 if w.pl_ref(pi).held_by == me {
-                    w.g.candy = 0;
                     player::release(w, pi);
+                } else {
+                    player::set_anim_by_id(w, pi, 0);
                 }
             }
         }
@@ -871,8 +1102,18 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             }
             true
         }
+        K::RunMotionController if crate::fieldpatrol::has(w, i) => {
+            crate::fieldpatrol::run(w, i);
+            false
+        }
         K::Idle | K::RunMotionController | K::PartMirrorAnim => false,
-        K::StandStill => true,
+        // update 0x08019240: unless IsAnim(0) SetAnim(0) again, then succeed
+        K::StandStill => {
+            if !w.en_ref(i).is_anim(0) {
+                set_anim(w, i, &[nm("idle")], true, Some(true));
+            }
+            true
+        }
         K::FacePlayer => {
             en::face_player(w, i);
             true
@@ -916,6 +1157,8 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             let dx = r.path.gx.wrapping_sub(w.en_ref(i).a.x);
             let dy = r.path.gy.wrapping_sub(w.en_ref(i).a.y);
             if ((dx.wrapping_mul(dx) >> 8) as i64) + ((dy.wrapping_mul(dy) >> 8) as i64) <= 0x400 {
+                // 0x0802A086: within range SetAnim(0) on every update (the idle enter draws rand(255) each frame)
+                set_anim(w, i, &[nm("idle")], true, Some(true));
                 return false;
             }
             let mut p = r.path;
@@ -932,7 +1175,7 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             r.d[0] = st;
             res
         }
-        K::FlyToPlayer => en::move_toward(w, i, speed, 8, false, true),
+        K::FlyToPlayer => en::fly_to_player(w, i, speed),
         K::AlignWithPlayer | K::LineUpForShot => en::align(w, i, if speed != 0 { speed } else { 0x73 }),
         K::Wander => {
             en::wander_step(w, i, speed, par(c, n, P::TurnP, 0));
@@ -944,27 +1187,59 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             r.path = p;
             (p.gx - w.en_ref(i).a.x).abs() < 0x800 && (p.gy - w.en_ref(i).a.y).abs() < 0x800
         }
-        K::CirclePlayer => {
-            en::face_player(w, i);
-            let (dx, dy) = DIR_VEC[w.en_ref(i).a.facing as usize];
-            en::walk_by(w, i, -dy * speed, dx * speed, (dy != 0 || dx != 0) && speed != 0);
-            false
-        }
+        K::CirclePlayer => en::circle_player(w, i, speed),
+        // update 0x08031004: a pending hit impulse is clamped to +-128 on x, else on y; per axis d > 0 ? (v < 128: v +=
+        // 38) : (v > -128: v -= 38) (|v| reaches 152); facing by the larger component (ties: y); pos + v
         K::HoverDrift => {
             let (dx, dy) = en::to_player(w, i);
-            {
+            let (vx, vy) = {
                 let e = w.en(i);
-                e.vx = (e.vx + dx.signum() * 38).clamp(-128, 128);
-                e.vy = (e.vy + dy.signum() * 38).clamp(-128, 128);
-            }
-            en::face_player(w, i);
-            let (vx, vy) = (w.en_ref(i).vx, w.en_ref(i).vy);
+                if e.vx.abs() > 0x200 || e.vy.abs() > 0x200 {
+                    if e.vx > 128 {
+                        e.vx = 128;
+                    } else if e.vx < -128 {
+                        e.vx = -128;
+                    } else {
+                        e.vy = e.vy.clamp(-128, 128);
+                    }
+                }
+                if dx > 0 {
+                    if e.vx < 128 {
+                        e.vx += 38;
+                    }
+                } else if e.vx > -128 {
+                    e.vx -= 38;
+                }
+                if dy > 0 {
+                    if e.vy < 128 {
+                        e.vy += 38;
+                    }
+                } else if e.vy > -128 {
+                    e.vy -= 38;
+                }
+                e.a.facing = if e.vx.abs() > e.vy.abs() {
+                    if e.vx > 0 {
+                        3
+                    } else {
+                        2
+                    }
+                } else if e.vy > 0 {
+                    0
+                } else {
+                    1
+                };
+                (e.vx, e.vy)
+            };
             en::walk_by(w, i, vx, vy, vx != 0 || vy != 0);
             false
         }
+        // update 0x080313EA: the counter 48 first, 0 -> finished without moving (47 moves)
         K::BackStep => {
+            if f >= 48 {
+                return true;
+            }
             en::move_by(w, i, r.d[0], r.d[1]);
-            f >= 48
+            false
         }
         K::KnockbackSlide => {
             let mut kb = kb_of(r);
@@ -972,10 +1247,14 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             kb_set(r, &kb);
             done
         }
+        // update 0x08037A56: while anim 4 shows step 4 px in the current facing (no re-aim); never finishes
         K::LungeStep => {
+            if w.en_ref(i).ea.pos.raw != 5 {
+                return false;
+            }
             let (dx, dy) = DIR_VEC[w.en_ref(i).a.facing as usize];
             en::move_by(w, i, dx * 1024, dy * 1024);
-            f >= 16
+            false
         }
         K::FollowMajinBuu => {
             let buu = w.live_enemies().into_iter().find(|&o| matches!(w.en_ref(o).ty, 0x1a | 0x1b | 0x1c));
@@ -989,13 +1268,33 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             }
             false
         }
+        // update 0x08032A64 (never finishes; d[0] the turn timer): a = the minor axis' direction toward the player, b
+        // the major one; unless aligned (|dx| or |dy| <= 1): probe(a) -> drive(a), else probe(b) -> drive(b), else turn(b)
         K::TankDrive => {
+            if r.d[0] != 0 {
+                r.d[0] -= 1;
+            }
+            if en::player(w, i).is_none() {
+                return false;
+            }
             let (dx, dy) = en::to_player(w, i);
-            let fdir = facing_toward(dx, dy);
-            w.en(i).a.facing = fdir;
-            let (fx, fy) = DIR_VEC[fdir as usize];
-            if dx.abs() + dy.abs() > 24 {
-                en::walk_by(w, i, fx * 128, fy * 128, true);
+            let mut aligned = dx.abs() <= 1 || dy.abs() <= 1;
+            let (a, b): (u8, u8) = if dx.abs() < dy.abs() {
+                (if dx >= 0 { 3 } else { 2 }, if dy >= 0 { 0 } else { 1 })
+            } else {
+                (if dy >= 0 { 0 } else { 1 }, if dx >= 0 { 3 } else { 2 })
+            };
+            if !aligned {
+                if tank_probe(w, i, a) {
+                    tank_drive(w, i, a, r);
+                } else if tank_probe(w, i, b) {
+                    tank_drive(w, i, b, r);
+                } else {
+                    aligned = true;
+                }
+            }
+            if aligned {
+                tank_turn(w, i, b, r);
             }
             false
         }
@@ -1005,35 +1304,72 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             f >= 16
         }
         // ---- melee
-        K::MeleeAttack | K::BioMechPunch => f >= 16,
+        // update 0x0802A276 = IsAnim(0): done once back in the idle state (the punch state's end SetAnim(0))
+        K::MeleeAttack => {
+            let d = Arc::clone(&w.data);
+            let e = w.en_ref(i);
+            e.a.anim_name(&d) == Some("idle") && d.anim.rules[e.ea.rule as usize].kind == RuleKind::Idle
+        }
+        // controller 0x0804C6B4: at counter 16 the hit (standard melee x1.0; accepted -> 48 + rand(2)); ends at 40
+        K::BioMechPunch => {
+            if f == 16 && en::melee_strike(w, i, 0x400, false, false, atk(2)) {
+                melee_sfx(w);
+            }
+            timed_end(w, i, f, 40)
+        }
+        // state tick 0x0803CB50: the strike (x1.5) at 48, an accepted hit plays 48 + rand(2); SetAnim(0) at 48 + 8 * frames
         K::HeavyPunch => {
-            if f == 48 {
-                en::melee_strike(w, i, 0x600, true, false, atk(2));
+            if f == 48 && en::melee_strike(w, i, 0x600, true, false, atk(2)) {
+                melee_sfx(w);
             }
-            timed_end(w, i, f, 64)
+            if f < r.d[0] {
+                return false;
+            }
+            one_idle(w, i);
+            true
         }
+        // finished as soon as another SetAnim replaced the controller; the swing at 32 (faces the player, x1.0; an
+        // accepted hit plays 62); the end SetAnim(0) at 64 + 8 * (frames - 2)
         K::WindupMelee => {
-            if f == 32 {
-                en::melee_strike(w, i, 0x400, true, false, atk(2));
+            if w.en_ref(i).anim_seq as i32 != r.d[0] {
+                return true;
             }
-            timed_end(w, i, f, 48)
+            if f == 32 && en::melee_strike(w, i, 0x400, true, false, atk(2)) {
+                w.sfx(62, 64);
+            }
+            if f >= r.d[1] {
+                set_anim(w, i, &[nm("idle")], true, Some(true));
+                return true;
+            }
+            false
         }
+        // update 0x0802F8DA: at 60 the strike 0x0802F77C then SetAnim(4) (the punch state); finished once back in idle
         K::HeavyStrike => {
             if r.d[0] == 0 {
                 return true;
             }
-            if f == 58 {
+            if f == 60 {
                 en::heavy_strike(w, i);
+                set_anim(w, i, &[an(4)], true, Some(false));
+                return false;
             }
-            f >= 76
+            let d = Arc::clone(&w.data);
+            f > 60 && w.en_ref(i).a.anim_name(&d) == Some("idle")
         }
+        // controller 0x03003278: at tick 0x8C the MeleeAttack hit (x1.5; accepted -> 48 + rand(2)); its end at 148
+        // (one SetAnim(0))
         K::ChargedPunch => {
             if f == 140 {
-                set_anim(w, i, &[an(4)], true, Some(false));
                 w.en(i).a.hittable = false;
-                en::melee_strike(w, i, 0x600, false, true, atk(2));
+                if en::melee_strike(w, i, 0x600, true, false, atk(2)) {
+                    melee_sfx(w);
+                }
             }
-            f >= 149
+            if f >= 148 {
+                one_idle(w, i);
+                return true;
+            }
+            false
         }
         K::MiniYakonLunge => {
             if r.d[0] == 0 {
@@ -1046,26 +1382,42 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             }
             f >= 24
         }
+        // update 0x0802C6EC: after a contact 16 frames back along -v; else pos += v (no collision test) and a kind-1
+        // message (the player's footprint) with the body box, melee x1.0: accepted -> 16 frames back
         K::DriftContact => {
-            let k = if r.d[2] > 0 { -1 } else { 1 };
             if r.d[2] > 0 {
                 r.d[2] -= 1;
+                let a = &mut w.en(i).a;
+                a.x -= r.d[0];
+                a.y -= r.d[1];
+                return false;
             }
-            if !en::move_by(w, i, k * r.d[0], k * r.d[1]) {
-                r.d[0] = -r.d[0];
-                r.d[1] = -r.d[1];
+            {
+                let a = &mut w.en(i).a;
+                a.x += r.d[0];
+                a.y += r.d[1];
             }
-            if r.d[2] <= 0 && en::contact_hit(w, i) {
-                r.d[2] = 16;
+            if let Some(pi) = en::player(w, i) {
+                let a = &w.en_ref(i).a;
+                let mut m = HitMsg { team: 0, rect: a.body_box(), dir: a.facing, mult: 0x400, atk: atk(2), attacker: me, att_stats: a.stats, att_is_player: false, source: me, crit: false, raw: 0, dmg: 0, no_react: false, foot: true };
+                if player::on_message(w, pi, &mut m) {
+                    r.d[2] = 16;
+                }
             }
             false
         }
         // ---- ranged
+        // the player's spawner 0x08019858: origin 0x0800FF44 on the body box; the blast tests a 16 x 16 box
         K::KiBlast => {
             if f == 16 {
-                let (mx, my) = en::muzzle(w, i, 10);
+                let (mx, my) = en::hand_point(w, i);
                 let dir = w.en_ref(i).a.facing;
-                shots::ki_blast(w, me, dir, 0, mx << 8, my << 8, atk(4), 1024, true);
+                let id = shots::ki_blast(w, me, dir, 0, mx << 8, my << 8, atk(4), 1024, true);
+                if let Some(k) = w.find(id) {
+                    if let shots::ShotKind::Straight(o) = &mut w.shot(k).kind {
+                        o.b = [8, 8, 16, 16];
+                    }
+                }
             }
             timed_end(w, i, f, 32)
         }
@@ -1097,32 +1449,50 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             en::shot(w, i, ShotType::Shell);
             true
         }
-        K::SoldierThrow | K::CyborgShot | K::TurretFire => {
-            let k = kind(c, n);
-            let fire = if k == K::CyborgShot { 1 } else { 8 };
-            let len = if k == K::TurretFire { 72 } else if k == K::SoldierThrow { 32 } else { 16 };
-            if f == fire {
-                let (x, y) = en::muzzle_fix(w, i, k == K::TurretFire);
+        // the wave (0x0802A2EC) at tick 8 from the per-facing muzzle; the soldier's ends at tick >= 32 once its wave is
+        // gone, the turret's at 72: SetAnim(0)
+        K::SoldierThrow | K::TurretFire => {
+            let soldier = kind(c, n) == K::SoldierThrow;
+            if f == 8 {
+                let (x, y) = en::muzzle_fix(w, i, !soldier);
                 let dir = w.en_ref(i).a.facing;
-                r.d[0] = shots::add(w, shots::energy_wave(me, dir, x, y)) as i32;
+                let s = shots::energy_wave(w, me, dir, x, y);
+                r.d[0] = shots::add(w, s) as i32;
             }
-            f >= len && !alive(w, r.d[0])
+            if if soldier { f >= 32 && !alive(w, r.d[0]) } else { f >= 72 } {
+                set_anim(w, i, &[nm("idle")], true, Some(true));
+                return true;
+            }
+            false
         }
-        K::TurretOpen | K::TurretClose => {
-            let d = Arc::clone(&w.data);
-            f >= 12 && w.en_ref(i).anim_done(&d)
+        // tick 0x0802F5F8: counter 1 spawns the wave; from 16 on, once the wave is gone: SetAnim(0), finished
+        K::CyborgShot => {
+            if f == 1 {
+                let (x, y) = en::muzzle_fix(w, i, false);
+                let dir = w.en_ref(i).a.facing;
+                let s = shots::energy_wave(w, me, dir, x, y);
+                r.d[0] = shots::add(w, s) as i32;
+            }
+            if f < 16 || alive(w, r.d[0]) {
+                return false;
+            }
+            set_anim(w, i, &[an(0)], true, Some(true));
+            true
         }
+        // finished on the update that sees the anim frame at 3
+        K::TurretOpen | K::TurretClose => w.en_ref(i).ea.pos.frame >= 3,
+        // controller 0x0203DD04: the bomb at tick 16 from the position + 0x0874CAD4[dir], SetAnim(0) at 24
         K::BombThrow => {
             if f == 16 {
-                if let Some(pi) = en::player(w, i) {
-                    let (mx, my) = en::muzzle(w, i, 8);
-                    let (tx, ty) = w.pl_ref(pi).a.foot_center();
-                    let dir = w.en_ref(i).a.facing;
-                    shots::add(w, shots::bomb(me, dir, mx << 8, my << 8, tx, ty));
-                }
+                const BOMB_MUZZLE: [(i32, i32); 4] = [(12, -8), (12, -8), (16, -16), (0, -16)];
+                let a = &w.en_ref(i).a;
+                let (ox, oy) = BOMB_MUZZLE[a.facing as usize];
+                let (dir, x, y) = (a.facing, (a.px() + ox) << 8, (a.py() + oy) << 8);
+                shots::add(w, shots::bomb(me, dir, x, y, r.d[0], r.d[1]));
             }
-            timed_end(w, i, f, 32)
+            timed_end(w, i, f, 24)
         }
+        // the controller 0x03002FA8 spawns a flame every tick 4..127; at 128: SetAnim(0) and the sound 63 stopped
         K::FlameBreath => {
             if (4..128).contains(&f) {
                 const NOZ: [(i32, i32); 4] = [(46, 10), (16, -48), (-6, -12), (74, -12)];
@@ -1132,15 +1502,31 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                 let s = shots::flame(w, me, dir, x, y);
                 shots::add(w, s);
             }
+            if f == 128 {
+                set_anim(w, i, &[nm("idle")], true, Some(true));
+                w.events.push(crate::world::Event::SfxStopMatch { id: 63 });
+            }
             f >= 128
         }
+        // controller tick 0x08037D64: t < 24 frame (t >> 2) & 1, < 28 frame 2, < 32 frame 3; t 28 the arm at the
+        // position + 0x0876CCB4[dir]; from 32 SetAnim(0) once the arm is gone
         K::GrappleArm => {
-            if f == 28 {
-                let (mx, my) = en::muzzle(w, i, 8);
-                let dir = w.en_ref(i).a.facing;
-                shots::add(w, shots::grapple_arm(me, dir, mx << 8, my << 8));
+            if f < 32 {
+                w.en(i).ea.pos.frame = if f < 24 { (f >> 2) & 1 } else if f < 28 { 2 } else { 3 };
+                if f == 28 {
+                    const O: [(i32, i32); 4] = [(7, 16), (-12, -56), (-24, -20), (48, -20)];
+                    let a = &w.en_ref(i).a;
+                    let (ox, oy) = O[a.facing as usize];
+                    let (dir, x, y) = (a.facing, (a.px() + ox) << 8, (a.py() + oy) << 8);
+                    r.d[0] = shots::add(w, shots::grapple_arm(me, dir, x, y)) as i32;
+                }
+                return false;
             }
-            timed_end(w, i, f, 60)
+            if alive_ent(w, r.d[0]) {
+                return false;
+            }
+            set_anim(w, i, &[nm("idle")], true, Some(true));
+            true
         }
         K::EnergyBarrage => {
             if f <= 48 {
@@ -1167,35 +1553,24 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             }
             f >= 301
         }
+        // the beam fires at tick 8 (stop 3, sound 32); the state ends once tick > 90 (SetAnim(0); the exit stops the
+        // beam: it retracts)
         K::KidBuuKamehameha => {
-            if f == 1 {
-                r.d[1] = crate::fx::beam_charge(w, me, KIDBUU_CHARGE, crate::fx::BeamSet::Kamehameha1) as i32;
-            }
-            if f == 8 {
-                if let Some(k) = w.find(r.d[1] as u32) {
-                    w.ents[k].removed = true;
+            if f == 9 {
+                if let Some(k) = w.find(w.en_ref(i).beam) {
+                    shots::kame_fire(w, k);
                 }
-                let dir = w.en_ref(i).a.facing;
-                const OFF: [(i32, i32); 4] = [(8, -2), (12, -2), (12, -2), (4, -2)];
-                let (ox, oy) = OFF[dir as usize];
-                let b = shots::grow_beam(w, me, dir, 0, shots::Muzzle::KidBuu { ox, oy }, atk(5), 41, 20, 3 << 8, 80 << 8, true, Some(shots::BEAM_POS_KAME_FIRE), false, 0);
-                let id = shots::add(w, b);
-                r.d[0] = id as i32;
-                w.en(i).beam = id;
             }
-            if f >= 90 {
+            if f >= 91 {
+                set_anim(w, i, &[nm("idle")], true, Some(true));
                 stop_enemy_beam(w, i);
                 return true;
             }
             false
         }
-        K::StoneSpit => {
-            if f == 1 {
-                en::shot(w, i, ShotType::Spit);
-            }
-            timed_end(w, i, f, 16)
-        }
-        K::AimAtPlayer => timed_end(w, i, f, 8),
+        // update 0x080500A4: done once the controller tick is > 8 (the 9th update)
+        K::StoneSpit => f >= 9,
+        K::AimAtPlayer => true,
         // ---- teleports
         K::NinjaTeleport => {
             en::ninja_teleport(w, i);
@@ -1243,122 +1618,281 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             false
         }
         // ---- grabs
+        // update 0x08033A2A: done when the player's HP <= 0 or the player left the hold; keys A/B/d-pad held -> stamp,
+        // count + 1, > 8 -> player SetAnim(0), done; no keys for > 10 frames -> count 0; the frame counter & 15 == 0 ->
+        // the player loses POW HP (no formula) and the vampire heals the same
         K::VampireGrab => {
-            let p = en::player(w, i);
-            let Some(pi) = p.filter(|&pi| r.d[0] != 0 && w.pl_ref(pi).held_by == me) else { return true };
-            if w.frame & 15 == 0 {
-                let pow = w.en_ref(i).a.stats.pow;
-                let d = player::lose_hp(w, pi, pow, 0);
-                en::heal(w, i, d as i64 * 1024);
+            let Some(pi) = en::player(w, i).filter(|&pi| w.pl_ref(pi).hp() > 0 && w.pl_ref(pi).held_by == me) else { return true };
+            let now = w.g.clock(w.frame) as i32;
+            let slot = w.pl_ref(pi).slot as usize;
+            if w.input[slot].held & 0xf3 != 0 {
+                r.d[1] = now;
+                r.d[0] += 1;
+                if r.d[0] > 8 {
+                    player::release(w, pi);
+                    return true;
+                }
+            } else if now - r.d[1] > 10 {
+                r.d[0] = 0;
             }
-            false
+            if now & 15 == 0 {
+                let pow = w.en_ref(i).a.stats.pow;
+                player::lose_hp(w, pi, pow, 0);
+                en::heal(w, i, pow as i64 * 1024);
+            }
+            w.pl_ref(pi).hp() <= 0
         }
+        // update 0x08029902: no player / KO -> finished; the frame counter & 63 == 0 -> 1 HP (no formula)
         K::LatchDrain => {
-            let Some(pi) = en::player(w, i).filter(|&pi| w.pl_ref(pi).held_by == me) else { return true };
-            if w.frame & 63 == 0 {
+            let Some(pi) = en::player(w, i).filter(|&pi| !w.pl_ref(pi).dead && w.pl_ref(pi).hp() > 0) else { return true };
+            if w.g.clock(w.frame) & 63 == 0 {
                 player::lose_hp(w, pi, 1, 0);
             }
             false
         }
+        // frame t >> 3 while below the frame count; its end: SetAnimRaw(0x13) under 0x03001B30, finished
         K::GrabWindup => {
-            let d = Arc::clone(&w.data);
-            f >= 12 && w.en_ref(i).anim_done(&d)
+            if (f >> 3) < r.d[0] {
+                w.en(i).ea.pos.frame = f >> 3;
+                return false;
+            }
+            let g = w.data.anim.generic["0x03001B30"];
+            set_anim_r(w, i, &[an(19)], false, g);
+            true
         }
+        // update 0x0802C645: no partner -> finished. Phase 0: the partner showing SetAnim(9)'s animation -> release;
+        // showing id 0x11 (draining) -> the presses are ignored; else a d-pad press toggles the player's frame and each
+        // 0x08040284(d-pad, 20, 90) success counts, the 5th releases. Release: the player back at the kept position,
+        // SetAnim(0), Spopovich SetAnim(9), phase 1: 60 more ticks
         K::BearHug => {
-            if r.d[0] == 0 {
-                return f >= 2;
+            let Some(yamu) = w.live_enemies().into_iter().find(|&o| w.ents[o].id as i32 == r.d[3] && r.d[3] != 0) else { return true };
+            if r.d[0] == 1 {
+                let c0 = r.d[1];
+                r.d[1] -= 1;
+                return c0 == 0;
             }
             let p = en::player(w, i);
-            if r.d[1] == 0 && (p.is_none() || p.is_some_and(|pi| w.pl_ref(pi).held_by != me) || w.en_ref(i).drain_done) {
-                r.d[1] = f;
+            let release = |w: &mut World, r: &mut NodeRt| {
                 if let Some(pi) = p {
-                    if w.pl_ref(pi).held_by == me {
-                        player::release(w, pi);
-                    }
+                    let pl = w.pl(pi);
+                    pl.a.x = r.d[4];
+                    pl.a.y = r.d[5];
+                    player::to_idle(w, pi);
                 }
-                w.en(i).drain_done = false;
+                set_anim(w, i, &[an(9)], true, Some(false));
+                r.d[0] = 1;
+                r.d[1] = 60;
+            };
+            if is_anim_id(w, yamu, 9) {
+                release(w, r);
+                return false;
             }
-            r.d[1] != 0 && f - r.d[1] >= 60
+            let Some(pi) = p else { return false };
+            if is_anim_id(w, yamu, 0x11) {
+                return false;
+            }
+            let slot = w.pl_ref(pi).slot as usize;
+            if w.g.pressed(slot) & 0xf0 != 0 {
+                w.pl(pi).ap.frame ^= 1;
+            }
+            if w.g.press_run(slot, 0xf0, 20, 90, w.frame) {
+                r.d[2] += 1;
+                if r.d[2] == 5 {
+                    release(w, r);
+                }
+            }
+            false
         }
+        // Yamu's drain (update 0x0802FC5D; d: 0 phase, 1 spot found, 2 counter, 3 partner, 4 target EP, 5 mover). Phase
+        // 0: find the spot Spopovich + (40, 1) when right of it, else / if blocked + (-40, 1), walk there (straight-line
+        // mover, speed 0x100); Spopovich showing SetAnim(9)'s animation -> finished; arrived -> face Spopovich's side,
+        // phase 1 (SetAnimRaw(0x12)), target EP = EP - maxEP / 4. Phase 1: EP == target -> SetAnim(9), phase 2 (60
+        // ticks); else counter + 1: every 8th EP - 1, every 32nd sound 19
         K::EnergyDrain => {
-            let Some(pi) = en::player(w, i) else { return true };
-            match r.d[0] {
-                0 => {
-                    if en::move_toward(w, i, 0x100, 16, true, false) {
-                        r.d[0] = 1;
-                    }
-                    w.pl_ref(pi).held_by == 0
-                }
-                1 => {
-                    let held = w.pl_ref(pi).held_by;
-                    if held == 0 {
-                        return true;
-                    }
-                    let (ep, max_ep) = (w.pl_ref(pi).ep() as i64, w.pl_ref(pi).max_ep() as i64);
-                    let lost = r.d[1] as i64;
-                    if f % 8 == 0 && 4 * ep > max_ep && 4 * lost < max_ep {
-                        player::lose_ep(w, pi, 1);
-                        r.d[1] += 1;
-                    } else if 4 * lost >= max_ep || 4 * ep <= max_ep {
-                        if let Some(spo) = w.live_enemies().into_iter().find(|&o| w.ents[o].id == held) {
-                            w.en(spo).drain_done = true;
-                        }
-                        r.d[0] = 2;
-                        r.d[2] = f;
-                    }
-                    false
-                }
-                _ => f - r.d[2] >= 60,
+            let p = en::player(w, i);
+            if r.d[0] == 2 {
+                r.d[2] = (r.d[2] - 1) & 0xff;
+                return r.d[2] == 0xff;
             }
+            if r.d[0] == 1 {
+                let Some(pi) = p else { return false };
+                if w.pl_ref(pi).ep() == r.d[4] {
+                    set_anim(w, i, &[an(9)], true, Some(false));
+                    r.d[0] = 2;
+                    r.d[2] = 60;
+                    return false;
+                }
+                r.d[2] = (r.d[2] + 1) & 0xff;
+                if r.d[2] & 7 == 0 {
+                    w.pl(pi).rec.ep -= 1;
+                }
+                if r.d[2] & 31 == 0 {
+                    w.sfx(19, 64);
+                }
+                return false;
+            }
+            if r.d[1] == 0 {
+                let spo = w.live_enemies().into_iter().find(|&o| matches!(w.en_ref(o).ty, 0x6d..=0x70));
+                r.d[3] = spo.map(|o| w.ents[o].id as i32).unwrap_or(0);
+                let Some(spo) = spo else { return true };
+                let (sx, sy) = (w.en_ref(spo).a.x, w.en_ref(spo).a.y);
+                en::unmark_self(w, i);
+                let mut tx = 0;
+                let mut ty = sy + 0x100;
+                if w.en_ref(i).a.x > sx && en::fits(w, i, (sx + (40 << 8)) >> 8, ty >> 8) {
+                    tx = sx + (40 << 8);
+                } else if en::fits(w, i, (sx - (40 << 8)) >> 8, ty >> 8) {
+                    tx = sx - (40 << 8);
+                } else {
+                    ty = -1;
+                }
+                en::mark_self(w, i);
+                if ty >= 0 {
+                    r.d[1] = 1;
+                    r.path = line_mover(w, i, tx >> 8, ty >> 8, 0x100);
+                    r.d[5] = 1;
+                }
+            }
+            let spo = w.live_enemies().into_iter().find(|&o| r.d[3] != 0 && w.ents[o].id as i32 == r.d[3]);
+            if spo.is_some_and(|s| is_anim_id(w, s, 9)) {
+                return true;
+            }
+            if r.d[1] == 0 || r.d[5] == 0 {
+                return false;
+            }
+            let mut m = r.path;
+            let arrived = line_mover_step(w, i, &mut m);
+            r.path = m;
+            if !arrived {
+                return false;
+            }
+            let right = spo.is_some_and(|s| w.en_ref(i).a.x > w.en_ref(s).a.x);
+            w.en(i).a.facing = if right { 2 } else { 3 };
+            r.d[0] = 1;
+            r.d[5] = 0;
+            let h = w.data.anim.hold;
+            set_anim_r(w, i, &[an(18)], true, h);
+            r.d[4] = match p {
+                Some(pi) if w.pl_ref(pi).ep() > w.pl_ref(pi).max_ep() >> 2 => w.pl_ref(pi).ep() - (w.pl_ref(pi).max_ep() >> 2),
+                _ => 0,
+            };
+            false
         }
-        K::FreezePlayer => f >= 48,
+        // update 0x0804FF94: done once the fragment left its freeze state (the escape SetAnim(0)s it)
+        K::FreezePlayer => w.en_ref(i).hook != en::Hook::Freeze,
+        // controller tick 0x0802AF11: t 0 the player becomes the candy-eat state at the enemy + 0x08752DF8[dir]; t 8 it
+        // leaves the world; t 24..111 every 8th min(POW >> 2, HP) eaten (0 -> 1 and the KO flag), every 32nd sound 11;
+        // t 120 a new player object at the kept position; t 160 SetAnim(0)
         K::EatCandy => {
             let p = en::player(w, i);
-            let Some(pi) = p.filter(|_| r.d[0] != 0) else { return true };
-            if (24..=111).contains(&f) && f % 8 == 0 {
-                let d = (w.en_ref(i).a.stats.pow >> 2).min(w.pl_ref(pi).hp());
-                let lost = player::lose_hp(w, pi, d, 1);
-                en::heal(w, i, lost as i64 * 1024);
+            if f == 1 {
+                if let Some(pi) = p {
+                    r.d[0] = w.pl_ref(pi).a.x;
+                    r.d[1] = w.pl_ref(pi).a.y;
+                    r.d[2] = 0;
+                    const O: [(i32, i32); 4] = [(-8, -20), (-8, -20), (-8, -20), (48, -20)];
+                    let a = &w.en_ref(i).a;
+                    let (ox, oy) = O[a.facing as usize];
+                    let (x, y) = ((a.px() + ox) << 8, (a.py() + oy) << 8);
+                    player::candy_eat(w, pi, x, y);
+                }
             }
-            if f >= 120 {
-                w.g.candy = 0;
-                player::release(w, pi);
+            if f < 24 {
+                if f == 8 {
+                    if let Some(pi) = p {
+                        player::candy_gone(w, pi);
+                    }
+                }
+                w.en(i).ea.pos.frame = f >> 3;
+            } else if f < 112 {
+                w.en(i).ea.pos.frame = 3 + (((f + 8) >> 3) & 1);
+                if f & 7 == 0 {
+                    if let Some(pi) = p {
+                        let mut d = w.en_ref(i).a.stats.pow >> 2;
+                        let hp = w.pl_ref(pi).rec.hp;
+                        if hp <= d {
+                            d = hp;
+                        }
+                        w.pl(pi).rec.hp -= d;
+                        if w.pl_ref(pi).rec.hp == 0 {
+                            w.pl(pi).rec.hp = 1;
+                            r.d[2] = 1;
+                        }
+                        en::heal(w, i, d as i64 * 1024);
+                    }
+                }
+                if f & 31 == 0 {
+                    w.sfx(11, 64);
+                }
+            } else if f < 128 {
+                w.en(i).ea.pos.frame = 5 + ((f - 112) >> 3);
+                if f == 120 {
+                    if let Some(pi) = p {
+                        player::candy_respawn(w, pi, (r.d[0] >> 8) << 8, (r.d[1] >> 8) << 8, r.d[2] != 0);
+                    }
+                }
+            } else if f >= 160 {
+                set_anim(w, i, &[nm("idle")], true, Some(true));
                 return true;
             }
             false
         }
         // ---- Buu
+        // controller tick 0x0802AB1D: frames 0 / 1-2 / 3-4; t 64 the arm at the position + 0x08752D6C[dir] (def 0x2B) or
+        // 0x08752D8C (10 px higher sideways), sound 8; from 72 SetAnim(0) once the arm is gone
         K::BuuStretchPunch => {
             if r.d[0] == 0 {
                 return true;
             }
-            if f == 64 {
-                const OFF: [(i32, i32); 4] = [(9, 16), (15, -56), (-24, -16), (48, -16)];
-                let a = &w.en_ref(i).a;
-                let (ox, oy) = OFF[a.facing as usize];
-                let gfx = w.data.enemy(w.en_ref(i).ty).and_then(|t| t.gfx);
-                let dir = a.facing;
-                r.d[1] = shots::add(w, shots::stretch_arm(me, dir, ox, oy + if gfx == Some(0x2b) { -10 } else { 0 })) as i32;
+            if f < 72 {
+                w.en(i).ea.pos.frame = if f < 8 {
+                    0
+                } else if f < 56 {
+                    1 + (((f + 8) >> 3) & 1)
+                } else {
+                    3 + ((f - 56) >> 3)
+                };
+                if f == 64 {
+                    let gfx = w.data.enemy(w.en_ref(i).ty).and_then(|t| t.gfx);
+                    let o: [(i32, i32); 4] = if gfx == Some(0x2b) { [(9, 16), (15, -56), (-24, -16), (48, -16)] } else { [(9, 16), (15, -56), (-24, -26), (48, -26)] };
+                    let a = &w.en_ref(i).a;
+                    let (ox, oy) = o[a.facing as usize];
+                    let (dir, x, y) = (a.facing, a.px() + ox, a.py() + oy);
+                    r.d[1] = shots::add(w, shots::stretch_arm(me, dir, x, y)) as i32;
+                    w.sfx(8, 64);
+                }
+                return false;
             }
-            if f >= 72 {
-                return !alive(w, r.d[1]);
+            if alive_ent(w, r.d[1]) {
+                return false;
             }
-            false
+            set_anim(w, i, &[nm("idle")], true, Some(true));
+            true
         }
+        // controller tick 0x0802B221: frame t >> 3 below 32, t 16 the beam at the position + 0x08752E28[dir] (def 0x2B)
+        // or 0x08752E48; from 32 SetAnim(0) once it is gone
         K::CandyBeam => {
             if r.d[0] == 0 {
                 return true;
             }
-            if f == 16 {
-                const OFF: [(i32, i32); 4] = [(16, 8), (16, -50), (-8, -26), (40, -26)];
-                let dir = w.en_ref(i).a.facing;
-                let (ox, oy) = OFF[dir as usize];
-                r.d[1] = shots::add(w, shots::candy_beam(me, dir, ox, oy)) as i32;
+            if f < 32 {
+                w.en(i).ea.pos.frame = f >> 3;
+                if f == 16 {
+                    const OFF: [(i32, i32); 4] = [(12, -8), (14, -38), (-16, -34), (40, -34)];
+                    const OFF_2B: [(i32, i32); 4] = [(12, -8), (14, -38), (-16, -24), (40, -24)];
+                    let gfx = w.data.enemy(w.en_ref(i).ty).and_then(|t| t.gfx);
+                    let a = &w.en_ref(i).a;
+                    let (ox, oy) = if gfx == Some(0x2b) { OFF_2B } else { OFF }[a.facing as usize];
+                    let (dir, x, y) = (a.facing, a.px() + ox, a.py() + oy);
+                    r.d[1] = shots::add(w, shots::candy_beam(me, dir, x, y)) as i32;
+                }
+                return false;
             }
-            if f >= 32 {
-                return !alive(w, r.d[1]);
+            if alive_ent(w, r.d[1]) {
+                return false;
             }
-            false
+            set_anim(w, i, &[nm("idle")], true, Some(true));
+            true
         }
         K::AbsorbStance => f >= 8,
         K::AbsorbPose | K::AbsorbPose2 => {
@@ -1389,7 +1923,8 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             }
             timed_end(w, i, f, 72)
         }
-        K::KidBuuSplitAnim => f >= 55,
+        // SetAnimRaw(0xC) under 0x03001B30; finishes on the 56th update
+        K::KidBuuSplitAnim => f >= 56,
         K::KidBuuSplit => {
             en::kid_buu_split(w, i);
             true
@@ -1410,11 +1945,17 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             en::janemba_parts(w, i);
             true
         }
+        // the part's controller is set by the node's first update; the hand on its 16th tick; its end SetAnim(0)s the
+        // arm part (rand(255))
         K::JanembaHandStrikeA | K::JanembaHandStrikeB => {
-            if f == 16 {
+            if f == 17 {
                 en::hand_strike(w, i, kind(c, n) == K::JanembaHandStrikeA);
             }
-            f >= 57
+            if f >= 57 {
+                w.rng.rand(255);
+                return true;
+            }
+            false
         }
         K::JanembaAscend => {
             if f >= 8 {
@@ -1440,7 +1981,23 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             r.d[0] == 0 && f > 70
         }
         K::WaitMinisDefeated => !w.live_enemies().iter().any(|&o| w.en_ref(o).ty == 0x38),
-        K::MiniHopToward | K::MiniHopFlee | K::Hop => {
+        // update 0x080346FC: tick + 8 (wraps at 0x100); at 0 re-aim with chance(0x4000); > 0x80: the whole step
+        // 0x087593F8[dir] (+-0.5 px per axis), no sliding
+        K::MiniHopToward => {
+            r.d[0] = (r.d[0] + 8) & 0xff;
+            let ph = r.d[0];
+            w.en(i).a.z = if ph >= 0x80 { -HOP_ARC8[((ph - 0x80) >> 3) as usize] } else { 0 };
+            if ph == 0 && w.rng.chance(0x4000) {
+                mini_aim(w, i);
+            }
+            if ph > 0x80 {
+                const V: [(i32, i32); 4] = [(128, 128), (-128, -128), (-128, 128), (128, -128)];
+                let (vx, vy) = V[w.en_ref(i).a.facing as usize];
+                en::try_move(w, i, vx, vy, 0, 0);
+            }
+            false
+        }
+        K::MiniHopFlee | K::Hop => {
             r.d[0] = (r.d[0] + 8) & 0xff;
             let ph = r.d[0];
             let air = ph >= 0x80;
@@ -1562,16 +2119,27 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             let d = Arc::clone(&w.data);
             f >= 8 && w.en_ref(i).anim_done(&d)
         }
-        K::PlayAnim0 => f >= 80,
+        // update 0x0804FF0C: done once the actor left the fragment state
+        K::PlayAnim0 => w.en_ref(i).hook != en::Hook::Fragment,
         K::PlayAnim12 | K::PlayAnim12b | K::PlayAnim12Swarm | K::PlayAnim12Yakon | K::PlayAnim12Yakon2 | K::GhostAnimA | K::GhostAnimB | K::PlayAnim13 | K::PlayAnim13Yakon | K::PlayAnimOnce => {
             let d = Arc::clone(&w.data);
             f >= 16 && w.en_ref(i).anim_done(&d)
         }
         K::PlayAnimTimed => f >= 32,
         K::DarkSphere => w.g.sphere_state == 1 || w.g.sphere_state == 3,
-        K::TauntAnim | K::MechTransform => {
+        K::TauntAnim => {
             let d = Arc::clone(&w.data);
             f >= 12 && w.en_ref(i).anim_done(&d)
+        }
+        // update 0x080314DC: running while in the one-shot state, then the paired graphics set, SetAnim(0), finished
+        K::MechTransform => {
+            let d = Arc::clone(&w.data);
+            if !w.en_ref(i).anim_done(&d) {
+                return false;
+            }
+            en::swap_gfx(w, i);
+            set_anim(w, i, &[an(0)], true, Some(true));
+            true
         }
         K::SummonMiniYakons => {
             for k in 0..5 {
@@ -1620,10 +2188,7 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             let (fw, fh) = (w.en_ref(i).a.foot_w, w.en_ref(i).a.foot_h);
             en::move_to_point(w, i, px + ox - (fw >> 1), py + oy - (fh >> 1), 0x100)
         }
-        K::WormSpawnBody => {
-            en::worm_spawn_body(w, i);
-            true
-        }
+        K::WormSpawnBody => true,
         K::WormHeadMove => {
             en::worm_head_step(w, i);
             false
@@ -1671,7 +2236,12 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
 pub fn on_hit(w: &mut World, i: usize, msg: &HitMsg) -> i32 {
     let Some(st) = w.en_ref(i).ai.top_state() else { return 0 };
     let Some(aux) = w.data.aux.get(&st).cloned() else { return 0 };
-    hit_node(w, i, &aux, 0, msg)
+    let n0 = w.en_ref(i).ai.orphans.len();
+    let r = hit_node(w, i, &aux, 0, msg);
+    if let Body::Enemy(e) = &mut w.ents[i].body {
+        e.ai.orphans.truncate(n0);
+    }
+    r
 }
 
 fn hit_node(w: &mut World, i: usize, t: &Arc<BehTree>, n: u16, msg: &HitMsg) -> i32 {
@@ -1840,4 +2410,77 @@ fn hit_node(w: &mut World, i: usize, t: &Arc<BehTree>, n: u16, msg: &HitMsg) -> 
         K::AbsorbPose | K::AbsorbPose2 | K::FreezeHelperHit | K::ShieldHit => 1,
         _ => 0,
     }
+}
+
+
+// ---- TankDrive helpers (node 0x08049E20; r.d[0] = the turn timer +4) ---------------------------------------------------
+
+fn tank_is(w: &World, i: usize, walk: bool) -> bool {
+    w.en_ref(i).a.anim_name(&w.data) == Some(if walk { "walk" } else { "idle" })
+}
+/// turn 0x0803282A: facing == dir -> ok; timer running -> no; else SetAnim(0) unless idle, timer = 60, and the
+/// opposite direction is refused (a tank never turns around directly)
+fn tank_turn(w: &mut World, i: usize, d: u8, r: &mut NodeRt) -> bool {
+    let f = w.en_ref(i).a.facing;
+    if f == d {
+        return true;
+    }
+    if r.d[0] != 0 {
+        return false;
+    }
+    if !tank_is(w, i, false) {
+        set_anim(w, i, &[nm("idle")], true, Some(true));
+    }
+    r.d[0] = 60;
+    if f ^ 1 == d {
+        return false;
+    }
+    w.en(i).a.facing = d;
+    true
+}
+/// probe 0x08032948: n = (|player pos - own pos| >> 8) / 8 on the axis (top-left positions; direction 1 measures x, a
+/// game quirk), n steps of 8 px along dir must all fit
+fn tank_probe(w: &mut World, i: usize, d: u8) -> bool {
+    let Some(pi) = en::player(w, i) else { return false };
+    let (px, py) = (w.pl_ref(pi).a.x, w.pl_ref(pi).a.y);
+    let (ex, ey) = (w.en_ref(i).a.x, w.en_ref(i).a.y);
+    let diff = if d == 0 { py - ey } else { px - ex };
+    let steps = (diff.abs() >> 8) / 8;
+    let (sx, sy) = DIR_VEC[d as usize];
+    en::unmark_self(w, i);
+    let (mut x, mut y) = (ex, ey);
+    let mut ok = true;
+    for _ in 0..steps {
+        x += sx * 0x800;
+        y += sy * 0x800;
+        if !en::fits(w, i, x >> 8, y >> 8) {
+            ok = false;
+            break;
+        }
+    }
+    en::mark_self(w, i);
+    ok
+}
+/// drive 0x0803287E: turn ok -> 0.25 px in the facing, the footprint tested: moved -> SetAnim(1) unless walking,
+/// blocked -> SetAnim(0) unless idle
+fn tank_drive(w: &mut World, i: usize, d: u8, r: &mut NodeRt) {
+    if !tank_turn(w, i, d, r) {
+        return;
+    }
+    let (sx, sy) = DIR_VEC[w.en_ref(i).a.facing as usize];
+    en::unmark_self(w, i);
+    let (x, y) = (w.en_ref(i).a.x, w.en_ref(i).a.y);
+    if en::fits(w, i, (x + sx * 0x40) >> 8, (y + sy * 0x40) >> 8) {
+        {
+            let a = &mut w.en(i).a;
+            a.x += sx * 0x40;
+            a.y += sy * 0x40;
+        }
+        if !tank_is(w, i, true) {
+            set_anim(w, i, &[nm("walk")], true, Some(true));
+        }
+    } else if !tank_is(w, i, false) {
+        set_anim(w, i, &[nm("idle")], true, Some(true));
+    }
+    en::mark_self(w, i);
 }

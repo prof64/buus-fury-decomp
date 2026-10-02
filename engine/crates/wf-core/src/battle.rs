@@ -247,6 +247,8 @@ pub fn spawn_enemy(w: &mut World, ty: i32, x: i32, y: i32, parent: EntityId, sta
         }
     }
     w.enemies.push(id);
+    // the enemy constructor's SetAnim(0): the idle state's enter draws its start tick (rand(255))
+    enemy::set_anim(w, i, &[crate::content::AnimRef::Name("idle")], true, Some(true));
     enemy::mark_self(w, i);
     if start != Some(-1) {
         let st = start.map(|s| s as u16).unwrap_or(w.data.enemy(ty).unwrap().ai);
@@ -393,6 +395,12 @@ fn live_primary(w: &World) -> Vec<EntityId> {
 
 /// before the world update: enemy grid marks follow positions set outside the enemy steps
 pub fn pre_step(w: &mut World) {
+    // the input object 0x03003300 (0x0804023C) records this frame's presses, stamped with the frame counter
+    let at = w.g.clock(w.frame) + 1;
+    for s in 0..w.players.len().clamp(1, crate::world::MAX_PLAYERS) {
+        let p = w.input[s].pressed;
+        w.g.note_input(s, at, p);
+    }
     if w.col.is_none() {
         return;
     }

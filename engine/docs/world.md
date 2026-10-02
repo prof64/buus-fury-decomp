@@ -141,3 +141,26 @@ edges reaching 423 of 452 areas; 2783 text lines (all 196 386 bank units referen
   pickup triggers (appended at runtime) come first.
 * Area record +8 (`areas.json` `rom.word08`) = the **combat** byte (0 in towns: A only talks / interacts).
 * No area has a variant selector (+0x28 = 0 everywhere): variant 0 always means 1.
+
+## 6. Field object graphics (2026-10-02; `wf-extract/src/field_gfx.rs`, re/buu/notes.md "Field: object graphics")
+
+`maps/<id>/objects.json` props gain `gfx {effect: "props_<map>", frame: k}`, `visible` (record +0x17 != 0; a hidden prop
+draws nothing), `priority` (record +0x16 >> 4 & 3), `pixel_bbox` and `hit_box` (world px; `hit_box` = the opaque pixel
+bounds with the top raised to the middle = a breakable's solid / hit box, as the game reads it from VRAM). Map sprites
+(list 4) are **level signs**: def +0 s16 x, y, +4 = the prop they belong to (shown only while it is visible), +5 text
+colour (2 = no text), +6 the number ("%d"), +7 unused by the draw; they gain `label {effect: "field_labels", frame,
+text, colour, prop}`. Draw rules (world px, `SpriteDraw` at the point, the frame's anchor lands there):
+
+| object | sheet / frame | point | priority |
+|---|---|---|---|
+| map prop / breakable | `props_<map>` k | rect top-left (+ a shaking breakable's (dx, dy)) | prop `priority` |
+| level sign | `field_labels` `label.frame` | (x, y + (sine[fc & 0xFF] >> 14)), sine table `0x087B6EEC` (16.16), fc = logic frame counter | 3 |
+| coin (size s) | `coin_s`, cel `((phase + draws) & 0xFF) >> 3` (0 if > 3) | (x >> 8, (y >> 8) - (z >> 8)) | 3 |
+| coin shadow | `shadow_4x2` (sizes 0, 2) / `shadow_10x4` (1, 3) | pickup box top-left (x - w/2, y + yoff) | 3 |
+| dropped item | `field_items` (supply i / 100 + equipment e) | box top-left (x0, y0 - (z >> 10)) | 3 |
+| dropped item shadow | `shadow_10x4` | (x0, y0 + 10) | 3 |
+| map item | `field_items` | def (x, y) (no shadow) | 3 |
+| breakable debris chip | `debris` | chip (x >> 8, y >> 8) | 3 |
+| item-get icon | `field_items` | player (x, y - 40 - ((k + 2) >> 4)), k = frames since the pickup | 2 |
+
+Coins are not drawn after 480 frames of age while `fc & 4`; the player holds raw anim 14 cel 1 during the item-get.

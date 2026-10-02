@@ -49,6 +49,8 @@ pub struct DamageResult {
     pub crit: bool,
     pub raw: i64,
     pub dmg: i64,
+    /// the damage before the block factor (ComputeDamage stores it at hit+0x18, 0x0800EABE, then applies the block)
+    pub unblocked: i64,
 }
 
 pub fn effective_def(d: i64) -> i64 {
@@ -83,10 +85,11 @@ pub fn compute_damage_raw(
     let r = rng(Draw::Rand(26));
     let raw = (((256 + r) * y) >> 8) * a;
     let mut dmg = (resist * raw + 127) >> 7;
+    let unblocked = dmg;
     if blocking && dmg != 0 {
         dmg = (dmg * block_factor) >> 16;
     }
-    DamageResult { crit, raw, dmg }
+    DamageResult { crit, raw, dmg, unblocked }
 }
 
 #[derive(Clone, Copy, Debug)]

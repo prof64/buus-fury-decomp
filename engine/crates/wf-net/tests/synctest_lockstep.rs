@@ -210,7 +210,7 @@ fn setup(t: &Value) -> Setup {
         })
         .unwrap_or_default();
     let pid = w.ents[pi].id;
-    let injector = w.add(Body::Injector(Box::new(Injector { hits, player: pid, now: 0 })));
+    let injector = w.add(Body::Injector(Box::new(Injector { hits, player: pid, now: 0, ai: vec![] })));
     Setup { s, enemy, injector }
 }
 

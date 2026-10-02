@@ -75,6 +75,8 @@ pub struct Breakable {
     pub dy: i32,
     /// broken: waiting for its deferred callback
     pub broken: bool,
+    /// the prop is solid (blocks the grids, can be hit)
+    pub solid: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -84,6 +86,8 @@ pub struct MapSprite {
     pub sprite: i32,
     pub params: [i32; 3],
     pub t: i32,
+    /// level sign: (label frame, prop it hangs on)
+    pub label: Option<(i32, i32)>,
 }
 
 /// a call queued for later (world +0x610), run at the start of the world update of frame `at`
@@ -102,6 +106,8 @@ pub struct ItemGet {
     pub supply: Option<i32>,
     /// then run (map items' "You found ..." event)
     pub then: Option<(Callback, Cause)>,
+    /// the item shown (>= 0 supply, < 0 equipment)
+    pub item: Option<i32>,
 }
 
 fn ov(a: [i32; 4], b: [i32; 4]) -> bool {
@@ -121,11 +127,17 @@ fn walk_free(w: &World, r: [i32; 4]) -> bool {
 pub fn spawn_breakable(w: &mut World, o: &crate::fieldcontent::ObjDef) -> Option<EntityId> {
     let ObjKind::Breakable { prop, param_a, hits, .. } = &o.kind else { return None };
     let r = w.field.as_ref().and_then(|f| f.props.get(*prop as usize)).map(|p| p.rect)?;
-    let bx = [r.x0 + 1, (r.y0 + r.y1) >> 1, r.x1 - 1, r.y1];
-    if let Some(c) = w.col.as_mut() {
-        c.mark_both(bx, 0);
+    // the prop graphic's opaque bounds, lower half (content `hit_box`; fallback: the rect's lower half)
+    let hb = w.field.as_ref().and_then(|f| w.data.field.as_ref()?.maps.get(&f.map)?.props.get(*prop as usize)?.hit_box);
+    let bx = hb.unwrap_or([r.x0 + 1, (r.y0 + r.y1) >> 1, r.x1 - 1, r.y1]);
+    // only a solid prop (map prop record +0x17 = the tile word's top byte) blocks the grids
+    let solid = w.field.as_ref().and_then(|f| w.data.field.as_ref()?.maps.get(&f.map)?.props.get(*prop as usize).map(|p| p.tile >> 24 != 0)).unwrap_or(true);
+    if solid {
+        if let Some(c) = w.col.as_mut() {
+            c.mark_both(bx, 0);
+        }
     }
-    Some(w.add(Body::Breakable(Box::new(Breakable { obj: o.at, prop: *prop, bx, hp: (*param_a).max(1), mask: *hits, last_dir: 0, shake: 0, dx: 0, dy: 0, broken: false }))))
+    Some(w.add(Body::Breakable(Box::new(Breakable { obj: o.at, prop: *prop, bx, hp: (*param_a).max(1), mask: *hits, last_dir: 0, shake: 0, dx: 0, dy: 0, broken: false, solid }))))
 }
 
 /// a map item (16x16 at the def position; (x, y+8)..(x+16, y+16) blocked on both grids)
@@ -152,8 +164,8 @@ pub fn spawn_map_item(w: &mut World, o: &crate::fieldcontent::ObjDef) -> Option<
 }
 
 pub fn spawn_map_sprite(w: &mut World, o: &crate::fieldcontent::ObjDef) -> Option<EntityId> {
-    let ObjKind::MapSprite { x, y, sprite, params } = &o.kind else { return None };
-    Some(w.add(Body::MapSprite(Box::new(MapSprite { x: *x, y: *y, sprite: *sprite, params: *params, t: 0 }))))
+    let ObjKind::MapSprite { x, y, sprite, params, label } = &o.kind else { return None };
+    Some(w.add(Body::MapSprite(Box::new(MapSprite { x: *x, y: *y, sprite: *sprite, params: *params, t: 0, label: *label }))))
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -165,7 +177,7 @@ pub fn breakable_message(w: &mut World, k: usize, msg: &mut HitMsg) -> bool {
         return false;
     }
     let Body::Breakable(b) = &mut w.ents[k].body else { return false };
-    if b.broken || !ov(b.bx, [msg.rect.x0, msg.rect.y0, msg.rect.x1, msg.rect.y1]) {
+    if b.broken || !b.solid || !ov(b.bx, [msg.rect.x0, msg.rect.y0, msg.rect.x1, msg.rect.y1]) {
         return false;
     }
     if b.mask & ((1 << msg.atk.kind) | (1 << msg.atk.sub)) == 0 {
@@ -173,6 +185,9 @@ pub fn breakable_message(w: &mut World, k: usize, msg: &mut HitMsg) -> bool {
     }
     b.last_dir = msg.dir;
     b.hp -= 1;
+    let (cx, cy) = ((b.bx[0] + b.bx[2]) >> 1, (b.bx[1] + b.bx[3]) >> 1);
+    spawn_debris(w.field.as_mut(), cx, cy);
+    let Body::Breakable(b) = &mut w.ents[k].body else { return false };
     // the melee's crit slot is not written for breakables: every recorded hit shook the screen (15, 75)
     msg.crit = true;
     if b.hp > 0 {
@@ -344,8 +359,9 @@ pub fn pickup_update(w: &mut World, i: usize) {
         PickupKind::Supply(_) | PickupKind::Equipment(_) if !p.landed => {
             let (nx, ny) = (p.x + p.vx, p.y + p.vy);
             let (ddx, ddy) = ((nx >> 8) - (p.x >> 8), (ny >> 8) - (p.y >> 8));
-            // collision sub-box inside the 16x16 icon (from the icon's pixels in the game; lower half here)
-            let sub = [p.bx[0] + ddx, p.bx[1] + 8 + ddy, p.bx[2] + ddx, p.bx[3] + ddy];
+            // collision sub-box inside the 16x16 icon (`0x0800DB64` from the icon's pixels: content `sub_box`)
+            let sb = sub_box(w, p.kind);
+            let sub = [p.bx[0] + sb[0] + ddx, p.bx[1] + sb[1] + ddy, p.bx[0] + sb[2] + ddx, p.bx[1] + sb[3] + ddy];
             if ddx == 0 && ddy == 0 || walk_free(w, sub) {
                 p.x = nx;
                 p.y = ny;
@@ -425,8 +441,12 @@ pub fn collect(w: &mut World, k: usize, slot: u8) {
         None
     };
     w.sfx(45, 64);
+    // the hold pose: raw anim 14, cel 1, facing kept (state 0x0804985C)
+    if let Some(pi) = w.player_idx(slot as usize) {
+        crate::player::script_pose(w, pi, 13, 1);
+    }
     if let Some(f) = w.field.as_mut() {
-        f.item_get = Some(ItemGet { left: 61, slot, supply, then });
+        f.item_get = Some(ItemGet { left: 61, slot, supply, then, item: Some(item) });
     }
     w.events.push(Event::Field(FieldEvent::Collected { kind, slot }));
 }
@@ -461,4 +481,46 @@ pub fn map_sprite_update(w: &mut World, i: usize) {
     if let Body::MapSprite(m) = &mut w.ents[i].body {
         m.t += 1;
     }
+}
+
+/// a dropped item's collision sub-box relative to its icon (content; default the lower half)
+fn sub_box(w: &World, kind: PickupKind) -> [i32; 4] {
+    let fd = w.data.field.as_ref();
+    let b = match kind {
+        PickupKind::Supply(i) => fd.and_then(|f| f.supply_box.get(&i).copied()),
+        PickupKind::Equipment(e) => fd.and_then(|f| f.equip_box.get(&e).copied()),
+        _ => None,
+    };
+    b.unwrap_or([0, 8, 16, 16])
+}
+
+/// a breakable's debris chip (vt 0x08049F38, display only: 8x8 `effects/debris`, 32 frames)
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct Debris {
+    pub x: i32,
+    pub y: i32,
+    pub vx: i32,
+    pub vy: i32,
+    pub t: i32,
+}
+
+/// `0x0800C912`: 4 chips from the box centre - 4 px, velocities (96, 0) (-96, 0) (0, 64) (0, -64) (24.8), no RNG
+fn spawn_debris(f: Option<&mut Box<crate::field::Field>>, cx: i32, cy: i32) {
+    let Some(f) = f else { return };
+    for (vx, vy) in [(96, 0), (-96, 0), (0, 64), (0, -64)] {
+        f.debris.push(Debris { x: (cx - 4) << 8, y: (cy - 4) << 8, vx, vy, t: 0 });
+    }
+}
+
+/// the chips' motion (+1 / +2 per frame on the velocity, INFERRED as acceleration away from the centre and down)
+pub fn debris_step(w: &mut World) {
+    let Some(f) = w.field.as_mut() else { return };
+    for d in f.debris.iter_mut() {
+        d.x += d.vx;
+        d.y += d.vy;
+        d.vx += d.vx.signum();
+        d.vy += 2;
+        d.t += 1;
+    }
+    f.debris.retain(|d| d.t < 32);
 }

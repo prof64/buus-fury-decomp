@@ -25,7 +25,7 @@ pub enum Cond {
 
 /// `{fn, data}` callback pair: none / run bytecode (`inline_0xADDR`) / run event (`sNNN`)
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-#[serde(tag = "kind", content = "id", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
 pub enum Callback {
     Script(String),
     Event(String),
@@ -103,7 +103,8 @@ pub enum ObjKind {
     Breakable { prop: i32, param_a: i32, hits: i32, on_break: Option<Callback> },
     /// item >= 0 supply, < 0 equipment (as the def stores it)
     Item { item: i32, x: i32, y: i32, on_pickup: Option<Callback> },
-    MapSprite { x: i32, y: i32, sprite: i32, params: [i32; 3] },
+    /// a level sign: `label` = (frame of `effects/field_labels`, prop index it hangs on)
+    MapSprite { x: i32, y: i32, sprite: i32, params: [i32; 3], label: Option<(i32, i32)> },
     Unknown,
 }
 
@@ -130,6 +131,14 @@ pub struct PropDef {
     pub rect: Rect,
     pub oam: u32,
     pub tile: u32,
+    /// frame of `effects/props_<map>` (field_gfx), None = not exported
+    pub frame: Option<i32>,
+    /// shown at load (record +0x17; also the solid flag)
+    pub visible: bool,
+    /// OBJ priority
+    pub priority: u8,
+    /// the breakable hit / solid box: the graphic's opaque bounds, lower half (`hit_box`)
+    pub hit_box: Option<[i32; 4]>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -173,6 +182,8 @@ pub struct MapDef {
     pub world_h: i32,
     /// camera limits (map header +0x9C / +0x9E)
     pub camera_max: (i32, i32),
+    /// the 3D world map (map header +0x3C: mode-7 ground layer kind 0x08007B63): flying player, 3D camera
+    pub three_d: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -190,6 +201,11 @@ pub struct FieldData {
     pub areas: BTreeMap<(i32, i32), AreaDef>,
     pub maps: BTreeMap<String, MapDef>,
     pub supplies: Vec<Supply>,
+    /// dropped items' collision sub-box inside the 16x16 icon (`icons/index.json` sub_box): supplies, equipment
+    pub supply_box: BTreeMap<i32, [i32; 4]>,
+    pub equip_box: BTreeMap<i32, [i32; 4]>,
+    /// the map-screen locations (`world/visited.json`): (world, area, bit) in table order (first match wins)
+    pub visited: Vec<(i32, i32, i32)>,
     /// bytecode of the spawn-condition scripts (`scripts/bytecode.json`), evaluated by `story::eval_condition`
     pub cond_code: BTreeMap<String, Vec<u8>>,
 }
@@ -329,7 +345,8 @@ fn obj(v: &Value, at: ObjRef) -> ObjDef {
         "map_sprite" => {
             let (x, y) = xy(&v["pos"]);
             let p = &v["params"];
-            ObjKind::MapSprite { x, y, sprite: int(&v["sprite"]) as i32, params: [int(&p[0]) as i32, int(&p[1]) as i32, int(&p[2]) as i32] }
+            let label = v["label"].as_object().map(|l| (l.get("frame").map(int).unwrap_or(0) as i32, l.get("prop").map(int).unwrap_or(-1) as i32));
+            ObjKind::MapSprite { x, y, sprite: int(&v["sprite"]) as i32, params: [int(&p[0]) as i32, int(&p[1]) as i32, int(&p[2]) as i32], label }
         }
         _ => ObjKind::Unknown,
     };
@@ -401,7 +418,16 @@ impl FieldData {
                 .as_array()
                 .into_iter()
                 .flatten()
-                .map(|v| PropDef { index: int(&v["index"]) as i32, rect: rect(&v["rect"]), oam: hexs(&v["oam_attr0_1"]), tile: hexs(&v["tile_word"]) })
+                .map(|v| PropDef {
+                    index: int(&v["index"]) as i32,
+                    rect: rect(&v["rect"]),
+                    oam: hexs(&v["oam_attr0_1"]),
+                    tile: hexs(&v["tile_word"]),
+                    frame: v["gfx"]["frame"].as_i64().map(|f| f as i32),
+                    visible: v["visible"].as_bool().unwrap_or(true),
+                    priority: v["priority"].as_u64().unwrap_or(3) as u8,
+                    hit_box: v["hit_box"].as_array().filter(|a| a.len() == 4).map(|a| [int(&a[0]) as i32, int(&a[1]) as i32, int(&a[2]) as i32, int(&a[3]) as i32]),
+                })
                 .collect();
             let (mut walk, mut shot, mut cw, mut ch) = (String::new(), String::new(), 1, 1);
             if let Some(c) = read_json(src, &format!("{dir}/collision.json")) {
@@ -412,6 +438,7 @@ impl FieldData {
             }
             let (mut ww, mut wh) = (0, 0);
             let mut cmax = (-1, -1);
+            let mut three_d = false;
             if let Some(mj) = read_json(src, &format!("{dir}/map.json")) {
                 for p in mj["properties"].as_array().into_iter().flatten() {
                     match p["name"].as_str() {
@@ -419,6 +446,7 @@ impl FieldData {
                         Some("world_h_px") => wh = int(&p["value"]) as i32,
                         Some("camera_max_x") => cmax.0 = int(&p["value"]) as i32,
                         Some("camera_max_y") => cmax.1 = int(&p["value"]) as i32,
+                        Some("unsupported_layers") => three_d = p["value"].as_str().is_some_and(|v| v.contains("0x08007B63")),
                         _ => {}
                     }
                 }
@@ -431,7 +459,7 @@ impl FieldData {
             if cmax.0 < 0 {
                 cmax = ((ww - 240).max(0), (wh - 160).max(0));
             }
-            fd.maps.insert(id.clone(), MapDef { id, start_pos: sp, exits, props, walk, shot, cw, ch, world_w: ww, world_h: wh, camera_max: cmax });
+            fd.maps.insert(id.clone(), MapDef { id, start_pos: sp, exits, props, walk, shot, cw, ch, world_w: ww, world_h: wh, camera_max: cmax, three_d });
         }
         for p in all.iter().filter(|p| p.starts_with("items/") && p.ends_with(".json") && !p.ends_with("index.json")) {
             let Some(it) = read_json(src, p) else { continue };
@@ -447,6 +475,29 @@ impl FieldData {
             });
         }
         fd.supplies.sort_by_key(|s| s.index);
+        if let Some(Value::Array(icons)) = read_json(src, "icons/index.json") {
+            for ic in icons {
+                let Some(b) = ic["sub_box"].as_array().filter(|a| a.len() == 4) else { continue };
+                let b = [int(&b[0]) as i32, int(&b[1]) as i32, int(&b[2]) as i32, int(&b[3]) as i32];
+                let k = int(&ic["index"]) as i32;
+                match ic["kind"].as_str() {
+                    Some("supply") => {
+                        fd.supply_box.insert(k, b);
+                    }
+                    Some("equipment") => {
+                        fd.equip_box.insert(k, b);
+                    }
+                    _ => {}
+                }
+            }
+        }
+        if let Some(v) = read_json(src, "world/visited.json") {
+            for r in v["records"].as_array().into_iter().flatten() {
+                for a in r["areas"].as_array().into_iter().flatten() {
+                    fd.visited.push((int(&a["world"]) as i32, int(&a["area"]) as i32, int(&a["bit"]) as i32));
+                }
+            }
+        }
         let mut want: Vec<String> = Vec::new();
         for a in fd.areas.values() {
             for o in &a.objects {

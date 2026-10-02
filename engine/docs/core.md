@@ -111,14 +111,24 @@ characters / forms / skills / equipment / levels, and collision inside every map
 |---|---|---|
 | `tests/vectors.rs` | RNG; 78 ComputeDamage calls with RNG state; 3162 enemy hits are formula outputs; LevelUp | all |
 | `tests/traces.rs` | player try-move on the map grids, enemy path follower (waypoints + positions), back-off / step-away / wander / straight-walk steps, knockback / critical launch / wall splat | all traces |
-| `tests/lockstep.rs` | the emulator lockstep recordings (player of every form, all skills, hurt / KO / forms, enemy dummies, injected hits, lag frames): state, anim, frame, ROM record, position, HP/EP, form, RNG, sounds, enemy position / HP, damage per frame | 616 / 616 of the reference's pass set (633 traces, 17 known divergences), 244k frames |
+| `tests/lockstep.rs` | the emulator lockstep recordings (player of every form, all skills, hurt / KO / forms, enemy dummies, injected hits, lag frames, 78 real enemies / bosses attacking incl. KOs and the game-over freeze, the 8 special holds, the Kamikaze Ghost's homing): state, anim, frame, ROM record, position, HP/EP, form, RNG, sounds, enemy position / HP, damage per frame | 703 / 703 = the reference's pass set (712 traces, the same 9 known divergences), 293k frames |
 | `tests/enemy_anim.rs` | 95 enemy animation recordings through `eanim.rs`; Yakon energy absorb | 78 926 ticks, 105 unmodelled (as the reference); all Yakon runs |
-| `tests/cross_ts.rs` | the TS sim and wf-core on 22 recorded-input fights (bosses, groups, skills), per frame: RNG, camera, player, every enemy incl. AI stack, every projectile, entity list | 29 700 frames identical (dumps from `tools/battle/buu_core_dump.test.ts`, `WF_TS_DUMPS`) |
+| `tests/cross_ts.rs` | the TS sim and wf-core on 35 recorded-input fights (bosses, groups, skills, enemy attacks / holds: mummies, vampires, enzymes, fragments, Bio Mech, cyborgs, tank, turret, soldiers, gunmen + bomber, mechanoid), per frame: RNG, camera, player, every enemy incl. AI stack, every projectile, entity list | 46 800 frames identical (dumps from `tools/battle/buu_core_dump.test.ts`, `WF_TS_DUMPS`, default `engine/target/wf-core-ts-dumps`) |
 | `tests/session.rs` | determinism, clone + byte snapshot replay, view/observe read-only, 2-player co-op, native vs wasm hash | all |
 
-Reference version: the port matches the TS sim at commit `b670c49` (enemy animation / SFX timing, decoded skill damage,
-story-form timers, lag-frame-aware lockstep). When the reference changes, re-run its tests on a snapshot of the commit,
-regenerate the cross-check dumps and port the diff (`git diff <old> <new> -- site/src/battle`).
+Reference version: the port matches the TS sim at commit `010de77` (lockstep round 3: every enemy-attack and special-hold
+recording, game-over timing, the empty-hitbox rule, Kamikaze Ghost homing; the semantics are listed in
+`tools/battle/LOCKSTEP.md` "Semantic changes for ports"). When the reference changes, re-run its tests on a snapshot of
+the commit, regenerate the cross-check dumps and port the diff (`git diff <old> <new> -- site/src/battle`).
+
+Port notes (round 3): a GotoState / PopState inside a tree does not stop the running tree - the replaced entries stay
+addressable as `AiCtl::orphans` until the evaluation ends; nodes that work at tree construction (DriftContact's draws,
+IfButtonMashed's counter) run in `nodes::build`; node-installed state objects with per-frame code are `enemy::Hook`;
+the frame counter (`Globals::fc0`, clock = fc0 + frame) and the input object's press ring (`Globals::presses`, per
+player slot) feed the escapes (freeze, bear hug, wraps, IfButtonMashed) and VampireGrab / LatchDrain's drains; the
+sprite frame records' boxes (record +4..+7) come from the extractor (`sprites/*/sprite.json` step `box`); the game-over
+freeze (KO + 199: modal player, message 0xF) applies to the one-player game only; a blocked hit's pre-block damage is
+`Event::DamageRoll` (what the lockstep logs).
 
 ## 8. Known gaps
 
@@ -130,6 +140,10 @@ pieces and the dark sphere disc are not drawn yet.
 ## 9. Coordination (in progress, 2026-10-02)
 
 Two agents extend `World` concurrently; keep changes additive and re-read before editing.
+
+**Byte snapshots are postcard (not self-describing)**: anything inside `World` must not use `#[serde(tag = ..)]`,
+`untagged`, `flatten` or `skip_serializing_if` — they serialize but fail to restore (`tests/session.rs`,
+`tests/field.rs` catch it). `#[serde(default)]` alone is fine.
 
 * **Cutscene systems** (script-host work, module `scene.rs`, field `World.scene: scene::Scene`): per-entity command
   tracks + the camera track, the director wait, script camera control (follow / pan / set), screen effects (fades,

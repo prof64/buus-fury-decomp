@@ -92,6 +92,10 @@ pub struct Injector {
     pub player: EntityId,
     /// the harness frame the hits are scheduled in (0 = the world frame); differs when the recording has lag frames
     pub now: u32,
+    /// injected AI starts (harness frame, enemy, state): GotoState(state) at the start of that frame (a frame with a
+    /// hit injects only the hit)
+    #[serde(default)]
+    pub ai: Vec<(u32, EntityId, u16)>,
 }
 
 /// sounds and other presentation events of one frame (data; the sim never plays anything)
@@ -101,6 +105,8 @@ pub enum Event {
     /// PlaySfx(id, volume 0..64)
     Sfx { id: i32, vol: i32 },
     SfxStop { id: i32 },
+    /// StopMatching 0x0803E32C: stop the voices playing that effect
+    SfxStopMatch { id: i32 },
     /// StopAllSfx 0x0803E2EC (script native 0x22)
     SfxStopAll,
     /// the music sequencer stopped (script native 0x24)
@@ -112,6 +118,8 @@ pub enum Event {
     SkillEnd,
     /// a ComputeDamage result (target entity, 1/1024 HP)
     Damage { target: EntityId, attacker: EntityId, dmg: i64, crit: bool },
+    /// a blocked hit's ComputeDamage before the block factor (0x0800EABE, what the lockstep logs); precedes its Damage
+    DamageRoll { target: EntityId, dmg: i64 },
     Info { text: String },
     /// field game: area changes, scripts to run, pickups, defeated placed enemies (field.rs)
     Field(crate::field::FieldEvent),
@@ -157,6 +165,73 @@ pub struct Globals {
     pub last_beep: i64,
     pub shakes: Vec<Shake>,
     pub shake_off: (i32, i32),
+    /// the game's frame counter 0x03000F94 at frame 0 (`clock` = fc0 + frame; nodes that test the counter itself,
+    /// e.g. VampireGrab's drain every 16 ticks)
+    #[serde(default)]
+    pub fc0: i64,
+    /// the input object 0x03003300 (0x0804023C) per player slot: this frame's new presses and the press ring
+    #[serde(default)]
+    pub presses: [PressLog; MAX_PLAYERS],
+    /// 0x030030BC: the next stuck mummy bandage's slot (0..7)
+    #[serde(default)]
+    pub wrap_slot: i32,
+    /// the Buu fragment's state object 0x03003158 (one IWRAM singleton shared by every fragment): (mode, vx, vy)
+    #[serde(default)]
+    pub frag: (i32, i32, i32),
+}
+
+/// the input object's record of new presses (0x0804023C): +4 the keys newly pressed this frame; a 64-entry ring of
+/// press events (+8 keys, +0x88 frame counter)
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct PressLog {
+    pub pressed: u16,
+    pub ring: std::collections::VecDeque<(u16, i64)>,
+}
+
+impl Globals {
+    /// the frame counter 0x03000F94 now
+    pub fn clock(&self, frame: u32) -> i64 {
+        self.fc0 + frame as i64
+    }
+    /// record a frame's new presses (stamped `at`, the counter during that frame's update)
+    pub fn note_input(&mut self, slot: usize, at: i64, pressed: u16) {
+        let Some(l) = self.presses.get_mut(slot) else { return };
+        l.pressed = pressed;
+        if pressed == 0 {
+            return;
+        }
+        l.ring.push_back((pressed, at));
+        if l.ring.len() > 64 {
+            l.ring.pop_front();
+        }
+    }
+    /// the keys newly pressed this frame (input +4)
+    pub fn pressed(&self, slot: usize) -> u16 {
+        self.presses.get(slot).map(|l| l.pressed).unwrap_or(0)
+    }
+    /// 0x08040284(input, mask, n, window): a press this frame and, walking the ring back from the newest event, the
+    /// last n events with a `mask` key all stamped >= now - window
+    pub fn press_run(&self, slot: usize, mask: u16, n: u32, window: i64, frame: u32) -> bool {
+        let Some(l) = self.presses.get(slot) else { return false };
+        if l.pressed == 0 {
+            return false;
+        }
+        let start = self.clock(frame) - window;
+        let mut n = n;
+        for &(keys, at) in l.ring.iter().rev() {
+            if n == 0 {
+                break;
+            }
+            if keys & mask == 0 {
+                continue;
+            }
+            if at < start {
+                return false;
+            }
+            n -= 1;
+        }
+        n == 0
+    }
 }
 
 /// live collision of the battle: the map's static walk / shot grids + the private enemy layer (map object +0xB0)
@@ -383,6 +458,10 @@ pub struct HitMsg {
     pub crit: bool,
     pub raw: i64,
     pub dmg: i64,
+    /// damage only (ComputeDamage + 0x08010BF2): no reaction, no i-frames (the flames 0x080247C0)
+    pub no_react: bool,
+    /// message kind 1: tested against the receiver's footprint (0x0800FDFA) instead of its body box
+    pub foot: bool,
 }
 
 #[derive(Clone)]
@@ -695,13 +774,20 @@ impl World {
             Body::Npc(_) => crate::scene::npc_update(self, i),
             Body::Hand(_) => crate::enemy::hand_update(self, i),
             Body::Injector(_) => {
-                let (hits, pid) = match &self.ents[i].body {
+                let (hits, pid, ai) = match &self.ents[i].body {
                     Body::Injector(j) => {
                         let now = if j.now != 0 { j.now } else { self.frame };
-                        (j.hits.iter().filter(|h| h.at == now).cloned().collect::<Vec<_>>(), j.player)
+                        (j.hits.iter().filter(|h| h.at == now).cloned().collect::<Vec<_>>(), j.player, j.ai.iter().filter(|a| a.0 == now).cloned().collect::<Vec<_>>())
                     }
                     _ => unreachable!(),
                 };
+                if hits.is_empty() {
+                    for (_, id, st) in ai {
+                        if let Some((k, _)) = self.enemy_by_id(id) {
+                            crate::nodes::replace_top(self, k, st);
+                        }
+                    }
+                }
                 for h in hits {
                     if let Some(pi) = self.find(pid) {
                         let a = &self.pl_ref(pi).a;
@@ -720,8 +806,19 @@ impl World {
                             crit: false,
                             raw: 0,
                             dmg: 0,
+                            no_react: false,
+                            foot: false,
                         };
                         broadcast(self, &mut m, false);
+                        // the emulator injects before the frame's script phase: the death script counts from this
+                        // frame
+                        let f = self.frame as i64;
+                        if let Some(pi) = self.find(pid) {
+                            let p = self.pl(pi);
+                            if p.dead && p.ko_at == f + 1 {
+                                p.ko_at = f;
+                            }
+                        }
                     }
                 }
             }

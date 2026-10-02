@@ -217,7 +217,7 @@ fn yakon_energy_absorb() {
             let pid = w.players[0];
             let a = wf_core::damage::atk(h["sub"].as_i64().unwrap() as u8);
             assert_eq!(a.kind as i64, h["kind"].as_i64().unwrap());
-            let msg = HitMsg { team: 1, rect: w.en_ref(e).a.body_box(), dir: 3, mult: h["mult"].as_i64().unwrap() as i32, atk: a, attacker: pid, att_stats: Default::default(), att_is_player: true, source: pid, crit: false, raw: 0, dmg: h["dmg"].as_i64().unwrap() };
+            let msg = HitMsg { team: 1, rect: w.en_ref(e).a.body_box(), dir: 3, mult: h["mult"].as_i64().unwrap() as i32, atk: a, attacker: pid, att_stats: Default::default(), att_is_player: true, source: pid, crit: false, raw: 0, dmg: h["dmg"].as_i64().unwrap(), no_react: false, foot: false };
             wf_core::nodes::on_hit(w, e, &msg);
             got.push(w.en_ref(e).hp1024);
             want.push(if k + 1 < hits.len() { hits[k + 1]["hp"].as_i64().unwrap() } else { run["hp_end"].as_i64().unwrap() });

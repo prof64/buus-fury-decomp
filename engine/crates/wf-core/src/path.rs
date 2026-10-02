@@ -37,6 +37,7 @@ pub fn update(w: &mut World, i: usize, p: &mut PathRt) {
     }
     p.counter = (p.counter + 7) & 7;
     step(w, i, p);
+    enemy::footstep(w, i, true);
 }
 
 /// 0x0803B6EA
@@ -185,7 +186,11 @@ pub fn step(w: &mut World, i: usize, p: &mut PathRt) {
         if m == 0 {
             m = 1;
         }
-        e.moving = true;
+    }
+    // 0x0803B9DA: SetAnim(1) right here unless IsAnim(1), whatever is showing (it replaces an attack controller a
+    // GotoState entered earlier in the same tick)
+    if !w.en_ref(i).is_anim(1) {
+        enemy::set_anim(w, i, &[crate::content::AnimRef::N(1)], true, Some(true));
     }
     let tdiv = |a: i64, b: i64| if b == 0 { 0 } else { a / b };
     // JS: (dx * speed) << 8 as int32, divided by m << 8
@@ -194,4 +199,7 @@ pub fn step(w: &mut World, i: usize, p: &mut PathRt) {
     let vx = tdiv(num_x, (m << 8) as i64) as i32;
     let vy = tdiv(num_y, (m << 8) as i64) as i32;
     enemy::try_move(w, i, vx, vy, vx, vy);
+    if !w.en_ref(i).walking() {
+        enemy::set_anim(w, i, &[crate::content::AnimRef::N(1)], true, Some(true));
+    }
 }

@@ -35,7 +35,7 @@ pub struct AreaId {
 
 /// what made a script run (the host maps `Callback` ids onto its compiled scripts)
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(tag = "cause", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
 pub enum Cause {
     /// a script / event / save-point trigger fired (object of the area or the map header)
     Trigger { obj: ObjRef },
@@ -133,8 +133,16 @@ pub struct Field {
     pub deferred: Vec<crate::fieldobj::Deferred>,
     /// the loot position and velocity (`0x03001010` / `0x03001018`, 24.8 velocity)
     pub loot: (i32, i32, i32, i32),
+    /// breakable debris chips (display)
+    pub debris: Vec<crate::fieldobj::Debris>,
+    /// the bottom label of the world map (message trigger 0x17 string id)
+    pub label: Option<i64>,
+    /// the world map's flying player (3D map only)
+    pub flight: Option<crate::fieldworld::Flight>,
     /// the blocking item-get presentation
     pub item_get: Option<crate::fieldobj::ItemGet>,
+    /// field enemies' patrol runners (def +0x18 steps; run by the AI node RunMotionController)
+    pub patrols: Vec<crate::fieldpatrol::Patrol>,
     /// placed enemies alive: (entity, object, last position px)
     pub placed: Vec<(EntityId, ObjRef, i32, i32)>,
     /// frame of the last area load
@@ -238,8 +246,12 @@ fn new_field() -> Field {
         combat: true,
         host: false,
         deferred: vec![],
+        patrols: vec![],
         loot: (0, 0, 0, 0),
         item_get: None,
+        debris: vec![],
+        label: None,
+        flight: None,
         placed: vec![],
         entered: 0,
         loads: 0,
@@ -340,11 +352,20 @@ pub fn spawn_object(w: &mut World, o: &ObjDef) -> Option<EntityId> {
             None
         }
         ObjKind::Enemy { ty, x, y, .. } => {
-            let i = spawn_enemy(w, *ty, *x, *y, 0, None)?;
-            // the actor constructor's idle enter (0x0800DFBE): tick = rand(255)
-            let r = w.rng.rand(255);
-            w.en(i).ea.pos.tick = r;
+            // the constructor first (spawn_enemy: its SetAnim(0) idle enter draws rand(255); the patrol runner from def
+            // +0x18), the AI's first state after it
+            let i = spawn_enemy(w, *ty, *x, *y, 0, Some(-1))?;
             let id = w.ents[i].id;
+            if let ObjKind::Enemy { behaviour, .. } = &o.kind {
+                crate::fieldpatrol::attach(w, id, behaviour);
+            }
+            if let Some(st) = w.data.enemy(*ty).map(|t| t.ai) {
+                let f = w.frame as i64;
+                let e = w.en(i);
+                e.mark1 = f;
+                e.mark2 = f;
+                crate::nodes::push(w, i, st);
+            }
             let k = w.field.as_ref().map(|f| f.placed.len()).unwrap_or(0);
             w.en(i).target = (k % nplayers) as u8;
             let (px, py) = (w.en_ref(i).a.px(), w.en_ref(i).a.py());
@@ -386,6 +407,8 @@ pub fn load_area(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<Dir>)
     w.g.shakes.clear();
     w.g.shake_off = (0, 0);
     // 2. map-screen visited bits: story flag 0x1C0 + bit (table 0x0874CA24) — TODO: the table is not exported yet
+    // 2. the map-screen visited bit (story flag 0x1C0 + bit)
+    crate::fieldworld::mark_visited(w, to.world, to.area);
     // 3. the map + the camera snap
     let col = fd.collision(m);
     w.arena = arena_of(a, m, &col);
@@ -397,10 +420,14 @@ pub fn load_area(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<Dir>)
         f.map = m.id.clone();
         f.camera_max = m.camera_max;
         f.combat = a.combat;
-        f.props = m.props.iter().map(|p| PropRt { rect: p.rect, visible: true, dx: 0 }).collect();
+        f.props = m.props.iter().map(|p| PropRt { rect: p.rect, visible: p.visible, dx: 0 }).collect();
         f.placed.clear();
         f.triggers.clear();
         f.deferred.clear();
+        f.debris.clear();
+        f.label = None;
+        f.flight = None;
+        f.patrols.clear();
         f.item_get = None;
         f.mode = Mode::Normal;
         f.busy = false;
@@ -457,6 +484,18 @@ pub fn load_area(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<Dir>)
         w.ents.push(crate::world::Entity { id: pid, removed: false, body: Body::Player(Box::new(p)) });
         w.rng.rand(255);
         w.rng.rand(255);
+    }
+    // the 3D world map: the flying player (z 60, heading north, speed 0)
+    if m.three_d {
+        if let Some(f) = w.field.as_mut() {
+            f.flight = Some(crate::fieldworld::Flight::arrive());
+        }
+        if let Some(i) = w.player_idx(0) {
+            let p = w.pl(i);
+            p.a.facing = 1;
+            p.ap.raw = 16;
+            p.ap.frame = 0;
+        }
     }
     w.story.variant_byte = variant;
     w.events.push(Event::Field(FieldEvent::AreaEnter { area: to, key: a.key.clone() }));
@@ -574,6 +613,10 @@ fn begin_fade_in(w: &mut World) {
     if let Some(f) = w.field.as_mut() {
         f.mode = Mode::FadeIn { k: 0 };
     }
+    // the world map's fade-in has no autowalk: the flyer is under control
+    if crate::fieldworld::flying(w) {
+        return;
+    }
     for s in 0..w.players.len() {
         if let Some(i) = w.player_idx(s) {
             player::start_autowalk(w, i);
@@ -586,6 +629,7 @@ fn begin_fade_in(w: &mut World) {
 pub fn post_step(w: &mut World) {
     let mode = w.field.as_ref().map(|f| f.mode.clone()).unwrap_or(Mode::Normal);
     crate::fieldobj::item_get_step(w);
+    crate::fieldobj::debris_step(w);
     match mode {
         Mode::Normal => trigger_check(w),
         Mode::FadeOut { k, to, x, y, facing } => {
@@ -605,7 +649,17 @@ pub fn post_step(w: &mut World) {
         }
         Mode::FadeIn { k } => {
             let k = k + 1;
-            if k >= FADE {
+            let flying = crate::fieldworld::flying(w);
+            if flying && k >= crate::fieldworld::FADE_IN_3D {
+                if let Some(f) = w.field.as_mut() {
+                    f.mode = Mode::Normal;
+                }
+                crate::fieldworld::reset_state(w);
+            } else if flying {
+                if let Some(f) = w.field.as_mut() {
+                    f.mode = Mode::FadeIn { k };
+                }
+            } else if k >= FADE {
                 if let Some(f) = w.field.as_mut() {
                     f.mode = Mode::Normal;
                 }
@@ -621,8 +675,11 @@ pub fn post_step(w: &mut World) {
     }
     // the script camera (scene.rs) owns player 0's camera while a script drives it
     let scripted = crate::scene::camera(w);
+    if crate::fieldworld::flying(w) {
+        crate::fieldworld::camera(w);
+    }
     for s in 0..w.players.len() {
-        if s == 0 && scripted {
+        if s == 0 && (scripted || crate::fieldworld::flying(w)) {
             continue;
         }
         camera(w, s);
@@ -715,7 +772,8 @@ pub fn trigger_check(w: &mut World) {
             let ok = match t.act {
                 Activation::Touch | Activation::TouchOnce => true,
                 Activation::Button(d) => inp.pressed & crate::input::A != 0 && d.is_none_or(|d| d == facing),
-                Activation::Altitude(lo, hi) => z > lo && z < hi,
+                // the world-map flyer's altitude (22.10, exclusive bounds); no other player has one
+                Activation::Altitude(lo, hi) => w.field.as_ref().and_then(|f| f.flight.as_ref()).is_some_and(|f| (lo << 10) < f.z && f.z < (hi << 10)) || (z > lo && z < hi && z != 0),
                 // on entry: not tested in the previous pass
                 Activation::Unknown(0x0800_7791) => {
                     let fresh = t.last.wrapping_add(1) != checks;
@@ -760,7 +818,13 @@ fn fire(w: &mut World, slot: usize, k: usize, t: &TriggerRt) {
             crate::fieldnpc::start_event(w);
             w.events.push(Event::Field(FieldEvent::Run { run: Callback::Event(s), cause: Cause::Trigger { obj }, slot: s8 }));
         }
-        TriggerKind::Message { .. } | TriggerKind::Region | TriggerKind::Unknown(_) => {}
+        // message 0x17: the world map's bottom label (string id)
+        TriggerKind::Message { value, .. } => {
+            if let Some(f) = w.field.as_mut() {
+                f.label = Some(value);
+            }
+        }
+        TriggerKind::Region | TriggerKind::Unknown(_) => {}
     }
     // touch_once: removed after firing unless an area load happened meanwhile
     if matches!(t.act, Activation::TouchOnce | Activation::Unknown(0x0800_71A7) | Activation::Unknown(0x0802_266F)) {

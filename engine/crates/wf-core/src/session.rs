@@ -44,6 +44,14 @@ impl Session {
         let world = crate::field::create(Arc::clone(&data), &config);
         Session { data, world, config: BattleConfig::default(), prev: [0; MAX_PLAYERS], outcome: Outcome::Running, hook: None }
     }
+    /// a field session with the script host's hook attached from the start: the first area's load scripts (on-enter:
+    /// gates / doors / bridges through open_area / block_area, 48 area variants) run before frame 0
+    pub fn new_field_hooked(data: Arc<GameData>, config: crate::field::FieldConfig, hook: FieldHook) -> Session {
+        let mut s = Session::new_field(data, config);
+        s.hook = Some(hook);
+        Self::run_hook(&mut s.hook, &mut s.world, 0);
+        s
+    }
     pub fn reset(&mut self, config: BattleConfig) {
         *self = Session::new(Arc::clone(&self.data), config);
     }

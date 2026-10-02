@@ -87,6 +87,54 @@ fn deterministic_with_snapshots() {
     }
 }
 
+/// the field view draws props, breakable debris, coins, dropped items and the item-get icon with the content sheets
+/// (positions per re/buu/notes.md "Field: object graphics", verified there against the emulator screen)
+#[test]
+fn view_draws_field_objects() {
+    use wf_view::{FrameSel, RenderView};
+    // 8-1, below breakable #0 (prop 1, hit box (233,88)-(263,104)) facing up, as objects_breakable_8_1
+    let mut s = Session::new_field(common::field_data(), FieldConfig { world: 8, area: 1, pos: Some((240, 104)), facing: 1, rng: RngInit::Seed(3), ..Default::default() });
+    let mut v = RenderView::default();
+    wf_core::view::render_view(&s.world, &mut v);
+    let props: Vec<_> = v.sprites.iter().filter(|d| d.sheet == "effects/props_area_08_001").collect();
+    assert!(!props.is_empty(), "props drawn");
+    assert!(props.iter().any(|d| (d.x, d.y) == (232, 72) && d.frame == FrameSel::Frame { index: 1, flip: false }), "prop 1 at its rect");
+    // punch: debris chips + shake
+    s.step(&[0]);
+    s.step(&[input::A]);
+    wf_core::view::render_view(&s.world, &mut v);
+    assert_eq!(v.sprites.iter().filter(|d| d.sheet == "effects/debris").count(), 4, "debris chips");
+    // loot: coins and a dropped supply at the loot point
+    wf_core::fieldobj::set_loot(&mut s.world, 330, 170, 0, 0);
+    wf_core::fieldobj::drop_zenie(&mut s.world, 1);
+    wf_core::fieldobj::drop_item(&mut s.world, 5);
+    s.step(&[0]);
+    wf_core::view::render_view(&s.world, &mut v);
+    assert!(v.sprites.iter().any(|d| d.sheet == "effects/coin_1"));
+    assert!(v.sprites.iter().any(|d| d.sheet == "effects/field_items" && d.frame == FrameSel::Frame { index: 5, flip: false }));
+    assert!(v.sprites.iter().any(|d| d.sheet == "effects/shadow_10x4"));
+}
+
+#[test]
+fn visited_flags_and_world_map() {
+    // entering 8-3 sets its map-screen bit (story flag 0x1C0 + bit)
+    let s = session(8, 3, (100, 192));
+    let fd = s.world.data.field.clone().unwrap();
+    let bit = fd.visited.iter().find(|v| v.0 == 8 && v.1 == 3).map(|v| v.2).expect("8-3 in the visited table");
+    assert!(s.world.story.flag(0x1C0 + bit));
+    // the world map 0-50: the flyer climbs with B, turns, and the view carries the mode-7 camera
+    let mut w = Session::new_field(common::field_data(), FieldConfig { world: 0, area: 50, pos: Some((872, 1800)), arrive: true, rng: RngInit::Seed(1), ..Default::default() });
+    assert!(w.world.field.as_ref().unwrap().flight.is_some());
+    for _ in 0..100 {
+        w.step(&[input::B | input::UP | input::RIGHT]);
+    }
+    let fl = w.world.field.as_ref().unwrap().flight.clone().unwrap();
+    assert!(fl.z > 60 << 10 && fl.h != 0);
+    let mut v = wf_view::RenderView::default();
+    wf_core::view::render_view(&w.world, &mut v);
+    assert!(v.map.as_ref().unwrap().mode7.is_some());
+}
+
 #[test]
 fn story_state_basics() {
     let s = session(8, 3, (100, 192));

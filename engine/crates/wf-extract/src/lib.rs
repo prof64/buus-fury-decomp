@@ -4,6 +4,7 @@
 
 pub mod annotations;
 pub mod effects;
+pub mod field_gfx;
 pub mod fx_extra;
 pub mod misc;
 pub mod sheet;
@@ -60,7 +61,7 @@ pub fn extract_rom(rom: &Rom, opts: &Options, progress: &mut dyn FnMut(&str)) ->
             "audio" => wf_audio::extract(rom, &mut out),
             "ui" => wf_ui::extract(rom, &mut out),
             // after portraits (speaker names) and maps (Tiled object layers)
-            "world" => wf_world::extract(rom, &mut out),
+            "world" => wf_world::extract(rom, &mut out).map(|_| field_gfx::world(rom, &mut out)),
             "scripts" => wf_script::content::extract(rom, &mut out),
             "sprites" => {
                 known = Some(sprites::known_frames(&sprites::extract(rom, &mut out)));
@@ -69,6 +70,7 @@ pub fn extract_rom(rom: &Rom, opts: &Options, progress: &mut dyn FnMut(&str)) ->
             "effects" => {
                 let k = known.take().unwrap_or_else(|| sprites::known_frames(&sprites::all_defs(rom)));
                 effects::extract(rom, &mut out, &k);
+                field_gfx::effects(rom, &mut out);
                 Ok(())
             }
             "portraits" => {
@@ -77,6 +79,7 @@ pub fn extract_rom(rom: &Rom, opts: &Options, progress: &mut dyn FnMut(&str)) ->
             }
             "items" => {
                 misc::item_icons(rom, &mut out);
+                field_gfx::icon_boxes(rom, &mut out);
                 Ok(())
             }
             _ => Ok(()),

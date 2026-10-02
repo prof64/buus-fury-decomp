@@ -153,7 +153,7 @@ pub fn dragon_fist(w: &World, owner_px: i32, owner_py: i32, dir: Dir, owner: Ent
 }
 fn df_msg(w: &World, owner: EntityId, src: EntityId, rect: Rect, dir: Dir, mult: i32) -> HitMsg {
     let stats = w.actor_by_id(owner).map(|a| a.stats).unwrap_or_default();
-    HitMsg { team: 1, rect, dir, mult, atk: crate::damage::atk(18), attacker: owner, att_stats: stats, att_is_player: true, source: src, crit: false, raw: 0, dmg: 0 }
+    HitMsg { team: 1, rect, dir, mult, atk: crate::damage::atk(18), attacker: owner, att_stats: stats, att_is_player: true, source: src, crit: false, raw: 0, dmg: 0, no_react: false, foot: false }
 }
 /// 0x08038E8A (the player's control, tick < 90): root by v, each child 0x20 more along the facing
 pub fn dragon_shift(w: &mut World, i: usize, v: i32) {
@@ -386,7 +386,7 @@ pub fn update(w: &mut World, i: usize) {
                     *l0 = links.clone();
                 }
                 let stats = w.actor_by_id(owner).map(|x| x.stats).unwrap_or_default();
-                let mut msg = HitMsg { team: 1, rect, dir, mult, atk: a, attacker: owner, att_stats: stats, att_is_player: true, source: me, crit: false, raw: 0, dmg: 0 };
+                let mut msg = HitMsg { team: 1, rect, dir, mult, atk: a, attacker: owner, att_stats: stats, att_is_player: true, source: me, crit: false, raw: 0, dmg: 0, no_react: false, foot: false };
                 if broadcast(w, &mut msg, true) {
                     let s = 48 + w.rng.rand(2);
                     w.sfx(s, 64);

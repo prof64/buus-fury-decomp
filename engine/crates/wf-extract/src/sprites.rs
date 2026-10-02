@@ -293,6 +293,11 @@ pub fn extract(rom: &Rom, out: &mut Content) -> Vec<Def> {
                     });
                     let dur = durs.get(k).copied().unwrap_or(default);
                     let mut st = json!({"frame": fi, "duration_frames": dur, "flip": flip, "rom": hx(fa)});
+                    // the frame record's box (+4 s8 ox, +5 s8 oy, +6 w, +7 h; read through 0x0800FE34 by the
+                    // picture-based tests: Kamikaze Ghost homing / contact)
+                    if (0x0800_0000..0x0880_0000).contains(&fa) {
+                        st["box"] = json!([rom.s8(fa + 4), rom.s8(fa + 5), rom.u8(fa + 6), rom.u8(fa + 7)]);
+                    }
                     if let Some((_, offs)) = &d.attach {
                         if let Some(att) = offs.get(&ai) {
                             let (x, y) = att[di][k];

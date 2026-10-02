@@ -39,8 +39,7 @@ const FIGHTER_OF_CHAR: [&str; 8] = ["goku", "gohan", "goten", "trunks", "vegeta"
 
 /// scenarios whose divergence is understood and not modelled (the reference's KNOWN list)
 fn known(name: &str) -> bool {
-    ["f32_ssdrain", "f33_ssdrain", "f23_bump", "f23_move", "f23_punch", "f23_skill11", "f46_punch", "f14_skill20", "f14_ssdrain", "f31_vs_skill13"].contains(&name)
-        || name.starts_with("f02_vs_enemy_")
+    ["f32_ssdrain", "f33_ssdrain", "f23_bump", "f23_move", "f23_punch", "f23_skill11", "f46_punch", "f14_skill20", "f14_ssdrain"].contains(&name)
 }
 
 fn i(v: &Value) -> i64 {
@@ -139,8 +138,13 @@ fn setup(t: &Value) -> Setup {
         ..Default::default()
     };
     let ety = ini.get("enemy").filter(|v| !v.is_null()).map(|e| i(&e["type"])).or_else(|| en.map(|e| i(&e["type"]))).unwrap_or(-1);
+    let i2 = ini.get("enemy2").filter(|v| !v.is_null());
     let arena = t["scenario"]["arena"].as_str().unwrap_or(if en.is_some() { "forest" } else { "htc" }).to_string();
-    let cfg = BattleConfig { arena, players: vec![fighter], phases: vec![Phase { enemy: format!("t{ety}"), count: 1 }], rng: RngInit::State(0, 0), xp: false };
+    let phase = match i2 {
+        Some(e2) => format!("t{ety}+t{}", i(&e2["type"])),
+        None => format!("t{ety}"),
+    };
+    let cfg = BattleConfig { arena, players: vec![fighter], phases: vec![Phase { enemy: phase, count: 1 }], rng: RngInit::State(0, 0), xp: false };
     let mut s = Session::new(d, cfg);
     let w = &mut s.world;
     let pi = w.player_idx(0).unwrap();
@@ -223,6 +227,9 @@ fn setup(t: &Value) -> Setup {
     if let Some(v) = has("beepAge") {
         w.g.last_beep = -i(&v);
     }
+    // the frame counter 0x03000F94 at frame 0: every f02_vs_enemy recording starts from the same setup, 9634
+    w.g.fc0 = ini.get("fc").filter(|v| !v.is_null()).map(i).unwrap_or(if ini.get("enemy").is_some_and(|v| !v.is_null()) { 9634 } else { 0 });
+    let mut ai_starts: Vec<(u32, EntityId, u16)> = vec![];
     let mut enemy = None;
     if let (Some(_), Some(ie)) = (en, ini.get("enemy").filter(|v| !v.is_null())) {
         if let Some(ei) = w.ents.iter().position(|e| matches!(e.body, Body::Enemy(_))) {
@@ -251,6 +258,56 @@ fn setup(t: &Value) -> Setup {
                 e.mark2 = -a;
             }
             enemy = Some(w.ents[ei].id);
+            let scn = en.unwrap();
+            // a real enemy starts its AI fresh at frame 1 (the emulator's injected GotoState(initial state))
+            if scn["dummy"].as_bool() == Some(false) {
+                let ty = w.en_ref(ei).ty;
+                let st = scn.get("state").filter(|v| !v.is_null()).map(|v| i(v) as u16).unwrap_or_else(|| w.data.enemy(ty).unwrap().ai);
+                ai_starts.push((1, w.ents[ei].id, st));
+            }
+            if let Some(e2i) = i2 {
+                let t2 = i(&e2i["type"]) as i32;
+                let me = w.ents[ei].id;
+                if let Some(k) = w.ents.iter().position(|x| x.id != me && matches!(&x.body, Body::Enemy(e) if e.ty == t2)) {
+                    wf_core::enemy::unmark_self(w, k);
+                    {
+                        let e = w.en(k);
+                        e.a.x = i(&e2i["x"]) as i32;
+                        e.a.y = i(&e2i["y"]) as i32;
+                    }
+                    wf_core::enemy::mark_self(w, k);
+                    {
+                        let e = w.en(k);
+                        e.a.facing = i(&e2i["dir"]) as u8;
+                        e.hp1024 = i(&e2i["hp"]);
+                    }
+                    // the emulator keeps the partner in the inert state 0xC (root: the Idle node) until frame 2
+                    let partner = scn.get("partner").filter(|v| !v.is_null());
+                    if partner.is_some() {
+                        wf_core::nodes::reset(w, k, 0xc);
+                    }
+                    let dd = Arc::clone(&w.data);
+                    let e = w.en(k);
+                    let raw = i(&e2i["raw"]) as i32;
+                    if raw > 0 {
+                        if let Some(&a) = e.a.sprite.and_then(|s| dd.sprite(s)).and_then(|s| s.by_raw.get(&raw)) {
+                            e.a.anim = Some(a);
+                            e.ea.pos = player::AnimPos { raw, frame: e2i.get("frame").map(i).unwrap_or(0) as i32, tick: e2i.get("tick").map(i).unwrap_or(0) as i32 };
+                        }
+                    }
+                    if let Some(a) = e2i.get("mark1Age").map(i).filter(|&a| a < 1_000_000) {
+                        e.mark1 = -a;
+                    }
+                    if let Some(a) = e2i.get("mark2Age").map(i).filter(|&a| a < 1_000_000) {
+                        e.mark2 = -a;
+                    }
+                    if let Some(pt) = partner {
+                        let ty = w.en_ref(k).ty;
+                        let st = pt.get("state").filter(|v| !v.is_null()).map(|v| i(v) as u16).unwrap_or_else(|| w.data.enemy(ty).unwrap().ai);
+                        ai_starts.push((2, w.ents[k].id, st));
+                    }
+                }
+            }
         }
     }
     w.rng.set_state([ini["rng"][0].as_u64().unwrap() as u32, ini["rng"][1].as_u64().unwrap() as u32]);
@@ -270,7 +327,7 @@ fn setup(t: &Value) -> Setup {
         })
         .unwrap_or_default();
     let pid = w.ents[pi].id;
-    let injector = w.add(Body::Injector(Box::new(Injector { hits, player: pid, now: 0 })));
+    let injector = w.add(Body::Injector(Box::new(Injector { hits, player: pid, now: 0, ai: ai_starts })));
     Setup { s, enemy, injector }
 }
 
@@ -279,7 +336,9 @@ fn row(w: &World, sfx: Vec<String>, dmg: Vec<String>, enemy: Option<EntityId>) -
     let p = w.pl_ref(pi);
     let (state, raw, frame, rom) = player::lockstep_view(w, pi);
     let e = enemy.and_then(|id| w.enemy_by_id(id)).map(|(_, e)| (e.a.x as i64, e.a.y as i64, e.a.facing as i64, e.hp1024));
-    Row { x: p.a.x as i64, y: p.a.y as i64, dir: p.a.facing as i64, raw: raw as i64, frame: frame as i64, state, hp: p.hp() as i64, ep: p.ep() as i64, form: p.form as i64, rom: rom as i64, rng: Some(w.rng.a as i64), sfx, dmg, e }
+    // the eaten player: the recorder finds no player object (position / facing 0)
+    let (x, y, dir) = if p.gone { (0, 0, 0) } else { (p.a.x as i64, p.a.y as i64, p.a.facing as i64) };
+    Row { x, y, dir, raw: raw as i64, frame: frame as i64, state, hp: p.hp() as i64, ep: p.ep() as i64, form: p.form as i64, rom: rom as i64, rng: Some(w.rng.a as i64), sfx, dmg, e }
 }
 
 fn replay(t: &Value) -> Vec<Row> {
@@ -314,13 +373,37 @@ fn replay(t: &Value) -> Vec<Row> {
             let ev = s.step_frames(inp).to_vec();
             let mut sfx = vec![];
             let mut dmg = vec![];
+            // the logged damage is ComputeDamage's before the block factor
+            let mut roll = None;
             for e in &ev {
                 match e {
                     Event::Sfx { id, vol } => sfx.push(format!("play:{id}:{vol}")),
                     Event::SfxStop { id } => sfx.push(format!("stop:{id}")),
+                    Event::SfxStopMatch { id } => sfx.push(format!("stopmatch:{id}")),
+                    Event::SfxStopAll => sfx.push("stopall".into()),
                     Event::Song { id } => sfx.push(format!("song:{id}")),
-                    Event::Damage { target, dmg: d, .. } => dmg.push(format!("{}:{d}", if *target == pid { 0 } else if Some(*target) == enemy { 1 } else { -1 })),
+                    Event::DamageRoll { dmg: d, .. } => roll = Some(*d),
+                    Event::Damage { target, dmg: d, .. } => {
+                        let d = roll.take().unwrap_or(*d);
+                        dmg.push(format!("{}:{d}", if *target == pid { 0 } else if Some(*target) == enemy { 1 } else { -1 }))
+                    }
                     _ => {}
+                }
+            }
+            if let Ok(range) = std::env::var("LOCKSTEP_TRACE") {
+                // debugging: per frame in FROM-TO the RNG calls and every enemy's AI stack / animation
+                let (a, b) = range.split_once('-').map(|(a, b)| (a.parse().unwrap_or(0), b.parse().unwrap_or(0))).unwrap_or((0, 0));
+                if f >= a && f <= b {
+                    let w = &s.world;
+                    let mut line = format!("{f} rng#{} {:08x}", w.rng.calls, w.rng.a);
+                    for k in 0..w.ents.len() {
+                        if let Body::Enemy(e) = &w.ents[k].body {
+                            line += &format!(" | e{} t{:x} {:x?} raw{} f{} t{} rule{} {},{} d{}", w.ents[k].id, e.ty, e.ai.states(), e.ea.pos.raw, e.ea.pos.frame, e.ea.pos.tick, e.ea.rule, e.a.x, e.a.y, e.a.facing);
+                        } else {
+                            line += &format!(" | {}", w.ents[k].kind());
+                        }
+                    }
+                    eprintln!("{line}");
                 }
             }
             let mut r = row(&s.world, sfx, dmg, enemy);
@@ -336,6 +419,11 @@ fn replay(t: &Value) -> Vec<Row> {
 
 fn compare(exp: &[Row], got: &[Row]) -> Option<(usize, Vec<&'static str>)> {
     for (k, e) in exp.iter().enumerate() {
+        // game over: at KO + 440 the game frees the player object (vtable 0, no frame record); the rest is the
+        // game-over screen
+        if e.state == "vt_00000000" && e.rom == 0 && e.hp == 0 && k > 0 && exp[k - 1].hp == 0 {
+            break;
+        }
         let Some(g) = got.get(k) else { return Some((k + 1, vec!["missing"])) };
         let no_anim = g.raw == -1 && (e.raw <= 0 || e.rom == 0);
         let swapped = e.raw == -1 && e.rom != 0 && e.rom == g.rom;

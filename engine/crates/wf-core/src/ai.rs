@@ -97,6 +97,8 @@ pub enum P {
     K,
     Dist,
     Atk,
+    Gap,
+    Presses,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -238,10 +240,25 @@ impl Hash for StackEntry {
     }
 }
 
-#[derive(Clone, Debug, Default, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct AiCtl {
     pub stack: Vec<StackEntry>,
     pub gen: u32,
+    /// entries replaced / popped while a tree was being evaluated: a GotoState does not stop the running tree (it
+    /// finishes its update on its own runtime), so their runtimes stay addressable until that evaluation ends
+    // (no skip_serializing_if: postcard byte snapshots are not self-describing, a skipped field breaks restore)
+    #[serde(default)]
+    pub orphans: Vec<StackEntry>,
+}
+impl Hash for AiCtl {
+    fn hash<H: Hasher>(&self, h: &mut H) {
+        self.stack.hash(h);
+        self.gen.hash(h);
+        // empty between frames (only live inside one evaluation)
+        if !self.orphans.is_empty() {
+            self.orphans.hash(h);
+        }
+    }
 }
 
 impl AiCtl {

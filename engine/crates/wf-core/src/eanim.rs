@@ -148,6 +148,12 @@ pub struct AnimRules {
     pub fallback_loop: u32,
     pub fallback_once: u32,
     pub idle: u32,
+    /// node-forced rules: { rule: 'hold' }, { 'loop', shift 3 }, { 'once_stop', shift 3, end 'none' }, { 'once',
+    /// shift 3, end 'hold' }
+    pub hold: u32,
+    pub loop3: u32,
+    pub once_stop3: u32,
+    pub once_hold3: u32,
 }
 
 impl AnimRules {
@@ -186,7 +192,11 @@ impl AnimRules {
                 }
             }
         }
-        AnimRules { rules, setanim, generic, types, keep, reverse, fallback_loop, fallback_once, idle }
+        let hold = push(EAnimRule::simple(RuleKind::Hold, 3, None, false), &mut rules);
+        let loop3 = push(EAnimRule::simple(RuleKind::Loop, 3, None, false), &mut rules);
+        let once_stop3 = push(EAnimRule::simple(RuleKind::OnceStop, 3, Some(End::None), false), &mut rules);
+        let once_hold3 = push(EAnimRule::simple(RuleKind::Once, 3, Some(End::Hold), false), &mut rules);
+        AnimRules { rules, setanim, generic, types, keep, reverse, fallback_loop, fallback_once, idle, hold, loop3, once_stop3, once_hold3 }
     }
     /// the rule of a SetState(controller) for a type (tests): shared object, else the type's recorded rule
     pub fn for_controller(&self, ctl: &str, ty: i32) -> Option<u32> {

@@ -48,6 +48,20 @@ const SCENARIOS: Scn[] = [
   { name: 'pikkon', enemy: 't91', arena: 'forest', seed: 71, frames: 1200, style: 'mix' },
   { name: 'vegeta_skills', enemy: 't68', count: 2, arena: 'forest', seed: 73, frames: 1500, style: 'mix', fighterId: 'vegeta', form: 26 },
   { name: 'gohan_skills', enemy: 't68', count: 2, arena: 'crater', seed: 79, frames: 1500, style: 'mix', fighterId: 'gohan', form: 10 },
+  // enemy attacks / special holds (lockstep round 3: wraps, vampire, enzyme latch, fragments, grapple, waves, bombs)
+  { name: 'mummy', enemy: 't77', count: 2, arena: 'crater', seed: 83, frames: 1500, style: 'melee' },
+  { name: 'mummy_mix', enemy: 't77', count: 2, arena: 'crater', seed: 89, frames: 1500, style: 'mix' },
+  { name: 'vampire', enemy: 't133', count: 2, arena: 'forest', seed: 97, frames: 1500, style: 'melee' },
+  { name: 'enzyme', enemy: 't24', count: 3, arena: 'crater', seed: 101, frames: 1200, style: 'melee' },
+  { name: 'fragment', enemy: 't14', count: 3, arena: 'crater', seed: 103, frames: 1200, style: 'mix' },
+  { name: 'bio_mech', enemy: 't5', arena: 'forest', seed: 107, frames: 1500, style: 'melee' },
+  { name: 'cyborg', enemy: 't17', count: 2, arena: 'forest', seed: 109, frames: 1200, style: 'mix' },
+  { name: 'tank', enemy: 't127', arena: 'forest', seed: 113, frames: 1200, style: 'idle' },
+  { name: 'turret', enemy: 't64', arena: 'forest', seed: 127, frames: 1200, style: 'mix' },
+  { name: 'soldiers', enemy: 't69', count: 3, arena: 'forest', seed: 131, frames: 1200, style: 'mix' },
+  { name: 'gunmen', enemy: 't44+t8', arena: 'forest', seed: 137, frames: 1200, style: 'idle' },
+  { name: 'mechanoid', enemy: 't72', arena: 'forest', seed: 139, frames: 1200, style: 'mix' },
+  { name: 'gotenks_ghosts', enemy: 't68', count: 2, arena: 'forest', seed: 149, frames: 1500, style: 'mix', fighterId: 'gotenks', form: 31 },
 ]
 
 const KEYS = [0, BTN.LEFT, BTN.RIGHT, BTN.UP, BTN.DOWN, BTN.A, BTN.A, BTN.B, BTN.B, BTN.R, BTN.LEFT | BTN.A, BTN.RIGHT | BTN.B, BTN.L, BTN.UP | BTN.A, BTN.R | BTN.B, BTN.DOWN | BTN.A]

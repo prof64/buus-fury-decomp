@@ -124,6 +124,12 @@ pub enum Gs {
     Skill18r,
     /// field transitions: the autowalk state (0x08010D7C, state 0x03002B54)
     AutoWalk,
+    /// Dabura's stone state (vtable 0x0804AB34)
+    Stone,
+    /// Majin Buu's candy: idle (0x0804BE60), hop (0x0804B7AC), being eaten (0x0804C2CC)
+    Candy,
+    CandyWalk,
+    CandyEat,
 }
 impl Gs {
     pub fn name(self) -> String {
@@ -131,6 +137,10 @@ impl Gs {
             Gs::Idle | Gs::Idle2 => "idle".into(),
             Gs::Walk => "walk".into(),
             Gs::AutoWalk => "autowalk".into(),
+            Gs::Stone => "vt_0804AB34".into(),
+            Gs::Candy => "candy".into(),
+            Gs::CandyWalk => "candy_walk".into(),
+            Gs::CandyEat => "candy_eat".into(),
             Gs::Dash => "dash".into(),
             Gs::Bored => "bored".into(),
             Gs::Punch => "punch".into(),
@@ -269,8 +279,16 @@ pub struct Player {
     pub hold_count: i32,
     pub hold_last: i64,
     pub blast: EntityId,
+    /// stuck mummy bandages (their stat reapply 0x0802D8E6 counts them)
     pub wraps: i32,
-    pub wrap_presses: Vec<u32>,
+    /// the stone state's counter (150 at the enter; key presses -5, damage -dmg >> 10)
+    pub stone_hp: i32,
+    /// candy: the shown sprite def is 0x36 (sprite 45) instead of the form's
+    pub candy_def: bool,
+    /// candy hop: the move code kept in the walk state (1 / 2 left / right + 3 / 6 up / down)
+    pub candy_code: i32,
+    /// the player object is out of the world (Majin Buu's eat, tick 8 .. 119): no update, no hits, not drawn
+    pub gone: bool,
     pub ss_gauge: i32,
     pub ss_acc: i32,
     pub ss3_gauge: i64,
@@ -346,7 +364,10 @@ impl Player {
             hold_last: 0,
             blast: 0,
             wraps: 0,
-            wrap_presses: vec![],
+            stone_hp: 0,
+            candy_def: false,
+            candy_code: 0,
+            gone: false,
             ss_gauge: 0,
             ss_acc: 0,
             ss3_gauge: 0,
@@ -399,11 +420,17 @@ impl Player {
     pub fn attacking(&self) -> bool {
         matches!(self.state, PState::Punch | PState::Skill | PState::Dash)
     }
+    /// the state's vfunc +0x1C (IfInPlayerBeamLine 0x08029B30): Ki Blast (0x0804FA30) = the refire request or anim
+    /// tick < 16 (until the blast leaves the hand); other skills: INFERRED any skill state
     pub fn charging(&self) -> bool {
+        if self.gs == Gs::Skill(7) {
+            return self.sk.as_ref().is_some_and(|s| s.refire) || self.ap.tick < 16;
+        }
         self.state == PState::Skill
     }
+    /// IfPlayerPetrified 0x0803AE65: the stone pose
     pub fn is_stone(&self) -> bool {
-        self.hold_kind == Some(HoldKind::Stone)
+        self.gs == Gs::Stone || self.hold_kind == Some(HoldKind::Stone)
     }
     pub fn swinging(&self) -> bool {
         self.state == PState::Punch
@@ -732,6 +759,13 @@ fn enter_state(w: &mut World, i: usize, gs: Gs) {
             pl.ap.frame = 0;
         }
         Gs::Hold => {}
+        // candy states: enter t = 0 (0x0804EA21 / 0x0804E921 / 0x0804EAD5), the frame kept
+        Gs::Candy | Gs::CandyEat => p(w, i).ap.tick = 0,
+        Gs::CandyWalk => {
+            let pl = p(w, i);
+            pl.ap.tick = 0;
+            pl.candy_code = 0;
+        }
         Gs::Punch => {
             {
                 let pl = p(w, i);
@@ -793,6 +827,10 @@ fn set_state_idle(w: &mut World, i: usize) {
 // ---- PlayerLike (the enemies' interface) ---------------------------------------------------------------------------------
 
 pub fn hold(w: &mut World, i: usize, by: EntityId, kind: HoldKind, frames: i32) {
+    hold_raw(w, i, by, kind, frames, 10)
+}
+/// `raw`: the animation the holder shows (frame 0); default the hurt animation's first frame (raw 10)
+pub fn hold_raw(w: &mut World, i: usize, by: EntityId, kind: HoldKind, frames: i32, raw: i32) {
     if pr(w, i).dead {
         return;
     }
@@ -814,9 +852,215 @@ pub fn hold(w: &mut World, i: usize, by: EntityId, kind: HoldKind, frames: i32) 
     if kind == HoldKind::Eat {
         pl.a.alpha = 0;
     } else {
-        pl.ap.raw = 10;
+        pl.ap.raw = raw;
     }
     pl.ap.frame = 0;
+}
+/// 0x0800ED18(player, 0x03001B00): the hold state (frame kept, no tick, no control)
+pub fn enter_hold(w: &mut World, i: usize) {
+    if pr(w, i).dead {
+        return;
+    }
+    end_skill(w, i);
+    enter_state(w, i, Gs::Hold);
+}
+/// SetAnim(0) (vfunc +0x28 with id 0)
+pub fn to_idle(w: &mut World, i: usize) {
+    if pr(w, i).dead {
+        return;
+    }
+    set_anim_id(w, i, 0);
+}
+/// SetAnimRaw(raw - 1), frame = `frame`, SetState(0x03001B00) (BearHug enter 0x0802C4C9)
+pub fn hold_pose(w: &mut World, i: usize, raw: i32, frame: i32) {
+    if pr(w, i).dead {
+        return;
+    }
+    end_skill(w, i);
+    {
+        let pl = p(w, i);
+        pl.ap.raw = raw;
+        pl.ap.frame = frame;
+    }
+    enter_state(w, i, Gs::Hold);
+}
+/// SetAnim(id) (vfunc +0x28)
+pub fn set_anim_by_id(w: &mut World, i: usize, id: usize) {
+    set_anim_id(w, i, id);
+}
+
+// ---- Dabura's stone (vtable 0x0804AB34): the spit's accepted hit (0x0802E60A, after the normal hit) does SetAnimRaw(0x15)
+// (raw 22) + SetState: counter 150; its damage reaction is counter -= damage >> 10 (HP still lost); control
+// 0x0802E384: a new A / B / d-pad press -> counter - 5; frame = counter < 75; counter <= 0 -> a puff at the body centre
+// and SetAnim(0). A new spit builds a new state (150 again)
+pub fn petrify(w: &mut World, i: usize) {
+    if pr(w, i).dead {
+        return;
+    }
+    p(w, i).ap.raw = 22;
+    enter_state(w, i, Gs::Stone);
+    p(w, i).stone_hp = 150;
+}
+fn ctl_stone(w: &mut World, i: usize) {
+    let pressed = inp(w, i).pressed;
+    let pl = p(w, i);
+    if pressed & 0xf3 != 0 {
+        pl.stone_hp -= 5;
+    }
+    pl.ap.frame = (75 > pl.stone_hp) as i32;
+    if pl.stone_hp > 0 {
+        return;
+    }
+    let (cx, cy) = pr(w, i).a.center();
+    fx::puff_rng(w, cx, cy);
+    set_anim_id(w, i, 0);
+}
+
+// ---- Majin Buu's candy (beam 0x080287AD, candy states 0x0804BE60 / 0x0804B7AC / 0x0804C2CC, eat 0x0802AF11) -------------
+/// the beam's accepted hit 0x08028862: SetDef(0x36), a candy idle state (SetAnimRaw(0) + SetState), frame rand(3),
+/// candy timer 0x03002FE4 = 300
+pub fn candy_hit(w: &mut World, i: usize) {
+    if pr(w, i).dead {
+        return;
+    }
+    end_skill(w, i);
+    {
+        let pl = p(w, i);
+        pl.candy_def = true;
+        pl.ap.raw = 1;
+    }
+    enter_state(w, i, Gs::Candy);
+    let f = w.rng.rand(3);
+    p(w, i).ap.frame = f;
+    w.g.candy = 300;
+}
+/// eat controller t 0: SetDef(0x36), the candy-eat state (enter 0x0804EAD5) placed at (x, y) (24.8)
+pub fn candy_eat(w: &mut World, i: usize, x: i32, y: i32) {
+    {
+        let pl = p(w, i);
+        pl.candy_def = true;
+        pl.ap.raw = 1;
+    }
+    enter_state(w, i, Gs::CandyEat);
+    let pl = p(w, i);
+    pl.a.z = 0;
+    pl.a.x = x;
+    pl.a.y = y;
+}
+/// eat t 8: the player object leaves the world (0x08011944); the candy-eat state's destructor clears the candy timer
+pub fn candy_gone(w: &mut World, i: usize) {
+    p(w, i).gone = true;
+    w.g.candy = 0;
+}
+/// eat t 120: a new player object at (x, y): facing down, the form's def, a new idle state (the constructor's idle
+/// tick and SetAnim(0), then the eat's own idle state: three rand(255)); the KO flag -> KO (INFERRED)
+pub fn candy_respawn(w: &mut World, i: usize, x: i32, y: i32, ko: bool) {
+    {
+        let pl = p(w, i);
+        pl.gone = false;
+        pl.candy_def = false;
+        pl.a.x = x;
+        pl.a.y = y;
+        pl.a.z = 0;
+        pl.a.facing = 0;
+        pl.a.flash = 0;
+    }
+    w.rng.rand(255);
+    w.rng.rand(255);
+    p(w, i).ap.raw = 1;
+    enter_state(w, i, Gs::Idle);
+    if ko {
+        p(w, i).rec.hp = 0;
+        after_hp_change(w, i);
+    }
+}
+/// candy idle control 0x08028390: timer 0 -> the form's def, SetAnim(0); a held d-pad key -> facing (left 2, right 3,
+/// up 1, down 0; the later one wins), a new candy walk state
+fn ctl_candy(w: &mut World, i: usize) {
+    let held = inp(w, i).held;
+    if w.g.candy == 0 {
+        p(w, i).candy_def = false;
+        return set_anim_id(w, i, 0);
+    }
+    if held & DPAD != 0 {
+        let pl = p(w, i);
+        if held & btn::LEFT != 0 {
+            pl.a.facing = 2;
+        }
+        if held & btn::RIGHT != 0 {
+            pl.a.facing = 3;
+        }
+        if held & btn::UP != 0 {
+            pl.a.facing = 1;
+        }
+        if held & btn::DOWN != 0 {
+            pl.a.facing = 0;
+        }
+        pl.ap.raw = 1;
+        enter_state(w, i, Gs::CandyWalk);
+    }
+}
+/// candy walk control 0x080284C0: at t 0 the timer 0 -> the form's def, SetAnim(0); no d-pad -> a new candy idle
+/// state; else a walk-speed step (left / right, flags 2, then up / down, flags 1), its move code kept; t 8..120 repeat
+/// the kept code; then t = (t + 8) & 0x7F, timer > 0 -> - 1. The facing never changes here
+fn ctl_candy_walk(w: &mut World, i: usize) {
+    let held = inp(w, i).held;
+    let sp = pr(w, i).walk_speed();
+    if pr(w, i).ap.tick == 0 {
+        if w.g.candy == 0 {
+            let pl = p(w, i);
+            pl.candy_def = false;
+            pl.a.z = 0;
+            return set_anim_id(w, i, 0);
+        }
+        if held & DPAD == 0 {
+            p(w, i).ap.raw = 1;
+            enter_state(w, i, Gs::Candy);
+        } else {
+            let mut code = 0;
+            if held & btn::LEFT != 0 {
+                walk_try(w, i, -sp, 0, 2);
+                code = 1;
+            } else if held & btn::RIGHT != 0 {
+                walk_try(w, i, sp, 0, 2);
+                code = 2;
+            }
+            if held & btn::UP != 0 {
+                walk_try(w, i, 0, -sp, 1);
+                code += 3;
+            } else if held & btn::DOWN != 0 {
+                walk_try(w, i, 0, sp, 1);
+                code += 6;
+            }
+            p(w, i).candy_code = code;
+        }
+    } else {
+        let c = pr(w, i).candy_code;
+        if matches!(c, 1 | 4 | 7) {
+            walk_try(w, i, -sp, 0, 2);
+        }
+        if matches!(c, 2 | 5 | 8) {
+            walk_try(w, i, sp, 0, 2);
+        }
+        if matches!(c, 3..=5) {
+            walk_try(w, i, 0, -sp, 1);
+        }
+        if matches!(c, 6..=8) {
+            walk_try(w, i, 0, sp, 1);
+        }
+    }
+    let pl = p(w, i);
+    pl.ap.tick = (pl.ap.tick + 8) & 0x7f;
+    if w.g.candy > 0 {
+        w.g.candy -= 1;
+    }
+}
+/// mummy bandages: every live bandage's update runs 0x0802D8E6 - the form controller's stat reset (0x0800E074:
+/// resists 128, so the hurt state's i-frames end) and walk / dash -48 per stuck bandage
+pub fn wrap_stats(w: &mut World, i: usize, stuck: i32) {
+    p(w, i).resist = 128;
+    refresh(w, i);
+    p(w, i).wraps = stuck;
 }
 pub fn release(w: &mut World, i: usize) {
     if pr(w, i).state != PState::Held {
@@ -873,11 +1117,19 @@ pub fn gain_xp(w: &mut World, i: usize, exp: i64) {
 // ---- update -----------------------------------------------------------------------------------------------------------
 
 pub fn update(w: &mut World, i: usize) {
+    // the world map's flying player (fieldworld.rs) replaces the 2D player's states
+    if crate::fieldworld::flyer_update(w, i) {
+        return;
+    }
     if pr(w, i).it_sel.is_some() {
         it_select(w, i);
         let mut pl = pr(w, i).clone();
         pl.sync_anim(w);
         *p(w, i) = pl;
+        return;
+    }
+    // eaten (out of the world): nothing of the player runs
+    if pr(w, i).gone {
         return;
     }
     {
@@ -916,6 +1168,16 @@ pub fn update(w: &mut World, i: usize) {
     let ko = pr(w, i).ko_at;
     let since_ko = if ko >= 0 { w.frame as i64 - ko } else { -1 };
     if since_ko == 199 {
+        // the death script's loop runs from here on (the original's one player): no other object is updated any
+        // more, and every actor gets message 0xF (0x0800F44A: the walk state's vfunc +0x10 SetAnim(0)s)
+        if w.players.len() == 1 {
+            w.modal = Some(vec![w.ents[i].id]);
+            for id in w.enemies.clone() {
+                if let Some(k) = w.find(id).filter(|&k| !w.ents[k].removed) {
+                    crate::enemy::stop_msg(w, k);
+                }
+            }
+        }
         let mut pl = pr(w, i).clone();
         pl.sync_anim(w);
         *p(w, i) = pl;
@@ -935,7 +1197,11 @@ pub fn update(w: &mut World, i: usize) {
     }
     anim_tick(w, i);
     // a script commanding the player (scene.rs puppet): the states it sets run, the controller does not
-    if !pr(w, i).dead && !crate::scene::is_puppet(w, w.ents[i].id) {
+    let puppet = crate::scene::is_puppet(w, w.ents[i].id);
+    if puppet {
+        crate::scene::player_frames_tick(w, i);
+    }
+    if !pr(w, i).dead && !puppet {
         control(w, i);
     }
     let mut pl = pr(w, i).clone();
@@ -1009,6 +1275,9 @@ fn anim_tick(w: &mut World, i: usize) {
             tick_loop(&mut a, n, 3);
             end(w, a)
         }
+        // the stone / candy idle / eat ticks do nothing; the hop tick 0x080284AB: height = -sin(t) >> 13
+        Gs::Stone | Gs::Candy | Gs::CandyEat => {}
+        Gs::CandyWalk => p(w, i).a.z = -(crate::tables::SIN256[(a.tick & 0xff) as usize] >> 13),
         Gs::Dash => {
             tick_loop(&mut a, n, 3);
             end(w, a);
@@ -1243,10 +1512,16 @@ fn swap_to_partner(w: &mut World, i: usize) {
 
 /// the state's control (vtable +8)
 fn control(w: &mut World, i: usize) {
+    if pr(w, i).gs == Gs::Stone {
+        return ctl_stone(w, i);
+    }
     if pr(w, i).state == PState::Held {
         return upd_held(w, i);
     }
     match pr(w, i).gs {
+        Gs::Candy => return ctl_candy(w, i),
+        Gs::CandyWalk => return ctl_candy_walk(w, i),
+        Gs::CandyEat => return,
         Gs::Idle => return ctl_idle(w, i),
         Gs::Walk => return ctl_walk(w, i),
         Gs::Dash => return ctl_dash(w, i),
@@ -1434,17 +1709,6 @@ fn passive(w: &mut World, i: usize) {
             pl.a.facing = 0;
             let x0 = pl.a.px();
             pl.defuse = Some((0, x0));
-        }
-    }
-    let pressed = inp(w, i).pressed;
-    let frame = w.frame;
-    let pl = p(w, i);
-    if pl.wraps > 0 && pressed & DPAD != 0 {
-        pl.wrap_presses.push(frame);
-        pl.wrap_presses.retain(|&f| (frame as i64) - (f as i64) < 60);
-        if pl.wrap_presses.len() >= 8 {
-            pl.wraps = 0;
-            pl.wrap_presses.clear();
         }
     }
 }
@@ -1664,7 +1928,7 @@ fn melee(w: &mut World, i: usize) {
     let a = &pr(w, i).a;
     let rect = Rect::at(PUNCH_RECT[a.facing as usize], a.px(), a.py());
     let me = w.ents[i].id;
-    let mut m = HitMsg { team: 1, rect, dir: a.facing, mult: 0x400, atk: atk(2), attacker: me, att_stats: a.stats, att_is_player: true, source: me, crit: false, raw: 0, dmg: 0 };
+    let mut m = HitMsg { team: 1, rect, dir: a.facing, mult: 0x400, atk: atk(2), attacker: me, att_stats: a.stats, att_is_player: true, source: me, crit: false, raw: 0, dmg: 0, no_react: false, foot: false };
     // field: areas without combat (area record +8 = 0) send no hit; a hit nobody accepted becomes the interact
     // message (talk, A pickups), then the A-trigger test — any of them suppresses the punch (field.rs / fieldnpc.rs)
     let combat = w.field.as_ref().is_none_or(|f| f.combat);
@@ -1927,7 +2191,7 @@ fn end_skill(w: &mut World, i: usize) {
                     if (k as i32) < committed {
                         if let ShotKind::Ghost(gh) = &mut w.shot(gi).kind {
                             gh.free = true;
-                            gh.wait = 1;
+                            gh.wait = 0;
                         }
                     } else {
                         w.ents[gi].removed = true;
@@ -2213,7 +2477,7 @@ fn upd_skill(w: &mut World, i: usize) {
                 let r = if lv > 1 { ENERGY_PUNCH_RECT_L3 } else { PUNCH_RECT }[facing as usize];
                 let rect = Rect::at(r, a0.px(), a0.py());
                 let st = pr(w, i).a.stats;
-                let mut m = HitMsg { team: 1, rect, dir: facing, mult, atk: a, attacker: me, att_stats: st, att_is_player: true, source: me, crit: false, raw: 0, dmg: 0 };
+                let mut m = HitMsg { team: 1, rect, dir: facing, mult, atk: a, attacker: me, att_stats: st, att_is_player: true, source: me, crit: false, raw: 0, dmg: 0, no_react: false, foot: false };
                 broadcast(w, &mut m, false);
             }
             if lv > 0 {
@@ -2292,7 +2556,7 @@ fn upd_skill(w: &mut World, i: usize) {
             // every swing frame: one message to the first receiver; every accepted frame plays 48 + rand(2)
             let st = pr(w, i).a.stats;
             let dir = [2, 0, 0, 0, 3, 1, 1, 1][def - 10];
-            let mut m = HitMsg { team: 1, rect, dir, mult: 0x2800, atk: a, attacker: me, att_stats: st, att_is_player: true, source: me, crit: false, raw: 0, dmg: 0 };
+            let mut m = HitMsg { team: 1, rect, dir, mult: 0x2800, atk: a, attacker: me, att_stats: st, att_is_player: true, source: me, crit: false, raw: 0, dmg: 0, no_react: false, foot: false };
             if broadcast(w, &mut m, true) {
                 let r = 48 + w.rng.rand(2);
                 sfx(w, r, 64);
@@ -2381,11 +2645,7 @@ fn upd_skill(w: &mut World, i: usize) {
             if t == 16 {
                 let (gx, gy) = shots::GHOST_SPAWN[facing as usize];
                 let (px, py) = (pr(w, i).a.px(), pr(w, i).a.py());
-                let g = shots::ghost(me, facing, (px + gx) << 8, (py + gy) << 8, s.ghosts.len() as i32);
-                w.rng.rand(255);
-                let at = w.frame + 24;
-                p(w, i).ghost_rng.push((at, 255));
-                let gid = shots::add(w, g);
+                let gid = shots::ghost(w, me, facing, (px + gx) << 8, (py + gy) << 8, s.ghosts.len() as i32);
                 sk_mut(w, i).unwrap().ghosts.push(gid);
             }
         }
@@ -2556,7 +2816,21 @@ fn start_it(w: &mut World, i: usize, lv: i32) {
         0
     };
     let cam = w.camera(pr(w, i).slot as usize);
-    let cand: Vec<(EntityId, bool)> = w.live_enemies().into_iter().filter(|&e| overlaps(&w.en_ref(e).a.body_box(), &cam)).take(16).map(|e| (w.ents[e].id, false)).collect();
+    let mut cand: Vec<(EntityId, bool)> = w.live_enemies().into_iter().filter(|&e| overlaps(&w.en_ref(e).a.body_box(), &cam)).take(16).map(|e| (w.ents[e].id, false)).collect();
+    if w.opts.pvp {
+        // PvP rule set: the opposing players on this player's camera are targets too (after the enemies, 16 at most)
+        let me = w.ents[i].id;
+        for &id in &w.players {
+            if cand.len() >= 16 || id == me {
+                continue;
+            }
+            if let Some(k) = w.find(id).filter(|&k| !w.ents[k].removed && matches!(w.ents[k].body, Body::Player(_)) && pvp_targetable(w, k)) {
+                if overlaps(&pr(w, k).a.body_box(), &cam) {
+                    cand.push((id, false));
+                }
+            }
+        }
+    }
     let (cx, cy) = pr(w, i).a.center();
     let serial = w.next_serial();
     p(w, i).it_sel = Some(ItSel { serial, n: (lv + 1).min(tier), cand, picks: vec![], x: cx << 8, y: cy << 8, vx: 0, vy: 0, cursor: true });
@@ -2666,7 +2940,7 @@ fn ctl_it(w: &mut World, i: usize) {
         let a = &pr(w, i).a;
         let rect = Rect::at(PUNCH_RECT[a.facing as usize], a.px(), a.py());
         let me = w.ents[i].id;
-        let mut m = HitMsg { team: 1, rect, dir: a.facing, mult: 0x600, atk: atk(2), attacker: me, att_stats: a.stats, att_is_player: true, source: me, crit: false, raw: 0, dmg: 0 };
+        let mut m = HitMsg { team: 1, rect, dir: a.facing, mult: 0x600, atk: atk(2), attacker: me, att_stats: a.stats, att_is_player: true, source: me, crit: false, raw: 0, dmg: 0, no_react: false, foot: false };
         if broadcast(w, &mut m, false) {
             let r = 48 + w.rng.rand(2);
             sfx(w, r, 64);
@@ -2688,7 +2962,7 @@ fn ctl_it(w: &mut World, i: usize) {
 fn upd_held(w: &mut World, i: usize) {
     let k = pr(w, i).hold_kind;
     let by = pr(w, i).held_by;
-    let InputFrame { held, pressed, .. } = inp(w, i);
+    let InputFrame { pressed, .. } = inp(w, i);
     let frame = w.frame as i64;
     let mash = |w: &mut World, mask: u16, need: i32, gap: i64| -> bool {
         let pl = p(w, i);
@@ -2705,19 +2979,8 @@ fn upd_held(w: &mut World, i: usize) {
         return release(w, i);
     }
     match k {
-        Some(HoldKind::Vampire) => {
-            let pl = p(w, i);
-            if held & (btn::A | btn::B | DPAD) != 0 {
-                if frame - pl.hold_last > 10 {
-                    pl.hold_count = 0;
-                }
-                pl.hold_count += 1;
-                pl.hold_last = frame;
-            }
-            if pl.hold_count > 8 {
-                return release(w, i);
-            }
-        }
+        // the vampire grab: the escape count, the drain and the vampire's position are the VampireGrab node's
+        Some(HoldKind::Vampire) => {}
         Some(HoldKind::Hug) => {
             if mash(w, DPAD, 4, 90) {
                 return release(w, i);
@@ -2741,7 +3004,7 @@ fn upd_held(w: &mut World, i: usize) {
         }
         _ => {}
     }
-    if matches!(k, Some(HoldKind::Vampire) | Some(HoldKind::Latch) | Some(HoldKind::Hug)) {
+    if matches!(k, Some(HoldKind::Latch) | Some(HoldKind::Hug)) {
         if let Some(ba) = w.actor_by_id(by).cloned() {
             let (bx, byy) = ba.foot_center();
             let hug = k == Some(HoldKind::Hug);
@@ -2766,6 +3029,13 @@ fn upd_held(w: &mut World, i: usize) {
 
 /// PvP rule set (`World::opts.pvp`, multiplayer only, not in the original game): another player's attack (melee,
 /// skills, its shots and effects: attacker = that player) is accepted like an enemy attack, same damage pipeline
+/// PvP: player entity `i` can currently be hit by another player's attack (alive, hittable, not being eaten) - what
+/// the homing shots and Instant Transmission may pick as an opposing target
+pub fn pvp_targetable(w: &World, i: usize) -> bool {
+    let pl = pr(w, i);
+    !pl.dead && pl.a.hittable && !(pl.state == PState::Held && pl.hold_kind == Some(HoldKind::Eat))
+}
+
 fn pvp_hit(w: &World, i: usize, msg: &HitMsg) -> bool {
     w.opts.pvp && msg.att_is_player && msg.attacker != w.ents[i].id && w.find(msg.attacker).is_some_and(|k| matches!(w.ents[k].body, Body::Player(_)))
 }
@@ -2773,14 +3043,23 @@ fn pvp_hit(w: &World, i: usize, msg: &HitMsg) -> bool {
 pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
     {
         let pl = pr(w, i);
-        if (msg.team == 1 && !pvp_hit(w, i, msg)) || pl.dead {
+        if msg.team == 1 && !pvp_hit(w, i, msg) {
             return false;
         }
         if pl.state == PState::Held && pl.hold_kind == Some(HoldKind::Eat) {
             return false;
         }
-        if !overlaps(&msg.rect, &pl.a.body_box()) {
+        // the eaten player is not in the world
+        if pl.gone {
             return false;
+        }
+        // message kind 1 tests the footprint (0x0800FDFA), else the body box
+        if !overlaps(&msg.rect, &if msg.foot { pl.a.foot_box() } else { pl.a.body_box() }) {
+            return false;
+        }
+        // KO: 0x08010F74 skips ComputeDamage but still accepts a box overlapping the body (an enemy wave puffs)
+        if pl.dead {
+            return msg.team != 1;
         }
         // not hittable (+0x1CC: reverting, Instant Transmission, the cutscene fusions): not accepted
         if !pl.a.hittable {
@@ -2796,6 +3075,9 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
     msg.crit = res.crit;
     msg.raw = res.raw;
     msg.dmg = dmg;
+    if res.unblocked != dmg {
+        w.events.push(Event::DamageRoll { target: w.ents[i].id, dmg: res.unblocked });
+    }
     w.events.push(Event::Damage { target: w.ents[i].id, attacker: msg.attacker, dmg, crit: res.crit });
     if msg.team == 1 {
         // PvP: the attacker's hit cue and on-hit hooks, as when it hits an enemy
@@ -2827,7 +3109,19 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
             return true;
         }
     }
+    // stone: the counter's reaction 0x0802E348 replaces the hurt state
+    if pr(w, i).gs == Gs::Stone {
+        p(w, i).stone_hp -= (dmg >> 10) as i32;
+        return true;
+    }
     if pr(w, i).state == PState::Held {
+        return true;
+    }
+    if msg.no_react {
+        // the flames skip the reaction; in the transformation singleton (SetAnim(23)) they call SetAnim(0)
+        if pr(w, i).gs == Gs::SsUp {
+            set_anim_id(w, i, 0);
+        }
         return true;
     }
     if blocking {
@@ -2869,7 +3163,9 @@ fn after_hp_change(w: &mut World, i: usize) {
         }
         p(w, i).ap.raw = 18;
         enter_state(w, i, Gs::Ko);
-        let fr = w.frame as i64;
+        // the death script (started here) first runs on the next frame: the script runner comes before the object
+        // updates, whichever object dealt the KO (an injected hit lands before it: world.rs Injector)
+        let fr = w.frame as i64 + 1;
         p(w, i).ko_at = fr;
     }
 }
@@ -2898,8 +3194,14 @@ pub fn lockstep_init(w: &mut World, i: usize, raw: i32, frame: i32, tick: i32, s
 /// what the lockstep compares: state name, raw animation (-1 when the sprite lacks it), frame, ROM frame record
 pub fn lockstep_view(w: &World, i: usize) -> (String, i32, i32, u32) {
     let pl = pr(w, i);
+    // eaten: the recorder finds no player object
+    if pl.gone {
+        return ("gone".into(), 0, 0, 0);
+    }
     let state = pl.gs.name();
-    let Some(a) = pl.a.sprite.and_then(|s| w.data.sprite(s)).and_then(|s| s.anim_raw(pl.ap.raw)) else { return (state, -1, pl.ap.frame, 0) };
+    // candy: the def is 0x36 (sprite 45)
+    let spr = if pl.candy_def { Some(45) } else { pl.a.sprite };
+    let Some(a) = spr.and_then(|s| w.data.sprite(s)).and_then(|s| s.anim_raw(pl.ap.raw)) else { return (state, -1, pl.ap.frame, 0) };
     let rom = a.dirs[pl.a.facing as usize & 3].get(pl.ap.frame.max(0) as usize).map(|s| s.rom).unwrap_or(0);
     let rom = if pl.ap.frame < 0 { 0 } else { rom };
     (state, a.canon_raw, pl.ap.frame, rom)

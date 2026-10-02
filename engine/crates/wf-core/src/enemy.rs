@@ -66,6 +66,31 @@ pub struct Enemy {
     pub ea: crate::eanim::EnemyAnim,
     /// the last one-shot ran out (its end callback fired)
     pub anim_ended: bool,
+    /// the current animation runs under a node's own state object (a forced rule, e.g. the back-off's reversed walk
+    /// 0x03002B9C), not the SetAnim table's: IsAnim (vfunc +0x34, 0x0800FAC6) is false
+    pub own_state: bool,
+    /// a node's own state object with per-frame code (SetState; tick + think run in the actor update before the AI;
+    /// any SetAnim replaces it): 0 none, else a [`Hook`]
+    pub hook: Hook,
+    /// Dabura's spit controller 0x030030C8 (tick 0x0802DE7C): ticks since its SetState, -1 = not the current state
+    pub spit_ctl: i32,
+    /// +1 per state entered through SetAnim (a node can tell its controller was replaced)
+    pub anim_seq: u32,
+    /// the shown graphics set when MechTransform swapped it (gfx id; -1 = the type's)
+    pub gfx_now: i32,
+}
+
+/// the node-installed state objects with per-frame code (`Enemy.stateHook` of the reference)
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum Hook {
+    #[default]
+    None,
+    /// LatchDrain's controller (0x0804C314): glued to the player at the offset kept by its enter (24.8)
+    Latch { ox: i32, oy: i32 },
+    /// the Buu fragment's PlayAnim0 state 0x03003158
+    Fragment,
+    /// the Buu fragment's FreezePlayer state 0x0300314C
+    Freeze,
 }
 
 impl Enemy {
@@ -118,6 +143,11 @@ impl Enemy {
             target: 0,
             ea: Default::default(),
             anim_ended: false,
+            own_state: false,
+            hook: Hook::None,
+            spit_ctl: -1,
+            anim_seq: 0,
+            gfx_now: -1,
         };
         // the constructor's SetAnim(0) runs before the object is in the world: no RNG draw
         e.set_anim_with(d, &[AnimRef::Name("idle")], true, Some(true), None, None, &mut Vec::new());
@@ -127,20 +157,65 @@ impl Enemy {
     /// enemy SetAnim table, else a generic loop / one-shot; `rule` forces one. Re-entering restarts the state.
     #[allow(clippy::too_many_arguments)]
     pub fn set_anim_with(&mut self, d: &crate::content::GameData, refs: &[AnimRef], restart: bool, looped: Option<bool>, rule: Option<u32>, rng: Option<&mut crate::rng::Rng>, events: &mut Vec<Event>) {
+        self.spit_ctl = -1;
+        self.hook = Hook::None;
         let prev = self.a.anim;
+        // the sprite lacks the requested animation: the game's state object still runs (no idle state, no rand(255));
+        // the idle animation is only shown (lockstep f02_vs_enemy_gun: GunShot on a sprite without raw 18)
+        let idle_ref = |r: &AnimRef| matches!(r, AnimRef::Name("idle") | AnimRef::N(0));
+        let missing = match self.a.sprite.and_then(|s| d.sprite(s)) {
+            Some(sp) => {
+                !refs.iter().any(idle_ref)
+                    && !refs.iter().any(|r| match r {
+                        AnimRef::N(n) => sp.by_raw.contains_key(&(n + 1)),
+                        AnimRef::Name(s) => sp.by_name.contains_key(*s),
+                    })
+            }
+            None => false,
+        };
         self.a.set_anim(d, refs, restart, looped);
         let Some(raw) = self.a.anim_raw(d) else { return };
         if self.a.anim == prev && !restart && rule.is_none() {
             return;
         }
         let ar = &d.anim;
-        let r = rule
+        // SetAnim(id) 0x0800ECF0: the state object comes from the enemy table 0x080726B8 by id, only the raw from the
+        // sprite def: SetAnim(0) is always the idle state, SetAnim(1) the walk loop (a type's recorded walk
+        // controller 0x0804A1D0@0x03001B58 when there is one)
+        let plain = rule.is_none() && !missing;
+        let single = if refs.len() == 1 { Some(refs[0]) } else { None };
+        let by_id = match single {
+            Some(AnimRef::Name("idle")) | Some(AnimRef::N(0)) if plain => Some(ar.setanim[&1]),
+            Some(AnimRef::Name("walk")) | Some(AnimRef::N(1)) if plain => Some(ar.types.get(&self.ty).and_then(|m| m.get("0x0804A1D0@0x03001B58")).copied().unwrap_or(ar.setanim[&2])),
+            _ => None,
+        };
+        let r = if missing { Some(ar.hold) } else { None }
+            .or(rule)
+            .or(by_id)
             .or_else(|| ar.types.get(&self.ty).and_then(|m| m.get(&raw.to_string())).copied())
             .or_else(|| ar.setanim.get(&raw).copied())
             .unwrap_or(if looped == Some(false) { ar.fallback_once } else { ar.fallback_loop });
         self.anim_ended = false;
+        self.own_state = rule.is_some();
+        self.anim_seq = self.anim_seq.wrapping_add(1);
         let mut h = EHost { d, sprite: self.a.sprite, facing: self.a.facing, rng, events };
         self.ea.enter(&ar.rules, raw, r, &mut h);
+    }
+    /// IsAnim(id) (vfunc +0x34, 0x0800FAC6): the state object is SetAnim(id)'s and the raw matches (a forced rule or a
+    /// node's own state object is not)
+    pub fn is_anim(&self, id: i32) -> bool {
+        !self.own_state && self.hook == Hook::None && self.ea.pos.raw == id + 1
+    }
+    /// IsAnim(1): the walk loop state is running (not the back-off's reversed walk showing the same raw)
+    pub fn walking(&self) -> bool {
+        self.is_anim(1)
+    }
+    /// SetAnimRaw 0x0800ECDA: obj+0x50 only (the state object and its frame / tick stay)
+    pub fn set_raw(&mut self, d: &crate::content::GameData, raw: i32) {
+        self.ea.pos.raw = raw;
+        if let Some(&k) = self.a.sprite.and_then(|s| d.sprite(s)).and_then(|s| s.by_raw.get(&raw)) {
+            self.a.anim = Some(k);
+        }
     }
     /// the state's tick before the AI; a one-shot's end callback is SetAnim(0)
     pub fn tick_anim(&mut self, d: &crate::content::GameData, rng: &mut crate::rng::Rng, events: &mut Vec<Event>) {
@@ -263,11 +338,12 @@ fn nm(s: &'static str) -> AnimRef {
     AnimRef::Name(s)
 }
 
-/// the target player: present, not removed and not dead
+/// the target player object ([0x03001B94]): present and not removed - still there after a KO (the AI's distance
+/// tests keep using its position)
 pub fn player(w: &World, i: usize) -> Option<usize> {
     let slot = w.en_ref(i).target as usize;
     let pi = w.player_idx(slot).or_else(|| w.player_idx(0))?;
-    if w.ents[pi].removed || w.pl_ref(pi).dead {
+    if w.ents[pi].removed {
         None
     } else {
         Some(pi)
@@ -285,7 +361,23 @@ pub fn update(w: &mut World, i: usize) {
     if crate::scene::puppet_update(w, i) {
         return;
     }
+    // the player's death script (0x08799D0C) blocks every object update at KO + 199; from KO + 200 an enemy only runs
+    // its state tick (caller 0x0800F5E0: no AI)
+    let ko_at = if w.players.len() == 1 { ctx_player(w, i).map(|pi| w.pl_ref(pi).ko_at).unwrap_or(-1) } else { -1 };
+    if ko_at >= 0 && w.frame as i64 - ko_at >= 199 {
+        if w.frame as i64 - ko_at > 199 {
+            tick_anim(w, i);
+        }
+        return;
+    }
     tick_anim(w, i);
+    if w.en_ref(i).spit_ctl >= 0 {
+        let c = w.en_ref(i).spit_ctl;
+        w.en(i).spit_ctl = c + 1;
+        if c == 0 {
+            shot(w, i, ShotType::Spit);
+        }
+    }
     {
         let e = w.en(i);
         if e.contact_cd > 0 {
@@ -318,17 +410,201 @@ pub fn update(w: &mut World, i: usize) {
         return;
     }
     w.en(i).moving = false;
+    run_hook(w, i);
     crate::nodes::tick(w, i);
     let d = Arc::clone(&w.data);
     let e = w.en_ref(i);
-    let name = e.a.anim_name(&d).map(String::from);
-    let moving = e.moving;
-    if e.a.anim.is_none() || matches!(name.as_deref(), Some("idle") | Some("walk")) {
-        if moving && name.as_deref() != Some("walk") {
-            set_anim(w, i, &[nm("walk")], false, Some(true));
-        } else if !moving && name.as_deref() == Some("walk") {
-            set_anim(w, i, &[nm("idle")], false, Some(true));
+    let name = e.a.anim_name(&d);
+    // a movement step SetAnim(1)s unless already walking (0x0803B9DA: IsAnim(1)); nothing switches back to idle when
+    // the movement stops - the next node's own SetAnim does
+    if (e.a.anim.is_none() || matches!(name, Some("idle") | Some("walk"))) && e.moving && !e.walking() {
+        set_anim(w, i, &[nm("walk")], true, Some(true));
+    }
+}
+
+/// the node-installed state object's tick (vtable +4) and think (+8), before the AI
+fn run_hook(w: &mut World, i: usize) {
+    match w.en_ref(i).hook {
+        Hook::None => {}
+        Hook::Latch { ox, oy } => {
+            let Some(pi) = player(w, i) else { return };
+            let (px, py) = (w.pl_ref(pi).a.x, w.pl_ref(pi).a.y);
+            unmark_self(w, i);
+            {
+                let e = w.en(i);
+                e.a.x = px + ox;
+                e.a.y = py + oy;
+            }
+            mark_self(w, i);
         }
+        Hook::Fragment => {
+            frag_tick(w, i);
+            frag_think(w, i);
+        }
+        Hook::Freeze => freeze_tick(w, i),
+    }
+}
+
+/// SetState(a node's own state object): no tick of its own (the hook runs it); frame / tick kept
+fn use_state(w: &mut World, i: usize, h: Hook) {
+    let d = Arc::clone(&w.data);
+    let e = w.en(i);
+    let raw = e.ea.pos.raw;
+    let mut ev = Vec::new();
+    let mut hh = EHost { d: &d, sprite: e.a.sprite, facing: e.a.facing, rng: None, events: &mut ev };
+    e.ea.enter(&d.anim.rules, raw, d.anim.keep, &mut hh);
+    e.hook = h;
+}
+pub fn set_raw(w: &mut World, i: usize, raw: i32) {
+    let d = Arc::clone(&w.data);
+    w.en(i).set_raw(&d, raw);
+}
+
+/// LatchDrain's enter (0x080298D8): SetAnimRaw(1), SetState(controller 0x0804C314: loop, shift 3) whose think
+/// (0x080298A2) glues the enzyme to the player at the offset kept by its enter (0x08029860)
+pub fn latch_enter(w: &mut World, i: usize) {
+    let d = Arc::clone(&w.data);
+    set_raw(w, i, 1);
+    {
+        let e = w.en(i);
+        let mut ev = Vec::new();
+        let mut hh = EHost { d: &d, sprite: e.a.sprite, facing: e.a.facing, rng: None, events: &mut ev };
+        e.ea.enter(&d.anim.rules, 1, d.anim.loop3, &mut hh);
+    }
+    let Some(pi) = player(w, i) else { return };
+    let (px, py) = (w.pl_ref(pi).a.x, w.pl_ref(pi).a.y);
+    let e = w.en(i);
+    e.hook = Hook::Latch { ox: e.a.x - px, oy: e.a.y - py };
+}
+
+// ---- Buu fragment (type 0x0E): PlayAnim0 / FreezePlayer ---------------------------------------------------------------
+
+/// PlayAnim0 enter 0x0804E5E8: frame = tick = 0, SetAnimRaw(0), SetState(0x03003158), whose enter 0x08030618 runs the
+/// think once
+pub fn frag_enter(w: &mut World, i: usize) {
+    {
+        let e = w.en(i);
+        e.ea.pos.frame = 0;
+        e.ea.pos.tick = 0;
+    }
+    set_raw(w, i, 1);
+    use_state(w, i, Hook::Fragment);
+    frag_think(w, i);
+}
+/// state tick 0x080307FA: mode 0 frame 0; mode 1 frame 1 at tick 0x30, 2 at 0x50; tick = (tick + 8) & 0x7F (the height
+/// bob is cosmetic and not modelled)
+fn frag_tick(w: &mut World, i: usize) {
+    let mode = w.g.frag.0;
+    let pos = &mut w.en(i).ea.pos;
+    let t = pos.tick;
+    if mode == 0 {
+        pos.frame = 0;
+    } else if mode == 1 {
+        if t == 0x30 {
+            pos.frame = 1;
+        } else if t == 0x50 {
+            pos.frame = 2;
+        }
+    }
+    pos.tick = (t + 8) & 0x7f;
+}
+/// state think 0x08030630 (the state object is one IWRAM singleton: its mode and step are shared by every fragment)
+fn frag_think(w: &mut World, i: usize) {
+    let Some(pi) = player(w, i) else { return };
+    if w.en_ref(i).ea.pos.tick == 0 {
+        let (pcx, pcy) = w.pl_ref(pi).a.fc();
+        let (ecx, ecy) = w.en_ref(i).a.fc();
+        let dx = pcx - ecx;
+        let dy = pcy - ecy;
+        let vx = if dx > 0 { 256 } else { -256 };
+        let vy = if dy > 0 { 256 } else { -256 };
+        let rx = pcx - (ecx + if dx > 0 { 32 } else { -32 });
+        let ry = pcy - (ecy + if dy > 0 { 32 } else { -32 });
+        let sx = if rx > 0 { 256 } else { -256 };
+        let sy = if ry > 0 { 256 } else { -256 };
+        let mode = ((vx * sx) >> 8 < 0 && (vy * sy) >> 8 < 0) as i32;
+        w.g.frag = (mode, vx, vy);
+        w.en(i).ea.pos.frame = 0;
+        if mode == 1 {
+            set_raw(w, i, 15);
+        } else {
+            w.en(i).ea.pos.tick = 0;
+            set_raw(w, i, 1);
+        }
+    }
+    let (mode, vx, vy) = w.g.frag;
+    let k = if mode != 0 { 2 } else { 1 };
+    let (nx, ny) = (w.en_ref(i).a.x + vx * k, w.en_ref(i).a.y + vy * k);
+    unmark_self(w, i);
+    if fits(w, i, nx >> 8, ny >> 8) {
+        let e = w.en(i);
+        e.a.x = nx;
+        e.a.y = ny;
+    }
+    mark_self(w, i);
+    let no_z = |a: &Actor| {
+        let b = a.body_box();
+        Rect::new(b.x0, b.y0 - a.z, b.x1, b.y1 - a.z)
+    };
+    if overlaps(&no_z(&w.en_ref(i).a), &no_z(&w.pl_ref(pi).a)) {
+        let d = Arc::clone(&w.data);
+        let e = w.en(i);
+        e.hook = Hook::None;
+        let raw = e.ea.pos.raw;
+        let mut ev = Vec::new();
+        let mut hh = EHost { d: &d, sprite: e.a.sprite, facing: e.a.facing, rng: None, events: &mut ev };
+        e.ea.enter(&d.anim.rules, raw, d.anim.keep, &mut hh);
+    }
+}
+/// FreezePlayer enter 0x080305AA, fragment side: SetAnimRaw(0x12) + SetState(0x0300314C): tick = frame = 0, at the
+/// player's position + (0, 1 px)
+pub fn freeze_enter(w: &mut World, i: usize) {
+    set_raw(w, i, 19);
+    {
+        let e = w.en(i);
+        e.ea.pos.frame = 0;
+        e.ea.pos.tick = 0;
+    }
+    if let Some(pi) = player(w, i) {
+        let (px, py) = (w.pl_ref(pi).a.x, w.pl_ref(pi).a.y);
+        unmark_self(w, i);
+        {
+            let e = w.en(i);
+            e.a.x = px;
+            e.a.y = py + 256;
+        }
+        mark_self(w, i);
+    }
+    use_state(w, i, Hook::Freeze);
+}
+/// the freeze state: tick 0x08030584 (frames 4 / 5 loop) and think 0x08030538 (a d-pad press -> tick + 2; the last 16
+/// A/B/d-pad presses within 90 frames, one now -> the player SetAnim(0), frame = tick = 0, SetAnim(0))
+fn freeze_tick(w: &mut World, i: usize) {
+    {
+        let pos = &mut w.en(i).ea.pos;
+        pos.tick += 1;
+        if pos.tick > 7 {
+            pos.tick = 0;
+            pos.frame += 1;
+            if pos.frame > 5 {
+                pos.frame = 4;
+            }
+        }
+    }
+    let slot = w.en_ref(i).target as usize;
+    if w.g.pressed(slot) & 0xf0 != 0 {
+        w.en(i).ea.pos.tick += 2;
+    }
+    if w.g.press_run(slot, 0xf3, 16, 90, w.frame) {
+        if let Some(pi) = player(w, i) {
+            player::release(w, pi);
+        }
+        {
+            let pos = &mut w.en(i).ea.pos;
+            pos.frame = 0;
+            pos.tick = 0;
+        }
+        set_anim(w, i, &[nm("idle")], true, Some(true));
     }
 }
 
@@ -369,14 +645,30 @@ pub fn muzzle_fix(w: &World, i: usize, turret: bool) -> (i32, i32) {
     let (ox, oy) = if turret { WAVE_TURRET } else { WAVE_SOLDIER }[a.facing as usize];
     ((a.px() + ox) << 8, (a.py() + oy) << 8)
 }
+/// 0x08029ED8: the body boxes must overlap the enemy's box grown to x0 - 4 .. x1 + 3, y0 .. y1 - 6; then the enemy
+/// turns toward the player like MeleeAttack (strike_rect) and the result is whether the player's body box overlaps
+/// that strike rect (the turn stays when it does not)
 pub fn in_melee_range(w: &mut World, i: usize) -> bool {
     let Some(pi) = player(w, i) else { return false };
     let p = &w.pl_ref(pi).a;
-    if !p.hittable || !overlaps(&p.body_box(), &w.en_ref(i).a.body_box().inflate(4)) {
+    let b = w.en_ref(i).a.body_box();
+    if !p.hittable || !overlaps(&p.body_box(), &Rect::new(b.x0 - 4, b.y0, b.x1 + 3, b.y1 - 6)) {
         return false;
     }
-    face_player(w, i);
-    true
+    let Some(r) = strike_rect(w, i, true) else { return false };
+    overlaps(&w.pl_ref(pi).a.body_box(), &r)
+}
+/// 0x0800FF44: the shot origin on the body box: down (cx, position y), up (cx, cy), left (x0, cy), right (x1, cy)
+pub fn hand_point(w: &World, i: usize) -> (i32, i32) {
+    let a = &w.en_ref(i).a;
+    let b = a.body_box();
+    let (cx, cy) = ((b.x0 + b.x1) >> 1, (b.y0 + b.y1) >> 1);
+    match a.facing {
+        0 => (cx, a.py()),
+        1 => (cx, cy),
+        2 => (b.x0, cy),
+        _ => (b.x1, cy),
+    }
 }
 pub fn player_attacking_me(w: &World, i: usize) -> bool {
     let Some(pi) = player(w, i) else { return false };
@@ -619,7 +911,7 @@ pub fn knock_step(w: &mut World, i: usize, kb: &mut KnockState) -> bool {
     let was = w.en_ref(i).a.hittable;
     w.en(i).a.hittable = false;
     let id = w.ents[i].id;
-    let mut m = HitMsg { team: 1, rect, dir: w.en_ref(i).last_hit_dir, mult: 409, atk: atk(3), attacker: id, att_stats: w.en_ref(i).a.stats, att_is_player: false, source: id, crit: false, raw: 0, dmg: 0 };
+    let mut m = HitMsg { team: 1, rect, dir: w.en_ref(i).last_hit_dir, mult: 409, atk: atk(3), attacker: id, att_stats: w.en_ref(i).a.stats, att_is_player: false, source: id, crit: false, raw: 0, dmg: 0, no_react: false, foot: false };
     broadcast(w, &mut m, false);
     w.en(i).a.hittable = was;
     true
@@ -647,11 +939,83 @@ pub fn step_from_player(w: &mut World, i: usize, speed: i32, face_toward: bool) 
     if m == 0 {
         return false;
     }
+    // the back-off runs under its own reversed-walk state (set by its enter): its step makes no SetAnim(1)
+    if !face_toward {
+        w.en(i).moving = true;
+    }
+    let vx = -((dx as i64 * speed as i64) / m as i64) as i32;
+    let vy = -((dy as i64 * speed as i64) / m as i64) as i32;
+    try_move(w, i, vx, vy, if dx >= 0 { -speed } else { speed }, if dy >= 0 { -speed } else { speed });
+    !w.en_ref(i).stepped
+}
+
+/// CirclePlayer update 0x0802F23A (Cyborgs): face the player on the major axis; the minor component of d is negated,
+/// then pos -= trunc(d' * speed / m): away on the major axis, toward on the minor one. true = nothing moved
+pub fn circle_player(w: &mut World, i: usize, speed: i32) -> bool {
+    let Some(pi) = player(w, i) else { return true };
+    let (px, py) = w.pl_ref(pi).a.fc();
+    let (x, y) = w.en_ref(i).a.fc();
+    let (mut dx, mut dy) = (px - x, py - y);
+    let (adx, ady) = (dx.abs(), dy.abs());
+    let m;
+    {
+        let e = w.en(i);
+        if adx > ady {
+            m = adx;
+            e.a.facing = if dx < 0 { 2 } else { 3 };
+            dy = -dy;
+        } else {
+            m = ady;
+            e.a.facing = if dy < 0 { 1 } else { 0 };
+            dx = -dx;
+        }
+    }
+    if m == 0 {
+        return false;
+    }
     w.en(i).moving = true;
     let vx = -((dx as i64 * speed as i64) / m as i64) as i32;
     let vy = -((dy as i64 * speed as i64) / m as i64) as i32;
     try_move(w, i, vx, vy, if dx >= 0 { -speed } else { speed }, if dy >= 0 { -speed } else { speed });
     !w.en_ref(i).stepped
+}
+
+/// FlyToPlayer update 0x08034ED8 (vampires): faces the major axis (ties vertical); m < 8 -> 0; else SetAnim(1) unless
+/// walking, pos + trunc(d * speed / m) if it fits (placed -> 0, blocked -> 1)
+pub fn fly_to_player(w: &mut World, i: usize, speed: i32) -> bool {
+    let Some(pi) = player(w, i) else { return false };
+    let (px, py) = w.pl_ref(pi).a.fc();
+    let (x, y) = w.en_ref(i).a.fc();
+    let (dx, dy) = (px - x, py - y);
+    let (adx, ady) = (dx.abs(), dy.abs());
+    let m;
+    {
+        let e = w.en(i);
+        if adx > ady {
+            m = adx;
+            e.a.facing = if dx > 0 { 3 } else { 2 };
+        } else {
+            m = ady;
+            e.a.facing = if dy > 0 { 0 } else { 1 };
+        }
+    }
+    if m < 8 {
+        return false;
+    }
+    if !w.en_ref(i).walking() {
+        set_anim(w, i, &[n(1)], true, Some(true));
+    }
+    let nx = w.en_ref(i).a.x + ((dx as i64 * speed as i64) / m as i64) as i32;
+    let ny = w.en_ref(i).a.y + ((dy as i64 * speed as i64) / m as i64) as i32;
+    unmark_self(w, i);
+    let ok = fits(w, i, nx >> 8, ny >> 8);
+    if ok {
+        let a = &mut w.en(i).a;
+        a.x = nx;
+        a.y = ny;
+    }
+    mark_self(w, i);
+    !ok
 }
 
 /// WalkToPlayer update 0x0802CDE8 (`st` = the detour counter)
@@ -796,31 +1160,111 @@ pub fn move_to_point(w: &mut World, i: usize, x: i32, y: i32, speed: i32) -> boo
     }
     false
 }
+/// 0x0800FE34: the shown frame record's box at the integer position; the body box when the record is unknown
+pub fn frame_box(w: &World, i: usize) -> Rect {
+    let e = w.en_ref(i);
+    let d = &w.data;
+    if let (Some(sp), Some(raw)) = (e.a.sprite.and_then(|s| d.sprite(s)), e.a.anim_raw(d)) {
+        if let Some(b) = sp.frame_box(raw, e.a.facing, e.anim_frame()) {
+            let (px, py) = (e.a.px(), e.a.py());
+            return Rect::new(px + b[0], py + b[1], px + b[0] + b[2], py + b[1] + b[3]);
+        }
+    }
+    e.a.body_box()
+}
+/// footstep sound 52 by sprite (def = gfx): gfx 0x4E / 0x11 / 0x4C on walk ticks 0 / 16 (the path follower 0x0803BB48
+/// after its step, AlignWithPlayer 0x0801CEEC before its move); gfx 0xA4 / 0x44 / 0xBF on ticks 8 / 24 (path follower)
+pub fn footstep(w: &mut World, i: usize, path: bool) {
+    let d = Arc::clone(&w.data);
+    let g = d.enemy(w.en_ref(i).ty).and_then(|t| t.gfx).unwrap_or(-1);
+    let e = w.en_ref(i);
+    // the game's step SetAnim(1)s before this test: a first walking step counts as walk tick 0
+    let t = if e.moving && e.a.anim_name(&d) != Some("walk") { 0 } else { e.ea.pos.tick };
+    if (g == 0x4e || g == 0x11 || g == 0x4c) && (t == 0 || t == 16) {
+        w.sfx(52, 64);
+    } else if path && (g == 0xa4 || g == 0x44 || g == 0xbf) && (t == 8 || t == 24) {
+        w.sfx(52, 64);
+    }
+}
+/// MechTransform 0x080314DC: swap to the paired graphics set (0xBB / 0xBC, 0xE6 / 0xE7, 0x85 / 0x86) via 0x0800EDF8
+pub fn swap_gfx(w: &mut World, i: usize) {
+    let d = Arc::clone(&w.data);
+    let g = if w.en_ref(i).gfx_now >= 0 { Some(w.en_ref(i).gfx_now) } else { d.enemy(w.en_ref(i).ty).and_then(|t| t.gfx) };
+    let to = match g {
+        Some(0xbb) => 0xbc,
+        Some(0xbc) => 0xbb,
+        Some(0xe6) => 0xe7,
+        Some(0xe7) => 0xe6,
+        Some(0x85) => 0x86,
+        Some(0x86) => 0x85,
+        _ => return,
+    };
+    let idx = to - crate::content::GFX_OFFSET;
+    if d.sprite(idx).is_none() {
+        return;
+    }
+    let e = w.en(i);
+    e.gfx_now = to;
+    e.a.set_sprite(&d, Some(idx));
+}
+/// message 0xF (0x0800F44A, the death script's freeze): the walk state's vfunc +0x10 SetAnim(0)s (0x0800E050); other
+/// states: INFERRED nothing
+pub fn stop_msg(w: &mut World, i: usize) {
+    let d = Arc::clone(&w.data);
+    if w.en_ref(i).a.anim_name(&d) == Some("walk") {
+        set_anim(w, i, &[n(0)], true, Some(true));
+    }
+}
+/// a node that ends a movement: SetAnim(0) if walking (IsAnim(1), 0x0801CE58)
+pub fn stop_walk(w: &mut World, i: usize) {
+    if w.en_ref(i).walking() {
+        set_anim(w, i, &[nm("idle")], true, Some(true));
+    }
+}
+/// AlignWithPlayer (0x0801CF6E): a step that fits SetAnims(1) unless IsAnim(1); a blocked step ends the node with
+/// SetAnim(0) if walking
 pub fn align(w: &mut World, i: usize, speed: i32) -> bool {
     if player(w, i).is_none() {
         return false;
     }
     let (dx, dy) = to_player(w, i);
+    let blocked = |w: &mut World| {
+        stop_walk(w, i);
+        w.en(i).moving = false;
+        true
+    };
+    let walk = |w: &mut World| {
+        if !w.en_ref(i).is_anim(1) {
+            set_anim(w, i, &[nm("walk")], true, Some(true));
+        }
+    };
+    if if dx.abs() > dy.abs() { dy.abs() >= 3 } else { dx.abs() >= 3 } {
+        footstep(w, i, false);
+    }
     if dx.abs() > dy.abs() {
         if dy.abs() < 3 {
+            stop_walk(w, i);
             w.en(i).a.facing = if dx > 0 { 3 } else { 2 };
             return true;
         }
         w.en(i).a.facing = if dy > 0 { 0 } else { 1 };
         if !walk_by(w, i, 0, dy.signum() * speed, dy != 0 && speed != 0) {
             w.en(i).a.facing = if dx > 0 { 3 } else { 2 };
-            return true;
+            return blocked(w);
         }
+        walk(w);
     } else {
         if dx.abs() < 3 {
+            stop_walk(w, i);
             w.en(i).a.facing = if dy > 0 { 0 } else { 1 };
             return true;
         }
         w.en(i).a.facing = if dx > 0 { 3 } else { 2 };
         if !walk_by(w, i, dx.signum() * speed, 0, dx != 0 && speed != 0) {
             w.en(i).a.facing = if dy > 0 { 0 } else { 1 };
-            return true;
+            return blocked(w);
         }
+        walk(w);
     }
     false
 }
@@ -829,27 +1273,41 @@ pub fn align(w: &mut World, i: usize, speed: i32) -> bool {
 
 fn msg_from(w: &World, i: usize, team: u8, rect: Rect, dir: Dir, mult: i32, a: AttackType) -> HitMsg {
     let id = w.ents[i].id;
-    HitMsg { team, rect, dir, mult, atk: a, attacker: id, att_stats: w.actor(i).map(|x| x.stats).unwrap_or_default(), att_is_player: false, source: id, crit: false, raw: 0, dmg: 0 }
+    HitMsg { team, rect, dir, mult, atk: a, attacker: id, att_stats: w.actor(i).map(|x| x.stats).unwrap_or_default(), att_is_player: false, source: id, crit: false, raw: 0, dmg: 0, no_react: false, foot: false }
 }
 
 /// 0x0802A0C4: face the player on the dominant axis, the half-box on that side
 pub fn strike_rect(w: &mut World, i: usize, face: bool) -> Option<Rect> {
-    player(w, i)?;
-    let mut f = w.en_ref(i).a.facing;
-    if face {
-        let (dx, dy) = to_player(w, i);
-        f = facing_toward(dx, dy);
-        w.en(i).a.facing = f;
-    }
+    let pi = player(w, i)?;
     let a = &w.en_ref(i).a;
     let bb = a.body_box();
     let ff = a.foot_box();
     let (cx, cy) = a.center();
+    let mut f = a.facing;
+    if face {
+        // 0x0802A0EE..0x0802A19A: the BODY box centres (of the facing before the turn), not the footprints
+        let (px, py) = w.pl_ref(pi).a.center();
+        let (dx, dy) = (px - cx, py - cy);
+        f = if dx.abs() > dy.abs() {
+            if dx > 0 {
+                3
+            } else {
+                2
+            }
+        } else if dy > 0 {
+            0
+        } else {
+            1
+        };
+        w.en(i).a.facing = f;
+    }
+    // vertical (0x0802A176): x from the footprint, y from the body box: down = body y0 .. body y1 - 6, up = body
+    // y0 .. footprint y0
     Some(match f {
         3 => Rect::new(cx, cy, bb.x1 + 3, bb.y1 + 3),
         2 => Rect::new(bb.x0 - 4, cy, cx, bb.y1 + 3),
-        0 => Rect::new(ff.x0, ff.y0, ff.x1, ff.y1 - 6),
-        _ => Rect::new(bb.x0, bb.y0, bb.x1, cy),
+        0 => Rect::new(ff.x0, bb.y0, ff.x1, bb.y1 - 6),
+        _ => Rect::new(ff.x0, bb.y0, ff.x1, ff.y0),
     })
 }
 pub fn melee_strike(w: &mut World, i: usize, mult: i32, face: bool, adjacent: bool, a: AttackType) -> bool {
@@ -873,12 +1331,13 @@ pub fn melee_strike(w: &mut World, i: usize, mult: i32, face: bool, adjacent: bo
     let mut m = msg_from(w, i, 0, rect, w.en_ref(i).a.facing, mult, a);
     player::on_message(w, pi, &mut m)
 }
-/// HeavyStrike 0x0802F77C
-pub fn heavy_strike(w: &mut World, i: usize) {
-    let Some(pi) = player(w, i) else { return };
+/// HeavyStrike 0x0802F77C: sound 62 first (0x0802F7B2), the hit; accepted -> 48 + rand(2) (0x0802F8AC)
+pub fn heavy_strike(w: &mut World, i: usize) -> bool {
+    let Some(pi) = player(w, i) else { return false };
     if !w.pl_ref(pi).a.hittable {
-        return;
+        return false;
     }
+    w.sfx(62, 64);
     face_player(w, i);
     let a = &w.en_ref(i).a;
     let b = a.body_box();
@@ -891,7 +1350,11 @@ pub fn heavy_strike(w: &mut World, i: usize) {
         _ => Rect::new(b.x0, cy - R, b.x1, cy),
     };
     let mut m = msg_from(w, i, 0, rect, a.facing, 0x400, atk(2));
-    player::on_message(w, pi, &mut m);
+    if player::on_message(w, pi, &mut m) {
+        let s = 48 + w.rng.rand(2);
+        w.sfx(s, 64);
+    }
+    true
 }
 pub fn contact_hit(w: &mut World, i: usize) -> bool {
     let Some(pi) = player(w, i) else { return false };
@@ -926,7 +1389,7 @@ pub fn area_hit(w: &mut World, i: usize, rect: Rect, a: AttackType, mult: i32) -
 /// launched volleyball: hits the other enemies (attacker: the player)
 pub fn area_hit_enemies(w: &mut World, i: usize, rect: Rect, pi: usize) {
     let pid = w.ents[pi].id;
-    let mut m = HitMsg { team: 1, rect, dir: w.en_ref(i).last_hit_dir, mult: 409, atk: atk(3), attacker: pid, att_stats: w.pl_ref(pi).a.stats, att_is_player: true, source: w.ents[i].id, crit: false, raw: 0, dmg: 0 };
+    let mut m = HitMsg { team: 1, rect, dir: w.en_ref(i).last_hit_dir, mult: 409, atk: atk(3), attacker: pid, att_stats: w.pl_ref(pi).a.stats, att_is_player: true, source: w.ents[i].id, crit: false, raw: 0, dmg: 0, no_react: false, foot: false };
     broadcast(w, &mut m, false);
 }
 
@@ -942,7 +1405,9 @@ pub enum ShotType {
 }
 const GUN_MUZZLE: [(i32, i32); 4] = [(4, 4), (13, -24), (-8, -8), (24, -8)];
 const GUN_BOX: [[i32; 4]; 4] = [[3, 10, 8, 16], [3, 5, 8, 16], [5, 4, 16, 8], [10, 4, 16, 8]];
-const DIAG: [(i32, i32); 4] = [(-316, 316), (316, -316), (-316, -316), (316, 316)];
+const RIFLE_BOX: [[i32; 4]; 4] = [[8, 14, 16, 16], [8, 2, 16, 16], [2, 8, 16, 16], [14, 8, 16, 16]];
+/// MummyWrapBurst spawn offsets by facing: straight (x, y), diagonal (x, y) (0x08756AA4)
+const WRAP_BURST_OFF: [[i32; 4]; 4] = [[0, 36, -12, 12], [0, -36, 12, -12], [-36, 0, -12, -12], [36, 0, 12, 12]];
 
 pub fn shot(w: &mut World, i: usize, kind: ShotType) {
     let a = w.en_ref(i).a.clone();
@@ -952,35 +1417,43 @@ pub fn shot(w: &mut World, i: usize, kind: ShotType) {
     let (cx, cy) = a.center();
     let (dx, dy) = DIR_VEC[f as usize];
     let owner = w.ents[i].id;
+    // the firing node's own sound (gun 0x080264EA / rifle 0x0802676A / tank 0x0801C900: 28; star 61) on the spawn frame
     let mk = |w: &mut World, dir: Dir, x: i32, y: i32, vx: i32, vy: i32, b: [i32; 4], o: StraightOpts| {
         let s = Shot::new(owner, dir, 0, x, y, ShotKind::Straight(Box::new(StraightOpts { vx, vy, b, ..o })));
-        w.add(Body::Shot(Box::new(s)));
+        let id = w.add(Body::Shot(Box::new(s)));
+        if let Some(k) = w.find(id) {
+            shots::spawn_rng(w, k);
+        }
     };
     let base = StraightOpts { a: atk(1), mult: 1024, ..Default::default() };
     match kind {
-        ShotType::Gun => mk(w, f, at.0, at.1, dx * 672, dy * 672, GUN_BOX[f as usize], StraightOpts { fragile: true, name: shots::SName::Gun, ..base }),
-        ShotType::Rifle => mk(w, f, at.0, at.1, dx * 448, dy * 448, [8, 8, 16, 16], StraightOpts { fragile: true, name: shots::SName::Rifle, trail: Some(shots::Trail { fx: shots::FxId::Fx0874e614, rec: 4, n: 3, rate: 0x2aaa }), ..base }),
-        ShotType::Shell => mk(w, f, (cx + dx * 12) << 8, (cy + dy * 12) << 8, dx * 448, dy * 448, [8, 8, 16, 16], StraightOpts { fragile: true, name: shots::SName::Shell, trail: Some(shots::Trail { fx: shots::FxId::Fx0871e630, rec: 4, n: 3, rate: 0x2aaa }), ..base }),
-        ShotType::Star => mk(w, f, (cx + dx * 8) << 8, (cy + dy * 8) << 8, dx * 448, dy * 448, [4, 4, 8, 8], StraightOpts { fragile: true, explode: false, name: shots::SName::Star, ..base }),
-        ShotType::Wrap | ShotType::Burst => {
-            let dirs: Vec<Dir> = if kind == ShotType::Wrap { vec![f] } else { vec![0, 1, 2, 3] };
-            for d in dirs {
-                let (ddx, ddy) = DIR_VEC[d as usize];
-                let b = if d >= 2 { [8, 4, 16, 8] } else { [4, 8, 8, 16] };
-                let nm = if kind == ShotType::Burst { shots::SName::WrapDiag } else { shots::SName::Wrap };
-                mk(w, d, (cx + ddx * 8) << 8, (cy + ddy * 8) << 8, ddx * 448, ddy * 448, b, StraightOpts { on_hit: OnHit::Wrap, explode: false, name: nm, ..base });
-                if kind == ShotType::Burst {
-                    let (vx, vy) = DIAG[d as usize];
-                    mk(w, d, cx << 8, cy << 8, vx, vy, [8, 8, 16, 16], StraightOpts { on_hit: OnHit::Wrap, explode: false, name: shots::SName::WrapDiag, ..base });
-                }
+        ShotType::Gun => mk(w, f, at.0, at.1, dx * 672, dy * 672, GUN_BOX[f as usize], StraightOpts { sfx_spawn: 28, fragile: true, name: shots::SName::Gun, ..base }),
+        // rifle bullet 0x080276A8: an accepted hit plays 48 + rand(2), the destroy 0x0802770C sound 46
+        ShotType::Rifle => mk(w, f, at.0, at.1, dx * 448, dy * 448, RIFLE_BOX[f as usize], StraightOpts { sfx_spawn: 28, rng_hit: 2, sfx_hit: 48, sfx_end: 46, fragile: true, name: shots::SName::Rifle, trail: Some(shots::Trail { fx: shots::FxId::Fx0874e614, rec: 4, n: 3, rate: 0x2aaa }), ..base }),
+        ShotType::Shell => mk(w, f, (cx + dx * 12) << 8, (cy + dy * 12) << 8, dx * 448, dy * 448, [8, 8, 16, 16], StraightOpts { sfx_spawn: 28, fragile: true, name: shots::SName::Shell, trail: Some(shots::Trail { fx: shots::FxId::Fx0871e630, rec: 4, n: 3, rate: 0x2aaa }), ..base }),
+        // throw controller 0x0802C08A: the star at the position + the muzzle table 0x087548F0, then PlaySfx(61)
+        ShotType::Star => mk(w, f, at.0, at.1, dx * 448, dy * 448, [4, 4, 8, 8], StraightOpts { sfx_spawn: 61, fragile: true, explode: false, name: shots::SName::Star, ..base }),
+        // MummyWrapShot 0x0802D0DC: one straight bandage at the position + 0x08756A74 [facing]; MummyWrapBurst
+        // 0x0802D214: per facing one straight and one diagonal at the position + 0x08756AA4 [facing]
+        ShotType::Wrap => {
+            shots::add(w, shots::mummy_wrap(owner, f, at.0, at.1, false));
+        }
+        ShotType::Burst => {
+            for d in 0..4u8 {
+                let o = WRAP_BURST_OFF[d as usize];
+                shots::add(w, shots::mummy_wrap(owner, d, (a.px() + o[0]) << 8, (a.py() + o[1]) << 8, false));
+                shots::add(w, shots::mummy_wrap(owner, d, (a.px() + o[2]) << 8, (a.py() + o[3]) << 8, true));
             }
         }
         ShotType::Spit => {
+            // Dabura's spit 0x0802E444: origin = the position + (0, -32); target = the player's footprint centre;
+            // velocity d * 512 / max(|dx|, |dy|) (truncating); box (8, 8, 16, 16); accepted -> the stone state
             let Some(pi) = player(w, i) else { return };
-            let (tx, ty) = w.pl_ref(pi).a.center();
-            let ddx = tx - cx;
-            let ddy = ty - cy;
-            let m = 1.max(ddx.abs()).max(ddy.abs());
+            let (ox, oy) = (a.px(), a.py() - 32);
+            let (tx, ty) = w.pl_ref(pi).a.foot_center();
+            let ddx = tx - ox;
+            let ddy = ty - oy;
+            let m = ddx.abs().max(ddy.abs()).max(1);
             let sector = if 2 * ddx < -5 * ddy {
                 0
             } else if 12 * ddx < -5 * ddy {
@@ -992,9 +1465,9 @@ pub fn shot(w: &mut World, i: usize, kind: ShotType) {
             } else {
                 4
             };
-            let vx = crate::fixed::round_div(ddx as i64 * 512, m as i64) as i32;
-            let vy = crate::fixed::round_div(ddy as i64 * 512, m as i64) as i32;
-            mk(w, f, cx << 8, (cy - 4) << 8, vx, vy, [4, 4, 8, 8], StraightOpts { explode: false, on_hit: OnHit::Stone, name: shots::SName::Spit, sector, ..base });
+            let vx = (ddx * 512) / m;
+            let vy = (ddy * 512) / m;
+            mk(w, f, ox << 8, oy << 8, vx, vy, [8, 8, 16, 16], StraightOpts { explode: false, on_hit: OnHit::Stone, name: shots::SName::Spit, sector, ..base });
         }
     }
 }
@@ -1042,24 +1515,36 @@ pub fn teleport_beside(w: &mut World, i: usize, side: i32) {
 }
 pub fn kid_buu_split(w: &mut World, i: usize) {
     for _ in 0..16 {
+        // 0x08032BB8: d in 1/256 px (the 24.8 position +- d); 0x08009904: both footprints on walkable map tiles
         let dx = w.rng.rand(192) - 96;
         let dy = w.rng.rand(192) - 96;
-        let (px, py) = (w.en_ref(i).a.px(), w.en_ref(i).a.py());
-        if !fits(w, i, px + dx, py + dy) || !fits(w, i, px - dx, py - dy) {
+        let (x, y) = (w.en_ref(i).a.x, w.en_ref(i).a.y);
+        let (fw, fh) = (w.en_ref(i).a.foot_w, w.en_ref(i).a.foot_h);
+        let ok = |w: &World, px: i32, py: i32| w.col.as_ref().is_none_or(|c| c.test(Layer::Walk, px, py, px + fw, py + fh));
+        if !ok(w, (x + dx) >> 8, (y + dy) >> 8) || !ok(w, (x - dx) >> 8, (y - dy) >> 8) {
             continue;
         }
+        // the puff 0x086FD9D0 (rate 0x1000 + rand(0x1000)) at the sprite box centre
         let (cx, cy) = w.en_ref(i).a.center();
-        crate::fx::puff(w, cx, cy, 0x1800);
-        let (x0, y0) = (px, py);
+        crate::fx::puff_rng(w, cx, cy);
+        unmark_self(w, i);
         let hp;
         {
             let e = w.en(i);
-            e.a.x = (x0 + dx) << 8;
-            e.a.y = (y0 + dy) << 8;
+            e.a.x = x + dx;
+            e.a.y = y + dy;
             e.hp1024 = (e.hp1024 + 1024) >> 1;
             hp = e.hp1024;
         }
-        if let Some(ci) = crate::battle::spawn_enemy(w, 0x3d, x0 - dx, y0 - dy, 0, Some(0x12a)) {
+        mark_self(w, i);
+        if let Some(ci) = crate::battle::spawn_enemy(w, 0x3d, (x - dx) >> 8, (y - dy) >> 8, 0, Some(0x12a)) {
+            unmark_self(w, ci);
+            {
+                let c = w.en(ci);
+                c.a.x = x - dx;
+                c.a.y = y - dy;
+            }
+            mark_self(w, ci);
             w.en(ci).hp1024 = hp;
         }
         return;
@@ -1102,6 +1587,8 @@ pub fn janemba_parts(w: &mut World, i: usize) {
 pub fn hand_strike(w: &mut World, i: usize, a_side: bool) {
     let Some(pi) = player(w, i) else { return };
     let Some(t) = w.data.enemy(0x36).cloned() else { return };
+    // an enemy object: its constructor's SetAnim(0) draws the idle start tick
+    w.rng.rand(255);
     let (ppx, ppy) = (w.pl_ref(pi).a.px(), w.pl_ref(pi).a.py());
     let mut a = Actor { x: (ppx + if a_side { 4 } else { -20 }) << 8, y: ppy << 8, facing: if a_side { 2 } else { 3 }, ..Default::default() };
     a.stats = crate::damage::CombatStats { str_: t.str_, pow: t.pow, end: t.end, end2: t.end, res_m: 128, res_e: 128, crit_bonus: 0, block_factor: 0x1000 };
@@ -1119,16 +1606,23 @@ pub fn hand_update(w: &mut World, i: usize) {
         h.t += 1;
         (h.t, h.hit)
     };
+    // the rising controller (0x0804C338) ends on tick 40 with SetAnim(0) (rand(255)); hits from tick 16
+    if t == 40 {
+        w.rng.rand(255);
+    }
     let pi = w.player_idx(0);
     if let Some(pi) = pi {
-        if !hit && !w.pl_ref(pi).dead && (16..=55).contains(&t) {
+        if !hit && !w.pl_ref(pi).dead && (16..40).contains(&t) {
             let Body::Hand(h) = &w.ents[i].body else { return };
             let id = w.ents[i].id;
-            let mut m = HitMsg { team: 0, rect: h.a.body_box(), dir: h.a.facing, mult: 0x400, atk: atk(2), attacker: id, att_stats: h.a.stats, att_is_player: false, source: id, crit: false, raw: 0, dmg: 0 };
+            let mut m = HitMsg { team: 0, rect: h.a.body_box(), dir: h.a.facing, mult: 0x400, atk: atk(2), attacker: id, att_stats: h.a.stats, att_is_player: false, source: id, crit: false, raw: 0, dmg: 0, no_react: false, foot: false };
             if player::on_message(w, pi, &mut m) {
                 if let Body::Hand(h) = &mut w.ents[i].body {
                     h.hit = true;
                 }
+                // 0x0803A0F2: the hit sound 48 + rand(2)
+                let s = 48 + w.rng.rand(2);
+                w.sfx(s, 64);
             }
         }
     }
@@ -1195,7 +1689,8 @@ pub fn worm_spawn_body(w: &mut World, i: usize) {
 pub fn worm_head_step(w: &mut World, i: usize) {
     if w.rng.rand(200) == 0 {
         let mut d = w.en_ref(i).worm_dir ^ 2;
-        if w.rng.rand(2) != 0 {
+        // 0x0802D546: the extra quarter turn when rand(2) == 0
+        if w.rng.rand(2) == 0 {
             d ^= 1;
         }
         w.en(i).worm_dir = d;
@@ -1250,7 +1745,7 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
         if msg.team == 0 || e.part || e.defeated || w.ents[i].removed || !e.a.hittable {
             return false;
         }
-        if !overlaps(&msg.rect, &e.a.body_box()) {
+        if !overlaps(&msg.rect, &if msg.foot { e.a.foot_box() } else { e.a.body_box() }) {
             return false;
         }
     }
@@ -1261,6 +1756,9 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
     msg.crit = res.crit;
     msg.raw = res.raw;
     msg.dmg = res.dmg;
+    if res.unblocked != res.dmg {
+        w.events.push(Event::DamageRoll { target: w.ents[i].id, dmg: res.unblocked });
+    }
     w.events.push(Event::Damage { target: w.ents[i].id, attacker: msg.attacker, dmg: res.dmg, crit: res.crit });
     if msg.att_is_player {
         w.events.push(Event::Hit);

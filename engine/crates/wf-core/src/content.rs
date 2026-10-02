@@ -172,6 +172,14 @@ impl Sprite {
     pub fn anim_raw(&self, raw: i32) -> Option<&Anim> {
         self.by_raw.get(&raw).map(|&i| &self.anims[i as usize])
     }
+    /// the frame record box (ox, oy, w, h) of animation `raw`, direction, frame index (clamped); 0x0800FE34
+    pub fn frame_box(&self, raw: i32, dir: u8, frame: i32) -> Option<[i32; 4]> {
+        let steps = self.anim_raw(raw)?.steps(dir);
+        if steps.is_empty() {
+            return None;
+        }
+        steps[(frame.max(0) as usize).min(steps.len() - 1)].fbox
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -281,6 +289,8 @@ pub struct MapCollision {
 }
 
 pub const GRID: usize = 256;
+/// enemy / form graphics id -> sprite index
+pub const GFX_OFFSET: i32 = 9;
 
 #[derive(Clone)]
 pub struct GameData {

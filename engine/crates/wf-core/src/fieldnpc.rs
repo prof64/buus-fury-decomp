@@ -33,6 +33,8 @@ pub enum StepRt {
     FacePlayer { count: i32 },
     WalkTo { tx: i32, ty: i32, dir: Dir, n: i32, vx: i32, vy: i32 },
     Wander(Box<Wander>),
+    /// `cutscene_move` (0x08039D98, world-map encounter objects): to (tx, ty, tz) in n frames (z 22.10)
+    Move3 { tx: i32, ty: i32, tz: i32, n: i32, vx: i32, vy: i32, vz: i32 },
     /// steps not modelled for NPCs (enemy walk_to, cutscene moves): never finish
     Other,
 }
@@ -225,7 +227,7 @@ fn create(w: &mut World, i: usize, st: &Step) -> StepRt {
 /// one step update; true = done
 fn update_step(w: &mut World, i: usize, s: &mut StepRt) -> bool {
     match s {
-        StepRt::Stand | StepRt::Other => false,
+        StepRt::Stand | StepRt::Other | StepRt::Move3 { .. } => false,
         StepRt::Wait { count } => {
             *count -= 1;
             *count < 0

@@ -184,17 +184,13 @@ pub fn replay(name: &str, t: &Value) -> Result<usize, String> {
 }
 
 /// understood divergences: (trace, first frame allowed to differ, reason)
-const KNOWN: &[(&str, usize, &str)] = &[(
-    "transitions_forest_up_exit",
-    257,
-    "battle AI animation model: a walking enemy goes idle (rand(255)) the frame its ChasePlayer stops running (enemy.rs, \
-     inherited from the reference sim); the game switches to idle with the next state's motion controller one frame later",
-),
+const KNOWN: &[(&str, usize, &str)] = &[
     (
-        "npc_capsule_walk",
-        136,
-        "4-20 variant 2: the game's live walk grid differs from the content collision of map area_04_020_v2 beyond \
-         the NPC marks (fork note in re/buu/notes.md); the walking NPC is blocked where the game lets it pass",
+        "npc_enemy_patrol",
+        2,
+        "battle AI animation model: the enemy that skipped its patrol (within 100 px at arrival, AI 0x17B -> 0x17C \
+         StepTowardPlayer) shows the walk animation in the sim while the game keeps idle; the patrols themselves match \
+         (npc_enemy_patrol_far, 1500 frames)",
     ),
 ];
 
@@ -444,4 +440,129 @@ fn objects() {
         })
     };
     check(&["objects_breakable_drops_8_1"], |n, t| replay_obj(n, t, &none, Some(drops())));
+}
+
+/// field enemies' patrols (RunMotionController running the def's steps): positions, facing, runner index, animation
+/// raw / frame / tick and the RNG every logic frame (enemies past their patrol state are the battle AI's: compared too)
+fn replay_patrol(name: &str, t: &Value) -> Result<usize, String> {
+    let rec = load("transitions_forest_up_exit").expect("record source");
+    let mut cfg = config(&rec);
+    let init = &t["init"];
+    let a = &t["area"];
+    cfg.world = i(&a[0]) as i32;
+    cfg.area = i(&a[1]) as i32;
+    cfg.variant = i(&a[2]) as i32;
+    cfg.pos = Some(((i(&init["player"]["x"]) >> 8) as i32, (i(&init["player"]["y"]) >> 8) as i32));
+    cfg.facing = i(&init["player"]["facing"]) as u8;
+    cfg.rng = RngInit::State(i(&init["rng"][0]) as u32, i(&init["rng"][1]) as u32);
+    let mut s = Session::new_field(common::field_data(), cfg);
+    let want0 = [i(&init["rng_f0"][0]) as u32, i(&init["rng_f0"][1]) as u32];
+    if s.world.rng.state() != want0 {
+        return Err(format!("{name}: load RNG {:08x?} != {:08x?}", s.world.rng.state(), want0));
+    }
+    let ks = keys(t);
+    let mut n = 0;
+    let mut hist: Vec<String> = vec![];
+    for fr in t["frames"].as_array().unwrap() {
+        let f = i(&fr["f"]) as usize;
+        if !fr["logic"].as_bool().unwrap_or(true) {
+            continue;
+        }
+        s.step(&[ks.get(f).copied().unwrap_or(0)]);
+        let w = &s.world;
+        let got: Vec<[i64; 7]> = (0..w.ents.len())
+            .filter_map(|k| match &w.ents[k].body {
+                Body::Enemy(e) => Some([
+                    e.a.x as i64,
+                    e.a.y as i64,
+                    e.a.facing as i64,
+                    wf_core::fieldpatrol::index(w, k).map(|x| x as i64).unwrap_or(-1),
+                    e.ea.pos.raw as i64,
+                    e.ea.pos.frame as i64,
+                    e.ea.pos.tick as i64,
+                ]),
+                _ => None,
+            })
+            .collect();
+        let want: Vec<[i64; 7]> = fr["enemies"].as_array().unwrap().iter().map(|r| [i(&r[0]), i(&r[1]), i(&r[2]), if i(&r[3]) == 255 { -1 } else { i(&r[3]) }, i(&r[4]), i(&r[5]), i(&r[6])]).collect();
+        let rng = [i(&fr["rng"][0]) as u32, i(&fr["rng"][1]) as u32];
+        hist.push(format!("{f:5} emu rng {rng:08x?} {want:?}\n      sim rng {:08x?} {got:?}", w.rng.state()));
+        let mut bad = vec![];
+        if rng != w.rng.state() {
+            bad.push("rng");
+        }
+        if got != want {
+            bad.push("enemies");
+        }
+        if !bad.is_empty() {
+            let ctx = hist.iter().rev().take(3).rev().cloned().collect::<Vec<_>>().join("\n");
+            return Err(format!("{name}: first divergence at frame {f} ({})\n{ctx}", bad.join(",")));
+        }
+        n += 1;
+    }
+    Ok(n)
+}
+
+/// the world map (tools/field/rec_worldmap.py): arrival on 0-50 (load RNG, 64-frame fade with control), the flyer
+/// (x, y, z, heading, facing, raw, frame, rev, speed, turn) and the 3D camera every logic frame, until a landing
+/// trigger hands over to its script (checked: the script id)
+fn replay_worldmap(name: &str, t: &Value) -> Result<usize, String> {
+    use wf_core::fieldcontent::Callback;
+    let mut cfg = config(t);
+    cfg.facing = 1;
+    let mut s = Session::new_field(common::field_data(), cfg);
+    let r0 = &t["init"]["rng_frame0"];
+    let want0 = [i(&r0[0]) as u32, i(&r0[1]) as u32];
+    if s.world.rng.state() != want0 {
+        return Err(format!("{name}: load RNG {:08x?} != {:08x?}", s.world.rng.state(), want0));
+    }
+    let ks = keys(t);
+    let frames = t["frames"].as_array().unwrap();
+    let mut n = 0;
+    for (k, fr) in frames.iter().enumerate() {
+        let f = i(&fr["f"]) as usize;
+        if !fr["logic"].as_bool().unwrap_or(true) {
+            continue;
+        }
+        if fr["fly"].is_null() {
+            break;
+        }
+        let ev = s.step(&[ks.get(f).copied().unwrap_or(0)]).to_vec();
+        let w = &s.world;
+        let p = w.pl_ref(w.player_idx(0).unwrap());
+        let fl = w.field.as_ref().unwrap().flight.as_ref().expect("flying");
+        let got = [p.a.x as i64, p.a.y as i64, fl.z as i64, fl.h as i64, p.a.facing as i64, fl.raw as i64, fl.frame as i64, fl.rev as i64, fl.spd as i64, fl.turn as i64];
+        let want: Vec<i64> = fr["fly"].as_array().unwrap().iter().map(i).collect();
+        // the camera runs at the end of the iteration: a spill into the next video frame records that frame's
+        let camv = match frames.get(k + 1) {
+            Some(nx) if !nx["logic"].as_bool().unwrap_or(true) => &nx["cam3d"],
+            _ => &fr["cam3d"],
+        };
+        let wcam: Vec<i64> = camv.as_array().unwrap().iter().map(i).collect();
+        let gcam: Vec<i64> = fl.cam.iter().map(|&v| v as i64).collect();
+        let rng = [i(&fr["rng"][0]) as u32, i(&fr["rng"][1]) as u32];
+        if got[..] != want[..] || gcam != wcam || rng != w.rng.state() {
+            return Err(format!("{name}: first divergence at frame {f}\n  emu {want:?} cam {wcam:?} rng {rng:08x?}\n  sim {got:?} cam {gcam:?} rng {:08x?}", w.rng.state()));
+        }
+        n += 1;
+        let runs: Vec<String> = ev.iter().filter_map(|e| if let wf_core::world::Event::Field(wf_core::field::FieldEvent::Run { run: Callback::Script(x), .. }) = e { Some(x.clone()) } else { None }).collect();
+        if !runs.is_empty() {
+            let want = t["notes"].as_str().unwrap_or("");
+            if !runs.iter().any(|r| want.contains(r.as_str())) {
+                return Err(format!("{name}: frame {f}: landing script {runs:?} not the recorded one ({want})"));
+            }
+            break;
+        }
+    }
+    Ok(n)
+}
+
+#[test]
+fn world_map() {
+    check(&["worldmap_flight", "worldmap_land_8_1"], replay_worldmap);
+}
+
+#[test]
+fn enemy_patrols() {
+    check(&["npc_enemy_patrol_far", "npc_enemy_patrol"], replay_patrol);
 }

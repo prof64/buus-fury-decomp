@@ -94,7 +94,7 @@ audio → [`docs/audio.md`](docs/audio.md), scripts → [`docs/scripting.md`](do
 | `sheet` | `sheet.png` (RGBA, palette swaps already applied) |
 | `frames[]` | `{x, y, w, h}` rectangle in the sheet, `anchor {x, y}` = the pixel that sits on the entity position, `rom` |
 | `animations{name}` | `raw_index` (engine anim number), `loop`, `timing_source`, `observed_frame_orders`, `directions{dir: [step]}` |
-| step | `{frame, duration_frames, flip, rom, attach?}`; `flip` = draw the frame mirrored around its anchor; `attach [dx, dy]` = position of the attachment (halo) relative to the entity position |
+| step | `{frame, duration_frames, flip, rom, box?, attach?}`; `flip` = draw the frame mirrored around its anchor; `box [ox, oy, w, h]` = the frame record's box (record +4..+7, relative to the integer position: picture-based hit / aim tests, 0x0800FE34); `attach [dx, dy]` = position of the attachment (halo) relative to the entity position |
 | `body_box{dir}` | `[x0, y0, x1, y1]` px relative to the entity position |
 | `footprint` | `[w, h]` px: the collision box tested against the walk grid at (x, y)..(x+w, y+h) |
 | `shadow` | effect id of the ground shadow drawn at the entity position, behind the body |
@@ -115,11 +115,16 @@ Same schema as sprites with one `default` animation over `any` direction (ROM or
 VRAM slot variant, phase = t >> 2), `bbk_flare`, `debris`; `fx_<addr>` = a run of raw OBJ records found in the ROM (curated names from `annotations/effect_names.json` where known, else automatic: colour, OBJ size, frame
 count; steps carry `obj` = record geometry [ox, oy, w, h, hflip, vflip]);
 `shadow_4x2`, `shadow_10x4`, `shadow_16x6`, `shadow_24x10`; `halo`.
+Field objects (`wf-extract/src/field_gfx.rs`; untrimmed frames in a fixed order, so the frame index is the id;
+draw rules in `docs/world.md` §6): `coin_0`..`coin_3` (4 cels each), `field_items` (frame = supply index, 100 +
+equipment index), `field_labels` (level-sign numbers), `props_<map id>` (frame k = map prop k).
 
 ### `portraits/<id>.png` — 64×64 dialogue portraits (155), `index.json` with `portrait_index`, name.
 
 ### `icons/` — `supply/NNN.png`, `equipment/NNN.png` (16×16; NNN = item index used by `items/`, `equipment/`),
 `skills/skill_NN.png` / `skill_NN_alt.png` (32×16, NN = skill id), `index.json`.
+Supply / equipment entries carry `sub_box` [x0, y0, x1, y1]: a dropped item's collision box inside its icon (opaque
+pixel bounds, top raised to the middle — the game computes it from VRAM, `0x0800DB64`).
 
 ## 4. Annotations (our research, compiled into the extractor)
 

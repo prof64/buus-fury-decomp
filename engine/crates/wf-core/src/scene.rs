@@ -417,9 +417,17 @@ pub fn anim_done(w: &World, i: usize) -> bool {
     }
 }
 
-/// end every puppet (the scene released its actors: players / enemies resume their own update)
+/// the scene released its actors: players / enemies resume their own update. A player left in a frame-range
+/// animation keeps playing it until its player presses a button (`pre_step`), like the game's controller object.
 pub fn release_puppets(w: &mut World) {
-    w.scene.puppets.clear();
+    let keep: Vec<bool> = w
+        .scene
+        .puppets
+        .iter()
+        .map(|p| matches!(p.anim.mode, AnimMode::Frames { .. }) && w.find(p.id).is_some_and(|i| matches!(w.ents[i].body, Body::Player(_))))
+        .collect();
+    let mut it = keep.into_iter();
+    w.scene.puppets.retain(|_| it.next().unwrap_or(false));
 }
 
 /// the actor's script sprite id (players / enemies: their sprite index + 9)
@@ -556,6 +564,8 @@ pub struct Director {
     pub wait: Option<WaitMode>,
     /// the wait finished this frame (the host resumes the script)
     pub done: bool,
+    /// the group mode runs only its members' updates (`World.modal` before it)
+    pub prev_modal: Option<Option<Vec<EntityId>>>,
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -746,7 +756,10 @@ pub struct Dialog {
     pub pos: BoxPos,
     pub page: u16,
     pub pages: u16,
-    /// choice window: number of options, cursor
+    /// typewriter frames per page (host-computed with the dialogue font) and the characters typed on this page
+    pub typing: Vec<u16>,
+    pub typed: i32,
+    /// choice: number of options (0 = plain text), cursor
     pub options: i32,
     pub cursor: i32,
     pub phase: DialogPhase,
@@ -755,9 +768,12 @@ pub struct Dialog {
     pub result: Option<i32>,
 }
 
-/// frames the box takes to open / close (dialog object 0x0800AD00; measured on the intro and NPC talk)
-pub const DIALOG_OPEN: i32 = 1;
-pub const DIALOG_CLOSE: i32 = 1;
+/// the first character appears this many frames after the box is created; the event continues this many frames
+/// after the closing A (dialog object 0x0800AD00; measured on events 43 and 74)
+pub const DIALOG_OPEN: i32 = 7;
+pub const DIALOG_CLOSE: i32 = 9;
+/// a menu / message window (node kind 3) continues the event this many frames after the A / B (event 34)
+pub const WINDOW_CLOSE: i32 = 2;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum MenuKind {
@@ -793,6 +809,8 @@ pub struct Menu {
     pub result: Option<i32>,
     /// items bought / sold (shop), for the host to apply to the inventory
     pub log: Vec<(i32, i32)>,
+    /// a purchase confirmed this frame (applied the next)
+    pub pending: Option<i32>,
 }
 
 /// shop entry (`shop_add_item`): category 0 supply / 1 equipment, item, price, flag
@@ -912,6 +930,12 @@ fn track_index(w: &mut World, owner: Owner) -> usize {
 /// Returns true when the caller must block.
 pub fn enqueue(w: &mut World, owner: Owner, cmd: Cmd) -> bool {
     let k = track_index(w, owner);
+    // a finished head that only holds (face_actor) gives way to the new command
+    if w.scene.tracks[k].holding {
+        w.scene.tracks[k].queue.clear();
+        w.scene.tracks[k].holding = false;
+        w.scene.tracks[k].started = false;
+    }
     w.scene.tracks[k].queue.push(cmd);
     if w.scene.director.batch {
         return false;
@@ -963,6 +987,14 @@ fn begin_wait(w: &mut World, mode: WaitMode) {
             start_head(w, k);
         }
     }
+    // the group mode (0x0804DEEC) updates only the group's actors (msg 0x0E), not the whole world
+    if let WaitMode::Group(g) = &mode {
+        let ids: Vec<EntityId> = g.iter().filter_map(|o| if let Owner::Entity(id) = o { Some(*id) } else { None }).collect();
+        if w.scene.director.prev_modal.is_none() {
+            w.scene.director.prev_modal = Some(w.modal.take());
+        }
+        w.modal = Some(ids);
+    }
     w.scene.director.wait = Some(mode);
     w.scene.director.done = false;
 }
@@ -1008,9 +1040,31 @@ fn actor_pos(w: &World, i: usize) -> (i32, i32) {
     w.actor(i).map(|a| (a.px(), a.py())).unwrap_or((0, 0))
 }
 
-/// the actor's bounding-box centre (0x0800FDFA)
+/// the actor's body-box centre (shot targets, puffs)
 pub fn box_center(w: &World, i: usize) -> (i32, i32) {
     w.actor(i).map(|a| a.center()).unwrap_or((0, 0))
+}
+
+/// a shot's target point on an actor (0x0800FDFA): the centre of its facing-down body box (fits the recorded
+/// flight times; one target sample)
+pub fn target_center(w: &World, i: usize) -> (i32, i32) {
+    let Some(a) = w.actor(i) else { return (0, 0) };
+    let b = a.body[0];
+    ((a.px() * 2 + b[0] + b[2]) >> 1, (a.py() * 2 + b[1] + b[3]) >> 1)
+}
+
+/// where a scripted ki blast leaves the actor (measured on 24 shots, 4 facings): the body box's leading edge
+/// (left / right) or centre (up / down) at its middle height, + 7 down when facing down
+pub fn muzzle(w: &World, i: usize) -> (i32, i32) {
+    let Some(a) = w.actor(i) else { return (0, 0) };
+    let b = a.body_box();
+    let (cx, cy) = ((b.x0 + b.x1) >> 1, (b.y0 + b.y1) >> 1);
+    match a.facing {
+        0 => (cx, cy + 7),
+        1 => (cx, cy),
+        2 => (b.x0, cy),
+        _ => (b.x1, cy),
+    }
 }
 
 /// commands whose start refreshes the actor / camera (vtable +0x3C / +0x40, 0x0802ED98): the refresh ticks the
@@ -1085,7 +1139,8 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
                 a.facing = (*dir & 3) as Dir;
             }
         }
-        Cmd::FaceActor { target } => face_toward(w, i, *target),
+        // FaceActor's start does nothing: its update turns the actor (0x0801599D)
+        Cmd::FaceActor { .. } => {}
         Cmd::MoveTo { x, y, speed, state, target, n, t, sx, sy } => {
             if let Some(i) = i {
                 if let Some((tid, dx, dy)) = *target {
@@ -1244,7 +1299,7 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
         Cmd::Shoot { kind, x, y, speed, t, n } => {
             *t = 0;
             if let Some(i) = i {
-                let (cx, cy) = box_center(w, i);
+                let (cx, cy) = muzzle(w, i);
                 match kind {
                     ShootKind::Blast => {
                         // the shoot state (raw 4) runs by itself; the blast flies to the point
@@ -1376,13 +1431,7 @@ fn update_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) -> bool {
                 return true;
             }
             match i {
-                Some(i) => {
-                    if scene_anim(w, i).is_none_or(|a| a.ended) {
-                        set_state(w, i, 0);
-                        return true;
-                    }
-                    false
-                }
+                Some(i) => scene_anim(w, i).is_none_or(|a| a.ended),
                 None => true,
             }
         }
@@ -1570,37 +1619,50 @@ fn hold_cmd(cmd: &Cmd) -> bool {
     matches!(cmd, Cmd::FaceActor { .. })
 }
 
+/// FaceActor's update (0x0801599D): the dominant axis of the 24.8 position difference, ties horizontal
 fn face_toward(w: &mut World, i: Option<usize>, target: EntityId) {
     let (Some(i), Some(ti)) = (i, w.find(target)) else { return };
-    let (x, y) = actor_pos(w, i);
-    let (tx, ty) = actor_pos(w, ti);
-    if let Some(a) = actor_mut(w, i) {
-        if tx != x || ty != y {
-            a.facing = facing_toward(tx - x, ty - y);
+    let (Some(a), Some(b)) = (w.actor(i), w.actor(ti)) else { return };
+    let (dx, dy) = (b.x - a.x, b.y - a.y);
+    let dir = if dx.abs() >= dy.abs() {
+        if dx > 0 {
+            Some(3)
+        } else if dx < 0 {
+            Some(2)
+        } else {
+            None
         }
+    } else if dy > 0 {
+        Some(0)
+    } else {
+        Some(1)
+    };
+    if let (Some(d), Some(a)) = (dir, actor_mut(w, i)) {
+        a.facing = d;
     }
 }
 
 /// emote balloon length (0x08016304; `emote_wait` measured 24 + 1 frames)
 pub const EMOTE_LEN: i32 = 24;
 
-/// the scene copy of the animation of the players that play a frame range (`play_anim_frames`) is written into
-/// the player's own state each frame
-fn sync_player_frames(w: &mut World) {
-    for k in 0..w.scene.puppets.len() {
-        let p = w.scene.puppets[k].clone();
-        if !matches!(p.anim.mode, AnimMode::Frames { .. }) {
-            continue;
-        }
-        let Some(i) = w.find(p.id) else { continue };
-        if !matches!(w.ents[i].body, Body::Player(_)) {
-            continue;
-        }
-        let (s, f) = w.actor(i).map(|a| (a.sprite, a.facing)).unwrap_or((None, 0));
-        let d = w.data.clone();
-        let mut a = p.anim.clone();
-        a.tick(&d, s, f);
-        w.scene.puppets[k].anim = a.clone();
+/// a player playing a frame range (`play_anim_frames`): the scene copy ticks in the player's update and is shown
+/// as a pose of the player's own state (called by player.rs after its state tick)
+pub fn player_frames_tick(w: &mut World, i: usize) {
+    let id = w.ents[i].id;
+    let Some(k) = w.scene.puppets.iter().position(|p| p.id == id) else { return };
+    let p = w.scene.puppets[k].clone();
+    if !matches!(p.anim.mode, AnimMode::Frames { .. }) {
+        return;
+    }
+    let (s, f) = w.actor(i).map(|a| (a.sprite, a.facing)).unwrap_or((None, 0));
+    let d = w.data.clone();
+    let mut a = p.anim.clone();
+    let out = a.tick(&d, s, f);
+    w.scene.puppets[k].anim = a.clone();
+    if out == AnimOut::ToIdle {
+        w.scene.puppets[k].anim = ActAnim::idle();
+        crate::player::script_set_anim(w, i, 0);
+    } else {
         crate::player::script_pose(w, i, a.id.clamp(0, 24) as usize, a.frame);
     }
 }
@@ -1653,6 +1715,11 @@ fn become_map_object(w: &mut World, index: i32, x: i32, y: i32, dir: Dir) {
 /// fade / dialog / menu is up, or the director waits
 pub fn pre_step(w: &mut World) {
     w.scene.keys = w.input;
+    if w.scene.depth == 0 && !w.scene.puppets.is_empty() && w.scene.director.wait.is_none() {
+        // outside a scene a player's input ends its leftover frame-range animation
+        let held: Vec<(EntityId, bool)> = w.players.iter().enumerate().map(|(s, &id)| (id, w.input[s.min(MAX_PLAYERS - 1)].held != 0)).collect();
+        w.scene.puppets.retain(|p| !held.iter().any(|&(id, h)| id == p.id && h));
+    }
     if w.scene.depth > 0 || w.scene.menu.is_some() {
         for s in 0..w.players.len().min(MAX_PLAYERS) {
             w.input[s] = InputFrame::default();
@@ -1662,7 +1729,6 @@ pub fn pre_step(w: &mut World) {
 
 /// after the entities: screen effects, dialog, menus, visuals, then the command tracks of the running wait mode
 pub fn tick(w: &mut World) {
-    sync_player_frames(w);
     tick_screen(w);
     tick_dialog(w);
     tick_menu(w);
@@ -1698,6 +1764,9 @@ fn tick_tracks(w: &mut World) {
     if all_idle {
         w.scene.director.wait = None;
         w.scene.director.done = true;
+        if let Some(prev) = w.scene.director.prev_modal.take() {
+            w.modal = prev;
+        }
     }
 }
 
@@ -1892,9 +1961,12 @@ pub fn start_fade(w: &mut World, kind: FadeKind, out: bool, frames: i32) {
         _ => frames.max(1),
     };
     w.scene.screen.fade = Some(Fade { kind, out, t: 0, len });
-    // the mosaic modes do not run the world update
+    // the mosaic modes do not run the world update; mosaic_in restores the palette at once
     if kind == FadeKind::Mosaic {
         w.scene.freeze = true;
+        if !out {
+            w.scene.screen.black = 0;
+        }
     }
 }
 
@@ -1932,6 +2004,10 @@ fn tick_screen(w: &mut World) {
         s.fade = None;
         if f.kind == FadeKind::Mosaic {
             w.scene.freeze = false;
+            if f.out {
+                // mosaic_out ends with the palette RAM cleared
+                w.scene.screen.black = 16;
+            }
         }
     } else {
         s.fade = Some(f);
@@ -1946,18 +2022,39 @@ pub fn fade_black(w: &World) -> u8 {
 // ---------------------------------------------------------------------------------------------------------------
 // dialog
 
-/// open a text box (event text node); `text` keeps its placement prefix (`!` top, `@` middle, `#` bottom)
-pub fn open_text(w: &mut World, text: &str, text_ref: u32, portrait: u8, kind: u8) {
+/// open a text box (event text node). `text` keeps its placement prefix (`!` top, `@` middle, `#` bottom);
+/// `typing` = per page, the frames the typewriter needs (one visible character per frame, the line fitter's
+/// skipped spaces / new lines / option markers ride along; computed by the host with the dialogue font). A page
+/// whose lines start with '-' is a choice (options = those lines).
+pub fn open_text(w: &mut World, text: &str, text_ref: u32, portrait: u8, kind: u8, typing: Vec<u16>) {
     let (pos, body) = split_pos(text);
-    let pages = body.split('\u{b}').count().max(1) as u16;
-    w.scene.dialog = Some(Dialog { text: body.to_string(), text_ref, portrait, kind, pos, page: 0, pages, options: 0, cursor: 0, phase: DialogPhase::Opening, t: 0, result: None });
+    let last = body.split('\u{b}').last().unwrap_or("");
+    let options = last.lines().filter(|l| l.trim_start().starts_with('-')).count() as i32;
+    let pages = (typing.len().max(1)) as u16;
+    w.scene.dialog = Some(Dialog {
+        text: body.to_string(),
+        text_ref,
+        portrait,
+        kind,
+        pos,
+        page: 0,
+        pages,
+        typing,
+        typed: 0,
+        options,
+        cursor: 0,
+        phase: DialogPhase::Opening,
+        t: 0,
+        result: None,
+    });
 }
 
 /// open a choice window (event node kind 3: lines starting with '-' are the options)
-pub fn open_choice(w: &mut World, text: &str, portrait: u8) {
-    let (pos, body) = split_pos(text);
-    let options = body.lines().filter(|l| l.starts_with('-')).count().max(1) as i32;
-    w.scene.dialog = Some(Dialog { text: body.to_string(), text_ref: 0, portrait, kind: 3, pos, page: 0, pages: 1, options, cursor: 0, phase: DialogPhase::Opening, t: 0, result: None });
+pub fn open_choice(w: &mut World, text: &str, portrait: u8, typing: Vec<u16>) {
+    open_text(w, text, 0, portrait, 3, typing);
+    if let Some(d) = w.scene.dialog.as_mut() {
+        d.options = d.options.max(1);
+    }
 }
 
 fn split_pos(text: &str) -> (BoxPos, &str) {
@@ -1969,7 +2066,7 @@ fn split_pos(text: &str) -> (BoxPos, &str) {
     }
 }
 
-/// the box closed: its result (choice index, -1 cancelled, 0 text) — clears it
+/// the box closed: its result (choice index, 0 for plain text) — clears it
 pub fn dialog_result(w: &mut World) -> Option<i32> {
     match &w.scene.dialog {
         Some(d) if d.phase == DialogPhase::Closed => {
@@ -1981,36 +2078,63 @@ pub fn dialog_result(w: &mut World) -> Option<i32> {
     }
 }
 
+/// The dialogue box (module 0x0800AD00), measured on NPC talk (events 43 / 74): the first character appears
+/// [`DIALOG_OPEN`] frames after the box is created, then one per frame; A is taken once the page is complete (A
+/// while typing does nothing); on a page break the next page types from the next frame; after the last page the box
+/// closes and the event continues [`DIALOG_CLOSE`] frames after the A. A choice cursor moves with UP / DOWN.
 fn tick_dialog(w: &mut World) {
     let k = w.scene.keys[0].pressed;
     let Some(d) = w.scene.dialog.as_mut() else { return };
     d.t += 1;
-    match d.phase {
-        DialogPhase::Opening => {
-            if d.t >= DIALOG_OPEN {
-                d.phase = DialogPhase::Shown;
-                d.t = 0;
-            }
+    if d.options > 0 && matches!(d.phase, DialogPhase::Opening | DialogPhase::Shown) {
+        if k & DOWN != 0 {
+            d.cursor = (d.cursor + 1) % d.options;
         }
-        DialogPhase::Shown => {
-            if d.kind == 3 {
-                if k & DOWN != 0 {
-                    d.cursor = (d.cursor + 1) % d.options;
-                }
-                if k & UP != 0 {
-                    d.cursor = (d.cursor + d.options - 1) % d.options;
-                }
+        if k & UP != 0 {
+            d.cursor = (d.cursor + d.options - 1) % d.options;
+        }
+    }
+    if d.kind == 3 {
+        // a menu / message window (node kind 3): shown at once, A picks, B cancels (-1), closes 2 frames later
+        match d.phase {
+            DialogPhase::Opening | DialogPhase::Shown => {
+                d.phase = DialogPhase::Shown;
                 if k & A != 0 {
                     d.result = Some(d.cursor);
                     d.phase = DialogPhase::Closing;
                     d.t = 0;
+                } else if k & B != 0 {
+                    d.result = Some(-1);
+                    d.phase = DialogPhase::Closing;
+                    d.t = 0;
                 }
+            }
+            DialogPhase::Closing => {
+                if d.t >= WINDOW_CLOSE {
+                    d.phase = DialogPhase::Closed;
+                }
+            }
+            DialogPhase::Closed => {}
+        }
+        return;
+    }
+    let need = d.typing.get(d.page as usize).copied().unwrap_or(0) as i32;
+    match d.phase {
+        DialogPhase::Opening => {
+            if d.t >= DIALOG_OPEN {
+                d.phase = DialogPhase::Shown;
+                d.typed = 1.min(need);
+            }
+        }
+        DialogPhase::Shown => {
+            if d.typed < need {
+                d.typed += 1;
             } else if k & A != 0 {
                 if d.page + 1 < d.pages {
                     d.page += 1;
-                    d.t = 0;
+                    d.typed = 0;
                 } else {
-                    d.result = Some(0);
+                    d.result = Some(if d.options > 0 { d.cursor } else { 0 });
                     d.phase = DialogPhase::Closing;
                     d.t = 0;
                 }
@@ -2032,15 +2156,19 @@ fn tick_dialog(w: &mut World) {
 pub const MENU_FADE: i32 = 16;
 
 pub fn open_menu(w: &mut World, kind: MenuKind) {
-    w.scene.menu = Some(Menu { kind, cursor: 0, t: 0, gauge: 0, fade: MENU_FADE, closing: false, result: None, log: Vec::new() });
+    w.scene.menu = Some(Menu { kind, cursor: 0, t: 0, gauge: 0, fade: MENU_FADE, closing: false, result: None, log: Vec::new(), pending: None });
+    // the world is saved and hidden while the menu screen runs (0x08011DB4 / 0x08011E0E)
+    w.scene.freeze = true;
 }
 
 /// the menu closed: (result, log) — clears it
 pub fn menu_result(w: &mut World) -> Option<(i32, Vec<(i32, i32)>)> {
     match &w.scene.menu {
-        Some(m) if m.result.is_some() && m.closing && m.fade <= 0 => {
+        Some(m) if m.result.is_some() && m.closing && m.fade >= MENU_FADE + 2 => {
             let r = (m.result.unwrap_or(-1), m.log.clone());
             w.scene.menu = None;
+            w.scene.freeze = false;
+            w.scene.screen.black = 0;
             Some(r)
         }
         _ => None,
@@ -2050,26 +2178,59 @@ pub fn menu_result(w: &mut World) -> Option<(i32, Vec<(i32, i32)>)> {
 fn tick_menu(w: &mut World) {
     let k = w.scene.keys[0].pressed;
     let held = w.scene.keys[0].held;
-    let shop_len = w.scene.shop.len() as i32;
+    let shop: Vec<ShopItem> = w.scene.shop.clone();
     let zenie = w.story.zenie as i64;
-    let Some(m) = w.scene.menu.as_mut() else { return };
+    let mut black: Option<i32> = None;
+    let mut sound: Option<i32> = None;
+    if let Some(m) = w.scene.menu.as_mut() {
+        menu_step(m, k, held, &shop, zenie, &mut black, &mut sound);
+    }
+    if let Some(b) = black {
+        w.scene.screen.black = b;
+    }
+    if let Some(s) = sound {
+        w.sfx(s, 64);
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn menu_step(m: &mut Menu, k: u16, held: u16, shop: &[ShopItem], zenie: i64, black: &mut Option<i32>, sound: &mut Option<i32>) {
     m.t += 1;
+    // the screen change: MENU_FADE frames to black, the menu screen; on leaving, the world is restored (black for
+    // one frame, two frames after the closing press) and fades in over MENU_FADE frames (measured on the shop)
+    if m.closing {
+        m.fade += 1;
+        let f = m.fade;
+        if f == 2 {
+            *black = Some(16);
+        } else if f > 2 {
+            *black = Some((16 - 16 * (f - 2) / MENU_FADE).clamp(0, 16));
+        }
+        return;
+    }
     if m.fade > 0 {
         m.fade -= 1;
         return;
     }
-    if m.closing {
+    // a purchase confirmed last frame: the money changes hands with the shop's sound
+    if let Some(p) = m.pending.take() {
+        if let Some(it) = shop.get(p as usize) {
+            if zenie >= it.price as i64 {
+                m.log.push((p, 1));
+                *sound = Some(41);
+            }
+        }
         return;
     }
     let close = |m: &mut Menu, r: i32| {
         m.result = Some(r);
         m.closing = true;
-        m.fade = MENU_FADE;
+        m.fade = 0;
     };
     match m.kind {
         MenuKind::ShopBuy | MenuKind::ShopSell { .. } | MenuKind::Character => {
             let n = match m.kind {
-                MenuKind::ShopBuy => shop_len.max(1),
+                MenuKind::ShopBuy => (shop.len() as i32).max(1),
                 MenuKind::Character => 9,
                 _ => 64,
             };
@@ -2082,14 +2243,10 @@ fn tick_menu(w: &mut World) {
             if k & A != 0 {
                 match m.kind {
                     MenuKind::Character => close(m, m.cursor),
-                    MenuKind::ShopBuy => {
-                        let _ = zenie;
-                        m.log.push((m.cursor, 1));
-                    }
+                    MenuKind::ShopBuy => m.pending = Some(m.cursor),
                     _ => m.log.push((m.cursor, -1)),
                 }
-            }
-            if k & B != 0 {
+            } else if k & B != 0 {
                 close(m, -1);
             }
         }
@@ -2101,7 +2258,7 @@ fn tick_menu(w: &mut World) {
             }
         }
         MenuKind::WatchThis { level } => {
-            // a fixed-length button sequence: each correct press (A / B / L / R / dpad edge) advances the gauge
+            // a fixed-length button sequence: each press advances the gauge (model, not the game's prompts)
             if k != 0 {
                 m.gauge += 1;
             }
@@ -2130,7 +2287,6 @@ fn tick_menu(w: &mut World) {
             }
         }
     }
-    let _ = (LEFT, RIGHT);
 }
 
 /// length of the staff credits mode (0x080335BC)
@@ -2146,27 +2302,25 @@ pub fn set_area(w: &mut World, rect: [i32; 4], main: bool, open: bool) {
 }
 
 fn apply_area(w: &mut World, r: [i32; 4], main: bool, open: bool) {
+    // `open_area` / `block_area` (0x2B / 0x2C, main) set the walk grid and the enemy layer; the `_alt` forms (0x2D /
+    // 0x2E) set the shot grid only (re/buu/notes.md "Field: live collision grids", all 458 area loads verified)
     let Some(col) = w.col.as_mut() else { return };
     let g = crate::content::GRID as i32;
     let (tx0, ty0, tx1, ty1) = ((r[0] >> 3).max(0), (r[1] >> 3).max(0), ((r[2] + 7) >> 3).min(g), ((r[3] + 7) >> 3).min(g));
     let v = open as u8;
-    if main {
-        let m = std::sync::Arc::make_mut(&mut col.map);
-        for ty in ty0..ty1 {
-            for tx in tx0..tx1 {
-                let k = (ty * g + tx) as usize;
+    let m = std::sync::Arc::make_mut(&mut col.map);
+    for ty in ty0..ty1 {
+        for tx in tx0..tx1 {
+            let k = (ty * g + tx) as usize;
+            if main {
                 m.walk[k] = v;
-                m.shot[k] = v;
                 // the field's live walk grid (talk NPC / prop marks, `Collision.walk`) shadows the map's
                 if let Some(wk) = col.walk.as_mut() {
                     wk[k] = v;
                 }
-            }
-        }
-        // the enemy layer starts from the walk grid
-        for ty in ty0..ty1 {
-            for tx in tx0..tx1 {
-                col.enemy[(ty * g + tx) as usize] = v;
+                col.enemy[k] = v;
+            } else {
+                m.shot[k] = v;
             }
         }
     }
