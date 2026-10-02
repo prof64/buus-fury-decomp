@@ -320,14 +320,23 @@ function Log2Chars() {
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td>A (hold)</td>
-                <td>
-                  <b>{c.special_melee.name}</b>
-                </td>
-                <td className="wrap small">{c.special_melee.description}</td>
-                <td className="small">flag bit {c.special_melee.unlock_flag_bit}</td>
-              </tr>
+              {c.special_melee ? (
+                <tr>
+                  <td>A (hold)</td>
+                  <td>
+                    <b>{c.special_melee.name}</b>
+                  </td>
+                  <td className="wrap small">{c.special_melee.description}</td>
+                  <td className="small">flag bit {c.special_melee.unlock_flag_bit}</td>
+                </tr>
+              ) : (
+                <tr>
+                  <td>A (hold)</td>
+                  <td colSpan={3} className="muted small">
+                    no special melee
+                  </td>
+                </tr>
+              )}
               {c.move_slots.map((m: J) => (
                 <tr key={m.slot}>
                   <td>B slot {m.slot}</td>

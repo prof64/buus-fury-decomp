@@ -82,10 +82,21 @@ export function Home() {
           <h3 style={{ margin: 0 }}>How the mechanics evolved →</h3>
           <div className="muted small">LoG I → LoG II → Buu’s Fury: damage model, stats, regen, forms, AI engine, side by side.</div>
         </Link>
-        <Link to="/battle" className="card2" style={{ display: 'block' }}>
-          <h3 style={{ margin: 0, color: 'var(--accent)' }}>Battle simulator →</h3>
-          <div className="muted small">Pick any playable fighter and face any enemy, using the real mechanics.</div>
-        </Link>
+        <div className="card2">
+          <Link to="/battle" style={{ display: 'block' }}>
+            <h3 style={{ margin: 0, color: 'var(--accent)' }}>Battle simulator →</h3>
+          </Link>
+          <div className="muted small">
+            All three games are playable: pick a fighter and face any enemy, boss or story fight, using each game’s real mechanics.
+          </div>
+          <div className="small" style={{ marginTop: 6, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            {GAMES.map((g) => (
+              <Link key={g.id} to={`/battle?game=${g.id}`}>
+                {g.short} →
+              </Link>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   )

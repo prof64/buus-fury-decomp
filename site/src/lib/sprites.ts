@@ -23,7 +23,8 @@ export interface Anim {
   raw_index: number
   loop: boolean
   timing_source?: string
-  observed_frame_orders?: number[][] | null
+  /** frame orders seen in the emulator; Buu entries are sometimes pre-joined strings ("0,1,2") */
+  observed_frame_orders?: (number[] | string)[] | null
   rom?: string
   directions: Partial<Record<'down' | 'up' | 'left' | 'right' | 'any', AnimStep[]>>
 }

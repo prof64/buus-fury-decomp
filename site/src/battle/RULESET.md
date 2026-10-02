@@ -45,7 +45,7 @@ interface Ruleset {
   load(): Promise<void>             // fetch data/<game>/*.json + preload sheets (idempotent)
   fighters(): FighterChoice[]       // playable characters + their forms (setup screen)
   enemies(): EnemyChoice[]          // the full enemy/boss catalog; ids are opaque strings
-  arenas(): ArenaChoice[]           // background image + walkable bounds rect (world px)
+  arenas(): ArenaChoice[]           // background image + walkable bounds rect (world px) + optional `view` rect: the painted part the camera may show
   presets(): PresetChoice[]         // optional multi-phase story fights
   levelRange: [min, max]
   knobs(): SetupKnob[]              // extra setup controls (stat bonuses -> setup.bonus, options -> setup.options)
@@ -159,7 +159,7 @@ start value, transform not interruptible, arena walls as rectangles, cutscene sc
 * `tools/battle/gen_vectors.py` — records damage / level-up vectors from the emulator (`data/battle/log2_vectors.json`).
 * `tools/battle/gen_formula_vectors.py` — reference vectors from `re/log2/formula.py`.
 * `tools/battle/extract_icons.py` — HUD move icons from the ROM → `site/public/assets/log2/battle/icons/`
-  (run once after `tools/extract/extract_all.py`; the HUD shows no icon without them).
+  (run automatically by `tools/extract/extract_all.py`, like the LoG1 / Buu icon scripts; the HUD shows no icon without them).
 * LoG1: `log1.test.ts` — 113 apply_damage calls and 10 punches recorded in the emulator, level table columns, and
   11 frame-by-frame replays of emulator recordings (Goku moves/flight/ki moves, wolf chase, wolf pack, Frieza
   soldiers walking/charging/ki blasts that hit, Raditz, squirrels fleeing, pterodactyl on the flying layer): every

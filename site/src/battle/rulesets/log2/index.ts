@@ -24,13 +24,13 @@ import { recordAtLevel, STAT_CAP, type GrowthMode, type Record8 } from './progre
 import { Log2Rng } from './rng'
 
 const ARENAS: (ArenaChoice & { map: number })[] = [
-  { id: 'cellgames', map: 324, name: 'The Cell Games Arena', image: '', size: [0, 0], bounds: { x0: 256, y0: 320, x1: 544, y1: 616 } },
+  { id: 'cellgames', map: 324, name: 'The Cell Games Arena', image: '', size: [0, 0], bounds: { x0: 256, y0: 320, x1: 544, y1: 616 }, view: { x0: 240, y0: 304, x1: 1320, y1: 632 } },
   { id: 'sparring', map: 175, name: 'Sparring Arena (Kami’s Lookout)', image: '', size: [0, 0], bounds: { x0: 40, y0: 84, x1: 240, y1: 250 } },
   { id: 'namek', map: 172, name: 'New Namek', image: '', size: [0, 0], bounds: { x0: 80, y0: 168, x1: 360, y1: 376 } },
   { id: 'gingertown', map: 287, name: 'Gingertown plaza', image: '', size: [0, 0], bounds: { x0: 88, y0: 64, x1: 384, y1: 256 } },
   { id: 'desert', map: 195, name: 'Southern Continent', image: '', size: [0, 0], bounds: { x0: 112, y0: 152, x1: 420, y1: 396 } },
   { id: 'islands', map: 304, name: 'Tropical Islands', image: '', size: [0, 0], bounds: { x0: 96, y0: 200, x1: 416, y1: 380 } },
-  { id: 'wilds', map: 13, name: 'East District 439 (wilderness)', image: '', size: [0, 0], bounds: { x0: 528, y0: 528, x1: 1080, y1: 1032 } },
+  { id: 'wilds', map: 13, name: 'East District 439 (wilderness)', image: '', size: [0, 0], bounds: { x0: 528, y0: 528, x1: 1080, y1: 1032 }, view: { x0: 512, y0: 512, x1: 1096, y1: 1048 } },
 ]
 const ARENA_FOR_MAP: Record<number, string> = { 324: 'cellgames', 325: 'cellgames', 175: 'sparring', 172: 'namek', 287: 'gingertown', 191: 'desert', 195: 'desert', 302: 'islands', 304: 'islands', 105: 'wilds', 46: 'gingertown', 14: 'gingertown', 155: 'gingertown', 215: 'desert', 229: 'desert', 242: 'desert', 251: 'desert', 296: 'islands', 297: 'islands', 298: 'islands' }
 
@@ -261,7 +261,7 @@ export class Log2Ruleset implements Ruleset {
 
   arenaRuntime(id: string): ArenaRuntime {
     const a = ARENAS.find((x) => x.id === id) ?? ARENAS[0]
-    return { id: a.id, name: a.name, image: a.image, size: a.size, bounds: a.bounds }
+    return { id: a.id, name: a.name, image: a.image, size: a.size, bounds: a.bounds, view: a.view }
   }
 
   createBattle(cfg: BattleConfig, w: World): RulesetBattle {

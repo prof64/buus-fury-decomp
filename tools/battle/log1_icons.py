@@ -5,18 +5,28 @@ The HUD (drawn at screen 8,8) shows the selected ki move (controller+5) in its r
 We force each selection with all moves learned (0x0300004D bits 1,2), render a frame and crop the box.
 Writes site/public/assets/log1/battle/icon_<n>.png (10x10 incl. the dark border).
 
-usage: .venv/bin/python tools/battle/log1_icons.py
+Uses the save state work/states/log1_wolf.ss when it exists; on a fresh checkout (no states) it warps to map 2 from
+boot instead (tools/extract/emu_states.py). `--fresh` forces the warp, `--out DIR` writes elsewhere.
+
+usage: .venv/bin/python tools/battle/log1_icons.py [--fresh] [--out DIR]
 """
 import os, sys
 from PIL import Image
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, os.path.join(ROOT, 're/log1'))
-from common import emu  # noqa: E402
+from common import STATES, emu  # noqa: E402
 
 OUT = os.path.join(ROOT, 'site/public/assets/log1/battle')
+if '--out' in sys.argv:
+    OUT = sys.argv[sys.argv.index('--out') + 1]
 os.makedirs(OUT, exist_ok=True)
-e = emu('log1_wolf.ss')
+if (STATES / 'log1_wolf.ss').exists() and '--fresh' not in sys.argv:
+    e = emu('log1_wolf.ss')
+else:
+    sys.path.insert(0, os.path.join(ROOT, 'tools/extract'))
+    import emu_states  # noqa: E402
+    e = emu_states.log1_warp(2)   # Mt. Paozu, default entrance: in-game with the HUD up
 e.w8(0x0300004D, e.r8(0x0300004D) | 6)
 for m in range(3):
     e.w8(0x030007AC + 5, m)

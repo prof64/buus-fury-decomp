@@ -277,7 +277,7 @@ export class Log1Ruleset implements Ruleset {
 
   arenaRuntime(id: string): ArenaRuntime {
     const a = ARENAS.find((x) => x.id === id) ?? ARENAS[0]
-    return { id: a.id, name: a.name, image: a.image, size: a.size, bounds: a.bounds }
+    return { id: a.id, name: a.name, image: a.image, size: a.size, bounds: a.bounds, view: a.view }
   }
 
   /** template + sprite from an enemy id */

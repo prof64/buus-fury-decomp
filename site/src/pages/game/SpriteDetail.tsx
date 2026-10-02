@@ -136,7 +136,7 @@ export function SpriteDetailPage({ game }: { game: string }) {
                         .join(' ')}
                     </td>
                     <td className="small">{a.timing_source}</td>
-                    <td className="mono small">{a.observed_frame_orders?.slice(0, 3).map((o) => o.join(',')).join(' | ')}</td>
+                    <td className="mono small">{a.observed_frame_orders?.slice(0, 3).map((o) => (Array.isArray(o) ? o.join(',') : String(o))).join(' | ')}</td>
                     <td>
                       <Addr a={a.rom} />
                     </td>

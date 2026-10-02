@@ -1,9 +1,12 @@
-"""Rebuild every graphics output for all three games.
+"""Rebuild every graphics output for all three games: everything the dashboard and the battle simulator load.
 
-    .venv/bin/python tools/extract/extract_all.py [game ...] [--skip-maps]
+    .venv/bin/python tools/extract/extract_all.py [game ...] [--skip-maps] [--no-icons]
 
 Outputs: site/public/assets/<game>/{sprites,effects,portraits,...}/<entity>/{NNN.png,sheet.png}
+         site/public/assets/<game>/battle/...   battle HUD icons (tools/battle/extract_icons.py, log1_icons.py,
+                                                 extract_buu_icons.py; run after the game's assets were rebuilt)
          data/<game>/sprites.json
+Finishes with tools/check_assets.py (every asset path referenced by data/ and site/src exists).
 """
 import sys
 import shutil
@@ -12,6 +15,17 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from gba import ASSETS, DATA, GAMES  # noqa: E402
 from export import write_json  # noqa: E402
+
+ROOT = Path(__file__).resolve().parent.parent.parent
+# battle HUD icons per game (the rebuild above wipes site/public/assets/<game>)
+ICON_SCRIPTS = {'log1': 'log1_icons.py', 'log2': 'extract_icons.py', 'buu': 'extract_buu_icons.py'}
+
+
+def battle_icons(game):
+    import subprocess
+    script = ROOT / 'tools' / 'battle' / ICON_SCRIPTS[game]
+    print(game, 'battle icons:', script.name, flush=True)
+    subprocess.run([sys.executable, str(script)], cwd=ROOT, check=True)
 
 
 def run(game, maps=True):
@@ -66,6 +80,10 @@ def run(game, maps=True):
 
 
 if __name__ == '__main__':
+    import subprocess
     args = [a for a in sys.argv[1:] if not a.startswith('--')]
     for g in (args or GAMES):
         run(g, maps='--skip-maps' not in sys.argv)
+        if '--no-icons' not in sys.argv:
+            battle_icons(g)
+    sys.exit(subprocess.run([sys.executable, str(ROOT / 'tools' / 'check_assets.py')]).returncode)

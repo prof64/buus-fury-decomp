@@ -66,6 +66,8 @@ export interface ArenaChoice {
   image: string
   size: [number, number]
   bounds: Rect
+  /** part of the image the camera may show (fully painted background); default: the whole image */
+  view?: Rect
   note?: string
 }
 

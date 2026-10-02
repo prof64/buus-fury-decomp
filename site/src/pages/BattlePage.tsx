@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import type { BattleConfig, GameKey, Outcome, StatLine } from '../battle/core/ruleset'
 import type { BattleSession } from '../battle/core/session'
 import { getRuleset, RULESET_INFO } from '../battle/rulesets'
@@ -16,10 +17,14 @@ const GAME_KEY = 'bt-game-v1'
 /** saved setup per game (LoG II keeps the original key) */
 const keyFor = (g: GameKey) => (g === 'log2' ? KEY : `${KEY}-${g}`)
 
-function initialGame(): GameKey {
+const playable = (g: string | null): g is GameKey => !!g && !!getRuleset(g as GameKey) && !!RULESET_INFO.find((i) => i.id === g)?.enabled
+
+/** `#/battle?game=log1` (links from the home page), else the last game played, else LoG II */
+function initialGame(param: string | null): GameKey {
+  if (playable(param)) return param
   try {
-    const g = localStorage.getItem(GAME_KEY) as GameKey | null
-    if (g && getRuleset(g) && RULESET_INFO.find((i) => i.id === g)?.enabled) return g
+    const g = localStorage.getItem(GAME_KEY)
+    if (playable(g)) return g
   } catch {
     /* ignore */
   }
@@ -27,7 +32,9 @@ function initialGame(): GameKey {
 }
 
 export function BattlePage() {
-  const [game, setGame] = useState<GameKey>(initialGame)
+  const [params] = useSearchParams()
+  const param = params.get('game')
+  const [game, setGame] = useState<GameKey>(() => initialGame(param))
   const rs = getRuleset(game)!
   const [ready, setReady] = useState(false)
   const [err, setErr] = useState<string>()
@@ -67,6 +74,10 @@ export function BattlePage() {
     }
     setGame(g)
   }
+  // a ?game= link followed while already on this page
+  useEffect(() => {
+    if (playable(param)) setGame(param)
+  }, [param])
 
   if (err) return <div className="page">Failed to load: {err}</div>
   if (!ready || !setup || setup.game !== rs.info.id) return <div className="page muted">Loading {rs.info.title} data…</div>

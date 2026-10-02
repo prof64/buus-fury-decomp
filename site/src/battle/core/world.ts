@@ -31,6 +31,8 @@ export interface ArenaRuntime {
   size: [number, number]
   /** walkable rectangle in world px: an entity's collision box must stay inside */
   bounds: Rect
+  /** part of the image the camera may show (fully painted background); default: the whole image */
+  view?: Rect
 }
 
 export interface Popup {
@@ -139,29 +141,39 @@ export class World {
     if (this.debug.hitboxes) this.flashes.push({ r, color, until: this.frame + frames })
   }
 
-  /** Centre the logical GBA camera on a point, clamped to the background image. */
-  centerCamera(x: number, y: number, margin = 40) {
+  /** The region the camera may show: the arena's painted `view` rect, else the whole image (empty = unknown). */
+  viewRect(): Rect | null {
+    if (this.arena.view) return this.arena.view
     const [mw, mh] = this.arena.size
+    return mw > 0 && mh > 0 ? { x0: 0, y0: 0, x1: mw, y1: mh } : null
+  }
+
+  /** Centre the logical GBA camera on a point, clamped to the arena (plus a margin of scenery) and the painted view. */
+  centerCamera(x: number, y: number, margin = 40) {
     const b = this.arena.bounds
     let cx = Math.round(x - GBA_W / 2)
     let cy = Math.round(y - GBA_H / 2)
-    // keep the view on the arena (plus a margin of scenery) and inside the map image
-    const lo = (a: number, b2: number, view: number) => [Math.max(0, a - margin), Math.max(0, b2 + margin - view)]
+    const lo = (a: number, b2: number, view: number) => [a - margin, b2 + margin - view]
     const [xa, xb] = lo(b.x0, b.x1, GBA_W)
     const [ya, yb] = lo(b.y0 - 24, b.y1, GBA_H)
     cx = xb >= xa ? Math.max(xa, Math.min(cx, xb)) : Math.round((b.x0 + b.x1) / 2 - GBA_W / 2)
     cy = yb >= ya ? Math.max(ya, Math.min(cy, yb)) : Math.round((b.y0 + b.y1) / 2 - GBA_H / 2)
-    if (mw > 0) cx = Math.max(0, Math.min(cx, Math.max(0, mw - GBA_W)))
-    if (mh > 0) cy = Math.max(0, Math.min(cy, Math.max(0, mh - GBA_H)))
+    const v = this.viewRect()
+    if (v) {
+      cx = clampSpan(cx, GBA_W, v.x0, v.x1)
+      cy = clampSpan(cy, GBA_H, v.y0, v.y1)
+    }
     this.camera = { x0: cx, y0: cy, x1: cx + GBA_W, y1: cy + GBA_H }
   }
 
   draw(r: Renderer) {
     r.followCamera(this.camera)
-    // clamp the (possibly wider) view to the map so we don't show void when the map is large enough
-    const [mw, mh] = this.arena.size
-    if (mw >= r.viewW) r.camX = Math.max(0, Math.min(r.camX, mw - r.viewW))
-    if (mh >= r.viewH) r.camY = Math.max(0, Math.min(r.camY, mh - r.viewH))
+    // clamp the (possibly wider) view to the painted background; a region smaller than the view is centred
+    const v = this.viewRect()
+    if (v) {
+      r.camX = clampSpan(r.camX, r.viewW, v.x0, v.x1)
+      r.camY = clampSpan(r.camY, r.viewH, v.y0, v.y1)
+    }
     r.beginFrame('#000')
     const bg = imageNow(this.arena.image)
     if (bg) r.ctx.drawImage(bg, -r.camX, -r.camY)
@@ -192,4 +204,10 @@ export class World {
       lbl.split('\n').forEach((line, i, arr) => r.overlayText(anyE.px!, anyE.py! - 30 - (arr.length - 1 - i) * 4, line, i === 0 ? '#ffd23f' : '#cfe8ff'))
     }
   }
+}
+
+/** Clamp the start of a `size`-long window into [lo, hi); a window larger than the span is centred on it. */
+export function clampSpan(start: number, size: number, lo: number, hi: number): number {
+  if (hi - lo <= size) return Math.round((lo + hi - size) / 2)
+  return Math.max(lo, Math.min(start, hi - size))
 }
