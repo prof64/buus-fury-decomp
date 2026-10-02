@@ -152,7 +152,10 @@ directions in engine order (left = direction 2), ground shadows (`buu_shadow_*`,
 OBJ of the halo forms (`attach` offsets) drawn by `Actor.draw`; camera 0x080077EC eases 3/64 (x) / 9/128 (y) of the
 distance to the footprint centre per frame and clamps to the map; walking starts one frame after the press; punch
 recovery 16 frames; dashing into a wall plays the hurt animation and pushes back 192/256 px per frame for 23 frames
-(`bump`); StepTowardPlayer 0x08018C3A moves `speed` on the major axis (velocity = d × speed / max(|dx|, |dy|)).
+(`bump`); the step nodes move `speed` on the major axis (velocity = d × speed / max(|dx|, |dy|)). The node enemy_ai.json calls
+StepTowardPlayer (0x08018C3A) moves away from the player while facing it: the simulator names it BackOffFacingPlayer
+(`data.ts` AI_RENAME); it, StepAwayFromPlayer, Wander and WalkToPlayer are replayed frame by frame against emulator
+recordings (`tools/battle/gen_buu_step_traces.py`, `data/battle/buu_step_traces.json`).
 Not modelled: the game's lag frames (busy scenes skip logic frames on the GBA).
 
 Map collision (tools/battle/COLLISION.md): arenas use the real map grids from the ROM map headers
@@ -202,7 +205,7 @@ enemy grid, map objects that mark tiles at load (NPCs, breakables) not placed.
   `buu_boss_hp_check.py` — Buu vectors, enemy hit table, aux trees, HUD icons, boss damage check (emulator).
 * `tools/battle/buu_collision.py` (map grids of every map -> `data/battle/buu_collision.json`; `--check` vs RAM,
   `--origins` composite offsets), `gen_buu_collision_traces.py`, `gen_buu_path_traces.py` (emulator traces for the
-  collision test); format and addresses in `tools/battle/COLLISION.md`.
+  collision test), `gen_buu_step_traces.py` (enemy step nodes); format and addresses in `tools/battle/COLLISION.md`.
 * `tools/battle/play.py` — drives the running page through `chrome-devtools-axi` (start a setup, inject
   button sequences frame-exactly, screenshot). `window.__battle` exposes the live `BattleSession`.
   `BT_GAME=log1|buu` picks the ruleset, `BT_URL` / `BT_SESSION` another dev server / browser session.

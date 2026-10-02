@@ -681,31 +681,24 @@ export function create(n: AiNodeJ, c: AiController): RNode {
         return false
       })
     }
-    case 'StepTowardPlayer':
-    case 'StepTowardPlayerThroughRocks':
-      return new Act(n, c, () => undefined, () => {
-        e.stepToward(speed, 0)
-        return false
-      })
+    // enemy_ai.json: StepTowardPlayer (renamed in data.ts AI_RENAME): the game backs off, facing the player
+    case 'BackOffFacingPlayer':
+    case 'BackOffFacingPlayerThroughRocks':
+      return new Act(n, c, () => undefined, () => e.stepFromPlayer(speed, true))
     case 'StepAwayFromPlayer':
-      return new Act(n, c, () => undefined, () => {
-        e.moveAway(speed)
-        return false
-      })
-    case 'WalkToPlayer':
-      return new Act(n, c, () => undefined, () => e.moveToward(speed, 8, true))
+      return new Act(n, c, () => undefined, () => e.stepFromPlayer(speed, false))
+    case 'WalkToPlayer': {
+      const st = { n: 0 }
+      return new Act(n, c, () => (st.n = 0), () => e.walkToPlayer(speed, st))
+    }
     case 'FlyToPlayer':
       return new Act(n, c, () => undefined, () => e.moveToward(speed, 8, false, true))
     case 'AlignWithPlayer':
     case 'LineUpForShot':
       return new Act(n, c, () => undefined, () => e.align(speed || 0x73))
     case 'Wander':
-      return new Act(n, c, (a) => (a.data.dir = e.w.rng.rand(4, 'wander dir')), (_f, a) => {
-        if (e.w.rng.chance(P(n, 'turn_p'), 'wander turn')) a.data.dir = e.w.rng.rand(4, 'wander dir')
-        const d = a.data.dir as Dir
-        e.facing = d
-        const [dx, dy] = DIR_VEC[d]
-        e.walkBy(dx * speed, dy * speed)
+      return new Act(n, c, () => undefined, () => {
+        e.wanderStep(speed, P(n, 'turn_p'))
         return false
       })
     case 'MoveToPoint': {

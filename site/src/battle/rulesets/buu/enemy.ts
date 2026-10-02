@@ -238,21 +238,25 @@ export class Enemy extends Actor implements EnemyLike {
     if (m) c.mark('enemy', ...m, 0)
     return ok
   }
-  /** enemy step (ChasePlayer's step 0x0803B9xx, StepTowardPlayer 0x08018C3A): unmark, try the full move, else only
+  /** enemy step (ChasePlayer's step 0x0803B9xx, the back-off / step-away steps 0x08018C3A / 0x0801CBA1): unmark, try the full move, else only
    *  the x part (fx), else only the y part (fy), re-mark. true = the full move was taken */
   tryMove(vx: number, vy: number, fx = vx, fy = vy): boolean {
     const w = this.w
     this.unmarkSelf()
     let ok = false
+    this.stepped = true
     if (this.fits(w, (this.x + vx) >> 8, (this.y + vy) >> 8)) {
       this.x += vx
       this.y += vy
       ok = true
     } else if (fx && this.fits(w, (this.x + fx) >> 8, this.py)) this.x += fx
     else if (fy && this.fits(w, this.px, (this.y + fy) >> 8)) this.y += fy
+    else this.stepped = false
     this.markSelf()
     return ok
   }
+  /** the last tryMove moved at all (full or one axis) */
+  stepped = false
   moveBy(_w: World, vx: number, vy: number): boolean {
     return this.tryMove(vx, vy)
   }
@@ -263,24 +267,118 @@ export class Enemy extends Actor implements EnemyLike {
     this.moving = true
     return this.moveBy(this.w, Math.round(vx), Math.round(vy))
   }
-  /** StepTowardPlayer update 0x08018C3A: d = player footprint centre - own footprint centre (0x0800FDFA rects);
-   *  facing by the dominant axis; velocity = trunc(d * speed / max(|dx|, |dy|)), i.e. `speed` on the major axis
-   *  (emulator: Majin Fighters step (153, 0..153) / 256 px per frame, never the Euclidean (136, 70)) */
-  stepToward(speed: number, stop: number): boolean {
+  /** footprint-rect centre (0x0800FDFA rect: (x0 + x1) >> 1) */
+  private static fc(a: Actor): [number, number] {
+    return [(a.px * 2 + a.footW) >> 1, (a.py * 2 + a.footH) >> 1]
+  }
+  /** step directly away from the player: 0x08018C3A (BackOffFacingPlayer, labelled StepTowardPlayer in the data)
+   *  keeps facing the player, 0x0801CBA1 (StepAwayFromPlayer) turns away. d = player footprint centre - own centre;
+   *  m = max(|dx|, |dy|); pos -= trunc(d * speed / m) (`speed` on the major axis), blocked -> one axis at full
+   *  speed (x - (dx >= 0 ? speed : -speed)), then y. Returns true (node finished) when no try moved; m = 0 -> no
+   *  move, running. Emulator-verified (data/battle/buu_step_traces.json). */
+  stepFromPlayer(speed: number, faceToward: boolean): boolean {
     const p = this.player
-    if (!p) return false
-    const [px, py] = p.footCenter()
-    const [x, y] = this.footCenter()
+    if (!p) return true
+    const [px, py] = Enemy.fc(p)
+    const [x, y] = Enemy.fc(this)
     const dx = px - x
     const dy = py - y
-    const m = Math.max(Math.abs(dx), Math.abs(dy))
-    if (!m) return true
-    this.facing = facingToward(dx, dy)
-    if (m <= stop) return true
-    // blocked: 0x08018C3A falls back to a full-speed step on x, then on y (sign of d; d = 0 counts as positive)
+    const adx = Math.abs(dx)
+    const ady = Math.abs(dy)
+    let m: number
+    if (adx > ady) {
+      m = adx
+      this.facing = faceToward ? (dx < 0 ? 2 : 3) : dx > 0 ? 2 : 3
+    } else {
+      m = ady
+      this.facing = faceToward ? (dy < 0 ? 1 : 0) : dy > 0 ? 1 : 0
+    }
+    if (!m) return false
     this.moving = true
-    this.tryMove(Math.trunc((dx * speed) / m), Math.trunc((dy * speed) / m), dx >= 0 ? speed : -speed, dy >= 0 ? speed : -speed)
+    this.tryMove(-Math.trunc((dx * speed) / m), -Math.trunc((dy * speed) / m), dx >= 0 ? -speed : speed, dy >= 0 ? -speed : speed)
+    return !this.stepped
+  }
+  /** WalkToPlayer update 0x0802CDE8 (Spopovich): face the player on the dominant axis; within 8 px (major axis of
+   *  the centre offset) stand; pos += trunc(d * speed / m) (a one-axis retry only for steps > 4 px, i.e. never);
+   *  no step while the walk animation shows frame 1 or 4 (obj+0x11);
+   *  blocked -> detour: n = rand(32) - 16 when 0, then sidestep `speed` on the minor axis (n < 0: -, n++; else +, n--)
+   *  each frame until n is back to 0 or the sidestep is blocked (n = 0); while n != 0 no direct step is tried. */
+  /** index of the shown animation step (the engine's obj+0x11 frame number) */
+  animFrame(): number {
+    if (!this.anim) return 0
+    const step = this.anim.stepAt(this.facing, this.animT, this.animLoop)
+    return step ? this.anim.steps(this.facing).indexOf(step) : 0
+  }
+  walkToPlayer(speed: number, st: { n: number }, animFrame = this.animFrame()): boolean {
+    // obj+0x11 = current animation frame: no step on frames 1 and 4 of the walk cycle
+    if (animFrame === 1 || animFrame === 4) return false
+    const p = this.player
+    if (!p) return false
+    const [px, py] = Enemy.fc(p)
+    const [x, y] = Enemy.fc(this)
+    const dx = px - x
+    const dy = py - y
+    const adx = Math.abs(dx)
+    const ady = Math.abs(dy)
+    let m: number
+    if (adx > ady) {
+      m = adx
+      this.facing = dx > 0 ? 3 : 2
+    } else {
+      m = ady
+      this.facing = dy > 0 ? 0 : 1
+    }
+    if (m < 8) return false
+    this.moving = true
+    const w = this.w
+    this.unmarkSelf()
+    const qx = Math.trunc((dx * speed) / m)
+    const qy = Math.trunc((dy * speed) / m)
+    let moved = false
+    if (st.n === 0) {
+      if (this.fits(w, (this.x + qx) >> 8, (this.y + qy) >> 8)) {
+        this.x += qx
+        this.y += qy
+        moved = true
+      } else if (Math.abs(qx) > 0x400 && this.fits(w, (this.x + qx) >> 8, this.py)) {
+        this.x += qx
+        moved = true
+      } else if (Math.abs(qy) > 0x400 && this.fits(w, this.px, (this.y + qy) >> 8)) {
+        this.y += qy
+        moved = true
+      }
+    }
+    if (!moved) {
+      if (st.n === 0) st.n = w.rng.rand(32, 'walk detour') - 16
+      let nx = this.x
+      let ny = this.y
+      const s = st.n < 0 ? -speed : speed
+      st.n += st.n < 0 ? 1 : -1
+      if (adx >= ady) ny += s
+      else nx += s
+      if (this.fits(w, nx >> 8, ny >> 8)) {
+        this.x = nx
+        this.y = ny
+      } else st.n = 0
+    }
+    this.markSelf()
     return false
+  }
+  /** Wander update 0x0802B708: each frame chance(turn_p) -> facing = rand(4); step `speed` in the facing (table
+   *  0x08752EB4 = down, up, left, right); blocked -> facing = rand(4) (no move). Never finishes. */
+  wanderStep(speed: number, turnP: number) {
+    const w = this.w
+    this.moving = true
+    if (w.rng.chance(turnP, 'wander turn')) this.facing = w.rng.rand(4, 'wander dir') as Dir
+    const [dx, dy] = DIR_VEC[this.facing]
+    const vx = (dx * 256 * speed) >> 8
+    const vy = (dy * 256 * speed) >> 8
+    this.unmarkSelf()
+    if (this.fits(w, (this.x + vx) >> 8, (this.y + vy) >> 8)) {
+      this.x += vx
+      this.y += vy
+    } else this.facing = w.rng.rand(4, 'wander dir') as Dir
+    this.markSelf()
   }
   /** normalised move toward the player; true when within `stop` px (centre distance) */
   moveToward(speed: number, stop: number, face: boolean, ignoreWalls = false): boolean {
@@ -299,12 +397,6 @@ export class Enemy extends Actor implements EnemyLike {
       this.clampInside(this.w)
     } else this.walkBy(vx, vy)
     return false
-  }
-  moveAway(speed: number) {
-    const [dx, dy] = this.toPlayer()
-    const d = Math.max(1, Math.hypot(dx, dy))
-    this.facing = facingToward(dx, dy)
-    this.walkBy((-dx * speed) / d, (-dy * speed) / d)
   }
   moveToPoint(x: number, y: number, speed: number): boolean {
     const dx = x - this.px

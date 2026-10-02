@@ -108,6 +108,8 @@ export interface AiNodeJ {
   addr: string
   fn: string
   name: string
+  /** the label in enemy_ai.json when the simulator uses a more accurate name (AI_RENAME) */
+  dataName?: string
   kind?: string
   onHit?: string
   params?: Record<string, { raw: number; [k: string]: unknown }>
@@ -138,6 +140,18 @@ export interface BuuData {
   origins: Map<string, [number, number]>
   portraits: Map<number, string>
   formulas: J
+}
+
+/** node types whose enemy_ai.json label does not match what the game does (emulator-verified, tools/battle/
+ *  gen_buu_step_traces.py): 0x08018E29 / update 0x08018C3A moves AWAY from the player while facing it */
+export const AI_RENAME: Record<string, string> = {
+  StepTowardPlayer: 'BackOffFacingPlayer',
+  StepTowardPlayerThroughRocks: 'BackOffFacingPlayerThroughRocks',
+}
+function renameAi(n: AiNodeJ): AiNodeJ {
+  const to = AI_RENAME[n.name]
+  const children = n.children?.map(renameAi)
+  return { ...n, ...(to ? { name: to, dataName: n.name } : {}), ...(children ? { children } : {}) }
 }
 
 function enemyName(e: J): string {
@@ -280,7 +294,7 @@ export function buildBuuData(src: { characters: J; levels: J; moves: J; items: J
     if (e.gfx != null) e.sprite = bank.index(e.gfx - GFX_OFFSET)
   }
   const states = new Map<number, AiNodeJ>()
-  for (const [k, v] of Object.entries(ai.states as Record<string, J>)) states.set(parseInt(k, 16), v.tree)
+  for (const [k, v] of Object.entries(ai.states as Record<string, J>)) states.set(parseInt(k, 16), renameAi(v.tree))
   for (const [k, v] of Object.entries(extra.reactions as Record<string, AiNodeJ>)) if (!states.has(parseInt(k, 16))) states.set(parseInt(k, 16), v)
   const aux = new Map<number, AiNodeJ>()
   for (const [k, v] of Object.entries(extra.aux as Record<string, AiNodeJ>)) aux.set(parseInt(k, 16), v)

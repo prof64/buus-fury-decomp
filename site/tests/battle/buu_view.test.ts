@@ -161,7 +161,7 @@ describe('camera 0x080077EC', () => {
 })
 
 describe('enemies', () => {
-  it('StepTowardPlayer 0x08018C3A moves `speed` on the major axis (Majin Fighter: (153, k) never (136, 70))', () => {
+  it('BackOffFacingPlayer 0x08018C3A (data: StepTowardPlayer) moves `speed` on the major axis (Majin Fighter: (153, k) never (136, 70))', () => {
     const s = makeBuuSim({ enemy: 't68', fighter: fighter() })
     const e = s.enemies[0]
     s.player.rec.hp = s.player.rec.maxHp = 99999

@@ -74,9 +74,13 @@ Only the feet matter: bodies overlap walls drawn above them freely.
 * The steps fall back per axis: ChasePlayer's step `0x0803B934` tries the full move, else only its x part, else
   only its y part; `0x08018C3A` (the node enemy_ai.json calls StepTowardPlayer) tries the full move, else
   +-speed on x, else +-speed on y.
-  (Finding on the side: `0x08018C3A` moves **away** from the player - x = x - d*speed/max(|dx|,|dy|) with a positive
-  param; emulator, Majin Fighter: x 143.0 -> 150.7 in 13 frames with the player at x 89. The simulator still runs it
-  toward the player.)
+  `0x08018C3A` moves **away** from the player (x = x - d*speed/max(|dx|,|dy|), positive param) while facing it; the
+  simulator calls it BackOffFacingPlayer. `0x0801CBA1` (StepAwayFromPlayer) is the same step facing away. Both return
+  1 (node done) when none of the three tries moved, 0 when d = 0.
+* Wander `0x0802B708` (+4 speed, +8 turn chance): chance -> facing = rand(4); one full step in the facing (table
+  `0x08752EB4`); blocked -> facing = rand(4), no fallback. WalkToPlayer `0x0802CDE8` (+8 detour counter): no step on
+  walk-animation frames 1 and 4 (obj+0x11); full step d*speed/max; blocked -> n = rand(32)-16 and sidestep `speed`
+  on the minor axis |n| frames (blocked sidestep -> n = 0).
 
 **Projectiles** (projectile grid): each shot's update tests its box with `0x08009324(box, [0x03001A50])` (bullet
 `0x08027562` and the other classes) and explodes when blocked or outside 0..2048; beams extend to the first wall.
@@ -135,6 +139,8 @@ two: the World Tournament stadium 7-6 (composite x = world x - 16) and HFIL 18-1
   airborne enemies (height offset), defeated enemies.
 * Objects that mark tiles at load in the game (NPCs, Broly's rocks are separate entities here, breakables) are not
   placed; the grids are bare terrain.
-* Not traced against the emulator: projectile explosions on the projectile grid, enemy steps other than the path
-  follower (WalkToPlayer, Wander, knock-backs use full / x / y fallback), the corner cases of overlapping enemies.
-* `0x08018C3A` direction (§3) is not changed in the simulator.
+* Also verified (`gen_buu_step_traces.py`, 5 runs, 240..600 frames, node update called per frame, RNG state per
+  frame): back-off (2 runs), step-away, wander, walk-to: position, facing, return value and detour counter.
+* Not traced against the emulator: projectile explosions on the projectile grid, knock-back (KnockbackSlide
+  0x08018A08 / 0x08018A92 uses the hit direction, launch state and other box tests: not ported), AlignWithPlayer,
+  CirclePlayer, the corner cases of overlapping enemies.

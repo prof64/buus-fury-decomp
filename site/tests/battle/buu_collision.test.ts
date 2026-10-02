@@ -5,6 +5,7 @@
 import { describe, expect, it } from 'vitest'
 import traces from '../../../data/battle/buu_collision_traces.json'
 import pathTraces from '../../../data/battle/buu_path_traces.json'
+import stepTraces from '../../../data/battle/buu_step_traces.json'
 import { PathMover } from '../../src/battle/rulesets/buu/path'
 import { buuData, fighter, makeBuuSim } from './buu_harness'
 import { BTN } from '../../src/battle/core/input'
@@ -122,6 +123,58 @@ describe('enemy path following (0x0803BB48 plan / wall-follow / step) vs emulato
         path.update(e)
         expect([path.wx, path.wy], `frame ${f} waypoint`).toEqual(r.waypoint[f])
         expect([e.x, e.y], `frame ${f}: sim (${e.x / 256}, ${e.y / 256}) game (${r.pos[f][0] / 256}, ${r.pos[f][1] / 256})`).toEqual(r.pos[f])
+      }
+    })
+  }
+})
+
+interface StepRun {
+  name: string
+  fn: string
+  start: [number, number]
+  footprint: [number, number]
+  player: [number, number]
+  playerFootprint: [number, number]
+  speed: number
+  param2: number
+  marked: [number, number][]
+  face: number
+  frames: { rng: [number, number]; player: [number, number]; b11: number; pos: [number, number]; face: number; n8: number; ret: number }[]
+}
+
+describe('enemy step nodes vs emulator (node update called every frame, Southwest Forest)', () => {
+  for (const r of (stepTraces as unknown as { runs: StepRun[] }).runs) {
+    it(`${r.name} (${r.fn}, ${r.frames.length} frames)`, () => {
+      const s = makeBuuSim({ enemy: 't68', arena: 'forest', fighter: fighter() })
+      const e = s.enemies[0]
+      e.update = () => undefined
+      const col = e.ctx.col!
+      e.unmarkSelf()
+      for (const [tx, ty] of r.marked) col.enemy[ty * col.w + tx] = 0
+      expect([e.footW, e.footH]).toEqual(r.footprint)
+      expect([s.player.footW, s.player.footH]).toEqual(r.playerFootprint)
+      s.player.x = r.player[0]
+      s.player.y = r.player[1]
+      e.x = r.start[0]
+      e.y = r.start[1]
+      e.facing = r.face as 0 | 1 | 2 | 3
+      e.markSelf()
+      const st = { n: r.param2 }
+      for (let f = 0; f < r.frames.length; f++) {
+        const g = r.frames[f]
+        if (g.ret === 0xdeadbeef) continue // a lag frame: the game ran no logic, the injected call did not happen
+        s.w.rng.setState([g.rng[0] | 0, g.rng[1] | 0])
+        s.player.x = g.player[0]
+        s.player.y = g.player[1]
+        let ret: boolean | void
+        if (r.fn === '0x08018C3A') ret = e.stepFromPlayer(r.speed, true)
+        else if (r.fn === '0x0801CBA1') ret = e.stepFromPlayer(r.speed, false)
+        else if (r.fn === '0x0802B708') e.wanderStep(r.speed, r.param2)
+        else ret = e.walkToPlayer(r.speed, st, g.b11)
+        const msg = `frame ${f}: sim (${e.x / 256}, ${e.y / 256}) f${e.facing} game (${g.pos[0] / 256}, ${g.pos[1] / 256}) f${g.face}`
+        expect([e.x, e.y, e.facing], msg).toEqual([g.pos[0], g.pos[1], g.face])
+        if (r.fn === '0x0802CDE8') expect(st.n, msg).toBe(g.n8)
+        if (ret !== undefined) expect(ret ? 1 : 0, msg).toBe(g.ret)
       }
     })
   }
