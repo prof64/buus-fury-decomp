@@ -10,7 +10,9 @@
 //! OBJs with that priority (last OAM entry first). The two top-most opaque pixels are kept per screen pixel for
 //! blending.
 
+pub mod banner;
 pub mod font;
+pub mod mode7;
 pub mod ui;
 
 use std::collections::HashMap;
@@ -95,6 +97,10 @@ pub struct Renderer {
     pub draw_hud: bool,
     /// The game's UI (`ui/` content); `Some(None)` = not available (placeholder HUD is drawn instead).
     ui: Option<Option<ui::Ui>>,
+    /// expanded colour -> the global palette's original RGB888 (`maps/palette.json`), for palette fades
+    orig_pal: Option<HashMap<u32, u32>>,
+    /// The area-name banner (`ui/banner.json`); `Some(None)` = content missing.
+    banner: Option<Option<banner::Banner>>,
     pub blend_math: BlendMath,
 }
 
@@ -158,6 +164,37 @@ fn darken(a: u32, evy: u32, m: BlendMath) -> u32 {
     out
 }
 
+/// `maps/palette.json` (RGB888 as stored) keyed by the expanded colour images carry.
+fn load_orig_palette(packs: &Packs) -> HashMap<u32, u32> {
+    let mut m = HashMap::new();
+    if let Ok(j) = packs.value("maps/palette.json") {
+        for v in j["rgb888"].as_array().into_iter().flatten() {
+            let Some(o) = v.as_str().and_then(|s| u32::from_str_radix(s.trim_start_matches('#'), 16).ok()) else { continue };
+            let mut e = 0xFF00_0000;
+            for sh in [16, 8, 0] {
+                let c5 = ((o >> sh) & 0xFF) >> 3;
+                e |= ((c5 << 3) | (c5 >> 2)) << sh;
+            }
+            m.entry(e).or_insert(o);
+        }
+    }
+    m
+}
+
+/// the fade routine `0x08007074`: `(c * (256 - level) + target * level) >> 11` per channel (BGR555), expanded
+fn palette_fade(e: u32, orig: &HashMap<u32, u32>, level: u32, target: u32) -> u32 {
+    let o = orig.get(&(e | 0xFF00_0000)).copied().unwrap_or(e & 0xFF_FFFF);
+    let l = level.min(256);
+    let mut out = 0xFF00_0000;
+    for sh in [16, 8, 0] {
+        let c = (o >> sh) & 0xFF;
+        let t = (target >> sh) & 0xFF;
+        let v = ((c * (256 - l) + t * l) >> 11).min(31);
+        out |= ((v << 3) | (v >> 2)) << sh;
+    }
+    out
+}
+
 impl Renderer {
     pub fn new() -> Renderer {
         Renderer {
@@ -175,6 +212,8 @@ impl Renderer {
             errors: Vec::new(),
             draw_hud: true,
             ui: None,
+            orig_pal: None,
+            banner: None,
             blend_math: BlendMath::default(),
         }
     }
@@ -278,6 +317,17 @@ impl Renderer {
                     screen.push((ui::HUD_PRIORITY, ui::HUD_POS.0, ui::HUD_POS.1, 80, 16, u.hud(packs, hv)));
                 }
             }
+            if let Some(bv) = &view.banner {
+                if self.banner.is_none() {
+                    self.banner = Some(banner::Banner::load(packs));
+                }
+                if let Some(Some(b)) = &mut self.banner {
+                    if let Some(px) = b.frame(&bv.text, bv.t) {
+                        // horizontally centred, bottom-anchored (32 px above the view's bottom edge, as on the GBA)
+                        screen.push((banner::PRIORITY, ox, h as i32 - (GBA_H - banner::Y), banner::W, banner::H, px));
+                    }
+                }
+            }
             if let Some(dv) = &view.dialog {
                 if let Some(px) = u.dialog(dv) {
                     // horizontally centred; top / bottom anchored to the view edges, middle centred
@@ -319,6 +369,19 @@ impl Renderer {
         let mode = (bld >> 6) & 3;
         let fade = view.fade_black.min(16) as u32;
         let bm = self.blend_math;
+        // palette fade: every colour as the fade routine left it in palette RAM, before blending
+        if let Some(pf) = view.palette_fade.filter(|f| f.level > 0) {
+            if self.orig_pal.is_none() {
+                self.orig_pal = Some(load_orig_palette(packs));
+            }
+            let orig = self.orig_pal.as_ref().unwrap();
+            let mut cache: HashMap<u32, u32> = HashMap::new();
+            let mut f = |e: u32| -> u32 { *cache.entry(e).or_insert_with(|| palette_fade(e, orig, pf.level as u32, pf.target)) };
+            for i in 0..w * h {
+                self.top[i] = f(self.top[i]);
+                self.bot[i] = f(self.bot[i]);
+            }
+        }
         for i in 0..w * h {
             let tl = self.top_l[i];
             let mut c = self.top[i];

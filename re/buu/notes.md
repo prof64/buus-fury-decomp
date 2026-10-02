@@ -1634,7 +1634,7 @@ positions on static frames or take the camera from the player's shadow OAM.
   125, screen, bob over 80 frames).
 * **Debris chips** (vt `0x08049F38`, `0x0800C454`): 8x8 gfx `0x08072500` at (x >> 8, y >> 8), start (centre - 4) << 8,
   velocity +1 / +2 per frame (24.8), 32 frames (`effects/debris`).
-* Not exported: the area name banner (vt `0x0804B528`, UI text).
+* Area name banner (vt `0x0804B528`): decoded, exported by wf-ui (`ui/banner.json`, `ui/images/banner.png`), see engine/docs/ui.md §4b (VERIFIED frame by frame).
 
 **Encounter trigger (VERIFIED: `data/field/worldmap_encounter.json`, `tools/field/wm_encounter.py`; z at creation
 `tools/field/wm_probe6.py`).** Recording: a steering controller flies into airborne encounter #6 (list index, def

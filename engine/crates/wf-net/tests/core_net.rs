@@ -200,6 +200,8 @@ fn lobby_to_match() {
         base: base.clone(),
         input_delay: 2,
         max_prediction: 12,
+        secret: format!("secret-{fighter}-{role:?}"),
+        ..Default::default()
     };
     let mut lobbies = vec![
         Some(NetLobby::new(Box::new(net.endpoint("host")), mk(Role::Host, "goku", 2), "ABCDE", clock.clone())),

@@ -32,6 +32,7 @@ pub const PICS: &[Pic] = &[
     Pic { id: "emote_marks", rom: 0x086B_8218, w: 8, h: 8, opaque: false, frames: 3, desc: "emote animation strip (! / ? marks)", code: "rodata 0x086B8130" },
     Pic { id: "emote_heart", rom: 0x086B_81E8, w: 8, h: 8, opaque: false, frames: 4, desc: "emote animation strip (heart)", code: "rodata 0x086B8134" },
     Pic { id: "emote_drop", rom: 0x086B_8244, w: 8, h: 8, opaque: false, frames: 6, desc: "emote animation strip (sweat drop / flame)", code: "rodata 0x086B8138" },
+    Pic { id: "banner", rom: 0x0807_248C, w: 240, h: 16, opaque: false, frames: 1, desc: "area-name banner background (the name is drawn over it in the small font, see banner.json)", code: "0x0800BE90" },
 ];
 
 pub fn decode(rom: &Rom, p: &Pic) -> Surface {

@@ -14,3 +14,5 @@ serde.workspace = true
 wf-rom.workspace = true
 wf-extract = { path = "../wf-extract" }
 wf-script-rhai = { path = "../wf-script-rhai" }
+serde_json.workspace = true
+wf-ui = { path = "../wf-ui" }

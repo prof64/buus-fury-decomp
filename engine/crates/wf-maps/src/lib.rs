@@ -6,6 +6,7 @@ pub mod collision;
 pub mod render;
 pub mod rom_maps;
 pub mod tiled;
+pub mod worldmap;
 
 use std::collections::{BTreeMap, HashMap};
 
@@ -193,6 +194,7 @@ pub fn extract(rom: &Rom, out: &mut Content) -> wf_rom::Result<()> {
                     layers.push((bg, r.clone(), lay, idx));
                 }
                 RES_EMPTY => {}
+                k if worldmap::handles(k) => {}
                 k => out.warn(format!(
                     "maps/{}: bg{bg} resource {} has an unsupported layer kind {} (not rendered)",
                     m.id,
@@ -200,6 +202,9 @@ pub fn extract(rom: &Rom, out: &mut Content) -> wf_rom::Result<()> {
                     hx(k)
                 )),
             }
+        }
+        if res.iter().flatten().any(|r| worldmap::handles(r.kind)) {
+            worldmap::export(&mut ctx, h, &res, &m.id, out);
         }
         let (w, hgt) = h.world_px();
         let comp = render::composite(&layers, h, w, hgt);
@@ -273,6 +278,23 @@ pub fn extract(rom: &Rom, out: &mut Content) -> wf_rom::Result<()> {
             "palette": "global BG palette 0x080701B0 (shared by every map)",
             "maps": index,
             "tilesets": tilesets_written.iter().map(|(k, v)| json!({"id": k, "maps": v})).collect::<Vec<_>>(),
+        }),
+    );
+    // the global palette's original RGB888 values (BG 0..255, OBJ 256..511): the fade routine 0x08007074 computes
+    // palette RAM from these, `(c * (256 - level) + target * level) >> 11` per channel (frontend palette fades)
+    let pal: Vec<String> = (0..512u32)
+        .map(|i| {
+            let b = rom.bytes(rom_maps::GLOBAL_PALETTE_RGB888 + 3 * i, 3);
+            format!("#{:02x}{:02x}{:02x}", b[0], b[1], b[2])
+        })
+        .collect();
+    out.put_json(
+        "maps/palette.json",
+        &json!({
+            "format": "engine/docs/maps.md",
+            "rom": "0x080701B0",
+            "note": "global palette, RGB888 as stored (BG 0..255, OBJ 256..511); images use the BGR555 expansion (c >> 3 << 3 | c >> 3 >> 2)",
+            "rgb888": pal,
         }),
     );
     Ok(())

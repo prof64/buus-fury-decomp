@@ -206,13 +206,20 @@ async function boot(baseTarBytes) {
   const cfg = { players: Number(qs.get('players') || 1), bindings, hotkeys, now: Date.now() / 1000 };
   // real battle by default (?arena=forest&enemy=t68&count=1&fighter=goku&seed=1); ?demo or ?area=8-3 = demo world
   if (qs.has('demo') || qs.has('area')) Object.assign(cfg, { demo: true, area: qs.get('area') || '8-3' });
+  // ?story or ?story=W-A: story mode (new game, field + the game's scripts)
+  if (qs.has('story')) cfg.story = qs.get('story') || '1-1';
   for (const k of ['arena', 'enemy', 'fighter']) if (qs.get(k)) cfg[k] = qs.get(k);
   for (const k of ['count', 'form', 'level', 'seed']) if (qs.get(k)) cfg[k] = Number(qs.get(k));
   const t1 = performance.now();
   // online (?net, net.js): lobby first; the match then runs as the app's simulation
   let net = null;
   if (qs.has('net')) {
-    net = await startNet({ x, mem: () => mem, withStr, str }, qs);
+    // the in-game lobby menu draws on the game canvas before the match exists
+    const showStage = () => {
+      $('stage').hidden = false;
+      show('');
+    };
+    net = await startNet({ x, mem: () => mem, withStr, str, canvas: $('screen'), showStage }, qs);
     if (!net) return;
     cfg.net = true;
   }

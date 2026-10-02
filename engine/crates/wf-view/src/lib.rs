@@ -57,6 +57,62 @@ pub struct RenderView {
     pub fade_black: u8,
     /// The dialogue box, if one is open (drawn above everything, like the game's priority-0 OBJs).
     pub dialog: Option<DialogView>,
+    /// The area-name banner shown on area entry (`ui/banner.json`), if one is up.
+    pub banner: Option<BannerView>,
+    /// The game's palette fade (`0x08007074`: palette RAM = `(c * (256 - level) + target * level) >> 11` from the
+    /// original RGB888 colours), used by area transitions (brightness 256 -> 0 by 8 per frame) and screen fades.
+    /// Applied to every colour before composition; `None` = no fade. Takes precedence over `fade_black`.
+    pub palette_fade: Option<PaletteFade>,
+    /// World-map (mode 7) extras the renderer cannot derive from `MapView.mode7` alone; `None` = defaults (see
+    /// [`WorldMapView`]).
+    pub world_map: Option<WorldMapView>,
+}
+
+/// Exact world-map presentation state (docs/frontend.md "World map"). Every field is optional; without it the
+/// renderer uses `MapView.mode7` for everything, derives the flyer from that camera, shows the props flagged
+/// visible in content and the mini-map box of the map's on-enter script.
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct WorldMapView {
+    /// The camera the BG2 scanline table / sky scroll were built from: the game builds them before its camera
+    /// update, so the picture shows the previous frame's camera on the ground while billboards / the flyer use
+    /// the current one.
+    pub bg_camera: Option<Mode7View>,
+    /// The flyer: x, y (24.8 world px), z (22.10, up), its sprite sheet (`sprites/<id>`), frame and step flip; the
+    /// renderer draws it (with halo and shadow) projected — `SpriteDraw`s of the player are ignored on the world map.
+    pub flyer: Option<FlyerView>,
+    /// Props shown / hidden by scripts (`prop_show` / `prop_hide`), overriding the content flag.
+    pub props_shown: Vec<u16>,
+    pub props_hidden: Vec<u16>,
+    /// The mini-map marker box (`spawn_box(x0, y0, x1, y1)`), None = the content default.
+    pub minimap_box: Option<[i32; 4]>,
+}
+
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct FlyerView {
+    pub x: i32,
+    pub y: i32,
+    pub z: i32,
+    pub sheet: String,
+    pub frame: u16,
+    pub flip: bool,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub struct PaletteFade {
+    /// 0 = normal .. 256 = the target colour
+    pub level: u16,
+    /// target colour, `0xRRGGBB` (black = 0)
+    pub target: u32,
+}
+
+/// The area-name banner (object `0x0800BF34`, vt `0x0804B528`): created by EnterArea after the player and the HUD
+/// when the new area's name string differs from the last one shown (and is not 0); not on the 3D world map.
+/// Shown for 239 frames: `t` = frames since its first draw (0..=238); from t = 223 the strip collapses vertically.
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct BannerView {
+    /// The area name (string table text, e.g. "Southwest Forest").
+    pub text: String,
+    pub t: u32,
 }
 
 /// An open dialogue box (`ui/dialog.json`): the renderer word-wraps `text` with the game's line fitter, pages it
@@ -89,6 +145,9 @@ impl RenderView {
         self.hud.clear();
         self.fade_black = 0;
         self.dialog = None;
+        self.palette_fade = None;
+        self.banner = None;
+        self.world_map = None;
     }
 }
 

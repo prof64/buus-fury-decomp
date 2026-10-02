@@ -27,7 +27,7 @@
 use crate::actor::Actor;
 use crate::content::GameData;
 use crate::geom::{facing_toward, Dir, Rect};
-use crate::input::{InputFrame, A, B, DOWN, LEFT, RIGHT, UP};
+use crate::input::{InputFrame, A, B, DOWN, UP};
 use crate::world::{Body, EntityId, World, GBA_H, GBA_W, MAX_PLAYERS};
 use serde::{Deserialize, Serialize};
 
@@ -99,6 +99,8 @@ pub struct ActAnim {
     pub mode: AnimMode,
     /// a one-shot animation reached its end (`play_anim` done)
     pub ended: bool,
+    /// a frame-range controller created this frame by a track's pop-and-start: no tick yet
+    pub fresh: bool,
 }
 
 /// what an animation tick asks the world to do
@@ -128,20 +130,30 @@ impl ActAnim {
         match self.mode.clone() {
             AnimMode::Pose => AnimOut::None,
             AnimMode::Frames { each, loops, loop_start, last, pass } => {
-                self.tick += 1;
+                // the frame-range controller (0x0804DE58): cels 0..last, `each` ticks per cel, later passes from
+                // `loop_start` (its tick restarts at loop_start * each); a controller created by a track's
+                // pop-and-start waits a frame before its first tick (a new world object)
+                if self.ended {
+                    return AnimOut::None;
+                }
+                if self.fresh {
+                    self.fresh = false;
+                    return AnimOut::None;
+                }
                 let each = each.max(1);
                 let last = last.max(1);
                 let ls = loop_start.clamp(0, last - 1);
-                let mut c = self.tick / each;
                 let mut pass = pass;
+                self.tick += 1;
+                let mut c = self.tick / each;
                 if c >= last {
-                    let rest = c - last;
-                    let span = (last - ls).max(1);
-                    pass = 1 + rest / span;
-                    c = ls + rest % span;
+                    pass += 1;
                     if loops > 0 && pass >= loops {
                         self.ended = true;
                         c = last - 1;
+                    } else {
+                        self.tick = ls * each;
+                        c = ls;
                     }
                 }
                 self.frame = c;
@@ -278,7 +290,8 @@ fn anim_out(w: &mut World, i: usize, out: AnimOut) {
     match out {
         AnimOut::None => {}
         AnimOut::ToIdle => set_state(w, i, 0),
-        AnimOut::Sfx(id, vol) => w.sfx(id, vol),
+        // the dash state's step sound is the player's (scripted actors run silently: buu_form)
+        AnimOut::Sfx(..) => {}
     }
 }
 
@@ -401,7 +414,7 @@ pub fn set_pose(w: &mut World, i: usize, id: i32, frame: i32) {
 
 fn set_frames(w: &mut World, i: usize, id: i32, mode: AnimMode) {
     let player = matches!(w.ents[i].body, Body::Player(_));
-    let a = ActAnim { mode, ..ActAnim::of(id) };
+    let a = ActAnim { mode, fresh: w.scene.chaining, ..ActAnim::of(id) };
     if let Some(m) = anim_mut(w, i) {
         *m = a;
     }
@@ -601,6 +614,8 @@ pub struct CamCtl {
     pub scroll: Option<Scroll>,
     /// camera+8 / +0xC (0x6D / 0x6E; meaning unknown, kept)
     pub param8: i32,
+    /// skip this frame's camera update (an area load snapped the camera within the frame)
+    pub hold: bool,
     pub param12: i32,
 }
 
@@ -664,13 +679,15 @@ pub struct Screen {
     pub black: i32,
     pub white: i32,
     pub mosaic: i32,
+    /// the black fade in 1/256 (the palette scale: colour * (256 - dim) >> 8)
+    pub dim: i32,
     pub flash: Option<PalFlash>,
     pub layers: Layers,
 }
 
 impl Default for Screen {
     fn default() -> Self {
-        Screen { fade: None, black: 0, white: 0, mosaic: 0, flash: None, layers: Layers::default() }
+        Screen { fade: None, black: 0, white: 0, mosaic: 0, dim: 0, flash: None, layers: Layers::default() }
     }
 }
 
@@ -884,6 +901,10 @@ pub struct Scene {
     pub depth: u32,
     /// a modal mode that does not run the world update is up (camera scroll, mosaic)
     pub freeze: bool,
+    /// the song playing (-1 none): PlaySong 0x0803F110 does not restart the song already playing
+    pub song: i32,
+    /// a track is starting its next command after a pop (inside the frame's track tick)
+    pub chaining: bool,
     /// the frame's raw input (script queries read it even while the players' input is masked)
     pub keys: [InputFrame; MAX_PLAYERS],
 }
@@ -911,6 +932,8 @@ impl Default for Scene {
             props: Vec::new(),
             depth: 0,
             freeze: false,
+            song: -1,
+            chaining: false,
             keys: [InputFrame::default(); MAX_PLAYERS],
         }
     }
@@ -1235,8 +1258,8 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
             if let Some(i) = i {
                 let (px, py) = actor_pos(w, i);
                 let dir = w.actor(i).map(|a| a.facing).unwrap_or(0);
-                let id = spawn_npc(w, *sprite, px, py, 0);
-                let _ = dir;
+                // same place and facing (0x080192BA moves the queue)
+                let id = spawn_npc(w, *sprite, px, py, dir);
                 let old = w.ents[i].id;
                 w.ents[i].removed = true;
                 // the remaining queued commands move to the new actor (0x080192BA)
@@ -1249,8 +1272,14 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
             if let Some(i) = i {
                 let (px, py) = actor_pos(w, i);
                 let dir = w.actor(i).map(|a| a.facing).unwrap_or(0);
+                let old = w.ents[i].id;
                 w.ents[i].removed = true;
-                become_map_object(w, *index, px, py, dir);
+                // the remaining queued commands move to the map object (0x080192BA), as for change_sprite
+                if let Some(id) = become_map_object(w, *index, px, py, dir) {
+                    if let Some(t) = w.scene.tracks.iter_mut().find(|t| t.owner == Owner::Entity(old)) {
+                        t.owner = Owner::Entity(id);
+                    }
+                }
             }
         }
         Cmd::Sfx { id } => w.sfx(*id, 64),
@@ -1480,6 +1509,11 @@ fn update_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) -> bool {
                 *vy += 8;
                 let v = *vy;
                 if let Some(ac) = actor_mut(w, i) {
+                    if *t == 8 {
+                        // the flight runs from the whole-pixel start (the fraction is dropped)
+                        ac.x = (ac.x >> 8) << 8;
+                        ac.y = (ac.y >> 8) << 8;
+                    }
                     ac.x += *sx;
                     ac.y += v;
                 }
@@ -1692,25 +1726,48 @@ fn prop_mut(w: &mut World, id: i32) -> &mut Prop {
 }
 
 /// `become_map_object`: the field layer spawns area object `index` at the stand-in's place
-fn become_map_object(w: &mut World, index: i32, x: i32, y: i32, dir: Dir) {
-    if w.field.is_none() {
-        return;
-    }
+fn become_map_object(w: &mut World, index: i32, x: i32, y: i32, dir: Dir) -> Option<EntityId> {
+    w.field.as_ref()?;
     // area +0x14: the actor list (list 1)
     let at = crate::fieldcontent::ObjRef::List(1, index as u16);
-    if let Some(id) = crate::field::spawn_map_object(w, at, true) {
-        if let Some(i) = w.find(id) {
-            if let Some(a) = actor_mut(w, i) {
-                a.x = x << 8;
-                a.y = y << 8;
-                a.facing = dir;
-            }
+    let id = crate::field::spawn_map_object(w, at, true)?;
+    if let Some(i) = w.find(id) {
+        if let Some(a) = actor_mut(w, i) {
+            a.x = x << 8;
+            a.y = y << 8;
+            a.facing = dir;
         }
     }
+    Some(id)
 }
 
 // ---------------------------------------------------------------------------------------------------------------
 // per frame
+
+/// the frame's music events (any source: area loads, scripts) keep `Scene.song` current; called at the end of the
+/// frame (`Session::step_post`) and after a session is created
+pub fn note_events(w: &mut World) {
+    for e in &w.events {
+        match e {
+            crate::world::Event::Song { id } => w.scene.song = *id,
+            crate::world::Event::SongStop => w.scene.song = -1,
+            _ => {}
+        }
+    }
+}
+
+/// `play_music`: start a song unless it is already playing
+pub fn play_song(w: &mut World, id: i32) {
+    let playing = w.scene.song == id || w.events.iter().rev().find_map(|e| match e {
+        crate::world::Event::Song { id: s } => Some(*s == id),
+        crate::world::Event::SongStop => Some(false),
+        _ => None,
+    }) == Some(true);
+    if !playing {
+        w.events.push(crate::world::Event::Song { id });
+        w.scene.song = id;
+    }
+}
 
 /// start of the frame: keep the raw input for the scripts; players get none while an event graph runs, a modal
 /// fade / dialog / menu is up, or the director waits
@@ -1806,7 +1863,9 @@ fn tick_track(w: &mut World, k: usize) -> bool {
     w.scene.tracks[k].started = false;
     w.scene.tracks[k].holding = false;
     if !w.scene.tracks[k].queue.is_empty() {
+        w.scene.chaining = true;
         start_head(w, k);
+        w.scene.chaining = false;
     }
     false
 }
@@ -1818,7 +1877,13 @@ fn tick_visuals(w: &mut World) {
             v.life -= 1;
         }
     }
+    // a fired beam's effect object ends with its sound changing (32 -> 33)
+    let ended_beam = w.scene.visuals.iter().any(|v| v.life == 0 && matches!(v.kind, VisualKind::Beam { kind: BeamKind::Beam | BeamKind::BeamAlt | BeamKind::Blast, .. }));
     w.scene.visuals.retain(|v| v.life != 0);
+    if ended_beam {
+        w.sfx_stop(32);
+        w.sfx(33, 64);
+    }
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -1923,6 +1988,12 @@ pub fn follow(w: &mut World, id: EntityId) {
 /// player-0 camera under script control. Returns true when the script owns the camera this frame (the caller
 /// skips the player camera).
 pub fn camera(w: &mut World) -> bool {
+    if w.scene.cam.hold {
+        w.scene.cam.hold = false;
+        let c = &mut w.cameras[0];
+        c.shown = c.rect;
+        return true;
+    }
     if w.scene.cam.scroll.is_some() {
         let c = &mut w.cameras[0];
         c.shown = c.rect;
@@ -1984,9 +2055,16 @@ fn tick_screen(w: &mut World) {
     f.t += 1;
     let lvl = (16 * f.t.min(f.len) / f.len.max(1)).clamp(0, 16);
     let s = &mut w.scene.screen;
+    let fine = (256 * f.t.min(f.len) / f.len.max(1)).clamp(0, 256);
     match (f.kind, f.out) {
-        (FadeKind::Black, true) => s.black = lvl,
-        (FadeKind::Black, false) => s.black = 16 - lvl,
+        (FadeKind::Black, true) => {
+            s.black = lvl;
+            s.dim = fine;
+        }
+        (FadeKind::Black, false) => {
+            s.black = 16 - lvl;
+            s.dim = 256 - fine;
+        }
         (FadeKind::White, true) => s.white = lvl,
         (FadeKind::White, false) => s.white = 16 - lvl,
         (FadeKind::Mosaic, true) => s.mosaic = lvl,
@@ -2011,6 +2089,14 @@ fn tick_screen(w: &mut World) {
     } else {
         s.fade = Some(f);
     }
+}
+
+/// the palette is all black: the brightest 5-bit colour scales to 0 (or the screen is fully faded)
+pub fn palette_black(w: &World) -> bool {
+    let s = &w.scene.screen;
+    // a black fade in progress scales the palette by its fine level; otherwise the coarse level (menus, mosaic)
+    let dim = if s.fade.as_ref().is_some_and(|f| f.kind == FadeKind::Black) { s.dim } else { s.dim.max(s.black * 16) };
+    (31 * (256 - dim.min(256))) >> 8 == 0
 }
 
 /// brightness toward black 0..16 shown this frame (`RenderView::fade_black`)
@@ -2242,7 +2328,15 @@ fn menu_step(m: &mut Menu, k: u16, held: u16, shop: &[ShopItem], zenie: i64, bla
             if k & A != 0 {
                 match m.kind {
                     MenuKind::Character => close(m, m.cursor),
-                    MenuKind::ShopBuy => m.pending = Some(m.cursor),
+                    MenuKind::ShopBuy => {
+                        // the purchase happens in the frame of the press (its redraw makes that frame long)
+                        if let Some(it) = shop.get(m.cursor as usize) {
+                            if zenie >= it.price as i64 {
+                                m.log.push((m.cursor, 1));
+                                *sound = Some(41);
+                            }
+                        }
+                    }
                     _ => m.log.push((m.cursor, -1)),
                 }
             } else if k & B != 0 {

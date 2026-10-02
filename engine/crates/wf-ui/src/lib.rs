@@ -101,6 +101,9 @@ pub fn extract(rom: &Rom, out: &mut Content) -> wf_rom::Result<()> {
     out.put("ui/hud/gauge_ss3.png", hud::to_picture(&h.img_ss3).png(&pal, true));
     out.put_json("ui/hud.json", &hud::json(&h));
 
+    // area-name banner (layout constants from its object, vt 0x0804B528)
+    out.put_json("ui/banner.json", &banner_json());
+
     // map screen
     let fr = mapscreen::render_frame(rom, true, true, true);
     out.put("ui/mapscreen/frame.png", fr.png(&pal, false));
@@ -133,6 +136,24 @@ pub fn extract(rom: &Rom, out: &mut Content) -> wf_rom::Result<()> {
     index.insert("palette".into(), json!("palette.json (0x0805652C); every PNG here uses it unless noted"));
     out.put_json("ui/index.json", &Value::Object(index));
     Ok(())
+}
+
+/// Area-name banner (object ctor `0x0800BF34`, vt `0x0804B528`, surface `0x0800BE90`, draw `0x0800BFCE`).
+fn banner_json() -> Value {
+    json!({
+        "image": "images/banner.png",
+        "surface": {"size": [240, 16], "background": "images/banner.png (LZ 0x0807248C, type 1, 0xF00 bytes)"},
+        "text": {"font": "fonts/small.json", "string": "the area's name string id (areas.json name_string_id)",
+                 "align": "centre: x0 = 120 - (width + 1) / 2, width = sum(glyph width + 1) (string drawer 0x0803DADA mode 1)",
+                 "pen_y": 11, "glyph_top": "pen y - 12", "color": 2, "shadow_color": 1, "shadow_offset": [1, 1],
+                 "note": "per glyph the shadow pass is drawn first, then the colour pass (glyph fn 0x0803F5A4)"},
+        "screen": {"objs": "7 x 32x16 + 1 x 16x16 8bpp affine OBJs at x 0, 32, .. 224, y 128", "priority": 0, "mode": "normal (no blending)"},
+        "timing": {"timer_start": 240, "update": "timer -= 1 before each draw; removed when it reaches 0 (239 visible frames)",
+                   "squash": "affine pa = 0x100, pd = 0x100 while timer > 16, else 0x1000 / timer (the strip collapses to its centre line)",
+                   "frame_t": "t = 239 - timer = frames since the first draw (0..238)"},
+        "created": "EnterArea 0x08008D44 after the player and the HUD, when the new area's name id (area +0xC) differs from the last shown one (0x03001984) and is not 0; the 3D world map (map +0x3C) creates its own label object 0x0800C0C8 instead and only records the id",
+        "rom": {"ctor": "0x0800BF34", "vtable": "0x0804B528", "surface": "0x0800BE90", "update": "0x0800BF94", "draw": "0x0800BFCE"}
+    })
 }
 
 fn menu_json() -> Value {

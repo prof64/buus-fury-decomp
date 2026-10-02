@@ -1,16 +1,20 @@
 [package]
 name = "wf-net"
-description = "Online multiplayer: rollback netcode (GGPO-style, transport-agnostic, no clock inside) over the deterministic wf-core session, lobby by room code, spectators, desync detection, sync test; WebRTC transport via Matchbox (native) or the browser (wf-web)"
+description = "Online multiplayer: rollback netcode (GGPO-style, transport-agnostic, no clock inside) over the deterministic wf-core session, lobby by room code, spectators, rejoin, desync detection, sync test; WebRTC transport via Matchbox (native) or the browser (wf-web); signaling + TURN servers"
 edition.workspace = true
 version.workspace = true
 license.workspace = true
 
 [features]
 default = []
-# native WebRTC data channels through a Matchbox signaling server (matchbox_socket + webrtc-rs on tokio)
-webrtc = ["dep:matchbox_socket", "dep:tokio"]
-# the `wf-signal` signaling server binary (matchbox_signaling)
-server = ["dep:matchbox_signaling", "dep:tokio"]
+# native WebRTC data channels through a Matchbox signaling server (matchbox_socket + webrtc-rs on tokio; our own
+# signaling client: wss:// with rustls, relay-only filter)
+webrtc = ["dep:matchbox_socket", "dep:tokio", "dep:tokio-tungstenite", "dep:tokio-rustls", "dep:rustls", "dep:webpki-roots", "dep:futures-util"]
+# the `wf-signal` signaling server binary (matchbox_signaling + room tokens, server key, TURN credentials at /ice,
+# optional built-in TLS for wss:// without a reverse proxy)
+server = ["dep:matchbox_signaling", "dep:tokio", "dep:axum", "dep:tokio-rustls", "dep:rustls"]
+# the `wf-turn` TURN relay binary (webrtc-rs `turn`: local relay-only tests, small deployments)
+turn = ["dep:turn", "dep:webrtc-util", "dep:tokio"]
 
 [dependencies]
 wf-core = { path = "../wf-core" }
@@ -18,11 +22,20 @@ wf-view = { path = "../wf-view" }
 wf-replay = { path = "../wf-replay" }
 serde = { workspace = true }
 serde_json = { workspace = true }
+sha1 = { workspace = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 matchbox_socket = { version = "0.14", optional = true }
 matchbox_signaling = { version = "0.14", optional = true }
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "net", "signal"], optional = true }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "net", "signal", "io-util", "sync"], optional = true }
+tokio-tungstenite = { version = "0.29", default-features = false, features = ["connect", "handshake", "__rustls-tls"], optional = true }
+tokio-rustls = { version = "0.26", default-features = false, optional = true }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"], optional = true }
+webpki-roots = { version = "1", optional = true }
+futures-util = { version = "0.3", default-features = false, features = ["sink", "std"], optional = true }
+axum = { version = "0.8", default-features = false, features = ["tokio", "http1", "query"], optional = true }
+turn = { version = "0.17", optional = true, features = ["metrics"] }
+webrtc-util = { version = "0.17", default-features = false, features = ["conn", "vnet"], optional = true }
 
 [dev-dependencies]
 wf-rom = { workspace = true }
@@ -32,3 +45,8 @@ wf-extract = { path = "../wf-extract" }
 name = "wf-signal"
 path = "src/bin/wf-signal.rs"
 required-features = ["server"]
+
+[[bin]]
+name = "wf-turn"
+path = "src/bin/wf-turn.rs"
+required-features = ["turn"]

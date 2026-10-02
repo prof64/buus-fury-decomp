@@ -27,6 +27,11 @@ pub struct SpectatorSession<G: Game> {
     desynced: bool,
     pub packets_recv: u64,
     pub hash_checks: u64,
+    /// every player of the match (any may serve us after the host left)
+    pub players: Vec<String>,
+    /// who served the newest packet
+    pub source: String,
+    ticks: u64,
 }
 
 impl<G: Game> SpectatorSession<G> {
@@ -50,6 +55,9 @@ impl<G: Game> SpectatorSession<G> {
             desynced: false,
             packets_recv: 0,
             hash_checks: 0,
+            players: Vec::new(),
+            source: String::new(),
+            ticks: 0,
         };
         s.hash_current();
         s
@@ -68,15 +76,19 @@ impl<G: Game> SpectatorSession<G> {
     }
 
     pub fn handle(&mut self, from: &str, msg: &Msg, now: f64) {
-        if from != self.host {
-            return;
-        }
+        // the acting host serves us: the original host, or (after it left) the connected player with the lowest
+        // slot, or a player that rejoined under a new id; every player has the same confirmed inputs, so any sender
+        // of this match (session nonce) is accepted (a wrong one would show up as a desync)
         let Msg::Spect(m) = msg else { return };
         if m.session != self.session || m.slots as usize != self.slots || self.slots == 0 {
             return;
         }
+        if !self.players.iter().any(|p| p == from) && from != self.host {
+            self.players.push(from.to_string());
+        }
         self.packets_recv += 1;
         self.last_recv = now;
+        self.source = from.to_string();
         self.host_frame = m.frame;
         let n = m.inputs.len() / self.slots;
         for i in 0..n {
@@ -131,7 +143,16 @@ impl<G: Game> SpectatorSession<G> {
                 }
             }
         }
-        out.push((self.host.clone(), crate::proto::encode(&Msg::SpectAck { session: self.session, ack: self.inputs.len() as i32 })));
+        // the ack goes to whoever serves us; twice a second to every player too (a new acting host learns about us)
+        self.ticks += 1;
+        let ack = crate::proto::encode(&Msg::SpectAck { session: self.session, ack: self.inputs.len() as i32 });
+        let to = if self.source.is_empty() { self.host.clone() } else { self.source.clone() };
+        if self.ticks % 30 == 0 {
+            for p in self.players.iter().filter(|p| **p != to) {
+                out.push((p.clone(), ack.clone()));
+            }
+        }
+        out.push((to, ack));
         n.max(0) as u32
     }
 

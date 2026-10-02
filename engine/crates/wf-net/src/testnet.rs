@@ -37,7 +37,8 @@ pub fn peers<G: Game>(net: &SimNet, games: Vec<G>, cfg: &NetConfig, spectators: 
     let mut out = Vec::new();
     for (i, g) in games.into_iter().enumerate() {
         let others = (0..n).filter(|&k| k != i).map(|k| (ids[k].clone(), vec![k])).collect();
-        let specs = if i == 0 { (0..spectators).map(|k| format!("spec{k}")).collect() } else { Vec::new() };
+        // every player knows the spectators; the acting host (lowest connected slot) serves them
+        let specs = (0..spectators).map(|k| format!("spec{k}")).collect();
         let ep = net.endpoint(&ids[i]);
         let sess = P2PSession::new(g, NetConfig { slots: n, ..cfg.clone() }, vec![i], others, specs, i == 0, 0.0);
         out.push(PeerRun { id: ids[i].clone(), sess, ep, input: RandomInput::new(seed * 131 + i as u64), start_tick: 0, leave_tick: None, left: false, period_ms: 1000.0 / cfg.fps, next_ms: 0.0 });
@@ -47,7 +48,9 @@ pub fn peers<G: Game>(net: &SimNet, games: Vec<G>, cfg: &NetConfig, spectators: 
 
 pub fn spectator<G: Game>(net: &SimNet, game: G, cfg: &NetConfig, slots: usize, k: usize) -> SpecRun<G> {
     let ep = net.endpoint(&format!("spec{k}"));
-    SpecRun { sess: SpectatorSession::new(game, cfg.session, "peer0".into(), slots, 0.0), ep, start_tick: 0, next_ms: 0.0 }
+    let mut sess = SpectatorSession::new(game, cfg.session, "peer0".into(), slots, 0.0);
+    sess.players = (0..slots).map(|k| format!("peer{k}")).collect();
+    SpecRun { sess, ep, start_tick: 0, next_ms: 0.0 }
 }
 
 #[derive(Debug, Default)]
@@ -59,13 +62,21 @@ pub struct RunResult {
 
 /// Run until every remaining peer (and spectator) has state `frames` hashed, or `max_ms` of virtual time.
 /// Time advances in 1 ms steps; each peer ticks on its own period.
-pub fn run<G: Game>(net: &SimNet, ps: &mut [PeerRun<G>], specs: &mut [SpecRun<G>], frames: i32, max_ms: f64) -> RunResult {
+pub fn run<G: Game>(net: &SimNet, ps: &mut Vec<PeerRun<G>>, specs: &mut [SpecRun<G>], frames: i32, max_ms: f64) -> RunResult {
+    run_with(net, ps, specs, frames, max_ms, &mut |_, _| None)
+}
+
+/// [`run`] with a hook called every virtual ms that may return a peer to add (a rejoining player).
+pub fn run_with<G: Game>(net: &SimNet, ps: &mut Vec<PeerRun<G>>, specs: &mut [SpecRun<G>], frames: i32, max_ms: f64, hook: &mut dyn FnMut(f64, &mut [PeerRun<G>]) -> Option<PeerRun<G>>) -> RunResult {
     let t0 = std::time::Instant::now();
     let clock = move || t0.elapsed().as_secs_f64() * 1000.0;
     let mut now = 0.0;
     let base = 1000.0 / 59.7275;
     let mut out = Vec::new();
     while now < max_ms {
+        if let Some(p) = hook(now, ps) {
+            ps.push(p);
+        }
         for p in ps.iter_mut() {
             if p.left || now < p.start_tick as f64 * base || now < p.next_ms {
                 continue;
@@ -152,4 +163,36 @@ impl Game for ToyGame {
     fn checksum(&self, s: &(u64, u32)) -> u64 {
         s.0 ^ ((s.1 as u64) << 40)
     }
+    fn save_bytes(&self) -> Option<Vec<u8>> {
+        let mut v = self.acc.to_le_bytes().to_vec();
+        v.extend_from_slice(&self.frame.to_le_bytes());
+        Some(v)
+    }
+    fn load_bytes(&mut self, b: &[u8]) -> bool {
+        if b.len() != 12 {
+            return false;
+        }
+        self.acc = u64::from_le_bytes(b[..8].try_into().unwrap());
+        self.frame = u32::from_le_bytes(b[8..].try_into().unwrap());
+        true
+    }
+}
+
+/// A peer that rejoins slot `slot` as `id`: the acting host (`ps[host]`) grants it (once every player agrees the
+/// slot is gone) and the new session starts from the snapshot, exactly like the lobby does it (`netsim.rs`).
+/// None while the host is not ready yet.
+pub fn try_rejoin<G: Game>(net: &SimNet, ps: &mut [PeerRun<G>], host: usize, slot: usize, id: &str, mut game: G, cfg: &NetConfig, seed: u64, now: f64) -> Option<PeerRun<G>> {
+    ps[host].sess.rejoin_ready(slot).ok()?;
+    let (g, bytes) = ps[host].sess.grant_rejoin(slot, id, now).expect("grant");
+    let mut g = g;
+    for e in g.peers.iter_mut() {
+        if e.0.is_empty() {
+            e.0 = ps[host].id.clone();
+        }
+    }
+    assert!(game.load_bytes(&bytes), "snapshot loads");
+    let ep = net.endpoint(id);
+    let sess = P2PSession::resume(game, NetConfig { slots: cfg.slots.max(g.epochs.len()), ..cfg.clone() }, &g, id, now).expect("snapshot verifies");
+    let period = ps[host].period_ms;
+    Some(PeerRun { id: id.to_string(), sess, ep, input: RandomInput::new(seed), start_tick: 0, leave_tick: None, left: false, period_ms: period, next_ms: now })
 }

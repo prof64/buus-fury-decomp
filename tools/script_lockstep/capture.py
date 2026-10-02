@@ -194,7 +194,7 @@ def snapshot(e):
     acts = r.actors()
     return {'objs': r.objs, 'actors': acts, 'cam': [s32v(e.r32(CAM)), s32v(e.r32(CAM + 4))],
             'area': [e.r8(0x0300197C + k) for k in range(3)],
-            'rng': [e.r32(0x03004A5C), e.r32(0x03004A60)], 'lf': e.r32(0x03000F94),
+            'rng': [e.r32(0x03004A5C), e.r32(0x03004A60)], 'lf': e.r32(0x03000F94), 'song': ((e.r32(0x030038A4 + 0xC) - SONG_TABLE) // 20) if e.r8(0x030038A4 + 5) == 1 else -1,
             'gd': e.read(GD, 0x600).hex(), 'recs': e.read(0x03001560, 0x68 * 9).hex(),
             'g': [s32v(e.r32(0x03001058 + 4 * i)) for i in range(4)],
             'l': [s32v(e.r32(0x03001020 + 4 * i)) for i in range(4)],

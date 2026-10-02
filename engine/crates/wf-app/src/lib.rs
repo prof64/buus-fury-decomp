@@ -15,6 +15,7 @@ pub mod overlay;
 pub mod rebind;
 pub mod replay_menu;
 pub mod session;
+pub mod story;
 
 use wf_content::Packs;
 use wf_render::{fit, Fit, Renderer, ViewMode};

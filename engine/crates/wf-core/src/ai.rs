@@ -131,6 +131,8 @@ pub struct CNode {
     pub addr: u32,
     pub p: Params,
     pub kids: Vec<u16>,
+    /// RunScript: the queued event's header address (def+0xC); InlineScript: the inline bytecode (def+0xC)
+    pub script: u32,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -164,12 +166,18 @@ fn push_node(out: &mut Vec<CNode>, v: &Value, all: Option<&BTreeMap<u16, Value>>
             return push_node(out, t, Some(all), depth + 1);
         }
         let idx = out.len() as u16;
-        out.push(CNode { k: K::Never, name: format!("missing state 0x{st:x}"), addr: 0, p, kids: vec![] });
+        out.push(CNode { k: K::Never, name: format!("missing state 0x{st:x}"), addr: 0, p, kids: vec![], script: 0 });
         return idx;
     }
     let idx = out.len() as u16;
     let addr = crate::content::int(v.get("addr").unwrap_or(&Value::Null)) as u32;
-    out.push(CNode { k: K::from_name(name), name: name.to_string(), addr, p, kids: vec![] });
+    // RunScript's <script> param (a header address); InlineScript's bytecode sits at def+0xC
+    let script = match name {
+        "RunScript" => v.get("params").and_then(|x| x.get("script")).map(|x| crate::content::int(&x["raw"]) as u32).unwrap_or(0),
+        "InlineScript" if addr != 0 => addr + 0xC,
+        _ => 0,
+    };
+    out.push(CNode { k: K::from_name(name), name: name.to_string(), addr, p, kids: vec![], script });
     let mut kids = Vec::new();
     for c in v.get("children").and_then(|x| x.as_array()).into_iter().flatten() {
         kids.push(push_node(out, c, all, depth));
@@ -184,7 +192,7 @@ pub fn compile_behaviour(id: u16, all: &BTreeMap<u16, Value>) -> BehTree {
         push_node(&mut nodes, v, Some(all), 0);
     }
     if nodes.is_empty() {
-        nodes.push(CNode { k: K::Never, name: format!("missing state 0x{id:x}"), addr: 0, p: Params::default(), kids: vec![] });
+        nodes.push(CNode { k: K::Never, name: format!("missing state 0x{id:x}"), addr: 0, p: Params::default(), kids: vec![], script: 0 });
     }
     BehTree { state: id, nodes }
 }

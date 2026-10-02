@@ -297,6 +297,15 @@ pub fn extract(rom: &Rom, out: &mut Content) -> Vec<Def> {
                     // picture-based tests: Kamikaze Ghost homing / contact)
                     if (0x0800_0000..0x0880_0000).contains(&fa) {
                         st["box"] = json!([rom.s8(fa + 4), rom.s8(fa + 5), rom.u8(fa + 6), rom.u8(fa + 7)]);
+                        // the OBJ pieces (+8, 12 B each: s8 dx, s8 dy, u8 w, u8 h, u16 attr0, u16 attr1, gfx): what
+                        // the affine draw (world map, 0x0800EF94) places one by one
+                        let n = rom.u32(fa).min(16);
+                        st["objs"] = json!((0..n)
+                            .map(|i| {
+                                let p = fa + 8 + 12 * i;
+                                json!([rom.s8(p), rom.s8(p + 1), rom.u8(p + 2), rom.u8(p + 3), rom.u16(p + 4), rom.u16(p + 6)])
+                            })
+                            .collect::<Vec<_>>());
                     }
                     if let Some((_, offs)) = &d.attach {
                         if let Some(att) = offs.get(&ai) {

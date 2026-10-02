@@ -19,6 +19,7 @@ use std::rc::Rc;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
+mod online;
 mod replays;
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
@@ -59,7 +60,11 @@ struct Args {
     spectate: Option<String>,
     realtime: bool,
     show_controls: bool,
+    /// headless: draw the online lobby menu over the shot (`main`, `host`, `room`)
+    show_online: Option<String>,
     demo: bool,
+    /// `--story [W-A]`: story mode (field + scripts) from a new game at area W-A (default 1-1)
+    story: Option<String>,
     arena: String,
     enemy: String,
     count: u32,
@@ -73,6 +78,10 @@ struct Args {
     record: Option<PathBuf>,
     /// online multiplayer / sync test (`--net-*`, wf_net::cli::HELP)
     net: wf_net::cli::NetArgs,
+    /// `--online`: open the online lobby menu at start (F12 any time)
+    online: bool,
+    /// `--signal` was given (overrides the lobby menu's saved server)
+    signal_given: bool,
 }
 
 fn parse_args() -> Args {
@@ -94,7 +103,9 @@ fn parse_args() -> Args {
         spectate: None,
         realtime: false,
         show_controls: false,
+        show_online: None,
         demo: false,
+        story: None,
         arena: "forest".into(),
         enemy: "t68".into(),
         count: 1,
@@ -105,6 +116,8 @@ fn parse_args() -> Args {
         replay: None,
         record: None,
         net: Default::default(),
+        online: false,
+        signal_given: false,
     };
     if a.headless {
         a.mute = true;
@@ -127,6 +140,13 @@ fn parse_args() -> Args {
                 a.demo = true;
             }
             "--demo" => a.demo = true,
+            "--story" => {
+                let v = v.get(i + 1).filter(|n| wf_app::story::parse_area(n).is_some()).cloned();
+                if v.is_some() {
+                    i += 1;
+                }
+                a.story = Some(v.unwrap_or_else(|| "1-1".into()));
+            }
             "--arena" => a.arena = next(&mut i),
             "--enemy" => a.enemy = next(&mut i),
             "--count" => a.count = next(&mut i).parse().unwrap_or(1),
@@ -159,6 +179,7 @@ fn parse_args() -> Args {
             }
             "--realtime" => a.realtime = true,
             "--show-controls" => a.show_controls = true,
+            "--show-online" => a.show_online = Some(next(&mut i)),
             "--frames" => a.frames = next(&mut i).parse().ok(),
             "--replay" => a.replay = Some(PathBuf::from(next(&mut i))),
             "--record" => a.record = Some(PathBuf::from(next(&mut i))),
@@ -168,7 +189,9 @@ fn parse_args() -> Args {
                 println!("{}", wf_net::cli::HELP);
                 std::process::exit(0);
             }
+            "--online" => a.online = true,
             s if s.starts_with("--net") || matches!(s, "--pvp" | "--pvp-enemies" | "--signal" | "--room") => {
+                a.signal_given |= s == "--signal";
                 a.net.flag(s, &mut || next(&mut i));
             }
             s => a.rom = Some(PathBuf::from(s)),
@@ -262,26 +285,21 @@ fn spawn_extract(rom: Vec<u8>, content: PathBuf, data: PathBuf) -> mpsc::Receive
 
 /// The simulation: `wf-core`'s battle by default, the frontend demo world with `--demo`.
 fn make_app(a: &Args, packs: Packs) -> Result<App, String> {
+    if let Some(area) = &a.story {
+        let at = wf_app::story::parse_area(area).ok_or_else(|| format!("--story: bad area {area} (W-A)"))?;
+        return wf_app::story::app(packs, at, vec![], a.seed);
+    }
     if a.demo {
         let cfg = DemoConfig { area: a.area.clone(), players: a.players, ..Default::default() };
         return App::demo(packs, &cfg).map_err(|e| e.to_string());
     }
     let cfg = wf_app::battle::config(&a.arena, &a.enemy, a.count, &a.fighter, a.form, a.level, a.players, a.seed);
-    if a.net.active() {
-        // online match (lobby blocks until it starts) or the local sync test: wf-net's Sims, rendered as usual
+    if let wf_net::cli::NetMode::SyncTest(d) = a.net.mode {
+        // the local sync test: wf-net's Sim, rendered as usual
         let data = wf_app::battle::game_data(&packs)?;
-        let sim: Box<dyn wf_view::Sim> = match a.net.mode {
-            wf_net::cli::NetMode::SyncTest(d) => Box::new(wf_net::cli::synctest_sim(&a.net, data, &cfg, d)),
-            _ => {
-                let mut net = a.net.clone();
-                net.record_dir.get_or_insert_with(|| a.data.join("replays").display().to_string());
-                let mut s = wf_net::cli::connect_blocking(&net, data, &cfg)?;
-                s.content = wf_app::battle::content_id(&packs);
-                Box::new(s)
-            }
-        };
-        return Ok(App::new(packs, sim));
+        return Ok(App::new(packs, Box::new(wf_net::cli::synctest_sim(&a.net, data, &cfg, d))));
     }
+    // (online: the local battle runs until the lobby (online.rs) starts the match)
     App::battle(packs, cfg)
 }
 
@@ -349,6 +367,8 @@ struct Running {
     replay_menu: ReplayMenu,
     store: replays::Store,
     mods: Mods,
+    /// the online lobby menu / room / match switching
+    online: online::Online,
 }
 
 fn now_unix() -> u64 {
@@ -428,8 +448,18 @@ impl Shell {
                     let _ = std::fs::write(&bpath, b.to_json());
                     b
                 });
-                let ctl = Control::new(&mut app, load_hotkeys(&self.args.data), now_unix());
+                let mut ctl = Control::new(&mut app, load_hotkeys(&self.args.data), now_unix());
+                let a = &self.args;
+                let local = wf_app::battle::config(&a.arena, &a.enemy, a.count, &a.fighter, a.form, a.level, a.players, a.seed);
+                let mut online = online::Online::new(a.net.clone(), &a.data, local, a.signal_given);
+                if a.net.active() && !matches!(a.net.mode, wf_net::cli::NetMode::SyncTest(_)) {
+                    online.start_cli(&mut app);
+                } else if a.online {
+                    online.toggle(&mut app);
+                }
+                let _ = &mut ctl;
                 self.phase = Phase::Ready(Box::new(Running {
+                    online,
                     ctl,
                     replay_menu: ReplayMenu::default(),
                     store: replays::Store::new(&self.args.data),
@@ -547,6 +577,12 @@ impl Shell {
                     *inp = r.keys.buttons(&r.bindings);
                 }
                 r.ctl.now_unix = now_unix();
+                // the online lobby: pump it; a starting match becomes the app's simulation
+                r.online.frame(&mut r.app, &mut r.ctl);
+                r.online.check_match(&r.app);
+                if r.online.menu.open {
+                    r.app.inputs.iter_mut().for_each(|i| *i = 0);
+                }
                 let live = r.app.inputs.clone();
                 if r.ctl.advance(&mut r.app, dt, &live) > 0 {
                     r.keys.consumed();
@@ -596,6 +632,7 @@ impl Shell {
                 let (vw, vh) = (f.view_w as usize, f.view_h as usize);
                 r.menu.draw(&r.app.packs, &mut r.app.renderer.fb, vw, vh, &r.bindings);
                 r.replay_menu.draw(&r.app.packs, &mut r.app.renderer.fb, vw, vh);
+                r.online.draw(&mut r.app, vw, vh);
                 // netplay overlay: connection line, desync / disconnect alerts, result
                 if let Some(s) = &net {
                     for (k, (t, alert)) in s.borrow().overlay().iter().enumerate() {
@@ -726,6 +763,22 @@ impl ApplicationHandler for Shell {
                     return;
                 }
                 let Phase::Ready(r) = &mut self.phase else { return };
+                // the online lobby menu (F12; Esc in an online match): every key goes to it while open
+                if down && (code == KeyCode::F12 || (code == KeyCode::Escape && r.online.in_match && !r.online.menu.open)) {
+                    r.online.toggle(&mut r.app);
+                    r.keys.clear();
+                    return;
+                }
+                if r.online.menu.open {
+                    if down {
+                        r.online.key(&format!("{code:?}"), &mut r.app, &mut r.ctl);
+                        if let Some(t) = event.text.as_deref() {
+                            r.online.text(t);
+                        }
+                    }
+                    r.keys.clear();
+                    return;
+                }
                 if r.replay_menu.open {
                     if down {
                         let cmd = r.replay_menu.key(&format!("{code:?}"));
@@ -918,6 +971,9 @@ fn headless(a: &Args) -> Result<(), String> {
         m.waiting = true;
         let b = std::fs::read_to_string(a.data.join("bindings.json")).ok().and_then(|s| Bindings::from_json(&s)).unwrap_or_default();
         m.draw(&s.app.packs, &mut shot.px, shot.w as usize, shot.h as usize, &b);
+    }
+    if let Some(which) = &a.show_online {
+        online::preview(which, &s.app.packs, &mut shot.px, shot.w as usize, shot.h as usize);
     }
     eprintln!(
         "{frames} steps ({step_ms:.4} ms/step), render {}x{} @{}x: {:.2} ms, state {:016x}, sfx voices busy {}, audio log {:?}",

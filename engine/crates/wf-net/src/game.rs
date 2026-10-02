@@ -18,6 +18,11 @@ pub trait Game {
     fn load_bytes(&mut self, _b: &[u8]) -> bool {
         false
     }
+    /// The session's index of the current state (after a load from bytes: a rejoin snapshot). Games that keep
+    /// per-frame bookkeeping (the rollback-aware sounds of `CoreGame`) carry it in their `State`.
+    fn set_frame_index(&mut self, _f: i32) {}
+    /// While on, first-time frames produce no presentation events (catching up after a rejoin).
+    fn set_quiet(&mut self, _on: bool) {}
 }
 
 /// Hash chain: `chain[k] = mix(chain[k-1], hash[k])`. Comparing one chain value compares every frame before it.

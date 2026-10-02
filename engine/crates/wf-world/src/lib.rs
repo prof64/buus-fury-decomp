@@ -316,7 +316,39 @@ pub fn extract(rom: &Rom, out: &mut Content) -> wf_rom::Result<()> {
         }),
     );
     out.put_json("world/areas.json", &json!({"counts": counts, "areas": areas_json}));
+    out.put_json("world/visited.json", &visited_table(rom));
     Ok(())
+}
+
+/// The map-screen locations table `0x0874CA24` (u32 count, +4 -> record pointers; record +0x14 n, +0x18.. n inline pointers to
+/// `{u8 world, u8 area, u16 bit}`): LoadArea step 2 (`0x08004A88`) sets story flag `0x1C0 + bit` of the first entry
+/// matching the area (re/buu/notes.md "Field: world map").
+fn visited_table(rom: &Rom) -> Value {
+    const TABLE: u32 = 0x0874_CA24;
+    let n = rom.u32(TABLE).min(256);
+    let list = rom.u32(TABLE + 4);
+    let mut records = Vec::new();
+    for k in 0..n {
+        let r = rom.u32(list + 4 * k);
+        if !rom.isptr(r) {
+            continue;
+        }
+        let cnt = rom.u32(r + 0x14).min(256);
+        let mut areas = Vec::new();
+        for j in 0..cnt {
+            let e = rom.u32(r + 0x18 + 4 * j);
+            if !rom.isptr(e) {
+                continue;
+            }
+            let bit = rom.u16(e + 2) as u32;
+            areas.push(json!({"world": rom.u8(e), "area": rom.u8(e + 1), "bit": bit, "flag": 0x1C0 + bit}));
+        }
+        records.push(json!({"index": k, "rom": wf_rom::hx(r), "areas": areas}));
+    }
+    json!({
+        "format": "map-screen locations (ROM 0x0874CA24); loading an area sets story flag 0x1C0 + bit of the first matching entry",
+        "records": records,
+    })
 }
 
 /// Append a Tiled `objectgroup` with the props and the objects of one area.

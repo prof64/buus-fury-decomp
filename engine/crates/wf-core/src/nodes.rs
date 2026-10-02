@@ -25,8 +25,8 @@ pub const NODE_NOTES: &[(&str, &str)] = &[
     ("IfUnknown", "condition 0x0804EE25 not decoded: false"),
     ("ShockStun", "electric-shock stun length not decoded: 48 frames"),
     ("VolleyballLaunch", "launched ball flight not decoded: 4 px/frame for 30 frames, hits other enemies"),
-    ("InlineScript", "bytecode not run (scripted escape / cutscene): the wf-script seam"),
-    ("RunScript", "cutscene scripts are not run: the wf-script seam"),
+    ("InlineScript", "queued once as a script run (the game re-runs the inline bytecode each update until it returns 1)"),
+    ("RunScript", "queues the event as a script run for the host (FieldEvent::Run, cause Ai)"),
 ];
 
 /// where a node's runtime lives: enemy entity index, AI stack level and that entry's serial
@@ -1098,7 +1098,25 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             pop(w, i);
             true
         }
-        K::Succeed | K::SelfMessage11 | K::RunScript | K::InlineScript => true,
+        K::Succeed | K::SelfMessage11 => true,
+        // the script seam: the host runs it (`FieldEvent::Run`, cause `Ai`); RunScript returns 1 at once
+        K::RunScript | K::InlineScript => {
+            let sc = c.tree.nodes[n as usize].script;
+            if sc != 0 && r.d[0] == 0 {
+                r.d[0] = 1;
+                let run = if matches!(c.tree.nodes[n as usize].k, K::RunScript) {
+                    crate::fieldcontent::Callback::Event(format!("header_0x{sc:08X}"))
+                } else {
+                    crate::fieldcontent::Callback::Script(format!("inline_0x{sc:08X}"))
+                };
+                w.events.push(crate::world::Event::Field(crate::field::FieldEvent::Run {
+                    run,
+                    cause: crate::field::Cause::Ai { entity: me },
+                    slot: 0,
+                }));
+            }
+            true
+        }
         K::StaggerMinions => {
             let rr = w.rng.rand(8);
             let kids = w.en_ref(i).children.clone();

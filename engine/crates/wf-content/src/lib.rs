@@ -12,6 +12,7 @@ pub mod audio;
 pub mod b64;
 pub mod image;
 pub mod map;
+pub mod mode7;
 pub mod sprite;
 
 use std::collections::{BTreeMap, BTreeSet};

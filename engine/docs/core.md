@@ -160,6 +160,11 @@ Two agents extend `World` concurrently; keep changes additive and re-read before
   `fieldobj.rs`; `World.story`, `World.field`; `Body::Pickup / Breakable / MapSprite`; map NPCs are `scene::Npc`
   with `behaviour: Some(field::Behaviour)`).
 
+**scene.rs status**: done as described above. Frame split: `Session::step_world` (no camera) → script host →
+`Session::step_post` (cameras). `Scene.song` follows the frame's music events at the end of `step_post` (byte
+snapshots carry no events). AI `RunScript` / `InlineScript` nodes emit `FieldEvent::Run { cause: Cause::Ai }`
+(`CNode.script` = header address / inline bytecode address).
+
 ## 10. Field game (`story.rs`, `fieldcontent.rs`, `field.rs`, `fieldnpc.rs`, `fieldobj.rs`)
 
 Buu's Fury fights in the field: a field session is the same `World` with `World.field = Some(..)`; players and enemies

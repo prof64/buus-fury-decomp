@@ -123,6 +123,42 @@ game's walk rules and camera, no enemies (useful for any map).
 `RenderView`: the enemy is rendered from content, the player walks to it and punches, the core emits hit SFX
 (48/49), swings (50/51) and the low-HP beep (41), and the muted driver starts SFX voices for them.
 
+### Story mode (`wf_app::story::StorySim`)
+
+`buus-fury --story [W-A]` / `?story[=W-A]` starts a new game in the field at area W-A (default 1-1 Snakeway): a
+`wf-core` field session (areas, exits / warps, NPCs, pickups, breakables, enemies, the world map) whose scripts run
+on the script host (`wf-script-core`) through the Rhai runtime (`wf-script-rhai`) from the content pack's
+`scripts/*.rhai` (moddable; no ROM at runtime). Per frame: `Session::step_world`, then the frame's `FieldEvent::Run`
+scripts (area on-enter / on-leave, triggers, talk, pickups, defeats) start one at a time and a blocked one resumes
+when `wf_script_core::poll` says so, then `Session::step_post`. Load scripts run right after their load instead of
+inside it (the core's hook must be `Send`, the Rhai runtime is not): only RNG draws inside load scripts could differ.
+
+Frontend-side completions of the core's view (`story::patch_view`, until `wf_core::view` provides them; all
+measured against the emulator):
+* **palette fade** of area transitions (`RenderView.palette_fade`, the fade routine's math on the original RGB888
+  palette `maps/palette.json`): field mode FadeOut k -> level 8k, FadeIn k -> 256 - 8k;
+* **OBJ layer one frame late**: the picture shows the previous frame's sprite build (shadow OAM is copied at the
+  next VBlank) over the current frame's BG scroll — the view's sprites are those from before the step;
+* **tile animations** run on the map's timers since the area load (`anim_frame = frame - Field.entered + 1`);
+* **skill icon greyed** (`_alt`) in areas without combat (`Field.combat == false`);
+* **area banner** (`BannerTracker`): the rule of §7 (a new load also removes a banner still showing).
+
+**Field parity** (`crates/wf-app/tests/field_parity.rs`, captures `crates/wf-render/re/capture_field.py`: the
+field recorders' traces re-run with the emulator screen + OAM of every video frame, git-ignored work/frontend/field/):
+
+| trace | frames | exact | median diff | remaining |
+|---|---|---|---|---|
+| npc_yemma_crowd (King Yemma's office, NPC crowd) | 1200 | 1169 | 0 px | a few arrival frames |
+| npc_westcity_idle (West City, NPCs) | 900 | 176 | 3 px | tile-animation phase on some frames |
+| objects_item_8_57 (map item pickup, item-get pose) | 392 | 281 | 0 px | water tile phase at the start (the trace starts mid-area) |
+| transitions_forest_roundtrip (8-3 -> 8-6 -> 8-3 with fades + banner) | 390 | 93 | 234 px | grass tile-animation phase after loads |
+| transitions_hercule_edge_up (3-2 -> 3-3) | 210 | 51 | 325 px | a wandering NPC of 3-3 the core does not place |
+| objects_breakable_drops_8_1 | 470 | 0 | 1333 px | the broken rock stays drawn; drops need the script host (not run in this test) |
+
+For the core agent: `render_view` should provide the palette fade, the one-frame OBJ lag, the map animation timer,
+the greyed icon and the banner (then `patch_view` becomes a no-op); a broken breakable's prop is still drawn;
+`effects/shadow_0x0` is requested for a sprite without a shadow (Yemma's office).
+
 ## 7. Game UI: HUD and dialogue box (`wf_render::ui`, content `ui/`)
 
 * HUD: `ui/hud.json` + `hud/{frame,gauge_ss,gauge_ss3}.png` + `icons/skills/`. Composed like `0x0800B99C`:
@@ -136,6 +172,18 @@ game's walk rules and camera, no enemies (useful for any map).
   middle / bottom use 48 / 88 (not yet confirmed on a capture) and anchor to the view's centre / bottom edge in
   the zoomed-out view.
 * Without `ui/` content (old caches) the placeholder HUD is drawn.
+* **Area-name banner** (`wf_render::banner`, content `ui/banner.json` + `ui/images/banner.png` + `fonts/small`):
+  `RenderView.banner = Some(BannerView { text, t })`. The 240x16 strip (background picture, name centred at
+  x0 = 120 - (width + 1) / 2, pen y 11, shadow colour 1 at (+1, +1) then colour 2 per glyph) is 8 affine OBJs at
+  y 128, priority 0, no blending; from t = 223 (object timer <= 16) the OBJ matrix d = 0x1000 / timer collapses it
+  onto its centre line (rows sample `((d * (y - 8)) >> 8) + 8`); gone at t = 239. Zoomed-out view: horizontally
+  centred, 32 px above the view's bottom edge (= y 128 in the classic view).
+  **Rule for wf-core**: when EnterArea (`0x08008D44`) finishes a load whose area name string id (area table +0xC,
+  `areas.json` `name_string_id`) differs from the last one shown (RAM `0x03001984`, persistent across loads) and is
+  not 0, record it as the last shown and start a banner with that text; not on the 3D world map (map header +0x3C:
+  the id is recorded, a label object `0x0800C0C8` is created instead). `t = 0` on the first frame after the load
+  (the first frame the new area runs; the banner's timer counts down during the area's fade-in like everything
+  else), `t += 1` every frame; drop it after t = 238. (Verified frame by frame vs the emulator, see §8.)
 
 ## 8. Emulator parity (headless, muted)
 
@@ -151,6 +199,7 @@ player frame from the captured animation step, halo, shadow, HUD) and diff it:
 | intro dialogue box ("normal...", style 0, top) | **0 px** |
 | Snake Way (3), forest fight | 0 px outside the other actors' OBJs (NPCs / enemies are not rebuilt by the tool) |
 | HUD (all scenes) | 0 px |
+| area-name banner, forest 8-3 -> 8-2 (`re/banner_capture.py`, `tests/banner_parity.rs`): surface vs OBJ VRAM; screen rows 128..144 every frame t = 31..238 (hold + collapse) and after | **0 px** |
 
 Found and fixed on the way: mGBA blends on 8-bit expanded channels (`(a8 * eva + b8 * evb) >> 4`), not 5-bit —
 the default `BlendMath::Mgba` matches the reference, `BlendMath::Hardware` is the PPU's 5-bit math; the HUD

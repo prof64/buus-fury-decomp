@@ -1,0 +1,71 @@
+# Buu's Fury online play on one small VPS (Linux, a public IPv4, ports 80/443 tcp + 3478 udp/tcp +
+# 49160-49200 udp open):
+#   caddy   wss:// + https:// for the signaling server (Let's Encrypt certificate for $WF_DOMAIN, automatic)
+#   signal  wf-signal: rooms by code, room tokens, server key, time-limited TURN credentials at /ice
+#   turn    coturn: STUN + TURN relay for players behind strict NATs (credentials from the shared secret)
+# Setup: cp env.example .env, edit it, then (from this directory)
+#   docker compose up -d --build
+# Players: buus-fury --online (F12) with server wss://$WF_DOMAIN, or the web app's ?net&signal=wss://$WF_DOMAIN
+# (+ &key=... if WF_SIGNAL_KEY is set). See README.md.
+
+services:
+  signal:
+    build:
+      context: ../..
+      dockerfile: deploy/netplay/Dockerfile
+    image: wf-netplay:latest
+    restart: unless-stopped
+    environment:
+      WF_SIGNAL_ADDR: 0.0.0.0:3536
+      WF_SIGNAL_KEY: ${WF_SIGNAL_KEY:-}
+      WF_REQUIRE_TOKEN: ${WF_REQUIRE_TOKEN:-1}
+      WF_MAX_ROOM: "8"
+      WF_MAX_PEERS: "2000"
+      # (add turns:${WF_DOMAIN}:5349?transport=tcp once coturn has a certificate, see README.md)
+      WF_TURN_URLS: turn:${WF_DOMAIN}:3478?transport=udp,turn:${WF_DOMAIN}:3478?transport=tcp
+      WF_STUN_URLS: stun:${WF_DOMAIN}:3478
+      WF_TURN_SECRET: ${TURN_SECRET:?set TURN_SECRET in .env}
+      WF_TURN_TTL: "86400"
+    expose:
+      - "3536"
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on: [signal]
+    environment:
+      WF_DOMAIN: ${WF_DOMAIN:?set WF_DOMAIN in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+  turn:
+    image: coturn/coturn:4.6
+    restart: unless-stopped
+    # TURN hands out relay ports: host networking avoids mapping a port range through Docker's proxy
+    network_mode: host
+    volumes:
+      - ./turnserver.conf:/etc/coturn/turnserver.conf:ro
+    command:
+      - -c
+      - /etc/coturn/turnserver.conf
+      - --static-auth-secret=${TURN_SECRET}
+      - --realm=${WF_DOMAIN}
+      - --external-ip=${PUBLIC_IP:?set PUBLIC_IP in .env}
+
+  # Alternative relay without coturn (smaller, UDP only, no turns://): `docker compose --profile wf-turn up -d`
+  # after removing / stopping the coturn service.
+  wf-turn:
+    profiles: [wf-turn]
+    image: wf-netplay:latest
+    restart: unless-stopped
+    network_mode: host
+    command: ["wf-turn", "--listen", "0.0.0.0:3478", "--public-ip", "${PUBLIC_IP}", "--secret", "${TURN_SECRET}", "--realm", "${WF_DOMAIN}"]
+
+volumes:
+  caddy_data:
+  caddy_config:

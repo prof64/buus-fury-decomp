@@ -26,6 +26,14 @@ pub trait Transport {
     fn recv(&mut self, now: f64) -> Vec<(String, Vec<u8>)>;
     /// peers that connected / left since the last call
     fn changes(&mut self) -> Vec<PeerChange>;
+    /// the connection to the signaling server is gone for good
+    fn closed(&self) -> bool {
+        false
+    }
+    /// why (for the UI)
+    fn error(&self) -> Option<String> {
+        None
+    }
 }
 
 impl<T: Transport + ?Sized> Transport for Box<T> {
@@ -40,6 +48,12 @@ impl<T: Transport + ?Sized> Transport for Box<T> {
     }
     fn changes(&mut self) -> Vec<PeerChange> {
         (**self).changes()
+    }
+    fn closed(&self) -> bool {
+        (**self).closed()
+    }
+    fn error(&self) -> Option<String> {
+        (**self).error()
     }
 }
 
@@ -127,6 +141,12 @@ impl<T: Transport> Transport for Conditioner<T> {
     fn changes(&mut self) -> Vec<PeerChange> {
         self.inner.changes()
     }
+    fn closed(&self) -> bool {
+        self.inner.closed()
+    }
+    fn error(&self) -> Option<String> {
+        self.inner.error()
+    }
 }
 
 // ------------------------------------------------------------------------------------------- in-process network
@@ -142,6 +162,8 @@ struct NetInner {
     cond: Conditions,
     /// pairs that cannot talk (partition tests)
     cut: Vec<(String, String)>,
+    /// endpoints whose network died (no traffic; their transport reports closed; nobody is told)
+    dead: Vec<String>,
     pub delivered: u64,
     pub dropped: u64,
 }
@@ -152,7 +174,7 @@ pub struct SimNet(Rc<RefCell<NetInner>>);
 
 impl SimNet {
     pub fn new(cond: Conditions, seed: u64) -> Self {
-        SimNet(Rc::new(RefCell::new(NetInner { flight: Vec::new(), seq: 0, members: Vec::new(), changes: BTreeMap::new(), rng: Rng64::new(seed), cond, cut: Vec::new(), delivered: 0, dropped: 0 })))
+        SimNet(Rc::new(RefCell::new(NetInner { flight: Vec::new(), seq: 0, members: Vec::new(), changes: BTreeMap::new(), rng: Rng64::new(seed), cond, cut: Vec::new(), dead: Vec::new(), delivered: 0, dropped: 0 })))
     }
     pub fn endpoint(&self, id: &str) -> SimEndpoint {
         let mut n = self.0.borrow_mut();
@@ -170,6 +192,13 @@ impl SimNet {
         for m in n.members.clone() {
             n.changes.entry(m).or_default().push(PeerChange::Disconnected(id.to_string()));
         }
+    }
+    /// the endpoint's network dies: no more traffic either way, its signaling reports closed, the others are not
+    /// told (they notice the silence)
+    pub fn kill(&self, id: &str) {
+        let mut n = self.0.borrow_mut();
+        n.members.retain(|m| m != id);
+        n.dead.push(id.to_string());
     }
     pub fn cut(&self, a: &str, b: &str) {
         self.0.borrow_mut().cut.push((a.to_string(), b.to_string()));
@@ -194,7 +223,7 @@ impl Transport for SimEndpoint {
     }
     fn send(&mut self, to: &str, data: Vec<u8>, now: f64) {
         let mut n = self.net.0.borrow_mut();
-        if !n.members.iter().any(|m| m == to) || n.cut.iter().any(|(a, b)| (a == &self.id && b == to) || (b == &self.id && a == to)) {
+        if !n.members.iter().any(|m| m == to) || n.dead.contains(&self.id) || n.cut.iter().any(|(a, b)| (a == &self.id && b == to) || (b == &self.id && a == to)) {
             return;
         }
         let c = n.cond;
@@ -229,6 +258,9 @@ impl Transport for SimEndpoint {
     }
     fn changes(&mut self) -> Vec<PeerChange> {
         self.net.0.borrow_mut().changes.remove(&self.id).unwrap_or_default()
+    }
+    fn closed(&self) -> bool {
+        self.net.0.borrow().dead.contains(&self.id)
     }
 }
 

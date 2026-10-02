@@ -190,7 +190,7 @@ pub fn map_json(
         .enumerate()
         .filter_map(|(bg, r)| {
             let r = r.as_ref()?;
-            (r.kind != RES_TILEMAP && r.kind != RES_WRAP && r.kind != crate::rom_maps::RES_EMPTY)
+            (r.kind != RES_TILEMAP && r.kind != RES_WRAP && r.kind != crate::rom_maps::RES_EMPTY && !crate::worldmap::handles(r.kind))
                 .then(|| json!({"bg": bg, "resource": hx(r.addr), "kind": hx(r.kind)}))
         })
         .collect();
@@ -227,6 +227,7 @@ pub fn map_json(
             prop("composite", "file", json!("composite.png")),
             prop("collision", "file", json!("collision.json")),
             prop("unsupported_layers", "string", json!(serde_json::to_string(&unsupported).unwrap())),
+            prop("mode7", "string", json!(if res.iter().flatten().any(|r| crate::worldmap::handles(r.kind)) { "mode7.json" } else { "" })),
             prop("rom_header", "string", json!(hx(h.addr))),
             prop("rom_minimap", "string", json!(hx(h.minimap))),
             prop("rom_rects", "string", json!(format!("{} x 0x18 at {}", h.n_rects, hx(h.rects)))),

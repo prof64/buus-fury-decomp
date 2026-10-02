@@ -1,21 +1,28 @@
 //! Native shell integration: the `--net-*` options of `buus-fury`, the blocking lobby before the window opens, and
-//! the headless netplay runner (scripted / random inputs, artificial latency / loss, JSON result) used by the
-//! two-process tests.
+//! the headless netplay runner (scripted / random inputs, artificial latency / loss, pauses, crashes, JSON result)
+//! used by the two-process tests.
 
 use std::sync::Arc;
 
 use wf_core::battle::BattleConfig;
 use wf_core::content::GameData;
 
-use crate::core_game::MatchConfig;
-use crate::lobby::{room_code, LobbySettings, Role};
+use crate::core_game::{MatchConfig, SfxMode};
+use crate::ice::{IceConfig, IceServer, PUBLIC_STUN};
+use crate::lobby::{parse_invite, room_code, room_token, LobbySettings, RejoinTicket, Role};
 use crate::transport::{Conditions, Rng64};
 
 pub const HELP: &str = "\
-online: --net-host [--room CODE] [--net-players N] [--pvp [--pvp-enemies]] | --net-join CODE | --net-spectate CODE
-        --signal ws://127.0.0.1:3536  --net-delay 2  --net-prediction 12  --net-name NAME  --net-stun URL
+online: --net-host [--room CODE] [--net-players N] [--pvp [--pvp-enemies]] | --net-join CODE[-TOKEN] | --net-spectate CODE[-TOKEN]
+        --net-rejoin [TICKET.json] (back into a running match; default <data>/net-rejoin.json)
+        --signal ws(s)://HOST:3536  --net-key KEY (server access key)  --net-token TOKEN|none (room token; hosts on a
+        non-local server get one: share CODE-TOKEN)  --net-ca FILE (extra CA for wss:// / https://)
+        --net-ice auto|none|stun:H:P|turn:H:P[?transport=tcp]|turns:H:5349 (repeatable; default: auto = ask the signaling
+        server's /ice, else Google STUN; none on localhost)  --net-turn-user U --net-turn-pass P  --net-relay-only
+        --net-delay 2  --net-prediction 12  --net-name NAME  --net-pause local|shared  --net-sfx reconcile|confirmed|predicted
         --net-latency MS --net-jitter MS --net-loss 0.05 --net-seed N (artificial network, added on send)
-        --net-report DIR (desync reports + .wfr)  --net-record DIR (match replays)  --net-random-input SEED  --net-result FILE (headless JSON)
+        --net-report DIR (desync reports + .wfr)  --net-record DIR (match replays)  --net-random-input SEED  --net-result FILE
+        headless tests: --net-pause-at FRAME:N (hold the menu N frames)  --net-exit-at FRAME (vanish without a goodbye)
 local:  --net-synctest N [--net-synctest-bytes] (roll back N frames every frame and compare hashes)";
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -26,6 +33,8 @@ pub enum NetMode {
     Join(String),
     Spectate(String),
     SyncTest(u32),
+    /// back into a running match (ticket file; empty = the shell's default path)
+    Rejoin(String),
 }
 
 #[derive(Clone, Debug)]
@@ -43,13 +52,32 @@ pub struct NetArgs {
     pub report_dir: Option<String>,
     pub random_input: Option<u64>,
     pub name: String,
+    /// `--net-ice` / `--net-stun` values (urls, `auto`, `none`)
     pub stun: Vec<String>,
+    pub turn_user: String,
+    pub turn_pass: String,
+    pub relay_only: bool,
+    pub ca: Option<String>,
+    /// signaling server access key
+    pub key: String,
+    /// room token (`none` = no token)
+    pub token: Option<String>,
     pub result: Option<String>,
     pub synctest_bytes: bool,
     /// save every match as a .wfr replay into this directory (the native shell defaults it to `<data>/replays`)
     pub record_dir: Option<String>,
     /// give up waiting in the lobby after this many seconds
     pub lobby_timeout_s: f64,
+    pub pause: String,
+    pub sfx: SfxMode,
+    /// the rejoin ticket file (the shell defaults it to `<data>/net-rejoin.json`)
+    pub ticket_path: Option<String>,
+    /// headless tests: hold the menu from frame A for N frames
+    pub pause_at: Option<(i32, i32)>,
+    /// headless tests: exit at this frame without a goodbye (a crash / pulled cable)
+    pub exit_at: Option<i32>,
+    /// seat secret (generated when empty)
+    pub secret: String,
 }
 
 impl Default for NetArgs {
@@ -69,12 +97,29 @@ impl Default for NetArgs {
             random_input: None,
             name: String::new(),
             stun: Vec::new(),
+            turn_user: String::new(),
+            turn_pass: String::new(),
+            relay_only: false,
+            ca: None,
+            key: std::env::var("WF_SIGNAL_KEY").unwrap_or_default(),
+            token: None,
             result: None,
             synctest_bytes: false,
             record_dir: None,
             lobby_timeout_s: 120.0,
+            pause: "local".into(),
+            sfx: SfxMode::default(),
+            ticket_path: None,
+            pause_at: None,
+            exit_at: None,
+            secret: String::new(),
         }
     }
+}
+
+fn pair(s: &str) -> Option<(i32, i32)> {
+    let (a, b) = s.split_once(':')?;
+    Some((a.parse().ok()?, b.parse().ok()?))
 }
 
 impl NetArgs {
@@ -87,6 +132,8 @@ impl NetArgs {
             "--net-host" => self.mode = NetMode::Host,
             "--net-join" => self.mode = NetMode::Join(next().to_ascii_uppercase()),
             "--net-spectate" => self.mode = NetMode::Spectate(next().to_ascii_uppercase()),
+            "--net-rejoin" => self.mode = NetMode::Rejoin(String::new()),
+            "--net-rejoin-file" => self.mode = NetMode::Rejoin(next()),
             "--net-synctest" => self.mode = NetMode::SyncTest(next().parse().unwrap_or(8)),
             "--net-synctest-bytes" => self.synctest_bytes = true,
             "--room" => self.room = Some(next().to_ascii_uppercase()),
@@ -103,10 +150,22 @@ impl NetArgs {
             "--net-report" => self.report_dir = Some(next()),
             "--net-random-input" => self.random_input = Some(next().parse().unwrap_or(1)),
             "--net-name" => self.name = next(),
-            "--net-stun" => self.stun.push(next()),
+            "--net-stun" | "--net-ice" => self.stun.push(next()),
+            "--net-turn-user" => self.turn_user = next(),
+            "--net-turn-pass" => self.turn_pass = next(),
+            "--net-relay-only" => self.relay_only = true,
+            "--net-ca" => self.ca = Some(next()),
+            "--net-key" => self.key = next(),
+            "--net-token" => self.token = Some(next().to_ascii_uppercase()),
             "--net-result" => self.result = Some(next()),
             "--net-record" => self.record_dir = Some(next()),
             "--net-lobby-timeout" => self.lobby_timeout_s = next().parse().unwrap_or(120.0),
+            "--net-pause" => self.pause = if next() == "shared" { "shared".into() } else { "local".into() },
+            "--net-sfx" => self.sfx = SfxMode::parse(&next()).unwrap_or_default(),
+            "--net-ticket" => self.ticket_path = Some(next()),
+            "--net-pause-at" => self.pause_at = pair(&next()),
+            "--net-exit-at" => self.exit_at = next().parse().ok(),
+            "--net-secret" => self.secret = next(),
             _ => return false,
         }
         true
@@ -131,29 +190,96 @@ impl NetArgs {
         // (no process id on wasm32-unknown-unknown: it panics there)
         let tag = if cfg!(target_arch = "wasm32") { "web".to_string() } else { (std::process::id() % 1000).to_string() };
         let name = if self.name.is_empty() { format!("{}-{tag}", fighter.fighter) } else { self.name.clone() };
-        LobbySettings { role, name, fighter, content, want_players: self.players, base: self.match_config(battle), input_delay: self.delay, max_prediction: self.prediction }
+        let secret = if self.secret.is_empty() { crate::netsim::make_secret(entropy() ^ self.seed.rotate_left(17)) } else { self.secret.clone() };
+        LobbySettings {
+            role,
+            name,
+            fighter,
+            content,
+            want_players: self.players,
+            base: self.match_config(battle),
+            input_delay: self.delay,
+            max_prediction: self.prediction,
+            auto_start: true,
+            ready: true,
+            pause: self.pause.clone(),
+            secret,
+            rejoin: None,
+        }
+    }
+
+    /// (room, token) for this peer: from the invite code it joins, or a new room (+ a token on a non-local server).
+    pub fn room_and_token(&self, seed: u64) -> (String, String) {
+        let (room, tok) = match &self.mode {
+            NetMode::Join(c) | NetMode::Spectate(c) => parse_invite(c),
+            _ => {
+                let room = self.room.as_deref().map(parse_invite).map(|r| r.0).unwrap_or_else(|| room_code(seed));
+                let tok = if crate::ice::is_local(&self.signal) { String::new() } else { room_token(seed.rotate_left(29) ^ 0x55) };
+                (room, tok)
+            }
+        };
+        let tok = match self.token.as_deref() {
+            Some("NONE") | Some("none") => String::new(),
+            Some(t) => t.to_string(),
+            None => tok,
+        };
+        (room, tok)
     }
 
     pub fn room_code(&self, seed: u64) -> String {
-        match &self.mode {
-            NetMode::Join(c) | NetMode::Spectate(c) => c.clone(),
-            _ => self.room.clone().unwrap_or_else(|| room_code(seed)),
-        }
+        self.room_and_token(seed).0
     }
 
-    /// ICE servers: as given; none for a signaling server on this machine (host candidates suffice), else a
-    /// public STUN server so peers behind NAT find each other.
-    pub fn ice(&self) -> Vec<String> {
-        if !self.stun.is_empty() {
-            return self.stun.iter().filter(|s| *s != "none").cloned().collect();
+    /// ICE servers and whether to ask the signaling server (`auto`). Default: none for a signaling server on this
+    /// machine (host candidates suffice), else `auto` with Google's public STUN as the fallback.
+    pub fn ice_config(&self) -> (IceConfig, bool) {
+        let mut auto = false;
+        let mut urls = Vec::new();
+        let mut none = false;
+        for s in &self.stun {
+            match s.as_str() {
+                "auto" => auto = true,
+                "none" => none = true,
+                u => urls.extend(u.split(',').map(|x| x.trim().to_string()).filter(|x| !x.is_empty())),
+            }
         }
-        let local = ["ws://127.0.0.1", "ws://localhost", "ws://[::1]"].iter().any(|p| self.signal.starts_with(p));
-        if local {
-            Vec::new()
-        } else {
-            vec!["stun:stun.l.google.com:19302".into()]
+        if none && urls.is_empty() {
+            return (IceConfig { servers: Vec::new(), relay_only: self.relay_only }, false);
         }
+        if urls.is_empty() && !auto && !crate::ice::is_local(&self.signal) {
+            auto = true;
+        }
+        if urls.is_empty() && auto {
+            urls.push(PUBLIC_STUN.to_string());
+        }
+        let stun: Vec<String> = urls.iter().filter(|u| u.starts_with("stun")).cloned().collect();
+        let turn: Vec<String> = urls.iter().filter(|u| u.starts_with("turn")).cloned().collect();
+        let mut servers = Vec::new();
+        if !stun.is_empty() {
+            servers.push(IceServer { urls: stun, ..Default::default() });
+        }
+        if !turn.is_empty() {
+            servers.push(IceServer { urls: turn, username: Some(self.turn_user.clone()), credential: Some(self.turn_pass.clone()) });
+        }
+        (IceConfig { servers, relay_only: self.relay_only }, auto)
     }
+
+    /// ICE server urls (compat)
+    pub fn ice(&self) -> Vec<String> {
+        self.ice_config().0.servers.into_iter().flat_map(|s| s.urls).collect()
+    }
+}
+
+/// Some entropy for room codes / secrets without a RNG dependency (time, process, a stack address).
+pub fn entropy() -> u64 {
+    let x = 0u8;
+    let a = &x as *const u8 as u64;
+    #[cfg(not(target_arch = "wasm32"))]
+    let t = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos() as u64).unwrap_or(7) ^ (std::process::id() as u64).rotate_left(32);
+    #[cfg(target_arch = "wasm32")]
+    let t = 0u64;
+    let mut r = Rng64::new(t ^ a.rotate_left(13));
+    r.next()
 }
 
 /// The shell's input script: `R60,D40,RA10` (letters R L U D A B S(tart) E(select) + frames).
@@ -218,12 +344,19 @@ pub fn synctest_sim(args: &NetArgs, data: Arc<GameData>, battle: &BattleConfig, 
     crate::netsim::SyncSim::new(&args.match_config(battle), data, distance, args.synctest_bytes)
 }
 
+/// Read a rejoin ticket file.
+pub fn read_ticket(path: &str) -> Result<RejoinTicket, String> {
+    let s = std::fs::read_to_string(path).map_err(|e| format!("rejoin ticket {path}: {e}"))?;
+    serde_json::from_str(&s).map_err(|e| format!("rejoin ticket {path}: {e}"))
+}
+
 #[cfg(not(target_arch = "wasm32"))]
 pub use native::*;
 
 #[cfg(not(target_arch = "wasm32"))]
 mod native {
     use super::*;
+    use crate::lobby::room_url_auth;
     use crate::netsim::{content_id, Clock, NetLobby, NetSim};
     use crate::transport::Transport;
     use std::rc::Rc;
@@ -239,7 +372,10 @@ mod native {
     pub fn transport(args: &NetArgs, url: &str) -> Result<Box<dyn Transport>, String> {
         #[cfg(feature = "webrtc")]
         {
-            let t = crate::matchbox::MatchboxTransport::connect(url, args.ice())?;
+            let (ice, auto) = args.ice_config();
+            let ice = ice.with_credentials(&args.turn_user, &args.turn_pass);
+            let o = crate::matchbox::ConnectOptions { ice, ice_auto: auto, ca: args.ca.clone(), key: args.key.clone() };
+            let t = crate::matchbox::MatchboxTransport::connect_with(url, &o)?;
             if args.cond != Conditions::default() {
                 return Ok(Box::new(crate::transport::Conditioner::new(t, args.cond, args.seed)));
             }
@@ -252,16 +388,66 @@ mod native {
         }
     }
 
+    /// Start (not block) a lobby for these options: host / join / spectate / rejoin. Returns the lobby and the
+    /// invite code to share.
+    pub fn open_lobby(args: &NetArgs, data: &GameData, battle: &BattleConfig, clock: Clock) -> Result<(NetLobby, String), String> {
+        let mut settings = args.lobby_settings(battle, content_id(data));
+        let (room, token, signal) = match &args.mode {
+            NetMode::Rejoin(p) => {
+                let path = if p.is_empty() { args.ticket_path.clone().unwrap_or_default() } else { p.clone() };
+                let t = read_ticket(&path)?;
+                let r = (t.room.clone(), t.token.clone(), if t.signal.is_empty() { args.signal.clone() } else { t.signal.clone() });
+                settings.name = t.name.clone();
+                settings.secret = t.secret.clone();
+                settings.rejoin = Some(t);
+                r
+            }
+            _ => {
+                let (r, t) = args.room_and_token(entropy());
+                (r, t, args.signal.clone())
+            }
+        };
+        let url = room_url_auth(&signal, &room, &token, &args.key);
+        let a = NetArgs { signal: signal.clone(), ..args.clone() };
+        let t = transport(&a, &url)?;
+        let mut lobby = NetLobby::new(t, settings, &room, clock);
+        lobby.set_invite(&token, &signal);
+        lobby.sfx = args.sfx;
+        Ok((lobby, crate::lobby::invite(&room, &token)))
+    }
+
+    /// The match from a started lobby, set up like the shell wants it (reports, replays, ticket, reconnect).
+    pub fn finish_lobby(args: &NetArgs, lobby: NetLobby, data: Arc<GameData>) -> Result<NetSim, String> {
+        if let Some(r) = &lobby.lobby.rejected {
+            return Err(format!("the host refused: {r}"));
+        }
+        if let Some(e) = lobby.status.borrow().error.clone() {
+            return Err(e);
+        }
+        let mut sim = lobby.into_sim(data)?;
+        sim.report_dir = args.report_dir.as_ref().map(std::path::PathBuf::from);
+        sim.record_dir = args.record_dir.as_ref().map(std::path::PathBuf::from);
+        sim.created = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+        sim.ticket_path = args.ticket_path.as_ref().map(std::path::PathBuf::from);
+        sim.save_ticket();
+        // lost every other player: a new connection to the same room
+        let a = NetArgs { signal: sim.signal.clone(), ..args.clone() };
+        let url = room_url_auth(&sim.signal, &sim.room, &sim.token, &args.key);
+        sim.reconnect = Some(Box::new(move || transport(&a, &url)));
+        Ok(sim)
+    }
+
     /// Join / host a room and wait (blocking, progress on stderr) until the match starts.
     pub fn connect_blocking(args: &NetArgs, data: Arc<GameData>, battle: &BattleConfig) -> Result<NetSim, String> {
         let clock = clock();
-        let code = args.room_code(Instant::now().elapsed().as_nanos() as u64 ^ std::process::id() as u64 ^ (std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos() as u64).unwrap_or(7)));
-        let url = crate::lobby::room_url(&args.signal, &code);
-        let settings = args.lobby_settings(battle, content_id(&data));
-        let role = settings.role;
-        eprintln!("wf-net: room {code} ({url}) as {role:?}; waiting for {} player(s)", args.players);
-        let t = transport(args, &url)?;
-        let mut lobby = NetLobby::new(t, settings, &code, clock.clone());
+        let (mut lobby, invite) = open_lobby(args, &data, battle, clock)?;
+        let role = lobby.lobby.settings.role;
+        let rejoin = lobby.lobby.settings.rejoin.is_some();
+        if rejoin {
+            eprintln!("wf-net: rejoining room {invite}");
+        } else {
+            eprintln!("wf-net: room {invite} as {role:?}; waiting for {} player(s)", args.players);
+        }
         let t0 = Instant::now();
         let mut shown = 0;
         loop {
@@ -269,27 +455,28 @@ mod native {
                 break;
             }
             let n = lobby.lobby.players_present();
-            if n != shown {
+            if n != shown && !rejoin {
                 shown = n;
-                eprintln!("wf-net: {n} player(s) in room {code}");
+                eprintln!("wf-net: {n} player(s) in room {invite}");
             }
             if t0.elapsed().as_secs_f64() > args.lobby_timeout_s {
-                return Err(format!("nobody joined room {code} within {} s", args.lobby_timeout_s));
+                return Err(format!("nobody joined room {invite} within {} s", args.lobby_timeout_s));
             }
             std::thread::sleep(Duration::from_millis(5));
         }
-        if let Some(r) = &lobby.lobby.rejected {
-            return Err(format!("the host refused: {r}"));
-        }
-        let mut sim = lobby.into_sim(data)?;
-        sim.report_dir = args.report_dir.as_ref().map(std::path::PathBuf::from);
-        sim.record_dir = args.record_dir.as_ref().map(std::path::PathBuf::from);
-        sim.created = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+        let mut sim = finish_lobby(args, lobby, data)?;
         let s = sim.status.borrow().clone();
-        eprintln!("wf-net: match started as {} ({} players{}), session {:08x}", s.local_slot.map(|k| format!("P{}", k + 1)).unwrap_or("spectator".into()), sim.start.players.len(), if sim.start.config.pvp { ", PvP" } else { "" }, sim.start.session);
+        eprintln!(
+            "wf-net: match {} as {} ({} players{}), session {:08x}",
+            if sim.rejoined() { "rejoined" } else { "started" },
+            s.local_slot.map(|k| format!("P{}", k + 1)).unwrap_or("spectator".into()),
+            sim.start.players.len(),
+            if sim.start.config.pvp { ", PvP" } else { "" },
+            sim.start.session
+        );
+        sim.created = sim.created.max(1);
         Ok(sim)
     }
-
 
     /// Headless netplay (no window, no audio): play `frames` frames with the `script` (or random) inputs at the
     /// game's real rate, wait until state `frames` is confirmed by every peer, linger so the others finish too, and
@@ -315,7 +502,7 @@ mod native {
             let r = serde_json::json!({
                 "mode": "synctest", "frames": frames, "check_distance": d, "bytes": args.synctest_bytes,
                 "error": sim.error, "resim_frames": sim.st.resim_frames, "ms": t0.elapsed().as_secs_f64() * 1e3,
-                "hash": format!("{:016x}", sim.state_hash()),
+                "hash": format!("{:016x}", sim.state_hash()), "sfx": sim.st.game.sfx_stats,
             });
             return finish(args, r);
         }
@@ -327,10 +514,22 @@ mod native {
         let mut done_at: Option<Instant> = None;
         let mut ev = Vec::new();
         let mut ticks = 0u64;
+        let mut sounds = 0u64;
+        let mut menu_ticks = 0u64;
         loop {
             let f = sim.status.borrow().frame;
-            let v = input(f, &mut rnd);
+            if args.exit_at.is_some_and(|x| f >= x) {
+                eprintln!("wf-net: exiting at frame {f} without a goodbye (test)");
+                std::process::exit(3);
+            }
+            let mut v = input(f, &mut rnd);
+            // the menu is open: what the app would pass (`Sim::paused_input`)
+            if args.pause_at.is_some_and(|(a, n)| f >= a && f < a + n) {
+                v = sim.paused_input().unwrap_or(0);
+                menu_ticks += 1;
+            }
             sim.step(&[v], &mut ev);
+            sounds += ev.len() as u64;
             ev.clear();
             ticks += 1;
             if done_at.is_none() && sim.hashed() >= frames {
@@ -339,7 +538,7 @@ mod native {
             if done_at.is_some_and(|d| d.elapsed() > Duration::from_millis(2500)) {
                 break;
             }
-            if t0.elapsed().as_secs_f64() > frames as f64 / 30.0 + 60.0 {
+            if t0.elapsed().as_secs_f64() > frames as f64 / 30.0 + 90.0 {
                 eprintln!("wf-net: giving up (state {frames} never confirmed)");
                 break;
             }
@@ -354,24 +553,35 @@ mod native {
         let s = sim.status.borrow().clone();
         let (h, c) = sim.hash_at(frames).unwrap_or((0, 0));
         let st = &s.stats;
-        let r = serde_json::json!({
+        let mut r = serde_json::json!({
             "mode": format!("{:?}", args.mode),
             "me": s.me, "slot": s.local_slot, "players": sim.start.players.len(), "pvp": sim.start.config.pvp,
             "frames": frames, "hash": format!("{h:016x}"), "chain": format!("{c:016x}"),
             "confirmed_ok": sim.hashed() >= frames,
-            "frame_now": s.frame, "ticks": ticks, "seconds": t0.elapsed().as_secs_f64(),
-            "desync": s.desync, "disconnected": s.disconnected, "outcome": s.outcome, "winner": s.winner,
+            "frame_now": s.frame, "world_frame": sim.frame(), "ticks": ticks, "seconds": t0.elapsed().as_secs_f64(),
+            "desync": s.desync, "disconnected": s.disconnected, "rejoined": s.rejoined, "was_rejoin": sim.rejoined(),
+            "outcome": s.outcome, "winner": s.winner,
+        });
+        let more = serde_json::json!({
             "rollbacks": st.rollbacks, "resim_frames": st.resim_frames, "max_rollback": st.max_rollback,
             "rollback_us_avg": if st.rollbacks > 0 { st.rollback_us / st.rollbacks as f64 } else { 0.0 },
             "rollback_us_max": st.rollback_us_max,
             "resim_us_per_frame": if st.resim_frames > 0 { st.rollback_us / st.resim_frames as f64 } else { 0.0 },
             "step_us_avg": if st.frames > 0 { st.step_us / st.frames as f64 } else { 0.0 },
-            "stalls": st.stalls, "skips": st.skips, "hash_checks": st.hash_checks,
+            "stalls": st.stalls, "skips": st.skips, "catchup_frames": st.catchup_frames, "hash_checks": st.hash_checks,
             "packets_sent": st.packets_sent, "packets_recv": st.packets_recv, "bytes_sent": st.bytes_sent, "bytes_recv": st.bytes_recv,
+        });
+        let more2 = serde_json::json!({
             "rtt_ms": s.rtt, "conditions": {"latency_ms": args.cond.latency_ms, "jitter_ms": args.cond.jitter_ms, "loss": args.cond.loss},
-            "spect_behind": s.spect_behind,
+            "spect_behind": s.spect_behind, "menu_ticks": menu_ticks, "pause": s.pause,
+            "sfx": s.sfx, "sound_events": sounds,
             "replay": replay,
         });
+        for m in [more, more2] {
+            if let (Some(a), serde_json::Value::Object(b)) = (r.as_object_mut(), m) {
+                a.extend(b);
+            }
+        }
         finish(args, r)
     }
 

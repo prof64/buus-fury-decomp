@@ -31,6 +31,9 @@ pub struct Step {
     pub flip: bool,
     #[serde(default)]
     pub attach: Option<[i32; 2]>,
+    /// the frame record's OBJ pieces `[dx, dy, w, h, attr0, attr1]` (record coordinates = entity position)
+    #[serde(default)]
+    pub objs: Vec<[i32; 6]>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -101,6 +104,9 @@ pub struct SpriteDef {
     pub shadow: Option<String>,
     #[serde(default)]
     pub attachment: Option<serde_json::Value>,
+    /// raw definition header fields (`shadow` = bytes 8..11, `word12` = bytes 12..15, ...)
+    #[serde(default)]
+    pub header: Option<serde_json::Value>,
 }
 
 impl SpriteDef {

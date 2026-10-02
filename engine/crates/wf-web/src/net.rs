@@ -1,19 +1,25 @@
 //! Online multiplayer in the browser (wf-net). JS owns the WebSocket to the signaling server and the
 //! RTCPeerConnections / data channels (engine/web/app/net.js, same protocol and channel setup as Matchbox, so
-//! browser and native peers meet in one room); this side runs the lobby and the rollback session on a
-//! `QueueTransport` that JS fills (`wf_net_recv`, `wf_net_peer`) and drains (`wf_net_out`).
+//! browser and native peers meet in one room); this side runs the lobby menu, the lobby and the rollback session on
+//! a `QueueTransport` that JS fills (`wf_net_recv`, `wf_net_peer`) and drains (`wf_net_out`).
 //!
-//! Flow: `wf_net_lobby(cfg)` -> per animation frame `wf_net_poll()` (+ `wf_net_out` loop) until it returns 1 ->
+//! Flow: the in-game lobby menu (`wf_menu_*`: drawn here with the game's menu font, actions polled by JS) ->
+//! `wf_net_lobby(cfg)` -> per animation frame `wf_net_poll()` (+ `wf_net_out` loop) until it returns 1 ->
 //! `wf_app_init({"net": true, ...})` runs the match (`NetSim`) through the normal app loop; `wf_net_status()` for
 //! the overlay, `wf_net_report()` for a desync report. `{"mode": "synctest", "synctest": 8}` = local sync test.
+//! Lost connection: the status asks for a new transport (`need_transport`); JS reconnects and calls
+//! `wf_net_reconnect()`, the match rejoins in place.
 
 use std::cell::RefCell;
+use std::collections::VecDeque;
 use std::rc::Rc;
 use std::sync::Arc;
 
+use wf_app::netmenu::{MenuAction, OnlineMenu, OnlinePrefs, Screen};
 use wf_app::wf_content::Packs;
 use wf_net::cli::{NetArgs, NetMode};
-use wf_net::netsim::{content_id, current_status, Clock, NetLobby};
+use wf_net::lobby::{room_url_auth, RejoinTicket};
+use wf_net::netsim::{content_id, current_status, offer_transport, Clock, NetLobby};
 use wf_net::transport::{Conditioner, PeerChange, QueueTransport, Transport};
 use wf_view::Sim;
 
@@ -27,18 +33,71 @@ struct Net {
     lobby: Option<NetLobby>,
 }
 
+struct Menu {
+    menu: OnlineMenu,
+    packs: Packs,
+    fb: Vec<u32>,
+    rgba: Vec<u8>,
+    scale: u32,
+    actions: VecDeque<String>,
+}
+
 thread_local! {
     static NET: RefCell<Option<Net>> = const { RefCell::new(None) };
+    static MENU: RefCell<Option<Menu>> = const { RefCell::new(None) };
 }
 
 fn clock() -> Clock {
     Rc::new(|| unsafe { now_ms() })
 }
 
-/// Prepare an online match (or a sync test). `cfg` JSON: `mode` host | join | spectate | synctest, `room`,
-/// `players`, `pvp`, `pvp_enemies`, `delay`, `prediction`, `latency`, `jitter`, `loss`, `net_seed`, `name`,
-/// `synctest` (distance), and the battle: `arena`, `enemy`, `count`, `fighter`, `form`, `level`, `seed`.
-/// Returns 0 (room code in the string buffer) or 1 (error text).
+/// The queue transport the JS glue fills, plus a closed flag for signaling failures.
+#[derive(Clone, Default)]
+struct WebTransport {
+    q: QueueTransport,
+    closed: Rc<RefCell<Option<String>>>,
+}
+impl Transport for WebTransport {
+    fn local_id(&self) -> Option<String> {
+        self.q.local_id()
+    }
+    fn send(&mut self, to: &str, data: Vec<u8>, now: f64) {
+        self.q.send(to, data, now)
+    }
+    fn recv(&mut self, now: f64) -> Vec<(String, Vec<u8>)> {
+        self.q.recv(now)
+    }
+    fn changes(&mut self) -> Vec<PeerChange> {
+        self.q.changes()
+    }
+    fn closed(&self) -> bool {
+        self.closed.borrow().is_some()
+    }
+    fn error(&self) -> Option<String> {
+        self.closed.borrow().clone()
+    }
+}
+
+thread_local! {
+    static CLOSED: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
+}
+
+fn web_transport(q: &QueueTransport, args: &NetArgs) -> Box<dyn Transport> {
+    let t = WebTransport { q: q.clone(), closed: CLOSED.with(|c| c.clone()) };
+    if args.cond != Default::default() {
+        Box::new(Conditioner::new(t, args.cond, args.seed))
+    } else {
+        Box::new(t)
+    }
+}
+
+/// Prepare an online match (or a sync test). `cfg` JSON: `mode` host | join | spectate | rejoin | synctest, `room`
+/// (an invite code `ROOM` or `ROOM-TOKEN`), `token`, `key`, `signal`, `players`, `pvp`, `pvp_enemies`, `delay`,
+/// `prediction`, `pause` (local | shared), `sfx` (reconcile | confirmed | predicted), `latency`, `jitter`, `loss`,
+/// `net_seed`, `name`, `secret` (random, from JS), `ticket` (rejoin: the JSON ticket), `ui` (the lobby menu: the
+/// host starts by hand, joiners say ready), `synctest` (distance), and the battle: `arena`, `enemy`, `count`,
+/// `fighter`, `form`, `level`, `seed`. Returns 0 (JSON `{room, token, invite, url}` in the string buffer) or 1
+/// (error text).
 ///
 /// # Safety
 /// `ptr`/`len` must describe readable memory.
@@ -53,10 +112,19 @@ pub unsafe extern "C" fn wf_net_lobby(ptr: *const u8, len: usize) -> u32 {
             args.flag(flag, &mut || once.take().unwrap_or_default());
         }
     };
+    let mut ticket: Option<RejoinTicket> = None;
     match cfg["mode"].as_str().unwrap_or("host") {
         "join" => set("--net-join", s("room")),
         "spectate" => set("--net-spectate", s("room")),
         "synctest" => set("--net-synctest", s("synctest").or(Some("8".into()))),
+        "rejoin" => {
+            ticket = cfg["ticket"].as_str().and_then(|t| serde_json::from_str(t).ok()).or_else(|| serde_json::from_value(cfg["ticket"].clone()).ok());
+            if ticket.is_none() {
+                set_str("no rejoin ticket");
+                return 1;
+            }
+            set("--net-join", ticket.as_ref().map(|t| t.room.clone()));
+        }
         _ => {
             set("--net-host", Some(String::new()));
             set("--room", s("room").filter(|r| !r.is_empty()));
@@ -71,8 +139,14 @@ pub unsafe extern "C" fn wf_net_lobby(ptr: *const u8, len: usize) -> u32 {
         ("loss", "--net-loss"),
         ("net_seed", "--net-seed"),
         ("name", "--net-name"),
+        ("signal", "--signal"),
+        ("token", "--net-token"),
+        ("key", "--net-key"),
+        ("pause", "--net-pause"),
+        ("sfx", "--net-sfx"),
+        ("secret", "--net-secret"),
     ] {
-        set(f, s(k));
+        set(f, s(k).filter(|v| !v.is_empty()));
     }
     if cfg["pvp"].as_bool() == Some(true) {
         set("--pvp", Some(String::new()));
@@ -84,7 +158,7 @@ pub unsafe extern "C" fn wf_net_lobby(ptr: *const u8, len: usize) -> u32 {
         set("--net-synctest-bytes", Some(String::new()));
     }
     let st = |k: &str, d: &str| cfg[k].as_str().unwrap_or(d).to_string();
-    let battle = wf_app::battle::config(
+    let mut battle = wf_app::battle::config(
         &st("arena", "forest"),
         &st("enemy", "t68"),
         cfg["count"].as_u64().unwrap_or(1) as u32,
@@ -94,6 +168,9 @@ pub unsafe extern "C" fn wf_net_lobby(ptr: *const u8, len: usize) -> u32 {
         if matches!(args.mode, NetMode::SyncTest(_)) { cfg["players"].as_u64().unwrap_or(1).clamp(1, 4) as usize } else { 1 },
         cfg["seed"].as_u64().unwrap_or(1) as u32,
     );
+    if cfg["ui"].as_bool() == Some(true) {
+        battle.xp = false;
+    }
     let packs: Packs = match host_packs() {
         Ok(p) => p,
         Err(e) => {
@@ -109,14 +186,34 @@ pub unsafe extern "C" fn wf_net_lobby(ptr: *const u8, len: usize) -> u32 {
         }
     };
     let q = QueueTransport::default();
+    CLOSED.with(|c| *c.borrow_mut() = None);
     let mut lobby = None;
-    let mut code = String::new();
+    let mut info = serde_json::json!({});
     if !matches!(args.mode, NetMode::SyncTest(_)) {
-        code = args.room_code(unsafe { now_ms() }.to_bits() ^ 0x9E37_79B9_7F4A_7C15);
-        let t: Box<dyn Transport> = if args.cond != Default::default() { Box::new(Conditioner::new(q.clone(), args.cond, args.seed)) } else { Box::new(q.clone()) };
-        lobby = Some(NetLobby::new(t, args.lobby_settings(&battle, content_id(&data)), &code, clock()));
+        let (room, token, signal) = match &ticket {
+            Some(t) => (t.room.clone(), t.token.clone(), if t.signal.is_empty() { args.signal.clone() } else { t.signal.clone() }),
+            None => {
+                let (r, t) = args.room_and_token(unsafe { now_ms() }.to_bits() ^ 0x9E37_79B9_7F4A_7C15 ^ cfg["net_seed"].as_u64().unwrap_or(0).rotate_left(21));
+                (r, t, args.signal.clone())
+            }
+        };
+        let mut settings = args.lobby_settings(&battle, content_id(&data));
+        if cfg["ui"].as_bool() == Some(true) {
+            settings.auto_start = false;
+            settings.ready = matches!(args.mode, NetMode::Host);
+        }
+        if let Some(t) = ticket {
+            settings.name = t.name.clone();
+            settings.secret = t.secret.clone();
+            settings.rejoin = Some(t);
+        }
+        let mut l = NetLobby::new(web_transport(&q, &args), settings, &room, clock());
+        l.set_invite(&token, &signal);
+        l.sfx = args.sfx;
+        info = serde_json::json!({ "room": room, "token": token, "invite": wf_net::lobby::invite(&room, &token), "url": room_url_auth(&signal, &room, &token, &args.key) });
+        lobby = Some(l);
     }
-    set_str(&code);
+    set_str(&info.to_string());
     NET.with(|n| *n.borrow_mut() = Some(Net { args, battle, data, q, lobby }));
     0
 }
@@ -147,6 +244,16 @@ pub unsafe extern "C" fn wf_net_peer(ptr: *const u8, len: usize, up: u32) {
             n.q.0.borrow_mut().changes.push(if up != 0 { PeerChange::Connected(id) } else { PeerChange::Disconnected(id) });
         }
     });
+}
+
+/// The signaling connection failed / was refused (`msg`: why).
+///
+/// # Safety
+/// `ptr`/`len` must describe readable memory.
+#[no_mangle]
+pub unsafe extern "C" fn wf_net_closed(ptr: *const u8, len: usize) {
+    let msg = unsafe { arg_str(ptr, len) };
+    CLOSED.with(|c| *c.borrow_mut() = Some(msg));
 }
 
 /// A datagram from peer `id`.
@@ -196,7 +303,7 @@ pub extern "C" fn wf_net_poll() -> u32 {
         match &mut n.lobby {
             Some(l) => {
                 if l.poll() {
-                    if l.lobby.rejected.is_some() {
+                    if l.lobby.rejected.is_some() || l.status.borrow().phase == "error" {
                         2
                     } else {
                         1
@@ -212,7 +319,67 @@ pub extern "C" fn wf_net_poll() -> u32 {
     r
 }
 
-/// Status JSON (phase, room, roster, slot, frame, rollbacks, rtt, desync, ...) in the string buffer.
+fn with_lobby(f: impl FnOnce(&mut NetLobby)) {
+    NET.with(|n| {
+        if let Some(l) = n.borrow_mut().as_mut().and_then(|n| n.lobby.as_mut()) {
+            f(l);
+        }
+    });
+}
+
+/// Lobby menu: ready (1) / not ready (0).
+#[no_mangle]
+pub extern "C" fn wf_net_ready(on: u32) {
+    with_lobby(|l| l.lobby.set_ready(on != 0));
+}
+
+/// Lobby menu: our fighter (`{"fighter": "vegeta", "form": 26}`).
+///
+/// # Safety
+/// `ptr`/`len` must describe readable memory.
+#[no_mangle]
+pub unsafe extern "C" fn wf_net_fighter(ptr: *const u8, len: usize) {
+    let v: serde_json::Value = serde_json::from_str(&unsafe { arg_str(ptr, len) }).unwrap_or_default();
+    with_lobby(|l| {
+        let mut f = l.lobby.settings.fighter.clone();
+        if let Some(x) = v["fighter"].as_str() {
+            f.fighter = x.into();
+        }
+        if let Some(x) = v["form"].as_i64() {
+            f.form = x as i32;
+        }
+        l.lobby.set_fighter(f);
+    });
+}
+
+/// Lobby menu host: start once everyone is ready.
+#[no_mangle]
+pub extern "C" fn wf_net_start() {
+    with_lobby(|l| l.lobby.request_start());
+}
+
+/// Leave the lobby (JS closes its connections).
+#[no_mangle]
+pub extern "C" fn wf_net_leave() {
+    NET.with(|n| *n.borrow_mut() = None);
+    wf_net::netsim::clear_current();
+}
+
+/// The match lost every other player and asks for a new connection (`status.need_transport`): JS opened a new
+/// signaling connection to the same room; route it to the match, which rejoins in place.
+#[no_mangle]
+pub extern "C" fn wf_net_reconnect() {
+    NET.with(|n| {
+        if let Some(n) = n.borrow_mut().as_mut() {
+            n.q = QueueTransport::default();
+            CLOSED.with(|c| *c.borrow_mut() = None);
+            offer_transport(web_transport(&n.q, &n.args));
+        }
+    });
+}
+
+/// Status JSON (phase, room, invite, roster, lobby list, slot, frame, rollbacks, rtt, desync, rejoin, ticket, ...)
+/// in the string buffer.
 #[no_mangle]
 pub extern "C" fn wf_net_status() {
     let s = current_status().map(|s| s.borrow().to_json()).unwrap_or_else(|| "{}".into());
@@ -264,4 +431,161 @@ pub extern "C" fn wf_net_replay(upto: i32) -> u32 {
         }
         None => 0,
     }
+}
+
+// ------------------------------------------------------------------------------------------------ lobby menu
+
+/// Open the in-game lobby menu (drawn by `wf_menu_frame`). `prefs` = saved `OnlinePrefs` JSON (or `{}`);
+/// `has_ticket` = a rejoin ticket is stored. Returns 0, or 1 (error text in the string buffer).
+///
+/// # Safety
+/// `ptr`/`len` must describe readable memory.
+#[no_mangle]
+pub unsafe extern "C" fn wf_menu_open(ptr: *const u8, len: usize, has_ticket: u32) -> u32 {
+    let prefs: OnlinePrefs = serde_json::from_str(&unsafe { arg_str(ptr, len) }).unwrap_or_default();
+    let packs = match host_packs() {
+        Ok(p) => p,
+        Err(e) => {
+            set_str(&e.to_string());
+            return 1;
+        }
+    };
+    let mut menu = OnlineMenu::default();
+    menu.prefs = prefs;
+    menu.has_ticket = has_ticket != 0;
+    menu.show(Screen::Main);
+    MENU.with(|m| *m.borrow_mut() = Some(Menu { menu, packs, fb: Vec::new(), rgba: Vec::new(), scale: 1, actions: VecDeque::new() }));
+    0
+}
+
+fn with_menu<R>(f: impl FnOnce(&mut Menu) -> R) -> Option<R> {
+    MENU.with(|m| m.borrow_mut().as_mut().map(f))
+}
+
+fn push_action(m: &mut Menu, a: MenuAction) {
+    let p = serde_json::to_value(&m.menu.prefs).unwrap_or_default();
+    let j = match a {
+        MenuAction::None => return,
+        MenuAction::Saved => serde_json::json!({ "t": "saved", "prefs": p }),
+        MenuAction::Host => serde_json::json!({ "t": "host", "prefs": p }),
+        MenuAction::Join { code, spectate } => serde_json::json!({ "t": "join", "code": code, "spectate": spectate, "prefs": p }),
+        MenuAction::Rejoin => serde_json::json!({ "t": "rejoin", "prefs": p }),
+        MenuAction::SetReady(r) => serde_json::json!({ "t": "ready", "on": r }),
+        MenuAction::SetFighter { fighter, form } => serde_json::json!({ "t": "fighter", "fighter": fighter, "form": form, "prefs": p }),
+        MenuAction::Start => serde_json::json!({ "t": "start" }),
+        MenuAction::Leave => serde_json::json!({ "t": "leave" }),
+        MenuAction::Close => serde_json::json!({ "t": "close" }),
+    };
+    m.actions.push_back(j.to_string());
+}
+
+/// A key (W3C `code`) for the menu; returns 1 when it was used.
+///
+/// # Safety
+/// `ptr`/`len` must describe readable memory.
+#[no_mangle]
+pub unsafe extern "C" fn wf_menu_key(ptr: *const u8, len: usize) -> u32 {
+    let code = unsafe { arg_str(ptr, len) };
+    with_menu(|m| {
+        if !m.menu.open {
+            return 0;
+        }
+        let a = m.menu.key(&code);
+        push_action(m, a);
+        1
+    })
+    .unwrap_or(0)
+}
+
+/// Typed text (`KeyboardEvent.key` of printable keys) for the menu's text fields.
+///
+/// # Safety
+/// `ptr`/`len` must describe readable memory.
+#[no_mangle]
+pub unsafe extern "C" fn wf_menu_text(ptr: *const u8, len: usize) {
+    let t = unsafe { arg_str(ptr, len) };
+    with_menu(|m| m.menu.text(&t));
+}
+
+/// The next menu action as JSON in the string buffer (`{"t": "host" | "join" | "rejoin" | "ready" | "fighter" |
+/// "start" | "leave" | "close" | "saved", ...}`); returns its length, 0 = none.
+#[no_mangle]
+pub extern "C" fn wf_menu_action() -> u32 {
+    let a = with_menu(|m| m.actions.pop_front()).flatten();
+    match a {
+        Some(s) => {
+            set_str(&s);
+            s.len() as u32
+        }
+        None => 0,
+    }
+}
+
+/// Show the room screen (the lobby opened) / a message / the main screen.
+///
+/// # Safety
+/// `ptr`/`len` must describe readable memory.
+#[no_mangle]
+pub unsafe extern "C" fn wf_menu_show(what: u32, ptr: *const u8, len: usize) {
+    let msg = unsafe { arg_str(ptr, len) };
+    with_menu(|m| match what {
+        // 1 = room (hosting), 2 = room (joining), 3 = room (watching), 4 = message, 5 = closed, else main
+        1 => m.menu.enter_room(true, false),
+        2 => m.menu.enter_room(false, false),
+        3 => m.menu.enter_room(false, true),
+        4 => m.menu.say(msg),
+        5 => m.menu.open = false,
+        _ => m.menu.show(Screen::Main),
+    });
+}
+
+/// Render the menu for a `win_w` x `win_h` device-pixel canvas into its own RGBA frame (`wf_menu_fb_*`); returns
+/// 1 while the menu is open.
+#[no_mangle]
+pub extern "C" fn wf_menu_frame(win_w: u32, win_h: u32) -> u32 {
+    with_menu(|m| {
+        if !m.menu.open {
+            return 0;
+        }
+        let (w, h) = (240usize, 160usize);
+        m.scale = (win_w / w as u32).min(win_h / h as u32).max(1);
+        m.fb.clear();
+        // a dark backdrop with a faint diagonal pattern
+        m.fb.extend((0..w * h).map(|i| {
+            let (x, y) = (i % w, i / w);
+            if (x + y) % 8 == 0 {
+                0xFF1A_1820
+            } else {
+                0xFF0D_0D0F
+            }
+        }));
+        let st = current_status().map(|s| s.borrow().clone());
+        m.menu.draw(&m.packs, &mut m.fb, w, h, st.as_ref());
+        m.rgba.resize(w * h * 4, 0);
+        for (o, &p) in m.rgba.chunks_exact_mut(4).zip(m.fb.iter()) {
+            o[0] = (p >> 16) as u8;
+            o[1] = (p >> 8) as u8;
+            o[2] = p as u8;
+            o[3] = 255;
+        }
+        1
+    })
+    .unwrap_or(0)
+}
+
+#[no_mangle]
+pub extern "C" fn wf_menu_fb_ptr() -> *const u8 {
+    with_menu(|m| m.rgba.as_ptr()).unwrap_or(std::ptr::null())
+}
+#[no_mangle]
+pub extern "C" fn wf_menu_fb_w() -> u32 {
+    240
+}
+#[no_mangle]
+pub extern "C" fn wf_menu_fb_h() -> u32 {
+    160
+}
+#[no_mangle]
+pub extern "C" fn wf_menu_fb_scale() -> u32 {
+    with_menu(|m| m.scale).unwrap_or(1)
 }

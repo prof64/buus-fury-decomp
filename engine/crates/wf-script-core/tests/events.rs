@@ -20,16 +20,16 @@ fn content_dir(rom: &[u8]) -> PathBuf {
     if let Ok(d) = std::env::var("WF_CONTENT") {
         return PathBuf::from(d);
     }
-    // reuse wf-core's test extraction when present (same options)
-    let shared = wf_rom::testutil::repo_root().join("engine/target/tmp/wf-core-content");
+    // reuse wf-core's field-test extraction when present (same options)
+    let shared = wf_rom::testutil::repo_root().join("engine/target/tmp/wf-core-field-content");
     if shared.join(".complete").exists() {
         return shared;
     }
-    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("wf-script-core-content");
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("wf-script-core-field-content");
     if dir.join(".complete").exists() {
         return dir;
     }
-    let opts = wf_extract::Options { only: ["tables", "sprites", "effects", "maps"].iter().map(|s| s.to_string()).collect() };
+    let opts = wf_extract::Options { only: ["tables", "sprites", "effects", "maps", "world", "items", "scripts"].iter().map(|s| s.to_string()).collect() };
     let (content, _) = wf_extract::extract(rom.to_vec(), &opts).expect("extract");
     for (path, data) in &content.files {
         let p = dir.join(path.strip_prefix("base/").unwrap_or(path));
@@ -64,6 +64,10 @@ fn world(f: &Fixture) -> World {
     Session::new(f.data.clone(), BattleConfig::default()).world
 }
 
+fn field_world(f: &Fixture) -> World {
+    Session::new_field(f.data.clone(), wf_core::field::FieldConfig { world: 1, area: 1, variant: 1, ..Default::default() }).world
+}
+
 /// Run a VM thread to completion, answering blocks by stepping "frames" (leader presses A every 2nd frame).
 fn run(set: &ScriptSet, w: &mut World, s: &mut StoryState, mut t: Thread) -> (Thread, u32) {
     let mut g = Globals::default();
@@ -74,6 +78,8 @@ fn run(set: &ScriptSet, w: &mut World, s: &mut StoryState, mut t: Thread) -> (Th
         assert!(frames < 10_000, "script never finished");
         let held = if frames % 2 == 0 { A } else { 0 };
         w.input[0] = InputFrame::from_held(held, 0);
+        w.scene.keys = w.input;
+        wf_core::scene::tick(w);
         if let Some(v) = poll(w, s) {
             st = t.resume(v, set, &mut g, &mut CoreHost { w, s });
         }
@@ -87,7 +93,8 @@ fn item_use_heals_consumes_and_plays_sfx() {
     let Some(f) = fixture() else { return };
     let mut w = world(f);
     let mut s = StoryState::default();
-    s.supplies.insert(0, 2);
+    w.story.supplies = vec![0; 83];
+    w.story.supplies[0] = 2;
     let i = wf_script_core::leader(&w).unwrap();
     w.pl(i).rec.hp = 10;
     let before = w.pl_ref(i).rec.hp;
@@ -95,7 +102,7 @@ fn item_use_heals_consumes_and_plays_sfx() {
     let (_t, _) = run(&f.set, &mut w, &mut s, Thread::new(ScriptId::Inline(0x083B_BBB0), [0; 4]));
     let after = w.pl_ref(i).rec.hp;
     assert!(after > before, "hp {before} -> {after}");
-    assert_eq!(s.supplies[&0], 1);
+    assert_eq!(w.story.supplies[0], 1);
     assert!(w.events.iter().any(|e| matches!(e, Event::Sfx { .. })));
 }
 
@@ -144,6 +151,22 @@ fn rhai_runtime_on_the_core_host_matches_the_vm() {
     }
 }
 
+/// enemy AI script nodes: RunScript names its event by header address (`header_0xADDR`), InlineScript by its
+/// bytecode (`inline_0xADDR`); the script host must resolve every one the AI content uses
+#[test]
+fn ai_script_nodes_resolve_to_scripts() {
+    let Some(f) = fixture() else { return };
+    let st = Rc::new(RefCell::new(CoreState { world: world(f), story: StoryState::default() }));
+    let rt = wf_script_rhai::Runtime::new(&f.files, Box::new(SharedHost(st))).unwrap();
+    // Goten's tag game (#121) and Super Buu's three phases (#474-#476)
+    for (h, ev) in [(0x0878_3150u32, 121u16), (0x0879_7A90, 474), (0x0879_7BC4, 475), (0x0879_7E14, 476)] {
+        assert_eq!(rt.event_id(&format!("header_0x{h:08X}")), Some(ev), "header 0x{h:08X}");
+    }
+    assert_eq!(rt.event_id("s121"), Some(121));
+    // Vegeta 0x88's inline node bytecode
+    assert!(f.files.contains_key("scripts/inline/inline_0x0870EA28.rhai"), "inline AI script not exported");
+}
+
 #[test]
 fn npc_talk_event_shows_text_and_waits_for_a() {
     let Some(f) = fixture() else { return };
@@ -159,40 +182,60 @@ fn npc_talk_event_shows_text_and_waits_for_a() {
 #[test]
 fn bindings_are_honest() {
     let Some(f) = fixture() else { return };
-    let (mut core, mut story, mut missing) = (0, 0, 0);
-    for n in 8..248u8 {
-        let mut w = world(f);
-        let mut s = StoryState::default();
-        let sig = wf_script::natives::sig(n);
-        let args = vec![1; sig.pops as usize];
-        let mut p = [0; 4];
-        let mut g = Globals::default();
-        let r = CoreHost { w: &mut w, s: &mut s }.call(&wf_script::vm::Call {
-            native: n,
-            args: &args,
-            script: wf_script::vm::ScriptKey::Inline(0),
-            pc: 0,
-            params: &mut p,
-            globals: &mut g,
-        });
-        match binding(n).at {
-            Where::Vm => {}
-            Where::Missing => {
-                missing += 1;
-                assert!(matches!(&r, Err(e) if e.contains("not available")), "0x{n:02x} {r:?}");
+    // every native runs on a real World (battle and field mode) with the right result arity; blocking ones block
+    // and complete under poll within a bounded number of frames (A pressed every other frame)
+    let mut count = std::collections::BTreeMap::new();
+    for field in [false, true] {
+        for n in 0..248u8 {
+            let at = binding(n).at;
+            if at == Where::Vm {
+                continue;
             }
-            at => {
-                if at == Where::Core {
-                    core += 1;
-                } else {
-                    story += 1;
+            let mut w = if field { field_world(f) } else { world(f) };
+            let mut s = StoryState::default();
+            let sig = wf_script::natives::sig(n);
+            // arguments: actor 0 (the leader) / small values; shops need an entry
+            let names = wf_script::natives::info(n).map(|i| i.args.clone()).unwrap_or_default();
+            let args: Vec<i32> = (0..sig.pops as usize).map(|k| if names.get(k).is_some_and(|a| a.contains("actor")) { 0 } else { 1 }).collect();
+            let mut p = [0; 4];
+            let mut g = Globals::default();
+            let r = wf_script::vm::Host::native(
+                &mut CoreHost { w: &mut w, s: &mut s },
+                wf_script::vm::Call { native: n, args: &args, script: wf_script::vm::ScriptKey::Inline(0), pc: 0, params: &mut p, globals: &mut g },
+            );
+            match &r {
+                Ok(wf_script::vm::NativeResult::Done(v)) => {
+                    if n != 0x8c {
+                        assert_eq!(v.is_some(), sig.pushes, "0x{n:02x} result arity");
+                    }
                 }
-                assert!(!matches!(&r, Err(e) if e.contains("not available")), "0x{n:02x} claims {at:?} but is missing");
-                if let Ok(wf_script::vm::NativeResult::Done(v)) = &r {
-                    assert_eq!(v.is_some(), sig.pushes, "0x{n:02x} result arity");
+                Ok(wf_script::vm::NativeResult::Block) => {
+                    let mut frames = 0;
+                    loop {
+                        frames += 1;
+                        if frames >= 200_000 {
+                            // play_anim of a looping state never ends: the game hangs the same way (micro play_anim_loop)
+                            assert!(n == 0x3c, "0x{n:02x} (field {field}) never completes: {:?}", s.pending);
+                            break;
+                        }
+                        let held = if frames % 2 == 0 { A } else { wf_core::input::B };
+                        let mut sess = Session { data: f.data.clone(), world: w, config: BattleConfig::default(), prev: [0; 4], outcome: wf_core::battle::Outcome::Running, hook: None };
+                        let mut inputs = [InputFrame::default(); 4];
+                        inputs[0] = InputFrame::from_held(held, 0);
+                        sess.step_frames(inputs);
+                        w = sess.world;
+                        if let Some(v) = poll(&mut w, &mut s) {
+                            assert_eq!(v.is_some(), sig.pushes && n != 0x8c || (n == 0x8c && v.is_some()), "0x{n:02x} resume arity");
+                            break;
+                        }
+                    }
                 }
+                Err(e) => panic!("0x{n:02x} {} (field {field}): {e}", wf_script_core::binding::name(n)),
+            }
+            if !field {
+                *count.entry(format!("{at:?}")).or_insert(0) += 1;
             }
         }
     }
-    eprintln!("bindings: {core} core, {story} story-state, {missing} missing");
+    eprintln!("bindings: {count:?}");
 }

@@ -142,3 +142,89 @@ fn synctest_catches_nondeterminism() {
     let err = (0..500u16).find_map(|f| bad.advance(&[f, 1]).err());
     assert!(err.is_some());
 }
+
+fn rejoined_events(p: &testnet::PeerRun<ToyGame>) -> usize {
+    p.sess.events.iter().filter(|e| matches!(e, NetEvent::Rejoined { .. })).count()
+}
+
+/// a player drops (no goodbye), the others give its slot neutral input; a new connection of that player gets the
+/// slot back from the acting host with a state snapshot, catches up and plays on: everyone agrees to the end
+#[test]
+fn rejoin_after_disconnect() {
+    for (lat, loss, seed) in [(60.0, 0.05, 1u64), (120.0, 0.10, 2), (20.0, 0.0, 3)] {
+        let net = SimNet::new(Conditions { latency_ms: lat, jitter_ms: 10.0, loss }, seed);
+        let c = NetConfig { disconnect_ms: 1500.0, ..cfg() };
+        let mut ps = testnet::peers(&net, vec![ToyGame::default(); 3], &c, 0, 8 + seed);
+        ps[2].leave_tick = Some(600);
+        let base = 1000.0 / 59.7275;
+        let mut added = false;
+        let r = testnet::run_with(&net, &mut ps, &mut [], 3000, 900_000.0, &mut |now, ps| {
+            if added || now < 600.0 * base + 2000.0 {
+                return None;
+            }
+            let p = testnet::try_rejoin(&net, ps, 0, 2, "peer2b", ToyGame::default(), &c, 99, now)?;
+            added = true;
+            Some(p)
+        });
+        assert!(added, "lat {lat}: the host never granted the rejoin");
+        assert!(r.done, "lat {lat}: not done");
+        let h = agree(&ps, 3000);
+        let rj = ps.iter().find(|p| p.id == "peer2b").unwrap();
+        assert_eq!(rj.sess.hashes[3000], h);
+        for p in ps.iter().take(2) {
+            assert_eq!(rejoined_events(p), 1, "{}: {:?}", p.id, p.sess.events);
+        }
+        // the slot is played again: the rejoiner's inputs are in everyone's log after the handover
+        let from = ps[0].sess.events.iter().find_map(|e| if let NetEvent::Rejoined { from, .. } = e { Some(*from) } else { None }).unwrap();
+        let used = &ps[1].sess.used_inputs()[from as usize..2900];
+        assert!(used.iter().any(|u| u[2] != 0), "slot 2 stays neutral after the rejoin");
+        eprintln!("rejoin lat {lat} loss {loss}: base {} handover at {from}, catch-up {} frames, rejoiner stats {:?}", rj.sess.base(), rj.sess.stats.catchup_frames, rj.sess.stats);
+    }
+}
+
+/// the host leaves: the next player acts as host (serves the spectator, grants the host's rejoin)
+#[test]
+fn host_leaves_then_rejoins() {
+    let net = SimNet::new(Conditions { latency_ms: 50.0, jitter_ms: 10.0, loss: 0.05 }, 21);
+    let c = NetConfig { disconnect_ms: 1500.0, ..cfg() };
+    let mut ps = testnet::peers(&net, vec![ToyGame::default(); 3], &c, 1, 31);
+    let mut sp = vec![testnet::spectator(&net, ToyGame::default(), &c, 3, 0)];
+    ps[0].leave_tick = Some(500);
+    let base = 1000.0 / 59.7275;
+    let mut added = false;
+    let r = testnet::run_with(&net, &mut ps, &mut sp, 2500, 900_000.0, &mut |now, ps| {
+        if added || now < 500.0 * base + 2500.0 {
+            return None;
+        }
+        let p = testnet::try_rejoin(&net, ps, 1, 0, "peer0b", ToyGame::default(), &c, 77, now)?;
+        added = true;
+        Some(p)
+    });
+    assert!(added);
+    assert!(r.done, "{:?}", sp[0].sess.frame());
+    let h = agree(&ps, 2500);
+    assert_eq!(sp[0].sess.hashes[2500], h);
+    assert!(sp[0].sess.events.is_empty(), "{:?}", sp[0].sess.events);
+    // back: the original slot's player is the lowest slot again, so it acts as host
+    let back = ps.iter().find(|p| p.id == "peer0b").unwrap();
+    assert!(back.sess.acting_host());
+    assert!(!ps[1].sess.acting_host());
+}
+
+/// a wrong snapshot is refused (the hash of the loaded state must match the host's)
+#[test]
+fn rejoin_snapshot_is_verified() {
+    let net = SimNet::new(Conditions::default(), 5);
+    let c = NetConfig { disconnect_ms: 500.0, ..cfg() };
+    let mut ps = testnet::peers(&net, vec![ToyGame::default(); 2], &c, 0, 3);
+    ps[1].leave_tick = Some(200);
+    testnet::run(&net, &mut ps, &mut [], 400, 60_000.0);
+    let (g, bytes) = ps[0].sess.grant_rejoin(1, "x", 60_000.0).expect("grant");
+    let mut bad = ToyGame::default();
+    bad.load_bytes(&bytes);
+    bad.acc ^= 1;
+    assert!(wf_net::session::P2PSession::resume(bad, NetConfig { slots: 2, ..c.clone() }, &g, "x", 0.0).is_err());
+    let mut good = ToyGame::default();
+    good.load_bytes(&bytes);
+    assert!(wf_net::session::P2PSession::resume(good, NetConfig { slots: 2, ..c }, &g, "x", 0.0).is_ok());
+}

@@ -434,7 +434,7 @@ dependencies = [
  "futures-io",
  "rustls 0.21.12",
  "rustls-pemfile",
- "webpki-roots",
+ "webpki-roots 0.22.6",
 ]
 
 [[package]]
@@ -4384,6 +4384,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "tokio-rustls"
+version = "0.26.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c9cc2678c2cdd569ef8215e2afd7954ada2ae20b4fdd2c5fe6139a3b02d105db"
+dependencies = [
+ "rustls 0.23.45",
+ "tokio",
+]
+
+[[package]]
 name = "tokio-stream"
 version = "0.1.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4402,7 +4412,10 @@ checksum = "8f72a05e828585856dacd553fba484c242c46e391fb0e58917c942ee9202915c"
 dependencies = [
  "futures-util",
  "log",
+ "rustls 0.23.45",
+ "rustls-pki-types",
  "tokio",
+ "tokio-rustls",
  "tungstenite 0.29.0",
 ]
 
@@ -4561,6 +4574,8 @@ dependencies = [
  "httparse",
  "log",
  "rand",
+ "rustls 0.23.45",
+ "rustls-pki-types",
  "sha1",
  "thiserror 2.0.21",
 ]
@@ -4943,6 +4958,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "webpki-roots"
+version = "1.0.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7dcd9d09a39985f5344844e66b0c530a33843579125f23e21e9f0f220850f22a"
+dependencies = [
+ "rustls-pki-types",
+]
+
+[[package]]
 name = "webrtc"
 version = "0.17.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5122,9 +5146,13 @@ dependencies = [
  "wf-content",
  "wf-core",
  "wf-extract",
+ "wf-net",
  "wf-render",
  "wf-replay",
  "wf-rom",
+ "wf-script",
+ "wf-script-core",
+ "wf-script-rhai",
  "wf-view",
 ]
 
@@ -5228,11 +5256,20 @@ dependencies = [
 name = "wf-net"
 version = "0.1.0"
 dependencies = [
+ "axum",
+ "futures-util",
  "matchbox_signaling",
  "matchbox_socket",
+ "rustls 0.23.45",
  "serde",
  "serde_json",
+ "sha1",
  "tokio",
+ "tokio-rustls",
+ "tokio-tungstenite",
+ "turn",
+ "webpki-roots 1.0.9",
+ "webrtc-util",
  "wf-core",
  "wf-extract",
  "wf-replay",
@@ -5287,6 +5324,7 @@ dependencies = [
  "wf-rom",
  "wf-script",
  "wf-script-rhai",
+ "wf-ui",
 ]
 
 [[package]]

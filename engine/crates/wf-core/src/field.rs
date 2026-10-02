@@ -50,6 +50,9 @@ pub enum Cause {
     /// the area's on-enter / the previous area's on-leave bytecode (run during the load, before the player exists)
     AreaEnter,
     AreaLeave,
+    /// an enemy AI node queued a script (RunScript: `run` = `header_0xADDR`, the event whose header is ADDR;
+    /// InlineScript: `inline_0xADDR`)
+    Ai { entity: EntityId },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]

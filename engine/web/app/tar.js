@@ -2,7 +2,7 @@
 import { untar as untarBase } from '../extract.js';
 
 /** Extraction categories, in order (keep in sync with wf_extract::CATEGORIES). Part of the content cache key. */
-export const CATEGORIES = ['tables', 'sprites', 'effects', 'portraits', 'items', 'maps', 'audio', 'ui', 'world'];
+export const CATEGORIES = ['tables', 'sprites', 'effects', 'portraits', 'items', 'maps', 'audio', 'ui', 'world', 'scripts'];
 
 /** Map<path, Uint8Array> from a ustar archive; strips a leading `base/` (the extractor's prefix). */
 export function untar(buf) {

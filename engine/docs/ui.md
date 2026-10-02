@@ -84,6 +84,17 @@ Buffer (OBJ tile order): `0x000..0x200` selected skill icon (`icons/skills/skill
 * HP·5 ≤ maxHP plays sound `0x08319488` every 60 frames.
 `hud.json` lists every step's pixels in the 80×16 picture.
 
+## 4b. Area-name banner — ctor `0x0800BF34`, vt `0x0804B528`, surface `0x0800BE90`, draw `0x0800BFCE`
+
+Created by EnterArea after the player and the HUD when the new area's name string id differs from the last one
+shown (`0x03001984`) and is not 0 (the 3D world map only records the id). Surface 240x16 8bpp: background =
+webfoot-LZ `0x0807248C` (type 1, 0xF00 bytes; `images/banner.png`), then the area name with the `small` font through
+the string drawer in centre mode (x 120: x0 = 120 - (width + 1) / 2; pen y 11, glyph tops at pen y - 12), shadow
+colour 1 at (+1, +1) and colour 2 per glyph. Shown as 7 x 32x16 + 1 x 16x16 8bpp affine OBJs at x 0..224, y 128,
+priority 0. Timer 240, -1 before every draw (239 visible frames); matrix a = 0x100, d = 0x100 while the timer is > 16,
+else 0x1000 / timer. Exported: `images/banner.png`, `banner.json` (all constants). VERIFIED: surface = OBJ VRAM,
+screen identical every frame (frontend `tests/banner_parity.rs`).
+
 ## 5. Pause menu
 
 Page surface 240×160 (BG2). Procedural primitives reproduced in `menu.rs`:

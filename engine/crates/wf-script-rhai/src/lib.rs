@@ -18,7 +18,7 @@ use std::collections::{BTreeMap, VecDeque};
 use std::rc::Rc;
 use wf_script::natives;
 use wf_script::steps::is_instant;
-use wf_script::vm::{ext_info, Call, ExtCall, ExtKind, Globals, Host, NativeResult, NodeCall, ScriptKey, EXTENSIONS};
+use wf_script::vm::{ext_info, Call, ExtCall, ExtKind, Globals, Host, NativeResult, NodeCall, SceneCall, ScriptKey, EXTENSIONS};
 
 type R<T> = Result<T, Box<EvalAltResult>>;
 
@@ -78,6 +78,9 @@ pub enum Frame {
         node: u16,
         params: usize,
         in_node: bool,
+        /// the host was told the graph started (`Host::scene`)
+        #[serde(default)]
+        entered: bool,
     },
 }
 
@@ -88,6 +91,8 @@ pub enum Act {
     RunEvent { event: u16, params: usize },
     Node(NodeCall),
     Ext { name: String, args: Vec<i32>, params: usize },
+    /// the host blocked on an event graph's start
+    Scene { event: u16 },
 }
 
 /// The complete state of one script thread — plain data.
@@ -126,6 +131,8 @@ pub enum GNode {
 pub struct Library {
     pub asts: BTreeMap<String, AST>,
     pub graphs: BTreeMap<u16, BTreeMap<u16, GNode>>,
+    /// event header address -> event index (from each event file's `// Event N (header 0xADDR)` line)
+    pub headers: BTreeMap<u32, u16>,
 }
 
 struct Ctx {
@@ -159,6 +166,7 @@ impl Library {
     pub fn compile(engine: &Engine, files: &BTreeMap<String, String>) -> Result<Library, String> {
         let mut asts = BTreeMap::new();
         let mut graphs = BTreeMap::new();
+        let mut headers = BTreeMap::new();
         for (path, src) in files {
             let key = path.rsplit('/').next().unwrap().trim_end_matches(".rhai").to_string();
             let ast = engine.compile(src).map_err(|e| format!("{path}: {e}"))?;
@@ -167,10 +175,14 @@ impl Library {
                     .call_fn(&mut rhai::Scope::new(), &ast, "event", ())
                     .map_err(|e| format!("{path}: event(): {e}"))?;
                 graphs.insert(ev, parse_graph(g).map_err(|e| format!("{path}: {e}"))?);
+                let hdr = src.lines().take(4).find_map(|l| l.split("(header 0x").nth(1)).and_then(|t| t.split(')').next());
+                if let Some(h) = hdr.and_then(|t| u32::from_str_radix(t, 16).ok()) {
+                    headers.insert(h, ev);
+                }
             }
             asts.insert(key, ast);
         }
-        Ok(Library { asts, graphs })
+        Ok(Library { asts, graphs, headers })
     }
 }
 
@@ -284,6 +296,16 @@ impl Runtime {
         c.t.frames.push(Frame::Unit { unit, step: None, locals: vec![], params: 0, role: Role::Plain, done: None });
     }
 
+    /// An event id as the core names it: `sNNN` (event index) or `header_0xADDR` (the event whose header is ADDR,
+    /// queued by an enemy's RunScript AI node).
+    pub fn event_id(&self, id: &str) -> Option<u16> {
+        if let Some(h) = id.strip_prefix("header_0x") {
+            let h = u32::from_str_radix(h, 16).ok()?;
+            return self.library().headers.get(&h).copied();
+        }
+        id.trim_start_matches('s').parse::<u16>().ok()
+    }
+
     /// Start a whole event.
     pub fn start_event(&self, event: u16, params: [i32; 4]) {
         self.start_event_by(event, params, 0);
@@ -293,7 +315,7 @@ impl Runtime {
     pub fn start_event_by(&self, event: u16, params: [i32; 4], who: i32) {
         let mut c = self.ctx.borrow_mut();
         c.t = ThreadState { params: vec![params], who, ..Default::default() };
-        c.t.frames.push(Frame::Event { event, node: 0, params: 0, in_node: false });
+        c.t.frames.push(Frame::Event { event, node: 0, params: 0, in_node: false, entered: false });
     }
 
     /// Start a named handler `file::entry(who)` (mod scripts: `on_talk(who)`, `on_enter(who)`,
@@ -352,7 +374,7 @@ impl Runtime {
                         host.set_var(*var, *value, &mut t.params[*params], globals)?;
                     }
                     Act::RunEvent { event, params } => {
-                        t.frames.push(Frame::Event { event: *event, node: 0, params: *params, in_node: false });
+                        t.frames.push(Frame::Event { event: *event, node: 0, params: *params, in_node: false, entered: false });
                     }
                     Act::Ext { name, args, params } => {
                         let who = t.who;
@@ -367,6 +389,7 @@ impl Runtime {
                             }
                         }
                     }
+                    Act::Scene { .. } => {}
                     Act::Node(n) => match host.node(n.clone())? {
                         NativeResult::Done(_) => {
                             if let Some(Frame::Event { in_node, .. }) = t.frames.last_mut() {
@@ -451,12 +474,23 @@ impl Runtime {
                     }
                 }
                 Frame::Event { in_node: true, .. } => return Err("event node in progress with nothing to run".into()),
+                Frame::Event { event, entered: false, .. } => {
+                    if let Some(Frame::Event { entered, .. }) = c.t.frames.last_mut() {
+                        *entered = true;
+                    }
+                    let Ctx { host, t, .. } = &mut *c;
+                    if let NativeResult::Block = host.scene(SceneCall::Enter { event: Some(event) })? {
+                        t.blocked = Some(Act::Scene { event });
+                        return Ok(Status::Blocked);
+                    }
+                }
                 Frame::Event { event, node, params, .. } => {
                     let g = self.lib.graphs.get(&event).ok_or(format!("no graph for event {event}"))?;
                     let n = g.get(&node).ok_or(format!("event {event}: no node {node}"))?.clone();
                     let Some(Frame::Event { node: cur, in_node, event: evf, .. }) = c.t.frames.last_mut() else { unreachable!() };
                     match n {
                         GNode::End(v) => {
+                            c.host.scene(SceneCall::Exit { event: Some(event) })?;
                             c.t.frames.pop();
                             if c.t.frames.is_empty() {
                                 c.t.event_result = Some(v);

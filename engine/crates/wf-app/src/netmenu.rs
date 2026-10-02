@@ -496,14 +496,16 @@ impl OnlineMenu {
             y += 10;
             for e in st.lobby.iter().take(5) {
                 let seat = match (e.seat, e.role.as_str()) {
-                    (_, "spectator") => "watch".to_string(),
+                    (_, "spectator") => "--".to_string(),
                     (Some(s), _) => format!("P{}", s + 1),
                     (None, _) => "-".to_string(),
                 };
                 let c = if e.me { 0xFFFF_FFFF } else { 0xFFB8_B8B8 };
                 text(fb, &seat, ox + 10, y, ACCENT);
                 text(fb, &e.name.chars().take(12).collect::<String>(), ox + 40, y, c);
-                if e.role != "spectator" {
+                if e.role == "spectator" {
+                    text(fb, "watching", ox + 120, y, 0xFF9A_988F);
+                } else {
                     text(fb, &format!("{} {}", cap(&e.fighter), e.form), ox + 120, y, c);
                     let r = if e.role == "host" { "HOST" } else if e.ready { "READY" } else { "..." };
                     text(fb, r, ox + 196, y, if e.ready || e.role == "host" { 0xFF7A_E07A } else { 0xFF9A_988F });
@@ -556,7 +558,7 @@ impl OnlineMenu {
             }
             y += 11;
         }
-        let hint = if self.editing.is_some() { "type, ENTER ok, ESC cancel" } else { "ENTER select  LEFT/RIGHT change  ESC back" };
+        let hint = if self.editing.is_some() { "type  ENTER ok  ESC cancel" } else { "ENTER ok  <> change  ESC back" };
         tiny::draw_text(fb, w, h, ox + 10, oy + 147, hint, 0xFF6A_6870);
     }
 }

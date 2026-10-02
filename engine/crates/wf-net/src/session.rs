@@ -14,12 +14,18 @@
 //!   any difference raises [`NetEvent::Desync`] (comparing the chain covers every earlier frame too).
 //! * **Disconnects**: a peer silent for `disconnect_ms` is dropped; its slots get neutral input from the frame
 //!   after its last input everyone has (peers reconcile to the minimum via the status in every packet).
-//! * **Spectators**: the host forwards confirmed inputs (all slots) to spectators, which run [`crate::spectator`].
+//! * **Rejoin**: the acting host (the connected player with the lowest slot) hands a disconnected slot to a
+//!   rejoining peer ([`P2PSession::grant_rejoin`]): the slot stays neutral up to a frame `from` beyond every input the
+//!   host has sent, then its inputs come from the new peer. The change travels with the host's inputs (every packet,
+//!   until the receiver's status shows the new seat epoch), so no peer can confirm a frame past `from` without it.
+//!   The rejoiner starts from the host's newest globally confirmed state (serialized snapshot + its hash and chain
+//!   value, verified on load: [`P2PSession::resume`]) and catches up with confirmed inputs at several frames per tick.
+//! * **Spectators**: the acting host forwards confirmed inputs (all slots) to spectators ([`crate::spectator`]).
 
 use std::collections::VecDeque;
 
 use crate::game::{chain_mix, Game};
-use crate::proto::{InputMsg, Msg, SpectMsg, MAX_FRAMES_PER_PACKET};
+use crate::proto::{InputMsg, Msg, SeatChange, SlotStatus, SpectMsg, MAX_FRAMES_PER_PACKET};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct NetConfig {
@@ -38,11 +44,29 @@ pub struct NetConfig {
     pub time_sync: bool,
     /// at most one time-sync skip every this many ticks
     pub skip_interval: u32,
+    /// frames simulated per tick at most while behind the other peers (rejoin, after a long stall)
+    pub catchup: u32,
+    /// a rejoined slot is handed over this many frames after the host's newest input (time to load + catch up)
+    pub rejoin_lead: i32,
+    /// a freshly seated (rejoining) peer may stay silent this long before it is dropped again
+    pub rejoin_grace_ms: f64,
 }
 
 impl Default for NetConfig {
     fn default() -> Self {
-        NetConfig { slots: 2, input_delay: 2, max_prediction: 12, disconnect_ms: 5000.0, fps: 59.7275, session: 0, time_sync: true, skip_interval: 12 }
+        NetConfig {
+            slots: 2,
+            input_delay: 2,
+            max_prediction: 12,
+            disconnect_ms: 5000.0,
+            fps: 59.7275,
+            session: 0,
+            time_sync: true,
+            skip_interval: 12,
+            catchup: 8,
+            rejoin_lead: 90,
+            rejoin_grace_ms: 20_000.0,
+        }
     }
 }
 
@@ -51,6 +75,8 @@ pub enum NetEvent {
     /// a peer's state hash differs from ours (state index = frames simulated)
     Desync { frame: i32, local: u64, remote: u64, peer: String, chain: bool },
     Disconnected { peer: String, slots: Vec<usize>, frame: i32 },
+    /// a disconnected slot was handed to (rejoining) peer `peer`: its inputs count from frame `from`
+    Rejoined { peer: String, slot: usize, from: i32 },
 }
 
 /// Counters for the overlay, tests and reports.
@@ -69,6 +95,8 @@ pub struct NetStats {
     pub stalls: u64,
     /// ticks skipped by time sync
     pub skips: u64,
+    /// frames simulated in catch-up (behind the others: rejoin)
+    pub catchup_frames: u64,
     pub packets_sent: u64,
     pub packets_recv: u64,
     pub bytes_sent: u64,
@@ -88,6 +116,8 @@ pub struct Peer {
     pub spectator: bool,
     pub connected: bool,
     last_recv: f64,
+    /// not dropped for silence before this time (a rejoining peer loading the snapshot)
+    grace_until: f64,
     /// how many of our local inputs (or, to a spectator, confirmed frames) the peer has
     acked: i32,
     pub rtt_ms: f64,
@@ -96,12 +126,17 @@ pub struct Peer {
     remote_frame: i32,
     local_adv: f64,
     remote_adv: f64,
-    /// the peer's view of every slot (known inputs, disconnected)
-    status: Vec<(i32, bool)>,
+    /// the peer's view of every slot (known inputs / disconnect frame, seat epoch)
+    status: Vec<SlotStatus>,
     pending_hashes: Vec<(i32, u64)>,
     pending_chain: Option<(i32, u64)>,
     desynced: bool,
     got_any: bool,
+    /// it said goodbye (left on purpose)
+    pub bye: bool,
+    /// dropped because it went silent (not announced by a goodbye or the transport): maybe it is us who lost
+    /// the connection
+    pub timed_out: bool,
 }
 
 impl Peer {
@@ -112,6 +147,7 @@ impl Peer {
             spectator,
             connected: true,
             last_recv: now,
+            grace_until: now,
             acked: 0,
             rtt_ms: 0.0,
             last_ping: 0,
@@ -119,11 +155,13 @@ impl Peer {
             remote_frame: 0,
             local_adv: 0.0,
             remote_adv: 0.0,
-            status: vec![(0, false); nslots],
+            status: vec![SlotStatus::default(); nslots],
             pending_hashes: Vec::new(),
             pending_chain: None,
             desynced: false,
             got_any: false,
+            bye: false,
+            timed_out: false,
         }
     }
 }
@@ -131,12 +169,33 @@ impl Peer {
 /// What one tick did.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Tick {
-    /// frames simulated for the first time (0 or 1)
+    /// frames simulated for the first time (0 or 1, more while catching up)
     pub advanced: u32,
     /// frames re-simulated
     pub resimulated: u32,
     pub stalled: bool,
     pub skipped: bool,
+}
+
+/// What a rejoining peer needs besides the state snapshot (sent as JSON by the lobby, see `lobby::GrantInfo`).
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct RejoinGrant {
+    pub slot: usize,
+    /// first state index of the rejoiner (the snapshot's), its state hash and hash-chain value
+    pub base: i32,
+    pub hash: u64,
+    pub chain: u64,
+    /// per slot: seat epoch, the frame the current seat's inputs start at, disconnect frame
+    pub epochs: Vec<u8>,
+    pub seat_from: Vec<i32>,
+    pub seat_peer: Vec<String>,
+    pub disc: Vec<Option<i32>>,
+    /// per slot: inputs from `base` for slots no connected peer serves (the rejoiner's own up to `from`, other
+    /// dropped players'); empty for connected peers' slots (they send them)
+    pub tails: Vec<Vec<u16>>,
+    /// (peer id, slots) of every connected player, the host included
+    pub peers: Vec<(String, Vec<usize>)>,
+    pub spectators: Vec<String>,
 }
 
 pub struct P2PSession<G: Game> {
@@ -148,10 +207,15 @@ pub struct P2PSession<G: Game> {
     frame: i32,
     /// highest frame ever simulated + 1 (frames below were simulated before: re-simulations)
     high: i32,
-    /// known inputs per slot, contiguous from frame 0 (the full match log)
+    /// first state index of this session (a rejoined session starts from a snapshot); earlier hashes are not checked
+    base: i32,
+    /// known inputs per slot, contiguous from frame 0 (the full match log; before `base`: placeholders)
     known: Vec<Vec<u16>>,
     /// slot disconnected from this frame on (its inputs are 0 there)
     disc: Vec<Option<i32>>,
+    /// seat epoch per slot and the change that started it (re-sent to peers that have not applied it)
+    epoch: Vec<u8>,
+    seat: Vec<Option<SeatChange>>,
     /// inputs used for each simulated frame
     used: Vec<Vec<u16>>,
     /// saved states (index, state), ascending
@@ -170,8 +234,14 @@ fn ms32(now: f64) -> u32 {
     (now as i64) as u32
 }
 
+/// `a` is a newer seat epoch than `b` (wrapping)
+fn newer(a: u8, b: u8) -> bool {
+    let d = a.wrapping_sub(b);
+    d != 0 && d < 128
+}
+
 impl<G: Game> P2PSession<G> {
-    /// `peers`: (transport id, slots) of every other player; `spectators`: transport ids (the host serves them).
+    /// `peers`: (transport id, slots) of every other player; `spectators`: transport ids (served by the acting host).
     pub fn new(game: G, cfg: NetConfig, local_slots: Vec<usize>, peers: Vec<(String, Vec<usize>)>, spectators: Vec<String>, is_host: bool, now: f64) -> Self {
         let n = cfg.slots.max(1);
         let mut s = P2PSession {
@@ -180,8 +250,11 @@ impl<G: Game> P2PSession<G> {
             is_host,
             frame: 0,
             high: 0,
+            base: 0,
             known: vec![Vec::new(); n],
             disc: vec![None; n],
+            epoch: vec![0; n],
+            seat: vec![None; n],
             used: Vec::new(),
             states: VecDeque::new(),
             hashes: Vec::new(),
@@ -199,9 +272,73 @@ impl<G: Game> P2PSession<G> {
         for id in spectators {
             s.peers.push(Peer::new(id, Vec::new(), true, n, now));
         }
+        s.game.set_frame_index(0);
         let st = s.game.save();
         s.states.push_back((0, st));
         s
+    }
+
+    /// A rejoining peer's session: `game` already holds the snapshot state of `g.base` (see
+    /// `lobby::GrantInfo`); its hash is checked against the host's. Errors when the snapshot does not verify.
+    pub fn resume(mut game: G, cfg: NetConfig, g: &RejoinGrant, me: &str, now: f64) -> Result<Self, String> {
+        let n = cfg.slots.max(1);
+        let base = g.base.max(0);
+        game.set_frame_index(base);
+        let st = game.save();
+        let h = game.checksum(&st);
+        if h != g.hash {
+            return Err(format!("the rejoin snapshot does not verify: state {base} hashes {h:016x}, the host has {:016x}", g.hash));
+        }
+        let mut known = vec![vec![0u16; base as usize]; n];
+        for (s, t) in g.tails.iter().enumerate().take(n) {
+            known[s].extend_from_slice(t);
+        }
+        let mut seat = vec![None; n];
+        for s in 0..n {
+            let e = g.epochs.get(s).copied().unwrap_or(0);
+            if e != 0 {
+                seat[s] = Some(SeatChange { slot: s as u8, epoch: e, from: g.seat_from.get(s).copied().unwrap_or(0), peer: g.seat_peer.get(s).cloned().unwrap_or_default() });
+            }
+        }
+        let mut hashes = vec![0u64; base as usize];
+        hashes.push(h);
+        let mut chain = vec![0u64; base as usize];
+        chain.push(g.chain);
+        let mut s = P2PSession {
+            game,
+            local_slots: vec![g.slot],
+            is_host: false,
+            frame: base,
+            high: base,
+            base,
+            known,
+            disc: g.disc.iter().copied().chain(std::iter::repeat(None)).take(n).collect(),
+            epoch: g.epochs.iter().copied().chain(std::iter::repeat(0)).take(n).collect(),
+            seat,
+            used: vec![vec![0u16; n]; base as usize],
+            states: VecDeque::new(),
+            hashes,
+            chain,
+            rollback_from: None,
+            peers: Vec::new(),
+            events: Vec::new(),
+            stats: NetStats::default(),
+            since_skip: 0,
+            cfg,
+        };
+        for (id, slots) in &g.peers {
+            if id != me {
+                let mut p = Peer::new(id.clone(), slots.clone(), false, n, now);
+                p.acked = base;
+                p.grace_until = now + s.cfg.rejoin_grace_ms;
+                s.peers.push(p);
+            }
+        }
+        for id in &g.spectators {
+            s.peers.push(Peer::new(id.clone(), Vec::new(), true, n, now));
+        }
+        s.states.push_back((base, st));
+        Ok(s)
     }
 
     pub fn add_spectator(&mut self, id: String, now: f64) {
@@ -212,6 +349,9 @@ impl<G: Game> P2PSession<G> {
 
     pub fn frame(&self) -> i32 {
         self.frame
+    }
+    pub fn base(&self) -> i32 {
+        self.base
     }
     /// inputs known for every slot up to (excluding) this frame
     pub fn confirmed(&self) -> i32 {
@@ -226,6 +366,30 @@ impl<G: Game> P2PSession<G> {
     }
     pub fn used_inputs(&self) -> &[Vec<u16>] {
         &self.used
+    }
+    /// the input of `slot` at frame `f` as the match uses it (neutral after a disconnect)
+    pub fn input_at(&self, slot: usize, f: i32) -> u16 {
+        self.input_for(slot, f)
+    }
+    pub fn disconnected_slots(&self) -> Vec<usize> {
+        (0..self.cfg.slots).filter(|&s| self.disc[s].is_some()).collect()
+    }
+    pub fn seat_epoch(&self, slot: usize) -> u8 {
+        self.epoch.get(slot).copied().unwrap_or(0)
+    }
+
+    /// We are the acting host: the connected player with the lowest slot (the original host while it is there).
+    /// It serves spectators and grants rejoins.
+    pub fn acting_host(&self) -> bool {
+        for s in 0..self.cfg.slots {
+            if self.local_slots.contains(&s) {
+                return true;
+            }
+            if self.peers.iter().any(|p| p.connected && !p.spectator && p.slots.contains(&s)) {
+                return false;
+            }
+        }
+        false
     }
 
     fn conf_len(&self, s: usize) -> i32 {
@@ -264,7 +428,7 @@ impl<G: Game> P2PSession<G> {
             _ => {}
         }
         self.disc[s] = Some(d);
-        for f in d..self.frame {
+        for f in d.max(self.base)..self.frame {
             if self.used.get(f as usize).is_some_and(|u| u[s] != 0) {
                 self.mark_rollback(f);
                 break;
@@ -272,18 +436,148 @@ impl<G: Game> P2PSession<G> {
         }
     }
 
+    /// Hand slot `s` to `peer` from frame `from` on (epoch `epoch`): neutral inputs from the disconnect frame up
+    /// to `from`, then the new peer's.
+    fn apply_seat(&mut self, c: &SeatChange, now: f64) {
+        let s = c.slot as usize;
+        if s >= self.cfg.slots || !newer(c.epoch, self.epoch[s]) || self.local_slots.contains(&s) {
+            return;
+        }
+        self.epoch[s] = c.epoch;
+        self.seat[s] = Some(c.clone());
+        let d = self.disc[s].unwrap_or(self.known[s].len() as i32).max(0);
+        let k = &mut self.known[s];
+        k.truncate(d as usize);
+        while (k.len() as i32) < c.from {
+            k.push(0);
+        }
+        self.disc[s] = None;
+        // frames from the disconnect on were simulated with 0 for this slot (or real inputs, if we had not dropped
+        // the slot yet): roll back to the first one that differs
+        for f in d.max(self.base)..self.frame {
+            if self.used.get(f as usize).is_some_and(|u| u[s] != self.input_for(s, f)) {
+                self.mark_rollback(f);
+                break;
+            }
+        }
+        for p in self.peers.iter_mut() {
+            if p.id != c.peer {
+                p.slots.retain(|&x| x != s);
+            }
+        }
+        match self.peers.iter_mut().find(|p| p.id == c.peer) {
+            Some(p) => {
+                if !p.slots.contains(&s) {
+                    p.slots.push(s);
+                }
+                p.spectator = false;
+                p.connected = true;
+                p.last_recv = now;
+                p.grace_until = now + self.cfg.rejoin_grace_ms;
+            }
+            None => {
+                let mut p = Peer::new(c.peer.clone(), vec![s], false, self.cfg.slots, now);
+                p.grace_until = now + self.cfg.rejoin_grace_ms;
+                self.peers.push(p);
+            }
+        }
+        self.events.push(NetEvent::Rejoined { peer: c.peer.clone(), slot: s, from: c.from });
+    }
+
+    /// Can slot `s` be handed to a rejoining peer now? (we act as host, it is disconnected and every connected
+    /// player agrees on its disconnect frame and epoch)
+    pub fn rejoin_ready(&self, s: usize) -> Result<(), String> {
+        if s >= self.cfg.slots || self.local_slots.contains(&s) {
+            return Err("not a remote slot".into());
+        }
+        if !self.acting_host() {
+            return Err("not the acting host".into());
+        }
+        let Some(d) = self.disc[s] else { return Err("the slot is still connected".into()) };
+        for p in self.peers.iter().filter(|p| p.connected && !p.spectator) {
+            let st = p.status[s];
+            if !p.got_any || !st.disc || st.known != d || st.epoch != self.epoch[s] {
+                return Err(format!("waiting for {} to agree on the disconnect", crate::lobby::short(&p.id)));
+            }
+        }
+        if self.hashes.is_empty() {
+            return Err("no confirmed state yet".into());
+        }
+        Ok(())
+    }
+
+    /// Acting host: hand disconnected slot `s` to `new_peer`. Returns what the rejoiner needs and the serialized
+    /// snapshot of the newest globally confirmed state.
+    pub fn grant_rejoin(&mut self, s: usize, new_peer: &str, now: f64) -> Result<(RejoinGrant, Vec<u8>), String> {
+        self.rejoin_ready(s)?;
+        let c = self.hashed();
+        let Some(st) = self.states.iter().find(|(i, _)| *i == c).map(|(_, st)| st.clone()) else {
+            return Err(format!("state {c} is not saved"));
+        };
+        // serialize state c (load it, serialize, back to the present)
+        let cur = self.states.back().map(|(_, st)| st.clone()).unwrap();
+        self.game.load(&st);
+        let bytes = self.game.save_bytes().ok_or("this game cannot serialize its state")?;
+        self.game.load(&cur);
+        // the seat: after every input we already sent, plus time for the rejoiner to load and catch up
+        let sent = self.local_slots.iter().map(|&x| self.known[x].len() as i32).max().unwrap_or(0).max(self.frame);
+        let from = sent + self.cfg.rejoin_lead.max(1);
+        let change = SeatChange { slot: s as u8, epoch: self.epoch[s].wrapping_add(1).max(1), from, peer: new_peer.to_string() };
+        self.apply_seat(&change, now);
+        let n = self.cfg.slots;
+        let mut tails = vec![Vec::new(); n];
+        for (q, tail) in tails.iter_mut().enumerate() {
+            let served = self.local_slots.contains(&q) || self.peers.iter().any(|p| p.connected && !p.spectator && p.id != new_peer && p.slots.contains(&q));
+            if q == s || !served {
+                let k = &self.known[q];
+                *tail = k[(c as usize).min(k.len())..].to_vec();
+            }
+        }
+        let mut peers = vec![(String::new(), self.local_slots.clone())];
+        for p in self.peers.iter().filter(|p| p.connected && !p.spectator && !p.slots.is_empty()) {
+            peers.push((p.id.clone(), p.slots.clone()));
+        }
+        let g = RejoinGrant {
+            slot: s,
+            base: c,
+            hash: self.hashes[c as usize],
+            chain: self.chain[c as usize],
+            epochs: self.epoch.clone(),
+            seat_from: self.seat.iter().map(|x| x.as_ref().map_or(0, |c| c.from)).collect(),
+            seat_peer: self.seat.iter().map(|x| x.as_ref().map_or(String::new(), |c| c.peer.clone())).collect(),
+            disc: self.disc.clone(),
+            tails,
+            peers,
+            spectators: self.peers.iter().filter(|p| p.spectator && p.connected).map(|p| p.id.clone()).collect(),
+        };
+        Ok((g, bytes))
+    }
+
     /// A packet from transport peer `from`.
     pub fn handle(&mut self, from: &str, msg: &Msg, now: f64) {
-        let Some(pi) = self.peers.iter().position(|p| p.id == from) else { return };
+        let Some(pi) = self.peers.iter().position(|p| p.id == from) else {
+            // a spectator we do not know yet (it joined late, or the host changed): serve it
+            if let Msg::SpectAck { session, .. } = msg {
+                if *session == self.cfg.session {
+                    self.add_spectator(from.to_string(), now);
+                }
+            }
+            return;
+        };
         match msg {
             Msg::Input(m) if m.session == self.cfg.session => self.on_input(pi, m, now),
             Msg::SpectAck { session, ack } if *session == self.cfg.session => {
                 let p = &mut self.peers[pi];
-                p.connected = true;
-                p.last_recv = now;
-                p.acked = p.acked.max(*ack);
+                if p.spectator {
+                    p.connected = true;
+                    p.last_recv = now;
+                    p.acked = p.acked.max(*ack);
+                }
             }
-            Msg::Bye { session } if *session == self.cfg.session => self.drop_peer(pi),
+            Msg::Bye { session } if *session == self.cfg.session => {
+                self.peers[pi].bye = true;
+                self.drop_peer(pi)
+            }
             _ => {}
         }
     }
@@ -316,11 +610,15 @@ impl<G: Game> P2PSession<G> {
             p.local_adv = p.local_adv * 0.9 + local_adv * 0.1;
             p.remote_adv = p.remote_adv * 0.9 + (m.adv as f64 / 16.0) * 0.1;
         }
-        // the peer's view of every slot; adopt its disconnects
-        for (s, &(k, d)) in m.status.iter().enumerate().take(self.cfg.slots) {
-            self.peers[pi].status[s] = (k, d);
-            if d && !self.local_slots.contains(&s) {
-                self.set_disc(s, k);
+        // seat changes first: the inputs in this packet may depend on them
+        for c in &m.seats {
+            self.apply_seat(c, now);
+        }
+        // the peer's view of every slot; adopt its disconnects (of the same seat)
+        for (s, &st) in m.status.iter().enumerate().take(self.cfg.slots) {
+            self.peers[pi].status[s] = st;
+            if st.disc && st.epoch == self.epoch[s] && !self.local_slots.contains(&s) {
+                self.set_disc(s, st.known);
             }
         }
         // its inputs
@@ -338,7 +636,7 @@ impl<G: Game> P2PSession<G> {
                     }
                     let v = m.inputs[i * slots.len() + j];
                     self.known[s].push(v);
-                    if f < self.frame && self.used[f as usize][s] != v {
+                    if f < self.frame && f >= self.base && self.used[f as usize][s] != v {
                         self.mark_rollback(f);
                     }
                 }
@@ -347,7 +645,7 @@ impl<G: Game> P2PSession<G> {
         // its hashes
         let p = &mut self.peers[pi];
         for &h in &m.hashes {
-            if !p.pending_hashes.contains(&h) {
+            if h.0 >= self.base && !p.pending_hashes.contains(&h) {
                 p.pending_hashes.push(h);
             }
         }
@@ -355,7 +653,7 @@ impl<G: Game> P2PSession<G> {
             let cut = p.pending_hashes.len() - 64;
             p.pending_hashes.drain(..cut);
         }
-        if m.chain.0 > 0 {
+        if m.chain.0 > 0 && m.chain.0 >= self.base {
             p.pending_chain = Some(m.chain);
         }
     }
@@ -368,6 +666,13 @@ impl<G: Game> P2PSession<G> {
             } else {
                 self.drop_peer(pi);
             }
+        }
+    }
+
+    /// drop a player peer now (a rejoin request proved that its old connection is stale)
+    pub fn drop_peer_id(&mut self, id: &str) {
+        if let Some(pi) = self.peers.iter().position(|p| p.id == id && !p.spectator) {
+            self.drop_peer(pi);
         }
     }
 
@@ -403,6 +708,7 @@ impl<G: Game> P2PSession<G> {
     fn rollback(&mut self, rb: i32, clock: &dyn Fn() -> f64) -> u32 {
         let t0 = clock();
         let target = self.frame;
+        let rb = rb.max(self.base);
         let Some(k) = self.states.iter().position(|(i, _)| *i == rb) else {
             // cannot happen: states are kept down to the oldest unconfirmed frame
             debug_assert!(false, "no saved state for frame {rb}");
@@ -430,12 +736,18 @@ impl<G: Game> P2PSession<G> {
         let mut g = self.confirmed().min(self.frame);
         for p in self.peers.iter().filter(|p| p.connected && !p.spectator) {
             if !p.got_any {
-                return 0;
+                return self.hashed().max(0);
             }
             for s in 0..self.cfg.slots {
-                let (k, d) = p.status[s];
-                if !d && self.disc[s].is_none() {
-                    g = g.min(k);
+                if self.disc[s].is_some() {
+                    continue;
+                }
+                let st = p.status[s];
+                if st.epoch != self.epoch[s] {
+                    // it has not taken over the slot's new seat yet: it has the (neutral) inputs up to the handover
+                    g = g.min(self.seat[s].as_ref().map_or(0, |c| c.from));
+                } else if !st.disc {
+                    g = g.min(st.known);
                 }
             }
         }
@@ -453,17 +765,21 @@ impl<G: Game> P2PSession<G> {
             self.chain.push(c);
         }
         // keep states from the oldest one a rollback or the hashing may still need
-        // (the newest hashed state too: a peer's disconnect frame can be exactly that state)
-        let keep = (self.hashes.len() as i32 - 1).max(0).min(self.confirmed()).min(self.frame);
+        // (the newest hashed state too: a peer's disconnect frame can be exactly that state; a rejoin snapshot)
+        let keep = (self.hashes.len() as i32 - 1).max(self.base).min(self.confirmed()).min(self.frame);
         while self.states.len() > 1 && self.states[0].0 < keep {
             self.states.pop_front();
         }
         // compare remote hashes
         let n = self.hashes.len() as i32;
+        let base = self.base;
         let mut found = Vec::new();
         for p in self.peers.iter_mut() {
             let mut rest = Vec::new();
             for &(k, h) in &p.pending_hashes {
+                if k < base {
+                    continue;
+                }
                 if k < n {
                     self.stats.hash_checks += 1;
                     if self.hashes[k as usize] != h && !p.desynced {
@@ -476,7 +792,9 @@ impl<G: Game> P2PSession<G> {
             }
             p.pending_hashes = rest;
             if let Some((k, c)) = p.pending_chain {
-                if k < n {
+                if k < base {
+                    p.pending_chain = None;
+                } else if k < n {
                     p.pending_chain = None;
                     self.stats.hash_checks += 1;
                     if self.chain[k as usize] != c && !p.desynced {
@@ -495,16 +813,34 @@ impl<G: Game> P2PSession<G> {
         self.peers.iter().filter(|p| p.connected && !p.spectator && p.got_any).map(|p| (p.local_adv - p.remote_adv) / 2.0).fold(0.0, f64::max)
     }
 
+    /// how far the most advanced connected player is ahead of us (estimated now), frames
+    pub fn frames_behind(&self) -> f64 {
+        let fms = 1000.0 / self.cfg.fps;
+        self.peers.iter().filter(|p| p.connected && !p.spectator && p.got_any).map(|p| p.remote_frame as f64 + p.rtt_ms / 2.0 / fms - self.frame as f64).fold(0.0, f64::max)
+    }
+
+    fn record_local(&mut self, local: &[u16]) {
+        let target = self.frame + self.cfg.input_delay as i32;
+        for (i, &s) in self.local_slots.clone().iter().enumerate() {
+            let v = local.get(i).copied().unwrap_or(0);
+            while (self.known[s].len() as i32) <= target {
+                let at_target = self.known[s].len() as i32 == target;
+                self.known[s].push(if at_target { v } else { 0 });
+            }
+        }
+    }
+
     /// One frame of wall time: roll back if needed, maybe advance one frame with `local` (held buttons of the
     /// local slots, in `local_slots` order), and append the packets to send to `out` as (peer id, bytes).
     pub fn tick(&mut self, now: f64, clock: &dyn Fn() -> f64, local: &[u16], out: &mut Vec<(String, Vec<u8>)>) -> Tick {
         let mut t = Tick::default();
         for pi in 0..self.peers.len() {
             let p = &self.peers[pi];
-            if p.connected && now - p.last_recv > self.cfg.disconnect_ms {
+            if p.connected && now - p.last_recv > self.cfg.disconnect_ms && now > p.grace_until {
                 if p.spectator {
                     self.peers[pi].connected = false;
                 } else {
+                    self.peers[pi].timed_out = true;
                     self.drop_peer(pi);
                 }
             }
@@ -513,6 +849,24 @@ impl<G: Game> P2PSession<G> {
             t.resimulated = self.rollback(rb, clock);
         }
         self.hash_confirmed();
+        // behind the others (a rejoin, a long stall): simulate frames whose inputs are all known, quietly
+        if self.frames_behind() > 6.0 {
+            self.game.set_quiet(true);
+            let mut n = 0;
+            while n < self.cfg.catchup && self.frame + 1 < self.confirmed() && self.frames_behind() > 3.0 {
+                self.record_local(local);
+                let f = self.frame;
+                self.simulate(f);
+                self.stats.catchup_frames += 1;
+                self.stats.frames += 1;
+                t.advanced += 1;
+                n += 1;
+            }
+            self.game.set_quiet(false);
+            if n > 0 {
+                self.hash_confirmed();
+            }
+        }
         let ahead = self.frame - self.confirmed();
         self.since_skip += 1;
         if ahead >= self.cfg.max_prediction as i32 {
@@ -523,36 +877,31 @@ impl<G: Game> P2PSession<G> {
             self.since_skip = 0;
             self.stats.skips += 1;
         } else {
-            let target = self.frame + self.cfg.input_delay as i32;
-            for (i, &s) in self.local_slots.clone().iter().enumerate() {
-                let v = local.get(i).copied().unwrap_or(0);
-                while (self.known[s].len() as i32) <= target {
-                    let at_target = self.known[s].len() as i32 == target;
-                    self.known[s].push(if at_target { v } else { 0 });
-                }
-            }
+            self.record_local(local);
             let t0 = clock();
             let f = self.frame;
             self.simulate(f);
             self.stats.step_us += (clock() - t0) * 1000.0;
             self.stats.frames += 1;
-            t.advanced = 1;
+            t.advanced += 1;
             self.hash_confirmed();
         }
         self.send(now, out);
         t
     }
 
-    fn status(&self) -> Vec<(i32, bool)> {
-        (0..self.cfg.slots).map(|s| match self.disc[s] {
-            Some(d) => (d, true),
-            None => (self.known[s].len() as i32, false),
-        }).collect()
+    fn status(&self) -> Vec<SlotStatus> {
+        (0..self.cfg.slots)
+            .map(|s| match self.disc[s] {
+                Some(d) => SlotStatus { known: d, disc: true, epoch: self.epoch[s] },
+                None => SlotStatus { known: self.known[s].len() as i32, disc: false, epoch: self.epoch[s] },
+            })
+            .collect()
     }
 
     fn recent_hashes(&self) -> (Vec<(i32, u64)>, (i32, u64)) {
         let n = self.hashes.len();
-        let from = n.saturating_sub(4);
+        let from = n.saturating_sub(4).max(self.base as usize);
         let h = (from..n).map(|k| (k as i32, self.hashes[k])).collect();
         let c = if n > 0 { ((n - 1) as i32, self.chain[n - 1]) } else { (0, 0) };
         (h, c)
@@ -563,18 +912,19 @@ impl<G: Game> P2PSession<G> {
         let (hashes, chain) = self.recent_hashes();
         let local_len = self.local_slots.iter().map(|&s| self.known[s].len()).min().unwrap_or(0) as i32;
         let confirmed = self.confirmed().min(self.frame);
+        let serve_spectators = self.acting_host();
         for pi in 0..self.peers.len() {
             let p = &self.peers[pi];
             if !p.connected {
                 continue;
             }
             let msg = if p.spectator {
-                if !self.is_host {
+                if !serve_spectators {
                     continue;
                 }
-                let start = p.acked.clamp(0, confirmed);
+                let start = p.acked.clamp(self.base, confirmed.max(self.base));
                 let end = confirmed.min(start + MAX_FRAMES_PER_PACKET as i32);
-                let mut inputs = Vec::with_capacity((end - start) as usize * self.cfg.slots);
+                let mut inputs = Vec::with_capacity((end - start).max(0) as usize * self.cfg.slots);
                 for f in start..end {
                     for s in 0..self.cfg.slots {
                         inputs.push(self.input_for(s, f));
@@ -594,6 +944,8 @@ impl<G: Game> P2PSession<G> {
                 let fms = 1000.0 / self.cfg.fps;
                 let est = p.remote_frame as f64 + p.rtt_ms / 2.0 / fms;
                 let adv = ((self.frame as f64 - est) * 16.0).clamp(-32000.0, 32000.0) as i16;
+                // seat changes the peer has not applied (its status shows an older epoch)
+                let seats: Vec<SeatChange> = (0..self.cfg.slots).filter_map(|s| self.seat[s].as_ref().filter(|c| newer(c.epoch, p.status[s].epoch) && c.peer != p.id).cloned()).collect();
                 Msg::Input(InputMsg {
                     session: self.cfg.session,
                     frame: self.frame,
@@ -603,6 +955,7 @@ impl<G: Game> P2PSession<G> {
                     hold: (now - p.last_ping_at).clamp(0.0, 65535.0) as u16,
                     ack,
                     status: status.clone(),
+                    seats,
                     hashes: hashes.clone(),
                     chain,
                     start,

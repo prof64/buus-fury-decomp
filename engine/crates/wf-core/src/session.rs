@@ -36,12 +36,14 @@ pub type FieldHook = Box<dyn FnMut(&mut World, &crate::field::FieldEvent) + Send
 
 impl Session {
     pub fn new(data: Arc<GameData>, config: BattleConfig) -> Session {
-        let world = battle::create(Arc::clone(&data), &config);
+        let mut world = battle::create(Arc::clone(&data), &config);
+        crate::scene::note_events(&mut world);
         Session { data, world, config, prev: [0; MAX_PLAYERS], outcome: Outcome::Running, hook: None }
     }
     /// a field session (the overworld game): new game or saved story, start area
     pub fn new_field(data: Arc<GameData>, config: crate::field::FieldConfig) -> Session {
-        let world = crate::field::create(Arc::clone(&data), &config);
+        let mut world = crate::field::create(Arc::clone(&data), &config);
+        crate::scene::note_events(&mut world);
         Session { data, world, config: BattleConfig::default(), prev: [0; MAX_PLAYERS], outcome: Outcome::Running, hook: None }
     }
     /// a field session with the script host's hook attached from the start: the first area's load scripts (on-enter:
@@ -50,6 +52,7 @@ impl Session {
         let mut s = Session::new_field(data, config);
         s.hook = Some(hook);
         Self::run_hook(&mut s.hook, &mut s.world, 0);
+        crate::scene::note_events(&mut s.world);
         s
     }
     pub fn reset(&mut self, config: BattleConfig) {
@@ -102,12 +105,15 @@ impl Session {
             let k = w.events.len();
             crate::field::post_step(w);
             Self::run_hook(&mut self.hook, &mut self.world, k);
+            // the frame's music events keep `Scene.song` current inside the state (byte snapshots carry no events)
+            crate::scene::note_events(&mut self.world);
             return &self.world.events;
         }
         battle::post_step(w);
         if self.outcome == Outcome::Running {
             self.outcome = battle::outcome(w);
         }
+        crate::scene::note_events(&mut self.world);
         &self.world.events
     }
     /// call the hook for the Run events from index `from` on (events the hook itself adds are not re-dispatched)

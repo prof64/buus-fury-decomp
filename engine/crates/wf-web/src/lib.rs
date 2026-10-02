@@ -192,6 +192,12 @@ pub unsafe extern "C" fn wf_app_init(cfg_ptr: *const u8, cfg_len: usize) -> u32 
     // {"net": true}: the online match / sync test prepared by wf_net_lobby (net.rs)
     let made = if let Some(sim) = net::take_sim(&cfg, &packs) {
         sim.map(|s| App::new(packs, s))
+    } else if let Some(area) = cfg["story"].as_str() {
+        // story mode: a new game at area "W-A" (field + scripts)
+        match wf_app::story::parse_area(area) {
+            Some(at) => wf_app::story::app(packs, at, vec![], cfg["seed"].as_u64().unwrap_or(1) as u32),
+            None => Err(format!("bad story area {area}")),
+        }
     } else if demo {
         App::demo(packs, &dc).map_err(|e| e.to_string())
     } else {

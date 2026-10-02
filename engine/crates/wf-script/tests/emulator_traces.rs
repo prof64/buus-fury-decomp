@@ -258,7 +258,7 @@ fn interpreter_matches_the_game() {
                 Root::Scene { scene, state } => {
                     let Some(ev) = set.events.get(scene) else { continue };
                     let mut t = Thread::new_event(&set, *scene, [0; 4]).unwrap();
-                    t.acts = vec![Act::Event(EventAct { header: ev.header, event: Some(*scene), node: *state, params: 0, in_node: false })];
+                    t.acts = vec![Act::Event(EventAct { header: ev.header, event: Some(*scene), node: *state, params: 0, in_node: false, entered: true })];
                     let _ = Entry::Terminal(0);
                     t
                 }
@@ -301,7 +301,7 @@ fn interpreter_matches_the_game() {
         let mut h = Replay { exp, i: 0, err: None };
         let ev = &set.events[&scene];
         let mut t = Thread::new_event(&set, scene, [0; 4]).unwrap();
-        t.acts = vec![Act::Event(EventAct { header: ev.header, event: Some(scene), node: state, params: 0, in_node: false })];
+        t.acts = vec![Act::Event(EventAct { header: ev.header, event: Some(scene), node: state, params: 0, in_node: false, entered: true })];
         let mut g = Globals::default();
         let mut st = t.run(&set, &mut g, &mut h);
         while let Ok(wf_script::Status::Blocked) = st {

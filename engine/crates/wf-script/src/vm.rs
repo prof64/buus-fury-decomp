@@ -85,6 +85,9 @@ pub struct EventAct {
     pub params: usize,
     /// A node is in progress (child frame or host node pending).
     pub in_node: bool,
+    /// The host was told the event graph started (`Host::scene`, the scene object's creation).
+    #[serde(default)]
+    pub entered: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -98,6 +101,8 @@ pub enum Act {
 pub enum Pending {
     Native { native: u8, pushes: bool },
     Node,
+    /// the host blocked on an event graph's start (`Host::scene`)
+    Scene,
 }
 
 /// One running script or event invocation (with its nested activations).
@@ -167,6 +172,14 @@ pub struct Call<'a> {
     pub globals: &'a mut Globals,
 }
 
+/// An event graph starting / ending (`0x08012588` run_scene: the scene object's creation broadcasts world message
+/// 0x0F, its end 0x10). The original's first node runs one frame after the start.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SceneCall {
+    Enter { event: Option<u16> },
+    Exit { event: Option<u16> },
+}
+
 /// A text box or choice node of an event.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum NodeCall {
@@ -183,6 +196,11 @@ pub trait Host {
     /// Text box / choice node. Usually blocks; the result value is ignored (a choice stores its selection
     /// host-side, read back by native 0x18).
     fn node(&mut self, call: NodeCall) -> Result<NativeResult, String>;
+    /// An event graph starts (may block: the original runs its first node a frame later) or ends.
+    fn scene(&mut self, call: SceneCall) -> Result<NativeResult, String> {
+        let _ = call;
+        Ok(NativeResult::Done(None))
+    }
     /// Remake extensions beyond the 248 originals (multiplayer API: `player_count`, `player(n)`,
     /// `give_item_to(n, i)`, …; see [`EXTENSIONS`]). Original bytecode never calls these.
     fn ext(&mut self, call: ExtCall<'_>) -> Result<NativeResult, String> {
@@ -265,7 +283,7 @@ impl Thread {
     pub fn new_event(set: &ScriptSet, event: u16, params: [i32; 4]) -> Result<Thread, VmError> {
         let ev = set.events.get(&event).ok_or(VmError::NoEvent(event as u32))?;
         let mut t = Thread::empty(params);
-        t.acts.push(Act::Event(EventAct { header: ev.header, event: Some(event), node: 0, params: 0, in_node: false }));
+        t.acts.push(Act::Event(EventAct { header: ev.header, event: Some(event), node: 0, params: 0, in_node: false, entered: false }));
         Ok(t)
     }
 
@@ -290,6 +308,7 @@ impl Thread {
                 }
             }
             Pending::Node => self.node_done(None),
+            Pending::Scene => {}
         }
         self.run(set, g, host)
     }
@@ -336,6 +355,15 @@ impl Thread {
         if e.in_node {
             unreachable!("event resumed while its node is in progress");
         }
+        if !e.entered {
+            e.entered = true;
+            let event = e.event;
+            if let NativeResult::Block = host.scene(SceneCall::Enter { event }).map_err(VmError::Host)? {
+                self.pending = Some(Pending::Scene);
+                return Ok(true);
+            }
+            return Ok(false);
+        }
         let header = e.header;
         let ev = set
             .headers
@@ -346,6 +374,8 @@ impl Thread {
         match entry {
             Entry::Terminal(v) => {
                 let v = *v;
+                let event = ev.index.into();
+                host.scene(SceneCall::Exit { event }).map_err(VmError::Host)?;
                 self.acts.pop();
                 if self.acts.is_empty() {
                     self.event_result = Some(v);
@@ -631,6 +661,7 @@ impl Thread {
                     node: 0,
                     params: pi,
                     in_node: false,
+                    entered: false,
                 }));
             }
             _ => {
