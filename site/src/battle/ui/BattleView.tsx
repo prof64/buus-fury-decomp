@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { BattleConfig, Outcome, Ruleset } from '../core/ruleset'
 import { BattleSession } from '../core/session'
 import { keysFor } from '../core/input'
+import { KeyBindings, useKeymapVersion } from './KeyBindings'
 
 declare global {
   interface Window {
@@ -13,10 +14,12 @@ export function BattleView({ rs, cfg, onEnd, onQuit }: { rs: Ruleset; cfg: Battl
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
   const sessRef = useRef<BattleSession | null>(null)
+  useKeymapVersion()
   const [wide, setWide] = useState(() => localStorage.getItem('bt-wide') === '1')
   const [debug, setDebug] = useState(() => localStorage.getItem('bt-debug') === '1')
   const [boxes, setBoxes] = useState(false)
   const [labels, setLabels] = useState(false)
+  const [showKeys, setShowKeys] = useState(false)
   const [speed, setSpeed] = useState(1)
   const [paused, setPaused] = useState(false)
   const [, setTick] = useState(0)
@@ -74,8 +77,13 @@ export function BattleView({ rs, cfg, onEnd, onQuit }: { rs: Ruleset; cfg: Battl
       if (e.code === 'Backquote' || e.code === 'F1') {
         e.preventDefault()
         setDebug((d) => !d)
-      } else if (e.code === 'KeyH') setBoxes((b) => !b)
-      else if (e.code === 'KeyL' && !e.metaKey) setLabels((b) => !b)
+      } else if (e.code === 'F2') {
+        e.preventDefault()
+        setBoxes((b) => !b)
+      } else if (e.code === 'F3') {
+        e.preventDefault()
+        setLabels((b) => !b)
+      }
       else if (e.code === 'Period' && s.paused) {
         s.setPaused(false)
         s.step()
@@ -105,18 +113,24 @@ export function BattleView({ rs, cfg, onEnd, onQuit }: { rs: Ruleset; cfg: Battl
           </select>
         </label>
         <label>
-          <input type="checkbox" checked={debug} onChange={(e) => setDebug(e.target.checked)} /> Debug panel <kbd>`</kbd>
+          <input type="checkbox" checked={debug} onChange={(e) => setDebug(e.target.checked)} /> Debug panel <kbd>F1</kbd>
         </label>
         <label>
-          <input type="checkbox" checked={boxes} onChange={(e) => setBoxes(e.target.checked)} /> Hitboxes <kbd>H</kbd>
+          <input type="checkbox" checked={boxes} onChange={(e) => setBoxes(e.target.checked)} /> Hitboxes <kbd>F2</kbd>
         </label>
         <label>
-          <input type="checkbox" checked={labels} onChange={(e) => setLabels(e.target.checked)} /> States/AI <kbd>L</kbd>
+          <input type="checkbox" checked={labels} onChange={(e) => setLabels(e.target.checked)} /> States/AI <kbd>F3</kbd>
         </label>
+        <button onClick={() => setShowKeys((k) => !k)}>⌨ Keys</button>
         <span className="muted small">
-          Move {keysFor('UP').concat(keysFor('LEFT')).join('')}… · A {keysFor('A').join('/')} · B {keysFor('B').join('/')} · L {keysFor('L').join('/')} · Start {keysFor('START').join('/')} · frame-step <kbd>.</kbd> when paused
+          A {keysFor('A').join('/')} · B {keysFor('B').join('/')} · L {keysFor('L').join('/')} · R {keysFor('R').join('/')} · Start {keysFor('START').join('/')} · Select {keysFor('SELECT').join('/')}
         </span>
       </div>
+      {showKeys && (
+        <div className="bt-keys-pop">
+          <KeyBindings />
+        </div>
+      )}
       <div className="bt-main">
         <div className="bt-canvas-wrap" ref={wrapRef}>
           <canvas ref={canvasRef} className="bt-canvas" />

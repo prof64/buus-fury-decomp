@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import type { BattleConfig, EnemyChoice, FighterSetup, Ruleset, GameKey } from '../core/ruleset'
 import { RULESET_INFO } from '../rulesets'
 import { keysFor } from '../core/input'
+import { KeyBindings, useKeymapVersion } from './KeyBindings'
 import { Portrait, SpritePreview } from './SpritePreview'
 import type { SpriteBank } from '../core/sprites'
 
@@ -47,6 +48,7 @@ const GROUP_ORDER = ['Boss', 'Enemy', 'NPC (scouter row)', 'Unused row']
 const groupRank = (g: string) => (GROUP_ORDER.includes(g) ? GROUP_ORDER.indexOf(g) : GROUP_ORDER.length)
 
 export function SetupScreen({ rs, state, onChange, onStart, onGame }: { rs: Ruleset; state: SetupState; onChange: (s: SetupState) => void; onStart: () => void; onGame?: (g: GameKey) => void }) {
+  useKeymapVersion()
   const fighters = useMemo(() => rs.fighters(), [rs])
   const enemies = useMemo(() => rs.enemies(), [rs])
   const arenas = useMemo(() => rs.arenas(), [rs])
@@ -256,13 +258,19 @@ export function SetupScreen({ rs, state, onChange, onStart, onGame }: { rs: Rule
                 <tr key={c.button}>
                   <td>
                     <b>{c.button === 'DPAD' ? 'D-pad' : c.button}</b>
-                    <div className="small muted">{c.button === 'DPAD' ? 'Arrows / WASD' : keysFor(c.button).join(' / ')}</div>
+                    <div className="small muted">
+                      {c.button === 'DPAD' ? ['UP', 'DOWN', 'LEFT', 'RIGHT'].map((d) => keysFor(d as 'UP')[0] ?? '?').join(' ') : keysFor(c.button).join(' / ')}
+                    </div>
                   </td>
                   <td className="small">{c.action}</td>
                 </tr>
               ))}
             </tbody>
           </table>
+          <details className="bt-keys-details">
+            <summary>Change key bindings</summary>
+            <KeyBindings />
+          </details>
           <button className="bt-start" onClick={onStart}>
             FIGHT!
           </button>

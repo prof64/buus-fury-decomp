@@ -23,40 +23,69 @@ export interface InputFrame {
   released: number
 }
 
+/** mGBA's default keyboard layout, so it feels like an emulator. Users can rebind (saved in localStorage). */
 export const DEFAULT_KEYMAP: Record<string, ButtonName> = {
   ArrowUp: 'UP',
   ArrowDown: 'DOWN',
   ArrowLeft: 'LEFT',
   ArrowRight: 'RIGHT',
-  KeyW: 'UP',
-  KeyS: 'DOWN',
-  KeyA: 'LEFT',
-  KeyD: 'RIGHT',
   KeyX: 'A',
-  KeyK: 'A',
   KeyZ: 'B',
-  KeyJ: 'B',
-  KeyQ: 'L',
-  KeyU: 'L',
-  KeyE: 'R',
-  KeyI: 'R',
+  KeyA: 'L',
+  KeyS: 'R',
   Enter: 'START',
-  ShiftRight: 'SELECT',
   Backspace: 'SELECT',
 }
 
-/** Human-readable control help (generic part; rulesets add what each button does). */
-export function keysFor(btn: ButtonName, map = DEFAULT_KEYMAP): string[] {
+export const BUTTON_ORDER: ButtonName[] = ['UP', 'DOWN', 'LEFT', 'RIGHT', 'A', 'B', 'L', 'R', 'START', 'SELECT']
+
+/** Codes the battle view keeps for its own hotkeys; never bindable. */
+export const RESERVED_CODES = ['Escape', 'F1', 'F2', 'F3', 'Period', 'Backquote']
+
+const KEYMAP_STORAGE = 'bt-keymap-v2'
+
+/** The active keymap: the user's saved bindings, else the mGBA defaults. */
+export function loadKeymap(): Record<string, ButtonName> {
+  try {
+    const saved = JSON.parse(localStorage.getItem(KEYMAP_STORAGE) ?? 'null')
+    if (saved && typeof saved === 'object') return saved
+  } catch {
+    /* storage unavailable */
+  }
+  return { ...DEFAULT_KEYMAP }
+}
+
+/** Saves bindings (null restores defaults) and tells live InputSources to reload them. */
+export function saveKeymap(map: Record<string, ButtonName> | null) {
+  try {
+    if (map) localStorage.setItem(KEYMAP_STORAGE, JSON.stringify(map))
+    else localStorage.removeItem(KEYMAP_STORAGE)
+  } catch {
+    /* storage unavailable */
+  }
+  window.dispatchEvent(new Event('bt-keymap'))
+}
+
+export function keyName(code: string): string {
   const names: Record<string, string> = {
     ArrowUp: '↑',
     ArrowDown: '↓',
     ArrowLeft: '←',
     ArrowRight: '→',
-    ShiftRight: 'Right Shift',
+    Backspace: 'Backspace',
+    Enter: 'Enter',
+    Space: 'Space',
+    ShiftLeft: 'L-Shift',
+    ShiftRight: 'R-Shift',
   }
+  return names[code] ?? code.replace(/^(Key|Digit)/, '')
+}
+
+/** Human-readable control help (generic part; rulesets add what each button does). */
+export function keysFor(btn: ButtonName, map: Record<string, ButtonName> = loadKeymap()): string[] {
   return Object.entries(map)
     .filter(([, b]) => b === btn)
-    .map(([k]) => names[k] ?? k.replace(/^Key/, ''))
+    .map(([k]) => keyName(k))
 }
 
 /**
@@ -78,7 +107,12 @@ export class InputSource {
     this.live = 0
   }
 
-  constructor(keymap = DEFAULT_KEYMAP) {
+  private onKeymap = () => {
+    this.keymap = loadKeymap()
+    this.live = 0
+  }
+
+  constructor(keymap = loadKeymap()) {
     this.keymap = keymap
   }
 
@@ -86,11 +120,13 @@ export class InputSource {
     target.addEventListener('keydown', this.onKeyDown)
     target.addEventListener('keyup', this.onKeyUp)
     target.addEventListener('blur', this.onBlur)
+    target.addEventListener('bt-keymap', this.onKeymap)
   }
   detach(target: Window = window) {
     target.removeEventListener('keydown', this.onKeyDown)
     target.removeEventListener('keyup', this.onKeyUp)
     target.removeEventListener('blur', this.onBlur)
+    target.removeEventListener('bt-keymap', this.onKeymap)
   }
 
   private key(e: KeyboardEvent, down: boolean) {

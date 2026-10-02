@@ -364,3 +364,48 @@
   text-align: right;
   font-family: var(--mono);
 }
+
+/* key bindings */
+.bt-keys table {
+  border-collapse: collapse;
+  width: 100%;
+}
+.bt-keys td {
+  padding: 3px 6px;
+  border-bottom: 1px solid var(--line);
+}
+.bt-keycap {
+  min-width: 110px;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.bt-keycap.waiting {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.bt-keys-foot {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.bt-keys-details {
+  margin: 10px 0;
+}
+.bt-keys-details summary {
+  cursor: pointer;
+  color: var(--accent);
+}
+.bt-keys-pop {
+  position: absolute;
+  z-index: 20;
+  right: 16px;
+  margin-top: 4px;
+  width: min(420px, calc(100vw - 32px));
+  padding: 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+}

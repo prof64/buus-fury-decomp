@@ -44,19 +44,20 @@ mechanics changed across the three games).
 ## Battle simulator (`#/battle`)
 
 Pick a game (the last one played is remembered; `#/battle?game=log1|log2|buu` picks one), a fighter, and either
-any enemy / boss or a story preset. Keyboard (Gamepad API also works):
+any enemy / boss or a story preset. Keyboard defaults are mGBA's (rebind them under "Change key bindings" on the
+setup screen or the ⌨ Keys toolbar button; Gamepad API also works):
 
-| GBA button | keys |
+| GBA button | key |
 |---|---|
-| D-pad | arrows or W A S D |
-| A | X or K |
-| B | Z or J |
-| L | Q or U |
-| R | E or I |
+| D-pad | arrows |
+| A | X |
+| B | Z |
+| L | A |
+| R | S |
 | START (pause) | Enter |
-| SELECT | Right Shift or Backspace |
+| SELECT | Backspace |
 
-Toolbar: widescreen, speed, debug panel (`` ` ``), hitboxes (H), state/AI labels, frame step (`.` while paused).
+Hotkeys: F1 debug panel, F2 hitboxes, F3 state/AI labels, `.` frame step while paused, Esc back to setup.
 
 **The Legacy of Goku** — D-pad: walk 1 px/frame, one direction at a time (no diagonals). A: punch / pick up an item.
 B: selected ki move (tap = Ki Blast, hold to charge). L: cycle ki move. R: take off / land (flight energy drains
