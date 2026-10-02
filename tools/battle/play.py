@@ -11,8 +11,11 @@ usage:
 """
 import json, os, subprocess, sys
 
-ENV = dict(os.environ, CHROME_DEVTOOLS_AXI_SESSION='battle')
-URL = 'http://localhost:5317/#/battle'
+ENV = dict(os.environ, CHROME_DEVTOOLS_AXI_SESSION=os.environ.get('BT_SESSION', 'battle'))
+URL = os.environ.get('BT_URL', 'http://localhost:5317/#/battle')
+# BT_GAME=log1|log2|buu selects the ruleset (page key 'bt-game-v1'); setups are saved per game
+GAME = os.environ.get('BT_GAME', 'log2')
+SETUP_KEY = 'bt-setup-v1' if GAME == 'log2' else 'bt-setup-v1-' + GAME
 
 
 def axi(*args, stdin=None):
@@ -35,10 +38,12 @@ def main():
         axi('open', URL)
         axi('resize', '1500', '950')
         expr = f"""(() => {{
-          const cur = JSON.parse(localStorage.getItem('bt-setup-v1') || '{{}}');
+          localStorage.setItem('bt-game-v1', {json.dumps(GAME)});
+          const cur = JSON.parse(localStorage.getItem({json.dumps(SETUP_KEY)}) || '{{}}');
           const add = {json.dumps(setup)};
           const m = {{...cur, ...add, fighter: {{...(cur.fighter||{{}}), ...(add.fighter||{{}}), options: {{...((cur.fighter||{{}}).options||{{}}), ...((add.fighter||{{}}).options||{{}})}}, bonus: {{...((cur.fighter||{{}}).bonus||{{}}), ...((add.fighter||{{}}).bonus||{{}})}} }} }};
-          localStorage.setItem('bt-setup-v1', JSON.stringify(m)); location.reload(); return 'ok' }})()"""
+          m.game = {json.dumps(GAME)};
+          localStorage.setItem({json.dumps(SETUP_KEY)}, JSON.stringify(m)); location.reload(); return 'ok' }})()"""
         print(page_eval(expr))
         print(run_js("await new Promise(r => setTimeout(r, 3500)); console.log(await page.eval(\"(() => { const b=[...document.querySelectorAll('button')].find(b => b.textContent.includes('FIGHT')); if(!b) return 'no fight button'; b.click(); return 'fight' })()\"));"))
         print(run_js("await new Promise(r => setTimeout(r, 1500)); console.log(await page.eval(\"(() => { const s = window.__battle; return s ? s.battle.debugLines(s.world).join('\\\\n') : 'no session' })()\"));"))

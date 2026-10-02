@@ -18,6 +18,8 @@ export interface SetupState {
 
 export function defaultSetup(rs: Ruleset): SetupState {
   const f = rs.fighters()[4] ?? rs.fighters()[0]
+  const enemies = rs.enemies()
+  const defEnemy = enemies.find((e) => e.id === 'c53') ?? [...enemies].filter((e) => e.group === 'Boss').sort((a, b) => a.hp - b.hp)[0] ?? enemies[0]
   const opts: Record<string, string | number | boolean> = {}
   const bonus: Record<string, number> = {}
   for (const k of rs.knobs()) {
@@ -26,10 +28,10 @@ export function defaultSetup(rs: Ruleset): SetupState {
   }
   return {
     game: rs.info.id,
-    fighter: { fighter: f.id, form: f.defaultForm, level: 30, bonus, options: opts },
+    fighter: { fighter: f.id, form: f.defaultForm, level: Math.max(rs.levelRange[0], rs.levelRange[1] >= 30 ? 30 : Math.ceil(rs.levelRange[1] / 2)), bonus, options: opts },
     mode: 'single',
-    enemy: 'c53',
-    count: 3,
+    enemy: defEnemy?.id ?? '',
+    count: defEnemy?.group === 'Boss' ? 1 : 3,
     preset: rs.presets()[0]?.id ?? '',
     arena: rs.arenas()[0]?.id ?? '',
     seed: 1234,
@@ -42,8 +44,9 @@ export function toConfig(rs: Ruleset, s: SetupState): BattleConfig {
 }
 
 const GROUP_ORDER = ['Boss', 'Enemy', 'NPC (scouter row)', 'Unused row']
+const groupRank = (g: string) => (GROUP_ORDER.includes(g) ? GROUP_ORDER.indexOf(g) : GROUP_ORDER.length)
 
-export function SetupScreen({ rs, state, onChange, onStart }: { rs: Ruleset; state: SetupState; onChange: (s: SetupState) => void; onStart: () => void }) {
+export function SetupScreen({ rs, state, onChange, onStart, onGame }: { rs: Ruleset; state: SetupState; onChange: (s: SetupState) => void; onStart: () => void; onGame?: (g: GameKey) => void }) {
   const fighters = useMemo(() => rs.fighters(), [rs])
   const enemies = useMemo(() => rs.enemies(), [rs])
   const arenas = useMemo(() => rs.arenas(), [rs])
@@ -61,13 +64,14 @@ export function SetupScreen({ rs, state, onChange, onStart }: { rs: Ruleset; sta
   const shown = enemies
     .filter((e) => group === 'all' || e.group === group)
     .filter((e) => !q || (e.name + ' ' + e.id + ' ' + e.group + ' ' + e.tags.join(' ')).toLowerCase().includes(q.toLowerCase()))
-    .sort((a, b) => GROUP_ORDER.indexOf(a.group) - GROUP_ORDER.indexOf(b.group) || a.hp - b.hp)
+    .sort((a, b) => groupRank(a.group) - groupRank(b.group) || a.hp - b.hp)
+  const groups = [...new Set(enemies.map((e) => e.group))].sort((a, b) => groupRank(a) - groupRank(b))
 
   return (
     <div className="bt-setup">
       <div className="bt-games">
         {RULESET_INFO.map((g) => (
-          <button key={g.id} className={g.id === state.game ? 'on' : ''} disabled={!g.enabled} title={g.note}>
+          <button key={g.id} className={g.id === state.game ? 'on' : ''} disabled={!g.enabled} title={g.note} onClick={() => g.enabled && onGame?.(g.id)}>
             {g.title}
             {!g.enabled && <small> — {g.note}</small>}
           </button>
@@ -162,10 +166,10 @@ export function SetupScreen({ rs, state, onChange, onStart }: { rs: Ruleset; sta
           {state.mode === 'single' ? (
             <>
               <div className="bt-row">
-                <input className="bt-search" placeholder="Search 109 enemy classes…" value={q} onChange={(e) => setQ(e.target.value)} />
+                <input className="bt-search" placeholder={`Search ${enemies.length} enemies…`} value={q} onChange={(e) => setQ(e.target.value)} />
                 <select value={group} onChange={(e) => setGroup(e.target.value)}>
                   <option value="all">All</option>
-                  {GROUP_ORDER.map((g) => (
+                  {groups.map((g) => (
                     <option key={g}>{g}</option>
                   ))}
                 </select>

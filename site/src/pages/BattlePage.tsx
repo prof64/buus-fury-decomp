@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import type { BattleConfig, Outcome, StatLine } from '../battle/core/ruleset'
+import type { BattleConfig, GameKey, Outcome, StatLine } from '../battle/core/ruleset'
 import type { BattleSession } from '../battle/core/session'
-import { getRuleset } from '../battle/rulesets'
+import { getRuleset, RULESET_INFO } from '../battle/rulesets'
 import { defaultSetup, SetupScreen, toConfig, type SetupState } from '../battle/ui/SetupScreen'
 import { BattleView } from '../battle/ui/BattleView'
 import '../battle/ui/battle.css'
@@ -12,9 +12,23 @@ interface Result {
 }
 
 const KEY = 'bt-setup-v1'
+const GAME_KEY = 'bt-game-v1'
+/** saved setup per game (LoG II keeps the original key) */
+const keyFor = (g: GameKey) => (g === 'log2' ? KEY : `${KEY}-${g}`)
+
+function initialGame(): GameKey {
+  try {
+    const g = localStorage.getItem(GAME_KEY) as GameKey | null
+    if (g && getRuleset(g) && RULESET_INFO.find((i) => i.id === g)?.enabled) return g
+  } catch {
+    /* ignore */
+  }
+  return 'log2'
+}
 
 export function BattlePage() {
-  const rs = getRuleset('log2')!
+  const [game, setGame] = useState<GameKey>(initialGame)
+  const rs = getRuleset(game)!
   const [ready, setReady] = useState(false)
   const [err, setErr] = useState<string>()
   const [setup, setSetup] = useState<SetupState>()
@@ -23,12 +37,14 @@ export function BattlePage() {
   const [run, setRun] = useState(0)
 
   useEffect(() => {
+    setReady(false)
+    setSetup(undefined)
     rs.load()
       .then(() => {
         const def = defaultSetup(rs)
         let s = def
         try {
-          const saved = JSON.parse(localStorage.getItem(KEY) ?? 'null')
+          const saved = JSON.parse(localStorage.getItem(keyFor(rs.info.id)) ?? 'null')
           if (saved && saved.game === def.game) s = { ...def, ...saved, fighter: { ...def.fighter, ...saved.fighter, options: { ...def.fighter.options, ...saved.fighter?.options }, bonus: { ...def.fighter.bonus, ...saved.fighter?.bonus } } }
         } catch {
           /* ignore */
@@ -40,11 +56,20 @@ export function BattlePage() {
   }, [rs])
 
   useEffect(() => {
-    if (setup) localStorage.setItem(KEY, JSON.stringify(setup))
-  }, [setup])
+    if (setup && setup.game === rs.info.id) localStorage.setItem(keyFor(rs.info.id), JSON.stringify(setup))
+  }, [setup, rs])
+  const pickGame = (g: GameKey) => {
+    if (g === game || !getRuleset(g)) return
+    try {
+      localStorage.setItem(GAME_KEY, g)
+    } catch {
+      /* ignore */
+    }
+    setGame(g)
+  }
 
   if (err) return <div className="page">Failed to load: {err}</div>
-  if (!ready || !setup) return <div className="page muted">Loading Legacy of Goku II data…</div>
+  if (!ready || !setup || setup.game !== rs.info.id) return <div className="page muted">Loading {rs.info.title} data…</div>
 
   const start = () => {
     setResult(undefined)
@@ -73,7 +98,7 @@ export function BattlePage() {
 
   return (
     <div className="bt-page">
-      {!cfg && <SetupScreen rs={rs} state={setup} onChange={setSetup} onStart={start} />}
+      {!cfg && <SetupScreen rs={rs} state={setup} onChange={setSetup} onStart={start} onGame={pickGame} />}
       {cfg && (
         <BattleView
           key={run}
