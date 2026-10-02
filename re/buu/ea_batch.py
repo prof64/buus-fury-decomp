@@ -8,7 +8,7 @@ from common import *
 from ea_rec import record, OUT
 
 scns = sys.argv[1].split(',') if len(sys.argv) > 1 else ['far', 'near', 'punch', 'kill']
-types = [int(x, 0) for x in sys.argv[2].split(',')] if len(sys.argv) > 2 else list(range(150))
+types = ([int(x, 0) for x in sys.argv[2].split(',')] if ',' in sys.argv[2] or '-' not in sys.argv[2] else list(range(int(sys.argv[2].split('-')[0]), int(sys.argv[2].split('-')[1]) + 1))) if len(sys.argv) > 2 else list(range(150))
 frames = int(sys.argv[3]) if len(sys.argv) > 3 else 600
 for t in types:
     for s in scns:

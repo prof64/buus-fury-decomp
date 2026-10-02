@@ -69,10 +69,13 @@ def snap(e, o):
     return [anim_raw(e, o), e.r8(o + 0x11), e.r16(o + 0x12), e.r8(o + 0x10),
             st, e.r32(st) if 0x02000000 <= st < 0x04000000 else 0, ai_state(e, o),
             s32v(e.r32(o + 0x1a0)), s32v(e.r32(o + 0x1a4)), e.r32(o + 0x28c) >> 10,
-            s32v(e.r32(o + 0x174)) if False else e.r16(o + 0x176), e.r32(o + 0x1cc)]
+            e.r16(o + 0x176), e.r32(o + 0x1cc), e.r32(o + 0x58)]
 
 
-FIELDS = ['raw', 'frame', 'tick', 'dir', 'st', 'stvt', 'ai', 'x', 'y', 'hp', 'z', 'hittable']
+FIELDS = ["raw", "frame", "tick", "dir", "st", "stvt", "ai", "x", "y", "hp", "z", "hittable", "def"]
+
+
+DEFS = set(u32(0x086B6BD8 + 4 * i) for i in range(298)) - {0}
 
 
 def record(t, scn, frames=600):
@@ -81,7 +84,7 @@ def record(t, scn, frames=600):
         return dict(type=t, scenario=scn, error='no spawn')
     p = e.r32(PLAYER)
     bx, by = s32v(e.r32(o + 0x1a0)) >> 8, s32v(e.r32(o + 0x1a4)) >> 8
-    dx = {'far': -110, 'near': -36}.get(scn, -22)
+    dx = {'far': -110, 'near': -36, 'mid': -64, 'blast': -90, 'move': -60}.get(scn, -22)
     px, py = bx + dx, by
     setpos(e, p, px, py)
     e.w8(p + 0x10, 3)
@@ -89,19 +92,29 @@ def record(t, scn, frames=600):
         e.w32(o + 0x28c, 1 << 10)
     ids = [e.breakpoint(a) for a in EV]
     objs = {}
+    extra = {}   # spawned actor-like objects (sprite def at +0x58), e.g. boss parts, corpses
     events = []
+    alive = True
+    lts = []   # logic tick counter 0x03000F94 after each video frame (equal = a lag frame: no game update ran)
     for f in range(frames):
         e.w16(REC + 0x16, e.r16(REC + 0x18))
-        if scn in ('far', 'near'):
+        if scn in ('far', 'near', 'mid', 'blast'):
             setpos(e, p, px, py)
         keys = 0
-        if scn in ('punch', 'kill'):
+        if alive and o not in enemies(e):
+            alive = False
+        if scn in ('punch', 'kill') and alive:
             # stay next to the enemy, facing it
             ex, ey = s32v(e.r32(o + 0x1a0)) >> 8, s32v(e.r32(o + 0x1a4)) >> 8
-            if ex or ey:
-                setpos(e, p, ex - 20, ey)
+            setpos(e, p, ex - 20, ey)
             e.w8(p + 0x10, 3)
             keys = KEY.A if f % 24 < 2 else 0
+        elif scn == 'blast':
+            e.w8(p + 0x10, 3)
+            keys = KEY.B if f % 48 < 2 else 0
+        elif scn == 'move':
+            # walk around the enemy: 90 frames each of right, down, left, up
+            keys = [KEY.RIGHT, KEY.DOWN, KEY.LEFT, KEY.UP][(f // 90) % 4]
         e.set_keys(keys)
         e.run(1)
         for h in e.hits():
@@ -119,23 +132,49 @@ def record(t, scn, frames=600):
                     ev.append(e.r32(r[1]) if 0x02000000 <= r[1] < 0x04000000 else 0)
                 events.append(ev)
             elif k == 'sfx':
-                events.append([f, 'sfx', 0, (r[1] - SFX_TABLE) // 12, lr, r[2], s32v(r[3])])
+                # who: the first of r4..r12 that is the player, an enemy or an object owned (+0x1C) by one
+                # (read after the frame; objects outlive their sound call almost always)
+                who = 0
+                cands = set(enemies(e)) | {p}
+                for v in r[4:13]:
+                    if v in cands:
+                        who = v
+                        break
+                    if 0x02000000 <= v < 0x02040000 and e.r32(v + 0x1C) in cands:
+                        who = e.r32(v + 0x1C)
+                        break
+                events.append([f, 'sfx', 0, (r[1] - SFX_TABLE) // 12, lr, r[2], s32v(r[3]), who])
             elif k == 'stopsfx':
                 events.append([f, 'stopsfx', 0, (r[1] - SFX_TABLE) // 12, lr])
             elif k == 'stopall':
                 events.append([f, 'stopall', 0, 0, lr])
             elif k == 'spawn':
-                events.append([f, 'spawn', r[1], e.r32(r[1]) if 0x02000000 <= r[1] < 0x04000000 else 0, lr])
-        for q in enemies(e):
-            d = objs.setdefault(q, {'type': etype(e, q), 'first': f, 'gfx': e.r16(q + 0x0e) if False else None,
-                                    'def': e.r32(q + 0x58), 'rows': []})
+                q = r[1]
+                ok_ = 0x02000000 <= q < 0x04000000
+                events.append([f, 'spawn', q, e.r32(q) if ok_ else 0, lr])
+                if ok_ and e.r32(q + 0x58) in DEFS:
+                    extra[q] = {'vt': e.r32(q), 'first': f, 'def': e.r32(q + 0x58), 'rows': []}
+        lts.append(e.r32(0x03000F94))
+        el = enemies(e)
+        for q in el:
+            d = objs.setdefault(q, {'type': etype(e, q), 'first': f, 'def': e.r32(q + 0x58), 'rows': []})
             d['rows'].append([f] + snap(e, q))
-        if not enemies(e) and f > 60:
+        for q, d in list(extra.items()):
+            if q in el or e.r32(q) != d['vt'] or e.r32(q + 0x58) != d['def']:
+                if q not in el:
+                    d.setdefault('end', f)
+                continue
+            st = e.r32(q + 0x14)
+            d['rows'].append([f, anim_raw(e, q), e.r8(q + 0x11), e.r16(q + 0x12), e.r8(q + 0x10), st,
+                              e.r32(st) if 0x02000000 <= st < 0x04000000 else 0, None,
+                              s32v(e.r32(q + 0x1a0)), s32v(e.r32(q + 0x1a4)), 0, 0, 0, e.r32(q + 0x58)])
+        if not el and f > 60 and not any('end' not in d for d in extra.values()):
             break
     for i in ids:
         e.clear(i)
-    return dict(type=t, scenario=scn, player=[px, py], fields=['f'] + FIELDS,
-                objs={'%08x' % k: v for k, v in objs.items()}, events=events)
+    return dict(type=t, scenario=scn, player=[px, py], pobj=p, lt=lts, fields=['f'] + FIELDS,
+                objs={'%08x' % k: v for k, v in objs.items()},
+                extra={'%08x' % k: v for k, v in extra.items() if v['rows']}, events=events)
 
 
 if __name__ == '__main__':
