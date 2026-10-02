@@ -93,7 +93,11 @@ def export(game, write_frames=True, only=None):
                 for k, fa in enumerate(fl):
                     fi, flip = frame_ref(fa)
                     dur = t['durations'][k] if t and k < len(t.get('durations', [])) else (t or {}).get('default', 8)
-                    seq.append({'frame': fi, 'duration_frames': dur, 'flip': flip, 'rom': hx(fa)})
+                    st = {'frame': fi, 'duration_frames': dur, 'flip': flip, 'rom': hx(fa)}
+                    att = (d.get('attach') or {}).get('offsets', {}).get(ai)
+                    if att:
+                        st['attach'] = list(att[di][k])
+                    seq.append(st)
                 dirs[DIRS[di]] = seq
             anims[aname] = {'raw_index': ai, 'loop': (t or {}).get('loop', True),
                             'observed_frame_orders': [k for k, _ in (t or {}).get('observed_sequences', [])] or None,
@@ -107,6 +111,9 @@ def export(game, write_frames=True, only=None):
             'rom': {'def': hx(d['addr']), 'remap_table': hx(d['remap_addr'] or None),
                     'palette': hx(PAL[game]), 'gfx_format': 'webfoot-lz (type 1) 8bpp tiles, shared 256-colour OBJ palette'},
             'header': d['header'], 'sheet': sheet, 'frames': frames, 'animations': anims,
+            **({'attachment': {'kind': 'halo', 'sprite': 'buu_halo', 'table': hx(d['attach']['addr']),
+                               'note': 'steps carry attach = [dx, dy]: halo OBJ position relative to the entity position'}}
+               if d.get('attach') else {}),
             'hitboxes': {'body_per_direction': boxes,
                          'note': 'collision rectangle (x0,y0)-(x1,y1) relative to entity position, read by 0x80079B8 (log2)'},
         })

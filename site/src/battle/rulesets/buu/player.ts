@@ -1,5 +1,5 @@
 // Buu's Fury player: movement (walk 5*SPD+102, dash +320 on a double tap within 20 f), melee (one instant hit on
-// the A press, rects 0x083C344C, 17-frame recovery), block (R: 1/16 from the front), energy shield (R+B), the 23
+// the A press, rects 0x083C344C, 16-frame recovery), block (R: 1/16 from the front), energy shield (R+B), the 23
 // skills with their EP rules (cost table 0x0871DA98 scaled by record+0x56/16, SS gauge while transformed), forms
 // (SS / SS3 gauges, Saiyaman), regen (timer +110/frame -> 3% EP), 24-frame hurt state with zero resists, crits,
 // equipment hooks (EP/HP per melee hit, HP regen, Crisis Ring) and the hold states enemies put the player in.
@@ -17,6 +17,7 @@ import type { BuuCtx, HoldKind, PlayerLike } from './context'
 import { ATK, computeDamage, HpAcc } from './damage'
 import type { BuuForm, EquipDef } from './data'
 import { recalcStats, levelOf, levelUp, xpGain, type BuuRecord, type EffStats } from './progression'
+import { audioEvent } from '../../audio/bus'
 import { AreaHit, BigBangBall, FullBeam, Ghost, GrowBeam, MasenkoCursor, StraightShot, kiBlast, VEL, type Shot } from './projectiles'
 
 /** melee rects 0x083C344C (x0,y0,x1,y1 relative to the position; same for every form) */
@@ -41,7 +42,7 @@ const FACE_TBL = [
 /** beam drain table 0x0871E148 in 1/256 EP per frame (0.418 / 1.5 / 5 EP) */
 const BEAM_DRAIN = [107, 384, 1280]
 
-export type PState = 'idle' | 'walk' | 'dash' | 'punch' | 'block' | 'shield' | 'hurt' | 'dying' | 'skill' | 'transform' | 'held'
+export type PState = 'idle' | 'walk' | 'dash' | 'punch' | 'block' | 'shield' | 'hurt' | 'bump' | 'dying' | 'skill' | 'transform' | 'held'
 
 const SKILL_MULT: Record<number, number[]> = {
   1: [1640], // Banshee
@@ -161,10 +162,8 @@ export class Player extends Actor implements PlayerLike {
   applyForm(id: number) {
     const f = this.ctx.data.forms[id]
     this.form = f
-    // gfx 117/119/121 (Goku's halo forms 2/4/6) have no decoded sprite definition: use the same form without
-    // the halo (gfx 115/118/120)
-    const HALO: Record<number, number> = { 117: 115, 119: 118, 121: 120 }
-    let spr = this.ctx.data.sprites.index((HALO[f.gfx] ?? f.gfx) - 9)
+    // gfx id = sprite index + 9 (the halo forms 2/4/6 use defs 108/110/112: Goku's frames + the halo table)
+    let spr = this.ctx.data.sprites.index(f.gfx - 9)
     for (let k = 1; !spr && k <= 3; k++) spr = this.ctx.data.sprites.index(f.gfx - 9 - k)
     this.setSprite(spr)
     this.refreshStats()
@@ -301,6 +300,7 @@ export class Player extends Actor implements PlayerLike {
       this.rec.level = nl
       this.refreshStats()
       w.popup('LEVEL UP!', this.px + 8, this.py - 34, '#8cf', 90)
+      audioEvent('level_up')
       w.logEvent('info', `level ${old} -> ${nl} (+${(nl - old) * 3} stat points)`)
     }
   }
@@ -311,6 +311,7 @@ export class Player extends Actor implements PlayerLike {
     if (was === 'skill' && s !== 'skill') this.endSkill(w)
     this.state = s
     this.t = 0
+    this.shakeX = this.shakeY = 0
     this.blocking = s === 'block' || s === 'shield'
     switch (s) {
       case 'idle':
@@ -327,6 +328,7 @@ export class Player extends Actor implements PlayerLike {
         this.setAnim('guard', false, true)
         break
       case 'hurt':
+      case 'bump':
         this.setAnim(['hurt', 'knockback'], true, false)
         break
       case 'dying':
@@ -359,7 +361,7 @@ export class Player extends Actor implements PlayerLike {
       case 'dash':
         return this.updDash(w)
       case 'punch':
-        if (this.t >= 17) this.setState(w, 'idle')
+        if (this.t >= 16) this.setState(w, 'idle')
         return
       case 'block':
         if (!(inp.held & BTN.R)) return this.setState(w, 'idle')
@@ -381,6 +383,24 @@ export class Player extends Actor implements PlayerLike {
         const [dx, dy] = DIR_VEC[this.hurtDir]
         this.moveBy(w, dx * 182, dy * 182)
         if (this.t > 24) this.setState(w, 'idle')
+        return
+      }
+      case 'bump': {
+        // dashed into a wall (emulator trace work/compare/emu_bump.py): hurt animation, pushed back 192/256 px per
+        // frame for 23 frames, no damage; the body shakes for the first 10 frames; then back to walk / idle
+        if (this.t >= 24) {
+          this.setState(w, 'idle')
+          return this.moveInput(w, true)
+        }
+        const [dx, dy] = DIR_VEC[this.facing]
+        this.moveBy(w, -dx * 192, -dy * 192)
+        if (this.t < 10) {
+          // INFERRED pattern (the game jitters the sprite by up to 4 px; the generator is not decoded): cosmetic only,
+          // does not draw from the game RNG
+          const h = Math.imul(w.frame + 1, 0x9e3779b1) >>> 0
+          this.shakeX = (h % 9) - 4
+          this.shakeY = ((h >>> 8) % 9) - 4
+        } else this.shakeX = this.shakeY = 0
         return
       }
       case 'skill':
@@ -463,26 +483,30 @@ export class Player extends Actor implements PlayerLike {
         this.lastDirKey = nd
         this.lastDirFrame = w.frame
         this.facing = nd & BTN.LEFT ? 2 : nd & BTN.RIGHT ? 3 : nd & BTN.UP ? 1 : 0
+        audioEvent('dash')
         return this.setState(w, 'dash')
       }
       this.lastDirKey = nd
       this.lastDirFrame = w.frame
     }
-    if (this.state !== 'walk') this.setState(w, 'walk')
-    const sp = this.walkSpeed()
+    // idle -> walk: the frame that enters the walk state only sets the facing / animation; the walk state moves
+    // from the next frame on (emulator trace: x unchanged on the first held frame, then 5*SPD+102 every frame)
+    const starting = this.state !== 'walk'
+    if (starting) this.setState(w, 'walk')
+    const sp = starting ? 0 : this.walkSpeed()
     let combo = 0
     if (held & BTN.LEFT) {
-      this.moveBy(w, -sp, 0)
+      if (sp) this.moveBy(w, -sp, 0)
       combo = 1
     } else if (held & BTN.RIGHT) {
-      this.moveBy(w, sp, 0)
+      if (sp) this.moveBy(w, sp, 0)
       combo = 2
     }
     if (held & BTN.UP) {
-      this.moveBy(w, 0, -sp)
+      if (sp) this.moveBy(w, 0, -sp)
       combo += 3
     } else if (held & BTN.DOWN) {
-      this.moveBy(w, 0, sp)
+      if (sp) this.moveBy(w, 0, sp)
       combo += 6
     }
     this.facing = FACE_TBL[combo][this.facing] as Dir
@@ -495,15 +519,16 @@ export class Player extends Actor implements PlayerLike {
     if (pressed & BTN.B) return this.startSkill(w)
     const [dx, dy] = DIR_VEC[this.facing]
     const sp = this.dashSpeed()
-    if (!this.moveBy(w, dx * sp, dy * sp)) return this.setState(w, 'idle')
+    if (!this.moveBy(w, dx * sp, dy * sp)) return this.setState(w, 'bump')
     const ws = this.walkSpeed()
     if (dx) this.moveBy(w, 0, held & BTN.UP ? -ws : held & BTN.DOWN ? ws : 0)
     else this.moveBy(w, held & BTN.LEFT ? -ws : held & BTN.RIGHT ? ws : 0, 0)
   }
 
   // ---- melee -------------------------------------------------------------------------------------------------
-  /** 0x08012A24: one instant hit test (mult 0x400, attack 0x086B8098), then state 4 + rand(3), 17 frames */
+  /** 0x08012A24: one instant hit test (mult 0x400, attack 0x086B8098), then state 4 + rand(3); back to idle 16 frames later (emulator trace, work/compare/trace_dash.txt) */
   melee(w: World) {
+    audioEvent('melee_swing')
     const rect = rectAt(PUNCH_RECT[this.facing], this.px, this.py)
     const msg: HitMsg = { team: 1, rect, dir: this.facing, mult: 0x400, atk: ATK[2], attacker: this, source: this }
     const hits = this.dealtBefore
@@ -560,6 +585,7 @@ export class Player extends Actor implements PlayerLike {
   startSkill(w: World) {
     const id = this.skill
     if (!this.canUseSkill(id)) return
+    audioEvent('skill_start', { id })
     const lv = this.skillLv(id)
     const mult = (SKILL_MULT[id] ?? [1024])[Math.min(lv, (SKILL_MULT[id] ?? [1024]).length - 1)]
     // costs paid on press (moves.json: "paid on press" / activation)
@@ -596,6 +622,7 @@ export class Player extends Actor implements PlayerLike {
   private endSkill(w: World) {
     const s = this.sk
     if (!s) return
+    audioEvent('skill_end')
     const p = s.proj
     if (p && !p.removed) {
       if (p instanceof GrowBeam) p.stop()
@@ -629,6 +656,7 @@ export class Player extends Actor implements PlayerLike {
         if (s.t === 16) {
           const [mx, my] = this.muzzle(10)
           this.blast = kiBlast(this.ctx, this, this.facing, 1, mx << 8, my << 8)
+          audioEvent('ki_blast')
           w.add(this.blast)
         }
         if (s.t >= 40 && s.refire && this.canAfford(this.skillCost(7))) {
@@ -653,6 +681,7 @@ export class Player extends Actor implements PlayerLike {
           if (!held) return s.t >= 30 ? end() : undefined
           const speed = id === 11 ? 2.14 : id === 3 ? 8.5 : 3.34
           const maxLen = id === 11 ? [64, 64, 96][lv] : 240
+          audioEvent('beam_fire')
           s.proj = w.add(new GrowBeam(this.ctx, this, this.facing, 1, () => this.muzzle(16), { atk, mult, width: id === 1 ? 12 : lv === 0 ? 16 : 16, speed, maxLen, color: BEAM_COLOR[id] ?? ['#fff', '#3bf'] }))
           this.setAnim(['special_beam', 'kiblast'], false, true)
           return
@@ -668,6 +697,7 @@ export class Player extends Actor implements PlayerLike {
         if (s.t === 30) {
           if (!held && s.release < 26) return end()
           const [mx, my] = this.muzzle(14)
+          audioEvent('beam_fire')
           s.proj = w.add(new FullBeam(this.ctx, this, this.facing, 1, mx, my, { atk, mult, life: 8 }))
         }
         if (s.t > 30 && s.t <= 40) this.drain(w, BEAM_DRAIN[lv])
@@ -700,6 +730,7 @@ export class Player extends Actor implements PlayerLike {
             return end()
           }
           ball.launched = true
+          audioEvent('big_bang')
           this.setAnim(['special_release', 'kiblast'], true, false)
         }
         if (s.t - s.release >= 20) {
@@ -714,6 +745,7 @@ export class Player extends Actor implements PlayerLike {
           const [mx, my] = this.muzzle(12)
           const [vx, vy] = VEL(this.facing, 732)
           w.add(new StraightShot(this.ctx, this, this.facing, 1, mx << 8, my << 8, { vx, vy, box: [7, 7, 14, 14], atk, mult, color: ['#fff6d0', '#e08020'], radius: 6, name: 'burning' }))
+          audioEvent('wave')
         }
         if (s.t >= 40) end()
         return
@@ -724,6 +756,7 @@ export class Player extends Actor implements PlayerLike {
           const [mx, my] = this.muzzle(14)
           const [vx, vy] = VEL(this.facing, 0x300)
           w.add(new StraightShot(this.ctx, this, this.facing, 1, mx << 8, my << 8, { vx, vy, box: [6, 6, 12, 12], atk: ATK[16], mult: 1024, color: ['#ffffff', '#f0a040'], radius: 5, name: 'volley' }))
+          audioEvent('wave')
         }
         if (s.t >= 45) end()
         return
@@ -755,6 +788,7 @@ export class Player extends Actor implements PlayerLike {
         if (!s.charged) return end()
         if (s.t - s.release === 3) {
           this.setAnim(['attack3', 'attack1'], true, false)
+          audioEvent('beam_fire')
           broadcast(w, { team: 1, rect: this.frontRect(40, 32), dir: this.facing, mult, atk, attacker: this, source: this })
         }
         if (s.t - s.release >= 16) end()
@@ -770,6 +804,7 @@ export class Player extends Actor implements PlayerLike {
           s.charge = 24
           s.proj = w.add(new AreaHit(this.ctx, this, this.facing, 1, this.frontRect(8, 16), { life: 20, every: 1000, atk, mult, color: ['#fffbd0', '#ffb020'] }))
           s.proj.kind = 'dragon'
+          audioEvent('beam_fire')
           s.hits = 0
         }
         if (s.proj && !s.proj.removed && s.t >= 20) {
@@ -843,6 +878,7 @@ export class Player extends Actor implements PlayerLike {
             return
           }
           c.release()
+          if (s.t - s.release === 1) audioEvent('wave')
           if (s.t - s.release === 1) this.setAnim(['throw', 'special_release', 'kiblast'], true, false)
           if (s.t - s.release >= 51) {
             s.proj = null
@@ -877,6 +913,7 @@ export class Player extends Actor implements PlayerLike {
     if (to === 255 || !this.ctx.data.forms[to]) return
     this.transformTo = to
     this.state = 'transform'
+    audioEvent('transform')
     this.t = 0
     this.blocking = false
     this.setAnim(['transform', 'meditate', 'special_charge'], true, true)
@@ -890,6 +927,7 @@ export class Player extends Actor implements PlayerLike {
     else this.ssGauge = Math.floor((this.maxEp * this.t) / LEN)
     if (this.t >= LEN) {
       this.applyForm(this.transformTo)
+      audioEvent('transform_done')
       if (this.form.ss3) this.ss3Gauge = this.maxEp * 65536
       else this.ssGauge = this.maxEp
       this.ctx.puff(w, this.center()[0], this.center()[1])
@@ -907,6 +945,7 @@ export class Player extends Actor implements PlayerLike {
     this.ssCooldown = 600 * 256
     this.ctx.puff(w, this.center()[0], this.center()[1])
     w.logEvent('info', `reverted to form ${f.id}`)
+    audioEvent('transform_done')
     if (this.state === 'transform' || this.state === 'skill') this.setState(w, 'idle')
   }
 
@@ -978,6 +1017,7 @@ export class Player extends Actor implements PlayerLike {
     msg.raw = res.raw
     msg.dmg = dmg
     const lost = this.hpAcc.take(dmg)
+    audioEvent('hurt', { melee: msg.atk.kind === 0 })
     w.logEvent('damage', `${msg.attacker.kind === 'enemy' ? (msg.attacker as unknown as { label: string }).label : msg.attacker.kind} -> player: ${dmg}/1024${res.crit ? ' CRIT' : ''}${blocking ? ' blocked' : ''}${this.state === 'hurt' ? ' (i-frames)' : ''} = ${lost} HP`)
     if (dmg > 0) {
       w.stats.hitsTaken++

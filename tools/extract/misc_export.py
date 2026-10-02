@@ -119,3 +119,37 @@ def portraits(game):
                                           'gfx_format': 'webfoot-lz, 64x64 linear 8bpp bitmap (256-colour palette)'}},
                                  conf=info.get('confidence', 'low')))
     return out
+
+
+# Buu's Fury ground shadows: table 0x086B759C, 4 x {u8 w, u8 h, u8, u8, u32 gfx, u32 vram slot, u16 attr0, u16 attr1},
+# looked up by the sprite header shadow bytes (+0x0A, +0x0B) in 0x08013E38. The OBJ is drawn at the entity position
+# (top-left of the collision footprint), behind the body. Raw tiles, colour 1 of the OBJ palette (black).
+BUU_SHADOWS = 0x86B759C
+# Halo OBJ (16x8 raw 8bpp tiles) drawn for the halo forms of Goku (defs 108/110/112, see wf_sprites attach table).
+BUU_HALO = 0x80725F0
+
+
+def buu_overlays():
+    import struct
+    from wf_sprites import OBJ_SIZE
+    R = Rom('buu')
+    pal = palette(R.bytes(PAL['buu'], 512), 256)
+    out = []
+    for i in range(4):
+        a = BUU_SHADOWS + 16 * i
+        w, h = R.bytes(a, 2)
+        g = R.u32(a + 4)
+        a0, a1 = struct.unpack('<HH', R.bytes(a + 12, 4))
+        W, H = OBJ_SIZE[(a0 >> 14, a1 >> 14)]
+        bpp = 8 if a0 & 0x2000 else 4
+        im = obj_image(R.bytes(g, W * H * bpp // 8), W, H, bpp, pal)
+        out.append(single_entity('buu', f'buu_shadow_{w}x{h}', f'Ground shadow {w}x{h}', 'effect', [(im, 0, 0, hx(g))],
+                                 'effects', {'rom': {'table': hx(a), 'gfx': hx(g), 'obj': f'{W}x{H} {bpp}bpp'},
+                                             'shadow_size': [w, h],
+                                             'notes': 'drawn at the entity position (anchor) for sprites whose header '
+                                                      'shadow bytes [2], [3] are this size'}, conf='high'))
+    im = obj_image(R.bytes(BUU_HALO, 128), 16, 8, 8, pal)
+    out.append(single_entity('buu', 'buu_halo', 'Halo', 'effect', [(im, 0, 0, hx(BUU_HALO))], 'effects',
+                             {'rom': {'gfx': hx(BUU_HALO), 'obj': '16x8 8bpp'},
+                              'notes': 'drawn at entity position + the step attach offset of halo sprites'}, conf='high'))
+    return out

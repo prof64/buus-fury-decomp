@@ -6,6 +6,8 @@ import type {
   ArenaChoice, BattleConfig, ControlHelp, EnemyChoice, FighterChoice, FighterSetup, FormChoice, PresetChoice, Ruleset, RulesetBattle, SetupKnob, StatLine,
 } from '../../core/ruleset'
 import type { ArenaRuntime, World } from '../../core/world'
+import { GBA_H, GBA_W } from '../../core/renderer'
+import { Actor } from './actor'
 import { BuuCtx } from './context'
 import { loadBuu, type BuuData, type BuuForm, type EquipDef } from './data'
 import { Enemy } from './enemy'
@@ -26,6 +28,10 @@ const ARENAS: (ArenaChoice & { map: string })[] = [
   { id: 'htc', map: '6-9', name: 'Hyperbolic Time Chamber', image: '', size: [0, 0], bounds: { x0: 72, y0: 64, x1: 328, y1: 240 } },
   { id: 'stadium', map: '7-6', name: 'World Tournament Stadium', image: '', size: [0, 0], bounds: { x0: 216, y0: 256, x1: 472, y1: 516 } },
   { id: 'forest', map: '8-3', name: 'Southwest Forest', image: '', size: [0, 0], bounds: { x0: 40, y0: 40, x1: 520, y1: 520 } },
+  // large open maps for the PC view (walls = the open ground, picked on the map renders; buildings are not solid)
+  { id: 'plateau', map: '19-3', name: 'Rocky Plateau (720x560)', image: '', size: [0, 0], bounds: { x0: 40, y0: 200, x1: 660, y1: 432 } },
+  { id: 'village', map: '15-1', name: 'Nataday Village (800x720)', image: '', size: [0, 0], bounds: { x0: 96, y0: 120, x1: 760, y1: 560 } },
+  { id: 'kamehouse', map: '5-1', name: 'Kame House island (720x640)', image: '', size: [0, 0], bounds: { x0: 72, y0: 368, x1: 648, y1: 560 } },
 ]
 const ARENA_FOR_MAP: Record<string, string> = Object.fromEntries(ARENAS.map((a) => [a.map, a.id]))
 ARENA_FOR_MAP['20-5'] = 'wasteland'
@@ -116,6 +122,7 @@ export class BuuRuleset implements Ruleset {
   async load() {
     if (this.d) return
     this.d = await loadBuu()
+    Actor.bank = this.d.sprites
     for (const a of ARENAS) {
       const m = this.d.maps.get(a.map)
       if (m) {
@@ -128,7 +135,7 @@ export class BuuRuleset implements Ruleset {
       const s = this.d.sprites.index(f.gfx - 9)
       if (s) sheets.add(s.json.sheet)
     }
-    for (const id of ['fx_086fd9d0', 'fx_08712fdc']) {
+    for (const id of ['fx_086fd9d0', 'fx_08712fdc', 'buu_halo', 'buu_shadow_4x2', 'buu_shadow_10x4', 'buu_shadow_16x6', 'buu_shadow_24x10']) {
       const s = this.d.sprites.get(id)
       if (s) sheets.add(s.json.sheet)
     }
@@ -148,7 +155,7 @@ export class BuuRuleset implements Ruleset {
     return FIGHTERS.map((fd) => {
       const forms: FormChoice[] = fd.forms.map((fid) => {
         const f = d.forms[fid]
-        const spr = d.sprites.index((({ 117: 115, 119: 118, 121: 120 } as Record<number, number>)[f.gfx] ?? f.gfx) - 9) ?? d.sprites.index(f.gfx - 10)
+        const spr = d.sprites.index(f.gfx - 9) ?? d.sprites.index(f.gfx - 10)
         const b = f.bonus
         const bonus = b.STR ? `+${b.STR} STR/POW/END, ${b.walk >= 0 ? '+' : ''}${b.walk} speed` : f.id === 24 ? 'speed / 4' : b.walk ? `+${b.walk} speed` : 'record stats'
         return { id: fid, name: formLabel(d, f), visual: { sprite: spr?.id, anim: 'idle', dir: 0 }, portrait: this.portrait(f.portrait), note: `form ${fid} (gfx ${f.gfx}, flags 0x${f.flags.toString(16)}): ${bonus}${f.fusion ? ', fusion' : ''}` }
@@ -453,9 +460,37 @@ export class BuuRuleset implements Ruleset {
       return Math.max(0, SURVIVE - (w.frame - phaseStart))
     }
 
+    // camera 0x080077EC: eases toward the player's footprint centre (screen point 120, 84) by 3/64 of the distance
+    // horizontally and 9/128 vertically per frame (22.10 fixed point), then 0x08009744 clamps it to the map
+    let camX = 0
+    let camY = 0
+    let camInit = false
+    const camera = (w2: World) => {
+      const tx = ((player.px * 2 + player.footW) >> 1) - 120
+      const ty = ((player.py * 2 + player.footH) >> 1) - 84
+      if (!camInit) {
+        camX = tx << 10
+        camY = ty << 10
+        camInit = true
+      } else {
+        camX += ((tx << 10) - camX) * 3 >> 6
+        camY += ((ty << 10) - camY) * 9 >> 7
+      }
+      const v = w2.viewRect()
+      if (v) {
+        camX = Math.max(v.x0 << 10, Math.min(camX, Math.max(v.x0, v.x1 - GBA_W) << 10))
+        camY = Math.max(v.y0 << 10, Math.min(camY, Math.max(v.y0, v.y1 - GBA_H) << 10))
+      }
+      const cx = camX >> 10
+      const cy = camY >> 10
+      w2.camera = { x0: cx, y0: cy, x1: cx + GBA_W, y1: cy + GBA_H }
+    }
+    camera(w)
+    camInit = false // snap again on the first frame (setups / tests may move the player after createBattle)
+
     const battle: RulesetBattle = {
       postStep(w2) {
-        w2.centerCamera(player.px + 8, player.py - 8)
+        camera(w2)
         if (!live().length && phase < cfg.phases.length - 1 && !player.dead) {
           if (!nextPhaseAt) {
             nextPhaseAt = w2.frame + 120

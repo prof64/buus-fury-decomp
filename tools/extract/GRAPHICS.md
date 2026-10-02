@@ -69,7 +69,8 @@ Definition:
 | +0x0C | 4 × {s32 x0,y0,x1,y1} | body rectangle per direction, relative to entity position (read by `0x080079B8`) |
 | +0x4C | nanims × 4 × u32 | per animation, per direction: pointer to a **frame list** (0 = unused) |
 
-Directions everywhere: **0 down, 1 up, 2 left, 3 right** (verified with the d-pad).
+Directions everywhere: **0 down, 1 up, 2 left, 3 right** (verified with the d-pad; in all three games the
+index-2 frames are the ones shown while walking left — sprites.json labels follow this order, `export.DIRS`).
 Frame list = consecutive 12-byte frame records; the count is not stored (state code indexes it):
 the extractor runs a list until the next list start / first invalid record.
 Frame record: `s8 dx, s8 dy, u8 w, u8 h, u16 attr0, u16 attr1, u32 gfx` — one OBJ at entity
@@ -89,12 +90,22 @@ Definition pointer table `0x086B6BD8`, 298 entries (287 valid). Definition:
 | +0x08 | u8[4] | shadow/size bytes |
 | +0x0C | u32 | flags |
 | +0x10 | 4 × {s32 x0,y0,x1,y1} | body rectangle per direction |
-| +0x50 | u32[n] | animation struct pointers (index 0 always empty) |
+| +0x50 | u32[n] | animation struct pointers (index 0: empty, or the halo table, see below) |
 
 Animation struct: `u32 nframes`, then `nframes × 4` frame pointers, **frame-major**: entry for
 (frame f, dir d) at `+4 + 16f + 4d` (`0x08010192`). Frame: `u32 nobj, s8 bbox dx,dy, u8 w,h`, then
 `nobj ×` the 12-byte OBJ record above — multi-OBJ frames (bosses up to 64×64 pieces). Entity fields:
 +0x50 current anim, +0x10 direction, +0x11 frame, +0x12 tick, +0x1A0/+0x1A4 position.
+
+Halo sprites (defs 49, 74, 93, 108, 110, 112, 152, 173, 271, 274 — e.g. 108 = Goku 106 + halo): animation slot 0
+points to a table indexed by the engine anim number (raw index − 1) → per animation `nframes × 4 dirs × {s8 dx,
+s8 dy}` (frame-major): the halo OBJ (16×8 raw 8bpp at `0x080725F0`) is drawn at entity position + (dx, dy), above
+the body. Exported as `attach: [dx, dy]` on each step plus entity `attachment`, and the `buu_halo` effect entity.
+
+Ground shadows: header bytes +0x0A/+0x0B (shadow w, h) select an entry of the table `0x086B759C` (4 × 16 bytes:
+u8 w, u8 h, u8, u8, u32 gfx, u32 VRAM slot, u16 attr0, u16 attr1; lookup `0x08013E38`): 4×2, 10×4, 16×6, 24×10.
+The OBJ (colour 1 = black) is drawn at the entity position, behind the body, and does not follow the height
+offset. Exported as the `buu_shadow_<w>x<h>` effect entities.
 
 ### 3.3 LoG1
 Sprite definition pointers `0x085C0C80` (86) + projectile definitions referenced from code

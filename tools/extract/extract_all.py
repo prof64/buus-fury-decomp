@@ -1,11 +1,13 @@
 """Rebuild every graphics output for all three games: everything the dashboard and the battle simulator load.
 
-    .venv/bin/python tools/extract/extract_all.py [game ...] [--skip-maps] [--no-icons]
+    .venv/bin/python tools/extract/extract_all.py [game ...] [--skip-maps] [--no-icons] [--no-audio]
 
 Outputs: site/public/assets/<game>/{sprites,effects,portraits,...}/<entity>/{NNN.png,sheet.png}
          site/public/assets/<game>/battle/...   battle HUD icons (tools/battle/extract_icons.py, log1_icons.py,
                                                  extract_buu_icons.py; run after the game's assets were rebuilt)
          data/<game>/sprites.json
+         site/public/assets/buu/audio/ + data/buu/audio.json   music + SFX (tools/audio/rip_buu.py; renders are cached
+                                                 in work/audio/cache, so a rebuild only re-encodes)
 Finishes with tools/check_assets.py (every asset path referenced by data/ and site/src exists).
 """
 import sys
@@ -28,6 +30,14 @@ def battle_icons(game):
     subprocess.run([sys.executable, str(script)], cwd=ROOT, check=True)
 
 
+def audio(game):
+    import subprocess
+    script = ROOT / 'tools' / 'audio' / f'rip_{game}.py'
+    if script.exists():
+        print(game, 'audio:', script.name, flush=True)
+        subprocess.run([sys.executable, str(script)], cwd=ROOT, check=True)
+
+
 def run(game, maps=True):
     t = time.time()
     extra = {}
@@ -41,7 +51,7 @@ def run(game, maps=True):
             extra = {k: prev[k] for k in ('maps', 'tilesets', 'maps_note') if k in prev}
         if (ASSETS / game).exists():
             for d in (ASSETS / game).iterdir():
-                if d.name != 'maps':
+                if d.name not in ('maps', 'audio'):   # audio: tools/audio/rip_buu.py output
                     shutil.rmtree(d, ignore_errors=True)
     ents = []
     if game == 'log1':
@@ -56,6 +66,8 @@ def run(game, maps=True):
         ents += sprites_wf_export.export(game)
         defs = WFSprites(game).all_defs()
         ents += misc_export.effects(game, defs)
+        if game == 'buu':
+            ents += misc_export.buu_overlays()
         ents += misc_export.portraits(game)
         import items_export
         ents += items_export.export(game)
@@ -86,4 +98,6 @@ if __name__ == '__main__':
         run(g, maps='--skip-maps' not in sys.argv)
         if '--no-icons' not in sys.argv:
             battle_icons(g)
+        if '--no-audio' not in sys.argv:
+            audio(g)
     sys.exit(subprocess.run([sys.executable, str(ROOT / 'tools' / 'check_assets.py')]).returncode)

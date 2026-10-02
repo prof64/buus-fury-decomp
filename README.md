@@ -9,7 +9,8 @@ Everything derived from them (images, emulator save states) is gitignored and re
 
 ## Setup (fresh checkout)
 
-Needs Python 3, Node 20+, and (macOS) Homebrew `ninja libpng freetype xz` for the emulator build.
+Needs Python 3, Node 20+, (macOS) Homebrew `ninja libpng freetype xz` for the emulator build, and `ffmpeg` (with
+libmp3lame) for the Buu's Fury audio rip.
 
     python3 -m venv .venv && .venv/bin/pip install capstone numpy pillow cmake
     sh tools/emu/build.sh                      # builds mGBA + the headless emulator shim
@@ -18,9 +19,10 @@ Needs Python 3, Node 20+, and (macOS) Homebrew `ninja libpng freetype xz` for th
 
 `extract_all.py` writes `site/public/assets/<game>/` (sprites, effects, portraits, items, UI, maps) and
 `data/<game>/sprites.json`, then the battle HUD icons (`tools/battle/extract_icons.py`, `log1_icons.py`,
-`extract_buu_icons.py`), and finishes with `tools/check_assets.py`, which scans `data/` and `site/src/` for every
+`extract_buu_icons.py`), the Buu's Fury music + sound effects (`tools/audio/rip_buu.py` → `site/public/assets/buu/audio/`,
+`data/buu/audio.json`; see `tools/audio/AUDIO.md`), and finishes with `tools/check_assets.py`, which scans `data/` and `site/src/` for every
 referenced asset path and fails if one is missing. Options: `extract_all.py log2` (one game), `--skip-maps`
-(keep the already-rendered maps), `--no-icons`. Run `python3 tools/check_assets.py` any time to re-check.
+(keep the already-rendered maps), `--no-icons`, `--no-audio`. Run `python3 tools/check_assets.py` any time to re-check.
 
 Site commands (in `site/`): `npm run dev`, `npm test` (vitest), `npx tsc -b`, `npx vite build`.
 
@@ -33,6 +35,7 @@ Site commands (in `site/`): `npm run dev`, `npm test` (vitest), `npx tsc -b`, `n
 | `data/battle/` | emulator-recorded test vectors (damage rolls, level-ups, move traces) and decoded tables used by the battle simulator |
 | `tools/emu/` | `emu.py`, a scriptable headless mGBA (frames, input, memory, screenshots, save states, watchpoints/breakpoints) |
 | `tools/extract/` | graphics extraction (`extract_all.py`; formats documented in `GRAPHICS.md`) |
+| `tools/audio/` | Buu's Fury sound driver notes (`AUDIO.md`) and the music / SFX ripper (`rip_buu.py`) |
 | `tools/battle/` | battle-simulator helpers: HUD icon extraction, vector recorders, `play.py` (drives the running page) |
 | `site/` | the Vite + React + TS app: dashboard (`src/pages/`) and battle simulator (`src/battle/`, see `src/battle/RULESET.md`) |
 | `work/` | local scratch (save states, disassembly listings, screenshots); gitignored |

@@ -14,6 +14,7 @@ import { MoveLabPage } from '../movelab/MoveLab'
 import { ItemsPage } from './game/Items'
 import { NotesPage } from './game/Notes'
 import { RawPage } from './game/Raw'
+import { AudioPage } from './game/Audio'
 
 const TABS: [string, string][] = [
   ['', 'Overview'],
@@ -26,6 +27,7 @@ const TABS: [string, string][] = [
   ['lab', 'Move lab'],
   ['items', 'Items'],
   ['notes', 'Notes'],
+  ['audio', 'Audio'],
   ['raw', 'Raw data'],
 ]
 
@@ -44,7 +46,7 @@ export function GamePage() {
           </span>
         </div>
         <nav className="tabs" aria-label="Sections">
-          {TABS.map(([to, label]) => (
+          {TABS.filter(([to]) => to !== 'audio' || game === 'buu').map(([to, label]) => (
             <NavLink key={to} to={`/g/${game}${to ? '/' + to : ''}`} end={to === ''}>
               {label}
             </NavLink>
@@ -69,6 +71,7 @@ export function GamePage() {
           <Route path="items" element={<ItemsPage game={game} />} />
           <Route path="notes" element={<NotesPage game={game} />} />
           <Route path="notes/:doc" element={<NotesPage game={game} />} />
+          <Route path="audio" element={<AudioPage game={game} />} />
           <Route path="raw" element={<RawPage game={game} />} />
           <Route path="raw/:name" element={<RawPage game={game} />} />
         </Routes>

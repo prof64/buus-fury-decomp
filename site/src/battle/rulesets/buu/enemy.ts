@@ -13,6 +13,7 @@ import type { BuuCtx, EnemyLike, PlayerLike } from './context'
 import { ATK, computeDamage, type AttackType } from './damage'
 import type { EnemyType } from './data'
 import { StraightShot, type GrowBeam } from './projectiles'
+import { audioEvent } from '../../audio/bus'
 
 const GUN_MUZZLE = [[4, 4], [13, -24], [-8, -8], [24, -8]]
 const GUN_BOX: [number, number, number, number][] = [[3, 10, 8, 16], [3, 5, 8, 16], [5, 4, 16, 8], [10, 4, 16, 8]]
@@ -200,6 +201,23 @@ export class Enemy extends Actor implements EnemyLike {
     if (!vx && !vy) return true
     this.moving = true
     return this.moveBy(this.w, Math.round(vx), Math.round(vy))
+  }
+  /** StepTowardPlayer update 0x08018C3A: d = player footprint centre - own footprint centre (0x0800FDFA rects);
+   *  facing by the dominant axis; velocity = trunc(d * speed / max(|dx|, |dy|)), i.e. `speed` on the major axis
+   *  (emulator: Majin Fighters step (153, 0..153) / 256 px per frame, never the Euclidean (136, 70)) */
+  stepToward(speed: number, stop: number): boolean {
+    const p = this.player
+    if (!p) return false
+    const [px, py] = p.footCenter()
+    const [x, y] = this.footCenter()
+    const dx = px - x
+    const dy = py - y
+    const m = Math.max(Math.abs(dx), Math.abs(dy))
+    if (!m) return true
+    this.facing = facingToward(dx, dy)
+    if (m <= stop) return true
+    this.walkBy(Math.trunc((dx * speed) / m), Math.trunc((dy * speed) / m))
+    return false
   }
   /** normalised move toward the player; true when within `stop` px (centre distance) */
   moveToward(speed: number, stop: number, face: boolean, ignoreWalls = false): boolean {
@@ -558,6 +576,7 @@ export class Enemy extends Actor implements EnemyLike {
     msg.crit = res.crit
     msg.raw = res.raw
     msg.dmg = res.dmg
+    if (msg.attacker.kind === 'player') audioEvent('hit')
     if (res.dmg > 0 && msg.attacker.kind === 'player') (msg.attacker as unknown as { onDealt?: (w: World, m: HitMsg, d: number) => void }).onDealt?.(w, msg, res.dmg)
     this.lastHitDir = msg.dir
     this.ai.onHit(msg)
@@ -648,7 +667,9 @@ export class Enemy extends Actor implements EnemyLike {
   }
 
   draw(r: Renderer, w: World) {
-    if (this.z < -4 || this.type.type === 0x4 || this.type.type === 0x19 || this.type.type === 0x1d) {
+    // the real ground shadow (sprite header) is drawn by Actor.draw; this soft one only marks airborne / hovering
+    // objects whose sprite has none
+    if ((this.z < -4 || this.type.type === 0x4 || this.type.type === 0x19 || this.type.type === 0x1d) && !this.shadowSprite()) {
       const g = r.ctx
       g.fillStyle = 'rgba(0,0,0,0.35)'
       g.beginPath()

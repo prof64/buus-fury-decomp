@@ -10,7 +10,9 @@ site/src/battle/
     rng.ts         Rng interface + RecordingRng (call history for the debug panel)
     input.ts       GBA buttons (KEYINPUT bit order), keyboard + Gamepad mapping, per-frame edges, injection
     loop.ts        fixed-timestep loop at the GBA rate (59.7275 Hz), pause / speed / frame advance
-    renderer.ts    240x160 (or widescreen) offscreen buffer, integer-scaled blit, camera, debug text
+    renderer.ts    native-pixel offscreen buffer: GBA 240x160, legacy widescreen, or the PC view (window size /
+                   integer zoom, auto zoom fits the arena's painted area); separate HUD layer (beginHud/endHud)
+                   anchored to the viewport corners; integer-scaled blit, camera, debug text
     sprites.ts     SpriteSet/SpriteBank from data/<game>/sprites.json (anchors, flips, per-direction anims)
     pixelfont.ts   3x5 bitmap font for crisp in-game text
     world.ts       World: entity list updated last->first each frame, popups, camera, debug events, stats
@@ -35,7 +37,8 @@ site/tests/battle/   vitest suites (formula, RNG, level-up, AI cadence, move rep
 Rendering is independent (`requestAnimationFrame`): `world.draw(renderer)` y-sorts entities by
 `layer` then `depth()`, then `battle.drawHud()`; debug labels are drawn at display resolution.
 Game logic must never read the renderer; use `world.camera` (the GBA-sized logical camera) for
-"off-screen" rules — widescreen only widens what is drawn around it.
+"off-screen" rules — the wider views (widescreen, PC view) only widen what is drawn around it. `drawHud` runs on the
+HUD layer: `r.ctx` / `r.viewW` / `r.viewH` are then the screen-space HUD buffer (scale `r.hudScale`), not the world.
 
 ## Implementing a ruleset
 
@@ -141,6 +144,14 @@ The aux (on-hit) trees and the reaction states 0x00..0x11 are not in enemy_ai.js
 decodes them from the ROM into `data/battle/buu_ai_extra.json`. Bosses whose aux trees have no ApplyDamage take no
 damage, exactly as in the game (verified with `tools/battle/buu_boss_hp_check.py`: Majin Buu 0x1A / 0x1B and the
 scripted Super Buu 0x77 lose 0 HP in the emulator); their presets are "survive 60 s" / "bat the ball back 3 times".
+
+Look & movement (verified frame by frame against the emulator, `tests/battle/buu_view.test.ts`): sprites.json
+directions in engine order (left = direction 2), ground shadows (`buu_shadow_*`, header shadow size) and the halo
+OBJ of the halo forms (`attach` offsets) drawn by `Actor.draw`; camera 0x080077EC eases 3/64 (x) / 9/128 (y) of the
+distance to the footprint centre per frame and clamps to the map; walking starts one frame after the press; punch
+recovery 16 frames; dashing into a wall plays the hurt animation and pushes back 192/256 px per frame for 23 frames
+(`bump`); StepTowardPlayer 0x08018C3A moves `speed` on the major axis (velocity = d × speed / max(|dx|, |dy|)).
+Not modelled: the game's lag frames (busy scenes skip logic frames on the GBA), map collision tiles.
 
 Fitted / inferred (marked in the code): skill state machines are fitted to the measured runs (first-hit frames,
 hit counts, EP), beam hit rate near / far, Big Bang multiplier = 0.284 x charged EP, path-finding replaced by

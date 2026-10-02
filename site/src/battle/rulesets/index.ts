@@ -5,10 +5,11 @@ import { log1Ruleset } from './log1'
 import { log2Ruleset } from './log2'
 import { buuRuleset } from './buu'
 
+/** setup-screen tab order: Buu's Fury (the default game) first */
 export const RULESET_INFO: RulesetInfo[] = [
-  log1Ruleset.info,
-  log2Ruleset.info,
   buuRuleset.info,
+  log2Ruleset.info,
+  log1Ruleset.info,
 ]
 
 const RULESETS: Partial<Record<GameKey, Ruleset>> = {

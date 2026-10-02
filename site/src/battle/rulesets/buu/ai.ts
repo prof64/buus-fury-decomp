@@ -660,14 +660,15 @@ export function create(n: AiNodeJ, c: AiController): RNode {
     // ---- movement -------------------------------------------------------------------------------------------------------
     case 'ChasePlayer':
     case 'ChasePlayerThroughRocks':
+      // pathfinding (0x0802A09F) replaced by the direct step of StepTowardPlayer
       return new Act(n, c, () => undefined, () => {
-        e.moveToward(speed, 2, true)
+        e.stepToward(speed, 2)
         return false
       })
     case 'StepTowardPlayer':
     case 'StepTowardPlayerThroughRocks':
       return new Act(n, c, () => undefined, () => {
-        e.moveToward(speed, 0, true)
+        e.stepToward(speed, 0)
         return false
       })
     case 'StepAwayFromPlayer':

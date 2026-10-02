@@ -3,6 +3,9 @@ import type { BattleConfig, Outcome, Ruleset } from '../core/ruleset'
 import { BattleSession } from '../core/session'
 import { keysFor } from '../core/input'
 import { KeyBindings, useKeymapVersion } from './KeyBindings'
+import type { ViewMode } from '../core/renderer'
+import { attachBattleAudio } from '../audio/director'
+import { AudioControl } from '../audio/AudioControl'
 
 declare global {
   interface Window {
@@ -10,12 +13,36 @@ declare global {
   }
 }
 
+/** view choices: PC view (window-sized, auto or fixed integer zoom), the classic 240x160 screen, legacy widescreen */
+const VIEWS: { id: string; label: string; mode: ViewMode }[] = [
+  { id: 'auto', label: 'PC · auto zoom', mode: { kind: 'pc', zoom: 0, widescreen: false, scale: 0 } },
+  { id: '1', label: 'PC · 1×', mode: { kind: 'pc', zoom: 1, widescreen: false, scale: 0 } },
+  { id: '2', label: 'PC · 2×', mode: { kind: 'pc', zoom: 2, widescreen: false, scale: 0 } },
+  { id: '3', label: 'PC · 3×', mode: { kind: 'pc', zoom: 3, widescreen: false, scale: 0 } },
+  { id: '4', label: 'PC · 4×', mode: { kind: 'pc', zoom: 4, widescreen: false, scale: 0 } },
+  { id: 'gba', label: 'GBA 240×160', mode: { kind: 'gba', widescreen: false, scale: 0 } },
+  { id: 'wide', label: 'GBA widescreen', mode: { kind: 'wide', widescreen: true, scale: 0 } },
+]
+const viewKey = (game: string) => 'bt-view-' + game
+function loadView(game: string): string {
+  try {
+    const v = localStorage.getItem(viewKey(game))
+    if (v && VIEWS.some((x) => x.id === v)) return v
+    // Buu's Fury defaults to the PC view; the other games keep their previous GBA / widescreen choice
+    if (game === 'buu') return 'auto'
+    return localStorage.getItem('bt-wide') === '1' ? 'wide' : 'gba'
+  } catch {
+    return game === 'buu' ? 'auto' : 'gba'
+  }
+}
+const modeOf = (id: string): ViewMode => ({ ...(VIEWS.find((v) => v.id === id) ?? VIEWS[0]).mode })
+
 export function BattleView({ rs, cfg, onEnd, onQuit }: { rs: Ruleset; cfg: BattleConfig; onEnd: (o: Outcome, s: BattleSession) => void; onQuit: () => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
   const sessRef = useRef<BattleSession | null>(null)
   useKeymapVersion()
-  const [wide, setWide] = useState(() => localStorage.getItem('bt-wide') === '1')
+  const [view, setView] = useState(() => loadView(cfg.game))
   const [debug, setDebug] = useState(() => localStorage.getItem('bt-debug') === '1')
   const [boxes, setBoxes] = useState(false)
   const [labels, setLabels] = useState(false)
@@ -31,13 +58,14 @@ export function BattleView({ rs, cfg, onEnd, onQuit }: { rs: Ruleset; cfg: Battl
     const fit = () => {
       const el = wrapRef.current
       if (!el) return
-      s.view.widescreen = localStorage.getItem('bt-wide') === '1'
+      s.view = modeOf(loadView(cfg.game))
       s.fit(el.clientWidth, el.clientHeight)
     }
     fit()
     const ro = new ResizeObserver(fit)
     ro.observe(wrapRef.current!)
     s.start()
+    const detachAudio = attachBattleAudio(s)
     const iv = setInterval(() => {
       setTick((t) => t + 1)
       setPaused(s.paused)
@@ -46,6 +74,7 @@ export function BattleView({ rs, cfg, onEnd, onQuit }: { rs: Ruleset; cfg: Battl
       ro.disconnect()
       clearInterval(iv)
       s.stop()
+      detachAudio()
       if (window.__battle === s) window.__battle = undefined
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -54,11 +83,15 @@ export function BattleView({ rs, cfg, onEnd, onQuit }: { rs: Ruleset; cfg: Battl
   useEffect(() => {
     const s = sessRef.current
     if (!s) return
-    localStorage.setItem('bt-wide', wide ? '1' : '0')
-    s.view.widescreen = wide
+    try {
+      localStorage.setItem(viewKey(cfg.game), view)
+    } catch {
+      /* storage unavailable: keep the choice for this battle only */
+    }
+    s.view = modeOf(view)
     const el = wrapRef.current!
     s.fit(el.clientWidth, el.clientHeight)
-  }, [wide])
+  }, [view, cfg.game])
   useEffect(() => {
     const s = sessRef.current
     if (!s) return
@@ -100,8 +133,16 @@ export function BattleView({ rs, cfg, onEnd, onQuit }: { rs: Ruleset; cfg: Battl
       <div className="bt-toolbar">
         <button onClick={onQuit}>◀ Setup</button>
         <button onClick={() => s && (s.setPaused(!s.paused), setPaused(!s.paused))}>{paused ? '▶ Resume' : '❚❚ Pause'}</button>
-        <label>
-          <input type="checkbox" checked={wide} onChange={(e) => setWide(e.target.checked)} /> Widescreen
+        <label title="PC view: the arena at the game's pixel size, as much of it as fits the window (auto picks the zoom so the arena fills the view). GBA: the original 240×160 screen.">
+          View{' '}
+          <select value={view} onChange={(e) => setView(e.target.value)}>
+            {VIEWS.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.label}
+              </option>
+            ))}
+          </select>
+          {s && s.renderer.zoom > 0 && <span className="muted small"> {s.renderer.viewW}×{s.renderer.viewH} @{s.renderer.scale}×</span>}
         </label>
         <label>
           Speed{' '}
@@ -122,6 +163,7 @@ export function BattleView({ rs, cfg, onEnd, onQuit }: { rs: Ruleset; cfg: Battl
           <input type="checkbox" checked={labels} onChange={(e) => setLabels(e.target.checked)} /> States/AI <kbd>F3</kbd>
         </label>
         <button onClick={() => setShowKeys((k) => !k)}>⌨ Keys</button>
+        <AudioControl />
         <span className="muted small">
           A {keysFor('A').join('/')} · B {keysFor('B').join('/')} · L {keysFor('L').join('/')} · R {keysFor('R').join('/')} · Start {keysFor('START').join('/')} · Select {keysFor('SELECT').join('/')}
         </span>

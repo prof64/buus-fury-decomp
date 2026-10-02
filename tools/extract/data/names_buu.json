@@ -433,6 +433,13 @@
    "confidence": "low",
    "anim_set": "npc"
   },
+  "49": {
+   "name": "Shell Brute (halo)",
+   "category": "enemy",
+   "confidence": "low",
+   "anim_set": "enemy",
+   "notes": "same animations as sprite 50 plus the halo attachment table (animation slot 0)"
+  },
   "50": {
    "name": "Shell Brute",
    "category": "enemy",
@@ -577,6 +584,13 @@
    "confidence": "low",
    "anim_set": "npc"
   },
+  "74": {
+   "name": "Purple Imp (halo)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc",
+   "notes": "same animations as sprite 73 plus the halo attachment table (animation slot 0)"
+  },
   "75": {
    "name": "Brown Fighter",
    "category": "enemy",
@@ -685,6 +699,13 @@
    "confidence": "low",
    "anim_set": "npc"
   },
+  "93": {
+   "name": "Super Saiyan Teen Gohan (halo)",
+   "category": "player",
+   "confidence": "medium",
+   "anim_set": "fighter",
+   "notes": "same animations as sprite 94 plus the halo attachment table (animation slot 0)"
+  },
   "94": {
    "name": "Super Saiyan Teen Gohan",
    "category": "player",
@@ -769,17 +790,38 @@
    "confidence": "low",
    "anim_set": "fighter"
   },
+  "108": {
+   "name": "Goku (halo)",
+   "category": "player",
+   "confidence": "high",
+   "anim_set": "fighter",
+   "notes": "same animations as sprite 106 plus the halo attachment table (animation slot 0)"
+  },
   "109": {
    "name": "Super Saiyan Goku",
    "category": "player",
    "confidence": "high",
    "anim_set": "fighter"
   },
+  "110": {
+   "name": "Super Saiyan Goku (halo)",
+   "category": "player",
+   "confidence": "high",
+   "anim_set": "fighter",
+   "notes": "same animations as sprite 109 plus the halo attachment table (animation slot 0)"
+  },
   "111": {
    "name": "Super Saiyan 3 Goku",
    "category": "player",
    "confidence": "high",
    "anim_set": "fighter"
+  },
+  "112": {
+   "name": "Super Saiyan 3 Goku (halo)",
+   "category": "player",
+   "confidence": "high",
+   "anim_set": "fighter",
+   "notes": "same animations as sprite 111 plus the halo attachment table (animation slot 0)"
   },
   "113": {
    "name": "Thug (\"HUGE\")",
@@ -1015,6 +1057,13 @@
    "confidence": "low",
    "anim_set": "npc"
   },
+  "152": {
+   "name": "Clown (halo)",
+   "category": "npc",
+   "confidence": "low",
+   "anim_set": "npc",
+   "notes": "same animations as sprite 153 plus the halo attachment table (animation slot 0)"
+  },
   "153": {
    "name": "Clown",
    "category": "npc",
@@ -1134,6 +1183,13 @@
    "category": "npc",
    "confidence": "low",
    "anim_set": "npc"
+  },
+  "173": {
+   "name": "Purple Lizard Brute (halo)",
+   "category": "boss",
+   "confidence": "low",
+   "anim_set": "fighter",
+   "notes": "same animations as sprite 174 plus the halo attachment table (animation slot 0)"
   },
   "174": {
    "name": "Purple Lizard Brute",
@@ -1717,6 +1773,13 @@
    "confidence": "high",
    "anim_set": "fighter"
   },
+  "271": {
+   "name": "Vegeta (halo)",
+   "category": "player",
+   "confidence": "high",
+   "anim_set": "fighter",
+   "notes": "same animations as sprite 270 plus the halo attachment table (animation slot 0)"
+  },
   "272": {
    "name": "Vegeta (NPC)",
    "category": "npc",
@@ -1728,6 +1791,13 @@
    "category": "player",
    "confidence": "high",
    "anim_set": "fighter"
+  },
+  "274": {
+   "name": "Super Saiyan Vegeta (halo)",
+   "category": "player",
+   "confidence": "high",
+   "anim_set": "fighter",
+   "notes": "same animations as sprite 273 plus the halo attachment table (animation slot 0)"
   },
   "275": {
    "name": "Vegito",

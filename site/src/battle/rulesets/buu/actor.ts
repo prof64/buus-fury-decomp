@@ -6,7 +6,7 @@
 import type { Dir, Rect } from '../../core/geom'
 import { overlaps } from '../../core/geom'
 import type { Renderer } from '../../core/renderer'
-import type { Anim, SpriteSet } from '../../core/sprites'
+import type { Anim, SpriteBank, SpriteSet } from '../../core/sprites'
 import type { Entity, World } from '../../core/world'
 import type { AttackType, CombatStats } from './damage'
 
@@ -168,12 +168,34 @@ export abstract class Actor implements Entity, Receiver {
   abstract update(w: World): void
   abstract onMessage(w: World, msg: HitMsg): boolean
 
+  /** sprite bank holding the shadow / halo OBJs (set when the ruleset loads) */
+  static bank: SpriteBank | null = null
+  /** ground shadow from the sprite header (shadow bytes [2], [3] -> table 0x086B759C); null = none */
+  shadowSprite(): SpriteSet | null {
+    const sh = (this.sprite?.json as unknown as { header?: { shadow?: number[] } } | undefined)?.header?.shadow
+    if (!sh || !sh[2]) return null
+    return Actor.bank?.get(`buu_shadow_${sh[2]}x${sh[3]}`) ?? null
+  }
+
+  /** cosmetic sprite shake (px), applied to body, shadow and halo */
+  shakeX = 0
+  shakeY = 0
+
   draw(r: Renderer, _w: World) {
     if (!this.sprite || !this.anim) return
-    const x = r.sx(this.px)
-    const y = r.sy(this.py + this.z)
+    const x = r.sx(this.px) + this.shakeX
+    const y = r.sy(this.py + this.z) + this.shakeY
     const white = this.flash > 0 && (this.flash & 2) !== 0
+    // OAM order of a WF actor: halo, body, shadow (lower index on top). The shadow OBJ sits at the entity
+    // position on the ground (it does not follow the height offset).
+    const sh = this.shadowSprite()
+    if (sh && this.alpha > 0) sh.drawFrame(r.ctx, 0, r.sx(this.px) + this.shakeX, r.sy(this.py) + this.shakeY, false, { alpha: this.alpha })
     this.sprite.draw(r.ctx, this.anim, this.facing, x, y, this.animT, { white, loop: this.animLoop, alpha: this.alpha })
+    const step = this.anim.stepAt(this.facing, this.animT, this.animLoop)
+    if (step?.attach) {
+      const halo = Actor.bank?.get('buu_halo')
+      halo?.drawFrame(r.ctx, 0, x + step.attach[0], y + step.attach[1], false, { alpha: this.alpha })
+    }
   }
 
   drawDebug(r: Renderer, _w: World) {

@@ -50,7 +50,7 @@ for p in sorted((ROOT / 'data').rglob('*.json')):
     walk(json.loads(p.read_text()), str(p.relative_to(ROOT)))
 
 # 2. code literals ('...', "...", `...`) that contain an assets/ path with a file extension
-LIT = re.compile(r"""(['"`])(/?assets/(?:[^'"`\s]|\$\{[^}]*\})*?\.(?:png|gif|json|jpg|webp))\1""")
+LIT = re.compile(r"""(['"`])(/?assets/(?:[^'"`\s]|\$\{[^}]*\})*?\.(?:png|gif|json|jpg|webp|mp3))\1""")
 for p in sorted((ROOT / 'site' / 'src').rglob('*.ts*')):
     for m in LIT.finditer(p.read_text()):
         path = re.sub(r'\$\{[^}]*\}', '*', m.group(2))

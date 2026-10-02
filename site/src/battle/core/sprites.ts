@@ -15,6 +15,8 @@ export interface AnimStepJson {
   frame: number
   duration_frames: number
   flip: boolean
+  /** offset [dx, dy] of an attached OBJ (Buu halo) from the entity position */
+  attach?: [number, number]
 }
 export interface AnimJson {
   raw_index: number
@@ -37,6 +39,7 @@ export interface AnimStep {
   frame: number
   dur: number
   flip: boolean
+  attach?: [number, number]
 }
 export class Anim {
   readonly total: number[]
@@ -96,7 +99,7 @@ export class SpriteSet {
     this.json = json
     for (const [name, a] of Object.entries(json.animations)) {
       const any = a.directions.any
-      const dirs = DIR_NAMES.map((d) => (a.directions[d] ?? any ?? []).map((s) => ({ frame: s.frame, dur: Math.max(1, s.duration_frames), flip: s.flip })))
+      const dirs = DIR_NAMES.map((d) => (a.directions[d] ?? any ?? []).map((s) => ({ frame: s.frame, dur: Math.max(1, s.duration_frames), flip: s.flip, attach: s.attach })))
       const anim = new Anim(name, a.raw_index, a.loop, dirs)
       this.anims.set(name, anim)
       if (!this.byRaw.has(a.raw_index)) this.byRaw.set(a.raw_index, anim)

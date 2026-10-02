@@ -111,6 +111,7 @@ class WFSprites:
             return None
         boxes = [struct.unpack('<4i', R.bytes(boxes_at + 16 * d, 16)) for d in range(4)]
         anims = []
+        attach_ptr = 0
         for a in range(na):
             if self.game == 'log2':
                 lists = [R.u32(anims_at + 16 * a + 4 * d) for d in range(4)]
@@ -120,6 +121,13 @@ class WFSprites:
                 anims.append({'lists': lists})
             else:
                 ap = R.u32(anims_at + 4 * a)
+                if a == 0 and ap:
+                    # Buu: animation slot 0 is never an animation. When set (Goku's halo forms, defs 108/110/112)
+                    # it points to the halo attachment table: per animation k a pointer (entry k - 1) to nframes x 4 dirs x
+                    # {s8 dx, s8 dy} (frame-major like the frame table) = halo OBJ offset from the entity position
+                    attach_ptr = ap
+                    anims.append(None)
+                    continue
                 if not ap:
                     anims.append(None)
                     continue
@@ -127,8 +135,16 @@ class WFSprites:
                 # frame-major: entry (frame f, dir d) at ap + 4 + 16*f + 4*d  (code at 0x08010192)
                 dirs = [[R.u32(ap + 4 + 16 * f + 4 * d) for f in range(nf)] for d in range(4)]
                 anims.append({'addr': ap, 'nframes': nf, 'dirs': dirs})
+        attach = None
+        if self.game == 'buu' and attach_ptr and R.isptr(attach_ptr):
+            attach = {'addr': attach_ptr, 'offsets': {}}
+            for k, a in enumerate(anims):
+                tp = R.u32(attach_ptr + 4 * (k - 1)) if a else 0   # indexed by the engine anim number (raw - 1)
+                if a and R.isptr(tp):
+                    attach['offsets'][k] = [[struct.unpack('<bb', R.bytes(tp + 8 * f + 2 * d, 2)) for f in range(a['nframes'])]
+                                            for d in range(4)]
         return {'addr': dp, 'header': hdr, 'remap': list(R.bytes(rp, 256)) if rp else None,
-                'remap_addr': rp, 'boxes': boxes, 'anims': anims}
+                'remap_addr': rp, 'boxes': boxes, 'anims': anims, 'attach': attach}
 
     def resolve_lists(self, defs):
         """LoG2 stores per-direction frame lists without counts. Infer counts: a list runs until

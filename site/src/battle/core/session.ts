@@ -85,13 +85,16 @@ export class BattleSession {
     for (let i = 0; i < n; i++) this.step()
   }
 
+  /** size the view for a container (CSS px); the PC view's auto zoom fits the arena's painted area */
   fit(w: number, h: number) {
-    this.renderer.fit(w, h, this.view)
+    const v = this.world.viewRect()
+    this.renderer.fit(w, h, this.view, v ? { w: v.x1 - v.x0, h: v.y1 - v.y0 } : null)
   }
 
   render() {
     const r = this.renderer
     this.world.draw(r)
+    r.beginHud()
     this.battle.drawHud(r, this.world)
     const c = r.ctx
     if (this.paused) {

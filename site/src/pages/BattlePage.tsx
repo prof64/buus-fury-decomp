@@ -19,7 +19,7 @@ const keyFor = (g: GameKey) => (g === 'log2' ? KEY : `${KEY}-${g}`)
 
 const playable = (g: string | null): g is GameKey => !!g && !!getRuleset(g as GameKey) && !!RULESET_INFO.find((i) => i.id === g)?.enabled
 
-/** `#/battle?game=log1` (links from the home page), else the last game played, else LoG II */
+/** `#/battle?game=log1` (links from the home page), else the last game played, else Buu's Fury */
 function initialGame(param: string | null): GameKey {
   if (playable(param)) return param
   try {
@@ -28,7 +28,7 @@ function initialGame(param: string | null): GameKey {
   } catch {
     /* ignore */
   }
-  return 'log2'
+  return 'buu'
 }
 
 export function BattlePage() {

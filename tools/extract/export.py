@@ -6,7 +6,9 @@ from PIL import Image
 from gba import ASSETS, DATA
 from render import trim, pack
 
-DIRS = ['down', 'up', 'right', 'left']
+# engine direction index order (all three games, verified in the emulator: Buu / LoG2 dir byte 2 = walking left,
+# LoG1 facing 2 = LEFT; the index-3 frames face right)
+DIRS = ['down', 'up', 'left', 'right']
 
 
 def _key(im, ox, oy):
