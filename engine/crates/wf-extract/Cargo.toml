@@ -10,4 +10,6 @@ wf-rom.workspace = true
 wf-audio = { path = "../wf-audio" }
 wf-maps = { path = "../wf-maps" }
 wf-tables = { path = "../wf-tables" }
+wf-ui = { path = "../wf-ui" }
+wf-world = { path = "../wf-world" }
 serde_json.workspace = true

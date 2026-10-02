@@ -12,7 +12,8 @@ pub mod sprites;
 pub use wf_rom::{content::Content, Error, Rom};
 
 /// Categories, in extraction order. `--only` / the wasm API select a subset by these names.
-pub const CATEGORIES: &[&str] = &["tables", "sprites", "effects", "portraits", "items", "maps", "audio"];
+pub const CATEGORIES: &[&str] =
+    &["tables", "sprites", "effects", "portraits", "items", "maps", "audio", "ui", "world"];
 
 #[derive(Clone, Debug, Default)]
 pub struct Options {
@@ -57,6 +58,9 @@ pub fn extract_rom(rom: &Rom, opts: &Options, progress: &mut dyn FnMut(&str)) ->
             "tables" => wf_tables::extract(rom, &mut out),
             "maps" => wf_maps::extract(rom, &mut out),
             "audio" => wf_audio::extract(rom, &mut out),
+            "ui" => wf_ui::extract(rom, &mut out),
+            // after portraits (speaker names) and maps (Tiled object layers)
+            "world" => wf_world::extract(rom, &mut out),
             "sprites" => {
                 known = Some(sprites::known_frames(&sprites::extract(rom, &mut out)));
                 Ok(())

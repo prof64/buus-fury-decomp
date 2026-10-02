@@ -1,0 +1,11 @@
+[package]
+name = "wf-world"
+description = "Buu's Fury world data from ROM: placed map objects (NPCs, enemy spawns, exits, triggers, chests), the area graph, dialogue text"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+wf-rom.workspace = true
+wf-maps = { path = "../wf-maps" }
+serde_json.workspace = true
