@@ -252,7 +252,9 @@ impl Npc {
 
 /// spawn a scripted actor (`spawn_actor`: facing down, idle)
 pub fn spawn_npc(w: &mut World, sprite_id: i32, x: i32, y: i32, dir: Dir) -> EntityId {
-    let n = Npc::new(&w.data, sprite_id, x, y, dir);
+    let mut n = Npc::new(&w.data, sprite_id, x, y, dir);
+    // the actor's constructor enters the idle state: a random start tick (one RNG draw)
+    n.anim.tick = w.rng.rand(255);
     w.add(Body::Npc(Box::new(n)))
 }
 
@@ -1070,7 +1072,8 @@ pub fn muzzle(w: &World, i: usize) -> (i32, i32) {
 /// commands whose start refreshes the actor / camera (vtable +0x3C / +0x40, 0x0802ED98): the refresh ticks the
 /// track, so they are done and popped within the start (set_pos and the camera sets take 1 frame, not 2)
 fn done_at_start(cmd: &Cmd) -> bool {
-    matches!(cmd, Cmd::SetPos { .. } | Cmd::CamSet { .. } | Cmd::CamParam { .. })
+    // remove_actor deletes the actor and its track with it (1 frame, trace boss_janemba_handover)
+    matches!(cmd, Cmd::SetPos { .. } | Cmd::CamSet { .. } | Cmd::CamParam { .. } | Cmd::Remove)
 }
 
 fn start_head(w: &mut World, k: usize) {
@@ -1099,8 +1102,8 @@ fn start_head(w: &mut World, k: usize) {
     }
 }
 
-/// the player camera's update (field or battle) once, outside the frame (a refresh)
-fn camera_refresh(w: &mut World) {
+/// the player-0 camera update (field or battle; a script's camera control first): the frame's camera step
+pub fn camera_update(w: &mut World) {
     if w.field.is_some() {
         crate::field::camera(w, 0);
     } else {
@@ -1191,9 +1194,7 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
                     a.x = *x << 8;
                     a.y = *y << 8;
                 }
-                if w.players.first() == Some(&w.ents[i].id) && w.scene.cam.mode == CamMode::Player {
-                    camera_refresh(w);
-                }
+
             }
         }
         Cmd::Puff { x, y, absolute } => {
@@ -1863,21 +1864,19 @@ fn cam_step(w: &mut World, sx: i32, sy: i32) {
 /// scroll mode does not run the world update). The host blocks until [`scroll_done`].
 pub fn start_scroll(w: &mut World, x: i32, y: i32, speed: i32) {
     let c = &w.cameras[0];
-    let (dx, dy) = (x - (c.x >> 10), y - (c.y >> 10));
-    let n = dx.abs().max(dy.abs()) / speed.max(1) + 1;
-    let (sx, sy) = ((dx << 10) / n, (dy << 10) / n);
+    // the mover works on the 22.10 difference; the step count comes from its whole pixels
+    let (dx, dy) = ((x << 10) - c.x, (y << 10) - c.y);
+    let n = (dx.abs().max(dy.abs()) >> 10) / speed.max(1) + 1;
+    let (sx, sy) = (dx / n, dy / n);
     w.scene.cam.mode = CamMode::Fixed;
     w.scene.cam.scroll = Some(Scroll { tx: x, ty: y, sx, sy, n, t: 0 });
     w.scene.freeze = true;
-    scroll_step(w);
 }
 
 fn scroll_step(w: &mut World) {
     let Some(s) = w.scene.cam.scroll.clone() else { return };
     if s.t >= s.n {
-        // arrived: the mode ends this frame
-        w.scene.cam.scroll = Some(Scroll { t: s.n + 1, ..s });
-        w.scene.freeze = false;
+        // arrived: the host's poll ends the mode (and the freeze)
         return;
     }
     cam_step(w, s.sx, s.sy);
@@ -1887,8 +1886,9 @@ fn scroll_step(w: &mut World) {
 /// the modal scroll arrived (clears it)
 pub fn scroll_done(w: &mut World) -> bool {
     match &w.scene.cam.scroll {
-        Some(s) if s.t > s.n => {
+        Some(s) if s.t >= s.n => {
             w.scene.cam.scroll = None;
+            w.scene.freeze = false;
             true
         }
         None => true,
@@ -1914,11 +1914,10 @@ fn follow_step(w: &mut World, id: EntityId) {
     cam_put(w, x, y);
 }
 
-/// `camera_follow` / `camera_follow_wait`: the follow object takes the camera and steps once at once
+/// `camera_follow` / `camera_follow_wait`: the follow object takes the camera (it steps with the frame's camera)
 pub fn follow(w: &mut World, id: EntityId) {
     w.scene.cam.mode = CamMode::Follow(id);
     w.scene.cam.scroll = None;
-    follow_step(w, id);
 }
 
 /// player-0 camera under script control. Returns true when the script owns the camera this frame (the caller

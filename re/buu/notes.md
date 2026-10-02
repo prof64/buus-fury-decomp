@@ -1366,8 +1366,37 @@ cur = create(list[idx]) }` (a new step updates in the frame it is created; steps
   vt+0x4C/0x50 (end: vt+0x4C(new,1), vt+0x48(0)). `0x0800A85F` enemy rect: = plain rect (`0x0800A4A4`).
   The rand(5) facing change stays even when the move is refused.
 
-**Field enemies.** Their def +0x18 behaviour list goes to a runner at enemy+0x22C but only runs while the AI executes
-node `0x080299A3` RunMotionController (wf-core treats it as idle); e.g. the 14-9 pyramid patrols (type 77).
+**Field enemies** (VERIFIED: `npc_enemy_patrol_far` 1500 frames and `npc_enemy_patrol` while in the patrol state,
+x / y / facing / runner index / raw / anim frame / anim tick equal). The enemy ctor (`0x0800F68C`) builds a
+behaviour runner at enemy+0x22C from the def's inline list at +0x18 (index -1, no step) and SetAnim(0) (rand(255),
+in creation order with the NPCs). Enemy update (vt+8 `0x0800FAE6`): actor update `0x0800EF08` (state tick) FIRST,
+then the AI tick `0x0800AB0C` (stack at enemy+0x238: `{actor, count, {node, state-table ptr} * count}`, top state =
+(ptr − `0x0870F514`) / 8). The runner only runs inside AI node `0x080299A3` RunMotionController (singleton
+`0x03002FEC`, vt `0x0804A6B0`): enter = nop (no anim change), update `0x08029978` = runner(enemy+0x22C), returns 0
+(never finishes), exit `0x08029988` = current step's vt+0xC (walk_to: nop; wander: if left != 0 run its end hook,
+`left` kept); the runner is never reset, a later enter resumes the same step. Type 77 (state 0x17A): Selector
+[IfPlayerWithin2(100 px) → GotoState 0x17B; RunMotionController]; in the frame the player comes in range the
+runner does not run (position unchanged, step state kept), the new state's StandStill draws rand(255). The mummy
+0x202f1dc in `npc_enemy_patrol` is within 100 px at its first AI tick (frame 0): GotoState 0x17B, StandStill enter
+= SetAnim(0) forced → the frame-0 rand(255); its runner is never created (it moves only by AI states 0x17C..).
+Enemy SetAnim(k) = `0x0800ECF0` with the enemy state table `0x080726B8` (= the NPC one for 0 / 1): 0 idle
+`0x03001B0C` (enter tick = rand(255)), 1 walk `0x03001B58` (tick 0, frame = tick >> 3); vt+0x34 `0x0800FAC6` =
+"is in anim k" (state and anim struct both match).
+Enemy grid helpers (all on the enemy layer map+0xB0 only, all skipped / "free" when enemy+0x291 != 0):
+vt+0x4C `0x0800F9A2` mark(rect, v), vt+0x50 `0x0800F9C2` test(rect), vt+0x48 `0x0800F740` mark(own foot, v).
+* walk_to `0x0800A1D5` {tx, ty, speed}: the NPC init `0x08009D24` (facing at once) + SetAnim(1) forced. Update
+  `0x0800A01C`: old = foot; pos += v; new = foot; mark(old,1); !test(new) → mark(old,0), anim(0), undo, return 0;
+  anim(1); facing = dir; mark(new,0); n -= 1 (u16); n == 0 → markfoot(1), pos = target, markfoot(0), done.
+  No player test.
+* wander `0x0800A82D` {speed}: SetAnim(0) forced + the wander base; check: mark(old,1); ok = test(new);
+  mark(ok ? new : old, 0); end: mark(new,1), markfoot(0). No player test, no rect.
+* wander_rect `0x0800A85F` {speed, rect}: SetAnim(0) forced + the plain-NPC rect wander `0x0800A4A4` (rect contains
+  new + walk-grid test, no marks, chance = speed << 7).
+* wait / stand / face_player: as for NPCs (wait: anim(0) unless idle, facing = rec+6).
+* `0x08039F09` (only type 141 in the scene map 0-50, condition flag_clear 388..397): a 3-D move step `0x08039D98`
+  {s16 x, s16 y, s16 z?, +8 u16 speed?} (vt `0x0804A800`, deltas against obj+0x1A0 >> 8, +0x1A4 >> 8, +0x1A8 >> 10);
+  not decoded. `0x0803A053` (0-50 only, record `0x080730A0`) builds a 0x14-byte object with vt `0x0804ABC8` from
+  {s16 x, s16 y, s16 r} (stores (r + 384)²): an animation-state object, not a behaviour step; not decoded.
 
 **Talk.** A pressed → melee `0x08012A24`: if the area's combat byte (area record +8 → `0x03001988`) is 0, only a
 talk message; else a hit broadcast first and, if no object accepted it, the talk message, then the A triggers
@@ -1477,3 +1506,165 @@ countdown, +0x4D8 stopwatch (10-minute cap), +0x4DC Holy Water timer + bonuses, 
 zenie, +0x4F8 nine 0x68-byte character records (byte0 bit0 = in party). The per-frame GameData tick
 `0x0800425C` (main loop, after the trigger check) runs the countdown / stopwatch / Holy Water timers. The quest log
 has no stored progress (its 40×3 conditions are scripts over flags; INFERRED).
+
+## Field: live collision grids (VERIFIED: `tools/field/grid_all.py`, 457 / 458 area variants identical)
+
+Live grids = map object `0x030019A4` +0xA8 walk, +0xAC shot, +0xB0 enemy layer (bitmaps, 32 bytes per row, bit
+`tx & 7`). At a load the map header's walk (+0x34) and shot (+0x38) blobs are inflated (the enemy layer starts as a
+copy of walk); the header is `area +0x2C [variant - 1]` (`0x080089CC`) — the extractor's per-variant collision is
+correct. Then, during the load, exactly these write the grids (nothing else):
+* talk NPC footprints: walk + enemy = 0 (plain NPCs never mark);
+* breakables: their box (prop graphic pixel bounds, lower half) walk + enemy = 0, **only if the prop is solid**:
+  prop object +0x1C = map prop record byte +0x17 (= the top byte of objects.json `tile_word`, e.g. 0x01380000 solid,
+  0x00380000 not; 13-53's breakable prop is not solid and marks nothing);
+* map items: (x, y+8)..(x+16, y+16) walk + enemy = 0;
+* the area's **on-enter script** (run inside the load, conditions on story flags): natives `0x2B open_area` /
+  `0x2C block_area` (`0x0800099C` / `0x080009F6`) set walk (+0xA8) **and the enemy layer** (+0xB0) to 1 / 0;
+  `0x2D open_area_alt` / `0x2E block_area_alt` (`0x08000A50` / `0x08000AA0`) set the **shot** grid (+0xAC) only.
+  Rect args (x0, y0, x1, y1) px, tiles x0>>3 .. (x1+7)>>3 exclusive (the 0x08009930 span). 48 area variants do this
+  (doors, fences, bridges, story gates: e.g. 2-33 `block_area(216,72,248,80); block_area_alt(216,56,248,64)`).
+The 4-20 "variant 2" divergence of npc_capsule_walk was a recorder bug: rec_npc.py stored the area record's byte +2
+(`[0x03001980] + 2`) instead of the world state's variant (`0x0300197E`); the game loads 4-20 variant 1, whose content
+grid matches exactly (fixed in rec_npc.py / npc_grid.py; npc_capsule_walk/block.json now say variant 1).
+World map 0-50: its walk blob is all-passable and the buffer at +0xA8 is reused as the mode-7 per-scanline affine
+table (`0x0800881A`), so the live "walk" bitmap there is not collision (the flying player ignores it).
+
+## Field: world map (VERIFIED: `tools/field/wm_model.py` replays `data/field/worldmap_{flight,land_8_1}.json` exactly)
+
+Recorder `tools/field/rec_worldmap.py` (8-1 capsule → s515 → 0-50; frame 0 = first logic frame after the load; rows add
+`fly` = flyer [x, y 24.8, z 22.10, heading 22.10, facing, raw, anim frame, rev, spd, turn] and `cam3d` = map object
+0x030019A4 [x, y, height (22.10), heading, pitch]); model / spec `tools/field/wm_model.py`; probes `wm_probe*.py`.
+
+**Entering.** A capsule A-trigger (e.g. 8-1 inline_0x0807AAAC) = `run_event(515, wx, wy)` (+ clear_flag 408): pose,
+glide up 100 px, `warp_fade(0, 50, 0, P0, P1)` = the capsule's world-map position (8-1: 872, 1800). Only map
+area_00_050 has map header +0x3C != 0 (the "3D" flag, map object +0x90): LoadArea then sets the 3D camera (x, y =
+dest << 10, height 0xF << 12, pitch 0x1F << 10), DISPCNT 0x1741 (mode 1, BG0-2 + OBJ), and turns the 94 header props
+into 3D billboard objects (vt 0x0804DF4C, the first 0x0804E2FC; 2D maps use 0x0800D15A / 0x0800D09E), no logic.
+EnterArea (`0x08008D44`) creates the **flying player** (ctor `0x080104F2`: base player ctor + vt 0x0804E1B4, flight
+state, SetAnimRaw(0xF)) with the 3D camera object (vt 0x0804E324, update `0x08034124`) and no HUD. RNG during the
+load: one rand(255) per actor (the 10 encounter objects) + 2 for the player (12 in the recording). Arrival: flyer at
+dest, **z = 60 << 10**, heading 0 (north), speed 0. **Fade-in = 64 logic frames** (brightness step 4) during which the
+control runs (no autowalk); at the end of the 64th the flyer's SetAnim(0) installs a fresh flight state (rev = spd =
+turn = 0, tick 0, frame 0, facing 1; position / heading / z kept). No trigger check during the fade.
+
+**Flying player** (actor update `0x0800EF08`: controller, state tick, state control; the flight state vt 0x0804D038,
+fields +4 rev, +8 spd, +0xC turn; `SetAnim` (vt+0x28 `0x08010548`) always installs a new flight state):
+* tick `0x08010398`: tick16 += 1; anim frame = (tick >> 3) & 3. Enter `0x08010388`: tick 0, frame 0, facing 1.
+* control `0x080103A6` (held keys): A held: `z > 5<<10 → z -= 1<<10`; else B held: `z < 120<<10 → z += 1<<10`.
+  acc = RIGHT ? 0x80 : LEFT ? −0x80 : 0. UP: spd += 0xC0, DOWN: spd −= 0xC0 (UP wins); spd = tdiv(spd·15, 16).
+  rev = 0 if spd > 0, 1 if spd < 0 (else kept); rev → acc = −acc. turn += acc; turn −= turn >> 3 (asr); turn > 0 →
+  turn −= 1. heading h += turn (22.10 angle, 256 << 10 = full turn, 0 = north, + = clockwise).
+  x += (SIN[(h>>10)&255]·spd) >> 18; y −= (SIN[((h>>10)+64)&255]·spd) >> 18 (SIN = s32[256] at 0x087B6EEC, 65536 =
+  1.0). Wrap `0x0800FEE2`: x < 0 → x += W<<8, else (x>>8) ≥ W → x −= W<<8, same for y (W, H = map object +0x94 /
+  +0x98 = 3584 × 2560). No collision. No RNG. Max speed ≈ 2880 (2.8 px/frame).
+  Anim: turn > 0x80 → raw 17, facing rev ? 2 : 1; turn < −0x80 → raw 17, facing rev ? 0 : 3; else raw 16,
+  facing rev ? 0 : 1 (SetAnimRaw k `0x0800ECDA` shows raw k + 1).
+* **3D camera** `0x08034124` (map object 0x030019A4; runs after the objects, end of the iteration): +0xC = h; when z
+  changed: pitch S (+0x10) = (z·218 + tdiv(z·z, 3511) + 0x10F3333) >> 10 (64-bit); sI(a) = (SIN[i]·(1024−f) +
+  SIN[i+1]·f) >> 16 with i = (a>>10)&255, f = a&1023, cI(a) = sI(a + (64<<10)); cam x = (x<<2) − ((sI(h)·cI(S)·30) >> 10),
+  cam y = (y<<2) + ((cI(h)·cI(S)·30) >> 10), height = z + sI(S)·30 (the eye 30 px behind the flyer). Then the
+  projection `0x0802ED98` (renderer side). No easing.
+* Renderer: mode 1; BG2 (BG2CNT 0xBE83: 256 colours, screen base 0x0600F000, 512×512 wrapping, streamed from the
+  3584×2560 world = layer kind `0x08007B63`, object 0x204C B) is the mode-7 ground: the HBlank IRQ (`0x080080BE`)
+  writes BG2 PA / PC / X / Y per scanline below the horizon (≈105 lines) from a table built each frame by `0x0802ED98`
+  from (x, y, height, heading, pitch); BG0 / BG1 = sky + clouds (layer kind `0x080088BD`: 2 KB text map at
+  0x0600E000+) and the bottom label; the flyer sprite at a fixed screen spot with its shadow; props as projected
+  billboards; a mini-map with the player marker top right. Screenshots: work/buu/wm_shot*.png.
+
+**Triggers** (the normal check `0x080126D4` on the flyer: point (x>>8, y>>8), first match fires, scan stops). List 0
+of 0-50 per landing spot: a **script trigger, altitude (0, 16)** (`lo<<10 < z < hi<<10` on obj+0x1A8) and a
+**message trigger** (touch, larger rect: message 0x17 with a string id = the bottom label, e.g. 585 "Southwest
+Forest"; the whole-map one = 597 "A Button: Descend/Land B Button: Ascend"). Scan order puts each script trigger
+before its message trigger, so above 16 px the label shows and landing needs A down to z = 15. Landing (8-1,
+VERIFIED): the trigger fires the frame z reaches 15 (inline_0x08073424): `fade_out(30); warp(8, 1, 0, 288, 168);
+camera_pan_to(160, 176, 500); fade_in(30); wait(20); jump_to(0, 288, 264, 25); camera_follow(0); show_hud();
+set_flag(402); set_flag_bits(393, 5, 0); set_flag_bits(388, 5, 0)` — while it runs the flyer gets no control (z
+stays 15). The warp is an immediate EnterArea: the 2D player is created (2 x rand(255)), song 28, the script jumps
+it down to the spot. Spots with conditions (6-5 / 6-1 Kami's Lookout at altitude (44, 76), 12-1 airship, 0-21 / 0-15
+event triggers) are flag-gated story destinations.
+
+**Encounters.** The 0-50 "enemies" are type 141 "floor trigger" objects (AI state 0x317: IfPlayerOnTop → TriggerSelf, else
+RunMotionController), invisible, drifting on `cutscene_move` steps (`0x08039F09` → `0x08039D98`: step +4 s16 tx, +6 ty,
++8 tz, +0xA u16 speed; n = (max(|dx|,|dy|,|dz|) << 8) / speed (n ≤ 0 → 1); v = (d<<8)/n (z: <<10); per frame
+n −= 1, at 0 snap to the target and finish, else pos += v; the ctor also sets heading = atan2 via soft-float, display
+only). Touching one runs its on-defeat callback → run_event(508 / 509, flag 388..397) = a random battle (fade, set the
+flag, `warp(0, 55, …)` battle stage with chance / rand rolls). Flags 388..397 are cleared on every landing.
+
+**Visited record / map screen.** Table 0x0874CA24: u32 count 55, +4 → 55 record pointers; record +0x14 n, +0x18.. n
+pointers to {u8 world, u8 area, u16 bit}. LoadArea step 2 (`0x08004A88`) sets story flag 0x1C0 + bit of the first
+matching entry (GD +0x8D). Dump: `data/field/worldmap_visited_table.json` (410 areas). The **map screen** = SELECT on a
+2D map (main loop `0x08006E3C`: SFX, fade, modal object vt 0x0804E384 (0x8044 B, ctor `0x080256F0`)): the current
+location's room map (the record's rooms, drawn when their visited bit is set) with a blinking player marker; no
+travel (screenshot work/buu/wm_mapscreen0.png). START (any map, HP != 0) = the pause menu. **Travel between areas** is
+only: exits, the capsules → world-map flight → landing spots, and scripted warps (e.g. Goku's Instant Transmission in
+events); there is no map-screen teleport.
+
+## Field: object graphics (fork F; content `wf-extract/src/field_gfx.rs`, rules engine/docs/world.md §6)
+
+Tools: `tools/field/gfx_probe.py` (objects + OAM per frame of an objects_* scenario), `gfx_shot.py`, `gfx_vramsrc.py`
+(who writes a VRAM tile), `gfx_mapsprite.py` (level-sign label pixels from VRAM), `gfx_verify.py <content base>`
+(exported frames vs the game's screen). Note: OAM RAM read after a frame holds the **previous** frame's build (shadow
+OAM is DMA'd at the next VBlank), and the object draw uses the camera ints +0x28/+0x2C of `0x030019A4`; compare
+positions on static frames or take the camera from the player's shadow OAM.
+
+* **Coins** (draw `0x08018284`): def `[0x086FC250 + 4 size]`: +0 u8 sprite w, h, box w, h; +8 s32 box y offset;
+  +0xC value; +0x10 bytes per cel; +0x14 OAM attr0|attr1; +0x18 four cels of raw 8bpp (OBJ palette). +0x28 phase
+  (the ctor's `next()`), +1 per draw; cel = (phase & 0xFF) >> 3, cel > 3 → 0 (copied into the coin's VRAM slot when it
+  changes). OAM top-left = (x - w/2, y - (z >> 8) - h). Not drawn when age (+0x24) > 0x1E0 and frame counter & 4.
+  Shadow (`0x08018614`): the shadow table entry chosen by (box w, box h) (4x2 → `shadow_4x2`, 10x4 → `shadow_10x4`), OAM
+  origin = the pickup box top-left (x - w/2, y + yoff). VERIFIED (VRAM cels = ROM cels; 8 coins, OAM/screen).
+* **Dropped items** (vt `0x0804B428`): 16x16 icon at the box top-left minus z >> 10; ground shadow = `shadow_10x4`
+  (the player's) at (x0, y0 + 10). **Map items** (vt `0x0804A314`): the icon at the def (x, y), no shadow. VERIFIED
+  (screen pixels).
+* **Item-get** (vt `0x0804C83C`): icon OAM priority 2 at player (x, y - 40 - ((k + 2) >> 4)), k = frames since the
+  A press (rises 1 px per 16 frames, 60 frames); the player shows raw anim 14 cel 1 (state `0x0804985C`, facing kept).
+  VERIFIED (OAM per frame, objects_item_8_57).
+* **Map props** (map header +0x24 count, +0x28 0x18-byte records, +0x2C one LZ graphics blob shared by all props,
+  loaded into one VRAM block by prop 0 `0x0800D15A`): record +0x10 attr0|attr1 (shape, 8bpp), +0x14 u16 tile offset
+  (32-byte units into the blob), +0x16 byte priority (>> 4 & 3), +0x17 byte visible / solid (+0x1C). Draw `0x0800CF7A`
+  at the rect top-left; vfunc +0xC = visible && on screen. Header +0x3C != 0 (only the world map 0-50) uses another
+  prop class (`0x0800CE1A`, 0x60-byte objects; not decoded). Breakable box = opaque pixel bounds of the prop graphic,
+  y0 = (y0 + y1) >> 1: VERIFIED 8-1 #1 (233,88)-(263,104), #2 (273,112)-(303,128), 8-52 #0 (46,73)-(66,88) from ROM data
+  alone; screen pixels of props 8-1 #2, 8-52 #0, 8-2 #0 identical.
+* **Map sprites = level signs** (list +0x20, ctor `0x0800C300`, vt `0x0804D878`): def +0 s16 x, y; +4 prop index (found
+  with message 8; the label is drawn only while that prop is visible: vfunc +0xC of the prop); +5 colour (2 = no
+  text); +6 number; +7 unused by the draw. Surface 32x16 8bpp (`0x0800C298`): "%d" in font `0x0806F4F4` (glyph columns
+  as docs/ui.md), centred (x0 = (32 - sum(w + 1)) / 2), shadow colour 1 at (+1, +1) under the colour pass. Draw
+  `0x0800C378`: OAM (x - 16, y - 8 + (sine[fc & 0xFF] >> 14)), table `0x087B6EEC`. VERIFIED (VRAM pixels of 70 / 100 /
+  125, screen, bob over 80 frames).
+* **Debris chips** (vt `0x08049F38`, `0x0800C454`): 8x8 gfx `0x08072500` at (x >> 8, y >> 8), start (centre - 4) << 8,
+  velocity +1 / +2 per frame (24.8), 32 frames (`effects/debris`).
+* Not exported: the area name banner (vt `0x0804B528`, UI text).
+
+**Encounter trigger (VERIFIED: `data/field/worldmap_encounter.json`, `tools/field/wm_encounter.py`; z at creation
+`tools/field/wm_probe6.py`).** Recording: a steering controller flies into airborne encounter #6 (list index, def
+(632, 2064)); per-frame `enc` = enemy list [x, y 24.8, z 22.10, AI top state, controller vt] and `hits`.
+* z at creation: every type-141 actor is created with **z = 60 << 10** (enemy ctor `0x0800F68C`). The same load frame,
+  0-50's map-event script `inline_0x08072A48` runs `set_actor_field_1a8(-2..-6, 0)` (native 0xF0 `0x08003A4E`:
+  actor+0x1A8 = v << 10, raw, positive = up) → the 5 ground encounters (sprite 253, list 0..4) get z = 0; the 5 airborne
+  ones (sprite 10) keep 60 px. `cutscene_move` step words: w0 = tx | ty << 16, w1 = tz | speed << 16 (the export's
+  `param` = w1; `to` omits tz): ground tz 0 / speed 25, air tz 100 / 50 / 30, speed 128. dz = tz − (z >> 10) counts in
+  n = (max(|dx|, |dy|, |dz|) << 8) / speed and vz = (dz << 10) / n (VERIFIED: air z after one step = 61440 + 85 / + 111).
+* IfPlayerOnTop = cond node `0x08036F44` (instance vt 0x0804BDE0; cond fn vt+0x14 `0x08036EA4`), wrapper tick
+  `0x080342AE` with a latch at +8:
+  ```
+  P = *0x03001C34 (the current player = the flyer); if !P: false
+  dx = (P.x >> 8) - (o.x >> 8); dy = (P.y >> 8) - (o.y >> 8)     // 24.8 -> px, each shifted first
+  if |dx| > 16 || |dy| > 16: false                                 // inclusive 16
+  dz = (P.z - o.z) >> 10                                           // obj+0x1A8, asr of the difference
+  cond = |dz| < 16
+  wrapper: cond ? (latch==0 ? (latch=1, child.enter) : ; return child.tick)
+                : (latch ? (latch=0, child.exit) : ; return 0)    // 0 -> the Selector runs RunMotionController
+  ```
+  Order: the flyer updates before the enemies (list runs last to first), so P is this frame's moved flyer; the
+  encounter's own position is pre-move (cond first; when true the motion does not run that frame).
+* TriggerSelf (singleton 0x03003280, vt 0x0804C1B4) tick `0x08036E60`: obj.vfunc+0x74(1, 0); return 1. vfunc+0x74 =
+  `0x0800F866` = the normal enemy-defeated handler with no loot (r2 = 0): queues a 0x24-byte defeat record (vt
+  0x0804955C: +4 = 1, +8/+0xC = centre, +0x10/+0x14 = 0, +0x18 = def's on_defeat, +0x1C = obj+0x228, +0x20 = obj) on
+  the world's deferred list (W+0x610), then XP `0x0800F80C` (type 141: exp 0 → nothing). The record (update
+  `0x0800F62C`) runs the on_defeat script (`0x08004038`) = `run_event(509 or 508, flag)` the same frame. No sound, no RNG,
+  the encounter is not removed (the warp reloads everything).
+* Timeline (VERIFIED): trigger frame 206 (flyer moved that frame, then frozen); 207–237 the world is frozen (31 logic
+  frames: flyer x/y/z/spd/turn and encounters unchanged, no RNG); frame 238 EnterArea(0, 55) dest (369, 158) (s509
+  `warp(0, 55, 0, 369, 158)` after fade_out(30)); load: 2 draws; song 34 at frame 266. A 60 px flyer can never trigger
+  a ground (z 0) encounter (|dz| = 60).

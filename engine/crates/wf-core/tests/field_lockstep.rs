@@ -188,9 +188,9 @@ const KNOWN: &[(&str, usize, &str)] = &[
     (
         "npc_enemy_patrol",
         2,
-        "battle AI animation model: the enemy that skipped its patrol (within 100 px at arrival, AI 0x17B -> 0x17C \
-         StepTowardPlayer) shows the walk animation in the sim while the game keeps idle; the patrols themselves match \
-         (npc_enemy_patrol_far, 1500 frames)",
+        "battle AI (StepTowardPlayer, nodes.rs): the enemy that skipped its patrol (within 100 px at arrival, 0x17B -> \
+         0x17C) and cannot move (blocked at x 32) shows the walk animation in the sim, the game keeps idle; the patrols \
+         themselves match (npc_enemy_patrol_far, 1500 frames; this trace's other enemies until then)",
     ),
 ];
 
@@ -510,7 +510,19 @@ fn replay_worldmap(name: &str, t: &Value) -> Result<usize, String> {
     use wf_core::fieldcontent::Callback;
     let mut cfg = config(t);
     cfg.facing = 1;
-    let mut s = Session::new_field(common::field_data(), cfg);
+    // stand-in script host: 0-50's map event inline_0x08072A48 runs set_actor_field_1a8(-2..-6, 0) during the load
+    let hook: wf_core::session::FieldHook = Box::new(|w, fe| {
+        if let wf_core::field::FieldEvent::Run { run: Callback::Script(id), .. } = fe {
+            if id == "inline_0x08072A48" {
+                for tag in 1..=5 {
+                    if let Some(k) = wf_core::field::actor_by_tag(w, tag) {
+                        wf_core::fieldpatrol::set_z(w, k, 0);
+                    }
+                }
+            }
+        }
+    });
+    let mut s = Session::new_field_hooked(common::field_data(), cfg, hook);
     let r0 = &t["init"]["rng_frame0"];
     let want0 = [i(&r0[0]) as u32, i(&r0[1]) as u32];
     if s.world.rng.state() != want0 {
@@ -541,11 +553,33 @@ fn replay_worldmap(name: &str, t: &Value) -> Result<usize, String> {
         let wcam: Vec<i64> = camv.as_array().unwrap().iter().map(i).collect();
         let gcam: Vec<i64> = fl.cam.iter().map(|&v| v as i64).collect();
         let rng = [i(&fr["rng"][0]) as u32, i(&fr["rng"][1]) as u32];
+        if let Some(enc) = fr["enc"].as_array() {
+            let we: Vec<[i64; 3]> = enc.iter().map(|e| [i(&e[0]), i(&e[1]), i(&e[2])]).collect();
+            let ge: Vec<[i64; 3]> = (0..w.ents.len())
+                .filter_map(|k| match &w.ents[k].body {
+                    Body::Enemy(e) => Some([e.a.x as i64, e.a.y as i64, wf_core::fieldpatrol::z_of(w, k) as i64]),
+                    _ => None,
+                })
+                .collect();
+            if we != ge {
+                return Err(format!("{name}: first divergence at frame {f} (encounters)\n  emu {we:?}\n  sim {ge:?}"));
+            }
+        }
         if got[..] != want[..] || gcam != wcam || rng != w.rng.state() {
             return Err(format!("{name}: first divergence at frame {f}\n  emu {want:?} cam {wcam:?} rng {rng:08x?}\n  sim {got:?} cam {gcam:?} rng {:08x?}", w.rng.state()));
         }
         n += 1;
         let runs: Vec<String> = ev.iter().filter_map(|e| if let wf_core::world::Event::Field(wf_core::field::FieldEvent::Run { run: Callback::Script(x), .. }) = e { Some(x.clone()) } else { None }).collect();
+        // an encounter (IfPlayerOnTop -> TriggerSelf): the game freezes the next frame (the battle event)
+        let encounter = ev.iter().any(|e| matches!(e, wf_core::world::Event::Field(wf_core::field::FieldEvent::Defeated { ty: 141, .. })));
+        if encounter {
+            let next = frames[k + 1..].iter().find(|x| x["logic"].as_bool().unwrap_or(true));
+            let frozen = next.is_some_and(|x| x["fly"] == fr["fly"]);
+            if !name.contains("encounter") || !frozen {
+                return Err(format!("{name}: frame {f}: an encounter fired where the game {}", if frozen { "did not record one" } else { "kept flying" }));
+            }
+            break;
+        }
         if !runs.is_empty() {
             let want = t["notes"].as_str().unwrap_or("");
             if !runs.iter().any(|r| want.contains(r.as_str())) {
@@ -559,7 +593,7 @@ fn replay_worldmap(name: &str, t: &Value) -> Result<usize, String> {
 
 #[test]
 fn world_map() {
-    check(&["worldmap_flight", "worldmap_land_8_1"], replay_worldmap);
+    check(&["worldmap_flight", "worldmap_land_8_1", "worldmap_encounter"], replay_worldmap);
 }
 
 #[test]

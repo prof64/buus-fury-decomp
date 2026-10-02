@@ -89,13 +89,15 @@ class Npc:
         self.raw = info['raw']
         self.frame = info['anim_frame']
         self.tick = None            # unknown at frame 0 (the ctor's rand(255) happened during the load)
+        self.enemy = False
+        self.no_grid = 0
 
     def foot(self):
         return (self.x >> 8, self.y >> 8, (self.x >> 8) + self.w, (self.y >> 8) + self.h)
 
 
 class Sim:
-    def __init__(self, trace, grids, nframes_of, load_ticks):
+    def __init__(self, trace, grids, nframes_of, load_ticks, enemy_nframes=None):
         self.t = trace
         i = trace['init']
         self.rng = Rng(*i['rng_f0'])
@@ -113,6 +115,21 @@ class Sim:
             npc = Npc(n, steps, nframes_of[k], ctor == 0x08017DA3)
             npc.tick = load_ticks.get(n['obj'])
             self.npcs.append(npc)
+        self.enemies = []
+        for k, x in enumerate(i.get('enemies', [])):
+            d = int(x['def'], 16)
+            cnt = u32(d + 0x18)
+            steps = [(u32(u32(d + 0x1C + 4 * j)), u32(d + 0x1C + 4 * j)) for j in range(cnt)]
+            r0 = x['row0']
+            en = Npc({'x': x['x'], 'y': x['y'], 'facing': x['facing'], 'foot': x['foot'], 'raw': r0[4],
+                      'anim_frame': r0[5]}, steps, enemy_nframes[k] if enemy_nframes else {}, False)
+            en.enemy = True
+            en.no_grid = x['no_grid']
+            en.tick = r0[6]
+            en.anim = 0 if r0[7] == '0x3001b0c' else 1
+            en.ai = r0[8]
+            en.diverged = False
+            self.enemies.append(en)
         self.player = None
 
     # --- animation (state singletons 0x03001B0C idle / 0x03001B58 walk)
@@ -153,8 +170,6 @@ class Sim:
             self.set_anim(n, 0 if fn == 0x0800A8E9 else 1)
             s.update(kind='face_player', count=s32(rec + 4))
         elif fn in (0x0800A1AF, 0x0800A1D5):
-            if fn == 0x0800A1D5:
-                raise NotImplementedError('enemy walk_to')
             tx, ty = s16(rec + 4) << 8, s16(rec + 6) << 8
             dx, dy = tx - n.x, ty - n.y
             adx, ady = abs(dx), abs(dy)
@@ -170,17 +185,20 @@ class Sim:
             else:
                 vx = vy = 0
                 cnt = 1
-            s.update(kind='walk_to', tx=s16(rec + 4), ty=s16(rec + 6), dir=d, n=cnt, vx=vx, vy=vy)
-        elif fn in (0x0800A75B, 0x0800A7A1, 0x0800A7DF, 0x0800A811):
+            s.update(kind='walk_to', tx=s16(rec + 4), ty=s16(rec + 6), dir=d, n=cnt, vx=vx, vy=vy, enemy=fn == 0x0800A1D5)
+            if fn == 0x0800A1D5:
+                self.set_anim(n, 1)   # ctor: SetAnim(1) forced (walk state enter: tick 0, frame 0)
+        elif fn in (0x0800A75B, 0x0800A7A1, 0x0800A7DF, 0x0800A811, 0x0800A82D, 0x0800A85F):
             self.set_anim(n, 0)
             spd = u32(rec + 4)
             r = ((spd << 5) + 0x7FF) & ~0x7FF
             s.update(kind='wander', spd=spd, dist=r >> 8, frames=(r + spd - 1) // spd, left=0, chance=spd << 4,
                      talk=fn in (0x0800A75B, 0x0800A7A1), rect=None)
-            if fn in (0x0800A7A1, 0x0800A811):
+            if fn in (0x0800A7A1, 0x0800A811, 0x0800A85F):
                 s['rect'] = (u16(rec + 8), u16(rec + 10), u16(rec + 12), u16(rec + 14))
-            if fn == 0x0800A811:
-                s['chance'] <<= 3
+            if fn in (0x0800A811, 0x0800A85F):
+                s['chance'] <<= 3   # both build the plain-NPC rect wander 0x0800A4A4 (vt 0x0804D848)
+            s['enemy_layer'] = fn == 0x0800A82D
         else:
             raise NotImplementedError(hex(fn))
         return s
@@ -208,7 +226,42 @@ class Sim:
             self.wander(n, s)
             return False
 
+    def emark(self, n, r, v):
+        """enemy vt+0x4C (0x0800F9A2): mark the enemy layer unless enemy+0x291"""
+        if not n.no_grid:
+            self.G.mark(r, v, layers=('enemy',))
+
+    def etest(self, n, r):
+        """enemy vt+0x50 (0x0800F9C2): test the enemy layer; enemy+0x291 -> always free"""
+        return True if n.no_grid else self.G.test(r, 'enemy')
+
+    def walk_to_enemy(self, n, s):
+        """0x0800A01C"""
+        old = n.foot()
+        n.x += s['vx']
+        n.y += s['vy']
+        new = n.foot()
+        self.emark(n, old, 1)
+        if not self.etest(n, new):
+            self.emark(n, old, 0)
+            self.set_anim(n, 0, force=False)
+            n.x -= s['vx']
+            n.y -= s['vy']
+            return False
+        self.set_anim(n, 1, force=False)
+        n.facing = s['dir']
+        self.emark(n, new, 0)
+        s['n'] = (s['n'] - 1) & 0xFFFF
+        if s['n'] == 0:
+            self.emark(n, n.foot(), 1)   # vt+0x48(1)
+            n.x, n.y = s['tx'] << 8, s['ty'] << 8
+            self.emark(n, n.foot(), 0)   # vt+0x48(0)
+            return True
+        return False
+
     def walk_to(self, n, s):
+        if s.get('enemy'):
+            return self.walk_to_enemy(n, s)
         old = n.foot()
         n.x += s['vx']
         n.y += s['vy']
@@ -248,6 +301,11 @@ class Sim:
             r = s['rect']
             if r[0] > new[0] or r[1] > new[1] or r[2] < new[2] or r[3] < new[3]:
                 return False
+        if s.get('enemy_layer'):
+            self.emark(n, s['old'], 1)
+            ok = self.etest(n, new)
+            self.emark(n, new if ok else s['old'], 0)
+            return ok
         if not s['talk']:
             return self.G.test(new)
         if self.player and overlap(self.pfoot(), new):
@@ -285,9 +343,31 @@ class Sim:
                 if s['talk']:
                     self.G.mark(s['new'], 1)
                     self.G.mark(n.foot(), 0)
+                elif s.get('enemy_layer'):
+                    self.emark(n, s['new'], 1)
+                    self.emark(n, n.foot(), 0)
                 self.set_anim(n, 0, force=False)
             else:
                 self.set_anim(n, 1, force=False)
+
+    RUN_MOTION_STATE = 378   # type 77 state 0x17A: Selector[IfPlayerWithin2(100) -> GotoState 0x17B; RunMotionController]
+
+    def step_enemies(self, row):
+        """enemy update 0x0800FAE6: actor update (state tick) first, then the AI tick (0x0800AB0C). The AI is taken
+        from the recording: while the top state is the patrol state, RunMotionController (update 0x08029978) runs the
+        map-behaviour runner at enemy+0x22C and never finishes; leaving it calls the current step's vt+0xC (exit
+        0x08029988); the runner is never reset"""
+        for k in reversed(range(len(self.enemies))):
+            en = self.enemies[k]
+            if en.diverged:
+                continue
+            want = row['enemies'][k]
+            self.anim_tick(en)
+            ai = want[8] if want else None
+            if ai == self.RUN_MOTION_STATE:
+                self.runner(en)
+            else:
+                en.diverged = True   # AI-driven from here on (not modelled in Python)
 
     def runner(self, n):
         while True:
@@ -362,6 +442,8 @@ class Sim:
         for n in reversed(self.npcs):
             self.runner(n)
             self.anim_tick(n)
+        if self.enemies:
+            self.step_enemies(row)
         for i, d in ext:
             if i >= first:
                 self.external(d)
@@ -398,7 +480,8 @@ def run(name, verbose=True):
     objs = [int(n['obj'], 16) for n in t['init']['npcs']]
     nfr = nframes_table(e, objs)
     ticks = {hex(o): e.r16(o + 0x12) for o in objs}
-    sim = Sim(t, Grids(walk, enemy), nfr, ticks)
+    eobjs = [int(x['obj'], 16) for x in t['init'].get('enemies', [])]
+    sim = Sim(t, Grids(walk, enemy), nfr, ticks, nframes_table(e, eobjs))
     first = None
     for f, row in enumerate(t['frames']):
         if not row['logic']:
@@ -415,6 +498,12 @@ def run(name, verbose=True):
             sim.step(f)
         got = [[n.x, n.y, n.facing, n.nframes.get(('canon', n.raw), n.raw), n.frame] for n in sim.npcs]
         want = [r[:5] if r else None for r in row['npcs']]
+        for k, en in enumerate(sim.enemies):
+            w_ = row['enemies'][k]
+            if en.diverged or w_ is None:
+                continue
+            got.append([en.x, en.y, en.facing, en.idx, en.nframes.get(('canon', en.raw), en.raw), en.frame, en.tick])
+            want.append(w_[:7])
         rng_ok = [sim.rng.s0, sim.rng.s1] == row['rng']
         if got != want or not rng_ok:
             first = f

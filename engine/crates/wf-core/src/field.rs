@@ -355,6 +355,12 @@ pub fn spawn_object(w: &mut World, o: &ObjDef) -> Option<EntityId> {
             // the constructor first (spawn_enemy: its SetAnim(0) idle enter draws rand(255); the patrol runner from def
             // +0x18), the AI's first state after it
             let i = spawn_enemy(w, *ty, *x, *y, 0, Some(-1))?;
+            // the world map (3584 x 2560, beyond the 2048-px grids): placed exactly at the def position
+            if w.field.as_ref().is_some_and(|f| f.camera_max.0 > 2048 || f.camera_max.1 > 2048) || w.data.field.as_ref().and_then(|d| w.field.as_ref().and_then(|f| d.maps.get(&f.map))).is_some_and(|m| m.three_d) {
+                let e = w.en(i);
+                e.a.x = *x << 8;
+                e.a.y = *y << 8;
+            }
             let id = w.ents[i].id;
             if let ObjKind::Enemy { behaviour, .. } = &o.kind {
                 crate::fieldpatrol::attach(w, id, behaviour);
@@ -519,7 +525,8 @@ pub fn rebuild_arena(data: &crate::content::GameData, f: &Field) -> Option<(Aren
 
 fn arena_of(a: &AreaDef, m: &MapDef, col: &crate::content::MapCollision) -> ArenaRt {
     // the game's walk test only bounds the box to 0..2048 (0x08009324); the camera clamps to the map
-    ArenaRt { id: a.key.clone(), map: m.id.clone(), bounds: Rect::new(0, 0, 2048, 2048), region: None, view: Some(Rect::new(0, 0, col.world_w.max(GBA_W), col.world_h.max(GBA_H))) }
+    let side = if m.three_d { m.world_w.max(m.world_h).max(2048) } else { 2048 };
+    ArenaRt { id: a.key.clone(), map: m.id.clone(), bounds: Rect::new(0, 0, side, side), region: None, view: Some(Rect::new(0, 0, col.world_w.max(GBA_W), col.world_h.max(GBA_H))) }
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -597,6 +604,15 @@ pub fn pre_step(w: &mut World) {
 /// a map NPC's update (scene.rs dispatches `Body::Npc` with a behaviour here)
 pub fn npc_update(w: &mut World, i: usize) {
     crate::fieldnpc::update(w, i)
+}
+
+/// a map placement by its script actor tag (actor id -(tag + 1) = list 1 index `tag`): placed enemies and NPCs
+pub fn actor_by_tag(w: &World, tag: i32) -> Option<usize> {
+    let f = w.field.as_ref()?;
+    if let Some(&(id, ..)) = f.placed.iter().find(|p| p.1 == ObjRef::List(1, tag as u16)) {
+        return w.find(id);
+    }
+    (0..w.ents.len()).find(|&k| matches!(&w.ents[k].body, Body::Npc(n) if n.tag == Some(tag)))
 }
 
 /// an object def of the current area (area lists, then the map header's exits)
@@ -690,6 +706,22 @@ pub fn post_step(w: &mut World) {
     }
     story::sync_from_players(w);
     w.story.play_frames += 1;
+}
+
+/// `vfunc+0x74(1, 0)` (TriggerSelf, `0x0800F866`): the defeated handler without loot; the object stays (the event's
+/// warp reloads the area). Emits `Defeated` and runs the on-defeat callback.
+pub fn trigger_self(w: &mut World, i: usize) {
+    let id = w.ents[i].id;
+    let (x, y, ty) = (w.en_ref(i).a.px(), w.en_ref(i).a.py(), w.en_ref(i).ty);
+    let obj = w.field.as_ref().and_then(|f| f.placed.iter().find(|p| p.0 == id).map(|p| p.1));
+    let cb = obj.and_then(|o| area_obj(w, o)).and_then(|d| match d.kind {
+        ObjKind::Enemy { on_defeat, .. } => on_defeat,
+        _ => None,
+    });
+    w.events.push(Event::Field(FieldEvent::Defeated { entity: id, ty, x, y }));
+    if let Some(run) = cb {
+        w.events.push(Event::Field(FieldEvent::Run { run, cause: Cause::Defeat { entity: id, ty, x, y }, slot: 0 }));
+    }
 }
 
 /// placed enemies that are gone: defeated (their on-defeat callback runs with the loot position)

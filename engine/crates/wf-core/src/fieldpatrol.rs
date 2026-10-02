@@ -27,8 +27,11 @@ pub fn attach(w: &mut World, entity: EntityId, steps: &[Step]) {
     if steps.is_empty() {
         return;
     }
+    // the enemy ctor 0x0800F68C puts type 141 (world-map encounters) at z = 60 px; 0-50's map event lowers the
+    // ground ones to 0 (set_actor_field_1a8)
+    let z = w.find(entity).filter(|&k| matches!(&w.ents[k].body, crate::world::Body::Enemy(e) if e.ty == 141)).map(|_| 60 << 10).unwrap_or(0);
     if let Some(f) = w.field.as_mut() {
-        f.patrols.push(Patrol { entity, steps: steps.to_vec(), idx: -1, cur: None, z: 0 });
+        f.patrols.push(Patrol { entity, steps: steps.to_vec(), idx: -1, cur: None, z });
     }
 }
 
@@ -333,3 +336,17 @@ pub fn index(w: &World, i: usize) -> Option<i32> {
     w.field.as_ref()?.patrols.iter().find(|p| p.entity == id).map(|p| p.idx)
 }
 
+
+/// an enemy's height obj+0x1A8 (22.10; the runner keeps it, 0 without one)
+pub fn z_of(w: &World, i: usize) -> i32 {
+    let id = w.ents[i].id;
+    w.field.as_ref().and_then(|f| f.patrols.iter().find(|p| p.entity == id)).map(|p| p.z).unwrap_or(0)
+}
+
+/// `set_actor_field_1a8(actor, v)` (native 0xF0): obj+0x1A8 = v << 10 (positive = up)
+pub fn set_z(w: &mut World, i: usize, z: i32) {
+    let id = w.ents[i].id;
+    if let Some(p) = w.field.as_mut().and_then(|f| f.patrols.iter_mut().find(|p| p.entity == id)) {
+        p.z = z;
+    }
+}

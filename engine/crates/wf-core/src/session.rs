@@ -67,6 +67,13 @@ impl Session {
     }
     /// one frame with explicit input frames (edges given)
     pub fn step_frames(&mut self, inputs: [InputFrame; MAX_PLAYERS]) -> &[Event] {
+        self.step_world(inputs);
+        self.step_post()
+    }
+    /// the first part of a frame: input, the objects' update, the cutscene systems (screen, dialog, command tracks).
+    /// A script host resumes its blocked scripts after this and before [`Session::step_post`] (the game resumes a
+    /// script from its wait mode before the frame's camera update; `wf-script-core` docs).
+    pub fn step_world(&mut self, inputs: [InputFrame; MAX_PLAYERS]) {
         let w = &mut self.world;
         w.events.clear();
         w.input = inputs;
@@ -80,16 +87,23 @@ impl Session {
                 w.step_entities();
             }
             crate::scene::tick(w);
-            let k = w.events.len();
-            crate::field::post_step(w);
-            Self::run_hook(&mut self.hook, &mut self.world, k);
-            return &self.world.events;
+            return;
         }
         if !crate::scene::frozen(w) {
             battle::pre_step(w);
             w.step_entities();
         }
         crate::scene::tick(w);
+    }
+    /// the rest of the frame: cameras and the field / battle rules after the update
+    pub fn step_post(&mut self) -> &[Event] {
+        let w = &mut self.world;
+        if w.field.is_some() {
+            let k = w.events.len();
+            crate::field::post_step(w);
+            Self::run_hook(&mut self.hook, &mut self.world, k);
+            return &self.world.events;
+        }
         battle::post_step(w);
         if self.outcome == Outcome::Running {
             self.outcome = battle::outcome(w);

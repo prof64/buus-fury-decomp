@@ -49,10 +49,36 @@ SCENARIOS = [
      'notes': 'Capsule Corporation: the player stands on the walk_to path of the NPC (walk_to blocked by the player)'},
     {'name': 'yemma_crowd', 'area': (1, 3), 'pos': (120, 290), 'input': [[0, 1200]],
      'notes': "Yemma's Office: the player stands inside the small wander rect of the NPC at (128, 280)"},
+    {'name': 'enemy_patrol_far', 'area': (14, 9), 'pos': (1000, 1000), 'input': [[0, 1500]],
+     'notes': 'Kyodai Pyramid 14-9 with the player parked off the map (1000, 1000): no enemy ever sees the player, the '
+              'type-77 mummies patrol their walk_to loops (map behaviour via RunMotionController) the whole time'},
     {'name': 'enemy_patrol', 'area': (14, 9), 'pos': (0x40, 0x100), 'input': [[0, 900]],
      'notes': 'Kyodai Pyramid 14-9: type-77 enemies whose AI runs RunMotionController (0x080299A3): the map behaviour '
               '(def +0x18: walk_to 0x0800A1D5 loops); enemies recorded in init.enemies / frames[].enemies'},
 ]
+
+
+AI_STATES = 0x0870F514
+
+
+def ai_top(e, o):
+    """AI stack at obj+0x238: [actor, count, {node, state ptr} * count]; top state id"""
+    st = o + 0x238
+    n = e.r32(st + 4)
+    if not n or n > 16:
+        return None
+    return (e.r32(st + 8 * n + 4) - AI_STATES) // 8
+
+
+def enemy_row(e, o):
+    """[x, y, facing, runner idx, raw, anim frame, anim tick, anim state, AI top state, step vt, step word +4, +8, +0x10]"""
+    cur = e.r32(o + 0x22C)
+    idx = e.r8(o + 0x22C + 4)
+    return [s32v(e.r32(o + 0x1A0)), s32v(e.r32(o + 0x1A4)), e.r8(o + 0x10), idx - 256 if idx >= 128 else idx,
+            anim_raw(e, o), e.r8(o + 0x11), e.r16(o + 0x12), hex(e.r32(o + 0x14)), ai_top(e, o),
+            STEP_VT.get(e.r32(cur), hex(e.r32(cur))) if cur else None,
+            s32v(e.r32(cur + 4)) if cur else None, s32v(e.r32(cur + 8)) if cur else None,
+            e.r16(cur + 0x10) if cur else None]
 
 
 def enemy_objs(e):
@@ -201,7 +227,7 @@ def record(scn):
                                 'x': s32v(e.r32(o + 0x1A0)), 'y': s32v(e.r32(o + 0x1A4)), 'facing': e.r8(o + 0x10),
                                 'foot': [e.r8(o + 0x19C), e.r8(o + 0x19D)], 'no_grid': e.r8(o + 0x291),
                                 'list_index': order.index(o) if o in order else None,
-                                'runner_index': e.r8(o + 0x22C + 4)})
+                                'runner_index': e.r8(o + 0x22C + 4), 'row0': enemy_row(e, o)})
     for o in objs:
         info = npc_info(o)
         info['list_index'] = order.index(o) if o in order else None
@@ -223,13 +249,12 @@ def record(scn):
                'talk_npc': hex(e.r32(0x03001BAC)) if e.r32(0x03001BAC) else None}
         if init['enemies']:
             live_e = set(enemy_objs(e))
-            row['enemies'] = [[s32v(e.r32(int(x['obj'], 16) + 0x1A0)), s32v(e.r32(int(x['obj'], 16) + 0x1A4)),
-                               e.r8(int(x['obj'], 16) + 0x10), e.r8(int(x['obj'], 16) + 0x22C + 4)]
-                              if int(x['obj'], 16) in live_e else None for x in init['enemies']]
+            row['enemies'] = [enemy_row(e, int(x['obj'], 16)) if int(x['obj'], 16) in live_e else None
+                              for x in init['enemies']]
         frames.append(row)
     e.set_keys(0)
     return {'name': scn['name'], 'source_state': 'work/states/buu_snakeway_start.ss', 'notes': scn['notes'],
-            'area': [w, m, e.r8(e.r32(AREA_PTR) + 2) if e.r32(AREA_PTR) else None], 'warp_to': list(pos),
+            'area': [w, m, e.r8(0x0300197E)], 'warp_to': list(pos),
             'init': init, 'input': scn['input'], 'frames': frames}
 
 

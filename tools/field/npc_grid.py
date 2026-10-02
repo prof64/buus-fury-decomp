@@ -45,7 +45,7 @@ if __name__ == '__main__':
     e, _, _, _ = rec_npc.goto_f0(scn)
     walk = e.read(e.r32(MAPOBJ + 0xA8), 256 * 256)
     enemy = e.read(e.r32(MAPOBJ + 0xB0), 256 * 256)
-    variant = e.r8(e.r32(AREA_PTR) + 2)
+    variant = e.r8(0x0300197E)
     cg, path = content_grid(*scn['area'], variant)
     print('content', path, 'walk ones live', sum(walk), 'content', sum(cg))
     diff = [(i % 256, i // 256, walk[i], cg[i]) for i in range(256 * 256) if walk[i] != cg[i]]

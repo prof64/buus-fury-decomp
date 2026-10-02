@@ -235,8 +235,34 @@ equipment physics and A pickups). Known divergences: `transitions_forest_up_exit
 enemy walk→idle one frame early, inherited from the reference), `npc_capsule_walk` from 136 (4-20 v2 live collision ≠
 content). `tests/field.rs`: conditions, exits, determinism + clone / byte snapshots, story.
 
+**Round 2** (`fieldpatrol.rs`, `fieldworld.rs`, `fieldview.rs`):
+* *Enemy patrols*: field enemies carry their def +0x18 step runner (`Field.patrols`, never reset); the AI node
+  `RunMotionController` runs one pass per update (enter nop, exit = the step's pause hook); enemy walk_to / wander /
+  wander_rect / `cutscene_move` (3D, world-map encounters) on the enemy layer. Enemies are built constructor first
+  (idle rand(255), runner) then their AI state.
+* *World map* (map header "3D" flag = area_00_050): the flying player (`Field.flight`: altitude 22.10, heading, speed,
+  turn; A/B altitude, UP/DOWN thrust, LEFT/RIGHT turn, wrap 3584 x 2560), the 3D camera (`Flight.cam`, exposed as
+  `MapView.mode7`), the 64-frame arrival fade with control, altitude triggers on the flyer's z, message triggers =
+  the bottom label (`Field.label`, `Mode7View.label`), encounters (`IfPlayerOnTop`: px distance <= 16 and |dz| < 16 px;
+  `TriggerSelf` in the field = `field::trigger_self`: defeated event + on-defeat script, object kept). Landing and the
+  capsule take-off are scripts (host). Visited record: loading an area sets story flag `0x1C0 + bit` from
+  `world/visited.json` (table 0x0874CA24). The map screen (SELECT, a room map of visited rooms) is UI: no core state
+  beyond the flags; travel = exits, capsule flights, scripted warps (nothing else exists in the game).
+* *Collision*: breakables mark the grids only when the prop is solid; `open_area` / `block_area` set walk + enemy
+  layer, the `_alt` forms the shot grid (scene.rs); on-enter scripts must run inside the load:
+  `Session::new_field_hooked(data, cfg, hook)` runs them before frame 0 (the hook also runs after every load).
+* *Host API added*: `field::actor_by_tag(w, tag)` (map placement actor ids -(tag+1)), `fieldpatrol::set_z / z_of`
+  (native 0xF0 `set_actor_field_1a8`: obj+0x1A8 = v << 10, positive = up), `field::trigger_self`.
+* *View* (`fieldview.rs`, content from `wf-extract/src/field_gfx.rs`): coins (`effects/coin_s`, cel from the phase,
+  bounce, shadows), dropped / map items (`effects/field_items`), props and breakables (`effects/props_<map>`, shake),
+  level signs (`effects/field_labels`, bob), debris chips, the item-get icon and hold pose; breakable hit boxes and
+  dropped items' collision sub-boxes come from the graphics (content `hit_box`, `icons/index.json sub_box`).
+* *Verification*: `tests/field_lockstep.rs` 25 recordings, 24 exact (+ world map flight 593 frames, landing, an
+  encounter; enemy patrols 1500 frames; Capsule Corp fixed: the recorder had the variant wrong); known: one
+  battle-AI animation detail in `npc_enemy_patrol` (frame 2). `tests/field.rs`: view draws, visited flags, flyer.
+
 **Gaps**: breakable boxes approximate the prop graphic's pixel bounds (prop rect lower half, 1 px inset); dropped
 items' collision sub-box (icon pixels) likewise; coin scatter verified only through the loot script (needs the
 script host); enemies' def behaviour (`RunMotionController` node) not run; enemy loot position INFERRED (their position,
 no velocity); debris chips and prop / pickup / map-sprite graphics are not drawn by the view; map-screen visited bits
-(table `0x0874CA24`) not set; the world map 0-50 flying player is not modelled; no variant selector exists in the ROM.
+(table `0x0874CA24`) not set; no variant selector exists in the ROM. Round 2 remaining: the area-name banner and the world map's 94 billboard props are not drawn; the mode-7 ground must be rendered by the frontend from `MapView.mode7`; debris motion past the start INFERRED; the event freeze after an encounter / landing is the host's.

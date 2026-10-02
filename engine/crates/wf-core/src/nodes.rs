@@ -454,9 +454,17 @@ fn cond(w: &mut World, c: &C, n: u16) -> bool {
             }
             false
         }
+        // cond 0x08036EA4 (world-map encounters): px distances <= 16 and |player z - own z| < 16 px (obj+0x1A8, 22.10)
         K::IfPlayerOnTop => {
-            let (dx, dy) = en::to_player(w, i);
-            dx.abs() < 16 && dy.abs() < 16
+            let Some(pi) = w.player_idx(0) else { return false };
+            let (pa, ea) = (&w.pl_ref(pi).a, &w.en_ref(i).a);
+            let (dx, dy) = (pa.px() - ea.px(), pa.py() - ea.py());
+            if dx.abs() > 16 || dy.abs() > 16 {
+                return false;
+            }
+            let pz = w.field.as_ref().and_then(|f| f.flight.as_ref()).map(|f| f.z).unwrap_or(0);
+            let dz = (pz - crate::fieldpatrol::z_of(w, i)) >> 10;
+            dz.abs() < 16
         }
         // 0x0802F945: the first Spopovich is in 0x03001B30 (the end of GrabWindup) showing anim id 0x12's animation
         K::IfPartnerHolding => {
@@ -1145,7 +1153,12 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             true
         }
         K::TriggerSelf => {
-            en::die(w, i, false);
+            // field (world-map encounters): the defeated handler without loot / removal runs the on-defeat script
+            if w.field.is_some() {
+                crate::field::trigger_self(w, i);
+            } else {
+                en::die(w, i, false);
+            }
             true
         }
         K::Block => false,

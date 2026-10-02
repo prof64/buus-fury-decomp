@@ -100,6 +100,23 @@ pub struct MapView {
     pub anim_frame: u32,
     /// Screen shake added to every BG scroll (px), like the game's shake offset.
     pub shake: (i32, i32),
+    /// The world map (area 0-50, map header "3D" flag): the mode-7 ground camera; None on 2D maps.
+    pub mode7: Option<Mode7View>,
+}
+
+/// The world map's 3D camera (map object `0x030019A4`, re/buu/notes.md "Field: world map"): the renderer projects
+/// the 3584x2560 ground (layer kind 0x08007B63) per scanline below the horizon (HBlank BG2 PA/PC/X/Y, `0x0802ED98`).
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct Mode7View {
+    /// eye position (22.10 of world px x4: `(x << 2) - ...`), height (22.10), heading (22.10, 256 << 10 = a turn,
+    /// 0 north, + clockwise), pitch (22.10 angle)
+    pub x: i32,
+    pub y: i32,
+    pub height: i32,
+    pub heading: i32,
+    pub pitch: i32,
+    /// the bottom label's string id (message triggers 0x17), None = none
+    pub label: Option<i32>,
 }
 
 /// Which pixels of a sprite sheet to draw.
@@ -244,6 +261,11 @@ pub trait Sim {
     }
     /// The concrete simulation, for tools that understand it (training overlays, ghosts); `None` = opaque.
     fn as_any(&self) -> Option<&dyn std::any::Any> {
+        None
+    }
+    /// What to do while the local player is in a menu: `None` = stop stepping (a local game pauses); `Some(b)` =
+    /// keep stepping with buttons `b` for the local player (an online match cannot wait for one player).
+    fn paused_input(&self) -> Option<Buttons> {
         None
     }
 }

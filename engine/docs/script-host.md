@@ -418,3 +418,11 @@ Note for harnesses that delete the area's objects after `Session::new_field` (e.
 `build_world`): talk NPCs, breakables and map items mark the walk grid / enemy layer when created — reset
 `w.col.as_mut().unwrap().walk = None` and the enemy layer (`enemy = map.walk.clone()`) too, or the removed objects
 keep blocking.
+
+**Round 2 (field agent)**: native 0xF0 `set_actor_field_1a8(actor, v)` = obj+0x1A8 = `v << 10`, positive = **up**
+(wf-script-core natives.rs stores `ac.z = -arg`: for map enemies use `wf_core::fieldpatrol::set_z(w, i, v << 10)`; the
+world map's on-enter event inline_0x08072A48 lowers the 5 ground encounters with it). Map placements (negative
+actor ids) resolve with `wf_core::field::actor_by_tag(w, -(id + 1))`. Run the area load's scripts synchronously:
+`Session::new_field_hooked` / `Session.hook` (gates and bridges in 48 areas use open_area / block_area on enter).
+`open_area` / `block_area` (0x2B/0x2C) = walk grid + enemy layer, `_alt` (0x2D/0x2E) = shot grid only (fixed in
+scene.rs `apply_area`).

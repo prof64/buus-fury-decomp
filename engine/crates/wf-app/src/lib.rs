@@ -10,6 +10,7 @@ pub mod control;
 pub mod demo;
 pub mod hotkeys;
 pub mod input;
+pub mod netmenu;
 pub mod overlay;
 pub mod rebind;
 pub mod replay_menu;
@@ -97,6 +98,19 @@ impl App {
         Ok(App::new(packs, Box::new(battle::CoreSim(s))))
     }
 
+    /// Swap the simulation (an online match starts / ends): fresh inputs, view and clock.
+    pub fn set_sim(&mut self, sim: Box<dyn Sim>) {
+        self.sim = sim;
+        self.inputs = vec![0; self.sim.players()];
+        self.acc = 0.0;
+        self.paused = false;
+        self.events.clear();
+        self.audio_out.push(AudioEvent::StopAllSfx);
+        self.audio_out.push(AudioEvent::StopSong);
+        self.view = RenderView::default();
+        self.sim.view(&mut self.view);
+    }
+
     /// One simulation step with the current inputs.
     pub fn step(&mut self) {
         self.events.clear();
@@ -113,7 +127,17 @@ impl App {
     /// only used for the stats.
     pub fn advance(&mut self, dt: f64, now_ms: &dyn Fn() -> f64) -> u32 {
         if self.paused {
-            return 0;
+            // an online match keeps running behind the menu (the local player stands still / holds the shared
+            // pause); everything else stops
+            match self.sim.paused_input() {
+                None => return 0,
+                Some(b) => {
+                    self.inputs.iter_mut().for_each(|i| *i = 0);
+                    if let Some(i) = self.inputs.first_mut() {
+                        *i = b;
+                    }
+                }
+            }
         }
         let period = 1.0 / self.pacing.fps;
         self.acc += dt.clamp(0.0, 0.25);
