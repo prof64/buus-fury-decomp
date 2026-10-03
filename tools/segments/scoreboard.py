@@ -27,20 +27,25 @@ CARGO = ['cargo', 'test', '--release', '-p', 'wf-import', '--test', 'segments', 
 LINE = re.compile(r'^segment (\S+): (\d+) video frames \((\d+) logic\), matched (\d+) / (\d+) \| first divergence (.*?) \| import held')
 
 # first-divergence text -> category (first match wins) and the agent that owns that kind of work (segments.md)
-CATS = [
-    ('importer', ('import', 'not importable', 'unsupported')),
-    ('sound', ('sfx', 'sound', 'song', 'music', 'snd')),
-    ('menu timing', ('menu', 'redraw', 'status page', 'lag')),
-    ('sprite memory', ('tile', 'vram', 'oam', 'slot', 'alloc')),
-    ('RNG', ('rng', 'rand')),
-    ('script', ('script', 'flag', 'event', 'scene', 'depth', 'dialog', 'text')),
-    ('animation', ('anim', 'cel', 'pose', 'raw ')),
-    ('position', ('pos', ' x ', ' y ', 'player', 'camera', 'facing', 'hp', 'actor', 'enemy', 'obj')),
+CATS = [   # the first divergence's kind (wf_import::segment's report: "<kind>: ...") -> category
+    ('importer', ('import', 'unsupported')),
+    ('sound', ('snd:',)),
+    ('menu timing', ('menu', 'redraw', 'lag')),
+    ('sprite memory', ('tile', 'vram', 'oam')),
+    ('RNG', ('rng:',)),
+    ('script / text', ('text:', 'script', 'flag', 'event', 'depth')),
+    ('screen fade', ('fade:',)),
+    ('camera', ('cam:',)),
+    ('animation', ('anim:', 'cel', 'pose')),
+    ('position / facing', ('pos:', 'dir:', 'hp:')),
+    ('object set', ('missing:', 'extra:')),
 ]
-OWNER = {'menu timing': 'Earth agent (redraw / mixer timing predictor)', 'sound': 'Earth agent (sound timing) / audio',
+OWNER = {'menu timing': 'Earth agent (redraw / mixer timing)', 'sound': 'Earth agent (sound timing) / audio',
          'importer': 'importer (wf-import)', 'sprite memory': 'chapter agent (tile allocator order)',
-         'RNG': 'chapter agent', 'script': 'cutscene / script-host agent', 'animation': 'chapter agent',
-         'position': 'chapter agent', 'other': '-'}
+         'RNG': 'chapter agent (who draws first: enemy AI / hits)', 'script / text': 'cutscene / script-host agent',
+         'screen fade': 'cutscene / script-host agent', 'camera': 'chapter agent (camera scroll)',
+         'animation': 'chapter agent', 'position / facing': 'chapter agent (enemy AI / knockback)',
+         'object set': 'chapter agent (spawns / removal)', 'other': '-'}
 CHAPTER_OWNER = {'ship': 'ship agent', 'fat': 'dungeon agents A / B (+ ship agent: Thieves Den, Pilaf)',
                  'janemba': 'side-content agent', 'superbuu': 'Super Buu agent'}
 
@@ -86,9 +91,56 @@ def do_cut(jobs, only):
             p.write_text(json.dumps(cuts, indent=0, sort_keys=True))
 
 
+def extend_one(job):
+    """stretch j's last segment ends where j's key log ends (a stretch boundary is not a cut): re-record it from
+    its own start state over j's tail + the following stretches' keys up to the next importable entry anywhere
+    (rec_segments --at-start --max 1), overwriting it in place"""
+    j, last, tail_keys = job
+    run = REAL / 'ext' / j
+    run.mkdir(parents=True, exist_ok=True)
+    seg = REAL / 'segs' / j
+    import shutil
+    shutil.copyfile(seg / 'states' / (last.stem + '.ss'), run / 'start.ss')
+    (run / 'keys.json').write_text(json.dumps({'from': None, 'keys': tail_keys}))
+    n = int(last.stem.split('_')[1])
+    tmp = REAL / 'ext' / (j + '_out')
+    if tmp.exists():
+        shutil.rmtree(tmp)
+    subprocess.run([PY, str(ROOT / 're/buu/ship/rec_segments.py'), str(run), str(tmp), '--prefix', 'r' + j[:3],
+                    '--first', str(n), '--max', '1', '--at-start'], capture_output=True, text=True, cwd=ROOT)
+    new = sorted(tmp.glob('*.json'))
+    if len(new) != 1 or new[0].name != last.name:
+        return j, f'extension failed: {[x.name for x in new]}'
+    subprocess.run([PY, str(ROOT / 'tools/segments/snd_phase.py'), str(new[0])], capture_output=True, text=True, cwd=ROOT)
+    shutil.move(str(new[0]), str(last))
+    return j, f'{last.name} extended over {len(tail_keys)} frames'
+
+
+def do_extend(jobs):
+    runs = sorted(d for d in (REAL / 'runs').iterdir() if d.is_dir())
+    keys = {d.name: json.loads((d / 'keys.json').read_text())['keys'] for d in runs}
+    names = [d.name for d in runs]
+    work = []
+    for i, j in enumerate(names):
+        segs = sorted((REAL / 'segs' / j).glob('*.json'))
+        if not segs or i + 1 == len(names):
+            continue
+        last = segs[-1]
+        f0 = int(re.search(r'"frame":(\d+)', open(last).readline()).group(1))
+        tail = keys[j][f0:]
+        for k in names[i + 1:]:
+            tail += keys[k]
+            if any((REAL / 'segs' / k).glob('*.json')):
+                break
+        work.append((j, last, tail))
+    with ThreadPoolExecutor(jobs) as ex:
+        for j, msg in ex.map(extend_one, work):
+            print(j, msg, flush=True)
+
+
 def replay_one(d):
     env = dict(os.environ, SEGMENT_DIR=str(d), SEGMENT_STRICT='0')
-    r = subprocess.run(CARGO, capture_output=True,
+    r = subprocess.run(CARGO + ['--', '--nocapture'], capture_output=True,
                        text=True, cwd=ROOT / 'engine', env=env)
     rows = []
     for ln in r.stderr.splitlines():
@@ -107,6 +159,8 @@ def board(jobs):
     res = {}
     with ThreadPoolExecutor(jobs) as ex:
         for name, rows, rc in ex.map(replay_one, dirs):
+            if not rows and rc != 0:
+                raise SystemExit(f'{name}: the replay did not run (build error? another agent mid-edit): rc {rc}')
             res[name] = rows
             print(name, len(rows), 'segments', sum(r['matched'] >= r['frames'] for r in rows), 'exact', flush=True)
     chapters = {}
@@ -136,7 +190,9 @@ def board(jobs):
          '(the cuts: `scoreboard.py cut`, local under `work/real/`; the run itself: `tools/segments/realrun.py`, §"How to replay',
          'the real run" in `engine/docs/segments.md`). A segment = the real game from one importable area entry (an exit',
          'arrival with nothing running) to the next; an entry by a script warp / in a cutscene is not a cut - its frames',
-         'stay in the segment before it. "not cut" = the frames before a stretch\'s first importable entry.', '',
+         'stay in the segment before it, and a segment runs on across the boundaries of the run\'s key logs (`scoreboard.py',
+         'extend`). "not cut" = frames in no segment (the run\'s start up to its first importable entry) - a chapter\'s',
+         'frames are counted where its segments start.', '',
          '| chapter | owner | run frames | not cut | segments | exact | frames | matched | % |', '|---|---|---|---|---|---|---|---|---|']
     order = [c for c in ('ship', 'fat', 'janemba', 'superbuu') if c in chapters]
     for k in order + ['**all**']:
@@ -150,6 +206,23 @@ def board(jobs):
         row = [chapters[c]['cats'].get(cat, 0) for c in order]
         if sum(row):
             L.append(f"| {cat} | {OWNER[cat]} | " + ' | '.join(str(x) for x in row) + f' | {sum(row)} |')
+    L += ['', '## Biggest losses (unmatched frames)', '', '| segment | stretch | category | lost | first divergence |',
+          '|---|---|---|---|---|']
+    for c, name, r, cat in sorted(bad, key=lambda b: -(b[2]['frames'] - b[2]['matched']))[:15]:
+        L.append(f"| `{r['segment']}` | {name} | {cat} | {r['frames'] - r['matched']:,} | {r['first'][:110]} |")
+    # the same kind of first divergence on the same sprite (or the same text / sound): likely one cause
+    groups = {}
+    for c, name, r, cat in bad:
+        m = re.search(r'"(\w+): (?:#\d+ )?(sprite \d+)?', r['first'])
+        key = (m.group(1) + (' ' + m.group(2) if m.group(2) else '')) if m else cat
+        if m and m.group(1) in ('snd', 'text', 'fade'):
+            key = re.search(r'"([^"]{0,60})', r['first']).group(1)
+        groups.setdefault(key, []).append(r['segment'])
+    rec = sorted(((k, v) for k, v in groups.items() if len(v) >= 3), key=lambda kv: (-len(kv[1]), kv[0]))
+    if rec:
+        L += ['', '## Recurring first divergences (3+ segments)', '']
+        for k, v in rec:
+            L.append(f"* {len(v)} x `{k}`: " + ', '.join(f'`{x}`' for x in v[:8]) + (' ...' if len(v) > 8 else ''))
     L += ['', '## Every non-exact segment', '', 'segment (stretch): matched / frames, category - first divergence', '']
     for ch in order:
         L.append(f'### {ch}')
@@ -167,5 +240,8 @@ if __name__ == '__main__':
     a = sys.argv[1:]
     if a and a[0] == 'cut':
         do_cut(int(a[1]) if len(a) > 1 else 6, a[2:])
+        do_extend(int(a[1]) if len(a) > 1 else 6)
+    elif a and a[0] == 'extend':
+        do_extend(int(a[1]) if len(a) > 1 else 6)
     else:
         board(int(a[0]) if a else 6)

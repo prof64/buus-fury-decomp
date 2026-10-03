@@ -3,7 +3,7 @@ it at every importable area entry (an exit arrival: the end of the first complet
 the new area, autowalking in, no event running — tools/segments/segment.py's rule), one segment file per cut, in
 tools/segments/segment.py's format (data/segments/NAME.json shape; spec engine/docs/segments.md).
 
-usage: rec_segments.py RUNDIR OUTDIR [--prefix ship] [--from-frame N] [--first N] [--max N]
+usage: rec_segments.py RUNDIR OUTDIR [--prefix ship] [--from-frame N] [--first N] [--max N] [--at-start]
   --from-frame: no cut before key frame N (the first segment starts at the first cut from there); --first: its number
   RUNDIR: run_route.py output (start.ss + keys.json); segments go to OUTDIR/<prefix>_<nnn>_<w>-<a>.json
   The emulator is rewound one frame at each cut (the cut is known when the next logic frame starts)."""
@@ -61,6 +61,12 @@ def main():
         finally:
             sg.OUT = old
 
+    if '--at-start' in a:
+        # the start state is itself a cut (a previous run's segment state): the first segment starts at frame 0
+        init, rec = sg.init_of(e)
+        rec.arm()
+        nseg += 1
+        seg = {'init': init, 'rec': rec, 'rows': [], 'n': nseg, 'f0': 0}
     f = 0
     while f < len(keys):
         k = keys[f]

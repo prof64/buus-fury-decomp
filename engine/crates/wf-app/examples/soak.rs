@@ -40,8 +40,17 @@ fn main() {
     if !cont {
         wf_core::menu::title::open_title(&mut session.world);
     }
-    let mut app = StorySim::with_session(&packs, session).expect("story sim");
-    if !cont {
+    // --import SEG.json: start from that cut's RAM (one import), the recordings' rows follow the cut
+    let mut app = match opt("--import") {
+        Some(seg) => {
+            let doc: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&seg).expect("read")).expect("json");
+            let ram = wf_import::GbaRam::from_json(&doc["init"]["ram"]).expect("ram");
+            println!("imported {seg} (area {})", doc["init"]["area"]);
+            StorySim::from_import(&packs, &ram).expect("import")
+        }
+        None => StorySim::with_session(&packs, session).expect("story sim"),
+    };
+    if !cont && opt("--import").is_none() {
         app.skip_area_banner();
     }
     // --sync W-A: the recording's keys are open loop, and the app's title / prologue run a few text-box phases off
@@ -156,7 +165,8 @@ fn main() {
         // the leader's HP (rows carry the current character's record HP)
         if let (Some(pi), Some(gh)) = (w.player_idx(0), r["hp"].as_i64()) {
             let pl = w.pl_ref(pi);
-            if pl.rec.hp as i64 != gh && w.story.current as i64 == r["goal"].as_i64().map(|_| w.story.current as i64).unwrap_or(w.story.current as i64) {
+            // (only while the game shows a player: its row HP is the current record's, which a scene can switch)
+            if !r["p"].is_null() && pl.rec.hp as i64 != gh && w.story.current as i64 == r["goal"].as_i64().map(|_| w.story.current as i64).unwrap_or(w.story.current as i64) {
                 hp_bad += 1;
                 if hp_bad == 30 && hp_reports < 6 {
                     hp_reports += 1;

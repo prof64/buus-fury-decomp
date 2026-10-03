@@ -11,6 +11,7 @@ wf-script = { path = "../wf-script" }
 serde.workspace = true
 
 [dev-dependencies]
+wf-import = { path = "../wf-import" }
 wf-rom.workspace = true
 wf-extract = { path = "../wf-extract" }
 wf-script-rhai = { path = "../wf-script-rhai" }

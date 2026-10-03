@@ -477,4 +477,10 @@ pub trait Sim {
     fn paused_input(&self) -> Option<Buttons> {
         None
     }
+    /// Display frames the original hardware would have spent without a new logic frame after the last step (an
+    /// area load, ...). Presentation only: a frontend's optional "original pacing" holds the picture that long;
+    /// never part of the simulation state (replays / netplay ignore it).
+    fn lag_hint(&self) -> u32 {
+        0
+    }
 }

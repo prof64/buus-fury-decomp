@@ -59,6 +59,9 @@ export class Enemy extends Actor implements EnemyLike {
   vx = 0
   vy = 0
   moving = false
+  /** a movement step this frame found the walk not running: its SetAnim(1) is due (0x0803B9DA tests IsAnim(1) at the
+   *  step, so a node that sets another animation after it - a GotoState into StandStill - keeps that one) */
+  walkDue = false
   slot = 0
   children: Enemy[] = []
   parentE: Enemy | null = null
@@ -168,6 +171,7 @@ export class Enemy extends Actor implements EnemyLike {
       return
     }
     this.moving = false
+    this.walkDue = false
     this.stateHook?.run()
     this.ai.tick()
     if (!this.anim || this.anim.name === 'idle' || this.anim.name === 'walk') {
@@ -175,7 +179,7 @@ export class Enemy extends Actor implements EnemyLike {
       // to idle when the movement stops - the next node's own SetAnim does (lockstep f02_vs_enemy_melee)
       // (the back-off's reversed walk or a node's own state is another state object: the check fails and SetAnim(1)
       // re-enters the walk)
-      if (this.moving && !this.walking()) this.setAnim('walk', true, true)
+      if (this.walkDue && !this.walking()) this.setAnim('walk', true, true)
     }
   }
 
@@ -221,6 +225,12 @@ export class Enemy extends Actor implements EnemyLike {
   walking(): boolean {
     return this.isAnim(1)
   }
+  /** a movement step (Earth 4-25: Vegeta backs off, then StandStill in the same frame) */
+  markMoving() {
+    if (!this.walking()) this.walkDue = true
+    this.moving = true
+  }
+
   tickAnim() {
     super.tickAnim()
     if (!this.anim) return
@@ -555,7 +565,7 @@ export class Enemy extends Actor implements EnemyLike {
   // ---- movement -------------------------------------------------------------------------------------------------
   walkBy(vx: number, vy: number): boolean {
     if (!vx && !vy) return true
-    this.moving = true
+    this.markMoving()
     return this.moveBy(this.w, Math.round(vx), Math.round(vy))
   }
   // ---- knockback (KnockbackSlide 0x08018BCA; reaction states 2, 3, 4, 0xE, 0xF of the shared on-hit trees) ----------
@@ -642,7 +652,7 @@ export class Enemy extends Actor implements EnemyLike {
     }
     if (!m) return false
     // the back-off runs under its own reversed-walk state (set by its enter): its step makes no SetAnim(1)
-    if (!faceToward) this.moving = true
+    if (!faceToward) this.markMoving()
     this.tryMove(-Math.trunc((dx * speed) / m), -Math.trunc((dy * speed) / m), dx >= 0 ? -speed : speed, dy >= 0 ? -speed : speed)
     return !this.stepped
   }
@@ -671,7 +681,7 @@ export class Enemy extends Actor implements EnemyLike {
       dx = -dx
     }
     if (!m) return false
-    this.moving = true
+    this.markMoving()
     this.tryMove(-Math.trunc((dx * speed) / m), -Math.trunc((dy * speed) / m), dx >= 0 ? -speed : speed, dy >= 0 ? -speed : speed)
     return !this.stepped
   }
@@ -704,7 +714,7 @@ export class Enemy extends Actor implements EnemyLike {
       this.facing = dy > 0 ? 0 : 1
     }
     if (m < 8) return false
-    this.moving = true
+    this.markMoving()
     const w = this.w
     this.unmarkSelf()
     const qx = Math.trunc((dx * speed) / m)
@@ -743,7 +753,7 @@ export class Enemy extends Actor implements EnemyLike {
    *  0x08752EB4 = down, up, left, right); blocked -> facing = rand(4) (no move). Never finishes. */
   wanderStep(speed: number, turnP: number) {
     const w = this.w
-    this.moving = true
+    this.markMoving()
     if (w.rng.chance(turnP, 'wander turn')) this.facing = w.rng.rand(4, 'wander dir') as Dir
     const [dx, dy] = DIR_VEC[this.facing]
     const vx = (dx * 256 * speed) >> 8
@@ -799,7 +809,7 @@ export class Enemy extends Actor implements EnemyLike {
     const vx = (dx * speed) / d
     const vy = (dy * speed) / d
     if (ignoreWalls) {
-      this.moving = true
+      this.markMoving()
       this.x += Math.round(vx)
       this.y += Math.round(vy)
       this.clampInside(this.w)

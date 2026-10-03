@@ -294,6 +294,8 @@ pub enum Owner {
     /// a mini-game mode's graphics: "Watch This!" (`0x08027DB0`, 0x2800 bytes), the power struggle's gauge
     /// (`0x080301F8`, 0x380)
     Minigame,
+    /// the timer HUD (`0x0802FCA0`, 0x400 bytes)
+    Timer,
     /// the travel menu's label object (`0x0803643C`, 0xF40 bytes)
     Dest,
     /// the HUD's stat-points mark (`0x0800BCC8` makes it, vtable 0x0804C070, 0x100 bytes)
@@ -550,12 +552,46 @@ pub fn release_later(w: &mut World, owner: Owner, frames: u32) {
     }
 }
 
+/// the room check of the current allocator (None: no model)
+pub fn room_of(w: &World) -> Option<i32> {
+    let objects = w.ents.iter().filter(|e| !e.removed).count();
+    w.field.as_ref().and_then(|f| f.vram.as_ref()).map(|v| v.a.room(objects))
+}
+
+/// a coin's shadow graphic key: (4, 2) small, (10, 4) big
+fn coin_shadow(big: bool) -> Option<usize> {
+    SHADOWS.iter().position(|s| (s.0, s.1) == if big { (10, 4) } else { (4, 2) })
+}
+
+/// a coin object (`0x08017F5A`): its tiles, then its shadow's shared graphic
+pub fn coin_created(w: &mut World, id: EntityId, big: bool) {
+    if w.field.as_ref().is_none_or(|f| f.vram.is_none()) {
+        return;
+    }
+    acquire(w, Owner::Ent(id), if big { 0x100 } else { 0x40 });
+    if let Some(k) = coin_shadow(big) {
+        shared_acquire(w, k);
+    }
+}
+
 /// the blocks of entity `i` go (its object is destroyed)
 pub fn entity_gone(w: &mut World, i: usize) {
     if w.field.as_ref().is_none_or(|f| f.vram.is_none()) {
         return;
     }
     let id = w.ents[i].id;
+    // a coin: its shadow's reference, then its tiles
+    if let Body::Pickup(p) = &w.ents[i].body {
+        if let crate::fieldobj::PickupKind::Zenie(size) = p.kind {
+            if st(w).is_some_and(|v| v.owners.iter().any(|o| o.1 == Owner::Ent(id))) {
+                if let Some(k) = coin_shadow(size & 1 == 1) {
+                    shared_release(w, k);
+                }
+                release(w, Owner::Ent(id));
+            }
+            return;
+        }
+    }
     // a flame shot holds a reference of the shared flame graphic only
     if matches!(&w.ents[i].body, Body::Shot(sh) if matches!(sh.kind, crate::shots::ShotKind::Flame { .. })) {
         keyed_release(w, KEY_FLAME);

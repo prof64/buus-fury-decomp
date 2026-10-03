@@ -36,6 +36,10 @@ pub struct Enemy {
     pub vx: i32,
     pub vy: i32,
     pub moving: bool,
+    /// a movement step this frame found the walk not running (its SetAnim(1) is due; 0x0803B9DA tests IsAnim(1) at the
+    /// step, so a node that sets another animation after it - a GotoState into StandStill - keeps that one)
+    #[serde(default)]
+    pub walk_due: bool,
     pub slot: i32,
     pub children: Vec<EntityId>,
     pub parent: EntityId,
@@ -148,6 +152,7 @@ impl Enemy {
             vx: 0,
             vy: 0,
             moving: false,
+            walk_due: false,
             slot: 0,
             children: vec![],
             parent: 0,
@@ -342,6 +347,16 @@ impl crate::eanim::Host for EHost<'_> {
 pub fn set_anim(w: &mut World, i: usize, refs: &[AnimRef], restart: bool, looped: Option<bool>) {
     set_anim_rule(w, i, refs, restart, looped, None)
 }
+/// a movement step: `moving`, and the walk's SetAnim(1) is due unless it is running now
+pub fn mark_moving(w: &mut World, i: usize) {
+    let walking = w.en_ref(i).walking();
+    let e = w.en(i);
+    e.moving = true;
+    if !walking {
+        e.walk_due = true;
+    }
+}
+
 pub fn set_anim_rule(w: &mut World, i: usize, refs: &[AnimRef], restart: bool, looped: Option<bool>, rule: Option<u32>) {
     let d = Arc::clone(&w.data);
     let mut ev = std::mem::take(&mut w.events);
@@ -408,7 +423,10 @@ pub fn update(w: &mut World, i: usize) {
     // (the objects a load made inside the event run on - the 3D world map's patrols only: a 2D area's enemies are
     // held like any others; 0-21, s026's warp_fade: Majin Buu's tree draws nothing until the event ends)
     let id = w.ents[i].id;
-    let own_load = crate::fieldworld::flying(w) && w.field.as_ref().is_some_and(|f| f.load_ids.0 <= id && id < f.load_ids.1);
+    // (through the map's arrival fade only: the frame after it the event holds them too - sb 21-25 f64759, the world
+    // map after Kid Buu: the patrols stop when the 3D fade-in ends while s-script still runs)
+    let own_load = crate::fieldworld::flying(w)
+        && w.field.as_ref().is_some_and(|f| f.load_ids.0 <= id && id < f.load_ids.1 && matches!(f.mode, crate::field::Mode::FadeIn { .. }));
     // (the item-get presentation holds them the same way, all 60 frames: Diablo Desert Express 11-22 - a Mad
     // Bomber's Wait(90) does not count while the player holds a dropped item up; shots fly on)
     if w.field.as_ref().is_some_and(|f| f.busy && !own_load || f.arrival.is_some() || f.item_get.as_ref().is_some_and(|g| g.left > 0)) {
@@ -512,6 +530,7 @@ fn update_rest(w: &mut World, i: usize) {
         return;
     }
     w.en(i).moving = false;
+    w.en(i).walk_due = false;
     run_hook(w, i);
     crate::nodes::tick(w, i);
     let d = Arc::clone(&w.data);
@@ -519,7 +538,7 @@ fn update_rest(w: &mut World, i: usize) {
     let name = e.a.anim_name(&d);
     // a movement step SetAnim(1)s unless already walking (0x0803B9DA: IsAnim(1)); nothing switches back to idle when
     // the movement stops - the next node's own SetAnim does
-    if (e.a.anim.is_none() || matches!(name, Some("idle") | Some("walk"))) && e.moving && !e.walking() {
+    if (e.a.anim.is_none() || matches!(name, Some("idle") | Some("walk"))) && e.walk_due && !e.walking() {
         set_anim(w, i, &[nm("walk")], true, Some(true));
     }
 }
@@ -975,7 +994,7 @@ pub fn walk_by(w: &mut World, i: usize, vx: i32, vy: i32, nonzero: bool) -> bool
     if !nonzero {
         return true;
     }
-    w.en(i).moving = true;
+    mark_moving(w, i);
     move_by(w, i, vx, vy)
 }
 
@@ -1089,7 +1108,7 @@ pub fn step_from_player(w: &mut World, i: usize, speed: i32, face_toward: bool) 
     // step-away's step SetAnim(1)s unless walking, whatever plays (story playthrough: a fighter's hurt animation
     // gives way to the walk in the step's frame)
     if !face_toward {
-        w.en(i).moving = true;
+        mark_moving(w, i);
         if !w.en_ref(i).walking() {
             set_anim(w, i, &[nm("walk")], true, Some(true));
         }
@@ -1130,7 +1149,7 @@ pub fn circle_player(w: &mut World, i: usize, speed: i32) -> bool {
     if m == 0 {
         return false;
     }
-    w.en(i).moving = true;
+    mark_moving(w, i);
     let vx = -((dx as i64 * speed as i64) / m as i64) as i32;
     let vy = -((dy as i64 * speed as i64) / m as i64) as i32;
     try_move(w, i, vx, vy, if dx >= 0 { -speed } else { speed }, if dy >= 0 { -speed } else { speed });
@@ -1200,7 +1219,7 @@ pub fn walk_to_player(w: &mut World, i: usize, speed: i32, st: &mut i32, anim_fr
     if m < 8 {
         return false;
     }
-    w.en(i).moving = true;
+    mark_moving(w, i);
     unmark_self(w, i);
     let qx = ((dx as i64 * speed as i64) / m as i64) as i32;
     let qy = ((dy as i64 * speed as i64) / m as i64) as i32;
@@ -1252,7 +1271,7 @@ pub fn wander_step(w: &mut World, i: usize, speed: i32, turn_p: i64) {
     if w.field.is_some() && !w.en_ref(i).is_anim(1) {
         set_anim(w, i, &[AnimRef::N(1)], true, Some(true));
     }
-    w.en(i).moving = true;
+    mark_moving(w, i);
     if w.rng.chance(turn_p) {
         let d = w.rng.rand(4) as Dir;
         w.en(i).a.facing = d;
@@ -1289,7 +1308,7 @@ pub fn move_toward(w: &mut World, i: usize, speed: i32, stop: i32, face: bool, i
     let vx = round_div_sqrt(dx as i64 * speed as i64, s) as i32;
     let vy = round_div_sqrt(dy as i64 * speed as i64, s) as i32;
     if ignore_walls {
-        w.en(i).moving = true;
+        mark_moving(w, i);
         let a = &mut w.en(i).a;
         a.x += vx;
         a.y += vy;

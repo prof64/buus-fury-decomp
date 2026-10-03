@@ -5358,6 +5358,7 @@ dependencies = [
  "serde_json",
  "wf-core",
  "wf-extract",
+ "wf-import",
  "wf-rom",
  "wf-script",
  "wf-script-rhai",

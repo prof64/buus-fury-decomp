@@ -21,6 +21,9 @@ use wf_core::session::Session;
 use wf_core::world::{World, MAX_PLAYERS};
 use wf_view::{Buttons, RenderView, Sim, SimEvent};
 
+/// the GBA's load lengths per destination area (display frames without a logic frame; measured)
+const LOAD_LAG: &str = include_str!("load_lag.json");
+
 pub struct StorySim {
     pub session: Session,
     /// the script host: the same glue the segment harness replays the real game with (`wf_import::StoryHost`:
@@ -97,6 +100,30 @@ impl StorySim {
         Ok(StorySim { session, host, prev: [0; MAX_PLAYERS], errors, init_events, presenter: Default::default() })
     }
 
+    /// Story mode from a real-game checkpoint: the RAM of an area-entry cut imported ONCE (`wf_import`), then the
+    /// app plays on with its own host and carries everything itself (the soak's chapter starts: ship, dungeons).
+    pub fn from_import(packs: &Packs, ram: &wf_import::GbaRam) -> Result<StorySim, String> {
+        let data: Arc<GameData> = crate::battle::load_data(packs)?;
+        if let Ok(f) = wf_render::ui::Font::load(packs, "dialog") {
+            wf_script_core::text::set_dialog_font((0..256u16).map(|c| f.advance(c)).collect());
+        }
+        let files: BTreeMap<String, String> = packs
+            .list()
+            .into_iter()
+            .filter(|p| p.starts_with("scripts/") && p.ends_with(".rhai"))
+            .filter_map(|p| packs.read(&p).and_then(|b| String::from_utf8(b).ok()).map(|s| (p, s)))
+            .collect();
+        let mut host = wf_import::StoryHost::new(&data, &files)?;
+        let imp = wf_import::import_emulator_state(&data, ram, &mut host).map_err(|e| format!("{e:?}"))?;
+        host.prev_held = imp.prev_keys;
+        let mut session = wf_import::StoryHost::session(&data, imp.world);
+        wf_core::field::attach_host(&mut session.world, true);
+        let errors = host.errors.clone();
+        let mut prev = [0; MAX_PLAYERS];
+        prev[0] = imp.prev_keys;
+        Ok(StorySim { session, host, prev, errors, init_events: Vec::new(), presenter: Default::default() })
+    }
+
     pub fn world(&self) -> &World {
         &self.session.world
     }
@@ -108,6 +135,18 @@ impl StorySim {
 }
 
 impl Sim for StorySim {
+    fn lag_hint(&self) -> u32 {
+        // an area load in the last step: the GBA's load length into that area (measured on the real route,
+        // load_lag.json via tools/db57/load_lag.py); 0 otherwise
+        let Some(f) = self.session.world.field.as_ref() else { return 0 };
+        if f.entered != self.session.world.frame {
+            return 0;
+        }
+        let key = format!("{}-{}", f.area.world, f.area.area);
+        let d: serde_json::Value = serde_json::from_str(LOAD_LAG).unwrap_or_default();
+        d["areas"][&key].as_u64().or_else(|| d["default"].as_u64()).unwrap_or(0) as u32
+    }
+
     fn step(&mut self, inputs: &[Buttons], events: &mut Vec<SimEvent>) {
         events.append(&mut self.init_events);
         self.presenter.before_step(&self.session.world);

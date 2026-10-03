@@ -16,21 +16,16 @@
 //! recording every logic frame (diagnosis only), `PLAYTHROUGH_TRACE=from..to` prints the host / scene state.
 
 use serde_json::Value;
-use std::cell::RefCell;
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::BTreeMap;
 use std::path::PathBuf;
-use std::rc::Rc;
 use std::sync::Arc;
 use wf_core::content::{DirSource, GameData};
-use wf_core::field::{Cause, FieldConfig, FieldEvent};
-use wf_core::fieldcontent::Callback;
+use wf_core::field::FieldConfig;
 use wf_core::input::InputFrame;
 use wf_core::scene::{self, Npc};
 use wf_core::session::Session;
 use wf_core::story::Story;
 use wf_core::world::{Body, EntityId, Event, World, MAX_PLAYERS};
-use wf_script_core::{poll, CoreState, HostState, SharedHost};
-use wf_script_rhai::{Runtime, Status, UnitRef};
 
 /// frames of `opening.json` that must match continuously (the verdict)
 const MIN_MATCHED: usize = 41423; // the whole recording: New Game -> ... -> Instant Transmission -> the Other World Tournament (Pikkon) -> Earth 2-1
@@ -209,144 +204,6 @@ fn build_world(data: &Arc<GameData>, doc: &Value) -> (World, BTreeMap<usize, Ent
 // ---------------------------------------------------------------------------------------------------------------
 // the story host (wf-app StorySim's loop)
 
-struct Job {
-    run: Callback,
-    cause: Cause,
-}
-
-struct Host {
-    rt: Runtime,
-    shared: SharedHost,
-    hs: HostState,
-    queue: VecDeque<Job>,
-    running: bool,
-    cause: Option<Cause>,
-    stepped: std::collections::BTreeSet<String>,
-    errors: Vec<String>,
-    started: Vec<(usize, String)>,
-}
-
-impl Host {
-    fn with_host<T>(&mut self, w: &mut World, op: impl FnOnce(&mut Runtime) -> T) -> T {
-        {
-            let mut st = self.shared.0.borrow_mut();
-            std::mem::swap(&mut st.world, w);
-            std::mem::swap(&mut st.story, &mut self.hs);
-        }
-        let r = op(&mut self.rt);
-        let mut st = self.shared.0.borrow_mut();
-        std::mem::swap(&mut st.world, w);
-        std::mem::swap(&mut st.story, &mut self.hs);
-        r
-    }
-    fn collect(&mut self, evs: &[Event]) {
-        for e in evs {
-            if let Event::Field(FieldEvent::Run { run, cause, .. }) = e {
-                self.queue.push_back(Job { run: run.clone(), cause: cause.clone() });
-            }
-        }
-    }
-    fn finish(&mut self, w: &mut World, st: Result<Status, String>) {
-        if !matches!(st, Ok(Status::Blocked)) {
-            match self.cause.take() {
-                Some(Cause::Ai { entity }) => scene::ai_script_done(w, entity),
-                // the load waits for its on-enter script
-                Some(Cause::AreaEnter) => wf_core::field::finish_arrival(w),
-                _ => {}
-            }
-        }
-        match st {
-            Ok(Status::Blocked) => {
-                // a map trigger's blocking inline script holds the field in the VM's nested loop (field::hold_nested)
-                if matches!(self.cause, Some(Cause::Trigger { .. })) {
-                    wf_core::field::hold_nested(w);
-                }
-                // an on-defeat inline script that blocks runs in the VM's nested loop like any callback: it holds the
-                // field when no event of this frame does yet (the level-up popup #3 that ran before it has ended:
-                // 12-28's Warlord - the other enemies do not update in the popup's exit frame)
-                if matches!(self.cause, Some(Cause::Defeat { .. })) && !w.field.as_ref().is_some_and(|f| f.busy) {
-                    wf_core::field::set_busy(w, true);
-                }
-                self.running = true
-            }
-            Ok(Status::Finished) => {
-                self.running = false;
-                w.story.g = self.rt.globals().g;
-                wf_core::field::set_busy(w, false);
-            }
-            Err(e) => {
-                self.errors.push(e);
-                self.running = false;
-                wf_core::field::set_busy(w, false);
-            }
-        }
-    }
-    fn start_event(&mut self, w: &mut World, ev: u16) {
-        let mut g = self.rt.globals();
-        g.g = w.story.g;
-        self.rt.set_globals(g);
-        self.rt.start_event(ev, [0; 4]);
-        let st = self.with_host(w, |rt| rt.run().map_err(|e| e.to_string()));
-        self.finish(w, st);
-    }
-    fn run_queue(&mut self, w: &mut World, k: usize) {
-        while !self.running {
-            let Some(job) = self.queue.pop_front() else { break };
-            self.hs.talk_event = matches!(job.cause, Cause::Talk { .. });
-            match &job.cause {
-                Cause::Talk { npc } => self.hs.talk_target = Some(*npc),
-                Cause::Break { x, y, .. } | Cause::Defeat { x, y, .. } => self.hs.loot_pos = (*x, *y),
-                _ => {}
-            }
-            wf_core::field::start_cause(w, &job.cause);
-            let mut g = self.rt.globals();
-            g.g = w.story.g;
-            self.rt.set_globals(g);
-            self.cause = Some(job.cause.clone());
-            match &job.run {
-                Callback::Script(id) => {
-                    let path = format!("scripts/inline/{id}.rhai");
-                    let steps = self.stepped.contains(&path);
-                    self.started.push((k, id.clone()));
-                    self.hs.in_unit = true;
-                    self.rt.start_unit(UnitRef::new(id.clone(), "", steps), [0; 4]);
-                }
-                Callback::Event(id) => match self.rt.event_id(id) {
-                    Some(n) => {
-                        self.started.push((k, format!("s{n:03}")));
-                        {
-                        self.hs.in_unit = false;
-                        self.rt.start_event(n, [0; 4])
-                    }
-                    }
-                    None => {
-                        self.errors.push(format!("unknown event id {id}"));
-                        continue;
-                    }
-                },
-            }
-            let st = self.with_host(w, |rt| rt.run().map_err(|e| e.to_string()));
-            self.finish(w, st);
-        }
-    }
-    fn resume_blocked(&mut self, w: &mut World, k: usize) {
-        if !self.running {
-            return;
-        }
-        let mut hs = std::mem::take(&mut self.hs);
-        let r = poll(w, &mut hs);
-        self.hs = hs;
-        if let Some(v) = r {
-            let st = self.with_host(w, |rt| rt.resume(v).map_err(|e| e.to_string()));
-            self.finish(w, st);
-            self.run_queue(w, k);
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------------------------------------------
-// compare
-
 fn sounds(w: &World) -> Vec<String> {
     let mut v: Vec<String> = w
         .events
@@ -508,11 +365,8 @@ fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Value) -
     let mut rep = Report::default();
     let (world, mut map) = build_world(data, doc);
     let mut sess = Session { data: data.clone(), world, config: Default::default(), prev: [0; MAX_PLAYERS], outcome: wf_core::battle::Outcome::Running, hook: None, presenter: Default::default() };
-    let spare = Session::new_field(data.clone(), FieldConfig::default()).world;
-    let shared = SharedHost(Rc::new(RefCell::new(CoreState { world: spare, story: HostState::default() })));
-    let rt = Runtime::new(files, Box::new(shared.clone())).expect("compile");
-    let stepped = files.iter().filter(|(_, src)| src.contains("fn step_0()")).map(|(p, _)| p.clone()).collect();
-    let mut host = Host { rt, shared, hs: HostState::default(), queue: VecDeque::new(), running: false, cause: None, stepped, errors: vec![], started: vec![] };
+    // the shared script host (wf-import): the same loop the segment harness and the app's story mode run
+    let mut host = wf_import::StoryHost::new(data, files).expect("compile");
     let frames = doc["frames"].as_array().unwrap();
     // the game's sounds per logic frame (a long logic frame plays its sounds in a later video frame)
     let mut game_snd: Vec<Vec<String>> = vec![vec![]; frames.len()];
@@ -572,46 +426,8 @@ fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Value) -
                     sess.world.rng.set_state([i(&r[0]) as u32, i(&r[1]) as u32]);
                 }
             }
-            // the frame's start (deferred calls: drop scripts, kill XP): their scripts run before the objects' update
-            sess.step_begin(inputs);
-            let pre: Vec<Event> = sess.world.events.clone();
-            host.collect(&pre);
-            let before = host.started.len();
-            host.run_queue(&mut sess.world, k);
-            let fresh = host.started.len() > before;
-            let n0 = sess.world.events.len();
-            if std::env::var("DBG_PICK").ok().and_then(|v| v.parse::<usize>().ok()) == Some(k) {
-                let c = sess.world.ents.iter().filter(|e| matches!(e.body, Body::Pickup(_))).map(|e| (e.id, e.removed)).collect::<Vec<_>>();
-                eprintln!("    after begin: pickups {c:?} running {}", host.running);
-            }
-            sess.step_update();
-            wf_script_core::tick_timers(&mut sess.world, &mut host.hs);
-            if std::env::var("DBG_PICK").ok().and_then(|v| v.parse::<usize>().ok()) == Some(k) {
-                let c = sess.world.ents.iter().filter(|e| matches!(e.body, Body::Pickup(_))).map(|e| (e.id, e.removed)).collect::<Vec<_>>();
-                eprintln!("    after update: pickups {c:?}");
-            }
-            // the running script resumes from its wait (not one this frame's start began: its first wait counts from
-            // the next frame), then the scripts the update started (NPC talk) start: an event's scene object steps
-            // its first node in the next frame (Host::scene Enter blocks a frame)
-            let evs: Vec<Event> = sess.world.events[n0..].to_vec();
-            if !fresh {
-                host.resume_blocked(&mut sess.world, k);
-            }
-            host.collect(&evs);
-            host.run_queue(&mut sess.world, k);
-            // the trigger check (post step) starts its event in this frame too
-            let n = sess.world.events.len();
-            if std::env::var("DBG_PICK").ok().and_then(|v| v.parse::<usize>().ok()) == Some(k) {
-                let c = sess.world.ents.iter().filter(|e| matches!(e.body, Body::Pickup(_))).map(|e| (e.id, e.removed)).collect::<Vec<_>>();
-                eprintln!("    before post: pickups {c:?} zenie {}", sess.world.story.zenie);
-            }
-            let post: Vec<Event> = sess.step_post()[n..].to_vec();
-            if std::env::var("DBG_PICK").ok().and_then(|v| v.parse::<usize>().ok()) == Some(k) {
-                let c = sess.world.ents.iter().filter(|e| matches!(e.body, Body::Pickup(_))).map(|e| (e.id, e.removed)).collect::<Vec<_>>();
-                eprintln!("    after post: pickups {c:?} zenie {} events {:?}", sess.world.story.zenie, post);
-            }
-            host.collect(&post);
-            host.run_queue(&mut sess.world, k);
+            // one logic frame in the shared host's order (wf_import::StoryHost::step_inputs)
+            host.step_inputs(&mut sess, inputs);
         }
         if let Some((a, b)) = trace {
             if (a..=b).contains(&k) {
@@ -668,7 +484,7 @@ fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Value) -
                 }
                 eprintln!(
                     "  t{k} logic {logic} keys {keys:x} run {} depth {} dialog {:?} busy {:?} pending {:?} p {:?} game p {} rng {:08x?} game {} steps {:?}",
-                    host.running,
+                    host.running(),
                     w.scene.depth,
                     w.scene.dialog.as_ref().map(|d| (d.kind, d.phase, d.page, d.pages, d.t)),
                     w.field.as_ref().map(|f| f.busy),

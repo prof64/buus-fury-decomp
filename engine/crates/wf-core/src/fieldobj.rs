@@ -348,6 +348,10 @@ fn scatter(w: &mut World, vx: i32, vy: i32) -> (i32, i32) {
 pub fn drop_zenie(w: &mut World, size: i32) -> Option<EntityId> {
     let (lx, ly, lvx, lvy) = w.field.as_ref()?.loot;
     let size = size.clamp(0, 3);
+    // no coin (and no draws) when the object tiles are short: room < 0x3000 (`0x08018356`)
+    if crate::vram::room_of(w).is_some_and(|r| r < 0x3000) {
+        return None;
+    }
     let phase = w.rng.next();
     let (vx, vy) = scatter(w, lvx, lvy);
     let big = size & 1 == 1;
@@ -360,6 +364,9 @@ pub fn drop_zenie(w: &mut World, size: i32) -> Option<EntityId> {
         p.spawn = Some((w.frame + 1, p.coin_rect()));
     }
     let id = w.add(Body::Pickup(Box::new(p)));
+    // its tiles (def +0x10: 0x40 small / 0x100 big) and its shadow's shared graphic (def +2/+3: (4, 2) / (10, 4);
+    // `0x08018550` -> `0x080184C0`; segment sb 20-6 f155)
+    crate::vram::coin_created(w, id, big);
     // the first physics step in the frame it spawns: the world update gives it when it is created before that
     // update (deferred calls, drop scripts at the frame's start), else now
     if !w.field.as_ref().is_some_and(|f| f.pre_update) {

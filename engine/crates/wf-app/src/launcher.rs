@@ -136,11 +136,14 @@ pub struct Settings {
     /// mod folder names that do not load
     pub disabled_mods: Vec<String>,
     pub battle: BattlePrefs,
+    /// story mode: hold the picture for the GBA's measured load lengths ("original pacing"; presentation only)
+    #[serde(default)]
+    pub original_pacing: bool,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { view: "pc:0".into(), volume: 100, fullscreen: false, disabled_mods: Vec::new(), battle: BattlePrefs::default() }
+        Settings { view: "pc:0".into(), volume: 100, fullscreen: false, disabled_mods: Vec::new(), battle: BattlePrefs::default(), original_pacing: false }
     }
 }
 

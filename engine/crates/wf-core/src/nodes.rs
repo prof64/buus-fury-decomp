@@ -1255,6 +1255,8 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             let rule = w.data.anim.once_stop2;
             set_anim_r(w, i, &[an(if collapse { 17 } else { 18 })], false, rule);
         }
+        // field: the Yakon pose's SetAnim runs in the node's first update (below)
+        K::PlayAnim13Yakon if w.field.is_some() => {}
         K::PlayAnim13 | K::PlayAnim13Yakon | K::GhostAnimA | K::GhostAnimB => set_anim(w, i, &[an(18)], true, Some(false)),
         // field (sc_janemba, Super Janemba's state 0x2DD: a hit cuts the teleport): the landing animation (0x13)
         // played backwards from its end, then the vanish (0x11) backwards - 71 frames, then a SetAnim(0)
@@ -1674,7 +1676,7 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             };
             let m = dx.abs().max(dy.abs());
             if m as i64 >= par(c, n, P::Dist, 50) && m > 0 {
-                w.en(i).moving = true;
+                en::mark_moving(w, i);
                 en::try_move(w, i, (dx << 8) / m, (dy << 8) / m, 0, 0);
             }
             false
@@ -2822,6 +2824,16 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                 ghost_gfx(w, i, &[(0x5e, 0x60), (0xdb, 0xdc), (0xe4, 0xe5)]);
             }
             true
+        }
+        // 0x0803A556 (field): the first update SetAnim(0x13)s and enters controller 0x030032CC (0x0803A538: tick + 1,
+        // cel = tick >> 3, at tick 32 the walk state 0x0800EE78 without an animation change - the last cel stays);
+        // the node finishes when the enemy is no longer in that state: the controller ticks before the AI, so in
+        // the update after its 32nd tick (real route 8-38: the pose after the combo, then Wait 60)
+        K::PlayAnim13Yakon if w.field.is_some() => {
+            if f == 1 {
+                set_anim(w, i, &[an(18)], true, Some(false));
+            }
+            f >= 33
         }
         K::PlayAnim12 | K::PlayAnim12b | K::PlayAnim12Swarm | K::PlayAnim12Yakon | K::PlayAnim12Yakon2 | K::PlayAnim13 | K::PlayAnim13Yakon | K::PlayAnimOnce => {
             let d = Arc::clone(&w.data);

@@ -761,8 +761,10 @@ fn step_screen(w: &mut World) {
 
 /// Switch Character's close beyond the pause menu's reload (cycles; emulator, `re/buu/ship/menu_timing.py`: real
 /// route 8-26 cancelled, no other actor +1k; 8-1 switched, none +27k; 7-2 switched, 3 other sprites +139k; Super
-/// Buu 21-14 switched, 4 other sprites +153k)
-const CHARSEL_CLOSE_LEADER: i64 = 26_500;
+/// Buu 21-14 switched, 4 other sprites +153k). The leader term refitted against the reload model's current
+/// constants: real route 8-1 x3 / 8-26 / 8-66 x2 switched, game minus model -27k .. -6k (8-66's second close ran a
+/// frame long at 26.5k)
+const CHARSEL_CLOSE_LEADER: i64 = 6_000;
 const CHARSEL_CLOSE_SPRITE: i64 = 34_000;
 
 fn close(w: &mut World) {

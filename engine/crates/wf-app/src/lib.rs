@@ -59,6 +59,10 @@ pub struct App {
     audio_out: Vec<AudioEvent>,
     /// Timing of the last render (ms) / steps, for the perf overlay.
     pub stats: Stats,
+    /// "Original pacing" (Settings, off by default): after a step the sim reports as a GBA lag (`Sim::lag_hint`:
+    /// an area load) the picture holds for that many steps without stepping the sim. Presentation only.
+    pub original_pacing: bool,
+    hold: u32,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -86,6 +90,8 @@ impl App {
             events: Vec::new(),
             audio_out: Vec::new(),
             stats: Stats::default(),
+            original_pacing: false,
+            hold: 0,
         }
     }
 
@@ -117,7 +123,15 @@ impl App {
     /// One simulation step with the current inputs.
     pub fn step(&mut self) {
         self.events.clear();
+        if self.original_pacing && self.hold > 0 {
+            // the GBA's dropped frames: the picture and the sim hold, the audio driver keeps playing
+            self.hold -= 1;
+            return;
+        }
         self.sim.step(&self.inputs, &mut self.events);
+        if self.original_pacing {
+            self.hold = self.sim.lag_hint();
+        }
         for e in &self.events {
             if let SimEvent::Audio(a) = e {
                 self.audio_out.push(*a);

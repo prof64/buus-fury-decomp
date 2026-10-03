@@ -55,6 +55,8 @@ struct Args {
     area: String,
     players: usize,
     mode: ViewMode,
+    /// Settings "original pacing" (story mode holds the picture for the GBA's load lengths)
+    original_pacing: bool,
     reextract: bool,
     frames: Option<u64>,
     shot: Option<PathBuf>,
@@ -125,6 +127,7 @@ fn parse_args() -> Args {
         area: "8-3".into(),
         players: 1,
         mode: ViewMode::Pc { zoom: 0 },
+        original_pacing: false,
         reextract: false,
         frames: None,
         shot: None,
@@ -530,6 +533,7 @@ fn apply_choice(a: &mut Args, l: &wf_app::launcher::Launcher, c: &wf_app::launch
     if !a.view_given {
         a.mode = l.settings.mode();
     }
+    a.original_pacing = l.settings.original_pacing;
     match c {
         Choice::Story { slot } => a.story_launch = Some(*slot),
         Choice::Title => a.title_launch = true,
@@ -714,6 +718,7 @@ impl Shell {
         match make_app(&self.args, packs) {
             Ok(mut app) => {
                 app.mode = self.args.mode;
+                app.original_pacing = self.args.original_pacing;
                 let bpath = self.args.data.join("bindings.json");
                 let bindings = std::fs::read_to_string(&bpath).ok().and_then(|s| Bindings::from_json(&s)).unwrap_or_else(|| {
                     let b = Bindings::default();
@@ -1226,6 +1231,7 @@ fn headless(a: &mut Args) -> Result<(), String> {
     let bank = wf_app::wf_content::audio::load_bank(&packs).ok().map(|b| &*Box::leak(Box::new(b)));
     let mut app = make_app(a, packs)?;
     app.mode = a.mode;
+    app.original_pacing = a.original_pacing;
     let mut saves_gen = 0;
     let mut s = wf_app::session::Session::new(app, bank);
     eprintln!("content ready + world loaded in {:.0} ms (headless, muted)", t0.elapsed().as_secs_f64() * 1e3);

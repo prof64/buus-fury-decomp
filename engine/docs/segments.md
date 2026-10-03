@@ -339,6 +339,30 @@ offered it and has other work): the running event's state at the cut - script th
 cutscene actors. Proofs planned: the opening recording's two in-cutscene loads and the real route's Kid Buu fight.
 Also A's: `sb_041` past f64758 (the world map after the fight).
 
+*Status (A, later).* `sb_041` past the fight: **64,786 / 66,219, the same with the allocator check on and off** -
+the data gate (21,330 frames) now expects all of them with the allocator on (one gate covers both sides). Two rules:
+a script waiting on the 3D map's arrival fade goes on in the fade's last frame (`Pending::Transition`: song 4 on
+f64758), and a load's own objects run through the event only during that fade - the frame after it the event holds
+the patrols too (`enemy::update`, f64759). Stop at f64786 (**Super Buu agent's**): the text box of s-script over the
+world map purges sprite memory (`vram::purge` suspends every map object, the flyer included, at f152508) - the game
+keeps updating them (the flyer's tick 15 -> 16 on the next logic frame; the patrols / circles too), while the
+allocator rows still match: on the 3D map the purge frees tiles but does not take the objects out of the update.
+
+*In-event entries: decoding where the event stands* (`tools/dungeons/evpos.py STATE`): the scene objects are on the
+IWRAM stack (+0 header = a scene-table entry, +8 u16 next state, +0x14 param ptr); the interpreters are the context
+stack 0x03001034; the VM 0x08004038 keeps its PC in the pushed r1 slot (the word after a stack word equal to the
+interpreter pointer; advanced per opcode at 0x08004064), so (scene, step, PC offset in the step's code) is readable.
+Kind-0 code is at record + 3; kind-4 code is decompressed into a heap buffer (the code starts 8 bytes after the
+buffer pointer the stack holds). The opening's two in-event loads: **1-10** = s061's `warp` then `jump 68`: s068
+step 0 at offset 9 (after its first native, `camera_scroll_to(160, 32, 300)`, blocking); **1-1** = s038 step 2
+(kind 4) at offset 23 (after `fade_out(1)`, `warp(1, 1, 1, 8, 167)`, `set_pos(161, 8, 176)`). Plan for the import
+(not built yet): area entry as today + the host's thread rebuilt at that point - `Frame::Event { event, node }` +
+the node's unit, run with an instant host that completes the actions before the PC (count = the natives the game's
+bytecode executed from the step's start to the PC, by running the step's bytecode in `wf_script::vm` with queries
+answered from the imported world), blocked on the native at the PC with its progress taken from the game's mode
+object (camera scroll / wait / walk counters). Open question found on the way: in 1-1 the PC stands right after
+`set_pos`, a non-blocking native in our model - the game may block one frame there (actor not yet spawned).
+
 ## 7. Side content (owner: the side-content agent, from 2026-10-02)
 
 **Ownership change (coordinator):** HFIL / Janemba (incl. the Janemba -> Super Janemba handover in the field), Broly
@@ -1102,7 +1126,8 @@ two Python hash seeds, gives identical key logs (13,000 frames); the earlier run
   grinds goku90 / goku120 / veg1 only on request). `tools/side/segrun.py DIR...` prints the non-exact cuts.
   46 cuts, `SEGMENT_VRAM=0`: 40 exact (run with `--target-dir engine/target-side`: `segrun.py` does); 4 are mid-area cuts the importer refuses (0-51 -> 18-1 through the map
   screen, 18-2's switch scene); 18-13 stops at f1470 (fade after the save-point menu); the arena (18-14, 6,940
-  frames) matches 3,988 (Janemba, s450 exact; open: Vegeta vs Super Janemba, `hp: 1267 vs game 1266`). Legs without an area entry (yemma, punched, vegeta, veg0, arena0, gogeta) have no importable cut
+  frames) is exact to its end (Janemba, s450, Vegeta vs Super Janemba, the fusion: 6,940 / 6,940); 18-13 stops at
+  the save write (below). Legs without an area entry (yemma, punched, vegeta, veg0, arena0, gogeta) have no importable cut
   yet - they start mid-area.
   The real Goku IS selectable in the switch menu at 18-13 (j10_arena: four LEFT) - the constructed start state's
   greyed-out Goku is its own artefact.
@@ -1119,6 +1144,11 @@ two Python hash seeds, gives identical key logs (13,000 frames); the earlier run
     animation in the defeat scene: three draws).
   - A script's `shake` suspends the running shake before that one ticks in the frame (s450 after a crit kill: the
     crit shake resumes 60 frames later with 11 frames and count 2 left: draws every second frame from the second).
+* **For the menu-timing agents (save write length):** `rj_h13_001_18_13` (18-13's save point, real route) stops at
+  f1470: A on Save Game at f1349, then the game's screen is black at f1470 - its flash write took one frame less
+  than ours (`menu/save.rs` `WRITE_FRAMES` = 121: we leave at f1471). The write is CPU time (~120 frames of the
+  checksum + flash loop), so the whole frames it spans depend on where in the frame it starts - the same kind of
+  prediction as the redraw-cost model (`sndsim::Redraw`), not a constant. Left to its owners.
 * The 1/1024 px camera difference (18-2 / 18-1 after the character switch, `hf_veg1_013/014`): the save point's
   Switch Character screen closes over 22 frames with the logic counter stopped; in its LAST frame the game's camera
   already makes one step toward the new character (160773 -> 160772, then one unit a frame), ours a frame later.
@@ -1547,8 +1577,9 @@ Buu) f7067, HP 306 vs 307 - a real engine difference, not a harness artefact, an
 * **The hit-damage remainder (1/1024 HP, `Player.hp_acc`) belongs to the player object and starts at 0 whenever that
   object is rebuilt**: at an area load (`field.rs`, found by the soak: five 1-HP drifts in Other World), at Buu's
   **candy respawn** (`nodes.rs`, the eat's tick 120: the player object is destroyed and made again - the game's row
-  has `p` null during the candy; 8-71: after the candy the next hit takes 4, not 5), and at `set_character`
-  (`switch_character`; INFERRED from the other two, no recording isolates it). Evidence is the recorded HP values
+  has `p` null during the candy; 8-71: after the candy the next hit takes 4, not 5). **Not** at `set_character`
+  (side-content agent, 2026-10-03: the object is kept - the real route's arena s450, Goku -> Vegeta, Super
+  Janemba's first hit takes 91 with the carried remainder, 90 without; `rj_arena_000_18_14` 6,940 / 6,940 with it). Evidence is the recorded HP values
   (the soak's Other World rows and shipr_338's f6808 .. f7067), not a trace of the object's field: ship-fixes agent,
   if 8-71 has another candy with hits before and after, it confirms or refutes this cheaply.
   With it every gate passes with HP compared (all of data/segments, incl. shipr_338 8,000 / 8,000).
@@ -1629,10 +1660,53 @@ drill and the Super Saiyan Goten fight into 4-25).
 *Regression tests* (no soak needed): `crates/wf-app/tests/carried_state.rs` - the host mark after the title's New
 Game; a load resets the hit-damage remainder, the regen count, the drain fraction and a pending script fade-in;
 `set_character` takes the new character's own skill slot.
-*Next stop (Earth agent - a control rule, not carried state):* 4-25 (gravity chamber, Trunks vs Vegeta), row
+*4-25 (Earth agent, 2026-10-04):* cut `work/earth/segs/x_trunks425.json` (Earth master 91,867 = 2-90 #2,
+6,900 frames, `SEGMENT_VRAM=0`: the allocator differs from f1258, Super Buu agent's) - two rules fixed on the way:
+`set_form` refreshes the player through 0x08010692, which builds the form object twice before its SetAnim(0)
+(two rand(120) for form 25, then the idle draw; s191 node 18); a movement step's SetAnim(1) is due only when the
+walk is not running *at the step* (`Enemy.walk_due`, TS `markMoving`: Vegeta's back-off ends in a GotoState into
+StandStill in the same frame - the deferred check re-set the walk; cross_ts green, dumps regenerated). The cut now
+runs to f6646 = soak row 139,936, the row below. Cause found, not fixed: Vegeta's InlineScript (0x0870EA28:
+play_anim(0, 12) x 3 on the player, face_actor, jump_to) runs its bytecode **inside Vegeta's update**, before the
+player's (list order); its step at f6646 sees the player's animation done, turns him (face_actor) and lets him go,
+so the player's control runs in that frame (held RIGHT+DOWN: walk). Ours resumes AI inline scripts after the whole
+objects pass, so the player is still a puppet in his update and walks a frame later. Fix = resume an AI inline
+script from its enemy's update (a host callback inside `nodes::update` for `InlineScript`) - a host change, next.
+Original note: *Next stop (Earth agent - a control rule, not carried state):* 4-25 (gravity chamber, Trunks vs Vegeta), row
 139,937: Trunks' one-shot state (`once`, raw from a hit) ends into idle on row 139,936 with RIGHT+DOWN already held,
 facing left; the game is in `walk` on 139,937 (and has moved on 139,938), the app turns first (idle, facing 3) and
 walks a frame later. No segment covers it (4-25 is entered by a script warp). Reproduce: `soak opening.json
 earth_all.json --sync 1-1 --frames 139945 --show 139930..139940`.
 *Row 122,530 (app 39 vs the row's 201 HP in 2-8)* - not traced; areas, flags, position and RNG stay equal through it.
 *Builds:* cargo commands for this work use `--target-dir engine/target-soak`.
+
+**§11 update 5 (B): regen count reconciled with the Kid Buu agent's rule (emulator trace, `work/db57/scratch/
+regentrace.py` / `regen_switch.py`).** The form controller's regen count (player +0x22C -> +0xC, +110 per logic
+frame) restarts at 0 in all three cases: (a) an ordinary area load (12-1 -> 12-2 / 12-3 of db5: the controller is a
+new object, count 0 in the load's frame, 110 the next); (b) the game's `set_character` native run through its own
+interpreter on a live field player (same controller object, count restarted: 25,190 -> 330 = three ticks after the
+native's frames); (c) the save point's Switch Character (s011; the world restore rebuilds player and controller:
+count 0 when the screen closes). So "a script switch restarts it" (agent A, sb_041) and "a load restarts it" (B, the
+2-90 soak stop) are one rule; the engine already has it on every path (`field::renew_player` drops it,
+`natives::switch_character` - used by the native and by Switch Character - sets 0). On the current tree the gated
+suite (incl. sb_041) and `wf-app` `carried_state` pass together; the full wf-app suite is green.
+*Row 122,530 (app 39 vs 201 HP, 2-8) - soak artefact, closed:* the game's row HP is 201 only while it has no player
+object (the 0-96 title card and the 43 frozen rows of the load into 2-8); from its player's first row (122,573) it is
+39, equal to the app's. The soak's HP check now skips rows without a game player (as `segment::compare` does).
+
+**§11 update 6 (B): emulator traces of the hit-damage remainder (player +0x228; 0x08010BF2 adds the hit's 1/1024 HP
+there, `work/db57/scratch/remtrace.py`).** (a) area loads: the remainder (860 at 12-3, 944 at 12-8 in db5) is gone
+with the old player object; the load's new player starts at 0 - VERIFIED. (b) the game's `set_character` native on
+a live player (Airship deck, remainder 860): the same object, **860 before and after** - set_character does NOT
+reset it (my earlier inferred reset was wrong; it is already gone from `switch_character` on the current tree).
+(c) Buu's candy respawn in 8-71 (`shipr_338` state, its own keys): the player object is destroyed (pointer 0 from
+f6912) and rebuilt with remainder **843 -> 0** - VERIFIED (`nodes.rs`' reset at the respawn stays).
+*One host loop:* `wf-script-core/tests/playthrough.rs` now runs on `wf_import::StoryHost` (`step_inputs`; dev-dependency
+on wf-import); its private copy is gone. The story playthrough still matches all 41,423 frames. App story mode, the
+segment harness and the playthrough lockstep now share one host.
+*Checkpoint starts for the soak:* `StorySim::from_import` (one import of an area-entry cut's RAM, then the app plays
+on by itself) and `soak --import SEG.json`. Used next for the ship chapter (a continuous master recorded from the
+first ship cut, `work/db57/shipmaster/`).
+*Row 33,189 (1-20) - closed, lag frame:* the game's logic frame 32,478 spans two video rows (33,189 / 33,190) and
+the scene's `set_pos` shows in the second; the app runs one display frame per logic frame (lag-frame option 1), so
+it shows the new position one row earlier. Same position, same RNG, areas and flags; no state difference.

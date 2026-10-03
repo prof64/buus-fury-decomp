@@ -702,6 +702,7 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
     crate::vram::release(w, crate::vram::Owner::StatMark);
     crate::vram::signs_gone(w);
     crate::vram::release(w, crate::vram::Owner::Minigame);
+    crate::vram::release(w, crate::vram::Owner::Timer);
     crate::vram::release(w, crate::vram::Owner::Hud);
     crate::vram::release(w, crate::vram::Owner::Map3d);
     crate::vram::release(w, crate::vram::Owner::HudOut);

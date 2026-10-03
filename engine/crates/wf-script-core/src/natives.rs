@@ -667,10 +667,14 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
         }
         0xb0 | 0xbc => {
             h.w.scene.timer_hud = Some(if n == 0xb0 { scene::TimerHud::Countdown } else { scene::TimerHud::Stopwatch });
+            // its object (`0x0802FCA0`, vtable 0x0804BACC): 0x400 tile bytes (segment sb 21-25 f29581)
+            wf_core::vram::release(h.w, wf_core::vram::Owner::Timer);
+            wf_core::vram::acquire(h.w, wf_core::vram::Owner::Timer, 0x400);
             unit()
         }
         0xb1 | 0xbd => {
             h.w.scene.timer_hud = None;
+            wf_core::vram::release(h.w, wf_core::vram::Owner::Timer);
             unit()
         }
         0xb2 => {
@@ -1078,9 +1082,9 @@ pub fn switch_character(w: &mut World, c: i32) -> Result<(), String> {
     // the new character's form controller starts its regen count (+0xC) at 0 (Kid Buu's arena: after s-script
     // hand-overs the bench's 5% tick comes 596 pass frames after the event that switched)
     p.regen_timer = 0;
-    // the rebuilt player object starts its hit-damage remainder at 0, as after a load or the candy respawn
-    // (INFERRED from those two: no recording isolates set_character yet)
-    p.hp_acc = Default::default();
+    // the hit-damage remainder stays: set_character keeps the player object (unlike a load or the candy respawn,
+    // which rebuild it). The real route's arena, s450 (Goku -> Vegeta): Super Janemba's first hit on Vegeta takes
+    // 91 with Goku's remainder, 90 without; with it the whole 6,940-frame cut rj_arena_000_18_14 is exact
     let gfx = |w: &World, f: i32| w.data.form(f).map(|f| f.gfx);
     let new_sprite = gfx(w, p.form) != gfx(w, form);
     let old = p.a.sprite;

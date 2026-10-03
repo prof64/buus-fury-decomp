@@ -88,3 +88,32 @@ fn set_character_takes_the_characters_own_skill_slot() {
     let pi = w.player_idx(0).expect("leader");
     assert_eq!(w.pl_ref(pi).sel, want, "the previous leader's skill slot followed to the new character");
 }
+
+/// "Original pacing" holds the picture for the GBA's load length after a step that loaded an area, without
+/// stepping the sim; off by default (no hold at all).
+#[test]
+fn original_pacing_holds_after_a_load_only_when_enabled() {
+    let Some(p) = packs() else { return };
+    for on in [false, true] {
+        // the Airship deck 12-1: walk right into its exit to 12-2, then count the steps the sim's frame stood still
+        let s = StorySim::new(&p, (12, 1), vec![], 3).expect("story");
+        let mut app = wf_app::App::new(packs().unwrap(), Box::new(s));
+        app.original_pacing = on;
+        let (mut held, mut loaded) = (0, false);
+        for _ in 0..1500 {
+            let before = app.sim.frame();
+            app.inputs[0] = 0x10u16.into();
+            app.step();
+            if app.sim.frame() == before {
+                held += 1;
+            }
+            loaded |= story_sim(&app).world().field.as_ref().is_some_and(|f| f.area.area == 2);
+        }
+        assert!(loaded, "did not reach 12-2");
+        if on {
+            assert!(held >= 10, "no hold after the load: {held}");
+        } else {
+            assert_eq!(held, 0, "the default must not hold");
+        }
+    }
+}
