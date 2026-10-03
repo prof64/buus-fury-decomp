@@ -80,7 +80,6 @@ fn mv(x: i32, y: i32, speed: i32, state: i32) -> Cmd {
 pub fn call(h: &mut CoreHost, c: &Call) -> R {
     let n = c.native;
     let a = c.args;
-    if std::env::var("NATIVE_DBG").is_ok() { eprintln!("native wf {} 0x{n:02x} {:?}", h.w.frame, a); }
     match n {
         0x00..=0x07 => Err(format!("native 0x{n:02x} is handled by the VM")),
         0x08..=0x0b => done(h.w.story.l[n as usize - 8]),

@@ -1,4 +1,4 @@
-"""run_route.py START.ss OUTDIR [--from MARK] [--to MARK] [--log]  -- play ship_route.goals from a state (headless,
+"""run_route.py START.ss OUTDIR [--real | --fat] [--from MARK] [--to MARK] [--log]  -- play ship_route.goals from a state (headless,
 muted), saving OUTDIR/<mark>.ss at each ('mark', name) goal, OUTDIR/end.ss at the end; OUTDIR/start.ss = START
 (the goal list is built from it). --log writes OUTDIR/keys.json (per-frame keys from the start / the mark)."""
 import json
@@ -22,7 +22,8 @@ def main():
     if frm is None:
         shutil.copyfile(start, out / 'start.ss')
     real = '--real' in a
-    gl = (ship_route.goals_real if real else ship_route.goals)(start_emu(str(out / 'start.ss')))
+    pick = ship_route.goals_fatbuu if '--fat' in a else ship_route.goals_real if real else ship_route.goals
+    gl = pick(start_emu(str(out / 'start.ss')))
     i0 = 0
     if frm is not None:
         i0 = gl.index(('mark', frm))

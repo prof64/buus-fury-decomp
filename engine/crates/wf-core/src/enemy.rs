@@ -1646,16 +1646,12 @@ pub fn teleport_beside(w: &mut World, i: usize, side: i32) {
     let (cx, cy) = w.en_ref(i).a.center();
     crate::fx::puff(w, cx, cy, 0x1800);
 }
-/// 0x08009816: a footprint that does not fit the walk layer moves to the first free tile-aligned spot of a square
-/// spiral around its tile (sc_janemba: Super Janemba's teleport against the arena's diagonal wall)
-fn free_spot(w: &mut World, i: usize) {
-    let (x, y, fw, fh) = {
-        let a = &w.en_ref(i).a;
-        (a.px(), a.py(), a.foot_w, a.foot_h)
-    };
-    let Some(c) = w.col.as_ref() else { return };
-    if c.test(Layer::Walk, x, y, x + fw, y + fh) {
-        return;
+/// 0x08009816: a rect that does not fit the walk layer moves to the first free tile-aligned spot of a square spiral
+/// around its tile (sc_janemba: Super Janemba's teleport against the arena's diagonal wall; the scripts' 0xCB / 0xCC)
+pub fn free_rect(w: &World, x: i32, y: i32, rw: i32, rh: i32) -> (i32, i32) {
+    let Some(c) = w.col.as_ref() else { return (x, y) };
+    if c.test(Layer::Walk, x, y, x + rw, y + rh) {
+        return (x, y);
     }
     let (bx, by) = (x & !7, y & !7);
     for k in 0..4096i64 {
@@ -1672,12 +1668,22 @@ fn free_spot(w: &mut World, i: usize) {
             (k - s * s - s + ((-s) >> 1), (-s) >> 1)
         };
         let (nx, ny) = (bx + dx as i32 * 8, by + dy as i32 * 8);
-        if c.test(Layer::Walk, nx, ny, nx + fw, ny + fh) {
-            let a = &mut w.en(i).a;
-            a.x = nx << 8;
-            a.y = ny << 8;
-            return;
+        if c.test(Layer::Walk, nx, ny, nx + rw, ny + rh) {
+            return (nx, ny);
         }
+    }
+    (x, y)
+}
+fn free_spot(w: &mut World, i: usize) {
+    let (x, y, fw, fh) = {
+        let a = &w.en_ref(i).a;
+        (a.px(), a.py(), a.foot_w, a.foot_h)
+    };
+    let (nx, ny) = free_rect(w, x, y, fw, fh);
+    if (nx, ny) != (x, y) {
+        let a = &mut w.en(i).a;
+        a.x = nx << 8;
+        a.y = ny << 8;
     }
 }
 pub fn kid_buu_split(w: &mut World, i: usize) {

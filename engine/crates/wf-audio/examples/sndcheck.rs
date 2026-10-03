@@ -42,7 +42,8 @@ fn main() {
             "upd" => {
                 last_n = e[4].as_u64().unwrap() as usize;
                 // chunks of <= 512 like 0x0803F296
-                let mut left = last_n;
+                // fewer than 64 pending samples: the update returns without mixing
+                let mut left = if last_n < 64 { 0 } else { last_n };
                 while left > 0 {
                     let c = left.min(512);
                     d.render_into(&mut out, c);

@@ -733,7 +733,9 @@ pub fn view(w: &World) -> Option<MenuView> {
 pub fn take_result(w: &mut World) -> Option<i32> {
     // the power struggle's mode ends inside a world frame: the script continues in that frame (s464: prop_hide and
     // the director's wait start the frame the mode ends)
-    let ended_in_world = w.menu.phase == (Phase::Leave { t: 0 }) && (minigame::world_runs(w) || minigame::watch_closing(w));
+    // (the credits too: `run_credits`' script continues in the frame the mode ends, segment sb the ending's fade)
+    let credits = matches!(w.menu.shown.as_deref(), Some(Screen::Credits(_)));
+    let ended_in_world = w.menu.phase == (Phase::Leave { t: 0 }) && (minigame::world_runs(w) || minigame::watch_closing(w) || credits);
     if !w.menu.scripted || (w.menu.phase != Phase::Idle && !ended_in_world) {
         return None;
     }

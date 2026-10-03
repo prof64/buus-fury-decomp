@@ -481,7 +481,7 @@ s452 (flag 125). Master `work/side/seg/sc_arena_master.json` (local), segments c
 | segment | from | frames | matched |
 |---|---|---|---|
 | `sc_janemba` | 18-14 entry | 6,000 | 6,000 (gate) |
-| `sc_janemba_full` (local, 22 MB) | 18-14 entry | 40,688 | 36,142: Janemba, the handover, Super Janemba, the fusion |
+| `sc_janemba_full` (local, 22 MB) | 18-14 entry | 40,688 | 40,688: exact to the end (Janemba, the handover, Super Janemba, the fusion, Gogeta's KO, the split, s452) |
 
 Rules found (field only where battle is pinned by the TypeScript cross-check):
 * Janemba's body parts: created at body + (-16, -16) / (48, -16) / (16, -40); then part 0x37's AI node (0x0803D0C4)
@@ -533,4 +533,33 @@ Rules found (field only where battle is pinned by the TypeScript cross-check):
   later. Gogeta's split (face -> set_pos), sb 21-18 / 21-19 (619 -> 1,233 / 367 -> 981, exact), sb 1-5 / 6-6 / 6-9 /
   20-5 further; Earth's 90 and the ship's 338 cuts unchanged.
 
-Open at 36,142 (full run, the split's aftermath): a Vegeta (sprite 102) walk a sub-pixel off.
+* Super Janemba's TeleportChain4 (node update 0x08034502): while the boss shows the vanish (0x11) or landing (0x13)
+  animation the node waits; otherwise - a hurt that cut the vanish, state 0x2DD's end, the landing's own end (36
+  frames, SetAnim(0)) - the side counter steps and, unless it is round (% 4), the teleport restarts from that frame
+  (vanish, hits off, jump 36 frames later to side = counter & 3, hittable 18 after the jump).
+* State 0x2DD (a hit during the chain; node 0x08034AA5, was "PlayAnimTimed" inferred): the landing animation played
+  backwards from its end, then the vanish backwards - 71 frames with hits off, then SetAnim(0) (hittable), PopState
+  the next frame.
+* Fusion (native `fuse`): base stats = the components' mean + 10 (SPD + 16), as the battle's `progression::fuse`
+  (Gogeta 96 / 74 / 81 / 86 in the game's record; the walk speed showed it). A fusion's kill XP goes to both
+  components' records, each the whole gain; the fusion's own XP stays (`CharState.fusion` = record +0x02).
+* `screen_rect_x/y_at_actor` (0xCB / 0xCC), field: the rect centred on the footprint centre, moved by 0x08009816's
+  spiral to the first spot where it fits the walk layer (not a camera clamp): the split's walk targets.
+
+## 10. Dragon Ball dungeons (fat-Buu arc; owners: dungeon agents A (1-4) and B (5-7), from 2026-10-03)
+
+The seven Dragon Balls = story flags 112 .. 118, each set by the dungeon's pickup / boss-defeat event (all seven are
+needed before s017 (119) and Gotenks vs Buu s218 (120)). Split, in flag order:
+
+| # | flag | set by | dungeon (world) | owner | segment prefix | work dir |
+|---|---|---|---|---|---|---|
+| 1 | 112 | s362 @ 9-15 | Thieves Den (9; needs a Bandana worn, equipment 126) | **A** | `db1_*` | `work/db/` |
+| 2 | 113 | s378 (11-24) | Diablo Desert + Diablo Desert Express (11) | **A** | `db2_*` | `work/db/` |
+| 3 | 114 | s366 @ 10-31 | Pilaf's Castle (10) | **A** | `db3_*` | `work/db/` |
+| 4 | 115 | s439 @ 15-33 | Nataday Village / Northern Wilderness / Volcano (15): Broly s436 (flag 111) -> s439 | **A** (takes Broly, see §7) | `db4_*` | `work/db/` |
+| 5 | 116 | s387 @ 12-28 | Airship (12) | **B** | `db5_*` | B's choice |
+| 6 | 117 | s399 @ 13-53 | Fukurou Forest / Ninja Stronghold (13) | **B** | `db6_*` | B's choice |
+| 7 | 118 | s406 @ 14-2 | Kyodai Pyramid / Totenhotep's Chamber (14) | **B** | `db7_*` | B's choice |
+
+Agent A's tools: `tools/dungeons/` (start-state builder on top of `tools/superbuu/mksave.py`, routes, cuts). The ship
+agent's real checkpoint states (§8) replace the constructed start states when they exist.

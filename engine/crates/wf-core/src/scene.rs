@@ -2940,7 +2940,13 @@ pub fn reapply_areas(w: &mut World) {
 pub fn screen_rect_at(w: &World, i: usize, rw: i32, rh: i32) -> (i32, i32) {
     // field: centred on the footprint centre (sc_janemba: Gogeta's split, rect 48 x 8 at (144, 200) with a 16 x 8
     // footprint -> (128, 200): the walk_to_speed target the script builds from it)
-    let (cx, cy) = if w.field.is_some() { w.actor(i).map(|a| a.foot_center()).unwrap_or((0, 0)) } else { box_center(w, i) };
+    if w.field.is_some() {
+        // ... and moved by 0x08009816 to the first spot where the rect fits the walk layer (the split's ending: Vegeta
+        // by the arena wall walks to where both fit)
+        let (cx, cy) = w.actor(i).map(|a| a.foot_center()).unwrap_or((0, 0));
+        return crate::enemy::free_rect(w, cx - rw / 2, cy - rh / 2, rw, rh);
+    }
+    let (cx, cy) = box_center(w, i);
     let c = w.cameras[0].rect;
     let x = (cx - rw / 2).clamp(c.x0, (c.x1 - rw).max(c.x0));
     let y = (cy - rh / 2).clamp(c.y0, (c.y1 - rh).max(c.y0));

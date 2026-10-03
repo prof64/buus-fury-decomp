@@ -490,7 +490,10 @@ class ShipDriver(Driver):
         sv = lambda v: v - (1 << 32) if v & 0x80000000 else v  # noqa: E731
         x, y = sv(e.r32(p + 0x1A0)) / 256, sv(e.r32(p + 0x1A4)) / 256
         z, h = sv(e.r32(p + 0x1A8)) / 1024, sv(e.r32(p + 0x1AC)) / 1024
-        pats = [o for o in enemies(e) if o[5] == 141 and not self.over_pad(o[1], o[2])]
+        # the Stolen Airship patrols only (graphics def 0x086A89D0; 0x086B43FC = the Rogue Submarines, whose
+        # encounter 0-52 drops no Bandana)
+        pats = [o for o in enemies(e) if o[5] == 141 and e.r32(o[0] + 0x58) == 0x086A89D0
+                and not self.over_pad(o[1], o[2])]
         if not pats:
             return KEY.UP
         o = min(pats, key=lambda o: math.hypot(o[1] - x, o[2] - y))
