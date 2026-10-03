@@ -80,7 +80,7 @@ pub fn render_view(w: &World, out: &mut RenderView) {
     if let Some(f) = w.field.as_ref() {
         let level = match f.mode {
             crate::field::Mode::FadeOut { k, step, .. } => crate::field::fade_out_level(k, step),
-            crate::field::Mode::FadeIn { k } => (256 - 8 * k).clamp(0, 256),
+            crate::field::Mode::FadeIn { k } => crate::field::fade_in_level(w, k),
             crate::field::Mode::Normal => 0,
         };
         if level > 0 {

@@ -2281,8 +2281,10 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
             wrap_burst(w, i);
             true
         }
+        // another object's energy message head-on (the player's energy attacks; another wave: two laser turrets facing
+        // each other, Babidi's ship 8-36 - the receiver puffs). A punch does not stop it (8-51)
         ShotKind::EnergyWave { len, mode, .. } => {
-            if msg.team != 1 || *mode != 0 {
+            if msg.source == me || *mode != 0 || msg.atk.kind != 1 {
                 return false;
             }
             let s = w.shot_ref(i);

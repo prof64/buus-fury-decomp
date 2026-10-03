@@ -839,7 +839,14 @@ pub fn camera(w: &mut World, slot: usize) {
 pub fn pre_step(w: &mut World) {
     // an event (nested loop inside the player update) or the item-get holds the players; the raw keys stay in scene.keys
     if w.field.as_ref().is_some_and(|f| f.item_get.is_some() || f.busy) {
-        w.input = Default::default();
+        // the world map's flyer reads the keys itself, event or not (s515's warp_fade: it answers A / B during the
+        // arrival fade-in)
+        let flying = crate::fieldworld::flying(w) && w.field.as_ref().is_some_and(|f| f.item_get.is_none());
+        for s in 0..w.input.len() {
+            if !(flying && s == 0) {
+                w.input[s] = Default::default();
+            }
+        }
     }
     if let Some(f) = w.field.as_mut() {
         f.pre_update = true;
@@ -1370,6 +1377,13 @@ fn exit_to(w: &mut World, slot: usize, to: Dest, push: Dir, rect: Rect, edge: bo
     }
     let dest = AreaId { world: to.world, area: to.area, variant: to.variant };
     begin_fade_out(w, dest, x, y, Some(facing));
+}
+
+/// brightness level (0..256 = black) of the fade-in after k frames: the 3D world map's arrival fades by 4 (64
+/// frames), the 2D areas' by 8
+pub fn fade_in_level(w: &World, k: i32) -> i32 {
+    let step = if crate::fieldworld::flying(w) { 256 / crate::fieldworld::FADE_IN_3D } else { 8 };
+    (256 - step * k).clamp(0, 256)
 }
 
 /// frames of a fade-out with brightness step `step` (0 = 8)

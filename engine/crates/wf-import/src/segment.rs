@@ -193,7 +193,7 @@ pub fn compare(w: &World, fr: &Value, es: &[String], map: &mut BTreeMap<usize, E
     let field_black = w.field.as_ref().is_some_and(|f| {
         let b = match f.mode {
             wf_core::field::Mode::FadeOut { k, step, .. } => 256 - wf_core::field::fade_out_level(k, step),
-            wf_core::field::Mode::FadeIn { k } => 8 * k,
+            wf_core::field::Mode::FadeIn { k } => 256 - wf_core::field::fade_in_level(w, k),
             wf_core::field::Mode::Normal => 256,
         };
         (31 * b.clamp(0, 256)) >> 8 == 0
@@ -332,6 +332,9 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
                             e.a.sprite,
                             e.hp1024 >> 10
                         )),
+                        wf_core::world::Body::Shot(sh) => Some(format!("shot({},{} t{} dir{} {:?})", sh.x >> 8, sh.y >> 8, sh.t, sh.dir, std::mem::discriminant(&sh.kind))),
+                        wf_core::world::Body::Fx(_) => Some("fx".into()),
+                        wf_core::world::Body::Breakable(b) => Some(format!("brk(box{:?} hp{} shake{})", b.bx, b.hp, b.shake)),
                         wf_core::world::Body::Pickup(p) => Some(format!("pickup({},{} z{} t{} box{:?})", p.x >> 8, p.y >> 8, p.z, p.t, p.bx)),
                         _ => None,
                     })

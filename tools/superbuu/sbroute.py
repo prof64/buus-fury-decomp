@@ -40,6 +40,13 @@ ROUTE = [
     ('area', 6, 9), ('wait', 30), ('walk', 192, 66), ('hold', DOWN, 2), ('wait', 3),
     ('node', 's225', 15, 20, DOWN, 3), ('prog', '0:10,A:3'), ('eventsw', 240), ('wait', 30), ('mark', 'gotenks'),
     ('boss', 20000), ('events',), ('wait', 30), ('mark', 'after_gotenks'),
+    # 6-20: the crater's edge (s232, A) -> Giant Crater 6-16: Gotenks vs Super Buu (s233 / s234 / s235); s455: Gohan's
+    # power awakened (Supreme Kai's world 19-3) -> Southwest Forest 8-1 (Ultimate Gohan)
+    ('walk', 400, 512), ('talk', 'D'), ('wait', 30), ('boss', 30000), ('events',), ('wait', 30), ('mark', 'ult_gohan'),
+    # 8-1 capsule (A) -> world map 0-50: fly to the Giant Crater spot (633, 1065) and land (inline_0x08073799 -> s234)
+    ('walk', 280, 256), ('talk', 'U'), ('fly', 648, 1076), ('events',), ('wait', 30), ('mark', 'gohan_vs_buu'),
+    # Ultimate Gohan vs Super Buu (6-16) -> Buu blows himself up (s466) -> Barren Wasteland 20-1
+    ('boss', 40000), ('events',), ('wait', 30), ('mark', 'wasteland'),
 ]
 
 

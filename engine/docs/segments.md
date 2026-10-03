@@ -198,3 +198,50 @@ remake reloads the area fresh (the ogres at Yemma's door are where they stood be
 pose in the game; the remake's rule restarts idle on any non-idle actor (needs the NPC SetAnim / vt+0x2C rule).
 Not recorded yet: the HTC fights, Gotenks, Ultimate Gohan, Vegito, inside Buu, Kid Buu, ending (route continues from
 `m_after_gotenks`).
+
+## 7. Side content (owner: the side-content agent, from 2026-10-02)
+
+**Ownership change (coordinator):** HFIL / Janemba (incl. the Janemba -> Super Janemba handover in the field), Broly
+and all post-game / optional areas and quests are the **side-content agent's**, no longer the Super Buu agent's
+"after the main chapters" work. The Super Buu agent keeps the Super Buu arc main line (§6) from its start state on.
+Shared tools are reused, not forked: `tools/superbuu/mksave.py` (start states as real save games), `tools/segments/
+segment.py`, `wf-import`. Side-content segments are named `sc_*` (`data/segments/sc_*.json`), start states live in
+`work/side/`, routes in `tools/side/`. Rules found go into wf-core / wf-script-core like any chapter's; additive.
+Status and the side-content catalogue follow below as they are recorded.
+
+## 8. Babidi's ship chapter (owner: the ship / Majin Buu chapter agent, 2026-10-02)
+
+Route + recorder: `re/buu/ship/` — `mkstate_dev.py` (DEV start: the real Other World end state `work/earth/ow_end.ss`
++ the Earth chapter's results applied through the game's own natives (flags 14..53, party joins, `level_up_to`,
+12 Senzu Beans) + the real chapter-transition event s314 -> Southwest Forest 8-1; to be replaced by the Earth agent's
+real end state), `ship_route.py` (ShipDriver goals: live-grid walk, `nav` through the exit graph with room fights,
+stat allocation and Switch Character menus, healing through the Inventory, Yakon's fight), `run_route.py --log`
+(key log), `rec_segments.py RUN OUT` (one segment per importable exit arrival, rows trimmed before the area change
+and its incomplete logic frame; start states in `OUT/states/`), `gate.py` (copies exact ones to `data/segments/` with
+an `expect` gate). Diagnosis: `seg_probe.py` (enemy AI stacks), `seg_rng.py` + `rngdiff.sh` (game RNG callers vs
+`SEGMENT_RNG`), `seg_trig.py` / `seg_objs.py` (trigger / object RAM). The full dev run (8-1 -> Dabura's arena, 82,256
+frames) gives 100 segments in `work/ship/segs_full`: 78 exact; 7 gated in data (`ship_*`).
+
+Rules found (wf-core / wf-script-core):
+* placed field enemies stand exactly at the def position (no free-spot search; `battle::spawn_enemy_at(.., exact)`).
+* AlignWithPlayer: a blocked step keeps the step's facing (0x0801CFA8; TS reference updated, cross_ts green).
+* shield soldiers: RaiseShield / LowerShield / ShieldBreak swap the graphics set on node **enter** (GotoState frame).
+* loot x = position + foot_w / 2 (not the body box centre: a shield soldier's sprite has a narrower body).
+* a breakable hit by a punch that also hit an enemy takes the enemy's crit flag (no stale-slot shake); breakable
+  shakes stop while an event holds the field.
+* energy waves (laser turret / soldier throw) accept another object's *energy* message head-on (two waves collide:
+  the receiver puffs); a punch does not stop them.
+* `save_field_on_next_scene` + `load_scene*` keeps the field (`field::SavedWorld`: entities incl. offstage players,
+  Field, grids, cameras, scene camera control); `return_to_field` restores it without a load (no draws); a scene load
+  whose area has an on-enter script keeps the players offstage (`Arrival.scene`).
+* harness: `SfxStopMatch` counts as a stop.
+
+**Content cache warning:** `engine/target/tmp/wf-core-field-content` / `wf-script-core-field-content` were stale
+(extracted before `field_gfx` added breakable `hit_box`es etc.). With fresh content (`wf-cli` extract, swapped in
+2026-10-02 19:4x) the opening playthrough is exact for all 41,423 frames and lockstep is 78/78; the stale dirs are kept
+as `*.stale`. Tests trust a `.complete` file only: re-extract after extractor changes.
+
+Open (dev run): Pui Pui / Yakon / Dabura are reached through scene loads inside events (s327 / s328 / s336:
+8-26 f286, 8-38 f306, 8-66 f291 — the warped-in player entity), the SoldierThrow end (8-51 f307: the game's idle
+enter draws nothing, 2 frames later), coin pickups in a few rooms, Destroyer (type 20) RNG in 8-50 / 8-56, the
+8-15 charsel swap (Switch Character in a save point), 8-16's s319 anim at f4805.

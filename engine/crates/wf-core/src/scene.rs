@@ -2068,8 +2068,12 @@ pub fn pre_step(w: &mut World) {
         w.scene.puppets.retain(|p| !held.iter().any(|&(id, h)| id == p.id && h));
     }
     if w.scene.depth > 0 || w.scene.menu.is_some() {
+        // the world map's flyer reads the keys itself during an event (s515's arrival fade-in)
+        let flyer = w.scene.menu.is_none() && crate::fieldworld::flying(w);
         for s in 0..w.players.len().min(MAX_PLAYERS) {
-            w.input[s] = InputFrame::default();
+            if !(flyer && s == 0) {
+                w.input[s] = InputFrame::default();
+            }
         }
     }
 }

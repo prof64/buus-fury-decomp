@@ -50,3 +50,13 @@ if __name__ == '__main__':
     else:
         for u, e in path(G, sys.argv[1], sys.argv[2]) or []:
             print(u, names.get(u), '->', e)
+
+
+_cache = None
+
+
+def load_cached():
+    global _cache
+    if _cache is None:
+        _cache = load()
+    return _cache

@@ -106,7 +106,7 @@ NOT_SET = {64 + 1, 64 + 2, 75, 95, 122}   # 64/65/66: one switch of three (64 ke
 EXTRA_SET = {125: {181, 183, 284}}
 CHAPTERS = {
     # name: (last story flag, location (world, area, variant, x, y) = a save point, levels per char)
-    'superbuu': (125, (18, 13, 1, 127, 163), {0: 125, 4: 125, 1: 115, 2: 125, 3: 125}),
+    'superbuu': (125, (18, 13, 1, 127, 163), {0: 180, 4: 180, 1: 160, 2: 165, 3: 165}),
 }
 
 
