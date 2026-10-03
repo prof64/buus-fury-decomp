@@ -2421,6 +2421,19 @@ fn on_death(w: &mut World, i: usize) {
             let (cx, cy) = w.en_ref(i).a.center();
             w.en(o).primary = true;
             if w.field.is_some() {
+                // (the death node 0x08032D44 with copies left - count by message 5 > 1 - takes the object out of the
+                // world list without its defeat handler: no defeat, no on-defeat callback; a placed copy hands its
+                // placement (callback, drops) to the survivor - the real route 19-3 f13415: the punched copy was the
+                // placed one, the game starts no s460)
+                let oid = w.ents[o].id;
+                if let Some(f) = w.field.as_mut() {
+                    if let Some(p) = f.placed.iter_mut().find(|p| p.0 == me) {
+                        p.0 = oid;
+                    }
+                    for l in f.placed_loot.iter_mut().filter(|l| l.0 == me) {
+                        l.0 = oid;
+                    }
+                }
                 crate::fx::puff_rng(w, cx, cy);
                 // (field: the survivor keeps its AI state - the real route, 19-3: the same punch then hits it through
                 // its own on-hit tree, three chances, no idle draw; battles keep the reference's phase-1 reset)

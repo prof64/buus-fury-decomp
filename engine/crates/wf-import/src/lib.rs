@@ -378,10 +378,11 @@ fn build_returned(_data: &Arc<GameData>, ram: &GbaRam, runner: &mut StoryHost, e
     field::load_area(&mut w, to, x, y, Some(facing));
     let evs: Vec<Event> = std::mem::take(&mut w.events);
     let _ = evs;
+    // (the players arrive at once: the restored field had them - the 3D map's flyer is made by the arrival)
+    field::finish_arrival(&mut w);
     if let Some(f) = w.field.as_mut() {
         f.arrival = None;
         f.mode = Mode::Normal;
-        f.triggers.retain(|_| true);
     }
     // the area's own objects go: the RAM's are the field as the scene left it
     let players = w.players.clone();
@@ -429,7 +430,13 @@ fn build_returned(_data: &Arc<GameData>, ram: &GbaRam, runner: &mut StoryHost, e
                 e.state_stamp = ram.s32(o + 0x210) as i64;
                 e.mark1 = ram.s32(o + 0x1E8) as i64;
                 e.counter = ram.s32(o + 0x1E4) as i64;
-                if let Some(&(_, raw, cel, tick)) = rows.get(&o) {
+                if let Some(&(sprite, raw, cel, tick)) = rows.get(&o) {
+                    // (the sprite the object shows: the world map's circles pick theirs by the place's state)
+                    let d = Arc::clone(&w.data);
+                    let e = w.en(ei);
+                    if e.a.sprite != Some(sprite - wf_core::scene::SPRITE_BASE) {
+                        e.a.set_sprite(&d, Some(sprite - wf_core::scene::SPRITE_BASE));
+                    }
                     e.ea.pos.raw = raw;
                     e.ea.pos.frame = cel;
                     e.ea.pos.tick = tick;
@@ -484,6 +491,29 @@ fn build_returned(_data: &Arc<GameData>, ram: &GbaRam, runner: &mut StoryHost, e
         p.ap.raw = raw;
         p.ap.frame = cel;
         p.ap.tick = tick;
+    }
+    // the 3D map's flyer: altitude +0x1A8, heading +0x1AC, the flight state (+4 reversing, +8 speed, +0xC turn), its
+    // animation, the 3D camera (map object +0 x, +4 y, +8 height, +0xC heading, +0x10 pitch)
+    if wf_core::fieldworld::flying(&w) {
+        let po = ram.player();
+        let st = ram.r32(po + 0x14);
+        let row = rows.get(&po).copied();
+        if let Some(fl) = w.field.as_mut().and_then(|f| f.flight.as_mut()) {
+            fl.z = ram.s32(po + 0x1A8);
+            fl.h = ram.s32(po + 0x1AC);
+            if ram.valid(st) {
+                fl.rev = ram.r32(st + 4) != 0;
+                fl.spd = ram.s32(st + 8);
+                fl.turn = ram.s32(st + 0xC);
+            }
+            fl.tick = ram.r16(po + 0x12) as i32;
+            fl.frame = ram.r8(po + 0x11) as i32;
+            if let Some((_, raw, _, _)) = row {
+                fl.raw = raw;
+            }
+            fl.cam = [ram.s32(CAM), ram.s32(CAM + 4), ram.s32(CAM + 8), ram.s32(CAM + 0xC), ram.s32(CAM + 0x10)];
+            fl.zc = None;
+        }
     }
     // the camera as the field left it (`return_to_field` puts the saved one back)
     w.scene.cam.mode = wf_core::scene::CamMode::Player;

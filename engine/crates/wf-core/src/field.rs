@@ -609,6 +609,9 @@ pub fn spawn_object(w: &mut World, o: &ObjDef) -> Option<EntityId> {
             // the placement's own graphics (ctor 0x0800FD55 takes the def's sprite: the same enemy type shows
             // different fighters, story playthrough Grand Kai's planet 1-12)
             if let ObjKind::Enemy { sprite, .. } = &o.kind {
+                // (the sprite id goes through the resolver `0x08000158`: 1 ..= 8 are the characters' current
+                // forms - segment sb 20-6 f2012: s473's become_map_object(5, 3) keeps Vegeta's sprite 280)
+                let sprite = &if (1..=8).contains(sprite) { crate::fieldnpc::char_sprite(w, *sprite - 1).unwrap_or(*sprite) } else { *sprite };
                 let content = *sprite - crate::scene::SPRITE_BASE;
                 if *sprite > 0 && w.data.sprite(content).is_some() && w.en_ref(i).a.sprite != Some(content) {
                     let d = w.data.clone();

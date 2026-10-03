@@ -66,9 +66,18 @@ LEGS = {
     # the Hercule Cafe 3-20 (s170: "Did you find any of the exhibits?" - Yes hands one in, flag bits 341 count them):
     # from XJ-6's end (the real start's exhibit 65 + XJ-6's 58)
     'cafe': ('pg_xj6.ss', [('fly', 2441, 1065, 127, 135), ('wait', 30), ('goto', '3-20', 150, 240, False), ('face', 'U'),
-                           # (the first talk only tells the story, flag 19; the second asks)
-                           ('keys', [(A_, 3, 60)]), ('events',), ('wait', 30),
-                           ('keys', [(A_, 3, 60)]), ('events',), ('wait', 30)]),
+                           # (the first talk only tells the story, flag 19; each later one takes one exhibit)
+                           *[g for _ in range(3) for g in (('keys', [(A_, 3, 60)]), ('events',), ('wait', 30))]]),
+    # the Z-Fighter Museum 4-23 (s189, the same hand-in; flag bits 346): from the hidden dungeon's end (exhibit 71) -
+    # back out to 2-8's take-off pad (161, 369, 47, 31; A), West City 4-1 -> 4-21 -> 4-23, talk facing up
+    # (the rock is back after each reload: punch it again, from the east this time)
+    'museum': ('pg_hidden.ss', [('goto', '2-35', 282, 128, False), ('walk', 282, 128), ('face', 'L'),
+                                ('keys', [(A_, 2, 14)] * 5), ('wait', 30),
+                                ('openwall', '2-35', [(x, y) for x in range(31, 35) for y in range(16, 18)]),
+                                ('goto', '2-8', 176, 380, False), ('keys', [(A_, 3, 240)]),
+                                ('fly', 1137, 1137, 71, 119), ('wait', 30), ('goto', '4-23', 100, 90, False),
+                                ('face', 'U'),
+                                *[g for _ in range(2) for g in (('keys', [(A_, 3, 60)]), ('events',), ('wait', 30))]]),
 }
 
 

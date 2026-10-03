@@ -42,6 +42,10 @@ fn main() {
     }
     // --import SEG.json: start from that cut's RAM (one import), the recordings' rows follow the cut
     let continue_on_save = args.iter().any(|a| a == "--continue-on-save");
+    let dump_at: Option<(usize, usize)> = opt("--dump-at").and_then(|v| {
+        let (a, b) = v.split_once("..").unwrap_or((v.as_str(), v.as_str()));
+        Some((a.parse().ok()?, b.parse().ok()?))
+    });
     let save_at: Option<usize> = opt("--save-at").and_then(|v| v.parse().ok());
     let mut continued = false;
     let mut continue_row: Option<usize> = None;
@@ -267,6 +271,13 @@ fn main() {
             if !diff.is_empty() {
                 flag_reports += 1;
                 println!("flags differ at row {k}: {diff:?}");
+            }
+        }
+        if dump_at.is_some_and(|(a, b)| a <= k && k <= b) {
+            if let Some(pi) = w.player_idx(0) {
+                let pl = w.pl_ref(pi);
+                for (ei, e) in w.ents.iter().enumerate() { if let wf_core::world::Body::Enemy(en) = &e.body { if !e.removed { println!("  row {k} enemy #{} ty {} pos ({}, {}) hp {} anim {:?} ai {:?}", ei, en.ty, en.a.x, en.a.y, en.hp1024 >> 10, en.ea.pos, en.ai.stack.iter().map(|s| s.state).collect::<Vec<_>>()); } } }
+                println!("leader at row {k}: rec {:?} equip {:?} skills {:?} form {} eff {:?} story equipment {:?}", pl.rec, pl.equip, pl.skills, pl.form, pl.eff, w.story.equipment);
             }
         }
         if show.is_some_and(|(a, b)| a <= k && k <= b) {

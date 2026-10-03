@@ -513,6 +513,11 @@ pub fn step(w: &mut World) {
             // the fade mode's iteration reads the input (edges of the first menu read are relative to it)
             w.menu.held = held;
             w.story.play_frames += 1;
+            // the task list (screen shakes) runs on through the fade-out (real route 0-21, Goku vs Majin Buu: a hit's
+            // shake draws its offsets every 2nd frame after START until it ends)
+            if w.field.is_some() {
+                w.tick_shakes();
+            }
             let step = (w.menu.tr.fade_out & !FADE_HOLD).max(1);
             let end = if w.menu.tr.fade_out & FADE_HOLD != 0 { 256 + step } else { 256 };
             let l = level + step;
@@ -782,6 +787,13 @@ fn close_with(w: &mut World, done: bool) {
                 .filter(|&i| !w.ents[i].removed && matches!(w.ents[i].body, crate::world::Body::Npc(_) | crate::world::Body::Enemy(_)))
                 .filter_map(|i| crate::scene::sprite_id(w, i))
                 .collect();
+            if std::env::var_os("T_FIG").is_some() {
+                for i in 0..w.ents.len() {
+                    if !w.ents[i].removed && matches!(w.ents[i].body, crate::world::Body::Npc(_) | crate::world::Body::Enemy(_)) {
+                        eprintln!("  t-fig ent {} sprite {:?} on_screen {} dec {} pos {:?}", i, crate::scene::sprite_id(w, i), crate::vram::on_screen(w, i), crate::scene::cel_dec(w, i), w.actor(i).map(|a| (a.px(), a.py())));
+                    }
+                }
+            }
             sprites.sort();
             sprites.dedup();
             Some((switched, sprites.len() as i64))
