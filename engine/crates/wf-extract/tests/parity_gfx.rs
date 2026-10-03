@@ -19,6 +19,7 @@ fn strip_step_extras(dirs: &Value) -> Value {
                 if let Some(o) = step.as_object_mut() {
                     o.remove("box");
                     o.remove("objs");
+                    o.remove("decode_cycles");
                 }
             }
         }

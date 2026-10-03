@@ -538,7 +538,7 @@ fn update_rest(w: &mut World, i: usize) {
     let name = e.a.anim_name(&d);
     // a movement step SetAnim(1)s unless already walking (0x0803B9DA: IsAnim(1)); nothing switches back to idle when
     // the movement stops - the next node's own SetAnim does
-    if (e.a.anim.is_none() || matches!(name, Some("idle") | Some("walk"))) && (if std::env::var("T_OLDWALK").is_ok() { e.moving } else { e.walk_due }) && !e.walking() {
+    if (e.a.anim.is_none() || matches!(name, Some("idle") | Some("walk"))) && e.walk_due && !e.walking() {
         set_anim(w, i, &[nm("walk")], true, Some(true));
     }
 }
@@ -2401,11 +2401,13 @@ fn on_death(w: &mut World, i: usize) {
                 e.primary = false;
             }
             w.ents[i].removed = true;
+            // (the puff 0x086FD9D0 at rate 0x1000 + rand(0x1000) - the real route's Kid Buu, 19-3: a punch on both
+            // copies, the first one's death draws its rate after its on-hit tree)
             let (cx, cy) = w.en_ref(i).a.center();
-            crate::fx::puff(w, cx, cy, 0x1800);
+            crate::fx::puff_rng(w, cx, cy);
             w.en(o).primary = true;
-            let st = w.data.enemy(0x3c).map(|t| t.ai).unwrap_or(0);
-            crate::nodes::reset(w, o, st);
+            // (the survivor keeps its AI state: the real route, 19-3 - the same punch then hits it through its own
+            // on-hit tree, three chances, and no idle draw)
             return;
         }
     }

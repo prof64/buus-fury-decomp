@@ -191,6 +191,9 @@ pub struct MapDef {
     pub prop_tile_bytes: i32,
     /// CPU cycles of the map loader's decompression (`collision.json` reload; None = unknown): sndsim.rs
     pub reload: Option<Reload>,
+    /// the map's BLDCNT (map header; `map.json` property `bldcnt`): its first-target bits decide whether a message
+    /// window fades (scene.rs `window_fades`)
+    pub bldcnt: u16,
 }
 
 /// see wf-maps `reload_json`
@@ -531,6 +534,7 @@ impl FieldData {
             let (mut ww, mut wh) = (0, 0);
             let mut cmax = (-1, -1);
             let mut three_d = false;
+            let mut bldcnt = 0u16;
             if let Some(mj) = read_json(src, &format!("{dir}/map.json")) {
                 for p in mj["properties"].as_array().into_iter().flatten() {
                     match p["name"].as_str() {
@@ -538,6 +542,7 @@ impl FieldData {
                         Some("world_h_px") => wh = int(&p["value"]) as i32,
                         Some("camera_max_x") => cmax.0 = int(&p["value"]) as i32,
                         Some("camera_max_y") => cmax.1 = int(&p["value"]) as i32,
+                        Some("bldcnt") => bldcnt = int(&p["value"]) as u16,
                         Some("unsupported_layers") => three_d = p["value"].as_str().is_some_and(|v| v.contains("0x08007B63")),
                         _ => {}
                     }
@@ -556,7 +561,7 @@ impl FieldData {
             if cmax.0 < 0 {
                 cmax = ((ww - 240).max(0), (wh - 160).max(0));
             }
-            fd.maps.insert(id.clone(), MapDef { id, start_pos: sp, exits, props, walk, shot, cw, ch, world_w: ww, world_h: wh, camera_max: cmax, three_d, prop_tile_bytes, reload });
+            fd.maps.insert(id.clone(), MapDef { id, start_pos: sp, exits, props, walk, shot, cw, ch, world_w: ww, world_h: wh, camera_max: cmax, three_d, prop_tile_bytes, reload, bldcnt });
         }
         // per-area files (mods): `world/areas/<W-A>.json` adds an area or changes one (fields given replace,
         // `objects` replaces the object list, `add_objects` appends to it)

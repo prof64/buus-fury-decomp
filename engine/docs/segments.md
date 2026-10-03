@@ -1785,3 +1785,20 @@ that many steps - the audio keeps playing, no sim state changes, replays / netpl
 box opens (4 - 7 frames), menu redraws, the pause menu's close (the Earth agent's cost model could feed the same
 hint). Test: `carried_state::original_pacing_holds_after_a_load_only_when_enabled`. The web shell does not expose
 the toggle yet.
+
+**§11 update 7 (B).** *Hit-damage remainder, all switches traced:* script `set_character` (860 -> 860) and the save
+point's Switch Character (probe 777 -> 777: the screen restores the same player object) both KEEP it; only a load
+and Buu's candy respawn (player object rebuilt) reset it - agrees with the side-content agent's Janemba arena cut.
+`carried_state` now pins "set_character keeps the remainder".
+*Ship chapter in the app (checkpoint start):* `soak work/db57/shipmaster/ship_master.json --import
+work/db57/shipmaster/ship_master.json` - the first ship cut (7-1) imported once, then the app plays the real route's
+keys by itself (330,000 rows recorded continuously with `segment.py record` from `shipr_001`'s state). One more
+app-only bug, fixed: **`become_map_object` on a placed enemy counted as its defeat** (`scene.rs` BecomeMapObject:
+the replaced enemy now leaves `Field.placed` without its on-defeat callback). 7-6, the tournament ring's double
+fight: Yamu's defeat s309 turns Spopovich #8 into #11, and the engine also ran #8's s308 (7-6 is entered inside an
+event: no harness cut covers it). With it the app follows the real ship route for **239,958 rows** (the rest of
+the tournament, East District, Babidi's ship stages 1 - 3 ...) to 8-14, where the route opens the pause menu (row
+239,577): the pause close's redraw timing (Earth agent's model) is where it stops. The 8-66 save (row ~326,000) is
+past it, so the Continue-keeps-matching test there waits for that model or a second checkpoint start after the menu.
+Not mine, seen on the way: `wf-script-core` lockstep scenario `shop` fails on the current tree with or without my
+edits (an in-flight menu change).
