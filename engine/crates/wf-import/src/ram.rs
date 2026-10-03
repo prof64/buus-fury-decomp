@@ -141,6 +141,11 @@ impl GbaRam {
         self.r32(a) as i32
     }
 
+    /// every EWRAM word equal to `vt` (heap objects outside the world list: a script command's object)
+    pub fn ewram_with(&self, vt: u32) -> Vec<u32> {
+        (0..self.ewram.len() / 4).map(|k| 0x0200_0000 + 4 * k as u32).filter(|&a| self.r32(a) == vt).collect()
+    }
+
     /// the object world's pointers in list order (the game updates them last to first)
     pub fn objects(&self) -> Vec<u32> {
         let n = (self.r32(OBJW + 4) as usize).min(256);

@@ -79,6 +79,31 @@ LEGS = {
                                 ('face', 'U'),
                                 *[g for _ in range(2) for g in (('keys', [(A_, 3, 60)]), ('events',), ('wait', 30))]]),
 }
+# the Hercule City Z-Mart (Orange Star 3-1's door -> 0-91, s028; post-game list: 0 Onigiri, 1 Curry Plate, 2 Steak,
+# 3 Turkey, 4 Cherry Soda, 5 Root Beer, 6 Hercule-ade, 7 Elixir): A at the counter facing left, Buy, Items, then
+# per row DOWN / UP and one A per item; B out of the list, the menus, and the goodbye
+D_, B_ = 128, 2
+
+
+def zmart(buys):
+    k, row = [(32, 20, 10), (A_, 3, 60), (A_, 3, 60), (A_, 3, 120), (0, 1, 60)], 0
+    for r, n in buys:
+        k += [(D_ if r > row else U_, 3, 15)] * abs(r - row) + [(A_, 3, 40)] * n
+        row = r
+    return [('goto', '0-91', 100, 123, False), ('walk', 88, 123), ('keys', k + [(B_, 3, 60)] * 4), ('events',),
+            ('wait', 30)]
+
+
+# supplies first (6 Curry Plates for the hidden dungeon; the Lighthouse Keeper's Root Beer, Turkey, Hercule-ade,
+# Elixir), then the 2-33 / hidden dungeon / museum chain again from that state
+LEGS['shop'] = [('fly', 2441, 1065, 127, 135), ('wait', 30), *zmart([(1, 6), (5, 1), (6, 1), (7, 1), (3, 1)])]
+LEGS['g233s'] = ('pg_shop.ss', [('walk', 120, 200), ('keys', [(D_, 60, 60)]), ('goto', '3-1', 30, 150, False), ('keys', [(A_, 3, 240)]), *LEGS['g233']])
+LEGS['hiddens'] = ('pg_g233s.ss', list(LEGS['hidden'][1]))
+# (the per-visit gate at 2-33 is shut again on the way out: Gohan opens it from inside, A in its rect)
+_m = list(LEGS['museum'][1])
+_k = next(i for i, g in enumerate(_m) if g[0] == 'goto' and g[1] == '2-8')
+LEGS['museums'] = ('pg_hiddens.ss', _m[:_k] + [('goto', '2-33', 226, 60, False), ('keys', [(A_, 3, 60)]), ('events',),
+                                             ('wait', 30), ('keys', [(D_, 60, 30)])] + _m[_k:])
 
 
 def start_of(leg):

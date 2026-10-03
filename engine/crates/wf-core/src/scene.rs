@@ -1345,6 +1345,12 @@ fn done_at_start(cmd: &Cmd) -> bool {
     matches!(cmd, Cmd::SetPos { .. } | Cmd::CamSet { .. } | Cmd::CamParam { .. } | Cmd::Remove | Cmd::PropSetPos { solo: true, .. })
 }
 
+/// wf-import (an event imported mid-node): start track `k`'s head as its tick would (the importer then sets the
+/// command's progress from RAM)
+pub fn import_start_head(w: &mut World, k: usize) {
+    start_head(w, k);
+}
+
 fn start_head(w: &mut World, k: usize) {
     loop {
         let Some(t) = w.scene.tracks.get_mut(k) else { return };

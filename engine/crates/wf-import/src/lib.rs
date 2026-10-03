@@ -558,14 +558,34 @@ fn field_from_ram(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
     // the camera as the field left it (`return_to_field` puts the saved one back)
     w.scene.cam.mode = wf_core::scene::CamMode::Player;
     wf_core::battle::set_camera(w, 0, ram.s32(CAM), ram.s32(CAM + 4));
-    // (a camera that is not where following the leader keeps it was held by a script before the scene: fixed;
-    // with no event running nothing holds it - the player camera easing toward the leader)
-    if w.scene.depth > 0 {
-        let mut probe = w.clone();
-        field::world_mode_cameras(&mut probe);
-        if (probe.cameras[0].x, probe.cameras[0].y) != (w.cameras[0].x, w.cameras[0].y) {
-            w.scene.cam.mode = wf_core::scene::CamMode::Fixed;
+    // the camera's controller: the mode's camera slot 0x03002BE0 - vt 0x0804D300 follows the actor at +4 (the
+    // leader: the player camera, easing toward it), vt 0x0804BE08 holds it still (a script's camera). Another
+    // object there (a screen shake) hides it: then a camera not where following the leader keeps it was held by a
+    // script before the scene (fixed); with no event running nothing holds it
+    let slot = ram.r32(0x0300_2BE0);
+    match ram.valid(slot).then(|| ram.r32(slot)) {
+        Some(0x0804_D300) => {
+            let a = ram.r32(slot + 4);
+            if a == ram.player() {
+                w.scene.cam.mode = wf_core::scene::CamMode::Player;
+            } else {
+                let (x, y) = (ram.s32(a + 0x1A0), ram.s32(a + 0x1A4));
+                if let Some(k) = (0..w.ents.len()).find(|&k| !w.ents[k].removed && w.actor(k).is_some_and(|ac| ac.x == x && ac.y == y)) {
+                    w.scene.cam.mode = wf_core::scene::CamMode::Follow(w.ents[k].id);
+                } else {
+                    notes.push(format!("camera follows RAM actor {a:#x}: no entity there"));
+                }
+            }
         }
+        Some(0x0804_BE08) => w.scene.cam.mode = wf_core::scene::CamMode::Fixed,
+        _ if w.scene.depth > 0 => {
+            let mut probe = w.clone();
+            field::world_mode_cameras(&mut probe);
+            if (probe.cameras[0].x, probe.cameras[0].y) != (w.cameras[0].x, w.cameras[0].y) {
+                w.scene.cam.mode = wf_core::scene::CamMode::Fixed;
+            }
+        }
+        _ => {}
     }
 }
 
@@ -712,6 +732,14 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
         e.ea.pos.raw = raw;
         e.ea.pos.frame = cel;
         e.ea.pos.tick = tick;
+        // the animation's rule from its state object (obj+0x14) when it is a shared one (IWRAM singletons: idle
+        // 0x03001B0C, loops, one-shots): a node the import re-entered may have set another (mid_7000: a
+        // knockback's one-shot over the idle the RAM shows)
+        let st = format!("0x{:08X}", ram.r32(o + 0x14));
+        if let Some(&r) = d.anim.generic.get(&st) {
+            e.ea.rule = r;
+            e.ea.done = false;
+        }
     }
     // (a knockback's animation index: the one now showing)
     let cur = w.en_ref(ei).a.anim.map(|a| a as i32 + 1).unwrap_or(0);
@@ -896,18 +924,6 @@ fn build_mid_event(_data: &Arc<GameData>, ram: &GbaRam, runner: &mut StoryHost, 
     field::set_busy(&mut w, true);
     field_from_ram(&mut w, ram, notes);
     import_player_state(&mut w, ram, notes);
-    // mid-node, a camera within 16 px of the leader's follow target is the player camera still easing toward it
-    // (INFERRED: the script camera's mode is not found in RAM yet; the return cuts keep `field_from_ram`'s rule -
-    // kbr_011's script camera sits a fraction of a pixel off)
-    if let Some(pi) = w.player_idx(0) {
-        let a = &w.pl_ref(pi).a;
-        let tx = (((a.px() * 2 + a.foot_w) >> 1) - 120) << 10;
-        let ty = (((a.py() * 2 + a.foot_h) >> 1) - 84) << 10;
-        let c = &w.cameras[0];
-        if ((tx - c.x).abs() >> 10) <= 16 && ((ty - c.y).abs() >> 10) <= 16 {
-            w.scene.cam.mode = wf_core::scene::CamMode::Player;
-        }
-    }
     // an event started from inside the frame's object pass (a defeat callback / hook run inline: the world list's
     // update call 0x08011A5E is on the stack under the VM) holds that frame: when it ends, the frame's remaining
     // updates run (`held_event`; mid_12000: Kid Buu's AI re-evaluates in s459's exit frame)
@@ -1087,13 +1103,46 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
         w.g.shakes.push(l);
     }
     w.scene.tracks.retain(|t| !t.queue.is_empty() || t.holding);
-    // an actor's animation command: the animation as the RAM row shows it
+    // each track's running command from its game object (heap objects matched by their target): a walk (vt
+    // 0x0804D0A4: +0xC / +0x10 24.8 step, +0x14 / +0x18 target, +0x1C steps left), a jump (vt 0x0804AE5C: +8 x
+    // step, +0xC y velocity after the last step, +0x10 / +0x14 24.8 position, +0x18 / +0x1C target, +0x38 air
+    // frames, +0x3C frames run: 8 crouch, `air` of flight, 8 landing). The commands before it in its track are
+    // done: dropped, it starts (its start effects: the walk state, the facing) and takes the object's progress
+    let walks = ram.ewram_with(0x0804_D0A4);
+    let jumps = ram.ewram_with(0x0804_AE5C);
+    let rng = w.rng.clone();
+    for k in 0..w.scene.tracks.len() {
+        let live = |c: &Cmd| -> Option<u32> {
+            match c {
+                Cmd::MoveTo { x, y, .. } | Cmd::GlideTo { x, y, .. } => walks.iter().copied().find(|&o| ram.s32(o + 0x14) == *x && ram.s32(o + 0x18) == *y),
+                Cmd::JumpTo { x, y, .. } => jumps.iter().copied().find(|&o| ram.s32(o + 0x18) == *x && ram.s32(o + 0x1C) == *y),
+                _ => None,
+            }
+        };
+        let Some((pos, o)) = w.scene.tracks[k].queue.iter().enumerate().find_map(|(j, c)| live(c).map(|o| (j, o))) else { continue };
+        if pos > 0 || !w.scene.tracks[k].started {
+            w.scene.tracks[k].queue.drain(..pos);
+            wf_core::scene::import_start_head(&mut w, k);
+        }
+        let Some(c) = w.scene.tracks[k].queue.first_mut() else { continue };
+        match c {
+            Cmd::MoveTo { n, t, sx, sy, .. } | Cmd::GlideTo { n, t, sx, sy, .. } => {
+                (*sx, *sy, *n, *t) = (ram.s32(o + 0xC), ram.s32(o + 0x10), ram.s32(o + 0x1C), 0);
+            }
+            Cmd::JumpTo { t, sx, vy, .. } => {
+                (*t, *sx, *vy) = (ram.s32(o + 0x3C), ram.s32(o + 8), ram.s32(o + 0xC));
+            }
+            _ => {}
+        }
+    }
+    w.rng = rng;
+    // the track actors' animations as the RAM rows show them (a started command restarted its animation): the
+    // RAM object at the entity's 24.8 position
     let rows: std::collections::BTreeMap<u32, (i32, i32, i32, i32)> = ram.actor_rows.iter().map(|r| (r.0, (r.1, r.2, r.3, r.4))).collect();
     let owners: Vec<wf_core::world::EntityId> = w
         .scene
         .tracks
         .iter()
-        .filter(|t| matches!(t.queue.first(), Some(Cmd::PlayAnim { .. })))
         .filter_map(|t| match t.owner {
             Owner::Entity(id) => Some(id),
             _ => None,
@@ -1101,15 +1150,25 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
         .collect();
     for id in owners {
         let Some(i) = w.find(id) else { continue };
-        if Some(i) == w.player_idx(0) {
-            if let Some(&(_, raw, cel, tick)) = rows.get(&ram.player()) {
-                let p = w.pl(i);
-                p.ap.raw = raw;
-                p.ap.frame = cel;
-                p.ap.tick = tick;
+        let Some((x, y)) = w.actor(i).map(|a| (a.x, a.y)) else { continue };
+        let o = if Some(i) == w.player_idx(0) { Some(ram.player()) } else { rows.keys().copied().find(|&o| ram.s32(o + 0x1A0) == x && ram.s32(o + 0x1A4) == y) };
+        let Some(&(_, raw, cel, tick)) = o.and_then(|o| rows.get(&o)) else { continue };
+        let d = Arc::clone(&w.data);
+        if let Some(pp) = w.scene.puppets.iter_mut().find(|p| p.id == id) {
+            (pp.anim.raw, pp.anim.frame, pp.anim.tick) = (raw, cel, tick);
+        }
+        match &mut w.ents[i].body {
+            wf_core::world::Body::Player(p) => {
+                (p.ap.raw, p.ap.frame, p.ap.tick) = (raw, cel, tick);
             }
-        } else {
-            notes.push(format!("mid-code: entity {id:?}'s animation command keeps its start"));
+            wf_core::world::Body::Npc(n) => {
+                (n.anim.raw, n.anim.frame, n.anim.tick) = (raw, cel, tick);
+            }
+            wf_core::world::Body::Enemy(e) => {
+                e.set_raw(&d, raw);
+                (e.ea.pos.raw, e.ea.pos.frame, e.ea.pos.tick) = (raw, cel, tick);
+            }
+            _ => {}
         }
     }
     notes.push(format!("event s{:03} at node {}: mid-code, action #{last} {wn:#04x} waiting (replayed from #{from})", ev.0, ev.1));
