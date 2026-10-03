@@ -244,7 +244,7 @@ class ShipDriver(Driver):
                 self.nop += 1
             else:
                 self.nop = 0
-            if self.nop > 240 and self.goals[self.k][0] in ('nav', 'fightp', 'yakon') if not self.done() else False:
+            if self.nop > 240 and self.goals[self.k][0] in ('nav', 'fightp', 'yakon', 'grind') if not self.done() else False:
                 return KEY.B if self.nop % 20 < 3 else 0
         if self.heal is not None:
             k = self.heal_step(e)
@@ -390,7 +390,8 @@ class ShipDriver(Driver):
                 # spend the level-ups' stat points between rooms (Status page: half STR, half END)
                 c = e.r8(0x03001068)
                 pts = e.r16(0x03001560 + 0x68 * c + 0x2C)
-                if pts >= 6 and not enemies(e):
+                if pts >= 6 and not enemies(e) and getattr(self, 'alloc_tried', None) != pts:
+                    self.alloc_tried = pts      # (a stat at its cap takes no point: once per count)
                     for m, on, off in alloc_keys([(0, [pts - pts // 2, 0, pts // 2, 0])])[1]:
                         self.prog += [m] * on + [0] * off
                     return self.prog.pop(0)

@@ -30,7 +30,7 @@ while not d.done() and len(keys) < cap:
         print(len(keys), 'level', level_of(e), s, flush=True)
     if s['p'] is not None:
         last_area = tuple(s['area'][:2])
-    if s['area'][:2] == [0, 2]:
+    if s['area'][:2] == [0, 2] or snap is not None and len(keys) - snap[2] > 8000:   # dead, or stuck in a room
         if snap is None or tries >= 16:
             raise SystemExit(f'FAILED: dead, no way on {s}')
         tries += 1

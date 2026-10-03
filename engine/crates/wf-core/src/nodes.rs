@@ -2364,7 +2364,13 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                         if w.field.is_some() && w.scene.cam.mode == crate::scene::CamMode::Follow(me) {
                             w.scene.cam.mode = crate::scene::CamMode::Player;
                         }
-                        // the new player object is the list's newest: not updated in this pass
+                        // the new player object is the list's newest: not updated in this pass; its hit-damage
+                        // remainder starts at 0 like any rebuilt player's (8-71: 311 -> 307 after the candy)
+                        if w.field.is_some() {
+                            if let Some(np) = w.player_idx(0) {
+                                w.pl(np).hp_acc = Default::default();
+                            }
+                        }
                         if let Some(fl) = w.field.as_mut() {
                             fl.player_new = true;
                         }

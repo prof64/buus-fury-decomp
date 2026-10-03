@@ -243,6 +243,13 @@ pub fn compare(w: &World, fr: &Value, es: &[String], map: &mut BTreeMap<usize, E
     if (w.story.zenie as i64) != i(&fr["zenie"]) {
         rep.bad(k, "zenie", format!("{} vs game {}", w.story.zenie, i(&fr["zenie"])));
     }
+    // the leader's HP (the row's `hp` = the current character's record HP): the app soak found a 1-HP drift no
+    // segment saw (§11). Only while the leader exists and the game shows one (not in scenes / menus).
+    if let (Some(pi), Some(gh)) = (w.player_idx(0), fr.get("hp").and_then(|v| v.as_i64())) {
+        if !fr["p"].is_null() && !wf_core::menu::active(w) && w.pl_ref(pi).rec.hp as i64 != gh {
+            rep.bad(k, "hp", format!("{} vs game {}", w.pl_ref(pi).rec.hp, gh));
+        }
+    }
 }
 
 /// the recording's objects at the cut -> the imported World's entities (same sprite, same 24.8 position)

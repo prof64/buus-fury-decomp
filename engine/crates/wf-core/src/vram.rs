@@ -340,6 +340,9 @@ pub struct VramState {
     /// effects whose block outlives the entity by a frame (`linger`)
     #[serde(default)]
     pub late: Vec<crate::world::EntityId>,
+    /// the damage numbers' places in the world list: (handle, the id the next entity got when it was made)
+    #[serde(default)]
+    pub popup_at: Vec<(u16, u32)>,
     /// actors whose shadow a script set (`shadow_set`): the shared graphic's index, None = no shadow
     #[serde(default)]
     pub shadow_set: Vec<(crate::world::EntityId, Option<u8>)>,
@@ -1011,6 +1014,7 @@ pub fn keyed_release(w: &mut World, key: u32) {
 /// is reused (its 16 frames start again); else a new object, when 0x100 bytes are free (`0x0800AD3E`)
 pub fn damage_number(w: &mut World, target: EntityId) {
     let now = w.frame;
+    let stamp = w.next_id;
     let objects = w.ents.iter().filter(|e| !e.removed).count();
     let Some(v) = st(w) else { return };
     if let Some(p) = v.popups.iter_mut().find(|p| p.0 == target && now.wrapping_sub(p.1) < 8) {
@@ -1024,10 +1028,33 @@ pub fn damage_number(w: &mut World, target: EntityId) {
     if let Some(h) = v.a.alloc(0x100) {
         v.owners.push((h, Owner::Popup));
         v.popups.push((target, now, h, now + POPUP_LIFE));
+        v.popup_at.retain(|p| p.0 != h);
+        v.popup_at.push((h, stamp));
     }
 }
 /// frames a damage number lives after its (re)start
 pub const POPUP_LIFE: u32 = 16;
+
+/// the damage numbers' update: an ended one goes. They are objects of the world list, so the pass (from the list's
+/// end) reaches a number before the objects made before it: its block is free for a hit of the same frame, and an
+/// effect made after it ends first (segment sb 19-3 f21208 / f21210). `after`: only the numbers made after that
+/// entity (None: all).
+pub fn popups_tick(w: &mut World, after: Option<EntityId>) {
+    let now = w.frame;
+    let Some(v) = st(w) else { return };
+    let at = |v: &VramState, h: u16| v.popup_at.iter().find(|p| p.0 == h).map(|p| p.1).unwrap_or(0);
+    let mut gone: Vec<(u32, u16)> = v.popups.iter().filter(|p| p.3 <= now).map(|p| (at(v, p.2), p.2)).filter(|g| after.is_none_or(|a| g.0 > a)).collect();
+    if !gone.is_empty() {
+        gone.sort();
+        // the entry stays for the reuse window's frame stamp only while the object lives
+        for (_, h) in gone.into_iter().rev() {
+            v.popups.retain(|p| p.2 != h);
+            v.popup_at.retain(|p| p.0 != h);
+            v.owners.retain(|o| o.0 != h);
+            v.a.free(h);
+        }
+    }
+}
 
 /// the HUD objects' update (after the actors): a sliding-out one goes at the end of its slide; the damage numbers
 /// end
@@ -1043,15 +1070,8 @@ pub fn hud_tick(w: &mut World) {
             v.a.free(h);
         }
     }
-    let gone: Vec<u16> = v.popups.iter().filter(|p| p.3 <= now).map(|p| p.2).collect();
-    if !gone.is_empty() {
-        // the entry stays for the reuse window's frame stamp only while the object lives
-        v.popups.retain(|p| p.3 > now);
-        for h in gone {
-            v.owners.retain(|o| o.0 != h);
-            v.a.free(h);
-        }
-    }
+    popups_tick(w, None);
+    let Some(v) = st(w) else { return };
     if v.hud_out.is_empty() {
         return;
     }

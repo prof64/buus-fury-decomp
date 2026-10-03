@@ -493,6 +493,14 @@ while hidden, state 0x114 / 0x118).
 | `m_gotenks` | 6-9, Gotenks (937 HP, STR 92 / END 81) against Super Buu (35,330 HP) after the spar and the fusion | 33,492 |
 | `m_gotenks_punched`, `m_after_gotenks`, `m_ult_gohan` | two punches in the air first (`sb_luck.py gotenks ult_gohan 0 12 6 punch`: 4 of 12 counts win both Gotenks fights; without them he loses with Buu at 7,482 HP); after the Lookout fight; **8-1, Ultimate Gohan** (the story's XP: level 129, 93 points unspent) | `m_gotenks_punched.keys.json`, `sbk_gotenks.json` (14,807 from m_gotenks_punched) |
 | `g01_nataday` | Nataday Village 15-1: Gohan's points spent (STR 129 / END 119), the capsule, the flight | `g01_nataday.keys.json` (3,006) |
+| `g02_pyramid` | Kyodai Pyramid 14-1, its second gate open (s517 (1, 120, 1), flag 176: Gohan) | `g02_pyramid.keys.json` (1,212 from g01) |
+| `g03_gohan141` | 14-1, **Gohan level 141** (1532 HP): 14-1 <-> 14-2 (two Super Majin Fighters + two Super Majin Soldiers, 84,450 XP a visit), `re/buu/ship/grind_safe.py` (snapshot in the safe room, retry with one more punch on a death: none needed) | `g03_gohan141.keys.json` (39,116) |
+| `g04_forest` | 8-1 again (pad, flight): `sb_real.py --start sb/g04_forest.ss --from ult_gohan` | `g04_forest.keys.json` |
+
+Findings (gates at this stage, flag 128 set): the dungeons' second gates each want one character - Nataday Gotenks
+140, Pilaf Goten 120, Southwest Forest Goku 100, Diablo Desert Gohan 100 (flag 170), the Pyramid Gohan 120 (flag
+176) - so Ultimate Gohan can level only in the last two (and on the Airship). A stat at its cap takes no point: the
+Status page then stays open under an A-mashing bot (STR / END 134 at level 134).
 
 Finding: the real party is far below the Super Buu agent's constructed one (Goku / Vegeta 180, Gohan 160, Goten /
 Trunks 165 there; real: 126 / 120 / 100 / 117 / 81). Gotenks' two fights cannot be prepared for any more at this
@@ -631,7 +639,9 @@ Results (90 segments, 104,026 video frames): **84 exact to their end**, 94,718 f
 gated in `data/segments/earth_*.json`.
 
 Open: 7-2 f1432 (portrait OBJ purge - the Super Buu agent's model; 7-3 is exact since it landed); 3-3 #4 f1479
-(a soldier's AlignWithPlayer: its bullet is missing when Gohan's blast should hit it). 2-9 #13 / 2-11 #4 /
+(fixed to f3569: a fragile bullet tests a message in its own update, after its move - `shots::on_message`, TS
+`projectiles.ts`, cross-check dumps regenerated; it now stops at an Inventory redraw, the ship-fixes agent's page
+costs, f3611). 2-9 #13 / 2-11 #4 /
 3-15 #4 are exact with the redraw + reload timing model below (88 / 90).
 
 **Note to the ship agent (from the Earth agent): the status-page redraw timing model is built** (below). To use
@@ -717,6 +727,14 @@ added to tools/emu). How the input landing is decided:
     Dungeons: db7_023 (14-20) still closes later in the game than the model's 17 frames by more than 100 k
     cycles - its reload does something these four maps do not (to profile with `leaveprof.py`; its owner's cut).
     Other transitions (shops, save points, the map screen) keep their constants.
+  - db7_023 (14-20) profiled (`leaveprof.py` with a cycle window, `leave.py`): the map part matches (3,775,747
+    measured / 3,775,222 model) but the iteration is 137 k cycles longer than the model (4,134,645 vs 3,997,721
+    before the mixes; 18 frames, model 17). Cause: the restore re-decompresses the current sprite frame of every
+    on-screen actor (caller 0x0803D983; every sprite frame is its own stream) - the player's 512-byte frame is the
+    "character stream" in the constant, here also two Super Bio Mechs (1,024 bytes, 21.6 k + 20.4 k) - and runs an
+    IWRAM routine at 0x03000C80..0x03000F40 on them (~51 k for the two: their palette remap, def `remap_table`).
+    That is 93 k of the 137 k; the rest is not located. NOT MODELLED YET: needs `decode_cycles` per sprite frame in
+    `sprites/*/sprite.json` (frame records are `AnimStep.rom`) and the on-screen actors' current frames at the close.
   - Tools (`work/earth/timing/`): `sndlog.py` (driver / DMA / redraw log), `timeline.py`, `cmp_core.py` (core
     decisions vs the game), `fit_base.py`, `prof.py` (per-bucket cycles of a redraw), `decmeas.py` / `decmodel.py`
     (decompressor), `mkvariant.py` (a segment with other keys), `mkshipstate.py` (savestate of a ship route cut).
@@ -1139,6 +1157,69 @@ Open (mine unless noted):
   blocked after a Skeleton's reaction state 0x213 moved it; the path follower's wall-follow then differs) and Broly's
   JumpSmash (controller 0x0804D310@0x0300325C: the animation is held to tick 248, ours ends the one-shot at 148).
 
+**10.2 update (A, later): open cuts closed, then all four dungeons re-cut from the REAL route.**
+
+*Second round on the constructed states* (122 / 137 exact; every remaining divergence a heal / pause menu):
+on-defeat event countdowns are held while an event holds the field (the drop script still runs on time); the pass an
+inline event's end completes uses the frame's unmasked keys (`Field.raw_input`); a footstep's sound is chosen by the
+object's own graphics; a shot node ends without firing when its animation state was replaced; a bomb's blast is a
+team-2 broadcast (it hits enemies too); `camera_pan_to` steps toward the unclamped target and a `warp_fade` arrival
+faces down; freed-object rows (direction > 7) are not actor rows, which makes in-segment script warps (db1_022,
+s515) pass **without an importer change**; Broly's JumpSmash plays raw 20 to tick 248, three dust ticks, landing cels.
+
+*Real states* (`tools/dungeons/realruns.py dr1 .. dr4` -> `work/db/drN`): the ship agent's §8 checkpoints and key
+logs joined into one continuous run per dungeon - nothing invented, no RAM writes. dr1 = `d06_thieves` ..
+`d10_map` (19,855 frames), dr2 = `fat/db2` (19,972), dr3 = `d11_pilaf` -> `d11b_rock` -> `d13_pilaf_won` -> `d15_map`
+(21,785; a failed log is replayed only up to the frame its checkpoint was saved, matched on logic counter + RNG +
+records), dr4 = `fat/db4` to `j_down` + `fat/db4b` (51,682). (d06 .. d15 lack flag 77: no dungeon script reads it.)
+The `db1_*` .. `db4_*` gates of the constructed states are **replaced** by `dr1_*` .. `dr4_*`:
+
+| chapter | cuts | exact | matched / cut frames | gated |
+|---|---|---|---|---|
+| dr1 Thieves Den | 22 | 21 | 14,567 / 17,613 | 8,324 |
+| dr2 Diablo Desert + Express | 17 | 14 | 18,188 / 18,942 | 8,740 |
+| dr3 Pilaf's Castle | 28 | 26 | 18,057 / 19,784 | 12,116 |
+| dr4 Nataday / Volcano / Broly | 72 | 71 | 49,226 / 49,545 | 33,711 |
+
+**132 / 139 exact, 100,038 of 105,884 frames.** The Broly fight (`dr4_042_15-32`, 2,735 frames) and the express
+robbers are exact end to end. `gate.py` now expects 32 frames less than a *truncated* window holds: a window cut out
+of a longer recording can end inside a load's lag frames, whose rows only match once the load completes -
+**`dr2_007_11-10` was red (584 / 600) for exactly that reason from the moment it was gated**; no engine rule was
+involved (not `attacking()`, not the menu cameras).
+
+Rules found on the real route (battle rules changed in wf-core **and** `site/src/battle/rulesets/buu`, dumps
+regenerated, cross_ts + both lockstep suites green):
+* **Bullets burst on any hit message** (battle rule). Handlers 0x0802764E (gun), 0x080278E2 (rifle), 0x0802C8AE
+  (shuriken), like the tank shell's: any kind-0 message but its own overlapping its box ends the bullet and is
+  *accepted* - no team or attack-kind test (we had: player team, physical only, not accepted). Trunks' ki blast meets
+  a gunman's bullet: the bullet bursts, the player is not hit (11-21, 15-3, 15-13).
+* **IfPlayerAttackingMe is the punch state only** (battle rule). Test 0x08029B58: player +0x14 == 0x03001B50. The
+  dash (0x03002B3C) and the skills (heap states) never count (we counted both): a gunman dashed into draws no dodge
+  chance (10-14).
+* **Vampire grab escape counts presses, not held keys** (battle rule; update 0x08033A2A reads input +4). The other
+  mash escapes (bear hug, freeze, wraps, latch, stone) already used the press ring; lockstep recordings
+  `hold_*_held` (held keys do not escape) added for all six.
+* **A coin's flight and its age are two counters.** The sixty moves (+0x2C) run in every frame, event frames and
+  held passes included; the age (+0x24, the 600-frame limit) only in the objects' own pass (`Pickup.mv`,
+  `fieldobj::held_moves`). Coins dropped under an event land under it (11-24).
+* **Death effects run one after the other.** Two enemies down in one frame: the first one's drop script and
+  on-defeat event run; the second one's wait until that event ends, then run inside the same interrupted pass and
+  hold it again; the rest of the pass completes when the last event ends (`Field.defeat_wait`; 11-24, s373 twice).
+* **The item-get presentation holds the enemies** for its 60 frames like an event (a Mad Bomber's Wait does not
+  count; shots fly on) (11-22).
+* **RandomStep writes the position only**: the enemy-grid mark stays at the kept position while a Skeleton's bones
+  rattle (`Enemy.jitter`). This was the "stale enemy-grid mark" of 15-14: our mark followed the jitter onto a wall
+  tile and freed it on the way back.
+* **Broly's rocks block nobody in the field.** They mark no grid when they appear; the ThroughRocks wrapper
+  (0x080369D0) broadcasts message 0x22 before and after its child, and a rock (0x08036C4E) answers by writing its
+  32 x 32 rect *free* into the walk and enemy grids - Broly's own mark inside a rock's rect included, until his next
+  re-plan (`nodes::rock_msg`; battles keep the reference's solid rocks). Not modelled: a *destroyed* rock answers
+  the first message with blocked, the second with free (never reached on the route).
+
+Open, all menu timing (Earth agent): `dr1_018` f5624, `dr2_009` f670, `dr2_010` f525, `dr2_015` f451, `dr3_013`
+f1928 (heal menus: sound 40), `dr3_016` f376 (the scripted menu native 141's Leave is longer than the game's),
+`dr4_053` f553 (pause menu's fade-in starts 1 - 2 frames early). The "Open" list above is superseded.
+
 **10.1 update (B, later 2026-10-03).** `dbx_004` is now exact to its end: **26,635 / 26,635** (s026, Goku vs Majin
 Buu, s027, s218 with its fusions, Gotenks' flight on 0-50, s020, Gotenks vs Buu in 0-15, the aftermath on 6-1); with
 `dbx_002` the whole chain after the seventh ball is 46,284 / 46,284 frames exact (full cuts in `work/db57/segsx`; the
@@ -1214,7 +1295,13 @@ fight (below). Ship / dungeons / post-ball were not chained (they start from oth
    drops video frames at loads, text boxes and menus. The soak uses the recording's logic counter to know which rows
    are logic frames. Real-time pacing of the app is therefore not the GBA's (loads are instant, 30-60 frames in the
    game).
-4. **3-1 after s125 (Earth agent).** Recording row 64,958 (Earth master frame 23,535): Gohan's Energy Blast state
+4. **3-1 after s125 - not a battle rule (Earth agent, 2026-10-04).** The segment harness covers the stretch now
+   (`work/earth/segs/x_blast31.json`: cut at 4-1 #2, master frame 20,623, 3,200 frames across the world map into
+   3-1) and is exact through it with the allocator check off (`SEGMENT_VRAM=0`; with it the 3D map's blocks differ
+   from f490 - the sprite-memory model's): the game's state there is the core's `skill7` and ends on the game's
+   frame. The app is in `skill6` at that row - a different skill selected, hence 4 frames shorter: the soak's
+   chained state (skill selection / L-R cycling before this point) differs, not the blast. Original note:
+   **3-1 after s125 (Earth agent).** Recording row 64,958 (Earth master frame 23,535): Gohan's Energy Blast state
    (`skill6`, game state vt 0x0804DC14) ends 4 frames earlier in the app (idle at 64,958, the game's at 64,962), the
    walk starts early, a robber's shot then hits and the run diverges (RNG from 65,044). No segment covers this
    stretch (the 3-1 cuts are #4 at frame 30,003 and #6 at 66,145: the load before it is inside an event, not

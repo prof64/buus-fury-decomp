@@ -2402,7 +2402,10 @@ fn on_death(w: &mut World, i: usize) {
             }
         }
     }
-    if death == "Idle" && w.field.is_some() {
+    // Kid Buu's death node (`0x08032D44`): the last copy is not destroyed - its defeat handler (vfunc +0x74) runs
+    // and it stays as it is (segment sb 19-3 f21479: no explosion, the object lives on into event 458)
+    let last_copy = death == "special" && (ty == 0x3c || ty == 0x3d);
+    if (death == "Idle" || last_copy) && w.field.is_some() {
         // field: the death node Idle (0x080716F4) changes nothing - the enemy stays as it is (its defeat scene
         // takes it over; story playthrough: Olibu stays idle at the KO punch)
         w.en(i).ko = -1;

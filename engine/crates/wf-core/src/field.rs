@@ -677,6 +677,7 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
     if let Some(v) = w.field.as_mut().and_then(|f| f.vram.as_mut()) {
         v.hud_out.clear();
         v.popups.clear();
+        v.popup_at.clear();
         v.delayed.clear();
         v.late.clear();
         v.shadow_set.clear();

@@ -747,19 +747,33 @@ fn step_screen(w: &mut World) {
     }
 }
 
+/// Switch Character's close beyond the pause menu's reload (cycles; emulator: real route 8-1 with 3 figures,
+/// Super Buu 21-14 with 9)
+const CHARSEL_CLOSE: i64 = 0;
+const CHARSEL_CLOSE_FIG: i64 = 0;
+
 fn close(w: &mut World) {
     close_with(w, false)
 }
 
 /// `done`: the mode's done check ended it (START): the world restore runs in this same iteration
 fn close_with(w: &mut World, done: bool) {
+    // Switch Character's close also frees its figures and brings the object world's graphics back
+    let figs = match w.menu.shown.as_deref() {
+        Some(Screen::CharSelect(c)) => Some(c.figs.len() as i64),
+        _ => None,
+    };
     w.menu.stack.clear();
     w.menu.phase = Phase::Leave { t: 0 };
     // the pause menu's black frames = the area reload's CPU time (sndsim.rs): the iteration's frames + this one
     // (the script-opened screens - Switch Character, save, shops - restore the world the same way: real route
     // save-point cuts 8-1 / 8-26 / 8-66, 27 black frames against the constant's 25)
     if w.menu.tr == PAUSE || w.menu.tr.leave == 25 && w.menu.tr.fade_out & FADE_HOLD != 0 {
-        if let Some(n) = crate::sndsim::reload_frames(w, done) {
+        let extra = figs.map(|n| CHARSEL_CLOSE + CHARSEL_CLOSE_FIG * n).unwrap_or(0);
+        if crate::sndsim::debug() {
+            eprintln!("menu close: figures {figs:?} extra {extra}");
+        }
+        if let Some(n) = crate::sndsim::reload_frames_with(w, done, extra) {
             w.menu.tr.leave = n as u16 + 1;
         }
     }

@@ -267,6 +267,11 @@ pub fn redraw_frames(w: &mut World, r: Redraw) -> Option<u8> {
 /// uncalibrated). Against the emulator (work/earth/timing/leaveprof.py): 2-9 5,377,882 vs 5,377,145 cycles
 /// before the mixes, 3-15 6,412,147 vs 6,414,682.
 pub fn reload_frames(w: &mut World, done: bool) -> Option<u8> {
+    reload_frames_with(w, done, 0)
+}
+
+/// [`reload_frames`] with `more` cycles of other work in the same iteration (a script-opened screen's own close)
+pub fn reload_frames_with(w: &mut World, done: bool, more: i64) -> Option<u8> {
     let f = w.field.as_ref()?;
     let fd = w.data.field.clone()?;
     let rl = fd.maps.get(&f.map)?.reload.as_ref()?;
@@ -302,7 +307,7 @@ pub fn reload_frames(w: &mut World, done: bool) -> Option<u8> {
     }
     // a close by a prompt (B) restores in the iteration after the event's: 18..29 k cycles less before it
     let rest = if done { RELOAD_REST } else { RELOAD_REST - 23_500 };
-    redraw_frames(w, Redraw { t0: 0, base: (rest + extra + c * 10_035 / 10_000) * 100_523 / 100_000 })
+    redraw_frames(w, Redraw { t0: 0, base: (rest + more + extra + c * 10_035 / 10_000) * 100_523 / 100_000 })
 }
 
 const RELOAD_REST: i64 = 225_200;

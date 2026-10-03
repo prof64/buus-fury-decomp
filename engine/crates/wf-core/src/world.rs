@@ -854,6 +854,7 @@ impl World {
             // (the scene drives it: segment sb 4-24, a suspended actor's idle tick runs on)
             let skip = self.modal.as_ref().is_some_and(|m| !m.contains(&self.ents[i].id))
                 || crate::vram::suspended(self, self.ents[i].id) && !matches!(self.ents[i].body, Body::Npc(_));
+            crate::vram::popups_tick(self, Some(self.ents[i].id));
             if !skip {
                 self.update_entity(i);
                 // it destroyed an object before it: the list compacted, the same object is at the next index

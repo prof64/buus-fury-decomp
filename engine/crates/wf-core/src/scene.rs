@@ -1180,7 +1180,31 @@ fn in_mode(mode: &WaitMode, o: Owner) -> bool {
 
 /// enter a wait mode: start every head the mode covers (msg 0x0D)
 fn begin_wait(w: &mut World, mode: WaitMode) {
-    for k in 0..w.scene.tracks.len() {
+    // heads start in track order; the SetAnim heads of posed actors among them (play_anim / set_anim after a
+    // set_pose: the idle enter draws) take their turns in the world list's order, last object first, like the ticks
+    // (s019 on 0-9: two play_anim(.., 0) in one batch - Trunks, spawned second, draws before Goten; the other heads
+    // keep the track order: sb 21-25). INFERRED from those two recordings.
+    // (only actors a `set_pose` holds: their SetAnim leaves the pose in the object's own turn)
+    let posed = |w: &World, o: Owner| match o {
+        Owner::Entity(id) => w.find(id).is_some_and(|i| matches!(&w.ents[i].body, Body::Npc(n) if matches!(n.anim.mode, AnimMode::Pose))),
+        _ => false,
+    };
+    let is_anim = |t: &Track| !t.started && matches!(t.queue.first(), Some(Cmd::PlayAnim { .. } | Cmd::SetAnim { .. })) && posed(w, t.owner);
+    let key = |w: &World, o: Owner| -> i64 {
+        match o {
+            Owner::Entity(id) => -(w.find(id).map(|i| i as i64).unwrap_or(-1)),
+            _ => i64::MIN,
+        }
+    };
+    let mut owners: Vec<Owner> = w.scene.tracks.iter().map(|t| t.owner).collect();
+    let slots: Vec<usize> = (0..owners.len()).filter(|&k| in_mode(&mode, owners[k]) && is_anim(&w.scene.tracks[k])).collect();
+    let mut anim: Vec<Owner> = slots.iter().map(|&k| owners[k]).collect();
+    anim.sort_by_key(|&o| key(w, o));
+    for (j, &k) in slots.iter().enumerate() {
+        owners[k] = anim[j];
+    }
+    for o in owners {
+        let Some(k) = w.scene.tracks.iter().position(|t| t.owner == o) else { continue };
         if !in_mode(&mode, w.scene.tracks[k].owner) {
             continue;
         }

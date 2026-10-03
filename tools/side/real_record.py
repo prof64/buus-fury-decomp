@@ -2,7 +2,8 @@
 as segment masters and cut them at the area entries. Nothing is re-played by a bot: each leg is its checkpoint state
 plus the keys the real route pressed from it.
 
-    .venv/bin/python tools/side/real_record.py [LEG ...]      (default: every leg but the three level grinds)
+    .venv/bin/python tools/side/real_record.py [LEG ...]      (default: every leg but the three level grinds;
+    --recut: cut the existing masters again)
 
 Masters: work/side/seg/rj_<leg>.json; cuts: work/side/rseg/<leg>/ (tools/superbuu/mkcuts.py).
 """
@@ -36,7 +37,7 @@ LEGS = {
     'gogeta': (J / 'j_sj2.ss', 'a_keys_sj2.json', 0, None),                             # the fusion, Gogeta, s452
 }
 GRINDS = ('goku90', 'goku120', 'veg1')
-legs = sys.argv[1:] or [k for k in LEGS if k not in GRINDS]
+legs = [a for a in sys.argv[1:] if not a.startswith('--')] or [k for k in LEGS if k not in GRINDS]
 (D / 'seg').mkdir(parents=True, exist_ok=True)
 for m in legs:
     st, kf, a, n = LEGS[m]
@@ -47,14 +48,17 @@ for m in legs:
     tmp.write_text(json.dumps({'keys': ks}))
     env = dict(os.environ, SEGMENT_DIR=str(D / 'seg'))
     name = f'rj_{m}'
-    r = subprocess.run([PY, str(ROOT / 'tools/segments/segment.py'), 'record', '--state', str(st), '--keys', str(tmp),
+    r = None
+    if '--recut' not in sys.argv:
+      r = subprocess.run([PY, str(ROOT / 'tools/segments/segment.py'), 'record', '--state', str(st), '--keys', str(tmp),
                         '--frames', str(len(ks)), '--name', name], env=env, cwd=ROOT, capture_output=True, text=True)
-    print(m, (r.stdout.strip().splitlines() or [r.stderr[-300:]])[-1], flush=True)
+    print(m, (r.stdout.strip().splitlines() or [r.stderr[-300:]])[-1] if r else 'recut', flush=True)
     out = D / 'rseg' / m
     out.mkdir(parents=True, exist_ok=True)
     for old in out.glob('*'):
         old.unlink()
-    r = subprocess.run([PY, str(ROOT / 'tools/superbuu/mkcuts.py'), str(D / 'seg' / f'{name}.json'), str(out)],
+    r = subprocess.run([PY, str(ROOT / 'tools/superbuu/mkcuts.py'), str(D / 'seg' / f'{name}.json'), str(out),
+                        '--prefix', 'rj_' + m],
                        env=env, cwd=ROOT, capture_output=True, text=True)
     print(m, 'cuts', len(list(out.glob('*.json'))), r.stderr[-300:], flush=True)
     tmp.unlink()

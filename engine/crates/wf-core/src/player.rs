@@ -1161,6 +1161,11 @@ pub fn lose_hp(w: &mut World, i: usize, n: i32, floor: i32) -> i32 {
     }
     let d = n.min(0.max(pr(w, i).rec.hp - floor));
     p(w, i).rec.hp -= d;
+    // a whole-HP write drops the hit-damage remainder (8-71: after Buu's drain ticks of 10 the next hit takes 4,
+    // not 5; the same happens when a load or set_character rebuilds the player from the record's whole HP)
+    if d > 0 && w.field.is_some() {
+        p(w, i).hp_acc = Default::default();
+    }
     w.stats.damage_taken += d as i64;
     after_hp_change(w, i);
     d
@@ -3538,6 +3543,7 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
 pub fn script_set_hp(w: &mut World, i: usize, v: i32) {
     let pl = p(w, i);
     pl.rec.hp = v.clamp(0, pl.rec.max_hp);
+    pl.hp_acc = Default::default();
     if v <= 0 && w.field.is_some() {
         after_hp_change(w, i);
     }
