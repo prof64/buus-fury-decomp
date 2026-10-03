@@ -10,6 +10,22 @@ use wf_extract::{extract_rom, Options};
 use wf_rom::gfx::{decode_png, Image};
 use wf_rom::testutil;
 
+/// Animation directions without the per-step keys the Rust extractor added later (`box`, `objs`).
+fn strip_step_extras(dirs: &Value) -> Value {
+    let mut v = dirs.clone();
+    if let Some(map) = v.as_object_mut() {
+        for steps in map.values_mut() {
+            for step in steps.as_array_mut().into_iter().flatten() {
+                if let Some(o) = step.as_object_mut() {
+                    o.remove("box");
+                    o.remove("objs");
+                }
+            }
+        }
+    }
+    v
+}
+
 fn load_png(p: &Path) -> Option<Image> {
     decode_png(&std::fs::read(p).ok()?).ok()
 }
@@ -101,7 +117,9 @@ fn compare_entity(c: &Ctx, py: &Value, dir: &str, file: &str) -> Vec<String> {
     for (name, p) in pa {
         let Some(m) = ma.get(name) else { continue };
         for key in ["raw_index", "loop", "timing_source", "directions"] {
-            if m[key] != p[key] {
+            // per-step `box` / `objs` were added after the Python reference was frozen
+            let mv = if key == "directions" { strip_step_extras(&m[key]) } else { m[key].clone() };
+            if mv != p[key] {
                 errs.push(format!("{id} anim {name}: {key} differs"));
             }
         }
