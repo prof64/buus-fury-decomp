@@ -47,9 +47,15 @@ LEGS = {
     # the hidden dungeon past 2-33 (from the g233 leg's end, Gohan in 2-34): the Key in 2-47 (s118, via 2-39), then
     # the locked chest in 2-46 (s117: the Z-Fighter Exhibit, item 71, flag 193)
     # (2-39's house door: the exit rect x 192..208 - walk up from x 200; the planner's edge spot at x 189 is blocked)
-    'hidden': ('pg_g233.ss', [('goto', '2-39', 200, 180), ('keys', [(U_, 60, 5)]), ('wait', 30),
-                              ('goto', '2-47', 104, 86), ('keys', [(U_, 10, 5), (A_, 3, 60)]), ('events',),
-                              ('wait', 30), ('goto', '2-46', 40, 104), ('keys', [(A_, 3, 60)]), ('events',),
+    'hidden': ('pg_g233.ss', [('goto', '2-39', 200, 180), ('walk', 201, 180), ('keys', [(U_, 60, 5)]), ('wait', 30),
+                              ('goto', '2-47', 104, 120), ('walk', 90, 96), ('face', 'U'), ('keys', [(A_, 3, 60)]), ('events',),
+                              ('wait', 30), ('walk', 104, 128),
+                              # 2-35's rock (breakable, 3 punches, hit box 249..279 x 128..144) splits the area: the
+                              # way to 2-40 .. 2-46 is past it
+                              ('goto', '2-35', 230, 128), ('walk', 230, 128), ('face', 'R'),
+                              ('keys', [(A_, 2, 14)] * 5), ('wait', 30),
+                              ('openwall', '2-35', [(x, y) for x in range(31, 35) for y in range(16, 18)]),
+                              ('goto', '2-46', 40, 104), ('keys', [(A_, 3, 60)]), ('events',),
                               ('wait', 30)]),
 }
 

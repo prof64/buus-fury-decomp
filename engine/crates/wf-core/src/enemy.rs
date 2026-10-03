@@ -338,7 +338,6 @@ impl crate::eanim::Host for EHost<'_> {
         self.sprite.and_then(|s| self.d.sprite(s)).and_then(|s| s.anim_raw(raw)).map(|a| a.steps(self.facing).len() as i32).unwrap_or(0)
     }
     fn rand(&mut self, n: u32) -> i32 {
-        if std::env::var("DBG_IDLE").is_ok() { eprintln!("DBGIDLE {}", std::backtrace::Backtrace::force_capture()); }
         match self.rng.as_mut() {
             Some(r) => r.rand(n),
             None => 0,

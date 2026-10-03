@@ -384,6 +384,17 @@ imports and matches **9,642 / 24,441** frames (stop: a punch that kills one of K
 a puff rate and a screen-shake jitter, ours an enemy idle: the copy-death path of this route's fight); its other 12
 in-event cuts are scene loads of s462 / s463 and the world-map warp_fades (refused).
 
+*Kid Buu, real route (A, later)*: `kbr_002` (the fight's entry) 9,642 -> **13,417 / 24,441**. Field rules:
+a copy killed while the other lives makes its puff with a random rate (0x1000 + rand(0x1000)) and the survivor
+**keeps its AI state** (no phase-1 reset, no idle draw: the same punch then hits it through its own on-hit tree);
+**Kid Buu's beam outlives the state that fired it**: the node's exit is a no-op (vtable 0x0804A6C0 +8), the beam
+belongs to the actor state 0x0804C690 and stops in Kid Buu's second update after a hit's GotoState (it hits through
+f12346 / f12347, retracts from f12348); the beam pose is that state's - cels 0, 1, 2, then 1 / 2 alternating every
+8 ticks until the state ends (no one-shot end, no idle). Battles keep the reference for all three. `sb_041` stays
+66,219 / 66,219. Next stop f13417: an actor (sprite 47) raw 13 vs the game's idle.
+The refused kinds: the s462 / s463 cuts are `return_to_field` (0x75) - the field restored after a scene is a
+mid-area state (its objects keep their pre-scene AI / positions), not a load; they need mid-area import.
+
 ## 7. Side content (owner: the side-content agent, from 2026-10-02)
 
 **Ownership change (coordinator):** HFIL / Janemba (incl. the Janemba -> Super Janemba handover in the field), Broly

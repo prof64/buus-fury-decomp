@@ -971,6 +971,10 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
         K::KidBuuKamehameha => {
             en::face_player(w, i);
             set_anim(w, i, &[an(3)], true, Some(false));
+            if w.field.is_some() {
+                let h = w.data.anim.hold;
+                w.en(i).ea.rule = h;
+            }
             const OFF: [(i32, i32); 4] = [(16, 20), (16, -4), (-12, 2), (44, 2)];
             let a = &w.en_ref(i).a;
             let (ox, oy) = OFF[a.facing as usize];
@@ -2010,6 +2014,16 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         // the beam fires at tick 8 (stop 3, sound 32); the state ends once tick > 90 (SetAnim(0); the exit stops the
         // beam: it retracts)
         K::KidBuuKamehameha => {
+            // (field: the pose is the actor state 0x0804C690's - cels 0, 1, 2 every 8 ticks, then 1 / 2 alternating
+            // until the state ends, never the one-shot's end and its idle: the real route 19-3, a copy's beam)
+            if w.field.is_some() {
+                let c = if f <= 8 { 0 } else { (f - 1) >> 3 };
+                let e = w.en(i);
+                e.ea.pos.frame = if c < 3 { c } else { 1 + ((c - 1) & 1) };
+                e.ea.pos.tick = f;
+                e.ea.done = false;
+                e.anim_ended = false;
+            }
             if f == 9 {
                 if let Some(k) = w.find(w.en_ref(i).beam) {
                     shots::kame_fire(w, k);
@@ -2172,6 +2186,9 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         K::LatchDrain => {
             let Some(pi) = en::player(w, i).filter(|&pi| !w.pl_ref(pi).dead && w.pl_ref(pi).hp() > 0) else { return true };
             if w.g.clock(w.frame) & 63 == 0 {
+                // through the player's apply-damage (vfunc -> `0x08010BF2`): its damage number too (real route 21-6
+                // f176; field only - the number is a tile user)
+                crate::vram::damage_number(w, w.ents[pi].id);
                 player::lose_hp(w, pi, 1, 0);
             }
             false

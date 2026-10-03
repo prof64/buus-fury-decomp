@@ -929,16 +929,41 @@ pub struct Dialog {
     /// the portrait sits left of the box (`0x08012012`, see [`speaker_layout`])
     #[serde(default)]
     pub portrait_left: bool,
+    /// a message window (kind 3) that fades in / out ([`window_fades`], decided when it opens)
+    #[serde(default)]
+    pub fades: bool,
 }
 
 /// the first character appears this many frames after the box is created; the event continues this many frames
 /// after the closing A (dialog object 0x0800AD00; measured on events 43 and 74)
 pub const DIALOG_OPEN: i32 = 7;
 pub const DIALOG_CLOSE: i32 = 9;
-/// a menu / message window (node kind 3) continues the event this many frames after the A / B: the window fades
-/// out over 16 frames (BLDALPHA 0x10 -> 0x0F01, one step a frame from the frame after the press), is gone on the
-/// 16th, and the next node runs the frame after (real game, West City Z-Mart s030 at 0-92: six windows, all 17)
-pub const WINDOW_CLOSE: i32 = 17;
+/// a menu / message window (node kind 3) continues the event this many frames after the A / B (event 34)
+pub const WINDOW_CLOSE: i32 = 2;
+/// ... and this many when it fades (see [`window_fades`]): it fades out over 16 frames (BLDALPHA 0x10 -> 0x0F01,
+/// one step a frame from the frame after the press), is gone on the 16th, and the next node runs the frame after
+/// (real game, West City Z-Mart s030 at 0-92: six windows, all 17)
+pub const WINDOW_FADE_CLOSE: i32 = 17;
+
+/// A message window fades in and out (`0x08030ED2`: BLDCNT := 0x3E41, BLDALPHA ramped by the callback 0x08030BF5)
+/// only when the current BLDCNT has no first-target layer (bits 0..5 clear); otherwise it shows and goes at once.
+/// BLDCNT here = the map's (`bldcnt` property: 0-91 / 0-92 0x1040 fade; 1-1, 4-1 0x1041 not) with the scripts'
+/// layer overrides.
+pub fn window_fades(w: &World) -> bool {
+    let Some(f) = w.field.as_ref() else { return false };
+    let Some(m) = w.data.field.as_ref().and_then(|d| d.maps.get(&f.map).map(|m| m.bldcnt)) else { return false };
+    let mut first = m & 0x3F;
+    for (i, b) in w.scene.screen.layers.blend.iter().enumerate() {
+        if let Some(b) = b {
+            if b & 1 != 0 {
+                first |= 1 << i;
+            } else {
+                first &= !(1 << i);
+            }
+        }
+    }
+    first == 0
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum MenuKind {
@@ -2784,7 +2809,14 @@ pub fn open_text(w: &mut World, text: &str, text_ref: u32, portrait: u8, kind: u
         t: 0,
         result: None,
         portrait_left,
+        fades: false,
     });
+    if kind == 3 {
+        let f = window_fades(w);
+        if let Some(d) = w.scene.dialog.as_mut() {
+            d.fades = f;
+        }
+    }
 }
 
 /// A text box's placement and portrait side from its prefix, the node `arg` and the event's speaker anchor
@@ -2874,7 +2906,7 @@ fn tick_dialog(w: &mut World) {
                 }
             }
             DialogPhase::Closing => {
-                if d.t >= WINDOW_CLOSE {
+                if d.t >= if d.fades { WINDOW_FADE_CLOSE } else { WINDOW_CLOSE } {
                     d.phase = DialogPhase::Closed;
                     crate::vram::text_close(w);
                 }

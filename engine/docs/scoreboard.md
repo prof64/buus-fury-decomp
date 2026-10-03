@@ -149,3 +149,13 @@ segment (stretch): matched / frames, category - first divergence
 * `r069_161_14-2` (069_k05_vegeta150): 166 / 2,174, **position / facing** - Some((166, "pos: #3 sprite 256: (89.8203125, 130.578125) vs game (91.8203125, 130.578125)"))
 * `r069_167_14-2` (069_k05_vegeta150): 623 / 914, **RNG** - Some((623, "rng: [4f5723e8, edd9719e] vs game [bffb91c7, cb05f4c1]"))
 * `r069_168_14-1` (069_k05_vegeta150): 413 / 55,831, **screen fade** - Some((438, "fade: black false vs game true"))
+
+## Note from dungeon agent A: in-event entries (2026-10-03)
+
+`wf-import` now imports one kind of area entry **inside a running event**: a script's immediate warp (native 0x77),
+including the first node of a scene a `jump` enters after such a warp (proof: the opening's 1-1 and 1-10, gates
+`ow_ev_1_1` / `ow_ev_1_10`; the real Kid Buu fight's entry into 19-3). Cut them with `rec_segments.py ... --events`
+(or `segment.py cut` at the entry). The other in-event kinds are still refused with `import: unsupported cut: ...`:
+`return_to_field` (0x75: the restored field is a mid-area state - its objects keep their pre-scene state),
+scene loads (0x72 .. 0x74), `warp_fade` (0x76) and the 3D world map. Re-cut with `--events` now for the warp kind;
+A will add a line here as each further kind lands.
