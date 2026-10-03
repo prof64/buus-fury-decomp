@@ -337,6 +337,9 @@ pub struct Field {
     /// the object tile allocator (vram.rs)
     #[serde(default)]
     pub vram: Option<crate::vram::VramState>,
+    /// the area's level signs (label objects) at its load: the menu close's reload draws their labels again (sndsim)
+    #[serde(default)]
+    pub signs: u8,
     /// the frame the 3D map's fade-in ended (the flyer runs the next frame although the warp's event still holds)
     #[serde(default)]
     pub fade_end: u32,
@@ -505,6 +508,7 @@ fn new_field() -> Field {
         list_redo: false,
         player_new: false,
         vram: Some(crate::vram::VramState::default()),
+        signs: 0,
         fade_end: 0,
         defer_objects: false,
         pending_objects: None,
@@ -804,6 +808,11 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
     let signs = a.objects.iter().filter(|o| objects && matches!(o.kind, ObjKind::MapSprite { label: Some(_), .. }) && cond_holds(w, &o.cond)).count();
     for k in 0..signs {
         crate::vram::acquire(w, crate::vram::Owner::Sign(k as u32), 0x200);
+    }
+    if objects {
+        if let Some(f) = w.field.as_mut() {
+            f.signs = signs as u8;
+        }
     }
     for list in [4, 2, 3] {
         for o in a.objects.iter().filter(|o| objects && list_of(o) == list) {

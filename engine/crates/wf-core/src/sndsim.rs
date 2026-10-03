@@ -333,7 +333,7 @@ pub fn reload_frames_with(w: &mut World, done: bool, more: i64) -> Option<u8> {
     // the level signs' labels (`0x0800C300` objects) are drawn into their surfaces again ("%d", `0x0800C298`):
     // ~25 k each (real run 14-1, three signs: the close +76 k over the model without them, the same tileset's 14-2
     // without signs within 5 k; profile: the glyph code 0x0803F6xx only in 14-1)
-    let signs = w.field.as_ref().and_then(|f| f.vram.as_ref()).map_or(0, |v| v.owners.iter().filter(|o| matches!(o.1, crate::vram::Owner::Sign(_))).count() as i64);
+    let signs = f.signs as i64;
     extra += SIGN_LABEL * signs;
     // an on-screen item on the ground: its two 16 x 16 pictures (measured 6,845 + 7,077 cycles, 8-6)
     let cam = w.cameras[0].rect;
