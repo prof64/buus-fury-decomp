@@ -438,6 +438,8 @@ pub fn add(w: &mut World, s: Shot) -> EntityId {
         ShotKind::Straight(o) if o.name == SName::KiBlast => 0x100,
         ShotKind::SuperBall { .. } | ShotKind::MasenkoBall(_) => 0x1000,
         ShotKind::Flame { .. } => 0x40,
+        // the beam class `0x080206B8` (segment sb 19-3: Kid Buu's beam)
+        ShotKind::Kame(_) => 0x300,
         _ => 0,
     };
     let id = w.add(Body::Shot(Box::new(s)));
@@ -2187,7 +2189,18 @@ fn bomb_update(w: &mut World, i: usize) {
     if t >= 71 {
         w.ents[i].removed = true;
         let r = rect(w, i);
-        hit(w, i, r, atk(1), 1024, true);
+        if w.field.is_some() {
+            // field: the blast's message is of sender class 2, which the enemies' handler (0x0800FBE6: class 1 or 2)
+            // takes as well as the player's - a Mad Bomber's bomb hurts another bandit (Diablo Desert 11-14: 49 HP and
+            // the knockback). Battles keep the reference (the player only)
+            let s = w.shot_ref(i);
+            let (owner, dir) = (s.owner, s.dir);
+            let stats = w.find(owner).and_then(|oi| w.actor(oi).map(|a| a.stats)).unwrap_or_default();
+            let mut m = HitMsg { team: 2, rect: r, dir, mult: 1024, atk: atk(1), attacker: owner, att_stats: stats, att_is_player: false, source: w.ents[i].id, crit: false, raw: 0, dmg: 0, no_react: false, foot: false };
+            broadcast(w, &mut m, true);
+        } else {
+            hit(w, i, r, atk(1), 1024, true);
+        }
         let (px, py) = (w.shot_ref(i).px(), w.shot_ref(i).py());
         for k in 0..4 {
             let (dvx, dvy) = [(96, 0), (-96, 0), (0, 64), (0, -64)][k];

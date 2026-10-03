@@ -329,9 +329,11 @@ ROUTE = [
     # then Goku again
     # (the boulder is back after the reload: punch it again from the east)
     ('exitat', 24, 72, 'L'), ('walk', 433, 66), ('face', 'L'), ('keys', [(A_, 2, 10)] * 4), ('wait', 20),
-    ('goto', '18-1', 104, 272), *charsel(-1), ('wait', 20), ('mark', 'veg1'),
-    ('goto', '18-12', 88, 52), ('face', 'U'), ('press', A_), ('events',), ('wait', 30), ('mark', 'gate'),
-    ('goto', '18-1', 104, 272), *charsel(1), ('wait', 20),
+    # (no room fights on the way back: a fight beside an exit pushes through it; the enemies near the path are
+    # still fought, hand_guard)
+    ('goto', '18-1', 104, 272, False), *charsel(-1), ('wait', 20), ('mark', 'veg1'),
+    ('goto', '18-12', 88, 52, False), ('face', 'U'), ('press', A_), ('events',), ('wait', 30), ('mark', 'gate'),
+    ('goto', '18-1', 104, 272, False), *charsel(1), ('wait', 20),
     ('goto', '18-12', 96, 30, False), ('exitat', 96, 26, 'U'), ('wait', 20), ('mark', 'h13'),
 ]
 

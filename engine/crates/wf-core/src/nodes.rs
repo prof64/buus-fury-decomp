@@ -874,9 +874,19 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
         }
         K::DriftContact => {}
         K::KiBlast => timed_enter(w, i, &[an(3)], true),
-        K::GunShot | K::RifleShot | K::MummyWrapShot => timed_enter(w, i, &[an(17), an(3)], true),
-        K::MummyWrapBurst => timed_enter(w, i, &[an(17), an(3)], false),
-        K::NinjaStarThrow => timed_enter(w, i, &[an(18), an(4)], true),
+        // (r.d[6] = the animation state the shot runs under: see `shot_state_gone`)
+        K::GunShot | K::RifleShot | K::MummyWrapShot => {
+            timed_enter(w, i, &[an(17), an(3)], true);
+            r.d[6] = w.en_ref(i).anim_seq as i32;
+        }
+        K::MummyWrapBurst => {
+            timed_enter(w, i, &[an(17), an(3)], false);
+            r.d[6] = w.en_ref(i).anim_seq as i32;
+        }
+        K::NinjaStarThrow => {
+            timed_enter(w, i, &[an(18), an(4)], true);
+            r.d[6] = w.en_ref(i).anim_seq as i32;
+        }
         // SoldierThrow 0x080266D8 (SetAnimRaw(0x13)) / TurretFire 0x0802B684 (SetAnimRaw(0x14)): face the player
         // with the routine 0x0801599C (field: the 24.8 rule, ties horizontal, Babidi's ship 8-22 turret; battles keep
         // the footprint rule the TypeScript cross-check pins, as FacePlayer)
@@ -1780,6 +1790,9 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             }
             timed_end(w, i, f, 32)
         }
+        // field: the shot is the actor's animation state's (controller) work - a state that was replaced meanwhile
+        // (a hurt animation: Volcano 15-25, a Cursed One punched mid-throw) fires nothing and the node is over
+        K::GunShot | K::RifleShot | K::NinjaStarThrow | K::MummyWrapShot | K::MummyWrapBurst if w.field.is_some() && r.d[6] != w.en_ref(i).anim_seq as i32 => true,
         K::GunShot => {
             if f == 4 {
                 en::shot(w, i, ShotType::Gun);

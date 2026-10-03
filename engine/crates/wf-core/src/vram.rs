@@ -365,9 +365,6 @@ pub fn acquire(w: &mut World, owner: Owner, bytes: i32) {
     if bytes <= 0 {
         return;
     }
-    if std::env::var("VRAM_DBG").is_ok() {
-        eprintln!("vram acquire wf {} owner {:?} bytes {}\n{}", w.frame, owner, bytes, std::backtrace::Backtrace::force_capture());
-    }
     let Some(v) = st(w) else { return };
     let h = match v.a.alloc(bytes) {
         Some(h) => Some(h),
@@ -509,9 +506,15 @@ pub fn entity_gone(w: &mut World, i: usize) {
         return;
     }
     let id = w.ents[i].id;
-    // an animated effect that played out deletes itself in its next update (segment sb 21-5: the explosion's
-    // block lives one frame longer)
-    if matches!(w.ents[i].body, Body::Fx(_)) && w.ents[i].removed {
+    // an animated effect's block lives one frame past our entity's end (segment sb 21-5: explosions `0x08712FDC`),
+    // except the smoke puff `0x086FD9D0` (segment sb 19-3: Kid Buu's teleport puffs go with the entity). MEASURED
+    // on those two kinds; the cause of the difference is not decoded (the update `0x0802A8AA` queues the delete
+    // `0x08011944` for every kind).
+    let exact = match &w.ents[i].body {
+        Body::Fx(f) => !matches!(**f, crate::fx::Fx::Anim { id: 0x086f_d9d0, .. }),
+        _ => false,
+    };
+    if exact && w.ents[i].removed {
         let at = w.frame + 1;
         if let Some(v) = st(w) {
             let hs: Vec<u16> = v.owners.iter().filter(|o| o.1 == Owner::Ent(id)).map(|o| o.0).collect();

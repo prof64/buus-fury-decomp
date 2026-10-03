@@ -308,7 +308,7 @@ and stat / heal menus: shipr_024, 058, 059, 061, 063, 065, 068, 072, 076, 081, 0
 250, 328.
 
 Round 4 (ship fix agent; rsegs 301 / 338 exact, 235,899 frames; gated: shipr_001 first 2,000, 007, 238, 254, 265, and
-the Buu fight `shipr_338_8-16` first 6,900 - it is exact to 6,935 of 19,591, was 2,869):
+the Buu fight `shipr_338_8-16` first 8,000 - exact to its end, 19,591, was 2,869):
 * IfHpBelow (node enter 0x0804E6A0, on-hit 0x080299FE): threshold = ((frac * whole max HP) >> 16) << 10 (2-9's
   bandits at 11 / 115 HP are not "below 10%"). TS updated.
 * SoldierThrow / TurretFire: the node (0x08026726) is finished as soon as the controller is no longer the actor's
@@ -334,15 +334,28 @@ the Buu fight `shipr_338_8-16` first 6,900 - it is exact to 6,935 of 19,591, was
   held by the trigger's nested loop, not a puppet), it ends as the 64th frame starts with one idle draw and the
   script goes on in that frame (`Field.script_fade_in`; 6-1 -> 6-13).
 * `load_scene*`'s camera is placed inside the new map's camera limits (s273: (1, 1) shows (1, 0)).
-* the logic-frame counter: `World.frame` does not advance on frames the world is frozen (a modal camera scroll,
-  `scene::frozen`), the game's counter does - that is where the Buu segment's count falls behind (3 by f4037). Only
-  differences are used so far (state stamps, cooldowns); a freeze between a stamp and its test would show.
+* the logic counter 0x03000F94 counts every logic frame; `World.frame` counts object passes (the engine's
+  pass-relative timers: deferred calls, drop countdowns, same-frame tests). The counter is `Globals::clock` = fc0 +
+  frame: outside the menu screens every host step advances it by exactly one (`Session::step_update` /
+  `step_post`, `Globals.clock_mark`), also on frames with no pass (modal camera scroll / mosaic, an open director
+  batch, a held frame) or two (a held pass completing). State stamps, cooldown marks (MarkTime, IfTimeInState,
+  IfCooldownOver) and the press ring read the clock. `SEGMENT_LF=1` prints where it leaves the game's counter:
+  only inside menu screens now (the menu timing model's).
+* Majin Buu's eat (controller 0x0802AF10): at tick 8 the player object leaves the world list; created before the
+  eater, the list compacts and the eater is updated again in that pass (its tick goes 7 -> 9: heal, sound 11,
+  respawn and end one frame earlier from there; `Field.list_redo`). The new player object (tick 120) is the list's
+  newest: not updated in that pass, updated first from then on (`Field.player_new`).
+* an enemy whose death node is Idle keeps running its AI: killed by the player's update, it still takes that pass's
+  step (Buu's slide moves once more in the frame of the last punch; the defeat event holds the frames after).
+* Result: the Buu fight segment `shipr_338_8-16` (rsegs_c) is exact, 19,591 / 19,591 (gated: first 8,000).
+* TS lockstep `f02_vs_enemy_t8e` (Worm Head): the harness took the first enemy in the list as the recorded one; since
+  the worm rule (segments are appended before the head, Super Buu chapter) that is a segment. It now takes the
+  enemy that is not a spawned part, as `wf-core/tests/lockstep.rs` does. 704 / 704 green.
 
 Open: 7-2 `shipr_002` from f5528 (the tournament crowd: a portrait text box takes object tiles and 12 of 24 actors
-leave the game's list - the sprite-memory model's); the Buu fight from f6935: the eat controller's first tick is in
-the frame the state is entered (heal at +23, sound 11 at +31, respawn at +119, end at +159 after the GotoState; ours
-and the TS lockstep count one later while the placement and removal frames match), then s344 / s345 (`set_character`
-with no player object in the scene).
+leave the game's list - the sprite-memory model's). The 8-33 knockback, Papaya Island facing, coin pickups and the
+8-50 / 8-56 Destroyer draws are still behind menu-timing divergences: the other 35 non-exact rsegs all diverge first
+at a pause / status / save-point menu.
 
 **Majin Buu arc, real route** (`ship_route.goals_fatbuu`; `run_route.py work/ship/real4b/c15_after_buu.ss
 work/ship/fat --fat [--from MARK] --log`). Checkpoints = `work/ship/fat/<mark>.ss`, every input from the driver:
@@ -370,7 +383,15 @@ work/ship/fat --fat [--from MARK] --log`). Checkpoints = `work/ship/fat/<mark>.s
 | `d15c_city` | West City's capsule, taking off: six Hamburgers, Goten full | |
 | `d16_desert` | **Diablo Desert entrance 11-1**: Goten 97 (695 HP), Trunks 80, flags 112 / 114 / 77 | from here the dungeon agents' own routes, played from the real state |
 | `db2/a_start` .. `db2/o_map` | Diablo Desert by agent A's `db2_route.py` unchanged (`re/buu/ship/fat_db.py db2 fat/d16_desert.ss`): gate, the four switches (`c_sw1` .. `f_sw4`), `h_11-13`, `i_train`, `l_11-24` (the five robbers), `m_ball` (flag 113), `o_map`; 19,972 frames, Goten 99 | `fat/db2/keys.json` |
-| `d20_airship` | **Airship entrance 12-1** (685 frames of flight from `db2/end.ss`) | `fat/d20_airship.keys.json`; then `tools/db57/run.py db5 fat/d20_airship.ss fat/db5` |
+| `d20_airship` | **Airship entrance 12-1** (685 frames of flight from `db2/end.ss`) | `fat/d20_airship.keys.json` |
+| `db5/a00_start` .. `db5/a06_map` | the Airship by agent B's `db5` route (`tools/db57/run.py db5 fat/d20_airship.ss fat/db5`): `a01_12-27` (14,045 frames), `a02_warlord` (the lift taken by hand: the route's `trig` stood 1 px left of the pad, `fat_goals.py` walk (108, 358) + UP, 1,379 frames), `a03_ball`, `a04_escape` (flag 116), `a06_map` | `fat/db5/keys_a00_fail.json` (first 14,045 frames), `a02_warlord.keys.json`, `keys_a02_warlord.json` (a02 -> a04, first 1,279 frames), `keys_a04_escape.json` (12,862) |
+| `d30_fukurou` | **Fukurou Forest entrance 13-1** (888 frames from `db5/end.ss`) | `fat/d30_fukurou.keys.json` |
+| `db6/n00_start` .. `db6/n09_map` | Fukurou Forest / Ninja Stronghold by agent B's `db6` route unchanged: `n01_13-47`, `n03_key`, `n05_boss` (Ninja Boss), `n06_ball` (flag 117), `n09_map`; 18,522 frames | `fat/db6/keys.json` |
+| `d40_pyramid` | **Kyodai Pyramid entrance 14-1** (1,134 frames from `db6/end.ss`) | `fat/d40_pyramid.keys.json` |
+| `db7/p01_challenger` | 14-2 with the gate open (Trunks, level 80, opens it and Goten takes over again at 14-1's save point: the real Trunks is no match for the Pyramid); s400 not yet run | `fat/db7/p01_challenger.keys.json` (1,213 frames from d40) |
+| `db7/p02_14-6` .. `db7/p14_map` | the Pyramid by agent B's `db7` route (`re/buu/ship/fat_db57.py db7 fat/d40_pyramid.ss fat/db7 --from p01_challenger`: the same route, its raw pit-maze walks shooting a visible Ghost out of the lane): `p03_man1`, `p04_man2` (**not spoken to**, see `db7fix`), `p05_sw1`; the pit maze by a luck search (`fat_luck.py`: 11 punches in the air in 14-16 first: `p05_sw1_punched`), `p06_man3`, `p07_sw2`, `p08_sw4`, `p08b_bridges`, `p09_sw3`, `p10_boss` (Totenhotep), `p11_headdress`, `p12_man4`, `p14_map` | `fat/db7/keys_p01_challenger.json` (first 9,141 frames: p01 -> p05), `keys_p05_sw1_pre.json` + `keys_p05_sw1.json` (p05 -> p08, 4,215), `keys_p08_sw4.json` (12,578) |
+| `d41_pyramid`, `db7fix/q00_start` .. `q03_map` | back in for man 2 (s414, flag 102: the route's single A came too early, so s406 gave no ball): 14-10, `q01_man2`, `q02_ball` (s406, **flag 118**), the pad, s515 -> s019 (flag 107) | `fat/d41_pyramid.keys.json`, `fat/db7fix/keys.json` (6,803) |
+| `d50_nataday` | **Nataday Village 15-1** after s019: Goten level 109, his 36 points spent (STR 97, END 82), 900 HP; all balls but the 4-Star | `fat/d50_nataday.keys.json` (914 frames from `db7fix/end.ss`); then `fat_db.py db4 fat/d50_nataday.ss` |
 
 Findings: the Dragon Ball hunt is the main line (flags 112 .. 118: Thieves Den 9, Diablo Desert 11, Pilaf's
 Castle 10, the Airship 12, Fukurou Forest 13, Kyodai Pyramid 14, Nataday Village 15), then s017 (119) and Gotenks vs
@@ -633,6 +654,36 @@ Rules found (field only where battle is pinned by the TypeScript cross-check):
   do not run the world update; Watch This!'s closing frame runs the scene's tracks, the script and the cameras but not
   the objects.
 * Debug: `SEGMENT_PUPPETS=1` in the segment trace prints the scene puppets' animations and the director's tracks.
+
+**HFIL corridor 18-1 .. 18-13 (in progress, 2026-10-03).** Start state `janemba` rebuilt with a player's supplies
+(3 Senzu Beans, 4 Three Course Meals, 5 Curry Plates; Goku 140, Vegeta 100). Route `tools/side/hfil.py --route`
+(marks -> `work/side/h_<mark>.ss` + `h_<mark>.keys.json`; run with `PYTHONHASHSEED=0`: the driver is not
+reproducible across Python hash seeds), driver = the ship chapter's `ShipDriver` + `SideDriver`:
+* `goto` walks the maze of areas over walk components and exits (`tools/side/maze.py`: an exit fires when the
+  player's position - the footprint's top-left px - is inside its rect; an edge exit keeps the offset along the edge;
+  `openwall` adds what a switch opened), clearing each room; `it` steers the Instant Transmission cursor with the
+  game's model (v = v * 3 / 4 + 1 px per held frame, pick box = trigger rect (x0 + 15, y0 + 7, x1, y1)); `hand_guard`
+  punches the Janemba Hand (0x39) that comes up beside the player and the enemies that come close; walks keep out of
+  the spike strips (script 507: 20 HP + knock-back when the player's position is inside the rect).
+* What the corridor is: 18-2's switch is an Instant Transmission target (flag 181: hides 18-4's wall x 88..151,
+  y 256); 18-10 is a gate maze - the centre switch (IT again) swaps two sets of four gates (flag 188), eight toggles
+  spiral from the entry column out to the ring, the ring's lanes beside the spikes lead to the boulder, which
+  breaks from its east side only (flag 284: the shortcut; it is back after every reload); 18-11: the real Vegeta is
+  the NPC at (208, 128) (s446, ~9,300 frames of scenes); 18-12's gate wants Vegeta at level 100 (s517).
+* Played so far by the real game: 18-1 -> the switch -> 18-10 -> the maze -> the boulder -> 18-11 -> s446 (marks
+  hfil / switch / maze / statues / vegeta). Open: the way back to 18-1 (the driver loops between 18-7 and 18-8 /
+  gets worn down without room fights), the character switch at 18-1's save point, the gate, 18-13.
+* Segments of the first leg (18-1 -> 18-10, 12,665 frames, 30 cuts in `work/side/hseg`, local): 20 exact with the
+  tile-allocator check off (`SEGMENT_VRAM=0`), 3 with it. Rules found: HandAmbush in the field does its enter work
+  on the node's first update (side draw, jump to the player's 24.8 position of that frame); the node the AI dump
+  calls SpawnPuff only detaches the enemy from the grid in the field (no effect object, no tiles); an armed
+  `save_field_on_next_scene` is taken at the `load_scene_fade` call, before its fade (the world list is empty for
+  the 64 frames; 18-2's switch scene, exact: IT pick, scene, return); a dead enemy's tiles are freed before its
+  explosion takes its own.
+* Open in those cuts: the tile allocator after a Janemba Hand's death (the explosion / death-effect blocks'
+  lifetime, from f160 of 18-2), RNG at 18-4 f209 / 18-3 f656 / 18-7 f395 / 18-8 f110 (Living Dead / Poltergeist /
+  Nosferatu rules not looked at yet), the inventory heal's sound 39 (the menu timing the Earth agent documents),
+  two mid-load cuts the importer refuses.
 
 * Script tracks (shared rule, 0x080193AE msg 0x0C): when a track's last command finishes, the director asks its
   vt+0x10; set_pos / prop_set_pos / camera_set* / camera_set_param* answer 1 like face_actor (`mov r0, #1` at

@@ -1092,6 +1092,8 @@ pub fn pre_step(w: &mut World) {
     // playthrough: Pikkon's KO levels Goku up; s003 runs, then the defeat scene s103); a level-up runs hook #3 inline,
     // holding the rest of the frame (the event starts now; story playthrough: the other objects neither move nor
     // animate in that frame)
+    // (an event already holding the field when the frame starts: see the on-defeat countdown below)
+    let event_held = w.field.as_ref().is_some_and(|f| f.busy);
     let due = w.field.as_mut().map(|f| std::mem::take(&mut f.xp_due)).unwrap_or_default();
     for (pid, exp) in due {
         if let Some(pi) = w.find(pid) {
@@ -1126,6 +1128,14 @@ pub fn pre_step(w: &mut World) {
     // death effects whose delay is over run their enemy's on-defeat callback after its drop script (frame numbering
     // as run_due_drops; 3-1's robbers: the loot draws, then s126), holding the rest of the frame like defeat_runs
     let next = w.frame + 1;
+    // an event holding the field holds the on-defeat callback's countdown (the drop script still runs on time):
+    // Diablo Desert Express 11-24 - a robber's event s373, 8 frames after the KO, comes 7 frames after the level-up
+    // popup that started the frame after the KO has closed
+    if let Some(f) = w.field.as_mut().filter(|_| event_held) {
+        for d in f.defeat_later.iter_mut() {
+            d.0 += 1;
+        }
+    }
     let later: Vec<(Callback, Cause)> = match w.field.as_mut() {
         Some(f) if f.defeat_later.iter().any(|d| d.0 <= next) => {
             let (due, keep): (Vec<_>, Vec<_>) = std::mem::take(&mut f.defeat_later).into_iter().partition(|d| d.0 <= next);
@@ -1350,6 +1360,22 @@ pub fn post_step(w: &mut World) {
                     f.fade_end = frame;
                 }
                 crate::fieldworld::reset_state(w);
+                // the event whose `warp_fade` ends here exits in this frame (its wait was the fade): a pass it has
+                // held since it started (a defeat callback's event: s027 -> s218 -> Gotenks on 0-50) completes now -
+                // the map's objects and the flyer update a second time in the fade's last frame
+                if w.field.as_ref().is_some_and(|f| f.held_event && f.busy) {
+                    if let Some(f) = w.field.as_mut() {
+                        f.held_event = false;
+                    }
+                    let shakes = std::mem::take(&mut w.g.shakes);
+                    w.step_entities();
+                    let new = std::mem::replace(&mut w.g.shakes, shakes);
+                    w.g.shakes.extend(new);
+                    let frame = w.frame;
+                    if let Some(f) = w.field.as_mut() {
+                        f.fade_end = frame;
+                    }
+                }
             } else if flying {
                 if let Some(f) = w.field.as_mut() {
                     f.mode = Mode::FadeIn { k };
@@ -1786,8 +1812,10 @@ pub fn warp_fade_slow(w: &mut World, world: i32, area: i32, variant: i32, x: i32
             }
         }
     }
-    // (a flyer's facing is not a walker's: the player the load builds faces down - 0-21's arrival)
-    begin_fade_out(w, AreaId { world, area, variant }, x, y, flying.then_some(0));
+    // the player the load builds faces down, whatever the old one faced (a flyer: 0-21's arrival; a walker: Diablo
+    // Desert Express 11-17 -> 11-18, facing left at the call)
+    let _ = flying;
+    begin_fade_out(w, AreaId { world, area, variant }, x, y, Some(0));
     // the fade object's brightness starts moving two frames after the call (s515 at 3-1: idle at the call, black 63
     // frames later)
     if let Some(Mode::FadeOut { step, k, .. }) = w.field.as_mut().map(|f| &mut f.mode) {

@@ -788,10 +788,11 @@ fn enter_state(w: &mut World, i: usize, gs: Gs) {
             }
             sfx_stop(w, 54);
             // the state deletes its aura effect itself: its tiles go this frame (segment sb 19-3; an effect that
-            // ends by itself gives them a frame later)
+            // ends by itself gives them a frame later). Field only: battles keep the TypeScript reference's entity
+            // list (the effect entity ends by itself there, cross_ts)
             let me = w.ents[i].id;
             let auras: Vec<usize> = (0..w.ents.len())
-                .filter(|&k| !w.ents[k].removed && matches!(&w.ents[k].body, Body::Fx(f) if matches!(**f, Fx::Loop { alive: Alive::Transform { p }, .. } if p == me)))
+                .filter(|&k| w.field.is_some() && !w.ents[k].removed && matches!(&w.ents[k].body, Body::Fx(f) if matches!(**f, Fx::Loop { alive: Alive::Transform { p }, .. } if p == me)))
                 .collect();
             for k in auras {
                 let id = w.ents[k].id;

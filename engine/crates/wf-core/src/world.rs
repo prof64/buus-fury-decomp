@@ -180,9 +180,10 @@ pub struct Globals {
     /// e.g. VampireGrab's drain every 16 ticks)
     #[serde(default)]
     pub fc0: i64,
-    /// this frame's update ran no object pass (`World.frame` as it was): the post step counts the frame on `fc0`
+    /// the logic counter at this frame's start (set by the update, taken by the post step): every logic frame
+    /// outside the menu screens counts exactly once on it, whatever object passes ran
     #[serde(default)]
-    pub clock_mark: Option<u32>,
+    pub clock_mark: Option<i64>,
     /// the input object 0x03003300 (0x0804023C) per player slot: this frame's new presses and the press ring
     #[serde(default)]
     pub presses: [PressLog; MAX_PLAYERS],

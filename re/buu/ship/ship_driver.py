@@ -163,17 +163,9 @@ class ShipDriver(Driver):
                 continue
             st = ai_state(e, o[0])
             # a Destroyer breathing fire; a Juggernaut (tank, type 58) driving / shelling along its facing
-            if not st or st[-1] not in ((0x85, 0x86) if o[5] == 20 else (0x2E3, 0x2E4)):
+            if not st or st[-1] not in ((0x86,) if o[5] == 20 else (0x2E3, 0x2E4)):
                 continue
             ex, ey, f = o[1], o[2], o[3]
-            if st[-1] == 0x85:
-                # lining up (it breathes next, and flames stun: a guard has to be up before they arrive)
-                if abs(x - ex) > abs(y - ey):
-                    f = 3 if x > ex else 2
-                else:
-                    f = 0 if y > ey else 1
-                if abs(x - ex) + abs(y - ey) > 130:
-                    continue
             if f >= 2:
                 ahead, side = (x - ex) * (1 if f == 3 else -1), y - ey
             else:
@@ -869,7 +861,7 @@ class ShipDriver(Driver):
 
     GHOSTS = (32,)
 
-    def blast(self, e, s, ens):
+    def blast(self, e, s, ens, turn_ok=True):
         x, y, pf = s['p']
         rec = 0x03001560 + 0x68 * e.r8(0x03001068)
         if e.r16(rec + 0x1A) < 23:
@@ -882,13 +874,16 @@ class ShipDriver(Driver):
                 st = ai_state(e, o[0])
                 if not st or st[-1] not in (0xD9, 0xDA, 0xDB) or abs(dx) + abs(dy) > 56:
                     continue
-            if abs(dy) <= 10 and 8 <= abs(dx) <= 90:
+            tol = 14 if o[5] in self.GHOSTS else 10
+            if abs(dy) <= tol and 8 <= abs(dx) <= 90:
                 face, turn = (3, KEY.RIGHT) if dx > 0 else (2, KEY.LEFT)
-            elif abs(dx) <= 10 and 8 <= abs(dy) <= 90:
+            elif abs(dx) <= tol and 8 <= abs(dy) <= 90:
                 face, turn = (0, KEY.DOWN) if dy > 0 else (1, KEY.UP)
             else:
                 continue
             if pf != face:
+                if not turn_ok:
+                    continue        # (a turn is a step: not on the Pyramid's pit lanes)
                 return turn if self.t % 6 < 2 else 0
             if abs(dx) + abs(dy) <= 34:
                 return KEY.A if self.t % 8 < 2 else 0      # (too close for a blast: it starts past the target)

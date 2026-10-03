@@ -1653,7 +1653,11 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
             w.scene.cam.mode = CamMode::Fixed;
             let c = &w.cameras[0];
             let (cx, cy) = (c.x >> 10, c.y >> 10);
-            let (tx, ty) = clamp_cam(w, *x, *y);
+            // the step count and the step come from the target as given; the camera's limits hold the position on
+            // the way and at the end (Diablo Desert Express 11-17: camera_pan_to(280, 32) from (0, 88) steps (501,
+            // -100) / 256 - x stops at the map's 240 while y goes on to 32)
+            let _ = clamp_cam;
+            let (tx, ty) = (*x, *y);
             let (nn, ssx, ssy) = step_math(tx - cx, ty - cy, *speed, 8);
             (*n, *sx, *sy, *t) = (nn, ssx << 2, ssy << 2, 0);
             *x = tx;

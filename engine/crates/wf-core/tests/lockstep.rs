@@ -229,6 +229,8 @@ fn setup(t: &Value) -> Setup {
     }
     // the frame counter 0x03000F94 at frame 0: every f02_vs_enemy recording starts from the same setup, 9634
     w.g.fc0 = ini.get("fc").filter(|v| !v.is_null()).map(i).unwrap_or(if ini.get("enemy").is_some_and(|v| !v.is_null()) { 9634 } else { 0 });
+    // the recorded mark ages are relative to the frame counter (the AI's clock = fc0 + frame, `Globals::clock`)
+    let fc0 = w.g.fc0;
     let mut ai_starts: Vec<(u32, EntityId, u16)> = vec![];
     let mut enemy = None;
     if let (Some(_), Some(ie)) = (en, ini.get("enemy").filter(|v| !v.is_null())) {
@@ -253,10 +255,10 @@ fn setup(t: &Value) -> Setup {
                 e.ea.pos = player::AnimPos { raw, frame: ie.get("frame").map(i).unwrap_or(0) as i32, tick: ie.get("tick").map(i).unwrap_or(0) as i32 };
             }
             if let Some(a) = ie.get("mark1Age").map(i).filter(|&a| a < 1_000_000) {
-                e.mark1 = -a;
+                e.mark1 = fc0 - a;
             }
             if let Some(a) = ie.get("mark2Age").map(i).filter(|&a| a < 1_000_000) {
-                e.mark2 = -a;
+                e.mark2 = fc0 - a;
             }
             enemy = Some(w.ents[ei].id);
             let scn = en.unwrap();
@@ -297,10 +299,10 @@ fn setup(t: &Value) -> Setup {
                         }
                     }
                     if let Some(a) = e2i.get("mark1Age").map(i).filter(|&a| a < 1_000_000) {
-                        e.mark1 = -a;
+                        e.mark1 = fc0 - a;
                     }
                     if let Some(a) = e2i.get("mark2Age").map(i).filter(|&a| a < 1_000_000) {
-                        e.mark2 = -a;
+                        e.mark2 = fc0 - a;
                     }
                     if let Some(pt) = partner {
                         let ty = w.en_ref(k).ty;

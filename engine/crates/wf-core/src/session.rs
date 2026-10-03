@@ -129,8 +129,9 @@ impl Session {
         let menu = crate::menu::active(&self.world) || self.world.menu.closed_this_frame;
         self.step_update_inner();
         let w = &mut self.world;
-        // (a held pass may still complete in this frame's post step: counted there)
-        w.g.clock_mark = (!menu && !crate::menu::active(w) && w.frame == f0).then_some(f0);
+        // (settled in the post step: a held pass may complete there, an interrupted pass that completes in a later
+        // frame is still the hold frame's pass)
+        w.g.clock_mark = (!menu && !crate::menu::active(w)).then_some(w.g.fc0 + f0 as i64);
     }
     fn step_update_inner(&mut self) {
         let w = &mut self.world;
@@ -179,8 +180,10 @@ impl Session {
     pub fn step_post(&mut self) -> &[Event] {
         self.step_post_world();
         // a logic frame whose object pass did not run still counts on the game's logic counter
-        if self.world.g.clock_mark.take() == Some(self.world.frame) {
-            self.world.g.fc0 += 1;
+        if let Some(c0) = self.world.g.clock_mark.take() {
+            if !crate::menu::active(&self.world) {
+                self.world.g.fc0 = c0 + 1 - self.world.frame as i64;
+            }
         }
         crate::sndsim::end_frame(&mut self.world);
         &self.world.events

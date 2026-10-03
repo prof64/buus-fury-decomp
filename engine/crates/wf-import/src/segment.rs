@@ -151,6 +151,11 @@ pub fn compare(w: &World, fr: &Value, es: &[String], map: &mut BTreeMap<usize, E
         if r.raw() < 0 && r.x() == 0 && r.y() == 0 {
             continue;
         }
+        // nor is an actor's freed memory during a script warp's load (the old player object, still in the
+        // recorder's list for the load's lag frames: a ROM pointer as x, a facing > 7; db1 9-1 -> the world map)
+        if r.dir() > 7 {
+            continue;
+        }
         let id = match map.get(&r.k()).copied().filter(|&id| w.find(id).is_some_and(|i| !w.ents[i].removed)) {
             Some(id) => Some(id),
             None => {

@@ -242,7 +242,8 @@ export function setupSim(t: LsTrace): { w: World; player: Player; battle: Rulese
   p.ctx.fc0 = (ini as { fc?: number }).fc ?? (ini.enemy ? 9634 : 0)
   let enemy: Enemy | null = null
   if (en && ini.enemy) {
-    enemy = w.entities.find((e) => e.kind === 'enemy') as Enemy
+    // the recorded enemy: the fight's own, not a part it spawned (Worm Head's segments come before it in the list)
+    enemy = (w.entities.find((e) => e.kind === 'enemy' && !(e as Enemy).parentE) ?? w.entities.find((e) => e.kind === 'enemy')) as Enemy
     enemy.unmarkSelf()
     enemy.x = ini.enemy.x
     enemy.y = ini.enemy.y

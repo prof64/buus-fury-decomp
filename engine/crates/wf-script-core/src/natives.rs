@@ -343,7 +343,7 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
         0x72 | 0x74 => {
             // an armed save is taken at the call, before the fade: the field's objects leave the world list for the
             // 64 frames of the fade-out (HFIL 18-2's switch script: world list empty from the call on; sc_hfil)
-            if h.s.save_armed && h.w.field.is_some() && std::env::var("LATE_SAVE").is_err() {
+            if h.s.save_armed && h.w.field.is_some() {
                 save_field(h.w, h.s);
                 scene::send_offstage(h.w);
                 h.w.ents.clear();

@@ -828,7 +828,11 @@ pub fn attached(w: &World, i: usize) -> bool {
     let e = w.en_ref(i);
     let held = ctx_player(w, i).is_some_and(|pi| w.pl_ref(pi).held_by == w.ents[i].id && w.ents[i].id != 0);
     // field: the height does not detach (sc_janemba: a hopping Mini-Janemba keeps marking the enemy grid)
-    !e.part && e.prev == 0 && !e.defeated && !e.detached && !w.ents[i].removed && (e.a.z == 0 || w.field.is_some()) && !held
+    // a field enemy whose death node is Idle stays the object it was (`ko < 0`): still on the enemy grid, so the
+    // step it takes in the pass of the killing hit is collision-checked like the ones before (0-21: Majin Buu's
+    // slide, blocked at the wall, stays blocked on the killing frame; 8-71: a free slide moves once more)
+    let gone = e.defeated && !(w.field.is_some() && e.ko < 0);
+    !e.part && e.prev == 0 && !gone && !e.detached && !w.ents[i].removed && (e.a.z == 0 || w.field.is_some()) && !held
 }
 pub fn mark_self(w: &mut World, i: usize) {
     if w.col.is_none() || w.en_ref(i).marked.is_some() || !attached(w, i) {
@@ -1295,8 +1299,15 @@ pub fn frame_box(w: &World, i: usize) -> Rect {
 /// after its step, AlignWithPlayer 0x0801CEEC before its move); gfx 0xA4 / 0x44 / 0xBF on ticks 8 / 24 (path follower)
 pub fn footstep(w: &mut World, i: usize, path: bool) {
     let d = Arc::clone(&w.data);
-    let g = d.enemy(w.en_ref(i).ty).and_then(|t| t.gfx).unwrap_or(-1);
+    let mut g = d.enemy(w.en_ref(i).ty).and_then(|t| t.gfx).unwrap_or(-1);
     let e = w.en_ref(i);
+    // field: the object's own graphics (a placement's sprite: Pilaf's Castle 10-14 has a Destroyer drawn with 0x4F,
+    // which makes no step sound, beside one with the type's 0x4E)
+    if w.field.is_some() {
+        if let Some(s) = e.a.sprite {
+            g = s + crate::content::GFX_OFFSET;
+        }
+    }
     // the game's step SetAnim(1)s before this test: a first walking step counts as walk tick 0
     let t = if e.moving && e.a.anim_name(&d) != Some("walk") { 0 } else { e.ea.pos.tick };
     if (g == 0x4e || g == 0x11 || g == 0x4c) && (t == 0 || t == 16) {
@@ -2219,7 +2230,6 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
         w.events.push(Event::DamageRoll { target: w.ents[i].id, dmg: res.unblocked });
     }
     w.events.push(Event::Damage { target: w.ents[i].id, attacker: msg.attacker, dmg: res.dmg, crit: res.crit });
-    crate::vram::damage_number(w, w.ents[i].id);
     if msg.att_is_player {
         w.events.push(Event::Hit);
         if res.dmg > 0 {
@@ -2248,6 +2258,9 @@ pub fn take_hit(w: &mut World, i: usize, msg: &HitMsg) -> bool {
     if w.en_ref(i).hp1024 == 0 {
         return true;
     }
+    // the damage number's object is made here (`0x0800E8E6`), not at the hit: an on-hit tree without ApplyDamage
+    // shows none (segment sb 19-3: Kid Buu's teleport on a hit)
+    crate::vram::damage_number(w, w.ents[i].id);
     let dmg = msg.dmg;
     let before = w.en_ref(i).hp().max(0);
     w.en(i).hp1024 -= dmg;
@@ -2391,6 +2404,11 @@ pub fn die(w: &mut World, i: usize, explode: bool) {
     if explode {
         let (cx, cy) = w.en_ref(i).a.center();
         let rate = 0x1000 + w.rng.rand(0x1000);
+        // field: the enemy object's tiles are freed before the explosion takes its own (the explosion gets the very
+        // block: HFIL's Janemba Hands, segments sc_hfil; the gated suites pass either way)
+        if w.field.is_some() {
+            crate::vram::entity_gone(w, i);
+        }
         crate::fx::explosion(w, cx, cy, rate);
     }
     // the object's destruction frees its enemy-grid cells (removed entities are not re-synced: story playthrough, a

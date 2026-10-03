@@ -21,6 +21,29 @@ if name == 'db2':
 elif name == 'db4':
     import db4_route as m
     from db4_driver import Db4Driver as drv
+elif name == 'db4b':
+    # db4's way back from the Volcano (mark j_down) for the real Goten (level 115 by then, no Turkeys): his 18 new
+    # stat points first, and no flame / block guard (two Destroyers in the open, 15-17: standing behind a guard
+    # costs more than running through; the rooms' fights give the level-ups that heal)
+    import db4_route as m
+    from db4_driver import Db4Driver
+    from ship_driver import alloc_keys
+
+    class drv(Db4Driver):
+        def flame_guard(self, e, s):
+            return None
+
+        def block_guard(self, e, s):
+            return None
+
+        def in_flame(self, e, px, py, margin=44):
+            return False
+
+    def db4b(e):
+        gl = m.db4(e)
+        i = gl.index(('mark', 'j_down'))
+        return gl[:i + 1] + [('wait', 10), alloc_keys([(0, [9, 0, 9, 0])]), ('wait', 30)] + gl[i + 1:]
+    m.db4b = db4b
 else:
     raise SystemExit(f'no route {name}')
-db_route.main(m.ROUTES, drv)
+db_route.main(getattr(m, 'ROUTES', None) or {name: getattr(m, name)}, drv)
