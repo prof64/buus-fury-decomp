@@ -56,6 +56,16 @@ pub struct Enemy {
     pub worm_dir: Dir,
     pub contact_cd: i32,
     pub part_offset: (i32, i32),
+    /// field Janemba part 0x37 (PartMirrorAnim): the body animation (raw) it saw on its previous update - its table
+    /// follows an animation switch one frame late (sc_janemba)
+    #[serde(default)]
+    pub mirror_raw: i32,
+    /// ... and the body's cel then (under the ascent's controller animation, raw 20, the frame byte it reads lags one
+    /// frame more); `mirror_prev` unused
+    #[serde(default)]
+    pub mirror_cel: i32,
+    #[serde(default)]
+    pub mirror_prev: i32,
     pub script_hits: i32,
     /// tiles this enemy marked blocked on the enemy grid
     pub marked: Option<[i32; 4]>,
@@ -78,6 +88,10 @@ pub struct Enemy {
     pub anim_seq: u32,
     /// the shown graphics set when MechTransform swapped it (gfx id; -1 = the type's)
     pub gfx_now: i32,
+    /// the running motion-controller leaf (state serial, node): its controller ticks with the animation, also while
+    /// an event holds the field and the AI does not think (nodes.rs `busy_controller`)
+    #[serde(default)]
+    pub ctl: (u32, u16),
 }
 
 /// the node-installed state objects with per-frame code (`Enemy.stateHook` of the reference)
@@ -137,6 +151,9 @@ impl Enemy {
             worm_dir: 0,
             contact_cd: 0,
             part_offset: (0, 0),
+            mirror_raw: 0,
+            mirror_cel: 0,
+            mirror_prev: 0,
             script_hits: 0,
             marked: None,
             stepped: false,
@@ -148,6 +165,7 @@ impl Enemy {
             spit_ctl: -1,
             anim_seq: 0,
             gfx_now: -1,
+            ctl: (0, 0),
         };
         // the constructor's SetAnim(0) runs before the object is in the world: no RNG draw
         e.set_anim_with(d, &[AnimRef::Name("idle")], true, Some(true), None, None, &mut Vec::new());
@@ -366,6 +384,7 @@ pub fn update(w: &mut World, i: usize) {
     let id = w.ents[i].id;
     if w.field.as_ref().is_some_and(|f| f.busy && !(f.load_ids.0 <= id && id < f.load_ids.1)) {
         tick_anim(w, i);
+        crate::nodes::busy_controller(w, i);
         return;
     }
     // the player's death script (0x08799D0C) blocks every object update at KO + 199; from KO + 200 an enemy only runs
@@ -811,7 +830,13 @@ pub fn sync_mark(w: &mut World, i: usize) {
 }
 /// footprint on the enemy grid; a detached enemy always fits
 pub fn passable(w: &mut World, i: usize, x: i32, y: i32) -> bool {
-    if w.col.is_none() || !attached(w, i) {
+    // field: a hopping enemy (height != 0) still meets the walls (sc_janemba: a Mini-Janemba's airborne step into a
+    // wall tile does not happen)
+    let airborne_only = w.field.is_some() && {
+        let e = w.en_ref(i);
+        e.a.z != 0 && !e.part && e.prev == 0 && !e.defeated && !w.ents[i].removed
+    };
+    if w.col.is_none() || (!attached(w, i) && !airborne_only) {
         return true;
     }
     let (fw, fh) = (w.en_ref(i).a.foot_w, w.en_ref(i).a.foot_h);
@@ -1654,12 +1679,18 @@ fn janemba_part_field(w: &mut World, i: usize) {
     if w.en_ref(i).ty != 0x37 {
         return;
     }
+    let seen = std::mem::replace(&mut w.en(i).mirror_raw, raw);
+    // the cel seen on the previous update (under the ascent's controller animation the frame byte lags a frame more)
+    let last_cel = std::mem::replace(&mut w.en(i).mirror_cel, cel as i32);
+    // a switch into the ascent's controller animation (raw 20) shows in the table a frame late
+    let raw = if raw == 20 && seen != 0 { seen } else { raw };
+    let cel = if raw == 20 && seen == raw { last_cel as usize } else { cel as usize };
     let table: &[i32] = match raw {
         10 => &[-1, -2, -1],
         20 => &[15, -3, -5],
         _ => &[0, 1, 0, -1],
     };
-    let dy = table.get(cel as usize).copied().unwrap_or(0);
+    let dy = table.get(cel).copied().unwrap_or(0);
     let parts: Vec<(usize, i32)> = (0..w.ents.len())
         .filter(|&k| !w.ents[k].removed)
         .filter_map(|k| match &w.ents[k].body {
@@ -1678,6 +1709,12 @@ fn janemba_part_field(w: &mut World, i: usize) {
         e.a.x = x + (ox << 8);
         e.a.y = y + ((oy + dy) << 8);
     }
+}
+/// Janemba's arm part for a hand strike: A = 0x34 (screen left), B = 0x35
+pub fn janemba_arm(w: &World, i: usize, a: bool) -> Option<usize> {
+    let me = w.ents[i].id;
+    let t = if a { 0x34 } else { 0x35 };
+    (0..w.ents.len()).find(|&k| !w.ents[k].removed && matches!(&w.ents[k].body, Body::Enemy(e) if e.part && e.parent == me && e.ty == t))
 }
 pub fn janemba_parts(w: &mut World, i: usize) {
     let me = w.ents[i].id;
@@ -1707,11 +1744,20 @@ pub fn hand_strike(w: &mut World, i: usize, a_side: bool) {
     let Some(t) = w.data.enemy(0x36).cloned() else { return };
     // an enemy object: its constructor's SetAnim(0) draws the idle start tick
     w.rng.rand(255);
-    let (ppx, ppy) = (w.pl_ref(pi).a.px(), w.pl_ref(pi).a.py());
+    let (mut ppx, mut ppy) = (w.pl_ref(pi).a.px(), w.pl_ref(pi).a.py());
+    // field: the arm part's controller makes the hand before the player's update (its frame-start position)
+    let slot = w.pl_ref(pi).slot as usize;
+    if let Some(&(x, y)) = w.field.as_ref().and_then(|f| f.frame_start_pos.get(slot)) {
+        ppx = x >> 8;
+        ppy = y >> 8;
+    }
     let mut a = Actor { x: (ppx + if a_side { 4 } else { -20 }) << 8, y: ppy << 8, facing: if a_side { 2 } else { 3 }, ..Default::default() };
     a.stats = crate::damage::CombatStats { str_: t.str_, pow: t.pow, end: t.end, end2: t.end, res_m: 128, res_e: 128, crit_bonus: 0, block_factor: 0x1000 };
     let d = Arc::clone(&w.data);
-    a.set_sprite(&d, t.sprite);
+    // the strike's spawn record 0x0877B050 gives the hand gfx 0x96 (the type table's 0x97 is the HFIL field hand's;
+    // sc_janemba: the strike hand is sprite 150)
+    let gfx = 0x96 - crate::content::GFX_OFFSET;
+    a.set_sprite(&d, if w.field.is_some() && d.sprite(gfx).is_some() { Some(gfx) } else { t.sprite });
     a.set_anim(&d, &[n(18)], true, Some(false));
     a.hittable = false;
     w.add(Body::Hand(Box::new(Hand { a, t: 0, hit: false })));
@@ -1751,8 +1797,16 @@ pub fn hand_update(w: &mut World, i: usize) {
         w.ents[i].removed = true;
     }
 }
+const MINI_PTS: [(i32, i32); 5] = [(104, 112), (120, 136), (152, 144), (184, 136), (200, 112)];
+/// field: the puffs announcing the minis the next top-up creates (one per missing mini, at its spot)
+pub fn mini_puffs(w: &mut World) {
+    let live = w.live_enemies().into_iter().filter(|&o| w.en_ref(o).ty == 0x38).count();
+    for &(x, y) in MINI_PTS.iter().take(5usize.saturating_sub(live)) {
+        crate::fx::puff_rng(w, x + 8, y + 8);
+    }
+}
 pub fn top_up_minis(w: &mut World, i: usize) {
-    const PTS: [(i32, i32); 5] = [(104, 112), (120, 136), (152, 144), (184, 136), (200, 112)];
+    const PTS: [(i32, i32); 5] = MINI_PTS;
     let live = w.live_enemies().into_iter().filter(|&o| w.en_ref(o).ty == 0x38).count();
     let b = w.arena.bounds;
     let me = w.ents[i].id;

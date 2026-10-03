@@ -2281,10 +2281,11 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
             wrap_burst(w, i);
             true
         }
-        // another object's energy message head-on (the player's energy attacks; another wave: two laser turrets facing
-        // each other, Babidi's ship 8-36 - the receiver puffs). A punch does not stop it (8-51)
+        // another object's message head-on (the player's punch or energy attack; another wave: two laser turrets
+        // facing each other) turns it back (mode 1) without a puff of its own: the sender's wave puffs on the
+        // accepted hit (Babidi's ship 8-36: one rand(0x1000) for two colliding waves; 8-51: a punch, no draw)
         ShotKind::EnergyWave { len, mode, .. } => {
-            if msg.source == me || *mode != 0 || msg.atk.kind != 1 {
+            if msg.source == me || *mode != 0 {
                 return false;
             }
             let s = w.shot_ref(i);
@@ -2294,7 +2295,7 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
                 if let ShotKind::EnergyWave { mode, .. } = &mut w.shot(i).kind {
                     *mode = 1;
                 }
-                fx::puff_rng(w, hx, hy);
+                return true;
             }
             false
         }

@@ -763,7 +763,14 @@ impl World {
     /// shake tasks: every `period` frames two RNG draws pick the offset ((next - 0x8000) * intensity) >> 19
     pub fn tick_shakes(&mut self) {
         let mut shakes = std::mem::take(&mut self.g.shakes);
-        for s in shakes.iter_mut() {
+        // field: the screen-effect slot holds one shake at a time; a newer one suspends the older until it ends
+        // (sc_janemba: the summon shake pauses through a crit shake, then goes on)
+        let n = shakes.len();
+        let stacked = self.field.is_some();
+        for (k, s) in shakes.iter_mut().enumerate() {
+            if stacked && k + 1 != n {
+                continue;
+            }
             s.left -= 1;
             if s.left == 0 {
                 self.g.shake_off = (0, 0);

@@ -79,6 +79,10 @@ pub enum Fx {
     ItMarkers { t: i32, alive: Alive },
     /// Big Bang explosion phase (state 2 of 0x08037650): 60 ticks, an explosion every 8th (RNG)
     BigBangBoom { n: i32, x0: i32, y0: i32, s: i32 },
+    /// thrown rock 0x08033F28 (vtable 0x0804CE50, Goten's rock drill): 22 updates of two gravity substeps (24.8),
+    /// then a 24x24 energy hit (0x086B8090, mult 0) on the player - accepted queues event s120 (header 0x08783084) -
+    /// and a puff
+    Rock { owner: EntityId, x: i32, y: i32, vx: i32, vy: i32, n: i32 },
 }
 
 impl Fx {
@@ -95,6 +99,7 @@ impl Fx {
             Fx::FlameKame { .. } => "flamekamefx",
             Fx::ItMarkers { .. } => "itfx",
             Fx::BigBangBoom { .. } => "bigbangboom",
+            Fx::Rock { .. } => "rockfx",
         }
     }
 }
@@ -108,6 +113,12 @@ pub fn fx_anim(w: &mut World, id: u32, x: i32, y: i32, start: i32, n: i32, rate:
 /// smoke puff 0x086FD9D0 (4 records)
 pub fn puff(w: &mut World, x: i32, y: i32, rate: i32) {
     fx_anim(w, 0x086f_d9d0, x, y, 0, 4, rate);
+}
+/// 0x08033F28: a rock thrown from (sx, sy) to (tx, ty) in 44 gravity substeps
+pub fn rock_throw(w: &mut World, owner: EntityId, sx: i32, sy: i32, tx: i32, ty: i32) -> EntityId {
+    let vx = ((tx - sx) * 0x5d3) >> 8;
+    let vy = (((ty - sy) * 0x5d3 - 0xba60) >> 8) - 0x200;
+    add(w, Fx::Rock { owner, x: sx << 8, y: sy << 8, vx, vy, n: 0x16 })
 }
 /// puff with the game's random rate 0x1000 + rand(0x1000)
 pub fn puff_rng(w: &mut World, x: i32, y: i32) {
@@ -201,6 +212,20 @@ fn fx_mut(w: &mut World, i: usize) -> &mut Fx {
     }
 }
 
+fn rock_land(w: &mut World, i: usize, owner: EntityId, x: i32, y: i32) {
+    let pi = w.ents.iter().position(|e| !e.removed && matches!(e.body, Body::Player(_)));
+    if let Some(pi) = pi {
+        let stats = w.find(owner).and_then(|oi| w.actor(oi).map(|a| a.stats)).unwrap_or_default();
+        let id = w.ents[i].id;
+        let mut m = HitMsg { team: 0, rect: Rect::new(x - 12, y - 12, x + 12, y + 12), dir: 0, mult: 0, atk: crate::damage::atk(1), attacker: owner, att_stats: stats, att_is_player: false, source: id, crit: false, raw: 0, dmg: 0, no_react: false, foot: true };
+        if crate::player::on_message(w, pi, &mut m) {
+            crate::field::queue_run(w, crate::fieldcontent::Callback::Event("header_0x08783084".into()), crate::field::Cause::Ai { entity: owner });
+        }
+    }
+    puff_rng(w, x, y);
+    w.ents[i].removed = true;
+}
+
 pub fn update(w: &mut World, i: usize) {
     let f = match &w.ents[i].body {
         Body::Fx(f) => (**f).clone(),
@@ -233,6 +258,23 @@ pub fn update(w: &mut World, i: usize) {
                     *acc &= 0xffff;
                     *rec = *first + (*rec - *first + adv) % *n;
                 }
+            }
+        }
+        Fx::Rock { owner, .. } => {
+            let mut end = None;
+            if let Fx::Rock { x, y, vx, vy, n, .. } = fx_mut(w, i) {
+                for _ in 0..2 {
+                    *vy += 0x20;
+                    *x += *vx;
+                    *y += *vy;
+                }
+                *n -= 1;
+                if *n == 0 {
+                    end = Some((*x >> 8, *y >> 8));
+                }
+            }
+            if let Some((x, y)) = end {
+                rock_land(w, i, owner, x, y);
             }
         }
         Fx::Debris { .. } => {

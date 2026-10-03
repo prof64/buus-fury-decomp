@@ -21,7 +21,8 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     if frm is None:
         shutil.copyfile(start, out / 'start.ss')
-    gl = ship_route.goals(start_emu(str(out / 'start.ss')))
+    real = '--real' in a
+    gl = (ship_route.goals_real if real else ship_route.goals)(start_emu(str(out / 'start.ss')))
     i0 = 0
     if frm is not None:
         i0 = gl.index(('mark', frm))
@@ -54,7 +55,7 @@ def main():
             e.run(1)
             keys.append(k)
             st['f'] += 1
-            if st['f'] - st['seg'] > 60000 or status(e)['area'][:2] == [0, 2]:
+            if st['f'] - st['seg'] > 200000 or status(e)['area'][:2] == [0, 2]:
                 raise RuntimeError(f'stuck / game over at goal {d.k} {d.goals[d.k]} {status(e)}')
     except Stop:
         pass

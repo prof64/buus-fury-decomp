@@ -43,6 +43,55 @@ def panel():
     return [('walk', 104, 161), ('face', 'U'), ('press', A), ('events',), ('wait', 60)]
 
 
+def real_prologue(e):
+    """from the Earth agent's real end state (work/earth/earth_end.ss: Goku in 7-2 after Spopovich / Yamu): the Senzu
+    Beans from Yajirobe (s230, flag 51), the rest of the tournament (s261 .. s314) to Southwest Forest, Goku to level 70
+    in East District 439 (the 8-2 gate), the gate, Gohan to level 85 in Southwest Forest (the ship's hatch)"""
+    pts = [e.r16(0x03001560 + 0x68 * c + 0x2C) for c in range(5)]
+    return [
+        ('mark', 'r00_7-2'),
+        nav(7, 1, False), ('walk', 224, 340), ('face', 'U'), ('press', A), ('wait', 60),   # the capsule
+        ('fly', 633, 1065, 31, 23), ('wait', 30),                                            # Kami's Lookout 6-1
+        ('walk', 48, 320), ('face', 'L'), ('press', A), ('until', 6, 13), ('wait', 30),
+        ('walk', 184, 116), ('talk', 'U'), ('wait', 30),                                     # Yajirobe: s230
+        # talking again: one more Senzu per story milestone flag (0, 13, 43, 54, ... : three here, s230 node 7)
+        *[('talk', 'U'), ('wait', 30)] * 3,
+        ('walk', 72, 150), ('face', 'U'), ('press', A), ('until', 6, 1), ('wait', 30),
+        ('walk', 304, 570), ('face', 'U'), ('press', A), ('wait', 60),
+        ('fly', 1953, 2041, 143, 159), ('wait', 30),                                         # Papaya Island 7-1
+        nav(7, 2, False), ('walk', 224, 88), ('hold', U, 20),                                # s261
+        ('story', 8, 1, True), ('wait', 30),                                                 # .. s314 -> 8-1
+        ('mark', 'r01_8-1'),
+        alloc_keys([(-1, split(pts[0]))]),                                                   # Goku's points
+        ('walk', 148, 186), *charsel(-1),                                                    # Goku
+        ('walk', 280, 266), ('face', 'U'), ('press', A), ('wait', 60),
+        ('fly', 2632, 1465, 80, 71), ('wait', 30),                                           # East District 2-8
+        ('mark', 'r02_grind_goku'),
+        ('grind', 70, [(2, 9), (2, 10)]),
+        nav(2, 8, False), ('walk', 176, 380), ('face', 'U'), ('press', A), ('wait', 60),
+        ('fly', 849, 1785, 31, 23), ('wait', 30),                                            # Southwest Forest 8-1
+        nav(8, 2, False), ('walk', 104, 56), ('face', 'U'), ('press', A), ('events',),      # s517: the gate
+        nav(8, 1, False), ('walk', 148, 186), *charsel(1),                                   # Gohan
+        ('mark', 'r03_grind_gohan'),
+        # 85 opens the hatch; the ship's corridors want more (no healing supplies): 92 like a careful player
+        ('grind', 100, [(8, 3), (8, 6)]),
+        nav(8, 16, False), ('wait', 30),
+    ]
+
+
+def goals_real(e):
+    """the chapter route from the real Earth end state"""
+    g = goals(e)
+    k = g.index(('mark', 'c04_8-16'))
+    g = g[k:]
+    # the ship's save points: Gohan again for the corridors (Vegeta after Pui Pui, Goku after Yakon are weaker)
+    k = g.index(('mark', 'c07_8-28'))
+    g[k + 1:k + 1] = [('walk', 60, 306), *charsel(-2)]
+    k = g.index(('mark', 'c09_8-41'))
+    g[k + 1:k + 1] = [('walk', 60, 314), *charsel(1)]
+    return real_prologue(e) + g
+
+
 def goals(e):
     pts = [e.r16(0x03001560 + 0x68 * c + 0x2C) for c in range(5)]
     return [

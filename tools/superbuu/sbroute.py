@@ -48,6 +48,59 @@ ROUTE = [
     # Ultimate Gohan vs Super Buu (6-16) -> Buu blows himself up (s466) -> Barren Wasteland 20-1
     # (beams from 70 px: Electric Kamehameha, slot 2, held 120 frames - melee loses to Buu's counters)
     ('beam', 40000, 2, 120, 70), ('events',), ('wait', 30), ('mark', 'wasteland'),
+    # Barren Wasteland (Gohan): 20-2 (s467 / s468: Hercule and Bee) -> 20-3 -> 20-4 (Gohan Lv 140 gate, A) -> 20-5:
+    # s469 (Dende; Gotenks' fusion, Watch This!; Buu absorbs Gotenks and Piccolo)
+    ('exitto', '20-2'), ('expect', 300), ('wait', 20), ('walke', 150, 184), ('events',), ('wait', 20),
+    ('exitto', '20-3'), ('wait', 20), ('exitto', '20-4'), ('wait', 20), ('walk', 368, 82), ('talk', 'U'), ('wait', 30),
+    ('exitto', '20-5'), ('wait', 20), ('walke', 200, 240), ('eventsw', 240), ('wait', 20), ('mark', 'gohan_vs_buu2'),
+    # Gohan vs Super Buu (118, defeat -> s470): Goku arrives (s471), Vegeta (s474..s476: Vegito), Vegito inside Buu,
+    # Vegeta and Goku leave (s481, flag 137) -> 20-5 (Goku)
+    ('boss', 40000), ('eventsw', 240), ('wait', 30), ('mark', 'fusion_saga'),
+    # Fusion Saga (Goku): 20-6 (clear the robots; Goku Lv 140 gate s473: "confront Majin Buu? Yes") -> 20-7: Goku and
+    # Vegeta vs Super Buu 0x77: three phase hits = Instant Transmission punches while he glides toward the screen's
+    # bottom (scripts #474 / #475 / #476: the Potara, Vegito)
+    ('exitto', '20-6'), ('wait', 5), ('boss', 12000), ('walk', 96, 44), ('talk', 'U'), ('eventsw', 240), ('wait', 20),
+    ('mark', 'goku_vs_buu'),
+    ('itbuu', 20000, 2, 176, 150, 119), ('eventsw', 240), ('itbuu', 20000, 2, 176, 150, 119), ('eventsw', 240),
+    ('itbuu', 20000, 2, 176, 150, 119), ('eventsw', 240), ('wait', 30), ('mark', 'vegito'),
+    # Vegito vs Super Buu (0x78, defeat -> s477), the absorption -> inside Buu 21-1 (Vegeta)
+    ('boss', 12000), ('eventsw', 240), ('wait', 30), ('mark', 'inside_buu'),
+    # inside Buu (Vegeta): 21-1's sphincter (A at its trigger: walk_to) -> 21-2 .. 21-6: break the pod (flag 139, s483)
+    ('walk', 500, 300), ('talk', 'R'), ('wait', 30), ('exitto', '21-2'), ('wait', 10), ('exitto', '21-3'), ('wait', 10),
+    ('exitto', '21-4'), ('wait', 10), ('exitto', '21-5'), ('wait', 10), ('exitto', '21-6'), ('wait', 10),
+    ('walk', 112, 66), ('hold', UP, 2), ('prog', 'A:2,0:25,A:2,0:25,A:2,0:25,A:2,0:25'), ('events',), ('wait', 20),
+    # -> 21-11: the three pods (140..142 -> s484: 143)
+    ('exitto', '21-5'), ('wait', 10), ('exitto', '21-4'), ('wait', 10), ('exitto', '21-7'), ('wait', 10),
+    ('exitto', '21-8'), ('wait', 10), ('exitto', '21-9'), ('wait', 10), ('exitto', '21-10'), ('wait', 10),
+    ('exitto', '21-11'), ('wait', 10),
+    ('walk', 104, 66), ('hold', UP, 2), ('prog', 'A:2,0:25,A:2,0:25,A:2,0:25,A:2,0:25'), ('events',), ('wait', 20),
+    ('walk', 200, 66), ('hold', UP, 2), ('prog', 'A:2,0:25,A:2,0:25,A:2,0:25,A:2,0:25'), ('events',), ('wait', 20),
+    ('walk', 296, 66), ('hold', UP, 2), ('prog', 'A:2,0:25,A:2,0:25,A:2,0:25,A:2,0:25'), ('events',), ('wait', 20), ('mark', 'intestines'),
+    # -> 21-19 / 21-21 / 21-23: the captives (s485 / s486 / s487: Buu's fakes) -> 21-26 the brain: s488, Super Buu
+    ('exitto', '21-10'), ('wait', 10), ('exitto', '21-9'), ('wait', 10), ('exitto', '21-8'), ('wait', 10),
+    ('exitto', '21-12'), ('wait', 10), ('exitto', '21-13'), ('wait', 10), ('exitto', '21-14'), ('wait', 10),
+    # 21-14 save point: Switch Characters -> Goku (full HP; Vegeta recovers in reserve)
+    ('walk', 166, 236), ('prog', 'U:2,0:10,A:2,0:60,D:2,0:20,A:2,0:90,L:2,0:20,A:2,0:150'),
+    ('exitto', '21-15'), ('wait', 10), ('exitto', '21-16'), ('wait', 10), ('exitto', '21-17'), ('wait', 10),
+    ('exitto', '21-18'), ('wait', 10), ('exitto', '21-19'), ('wait', 10), ('walke', 100, 240), ('events',), ('wait', 20),
+    ('boss', 20000), ('events',), ('wait', 20),
+    ('exitto', '21-20'), ('wait', 10), ('exitto', '21-21'), ('wait', 10), ('walke', 100, 240), ('events',),
+    ('boss', 20000), ('events',), ('wait', 20), ('exitto', '21-22'), ('wait', 10), ('exitto', '21-23'), ('wait', 10),
+    ('walke', 100, 240), ('events',), ('boss', 20000), ('events',), ('wait', 20),
+    ('exitto', '21-24'), ('wait', 10), ('exitto', '21-25'), ('wait', 10), ('exitto', '21-26'), ('wait', 10),
+    ('walke', 200, 320), ('eventsw', 240), ('wait', 20), ('mark', 'brain'),
+    # Super Buu (121; defeat s489: flag 147, Kid Buu Saga) -> s478 (out of Buu; s479 flag 148) -> world map
+    ('boss', 30000), ('eventsw', 240), ('wait', 20), ('walke', 160, 40), ('eventsw', 240), ('wait', 30),
+    ('mark', 'kid_buu_saga'),
+    # Kid Buu Saga: fly back to the crater spot (s480: "ready to confront Kid Buu? Yes") -> Planet of the Kais 19-3: Goku
+    # vs Kid Buu (splits, 125000 HP each round), Vegeta's timed stand (keep away from him until the countdown ends),
+    # the Spirit Bomb (power struggle), flag 149 -> world map
+    ('fly', 648, 1076), ('eventsw', 240), ('wait', 30), ('mark', 'kid_buu'),
+    ('boss', 60000, 'timer'), ('evade', 20000), ('eventsw', 240), ('wait', 30), ('mark', 'after_kid_buu'),
+    # the final sequence: West City (world map spot 1250, 1200) -> Capsule Corp 4-20 -> 4-21: s190 ("final sequence of
+    # the game ... ready? Yes") -> the party, the World Tournament, Uub (s311 / s312), the staff credits, the title
+    ('fly', 1250, 1200), ('eventsw', 240), ('wait', 30), ('exitto', '4-20'), ('wait', 20), ('exitto', '4-21'),
+    ('wait', 20), ('mark', 'final'), ('walke', 100, 76), ('eventsw', 240), ('wait', 30), ('mark', 'the_end'),
 ]
 
 

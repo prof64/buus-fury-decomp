@@ -203,10 +203,14 @@ impl StorySim {
                 Callback::Script(id) => {
                     let path = format!("scripts/inline/{id}.rhai");
                     let steps = self.stepped.contains(&path);
+                    self.hs.in_unit = true;
                     self.rt.start_unit(UnitRef::new(id.clone(), "", steps), [0; 4]);
                 }
                 Callback::Event(id) => match self.rt.event_id(id).ok_or(()) {
-                    Ok(n) => self.rt.start_event(n, [0; 4]),
+                    Ok(n) => {
+                        self.hs.in_unit = false;
+                        self.rt.start_event(n, [0; 4])
+                    },
                     Err(_) => {
                         self.errors.push(format!("unknown event id {id}"));
                         continue;

@@ -211,6 +211,11 @@ Status and the side-content catalogue follow below as they are recorded.
 
 ## 8. Babidi's ship chapter (owner: the ship / Majin Buu chapter agent, 2026-10-02)
 
+> **Note from the Earth agent (§9):** the real Earth end state now exists: `work/earth/earth_end.ss` = the real game
+> played from the soft reset through Other World and every Earth chapter (no flags set by hand) to Goku in 7-2 after
+> the tournament (flag 50, lf 192,179). It rebuilds from `data/story_playthrough/earth_route_keys.json` (`start` +
+> `chapter` key runs from route.py's soft reset). Re-record the ship chapter from it instead of `mkstate_dev.py`.
+
 Route + recorder: `re/buu/ship/` — `mkstate_dev.py` (DEV start: the real Other World end state `work/earth/ow_end.ss`
 + the Earth chapter's results applied through the game's own natives (flags 14..53, party joins, `level_up_to`,
 12 Senzu Beans) + the real chapter-transition event s314 -> Southwest Forest 8-1; to be replaced by the Earth agent's
@@ -311,3 +316,47 @@ take-off (flyer facing at the arrival, airship patrol facing), coin pickup timin
 walking criminal in the core but passes it in the game (2-9 #9), Spopovich / tournament ring scenes (7-2 f1200 an
 NPC the game removed, 7-3 f2241 an anim cel), s128's camera pan start (2-8 #1 f5646), Goten's rock drill NPC cel
 (2-90 #2 f182), the tank's sound 28 (3-14 #5).
+
+**Side-content catalogue** (data survey 2026-10-02; flags = story flags): Broly turns out to be **mainline** (Dragon
+Ball saga: his defeat s436 sets flag 111, which Dragon Ball #4 s439 needs) — kept here as assigned. The optional
+content: the dungeon level-gate tiers (s517: tier 2 after flag 128, tier 3 after 149 at 8-2 / 10-1 / 11-1 / 14-1 /
+15-1, 9-1), per-visit gates (s518: 2-33 Gohan L140, 8-7 Vegeta L120, 13-1), the East District hidden dungeon
+(2-33..2-47), Hercule Exhibits (25, s170 at 3-20) and Z-Fighter Exhibits (15, s189 at 4-23) -> Gogeta's Fusion Dance,
+the Lighthouse Keeper trade chain (s347), the ninja bandana bounty (s391), fishing -> Korin, the Capsule Corp NPCs
+(s185 / s199), Yajirobe, world-map ambushes (s509), Heaven / Dabura (22-1, s490..493), and the post-game (flag 149 ->
+s190): the Airship "XJ-6" (12-x, s385 / s389), the tier-3 sets, the Barren gate (20-4, Goku L175), exhibit
+replacements. Optional HFIL chests: s440 / s441 / s442 (flags 213 / 214 / 215).
+
+**Start states** (`tools/side/mksave_side.py CHAPTER out.ss`, the §6 builder with extra chapters):
+* `janemba` — flags through 120, a save at 1-5's arrival point (s066 on the load), current char Goku; route
+  `tools/side/jroute.py` (1-5 pad -> 0-51 -> HFIL 18-1). The HFIL corridor 18-1 .. 18-11 (Poltergeists, Living Dead,
+  Lich, Nosferatu: levels 116..125) is not routed yet (the driver's melee loses to them).
+* `janemba_arena` — flags through 123 + 181 / 183 / 284, a save at the 18-13 save point (s448 on the load), Goku /
+  Vegeta level 200 (liberty: the route's melee bot needs it for the two Super Janemba fights).
+Route `jroute.py --route arena --wait 1` (driver goals + `tools/side/sidedriver.py`: `bossx` = boss with the area's
+exits blocked and their push keys masked, `bosst` = fight given enemy types in priority order, rotate the approach
+side when the target's HP stops falling, dodge the given types): 41,967 frames from the load, real game: s448, s449,
+Janemba (minis first), s450 the handover to Super Janemba, s451 the fusion (Watch This!), Gogeta vs Super Janemba,
+s452 (flag 125). Master `work/side/seg/sc_arena_master.json` (local), segments cut at the 18-14 entry:
+`data/segments/sc_janemba` (6,000 frames, gate) and `work/side/seg/sc_janemba_full` (40,688 frames, local).
+
+| segment | from | frames | matched |
+|---|---|---|---|
+| `sc_janemba` | 18-14 entry | 6,000 | 1,404 (gate) |
+
+Rules found (field only where battle is pinned by the TypeScript cross-check):
+* Janemba's body parts: created at body + (-16, -16) / (48, -16) / (16, -40); then part 0x37's AI node (0x0803D0C4)
+  places the chain every frame its AI runs at (16, -40) / (-12, -21) / (44, -21) + a y delta by the body's cel:
+  raw 10 [-1, -2, -1], raw 20 [15, -3, -5], else [0, 1, 0, -1] (0x0803CF46 / 0x0803D046 / 0x0803CFC2; read before
+  the body's tick; a switch into raw 20 shows a frame late, and under it the previous frame's cel). Battle keeps the
+  measured fixed offsets (-12, -22) ... until the TypeScript reference is updated.
+* Hand strikes: the arm part (A 0x34 / B 0x35) plays raw 19 (8 frames a cel, no start draw), the body stays idle; the
+  hand is gfx 0x96 (spawn record 0x0877B050) at the player's frame-start position (+4 / -20), the arm's SetAnim(0)
+  ends the strike.
+* Ascend = raw 20 one pass (cel 0 shows 9 frames); descend rises from its 2nd frame, lands after 67, the animation
+  plays back (cel 1 for 8 frames, then cel 0), 16 frames later the shake (0x46, 0x1E) and a puff per missing mini
+  (rate 0x1000 + rand(0x1000)), 16 more: the minis and SetAnim(0) (229 frames after the ascent began).
+* The field's shake slot holds one shake at a time: a newer one suspends the older until it ends.
+* Mini-Janemba: the roll's dash is a collision-checked step without sliding; a hopping enemy meets the walls.
+* Remove / become_map_object / glide lift an NPC's walk mark (s101); the field enemies' AI does not run in an event's
+  exit frame (the game's next frame does).

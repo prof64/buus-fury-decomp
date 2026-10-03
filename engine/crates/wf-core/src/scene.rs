@@ -87,6 +87,9 @@ pub enum AnimMode {
     Pose,
     /// `play_anim_frames`: cels 0..last, each `each` frames, restart at `loop_start`, `loops` passes (0 = forever)
     Frames { each: i32, loops: i32, loop_start: i32, last: i32, pass: i32 },
+    /// an enemy's SetAnim: the enemy state table's rule for the raw (eanim.rs `setanim_table`; 2-90: play_anim(123,
+    /// 10) on Goten plays raw 11 once and stops on its last cel, then the script goes on)
+    Enemy,
 }
 
 /// an actor's animation as the game keeps it (obj+0x50 anim, +0x11 cel, +0x12 tick)
@@ -131,6 +134,54 @@ impl ActAnim {
         let n = self.cels(d, sprite, dir).max(1);
         match self.mode.clone() {
             AnimMode::Pose => AnimOut::None,
+            AnimMode::Enemy => {
+                use crate::eanim::{End, RuleKind};
+                let Some(r) = d.anim.setanim.get(&self.raw).map(|&k| &d.anim.rules[k as usize]) else { return AnimOut::None };
+                self.tick = (self.tick + 1) & 0xffff;
+                match r.kind {
+                    RuleKind::Idle => {
+                        if n == 2 {
+                            self.frame = ((self.tick & 0xff) > 0xf0) as i32;
+                        } else {
+                            self.frame = (self.tick >> 3) & 0xff;
+                            if self.frame >= n {
+                                self.frame = 0;
+                                self.tick = 0;
+                            }
+                        }
+                    }
+                    RuleKind::Loop => {
+                        let mut f = self.tick >> r.shift;
+                        if f >= n {
+                            self.tick = 0;
+                            f = 0;
+                        }
+                        self.frame = f;
+                    }
+                    RuleKind::Bored => {
+                        let f = self.tick >> 5;
+                        if f >= n {
+                            self.tick = 0x40;
+                            self.frame = 2;
+                        } else {
+                            self.frame = f;
+                        }
+                    }
+                    RuleKind::Once | RuleKind::OnceStop if !self.ended => {
+                        let f = self.tick >> r.shift;
+                        if f >= n {
+                            self.ended = true;
+                            if r.end == Some(End::Idle) {
+                                return AnimOut::ToIdle;
+                            }
+                        } else {
+                            self.frame = f;
+                        }
+                    }
+                    _ => {}
+                }
+                AnimOut::None
+            }
             AnimMode::Frames { each, loops, loop_start, last, pass } => {
                 // the frame-range controller (0x0804DE58): cels 0..last, `each` ticks per cel, later passes from
                 // `loop_start` (its tick restarts at loop_start * each); a controller created by a track's
@@ -405,6 +456,9 @@ pub fn set_state(w: &mut World, i: usize, id: i32) {
             w.sfx(s, 64);
         }
         _ => {}
+    }
+    if matches!(w.ents[i].body, Body::Enemy(_)) {
+        a.mode = AnimMode::Enemy;
     }
     if let Some(m) = anim_mut(w, i) {
         *m = a;

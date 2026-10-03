@@ -167,7 +167,11 @@ pub fn compare(w: &World, fr: &Value, es: &[String], map: &mut BTreeMap<usize, E
         if let Some((raw, frame)) = scene::shown_anim(w, i) {
             let ours = ac.sprite.and_then(|s| w.data.sprite(s)).and_then(|sp| sp.anim_raw(raw)).map(|a| a.canon_raw.min(raw)).unwrap_or(-1);
             if r.raw() >= 0 && (ours != r.raw() || (ours >= 0 && frame != r.frame())) {
-                rep.bad(k, "anim", format!("#{} sprite {}: raw {} cel {} vs game raw {} cel {}", r.k(), r.sprite(), ours, frame, r.raw(), r.frame()));
+                let tick = match &w.ents[i].body {
+                    Body::Npc(n) => format!(" tick {}", n.anim.tick),
+                    _ => String::new(),
+                };
+                rep.bad(k, "anim", format!("#{} sprite {}: raw {} cel {}{} vs game raw {} cel {} tick {}", r.k(), r.sprite(), ours, frame, tick, r.raw(), r.frame(), a[8]));
             }
         }
     }
@@ -303,6 +307,9 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
             }
             host.step(&mut sess, keys);
             wf_core::rng::TRACE.store(false, std::sync::atomic::Ordering::Relaxed);
+        } else if wf_core::menu::active(&sess.world) && std::env::var("SEG_MENU_LOGIC").is_err() {
+            // a menu screen runs per video frame (menu::step models the game's redraw lag itself)
+            host.step(&mut sess, keys);
         } else {
             sess.world.events.clear();
         }
@@ -310,6 +317,17 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
             if (a..=b).contains(&k) {
                 let w = &sess.world;
                 let p = w.player_idx(0).map(|pi| (w.pl_ref(pi).a.x, w.pl_ref(pi).a.y, w.pl_ref(pi).a.facing, w.pl_ref(pi).gs.name()));
+                if std::env::var("SEGMENT_NPC").is_ok() {
+                    let npcs: Vec<String> = (0..w.ents.len()).filter(|&i| !w.ents[i].removed).filter_map(|i| match &w.ents[i].body {
+                        Body::Npc(n) => Some(format!("{}:{}/{}", n.sprite_id, n.anim.raw, n.anim.tick)),
+                        _ => None,
+                    }).collect();
+                    let game: Vec<String> = fr["actors"].as_array().into_iter().flatten().map(|a| format!("{}:{}/{}", a[1], a[6], a[8])).collect();
+                    eprintln!("  t{k} npcs {} | game {}", npcs.join(" "), game.join(" "));
+                }
+                if wf_core::menu::active(w) {
+                    eprintln!("  t{k} menu {:?} lag {} ticks {} play {} game lf {} snd {}", w.menu.phase, w.menu.lag, w.menu.ticks, w.story.play_frames, lf, fr["snd"]);
+                }
                 eprintln!(
                     "  t{k} logic {logic} keys {keys:x} run {} depth {} busy {:?} mode {:?} pending {:?} p {:?} game p {} rng {:08x?} game {}",
                     host.running(),

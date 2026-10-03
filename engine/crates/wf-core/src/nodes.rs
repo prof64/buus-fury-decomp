@@ -229,6 +229,9 @@ fn enter(w: &mut World, c: &C, n: u16) {
                 r.d = [0; 8];
             }
             let mut r = *r;
+            if is_controller(kind(c, n)) {
+                w.en(c.i).ctl = (c.serial, n);
+            }
             leaf_enter(w, c, n, &mut r);
             if let Some(x) = rt(w, c, n) {
                 *x = r;
@@ -262,6 +265,9 @@ fn exit(w: &mut World, c: &C, n: u16) {
             }
         }
         _ => {
+            if is_controller(kind(c, n)) && w.en_ref(c.i).ctl == (c.serial, n) {
+                w.en(c.i).ctl = (0, 0);
+            }
             let Some(r) = rt(w, c, n) else { return };
             let mut r = *r;
             leaf_exit(w, c, n, &mut r);
@@ -345,6 +351,10 @@ fn update(w: &mut World, c: &C, n: u16) -> i32 {
         }
         _ => {
             let Some(r) = rt(w, c, n) else { return 0 };
+            // a motion controller that already ran out while the field was held: the node only reports it
+            if is_controller(kind(c, n)) && r.d[7] != 0 {
+                return 1;
+            }
             r.f += 1;
             let mut r = *r;
             let f = r.f;
@@ -354,6 +364,40 @@ fn update(w: &mut World, c: &C, n: u16) -> i32 {
             }
             done as i32
         }
+    }
+}
+
+/// the nodes whose work runs in a motion controller (a state object ticked with the animation in the actor update,
+/// before the AI): FlameBreath 0x03002FA8, SoldierThrow 0x03002FCC, TurretFire 0x0300305C, CyborgShot 0x03003108,
+/// GrappleArm 0x03003294, BombThrow 0x0203DD04
+fn is_controller(k: K) -> bool {
+    matches!(k, K::FlameBreath | K::SoldierThrow | K::TurretFire | K::CyborgShot | K::GrappleArm | K::BombThrow)
+}
+
+/// an event holds the field: the AI does not think, but the running motion controller keeps ticking (a turret's fire
+/// ends on time, a Destroyer keeps breathing flames; Babidi's ship 8-53 / 8-59 door scripts). Once it has run out,
+/// the node finishes on the AI's next update without running again
+pub fn busy_controller(w: &mut World, i: usize) {
+    let (serial, n) = w.en_ref(i).ctl;
+    if serial == 0 {
+        return;
+    }
+    let Some(c) = ctx_top(w, i) else { return };
+    if c.serial != serial || !is_controller(kind(&c, n)) {
+        return;
+    }
+    let Some(r) = rt(w, &c, n) else { return };
+    if r.d[7] != 0 {
+        return;
+    }
+    r.f += 1;
+    let mut r = *r;
+    let f = r.f;
+    if leaf_update(w, &c, n, f, &mut r) {
+        r.d[7] = 1;
+    }
+    if let Some(x) = rt(w, &c, n) {
+        *x = r;
     }
 }
 
@@ -940,8 +984,32 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
         K::KidBuuSplitAnim => set_anim(w, i, &[an(11)], true, Some(false)),
         K::BabidiHover => w.g.buu_pacified = 0,
         K::BabidiGesture => set_anim(w, i, &[an(18)], true, Some(true)),
+        // field (sc_janemba): the arm part plays the strike (raw 19), the body keeps its idle; battle keeps the
+        // reference's body animation (cross_ts)
+        K::JanembaHandStrikeA | K::JanembaHandStrikeB if w.field.is_some() => {
+            // SetAnimRaw(0x12) + the strike controller (no state rule, no start draw): 8 frames a cel
+            if let Some(k) = en::janemba_arm(w, i, kind(c, n) == K::JanembaHandStrikeA) {
+                let rule = w.data.anim.fallback_once;
+                en::set_anim_rule(w, k, &[an(18)], true, Some(false), Some(rule));
+            }
+        }
         K::JanembaHandStrikeA | K::JanembaHandStrikeB => set_anim(w, i, &[an(17)], true, Some(false)),
+        // field (sc_janemba): anim 0x13 = raw 20, one pass at 8 frames a cel, held on its last cel through the rise and
+        // the descent; battle keeps the reference's
+        K::JanembaAscend if w.field.is_some() => {
+            let rule = w.data.anim.fallback_once;
+            en::set_anim_rule(w, i, &[an(19)], true, Some(false), Some(rule));
+            // the controller (0x030032B8) counts from its first update: cel 0 shows 9 frames
+            w.en(i).ea.pos.tick = 0xffff;
+        }
         K::JanembaAscend => set_anim(w, i, &[an(18)], true, Some(true)),
+        // field: the same animation goes on (no restart)
+        K::JanembaDescendSummon if w.field.is_some() => {
+            w.en(i).a.z = -200;
+            r.d[0] = -1;
+            // its controller (0x0804D3C8) rises from its second frame (minis 229 frames after the ascent began)
+            r.d[1] = 1;
+        }
         K::JanembaDescendSummon => {
             w.en(i).a.z = -200;
             r.d[0] = -1;
@@ -1006,7 +1074,12 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             shots::add(w, s);
             set_anim(w, i, &[an(17)], true, Some(true));
         }
-        K::TauntAnim => set_anim(w, i, &[an(4)], true, Some(false)),
+        // controller 0x0804E030 (enter 0x08033D84): anim 4, frame = tick >> 3, no swing sound; tick 0x20 -> SetAnim(0)
+        // (the idle enter's rand(255))
+        K::TauntAnim => {
+            let once = w.data.anim.setanim[&4];
+            en::set_anim_rule(w, i, &[an(4)], true, Some(false), Some(once))
+        }
         K::SpawnEnzymes => {
             r.d[0] = 120;
             r.d[1] = w.en_ref(i).spawned;
@@ -1138,16 +1211,17 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                 if inline && w.field.as_ref().is_some_and(|f| f.host) {
                     w.scene.ai_wait.push(me);
                 }
-                let run = if matches!(c.tree.nodes[n as usize].k, K::RunScript) {
-                    crate::fieldcontent::Callback::Event(format!("header_0x{sc:08X}"))
+                // RunScript (0x0803388C) appends an event object to the world's list: it runs next frame
+                if !inline {
+                    let run = crate::fieldcontent::Callback::Event(format!("header_0x{sc:08X}"));
+                    crate::field::queue_run(w, run, crate::field::Cause::Ai { entity: me });
                 } else {
-                    crate::fieldcontent::Callback::Script(format!("inline_0x{sc:08X}"))
-                };
-                w.events.push(crate::world::Event::Field(crate::field::FieldEvent::Run {
-                    run,
-                    cause: crate::field::Cause::Ai { entity: me },
-                    slot: 0,
-                }));
+                    w.events.push(crate::world::Event::Field(crate::field::FieldEvent::Run {
+                        run: crate::fieldcontent::Callback::Script(format!("inline_0x{sc:08X}")),
+                        cause: crate::field::Cause::Ai { entity: me },
+                        slot: 0,
+                    }));
+                }
                 return !w.scene.ai_wait.contains(&me);
             }
             true
@@ -2027,7 +2101,14 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                 en::hand_strike(w, i, kind(c, n) == K::JanembaHandStrikeA);
             }
             if f >= 57 {
-                w.rng.rand(255);
+                // the arm part's SetAnim(0) (its idle start draw)
+                let arm = if w.field.is_some() { en::janemba_arm(w, i, kind(c, n) == K::JanembaHandStrikeA) } else { None };
+                match arm {
+                    Some(k) => en::set_anim(w, k, &[an(0)], true, Some(true)),
+                    None => {
+                        w.rng.rand(255);
+                    }
+                }
                 return true;
             }
             false
@@ -2037,6 +2118,41 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                 w.en(i).a.z = (24 - 3 * f).max(-200);
             }
             f > 128
+        }
+        // field (sc_janemba): landed (67 frames), the animation plays back (cel 1 for 8 frames, then cel 0); 16 frames
+        // later the screen shake (0x0800797C(0x46, 0x1E)); 16 more: the minis are topped up to 5 and the body goes back
+        // to idle (SetAnim(0)) - the node's end (minis 229 frames after the ascent began)
+        K::JanembaDescendSummon if w.field.is_some() => {
+            if r.d[1] == 1 {
+                r.d[1] = 0;
+                return false;
+            }
+            if w.en_ref(i).a.z < 0 {
+                let z = (w.en_ref(i).a.z + 3).min(0);
+                w.en(i).a.z = z;
+                if z == 0 {
+                    r.d[0] = 32;
+                    w.en(i).ea.pos.frame = 1;
+                }
+                return false;
+            }
+            if r.d[0] > 0 {
+                r.d[0] -= 1;
+                let k = 32 - r.d[0];
+                w.en(i).ea.pos.frame = if k < 8 { 1 } else { 0 };
+                if r.d[0] == 16 {
+                    // 0x08039A90: the shake, then a puff (rate 0x1000 + rand(0x1000)) at each missing mini's spot; the
+                    // minis come out 16 frames later
+                    w.shake(70, 30);
+                    en::mini_puffs(w);
+                }
+                if r.d[0] == 0 {
+                    en::top_up_minis(w, i);
+                    en::set_anim(w, i, &[an(0)], true, Some(true));
+                    return true;
+                }
+            }
+            false
         }
         K::JanembaDescendSummon => {
             if w.en_ref(i).a.z < 0 {
@@ -2116,7 +2232,13 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         }
         K::MiniRollAttack => {
             if f > 16 && f < 32 {
-                en::move_by(w, i, r.d[0], r.d[1]);
+                // field (sc_janemba): the dash is a collision-checked step without sliding (a mini blocked by
+                // another stays put); battle keeps the reference's free move
+                if w.field.is_some() {
+                    en::try_move(w, i, r.d[0], r.d[1], 0, 0);
+                } else {
+                    en::move_by(w, i, r.d[0], r.d[1]);
+                }
             }
             if f == 32 {
                 let bb = w.en_ref(i).a.body_box();
@@ -2202,9 +2324,23 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         }
         K::PlayAnimTimed => f >= 32,
         K::DarkSphere => w.g.sphere_state == 1 || w.g.sphere_state == 3,
+        // controller 0x0804E030 (update 0x08033D9A): tick 8 throws a rock at the player's footprint centre
+        // + (rand(64) - 32, rand(64) - 32) from the facing offset 0x0875939C (rock object 0x08033F28)
         K::TauntAnim => {
-            let d = Arc::clone(&w.data);
-            f >= 12 && w.en_ref(i).anim_done(&d)
+            if f == 8 {
+                if let Some(pi) = en::player(w, i) {
+                    let dx = w.rng.rand(64) - 32;
+                    let dy = w.rng.rand(64) - 32;
+                    const OFF: [(i32, i32); 4] = [(4, 4), (13, -24), (-8, -8), (24, -8)];
+                    let a = &w.en_ref(i).a;
+                    let (ox, oy) = OFF[a.facing as usize & 3];
+                    let (sx, sy) = (a.px() + ox, a.py() + oy);
+                    let fb = w.pl_ref(pi).a.foot_box();
+                    let (tx, ty) = (((fb.x0 + fb.x1) >> 1) + dx, ((fb.y0 + fb.y1) >> 1) + dy);
+                    crate::fx::rock_throw(w, me, sx, sy, tx, ty);
+                }
+            }
+            f > 1 && w.en_ref(i).is_anim(0)
         }
         // update 0x080314DC: running while in the one-shot state, then the paired graphics set, SetAnim(0), finished
         K::MechTransform => {

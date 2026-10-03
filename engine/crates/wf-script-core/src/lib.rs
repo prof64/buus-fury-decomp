@@ -133,6 +133,11 @@ pub struct HostState {
     /// otherwise `warp` does not wait for it (the script is queued after the running one)
     #[serde(default)]
     pub nest_area_enter: bool,
+    /// the running job is a unit script (inline code): an event it starts (`run_event`) is the VM's nested loop, not
+    /// a scene object — its end gives the map NPCs no extra animation tick (2-90's gate: s517 from the button
+    /// trigger's code)
+    #[serde(default)]
+    pub in_unit: bool,
 }
 
 /// compatibility name (older tests / docs)
@@ -271,9 +276,14 @@ impl Host for CoreHost<'_> {
             }
             SceneCall::Exit { .. } => {
                 end_event(self.w);
+                if self.s.in_unit && self.w.scene.depth == 0 {
+                    if let Some(f) = self.w.field.as_mut() {
+                        f.event_ended = false;
+                    }
+                }
                 // the event ended straight out of a command wait: in the game the wait loop returned at the top of
                 // this frame, so the field's NPCs already ran this frame's update unfrozen
-                if self.s.from_wait && self.w.scene.depth == 0 {
+                if self.s.from_wait && self.w.scene.depth == 0 && !self.s.in_unit {
                     release_field_npcs(self.w, self.s.event_watermark);
                 }
                 Ok(NativeResult::Done(None))

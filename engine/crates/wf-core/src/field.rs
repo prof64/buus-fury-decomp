@@ -207,6 +207,11 @@ pub struct Field {
     /// script; 3-1's robbers: s126 8 frames after the KO): (due frame, callback, cause)
     #[serde(default)]
     pub defeat_later: Vec<(u32, Callback, Cause)>,
+    /// event objects an object queued on the world's event list (+0x610: RunScript, Goten's rock hit): (due frame,
+    /// callback, cause); the next frame's list pass starts them, the script's first command runs the frame after
+    /// (2-90: s121 starts the frame after Goten's RunScript)
+    #[serde(default)]
+    pub queued_runs: Vec<(u32, Callback, Cause)>,
     /// a level-up hook started at the start of this frame's update: it runs inline (a nested loop), nothing else
     /// updates this frame
     pub held: bool,
@@ -233,6 +238,10 @@ pub struct Field {
     /// away (player.rs `ctl_it_field`)
     #[serde(default)]
     pub trig_off: bool,
+    /// each player's 24.8 position when this frame's update began (objects updated before the player read it: the
+    /// field list updates last to first; Janemba's arm parts create the strike hand there)
+    #[serde(default)]
+    pub frame_start_pos: Vec<(i32, i32)>,
     /// a script removed the leader's object (`remove_actor(0)`: s511 on the Other World map); the next load creates
     /// it again from the record (EnterArea always builds the player)
     #[serde(default)]
@@ -363,6 +372,7 @@ fn new_field() -> Field {
         xp_due: vec![],
         defeat_runs: vec![],
         defeat_later: vec![],
+        queued_runs: vec![],
         held: false,
         held_event: false,
         resume_held: false,
@@ -373,6 +383,7 @@ fn new_field() -> Field {
         entered: 0,
         loads: 0,
         trig_off: false,
+        frame_start_pos: vec![],
         player_removed: false,
         on_enter_queued: false,
         nest_load: false,
@@ -847,6 +858,10 @@ pub fn camera(w: &mut World, slot: usize) {
 /// before the entity update: the deferred calls due (start of the world update); the item-get presentation holds the
 /// players' input
 pub fn pre_step(w: &mut World) {
+    let pos: Vec<(i32, i32)> = (0..w.players.len()).filter_map(|s| w.player_idx(s)).map(|i| (w.pl_ref(i).a.x, w.pl_ref(i).a.y)).collect();
+    if let Some(f) = w.field.as_mut() {
+        f.frame_start_pos = pos;
+    }
     // an event (nested loop inside the player update) or the item-get holds the players; the raw keys stay in scene.keys
     if w.field.as_ref().is_some_and(|f| f.item_get.is_some() || f.busy) {
         // the world map's flyer reads the keys itself, event or not (s515's warp_fade: it answers A / B during the
@@ -971,6 +986,18 @@ fn begin_fade_in(w: &mut World) {
 /// after the entity update: the trigger check, the fade timeline, cameras, placed enemies' defeats, story sync,
 /// play time
 pub fn post_step(w: &mut World) {
+    let now = w.frame;
+    let due: Vec<(u32, Callback, Cause)> = match w.field.as_mut() {
+        Some(f) if f.queued_runs.iter().any(|q| q.0 <= now) => {
+            let (due, keep) = std::mem::take(&mut f.queued_runs).into_iter().partition(|q| q.0 <= now);
+            f.queued_runs = keep;
+            due
+        }
+        _ => vec![],
+    };
+    for (_, run, cause) in due {
+        w.events.push(Event::Field(FieldEvent::Run { run, cause, slot: 0 }));
+    }
     // the death effect whose update runs an inline hook is suspended with it: its drop countdown waits (story
     // playthrough: the coins drop 7 frames after the level-up popup closes, 8 updates after the KO)
     if let Some(f) = w.field.as_mut().filter(|f| f.held_event) {
@@ -1559,6 +1586,15 @@ pub fn set_busy(w: &mut World, busy: bool) {
 
 /// a map trigger's inline script blocked (prop_hide / prop_show: 4-20's doors): the game's VM runs it in a nested
 /// loop that animates the objects without their think until it ends (the host clears it with `set_busy(false)`)
+/// an object queued an event object on the world's event list: it runs at the start of the next frame's update
+/// (outside the field: at once)
+pub fn queue_run(w: &mut World, run: Callback, cause: Cause) {
+    match w.field.as_mut() {
+        Some(f) => f.queued_runs.push((w.frame + 1, run, cause)),
+        None => w.events.push(Event::Field(FieldEvent::Run { run, cause, slot: 0 })),
+    }
+}
+
 pub fn hold_nested(w: &mut World) {
     set_busy(w, true);
     if let Some(f) = w.field.as_mut() {

@@ -29,6 +29,21 @@ def ai_state(e, o):
     return [(e.r32(st + 12 + 8 * i) - 0x0870F514) // 8 for i in range(min(n, 8))]
 
 
+LEVELS = None
+
+
+def level_of(e, c=None):
+    """the level of character c (default: the active one) from its XP (data/buu/levels.json)"""
+    global LEVELS
+    if LEVELS is None:
+        import json
+        LEVELS = [x['total_xp'] for x in json.load(open(ROOT / 'data/buu/levels.json'))['levels']]
+    if c is None:
+        c = e.r8(0x03001068)
+    xp = e.r32(0x03001560 + 0x68 * c + 0x24)
+    return 50 + max(i for i, t in enumerate(LEVELS) if xp >= t)
+
+
 def enemies(e):
     """[(obj, x px, y px, facing, hp, type)] from the enemy list"""
     out = []
@@ -72,6 +87,7 @@ class ShipDriver(Driver):
         self.heal_cool = 0
         self.nop = 0
         self.on_mark = None
+        self.grind_k = None
         self.in_nav = False
         self.fight_done = False
         self.nav_area = None
@@ -79,7 +95,7 @@ class ShipDriver(Driver):
         self.push_t = None
 
     AVOID = (20, 64)            # not worth fighting in passing: Destroyer (3762 HP), Laser Turret (in wall niches)
-    HEALS = (21, 18, 17)        # Senzu Bean, Super Elixir, Elixir (supply ids), in order of preference
+    HEALS = (21, 18, 17, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 19, 16, 15, 14, 13, 12, 11, 10)  # Senzu, elixirs, food, drinks
 
     def keys(self, e):
         # a pause menu left open (a menu program that went wrong): B out of it
@@ -221,6 +237,49 @@ class ShipDriver(Driver):
             return self.fightp(e, s, g)
         if kind == 'nav':
             return self.nav(e, s, g)
+        if kind == 'grind':
+            # ('grind', level, [(w, a), ...]): walk the areas in a cycle (nav with room fights; reloading an area
+            # brings its enemies back) until the active character reaches `level`
+            if s['p'] is not None and s['scene'] == 0 and level_of(e) >= g[1]:
+                self.next_goal()
+                return None
+            route = g[2]
+            if self.grind_k is None:
+                self.grind_k = 0
+            w, a = route[self.grind_k % len(route)]
+            if s['area'][:2] == [w, a] and s['p'] is not None and self.nav_area is None:
+                # spend the level-ups' stat points between rooms (Status page: half STR, half END)
+                c = e.r8(0x03001068)
+                pts = e.r16(0x03001560 + 0x68 * c + 0x2C)
+                if pts >= 6 and not enemies(e):
+                    for m, on, off in alloc_keys([(0, [pts - pts // 2, 0, pts // 2, 0])])[1]:
+                        self.prog += [m] * on + [0] * off
+                    return self.prog.pop(0)
+                self.grind_k += 1
+                w, a = route[self.grind_k % len(route)]
+            return self.nav(e, s, ('nav', w, a, True), inner=True)
+        if kind == 'story':
+            # ('story', w, a[, boss]): play events through (A mash) and fight whatever enemies the story puts in front
+            # of the player, until area w-a is reached with the player controllable and no event for 20 frames
+            # (boss: never skip an enemy that takes no damage)
+            if s['area'][:2] == [g[1], g[2]] and s['scene'] == 0 and s['p'] is not None and not enemies(e):
+                self.idle += 1
+                if self.idle >= 20:
+                    self.next_goal()
+                    return None
+                return 0
+            if s['scene'] > 0 or s['p'] is None:
+                self.idle = 0
+                return self.mash_a()
+            if enemies(e):
+                self.idle = 0
+                self.in_nav = True
+                self.fight_done = False
+                k = self.fightp(e, s, ('fightp', 10 ** 9, 99999, 6, len(g) > 3 and g[3]))
+                self.in_nav = False
+                return k
+            self.idle = 0
+            return self.mash_a()
         if kind == 'fly':
             return self.fly(e, s, g)
         if kind == 'mark':
@@ -268,7 +327,7 @@ class ShipDriver(Driver):
             k |= KEY.A
         return k
 
-    def nav(self, e, s, g):
+    def nav(self, e, s, g, inner=False):
         """('nav', w, a[, fight]): walk through the exits (nav.route) to area w-a; with fight, clear each room's
         enemies (fightp) before leaving it. Done 20 frames after arriving with the player present."""
         import nav as navm
@@ -287,9 +346,17 @@ class ShipDriver(Driver):
             self.nav_t = self.t
             self.push_t = None
         if cur == f'{g[1]}-{g[2]}':
+            # arrived: clear this room too (a grind's target room), then done 20 frames later
+            if len(g) > 3 and g[3] and not self.fight_done:
+                self.in_nav = True
+                k = self.fightp(e, s, ('fightp', 10 ** 9, 99999, 6))
+                if not self.fight_done:
+                    return k
             if self.t - self.nav_t >= 20:
                 self.in_nav = False
                 self.nav_area = None
+                if inner:
+                    return 0
                 self.next_goal()
                 return None
             return 0
@@ -304,6 +371,15 @@ class ShipDriver(Driver):
         if not hops:
             raise RuntimeError(f'nav: no route {cur} -> {g[1]}-{g[2]}')
         to, rect, push = hops[0][1]
+        # several exits lead there (2-11's two doors down to 2-10): take one the player can walk to
+        alts = [x for x in navm.exits(cur) if x[0] == to]
+        if len(alts) > 1:
+            self.reachable(e, s, 0, 0)
+            for x in alts:
+                ax, ay = navm.approach(x[1], x[2])
+                if self.reachable(e, s, ax, ay):
+                    to, rect, push = x
+                    break
         tx, ty = navm.approach(rect, push)
         x, y = s['p'][0], s['p'][1]
         # pushing into an exit is sticky (an exit fires after the direction is held for a while)
@@ -347,6 +423,19 @@ class ShipDriver(Driver):
                         r = plain(start, goal, fw, fh, blocked)
                     finally:
                         g.walk = keep
+                if r is None:
+                    # standing on a tile the grid calls blocked (under a canopy, pushed into a wall): start from the
+                    # nearest free tile around
+                    for rad in (1, 2, 3):
+                        for dx in range(-rad, rad + 1):
+                            for dy in range(-rad, rad + 1):
+                                if max(abs(dx), abs(dy)) != rad:
+                                    continue
+                                st = (start[0] + dx, start[1] + dy)
+                                if g.ok_box(st[0], st[1], fw, fh):
+                                    r = plain(st, goal, fw, fh, blocked)
+                                    if r is not None:
+                                        return [start] + r
                 return r
             g.bfs = bfs
             g.patched = True

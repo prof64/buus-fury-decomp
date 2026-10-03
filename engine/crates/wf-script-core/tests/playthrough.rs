@@ -300,12 +300,16 @@ impl Host {
                     let path = format!("scripts/inline/{id}.rhai");
                     let steps = self.stepped.contains(&path);
                     self.started.push((k, id.clone()));
+                    self.hs.in_unit = true;
                     self.rt.start_unit(UnitRef::new(id.clone(), "", steps), [0; 4]);
                 }
                 Callback::Event(id) => match self.rt.event_id(id) {
                     Some(n) => {
                         self.started.push((k, format!("s{n:03}")));
+                        {
+                        self.hs.in_unit = false;
                         self.rt.start_event(n, [0; 4])
+                    }
                     }
                     None => {
                         self.errors.push(format!("unknown event id {id}"));
