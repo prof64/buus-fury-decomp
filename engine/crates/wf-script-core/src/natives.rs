@@ -1109,6 +1109,9 @@ fn load_scene(w: &mut World, s: &mut HostState, world: i32, map: i32, variant: i
             None => s.area,
         };
         s.saved_field = Some(SavedField { area, x: px, y: py, facing, cam: (w.cameras[0].x, w.cameras[0].y) });
+        if w.field.is_some() {
+            w.scene.saved_world = Some(Box::new(wf_core::field::save_world(w)));
+        }
     }
     if w.field.is_some() {
         let to = wf_core::field::AreaId { world, area: map, variant };
@@ -1128,6 +1131,14 @@ fn return_to_field(w: &mut World, s: &mut HostState) {
         w.scene.requests.push(scene::Request::ReturnToField);
         return;
     };
+    // the field kept as it was: restored, not reloaded (0x75)
+    if let Some(sw) = w.scene.saved_world.take() {
+        if w.field.is_some() {
+            wf_core::field::restore_world(w, *sw);
+            let _ = f;
+            return;
+        }
+    }
     if w.field.is_some() {
         let to = wf_core::field::AreaId { world: f.area.0, area: f.area.1, variant: f.area.2 };
         scene::bring_back(w);

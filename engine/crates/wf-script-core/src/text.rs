@@ -181,6 +181,11 @@ pub fn typing(text: &str) -> Vec<u16> {
                 }
                 while k < l.len() {
                     if l[k] == 8 {
+                        // a colour pair rides along with the next character; one that ends its line takes a frame
+                        // of its own (s464 node 18: "... the A Button{0008}{0002}" / "to swing the sword!")
+                        if k + 2 >= l.len() {
+                            n += 1;
+                        }
                         k += 2;
                         continue;
                     }

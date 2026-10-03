@@ -832,6 +832,25 @@ pub fn pre_step(w: &mut World) {
         f.pre_pickups = pickups_before as u32;
     }
     crate::fieldobj::run_deferred(w);
+    // the death effects' kill XP (their first update: new objects update first), before the defeat callbacks (story
+    // playthrough: Pikkon's KO levels Goku up; s003 runs, then the defeat scene s103); a level-up runs hook #3 inline,
+    // holding the rest of the frame (the event starts now; story playthrough: the other objects neither move nor
+    // animate in that frame)
+    let due = w.field.as_mut().map(|f| std::mem::take(&mut f.xp_due)).unwrap_or_default();
+    for (pid, exp) in due {
+        if let Some(pi) = w.find(pid) {
+            let n = w.events.len();
+            crate::player::gain_xp(w, pi, exp);
+            let leveled = w.events[n..].iter().any(|e| matches!(e, Event::Field(FieldEvent::Run { cause: Cause::LevelUp { .. }, .. })));
+            if leveled {
+                crate::fieldnpc::start_event(w);
+                if let Some(f) = w.field.as_mut() {
+                    f.held = true;
+                    f.held_event = true;
+                }
+            }
+        }
+    }
     let runs = w.field.as_mut().map(|f| std::mem::take(&mut f.defeat_runs)).unwrap_or_default();
     let any = !runs.is_empty();
     for (run, cause) in runs {
@@ -869,24 +888,6 @@ pub fn pre_step(w: &mut World) {
             if let Some(f) = w.field.as_mut() {
                 f.held = true;
                 f.held_event = true;
-            }
-        }
-    }
-    // the death effects' kill XP (their first update: new objects update first); a level-up runs hook #3 inline,
-    // holding the rest of the frame (the event starts now; story playthrough: the other objects neither move nor
-    // animate in that frame)
-    let due = w.field.as_mut().map(|f| std::mem::take(&mut f.xp_due)).unwrap_or_default();
-    for (pid, exp) in due {
-        if let Some(pi) = w.find(pid) {
-            let n = w.events.len();
-            crate::player::gain_xp(w, pi, exp);
-            let leveled = w.events[n..].iter().any(|e| matches!(e, Event::Field(FieldEvent::Run { cause: Cause::LevelUp { .. }, .. })));
-            if leveled {
-                crate::fieldnpc::start_event(w);
-                if let Some(f) = w.field.as_mut() {
-                    f.held = true;
-                    f.held_event = true;
-                }
             }
         }
     }
@@ -943,6 +944,14 @@ pub fn post_step(w: &mut World) {
         }
     }
     // an inline hook's event ended this frame: the update it interrupted completes now
+    // the next queued event of the held frame started at once (story playthrough: s003's level-up ends, Pikkon's
+    // defeat scene s103 starts in the same frame): the frame stays held until that one ends too
+    if w.field.as_ref().is_some_and(|f| f.resume_held && f.busy) {
+        if let Some(f) = w.field.as_mut() {
+            f.resume_held = false;
+            f.held_event = true;
+        }
+    }
     let resumed = w.field.as_ref().is_some_and(|f| f.resume_held);
     if resumed {
         // the held update is the rest of the frame the event interrupted: NPCs run their normal update in it, without
@@ -1452,5 +1461,57 @@ pub fn hold_nested(w: &mut World) {
 pub fn attach_host(w: &mut World, on: bool) {
     if let Some(f) = w.field.as_mut() {
         f.host = on;
+    }
+}
+
+/// `save_field_on_next_scene` + the next `load_scene*` (0x08009196): the field as it is (world descriptor, camera,
+/// map objects, entities) kept for `return_to_field` (0x75), which restores it without a load (no object or player
+/// re-creation, no RNG draws; VERIFIED Babidi's ship switch scripts 8-20 / 8-23 / 8-25)
+#[derive(Clone, Debug, Hash, Serialize, Deserialize)]
+pub struct SavedWorld {
+    pub ents: Vec<crate::world::Entity>,
+    pub enemies: Vec<crate::world::EntityId>,
+    pub field: Option<Box<Field>>,
+    pub cameras: Vec<crate::world::Camera>,
+    pub enemy_layer: Option<Vec<u8>>,
+    pub walk_layer: Option<Vec<u8>>,
+    /// the camera control (the scene load fixes it; the restore gives the follow camera back)
+    pub cam: crate::scene::CamCtl,
+}
+
+pub fn save_world(w: &World) -> SavedWorld {
+    let mut ents = w.ents.clone();
+    // players a scene already sent offstage belong to the saved field
+    ents.extend(w.scene.offstage.iter().cloned());
+    SavedWorld {
+        ents,
+        enemies: w.enemies.clone(),
+        field: w.field.clone(),
+        cameras: w.cameras.to_vec(),
+        enemy_layer: w.col.as_ref().map(|c| c.enemy.clone()),
+        walk_layer: w.col.as_ref().and_then(|c| c.walk.clone()),
+        cam: w.scene.cam.clone(),
+    }
+}
+
+/// `return_to_field` with a saved field: everything back as it was (the players included)
+pub fn restore_world(w: &mut World, s: SavedWorld) {
+    w.scene.offstage.clear();
+    w.scene.cam = s.cam;
+    w.ents = s.ents;
+    w.enemies = s.enemies;
+    w.field = s.field;
+    for (k, c) in s.cameras.into_iter().enumerate().take(w.cameras.len()) {
+        w.cameras[k] = c;
+    }
+    let data = w.data.clone();
+    if let Some((arena, m)) = w.field.as_ref().and_then(|f| rebuild_arena(&data, f)) {
+        w.arena = arena;
+        let mut c = crate::world::Collision::new(m);
+        if let Some(l) = s.enemy_layer {
+            c.enemy = l;
+        }
+        c.walk = s.walk_layer;
+        w.col = Some(c);
     }
 }

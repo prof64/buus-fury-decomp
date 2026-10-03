@@ -64,7 +64,8 @@ page with markers, page changes, close) — every compared frame and every sound
 map screen are also exact with `MENU_PARITY_FREE=1` (their own frame-cost models). Also strict: `shop_*`, `save_*`,
 `title_*` (title, Single Player, Select Game, New Game into the prologue, Continue into the field, Delete Game) and
 `charsel_*` (Switch Character: figures, silhouettes, walk / idle timing) — `re/buu/menu/NOTES_screens.md`.
-`map_left` (the Scouter page, a stand-in) is reported only. The world restore's length after a screen (CPU time:
+Also strict: `map_left`, `map_scouter_move`, `map_scouter_info` (the Scouter page and its info page; exact with the
+oracle, near-exact free: the info page's setup takes 5 or 6 frames by the frame phase). The world restore's length after a screen (CPU time:
 24 or 25 black frames) is taken from the trace too.
 
 ## 4b. Integration
@@ -91,8 +92,12 @@ map screen are also exact with `MENU_PARITY_FREE=1` (their own frame-cost models
 
 * The dialogue typewriter does not read `menu::options::settings(w).text_speed` yet (fixed default speed); the
   frontend should also send the stored volumes at session start (only changes are evented).
-* The map screen's **Scouter** page (L of the area map, vt `0x0804A570`: the live field objects on the grid, a
-  cursor, A = an info page) is a stand-in (frame, grid, fades, R back): `re/buu/menu/NOTES_minigames.md`.
+* **Note for the shop / save / title / charsel captures (fork C):** `capture.py`'s story dict now also records the
+  field place: `area` [world, area, variant], `player` [x, y, +0x11] (the test starts the remake's field there:
+  `cfg.world/area/variant/pos`, which changes the field frames of recaptured traces), and `facing` (+0x10), `objs`
+  (the other actors [def id, x, y, direction]), `cam`, `rng`. The last four are applied only when the scenario's
+  extra has `live_field: True` (`meta.live_field`: actors / camera / facing before frame 0, the RNG after frame 0) —
+  used by the Scouter scenarios; opt in if a screen shows or draws from the live field.
 * Map screen / credits / Watch This! setup CPU time is a model (`mapscreen::setup_frames`: 200k + 25 cycles per
   decompressed tile byte; `credits::page_cost`); exact on the captured areas / all 47 credit pages.
 * Not frame-checked against a capture: the field after Switch Character (leader rebuild), the death hook's start

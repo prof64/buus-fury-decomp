@@ -49,6 +49,7 @@ def main():
             e.run(1)
             log.append(k)
         keys[name] = log
+        keyfile.write_text(json.dumps(keys))
         print(f'{name}: {len(log)} frames {time.time() - t0:.1f}s', status(e), flush=True)
         if only == name:
             break

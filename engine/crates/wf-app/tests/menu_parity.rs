@@ -121,7 +121,7 @@ fn traces() -> PathBuf {
 }
 
 /// scenarios that must be exact (prefixes)
-const STRICT: &[&str] = &["shop_", "save_", "title_", "charsel_", "status_", "inventory_", "equip_", "cr_", "mg_", "options_", "journal_", "skills_", "cr_", "map_snake", "map_forest"];
+const STRICT: &[&str] = &["shop_", "save_", "title_", "charsel_", "status_", "inventory_", "equip_", "cr_", "mg_", "options_", "journal_", "skills_", "cr_", "map_snake", "map_forest", "map_left", "map_scouter"];
 
 /// the capture's picture hash: sha1 of the RGB bytes, first 16 hex digits
 fn hash(fb: &[u32]) -> String {

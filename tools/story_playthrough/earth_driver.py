@@ -305,7 +305,7 @@ class EarthDriver(Driver):
             return None
         eng = getattr(self, 'engaged', {})
         self.engaged = eng
-        ens = [o for o in self.enemies(e) if eng.get((o[0] // 32, o[1] // 32), 0) < 600]
+        ens = [o for o in self.enemies(e) if eng.get((o[0] // 32, o[1] // 32), 0) < 600 or 'snipe' in g[2:]]
         if not ens or self.t >= cap:
             self.idle += 1
             if self.idle < 30:

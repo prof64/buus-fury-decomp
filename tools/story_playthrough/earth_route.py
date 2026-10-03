@@ -15,12 +15,16 @@ CYCLE_2_9 = (
     ('walk', 248, 8), ('hold', U, 30), ('area', 2, 8), ('wait', 30),
     ('walk', 248, 440), ('hold', D, 30), ('area', 2, 9), ('wait', 30),
 )
-# fight in 3-2, over to 3-14 (the circus grounds) and back
-CYCLE_3_2 = (
+# as CYCLE_2_9, fighting on at low HP (the criminals only punch: Energy Blasts from range)
+CYCLE_2_9_STAY = (('fight2', 3000, 'stay'),) + CYCLE_2_9[1:]
+# the circus fighters (flag 25): fight in 3-15, down to 3-14 and back up
+CYCLE_3_15 = (
     ('fight2', 3000), ('wait', 30),
-    ('walk', 4, 140), ('hold', L, 30), ('area', 3, 14), ('wait', 30),
-    ('walk', 450, 140), ('hold', R, 30), ('area', 3, 2), ('wait', 30),
+    ('walk', 160, 290), ('hold', D, 30), ('area', 3, 14), ('wait', 30),
+    ('walk', 400, 8), ('hold', U, 30), ('area', 3, 15), ('wait', 30),
 )
+# Inventory: START, R (Inventory), A on the first supply, A = use, B, START
+USE_FIRST_SUPPLY = 'S:3,0:60,RS:5,0:40,A:6,0:40,A:6,0:40,B:6,0:30,S:6,0:60'
 
 SEGMENTS = [
     # Goku's house 2-1 -> 2-2 -> 2-8: Chi-Chi's lunch (s110, flag 14), Nimbus (s111) -> Hercule City 3-1
@@ -98,7 +102,7 @@ SEGMENTS = [
         ('fly', 2632, 1465, 80, 71), ('wait', 30),
         ('walk', 248, 440), ('hold', D, 30), ('area', 2, 9), ('wait', 30),
         ('levelup', 4, CYCLE_2_9),
-        ('alloc', 0),
+        ('wait', 120), ('alloc', 0),
     ]),
     # the circus fight: 2-9 -> 2-8, the world map circle -> Hercule City 3-1 -> 3-2 -> 3-3: s143 (five fighters,
     # their defeat events s144-s148, flags 29-33) -> s149 (flag 34) -> 3-2
@@ -110,8 +114,13 @@ SEGMENTS = [
         ('walk', 540, 10), ('hold', U, 30), ('area', 3, 3), ('wait', 30),
         ('walk', 300, 180), ('hold', L, 20), ('expect', 100), ('wait', 20),
         ('fight2', 12000), ('wait', 30), ('until', 3, 2), ('wait', 30),
-        # a level-up refills HP / EP: fight the 3-2 street fighters (back and forth to 3-14) until one
-        ('levelup', 1, CYCLE_3_2),
+        # low on HP: the Rice Ball (+40 HP), then the circus fighters until a level-up (refills HP / EP)
+        ('wait', 60), ('menu', USE_FIRST_SUPPLY),
+        ('walk', 4, 140), ('hold', L, 30), ('area', 3, 14), ('wait', 30),
+        ('walk', 400, 8), ('hold', U, 30), ('area', 3, 15), ('wait', 30),
+        ('levelup', 1, CYCLE_3_15),
+        ('walk', 160, 290), ('hold', D, 30), ('area', 3, 14), ('wait', 30),
+        ('walk', 400, 48), ('walk', 450, 140), ('hold', R, 30), ('area', 3, 2), ('wait', 30),
     ]),
     # the Musuka Circus: 3-2 -> 3-14 -> 3-15 (fighters) -> 3-17 (fighters) -> 3-19 (three thugs): Musuka (s169,
     # flag 36)
@@ -126,7 +135,7 @@ SEGMENTS = [
     ('tank', [
         ('walk', 400, 128), ('hold', D, 30), ('area', 3, 17), ('wait', 30), ('fight2', 3000, 'melee'), ('wait', 30),
         ('walk', 160, 290), ('hold', D, 30), ('area', 3, 15), ('wait', 30), ('fight2', 3000, 'melee'), ('wait', 30),
-        ('alloc', 1),
+        ('wait', 120), ('alloc', 1),
         ('walk', 160, 290), ('hold', D, 30), ('area', 3, 14), ('wait', 30),
         ('walk', 400, 48), ('walk', 300, 140), ('events',), ('wait', 20), ('fight2', 12000, 'snipe'), ('wait', 30),
         ('events',), ('wait', 30),
@@ -148,8 +157,10 @@ SEGMENTS = [
     # a Rice Ball (Inventory: START, R, A, A = use), then through East District 439: 2-8 -> 2-9 -> 2-10 -> 2-11 ->
     # 2-90 (Goten's rock drill, s119)
     ('rocks', [
-        ('menu', 'S:3,0:60,RS:5,0:40,A:6,0:40,A:6,0:40,B:6,0:30,S:6,0:60'),
-        ('walk', 248, 440), ('hold', D, 30), ('area', 2, 9), ('wait', 30), ('fight2', 3000), ('wait', 30),
+        ('walk', 248, 440), ('hold', D, 30), ('area', 2, 9), ('wait', 30),
+        # low on HP after the circus: the 2-9 criminals until a level-up refills it
+        ('levelup', 1, CYCLE_2_9_STAY),
+        ('fight2', 3000), ('wait', 30),
         ('walk', 450, 220), ('hold', R, 30), ('area', 2, 10), ('wait', 30), ('fight2', 3000), ('wait', 30),
         ('walk', 200, 6), ('hold', U, 30), ('area', 2, 11), ('wait', 30), ('fight2', 3000), ('wait', 30),
         ('walk', 270, 6), ('hold', U, 30), ('area', 2, 90), ('wait', 30),
@@ -161,7 +172,7 @@ SEGMENTS = [
         ('walk', 4, 90), ('hold', L, 30), ('area', 2, 11), ('wait', 30), ('fight2', 3000), ('wait', 30),
         ('walk', 210, 450), ('hold', D, 30), ('area', 2, 10), ('wait', 30), ('fight2', 3000), ('wait', 30),
         ('walk', 200, 6), ('hold', U, 30), ('area', 2, 11), ('wait', 30), ('fight2', 3000), ('wait', 30),
-        ('alloc', 1),
+        ('wait', 120), ('alloc', 1),
         ('walk', 270, 6), ('hold', U, 30), ('area', 2, 90), ('wait', 30),
         ('walk', 96, 226), ('talk', 'U'), ('wait', 30),
     ]),

@@ -403,10 +403,15 @@ fn runner(w: &mut World, i: usize) {
 pub fn update(w: &mut World, i: usize) {
     // a load waiting for its on-enter script holds the map NPCs like an event (story playthrough: Grand Kai's 1-15)
     let (busy, since, ended) = w.field.as_ref().map(|f| (f.busy || f.arrival.is_some(), f.busy_since, f.event_ended)).unwrap_or((false, 0, false));
+    // the item-get presentation's loop holds the behaviours too, animations tick (4-30: the scientist's wander draws
+    // nothing while Gohan holds the capsule up)
+    let item_get = w.field.as_ref().is_some_and(|f| f.item_get.is_some());
     if busy {
         if since != w.frame {
             anim_tick(w, i);
         }
+    } else if item_get {
+        anim_tick(w, i);
     } else {
         if ended {
             anim_tick(w, i);

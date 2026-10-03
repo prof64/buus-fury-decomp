@@ -10,8 +10,8 @@
 //!   (`0x08026B4C`) shown while the bounds allow scrolling that way.
 //! * **World map** (`0x08025E2F` -> vt `0x0804A994`, enter `0x0802641C`): the 240x160 world picture over the green
 //!   grid, the markers of script #15 (one per unlocked place, the current world's blinking).
-//! * **Scouter** (`0x080261D4`, vt `0x0804A570`): the live field objects on the grid with a target cursor —
-//!   **stand-in** here (the frame, grid and page navigation only; see the notes).
+//! * **Scouter** (`0x080261D4`, vt `0x0804A570`): the live field objects on the grid with a target cursor; A on a
+//!   selection opens its info page (`0x08025E50`; B back to a new Scouter, A closes) — scouter.rs.
 //!
 //! Pages: Scouter <-L- Area -R-> World. Common step `0x08024C54`: the page's own step (+0x40), then the fade: EVA
 //! (BLDALPHA, EVB 0) rises by 1 per iteration to 16; L / R (when that page exists) start a page change (BLDCNT
@@ -464,6 +464,9 @@ impl Page for MapScreen {
         match (self.entered, self.page) {
             (false, MapPage::World) => 4,
             (false, MapPage::Area) => 1 + setup_frames(self.tile_bytes, RETURN_START),
+            // the info page: the picture, content, portrait and description surfaces (5-6 frames by the frame phase;
+            // Goku: 6 then 5 in map_scouter_info)
+            (false, MapPage::Info) => 6,
             (false, _) => 2,
             _ => 1,
         }

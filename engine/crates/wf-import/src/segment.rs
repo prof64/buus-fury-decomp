@@ -289,7 +289,14 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
         lf_prev = lf;
         if logic {
             rep.logic += 1;
+            // SEGMENT_TRACE with SEGMENT_RNG=1: every RNG call's source location inside the traced frames
+            let rng_trace = trace.is_some_and(|(a, b)| (a..=b).contains(&k)) && std::env::var("SEGMENT_RNG").is_ok();
+            if rng_trace {
+                eprintln!("  rng calls of t{k}:");
+                wf_core::rng::TRACE.store(true, std::sync::atomic::Ordering::Relaxed);
+            }
             host.step(&mut sess, keys);
+            wf_core::rng::TRACE.store(false, std::sync::atomic::Ordering::Relaxed);
         } else {
             sess.world.events.clear();
         }

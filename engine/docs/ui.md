@@ -167,4 +167,7 @@ References in `crates/wf-ui/tests/data/` come from `re/buu/ui/make_refs.py` (emu
   not decoded; nor the outline script.
 * Title-screen menu overlay is documented, not rendered. The choice cursor arrow (`0x080178C8`) is not rendered.
 * Emote strip names are visual; their frame timing is in the (unexplored) emote object.
-* Buu's Fury has no scouter / encyclopedia screen; the Journal is the quest log.
+* Buu's Fury does have a scouter: the map screen's Scouter page (SELECT in the field, then L) shows the live field
+  actors with a target cursor, and A opens an info page (stats, portrait, scrolling description) from the scouter
+  database (`0x0874D380`, 232 entries; `ui/menu/scouter.json`). Remake: `wf-core/src/menu/scouter.rs`. The Journal is
+  the quest log.

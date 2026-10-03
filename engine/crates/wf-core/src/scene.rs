@@ -103,11 +103,6 @@ pub struct ActAnim {
     pub ended: bool,
     /// a frame-range controller created this frame by a track's pop-and-start: no tick yet
     pub fresh: bool,
-    /// idle reached by a one-shot state's own end (not requested by a script): the requested-anim check of
-    /// `play_anim(a, 0)` (vt+0x34) does not see it as idle, so the script's idle restarts it (rand(255); story
-    /// segment sb_01_03, s025: the ki blast's thrower)
-    #[serde(default)]
-    pub self_idle: bool,
 }
 
 /// what an animation tick asks the world to do
@@ -296,12 +291,7 @@ pub fn npc_update(w: &mut World, i: usize) {
 fn anim_out(w: &mut World, i: usize, out: AnimOut) {
     match out {
         AnimOut::None => {}
-        AnimOut::ToIdle => {
-            set_state(w, i, 0);
-            if let Some(a) = anim_mut(w, i) {
-                a.self_idle = true;
-            }
-        }
+        AnimOut::ToIdle => set_state(w, i, 0),
         // the dash state's step sound is the player's (scripted actors run silently: buu_form)
         AnimOut::Sfx(..) => {}
     }
@@ -965,6 +955,9 @@ pub struct Scene {
     /// the player objects while a cutscene scene is loaded (load_scene 0x72-0x74 builds the map with no player
     /// object, 0x08009030); `return_to_field` / a warp brings them back
     pub offstage: Vec<crate::world::Entity>,
+    /// the field `save_field_on_next_scene` kept for `return_to_field` (field.rs `save_world`)
+    #[serde(default)]
+    pub saved_world: Option<Box<crate::field::SavedWorld>>,
     /// enemies whose AI InlineScript node waits for its script (the host calls `ai_script_done`)
     pub ai_wait: Vec<EntityId>,
     /// the area-name banner (object 0x0800BF34): its text and frames since its first draw (0..=238)
@@ -1011,6 +1004,7 @@ impl Default for Scene {
             song: -1,
             chaining: false,
             offstage: Vec::new(),
+            saved_world: None,
             ai_wait: Vec::new(),
             banner: None,
             banner_last: 0,
@@ -1227,17 +1221,11 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
     let i = owner_index(w, owner);
     match cmd {
         Cmd::PlayAnim { anim } => {
-            // anim 0 (idle) completes at once; it restarts the idle state only on an actor not already idle
-            // (a held pose / other state goes back to idle, with the idle's random tick); a player always
-            // re-enters idle (story playthrough s101: play_anim(0, 0) after a scripted dash draws rand(255) again)
-            let not_idle = |w: &World, i: usize| {
-                matches!(w.ents[i].body, Body::Player(_))
-                    || scene_anim(w, i).is_some_and(|a| a.raw != ActAnim::of(0).raw || a.mode != AnimMode::Table || a.self_idle)
-            };
+            // the command's start is SetAnim(anim) (0x08015944 -> vt+0x28), anim 0 included: the NPC class always
+            // re-enters the state (vt+0x2C 0x08011162 -> SetState), so idle draws its rand(255) even on an idle
+            // actor (s025, s464); a player always re-enters idle too (story playthrough s101)
             if let Some(i) = i {
-                if *anim != 0 || not_idle(w, i) {
-                    set_state(w, i, *anim);
-                }
+                set_state(w, i, *anim);
             }
         }
         Cmd::SetAnim { anim } => {
@@ -1531,6 +1519,8 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
             (*n, *sx, *sy, *t) = (nn, ssx << 2, ssy << 2, 0);
             *x = tx;
             *y = ty;
+            // the pan starts from the whole-pixel position (story playthrough s103: 323.98 -> 314.0 -> 305 at 9 px)
+            cam_put(w, cx << 10, cy << 10);
             // the pan's first step is applied at once
             cam_step(w, *sx, *sy);
             *t = 1;
@@ -1757,10 +1747,6 @@ fn update_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) -> bool {
                         crate::shots::beam_stop(w, k);
                     }
                     set_state(w, i, 0);
-                    // the command's own idle: a following `play_anim(a, 0)` restarts it (s025)
-                    if let Some(a) = anim_mut(w, i) {
-                        a.self_idle = true;
-                    }
                 }
                 return true;
             }

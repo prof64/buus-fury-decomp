@@ -310,12 +310,12 @@ impl Arrow {
 
 /// The info page (`0x08025E50`, vt `0x0804A52C`, enter `0x08026048`; the scouted bit GD +0xC5 + db / 8 set):
 /// BG3 the 240x160 picture `0x08732384` with the content (`0x08024D94`: the name centred at (0x38, 0x90), the
-/// labels (strings 760 764 768 772) at x 0x70, y 0x16 0x20 0x2A 0x34, the values right-aligned at x 0xA0 (`%d`,
+/// labels (strings 190..193) at x 0x70, y 0x16 0x20 0x2A 0x34, the values right-aligned at x 0xA0 (`%d`,
 /// `??` for −1; characters: the record's HP and RecalcStats STR / POW / END, enemies: the record's HP else the
-/// type's, the type's STR / POW / END), the portrait at (168, 8) or "No Portrait Data" (string 776) at (0xC8,
+/// type's, the type's STR / POW / END), the portrait at (168, 8) or "No Portrait Data" (string 194) at (0xC8,
 /// 0x22)); BG2 the description window (15, 11)-(28, 18) (the description in the dialog font wrapped to 104 px,
 /// y 0xE, 16 px lines, rows scroll..scroll + 56); the database sprite (`0x080272EC`: idle (its enter: rand(255)),
-/// then walking when it has a walk (vt+0x28(2)); every update the direction `0x0874D35C[(c >> 7) & 3]` and the
+/// then the walk state ticking the idle's cels (vt+0x28(2)); every update the direction `0x0874D35C[(c >> 7) & 3]` and the
 /// position from the cel's frame record: x = 0x38 − w / 2 − ox, y = 0x38 − h / 2 − oy (h > 32) or 0x40); the two
 /// arrows. Step (`0x08025FAC`): UP / DOWN held scroll 1 px within 0..max (lines · 16 − 56); B: back to a new
 /// Scouter after the fade (+0xC, `0x0802601A`); A: close.
@@ -354,11 +354,12 @@ impl Info {
             s.max = (lines * 16 - DESC_H).max(0);
         }
         s.sprite = e.def - 9;
-        // the actor's idle enter, then vt+0x28(2): the walk when the sprite has one
+        // the actor's idle enter (rand(255)), then vt+0x28(2) (`0x0802735C`): the walk state (0x03001B58) when the
+        // sprite has a walk; the state ticks (8 per cel, looping) the idle's cels, the picture stays the idle's
         let mut anim = ActAnim::of(0);
         anim.tick = w.rng.rand(255);
         if w.data.sprite(s.sprite).is_some_and(|sp| sp.anim_raw(2).is_some()) {
-            anim = ActAnim::of(1);
+            anim = ActAnim { raw: 1, id: 1, ..Default::default() };
         }
         s.anim = anim;
         s.place(w);
@@ -429,7 +430,7 @@ impl Info {
         let mut p = Pen::new(MenuFont::Small, 0x38, 0x90, 1, 2, Some(1));
         p.line_h = 8;
         cv.text(t, &mut p, t.s(e.name as usize));
-        for (s, y) in [(760usize, 0x16), (764, 0x20), (768, 0x2A), (772, 0x34)] {
+        for (s, y) in [(190usize, 0x16), (191, 0x20), (192, 0x2A), (193, 0x34)] {
             let mut p = Pen::new(MenuFont::Small, 0x70, y, 0, 2, Some(1));
             p.line_h = 8;
             cv.text(t, &mut p, t.s(s));
@@ -449,7 +450,7 @@ impl Info {
             None => {
                 let mut p = Pen::new(MenuFont::Small, 0xC8, 0x22, 1, 2, Some(1));
                 p.line_h = 8;
-                cv.text_wrapped(t, &mut p, 0x38, t.s(776));
+                cv.text_wrapped(t, &mut p, 0x38, t.s(194));
             }
         }
         let bg3 = MenuLayer { w: 240, h: 160, x: 0, y: 0, priority: 3, ops: cv.ops };

@@ -85,9 +85,43 @@ in, 160 → 0. A page's draw takes 2 frames when `2·width(heading) + width(line
   page uses the base vt `0x0804A4E8` (no BLDCNT reset).
 * Close: EVA reaches 0 → the mode ends; 23 black frames (world restore), the field's 16-frame fade-in.
 
-### Gap: the Scouter page (`0x080261D4`, vt `0x0804A570`)
+### The Scouter page (`0x080261D4`, vt `0x0804A570`; remake `menu/scouter.rs`)
 
-The page L of the area map shows the live field objects (player, NPCs, enemies: their sprites) on the grid with a
-target cursor; the D-pad selects one and A opens its info (portrait, name, description: strings "No Portrait
-Data", "Database Empty"). Not reverse-engineered: the remake shows a stand-in (frame without L, the grid, the fades,
-R back to the area page). Captured in `map_left` (frames 79..150 differ).
+* Records: message 0x16 over the saved field world (object list last to first; handler `0x080102FC`): actors with a
+  database entry (`0x08027948`, table `0x0874D380`, 232 × 16 bytes {name string, description string, def id,
+  portrait arg, stats}; def 0x95 counts as 0x92; characters / NPCs: the first entry with the def and stats < 0, else
+  the first with the def; enemies: stats == their type) → 40-byte records at obj+0x10 {db, HP (enemies) / −1,
+  direction, x, y (position >> 8 − camera `0x030019A4` +0x28 / +0x2C), box, blip}.
+* Enter `0x08026212`: DISPCNT 0x1940 (BG0 frame, BG3 grid, OBJ). Per record a blip (`0x08027390`): a plain actor of
+  the entry's def, idle — its state enter draws rand(255) (the only RNG use while the map screen is up) — in the
+  record's direction; the record box = the idle's first cel record +4..+7 around (x, y). Then the cursor
+  (`0x08026F94`, vt `0x0804D5E4`) at (120, 80).
+* Update: the selection (`0x0802627E`, vt+0x3C): records whose box holds the cursor point, the nearest box centre
+  (squared distance); old blip → priority byte 0x38 (`0x08027448`), new → 0x28 plus the remap controller
+  (`0x08027424`, vt `0x0804AE38`: c += 1, remap = `0x0874D360[(c >> 2) & 7]`, 4 distinct tables). OBJ priority =
+  byte >> 4. The cursor (`0x08027020`): A pressed → closing, counter 0; A released → opening; counter ±1 within 0..4,
+  frame c >> 1 uploaded at even counts; D-pad held ±0x80 to the velocity, pos += vel, vel = vel·3/4 (toward 0),
+  clamp x 0x1000..0xE000, y 0x1000..0x9000 (velocity 0). The cursor's OAM and the blips' cels / remaps show the
+  previous update.
+* Step +0x40 `0x08026360`: A pressed with a selection → BLDCNT 0x3F5F fade, then (`0x0802638A`) the info page.
+
+### The info page (`0x08025E50`, vt `0x0804A52C`, enter `0x08026048`)
+
+* Ctor: the scouted bit (GD +0xC5 + db / 8), description lines (dialog font, 104 px) → max scroll = lines·16 − 56.
+* Enter: DISPCNT 0x1C40. BG3 (0x1F83) = the picture `0x08732384` + content `0x08024D94` (small font, shadow 1,
+  colour 2: name centred (0x38, 0x90); labels = string entries 190..193 at x 0x70, y 0x16 0x20 0x2A 0x34 (the
+  code passes byte offsets 760..772); values right-aligned at 0xA0, `%d` or `??`: characters (stats −2 − c) record
+  HP / RecalcStats STR POW END, enemies record HP else type HP, type STR POW END (`0x08711274` +4, +0xD..+0xF);
+  portrait (`0x08011F20(arg)`, content index arg − 8) at (168, 8), else entry 194 "No Portrait Data" wrapped to 0x38
+  at (0xC8, 0x22)). BG2 (0x1E83) = the description window (15, 11)–(28, 18): the text surface (y 0xE, 16 px lines)
+  rows scroll..scroll+56 copied to tiles `0x06009800`.
+* The sprite (`0x080272EC`, vt `0x0804CE7C`): idle enter (rand(255)), then vt+0x28(2) → the walk state 0x03001B58
+  when def byte 0 > 1 and def+0x58 is set: it ticks the idle's cels (8 per cel, looping) — the picture stays the
+  idle's. Update: direction `0x0874D35C[(c >> 7) & 3]` = 0 3 1 2; position from the cel record: x = 0x38 − w/2 − ox,
+  y = h > 32 ? 0x38 − h/2 − oy : 0x40. Shown one update late like the blips.
+* Arrows (`0x080271D0`, vt `0x0804D60C`): up (+0x24, OAM word `0x0874D248`+8) active while scroll > 0, down (+0x28,
+  +4, vflipped) while scroll < max; both use the tiles at +0x14; active: counter += 1, frame = bit 4; else 0 / 0.
+* Step `0x08025FAC`: UP / DOWN held ±1 px; B → +0xC (the common step closes; at the fade's end `0x0802601A` builds a
+  new Scouter, vt `0x0804E3C8`, new blips / RNG draws); A closes. Enter CPU time 5–6 frames.
+* Captures: `map_left`, `map_scouter_move`, `map_scouter_info` (scenario extra `live_field`: the test sets the field
+  actors, camera, player direction and RNG as captured).
