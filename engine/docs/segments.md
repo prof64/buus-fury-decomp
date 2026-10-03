@@ -377,15 +377,28 @@ Second pass (2026-10-03) rules, each from these recordings:
   `shop` is exact with `ui/` content. The punch machine: its wait mode updates the world, and a wait ending on the
   hidden (blinking) marker starts another (the marker blinks on the boot counter, `Story.lf_bias`).
 
-Results (90 segments, 104,026 video frames): **76 exact to their end**, 88,908 frames continuously matched; all 76
-gated in `data/segments/earth_*.json` (they pass with the default content too).
+Third pass (2026-10-03):
+* Talk events (`HostState.talk_event`, set by the hosts for `Cause::Talk`) exit at the top of the frame: a Director
+  wait followed only by story / HUD natives, a closing text box, or a modal scroll (the frame's world update then
+  runs, `from_scroll` -> `held_event`) all give the field its update in the exit frame (4-27 #1 / #2, 4-20 #5).
+  Map-trigger cutscenes (s073, s159, s130) keep the old rule (no catch-up after a native).
+* The 3D map's view rect (`fieldworld::view_rect`, 0x0802ED98, VERIFIED against RAM) and the draw-time facing of
+  enemies inside it (0x08010010; heading obj+0x1AC from `cutscene_move`'s float atan2). 3-1 / 3-11 pass the old
+  airship-facing frames; their current first divergences (a zero 3D camera in the load frame, the flyer's cel) come
+  from the in-progress flyer-hold change in `fieldworld::flyer_update` (another agent's, uncommitted).
 
-Open: menu sounds 40 / 39 on the status page (2-9 #13, 2-11 #4, 3-15 #4: sub-frame input timing); the world map
-(airship facing needs the 3D view rect 0x0802EF.. that culls the facing update, 3-1 #4 / 3-11 #2; airship 1/256
-drift 2-8 #15 / 4-1 #2); s128's camera pan start (2-8 #1); a tank-area soldier whose AlignWithPlayer stalls in the
-core (3-3 #4 f1479); Trunks' idle cel (4-20 #5); Bulma half-pixel (4-27 #1); s194's nested exit catch-up (4-27 #2:
-the NPCs think in the exit frame here but not after s073 / 3-1 / 3-12 - rule unknown); 7-2 f1200 an NPC the game
-removed; 7-3 f2995 three NPCs whose sprite defs the game drops while a text box with a portrait is up.
+Results (90 segments, 104,026 video frames): **79 exact to their end**, 88,169 frames continuously matched; all 79
+gated in `data/segments/earth_*.json`.
+
+Open, with what was found:
+* Status-page sound 40 / 39 (2-9 #13, 2-11 #4, 3-15 #4; also the ship chapter): a page redraw takes 619..668
+  scanlines; whether the next iteration slips 3 or 4 frames depends on it, and the variation (up to ~16k
+  instructions) is the software sound mixer (IWRAM 0x03000880.., resampling loops per active voice) running inside
+  the redraw window. Exact timing needs the mixer's CPU load per frame (active voices / pitches) - not modelled.
+* 7-2 f1200 and 7-3 f2995: NPCs parked off the world list (0x08011744: objects give up memory, vt+0x18 -> 2, moved
+  to the list at +0x40C) when a portrait text box allocates - the OBJ / heap purge the Super Buu agent is modelling.
+* 2-8 #1 f5646: the camera's 3-frame wobble is one step ahead after a long load frame; 3-3 #4 f1479: a soldier's
+  AlignWithPlayer stalls in the core while the game's keeps cycling states; 2-8 #15 / 4-1 #2: 3D map (see above).
 
 **Side-content catalogue** (data survey 2026-10-02; flags = story flags): Broly turns out to be **mainline** (Dragon
 Ball saga: his defeat s436 sets flag 111, which Dragon Ball #4 s439 needs) — kept here as assigned. The optional

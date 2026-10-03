@@ -146,8 +146,9 @@ pub struct HostState {
     /// s073 / s159)
     #[serde(default)]
     pub talk_event: bool,
-    /// the thread resumed from a modal scroll this frame: the scroll mode returned at the top of the frame, so an
-    /// exit now leaves this frame's world update to run (4-20: s184 ends on its scroll, the NPCs tick in that frame)
+    /// a talk event resumed from a modal scroll this frame: the scroll mode returned at the top of the frame, so an
+    /// exit now leaves this frame's world update to run (4-20: s184 ends on its scroll, the NPCs tick in that frame;
+    /// map-trigger cutscenes do not, 3-3 / 7-3)
     #[serde(default)]
     pub from_scroll: bool,
 }
@@ -262,7 +263,6 @@ impl Host for CoreHost<'_> {
         if !keeps {
             self.s.from_wait = false;
         }
-        self.s.from_scroll = false;
         let r = natives::call(self, &call);
         // the VM's globals are World state too (they persist across scripts and snapshot with the world)
         self.w.story.g = call.globals.g;
@@ -291,7 +291,7 @@ impl Host for CoreHost<'_> {
                 Ok(NativeResult::Block)
             }
             SceneCall::Exit { .. } => {
-                if std::mem::take(&mut self.s.from_scroll) && self.w.scene.depth == 1 {
+                        if std::mem::take(&mut self.s.from_scroll) && self.w.scene.depth == 1 {
                     if let Some(f) = self.w.field.as_mut() {
                         f.held_event = true;
                     }
@@ -392,6 +392,7 @@ pub fn poll(w: &mut World, s: &mut HostState) -> Option<Option<i32>> {
         s.boost[0] -= 1;
     }
     s.from_wait = false;
+    s.from_scroll = false;
     if matches!(s.pending, Some(Pending::Phases { .. })) {
         let r = natives::poll_phases(w, s);
         if r.is_some() {
@@ -413,7 +414,7 @@ pub fn poll(w: &mut World, s: &mut HostState) -> Option<Option<i32>> {
         Pending::Fade => scene::fade_done(w).then_some(None),
         Pending::Scroll => {
             let done = scene::scroll_done(w);
-            s.from_scroll = done;
+            s.from_scroll = done && s.talk_event;
             done.then_some(None)
         }
         Pending::Dialog { choice } => {

@@ -477,8 +477,10 @@ pub fn open_watch(w: &mut World, level: i32) {
 /// world too (7-3: the NPCs' idle ticks run from the iteration after the press until the mode ends)
 pub fn world_runs(w: &World) -> bool {
     let power = |s: Option<&Screen>| matches!(s, Some(Screen::Minigame(m)) if m.kind == Kind::Power || (m.kind == Kind::Punch && m.waited));
-    // the closing frame too (the stack is empty, the screen still shows)
-    power(w.menu.stack.last()) || (w.menu.stack.is_empty() && power(w.menu.shown.as_deref()))
+    // the closing frame too (the stack is empty, the screen still shows); Watch This!'s closing frame alone
+    // (sc_janemba: Gogeta's watch, level 2 - the camera and the actors' turns run in its last frame)
+    let watch = |s: Option<&Screen>| matches!(s, Some(Screen::Minigame(m)) if m.kind == Kind::Watch);
+    power(w.menu.stack.last()) || (w.menu.stack.is_empty() && (power(w.menu.shown.as_deref()) || watch(w.menu.shown.as_deref())))
 }
 
 /// `run_power_struggle` (0xC6): the screen over the field; nothing to push when it closes

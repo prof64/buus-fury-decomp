@@ -566,6 +566,9 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
         0xa1..=0xa3 => {
             let Some(i) = resolve_actor(h.w, h.s, arg(a, 0)) else { return done(0) };
             let ac = h.w.actor(i).ok_or("actor")?;
+            if std::env::var("NATIVE_DBG").is_ok() {
+                eprintln!("  actor {} -> ent {} kind {} pos ({},{})", arg(a, 0), i, h.w.ents[i].kind(), ac.px(), ac.py());
+            }
             done(match n {
                 0xa1 => ac.px(),
                 0xa2 => ac.py(),
@@ -716,6 +719,9 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
         0xcb | 0xcc => {
             let Some(i) = resolve_actor(h.w, h.s, arg(a, 0)) else { return done(0) };
             let (x, y) = scene::screen_rect_at(h.w, i, arg(a, 1), arg(a, 2));
+            if std::env::var("NATIVE_DBG").is_ok() {
+                eprintln!("  rect -> ({x},{y})");
+            }
             done(if n == 0xcb { x } else { y })
         }
         0xcd => {
