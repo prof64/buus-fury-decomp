@@ -688,7 +688,17 @@ first divergence with a category. One command after an engine change: `.venv/bin
 (builds the segments test once into `engine/target-route`, then replays 1,412 segments / 1.43 M frames in ~2 minutes
 on 10 jobs); the cuts (`scoreboard.py cut`: `realrun.py runs`, `rec_segments.py` per stretch, `snd_phase.py`, then
 `extend` - each stretch's last segment re-recorded across the key-log boundary up to the next importable entry; hours
-of emulation, ~1 GB) stay under `work/real/`.
+of emulation, ~1 GB) stay under `work/real/`. The board starts at the soft reset: run dirs `E1_opening` (title, New
+Game, the Other World opening) and `E2_earth` replay the Earth agent's `data/story_playthrough/earth_route_keys.json`,
+whose end is the ship route's start byte for byte (EWRAM / IWRAM / VRAM); `realrun.py rebuild` starts there too.
+Tools for a divergence: `tools/segments/segrows.py SEG.json [A B] [fields]` (the recorded rows where they change),
+`tools/segments/romdis.py ADDR [N]` (Thumb disassembly with literal pools).
+
+Fixed from the board (2026-10-03): **message windows** (event node kind 3) fade in / out only when the current
+BLDCNT has no first-target layer (`0x08030ED2`: then BLDCNT := 0x3E41 and BLDALPHA is ramped 16 steps by the
+callback 0x08030BF5); the event continues 17 frames after the closing A instead of 2 (`scene::window_fades`, map
+property `bldcnt`, `MapDef.bldcnt`): the West City Z-Mart (0-92, map BLDCNT 0x1040) - three identical failures - now
+exact; event 34's lockstep scenario (1-1, 0x1041) keeps its 2.
 
 **Dungeon agents, note:** `re/buu/ship/ship_driver.py` (the base of your drivers) changed on 2026-10-03 - Ghosts
 are no longer hunted (blasted / punched only when visible and in the way), a Vampire's grab is mashed out of, the

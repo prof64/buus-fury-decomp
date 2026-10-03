@@ -243,7 +243,9 @@ impl StoryHost {
                 break;
             }
             // (the node only goes past its queue by running through it; a frame-spanning wait the probe cannot pass)
-            if st.is_err() || !held || self.rt.with_thread(|t| t.frames.iter().all(|f| !matches!(f, wf_script_rhai::Frame::Event { event: e, node: nd, .. } if *e == event && *nd == node))) {
+            // (the node's handler is the top unit: once it is gone the next node would start - stop there)
+            let in_node = self.rt.with_thread(|t| t.frames.iter().any(|f| matches!(f, wf_script_rhai::Frame::Unit { .. })));
+            if st.is_err() || !held || !in_node {
                 break;
             }
             done += n;

@@ -372,14 +372,14 @@ impl Runtime {
                 return Ok(Status::Blocked);
             }
             // 1. queued actions first
-            if c.t.hold_queue && !c.t.queue.is_empty() {
-                return Ok(Status::Blocked);
-            }
             if c.t.skip > 0 && !c.t.queue.is_empty() {
                 c.t.skip -= 1;
                 c.t.queue.pop_front();
                 c.t.last = None;
                 continue;
+            }
+            if c.t.hold_queue && !c.t.queue.is_empty() {
+                return Ok(Status::Blocked);
             }
             if let Some(a) = c.t.queue.pop_front() {
                 let Ctx { host, globals, t } = &mut *c;

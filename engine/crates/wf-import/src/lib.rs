@@ -397,11 +397,6 @@ fn build_event_entry(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner:
     w.rng = Rng::new(rng0[0], rng0[1]);
     w.events.clear();
     let calls0 = w.rng.calls;
-    // a script's fade_out before its warp: the screen stays black through the load
-    if ram.screen_black == Some(true) {
-        w.scene.screen.black = 16;
-        w.scene.screen.dim = 256;
-    }
     // the event holds the field (a load inside it keeps it held)
     w.scene.depth = 1;
     field::set_busy(&mut w, true);
@@ -418,6 +413,12 @@ fn build_event_entry(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner:
             return Built { world: w, draws, held: 0, finished: false };
         }
     };
+    // a script's fade_out before its warp: the screen stays black through the load (a warp_fade's darkness is the
+    // field's own fade)
+    if ram.screen_black == Some(true) && !fading {
+        w.scene.screen.black = 16;
+        w.scene.screen.dim = 256;
+    }
     let mut evs: Vec<Event>;
     if fading {
         // warp_fade 0x76: the field's fade-out ends in this frame's post step with the load (no idle draw of its own:
@@ -454,7 +455,9 @@ fn build_event_entry(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner:
     match probe {
         Some((k, 0x76)) => {
             runner.continue_event(&mut w, ev.0, ev.1, ev.2, k, Some(Pending::Transition));
+            if std::env::var("DBG_EV").is_ok() { eprintln!("EV after continue {} evs {}", runner.thread_summary(), evs.len()); }
             runner.nest_over(&mut w, &evs);
+            if std::env::var("DBG_EV").is_ok() { eprintln!("EV after nest {}", runner.thread_summary()); }
         }
         Some((k, _)) => {
             runner.continue_event(&mut w, ev.0, ev.1, ev.2, k, Some(Pending::Arrival));

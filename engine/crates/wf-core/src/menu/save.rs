@@ -433,10 +433,12 @@ pub struct Save {
     pub black: bool,
 }
 
-/// redraw frames: the list (with the redraw from the done check, then the popup's enter + draw) and the write
+/// redraw frames: the list (with the redraw from the done check, then the popup's enter + draw) and the write.
+/// The write (checksum + flash loop, interrupts off: emulator 18-13 save point, 34.05 M cycles from the VBlank, its
+/// iteration over 121.4 frames) ends with the palettes cleared, shown in its last frame (`leave_black`)
 pub const LIST_FRAMES: u8 = 1;
 pub const POPUP_FRAMES: u8 = 3;
-pub const WRITE_FRAMES: u8 = 121;
+pub const WRITE_FRAMES: u8 = 120;
 
 impl Save {
     pub fn new(w: &World, flag: bool) -> Save {
@@ -517,6 +519,10 @@ impl Page for Save {
             v.layers.push(popup(t, 8));
         }
         v
+    }
+    // the write's iteration ends with the palettes cleared: its last frame is already black
+    fn leave_black(&self) -> bool {
+        self.black || self.stage == Stage::Done
     }
     fn redraw_cost(&self) -> u8 {
         match self.stage {

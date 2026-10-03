@@ -55,7 +55,7 @@ LEGS = {
                               ('goto', '2-35', 230, 128), ('walk', 230, 128), ('face', 'R'),
                               ('keys', [(A_, 2, 14)] * 5), ('wait', 30),
                               ('openwall', '2-35', [(x, y) for x in range(31, 35) for y in range(16, 18)]),
-                              ('goto', '2-46', 40, 104), ('keys', [(A_, 3, 60)]), ('events',),
+                              ('goto', '2-46', 64, 105), ('keys', [(A_, 3, 60)]), ('events',),
                               ('wait', 30)]),
 }
 
