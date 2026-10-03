@@ -16,7 +16,7 @@ sys.path.insert(0, str(ROOT / 're' / 'buu' / 'ship'))
 sys.path.insert(0, str(ROOT / 'tools' / 'story_playthrough'))
 sys.path.insert(0, str(ROOT / 'tools' / 'field'))
 sys.path.insert(0, str(HERE))
-from ship_driver import ShipDriver, enemies, ai_state, status, KEY  # noqa: E402,F401
+from shipdrv import ShipDriver, enemies, ai_state, status, KEY  # noqa: E402,F401
 from route import start_emu  # noqa: E402
 
 
@@ -34,7 +34,7 @@ class SideDriver(ShipDriver):
     def nav(self, e, s, g, inner=False):
         """ShipDriver.nav with the exit's approach point taken where the player can walk to (HFIL's edge exits span
         two levels of a cliff: the rect's centre can be on the other one)"""
-        import nav as navm
+        import sidenav as navm
         plain = navm.approach
 
         def approach(rect, push):
@@ -222,26 +222,31 @@ class SideDriver(ShipDriver):
                 return None
             return 0
         if g[0] == 'maze10':
-            # ('maze10', x, y): HFIL 18-10's gate maze to (x, y): maze10.plan from here (the wall state read from the
-            # live grid), its walks and switch toggles (Instant Transmission) take this goal's place
+            # ('maze10', x, y): HFIL 18-10's gate maze to (x, y): maze10.plan from where the player is (the wall state
+            # read from the live grid) every step: walk to the plan's next spot; there, a switch toggle (Instant
+            # Transmission) runs as its own goal and this one resumes after it
             import maze10
             s = status(e)
             if s['p'] is None or s['scene'] > 0:
                 return 0
+            x, y = s['p'][0], s['p'][1]
             raw = e.read(e.r32(0x030019A4 + 0xA8), 32 * 80)
             state = (raw[35 * 32 + (41 >> 3)] >> (41 & 7)) & 1
-            pl = maze10.plan((s['p'][0], s['p'][1]), (g[1], g[2]), state)
+            pl = maze10.plan((x, y), (g[1], g[2]), state)
             if pl is None:
-                raise RuntimeError('maze10: no route')
-            new = []
-            for st in pl:
-                if st[0] == 'toggle':
-                    new += [('it', 301, 309, 31, 23), ('unstick',)]
-                else:
-                    new += [st, ('unstick',)]
-            self.goals[self.k:self.k + 1] = new
-            self.t = 0
-            return 0
+                raise RuntimeError(f'maze10: no route from {(x, y)} state {state}')
+            tx, ty = pl[0][1], pl[0][2]
+            if abs(x - tx) > 3 or abs(y - ty) > 3:
+                if self.stuck > 60:
+                    self.stuck = 0
+                    self.path = None
+                return self.walk_keys(e, s, tx, ty)
+            if len(pl) > 1:
+                self.goals[self.k:self.k + 1] = [('it', 301, 309, 31, 23), g]
+                self.t = 0
+                return 0
+            self.next_goal()
+            return None
         if g[0] == 'openwall':
             # ('openwall', 'W-A', [(tx, ty), ...]): a switch opened these tiles (the maze planner's static grid)
             import maze

@@ -1426,10 +1426,8 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
                 };
                 // the dust cloud's rate is 0x1000 + rand(0x1000) (0x08019554; story playthrough: the gate's puffs)
                 crate::fx::puff_rng(w, cx, cy);
-                puff_first_update(w);
             } else if *absolute && matches!(owner, Owner::Prop(_)) {
                 crate::fx::puff_rng(w, *x, *y);
-                puff_first_update(w);
             }
         }
         Cmd::HitFlash => {
@@ -2150,15 +2148,6 @@ fn become_map_object(w: &mut World, index: i32, x: i32, y: i32, dir: Dir) -> Opt
 
 // ---------------------------------------------------------------------------------------------------------------
 // per frame
-
-/// a script's puff exists before the frame's object pass in the game (scripts run before the objects): its first
-/// update is the creation frame's (segment sb 21-26: its tiles go one frame earlier than an effect made in the pass)
-fn puff_first_update(w: &mut World) {
-    let i = w.ents.len() - 1;
-    if matches!(w.ents[i].body, Body::Fx(_)) {
-        crate::fx::update(w, i);
-    }
-}
 
 /// the frame's music events (any source: area loads, scripts) keep `Scene.song` current; called at the end of the
 /// frame (`Session::step_post`) and after a session is created

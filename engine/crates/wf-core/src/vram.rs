@@ -506,9 +506,14 @@ pub fn entity_gone(w: &mut World, i: usize) {
         return;
     }
     let id = w.ents[i].id;
-    // an animated effect that played out deletes itself in its next update (segment sb 21-5: the explosion's
-    // block lives one frame longer)
-    let exact = matches!(w.ents[i].body, Body::Fx(_));
+    // an explosion's block (`0x08712FDC`) lives one frame past our entity's end (segments sb 21-5, 20-8); a puff's
+    // or a spark's goes with it (sb 21-26 a script's puff, sb 19-3 Kid Buu's teleport puffs and beam sparks).
+    // MEASURED per kind: the update `0x0802A8AA` is the same for all, so the explosion's extra frame is likely in
+    // its record count - not decoded.
+    let exact = match &w.ents[i].body {
+        Body::Fx(f) => !matches!(**f, crate::fx::Fx::Anim { id, .. } if id != 0x0871_2fdc),
+        _ => false,
+    };
     if exact && w.ents[i].removed {
         let at = w.frame + 1;
         if let Some(v) = st(w) {

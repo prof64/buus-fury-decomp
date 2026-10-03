@@ -116,6 +116,11 @@ impl Session {
         crate::scene::pre_step(w);
         if w.field.is_some() {
             crate::field::pre_step(w);
+            // the keys a held pass resumes with are the frame's own, not the cutscene mask's (Diablo Desert Express
+            // 11-24: A pressed in the frame a one-frame on-defeat event ends - the punch starts in the resumed pass)
+            if let Some(f) = w.field.as_mut().filter(|f| f.raw_input.is_some()) {
+                f.raw_input = Some(inputs);
+            }
             Self::run_hook(&mut self.hook, &mut self.world, 0);
         }
     }

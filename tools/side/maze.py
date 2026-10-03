@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT / 'tools' / 'story_playthrough'))
 sys.path.insert(0, str(ROOT / 're' / 'buu' / 'ship'))
 from grid import Grid, map_of  # noqa: E402
-import nav as navm  # noqa: E402
+import sidenav as navm  # noqa: E402
 
 DIRS = {'up': (0, -1), 'down': (0, 1), 'left': (-1, 0), 'right': (1, 0)}
 # walls a switch opens (tiles that become walkable), by area: add before planning once the switch is done

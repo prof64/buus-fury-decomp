@@ -470,6 +470,10 @@ class ShipDriver(Driver):
         want = math.degrees(math.atan2(dx, -dy)) * 256 / 360
         diff = (want - h + 128) % 256 - 128
         k = 0
+        if len(g) > 5 and g[5] == 'near' and dist < 220:
+            # ('fly', x, y, w, h, 'near'): only up to the place (still in the air)
+            self.next_goal()
+            return None
         if dist < min(rw, rh) / 2 - 4:
             return KEY.A
         if diff > 3:
