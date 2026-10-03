@@ -240,6 +240,11 @@ pub struct Field {
     /// frame it ends the enemies still run their update (2-90: Super Saiyan Goten's AI starts in s121's last frame)
     #[serde(default)]
     pub queued_event: bool,
+    /// the frame a breakable's callback event started (fieldobj `break_done`): one that does not end in that frame (a
+    /// track command pending: HFIL 18-10's boulder, `puff_at`) is an ordinary event from then on - the objects are
+    /// held in its frames and its exit frame releases only what comes after the hook (the real route, rj_back1)
+    #[serde(default)]
+    pub break_event: u32,
     /// a level-up hook started at the start of this frame's update: it runs inline (a nested loop), nothing else
     /// updates this frame
     pub held: bool,
@@ -451,6 +456,7 @@ fn new_field() -> Field {
         coins_moved: false,
         queued_runs: vec![],
         queued_event: false,
+        break_event: 0,
         held: false,
         held_event: false,
         resume_held: false,

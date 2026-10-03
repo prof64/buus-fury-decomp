@@ -1058,8 +1058,8 @@ pub fn switch_character(w: &mut World, c: i32) -> Result<(), String> {
         }
     }
     p.holy_left = 0;
-    // the rebuilt player object starts its hit-damage remainder at 0, as after a load (8-16 -> 8-71, Vegeta vs Buu:
-    // HP 307, not 306, once the harness compares the leader's HP)
+    // the rebuilt player object starts its hit-damage remainder at 0, as after a load or the candy respawn
+    // (INFERRED from those two: no recording isolates set_character yet)
     p.hp_acc = Default::default();
     let gfx = |w: &World, f: i32| w.data.form(f).map(|f| f.gfx);
     let new_sprite = gfx(w, p.form) != gfx(w, form);

@@ -1161,11 +1161,6 @@ pub fn lose_hp(w: &mut World, i: usize, n: i32, floor: i32) -> i32 {
     }
     let d = n.min(0.max(pr(w, i).rec.hp - floor));
     p(w, i).rec.hp -= d;
-    // a whole-HP write drops the hit-damage remainder (8-71: after Buu's drain ticks of 10 the next hit takes 4,
-    // not 5; the same happens when a load or set_character rebuilds the player from the record's whole HP)
-    if d > 0 && w.field.is_some() {
-        p(w, i).hp_acc = Default::default();
-    }
     w.stats.damage_taken += d as i64;
     after_hp_change(w, i);
     d
@@ -1834,12 +1829,14 @@ fn passive(w: &mut World, i: usize) {
     if pr(w, i).story_form(w) {
         return story_tick(w, i);
     }
+    let mut benched = false;
     {
         let pl = p(w, i);
         pl.regen_timer += 110;
         if pl.regen_timer >= 0x10000 {
             pl.regen_timer -= 0x10000;
             pl.rec.ep = pl.rec.max_ep.min(pl.rec.ep + ((pl.rec.max_ep * 0x7ae) >> 16));
+            benched = true;
         }
         if pl.eff.hp_regen256 != 0 {
             pl.hp_regen_acc += pl.eff.hp_regen256;
@@ -1848,6 +1845,20 @@ fn passive(w: &mut World, i: usize) {
                 pl.hp_regen_acc &= 0xff;
                 pl.rec.hp = pl.rec.max_hp.min(pl.rec.hp + n);
             }
+        }
+    }
+    // 0x0800E25C: the same tick gives every OTHER character's record (0 .. 8, whatever it is) 5% of its maximum EP
+    // and HP (max * 0xCCD >> 16, clamped) - the bench recovers while the leader fights (Kid Buu's arena 21-25: Vegeta
+    // is at full HP when the script hands the fight over to him)
+    if benched && w.field.is_some() && w.players.len() == 1 {
+        let cur = w.story.current;
+        for (c, ch) in w.story.chars.iter_mut().enumerate().take(9) {
+            if c as i32 == cur {
+                continue;
+            }
+            let r = &mut ch.rec;
+            r.ep = r.max_ep.min(r.ep + ((r.max_ep * 0xccd) >> 16));
+            r.hp = r.max_hp.min(r.hp + ((r.max_hp * 0xccd) >> 16));
         }
     }
     if pr(w, i).holy_left > 0 {
@@ -3543,7 +3554,6 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
 pub fn script_set_hp(w: &mut World, i: usize, v: i32) {
     let pl = p(w, i);
     pl.rec.hp = v.clamp(0, pl.rec.max_hp);
-    pl.hp_acc = Default::default();
     if v <= 0 && w.field.is_some() {
         after_hp_change(w, i);
     }

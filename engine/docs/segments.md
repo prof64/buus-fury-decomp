@@ -269,6 +269,14 @@ Other rules of this round: the BG sphere effect (`0x0803AA58`) draws rand(4) per
 before the objects, and ends with its area; an NPC's script anims 10 / 11 play once (8 ticks a cel) and stay on the
 last cel (own state `0x03001B30` in `0x080727C8`); a scripted `play_anim(player, 23)` makes the transform aura.
 
+**Hand-off note for the Kid Buu fight agent (2026-10-03, Super Buu agent):** two things in 21-25 are already
+done in the working tree, do not redo them: (a) the allocator order at f21208 / f21210 - damage numbers are world
+list objects and end in list order (`vram::popups_tick`, called per entity in `World::step_entities_list`); (b) the
+"missing enemy" at f21479 - Kid Buu's death node `0x08032D44` does not destroy the last copy (it calls its defeat
+handler vfunc +0x74 and the object stays; `enemy::on_death`, `last_copy`). With both, `sb_041` runs to **f22111**
+(`hp: 5634 vs game 5739`, allocator check ON and exact up to there) - the fight is yours from that frame. I keep
+`vram.rs` and the allocator rows; tell me here if a fight fix needs a new tile user.
+
 Results (2026-10-03, with the allocator check where the gate has `vram` rows): 21-2..21-10, 21-12, 21-15..21-17,
 21-20..21-24 exact; `sb_041` (21-25, Kid Buu) **21,210** (was 11,442; without the allocator check 21,479: an enemy
 object missing); `sb_044` (ending 4-20) **23,962 / 24,101** (was 1,974). Open: `sb_029` f703 / `sb_030` f490 -
@@ -279,6 +287,11 @@ in `page_cost` (menus); Earth 7-2 f1432 and db7_041 f765 are not purges (allocat
 an actor's instance is destroyed (`0x0800ECA0` via `0x08017CE1`) and actor #17's animation stands at tick 29 until it
 reads tick 41 at f1432; db7_041 - at f579 actors 123 and 269 enter idle in one frame and their two rand(255) draws
 are in the other order (ticks 74 / 79 swapped), the cel shows it at f765.
+
+**Claim (dungeon agent A, 2026-10-03, by the coordinator): the Kid Buu fight itself in `sb_041` (21-25).** A works
+with the allocator check off (`SEGMENT_VRAM=0`): the enemy object missing at f21479 and every divergence after it
+through the three phases (Kid Buu's AI / attacks, the Spirit Bomb sequence, the script hand-overs, Uub). The Super
+Buu agent keeps the sprite-memory / allocator side of that cut (free-list order, unmodelled tile users).
 
 ## 7. Side content (owner: the side-content agent, from 2026-10-02)
 
@@ -1321,3 +1334,52 @@ fight (below). Ship / dungeons / post-ball were not chained (they start from oth
 8. **One transient position mismatch** at row 33,189 in 1-20 (King Kai's planet): the leader stands elsewhere than
    the recording's player for fewer than 150 rows while areas / RNG stay equal - a scene where the row's "player" is
    another object, or a puppet position; not looked at.
+
+**§11 update (B, later 2026-10-03).**
+
+*Leader HP is now compared by the segment harness* (`segment::compare`, key `hp`: the row's current-character HP
+against the leader's, while the game shows a leader and no menu is up). One gate moved, `shipr_338_8-16` (Vegeta vs
+Buu) f7067, HP 306 vs 307 - a real engine difference, not a harness artefact, and not the damage-popup edit:
+* **The hit-damage remainder (1/1024 HP, `Player.hp_acc`) belongs to the player object and starts at 0 whenever that
+  object is rebuilt**: at an area load (`field.rs`, found by the soak: five 1-HP drifts in Other World), at Buu's
+  **candy respawn** (`nodes.rs`, the eat's tick 120: the player object is destroyed and made again - the game's row
+  has `p` null during the candy; 8-71: after the candy the next hit takes 4, not 5), and at `set_character`
+  (`switch_character`; INFERRED from the other two, no recording isolates it). Evidence is the recorded HP values
+  (the soak's Other World rows and shipr_338's f6808 .. f7067), not a trace of the object's field: ship-fixes agent,
+  if 8-71 has another candy with hits before and after, it confirms or refutes this cheaply.
+  With it every gate passes with HP compared (all of data/segments, incl. shipr_338 8,000 / 8,000).
+
+*db7_041 f765 (s019 on 0-9) - fixed.* Not the OBJ purge (Super Buu agent's check): at f579 node 4's batch starts
+`play_anim(123, 0)` and `play_anim(269, 0)` on two actors a `set_pose` holds, and the game draws Trunks' idle tick
+(spawned second) before Goten's. `scene::begin_wait`: heads start in track order, but the SetAnim heads of *posed*
+actors take their turns in the world list's order (last object first), like the ticks. INFERRED from this recording
+and sb 21-25 (which needs the track order for its other heads: ordering every head, or every SetAnim head, by the
+list breaks sb_041 at f13124). `db7_041` 2,097 / 2,097; db7 is 40 / 41 exact (db7_023 ends at a heal menu).
+
+*field_lockstep / wf-app after the soak fixes:* field_lockstep, field, session, and the whole wf-app test suite
+(13 test binaries) pass on the current tree.
+
+**Lag frames: the app's policy (proposal - pacing NOT changed).** The GBA runs one logic frame per video frame
+except where the main loop overruns: area loads (30 - 60 video frames with the logic counter frozen), text boxes
+opening (portrait boxes: 4 - 7), menu page redraws (3 - 4), the pause menu's close (20 - 40), heavy object frames
+(1). The recordings carry both counters; the core steps logic frames and models the menu's own lag; the app (and
+the web shell) call one step per display frame, so the app is *faster* than the GBA exactly there: loads are
+instant, boxes open without the hitch. Options:
+1. **Keep it (current).** One logic frame per display frame, no dropped frames. Best feel; replays / netcode /
+   determinism are per logic frame already. Cost: not GBA-paced - music and scene timing against wall-clock differ
+   from the original by the lag total (about 4.5 % of the Other World recording: 1,785 of 41,423 rows), and a real
+   key log needs the recording's logic counter (the soak does that).
+2. **Presentation-only lag.** The frontend holds the last frame for the load's measured length (a per-load table or
+   the decompression-cost model the Earth agent built for the pause menu's close) while the sim does not step. The
+   sim stays lag-free and deterministic; pacing matches the GBA at loads. Needs the lag length as data the sim
+   exposes (`World` already knows when a load / box open happened).
+3. **Lag in the sim.** The core returns "no logic frame this video frame" from a cost model (loads, boxes, menus).
+   Exact GBA pacing and key logs replay without the logic counter, but every lag source needs an exact model (the
+   menu redraw study in §9 shows where that stops being possible) and input semantics change (keys pressed during
+   a dropped frame).
+Recommendation: 1 as the default, 2 as an "original pacing" option once the load lengths are data; not 3.
+
+**Still open from the coordinator's list (B, not done in this pass):** the Save -> Continue round trip through the
+in-game Save screen and the title's Continue; moving `wf-script-core/tests/playthrough.rs` onto `StoryHost` (it is
+the last private copy of the host loop); soaking ship / dungeons / post-ball through Continue or the §8
+checkpoints; the row 33,189 position mismatch in 1-20.

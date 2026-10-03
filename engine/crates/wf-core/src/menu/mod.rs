@@ -747,10 +747,11 @@ fn step_screen(w: &mut World) {
     }
 }
 
-/// Switch Character's close beyond the pause menu's reload (cycles; emulator: real route 8-1 with 3 figures,
-/// Super Buu 21-14 with 9)
-const CHARSEL_CLOSE: i64 = 0;
-const CHARSEL_CLOSE_FIG: i64 = 0;
+/// Switch Character's close beyond the pause menu's reload (cycles; emulator, `re/buu/ship/menu_timing.py`: real
+/// route 8-26 cancelled, no other actor +1k; 8-1 switched, none +27k; 7-2 switched, 3 other sprites +139k; Super
+/// Buu 21-14 switched, 4 other sprites +153k)
+const CHARSEL_CLOSE_LEADER: i64 = 26_500;
+const CHARSEL_CLOSE_SPRITE: i64 = 34_000;
 
 fn close(w: &mut World) {
     close_with(w, false)
@@ -758,9 +759,19 @@ fn close(w: &mut World) {
 
 /// `done`: the mode's done check ended it (START): the world restore runs in this same iteration
 fn close_with(w: &mut World, done: bool) {
-    // Switch Character's close also frees its figures and brings the object world's graphics back
+    // Switch Character's close also frees its figures and loads the object world's graphics again: the other
+    // actors' sprites (per distinct sprite) and, when the leader changed, the new one's
     let figs = match w.menu.shown.as_deref() {
-        Some(Screen::CharSelect(c)) => Some(c.figs.len() as i64),
+        Some(Screen::CharSelect(c)) => {
+            let switched = w.menu.result.as_ref().is_some_and(|r| r.code == 2) || c.figs.get(c.sel).is_some_and(|f| f.ch != w.story.current);
+            let mut sprites: Vec<i32> = (0..w.ents.len())
+                .filter(|&i| !w.ents[i].removed && matches!(w.ents[i].body, crate::world::Body::Npc(_) | crate::world::Body::Enemy(_)))
+                .filter_map(|i| crate::scene::sprite_id(w, i))
+                .collect();
+            sprites.sort();
+            sprites.dedup();
+            Some((switched, sprites.len() as i64))
+        }
         _ => None,
     };
     w.menu.stack.clear();
@@ -769,7 +780,7 @@ fn close_with(w: &mut World, done: bool) {
     // (the script-opened screens - Switch Character, save, shops - restore the world the same way: real route
     // save-point cuts 8-1 / 8-26 / 8-66, 27 black frames against the constant's 25)
     if w.menu.tr == PAUSE || w.menu.tr.leave == 25 && w.menu.tr.fade_out & FADE_HOLD != 0 {
-        let extra = figs.map(|n| CHARSEL_CLOSE + CHARSEL_CLOSE_FIG * n).unwrap_or(0);
+        let extra = figs.map(|(sw, n)| if sw { CHARSEL_CLOSE_LEADER } else { 0 } + CHARSEL_CLOSE_SPRITE * n).unwrap_or(0);
         if crate::sndsim::debug() {
             eprintln!("menu close: figures {figs:?} extra {extra}");
         }
