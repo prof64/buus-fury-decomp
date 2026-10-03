@@ -67,6 +67,15 @@ NOTES = {
                     'after it) and ~480 of the ship route\'s up to its first entry; first divergence at its frame 6,658: actor #42 '
                     '(sprite 222) raw 1 cel 0 vs the game\'s cel 1, tick 1776 vs 1777 - an NPC idle animation one tick '
                     'behind after ~1,800 frames',
+    'r033_002_6-1': 'Goku vs Majin Buu, 0-21 (was an RNG row at 9,545: the hit\'s screen shake now ticks through the '
+                    'pause fade-out). Now at 9,904: one punch\'s draws come in a different order - game: crit chance, '
+                    'rand(26), two chances (0x080192AB: the hit tree), the punch sfx / anim rands (0x080116DD), then '
+                    'the knockback rands (0x08018B4B: KnockbackSlide enter); ours: one hit-tree chance and the knockback '
+                    'before the punch rands - same count, different values (knock (-152, 44) vs (-144, 7))',
+    'r002_006_4-1': 'West City -> the Bandana hunt (was an animation row at 1,763: a patrol airship\'s s509 now starts '
+                    'a frame later, field.rs trigger_self). Now at 4,178 (0-55): the bandits\' on-defeat bytecode '
+                    '0x08073EFC (run_script(506) -> prop_show, then chance(25)) resumes 2 frames after prop_show in the '
+                    'game, 1 in ours; prop_show from every unit script is not it (breaks the take-off at 1,469)',
     'r038_002_18-2': 'a heal menu closed in 18-2: predicted 21 black frames 208 cycles before the 22nd',
     'r047_002_18-13': 'heal menu / Switch Character in 18-13: one frame short',
 }

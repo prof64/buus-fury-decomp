@@ -387,82 +387,8 @@ fn build_returned(_data: &Arc<GameData>, ram: &GbaRam, runner: &mut StoryHost, e
     // (the event still holds the field: the arrival does not release it)
     w.scene.depth = 1;
     field::set_busy(&mut w, true);
-    // the area's own objects go: the RAM's are the field as the scene left it
-    let players = w.players.clone();
-    for e in w.ents.iter_mut().filter(|e| !players.contains(&e.id)) {
-        e.removed = true;
-    }
-    w.ents.retain(|e| !e.removed);
-    w.enemies.clear();
-    if let Some(f) = w.field.as_mut() {
-        f.placed.clear();
-        f.patrols.clear();
-    }
+    import_objects(&mut w, ram, notes);
     let rows: std::collections::BTreeMap<u32, (i32, i32, i32, i32)> = ram.actor_rows.iter().map(|r| (r.0, (r.1, r.2, r.3, r.4))).collect();
-    // the world list is updated last to first: RAM order = our entity order
-    for o in ram.objects() {
-        let vt = ram.r32(o);
-        let (ox, oy, of) = (ram.s32(o + 0x1A0), ram.s32(o + 0x1A4), ram.r8(o + 0x10));
-        match vt {
-            VT_ENEMY => {
-                let ty = ((ram.r32(o + 0x224).wrapping_sub(0x0871_1274)) / 28) as i32;
-                let states: Vec<i32> = {
-                    let st = o + 0x238;
-                    let n = ram.r32(st + 4).min(8);
-                    (0..n).map(|i| (ram.r32(st + 12 + 8 * i).wrapping_sub(0x0870_F514) / 8) as i32).collect()
-                };
-                let Some(ei) = wf_core::battle::spawn_enemy_at(&mut w, ty, ox >> 8, oy >> 8, 0, states.first().copied(), true) else {
-                    notes.push(format!("enemy type {ty} at ({ox}, {oy}) not built"));
-                    continue;
-                };
-                for &s in states.iter().skip(1) {
-                    wf_core::nodes::push(&mut w, ei, s as u16);
-                }
-                // the node runtimes of every stack entry (obj+0x238 +8: {runtime, def} per level)
-                for lvl in 0..states.len() {
-                    let r = ram.r32(o + 0x238 + 8 + 8 * lvl as u32);
-                    import_ai_rt(&mut w, ei, lvl, ram, r, notes);
-                }
-                let e = w.en(ei);
-                e.a.x = ox;
-                e.a.y = oy;
-                e.a.facing = of;
-                e.hp1024 = ram.s32(o + 0x28C) as i64;
-                // the AI's timers on the frame counter (the World's clock = the logic counter here): state entry
-                // +0x210, MarkTime +0x1E8, the counter +0x1E4
-                e.state_stamp = ram.s32(o + 0x210) as i64;
-                e.mark1 = ram.s32(o + 0x1E8) as i64;
-                e.counter = ram.s32(o + 0x1E4) as i64;
-                if let Some(&(sprite, raw, cel, tick)) = rows.get(&o) {
-                    // (the sprite the object shows: the world map's circles pick theirs by the place's state)
-                    let d = Arc::clone(&w.data);
-                    let e = w.en(ei);
-                    if e.a.sprite != Some(sprite - wf_core::scene::SPRITE_BASE) {
-                        e.a.set_sprite(&d, Some(sprite - wf_core::scene::SPRITE_BASE));
-                    }
-                    e.ea.pos.raw = raw;
-                    e.ea.pos.frame = cel;
-                    e.ea.pos.tick = tick;
-                }
-                wf_core::enemy::sync_mark(&mut w, ei);
-            }
-            VT_NPC | VT_NPC_TALK => {
-                let Some(&(sprite, raw, cel, tick)) = rows.get(&o) else { continue };
-                let mut n = wf_core::scene::Npc::new(&w.data, sprite, ox >> 8, oy >> 8, of);
-                n.a.x = ox;
-                n.a.y = oy;
-                n.anim.raw = raw;
-                n.anim.frame = cel;
-                n.anim.tick = tick;
-                // the hold state 0x03001B00 (`set_pose`): frozen on its cel
-                if ram.r32(o + 0x14) == 0x0300_1B00 {
-                    n.anim.mode = wf_core::scene::AnimMode::Pose;
-                }
-                w.add(Body::Npc(Box::new(n)));
-            }
-            _ => {}
-        }
-    }
     patch_leader(&mut w, ram, notes);
     // the walk and enemy grids as they stand (map object +0xA8 / +0xB0: bitmaps, 32 bytes a row, bit = free)
     import_grids(&mut w, ram);
@@ -617,6 +543,152 @@ fn import_grids(w: &mut World, ram: &GbaRam) {
             }
         }
     }
+}
+
+/// the field's actors from RAM, by **match and patch** (mid-area imports): every RAM actor (enemy / NPC object) is
+/// matched to an entity the area's own load made - same enemy type / NPC sprite, the nearest unclaimed one - and
+/// that entity is patched to the RAM's state (it keeps what the load attached: patrol runners, placements, talk
+/// events); RAM actors without a match are built; entities no RAM actor claims go. The actors end in the RAM's
+/// world-list order (the update order).
+fn import_objects(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
+    let rows: std::collections::BTreeMap<u32, (i32, i32, i32, i32)> = ram.actor_rows.iter().map(|r| (r.0, (r.1, r.2, r.3, r.4))).collect();
+    let players = w.players.clone();
+    // our candidates: (entity id, kind key) - enemies by type, NPCs by sprite id
+    let key_of = |w: &World, i: usize| -> Option<(u8, i32)> {
+        match &w.ents[i].body {
+            Body::Enemy(e) => Some((0, e.ty)),
+            Body::Npc(n) => Some((1, n.sprite_id)),
+            _ => None,
+        }
+    };
+    let mut free: Vec<(wf_core::world::EntityId, (u8, i32))> =
+        (0..w.ents.len()).filter(|&i| !w.ents[i].removed && !players.contains(&w.ents[i].id)).filter_map(|i| key_of(w, i).map(|k| (w.ents[i].id, k))).collect();
+    let mut order: Vec<wf_core::world::EntityId> = vec![];
+    // the world list is updated last to first: RAM order = our entity order
+    for o in ram.objects() {
+        let vt = ram.r32(o);
+        let (ox, oy, of) = (ram.s32(o + 0x1A0), ram.s32(o + 0x1A4), ram.r8(o + 0x10));
+        let key = match vt {
+            VT_ENEMY => (0u8, ((ram.r32(o + 0x224).wrapping_sub(0x0871_1274)) / 28) as i32),
+            VT_NPC | VT_NPC_TALK => match rows.get(&o) {
+                Some(&(sprite, ..)) => (1u8, sprite),
+                None => continue,
+            },
+            _ => continue,
+        };
+        // the nearest unclaimed entity of the same kind
+        let pick = free
+            .iter()
+            .enumerate()
+            .filter(|(_, c)| c.1 == key)
+            .filter_map(|(k, c)| w.find(c.0).and_then(|i| w.actor(i)).map(|a| (k, ((a.x - ox) as i64).abs() + ((a.y - oy) as i64).abs())))
+            .min_by_key(|x| x.1)
+            .map(|x| x.0);
+        let id = match (pick, key.0) {
+            (Some(k), _) => free.remove(k).0,
+            (None, 0) => {
+                let states = ai_states(ram, o);
+                let Some(ei) = wf_core::battle::spawn_enemy_at(w, key.1, ox >> 8, oy >> 8, 0, states.first().copied(), true) else {
+                    notes.push(format!("enemy type {} at ({ox}, {oy}) not built", key.1));
+                    continue;
+                };
+                w.ents[ei].id
+            }
+            (None, _) => {
+                let n = wf_core::scene::Npc::new(&w.data, key.1, ox >> 8, oy >> 8, of);
+                w.add(Body::Npc(Box::new(n)))
+            }
+        };
+        let Some(i) = w.find(id) else { continue };
+        order.push(id);
+        match key.0 {
+            0 => patch_enemy(w, i, ram, o, rows.get(&o).copied(), notes),
+            _ => {
+                if let Body::Npc(n) = &mut w.ents[i].body {
+                    n.a.x = ox;
+                    n.a.y = oy;
+                    n.a.facing = of;
+                    if let Some(&(_, raw, cel, tick)) = rows.get(&o) {
+                        n.anim.raw = raw;
+                        n.anim.frame = cel;
+                        n.anim.tick = tick;
+                    }
+                    // the hold state 0x03001B00 (`set_pose`): frozen on its cel
+                    if ram.r32(o + 0x14) == 0x0300_1B00 {
+                        n.anim.mode = wf_core::scene::AnimMode::Pose;
+                    }
+                }
+            }
+        }
+    }
+    // the load's objects the field no longer has
+    for (id, _) in free {
+        if let Some(i) = w.find(id) {
+            if matches!(w.ents[i].body, Body::Enemy(_)) {
+                wf_core::enemy::unmark_self(w, i);
+            }
+            w.ents[i].removed = true;
+        }
+    }
+    w.ents.retain(|e| !e.removed);
+    let gone: Vec<wf_core::world::EntityId> = w.enemies.iter().copied().filter(|&id| w.find(id).is_none()).collect();
+    w.enemies.retain(|id| !gone.contains(id));
+    if let Some(f) = w.field.as_mut() {
+        f.placed.retain(|p| !gone.contains(&p.0));
+        f.patrols.retain(|p| !gone.contains(&p.entity));
+    }
+    // the actors in the RAM's order, after the other objects
+    let mut actors = vec![];
+    for id in &order {
+        if let Some(i) = w.ents.iter().position(|e| e.id == *id) {
+            actors.push(w.ents.remove(i));
+        }
+    }
+    w.ents.extend(actors);
+}
+
+/// an enemy's AI state stack (obj+0x238: +4 depth, +8 {runtime, def} per level; def = 0x0870F514 + 8 * state)
+fn ai_states(ram: &GbaRam, o: u32) -> Vec<i32> {
+    let st = o + 0x238;
+    let n = ram.r32(st + 4).min(8);
+    (0..n).map(|i| (ram.r32(st + 12 + 8 * i).wrapping_sub(0x0870_F514) / 8) as i32).collect()
+}
+
+/// an enemy entity set to a RAM enemy object's state
+fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32, i32, i32, i32)>, notes: &mut Vec<String>) {
+    let states = ai_states(ram, o);
+    // the state stack as the RAM has it (re-entered: their runtimes come next)
+    if let Some(&first) = states.first() {
+        wf_core::nodes::reset(w, ei, first as u16);
+        for &s in states.iter().skip(1) {
+            wf_core::nodes::push(w, ei, s as u16);
+        }
+    }
+    for lvl in 0..states.len() {
+        let r = ram.r32(o + 0x238 + 8 + 8 * lvl as u32);
+        import_ai_rt(w, ei, lvl, ram, r, notes);
+    }
+    let d = Arc::clone(&w.data);
+    let e = w.en(ei);
+    e.a.x = ram.s32(o + 0x1A0);
+    e.a.y = ram.s32(o + 0x1A4);
+    e.a.facing = ram.r8(o + 0x10);
+    e.hp1024 = ram.s32(o + 0x28C) as i64;
+    // the AI's timers on the frame counter (the World's clock = the logic counter here): state entry +0x210,
+    // MarkTime +0x1E8, the counter +0x1E4
+    e.state_stamp = ram.s32(o + 0x210) as i64;
+    e.mark1 = ram.s32(o + 0x1E8) as i64;
+    e.counter = ram.s32(o + 0x1E4) as i64;
+    if let Some((sprite, raw, cel, tick)) = row {
+        // (the sprite the object shows: the world map's circles pick theirs by the place's state)
+        if e.a.sprite != Some(sprite - wf_core::scene::SPRITE_BASE) {
+            e.a.set_sprite(&d, Some(sprite - wf_core::scene::SPRITE_BASE));
+        }
+        e.ea.pos.raw = raw;
+        e.ea.pos.frame = cel;
+        e.ea.pos.tick = tick;
+    }
+    wf_core::enemy::sync_mark(w, ei);
 }
 
 /// the 3D world map (an area whose load makes the flyer)

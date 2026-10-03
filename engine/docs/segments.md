@@ -432,6 +432,16 @@ ids / animation indices need the ROM's sprite-def tables: the recording's `init.
 (`GbaRam.actor_rows`). The event: blocked in the return's fade-in phase (`Pending::Phases`, fade started at the
 cut). Proof - the real route's Kid Buu run, cut with `--events`: **9 / 14 cuts exact**, the eight `return_to_field`
 ones gated (`rkb_003`, `004`, `005`, `006`, `007`, `009`, `010`, `011`: up to 2,000 frames each, allocator check on).
+Increment 2 (A): **match and patch** (`import_objects`) - the general shape of the any-frame import: every RAM
+actor is matched to an entity the area's own load made (same enemy type / NPC sprite, nearest unclaimed), patched
+to the RAM's state (position, facing, HP, AI stack re-entered + runtimes + timers, sprite, animation; NPCs: anim,
+held pose), so what the load attached stays (patrol runners, placements, talk events); unmatched RAM actors are
+built, unclaimed entities go; actors end in the RAM's world-list order. All return cuts stay where they were
+(10 / 14 exact, the gates green); `kbr_014` keeps its patrols now and stops at f16 on a circle's sub-pixel drift:
+the world map's step runner (enemy +0x22C -> step object vt 0x0804A800: +4 packed target, +8 count, +0xC / +0x10
+velocity, +0x18 counter, +0x1C stamp) is not imported into `fieldpatrol::StepRt` yet. `kbr_012`'s loop position
+needs the script's own state: `set_local` / `local` are the L words (imported), but where a step loop stands needs
+the interpreter's PC mapped to our decompiled steps (`tools/dungeons/evpos.py` reads the PC) - not done.
 Increment 1e (A):
 * **`kbr_002` f13417 fixed - Kid Buu's death node 0x08032D44**: it counts the copies (message 5, `0x08011CCA`); more
   than one -> the object leaves the world list (`0x08011944`) and, with 0x400 tile bytes free, a puff at its box

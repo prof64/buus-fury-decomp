@@ -846,10 +846,21 @@ impl Page for Equip {
     /// the dialog over the list (equip_change, 34 iterations): only the dialog's surface is drawn - 118,700 + its
     /// draw list + 0.3 per glyph instruction, the first time + 66,400 (within 1.5k). The page itself keeps its
     /// constant (its list / slot transitions are not separated yet: `work/buu/menu/cycles/equip_*.json`)
+    ///
+    /// The page (slots or the item list; equip_page / equip_change, 79 iterations): 180,382 + its draw list + 2,428
+    /// per text line + 0.486 per glyph instruction (within 3.6k); the first draw of a new container + 100,600 for
+    /// the slots (entering, back from the list), + 62,600 + 5,000 per line for the list (within 6k)
     fn redraw_time(&self, w: &World, d: &MenuData) -> Option<crate::sndsim::Redraw> {
-        let l = self.list.as_ref()?;
-        if l.dialog.is_none() && l.cant.is_none() {
-            return None;
+        let open = self.list.as_ref().is_some_and(|l| l.dialog.is_some() || l.cant.is_some());
+        if !open {
+            let v = self.view(w, d);
+            let l0 = v.layers.first()?;
+            let (gn, lines) = (crate::sndsim::ops_cost(&d.text, &l0.ops).0, crate::sndsim::text_counts(&d.text, &l0.ops).3);
+            let mut own = 180_382 + crate::sndsim::layer_cycles(&d.text, &l0.ops, 2_428) + gn * 486 / 1000;
+            if !self.container_ref().ever {
+                own += if self.slots.is_some() { 100_600 } else { 62_600 + 5_000 * lines };
+            }
+            return Some(crate::sndsim::Redraw { t0: 4_641, base: own - 4_641 });
         }
         let v = self.view(w, d);
         let top = v.layers.get(1)?;
