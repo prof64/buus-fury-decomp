@@ -146,6 +146,10 @@ impl Session {
             if !crate::field::frozen(w) && !crate::scene::frozen(w) && !watch_closing {
                 battle::pre_step(w);
                 w.step_entities();
+            } else if crate::field::frozen(w) && !watch_closing {
+                // the task list (screen shakes) keeps running while an inline event holds the objects' update (the
+                // real route, Southwest Forest 8-3: a crit shake draws its offsets through the level-up popup)
+                w.tick_shakes();
             }
             // the leader's KO timer: the death / Lazarus Crystal hook (menu/gameover.rs)
             crate::menu::gameover::tick(w);

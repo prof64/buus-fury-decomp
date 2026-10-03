@@ -298,6 +298,8 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
     let mut sess = StoryHost::session(data, imp.world);
     let game_snd = game_sounds(doc);
     let trace = range_env("SEGMENT_TRACE");
+    let vram_check = std::env::var("SEGMENT_VRAM").is_ok();
+    let mut game_vram = doc["init"].get("vram").cloned().unwrap_or(Value::Null);
     let mut lf_prev = i(&doc["init"]["lf"]);
     let mut presented = host.hs.present.len();
     for (k, fr) in frames.iter().enumerate() {
@@ -332,6 +334,12 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
                     }).collect();
                     let game: Vec<String> = fr["actors"].as_array().into_iter().flatten().map(|a| format!("{}:{}/{}", a[1], a[6], a[8])).collect();
                     eprintln!("  t{k} npcs {} | game {}", npcs.join(" "), game.join(" "));
+                }
+                if std::env::var("SEGMENT_FORM").is_ok() {
+                    if let Some(pi) = w.player_idx(0) {
+                        let pl = w.pl_ref(pi);
+                        eprintln!("  t{k} form {} walk {} spd {}", pl.form, pl.walk, pl.eff.spd);
+                    }
                 }
                 if std::env::var("SEGMENT_PUPPETS").is_ok() {
                     let pp: Vec<String> = w.scene.puppets.iter().map(|p| format!("{}:{}/{}/{}", p.id, p.anim.raw, p.anim.frame, p.anim.tick)).collect();
@@ -410,11 +418,24 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
         if game_text != ours_text {
             rep.bad(k, "text", format!("game opens a text box: {game_text}, ours: {ours_text}"));
         }
+        if fr.get("vram").is_some() {
+            game_vram = fr["vram"].clone();
+        }
         let complete = frames.get(k + 1).is_none_or(|n| i(&n["lf"]) != lf);
         if !complete {
             continue;
         }
         compare(w, fr, &game_snd[k], &mut map, k, &mut rep);
+        // SEGMENT_VRAM=1: the object tile allocator vs the game's (recordings with `vram` rows)
+        if vram_check && !game_vram.is_null() {
+            if let Some(v) = w.field.as_ref().and_then(|f| f.vram.as_ref()) {
+                let ours = vram_json(&v.a);
+                if ours != game_vram {
+                    let d = vram_diff(&ours, &game_vram);
+                    rep.bad(k, "vram", d);
+                }
+            }
+        }
         if rep.first.is_none() {
             rep.compared = k + 1;
         }
@@ -425,4 +446,41 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
         eprintln!("  scripts started: {:?}", rep.started);
     }
     rep
+}
+
+/// the allocator in the recording's row form (tools/segments/segment.py `vram_state`)
+fn vram_json(a: &wf_core::vram::ObjVram) -> Value {
+    let mut v = vec![serde_json::json!(a.free_head), serde_json::json!(a.spare_head)];
+    for b in &a.e {
+        if b.used == 0xFF {
+            v.push(serde_json::json!([255, b.hi, b.lo]));
+        } else {
+            v.push(serde_json::json!([b.used, b.start, b.size, b.hi, b.lo, b.fnext, b.fprev]));
+        }
+    }
+    Value::Array(v)
+}
+
+/// the used blocks (start, size) of both, for a divergence message
+fn vram_diff(ours: &Value, game: &Value) -> String {
+    let used = |v: &Value| -> Vec<(i64, i64)> {
+        let mut u: Vec<(i64, i64)> = v
+            .as_array()
+            .into_iter()
+            .flatten()
+            .skip(2)
+            .filter_map(|b| b.as_array())
+            .filter(|b| b.len() == 7 && b[0].as_i64() == Some(1))
+            .map(|b| (i(&b[1]), i(&b[2])))
+            .collect();
+        u.sort();
+        u
+    };
+    let (a, b) = (used(ours), used(game));
+    if a == b {
+        return "free / spare lists differ (same used blocks)".into();
+    }
+    let only_a: Vec<_> = a.iter().filter(|x| !b.contains(x)).collect();
+    let only_b: Vec<_> = b.iter().filter(|x| !a.contains(x)).collect();
+    format!("used blocks (start, size) ours only {only_a:?}, game only {only_b:?}")
 }

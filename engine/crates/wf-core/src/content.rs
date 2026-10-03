@@ -153,6 +153,10 @@ pub struct Sprite {
     pub foot: (i32, i32),
     /// effect id of the ground shadow
     pub shadow: Option<String>,
+    /// object tiles one instance allocates (def +2, header flags2 | flags3 << 8; vram.rs)
+    pub tile_bytes: i32,
+    /// the shared shadow graphic's (w, h) (def +0xA / +0xB; `0x08013E38`)
+    pub shadow_key: (u8, u8),
 }
 
 impl Sprite {
@@ -921,7 +925,11 @@ fn parse_sprite(s: &Value, index: i32, timing: Option<&Value>) -> Sprite {
         }
     }
     let shadow = s["shadow"].as_str().map(String::from);
-    Sprite { index, id: gets(s, "id"), anims, by_raw, by_name, body, foot, shadow }
+    let h = &s["header"];
+    let tile_bytes = (h["flags2"].as_i64().unwrap_or(0) | h["flags3"].as_i64().unwrap_or(0) << 8) as i32;
+    let sh = h["shadow"].as_array();
+    let shadow_key = sh.map(|a| (a.get(2).and_then(|v| v.as_u64()).unwrap_or(0) as u8, a.get(3).and_then(|v| v.as_u64()).unwrap_or(0) as u8)).unwrap_or((0, 0));
+    Sprite { index, id: gets(s, "id"), anims, by_raw, by_name, body, foot, shadow, tile_bytes, shadow_key }
 }
 
 /// the reference loader's graphics fallbacks (data.ts): Janemba body parts from their spawn records, placeholders

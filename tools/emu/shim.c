@@ -4,6 +4,7 @@
 #include <mgba/core/core.h>
 #include <mgba/core/config.h>
 #include <mgba/core/log.h>
+#include <mgba/core/timing.h>
 #include <mgba/core/serialize.h>
 #include <mgba/debugger/debugger.h>
 #include <mgba/internal/arm/arm.h>
@@ -203,3 +204,6 @@ void emu_close(struct Emu* emu) {
 	free(emu->video);
 	free(emu);
 }
+
+// global CPU cycle count (16.78 MHz clock) since power-on
+uint64_t emu_cycles(struct Emu* emu) { return mTimingGlobalTime(emu->core->timing); }

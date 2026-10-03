@@ -320,7 +320,10 @@ pub fn spawn_npc(w: &mut World, sprite_id: i32, x: i32, y: i32, dir: Dir) -> Ent
     let mut n = Npc::new(&w.data, sprite_id, x, y, dir);
     // the actor's constructor enters the idle state: a random start tick (one RNG draw)
     n.anim.tick = w.rng.rand(255);
-    w.add(Body::Npc(Box::new(n)))
+    let id = w.add(Body::Npc(Box::new(n)));
+    let ni = w.ents.len() - 1;
+    crate::vram::actor_created(w, ni);
+    id
 }
 
 pub fn npc_update(w: &mut World, i: usize) {
@@ -394,6 +397,19 @@ pub fn shown_anim(w: &World, i: usize) -> Option<(i32, i32)> {
         Body::Player(p) => Some((p.ap.raw, p.ap.frame)),
         _ => w.scene.puppets.iter().find(|p| p.id == w.ents[i].id).map(|p| (p.anim.raw, p.anim.frame)),
     }
+}
+
+/// the box of the cel an actor shows (frame record +4..+7: ox, oy, w, h relative to its integer position)
+pub fn cel_box(w: &World, i: usize) -> Option<[i32; 4]> {
+    let a = w.actor(i)?;
+    let sp = w.data.sprite(a.sprite?)?;
+    let (raw, frame) = match shown_anim(w, i) {
+        Some(x) => x,
+        None => (a.anim.and_then(|k| sp.anims.get(k as usize)).map(|an| an.raw).unwrap_or(1), 0),
+    };
+    let an = sp.anim_raw(raw)?;
+    let st = an.steps(a.facing).get(frame.max(0) as usize).or_else(|| an.steps(a.facing).first())?;
+    st.fbox
 }
 
 /// the scene animation of an Npc / enemy puppet
@@ -1883,8 +1899,12 @@ fn update_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) -> bool {
     }
 }
 
+/// the command's vt+0x10 (0x080193AE: the last command of a track that finished asks it): 1 = the track is idle at
+/// once, the command stays as its head. face_actor, and the instant set_pos / prop_set_pos / camera_set* /
+/// camera_set_param* (vt+0x10 = `mov r0, #1`: 0x0804ED2D / 35 / 39 / 3D / 31 / 41; sc_janemba: Gogeta's split
+/// face -> set_pos ends the wait in set_pos's tick); the others return 0 (pop, idle on the next tick)
 fn hold_cmd(cmd: &Cmd) -> bool {
-    matches!(cmd, Cmd::FaceActor { .. })
+    matches!(cmd, Cmd::FaceActor { .. } | Cmd::SetPos { .. } | Cmd::CamSet { .. } | Cmd::CamParam { .. } | Cmd::PropSetPos { .. })
 }
 
 /// FaceActor's update (0x0801599D): the dominant axis of the 24.8 position difference, ties horizontal
@@ -2081,6 +2101,7 @@ pub fn banner_step(w: &mut World) {
         *t += 1;
         if *t > 238 {
             w.scene.banner = None;
+            crate::vram::banner(w, false);
         }
     }
     let loads: Vec<crate::field::AreaId> = w
@@ -2101,6 +2122,7 @@ pub fn banner_step(w: &mut World) {
         } else if a.name_id != 0 && a.name_id != w.scene.banner_last {
             w.scene.banner_last = a.name_id;
             w.scene.banner = Some((a.banner.clone(), 0));
+            crate::vram::banner(w, true);
         }
     }
 }

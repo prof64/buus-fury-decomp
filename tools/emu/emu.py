@@ -154,6 +154,12 @@ class Emu:
     def oam(self): return self.read(0x07000000, 0x400)
 
     def reg(self, i): return self.L.emu_reg(self.h, i) & 0xFFFFFFFF
+
+    def cycles(self):
+        """global CPU cycle count since power-on"""
+        self.L.emu_cycles.restype = ctypes.c_uint64
+        self.L.emu_cycles.argtypes = [ctypes.c_void_p]
+        return self.L.emu_cycles(self.h)
     def set_reg(self, i, v): self.L.emu_set_reg(self.h, i, v)
 
     # --- video

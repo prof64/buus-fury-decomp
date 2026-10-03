@@ -39,3 +39,4 @@ pub mod observe;
 pub mod session;
 pub mod snapshot;
 pub mod view;
+pub mod vram;

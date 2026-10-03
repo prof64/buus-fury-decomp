@@ -250,6 +250,7 @@ pub fn spawn_enemy_at(w: &mut World, ty: i32, x: i32, y: i32, parent: EntityId, 
     e.a.y = y << 8;
     let id = w.add(Body::Enemy(Box::new(e)));
     let i = w.find(id).unwrap();
+    crate::vram::actor_created(w, i);
     enemy::clamp_inside(w, i);
     if parent == 0 && !exact {
         if let Some(c) = &w.col {

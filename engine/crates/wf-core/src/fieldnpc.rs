@@ -89,6 +89,8 @@ pub fn spawn(w: &mut World, o: &ObjDef) -> Option<EntityId> {
     mirror(&mut n);
     let f = foot(&n);
     let id = w.add(Body::Npc(Box::new(n)));
+    let ni = w.ents.len() - 1;
+    crate::vram::actor_created(w, ni);
     if talk.is_some() {
         mark(w, f, 0);
     }

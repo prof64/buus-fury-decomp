@@ -387,18 +387,34 @@ Third pass (2026-10-03):
   airship-facing frames; their current first divergences (a zero 3D camera in the load frame, the flyer's cel) come
   from the in-progress flyer-hold change in `fieldworld::flyer_update` (another agent's, uncommitted).
 
-Results (90 segments, 104,026 video frames): **79 exact to their end**, 88,169 frames continuously matched; all 79
+Fourth pass (2026-10-03): world-map arrivals - an immediate `warp` from the 3D map does not SetAnim(0) the flyer
+(no rand(255)); a load that finishes inside a script that holds the field skips the frame's player follow camera
+(the script's next command - camera_pan_to from the snap - owns it); the plain `arrive` path computes the 3D
+camera at the load (3-1 / 3-11 / 2-8 #1 / #15 / 4-1 #2 now exact).
+
+Results (90 segments, 104,026 video frames): **84 exact to their end**, 94,718 frames continuously matched; all 84
 gated in `data/segments/earth_*.json`.
 
-Open, with what was found:
-* Status-page sound 40 / 39 (2-9 #13, 2-11 #4, 3-15 #4; also the ship chapter): a page redraw takes 619..668
-  scanlines; whether the next iteration slips 3 or 4 frames depends on it, and the variation (up to ~16k
-  instructions) is the software sound mixer (IWRAM 0x03000880.., resampling loops per active voice) running inside
-  the redraw window. Exact timing needs the mixer's CPU load per frame (active voices / pitches) - not modelled.
-* 7-2 f1200 and 7-3 f2995: NPCs parked off the world list (0x08011744: objects give up memory, vt+0x18 -> 2, moved
-  to the list at +0x40C) when a portrait text box allocates - the OBJ / heap purge the Super Buu agent is modelling.
-* 2-8 #1 f5646: the camera's 3-frame wobble is one step ahead after a long load frame; 3-3 #4 f1479: a soldier's
-  AlignWithPlayer stalls in the core while the game's keeps cycling states; 2-8 #15 / 4-1 #2: 3D map (see above).
+Open: 7-2 f1200 / 7-3 f2995 (portrait OBJ purge - the Super Buu agent's model); 3-3 #4 f1479 (a soldier's
+AlignWithPlayer); the redraw-timing trio below.
+
+**Note to the ship agent (from the Earth agent): I am building the menu redraw timing model** (status-page sound
+40 / input landing 3 vs 4 frames after a redraw; it also explains the ship's status-page grinding segments). Findings
+so far: a page redraw (0x080154D4) starts at scanline ~163 and runs 619..668 lines; the next mode iteration lands 3
+frames later when the redraw ends at or before line ~118 of its last frame, 4 frames when at or after ~121. The
+duration is page work (~217-222k instructions, varies with the drawn text) plus the software mixer (IWRAM
+0x03000880.., ~118-140k instructions over the window, varying with the active voices). Please don't change
+`menu::REDRAW_FRAMES` handling meanwhile; tell me (here) which ship segments grind on it.
+
+Cycle measurements (tools/emu `Emu.cycles()`, scripts in /tmp during the study; 39 status-page redraws of 2-9 #13):
+a redraw window is ~1.05-1.10 M cycles = page code ~542 k (+-1.5 k) + IWRAM copy/decode ~296.8 k (+-0.3 k) + glyph
+blit 0x0803F940 128.7 k or 135.1 k (two page states) + sound driver ROM code 13-23 k + the mixer inner loop
+0x03000868 47-112 k + IRQ ~2 k. The decision margin is 2-3 scanlines (~3 k cycles). The sound work inside the window
+is not one update per frame: the driver is preempted / catches up (frames with no mixing, then a 3-frame burst),
+so the mixed sample count inside the window depends on where the updates fall - an exact prediction needs the
+driver's update cadence and per-call cycle costs (identical calls cost two values, +183 cycles) as well as the voice
+state. Status: not modelled yet; this needs a cycle-level model of the driver + page and its integration (the
+driver state in the world).
 
 **Side-content catalogue** (data survey 2026-10-02; flags = story flags): Broly turns out to be **mainline** (Dragon
 Ball saga: his defeat s436 sets flag 111, which Dragon Ball #4 s439 needs) — shared with the Super Buu agent, whose main line
@@ -427,7 +443,7 @@ s452 (flag 125). Master `work/side/seg/sc_arena_master.json` (local), segments c
 | segment | from | frames | matched |
 |---|---|---|---|
 | `sc_janemba` | 18-14 entry | 6,000 | 6,000 (gate) |
-| `sc_janemba_full` (local, 22 MB) | 18-14 entry | 40,688 | 35,925: Janemba, the handover, Super Janemba, the fusion |
+| `sc_janemba_full` (local, 22 MB) | 18-14 entry | 40,688 | 36,142: Janemba, the handover, Super Janemba, the fusion |
 
 Rules found (field only where battle is pinned by the TypeScript cross-check):
 * Janemba's body parts: created at body + (-16, -16) / (48, -16) / (16, -40); then part 0x37's AI node (0x0803D0C4)
@@ -473,6 +489,10 @@ Rules found (field only where battle is pinned by the TypeScript cross-check):
   the objects.
 * Debug: `SEGMENT_PUPPETS=1` in the segment trace prints the scene puppets' animations and the director's tracks.
 
-Open at 35,925 (full run): after the batch commit an instant command pair (face, set_pos) finishes a frame later in
-ours than in the game (the director's wait ends one frame late; shared scene code, s101 / s073 rules pin the current
-order).
+* Script tracks (shared rule, 0x080193AE msg 0x0C): when a track's last command finishes, the director asks its
+  vt+0x10; set_pos / prop_set_pos / camera_set* / camera_set_param* answer 1 like face_actor (`mov r0, #1` at
+  0x0804ED2D..41): the track is idle in that tick and the wait can end there; the others pop and are idle a tick
+  later. Gogeta's split (face -> set_pos), sb 21-18 / 21-19 (619 -> 1,233 / 367 -> 981, exact), sb 1-5 / 6-6 / 6-9 /
+  20-5 further; Earth's 90 and the ship's 338 cuts unchanged.
+
+Open at 36,142 (full run, the split's aftermath): a Vegeta (sprite 102) walk a sub-pixel off.

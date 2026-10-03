@@ -376,6 +376,7 @@ pub fn import_emulator_state(data: &Arc<GameData>, ram: &GbaRam, runner: &mut St
         notes.push("the load's scripts are still running at the cut (host state carries over)".into());
     }
     check(&mut world, ram, &mut notes);
+    import_vram(&mut world, ram);
     Ok(Imported { world, prev_keys: ram.r16(INPUT + 2) & 0x3FF, lf: info.lf, kind: info.kind, held_frames: b.held, draws: b.draws, notes })
 }
 
@@ -428,3 +429,62 @@ fn check(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
     }
 }
 
+
+/// the object tile allocator (`0x03001C4C`, vram.rs) as the RAM holds it; the actors' blocks (obj +0xC) belong to
+/// their entities (matched by position like `check`), the shadows' to their shared graphics (`0x03002B88` + 4k:
+/// reference count, handle +2); other blocks stay foreign
+fn import_vram(w: &mut World, ram: &GbaRam) {
+    use wf_core::vram::{ObjVram, Owner, VramState, ENTRIES, UNITS};
+    const A: u32 = 0x0300_1C4C;
+    let mut a = ObjVram::fresh();
+    a.free_head = ram.r8(A);
+    a.spare_head = ram.r8(A + 1);
+    for i in 0..ENTRIES {
+        let b = A + 0x694 + 10 * i as u32;
+        a.e[i] = wf_core::vram::Block { used: ram.r8(b), start: ram.r16(b + 2), size: ram.r16(b + 4), hi: ram.r8(b + 6), lo: ram.r8(b + 7), fnext: ram.r8(b + 8), fprev: ram.r8(b + 9) };
+    }
+    for u in 0..UNITS as u32 {
+        a.idx[u as usize] = ram.r8(A + 0xC00 + u);
+    }
+    let mut owners: Vec<(u16, Owner)> = vec![];
+    let mut used_ents: Vec<wf_core::world::EntityId> = vec![];
+    for o in ram.objects() {
+        let vt = ram.r32(o);
+        if vt == VT_HUD || vt == VT_BANNER {
+            let h = ram.r16(o + 0xC);
+            if h != 0xFFFF {
+                owners.push((h, if vt == VT_HUD { Owner::Hud } else { Owner::Banner }));
+            }
+            continue;
+        }
+        if !matches!(vt, VT_PLAYER | VT_ENEMY | VT_NPC | VT_NPC_TALK | 0x0804_E1B4 | 0x0804_AC20) {
+            continue;
+        }
+        let h = ram.r16(o + 0xC);
+        if h == 0xFFFF {
+            continue;
+        }
+        let (x, y) = (ram.s32(o + 0x1A0), ram.s32(o + 0x1A4));
+        let ent = (0..w.ents.len()).find(|&k| !w.ents[k].removed && !used_ents.contains(&w.ents[k].id) && w.actor(k).is_some_and(|ac| ac.x == x && ac.y == y));
+        if let Some(k) = ent {
+            used_ents.push(w.ents[k].id);
+            owners.push((h, Owner::Ent(w.ents[k].id)));
+        }
+    }
+    let mut shared_rc = [0u8; 4];
+    for (k, rc) in shared_rc.iter_mut().enumerate() {
+        let p = 0x0300_2B88 + 4 * k as u32;
+        *rc = ram.r8(p);
+        if *rc > 0 {
+            owners.push((ram.r16(p + 2), Owner::Shared(k as u8)));
+        }
+    }
+    for b in &a.e {
+        if b.used == 1 && !owners.iter().any(|o| o.0 == b.start << 1) {
+            owners.push((b.start << 1, Owner::Foreign));
+        }
+    }
+    if let Some(f) = w.field.as_mut() {
+        f.vram = Some(VramState { a, owners, shared_rc, suspended: vec![] });
+    }
+}

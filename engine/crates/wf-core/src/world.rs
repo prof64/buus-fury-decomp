@@ -812,6 +812,7 @@ impl World {
             }
             self.update_entity(i);
         }
+        crate::vram::reap(self);
         self.ents.retain(|e| !e.removed);
     }
 
@@ -851,6 +852,7 @@ impl World {
         crate::field::hud_tick(self);
         // the task list (screen shakes) runs after the objects
         self.tick_shakes();
+        crate::vram::reap(self);
         self.ents.retain(|e| !e.removed);
     }
 

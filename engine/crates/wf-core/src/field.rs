@@ -275,6 +275,9 @@ pub struct Field {
     /// a script's `warp_fade` whose host nests the load's on-enter script (`nest_load` at the fade's load)
     #[serde(default)]
     pub nest_fade: bool,
+    /// the object tile allocator (vram.rs)
+    #[serde(default)]
+    pub vram: Option<crate::vram::VramState>,
     /// the frame the 3D map's fade-in ended (the flyer runs the next frame although the warp's event still holds)
     #[serde(default)]
     pub fade_end: u32,
@@ -425,6 +428,7 @@ fn new_field() -> Field {
         on_enter_queued: false,
         nest_load: false,
         nest_fade: false,
+        vram: Some(crate::vram::VramState::default()),
         fade_end: 0,
         defer_objects: false,
         pending_objects: None,
@@ -613,6 +617,14 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
     w.scene.dest_label = None;
     // every object goes; the players are re-created below (same entity ids)
     let players = w.players.clone();
+    // their object tiles too (the players' objects are re-created at the arrival), the HUD's and the banner's
+    // first; nothing left: re-initialised
+    crate::vram::release(w, crate::vram::Owner::Hud);
+    crate::vram::release(w, crate::vram::Owner::Banner);
+    for i in 0..w.ents.len() {
+        crate::vram::entity_gone(w, i);
+    }
+    crate::vram::load_reset(w);
     w.ents.retain(|e| players.contains(&e.id));
     w.enemies.clear();
     w.modal = None;
@@ -835,6 +847,8 @@ fn arrive(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<Dir>) {
         p.a.y = sy << 8;
         p.a.facing = facing.unwrap_or(old_facing);
         w.ents.push(crate::world::Entity { id: pid, removed: false, body: Body::Player(Box::new(p)) });
+        let pi = w.ents.len() - 1;
+        crate::vram::actor_created(w, pi);
         // the idle state is entered twice; the second draw is the idle tick that stays (intro lockstep: the
         // player's blink after the warp)
         w.rng.rand(255);
@@ -857,6 +871,8 @@ fn arrive(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<Dir>) {
         // the 3D map object's camera exists from the load, behind the flyer (3-1: the load inside s130's warp)
         crate::fieldworld::camera(w);
     }
+    // the HUD object after the players (`0x0800B854`)
+    crate::vram::hud_created(w);
     w.story.variant_byte = variant;
     w.events.push(Event::Field(FieldEvent::AreaEnter { area: to, key: a.key.clone() }));
 }
