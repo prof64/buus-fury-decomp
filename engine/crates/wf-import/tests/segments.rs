@@ -3,8 +3,9 @@
 //! with the recording's input; the verdict per segment is the first divergence.
 //!
 //! `SEGMENT=name[,name]` runs only those; `SEGMENT_VERBOSE=N` / `SEGMENT_TRACE=a..b` (wf_import::segment);
-//! `SEGMENT_STRICT=0` reports without failing. A segment is held to `"expect": {"matched": N}` in its file when
-//! present (frames that must match continuously), else to the whole recording.
+//! A segment with `"expect": {"matched": N}` in its file is a gate (N video frames must match continuously); one
+//! without it only reports (chapter work in progress). `SEGMENT_STRICT=0` never fails, `SEGMENT_STRICT=all` holds
+//! every segment to its whole recording. `SEGMENT_DIR` = another directory of segments.
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -68,14 +69,18 @@ fn segments_match_the_game() {
     }
     let Some((data, files)) = setup() else { return };
     let strict = std::env::var("SEGMENT_STRICT").map(|v| v != "0").unwrap_or(true);
+    // SEGMENT_STRICT=all: every segment must match to its end
+    let all_strict = std::env::var("SEGMENT_STRICT").is_ok_and(|v| v == "all");
     let mut failed = vec![];
     for p in &paths {
         let doc = wf_import::segment::load(p).unwrap();
         let name = p.file_stem().unwrap().to_string_lossy().to_string();
         let t = std::time::Instant::now();
         let rep = wf_import::segment::replay(&data, &files, &doc);
-        let need = doc.get("expect").and_then(|e| e["matched"].as_u64()).map(|n| n as usize).unwrap_or(rep.frames).min(rep.frames);
-        let ok = rep.compared >= need;
+        // a segment is a gate only with "expect" (chapter work in progress reports without failing the suite)
+        let gate = doc.get("expect").and_then(|e| e["matched"].as_u64()).map(|n| n as usize);
+        let need = gate.unwrap_or(rep.frames).min(rep.frames);
+        let ok = rep.compared >= need || (gate.is_none() && !all_strict);
         eprintln!(
             "segment {name}: {} video frames ({} logic), matched {} / {} | first divergence {:?} | import held {} draws {} | {} actor checks | {:.2}s{}",
             rep.frames,

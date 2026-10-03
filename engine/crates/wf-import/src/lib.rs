@@ -197,6 +197,18 @@ fn press_ring(ram: &GbaRam) -> std::collections::VecDeque<(u16, i64)> {
     v.into_iter().collect()
 }
 
+/// the IWRAM singletons the core keeps in `World.g` (they survive area loads): the path followers' re-plan phase,
+/// candy, Buu pacified, the energy sphere, Babidi's waypoint, the teleport chain, the mummy wrap slot
+fn import_globals(w: &mut World, ram: &GbaRam) {
+    w.g.path_stagger = (ram.r8(0x0300_32E5) & 7) as i32;
+    w.g.candy = ram.s32(0x0300_2FE4).max(0);
+    w.g.buu_pacified = ram.s32(0x0300_302C);
+    w.g.sphere_state = ram.r8(0x0300_32E4) as i32;
+    w.g.waypoint = ram.s32(0x0300_32EC);
+    w.g.tele_chain = ram.s32(0x0300_3228);
+    w.g.wrap_slot = ram.s32(0x0300_30BC);
+}
+
 /// the RNG state `n` calls before `s` (the generator 0x0803FAAC is invertible)
 pub fn rewind(s: [u32; 2], n: u32) -> [u32; 2] {
     let (mut a, mut b) = (s[0], s[1]);
@@ -293,6 +305,7 @@ fn build_area_entry(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner: 
     w.g.fc0 = 0;
     w.g.presses[0].ring = press_ring(ram);
     w.g.presses[0].pressed = 0;
+    import_globals(&mut w, ram);
     w.scene.song = song(ram);
     // the banner: shown by this load when the RAM has a banner object (its name id then differed from the last one)
     let banner_obj = ram.objects().iter().any(|&o| ram.r32(o) == VT_BANNER);

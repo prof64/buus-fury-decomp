@@ -22,8 +22,10 @@ cd engine && SEGMENT=ow_1_13b cargo test -p wf-import --test segments -- --nocap
 Output `data/segments/NAME.json` (one frame per line; ~250 KB per 600 frames incl. the start RAM) and
 `work/segments/NAME.ss` (the start save state, local only). Rows = the playthrough's (`tools/story_playthrough/
 record.py`). `init` = the start snapshot (`capture.snapshot`) + `keys` (input manager held keys) + `ram`
-(`{iwram, ewram}`: zlib + base64). Optional `"expect": {"matched": N}` in the file makes the test hold the segment to
-N continuously matched video frames instead of all of them (for segments that are work in progress).
+(`{iwram, ewram}`: zlib + base64). A segment with `"expect": {"matched": N}` in its file is a **gate** (the test fails below N continuously
+matched video frames); one without it only reports, so chapter work in progress never turns the suite red.
+`SEGMENT_STRICT=all` holds every segment to its whole recording, `SEGMENT_STRICT=0` never fails, `SEGMENT_DIR=dir`
+runs another directory (the recorder writes there too when it is set).
 
 **Where to start a segment:** at an **area-entry cut** — the emulator state right after the logic frame in which
 the leader appears in a freshly loaded area (fade-in not stepped yet). `segment.py cut --at area:W-A[#n]` picks it in
@@ -91,4 +93,40 @@ running script's VM thread from RAM. Use area-entry cuts; a chapter has many (ev
 
 ## 4. Proof (2026-10-02)
 
-See the table at the end (filled by the proof run).
+The story playthrough's 26,651 exact frames (New Game -> Cave of the Ancients 1-17), cut at **every** area-entry
+cut from 1-2 on and recorded again from the rebuilt emulator state to frame 26,650 (`work/proof_cuts.sh`, segments in
+`work/segments_proof/`, every re-recorded row identical to the playthrough's), imported and replayed:
+**17 / 17 segments exact to the end** (every actor, camera, fade, RNG, sounds, text, zenie), with no import note
+(RNG, leader, camera and every actor equal to the RAM right after the rebuild).
+
+| cut | start frame | frames replayed | load: RNG draws / held frames |
+|---|---|---|---|
+| 1-2 | 6,811 | 19,839 | 3 / 0 (on-enter `block_area`) |
+| 1-5 | 7,215 | 19,435 | 3 / 0 |
+| 1-3 | 7,388 | 19,262 | 11 / 0 (Yemma's office NPCs) |
+| 1-4 | 9,252 | 17,398 | 7 / 0 |
+| 1-11 | 11,999 | 14,651 | 12 / 0 |
+| 1-12 | 14,407 | 12,243 | 5 / 0 |
+| 1-13 #1 / #2 / #3 | 15,058 / 20,553 / 22,342 | 11,592 / 6,097 / 4,308 | 6 / 0 |
+| 1-14 #1 / #2 / #3 / #4 | 16,609 / 19,717 / 21,658 / 24,223 | 10,041 / 6,933 / 4,992 / 2,427 | 7 / 0 |
+| 1-15 #1 / #2 | 18,148 / 24,976 | 8,502 / 1,674 | 4, 3 / **2** (on-enter `prop_show` blocks: played by wf-core) |
+| 1-16 | 25,654 | 996 | 4 / 0 |
+| 1-17 | 26,069 | 581 | 3 / 2 (blocking on-enter) |
+
+Not importable in that span: 1-1 and 1-10 (their loads run inside an event: the prologue's and s061's warps) —
+`segment.py cuts` flags such cuts, and
+loads that are not an exit's arrival (a script warp / save load: leader idle, another fade object) as not importable
+yet. One rule found on the way: the path followers' re-plan phase (`0x030032E5`,
+`World.g.path_stagger`) survives loads; without it the Grand Kai's planet fighters drift 1/256 px within 300 frames.
+
+Regression set in `data/segments/` (`cargo test -p wf-import --test segments`, ~0.1 s each): `ow_1_12` (plain exit),
+`ow_1_15` (blocking on-enter script + the boss), `ow_1_17` (blocking on-enter). They carry `"expect"` (gates); add it to a
+chapter segment once it matches.
+
+## 5. Next (mid-area import)
+
+Importing at an arbitrary frame needs, from RAM: every object's state (enemy AI stacks and node runtimes, patrol
+runners, path followers, projectiles / effects, pickups and their timers, breakables' HP, NPC behaviour runners), the
+trigger list's touch / once state, a running event's script thread (VM frames, waits, the director's queues), and the
+camera controller / screen-effect objects. The current area-entry import is the base for it: rebuild the area, then
+overwrite the objects from RAM and check the next frames.
