@@ -521,6 +521,6 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
         .map(|o| (o.1, stamp, a.e[a.idx[(o.0 >> 1) as usize & 511] as usize].size as i32 * 64))
         .collect();
     if let Some(f) = w.field.as_mut() {
-        f.vram = Some(VramState { a, owners, shared_rc, suspended: vec![], hud_out: vec![], popups: vec![], keyed: vec![], stashed: None, delayed: vec![], objs, susp: vec![], late: vec![], shadow_set: vec![], popup_at: vec![], pass_at: 0 });
+        f.vram = Some(VramState { a, owners, shared_rc, suspended: vec![], hud_out: vec![], popups: vec![], keyed: vec![], stashed: None, delayed: vec![], objs, susp: vec![], shadow_set: vec![], popup_at: vec![], pass_at: 0 });
     }
 }

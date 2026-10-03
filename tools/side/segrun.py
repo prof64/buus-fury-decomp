@@ -12,7 +12,8 @@ dirs = [a for a in sys.argv[1:] if not a.startswith('--')]
 tot = ok = 0
 for d in dirs:
     env = dict(os.environ, SEGMENT_DIR=str(Path(d).resolve()))
-    r = subprocess.run(['cargo', 'test', '--release', '-p', 'wf-import', '--test', 'segments', '--', '--nocapture'],
+    r = subprocess.run(['cargo', 'test', '--release', '--target-dir', str(ROOT / 'engine' / 'target-side'), '-p', 'wf-import', '--test',
+                        'segments', '--', '--nocapture'],
                        cwd=ROOT / 'engine', env=env, capture_output=True, text=True)
     for line in (r.stdout + r.stderr).splitlines():
         m = re.match(r'segment (\S+): (\d+) video frames \(\d+ logic\), matched (\d+) / \d+ \| first divergence (.*?) \| import', line)

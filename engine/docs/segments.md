@@ -293,6 +293,46 @@ with the allocator check off (`SEGMENT_VRAM=0`): the enemy object missing at f21
 through the three phases (Kid Buu's AI / attacks, the Spirit Bomb sequence, the script hand-overs, Uub). The Super
 Buu agent keeps the sprite-memory / allocator side of that cut (free-list order, unmodelled tile users).
 
+**Kid Buu fight (agent A, 2026-10-03): `sb_041` 22,111 -> 64,758 / 66,219 with `SEGMENT_VRAM=0`** - all three
+phases, both hand-overs, the two countdown minutes, the Spirit Bomb's gauge and the end of the fight are exact; the
+cut now stops on the world map after it (0-50, f64758: song 4 one frame late, three patrols 0.1 px off - map /
+cutscene timing, not the fight). `sb_042` (the same recording from 21-26) 64,630 / 66,091. The "missing enemy" of
+f21479 was the Super Buu agent's `last_copy` rule (above), not the hand-over. Rules, in the order found (battle rules
+also in `site/src/battle/rulesets/buu`, dumps regenerated; cross_ts, both lockstep suites green):
+* **The bench recovers** (0x0800E25C, in the form controller's regen tick: +0x6E a pass frame, at 0x10000): besides
+  the leader's 3% EP, every OTHER character record (0 .. 8) gets 5% of its maximum EP and HP (`max * 0xCCD >> 16`,
+  clamped). Vegeta is at full HP when s-script hands him the fight (f2874: 5634 -> 5739).
+* **`set_character` starts the new controller's regen count at 0** (the tick after a hand-over comes 596 free pass
+  frames after the event: f26559 -> f27154).
+* **Kid Buu's copy is created on the pixel** of the 24.8 position - d (no sub-pixel part); the original keeps +d.
+* **Merge** (0x08032E00): the midpoint of the two 24.8 positions, taken only if the footprint there is free on the
+  enemy grid *as it stands* (0x08009904, both marks on it: two halves on the same tiles merge in place); two puffs
+  with random rates (two rand(0x1000)); the absorbed copy leaves the grid.
+* **A countdown switched on counts in the frame it is set** when that is the event's last instruction (its object's
+  first update: 3600 reads 3599 in the event's exit frame; hook #9 runs 3599 frames later); one that is already on
+  (at 0 after its hook) is only set (`Timers.fresh`).
+* **The BG sphere effect keeps redrawing under the power gauge** (117 rand(4) a frame: the gauge's loop runs the
+  world update). Harness: a power gauge that ended inside a world frame does not take a lag frame as a step of its
+  own (the script's 9 lag frames after the Spirit Bomb's gauge, f61646 .. f61654).
+
+**For the Super Buu agent (allocator), from the Earth agent (2026-10-04): the 3D world map's load.** Cut
+`work/earth/segs/x_blast31.json` (Earth master frame 20,623: 4-1 #2 -> fly over the world map -> 3-1; exact to its
+end with `SEGMENT_VRAM=0`, 3,200 frames) diverges on the allocator at f490, right after the load of 0-50 (fade-out
+ends f473, load f474): ours has the 15 blocks at 273..512, the game has the same 15 blocks (sizes 60, 16, 1, 1,
+16 x 3, 1, 16 x 6... in the same order) at 76..315 **plus a 197-unit block at (315, 197)**, the top of the pool.
+So the 3D map's load takes 197 units (12,608 bytes) first - the mode-7 / flyer graphics - and everything else is
+allocated below it. `e_3_14_5` (re-cut, 8,183 frames) stops the same way at f624 with game-only `(471, 4)`.
+Both cuts are not gated because of this.
+
+Real route (`work/ship/sb`: `k05_vegeta150` + `m_kid_buu` / `m_kid_buu_punched` / `sbk_kid_buu` key logs, joined
+with `tools/dungeons/joinkeys.py` + `mkrun.py`, 80,115 frames, replays to the end): its fight is **not cut** - every
+area entry from 14-1 to the world map after the fight is inside an event (the flight and s480's warp into 19-3), so
+`rec_segments.py` finds no importable entry; only the ending's `4-20` cut comes out (exact, 1 / 1). The fight rules
+above are verified on `sb_041` only. Not done: Broly's breaking rock (rock states 2 .. 4 answer message 0x22 with
+blocked before the chase step and free after it - needs the rock's break animation, which our rock does not have).
+Seen on the way, not mine: `wf-app` test `carried_state` (untracked, the app-soak agent's) expects a load to reset
+the regen count; `field::renew_player` still carries it.
+
 ## 7. Side content (owner: the side-content agent, from 2026-10-02)
 
 **Ownership change (coordinator):** HFIL / Janemba (incl. the Janemba -> Super Janemba handover in the field), Broly
@@ -544,6 +584,33 @@ Trunks 165 there; real: 126 / 120 / 100 / 117 / 81). Gotenks' two fights cannot 
 point (Goten and Trunks were last free on the world map before s017); 20-4's gate wants Gohan at 140 and s473 Goku
 at 140 - both can still level (Ultimate Gohan has the world map from 8-1; Goku the Wasteland).
 
+### How to replay the real run
+
+The whole real playthrough from the ship chapter's start to the title screen after the credits is committed as 73
+packed key logs, `data/realrun/NNN_<name>.keys.gz` (gzip of JSON `[[keys, count], ...]`, one entry per run of equal
+frames) + `data/realrun/manifest.json` (per stretch: chapter, frames, the game status at its start and end);
+1,465,272 frames in all. `tools/segments/realrun.py`:
+
+* `realrun.py rebuild OUTDIR [FIRST.ss]` - one emulator, the logs in order from the first state (default
+  `work/ship/real4/start.ss`, the ship route's start: Papaya Island 7-1 after the Earth chapter's real end);
+  `OUTDIR/NNN_<name>.ss` at every stretch end, each checked against the manifest. Any checkpoint of the tables above
+  is the end state of the stretch of the same name (or a mark inside it: replay that stretch's log up to the frame
+  count given in the table).
+* `realrun.py pack` - what wrote the logs: every stretch replayed from its local start state until the game is in
+  its local end state (status + logic frame counter + player pointer); the valid length of each key file is found
+  that way, not taken from notes. Run it again after adding a stretch to `CHAIN`.
+* `realrun.py runs OUTDIR` - one `rec_segments.py` run directory a stretch (what `scoreboard.py cut` uses).
+
+Nothing but key presses goes in: no RAM write, no save edit. The stretches that begin "punched" replay the punches
+that shifted the RNG; a failed attempt's keys are not in the logs.
+
+### Scoreboard
+
+`engine/docs/scoreboard.md` (+ `data/realrun/scoreboard.json`): the real run cut at every importable area entry and
+replayed on wf-core - per chapter and overall: segments / exact, frames / matched, and every non-exact segment's
+first divergence with a category. One command after an engine change: `.venv/bin/python tools/segments/scoreboard.py`
+(builds into `engine/target-route`); the cuts (`scoreboard.py cut`, hours of emulation, ~GBs) stay under `work/real/`.
+
 **Dungeon agents, note:** `re/buu/ship/ship_driver.py` (the base of your drivers) changed on 2026-10-03 - Ghosts
 are no longer hunted (blasted / punched only when visible and in the way), a Vampire's grab is mashed out of, the
 flame guard has a wider line and falls back to a guard (R), `walk` takes the free axis at a wall corner, `nav` taps A
@@ -764,14 +831,30 @@ added to tools/emu). How the input landing is decided:
     Dungeons: db7_023 (14-20) still closes later in the game than the model's 17 frames by more than 100 k
     cycles - its reload does something these four maps do not (to profile with `leaveprof.py`; its owner's cut).
     Other transitions (shops, save points, the map screen) keep their constants.
-  - db7_023 (14-20) profiled (`leaveprof.py` with a cycle window, `leave.py`): the map part matches (3,775,747
-    measured / 3,775,222 model) but the iteration is 137 k cycles longer than the model (4,134,645 vs 3,997,721
-    before the mixes; 18 frames, model 17). Cause: the restore re-decompresses the current sprite frame of every
-    on-screen actor (caller 0x0803D983; every sprite frame is its own stream) - the player's 512-byte frame is the
-    "character stream" in the constant, here also two Super Bio Mechs (1,024 bytes, 21.6 k + 20.4 k) - and runs an
-    IWRAM routine at 0x03000C80..0x03000F40 on them (~51 k for the two: their palette remap, def `remap_table`).
-    That is 93 k of the 137 k; the rest is not located. NOT MODELLED YET: needs `decode_cycles` per sprite frame in
-    `sprites/*/sprite.json` (frame records are `AnimStep.rom`) and the on-screen actors' current frames at the close.
+  - **Reload model, second pass (2026-10-04; supersedes the constants above)**, from windowed profiles of
+    db7_023 (14-20), db5_019 (12-26), ship 8-6 (`leaveprof.py SEG FRAME N OUT WIN_A WIN_B`):
+    - every on-screen actor's current sprite frame is decompressed again (caller 0x0803D968; each OBJ piece of a
+      frame is its own stream). The extractor writes it per animation step (`sprites/*/sprite.json`
+      `decode_cycles`, `AnimStep.dec`); a sprite with a palette remap table uses the remapping decoder
+      **0x03000CA0** (the same walk, each literal through the table: `deccost::decode_cycles_remap`). The player's
+      frame was the "character stream" (model 14,266 / 17,036 / 13,328 / 15,109 vs measured 14,330 / 17,100 /
+      13,332 / 15,173). ~4 k of upload per actor; an on-screen item on the ground 13.9 k (two 16 x 16 pictures).
+    - the listed tiles' copy to VRAM: ~375 cycles per tile (`reload.tiles`; 0x03000700 + 0x08009C00, 275 + 98).
+    - a layer of at most **4 chunks** (not 2 x 2: 12-26's 3 x 1 layers) is loaded whole; the minimap is in `fixed`.
+    - rest = 116.8 k (START) / 103.1 k (a prompt's close) + 375 x tiles + 5 k per windowed chunk + the actors.
+    - the game starts a song only when another one is playing: an area change inside the same music does not
+      restart the sequencer (`sndsim::apply_events`; sb_029's mixes were 376 k against the game's 545 k).
+    - the restore's camera update also steps the screen shake (a heal menu opened mid-shake: db5 12-25), and
+      shows a frame earlier when the iteration's last sound update runs over a VBlank (`Menu.leave_cam`).
+    Model vs emulator before the mixes: 14-20 4,130,102 / 4,134,645; 12-26 7,327,571 / 7,323,767; 8-6 4,717,839 /
+    4,718,284; 8-3 7,214,815 / 7,206,820 and 7,338,364 / 7,352,918; 12-19 4,366,668 / 4,348,292 (the worst: +18 k;
+    db5_014 ends 10 k before a frame boundary in the game and is the one known miss). What is left in the error:
+    the prompt-close's start (17-31 k after the VBlank, cause not found) and ~+-10 k per map.
+    Sweep with the model (copies with `snd_phase`, `work/earth/bin/sweep.sh DIR OUT`): dr1 20 / 22 (dr1_004 /
+    dr1_018 stop at a missing object, not timing: f447 / f7981), dr2 17 / 17, dr3 28 / 28, dr4 72 / 72, db5 38 / 40
+    (db5_014 above, db5_006 f1030 an actor's position), db6 37 / 37, db7 40 / 41 (db7_023 passes its menu, then
+    f1278 RNG); ship menu list 29 / 30 (shipr_266 f5973: a screen shake resuming after a heal menu opened while
+    hurt - the shake's phase, not the close).
   - Tools (`work/earth/timing/`): `sndlog.py` (driver / DMA / redraw log), `timeline.py`, `cmp_core.py` (core
     decisions vs the game), `fit_base.py`, `prof.py` (per-bucket cycles of a redraw), `decmeas.py` / `decmodel.py`
     (decompressor), `mkvariant.py` (a segment with other keys), `mkshipstate.py` (savestate of a ship route cut).
@@ -805,10 +888,21 @@ page's own cycles built from its draw list; opt-in as before (`init.snd_phase`),
 * **Journal**: 184,670 + 882 per line + 3.767 per instruction, enter 188,273 (36 redraws of three scenarios: std
   1.5k, max 6k on the empty list). **Options**: 232,905 + generic, enter 100,222 (51 redraws: std 0.7k, max 1.7k).
   Their idle step is not measured yet (the status value is used).
-* Not modelled yet (constants kept; measurements in `work/buu/menu/cycles/`): Equip, Skills, Shop, Save - their
-  redraws have sub-states (compare panels, popups, quantity / confirm boxes) the per-page fit does not separate
-  (residuals 20k .. 40k); Switch Character's redraw is 2 frames with > 70k margin (own 350k .. 390k, end 415k ..
-  490k against 562k), its first iteration 3 (651k + post = 783k against 842k).
+* Alignment for the fits: the `menu redraw` log line carries `mfN` (video frames stepped by menu screens so far);
+  `cycles_fit.py` pairs a model redraw with the measured iteration at mf + the scenario's constant offset (pairing
+  in order drifted wherever a constant frame count differed from the game's - the earlier 20k .. 40k residuals of
+  Shop / Skills were that, not sub-states). `--layers` prints each layer's generic cycles / lines / glyph
+  instructions, `GROUPS=n` groups a page's rows by draw-list signature, `FIT=0,2,3` restricts the regressors.
+* **Shop** (buy / sell lists, quantity and confirm boxes alike): 185,539 + 2,162 per line + 3.648 per glyph
+  instruction (111 redraws of four scenarios: std 2.2k, max 4.8k). **Skills**: 146,570 + 4.541 per instruction,
+  enter 129,107 (54 redraws: std 0.6k, max 2k); its popup draws its own surface only: first iteration 239,500 +
+  list + 0.063 per instruction, redraw 129,600 + list + 0.567 per instruction (two popups, exact on the six
+  measured). **Equip**'s dialog (Equip / can't-equip over the list): its surface only, 118,700 + list + 0.3 per
+  instruction, the first time + 66,400 (34 iterations within 1k).
+* Idle steps (`cycles.py --all`): Journal 2,784, Options 4,524, Inventory 3,240, status 4,221 .. 4,579.
+* Still on constants: the **Equip page** itself (its redraws carry one-time costs when a slot's list opens, ~+135k,
+  and closes, ~+97k; base ~267k + list: rows in `work/buu/menu/cycles/equip_*.json`, not separated yet), **Save**
+  (2 + 2 iterations measured: too few), Switch Character's own redraws (fixed 360,000: always 2 frames).
 * Script-opened screens (Switch Character / save / shop): the fade-out's hold frame (level 256) does not ease the
   field cameras (one step too many before; the world restore's step at the close stays), and their close takes the
   pause menu's reload time (`sndsim::reload_frames`, was only used for `PAUSE`): save-point cuts 8-1 / 8-26 / 7-2
@@ -828,6 +922,16 @@ page's own cycles built from its draw list; opt-in as before (`init.snd_phase`),
   frames. The ending cut `sb_044_04_20` with `snd_phase`: all 40 pages right, page 74 takes 1 frame (margin 1,477
   cycles: counted as NEAR); it now runs to f24,056 of 24,101, where the game is back at the title (area 0-2) and
   ours loads 1-1.
+* Gates using the models (`init.snd_phase` in the data file): `sb_030_21_14` (gate 490 -> 746, its end),
+  `sb_044_04_20` (23,962 -> 24,056: all 40 credit pages; page 74's decision has 1.5k cycles of margin), new
+  `shipr_056 / 063 / 172 / 227 / 281 / 312` (status, inventory + Use dialog, Switch Character + its close) and
+  `db2_013_11-23 / db2_015_11-23` (dungeon heal menus). Of the 400 other gated files only `sb_029_21_13` changes
+  with `snd_phase` (688 < its gate 703: left without it until the sound state after its area change is right);
+  the rest are cut before any menu. `tools/segments/set_gate.py FILE N [HEADER_SRC]` rewrites a gate.
+  Earth cuts with the models: 91 / 95 (`work/earth/segs`; `e_3_3_4` f3569 is the pause close on map 3-2 - 43 black
+  frames, the reload model one short; the other three are not menus).
+* A dead thrower's bomb bursts without a blast message (`shots::bomb_update`'s field branch skipped `hit`'s
+  owner test): real route 2-10 `shipr_004` f299, the bomber punched out while its bomb was in the air.
 * Ship route with the models (the six save-point cuts got `snd_phase` too): **333 / 338 exact** (was 301). Left:
   `shipr_236` (pause close, camera at the reload), `shipr_328` from f18,226 (a later menu), `shipr_266` f6007 (a
   hurt animation cel right after the menu: a field divergence the menu no longer hides), `shipr_002` (crowd /
@@ -969,6 +1073,48 @@ two Python hash seeds, gives identical key logs (13,000 frames); the earlier run
     (splat) is set - both are only written by a hit (0x0800FC66) and are *uninitialised* heap memory before the
     first one (0xF0 / a stale pointer here), so a never-hit enemy's slide after a grab depends on the heap's
     history.
+* **Re-cut from the REAL route (2026-10-03, later).** `tools/side/real_record.py` records each leg of the real
+  Janemba saga (§8's table: `work/ship/jan/<checkpoint>.ss` + its key log; nothing re-played) as a master
+  `work/side/seg/rj_<leg>.json` and cuts it into `work/side/rseg/<leg>/rj_<leg>_NNN_W_A.json` (`mkcuts.py --prefix`:
+  the cut states `work/segments/<name>.ss` are shared by name - plain `sb_...` names from two masters overwrite each
+  other, which silently breaks emulator probes of the older cut; `hfil_record.py` now names its cuts `hf_<leg>_...`).
+  Legs: yemma, hfil, switch, maze, punched, statues, vegeta, back1, veg0, h13, arena0, arena, gogeta (the three level
+  grinds goku90 / goku120 / veg1 only on request). `tools/side/segrun.py DIR...` prints the non-exact cuts.
+  46 cuts, `SEGMENT_VRAM=0`: 40 exact (run with `--target-dir engine/target-side`: `segrun.py` does); 4 are mid-area cuts the importer refuses (0-51 -> 18-1 through the map
+  screen, 18-2's switch scene); 18-13 stops at f1470 (fade after the save-point menu); the arena (18-14, 6,940
+  frames) matches 3,988 (Janemba, s450 exact; open: Vegeta vs Super Janemba, `hp: 1267 vs game 1266`). Legs without an area entry (yemma, punched, vegeta, veg0, arena0, gogeta) have no importable cut
+  yet - they start mid-area.
+  The real Goku IS selectable in the switch menu at 18-13 (j10_arena: four LEFT) - the constructed start state's
+  greyed-out Goku is its own artefact.
+* Rules from the real cuts:
+  - A breakable bound to a non-solid prop takes hits (18-10's boulder: the breakable's prop 13 is hidden and not
+    solid, the solid prop 12 lies over it): the punch plays the hit sound and shakes the screen (15, 75).
+  - A breakable's callback runs from inside the breakable's own update as a nested loop of the game. A callback
+    that waits for a track command (the boulder's `puff_at`) takes frames: the loop's frames have no object pass
+    (f202: only the puff's draw); in the frame its wait ends the interrupted pass goes on - the enemies make a held
+    update (animation + controller, no AI), the players run (f203: the punch ends, one draw) - and the frame after
+    the enemies' animations tick twice. One-frame callbacks (loot scripts) are unchanged (sb 21-11).
+  - Janemba: the arm's strike animation starts with its controller on the node's first update (was one frame
+    early, not checked: parts); a killing punch that cuts a strike starts no next one (all three parts end the hurt
+    animation in the defeat scene: three draws).
+  - A script's `shake` suspends the running shake before that one ticks in the frame (s450 after a crit kill: the
+    crit shake resumes 60 frames later with 11 frames and count 2 left: draws every second frame from the second).
+* The 1/1024 px camera difference (18-2 / 18-1 after the character switch, `hf_veg1_013/014`): the save point's
+  Switch Character screen closes over 22 frames with the logic counter stopped; in its LAST frame the game's camera
+  already makes one step toward the new character (160773 -> 160772, then one unit a frame), ours a frame later.
+  This is the menu-close model (the Earth / ship-fixes agents' "cameras ease through close"), not a field rule -
+  left to them.
+* **18-8 f340, not modelled - what exactly is read** (`work/side/hseg/sb_025_18_08`, Nosferatu = enemy object
+  0x0203DBB0): KnockbackSlide's update 0x08018A92, when the slide's step does not fit (0x08018B70..), reads the
+  enemy's "last hit was critical" word at object +0x294 and "last hit was attack sub 3" word at +0x298; either
+  non-zero -> it sends the wall-splat hit message and ends the slide (returns 1), both zero -> the slide goes on.
+  Both words are written only by a hit that lands on the enemy (0x0800FC66 / 0x0800FC78, after ComputeDamage);
+  the enemy's constructor does not clear them. This Nosferatu was never hit: at the cut's start +0x294 = 0x000000F0
+  and +0x298 = 0x0203DF54 (a heap pointer left by the block's previous owner), VampireGrab's exit (0x08033B02)
+  then zeroes +0x294 at f339 and leaves +0x298 = 0x0203DF54. So the blocked slide of f340 ends at once with a splat
+  message, where a zeroed object (ours) slides on (ours moves 0.47 px, the game's stays). The value is whatever
+  the allocator's block held before: no deterministic rule short of modelling the heap; a cheap approximation
+  ("never-hit enemies behave as splat-hit") would be a guess - one sample. Left as is.
 * **For the Super Buu agent (OBJ tile allocator, `vram.rs` - not changed by the side-content agent):** in
   `work/side/hseg/sb_000_18_02` (HFIL 18-2) the Janemba Hand (type 0x39, 0x400 tile bytes, block (439, 16)) is
   killed by a punch at f128. The game's allocator row of that frame still has (439, 16) used and nothing new:
@@ -1452,3 +1598,21 @@ earth_all.json --sync 1-1 --show 137040..137060`.
 Not done from the coordinator's list: the playthrough test on `StoryHost`; the emulator trace of the damage
 remainder field (candy respawn, set_character); ship / dungeons / post-ball in the app; row 33,189; the "original
 pacing" presentation mode.
+
+**§11 update 4 (B).** *2-90 stop (row 137,054) - fixed, carried state again:* the **form controller (player +0x22C)
+is a new object after a load**: its regen count (+0xC) and Super Saiyan drain fraction start at 0. Evidence: the
+count is 0 in the start RAM of all 412 gated cuts (`work/db57/scratch/regen.py`); `Field` carried both, and a drain
+fraction left from an earlier transformation made Gohan's Super Saiyan run out 9 frames late in 2-90, so a hit the
+game takes missed (flag 281 / the RNG followed from that). `field.rs` (the player rebuild no longer copies
+`regen_timer` / `ss_acc`). The chained soak now follows the real route for **139,937 rows** (through Goten's rock
+drill and the Super Saiyan Goten fight into 4-25).
+*Regression tests* (no soak needed): `crates/wf-app/tests/carried_state.rs` - the host mark after the title's New
+Game; a load resets the hit-damage remainder, the regen count, the drain fraction and a pending script fade-in;
+`set_character` takes the new character's own skill slot.
+*Next stop (Earth agent - a control rule, not carried state):* 4-25 (gravity chamber, Trunks vs Vegeta), row
+139,937: Trunks' one-shot state (`once`, raw from a hit) ends into idle on row 139,936 with RIGHT+DOWN already held,
+facing left; the game is in `walk` on 139,937 (and has moved on 139,938), the app turns first (idle, facing 3) and
+walks a frame later. No segment covers it (4-25 is entered by a script warp). Reproduce: `soak opening.json
+earth_all.json --sync 1-1 --frames 139945 --show 139930..139940`.
+*Row 122,530 (app 39 vs the row's 201 HP in 2-8)* - not traced; areas, flags, position and RNG stay equal through it.
+*Builds:* cargo commands for this work use `--target-dir engine/target-soak`.

@@ -233,8 +233,7 @@ pub fn breakable_message(w: &mut World, k: usize, msg: &mut HitMsg) -> bool {
     let bx = b.bx;
     let id = w.ents[k].id;
     let rate = 0x1000 + w.rng.rand(0x1000);
-    let boom = crate::fx::explosion(w, (bx[0] + bx[2]) >> 1, (bx[1] + bx[3]) >> 1, rate);
-    crate::vram::linger(w, boom);
+    crate::fx::explosion(w, (bx[0] + bx[2]) >> 1, (bx[1] + bx[3]) >> 1, rate);
     let at = w.frame + 16;
     if let Some(f) = w.field.as_mut() {
         f.deferred.push(Deferred::Break { at, entity: id });
@@ -320,6 +319,7 @@ fn break_done(w: &mut World, id: EntityId) {
             // (segment sb 21-11)
             f.queued_event = true;
             f.break_event = frame;
+            f.break_cb = true;
         }
     }
 }
@@ -638,17 +638,25 @@ fn spawn_debris(f: Option<&mut Box<crate::field::Field>>, cx: i32, cy: i32) {
 
 /// the chips' motion (+1 / +2 per frame on the velocity, INFERRED as acceleration away from the centre and down)
 pub fn debris_step(w: &mut World) {
-    let Some(f) = w.field.as_mut() else { return };
-    for d in f.debris.iter_mut() {
-        d.x += d.vx;
-        d.y += d.vy;
-        d.vx += d.vx.signum();
-        d.vy += 2;
-        d.t += 1;
+    // (the frame a break's callback event takes: no object is updated, see fx::update)
+    if w.field.as_ref().is_some_and(|f| f.busy && f.busy_pre_pass == w.frame && f.busy_since + 1 == w.frame) {
+        return;
     }
-    // a chip object lives 2 updates past its 32 shown frames (its shared tiles: segment sb 21-5)
-    let gone = f.debris.iter().filter(|d| d.t >= 34).count();
-    f.debris.retain(|d| d.t < 34);
+    let twice = w.field.as_ref().is_some_and(|f| f.break_owed == w.frame);
+    let Some(f) = w.field.as_mut() else { return };
+    for _ in 0..1 + twice as i32 {
+        for d in f.debris.iter_mut() {
+            d.x += d.vx;
+            d.y += d.vy;
+            d.vx += d.vx.signum();
+            d.vy += 2;
+            d.t += 1;
+        }
+    }
+    // a chip object lives 32 updates, the first one in the frame after the hit (its shared tiles: segments sb
+    // 21-11 f252, and sb 21-5 f569 with the held frame)
+    let gone = f.debris.iter().filter(|d| d.t >= 33).count();
+    f.debris.retain(|d| d.t < 33);
     for _ in 0..gone {
         crate::vram::keyed_release(w, crate::vram::KEY_DEBRIS);
     }

@@ -3494,6 +3494,7 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
     }
     let before = pr(w, i).rec.hp;
     let lost = if dmg > 0 && before > 0 { p(w, i).hp_acc.take(dmg) } else { 0 };
+    if std::env::var_os("WF_DBG_MSG").is_some() { eprintln!("  t-msg accepted frame {} dmg {} before {} lost {} blocking {} gs {:?}", w.frame, dmg, before, lost, blocking, pr(w, i).gs); }
     // 0x0800E8E6 runs for every accepted hit, 0 damage included: the 12-frame flash restarts
     p(w, i).a.flash = 12;
     if dmg == 0 || before == 0 {

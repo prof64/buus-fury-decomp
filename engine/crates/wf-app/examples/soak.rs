@@ -184,7 +184,7 @@ fn main() {
             }
         }
         if show.is_some_and(|(a, b)| a <= k && k <= b) {
-            let pl = w.player_idx(0).map(|pi| w.pl_ref(pi)).map(|p| (p.a.x, p.a.y, p.a.facing, p.gs.name(), p.rec.hp, p.rec.ep, (p.form, p.ss_gauge, p.ss_acc, p.ss3_gauge, p.ss_cooldown, p.regen_timer, p.ep_acc)));
+            let pl = w.player_idx(0).map(|pi| w.pl_ref(pi)).map(|p| (p.a.x, p.a.y, p.a.facing, p.gs.name(), p.rec.hp, p.rec.ep, (p.form, p.ss_gauge, p.ss_acc, p.ss3_gauge, p.ss_cooldown, p.regen_timer, p.story_cnt)));
             println!("row {k} keys {keys:x} app {pl:?} busy {:?} depth {} | game p {} hp {} depth {}", w.field.as_ref().map(|f| (f.busy, f.nested, f.held, f.held_event)), w.scene.depth, r["p"], r["hp"], r["depth"]);
         }
         if let Some(gr) = r["rng"].as_array() {

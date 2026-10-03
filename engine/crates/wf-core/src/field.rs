@@ -250,6 +250,14 @@ pub struct Field {
     pub break_event: u32,
     #[serde(default)]
     pub break_modal: bool,
+    /// a breakable's callback event is running (set when it is queued, cleared when the event ends)
+    #[serde(default)]
+    pub break_cb: bool,
+    /// the frame in which the effects and debris chips get the second update of the callback's last frame: the
+    /// nested loop's pass and the rest of the interrupted pass both update the objects older than the break's
+    /// timer object (VERIFIED segment sb 21-11: f236 no update, f237 the chips' update `0x0800C4A6` twice)
+    #[serde(default)]
+    pub break_owed: u32,
     /// the frame after the resumed pass: the enemies' animations tick once more before their update
     #[serde(default)]
     pub break_extra: bool,
@@ -467,6 +475,8 @@ fn new_field() -> Field {
         queued_event: false,
         break_event: 0,
         break_modal: false,
+        break_cb: false,
+        break_owed: 0,
         break_extra: false,
         held: false,
         held_event: false,
@@ -700,7 +710,6 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
         v.popups.clear();
         v.popup_at.clear();
         v.delayed.clear();
-        v.late.clear();
         v.shadow_set.clear();
         let keys: Vec<u32> = v.keyed.drain(..).map(|k| k.0).collect();
         for k in keys {
@@ -2038,6 +2047,9 @@ pub fn set_busy(w: &mut World, busy: bool) {
         }
         if !busy && f.busy {
             f.event_ended = true;
+            if std::mem::take(&mut f.break_cb) {
+                f.break_owed = frame + 1;
+            }
             if f.held_event {
                 f.held_event = false;
                 f.resume_held = true;

@@ -2206,7 +2206,11 @@ fn bomb_update(w: &mut World, i: usize) {
             let (owner, dir) = (s.owner, s.dir);
             let stats = w.find(owner).and_then(|oi| w.actor(oi).map(|a| a.stats)).unwrap_or_default();
             let mut m = HitMsg { team: 2, rect: r, dir, mult: 1024, atk: atk(1), attacker: owner, att_stats: stats, att_is_player: false, source: w.ents[i].id, crit: false, raw: 0, dmg: 0, no_react: false, foot: false };
-            broadcast(w, &mut m, true);
+            // a dead thrower's bomb still bursts but hits nobody (as `hit`: real route 2-10, the bomber punched out
+            // while its bomb is in the air - the blast beside the player does nothing)
+            if !owner_dead(w, owner) {
+                broadcast(w, &mut m, true);
+            }
         } else {
             hit(w, i, r, atk(1), 1024, true);
         }

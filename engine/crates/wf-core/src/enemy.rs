@@ -1452,6 +1452,7 @@ pub fn align(w: &mut World, i: usize, speed: i32) -> bool {
 // ---- attacks -------------------------------------------------------------------------------------------------------
 
 fn msg_from(w: &World, i: usize, team: u8, rect: Rect, dir: Dir, mult: i32, a: AttackType) -> HitMsg {
+    if std::env::var_os("WF_DBG_MSG").is_some() { eprintln!("  t-msg frame {} en {} rect {:?} dir {} facing {} body {:?} players {:?}", w.frame, i, rect, dir, w.actor(i).map(|x| x.facing).unwrap_or(9), w.actor(i).map(|x| x.body_box()), player(w, i).map(|p| { let x = &w.pl_ref(p).a; (x.hittable, x.body_box(), x.foot_box(), w.pl_ref(p).gs) })); }
     let id = w.ents[i].id;
     HitMsg { team, rect, dir, mult, atk: a, attacker: id, att_stats: w.actor(i).map(|x| x.stats).unwrap_or_default(), att_is_player: false, source: id, crit: false, raw: 0, dmg: 0, no_react: false, foot: false }
 }

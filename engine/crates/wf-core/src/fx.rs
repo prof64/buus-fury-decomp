@@ -233,6 +233,24 @@ fn rock_land(w: &mut World, i: usize, owner: EntityId, x: i32, y: i32) {
 }
 
 pub fn update(w: &mut World, i: usize) {
+    // a broken breakable's timer object (the list's newest when it fires) starts its callback's event inside its
+    // update, and the event takes the rest of the frame: the older objects are not updated (VERIFIED segment sb
+    // 21-5 f552: the break's puff `0x0802A8AA` is not called that frame and so lives one frame longer; the player's
+    // skip is player.rs's)
+    if w.field.as_ref().is_some_and(|f| f.busy && f.busy_pre_pass == w.frame && f.busy_since + 1 == w.frame) {
+        return;
+    }
+    // ... and in the callback's last frame they are updated twice (field.rs `break_owed`)
+    if w.field.as_ref().is_some_and(|f| f.break_owed == w.frame) && matches!(&w.ents[i].body, Body::Fx(f) if matches!(**f, Fx::Anim { .. })) {
+        update_one(w, i);
+        if w.ents[i].removed {
+            return;
+        }
+    }
+    update_one(w, i);
+}
+
+fn update_one(w: &mut World, i: usize) {
     let f = match &w.ents[i].body {
         Body::Fx(f) => (**f).clone(),
         _ => return,
