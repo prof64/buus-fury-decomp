@@ -1314,7 +1314,10 @@ pub fn set(h: &mut CoreHost, var: u8, v: i32) -> Result<(), String> {
             let ss = h.w.data.form(h.w.pl_ref(i).form).map(|f| (f.ss, f.ss3)).unwrap_or((false, false));
             let p = h.w.pl(i);
             match var {
-                12 => p.rec.hp = v.clamp(0, p.rec.max_hp),
+                12 => {
+                    wf_core::player::script_set_hp(h.w, i, v);
+                    return Ok(());
+                }
                 13 => {
                     p.rec.max_hp = v;
                     p.rec.hp = v;

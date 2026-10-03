@@ -24,6 +24,11 @@ use wf_view::{MenuFont, MenuView};
 /// video frames one redraw of the page / the dialog takes (measured: `re/buu/menu/timing.py`)
 pub const REDRAW_FRAMES: u8 = 4;
 pub const DIALOG_FRAMES: u8 = 2;
+/// the timing model (sndsim.rs): the list redraw's constant part, the page's enter, the dialog's enter + surface
+const LIST_CYCLES: i64 = 210_710;
+const ENTER_CYCLES: i64 = 142_026;
+const DIALOG_CYCLES: i64 = 202_242;
+const T0: i64 = 4_641;
 
 /// supply def strings and flags (`items/*.json`: name = def +4, plural = +6, description = +8)
 #[derive(Clone, Debug, Default)]
@@ -98,6 +103,9 @@ pub struct Inventory {
     /// the dialog ended with this result: the next iteration is its exit stub's (`0x0803D876`), after which the
     /// page's event handler goes on (the lists again for 1) and the page redraws
     pub stub: Option<i32>,
+    /// not drawn yet since the page was built (the timing model: the first redraw carries the page's enter)
+    #[serde(default)]
+    pub fresh: bool,
     /// stands in for the page's container during the stub iteration (drawn: no redraw yet)
     pub hold: Container,
 }
@@ -148,7 +156,7 @@ impl Inventory {
         let a = c.add(Widget::TabBox(t0));
         let b = c.add(Widget::TabBox(TabBox::new(t, x1, 0x20, t.s(35), false)));
         let cursor = c.add(Widget::Cursor(Cursor { t: 0 }));
-        let mut p = Inventory { c, lists: [Vec::new(), Vec::new()], tab: 0, top: 0, cur: 0, up, down, tabs: [a, b], cursor, counts: Vec::new(), gauge: (0, 0), dialog: None, stub: None, hold: Container { drawn: true, ..Container::default() } };
+        let mut p = Inventory { c, lists: [Vec::new(), Vec::new()], tab: 0, top: 0, cur: 0, up, down, tabs: [a, b], cursor, counts: Vec::new(), gauge: (0, 0), dialog: None, stub: None, fresh: true, hold: Container { drawn: true, ..Container::default() } };
         p.rebuild(w);
         p
     }
@@ -471,6 +479,24 @@ impl Page for Inventory {
         } else {
             REDRAW_FRAMES
         }
+    }
+    fn after_draw(&mut self, _w: &World) {
+        self.fresh = false;
+    }
+    /// the iteration's own cycles (emulator measurements `re/buu/ship/menu_timing.py`, real route 8-51: the list
+    /// 502,271 / 508,867 with the cursor, the first redraw after the page switch 650,893, the Use dialog's first
+    /// iteration 1,009,750): the page's constant part + its draw list (`sndsim::layer_cycles`)
+    fn redraw_time(&self, w: &World, d: &MenuData) -> Option<crate::sndsim::Redraw> {
+        let v = self.draw(w, d);
+        let layer = |k: usize| v.layers.get(k).map(|l| crate::sndsim::layer_cycles(&d.text, &l.ops)).unwrap_or(0);
+        let mut own = LIST_CYCLES + layer(0);
+        if self.fresh {
+            own += ENTER_CYCLES;
+        }
+        if self.dialog.is_some() {
+            own += DIALOG_CYCLES + layer(1);
+        }
+        Some(crate::sndsim::Redraw { t0: T0, base: own - T0 })
     }
 }
 

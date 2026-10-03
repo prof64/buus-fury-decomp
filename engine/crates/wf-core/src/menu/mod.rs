@@ -161,6 +161,10 @@ pub trait Page {
     fn redraw_time(&self, _w: &World, _d: &MenuData) -> Option<crate::sndsim::Redraw> {
         None
     }
+    /// the page's name in the timing model's log
+    fn name(&self) -> &'static str {
+        std::any::type_name::<Self>().rsplit("::").next().unwrap_or("?")
+    }
     /// frames the mode's enter + first update take beyond the first one (its picture shows at once; no
     /// iteration in them): credits / Watch This! 1
     fn enter_lag(&self) -> u8 {
@@ -603,6 +607,13 @@ fn redraw(w: &mut World, first: bool) {
         let mut cost = if first { 1 } else { top.redraw_cost().max(1) };
         if cost > 1 && w.data.sound.is_some() {
             let timed = w.data.menu.clone().and_then(|d| top.page().redraw_time(w, &d));
+            if crate::sndsim::debug() {
+                if let Some(d) = w.data.menu.clone() {
+                    let v = top.page().view(w, &d);
+                    let l: Vec<String> = v.layers.iter().map(|l| format!("{:?} {}", crate::sndsim::ops_cost(&d.text, &l.ops), crate::sndsim::ops_summary(&l.ops))).collect();
+                    eprintln!("menu redraw f{} {} const {} timed {:?} pressed {:#x} released {:#x} objs {} | {}", w.frame, top.page().name(), cost, timed.map(|t| (t.t0, t.base)), w.menu.pressed, w.menu.released, v.objs.len(), l.join(" || "));
+                }
+            }
             match timed {
                 Some(r) => match crate::sndsim::redraw_frames(w, r) {
                     Some(f) => cost = f,
@@ -709,6 +720,12 @@ fn step_screen(w: &mut World) {
 fn close(w: &mut World) {
     w.menu.stack.clear();
     w.menu.phase = Phase::Leave { t: 0 };
+    // the pause menu's black frames = the area reload's CPU time (sndsim.rs): the iteration's frames + this one
+    if w.menu.tr == PAUSE {
+        if let Some(n) = crate::sndsim::reload_frames(w) {
+            w.menu.tr.leave = n as u16 + 1;
+        }
+    }
     w.menu.lag = 0;
     w.menu.pending = None;
     w.menu.result = Some(MenuResult { code: 0 });

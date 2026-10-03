@@ -391,7 +391,36 @@ work/ship/fat --fat [--from MARK] --log`). Checkpoints = `work/ship/fat/<mark>.s
 | `db7/p01_challenger` | 14-2 with the gate open (Trunks, level 80, opens it and Goten takes over again at 14-1's save point: the real Trunks is no match for the Pyramid); s400 not yet run | `fat/db7/p01_challenger.keys.json` (1,213 frames from d40) |
 | `db7/p02_14-6` .. `db7/p14_map` | the Pyramid by agent B's `db7` route (`re/buu/ship/fat_db57.py db7 fat/d40_pyramid.ss fat/db7 --from p01_challenger`: the same route, its raw pit-maze walks shooting a visible Ghost out of the lane): `p03_man1`, `p04_man2` (**not spoken to**, see `db7fix`), `p05_sw1`; the pit maze by a luck search (`fat_luck.py`: 11 punches in the air in 14-16 first: `p05_sw1_punched`), `p06_man3`, `p07_sw2`, `p08_sw4`, `p08b_bridges`, `p09_sw3`, `p10_boss` (Totenhotep), `p11_headdress`, `p12_man4`, `p14_map` | `fat/db7/keys_p01_challenger.json` (first 9,141 frames: p01 -> p05), `keys_p05_sw1_pre.json` + `keys_p05_sw1.json` (p05 -> p08, 4,215), `keys_p08_sw4.json` (12,578) |
 | `d41_pyramid`, `db7fix/q00_start` .. `q03_map` | back in for man 2 (s414, flag 102: the route's single A came too early, so s406 gave no ball): 14-10, `q01_man2`, `q02_ball` (s406, **flag 118**), the pad, s515 -> s019 (flag 107) | `fat/d41_pyramid.keys.json`, `fat/db7fix/keys.json` (6,803) |
-| `d50_nataday` | **Nataday Village 15-1** after s019: Goten level 109, his 36 points spent (STR 97, END 82), 900 HP; all balls but the 4-Star | `fat/d50_nataday.keys.json` (914 frames from `db7fix/end.ss`); then `fat_db.py db4 fat/d50_nataday.ss` |
+| `d50_nataday` | **Nataday Village 15-1** after s019: Goten level 109, his 36 points spent (STR 97, END 82), 900 HP; all balls but the 4-Star | `fat/d50_nataday.keys.json` (914 frames from `db7fix/end.ss`) |
+| `db4/a_start` .. `db4/j_down` | Nataday / the Wilderness / the Volcano by agent A's `db4_route.py` unchanged (`fat_db.py db4 fat/d50_nataday.ss`): `b_priest`, `c_elder`, `d_gate`, `e_15-2` .. `e5_15-9n`, `f_volcano` .. `f5_ledge`, `g_bridge` .. `g3_15-31`, `h_summit`, **`i_broly`** (Broly beaten, flag 111; Goten 115), `j0_ledge`, `j1_ledge`, `j_down` | `fat/db4/keys_a_fail.json` (its first frames up to j_down; the run died later in 15-16) |
+| `db4b/j_15-9` .. `db4b/m_map` | the way back (`fat_db.py db4b ... --from j_down`: Goten's 18 new points, no flame / block guard): `k_village`, `l_ball` (s439, **flag 115**: all seven), `m_map` | `fat/db4b/keys.json` (13,893 frames from j_down) |
+| `dbx/x01_city`, `dbx/x01_map` | West City: six Onigiri; in the air 213 px from the airship marker (the route's `flyinto` took a patrol airship for it from further away) | `fat/dbx/x01_city.keys.json` (2,411 frames from `db4b/end.ss`), `x01_map.keys.json` (225) |
+| `dbx/x02_s017`, `dbx/x03_goku_pre`, `dbx/x03_goku` | agent B's `dbx` route (`tools/db57/run.py dbx ... --from x01_map`): s017 (flag 119), Shenron, the fusion training -> Goku on the Lookout 6-1 (level 70: 399 HP); `x03_goku` = his 39 points spent (STR 59, END 57) | `fat/dbx/keys_x01_map.json` (18,282), `x03_goku.keys.json` (965) |
+| `dbx/x04_map`, `dbx/x05_s026` | 6-1's pad; the world map circle (s026) -> 0-21 | `fat/dbx/keys_x03_goku.json` (first 1,177 frames: x03 -> x05; that run lost to Buu) |
+| `dbx/x06_gotenks`, `dbx/x07_s020`, **`dbx/x08_end` = `dbx/end.ss`** | `re/buu/ship/fat_db57.py dbx ... --from x05_s026` (the route with heals below 45% HP: the real Goku eats five of the six Onigiri): Goku vs Majin Buu won (s027, **flag 120**), s218, Gotenks on the map, s020, Gotenks vs Buu, the Lookout, 0-96 | `fat/dbx/keys_x05_s026.json` (29,206) |
+
+**Hand-off (Janemba / Super Buu agents): `work/ship/fat/dbx/end.ss`** - the REAL game state where the Janemba saga's
+prologue starts (0-96, scene running), reached from power-on by play only (no RAM writes anywhere on the way: ship
+route `work/ship/real4*`, then this table). Flags 1 .. 120 as the main line sets them, **plus** what the real play
+left: 77 (radar), 79 .. 82 (Thieves Den), 83 .. 94 (desert switches / robbers, Pilaf's Guardian), 96 .. 111 (dungeon
+steps, Broly), and the dungeon gates' own flags. Party: Goku 70+ (430 HP, STR 59 / END 57, 6 points unspent), Gohan
+100 (631 HP, 18 points), **Goten 117** (1120 HP, STR 106 / END 91, 6 points), **Trunks 81** (420 HP, 12 points),
+Vegeta 92 (621 HP), Gotenks 926 HP (STR 92 / END 81); 1 Onigiri, 1 Milk, 440 zenie; equipment 3 items. A constructed
+§6 / §7 start state differs from it mainly in Trunks (real: 81, he only opened three level-80 gates) and the supplies.
+
+The fat Buu arc's real route in order, with its total: d00 -> d16 (ship_route.goals_fatbuu, 29,219 + 93,659 + 19,856
++ 1,005 + 1,195 + 11,327 + 9,264 + 12,827 frames), db2 19,972, flight 685, db5 14,045 + 1,379 + 1,279 + 12,862,
+flight 888, db6 18,522, flight 1,134, db7 1,213 + 9,141 + 4,215 (+ 11 punches) + 12,578, back for man 2 6,803 (+
+flight), Nataday 914 + db4 to j_down + 13,893, West City 2,411 + 225, dbx 18,282 + 965 + 1,177 + 29,206.
+**Dungeon agents, note:** `re/buu/ship/ship_driver.py` (the base of your drivers) changed on 2026-10-03 - Ghosts
+are no longer hunted (blasted / punched only when visible and in the way), a Vampire's grab is mashed out of, the
+flame guard has a wider line and falls back to a guard (R), `walk` takes the free axis at a wall corner, `nav` taps A
+at a shut door, fights punch straight up / down, `fightp` no longer calls a `tank` method (yours is untouched; mine is
+`tank_fight`). Your recorded `keys.json` stay valid; a re-run of a route now plays different keys.
+
+Runners for the real states: `re/buu/ship/fat_db.py` (agent A's routes), `fat_db57.py` (agent B's, plus `db7fix` and
+the real-level heal threshold), `fat_goals.py` (a ShipDriver goal list between two of them), `fat_luck.py` (punch-count
+luck search over a stretch), `watch2.py` / `pts.py` / `world_objs.py` (inspection).
 
 Findings: the Dragon Ball hunt is the main line (flags 112 .. 118: Thieves Den 9, Diablo Desert 11, Pilaf's
 Castle 10, the Airship 12, Fukurou Forest 13, Kyodai Pyramid 14, Nataday Village 15), then s017 (119) and Gotenks vs
@@ -657,8 +686,10 @@ Rules found (field only where battle is pinned by the TypeScript cross-check):
 
 **HFIL corridor 18-1 .. 18-13 (in progress, 2026-10-03).** Start state `janemba` rebuilt with a player's supplies
 (3 Senzu Beans, 4 Three Course Meals, 5 Curry Plates; Goku 140, Vegeta 100). Route `tools/side/hfil.py --route`
-(marks -> `work/side/h_<mark>.ss` + `h_<mark>.keys.json`; run with `PYTHONHASHSEED=0`: the driver is not
-reproducible across Python hash seeds), driver = the ship chapter's `ShipDriver` + `SideDriver`:
+(marks -> `work/side/h_<mark>.ss` + `h_<mark>.keys.json`), driver = a frozen copy of the ship chapter's
+`ShipDriver` (`tools/side/shipdrv.py`, `sidenav.py`) + `SideDriver`. Reproducible: the same leg run three times,
+two Python hash seeds, gives identical key logs (13,000 frames); the earlier run-to-run differences were the shared
+`re/buu/ship/ship_driver.py` changing under the route (the ship agent's edits between runs).
 * `goto` walks the maze of areas over walk components and exits (`tools/side/maze.py`: an exit fires when the
   player's position - the footprint's top-left px - is inside its rect; an edge exit keeps the offset along the edge;
   `openwall` adds what a switch opened), clearing each room; `it` steers the Instant Transmission cursor with the
@@ -678,8 +709,17 @@ reproducible across Python hash seeds), driver = the ship chapter's `ShipDriver`
   on the node's first update (side draw, jump to the player's 24.8 position of that frame); the node the AI dump
   calls SpawnPuff only detaches the enemy from the grid in the field (no effect object, no tiles); an armed
   `save_field_on_next_scene` is taken at the `load_scene_fade` call, before its fade (the world list is empty for
-  the 64 frames; 18-2's switch scene, exact: IT pick, scene, return); a dead enemy's tiles are freed before its
-  explosion takes its own.
+  the 64 frames; 18-2's switch scene, exact: IT pick, scene, return).
+* **For the Super Buu agent (OBJ tile allocator, `vram.rs` - not changed by the side-content agent):** in
+  `work/side/hseg/sb_000_18_02` (HFIL 18-2) the Janemba Hand (type 0x39, 0x400 tile bytes, block (439, 16)) is
+  killed by a punch at f128. The game's allocator row of that frame still has (439, 16) used and nothing new:
+  the explosion (0x0804C904) got the very block the hand's object gave back, i.e. the dead enemy's tiles are freed
+  *before* the explosion allocates (exact fit taken at once). Ours allocates the explosion first ((381, 16)) and
+  frees (439, 16) at the reap. Calling `vram::entity_gone(w, i)` in `enemy::die` before `fx::explosion` (field only)
+  fixes f128 and keeps every gated segment green (tried, then reverted - yours to decide); the next difference is
+  then f160 of the same cut ("game only" blocks: the explosion / death-effect 0x0804A2C0 / drop objects keep a
+  block longer than ours), and (421, 4)-sized blocks at 18-3 f274 (a damage number). `SEGMENT_VRAM=0` skips the
+  check; `VRAM_DBG=1` prints our owners at the first mismatch.
 * Open in those cuts: the tile allocator after a Janemba Hand's death (the explosion / death-effect blocks'
   lifetime, from f160 of 18-2), RNG at 18-4 f209 / 18-3 f656 / 18-7 f395 / 18-8 f110 (Living Dead / Poltergeist /
   Nosferatu rules not looked at yet), the inventory heal's sound 39 (the menu timing the Earth agent documents),

@@ -3530,6 +3530,16 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
     enter_state(w, i, Gs::Hurt);
     true
 }
+/// scripts: the HP setter (variable 0x0C). HP 0 is a KO like a hit's (the countdown's hook #9 ends with set_hp(0):
+/// 12-22, the player lies down in the frame the event exits, the death script follows 200 frames later)
+pub fn script_set_hp(w: &mut World, i: usize, v: i32) {
+    let pl = p(w, i);
+    pl.rec.hp = v.clamp(0, pl.rec.max_hp);
+    if v <= 0 && w.field.is_some() {
+        after_hp_change(w, i);
+    }
+}
+
 /// KO (0x0801088A)
 fn after_hp_change(w: &mut World, i: usize) {
     if pr(w, i).equip.contains(&153) {

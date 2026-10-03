@@ -98,6 +98,10 @@ pub struct Enemy {
     /// the enemy grid for good (no marks, every spot fits)
     #[serde(default)]
     pub detached: bool,
+    /// JumpSmash's controller 0x0300325C goes on for two ticks after the landing (ticks 249 / 250): three dust
+    /// clouds each, before the AI (field; Volcano Summit 15-32)
+    #[serde(default)]
+    pub smash_puffs: u8,
     /// the running motion-controller leaf (state serial, node): its controller ticks with the animation, also while
     /// an event holds the field and the AI does not think (nodes.rs `busy_controller`)
     #[serde(default)]
@@ -178,6 +182,7 @@ impl Enemy {
             anim_seq: 0,
             gfx_now: -1,
             detached: false,
+            smash_puffs: 0,
             ctl: (0, 0),
         };
         // the constructor's SetAnim(0) runs before the object is in the world: no RNG draw
@@ -418,7 +423,20 @@ pub fn update(w: &mut World, i: usize) {
         return;
     }
     tick_anim(w, i);
+    if w.en_ref(i).smash_puffs > 0 {
+        w.en(i).smash_puffs -= 1;
+        smash_dust(w, i);
+    }
     update_rest(w, i);
+}
+
+/// the landing's three dust clouds (0x08035D04 ..: each rate 0x1000 + rand(0x1000))
+pub fn smash_dust(w: &mut World, i: usize) {
+    for k in -1..=1 {
+        let (cx, _) = w.en_ref(i).a.center();
+        let py = w.en_ref(i).a.py();
+        crate::fx::puff_rng(w, cx + k * 12, py + 4);
+    }
 }
 
 /// the frame an event ended in (field): an enemy that only ticked its animation while the event held the field runs
@@ -2404,11 +2422,6 @@ pub fn die(w: &mut World, i: usize, explode: bool) {
     if explode {
         let (cx, cy) = w.en_ref(i).a.center();
         let rate = 0x1000 + w.rng.rand(0x1000);
-        // field: the enemy object's tiles are freed before the explosion takes its own (the explosion gets the very
-        // block: HFIL's Janemba Hands, segments sc_hfil; the gated suites pass either way)
-        if w.field.is_some() {
-            crate::vram::entity_gone(w, i);
-        }
         crate::fx::explosion(w, cx, cy, rate);
     }
     // the object's destruction frees its enemy-grid cells (removed entities are not re-synced: story playthrough, a

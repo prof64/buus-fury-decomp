@@ -239,6 +239,7 @@ pub fn update(w: &mut World, i: usize) {
     };
     match f {
         Fx::Anim { .. } => {
+            let mut ended = false;
             if let Fx::Anim { rec, left, rate, acc, .. } = fx_mut(w, i) {
                 *acc += *rate;
                 let adv = *acc >> 16;
@@ -246,10 +247,14 @@ pub fn update(w: &mut World, i: usize) {
                     *rec += adv;
                     *left -= adv;
                     *acc &= 0xffff;
-                    if *left <= 0 {
-                        w.ents[i].removed = true;
-                    }
+                    ended = *left <= 0;
                 }
+            }
+            if ended {
+                // the object deletes itself in its update (`0x0802A8AA`): its tiles are free for the objects
+                // updated after it this frame (segment sb 19-3: a beam's new explosion takes the block)
+                w.ents[i].removed = true;
+                crate::vram::entity_gone(w, i);
             }
         }
         Fx::Loop { alive: al, .. } => {

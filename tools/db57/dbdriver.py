@@ -127,6 +127,12 @@ class DbDriver(ShipDriver):
                 return k
             finally:
                 self.rush = False
+        if kind == 'waitcd':
+            # ('waitcd', n): stand still until the script countdown (GD+0x4D4) is <= n
+            if e.r32(0x03001068 + 0x4D4) <= g[1]:
+                self.next_goal()
+                return None
+            return 0
         if kind == 'clear':
             if s['scene'] > 0 or s['p'] is None:
                 self.idle = 0

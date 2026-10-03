@@ -192,25 +192,30 @@ pub fn redraw_frames(w: &mut World, r: Redraw) -> Option<u8> {
         let phase = s.phase as i64;
         // the DMA interrupts before the redraw delay it (~187 cycles each)
         let r = Redraw { t0: r.t0 + if phase < r.t0 { 187 * ((r.t0 - phase) / DMA + 1) } else { 0 }, ..r };
-        // the interrupt after which the play position is IRQ_MIX ahead
-        let ahead = s.pos.wrapping_sub(s.last) & 1023;
+        // every interrupt after which the play position is IRQ_MIX ahead mixes (one in a redraw, several in a
+        // reload); each mix lengthens the iteration by its cycles and the interrupts' entry / exit around it
         let mut t1 = r.t0 + r.base;
         let mut irq = (0i64, 0i64);
-        if ahead <= IRQ_MIX {
-            let k = ((IRQ_MIX - ahead + 15) / 16) as i64;
+        let ahead = (s.pos.wrapping_sub(s.last) & 1023) as i64;
+        for j in 1..200i64 {
+            // the j-th mix: the interrupt after which the position is j x IRQ_MIX past the last update's
+            let need = IRQ_MIX as i64 * j - ahead;
+            if need < 0 {
+                break;
+            }
+            let k = (need + 15) / 16;
             // k == 0: already there at the frame's start (the previous iteration ran long)
             let t = if k == 0 { 0 } else { phase + (k - 1) * DMA };
-            if t < t1 {
-                if debug() {
-                    dump("irq", IRQ_MIX, d);
-                }
-                let c = wf_audio::cost::update(d, IRQ_MIX);
-                s.last = s.last.wrapping_add(IRQ_MIX);
-                // the mix as the redraw sees it: its cycles and the interrupts' entry / exit around it
-                let c = c * 10_065 / 10_000;
-                t1 += c;
-                irq = (t, c);
+            if t >= t1 {
+                break;
             }
+            if debug() {
+                dump("irq", IRQ_MIX, d);
+            }
+            let c = wf_audio::cost::update(d, IRQ_MIX) * 10_065 / 10_000;
+            s.last = s.last.wrapping_add(IRQ_MIX);
+            t1 += c;
+            irq = (t, irq.1 + c);
         }
         let t = t1 + 37;
         let p = pos_at(s, t);
@@ -247,6 +252,22 @@ pub fn redraw_frames(w: &mut World, r: Redraw) -> Option<u8> {
         frames as u8
     })
 }
+
+/// The pause menu's close: the world is rebuilt in one main-loop iteration - the map loader's decompression
+/// (`MapDef.reload_cycles`, +0.35 % for the sound DMA's stolen cycles), ~267 k cycles of everything else, and an
+/// interrupt mix every 928 samples. Returns the video frames the iteration takes (None: unknown map / no sound
+/// content / uncalibrated). Measured: 2-9 22 frames (R 252 k), 3-15 26 (R 281 k); the object-dependent part of R
+/// is not modelled (+-15 k cycles).
+pub fn reload_frames(w: &mut World) -> Option<u8> {
+    let f = w.field.as_ref()?;
+    let c = w.data.field.as_ref()?.maps.get(&f.map)?.reload_cycles as i64;
+    if c == 0 {
+        return None;
+    }
+    redraw_frames(w, Redraw { t0: 0, base: RELOAD_REST + c * 10_035 / 10_000 })
+}
+
+const RELOAD_REST: i64 = 266_800;
 
 /// the iteration makes the VBlank when it ends this many cycles before it at the latest (the wait's own entry)
 const CUTOFF: i64 = 0;
@@ -361,6 +382,25 @@ pub fn ops_cost(t: &crate::menu::text::TextData, ops: &[MenuOp]) -> (i64, i64, i
         }
     }
     (gn, small, extra)
+}
+
+/// Cycles of a draw list for the pages whose constant part is measured per page (inventory, journal, ...): the
+/// shadowed glyphs (3.5664 per glyph-routine instruction), the pictures (16 x 16: 7,284, the keyed cursor 6,596,
+/// others 28.45 per pixel: the blit `0x0803F922`), and the plain text / fills / pixels of [`ops_cost`]. The
+/// backgrounds, panels and the surface copies are part of the page's constant.
+pub fn layer_cycles(t: &crate::menu::text::TextData, ops: &[MenuOp]) -> i64 {
+    let (gn, small, extra) = ops_cost(t, ops);
+    let mut c = gn * 35_664 / 10_000 + small * 7_284 + extra;
+    for op in ops {
+        if let MenuOp::Image { path, fw, fh, .. } = op {
+            if (*fw, *fh) != (16, 16) {
+                c += *fw as i64 * *fh as i64 * 2_845 / 100;
+            } else if path.ends_with("cursor.png") {
+                c -= 688;
+            }
+        }
+    }
+    c
 }
 
 /// debug: a draw list's operations other than shadowed text, compact

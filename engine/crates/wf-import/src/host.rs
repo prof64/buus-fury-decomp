@@ -279,7 +279,7 @@ impl StoryHost {
         let fresh = self.started.len() > before;
         let n0 = sess.world.events.len();
         sess.step_update();
-        wf_script_core::tick_timers(&sess.world, &mut self.hs);
+        wf_script_core::tick_timers(&mut sess.world, &mut self.hs);
         // the running script resumes from its wait (not one this frame's start began: its first wait counts from the
         // next frame), then the scripts the update started (NPC talk)
         let evs: Vec<Event> = sess.world.events[n0..].to_vec();

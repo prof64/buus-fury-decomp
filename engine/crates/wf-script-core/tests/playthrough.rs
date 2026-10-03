@@ -585,7 +585,7 @@ fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Value) -
                 eprintln!("    after begin: pickups {c:?} running {}", host.running);
             }
             sess.step_update();
-            wf_script_core::tick_timers(&sess.world, &mut host.hs);
+            wf_script_core::tick_timers(&mut sess.world, &mut host.hs);
             if std::env::var("DBG_PICK").ok().and_then(|v| v.parse::<usize>().ok()) == Some(k) {
                 let c = sess.world.ents.iter().filter(|e| matches!(e.body, Body::Pickup(_))).map(|e| (e.id, e.removed)).collect::<Vec<_>>();
                 eprintln!("    after update: pickups {c:?}");

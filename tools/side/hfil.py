@@ -164,6 +164,8 @@ class SideDriver(ShipDriver):
             # runs, he jumps back: done 6 frames after he is back.
             s = status(e)
             st = getattr(self, '_it', None)
+            if s['scene'] > 0 and not st:   # a level-up's popups (an Instant Transmission kill)
+                return self.mash_a()
             if st is None:
                 if s['p'] is None:
                     return 0
@@ -227,7 +229,9 @@ class SideDriver(ShipDriver):
             # Transmission) runs as its own goal and this one resumes after it
             import maze10
             s = status(e)
-            if s['p'] is None or s['scene'] > 0:
+            if s['scene'] > 0:          # a level-up's popups
+                return self.mash_a()
+            if s['p'] is None:
                 return 0
             x, y = s['p'][0], s['p'][1]
             raw = e.read(e.r32(0x030019A4 + 0xA8), 32 * 80)
@@ -338,8 +342,9 @@ ROUTE = [
     # still fought, hand_guard)
     ('goto', '18-1', 104, 272, False), *charsel(-1), ('wait', 20), ('mark', 'veg1'),
     ('goto', '18-12', 88, 52, False), ('face', 'U'), ('press', A_), ('events',), ('wait', 30), ('mark', 'gate'),
-    ('goto', '18-1', 104, 272, False), *charsel(1), ('wait', 20),
-    ('goto', '18-12', 96, 30, False), ('exitat', 96, 26, 'U'), ('wait', 20), ('mark', 'h13'),
+    # 18-13: s448 (Pikkon) on the way in, then its save point: Goku again
+    ('exitat', 96, 28, 'U'), ('wait', 20), ('events',), ('wait', 30), ('walk', 120, 204), *charsel(1), ('wait', 20),
+    ('mark', 'h13'),
 ]
 
 

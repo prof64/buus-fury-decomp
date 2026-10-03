@@ -555,7 +555,8 @@ pub fn start_event(w: &mut World) {
                 set_anim(w, k, 0, true);
                 mirror(npc(w, k));
             }
-            Body::Player(p) if p.gs == crate::player::Gs::Walk => crate::player::set_idle(w, k),
+            // (the bored pose too: 12-22, the countdown's hook #9 starts on a player standing bored - idle, one draw)
+            Body::Player(p) if matches!(p.gs, crate::player::Gs::Walk | crate::player::Gs::Bored) => crate::player::set_idle(w, k),
             // a walking enemy stops: idle state (story playthrough: a fighter walking when the level-up hook starts
             // goes idle with a fresh idle tick; a hurt one keeps its state)
             // (a defeated enemy that stays for its on-defeat event - ko < 0, a boss - is still an actor: Totenhotep

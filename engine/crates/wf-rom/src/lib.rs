@@ -9,6 +9,7 @@
 //! Nothing here touches the file system, so the crate builds for `wasm32-unknown-unknown`.
 
 pub mod content;
+pub mod deccost;
 pub mod gfx;
 pub mod lz;
 pub mod text;

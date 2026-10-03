@@ -26,4 +26,21 @@ def db5():
     ]
 
 
-ROUTES = {'db5': db5}
+def db5t():
+    """The Airship's self destruct running out (from db5's mark `a04_escape`, work/db57/r5: the ball taken, s387's
+    3-minute countdown running in 12-28): wait by 12-27's save point, walk out to the empty lift room 12-22 and let
+    the countdown reach 0 there."""
+    return [
+        ('mark', 't00'),
+        ('go', 12, 27, 'near'),
+        ('waitcd', 2900),
+        ('go', 12, 22, 'near'),
+        ('mark', 't01_12-22'),
+        ('waitcd', 0),
+        ('mark', 't02_zero'),
+        ('wait', 1500),
+        ('mark', 't03_end'),
+    ]
+
+
+ROUTES = {'db5': db5, 'db5t': db5t}

@@ -337,6 +337,9 @@ pub struct VramState {
     /// object got when it was made (its place in the world list), its tile bytes
     #[serde(default)]
     pub objs: Vec<(Owner, u32, i32)>,
+    /// effects whose block outlives the entity by a frame (`linger`)
+    #[serde(default)]
+    pub late: Vec<crate::world::EntityId>,
     /// what a purge suspended, in order (`suspended` = its entities)
     #[serde(default)]
     pub susp: Vec<Susp>,
@@ -506,12 +509,16 @@ pub fn entity_gone(w: &mut World, i: usize) {
         return;
     }
     let id = w.ents[i].id;
-    // an explosion's block (`0x08712FDC`) lives one frame past our entity's end (segments sb 21-5, 20-8); a puff's
-    // or a spark's goes with it (sb 21-26 a script's puff, sb 19-3 Kid Buu's teleport puffs and beam sparks).
-    // MEASURED per kind: the update `0x0802A8AA` is the same for all, so the explosion's extra frame is likely in
-    // its record count - not decoded.
+    // an animated effect's block goes with our entity (segments sb 21-26: a script's puffs; sb 19-3: Kid Buu's
+    // teleport puffs, his beam's explosions), except a broken object's explosion, whose block lives one frame
+    // longer (`linger`; sb 21-5). MEASURED: the cause of that extra frame is not decoded (the effect's update
+    // `0x0802A8AA` is the same). Other effect kinds keep the extra frame (not measured apart).
+    let late = st(w).is_some_and(|v| v.late.contains(&id));
+    if let Some(v) = st(w) {
+        v.late.retain(|&x| x != id);
+    }
     let exact = match &w.ents[i].body {
-        Body::Fx(f) => !matches!(**f, crate::fx::Fx::Anim { id, .. } if id != 0x0871_2fdc),
+        Body::Fx(f) => late || !matches!(**f, crate::fx::Fx::Anim { .. }),
         _ => false,
     };
     if exact && w.ents[i].removed {
@@ -528,6 +535,13 @@ pub fn entity_gone(w: &mut World, i: usize) {
     }
     let sh = sprite_of(w, i).map(|s| s.1).unwrap_or((false, None));
     actor_destroyed(w, id, sh);
+}
+
+/// effect `id`'s block will live one frame past the entity's end (see `entity_gone`)
+pub fn linger(w: &mut World, id: EntityId) {
+    if let Some(v) = st(w) {
+        v.late.push(id);
+    }
 }
 
 /// the offstage players' blocks go (a scene load destroys their objects)
@@ -552,12 +566,13 @@ pub fn offstage_gone(w: &mut World) {
     }
 }
 
-/// the removed entities' blocks go, in list order (before the list drops them)
+/// the removed entities' blocks go (before the list drops them), in the update's order: the list from its end
+/// (segment sb 20-8: two effects ending in one frame, the later object's block first)
 pub fn reap(w: &mut World) {
     if w.field.as_ref().is_none_or(|f| f.vram.is_none()) {
         return;
     }
-    for i in 0..w.ents.len() {
+    for i in (0..w.ents.len()).rev() {
         if w.ents[i].removed {
             entity_gone(w, i);
         }

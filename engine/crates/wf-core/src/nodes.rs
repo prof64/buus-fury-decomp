@@ -975,6 +975,12 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             let h = w.data.anim.hold;
             set_anim_r(w, i, &[an(20)], true, h);
         }
+        // field (HFIL's Nosferatu, sc_hfil 18-8): the puff appears in the frame the state is entered, its rate drawn
+        // (0x1000 + rand(0x1000), 0x0804E733); battle keeps the reference's fixed-rate puff on the node's update
+        K::VampireSummon | K::VampireSummon2 if w.field.is_some() => {
+            let (cx, cy) = w.en_ref(i).a.center();
+            crate::fx::puff_rng(w, cx, cy);
+        }
         K::TeleportNearPlayer => {
             r.d[0] = w.rng.rand(4);
             set_anim(w, i, &[an(17)], true, Some(false));
@@ -1203,6 +1209,8 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
         // ChargedPunch's, whose one-shot ends at tick 148 with an idle draw). Battles keep the reference
         K::JumpSmash if w.field.is_some() => set_anim(w, i, &[an(19)], true, Some(true)),
         K::JumpSmash => set_anim(w, i, &[an(18)], true, Some(true)),
+        // (field: the update plays the landing's cels first)
+        K::FinishLandingAnim if w.field.is_some() => {}
         K::FinishLandingAnim => set_anim(w, i, &[nm("idle")], true, Some(true)),
         // node 0x0874CA2C (Ronin / Samurai / Shogun guard): the enemy's SetAnim(0x11) (vfunc +0x28 -> 0x0800FAB6):
         // raw 19 under the one-shot state 0x03001B18 (16 ticks, then SetAnim(0)); restarted by every enter
@@ -1482,6 +1490,10 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                 if w.field.is_some() {
                     return true;
                 }
+            }
+            // field: the puff came with the node's enter (below)
+            if w.field.is_some() {
+                return true;
             }
             let (cx, cy) = w.en_ref(i).a.center();
             crate::fx::puff(w, cx, cy, 0x1800);
@@ -2681,6 +2693,14 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                 let z = (w.en_ref(i).a.z + 8).min(0);
                 w.en(i).a.z = z;
             }
+            // field: the three dust clouds draw their rate (rand(0x1000) each, 0x08035D04 ..) on tick 248, where the
+            // node is over, and on the controller's next two ticks (`Enemy.smash_puffs`; 15-32)
+            if w.field.is_some() && f == 248 {
+                w.en(i).a.z = 0;
+                en::smash_dust(w, i);
+                w.en(i).smash_puffs = 2;
+                return true;
+            }
             if f == 248 {
                 w.en(i).a.z = 0;
                 for k in -1..=1 {
@@ -2691,6 +2711,18 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                 return true;
             }
             false
+        }
+        // field: controller 0x0300326C plays the jump's cels 6 and 7 (4 ticks each, its own tick from 0), then
+        // SetAnim(0) (15-32: the idle draw comes 8 frames after the landing hit)
+        K::FinishLandingAnim if w.field.is_some() => {
+            if (0..=7).contains(&f) {
+                hold_pose(w, i, 20, 6 + (f >> 2));
+                w.en(i).ea.pos.tick = f;
+            } else if f == 8 {
+                // (the node is over with it: StandStill's idle enter follows in the same frame)
+                set_anim(w, i, &[an(0)], true, Some(true));
+            }
+            f >= 8
         }
         K::FinishLandingAnim => f >= 11,
         // Babidi's controller tick 0x0802ADC8: cel = (tick >> 3) & 3; at tick 0x60: SetAnim(0) (idle rand(255)), and

@@ -227,7 +227,8 @@ pub fn breakable_message(w: &mut World, k: usize, msg: &mut HitMsg) -> bool {
     let bx = b.bx;
     let id = w.ents[k].id;
     let rate = 0x1000 + w.rng.rand(0x1000);
-    crate::fx::explosion(w, (bx[0] + bx[2]) >> 1, (bx[1] + bx[3]) >> 1, rate);
+    let boom = crate::fx::explosion(w, (bx[0] + bx[2]) >> 1, (bx[1] + bx[3]) >> 1, rate);
+    crate::vram::linger(w, boom);
     let at = w.frame + 16;
     if let Some(f) = w.field.as_mut() {
         f.deferred.push(Deferred::Break { at, entity: id });

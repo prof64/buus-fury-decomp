@@ -22,6 +22,8 @@ struct St<'a> {
     sl: i32,
     c: u32,
     ok: bool,
+    ldrb: u32,
+    strb: u32,
 }
 
 impl St<'_> {
@@ -99,16 +101,16 @@ fn copy(st: &mut St, out: &mut Vec<u8>, ip: u32, sb: u32, rle: bool) {
         return;
     }
     if rle {
-        st.c += LDRB;
+        st.c += st.ldrb;
         let v = out[out.len() - ip];
         for k in 0..sb {
             out.push(v);
-            st.c += STRB + 1 + if k < sb - 1 { B } else { 1 };
+            st.c += st.strb + 1 + if k < sb - 1 { B } else { 1 };
         }
     } else {
         for k in 0..sb {
             out.push(out[out.len() - ip]);
-            st.c += LDRB + STRB + 1 + if k < sb - 1 { B } else { 1 };
+            st.c += st.ldrb + st.strb + 1 + if k < sb - 1 { B } else { 1 };
         }
     }
     st.c += B;
@@ -116,7 +118,13 @@ fn copy(st: &mut St, out: &mut Vec<u8>, ip: u32, sb: u32, rle: bool) {
 
 /// Cycles of one call on the stream at ROM offset `src` (None: not a valid stream).
 pub fn decode_cycles(rom: &[u8], src: usize) -> Option<u32> {
-    let mut st = St { rom, src, r6: 0, sl: 0, c: 0, ok: true };
+    decode_cycles_to(rom, src, false)
+}
+
+/// The same with the output in EWRAM (byte load 5, byte store 4: the map loader's buffers).
+pub fn decode_cycles_to(rom: &[u8], src: usize, ewram: bool) -> Option<u32> {
+    let (ldrb, strb) = if ewram { (5, 4) } else { (LDRB, STRB) };
+    let mut st = St { rom, src, r6: 0, sl: 0, c: 0, ok: true, ldrb, strb };
     let mut out: Vec<u8> = Vec::new();
     st.c += 10 + 1 + 1 + 1 + B;
     let (mut r5, mut ip, mut r4, mut r3) = (8u32, 1u32, 0u32, 1u32);
@@ -128,7 +136,7 @@ pub fn decode_cycles(rom: &[u8], src: usize) -> Option<u32> {
             st.c += B + 1 + B;
             let r7 = st.bits(r3);
             out.push(r7.wrapping_add(r4) as u8);
-            st.c += 1 + STRB;
+            st.c += 1 + st.strb;
             continue;
         }
         st.c += 1;
@@ -197,7 +205,7 @@ pub fn decode_cycles(rom: &[u8], src: usize) -> Option<u32> {
             let r7 = st.bits(4) as i32 - 1;
             st.c += 1;
             if r7 == 0 {
-                st.c += B + STRB;
+                st.c += B + st.strb;
                 out.push(0);
                 continue;
             }
@@ -206,7 +214,7 @@ pub fn decode_cycles(rom: &[u8], src: usize) -> Option<u32> {
                 if r7 as usize > out.len() {
                     return None;
                 }
-                st.c += B + LDRB + B + STRB;
+                st.c += B + st.ldrb + B + st.strb;
                 out.push(out[out.len() - r7 as usize]);
                 continue;
             }
@@ -219,7 +227,7 @@ pub fn decode_cycles(rom: &[u8], src: usize) -> Option<u32> {
                         st.c += 1 + B;
                         let v = st.bits(8) as u8;
                         out.push(v);
-                        st.c += STRB + 1 + if k < 255 { B } else { 1 };
+                        st.c += st.strb + 1 + if k < 255 { B } else { 1 };
                     }
                     if !st.ok {
                         return None;
@@ -284,7 +292,7 @@ mod tests {
     /// sound DMA's stolen cycles)
     #[test]
     fn portraits_match_the_measurements() {
-        let Some(rom) = wf_rom::testutil::rom() else { return };
+        let Some(rom) = crate::testutil::rom() else { return };
         assert_eq!(super::decode_cycles(rom.data(), 0x006C_4758), Some(99_211));
         assert_eq!(super::decode_cycles(rom.data(), 0x006C_7580), Some(110_084));
     }

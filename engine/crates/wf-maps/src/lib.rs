@@ -115,6 +115,50 @@ pub fn tileset(ctx: &mut Ctx, h: &Header) -> Tileset {
     Tileset { tiles, n_listed: n, anim_frames }
 }
 
+/// CPU cycles the map loader's decompression takes for a header (`wf_rom::deccost`): every tilemap chunk of the
+/// four layers and the tile chunks the tile list names (into EWRAM buffers), the tile list and frame 0 of every
+/// tile animation (into IWRAM). It is ~95 % of an area (re)load - the black frames when the pause menu closes
+/// (wf-core `sndsim.rs`); the streams and their order match an emulator profile call by call
+/// (`examples/reloadinfo.rs`, work/earth/timing/leaveprof.py).
+pub fn reload_cycles(rom: &Rom, h: &Header) -> u64 {
+    let cyc = |p: u32, ew: bool| wf_rom::deccost::decode_cycles_to(rom.data(), (p & 0x01FF_FFFF) as usize, ew).unwrap_or(0) as u64;
+    let mut total = 0;
+    for &r in &h.res {
+        let Some(res) = rom_maps::resource(rom, r) else { continue };
+        for &c in &res.chunks {
+            if rom.isptr(c) {
+                total += cyc(c + 8, true);
+            }
+        }
+    }
+    if rom.isptr(h.tile_list) {
+        total += cyc(h.tile_list + 8, false);
+        let list = rom.lz(h.tile_list).unwrap_or_default();
+        let n = (list.len() / 2).min(VRAM_TILES);
+        let (mut e, mut last) = (0u16, u32::MAX);
+        for i in 0..n {
+            let d = u16::from_le_bytes([list[2 * i], list[2 * i + 1]]);
+            e = if i == 0 { d } else { e.wrapping_add(d).wrapping_add(1) };
+            let c = e as u32 >> 8;
+            if c != last {
+                last = c;
+                let p = rom.u32(h.tile_chunks + 4 * c);
+                if rom.isptr(p) {
+                    total += cyc(p + 8, true);
+                }
+            }
+        }
+    }
+    for a in &h.anims {
+        if let Some(&(_, p)) = a.frames.first() {
+            if rom.isptr(p) {
+                total += cyc(p, false);
+            }
+        }
+    }
+    total
+}
+
 /// One map = one distinct map header.
 pub struct MapInfo {
     pub id: String,
@@ -211,7 +255,9 @@ pub fn extract(rom: &Rom, out: &mut Content) -> wf_rom::Result<()> {
         out.put(format!("maps/{}/composite.png", m.id), wf_rom::gfx::encode_png_indexed(w, hgt, &comp, &ctx.pal, false));
 
         let coll = collision::grids(&mut ctx, h);
-        out.put_json(format!("maps/{}/collision.json", m.id), &collision::to_json(&coll, h));
+        let mut cj = collision::to_json(&coll, h);
+        cj["reload_cycles"] = json!(reload_cycles(rom, h));
+        out.put_json(format!("maps/{}/collision.json", m.id), &cj);
 
         let map_json = tiled::map_json(m, &layers, &res, &ts_id, &ts, &ctx.pal);
         out.put_json(format!("maps/{}/map.json", m.id), &map_json);

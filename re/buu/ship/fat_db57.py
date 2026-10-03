@@ -45,5 +45,15 @@ def db7fix():
 
 
 routes7.ROUTES['db7fix'] = db7fix
+
+import routesx  # noqa: E402
+
+
+class RealXDriver(routesx.XDriver):
+    # the real Goku (level 70, 399 HP) against Majin Buu's 45,000: eat well before the last hit
+    EMERGENCY = float(__import__('os').environ.get('EMERGENCY', '0.45'))
+
+
+routesx.DRIVER = RealXDriver
 routes7.DRIVER = RealPyramidDriver
 run.main()

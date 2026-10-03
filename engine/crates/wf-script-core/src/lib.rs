@@ -388,13 +388,29 @@ fn release_field_npcs(w: &mut World, watermark: EntityId) {
 /// the field runs free (no event holds it, no transition): None outside the field
 fn self_field_free(w: &World) -> Option<bool> {
     let f = w.field.as_ref()?;
-    Some(!f.busy && f.item_get.is_none() && matches!(f.mode, wf_core::field::Mode::Normal))
+    // (the walk-in's last frame counts: the fade-in ends in this frame's post step)
+    let free_mode = match f.mode {
+        wf_core::field::Mode::Normal => true,
+        wf_core::field::Mode::FadeIn { k } => k + 1 >= wf_core::field::FADE && !wf_core::fieldworld::flying(w),
+        _ => false,
+    };
+    Some(!f.busy && f.item_get.is_none() && free_mode)
 }
 
-/// the script timers' logic frame (hosts call it once per frame after the world update, a script running or not)
-pub fn tick_timers(w: &World, s: &mut HostState) {
+/// the script timers' logic frame (hosts call it once per frame after the world update, a script running or not).
+/// The countdown reaching 0 runs the engine hook #9 (OnTimerFinished: flags 277 / 278 pick s461 / s463, flag 95 the
+/// Airship's self destruct - white fade, HP 0) in that frame (MEASURED 12-22: GD+0x4D4 15 on the cut's f1702, `run 9`
+/// on f1717).
+pub fn tick_timers(w: &mut World, s: &mut HostState) {
     if s.timers.countdown_on && s.timers.countdown > 0 && self_field_free(w).unwrap_or(true) {
         s.timers.countdown -= 1;
+        if s.timers.countdown == 0 && w.field.as_ref().is_some_and(|f| f.host) {
+            w.events.push(wf_core::world::Event::Field(wf_core::field::FieldEvent::Run {
+                run: wf_core::fieldcontent::Callback::Event("s009".into()),
+                cause: wf_core::field::Cause::Menu,
+                slot: 0,
+            }));
+        }
     }
 }
 
