@@ -185,3 +185,36 @@ def goals(e):
         ('story', 8, 70, True),                   # Vegeta vs Buu (8-71, s344) -> Goku
         ('mark', 'c15_after_buu'),
     ]
+
+
+def goals_fatbuu(e):
+    """The Majin Buu arc from `c15_after_buu` (Goku in Rocky Canyon 8-70; work/ship/real4b/c15_after_buu.ss), work in
+    progress: Kami's Lookout (s214, flag 76: Goten + Trunks) -> Bulma's Dragon Radar (s193, flag 77) -> West City
+    prep. Next: the seven Dragon Balls (flags 112 .. 118: Thieves Den 9, Diablo Desert 11, Pilaf's Castle 10, the
+    Airship 12, Fukurou Forest 13, Kyodai Pyramid 14, Nataday Village 15), s017 (119), s027 / s218 (120).
+
+    Thieves Den needs a Bandana (equipment 126) worn: only the Stolen Airship encounter's (0-55) first four enemy
+    slots drop it (on-defeat 0x08073EFC, 25%), and s508 spawns those slots only for a current character of level
+    <= 70 - Trunks (65), not Goten (75)."""
+    return [
+        ('mark', 'd00_8-70'),
+        ('walk', 272, 280), ('face', 'U'), ('press', A), ('wait', 60),
+        ('fly', 633, 1065, 31, 23), ('wait', 30),                              # Kami's Lookout 6-1
+        ('walk', 310, 560), ('story', 6, 1, True),                             # s214: now Goten
+        ('mark', 'd01_goten'),
+        ('walk', 310, 560), ('face', 'D'), ('press', A), ('wait', 60),         # the edge: the world map
+        ('fly', 1137, 1137, 71, 119), ('wait', 30),                            # West City 4-1
+        nav(4, 27, False), ('walk', 144, 194), ('talk', 'U'), ('events',),     # Bulma: the Dragon Radar
+        ('mark', 'd02_radar'),
+        # West City: Trunks (save point), his 15 stat points, five Hamburgers at the Z-Mart (s030), the capsule
+        nav(4, 1, False), ('walk', 148, 594), *charsel(1),
+        alloc_keys([(0, [8, 0, 7, 0])]),
+        ('walk', 264, 310), ('hold', U, 40), ('wait', 30),
+        ('unstick',), ('walk', 102, 124), ('hold', L, 10),
+        ('keys', [(A, 3, 60), (A, 3, 60), (A, 3, 100), (D, 3, 15), (D, 3, 15)] + [(A, 3, 40)] * 5 +
+         [(B, 3, 80), (B, 3, 60), (D, 3, 15), (D, 3, 15), (A, 3, 60), (A, 3, 60)]), ('events',), ('wait', 30),
+        ('unstick',), ('walk', 112, 212), ('hold', D, 40), ('wait', 30),
+        ('unstick',), ('walk', 416, 360), ('face', 'U'), ('press', A), ('wait', 60),
+        ('mark', 'd03_hunt'),
+        ('hunt', 126),                                                         # world map encounters: the Bandana
+    ]

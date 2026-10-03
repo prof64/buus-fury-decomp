@@ -293,10 +293,33 @@ Rules found (wf-core / wf-script-core), round 2:
 * boss handovers (s327 / s328 / s336), motion controllers ticking while an event holds the field, shared soldier-throw
   wave, Destroyer flames during holds: round 1 notes below still hold.
 
-Open: the pause-menu heal / stat screens' sound 40 timing (`snd: play 40` in ~25 grind segments, menu code under
-concurrent edits), the Switch Character swap at save points (missing / cam a frame off), 8-16 s319's NPC idle cel,
-s342's 8-17 camera_scroll_to one frame early (f2911 of the Buu-fight segment), RNG in a few 8-3 / 8-31 / 8-33 rooms,
-Papaya 7-1 NPC facing. Next: the fat Buu arc from Goku in 8-70 (c15) to the Super Buu chapter's start (§6).
+Round 3 rules (rsegs now 295 / 338 exact, 220,394 frames):
+* the task list (screen shakes) keeps running while an inline event holds the objects' update: a crit shake draws
+  its offsets through the level-up popup (`Session::step_update`, 8-3 / 8-6 RNG).
+* a Laser Turret is hittable only between TurretClose and TurretOpen (obj+0x1CC; 8-36: a punch beside a retracted
+  turret hits the fighter alone); TS reference updated, cross_ts green.
+* `enemy::face_player` = the game's routine 0x0801599C in the field (Destroyer flames 8-45 / 8-55).
+* Status page redraw = 5 frames (`menu/status.rs`; the Earth agent owns the redraw / mixer timing from here on).
+
+Segments that still depend on menu timing (Earth agent's predictor): the pause menu's close (black frames before
+the world resumes vary per area: 8-6 21, 8-66 21, 8-26 20, 2-10 23, 8-1 28, 8-3 31 / 32, 8-14 40; the model has 25)
+and stat / heal menus: shipr_024, 058, 059, 061, 063, 065, 068, 072, 076, 081, 087, 095, 103, 113, 125, 138, 153,
+176, 179, 183, 188, 194, 200, 208, 218, 236, 266, 281, 308, 312; save point / Switch Character: 056, 172, 226, 227,
+250, 328.
+
+Open (mine): 8-16 s319's Kibito (sprite 258) idle tick after `return_to_field` (f4893), s342's 8-17
+camera scroll one frame early after fade_in_white (Buu-fight segment f2911; our logic-frame count is 2 behind the
+game's by then), a Majin Soldier's recovery 3 frames early (8-31 f905, 8-32, 8-50), a fighter's knockback position
+(8-33 f412), East District bandit position (2-9 f34).
+
+**Majin Buu arc** (`ship_route.goals_fatbuu`, from `work/ship/real4b/c15_after_buu.ss`): played so far by the real
+game: capsule -> Kami's Lookout s214 (flag 76, Goten) -> West City -> Bulma's Dragon Radar s193 (flag 77) ->
+Trunks at the save point, his stat points, Hamburgers at the Z-Mart. The main line then needs all seven Dragon
+Balls (flags 112 .. 118: seven dungeons, worlds 9 .. 15) before s017 (119) and Gotenks vs Buu s218 (120); the
+Janemba saga (121 .. 125) follows, then §6's start. First gate found: the Thieves Den wants a Bandana worn
+(equipment 126), dropped only by the Stolen Airship encounter's low-level group (current character <= level 70:
+Trunks) - `('hunt', 126)` flies into world-map encounters, fights and returns; Trunks (190 HP) does not survive the
+Rogue Submarine's Mercenary yet. Not reached: Super Buu's appearance; no end state to hand over yet.
 
 Round 1 (dev state, kept for reference): placed field enemies stand exactly at the def position; AlignWithPlayer keeps
 the facing on a blocked step; shield graphics swap on node enter; loot x = position + foot_w / 2; breakable crit /
