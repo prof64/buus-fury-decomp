@@ -1334,7 +1334,14 @@ pub fn update(w: &mut World, i: usize) {
     }
     // an event holding the field holds the form controller too: no regen, no Super Saiyan drain (2-90: s121's
     // set_energy(100) is still 100 when the fight starts 1,530 frames later)
-    let held = w.field.as_ref().is_some_and(|f| f.busy);
+    // - and so does an AI inline script commanding the player while its animation runs (Earth 4-25, emulator trace
+    // work/db57/scratch/storycnt.py: Trunks' form-25 countdown stays at 200 from Vegeta's first play_anim to the
+    // frame the player is let go, then ticks again in that frame)
+    let held = w.field.as_ref().is_some_and(|f| f.busy)
+        || crate::scene::is_puppet(w, w.ents[i].id)
+            && w.scene.depth == 0
+            && !w.scene.ai_wait.is_empty()
+            && !script_anim_done(w, i);
     if since_ko < 199 && (!pr(w, i).dead || pr(w, i).story_form(w)) && !held {
         passive(w, i);
     }
@@ -1355,6 +1362,11 @@ pub fn update(w: &mut World, i: usize) {
     anim_tick(w, i);
     // a script commanding the player (scene.rs puppet): the states it sets run, the controller does not
     let puppet = crate::scene::is_puppet(w, w.ents[i].id) && !free;
+    if free {
+        // (no longer the script's: its animation is the player state's again)
+        let id = w.ents[i].id;
+        w.scene.puppets.retain(|p| p.id != id);
+    }
     if puppet {
         crate::scene::player_frames_tick(w, i);
     }

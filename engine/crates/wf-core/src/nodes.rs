@@ -934,7 +934,11 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             let r0 = w.data.anim.once_stop3;
             let open = kind(c, n) == K::TurretOpen;
             set_anim_r(w, i, &[an(if open { 19 } else { 18 })], false, r0);
-            w.en(i).a.hittable = !open;
+            // field: TurretClose makes it hittable only at its end (Flying Mega-Fortress XJ-6 12-20: a punch during
+            // the 24 frames of the gun coming out passes through; obj+0x1CC set at the node's finish)
+            if open || w.field.is_none() {
+                w.en(i).a.hittable = !open;
+            }
         }
         // the shell controller 0x030030EC: SetAnimRaw(0x13) played once (8 ticks per frame), then SetAnim(0)
         K::TankShoot => {
@@ -1447,11 +1451,6 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             let sc = c.tree.nodes[n as usize].script;
             let inline = matches!(c.tree.nodes[n as usize].k, K::InlineScript);
             if r.d[0] == 1 {
-                if std::env::var("TMPDBG").is_ok() { eprintln!("TMPDBG f{} inline-node me {me} inline {inline} wait {:?} dir {:?} depth {} at {}", w.frame, w.scene.ai_wait, w.scene.director.wait.is_some(), w.scene.depth, w.scene.tracks_at); }
-                // (the inline script's parallel block steps in this update; the script ends with it)
-                if inline && w.scene.ai_wait.contains(&me) && w.field.is_some() && w.scene.depth == 0 && crate::scene::tick_tracks_in_update(w) {
-                    crate::scene::ai_script_done(w, me);
-                }
                 return !w.scene.ai_wait.contains(&me);
             }
             if sc != 0 && r.d[0] == 0 {
@@ -1945,7 +1944,13 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             true
         }
         // finished on the update that sees the anim frame at 3
-        K::TurretOpen | K::TurretClose => w.en_ref(i).ea.pos.frame >= 3,
+        K::TurretOpen | K::TurretClose => {
+            let done = w.en_ref(i).ea.pos.frame >= 3;
+            if done && w.field.is_some() && kind(c, n) == K::TurretClose {
+                w.en(i).a.hittable = true;
+            }
+            done
+        }
         // controller 0x0203DD04: the bomb at tick 16 from the position + 0x0874CAD4[dir], SetAnim(0) at 24
         K::BombThrow => {
             // a hit's reaction replaced the controller (2-10: a bomber hurt mid-throw throws nothing once it recovers)

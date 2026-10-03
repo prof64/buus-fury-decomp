@@ -384,6 +384,9 @@ fn build_returned(_data: &Arc<GameData>, ram: &GbaRam, runner: &mut StoryHost, e
         f.arrival = None;
         f.mode = Mode::Normal;
     }
+    // (the event still holds the field: the arrival does not release it)
+    w.scene.depth = 1;
+    field::set_busy(&mut w, true);
     // the area's own objects go: the RAM's are the field as the scene left it
     let players = w.players.clone();
     for e in w.ents.iter_mut().filter(|e| !players.contains(&e.id)) {
@@ -512,7 +515,8 @@ fn build_returned(_data: &Arc<GameData>, ram: &GbaRam, runner: &mut StoryHost, e
                 fl.raw = raw;
             }
             fl.cam = [ram.s32(CAM), ram.s32(CAM + 4), ram.s32(CAM + 8), ram.s32(CAM + 0xC), ram.s32(CAM + 0x10)];
-            fl.zc = None;
+            // (the camera object caches the altitude of its last pitch: the pitch stays until z changes)
+            fl.zc = Some(fl.z);
         }
     }
     // the camera as the field left it (`return_to_field` puts the saved one back)

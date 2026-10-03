@@ -2124,6 +2124,13 @@ fn wave_update(w: &mut World, i: usize) {
         }
         return;
     }
+    // field: while a script holds the field the wave gets message 0xC only, whose handler (0x0802A714) runs this update
+    // with its "live" flag clear (r1 = 0, 0x0802A412): no wall / hit test, no growth or move, no life count - only the
+    // animation counter (Flying Mega-Fortress XJ-6 12-3: the lift's inline script freezes a turret's wave short of
+    // Goku; sc pg_xj6_001)
+    if w.field.as_ref().is_some_and(|f| f.busy) {
+        return;
+    }
     let (px, py) = (w.shot_ref(i).px(), w.shot_ref(i).py());
     let (hx, hy) = (px + dx * len, py + dy * len);
     let r = rect(w, i);

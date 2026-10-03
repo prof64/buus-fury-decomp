@@ -1095,9 +1095,6 @@ pub struct Scene {
     pub saved_world: Option<Box<crate::field::SavedWorld>>,
     /// enemies whose AI InlineScript node waits for its script (the host calls `ai_script_done`)
     pub ai_wait: Vec<EntityId>,
-    /// 1 + the world frame the command tracks were ticked in an enemy's update (`tick_tracks_in_update`; 0 = none)
-    #[serde(default)]
-    pub tracks_at: u32,
     /// the area-name banner (object 0x0800BF34): its text and frames since its first draw (0..=238)
     pub banner: Option<(String, u32)>,
     /// the last area name id shown (RAM 0x03001984, kept across loads)
@@ -1147,7 +1144,6 @@ impl Default for Scene {
             offstage: Vec::new(),
             saved_world: None,
             ai_wait: Vec::new(),
-            tracks_at: 0,
             banner: None,
             banner_last: 0,
             banner_made: u32::MAX,
@@ -2373,8 +2369,19 @@ pub fn tick(w: &mut World) {
     tick_dialog(w);
     tick_menu(w);
     tick_visuals(w);
-    if w.scene.tracks_at != w.frame.wrapping_add(1) {
-        tick_tracks(w);
+    let blocked = w.scene.director.wait.is_some();
+    tick_tracks(w);
+    // An AI InlineScript's parallel block ended: the game runs the script's nested frame loop inside that enemy's
+    // update, and when the block ends the update goes on in the same frame - the node returns 1 and the rest of the
+    // enemy's AI runs (Earth 4-25 f6646: Vegeta's 0x0870EA28 ends with face_actor / his own jump_to, then
+    // GotoState(0x310) and StandStill's idle draw in that frame). The host ends the script after the objects.
+    if blocked && w.scene.director.wait.is_none() && w.field.is_some() && w.scene.depth == 0 {
+        for id in w.scene.ai_wait.clone() {
+            let Some(i) = w.find(id).filter(|&i| !w.ents[i].removed && matches!(w.ents[i].body, Body::Enemy(_))) else { continue };
+            ai_script_done(w, id);
+            w.scene.puppets.retain(|p| p.id != id);
+            crate::enemy::release_update(w, i);
+        }
     }
     sync_props(w);
     // dropped owners
@@ -2387,19 +2394,6 @@ pub fn tick(w: &mut World) {
     let live: Vec<bool> = w.scene.puppets.iter().map(|p| w.find(p.id).is_some()).collect();
     let mut it = live.into_iter();
     w.scene.puppets.retain(|_| it.next().unwrap_or(false));
-}
-
-/// An AI InlineScript waiting on its parallel block: the game runs the script's nested frame loop inside that
-/// enemy's update, so its command tracks step there (before the objects the list updates after it) and the node
-/// returns 1 in the update the block ends in (Earth 4-25: Vegeta's 0x0870EA28 - face_actor and his own jump_to are
-/// instant, GotoState(0x310) and StandStill's idle draw follow in the same update). True = the block ended.
-pub fn tick_tracks_in_update(w: &mut World) -> bool {
-    if w.scene.director.wait.is_none() || w.scene.tracks_at == w.frame.wrapping_add(1) {
-        return false;
-    }
-    w.scene.tracks_at = w.frame.wrapping_add(1);
-    tick_tracks(w);
-    w.scene.director.wait.is_none()
 }
 
 fn tick_tracks(w: &mut World) {

@@ -432,6 +432,23 @@ ids / animation indices need the ROM's sprite-def tables: the recording's `init.
 (`GbaRam.actor_rows`). The event: blocked in the return's fade-in phase (`Pending::Phases`, fade started at the
 cut). Proof - the real route's Kid Buu run, cut with `--events`: **9 / 14 cuts exact**, the eight `return_to_field`
 ones gated (`rkb_003`, `004`, `005`, `006`, `007`, `009`, `010`, `011`: up to 2,000 frames each, allocator check on).
+Increment 1e (A):
+* **`kbr_002` f13417 fixed - Kid Buu's death node 0x08032D44**: it counts the copies (message 5, `0x08011CCA`); more
+  than one -> the object leaves the world list (`0x08011944`) and, with 0x400 tile bytes free, a puff at its box
+  centre (`0x0801952C`, random rate); no defeat handler, no on-defeat callback. Ours had treated the punched copy -
+  the placed one - as a placed defeat and ran s460: a dying copy now **hands its placement (callback, drops) to the
+  survivor** (field; battles have no placements, the TS reference is unchanged). `kbr_002` 13,417 -> **15,749**;
+  `sb_041` stays exact; battle lockstep 709 / 709, cross_ts green.
+* **`kbr_014` (a `return_to_field` onto the 3D map)**: the players come from the arrival (`finish_arrival`), the
+  event keeps holding the field after it (depth 1, busy - the arrival had released it: the flyer flew under A),
+  the flyer from RAM (altitude +0x1A8, heading +0x1AC, flight state +4 / +8 / +0xC, its tick / cel / raw) and the 3D
+  camera (map object +0 / +4 / +8 / +0xC / +0x10 pitch); **the pitch is cached with the altitude of its last update
+  (camera object +8, 0x08034124)**: `zc` = the altitude, the imported pitch stays until z changes. Enemies take the
+  recording's sprite (the world map's circles show 10 / 11 by the place's state). `kbr_014` 0 -> 16 / 522; stop:
+  a patrol (sprite 253) moves on ours, not in the game - the world map's patrols run `RunMotionController` (state
+  0x317) with the runner at enemy +0x22C, whose step index / step runtime is not imported (ours rebuilds them as
+  plain enemies, no patrol): next, by matching the area's own objects to RAM's instead of rebuilding them; the 12th
+  actor on ours is the same mismatch.
 Increment 1d: a leader under a script's frame-range controller (0x0804DE58: +4 pass, +8 ticks a cel, +0xC passes,
 +0x10 loop start, +0x14 last cel) is rebuilt as a scene puppet (`AnimMode::Frames`); the probe no longer moves the
 generator (its queries' `rand`s are replayed by the placement run: probe and placement saw different draws, so a
