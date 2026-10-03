@@ -62,6 +62,8 @@ pub struct MapData {
     pub records: Vec<Record>,
     /// scroll arrows: attr0, attr1 per type (0 down, 1 up, 2 left, 3 right)
     pub arrows: [(u16, u16); 4],
+    /// the Scouter's database, remaps and info page data (`ui/menu/scouter.json`): scouter.rs
+    pub scout: Option<Arc<super::scouter::ScoutData>>,
 }
 
 fn arr4(v: &serde_json::Value) -> [i32; 4] {
@@ -109,7 +111,7 @@ impl MapData {
         for (k, a) in v["arrows"].as_array().into_iter().flatten().take(4).enumerate() {
             arrows[k] = (a["attr0"].as_u64().unwrap_or(0) as u16, a["attr1"].as_u64().unwrap_or(0) as u16);
         }
-        Some(Arc::new(MapData { records, arrows }))
+        Some(Arc::new(MapData { records, arrows, scout: super::scouter::ScoutData::load(src) }))
     }
 }
 
@@ -211,13 +213,16 @@ pub struct MapScreen {
     pub entered: bool,
     /// the area record's tile bytes (CPU time model)
     pub tile_bytes: u32,
+    /// the Scouter page's objects
+    #[serde(default)]
+    pub scout: Option<Box<super::scouter::Scout>>,
 }
 
 /// screen change of the map screen (frame 0 = SELECT): the pause menu's 16-frame fade, black while the world is
 /// saved, the page's EVA ramp from the 19th frame; after the closing iteration 24 black frames and the fade-in
 pub const MAPSCREEN: Transition = Transition { fade_out: 16, enter: 2, leave: 24, fade_in: 16 };
 
-fn md(w: &World) -> Option<Arc<MapData>> {
+pub(crate) fn md(w: &World) -> Option<Arc<MapData>> {
     w.data.menu.as_ref().and_then(|d| d.maps.clone())
 }
 
@@ -245,6 +250,7 @@ impl MapScreen {
             oam_shown: Oam::default(),
             entered: false,
             tile_bytes: 0,
+            scout: None,
         }
     }
 
@@ -324,10 +330,11 @@ impl MapScreen {
         s
     }
 
-    /// `0x080261D4`: the scouter page (stand-in)
-    pub fn scouter(_w: &World) -> MapScreen {
+    /// `0x080261D4`: the scouter page (scouter.rs)
+    pub fn scouter(w: &mut World) -> MapScreen {
         let mut s = MapScreen::blank(MapPage::Scouter);
         s.r_btn = 1;
+        s.scout = Some(Box::new(super::scouter::Scout::new(w)));
         s
     }
 
@@ -340,6 +347,9 @@ impl MapScreen {
 
     /// the objects' update + OAM build (`0x08011A1E`, `0x080115B0`)
     fn objects(&mut self, w: &World) {
+        if let Some(sc) = self.scout.as_mut() {
+            sc.update(w);
+        }
         for m in self.markers.iter_mut() {
             m.update();
         }
@@ -476,7 +486,14 @@ impl Page for MapScreen {
                     self.close();
                 }
             }
-            MapPage::Scouter => {}
+            MapPage::Scouter => {
+                if pressed & A != 0 && self.scout.as_ref().is_some_and(|s| s.sel.is_some()) {
+                    // 0x08026360: the info page after the fade (BLDCNT 0x3E5E)
+                    self.next = 3;
+                    self.keep_frame = true;
+                    self.changing = true;
+                }
+            }
         }
         if self.changing {
             self.eva = self.eva.wrapping_sub(1);
@@ -484,6 +501,7 @@ impl Page for MapScreen {
                 return match self.next {
                     1 => Action::Replace(Screen::MapScreen(self.page_to(w, false))),
                     2 => Action::Replace(Screen::MapScreen(self.page_to(w, true))),
+                    3 => Action::Replace(Screen::MapScreen(self.page_to(w, true))),
                     _ => {
                         // the last iteration's registers (EVA 0) stay on screen while the screen ends
                         w.menu.shown = Some(Box::new(Screen::MapScreen(self.clone())));
@@ -589,7 +607,10 @@ impl Page for MapScreen {
             let f = self.markers.get(i).map(|m| m.frame).unwrap_or(0);
             v.objs.push(MenuObj { path: "ui/mapscreen/marker.png".into(), frame: f as u16, fw: 8, fh: 8, x, y, priority: p, hflip: false, vflip: false, pal: 0, ..Default::default() });
         }
-        if let Some(rec) = mdat.as_ref().and_then(|m| m.records.get(self.rec.max(0) as usize)) {
+        if let Some(sc) = self.scout.as_ref() {
+            sc.objs(w, &mut v.objs);
+        }
+        if let Some(rec) = mdat.as_ref().and_then(|m| m.records.get(self.rec.max(0) as usize)).filter(|_| self.rec >= 0) {
             if let Some(op) = rec.objs.as_ref() {
                 for &(k, x, y) in &o.entries {
                     let e = &rec.entries[k as usize];
@@ -607,7 +628,7 @@ impl Page for MapScreen {
 impl MapScreen {
     /// the page L (`right` false) / R of this one; the new page keeps the blend mode (its enter does not touch
     /// BLDCNT) and starts at EVA 0
-    fn page_to(&self, w: &World, right: bool) -> MapScreen {
+    fn page_to(&self, w: &mut World, right: bool) -> MapScreen {
         let mut s = match (self.page, right) {
             (MapPage::Area, false) => MapScreen::scouter(w),
             (MapPage::Area, true) => MapScreen::world(w),

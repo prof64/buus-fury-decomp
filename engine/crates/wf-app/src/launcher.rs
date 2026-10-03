@@ -762,8 +762,9 @@ pub fn title_app(packs: Packs, slots: &[Vec<u8>], seed: u32) -> Result<App, Stri
     let cfg = FieldConfig { world: 1, area: 1, rng: RngInit::Seed(seed), ..Default::default() };
     let mut session = Session::new_field(data, cfg);
     session.world.saves = saves;
+    // before the sim takes the creation events: the title's song replaces the placeholder area's
+    wf_core::menu::title::open_title(&mut session.world);
     let mut s = crate::story::StorySim::with_session(&packs, session)?;
-    wf_core::menu::title::open_title(&mut s.session.world);
     s.skip_area_banner();
     Ok(App::new(packs, Box::new(s)))
 }

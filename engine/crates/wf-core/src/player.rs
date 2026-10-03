@@ -1287,7 +1287,9 @@ pub fn update(w: &mut World, i: usize) {
     if puppet {
         crate::scene::player_frames_tick(w, i);
     }
-    if !pr(w, i).dead && !puppet {
+    // a trigger script's nested loop: the state's control does not run (field::hold_nested)
+    let nested = w.field.as_ref().is_some_and(|f| f.nested);
+    if !pr(w, i).dead && !puppet && !nested {
         control(w, i);
     }
     let mut pl = pr(w, i).clone();

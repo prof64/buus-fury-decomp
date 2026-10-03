@@ -165,7 +165,13 @@ impl StorySim {
             }
         }
         match st {
-            Ok(Status::Blocked) => self.running = true,
+            Ok(Status::Blocked) => {
+                // a map trigger's blocking inline script holds the field in the VM's nested loop (field::hold_nested)
+                if matches!(self.cause, Some(Cause::Trigger { .. })) {
+                    wf_core::field::hold_nested(&mut self.session.world);
+                }
+                self.running = true
+            }
             Ok(Status::Finished) => {
                 self.running = false;
                 self.globals = self.rt.globals();

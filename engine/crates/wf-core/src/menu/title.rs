@@ -454,6 +454,34 @@ pub const BOOT: Transition = Transition { fade_out: 0, enter: 1, leave: 1, fade_
 pub fn open_title(w: &mut World) {
     let t = Title::new(w);
     super::open(w, super::Screen::Title(t), BOOT, false);
+    // the enter (`0x080053CC`) starts the title song; the placeholder world's area song never plays
+    w.events.retain(|e| !matches!(e, crate::world::Event::Song { .. }));
+    w.scene.song = -1;
+    crate::scene::play_song(w, TITLE_SONG);
+}
+
+/// the title's song (`0x080053CC`)
+pub const TITLE_SONG: i32 = 45;
+
+/// `return_to_title` (0x8E: game over after script #0's "You have died!", the ending): a fresh session on the
+/// title screen with the save slots and the options kept. The world under the title is a placeholder (Snakeway's
+/// first area) the title's New Game / Continue replaces.
+pub fn title_world(data: &Arc<crate::content::GameData>, w: &World) -> World {
+    let cfg = crate::field::FieldConfig {
+        world: 1,
+        area: 1,
+        rng: crate::battle::RngInit::State(w.rng.a, w.rng.b),
+        ..Default::default()
+    };
+    let mut nw = crate::field::create(Arc::clone(data), &cfg);
+    nw.saves = w.saves.clone();
+    nw.saves.pending = None;
+    nw.menu.settings = w.menu.settings.clone();
+    nw.events.retain(|e| !matches!(e, crate::world::Event::Field(crate::field::FieldEvent::Run { .. })));
+    nw.events.insert(0, crate::world::Event::SongStop);
+    open_title(&mut nw);
+    crate::scene::note_events(&mut nw);
+    nw
 }
 
 /// Continue: black frames after the switch (the area load) and the fade-in step (`0x080495B4` +8 = 4)

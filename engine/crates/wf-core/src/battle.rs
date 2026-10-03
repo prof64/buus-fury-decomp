@@ -222,6 +222,13 @@ pub fn arena_runtime(d: &GameData, id: &str) -> (ArenaRt, Option<(i32, i32)>) {
 
 /// spawn an enemy of `ty` at px (x, y); parent = 0 for none; start: None = the type's AI state, Some(-1) = no AI
 pub fn spawn_enemy(w: &mut World, ty: i32, x: i32, y: i32, parent: EntityId, start: Option<i32>) -> Option<usize> {
+    spawn_enemy_at(w, ty, x, y, parent, start, false)
+}
+
+/// spawn_enemy; `exact`: at (x, y) as given, no free-spot search (the field's placed enemies: the constructor
+/// 0x0800FD55 takes the def position as it is, VERIFIED Babidi's ship 8-12 / 8-21 / 8-42, where a def overlaps a
+/// marked tile)
+pub fn spawn_enemy_at(w: &mut World, ty: i32, x: i32, y: i32, parent: EntityId, start: Option<i32>, exact: bool) -> Option<usize> {
     w.data.enemy(ty)?;
     let mut e = Enemy::new(w, ty);
     e.a.x = x << 8;
@@ -229,7 +236,7 @@ pub fn spawn_enemy(w: &mut World, ty: i32, x: i32, y: i32, parent: EntityId, sta
     let id = w.add(Body::Enemy(Box::new(e)));
     let i = w.find(id).unwrap();
     enemy::clamp_inside(w, i);
-    if parent == 0 {
+    if parent == 0 && !exact {
         if let Some(c) = &w.col {
             let a = &w.en_ref(i).a;
             let region = w.arena.region.clone();
@@ -238,7 +245,7 @@ pub fn spawn_enemy(w: &mut World, ty: i32, x: i32, y: i32, parent: EntityId, sta
             e.a.x = fx << 8;
             e.a.y = fy << 8;
         }
-    } else {
+    } else if parent != 0 {
         w.en(i).parent = parent;
         if let Some((pi, _)) = w.enemy_by_id(parent) {
             w.en(pi).children.push(id);

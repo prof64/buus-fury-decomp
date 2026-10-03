@@ -2168,7 +2168,7 @@
   ],
   "category": "map",
   "kind": "immediate",
-  "blocking": false,
+  "blocking": "conditional (the scene area's on-enter script runs nested inside the load: the host runs it, the native returns when it ended)",
   "handler": "0x080020ED",
   "engine_fn": "0x08009030(world_obj, world, map, variant, &{x,y}, 1, 0)",
   "semantics": "Load map WORLD/MAP as a scene immediately (no fades; scripts wrap it in fade_out/fade_in), same as load_scene_fade otherwise (last flag 0).",

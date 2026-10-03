@@ -32,6 +32,7 @@ def main():
     prev_state = None
     prev_row = None
     prev_lf = e.r32(0x03000F94)
+    change_at = 0
     flags = e.read(sg.GD + 0x55, 0x80).hex()
     area0 = [e.r8(sg.WS), e.r8(sg.WS + 1), e.r8(sg.WS + 2)]
 
@@ -70,18 +71,29 @@ def main():
         flags = sg.row_extras(e, row, flags)
         if prev_row is not None and row['area'] != prev_row['area']:
             pending = True
+            change_at = len(seg['rows']) if seg is not None else 0
         elif pending and prev_row is not None and e.r32(0x03000F94) != prev_lf and prev_row['p'] is not None:
             # the previous frame closed the load's first complete logic frame: cut there if importable
             pending = False
             p = prev_row['p']
             if prev_row.get('depth') == 0 and p and p[3] == 'autowalk':
                 if seg is not None:
-                    seg['rows'].pop()          # this frame belongs to the next segment
+                    # the old segment ends before the area change: the game's load spans several video frames
+                    # (objects appear while it runs); the next segment starts after the load's logic frame
+                    cut_lf = seg['rows'][change_at]['lf'] if change_at < len(seg['rows']) else None
+                    del seg['rows'][change_at:]
+                    # a logic frame that spans video frames (a lag frame before the load): its first video frames
+                    # show the old area mid-frame; drop the incomplete logic frame too
+                    while seg['rows'] and seg['rows'][-1]['lf'] == cut_lf:
+                        seg['rows'].pop()
                 finish(seg)
                 if nseg >= mx:
                     return
                 e.load(prev_state)
                 e.hits()                        # drop the discarded frame's breakpoint hits
+                (out / 'states').mkdir(exist_ok=True)
+                ar = [e.r8(sg.WS), e.r8(sg.WS + 1)]
+                e.save_file(str(out / 'states' / f'{prefix}_{nseg + 1:03d}_{ar[0]}-{ar[1]}.ss'))
                 init, rec = sg.init_of(e)
                 rec.arm()
                 nseg += 1

@@ -90,6 +90,13 @@ impl Session {
         w.events.clear();
         w.g.shake_ended = false;
         w.input = inputs;
+        // `return_to_title` (0x8E) last frame: the session restarts on the title screen (menu/title.rs)
+        if w.scene.requests.iter().any(|r| matches!(r, crate::scene::Request::ReturnToTitle)) {
+            *w = crate::menu::title::title_world(&self.data, w);
+            w.input = inputs;
+            self.presenter.reset();
+            return;
+        }
         // a menu screen runs instead of the world (menu/mod.rs): nothing else updates
         if crate::menu::active(w) {
             crate::menu::step(w);
@@ -115,6 +122,9 @@ impl Session {
     pub fn step_update(&mut self) {
         let w = &mut self.world;
         if crate::menu::active(w) {
+            if w.field.is_some() && crate::menu::minigame::world_runs(w) {
+                w.step_entities();
+            }
             return;
         }
         if let Some(f) = w.field.as_mut() {
@@ -125,6 +135,8 @@ impl Session {
                 battle::pre_step(w);
                 w.step_entities();
             }
+            // the leader's KO timer: the death / Lazarus Crystal hook (menu/gameover.rs)
+            crate::menu::gameover::tick(w);
             crate::scene::tick(w);
             return;
         }
@@ -139,6 +151,9 @@ impl Session {
     pub fn step_post(&mut self) -> &[Event] {
         let w = &mut self.world;
         if crate::menu::active(w) && !crate::menu::opened_this_frame(w) {
+            if w.field.is_some() && crate::menu::minigame::world_runs(w) {
+                crate::field::world_mode_cameras(w);
+            }
             crate::menu::post(w);
             return &self.world.events;
         }

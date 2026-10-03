@@ -8,11 +8,12 @@ from route import KEY
 
 U, D, L, R, A, B = KEY.UP, KEY.DOWN, KEY.LEFT, KEY.RIGHT, KEY.A, KEY.B
 
-# fight in 2-9, over to 2-10, fight, back to 2-9 (East District 439: the fighters come back on every load)
+# fight in 2-9 (two criminals: melee only, Energy Blasts from range finish them), up to 2-8 and back (the fighters
+# come back on every load)
 CYCLE_2_9 = (
     ('fight2', 3000), ('wait', 30),
-    ('walk', 450, 220), ('hold', R, 30), ('area', 2, 10), ('wait', 30), ('fight2', 3000), ('wait', 30),
-    ('walk', 4, 200), ('hold', L, 30), ('area', 2, 9), ('wait', 30),
+    ('walk', 248, 8), ('hold', U, 30), ('area', 2, 8), ('wait', 30),
+    ('walk', 248, 440), ('hold', D, 30), ('area', 2, 9), ('wait', 30),
 )
 # fight in 3-2, over to 3-14 (the circus grounds) and back
 CYCLE_3_2 = (

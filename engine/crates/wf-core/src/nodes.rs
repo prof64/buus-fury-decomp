@@ -607,6 +607,21 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
     match kind(c, n) {
         // node 0x080716F4: enter no-op, update 0 - no animation change
         K::Idle => {}
+        // shield soldiers: the graphics swap runs on enter (seen on the GotoState frame)
+        K::RaiseShield => {
+            w.en(i).shield = 1;
+            shield_gfx(w, i, &[(0xB0, 0xAF), (0x102, 0xB2), (0x56, 0xAC)]);
+        }
+        K::LowerShield => {
+            w.en(i).shield = 0;
+            shield_gfx(w, i, &[(0xAF, 0xB0), (0xB2, 0x102), (0xAC, 0x56)]);
+        }
+        K::ShieldBreak => {
+            w.en(i).shield = -1;
+            shield_gfx(w, i, &[(0xB0, 0xB1), (0xAF, 0xB1), (0x102, 0x100), (0xB2, 0x100), (0x56, 0x55), (0xAC, 0x55)]);
+            let (cx, cy) = w.en_ref(i).a.center();
+            crate::fx::puff_rng(w, cx, cy);
+        }
         // RunMotionController with a field patrol runner (0x080299A3): enter is a nop (fieldpatrol.rs)
         K::RunMotionController if crate::fieldpatrol::has(w, i) => {}
         K::RunMotionController | K::PartMirrorAnim => {
@@ -2221,20 +2236,9 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             }
             false
         }
-        K::RaiseShield => {
-            w.en(i).shield = 1;
-            true
-        }
-        K::LowerShield => {
-            w.en(i).shield = 0;
-            true
-        }
-        K::ShieldBreak => {
-            w.en(i).shield = -1;
-            let (cx, cy) = w.en_ref(i).a.center();
-            crate::fx::puff_rng(w, cx, cy);
-            true
-        }
+        // the swap happens when the node is entered (the state's GotoState frame; VERIFIED 8-32 segment), the update
+        // only finishes
+        K::RaiseShield | K::LowerShield | K::ShieldBreak => true,
         K::WaitFormationSlot => w.en_ref(i).slot != 0,
         K::MoveToFormationA | K::MoveToFormationB => {
             let Some(pi) = en::player(w, i) else { return true };
@@ -2540,4 +2544,20 @@ fn tank_drive(w: &mut World, i: usize, d: u8, r: &mut NodeRt) {
         set_anim(w, i, &[nm("idle")], true, Some(true));
     }
     en::mark_self(w, i);
+}
+
+/// shield soldiers' graphics swaps (RaiseShield 0x0802CD7D / LowerShield 0x0802CDE1 / ShieldBreak 0x0802D49F): the
+/// enemy's graphics set changes (gfx ids: shield down / up / broken); the animation carries on
+fn shield_gfx(w: &mut World, i: usize, map: &[(i32, i32)]) {
+    let d = w.data.clone();
+    let g = if w.en_ref(i).gfx_now >= 0 { Some(w.en_ref(i).gfx_now) } else { d.enemy(w.en_ref(i).ty).and_then(|t| t.gfx) };
+    let Some(g) = g else { return };
+    let Some(&(_, to)) = map.iter().find(|(from, _)| *from == g) else { return };
+    let idx = to - crate::content::GFX_OFFSET;
+    if d.sprite(idx).is_none() {
+        return;
+    }
+    let e = w.en(i);
+    e.gfx_now = to;
+    e.a.set_sprite(&d, Some(idx));
 }

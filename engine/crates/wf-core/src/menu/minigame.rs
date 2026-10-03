@@ -460,6 +460,15 @@ pub fn open_watch(w: &mut World, level: i32) {
     open_overlay(w, s, held);
 }
 
+/// the power struggle's mode keeps the field's object world updating (mode vt `0x0804B5D8` entry 3 = `0x08007018`,
+/// which calls the world update `0x080115B0`; story segment sb_01_05b: the Z-Sword, s464 - the actors' animations
+/// and Gohan's frame-range pose keep running under the gauge)
+pub fn world_runs(w: &World) -> bool {
+    let power = |s: Option<&Screen>| matches!(s, Some(Screen::Minigame(m)) if m.kind == Kind::Power);
+    // the closing frame too (the stack is empty, the screen still shows)
+    power(w.menu.stack.last()) || (w.menu.stack.is_empty() && power(w.menu.shown.as_deref()))
+}
+
 /// `run_power_struggle` (0xC6): the screen over the field; nothing to push when it closes
 pub fn open_power(w: &mut World) {
     let held = w.input[0].held;

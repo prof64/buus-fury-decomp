@@ -327,6 +327,11 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
         }
         0x73 => {
             load_scene(h.w, h.s, arg(a, 0), arg(a, 1), arg(a, 2), arg(a, 3), arg(a, 4), true);
+            // the scene's on-enter script runs inside the load (nested): its commands' frames come before the
+            // script's next action (s025: 0-16 hides two props before the actors appear)
+            if h.s.nest_area_enter && h.w.field.as_ref().is_some_and(|f| f.on_enter_queued) {
+                return block(h.s, Pending::Arrival);
+            }
             unit()
         }
         0x75 => {
@@ -351,10 +356,16 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
                             wf_core::player::set_idle(h.w, i);
                         }
                     }
+                    if let Some(f) = h.w.field.as_mut() {
+                        f.nest_load = h.s.nest_area_enter;
+                    }
                     wf_core::field::load_area(h.w, wf_core::field::AreaId { world: wd, area: m, variant: v }, x, y, Some(0));
+                    if let Some(f) = h.w.field.as_mut() {
+                        f.nest_load = false;
+                    }
                     // the load waits for the new area's on-enter script (no event holds the field: Other World travel
                     // s511 / s512): a nesting host runs it now, the warp returns when the players arrived
-                    if h.s.nest_area_enter && h.w.field.as_ref().is_some_and(|f| f.arrival.is_some()) {
+                    if h.s.nest_area_enter && h.w.field.as_ref().is_some_and(|f| f.on_enter_queued) {
                         return block(h.s, Pending::Arrival);
                     }
                 } else {
@@ -444,7 +455,14 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
             block(h.s, Pending::Menu { native: n, push: true })
         }
         0x8d => {
-            scene::open_menu(h.w, MenuKind::Character);
+            if leader(h.w).is_none() {
+                return Ok(NativeResult::Done(None)); // `0x080027DE`: nothing without a player object
+            }
+            if h.w.data.menu.is_some() {
+                wf_core::menu::charsel::open_charsel(h.w);
+            } else {
+                scene::open_menu(h.w, MenuKind::Character);
+            }
             block(h.s, Pending::Menu { native: n, push: false })
         }
         0x8e => {
@@ -502,8 +520,14 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
             }
             if let Some(i) = fighter_of(h.w, c) {
                 let mut p = h.w.pl_ref(i).clone();
+                let gfx = |w: &World, f: i32| w.data.form(f).map(|f| f.gfx);
+                let new_sprite = gfx(h.w, p.form) != gfx(h.w, form);
                 p.apply_form(h.w, form);
                 *h.w.pl(i) = p;
+                // the active character's sprite is rebuilt, then vt+0x28(0) (s067: set_char_form(1, 108))
+                if new_sprite && leader(h.w) == Some(i) {
+                    wf_core::player::set_idle(h.w, i);
+                }
             }
             unit()
         }
@@ -635,11 +659,8 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
             unit()
         }
         0xc6 => {
-            if h.w.data.menu.is_some() {
-                wf_core::menu::minigame::open_power(h.w);
-            } else {
-                scene::open_menu(h.w, MenuKind::PowerStruggle);
-            }
+            // the exact screen (menu/minigame.rs) needs no menu content: used with or without it
+            wf_core::menu::minigame::open_power(h.w);
             block(h.s, Pending::Menu { native: n, push: false })
         }
         0xc7 => {
@@ -942,9 +963,16 @@ pub fn switch_character(w: &mut World, c: i32) -> Result<(), String> {
         }
     }
     p.holy_left = 0;
+    let gfx = |w: &World, f: i32| w.data.form(f).map(|f| f.gfx);
+    let new_sprite = gfx(w, p.form) != gfx(w, form);
     p.apply_form(w, form);
     *w.pl(i) = p;
     w.story.current = c;
+    // 0x08010692 rebuilds the player and ends with vt+0x28(0): the idle state is entered again (rand(255); s067:
+    // Goku -> Gohan on the Planet of the Kais; also with the same sprite: s124's set_character(1) right after its
+    // warp to Hercule City draws once more after the new player's two)
+    let _ = new_sprite;
+    wf_core::player::set_idle(w, i);
     Ok(())
 }
 

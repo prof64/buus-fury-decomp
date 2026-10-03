@@ -58,6 +58,22 @@ def player_pos(e):
     out = dict(area=[e.r8(0x0300197C), e.r8(0x0300197D), e.r8(0x0300197E)])
     if 0x02000000 <= p < 0x02040000:
         out['player'] = [e.r32(p + 0x1A0) >> 8, e.r32(p + 0x1A4) >> 8, e.r8(p + 0x11)]
+        # newer captures (the map screen's Scouter shows the live field): the player's direction (+0x10), the
+        # other actors of the object list (0x03001C4C) [def id, x, y, direction] (def id = the actor def table
+        # 0x086B6BB4 index), the camera (0x030019A4 +0x28 / +0x2C) and the RNG state (0x03004A5C)
+        out['facing'] = e.r8(p + 0x10)
+        ids = {}
+        for i in range(10, 0x200):
+            ids.setdefault(e.r32(0x086B6BB4 + 4 * i), i)
+        objs = []
+        for i in range(e.r32(0x03001C4C + 4)):
+            o = e.r32(0x03001C4C + 8 + 4 * i)
+            d = e.r32(o + 0x58)
+            if o != p and d in ids:
+                objs.append([ids[d], e.r32(o + 0x1A0) >> 8, e.r32(o + 0x1A4) >> 8, e.r8(o + 0x10)])
+        out['objs'] = objs
+        out['cam'] = [e.r32(0x030019A4 + 0x28), e.r32(0x030019A4 + 0x2C)]
+    out['rng'] = [e.r32(0x03004A5C), e.r32(0x03004A60)]
     return out
 
 

@@ -390,6 +390,13 @@ pub fn poll(w: &mut World, s: &mut HostState) -> Option<Option<i32>> {
             let (native, push) = (*native, *push);
             // the real screens (wf_core::menu): their effects are applied by the screen; the result after the fade-in
             if let Some(r) = wf_core::menu::take_result(w) {
+                // Switch Character chose (2): its handler set the current character and cleared the timed buff
+                // (GD+0x4DC); `0x080027DE` rebuilds the leader for it
+                if native == 0x8d && r == 2 {
+                    s.boost[0] = 0;
+                    let c = w.story.current;
+                    let _ = natives::switch_character(w, c);
+                }
                 return {
                     s.pending = None;
                     Some(push.then_some(r - 1))

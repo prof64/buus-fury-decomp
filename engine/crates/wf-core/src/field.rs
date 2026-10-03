@@ -13,7 +13,7 @@
 //! {..})`; the script host answers through the functions at the end of this file (warp, spawn_map_object, spawn
 //! pickups, busy). Spawn conditions are evaluated in the core (`story::eval_condition`).
 
-use crate::battle::{self, spawn_enemy};
+use crate::battle;
 use crate::fieldcontent::{Activation, AreaDef, Callback, Cond, Dest, MapDef, ObjDef, ObjKind, ObjRef, TriggerKind};
 use crate::geom::{Dir, Rect};
 use crate::player::{self, Player, PlayerInit};
@@ -147,6 +147,10 @@ pub struct Field {
     pub mode: Mode,
     /// a script / event holds the field (set by the host): no trigger check, no talk
     pub busy: bool,
+    /// the hold is a map trigger's blocking inline script (the VM's nested loop, `hold_nested`): the objects do not
+    /// think at all (a walking player keeps walking in place: its control does not run, its animation ticks)
+    #[serde(default)]
+    pub nested: bool,
     /// a script host is attached: blocking events (event triggers, save points, talk) set `busy` until it clears it
     pub host: bool,
     /// trigger check passes (list +0xC4)
@@ -212,6 +216,18 @@ pub struct Field {
     /// away (player.rs `ctl_it_field`)
     #[serde(default)]
     pub trig_off: bool,
+    /// a script removed the leader's object (`remove_actor(0)`: s511 on the Other World map); the next load creates
+    /// it again from the record (EnterArea always builds the player)
+    #[serde(default)]
+    pub player_removed: bool,
+    /// the last load queued its area's on-enter script (`FieldEvent::Run` with `Cause::AreaEnter`)
+    #[serde(default)]
+    pub on_enter_queued: bool,
+    /// set by a nesting script host around a script's immediate warp (`warp` 0x77 inside an event): the load defers
+    /// its arrival to the on-enter script like an exit's load (the game nests the script: 3-1's on-enter prop_hide
+    /// holds the player's creation 2 frames after s124 / s129's warps)
+    #[serde(default)]
+    pub nest_load: bool,
 }
 
 /// how a field session starts
@@ -304,6 +320,7 @@ fn new_field() -> Field {
         triggers: vec![],
         mode: Mode::Normal,
         busy: false,
+        nested: false,
         busy_since: 0,
         checks: 0,
         event_ended: false,
@@ -331,6 +348,9 @@ fn new_field() -> Field {
         entered: 0,
         loads: 0,
         trig_off: false,
+        player_removed: false,
+        on_enter_queued: false,
+        nest_load: false,
     }
 }
 
@@ -430,7 +450,7 @@ pub fn spawn_object(w: &mut World, o: &ObjDef) -> Option<EntityId> {
         ObjKind::Enemy { ty, x, y, .. } => {
             // the constructor first (spawn_enemy: its SetAnim(0) idle enter draws rand(255); the patrol runner from def
             // +0x18), the AI's first state after it
-            let i = spawn_enemy(w, *ty, *x, *y, 0, Some(-1))?;
+            let i = crate::battle::spawn_enemy_at(w, *ty, *x, *y, 0, Some(-1), true)?;
             // the placement's own graphics (ctor 0x0800FD55 takes the def's sprite: the same enemy type shows
             // different fighters, story playthrough Grand Kai's planet 1-12)
             if let ObjKind::Enemy { sprite, .. } = &o.kind {
@@ -540,6 +560,7 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
         f.busy = keep_busy;
         f.entered = w.frame;
         f.loads += 1;
+        f.on_enter_queued = false;
     }
     for s in 0..w.players.len().max(1) {
         snap_camera(w, s, x, y);
@@ -575,10 +596,13 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
     }
     if let Some(sc) = &a.on_enter {
         w.events.push(Event::Field(FieldEvent::Run { run: Callback::Script(sc.clone()), cause: Cause::AreaEnter, slot: 0 }));
+        if let Some(f) = w.field.as_mut() {
+            f.on_enter_queued = true;
+        }
         // with a script host the rest of the load waits for the script (the players stay out of the world). Not
         // while an event holds the field: its host runs one script at a time, and the event waits for this load
         // (the game nests the on-enter script; scripts that block on load are not known inside events yet)
-        if w.field.as_ref().is_some_and(|f| f.host && !f.busy) && w.scene.depth == 0 && objects {
+        if w.field.as_ref().is_some_and(|f| f.host && (!f.busy && w.scene.depth == 0 || f.nest_load)) && objects {
             crate::scene::send_offstage(w);
             if let Some(f) = w.field.as_mut() {
                 f.arrival = Some(Arrival { to, x, y, facing, fade_in: false, frame: w.frame });
@@ -587,6 +611,19 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
         }
     }
     arrive(w, to, x, y, facing);
+}
+
+/// a mode that keeps the object world running over the field (the power struggle, `menu::minigame::world_runs`):
+/// the cameras ease as in a field frame (the follow camera is part of the world update), nothing else of the field
+/// frame runs
+pub fn world_mode_cameras(w: &mut World) {
+    let scripted = crate::scene::camera(w);
+    for s in 0..w.players.len() {
+        if s == 0 && scripted {
+            continue;
+        }
+        camera(w, s);
+    }
 }
 
 /// the area's on-enter script is over: the load's remaining part (the players, the world map flyer, AreaEnter); an
@@ -638,7 +675,10 @@ fn arrive(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<Dir>) {
                 let Body::Player(old) = ent.body else { continue };
                 (renew_player(w, &old), old.a.facing)
             }
-            None if slot == 0 => {
+            None if slot == 0 && w.field.as_ref().is_some_and(|f| f.player_removed) => {
+                if let Some(f) = w.field.as_mut() {
+                    f.player_removed = false;
+                }
                 let p = make_player(w, 0, w.story.current);
                 let f = p.a.facing;
                 (p, f)
@@ -868,10 +908,18 @@ pub fn post_step(w: &mut World) {
     // an inline hook's event ended this frame: the update it interrupted completes now
     let resumed = w.field.as_ref().is_some_and(|f| f.resume_held);
     if resumed {
+        // the held update is the rest of the frame the event interrupted: NPCs run their normal update in it, without
+        // the extra tick of an event's last frame (story playthrough: King Kai's idle tick after Pikkon's mid-fight
+        // dialog advances by 2, not 3)
+        let ended = w.field.as_ref().is_some_and(|f| f.event_ended);
         if let Some(f) = w.field.as_mut() {
             f.resume_held = false;
+            f.event_ended = false;
         }
         w.step_entities();
+        if let Some(f) = w.field.as_mut() {
+            f.event_ended = ended;
+        }
     }
     // an event that ended in this frame's script phase was still running when the game's trigger check ran (deferred
     // calls, player update, trigger check, the other objects, then the scripts): no check this frame (story
@@ -1339,10 +1387,22 @@ pub fn set_busy(w: &mut World, busy: bool) {
             }
         }
         f.busy = busy;
+        if !busy {
+            f.nested = false;
+        }
     }
     if !busy {
         // the event's scene object is gone: later scenes carry no talk anchor
         w.scene.talk_anchor = crate::scene::NO_ANCHOR;
+    }
+}
+
+/// a map trigger's inline script blocked (prop_hide / prop_show: 4-20's doors): the game's VM runs it in a nested
+/// loop that animates the objects without their think until it ends (the host clears it with `set_busy(false)`)
+pub fn hold_nested(w: &mut World) {
+    set_busy(w, true);
+    if let Some(f) = w.field.as_mut() {
+        f.nested = true;
     }
 }
 

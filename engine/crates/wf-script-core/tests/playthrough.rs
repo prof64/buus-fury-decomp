@@ -33,7 +33,7 @@ use wf_script_core::{poll, CoreState, HostState, SharedHost};
 use wf_script_rhai::{Runtime, Status, UnitRef};
 
 /// frames of `opening.json` that must match continuously (the verdict)
-const MIN_MATCHED: usize = 32434; // New Game -> Olibu -> the level-65 gate -> the Cave of the Ancients 1-17
+const MIN_MATCHED: usize = 36628; // New Game -> Olibu -> the level-65 gate -> Cave of the Ancients -> Instant Transmission -> the Other World Tournament (Pikkon)
 
 fn repo() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..")
@@ -267,7 +267,13 @@ impl Host {
             }
         }
         match st {
-            Ok(Status::Blocked) => self.running = true,
+            Ok(Status::Blocked) => {
+                // a map trigger's blocking inline script holds the field in the VM's nested loop (field::hold_nested)
+                if matches!(self.cause, Some(Cause::Trigger { .. })) {
+                    wf_core::field::hold_nested(w);
+                }
+                self.running = true
+            }
             Ok(Status::Finished) => {
                 self.running = false;
                 w.story.g = self.rt.globals().g;
@@ -615,11 +621,36 @@ fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Value) -
                     _ => None,
                 }).collect();
                 let ens: Vec<String> = w.ents.iter().filter_map(|e| match &e.body {
-                    Body::Enemy(en) => Some(format!("{}:{:?} f{} st{:?} ({},{}) anim {:?} mv {}", e.id, en.a.sprite, en.a.facing, en.ai.stack.iter().map(|s| format!("{:x}", s.state)).collect::<Vec<_>>(), en.a.x, en.a.y, en.ea, en.moving)),
+                    Body::Enemy(en) => Some(format!("{}:{:?} f{} st{:?} ({},{}) anim {:?} mv {} mark {:?}", e.id, en.a.sprite, en.a.facing, en.ai.stack.iter().map(|s| format!("{:x}", s.state)).collect::<Vec<_>>(), en.a.x, en.a.y, en.ea, en.moving, en.marked)),
                     _ => None,
                 }).collect();
                 if !ens.is_empty() {
                     eprintln!("    enemies {ens:?}");
+                }
+                // PLAYTHROUGH_NPC=sprite: that NPC's animation (raw, frame, tick) against the game's actor row
+                if let Some(sp) = std::env::var("PLAYTHROUGH_NPC").ok().and_then(|v| v.parse::<i32>().ok()) {
+                    for e in w.ents.iter().filter(|e| !e.removed) {
+                        if let Body::Npc(n) = &e.body {
+                            if n.sprite_id == sp {
+                                let g: Vec<&Value> = fr["actors"].as_array().into_iter().flatten().filter(|a| a[1].as_i64() == Some(sp as i64)).collect();
+                                eprintln!("    npc {sp} ours raw {} frame {} tick {} | game {:?}", n.anim.raw, n.anim.frame, n.anim.tick, g.first().map(|a| (a[6].clone(), a[7].clone(), a[8].clone())));
+                            }
+                        }
+                    }
+                }
+                // PLAYTHROUGH_ENTS=1: every live entity with an actor (kind, sprite, position, foot)
+                if std::env::var("PLAYTHROUGH_ENTS").is_ok() {
+                    if let Some(c) = w.col.as_ref() {
+                        if let Some(g) = c.walk.as_ref() {
+                            let d: Vec<(usize, usize, u8)> = (0..g.len()).filter(|&k| g[k] != c.map.walk[k]).map(|k| ((k % 256) * 8, (k / 256) * 8, g[k])).collect();
+                            eprintln!("    walk grid changes (x, y, v): {d:?}");
+                        }
+                    }
+                    for (i, e) in w.ents.iter().enumerate() {
+                        if let Some(a) = w.actor(i).filter(|_| !e.removed) {
+                            eprintln!("    ent {} {:?} sprite {:?} ({}, {}) foot {}x{} solid {:?}", e.id, std::mem::discriminant(&e.body), a.sprite, a.x as f64 / 256.0, a.y as f64 / 256.0, a.foot_w, a.foot_h, a.body_box());
+                        }
+                    }
                 }
                 eprintln!("    field mode {:?} arrival {:?}", w.field.as_ref().map(|f| f.mode.clone()), w.field.as_ref().map(|f| f.arrival.is_some()));
                 if let Some(pi) = w.player_idx(0) {

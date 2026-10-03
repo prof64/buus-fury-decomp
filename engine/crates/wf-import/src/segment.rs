@@ -95,7 +95,7 @@ fn sounds(w: &World) -> Vec<String> {
         .iter()
         .filter_map(|e| match e {
             Event::Sfx { id, vol } => Some(format!("play {id} {vol}")),
-            Event::SfxStop { id } => Some(format!("stop {id}")),
+            Event::SfxStop { id } | Event::SfxStopMatch { id } => Some(format!("stop {id}")),
             Event::SfxStopAll => Some("stopall".into()),
             Event::Song { id } => Some(format!("song {id}")),
             _ => None,
@@ -309,6 +309,23 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
                     w.rng.state(),
                     fr["rng"],
                 );
+                // the enemies: position px, AI state stack (top last), sprite
+                let ens: Vec<String> = (0..w.ents.len())
+                    .filter(|&i| !w.ents[i].removed)
+                    .filter_map(|i| match &w.ents[i].body {
+                        wf_core::world::Body::Enemy(e) => Some(format!(
+                            "({},{} {:x?} s{:?} hp{})",
+                            e.a.x >> 8,
+                            e.a.y >> 8,
+                            e.ai.stack.iter().map(|s| s.state).collect::<Vec<_>>(),
+                            e.a.sprite,
+                            e.hp1024 >> 10
+                        )),
+                        wf_core::world::Body::Pickup(p) => Some(format!("pickup({},{} z{} t{} box{:?})", p.x >> 8, p.y >> 8, p.z, p.t, p.bx)),
+                        _ => None,
+                    })
+                    .collect();
+                eprintln!("      enemies {}", ens.join(" "));
             }
         }
         let w = &sess.world;

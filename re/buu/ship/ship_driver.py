@@ -221,12 +221,52 @@ class ShipDriver(Driver):
             return self.fightp(e, s, g)
         if kind == 'nav':
             return self.nav(e, s, g)
+        if kind == 'fly':
+            return self.fly(e, s, g)
         if kind == 'mark':
             if self.on_mark:
                 self.on_mark(g[1], e)
             self.next_goal()
             return None
         return super().step(e)
+
+    def fly(self, e, s, g):
+        """('fly', x, y, w, h): world map 0-50 (as tools/story_playthrough/earth_driver.py): climb above the
+        encounters (z ~110 px), steer (LEFT / RIGHT turn, UP thrust) to the rect's centre, then descend (A) inside it
+        until the landing script warps; done once controllable elsewhere"""
+        import math
+        x0, y0, rw, rh = g[1], g[2], g[3], g[4]
+        if s['area'][:2] != [0, 50]:
+            if s['scene'] > 0 or s['p'] is None:
+                self.idle = 0
+                return self.mash_a()
+            self.next_goal()
+            return None
+        p = e.r32(0x03001C34)
+        if not p or s['scene'] > 0:
+            return self.mash_a() if s['scene'] > 0 else 0
+        sv = lambda v: v - (1 << 32) if v & 0x80000000 else v  # noqa: E731
+        x, y = sv(e.r32(p + 0x1A0)) / 256, sv(e.r32(p + 0x1A4)) / 256
+        z, h = sv(e.r32(p + 0x1A8)) / 1024, sv(e.r32(p + 0x1AC)) / 1024
+        tx, ty = x0 + rw / 2, y0 + rh / 2
+        dx, dy = tx - x, ty - y
+        dist = math.hypot(dx, dy)
+        want = math.degrees(math.atan2(dx, -dy)) * 256 / 360
+        diff = (want - h + 128) % 256 - 128
+        k = 0
+        if dist < min(rw, rh) / 2 - 4:
+            return KEY.A
+        if diff > 3:
+            k |= KEY.RIGHT
+        elif diff < -3:
+            k |= KEY.LEFT
+        if abs(diff) < 40 or dist > 120:
+            k |= KEY.UP
+        if z < 105 and dist > 150:
+            k |= KEY.B
+        elif dist < 400 and z > 20:
+            k |= KEY.A
+        return k
 
     def nav(self, e, s, g):
         """('nav', w, a[, fight]): walk through the exits (nav.route) to area w-a; with fight, clear each room's
@@ -355,7 +395,7 @@ class ShipDriver(Driver):
             tg[0], tg[1] = en[4], 0
         else:
             tg[1] += 1
-            if tg[1] > 400:
+            if tg[1] > 400 and not (len(g) > 4 and g[4]):
                 self.skip.add(en[0])
         dx, dy = ex - x, ey - y
         per = g[3] if len(g) > 3 else 10

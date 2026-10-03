@@ -121,7 +121,7 @@ fn traces() -> PathBuf {
 }
 
 /// scenarios that must be exact (prefixes)
-const STRICT: &[&str] = &["shop_", "save_", "title_", "status_", "inventory_", "equip_", "cr_", "mg_", "options_", "journal_", "skills_", "cr_", "map_snake", "map_forest"];
+const STRICT: &[&str] = &["shop_", "save_", "title_", "charsel_", "status_", "inventory_", "equip_", "cr_", "mg_", "options_", "journal_", "skills_", "cr_", "map_snake", "map_forest"];
 
 /// the capture's picture hash: sha1 of the RGB bytes, first 16 hex digits
 fn hash(fb: &[u32]) -> String {
@@ -151,12 +151,45 @@ fn run(packs: &Packs, data: &Arc<wf_core::content::GameData>, name: &str) -> Opt
     if let Some(p) = sj["player"].as_array().filter(|a| a.len() >= 2) {
         cfg.pos = Some((i(&p[0]) as i32, i(&p[1]) as i32));
     }
+    let meta = &tr["meta"];
+    // screens showing the live field (the map screen's Scouter; `meta.live_field`): the player's direction, the
+    // other actors' positions / directions, the camera and the RNG as the emulator had them
+    let live = meta["live_field"].as_bool().unwrap_or(false);
+    if live {
+        if let Some(f) = sj["facing"].as_i64() {
+            cfg.facing = f as u8;
+        }
+    }
     let session = Session::new_field(Arc::clone(data), cfg);
     let mut sim = StorySim::with_session(packs, session).expect("story sim");
     sim.skip_area_banner();
+    if live {
+        let w = &mut sim.session.world;
+        let mut objs: Vec<Option<&Value>> = sj["objs"].as_array().map(|a| a.iter().map(Some).collect()).unwrap_or_default();
+        for e in w.ents.iter_mut().rev() {
+            let a = match &mut e.body {
+                wf_core::world::Body::Npc(n) => &mut n.a,
+                wf_core::world::Body::Enemy(n) => &mut n.a,
+                _ => continue,
+            };
+            let Some(def) = a.sprite.map(|s| s + 9) else { continue };
+            if let Some(o) = objs.iter_mut().rev().find(|o| o.is_some_and(|o| i(&o[0]) as i32 == def)).and_then(|o| o.take()) {
+                a.x = (i(&o[1]) as i32) << 8;
+                a.y = (i(&o[2]) as i32) << 8;
+                a.facing = i(&o[3]) as u8;
+            }
+        }
+        if let Some(c) = sj["cam"].as_array().filter(|c| c.len() == 2) {
+            let (x, y) = (i(&c[0]) as i32, i(&c[1]) as i32);
+            let cam = &mut w.cameras[0];
+            cam.x = x << 10;
+            cam.y = y << 10;
+            cam.rect = wf_core::geom::Rect::new(x, y, x + 240, y + 160);
+            cam.shown = cam.rect;
+        }
+    }
     let rows = frames["frames"].as_array()?;
     // script-opened screens: the remake opens the screen the frame the emulator's script did
-    let meta = &tr["meta"];
     // the save slots (the game's EEPROM cache, title scenarios): `meta.saves[k]` = a story dict + location
     if let Some(sv) = meta["saves"].as_array() {
         for (k, s) in sv.iter().enumerate() {
@@ -237,6 +270,12 @@ fn run(packs: &Packs, data: &Arc<wf_core::content::GameData>, name: &str) -> Opt
             }
         }
         sim.step(&[keys], &mut ev);
+        // the RNG once the screen is open (the field frame before may draw differently)
+        if live && k == 0 {
+            if let Some(r) = sj["rng"].as_array().filter(|r| r.len() == 2) {
+                sim.session.world.rng.set_state([i(&r[0]) as u32, i(&r[1]) as u32]);
+            }
+        }
         if std::env::var("MENU_PARITY_STORY").is_ok_and(|v| v.split(',').any(|x| x.parse::<usize>().ok() == Some(k))) {
             let st = &sim.world().story;
             eprintln!("{name} {k}: equipment {:?} equip {:?} supplies {:?}", st.equipment, st.chars.iter().map(|c| c.equip).collect::<Vec<_>>(), st.supplies.iter().enumerate().filter(|(_, n)| **n > 0).collect::<Vec<_>>());

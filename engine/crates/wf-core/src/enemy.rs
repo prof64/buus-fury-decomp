@@ -1281,8 +1281,9 @@ pub fn align(w: &mut World, i: usize, speed: i32) -> bool {
             return true;
         }
         w.en(i).a.facing = if dy > 0 { 0 } else { 1 };
+        // a blocked try-move (0x0801CFA8): SetAnim(0) if walking, done; the facing stays the step's (VERIFIED Babidi's
+        // ship 8-31 / 8-42 segments)
         if !walk_by(w, i, 0, dy.signum() * speed, dy != 0 && speed != 0) {
-            w.en(i).a.facing = if dx > 0 { 3 } else { 2 };
             return blocked(w);
         }
         walk(w);
@@ -1294,7 +1295,6 @@ pub fn align(w: &mut World, i: usize, speed: i32) -> bool {
         }
         w.en(i).a.facing = if dx > 0 { 3 } else { 2 };
         if !walk_by(w, i, dx.signum() * speed, 0, dx != 0 && speed != 0) {
-            w.en(i).a.facing = if dy > 0 { 0 } else { 1 };
             return blocked(w);
         }
         walk(w);

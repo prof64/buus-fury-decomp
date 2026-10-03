@@ -25,6 +25,7 @@ pub mod mapscreen;
 pub mod minigame;
 pub mod options;
 pub mod save;
+pub mod scouter;
 pub mod shop;
 pub mod skills;
 pub mod status;
@@ -123,6 +124,10 @@ pub trait Page {
     /// shown over the last copied picture
     fn objs(&self, _w: &World) -> Vec<wf_view::MenuObj> {
         Vec::new()
+    }
+    /// the closing iteration's frame is already black (Switch Character), not the page
+    fn leave_black(&self) -> bool {
+        false
     }
     /// draw-time side effects and values sampled when the surface is drawn (kept in the shown copy)
     fn before_draw(&mut self, _w: &World) {}
@@ -669,6 +674,9 @@ fn close(w: &mut World) {
 pub fn view(w: &World) -> Option<MenuView> {
     match w.menu.phase {
         // the closing iteration still shows the page
+        Phase::Leave { t: 0 } if w.menu.shown.as_deref().is_some_and(|s| s.page().leave_black()) => {
+            return Some(MenuView { backdrop: 0, palette: vec![(0, 0)], ..Default::default() })
+        }
         Phase::Run | Phase::Leave { t: 0 } => {}
         Phase::Enter { .. } | Phase::Leave { .. } => return Some(MenuView { backdrop: 0, palette: vec![(0, 0)], ..Default::default() }),
         Phase::Idle => {

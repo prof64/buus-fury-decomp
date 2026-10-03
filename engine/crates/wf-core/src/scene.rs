@@ -103,6 +103,11 @@ pub struct ActAnim {
     pub ended: bool,
     /// a frame-range controller created this frame by a track's pop-and-start: no tick yet
     pub fresh: bool,
+    /// idle reached by a one-shot state's own end (not requested by a script): the requested-anim check of
+    /// `play_anim(a, 0)` (vt+0x34) does not see it as idle, so the script's idle restarts it (rand(255); story
+    /// segment sb_01_03, s025: the ki blast's thrower)
+    #[serde(default)]
+    pub self_idle: bool,
 }
 
 /// what an animation tick asks the world to do
@@ -291,7 +296,12 @@ pub fn npc_update(w: &mut World, i: usize) {
 fn anim_out(w: &mut World, i: usize, out: AnimOut) {
     match out {
         AnimOut::None => {}
-        AnimOut::ToIdle => set_state(w, i, 0),
+        AnimOut::ToIdle => {
+            set_state(w, i, 0);
+            if let Some(a) = anim_mut(w, i) {
+                a.self_idle = true;
+            }
+        }
         // the dash state's step sound is the player's (scripted actors run silently: buu_form)
         AnimOut::Sfx(..) => {}
     }
@@ -386,6 +396,14 @@ fn actor_mut(w: &mut World, i: usize) -> Option<&mut Actor> {
 pub fn set_state(w: &mut World, i: usize, id: i32) {
     if matches!(w.ents[i].body, Body::Player(_)) {
         make_puppet(w, i);
+        // a new state replaces a frame-range animation the player was playing (s464: play_anim_frames(0, 17, ..)
+        // under the power struggle, then play_anim(0, 17) runs its 6 cels)
+        let pid = w.ents[i].id;
+        if let Some(pp) = w.scene.puppets.iter_mut().find(|p| p.id == pid) {
+            if matches!(pp.anim.mode, AnimMode::Frames { .. }) {
+                pp.anim = ActAnim::of(id);
+            }
+        }
         crate::player::script_set_anim(w, i, id.clamp(0, 24) as usize);
         return;
     }
@@ -1209,10 +1227,11 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
     match cmd {
         Cmd::PlayAnim { anim } => {
             // anim 0 (idle) completes at once; it restarts the idle state only on an actor not already idle
-            // (a held pose / other state goes back to idle, with the idle's random tick)
+            // (a held pose / other state goes back to idle, with the idle's random tick); a player always
+            // re-enters idle (story playthrough s101: play_anim(0, 0) after a scripted dash draws rand(255) again)
             let not_idle = |w: &World, i: usize| {
-                !matches!(w.ents[i].body, Body::Player(_))
-                    && scene_anim(w, i).is_some_and(|a| a.raw != ActAnim::of(0).raw || a.mode != AnimMode::Table)
+                matches!(w.ents[i].body, Body::Player(_))
+                    || scene_anim(w, i).is_some_and(|a| a.raw != ActAnim::of(0).raw || a.mode != AnimMode::Table || a.self_idle)
             };
             if let Some(i) = i {
                 if *anim != 0 || not_idle(w, i) {
@@ -1268,6 +1287,9 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
                 let (px, py) = actor_pos(w, i);
                 let (nn, ssx, ssy) = step_math(*x - px, *y - py, *speed, 8);
                 (*n, *sx, *sy, *t) = (nn, ssx, ssy, 0);
+                // a glide lifts the NPC's grid mark like a walk and sets none where it stops (story playthrough
+                // s101: the fighters knocked back from (328, 384) leave the floor free for Goku's walk)
+                crate::fieldnpc::script_move_mark(w, i, false);
             }
         }
         Cmd::JumpTo { x, y, air, t, sx, vy } => {
@@ -1325,7 +1347,13 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
         }
         Cmd::Remove => {
             if let Some(i) = i {
+                crate::fieldnpc::script_move_mark(w, i, false);
                 w.ents[i].removed = true;
+                if matches!(w.ents[i].body, Body::Player(_)) {
+                    if let Some(f) = w.field.as_mut() {
+                        f.player_removed = true;
+                    }
+                }
                 if w.scene.boss_bar.as_ref().is_some_and(|b| b.entity == w.ents[i].id) {
                     w.scene.boss_bar = None;
                 }
@@ -1350,6 +1378,9 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
                 let (px, py) = actor_pos(w, i);
                 let dir = w.actor(i).map(|a| a.facing).unwrap_or(0);
                 let old = w.ents[i].id;
+                // the NPC's destructor lifts its grid mark (story playthrough s101: Pikkon's spot at (376, 384)
+                // stays walkable once he is the enemy)
+                crate::fieldnpc::script_move_mark(w, i, false);
                 w.ents[i].removed = true;
                 // the remaining queued commands move to the map object (0x080192BA), as for change_sprite
                 if let Some(id) = become_map_object(w, *index, px, py, dir) {
@@ -1421,7 +1452,9 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
                     ShootKind::Blast => {
                         // the shoot state (raw 4) runs by itself; the blast flies to the point
                         set_state(w, i, 3);
-                        w.sfx(21, 64);
+                        // the ki blast object (0x08027CBC): its sound is 20 + rand(2) (story segment sb_01_03, s025)
+                        let snd = 20 + w.rng.rand(2);
+                        w.sfx(snd, 64);
                         let (nn, _, _) = step_math(*x - cx, *y - cy, *speed, 8);
                         *n = nn;
                     }
@@ -1671,7 +1704,10 @@ fn update_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) -> bool {
             if kind == BeamKind::Wave {
                 if let Some(i) = i {
                     if *t < *frames {
-                        set_pose(w, i, 17, (*t >> 3).min(2));
+                        // 8 ticks per cel, held on cel 3 (or the sprite's last; s025: sprites 43 / 42)
+                        let (sp, dir) = w.actor(i).map(|a| (a.sprite, a.facing)).unwrap_or((None, 0));
+                        let n = ActAnim::of(17).cels(&w.data, sp, dir).max(1);
+                        set_pose(w, i, 17, (*t >> 3).min(3).min(n - 1));
                     }
                     if *t == 16 {
                         let (x, y) = actor_pos(w, i);
@@ -1720,6 +1756,10 @@ fn update_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) -> bool {
                         crate::shots::beam_stop(w, k);
                     }
                     set_state(w, i, 0);
+                    // the command's own idle: a following `play_anim(a, 0)` restarts it (s025)
+                    if let Some(a) = anim_mut(w, i) {
+                        a.self_idle = true;
+                    }
                 }
                 return true;
             }
@@ -2343,8 +2383,10 @@ fn tick_screen(w: &mut World) {
     let fine = (256 * f.t.min(f.len) / f.len.max(1)).clamp(0, 256);
     match (f.kind, f.out) {
         (FadeKind::Black, true) => {
-            s.black = lvl;
-            s.dim = fine;
+            // a fade-out darkens from the current palette: an already black screen stays black (return_to_field
+            // after a scene that ended faded out: s057 -> 1-3)
+            s.black = s.black.max(lvl);
+            s.dim = s.dim.max(fine);
         }
         (FadeKind::Black, false) => {
             s.black = 16 - lvl;

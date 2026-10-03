@@ -112,7 +112,15 @@ impl StoryHost {
             }
         }
         match st {
-            Ok(Status::Blocked) => self.running = true,
+            Ok(Status::Blocked) => {
+                // a map trigger's inline script that blocks (prop_hide / prop_show at Capsule Corp's doors) holds the
+                // field until it ends, like an event: the objects' think pauses, animations tick (4-20: the player's
+                // walk stops 2 frames)
+                if matches!(self.cause, Some(Cause::Trigger { .. })) && self.outer.is_empty() {
+                    wf_core::field::hold_nested(w);
+                }
+                self.running = true
+            }
             Ok(Status::Finished) => {
                 self.running = false;
                 w.story.g = self.rt.globals().g;

@@ -61,11 +61,11 @@ Strict (must be exact, `STRICT` in the test): `status_*`, `inventory_*`, `equip_
 `skills_*`, `cr_*` (credits), `mg_*` (mini-games: power struggle, punch gauge, Watch This!; the native's push is
 checked too), `map_snakeway` / `map_forest` (map screen: area page, scrolling, record markers, revealed rooms, world
 page with markers, page changes, close) — every compared frame and every sound exact; credits, mini-games and the
-map screen are also exact with `MENU_PARITY_FREE=1` (their own frame-cost models). The shop / save /
-title / character-switch / game-over scenarios and `map_left` (the Scouter page, a stand-in) are reported but not
-strict until their screens are finished (`charsel_*` opens no screen yet; `shop_*` / `save_*` differ only on their first black frame,
-`title_*` on the continue / new-game hand-over). The world restore's length after a screen (CPU time: 24 or 25
-black frames) is taken from the trace too.
+map screen are also exact with `MENU_PARITY_FREE=1` (their own frame-cost models). Also strict: `shop_*`, `save_*`,
+`title_*` (title, Single Player, Select Game, New Game into the prologue, Continue into the field, Delete Game) and
+`charsel_*` (Switch Character: figures, silhouettes, walk / idle timing) — `re/buu/menu/NOTES_screens.md`.
+`map_left` (the Scouter page, a stand-in) is reported only. The world restore's length after a screen (CPU time:
+24 or 25 black frames) is taken from the trace too.
 
 ## 4b. Integration
 
@@ -73,7 +73,15 @@ black frames) is taken from the trace too.
   `minigame::open_watch` / `open_power` / `open_punch`, 0xCE / 0xCF `shop::open_shop_buy` / `open_shop_sell`, 0xD1
   `credits::open_credits`; the script blocks (`Pending::Menu`) until `menu::take_result` (after the fade-in) and
   pushes `result − 1` where the game does. The screens apply their effects (purchases, saves) themselves. Without
-  `ui/` content the old models in `scene.rs` still run. 0x8D (character switch) still uses the scene model.
+  `ui/` content the old models in `scene.rs` still run. 0x8D `charsel::open_charsel` (no player object = nothing):
+  result 2 = chosen (`Story.current` set; the poll clears the timed buff and rebuilds the leader with
+  `natives::switch_character`, as `0x080027DE` does), 1 = cancelled; nothing pushed.
+* **Title / game over** (`menu/title.rs`, `menu/gameover.rs`): 0x8E queues `Request::ReturnToTitle`; the session
+  replaces the world with `title::title_world` next frame (save slots + options kept, song 45). The leader's KO
+  runs the engine hook script #0 at KO + 199 (`gameover::tick`: Lazarus Crystal revive, else "You have died!" →
+  0x8E); Buu's Fury has no game-over screen. New Game / Continue on the title build the field world
+  (`title::boot`). Launcher: `launcher::title_app` (slot files in), `launcher::saves_of` (slot files out when the
+  generation changes); slots live in `World.saves` (snapshot state, postcard bytes per slot).
 * **Equipment model**: `Story.equipment` holds every owned copy; wearers come from the characters' slots
   (`equip::marks`), unequipped copies = unmarked entries (shop sell, take_equipment).
 * **Options**: `World.menu.settings` (text speed, SFX / music volume, raw 0..8, global like the game's `0x03001914`);
@@ -87,8 +95,8 @@ black frames) is taken from the trace too.
   cursor, A = an info page) is a stand-in (frame, grid, fades, R back): `re/buu/menu/NOTES_minigames.md`.
 * Map screen / credits / Watch This! setup CPU time is a model (`mapscreen::setup_frames`: 200k + 25 cycles per
   decompressed tile byte; `credits::page_cost`); exact on the captured areas / all 47 credit pages.
-* Character switch (0x8D), game over and the title hand-over are being finished (see the per-area
-  notes `re/buu/menu/NOTES_*.md`).
+* Not frame-checked against a capture: the field after Switch Character (leader rebuild), the death hook's start
+  frame and the return to the title. The title's Multiplayer item and its OPTIONS page are not reproduced.
 
 * Redraw CPU time is modelled per screen (frame counts), not per cycle: the sound driver's IRQ load is not
   modelled, so a long redraw can take one frame more or less than on the GBA and the picture of a frame where the

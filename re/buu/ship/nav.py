@@ -16,7 +16,7 @@ def areas():
 
 @lru_cache(None)
 def exits(key, variant=1):
-    """[(to_key, rect, push)] of area `key` (unconditional exits only)"""
+    """[(to_key, rect, push)] of area `key` (map exits: unconditional; area exits: any condition)"""
     a = areas()[key]
     m = a['maps'][min(max(variant, 1), len(a['maps'])) - 1]
     o = json.loads((CONTENT / 'maps' / m / 'objects.json').read_text())
@@ -28,7 +28,7 @@ def exits(key, variant=1):
         if ar['key'] != key:
             continue
         for t in ar['objects']:
-            if t['type'] == 'exit' and (t.get('condition') or {}).get('always') and t.get('to'):
+            if t['type'] == 'exit' and t.get('to'):          # conditional exits too (story-gated doors)
                 out.append((t['to']['key'], t['rect'], t.get('push')))
     return out
 
