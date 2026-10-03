@@ -932,14 +932,10 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
         }
         K::TeleportChain4 => {
             set_anim(w, i, &[an(17)], true, Some(false));
-            // field: the vanish takes hits off (as TeleportNearPlayer's). The node's update (0x08034502) steps the
-            // persistent side counter (0x03003228) whenever it finds the boss out of the vanish / landing animations
-            // and restarts the teleport unless the counter is round; a hurt that cuts the vanish before the node's
-            // first update shows here as re-entries: the first update then steps it once (sc_janemba: 0 -> 1 at
-            // 33,981, 1 -> 2 at 37,297; a plain enter at 37,459 does not)
+            // field: the vanish takes hits off (as TeleportNearPlayer's); its raw is what the node's check knows
             if w.field.is_some() {
                 w.en(i).a.hittable = false;
-                w.en(i).chain_enters += 1;
+                r.d[2] = w.en_ref(i).ea.pos.raw;
             }
         }
         K::NinjaReveal => {
@@ -1129,6 +1125,14 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
         K::PlayAnim0 => en::frag_enter(w, i),
         K::PlayAnim12 | K::PlayAnim12b | K::PlayAnim12Swarm | K::PlayAnim12Yakon | K::PlayAnim12Yakon2 | K::GhostAnimA | K::GhostAnimB => set_anim(w, i, &[an(17)], true, Some(false)),
         K::PlayAnim13 | K::PlayAnim13Yakon | K::PlayAnimOnce => set_anim(w, i, &[an(18)], true, Some(false)),
+        // field (sc_janemba, Super Janemba's state 0x2DD: a hit cuts the teleport): the landing animation (0x13)
+        // played backwards from its end, then the vanish (0x11) backwards - 71 frames, then a SetAnim(0)
+        K::PlayAnimTimed if w.field.is_some() => {
+            let hold = w.data.anim.hold;
+            en::set_anim_rule(w, i, &[an(19)], true, Some(false), Some(hold));
+            // no hits until its end
+            w.en(i).a.hittable = false;
+        }
         K::PlayAnimTimed => set_anim(w, i, &[an(19)], true, Some(true)),
         K::DarkSphere => {
             let (cx, cy) = w.en_ref(i).a.center();
@@ -1824,18 +1828,29 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         K::TeleportChain4 => {
             // field (sc_janemba): the jump 36 frames after the vanish shows, to side = counter & 3, hittable again 18
             // later. Battle keeps the reference's
-            // (a re-entered chain's restart is the game's next frame: its controller counts from there)
-            if w.field.is_some() && std::mem::take(&mut w.en(i).chain_enters) >= 2 {
-                w.g.tele_chain = (w.g.tele_chain + 1) % 12;
-                r.d[1] = 1;
-            }
-            let f = if w.field.is_some() { f - r.d[1] } else { f };
             if w.field.is_some() && f % 72 == 54 {
                 w.en(i).a.hittable = true;
             }
             if w.field.is_some() {
+                // the node's check (0x08034502): out of the vanish / landing animations (a hurt that cut the
+                // vanish, state 0x2DD's reverse, the landing's end below) -> the persistent side counter
+                // (0x03003228) steps, a round one ends the chain, else the teleport restarts from this frame
+                // (sc_janemba: 0 -> 1 at 33,981, 1 -> 2 at 37,297, 10 -> 11 at 38,045)
+                let raw = w.en_ref(i).ea.pos.raw;
+                if f >= 1 && raw != r.d[2] && raw != r.d[3] {
+                    w.g.tele_chain = (w.g.tele_chain + 1) % 12;
+                    if w.g.tele_chain % 4 == 0 {
+                        return true;
+                    }
+                    set_anim(w, i, &[an(17)], true, Some(false));
+                    w.en(i).a.hittable = false;
+                    r.d[2] = w.en_ref(i).ea.pos.raw;
+                    r.f = 0;
+                    return false;
+                }
                 if f % 72 == 36 {
                     en::teleport_beside(w, i, w.g.tele_chain & 3);
+                    r.d[3] = w.en_ref(i).ea.pos.raw;
                 }
                 // the landing animation's end (36 frames) SetAnim(0)s the boss; the node steps the counter: a round
                 // counter ends the chain, else the next vanish (anim 0x11, hits off)
@@ -1847,6 +1862,8 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                     }
                     set_anim(w, i, &[an(17)], true, Some(false));
                     w.en(i).a.hittable = false;
+                    r.d[2] = w.en_ref(i).ea.pos.raw;
+                    r.f = 0;
                 }
                 return false;
             }
@@ -2448,6 +2465,18 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         K::PlayAnim12 | K::PlayAnim12b | K::PlayAnim12Swarm | K::PlayAnim12Yakon | K::PlayAnim12Yakon2 | K::GhostAnimA | K::GhostAnimB | K::PlayAnim13 | K::PlayAnim13Yakon | K::PlayAnimOnce => {
             let d = Arc::clone(&w.data);
             f >= 16 && w.en_ref(i).anim_done(&d)
+        }
+        K::PlayAnimTimed if w.field.is_some() => {
+            if f == 36 {
+                let hold = w.data.anim.hold;
+                en::set_anim_rule(w, i, &[an(17)], true, Some(false), Some(hold));
+            }
+            if f == 71 {
+                en::set_anim(w, i, &[an(0)], true, Some(true));
+                w.en(i).a.hittable = true;
+            }
+            // (the sequence's PopState runs in the next frame)
+            f >= 71
         }
         K::PlayAnimTimed => f >= 32,
         K::DarkSphere => w.g.sphere_state == 1 || w.g.sphere_state == 3,

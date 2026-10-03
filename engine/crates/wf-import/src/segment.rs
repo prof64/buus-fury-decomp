@@ -186,7 +186,7 @@ pub fn compare(w: &World, fr: &Value, es: &[String], map: &mut BTreeMap<usize, E
     let shown: Vec<EntityId> = fr["actors"].as_array().into_iter().flatten().filter_map(|a| map.get(&Row(a).k()).copied()).collect();
     // a pause-menu page replaces the object world in the game (saved and restored around it): no actors to match
     let menu_page = menu_screen || wf_core::menu::active(w) && fr["actors"].as_array().is_none_or(|a| a.is_empty());
-    for (ei, e) in w.ents.iter().enumerate().filter(|(_, e)| !e.removed && !menu_page) {
+    for (ei, e) in w.ents.iter().enumerate().filter(|(_, e)| !e.removed && !menu_page && !wf_core::vram::suspended(w, e.id)) {
         let is_actor = matches!(e.body, Body::Npc(_) | Body::Player(_) | Body::Enemy(_));
         if is_actor && !shown.contains(&e.id) {
             rep.bad(k, "extra", format!("entity {} sprite {:?} ({}) not in the game", e.id, scene::sprite_id(w, ei), if matches!(e.body, Body::Npc(_)) { "npc" } else if matches!(e.body, Body::Player(_)) { "player" } else { "enemy" }));
@@ -478,7 +478,9 @@ fn vram_diff(ours: &Value, game: &Value) -> String {
     };
     let (a, b) = (used(ours), used(game));
     if a == b {
-        return "free / spare lists differ (same used blocks)".into();
+        let (x, y) = (ours.as_array().unwrap(), game.as_array().unwrap());
+        let d: Vec<String> = (0..x.len().min(y.len())).filter(|&k| x[k] != y[k]).take(4).map(|k| format!("[{}] ours {} game {}", k as i64 - 2, x[k], y[k])).collect();
+        return format!("free / spare lists differ (same used blocks): {}", d.join(", "));
     }
     let only_a: Vec<_> = a.iter().filter(|x| !b.contains(x)).collect();
     let only_b: Vec<_> = b.iter().filter(|x| !a.contains(x)).collect();

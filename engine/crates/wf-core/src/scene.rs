@@ -838,6 +838,9 @@ pub struct Visual {
     pub t: i32,
     /// frames left (-1 = until removed)
     pub life: i32,
+    /// the object's tile owner key (vram.rs; 0 = none)
+    #[serde(default)]
+    pub vid: u32,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -1420,6 +1423,8 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
         Cmd::Remove => {
             if let Some(i) = i {
                 crate::fieldnpc::script_move_mark(w, i, false);
+                // the object is destroyed now: its tiles go (segment sb 7-5)
+                crate::vram::entity_gone(w, i);
                 w.ents[i].removed = true;
                 if matches!(w.ents[i].body, Body::Player(_)) {
                     if let Some(f) = w.field.as_mut() {
@@ -1489,7 +1494,7 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
                 }
                 let (x, y) = actor_pos(w, i);
                 let owner = w.ents[i].id;
-                w.scene.visuals.push(Visual { kind: VisualKind::ItemIcon(*item), x, y: y - 32, owner, t: 0, life: 60 });
+                w.scene.visuals.push(Visual { kind: VisualKind::ItemIcon(*item), x, y: y - 32, owner, t: 0, life: 60, vid: 0 });
             }
         }
         Cmd::Emote { emote, t, .. } => {
@@ -1497,7 +1502,10 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
             if let Some(i) = i {
                 let (x, y) = actor_pos(w, i);
                 let owner = w.ents[i].id;
-                w.scene.visuals.push(Visual { kind: VisualKind::Emote(*emote), x, y: y - 32, owner, t: 0, life: emote_len(*emote) });
+                let vid = w.next_serial();
+                w.scene.visuals.push(Visual { kind: VisualKind::Emote(*emote), x, y: y - 32, owner, t: 0, life: emote_len(*emote), vid });
+                // the emote object's tiles (`0x08016304`, vtable 0x0804A298: 0x40)
+                crate::vram::acquire(w, crate::vram::Owner::Visual(vid), 0x40);
             }
         }
         Cmd::Beam { kind, dir, t, .. } => {
@@ -1787,7 +1795,7 @@ fn update_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) -> bool {
                         let (x, y) = actor_pos(w, i);
                         let owner = w.ents[i].id;
                         let dir = w.actor(i).map(|a| a.facing as i32).unwrap_or(0);
-                        w.scene.visuals.push(Visual { kind: VisualKind::Beam { kind, dir }, x, y, owner, t: 0, life: (*frames - 16).max(1) });
+                        w.scene.visuals.push(Visual { kind: VisualKind::Beam { kind, dir }, x, y, owner, t: 0, life: (*frames - 16).max(1), vid: 0 });
                     }
                 }
             } else if *t == 24 {
@@ -2114,7 +2122,12 @@ pub fn banner_step(w: &mut World) {
         })
         .collect();
     let Some(fd) = w.data.field.clone() else { return };
+    // a cutscene's backdrop load (`load_scene`) shows no banner (no banner object: segment sb 4-24)
+    let scene_load = w.field.as_ref().is_some_and(|f| f.scene_load);
     for area in loads {
+        if scene_load {
+            continue;
+        }
         w.scene.banner = None;
         let Some(a) = fd.area(area.world, area.area) else { continue };
         let three_d = a.maps.iter().any(|m| fd.maps.get(m).is_some_and(|m| m.three_d));
@@ -2123,8 +2136,16 @@ pub fn banner_step(w: &mut World) {
         } else if a.name_id != 0 && a.name_id != w.scene.banner_last {
             w.scene.banner_last = a.name_id;
             w.scene.banner = Some((a.banner.clone(), 0));
-            crate::vram::banner(w, true);
         }
+    }
+}
+
+/// the load creates the banner object (its tiles) with the area's music, between its object lists 0 and 1
+/// (`banner_step` shows it at the frame's end; segment sb 7-2)
+pub fn banner_load(w: &mut World, a: &crate::fieldcontent::AreaDef, three_d: bool) {
+    let scene_load = w.field.as_ref().is_some_and(|f| f.scene_load);
+    if !scene_load && !three_d && a.name_id != 0 && a.name_id != w.scene.banner_last {
+        crate::vram::banner(w, true);
     }
 }
 
@@ -2282,7 +2303,11 @@ fn tick_visuals(w: &mut World) {
         }
     }
     // a fired beam's effect object ends with its sound changing (32 -> 33)
+    let ended: Vec<u32> = w.scene.visuals.iter().filter(|v| v.life == 0 && v.vid != 0).map(|v| v.vid).collect();
     w.scene.visuals.retain(|v| v.life != 0);
+    for o in ended {
+        crate::vram::release(w, crate::vram::Owner::Visual(o));
+    }
 }
 
 // ---------------------------------------------------------------------------------------------------------------

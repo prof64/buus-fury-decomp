@@ -132,6 +132,13 @@ impl ObjVram {
 
     /// `0x0801124C`: a block of `bytes` (>> 6 units); the handle (start unit * 2), or None
     pub fn alloc(&mut self, bytes: i32) -> Option<u16> {
+        let r = self.alloc_inner(bytes);
+        if std::env::var("DBG_VRAM").is_ok() {
+            eprintln!("  alloc {bytes:#x} -> {r:x?}");
+        }
+        r
+    }
+    fn alloc_inner(&mut self, bytes: i32) -> Option<u16> {
         let need = (bytes >> 6) as u16;
         let (mut best, mut bsz) = (FF, u32::MAX);
         let mut i = self.free_head;
@@ -186,6 +193,9 @@ impl ObjVram {
 
     /// `0x0801142A`: free the block of a handle
     pub fn free(&mut self, handle: u16) {
+        if std::env::var("DBG_VRAM").is_ok() {
+            eprintln!("  free {handle:#x}");
+        }
         let i = self.idx[(handle >> 1) as usize & 511];
         let b = self.e[i as usize];
         self.e[i as usize].used = 0;
@@ -261,8 +271,12 @@ pub enum Owner {
     Shared(u8),
     /// the text box's blocks (`0x08012030`)
     Text,
+    /// the text box's portrait block
+    TextPortrait,
     /// a title text object (`show_title_text` 0xB2, vtable 0x0804B3D8: ((width + 0x21) >> 5 << 5) * 32 bytes)
     Title,
+    /// a scene visual's object (an emote bubble: `emote` 0x5A / 0x5B, vtable 0x0804A298, 0x40), by its `vid`
+    Visual(u32),
     /// a choice box's cursor (vtable 0x0804C974, `0x080178C8`: 0x100)
     Cursor,
     /// the map's props object (vtable 0x0804D1E4, `0x0800D15A`: the props' graphics size)
@@ -507,11 +521,14 @@ pub fn purge(w: &mut World, need: i32) {
 /// vfunc +0x1C (`0x0800F516`): the object leaves the world list, its tiles and shadow reference go
 fn suspend(w: &mut World, i: usize) {
     let id = w.ents[i].id;
+    if std::env::var("DBG_VRAM").is_ok() {
+        eprintln!("SUSPEND f{} ent {} idx {} sprite {:?} onscreen {}", w.frame, id, i, crate::scene::sprite_id(w, i), on_screen(w, i));
+    }
     let key = sprite_of(w, i).map(|s| s.1);
-    release(w, Owner::Ent(id));
     if let Some(k) = key.and_then(shadow_index) {
         shared_release(w, k);
     }
+    release(w, Owner::Ent(id));
     if let Some(v) = st(w) {
         v.suspended.push(id);
     }
@@ -546,25 +563,28 @@ pub fn text_open(w: &mut World, portrait: bool) {
         sizes.push(0x1000);
     }
     sizes.push(0x800);
-    for n in sizes {
+    let n_sizes = sizes.len();
+    for (k, n) in sizes.into_iter().enumerate() {
         purge(w, n);
         if let Some(v) = st(w) {
             if let Some(h) = v.a.alloc(n) {
-                v.owners.push((h, Owner::Text));
+                v.owners.push((h, if portrait && k == n_sizes - 2 { Owner::TextPortrait } else { Owner::Text }));
             }
         }
     }
 }
 
-/// the text box closes: its blocks freed (last allocated first), the suspended objects restored (`0x08012180`)
+/// the text box closes: its blocks freed (the portrait's first, then the others last allocated first), the
+/// suspended objects restored (`0x08012180`; segment sb 4-24)
 pub fn text_close(w: &mut World) {
     let Some(v) = st(w) else { return };
-    let hs: Vec<u16> = v.owners.iter().filter(|o| o.1 == Owner::Text).map(|o| o.0).collect();
+    let mut hs: Vec<u16> = v.owners.iter().filter(|o| o.1 == Owner::TextPortrait).map(|o| o.0).collect();
+    hs.extend(v.owners.iter().filter(|o| o.1 == Owner::Text).map(|o| o.0).rev());
     if hs.is_empty() {
         return;
     }
-    v.owners.retain(|o| o.1 != Owner::Text);
-    for h in hs.into_iter().rev() {
+    v.owners.retain(|o| o.1 != Owner::Text && o.1 != Owner::TextPortrait);
+    for h in hs {
         v.a.free(h);
     }
     restore(w);

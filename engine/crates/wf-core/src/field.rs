@@ -630,6 +630,7 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
     }
     // the players a scene load sent offstage are destroyed with the objects too (4-21 -> s190's 4-24 scene)
     crate::vram::offstage_gone(w);
+    crate::vram::release(w, crate::vram::Owner::Title);
     crate::vram::release(w, crate::vram::Owner::Props);
     crate::vram::load_reset(w);
     w.ents.retain(|e| players.contains(&e.id));
@@ -882,8 +883,12 @@ fn arrive(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<Dir>) {
         // the 3D map object's camera exists from the load, behind the flyer (3-1: the load inside s130's warp)
         crate::fieldworld::camera(w);
     }
-    // the HUD object after the players (`0x0800B854`)
-    crate::vram::hud_created(w);
+    // the HUD object after the players (`0x0800B854`), then the banner object (segment sb 4-21); a cutscene's
+    // backdrop (the players offstage, `0x08009030`) has neither (segment sb 4-24)
+    if w.scene.offstage.is_empty() {
+        crate::vram::hud_created(w);
+        crate::scene::banner_load(w, a, m.three_d);
+    }
     w.story.variant_byte = variant;
     w.events.push(Event::Field(FieldEvent::AreaEnter { area: to, key: a.key.clone() }));
 }

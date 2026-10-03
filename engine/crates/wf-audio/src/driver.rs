@@ -14,6 +14,7 @@
 //! 16 777 216 / 1050 = 15 978.3 Hz.
 
 use crate::bank::{flag, Cell, Entry, Song, SoundBank};
+use serde::{Deserialize, Serialize};
 
 /// The hardware mix rate (timer 0 reload 0xFBE6).
 pub const MIX_RATE: f64 = 16_777_216.0 / 1050.0;
@@ -96,7 +97,7 @@ impl EffectKind {
 }
 
 /// Per-tick handler stored at track+0x54.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 enum TickFn {
     VolUp,            // 0x0803E5DA
     VolDown,          // 0x0803E5AC
@@ -116,7 +117,7 @@ enum TickFn {
 }
 
 /// Which sample entry a voice plays.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Hash, Serialize, Deserialize)]
 pub enum EntryRef {
     #[default]
     None,
@@ -124,7 +125,7 @@ pub enum EntryRef {
     Sfx(u8),
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Voice {
     pub pos: i32,
     pub step: i32,
@@ -146,7 +147,7 @@ pub struct Voice {
     pub is_track: bool,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Track {
     pub v: Voice,
     // +0x40..
@@ -173,7 +174,7 @@ pub struct Track {
     param: u8,       // +0x5E
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Player {
     pub ticks_left: u8,       // +0
     pub row: u8,              // +1
@@ -196,6 +197,46 @@ pub struct RowEvent {
     pub sample: u64,
     pub order: i32,
     pub row: u8,
+}
+
+/// [`Driver`]'s state without the bank (serializable; see [`Driver::state`] / [`Driver::from_state`]).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct DriverState {
+    pub player: Player,
+    pub voices: Vec<Voice>,
+    pub clock: u64,
+}
+
+/// Voice RAM layout (`+0` pos, `+4` step, `+0xC` gain, `+0x10` flags, `+0x11` loop mode, `+0x12` volume, `+0x13`
+/// pan, `+0x14` rate, `+0x1C` |step|, `+0x20` loop start, `+0x24` end, `+0x28` entry, `+0x30` pitch, `+0x34` master).
+fn seed_voice(bank: &SoundBank, v: &mut Voice, ram: &[u8]) {
+    let u32_ = |o: usize| u32::from_le_bytes([ram[o], ram[o + 1], ram[o + 2], ram[o + 3]]);
+    v.pos = u32_(0) as i32;
+    v.step = u32_(4) as i32;
+    v.gain = u32_(0xC);
+    v.flags = ram[0x10];
+    v.loop_mode = ram[0x11];
+    v.volume = ram[0x12];
+    v.pan = ram[0x13] as i8;
+    v.rate = u16::from_le_bytes([ram[0x14], ram[0x15]]);
+    v.step_mag = u32_(0x1C) as i32;
+    v.loop_start = u32_(0x20) as i32;
+    v.end = u32_(0x24) as i32;
+    let e = u32_(0x28);
+    v.entry = bank
+        .instruments
+        .iter()
+        .position(|x| x.rom == e)
+        .map(|i| EntryRef::Instrument(i as u8))
+        .or_else(|| bank.sfx.iter().position(|x| x.rom == e).map(|i| EntryRef::Sfx(i as u8)))
+        .unwrap_or(EntryRef::None);
+    v.sample = match v.entry {
+        EntryRef::Instrument(i) => Some(bank.instruments[i as usize].sample),
+        EntryRef::Sfx(i) => Some(bank.sfx[i as usize].sample),
+        EntryRef::None => None,
+    };
+    v.pitch = u32_(0x30);
+    v.master = ram[0x34];
 }
 
 pub struct Driver<'a> {
@@ -627,6 +668,7 @@ impl<'a> Driver<'a> {
         v.pos = u32_(0) as i32;
         v.step = u32_(4) as i32;
         v.gain = u32_(0xC);
+        v.flags = ram[0x10];
         v.loop_mode = ram[0x11];
         v.volume = ram[0x12];
         v.pan = ram[0x13] as i8;
@@ -684,6 +726,66 @@ impl<'a> Driver<'a> {
         t.cvol = ram[0x5C];
         t.fx = ram[0x5D];
         t.param = ram[0x5E];
+    }
+
+    /// The driver's whole state (no bank reference): what a deterministic world keeps between updates.
+    pub fn state(&self) -> DriverState {
+        DriverState { player: self.player.clone(), voices: self.voices.clone(), clock: self.clock }
+    }
+
+    /// A driver continuing from `st`.
+    pub fn from_state(bank: &'a SoundBank, st: DriverState) -> Driver<'a> {
+        let mut d = Driver::new(bank);
+        d.player = st.player;
+        d.voices = st.voices;
+        d.clock = st.clock;
+        d
+    }
+
+    /// Load an SFX voice from a dump of the game's 0x40-byte voice RAM (`0x03003E5C + 0x40 * i`).
+    pub fn seed_voice_ram(&mut self, vi: usize, ram: &[u8]) {
+        let bank = self.bank;
+        if let Some(v) = self.voices.get_mut(vi) {
+            seed_voice(bank, v, ram);
+        }
+    }
+
+    /// Load the sequencer position from the game's player header (`0x030038A4`, 0x18 bytes): counters, song (by
+    /// its ROM address), order; the pattern follows from the order, the next cell row from the row.
+    pub fn seed_player_ram(&mut self, ram: &[u8]) {
+        let bank = self.bank;
+        let u32_ = |o: usize| u32::from_le_bytes([ram[o], ram[o + 1], ram[o + 2], ram[o + 3]]);
+        let p = &mut self.player;
+        p.ticks_left = ram[0];
+        p.row = ram[1];
+        p.rows = ram[2];
+        p.speed = ram[3];
+        p.tempo = ram[4];
+        p.playing = ram[5] != 0;
+        p.samples_per_tick = u16::from_le_bytes([ram[6], ram[7]]);
+        p.countdown = u16::from_le_bytes([ram[8], ram[9]]);
+        let sp = u32_(0xC);
+        p.song = bank.songs.iter().position(|s| s.rom == sp);
+        p.order = u32_(0x10) as i32;
+        if let Some(song) = p.song.map(|i| &bank.songs[i]) {
+            if p.order >= 0 && (p.order as usize) < song.orders.len() {
+                p.pattern = song.orders[p.order as usize] as usize;
+                p.row_in_pattern = p.row as usize + 1;
+            }
+        }
+    }
+
+    /// The whole driver from a RAM dump: player header (0x18) + 15 tracks (0x60) + 16 SFX voices (0x40).
+    pub fn seed_ram(&mut self, ram: &[u8]) {
+        self.seed_player_ram(&ram[..0x18]);
+        for t in 0..N_TRACKS {
+            let o = 0x18 + 0x60 * t;
+            self.seed_track_ram(t, &ram[o..o + 0x60]);
+        }
+        for v in 0..N_VOICES {
+            let o = 0x18 + 0x60 * N_TRACKS + 0x40 * v;
+            self.seed_voice_ram(v, &ram[o..o + 0x40]);
+        }
     }
 
     /// Options-menu volumes (`0x0803F18C` / `0x0803E42A`: master byte of every track / SFX voice; flags a

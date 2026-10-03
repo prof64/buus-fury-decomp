@@ -559,11 +559,11 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
         }
         0x9e | 0x9f => {
             let kind = if n == 0x9e { VisualKind::MarkerA } else { VisualKind::MarkerB };
-            h.w.scene.visuals.push(Visual { kind, x: arg(a, 0), y: arg(a, 1), owner: 0, t: 0, life: -1 });
+            h.w.scene.visuals.push(Visual { kind, x: arg(a, 0), y: arg(a, 1), owner: 0, t: 0, life: -1, vid: 0 });
             unit()
         }
         0xa0 => {
-            h.w.scene.visuals.push(Visual { kind: VisualKind::Box { w: arg(a, 2), h: arg(a, 3) }, x: arg(a, 0), y: arg(a, 1), owner: 0, t: 0, life: -1 });
+            h.w.scene.visuals.push(Visual { kind: VisualKind::Box { w: arg(a, 2), h: arg(a, 3) }, x: arg(a, 0), y: arg(a, 1), owner: 0, t: 0, life: -1, vid: 0 });
             unit()
         }
         0xa1..=0xa3 => {
@@ -813,7 +813,7 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
             unit()
         }
         0xec => {
-            h.w.scene.visuals.push(Visual { kind: VisualKind::MapMarker { highlight: arg(a, 2) != 0 }, x: arg(a, 0) - 4, y: arg(a, 1) - 4, owner: 0, t: 0, life: -1 });
+            h.w.scene.visuals.push(Visual { kind: VisualKind::MapMarker { highlight: arg(a, 2) != 0 }, x: arg(a, 0) - 4, y: arg(a, 1) - 4, owner: 0, t: 0, life: -1, vid: 0 });
             unit()
         }
         0xed => {
@@ -921,7 +921,7 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
         }
         0xf4 => {
             h.w.scene.visuals.retain(|v| v.kind != VisualKind::EnergySphere);
-            h.w.scene.visuals.push(Visual { kind: VisualKind::EnergySphere, x: arg(a, 0), y: arg(a, 1), owner: arg(a, 2) as u32, t: arg(a, 3), life: -1 });
+            h.w.scene.visuals.push(Visual { kind: VisualKind::EnergySphere, x: arg(a, 0), y: arg(a, 1), owner: arg(a, 2) as u32, t: arg(a, 3), life: -1, vid: 0 });
             unit()
         }
         0xf6 => done(0),
@@ -1074,7 +1074,7 @@ fn fuse(w: &mut World, fused: i32, kind: i32, ma: i32, mb: i32, seconds: i32) {
     f.rec.spd = half(a.rec.spd, b.rec.spd) + 16;
     f.flags |= 3;
     f.ss_cooldown = if seconds == -1 { -1 } else { seconds * 60 };
-    let _ = kind;
+    f.fusion = ((ma & 15) | (mb & 15) << 4 | (kind & 0xff) << 8) as u16;
     if let Some(x) = w.story.chars.get_mut(ma as usize) {
         x.flags &= !1;
     }

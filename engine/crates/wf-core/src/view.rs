@@ -114,7 +114,7 @@ pub fn render_view(w: &World, out: &mut RenderView) {
     if let Some((text, t)) = w.scene.banner.as_ref().filter(|b| b.1 <= 238) {
         out.banner = Some(wf_view::BannerView { text: text.clone(), t: *t });
     }
-    let mut order: Vec<usize> = (0..w.ents.len()).filter(|&i| !w.ents[i].removed).collect();
+    let mut order: Vec<usize> = (0..w.ents.len()).filter(|&i| !w.ents[i].removed && !crate::vram::suspended(w, w.ents[i].id)).collect();
     order.sort_by_key(|&i| draw_key(w, i));
     // field: the debris chips, the item-get icon (front-most), then the props after the actors (behind them)
     crate::fieldview::front(w, out);

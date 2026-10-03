@@ -101,6 +101,7 @@ pub fn story_from(d: &wf_core::content::GameData, s: &Value) -> Story {
                 ss_cooldown: i(&c["ss_cooldown"]) as i32,
                 flags: i(&c["flags"]) as u8,
                 skill_cur: c["skill_cur"].as_array().map(|a| a.iter().map(|v| i(v) as i32).collect()).unwrap_or_default(),
+                fusion: 0,
             };
         }
     }

@@ -189,10 +189,15 @@ fn title_widths(rom: &Rom, out: &mut Content) {
     let font = rom.u32(0x0875_3A1C);
     let (glyphs, wide) = (rom.u32(font), rom.u32(font + 4));
     let mut v = Vec::new();
-    for k in 0..512u32 {
+    // the string handle table: entries up to the first non-pointer after 0x800 (handles go past 1500)
+    for k in 0..0x2000u32 {
         let p = rom.u32(0x0806_BCE8 + 4 * k);
         if !rom.isptr(p) {
-            break;
+            if k > 0x800 {
+                break;
+            }
+            v.push(0);
+            continue;
         }
         let mut w = 0u32;
         let mut a = p;

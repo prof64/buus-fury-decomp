@@ -1151,6 +1151,29 @@ pub fn gain_xp(w: &mut World, i: usize, exp: i64) {
         return;
     }
     let g = xp_gain(exp, pr(w, i).eff.xp_mult as i64);
+    // field: a fusion's experience goes to its two components' records, each the whole gain (sc_janemba: Gogeta's
+    // Super Janemba KO adds 20,500 to Goku's and to Vegeta's XP, Gogeta's stays)
+    if w.field.is_some() {
+        let ch = pr(w, i).form_ref(w).char_;
+        let fu = if pr(w, i).form_ref(w).fusion { w.story.chars.get(ch as usize).map(|c| c.fusion).unwrap_or(0) } else { 0 };
+        if fu != 0 {
+            for c in [(fu & 15) as usize, ((fu >> 4) & 15) as usize] {
+                let growth = w.data.chars.iter().find(|x| x.index == c as i32).map(|x| x.growth);
+                let xt = Arc::clone(&w.data);
+                let Some(cs) = w.story.chars.get_mut(c) else { continue };
+                cs.rec.xp += g;
+                let nl = level_of(cs.rec.xp, &xt.xp_table);
+                if nl > cs.rec.level {
+                    if let Some(gr) = growth {
+                        let old = cs.rec.level;
+                        level_up(&mut cs.rec, &gr, old, nl, &mut w.rng);
+                    }
+                    cs.rec.level = nl;
+                }
+            }
+            return;
+        }
+    }
     p(w, i).rec.xp += g;
     let nl = level_of(pr(w, i).rec.xp, &w.data.xp_table);
     if nl > pr(w, i).rec.level {

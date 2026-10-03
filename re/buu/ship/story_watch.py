@@ -32,4 +32,4 @@ for f in range(cap):
         break
 if out:
     e.save_file(os.path.abspath(out))
-print(status(e))
+print(status(e), 'goal', d.k, d.goals[d.k] if not d.done() else None)

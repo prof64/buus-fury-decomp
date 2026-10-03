@@ -839,7 +839,10 @@ impl World {
                 c -= 1;
                 continue;
             };
-            let skip = self.modal.as_ref().is_some_and(|m| !m.contains(&self.ents[i].id));
+            // a purge's suspended objects are out of the list (vram.rs); a cutscene actor keeps its animation
+            // (the scene drives it: segment sb 4-24, a suspended actor's idle tick runs on)
+            let skip = self.modal.as_ref().is_some_and(|m| !m.contains(&self.ents[i].id))
+                || crate::vram::suspended(self, self.ents[i].id) && !matches!(self.ents[i].body, Body::Npc(_));
             if !skip {
                 self.update_entity(i);
             }

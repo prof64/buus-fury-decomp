@@ -362,6 +362,13 @@ class ShipDriver(Driver):
                 self.grind_k += 1
                 w, a = route[self.grind_k % len(route)]
             return self.nav(e, s, ('nav', w, a, True), inner=True)
+        if kind == 'unstick':
+            # ('unstick',): clear the walk's stuck counter (a walk that gave up leaves it over the limit, and the
+            # next walk would end at once)
+            self.stuck = 0
+            self.path = None
+            self.next_goal()
+            return None
         if kind == 'hunt':
             return self.hunt(e, s, g)
         if kind == 'rest':

@@ -48,6 +48,9 @@ pub struct CharState {
     /// learned level, which `set_skill_level` sets both to); empty / missing entries = the learned level
     #[serde(default)]
     pub skill_cur: Vec<i32>,
+    /// fusion components (+0x02: bits 0-3 char A, 4-7 char B, 8-15 the fusion's level byte; 0 = not a fusion)
+    #[serde(default)]
+    pub fusion: u16,
 }
 
 impl CharState {
@@ -141,6 +144,7 @@ impl Story {
                 ss_cooldown: 0,
                 flags: c.in_party as u8,
                 skill_cur: Vec::new(),
+                fusion: 0,
             };
         }
         s.chars[0].flags |= 1;
