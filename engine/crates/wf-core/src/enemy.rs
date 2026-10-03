@@ -1819,13 +1819,8 @@ pub fn kid_buu_split(w: &mut World, i: usize) {
         }
         mark_self(w, i);
         if let Some(ci) = crate::battle::spawn_enemy(w, 0x3d, (x - dx) >> 8, (y - dy) >> 8, 0, Some(0x12a)) {
-            unmark_self(w, ci);
-            {
-                let c = w.en(ci);
-                c.a.x = x - dx;
-                c.a.y = y - dy;
-            }
-            mark_self(w, ci);
+            // (the copy is created at the PIXEL of the 24.8 position - d: it has no sub-pixel part; the real route,
+            // Kid Buu's arena 21-25: original (279.99, 410.37) + (42, 68) / 256, copy at (279, 410) exactly)
             w.en(ci).hp1024 = hp;
         }
         return;

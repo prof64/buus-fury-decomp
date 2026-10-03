@@ -763,7 +763,7 @@ fn close_with(w: &mut World, done: bool) {
     // actors' sprites (per distinct sprite) and, when the leader changed, the new one's
     let figs = match w.menu.shown.as_deref() {
         Some(Screen::CharSelect(c)) => {
-            let switched = w.menu.result.as_ref().is_some_and(|r| r.code == 2) || c.figs.get(c.sel).is_some_and(|f| f.ch != w.story.current);
+            let switched = c.switched;
             let mut sprites: Vec<i32> = (0..w.ents.len())
                 .filter(|&i| !w.ents[i].removed && matches!(w.ents[i].body, crate::world::Body::Npc(_) | crate::world::Body::Enemy(_)))
                 .filter_map(|i| crate::scene::sprite_id(w, i))

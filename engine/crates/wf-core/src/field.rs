@@ -677,6 +677,7 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
     // first; nothing left: re-initialised
     // (an imported state's objects of classes the model does not know go with the area too: ship 7-2 -> 7-4)
     crate::vram::release(w, crate::vram::Owner::Foreign);
+    crate::vram::release(w, crate::vram::Owner::StatMark);
     crate::vram::release(w, crate::vram::Owner::Hud);
     crate::vram::release(w, crate::vram::Owner::Map3d);
     crate::vram::release(w, crate::vram::Owner::HudOut);
@@ -2010,6 +2011,13 @@ pub fn set_busy(w: &mut World, busy: bool) {
             f.busy_since = frame;
         }
         if !busy && f.busy {
+            // a breakable's callback that did not end in the frame it began: an ordinary event (see `break_event`)
+            if f.break_event != 0 {
+                if frame != f.busy_since {
+                    f.queued_event = false;
+                }
+                f.break_event = 0;
+            }
             f.event_ended = true;
             if f.held_event {
                 f.held_event = false;

@@ -442,8 +442,15 @@ pub fn add(w: &mut World, s: Shot) -> EntityId {
         ShotKind::Kame(_) => 0x300,
         _ => 0,
     };
+    let flame = matches!(s.kind, ShotKind::Flame { .. });
     let id = w.add(Body::Shot(Box::new(s)));
     crate::vram::acquire(w, crate::vram::Owner::Ent(id), tiles);
+    if flame {
+        // the flame class (`0x080246B4`) gives the base's 0x40 back and uses one shared 0x1300 graphic (the first
+        // flame allocates it; segment sb 20-3 f48)
+        crate::vram::release(w, crate::vram::Owner::Ent(id));
+        crate::vram::keyed_acquire(w, crate::vram::KEY_FLAME, 0x1300);
+    }
     id
 }
 pub fn add_straight(w: &mut World, owner: EntityId, dir: Dir, team: u8, x: i32, y: i32, o: StraightOpts) -> EntityId {

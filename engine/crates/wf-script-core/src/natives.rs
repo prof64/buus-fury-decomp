@@ -1036,6 +1036,7 @@ pub fn switch_character(w: &mut World, c: i32) -> Result<(), String> {
                 }
             }
             p.holy_left = 0;
+            p.regen_timer = 0;
             p.apply_form(w, form);
             w.scene.offstage[k].body = Body::Player(Box::new(p));
         }
@@ -1058,6 +1059,9 @@ pub fn switch_character(w: &mut World, c: i32) -> Result<(), String> {
         }
     }
     p.holy_left = 0;
+    // the new character's form controller starts its regen count (+0xC) at 0 (Kid Buu's arena: after s-script
+    // hand-overs the bench's 5% tick comes 596 pass frames after the event that switched)
+    p.regen_timer = 0;
     // the rebuilt player object starts its hit-damage remainder at 0, as after a load or the candy respawn
     // (INFERRED from those two: no recording isolates set_character yet)
     p.hp_acc = Default::default();

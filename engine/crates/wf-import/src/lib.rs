@@ -476,10 +476,10 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
             }
             continue;
         }
-        if vt == VT_HUD || vt == VT_BANNER {
+        if vt == VT_HUD || vt == VT_BANNER || vt == 0x0804_C070 {
             let h = ram.r16(o + 0xC);
             if h != 0xFFFF {
-                owners.push((h, if vt == VT_HUD { Owner::Hud } else { Owner::Banner }));
+                owners.push((h, if vt == VT_HUD { Owner::Hud } else if vt == VT_BANNER { Owner::Banner } else { Owner::StatMark }));
             }
             continue;
         }
@@ -515,7 +515,7 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
     let stamp = w.next_id;
     let objs: Vec<(Owner, u32, i32)> = owners
         .iter()
-        .filter(|o| matches!(o.1, Owner::Hud | Owner::Banner | Owner::BossBar))
+        .filter(|o| matches!(o.1, Owner::Hud | Owner::Banner | Owner::BossBar | Owner::StatMark))
         .map(|o| (o.1, stamp, a.e[a.idx[(o.0 >> 1) as usize & 511] as usize].size as i32 * 64))
         .collect();
     if let Some(f) = w.field.as_mut() {

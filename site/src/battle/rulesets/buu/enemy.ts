@@ -1140,12 +1140,8 @@ export class Enemy extends Actor implements EnemyLike {
       this.markSelf()
       this.hp1024 = (this.hp1024 + 1024) >> 1
       const copy = this.ctx.spawnEnemy(w, 0x3d, (x0 - dx) >> 8, (y0 - dy) >> 8, null, 0x12a) as Enemy | null
-      if (copy) {
-        copy.unmarkSelf()
-        copy.x = x0 - dx
-        copy.y = y0 - dy
-        copy.markSelf()
-      }
+      // (the copy is created at the PIXEL of the 24.8 position - d: it has no sub-pixel part; the real route, Kid
+      // Buu's arena 21-25: original (279.99, 410.37) + (42, 68) / 256, copy at (279, 410) exactly)
       if (copy) copy.hp1024 = this.hp1024
       w.logEvent('info', `Kid Buu splits: ${this.hp} + ${this.hp} HP`)
       return

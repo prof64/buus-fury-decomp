@@ -34,6 +34,9 @@ pub struct CFig {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct CharSelect {
     pub c: Container,
+    /// A chose another character than the current one (the timing model: the close loads the new leader)
+    #[serde(default)]
+    pub switched: bool,
     pub figs: Vec<CFig>,
     /// the selected figure (+0x160)
     pub sel: usize,
@@ -89,7 +92,7 @@ impl CharSelect {
         c.add(Widget::Label(Label { x: bx + 0x10, y: 0x90, text: t.s(26).to_vec(), colour: 5, align: 0, font: Font::Menu }));
         let left = c.add(Widget::Button(Button::new(BTN_LEFT, 0x18, 0x4A, 4, true, false)));
         let right = c.add(Widget::Button(Button::new(BTN_RIGHT, 0xC8, 0x4A, 5, true, false)));
-        CharSelect { c, oam: figs.clone(), figs, sel, left, right, rng_after: None, idle_at_step: false }
+        CharSelect { c, switched: false, oam: figs.clone(), figs, sel, left, right, rng_after: None, idle_at_step: false }
     }
 
     /// the figures' idle enters (rand(255) each) when the screen is built (`idle_at_step`; no-op after)
@@ -171,6 +174,12 @@ impl Page for CharSelect {
             0 => {
                 w.sfx(super::SFX_MENU, 64);
                 if let Some(f) = p.figs.get(p.sel) {
+                    if w.story.current != f.ch {
+                        p.switched = true;
+                        if let Some(super::Screen::CharSelect(sh)) = w.menu.shown.as_deref_mut() {
+                            sh.switched = true;
+                        }
+                    }
                     w.story.current = f.ch;
                 }
                 (true, Some(Action::Pop(2)))
@@ -194,6 +203,11 @@ impl Page for CharSelect {
     /// the page frame + prompts: 2 frames (`re/buu/menu/timing.py`)
     fn redraw_cost(&self) -> u8 {
         2
+    }
+    /// the redraw's own cycles: 349,559 .. 389,604 measured (a prompt's press, a selection change; the figures
+    /// are objects, not drawn into the page) - always 2 frames, the value places the sound update
+    fn redraw_time(&self, _w: &World, _d: &MenuData) -> Option<crate::sndsim::Redraw> {
+        Some(crate::sndsim::Redraw { t0: 4_641, base: 360_000 })
     }
     fn leave_black(&self) -> bool {
         true

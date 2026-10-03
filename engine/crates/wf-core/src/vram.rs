@@ -289,6 +289,8 @@ pub enum Owner {
     HudOut,
     /// a damage number (`popups`)
     Popup,
+    /// the HUD's stat-points mark (`0x0800BCC8` makes it, vtable 0x0804C070, 0x100 bytes)
+    StatMark,
     /// an ended effect object's block (`delayed`)
     Ending,
     /// the boss HP bar (`show_boss_bar` 0x8F / 0x90, vtable 0x0804CE28: 0x200)
@@ -385,7 +387,7 @@ pub fn acquire(w: &mut World, owner: Owner, bytes: i32) {
     let stamp = w.next_id;
     if let (Some(h), Some(v)) = (h, st(w)) {
         v.owners.push((h, owner));
-        if matches!(owner, Owner::Hud | Owner::Banner | Owner::BossBar) && !v.objs.iter().any(|o| o.0 == owner) {
+        if matches!(owner, Owner::Hud | Owner::Banner | Owner::BossBar | Owner::StatMark) && !v.objs.iter().any(|o| o.0 == owner) {
             v.objs.push((owner, stamp, bytes));
         }
     }
@@ -551,6 +553,10 @@ pub fn entity_gone(w: &mut World, i: usize) {
     // teleport puffs, his beam's explosions), except a broken object's explosion, whose block lives one frame
     // longer (`linger`; sb 21-5). MEASURED: the cause of that extra frame is not decoded (the effect's update
     // `0x0802A8AA` is the same). Other effect kinds keep the extra frame (not measured apart).
+    if matches!(&w.ents[i].body, Body::Shot(sh) if matches!(sh.kind, crate::shots::ShotKind::Flame { .. })) {
+        keyed_release(w, KEY_FLAME);
+        return;
+    }
     let late = st(w).is_some_and(|v| v.late.contains(&id));
     if let Some(v) = st(w) {
         v.late.retain(|&x| x != id);
@@ -670,6 +676,8 @@ fn ent_act(w: &World, i: usize, level: i32) -> Act {
 fn own_act(o: Owner, level: i32) -> Act {
     let n = match o {
         Owner::Banner => 2,
+        // the stat-points mark from 3 (`0x0800B5C2`)
+        Owner::StatMark => 3,
         Owner::Hud | Owner::BossBar => 4,
         _ => return Act::Keep,
     };
@@ -891,6 +899,11 @@ pub fn hud_shown(w: &mut World, on: bool) {
     }
     if on {
         acquire(w, Owner::Hud, 0x500);
+        // its update of this frame makes the stat-points mark (segment sb 20-2 f1574: the same frame)
+        let points = w.story.chars.get(w.story.current.max(0) as usize).map(|c| c.rec.points).unwrap_or(0);
+        if points != 0 && !st(w).is_some_and(|v| v.owners.iter().any(|o| o.1 == Owner::StatMark)) {
+            acquire(w, Owner::StatMark, 0x100);
+        }
     } else if let Some(v) = st(w) {
         let hs: Vec<u16> = v.owners.iter().filter(|o| o.1 == Owner::Hud).map(|o| o.0).collect();
         for h in hs {
@@ -988,6 +1001,9 @@ pub fn figures_gone(w: &mut World, sprites: &[i32]) {
 /// key of the breakables' debris chip graphic (4 chips per hit share it, 0x40 bytes; `0x0800C454`)
 pub const KEY_DEBRIS: u32 = 1;
 
+/// key of the flame shots' graphic (0x1300 bytes; `0x080246B4`)
+pub const KEY_FLAME: u32 = 2;
+
 /// a user of a keyed shared graphic appears: the first one allocates it
 pub fn keyed_acquire(w: &mut World, key: u32, bytes: i32) {
     let Some(v) = st(w) else { return };
@@ -1071,6 +1087,15 @@ pub fn hud_tick(w: &mut World) {
         }
     }
     popups_tick(w, None);
+    // the HUD's update (`0x0800BCC8`) makes the stat-points mark when the leader has points to spend and there is
+    // none; the mark deletes itself when the points are spent (`0x0800B530`)
+    let points = w.story.chars.get(w.story.current.max(0) as usize).map(|c| c.rec.points).unwrap_or(0);
+    let (hud, mark) = st(w).map(|v| (v.owners.iter().any(|o| o.1 == Owner::Hud), v.owners.iter().any(|o| o.1 == Owner::StatMark) || v.susp.iter().any(|x| matches!(x, Susp::Own(Owner::StatMark, _, _))))).unwrap_or((false, false));
+    if mark && points == 0 {
+        release(w, Owner::StatMark);
+    } else if hud && !mark && points != 0 {
+        acquire(w, Owner::StatMark, 0x100);
+    }
     let Some(v) = st(w) else { return };
     if v.hud_out.is_empty() {
         return;
@@ -1080,6 +1105,11 @@ pub fn hud_tick(w: &mut World) {
     }
     let gone: Vec<u16> = v.hud_out.iter().filter(|o| o.1 <= 0).map(|o| o.0).collect();
     v.hud_out.retain(|o| o.1 > 0);
+    // (the HUD's destructor deletes its mark first: segment sb 20-2 f58)
+    if !gone.is_empty() {
+        release(w, Owner::StatMark);
+    }
+    let Some(v) = st(w) else { return };
     for h in gone {
         v.owners.retain(|o| o.0 != h);
         v.a.free(h);

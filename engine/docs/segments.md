@@ -1383,3 +1383,15 @@ Recommendation: 1 as the default, 2 as an "original pacing" option once the load
 in-game Save screen and the title's Continue; moving `wf-script-core/tests/playthrough.rs` onto `StoryHost` (it is
 the last private copy of the host loop); soaking ship / dungeons / post-ball through Continue or the §8
 checkpoints; the row 33,189 position mismatch in 1-20.
+
+**§11 update 2 (B): Save -> Continue.** `cargo run --release -p wf-app --example saveloop -- [W-A x y]` (headless,
+muted; `engine/crates/wf-app/examples/saveloop.rs`): a story session walks into a save point's rect (default the
+Airship deck 12-1; the A trigger needs the leader's position point inside the rect), A opens s011, the game's Save
+screen writes slot 1 (634 bytes, `launcher::saves_of`), a NEW app session is built on the title with that slot file
+(`launcher::title_app`), START / A choose Continue, and the continued world is compared with the saved one:
+**area, position, current character, flags, supplies, equipment, zenie, G / L script words, game bits and all nine
+character records are equal; no script errors** (play time runs on, 457 vs 398 frames). Limits: the state saved is a
+fresh game's (few flags, one character), and no real recording passes through a save, so "keeps matching the
+recording after Continue" is not shown yet - the ship route's 8-66 save is the first real log that does.
+Decision recorded (coordinator): lag-frame option 1 stays the default; option 2 ("original pacing", presentation
+only, a Settings toggle, never sim state) is to be built - not started.
