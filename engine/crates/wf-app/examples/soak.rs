@@ -41,6 +41,9 @@ fn main() {
         wf_core::menu::title::open_title(&mut session.world);
     }
     // --import SEG.json: start from that cut's RAM (one import), the recordings' rows follow the cut
+    let continue_on_save = args.iter().any(|a| a == "--continue-on-save");
+    let mut continued = false;
+    let mut continue_row: Option<usize> = None;
     let mut app = match opt("--import") {
         Some(seg) => {
             let doc: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&seg).expect("read")).expect("json");
@@ -110,6 +113,64 @@ fn main() {
             first_rng = None;
             rng_bad = 0;
             pos_bad = 0;
+        }
+        // --continue-on-save: the app's own Save screen wrote a slot (the route saves at a save point) and the field
+        // is free again: a fresh session on the title with that slot file, Continue through the title's menus, the
+        // continued story compared with the saved one; then the key log goes on in the continued session
+        if continue_on_save && !continued && app.world().saves.generation > 0 && !wf_core::menu::active(app.world())
+            && app.world().scene.depth == 0 && app.world().field.as_ref().is_some_and(|f| !f.busy)
+        {
+            continued = true;
+            let w = app.world();
+            let slot = w.saves.current.max(0) as usize;
+            let slots: Vec<Vec<u8>> = (0..3).map(|i| w.saves.slot_bytes(i)).collect();
+            let saved = w.story.clone();
+            let pos = w.player_idx(0).map(|pi| (w.pl_ref(pi).a.px(), w.pl_ref(pi).a.py()));
+            println!("save written at row {k} (slot {}, {} bytes): area {:?} leader {:?}", slot + 1, slots[slot].len(), w.field.as_ref().map(|f| (f.area.world, f.area.area)), pos);
+            let data = wf_app::battle::load_data(&packs).expect("data");
+            let mut sv = wf_core::menu::save::Saves::default();
+            for (i, b) in slots.iter().enumerate() {
+                sv.set_slot_bytes(i, b);
+            }
+            let mut sess = wf_core::session::Session::new_field(data, wf_core::field::FieldConfig { world: 1, area: 1, rng: wf_core::battle::RngInit::Seed(7), ..Default::default() });
+            sess.world.saves = sv;
+            wf_core::menu::title::open_title(&mut sess.world);
+            let mut fresh = StorySim::with_session(&packs, sess).expect("title");
+            fresh.skip_area_banner();
+            // START, A (Single Player), DOWN to the saved slot, A (Continue)
+            let mut ok = false;
+            for i in 0..2000u32 {
+                let phase = i / 40;
+                let key = if i % 40 < 4 { match phase { 0 => 8u16, 1 => 1, p if p >= 2 && p < 2 + slot as u32 => 0x80, _ => 1 } } else { 0 };
+                let mut ev = vec![];
+                fresh.step(&[key], &mut ev);
+                let fw = fresh.world();
+                if i > 120 && !wf_core::menu::active(fw) && fw.field.is_some() && fw.player_idx(0).is_some() && fw.story.flags == saved.flags {
+                    ok = true;
+                    println!("continued after {i} title frames");
+                    break;
+                }
+            }
+            let fw = fresh.world();
+            let cpos = fw.player_idx(0).map(|pi| (fw.pl_ref(pi).a.px(), fw.pl_ref(pi).a.py()));
+            let mut diffs = vec![];
+            if fw.story.flags != saved.flags { diffs.push("flags".to_string()); }
+            if fw.story.supplies != saved.supplies { diffs.push("supplies".into()); }
+            if fw.story.equipment != saved.equipment { diffs.push("equipment".into()); }
+            if fw.story.zenie != saved.zenie { diffs.push("zenie".into()); }
+            if fw.story.current != saved.current { diffs.push("current".into()); }
+            if fw.story.g != saved.g || fw.story.l != saved.l { diffs.push("script words".into()); }
+            for (c, (a, b)) in fw.story.chars.iter().zip(saved.chars.iter()).enumerate() {
+                if serde_json::to_string(a).ok() != serde_json::to_string(b).ok() { diffs.push(format!("char {c}")); }
+            }
+            println!("Continue: ok {ok}, area {:?} leader {cpos:?}, story differences {diffs:?}", fw.field.as_ref().map(|f| (f.area.world, f.area.area)));
+            app = fresh;
+            first_area = None;
+            first_pos = None;
+            first_rng = None;
+            rng_bad = 0;
+            pos_bad = 0;
+            continue_row = Some(k);
         }
         let menu = wf_core::menu::active(app.world());
         let logic = lf != prev_lf;
@@ -214,6 +275,7 @@ fn main() {
     let s = &app;
     let w = s.world();
     println!("rows {} stepped {} | script errors {}", rows.len().min(limit), stepped, s.errors.len());
+    println!("continued at row {continue_row:?}");
     println!("first area divergence: {first_area:?}");
     println!("first position divergence: {first_pos:?}");
     println!("first RNG divergence: {first_rng:?}");

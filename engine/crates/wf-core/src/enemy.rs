@@ -2404,10 +2404,16 @@ fn on_death(w: &mut World, i: usize) {
             // (the puff 0x086FD9D0 at rate 0x1000 + rand(0x1000) - the real route's Kid Buu, 19-3: a punch on both
             // copies, the first one's death draws its rate after its on-hit tree)
             let (cx, cy) = w.en_ref(i).a.center();
-            crate::fx::puff_rng(w, cx, cy);
             w.en(o).primary = true;
-            // (the survivor keeps its AI state: the real route, 19-3 - the same punch then hits it through its own
-            // on-hit tree, three chances, and no idle draw)
+            if w.field.is_some() {
+                crate::fx::puff_rng(w, cx, cy);
+                // (field: the survivor keeps its AI state - the real route, 19-3: the same punch then hits it through
+                // its own on-hit tree, three chances, no idle draw; battles keep the reference's phase-1 reset)
+            } else {
+                crate::fx::puff(w, cx, cy, 0x1800);
+                let st = w.data.enemy(0x3c).map(|t| t.ai).unwrap_or(0);
+                crate::nodes::reset(w, o, st);
+            }
             return;
         }
     }
