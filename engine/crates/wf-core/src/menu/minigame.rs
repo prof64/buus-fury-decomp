@@ -30,7 +30,6 @@ use wf_view::{MenuFont, MenuLayer, MenuOp, MenuView};
 pub const BAR_MAX: i32 = 85;
 /// the wait after a finished game (mode `0x08049978` with 30)
 pub const WAIT: i32 = 30;
-const PUNCH_AWAITS_A: bool = true;
 /// screens over the field: no fades, no black frames; the world gets the frame the game ends in
 pub const OVERLAY: Transition = Transition { fade_out: 0, enter: 0, leave: 1, fade_in: 0 };
 
@@ -74,11 +73,14 @@ pub struct Minigame {
     pub watch: Option<Watch>,
     /// Watch This!: the construction (VRAM eviction, box decode) makes the first iteration 2 frames long
     pub enter_lag: u8,
+    /// this iteration was one of the punch wait mode's (the object world updates in it)
+    #[serde(default)]
+    pub waited: bool,
 }
 
 impl Minigame {
     fn base(kind: Kind, g: Gauge, w: &World) -> Minigame {
-        Minigame { c: Container::default(), kind, g, wait: 0, oam_shown: None, oam_last: None, counter: w.story.play_frames as u32, watch: None, enter_lag: 0 }
+        Minigame { c: Container::default(), kind, g, wait: 0, oam_shown: None, oam_last: None, counter: (w.story.play_frames as i64 + w.story.lf_bias) as u32, watch: None, enter_lag: 0, waited: false }
     }
     /// `0x0803018C`: the gauge at (72, 144), empty, peak 0
     pub fn power(w: &World) -> Minigame {
@@ -184,19 +186,22 @@ impl Page for Minigame {
             let v = wt.verdict;
             return if v != 0 { self.finish(w, v) } else { Action::None };
         }
+        // a wait iteration: not the press / the step that starts a wait
+        self.waited = self.wait > 0 && self.wait <= WAIT;
         if self.wait > 0 {
-            // the wait mode 0x08049978: 30 iterations, then the game's mode ends (the punch machine's waits for an A
-            // press first: 7-3, the A held over the wait's end is not one, the mode returns on the next press)
+            // the wait mode 0x08049978: 30 iterations, then the mode's step returns marker + 1 (the native pushes
+            // code - 1); 0 (the blinking marker hidden, peak -1) does not end the mode: the step runs again and
+            // starts another wait (7-3: four waits, 123 frames)
             self.wait -= 1;
-            if self.wait == 0 && !(self.kind == Kind::Punch && PUNCH_AWAITS_A) {
-                return self.finish(w, 0);
-            }
-            return Action::None;
-        }
-        if self.kind == Kind::Punch && self.g.done {
-            if w.menu.pressed & A != 0 {
-                // the mode returns marker + 1; the native pushes code - 1
-                let r = self.g.peak + 1;
+            if self.wait == 0 {
+                let r = match self.kind {
+                    Kind::Punch => self.g.peak + 1,
+                    _ => 0,
+                };
+                if self.kind == Kind::Punch && r == 0 {
+                    self.wait = WAIT + 1;
+                    return Action::None;
+                }
                 return self.finish(w, r);
             }
             return Action::None;
@@ -468,10 +473,10 @@ pub fn open_watch(w: &mut World, level: i32) {
 /// the power struggle's mode keeps the field's object world updating (mode vt `0x0804B5D8` entry 3 = `0x08007018`,
 /// which calls the world update `0x080115B0`; story segment sb_01_05b: the Z-Sword, s464 - the actors' animations
 /// and Gohan's frame-range pose keep running under the gauge)
-/// The punch machine's 30-iteration wait mode after the press (`0x08049978`) runs the object world too (7-3: the
-/// NPCs' idle ticks run from the iteration after the press until the mode ends)
+/// The punch machine's 30-iteration wait modes after the press (`0x08049978`, step `0x08006BA0`) update the object
+/// world too (7-3: the NPCs' idle ticks run from the iteration after the press until the mode ends)
 pub fn world_runs(w: &World) -> bool {
-    let power = |s: Option<&Screen>| matches!(s, Some(Screen::Minigame(m)) if m.kind == Kind::Power || (m.kind == Kind::Punch && m.g.done && m.wait < WAIT));
+    let power = |s: Option<&Screen>| matches!(s, Some(Screen::Minigame(m)) if m.kind == Kind::Power || (m.kind == Kind::Punch && m.waited));
     // the closing frame too (the stack is empty, the screen still shows)
     power(w.menu.stack.last()) || (w.menu.stack.is_empty() && power(w.menu.shown.as_deref()))
 }

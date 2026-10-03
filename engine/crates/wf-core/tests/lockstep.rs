@@ -232,7 +232,8 @@ fn setup(t: &Value) -> Setup {
     let mut ai_starts: Vec<(u32, EntityId, u16)> = vec![];
     let mut enemy = None;
     if let (Some(_), Some(ie)) = (en, ini.get("enemy").filter(|v| !v.is_null())) {
-        if let Some(ei) = w.ents.iter().position(|e| matches!(e.body, Body::Enemy(_))) {
+        // the recorded enemy: the fight's own (not a part it spawned; Worm Head's segments come before it in the list)
+        if let Some(ei) = w.ents.iter().position(|e| matches!(&e.body, Body::Enemy(x) if x.parent == 0)) {
             wf_core::enemy::unmark_self(w, ei);
             {
                 let e = w.en(ei);

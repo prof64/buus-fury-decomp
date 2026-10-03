@@ -92,6 +92,10 @@ pub struct Story {
     pub quests: Vec<Quest>,
     /// play time in frames (counted while the field runs)
     pub play_frames: u64,
+    /// the boot frame counter (`0x03000F94`) minus the play time (-(GD+0x4D0)): the punch marker's blink runs on
+    /// the boot counter (7-3)
+    #[serde(default)]
+    pub lf_bias: i64,
 }
 
 impl Default for Story {
@@ -109,6 +113,7 @@ impl Default for Story {
             current: 0,
             quests: vec![Quest::default(); 40],
             play_frames: 0,
+            lf_bias: 0,
         }
     }
 }

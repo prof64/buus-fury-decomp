@@ -142,6 +142,7 @@ pub fn import_story(data: &GameData, ram: &GbaRam) -> Story {
     st.equipment = (0..n).map(|k| u32le(&gd, 0xE8 + 4 * k)).filter(|v| v >> 28 == 0).map(|v| (v & 0x0FFF_FFFF) as i32).collect();
     st.zenie = u32le(&gd, 0x4F4);
     st.play_frames = (ram.lf() as i64 + u32le(&gd, 0x4D0) as i32 as i64).max(0) as u64;
+    st.lf_bias = ram.lf() as i64 - st.play_frames as i64;
     for c in 0..9usize.min(st.chars.len()) {
         let r = ram.read(REC0 + 0x68 * c as u32, 0x68);
         let mut rec = st.chars[c].rec.clone();

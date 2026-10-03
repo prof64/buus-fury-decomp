@@ -394,6 +394,9 @@ pub fn update(w: &mut World, i: usize) {
     let id = w.ents[i].id;
     if w.field.as_ref().is_some_and(|f| (f.busy || f.arrival.is_some()) && !(f.load_ids.0 <= id && id < f.load_ids.1)) {
         tick_anim(w, i);
+        if w.en_ref(i).part && matches!(w.en_ref(i).ty, 0x34 | 0x35 | 0x37) {
+            part_hurt_end(w, i);
+        }
         crate::nodes::busy_controller(w, i);
         return;
     }
@@ -1684,6 +1687,13 @@ pub fn kid_buu_merge(w: &mut World, i: usize) {
 /// the body's own tick: hurt (raw 10) [-1, -2, -1], raw 20 [15, -3, -5], else [0, 1, 0, -1] px. The parts are
 /// created at (-16, -16) / (48, -16) / (16, -40) (the spawn's own frame). Battle keeps the measured fixed offsets
 /// (the TypeScript cross-check reference; engine/docs/segments.md §7).
+/// a Janemba part's hurt animation (JanembaPartFlash) ends with SetAnim(0) (the idle's rand(255)) - also while an
+/// event holds the field (sc_janemba: the defeat scene's first frames)
+fn part_hurt_end(w: &mut World, i: usize) {
+    if w.en_ref(i).ea.pos.raw == 10 && w.en_ref(i).ea.done {
+        set_anim(w, i, &[n(0)], true, Some(true));
+    }
+}
 fn janemba_part_field(w: &mut World, i: usize) {
     let par = w.en_ref(i).parent;
     let Some((pi, (raw, cel, x, y, z, f))) = w
@@ -1699,10 +1709,7 @@ fn janemba_part_field(w: &mut World, i: usize) {
         e.a.z = z;
         e.a.facing = f;
     }
-    // a part's hurt animation (JanembaPartFlash) ends with SetAnim(0) (the idle's rand(255))
-    if w.en_ref(i).ea.pos.raw == 10 && w.en_ref(i).ea.done {
-        set_anim(w, i, &[n(0)], true, Some(true));
-    }
+    part_hurt_end(w, i);
     // the hand strike's controller on the arm part (set by JanembaHandStrike's first update): the hand on its 16th
     // tick, before the player's update (sc_janemba: a punch that hurts Janemba in that frame still meets the hand);
     // on its 56th the arm's SetAnim(0)
@@ -1742,9 +1749,6 @@ fn janemba_part_field(w: &mut World, i: usize) {
         _ => &[0, 1, 0, -1],
     };
     let dy = table.get(cel).copied().unwrap_or(0);
-    if std::env::var("JP_DBG").is_ok() {
-        eprintln!("jp wf {} raw {} cur {} seen {} cel {} dy {}", w.frame, raw, cur_raw, seen, cel, dy);
-    }
     let parts: Vec<(usize, i32)> = (0..w.ents.len())
         .filter(|&k| !w.ents[k].removed)
         .filter_map(|k| match &w.ents[k].body {

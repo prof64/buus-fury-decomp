@@ -146,7 +146,8 @@ No playthrough reaches it yet, so the state is a **save game loaded by the real 
    (never set)) + the HFIL puzzle / gate flags on the way to Janemba (181, 183 (18-12 Vegeta Lv 100 gate), 284);
    optional collectibles, side quests and map-visited bits stay clear;
 4. levels with the game's level-up (`level_up_to` 0xF3: random growth), points spent like the Status screen does
-   (35 / 25 / 25 / 15 %), RecalcStats 0x08013C66: Goku / Vegeta / Goten / Trunks 125, Gohan 115; zenie 18,000;
+   (35 / 25 / 25 / 15 %; the stat-point pool is a u16 at +0x2C), RecalcStats 0x08013C66: Goku / Goten 180,
+   Vegeta 160, Gohan / Trunks 165; zenie 18,000 (lower levels die in the later fights);
 5. GameData +0x8A0 = the 18-13 save point (HFIL, next to Janemba's arena), +1 bit 0; written to EEPROM slot 0 by the
    game's own slot writer 0x080049F2 (checksum, EEPROM protocol); then soft reset -> title -> Game 1 -> the game's
    load. Every RAM byte of the resulting state comes from the boot + load path (`work/superbuu/libemu_sb.dylib`:
@@ -157,11 +158,18 @@ no intervention (King Yemma s059 -> s067 -> the Z-Sword s464 -> Kami's Lookout -
 This!) -> Gotenks vs Super Buu -> 6-20), so every flag / party bit these scripts read holds what the story needs.
 Known liberties: the levels / zenie / empty inventory are a plausible player's, not a recorded one's.
 
-**Route** `tools/superbuu/sbroute.py` (driver goals + `tools/superbuu/sbdriver.py`: `walke`, `areaw`, `fastmash`,
-`prog`, `node` (breakpoint on the scene step: timed presses, e.g. the Z-Sword swings 47 frames after node 19 / 33
-start), `eventsw` (Watch This!: reads the drawn sequence from the mode object), `boss`): 40,046 frames, keys in
-`work/superbuu/sb_keys.json`; master recording `SEGMENT_DIR=work/superbuu/seg segment.py record --keys ...
---name sb_master`, segments cut at importable area entries.
+**Route** `tools/superbuu/sbroute.py [--from MARK] [--to MARK]` (driver goals + `tools/superbuu/sbdriver.py`): the
+whole main path, **190,593 frames** from the start state to the title after the credits (Z-Sword, Lookout / HTC,
+Gotenks, Ultimate Gohan, Vegito, inside Buu, Kid Buu's three phases, Uub, ending + credits); checkpoints
+`work/superbuu/m_<mark>.ss` (start, zsword, lookout, gotenks, ult_gohan, wasteland, fusion_saga, goku_vs_buu, vegito,
+inside_buu, intestines, brain, kid_buu_saga, kid_buu, after_kid_buu, final, the_end), keys in
+`work/superbuu/sb_keys.json`. Goals: `walke`, `areaw`, `fastmash`, `prog`, `node` (timed presses after a scene node),
+`eventsw` (Watch This! sequence from the mode object; the power struggle 0x0804B5D8: A every other frame), `boss`
+(+ `timer`: survive the countdown), `fly`, `exitto` (BFS over the exit graph), `evade` (Vegeta's countdown, GD+1 bit 2),
+`itbuu` (Super Buu 0x77: dodge the ball, Instant Transmission onto Buu while he glides - the phase advances only on a
+hit taken while the player's anim is IT, sprite anim 0x13), `beam`, `bat`, `zap`. Master
+`work/superbuu/seg/sb_master.json` (82 MB), cut by `tools/superbuu/mkcuts.py` into `work/superbuu/segs/` (47 cuts at
+the area entries outside events).
 
 | segment | from | frames | matched | notes |
 |---|---|---|---|---|
@@ -169,6 +177,17 @@ start), `eventsw` (Watch This!: reads the drawn sequence from the mode object), 
 | `sb_18_01` | 18-1 | 600 | 600 | Goku's pad -> Other World travel map 0-51 -> Yemma's Office -> 1-5 |
 | `sb_01_03` | 1-3 | 7,735 | 7,553 (gate) | King Yemma s059 + the Janemba flashback scenes (0-17 / 0-16 / 0-96) |
 | `sb_01_05b` | 1-5 #2 | 11,000 | 6,541 (gate) | s067 -> 19-3 / 19-7 (Gohan), the Z-Sword power struggle and boulder |
+
+From the full route (`sb_0NN_<world>_<area>`, all gated; the four above come from an older start state, still valid):
+
+| cuts | where | result |
+|---|---|---|
+| sb_000, sb_001 | 18-12, 18-1 | exact (479, 315) |
+| sb_008 - sb_010 | 20-2 .. 20-4 (Wasteland, Gohan vs Buu) | exact (2,632 / 302 / 442) |
+| sb_013 - sb_028, sb_031 - sb_033, sb_036 - sb_040 | inside Buu 21-2 .. 21-24 (worms, Blisters / Enzymes, the pods, brain) | exact, 24 cuts, 15,861 frames |
+| sb_029 / sb_030 | 21-13 / 21-14 (save point: Switch Characters) | 688 / 475 |
+| sb_034 / sb_035 | 21-18 / 21-19 (Buu absorbs: s485 -> s502) | 619 / 367 |
+| not gated (> 2 MB) | sb_004 1-3 7,623 · sb_005 1-5 7,350 · sb_006 6-6 3,443 · sb_011 20-5 3,025 · sb_012 20-6 975 · sb_041 21-25 (Kid Buu) 10,966 · sb_044 4-20 (ending) 1,974 | |
 
 Rules found (all in wf-core / wf-script-core / wf-import, regressions green):
 * **Travel map** 0-51 (`show_destination_label` 0xD9, label entity vt 0x0804BAF4, update 0x0803669E): the selection
@@ -192,12 +211,25 @@ Rules found (all in wf-core / wf-script-core / wf-import, regressions green):
   calls the world update 0x080115B0), players get no input; the script continues in the frame the mode ends; a new
   state replaces a frame-range animation the player was playing. 0xC6 always opens the exact screen (menu/minigame.rs).
 
-Open: `sb_01_03` f7569 — `return_to_field` restores the field's saved objects (NPC positions / animation states), the
-remake reloads the area fresh (the ogres at Yemma's door are where they stood before the scene in the game).
-`sb_01_05b` f6541 — `play_anim(1, 0)` on Goku (spawned `spawn_actor(1, ..)`, holding `set_pose(1, 12, 0)`) leaves the
-pose in the game; the remake's rule restarts idle on any non-idle actor (needs the NPC SetAnim / vt+0x2C rule).
-Not recorded yet: the HTC fights, Gotenks, Ultimate Gohan, Vegito, inside Buu, Kid Buu, ending (route continues from
-`m_after_gotenks`).
+Rules found inside Buu (VERIFIED by the cuts above; battle code mirrored in the TS reference, cross_ts green):
+* **Worm** (0x8E head / 0x8F segments): the head's constructor (its first state's enter) appends the 5 segments to the
+  world list before the head itself is appended (`battle::push_initial`: the enemy moves after objects its enter
+  made); the 12-slot ring moves a segment only when a command arrives (prefilled 12, replays the 13th back); segment
+  graphics 0x129 (spawn template 0x08756A2C); the last segment sets Worm Tail 0x12A + SetAnim(1) every frame; head and
+  segments stay idle (no walk anim while moving); contact = message kind 1 (player footprint), 21-frame counter.
+* **Blister**: an Enzyme spawns only where its footprint (sprite 0x57) is free on the enemy grid (else retry next
+  frame, 0x0802F458).
+* A load waiting for its on-enter script holds the enemies like an event (only their anim ticks).
+* A broken breakable's callback starts its event before the object pass: the player is not updated that frame
+  (`Field.busy_pre_pass`), and the enemies run their update in the event's exit frame (`queued_event`).
+* A `load_scene` backdrop's objects are held by the scene's event (`Field.scene_load`).
+* A text node whose last page lists `-` options is a choice (s011's "-Save / -Switch Characters").
+* Switch Character builds its figures (idle rand(255) each) when the fade-out reaches black; the field's cameras keep
+  easing during a menu's fade-out; the screen is black during a page's leave frames.
+
+Open: `sb_029` f702 / `sb_030` f489 — the RNG after Switch Characters closes (the rebuilt leader). `sb_034` f619 —
+s502's sprite swap (`change_sprite` Buu 123 -> 126) is 1 frame late and the white fade timing. `sb_041` f10981 — Kid
+Buu's arena: the player object the game removes. `sb_044` f1985 — an extra NPC in 4-20 (the ending).
 
 ## 7. Side content (owner: the side-content agent, from 2026-10-02)
 
