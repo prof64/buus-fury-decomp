@@ -806,6 +806,10 @@ impl World {
     /// into the next index): story playthrough, the player's punch that destroys a fighter loaded before it ticks
     /// its animation twice in that frame.
     fn step_entities_list(&mut self) {
+        // the travel menu's label entity (the Other World map 0-51; created by a script, alone in the world list)
+        if self.scene.dest_label.is_some() {
+            crate::field::dest_menu(self);
+        }
         let live = |w: &World| -> Vec<usize> { (0..w.ents.len()).filter(|&k| !w.ents[k].removed).collect() };
         let start = live(self).len();
         let mut c = start as i64 - 1;

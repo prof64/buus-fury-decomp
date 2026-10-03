@@ -58,9 +58,12 @@ Everything else — logic, input edges, events, sounds, every pixel — is compa
 runs the remake's own frame-cost model instead (reported as agreement).
 
 Strict (must be exact, `STRICT` in the test): `status_*`, `inventory_*`, `equip_*`, `options_*`, `journal_*`,
-`skills_*`, `cr_*` (credits), `mg_*` (mini-games) — every compared frame and every sound exact. The shop / save /
-title / character-switch / game-over and map-screen scenarios are reported but not strict until their screens are
-finished (`charsel_*`, `map_*` open no screen yet; `shop_*` / `save_*` differ only on their first black frame,
+`skills_*`, `cr_*` (credits), `mg_*` (mini-games: power struggle, punch gauge, Watch This!; the native's push is
+checked too), `map_snakeway` / `map_forest` (map screen: area page, scrolling, record markers, revealed rooms, world
+page with markers, page changes, close) — every compared frame and every sound exact; credits, mini-games and the
+map screen are also exact with `MENU_PARITY_FREE=1` (their own frame-cost models). The shop / save /
+title / character-switch / game-over scenarios and `map_left` (the Scouter page, a stand-in) are reported but not
+strict until their screens are finished (`charsel_*` opens no screen yet; `shop_*` / `save_*` differ only on their first black frame,
 `title_*` on the continue / new-game hand-over). The world restore's length after a screen (CPU time: 24 or 25
 black frames) is taken from the trace too.
 
@@ -80,7 +83,11 @@ black frames) is taken from the trace too.
 
 * The dialogue typewriter does not read `menu::options::settings(w).text_speed` yet (fixed default speed); the
   frontend should also send the stored volumes at session start (only changes are evented).
-* Character switch (0x8D), game over, the map screen and the title hand-over are being finished (see the per-area
+* The map screen's **Scouter** page (L of the area map, vt `0x0804A570`: the live field objects on the grid, a
+  cursor, A = an info page) is a stand-in (frame, grid, fades, R back): `re/buu/menu/NOTES_minigames.md`.
+* Map screen / credits / Watch This! setup CPU time is a model (`mapscreen::setup_frames`: 200k + 25 cycles per
+  decompressed tile byte; `credits::page_cost`); exact on the captured areas / all 47 credit pages.
+* Character switch (0x8D), game over and the title hand-over are being finished (see the per-area
   notes `re/buu/menu/NOTES_*.md`).
 
 * Redraw CPU time is modelled per screen (frame counts), not per cycle: the sound driver's IRQ load is not

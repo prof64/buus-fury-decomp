@@ -121,7 +121,7 @@ fn traces() -> PathBuf {
 }
 
 /// scenarios that must be exact (prefixes)
-const STRICT: &[&str] = &["status_", "inventory_", "equip_", "cr_", "mg_", "options_", "journal_", "skills_", "cr_"];
+const STRICT: &[&str] = &["shop_", "save_", "title_", "status_", "inventory_", "equip_", "cr_", "mg_", "options_", "journal_", "skills_", "cr_", "map_snake", "map_forest"];
 
 /// the capture's picture hash: sha1 of the RGB bytes, first 16 hex digits
 fn hash(fb: &[u32]) -> String {
@@ -141,7 +141,16 @@ fn run(packs: &Packs, data: &Arc<wf_core::content::GameData>, name: &str) -> Opt
     let frames = &tr;
     let sj = &tr["story"];
     let story = story_from(data, sj);
-    let cfg = FieldConfig { world: 1, area: 1, story: Some(story), rng: wf_core::battle::RngInit::Seed(1), ..Default::default() };
+    let mut cfg = FieldConfig { world: 1, area: 1, story: Some(story), rng: wf_core::battle::RngInit::Seed(1), ..Default::default() };
+    // the capture's field place (newer captures): area and the player's position (footprint top-left px)
+    if let Some(a) = sj["area"].as_array().filter(|a| a.len() == 3) {
+        cfg.world = i(&a[0]) as i32;
+        cfg.area = i(&a[1]) as i32;
+        cfg.variant = i(&a[2]) as i32;
+    }
+    if let Some(p) = sj["player"].as_array().filter(|a| a.len() >= 2) {
+        cfg.pos = Some((i(&p[0]) as i32, i(&p[1]) as i32));
+    }
     let session = Session::new_field(Arc::clone(data), cfg);
     let mut sim = StorySim::with_session(packs, session).expect("story sim");
     sim.skip_area_banner();

@@ -16,10 +16,13 @@ class EarthDriver(Driver):
     def next_goal(self):
         super().next_goal()
         self.walk_area = None
+        self.walk_t = 0
         self.tgt = None
         self.tgt_at = -99
         self.bans = {}
+        self.engaged = {}
         self.tmode = None
+        self.hphase = 0
 
     def step(self, e):
         g = self.goals[self.k]
@@ -31,7 +34,8 @@ class EarthDriver(Driver):
             elif s['area'][:2] != self.walk_area:
                 self.next_goal()
                 return None
-            if self.t > 3000 and s['scene'] == 0:
+            self.walk_t = getattr(self, 'walk_t', 0) + (1 if s['scene'] == 0 else 0)
+            if self.walk_t > 3000:
                 raise RuntimeError(f'walk {g} not done after 3000 frames: {s}')
             return super().step(e)
         if kind == 'until':
@@ -69,12 +73,80 @@ class EarthDriver(Driver):
             return 0
         if kind == 'fly':
             return self.fly(e, s, g)
+        if kind == 'herd':
+            return self.herd(e, s, g)
+        if kind == 'levelup':
+            # ('levelup', n, cycle): repeat the goal list `cycle` (a round trip between areas with fights) until the
+            # current character's level went up by n since this goal started (a level-up refills HP / EP)
+            import json as _json
+            from common_field import record_of
+            if not hasattr(self, 'xp_table'):
+                from grid import CONTENT
+                self.xp_table = [l['total_xp'] for l in _json.loads((CONTENT / 'levels.json').read_text())['levels']]
+            xp = record_of(e)['xp']
+            lvl = max(i for i in range(len(self.xp_table)) if xp >= self.xp_table[i])
+            if len(g) < 4:
+                self.goals[self.k] = g = (g[0], g[1], g[2], lvl + g[1])
+            if lvl >= g[3]:
+                self.next_goal()
+                return None
+            self.goals[self.k:self.k] = list(g[2])
+            self.k -= 1
+            self.next_goal()
+            return None
+        if kind == 'dodge':
+            # ('dodge', x0, x1, y): keep running between x0 and x1 on row y (Goten's thrown rocks land where the
+            # player stood when thrown) until an event runs and ends (s121), then as 'events'
+            if s['scene'] > 0:
+                return self.mash_a()
+            if e.r8(0x03001068 + 0x55 + (g[4] >> 3)) >> (g[4] & 7) & 1:
+                self.goals[self.k] = ('events',)
+                return 0
+            if s['p'] is None:
+                return 0
+            x, y = s['p'][0], s['p'][1]
+            if not hasattr(self, 'dodge_dir') or self.t == 0:
+                self.dodge_dir = 1
+            if x >= g[2]:
+                self.dodge_dir = -1
+            elif x <= g[1]:
+                self.dodge_dir = 1
+            # a rock in the air (object vt 0x0804CE50: +0x20 x 24.8, +0x40 vx, +0x48 frames left): run away from
+            # where it lands
+            from common_field import OBJW
+            sv = lambda v: v - (1 << 32) if v & 0x80000000 else v
+            for i in range(e.r32(OBJW + 4)):
+                o = e.r32(OBJW + 8 + 4 * i)
+                if e.r32(o) == 0x0804CE50:
+                    lx = (sv(e.r32(o + 0x20)) + sv(e.r32(o + 0x40)) * e.r32(o + 0x48)) >> 8
+                    away = 1 if x + 8 > lx else -1
+                    if (away > 0 and x < g[2]) or (away < 0 and x > g[1]):
+                        self.dodge_dir = away
+                    break
+            k = KEY.RIGHT if self.dodge_dir > 0 else KEY.LEFT
+            if y < g[3] - 2:
+                k |= KEY.DOWN
+            elif y > g[3] + 2:
+                k |= KEY.UP
+            return k
         if kind == 'talkto':
             return self.talkto(e, s, g)
         if kind == 'fight2':
             return self.fight2(e, s, g)
         if kind == 'alloc':
             return self.alloc(e, s, g)
+        if kind == 'menu':
+            # ('menu', program): a fixed key program (route.program_keys syntax), then B until the field is back
+            from route import program_keys
+            if self.t == 0:
+                self.menu_keys = program_keys(g[1])
+            if self.t < len(self.menu_keys):
+                return self.menu_keys[self.t]
+            u = self.t - len(self.menu_keys)
+            if s['p'] is None and u < 600:
+                return KEY.B if u % 16 < 3 else 0
+            self.next_goal()
+            return None
         return super().step(e)
 
     def alloc(self, e, s, g):
@@ -218,7 +290,14 @@ class EarthDriver(Driver):
             return self.mash_a()
         if s['p'] is None:
             return 0
-        ens = self.enemies(e)
+        rc = record_of(e)
+        # low on HP: stop fighting (the next goals walk on); enemies engaged for 600 frames are given up
+        if rc['hp'] * 100 < rc['maxhp'] * 30 and 'stay' not in g[2:]:
+            self.next_goal()
+            return None
+        eng = getattr(self, 'engaged', {})
+        self.engaged = eng
+        ens = [o for o in self.enemies(e) if eng.get((o[0] // 32, o[1] // 32), 0) < 600]
         if not ens or self.t >= cap:
             self.idle += 1
             if self.idle < 30:
@@ -226,7 +305,9 @@ class EarthDriver(Driver):
             self.next_goal()
             return None
         x, y = s['p'][0], s['p'][1]
-        rc = record_of(e)
+        if getattr(self, 'tgt', None) is not None:
+            tk = (self.tgt[0][0] // 32, self.tgt[0][1] // 32)
+            eng[tk] = eng.get(tk, 0) + 1
         ranged = 'melee' not in g[2:] and rc['ep'] * 100 >= rc['maxep'] * 8
         snipe = 'snipe' in g[2:] and any(o[2] >= 48 for o in ens)
         if snipe:
@@ -307,10 +388,22 @@ class EarthDriver(Driver):
                         best = (len(p), i, oi, en)
             if best is None:
                 self.idle += 1
-                if self.idle > 90:
+                if self.idle > 240:
                     self.next_goal()
                     return None
-                return 0
+                # no spot reachable on the static grid: chase the nearest one directly
+                en = min(ens, key=lambda o: abs(o[0] - x) + abs(o[1] - y))
+                k = 0
+                if en[0] > x + 2:
+                    k |= KEY.RIGHT
+                elif en[0] < x - 2:
+                    k |= KEY.LEFT
+                if en[1] > y + 2:
+                    k |= KEY.DOWN
+                elif en[1] < y - 2:
+                    k |= KEY.UP
+                self.tgt = None
+                return k
             self.tgt = (best[3][:2], best[1], best[2])
             self.path = None
         self.idle = 0
@@ -333,6 +426,62 @@ class EarthDriver(Driver):
                 self.tgt = None
                 return 0
         self.mash = 0
+        return k
+
+    def herd(self, e, s, g):
+        """('herd', cap): an enemy that keeps 60 px away and stands still between 60 and 100 px (Vegeta in the
+        gravity chamber, steps away at 2 px/f): line up on its row 70..95 px away, then dash at it (double tap,
+        ~3 px/f) and punch; done when an event starts (then as 'events')"""
+        if s['scene'] > 0:
+            self.goals[self.k] = ('events',)
+            return self.mash_a()
+        if s['p'] is None:
+            return 0
+        if self.t > g[1]:
+            raise RuntimeError(f'herd not done: {s}')
+        ens = self.enemies(e)
+        if not ens:
+            return 0
+        x, y = s['p'][0], s['p'][1]
+        ex, ey, fw, fh = ens[0]
+        side = -1 if x + 8 < ex + fw // 2 else 1        # -1: we are left of it
+        gx = ex - (x + 16) if side < 0 else x - (ex + fw)
+        d = 'R' if side < 0 else 'L'
+        ph = getattr(self, 'hphase', 0)
+        if ph:
+            # dashing: tap, release, hold; punch when close
+            self.hphase += 1
+            if ph < 3:
+                return DIRS[d]
+            if ph < 5:
+                return 0
+            if gx <= 12 or ph > 60:
+                if ph > 75:
+                    self.hphase = 0
+                return DIRS[d] | (KEY.A if ph % 4 < 2 else 0)
+            return DIRS[d]
+        aligned = abs((y + 4) - (ey + fh // 2)) <= 2
+        if aligned and 60 <= gx <= 95 and s['p'][2] == self.FACE[d]:
+            self.hphase = 1
+            return 0
+        # get to the row, 75 px from it on the roomier side
+        tx = ex - 16 - 75 if (ex - 16 - 75 >= 24) else ex + fw + 75
+        ty = ey + fh // 2 - 4
+        if abs(x - tx) <= 3 and abs(y - ty) <= 1:
+            return DIRS['R' if tx < ex else 'L']
+        if abs(x - tx) + abs(y - ty) > 12:
+            k = self.steer(e, s, tx, ty)
+            if k:
+                return k
+        k = 0
+        if tx > x + 1:
+            k |= KEY.RIGHT
+        elif tx < x - 1:
+            k |= KEY.LEFT
+        if ty > y + 1:
+            k |= KEY.DOWN
+        elif ty < y - 1:
+            k |= KEY.UP
         return k
 
     def talkto(self, e, s, g):

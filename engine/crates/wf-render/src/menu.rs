@@ -153,21 +153,11 @@ impl MenuRenderer {
         self.sheets.get(key).cloned().flatten()
     }
 
-    /// an RGBA sprite pixel's OBJ palette index
-    fn obj_index(&mut self, packs: &Packs, rgb: u32) -> u8 {
+    /// an RGBA sprite pixel's OBJ palette index: the sheets are rendered with the UI palette (`0x0805652C`,
+    /// wf-extract sprites.rs), whose colours are unique except black (0 / 1: index 0 is transparent -> 1)
+    fn obj_index(&mut self, _packs: &Packs, rgb: u32) -> u8 {
         if self.obj_rev.is_none() {
             let mut m = HashMap::new();
-            if let Ok(v) = packs.json::<serde_json::Value>("maps/palette.json") {
-                let cols = v["obj"].as_array().or_else(|| v["colors"].as_array().filter(|a| a.len() >= 512).map(|a| a.as_slice()).map(|_| v["colors"].as_array().unwrap()));
-                if let Some(a) = cols {
-                    let off = if v["obj"].is_array() { 0 } else { 256 };
-                    for k in 1..256usize {
-                        if let Some(c) = a.get(off + k).and_then(|c| c.as_str()).and_then(|c| u32::from_str_radix(c.trim_start_matches('#'), 16).ok()) {
-                            m.entry(c).or_insert(k as u8);
-                        }
-                    }
-                }
-            }
             for k in 1..256usize {
                 m.entry(self.pal[k]).or_insert(k as u8);
             }

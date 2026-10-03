@@ -501,6 +501,8 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
     let had_area = w.field.as_ref().is_some_and(|f| f.loads > 0);
     // a load inside a running event (script warp / scene load) keeps the field held until the event ends
     let keep_busy = w.scene.depth > 0 && w.field.as_ref().is_some_and(|f| f.busy);
+    // the label entity of a travel menu is an object of the old area
+    w.scene.dest_label = None;
     // every object goes; the players are re-created below (same entity ids)
     let players = w.players.clone();
     w.ents.retain(|e| players.contains(&e.id));
@@ -629,15 +631,25 @@ fn arrive(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<Dir>) {
     // the player objects at the destination (leader first; partners next to it), after the actors in the list: they
     // update before them. Each new player draws 2 x rand(255).
     for (slot, &pid) in players.iter().enumerate() {
-        let Some(k) = w.ents.iter().position(|e| e.id == pid) else { continue };
-        let ent = w.ents.remove(k);
-        let Body::Player(old) = ent.body else { continue };
-        let mut p = renew_player(w, &old);
+        // a player a script removed (`remove_actor(0)`: s511, the Other World map) is created from its record
+        let (mut p, old_facing) = match w.ents.iter().position(|e| e.id == pid) {
+            Some(k) => {
+                let ent = w.ents.remove(k);
+                let Body::Player(old) = ent.body else { continue };
+                (renew_player(w, &old), old.a.facing)
+            }
+            None if slot == 0 => {
+                let p = make_player(w, 0, w.story.current);
+                let f = p.a.facing;
+                (p, f)
+            }
+            None => continue,
+        };
         let (fw, fh) = (p.a.foot_w, p.a.foot_h);
         let (sx, sy) = if slot == 0 { (x, y) } else { w.col.as_ref().unwrap().free_spot(crate::world::Layer::Walk, x + 24 * slot as i32, y, fw, fh, None, None) };
         p.a.x = sx << 8;
         p.a.y = sy << 8;
-        p.a.facing = facing.unwrap_or(old.a.facing);
+        p.a.facing = facing.unwrap_or(old_facing);
         w.ents.push(crate::world::Entity { id: pid, removed: false, body: Body::Player(Box::new(p)) });
         // the idle state is entered twice; the second draw is the idle tick that stays (intro lockstep: the
         // player's blink after the warp)
@@ -1130,6 +1142,50 @@ pub fn trigger_check(w: &mut World) {
             }
             fire(w, s, k, t);
             return;
+        }
+    }
+}
+
+/// the travel menu (`show_destination_label` 0xD9: label entity vt 0x0804BAF4, update 0x0803669E): the selection is
+/// one of the area's triggers. Pressed LEFT / RIGHT / UP / DOWN (checked in that order) move it (0x0803656C) to the
+/// trigger whose centre ((x0 + x1 + 15) >> 1, (y0 + y1 + 7) >> 1) lies in that direction: along >= |across|, the
+/// smallest along^2 + 9 across^2; A runs the selected trigger's activation (the label index = the trigger index).
+pub fn dest_menu(w: &mut World) {
+    let pressed = w.input[0].pressed;
+    let Some(f) = w.field.as_ref() else { return };
+    let trigs: Vec<TriggerRt> = f.triggers.clone();
+    let centre = |r: &Rect| ((r.x0 + r.x1 + 15) >> 1, (r.y0 + r.y1 + 7) >> 1);
+    // (key, direction vector 0x0807268C)
+    for (key, (dx, dy)) in [(crate::input::LEFT, (-1, 0)), (crate::input::RIGHT, (1, 0)), (crate::input::UP, (0, -1)), (crate::input::DOWN, (0, 1))] {
+        if pressed & key == 0 {
+            continue;
+        }
+        let cur = w.scene.dest_sel;
+        let Some(c) = trigs.get(cur as usize) else { continue };
+        let (cx, cy) = centre(&c.rect);
+        let mut best = i64::from(i32::MAX);
+        for (k, t) in trigs.iter().enumerate() {
+            if k as i32 == cur {
+                continue;
+            }
+            let (tx, ty) = centre(&t.rect);
+            let (ex, ey) = ((tx - cx) as i64, (ty - cy) as i64);
+            let along = ex * dx + ey * dy;
+            let across = (ex * dy + ey * dx).abs();
+            if along < across {
+                continue;
+            }
+            let score = along * along + 9 * across * across;
+            if score < best {
+                best = score;
+                w.scene.dest_sel = k as i32;
+            }
+        }
+    }
+    if pressed & crate::input::A != 0 {
+        let k = w.scene.dest_sel as usize;
+        if let Some(t) = trigs.get(k) {
+            fire(w, 0, k, t);
         }
     }
 }

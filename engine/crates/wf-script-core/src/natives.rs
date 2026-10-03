@@ -352,6 +352,11 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
                         }
                     }
                     wf_core::field::load_area(h.w, wf_core::field::AreaId { world: wd, area: m, variant: v }, x, y, Some(0));
+                    // the load waits for the new area's on-enter script (no event holds the field: Other World travel
+                    // s511 / s512): a nesting host runs it now, the warp returns when the players arrived
+                    if h.s.nest_area_enter && h.w.field.as_ref().is_some_and(|f| f.arrival.is_some()) {
+                        return block(h.s, Pending::Arrival);
+                    }
                 } else {
                     wf_core::field::warp(h.w, wd, m, v, x, y, true);
                 }
@@ -720,6 +725,8 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
         }
         0xd9 => {
             h.w.scene.dest_label = Some((arg(a, 0), vec![0; 32]));
+            // the ctor starts on trigger list entry [count - set - 1] (= our trigger index `set`)
+            h.w.scene.dest_sel = arg(a, 0);
             unit()
         }
         0xda => {

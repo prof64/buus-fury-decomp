@@ -51,6 +51,8 @@ pub struct MenuData {
     pub opts: options::OptsData,
     /// supplies' inventory data (def +4 name, +6 plural, +8 description, icon, story flag, use script): inventory.rs
     pub inv: inventory::InvData,
+    /// the map screen's area records (`ui/mapscreen/area_maps.json`): mapscreen.rs
+    pub maps: Option<Arc<mapscreen::MapData>>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -104,7 +106,7 @@ impl MenuData {
         let items = shop::ItemsUi::load(src);
         let opts = options::OptsData::load(src);
         let inv = inventory::InvData::load(src);
-        Some(Arc::new(MenuData { text, portraits, forms, items, opts, inv }))
+        Some(Arc::new(MenuData { text, portraits, forms, items, opts, inv, maps: mapscreen::MapData::load(src) }))
     }
 }
 
@@ -117,6 +119,11 @@ pub trait Page {
     fn container_ref(&self) -> &kit::Container;
     /// the mode's update before the redraw check (vt +0xC prologue: counters that request redraws)
     fn update(&mut self, _w: &World) {}
+    /// the screen's live OBJs (character objects updated every iteration, independent of the BG redraw):
+    /// shown over the last copied picture
+    fn objs(&self, _w: &World) -> Vec<wf_view::MenuObj> {
+        Vec::new()
+    }
     /// draw-time side effects and values sampled when the surface is drawn (kept in the shown copy)
     fn before_draw(&mut self, _w: &World) {}
     /// draw-time side effects the game applies after the part of the surface that shows them (the state shown
@@ -385,6 +392,10 @@ impl Default for Transition {
 }
 
 /// the pause menu (START): see [`step`]
+/// `Transition.fade_out` flag: the fade-out's last level stays one more frame before the black frames (the quick
+/// fade `0x0805058C` of script-opened screens)
+pub const FADE_HOLD: u16 = 0x8000;
+
 pub const PAUSE: Transition = Transition { fade_out: 16, enter: 5, leave: 25, fade_in: 16 };
 
 /// Open a menu screen with a transition (`scripted`: a script waits for `World.menu.result`). The field fades out
@@ -463,8 +474,10 @@ pub fn step(w: &mut World) {
             // the fade mode's iteration reads the input (edges of the first menu read are relative to it)
             w.menu.held = held;
             w.story.play_frames += 1;
-            let l = level + w.menu.tr.fade_out.max(1);
-            w.menu.phase = if l >= 256 { Phase::Enter { t: 0 } } else { Phase::FadeOut { level: l } };
+            let step = (w.menu.tr.fade_out & !FADE_HOLD).max(1);
+            let end = if w.menu.tr.fade_out & FADE_HOLD != 0 { 256 + step } else { 256 };
+            let l = level + step;
+            w.menu.phase = if l >= end { Phase::Enter { t: 0 } } else { Phase::FadeOut { level: l } };
         }
         Phase::Enter { t } => {
             if t + 1 >= w.menu.tr.enter.max(1) {
@@ -676,7 +689,12 @@ pub fn view(w: &World) -> Option<MenuView> {
     }
     let d = w.data.menu.as_ref()?;
     let s = w.menu.shown.as_deref()?;
-    Some(s.view(w, d))
+    let mut v = s.view(w, d);
+    // OBJs: the objects' state at the last update (OAM is written by the update, not the redraw)
+    if let Some(top) = w.menu.stack.last() {
+        v.objs.extend(top.page().objs(w));
+    }
+    Some(v)
 }
 
 /// A script-opened menu has finished (the fade-in after it is over): its result code (the native's push / effect
@@ -698,7 +716,8 @@ pub fn opened_this_frame(w: &World) -> bool {
 /// the field's palette fade while the menu fades it out / in (level 0..256 toward black)
 pub fn field_fade(w: &World) -> Option<u16> {
     match w.menu.phase {
-        Phase::FadeOut { level } => Some(level),
+        // `FADE_HOLD`: the last level stays one more frame
+        Phase::FadeOut { level } => Some(if level >= 256 { 256 - (w.menu.tr.fade_out & !FADE_HOLD) } else { level }),
         Phase::FadeIn { level } => Some(level),
         Phase::Enter { .. } | Phase::Leave { .. } => None,
         _ => None,

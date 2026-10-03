@@ -148,6 +148,7 @@ impl Session {
             Self::run_hook(&mut self.hook, &mut self.world, k);
             // START: the pause menu (the field main loop checks it after the objects, triggers and scripts)
             crate::menu::check_pause(&mut self.world);
+            crate::menu::mapscreen::check_select(&mut self.world);
             // the frame's music events keep `Scene.song` current inside the state (byte snapshots carry no events)
             crate::scene::note_events(&mut self.world);
             return &self.world.events;

@@ -30,13 +30,14 @@ def ai_state(e, o):
 
 
 def enemies(e):
-    """[(obj, x px, y px, facing, hp)] from the enemy list"""
+    """[(obj, x px, y px, facing, hp, type)] from the enemy list"""
     out = []
     n = e.r32(ENEMY_LIST)
     for k in range(min(n, 64)):
         o = e.r32(ENEMY_LIST + 4 + 4 * k)
         sv = lambda v: v - (1 << 32) if v & 0x80000000 else v  # noqa: E731
-        out.append((o, sv(e.r32(o + 0x1A0)) >> 8, sv(e.r32(o + 0x1A4)) >> 8, e.r8(o + 0x10), sv(e.r32(o + 0x28C))))
+        out.append((o, sv(e.r32(o + 0x1A0)) >> 8, sv(e.r32(o + 0x1A4)) >> 8, e.r8(o + 0x10), sv(e.r32(o + 0x28C)),
+                    (e.r32(o + 0x224) - 0x08711274) // 28))
     return out
 
 
@@ -65,19 +66,69 @@ class ShipDriver(Driver):
         self.reach_at = None
         self.skip = set()
         self.target = None
+        self.tgt = {}
         self.prog = []
+        self.heal = None
+        self.heal_cool = 0
+        self.nop = 0
+        self.on_mark = None
+        self.in_nav = False
+        self.fight_done = False
+        self.nav_area = None
+        self.nav_t = 0
+        self.push_t = None
 
+    AVOID = (20, 64)            # not worth fighting in passing: Destroyer (3762 HP), Laser Turret (in wall niches)
     HEALS = (21, 18, 17)        # Senzu Bean, Super Elixir, Elixir (supply ids), in order of preference
 
     def keys(self, e):
+        # a pause menu left open (a menu program that went wrong): B out of it
+        if not self.prog and self.heal is None:
+            st = status(e)
+            if st['p'] is None and st['scene'] == 0 and e.r32(0x03001C34) == 0:
+                self.nop += 1
+            else:
+                self.nop = 0
+            if self.nop > 240 and self.goals[self.k][0] in ('nav', 'fightp', 'yakon') if not self.done() else False:
+                return KEY.B if self.nop % 20 < 3 else 0
+        if self.heal is not None:
+            k = self.heal_step(e)
+            if k is not None:
+                return k
         if self.prog:
             return self.prog.pop(0)
         return super().keys(e)
 
+    def heal_step(self, e):
+        """the healing menu, opened only when START took (a hurt / grabbed player cannot pause)"""
+        h = self.heal
+        h['t'] += 1
+        if h['phase'] == 'open':
+            if h['t'] <= 2:
+                return KEY.START
+            if status(e)['p'] is None:          # the pause menu is up
+                h['phase'] = 'menu'
+                prog = [(0, 0, 70), (KEY.R, 3, 60)] + [(KEY.DOWN, 3, 20)] * h['row'] + \
+                    [(KEY.A, 3, 40), (KEY.A, 3, 80), (KEY.B, 3, 60)]
+                self.prog = []
+                for m, on, off in prog:
+                    self.prog += [m] * on + [0] * off
+                self.heal = None
+                return self.prog.pop(0)
+            if h['t'] > 40:
+                self.heal = None
+                self.heal_cool = 20
+            return 0
+        self.heal = None
+        return None
+
     def maybe_heal(self, e, s, frac=0.35):
         """below `frac` of max HP in the field: the pause menu's Inventory, use the best healing supply
         (START, R to Inventory, DOWN to its row, A, A Use, B back to the field)"""
-        if self.prog or s['p'] is None or s['scene'] > 0:
+        if self.heal_cool > 0:
+            self.heal_cool -= 1
+            return False
+        if self.prog or self.heal is not None or s['p'] is None or s['scene'] > 0:
             return False
         rec = 0x03001560 + 0x68 * e.r8(0x03001068)
         hp, mx = e.r16(rec + 0x16), e.r16(rec + 0x18)
@@ -86,11 +137,7 @@ class ShipDriver(Driver):
         sup = e.read(0x03001068 + 2, 25)
         for it in self.HEALS:
             if sup[it]:
-                row = sum(1 for i in range(it) if sup[i])
-                prog = [(KEY.START, 2, 60), (KEY.R, 3, 50)] + [(KEY.DOWN, 3, 20)] * row + \
-                    [(KEY.A, 3, 40), (KEY.A, 3, 80), (KEY.B, 3, 60)]
-                for m, on, off in prog:
-                    self.prog += [m] * on + [0] * off
+                self.heal = {'phase': 'open', 't': 0, 'row': sum(1 for i in range(it) if sup[i])}
                 return True
         return False
 
@@ -105,7 +152,7 @@ class ShipDriver(Driver):
         s = status(e)
         if kind == 'walk':
             if self.maybe_heal(e, s):
-                return self.prog.pop(0)
+                return self.heal_step(e) or 0
             if self.walk_area is None:
                 self.walk_area = s['area'][:2]
             elif s['area'][:2] != self.walk_area:
@@ -172,15 +219,97 @@ class ShipDriver(Driver):
             if s['scene'] > 0:
                 return self.mash_a()
             return self.fightp(e, s, g)
+        if kind == 'nav':
+            return self.nav(e, s, g)
+        if kind == 'mark':
+            if self.on_mark:
+                self.on_mark(g[1], e)
+            self.next_goal()
+            return None
         return super().step(e)
+
+    def nav(self, e, s, g):
+        """('nav', w, a[, fight]): walk through the exits (nav.route) to area w-a; with fight, clear each room's
+        enemies (fightp) before leaving it. Done 20 frames after arriving with the player present."""
+        import nav as navm
+        if s['scene'] > 0:
+            return self.mash_a()
+        if s['p'] is None:
+            return 0
+        cur = f"{s['area'][0]}-{s['area'][1]}"
+        if cur != self.nav_area:
+            self.nav_area = cur
+            self.skip = set()
+            self.tgt = {}
+            self.fight_done = False
+            self.path = None
+            self.idle = 0
+            self.nav_t = self.t
+            self.push_t = None
+        if cur == f'{g[1]}-{g[2]}':
+            if self.t - self.nav_t >= 20:
+                self.in_nav = False
+                self.nav_area = None
+                self.next_goal()
+                return None
+            return 0
+        if self.maybe_heal(e, s):
+            return self.heal_step(e) or 0
+        if len(g) > 3 and g[3] and not self.fight_done:
+            self.in_nav = True
+            k = self.fightp(e, s, ('fightp', 10 ** 9, 99999, 6))
+            if not self.fight_done:
+                return k
+        hops = navm.route(cur, f'{g[1]}-{g[2]}')
+        if not hops:
+            raise RuntimeError(f'nav: no route {cur} -> {g[1]}-{g[2]}')
+        to, rect, push = hops[0][1]
+        tx, ty = navm.approach(rect, push)
+        x, y = s['p'][0], s['p'][1]
+        # pushing into an exit is sticky (an exit fires after the direction is held for a while)
+        if self.push_t is None or self.t - self.push_t > 150:
+            if abs(x - tx) > 8 or abs(y - ty) > 8:
+                self.push_t = None
+                return self.walk_keys(e, s, tx, ty)
+            if self.push_t is None:
+                self.push_t = self.t
+        k = {'up': KEY.UP, 'down': KEY.DOWN, 'left': KEY.LEFT, 'right': KEY.RIGHT}[push]
+        # keep lined up with the exit's centre while pushing
+        if push in ('up', 'down') and abs(x - tx) > 2:
+            k |= KEY.RIGHT if tx > x else KEY.LEFT
+        if push in ('left', 'right') and abs(y - ty) > 2:
+            k |= KEY.DOWN if ty > y else KEY.UP
+        return k
 
     # --- live walk grid (doors / gates opened by scripts) ---------------------------------------------------------
 
     def live_walk(self, e):
+        """the walk grid = the live grid OR the map's own (closed doors open when touched)"""
         raw = e.read(e.r32(MAPOBJ + 0xA8), 32 * self.grid.h)
         w = self.grid.w
-        self.grid.walk = bytearray((raw[ty * 32 + (tx >> 3)] >> (tx & 7)) & 1
-                                   for ty in range(self.grid.h) for tx in range(w))
+        if getattr(self.grid, 'static', None) is None:
+            self.grid.static = bytes(self.grid.walk)
+        st = self.grid.static
+        live = bytearray((raw[ty * 32 + (tx >> 3)] >> (tx & 7)) & 1 for ty in range(self.grid.h) for tx in range(w))
+        self.grid.walk = live
+        self.grid.union = bytearray(a | b for a, b in zip(live, st))
+        if not getattr(self.grid, 'patched', False):
+            g = self.grid
+            plain = g.bfs
+
+            def bfs(start, goal, fw=2, fh=1, blocked=()):
+                r = plain(start, goal, fw, fh, blocked)
+                if r is None:
+                    # a closed door (opens when touched): retry with the map's own grid
+                    keep = g.walk
+                    g.walk = g.union
+                    try:
+                        r = plain(start, goal, fw, fh, blocked)
+                    finally:
+                        g.walk = keep
+                return r
+            g.bfs = bfs
+            g.patched = True
 
     def walk(self, e, s, tx, ty):
         if s['p'] is not None and tuple(s['area']) != self.grid_key:
@@ -201,9 +330,10 @@ class ShipDriver(Driver):
         if s['p'] is None:
             return 0
         if self.maybe_heal(e, s):
-            return self.prog.pop(0)
+            return self.heal_step(e) or 0
         x, y = s['p'][0], s['p'][1]
-        ens = [o for o in enemies(e) if abs(o[1] - x) + abs(o[2] - y) <= radius and o[0] not in self.skip]
+        ens = [o for o in enemies(e) if abs(o[1] - x) + abs(o[2] - y) <= radius and o[0] not in self.skip
+               and o[5] not in self.AVOID]
         ens = [o for o in ens if self.reachable(e, s, o[1], o[2])]
         if not ens or self.t >= cap:
             if self.t >= cap and ens:
@@ -211,17 +341,22 @@ class ShipDriver(Driver):
             self.idle += 1
             if self.idle < 30:
                 return 0
+            if self.in_nav:
+                self.fight_done = True
+                return 0
             self.next_goal()
             return None
         self.idle = 0
         en = min(ens, key=lambda o: abs(o[1] - x) + abs(o[2] - y))
         ex, ey = en[1], en[2]
-        # an enemy that takes no damage for 900 frames of being the target (out of reach, invulnerable) is skipped
-        if self.target is None or self.target[0] != en[0] or en[4] < self.target[1]:
-            self.target = [en[0], en[4], self.t]
-        elif self.t - self.target[2] > 900:
-            self.skip.add(en[0])
-            self.target = None
+        # an enemy that takes no damage over 400 frames of being the target (out of reach, invulnerable) is skipped
+        tg = self.tgt.setdefault(en[0], [en[4], 0])
+        if en[4] < tg[0]:
+            tg[0], tg[1] = en[4], 0
+        else:
+            tg[1] += 1
+            if tg[1] > 400:
+                self.skip.add(en[0])
         dx, dy = ex - x, ey - y
         per = g[3] if len(g) > 3 else 10
         # in reach of the melee box (right: (16,-24)-(24,8), left: (-8,-24)-(0,8) around the footprint)
@@ -280,7 +415,7 @@ class ShipDriver(Driver):
         if s['p'] is None:
             return 0
         if self.maybe_heal(e, s):
-            return self.prog.pop(0)
+            return self.heal_step(e) or 0
         ens = enemies(e)
         if not ens:
             self.idle += 1
@@ -337,6 +472,9 @@ class ShipDriver(Driver):
             self.path = None
         if getattr(self, 'reach_at', None) is None or self.t - self.reach_at >= 30 or self.t < self.reach_at:
             self.live_walk(e)
+            raw = e.read(e.r32(MAPOBJ + 0xA8), 32 * self.grid.h)
+            live = lambda tx, ty: 0 <= tx < self.grid.w and 0 <= ty < self.grid.h and \
+                (raw[ty * 32 + (tx >> 3)] >> (tx & 7)) & 1  # noqa: E731
             from collections import deque
             st = (s['p'][0] // 8, s['p'][1] // 8)
             seen = {st}
@@ -345,7 +483,7 @@ class ShipDriver(Driver):
                 cx, cy = q.popleft()
                 for d in ((1, 0), (-1, 0), (0, 1), (0, -1)):
                     n = (cx + d[0], cy + d[1])
-                    if n not in seen and self.grid.ok(*n):
+                    if n not in seen and live(*n):
                         seen.add(n)
                         q.append(n)
             self.reach = seen

@@ -19,7 +19,7 @@ SET_FLAG, JOIN, LEVEL_TO, RUN_EVENT, SET_CHAR, FLAG2, HEAL = 0x1D, 0x97, 0xF3, 0
 
 
 def build(out, levels=None):
-    levels = levels or {0: 82, 1: 86, 2: 78, 3: 78, 4: 84}
+    levels = levels or {0: 92, 1: 92, 2: 80, 3: 80, 4: 92}
     e = emu(str(BASE))
     e.run(3)
     items = []

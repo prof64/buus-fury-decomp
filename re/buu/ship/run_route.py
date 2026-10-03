@@ -1,6 +1,9 @@
-"""run_route.py START.ss OUTDIR [--from LABEL] [--to LABEL] -- play ship_route segments from a state, saving
-OUTDIR/<label>.ss at each segment start (and OUTDIR/end.ss); prints progress. Headless, muted."""
+"""run_route.py START.ss OUTDIR [--from MARK] [--to MARK] [--log]  -- play ship_route.goals from a state (headless,
+muted), saving OUTDIR/<mark>.ss at each ('mark', name) goal, OUTDIR/end.ss at the end; OUTDIR/start.ss = START
+(the goal list is built from it). --log writes OUTDIR/keys.json (per-frame keys from the start / the mark)."""
+import json
 import os
+import shutil
 import sys
 from pathlib import Path
 
@@ -16,39 +19,58 @@ def main():
     frm = a[a.index('--from') + 1] if '--from' in a else None
     to = a[a.index('--to') + 1] if '--to' in a else None
     out.mkdir(parents=True, exist_ok=True)
-    e = start_emu(start)
-    segs = ship_route.segments(e) if frm is None else None
+    if frm is None:
+        shutil.copyfile(start, out / 'start.ss')
+    gl = ship_route.goals(start_emu(str(out / 'start.ss')))
+    i0 = 0
     if frm is not None:
-        # the points split is computed from the chapter start state
-        segs = ship_route.segments(start_emu(str(out / 'start.ss')) if (out / 'start.ss').exists() else e)
-        segs = segs[[s[0] for s in segs].index(frm):]
+        i0 = gl.index(('mark', frm))
         e = start_emu(str(out / f'{frm}.ss'))
     else:
-        e.save_file(str(out / 'start.ss'))
-    f = 0
-    for label, goals in segs:
-        if label == to:
-            break
-        e.save_file(str(out / f'{label}.ss'))
-        d = ShipDriver(goals)
-        n = 0
-        prev = None
+        e = start_emu(start)
+    gl = gl[i0:]
+    d = ShipDriver(gl)
+    st = {'f': 0, 'last': None, 'seg': 0}
+
+    class Stop(Exception):
+        pass
+
+    def on_mark(name, ee):
+        if name == to:
+            raise Stop()
+        if st['last']:
+            print(f"{st['last']}: {st['f'] - st['seg']} frames -> {status(ee)}", flush=True)
+        st['last'], st['seg'] = name, st['f']
+        ee.save_file(str(out / f'{name}.ss'))
+    d.on_mark = on_mark
+    keys = []
+    ring = []
+    try:
         while not d.done():
-            e.set_keys(d.keys(e))
+            if st['f'] % 600 == 0:
+                ring = (ring + [e.save()])[-3:]
+            k = d.keys(e)
+            e.set_keys(k)
             e.run(1)
-            f += 1
-            n += 1
-            s = status(e)
-            key = (tuple(s['area']), s['scene'] > 0, d.k)
-            if key != prev:
-                prev = key
-            if n > 40000:
-                raise RuntimeError(f'segment {label} stuck at goal {d.k} {d.goals[d.k]} {s}')
-        s = status(e)
-        print(f'{label}: {n} frames -> {s}', flush=True)
+            keys.append(k)
+            st['f'] += 1
+            if st['f'] - st['seg'] > 60000 or status(e)['area'][:2] == [0, 2]:
+                raise RuntimeError(f'stuck / game over at goal {d.k} {d.goals[d.k]} {status(e)}')
+    except Stop:
+        pass
+    except RuntimeError:
+        # the states 1200 .. 1800 frames before the failure, for debugging
+        for i, b in enumerate(ring):
+            e.load(b)
+            e.save_file(str(out / f'fail{i}.ss'))
+        raise
+    f, last, seg_f = st['f'], st['last'], st['seg']
+    print(f'{last}: {f - seg_f} frames -> {status(e)}')
     e.set_keys(0)
     e.save_file(str(out / 'end.ss'))
     e.screenshot(str(out / 'end.png'), scale=2)
+    if '--log' in a:
+        (out / 'keys.json').write_text(json.dumps({'from': frm, 'keys': keys}))
     print('total', f)
 
 

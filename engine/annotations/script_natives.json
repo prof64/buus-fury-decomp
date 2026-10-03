@@ -2254,7 +2254,7 @@
   ],
   "category": "map",
   "kind": "immediate",
-  "blocking": false,
+  "blocking": "conditional (an area load waiting for its on-enter script when no event holds the field: the host runs it nested, the warp returns when the players arrived)",
   "handler": "0x08002391",
   "engine_fn": "0x03002A58 = 1; player vt+0x28(0); 0x08008D44(world_obj, world, map, &{x,y}, dir, 0)",
   "semantics": "Move the PLAYER to map WORLD/MAP at (X, Y) facing DIR immediately (no fades; scripts wrap it). NOTE: the 3rd argument is the map VARIANT (layout), not a facing (cross-checked by engine/crates/wf-world warps).",

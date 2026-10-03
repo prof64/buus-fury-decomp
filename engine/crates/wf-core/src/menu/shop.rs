@@ -51,6 +51,10 @@ pub struct ItemsUi {
     pub chapter_code: Vec<u8>,
     /// the title menus' box remap (`ui/menu/title_shade.json`, title.rs)
     pub title_shade: Vec<u8>,
+    /// the OBJ remap of party members that cannot be chosen (`ui/menu/silhouette.json`, save.rs)
+    pub silhouette: Vec<u8>,
+    /// the save slot corner markers' offsets (`ui/menu/slot_corner.json`)
+    pub corners: Vec<[i32; 2]>,
 }
 
 fn put(v: &mut Vec<ItemUi>, i: usize, it: ItemUi) {
@@ -98,6 +102,16 @@ impl ItemsUi {
                 if let Some(h) = v["events"]["s006"]["nodes"][0]["code"]["code"].as_str() {
                     out.chapter_code = (0..h.len() / 2).filter_map(|k| u8::from_str_radix(&h[2 * k..2 * k + 2], 16).ok()).collect();
                 }
+            }
+        }
+        if let Some(b) = src.read("ui/menu/silhouette.json") {
+            if let Ok(v) = serde_json::from_slice::<Value>(&b) {
+                out.silhouette = v["table"].as_array().map(|a| a.iter().map(|x| x.as_u64().unwrap_or(0) as u8).collect()).unwrap_or_default();
+            }
+        }
+        if let Some(b) = src.read("ui/menu/slot_corner.json") {
+            if let Ok(v) = serde_json::from_slice::<Value>(&b) {
+                out.corners = v["offsets"].as_array().map(|a| a.iter().map(|o| [o[0].as_i64().unwrap_or(0) as i32, o[1].as_i64().unwrap_or(0) as i32]).collect()).unwrap_or_default();
             }
         }
         if let Some(b) = src.read("ui/menu/title_shade.json") {
@@ -604,10 +618,10 @@ impl Page for Shop {
 }
 
 /// the transition of the script-opened screens (quick fade `0x0805058C` / `0x08050568`, world save / restore)
-pub const SCRIPTED: Transition = Transition { fade_out: 16, enter: 4, leave: 25, fade_in: 16 };
+pub const SCRIPTED: Transition = Transition { fade_out: 16 | super::FADE_HOLD, enter: 3, leave: 25, fade_in: 16 };
 
 /// the sell screen builds its list in the ctor: one more black frame
-pub const SCRIPTED_SELL: Transition = Transition { fade_out: 16, enter: 5, leave: 25, fade_in: 16 };
+pub const SCRIPTED_SELL: Transition = Transition { fade_out: 16 | super::FADE_HOLD, enter: 4, leave: 25, fade_in: 16 };
 
 /// native 0xCE `open_shop_buy`: the buy screen over `Scene.shop`; blocks until the player leaves (no result)
 pub fn open_shop_buy(w: &mut World) {

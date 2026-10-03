@@ -922,6 +922,10 @@ pub struct Scene {
     pub timer_hud: Option<TimerHud>,
     /// destination label set (0xD9) and its 32 entries (0xDA)
     pub dest_label: Option<(i32, Vec<i32>)>,
+    /// the travel menu's selection (label entity vt 0x0804BAF4 +0x10): an index into `Field.triggers` (= the label
+    /// index); see `field::dest_menu`
+    #[serde(default)]
+    pub dest_sel: i32,
     pub radar: Option<Radar>,
     pub visuals: Vec<Visual>,
     pub dialog: Option<Dialog>,
@@ -975,6 +979,7 @@ impl Default for Scene {
             title: None,
             timer_hud: None,
             dest_label: None,
+            dest_sel: 0,
             radar: None,
             visuals: Vec::new(),
             dialog: None,

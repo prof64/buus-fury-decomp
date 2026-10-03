@@ -74,6 +74,9 @@ pub enum Pending {
     Menu { native: u8, push: bool },
     /// a field transition (warp_fade)
     Transition,
+    /// an immediate `warp` whose area load waits for its on-enter script: the host runs that script nested (the
+    /// game runs it inside EnterArea) and the warp returns once the players arrived
+    Arrival,
     /// several phases in a row
     Phases { list: Vec<Phase>, k: usize, started: bool },
 }
@@ -126,6 +129,10 @@ pub struct HostState {
     /// (the world updates newest first), so only they see a release at the top of the frame
     #[serde(default)]
     pub event_watermark: EntityId,
+    /// the host runs an area load's on-enter script nested inside the script that warped (wf-import `StoryHost`);
+    /// otherwise `warp` does not wait for it (the script is queued after the running one)
+    #[serde(default)]
+    pub nest_area_enter: bool,
 }
 
 /// compatibility name (older tests / docs)
@@ -397,6 +404,7 @@ pub fn poll(w: &mut World, s: &mut HostState) -> Option<Option<i32>> {
             }
         }
         Pending::Transition => w.field.as_ref().is_none_or(|f| f.mode == wf_core::field::Mode::Normal).then_some(None),
+        Pending::Arrival => w.field.as_ref().is_none_or(|f| f.arrival.is_none()).then_some(None),
         Pending::Phases { .. } => None,
     };
     if r.is_some() {

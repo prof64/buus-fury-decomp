@@ -26,6 +26,15 @@ struct Job {
     cause: Cause,
 }
 
+/// a blocked script suspended while a nested one runs (an area load's on-enter script inside a script's warp)
+#[derive(Clone)]
+struct Outer {
+    thread: wf_script_rhai::ThreadState,
+    pending: Option<wf_script_core::Pending>,
+    from_wait: bool,
+    cause: Option<Cause>,
+}
+
 pub struct StoryHost {
     rt: Runtime,
     shared: SharedHost,
@@ -34,6 +43,8 @@ pub struct StoryHost {
     queue: VecDeque<Job>,
     running: bool,
     cause: Option<Cause>,
+    /// scripts suspended under the running one (innermost last)
+    outer: Vec<Outer>,
     stepped: BTreeSet<String>,
     /// script errors (compile / run)
     pub errors: Vec<String>,
@@ -52,7 +63,8 @@ impl StoryHost {
         let shared = SharedHost(Rc::new(RefCell::new(CoreState { world: spare, story: HostState::default() })));
         let rt = Runtime::new(files, Box::new(shared.clone()))?;
         let stepped = files.iter().filter(|(_, src)| src.contains("fn step_0()")).map(|(p, _)| p.clone()).collect();
-        Ok(StoryHost { rt, shared, hs: HostState::default(), queue: VecDeque::new(), running: false, cause: None, stepped, errors: vec![], started: vec![], prev_held: 0, frame: 0 })
+        let hs = HostState { nest_area_enter: true, ..HostState::default() };
+        Ok(StoryHost { rt, shared, hs, queue: VecDeque::new(), running: false, cause: None, outer: vec![], stepped, errors: vec![], started: vec![], prev_held: 0, frame: 0 })
     }
 
     /// a session around an imported / built world (no hook: the host runs the queue itself)
@@ -104,13 +116,52 @@ impl StoryHost {
             Ok(Status::Finished) => {
                 self.running = false;
                 w.story.g = self.rt.globals().g;
-                wf_core::field::set_busy(w, false);
+                if self.outer.is_empty() {
+                    wf_core::field::set_busy(w, false);
+                }
             }
             Err(e) => {
                 self.errors.push(e);
                 self.running = false;
-                wf_core::field::set_busy(w, false);
+                if self.outer.is_empty() {
+                    wf_core::field::set_busy(w, false);
+                }
             }
+        }
+        // a nested script ended: the suspended one is the running (blocked) script again
+        if !self.running {
+            if let Some(o) = self.outer.pop() {
+                self.rt.restore(o.thread);
+                self.hs.pending = o.pending;
+                self.hs.from_wait = o.from_wait;
+                self.cause = o.cause;
+                self.running = true;
+            }
+        }
+    }
+
+    /// The game runs an area load's on-enter script inside EnterArea, nested in the script whose `warp` loads the
+    /// area (Other World travel s511 / s512, which no event holds; `Pending::Arrival`). A script call that left such
+    /// a load (its on-enter `Run` among the events since `from`) runs that script now on top of it; when it ends
+    /// the suspended script resumes at once (the game's warp returns in the same frame).
+    fn nest_loads(&mut self, w: &mut World, from: usize) {
+        if !self.running || !matches!(self.hs.pending, Some(wf_script_core::Pending::Arrival)) {
+            return;
+        }
+        let k = (from..w.events.len()).find(|&k| matches!(&w.events[k], Event::Field(FieldEvent::Run { cause: Cause::AreaEnter, .. })));
+        let Some(k) = k else { return };
+        let Event::Field(FieldEvent::Run { run, .. }) = w.events.remove(k) else { return };
+        let o = Outer { thread: self.rt.state(), pending: self.hs.pending.take(), from_wait: std::mem::take(&mut self.hs.from_wait), cause: self.cause.take() };
+        self.outer.push(o);
+        self.running = false;
+        self.queue.push_front(Job { run, cause: Cause::AreaEnter });
+        self.run_queue(w);
+    }
+
+    /// after a nested script ended: the suspended script continues now if its wait is over
+    fn resume_outer(&mut self, w: &mut World) {
+        if self.running && matches!(self.hs.pending, Some(wf_script_core::Pending::Arrival)) {
+            self.resume_blocked(w);
         }
     }
 
@@ -156,8 +207,14 @@ impl StoryHost {
                     }
                 },
             }
+            let from = w.events.len();
+            let depth = self.outer.len();
             let st = self.with_host(w, |rt| rt.run().map_err(|e| e.to_string()));
             self.finish(w, st);
+            self.nest_loads(w, from);
+            if self.outer.len() < depth {
+                self.resume_outer(w);
+            }
         }
     }
 
@@ -169,8 +226,14 @@ impl StoryHost {
         let r = poll(w, &mut hs);
         self.hs = hs;
         if let Some(v) = r {
+            let from = w.events.len();
+            let depth = self.outer.len();
             let st = self.with_host(w, |rt| rt.resume(v).map_err(|e| e.to_string()));
             self.finish(w, st);
+            self.nest_loads(w, from);
+            if self.outer.len() < depth {
+                self.resume_outer(w);
+            }
             self.run_queue(w);
         }
     }
@@ -215,6 +278,7 @@ pub struct HostSnapshot {
     queue: VecDeque<Job>,
     running: bool,
     cause: Option<Cause>,
+    outer: Vec<Outer>,
     errors: usize,
     started: usize,
     prev_held: u16,
@@ -236,6 +300,7 @@ impl StoryHost {
             queue: self.queue.clone(),
             running: self.running,
             cause: self.cause.clone(),
+            outer: self.outer.clone(),
             errors: self.errors.len(),
             started: self.started.len(),
             prev_held: self.prev_held,
@@ -249,6 +314,7 @@ impl StoryHost {
         self.queue = s.queue.clone();
         self.running = s.running;
         self.cause = s.cause.clone();
+        self.outer = s.outer.clone();
         self.errors.truncate(s.errors);
         self.started.truncate(s.started);
         self.prev_held = s.prev_held;

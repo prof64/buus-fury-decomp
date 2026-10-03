@@ -64,6 +64,13 @@ pub struct Title {
     pub confirm: Option<Container>,
     pub a_btn: usize,
     pub leaving: Leaving,
+    /// the "Are you sure?" mode ended: its exit stub iteration runs before the page's own (no input, no update)
+    #[serde(default)]
+    pub stub: bool,
+    /// Delete: the erase runs in the handler before the list's redraw; the old figures stay in OAM until the next
+    /// update (iterations left)
+    #[serde(default)]
+    pub held: Option<(u8, Box<GameList>)>,
 }
 
 /// redraw frames (the title picture is decoded each time): measured from the captures
@@ -76,7 +83,7 @@ fn item(id: i32, nav: [i32; 4], text: &[u16], y: i32, code: i32) -> Widget {
 
 impl Title {
     pub fn new(w: &World) -> Title {
-        let mut t = Title { page: TPage::Title, c: Container::default(), list: GameList::new(w, 9, 10, true), delete: false, chosen: Vec::new(), confirm: None, a_btn: 0, leaving: Leaving::No };
+        let mut t = Title { page: TPage::Title, c: Container::default(), list: GameList::new(w, 9, 10, true), delete: false, chosen: Vec::new(), confirm: None, a_btn: 0, leaving: Leaving::No, stub: false, held: None };
         t.set_page(w, TPage::Title);
         t
     }
@@ -121,6 +128,9 @@ impl Title {
         while j >= 0 && (j as usize) < party.len() {
             if party[j as usize].1 {
                 self.chosen[slot as usize] = party[j as usize].0;
+                if let Some(s) = self.list.summaries.get_mut(slot as usize) {
+                    s.chosen = party[j as usize].0;
+                }
                 return true;
             }
             j += dir;
@@ -135,7 +145,10 @@ impl Title {
                 w.sfx(super::SFX_ACCEPT, 64);
                 if self.delete {
                     if self.summary(sel).is_some() {
+                        // a nested mode run from the release handler: the list is not redrawn under it (its A prompt
+                        // stays pressed) and its objects stop
                         self.confirm = Some(confirm_kids(&w.data.menu.as_ref().expect("menu content").text));
+                        self.list.c.focus = Some(self.a_btn);
                         self.list.c.drawn = false;
                     }
                     return None;
@@ -230,9 +243,33 @@ impl Page for Title {
             _ => &self.c,
         }
     }
-    fn before_draw(&mut self, _w: &World) {
+    fn update(&mut self, _w: &World) {
+        // the Continue fade is a nested mode: the page's update (the objects' animation) stops after its first step
+        let fading = matches!(self.leaving, Leaving::Continue(l) if l > CONTINUE_TICKS);
+        if let Some((n, _)) = self.held.as_mut() {
+            *n -= 1;
+            if *n == 0 {
+                self.held = None;
+            }
+        }
+        if self.page == TPage::Select && !fading && self.confirm.is_none() && !self.stub {
+            self.list.tick_figs();
+        }
+    }
+    fn before_draw(&mut self, w: &World) {
         if self.page == TPage::Select {
             self.list.prepare();
+            self.list.build_figs(w);
+        }
+    }
+    fn objs(&self, w: &World) -> Vec<wf_view::MenuObj> {
+        if let Some((_, l)) = &self.held {
+            return l.fig_objs(w);
+        }
+        if self.page == TPage::Select {
+            self.list.fig_objs(w)
+        } else {
+            Vec::new()
         }
     }
     fn step(&mut self, w: &mut World) -> Action {
@@ -255,16 +292,29 @@ impl Page for Title {
             }
             Leaving::No => {}
         }
+        if self.stub {
+            self.stub = false;
+            return Action::None;
+        }
         if self.confirm.is_some() {
             let (_, act) = kit::run_step(self, w, |p| p.confirm.as_mut().expect("confirm"), |p, w, _src, code| match code {
                 0 => {
                     w.sfx(super::SFX_MENU, 64);
                     let k = p.list.sel.max(0) as usize;
+                    p.held = Some((3, Box::new(p.list.clone())));
                     w.saves.set(k, None);
                     if let Some(s) = p.list.summaries.get_mut(k) {
                         *s = Summary::default();
                     }
                     p.confirm = None;
+                    p.list.c.focus = None;
+                    p.stub = true;
+                    // the box's BG0 goes off at once; the erase runs before the list's redraw
+                    if let Some(s) = w.menu.shown.as_mut() {
+                        if let super::Screen::Title(x) = &mut **s {
+                            x.confirm = None;
+                        }
+                    }
                     if let Some(Widget::Button(b)) = p.list.c.kids.get_mut(p.a_btn) {
                         b.enabled = false;
                     }
@@ -274,6 +324,9 @@ impl Page for Title {
                 1 => {
                     w.sfx(super::SFX_MENU, 64);
                     p.confirm = None;
+                    p.list.c.focus = None;
+                    p.list.c.drawn = false;
+                    p.stub = true;
                     // the box's BG0 goes off at once (no redraw of the list)
                     if let Some(s) = w.menu.shown.as_mut() {
                         if let super::Screen::Title(x) = &mut **s {
@@ -382,12 +435,17 @@ impl Page for Title {
     }
     fn redraw_cost(&self) -> u8 {
         match (self.page, self.leaving) {
+            // the release redraw (A up) shows a frame late; the fade then shows one picture per frame
+            (_, Leaving::Continue(0)) => 2,
             (_, Leaving::Continue(_)) => 1,
             (TPage::Select, _) => SELECT_FRAMES,
             _ => TITLE_FRAMES,
         }
     }
 }
+
+/// object updates the Continue fade still sees (fade level reached)
+pub const CONTINUE_TICKS: u16 = 16;
 
 /// the title boot: no fade, the title on screen at once
 pub const BOOT: Transition = Transition { fade_out: 0, enter: 1, leave: 1, fade_in: 0 };

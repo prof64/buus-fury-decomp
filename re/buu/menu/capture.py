@@ -48,7 +48,17 @@ def story(e):
         play_base=int.from_bytes(b[0x4D0:0x4D4], 'little', signed=True), counter=e.r32(0x03000F94),
         holy=[int.from_bytes(b[o:o + 4], 'little') for o in range(0x4DC, 0x4F0, 4)],
         chars=[record(e, i) for i in range(9)],
-        gd=b.hex())
+        gd=b.hex(), **player_pos(e))
+
+
+def player_pos(e):
+    """the field: area (0x0300197C world / area / variant) and the player object's position (+0x1A0 / +0x1A4, 24.8 ->
+    px) and facing (+0x11), for harnesses that start the remake's field at the same place"""
+    p = e.r32(0x03001C34)
+    out = dict(area=[e.r8(0x0300197C), e.r8(0x0300197D), e.r8(0x0300197E)])
+    if 0x02000000 <= p < 0x02040000:
+        out['player'] = [e.r32(p + 0x1A0) >> 8, e.r32(p + 0x1A4) >> 8, e.r8(p + 0x11)]
+    return out
 
 
 def probe(e):

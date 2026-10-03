@@ -24,12 +24,15 @@ def main():
     args = sys.argv[1:]
     frm = args[args.index('--from') + 1] if '--from' in args else None
     only = args[args.index('--only') + 1] if '--only' in args else None
-    cap = int(args[args.index('--cap') + 1]) if '--cap' in args else 40000
+    cap = int(args[args.index('--cap') + 1]) if '--cap' in args else 200000
     names = [n for n, _ in SEGMENTS]
     i0 = names.index(frm) if frm else 0
     keyfile = OUT / 'keys.json'
     keys = json.loads(keyfile.read_text()) if keyfile.exists() and frm else {}
-    e = start_emu(str(START if i0 == 0 else OUT / f'seg_{names[i0]}.ss'))
+    seg0 = OUT / f'seg_{names[i0]}.ss'
+    if i0 and not seg0.exists():
+        seg0 = OUT / 'seg_end.ss'      # the first new segment: the previous run's end
+    e = start_emu(str(START if i0 == 0 else seg0))
     for name, goals in SEGMENTS[i0:]:
         e.save_file(OUT / f'seg_{name}.ss')
         t0 = time.time()
