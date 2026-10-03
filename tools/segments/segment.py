@@ -256,7 +256,7 @@ def cmd_cuts(a):
         # a load inside a running event (a script's warp / scene load) is not an importable area entry
         # an importable entry: an exit's arrival (the leader autowalks into the fade-in), not a script's / save load
         p = frames[k].get('p')
-        note = '  (inside an event: not importable)' if frames[k].get('depth') else \
+        note = '  (inside an event: wf-import continues the event)' if frames[k].get('depth') else \
             '' if p and p[3] == 'autowalk' else f'  (not an exit arrival, leader {p and p[3]}: not importable yet)'
         print(f'area:{ar[0]}-{ar[1]}#{n}', 'frame', k, 'variant', ar[2], 'lf', frames[k]['lf'], note)
 

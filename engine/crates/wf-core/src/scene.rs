@@ -935,8 +935,10 @@ pub struct Dialog {
 /// after the closing A (dialog object 0x0800AD00; measured on events 43 and 74)
 pub const DIALOG_OPEN: i32 = 7;
 pub const DIALOG_CLOSE: i32 = 9;
-/// a menu / message window (node kind 3) continues the event this many frames after the A / B (event 34)
-pub const WINDOW_CLOSE: i32 = 2;
+/// a menu / message window (node kind 3) continues the event this many frames after the A / B: the window fades
+/// out over 16 frames (BLDALPHA 0x10 -> 0x0F01, one step a frame from the frame after the press), is gone on the
+/// 16th, and the next node runs the frame after (real game, West City Z-Mart s030 at 0-92: six windows, all 17)
+pub const WINDOW_CLOSE: i32 = 17;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum MenuKind {
@@ -1500,7 +1502,9 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
             if let Some(i) = i {
                 let (px, py) = actor_pos(w, i);
                 let dir = w.actor(i).map(|a| a.facing).unwrap_or(0);
-                // the old actor's object is destroyed first: its tiles are free for the new one (segment sb 20-8)
+                // the old actor's object is destroyed first: its tiles are free for the new one (segment sb 20-8);
+                // its destructor lifts its walk-grid mark (segment sb 21-18: Buu 123 -> 126 left (152, 200) blocked)
+                crate::fieldnpc::script_move_mark(w, i, false);
                 crate::vram::entity_gone(w, i);
                 // same place and facing (0x080192BA moves the queue)
                 let id = spawn_npc(w, *sprite, px, py, dir);
@@ -1523,6 +1527,12 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
                 // (its tiles go before the map object takes its own: segment sb 21-19, the same block)
                 crate::vram::entity_gone(w, i);
                 w.ents[i].removed = true;
+                // a placed enemy replaced this way is not defeated: no on-defeat callback (7-6, the tournament ring:
+                // Yamu's defeat s309 turns Spopovich #8 into #11 - the game runs no s308; app soak of the ship route)
+                if let Some(f) = w.field.as_mut() {
+                    f.placed.retain(|p| p.0 != old);
+                    f.placed_loot.retain(|l| l.0 != old);
+                }
                 // the remaining queued commands move to the map object (0x080192BA), as for change_sprite
                 if let Some(id) = become_map_object(w, *index, px, py, dir) {
                     if let Some(t) = w.scene.tracks.iter_mut().find(|t| t.owner == Owner::Entity(old)) {
@@ -2692,7 +2702,13 @@ fn tick_screen(w: &mut World) {
             s.dim = 256 - fine;
         }
         (FadeKind::White, true) => s.white = lvl,
-        (FadeKind::White, false) => s.white = 16 - lvl,
+        (FadeKind::White, false) => {
+            // the fade from white writes the palette from white toward the target: a screen left black before it
+            // (a load's black) shows from its first step (real route 8-66 f18226: Yakon's room after the load)
+            s.white = 16 - lvl;
+            s.black = 0;
+            s.dim = 0;
+        }
         (FadeKind::Mosaic, true) => s.mosaic = lvl,
         (FadeKind::Mosaic, false) => s.mosaic = 16 - lvl,
         (FadeKind::Flash, _) => {

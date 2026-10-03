@@ -538,7 +538,7 @@ fn update_rest(w: &mut World, i: usize) {
     let name = e.a.anim_name(&d);
     // a movement step SetAnim(1)s unless already walking (0x0803B9DA: IsAnim(1)); nothing switches back to idle when
     // the movement stops - the next node's own SetAnim does
-    if (e.a.anim.is_none() || matches!(name, Some("idle") | Some("walk"))) && e.walk_due && !e.walking() {
+    if (e.a.anim.is_none() || matches!(name, Some("idle") | Some("walk"))) && (if std::env::var("T_OLDWALK").is_ok() { e.moving } else { e.walk_due }) && !e.walking() {
         set_anim(w, i, &[nm("walk")], true, Some(true));
     }
 }
@@ -1429,7 +1429,11 @@ pub fn align(w: &mut World, i: usize, speed: i32) -> bool {
     let (dx, dy) = to_player(w, i);
     let blocked = |w: &mut World| {
         stop_walk(w, i);
-        w.en(i).moving = false;
+        // (no SetAnim(1) for a step that did not fit: real route 8-45, a Destroyer's last align step is blocked, then
+        // StandStill's idle - the walk must not come back after it)
+        let e = w.en(i);
+        e.moving = false;
+        e.walk_due = false;
         true
     };
     let walk = |w: &mut World| {

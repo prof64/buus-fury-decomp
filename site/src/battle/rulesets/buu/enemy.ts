@@ -902,6 +902,7 @@ export class Enemy extends Actor implements EnemyLike {
   private alignBlocked() {
     this.stopWalk()
     this.moving = false
+    this.walkDue = false
     return true
   }
   align(speed: number): boolean {

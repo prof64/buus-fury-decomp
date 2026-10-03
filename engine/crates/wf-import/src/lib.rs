@@ -337,6 +337,107 @@ fn build_area_entry(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner: 
     Built { world: w, draws, held, finished: finished || held > 0 }
 }
 
+/// the running event at a cut inside an event: (event, node, params) from the innermost scene object on the IWRAM
+/// stack (`0x0801246E`: +0 header, +8 u16 next state, +0x14 param block pointer; SCRIPT.md B4)
+pub fn running_event(ram: &GbaRam, runner: &StoryHost) -> Option<(u16, u16, [i32; 4])> {
+    let mut a = 0x0300_7000u32;
+    while a < 0x0300_8000 - 0x18 {
+        let h = ram.r32(a);
+        let pp = ram.r32(a + 0x14);
+        if let Some(ev) = runner.event_of_header(h).filter(|_| matches!(pp >> 24, 2 | 3) && ram.valid(pp)) {
+            let next = ram.r16(a + 8) as u16;
+            if let Some(node) = runner.node_before(ev, next) {
+                let params = [0, 4, 8, 12].map(|o| ram.s32(pp + o));
+                return Some((ev, node, params));
+            }
+        }
+        a += 4;
+    }
+    None
+}
+
+/// one build of an area entry INSIDE an event (a script's warp): the leader before the load, the event held, the
+/// load as warp 0x77 makes it (the players go idle, EnterArea re-creates them facing down, the on-enter scripts run
+/// nested), then the event continues from its node after the warp (`StoryHost::continue_event`)
+fn build_event_entry(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner: &mut StoryHost, ev: (u16, u16, [i32; 4]), rng0: [u32; 2], frame0: u32, notes: &mut Vec<String>) -> Built {
+    let story = import_story(data, ram);
+    let (x, y, facing) = info.leader.unwrap_or((120, 120, 0));
+    let to = info.area;
+    let cfg = FieldConfig { world: to.world, area: to.area, variant: to.variant, pos: Some((x, y)), facing, chars: vec![story.current], story: Some(story.clone()), rng: wf_core::battle::RngInit::State(rng0[0], rng0[1]), xp: true, arrive: false };
+    let mut w = field::create(data.clone(), &cfg);
+    let players = w.players.clone();
+    w.ents.retain(|e| players.contains(&e.id));
+    w.enemies.clear();
+    w.story = story;
+    if let Some(f) = w.field.as_mut() {
+        f.placed.clear();
+        f.placed_loot.clear();
+        f.triggers.clear();
+        f.patrols.clear();
+        f.deferred.clear();
+        f.loads = 0;
+        f.mode = Mode::Normal;
+    }
+    field::attach_host(&mut w, true);
+    patch_leader(&mut w, ram, notes);
+    w.frame = frame0;
+    w.g.fc0 = 0;
+    w.g.presses[0].ring = press_ring(ram);
+    w.g.presses[0].pressed = 0;
+    import_globals(&mut w, ram);
+    w.scene.song = song(ram);
+    w.scene.hud_hidden = w.story.game_bits & 2 == 0;
+    w.scene.banner = None;
+    w.scene.banner_last = -1;
+    w.rng = Rng::new(rng0[0], rng0[1]);
+    w.events.clear();
+    let calls0 = w.rng.calls;
+    // a script's fade_out before its warp: the screen stays black through the load
+    if ram.screen_black == Some(true) {
+        w.scene.screen.black = 16;
+        w.scene.screen.dim = 256;
+    }
+    // the event holds the field (a load inside it keeps it held)
+    w.scene.depth = 1;
+    field::set_busy(&mut w, true);
+    // warp 0x77 (wf-script-core natives): the players go idle, the script camera ends, EnterArea
+    w.scene.cam.mode = wf_core::scene::CamMode::Player;
+    w.scene.cam.scroll = None;
+    for s in 0..w.players.len() {
+        if let Some(i) = w.player_idx(s) {
+            wf_core::player::set_idle(&mut w, i);
+        }
+    }
+    if let Some(f) = w.field.as_mut() {
+        f.nest_load = true;
+    }
+    field::load_area(&mut w, to, x, y, Some(0));
+    if let Some(f) = w.field.as_mut() {
+        f.nest_load = false;
+    }
+    // (the 3D world map's arrival is a warp_fade's: its flyer and fade are not rebuilt here)
+    if wf_core::fieldworld::flying(&w) {
+        notes.push(format!("unsupported: event s{:03} node {}: a load of the 3D world map (warp_fade)", ev.0, ev.1));
+        let draws = w.rng.calls.wrapping_sub(calls0);
+        return Built { world: w, draws, held: 0, finished: false };
+    }
+    let evs: Vec<Event> = std::mem::take(&mut w.events);
+    runner.run_nested(&mut w, &evs);
+    let Some(skipped) = runner.continue_event(&mut w, ev.0, ev.1, ev.2, (to.world, to.area, to.variant)) else {
+        notes.push(format!("unsupported: event s{:03} node {}: the load is not a warp 0x77 this import rebuilds (scene load / warp_fade)", ev.0, ev.1));
+        let draws = w.rng.calls.wrapping_sub(calls0);
+        return Built { world: w, draws, held: 0, finished: false };
+    };
+
+    // the load frame's end: the cameras (a modal scroll the continuation started takes its step; the script sees it
+    // done in the next frame - the game's PC is still in camera_scroll_to at the cut: opening 1-10, s068)
+    field::world_mode_cameras(&mut w);
+    notes.retain(|n| !n.starts_with("event "));
+    notes.push(format!("event s{:03} continues at node {} ({} actions before the cut dropped)", ev.0, ev.1, skipped));
+    let draws = w.rng.calls.wrapping_sub(calls0);
+    Built { world: w, draws, held: 0, finished: true }
+}
+
 /// Import a real-game state (work RAM) as a wf-core World ready to continue from the next logic frame.
 ///
 /// Supported: area-entry cuts ([`CutKind::AreaEntry`]); other points return `ImportError::Unsupported`. `runner` runs
@@ -344,8 +445,11 @@ fn build_area_entry(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner: 
 /// replay (its running script / queue are part of the state).
 pub fn import_emulator_state(data: &Arc<GameData>, ram: &GbaRam, runner: &mut StoryHost) -> Result<Imported, ImportError> {
     let info = inspect(ram);
+    // an area entry inside a running event (a script's warp): the event's position from the scene objects
+    let in_event = (info.kind == CutKind::MidArea && info.depth > 0 && info.leader.is_some()).then(|| running_event(ram, runner)).flatten();
     match info.kind {
         CutKind::AreaEntry => {}
+        CutKind::MidArea if in_event.is_some() => {}
         CutKind::LoadPending => return Err(ImportError::Unsupported(format!("area {:?}: the load's on-enter script is still blocked (no leader); cut at the frame the leader appears", info.area))),
         CutKind::MidArea => return Err(ImportError::Unsupported(format!("area {:?}: mid-area (mode {:#x} brightness {}, depth {}); only area-entry cuts are importable so far", info.area, info.mode.0, info.mode.1, info.depth))),
     }
@@ -359,7 +463,10 @@ pub fn import_emulator_state(data: &Arc<GameData>, ram: &GbaRam, runner: &mut St
         let mut n = vec![];
         let probe = runner.snapshot();
         let frame0 = info.lf.wrapping_sub(last.as_ref().map(|b| b.held).unwrap_or(0));
-        let b = build_area_entry(data, ram, &info, runner, guess, frame0, 600, &mut n);
+        let b = match in_event {
+            Some(ev) => build_event_entry(data, ram, &info, runner, ev, guess, frame0, &mut n),
+            None => build_area_entry(data, ram, &info, runner, guess, frame0, 600, &mut n),
+        };
         let ok = b.world.rng.state() == target;
         let next = rewind(target, b.draws);
         notes = n;
@@ -372,6 +479,9 @@ pub fn import_emulator_state(data: &Arc<GameData>, ram: &GbaRam, runner: &mut St
         last = Some(b);
     }
     let b = last.unwrap();
+    if let Some(n) = notes.iter().find(|n| n.starts_with("unsupported: ")) {
+        return Err(ImportError::Unsupported(n.trim_start_matches("unsupported: ").to_string()));
+    }
     if b.world.rng.state() != target {
         return Err(ImportError::Mismatch(format!("RNG {:08x?} after {} draws vs RAM {:08x?}", b.world.rng.state(), b.draws, target)));
     }

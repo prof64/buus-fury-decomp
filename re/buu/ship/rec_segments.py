@@ -3,7 +3,7 @@ it at every importable area entry (an exit arrival: the end of the first complet
 the new area, autowalking in, no event running — tools/segments/segment.py's rule), one segment file per cut, in
 tools/segments/segment.py's format (data/segments/NAME.json shape; spec engine/docs/segments.md).
 
-usage: rec_segments.py RUNDIR OUTDIR [--prefix ship] [--from-frame N] [--first N] [--max N] [--at-start]
+usage: rec_segments.py RUNDIR OUTDIR [--prefix ship] [--from-frame N] [--first N] [--max N] [--at-start] [--events]
   --from-frame: no cut before key frame N (the first segment starts at the first cut from there); --first: its number
   RUNDIR: run_route.py output (start.ss + keys.json); segments go to OUTDIR/<prefix>_<nnn>_<w>-<a>.json
   The emulator is rewound one frame at each cut (the cut is known when the next logic frame starts)."""
@@ -24,6 +24,8 @@ def main():
     prefix = a[a.index('--prefix') + 1] if '--prefix' in a else 'ship'
     mx = int(a[a.index('--max') + 1]) if '--max' in a else 10 ** 9
     ff = int(a[a.index('--from-frame') + 1]) if '--from-frame' in a else 0
+    # --events: cut at area entries inside a running event too (a script's warp; wf-import continues the event)
+    events = '--events' in a
     n0 = int(a[a.index('--first') + 1]) - 1 if '--first' in a else 0
     out.mkdir(parents=True, exist_ok=True)
     log = json.loads((run / 'keys.json').read_text())
@@ -85,7 +87,7 @@ def main():
             # the previous frame closed the load's first complete logic frame: cut there if importable
             pending = False
             p = prev_row['p']
-            if prev_row.get('depth') == 0 and p and p[3] == 'autowalk' and f >= ff:
+            if (prev_row.get('depth') == 0 and p and p[3] == 'autowalk' or events and prev_row.get('depth') and p) and f >= ff:
                 if seg is not None:
                     # the old segment ends before the area change: the game's load spans several video frames
                     # (objects appear while it runs); the next segment starts after the load's logic frame

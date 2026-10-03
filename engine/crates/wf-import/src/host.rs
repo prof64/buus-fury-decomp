@@ -75,7 +75,7 @@ impl StoryHost {
     /// the running thread's frames, queue and blocked action (debugging: SEGMENT_HOST)
     pub fn thread_summary(&self) -> String {
         let t = self.rt.state();
-        format!("frames {:?} queue {:?} blocked {:?} pending {:?} outer {}", t.frames, t.queue, t.blocked, self.hs.pending, self.outer.len())
+        format!("blocked {:?} pending {:?} outer {} queue {}", t.blocked, self.hs.pending, self.outer.len(), t.queue.len())
     }
 
     /// a script is blocked (waiting for frames / input / a fade ...)
@@ -199,6 +199,77 @@ impl StoryHost {
         self.rt.start_event(ev, [0; 4]);
         let st = self.with_host(w, |rt| rt.run().map_err(|e| e.to_string()));
         self.finish(w, st);
+    }
+
+    /// the event of a scene header address (`// Event N (header 0xADDR)`), for imports
+    pub fn event_of_header(&self, header: u32) -> Option<u16> {
+        self.rt.library().headers.get(&header).copied()
+    }
+
+    /// the graph node that is running when a scene object's next state is `next` (a code node leading there)
+    pub fn node_before(&self, event: u16, next: u16) -> Option<u16> {
+        let g = self.rt.library().graphs.get(&event)?;
+        let nx = |n: &wf_script_rhai::GNode| match n {
+            wf_script_rhai::GNode::Code { next, .. } | wf_script_rhai::GNode::Say { next, .. } | wf_script_rhai::GNode::SayArgs { next, .. } | wf_script_rhai::GNode::Choice { next, .. } => Some(*next),
+            _ => None,
+        };
+        g.iter().find(|(_, n)| matches!(n, wf_script_rhai::GNode::Code { .. }) && nx(n) == Some(next)).or_else(|| g.iter().find(|(_, n)| nx(n) == Some(next))).map(|(k, _)| *k)
+    }
+
+    /// Import: continue event `event` from graph node `node` as the game runs it at an area entry inside the event.
+    /// The node's handler queues its actions; those up to and including the load into `area` (warp 0x76 / 0x77 with
+    /// that target) ran before the cut and are dropped; with no such load in the node it started after the load
+    /// (a `jump` into a new scene): all of it runs now. Returns the actions dropped; None = not a load this import
+    /// rebuilds (only warp 0x77, or node 0 of a scene a jump entered after one)
+    pub fn continue_event(&mut self, w: &mut World, event: u16, node: u16, params: [i32; 4], area: (i32, i32, i32)) -> Option<usize> {
+        let mut g = self.rt.globals();
+        g.g = w.story.g;
+        self.rt.set_globals(g);
+        self.hs.in_unit = false;
+        self.rt.start_event_at(event, node, params);
+        self.rt.with_thread(|t| t.hold_queue = true);
+        let st = self.with_host(w, |rt| rt.run().map_err(|e| e.to_string()));
+        if let Err(e) = st {
+            self.errors.push(e);
+            return None;
+        }
+        let found = self.rt.with_thread(|t| {
+            t.hold_queue = false;
+            t.queue.iter().enumerate().find_map(|(k, a)| match a {
+                wf_script_rhai::Act::Native { native: n @ 0x70..=0x77, args, .. } if args.len() >= 3 && (args[0], args[1], args[2]) == area => Some((k, *n)),
+                _ => None,
+            })
+        });
+        let skip = match found {
+            Some((k, 0x77)) => k + 1,
+            None if node == 0 => 0,
+            _ => return None,
+        };
+        self.rt.with_thread(|t| t.skip = skip);
+        self.started.push((self.frame, format!("s{event:03}@{node}")));
+        self.cause = None;
+        let st = self.with_host(w, |rt| rt.run().map_err(|e| e.to_string()));
+        self.finish(w, st);
+        Some(skip)
+    }
+
+    /// run a load's scripts nested inside a script (import of a warp inside an event): the field stays held when they
+    /// end, as under the warp that made the load
+    pub fn run_nested(&mut self, w: &mut World, evs: &[Event]) {
+        self.outer.push(Outer { thread: self.rt.state(), pending: None, from_wait: false, cause: None });
+        self.collect(evs);
+        self.run_queue(w);
+        // (still running nested: it stays on top of the placeholder; ended: the placeholder came back - drop it)
+        if self.outer.is_empty() {
+            self.running = false;
+        } else if !self.running {
+            self.outer.pop();
+        }
+    }
+
+    /// the blocked script goes on if its wait is already over (the rest of an imported frame)
+    pub fn settle(&mut self, w: &mut World) {
+        self.resume_blocked(w);
     }
 
     /// run queued scripts until one blocks or the queue is empty

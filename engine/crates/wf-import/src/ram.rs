@@ -70,11 +70,14 @@ pub const ST_AUTOWALK: u32 = 0x0804_E00C;
 pub struct GbaRam {
     pub iwram: Vec<u8>,
     pub ewram: Vec<u8>,
+    /// the screen is black at the cut (the palette / blend IO is not work RAM: the recording's display probe; a
+    /// script's fade_out before its warp leaves it so - in-event imports)
+    pub screen_black: Option<bool>,
 }
 
 impl GbaRam {
     pub fn new(iwram: Vec<u8>, ewram: Vec<u8>) -> GbaRam {
-        let mut r = GbaRam { iwram, ewram };
+        let mut r = GbaRam { iwram, ewram, screen_black: None };
         r.iwram.resize(IWRAM_SIZE, 0);
         r.ewram.resize(EWRAM_SIZE, 0);
         r

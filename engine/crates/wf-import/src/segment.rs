@@ -300,7 +300,9 @@ fn range_env(name: &str) -> Option<(usize, usize)> {
 
 /// import the segment's start state; Err = the import failed
 pub fn start(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Value) -> Result<(Imported, StoryHost), String> {
-    let ram = GbaRam::from_json(&doc["init"]["ram"])?;
+    let mut ram = GbaRam::from_json(&doc["init"]["ram"])?;
+    // the display at the cut: the first recorded row's probe (the screen does not change before its logic frame)
+    ram.screen_black = doc["frames"].get(0).and_then(|f| f["io"].get(5)).and_then(|v| v.as_i64()).map(|v| v == 0);
     let mut host = StoryHost::new(data, files)?;
     let mut imp = import_emulator_state(data, &ram, &mut host).map_err(|e| e.to_string())?;
     host.prev_held = imp.prev_keys;
@@ -375,10 +377,13 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
                 let w = &sess.world;
                 let p = w.player_idx(0).map(|pi| (w.pl_ref(pi).a.x, w.pl_ref(pi).a.y, w.pl_ref(pi).a.facing, w.pl_ref(pi).gs.name()));
                 if std::env::var("SEGMENT_HOST").is_ok() {
-                    eprintln!("  t{k} host {}", host.thread_summary());
+                    eprintln!("  t{k} host {} screen {:?} {} {}", host.thread_summary(), w.scene.screen.fade, w.scene.screen.black, w.scene.screen.dim);
                 }
                 if std::env::var("SEGMENT_TIMERS").is_ok() {
                     eprintln!("  t{k} timers {:?}", host.hs.timers);
+                }
+                if std::env::var("SEGMENT_FADEDBG").is_ok() {
+                    eprintln!("  t{k} fadedbg {:?} dim {} black {}", w.scene.screen.fade, w.scene.screen.dim, w.scene.screen.black);
                 }
                 if std::env::var("SEGMENT_AIDBG").is_ok() {
                     for i in 0..w.ents.len() {

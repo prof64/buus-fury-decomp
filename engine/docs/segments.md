@@ -259,11 +259,25 @@ frame - `SEGMENT_VRAM=0` skips it, `VRAM_DBG=1` prints our owners at a mismatch,
 * Order rules found with it: removed objects' blocks go in update order (list from the end); a dying enemy's
   instance is destroyed before its explosion is made (the explosion takes the same block: sb 20-6, side 18-2 f128);
   `become_map_object` frees the NPC before the map object takes its tiles; the transform aura is deleted by the
-  state's exit (same frame); a broken object's explosion keeps its block one frame past our entity (MEASURED, cause
-  not decoded); unknown imported objects go at the next load.
-* Not modelled yet (allocator-only stops; the cut's other checks go on - those gates carry no `vram` rows): enemy
-  drops (3 x 0x40 + 0x100 at a kill: sb 20-6 f155, side 18-2 f160), a 61-unit object at 18-12 / 18-1, 20-2..20-5
-  and 1-3 / 1-5 / 6-6 objects, 21-11 f252, the fight objects after sb 21-25 f21210 (free-list order).
+  state's exit (same frame); an animated effect frees its block in the update that ends it; damage numbers are list
+  objects and end in list order (a number older than the object being updated is past its update); unknown
+  imported objects go at the next load; a script-shown HUD gets its update (stat-points mark) in the same frame.
+* **The "explosion's extra frame" - decoded:** a broken object whose callback starts an event runs it inside its
+  own update; the event takes the rest of the frame, so the objects older than the break (its puff, the debris
+  chips) get no update that frame, and in the frame the event ends they are updated twice (the nested loop's pass
+  and the rest of the interrupted one). VERIFIED by breakpoints on the puff's update `0x0802A8AA` (sb 21-5 f552)
+  and the chips' update `0x0800C4A6` (sb 21-11 f236 / f237). Chips live 32 updates (`field.rs` `break_owed`).
+* More tile users (2026-10-03, second round): HUD stat-points mark (`0x0800BCC8`, vtable 0x0804C070, 0x100, made
+  by the HUD while the leader has points, purge level 3); level-sign labels (`0x0800C300`, 0x200 each, before the
+  area's objects); flame shots share one 0x1300 graphic (`0x080246B4`); travel-menu label (`0x0803643C`, 0xF40);
+  "Watch This!" (`0x08027DB0`, 0x2800, purges, restore at its end); power-struggle gauge (`0x080301F8`, 0x380);
+  scripted wave beam (`0x080286D4`, 0xC0, the command's frames); candy beam shot 0xC0; timer HUD (`0x0802FCA0`,
+  0x400); coins (`0x08017F5A`: 0x40 / 0x100 + the shadow's shared graphic; **no coin and no RNG draws when the
+  room is under 0x3000**, `0x08018356`); the 3D map HUD and the timer HUD answer the purge from level 15 (the map
+  HUD, the list's last object, goes before the flyer: sb 21-25 f64781); `set_attachment` swaps the shadow; the
+  title screen's placeholder world holds no tiles and keeps the RNG.
+* Also: `change_sprite` lifts the old NPC's walk-grid mark like its destructor does (sb 21-18 / 21-19: Buu
+  123 -> 126 left (152, 200) blocked - the "player stop at (148, 208)").
 
 Other rules of this round: the BG sphere effect (`0x0803AA58`) draws rand(4) per row past the third every frame,
 before the objects, and ends with its area; an NPC's script anims 10 / 11 play once (8 ticks a cel) and stay on the
@@ -277,16 +291,12 @@ handler vfunc +0x74 and the object stays; `enemy::on_death`, `last_copy`). With 
 (`hp: 5634 vs game 5739`, allocator check ON and exact up to there) - the fight is yours from that frame. I keep
 `vram.rs` and the allocator rows; tell me here if a fight fix needs a new tile user.
 
-Results (2026-10-03, with the allocator check where the gate has `vram` rows): 21-2..21-10, 21-12, 21-15..21-17,
-21-20..21-24 exact; `sb_041` (21-25, Kid Buu) **21,210** (was 11,442; without the allocator check 21,479: an enemy
-object missing); `sb_044` (ending 4-20) **23,962 / 24,101** (was 1,974). Open: `sb_029` f703 / `sb_030` f490 -
-Switch Character's leave lasts 16 frames in the game vs 25 (lag frames of the world restore); `sb_034` f1134 /
-`sb_035` f882 - after the fight the player is stopped by something at (148, 208) that the game does not have (no
-actor there: a stale grid mark?); `sb_044` f23962 - the credits' page 74 (cost 163) takes 1 frame in the ending vs 2
-in `page_cost` (menus); Earth 7-2 f1432 and db7_041 f765 are not purges (allocator exact up to them): 7-2 - at f1386
-an actor's instance is destroyed (`0x0800ECA0` via `0x08017CE1`) and actor #17's animation stands at tick 29 until it
-reads tick 41 at f1432; db7_041 - at f579 actors 123 and 269 enter idle in one frame and their two rand(255) draws
-are in the other order (ticks 74 / 79 swapped), the cel shows it at f765.
+Results (2026-10-03, second round; every gate carries allocator rows, the check is on): **Kid Buu 21-25 exact end
+to end (66,219 / 66,219)**, **ending 4-20 exact to the title (24,101)**, 4-21 (23,823), 18-12, 18-1, 1-3, 20-2 ..
+20-4, 21-2 .. 21-24 all exact (21-13 / 21-14 with the menu agent's `snd_phase`). Not exact, none on the allocator:
+1-5 f11,378 (camera), 6-6 f4,694 (RNG), 20-5 f6,087 (animation), 20-6 f2,012 (an entity missing). Earth 7-2 f1432
+-> Earth agent, db7_041 f765 -> dungeons 5-7 agent (both: allocator exact up to them). Not mine (checked): the red
+gates earth_3_3_4 f1589 / shipr_320_8-45 f938 draw in enemy animation / AI code this round did not touch.
 
 **Claim (dungeon agent A, 2026-10-03, by the coordinator): the Kid Buu fight itself in `sb_041` (21-25).** A works
 with the allocator check off (`SEGMENT_VRAM=0`): the enemy object missing at f21479 and every divergence after it
@@ -348,20 +358,31 @@ world map purges sprite memory (`vram::purge` suspends every map object, the fly
 keeps updating them (the flyer's tick 15 -> 16 on the next logic frame; the patrols / circles too), while the
 allocator rows still match: on the 3D map the purge frees tiles but does not take the objects out of the update.
 
-*In-event entries: decoding where the event stands* (`tools/dungeons/evpos.py STATE`): the scene objects are on the
-IWRAM stack (+0 header = a scene-table entry, +8 u16 next state, +0x14 param ptr); the interpreters are the context
-stack 0x03001034; the VM 0x08004038 keeps its PC in the pushed r1 slot (the word after a stack word equal to the
-interpreter pointer; advanced per opcode at 0x08004064), so (scene, step, PC offset in the step's code) is readable.
-Kind-0 code is at record + 3; kind-4 code is decompressed into a heap buffer (the code starts 8 bytes after the
-buffer pointer the stack holds). The opening's two in-event loads: **1-10** = s061's `warp` then `jump 68`: s068
-step 0 at offset 9 (after its first native, `camera_scroll_to(160, 32, 300)`, blocking); **1-1** = s038 step 2
-(kind 4) at offset 23 (after `fade_out(1)`, `warp(1, 1, 1, 8, 167)`, `set_pos(161, 8, 176)`). Plan for the import
-(not built yet): area entry as today + the host's thread rebuilt at that point - `Frame::Event { event, node }` +
-the node's unit, run with an instant host that completes the actions before the PC (count = the natives the game's
-bytecode executed from the step's start to the PC, by running the step's bytecode in `wf_script::vm` with queries
-answered from the imported world), blocked on the native at the PC with its progress taken from the game's mode
-object (camera scroll / wait / walk counters). Open question found on the way: in 1-1 the PC stands right after
-`set_pos`, a non-blocking native in our model - the game may block one frame there (actor not yet spawned).
+*In-event entries: built (A).* `wf-import` now imports an area entry made by a **warp 0x77 inside a running
+event** (`lib.rs` `running_event` + `build_event_entry`, `host.rs` `continue_event` / `run_nested`, Rhai runtime
+`start_event_at` / `hold_queue` / `skip`):
+* the running event from RAM: the innermost scene object on the IWRAM stack (+0 header -> event via the scripts'
+  header lines, +8 next state -> the code node leading to it, +0x14 its param block);
+* the frame rebuilt as the warp makes it: the leader before the load, the event holding the field (depth 1, busy),
+  the players idle, `load_area(..., facing down)`, the load's on-enter scripts nested (the field stays held), then
+  the event from that node: its handler queues the node's actions, those up to and including the warp into this
+  area are dropped (the game ran them), the rest run now until the first wait; a node without such a warp is the
+  first node of a scene a `jump` entered after the load (all of it runs). The load frame ends with one camera
+  update: a modal scroll started there takes its step, the script sees it end in the next frame (the game's PC is
+  still in `camera_scroll_to` at the cut - 1-10);
+* the screen black at the cut (a script's `fade_out` before the warp) comes from the recording's first display
+  probe (`GbaRam.screen_black`: palette / blend IO is not work RAM);
+* refused (`Unsupported`): scene loads (`load_scene` 0x70..0x75), `warp_fade` (0x76) and the 3D world map.
+Cutting: `rec_segments.py ... --events` cuts at in-event entries too; `segment.py cut` always could.
+Settled with an emulator trace (`tools/dungeons/vmtrace.py`: the VM's opcode fetches per frame): in a cutscene the
+game runs **one native per frame** around a warp - s038's `set_pos` x 3 after the warp in 1-1 take frames 3839,
+3840, 3841 - which our action model already does (no hold rule needed).
+Proof: the opening's two in-event loads, **1-1 (s038 node 2, 2,900 frames) and 1-10 (s061 -> s068 node 0, 1,500
+frames), both exact to the end**, gated as `ow_ev_1_1` / `ow_ev_1_10`. The real route's Kid Buu run
+(`work/db/kbr2`: `k05_vegeta150` + its key logs, cut with `--events`): the fight's own entry into 19-3 (s457's warp)
+imports and matches **9,642 / 24,441** frames (stop: a punch that kills one of Kid Buu's two copies - the game draws
+a puff rate and a screen-shake jitter, ours an enemy idle: the copy-death path of this route's fight); its other 12
+in-event cuts are scene loads of s462 / s463 and the world-map warp_fades (refused).
 
 ## 7. Side content (owner: the side-content agent, from 2026-10-02)
 
@@ -985,6 +1006,22 @@ page's own cycles built from its draw list; opt-in as before (`init.snd_phase`),
   sprite memory) and `shipr_004` f299 (the player is hit: appeared with another agent's uncommitted battle edits,
   not a menu). Dungeon heal menus: db2_013 / db2_015 exact, db1_004 / db2_009 / db3_014 / db3_020 run to the pause
   close, db3_013 stops at a status redraw decision (f2604; `snd_phase` added to those seven files).
+* Round 6 (ship fix agent, 2026-10-04):
+  - A menu's close sends message 0x1A to every world object (0x08006FBE, objects last to first, 0x08011C0C); the
+    player's handler 0x08010FFC runs the form controller's stat reset 0x0800E074: **resists back to 128**, so a hurt
+    state's i-frames end at the close (`player::menu_closed`; real route 8-38 `shipr_266` f6007: healed in the pause
+    menu while hurt, hit again 17 frames after the close - the game takes the damage).
+  - Yakon's post-combo pose (PlayAnim13Yakon 0x0803A556, field only): SetAnim(0x13) in the node's first update, not
+    its enter; it finishes when the enemy leaves controller 0x030032CC (0x0803A538: 32 ticks, then the walk state
+    0x0800EE78 with the last cel kept) - the update after the 32nd tick. `shipr_266` now exact.
+  - Switch Character close: `CHARSEL_CLOSE_LEADER` refitted 26.5k -> 6k against the reload model's current
+    constants (six measured switched closes, game - model was -27k .. -6k; 8-66's second close ran a frame long).
+  - **To the Earth agent** (`Enemy.walk_due`, yours): `shipr_320_8-45` f938 went red with it - AlignWithPlayer's
+    blocked step (0x0801CFA8) cleared `moving` but left `walk_due` set, so the walk came back after StandStill's
+    SetAnim(0) (a Destroyer, extra rand). Fixed by clearing `walk_due` in the blocked path (Rust `align`, TS
+    `alignBlocked`; TS dumps regenerated, cross_ts green). The rule itself is unchanged.
+  - A fade from white (scene `FadeKind::White`, in) clears the black level at its first step: the palette is
+    written from white toward the target (8-66 f18,226: the load left the screen black, the game shows the white).
 
 **Side-content catalogue** (data survey 2026-10-02; flags = story flags): Broly turns out to be **mainline** (Dragon
 Ball saga: his defeat s436 sets flag 111, which Dragon Ball #4 s439 needs) — shared with the Super Buu agent, whose main line
@@ -1181,6 +1218,32 @@ two Python hash seeds, gives identical key logs (13,000 frames); the earlier run
 * Open: the tile allocator after a Janemba Hand's death (the explosion / death-effect blocks' lifetime, from f160
   of 18-2; with the check on only a few cuts pass), the inventory heal's sound 39 (the menu timing the Earth agent
   documents), the two mid-load cuts the importer refuses.
+
+**Post-game and level gates from the REAL route (side-content agent, 2026-10-03).**
+* Real post-game state: `tools/side/postgame_state.py` replays the real route's last leg (`work/ship/sb/
+  m_kid_buu_punched.ss` + `sbk_kid_buu.json`) and saves its first quiet frame after the ending's flag 149: Goku
+  flying on the world map 0-50 (s463 node 69), under control -> `work/side/pg_start.ss` (+ its key prefix). Party:
+  Goku 158, Gohan 141, Goten 118, Trunks 91, Vegeta 150. No RAM writes. (The real route then took the "final
+  sequence" s190 at Capsule Corp straight to the credits; its last save is 18-13's, without flag 149 - a Continue
+  from the title does not give the post-game.)
+* `tools/side/gates.py STATE.ss`: every level gate the map scripts call (s517 one-time: character, level, prop,
+  flag; s518 per-visit, flag 187 for the visit, `is_tampered()` = 0) with opened / can-open for the state. 26 gates;
+  the real post-game state has 13 opened (the main line's and the real route's), and can open 8-2 Goku L100 (163),
+  11-1 Gohan L100 (170), 2-33 Gohan L140, 8-7 Vegeta L120, 13-1 Goku L135 (post-game). Out of reach without a
+  grind: 8-2 Gotenks 125, 10-1 Goten 120 / 145, 11-1 Trunks 135, 13-1 Trunks 110, 14-1 Vegeta 155, 15-1 Gotenks 140
+  / Gohan 165, 20-4 Goku 175 (the Barren gate).
+* `tools/side/pgroute.py LEG --record`: legs from `pg_start.ss` on the HFIL driver (`fly` = the world-map entry
+  rect, `goto`, the save point's Switch Character), recorded to `work/side/seg/pg_<leg>.json`, cut into
+  `work/side/pgseg/<leg>/`. Legs: g82 (8-2's L100 gate opens: flag 163), g131 (13-1's post-game gate, Goku L135, and
+  through to 13-2), g233 (East District 2-8's save point -> Gohan -> 2-9 .. 2-14 -> the hidden dungeon's gate 2-33,
+  Gohan L140 -> 2-34). 13 cuts: all 9 importable ones exact (allocator check on); the other 4 start on a world-map
+  landing or a blocked on-enter load (the in-event importer's).
+* Gates in data/segments: `pg_g82_001_08_02` (380, the L100 gate's s517), `pg_g233_006_02_14` (277),
+  `pg_g233_007_02_33` (385, the s518 gate), `rj_arena_000_18_14` (515: the allocator check stops it there - exact to
+  6,940 with `SEGMENT_VRAM=0`), `rj_back1_000_18_10` (241, allocator; exact to 382 without).
+* Gate mechanics as recorded: a gate is an A-button script trigger (s517's 8-2 / 11-1 rects also want facing up);
+  the position (footprint top-left) must be inside the rect - stand up against it; s518's open_area leaves a
+  32-px opening (2-33: x 216..248), so a character beside it stays blocked by the posts.
 
 * Script tracks (shared rule, 0x080193AE msg 0x0C): when a track's last command finishes, the director asks its
   vt+0x10; set_pos / prop_set_pos / camera_set* / camera_set_param* answer 1 like face_actor (`mov r0, #1` at

@@ -3010,6 +3010,7 @@ pub fn script_set_form(w: &mut World, i: usize, form: i32) {
     form_exit(w, i);
     apply_form(w, i, form);
     form_enter(w, i);
+    if std::env::var("T_OLDFORM").is_ok() { set_anim_id(w, i, 0); new_form_object(w, i); return; }
     new_form_object(w, i);
     new_form_object(w, i);
     set_anim_id(w, i, 0);
