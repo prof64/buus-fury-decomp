@@ -42,6 +42,7 @@ fn main() {
     }
     // --import SEG.json: start from that cut's RAM (one import), the recordings' rows follow the cut
     let continue_on_save = args.iter().any(|a| a == "--continue-on-save");
+    let save_at: Option<usize> = opt("--save-at").and_then(|v| v.parse().ok());
     let mut continued = false;
     let mut continue_row: Option<usize> = None;
     let mut app = match opt("--import") {
@@ -113,6 +114,21 @@ fn main() {
             first_rng = None;
             rng_bad = 0;
             pos_bad = 0;
+        }
+        // --save-at ROW: the player stands in a save point's rect there (the route used it for Switch Character):
+        // the app saves through the real screens (A, "-Save", the slot, confirm) on extra frames - no rows consumed
+        if save_at == Some(k) {
+            let gen0 = app.world().saves.generation;
+            for (key, n) in [(0x40u16, 4), (0, 6), (1, 3), (0, 60), (1, 3), (0, 90), (1, 3), (0, 60), (1, 3), (0, 60), (1, 3), (0, 120)] {
+                for _ in 0..n {
+                    let mut ev = vec![];
+                    app.step(&[key], &mut ev);
+                }
+                if app.world().saves.generation != gen0 && !wf_core::menu::active(app.world()) && app.world().scene.depth == 0 {
+                    break;
+                }
+            }
+            println!("save program at row {k}: generation {} -> {}", gen0, app.world().saves.generation);
         }
         // --continue-on-save: the app's own Save screen wrote a slot (the route saves at a save point) and the field
         // is free again: a fresh session on the title with that slot file, Continue through the title's menus, the

@@ -295,6 +295,12 @@ pub extern "C" fn wf_app_set_mode(kind: u32, zoom: u32) {
     with_game(|g| g.app.mode = if kind == 1 { ViewMode::Gba { scale: zoom } } else { ViewMode::Pc { zoom } });
 }
 
+/// story mode's "original pacing" (launcher Settings; presentation only)
+#[no_mangle]
+pub extern "C" fn wf_app_set_pacing(on: u32) {
+    with_game(|g| g.app.original_pacing = on != 0);
+}
+
 #[no_mangle]
 pub extern "C" fn wf_app_set_paused(p: u32) {
     with_game(|g| g.app.paused = p != 0);

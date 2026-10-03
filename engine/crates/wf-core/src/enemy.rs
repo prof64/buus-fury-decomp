@@ -109,6 +109,9 @@ pub struct Enemy {
     /// a RandomStep node is moving the actor around its kept position: the grid mark stays at that position (field)
     #[serde(default)]
     pub jitter: bool,
+    /// field: the beam of a left KidBuuKamehameha stops at this enemy's second update after (nodes.rs)
+    #[serde(default)]
+    pub beam_stop_due: u8,
     /// the running motion-controller leaf (state serial, node): its controller ticks with the animation, also while
     /// an event holds the field and the AI does not think (nodes.rs `busy_controller`)
     #[serde(default)]
@@ -192,6 +195,7 @@ impl Enemy {
             detached: false,
             smash_puffs: 0,
             jitter: false,
+            beam_stop_due: 0,
             ctl: (0, 0),
         };
         // the constructor's SetAnim(0) runs before the object is in the world: no RNG draw
@@ -334,6 +338,7 @@ impl crate::eanim::Host for EHost<'_> {
         self.sprite.and_then(|s| self.d.sprite(s)).and_then(|s| s.anim_raw(raw)).map(|a| a.steps(self.facing).len() as i32).unwrap_or(0)
     }
     fn rand(&mut self, n: u32) -> i32 {
+        if std::env::var("DBG_IDLE").is_ok() { eprintln!("DBGIDLE {}", std::backtrace::Backtrace::force_capture()); }
         match self.rng.as_mut() {
             Some(r) => r.rand(n),
             None => 0,
@@ -415,6 +420,12 @@ pub fn ctx_player(w: &World, i: usize) -> Option<usize> {
 pub fn update(w: &mut World, i: usize) {
     if crate::scene::puppet_update(w, i) {
         return;
+    }
+    if w.en_ref(i).beam_stop_due > 0 {
+        w.en(i).beam_stop_due -= 1;
+        if w.en_ref(i).beam_stop_due == 0 {
+            crate::nodes::stop_beam_of(w, i);
+        }
     }
     // while an event holds the field only the animation ticks (like the map NPCs; story playthrough: the
     // fighters a cutscene hands over with become_map_object start their AI when the event ends)

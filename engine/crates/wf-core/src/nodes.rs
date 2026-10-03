@@ -1354,6 +1354,12 @@ fn leaf_exit(w: &mut World, c: &C, n: u16, _r: &mut NodeRt) {
         K::ChargedPunch => w.en(i).a.hittable = true,
         // Babidi can be hit again once he leaves the hover (obj+0x1CC back to 1 with the state change to 0xC6)
         K::BabidiHover => w.en(i).a.hittable = true,
+        // (field: the node's own exit is a no-op (vtable 0x0804A6C0 +8 = bx lr); the beam belongs to the actor state
+        // its enter set (0x0804C690), which goes when the next state sets the actor's - a hit's GotoState into the
+        // teleport: the beam stays active (and hits) through Kid Buu's next update and stops in the one after, its
+        // retraction starting the frame after that - the real route, 19-3: hit f12345, beam hits f12346 / f12347,
+        // retracts from f12348)
+        K::KidBuuKamehameha if w.field.is_some() => w.en(i).beam_stop_due = 2,
         K::KidBuuKamehameha => stop_enemy_beam(w, i),
         // exit 0x08033AF6: crit = 0, hit dir = facing ^ 1 (the KnockbackSlide that follows slides it backwards), SetAnim(9)
         K::VampireGrab => {
@@ -1377,6 +1383,10 @@ fn leaf_exit(w: &mut World, c: &C, n: u16, _r: &mut NodeRt) {
         K::ShockStun => w.en(i).stunned = false,
         _ => {}
     }
+}
+
+pub fn stop_beam_of(w: &mut World, i: usize) {
+    stop_enemy_beam(w, i);
 }
 
 fn stop_enemy_beam(w: &mut World, i: usize) {

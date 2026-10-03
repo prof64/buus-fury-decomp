@@ -259,6 +259,7 @@ async function boot(baseTarBytes) {
         const pr = lsGet('wf.prefs') || {};
         pr.mode = out.settings.view;
         pr.vol = out.settings.volume / 100;
+        pr.pacing = !!out.settings.original_pacing;
         lsSet('wf.prefs', pr);
         const c = out.choice;
         if (c.kind === 'add_mod') {
@@ -375,6 +376,8 @@ async function boot(baseTarBytes) {
     $('mode').value = prefs.mode || 'pc:0';
   };
   applyMode();
+  // launcher Settings "Original pacing" (story mode; presentation only)
+  x.wf_app_set_pacing?.(prefs.pacing ? 1 : 0);
   if (qs.get('mode')) {
     prefs.mode = qs.get('mode');
     applyMode();

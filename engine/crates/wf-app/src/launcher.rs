@@ -240,6 +240,8 @@ enum Row {
     View,
     Volume,
     Fullscreen,
+    /// story mode's "original pacing" (holds the picture for the GBA's load lengths; presentation only)
+    Pacing,
     Controls,
     Back,
 }
@@ -376,7 +378,7 @@ impl Launcher {
                 v
             }
             Screen::Settings => {
-                let mut v = vec![Row::View, Row::Volume];
+                let mut v = vec![Row::View, Row::Volume, Row::Pacing];
                 if self.native {
                     v.push(Row::Fullscreen);
                 }
@@ -484,6 +486,7 @@ impl Launcher {
             }
             Row::Volume => self.settings.volume = (self.settings.volume as i32 + d.signum() * 10).clamp(0, 100) as u32,
             Row::Fullscreen => self.settings.fullscreen = !self.settings.fullscreen,
+            Row::Pacing => self.settings.original_pacing = !self.settings.original_pacing,
             _ => return Choice::None,
         }
         Choice::Settings
@@ -544,7 +547,7 @@ impl Launcher {
                 self.message = "That slot is empty.".into();
             }
             Row::Fight => return Choice::Battle(self.battle_config()),
-            Row::Mod(_) | Row::Kind | Row::Fullscreen => return self.change(row, 1),
+            Row::Mod(_) | Row::Kind | Row::Fullscreen | Row::Pacing => return self.change(row, 1),
             Row::ModsFolder => return if self.native { Choice::OpenModsFolder } else { Choice::AddMod },
             Row::Controls => {
                 self.rebind.toggle();
@@ -598,6 +601,7 @@ impl Launcher {
             Row::View => (t("View"), format!("< {} >", VIEWS.iter().find(|v| v.0 == self.settings.view).map(|v| v.1).unwrap_or("?"))),
             Row::Volume => (t("Volume"), format!("< {}% >", self.settings.volume)),
             Row::Fullscreen => (t("Fullscreen"), if self.settings.fullscreen { t("< on >") } else { t("< off >") }),
+            Row::Pacing => (t("Original pacing"), if self.settings.original_pacing { t("< on >") } else { t("< off >") }),
             Row::Controls => (t("Controls..."), String::new()),
             Row::Back => (t("Back"), String::new()),
         }
