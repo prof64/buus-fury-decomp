@@ -657,6 +657,7 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
             h.s.timers.countdown = arg(a, 0) * 60;
             // (a countdown switched on makes its object, whose first update counts at once; one already on - at 0
             // after its hook - is only set: 21-25's second minute reads 3600 in the frame it is set)
+            if std::env::var("DBG_CD").is_ok() { eprintln!("DBGCD set from_wait {} from_scroll {} on {}", h.s.from_wait, h.s.from_scroll, h.s.timers.countdown_on); }
             h.s.timers.fresh = !h.s.timers.countdown_on;
             h.s.timers.countdown_on = true;
             unit()

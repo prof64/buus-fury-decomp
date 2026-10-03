@@ -234,6 +234,9 @@ def board(jobs):
                 ch['exact'] += 1
             else:
                 cat = category(r['first'])
+                # a fade off by a frame after a menu / Switch Character closed = the world restore's length
+                if cat == 'screen fade' and 'predict' in NOTES.get(r['segment'], ''):
+                    cat = 'menu timing'
                 ch['cats'][cat] = ch['cats'].get(cat, 0) + 1
                 bad.append((c['chapter'], name, r, cat))
     tot = {k: sum(c[k] for c in chapters.values()) for k in ('stretches', 'run_frames', 'cut_frames', 'segments', 'exact', 'frames', 'matched')}

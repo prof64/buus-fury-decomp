@@ -15,32 +15,33 @@
   },
   "fat": {
    "cats": {
-    "RNG": 1,
+    "RNG": 3,
     "animation": 1,
-    "camera": 1,
-    "position / facing": 3,
-    "sound": 2
+    "camera": 3,
+    "position / facing": 2,
+    "sound": 1
    },
-   "cut_frames": 481874,
-   "exact": 363,
-   "frames": 481874,
-   "matched": 340804,
+   "cut_frames": 380206,
+   "exact": 361,
+   "frames": 380206,
+   "matched": 319265,
    "run_frames": 388646,
    "segments": 371,
    "stretches": 33
   },
   "janemba": {
    "cats": {
-    "RNG": 2,
-    "camera": 2,
+    "RNG": 3,
+    "camera": 1,
+    "menu timing": 2,
     "object set": 1,
-    "position / facing": 1,
-    "screen fade": 1
+    "position / facing": 2,
+    "sound": 1
    },
-   "cut_frames": 168376,
-   "exact": 248,
-   "frames": 168376,
-   "matched": 156630,
+   "cut_frames": 187291,
+   "exact": 245,
+   "frames": 187291,
+   "matched": 174987,
    "run_frames": 199703,
    "segments": 255,
    "stretches": 16
@@ -60,27 +61,27 @@
     "camera": 1,
     "sound": 1
    },
-   "cut_frames": 370065,
+   "cut_frames": 395616,
    "exact": 336,
-   "frames": 370065,
-   "matched": 360140,
+   "frames": 395616,
+   "matched": 385691,
    "run_frames": 398194,
    "segments": 338,
    "stretches": 2
   },
   "superbuu": {
    "cats": {
-    "RNG": 15,
-    "camera": 4,
-    "other": 1,
+    "RNG": 16,
+    "camera": 5,
+    "menu timing": 3,
+    "object set": 1,
     "position / facing": 22,
-    "screen fade": 1,
     "sound": 1
    },
-   "cut_frames": 364707,
-   "exact": 404,
-   "frames": 364707,
-   "matched": 299655,
+   "cut_frames": 467701,
+   "exact": 400,
+   "frames": 467701,
+   "matched": 307681,
    "run_frames": 478729,
    "segments": 448,
    "stretches": 22
@@ -88,13 +89,13 @@
  },
  "dirty": true,
  "total": {
-  "cut_frames": 1576964,
-  "exact": 1455,
-  "frames": 1576964,
-  "matched": 1299152,
+  "cut_frames": 1622756,
+  "exact": 1446,
+  "frames": 1622756,
+  "matched": 1329547,
   "run_frames": 1668050,
   "segments": 1519,
   "stretches": 75
  },
- "tree": "604927f"
+ "tree": "77c5835"
 }

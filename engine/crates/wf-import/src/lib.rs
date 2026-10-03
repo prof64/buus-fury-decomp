@@ -456,6 +456,8 @@ fn build_returned(_data: &Arc<GameData>, ram: &GbaRam, runner: &mut StoryHost, e
     patch_leader(&mut w, ram, notes);
     // the walk and enemy grids as they stand (map object +0xA8 / +0xB0: bitmaps, 32 bytes a row, bit = free)
     import_grids(&mut w, ram);
+    // (building the enemies entered their states: the path stagger as the RAM has it)
+    w.g.path_stagger = (ram.r8(0x0300_32E5) & 7) as i32;
     // the leader as it stands: its 24.8 position (the load put it on the pixel) and animation (an idle's tick runs
     // on through the scene)
     if let Some(pi) = w.player_idx(0) {
