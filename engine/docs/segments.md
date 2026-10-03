@@ -773,3 +773,88 @@ its destination; an event ending out of a wait / closing text box lets the older
 queued (object-list) event's exit frame gives the player its own update; a defeated boss kept for its on-defeat event
 still gets the event-start stop message. Open: db7_023 f1243 (pause menu), db7_041 f765 (s019's 0-9 scene, an idle
 tick under portrait boxes, not investigated).
+
+### 10.2 Dungeons 1-4 (agent A, 2026-10-03)
+
+**Start states** (`tools/dungeons/mksave_db.py` + `db2_save.py` / `db3_save.py` / `db4_save.py` -> `work/db/dbN_start.ss`):
+save games loaded by the real game (§6's method), **chained**: db1 on the ship agent's REAL `work/ship/fat/d03_hunt.ss`
+(West City after the Dragon Radar, Trunks, 5 Hamburgers), db2 on db1's real end state, db3 on db2's, db4 on db3's - so
+flags 112 .. 114, the Dragon Balls, levels, zenie and bookkeeping flags of dungeons 2 .. 4 come from play. Invented
+(everything else is what the base has):
+* db1: Trunks level 90 (the gate wants 80; at 80 the bot does not survive the Juggernaut), the Bandana (126, the
+  game's list append 0x08004448; the route wears it through the pause menu's Equip page), 10 Hamburgers, 2000 zenie,
+  a save at 9-1's save point;
+* db2: Goten active, a save at 11-1 between the pad and the gate (characters switch only at save points);
+* db3: Trunks active at 10-1's save point, 9 Hamburgers + 4 Turkeys (dungeon 2 ate the food);
+* db4: flags 116 .. 118 + items 30 .. 32 (agent B's dungeons: Nataday appears only with the six other balls) and 107
+  (s019's arrival), Goten level 100 (the gate's minimum), 16 Turkeys, a save at 15-1's arrival spot.
+The builder refills HP / EP and sets GameData +1 bit 1 (**HUD shown**): a save made from a world-map state has it clear
+(hide_hud) and loads without a HUD; a first round of db2 .. db4 recorded that way is kept in `work/db/dbN_nohud`.
+
+**Routes** (`tools/dungeons/db_route.py db1`, `db2_route.py`, `db3_route.py`, `db4_route.py`; ShipDriver goals +
+`db_driver.py` / `dbN_driver.py`; `chain.sh` rebuilds states + runs + cuts), every input from the bot, no RAM writes:
+
+| chapter | route (real game) | frames | cuts | exact | matched / cut frames |
+|---|---|---|---|---|---|
+| db1 Thieves Den (9) | Bandana on, gate s517 (Trunks 80), 9-2 .. 9-4 bandits, the Juggernaut of 9-5 and its crew, 9-6, door guards s349 / s350, hall 9-11, 9-12 .. 9-14, s357, the 1-Star ball s362 (the monkey takes the Bandana, four bandits attack), back through the hostile den and the respawned tank, the pad to 0-50 | 12,561 | 22 | 20 | 9,997 / 10,899 |
+| db2 Diablo Desert + Express (11) | gate (Goten 80), the four rock switches of 11-2 / 4 / 5 / 10 (flags 89 .. 92: Energy Blasts break the rocks), the stairs 11-15, plateau 11-14 / 11-13, the jump onto the train (11-17 robbery s372), the roofs 11-18 .. 11-20, the cars 11-21 .. 11-24, the five robbers (flags 83 .. 87, s378: 2-Star ball), back to the 11-20 roof pad, 0-50 | 22,786 | 17 | 11 | 12,632 / 21,796 |
+| db3 Pilaf's Castle (10) | gate (Trunks 80), 10-2 .. 10-5, 10-12, 10-14, the wall button of 10-15 (flag 260), 10-20 / 21 / 27 (Ghosts) / 28 / 30, s364, Pilaf's Guardian (10,605 HP, s365), the 3-Star ball s366, back out, 0-50 | 26,498 | 26 | 22 | 14,727 / 24,901 |
+| db4 Nataday / Northern Wilderness / Volcano (15) | priest s437, elder s431, gate (Goten 100), 15-2 .. 15-9, around the broken bridge (15-10 .. 15-17), 15-18, the Volcano's ledges and caves 15-19 .. 15-31 (floor switch: flag 110), **Broly** on the summit 15-32 (s435 / s436, flag 111), back down, s439 (4-Star ball), the pad to 0-50 | 59,745 | 72 | 65 | 49,946 / 57,518 |
+
+137 cuts (115,114 frames; `work/db/dbN/segs`, local): **118 exact**, 87,302 frames continuously matched. Gated in data
+(`tools/dungeons/gate.py dbN`: `db1_*` .. `db4_*`, 137 files, 62,683 frames): exact cuts whole up to 600 frames, the
+others on their first-matched window (the file's `full` field keeps the whole cut's numbers).
+
+Driver notes: a *button* trigger (gates, pickups, pads) fires only with the footprint touching its rect (walk below,
+hold UP 12, A); narrow doors want the door's own x; the **Juggernaut** (`tank` goal) fills its canyon and shells its
+column: walk up under its body, block (R) while a shell (vt 0x0804A368) is in the air, punch upward (from the far
+side: downward); its crew is fought with `fightp`.
+
+Rules found (wf-core / wf-script-core / wf-import; playthrough, lockstep, field_lockstep, data segments green):
+* **Tanks take damage through their own on-hit node** 0x08032F84 (`TankDamage`, first child of state 0x2E6 / 0x2E7's
+  aux Sequence, missing from the decode): as ApplyDamage, the damage / 4 (signed divide 0x08046E58) when the hit's
+  direction equals the tank's facing. Before, no hit ever hurt a tank. In `tools/battle/gen_buu_ai_extra.py`,
+  `data/battle/buu_ai_extra.json`, `wf-tables/data/ai_extra.json`, `nodes.rs` and the TS reference (`ai.ts`; dumps
+  regenerated).
+* **A destroyed tank's crew** (death node 0x080333C4, field): after the defeat handler (drop script 8 frames later,
+  its def +0x10), the removal and the puff, four enemies from the template 0x087592BC at the tank's position + (0, 0),
+  (24, 0), (24, 24), (0, 24), each rand(2) of the tank's two crew types (table 0x087592DC: Juggernaut = Mad Bomber /
+  Hooligan); they are placed-enemy objects without an area def (`ObjRef::List(0xff, type)`: drop scripts, XP).
+* **IfContactHit / IfMeleeHit** (shared condition 0x080361B8, field): the strike rect toward the player on the
+  body-box centres' dominant axis, the message carries that direction; IfContactHit (a tank's crush) puts the facing
+  back, IfMeleeHit keeps the turn; accepted -> sound 48 + rand(2).
+* **Shot states are actor state objects** (GunShot 0x03002FC4, RifleShot 0x03002FD8, KiBlast, NinjaStarThrow,
+  MummyWrapShot / Burst): they tick with the actor while an event holds the field - a Hessian's rocket leaves during
+  the level-up popup (`nodes::is_ctl`, field). While an event holds the field an enemy's straight shot flies on (trail
+  too) but sends **no hit message** (the player's handler gets no kind-0 message: the rocket crosses the player).
+* **`unequip_slot` (0xF1) and the resist change do not recalculate stats**: 0x08004544 changes the record slot and the
+  list only; the live fighter keeps its STR / POW / END until the next RecalcStats (after s362 took the Bandana the
+  player still hits with its bonus); `set_resist` writes the two resist bytes only.
+* **A detached enemy** (obj+0x291: Ghost) fits anywhere in the field - no arena-bounds test (10-27: a Ghost chases
+  straight at a player in the doorway).
+* **GotoState enters the new state's first leaf at once**; two enters do their work there: **NinjaDisguise** 0x0802C1B0
+  = SetAnimRaw(0x12), frame = rand(frame count), hold state 0x03001B00; **HeavyStrike** 0x0802F74C = the pose vt+0x30(4,
+  0) (raw 5, frame 0, held) + the 60-frame count, no turn (the facing is IfPlayerInMeleeRange's); the strike itself
+  0x0802F77C is the standard strike with the turn (`strike_rect`), not a 57-px box (field; battles keep the reference).
+* **Wander** (0x0802B708) starts with SetAnim(1) unless IsAnim(1): a hurt animation still showing after the reaction
+  state popped is replaced without an idle (no rand(255)) (field).
+* **Talk events**: `refresh_map_objects` (0x8B) keeps the exit at the top of the frame (s431: the villagers wander in
+  the exit frame). **`set_pos` moves a map NPC's walk mark** (15-1's on-enter puts the elder beside the gate).
+* **A trigger's script runs before the frame's cameras**: a script that starts with a camera scroll takes the camera
+  where it was before this frame's follow ease (11-13's jump onto the train, 11-21's ladder: `Field.cam_before`).
+* Import: the HUD-hidden bit (GD+1 bit 1) -> `scene.hud_hidden` (no low-HP beep without a HUD). Harness: a lag frame
+  in the pause menu's opening fade-out is a frame without an update (the cameras ease through the fade); a damage
+  number in freed actor memory (raw -1 at (0, 0)) is not an actor row.
+
+Open (mine unless noted):
+* menu timing (Earth agent's predictor): the heal menus end `db1_004`, `db2_009 / 013 / 015`, `db3_013 / 014 / 020`,
+  `db4_010 / 015 / 036 / 037 / 044 / 055` (sound 39 / 40 landing);
+* `db1_022` f344: the script warp to the world map (s515's warp_fade) is not an importable cut - the load's lag frames
+  show the old player object; the cut matches up to the load;
+* not analysed yet (first divergence only): `db2_010` f294 a Mad Bomber's position (0.4 / 0.7 px); `db2_011` f507
+  the camera during the jump onto the train (script pan, 0.02 / 0.06 px); `db2_014` f306 a robber's idle at tick 512
+  (game: cel 0 tick 512, ours cel 1 tick 511); `db3_006` f810 a sound 52 (footstep) the game does not play;
+  `db4_026` f270 the player's x (0.75 px);
+* seen in the HUD-less first round, not in the gated cuts: a **stale enemy-grid mark** (15-14: tile (24, 31) stays
+  blocked after a Skeleton's reaction state 0x213 moved it; the path follower's wall-follow then differs) and Broly's
+  JumpSmash (controller 0x0804D310@0x0300325C: the animation is held to tick 248, ours ends the one-shot at 148).

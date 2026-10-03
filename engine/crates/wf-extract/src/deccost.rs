@@ -277,3 +277,15 @@ pub fn decode_cycles(rom: &[u8], src: usize) -> Option<u32> {
     }
     st.ok.then_some(st.c)
 }
+
+#[cfg(test)]
+mod tests {
+    /// the two portraits measured in the emulator (user-mode cycles 99,577 and 110,510; the model leaves out the
+    /// sound DMA's stolen cycles)
+    #[test]
+    fn portraits_match_the_measurements() {
+        let Some(rom) = wf_rom::testutil::rom() else { return };
+        assert_eq!(super::decode_cycles(rom.data(), 0x006C_4758), Some(99_211));
+        assert_eq!(super::decode_cycles(rom.data(), 0x006C_7580), Some(110_084));
+    }
+}

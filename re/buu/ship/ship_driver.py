@@ -163,9 +163,17 @@ class ShipDriver(Driver):
                 continue
             st = ai_state(e, o[0])
             # a Destroyer breathing fire; a Juggernaut (tank, type 58) driving / shelling along its facing
-            if not st or st[-1] not in ((0x86,) if o[5] == 20 else (0x2E3, 0x2E4)):
+            if not st or st[-1] not in ((0x85, 0x86) if o[5] == 20 else (0x2E3, 0x2E4)):
                 continue
             ex, ey, f = o[1], o[2], o[3]
+            if st[-1] == 0x85:
+                # lining up (it breathes next, and flames stun: a guard has to be up before they arrive)
+                if abs(x - ex) > abs(y - ey):
+                    f = 3 if x > ex else 2
+                else:
+                    f = 0 if y > ey else 1
+                if abs(x - ex) + abs(y - ey) > 130:
+                    continue
             if f >= 2:
                 ahead, side = (x - ex) * (1 if f == 3 else -1), y - ey
             else:
@@ -777,8 +785,13 @@ class ShipDriver(Driver):
         far = [o for o in ens if o[5] in self.GHOSTS
                or o[5] not in self.TANKS and not self.reachable(e, s, o[1], o[2])]
         ens = [o for o in ens if o not in far]
-        # one out of reach (a Ghost hovering inside a wall) but close and in line: a ki blast (B, 23 EP)
-        k = self.blast(e, s, far)
+        # one out of reach (a Ghost hovering inside a wall) but close and in line: a ki blast (B, 23 EP); the guards
+        # against flames / thrown waves first
+        k = self.flame_guard(e, s)
+        if k is None:
+            k = self.block_guard(e, s)
+        if k is None:
+            k = self.blast(e, s, [o for o in far if o[5] in self.GHOSTS])
         if k is not None:
             return k
         if not ens or self.t >= cap:
@@ -824,7 +837,7 @@ class ShipDriver(Driver):
         if tg[1] > 60:
             # not getting at it (knocked back at each approach): a ki blast when it is in line
             k = self.blast(e, s, [en])
-            if k is not None:
+            if k:
                 return k
         # in reach of the melee box (right: (16,-24)-(24,8), left: (-8,-24)-(0,8) around the footprint)
         if -20 <= dy <= 4 and 3 <= abs(dx) <= 21:
