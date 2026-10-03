@@ -920,8 +920,21 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
         K::TeleportNearPlayer => {
             r.d[0] = w.rng.rand(4);
             set_anim(w, i, &[an(17)], true, Some(false));
+            // field (sc_janemba): the vanish takes hits off until the node ends (a punch at it computes nothing);
+            // battle keeps the reference's
+            if w.field.is_some() {
+                w.en(i).a.hittable = false;
+            }
         }
-        K::TeleportChain4 => set_anim(w, i, &[an(17)], true, Some(false)),
+        K::TeleportChain4 => {
+            set_anim(w, i, &[an(17)], true, Some(false));
+            // field: the vanish takes hits off (as TeleportNearPlayer's) and steps the persistent side counter
+            // (0x03003228) at once: the jump goes to the new side (sc_janemba: counter 0 -> 1, above the player)
+            if w.field.is_some() {
+                w.en(i).a.hittable = false;
+                w.g.tele_chain = (w.g.tele_chain + 1) % 12;
+            }
+        }
         K::NinjaReveal => {
             r.d[0] = w.en_ref(i).a.x;
             r.d[1] = w.en_ref(i).a.y;
@@ -1787,9 +1800,39 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             if f == 36 {
                 en::teleport_beside(w, i, r.d[0]);
             }
+            if w.field.is_some() {
+                // field (sc_janemba): hittable again 18 frames after the landing; the landing animation (0x14) plays
+                // 36 frames and its end SetAnim(0)s the boss - the node's end, MeleeAttack follows
+                if f >= 54 {
+                    w.en(i).a.hittable = true;
+                }
+                if f >= 72 {
+                    en::set_anim(w, i, &[an(0)], true, Some(true));
+                    return true;
+                }
+                return false;
+            }
             f >= 54
         }
         K::TeleportChain4 => {
+            // field (sc_janemba): the controller counts from the frame after the node's (the jump 37 frames after
+            // the enter, hittable again 18 later); battle keeps the reference's
+            let f = if w.field.is_some() { f - 1 } else { f };
+            if w.field.is_some() && f % 72 == 54 {
+                w.en(i).a.hittable = true;
+            }
+            if w.field.is_some() {
+                if f % 72 == 36 {
+                    en::teleport_beside(w, i, w.g.tele_chain & 3);
+                }
+                if f > 0 && f % 72 == 0 {
+                    if w.g.tele_chain % 4 == 0 {
+                        return true;
+                    }
+                    w.g.tele_chain = (w.g.tele_chain + 1) % 12;
+                }
+                return false;
+            }
             if f % 72 == 36 {
                 let side = w.g.tele_chain & 3;
                 en::teleport_beside(w, i, side);

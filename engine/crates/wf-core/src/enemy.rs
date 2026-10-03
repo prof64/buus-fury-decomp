@@ -1611,16 +1611,74 @@ pub fn teleport_beside(w: &mut World, i: usize, side: i32) {
     let (cx, cy) = w.en_ref(i).a.center();
     crate::fx::puff(w, cx, cy, 0x1800);
     let (pfx, pfy) = w.pl_ref(pi).a.foot_center();
+    // field (sc_janemba): the player's whole-pixel position + the side offset; battle keeps the reference's
+    // footprint-centred placement
+    let at = w.field.is_some().then(|| (w.pl_ref(pi).a.px(), w.pl_ref(pi).a.py()));
     {
         let a = &mut w.en(i).a;
-        a.x = (pfx + ox - (a.foot_w >> 1)) << 8;
-        a.y = (pfy + oy - (a.foot_h >> 1)) << 8;
+        match at {
+            Some((px, py)) => {
+                a.x = (px + ox) << 8;
+                a.y = (py + oy) << 8;
+            }
+            None => {
+                a.x = (pfx + ox - (a.foot_w >> 1)) << 8;
+                a.y = (pfy + oy - (a.foot_h >> 1)) << 8;
+            }
+        }
     }
-    clamp_inside(w, i);
-    face_player(w, i);
+    if at.is_some() {
+        free_spot(w, i);
+    } else {
+        clamp_inside(w, i);
+    }
+    // field: the landing keeps the facing (the sequence's FacePlayer turns it). The grid is not touched: the old
+    // footprint stays marked for good and the enemy takes the new spot as its own (its next move unmarks tiles it
+    // never marked; sc_janemba: Super Janemba's teleports leave holes)
+    if at.is_none() {
+        face_player(w, i);
+    } else {
+        let a = &w.en_ref(i).a;
+        let m = [a.px(), a.py(), a.px() + a.foot_w, a.py() + a.foot_h];
+        w.en(i).marked = Some(m);
+    }
     set_anim(w, i, &[n(19)], true, Some(false));
     let (cx, cy) = w.en_ref(i).a.center();
     crate::fx::puff(w, cx, cy, 0x1800);
+}
+/// 0x08009816: a footprint that does not fit the walk layer moves to the first free tile-aligned spot of a square
+/// spiral around its tile (sc_janemba: Super Janemba's teleport against the arena's diagonal wall)
+fn free_spot(w: &mut World, i: usize) {
+    let (x, y, fw, fh) = {
+        let a = &w.en_ref(i).a;
+        (a.px(), a.py(), a.foot_w, a.foot_h)
+    };
+    let Some(c) = w.col.as_ref() else { return };
+    if c.test(Layer::Walk, x, y, x + fw, y + fh) {
+        return;
+    }
+    let (bx, by) = (x & !7, y & !7);
+    for k in 0..4096i64 {
+        let s = crate::fixed::isqrt(k);
+        let (dx, dy) = if s & 1 == 1 {
+            if s * s + s >= k {
+                ((s + 1) >> 1, k - s * s - ((s + 1) >> 1) + 1)
+            } else {
+                (((s + 1) >> 1) - k + s * s + s, (s + 1) >> 1)
+            }
+        } else if s * s + s >= k {
+            ((-s) >> 1, ((-s) >> 1) - k + s * s + s)
+        } else {
+            (k - s * s - s + ((-s) >> 1), (-s) >> 1)
+        };
+        let (nx, ny) = (bx + dx as i32 * 8, by + dy as i32 * 8);
+        if c.test(Layer::Walk, nx, ny, nx + fw, ny + fh) {
+            let a = &mut w.en(i).a;
+            a.x = nx << 8;
+            a.y = ny << 8;
+            return;
+        }
+    }
 }
 pub fn kid_buu_split(w: &mut World, i: usize) {
     for _ in 0..16 {
@@ -2081,9 +2139,6 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
         // field: the body box (0x0800FE78) is at the ground position - the height does not lift it (sc_janemba:
         // a punch lands on Janemba 66 px up in its ascent)
         let body = if w.field.is_some() { e.a.body_box_ground() } else { e.a.body_box() };
-        if std::env::var("PART_DBG").is_ok() {
-            eprintln!("enemy hit wf {} ty {:x} z {} rect {:?} ground {:?} lifted {:?}", w.frame, e.ty, e.a.z, msg.rect, body, e.a.body_box());
-        }
         if !overlaps(&msg.rect, &if msg.foot { e.a.foot_box() } else { body }) {
             return false;
         }

@@ -120,6 +120,9 @@ pub struct HostState {
     pub saved_field: Option<SavedField>,
     /// timed stat boost (GD+0x4DC..0x4F0): frames, str, pow, end, spd, special
     pub boost: [i32; 6],
+    /// Switch Character's chosen leader was rebuilt at the screen's close (the world restore), not again at the end
+    #[serde(default)]
+    pub charsel_rebuilt: bool,
     pub pending: Option<Pending>,
     /// the thread is resuming from a command wait (`Pending::Director`) this frame: an event that ends now exits at
     /// the top of the frame in the game (before the objects update)
@@ -138,6 +141,15 @@ pub struct HostState {
     /// trigger's code)
     #[serde(default)]
     pub in_unit: bool,
+    /// the running job is an NPC's talk event (started in the player's update): Story / HUD natives between a wait's
+    /// end and its exit keep the exit at the top of the frame (4-27: s193 -> s194; not for map-trigger cutscenes,
+    /// s073 / s159)
+    #[serde(default)]
+    pub talk_event: bool,
+    /// the thread resumed from a modal scroll this frame: the scroll mode returned at the top of the frame, so an
+    /// exit now leaves this frame's world update to run (4-20: s184 ends on its scroll, the NPCs tick in that frame)
+    #[serde(default)]
+    pub from_scroll: bool,
 }
 
 /// compatibility name (older tests / docs)
@@ -246,7 +258,11 @@ impl Host for CoreHost<'_> {
     fn native(&mut self, call: Call<'_>) -> Result<NativeResult, String> {
         // any native between a wait's end and the event's exit: the exit no longer happens at the top of the frame
         // (story playthrough: s073 end_parallel -> camera_follow -> exit, no NPC catch-up)
-        self.s.from_wait = false;
+        let keeps = self.s.talk_event && (matches!(binding::binding(call.native).at, binding::Where::Story | binding::Where::Vm) || matches!(call.native, 0x2f | 0x30));
+        if !keeps {
+            self.s.from_wait = false;
+        }
+        self.s.from_scroll = false;
         let r = natives::call(self, &call);
         // the VM's globals are World state too (they persist across scripts and snapshot with the world)
         self.w.story.g = call.globals.g;
@@ -275,6 +291,11 @@ impl Host for CoreHost<'_> {
                 Ok(NativeResult::Block)
             }
             SceneCall::Exit { .. } => {
+                if std::mem::take(&mut self.s.from_scroll) && self.w.scene.depth == 1 {
+                    if let Some(f) = self.w.field.as_mut() {
+                        f.held_event = true;
+                    }
+                }
                 end_event(self.w);
                 if self.s.in_unit && self.w.scene.depth == 0 {
                     // (not for an event run before the objects, a queued one / a broken pod's callback: the enemies
@@ -390,7 +411,11 @@ pub fn poll(w: &mut World, s: &mut HostState) -> Option<Option<i32>> {
             done.then_some(None)
         }
         Pending::Fade => scene::fade_done(w).then_some(None),
-        Pending::Scroll => scene::scroll_done(w).then_some(None),
+        Pending::Scroll => {
+            let done = scene::scroll_done(w);
+            s.from_scroll = done;
+            done.then_some(None)
+        }
         Pending::Dialog { choice } => {
             let choice = *choice;
             match scene::dialog_result(w) {
@@ -398,6 +423,9 @@ pub fn poll(w: &mut World, s: &mut HostState) -> Option<Option<i32>> {
                     if choice {
                         s.menu_result = r;
                     }
+                    // a talk event's text box closes at the top of the frame too (4-27: Bulma walks in s193's exit
+                    // frame)
+                    s.from_wait = s.talk_event;
                     Some(None)
                 }
                 None => None,
@@ -405,11 +433,20 @@ pub fn poll(w: &mut World, s: &mut HostState) -> Option<Option<i32>> {
         }
         Pending::Menu { native, push } => {
             let (native, push) = (*native, *push);
+            // Switch Character chose (2): the object world restored when the screen closes (its second leave
+            // frame) rebuilds the leader for it, idle entered once (segment sb 21-14: one rand(255) then, none at
+            // the fade-in's end)
+            if native == 0x8d && !s.charsel_rebuilt && matches!(w.menu.phase, wf_core::menu::Phase::Leave { t } if t >= 1) && w.menu.result.as_ref().is_some_and(|r| r.code == 2) {
+                s.charsel_rebuilt = true;
+                s.boost[0] = 0;
+                let c = w.story.current;
+                let _ = natives::switch_character(w, c);
+            }
             // the real screens (wf_core::menu): their effects are applied by the screen; the result after the fade-in
             if let Some(r) = wf_core::menu::take_result(w) {
                 // Switch Character chose (2): its handler set the current character and cleared the timed buff
                 // (GD+0x4DC); `0x080027DE` rebuilds the leader for it
-                if native == 0x8d && r == 2 {
+                if native == 0x8d && r == 2 && !std::mem::take(&mut s.charsel_rebuilt) {
                     s.boost[0] = 0;
                     let c = w.story.current;
                     let _ = natives::switch_character(w, c);

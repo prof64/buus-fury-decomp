@@ -286,6 +286,7 @@ impl Host {
     fn run_queue(&mut self, w: &mut World, k: usize) {
         while !self.running {
             let Some(job) = self.queue.pop_front() else { break };
+            self.hs.talk_event = matches!(job.cause, Cause::Talk { .. });
             match &job.cause {
                 Cause::Talk { npc } => self.hs.talk_target = Some(*npc),
                 Cause::Break { x, y, .. } | Cause::Defeat { x, y, .. } => self.hs.loot_pos = (*x, *y),

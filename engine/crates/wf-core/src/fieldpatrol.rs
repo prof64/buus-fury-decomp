@@ -20,6 +20,9 @@ pub struct Patrol {
     pub cur: Option<StepRt>,
     /// height (obj+0x1A8, 22.10) moved by `cutscene_move`
     pub z: i32,
+    /// heading (obj+0x1AC) the last `cutscene_move` set: the 3D map's draw faces the sprite by it
+    #[serde(default)]
+    pub h: i32,
 }
 
 /// the enemy constructor's runner (no step yet)
@@ -31,7 +34,7 @@ pub fn attach(w: &mut World, entity: EntityId, steps: &[Step]) {
     // ground ones to 0 (set_actor_field_1a8)
     let z = w.find(entity).filter(|&k| matches!(&w.ents[k].body, crate::world::Body::Enemy(e) if e.ty == 141)).map(|_| 60 << 10).unwrap_or(0);
     if let Some(f) = w.field.as_mut() {
-        f.patrols.push(Patrol { entity, steps: steps.to_vec(), idx: -1, cur: None, z });
+        f.patrols.push(Patrol { entity, steps: steps.to_vec(), idx: -1, cur: None, z, h: 0 });
     }
 }
 
@@ -137,7 +140,9 @@ fn create(w: &mut World, i: usize, st: &Step, z: i32) -> StepRt {
             let (dx, dy, dz) = (tx - a.px(), ty - a.py(), tz - (z >> 10));
             let m = dx.abs().max(dy.abs()).max(dz.abs()) as i64;
             let n = if spd > 0 { ((m << 8) / spd as i64) as i32 } else { 1 }.max(1);
-            StepRt::Move3 { tx, ty, tz, n, vx: (dx << 8) / n, vy: (dy << 8) / n, vz: (dz << 10) / n }
+            // 0x08039E76: atan2 in doubles, then floats: * 1/(2 pi) (0x3E22F984) * 1024.0, truncated
+            let ang = ((dy as f64).atan2(dx as f64) as f32) * f32::from_bits(0x3E22_F984) * 1024.0f32;
+            StepRt::Move3 { tx, ty, tz, n, vx: (dx << 8) / n, vy: (dy << 8) / n, vz: (dz << 10) / n, h: ang as i32 }
         }
         _ => StepRt::Other,
     }
@@ -146,7 +151,7 @@ fn create(w: &mut World, i: usize, st: &Step, z: i32) -> StepRt {
 fn update_step(w: &mut World, i: usize, s: &mut StepRt, z: &mut i32) -> bool {
     match s {
         StepRt::Stand | StepRt::Other => false,
-        StepRt::Move3 { tx, ty, tz, n, vx, vy, vz } => {
+        StepRt::Move3 { tx, ty, tz, n, vx, vy, vz, .. } => {
             *n -= 1;
             let a = &mut w.en(i).a;
             if *n <= 0 {
@@ -313,7 +318,11 @@ pub fn run(w: &mut World, i: usize) {
             p.idx = 0;
         }
         let st = p.steps[p.idx as usize].clone();
-        p.cur = Some(create(w, i, &st, p.z));
+        let c = create(w, i, &st, p.z);
+        if let StepRt::Move3 { h, .. } = c {
+            p.h = h;
+        }
+        p.cur = Some(c);
     }
     put(w, p);
 }
@@ -349,4 +358,10 @@ pub fn set_z(w: &mut World, i: usize, z: i32) {
     if let Some(p) = w.field.as_mut().and_then(|f| f.patrols.iter_mut().find(|p| p.entity == id)) {
         p.z = z;
     }
+}
+
+/// the heading (obj+0x1AC) of a patrolling enemy
+pub fn heading(w: &World, i: usize) -> i32 {
+    let id = w.ents[i].id;
+    w.field.as_ref().and_then(|f| f.patrols.iter().find(|p| p.entity == id)).map(|p| p.h).unwrap_or(0)
 }

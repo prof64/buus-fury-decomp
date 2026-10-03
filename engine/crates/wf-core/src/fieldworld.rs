@@ -72,8 +72,14 @@ pub fn flyer_update(w: &mut World, i: usize) -> bool {
     if slot != 0 {
         return true;
     }
-    // a text box over the map (a circle's question, s480) holds the flyer; an event's fades do not (s479, s515)
-    if w.scene.dialog.is_some() && w.field.as_ref().is_some_and(|f| f.busy) {
+    // an event over the running map (a circle's question s480) holds the flyer; a warp's fade-in and the frame after
+    // it do not (s479 / s515: the event ends then)
+    let frame = w.frame;
+    if w.field.as_ref().is_some_and(|f| f.busy && matches!(f.mode, crate::field::Mode::Normal) && f.fade_end + 1 != frame) {
+        // (its animation keeps ticking)
+        let f = w.field.as_mut().unwrap().flight.as_mut().unwrap();
+        f.tick = (f.tick + 1) & 0xFFFF;
+        f.frame = (f.tick >> 3) & 3;
         return true;
     }
     let keys = w.input[0].held;
@@ -182,6 +188,8 @@ pub fn camera(w: &mut World) {
     f.cam[1] = ((y as i64) << 2).wrapping_add((c_i(f.h) * cs * 30) >> 10) as i32;
     f.cam[2] = (f.z as i64 + s_i(s) * 30) as i32;
     f.cam[3] = f.h;
+    let cam = f.cam;
+    face_objects(w, cam);
     let c = &mut w.cameras[0];
     c.shown = c.rect;
     let (cx, cy) = ((x >> 8) - 112, (y >> 8) - 76);
@@ -196,5 +204,52 @@ pub fn mark_visited(w: &mut World, world: i32, area: i32) {
     let Some(fd) = w.data.field.as_ref() else { return };
     if let Some(&(_, _, bit)) = fd.visited.iter().find(|v| v.0 == world && v.1 == area) {
         w.story.set_flag(0x1C0 + bit, true);
+    }
+}
+
+/// the 3D camera's ground rect (`0x0802ED98`, camera +0x18..+0x24, px): the bounding box of the view's footprint -
+/// the point under the eye at the pitch's ground distance, 224 px ahead, +-112 px across and the +-20 heading rays
+/// (VERIFIED against RAM, 3-1)
+pub fn view_rect(cam: [i32; 5]) -> [i32; 4] {
+    use crate::tables::CSC256;
+    let [cx, cy, hgt, h, p] = cam;
+    let a = p.wrapping_add(0x7ef9);
+    let (i, fr) = (((a >> 10) & 255) as usize, a & 1023);
+    let t2 = CSC256[i].wrapping_mul(1024 - fr).wrapping_add(CSC256[(i + 1) & 255].wrapping_mul(fr));
+    let cv = SIN256[(i + 0x40) & 255].wrapping_mul(1024 - fr).wrapping_add(SIN256[(i + 0x41) & 255].wrapping_mul(fr)) >> 16;
+    let r0 = hgt.wrapping_mul(cv) >> 10;
+    let d = (r0.wrapping_mul(t2 >> 16) >> 10) - 1024;
+    let s = s_i(h) as i32;
+    let c = c_i(h) as i32;
+    let (m00, m01, m10, m11) = (c, -s, s, c);
+    let x0 = cx.wrapping_sub(m01.wrapping_mul(d) >> 10) >> 10;
+    let y0 = cy.wrapping_sub(m11.wrapping_mul(d) >> 10) >> 10;
+    let mut pts = vec![(x0, y0), (x0 - ((m01 * 224) >> 10), y0 - ((m11 * 224) >> 10)), (x0 - ((m00 * 112) >> 10), y0 - ((m10 * 112) >> 10)), (x0 + ((m00 * 112) >> 10), y0 + ((m10 * 112) >> 10))];
+    let hh = h >> 10;
+    for dd in [-20, 20] {
+        let q = ((hh + dd) & 255) as usize;
+        pts.push((x0 + ((SIN256[q] * 224) >> 16), y0 - ((SIN256[(q + 64) & 255] * 224) >> 16)));
+    }
+    let r = pts.iter().fold([i32::MAX, i32::MAX, i32::MIN, i32::MIN], |r, &(x, y)| [r[0].min(x), r[1].min(y), r[2].max(x), r[3].max(y)]);
+    [r[0], r[1], r[2] + 1, r[3] + 1]
+}
+
+/// the 3D map's object draw (`0x0801003A`): an enemy inside the view rect gets its facing from its heading relative
+/// to the camera (`0x08010010`: table 0x08072718 by ((heading >> 10) - (camera heading >> 10)) & 0xFF >> 5); outside
+/// it keeps the last one (3-1: an airship turns when it comes into view)
+fn face_objects(w: &mut World, cam: [i32; 5]) {
+    const FACE: [u8; 8] = [1, 3, 3, 0, 0, 2, 2, 1];
+    let r = view_rect(cam);
+    for i in 0..w.ents.len() {
+        if w.ents[i].removed || !matches!(w.ents[i].body, crate::world::Body::Enemy(_)) {
+            continue;
+        }
+        let (px, py) = (w.en_ref(i).a.x >> 8, w.en_ref(i).a.y >> 8);
+        if px < r[0] || px >= r[2] || py < r[1] || py >= r[3] {
+            continue;
+        }
+        let oh = crate::fieldpatrol::heading(w, i);
+        let k = ((((oh >> 10) - (cam[3] >> 10)) & 0xff) >> 5) as usize;
+        w.en(i).a.facing = FACE[k];
     }
 }

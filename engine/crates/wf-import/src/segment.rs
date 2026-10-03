@@ -373,13 +373,14 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
                     .filter(|&i| !w.ents[i].removed)
                     .filter_map(|i| match &w.ents[i].body {
                         wf_core::world::Body::Enemy(e) => Some(format!(
-                            "({},{} {:x?} s{:?} hp{} anim{:?})",
+                            "({},{} {:x?} s{:?} hp{} anim{:?} m{:?})",
                             e.a.x >> 8,
                             e.a.y >> 8,
                             e.ai.stack.iter().map(|s| s.state).collect::<Vec<_>>(),
                             e.a.sprite,
                             e.hp1024 >> 10,
-                            (e.ea.pos.raw, e.ea.pos.frame, e.ea.pos.tick)
+                            (e.ea.pos.raw, e.ea.pos.frame, e.ea.pos.tick),
+                            e.marked
                         )),
                         wf_core::world::Body::Shot(sh) => Some(format!("shot({},{} t{} dir{} {:?})", sh.x >> 8, sh.y >> 8, sh.t, sh.dir, std::mem::discriminant(&sh.kind))),
                         wf_core::world::Body::Fx(_) => Some("fx".into()),

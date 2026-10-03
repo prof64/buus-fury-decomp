@@ -56,6 +56,22 @@ def enemies(e):
     return out
 
 
+PICKUP_VT = (0x08049CC4, 0x08049C98)    # coin, dropped item (supply / equipment)
+
+
+def pickups(e):
+    """[(vt, box x0, y0, x1, y1)] of the pickups lying in the object world (0x03001C4C)"""
+    out = []
+    n = e.r32(0x03001C4C + 4)
+    sv = lambda v: v - (1 << 32) if v & 0x80000000 else v  # noqa: E731
+    for k in range(min(n, 255)):
+        o = e.r32(0x03001C4C + 8 + 4 * k)
+        vt = e.r32(o)
+        if vt in PICKUP_VT:
+            out.append((vt, sv(e.r32(o + 0x14)), sv(e.r32(o + 0x18)), sv(e.r32(o + 0x1C)), sv(e.r32(o + 0x20))))
+    return out
+
+
 def alloc_keys(chars):
     """Status page stat allocation: chars = [(tab_moves, [str, pow, end, spd]), ...] in order; tab_moves = RIGHT
     presses (negative: LEFT) from the previous tab (the first from the active character's). START opens, B closes."""
@@ -346,6 +362,8 @@ class ShipDriver(Driver):
                 self.grind_k += 1
                 w, a = route[self.grind_k % len(route)]
             return self.nav(e, s, ('nav', w, a, True), inner=True)
+        if kind == 'hunt':
+            return self.hunt(e, s, g)
         if kind == 'rest':
             # ('rest', c): stand still until character c (in reserve: +5% HP / EP every ~596 frames) is full again
             r = 0x03001560 + 0x68 * g[1]
@@ -423,6 +441,95 @@ class ShipDriver(Driver):
         elif dist < 400 and z > 20:
             k |= KEY.A
         return k
+
+    def hunt(self, e, s, g):
+        """('hunt', equipment_id[, n]): world map encounters until the equipment list holds `n` (default 1) of the
+        item: on 0-50 fly low into the nearest patrolling encounter (type 141), in the encounter arena 0-55 (Stolen
+        Airship) fight everything, then A on its exit pad (345, 217) back to the map (on-defeat 0x08073EFC: 25% a
+        Bandana once flag 76 is set)"""
+        import math
+        want = g[2] if len(g) > 2 else 1
+        n = e.r16(0x03001068 + 0xE4)
+        have = sum(1 for i in range(min(n, 250)) if e.r32(0x03001068 + 0xE8 + 4 * i) & 0xFFFF == g[1])
+        if have >= want and s['area'][:2] == [0, 50]:
+            self.next_goal()
+            return None
+        if s['scene'] > 0 or s['p'] is None:
+            return self.mash_a()
+        if s['area'][0] == 0 and 51 <= s['area'][1] <= 59:
+            if enemies(e):
+                self.in_nav = True
+                self.fight_done = False
+                k = self.fightp(e, s, ('fightp', 10 ** 9, 99999, 6))
+                self.in_nav = False
+                return k
+            x, y = s['p'][0], s['p'][1]
+            # the loot first (a dropped Bandana lies where its bandit fell)
+            loot = [q for q in pickups(e) if q[0] == 0x08049C98]
+            if loot and self.t % 2000 < 1500:
+                q = min(loot, key=lambda q: abs(q[1] - x) + abs(q[2] - y))
+                return self.walk_keys(e, s, (q[1] + q[3]) // 2 - 8, (q[2] + q[4]) // 2 - 4)
+            r = self.map_pad(s)
+            px, py = r['x'] + r['w'] // 2 - 8, r['y'] + r['h'] - 10
+            if abs(x - px) > 8 or abs(y - py) > 8:
+                return self.walk_keys(e, s, px, py)
+            self.mash += 1
+            return KEY.A if self.mash % 20 < 2 else 0
+        if s['area'][:2] != [0, 50]:
+            return self.mash_a()
+        p = e.r32(0x03001C34)
+        if not p:
+            return 0
+        sv = lambda v: v - (1 << 32) if v & 0x80000000 else v  # noqa: E731
+        x, y = sv(e.r32(p + 0x1A0)) / 256, sv(e.r32(p + 0x1A4)) / 256
+        z, h = sv(e.r32(p + 0x1A8)) / 1024, sv(e.r32(p + 0x1AC)) / 1024
+        pats = [o for o in enemies(e) if o[5] == 141 and not self.over_pad(o[1], o[2])]
+        if not pats:
+            return KEY.UP
+        o = min(pats, key=lambda o: math.hypot(o[1] - x, o[2] - y))
+        dx, dy = o[1] - x, o[2] - y
+        wantd = math.degrees(math.atan2(dx, -dy)) * 256 / 360
+        diff = (wantd - h + 128) % 256 - 128
+        k = 0
+        if diff > 3:
+            k |= KEY.RIGHT
+        elif diff < -3:
+            k |= KEY.LEFT
+        if abs(diff) < 40:
+            k |= KEY.UP
+        # cruise high (no landing pad takes the player), drop onto the encounter
+        dist = math.hypot(dx, dy)
+        if dist > 90 and z < 100:
+            k |= KEY.B
+        elif dist <= 90 and z > 2 and not self.over_pad(x, y):
+            k |= KEY.A
+        return k
+
+    PADS = None
+
+    def over_pad(self, x, y):
+        """near one of the world map's landing rects (0-50 script triggers warping into an area)"""
+        import nav as navm
+        import json
+        if ShipDriver.PADS is None:
+            o = json.loads((navm.CONTENT / 'maps' / 'area_00_050' / 'objects.json').read_text())
+            ShipDriver.PADS = [t['rect'] for ar in o['areas'] for t in ar['objects'] if t.get('warps')]
+        return any(r['x'] - 48 <= x < r['x'] + r['w'] + 48 and r['y'] - 48 <= y < r['y'] + r['h'] + 48
+                   for r in ShipDriver.PADS)
+
+    def map_pad(self, s):
+        """the current area's pad back to the world map (a script trigger warping to 0-50)"""
+        import nav as navm
+        import json
+        key = f"{s['area'][0]}-{s['area'][1]}"
+        a = navm.areas()[key]
+        m = a['maps'][0]
+        o = json.loads((navm.CONTENT / 'maps' / m / 'objects.json').read_text())
+        for ar in o['areas']:
+            for t in ar['objects']:
+                if any(w.get('to') == '0-50' for w in t.get('warps') or []):
+                    return t['rect']
+        raise RuntimeError(f'no map pad in {key}')
 
     def nav(self, e, s, g, inner=False):
         """('nav', w, a[, fight]): walk through the exits (nav.route) to area w-a; with fight, clear each room's

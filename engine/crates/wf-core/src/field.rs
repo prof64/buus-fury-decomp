@@ -275,6 +275,9 @@ pub struct Field {
     /// a script's `warp_fade` whose host nests the load's on-enter script (`nest_load` at the fade's load)
     #[serde(default)]
     pub nest_fade: bool,
+    /// the frame the 3D map's fade-in ended (the flyer runs the next frame although the warp's event still holds)
+    #[serde(default)]
+    pub fade_end: u32,
     /// set by a nesting script host around `load_scene` (0x73): the area's objects are spawned after its on-enter
     /// script, as the game's load (0x08009030 runs the map's load scripts, then the object loop): a script that blocks
     /// there delays them (8-60's prop_show(1): the fighters appear 3 frames after the load, Babidi's ship 8-63 buttons)
@@ -422,6 +425,7 @@ fn new_field() -> Field {
         on_enter_queued: false,
         nest_load: false,
         nest_fade: false,
+        fade_end: 0,
         defer_objects: false,
         pending_objects: None,
         load_ids: (0, 0),
@@ -1198,8 +1202,10 @@ pub fn post_step(w: &mut World) {
             let k = k + 1;
             let flying = crate::fieldworld::flying(w);
             if flying && k >= crate::fieldworld::FADE_IN_3D {
+                let frame = w.frame;
                 if let Some(f) = w.field.as_mut() {
                     f.mode = Mode::Normal;
+                    f.fade_end = frame;
                 }
                 crate::fieldworld::reset_state(w);
             } else if flying {

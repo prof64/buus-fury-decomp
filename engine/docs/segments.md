@@ -185,9 +185,9 @@ From the full route (`sb_0NN_<world>_<area>`, all gated; the four above come fro
 | sb_000, sb_001 | 18-12, 18-1 | exact (479, 315) |
 | sb_008 - sb_010 | 20-2 .. 20-4 (Wasteland, Gohan vs Buu) | exact (2,632 / 302 / 442) |
 | sb_013 - sb_028, sb_031 - sb_033, sb_036 - sb_040 | inside Buu 21-2 .. 21-24 (worms, Blisters / Enzymes, the pods, brain) | exact, 24 cuts, 15,861 frames |
-| sb_029 / sb_030 | 21-13 / 21-14 (save point: Switch Characters) | 688 / 475 |
+| sb_029 / sb_030 | 21-13 / 21-14 (save point: Switch Characters) | 703 / 490 |
 | sb_034 / sb_035 | 21-18 / 21-19 (Buu absorbs: s485 -> s502) | 619 / 367 |
-| not gated (> 2 MB) | sb_004 1-3 7,623 · sb_005 1-5 7,350 · sb_006 6-6 3,443 · sb_011 20-5 3,025 · sb_012 20-6 975 · sb_041 21-25 (Kid Buu) 10,966 · sb_044 4-20 (ending) 1,974 | |
+| prefixes (the cut's first matched + 120 frames; full cuts in work/superbuu/segs) | sb_004 1-3 7,623 · sb_005 1-5 7,350 · sb_006 6-6 3,443 · sb_011 20-5 3,025 · sb_012 20-6 975 · sb_041 21-25 -> world map -> Kid Buu 11,442 · sb_044 4-20 (ending) 1,974 | gated |
 
 Rules found (all in wf-core / wf-script-core / wf-import, regressions green):
 * **Travel map** 0-51 (`show_destination_label` 0xD9, label entity vt 0x0804BAF4, update 0x0803669E): the selection
@@ -227,9 +227,23 @@ Rules found inside Buu (VERIFIED by the cuts above; battle code mirrored in the 
 * Switch Character builds its figures (idle rand(255) each) when the fade-out reaches black; the field's cameras keep
   easing during a menu's fade-out; the screen is black during a page's leave frames.
 
-Open: `sb_029` f702 / `sb_030` f489 — the RNG after Switch Characters closes (the rebuilt leader). `sb_034` f619 —
-s502's sprite swap (`change_sprite` Buu 123 -> 126) is 1 frame late and the white fade timing. `sb_041` f10981 — Kid
-Buu's arena: the player object the game removes. `sb_044` f1985 — an extra NPC in 4-20 (the ending).
+* A script's `warp_fade` inside an event nests the new area's on-enter script in the load (`Field.nest_fade`): the
+  players arrive when it ends (s479 -> the world map 0-50, its `prop_show` steps hold 2 frames); the 3D map camera
+  exists from the load; the load's own objects stop running with their event (`load_ids` cleared when it ends); an
+  event over the world map holds the flyer (its animation ticks) except a warp's fade-in and the frame after.
+* Switch Character's chosen leader is rebuilt (one idle rand(255)) when the screen closes (its 2nd leave frame).
+
+**Blocker: OBJ VRAM purge** (`0x08011732(world, need)`): a text box (`0x08012030`: 0x1000 / 0x1000 / (portrait)
+0x1000 / 0x800 bytes) needs room in the object tile allocator (best-fit blocks at world+0x694, 512 units of 64
+bytes; room = largest free block << 6, `0x080116FC`). Short of room it suspends objects from the end of the list by
+level (vfunc +0x18: actors 13 off screen / 14 on screen, the camera's object 15, effects lower) until it fits, and
+brings them back later. It fires in crowded scenes: the world map's question boxes (sb_041 f11454: 6 patrols gone)
+and every box of the ending gathering 4-24 (sb_044 f1985: 1-4 NPCs). Needs a model of every object's tile block
+(sizes 1 / 4 / 8 / 16 / 64 units, allocation order) — not started.
+
+Open: `sb_029` f703 / `sb_030` f490 — Switch Character's leave lasts 16 frames here vs 25 (the world restore's CPU
+time; lag frames). `sb_034` f619 —
+s502's sprite swap (`change_sprite` Buu 123 -> 126) is 1 frame late and the white fade timing. `sb_041` / `sb_044`: the OBJ VRAM purge above.
 
 ## 7. Side content (owner: the side-content agent, from 2026-10-02)
 

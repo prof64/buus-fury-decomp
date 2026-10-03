@@ -38,7 +38,18 @@ pub enum StepRt {
     WalkTo { tx: i32, ty: i32, dir: Dir, n: i32, vx: i32, vy: i32 },
     Wander(Box<Wander>),
     /// `cutscene_move` (0x08039D98, world-map encounter objects): to (tx, ty, tz) in n frames (z 22.10)
-    Move3 { tx: i32, ty: i32, tz: i32, n: i32, vx: i32, vy: i32, vz: i32 },
+    Move3 {
+        tx: i32,
+        ty: i32,
+        tz: i32,
+        n: i32,
+        vx: i32,
+        vy: i32,
+        vz: i32,
+        /// the heading the step's ctor stores at obj+0x1AC: (int)(atan2(dy, dx) / 2pi * 1024) in floats
+        #[serde(default)]
+        h: i32,
+    },
     /// steps not modelled for NPCs (enemy walk_to, cutscene moves): never finish
     Other,
 }
