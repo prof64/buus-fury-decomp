@@ -71,6 +71,14 @@ class EarthDriver(Driver):
                 return KEY.A if ph < 2 else 0
             self.goals[self.k] = ('events',)
             return 0
+        if kind == 'area' and self.k > 0 and self.goals[self.k - 1][0] == 'hold':
+            # keep holding the previous 'hold' goal's keys until the area changes (driver.py holds the last walk key)
+            if s['area'][:2] == [g[1], g[2]]:
+                self.next_goal()
+                return None
+            if self.t > 600:
+                raise RuntimeError(f'area {g} not reached: {s}')
+            return self.goals[self.k - 1][1]
         if kind == 'fly':
             return self.fly(e, s, g)
         if kind == 'herd':

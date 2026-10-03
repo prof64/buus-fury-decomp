@@ -325,7 +325,7 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
                         _ => None,
                     })
                     .collect();
-                eprintln!("      enemies {}", ens.join(" "));
+                eprintln!("      loot {:?} enemies {}", w.field.as_ref().map(|f| f.loot), ens.join(" "));
             }
         }
         let w = &sess.world;

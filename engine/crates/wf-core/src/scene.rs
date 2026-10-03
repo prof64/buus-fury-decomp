@@ -1178,7 +1178,8 @@ pub fn muzzle(w: &World, i: usize) -> (i32, i32) {
 /// track, so they are done and popped within the start (set_pos and the camera sets take 1 frame, not 2)
 fn done_at_start(cmd: &Cmd) -> bool {
     // remove_actor deletes the actor and its track with it (1 frame, trace boss_janemba_handover)
-    matches!(cmd, Cmd::SetPos { .. } | Cmd::CamSet { .. } | Cmd::CamParam { .. } | Cmd::Remove)
+    // prop_set_pos too (s464: the boulder placed between Goku's walk and his pose: 1 frame)
+    matches!(cmd, Cmd::SetPos { .. } | Cmd::CamSet { .. } | Cmd::CamParam { .. } | Cmd::Remove | Cmd::PropSetPos { .. })
 }
 
 fn start_head(w: &mut World, k: usize) {

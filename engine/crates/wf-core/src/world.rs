@@ -813,6 +813,10 @@ impl World {
         let live = |w: &World| -> Vec<usize> { (0..w.ents.len()).filter(|&k| !w.ents[k].removed).collect() };
         let start = live(self).len();
         let mut c = start as i64 - 1;
+        // an item-get that starts in this pass (a map item / dropped item picked up with A in the player's update)
+        // runs the presentation's loop from there: the objects after it are not updated this frame (4-30's capsule:
+        // the scientist's idle tick stops for that frame)
+        let item_get_before = self.field.as_ref().is_some_and(|f| f.item_get.is_some());
         while c >= 0 {
             let l = live(self);
             let Some(&i) = l.get(c as usize) else {
@@ -824,6 +828,9 @@ impl World {
                 self.update_entity(i);
             }
             c -= 1;
+            if !item_get_before && self.field.as_ref().is_some_and(|f| f.item_get.is_some()) {
+                break;
+            }
         }
         // the task list (screen shakes) runs after the objects
         self.tick_shakes();

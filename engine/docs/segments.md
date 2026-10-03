@@ -130,3 +130,71 @@ runners, path followers, projectiles / effects, pickups and their timers, breaka
 trigger list's touch / once state, a running event's script thread (VM frames, waits, the director's queues), and the
 camera controller / screen-effect objects. The current area-entry import is the base for it: rebuild the area, then
 overwrite the objects from RAM and check the next frames.
+
+## 6. Chapter: Super Buu arc (start state, route, segments)
+
+**Start state** (`tools/superbuu/mksave.py superbuu work/superbuu/sb_start.ss`, ~1 s): the Super Buu Saga begins when
+Janemba's defeat scene s452 sets story flag 125 (event #6's chapter label "Super Buu Saga" = flag 125 set, 137 clear).
+No playthrough reaches it yet, so the state is a **save game loaded by the real game**:
+1. base = `work/earth/ow_end.ss` (copied to `work/superbuu/base_ow_end.ss`): the story playthrough route played by the
+   real game through Other World (flags 1-13, 157 set by play);
+2. the mainline's party / form / skill changes after that are applied by **running the events' own natives through the
+   game's script interpreter** (0x08004098), event by event in story order (`STORY` in mksave.py: flags 15 .. 125;
+   conditional helpers s501 / s503 resolved for the branch the story takes, e.g. s452 -> s503(1, 5, ..): leave 7,
+   join 0 / 4, current char 0);
+3. flags 1..125 as the mainline sets them (not 65 / 66 (one switch of three), 75 / 95 (set and cleared again), 122
+   (never set)) + the HFIL puzzle / gate flags on the way to Janemba (181, 183 (18-12 Vegeta Lv 100 gate), 284);
+   optional collectibles, side quests and map-visited bits stay clear;
+4. levels with the game's level-up (`level_up_to` 0xF3: random growth), points spent like the Status screen does
+   (35 / 25 / 25 / 15 %), RecalcStats 0x08013C66: Goku / Vegeta / Goten / Trunks 125, Gohan 115; zenie 18,000;
+5. GameData +0x8A0 = the 18-13 save point (HFIL, next to Janemba's arena), +1 bit 0; written to EEPROM slot 0 by the
+   game's own slot writer 0x080049F2 (checksum, EEPROM protocol); then soft reset -> title -> Game 1 -> the game's
+   load. Every RAM byte of the resulting state comes from the boot + load path (`work/superbuu/libemu_sb.dylib`:
+   tools/emu/shim.c + savedata access, `tools/superbuu/build_sb.sh`).
+
+Validation: the title's Select Game shows the slot as "Super Buu Saga"; the game plays the whole chapter from it with
+no intervention (King Yemma s059 -> s067 -> the Z-Sword s464 -> Kami's Lookout -> HTC sparring -> the fusion (Watch
+This!) -> Gotenks vs Super Buu -> 6-20), so every flag / party bit these scripts read holds what the story needs.
+Known liberties: the levels / zenie / empty inventory are a plausible player's, not a recorded one's.
+
+**Route** `tools/superbuu/sbroute.py` (driver goals + `tools/superbuu/sbdriver.py`: `walke`, `areaw`, `fastmash`,
+`prog`, `node` (breakpoint on the scene step: timed presses, e.g. the Z-Sword swings 47 frames after node 19 / 33
+start), `eventsw` (Watch This!: reads the drawn sequence from the mode object), `boss`): 40,046 frames, keys in
+`work/superbuu/sb_keys.json`; master recording `SEGMENT_DIR=work/superbuu/seg segment.py record --keys ...
+--name sb_master`, segments cut at importable area entries.
+
+| segment | from | frames | matched | notes |
+|---|---|---|---|---|
+| `sb_18_12` | 18-12 (HFIL exit) | 178 | 178 | |
+| `sb_18_01` | 18-1 | 600 | 600 | Goku's pad -> Other World travel map 0-51 -> Yemma's Office -> 1-5 |
+| `sb_01_03` | 1-3 | 7,735 | 7,553 (gate) | King Yemma s059 + the Janemba flashback scenes (0-17 / 0-16 / 0-96) |
+| `sb_01_05b` | 1-5 #2 | 11,000 | 6,541 (gate) | s067 -> 19-3 / 19-7 (Gohan), the Z-Sword power struggle and boulder |
+
+Rules found (all in wf-core / wf-script-core / wf-import, regressions green):
+* **Travel map** 0-51 (`show_destination_label` 0xD9, label entity vt 0x0804BAF4, update 0x0803669E): the selection
+  is one of the area's triggers (label index = trigger index, start = the native's argument); LEFT / RIGHT / UP / DOWN
+  (in that order) move to the trigger whose centre ((x0 + x1 + 15) >> 1, (y0 + y1 + 7) >> 1) lies that way
+  (along >= |across|, least along² + 9 across²); A runs its activation (`field::dest_menu`).
+* **Nested on-enter scripts**: `warp` 0x77 and `load_scene` 0x73 run the new area's on-enter script inside the load
+  (EnterArea); the script that warped continues when it ends (`Pending::Arrival`, `HostState.nest_area_enter`,
+  StoryHost runs it on top of the suspended thread). 0-51's (non-blocking) lets the player arrive in the load frame;
+  1-5's (`prop_show` step) holds the arrival 2 frames; 0-16's two `prop_hide`s delay s025's actors 4 frames. Both
+  natives are "conditional blocking" in script_natives.json (the Rhai step splitter cuts after them).
+* A player a script removed (`remove_actor(0)`, s511) is rebuilt by the next load (`Field.player_removed`).
+* `set_character` / `set_char_form` of the active character re-enter idle when the sprite changes (0x08010692 ends with
+  vt+0x28(0): one rand(255)).
+* Cutscene ki blast (0x41 / 0x42): sound 20 + rand(2). `fire_wave_beam`: 8 frames per cel, held on cel 3 (or the
+  sprite's last). An idle reached by a one-shot state's own end or a beam command's end is restarted by a following
+  `play_anim(a, 0)` (`ActAnim.self_idle`). `prop_set_pos` takes no frame of its own (`done_at_start`).
+* A black fade-out darkens from the current palette (an already black screen stays black: return_to_field after a
+  scene that ended faded out).
+* The power struggle (0xC6) keeps the object world and the cameras running under the gauge (mode vt 0x0804B5D8 entry 3
+  calls the world update 0x080115B0), players get no input; the script continues in the frame the mode ends; a new
+  state replaces a frame-range animation the player was playing. 0xC6 always opens the exact screen (menu/minigame.rs).
+
+Open: `sb_01_03` f7569 — `return_to_field` restores the field's saved objects (NPC positions / animation states), the
+remake reloads the area fresh (the ogres at Yemma's door are where they stood before the scene in the game).
+`sb_01_05b` f6541 — `play_anim(1, 0)` on Goku (spawned `spawn_actor(1, ..)`, holding `set_pose(1, 12, 0)`) leaves the
+pose in the game; the remake's rule restarts idle on any non-idle actor (needs the NPC SetAnim / vt+0x2C rule).
+Not recorded yet: the HTC fights, Gotenks, Ultimate Gohan, Vegito, inside Buu, Kid Buu, ending (route continues from
+`m_after_gotenks`).

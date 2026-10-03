@@ -123,6 +123,8 @@ impl Session {
         let w = &mut self.world;
         if crate::menu::active(w) {
             if w.field.is_some() && crate::menu::minigame::world_runs(w) {
+                // the players get no input: the mode reads the keys (menu_parity mg_power: no punches)
+                w.input = [InputFrame::default(); MAX_PLAYERS];
                 w.step_entities();
             }
             return;

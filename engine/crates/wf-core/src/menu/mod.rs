@@ -708,7 +708,10 @@ pub fn view(w: &World) -> Option<MenuView> {
 /// A script-opened menu has finished (the fade-in after it is over): its result code (the native's push / effect
 /// is decided by the screen). Clears it.
 pub fn take_result(w: &mut World) -> Option<i32> {
-    if !w.menu.scripted || w.menu.phase != Phase::Idle {
+    // the power struggle's mode ends inside a world frame: the script continues in that frame (s464: prop_hide and
+    // the director's wait start the frame the mode ends)
+    let ended_in_world = w.menu.phase == (Phase::Leave { t: 0 }) && minigame::world_runs(w);
+    if !w.menu.scripted || (w.menu.phase != Phase::Idle && !ended_in_world) {
         return None;
     }
     let r = w.menu.result.take()?;

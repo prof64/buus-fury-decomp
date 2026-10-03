@@ -118,6 +118,10 @@ pub struct Arrival {
     pub fade_in: bool,
     /// the frame of the load (a script that did not block finishes in it: the frame's camera step is owed)
     pub frame: u32,
+    /// a cutscene scene load (`load_scene*` with the players offstage): the players stay offstage after the on-enter
+    /// script (no player object, no draws; VERIFIED Babidi's ship switch scripts, e.g. 8-20 -> load_scene 8-26)
+    #[serde(default)]
+    pub scene: bool,
 }
 
 /// the run mode of the field loop
@@ -190,6 +194,10 @@ pub struct Field {
     /// on-defeat callbacks of placed enemies, run at the start of the next frame's update (the dying enemy's death
     /// handler runs there; story playthrough: the first boss's defeat scene starts the frame after the KO)
     pub defeat_runs: Vec<(Callback, Cause)>,
+    /// on-defeat callbacks of enemies whose death effect runs them after its delay (SelfDestruct: with the drop
+    /// script; 3-1's robbers: s126 8 frames after the KO): (due frame, callback, cause)
+    #[serde(default)]
+    pub defeat_later: Vec<(u32, Callback, Cause)>,
     /// a level-up hook started at the start of this frame's update: it runs inline (a nested loop), nothing else
     /// updates this frame
     pub held: bool,
@@ -338,6 +346,7 @@ fn new_field() -> Field {
         placed_loot: vec![],
         xp_due: vec![],
         defeat_runs: vec![],
+        defeat_later: vec![],
         held: false,
         held_event: false,
         resume_held: false,
@@ -603,9 +612,11 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
         // while an event holds the field: its host runs one script at a time, and the event waits for this load
         // (the game nests the on-enter script; scripts that block on load are not known inside events yet)
         if w.field.as_ref().is_some_and(|f| f.host && (!f.busy && w.scene.depth == 0 || f.nest_load)) && objects {
+            // the players are already offstage: a cutscene scene load
+            let scene = !w.scene.offstage.is_empty() && !w.players.iter().any(|&id| w.find(id).is_some());
             crate::scene::send_offstage(w);
             if let Some(f) = w.field.as_mut() {
-                f.arrival = Some(Arrival { to, x, y, facing, fade_in: false, frame: w.frame });
+                f.arrival = Some(Arrival { to, x, y, facing, fade_in: false, frame: w.frame, scene });
             }
             return;
         }
@@ -630,7 +641,9 @@ pub fn world_mode_cameras(w: &mut World) {
 /// exit's fade-in starts. No-op without a pending arrival.
 pub fn finish_arrival(w: &mut World) {
     let Some(ar) = w.field.as_mut().and_then(|f| f.arrival.take()) else { return };
-    crate::scene::bring_back(w);
+    if !ar.scene {
+        crate::scene::bring_back(w);
+    }
     arrive(w, ar.to, ar.x, ar.y, ar.facing);
     if ar.fade_in {
         begin_fade_in(w);
@@ -835,6 +848,30 @@ pub fn pre_step(w: &mut World) {
         }
     }
     run_due_drops(w);
+    // death effects whose delay is over run their enemy's on-defeat callback after its drop script (frame numbering
+    // as run_due_drops; 3-1's robbers: the loot draws, then s126), holding the rest of the frame like defeat_runs
+    let next = w.frame + 1;
+    let later: Vec<(Callback, Cause)> = match w.field.as_mut() {
+        Some(f) if f.defeat_later.iter().any(|d| d.0 <= next) => {
+            let (due, keep): (Vec<_>, Vec<_>) = std::mem::take(&mut f.defeat_later).into_iter().partition(|d| d.0 <= next);
+            f.defeat_later = keep;
+            due.into_iter().map(|d| (d.1, d.2)).collect()
+        }
+        _ => vec![],
+    };
+    if !later.is_empty() {
+        for (run, cause) in later {
+            w.events.push(Event::Field(FieldEvent::Run { run, cause, slot: 0 }));
+        }
+        // the hold without start_event's busy: the drop script queued before it ends first and must not release
+        // the held update (set_busy(false)); the event's scene start holds the field
+        if w.field.as_ref().is_some_and(|f| f.host) {
+            if let Some(f) = w.field.as_mut() {
+                f.held = true;
+                f.held_event = true;
+            }
+        }
+    }
     // the death effects' kill XP (their first update: new objects update first); a level-up runs hook #3 inline,
     // holding the rest of the frame (the event starts now; story playthrough: the other objects neither move nor
     // animate in that frame)
@@ -1034,7 +1071,7 @@ fn defeats(w: &mut World) {
             Some((_, e)) if !e.defeated => {
                 let (x, y) = (e.a.px(), e.a.py());
                 keep.push((id, obj, x, y));
-                let (cx, cy) = (e.a.center().0, e.a.py() + e.a.foot_h);
+                let (cx, cy) = (e.a.px() + (e.a.foot_w >> 1), e.a.py() + e.a.foot_h);
                 let v = crate::geom::DIR_VEC[e.last_hit_dir as usize & 3];
                 loot_keep.push((id, cx, cy, v.0 << 8, v.1 << 8));
             }
@@ -1046,7 +1083,7 @@ fn defeats(w: &mut World) {
                 // rightwards)
                 let (fx, fy, fvx, fvy) = match other {
                     Some((_, e)) => {
-                        let (cx, cy) = (e.a.center().0, e.a.py() + e.a.foot_h);
+                        let (cx, cy) = (e.a.px() + (e.a.foot_w >> 1), e.a.py() + e.a.foot_h);
                         let v = crate::geom::DIR_VEC[e.last_hit_dir as usize & 3];
                         (cx, cy, v.0 << 8, v.1 << 8)
                     }
@@ -1070,8 +1107,13 @@ fn defeats(w: &mut World) {
                     }
                 }
                 if let Some(run) = cb {
+                    let due = w.frame + delay;
                     if let Some(f) = w.field.as_mut() {
-                        f.defeat_runs.push((run, Cause::Defeat { entity: id, ty, x, y }));
+                        if delay > 0 {
+                            f.defeat_later.push((due, run, Cause::Defeat { entity: id, ty, x, y }));
+                        } else {
+                            f.defeat_runs.push((run, Cause::Defeat { entity: id, ty, x, y }));
+                        }
                     }
                 }
             }

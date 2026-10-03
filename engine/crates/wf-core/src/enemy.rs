@@ -975,6 +975,12 @@ pub fn step_from_player(w: &mut World, i: usize, speed: i32, face_toward: bool) 
         if !w.en_ref(i).walking() {
             set_anim(w, i, &[nm("walk")], true, Some(true));
         }
+    } else if w.en_ref(i).ea.rule != w.data.anim.reverse {
+        // the back-off's step with its reversed-walk state gone (a hurt state pushed over it and popped): the state
+        // comes back with the step (story playthrough: Pikkon's back-off after a hit restarts the reversed walk, 4
+        // cels from 3 down, instead of finishing the hurt animation)
+        let rev = w.data.anim.reverse;
+        set_anim_rule(w, i, &[AnimRef::N(1)], true, Some(true), Some(rev));
     }
     let vx = -((dx as i64 * speed as i64) / m as i64) as i32;
     let vy = -((dy as i64 * speed as i64) / m as i64) as i32;
@@ -1897,7 +1903,7 @@ fn on_death(w: &mut World, i: usize) {
     // direction; field.rs defeats)
     {
         let e = w.en_ref(i);
-        let (cx, cy) = (e.a.center().0, e.a.py() + e.a.foot_h);
+        let (cx, cy) = (e.a.px() + (e.a.foot_w >> 1), e.a.py() + e.a.foot_h);
         let v = crate::geom::DIR_VEC[e.last_hit_dir as usize & 3];
         if let Some(l) = w.field.as_mut().and_then(|f| f.placed_loot.iter_mut().find(|l| l.0 == me)) {
             *l = (me, cx, cy, v.0 << 8, v.1 << 8);

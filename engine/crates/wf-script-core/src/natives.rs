@@ -294,7 +294,13 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
         0x60 => enqueue(h, arg(a, 0), mv(arg(a, 1), arg(a, 2), 100, 1)),
         0x61 => enqueue(h, arg(a, 0), mv(arg(a, 1), arg(a, 2), arg(a, 3), 1)),
         0x62 => enqueue_owner(h, Some(Owner::Prop(arg(a, 0))), Cmd::PropPoof { vanish: arg(a, 1) != 0, t: 0 }),
-        0x63 | 0x64 => enqueue_owner(h, Some(Owner::Prop(arg(a, 0))), Cmd::PropShow { on: n == 0x64 }),
+        0x63 | 0x64 => {
+            // an area without that map prop: no owner object, the command is dropped at once (3-10's on-enter
+            // prop_hide(0): the player arrives in the load's frame)
+            let id = arg(a, 0);
+            let missing = h.w.field.as_ref().is_some_and(|f| id < 0 || id as usize >= f.props.len());
+            enqueue_owner(h, (!missing).then_some(Owner::Prop(id)), Cmd::PropShow { on: n == 0x64 })
+        }
         0x65 => enqueue_owner(h, Some(Owner::Prop(arg(a, 0))), Cmd::Puff { x: arg(a, 1), y: arg(a, 2), absolute: true }),
         0x66 => enqueue_owner(h, Some(Owner::Prop(arg(a, 0))), Cmd::PropMoveTo { x: arg(a, 1), y: arg(a, 2), speed: arg(a, 3), n: 0, t: 0, sx: 0, sy: 0 }),
         0x67 => enqueue_owner(h, Some(Owner::Prop(arg(a, 0))), Cmd::PropJumpTo { x: arg(a, 1), y: arg(a, 2), t: 0, vx: 0, vy: 0 }),

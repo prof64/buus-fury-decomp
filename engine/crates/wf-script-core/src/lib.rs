@@ -313,6 +313,11 @@ impl Host for SharedHost {
 /// An event graph starts (`Host::scene` Enter, called by the VM / Rhai runtime for top-level and nested graphs):
 /// players lose their input until [`end_event`] (the game's scene nesting count 0x03002A5C / world message 0x0F).
 pub fn begin_event(w: &mut World) {
+    // an event a script starts (run_event from a trigger's inline code: West City's world map circle -> s515) stops
+    // the field like an event trigger / talk does at its fire (walking map NPCs go idle, the player stops)
+    if w.scene.depth == 0 && w.field.as_ref().is_some_and(|f| f.host && !f.busy) {
+        wf_core::fieldnpc::start_event(w);
+    }
     w.scene.depth += 1;
     // the field holds still while an event runs: no triggers / talk, map NPCs freeze (their animations tick)
     wf_core::field::set_busy(w, true);

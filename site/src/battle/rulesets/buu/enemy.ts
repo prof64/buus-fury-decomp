@@ -860,7 +860,8 @@ export class Enemy extends Actor implements EnemyLike {
   private alignWalk() {
     if (!this.isAnim(1)) this.setAnim('walk', true, true)
   }
-  /** 0x0801CFA8: a blocked step ends the node with SetAnim(0) if walking (no walk is restarted after the AI) */
+  /** 0x0801CFA8: a blocked step ends the node with SetAnim(0) if walking (no walk is restarted after the AI); the facing
+   *  stays the step's (no facing write on that path; VERIFIED Babidi's ship segments 8-31 / 8-42) */
   private alignBlocked() {
     this.stopWalk()
     this.moving = false
@@ -878,7 +879,6 @@ export class Enemy extends Actor implements EnemyLike {
       }
       this.facing = dy > 0 ? 0 : 1
       if (!this.walkBy(0, Math.sign(dy) * speed)) {
-        this.facing = dx > 0 ? 3 : 2
         return this.alignBlocked()
       }
       this.alignWalk()
@@ -890,7 +890,6 @@ export class Enemy extends Actor implements EnemyLike {
       }
       this.facing = dx > 0 ? 3 : 2
       if (!this.walkBy(Math.sign(dx) * speed, 0)) {
-        this.facing = dy > 0 ? 0 : 1
         return this.alignBlocked()
       }
       this.alignWalk()

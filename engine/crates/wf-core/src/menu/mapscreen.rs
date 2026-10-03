@@ -137,6 +137,8 @@ pub enum MapPage {
     Area,
     World,
     Scouter,
+    /// the Scouter's info page (`0x08025E50`)
+    Info,
 }
 
 /// a blinking marker (`0x08026DE4`, vt `0x0804D634` / `0x0804D594`): top-left position, the animation counter
@@ -216,6 +218,9 @@ pub struct MapScreen {
     /// the Scouter page's objects
     #[serde(default)]
     pub scout: Option<Box<super::scouter::Scout>>,
+    /// the info page
+    #[serde(default)]
+    pub info: Option<Box<super::scouter::Info>>,
 }
 
 /// screen change of the map screen (frame 0 = SELECT): the pause menu's 16-frame fade, black while the world is
@@ -251,6 +256,7 @@ impl MapScreen {
             entered: false,
             tile_bytes: 0,
             scout: None,
+            info: None,
         }
     }
 
@@ -338,17 +344,27 @@ impl MapScreen {
         s
     }
 
+    /// `0x08025E50`: the info page of the selected record
+    pub fn info(w: &mut World, rec: &super::scouter::Rec) -> MapScreen {
+        let mut s = MapScreen::blank(MapPage::Info);
+        s.info = Some(Box::new(super::scouter::Info::new(w, rec)));
+        s
+    }
+
     fn has_prev(&self) -> bool {
-        self.page != MapPage::Scouter
+        !matches!(self.page, MapPage::Scouter | MapPage::Info)
     }
     fn has_next(&self) -> bool {
-        self.page != MapPage::World
+        !matches!(self.page, MapPage::World | MapPage::Info)
     }
 
     /// the objects' update + OAM build (`0x08011A1E`, `0x080115B0`)
     fn objects(&mut self, w: &World) {
         if let Some(sc) = self.scout.as_mut() {
             sc.update(w);
+        }
+        if let Some(i) = self.info.as_mut() {
+            i.update(w);
         }
         for m in self.markers.iter_mut() {
             m.update();
@@ -486,12 +502,13 @@ impl Page for MapScreen {
                     self.close();
                 }
             }
-            MapPage::Scouter => {
-                if pressed & A != 0 && self.scout.as_ref().is_some_and(|s| s.sel.is_some()) {
-                    // 0x08026360: the info page after the fade (BLDCNT 0x3E5E)
-                    self.next = 3;
-                    self.keep_frame = true;
-                    self.changing = true;
+            MapPage::Scouter => {}
+            MapPage::Info => {
+                if let Some(i) = self.info.as_mut() {
+                    i.step(w);
+                }
+                if pressed & A != 0 {
+                    self.close();
                 }
             }
         }
@@ -501,7 +518,14 @@ impl Page for MapScreen {
                 return match self.next {
                     1 => Action::Replace(Screen::MapScreen(self.page_to(w, false))),
                     2 => Action::Replace(Screen::MapScreen(self.page_to(w, true))),
-                    3 => Action::Replace(Screen::MapScreen(self.page_to(w, true))),
+                    3 => {
+                        let rec = self.scout.as_ref().and_then(|s| s.sel.map(|k| s.recs[k as usize].clone()));
+                        match rec {
+                            Some(r) => Action::Replace(Screen::MapScreen(MapScreen::info(w, &r))),
+                            None => Action::Pop(1),
+                        }
+                    }
+                    _ if self.info.as_ref().is_some_and(|i| i.back) => Action::Replace(Screen::MapScreen(MapScreen::scouter(w))),
                     _ => {
                         // the last iteration's registers (EVA 0) stay on screen while the screen ends
                         w.menu.shown = Some(Box::new(Screen::MapScreen(self.clone())));
@@ -510,6 +534,12 @@ impl Page for MapScreen {
                 };
             }
             return Action::None;
+        }
+        // 0x08026360: the Scouter's A on a selection: the info page after the fade (BLDCNT 0x3F5F)
+        if self.page == MapPage::Scouter && pressed & A != 0 && self.scout.as_ref().is_some_and(|s| s.sel.is_some()) {
+            self.next = 3;
+            self.keep_frame = false;
+            self.changing = true;
         }
         if pressed & L != 0 && self.has_prev() {
             self.start_change(1);
@@ -526,8 +556,16 @@ impl Page for MapScreen {
         Action::None
     }
     fn view(&self, w: &World, d: &MenuData) -> MenuView {
-        let _ = d;
         let mut v = MenuView::default();
+        // the info page: its own screen (DISPCNT 0x1C40: BG2 the description window over BG3, OBJs)
+        if let Some(i) = self.info.as_ref() {
+            let (layers, objs) = i.view(w, d);
+            v.layers = layers;
+            v.objs = objs;
+            let first: u32 = 0b11 | 1 << 31;
+            v.blend = Some(MenuBlend { first, second: first | 1 << 30, eva: self.eva.min(16), evb: 0 });
+            return v;
+        }
         // BG3: the grid on the world / scouter pages
         let mut bg3 = Vec::new();
         if self.page != MapPage::Area {
@@ -574,7 +612,7 @@ impl Page for MapScreen {
             MapPage::World => {
                 bg2.ops.push(MenuOp::Image { path: "ui/mapscreen/world_map.png".into(), frame: 0, fw: 240, fh: 160, x: 0, y: 0, key0: true });
             }
-            MapPage::Scouter => {}
+            MapPage::Scouter | MapPage::Info => {}
         }
         v.layers.push(bg2);
         // BG0: the frame with the L / R prompts
