@@ -148,6 +148,11 @@ impl Session {
             if w.field.is_some() && crate::menu::minigame::world_runs(w) {
                 // the players get no input: the mode reads the keys (menu_parity mg_power: no punches)
                 w.input = [InputFrame::default(); MAX_PLAYERS];
+                // (the BG sphere effect redraws before the objects, as in a frame of the field - not in the gauge's
+                // closing iteration: sb 21-25 f61645 .. f61655, 117 draws a logic frame, none in the 9-frame close)
+                if !w.menu.stack.is_empty() {
+                    crate::scene::sphere_jitter(w);
+                }
                 w.step_entities();
             } else if w.field.is_some() && matches!(w.menu.phase, crate::menu::Phase::FadeOut { level } if level < 256) || w.field.is_some() && matches!(w.menu.phase, crate::menu::Phase::FadeIn { .. }) {
                 // a screen opening over the field: its fade-out leaves the objects still, the cameras keep easing

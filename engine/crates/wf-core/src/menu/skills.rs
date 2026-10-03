@@ -357,6 +357,20 @@ impl Page for Skills {
             REDRAW_FRAMES
         }
     }
+    /// the page without its popup: skills_basic / skills_levels / skills_start, 54 redraws, residual std 0.6k, max
+    /// 2k cycles (the popup's iterations keep the constant: six measured, not separated yet)
+    fn redraw_time(&self, w: &World, d: &MenuData) -> Option<crate::sndsim::Redraw> {
+        if self.popup.is_some() {
+            // the popup's surface alone (two popups measured, first iteration and redraw each: exact on those)
+            let v = self.view(w, d);
+            let top = v.layers.get(1)?;
+            let gn = crate::sndsim::ops_cost(&d.text, &top.ops).0;
+            let k = if self.container_ref().ever { 129_600 + gn * 567 / 1000 } else { 239_500 + gn * 63 / 1000 };
+            let own = k + crate::sndsim::layer_cycles(&d.text, &top.ops, 0);
+            return Some(crate::sndsim::Redraw { t0: 4_641, base: own - 4_641 });
+        }
+        Some(super::page_time(d, &self.view(w, d), !self.c.ever, 4_641, 146_570, 0, 1_371, 129_107))
+    }
 }
 
 impl Popup {

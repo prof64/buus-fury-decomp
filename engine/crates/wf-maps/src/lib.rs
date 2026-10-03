@@ -117,7 +117,7 @@ pub fn tileset(ctx: &mut Ctx, h: &Header) -> Tileset {
 
 /// CPU cycles of the map loader's decompression for a header (`wf_rom::deccost`), as `collision.json` `reload`:
 /// `fixed` = the minimap, the tile list, the tile chunks it names and frame 0 of every tile animation; per layer
-/// its chunk grid with each chunk's cycles into EWRAM (`ew`: a layer of at most 2 x 2 chunks is loaded whole into
+/// its chunk grid with each chunk's cycles into EWRAM (`ew`: a layer of at most 4 chunks is loaded whole into
 /// its four slots) and into IWRAM (`iw`: a larger layer loads the chunks around the camera through a buffer).
 /// Decompression is ~95 % of an area (re)load - the black frames when the pause menu closes (wf-core
 /// `sndsim.rs`); streams and order match emulator profiles call by call (`examples/reloadinfo.rs`,

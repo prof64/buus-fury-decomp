@@ -440,6 +440,8 @@ pub fn add(w: &mut World, s: Shot) -> EntityId {
         ShotKind::Flame { .. } => 0x40,
         // the beam class `0x080206B8` (segment sb 19-3: Kid Buu's beam)
         ShotKind::Kame(_) => 0x300,
+        // Majin Buu's candy beam `0x080286D4` (segment sb 1-3 f6210)
+        ShotKind::CandyBeam { .. } => 0xC0,
         _ => 0,
     };
     let flame = matches!(s.kind, ShotKind::Flame { .. });

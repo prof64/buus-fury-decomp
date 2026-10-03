@@ -1959,6 +1959,9 @@ fn update_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) -> bool {
                     let (px, py) = actor_pos(w, i);
                     let (sx, sy) = (px + OFF[k as usize].0, py + OFF[k as usize].1);
                     *n = (((*x - sx).abs().max((*y - sy).abs())) >> 1) + 1;
+                    // the beam object (`0x080286D4`, 0xC0 tile bytes) for the ball's flight; its end makes a second
+                    // one (`0x08028B5A`) for as long (segment sb 1-3 f6210: 35 frames, one frame free, 35 more)
+                    crate::vram::beam_pair(w, crate::vram::Owner::Blast(w.ents[i].id), 0xC0, CANDY_OBJECT_FRAMES);
                 }
                 let cel = if (8..16).contains(t) { 2 * k + 2 } else { 2 * k + 1 };
                 ball_cel(w, i, cel, *t);
@@ -2280,15 +2283,21 @@ pub fn play_song(w: &mut World, id: i32) {
     }
 }
 
+/// the BG sphere effect's draws of a frame (also under the power gauge minigame, whose loop runs the world update:
+/// Kid Buu's arena 21-25, the Spirit Bomb's push under s-script's `power_minigame`)
+pub fn sphere_jitter(w: &mut World) {
+    let jitter: i32 = w.scene.visuals.iter().filter(|v| v.kind == VisualKind::EnergySphere).map(|v| (v.owner as i32 - 3).max(0)).sum();
+    for _ in 0..jitter {
+        w.rng.rand(4);
+    }
+}
+
 /// start of the frame: keep the raw input for the scripts; players get none while an event graph runs, a modal
 /// fade / dialog / menu is up, or the director waits
 pub fn pre_step(w: &mut World) {
     // the BG sphere effect (`0x0803AA58`) redraws every frame with jittered rows, before the objects update: rand(4)
     // for each row past the third (radius - 3 draws; VERIFIED segment sb 20-8, Kid Buu's planet burst)
-    let jitter: i32 = w.scene.visuals.iter().filter(|v| v.kind == VisualKind::EnergySphere).map(|v| (v.owner as i32 - 3).max(0)).sum();
-    for _ in 0..jitter {
-        w.rng.rand(4);
-    }
+    sphere_jitter(w);
     w.scene.keys = w.input;
     w.scene.cam.stepped = false;
     if w.scene.depth == 0 && !w.scene.puppets.is_empty() && w.scene.director.wait.is_none() {
@@ -2421,6 +2430,9 @@ fn tick_track(w: &mut World, k: usize) -> bool {
     }
     false
 }
+
+/// frames a scripted candy beam's object lives (MEASURED sb 1-3: alloc f6210, free f6245)
+const CANDY_OBJECT_FRAMES: u32 = 35;
 
 fn tick_visuals(w: &mut World) {
 

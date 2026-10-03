@@ -127,6 +127,10 @@ fn emu_sounds(f: &Value) -> Vec<String> {
 
 /// one complete logic frame: the World against the recording's row
 pub fn compare(w: &World, fr: &Value, es: &[String], map: &mut BTreeMap<usize, EntityId>, k: usize, rep: &mut Report) {
+    // the title screen: our world is a placeholder field under it, the game has none (its area id is stale)
+    if wf_core::menu::title::on_title(w) {
+        return;
+    }
     let a = &fr["area"];
     if let Some(f) = w.field.as_ref() {
         let ours = (f.area.world as i64, f.area.area as i64, f.area.variant as i64);
@@ -378,7 +382,7 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
                 if std::env::var("SEGMENT_FORM").is_ok() {
                     if let Some(pi) = w.player_idx(0) {
                         let pl = w.pl_ref(pi);
-                        eprintln!("  t{k} form {} walk {} spd {}", pl.form, pl.walk, pl.eff.spd);
+                        eprintln!("  t{k} form {} walk {} spd {} ss_gauge {} ss_acc {} ss3 {} cooldown {} regen_timer {} ep_acc {}", pl.form, pl.walk, pl.eff.spd, pl.ss_gauge, pl.ss_acc, pl.ss3_gauge, pl.ss_cooldown, pl.regen_timer, pl.ep_acc);
                     }
                 }
                 if std::env::var("SEGMENT_PUPPETS").is_ok() {

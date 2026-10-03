@@ -401,6 +401,9 @@ pub struct Menu {
     /// harnesses: the picture on screen when a screen is opened mid-redraw (the first redraw becomes `pending`)
     #[serde(default)]
     pub boot_shown: Option<Box<Screen>>,
+    /// frames the restore's camera update comes before the last black frame (sndsim `wrap`)
+    #[serde(default)]
+    pub leave_cam: u16,
 }
 
 /// How a menu screen comes and goes (all measured per screen kind): the field fades out by `fade_out` per frame
@@ -495,8 +498,14 @@ pub fn check_pause(w: &mut World) -> bool {
 /// * the closing iteration still shows the page; then 24 black frames (the exit stub's iteration + the world
 ///   restore), the 16-frame fade-in (levels 240..0), the world runs again the frame after.
 
+static DEBUG_FRAMES: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+
 /// One video frame of an active menu (called instead of the world update).
 pub fn step(w: &mut World) {
+    // debug log only: video frames stepped by menu screens so far (aligns the model's redraws with measurements)
+    if crate::sndsim::debug() {
+        DEBUG_FRAMES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    }
     let held = w.input[0].held;
     match w.menu.phase {
         Phase::Idle => {}
@@ -557,7 +566,10 @@ pub fn step(w: &mut World) {
             }
             // the world restore ends with a camera update: a follow camera still easing when the menu opened is
             // one step further in the last black frame (ship cuts 8-6 / 8-3: closed while the camera eased)
-            if t + 2 == w.menu.tr.leave && w.menu.tr.fade_in != 0 && w.field.is_some() {
+            // (with a screen shake's offset: a heal menu opened mid-shake, db5 12-25 / ship 8-38; when the
+            // iteration's last sound update ran over a VBlank the update shows a frame earlier: `Menu.leave_cam`)
+            if t + 2 + w.menu.leave_cam == w.menu.tr.leave && w.menu.tr.fade_in != 0 && w.field.is_some() {
+                w.tick_shakes();
                 crate::field::world_mode_cameras(w);
             }
             if t + 1 >= w.menu.tr.leave.max(1) {
@@ -638,7 +650,7 @@ fn redraw(w: &mut World, first: bool) {
                 let timed = top.page().redraw_time(w, &d);
                 let v = top.page().view(w, &d);
                 let l: Vec<String> = v.layers.iter().map(|l| format!("{:?} tc{:?} {}", crate::sndsim::ops_cost(&d.text, &l.ops), crate::sndsim::text_counts(&d.text, &l.ops), crate::sndsim::ops_summary(&l.ops))).collect();
-                eprintln!("menu redraw f{} {} const {} timed {:?} pressed {:#x} released {:#x} objs {} | {}", w.frame, top.page().name(), cost, timed.map(|t| (t.t0, t.base)), w.menu.pressed, w.menu.released, v.objs.len(), l.join(" || "));
+                eprintln!("menu redraw f{} mf{} {} const {} timed {:?} pressed {:#x} released {:#x} objs {} | {}", w.frame, DEBUG_FRAMES.load(std::sync::atomic::Ordering::Relaxed), top.page().name(), cost, timed.map(|t| (t.t0, t.base)), w.menu.pressed, w.menu.released, v.objs.len(), l.join(" || "));
             }
         }
         if cost > 1 && w.data.sound.is_some() {
@@ -784,8 +796,10 @@ fn close_with(w: &mut World, done: bool) {
         if crate::sndsim::debug() {
             eprintln!("menu close: figures {figs:?} extra {extra}");
         }
+        w.menu.leave_cam = 0;
         if let Some(n) = crate::sndsim::reload_frames_with(w, done, extra) {
             w.menu.tr.leave = n as u16 + 1;
+            w.menu.leave_cam = w.sound.wrap as u16;
         }
     }
     w.menu.lag = 0;

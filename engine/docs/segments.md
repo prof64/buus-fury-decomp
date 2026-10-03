@@ -518,6 +518,21 @@ while hidden, state 0x114 / 0x118).
 | `i01_21-2` | 21-2: the sphincter trigger (A at (500, 300) facing right walks him to (552, 416)), then ShipDriver's nav (the route's `exitto` stands still at (520, 400) here) | `i01_21-2.keys.json` (863 from m_inside_buu); then `--from inside_buu --skip 4` |
 | `m_intestines`, `m_brain`, **`m_kid_buu_saga`**, `m_kid_buu` (first) | the route from 21-2 on, unchanged: the four pods (flags 139 .. 143), the three fakes, 21-26; Super Buu's last fight (s489, flag 147), out of Buu (flag 148), **the world map, Goku 143**; 19-3 against Kid Buu (that first try: round 1 won, lost in round 2 - he had come with 1268 of 2133 HP) | `sbk_inside_buu_skip.json` (36,890 frames from i01 to m_kid_buu; then the lost fight) |
 | `k01_rested` | West City: Vegeta stands in at the save point until Goku is full (2133 HP), Goku's 11 points, the capsule; then `--start sb/k01_rested.ss --from kid_buu_saga` | `k01_rested.keys.json` (7,678 from m_kid_buu_saga) |
+| `k02_pyramid`, `k03_goku158` | the Pyramid again (its second tier stays open for everybody once Gohan opened it): **Goku level 158** (2842 HP), 14-1 <-> 14-2 | `k02_pyramid.keys.json`, `k03_goku158.keys.json` (77,983) |
+| `k04_vegeta` | 14-1's save point, Vegeta active (the Kid Buu fight's second round is HIS: the first tries lost there, Vegeta at 120) | `k04_vegeta.keys.json` (814) |
+| `k05_vegeta150` | 14-1, **Vegeta level 150** (2846 HP): 14-1 <-> 14-2, `grind_safe.py` (5 retries) | `k05_vegeta150.keys.json` (110,161) |
+| `m_kid_buu` | 19-3, Goku 158 / Vegeta 150, before Kid Buu (Goku active again, the pad, `('fly', 633, 1065, 31, 23)`, s480) | `m_kid_buu.keys.json` (10,616 from k05) |
+| `m_kid_buu_punched`, `m_after_kid_buu`, `m_final`, **`m_the_end` = `the_end.ss`** | one punch in the air first (`sb_luck.py`: 3 of 6 counts win), Kid Buu's rounds, Vegeta's stand, the Spirit Bomb (area 0-2 with HP left - not a game over), **flag 149**, the world map; Capsule Corp 4-21 (s190); the party, the Tournament, Uub, the staff credits, **the title screen** | `m_kid_buu_punched.keys.json`, `sbk_kid_buu.json` (43,888 / 45,619 / 69,459 frames) |
+
+**The real playthrough is complete: power-on to the credits by play only** (no RAM write anywhere): `work/ship/real4*`
+(the ship) -> `work/ship/fat/` (the fat Buu arc) -> `work/ship/jan/` (Janemba) -> `work/ship/sb/` (Super Buu, Kid
+Buu, the ending), every stretch with its key log as listed in these tables. End party: Goku 158, Vegeta 150, Gohan
+141, Goten 117, Trunks 81.
+
+Finding (Kid Buu, 19-3): round 1 is Goku's (125,000 HP; level 143 does it with ~400 damage taken), then the active
+character is Vegeta with his own HP for the 'timer' round (two Buus) - the party member to level for this fight is
+Vegeta. The Super Buu agent's `('fly', 648, 1076)` ends at once when started during a take-off scene (it wrote a
+wrong `m_kid_buu`); ShipDriver's `('fly', 633, 1065, 31, 23)` lands on the crater and answers s480.
 
 Findings (gates at this stage, flag 128 set): the dungeons' second gates each want one character - Nataday Gotenks
 140, Pilaf Goten 120, Southwest Forest Goku 100, Diablo Desert Gohan 100 (flag 170), the Pyramid Gohan 120 (flag

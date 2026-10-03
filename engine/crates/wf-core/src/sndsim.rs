@@ -49,6 +49,10 @@ pub struct SoundSim {
     pub seen: u32,
     /// redraw decisions closer than [`NEAR`] to the cutoff so far
     pub near: u32,
+    /// the last timed iteration: video frames between the frame its work ended in and its last one (1 when the
+    /// catch-up sound update ran over a VBlank: the restore's camera update shows a frame earlier)
+    #[serde(default)]
+    pub wrap: u8,
     /// the state came from a game RAM image without the hardware's timer phase (an emulator state imported
     /// without `snd_phase`): the driver still runs, the pages keep their constant redraw costs
     pub uncalibrated: bool,
@@ -234,6 +238,7 @@ pub fn redraw_frames(w: &mut World, r: Redraw) -> Option<u8> {
         let end = t + post;
         // the iteration ends before the VBlank it then waits for
         let frames = ((end - CUTOFF).div_euclid(FRAME) + 1).clamp(1, 60);
+        s.wrap = (frames - 1 - t.div_euclid(FRAME)).clamp(0, 3) as u8;
         let margin = frames * FRAME + CUTOFF - end;
         let near = margin.min(FRAME - margin) < NEAR;
         if near {
@@ -279,7 +284,7 @@ pub fn reload_frames_with(w: &mut World, done: bool, more: i64) -> Option<u8> {
     let mut c = rl.fixed;
     let mut extra = 0;
     for l in &rl.layers {
-        if l.cols <= 2 && l.rows <= 2 {
+        if l.cols * l.rows <= 4 {
             // loaded whole into the layer's four chunk slots
             c += l.ew.iter().sum::<i64>();
             continue;
@@ -335,7 +340,7 @@ pub fn reload_frames_with(w: &mut World, done: bool, more: i64) -> Option<u8> {
     // a close by a prompt (B) restores in the iteration after the event's: less before it (its start varies by
     // ~14 k cycles, not modelled)
     let rest = if done { RELOAD_REST } else { RELOAD_REST - 13_700 };
-    redraw_frames(w, Redraw { t0: 0, base: (rest + extra + c * 10_035 / 10_000) * 100_523 / 100_000 })
+    redraw_frames(w, Redraw { t0: 0, base: (rest + more + extra + c * 10_035 / 10_000) * 100_523 / 100_000 })
 }
 
 const RELOAD_REST: i64 = 116_800;

@@ -843,6 +843,19 @@ impl Page for Equip {
             _ => REDRAW_FRAMES,
         }
     }
+    /// the dialog over the list (equip_change, 34 iterations): only the dialog's surface is drawn - 118,700 + its
+    /// draw list + 0.3 per glyph instruction, the first time + 66,400 (within 1.5k). The page itself keeps its
+    /// constant (its list / slot transitions are not separated yet: `work/buu/menu/cycles/equip_*.json`)
+    fn redraw_time(&self, w: &World, d: &MenuData) -> Option<crate::sndsim::Redraw> {
+        let l = self.list.as_ref()?;
+        if l.dialog.is_none() && l.cant.is_none() {
+            return None;
+        }
+        let v = self.view(w, d);
+        let top = v.layers.get(1)?;
+        let own = 118_700 + crate::sndsim::layer_cycles(&d.text, &top.ops, 0) + crate::sndsim::ops_cost(&d.text, &top.ops).0 * 300 / 1000 + if self.container_ref().ever { 0 } else { 66_400 };
+        Some(crate::sndsim::Redraw { t0: 4_641, base: own - 4_641 })
+    }
 }
 
 /// a harness opening this screen from JSON (`menu::open_from_json`); None = not this screen's kind

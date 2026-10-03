@@ -678,6 +678,7 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
     }
     // the label entity of a travel menu is an object of the old area
     w.scene.dest_label = None;
+    crate::vram::release(w, crate::vram::Owner::Dest);
     // every object goes; the players are re-created below (same entity ids)
     let players = w.players.clone();
     // a re-created player is a new object: not under the script's control until a command takes it again (6-1's
@@ -699,6 +700,7 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
         v.popup_at.clear();
         v.delayed.clear();
         v.late.clear();
+        v.retake.clear();
         v.shadow_set.clear();
         let keys: Vec<u32> = v.keyed.drain(..).map(|k| k.0).collect();
         for k in keys {

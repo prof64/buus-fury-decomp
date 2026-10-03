@@ -615,6 +615,11 @@ impl Page for Shop {
     fn redraw_cost(&self) -> u8 {
         REDRAW_FRAMES
     }
+    /// shop_buy / shop_repeat / shop_sell / shop_sell_eq (list, quantity and confirm boxes alike): 111 redraws,
+    /// residual std 2.2k, max 4.8k cycles
+    fn redraw_time(&self, w: &World, d: &MenuData) -> Option<crate::sndsim::Redraw> {
+        Some(super::page_time(d, &self.view(w, d), false, 4_641, 185_539, 2_162, 478, 0))
+    }
 }
 
 /// the transition of the script-opened screens (quick fade `0x0805058C` / `0x08050568`, world save / restore)

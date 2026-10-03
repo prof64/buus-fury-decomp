@@ -780,6 +780,9 @@ impl World {
         // field: the screen-effect slot holds one shake at a time; a newer one suspends the older until it ends
         // (sc_janemba: the summon shake pauses through a crit shake, then goes on)
         let n = shakes.len();
+        if std::env::var("SHAKE_DBG").is_ok() {
+            eprintln!("shakes wf {} {:?}", self.frame, shakes.iter().map(|s| (s.left, s.cnt, s.period)).collect::<Vec<_>>());
+        }
         let stacked = self.field.is_some();
         for (k, s) in shakes.iter_mut().enumerate() {
             if stacked && k + 1 != n {

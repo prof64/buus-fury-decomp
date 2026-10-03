@@ -463,6 +463,11 @@ pub fn open_title(w: &mut World) {
 /// the title's song (`0x080053CC`)
 pub const TITLE_SONG: i32 = 45;
 
+/// the title screen is up (its world is a placeholder field: the game keeps no area there)
+pub fn on_title(w: &World) -> bool {
+    super::active(w) && (matches!(w.menu.shown.as_deref(), Some(super::Screen::Title(_))) || matches!(w.menu.stack.first(), Some(super::Screen::Title(_))))
+}
+
 /// `return_to_title` (0x8E: game over after script #0's "You have died!", the ending): a fresh session on the
 /// title screen with the save slots and the options kept. The world under the title is a placeholder (Snakeway's
 /// first area) the title's New Game / Continue replaces.
@@ -474,6 +479,15 @@ pub fn title_world(data: &Arc<crate::content::GameData>, w: &World) -> World {
         ..Default::default()
     };
     let mut nw = crate::field::create(Arc::clone(data), &cfg);
+    // the placeholder field's load is ours only: the game's RNG is where the last frame left it (ending 4-20 ->
+    // the title, segment sb_044 f24056)
+    nw.rng = w.rng.clone();
+    // ... and no object holds tiles
+    if let Some(f) = nw.field.as_mut() {
+        if f.vram.is_some() {
+            f.vram = Some(Default::default());
+        }
+    }
     nw.saves = w.saves.clone();
     nw.saves.pending = None;
     nw.menu.settings = w.menu.settings.clone();

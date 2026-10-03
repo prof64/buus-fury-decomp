@@ -11,10 +11,10 @@ skip = int(sys.argv[3]) if len(sys.argv) > 3 else 0
 ours = []
 page = None
 for ln in open(log, errors='replace'):
-    m = re.match(r'menu redraw f\d+ (\w+) const (\d+) timed (\S+ ?\S*) pressed (\S+) released (\S+) objs \d+ \| (.*)', ln)
+    m = re.match(r'menu redraw f\d+ (?:mf(\d+) )?(\w+) const (\d+) timed (\S+ ?\S*) pressed (\S+) released (\S+) objs \d+ \| (.*)', ln)
     if m:
-        page = (m.group(1), int(m.group(2)), m.group(4), m.group(6)[:60])
-        if 'None' in m.group(3):
+        page = (m.group(2), int(m.group(3)), m.group(5), m.group(7)[:60])
+        if 'None' in m.group(4):
             ours.append({'page': page[0], 'const': page[1], 'own': None, 'feat': page[3], 'pressed': page[2]})
         continue
     m = re.match(r'snd redraw f\d+: t0 (\d+) base (\d+) irq at (\d+) cost (\d+) post n (\d+) cost (\d+) end (\d+) -> (\d+) frames, margin (-?\d+)', ln)

@@ -291,8 +291,11 @@ pub enum Owner {
     Popup,
     /// a level sign's label object (`0x0800C300`, vtable 0x0804D878, 0x200 bytes): its index in the load
     Sign(u32),
-    /// the "Watch This!" mode's graphics (`0x08027DB0`, 0x2800 bytes)
+    /// a mini-game mode's graphics: "Watch This!" (`0x08027DB0`, 0x2800 bytes), the power struggle's gauge
+    /// (`0x080301F8`, 0x380)
     Minigame,
+    /// the travel menu's label object (`0x0803643C`, 0xF40 bytes)
+    Dest,
     /// the HUD's stat-points mark (`0x0800BCC8` makes it, vtable 0x0804C070, 0x100 bytes)
     StatMark,
     /// an ended effect object's block (`delayed`)
@@ -349,6 +352,9 @@ pub struct VramState {
     /// the damage numbers' places in the world list: (handle, the id the next entity got when it was made)
     #[serde(default)]
     pub popup_at: Vec<(u16, u32)>,
+    /// second objects due (`beam_pair`): (frame, tile bytes, frames it lives)
+    #[serde(default)]
+    pub retake: Vec<(u32, i32, u32)>,
     /// the entity the object pass is updating (0 outside the pass)
     #[serde(default)]
     pub pass_at: u32,
@@ -547,6 +553,19 @@ pub fn release_later(w: &mut World, owner: Owner, frames: u32) {
         v.owners.retain(|o| o.0 != h);
         v.owners.push((h, Owner::Ending));
         v.delayed.push((h, at));
+    }
+}
+
+/// an object of `bytes` that ends after `frames` updates and makes a second one for as long in its next frame
+pub fn beam_pair(w: &mut World, owner: Owner, bytes: i32, frames: u32) {
+    if w.field.as_ref().is_none_or(|f| f.vram.is_none()) {
+        return;
+    }
+    acquire(w, owner, bytes);
+    release_later(w, owner, frames);
+    let at = w.frame + frames + 1;
+    if let Some(v) = st(w) {
+        v.retake.push((at, bytes, frames));
     }
 }
 
@@ -1119,6 +1138,21 @@ pub fn hud_tick(w: &mut World) {
         }
     }
     popups_tick(w, None);
+    let due: Vec<(u32, i32, u32)> = st(w).map(|v| v.retake.iter().filter(|r| r.0 <= now).copied().collect()).unwrap_or_default();
+    if !due.is_empty() {
+        if let Some(v) = st(w) {
+            v.retake.retain(|r| r.0 > now);
+        }
+        for (_, bytes, frames) in due {
+            acquire(w, Owner::Ending, bytes);
+            let at = now + frames;
+            if let Some(v) = st(w) {
+                if let Some(o) = v.owners.last() {
+                    v.delayed.push((o.0, at));
+                }
+            }
+        }
+    }
     // the HUD's update (`0x0800BCC8`) makes the stat-points mark when the leader has points to spend and there is
     // none; the mark deletes itself when the points are spent (`0x0800B530`)
     let points = w.story.chars.get(w.story.current.max(0) as usize).map(|c| c.rec.points).unwrap_or(0);

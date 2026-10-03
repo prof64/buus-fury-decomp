@@ -29,7 +29,7 @@ def generic(feat):
 
 
 rows = defaultdict(list)
-args = [x for x in sys.argv[1:] if x != '--rows']
+args = [x for x in sys.argv[1:] if x not in ('--rows', '--layers')]
 if args and args[0] == '--dir':
     # --dir LOGDIR CYCLESDIR [scenario ...]: LOGDIR/<scenario>.log + CYCLESDIR/<scenario>.json, aligned from the end
     # (the last measured iteration is the screen's close)
@@ -42,31 +42,48 @@ for arg in args:
     skip = parts[2] if len(parts) > 2 else 1
     ours = []
     for ln in open(log, errors='replace'):
-        m = re.match(r'menu redraw f\d+ (\w+) const (\d+) timed (.*?) pressed (\S+) released (\S+) objs (\d+) \| (.*)', ln)
+        m = re.match(r'menu redraw f\d+ (?:mf(\d+) )?(\w+) const (\d+) timed (.*?) pressed (\S+) released (\S+) objs (\d+) \| (.*)', ln)
         if m:
-            layers = m.group(7).split(' || ')
-            tm = re.match(r'Some\(\((\d+), (-?\d+)\)\)', m.group(3))
-            ours.append((m.group(1), int(m.group(2)), m.group(4), m.group(5), layers, int(tm.group(1)) + int(tm.group(2)) if tm else None))
+            layers = m.group(8).split(' || ')
+            tm = re.match(r'Some\(\((\d+), (-?\d+)\)\)', m.group(4))
+            ours.append((m.group(2), int(m.group(3)), m.group(5), m.group(6), layers, int(tm.group(1)) + int(tm.group(2)) if tm else None, int(m.group(1) or 0)))
     ours = [o for o in ours if o[1] > 1]
     if skip == 'auto':
         skip = max(len(cyc) - len(ours) - 1, 0)
     skip = int(skip)
-    agree = sum(1 for o, g in zip(ours, cyc[skip:]) if o[1] == g['frames'])
-    if agree < len(ours):
-        print(f'# {parts[1].split("/")[-1]}: {len(ours)} model redraws, {len(cyc)} measured, skip {skip}: frame counts agree on {agree}')
+    # align by video frame: the model's menu frame counter (mf) + a constant offset = the measured f0
+    by_f = {g['f0']: g for g in cyc}
+    best = (0, 0)
+    from collections import Counter
+    offs = Counter(f - o[6] for o in ours for f in by_f)
+    if offs:
+        off, n = offs.most_common(1)[0]
+        best = (n, off)
+    pairs = [(o, by_f[o[6] + best[1]]) for o in ours if o[6] + best[1] in by_f]
+    if best[0] < len(ours):
+        print(f'# {parts[1].split("/")[-1]}: {len(ours)} model redraws, {len(cyc)} measured, {best[0]} aligned (offset {best[1]})')
     prev = None
-    for o, g in zip(ours, cyc[skip:]):
+    for o, g in pairs:
         fresh = 1 if prev != o[0] else 0
         prev = o[0]
         gen = [generic(x) for x in o[4]]
         tot = sum(x[0] for x in gen)
         lines = sum(x[1] for x in gen)
         key = o[0] + ('+' + str(len(gen) - 1) if len(gen) > 1 else '')
-        rows[key].append(dict(model=o[5], fresh=fresh, own=g['own'], gen=tot, rest=g['own'] - tot, lines=lines, frames=g['frames'], const=o[1], end=g['end'], f0=g['f0'],
+        rows[key].append(dict(lay=[(x[0], x[1], x[2]) for x in gen], model=o[5], fresh=fresh, own=g['own'], gen=tot, rest=g['own'] - tot, lines=lines, frames=g['frames'], const=o[1], end=g['end'], f0=g['f0'],
                               pressed=o[2], released=o[3], gn=sum(x[2] for x in gen), g=sum(x[3] for x in gen), ops=gen[-1][4][:70], src=parts[1].split('/')[-1][:-5]))
 for page, rs in sorted(rows.items()):
     cols = [[1, r['lines'], r['gn'] / 1000, r['fresh']] for r in rs]
     use = [k for k in range(4) if len(set(c[k] for c in cols)) > 1 or k == 0]
+    import os
+    if os.environ.get('FIT'):
+        use = [k for k in use if str(k) in os.environ['FIT'].split(',')]
+    if os.environ.get('GROUPS'):
+        gr = defaultdict(list)
+        for r in rs:
+            gr[(r['lines'], r['gn'], r['fresh'], r['ops'][:int(os.environ['GROUPS'])])].append(r['rest'])
+        for kk, v in sorted(gr.items()):
+            print(f'   group lines {kk[0]:2d} gn {kk[1]:6d} fresh {kk[2]} n {len(v):2d} rest mean {np.mean(v):8.0f} spread {max(v) - min(v):6.0f} | {kk[3]}')
     A = np.array([[c[k] for k in use] for c in cols], dtype=float)
     y = np.array([r['rest'] for r in rs], dtype=float)
     k, *_ = np.linalg.lstsq(A, y, rcond=None)
@@ -76,6 +93,9 @@ for page, rs in sorted(rows.items()):
     errs = [r['model'] - r['own'] for r in rs if r['model'] is not None]
     if errs:
         print(f'   the model (t0 + base) - measured: n {len(errs)} mean {np.mean(errs):.0f} std {np.std(errs):.0f} min {min(errs)} max {max(errs)}')
+    if '--layers' in sys.argv:
+        for r in rs:
+            print(f"  L {r['src'][:14]:14s} f{r['f0']:4d} own {r['own']:8d} frames {r['frames']} fresh {r['fresh']} k{r['pressed']}/{r['released']} layers " + ' '.join(f'[cyc {a} lines {b} gn {c}]' for a, b, c in r['lay']))
     if '--rows' not in sys.argv:
         continue
     for r, e in zip(rs, res):

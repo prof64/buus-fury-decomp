@@ -405,9 +405,9 @@ fn self_field_free(w: &World) -> Option<bool> {
 /// Airship's self destruct - white fade, HP 0) in that frame (MEASURED 12-22: GD+0x4D4 15 on the cut's f1702, `run 9`
 /// on f1717).
 pub fn tick_timers(w: &mut World, s: &mut HostState) {
-    // the game runs the scripts before the frame's objects: a countdown started by the last instruction of an event
-    // counts that frame already (Kid Buu's arena 21-25: 3600 set in the event's exit frame reads 3599 in it; the
-    // hook runs 3599 frames later) - our scripts run after the update, so the first free tick counts twice
+    // a countdown switched ON by the last instruction of an event counts in that frame already (Kid Buu's arena
+    // 21-25: 3600 set in the event's exit frame reads 3599 in it; the hook runs 3599 frames later) - our scripts
+    // run after the update, so its first free tick counts twice
     let fresh = std::mem::take(&mut s.timers.fresh);
     if s.timers.countdown_on && s.timers.countdown > 0 && self_field_free(w).unwrap_or(true) {
         if fresh && s.timers.countdown > 1 {
@@ -502,6 +502,10 @@ pub fn poll(w: &mut World, s: &mut HostState) -> Option<Option<i32>> {
                 if native == 0xa7 {
                     wf_core::vram::release(w, wf_core::vram::Owner::Minigame);
                     wf_core::vram::restore(w);
+                }
+                // the power struggle's gauge object goes with the mode (`0x08030018`)
+                if native == 0xc6 {
+                    wf_core::vram::release(w, wf_core::vram::Owner::Minigame);
                 }
                 return {
                     s.pending = None;

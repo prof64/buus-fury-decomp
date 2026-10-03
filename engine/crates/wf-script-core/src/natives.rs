@@ -655,8 +655,10 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
         }
         0xae => {
             h.s.timers.countdown = arg(a, 0) * 60;
+            // (a countdown switched on makes its object, whose first update counts at once; one already on - at 0
+            // after its hook - is only set: 21-25's second minute reads 3600 in the frame it is set)
+            h.s.timers.fresh = !h.s.timers.countdown_on;
             h.s.timers.countdown_on = true;
-            h.s.timers.fresh = true;
             unit()
         }
         0xaf => {
@@ -732,6 +734,9 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
         }
         0xc6 => {
             // the exact screen (menu/minigame.rs) needs no menu content: used with or without it
+            // the mode's gauge object (`0x080301F8`, vtable 0x0804C020): 0x380 tile bytes while it runs (segment
+            // sb 1-5 f4204)
+            wf_core::vram::acquire(h.w, wf_core::vram::Owner::Minigame, 0x380);
             wf_core::menu::minigame::open_power(h.w);
             block(h.s, Pending::Menu { native: n, push: false })
         }
@@ -816,6 +821,9 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
         }
         0xd9 => {
             h.w.scene.dest_label = Some((arg(a, 0), vec![0; 32]));
+            // the label object (`0x0803643C`, vtable 0x0804BAF4): 0xF40 tile bytes (segment sb 18-1 -> 0-51)
+            wf_core::vram::release(h.w, wf_core::vram::Owner::Dest);
+            wf_core::vram::acquire(h.w, wf_core::vram::Owner::Dest, 0xF40);
             // the ctor starts on trigger list entry [count - set - 1] (= our trigger index `set`)
             h.w.scene.dest_sel = arg(a, 0);
             unit()

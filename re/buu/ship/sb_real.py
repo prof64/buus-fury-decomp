@@ -55,7 +55,7 @@ try:
         if '-v' in a and key != prev:
             print(f, d.k, d.goals[d.k] if not d.done() else None, s, flush=True)
         prev = key
-        if s['area'][:2] == [0, 2]:
+        if s['area'][:2] == [0, 2] and s['hp'] == 0:      # (0-2 with HP left is the Spirit Bomb's scene)
             raise RuntimeError('game over')
 except Exception as x:  # noqa: BLE001
     err = x

@@ -1147,13 +1147,8 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
         }
         // field (sc_janemba): the arm part plays the strike (raw 19), the body keeps its idle; battle keeps the
         // reference's body animation (cross_ts)
-        K::JanembaHandStrikeA | K::JanembaHandStrikeB if w.field.is_some() => {
-            // SetAnimRaw(0x12) + the strike controller (no state rule, no start draw): 8 frames a cel
-            if let Some(k) = en::janemba_arm(w, i, kind(c, n) == K::JanembaHandStrikeA) {
-                let rule = w.data.anim.fallback_once;
-                en::set_anim_rule(w, k, &[an(18)], true, Some(false), Some(rule));
-            }
-        }
+        // (the arm's animation starts with its controller, on the node's first update)
+        K::JanembaHandStrikeA | K::JanembaHandStrikeB if w.field.is_some() => {}
         K::JanembaHandStrikeA | K::JanembaHandStrikeB => set_anim(w, i, &[an(17)], true, Some(false)),
         // field (sc_janemba): anim 0x13 = raw 20, one pass at 8 frames a cel, held on its last cel through the rise and
         // the descent; battle keeps the reference's
@@ -2514,8 +2509,13 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             // field: the node's first update gives the arm part the strike controller (it makes the hand and ends
             // the arm's animation itself: enemy.rs janemba_part_field); the node waits it out
             let arm = en::janemba_arm(w, i, kind(c, n) == K::JanembaHandStrikeA);
-            if f == 1 {
+            // (not once Janemba is down: the killing punch that cut a strike starts no next one - the real route's
+            // arena: all three parts end their hurt animation 27 frames into the defeat scene, three draws)
+            if f == 1 && w.en_ref(i).hp1024 > 0 {
                 if let Some(k) = arm {
+                    // SetAnimRaw(0x12) + the strike controller (no state rule, no start draw): 8 frames a cel
+                    let rule = w.data.anim.fallback_once;
+                    en::set_anim_rule(w, k, &[an(18)], true, Some(false), Some(rule));
                     w.en(k).strike = (1, kind(c, n) == K::JanembaHandStrikeA);
                 }
             }
