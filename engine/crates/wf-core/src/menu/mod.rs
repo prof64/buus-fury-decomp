@@ -785,15 +785,10 @@ fn close_with(w: &mut World, done: bool) {
             let switched = c.switched;
             let mut sprites: Vec<i32> = (0..w.ents.len())
                 .filter(|&i| !w.ents[i].removed && matches!(w.ents[i].body, crate::world::Body::Npc(_) | crate::world::Body::Enemy(_)))
+                // on screen only (real run 21-14 r064_017: four sprites all off screen, the close costs none of them)
+                .filter(|&i| crate::vram::on_screen(w, i))
                 .filter_map(|i| crate::scene::sprite_id(w, i))
                 .collect();
-            if std::env::var_os("T_FIG").is_some() {
-                for i in 0..w.ents.len() {
-                    if !w.ents[i].removed && matches!(w.ents[i].body, crate::world::Body::Npc(_) | crate::world::Body::Enemy(_)) {
-                        eprintln!("  t-fig ent {} sprite {:?} on_screen {} dec {} pos {:?}", i, crate::scene::sprite_id(w, i), crate::vram::on_screen(w, i), crate::scene::cel_dec(w, i), w.actor(i).map(|a| (a.px(), a.py())));
-                    }
-                }
-            }
             sprites.sort();
             sprites.dedup();
             Some((switched, sprites.len() as i64))

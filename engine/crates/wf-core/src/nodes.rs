@@ -1447,6 +1447,11 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             let sc = c.tree.nodes[n as usize].script;
             let inline = matches!(c.tree.nodes[n as usize].k, K::InlineScript);
             if r.d[0] == 1 {
+                if std::env::var("TMPDBG").is_ok() { eprintln!("TMPDBG f{} inline-node me {me} inline {inline} wait {:?} dir {:?} depth {} at {}", w.frame, w.scene.ai_wait, w.scene.director.wait.is_some(), w.scene.depth, w.scene.tracks_at); }
+                // (the inline script's parallel block steps in this update; the script ends with it)
+                if inline && w.scene.ai_wait.contains(&me) && w.field.is_some() && w.scene.depth == 0 && crate::scene::tick_tracks_in_update(w) {
+                    crate::scene::ai_script_done(w, me);
+                }
                 return !w.scene.ai_wait.contains(&me);
             }
             if sc != 0 && r.d[0] == 0 {

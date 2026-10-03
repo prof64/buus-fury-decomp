@@ -71,7 +71,7 @@ LEGS = {
     # the Z-Fighter Museum 4-23 (s189, the same hand-in; flag bits 346): from the hidden dungeon's end (exhibit 71) -
     # back out to 2-8's take-off pad (161, 369, 47, 31; A), West City 4-1 -> 4-21 -> 4-23, talk facing up
     # (the rock is back after each reload: punch it again, from the east this time)
-    'museum': ('pg_hidden.ss', [('goto', '2-35', 282, 128, False), ('walk', 282, 128), ('face', 'L'),
+    'museum': ('pg_hidden.ss', [('goto', '2-35', 282, 136, False), ('walk', 282, 136), ('face', 'L'),
                                 ('keys', [(A_, 2, 14)] * 5), ('wait', 30),
                                 ('openwall', '2-35', [(x, y) for x in range(31, 35) for y in range(16, 18)]),
                                 ('goto', '2-8', 176, 380, False), ('keys', [(A_, 3, 240)]),

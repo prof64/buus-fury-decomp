@@ -61,6 +61,12 @@ NOTES = {
                      '>= 21,578 cycles)',
     'r064_017_21-14': 'Switch Character at 21-14 (Vegeta -> Goku, 4 figures): predicted 15, the game 14 (over by '
                       '>= 99 k cycles: CHARSEL_CLOSE_SPRITE x 4?)',
+    'rE2__090_7-3': 'not the Earth agent\'s e_7_3_1: the real run\'s Earth chapter cut at its last importable entry, '
+                    'Papaya Island 7-3 (file work/real/segs/E2_earth/rE2__090_7-3.json, state states/rE2__090_7-3.ss, '
+                    'key frame 108,563 of the Earth keys): 52,416 frames, the Earth keys\' last 51,940 (no importable entry '
+                    'after it) and ~480 of the ship route\'s up to its first entry; first divergence at its frame 6,658: actor #42 '
+                    '(sprite 222) raw 1 cel 0 vs the game\'s cel 1, tick 1776 vs 1777 - an NPC idle animation one tick '
+                    'behind after ~1,800 frames',
     'r038_002_18-2': 'a heal menu closed in 18-2: predicted 21 black frames 208 cycles before the 22nd',
     'r047_002_18-13': 'heal menu / Switch Character in 18-13: one frame short',
 }
