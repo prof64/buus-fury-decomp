@@ -121,6 +121,18 @@ impl Session {
     }
     /// the objects' update and the cutscene systems (second part of [`Session::step_world`])
     pub fn step_update(&mut self) {
+        // the game's logic counter (0x03000F94) counts every logic frame, also the ones whose object pass does not
+        // run (a modal camera scroll or mosaic, an open director batch, an inline level-up hook's frame). `World.frame`
+        // counts object passes (the engine's pass-relative timers); the counter is `Globals::clock` = fc0 + frame:
+        // state stamps, cooldown marks and the press ring are taken from it. Menu screens keep their own timing
+        let f0 = self.world.frame;
+        let menu = crate::menu::active(&self.world) || self.world.menu.closed_this_frame;
+        self.step_update_inner();
+        let w = &mut self.world;
+        // (a held pass may still complete in this frame's post step: counted there)
+        w.g.clock_mark = (!menu && !crate::menu::active(w) && w.frame == f0).then_some(f0);
+    }
+    fn step_update_inner(&mut self) {
         let w = &mut self.world;
         if std::mem::take(&mut w.menu.closed_this_frame) {
             return;
@@ -166,6 +178,10 @@ impl Session {
     /// the rest of the frame: cameras and the field / battle rules after the update
     pub fn step_post(&mut self) -> &[Event] {
         self.step_post_world();
+        // a logic frame whose object pass did not run still counts on the game's logic counter
+        if self.world.g.clock_mark.take() == Some(self.world.frame) {
+            self.world.g.fc0 += 1;
+        }
         crate::sndsim::end_frame(&mut self.world);
         &self.world.events
     }

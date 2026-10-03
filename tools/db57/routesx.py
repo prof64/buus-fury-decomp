@@ -16,6 +16,7 @@ def sv(v):
 
 class XDriver(DbDriver):
     AVOID = (20, 64, 25, 4, 29)      # Babidi hovers over 0-21 and takes no hits: never a target
+    EMERGENCY = 0.08                 # no area-entry cut between the fights here: a pause menu ends the exact match
 
     def flyer(self, e):
         p = e.r32(0x03001C34)

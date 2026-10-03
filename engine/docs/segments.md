@@ -363,7 +363,14 @@ work/ship/fat --fat [--from MARK] --log`). Checkpoints = `work/ship/fat/<mark>.s
 | `d11_pilaf` | **Pilaf's Castle entrance 10-1** | `fat/keys_d11_d11b.json` (1,195) |
 | `d11b_rock` | 10-1 after Trunks' level-80 rock (flag 166), Goten again, his 12 points spent | `fat/keys_d11b_d13.json` (11,327 from d11b) |
 | `d12_pilaf_boss` | 10-30 (the save point before the boss), Goten 96, HP 401 | |
-| `d13_pilaf_won` | 10-31 after Pilaf's Guardian (type 63, 10,605 HP; s365, flag 94) | |
+| `d13_pilaf_won` | 10-31 after Pilaf's Guardian (type 63, 10,605 HP; s365, flag 94) | `fat/keys_d13_fail.json` (its first 9,264 frames: d13 -> d15_map) |
+| `d14_ball3` | 10-31 with the 3-Star Dragon Ball (s366, flag 114: the ball lies there only once the room is entered again with flag 94 set; A on it) | |
+| `d15_map` | 10-1's pad, taking off (Goten rested at 10-30's save point on the way out) | `fat/keys_d15_d16.json` (12,827 frames from d15_map) |
+| `d15b_radar` | 4-27 right after s193's radar node (**flag 77**: Bulma stands at (176, 152); d02's talk reached nobody, so d02 .. d15_map do not have it) | |
+| `d15c_city` | West City's capsule, taking off: six Hamburgers, Goten full | |
+| `d16_desert` | **Diablo Desert entrance 11-1**: Goten 97 (695 HP), Trunks 80, flags 112 / 114 / 77 | from here the dungeon agents' own routes, played from the real state |
+| `db2/a_start` .. `db2/o_map` | Diablo Desert by agent A's `db2_route.py` unchanged (`re/buu/ship/fat_db.py db2 fat/d16_desert.ss`): gate, the four switches (`c_sw1` .. `f_sw4`), `h_11-13`, `i_train`, `l_11-24` (the five robbers), `m_ball` (flag 113), `o_map`; 19,972 frames, Goten 99 | `fat/db2/keys.json` |
+| `d20_airship` | **Airship entrance 12-1** (685 frames of flight from `db2/end.ss`) | `fat/d20_airship.keys.json`; then `tools/db57/run.py db5 fat/d20_airship.ss fat/db5` |
 
 Findings: the Dragon Ball hunt is the main line (flags 112 .. 118: Thieves Den 9, Diablo Desert 11, Pilaf's
 Castle 10, the Airship 12, Fukurou Forest 13, Kyodai Pyramid 14, Nataday Village 15), then s017 (119) and Gotenks vs
@@ -373,6 +380,14 @@ drops only from the Stolen Airship encounter 0-55 (world-map patrols with graphi
 (Trunks, 65; 22,025 XP = level 71 ends it). Each airship is used up by its flag (388 .. 392; 75% are treasure
 rooms) until a landing in a town clears them. RNG only moves on draws, so `hunt_search.py` varies the number of
 punches thrown in West City before take-off (32: the Bandana after 19,521 frames).
+
+Bot rules found in Pilaf's Castle (all in `ship_driver.py`): a Destroyer's flames reach further on the right / lower
+side of its line (the positions are top-left corners), and with no way out of the line a guard (R) facing it takes
+none of them; a Vampire's grab (state 0x2FE) is NOT left by holding A / B (200 frames held: still held) but by
+separate presses (A, nothing, B, nothing: free within ~20 frames) - the engine's VampireGrab counts keys *held*;
+Ghosts are only touchable in states 0xD9 .. 0xDB; an Energy Blast fired from closer than ~34 px starts past its
+target; the punch reaches ~26 px straight up and down as well (corridors one footprint wide); a diagonal step into a
+wall corner does not slide. 10-15's door breaks on A (flag 260) and opens 8 px right of its exit's centre.
 
 Thieves Den: the rock in 9-1 needs Trunks at level 80 (s517 (3, 80)); the Bandana goes on Goten from the pause
 menu's Equip page (accessory row) once the landing's jump-in is over (~200 frames). 9-5's Juggernaut tank (type 58,
@@ -478,16 +493,20 @@ camera at the load (3-1 / 3-11 / 2-8 #1 / #15 / 4-1 #2 now exact).
 Results (90 segments, 104,026 video frames): **84 exact to their end**, 94,718 frames continuously matched; all 84
 gated in `data/segments/earth_*.json`.
 
-Open: 7-2 f1200 / 7-3 f2995 (portrait OBJ purge - the Super Buu agent's model); 3-3 #4 f1479 (a soldier's
-AlignWithPlayer); the redraw-timing trio below.
+Open: 7-2 f1432 (portrait OBJ purge - the Super Buu agent's model; 7-3 is exact since it landed); 3-3 #4 f1479
+(a soldier's AlignWithPlayer); 2-9 #13 / 2-11 #4 / 3-15 #4 now past their status pages, at the pause menu's close
+(per-area black frames, below).
 
-**Note to the ship agent (from the Earth agent): I am building the menu redraw timing model** (status-page sound
-40 / input landing 3 vs 4 frames after a redraw; it also explains the ship's status-page grinding segments). Findings
-so far: a page redraw (0x080154D4) starts at scanline ~163 and runs 619..668 lines; the next mode iteration lands 3
-frames later when the redraw ends at or before line ~118 of its last frame, 4 frames when at or after ~121. The
-duration is page work (~217-222k instructions, varies with the drawn text) plus the software mixer (IWRAM
-0x03000880.., ~118-140k instructions over the window, varying with the active voices). Please don't change
-`menu::REDRAW_FRAMES` handling meanwhile; tell me (here) which ship segments grind on it.
+**Note to the ship agent (from the Earth agent): the status-page redraw timing model is built** (below). To use
+it on a segment: (1) content with `audio/` + `portraits/` (the default segment content now extracts both; my local
+one is `engine/target/tmp/earth-content`), (2) `init.snd_phase` in the segment file -
+`tools/segments/snd_phase.py SEG.json ...` adds it (from `source.state`, or for route cuts by arithmetic from
+`<run>/start.ss`; I ran it on your 30 menu-timing `work/ship/rsegs` files, nothing else in them changed). Without
+`snd_phase` a segment keeps the constant 5-frame redraw (all gated segments behave as before). Result on your list:
+shipr_068 / 183 now pass their status pages; every other one of the 30 first diverges at the pause menu's close
+(the per-area black frames you listed: the same mechanism - a long iteration with ~7 interrupt mixes plus an
+area-dependent reload, not modelled yet) or on another page (Inventory / Journal redraws keep constant costs:
+236, 266, 281, 308, 312). `work/earth/bin/shipmenu.sh` runs the 30, `shipseg.sh NAME` one with the model's log.
 
 Redraw timing study (2026-10-03; scripts and data in `work/earth/timing/`, emulator cycle counter `Emu.cycles()`
 added to tools/emu). How the input landing is decided:
@@ -508,11 +527,39 @@ added to tools/emu). How the input landing is decided:
   window) land at fixed times inside whatever code runs and change its prefetch state - the "183-cycle bimodal" mix
   calls are exactly such DMA steals (3 x 58 + IRQ). So the page's work has no fixed cycle cost; exactness needs an
   instruction-level ARM/Thumb timing model of the executed code (an emulator core).
-* What a deterministic predictor can do: with the mixer cost known, redraw length = 376.4 k + 4.238 x glyph-loop
-  instructions + 7 345 x (page state) + 1.011 x mixer cycles fits the 39 redraws with std 400 / max 1 484 cycles;
-  the 3-vs-4 decision margin is ~3 700 cycles, so all 39 classify correctly - but it is a bounded-error model, not
-  exact, and it needs the sound driver (wf-audio) inside the world plus a glyph-cost table and a mixer cost model.
-  Not built pending a decision.
+* **The bounded-error predictor (built; `wf-core/src/sndsim.rs`, `wf-audio/src/cost.rs`, `menu/status.rs`)**:
+  - The sound driver is world state (`World.sound`: wf-audio's `DriverState`, the play position, the last mixed
+    position, the DMA phase; hashed and in byte snapshots when there is sound content). It advances every frame
+    from the frame's sound events with wf-audio's own code (`Driver::advance`, no output), muted or not. Imported
+    from RAM (`0x030038A4` player + tracks + voices, `0x0300389C / A0`) + `init.snd_phase`; the port matches the
+    game's driver RAM on every update of the three logs (`wf-audio/examples/sndcheck.rs`).
+  - DMA cadence: one interrupt per 16,800 cycles, a frame is 280,896 = 16 periods + 12,096, so the phase is pure
+    arithmetic from boot (the 90 Earth cuts' measured phases agree to +-45 cycles; no restarts). A host replaying a
+    recording calls `sndsim::lag_frame` for the game's lag frames (the segment harness does).
+  - Mixer cost: the inner loop exactly (`driver::inner_cycles`), the Thumb side as a linear fit of work counters
+    (`cost.rs`; 561 updates: std 123, max 358 cycles). In the redraw the 928-sample mix lands within ~25 cycles of
+    the game's and costs within ~1 %.
+  - Page cost (status): 327,464 (327,223 while allocating) + the portrait's decompression (`decode_cycles` in
+    `portraits/index.json`: an instruction-path walk of the IWRAM decompressor 0x03000040,
+    `wf-extract/src/deccost.rs`, 99,211 vs 99,577 measured) + 3.5664 x shadowed-glyph instructions (from the
+    fonts' column bitmaps, now `cols` in `ui/fonts/*.json`) + 7,284 per 16 x 16 picture (prompts, the blinking
+    cursor) + the tabs (plain text 990 / line + 315 / glyph + 3.227 / column-loop instruction, fills 54 + 4.25 /
+    px, pixels 45). Cycles before the redraw in its frame by what the step did: idle 4,641 / 4,733, a held prompt
+    1,954, UP / DOWN 2,838, LEFT / RIGHT 5,260, entering allocation 52,600 (the cursor's picture), accepting
+    28,400 (RecalcStats), +187 per DMA interrupt before it.
+  - Decision: frames = floor(end / 280,896) + 1 with end = t0 + page + 1.0065 x interrupt mix + 37 + catch-up
+    update. Error against the emulator: std ~430 cycles, max ~1,650 (the no-points page reads ~1,500 high) over
+    126 redraws of four segments; the closest real decisions were 1,352 / 1,663 / 1,728 cycles from the cutoff.
+    A decision within 1,500 cycles is counted in `World.sound.near` and logged with `WF_SND_DEBUG=1` ("NEAR";
+    the log also prints every redraw's terms).
+  - Validation: e_2_9_13 (43 redraws), e_2_11_4 (25), e_3_15_4 (31) and the ship's shipr_063 (27, four party
+    tabs, another portrait; not used for the fit): every 4-vs-5 decision right. The three Earth segments now run
+    to their pause menu's close (554 / 1021 / 977 frames, from 403 / 899 / 905): the close takes 23 / 27+ / 27
+    frames against the model's 25 - a 5.6 M..6.7 M-cycle area reload plus 6..8 interrupt mixes (`timing/leave.py`),
+    the next thing to model (per-area reload cost).
+  - Tools (`work/earth/timing/`): `sndlog.py` (driver / DMA / redraw log), `timeline.py`, `cmp_core.py` (core
+    decisions vs the game), `fit_base.py`, `prof.py` (per-bucket cycles of a redraw), `decmeas.py` / `decmodel.py`
+    (decompressor), `mkvariant.py` (a segment with other keys), `mkshipstate.py` (savestate of a ship route cut).
 
 **Side-content catalogue** (data survey 2026-10-02; flags = story flags): Broly turns out to be **mainline** (Dragon
 Ball saga: his defeat s436 sets flag 111, which Dragon Ball #4 s439 needs) — shared with the Super Buu agent, whose main line
@@ -623,3 +670,106 @@ needed before s017 (119) and Gotenks vs Buu s218 (120)). Split, in flag order:
 
 Agent A's tools: `tools/dungeons/` (start-state builder on top of `tools/superbuu/mksave.py`, routes, cuts). The ship
 agent's real checkpoint states (§8) replace the constructed start states when they exist.
+
+### 10.1 Dungeons 5-7 and the events after the seventh ball (agent B, 2026-10-03)
+
+Play order (0-50's on-enter radar script `inline_0x08072A48`): the six balls of flags 112 .. 114, 116 .. 118 are
+shown at once, in any order; Nataday Village (flag 115, dungeon 4) appears only when those six are held, so a real
+route plays it **last** and the summoning follows it. Entry gates: 13-1 Goten L80 (s518), 14-1 Trunks L80 (s517), the
+Airship none.
+
+**Start states** `tools/db57/mkstate.py db5 | db6 | db7 | dbx` -> `work/db57/<ch>_start.ss`: save games loaded by the
+real game (§6's method) on top of the ship agent's REAL state `work/ship/fat/d02_radar.ss`. Invented: the earlier
+balls' flags + items (db5: 112 - 114; db6: + 116; db7: + 117 and 96 - 99; dbx: all seven, Broly's 107 - 111 and the
+dungeons' own 96 - 106), Goten / Trunks level 100 (dbx: 110) by the game's `level_up_to` + Status-style points, 8
+Steaks + 3 Senzu, 3000 zenie, the dungeon entrance's own save point (dbx: Nataday 15-1), and **flag 77** (s193, the
+Dragon Radar: `d02_radar.ss` turned out not to have it - ship agent: s193's radar node did not run in that state).
+dbx also sets **Goku to level 100** (real: 70 with 39 unspent points): at 70 he needs a pause menu against Majin
+Buu's 45,000 HP in 0-21, and nothing between that fight and Gotenks vs Buu is an area-entry cut (a pause menu ends a
+segment's exact match). The real-level route completes too (one heal, `work/db57/rx70`, not cut). db6 / db7 were
+recorded before flag 77 was added (their dungeon frames do not read it); db5 / dbx after.
+
+**Tools** `tools/db57/`: `run.py ROUTE START.ss OUTDIR [--from MARK]` (routes.py / routes6.py / routes7.py /
+routesx.py, marks, key log in rec_segments.py's format), `dbdriver.py` (on ShipDriver: `go` = nav over a graph with
+the script-trigger warps, modes clear / rush / `near`; `clear`, `item`, `trig`; heals at exits (`TOPUP`) so a pause
+menu costs only a segment's tail), `peek.py` (state + screenshot at frames of a run), `gate.py` / `trim.py` (gates
+into data/segments: exact cuts whole, others on their first-matched window), cuts by `re/buu/ship/rec_segments.py`.
+An exit (and a lift pad) fires only while the footprint's top-left point is inside its rect across the push.
+
+| chapter | route (real game, no RAM writes) | frames | cuts | exact | matched |
+|---|---|---|---|---|---|
+| db5 Airship XJ-5 (12) | 12-1 .. 12-27 (4 lifts, 3 platforms), Warlord 12-28 (s386), 5-Star ball (s387), the 3-minute escape back to 12-1's pad, 0-50 | 27,707 | 40 | 37 | 26,088 / 26,745 |
+| db6 Ninja Stronghold (13) | gate s518, s390, 13-32 .. 13-47, the Ninja Key 13-52 (s396), door s395, Ninja Boss 13-53 (s397 / s398), 6-Star ball (s399), out | 18,235 | 37 | 37 | 16,809 |
+| db7 Kyodai Pyramid (14) | gate s517, Dr. Challenger s400, men 1-4, the four s415 switches, the 14-17 pit maze, 14-21, Totenhotep 14-24 (s419 - s421), s406 (7-Star), out, s019 | 27,161 | 41 | 39 | 24,960 / 27,151 |
+| dbx after the 7th ball | 15-1 pad -> 0-50 -> the airship marker (s017: Bulma, Shenron) -> s215 / s216 (fusion dance, Watch This!) / s217 -> Goku on 6-1 -> 0-50 -> s026 -> 0-21 Goku vs Majin Buu -> s027 -> s218 (fusion x3) -> Gotenks on 0-50 -> s020 -> 0-15 Gotenks vs Buu -> back on 6-1; ends where the Janemba prologue starts (0-96) | 46,682 | 4 | 3 | see below |
+
+dbx cuts (only exit arrivals are importable, so the route steps through 15-33 and 6-2 to make two): `dbx_002` 15-1
+-> the whole summoning chain to Goku on the Lookout, **19,500 / 19,500**; `dbx_004` 6-1 -> ... 26,635 frames: matches
+**20,256** (s026, the whole Goku vs Buu fight, s027, s218 with its three fusions, the warp to 0-50) with the death
+rule of the committed tree, **8,957** with the ship agent's in-flight edit in `enemy::update_rest` ("an enemy the
+player's update just killed still takes this pass's step", from 8-71): in 0-21 Majin Buu (type 28, stack [0xAF, 2]) does
+**not** move in the frame of the killing punch (game pos (6168, 47308) on f8953 .. f8958 of the cut; wf moves it
+(-0.53, +0.17)). Ship agent: the two cases need one rule - probably "a slide already running goes on, the killing hit
+starts no new reaction". Gated in data: db5 40 files (first-matched windows where a heal menu ends the match), db6 32,
+db7 22, dbx 4 (`dbx_002` first 6,000, `dbx_004` first 7,500 frames; full cuts in `work/db57/segsx`).
+
+Rules found by B (dungeon 5 + dbx; the forks' rules for 6 / 7 follow):
+* **BackStep** (0x080313EA; Mechanoid 0x172): the step adds both components and is taken back whole when the footprint
+  does not fit - no sliding (`nodes.rs`; TS `ai.ts` mirrored, dumps regenerated).
+* **On-defeat inline scripts** run in the VM's nested loop: one that blocks holds the field when no event of the frame
+  does (the level-up popup #3 before it has ended: the other enemies do not update in the popup's exit frame) - hosts
+  `finish` (wf-import, wf-app, playthrough test).
+* **Loot block** (0x03001010 / 0x03001018): the on-defeat callback sees the death's block (footprint centre x, bottom
+  y, 256 px along the killing hit), like the drop script (`field::defeats`).
+* **`spawn_map_item` (0xAA)** = the dropped-item constructor 0x0800D30E from the loot block (4 RNG draws, the flight
+  of a drop), then the map item's vtable (A takes it, its event runs): `fieldobj::throw_map_item` (12-28's ball flies
+  from the Warlord).
+* **A held pass resumes with the frame's own input** (`Field.raw_input`): RIGHT held through the Warlord's defeat
+  script - the walk starts in the script's last frame.
+* **Countdown** (GD+0x4D4, s387's self destruct): one per logic frame only while the field runs free (no event / inline
+  script hold, no exit fade or walk-in, no item-get); ticked by the hosts every frame (`wf_script_core::tick_timers`),
+  imported at area entry. MEASURED 12-28 .. 12-1 (10,589 after the lift ride in both). The timeout itself is not
+  modelled.
+* **World-map marker** (behaviour step 0x0803A053, update 0x08039F4E; 0-50's airship, s017): kept at centre + radius
+  x d / isqrt(|d|^2), d = leader - centre (whole px, signed divisions), height = the leader's, heading by d's octant
+  (`StepRt::Ring`).
+* **An encounter's on-defeat *event*** (callback 0x0800424F, `field::trigger_self`) joins the world list and runs from
+  the next frame's start, which it holds (the flyer's animation skips that tick; an inline script callback runs at
+  once as before).
+* **`return_to_field`** restores the field without the saving `load_scene`'s transient load flags (`defer_objects`
+  ...): after it, a `warp` builds the area's NPCs before the player again (s215 -> s216).
+* **`set_character` with the player offstage** (s217, between load_scene and warp): the current character and the
+  offstage player change, no idle draw; with a player it rebuilds the object at the end of the world list (its
+  script track ticks before older actors': s501 as Trunks).
+* **`warp_fade` from the 3D map** (s026): no idle draw; the flyer turns north, its animation restarts, it is held
+  through the fade; the player the load builds faces down. That player is a **free object during the fade-in** - it
+  reads the keys although the event runs (A punches), until the script's next command takes it (`field::free_arrival`).
+* **Enemies an event's load creates** run on only on the 3D world map (its patrols); a 2D area's are held like any
+  others (0-21's Majin Buu draws nothing until s026 ends).
+
+Open (B): `dbx_004` f20257 - in the frame s218 ends on the world map the game runs the objects twice (the event's own
+update and the pass it interrupted since Buu's defeat in 0-21); ours once (the held-pass resume does not survive the
+event's loads). The Gotenks flight, s020 and Gotenks vs Buu behind it are recorded (6,400 frames) but not matched yet.
+db5: 3 cuts end at a heal menu (menu redraw timing, Earth agent). The countdown's timeout event.
+
+Rules found in dungeon 6 (`tools/db57/routes6.py`; 13-1's gate closes on every entry and is opened again from inside
+on the way out): SelfMessage11 (Ronin / Samurai / Shogun) = the enemy's SetAnim(0x11) (raw 19 under the one-shot
+0x03001B18, restarted per enter; field only); an inline hook's event holds the player's control (animation tick only)
+and its exit frame's completed pass does not tick the shake task again; an on-defeat callback that ends without an
+event releases the held frame (`field::release_unstarted_hold`); NinjaReveal ends with SetAnim(0), keeps the jittered
+position, puff rate 0x1000 + rand(0x1000) (field only); `spawn_map_item_at` (0xA9) throws the item like
+`spawn_map_item` (4 RNG draws) from (x, y) with zero velocity. The Ninja Key is object vtable 0x0804A314 in a wall
+statue (A facing up); the balls are 0x0804C508.
+
+Rules found in dungeon 7 (`tools/db57/routes7.py`; 14-3's east door skips 14-7 .. 14-9, 14-12's halves connect only
+through 14-13 -> 14-14 -> 14-15, the pit maze's touch triggers fire on the position point, 14-21's switches break
+only to Energy Blasts; with six balls held the map entry plays s515 -> s019 -> Nataday 15-1): Ghost GhostAnimA / B =
+SetAnimRaw(0x12), then the paired graphics set (0x60 / 0x5E ...) idle without a draw; the node labelled SpawnPuff is
+Detach (obj+0x291: Ghosts never mark the enemy grid); Skeleton collapse / rise (unhittable, raw 0x11 / 0x12 at 4
+ticks a cel, the rise ends with SetAnim(0) + hittable); RandomStep = a per-frame +-1 px rattle around the kept
+position; WindupMelee unhittable from tick 32 to the last cel, a field controller during event holds (these five
+mirrored in the TS reference, dumps regenerated - no dump scenario has a Ghost or Skeleton); a wander step marks only
+its destination; an event ending out of a wait / closing text box lets the older enemies update in that frame; a
+queued (object-list) event's exit frame gives the player its own update; a defeated boss kept for its on-defeat event
+still gets the event-start stop message. Open: db7_023 f1243 (pause menu), db7_041 f765 (s019's 0-9 scene, an idle
+tick under portrait boxes, not investigated).

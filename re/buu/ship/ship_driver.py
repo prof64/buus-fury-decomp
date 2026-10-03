@@ -187,6 +187,13 @@ class ShipDriver(Driver):
                     continue
                 if all(free(x + ddx * j, y + ddy * j) for j in range(8, need + 8, 8)):
                     return self.guard_key(k, x, y)
+            if o[5] == 20:
+                # no way out of the line (Pilaf's Castle 10-14: two side by side under the door): guard facing it
+                # (a block from the front takes 1/16)
+                want = f ^ 1
+                if s['p'][2] != want and not self.blocking(e):
+                    return (KEY.DOWN, KEY.UP, KEY.LEFT, KEY.RIGHT)[want]
+                return KEY.R
             k = self.flee(e, s, ex, ey)
             return self.guard_key(k, x, y) if k else None
         return None
@@ -207,6 +214,15 @@ class ShipDriver(Driver):
             if -16 < ahead < 260 and -margin < side < margin + 20:
                 return True
         return False
+
+    GRABS = (0x2FE,)    # VampireGrab: drains POW every 16 frames until A / B / d-pad has been held 9 frames
+
+    def grab_guard(self, e):
+        for o in enemies(e):
+            st = ai_state(e, o[0])
+            if st and st[-1] in self.GRABS:
+                return (KEY.A, 0, KEY.B, 0)[self.t % 4]   # (presses count, not holding)
+        return None
 
     def guard_key(self, k, x, y):
         """remember the guard's key; held 8 frames without moving: that direction is blocked for 90 frames"""
@@ -751,6 +767,9 @@ class ShipDriver(Driver):
             return 0
         if self.maybe_heal(e, s):
             return self.heal_step(e) or 0
+        k = self.grab_guard(e)
+        if k is not None:
+            return k
         x, y = s['p'][0], s['p'][1]
         ens = [o for o in enemies(e) if abs(o[1] - x) + abs(o[2] - y) <= radius and o[0] not in self.skip
                and o[5] not in self.AVOID]
@@ -777,7 +796,7 @@ class ShipDriver(Driver):
         en = min(ens, key=lambda o: abs(o[1] - x) + abs(o[2] - y))
         ex, ey = en[1], en[2]
         if en[5] in self.TANKS:
-            return self.tank(e, s, en)
+            return self.tank_fight(e, s, en)
         # an enemy that takes no damage over 400 frames of being the target (out of reach, invulnerable) is skipped
         tg = self.tgt.setdefault(en[0], [en[4], 0])
         if en[4] < tg[0]:
@@ -835,7 +854,7 @@ class ShipDriver(Driver):
             k |= KEY.DOWN if ty > y else KEY.UP
         return k
 
-    GHOSTS = (32, 133)
+    GHOSTS = (32,)
 
     def blast(self, e, s, ens):
         x, y, pf = s['p']
@@ -858,12 +877,14 @@ class ShipDriver(Driver):
                 continue
             if pf != face:
                 return turn if self.t % 6 < 2 else 0
+            if abs(dx) + abs(dy) <= 34:
+                return KEY.A if self.t % 8 < 2 else 0      # (too close for a blast: it starts past the target)
             return KEY.B if self.t % 30 < 3 else 0
         return None
 
     TANKS = (58,)       # Juggernaut: TankDrive lines up on the nearer axis (0.25 px/f), shells along its facing
 
-    def tank(self, e, s, en):
+    def tank_fight(self, e, s, en):
         """a tank (64 x 64 footprint at its position) lines its centre up with the player's on the nearer axis
         (TankDrive, 0.25 px/f) and shells along its facing only once stopped and lined up within 16 px. So: stand
         just under it (the up punch reaches ~24 px) or beside it, the centres 20 px apart - it keeps driving and
@@ -1104,7 +1125,9 @@ class ShipDriver(Driver):
 
     def walk_keys(self, e, s, tx, ty):
         """walk()'s steering toward (tx, ty) without completing the goal (out of a Destroyer's flame first)"""
-        k = self.flame_guard(e, s)
+        k = self.grab_guard(e)
+        if k is None:
+            k = self.flame_guard(e, s)
         if k is None:
             k = self.block_guard(e, s)
         if k is None and s['p'] is not None:

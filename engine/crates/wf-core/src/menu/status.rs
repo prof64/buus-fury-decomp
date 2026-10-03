@@ -19,8 +19,8 @@ use wf_view::{MenuFont, MenuView};
 pub const REDRAW_FRAMES: u8 = 5;
 /// the redraw's CPU cycles (sndsim.rs; fit on 39 redraws of segment e_2_9_13, work/earth/timing): constant part,
 /// per 10,000 glyph-routine instructions, the cursor picture; cycles before the redraw in its frame
-const REDRAW_BASE: i64 = 347_354;
-const REDRAW_BASE_ALLOC: i64 = 347_113;
+const REDRAW_BASE: i64 = 327_464;
+const REDRAW_BASE_ALLOC: i64 = 327_223;
 const REDRAW_GLYPH: i64 = 35_664;
 const REDRAW_CURSOR: i64 = 7_284;
 /// a portrait without `decode_cycles` (older content): a typical one
@@ -508,7 +508,7 @@ impl Page for Status {
     }
     fn redraw_time(&self, w: &World, d: &MenuData) -> Option<crate::sndsim::Redraw> {
         let v = self.draw(w, d);
-        let (gn, small) = v.layers.first().map(|l| crate::sndsim::ops_cost(&d.text, &l.ops)).unwrap_or((0, 0));
+        let (gn, small, extra) = v.layers.first().map(|l| crate::sndsim::ops_cost(&d.text, &l.ops)).unwrap_or((0, 0, 0));
         // the step before the redraw (cycles from the VBlank to the redraw; work/earth/timing/pre.py)
         let m = &w.menu;
         let sfx = |id: i32| w.events.iter().any(|e| matches!(e, crate::world::Event::Sfx { id: i, .. } if *i == id));
@@ -545,7 +545,7 @@ impl Page for Status {
         let dec = if pb >= 8 { d.portrait_cycles.get((pb - 8) as usize).copied().filter(|&c| c != 0).unwrap_or(PORTRAIT_CYCLES) } else { 0 } as i64;
         if crate::sndsim::debug() {
             eprintln!(
-                "status redraw: gn {gn} small {small} dec {dec} pressed {:#x} released {:#x} alloc {} focus {:?} events {} img {:?}",
+                "status redraw: gn {gn} small {small} dec {dec} extra {extra} pressed {:#x} released {:#x} alloc {} focus {:?} events {} img {:?}",
                 m.pressed,
                 m.released,
                 self.alloc,
@@ -554,6 +554,6 @@ impl Page for Status {
                 v.layers.first().map(|l| crate::sndsim::ops_summary(&l.ops)).unwrap_or_default()
             );
         }
-        Some(crate::sndsim::Redraw { t0, base: base + dec + gn * REDRAW_GLYPH / 10_000 + small * REDRAW_CURSOR })
+        Some(crate::sndsim::Redraw { t0, base: base + dec + extra + gn * REDRAW_GLYPH / 10_000 + small * REDRAW_CURSOR })
     }
 }

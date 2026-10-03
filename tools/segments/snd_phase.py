@@ -25,18 +25,25 @@ def phase(state):
 
 
 def main():
+    starts = {}
     for f in sys.argv[1:]:
         p = Path(f)
         s = p.read_text()
         nl = s.index('\n')
         head = s[:nl]
         m = re.search(r'"state":"([^"]+)"', head)
-        if not m:
-            print(f, 'no source.state'); continue
-        st = ROOT / m.group(1)
-        if not st.exists():
-            print(f, 'missing', st); continue
-        ph = phase(st)
+        r = re.search(r'"kind":"route","run":"([^"]+)","frame":(\d+)', head)
+        if m and (ROOT / m.group(1)).exists():
+            ph = phase(ROOT / m.group(1))
+        elif r and (ROOT / r.group(1) / 'start.ss').exists():
+            # a cut of a route run: the interrupt cadence is pure arithmetic from the run's start (one frame =
+            # 280,896 cycles = 16 periods + 12,096; verified on the 90 Earth cuts to +-45 cycles)
+            run = r.group(1)
+            if run not in starts:
+                starts[run] = phase(ROOT / run / 'start.ss')
+            ph = (starts[run] - int(r.group(2)) * 12096) % 16800
+        else:
+            print(f, 'no savestate (source.state / source.run)'); continue
         head = re.sub(r'"snd_phase":\d+,', '', head)
         head = head.replace('"init":{', '"init":{"snd_phase":%d,' % ph, 1)
         p.write_text(head + s[nl:])

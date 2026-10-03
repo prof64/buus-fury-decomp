@@ -787,6 +787,17 @@ fn enter_state(w: &mut World, i: usize, gs: Gs) {
                 }
             }
             sfx_stop(w, 54);
+            // the state deletes its aura effect itself: its tiles go this frame (segment sb 19-3; an effect that
+            // ends by itself gives them a frame later)
+            let me = w.ents[i].id;
+            let auras: Vec<usize> = (0..w.ents.len())
+                .filter(|&k| !w.ents[k].removed && matches!(&w.ents[k].body, Body::Fx(f) if matches!(**f, Fx::Loop { alive: Alive::Transform { p }, .. } if p == me)))
+                .collect();
+            for k in auras {
+                let id = w.ents[k].id;
+                crate::vram::release(w, crate::vram::Owner::Ent(id));
+                w.ents[k].removed = true;
+            }
         }
         _ => {}
     }
@@ -853,6 +864,13 @@ fn enter_state(w: &mut World, i: usize, gs: Gs) {
                 pl.ap.tick = 0;
                 pl.ap.frame = 0;
                 pl.transform_done = false;
+            }
+            // the state object's ctor (`0x0801C3EC`) makes the aura effect; a transformation started by the player made
+            // it already (segment sb 19-3: s457's play_anim(0, 23) takes the effect's 0x400 tile bytes)
+            if gs == Gs::SsUp {
+                let (ax, ay) = pr(w, i).a.center();
+                let me = w.ents[i].id;
+                fx::add(w, Fx::Loop { id: 0x0875_2d28, x: ax, y: ay + 1, first: 0, n: 3, rec: 0, rate: 0x4000, acc: 0, alive: Alive::Transform { p: me } });
             }
             sfx(w, 54, 64);
         }
@@ -1242,7 +1260,7 @@ pub fn update(w: &mut World, i: usize) {
         return;
     }
     // eaten (out of the world): nothing of the player runs
-    if pr(w, i).gone {
+    if pr(w, i).gone || w.field.as_ref().is_some_and(|f| f.player_new) {
         return;
     }
     // an event a broken breakable's callback started at this frame's start (before the object pass): the event holds

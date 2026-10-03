@@ -68,7 +68,11 @@ pub fn tick_kind(id: i32) -> TickKind {
     match id {
         0 => TickKind::Idle,
         2 => TickKind::Loop { sound: true },
-        1 | 10 | 11 | 13 | 14 | 15 => TickKind::Loop { sound: false },
+        1 | 13 | 14 | 15 => TickKind::Loop { sound: false },
+        // (an NPC's 10 / 11 are their own state `0x03001B30` in its table `0x080727C8`: played once, 8 ticks a
+        // cel, then it stays on the last one (no idle enter); segment sb 19-3: s457's play_anim(5, 10) ends after
+        // 11 cels without the idle's draw)
+        10 | 11 => TickKind::Once { shift: 3, hold: true },
         3 | 9 => TickKind::Once { shift: 3, hold: false },
         4..=6 => TickKind::Once { shift: 2, hold: false },
         7 => TickKind::Hold,
@@ -2199,7 +2203,9 @@ pub fn bring_back(w: &mut World) {
 /// only records the id). Called with the music bookkeeping at the end of the frame / after a session is created.
 pub fn banner_step(w: &mut World) {
     // the banner a load of this frame made shows from now (t = 0)
+    // (once: a frame that does not advance the world's frame count still ages it; segment sb 19-3)
     if w.scene.banner.is_some() && w.scene.banner_made == w.frame {
+        w.scene.banner_made = u32::MAX;
         return;
     }
     if let Some((_, t)) = w.scene.banner.as_mut() {
@@ -2451,6 +2457,14 @@ fn cam_step(w: &mut World, sx: i32, sy: i32) {
 /// every step, no final snap); the first step happens in the frame it starts. The world is frozen meanwhile (the
 /// scroll mode does not run the world update). The host blocks until [`scroll_done`].
 pub fn start_scroll(w: &mut World, x: i32, y: i32, speed: i32) {
+    // an A-button trigger's script runs before the frame's cameras in the game: its scroll starts from the camera
+    // before this frame's follow ease (field.rs `cam_before`)
+    if w.scene.cam.stepped {
+        if let Some((bx, by)) = w.field.as_mut().and_then(|f| f.cam_before.take()) {
+            w.cameras[0].x = bx;
+            w.cameras[0].y = by;
+        }
+    }
     let c = &w.cameras[0];
     // the mover works on the 22.10 difference; the step count comes from its whole pixels
     let (dx, dy) = ((x << 10) - c.x, (y << 10) - c.y);

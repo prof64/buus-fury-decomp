@@ -278,16 +278,23 @@ def goals_fatbuu(e):
         nav(10, 30, False), ('fightp', 20000), *rest_at(60, 109),
         nav(10, 1), ('unstick',), ('walk', 88, 98), ('face', 'U'), ('press', A), ('wait', 120),
         ('mark', 'd15_map'),
-        # --- Diablo Desert 11: Goten's level-80 gate in 11-1 (flag 169), the four switches (11-2 flag 89, 11-4 flag
-        # 90, 11-5 flag 91, 11-10 flag 92), the train from 11-13 (11-17: s372, flag 93), the five robbers of 11-24
-        # (s373 .. s377 -> s378: the 2-Star Dragon Ball, flag 113), out by 11-20's pad ------------------------------
+        # --- West City again: the Dragon Radar after all (flag 77: Bulma stands at (176, 152), d02's talk from
+        # (144, 194) reached nobody), six Hamburgers, Goten rested at the save point -------------------------------
+        ('wait', 120), ('fly', 1137, 1137, 71, 119), ('wait', 200),
+        nav(4, 27, False), ('unstick',), ('walk', 176, 172), ('talk', 'U'), ('events',), ('wait', 30), ('events',),
+        ('wait', 30),
+        ('mark', 'd15b_radar'),
+        nav(4, 1, False), ('unstick',), ('walk', 264, 310), ('hold', U, 40), ('wait', 30),
+        ('unstick',), ('walk', 102, 124), ('hold', L, 10),
+        ('keys', [(A, 3, 60), (A, 3, 60), (A, 3, 100), (D, 3, 15), (D, 3, 15)] + [(A, 3, 40)] * 6 +
+         [(B, 3, 80), (B, 3, 60), (D, 3, 15), (D, 3, 15), (A, 3, 60), (A, 3, 60)]), ('events',), ('wait', 30),
+        ('unstick',), ('walk', 112, 212), ('hold', D, 40), ('wait', 30),
+        *rest_at(148, 594),
+        ('unstick',), ('walk', 416, 360), ('face', 'U'), ('press', A), ('wait', 60),
+        ('mark', 'd15c_city'),
+        # --- the other dungeons are played by the dungeon agents' own routes from here (re/buu/ship/fat_chain.py):
+        # Diablo Desert 11 (tools/dungeons/db2_route.py), the Airship 12, Fukurou Forest 13, Kyodai Pyramid 14
+        # (tools/db57), Nataday Village 15 last (it only appears with the other six balls held)
         ('fly', 1505, 985, 143, 159), ('wait', 200),
         ('mark', 'd16_desert'),
-        ('unstick',), ('walk', 224, 196), ('face', 'U'), ('press', A), ('events',), ('wait', 30),
-        nav(11, 2), ('unstick',), ('walk', 416, 288), ('wait', 30), ('events',), ('wait', 30),
-        nav(11, 4), ('unstick',), ('walk', 200, 240), ('wait', 30), ('events',), ('wait', 30),
-        nav(11, 5), ('unstick',), ('walk', 88, 96), ('wait', 30), ('events',), ('wait', 30),
-        nav(11, 10), ('unstick',), ('walk', 408, 48), ('wait', 30), ('events',), ('wait', 30),
-        nav(11, 13),
-        ('mark', 'd17_station'),
     ]

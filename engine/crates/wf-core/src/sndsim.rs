@@ -306,14 +306,36 @@ pub fn glyph_instructions(cols: &[u16]) -> i64 {
     n
 }
 
-/// glyph-routine instructions of a page's draw list and its 16 x 16 pictures (the cursor)
-pub fn ops_cost(t: &crate::menu::text::TextData, ops: &[MenuOp]) -> (i64, i64) {
+/// instructions of the plain glyph routine's column loop (`0x0803F500..0x0803F532`) for one glyph
+pub fn plain_glyph_instructions(cols: &[u16]) -> i64 {
+    let mut n = 0;
+    for &c in cols {
+        n += 17;
+        let mut c = c as u32;
+        while c != 0 {
+            n += if c & 1 != 0 { 9 } else { 7 };
+            c >>= 1;
+        }
+    }
+    n + 6
+}
+
+/// What a page's draw list costs beyond the page's constant part: glyph-routine instructions of the shadowed
+/// text, the 16 x 16 pictures (the cursor, the prompts), and the cycles of the plain text lines, fills and pixels
+/// (the tabs: one per party member). Per-unit costs from emulator profiles (`work/earth/timing/prof.py`): a plain
+/// text line 990 cycles + 315 per glyph + 3.227 per column-loop instruction, a fill row 54 + 4.25 per pixel, a
+/// pixel 45.
+pub fn ops_cost(t: &crate::menu::text::TextData, ops: &[MenuOp]) -> (i64, i64, i64) {
     let mut gn = 0;
     let mut small = 0;
+    let mut extra = 0;
     for op in ops {
         match op {
-            MenuOp::Text { font, shadow: Some(_), text, .. } => {
+            MenuOp::Text { font, shadow, text, .. } => {
                 let fm = t.font(*font);
+                if shadow.is_none() {
+                    extra += 990;
+                }
                 let mut k = 0;
                 while k < text.len() {
                     let c = text[k];
@@ -323,15 +345,22 @@ pub fn ops_cost(t: &crate::menu::text::TextData, ops: &[MenuOp]) -> (i64, i64) {
                     }
                     k += 1;
                     if c < 0xFF && fm.has.get(c as usize).copied().unwrap_or(false) {
-                        gn += glyph_instructions(fm.cols.get(c as usize).map(|v| v.as_slice()).unwrap_or(&[]));
+                        let cols = fm.cols.get(c as usize).map(|v| v.as_slice()).unwrap_or(&[]);
+                        if shadow.is_some() {
+                            gn += glyph_instructions(cols);
+                        } else {
+                            extra += 315 + plain_glyph_instructions(cols) * 3_227 / 1000;
+                        }
                     }
                 }
             }
             MenuOp::Image { fw: 16, fh: 16, .. } => small += 1,
+            MenuOp::Fill { x0, y0, x1, y1, .. } => extra += (y1 - y0).max(0) as i64 * (54 + (x1 - x0).max(0) as i64 * 425 / 100),
+            MenuOp::Pixel { .. } => extra += 45,
             _ => {}
         }
     }
-    (gn, small)
+    (gn, small, extra)
 }
 
 /// debug: a draw list's operations other than shadowed text, compact

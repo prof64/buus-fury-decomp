@@ -180,6 +180,9 @@ pub struct Globals {
     /// e.g. VampireGrab's drain every 16 ticks)
     #[serde(default)]
     pub fc0: i64,
+    /// this frame's update ran no object pass (`World.frame` as it was): the post step counts the frame on `fc0`
+    #[serde(default)]
+    pub clock_mark: Option<u32>,
     /// the input object 0x03003300 (0x0804023C) per player slot: this frame's new presses and the press ring
     #[serde(default)]
     pub presses: [PressLog; MAX_PLAYERS],
@@ -852,6 +855,15 @@ impl World {
                 || crate::vram::suspended(self, self.ents[i].id) && !matches!(self.ents[i].body, Body::Npc(_));
             if !skip {
                 self.update_entity(i);
+                // it destroyed an object before it: the list compacted, the same object is at the next index
+                if self.field.as_mut().is_some_and(|f| std::mem::take(&mut f.list_redo)) {
+                    if let Some(&j) = live(self).get(c as usize) {
+                        self.update_entity(j);
+                    }
+                    if let Some(f) = self.field.as_mut() {
+                        f.list_redo = false;
+                    }
+                }
             }
             c -= 1;
             if !item_get_before && self.field.as_ref().is_some_and(|f| f.item_get.is_some()) {
@@ -864,6 +876,13 @@ impl World {
         self.tick_shakes();
         crate::vram::reap(self);
         self.ents.retain(|e| !e.removed);
+        // a player object created in this pass is the list's newest object
+        if self.field.as_mut().is_some_and(|f| std::mem::take(&mut f.player_new)) {
+            if let Some(k) = self.player_idx(0) {
+                let e = self.ents.remove(k);
+                self.ents.push(e);
+            }
+        }
     }
 
     fn update_entity(&mut self, i: usize) {

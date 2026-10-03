@@ -445,8 +445,9 @@ fn update_rest(w: &mut World, i: usize) {
             e.contact_cd -= 1;
         }
         if e.defeated && e.ko < 0 {
-            // field Idle death: no fade, no removal (its animation ticked above)
-            return;
+            // field Idle death: no fade, no removal (its animation ticked above); the object's AI runs on - an
+            // enemy the player's update just killed still takes this pass's step (real route 8-71: Majin Buu's
+            // slide moves once more in the frame of the last punch; the defeat's event holds the later frames)
         } else if e.defeated {
             e.ko += 1;
             if e.ko > 150 {

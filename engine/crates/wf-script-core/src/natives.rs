@@ -341,6 +341,14 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
             unit()
         }
         0x72 | 0x74 => {
+            // an armed save is taken at the call, before the fade: the field's objects leave the world list for the
+            // 64 frames of the fade-out (HFIL 18-2's switch script: world list empty from the call on; sc_hfil)
+            if h.s.save_armed && h.w.field.is_some() && std::env::var("LATE_SAVE").is_err() {
+                save_field(h.w, h.s);
+                scene::send_offstage(h.w);
+                h.w.ents.clear();
+                h.w.enemies.clear();
+            }
             let (wd, m, v, x, y) = (arg(a, 0), arg(a, 1), arg(a, 2), arg(a, 3), arg(a, 4));
             let list = vec![
                 Phase::Fade { kind: FadeKind::Black, out: true, frames: 64 },
@@ -533,6 +541,13 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
         }
         0x95 => {
             switch_character(h.w, arg(a, 0))?;
+            // the script's rebuilt player is a new object at the end of the world's list: it updates (and ticks its
+            // script track) before the older ones (s218 -> s501 as Trunks: his walk and Goten's end in one frame,
+            // his idle draw first)
+            if let Some(i) = leader(h.w) {
+                let e = h.w.ents.remove(i);
+                h.w.ents.push(e);
+            }
             unit()
         }
         0x96 => done(h.w.story.chars.get(arg(a, 0) as usize).is_some_and(|c| c.flags & 1 != 0) as i32),
@@ -998,6 +1013,9 @@ fn add_supply_u8(w: &mut World, item: i32, n: i32, saturate: bool) {
 /// `set_character`: the leader becomes character `c` (its persistent record, form, equipment and skills)
 pub fn switch_character(w: &mut World, c: i32) -> Result<(), String> {
     let Some(i) = leader(w) else {
+        if !w.scene.offstage.iter().any(|e| matches!(e.body, Body::Player(_))) {
+            return Err("native 0x95: no player".into());
+        }
         // no player object (offstage during a cutscene scene: s217's set_character(0) between its load_scene and
         // its warp): the current character changes and the player kept offstage becomes it - no idle draw; the
         // next load builds the new character (6-1: Goku, and the NPC whose condition reads get_character())
@@ -1176,22 +1194,29 @@ pub fn poll_phases(w: &mut World, s: &mut HostState) -> Option<Option<i32>> {
 
 /// `load_scene*`: load map world/map as a cutscene backdrop, camera top-left at (x, y)
 #[allow(clippy::too_many_arguments)]
-fn load_scene(w: &mut World, s: &mut HostState, world: i32, map: i32, variant: i32, x: i32, y: i32, objects: bool) {
-    if s.save_armed {
-        s.save_armed = false;
-        let (px, py, facing) = leader(w).map(|i| (w.pl_ref(i).a.px(), w.pl_ref(i).a.py(), w.pl_ref(i).a.facing)).unwrap_or_default();
-        let area = match &w.field {
-            Some(f) => (f.area.world, f.area.area, f.area.variant),
-            None => s.area,
-        };
-        s.saved_field = Some(SavedField { area, x: px, y: py, facing, cam: (w.cameras[0].x, w.cameras[0].y) });
-        if w.field.is_some() {
-            // the kept field's objects give their shared graphics back and its tile allocator is set aside: the
-            // scene gets a fresh one (message 0xA; segment sb 21-5's s483)
-            wf_core::vram::world_hide(w);
-            w.scene.saved_world = Some(Box::new(wf_core::field::save_world(w)));
-        }
+/// the armed field save (`save_field_on_next_scene`): the snapshot 0x08009196 takes the field's objects out of the
+/// world at once
+fn save_field(w: &mut World, s: &mut HostState) {
+    if !s.save_armed {
+        return;
     }
+    s.save_armed = false;
+    let (px, py, facing) = leader(w).map(|i| (w.pl_ref(i).a.px(), w.pl_ref(i).a.py(), w.pl_ref(i).a.facing)).unwrap_or_default();
+    let area = match &w.field {
+        Some(f) => (f.area.world, f.area.area, f.area.variant),
+        None => s.area,
+    };
+    s.saved_field = Some(SavedField { area, x: px, y: py, facing, cam: (w.cameras[0].x, w.cameras[0].y) });
+    if w.field.is_some() {
+        // the kept field's objects give their shared graphics back and its tile allocator is set aside: the
+        // scene gets a fresh one (message 0xA; segment sb 21-5's s483)
+        wf_core::vram::world_hide(w);
+        w.scene.saved_world = Some(Box::new(wf_core::field::save_world(w)));
+    }
+}
+
+fn load_scene(w: &mut World, s: &mut HostState, world: i32, map: i32, variant: i32, x: i32, y: i32, objects: bool) {
+    save_field(w, s);
     if w.field.is_some() {
         let to = wf_core::field::AreaId { world, area: map, variant };
         // a cutscene scene has no player object (0x08009030): the players wait offstage

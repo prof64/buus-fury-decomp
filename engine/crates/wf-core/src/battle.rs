@@ -275,7 +275,7 @@ pub fn spawn_enemy_at(w: &mut World, ty: i32, x: i32, y: i32, parent: EntityId, 
     enemy::mark_self(w, i);
     if start != Some(-1) {
         let st = start.map(|s| s as u16).unwrap_or(w.data.enemy(ty).unwrap().ai);
-        let f = w.frame as i64;
+        let f = w.g.clock(w.frame);
         {
             // obj+0x1E8 / +0x1EC are stamped with the frame counter at creation (obj+0x210 only by Block's exit)
             let e = w.en(i);

@@ -745,7 +745,16 @@ export function create(n: AiNodeJ, c: AiController): RNode {
     case 'SpawnPuff':
     case 'VampireSummon':
     case 'VampireSummon2':
-      return new Instant(n, c, () => e.ctx.puff(e.w, ...e.center()))
+      return new Instant(n, c, () => {
+        // the node enemy_ai.json calls SpawnPuff (create 0x0802F21C, singleton 0x030030FC, vtable 0x08049A5C): its
+        // enter 0x0804E53C detaches the enemy from the enemy grid for good (0x0800F924: obj+0x291 = 1, tiles freed;
+        // the Ghost's first state - Kyodai Pyramid 14-17)
+        if (n.name === 'SpawnPuff') {
+          e.unmarkSelf()
+          e.detached = true
+        }
+        e.ctx.puff(e.w, ...e.center())
+      })
     case 'SelfDestruct':
       return new Instant(n, c, () => e.die(true))
     case 'TriggerSelf':
@@ -1007,10 +1016,21 @@ export function create(n: AiNodeJ, c: AiController): RNode {
       })
     }
     case 'RandomStep':
-      return new Act(n, c, (a) => (a.data.dir = e.w.rng.rand(4, 'random step')), (f, a) => {
-        const [dx, dy] = DIR_VEC[a.data.dir as Dir]
-        e.walkBy(dx * 256, dy * 256)
-        return f >= 16
+      // create 0x08037C06 (vtable 0x0804B1C0; the Skeleton's bones rattle before they rise): enter 0x0804E824 keeps
+      // the position; update 0x08037BBC = the kept position + (rand(3) - 1, rand(3) - 1) px written straight to the
+      // actor (no grid test), never finished; exit 0x0804F638 puts the kept position back (Kyodai Pyramid 14-20)
+      return new Act(n, c, (a) => {
+        a.data.x = e.x
+        a.data.y = e.y
+      }, (_f, a) => {
+        const dx = (e.w.rng.rand(3, 'rattle x') - 1) << 8
+        const dy = (e.w.rng.rand(3, 'rattle y') - 1) << 8
+        e.x = a.data.x + dx
+        e.y = a.data.y + dy
+        return false
+      }, (a) => {
+        e.x = a.data.x
+        e.y = a.data.y
       })
 
     // ---- melee --------------------------------------------------------------------------------------------------------
@@ -1061,6 +1081,8 @@ export function create(n: AiNodeJ, c: AiController): RNode {
         len = 64 + ((Math.max(2, e.ea.host.nframes(e.ea.pos.raw)) - 2) << 3)
       }, (f) => {
         if (e.animSeq !== seq) return true
+        // tick 0x08033CF0: not hittable (obj+0x1CC = 0) from the swing at 32 until the last cel starts
+        e.hittable = !(f >= 32 && f < len - 32)
         if (f === 32 && e.meleeStrike(0x400, true)) audioEvent('sfx', { id: 62, vol: 64 })
         if (f >= len) {
           e.setAnim('idle', true, true)
@@ -2009,8 +2031,25 @@ export function create(n: AiNodeJ, c: AiController): RNode {
       return playAnim(n, c, 17, false, 16)
     case 'PlayAnim13':
     case 'PlayAnim13Yakon':
-    case 'PlayAnimOnce':
       return playAnim(n, c, 18, false, 16)
+    case 'PlayAnimOnce': {
+      // the Skeleton's state 0x213: the collapse (def 0x08759370, singleton 0x0300320C): enter 0x0804EAA0 = not
+      // hittable (obj+0x1CC = 0) + SetAnimRaw(0x11) under the one-shot state 0x03001B38 ({vtable 0x0804E0AC, shift
+      // 2}: 4 ticks a cel, the last one stays); the rise (def 0x0875938C): SetAnimRaw(0x12) under the same state, its
+      // exit 0x0804F6CC = SetAnim(0) (the idle enter's rand(255)) + hittable again
+      const collapse = parseInt(n.addr, 16) === 0x08759370
+      return new Act(n, c, () => {
+        if (collapse) e.hittable = false
+        e.setAnim(collapse ? 17 : 18, true, false, { rule: 'once_stop', shift: 2, end: 'none' })
+      }, (f) => {
+        const done = f >= 16 && e.animDone()
+        if (done && !collapse) {
+          e.setAnim(0, true, true)
+          e.hittable = true
+        }
+        return done
+      })
+    }
     case 'PlayAnimTimed':
       // Babidi's state 0xC9 (hit on the ground): enter 0x0802AEDA SetAnimRaw(0x14) under the controller 0x03003030
       // and Majin Buu is pacified (0x0300302C = 1); tick 0x0802AEC0: the tick wraps at 0x20, cel = tick >> 3; the
@@ -2095,7 +2134,14 @@ export function create(n: AiNodeJ, c: AiController): RNode {
       })
     case 'GhostAnimA':
     case 'GhostAnimB':
-      return playAnim(n, c, 17, false, 16)
+      // enters 0x0804EBC8 / 0x0804EB38 = SetAnimRaw(0x12) under the one-shot state 0x03001B30; updates 0x0802DFD8 /
+      // 0x0802E040: once that state is over, the paired graphics set through 0x0800EDF8 - A: the shown set -> the
+      // unseen one (0x60 -> 0x5E, 0xDC -> 0xDB, 0xE5 -> 0xE4), B back (Kyodai Pyramid 14-17)
+      return new Act(n, c, () => e.setAnim(18, true, false), (f) => {
+        if (!(f >= 16 && e.animDone())) return false
+        e.ghostGfx(n.name === 'GhostAnimA')
+        return true
+      })
     case 'WaitFormationSlot':
       return new Act(n, c, () => undefined, () => e.slot !== 0)
     case 'MoveToFormationA':

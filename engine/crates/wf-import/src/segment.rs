@@ -321,6 +321,7 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
     let mut game_vram = doc["init"].get("vram").cloned().unwrap_or(Value::Null);
     let mut lf_prev = i(&doc["init"]["lf"]);
     let mut presented = host.hs.present.len();
+    let mut lf_drift = 0i64;
     for (k, fr) in frames.iter().enumerate() {
         let keys = i(&fr["keys"]) as u16;
         let lf = i(&fr["lf"]);
@@ -336,8 +337,11 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
             }
             host.step(&mut sess, keys);
             wf_core::rng::TRACE.store(false, std::sync::atomic::Ordering::Relaxed);
-        } else if wf_core::menu::active(&sess.world) {
-            // a menu screen runs per video frame (menu::step models the game's redraw lag itself)
+        } else if wf_core::menu::active(&sess.world) && !(matches!(sess.world.menu.phase, wf_core::menu::Phase::FadeOut { .. }) && !sess.world.menu.scripted) {
+            // a menu screen runs per video frame (menu::step models the game's redraw lag itself); the pause menu's
+            // opening fade-out is still the field's loop - the logic counter runs, and a lag frame there is a frame
+            // without an update (the cameras keep easing through the fade: dungeon segments db3 10-14, db4 15-17 /
+            // 15-29); a script-opened menu (the save point's Switch Characters) fades inside its own loop
             host.step(&mut sess, keys);
         } else {
             sess.world.events.clear();
@@ -446,6 +450,14 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
             game_vram = fr["vram"].clone();
         }
         let complete = frames.get(k + 1).is_none_or(|n| i(&n["lf"]) != lf);
+        // SEGMENT_LF=1: where `World.frame` leaves the game's logic counter (0x03000F94)
+        if logic && std::env::var("SEGMENT_LF").is_ok() {
+            let d = lf - w.g.clock(w.frame);
+            if d != lf_drift {
+                eprintln!("  lf drift {lf_drift} -> {d} at f{k}: frozen {} field-frozen {} menu {} mode {:?} pending {:?}", scene::frozen(w), wf_core::field::frozen(w), wf_core::menu::active(w), w.field.as_ref().map(|f| f.mode.clone()), host.hs.pending);
+                lf_drift = d;
+            }
+        }
         if !complete {
             continue;
         }
@@ -456,6 +468,9 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
                 let ours = vram_json(&v.a);
                 if ours != game_vram {
                     let d = vram_diff(&ours, &game_vram);
+                    if std::env::var("VRAM_DBG").is_ok() {
+                        eprintln!("    f{k} vram owners {:?}", v.owners);
+                    }
                     rep.bad(k, "vram", d);
                 }
             }

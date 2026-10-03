@@ -437,7 +437,7 @@ fn face_player_routine(w: &mut World, i: usize) {
 
 fn cond(w: &mut World, c: &C, n: u16) -> bool {
     let i = c.i;
-    let frame = w.frame as i64;
+    let frame = w.g.clock(w.frame);
     match kind(c, n) {
         K::Chance => {
             let p = par(c, n, P::Prob, 0);
@@ -1169,6 +1169,11 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             r.d[0] = V[f as usize].0;
             r.d[1] = V[f as usize].1;
         }
+        // field (HFIL's Janemba Hands, segments sc_hfil): the node's first update does the enter's work (the side
+        // draw, the jump to the player's position of that frame, the controller 0x0804D714)
+        K::HandAmbush if w.field.is_some() => {
+            r.d[0] = 0;
+        }
         K::HandAmbush => {
             if let Some(pi) = en::player(w, i) {
                 let left = w.rng.rand(2) != 0;
@@ -1305,7 +1310,7 @@ fn leaf_exit(w: &mut World, c: &C, n: u16, _r: &mut NodeRt) {
     match kind(c, n) {
         K::Block => {
             w.en(i).a.blocking = false;
-            let f = w.frame as i64;
+            let f = w.g.clock(w.frame);
             w.en(i).state_stamp = f;
         }
         K::ChargedPunch => w.en(i).a.hittable = true,
@@ -1347,7 +1352,7 @@ fn stop_enemy_beam(w: &mut World, i: usize) {
 fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
     let i = c.i;
     let me = w.ents[i].id;
-    let frame = w.frame as i64;
+    let frame = w.g.clock(w.frame);
     let speed = par(c, n, P::Speed, 0) as i32;
     match kind(c, n) {
         K::Never => false,
@@ -1458,6 +1463,11 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             if matches!(kind(c, n), K::SpawnPuff) {
                 en::unmark_self(w, i);
                 w.en(i).detached = true;
+                // field: that is all it does - no effect object, no tiles (HFIL's Janemba Hands: the object list
+                // and the tile allocator at the area's start; segments sc_hfil). Battle keeps the reference's puff
+                if w.field.is_some() {
+                    return true;
+                }
             }
             let (cx, cy) = w.en_ref(i).a.center();
             crate::fx::puff(w, cx, cy, 0x1800);
@@ -2240,6 +2250,13 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                     // takes it back. Field only: battles keep the reference's camera
                     if w.field.is_some() {
                         crate::scene::follow(w, me);
+                        // the player object leaves the world list: created before the eater, the list compacts
+                        // and the eater is updated again in this pass (its tick goes 7 -> 9 in that frame)
+                        if p.is_some_and(|pi| pi < i) {
+                            if let Some(fl) = w.field.as_mut() {
+                                fl.list_redo = true;
+                            }
+                        }
                     }
                 }
                 w.en(i).ea.pos.frame = f >> 3;
@@ -2270,6 +2287,10 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                         player::candy_respawn(w, pi, (r.d[0] >> 8) << 8, (r.d[1] >> 8) << 8, r.d[2] != 0);
                         if w.field.is_some() && w.scene.cam.mode == crate::scene::CamMode::Follow(me) {
                             w.scene.cam.mode = crate::scene::CamMode::Player;
+                        }
+                        // the new player object is the list's newest: not updated in this pass
+                        if let Some(fl) = w.field.as_mut() {
+                            fl.player_new = true;
                         }
                     }
                 }
@@ -2567,6 +2588,30 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             }
             false
         }
+        K::HandAmbush if w.field.is_some() => {
+            if f == 1 {
+                if let Some(pi) = en::player(w, i) {
+                    let left = w.rng.rand(2) != 0;
+                    // (the 24.8 position, sub-pixels kept)
+                    let (ppx, py) = (w.pl_ref(pi).a.x, w.pl_ref(pi).a.y);
+                    let e = w.en(i);
+                    let off: i32 = if left { 4 } else { -20 };
+                    e.a.x = ppx + (off << 8);
+                    e.a.y = py;
+                    e.a.facing = if left { 2 } else { 3 };
+                }
+                set_anim(w, i, &[an(17)], true, Some(false));
+                w.en(i).a.alpha = 256;
+            }
+            let f = f - 1;
+            if (80..=103).contains(&f) && r.d[0] == 0 {
+                let bb = w.en_ref(i).a.body_box();
+                if en::area_hit(w, i, bb, atk(2), 0x400) {
+                    r.d[0] = 1;
+                }
+            }
+            f >= 106
+        }
         K::HandAmbush => {
             if (80..=103).contains(&f) && r.d[0] == 0 {
                 let bb = w.en_ref(i).a.body_box();
@@ -2848,7 +2893,7 @@ fn hit_node(w: &mut World, i: usize, t: &Arc<BehTree>, n: u16, msg: &HitMsg) -> 
             None => 0,
         }
     };
-    let frame = w.frame as i64;
+    let frame = w.g.clock(w.frame);
     match node.k {
         K::Sequence => {
             let mut res = 1;

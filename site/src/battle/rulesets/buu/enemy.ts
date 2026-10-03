@@ -489,8 +489,11 @@ export class Enemy extends Actor implements EnemyLike {
    *  controller (0x0804E938, rise / vanish); Attach 0x0800F954 when those end. Modelled: body parts, worm segments,
    *  the enemy holding the player, airborne (height offset), defeated (INFERRED mapping of the controllers) */
   attached(): boolean {
-    return !this.part && !this.prev && !this.defeated && !this.removed && this.z === 0 && this.ctx.player?.heldBy !== this
+    return !this.part && !this.prev && !this.defeated && !this.detached && !this.removed && this.z === 0 && this.ctx.player?.heldBy !== this
   }
+  /** obj+0x291 set by the Detach node (enemy_ai.json "SpawnPuff", enter 0x0804E53C -> 0x0800F924): off the enemy grid
+   *  for good (the Ghost's first state) */
+  detached = false
   /** vfunc +0x48(0) = 0x0800F740(enemy, 0): mark the footprint's tiles blocked */
   markSelf() {
     const c = this.ctx.col
@@ -844,6 +847,28 @@ export class Enemy extends Actor implements EnemyLike {
     if (!s) return
     this.gfxNow = to
     this.setSprite(s)
+  }
+  /** GhostAnimA / GhostAnimB (0x0802DFD8 / 0x0802E040): the Ghost / Phantom / Poltergeist graphics set <-> its unseen
+   *  twin via 0x0800EDF8; the new set shows its first (idle) animation from the start: obj+0x34 = the def's table,
+   *  +0x38 / +0x30 = 0, with no rand(255) draw (the one-shot state had already handed back to the normal one) */
+  ghostGfx(vanish: boolean) {
+    const g = this.gfxNow ?? this.type.gfx
+    const PAIRS: [number, number][] = [[0x60, 0x5e], [0xdc, 0xdb], [0xe5, 0xe4]]
+    const pr = PAIRS.find((q) => q[vanish ? 0 : 1] === g)
+    if (!pr) return
+    const to = pr[vanish ? 1 : 0]
+    const s = this.ctx.data.sprites.index(to - GFX_OFFSET)
+    if (!s) return
+    this.gfxNow = to
+    this.setSprite(s)
+    const host = this.ea.host as { rand: (n: number, why?: string) => number }
+    const rand = host.rand
+    host.rand = () => 0
+    try {
+      this.setAnim(0, true, true)
+    } finally {
+      host.rand = rand
+    }
   }
   /** message 0xF (0x0800F44A, the death script's freeze): the current animation state's vfunc +0x10 - the walk state
    *  (0x03003100) SetAnim(0)s (0x0800E050); other states: INFERRED nothing */

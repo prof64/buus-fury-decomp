@@ -365,6 +365,9 @@ pub fn acquire(w: &mut World, owner: Owner, bytes: i32) {
     if bytes <= 0 {
         return;
     }
+    if std::env::var("VRAM_DBG").is_ok() {
+        eprintln!("vram acquire wf {} owner {:?} bytes {}\n{}", w.frame, owner, bytes, std::backtrace::Backtrace::force_capture());
+    }
     let Some(v) = st(w) else { return };
     let h = match v.a.alloc(bytes) {
         Some(h) => Some(h),

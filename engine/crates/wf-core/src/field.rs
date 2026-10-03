@@ -252,6 +252,14 @@ pub struct Field {
     pub arrival: Option<Arrival>,
     /// the last trigger check fired a trigger (or collected a coin): it was the frame's one activation
     pub check_fired: bool,
+    /// a script trigger (A button or touch) fired in this frame's check: the game runs its script from the player's
+    /// update (the trigger test), before the cameras. A script that starts with a camera scroll takes the camera
+    /// where it was - `cam_before` = player 0's camera before this frame's follow ease (Diablo Desert 11-13: the jump
+    /// onto the train while the camera trails the walk); other scripts leave the follow camera as it is
+    #[serde(default)]
+    pub button_fired: bool,
+    #[serde(default)]
+    pub cam_before: Option<(i32, i32)>,
     /// pickups in the world when this frame's deferred calls started (coins they drop are checked before the update)
     pub pre_pickups: u32,
     /// frame of the last area load
@@ -285,6 +293,14 @@ pub struct Field {
     /// and under control, no autowalk (6-1 -> 6-13, the tournament grounds' gate)
     #[serde(default)]
     pub script_fade_in: bool,
+    /// the object being updated destroyed one before it in the world list (Majin Buu's eat removes the player
+    /// object): the list compacts and it is updated again in this pass (`World::step_entities_list`)
+    #[serde(default)]
+    pub list_redo: bool,
+    /// a new player object was created in this pass (the eat's respawn): it sits at the end of the list from the
+    /// pass's end on, and is not updated in this one
+    #[serde(default)]
+    pub player_new: bool,
     /// the object tile allocator (vram.rs)
     #[serde(default)]
     pub vram: Option<crate::vram::VramState>,
@@ -430,6 +446,8 @@ fn new_field() -> Field {
         pre_update: false,
         arrival: None,
         check_fired: false,
+        button_fired: false,
+        cam_before: None,
         pre_pickups: 0,
         entered: 0,
         loads: 0,
@@ -440,6 +458,8 @@ fn new_field() -> Field {
         nest_load: false,
         nest_fade: false,
         script_fade_in: false,
+        list_redo: false,
+        player_new: false,
         vram: Some(crate::vram::VramState::default()),
         fade_end: 0,
         defer_objects: false,
@@ -571,7 +591,7 @@ pub fn spawn_object(w: &mut World, o: &ObjDef) -> Option<EntityId> {
             }
             let mut i = i;
             if let Some(st) = w.data.enemy(*ty).map(|t| t.ai) {
-                let f = w.frame as i64;
+                let f = w.g.clock(w.frame);
                 let e = w.en(i);
                 e.mark1 = f;
                 e.mark2 = f;
@@ -1353,6 +1373,11 @@ pub fn post_step(w: &mut World) {
     if crate::fieldworld::flying(w) {
         crate::fieldworld::camera(w);
     }
+    let button = w.field.as_mut().is_some_and(|f| std::mem::take(&mut f.button_fired));
+    let before = w.cameras.first().map(|c| (c.x, c.y));
+    if let Some(f) = w.field.as_mut() {
+        f.cam_before = if button { before } else { None };
+    }
     for s in 0..w.players.len() {
         if s == 0 && (scripted || crate::fieldworld::flying(w)) || modal {
             continue;
@@ -1646,7 +1671,13 @@ fn fire(w: &mut World, slot: usize, k: usize, t: &TriggerRt) {
             let edge = matches!(kind, TriggerKind::EdgeExit { .. });
             exit_to(w, slot, to, push, t.rect, edge);
         }
-        TriggerKind::Script(s) => w.events.push(Event::Field(FieldEvent::Run { run: Callback::Script(s), cause: Cause::Trigger { obj }, slot: s8 })),
+        TriggerKind::Script(s) => {
+            // (touch triggers too: Diablo Desert Express 11-21's ladder scroll starts while the camera trails)
+            if let Some(f) = w.field.as_mut() {
+                f.button_fired = true;
+            }
+            w.events.push(Event::Field(FieldEvent::Run { run: Callback::Script(s), cause: Cause::Trigger { obj }, slot: s8 }))
+        }
         TriggerKind::Event(s) | TriggerKind::SavePoint(s) => {
             let _ = host;
             crate::fieldnpc::start_event(w);

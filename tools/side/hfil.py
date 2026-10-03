@@ -301,7 +301,7 @@ class SideDriver(ShipDriver):
 
 
 W4 = [(x, 32) for x in range(11, 19)]                      # 18-4's wall (x 88..151, y 256): hidden by 18-2's switch
-ROCK = [(x, y) for x in range(50, 54) for y in range(6, 10)]  # 18-10's boulder (400..432, 48..80): trigger 2 moves it
+ROCK = [(x, y) for x in range(50, 54) for y in range(7, 10)]  # 18-10's boulder (400..432, 56..80): punched from the east
 A_, B_, L_, R_, U_, D_ = 1, 2, 32, 16, 64, 128
 # save point menu -> Switch Characters -> LEFT / RIGHT -> A (re/buu/ship/ship_route.py charsel)
 def charsel(moves):
@@ -318,13 +318,17 @@ ROUTE = [
     ('openwall', '18-4', W4), ('mark', 'switch'),
     # 18-3 -> 18-4's pocket -> 18-5 -> 18-4 -> (the opened wall) -> 18-3's upper floor -> 18-4 -> 18-6 .. 18-9 -> 18-10
     ('goto', '18-10', 336, 40), ('mark', 'maze'),
-    # 18-10: the gate maze (eight switch toggles by Instant Transmission), the ring's lanes beside the spikes, the
-    # trigger that moves the boulder (flag 284), the exit to 18-11
-    ('maze10', 592, 72), ('openwall', '18-10', ROCK), ('exitat', 600, 72, 'R'), ('wait', 30), ('mark', 'statues'),
+    # 18-10: the gate maze (eight switch toggles by Instant Transmission), the ring's lanes beside the spikes; the
+    # boulder between the ring and the entry breaks from its east side (punches; flag 284: the shortcut back); the
+    # exit to 18-11
+    ('maze10', 440, 66), ('walk', 433, 66), ('face', 'L'), ('keys', [(A_, 2, 10)] * 4), ('wait', 20),
+    ('openwall', '18-10', ROCK), ('walk', 592, 72), ('exitat', 600, 72, 'R'), ('wait', 30), ('mark', 'statues'),
     # 18-11: four Vegetas; the real one stands at (208, 128) (s446: he joins, flag 123)
     ('talkto', 208, 142, 'U'), ('wait', 30), ('mark', 'vegeta'),
     # back to 18-1 (the boulder is open now), its save point: Vegeta for the level-100 gate of 18-12 (s517, flag 183),
     # then Goku again
+    # (the boulder is back after the reload: punch it again from the east)
+    ('exitat', 24, 72, 'L'), ('walk', 433, 66), ('face', 'L'), ('keys', [(A_, 2, 10)] * 4), ('wait', 20),
     ('goto', '18-1', 104, 272), *charsel(-1), ('wait', 20), ('mark', 'veg1'),
     ('goto', '18-12', 88, 52), ('face', 'U'), ('press', A_), ('events',), ('wait', 30), ('mark', 'gate'),
     ('goto', '18-1', 104, 272), *charsel(1), ('wait', 20),
