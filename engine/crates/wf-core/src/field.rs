@@ -240,11 +240,15 @@ pub struct Field {
     /// frame it ends the enemies still run their update (2-90: Super Saiyan Goten's AI starts in s121's last frame)
     #[serde(default)]
     pub queued_event: bool,
-    /// the frame a breakable's callback event started (fieldobj `break_done`): one that does not end in that frame (a
-    /// track command pending: HFIL 18-10's boulder, `puff_at`) is an ordinary event from then on - the objects are
-    /// held in its frames and its exit frame releases only what comes after the hook (the real route, rj_back1)
+    /// the frame a breakable's callback started (fieldobj `break_done`); cleared once it is over. The callback runs
+    /// from inside the breakable's own update, as a nested loop of the game: while its script waits for a track
+    /// command (HFIL 18-10's boulder: `puff_at`) the frames are the loop's - no object pass (`break_modal`) - and in
+    /// the frame the wait is over the interrupted pass goes on with the objects after the breakable: the players
+    /// (the real route, rj_back1 18-10: f202 the puff only, f203 the player only, f204 everything)
     #[serde(default)]
     pub break_event: u32,
+    #[serde(default)]
+    pub break_modal: bool,
     /// a level-up hook started at the start of this frame's update: it runs inline (a nested loop), nothing else
     /// updates this frame
     pub held: bool,
@@ -457,6 +461,7 @@ fn new_field() -> Field {
         queued_runs: vec![],
         queued_event: false,
         break_event: 0,
+        break_modal: false,
         held: false,
         held_event: false,
         resume_held: false,
@@ -678,6 +683,8 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
     // (an imported state's objects of classes the model does not know go with the area too: ship 7-2 -> 7-4)
     crate::vram::release(w, crate::vram::Owner::Foreign);
     crate::vram::release(w, crate::vram::Owner::StatMark);
+    crate::vram::signs_gone(w);
+    crate::vram::release(w, crate::vram::Owner::Minigame);
     crate::vram::release(w, crate::vram::Owner::Hud);
     crate::vram::release(w, crate::vram::Owner::Map3d);
     crate::vram::release(w, crate::vram::Owner::HudOut);
@@ -747,6 +754,10 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
         f.entered = w.frame;
         f.loads += 1;
         f.on_enter_queued = false;
+        // a script fade-in belongs to the load its `warp_fade` made (set after this returns): any other load ends
+        // it (app soak: warp_fade to the world map, then a circle's immediate warp into 2-8 left it set, and the
+        // door script's nested hold no longer kept the walking player's state)
+        f.script_fade_in = false;
     }
     // the props object (`0x0800D15A`, before the area's objects)
     if m.prop_tile_bytes > 0 {
@@ -763,6 +774,12 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
         f.pending_objects = defer.then_some(to);
     }
     let objects = objects && !defer;
+    // the level signs' label objects (area list +0x20, `0x0800C300`: 0x200 tile bytes each) come first
+    // (segment sb 20-3 -> 20-4)
+    let signs = a.objects.iter().filter(|o| objects && matches!(o.kind, ObjKind::MapSprite { label: Some(_), .. }) && cond_holds(w, &o.cond)).count();
+    for k in 0..signs {
+        crate::vram::acquire(w, crate::vram::Owner::Sign(k as u32), 0x200);
+    }
     for list in [4, 2, 3] {
         for o in a.objects.iter().filter(|o| objects && list_of(o) == list) {
             if cond_holds(w, &o.cond) {
@@ -968,6 +985,8 @@ fn arrive(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<Dir>) {
         crate::vram::hud_created(w);
     }
     crate::scene::banner_load(w, a, m.three_d, scene);
+    // (the HUD's first update makes the stat-points mark: segment sb 20-4 -> 20-5, after the banner)
+    crate::vram::stat_mark(w);
     w.story.variant_byte = variant;
     w.events.push(Event::Field(FieldEvent::AreaEnter { area: to, key: a.key.clone() }));
 }
@@ -2011,13 +2030,6 @@ pub fn set_busy(w: &mut World, busy: bool) {
             f.busy_since = frame;
         }
         if !busy && f.busy {
-            // a breakable's callback that did not end in the frame it began: an ordinary event (see `break_event`)
-            if f.break_event != 0 {
-                if frame != f.busy_since {
-                    f.queued_event = false;
-                }
-                f.break_event = 0;
-            }
             f.event_ended = true;
             if f.held_event {
                 f.held_event = false;

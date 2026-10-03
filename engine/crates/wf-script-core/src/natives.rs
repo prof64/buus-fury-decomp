@@ -625,6 +625,9 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
             done(lv)
         }
         0xa7 => {
+            // the mode (`0x08027DB0`) takes 0x2800 tile bytes, purging first (segment sb 6-6 f3477)
+            wf_core::vram::purge(h.w, 0x2800);
+            wf_core::vram::acquire(h.w, wf_core::vram::Owner::Minigame, 0x2800);
             if h.w.data.menu.is_some() {
                 wf_core::menu::minigame::open_watch(h.w, arg(a, 0));
             } else {
@@ -653,6 +656,7 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
         0xae => {
             h.s.timers.countdown = arg(a, 0) * 60;
             h.s.timers.countdown_on = true;
+            h.s.timers.fresh = true;
             unit()
         }
         0xaf => {
@@ -1034,6 +1038,7 @@ pub fn switch_character(w: &mut World, c: i32) -> Result<(), String> {
                 if !cs.skills.is_empty() {
                     p.skills = cs.skills.clone();
                 }
+                p.sel = (cs.sel.max(0) as usize).min(p.skills.len().saturating_sub(1));
             }
             p.holy_left = 0;
             p.regen_timer = 0;
@@ -1057,6 +1062,9 @@ pub fn switch_character(w: &mut World, c: i32) -> Result<(), String> {
         if !cs.skills.is_empty() {
             p.skills = cs.skills.clone();
         }
+        // the selected skill is the character's own (record +0x15): Goku's L-cycled slot does not follow to Gohan
+        // (app soak, 3-1 after s125: Gohan fired skill slot 2 instead of his slot 0)
+        p.sel = (cs.sel.max(0) as usize).min(p.skills.len().saturating_sub(1));
     }
     p.holy_left = 0;
     // the new character's form controller starts its regen count (+0xC) at 0 (Kid Buu's arena: after s-script
@@ -1302,6 +1310,11 @@ pub fn menu_closed(w: &mut World, s: &mut HostState, native: u8, r: i32, log: &[
             for &(k, _) in log {
                 add_supply_u8(w, k, -1, false);
             }
+        }
+        0xa7 => {
+            // ... and gives them back when it ends; the purged objects return (`0x08027E00`)
+            wf_core::vram::release(w, wf_core::vram::Owner::Minigame);
+            wf_core::vram::restore(w);
         }
         0x8d => {
             if r >= 0 && w.story.chars.get(r as usize).is_some_and(|c| c.in_party()) {

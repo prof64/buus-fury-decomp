@@ -467,6 +467,7 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
     }
     let mut owners: Vec<(u16, Owner)> = vec![];
     let mut used_ents: Vec<wf_core::world::EntityId> = vec![];
+    let mut signs = 0u32;
     for o in ram.objects() {
         let vt = ram.r32(o);
         if vt == 0x0804_D1E4 {
@@ -476,10 +477,11 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
             }
             continue;
         }
-        if vt == VT_HUD || vt == VT_BANNER || vt == 0x0804_C070 {
+        if vt == VT_HUD || vt == VT_BANNER || vt == 0x0804_C070 || vt == 0x0804_D878 {
             let h = ram.r16(o + 0xC);
             if h != 0xFFFF {
-                owners.push((h, if vt == VT_HUD { Owner::Hud } else if vt == VT_BANNER { Owner::Banner } else { Owner::StatMark }));
+                signs += (vt == 0x0804_D878) as u32;
+                owners.push((h, if vt == VT_HUD { Owner::Hud } else if vt == VT_BANNER { Owner::Banner } else if vt == 0x0804_D878 { Owner::Sign(signs - 1) } else { Owner::StatMark }));
             }
             continue;
         }
@@ -515,10 +517,10 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
     let stamp = w.next_id;
     let objs: Vec<(Owner, u32, i32)> = owners
         .iter()
-        .filter(|o| matches!(o.1, Owner::Hud | Owner::Banner | Owner::BossBar | Owner::StatMark))
+        .filter(|o| matches!(o.1, Owner::Hud | Owner::Banner | Owner::BossBar | Owner::StatMark | Owner::Sign(_)))
         .map(|o| (o.1, stamp, a.e[a.idx[(o.0 >> 1) as usize & 511] as usize].size as i32 * 64))
         .collect();
     if let Some(f) = w.field.as_mut() {
-        f.vram = Some(VramState { a, owners, shared_rc, suspended: vec![], hud_out: vec![], popups: vec![], keyed: vec![], stashed: None, delayed: vec![], objs, susp: vec![], late: vec![], shadow_set: vec![], popup_at: vec![] });
+        f.vram = Some(VramState { a, owners, shared_rc, suspended: vec![], hud_out: vec![], popups: vec![], keyed: vec![], stashed: None, delayed: vec![], objs, susp: vec![], late: vec![], shadow_set: vec![], popup_at: vec![], pass_at: 0 });
     }
 }

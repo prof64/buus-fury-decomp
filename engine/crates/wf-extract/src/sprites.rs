@@ -293,6 +293,20 @@ pub fn extract(rom: &Rom, out: &mut Content) -> Vec<Def> {
                     });
                     let dur = durs.get(k).copied().unwrap_or(default);
                     let mut st = json!({"frame": fi, "duration_frames": dur, "flip": flip, "rom": hx(fa)});
+                    // CPU cycles the game spends decompressing the frame's OBJ pieces (each its own stream after an
+                    // 8-byte header; a remapped sprite uses the remapping decoder): an area reload decompresses
+                    // the frame every on-screen actor shows (wf-core sndsim.rs)
+                    if (0x0800_0000..0x0880_0000).contains(&fa) {
+                        let remapped = d.remap_addr != 0;
+                        let cyc: u32 = frame_objs(rom, fa)
+                            .iter()
+                            .map(|o| {
+                                let p = (o.gfx & 0x01FF_FFFF) as usize + 8;
+                                if remapped { wf_rom::deccost::decode_cycles_remap(rom.data(), p) } else { wf_rom::deccost::decode_cycles(rom.data(), p) }.unwrap_or(0)
+                            })
+                            .sum();
+                        st["decode_cycles"] = json!(cyc);
+                    }
                     // the frame record's box (+4 s8 ox, +5 s8 oy, +6 w, +7 h; read through 0x0800FE34 by the
                     // picture-based tests: Kamikaze Ghost homing / contact)
                     if (0x0800_0000..0x0880_0000).contains(&fa) {

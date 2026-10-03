@@ -24,6 +24,8 @@ struct St<'a> {
     ok: bool,
     ldrb: u32,
     strb: u32,
+    /// extra cycles per literal byte (the remapping decoder looks each one up)
+    lit: u32,
 }
 
 impl St<'_> {
@@ -123,8 +125,18 @@ pub fn decode_cycles(rom: &[u8], src: usize) -> Option<u32> {
 
 /// The same with the output in EWRAM (byte load 5, byte store 4: the map loader's buffers).
 pub fn decode_cycles_to(rom: &[u8], src: usize, ewram: bool) -> Option<u32> {
+    decode(rom, src, ewram, 0)
+}
+
+/// The remapping decoder `0x03000CA0` (sprites with a palette remap table): the same walk, every literal byte goes
+/// through the table (`ldrb r7, [r2, r7]` from ROM: 6 cycles). Output in IWRAM.
+pub fn decode_cycles_remap(rom: &[u8], src: usize) -> Option<u32> {
+    decode(rom, src, false, 6)
+}
+
+fn decode(rom: &[u8], src: usize, ewram: bool, lit: u32) -> Option<u32> {
     let (ldrb, strb) = if ewram { (5, 4) } else { (LDRB, STRB) };
-    let mut st = St { rom, src, r6: 0, sl: 0, c: 0, ok: true, ldrb, strb };
+    let mut st = St { rom, src, r6: 0, sl: 0, c: 0, ok: true, ldrb, strb, lit };
     let mut out: Vec<u8> = Vec::new();
     st.c += 10 + 1 + 1 + 1 + B;
     let (mut r5, mut ip, mut r4, mut r3) = (8u32, 1u32, 0u32, 1u32);
@@ -136,7 +148,7 @@ pub fn decode_cycles_to(rom: &[u8], src: usize, ewram: bool) -> Option<u32> {
             st.c += B + 1 + B;
             let r7 = st.bits(r3);
             out.push(r7.wrapping_add(r4) as u8);
-            st.c += 1 + st.strb;
+            st.c += 1 + st.strb + st.lit;
             continue;
         }
         st.c += 1;
@@ -227,7 +239,7 @@ pub fn decode_cycles_to(rom: &[u8], src: usize, ewram: bool) -> Option<u32> {
                         st.c += 1 + B;
                         let v = st.bits(8) as u8;
                         out.push(v);
-                        st.c += st.strb + 1 + if k < 255 { B } else { 1 };
+                        st.c += st.lit + st.strb + 1 + if k < 255 { B } else { 1 };
                     }
                     if !st.ok {
                         return None;

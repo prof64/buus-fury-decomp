@@ -416,6 +416,18 @@ pub fn cel_box(w: &World, i: usize) -> Option<[i32; 4]> {
     st.fbox
 }
 
+/// decompression cycles of the cel an actor shows (`AnimStep.dec`; 0 = unknown / no sprite)
+pub fn cel_dec(w: &World, i: usize) -> u32 {
+    let Some(a) = w.actor(i) else { return 0 };
+    let Some(sp) = a.sprite.and_then(|s| w.data.sprite(s)) else { return 0 };
+    let (raw, frame) = match shown_anim(w, i) {
+        Some(x) => x,
+        None => (a.anim.and_then(|k| sp.anims.get(k as usize)).map(|an| an.raw).unwrap_or(1), 0),
+    };
+    let Some(an) = sp.anim_raw(raw) else { return 0 };
+    an.steps(a.facing).get(frame.max(0) as usize).or_else(|| an.steps(a.facing).first()).map(|s| s.dec).unwrap_or(0)
+}
+
 /// the scene animation of an Npc / enemy puppet
 pub fn scene_anim(w: &World, i: usize) -> Option<&ActAnim> {
     match &w.ents[i].body {

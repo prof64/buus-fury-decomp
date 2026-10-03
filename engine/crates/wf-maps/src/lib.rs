@@ -136,6 +136,7 @@ pub fn reload_json(rom: &Rom, h: &Header) -> Value {
                            "offset": [res.offset.0, res.offset.1], "ew": ew, "iw": iw}));
     }
     let mut fixed = 0;
+    let mut tiles = 0;
     if rom.isptr(h.minimap) {
         fixed += cyc(h.minimap + 8, true);
     }
@@ -143,6 +144,7 @@ pub fn reload_json(rom: &Rom, h: &Header) -> Value {
         fixed += cyc(h.tile_list + 8, false);
         let list = rom.lz(h.tile_list).unwrap_or_default();
         let n = (list.len() / 2).min(VRAM_TILES);
+        tiles = n;
         let (mut e, mut last) = (0u16, u32::MAX);
         for i in 0..n {
             let d = u16::from_le_bytes([list[2 * i], list[2 * i + 1]]);
@@ -164,7 +166,8 @@ pub fn reload_json(rom: &Rom, h: &Header) -> Value {
             }
         }
     }
-    json!({"fixed": fixed, "layers": layers})
+    // `tiles`: the listed tiles, each copied to VRAM (~375 cycles)
+    json!({"fixed": fixed, "tiles": tiles, "layers": layers})
 }
 
 /// One map = one distinct map header.

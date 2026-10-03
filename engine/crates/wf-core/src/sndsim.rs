@@ -285,32 +285,50 @@ pub fn reload_frames_with(w: &mut World, done: bool, more: i64) -> Option<u8> {
             continue;
         }
         // a larger layer: the chunks under the 256 x 256 px tile screen centred on the screen's centre at the
-        // layer's scroll, through a buffer (~7 k cycles of copying per chunk). VERIFIED on
+        // layer's scroll, through a buffer (~5 k cycles of copying per chunk). VERIFIED on
         // 8-3 at camera (0, 347): layer offsets 0 / 128 / 192 px load columns {0} / {0, 1} / {0, 1}, rows {1, 2}
         let sx = ((cx * l.rate.0 + l.offset.0) >> 10) + 120 - 128;
         let sy = ((cy * l.rate.1 + l.offset.1) >> 10) + 80 - 128;
-        extra += 800;
         for row in (sy >> 8)..=((sy + 255) >> 8) {
             for col in (sx >> 8)..=((sx + 255) >> 8) {
                 if (0..l.cols as i64).contains(&col) && (0..l.rows as i64).contains(&row) {
                     let v = l.iw.get((row * l.cols as i64 + col) as usize).copied().unwrap_or(0);
                     if v != 0 {
                         c += v;
-                        extra += 7_000;
+                        extra += 5_000;
                     }
                 }
             }
         }
     }
-    if debug() {
-        eprintln!("snd reload: map {} cam ({cx}, {cy}) decompression {c} + {extra}", f.map);
+    // the listed tiles' copy to VRAM
+    extra += 375 * rl.tiles;
+    // every on-screen actor's current frame is decompressed again (0x0803D968; remapped sprites through the
+    // remapping decoder), ~4 k cycles of upload each
+    let mut frames = 0;
+    let mut actors = 0;
+    for i in 0..w.ents.len() {
+        if w.ents[i].removed || w.actor(i).is_none() || !crate::vram::on_screen(w, i) {
+            continue;
+        }
+        let d = crate::scene::cel_dec(w, i) as i64;
+        if d > 0 {
+            frames += d;
+            actors += 1;
+            extra += 4_000;
+        }
     }
-    // a close by a prompt (B) restores in the iteration after the event's: 18..29 k cycles less before it
-    let rest = if done { RELOAD_REST } else { RELOAD_REST - 23_500 };
-    redraw_frames(w, Redraw { t0: 0, base: (rest + more + extra + c * 10_035 / 10_000) * 100_523 / 100_000 })
+    c += frames;
+    if debug() {
+        eprintln!("snd reload: map {} cam ({cx}, {cy}) decompression {c} ({actors} actors' frames {frames}) + {extra}", f.map);
+    }
+    // a close by a prompt (B) restores in the iteration after the event's: less before it (its start varies by
+    // ~14 k cycles, not modelled)
+    let rest = if done { RELOAD_REST } else { RELOAD_REST - 13_700 };
+    redraw_frames(w, Redraw { t0: 0, base: (rest + extra + c * 10_035 / 10_000) * 100_523 / 100_000 })
 }
 
-const RELOAD_REST: i64 = 225_200;
+const RELOAD_REST: i64 = 116_800;
 
 /// the iteration makes the VBlank when it ends this many cycles before it at the latest (the wait's own entry)
 const CUTOFF: i64 = 0;

@@ -1821,6 +1821,13 @@ pub fn kid_buu_split(w: &mut World, i: usize) {
         if let Some(ci) = crate::battle::spawn_enemy(w, 0x3d, (x - dx) >> 8, (y - dy) >> 8, 0, Some(0x12a)) {
             // (the copy is created at the PIXEL of the 24.8 position - d: it has no sub-pixel part; the real route,
             // Kid Buu's arena 21-25: original (279.99, 410.37) + (42, 68) / 256, copy at (279, 410) exactly)
+            unmark_self(w, ci);
+            {
+                let c = w.en(ci);
+                c.a.x = ((x - dx) >> 8) << 8;
+                c.a.y = ((y - dy) >> 8) << 8;
+            }
+            mark_self(w, ci);
             w.en(ci).hp1024 = hp;
         }
         return;
@@ -1832,17 +1839,25 @@ pub fn kid_buu_merge(w: &mut World, i: usize) {
     let Some(o) = other else { return };
     let ohp = w.en_ref(o).hp1024;
     w.en(i).hp1024 += ohp;
-    let mx = (w.en_ref(i).a.px() + w.en_ref(o).a.px()) >> 1;
-    let my = (w.en_ref(i).a.py() + w.en_ref(o).a.py()) >> 1;
-    if fits(w, i, mx, my) {
+    // the midpoint of the two 24.8 positions (the real route, Kid Buu's arena 21-25: (261.63, 311.74) and (252.70,
+    // 390.58) merge at (257.17, 351.16))
+    let mx = (w.en_ref(i).a.x + w.en_ref(o).a.x) >> 1;
+    let my = (w.en_ref(i).a.y + w.en_ref(o).a.y) >> 1;
+    // 0x08009904 on the enemy grid as it stands - both marks still on it: a midpoint on either footprint's tiles
+    // fails and the survivor stays where it is (21-25: two halves 0.1 px apart merge in place)
+    let (fw, fh) = (w.en_ref(i).a.foot_w, w.en_ref(i).a.foot_h);
+    if w.col.as_ref().is_none_or(|c| c.test(Layer::Enemy, mx >> 8, my >> 8, (mx >> 8) + fw, (my >> 8) + fh)) {
         let a = &mut w.en(i).a;
-        a.x = mx << 8;
-        a.y = my << 8;
+        a.x = mx;
+        a.y = my;
     }
+    // two puffs 0x086FD9D0, each rate 0x1000 + rand(0x1000) (draws at 0x08032EAC / 0x08032F0A)
     let (cx, cy) = w.en_ref(i).a.center();
-    crate::fx::puff(w, cx, cy, 0x1800);
+    crate::fx::puff_rng(w, cx, cy);
     let (ox, oy) = w.en_ref(o).a.center();
-    crate::fx::puff(w, ox, oy, 0x1800);
+    crate::fx::puff_rng(w, ox, oy);
+    // (the absorbed copy leaves the enemy grid: its mark would stand in the path follower's way)
+    unmark_self(w, o);
     w.ents[o].removed = true;
     let oe = w.en(o);
     oe.defeated = true;

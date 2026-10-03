@@ -1142,6 +1142,12 @@ export class Enemy extends Actor implements EnemyLike {
       const copy = this.ctx.spawnEnemy(w, 0x3d, (x0 - dx) >> 8, (y0 - dy) >> 8, null, 0x12a) as Enemy | null
       // (the copy is created at the PIXEL of the 24.8 position - d: it has no sub-pixel part; the real route, Kid
       // Buu's arena 21-25: original (279.99, 410.37) + (42, 68) / 256, copy at (279, 410) exactly)
+      if (copy) {
+        copy.unmarkSelf()
+        copy.x = ((x0 - dx) >> 8) << 8
+        copy.y = ((y0 - dy) >> 8) << 8
+        copy.markSelf()
+      }
       if (copy) copy.hp1024 = this.hp1024
       w.logEvent('info', `Kid Buu splits: ${this.hp} + ${this.hp} HP`)
       return
@@ -1151,14 +1157,22 @@ export class Enemy extends Actor implements EnemyLike {
     const other = this.ctx.liveEnemies().find((o) => o !== this && (o.type.type === 0x3c || o.type.type === 0x3d)) as Enemy | undefined
     if (!other) return
     this.hp1024 += other.hp1024
-    const mx = (this.px + other.px) >> 1
-    const my = (this.py + other.py) >> 1
-    if (this.fits(this.w, mx, my)) {
-      this.x = mx << 8
-      this.y = my << 8
+    // the midpoint of the two 24.8 positions (the real route, Kid Buu's arena 21-25: (261.63, 311.74) and (252.70,
+    // 390.58) merge at (257.17, 351.16))
+    const mx = (this.x + other.x) >> 1
+    const my = (this.y + other.y) >> 1
+    // 0x08009904 on the enemy grid as it stands - both marks still on it: a midpoint on either footprint's tiles
+    // fails and the survivor stays where it is (21-25: two halves 0.1 px apart merge in place)
+    const col = this.ctx.col
+    if (!col || col.test('enemy', mx >> 8, my >> 8, (mx >> 8) + this.footW, (my >> 8) + this.footH)) {
+      this.x = mx
+      this.y = my
     }
-    this.ctx.puff(this.w, ...this.center())
-    this.ctx.puff(this.w, ...other.center())
+    // two puffs 0x086FD9D0, each rate 0x1000 + rand(0x1000) (draws at 0x08032EAC / 0x08032F0A)
+    this.ctx.puffRng(this.w, ...this.center())
+    this.ctx.puffRng(this.w, ...other.center())
+    // (the absorbed copy leaves the enemy grid: its mark would stand in the path follower's way)
+    other.unmarkSelf()
     other.removed = true
     other.defeated = true
     other.primary = false

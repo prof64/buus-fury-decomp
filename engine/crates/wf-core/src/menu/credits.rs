@@ -112,6 +112,16 @@ impl Page for Credits {
             1
         }
     }
+    /// a new pair's iteration in cycles (emulator: `re/buu/menu/cycles.py` cr_native_fast, the 43 pages that take
+    /// 2 frames there: 141,207 + the two surfaces' draw lists, residual std 0.5k, max 1.1k): with the sound model
+    /// the mixer's load decides between 1 and 2 frames (the ending's page 74 fits one frame; `page_cost`'s width
+    /// threshold stays for uncalibrated worlds)
+    fn redraw_time(&self, w: &World, d: &MenuData) -> Option<crate::sndsim::Redraw> {
+        if self.t != 0x90 {
+            return None;
+        }
+        Some(super::page_time(d, &self.view(w, d), false, 4_641, 141_207, -85, 387, 0))
+    }
     fn view(&self, _w: &World, d: &MenuData) -> MenuView {
         let t = &d.text;
         let mut title = Canvas::new();

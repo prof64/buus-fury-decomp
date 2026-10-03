@@ -87,6 +87,9 @@ pub struct Timers {
     pub countdown_on: bool,
     pub stopwatch: i32,
     pub stopwatch_on: bool,
+    /// the countdown was started in the last script phase (see `tick_timers`)
+    #[serde(default)]
+    pub fresh: bool,
 }
 
 /// the field saved by `save_field_on_next_scene` for `return_to_field`
@@ -402,7 +405,14 @@ fn self_field_free(w: &World) -> Option<bool> {
 /// Airship's self destruct - white fade, HP 0) in that frame (MEASURED 12-22: GD+0x4D4 15 on the cut's f1702, `run 9`
 /// on f1717).
 pub fn tick_timers(w: &mut World, s: &mut HostState) {
+    // the game runs the scripts before the frame's objects: a countdown started by the last instruction of an event
+    // counts that frame already (Kid Buu's arena 21-25: 3600 set in the event's exit frame reads 3599 in it; the
+    // hook runs 3599 frames later) - our scripts run after the update, so the first free tick counts twice
+    let fresh = std::mem::take(&mut s.timers.fresh);
     if s.timers.countdown_on && s.timers.countdown > 0 && self_field_free(w).unwrap_or(true) {
+        if fresh && s.timers.countdown > 1 {
+            s.timers.countdown -= 1;
+        }
         s.timers.countdown -= 1;
         if s.timers.countdown == 0 && w.field.as_ref().is_some_and(|f| f.host) {
             w.events.push(wf_core::world::Event::Field(wf_core::field::FieldEvent::Run {
@@ -487,6 +497,11 @@ pub fn poll(w: &mut World, s: &mut HostState) -> Option<Option<i32>> {
                     s.boost[0] = 0;
                     let c = w.story.current;
                     let _ = natives::switch_character(w, c);
+                }
+                // "Watch This!" gives its tile bytes back; the purged objects return (`0x08027E00`)
+                if native == 0xa7 {
+                    wf_core::vram::release(w, wf_core::vram::Owner::Minigame);
+                    wf_core::vram::restore(w);
                 }
                 return {
                     s.pending = None;

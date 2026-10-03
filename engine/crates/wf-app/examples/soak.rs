@@ -66,6 +66,8 @@ fn main() {
     let _ = rec;
     let mut prev_lf = -1i64;
     let mut rng_bad = 0usize;
+    let mut flag_check: Option<(usize, String)> = None;
+    let mut flag_reports = 0usize;
     let (mut hp_bad, mut hp_reports) = (0usize, 0usize);
     let mut pos_bad = 0usize;
     let (mut stepped, mut first_area, mut first_pos, mut first_rng) = (0usize, None, None, None);
@@ -164,9 +166,26 @@ fn main() {
                 hp_bad = 0;
             }
         }
+        // story flags: a row carries `flags` (hex of GD+0x55 ..) when they changed; compare 20 rows later (the app
+        // may set a flag a few rows off inside the same event)
+        if let Some(h) = r.get("flags").and_then(|v| v.as_str()) {
+            flag_check = Some((k + 20, h.to_string()));
+        }
+        if flag_check.as_ref().is_some_and(|(at, _)| *at == k) && flag_reports < 8 {
+            let (_, h) = flag_check.take().unwrap();
+            let game: Vec<u8> = (0..h.len() / 2).filter_map(|j| u8::from_str_radix(&h[2 * j..2 * j + 2], 16).ok()).collect();
+            let diff: Vec<String> = (0..game.len().min(w.story.flags.len()) * 8)
+                .filter(|&f| (game[f >> 3] >> (f & 7)) & 1 != (w.story.flags[f >> 3] >> (f & 7)) & 1)
+                .map(|f| format!("{f}:{}", if (game[f >> 3] >> (f & 7)) & 1 != 0 { "game only" } else { "app only" }))
+                .collect();
+            if !diff.is_empty() {
+                flag_reports += 1;
+                println!("flags differ at row {k}: {diff:?}");
+            }
+        }
         if show.is_some_and(|(a, b)| a <= k && k <= b) {
             let pl = w.player_idx(0).map(|pi| w.pl_ref(pi)).map(|p| (p.a.x, p.a.y, p.a.facing, p.gs.name(), p.rec.hp, p.rec.ep));
-            println!("row {k} keys {keys:x} app {pl:?} busy {:?} depth {} | game p {} hp {} depth {}", w.field.as_ref().map(|f| f.busy), w.scene.depth, r["p"], r["hp"], r["depth"]);
+            println!("row {k} keys {keys:x} app {pl:?} busy {:?} depth {} | game p {} hp {} depth {}", w.field.as_ref().map(|f| (f.busy, f.nested, f.held, f.held_event)), w.scene.depth, r["p"], r["hp"], r["depth"]);
         }
         if let Some(gr) = r["rng"].as_array() {
             let g = [gr[0].as_u64().unwrap_or(0) as u32, gr[1].as_u64().unwrap_or(0) as u32];

@@ -509,6 +509,15 @@ while hidden, state 0x114 / 0x118).
 | `g02_pyramid` | Kyodai Pyramid 14-1, its second gate open (s517 (1, 120, 1), flag 176: Gohan) | `g02_pyramid.keys.json` (1,212 from g01) |
 | `g03_gohan141` | 14-1, **Gohan level 141** (1532 HP): 14-1 <-> 14-2 (two Super Majin Fighters + two Super Majin Soldiers, 84,450 XP a visit), `re/buu/ship/grind_safe.py` (snapshot in the safe room, retry with one more punch on a death: none needed) | `g03_gohan141.keys.json` (39,116) |
 | `g04_forest` | 8-1 again (pad, flight): `sb_real.py --start sb/g04_forest.ss --from ult_gohan` | `g04_forest.keys.json` |
+| `m_gohan_vs_buu` | Giant Crater 6-16, Ultimate Gohan (141) against Super Buu | `sbk_ult_gohan_fail.json` (first 1,888 frames from g04; that run then lost with the route's beams) |
+| `m_wasteland` | Barren Wasteland 20-1 after the fight **by punches** (`SB_MELEE=1`: the real Gohan has STR 134 / POW 53; the route's Electric Kamehameha loses, melee wins at once) and s466 | `sbk_gohan_vs_buu.json` (3,828) |
+| `m_gohan_vs_buu2`, `m_fusion_saga` | 20-5 after s469 (20-4's gate: Gohan 140); 20-5 as Goku after Gohan's second fight, s470 .. s481 (flag 137) | `sbk_wasteland.json` (9,038 / 19,994 frames) |
+| `m_goku_vs_buu` (first) | 20-6 at the gate s473 - which wants **Goku at 140** (real: 126) | (20,931) |
+| `g05_goku141` | 20-5, **Goku level 141** (2042 HP): 20-5 <-> 20-6 (two Metal Hulks; a Power Mechandoid, level 160, 104,050 XP), `grind_safe.py`, no retry | `g05_goku141.keys.json` (27,152 from the first m_goku_vs_buu) |
+| `m_goku_vs_buu`, `m_vegito`, **`m_inside_buu`** | `sb_real.py --start sb/g05_goku141.ss --from fusion_saga`: 20-7 (the gate); after the three Instant Transmission rounds (s474 .. s476); **21-1 inside Buu, Vegeta (120)** after Vegito's fight and the absorption (s477) | `sbk_fusion_saga.json` (its first 2,449 / 21,280 / 25,599 frames; the rest is a stuck walk) |
+| `i01_21-2` | 21-2: the sphincter trigger (A at (500, 300) facing right walks him to (552, 416)), then ShipDriver's nav (the route's `exitto` stands still at (520, 400) here) | `i01_21-2.keys.json` (863 from m_inside_buu); then `--from inside_buu --skip 4` |
+| `m_intestines`, `m_brain`, **`m_kid_buu_saga`**, `m_kid_buu` (first) | the route from 21-2 on, unchanged: the four pods (flags 139 .. 143), the three fakes, 21-26; Super Buu's last fight (s489, flag 147), out of Buu (flag 148), **the world map, Goku 143**; 19-3 against Kid Buu (that first try: round 1 won, lost in round 2 - he had come with 1268 of 2133 HP) | `sbk_inside_buu_skip.json` (36,890 frames from i01 to m_kid_buu; then the lost fight) |
+| `k01_rested` | West City: Vegeta stands in at the save point until Goku is full (2133 HP), Goku's 11 points, the capsule; then `--start sb/k01_rested.ss --from kid_buu_saga` | `k01_rested.keys.json` (7,678 from m_kid_buu_saga) |
 
 Findings (gates at this stage, flag 128 set): the dungeons' second gates each want one character - Nataday Gotenks
 140, Pilaf Goten 120, Southwest Forest Goku 100, Diablo Desert Gohan 100 (flag 170), the Pyramid Gohan 120 (flag
@@ -789,8 +798,22 @@ page's own cycles built from its draw list; opt-in as before (`init.snd_phase`),
   field cameras (one step too many before; the world restore's step at the close stays), and their close takes the
   pause menu's reload time (`sndsim::reload_frames`, was only used for `PAUSE`): save-point cuts 8-1 / 8-26 / 7-2
   now exact, 8-66 to f18,226.
-* Ship route with the models (the six save-point cuts got `snd_phase` too): **332 / 338 exact, 289,193 frames**
-  (was 301). Left: `shipr_056` (its close is 27 frames with 7.4k cycles of margin on 7.31M: the model says 26),
+* **Switch Character's close** (for the Super Buu agent's 21-13 / 21-14 and the ship's save points): the pause
+  menu's reload (`sndsim::reload_frames_with`) + 26,500 when the leader changed (`CharSelect.switched`) + 34,000
+  per distinct sprite among the area's other actors (the figures took the object tiles: the world's graphics load
+  again; measured beyond the pause reload: 8-26 cancelled, no actor +1k; 8-1 switched +27k; 7-2 3 sprites +139k;
+  21-14 4 sprites +153k). Its redraws got a time too (360,000: always 2 frames, but the constant's crude end put the
+  sound update ~190k cycles late and moved the reload's first interrupt mix). `sb_030_21_14` is exact to its end
+  with `snd_phase` (746 / 746, 15 black frames + the stub's), `shipr_056` too. `sb_029_21_13` still ends its close a
+  frame early: the same reload, but the model's four interrupt mixes cost 376k against the game's 545k - the sound
+  driver's state after that cut's 21-13 -> 21-14 area change (for the sndsim owner). Copies with `snd_phase`:
+  `work/ship/timing/sb/`.
+* **Credits**: a new pair's iteration = 141,207 + the two surfaces' draw lists (-85 per line, 3.557 per glyph
+  instruction; 43 pages of cr_native_fast: std 0.5k, max 1.1k); with the sound model the mixer decides 1 vs 2
+  frames. The ending cut `sb_044_04_20` with `snd_phase`: all 40 pages right, page 74 takes 1 frame (margin 1,477
+  cycles: counted as NEAR); it now runs to f24,056 of 24,101, where the game is back at the title (area 0-2) and
+  ours loads 1-1.
+* Ship route with the models (the six save-point cuts got `snd_phase` too): **333 / 338 exact** (was 301). Left:
   `shipr_236` (pause close, camera at the reload), `shipr_328` from f18,226 (a later menu), `shipr_266` f6007 (a
   hurt animation cel right after the menu: a field divergence the menu no longer hides), `shipr_002` (crowd /
   sprite memory) and `shipr_004` f299 (the player is hit: appeared with another agent's uncommitted battle edits,

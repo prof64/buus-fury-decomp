@@ -289,6 +289,10 @@ pub enum Owner {
     HudOut,
     /// a damage number (`popups`)
     Popup,
+    /// a level sign's label object (`0x0800C300`, vtable 0x0804D878, 0x200 bytes): its index in the load
+    Sign(u32),
+    /// the "Watch This!" mode's graphics (`0x08027DB0`, 0x2800 bytes)
+    Minigame,
     /// the HUD's stat-points mark (`0x0800BCC8` makes it, vtable 0x0804C070, 0x100 bytes)
     StatMark,
     /// an ended effect object's block (`delayed`)
@@ -345,6 +349,9 @@ pub struct VramState {
     /// the damage numbers' places in the world list: (handle, the id the next entity got when it was made)
     #[serde(default)]
     pub popup_at: Vec<(u16, u32)>,
+    /// the entity the object pass is updating (0 outside the pass)
+    #[serde(default)]
+    pub pass_at: u32,
     /// actors whose shadow a script set (`shadow_set`): the shared graphic's index, None = no shadow
     #[serde(default)]
     pub shadow_set: Vec<(crate::world::EntityId, Option<u8>)>,
@@ -387,7 +394,7 @@ pub fn acquire(w: &mut World, owner: Owner, bytes: i32) {
     let stamp = w.next_id;
     if let (Some(h), Some(v)) = (h, st(w)) {
         v.owners.push((h, owner));
-        if matches!(owner, Owner::Hud | Owner::Banner | Owner::BossBar | Owner::StatMark) && !v.objs.iter().any(|o| o.0 == owner) {
+        if matches!(owner, Owner::Hud | Owner::Banner | Owner::BossBar | Owner::StatMark | Owner::Sign(_)) && !v.objs.iter().any(|o| o.0 == owner) {
             v.objs.push((owner, stamp, bytes));
         }
     }
@@ -678,7 +685,7 @@ fn own_act(o: Owner, level: i32) -> Act {
         Owner::Banner => 2,
         // the stat-points mark from 3 (`0x0800B5C2`)
         Owner::StatMark => 3,
-        Owner::Hud | Owner::BossBar => 4,
+        Owner::Hud | Owner::BossBar | Owner::Sign(_) => 4,
         _ => return Act::Keep,
     };
     if level >= n {
@@ -878,6 +885,30 @@ pub fn hud_created(w: &mut World) {
     acquire(w, Owner::Hud, 0x500);
 }
 
+/// the HUD's update (`0x0800BCC8`): the stat-points mark is made when the leader has points to spend, a HUD
+/// exists and there is no mark
+pub fn stat_mark(w: &mut World) {
+    let points = w.story.chars.get(w.story.current.max(0) as usize).map(|c| c.rec.points).unwrap_or(0);
+    let (hud, mark) = st(w)
+        .map(|v| (v.owners.iter().any(|o| o.1 == Owner::Hud), v.owners.iter().any(|o| o.1 == Owner::StatMark) || v.susp.iter().any(|x| matches!(x, Susp::Own(Owner::StatMark, _, _)))))
+        .unwrap_or((false, false));
+    if hud && !mark && points != 0 {
+        acquire(w, Owner::StatMark, 0x100);
+    }
+}
+
+/// the level signs' labels go (an area load)
+pub fn signs_gone(w: &mut World) {
+    let Some(v) = st(w) else { return };
+    let hs: Vec<u16> = v.owners.iter().filter(|o| matches!(o.1, Owner::Sign(_))).map(|o| o.0).collect();
+    v.owners.retain(|o| !matches!(o.1, Owner::Sign(_)));
+    v.objs.retain(|o| !matches!(o.0, Owner::Sign(_)));
+    v.susp.retain(|x| !matches!(x, Susp::Own(Owner::Sign(_), _, _)));
+    for h in hs {
+        v.a.free(h);
+    }
+}
+
 /// every scene visual's object goes (an area load)
 pub fn visuals_gone(w: &mut World) {
     let Some(v) = st(w) else { return };
@@ -899,11 +930,6 @@ pub fn hud_shown(w: &mut World, on: bool) {
     }
     if on {
         acquire(w, Owner::Hud, 0x500);
-        // its update of this frame makes the stat-points mark (segment sb 20-2 f1574: the same frame)
-        let points = w.story.chars.get(w.story.current.max(0) as usize).map(|c| c.rec.points).unwrap_or(0);
-        if points != 0 && !st(w).is_some_and(|v| v.owners.iter().any(|o| o.1 == Owner::StatMark)) {
-            acquire(w, Owner::StatMark, 0x100);
-        }
     } else if let Some(v) = st(w) {
         let hs: Vec<u16> = v.owners.iter().filter(|o| o.1 == Owner::Hud).map(|o| o.0).collect();
         for h in hs {
@@ -1033,8 +1059,13 @@ pub fn damage_number(w: &mut World, target: EntityId) {
     let stamp = w.next_id;
     let objects = w.ents.iter().filter(|e| !e.removed).count();
     let Some(v) = st(w) else { return };
-    if let Some(p) = v.popups.iter_mut().find(|p| p.0 == target && now.wrapping_sub(p.1) < 8) {
-        p.3 = now + POPUP_LIFE;
+    if let Some(k) = v.popups.iter().position(|p| p.0 == target && now.wrapping_sub(p.1) < 8) {
+        // its 16 updates start again (`0x0800AB54`); a number older than the object being updated still gets this
+        // frame's update (segment sb 20-3 f211: a flame's hit, the number ends a frame earlier)
+        let h = v.popups[k].2;
+        let at = v.popup_at.iter().find(|p| p.0 == h).map(|p| p.1).unwrap_or(0);
+        let pending = v.pass_at != 0 && at <= v.pass_at;
+        v.popups[k].3 = now + POPUP_LIFE - pending as u32;
         return;
     }
     v.popups.retain(|p| p.0 != target || p.3 >= now);
@@ -1058,6 +1089,7 @@ pub const POPUP_LIFE: u32 = 16;
 pub fn popups_tick(w: &mut World, after: Option<EntityId>) {
     let now = w.frame;
     let Some(v) = st(w) else { return };
+    v.pass_at = after.unwrap_or(0);
     let at = |v: &VramState, h: u16| v.popup_at.iter().find(|p| p.0 == h).map(|p| p.1).unwrap_or(0);
     let mut gone: Vec<(u32, u16)> = v.popups.iter().filter(|p| p.3 <= now).map(|p| (at(v, p.2), p.2)).filter(|g| after.is_none_or(|a| g.0 > a)).collect();
     if !gone.is_empty() {
@@ -1090,11 +1122,10 @@ pub fn hud_tick(w: &mut World) {
     // the HUD's update (`0x0800BCC8`) makes the stat-points mark when the leader has points to spend and there is
     // none; the mark deletes itself when the points are spent (`0x0800B530`)
     let points = w.story.chars.get(w.story.current.max(0) as usize).map(|c| c.rec.points).unwrap_or(0);
-    let (hud, mark) = st(w).map(|v| (v.owners.iter().any(|o| o.1 == Owner::Hud), v.owners.iter().any(|o| o.1 == Owner::StatMark) || v.susp.iter().any(|x| matches!(x, Susp::Own(Owner::StatMark, _, _))))).unwrap_or((false, false));
-    if mark && points == 0 {
+    if points == 0 {
         release(w, Owner::StatMark);
-    } else if hud && !mark && points != 0 {
-        acquire(w, Owner::StatMark, 0x100);
+    } else {
+        stat_mark(w);
     }
     let Some(v) = st(w) else { return };
     if v.hud_out.is_empty() {

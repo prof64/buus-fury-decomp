@@ -308,6 +308,9 @@ impl StoryHost {
         let post: Vec<Event> = sess.world.events[n.min(sess.world.events.len())..].to_vec();
         self.collect(&post);
         self.run_queue(&mut sess.world);
+        // the game runs a frame's scripts before its objects: a HUD a script showed gets its update (the
+        // stat-points mark) in the same frame, after the script's own objects (segments sb 20-2 f1574, 20-5 f5212)
+        wf_core::vram::stat_mark(&mut sess.world);
     }
 }
 

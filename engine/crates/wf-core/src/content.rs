@@ -92,6 +92,8 @@ pub struct AnimStep {
     pub attach: Option<(i32, i32)>,
     /// the frame record's box (record +4..+7: ox, oy, w, h relative to the integer position; 0x0800FE34)
     pub fbox: Option<[i32; 4]>,
+    /// CPU cycles of the frame's decompression (`decode_cycles`; 0 = unknown): sndsim.rs
+    pub dec: u32,
 }
 
 #[derive(Clone, Debug)]
@@ -879,7 +881,7 @@ fn parse_sprite(s: &Value, index: i32, timing: Option<&Value>) -> Sprite {
                                 dur = int(e);
                             }
                         }
-                        AnimStep { frame: geti(st, "frame") as u16, dur: dur.max(1) as u32, rom: int(&st["rom"]) as u32, flip: st["flip"].as_bool().unwrap_or(false), attach: st["attach"].as_array().filter(|a| a.len() >= 2).map(|a| (int(&a[0]) as i32, int(&a[1]) as i32)), fbox: st["box"].as_array().filter(|a| a.len() >= 4).map(|a| [int(&a[0]) as i32, int(&a[1]) as i32, int(&a[2]) as i32, int(&a[3]) as i32]) }
+                        AnimStep { frame: geti(st, "frame") as u16, dur: dur.max(1) as u32, rom: int(&st["rom"]) as u32, flip: st["flip"].as_bool().unwrap_or(false), attach: st["attach"].as_array().filter(|a| a.len() >= 2).map(|a| (int(&a[0]) as i32, int(&a[1]) as i32)), fbox: st["box"].as_array().filter(|a| a.len() >= 4).map(|a| [int(&a[0]) as i32, int(&a[1]) as i32, int(&a[2]) as i32, int(&a[3]) as i32]), dec: st["decode_cycles"].as_u64().unwrap_or(0) as u32 }
                     })
                     .collect()
             });

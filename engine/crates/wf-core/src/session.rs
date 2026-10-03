@@ -161,7 +161,35 @@ impl Session {
         }
         if w.field.is_some() {
             // Watch This!'s closing frame runs the scene's tracks, the script and the cameras, not the objects
-            if !crate::field::frozen(w) && !crate::scene::frozen(w) && !watch_closing {
+            // a breakable's callback waiting for a track command (field.rs `break_event`): the nested loop's frames
+            // have no object pass; the frame after its wait is the rest of the interrupted pass - the players
+            // (a later frame of the loop ticks the tracks first: the wait that ends there returns into the pass)
+            let ticked = w.field.as_ref().is_some_and(|f| f.break_event != 0 && f.break_modal);
+            if ticked {
+                crate::scene::tick(w);
+            }
+            let waiting = w.scene.director.wait.is_some();
+            let brk = match w.field.as_mut() {
+                Some(f) if f.break_event != 0 && waiting => {
+                    f.break_modal = true;
+                    1
+                }
+                Some(f) if f.break_event != 0 => {
+                    f.break_event = 0;
+                    if std::mem::take(&mut f.break_modal) { 2 } else { 0 }
+                }
+                _ => 0,
+            };
+            if brk == 1 {
+                w.tick_shakes();
+                crate::fieldobj::held_moves(w);
+            } else if brk == 2 {
+                for s in 0..w.players.len() {
+                    if let Some(pi) = w.player_idx(s) {
+                        crate::player::release_passive(w, pi);
+                    }
+                }
+            } else if !crate::field::frozen(w) && !crate::scene::frozen(w) && !watch_closing {
                 battle::pre_step(w);
                 w.step_entities();
             } else if crate::field::frozen(w) && !watch_closing {
@@ -173,7 +201,9 @@ impl Session {
             }
             // the leader's KO timer: the death / Lazarus Crystal hook (menu/gameover.rs)
             crate::menu::gameover::tick(w);
-            crate::scene::tick(w);
+            if !ticked {
+                crate::scene::tick(w);
+            }
             return;
         }
         let w = &mut self.world;

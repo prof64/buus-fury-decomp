@@ -17,6 +17,9 @@ OUT.mkdir(parents=True, exist_ok=True)
 a = sys.argv
 opt = lambda n, d=None: a[a.index(n) + 1] if n in a else d  # noqa: E731
 goals = list(sbroute.ROUTE)
+if os.environ.get('SB_MELEE'):
+    # the real Gohan is a melee build (STR 134, POW 53): punches instead of the route's Electric Kamehameha
+    goals = [('boss', g[1]) if g[0] == 'beam' else g for g in goals]
 frm, to, cap = opt('--from'), opt('--to'), int(opt('--cap', 10 ** 7))
 st = opt('--start') or str(OUT / 'sb_start.ss')
 if frm:
@@ -25,6 +28,7 @@ if frm:
         st = str(OUT / f'm_{frm}.ss')
 if to:
     goals = goals[:goals.index(('mark', to)) + 1]
+goals = goals[int(opt('--skip', 0)):]      # (the first goals after --from already played by hand)
 e = start_emu(st)
 d = Driver(goals)
 f = 0
@@ -60,4 +64,4 @@ print('end', f, 'done' if d.done() else f'NOT DONE {err!r} at goal {d.k} {d.goal
       status(e))
 e.set_keys(0)
 e.save_file(str(OUT / 'end.ss'))
-(OUT / f"sbk_{frm or 'start'}.json").write_text(json.dumps({'from': frm, 'keys': log, 'failed': err is not None}))
+(OUT / f"sbk_{frm or 'start'}{'_skip' if opt('--skip') else ''}.json").write_text(json.dumps({'from': frm, 'keys': log, 'failed': err is not None}))
