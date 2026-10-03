@@ -556,7 +556,14 @@ pub enum Cmd {
     PropShow { on: bool },
     PropMoveTo { x: i32, y: i32, speed: i32, n: i32, t: i32, sx: i32, sy: i32 },
     PropJumpTo { x: i32, y: i32, t: i32, vx: i32, vy: i32 },
-    PropSetPos { x: i32, y: i32 },
+    /// `solo`: enqueued outside a batch (done at its start: s464 n12); inside a batch it takes its tick (s464 n36:
+    /// 80 positions of the Katchin block, one per frame plus the batch's start)
+    PropSetPos {
+        x: i32,
+        y: i32,
+        #[serde(default)]
+        solo: bool,
+    },
     /// camera track: 0x6A follow + wait, 0x6B pan, 0x6C release + wait, 0x6D / 0x6E params, 0x6F / 0x70 set
     CamFollowWait { target: EntityId, left: i32 },
     CamPanTo { x: i32, y: i32, speed: i32, n: i32, t: i32, sx: i32, sy: i32 },
@@ -1173,7 +1180,7 @@ pub fn muzzle(w: &World, i: usize) -> (i32, i32) {
 fn done_at_start(cmd: &Cmd) -> bool {
     // remove_actor deletes the actor and its track with it (1 frame, trace boss_janemba_handover)
     // prop_set_pos too (s464: the boulder placed between Goku's walk and his pose: 1 frame)
-    matches!(cmd, Cmd::SetPos { .. } | Cmd::CamSet { .. } | Cmd::CamParam { .. } | Cmd::Remove | Cmd::PropSetPos { .. })
+    matches!(cmd, Cmd::SetPos { .. } | Cmd::CamSet { .. } | Cmd::CamParam { .. } | Cmd::Remove | Cmd::PropSetPos { solo: true, .. })
 }
 
 fn start_head(w: &mut World, k: usize) {
@@ -1481,7 +1488,7 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
                 prop_mut(w, p).visible = *on;
             }
         }
-        Cmd::PropSetPos { x, y } => {
+        Cmd::PropSetPos { x, y, .. } => {
             if let Owner::Prop(p) = owner {
                 let pr = prop_mut(w, p);
                 pr.x = *x << 8;
@@ -2090,17 +2097,24 @@ pub fn tick(w: &mut World) {
 fn tick_tracks(w: &mut World) {
     let Some(mode) = w.scene.director.wait.clone() else { return };
     let mut all_idle = true;
-    let mut k = 0;
-    while k < w.scene.tracks.len() {
-        let owner = w.scene.tracks[k].owner;
-        if !in_mode(&mode, owner) {
-            k += 1;
+    // the actors' tracks tick in the world list's update order (last object first), the camera track first (story
+    // playthrough s103: three NPCs ending their walks in one frame draw their idle ticks newest object first)
+    let key = |w: &World, o: Owner| -> i64 {
+        match o {
+            Owner::Entity(id) => -(w.find(id).map(|i| i as i64).unwrap_or(-1)),
+            _ => i64::MIN,
+        }
+    };
+    let mut owners: Vec<Owner> = w.scene.tracks.iter().map(|t| t.owner).collect();
+    owners.sort_by_key(|&o| key(w, o));
+    for o in owners {
+        let Some(k) = w.scene.tracks.iter().position(|t| t.owner == o) else { continue };
+        if !in_mode(&mode, o) {
             continue;
         }
         if !tick_track(w, k) {
             all_idle = false;
         }
-        k += 1;
     }
     if all_idle {
         w.scene.director.wait = None;

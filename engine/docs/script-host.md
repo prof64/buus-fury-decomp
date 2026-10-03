@@ -442,8 +442,25 @@ Counts: VM 16, core 32, field 22, partial 13, scene 112, story 53
   so coins are tested with their rect from before the frame's step (or where they dropped); coins move 60 frames;
   pickups stop while an event holds the field; scripted puffs draw their rate (0x1000 + rand(0x1000)); skill
   edits reach a player offstage in a cutscene scene; L plays sound 40. Route helpers: `tools/story_playthrough/`
-  `try_route.py` (goals from a save state), `endstate.py`, `objdump.py`, `lootwatch.py`. Next on the route: the
-  Instant Transmission puzzle in 1-17 (s098), then the rest of Other World.
+  `try_route.py` (goals from a save state), `endstate.py`, `objdump.py`, `lootwatch.py`, `probe.py`.
+  Round 5 (recording extended to 41,423 frames: Instant Transmission over the 1-17 wall to the Cotton Gi, Grand
+  Kai's tournament 1-20, the final against Pikkon, his defeat scene and the cutscenes to Earth 2-1 = the end of
+  Other World): **all 41,423 frames exact**. Rules added:
+  - field Instant Transmission (player.rs `ctl_it_field`): the pick also offers triggers whose test is
+    `0x0804AA08` (activation 0x0802266F) with rect (x0 + 15, y0 + 7, x1, y1) on camera; the run (vt 0x0804E334)
+    turns the trigger list off (+0xD0) while away, lands at the centre of (x0, y0, x1 + 15, y1 + 7) - (8, -4)
+    facing down, and arms the trigger (0x080125FA: the next check fires it anywhere, then restores it); the run
+    waits while the fired event holds the field, the item-get pose gives the run's state back, sfx 31 at t -23
+    always; the selector is a modal loop (no camera, no trigger check);
+  - an event that ends in this frame's script phase leaves no trigger check that frame, unless a held update
+    resumes (s090 -> s091); a held frame whose next queued event starts at once stays held (s003 -> s103); the
+    resumed update gives NPCs no extra "event ended" tick; kill XP (level-up) runs before the defeat callbacks;
+  - command tracks: set_pos popped at its start leaves the next command for the next tick, a head the tick starts
+    is not updated in it, and tracks tick in world-list order (newest object first, camera first);
+    `play_anim(0, 0)` re-idles a player; glide / remove / become_map_object lift an NPC's grid mark;
+    `camera_pan_to` starts from the whole-pixel position; `set_form` = form exit, idle (rand), form enter;
+  - the back-off node (0x08018E29) restores its reversed walk when a popped hurt state left another animation.
+  Next: Earth (2-1 on) is the chapter agents' (wf-import segments); this recording ends at the Earth arrival.
 
 ## 10. Field core status (field agent, 2026-10-02; details docs/core.md §10)
 

@@ -2897,6 +2897,16 @@ fn form_exit(w: &mut World, i: usize) {
         sfx_stop(w, 54);
     }
 }
+/// script `set_form` (0x080036A5): leave the old form (0x0801712C), set the record's form, refresh the player entity
+/// (0x08010692: SetAnim(0), the idle's rand(255)), enter the new form (0x0801711C; story playthrough s103: stop /
+/// play sfx 54, one draw)
+pub fn script_set_form(w: &mut World, i: usize, form: i32) {
+    form_exit(w, i);
+    apply_form(w, i, form);
+    form_enter(w, i);
+    set_anim_id(w, i, 0);
+    new_form_object(w, i);
+}
 fn finish_transform(w: &mut World, i: usize) {
     {
         let pl = p(w, i);

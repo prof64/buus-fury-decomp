@@ -180,15 +180,19 @@ pub fn compare(w: &World, fr: &Value, es: &[String], map: &mut BTreeMap<usize, E
         }
     }
     let cam = fr["cam"].as_array().unwrap();
-    let c = &w.cameras[0];
-    if c.x != i(&cam[0]) as i32 || c.y != i(&cam[1]) as i32 {
-        rep.bad(k, "cam", format!("({}, {}) vs game ({}, {})", c.x as f64 / 1024.0, c.y as f64 / 1024.0, i(&cam[0]) as f64 / 1024.0, i(&cam[1]) as f64 / 1024.0));
+    // the 3D world map: the game's camera object is the map's 3D camera (x, y 22.10: wf-core `Flight.cam`)
+    let (cx, cy) = match w.field.as_ref().and_then(|f| f.flight.as_ref()) {
+        Some(fl) => (fl.cam[0], fl.cam[1]),
+        None => (w.cameras[0].x, w.cameras[0].y),
+    };
+    if cx != i(&cam[0]) as i32 || cy != i(&cam[1]) as i32 {
+        rep.bad(k, "cam", format!("({}, {}) vs game ({}, {})", cx as f64 / 1024.0, cy as f64 / 1024.0, i(&cam[0]) as f64 / 1024.0, i(&cam[1]) as f64 / 1024.0));
     }
     let io = fr["io"].as_array().unwrap();
     let game_black = i(&io[5]) == 0;
     let field_black = w.field.as_ref().is_some_and(|f| {
         let b = match f.mode {
-            wf_core::field::Mode::FadeOut { k, .. } => 256 - 8 * k,
+            wf_core::field::Mode::FadeOut { k, step, .. } => 256 - wf_core::field::fade_out_level(k, step),
             wf_core::field::Mode::FadeIn { k } => 8 * k,
             wf_core::field::Mode::Normal => 256,
         };
@@ -332,6 +336,8 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
                         _ => None,
                     })
                     .collect();
+                let pst = w.player_idx(0).map(|pi| w.pl_ref(pi).a.stats);
+                eprintln!("      player stats {:?}", pst);
                 eprintln!("      loot {:?} enemies {}", w.field.as_ref().map(|f| f.loot), ens.join(" "));
             }
         }

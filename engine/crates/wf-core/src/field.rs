@@ -130,7 +130,16 @@ pub enum Mode {
     Normal,
     /// fade-out (`0x08006D98`, brightness 256 → 0 by 8): k = fade frames done (1..32); the load runs at the end of
     /// the 32nd
-    FadeOut { k: i32, to: AreaId, x: i32, y: i32, facing: Option<Dir> },
+    FadeOut {
+        k: i32,
+        to: AreaId,
+        x: i32,
+        y: i32,
+        facing: Option<Dir>,
+        /// brightness step per frame: 0 = the exits' 8 (32 frames); 4 = a script's `warp_fade` (64 frames)
+        #[serde(default)]
+        step: i32,
+    },
     /// fade-in (`0x08006DD6`): k = fade frames done; the player goes idle at the end of the 32nd
     FadeIn { k: i32 },
 }
@@ -236,6 +245,10 @@ pub struct Field {
     /// holds the player's creation 2 frames after s124 / s129's warps)
     #[serde(default)]
     pub nest_load: bool,
+    /// entity ids an area load made while an event held the field (lo..hi): never told to stop by the event, they
+    /// run while it holds (the world map's patrolling encounters during s515's warp_fade fade-in)
+    #[serde(default)]
+    pub load_ids: (u32, u32),
 }
 
 /// how a field session starts
@@ -360,6 +373,7 @@ fn new_field() -> Field {
         player_removed: false,
         on_enter_queued: false,
         nest_load: false,
+        load_ids: (0, 0),
     }
 }
 
@@ -530,6 +544,7 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
     let had_area = w.field.as_ref().is_some_and(|f| f.loads > 0);
     // a load inside a running event (script warp / scene load) keeps the field held until the event ends
     let keep_busy = w.scene.depth > 0 && w.field.as_ref().is_some_and(|f| f.busy);
+    let load_lo = w.next_id;
     // the label entity of a travel menu is an object of the old area
     w.scene.dest_label = None;
     // every object goes; the players are re-created below (same entity ids)
@@ -595,6 +610,9 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
         if cond_holds(w, &o.cond) {
             spawn_object(w, o);
         }
+    }
+    if let Some(f) = w.field.as_mut() {
+        f.load_ids = if keep_busy { (load_lo, w.next_id) } else { (0, 0) };
     }
     // 5. the old area's on-leave, the new area's on-enter (both before the player exists)
     if had_area {
@@ -983,11 +1001,17 @@ pub fn post_step(w: &mut World) {
         Mode::Normal => trigger_check(w),
         // the load is waiting for its on-enter script: the screen stays black
         Mode::FadeOut { .. } if w.field.as_ref().is_some_and(|f| f.arrival.is_some()) => {}
-        Mode::FadeOut { k, to, x, y, facing } => {
+        Mode::FadeOut { k, to, x, y, facing, step } => {
             let k = k + 1;
-            if k >= FADE {
+            if k >= fade_len(step) {
+                // a script's fading warp rebuilds the player and its camera at the load: the script camera ends
+                if step != 0 {
+                    w.scene.cam.mode = crate::scene::CamMode::Player;
+                    w.scene.cam.scroll = None;
+                }
                 // the mode's destructor: the old player goes idle (1 x rand(255)), then EnterArea in the same frame
-                for s in 0..w.players.len() {
+                // (a script's warp_fade set it idle at its call; its own fade has no such destructor)
+                for s in 0..if step != 0 { 0 } else { w.players.len() } {
                     if let Some(i) = w.player_idx(s) {
                         player::set_idle(w, i);
                     }
@@ -998,13 +1022,13 @@ pub fn post_step(w: &mut World) {
                     Some(ar) => {
                         ar.fade_in = true;
                         if let Some(f) = w.field.as_mut() {
-                            f.mode = Mode::FadeOut { k, to, x, y, facing };
+                            f.mode = Mode::FadeOut { k, to, x, y, facing, step };
                         }
                     }
                     None => begin_fade_in(w),
                 }
             } else if let Some(f) = w.field.as_mut() {
-                f.mode = Mode::FadeOut { k, to, x, y, facing };
+                f.mode = Mode::FadeOut { k, to, x, y, facing, step };
             }
         }
         Mode::FadeIn { k } => {
@@ -1348,9 +1372,39 @@ fn exit_to(w: &mut World, slot: usize, to: Dest, push: Dir, rect: Rect, edge: bo
     begin_fade_out(w, dest, x, y, Some(facing));
 }
 
+/// frames of a fade-out with brightness step `step` (0 = 8)
+pub fn fade_len(step: i32) -> i32 {
+    256 / if step > 0 { step } else { 8 }
+}
+
+/// brightness level (0..256) of a fade-out after k frames
+pub fn fade_out_level(k: i32, step: i32) -> i32 {
+    ((if step > 0 { step } else { 8 }) * k).clamp(0, 256)
+}
+
+/// `warp_fade` (0x76, handler 0x080022E7): the player goes idle (vt+0x28(0)), a 64-frame fade-out (brightness by 4),
+/// then the load (story: s515's world-map take-off holds the idle player and the camera still for 64 frames)
+pub fn warp_fade_slow(w: &mut World, world: i32, area: i32, variant: i32, x: i32, y: i32) {
+    if w.field.is_none() {
+        return;
+    }
+    for s in 0..w.players.len() {
+        if let Some(i) = w.player_idx(s) {
+            player::set_idle(w, i);
+        }
+    }
+    begin_fade_out(w, AreaId { world, area, variant }, x, y, None);
+    // the fade object's brightness starts moving two frames after the call (s515 at 3-1: idle at the call, black 63
+    // frames later)
+    if let Some(Mode::FadeOut { step, k, .. }) = w.field.as_mut().map(|f| &mut f.mode) {
+        *step = 4;
+        *k = -1;
+    }
+}
+
 fn begin_fade_out(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<Dir>) {
     if let Some(f) = w.field.as_mut() {
-        f.mode = Mode::FadeOut { k: 0, to, x, y, facing };
+        f.mode = Mode::FadeOut { k: 0, to, x, y, facing, step: 0 };
     }
     w.events.push(Event::Field(FieldEvent::Transition { to }));
 }

@@ -195,8 +195,12 @@ pub fn breakable_message(w: &mut World, k: usize, msg: &mut HitMsg) -> bool {
     let (cx, cy) = ((b.bx[0] + b.bx[2]) >> 1, (b.bx[1] + b.bx[3]) >> 1);
     spawn_debris(w.field.as_mut(), cx, cy);
     let Body::Breakable(b) = &mut w.ents[k].body else { return false };
-    // the melee's crit slot is not written for breakables: every recorded hit shook the screen (15, 75)
-    msg.crit = true;
+    // the melee's crit slot is not written for breakables: alone, every recorded hit shook the screen (15, 75) (the
+    // stack slot's stale value); with an enemy hit by the same punch the enemy's ComputeDamage wrote it (Babidi's
+    // ship 8-34: a killing punch that also hit a crate, no shake)
+    if msg.raw == 0 && msg.dmg == 0 {
+        msg.crit = true;
+    }
     if b.hp > 0 {
         b.shake = 23;
         return true;
@@ -214,6 +218,11 @@ pub fn breakable_message(w: &mut World, k: usize, msg: &mut HitMsg) -> bool {
 }
 
 pub fn breakable_update(w: &mut World, i: usize) {
+    // an event holding the field (the level-up popup's nested loop) stops the hit shake, like the pickups
+    // (Babidi's ship 8-34: no shake draws during a kill's level-up)
+    if w.field.as_ref().is_some_and(|f| f.busy) {
+        return;
+    }
     let Body::Breakable(b) = &w.ents[i].body else { return };
     if b.shake <= 0 {
         return;

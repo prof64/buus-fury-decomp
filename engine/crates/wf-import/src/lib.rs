@@ -297,7 +297,7 @@ fn build_area_entry(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner: 
         f.patrols.clear();
         f.deferred.clear();
         f.loads = 0;
-        f.mode = Mode::FadeOut { k: field::FADE - 1, to, x, y, facing: Some(facing) };
+        f.mode = Mode::FadeOut { k: field::FADE - 1, to, x, y, facing: Some(facing), step: 0 };
     }
     field::attach_host(&mut w, true);
     patch_leader(&mut w, ram, notes);

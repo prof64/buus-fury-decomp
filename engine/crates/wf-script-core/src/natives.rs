@@ -305,7 +305,7 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
         0x66 => enqueue_owner(h, Some(Owner::Prop(arg(a, 0))), Cmd::PropMoveTo { x: arg(a, 1), y: arg(a, 2), speed: arg(a, 3), n: 0, t: 0, sx: 0, sy: 0 }),
         0x67 => enqueue_owner(h, Some(Owner::Prop(arg(a, 0))), Cmd::PropJumpTo { x: arg(a, 1), y: arg(a, 2), t: 0, vx: 0, vy: 0 }),
         0x68 => enqueue_owner(h, Some(Owner::Prop(arg(a, 0))), Cmd::Wait { left: arg(a, 1) }),
-        0x69 => enqueue_owner(h, Some(Owner::Prop(arg(a, 0))), Cmd::PropSetPos { x: arg(a, 1), y: arg(a, 2) }),
+        0x69 => enqueue_owner(h, Some(Owner::Prop(arg(a, 0))), Cmd::PropSetPos { x: arg(a, 1), y: arg(a, 2), solo: !h.w.scene.director.batch }),
         0x6a => {
             let cmd = match entity_of(h, arg(a, 0)) {
                 Some(t) => Cmd::CamFollowWait { target: t, left: arg(a, 1) },
@@ -351,8 +351,11 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
         0x76 | 0x77 => {
             let (wd, m, v, x, y) = (arg(a, 0), arg(a, 1), arg(a, 2), arg(a, 3), arg(a, 4));
             // a warp rebuilds the player and its camera: the script's camera control ends
-            h.w.scene.cam.mode = scene::CamMode::Player;
-            h.w.scene.cam.scroll = None;
+            // (the fading warp's camera holds until its load: s515's world-map take-off)
+            if n == 0x77 {
+                h.w.scene.cam.mode = scene::CamMode::Player;
+                h.w.scene.cam.scroll = None;
+            }
             if h.w.field.is_some() {
                 if n == 0x77 {
                     // the immediate warp: the player goes idle first (vt+0x28(0): 1 x rand(255)), then EnterArea
@@ -375,7 +378,7 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
                         return block(h.s, Pending::Arrival);
                     }
                 } else {
-                    wf_core::field::warp(h.w, wd, m, v, x, y, true);
+                    wf_core::field::warp_fade_slow(h.w, wd, m, v, x, y);
                 }
                 if n == 0x76 {
                     return block(h.s, Pending::Transition);
@@ -726,9 +729,7 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
             if h.w.data.form(arg(a, 0)).is_none() {
                 return Err(format!("native 0xd0: unknown form {}", arg(a, 0)));
             }
-            let mut p = h.w.pl_ref(i).clone();
-            p.apply_form(h.w, arg(a, 0));
-            *h.w.pl(i) = p;
+            wf_core::player::script_set_form(h.w, i, arg(a, 0));
             unit()
         }
         0xd1 => {

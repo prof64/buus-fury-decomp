@@ -363,7 +363,8 @@ pub fn update(w: &mut World, i: usize) {
     }
     // while an event holds the field only the animation ticks (like the map NPCs; story playthrough: the
     // fighters a cutscene hands over with become_map_object start their AI when the event ends)
-    if w.field.as_ref().is_some_and(|f| f.busy) {
+    let id = w.ents[i].id;
+    if w.field.as_ref().is_some_and(|f| f.busy && !(f.load_ids.0 <= id && id < f.load_ids.1)) {
         tick_anim(w, i);
         return;
     }

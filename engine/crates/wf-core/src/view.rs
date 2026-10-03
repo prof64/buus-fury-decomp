@@ -79,7 +79,7 @@ pub fn render_view(w: &World, out: &mut RenderView) {
     // the area transition's palette fade (field FadeOut k -> level 8k, FadeIn k -> 256 - 8k; 0x08006D98 / 0x08006DD6)
     if let Some(f) = w.field.as_ref() {
         let level = match f.mode {
-            crate::field::Mode::FadeOut { k, .. } => (8 * k).clamp(0, 256),
+            crate::field::Mode::FadeOut { k, step, .. } => crate::field::fade_out_level(k, step),
             crate::field::Mode::FadeIn { k } => (256 - 8 * k).clamp(0, 256),
             crate::field::Mode::Normal => 0,
         };

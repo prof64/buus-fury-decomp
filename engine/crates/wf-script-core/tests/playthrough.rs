@@ -33,7 +33,7 @@ use wf_script_core::{poll, CoreState, HostState, SharedHost};
 use wf_script_rhai::{Runtime, Status, UnitRef};
 
 /// frames of `opening.json` that must match continuously (the verdict)
-const MIN_MATCHED: usize = 37365; // New Game -> Olibu -> the level-65 gate -> Cave of the Ancients -> Instant Transmission -> the Other World Tournament (Pikkon)
+const MIN_MATCHED: usize = 41423; // the whole recording: New Game -> ... -> Instant Transmission -> the Other World Tournament (Pikkon) -> Earth 2-1
 
 fn repo() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..")
