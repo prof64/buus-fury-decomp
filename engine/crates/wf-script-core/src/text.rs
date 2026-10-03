@@ -104,6 +104,11 @@ const LINES: usize = 4;
 /// the line fitter 0x0803DE6A (same rules as `wf_ui::font::wrap`): leading spaces / new lines skipped, a line ends at
 /// `\n` or the end, breaks at the last space whose prefix fits, a word longer than the line is cut
 fn wrap(font: &Option<std::sync::Arc<Vec<u32>>>, text: &[u16]) -> Vec<Vec<u16>> {
+    wrap_spans(font, text).into_iter().map(|(s, e)| text[s..e].to_vec()).collect()
+}
+
+/// [`wrap`]'s lines as (start, end) unit indices
+fn wrap_spans(font: &Option<std::sync::Arc<Vec<u32>>>, text: &[u16]) -> Vec<(usize, usize)> {
     let mut out = Vec::new();
     let mut i = 0;
     loop {
@@ -150,10 +155,56 @@ fn wrap(font: &Option<std::sync::Arc<Vec<u32>>>, text: &[u16]) -> Vec<Vec<u16>> 
             w = nw;
             j += 1;
         }
-        out.push(text[start..end.min(text.len())].to_vec());
+        out.push((start, end.min(text.len())));
         i = next;
     }
     out
+}
+
+/// the typewriter's page and characters typed on it once `used` units of the box text (no placement prefix) are
+/// consumed - the game's typing pointer (text box object 0x08049F60 +0x14 minus +0x10, in u16 units); counted by
+/// [`typing`]'s rules (a page that has typed to its end waits on it)
+pub fn typed_at(text: &str, used: usize) -> (u16, u16) {
+    let font = DIALOG_FONT.read().ok().and_then(|f| f.clone());
+    let units: Vec<u16> = text.encode_utf16().collect();
+    let mut page = 0u16;
+    let mut off = 0usize;
+    let mut last = (0u16, 0u16);
+    for chunk in units.split(|&c| c == 0x0B) {
+        let spans = wrap_spans(&font, chunk);
+        for p in spans.chunks(LINES) {
+            let mut n = 0u16;
+            for &(s, e) in p {
+                let l = &chunk[s..e];
+                let mut k = 0;
+                if l.len() >= 2 && l[0] == '-' as u16 && l[1] == ' ' as u16 {
+                    k = 2;
+                }
+                while k < l.len() && off + s + k < used {
+                    if l[k] == 8 {
+                        if k + 2 >= l.len() {
+                            n += 1;
+                        }
+                        k += 2;
+                        continue;
+                    }
+                    n += 1;
+                    k += 1;
+                }
+            }
+            last = (page, n);
+            let end = p.last().map(|&(_, e)| off + e).unwrap_or(off);
+            if used <= end {
+                return last;
+            }
+            page += 1;
+        }
+        if spans.is_empty() {
+            page += 1;
+        }
+        off += chunk.len() + 1;
+    }
+    last
 }
 
 /// frames the typewriter needs per page: one per visible character of the fitted lines (colour pairs and an

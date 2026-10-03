@@ -295,6 +295,10 @@ pub struct Field {
     pub entered: u32,
     /// number of area loads (touch_once triggers survive only within one)
     pub loads: u32,
+    /// a talk started in the player's update: (the player's live list index, `loads`) - the event's nested loop
+    /// returns into that pass (`resume_pass_after_load`)
+    #[serde(default)]
+    pub talk_pass: Option<(usize, u32)>,
     /// the trigger list's enable flag (+0xD0) is clear: Instant Transmission's run turns the checks off while Goku is
     /// away (player.rs `ctl_it_field`)
     #[serde(default)]
@@ -490,6 +494,7 @@ fn new_field() -> Field {
         pre_pickups: 0,
         entered: 0,
         loads: 0,
+        talk_pass: None,
         trig_off: false,
         frame_start_pos: vec![],
         player_removed: false,
@@ -2049,6 +2054,33 @@ pub fn respawn_breakables(w: &mut World) {
                 }
             }
             spawn_object(w, o);
+        }
+    }
+}
+
+/// the current map has the props object (`0x0800D15A`, the first object of the area's list; not an entity here)
+pub fn props_object(w: &World) -> bool {
+    let (Some(f), Some(fd)) = (w.field.as_ref(), w.data.field.as_ref()) else { return false };
+    fd.maps.get(&f.map).is_some_and(|m| m.prop_tile_bytes > 0 || !m.props.is_empty())
+}
+
+/// The event a talk started (inside the player's update, list index `k`) loaded another area and has ended: the
+/// game's nested loop returns into the interrupted objects pass, which goes on by list index in the new area's list -
+/// the objects below `k` get this frame's update a second time (Earth 7-3, the real run: s288 -> warp to 7-6 ->
+/// s303; the four NPCs and the player at indices 0..4 tick twice in its exit frame, the rest once).
+pub fn resume_pass_after_load(w: &mut World) {
+    let Some((k, loads)) = w.field.as_mut().and_then(|f| f.talk_pass.take()) else { return };
+    if w.field.as_ref().is_some_and(|f| f.loads == loads) {
+        return;
+    }
+    // (list indices as the game's: the props object, when the map has one, is the list's first object)
+    let k = k.saturating_sub(props_object(w) as usize);
+    let live: Vec<usize> = (0..w.ents.len()).filter(|&i| !w.ents[i].removed).collect();
+    for &i in live.iter().take(k).rev() {
+        match &w.ents[i].body {
+            Body::Npc(_) => crate::scene::npc_update(w, i),
+            Body::Player(_) => crate::player::anim_tick_only(w, i),
+            _ => {}
         }
     }
 }

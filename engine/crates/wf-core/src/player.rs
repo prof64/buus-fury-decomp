@@ -1443,6 +1443,13 @@ fn tick_bored(a: &mut AnimPos, n: i32) {
 }
 
 /// the state's tick (vtable +4)
+/// the state's animation tick alone (field.rs `resume_pass_after_load`)
+pub fn anim_tick_only(w: &mut World, i: usize) {
+    anim_tick(w, i);
+    let mut pl = pr(w, i).clone();
+    pl.sync_anim(w);
+    *p(w, i) = pl;
+}
 fn anim_tick(w: &mut World, i: usize) {
     let n = pr(w, i).anim_n(w);
     let gs = pr(w, i).gs;

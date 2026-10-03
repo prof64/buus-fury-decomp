@@ -533,6 +533,10 @@ pub fn interact(w: &mut World, pi: usize) -> bool {
             set_anim(w, k, 0, true);
             mirror(npc(w, k));
             start_event(w);
+            let pk = (0..w.ents.len()).filter(|&j| !w.ents[j].removed).position(|j| j == pi).unwrap_or(0) + crate::field::props_object(w) as usize;
+            if let Some(f) = w.field.as_mut() {
+                f.talk_pass = Some((pk, f.loads));
+            }
             // the talk scene's speaker anchor (`0x08017D44`): player - NPC, 24.8 (text box side / top-bottom)
             let (nx, ny) = (npc(w, k).a.x, npc(w, k).a.y);
             let pa = &w.pl_ref(pi).a;

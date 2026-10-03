@@ -1628,6 +1628,10 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
                     // position, record 55/56) and sound 3
                     w.sfx(3, 64);
                     let owner = w.ents[i].id;
+                    // the beam object is made here (start `0x0803C1E0` -> `0x080206B8`: its 0x300 tile bytes at once;
+                    // segment sb 6-6 f5770, fire_beam_alt); the shot at t 24 is its firing (shots.rs takes the block)
+                    crate::vram::release(w, crate::vram::Owner::BeamObj(owner));
+                    crate::vram::acquire(w, crate::vram::Owner::BeamObj(owner), 0x300);
                     crate::fx::beam_charge(w, owner, BEAM_CHARGE, crate::fx::BeamSet::Other);
                 }
             }
@@ -2941,6 +2945,7 @@ fn tick_dialog(w: &mut World) {
         return;
     }
     let need = d.typing.get(d.page as usize).copied().unwrap_or(0) as i32;
+    if std::env::var("DBG_DLG").is_ok() { eprintln!("DBG_DLG wf{} page {}/{} typing {:?} typed {} {:?} t {}", w.frame, d.page, d.pages, d.typing, d.typed, d.phase, d.t); }
     match d.phase {
         DialogPhase::Opening => {
             if d.t >= DIALOG_OPEN {

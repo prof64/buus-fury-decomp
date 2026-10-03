@@ -496,6 +496,14 @@ fn field_from_ram(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
     import_grids(w, ram);
     // (building the enemies entered their states: the path stagger as the RAM has it)
     w.g.path_stagger = (ram.r8(0x0300_32E5) & 7) as i32;
+    // the BG sphere effect (`show_energy_sphere` 0xF4; the effect slot 0x03001990 -> object vt 0x080493B4: +0xA the
+    // script's 4th argument, +0xB radius, +0x10 / +0x14 centre; drawn by 0x0803AA58 with radius - 3 jitter draws)
+    w.scene.visuals.retain(|v| v.kind != wf_core::scene::VisualKind::EnergySphere);
+    let sp = ram.r32(0x0300_1990);
+    if ram.valid(sp) && ram.r32(sp) == 0x0804_93B4 {
+        let v = wf_core::scene::Visual { kind: wf_core::scene::VisualKind::EnergySphere, x: ram.s32(sp + 0x10), y: ram.s32(sp + 0x14), owner: ram.r8(sp + 0xB) as u32, t: ram.r8(sp + 0xA) as i32, life: -1, vid: 0 };
+        w.scene.visuals.push(v);
+    }
     // the leader as it stands: its 24.8 position (the load put it on the pixel) and animation (an idle's tick runs
     // on through the scene)
     if let Some(pi) = w.player_idx(0) {
@@ -550,8 +558,9 @@ fn field_from_ram(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
     // the camera as the field left it (`return_to_field` puts the saved one back)
     w.scene.cam.mode = wf_core::scene::CamMode::Player;
     wf_core::battle::set_camera(w, 0, ram.s32(CAM), ram.s32(CAM + 4));
-    // (a camera that is not where following the leader keeps it was held by a script before the scene: fixed)
-    {
+    // (a camera that is not where following the leader keeps it was held by a script before the scene: fixed;
+    // with no event running nothing holds it - the player camera easing toward the leader)
+    if w.scene.depth > 0 {
         let mut probe = w.clone();
         field::world_mode_cameras(&mut probe);
         if (probe.cameras[0].x, probe.cameras[0].y) != (w.cameras[0].x, w.cameras[0].y) {
@@ -844,6 +853,59 @@ fn import_player_state(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
     p.hp_acc.acc = ram.s32(po + 0x228) as i64;
 }
 
+/// **an event running mid-node over a standing field** (mid-area in-event): the field from RAM as `build_mid`
+/// makes it, the event held, its node started afresh (a text node opens its box) and the text box set to the RAM's
+/// (object vt 0x08049F60: +0x10 text, +0x14 typing pointer; one character a frame, see `text::typed_at`)
+fn build_mid_event(_data: &Arc<GameData>, ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4]), mut w: World, calls0: u32, notes: &mut Vec<String>) -> Built {
+    let to = w.field.as_ref().map(|f| f.area).unwrap_or_default();
+    let po = ram.player();
+    let (x, y, facing) = (ram.s32(po + 0x1A0) >> 8, ram.s32(po + 0x1A4) >> 8, ram.r8(po + 0x10));
+    field::load_area(&mut w, to, x, y, Some(facing));
+    w.events.clear();
+    field::finish_arrival(&mut w);
+    if let Some(f) = w.field.as_mut() {
+        f.arrival = None;
+        f.mode = Mode::Normal;
+    }
+    w.scene.depth = 1;
+    field::set_busy(&mut w, true);
+    field_from_ram(&mut w, ram, notes);
+    import_player_state(&mut w, ram, notes);
+    // mid-node, a camera within 16 px of the leader's follow target is the player camera still easing toward it
+    // (INFERRED: the script camera's mode is not found in RAM yet; the return cuts keep `field_from_ram`'s rule -
+    // kbr_011's script camera sits a fraction of a pixel off)
+    if let Some(pi) = w.player_idx(0) {
+        let a = &w.pl_ref(pi).a;
+        let tx = (((a.px() * 2 + a.foot_w) >> 1) - 120) << 10;
+        let ty = (((a.py() * 2 + a.foot_h) >> 1) - 84) << 10;
+        let c = &w.cameras[0];
+        if ((tx - c.x).abs() >> 10) <= 16 && ((ty - c.y).abs() >> 10) <= 16 {
+            w.scene.cam.mode = wf_core::scene::CamMode::Player;
+        }
+    }
+    runner.continue_event(&mut w, ev.0, ev.1, ev.2, 0, None);
+    // the text box as the RAM shows it
+    let tb = ram.objects().into_iter().find(|&o| ram.r32(o) == 0x0804_9F60);
+    match (tb, w.scene.dialog.as_mut()) {
+        (Some(o), Some(d)) => {
+            // the typing pointer's units consumed, paged and counted by our line fitter (the game's +0x1C / +0x20
+            // count its own lines and scroll, not the A-wait pages)
+            let used = ((ram.r32(o + 0x14) as i64 - ram.r32(o + 0x10) as i64) / 2).max(0) as usize;
+            let (page, typed) = wf_script_core::text::typed_at(&d.text, used);
+            d.page = page.min(d.pages.saturating_sub(1));
+            d.typed = typed as i32;
+            d.phase = wf_core::scene::DialogPhase::Shown;
+            d.t = 64;
+        }
+        (None, Some(_)) => notes.push("mid-area: the event's text box is not open in RAM (opening / closing)".into()),
+        _ => {}
+    }
+    if let Some(pi) = w.player_idx(0) { let p = w.pl(pi); eprintln!("DBG_AP {:?} {:?} {:?}", p.gs, p.state, p.ap); }
+    notes.push(format!("event s{:03} at node {}: mid-node over a standing field (mid-area)", ev.0, ev.1));
+    let draws = w.rng.calls.wrapping_sub(calls0);
+    Built { world: w, draws, held: 0, finished: true }
+}
+
 /// the 3D world map (an area whose load makes the flyer)
 fn is_3d(_data: &GameData, to: AreaId) -> bool {
     (to.world, to.area) == (0, 50)
@@ -901,11 +963,8 @@ fn build_event_entry(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner:
         Some((_, 0x76)) => true,
         Some(_) => false,
         None if ev.1 == 0 && !is_3d(data, to) => false,
-        None => {
-            notes.push(format!("unsupported: event s{:03} node {}: no warp into {:?} in the node (scene load / return_to_field / an earlier scene's warp_fade)", ev.0, ev.1, areat));
-            let draws = w.rng.calls.wrapping_sub(calls0);
-            return Built { world: w, draws, held: 0, finished: false };
-        }
+        // no load in the node: the event is running mid-node over a field that has been there (mid-area)
+        None => return build_mid_event(data, ram, runner, ev, w, calls0, notes),
     };
     // a script's fade_out before its warp: the screen stays black through the load (a warp_fade's darkness is the
     // field's own fade)
@@ -1135,6 +1194,16 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
             let h = ram.r16(o + 0x16);
             if h != 0xFFFF {
                 owners.push((h, Owner::Props));
+            }
+            continue;
+        }
+        // an open text box (0x08012030): its blocks +0x78 / +0x7A / +0x7C, the portrait's +0x7E (mid_3000)
+        if vt == 0x0804_9F60 {
+            for k in 0..4u32 {
+                let h = ram.r16(o + 0x78 + 2 * k);
+                if h != 0xFFFF && h != 0 {
+                    owners.push((h, if k == 3 { Owner::TextPortrait } else { Owner::Text }));
+                }
             }
             continue;
         }

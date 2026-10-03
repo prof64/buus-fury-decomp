@@ -323,6 +323,19 @@ are deterministic, but they are other objects' internals (code / heap pointers) 
 whole object heap with real addresses and every class's field writes. Not modelled; `tools/superbuu/heapnode.py`
 prints a new node's leftover words. (The side-content agent's Nosferatu 18-8 case is likely the same kind.)
 
+**6-6 (Gotenks; Super Buu agent, 2026-10-03): 4,694 -> 5,795.**
+* A screen shake is a camera mode: `0x0800797C` pushes it on the camera object's mode stack (`0x080210D6`), and a
+  script camera command sets a new mode (`0x08021094`: the old one's exit) - `camera_pan_to` (via `0x080211A8`)
+  and `camera_follow` end a running shake (`scene::camera_mode_set`). The shake is updated with the camera, after
+  the frame's scripts and commands: in the field its tick moved from the object pass to `Session::step_post`
+  (`G::shake_due`). VERIFIED: Gotenks' crit shake at the KO stops at s228's pan (f4694). No other cut changed
+  (all gates, my 47 + 33 cuts).
+* A scripted beam's object (`0x080206B8`, 0x300 tile bytes) is made when its command starts (`0x0803C1E0`), not at
+  the firing (t 24); the shot takes that block (`vram::Owner::BeamObj`, `rekey`). f5770.
+* Open f5795: s228's `fire_beam_alt(222, 1, 120)` (Piccolo) - in the game the beam hurts nobody (no damage draws,
+  no hit sounds); ours hits Super Buu standing below. The command's object gets the record `0x0877C41C` where the
+  player's beams get an attack type - not decoded yet.
+
 **Claim (dungeon agent A, 2026-10-03, by the coordinator): the Kid Buu fight itself in `sb_041` (21-25).** A works
 with the allocator check off (`SEGMENT_VRAM=0`): the enemy object missing at f21479 and every divergence after it
 through the three phases (Kid Buu's AI / attacks, the Spirit Bomb sequence, the script hand-overs, Uub). The Super

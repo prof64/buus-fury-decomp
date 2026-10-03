@@ -277,7 +277,10 @@ fn main() {
             if let Some(pi) = w.player_idx(0) {
                 let pl = w.pl_ref(pi);
                 for (ei, e) in w.ents.iter().enumerate() { if let wf_core::world::Body::Enemy(en) = &e.body { if !e.removed { println!("  row {k} enemy #{} ty {} pos ({}, {}) hp {} anim {:?} ai {:?}", ei, en.ty, en.a.x, en.a.y, en.hp1024 >> 10, en.ea.pos, en.ai.stack.iter().map(|s| s.state).collect::<Vec<_>>()); if std::env::var("SOAK_AI").is_ok() { if let Some(st) = en.ai.stack.last() { for (ni, (n, r)) in st.tree.nodes.iter().zip(st.rt.iter()).enumerate() { if true { println!("    node {ni} {} {:?} f {} i {} on {} d {:?}", n.name, n.p, r.f, r.i, r.on, r.d); } } } } } } }
-                if let Some(seg) = opt("--diff-seg") {
+                // --diff-seg FILE, or ROW=FILE,ROW=FILE.. (each at its row)
+                let seg_at = opt("--diff-seg").map(|v| v.strip_prefix('@').map(|f| std::fs::read_to_string(f).expect("list").trim().to_string()).unwrap_or(v)).and_then(|v| if v.contains('=') { v.split(',').find_map(|kv| kv.split_once('=').filter(|(r, _)| r.parse::<usize>().ok() == Some(k)).map(|(_, f)| f.to_string())) } else { Some(v) });
+                if let Some(seg) = seg_at {
+                    println!("  diff vs {seg} at row {k}");
                     let doc: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&seg).expect("read")).expect("json");
                     let fresh = StorySim::from_segment(&packs, &doc).expect("import");
                     let v = fresh.world();
@@ -298,9 +301,15 @@ fn main() {
                             wf_core::world::Body::Player(_) => "P".to_string(),
                             wf_core::world::Body::Enemy(en) => format!("E{:x}", en.ty),
                             wf_core::world::Body::Npc(n) => format!("N{}", n.sprite_id),
-                            _ => "o".to_string(),
+                            b => format!("o[{}]", format!("{b:?}").chars().take(60).collect::<String>()),
                         })).collect();
                         println!("  order {nm} {}", o.join(" "));
+                    }
+                    if let (Some(a), Some(b)) = (w.field.as_ref().and_then(|f| f.vram.as_ref()), v.field.as_ref().and_then(|f| f.vram.as_ref())) {
+                        let mut oa: Vec<String> = a.owners.iter().map(|o| format!("{}:{:?}", o.0, o.1)).collect();
+                        let mut ob: Vec<String> = b.owners.iter().map(|o| format!("{}:{:?}", o.0, o.1)).collect();
+                        oa.sort(); ob.sort();
+                        println!("  vram app owners {:?} rc {:?} susp {}\n  vram imp owners {:?} rc {:?} susp {}", oa, a.shared_rc, a.suspended.len(), ob, b.shared_rc, b.suspended.len());
                     }
                     if std::env::var("SOAK_G").is_ok() { println!("  g app {:?}\n  g imp {:?}", w.g, v.g); }
                 }

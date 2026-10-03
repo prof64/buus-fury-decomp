@@ -317,6 +317,11 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
             // prop_hide(0): the player arrives in the load's frame)
             let id = arg(a, 0);
             let missing = h.w.field.as_ref().is_some_and(|f| id < 0 || id as usize >= f.props.len());
+            if !missing && h.s.defeat_job {
+                // an on-defeat callback (`StoryState::defeat_job`): the command completes a frame later
+                let _ = scene::enqueue(h.w, Owner::Prop(id), Cmd::PropShow { on: n == 0x64 });
+                return enqueue_owner(h, Some(Owner::Prop(id)), Cmd::Wait { left: 1 });
+            }
             enqueue_owner(h, (!missing).then_some(Owner::Prop(id)), Cmd::PropShow { on: n == 0x64 })
         }
         0x65 => enqueue_owner(h, Some(Owner::Prop(arg(a, 0))), Cmd::Puff { x: arg(a, 1), y: arg(a, 2), absolute: true }),

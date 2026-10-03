@@ -296,6 +296,8 @@ pub enum Owner {
     Minigame,
     /// the timer HUD (`0x0802FCA0`, 0x400 bytes)
     Timer,
+    /// a scripted beam's object (`0x080206B8`, 0x300) before its shot exists: the actor's id
+    BeamObj(EntityId),
     /// the travel menu's label object (`0x0803643C`, 0xF40 bytes)
     Dest,
     /// the HUD's stat-points mark (`0x0800BCC8` makes it, vtable 0x0804C070, 0x100 bytes)
@@ -550,6 +552,17 @@ pub fn release_later(w: &mut World, owner: Owner, frames: u32) {
         v.owners.push((h, Owner::Ending));
         v.delayed.push((h, at));
     }
+}
+
+/// the blocks of `from` now belong to `to` (one object changing hands); false when `from` has none
+pub fn rekey(w: &mut World, from: Owner, to: Owner) -> bool {
+    let Some(v) = st(w) else { return false };
+    let mut any = false;
+    for o in v.owners.iter_mut().filter(|o| o.1 == from) {
+        o.1 = to;
+        any = true;
+    }
+    any
 }
 
 /// the room check of the current allocator (None: no model)
@@ -939,8 +952,8 @@ pub fn signs_gone(w: &mut World) {
 /// every scene visual's object goes (an area load)
 pub fn visuals_gone(w: &mut World) {
     let Some(v) = st(w) else { return };
-    let hs: Vec<u16> = v.owners.iter().filter(|o| matches!(o.1, Owner::Visual(_) | Owner::Blast(_))).map(|o| o.0).collect();
-    v.owners.retain(|o| !matches!(o.1, Owner::Visual(_) | Owner::Blast(_)));
+    let hs: Vec<u16> = v.owners.iter().filter(|o| matches!(o.1, Owner::Visual(_) | Owner::Blast(_) | Owner::BeamObj(_))).map(|o| o.0).collect();
+    v.owners.retain(|o| !matches!(o.1, Owner::Visual(_) | Owner::Blast(_) | Owner::BeamObj(_)));
     for h in hs {
         v.a.free(h);
     }

@@ -2783,7 +2783,11 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             for (x, y) in [(200, 136), (112, 272), (296, 240)] {
                 let b = w.arena.bounds;
                 if x + 16 >= b.x0 && x + 48 <= b.x1 && y + 16 >= b.y0 && y + 48 <= b.y1 {
-                    w.add(Body::Rock { x, y, hp: 2 });
+                    let id = w.add(Body::Rock { x, y, hp: 2 });
+                    // (field: each rock object holds its own 0x2000-byte tile block - the game's 15-32 allocator
+                    // at the area entry: three 128-unit blocks no actor owns; without them the portrait text box
+                    // that follows purges nothing and Broly keeps his place in the update list)
+                    crate::vram::acquire(w, crate::vram::Owner::Ent(id), 0x2000);
                 }
             }
             true

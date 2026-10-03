@@ -445,8 +445,14 @@ pub fn add(w: &mut World, s: Shot) -> EntityId {
         _ => 0,
     };
     let flame = matches!(s.kind, ShotKind::Flame { .. });
+    let kame_owner = matches!(s.kind, ShotKind::Kame(_)).then_some(s.owner);
     let id = w.add(Body::Shot(Box::new(s)));
-    crate::vram::acquire(w, crate::vram::Owner::Ent(id), tiles);
+    // a scripted beam's object exists from its command's start (scene.rs `Cmd::Beam`): the shot takes its block
+    if let Some(o) = kame_owner.filter(|&o| crate::vram::rekey(w, crate::vram::Owner::BeamObj(o), crate::vram::Owner::Ent(id))) {
+        let _ = o;
+    } else {
+        crate::vram::acquire(w, crate::vram::Owner::Ent(id), tiles);
+    }
     if flame {
         // the flame class (`0x080246B4`) gives the base's 0x40 back and uses one shared 0x1300 graphic (the first
         // flame allocates it; segment sb 20-3 f48)
