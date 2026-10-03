@@ -502,6 +502,17 @@ static DEBUG_FRAMES: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32
 
 /// One video frame of an active menu (called instead of the world update).
 pub fn step(w: &mut World) {
+    let p0 = w.story.play_frames;
+    step_inner(w);
+    // the screen's logic frames (its mode loop's iterations, counted in `play_frames`) count on 0x03000F94 too: an
+    // enemy's state stamp is that much older after a pause menu (real route 0-21, Goku vs Majin Buu: the on-hit
+    // IfTimeInState(90) of Buu's state 0xB3 is true after a heal menu - its Chance draws)
+    if w.field.is_some() {
+        w.g.fc0 += w.story.play_frames.wrapping_sub(p0) as i64;
+    }
+}
+
+fn step_inner(w: &mut World) {
     // debug log only: video frames stepped by menu screens so far (aligns the model's redraws with measurements)
     if crate::sndsim::debug() {
         DEBUG_FRAMES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);

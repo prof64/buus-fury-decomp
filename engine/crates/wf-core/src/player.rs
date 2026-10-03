@@ -3137,7 +3137,11 @@ fn start_it(w: &mut World, i: usize, lv: i32) {
             if cand.len() + tcand.len() >= 16 {
                 break;
             }
-            if t.act != crate::fieldcontent::Activation::Unknown(0x0802_266F) {
+            // (the trigger's test asks its activation's vt+8 - "A pressed": 0x0802262D for 0x0802266F, the same code at
+            // 0x080076F5 for the plain A-button activation 0x0800770D: HFIL 18-10's centre switch is picked by
+            // Instant Transmission too, the real route's maze. The A-facing activation's vt+8 (0x08007715) adds a
+            // facing test - not seen in a pick yet, left out)
+            if !matches!(t.act, crate::fieldcontent::Activation::Unknown(0x0802_266F) | crate::fieldcontent::Activation::Button(None)) {
                 continue;
             }
             let r = Rect::new(t.rect.x0 + 15, t.rect.y0 + 7, t.rect.x1, t.rect.y1);
@@ -3172,9 +3176,6 @@ fn it_select(w: &mut World, i: usize) {
         enter_state(w, i, Gs::Skill(14));
         p(w, i).a.hittable = false;
         return;
-    }
-    if std::env::var("IT_DBG").is_ok() {
-        eprintln!("it_sel wf {} x {} y {} n {} cand {:?} tcand {:?} order {:?}", w.frame, s.x, s.y, s.n, s.cand, s.tcand, s.order);
     }
     if s.n > 0 && s.cursor {
         let (px, py) = (s.x >> 8, s.y >> 8);

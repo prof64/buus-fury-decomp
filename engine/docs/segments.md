@@ -443,6 +443,22 @@ ids / animation indices need the ROM's sprite-def tables: the recording's `init.
 (`GbaRam.actor_rows`). The event: blocked in the return's fade-in phase (`Pending::Phases`, fade started at the
 cut). Proof - the real route's Kid Buu run, cut with `--events`: **9 / 14 cuts exact**, the eight `return_to_field`
 ones gated (`rkb_003`, `004`, `005`, `006`, `007`, `009`, `010`, `011`: up to 2,000 frames each, allocator check on).
+Increment 4 (A):
+* **`kbr_012` settled - not a host rule**: the game keeps the actors at s463 node 66's `load_scene_fade` because
+  nothing armed a field save there; ours was armed by the *import*: the probe / placement replay node 64's handler,
+  whose `save_field_on_next_scene` (an immediate native) armed the host while the `load_scene` that consumes it was
+  a dropped action. The probe and the placement now restore the host state and the story after replaying (their
+  effects ran before the cut: RAM has them). The HFIL rule stays as it is. **`kbr_012` exact (1,024 / 1,024)**,
+  gated `rkb_012_19-3`: **12 / 14** Kid Buu cuts exact.
+* **Any-frame import, round 2**: the leader's state machine (`import_player_state`: the state object's vtable ->
+  idle / walk / dash / autowalk / bored / punch / hold / hold0 / once / block / hurt / ko, the animation from the
+  row, `player::import_state` sets it without enter effects), the hit-damage remainder (player object +0x228),
+  KnockbackSlide runtimes (vt 0x0804A138: +4 / +8 velocity, +0xC frames left, the showing animation), enemies'
+  animation index from the raw (`set_raw`). The real Kid Buu fight cut every 3,000 frames (8 cuts): **f9000 exact
+  (600 / 600)**; f18000 stops at frame 0 on the follow camera's ease (its sub-state is not imported); f24000 is a
+  load's fade (mode 0x08049D18); **five of eight stand inside events at a dialog / code node** (s457 nodes 29 / 60,
+  s459 n11, s460 n7, s461 n9): an event running mid-node needs the text box's state (page, revealed characters,
+  wait) from RAM - next. Not ready for the scoreboard yet.
 Increment 3 (A):
 * **World-map patrol steps import** (`import_patrol`): the runner's current step object (enemy +0x22C, vt
   0x0804A800 = `cutscene_move`: +4 s16 target x / y, +8 s16 z / u16 speed, +0xC / +0x10 / +0x14 velocity, +0x18

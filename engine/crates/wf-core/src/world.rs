@@ -881,9 +881,12 @@ impl World {
         }
         // the HUD (an early object of the area's list: updated after the actors)
         crate::field::hud_tick(self);
-        // the task list (screen shakes) runs after the objects (field: after the scene's commands, session.rs)
-        if self.field.is_none() || std::env::var("SHAKE_LATE").is_err() {
+        // the task list (screen shakes) runs after the objects; field: with the camera after the frame's scripts and
+        // commands (session.rs `step_post`)
+        if self.field.is_none() {
             self.tick_shakes();
+        } else {
+            self.g.shake_due = self.frame;
         }
         crate::vram::reap(self);
         self.ents.retain(|e| !e.removed);
