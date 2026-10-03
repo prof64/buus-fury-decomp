@@ -187,8 +187,12 @@ impl Page for Journal {
         REDRAW_FRAMES
     }
     /// journal_scroll / journal_start / journal_new_game: 36 redraws, residual std 1.5k, max 6k (the empty list)
+    /// the idle step measured on this page (`re/buu/menu/cycles.py --all`)
+    fn idle_cycles(&self) -> Option<i64> {
+        Some(2_784)
+    }
     fn redraw_time(&self, w: &World, d: &MenuData) -> Option<crate::sndsim::Redraw> {
-        Some(super::page_time(d, &self.view(w, d), !self.c.ever, 4_641, 184_670, 882, 597, 188_273))
+        Some(super::page_time(d, &self.view(w, d), !self.c.ever, 2_784, 184_670, 882, 597, 188_273))
     }
 }
 

@@ -412,12 +412,13 @@ fn renew_player(w: &World, old: &Player) -> Player {
         PlayerInit { slot: old.slot, form: old.form, rec: old.rec.clone(), equip: old.equip, skills: old.skills.clone(), skill_level: old.skill_level, sel: old.sel, holy_water: false, forms_allowed: old.forms_allowed.clone() },
     );
     p.ss_gauge = old.ss_gauge;
-    p.ss_acc = old.ss_acc;
+    // the form controller (player +0x22C) is a new object after a load: its regen count (+0xC) and its Super Saiyan
+    // drain fraction start at 0 (the count is 0 in the start RAM of all 412 gated cuts; app soak, 2-90: carried, the
+    // drain fraction left from an earlier transformation made Gohan's Super Saiyan run out 9 frames late)
     p.ss3_gauge = old.ss3_gauge;
     p.ss_cooldown = old.ss_cooldown;
     p.holy_left = old.holy_left;
     p.boost = old.boost;
-    p.regen_timer = old.regen_timer;
     p.hp_regen_acc = old.hp_regen_acc;
     // (the hit-damage remainder `hp_acc` is the player object's: a load's new player starts it at 0 - app soak of
     // the real route: carried across loads, Goku's HP ran 1 below the game's from 1-13 on)
@@ -700,7 +701,6 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
         v.popup_at.clear();
         v.delayed.clear();
         v.late.clear();
-        v.retake.clear();
         v.shadow_set.clear();
         let keys: Vec<u32> = v.keyed.drain(..).map(|k| k.0).collect();
         for k in keys {

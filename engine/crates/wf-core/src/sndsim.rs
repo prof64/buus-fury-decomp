@@ -105,7 +105,14 @@ fn apply_events(w: &mut World, d: &mut Driver) {
             Event::SfxStop { id } => d.stop_sfx(*id as u8),
             Event::SfxStopMatch { id } => d.stop_matching_sfx(*id as u8),
             Event::SfxStopAll => d.stop_all_sfx(),
-            Event::Song { id } => d.play_song(*id as usize),
+            // the game starts a song only when it is not the one playing (an area change inside the same music:
+            // no PlaySong 0x0803F110 call, the sequencer runs on - sb 21-13 -> 21-14)
+            Event::Song { id } => {
+                let st = d.state();
+                if !(st.player.playing && st.player.song == Some(*id as usize)) {
+                    d.play_song(*id as usize);
+                }
+            }
             Event::SongStop => d.stop_song(),
             Event::MasterVolumes { music, sfx } => d.set_master_volumes(*music as u8, *sfx as u8),
             _ => {}

@@ -28,7 +28,9 @@ def run(name, prof=False):
     if extra.get('trigger'):
         extra['trigger'](c.e)
     ks = program(keys)
-    res = menu_timing.measure(c.e, ks + [0], 0, len(ks), prof)
+    res = menu_timing.measure(c.e, ks + [0], 0, len(ks), prof, '--all' in sys.argv)
+    if '--all' in sys.argv:
+        name += '_all'
     d = OUT / 'cycles'
     d.mkdir(parents=True, exist_ok=True)
     (d / f'{name}.json').write_text(json.dumps(res))

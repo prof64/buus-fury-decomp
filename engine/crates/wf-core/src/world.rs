@@ -176,6 +176,9 @@ pub struct Globals {
     /// a shake ended in this frame's update: the camera slot is still held for the frame (field cameras)
     #[serde(default)]
     pub shake_ended: bool,
+    /// the world frame of the last shake-task tick (a script's shake made later in the same frame: scene.rs)
+    #[serde(default)]
+    pub shakes_ticked: u32,
     /// the game's frame counter 0x03000F94 at frame 0 (`clock` = fc0 + frame; nodes that test the counter itself,
     /// e.g. VampireGrab's drain every 16 ticks)
     #[serde(default)]
@@ -780,9 +783,7 @@ impl World {
         // field: the screen-effect slot holds one shake at a time; a newer one suspends the older until it ends
         // (sc_janemba: the summon shake pauses through a crit shake, then goes on)
         let n = shakes.len();
-        if std::env::var("SHAKE_DBG").is_ok() {
-            eprintln!("shakes wf {} {:?}", self.frame, shakes.iter().map(|s| (s.left, s.cnt, s.period)).collect::<Vec<_>>());
-        }
+        self.g.shakes_ticked = self.frame;
         let stacked = self.field.is_some();
         for (k, s) in shakes.iter_mut().enumerate() {
             if stacked && k + 1 != n {

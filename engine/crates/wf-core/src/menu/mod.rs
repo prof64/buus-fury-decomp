@@ -851,14 +851,20 @@ pub fn view(w: &World) -> Option<MenuView> {
     Some(v)
 }
 
+/// a mode that ended inside a world frame (power gauge, Watch This!, credits): the screen's next step is the next
+/// world frame's start, not a frame of its own (a harness must not spend a lag frame on it)
+pub fn ended_in_world(w: &World) -> bool {
+    let credits = matches!(w.menu.shown.as_deref(), Some(Screen::Credits(_)));
+    w.menu.phase == (Phase::Leave { t: 0 }) && (minigame::world_runs(w) || minigame::watch_closing(w) || credits)
+}
+
 /// A script-opened menu has finished (the fade-in after it is over): its result code (the native's push / effect
 /// is decided by the screen). Clears it.
 pub fn take_result(w: &mut World) -> Option<i32> {
     // the power struggle's mode ends inside a world frame: the script continues in that frame (s464: prop_hide and
     // the director's wait start the frame the mode ends)
     // (the credits too: `run_credits`' script continues in the frame the mode ends, segment sb the ending's fade)
-    let credits = matches!(w.menu.shown.as_deref(), Some(Screen::Credits(_)));
-    let ended_in_world = w.menu.phase == (Phase::Leave { t: 0 }) && (minigame::world_runs(w) || minigame::watch_closing(w) || credits);
+    let ended_in_world = ended_in_world(w);
     if !w.menu.scripted || (w.menu.phase != Phase::Idle && !ended_in_world) {
         return None;
     }

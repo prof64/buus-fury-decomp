@@ -238,11 +238,15 @@ impl Page for Options {
         REDRAW_FRAMES
     }
     /// options_sliders / options_pages / journal_scroll: 51 redraws, residual std 0.7k, max 1.7k
+    /// the idle step measured on this page (`re/buu/menu/cycles.py --all`)
+    fn idle_cycles(&self) -> Option<i64> {
+        Some(4_524)
+    }
     fn redraw_time(&self, w: &World, d: &MenuData) -> Option<crate::sndsim::Redraw> {
         if self.blank {
             return None;
         }
-        Some(super::page_time(d, &self.view(w, d), !self.c.ever, 4_641, 232_905, 0, 0, 100_222))
+        Some(super::page_time(d, &self.view(w, d), !self.c.ever, 4_524, 232_905, 0, 0, 100_222))
     }
 }
 

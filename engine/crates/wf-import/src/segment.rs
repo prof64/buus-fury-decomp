@@ -353,7 +353,13 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
             }
             host.step(&mut sess, keys);
             wf_core::rng::TRACE.store(false, std::sync::atomic::Ordering::Relaxed);
-        } else if wf_core::menu::active(&sess.world) && !(matches!(sess.world.menu.phase, wf_core::menu::Phase::FadeOut { .. }) && !sess.world.menu.scripted) {
+        } else if wf_core::menu::active(&sess.world)
+            && !(matches!(sess.world.menu.phase, wf_core::menu::Phase::FadeOut { .. }) && !sess.world.menu.scripted)
+            // (a power gauge that ended inside the last world frame: the lag after it is the script's - sb 21-25
+            // f61646, 9 lag frames after the Spirit Bomb's gauge filled - and the screen's last step is the next
+            // world frame's)
+            && !(wf_core::menu::ended_in_world(&sess.world) && wf_core::menu::minigame::world_runs(&sess.world))
+        {
             // a menu screen runs per video frame (menu::step models the game's redraw lag itself); the pause menu's
             // opening fade-out is still the field's loop - the logic counter runs, and a lag frame there is a frame
             // without an update (the cameras keep easing through the fade: dungeon segments db3 10-14, db4 15-17 /

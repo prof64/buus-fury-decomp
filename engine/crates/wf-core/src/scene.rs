@@ -1540,6 +1540,15 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
         Cmd::Shake { intensity, frames, t } => {
             // the shake object (0x0804A720) is updated in the frame it is created: its first tick (and RNG
             // draws) happen now; later ticks in the world update (story playthrough, Yemma's s048)
+            // field: the shake it suspends did not tick in this frame (the game makes the script's shake before the
+            // task list runs: the real route's arena, s450 - the killing punch's crit shake resumes after the script's
+            // 60 frames with its count as it was 4 frames in, not 5). A tick that drew stays (never seen).
+            if w.field.is_some() && w.g.shakes_ticked == w.frame {
+                if let Some(s) = w.g.shakes.last_mut().filter(|s| s.cnt != s.period) {
+                    s.left += 1;
+                    s.cnt += 1;
+                }
+            }
             let mut others = std::mem::take(&mut w.g.shakes);
             w.shake(*frames, *intensity);
             w.tick_shakes();
@@ -1897,6 +1906,10 @@ fn update_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) -> bool {
                         let owner = w.ents[i].id;
                         let dir = w.actor(i).map(|a| a.facing as i32).unwrap_or(0);
                         w.scene.visuals.push(Visual { kind: VisualKind::Beam { kind, dir }, x, y, owner, t: 0, life: (*frames - 16).max(1), vid: 0 });
+                        // the beam object (`0x080286D4` from `0x0803C494`, 0xC0 tile bytes) lives the command's
+                        // frame count (segment sb 1-3 f6210 / f6246: s025's two fire_wave_beam(.., 35))
+                        crate::vram::acquire(w, crate::vram::Owner::Blast(owner), 0xC0);
+                        crate::vram::release_later(w, crate::vram::Owner::Blast(owner), (*frames).max(1) as u32);
                     }
                 }
             } else if *t == 24 {
@@ -1959,9 +1972,6 @@ fn update_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) -> bool {
                     let (px, py) = actor_pos(w, i);
                     let (sx, sy) = (px + OFF[k as usize].0, py + OFF[k as usize].1);
                     *n = (((*x - sx).abs().max((*y - sy).abs())) >> 1) + 1;
-                    // the beam object (`0x080286D4`, 0xC0 tile bytes) for the ball's flight; its end makes a second
-                    // one (`0x08028B5A`) for as long (segment sb 1-3 f6210: 35 frames, one frame free, 35 more)
-                    crate::vram::beam_pair(w, crate::vram::Owner::Blast(w.ents[i].id), 0xC0, CANDY_OBJECT_FRAMES);
                 }
                 let cel = if (8..16).contains(t) { 2 * k + 2 } else { 2 * k + 1 };
                 ball_cel(w, i, cel, *t);
@@ -2430,9 +2440,6 @@ fn tick_track(w: &mut World, k: usize) -> bool {
     }
     false
 }
-
-/// frames a scripted candy beam's object lives (MEASURED sb 1-3: alloc f6210, free f6245)
-const CANDY_OBJECT_FRAMES: u32 = 35;
 
 fn tick_visuals(w: &mut World) {
 
