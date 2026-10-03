@@ -101,7 +101,7 @@ const BEAM_CHARGE_BANSHEE: [(i32, i32); 4] = [(2, 6), (13, -25), (-8, -6), (24, 
 const BBK_FLARE_POS: [(i32, i32); 4] = [(8, 16), (8, -32), (-16, -6), (32, -6)];
 const FLAME_FIRST: [(i32, i32); 4] = [(8, 16), (8, -32), (0, -6), (16, -6)];
 /// SetAnim id -> raw animation (0x08072670 + 1)
-const ANIM_RAW: [i32; 25] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 19, 20, 21, 22, 23, 24, 11, 12];
+pub const ANIM_RAW: [i32; 25] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 19, 20, 21, 22, 23, 24, 11, 12];
 const ANIM_STATE: [Gs; 25] = [
     Gs::Idle, Gs::Walk, Gs::Dash, Gs::Once3, Gs::Punch, Gs::Punch, Gs::Punch, Gs::Hold0, Gs::Bored, Gs::Once3, Gs::LoopC, Gs::LoopC, Gs::Once4, Gs::LoopC, Gs::LoopC,
     Gs::LoopB, Gs::OnceHold, Gs::Once4, Gs::Once4, Gs::Once4, Gs::Once4, Gs::Once4, Gs::Once4, Gs::SsUp, Gs::SsRevert,

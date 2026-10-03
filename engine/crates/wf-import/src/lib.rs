@@ -473,9 +473,10 @@ fn build_returned(_data: &Arc<GameData>, ram: &GbaRam, runner: &mut StoryHost, e
         let st = ram.r32(ram.player() + 0x14);
         if ram.valid(st) && ram.r32(st) == 0x0804_DE58 {
             let mode = wf_core::scene::AnimMode::Frames { each: ram.s32(st + 8), loops: ram.s32(st + 0xC), loop_start: ram.s32(st + 0x10), last: ram.s32(st + 0x14), pass: ram.s32(st + 4) };
-            wf_core::player::script_pose(&mut w, pi, raw.clamp(0, 24) as usize, cel);
+            let aid = wf_core::player::ANIM_RAW.iter().position(|&r| r == raw).unwrap_or(0);
+            wf_core::player::script_pose(&mut w, pi, aid, cel);
             let id = w.ents[pi].id;
-            let anim = wf_core::scene::ActAnim { raw, frame: cel, tick, mode, ..wf_core::scene::ActAnim::of(raw) };
+            let anim = wf_core::scene::ActAnim { raw, frame: cel, tick, mode, ..wf_core::scene::ActAnim::of(aid as i32) };
             w.scene.puppets.retain(|p| p.id != id);
             w.scene.puppets.push(wf_core::scene::Puppet { id, anim });
         }

@@ -63,6 +63,10 @@ LEGS = {
                ('keys', [(32, 3, 40), (A_, 3, 200)]), ('wait', 30), ('talknpc', 0), ('wait', 30)],
     # the airship marker (flag 149, not 151: Flying Mega-Fortress XJ-6) -> 12-1; the dungeon itself: tools/side/xj6.py
     'xj6a': [('fly', 1929, 401, 95, 79), ('wait', 200)],
+    # the Hercule Cafe 3-20 (s170: "Did you find any of the exhibits?" - Yes hands one in, flag bits 341 count them):
+    # from XJ-6's end (the real start's exhibit 65 + XJ-6's 58)
+    'cafe': ('pg_xj6.ss', [('fly', 2441, 1065, 127, 135), ('wait', 30), ('goto', '3-20', 150, 225, False),
+                           ('keys', [(A_, 3, 60)]), ('events',), ('wait', 30)]),
 }
 
 
@@ -73,7 +77,7 @@ def start_of(leg):
 
 def record(leg):
     # (legs driven by another script: xj6 = tools/side/xj6.py from pg_xj6a.ss)
-    if leg not in LEGS:
+    if leg == 'xj6':
         LEGS[leg] = ('pg_xj6a.ss', [])
     keys = json.loads((D / f'pg_{leg}.keys.json').read_text())
     keys = keys['keys'] if isinstance(keys, dict) else keys
