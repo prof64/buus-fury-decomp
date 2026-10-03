@@ -244,7 +244,8 @@ fn save_load_across_restarts() {
     assert!(c.verify(&a, &r.to_bytes()).unwrap().ok);
     c.seek(&mut a, 600);
     assert_eq!(a.sim.state_hash(), hashes[600]);
-    // finalize hands the recording to the host
+    // finalize hands the recording to the host (drop the autosave a battle ending mid-run already sent)
+    c.take_requests();
     c.finalize(&a);
     assert_eq!(replays(c.take_requests()).len(), 1);
 }
