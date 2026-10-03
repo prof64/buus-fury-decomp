@@ -1132,6 +1132,13 @@ fn ctl_candy_walk(w: &mut World, i: usize) {
         w.g.candy -= 1;
     }
 }
+/// a menu closed (0x08006FBE: message 0x1A to every world object; the player's handler 0x08010FFC calls the form
+/// controller's vfunc +0xC = the stat recalculation + reset 0x0800E074): resists 128, so a hurt state's i-frames
+/// end (real route 8-38: hit, healed in the pause menu, hit again 17 frames after it closed)
+pub fn menu_closed(w: &mut World, i: usize) {
+    p(w, i).resist = 128;
+    refresh(w, i);
+}
 /// mummy bandages: every live bandage's update runs 0x0802D8E6 - the form controller's stat reset (0x0800E074:
 /// resists 128, so the hurt state's i-frames end) and walk / dash -48 per stuck bandage
 pub fn wrap_stats(w: &mut World, i: usize, stuck: i32) {
@@ -3494,7 +3501,6 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
     }
     let before = pr(w, i).rec.hp;
     let lost = if dmg > 0 && before > 0 { p(w, i).hp_acc.take(dmg) } else { 0 };
-    if std::env::var_os("WF_DBG_MSG").is_some() { eprintln!("  t-msg accepted frame {} dmg {} before {} lost {} blocking {} gs {:?}", w.frame, dmg, before, lost, blocking, pr(w, i).gs); }
     // 0x0800E8E6 runs for every accepted hit, 0 damage included: the 12-frame flash restarts
     p(w, i).a.flash = 12;
     if dmg == 0 || before == 0 {

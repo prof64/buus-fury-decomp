@@ -788,6 +788,12 @@ fn close_with(w: &mut World, done: bool) {
     };
     w.menu.stack.clear();
     w.menu.phase = Phase::Leave { t: 0 };
+    // the world restore's message 0x1A: the players' stats are recalculated and their resists reset
+    for s in 0..w.players.len() {
+        if let Some(i) = w.player_idx(s) {
+            crate::player::menu_closed(w, i);
+        }
+    }
     // the pause menu's black frames = the area reload's CPU time (sndsim.rs): the iteration's frames + this one
     // (the script-opened screens - Switch Character, save, shops - restore the world the same way: real route
     // save-point cuts 8-1 / 8-26 / 8-66, 27 black frames against the constant's 25)

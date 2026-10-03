@@ -520,7 +520,16 @@ pub fn poll(w: &mut World, s: &mut HostState) -> Option<Option<i32>> {
                 None => None,
             }
         }
-        Pending::Transition => w.field.as_ref().is_none_or(|f| f.mode == wf_core::field::Mode::Normal).then_some(None),
+        // (the 3D map's arrival fade ends in this frame's post step: the script goes on in the fade's last frame -
+        // sb 21-25 f64758, the world map after Kid Buu: s-script's song starts and the patrols stop with it)
+        Pending::Transition => w
+            .field
+            .as_ref()
+            .is_none_or(|f| {
+                f.mode == wf_core::field::Mode::Normal
+                    || (wf_core::fieldworld::flying(w) && matches!(f.mode, wf_core::field::Mode::FadeIn { k } if k + 1 >= wf_core::fieldworld::FADE_IN_3D))
+            })
+            .then_some(None),
         Pending::Arrival => w.field.as_ref().is_none_or(|f| f.arrival.is_none()).then_some(None),
         Pending::Phases { .. } => None,
     };
