@@ -1653,6 +1653,15 @@ pub fn shot(w: &mut World, i: usize, kind: ShotType) {
 
 // ---- teleports / special ---------------------------------------------------------------------------------------
 
+/// field: a teleport's puff takes its first update in the frame it is made (segment sb 19-3: Kid Buu's two puffs
+/// give their tiles a frame earlier than an effect made by an object's update, like a script's puff; MEASURED on
+/// the tile allocator only, the battle reference keeps its timing)
+fn teleport_puff_update(w: &mut World) {
+    if w.field.is_some() {
+        let k = w.ents.len() - 1;
+        crate::fx::update(w, k);
+    }
+}
 pub fn ninja_teleport(w: &mut World, i: usize) {
     for _ in 0..16 {
         let dx = w.rng.rand(201) - 100;
@@ -1666,11 +1675,13 @@ pub fn ninja_teleport(w: &mut World, i: usize) {
         }
         let (cx, cy) = w.en_ref(i).a.center();
         crate::fx::puff_rng(w, cx, cy);
+        teleport_puff_update(w);
         let a = &mut w.en(i).a;
         a.x += dx << 8;
         a.y += dy << 8;
         let (cx, cy) = w.en_ref(i).a.center();
         crate::fx::puff_rng(w, cx, cy);
+        teleport_puff_update(w);
         return;
     }
 }
