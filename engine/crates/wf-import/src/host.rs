@@ -449,6 +449,7 @@ impl StoryHost {
         // here, before the objects pass, on the state the last frame left (Earth 4-25, Vegeta's 0x0870EA28:
         // play_anim on the player x 3, face_actor - the player's control runs in that frame: held RIGHT walks).
         let early = !fresh && self.running && self.inline_ai && self.outer.is_empty();
+        if std::env::var("TMPDBG").is_ok() { eprintln!("TMPDBG host f{} running {} inline {} cause {:?} fresh {} outer {} {}", self.frame, self.running, self.inline_ai, self.cause, fresh, self.outer.len(), self.thread_summary()); }
         if early {
             wf_script_core::tick_timers(&mut sess.world, &mut self.hs);
             self.resume_blocked(&mut sess.world);

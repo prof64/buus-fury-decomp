@@ -48,9 +48,8 @@ fn main() {
     let mut app = match opt("--import") {
         Some(seg) => {
             let doc: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&seg).expect("read")).expect("json");
-            let ram = wf_import::GbaRam::from_json(&doc["init"]["ram"]).expect("ram");
-            println!("imported {seg} (area {})", doc["init"]["area"]);
-            StorySim::from_import(&packs, &ram).expect("import")
+            println!("imported {seg} (area {}, snd_phase {})", doc["init"]["area"], doc["init"]["snd_phase"]);
+            StorySim::from_segment(&packs, &doc).expect("import")
         }
         None => StorySim::with_session(&packs, session).expect("story sim"),
     };

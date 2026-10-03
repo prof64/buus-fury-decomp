@@ -1152,7 +1152,12 @@ export function create(n: AiNodeJ, c: AiController): RNode {
       const vx = (SIN256[(ang + 0x40) & 0xff] * s3) >> 10
       const vy = (SIN256[ang] * s3) >> 10
       let back = 0
-      return new Act(n, c, () => undefined, () => {
+      // enter 0x0804E850 (node vtable 0x0804B640 entry 0): detach from the enemy grid (0x0800F924: obj+0x291 = 1,
+      // tiles freed; real route 21-4)
+      return new Act(n, c, () => {
+        e.unmarkSelf()
+        e.detached = true
+      }, () => {
         if (back > 0) {
           back--
           e.x -= vx

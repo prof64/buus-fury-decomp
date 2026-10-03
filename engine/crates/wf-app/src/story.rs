@@ -102,6 +102,28 @@ impl StorySim {
 
     /// Story mode from a real-game checkpoint: the RAM of an area-entry cut imported ONCE (`wf_import`), then the
     /// app plays on with its own host and carries everything itself (the soak's chapter starts: ship, dungeons).
+    /// A checkpoint start from a segment / recording document (its `init.ram` + `init.snd_phase`): the segment
+    /// harness's own start (`wf_import::segment::start`: the area entry and the sound driver's state), then the app.
+    pub fn from_segment(packs: &Packs, doc: &serde_json::Value) -> Result<StorySim, String> {
+        let data: Arc<GameData> = crate::battle::load_data(packs)?;
+        if let Ok(f) = wf_render::ui::Font::load(packs, "dialog") {
+            wf_script_core::text::set_dialog_font((0..256u16).map(|c| f.advance(c)).collect());
+        }
+        let files: BTreeMap<String, String> = packs
+            .list()
+            .into_iter()
+            .filter(|p| p.starts_with("scripts/") && p.ends_with(".rhai"))
+            .filter_map(|p| packs.read(&p).and_then(|b| String::from_utf8(b).ok()).map(|s| (p, s)))
+            .collect();
+        let (imp, host) = wf_import::segment::start(&data, &files, doc)?;
+        let mut session = wf_import::StoryHost::session(&data, imp.world);
+        wf_core::field::attach_host(&mut session.world, true);
+        let errors = host.errors.clone();
+        let mut prev = [0; MAX_PLAYERS];
+        prev[0] = imp.prev_keys;
+        Ok(StorySim { session, host, prev, errors, init_events: Vec::new(), presenter: Default::default() })
+    }
+
     pub fn from_import(packs: &Packs, ram: &wf_import::GbaRam) -> Result<StorySim, String> {
         let data: Arc<GameData> = crate::battle::load_data(packs)?;
         if let Ok(f) = wf_render::ui::Font::load(packs, "dialog") {

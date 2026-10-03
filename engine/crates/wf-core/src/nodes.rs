@@ -890,7 +890,13 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
                 set_anim(w, i, &[an(4)], true, Some(false));
             }
         }
-        K::DriftContact => {}
+        // enter 0x0804E850 (node vtable 0x0804B640 entry 0): the Blood Cell detaches from the enemy grid
+        // (`0x0800F924`: obj+0x291 = 1, its tiles freed; it never marks again - VERIFIED real route 21-4: the two
+        // drifting cells are detached in RAM and leave no mark where the Blister's Enzyme spawns)
+        K::DriftContact => {
+            en::unmark_self(w, i);
+            w.en(i).detached = true;
+        }
         K::KiBlast => timed_enter(w, i, &[an(3)], true),
         // (r.d[6] = the animation state the shot runs under: see `shot_state_gone`)
         K::GunShot | K::RifleShot | K::MummyWrapShot => {
