@@ -232,6 +232,8 @@ def board(jobs):
                 raise SystemExit(f'{name}: the replay did not run (build error? another agent mid-edit): rc {rc}')
             res[name] = rows
             print(name, len(rows), 'segments', sum(r['matched'] >= r['frames'] for r in rows), 'exact', flush=True)
+    # (the per-segment results: what `mid cut` picks its long non-exact segments from)
+    (REAL / 'board_rows.json').write_text(json.dumps(res, indent=0, sort_keys=True))
     chapters = {}
     bad = []
     for name in sorted(cuts):
@@ -324,9 +326,176 @@ def board(jobs):
     print('all:', tot)
 
 
+# --- every-N-frames cuts (any-frame import): where a long segment really diverges ----------------------------------
+# `mid cut N [JOBS] [SEG ...]`: every area-entry segment that is not exact and loses more than N frames (or the named
+# ones) is re-recorded from its start state and cut into tiles of N frames, one at its frame N, 2N, ... (the tile
+# at 0 is the segment itself) -> work/real/mid/<stretch>/<segment>+<frame>.json (init.snd_phase from the segment's).
+# `mid [JOBS]`: replays the tiles -> engine/docs/scoreboard-mid.md + data/realrun/scoreboard_mid.json: per frame of
+# those segments, verified exact (the segment's own matched prefix or a tile's), diverged (a tile after its first
+# divergence) or not covered (a refused tile: the importer cannot start there yet).
+MID = REAL / 'mid'
+TILE = re.compile(r'^(.+)\+(\d{6})$')
+
+
+def mid_cut_one(job):
+    d, seg, n = job
+    sys.path.insert(0, str(ROOT / 'tools' / 'segments'))
+    sys.path.insert(0, str(ROOT / 'tools' / 'story_playthrough'))
+    sys.path.insert(0, str(ROOT / 'tools' / 'field'))
+    import segment as sg
+    from route import start_emu
+    head, frames = sg.load_doc(REAL / 'segs' / d / f'{seg}.json')
+    ph = head['init'].get('snd_phase')
+    e = start_emu(str(REAL / 'segs' / d / 'states' / f'{seg}.ss'))
+    out = MID / d
+    out.mkdir(parents=True, exist_ok=True)
+    for j in range(n):
+        e.set_keys(frames[j]['keys'])
+        e.run(1)
+    k, made, bad = n, 0, None
+    while k + n // 4 < len(frames):
+        m = min(n, len(frames) - k)
+        init, objs, rows = sg.record(e, lambda j, _e: frames[k + j]['keys'], m)
+        for j, r in enumerate(rows):
+            f = frames[k + j]
+            diff = [x for x in ('lf', 'rng', 'area', 'p') if f.get(x) != r.get(x)]
+            if diff and bad is None:
+                bad = f'{seg}: re-recorded frame {k + j} differs ({diff})'
+        if ph is not None:
+            # one video frame = 280,896 cycles = 16 sound periods + 12,096 (snd_phase.py)
+            init = {'snd_phase': (ph - k * 12096) % 16800, **init}
+        name = f'{seg}+{k:06d}'
+        src = {'kind': 'tile', 'of': seg, 'at': k}
+        sg.OUT = out
+        sg.save(name, {'kind': 'segment', 'name': name, 'source': src, 'init': init, 'objs': objs, 'frames': rows})
+        made += 1
+        k += m
+    return seg, made, bad
+
+
+def do_mid_cut(n, jobs, only):
+    from concurrent.futures import ProcessPoolExecutor
+    res = json.loads((REAL / 'board_rows.json').read_text())
+    work = []
+    for d, rows in sorted(res.items()):
+        for r in rows:
+            if only and r['segment'] not in only:
+                continue
+            if not only and r['frames'] - r['matched'] <= n:
+                continue
+            work.append((d, r['segment'], n))
+    for d, seg, _ in work:
+        for p in (MID / d).glob(f'{seg}+*.json'):
+            p.unlink()
+    with ProcessPoolExecutor(jobs) as ex:
+        for seg, made, bad in ex.map(mid_cut_one, work):
+            print(seg, made, 'tiles', bad or '', flush=True)
+    (MID / 'tile.json').write_text(json.dumps({'n': n}))
+
+
+def mid_board(jobs):
+    build()
+    res = json.loads((REAL / 'board_rows.json').read_text())
+    cuts = json.loads((REAL / 'cuts.json').read_text())
+    n = json.loads((MID / 'tile.json').read_text())['n']
+    dirs = [d for d in sorted(MID.iterdir()) if d.is_dir() and any(d.glob('*.json'))]
+    tiles = {}
+    with ThreadPoolExecutor(jobs) as ex:
+        for name, rows, rc in ex.map(replay_one, dirs):
+            if not rows and rc != 0:
+                raise SystemExit(f'{name}: the replay did not run: rc {rc}')
+            for r in rows:
+                m = TILE.match(r['segment'])
+                tiles.setdefault(m.group(1), []).append((int(m.group(2)), r))
+    segs, chapters = [], {}
+    for d, rows in sorted(res.items()):
+        for r in rows:
+            if r['segment'] not in tiles:
+                continue
+            ts = sorted(tiles[r['segment']], key=lambda t: t[0])
+            ok = min(r['matched'], r['frames'], ts[0][0])   # the segment's own prefix (up to the first tile)
+            div = (ts[0][0] - ok)
+            unc = 0
+            first = None
+            spots = []
+            for k, t in ts:
+                if t['first'].startswith('Some((0, "import'):
+                    unc += t['frames']
+                    spots.append((k, 'refused', t['first']))
+                    continue
+                ok += min(t['matched'], t['frames'])
+                div += t['frames'] - min(t['matched'], t['frames'])
+                if t['matched'] < t['frames']:
+                    spots.append((k + t['matched'], category(t['first']), t['first']))
+            s = {'segment': r['segment'], 'stretch': d, 'chapter': cuts.get(d, {}).get('chapter', '?'),
+                 'frames': r['frames'], 'own': r['matched'], 'own_first': r['first'], 'verified': ok, 'diverged': div,
+                 'uncovered': unc, 'tiles': len(ts), 'exact_tiles': sum(t['matched'] >= t['frames'] for _, t in ts),
+                 'refused': sum(1 for x in spots if x[1] == 'refused'), 'spots': spots}
+            segs.append(s)
+            c = chapters.setdefault(s['chapter'], {'segments': 0, 'frames': 0, 'own': 0, 'verified': 0, 'diverged': 0,
+                                                   'uncovered': 0, 'tiles': 0, 'exact_tiles': 0, 'refused': 0})
+            for key in ('frames', 'verified', 'diverged', 'uncovered', 'tiles', 'exact_tiles', 'refused'):
+                c[key] += s[key]
+            c['own'] += min(r['matched'], r['frames'])
+            c['segments'] += 1
+    tot = {k: sum(c[k] for c in chapters.values()) for k in ('segments', 'frames', 'own', 'verified', 'diverged', 'uncovered', 'tiles', 'exact_tiles', 'refused')}
+    head = subprocess.run(['git', 'rev-parse', '--short', 'HEAD'], capture_output=True, text=True, cwd=ROOT).stdout.strip()
+    pc = lambda a, b: f'{100.0 * a / b:.1f}' if b else '-'
+    L = ['# Parity scoreboard, every-N-frames cuts', '',
+         f'Tree: `{head}`. Tiles of {n:,} frames. Regenerate: `scoreboard.py` (the area-entry board, which lists the',
+         f'segments), `scoreboard.py mid cut {n}` (local, under `work/real/mid/`), `scoreboard.py mid`.', '',
+         f'Every area-entry segment that loses more than {n:,} frames on the main board, cut again at its frame {n:,},',
+         f'{2 * n:,}, ... (the any-frame import, `engine/docs/segments.md` §"Scoreboard"). A frame is **verified** when',
+         'the segment or a tile replays it exactly from the last cut before it; **diverged** when it comes after a',
+         'tile\'s first divergence; **not covered** when its tile was refused by the importer.', '',
+         '| chapter | segments | frames | exact on the main board | verified exact | diverged | not covered | tiles | exact tiles | refused |',
+         '|---|---|---|---|---|---|---|---|---|---|']
+    order = [c for c in ('opening', 'earth', 'ship', 'fat', 'janemba', 'superbuu') if c in chapters]
+    for k in order + ['**all**']:
+        c = tot if k == '**all**' else chapters[k]
+        L.append(f"| {k} | {c['segments']} | {c['frames']:,} | {c['own']:,} ({pc(c['own'], c['frames'])}%) | "
+                 f"{c['verified']:,} ({pc(c['verified'], c['frames'])}%) | {c['diverged']:,} | {c['uncovered']:,} | "
+                 f"{c['tiles']} | {c['exact_tiles']} | {c['refused']} |")
+    # refusals: what the importer would gain (frames not covered), by its reason
+    why = {}
+    for s in segs:
+        for k, cat, t in s['spots']:
+            if cat == 'refused':
+                r = re.sub(r'\d+', 'N', t.split('import: ', 1)[-1])[:110]
+                w = why.setdefault(r, [0, 0, set()])
+                w[0] += 1
+                w[1] += n
+                w[2].add(s['chapter'])
+    if why:
+        L += ['', '## Refused tiles by reason (for the importer)', '', '| reason | tiles | frames | chapters |', '|---|---|---|---|']
+        for r, (c, f, chs) in sorted(why.items(), key=lambda x: -x[1][1]):
+            L.append(f'| {r} | {c} | {f:,} | {", ".join(sorted(chs))} |')
+    L += ['', '## Per segment: where it really diverges', '',
+          'segment: main-board matched / frames (its first divergence) -> verified / diverged / not covered; then each',
+          'tile divergence (segment frame: category) - a tile that diverges is a separate cause from the one before it', '']
+    for ch in order:
+        L += [f'### {ch}', '']
+        for s in sorted((s for s in segs if s['chapter'] == ch), key=lambda s: -(s['frames'] - s['verified'])):
+            L.append(f"* `{s['segment']}` ({s['stretch']}): {s['own']:,} / {s['frames']:,} ({s['own_first'][:90]}) -> "
+                     f"**{s['verified']:,}** / {s['diverged']:,} / {s['uncovered']:,}; {s['exact_tiles']} / {s['tiles']} tiles exact")
+            for k, cat, t in s['spots'][:12]:
+                L.append(f"  * {k:,}: {cat} - {t[:130]}")
+            if len(s['spots']) > 12:
+                L.append(f"  * ... {len(s['spots']) - 12} more")
+        L.append('')
+    (ROOT / 'engine' / 'docs' / 'scoreboard-mid.md').write_text('\n'.join(L))
+    (DATA / 'scoreboard_mid.json').write_text(json.dumps({'tree': head, 'tile': n, 'total': tot, 'chapters': chapters,
+                                                          'segments': segs}, indent=1, sort_keys=True))
+    print('all:', tot)
+
+
 if __name__ == '__main__':
     a = sys.argv[1:]
-    if a and a[0] == 'cut':
+    if a[:2] == ['mid', 'cut']:
+        do_mid_cut(int(a[2]) if len(a) > 2 else 1000, int(a[3]) if len(a) > 3 else 8, a[4:])
+    elif a and a[0] == 'mid':
+        mid_board(int(a[1]) if len(a) > 1 else 6)
+    elif a and a[0] == 'cut':
         do_cut(int(a[1]) if len(a) > 1 else 6, a[2:])
         do_extend(int(a[1]) if len(a) > 1 else 6)
     elif a and a[0] == 'extend':

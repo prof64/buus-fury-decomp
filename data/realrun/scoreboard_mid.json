@@ -1,0 +1,91 @@
+{
+ "chapters": {
+  "fat": {
+   "diverged": 9087,
+   "exact_tiles": 0,
+   "frames": 9485,
+   "own": 396,
+   "refused": 0,
+   "segments": 1,
+   "tiles": 9,
+   "uncovered": 0,
+   "verified": 398
+  }
+ },
+ "segments": [
+  {
+   "chapter": "fat",
+   "diverged": 9087,
+   "exact_tiles": 0,
+   "frames": 9485,
+   "own": 396,
+   "own_first": "Some((458, \"cam: (36.2890625, 509.953125) vs game (36.3359375, 509.943359375)\"))",
+   "refused": 0,
+   "segment": "r009_006_4-1",
+   "spots": [
+    [
+     1000,
+     "position / facing",
+     "Some((0, \"pos: #5 sprite 261: (322.5, 360) vs game (322, 360)\"))"
+    ],
+    [
+     2000,
+     "position / facing",
+     "Some((0, \"pos: #11 sprite 69: (736, 386) vs game (736, 386.5)\"))"
+    ],
+    [
+     3000,
+     "position / facing",
+     "Some((0, \"pos: #6 sprite 180: (118.5, 344) vs game (118, 344)\"))"
+    ],
+    [
+     4000,
+     "position / facing",
+     "Some((0, \"pos: #3 sprite 36: (680, 547.5) vs game (680, 548)\"))"
+    ],
+    [
+     5000,
+     "position / facing",
+     "Some((0, \"pos: #3 sprite 36: (648, 530) vs game (648, 530.5)\"))"
+    ],
+    [
+     6000,
+     "position / facing",
+     "Some((0, \"pos: #3 sprite 36: (632, 549) vs game (632, 548.5)\"))"
+    ],
+    [
+     7000,
+     "position / facing",
+     "Some((0, \"pos: #3 sprite 36: (648, 528) vs game (648.5, 528)\"))"
+    ],
+    [
+     8000,
+     "position / facing",
+     "Some((0, \"pos: #3 sprite 36: (615.5, 544) vs game (616, 544)\"))"
+    ],
+    [
+     9002,
+     "animation",
+     "Some((2, \"anim: #7 sprite 239: raw 1 cel 0 tick 66 vs game raw 1 cel 1 tick 497\"))"
+    ]
+   ],
+   "stretch": "009_d16_desert",
+   "tiles": 9,
+   "uncovered": 0,
+   "verified": 398
+  }
+ ],
+ "tile": 1000,
+ "total": {
+  "diverged": 9087,
+  "exact_tiles": 0,
+  "frames": 9485,
+  "own": 396,
+  "refused": 0,
+  "segments": 1,
+  "tiles": 9,
+  "uncovered": 0,
+  "verified": 398
+ },
+ "tree": "3d6c757"
+}

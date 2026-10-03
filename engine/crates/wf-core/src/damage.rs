@@ -100,7 +100,13 @@ pub enum Draw {
 
 pub fn rng_draw(rng: &mut Rng) -> impl FnMut(Draw) -> i64 + '_ {
     move |d| match d {
-        Draw::Chance(p) => rng.chance(p) as i64,
+        Draw::Chance(p) => {
+            let r = rng.chance(p) as i64;
+            if std::env::var("DBG_CRIT").is_ok() {
+                eprintln!("  chance {p:#x} -> {r}");
+            }
+            r
+        }
         Draw::Rand(n) => rng.rand(n) as i64,
     }
 }

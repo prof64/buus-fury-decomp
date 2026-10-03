@@ -2305,7 +2305,8 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
     }
     {
         let e = w.en_ref(i);
-        if msg.team == 0 || e.part || e.defeated || w.ents[i].removed || !e.a.hittable {
+        // (the handler `0x0800FBE6` takes sender classes 1 and 2)
+        if !matches!(msg.team, 1 | 2) || e.part || e.defeated || w.ents[i].removed || !e.a.hittable {
             return false;
         }
         // field: the body box (0x0800FE78) is at the ground position - the height does not lift it (sc_janemba:

@@ -54,9 +54,54 @@ pub struct StoryHost {
     pub prev_held: u16,
     /// logic frames stepped
     pub frame: usize,
+    /// the events' original step bytecode ((event, node) -> (ROM code address when stored uncompressed, code); the
+    /// content's `scripts/bytecode.json`, `set_step_code`): the importer maps a running interpreter's PC to the
+    /// natives the node has run
+    pub step_code: StepCode,
+}
+
+type StepCode = BTreeMap<(u16, u16), (Option<u32>, Vec<u8>)>;
+static STEP_CODE: std::sync::OnceLock<StepCode> = std::sync::OnceLock::new();
+
+/// the events' step bytecode from the content's `scripts/bytecode.json`, for every host made after (see
+/// `StoryHost::step_code`; the segments harness calls it once)
+pub fn set_step_code(json: &[u8]) {
+    let Ok(v) = serde_json::from_slice::<serde_json::Value>(json) else { return };
+    let Some(evs) = v["events"].as_object() else { return };
+    let hex = |s: &str| -> Vec<u8> { (0..s.len() / 2).filter_map(|k| u8::from_str_radix(&s[2 * k..2 * k + 2], 16).ok()).collect() };
+    let mut m = StepCode::new();
+    for (name, e) in evs {
+        let Some(ev) = name.strip_prefix('s').and_then(|x| x.parse::<u16>().ok()) else { continue };
+        for n in e["nodes"].as_array().into_iter().flatten() {
+            let (Some(node), Some(code)) = (n["node"].as_u64(), n["code"]["code"].as_str()) else { continue };
+            let addr = n["code"]["code_addr"].as_str().and_then(|a| u32::from_str_radix(a.trim_start_matches("0x"), 16).ok());
+            m.insert((ev, node as u16), (addr, hex(code)));
+        }
+    }
+    let _ = STEP_CODE.set(m);
 }
 
 impl StoryHost {
+
+    /// Import: event `event` stopped inside node `node`'s code: the handler runs with its first `drop` natives
+    /// dropped unexecuted (the game ran them before the cut; instant ones are queued so none runs twice), the rest
+    /// run as usual (the host blocks on the first that waits)
+    pub fn continue_mid_node(&mut self, w: &mut World, event: u16, node: u16, params: [i32; 4], drop: usize) {
+        let mut g = self.rt.globals();
+        g.g = w.story.g;
+        self.rt.set_globals(g);
+        self.hs.in_unit = false;
+        self.rt.start_event_at(event, node, params);
+        self.started.push((self.frame, format!("s{event:03}@{node}")));
+        self.cause = None;
+        self.rt.with_thread(|t| {
+            t.skip = drop;
+            t.queue_instants = true;
+        });
+        let st = self.with_host(w, |rt| rt.run().map_err(|e| e.to_string()));
+        self.rt.with_thread(|t| t.queue_instants = false);
+        self.finish(w, st);
+    }
     /// `files` = the exported scripts (`wf_script::export::export(rom, &ScriptSet::load_all(rom))`)
     pub fn new(data: &Arc<GameData>, files: &BTreeMap<String, String>) -> Result<StoryHost, String> {
         let spare = Session::new_field(data.clone(), FieldConfig::default()).world;
@@ -64,7 +109,7 @@ impl StoryHost {
         let rt = Runtime::new(files, Box::new(shared.clone()))?;
         let stepped = files.iter().filter(|(_, src)| src.contains("fn step_0()")).map(|(p, _)| p.clone()).collect();
         let hs = HostState { nest_area_enter: true, ..HostState::default() };
-        Ok(StoryHost { rt, shared, hs, queue: VecDeque::new(), running: false, cause: None, outer: vec![], stepped, errors: vec![], started: vec![], prev_held: 0, frame: 0 })
+        Ok(StoryHost { rt, shared, hs, queue: VecDeque::new(), running: false, cause: None, outer: vec![], stepped, errors: vec![], started: vec![], prev_held: 0, frame: 0, step_code: STEP_CODE.get().cloned().unwrap_or_default() })
     }
 
     /// a session around an imported / built world (no hook: the host runs the queue itself)

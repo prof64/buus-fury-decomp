@@ -121,6 +121,10 @@ pub struct ThreadState {
     pub hold_queue: bool,
     #[serde(default)]
     pub skip: usize,
+    /// importing a running event mid-node: instant natives are queued like the others (so `skip` drops exactly
+    /// the natives the game ran before the cut, none executed twice)
+    #[serde(default)]
+    pub queue_instants: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -695,7 +699,7 @@ fn bind_api(e: &mut Engine, ctx: &Rc<RefCell<Ctx>>, lib: &Rc<RefCell<Option<Rc<L
             let a: Vec<i32> = args.iter().map(|d| int_arg(d)).collect::<R<_>>()?;
             let mut b = c.borrow_mut();
             let (_, p, script) = b.t.cur_unit()?;
-            let now = query || (instant && b.t.queue.is_empty());
+            let now = query || (instant && b.t.queue.is_empty() && !b.t.queue_instants);
             if !now {
                 b.t.queue.push_back(Act::Native { native: n, args: a, params: p, script });
                 return Ok(Dynamic::UNIT);

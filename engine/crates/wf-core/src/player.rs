@@ -3496,7 +3496,7 @@ fn pvp_hit(w: &World, i: usize, msg: &HitMsg) -> bool {
 pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
     {
         let pl = pr(w, i);
-        if msg.team == 1 && !pvp_hit(w, i, msg) {
+        if msg.team == 1 && !pvp_hit(w, i, msg) || msg.team == crate::shots::TEAM_NONE {
             return false;
         }
         if pl.state == PState::Held && pl.hold_kind == Some(HoldKind::Eat) {

@@ -1802,6 +1802,8 @@ fn masenko_ball_update(w: &mut World, i: usize) {
 /// (head +- 8) on a projectile wall -> stopped; else the head message: accepted -> stopped + the hit effect, not
 /// accepted -> len += 3 while the head box overlaps the camera. Then always the body message (position .. head + 6).
 /// Released: moves 3 px per tick, len -= 3, removed once len < 0 (destructor sounds: the owner's beam_end).
+/// a hit message's sender class that no object accepts (an NPC's beam: scene.rs)
+pub const TEAM_NONE: u8 = 0xEC;
 pub fn kame_beam(owner: EntityId, dir: Dir, x: i32, y: i32, built: i64, a: AttackType, mult: i32, gfx: bool) -> Shot {
     Shot::new(owner, dir, 1, x << 8, y << 8, ShotKind::Kame(Box::new(KameBeam { len: 8, done: false, a, mult, gfx, vt: 0, stopped: false, next: built, charging: false, sounds: false })))
 }

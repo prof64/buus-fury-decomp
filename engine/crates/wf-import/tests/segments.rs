@@ -37,6 +37,10 @@ fn setup() -> Option<(Arc<GameData>, BTreeMap<String, String>)> {
     let font = wf_ui::font::Font::load(&rom, "dialog", 0x0806_EE6C);
     wf_script_core::text::set_dialog_font((0..256u16).map(|c| font.advance(c)).collect());
     let data = Arc::new(GameData::load(&DirSource { root: content_dir() }).expect("content"));
+    // the step bytecode (an event imported mid-node: the natives its interpreter has run)
+    if let Ok(b) = std::fs::read(content_dir().join("scripts/bytecode.json")) {
+        wf_import::host::set_step_code(&b);
+    }
     let set = wf_script::ScriptSet::load_all(&rom);
     let (files, errs) = wf_script::export::export(&rom, &set);
     assert!(errs.is_empty(), "decompile errors: {errs:?}");

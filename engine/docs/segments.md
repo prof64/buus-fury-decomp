@@ -1277,6 +1277,18 @@ page's own cycles built from its draw list; opt-in as before (`init.snd_phase`),
   - `shipr_002` (7-2 pause, then 8-1 Switch Character): with `snd_phase` (work file) it runs to f18,475; the close
     there (game 26 frames, ours 27) has the right own time (6,358,863 vs 6,351,398) but the interrupt mixes cost
     954k in the model vs 787k in the game (7 mixes each) - the sound driver's state, Earth's.
+* **Reload estimate, per map (ship fix agent owns it from 2026-10-04; Earth agent: please leave
+  `reload_frames_with`'s map terms to me, the sound / mix parts stay yours).**
+  - The decompression part is right: every decompressor call of four closes (14-1, 14-2, 18-1, 8-3) measured inside
+    the IWRAM decompressor (0x03000044, `/tmp/shipfix/decs.py`) is within 0.4% of `wf_rom::deccost`, and the model
+    loads the same chunks as the game (all tile chunks of the list, the last included; per-map residuals do not
+    follow tiles, layers, whole-layer chunks or the fixed cost: regression std 20k either way).
+  - 14-1's +76k: its **three level signs** (`0x0800C300` label objects) have their labels drawn again in the reload
+    (glyph code 0x0803F6xx, present in 14-1's profile only). `Field.signs` (counted at the area load, as the label
+    objects are made) x `SIGN_LABEL` 25,300 in the reload's extra. Real run: r067_136_14-1 now exact, r069_168_14-1
+    413 -> 20,168 frames, r069_024 stays exact. Maps with signs among the larger residuals (11-15 +42k, 8-14 +22k, 2-11
+    +20k) are likely the same term.
+  - Left: 18-1 (r044_015) -20k with no signs (one sample, inside the per-map spread of +-20k).
 
 **Side-content catalogue** (data survey 2026-10-02; flags = story flags): Broly turns out to be **mainline** (Dragon
 Ball saga: his defeat s436 sets flag 111, which Dragon Ball #4 s439 needs) — shared with the Super Buu agent, whose main line

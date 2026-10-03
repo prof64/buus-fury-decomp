@@ -1965,6 +1965,12 @@ fn update_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) -> bool {
                     let (fx0, fy0) = crate::shots::BEAM_POS_KAME_FIRE[dir as usize];
                     let (x, y) = (a.px() + fx0, a.py() + fy0);
                     let mut shot = crate::shots::kame_beam(owner, dir, x, y, w.frame as i64 - 23, crate::damage::atk(5), 328, true);
+                    // the beam's hit message takes its sender class from the owner's +0x1D0: a map NPC's object has
+                    // no such field there (Piccolo's reads 0x030032EC), and the enemies take classes 1 and 2 only -
+                    // an NPC's scripted beam hurts nobody (VERIFIED segment sb 6-6 f5795: s228's fire_beam_alt)
+                    if matches!(w.ents[i].body, Body::Npc(_)) {
+                        shot.team = crate::shots::TEAM_NONE;
+                    }
                     if let crate::shots::ShotKind::Kame(k) = &mut shot.kind {
                         k.sounds = true;
                     }

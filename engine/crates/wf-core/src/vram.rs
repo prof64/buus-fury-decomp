@@ -521,6 +521,12 @@ pub fn actor_destroyed(w: &mut World, id: EntityId, sh: Shares) {
     if w.field.as_ref().is_none_or(|f| f.vram.is_none()) {
         return;
     }
+    // the destructor (`0x0800F76E`) deletes the boss bar showing this actor first (`0x08052538`; segment sb 6-6
+    // f8397: bar, shadow, tiles)
+    if w.scene.boss_bar.as_ref().is_some_and(|b| b.entity == id) {
+        w.scene.boss_bar = None;
+        release(w, Owner::BossBar);
+    }
     let owned = st(w).is_some_and(|v| v.owners.iter().any(|o| o.1 == Owner::Ent(id)));
     let was_suspended = st(w).is_some_and(|v| v.suspended.contains(&id));
     if let Some(v) = st(w) {

@@ -897,6 +897,10 @@ fn build_mid_event(_data: &Arc<GameData>, ram: &GbaRam, runner: &mut StoryHost, 
             f.held_event = true;
         }
     }
+    // stopped inside the node's code: the natives its interpreter has run (the PC after the one that blocks)
+    if let Some(ran) = natives_run(ram, runner, ev) {
+        return build_mid_code(ram, runner, ev, w, calls0, &ran, notes);
+    }
     runner.continue_event(&mut w, ev.0, ev.1, ev.2, 0, None);
     // the text box as the RAM shows it
     let tb = ram.objects().into_iter().find(|&o| ram.r32(o) == 0x0804_9F60);
@@ -929,6 +933,119 @@ fn build_mid_event(_data: &Arc<GameData>, ram: &GbaRam, runner: &mut StoryHost, 
         _ => {}
     }
     notes.push(format!("event s{:03} at node {}: mid-node over a standing field (mid-area)", ev.0, ev.1));
+    let draws = w.rng.calls.wrapping_sub(calls0);
+    Built { world: w, draws, held: 0, finished: true }
+}
+
+/// the natives (in order) event `ev`'s node has run, from its interpreter's PC: the interpreters on the context
+/// stack 0x03001034 ([0] depth, [1..] objects), each object's PC in the stack word after the one holding it (the VM
+/// 0x08004038 keeps it in the pushed r1 slot); the node's code found at its ROM address or (compressed) as the
+/// decompressed copy in EWRAM around the PC. Queries (natives that answer a value) are left out: the script asks
+/// them again. None = no interpreter stands in the node's code
+fn natives_run(ram: &GbaRam, runner: &StoryHost, ev: (u16, u16, [i32; 4])) -> Option<Vec<u8>> {
+    let (addr, code) = runner.step_code.get(&(ev.0, ev.1))?;
+    let depth = ram.r32(0x0300_1034).min(8);
+    let mut pc_off = None;
+    for k in 1..=depth {
+        let it = ram.r32(0x0300_1034 + 4 * k);
+        for a in (0x0300_7000u32..0x0300_7FFC).step_by(4) {
+            if ram.r32(a) != it {
+                continue;
+            }
+            let pc = ram.r32(a + 4);
+            let off = match addr {
+                Some(base) if pc >= *base && pc <= base + code.len() as u32 => Some((pc - base) as usize),
+                None if pc >> 24 == 2 => (0..=code.len().min(pc as usize)).find(|&o| ram.read(pc - o as u32, code.len()) == *code),
+                _ => None,
+            };
+            if off.is_some() {
+                pc_off = off;
+            }
+        }
+    }
+    let pc_off = pc_off?;
+    let insns = wf_script::bytecode::decode_reachable(code).ok()?;
+    let ran: Vec<u8> = insns
+        .values()
+        .filter(|i| i.off < pc_off)
+        .filter_map(|i| match i.op {
+            wf_script::bytecode::Op::Native(n) => Some(n),
+            _ => None,
+        })
+        .filter(|&n| !(wf_script::natives::sig(n).pushes && !wf_script::steps::is_result_action(n)))
+        .filter(|&n| !(wf_script::natives::RUN_SCRIPT..=wf_script::natives::RUN_SCRIPT_P0_P1).contains(&n))
+        .collect();
+    (!ran.is_empty()).then_some(ran)
+}
+
+/// **an event stopped inside a code node** (mid-area): the node's natives before the interpreter's PC ran before
+/// the cut; the last one is the one waiting. The node runs again from the group that one belongs to - a batch's
+/// `begin_parallel` (0x38) when it waits in `end_parallel` (0x3A), else the waiting native itself - with the
+/// natives before it dropped; what the replayed group started is then set to the RAM's: the RNG and the screen
+/// shakes as they were (shake objects vt 0x0804A720 the game no longer has: their commands dropped), an actor's
+/// animation command playing at its RAM cel / tick
+fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4]), mut w: World, calls0: u32, ran: &[u8], notes: &mut Vec<String>) -> Built {
+    use wf_core::scene::{Cmd, Owner};
+    let last = ran.len() - 1;
+    let from = if ran[last] == 0x3A { ran[..last].iter().rposition(|&n| n == 0x38).unwrap_or(last) } else { last };
+    let (rng, shakes) = (w.rng.clone(), w.g.shakes.clone());
+    runner.continue_mid_node(&mut w, ev.0, ev.1, ev.2, from);
+    w.rng = rng;
+    // the screen shake (the camera slot 0x03002BE0 -> vt 0x0804A720: +4 intensity, +5 period, +6 count, +8 frames
+    // left): the group's shake commands before the running one are done, the running one is the RAM's
+    w.g.shakes = shakes;
+    let so = ram.r32(0x0300_2BE0);
+    let live = (ram.valid(so) && ram.r32(so) == 0x0804_A720).then(|| wf_core::world::Shake { intensity: ram.r8(so + 4) as i32, period: ram.r8(so + 5) as i32, cnt: ram.r8(so + 6) as i32, left: ram.s32(so + 8) });
+    for t in w.scene.tracks.iter_mut() {
+        if !t.queue.iter().any(|c| matches!(c, Cmd::Shake { .. })) {
+            continue;
+        }
+        let cur = live.as_ref().and_then(|l| t.queue.iter().position(|c| matches!(c, Cmd::Shake { intensity, .. } if *intensity == l.intensity)));
+        match cur {
+            Some(k) => {
+                t.queue.drain(..k);
+                if let (Some(Cmd::Shake { frames, t: tt, .. }), Some(l)) = (t.queue.first_mut(), live.as_ref()) {
+                    // (its start frame ticked it once: t = frames - 1 - left)
+                    *tt = *frames - 1 - l.left;
+                }
+                t.started = true;
+            }
+            None => {
+                t.queue.retain(|c| !matches!(c, Cmd::Shake { .. }));
+                t.started = false;
+            }
+        }
+    }
+    if let Some(l) = live {
+        w.g.shakes.push(l);
+    }
+    w.scene.tracks.retain(|t| !t.queue.is_empty() || t.holding);
+    // an actor's animation command: the animation as the RAM row shows it
+    let rows: std::collections::BTreeMap<u32, (i32, i32, i32, i32)> = ram.actor_rows.iter().map(|r| (r.0, (r.1, r.2, r.3, r.4))).collect();
+    let owners: Vec<wf_core::world::EntityId> = w
+        .scene
+        .tracks
+        .iter()
+        .filter(|t| matches!(t.queue.first(), Some(Cmd::PlayAnim { .. })))
+        .filter_map(|t| match t.owner {
+            Owner::Entity(id) => Some(id),
+            _ => None,
+        })
+        .collect();
+    for id in owners {
+        let Some(i) = w.find(id) else { continue };
+        if Some(i) == w.player_idx(0) {
+            if let Some(&(_, raw, cel, tick)) = rows.get(&ram.player()) {
+                let p = w.pl(i);
+                p.ap.raw = raw;
+                p.ap.frame = cel;
+                p.ap.tick = tick;
+            }
+        } else {
+            notes.push(format!("mid-code: entity {id:?}'s animation command keeps its start"));
+        }
+    }
+    notes.push(format!("event s{:03} at node {}: mid-code after {} natives (from #{from}, {:#04x} waiting)", ev.0, ev.1, ran.len(), ran[last]));
     let draws = w.rng.calls.wrapping_sub(calls0);
     Built { world: w, draws, held: 0, finished: true }
 }

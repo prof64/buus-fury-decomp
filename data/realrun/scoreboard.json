@@ -3,12 +3,12 @@
   "earth": {
    "cats": {
     "RNG": 1,
-    "animation": 2
+    "animation": 1
    },
    "cut_frames": 157565,
-   "exact": 87,
+   "exact": 88,
    "frames": 157565,
-   "matched": 150622,
+   "matched": 150738,
    "run_frames": 160503,
    "segments": 90,
    "stretches": 1
@@ -16,21 +16,21 @@
   "fat": {
    "cats": {
     "RNG": 3,
-    "animation": 2,
+    "animation": 1,
     "camera": 5,
     "position / facing": 1
    },
    "cut_frames": 380206,
-   "exact": 360,
+   "exact": 361,
    "frames": 380206,
-   "matched": 341750,
+   "matched": 342768,
    "run_frames": 388646,
    "segments": 371,
    "stretches": 33
   },
   "janemba": {
    "cats": {
-    "RNG": 4,
+    "RNG": 2,
     "camera": 1,
     "menu timing": 2,
     "object set": 1,
@@ -38,64 +38,60 @@
     "sound": 1
    },
    "cut_frames": 187291,
-   "exact": 245,
+   "exact": 247,
    "frames": 187291,
-   "matched": 176906,
+   "matched": 182892,
    "run_frames": 199703,
    "segments": 255,
    "stretches": 16
   },
   "opening": {
-   "cats": {
-    "sound": 1
-   },
+   "cats": {},
    "cut_frames": 34377,
-   "exact": 16,
+   "exact": 17,
    "frames": 34377,
-   "matched": 33637,
+   "matched": 34377,
    "run_frames": 42275,
    "segments": 17,
    "stretches": 1
   },
   "ship": {
    "cats": {
-    "camera": 1,
-    "position / facing": 1
+    "camera": 1
    },
    "cut_frames": 395616,
-   "exact": 336,
+   "exact": 337,
    "frames": 395616,
-   "matched": 380737,
+   "matched": 394207,
    "run_frames": 398194,
    "segments": 338,
    "stretches": 2
   },
   "superbuu": {
    "cats": {
-    "RNG": 17,
-    "camera": 4,
-    "menu timing": 2,
-    "position / facing": 23,
+    "RNG": 16,
+    "camera": 3,
+    "position / facing": 24,
     "sound": 1
    },
    "cut_frames": 467701,
-   "exact": 401,
+   "exact": 404,
    "frames": 467701,
-   "matched": 299631,
+   "matched": 329030,
    "run_frames": 478729,
    "segments": 448,
    "stretches": 22
   }
  },
- "dirty": false,
+ "dirty": true,
  "total": {
   "cut_frames": 1622756,
-  "exact": 1445,
+  "exact": 1454,
   "frames": 1622756,
-  "matched": 1383283,
+  "matched": 1434012,
   "run_frames": 1668050,
   "segments": 1519,
   "stretches": 75
  },
- "tree": "b522c0c"
+ "tree": "3d6c757"
 }
