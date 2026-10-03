@@ -179,6 +179,9 @@ pub struct Globals {
     /// the world frame of the last shake-task tick (a script's shake made later in the same frame: scene.rs)
     #[serde(default)]
     pub shakes_ticked: u32,
+    /// field: the frame whose shake tick is due after the script phase (session.rs `step_post`)
+    #[serde(default)]
+    pub shake_due: u32,
     /// the game's frame counter 0x03000F94 at frame 0 (`clock` = fc0 + frame; nodes that test the counter itself,
     /// e.g. VampireGrab's drain every 16 ticks)
     #[serde(default)]

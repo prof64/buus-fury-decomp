@@ -399,7 +399,6 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
                     for i in 0..w.ents.len() {
                         if let Body::Enemy(e) = &w.ents[i].body {
                             for se in &e.ai.stack {
-                                let cur: Vec<String> = se.rt.iter().enumerate().filter(|(_, r)| format!("{r:?}") != format!("{:?}", wf_core::ai::NodeRt::default())).map(|(j, r)| format!("{j}:{}:f{}i{}on{}d{:?}", se.tree.nodes.get(j).map(|n| n.name.clone()).unwrap_or_default(), r.f, r.i, r.on as u8, &r.d[..4])).collect();
                                 eprintln!("  t{k} ai en{i} st{} {}", se.state, { let kids = &se.tree.nodes[0].kids; let ci = se.rt[0].i as usize; let ks: Vec<String> = kids.iter().enumerate().map(|(n, &kk)| format!("{}{}", if n == ci { "*" } else { "" }, se.tree.nodes[kk as usize].name)).collect(); let kk = kids.get(ci).copied().unwrap_or(0) as usize; let r = &se.rt[kk]; format!("{} | cur {} f{} i{} d{:?} p{:?}", ks.join(","), se.tree.nodes[kk].name, r.f, r.i, &r.d[..4], se.tree.nodes[kk].p) });
                             }
                         }

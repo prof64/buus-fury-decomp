@@ -432,6 +432,14 @@ fn import_ai_rt(w: &mut World, ei: usize, lvl: usize, ram: &GbaRam, r: u32, note
                     gy: ram.s32(r + 0x20),
                 };
             }
+            // KnockbackSlide (0x0804A138): +4 / +8 velocity, +0xC frames left; its animation is the one showing
+            K::KnockbackSlide => {
+                rt.d[0] = ram.s32(r + 4);
+                rt.d[1] = ram.s32(r + 8);
+                rt.d[2] = ram.s32(r + 0xC);
+                rt.d[3] = -1;
+            }
+            K::PopState | K::PushState => {}
             K::Chance | K::GotoState | K::SubState | K::IfPlayerWithin | K::IfPlayerFarther | K::IfPlayerInMeleeRange | K::IfTimeInState | K::IfCooldownOver | K::IfLastKidBuu => {}
             k => notes.push(format!("ai runtime of {k:?} (state {:#x} node {n}) not imported", tree.state)),
         }
@@ -691,9 +699,19 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
         if e.a.sprite != Some(sprite - wf_core::scene::SPRITE_BASE) {
             e.a.set_sprite(&d, Some(sprite - wf_core::scene::SPRITE_BASE));
         }
+        e.set_raw(&d, raw);
         e.ea.pos.raw = raw;
         e.ea.pos.frame = cel;
         e.ea.pos.tick = tick;
+    }
+    // (a knockback's animation index: the one now showing)
+    let cur = w.en_ref(ei).a.anim.map(|a| a as i32 + 1).unwrap_or(0);
+    for st in w.en(ei).ai.stack.iter_mut() {
+        for (n, rt) in st.rt.iter_mut().enumerate() {
+            if st.tree.nodes.get(n).is_some_and(|x| x.k == wf_core::ai::K::KnockbackSlide) && rt.d[3] == -1 {
+                rt.d[3] = cur;
+            }
+        }
     }
     wf_core::enemy::sync_mark(w, ei);
     import_patrol(w, ei, ram, o);
@@ -772,6 +790,7 @@ fn build_mid(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner: &mut St
         f.mode = Mode::Normal;
     }
     field_from_ram(&mut w, ram, notes);
+    import_player_state(&mut w, ram, notes);
     // what the RAM has that the import does not rebuild yet
     let known = [VT_PLAYER, VT_ENEMY, VT_NPC, VT_NPC_TALK, VT_BANNER];
     let other: std::collections::BTreeSet<u32> = ram.objects().into_iter().map(|o| ram.r32(o)).filter(|v| !known.contains(v)).collect();
@@ -781,6 +800,48 @@ fn build_mid(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner: &mut St
     let _ = runner;
     let draws = w.rng.calls.wrapping_sub(calls0);
     Built { world: w, draws, held: 0, finished: true }
+}
+
+/// the leader's state machine (mid-area imports): the state object (+0x14) by its vtable -> our state, the
+/// animation from the recording's row (the animation-driven states - punch, hurt, once, ko - run on it)
+fn import_player_state(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
+    use wf_core::player::Gs;
+    let Some(pi) = w.player_idx(0) else { return };
+    let po = ram.player();
+    let st = ram.r32(po + 0x14);
+    if !ram.valid(st) {
+        return;
+    }
+    let gs = match ram.r32(st) {
+        0x0804_C790 => Gs::Idle,
+        0x0804_A77C => Gs::Idle2,
+        0x0804_C3A8 => Gs::Walk,
+        0x0804_BEF0 => Gs::Dash,
+        0x0804_E00C => Gs::AutoWalk,
+        0x0804_C384 => Gs::Bored,
+        0x0804_C35C => Gs::Punch,
+        0x0804_A188 => Gs::Hold0,
+        0x0804_985C => Gs::Hold,
+        0x0804_D784 => Gs::Once3,
+        0x0804_C744 => Gs::Block,
+        0x0804_D75C => Gs::Hurt,
+        0x0804_C768 => Gs::Ko,
+        vt => {
+            notes.push(format!("mid-area: the leader's state vt {vt:#x} is not imported"));
+            return;
+        }
+    };
+    let row = ram.actor_rows.iter().find(|r| r.0 == po).copied();
+    wf_core::player::import_state(w, pi, gs);
+    let p = w.pl(pi);
+    if let Some((_, _, raw, cel, tick)) = row {
+        p.ap.raw = raw;
+        p.ap.frame = cel;
+        p.ap.tick = tick;
+    }
+    p.a.blocking = gs == Gs::Block;
+    // the hit-damage remainder in 1/1024 HP (player object +0x228)
+    p.hp_acc.acc = ram.s32(po + 0x228) as i64;
 }
 
 /// the 3D world map (an area whose load makes the flyer)

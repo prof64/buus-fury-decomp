@@ -293,7 +293,16 @@ fn main() {
                     }
                     for (ei, e) in v.ents.iter().enumerate() { if let wf_core::world::Body::Enemy(en) = &e.body { if !e.removed { println!("  import enemy #{} ty {} pos ({}, {}) hp {} marked {:?} anim {:?} ai {:?}", ei, en.ty, en.a.x, en.a.y, en.hp1024 >> 10, en.marked, en.ea.pos, en.ai.stack.iter().map(|s| (s.state, s.rt.iter().map(|r| r.path).collect::<Vec<_>>())).collect::<Vec<_>>()); } } }
                     for (ei, e) in w.ents.iter().enumerate() { if let wf_core::world::Body::Enemy(en) = &e.body { if !e.removed { println!("  app    enemy #{} ty {} pos ({}, {}) hp {} marked {:?} anim {:?} ai {:?}", ei, en.ty, en.a.x, en.a.y, en.hp1024 >> 10, en.marked, en.ea.pos, en.ai.stack.iter().map(|s| (s.state, s.rt.iter().map(|r| r.path).collect::<Vec<_>>())).collect::<Vec<_>>()); } } }
-                    println!("  g app {:?}\n  g imp {:?}", w.g, v.g);
+                    for (nm, ww) in [("app", w), ("imp", v)] {
+                        let o: Vec<String> = ww.ents.iter().enumerate().filter(|(_, e)| !e.removed).map(|(k, e)| format!("{k}:{}", match &e.body {
+                            wf_core::world::Body::Player(_) => "P".to_string(),
+                            wf_core::world::Body::Enemy(en) => format!("E{:x}", en.ty),
+                            wf_core::world::Body::Npc(n) => format!("N{}", n.sprite_id),
+                            _ => "o".to_string(),
+                        })).collect();
+                        println!("  order {nm} {}", o.join(" "));
+                    }
+                    if std::env::var("SOAK_G").is_ok() { println!("  g app {:?}\n  g imp {:?}", w.g, v.g); }
                 }
                 println!("leader at row {k}: rec {:?} equip {:?} skills {:?} form {} eff {:?} story equipment {:?}", pl.rec, pl.equip, pl.skills, pl.form, pl.eff, w.story.equipment);
             }

@@ -1183,6 +1183,25 @@ page's own cycles built from its draw list; opt-in as before (`init.snd_phase`),
     start offset is the VBlank whenever the popup's iteration fits its frame.
   - Script lockstep `shop`: exact on this tree. It fails exactly when `scene::window_fades` returns true on 1-1
     (map bldcnt 0x1041 -> no fade); a content cache without the new `bldcnt` map property (=0) turns it red.
+* Round 7 (ship fix agent, 2026-10-04):
+  - `set_character` releases the old form's graphics and loads the new one's (0x0801712C / 0x0801711C): an aura
+    form stops / starts sfx 54 there too (as `set_form`). `shipr_328` (8-66, set_character(4)) now exact.
+  - Switch Character close: only ON-SCREEN other actors' sprites cost the per-sprite reload (real run 21-14
+    `r064_017`: four sprites, all off screen, close = the reload alone within 12k; sb_030's four are on screen).
+    r064_017 now exact.
+  - Equip page timing (`equip.rs`): slots / list = 180,382 + draw list + 2,428 per line + 0.486 per glyph
+    instruction; a new container's first draw + 100,600 (slots) or 62,600 + 5,000 per line (list): 98 measured
+    iterations within 7.8k (std 3.4k). Save popup = both layers' draw lists + 261,163 (2 iterations, exact).
+  - **To the Earth agent (reload model, per map):** the pause / Switch Character close residual (game own minus
+    the model's base, cycles) is map-dependent, not layer-count-dependent: 49 measured closes over the real run
+    (`/tmp/shipfix/resid_all.log` method: `menu_timing.py` per close) range -20k .. +42k, e.g. 8-3 -2k..+13k, 14-2
+    -14k..+16k, 18-2 +2k..+20k, 11-15 +42k, 18-1 -20k, and **14-1 +67k .. +83k** (r069_024 pause close +76k, r067_136
+    / r069_168 Switch Character +67k / +83k). The scoreboard's 14-1 rows (r067_136, r069_168: one black frame
+    short) and 18-1 (r044_015: one long) are this map term; the Switch Character extras are not involved (the
+    leader term is 6k).
+  - `shipr_002` (7-2 pause, then 8-1 Switch Character): with `snd_phase` (work file) it runs to f18,475; the close
+    there (game 26 frames, ours 27) has the right own time (6,358,863 vs 6,351,398) but the interrupt mixes cost
+    954k in the model vs 787k in the game (7 mixes each) - the sound driver's state, Earth's.
 
 **Side-content catalogue** (data survey 2026-10-02; flags = story flags): Broly turns out to be **mainline** (Dragon
 Ball saga: his defeat s436 sets flag 111, which Dragon Ball #4 s439 needs) — shared with the Super Buu agent, whose main line
@@ -1907,7 +1926,12 @@ drill and the Super Saiyan Goten fight into 4-25).
 *Regression tests* (no soak needed): `crates/wf-app/tests/carried_state.rs` - the host mark after the title's New
 Game; a load resets the hit-damage remainder, the regen count, the drain fraction and a pending script fade-in;
 `set_character` takes the new character's own skill slot.
-*4-25, update (Earth agent):* the player part is fixed - row 139,937 now walks on the game's frame
+*4-25 closed (Earth agent):* `x_trunks425` is exact to its end (6,900 / 6,900 with `SEGMENT_VRAM=0`). Rules:
+an AI InlineScript's parallel block that ends in `scene::tick` hands its enemy the rest of its update in the same
+frame (`ai_script_done`, out of the puppets, `enemy::release_update`: Vegeta's GotoState(0x310) / StandStill idle
+draw at f6646 - the game's nested loop returns inside his update); the player a script played an animation on is
+dropped from the puppets once his control is back (his state's animation shows again). Soak agent: Earth runs on
+past row 139,937. Earlier note: *4-25, update (Earth agent):* the player part is fixed - row 139,937 now walks on the game's frame
 (`player::update`: a player puppet of an AI inline script that holds no field event gets its control back the
 frame after its commanded animation ended, while the script goes on; Vegeta's InlineScript is the only such case
 seen). Resuming the inline script before the objects pass (tried) is not it: the script waits on its parallel

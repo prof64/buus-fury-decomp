@@ -740,6 +740,14 @@ pub fn script_anim_done(w: &World, i: usize) -> bool {
     matches!(pr(w, i).gs, Gs::Idle | Gs::Idle2 | Gs::Hold | Gs::Hold0)
 }
 
+/// wf-import (mid-area): put the player in state `gs` as a RAM snapshot shows it - no enter effects (no draws,
+/// no animation reset); the caller sets the animation
+pub fn import_state(w: &mut World, i: usize, gs: Gs) {
+    let pl = p(w, i);
+    pl.gs = gs;
+    pl.state = coarse(pl, gs);
+}
+
 /// SetAnim(id) (vfunc +0x28 0x0800ECF0)
 fn set_anim_id(w: &mut World, i: usize, id: usize) {
     p(w, i).ap.raw = ANIM_RAW[id];
@@ -3164,6 +3172,9 @@ fn it_select(w: &mut World, i: usize) {
         enter_state(w, i, Gs::Skill(14));
         p(w, i).a.hittable = false;
         return;
+    }
+    if std::env::var("IT_DBG").is_ok() {
+        eprintln!("it_sel wf {} x {} y {} n {} cand {:?} tcand {:?} order {:?}", w.frame, s.x, s.y, s.n, s.cand, s.tcand, s.order);
     }
     if s.n > 0 && s.cursor {
         let (px, py) = (s.x >> 8, s.y >> 8);

@@ -221,8 +221,8 @@ impl Session {
             if !ticked {
                 crate::scene::tick(w);
             }
-            if std::env::var("SHAKE_LATE").is_ok() && w.g.shakes_ticked != w.frame && !crate::field::frozen(w) {
-                w.tick_shakes();
+            if !crate::field::frozen(w) {
+                w.g.shake_due = w.frame;
             }
             return;
         }
@@ -255,6 +255,11 @@ impl Session {
             return;
         }
         if w.field.is_some() {
+            // the screen shake is a camera mode, updated with the camera after the frame's scripts and commands: a
+            // script camera command started this frame replaces it first (scene.rs `camera_mode_set`)
+            if std::env::var("SHAKE_LATE").is_ok() && w.g.shake_due == w.frame && w.g.shakes_ticked != w.frame {
+                w.tick_shakes();
+            }
             let k = w.events.len();
             crate::field::post_step(w);
             Self::run_hook(&mut self.hook, &mut self.world, k);
