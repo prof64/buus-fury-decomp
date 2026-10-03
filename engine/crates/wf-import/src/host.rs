@@ -153,7 +153,7 @@ impl StoryHost {
     /// a load (its on-enter `Run` among the events since `from`) runs that script now on top of it; when it ends
     /// the suspended script resumes at once (the game's warp returns in the same frame).
     fn nest_loads(&mut self, w: &mut World, from: usize) {
-        if !self.running || !matches!(self.hs.pending, Some(wf_script_core::Pending::Arrival)) {
+        if !self.running || !matches!(self.hs.pending, Some(wf_script_core::Pending::Arrival | wf_script_core::Pending::Transition)) {
             return;
         }
         let k = (from..w.events.len()).find(|&k| matches!(&w.events[k], Event::Field(FieldEvent::Run { cause: Cause::AreaEnter, .. })));
@@ -276,7 +276,10 @@ impl StoryHost {
         self.run_queue(&mut sess.world);
         // the trigger check (post step) starts its event in this frame too
         let n = sess.world.events.len();
-        let post: Vec<Event> = sess.step_post()[n..].to_vec();
+        sess.step_post();
+        // a warp_fade's load (the field's fade mode, post step): its on-enter script runs nested now
+        self.nest_loads(&mut sess.world, n);
+        let post: Vec<Event> = sess.world.events[n.min(sess.world.events.len())..].to_vec();
         self.collect(&post);
         self.run_queue(&mut sess.world);
     }

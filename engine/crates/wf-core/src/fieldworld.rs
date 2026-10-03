@@ -72,6 +72,10 @@ pub fn flyer_update(w: &mut World, i: usize) -> bool {
     if slot != 0 {
         return true;
     }
+    // a text box over the map (a circle's question, s480) holds the flyer; an event's fades do not (s479, s515)
+    if w.scene.dialog.is_some() && w.field.as_ref().is_some_and(|f| f.busy) {
+        return true;
+    }
     let keys = w.input[0].held;
     let (mut x, mut y) = (w.pl_ref(i).a.x, w.pl_ref(i).a.y);
     let f = w.field.as_mut().unwrap().flight.as_mut().unwrap();

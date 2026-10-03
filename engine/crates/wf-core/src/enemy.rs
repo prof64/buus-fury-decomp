@@ -392,7 +392,7 @@ pub fn update(w: &mut World, i: usize) {
     // a load waiting for its on-enter script holds them too (like the map NPCs; segment sb 21-4: the Blister's spawn
     // timer starts after the 2 held frames)
     let id = w.ents[i].id;
-    if w.field.as_ref().is_some_and(|f| (f.busy || f.arrival.is_some()) && !(f.load_ids.0 <= id && id < f.load_ids.1)) {
+    if w.field.as_ref().is_some_and(|f| f.busy && !(f.load_ids.0 <= id && id < f.load_ids.1) || f.arrival.is_some()) {
         tick_anim(w, i);
         if w.en_ref(i).part && matches!(w.en_ref(i).ty, 0x34 | 0x35 | 0x37) {
             part_hurt_end(w, i);
@@ -2081,6 +2081,9 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
         // field: the body box (0x0800FE78) is at the ground position - the height does not lift it (sc_janemba:
         // a punch lands on Janemba 66 px up in its ascent)
         let body = if w.field.is_some() { e.a.body_box_ground() } else { e.a.body_box() };
+        if std::env::var("PART_DBG").is_ok() {
+            eprintln!("enemy hit wf {} ty {:x} z {} rect {:?} ground {:?} lifted {:?}", w.frame, e.ty, e.a.z, msg.rect, body, e.a.body_box());
+        }
         if !overlaps(&msg.rect, &if msg.foot { e.a.foot_box() } else { body }) {
             return false;
         }

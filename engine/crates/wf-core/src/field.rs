@@ -272,6 +272,9 @@ pub struct Field {
     /// holds the player's creation 2 frames after s124 / s129's warps)
     #[serde(default)]
     pub nest_load: bool,
+    /// a script's `warp_fade` whose host nests the load's on-enter script (`nest_load` at the fade's load)
+    #[serde(default)]
+    pub nest_fade: bool,
     /// set by a nesting script host around `load_scene` (0x73): the area's objects are spawned after its on-enter
     /// script, as the game's load (0x08009030 runs the map's load scripts, then the object loop): a script that blocks
     /// there delays them (8-60's prop_show(1): the fighters appear 3 frames after the load, Babidi's ship 8-63 buttons)
@@ -418,6 +421,7 @@ fn new_field() -> Field {
         player_removed: false,
         on_enter_queued: false,
         nest_load: false,
+        nest_fade: false,
         defer_objects: false,
         pending_objects: None,
         load_ids: (0, 0),
@@ -696,8 +700,16 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
             // the players are already offstage: a cutscene scene load
             let scene = !w.scene.offstage.is_empty() && !w.players.iter().any(|&id| w.find(id).is_some());
             crate::scene::send_offstage(w);
+            let three_d = m.three_d;
             if let Some(f) = w.field.as_mut() {
                 f.arrival = Some(Arrival { to, x, y, facing, fade_in: false, frame: w.frame, scene });
+                // the 3D map object's camera exists from the load, at the arrival point (segment sb 21-25)
+                if three_d {
+                    let mut fl = crate::fieldworld::Flight::arrive();
+                    fl.cam[0] = x << 10;
+                    fl.cam[1] = y << 10;
+                    f.flight = Some(fl);
+                }
             }
             return;
         }
@@ -1157,7 +1169,17 @@ pub fn post_step(w: &mut World) {
                         player::set_idle(w, i);
                     }
                 }
+                // a script's warp_fade inside an event: the game runs the area's on-enter script inside the load, the
+                // players arrive when it ends (segment sb 21-25: s479 -> the world map 0-50, its prop_show steps)
+                let nest = step != 0 && w.field.as_ref().is_some_and(|f| f.nest_fade);
+                if let Some(f) = w.field.as_mut() {
+                    f.nest_load = nest;
+                    f.nest_fade = false;
+                }
                 load_area(w, to, x, y, facing);
+                if let Some(f) = w.field.as_mut() {
+                    f.nest_load = false;
+                }
                 // a load waiting for its on-enter script fades in when it completes (finish_arrival)
                 match w.field.as_mut().and_then(|f| f.arrival.as_mut()) {
                     Some(ar) => {
@@ -1672,6 +1694,9 @@ pub fn set_busy(w: &mut World, busy: bool) {
         f.busy = busy;
         if !busy {
             f.nested = false;
+            // the load's own objects ran through the event that loaded them; a later event holds them like the
+            // others (segment sb 21-25: the world map's patrols stop at the next circle's event)
+            f.load_ids = (0, 0);
         }
     }
     if !busy {

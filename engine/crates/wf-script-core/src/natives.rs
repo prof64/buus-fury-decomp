@@ -388,6 +388,9 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
                     }
                 } else {
                     wf_core::field::warp_fade_slow(h.w, wd, m, v, x, y);
+                    if let Some(f) = h.w.field.as_mut() {
+                        f.nest_fade = h.s.nest_area_enter && h.w.scene.depth > 0;
+                    }
                 }
                 if n == 0x76 {
                     return block(h.s, Pending::Transition);

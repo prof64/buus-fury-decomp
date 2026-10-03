@@ -315,7 +315,7 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
             }
             host.step(&mut sess, keys);
             wf_core::rng::TRACE.store(false, std::sync::atomic::Ordering::Relaxed);
-        } else if wf_core::menu::active(&sess.world) && std::env::var("SEG_MENU_LOGIC").is_err() {
+        } else if wf_core::menu::active(&sess.world) {
             // a menu screen runs per video frame (menu::step models the game's redraw lag itself)
             host.step(&mut sess, keys);
         } else {

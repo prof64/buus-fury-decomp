@@ -343,18 +343,35 @@ Rules found (wf-core / wf-script-core / wf-import; playthrough, lockstep, cross_
 * content: `fieldcontent` also takes a map with `mode7.json` as the 3D world map (re-extracted content lists no
   unsupported panorama layer any more: field_lockstep world_map was red).
 
-Results (90 segments from the master recording, 104,026 video frames): **68 exact to their end**, 74,702 frames
-continuously matched. Run them with menu content (the shared dirs have no `ui/`; adding it turns lockstep's `shop`
-red because the real shop screen replaces the model): `WF_FIELD_CONTENT=engine/target/tmp/earth-content`
-(= wf-core-field-content + `wf-extract --only ui,portraits`). Gated in `data/segments/`: `earth_4_20_2`
-(the door trigger's nested hold), `earth_3_3_1`, `earth_2_9_3` (Ki Blast vs a criminal), `earth_2_9_17` (low-HP
-beep), `earth_3_3_2` (s160's live face_actor, 3,523 frames).
+Second pass (2026-10-03) rules, each from these recordings:
+* Goten's rock drill (2-90): TauntAnim is the throw controller 0x0804E030 (tick 8: two rand(64), a rock 0x08033F28
+  from the facing offset toward the player's footprint centre, 22 updates of two gravity substeps, then a kind-1
+  energy message (mult 0) - accepted queues s120 - and a puff); tick 32 -> SetAnim(0).
+* RunScript (and the rock's hit) append an event object to the world list: it starts in the next frame's list pass
+  (`field::queue_run`); in the frame such an event ends the enemies and the players' form controllers still run.
+* An event holding the field holds the players' passive update (regen, Super Saiyan drain).
+* `play_anim` on an enemy uses the enemy SetAnim table's rule (raw 11 once-stop for Goten's power-up).
+* The player's / Gohan enemy's Ki blast box follows its record: 8x16 / 16x8 from tick 16 (2-9 #9, 2-10 #1).
+* A bomber hurt mid-throw throws nothing; the tank's TankShoot is a controller (shell at anim frame 2 from
+  0x08757354, record box, 48 + rand(2) on a hit); the shell's handler destroys it on any kind-0 message and accepts
+  (Gohan's blast shoots shells down); IfPlayerInLineOfFire needs IsAnim(0) and > 16 px along the facing.
+  (Battle reference updated too: site `ai.ts` / `enemy.ts` / `projectiles.ts`, TS dumps regenerated, cross_ts green.)
+* A map item's event after the item-get completes the interrupted object pass when it ends (4-30).
+* An NPC left in a `set_pose` keeps it frozen after the event (3-3).
+* Menus: a script-opened menu that closes without handing the frame back holds the world that frame
+  (`Menu.closed_this_frame`); lockstep steps menu screens per video frame and counts a menu's black page as black -
+  `shop` is exact with `ui/` content. The punch machine: its wait mode updates the world, and a wait ending on the
+  hidden (blinking) marker starts another (the marker blinks on the boot counter, `Story.lf_bias`).
 
-Open: Status-page allocation sounds (`play 40` on A in the core, not in the game: menus), the world map after the
-take-off (flyer facing at the arrival, airship patrol facing), coin pickup timing in 3-17, a Ki blast that hits a
-walking criminal in the core but passes it in the game (2-9 #9), Spopovich / tournament ring scenes (7-2 f1200 an
-NPC the game removed, 7-3 f2241 an anim cel), s128's camera pan start (2-8 #1 f5646), Goten's rock drill NPC cel
-(2-90 #2 f182), the tank's sound 28 (3-14 #5).
+Results (90 segments, 104,026 video frames): **76 exact to their end**, 88,908 frames continuously matched; all 76
+gated in `data/segments/earth_*.json` (they pass with the default content too).
+
+Open: menu sounds 40 / 39 on the status page (2-9 #13, 2-11 #4, 3-15 #4: sub-frame input timing); the world map
+(airship facing needs the 3D view rect 0x0802EF.. that culls the facing update, 3-1 #4 / 3-11 #2; airship 1/256
+drift 2-8 #15 / 4-1 #2); s128's camera pan start (2-8 #1); a tank-area soldier whose AlignWithPlayer stalls in the
+core (3-3 #4 f1479); Trunks' idle cel (4-20 #5); Bulma half-pixel (4-27 #1); s194's nested exit catch-up (4-27 #2:
+the NPCs think in the exit frame here but not after s073 / 3-1 / 3-12 - rule unknown); 7-2 f1200 an NPC the game
+removed; 7-3 f2995 three NPCs whose sprite defs the game drops while a text box with a portrait is up.
 
 **Side-content catalogue** (data survey 2026-10-02; flags = story flags): Broly turns out to be **mainline** (Dragon
 Ball saga: his defeat s436 sets flag 111, which Dragon Ball #4 s439 needs) — kept here as assigned. The optional

@@ -15,14 +15,17 @@ def areas():
 
 
 @lru_cache(None)
-def exits(key, variant=1):
-    """[(to_key, rect, push)] of area `key` (map exits: unconditional; area exits: any condition)"""
-    a = areas()[key]
+def exits(key, variant=1, gated=False):
+    """[(to_key, rect, push)] of area `key` (map exits: unconditional, with `gated` any; area exits: any condition)"""
+    a = areas().get(key)
+    if a is None:
+        return []
     m = a['maps'][min(max(variant, 1), len(a['maps'])) - 1]
     o = json.loads((CONTENT / 'maps' / m / 'objects.json').read_text())
     out = []
     for t in o.get('map_triggers', []):
-        if t.get('type') == 'exit' and (t.get('condition') or {}).get('always') and t.get('to'):
+        if (t.get('type') == 'exit' or gated and t.get('type') == 'edge_exit') and t.get('to') and \
+                (gated or (t.get('condition') or {}).get('always')):
             out.append((t['to']['key'], t['rect'], t.get('push')))
     for ar in o.get('areas', []):
         if ar['key'] != key:
@@ -33,20 +36,21 @@ def exits(key, variant=1):
     return out
 
 
-def route(src, dst, avoid=()):
-    """the list of (area, exit) hops from src to dst (keys 'w-a')"""
+def route(src, dst, avoid=(), gated=False):
+    """the list of (area, exit) hops from src to dst (keys 'w-a'); without a route over the unconditional map exits,
+    the story-gated ones too (West City -> 4-20)"""
     prev = {src: None}
     q = deque([src])
     while q:
         k = q.popleft()
         if k == dst:
             break
-        for to, rect, push in exits(k):
+        for to, rect, push in exits(k, 1, gated):
             if to not in prev and to in areas() and to not in avoid:
                 prev[to] = (k, (to, rect, push))
                 q.append(to)
     if dst not in prev:
-        return None
+        return None if gated else route(src, dst, avoid, True)
     hops = []
     k = dst
     while prev[k] is not None:

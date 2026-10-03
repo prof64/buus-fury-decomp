@@ -229,7 +229,7 @@ fn enter(w: &mut World, c: &C, n: u16) {
                 r.d = [0; 8];
             }
             let mut r = *r;
-            if is_controller(kind(c, n)) {
+            if is_controller(kind(c, n)) || (w.field.is_some() && matches!(kind(c, n), K::MiniHopToward | K::MiniHopFlee)) {
                 w.en(c.i).ctl = (c.serial, n);
             }
             leaf_enter(w, c, n, &mut r);
@@ -383,6 +383,16 @@ pub fn busy_controller(w: &mut World, i: usize) {
         return;
     }
     let Some(c) = ctx_top(w, i) else { return };
+    // field: a mini's hop counter is its controller's (0x0300322C): it counts on through an event, the hop's moves
+    // are the AI's (sc_janemba: after the defeat scene the minis resume mid-cycle)
+    if c.serial == serial && w.field.is_some() && matches!(kind(&c, n), K::MiniHopToward | K::MiniHopFlee) {
+        if let Some(r) = rt(w, &c, n) {
+            r.d[0] = (r.d[0] + 8) & 0xff;
+            let ph = r.d[0];
+            w.en(i).a.z = if ph >= 0x80 { -HOP_ARC8[((ph - 0x80) >> 3) as usize] } else { 0 };
+        }
+        return;
+    }
     if c.serial != serial || !is_controller(kind(&c, n)) {
         return;
     }

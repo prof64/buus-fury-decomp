@@ -13,8 +13,10 @@ use crate::world::World;
 use serde::{Deserialize, Serialize};
 use wf_view::{MenuFont, MenuView};
 
-/// video frames one redraw of this page takes (the page draw + portrait decode + 38 400-byte copy: 4 frames)
-pub const REDRAW_FRAMES: u8 = 4;
+/// video frames one redraw of this page takes (the page draw + portrait decode + 38 400-byte copy): 5 (the real
+/// route's stat allocations: the blinking LevelUp! redraw holds the loop 4 frames every 8 updates, the Use Points
+/// press lands in the iteration before it; menu_parity stays exact, Earth / ship segments match more frames)
+pub const REDRAW_FRAMES: u8 = 5;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Status {
