@@ -7,7 +7,7 @@
 
 import { DIR_VEC, facingToward, overlaps, type Dir } from '../../core/geom'
 import { SIN256, type HitMsg } from './actor'
-import type { AiNodeJ } from './data'
+import { GFX_OFFSET, type AiNodeJ } from './data'
 import type { Enemy, KnockState } from './enemy'
 import { ATK } from './damage'
 import { PathMover } from './path'
@@ -1983,7 +1983,22 @@ export function create(n: AiNodeJ, c: AiController): RNode {
         if (e.spawned >= 8) return false
         if (--e.enzTimer <= 0) {
           const off = e.w.rng.rand(2, 'enzyme spot') ? [16, -8] : [0, 0]
-          if (e.ctx.spawnEnemy(e.w, 0x18, e.px + off[0], e.py + off[1], e)) {
+          const [x, y] = [e.px + off[0], e.py + off[1]]
+          // 0x0802F458: the Enzyme's footprint (sprite def 0x57) must be free on the enemy grid, the Blister detached
+          // (vfunc +0x48); else no spawn and a retry next frame (VERIFIED segment sb 21-7)
+          const sp = e.ctx.data.sprites.index(0x57 - GFX_OFFSET)
+          const c = e.ctx.col
+          let free = true
+          if (sp && c) {
+            const sh = (sp.json as unknown as { header?: { shadow?: number[] } } | undefined)?.header?.shadow
+            const [fw, fh] = [sh?.[0] || 16, sh?.[1] || 8]
+            const m = e.marked
+            const saved = m ? c.save('enemy', ...m) : null
+            if (m) c.mark('enemy', ...m, 1)
+            free = c.test('enemy', x, y, x + fw, y + fh)
+            if (m && saved) c.load('enemy', ...m, saved)
+          }
+          if (free && e.ctx.spawnEnemy(e.w, 0x18, x, y, e)) {
             e.spawned++
             e.enzTimer = 120
           }

@@ -2199,10 +2199,10 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                     // 0x08039A90: the shake, then a puff (rate 0x1000 + rand(0x1000)) at each missing mini's spot; the
                     // minis come out 16 frames later
                     w.shake(70, 30);
-                    en::mini_puffs(w, i);
+                    r.d[2] = en::mini_puffs(w) as i32;
                 }
                 if r.d[0] == 0 {
-                    en::top_up_minis(w, i);
+                    en::mini_create(w, i, r.d[2] as usize);
                     en::set_anim(w, i, &[an(0)], true, Some(true));
                     return true;
                 }

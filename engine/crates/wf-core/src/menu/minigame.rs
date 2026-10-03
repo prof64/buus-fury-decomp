@@ -30,6 +30,7 @@ use wf_view::{MenuFont, MenuLayer, MenuOp, MenuView};
 pub const BAR_MAX: i32 = 85;
 /// the wait after a finished game (mode `0x08049978` with 30)
 pub const WAIT: i32 = 30;
+const PUNCH_AWAITS_A: bool = true;
 /// screens over the field: no fades, no black frames; the world gets the frame the game ends in
 pub const OVERLAY: Transition = Transition { fade_out: 0, enter: 0, leave: 1, fade_in: 0 };
 
@@ -184,14 +185,18 @@ impl Page for Minigame {
             return if v != 0 { self.finish(w, v) } else { Action::None };
         }
         if self.wait > 0 {
-            // the wait mode 0x08049978: 30 iterations, then the game's mode ends
+            // the wait mode 0x08049978: 30 iterations, then the game's mode ends (the punch machine's waits for an A
+            // press first: 7-3, the A held over the wait's end is not one, the mode returns on the next press)
             self.wait -= 1;
-            if self.wait == 0 {
-                let r = match self.kind {
-                    // the mode returns marker + 1; the native pushes code - 1
-                    Kind::Punch => self.g.peak + 1,
-                    _ => 0,
-                };
+            if self.wait == 0 && !(self.kind == Kind::Punch && PUNCH_AWAITS_A) {
+                return self.finish(w, 0);
+            }
+            return Action::None;
+        }
+        if self.kind == Kind::Punch && self.g.done {
+            if w.menu.pressed & A != 0 {
+                // the mode returns marker + 1; the native pushes code - 1
+                let r = self.g.peak + 1;
                 return self.finish(w, r);
             }
             return Action::None;
@@ -466,7 +471,7 @@ pub fn open_watch(w: &mut World, level: i32) {
 /// The punch machine's 30-iteration wait mode after the press (`0x08049978`) runs the object world too (7-3: the
 /// NPCs' idle ticks run from the iteration after the press until the mode ends)
 pub fn world_runs(w: &World) -> bool {
-    let power = |s: Option<&Screen>| matches!(s, Some(Screen::Minigame(m)) if m.kind == Kind::Power || (m.kind == Kind::Punch && m.wait > 0 && m.wait < WAIT));
+    let power = |s: Option<&Screen>| matches!(s, Some(Screen::Minigame(m)) if m.kind == Kind::Power || (m.kind == Kind::Punch && m.g.done && m.wait < WAIT));
     // the closing frame too (the stack is empty, the screen still shows)
     power(w.menu.stack.last()) || (w.menu.stack.is_empty() && power(w.menu.shown.as_deref()))
 }

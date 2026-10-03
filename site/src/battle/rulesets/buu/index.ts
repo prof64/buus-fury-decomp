@@ -464,7 +464,20 @@ export class BuuRuleset implements Ruleset {
       // the enemy constructor's SetAnim(0): the idle state's enter draws its start tick (rand(255))
       e.setAnim('idle', true, true)
       e.markSelf()
-      if (start !== -1) e.start(ww, start ?? t.ai)
+      if (start !== -1) {
+        const before = ww.entities.length
+        e.start(ww, start ?? t.ai)
+        // objects the first state's enter creates (Worm Head's segments) are appended to the world list before the
+        // constructor's caller appends the enemy itself (0x0802CBD4 / 0x0801191A; VERIFIED 21-9's list: segments
+        // 0..4, then the head): the enemy moves after them (the list updates from its end)
+        if (ww.entities.length > before) {
+          const k = ww.entities.indexOf(e)
+          if (k >= 0) {
+            ww.entities.splice(k, 1)
+            ww.entities.push(e)
+          }
+        }
+      }
       return e
     }
     ctx.spawnEnemy = (ww, type, x, y, parent, start) => spawnEnemy(ww, type, x, y, parent as Enemy | null, start)

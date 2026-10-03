@@ -322,7 +322,8 @@ export function buildBuuData(src: { characters: J; levels: J; moves: J; items: J
   })
   // variants without graphics borrow the graphics of a type with the same name / the next type (spawned by bosses)
   // Janemba body parts carry their graphics in the spawn records (JanembaSpawnParts 0x08039D7B), not the type table
-  const PART_GFX: Record<number, number> = { 0x34: 0x93, 0x35: 0x94, 0x37: 0x98 }
+  // (Worm Body: its spawn template 0x08756A2C, +0x10 = 0x129)
+  const PART_GFX: Record<number, number> = { 0x34: 0x93, 0x35: 0x94, 0x37: 0x98, 0x8f: 0x129 }
   // types with no graphics in the type / spawn tables: borrow a family member's graphics (placeholders, marked
   // `placeholderGfx`): Mega Cyborg -> Cyborg, Super Bio Mech -> Bio Mech, Vegeta NPC -> Majin Vegeta,
   // unnamed fighters / helpers -> Human / Majin Fighter

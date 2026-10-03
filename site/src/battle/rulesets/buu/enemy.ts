@@ -962,12 +962,14 @@ export class Enemy extends Actor implements EnemyLike {
     return true
   }
   /** contact damage (worm, blood cell, mini-yakon): standard melee x1.0 with the body box */
-  contactHit(): boolean {
+  contactHit(foot = false): boolean {
     const p = this.player
     if (!p || !p.hittable || this.contactCd > 0) return false
-    if (!overlaps(this.bodyBox(), p.bodyBox())) return false
-    const ok = p.onMessage(this.w, { team: 0, rect: this.bodyBox(), dir: this.facing, mult: 0x400, atk: ATK[2], attacker: this, source: this })
-    if (ok) this.contactCd = 20
+    if (!overlaps(this.bodyBox(), foot ? p.footBox() : p.bodyBox())) return false
+    const ok = p.onMessage(this.w, { team: 0, rect: this.bodyBox(), dir: this.facing, mult: 0x400, atk: ATK[2], attacker: this, source: this, foot })
+    // the worm's counter is decremented instead of the contact test (20 frames without a test, segment sb 21-14);
+    // the update's own decrement runs first
+    if (ok) this.contactCd = foot ? 21 : 20
     return ok
   }
   /** IfContactExplode (swarm unit 0x0D): energy x4.0 with its own box against the world */
@@ -1190,7 +1192,8 @@ export class Enemy extends Actor implements EnemyLike {
     for (let i = 1; i <= 5; i++) {
       const s = this.ctx.spawnEnemy(this.w, 0x8f, this.px, this.py - 12 * i, this) as Enemy | null
       if (!s) break
-      // the ring buffer starts full of the head's direction so the segments keep their 12 px spacing (INFERRED)
+      // the 12-slot ring (0x0802D650) replays the slot it overwrites when a command arrives: a body moves only on a
+      // received command (VERIFIED segment sb 21-9: each segment starts one frame after the one before it)
       s.cmds = Array(12).fill(this.wormDir)
       chain.push(s)
     }
@@ -1212,26 +1215,35 @@ export class Enemy extends Actor implements EnemyLike {
       if (this.fits(w, this.px + dx, this.py + dy)) {
         this.x += dx << 8
         this.y += dy << 8
-        this.moving = true
         break
       }
       this.wormDir = ((this.wormDir + 1) & 3) as Dir
     }
     this.facing = this.wormDir
     this.next?.cmds.push(this.wormDir)
-    this.contactHit()
+    this.contactHit(true)
   }
+  /** the head and the segments stay in the idle state while they move (no SetAnim(1): VERIFIED segment sb 21-11) */
   wormBodyStep() {
-    if (this.cmds.length >= 12) {
+    // the last segment (no next, 0x0802D674): sprite def 0x12A (Worm Tail) set again every frame (0x0800EDF8: the
+    // animation restarts) + SetAnim(1)
+    if (!this.next || this.next.removed) {
+      const s = this.ctx.data.sprites.index(0x12a - GFX_OFFSET)
+      if (s) {
+        this.gfxNow = 0x12a
+        this.setSprite(s)
+        this.setAnim(1, true, true)
+      }
+    }
+    if (this.cmds.length > 12) {
       const d = this.cmds.shift()! as Dir
       const [dx, dy] = DIR_VEC[d]
       this.x += dx << 8
       this.y += dy << 8
       this.facing = d
-      this.moving = true
       this.next?.cmds.push(d)
     }
-    this.contactHit()
+    this.contactHit(true)
   }
 
   // ---- damage --------------------------------------------------------------------------------------------------------

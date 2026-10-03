@@ -72,9 +72,6 @@ pub struct Enemy {
     /// ... and the hand it made (0 = none)
     #[serde(default)]
     pub strike_hand: EntityId,
-    /// field Janemba: the death effects of its minis (they still answer the top-up's count while they play)
-    #[serde(default)]
-    pub mini_deaths: Vec<EntityId>,
     pub script_hits: i32,
     /// tiles this enemy marked blocked on the enemy grid
     pub marked: Option<[i32; 4]>,
@@ -165,7 +162,6 @@ impl Enemy {
             mirror_prev: 0,
             strike: (0, false),
             strike_hand: 0,
-            mini_deaths: vec![],
             script_hits: 0,
             marked: None,
             stepped: false,
@@ -1922,23 +1918,27 @@ pub fn hand_update(w: &mut World, i: usize) {
 }
 const MINI_PTS: [(i32, i32); 5] = [(104, 112), (120, 136), (152, 144), (184, 136), (200, 112)];
 /// field: the puffs announcing the minis the next top-up creates (one per missing mini, at its spot)
-/// field: the minis' death effects still playing (counted with the living by the top-up's message)
-fn dying_minis(w: &mut World, i: usize) -> usize {
-    let ids = std::mem::take(&mut w.en(i).mini_deaths);
-    let keep: Vec<EntityId> = ids.into_iter().filter(|&id| w.find(id).is_some_and(|k| !w.ents[k].removed)).collect();
-    let n = keep.len();
-    w.en(i).mini_deaths = keep;
+/// returns the missing count, which the top-up 16 frames later creates as it is (sc_janemba: a mini killed in
+/// between is not replaced - 4 new minis with none left)
+pub fn mini_puffs(w: &mut World) -> usize {
+    let live = w.live_enemies().into_iter().filter(|&o| w.en_ref(o).ty == 0x38).count();
+    let n = 5usize.saturating_sub(live);
+    for &(x, y) in MINI_PTS.iter().take(n) {
+        crate::fx::puff_rng(w, x + 8, y + 8);
+    }
     n
 }
-pub fn mini_puffs(w: &mut World, i: usize) {
-    let live = w.live_enemies().into_iter().filter(|&o| w.en_ref(o).ty == 0x38).count() + dying_minis(w, i);
-    for &(x, y) in MINI_PTS.iter().take(5usize.saturating_sub(live)) {
-        crate::fx::puff_rng(w, x + 8, y + 8);
+/// field: the top-up of `mini_puffs`'s count (at the fixed spots, in order)
+pub fn mini_create(w: &mut World, i: usize, n: usize) {
+    let b = w.arena.bounds;
+    let me = w.ents[i].id;
+    for &(x, y) in MINI_PTS.iter().take(n) {
+        crate::battle::spawn_enemy(w, 0x38, b.x0.max((b.x1 - 16).min(x)), b.y0.max((b.y1 - 16).min(y)), me, None);
     }
 }
 pub fn top_up_minis(w: &mut World, i: usize) {
     const PTS: [(i32, i32); 5] = MINI_PTS;
-    let live = w.live_enemies().into_iter().filter(|&o| w.en_ref(o).ty == 0x38).count() + dying_minis(w, i);
+    let live = w.live_enemies().into_iter().filter(|&o| w.en_ref(o).ty == 0x38).count();
     let b = w.arena.bounds;
     let me = w.ents[i].id;
     for &(x, y) in PTS.iter().take(5usize.saturating_sub(live)) {
@@ -2025,7 +2025,7 @@ pub fn worm_head_step(w: &mut World, i: usize) {
 pub fn worm_body_step(w: &mut World, i: usize) {
     // the last segment (no next, 0x0802D674): sprite def 0x12A (Worm Tail) set again every frame (0x0800EDF8: the
     // animation restarts) + SetAnim(1)
-    if w.enemy_by_id(w.en_ref(i).next).is_none() {
+    if w.enemy_by_id(w.en_ref(i).next).is_none_or(|(k, _)| w.ents[k].removed) {
         let d = Arc::clone(&w.data);
         let idx = 0x12A - crate::content::GFX_OFFSET;
         if d.sprite(idx).is_some() {
@@ -2240,15 +2240,7 @@ pub fn die(w: &mut World, i: usize, explode: bool) {
     if explode {
         let (cx, cy) = w.en_ref(i).a.center();
         let rate = 0x1000 + w.rng.rand(0x1000);
-        let fx = crate::fx::explosion(w, cx, cy, rate);
-        // field: a mini's death effect carries its gfx def - the next top-up counts it as a living mini
-        // (sc_janemba: a mini killed 2 frames before the top-up, 4 new ones)
-        if w.field.is_some() && w.en_ref(i).ty == 0x38 {
-            let par = w.en_ref(i).parent;
-            if let Some((pk, _)) = w.enemy_by_id(par) {
-                w.en(pk).mini_deaths.push(fx);
-            }
-        }
+        crate::fx::explosion(w, cx, cy, rate);
     }
     // the object's destruction frees its enemy-grid cells (removed entities are not re-synced: story playthrough, a
     // fighter's path re-plan went around a dead one)
