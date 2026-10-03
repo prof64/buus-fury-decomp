@@ -516,11 +516,13 @@ pub fn release_puppets(w: &mut World) {
         let Some(i) = w.ents.iter().position(|e| e.id == p.id) else { continue };
         if let Body::Npc(n) = &mut w.ents[i].body {
             let (raw, tick, frame) = (n.anim.raw, n.anim.tick, n.anim.frame);
+            let pose = n.anim.mode == AnimMode::Pose;
             if let Some(b) = n.behaviour.as_mut() {
                 b.anim = (raw - 1).clamp(0, 255) as u8;
                 b.raw = raw;
                 b.tick = tick;
                 b.frame = frame;
+                b.pose = pose;
             }
         }
     }

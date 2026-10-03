@@ -562,6 +562,7 @@ fn replay(f: &Fixture, name: &str, doc: &Value, rt: Rt) -> Report {
         let logic = k == 0 || lf != lf_prev || fr.get("lf").is_none();
         lf_prev = lf;
         let starting: Vec<&Start> = starts.iter().filter(|(s, _)| *s == k).map(|(_, s)| s).collect();
+        let menu_frame = k > 0 && !logic && wf_core::menu::active(&sess.world);
         if k == 0 {
             let w = &mut sess.world;
             // the call frame: the script starts before this frame's world update (it blocks in a nested loop)
@@ -576,8 +577,12 @@ fn replay(f: &Fixture, name: &str, doc: &Value, rt: Rt) -> Report {
             }
             // the wait mode's first frame updates the camera (scroll steps, follow, the player camera)
             scene::camera_update(&mut sess.world);
-        } else if logic {
-            rep.logic += 1;
+        } else if logic || wf_core::menu::active(&sess.world) {
+            // a menu screen runs per video frame (menu::step models the game's redraw lag itself; the game's logic
+            // frame counter does not advance while it runs)
+            if logic {
+                rep.logic += 1;
+            }
             let mut inputs = [InputFrame::default(); MAX_PLAYERS];
             inputs[0] = InputFrame::from_held(keys, prev_held);
             prev_held = keys;
@@ -626,7 +631,7 @@ fn replay(f: &Fixture, name: &str, doc: &Value, rt: Rt) -> Report {
             let steps: Vec<String> = fr["steps"].as_array().into_iter().flatten().map(|s| s.to_string()).collect();
             eprintln!("  t{k} logic {logic} keys {keys:x} running {} depth {} pending {:?} dialog {:?} cam {:?} {:?} tracks {:?} steps {:?}", drv.running, sess.world.scene.depth, hs.pending, sess.world.scene.dialog.as_ref().map(|d| (d.kind, d.phase, d.page, d.pages, d.cursor, d.t)), sess.world.scene.cam.mode, (sess.world.cameras[0].x, sess.world.cameras[0].y, sess.world.field.as_ref().map(|f| f.camera_max)), sess.world.scene.tracks.iter().map(|t| (t.owner, t.queue.len(), t.started, t.holding)).collect::<Vec<_>>(), steps);
         }
-        if !logic {
+        if !logic && !wf_core::menu::active(&sess.world) && !menu_frame {
             // a lag frame: the game ran no logic, so nothing sounded (our events are the last step's)
             sess.world.events.clear();
         }
@@ -771,7 +776,9 @@ fn compare(w: &World, fr: &Value, es: &[String], objs: &[Value], map: &mut BTree
     let io = fr["io"].as_array().unwrap();
     let pal = i(&io[5]);
     let game_black = pal == 0;
-    let ours_black = scene::palette_black(w);
+    // a menu screen's black (its enter / leave iterations: menu::view's black page)
+    let menu_black = wf_core::menu::view(w).is_some_and(|v| v.backdrop == 0 && v.palette == [(0u16, 0u32)]);
+    let ours_black = scene::palette_black(w) || menu_black;
     if game_black != ours_black {
         rep.fade += 1;
         rep.note(k, "fade", format!("black {} (lvl {} mosaic {}) vs game palette sum {pal:#x}", ours_black, w.scene.screen.black, w.scene.screen.mosaic));

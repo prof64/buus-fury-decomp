@@ -23,6 +23,13 @@ def charsel(moves):
     return [('face', 'U'), ('keys', k), ('events',)]
 
 
+def shop(x, y, row, n):
+    """a food stall (\"Want something to eat?\" -Sure): row `row` of the buy list, A `n` times (one item each while
+    the zenie lasts), B out, the goodbye text"""
+    k = [(A, 3, 60), (A, 3, 100)] + [(D, 3, 15)] * row + [(A, 3, 40)] * n + [(B, 3, 100), (A, 3, 60)]
+    return [('walk', x, y), ('face', 'U'), ('keys', k), ('events',), ('wait', 30)]
+
+
 def split(n):
     """unspent stat points -> [STR, POW, END, SPD]: half STR, half END"""
     return [n - n // 2, 0, n // 2, 0]
@@ -73,8 +80,19 @@ def real_prologue(e):
         nav(8, 2, False), ('walk', 104, 56), ('face', 'U'), ('press', A), ('events',),      # s517: the gate
         nav(8, 1, False), ('walk', 148, 186), *charsel(1),                                   # Gohan
         ('mark', 'r03_grind_gohan'),
-        # 85 opens the hatch; the ship's corridors want more (no healing supplies): 92 like a careful player
+        # 85 opens the hatch; the ship's corridors (Destroyers, soldiers' waves, no Senzu Beans to spare) want 100
         ('grind', 100, [(8, 3), (8, 6)]),
+        # Vegeta too: he fights Buu alone in the Giant Crater (8-71, Buu 14640 HP); Gohan rests in reserve meanwhile
+        nav(8, 1, False), ('walk', 148, 186), *charsel(1),                                   # Vegeta
+        ('mark', 'r04_grind_vegeta'),
+        ('grind', 92, [(8, 3), (8, 6)]),
+        nav(8, 1, False), ('walk', 148, 186), *charsel(-1),                                  # Gohan
+        # the zenie from the grind buys food at Papaya Island's stall (s258: Onigiri, 200 HP for 1000 Z)
+        nav(8, 1, False), ('walk', 280, 266), ('face', 'U'), ('press', A), ('wait', 60),
+        ('fly', 1953, 2041, 143, 159), ('wait', 30),                                         # Papaya Island 7-1
+        nav(7, 2, False), ('mark', 'r05_shop'), *shop(276, 590, 4, 12),
+        nav(7, 1, False), ('walk', 224, 340), ('face', 'U'), ('press', A), ('wait', 60),
+        ('fly', 849, 1785, 31, 23), ('wait', 30),                                            # Southwest Forest
         nav(8, 16, False), ('wait', 30),
     ]
 
@@ -88,7 +106,13 @@ def goals_real(e):
     k = g.index(('mark', 'c07_8-28'))
     g[k + 1:k + 1] = [('walk', 60, 306), *charsel(-2)]
     k = g.index(('mark', 'c09_8-41'))
+    # stage 3 (the hub rooms come back on every pass, Destroyers) wants more than 92: the six fighters next door in
+    # 8-42 are easy experience (a level-up refills HP)
     g[k + 1:k + 1] = [('walk', 60, 314), *charsel(1)]
+    import os
+    if os.environ.get('S3') == 'walk':
+        k1 = g.index(('mark', 'c11_8-66'))
+        g[k:k1] = [('nav', x[1], x[2], False) if x[0] == 'nav' else x for x in g[k:k1]]
     return real_prologue(e) + g
 
 
@@ -142,6 +166,22 @@ def goals(e):
         nav(8, 65), *panel(),                     # s335 (flag 72)
         nav(8, 44), *panel(),                     # s330 (flag 70)
         nav(8, 47), *panel(),                     # s331 (flag 71)
-        nav(8, 66), ('mark', 'c11_8-66'),
+        nav(8, 66, False),                        # straight on (the rooms behind came back)
+        # the save point before Dabura: Goku stands in while Gohan rests in reserve (+5% HP every ~10 s)
+        ('walk', 60, 306), *charsel(-1), ('rest', 1), ('walk', 60, 306), *charsel(1),
+        ('mark', 'c11_8-66'),
         ('walk', 104, 340), ('hold', D, 60), ('expect', 200), ('wait', 30),   # s336 -> Dabura
+        # --- Dabura (8-68, scripted), Babidi's spell on Vegeta, Goku vs Majin Vegeta (8-70: four 8500-HP rounds,
+        # s325 / s338 / s340 / s341), Vegeta left standing in Rocky Canyon ---------------------------------------------
+        ('mark', 'c12_8-68'),
+        ('story', 8, 70, True),
+        # --- Vegeta: the capsule (flag 73) back to Southwest Forest, the ship's door (s342) -> Giant Crater 8-71 -----
+        ('mark', 'c13_8-70'),
+        ('walk', 272, 280), ('face', 'U'), ('press', A), ('wait', 60),
+        ('fly', 849, 1785, 31, 23), ('wait', 30),
+        nav(8, 15), nav(8, 16, False),
+        ('walk', 48, 112), ('face', 'U'), ('press', A),
+        ('mark', 'c14_s342'),
+        ('story', 8, 70, True),                   # Vegeta vs Buu (8-71, s344) -> Goku
+        ('mark', 'c15_after_buu'),
     ]

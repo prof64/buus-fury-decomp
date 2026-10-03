@@ -1220,6 +1220,11 @@ pub fn update(w: &mut World, i: usize) {
     if pr(w, i).gone {
         return;
     }
+    // an event a broken breakable's callback started at this frame's start (before the object pass): the event holds
+    // the frame, the player is not updated (segment sb 21-5: the punch's last tick stays one frame more)
+    if w.field.as_ref().is_some_and(|f| f.busy && f.busy_pre_pass == w.frame && f.busy_since + 1 == w.frame) {
+        return;
+    }
     {
         let pl = p(w, i);
         if pl.a.flash > 0 {
@@ -1274,7 +1279,10 @@ pub fn update(w: &mut World, i: usize) {
     if pr(w, i).defuse.is_some() {
         return defuse_step(w, i);
     }
-    if since_ko < 199 && (!pr(w, i).dead || pr(w, i).story_form(w)) {
+    // an event holding the field holds the form controller too: no regen, no Super Saiyan drain (2-90: s121's
+    // set_energy(100) is still 100 when the fight starts 1,530 frames later)
+    let held = w.field.as_ref().is_some_and(|f| f.busy);
+    if since_ko < 199 && (!pr(w, i).dead || pr(w, i).story_form(w)) && !held {
         passive(w, i);
     }
     if pr(w, i).defuse.is_some() {
@@ -1499,13 +1507,15 @@ fn fire_blast(w: &mut World, i: usize) {
     let (a, mult) = if w.data.skill_engine(real).is_none() { (atk(4), 1024) } else { (atk(skill_sub_of(w, real)), skill_mult_of(w, real, pr(w, i).skill_lv(w, real))) };
     let eng = w.data.skill_engine(real).cloned();
     let id = shots::ki_blast(w, me, dir, 1, mx << 8, my << 8, a, mult, true);
-    // the player's blast (vtable 0x0804B454) tests a 16 x 16 box centred on its position
+    // the player's blast (vtable 0x0804B454) tests its record's box centred on its position: 16 x 16, thin from tick 16
     if let Some(k) = w.find(id) {
         if let ShotKind::Straight(o) = &mut w.shot(k).kind {
             o.b = [8, 8, 16, 16];
+            o.rec_box = true;
             if let Some(e) = &eng {
                 if let Some((bw, bh)) = e.hit_box {
                     o.b = [bw / 2, bh / 2, bw, bh];
+                    o.rec_box = false;
                 }
                 if let Some(v) = e.speed {
                     let (dx, dy) = DIR_VEC[dir as usize];
@@ -1743,6 +1753,13 @@ fn cycle_skill(w: &mut World, i: usize) {
     }
     // the switch's click (story playthrough: L in the Cave of the Ancients)
     sfx(w, 40, 64);
+}
+
+/// the frame an event from the world's event list ended in: the passive part of the update the event held
+pub fn release_passive(w: &mut World, i: usize) {
+    if pr(w, i).ko_at < 0 && !pr(w, i).dead {
+        passive(w, i);
+    }
 }
 
 fn passive(w: &mut World, i: usize) {

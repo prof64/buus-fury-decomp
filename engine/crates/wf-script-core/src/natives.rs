@@ -332,7 +332,13 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
             start_phases(h, list)
         }
         0x73 => {
+            if let Some(f) = h.w.field.as_mut() {
+                f.defer_objects = h.s.nest_area_enter;
+            }
             load_scene(h.w, h.s, arg(a, 0), arg(a, 1), arg(a, 2), arg(a, 3), arg(a, 4), true);
+            if let Some(f) = h.w.field.as_mut() {
+                f.defer_objects = false;
+            }
             // the scene's on-enter script runs inside the load (nested): its commands' frames come before the
             // script's next action (s025: 0-16 hides two props before the actors appear)
             if h.s.nest_area_enter && h.w.field.as_ref().is_some_and(|f| f.on_enter_queued) {
@@ -1121,6 +1127,12 @@ fn load_scene(w: &mut World, s: &mut HostState, world: i32, map: i32, variant: i
         // a cutscene scene has no player object (0x08009030): the players wait offstage
         scene::send_offstage(w);
         wf_core::field::load_area_with(w, to, x + 112, y + 76, None, objects);
+        // a scene's objects are held by its event like the others (not the warp loads' running ones: segment sb
+        // s483's 21-4 backdrop, its Blister spawns nothing)
+        if let Some(f) = w.field.as_mut() {
+            f.load_ids = (0, 0);
+            f.scene_load = true;
+        }
     } else {
         s.area = (world, map, variant);
         w.scene.requests.push(scene::Request::LoadScene { world, map, variant, x, y, objects });
@@ -1236,7 +1248,10 @@ pub fn node(h: &mut CoreHost, call: NodeCall) -> R {
             let typing = text::typing(&shown);
             // the box does not depend on the node kind (5 / 6) or the bank reference: both runtimes agree on text
             scene::open_text(h.w, &shown, 0, arg, 5, typing);
-            block(h.s, Pending::Dialog { choice: false })
+            // a text node whose last page lists options ('-' lines) is a choice too: its cursor is the menu result
+            // (s011's "-Save / -Switch Characters", a banked text node with box 7: segment sb 21-14)
+            let choice = h.w.scene.dialog.as_ref().is_some_and(|d| d.options > 0);
+            block(h.s, Pending::Dialog { choice })
         }
         NodeCall::Choice { text, arg, .. } => {
             h.s.present.push(Present::Choice { text: text.clone(), portrait: arg });

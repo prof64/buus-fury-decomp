@@ -196,6 +196,7 @@ impl StorySim {
                 Cause::Break { x, y, .. } | Cause::Defeat { x, y, .. } => self.hs.loot_pos = (*x, *y),
                 _ => {}
             }
+            wf_core::field::start_cause(&mut self.session.world, &job.cause);
             self.globals.g = self.session.world.story.g;
             self.rt.set_globals(self.globals.clone());
             self.cause = Some(job.cause.clone());

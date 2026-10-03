@@ -291,6 +291,7 @@ impl Host {
                 Cause::Break { x, y, .. } | Cause::Defeat { x, y, .. } => self.hs.loot_pos = (*x, *y),
                 _ => {}
             }
+            wf_core::field::start_cause(w, &job.cause);
             let mut g = self.rt.globals();
             g.g = w.story.g;
             self.rt.set_globals(g);

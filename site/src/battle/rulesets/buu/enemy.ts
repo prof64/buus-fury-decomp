@@ -19,6 +19,8 @@ import { ENEMY_SETANIM, EnemyAnim, setAnimRule, type EAnimRule } from './eanim'
 const GUN_MUZZLE = [[4, 4], [13, -24], [-8, -8], [24, -8]]
 const GUN_BOX: [number, number, number, number][] = [[3, 10, 8, 16], [3, 5, 8, 16], [5, 4, 16, 8], [10, 4, 16, 8]]
 const RIFLE_BOX: [number, number, number, number][] = [[8, 14, 16, 16], [8, 2, 16, 16], [2, 8, 16, 16], [14, 8, 16, 16]]
+const SHELL_MUZZLE: [number, number][] = [[30, 60], [34, -12], [-16, 24], [60, 24]]
+const SHELL_BOX: [number, number, number, number][] = [[8, 14, 16, 16], [8, 2, 16, 16], [2, 8, 16, 16], [14, 8, 16, 16]]
 const WAVE_MUZZLE = { soldier: [[2, 8], [9, -28], [-16, -11], [24, -11]], turret: [[4, 4], [4, -25], [-13, -14], [22, -13]] }
 /** 0x086FDA20: knockback sign per direction index (hit dir ^ 1) */
 const KB_SIGN = [-8, 8, 8, -8]
@@ -1008,8 +1010,10 @@ export class Enemy extends Actor implements EnemyLike {
         mk(f, ...at, dx * 448, dy * 448, RIFLE_BOX[f], { sfxSpawn: 28, rngHit: [2], sfxHit: 48, sfxEnd: 46, fragile: true, color: ['#e0ffe0', '#40c040'], fx: { id: 'fx_0874e614', frame: (d) => d }, trail: { id: 'fx_0874e614', rec: 4, n: 3, rate: 0x2aaa } })
         break
       case 'shell':
-        // tank shell 0x0801C900: record dir, smoke trail records 4-6 (rate 0x2AAA) every 4 ticks
-        mk(f, (cx + dx * 12) << 8, (cy + dy * 12) << 8, dx * 448, dy * 448, [8, 8, 16, 16], { sfxSpawn: 28, fragile: true, radius: 4, color: ['#ffd0d0', '#d03020'], fx: { id: 'fx_0871e630', frame: (d) => d }, trail: { id: 'fx_0871e630', rec: 4, n: 3, rate: 0x2aaa } })
+        // tank shell 0x0801C900: record dir, smoke trail records 4-6 (rate 0x2AAA) every 4 ticks; from the tank
+        // controller 0x0802E278 at the position + 0x08757354 [facing], box = the record's (0x0871E630 + 12 * dir)
+        // (Earth segment 3-14: the shell that hits Gohan)
+        mk(f, (this.px + SHELL_MUZZLE[f][0]) << 8, (this.py + SHELL_MUZZLE[f][1]) << 8, dx * 448, dy * 448, SHELL_BOX[f], { sfxSpawn: 28, rngHit: [2], sfxHit: 48, fragile: true, radius: 4, color: ['#ffd0d0', '#d03020'], fx: { id: 'fx_0871e630', frame: (d) => d }, trail: { id: 'fx_0871e630', rec: 4, n: 3, rate: 0x2aaa } })
         break
       case 'star':
         // throw controller 0x0802C08A (tick 8 of 32): the star 0x0802C790 (vtable 0x0804BAA0) at the position (obj+0x1A0)

@@ -401,6 +401,16 @@ pub fn busy_controller(w: &mut World, i: usize) {
     }
 }
 
+/// the game's face-the-player routine 0x0801599C: exact in the field (24.8 difference, ties horizontal); battles keep
+/// the footprint-pixel rule the TypeScript cross-check pins (tests/cross_ts.rs) until it is re-verified there
+fn face_player_routine(w: &mut World, i: usize) {
+    if w.field.is_some() {
+        en::face_player_exact(w, i);
+    } else {
+        en::face_player(w, i);
+    }
+}
+
 // ---- conditions ------------------------------------------------------------------------------------------------------
 
 fn cond(w: &mut World, c: &C, n: u16) -> bool {
@@ -438,13 +448,18 @@ fn cond(w: &mut World, c: &C, n: u16) -> bool {
         K::IfPlayerInZone => en::dist2(w, i) <= 160 * 160,
         K::IfPlayerInRoomZone => en::player(w, i).is_some(),
         K::IfPlayerBlastIncoming => en::blast_incoming(w, i),
+        // 0x080331EC: only while IsAnim(0) (3-2: a tank that just started driving does not roll its Chance); the
+        // footprint centres more than 16 px apart along the facing, less than 16 across
         K::IfPlayerInLineOfFire => {
+            if !w.en_ref(i).is_anim(0) {
+                return false;
+            }
             let (dx, dy) = en::to_player(w, i);
-            let (fx, fy) = DIR_VEC[w.en_ref(i).a.facing as usize];
-            if fx != 0 {
-                dx.signum() == fx && dy.abs() < 16
-            } else {
-                dy.signum() == fy && dx.abs() < 16
+            match w.en_ref(i).a.facing {
+                0 => dx.abs() < 16 && dy > 16,
+                1 => dx.abs() < 16 && dy < -16,
+                2 => dy.abs() < 16 && dx < -16,
+                _ => dy.abs() < 16 && dx > 16,
             }
         }
         K::IfContactHit | K::IfMeleeHit => en::melee_strike(w, i, 1024, false, false, atk(2)),
@@ -458,7 +473,16 @@ fn cond(w: &mut World, c: &C, n: u16) -> bool {
             if !w.pl_ref(pi).a.hittable {
                 return false;
             }
-            let (dx, dy) = en::to_player(w, i);
+            let (mut dx, mut dy) = en::to_player(w, i);
+            // field (sc_janemba): 0x08034574 compares the centres of the current-facing body boxes (0x0800FE78, at the
+            // ground position: a hopping mini's height does not count);
+            // battle keeps the reference's
+            if w.field.is_some() {
+                let c = |b: crate::geom::Rect| ((b.x0 + b.x1) >> 1, (b.y0 + b.y1) >> 1);
+                let (px, py) = c(w.pl_ref(pi).a.body_box_ground());
+                let (mx, my) = c(w.en_ref(i).a.body_box_ground());
+                (dx, dy) = (px - mx, py - my);
+            }
             dx.abs() <= 47 && dy.abs() <= 47
         }
         K::IfLastKidBuu => w.live_enemies().iter().filter(|&&o| matches!(w.en_ref(o).ty, 0x3c | 0x3d)).count() == 1,
@@ -801,15 +825,17 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
         K::MummyWrapBurst => timed_enter(w, i, &[an(17), an(3)], false),
         K::NinjaStarThrow => timed_enter(w, i, &[an(18), an(4)], true),
         // SoldierThrow 0x080266D8 (SetAnimRaw(0x13)) / TurretFire 0x0802B684 (SetAnimRaw(0x14)): face the player
+        // with the routine 0x0801599C (field: the 24.8 rule, ties horizontal, Babidi's ship 8-22 turret; battles keep
+        // the footprint rule the TypeScript cross-check pins, as FacePlayer)
         K::SoldierThrow | K::TurretFire => {
-            en::face_player(w, i);
+            face_player_routine(w, i);
             let r0 = w.data.anim.once_stop3;
             let a = if kind(c, n) == K::SoldierThrow { 19 } else { 20 };
             set_anim_r(w, i, &[an(a), an(3)], false, r0);
         }
         // controller state 0x03003108 (enter 0x0802F6A8: face, SetAnimRaw(0x12))
         K::CyborgShot => {
-            en::face_player(w, i);
+            face_player_routine(w, i);
             let r0 = w.data.anim.once_hold3;
             set_anim_r(w, i, &[an(18), an(3)], false, r0);
         }
@@ -818,10 +844,17 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             let r0 = w.data.anim.once_stop3;
             set_anim_r(w, i, &[an(if kind(c, n) == K::TurretOpen { 19 } else { 18 })], false, r0);
         }
+        // the shell controller 0x030030EC: SetAnimRaw(0x13) played once (8 ticks per frame), then SetAnim(0)
+        K::TankShoot => {
+            let once = w.data.anim.setanim[&4];
+            set_anim_r(w, i, &[an(18)], true, once);
+            r.d[1] = w.en_ref(i).ea.pos.raw;
+        }
         // enter 0x08026A26 (after facing): d = the player's position - own, the component across the facing zeroed,
         // each clamped to +-128
         K::BombThrow => {
             timed_enter(w, i, &[an(18), an(4)], true);
+            r.d[2] = w.en_ref(i).ea.pos.raw;
             if let Some(pi) = en::player(w, i) {
                 let (ppx, ppy) = (w.pl_ref(pi).a.px(), w.pl_ref(pi).a.py());
                 let a = &w.en_ref(i).a;
@@ -1096,7 +1129,15 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
 }
 /// MiniHopToward's aim: the diagonal toward the player from the footprint centres (a zero keeps the facing)
 fn mini_aim(w: &mut World, i: usize) {
-    let (dx, dy) = en::to_player(w, i);
+    let (mut dx, mut dy) = en::to_player(w, i);
+    // 0x080346FC aims with the whole-pixel footprint centres (0x0800FDFA + 0x0804F900)
+    if w.field.is_some() {
+        if let Some(pi) = en::player(w, i) {
+            let (px, py) = w.pl_ref(pi).a.fc();
+            let (mx, my) = w.en_ref(i).a.fc();
+            (dx, dy) = (px - mx, py - my);
+        }
+    }
     let f = if dx > 0 && dy > 0 {
         0
     } else if dx > 0 && dy < 0 {
@@ -1252,11 +1293,7 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         K::FacePlayer => {
             // field: the game's routine (0x0801599C, 24.8 difference, ties horizontal); battles keep the footprint-
             // pixel rule the TypeScript cross-check pins (tests/cross_ts.rs) until it is re-verified there
-            if w.field.is_some() {
-                en::face_player_exact(w, i);
-            } else {
-                en::face_player(w, i);
-            }
+            face_player_routine(w, i);
             true
         }
         K::Wait => f as i64 >= par(c, n, P::Frames, 0),
@@ -1553,7 +1590,7 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             false
         }
         // ---- ranged
-        // the player's spawner 0x08019858: origin 0x0800FF44 on the body box; the blast tests a 16 x 16 box
+        // the player's spawner 0x08019858: origin 0x0800FF44 on the body box; the blast tests its record's box (shots::ki_blast_box)
         K::KiBlast => {
             if f == 16 {
                 let (mx, my) = en::hand_point(w, i);
@@ -1562,6 +1599,7 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                 if let Some(k) = w.find(id) {
                     if let shots::ShotKind::Straight(o) = &mut w.shot(k).kind {
                         o.b = [8, 8, 16, 16];
+                        o.rec_box = true;
                     }
                 }
             }
@@ -1591,9 +1629,15 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             }
             timed_end(w, i, f, 24)
         }
+        // controller 0x030030EC (tick 0x0802E278): the shell when the animation reaches frame 2 (tick 16); the node is
+        // finished once the controller is gone (the once-state's end: SetAnim(0) at tick 32) (3-14: the shell sounds
+        // 16 frames after the GotoState)
         K::TankShoot => {
-            en::shot(w, i, ShotType::Shell);
-            true
+            if r.d[0] == 0 && w.en_ref(i).ea.pos.raw == r.d[1] && w.en_ref(i).ea.pos.frame == 2 {
+                r.d[0] = 1;
+                en::shot(w, i, ShotType::Shell);
+            }
+            f > 1 && w.en_ref(i).ea.pos.raw != r.d[1]
         }
         // the wave (0x0802A2EC) at tick 8 from the per-facing muzzle; the soldier's ends at tick >= 32 once its wave is
         // gone, the turret's at 72: SetAnim(0)
@@ -1632,6 +1676,10 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         K::TurretOpen | K::TurretClose => w.en_ref(i).ea.pos.frame >= 3,
         // controller 0x0203DD04: the bomb at tick 16 from the position + 0x0874CAD4[dir], SetAnim(0) at 24
         K::BombThrow => {
+            // a hit's reaction replaced the controller (2-10: a bomber hurt mid-throw throws nothing once it recovers)
+            if w.en_ref(i).ea.pos.raw != r.d[2] {
+                return true;
+            }
             if f == 16 {
                 const BOMB_MUZZLE: [(i32, i32); 4] = [(12, -8), (12, -8), (16, -16), (0, -16)];
                 let a = &w.en_ref(i).a;
@@ -2096,19 +2144,26 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         }
         // the part's controller is set by the node's first update; the hand on its 16th tick; its end SetAnim(0)s the
         // arm part (rand(255))
+        K::JanembaHandStrikeA | K::JanembaHandStrikeB if w.field.is_some() => {
+            // field: the node's first update gives the arm part the strike controller (it makes the hand and ends
+            // the arm's animation itself: enemy.rs janemba_part_field); the node waits it out
+            let arm = en::janemba_arm(w, i, kind(c, n) == K::JanembaHandStrikeA);
+            if f == 1 {
+                if let Some(k) = arm {
+                    w.en(k).strike = (1, kind(c, n) == K::JanembaHandStrikeA);
+                }
+            }
+            // done when the arm's strike ends - also when Janemba's hurt flash cut it (sc_janemba: ten punches, ten
+            // strikes of state 0xff, then the ascent)
+            f >= 57 || (f > 1 && arm.is_none_or(|k| w.en_ref(k).strike.0 == 0))
+        }
         K::JanembaHandStrikeA | K::JanembaHandStrikeB => {
             if f == 17 {
-                en::hand_strike(w, i, kind(c, n) == K::JanembaHandStrikeA);
+                let _ = en::hand_strike(w, i, kind(c, n) == K::JanembaHandStrikeA);
             }
             if f >= 57 {
-                // the arm part's SetAnim(0) (its idle start draw)
-                let arm = if w.field.is_some() { en::janemba_arm(w, i, kind(c, n) == K::JanembaHandStrikeA) } else { None };
-                match arm {
-                    Some(k) => en::set_anim(w, k, &[an(0)], true, Some(true)),
-                    None => {
-                        w.rng.rand(255);
-                    }
-                }
+                // the arm's SetAnim(0) (its idle start draw)
+                w.rng.rand(255);
                 return true;
             }
             false
@@ -2144,7 +2199,7 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                     // 0x08039A90: the shake, then a puff (rate 0x1000 + rand(0x1000)) at each missing mini's spot; the
                     // minis come out 16 frames later
                     w.shake(70, 30);
-                    en::mini_puffs(w);
+                    en::mini_puffs(w, i);
                 }
                 if r.d[0] == 0 {
                     en::top_up_minis(w, i);
@@ -2241,7 +2296,9 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                 }
             }
             if f == 32 {
-                let bb = w.en_ref(i).a.body_box();
+                // field: the hit box is 0x0800FE78's, at the ground position (sc_janemba: a mini mid-hop hits)
+                let a = &w.en_ref(i).a;
+                let bb = if w.field.is_some() { a.body_box_ground() } else { a.body_box() };
                 en::area_hit(w, i, bb, atk(0), 0x400);
                 return true;
             }
@@ -2367,7 +2424,27 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             if w.en_ref(i).enz_timer <= 0 {
                 let off = if w.rng.rand(2) != 0 { (16, -8) } else { (0, 0) };
                 let (px, py) = (w.en_ref(i).a.px(), w.en_ref(i).a.py());
-                if crate::battle::spawn_enemy(w, 0x18, px + off.0, py + off.1, me, None).is_some() {
+                let (x, y) = (px + off.0, py + off.1);
+                // 0x0802F458: the Enzyme's footprint (sprite def 0x57) must be free on the enemy grid, the Blister
+                // detached (vfunc +0x48); else no spawn and a retry next frame (VERIFIED segment sb 21-7)
+                let foot = w.data.sprite(0x57 - crate::content::GFX_OFFSET).map(|s| s.foot);
+                let free = match (foot, w.col.is_some()) {
+                    (Some((fw, fh)), true) => {
+                        let marked = w.en_ref(i).marked;
+                        let c = w.col.as_mut().unwrap();
+                        let saved = marked.map(|m| (m, c.save_enemy(m)));
+                        if let Some((m, _)) = saved {
+                            c.mark_enemy(m, 1);
+                        }
+                        let ok = c.test(crate::world::Layer::Enemy, x, y, x + fw, y + fh);
+                        if let Some((m, sv)) = saved {
+                            c.load_enemy(m, &sv);
+                        }
+                        ok
+                    }
+                    _ => true,
+                };
+                if free && crate::battle::spawn_enemy(w, 0x18, x, y, me, None).is_some() {
                     let e = w.en(i);
                     e.spawned += 1;
                     e.enz_timer = 120;
@@ -2407,6 +2484,9 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             w.en(i).a.alpha = if f & 2 != 0 { 77 } else { 256 };
             f as i64 >= par(c, n, P::Frames, 32)
         }
+        // field (sc_janemba): the stun lasts the hurt animation (0x08039BFD: done when the state's animation ended);
+        // battle keeps the reference's 48 frames
+        K::ShockStun if w.field.is_some() => f > 1 && w.en_ref(i).ea.pos.raw != 10,
         K::ShockStun => f >= 48,
         K::VolleyballTransform | K::VolleyballRestore => {
             w.en(i).volleyball = kind(c, n) == K::VolleyballTransform;
@@ -2493,6 +2573,14 @@ fn hit_node(w: &mut World, i: usize, t: &Arc<BehTree>, n: u16, msg: &HitMsg) -> 
             } else {
                 1
             }
+        }
+        // on-hit 0x0803999D (field, sc_janemba): the body parts play the hurt animation from the hit's frame; battle
+        // keeps the reference (no part flash)
+        K::JanembaPartFlash => {
+            if w.field.is_some() {
+                en::janemba_parts_hurt(w, i);
+            }
+            1
         }
         K::GotoState => {
             replace_top(w, i, p.g(P::State) as u16);

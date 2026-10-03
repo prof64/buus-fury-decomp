@@ -58,7 +58,7 @@ kinds!(
     SummonMinion, KidBuuSplitAnim, KidBuuSplit, KidBuuMerge, BabidiHover, BabidiGesture,
     // Janemba
     JanembaSpawnParts, JanembaHandStrikeA, JanembaHandStrikeB, JanembaAscend, JanembaDescendSummon, WaitMinisDefeated,
-    MiniHopToward, MiniHopFlee, MiniRollAttack, HandAmbush, HandSink, SuperJanembaWave,
+    MiniHopToward, MiniHopFlee, MiniRollAttack, HandAmbush, HandSink, SuperJanembaWave, JanembaPartFlash,
     // others
     BrolySpawnRocks, JumpSmash, FinishLandingAnim, StunnedAnim, StunnedAnim21, PlayAnimHold, RecoverAnim, PlayAnim0,
     PlayAnim12, PlayAnim12b, PlayAnim12Swarm, PlayAnim12Yakon, PlayAnim12Yakon2, PlayAnim13, PlayAnim13Yakon, PlayAnimOnce,

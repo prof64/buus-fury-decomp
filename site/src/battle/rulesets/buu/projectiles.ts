@@ -104,6 +104,8 @@ export interface StraightOpts {
   vy: number
   /** box relative to the position: x0 = px - ox, y0 = py - oy, size w x h */
   box: [number, number, number, number]
+  /** the box follows the blast's record (kiBlastBox) */
+  recBox?: boolean
   atk: AttackType
   mult: number
   color: [string, string]
@@ -169,7 +171,7 @@ export class StraightShot extends Shot {
     this.o.delay = 0
   }
   rect(): Rect {
-    const [ox, oy, w, h] = this.o.box
+    const [ox, oy, w, h] = this.o.recBox ? kiBlastBox(this.dir, this.t) : this.o.box
     return { x0: this.px - ox, y0: this.py - oy, x1: this.px - ox + w, y1: this.py - oy + h }
   }
   update(w: World) {
@@ -213,6 +215,16 @@ export class StraightShot extends Shot {
     this.removed = true
   }
   onMessage(_w: World, msg: HitMsg): boolean {
+    // the tank shell's handler 0x0801CB38: any message of kind 0 but its own overlapping its box destroys it
+    // (0x0801C978: explosion, rate 0x2000) and is accepted (Earth segment 3-14: a ki blast shoots a shell down)
+    if (this.o.name === 'shell') {
+      if (this.dead < 0 && !msg.foot && msg.source !== this && !this.removed && overlaps(msg.rect, this.rect())) {
+        this.removed = true
+        this.ctx.explosion(_w, this.px, this.py)
+        return true
+      }
+      return false
+    }
     if (this.o.fragile && this.dead < 0 && msg.team === 1 && msg.atk.kind === 0 && msg.source !== this && overlaps(msg.rect, this.rect())) {
       this.removed = true
       if (this.o.sfxEnd != null) audioEvent('sfx', { id: this.o.sfxEnd, vol: 64 })
@@ -356,6 +368,14 @@ export const kiFrame = (t: number) => {
 /** player / enemy ki blast class 0x080197B4 (3 px/frame, dir table 0x08719C40). Graphics: run 0x0871370C, records
  *  dir*4 + kiFrame(t); on a wall or an accepted hit it stops and shows the spark record 16 for 16 ticks. The ctor and
  *  an accepted hit each pick a sound with rand(2). */
+/** the blast's box (vtable 0x0804B454: the record at obj+0x18, 0x0871370C + 12 * (facing * 4 + frame), frame t >> 3 =
+ *  0, 1, 2, 3, then 2, 3): 16 x 16 for frames 0-1, then 8 x 16 (down / up) or 16 x 8 (left / right) (Earth segments
+ *  2-9 / 2-10: a blast passing a criminal's edge misses) */
+export function kiBlastBox(dir: number, t: number): [number, number, number, number] {
+  if (t >> 3 < 2) return [8, 8, 16, 16]
+  return dir < 2 ? [4, 8, 8, 16] : [8, 4, 16, 8]
+}
+
 export function kiBlast(ctx: BuuCtx, owner: Actor, dir: Dir, team: Team, x: number, y: number, atk = ATK[4], mult = 1024, w?: World): StraightShot {
   const [vx, vy] = VEL(dir, 0x300)
   const s = new StraightShot(ctx, owner, dir, team, x, y, {

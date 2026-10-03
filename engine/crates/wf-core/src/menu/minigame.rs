@@ -463,8 +463,10 @@ pub fn open_watch(w: &mut World, level: i32) {
 /// the power struggle's mode keeps the field's object world updating (mode vt `0x0804B5D8` entry 3 = `0x08007018`,
 /// which calls the world update `0x080115B0`; story segment sb_01_05b: the Z-Sword, s464 - the actors' animations
 /// and Gohan's frame-range pose keep running under the gauge)
+/// The punch machine's 30-iteration wait mode after the press (`0x08049978`) runs the object world too (7-3: the
+/// NPCs' idle ticks run from the iteration after the press until the mode ends)
 pub fn world_runs(w: &World) -> bool {
-    let power = |s: Option<&Screen>| matches!(s, Some(Screen::Minigame(m)) if m.kind == Kind::Power);
+    let power = |s: Option<&Screen>| matches!(s, Some(Screen::Minigame(m)) if m.kind == Kind::Power || (m.kind == Kind::Punch && m.wait > 0 && m.wait < WAIT));
     // the closing frame too (the stack is empty, the screen still shows)
     power(w.menu.stack.last()) || (w.menu.stack.is_empty() && power(w.menu.shown.as_deref()))
 }

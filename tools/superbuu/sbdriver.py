@@ -266,12 +266,19 @@ def step(self, e):
         # last until the Spirit Bomb): each frame the walkable 8-direction step (16 px look-ahead on the walk grid)
         # that ends farthest from it; ends when an event starts
         s = status(e)
-        if s['scene'] > 0 and self.t > 5:
-            # done once the countdown is over (GameData +1 bit 2 clear); a dialog meanwhile is played through
-            if not e.r8(0x03001069) & 4:
+        if self.t == 0:
+            self._ev_armed = False
+        counting = bool(e.r8(0x03001069) & 4)
+        if counting:
+            self._ev_armed = True
+        if s['scene'] > 0:
+            # done once a countdown ran and is over (GameData +1 bit 2 clear); scenes meanwhile are played through
+            if self._ev_armed and not counting:
                 self.next_goal()
                 return None
             return self.mash_a()
+        if not self._ev_armed:
+            return 0
         if self.t >= g[1]:
             raise RuntimeError('evade: no event')
         if s['p'] is None:

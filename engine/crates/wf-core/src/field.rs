@@ -45,8 +45,17 @@ pub enum Cause {
     Pickup { obj: ObjRef },
     /// a breakable prop broke (loot script; loot position = x, y)
     Break { obj: ObjRef, x: i32, y: i32 },
-    /// a placed enemy was defeated (on-defeat callback; loot position = x, y)
-    Defeat { entity: EntityId, ty: i32, x: i32, y: i32 },
+    /// a placed enemy was defeated (on-defeat callback; loot position = x, y). `loot`: the field loot block (position,
+    /// velocity) this run starts with - the type's drop script runs with its own enemy's (two enemies dying in one
+    /// frame drop where each died; Babidi's ship 8-62)
+    Defeat {
+        entity: EntityId,
+        ty: i32,
+        x: i32,
+        y: i32,
+        #[serde(default)]
+        loot: Option<(i32, i32, i32, i32)>,
+    },
     /// the area's on-enter / the previous area's on-leave bytecode (run during the load, before the player exists)
     AreaEnter,
     AreaLeave,
@@ -170,6 +179,11 @@ pub struct Field {
     pub checks: u32,
     /// the frame the field became busy (an event started: NPC animations do not tick that frame)
     pub busy_since: u32,
+    /// a broken breakable's callback ran at the start of this frame number (`fieldobj::break_done`, before the object
+    /// pass): an event it starts holds the frame, the player is not updated in that pass (segment sb 21-5 / 21-11:
+    /// the pods)
+    #[serde(default)]
+    pub busy_pre_pass: u32,
     /// the event ended this frame (NPC animations tick once more)
     pub event_ended: bool,
     /// drop scripts waiting for the death effect (SelfDestruct: the effect object runs the type's drop script after
@@ -212,6 +226,10 @@ pub struct Field {
     /// (2-90: s121 starts the frame after Goten's RunScript)
     #[serde(default)]
     pub queued_runs: Vec<(u32, Callback, Cause)>,
+    /// the running event came from the world's event list: the game runs it before the objects update, so in the
+    /// frame it ends the enemies still run their update (2-90: Super Saiyan Goten's AI starts in s121's last frame)
+    #[serde(default)]
+    pub queued_event: bool,
     /// a level-up hook started at the start of this frame's update: it runs inline (a nested loop), nothing else
     /// updates this frame
     pub held: bool,
@@ -254,10 +272,21 @@ pub struct Field {
     /// holds the player's creation 2 frames after s124 / s129's warps)
     #[serde(default)]
     pub nest_load: bool,
+    /// set by a nesting script host around `load_scene` (0x73): the area's objects are spawned after its on-enter
+    /// script, as the game's load (0x08009030 runs the map's load scripts, then the object loop): a script that blocks
+    /// there delays them (8-60's prop_show(1): the fighters appear 3 frames after the load, Babidi's ship 8-63 buttons)
+    #[serde(default)]
+    pub defer_objects: bool,
+    /// the deferred objects' area (`defer_objects`): spawned when the on-enter script ends (`finish_arrival`)
+    #[serde(default)]
+    pub pending_objects: Option<AreaId>,
     /// entity ids an area load made while an event held the field (lo..hi): never told to stop by the event, they
     /// run while it holds (the world map's patrolling encounters during s515's warp_fade fade-in)
     #[serde(default)]
     pub load_ids: (u32, u32),
+    /// the area is a cutscene's backdrop (`load_scene`): its objects are held by the event like any other
+    #[serde(default)]
+    pub scene_load: bool,
     /// the HUD object's low-HP beep stamp (hud +0x10: logic frame of the last beep, the load's at creation)
     #[serde(default)]
     pub hud_beep: u32,
@@ -355,6 +384,7 @@ fn new_field() -> Field {
         busy: false,
         nested: false,
         busy_since: 0,
+        busy_pre_pass: 0,
         checks: 0,
         event_ended: false,
         pending_drops: Vec::new(),
@@ -373,6 +403,7 @@ fn new_field() -> Field {
         defeat_runs: vec![],
         defeat_later: vec![],
         queued_runs: vec![],
+        queued_event: false,
         held: false,
         held_event: false,
         resume_held: false,
@@ -387,7 +418,10 @@ fn new_field() -> Field {
         player_removed: false,
         on_enter_queued: false,
         nest_load: false,
+        defer_objects: false,
+        pending_objects: None,
         load_ids: (0, 0),
+        scene_load: false,
         hud_beep: 0,
     }
 }
@@ -508,12 +542,13 @@ pub fn spawn_object(w: &mut World, o: &ObjDef) -> Option<EntityId> {
             if let ObjKind::Enemy { behaviour, .. } = &o.kind {
                 crate::fieldpatrol::attach(w, id, behaviour);
             }
+            let mut i = i;
             if let Some(st) = w.data.enemy(*ty).map(|t| t.ai) {
                 let f = w.frame as i64;
                 let e = w.en(i);
                 e.mark1 = f;
                 e.mark2 = f;
-                crate::nodes::push(w, i, st);
+                i = crate::battle::push_initial(w, i, st);
             }
             let k = w.field.as_ref().map(|f| f.placed.len()).unwrap_or(0);
             w.en(i).target = (k % nplayers) as u8;
@@ -611,7 +646,13 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
         snap_camera(w, s, x, y);
     }
     // 4. map sprites, breakables, items (forward, conditions), then the trigger list (map header triggers, area
-    // triggers; scanned area first), the song, the actors
+    // triggers; scanned area first), the song, the actors. A nested scene load spawns the objects after the on-enter
+    // script (`defer_objects`)
+    let defer = objects && a.on_enter.is_some() && w.field.as_ref().is_some_and(|f| f.defer_objects);
+    if let Some(f) = w.field.as_mut() {
+        f.pending_objects = defer.then_some(to);
+    }
+    let objects = objects && !defer;
     for list in [4, 2, 3] {
         for o in a.objects.iter().filter(|o| objects && list_of(o) == list) {
             if cond_holds(w, &o.cond) {
@@ -634,6 +675,7 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
     }
     if let Some(f) = w.field.as_mut() {
         f.load_ids = if keep_busy { (load_lo, w.next_id) } else { (0, 0) };
+        f.scene_load = false;
     }
     // 5. the old area's on-leave, the new area's on-enter (both before the player exists)
     if had_area {
@@ -663,6 +705,32 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
     arrive(w, to, x, y, facing);
 }
 
+/// the objects a nested scene load deferred to its on-enter script (`defer_objects`), in the load's list order; made
+/// while an event holds the field, they run like the load's own (`load_ids`)
+fn spawn_pending_objects(w: &mut World) {
+    let Some(to) = w.field.as_mut().and_then(|f| f.pending_objects.take()) else { return };
+    let fd = field_data(w);
+    let Some(a) = fd.area(to.world, to.area) else { return };
+    let lo = w.next_id;
+    for list in [4, 2, 3, 0, 1] {
+        for o in a.objects.iter().filter(|o| list_of(o) == list) {
+            if cond_holds(w, &o.cond) {
+                spawn_object(w, o);
+            }
+        }
+    }
+    let hi = w.next_id;
+    if let Some(f) = w.field.as_mut() {
+        if f.scene_load {
+            // held with the scene (its event)
+        } else if f.load_ids.1 > f.load_ids.0 {
+            f.load_ids.1 = hi;
+        } else if f.busy {
+            f.load_ids = (lo, hi);
+        }
+    }
+}
+
 /// a mode that keeps the object world running over the field (the power struggle, `menu::minigame::world_runs`):
 /// the cameras ease as in a field frame (the follow camera is part of the world update), nothing else of the field
 /// frame runs
@@ -679,6 +747,7 @@ pub fn world_mode_cameras(w: &mut World) {
 /// the area's on-enter script is over: the load's remaining part (the players, the world map flyer, AreaEnter); an
 /// exit's fade-in starts. No-op without a pending arrival.
 pub fn finish_arrival(w: &mut World) {
+    spawn_pending_objects(w);
     let Some(ar) = w.field.as_mut().and_then(|f| f.arrival.take()) else { return };
     if !ar.scene {
         crate::scene::bring_back(w);
@@ -995,6 +1064,11 @@ pub fn post_step(w: &mut World) {
         }
         _ => vec![],
     };
+    if !due.is_empty() {
+        if let Some(f) = w.field.as_mut() {
+            f.queued_event = true;
+        }
+    }
     for (_, run, cause) in due {
         w.events.push(Event::Field(FieldEvent::Run { run, cause, slot: 0 }));
     }
@@ -1034,12 +1108,26 @@ pub fn post_step(w: &mut World) {
     // playthrough: s100, armed during s099, fires only once Instant Transmission's return has turned the checks
     // back on). A held update (defeat scene) instead completes after its event, check included (s090 -> s091).
     let ended_before = w.field.as_ref().is_some_and(|f| f.event_ended) && !resumed;
-    if ended_before && std::env::var("EN_REL").is_ok() {
+    let queued = ended_before && w.field.as_ref().is_some_and(|f| f.queued_event);
+    if ended_before {
+        if let Some(f) = w.field.as_mut() {
+            f.queued_event = false;
+        }
+    }
+    if ended_before && (queued || std::env::var("EN_REL").is_ok()) {
         // the enemies' update of the exit frame runs past the busy check (enemy::release_update)
         let n = w.ents.len();
         for k in (0..n).rev() {
             if !w.ents[k].removed && matches!(w.ents[k].body, Body::Enemy(_)) {
                 crate::enemy::release_update(w, k);
+            }
+        }
+        // the players' form controllers run too (2-90: the Super Saiyan drain's phase after s121)
+        if queued {
+            for s in 0..w.players.len() {
+                if let Some(pi) = w.player_idx(s) {
+                    crate::player::release_passive(w, pi);
+                }
             }
         }
     }
@@ -1141,7 +1229,7 @@ pub fn trigger_self(w: &mut World, i: usize) {
     });
     w.events.push(Event::Field(FieldEvent::Defeated { entity: id, ty, x, y }));
     if let Some(run) = cb {
-        w.events.push(Event::Field(FieldEvent::Run { run, cause: Cause::Defeat { entity: id, ty, x, y }, slot: 0 }));
+        w.events.push(Event::Field(FieldEvent::Run { run, cause: Cause::Defeat { entity: id, ty, x, y, loot: None }, slot: 0 }));
     }
 }
 
@@ -1196,9 +1284,9 @@ fn defeats(w: &mut World) {
                     let due = w.frame + delay;
                     if let Some(f) = w.field.as_mut() {
                         if delay > 0 {
-                            f.defeat_later.push((due, run, Cause::Defeat { entity: id, ty, x, y }));
+                            f.defeat_later.push((due, run, Cause::Defeat { entity: id, ty, x, y, loot: Some((x, y, 0, 0)) }));
                         } else {
-                            f.defeat_runs.push((run, Cause::Defeat { entity: id, ty, x, y }));
+                            f.defeat_runs.push((run, Cause::Defeat { entity: id, ty, x, y, loot: Some((x, y, 0, 0)) }));
                         }
                     }
                 }
@@ -1228,8 +1316,16 @@ fn run_due_drops(w: &mut World) {
             let ds = w.data.enemy(ty).map(|t| t.drop_script).unwrap_or(0);
             crate::fieldobj::set_loot(w, x, y, vx, vy);
             let run = Callback::Script(format!("inline_0x{ds:08X}"));
-            w.events.push(Event::Field(FieldEvent::Run { run, cause: Cause::Defeat { entity: id, ty, x, y }, slot: 0 }));
+            w.events.push(Event::Field(FieldEvent::Run { run, cause: Cause::Defeat { entity: id, ty, x, y, loot: Some((x, y, vx, vy)) }, slot: 0 }));
         }
+    }
+}
+
+/// a host starts a queued run: the loot block it carries becomes the field's (drop scripts queued in one frame each
+/// drop at their own enemy)
+pub fn start_cause(w: &mut World, c: &Cause) {
+    if let Cause::Defeat { loot: Some((x, y, vx, vy)), .. } = c {
+        crate::fieldobj::set_loot(w, *x, *y, *vx, *vy);
     }
 }
 

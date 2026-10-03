@@ -145,6 +145,10 @@ pub struct StraightOpts {
     pub spawned: bool,
     pub x0: i32,
     pub y0: i32,
+    /// the box is the current record's (the player's blast 0x0804B454: obj+0x18 advances with its frame, the hit
+    /// box shrinks to 8 x 16 / 16 x 8 from tick 16; 2-10: a blast passing a criminal's edge misses)
+    #[serde(default)]
+    pub rec_box: bool,
 }
 impl Default for StraightOpts {
     fn default() -> Self {
@@ -172,6 +176,7 @@ impl Default for StraightOpts {
             spawned: false,
             x0: 0,
             y0: 0,
+            rec_box: false,
         }
     }
 }
@@ -444,6 +449,17 @@ pub fn ki_blast(w: &mut World, owner: EntityId, dir: Dir, team: u8, x: i32, y: i
     }
     id
 }
+/// the blast's box (vtable 0x0804B454: the record at obj+0x18, 0x0871370C + 12 * (facing * 4 + frame), frame t >> 3 =
+/// 0, 1, 2, 3, then 2, 3): 16 x 16 for frames 0-1, then 8 x 16 (down / up) or 16 x 8 (left / right)
+pub fn ki_blast_box(dir: i32, t: i32) -> [i32; 4] {
+    if t >> 3 < 2 {
+        [8, 8, 16, 16]
+    } else if dir < 2 {
+        [4, 8, 8, 16]
+    } else {
+        [8, 4, 16, 8]
+    }
+}
 pub fn spawn_rng(w: &mut World, i: usize) {
     let (n, sfx) = match &mut w.shot(i).kind {
         ShotKind::Straight(o) => {
@@ -637,6 +653,10 @@ pub fn rect(w: &World, i: usize) -> Rect {
     let (px, py) = (s.px(), s.py());
     let (dx, dy) = DIR_VEC[s.dir as usize];
     match &s.kind {
+        ShotKind::Straight(o) if o.rec_box => {
+            let b = ki_blast_box(s.dir as i32, s.t as i32);
+            Rect::new(px - b[0], py - b[1], px - b[0] + b[2], py - b[1] + b[3])
+        }
         ShotKind::Straight(o) => Rect::new(px - o.b[0], py - o.b[1], px - o.b[0] + o.b[2], py - o.b[1] + o.b[3]),
         ShotKind::GrowBeam(b) => {
             let h = b.width >> 1;
@@ -2260,6 +2280,18 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
             }
             bigbang_explode(w, i);
             true
+        }
+        // the tank shell's handler 0x0801CB38: any message of kind 0 but its own overlapping its box destroys it
+        // (0x0801C978: explosion, rate 0x2000) and is accepted (3-14: Gohan's ki blast shoots a shell down, its hit
+        // sound plays)
+        ShotKind::Straight(o) if o.name == SName::Shell => {
+            if o.dead < 0 && !msg.foot && msg.source != me && !w.ents[i].removed && overlaps(&msg.rect, &rect(w, i)) {
+                w.ents[i].removed = true;
+                let (px, py) = (w.shot_ref(i).px(), w.shot_ref(i).py());
+                fx::explosion(w, px, py, 0x2000);
+                return true;
+            }
+            false
         }
         ShotKind::Straight(o) => {
             if o.fragile && o.dead < 0 && msg.team == 1 && msg.atk.kind == 0 && msg.source != me && overlaps(&msg.rect, &rect(w, i)) {

@@ -931,6 +931,8 @@ fn resolve_enemy_gfx(en: &mut [EnemyType], sprites: &BTreeMap<i32, Sprite>) {
         0x34 => Some(0x93),
         0x35 => Some(0x94),
         0x37 => Some(0x98),
+        // Worm Body: the spawn template 0x08756A2C (+0x10 = 0x129)
+        0x8f => Some(0x129),
         _ => None,
     };
     let placeholder = |t: i32| match t {

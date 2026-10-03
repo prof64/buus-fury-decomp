@@ -61,11 +61,20 @@ pub struct Enemy {
     #[serde(default)]
     pub mirror_raw: i32,
     /// ... and the body's cel then (under the ascent's controller animation, raw 20, the frame byte it reads lags one
-    /// frame more); `mirror_prev` unused
+    /// frame more); `mirror_prev`: the body's raw on this part's previous update (every part: the hurt mirror)
     #[serde(default)]
     pub mirror_cel: i32,
     #[serde(default)]
     pub mirror_prev: i32,
+    /// field Janemba arm part (0x34 / 0x35): the hand strike's controller ticks (0 = none) and its side (A = 0x34)
+    #[serde(default)]
+    pub strike: (i32, bool),
+    /// ... and the hand it made (0 = none)
+    #[serde(default)]
+    pub strike_hand: EntityId,
+    /// field Janemba: the death effects of its minis (they still answer the top-up's count while they play)
+    #[serde(default)]
+    pub mini_deaths: Vec<EntityId>,
     pub script_hits: i32,
     /// tiles this enemy marked blocked on the enemy grid
     pub marked: Option<[i32; 4]>,
@@ -154,6 +163,9 @@ impl Enemy {
             mirror_raw: 0,
             mirror_cel: 0,
             mirror_prev: 0,
+            strike: (0, false),
+            strike_hand: 0,
+            mini_deaths: vec![],
             script_hits: 0,
             marked: None,
             stepped: false,
@@ -381,8 +393,10 @@ pub fn update(w: &mut World, i: usize) {
     }
     // while an event holds the field only the animation ticks (like the map NPCs; story playthrough: the
     // fighters a cutscene hands over with become_map_object start their AI when the event ends)
+    // a load waiting for its on-enter script holds them too (like the map NPCs; segment sb 21-4: the Blister's spawn
+    // timer starts after the 2 held frames)
     let id = w.ents[i].id;
-    if w.field.as_ref().is_some_and(|f| f.busy && !(f.load_ids.0 <= id && id < f.load_ids.1)) {
+    if w.field.as_ref().is_some_and(|f| (f.busy || f.arrival.is_some()) && !(f.load_ids.0 <= id && id < f.load_ids.1)) {
         tick_anim(w, i);
         crate::nodes::busy_controller(w, i);
         return;
@@ -675,6 +689,11 @@ pub fn face_player(w: &mut World, i: usize) {
     if player(w, i).is_none() {
         return;
     }
+    // the field: the game's routine 0x0801599C (the nodes' enters: FlameBreath 0x08023FA8, TurretFire, SoldierThrow,
+    // CyborgShot ...; Babidi's ship Destroyers / turrets); battles keep the footprint rule cross_ts pins
+    if w.field.is_some() {
+        return face_player_exact(w, i);
+    }
     let (dx, dy) = to_player(w, i);
     w.en(i).a.facing = facing_toward(dx, dy);
 }
@@ -800,7 +819,8 @@ pub fn blast_incoming(w: &World, i: usize) -> bool {
 pub fn attached(w: &World, i: usize) -> bool {
     let e = w.en_ref(i);
     let held = ctx_player(w, i).is_some_and(|pi| w.pl_ref(pi).held_by == w.ents[i].id && w.ents[i].id != 0);
-    !e.part && e.prev == 0 && !e.defeated && !w.ents[i].removed && e.a.z == 0 && !held
+    // field: the height does not detach (sc_janemba: a hopping Mini-Janemba keeps marking the enemy grid)
+    !e.part && e.prev == 0 && !e.defeated && !w.ents[i].removed && (e.a.z == 0 || w.field.is_some()) && !held
 }
 pub fn mark_self(w: &mut World, i: usize) {
     if w.col.is_none() || w.en_ref(i).marked.is_some() || !attached(w, i) {
@@ -830,13 +850,7 @@ pub fn sync_mark(w: &mut World, i: usize) {
 }
 /// footprint on the enemy grid; a detached enemy always fits
 pub fn passable(w: &mut World, i: usize, x: i32, y: i32) -> bool {
-    // field: a hopping enemy (height != 0) still meets the walls (sc_janemba: a Mini-Janemba's airborne step into a
-    // wall tile does not happen)
-    let airborne_only = w.field.is_some() && {
-        let e = w.en_ref(i);
-        e.a.z != 0 && !e.part && e.prev == 0 && !e.defeated && !w.ents[i].removed
-    };
-    if w.col.is_none() || (!attached(w, i) && !airborne_only) {
+    if w.col.is_none() || !attached(w, i) {
         return true;
     }
     let (fw, fh) = (w.en_ref(i).a.foot_w, w.en_ref(i).a.foot_h);
@@ -1439,18 +1453,28 @@ pub fn heavy_strike(w: &mut World, i: usize) -> bool {
     true
 }
 pub fn contact_hit(w: &mut World, i: usize) -> bool {
+    contact_hit_kind(w, i, false)
+}
+/// the worm's contact (0x0802D5F2 / 0x0802D756): message kind 1, the body rect against the player's footprint
+pub fn contact_hit_foot(w: &mut World, i: usize) -> bool {
+    contact_hit_kind(w, i, true)
+}
+fn contact_hit_kind(w: &mut World, i: usize, foot: bool) -> bool {
     let Some(pi) = player(w, i) else { return false };
     if !w.pl_ref(pi).a.hittable || w.en_ref(i).contact_cd > 0 {
         return false;
     }
     let bb = w.en_ref(i).a.body_box();
-    if !overlaps(&bb, &w.pl_ref(pi).a.body_box()) {
+    if !overlaps(&bb, &if foot { w.pl_ref(pi).a.foot_box() } else { w.pl_ref(pi).a.body_box() }) {
         return false;
     }
     let mut m = msg_from(w, i, 0, bb, w.en_ref(i).a.facing, 0x400, atk(2));
+    m.foot = foot;
     let ok = player::on_message(w, pi, &mut m);
     if ok {
-        w.en(i).contact_cd = 20;
+        // the worm's counter is decremented instead of the contact test (20 frames without a test, segment sb 21-14);
+        // the update's own decrement runs first
+        w.en(i).contact_cd = if foot { 21 } else { 20 };
     }
     ok
 }
@@ -1475,6 +1499,9 @@ pub fn area_hit_enemies(w: &mut World, i: usize, rect: Rect, pi: usize) {
     broadcast(w, &mut m, false);
 }
 
+const SHELL_MUZZLE: [(i32, i32); 4] = [(30, 60), (34, -12), (-16, 24), (60, 24)];
+const SHELL_BOX: [[i32; 4]; 4] = [[8, 14, 16, 16], [8, 2, 16, 16], [2, 8, 16, 16], [14, 8, 16, 16]];
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ShotType {
     Gun,
@@ -1496,7 +1523,6 @@ pub fn shot(w: &mut World, i: usize, kind: ShotType) {
     let f = a.facing;
     let (mx, my) = GUN_MUZZLE[f as usize];
     let at = ((a.px() + mx) << 8, (a.py() + my) << 8);
-    let (cx, cy) = a.center();
     let (dx, dy) = DIR_VEC[f as usize];
     let owner = w.ents[i].id;
     // the firing node's own sound (gun 0x080264EA / rifle 0x0802676A / tank 0x0801C900: 28; star 61) on the spawn frame
@@ -1512,7 +1538,9 @@ pub fn shot(w: &mut World, i: usize, kind: ShotType) {
         ShotType::Gun => mk(w, f, at.0, at.1, dx * 672, dy * 672, GUN_BOX[f as usize], StraightOpts { sfx_spawn: 28, fragile: true, name: shots::SName::Gun, ..base }),
         // rifle bullet 0x080276A8: an accepted hit plays 48 + rand(2), the destroy 0x0802770C sound 46
         ShotType::Rifle => mk(w, f, at.0, at.1, dx * 448, dy * 448, RIFLE_BOX[f as usize], StraightOpts { sfx_spawn: 28, rng_hit: 2, sfx_hit: 48, sfx_end: 46, fragile: true, name: shots::SName::Rifle, trail: Some(shots::Trail { fx: shots::FxId::Fx0874e614, rec: 4, n: 3, rate: 0x2aaa }), ..base }),
-        ShotType::Shell => mk(w, f, (cx + dx * 12) << 8, (cy + dy * 12) << 8, dx * 448, dy * 448, [8, 8, 16, 16], StraightOpts { sfx_spawn: 28, fragile: true, name: shots::SName::Shell, trail: Some(shots::Trail { fx: shots::FxId::Fx0871e630, rec: 4, n: 3, rate: 0x2aaa }), ..base }),
+        // tank shell 0x0801C900 from the tank controller 0x0802E278: the position + 0x08757354 [facing], box = the
+        // record's (0x0871E630 + 12 * dir); an accepted hit plays 48 + rand(2) (3-14: the shell that hits Gohan)
+        ShotType::Shell => mk(w, f, (a.px() + SHELL_MUZZLE[f as usize].0) << 8, (a.py() + SHELL_MUZZLE[f as usize].1) << 8, dx * 448, dy * 448, SHELL_BOX[f as usize], StraightOpts { sfx_spawn: 28, rng_hit: 2, sfx_hit: 48, fragile: true, name: shots::SName::Shell, trail: Some(shots::Trail { fx: shots::FxId::Fx0871e630, rec: 4, n: 3, rate: 0x2aaa }), ..base }),
         // throw controller 0x0802C08A: the star at the position + the muzzle table 0x087548F0, then PlaySfx(61)
         ShotType::Star => mk(w, f, at.0, at.1, dx * 448, dy * 448, [4, 4, 8, 8], StraightOpts { sfx_spawn: 61, fragile: true, explode: false, name: shots::SName::Star, ..base }),
         // MummyWrapShot 0x0802D0DC: one straight bandage at the position + 0x08756A74 [facing]; MummyWrapBurst
@@ -1670,11 +1698,37 @@ fn janemba_part_field(w: &mut World, i: usize) {
         w.ents[i].removed = true;
         return;
     };
-    let _ = pi;
     {
         let e = w.en(i);
         e.a.z = z;
         e.a.facing = f;
+    }
+    // a part's hurt animation (JanembaPartFlash) ends with SetAnim(0) (the idle's rand(255))
+    if w.en_ref(i).ea.pos.raw == 10 && w.en_ref(i).ea.done {
+        set_anim(w, i, &[n(0)], true, Some(true));
+    }
+    // the hand strike's controller on the arm part (set by JanembaHandStrike's first update): the hand on its 16th
+    // tick, before the player's update (sc_janemba: a punch that hurts Janemba in that frame still meets the hand);
+    // on its 56th the arm's SetAnim(0)
+    let (st, a_side) = w.en_ref(i).strike;
+    if st > 0 {
+        let st = st + 1;
+        w.en(i).strike.0 = if st >= 57 { 0 } else { st };
+        if st == 17 {
+            let h = hand_strike(w, pi, a_side);
+            w.en(i).strike_hand = h.unwrap_or(0);
+        }
+        if st >= 57 {
+            // the controller's end: its hand goes idle (SetAnim(0)) and frees the tiles its constructor marked
+            // (whatever else had marked them: holes); the arm part is older than the minis, so a mini hopping into
+            // them in this frame is still blocked (sc_janemba)
+            let h = std::mem::take(&mut w.en(i).strike_hand);
+            if let Some(hk) = (h != 0).then(|| w.find(h)).flatten() {
+                w.rng.rand(255);
+                unmark_hand(w, hk);
+            }
+            set_anim(w, i, &[n(0)], true, Some(true));
+        }
     }
     if w.en_ref(i).ty != 0x37 {
         return;
@@ -1683,14 +1737,18 @@ fn janemba_part_field(w: &mut World, i: usize) {
     // the cel seen on the previous update (under the ascent's controller animation the frame byte lags a frame more)
     let last_cel = std::mem::replace(&mut w.en(i).mirror_cel, cel as i32);
     // a switch into the ascent's controller animation (raw 20) shows in the table a frame late
+    let cur_raw = raw;
     let raw = if raw == 20 && seen != 0 { seen } else { raw };
-    let cel = if raw == 20 && seen == raw { last_cel as usize } else { cel as usize };
+    let cel = if (raw == 20 && seen == raw) || (cur_raw == 20 && seen != 20 && seen != 0) { last_cel as usize } else { cel as usize };
     let table: &[i32] = match raw {
         10 => &[-1, -2, -1],
         20 => &[15, -3, -5],
         _ => &[0, 1, 0, -1],
     };
     let dy = table.get(cel).copied().unwrap_or(0);
+    if std::env::var("JP_DBG").is_ok() {
+        eprintln!("jp wf {} raw {} cur {} seen {} cel {} dy {}", w.frame, raw, cur_raw, seen, cel, dy);
+    }
     let parts: Vec<(usize, i32)> = (0..w.ents.len())
         .filter(|&k| !w.ents[k].removed)
         .filter_map(|k| match &w.ents[k].body {
@@ -1711,6 +1769,34 @@ fn janemba_part_field(w: &mut World, i: usize) {
     }
 }
 /// Janemba's arm part for a hand strike: A = 0x34 (screen left), B = 0x35
+/// JanembaPartFlash (on hit): every body part plays the hurt animation (raw 10)
+pub fn janemba_parts_hurt(w: &mut World, i: usize) {
+    let me = w.ents[i].id;
+    let parts: Vec<usize> = (0..w.ents.len()).filter(|&k| !w.ents[k].removed && matches!(&w.ents[k].body, Body::Enemy(e) if e.part && e.parent == me)).collect();
+    for k in parts {
+        // field: an arm part in a hand strike - the strike controller's exit puts its hand into the idle controller
+        // (SetAnim(0): rand(255)) and destroys it (sc_janemba: Janemba punched in the frame the hand appears)
+        if w.field.is_some() && w.en_ref(k).strike.0 > 0 {
+            let h = std::mem::take(&mut w.en(k).strike_hand);
+            w.en(k).strike.0 = 0;
+            if let Some(hk) = (h != 0).then(|| w.find(h)).flatten() {
+                w.rng.rand(255);
+                unmark_hand(w, hk);
+                w.ents[hk].removed = true;
+            }
+        }
+        set_anim(w, k, &[n(9)], true, Some(false));
+    }
+}
+fn unmark_hand(w: &mut World, k: usize) {
+    let m = match &mut w.ents[k].body {
+        Body::Hand(h) => h.marked.take(),
+        _ => None,
+    };
+    if let (Some(m), Some(c)) = (m, w.col.as_mut()) {
+        c.mark_enemy(m, 1);
+    }
+}
 pub fn janemba_arm(w: &World, i: usize, a: bool) -> Option<usize> {
     let me = w.ents[i].id;
     let t = if a { 0x34 } else { 0x35 };
@@ -1736,12 +1822,23 @@ pub fn janemba_parts(w: &mut World, i: usize) {
             p.part = true;
             p.part_offset = (ox, oy);
             p.a.hittable = false;
+            // field: the enemy constructor marks the footprint on the enemy grid where the part is created; the
+            // mirror node moves the parts without marks, so that mark stays (sc_janemba: minis hop around it)
+            if field {
+                let a = &w.en_ref(pi).a;
+                let m = [a.px(), a.py(), a.px() + a.foot_w, a.py() + a.foot_h];
+                if let Some(c) = w.col.as_mut() {
+                    c.mark_enemy(m, 0);
+                }
+                // nothing unmarks it later (no re-sync for a part)
+                w.en(pi).marked = None;
+            }
         }
     }
 }
-pub fn hand_strike(w: &mut World, i: usize, a_side: bool) {
-    let Some(pi) = player(w, i) else { return };
-    let Some(t) = w.data.enemy(0x36).cloned() else { return };
+pub fn hand_strike(w: &mut World, i: usize, a_side: bool) -> Option<EntityId> {
+    let pi = player(w, i)?;
+    let t = w.data.enemy(0x36).cloned()?;
     // an enemy object: its constructor's SetAnim(0) draws the idle start tick
     w.rng.rand(255);
     let (mut ppx, mut ppy) = (w.pl_ref(pi).a.px(), w.pl_ref(pi).a.py());
@@ -1760,7 +1857,32 @@ pub fn hand_strike(w: &mut World, i: usize, a_side: bool) {
     a.set_sprite(&d, if w.field.is_some() && d.sprite(gfx).is_some() { Some(gfx) } else { t.sprite });
     a.set_anim(&d, &[n(18)], true, Some(false));
     a.hittable = false;
-    w.add(Body::Hand(Box::new(Hand { a, t: 0, hit: false })));
+    // field: an enemy object - its constructor marks its footprint on the enemy grid (sc_janemba)
+    let marked = if w.field.is_some() {
+        let m = [a.px(), a.py(), a.px() + a.foot_w, a.py() + a.foot_h];
+        if let Some(c) = w.col.as_mut() {
+            c.mark_enemy(m, 0);
+        }
+        Some(m)
+    } else {
+        None
+    };
+    Some(w.add(Body::Hand(Box::new(Hand { a, t: 0, hit: false, marked }))))
+}
+/// field: a strike hand is an enemy object (type 0x36, 50 HP, Idle): the player's hits reach it (sc_janemba: a punch
+/// on Janemba and the hand computes both - crit chance and roll each; the hand's reaction is the flash's: see
+/// janemba_parts_hurt)
+pub fn hand_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
+    let Body::Hand(h) = &w.ents[i].body else { return false };
+    // only until the arm's strike controller ends (it frees the hand's tiles then: `marked`); the fading hand is out
+    // of the enemy list (sc_janemba: a blast through it at tick 46 computes nothing)
+    if msg.team == 0 || h.marked.is_none() || !overlaps(&msg.rect, &h.a.body_box()) {
+        return false;
+    }
+    let def = h.a.stats;
+    let res = compute_damage(msg.atk, msg.mult, &msg.att_stats, &def, false, &mut w.rng);
+    msg.crit = res.crit;
+    true
 }
 /// Janemba hand (type 0x36): one hit during its frames 16..55, gone after 57
 pub fn hand_update(w: &mut World, i: usize) {
@@ -1771,7 +1893,8 @@ pub fn hand_update(w: &mut World, i: usize) {
         (h.t, h.hit)
     };
     // the rising controller (0x0804C338) ends on tick 40 with SetAnim(0) (rand(255)); hits from tick 16
-    if t == 40 {
+    // battle: tick 40 SetAnim(0)s it (field: the arm part's strike controller does, at its end)
+    if t == 40 && w.field.is_none() {
         w.rng.rand(255);
     }
     let pi = w.player_idx(0);
@@ -1799,15 +1922,23 @@ pub fn hand_update(w: &mut World, i: usize) {
 }
 const MINI_PTS: [(i32, i32); 5] = [(104, 112), (120, 136), (152, 144), (184, 136), (200, 112)];
 /// field: the puffs announcing the minis the next top-up creates (one per missing mini, at its spot)
-pub fn mini_puffs(w: &mut World) {
-    let live = w.live_enemies().into_iter().filter(|&o| w.en_ref(o).ty == 0x38).count();
+/// field: the minis' death effects still playing (counted with the living by the top-up's message)
+fn dying_minis(w: &mut World, i: usize) -> usize {
+    let ids = std::mem::take(&mut w.en(i).mini_deaths);
+    let keep: Vec<EntityId> = ids.into_iter().filter(|&id| w.find(id).is_some_and(|k| !w.ents[k].removed)).collect();
+    let n = keep.len();
+    w.en(i).mini_deaths = keep;
+    n
+}
+pub fn mini_puffs(w: &mut World, i: usize) {
+    let live = w.live_enemies().into_iter().filter(|&o| w.en_ref(o).ty == 0x38).count() + dying_minis(w, i);
     for &(x, y) in MINI_PTS.iter().take(5usize.saturating_sub(live)) {
         crate::fx::puff_rng(w, x + 8, y + 8);
     }
 }
 pub fn top_up_minis(w: &mut World, i: usize) {
     const PTS: [(i32, i32); 5] = MINI_PTS;
-    let live = w.live_enemies().into_iter().filter(|&o| w.en_ref(o).ty == 0x38).count();
+    let live = w.live_enemies().into_iter().filter(|&o| w.en_ref(o).ty == 0x38).count() + dying_minis(w, i);
     let b = w.arena.bounds;
     let me = w.ents[i].id;
     for &(x, y) in PTS.iter().take(5usize.saturating_sub(live)) {
@@ -1845,6 +1976,8 @@ pub fn worm_spawn_body(w: &mut World, i: usize) {
     for k in 1..=5 {
         let (px, py) = (w.en_ref(i).a.px(), w.en_ref(i).a.py());
         let Some(si) = crate::battle::spawn_enemy(w, 0x8f, px, py - 12 * k, me, None) else { break };
+        // the 12-slot ring (0x0802D650) replays the slot it overwrites when a command arrives: a body moves only on
+        // a received command (VERIFIED segment sb 21-9: each segment starts one frame after the one before it)
         let wd = w.en_ref(i).worm_dir;
         w.en(si).cmds = vec![wd; 12];
         chain.push(w.ents[si].id);
@@ -1858,6 +1991,8 @@ pub fn worm_spawn_body(w: &mut World, i: usize) {
         }
     }
 }
+/// the head and the segments stay in the idle state while they move (no SetAnim(1): VERIFIED segment sb 21-11, only
+/// the tails' walk state takes the event's stop message)
 pub fn worm_head_step(w: &mut World, i: usize) {
     if w.rng.rand(200) == 0 {
         let mut d = w.en_ref(i).worm_dir ^ 2;
@@ -1874,7 +2009,6 @@ pub fn worm_head_step(w: &mut World, i: usize) {
             let e = w.en(i);
             e.a.x += dx << 8;
             e.a.y += dy << 8;
-            e.moving = true;
             break;
         }
         let e = w.en(i);
@@ -1886,10 +2020,22 @@ pub fn worm_head_step(w: &mut World, i: usize) {
     if let Some((ni, _)) = w.enemy_by_id(next) {
         w.en(ni).cmds.push(wd);
     }
-    contact_hit(w, i);
+    contact_hit_foot(w, i);
 }
 pub fn worm_body_step(w: &mut World, i: usize) {
-    if w.en_ref(i).cmds.len() >= 12 {
+    // the last segment (no next, 0x0802D674): sprite def 0x12A (Worm Tail) set again every frame (0x0800EDF8: the
+    // animation restarts) + SetAnim(1)
+    if w.enemy_by_id(w.en_ref(i).next).is_none() {
+        let d = Arc::clone(&w.data);
+        let idx = 0x12A - crate::content::GFX_OFFSET;
+        if d.sprite(idx).is_some() {
+            let e = w.en(i);
+            e.gfx_now = 0x12A;
+            e.a.set_sprite(&d, Some(idx));
+            set_anim(w, i, &[n(1)], true, Some(true));
+        }
+    }
+    if w.en_ref(i).cmds.len() > 12 {
         let d = w.en(i).cmds.remove(0);
         let (dx, dy) = DIR_VEC[d as usize];
         {
@@ -1897,14 +2043,13 @@ pub fn worm_body_step(w: &mut World, i: usize) {
             e.a.x += dx << 8;
             e.a.y += dy << 8;
             e.a.facing = d;
-            e.moving = true;
         }
         let next = w.en_ref(i).next;
         if let Some((ni, _)) = w.enemy_by_id(next) {
             w.en(ni).cmds.push(d);
         }
     }
-    contact_hit(w, i);
+    contact_hit_foot(w, i);
 }
 
 // ---- damage --------------------------------------------------------------------------------------------------------
@@ -1912,12 +2057,27 @@ pub fn worm_body_step(w: &mut World, i: usize) {
 /// enemy message handler (0x0800FAFA kind 0): ComputeDamage on every accepted hit, the player's melee hooks, then
 /// the top state's on-hit tree (whose ApplyDamage takes the HP)
 pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
+    // field: Janemba's parts are enemy objects too - a hit under one computes its damage (crit chance + roll) and
+    // nothing else (sc_janemba: a punch under the lowered arm in the ascent)
+    if w.field.is_some() && msg.team != 0 && !w.ents[i].removed && matches!(w.en_ref(i).ty, 0x34 | 0x35 | 0x37) && w.en_ref(i).part {
+        let e = w.en_ref(i);
+        if msg.foot || !overlaps(&msg.rect, &e.a.body_box_ground()) {
+            return false;
+        }
+        let def = e.a.stats;
+        let res = compute_damage(msg.atk, msg.mult, &msg.att_stats, &def, false, &mut w.rng);
+        msg.crit = res.crit;
+        return true;
+    }
     {
         let e = w.en_ref(i);
         if msg.team == 0 || e.part || e.defeated || w.ents[i].removed || !e.a.hittable {
             return false;
         }
-        if !overlaps(&msg.rect, &if msg.foot { e.a.foot_box() } else { e.a.body_box() }) {
+        // field: the body box (0x0800FE78) is at the ground position - the height does not lift it (sc_janemba:
+        // a punch lands on Janemba 66 px up in its ascent)
+        let body = if w.field.is_some() { e.a.body_box_ground() } else { e.a.body_box() };
+        if !overlaps(&msg.rect, &if msg.foot { e.a.foot_box() } else { body }) {
             return false;
         }
     }
@@ -2080,7 +2240,15 @@ pub fn die(w: &mut World, i: usize, explode: bool) {
     if explode {
         let (cx, cy) = w.en_ref(i).a.center();
         let rate = 0x1000 + w.rng.rand(0x1000);
-        crate::fx::explosion(w, cx, cy, rate);
+        let fx = crate::fx::explosion(w, cx, cy, rate);
+        // field: a mini's death effect carries its gfx def - the next top-up counts it as a living mini
+        // (sc_janemba: a mini killed 2 frames before the top-up, 4 new ones)
+        if w.field.is_some() && w.en_ref(i).ty == 0x38 {
+            let par = w.en_ref(i).parent;
+            if let Some((pk, _)) = w.enemy_by_id(par) {
+                w.en(pk).mini_deaths.push(fx);
+            }
+        }
     }
     // the object's destruction frees its enemy-grid cells (removed entities are not re-synced: story playthrough, a
     // fighter's path re-plan went around a dead one)

@@ -22,8 +22,9 @@ fn content_dir() -> PathBuf {
     }
     // the field-test extraction shared by the test crates; `wf_extract::cache` re-extracts it when the extractor's
     // source hash in its `.complete` marker differs (no stale content after an extractor change)
-    let only = ["tables", "sprites", "effects", "maps", "world", "items", "scripts"];
-    let shared = repo().join("engine/target/tmp/wf-core-field-content");
+    // + `ui`: the menu screens (Switch Characters, the title after the credits)
+    let only = ["tables", "sprites", "effects", "maps", "world", "items", "scripts", "ui"];
+    let shared = repo().join("engine/target/tmp/wf-import-segment-content");
     if wf_extract::cache::fresh(&shared, &only) {
         return shared;
     }

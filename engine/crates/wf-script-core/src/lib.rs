@@ -277,7 +277,9 @@ impl Host for CoreHost<'_> {
             SceneCall::Exit { .. } => {
                 end_event(self.w);
                 if self.s.in_unit && self.w.scene.depth == 0 {
-                    if let Some(f) = self.w.field.as_mut() {
+                    // (not for an event run before the objects, a queued one / a broken pod's callback: the enemies
+                    // run their update in its exit frame, segment sb 21-11)
+                    if let Some(f) = self.w.field.as_mut().filter(|f| !f.queued_event) {
                         f.event_ended = false;
                     }
                 }

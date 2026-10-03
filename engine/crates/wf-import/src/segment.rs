@@ -137,9 +137,14 @@ pub fn compare(w: &World, fr: &Value, es: &[String], map: &mut BTreeMap<usize, E
     }
     // actors (the player included). A recording object that is gone frees its entity (area loads re-create the
     // player object: a new obj# for the same entity)
+    // a menu screen's own objects replace the game's object world (the party menu's character figures: segment sb
+    // 21-14); the world's actors are compared again when it closes
+    let menu_screen = wf_core::menu::active(w) && !matches!(w.menu.phase, wf_core::menu::Phase::FadeOut { .. });
     let present: Vec<usize> = fr["actors"].as_array().into_iter().flatten().map(|a| Row(a).k()).collect();
-    map.retain(|k, _| present.contains(k));
-    for a in fr["actors"].as_array().into_iter().flatten() {
+    if !menu_screen {
+        map.retain(|k, _| present.contains(k));
+    }
+    for a in fr["actors"].as_array().into_iter().flatten().filter(|_| !menu_screen) {
         let r = Row(a);
         let id = match map.get(&r.k()).copied().filter(|&id| w.find(id).is_some_and(|i| !w.ents[i].removed)) {
             Some(id) => Some(id),
@@ -153,7 +158,10 @@ pub fn compare(w: &World, fr: &Value, es: &[String], map: &mut BTreeMap<usize, E
             }
         };
         let Some(i) = id.and_then(|id| w.find(id)).filter(|&i| !w.ents[i].removed) else {
-            rep.bad(k, "missing", format!("obj #{} sprite {} has no entity", r.k(), r.sprite()));
+            // the entity at that position (a sprite mismatch) helps the diagnosis
+            let there = (0..w.ents.len()).find(|&i| !w.ents[i].removed && w.actor(i).is_some_and(|a| a.x == r.x() && a.y == r.y()));
+            let there = there.map(|i| format!(" (ours there: sprite {:?})", scene::sprite_id(w, i))).unwrap_or_default();
+            rep.bad(k, "missing", format!("obj #{} sprite {} has no entity{there}", r.k(), r.sprite()));
             continue;
         };
         let ac = w.actor(i).unwrap();
@@ -177,7 +185,7 @@ pub fn compare(w: &World, fr: &Value, es: &[String], map: &mut BTreeMap<usize, E
     }
     let shown: Vec<EntityId> = fr["actors"].as_array().into_iter().flatten().filter_map(|a| map.get(&Row(a).k()).copied()).collect();
     // a pause-menu page replaces the object world in the game (saved and restored around it): no actors to match
-    let menu_page = wf_core::menu::active(w) && fr["actors"].as_array().is_none_or(|a| a.is_empty());
+    let menu_page = menu_screen || wf_core::menu::active(w) && fr["actors"].as_array().is_none_or(|a| a.is_empty());
     for (ei, e) in w.ents.iter().enumerate().filter(|(_, e)| !e.removed && !menu_page) {
         let is_actor = matches!(e.body, Body::Npc(_) | Body::Player(_) | Body::Enemy(_));
         if is_actor && !shown.contains(&e.id) {
@@ -204,7 +212,7 @@ pub fn compare(w: &World, fr: &Value, es: &[String], map: &mut BTreeMap<usize, E
         };
         (31 * b.clamp(0, 256)) >> 8 == 0
     });
-    if game_black != (scene::palette_black(w) || field_black) {
+    if game_black != (scene::palette_black(w) || field_black || wf_core::menu::screen_black(w)) {
         rep.bad(k, "fade", format!("black {} vs game {}", !game_black, game_black));
     }
     if let Some(r) = fr["rng"].as_array() {
@@ -329,8 +337,8 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
                     eprintln!("  t{k} menu {:?} lag {} ticks {} play {} game lf {} snd {}", w.menu.phase, w.menu.lag, w.menu.ticks, w.story.play_frames, lf, fr["snd"]);
                 }
                 eprintln!(
-                    "  t{k} logic {logic} keys {keys:x} run {} depth {} busy {:?} mode {:?} pending {:?} p {:?} game p {} rng {:08x?} game {}",
-                    host.running(),
+                    "  t{k} wf {} logic {logic} keys {keys:x} run {} depth {} busy {:?} mode {:?} pending {:?} p {:?} game p {} rng {:08x?} game {}",
+                    w.frame, host.running(),
                     w.scene.depth,
                     w.field.as_ref().map(|f| f.busy),
                     w.field.as_ref().map(|f| f.mode.clone()),
@@ -340,6 +348,26 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
                     w.rng.state(),
                     fr["rng"],
                 );
+                // SEGMENT_ORDER=1: the entity list order (index: kind)
+                if std::env::var("SEGMENT_ORDER").is_ok() {
+                    let o: Vec<String> = w.ents.iter().enumerate().filter(|(_, e)| !e.removed).map(|(k, e)| format!("{k}:{}", match &e.body {
+                        wf_core::world::Body::Player(_) => "P".to_string(),
+                        wf_core::world::Body::Enemy(en) => format!("E{:x}", en.ty),
+                        wf_core::world::Body::Npc(_) => "N".to_string(),
+                        _ => "o".to_string(),
+                    })).collect();
+                    eprintln!("      order {}", o.join(" "));
+                }
+                // SEGMENT_GRID=tx0,ty0,tx1,ty1: the enemy-layer grid in those tiles ('#' blocked)
+                if let Some(v) = std::env::var("SEGMENT_GRID").ok() {
+                    let t: Vec<i32> = v.split(',').filter_map(|s| s.parse().ok()).collect();
+                    if let (Some(c), [tx0, ty0, tx1, ty1]) = (w.col.as_ref(), t.as_slice()) {
+                        for ty in *ty0..*ty1 {
+                            let row: String = (*tx0..*tx1).map(|tx| if c.tile(wf_core::world::Layer::Enemy, tx, ty) { '.' } else { '#' }).collect();
+                            eprintln!("      grid {ty} {row}");
+                        }
+                    }
+                }
                 // the enemies: position px, AI state stack (top last), sprite
                 let ens: Vec<String> = (0..w.ents.len())
                     .filter(|&i| !w.ents[i].removed)
@@ -362,6 +390,9 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
                     .collect();
                 let pst = w.player_idx(0).map(|pi| (w.pl_ref(pi).ap.raw, w.pl_ref(pi).ap.frame, w.pl_ref(pi).ap.tick, w.pl_ref(pi).a.stats.str_));
                 eprintln!("      player anim (raw, frame, tick, str) {:?} held {:?}", pst, w.field.as_ref().map(|f| (f.held, f.held_event, f.resume_held, f.event_ended, f.busy)));
+                if std::env::var("SEGMENT_TRACKS").is_ok() {
+                    eprintln!("      tracks {:?} wait {:?} done {}", w.scene.tracks.iter().map(|t| (t.owner, t.queue.len(), t.started, t.holding, t.queue.first().map(|c| format!("{c:?}").chars().take(40).collect::<String>()))).collect::<Vec<_>>(), w.scene.director.wait, w.scene.director.done);
+                }
                 eprintln!("      loot {:?} enemies {}", w.field.as_ref().map(|f| f.loot), ens.join(" "));
             }
         }
@@ -383,5 +414,8 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
     }
     rep.errors = host.errors.clone();
     rep.started = host.started.clone();
+    if std::env::var("SEGMENT_STARTED").is_ok() {
+        eprintln!("  scripts started: {:?}", rep.started);
+    }
     rep
 }

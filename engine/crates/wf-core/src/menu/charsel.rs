@@ -43,6 +43,10 @@ pub struct CharSelect {
     pub oam: Vec<CFig>,
     /// a harness built the screen with a copy of the RNG: the world's RNG takes it at the first step
     pub rng_after: Option<Rng>,
+    /// the figures' idle draws are still to come: the game builds the screen (the figures' idle enters) when the
+    /// field's fade-out reaches black (segment sb 21-14: 16 frames after `character_menu`)
+    #[serde(default)]
+    pub idle_at_step: bool,
 }
 
 /// the figures' facing (down) and the walk animation id
@@ -85,7 +89,23 @@ impl CharSelect {
         c.add(Widget::Label(Label { x: bx + 0x10, y: 0x90, text: t.s(26).to_vec(), colour: 5, align: 0, font: Font::Menu }));
         let left = c.add(Widget::Button(Button::new(BTN_LEFT, 0x18, 0x4A, 4, true, false)));
         let right = c.add(Widget::Button(Button::new(BTN_RIGHT, 0xC8, 0x4A, 5, true, false)));
-        CharSelect { c, oam: figs.clone(), figs, sel, left, right, rng_after: None }
+        CharSelect { c, oam: figs.clone(), figs, sel, left, right, rng_after: None, idle_at_step: false }
+    }
+
+    /// the figures' idle enters (rand(255) each) when the screen is built (`idle_at_step`; no-op after)
+    pub fn build_idle(&mut self, w: &mut World) {
+        if !std::mem::take(&mut self.idle_at_step) {
+            return;
+        }
+        let mut rng = w.rng;
+        for (k, f) in self.figs.iter_mut().enumerate() {
+            let a = idle(&mut rng);
+            if k != self.sel {
+                f.anim = a;
+            }
+        }
+        w.rng = rng;
+        self.oam = self.figs.clone();
     }
 
     /// `0x0802EC00` / `0x0802EBBE`: the previous / next choosable figure
@@ -135,6 +155,7 @@ impl Page for CharSelect {
         if let Some(r) = self.rng_after.take() {
             w.rng = r;
         }
+        self.build_idle(w);
         // the object world's update: the choosable figures animate
         let d = std::sync::Arc::clone(&w.data);
         for f in self.figs.iter_mut().filter(|f| f.choosable) {
@@ -212,8 +233,8 @@ pub const SCRIPTED: Transition = Transition { fade_out: 16 | super::FADE_HOLD, e
 /// object = nothing happens (the caller checks).
 pub fn open_charsel(w: &mut World) {
     let mut rng = w.rng;
-    let s = CharSelect::new(w, &mut rng);
-    w.rng = rng;
+    let mut s = CharSelect::new(w, &mut rng);
+    s.idle_at_step = true;
     super::open(w, super::Screen::CharSelect(s), SCRIPTED, true);
 }
 

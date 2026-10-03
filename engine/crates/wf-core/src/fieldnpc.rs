@@ -24,6 +24,10 @@ pub struct Behaviour {
     pub tick: i32,
     pub frame: i32,
     pub raw: i32,
+    /// a script left the NPC in a pose (set_pose's state has no tick): frozen until its next SetAnim (3-3: the
+    /// officer s143 posed and glided away keeps cel 0)
+    #[serde(default)]
+    pub pose: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -70,7 +74,7 @@ pub fn spawn(w: &mut World, o: &ObjDef) -> Option<EntityId> {
         _ => None,
     };
     let tick = w.rng.rand(255);
-    n.behaviour = Some(Behaviour { steps: behaviour.clone(), talk: talk.is_some(), idx: -1, cur: None, anim: 0, tick, frame: 0, raw: 1 });
+    n.behaviour = Some(Behaviour { steps: behaviour.clone(), talk: talk.is_some(), idx: -1, cur: None, anim: 0, tick, frame: 0, raw: 1, pose: false });
     mirror(&mut n);
     let f = foot(&n);
     let id = w.add(Body::Npc(Box::new(n)));
@@ -144,6 +148,7 @@ fn set_anim(w: &mut World, i: usize, k: u8, force: bool) {
     }
     let tick = if k == 0 { w.rng.rand(255) } else { 0 };
     let b = beh(w, i);
+    b.pose = false;
     b.anim = k;
     b.raw = k as i32 + 1;
     b.tick = tick;
@@ -156,6 +161,9 @@ fn anim_tick(w: &mut World, i: usize) {
     let raw = n.behaviour.as_ref().map(|b| b.raw).unwrap_or(1);
     let nf = n.a.sprite.and_then(|s| w.data.sprite(s)).and_then(|sp| sp.anim_raw(raw)).map(|a| a.nframes()).unwrap_or(1);
     let b = beh(w, i);
+    if b.pose {
+        return;
+    }
     b.tick = (b.tick + 1) & 0xFFFF;
     if b.anim == 0 && nf == 2 {
         b.frame = if (b.tick & 0xFF) > 0xF0 { 1 } else { 0 };

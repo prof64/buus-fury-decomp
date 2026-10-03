@@ -78,6 +78,9 @@ pub struct Hand {
     pub a: crate::actor::Actor,
     pub t: i32,
     pub hit: bool,
+    /// field: the enemy-grid tiles its constructor marked (cleared by the arm's strike controller end, holes and all)
+    #[serde(default)]
+    pub marked: Option<[i32; 4]>,
 }
 
 #[derive(Clone, Debug, Hash, Serialize, Deserialize)]
@@ -947,6 +950,7 @@ pub fn deliver(w: &mut World, k: usize, msg: &mut HitMsg) -> bool {
         Body::Enemy(_) => crate::enemy::on_message(w, k, msg),
         Body::Shot(_) => crate::shots::on_message(w, k, msg),
         Body::Breakable(_) => crate::fieldobj::breakable_message(w, k, msg),
+        Body::Hand(_) if w.field.is_some() => crate::enemy::hand_message(w, k, msg),
         _ => false,
     }
 }

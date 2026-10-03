@@ -355,6 +355,10 @@ pub struct Menu {
     /// screens drawn over the field): the world updates in this same frame
     #[serde(default)]
     pub resume: bool,
+    /// the mode loop ran this frame's iteration and closed without handing the frame back (`resume` unset): the
+    /// world does not update in it (shop lockstep: the NPCs' idle ticks stop in the frame the fade-in ends)
+    #[serde(default)]
+    pub closed_this_frame: bool,
     /// the game options (`0x03001914`: text speed, SFX volume, music volume, 0; the cartridge's options block,
     /// shared by every save): kept across menus (options.rs)
     #[serde(default)]
@@ -482,6 +486,16 @@ pub fn step(w: &mut World) {
             let step = (w.menu.tr.fade_out & !FADE_HOLD).max(1);
             let end = if w.menu.tr.fade_out & FADE_HOLD != 0 { 256 + step } else { 256 };
             let l = level + step;
+            // the screen black: the mode switch builds the new screen (Switch Character's figures enter idle)
+            if level < 256 && l >= 256 {
+                if let Some(Screen::CharSelect(c)) = w.menu.stack.last_mut() {
+                    let mut c = c.clone();
+                    c.build_idle(w);
+                    if let Some(Screen::CharSelect(top)) = w.menu.stack.last_mut() {
+                        *top = c;
+                    }
+                }
+            }
             w.menu.phase = if l >= end { Phase::Enter { t: 0 } } else { Phase::FadeOut { level: l } };
         }
         Phase::Enter { t } => {
@@ -668,6 +682,15 @@ fn close(w: &mut World) {
     w.menu.lag = 0;
     w.menu.pending = None;
     w.menu.result = Some(MenuResult { code: 0 });
+}
+
+/// the screen is black while a page closes (its leave frames; segment comparisons: sb 21-14's Switch Character)
+pub fn screen_black(w: &World) -> bool {
+    match w.menu.phase {
+        Phase::Leave { t: 0 } => w.menu.shown.as_deref().is_some_and(|s| s.page().leave_black()),
+        Phase::Leave { .. } => true,
+        _ => false,
+    }
 }
 
 /// the menu screen to show this frame (None while the field is shown: fades, idle)

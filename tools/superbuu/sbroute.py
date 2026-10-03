@@ -96,7 +96,8 @@ ROUTE = [
     # vs Kid Buu (splits, 125000 HP each round), Vegeta's timed stand (keep away from him until the countdown ends),
     # the Spirit Bomb (power struggle), flag 149 -> world map
     ('fly', 648, 1076), ('eventsw', 240), ('wait', 30), ('mark', 'kid_buu'),
-    ('boss', 60000, 'timer'), ('evade', 20000), ('eventsw', 240), ('wait', 30), ('mark', 'after_kid_buu'),
+    ('boss', 60000, 'timer'), ('eventsw', 240), ('evade', 20000), ('evade', 20000), ('eventsw', 240), ('wait', 30),
+    ('mark', 'after_kid_buu'),
     # the final sequence: West City (world map spot 1250, 1200) -> Capsule Corp 4-20 -> 4-21: s190 ("final sequence of
     # the game ... ready? Yes") -> the party, the World Tournament, Uub (s311 / s312), the staff credits, the title
     ('fly', 1250, 1200), ('eventsw', 240), ('wait', 30), ('exitto', '4-20'), ('wait', 20), ('exitto', '4-21'),

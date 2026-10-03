@@ -211,45 +211,52 @@ Status and the side-content catalogue follow below as they are recorded.
 
 ## 8. Babidi's ship chapter (owner: the ship / Majin Buu chapter agent, 2026-10-02)
 
-> **Note from the Earth agent (§9):** the real Earth end state now exists: `work/earth/earth_end.ss` = the real game
-> played from the soft reset through Other World and every Earth chapter (no flags set by hand) to Goku in 7-2 after
-> the tournament (flag 50, lf 192,179). It rebuilds from `data/story_playthrough/earth_route_keys.json` (`start` +
-> `chapter` key runs from route.py's soft reset). Re-record the ship chapter from it instead of `mkstate_dev.py`.
+**Real route** (replaces the dev state): `re/buu/ship/run_route.py work/earth/earth_end.ss work/ship/real4 --real --log
+--to c14_s342` plays the real game from the Earth agent's end state (Goku in 7-2 after the tournament) for 378,903
+frames, every input from the driver (`ship_route.goals_real`, `ship_driver.ShipDriver`), no RAM writes:
+Yajirobe's Senzu (s230 x2) -> the rest of the tournament (s261 .. s314) -> Goku to 70 in East District 439 (the 8-2
+gate) -> Gohan to 100, Vegeta to 92 in Southwest Forest 8-3 / 8-6 (Vegeta fights Buu alone later) -> Onigiri at
+Papaya Island's stall (s258) -> Babidi's ship (3 switches + Pui Pui, 3 switches + Yakon, 3 Switch items / 3 panels)
+-> Gohan rests in reserve at 8-66's save point (reserve characters regain 5% HP / ~596 frames) -> Dabura (8-68) ->
+Goku vs Majin Vegeta (8-70, four rounds) -> Vegeta's capsule back to 8-16 (s342). Marks `r00..r05`, `c04..c14` are
+saved states (`run_route.py --from MARK`). `real4b`: c14 -> Vegeta vs Buu in the Giant Crater 8-71 (s343 / s344) ->
+Goku in Rocky Canyon (`c15_after_buu`, 19,292 frames); `real4c` = both logs joined (398,195 frames).
 
-Route + recorder: `re/buu/ship/` — `mkstate_dev.py` (DEV start: the real Other World end state `work/earth/ow_end.ss`
-+ the Earth chapter's results applied through the game's own natives (flags 14..53, party joins, `level_up_to`,
-12 Senzu Beans) + the real chapter-transition event s314 -> Southwest Forest 8-1; to be replaced by the Earth agent's
-real end state), `ship_route.py` (ShipDriver goals: live-grid walk, `nav` through the exit graph with room fights,
-stat allocation and Switch Character menus, healing through the Inventory, Yakon's fight), `run_route.py --log`
-(key log), `rec_segments.py RUN OUT` (one segment per importable exit arrival, rows trimmed before the area change
-and its incomplete logic frame; start states in `OUT/states/`), `gate.py` (copies exact ones to `data/segments/` with
-an `expect` gate). Diagnosis: `seg_probe.py` (enemy AI stacks), `seg_rng.py` + `rngdiff.sh` (game RNG callers vs
-`SEGMENT_RNG`), `seg_trig.py` / `seg_objs.py` (trigger / object RAM). The full dev run (8-1 -> Dabura's arena, 82,256
-frames) gives 100 segments in `work/ship/segs_full`: 78 exact; 7 gated in data (`ship_*`).
+Driver tactics that made it survivable without Senzu stocks: `flame_guard` (a Destroyer's FlameBreath 0x86 fans
+along its facing ~100+ px: step out of the line, else flee, never through a door), `block_guard` (R toward a soldier
+lining up a wave: 0x156 / 0x1E2 / 0x1E8, a front block takes 1/16), `rest` (stand still until a reserve character
+is full), the `buu` fight: Buu takes damage only while **pacified** (0x0300302C != 0: Babidi's state 0xC9 enter
+0x0802AEDA sets it for ~770 frames, his gesture enter 0x0802AD88 clears it; Buu wanders 0xA2 and does not fight back)
+- block (R) turned to Buu otherwise, punch him while pacified.
 
-Rules found (wf-core / wf-script-core):
-* placed field enemies stand exactly at the def position (no free-spot search; `battle::spawn_enemy_at(.., exact)`).
-* AlignWithPlayer: a blocked step keeps the step's facing (0x0801CFA8; TS reference updated, cross_ts green).
-* shield soldiers: RaiseShield / LowerShield / ShieldBreak swap the graphics set on node **enter** (GotoState frame).
-* loot x = position + foot_w / 2 (not the body box centre: a shield soldier's sprite has a narrower body).
-* a breakable hit by a punch that also hit an enemy takes the enemy's crit flag (no stale-slot shake); breakable
-  shakes stop while an event holds the field.
-* energy waves (laser turret / soldier throw) accept another object's *energy* message head-on (two waves collide:
-  the receiver puffs); a punch does not stop them.
-* `save_field_on_next_scene` + `load_scene*` keeps the field (`field::SavedWorld`: entities incl. offstage players,
-  Field, grids, cameras, scene camera control); `return_to_field` restores it without a load (no draws); a scene load
-  whose area has an on-enter script keeps the players offstage (`Arrival.scene`).
-* harness: `SfxStopMatch` counts as a stop.
+**Segments**: `rec_segments.py work/ship/real4 work/ship/rsegs --prefix shipr` -> 338 segments (370,281 frames):
+285 exact (208,315 frames); `--from-frame 378600 --first 338` on `real4c` re-cuts the last one through the Buu fight
+(`work/ship/rsegs_c/shipr_338_8-16`, 19,591 frames, exact to 2,869). Gated in data (`shipr_*`, 23 segments, 18,988
+frames): Babidi's ship stages 1-3 (switch rooms, the 8-63 hub buttons, the Destroyer rooms 8-45 / 8-55, the panels),
+Vegeta's 8-13 Destroyer room; the 7 dev-state gates (`ship_*`) are retired.
 
-**Content cache warning:** `engine/target/tmp/wf-core-field-content` / `wf-script-core-field-content` were stale
-(extracted before `field_gfx` added breakable `hit_box`es etc.). With fresh content (`wf-cli` extract, swapped in
-2026-10-02 19:4x) the opening playthrough is exact for all 41,423 frames and lockstep is 78/78; the stale dirs are kept
-as `*.stale`. Tests trust a `.complete` file only: re-extract after extractor changes.
+Rules found (wf-core / wf-script-core), round 2:
+* the nodes' face-the-player enters (FlameBreath 0x08023FA8, TurretFire 0x0802B684, SoldierThrow 0x080266D8,
+  CyborgShot 0x0802F6A8, FacePlayer) all call 0x0801599C (24.8 difference, ties horizontal): `enemy::face_player` uses
+  it in the field (battles keep the footprint rule cross_ts pins).
+* drop scripts queued in one frame drop where *their* enemy died (`Cause::Defeat.loot`, set at the run's start by
+  `field::start_cause`): two fighters dying together no longer share the last loot position (8-62).
+* a nested `load_scene` (0x73 with a nesting host) spawns the area's objects after its on-enter script, as
+  0x08009030 does (load scripts, then the object loop): 8-60's prop_show(1) blocks 3 frames, its fighters appear then
+  (`Field.defer_objects` / `pending_objects`, `finish_arrival`).
+* boss handovers (s327 / s328 / s336), motion controllers ticking while an event holds the field, shared soldier-throw
+  wave, Destroyer flames during holds: round 1 notes below still hold.
 
-Open (dev run): Pui Pui / Yakon / Dabura are reached through scene loads inside events (s327 / s328 / s336:
-8-26 f286, 8-38 f306, 8-66 f291 — the warped-in player entity), the SoldierThrow end (8-51 f307: the game's idle
-enter draws nothing, 2 frames later), coin pickups in a few rooms, Destroyer (type 20) RNG in 8-50 / 8-56, the
-8-15 charsel swap (Switch Character in a save point), 8-16's s319 anim at f4805.
+Open: the pause-menu heal / stat screens' sound 40 timing (`snd: play 40` in ~25 grind segments, menu code under
+concurrent edits), the Switch Character swap at save points (missing / cam a frame off), 8-16 s319's NPC idle cel,
+s342's 8-17 camera_scroll_to one frame early (f2911 of the Buu-fight segment), RNG in a few 8-3 / 8-31 / 8-33 rooms,
+Papaya 7-1 NPC facing. Next: the fat Buu arc from Goku in 8-70 (c15) to the Super Buu chapter's start (§6).
+
+Round 1 (dev state, kept for reference): placed field enemies stand exactly at the def position; AlignWithPlayer keeps
+the facing on a blocked step; shield graphics swap on node enter; loot x = position + foot_w / 2; breakable crit /
+shake rules; energy waves collide head-on; `save_field_on_next_scene` + `load_scene*` keep the field
+(`field::SavedWorld`), `return_to_field` restores it; `SfxStopMatch` counts as a stop. Test content caches are stamped
+with the extractor hash (`wf_extract::cache`) and re-extract on mismatch.
 
 ## 9. Earth chapters: Gohan, Great Saiyaman, Videl, Goten & Trunks, the World Tournament (owner: the Earth agent)
 
@@ -342,7 +349,7 @@ s452 (flag 125). Master `work/side/seg/sc_arena_master.json` (local), segments c
 
 | segment | from | frames | matched |
 |---|---|---|---|
-| `sc_janemba` | 18-14 entry | 6,000 | 1,404 (gate) |
+| `sc_janemba` | 18-14 entry | 6,000 | 5,223 (gate) |
 
 Rules found (field only where battle is pinned by the TypeScript cross-check):
 * Janemba's body parts: created at body + (-16, -16) / (48, -16) / (16, -40); then part 0x37's AI node (0x0803D0C4)
@@ -360,3 +367,14 @@ Rules found (field only where battle is pinned by the TypeScript cross-check):
 * Mini-Janemba: the roll's dash is a collision-checked step without sliding; a hopping enemy meets the walls.
 * Remove / become_map_object / glide lift an NPC's walk mark (s101); the field enemies' AI does not run in an event's
   exit frame (the game's next frame does).
+* Enemy grid (field, checked by dumping the live grid, map object [0x080726AC + 8] + 0xB0, against ours with
+  `SEGMENT_GRID` / `SEGMENT_ORDER` in the segment trace): a hopping enemy keeps its marks (height does not detach);
+  every enemy constructor marks its footprint - the body parts once where they are created (the mirror node moves them
+  without marks), the strike hands too (cleared on their tick 40, holes in walls and Janemba's mark included).
+  Unmarking clears whatever shares the tiles, which is what later steps collide with.
+* JanembaPartFlash (0x0803999D, Janemba's on-hit tree): every part plays the hurt animation from the hit; each part's
+  own end SetAnim(0)s it (idle draw). ShockStun (state 0x0A's reaction) lasts the hurt animation, then PopState
+  (0x104 resumes: WaitMinisDefeated -> the strikes).
+Open at 5,223: a Mini-Janemba's re-aim (0x080346FC at hop counter 0: chance(0x4000), quadrant from the footprint
+centres) faces left in the game where ours keeps facing up (dy = 0 with the player's position of that frame); which
+player position the game reads there is not settled.

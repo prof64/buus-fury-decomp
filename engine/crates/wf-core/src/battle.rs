@@ -221,6 +221,21 @@ pub fn arena_runtime(d: &GameData, id: &str) -> (ArenaRt, Option<(i32, i32)>) {
 }
 
 /// spawn an enemy of `ty` at px (x, y); parent = 0 for none; start: None = the type's AI state, Some(-1) = no AI
+/// a new enemy's first AI state (its constructor's push); returns the enemy's index after it. Objects the state's
+/// enter creates (Worm Head's segments) are appended to the world list before the constructor's caller appends the
+/// enemy itself (0x0802CBD4 appends each segment via 0x0801191A; VERIFIED 21-9's list: segments 0..4, then the head),
+/// so the enemy moves after them (the list updates from its end: the head first)
+pub fn push_initial(w: &mut World, i: usize, st: u16) -> usize {
+    let before = w.ents.len();
+    crate::nodes::push(w, i, st);
+    if w.ents.len() > before {
+        let e = w.ents.remove(i);
+        w.ents.push(e);
+        return w.ents.len() - 1;
+    }
+    i
+}
+
 pub fn spawn_enemy(w: &mut World, ty: i32, x: i32, y: i32, parent: EntityId, start: Option<i32>) -> Option<usize> {
     spawn_enemy_at(w, ty, x, y, parent, start, false)
 }
@@ -266,7 +281,7 @@ pub fn spawn_enemy_at(w: &mut World, ty: i32, x: i32, y: i32, parent: EntityId, 
             e.mark1 = f;
             e.mark2 = f;
         }
-        crate::nodes::push(w, i, st);
+        return Some(push_initial(w, i, st));
     }
     Some(i)
 }

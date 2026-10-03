@@ -94,8 +94,96 @@ class ShipDriver(Driver):
         self.nav_t = 0
         self.push_t = None
 
-    AVOID = (20, 64)            # not worth fighting in passing: Destroyer (3762 HP), Laser Turret (in wall niches)
-    HEALS = (21, 18, 17, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 19, 16, 15, 14, 13, 12, 11, 10)  # Senzu, elixirs, food, drinks
+    # not worth fighting in passing: Destroyer (3762 HP, flames), Laser Turret (in wall niches); Babidi (4 / 29: beside
+    # the boss in 8-71, not a target)
+    AVOID = (20, 64, 4, 29)
+    HEALS = (21, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)  # the HP ones: Senzu, then food (10 .. 19 are drinks: EP only)
+    FLAMERS = (20,)             # Destroyer: FlameBreath (state 0x86) along its facing once the player is within 88 px
+
+    THROWS = (0x156, 0x1E2, 0x1E8)   # Majin Soldier / Shield Soldier: AlignWithPlayer + SoldierThrow (an energy wave)
+
+    def block_guard(self, e, s):
+        """a soldier lined up for its wave throw: face it and hold R (a block from the front takes 1/16 damage) until
+        40 frames after the throw state; None otherwise"""
+        if s['p'] is None:
+            return None
+        x, y, pf = s['p']
+        for o in enemies(e):
+            st = ai_state(e, o[0])
+            if not st or st[-1] not in self.THROWS:
+                continue
+            dx, dy = o[1] - x, o[2] - y
+            # close by, closing in and punching beats waiting behind the guard
+            if abs(dy) <= 16 and 56 < abs(dx) < 170:
+                want = 3 if dx > 0 else 2
+            elif abs(dx) <= 16 and 56 < abs(dy) < 170:
+                want = 0 if dy > 0 else 1
+            else:
+                continue
+            self.block = (self.t + 40, want)
+            break
+        if getattr(self, 'block', None) is None or self.t >= self.block[0] or self.block[0] - self.t > 40:
+            self.block = None
+            return None
+        want = self.block[1]
+        if pf != want and not self.blocking(e):
+            return (KEY.DOWN, KEY.UP, KEY.LEFT, KEY.RIGHT)[want]
+        return KEY.R
+
+    def blocking(self, e):
+        p = e.r32(0x03001C34)
+        return p != 0 and e.r8(p + 0x1C8) != 0
+
+    def flame_guard(self, e, s):
+        """a Destroyer breathing fire (0x86, 124 frames along its facing) with the player in front of it (the flames
+        reach ~100 px): step out of the line (perpendicular, to a side free of walls and enemies), else run from it
+        when close; None otherwise"""
+        if s['p'] is None or self.grid is None:
+            return None
+        x, y = s['p'][0], s['p'][1]
+        ens = enemies(e)
+        for o in ens:
+            if o[5] not in self.FLAMERS:
+                continue
+            st = ai_state(e, o[0])
+            if not st or st[-1] != 0x86:
+                continue
+            ex, ey, f = o[1], o[2], o[3]
+            if f >= 2:
+                ahead, side = (x - ex) * (1 if f == 3 else -1), y - ey
+            else:
+                ahead, side = (y - ey) * (1 if f == 0 else -1), x - ex
+            if not (-16 < ahead < 260 and abs(side) < 44):
+                continue
+
+            def free(px, py):
+                return self.grid.ok_box(px // 8, py // 8) and not any(
+                    q[0] != o[0] and abs(q[1] - px) < 16 and abs(q[2] - py) < 12 for q in ens)
+            # a direction that did not move the player (a wall the grid missed) is out for a while
+            dead = getattr(self, 'guard_dead', {})
+            need = 44 - abs(side) + 8
+            for sd in ((1, -1) if side >= 0 else (-1, 1)):
+                ddx, ddy = (0, sd) if f >= 2 else (sd, 0)
+                k = (KEY.DOWN if sd > 0 else KEY.UP) if f >= 2 else (KEY.RIGHT if sd > 0 else KEY.LEFT)
+                if dead.get(k, -1) > self.t:
+                    continue
+                if all(free(x + ddx * j, y + ddy * j) for j in range(8, need + 8, 8)):
+                    return self.guard_key(k, x, y)
+            k = self.flee(e, s, ex, ey)
+            return self.guard_key(k, x, y) if k else None
+        return None
+
+    def guard_key(self, k, x, y):
+        """remember the guard's key; held 8 frames without moving: that direction is blocked for 90 frames"""
+        last = getattr(self, 'guard_last', None)
+        if last and last[0] == k and last[1] == (x, y):
+            n = last[2] + 1
+            if n >= 8:
+                self.guard_dead = {**getattr(self, 'guard_dead', {}), k: self.t + 90}
+        else:
+            n = 0
+        self.guard_last = (k, (x, y), n)
+        return k
 
     def keys(self, e):
         # a pause menu left open (a menu program that went wrong): B out of it
@@ -258,6 +346,13 @@ class ShipDriver(Driver):
                 self.grind_k += 1
                 w, a = route[self.grind_k % len(route)]
             return self.nav(e, s, ('nav', w, a, True), inner=True)
+        if kind == 'rest':
+            # ('rest', c): stand still until character c (in reserve: +5% HP / EP every ~596 frames) is full again
+            r = 0x03001560 + 0x68 * g[1]
+            if e.r16(r + 0x16) >= e.r16(r + 0x18) and e.r16(r + 0x1A) >= e.r16(r + 0x1C):
+                self.next_goal()
+                return None
+            return 0
         if kind == 'story':
             # ('story', w, a[, boss]): play events through (A mash) and fight whatever enemies the story puts in front
             # of the player, until area w-a is reached with the player controllable and no event for 20 frames
@@ -273,6 +368,8 @@ class ShipDriver(Driver):
                 return self.mash_a()
             if enemies(e):
                 self.idle = 0
+                if any(o[5] in self.BUU for o in enemies(e)):
+                    return self.buu(e, s)
                 self.in_nav = True
                 self.fight_done = False
                 k = self.fightp(e, s, ('fightp', 10 ** 9, 99999, 6, len(g) > 3 and g[3]))
@@ -486,6 +583,11 @@ class ShipDriver(Driver):
             tg[1] += 1
             if tg[1] > 400 and not (len(g) > 4 and g[4]):
                 self.skip.add(en[0])
+        k = self.flame_guard(e, s)
+        if k is None:
+            k = self.block_guard(e, s)
+        if k is not None:
+            return k
         dx, dy = ex - x, ey - y
         per = g[3] if len(g) > 3 else 10
         # in reach of the melee box (right: (16,-24)-(24,8), left: (-8,-24)-(0,8) around the footprint)
@@ -532,10 +634,80 @@ class ShipDriver(Driver):
             nx, ny = x + dx * 24, y + dy * 24
             if not all(self.grid.ok_box((x + dx * j) // 8, (y + dy * j) // 8) for j in (8, 16, 24)):
                 continue
+            # never out through a door (fleeing a Destroyer at a doorway would bounce between two rooms)
+            if any(r['x'] - 16 <= nx < r['x'] + r['w'] + 16 and r['y'] - 16 <= ny < r['y'] + r['h'] + 16
+                   for r in self.exit_rects(s)):
+                continue
             d = abs(nx - ex) + abs(ny - ey)
             if best is None or d > best:
                 best, bk = d, k
         return bk
+
+    BUU = (26, 27)                       # Majin Buu (7320 / 14640 HP)
+
+    def buu(self, e, s):
+        """Majin Buu with Babidi (8-71): Buu takes damage only while pacified (0x0300302C != 0: he wanders, 0xA2 /
+        0xA3, and does not fight back). A punch on Babidi pacifies him (Babidi's 0xC9 -> enter 0x0802AEDA sets it, for
+        ~770 frames, until Babidi's next gesture 0x0802AD88 clears it); Babidi can be hit only while he wanders on the
+        ground (0xC8, >= 300 frames after each gesture), not while he hovers (0xC5). So: block (R) turned to Buu, then
+        punch Babidi when he lands, then punch Buu (A every 6 frames from beside him); step across the line of Buu's
+        candy beam (0x9B)"""
+        if s['p'] is None:
+            return 0
+        if self.maybe_heal(e, s):
+            return self.heal_step(e) or 0
+        ens = enemies(e)
+        b = next(o for o in ens if o[5] in self.BUU)
+        bab = next((o for o in ens if o[5] in (4, 29)), None)
+        st = (ai_state(e, b[0]) or [0])[-1]
+        bst = (ai_state(e, bab[0]) or [0])[-1] if bab else 0
+        x, y, pf = s['p']
+        pacified = e.r32(0x0300302C) != 0
+        if st == 0x9B and not pacified:
+            self.mash = 0
+            if b[3] >= 2:
+                return KEY.DOWN if y >= b[2] else KEY.UP
+            return KEY.RIGHT if x >= b[1] else KEY.LEFT
+        tgt = b if pacified else bab if bab is not None and bst == 0xC8 else None
+        if tgt is None:
+            # Buu cannot be hurt: guard (R, a block from the front takes 1/16) turned to him
+            self.mash = 0
+            dx, dy = b[1] - x, b[2] - y
+            face = (3 if dx > 0 else 2) if abs(dx) >= abs(dy) else (0 if dy > 0 else 1)
+            if pf != face:
+                if self.blocking(e):
+                    return 0
+                return (KEY.DOWN, KEY.UP, KEY.LEFT, KEY.RIGHT)[face]
+            return KEY.R
+        bx, by = tgt[1], tgt[2]
+        dx, dy = bx - x, by - y
+        if -20 <= dy <= 4 and 3 <= abs(dx) <= 21:
+            face = 3 if dx > 0 else 2
+            if pf != face:
+                self.mash = 0
+                return KEY.RIGHT if dx > 0 else KEY.LEFT
+            self.mash += 1
+            return KEY.A if self.mash % 6 < 2 else 0
+        self.mash = 0
+        sides = sorted((-1, 1), key=lambda sd: abs(bx + sd * 16 - x))
+        tx, ty = bx + sides[0] * 16, by
+        if self.grid is not None and not self.grid.ok_box(tx // 8, ty // 8):
+            tx = bx + sides[1] * 16
+        if abs(x - tx) + abs(y - ty) > 24:
+            return self.walk_keys(e, s, tx, ty)
+        k = 0
+        if abs(x - tx) > 1:
+            k |= KEY.RIGHT if tx > x else KEY.LEFT
+        if abs(y - ty) > 1:
+            k |= KEY.DOWN if ty > y else KEY.UP
+        return k
+
+    def exit_rects(self, s):
+        import nav as navm
+        key = f"{s['area'][0]}-{s['area'][1]}"
+        if getattr(self, '_exits', (None,))[0] != key:
+            self._exits = (key, [x[1] for x in navm.exits(key)])
+        return self._exits[1]
 
     def yakon(self, e, s, g):
         """('yakon', cap): Yakon (re/buu/YAKON.md): flee his punch combo (0x321 / 0x322) and his mouth beam's column
@@ -623,7 +795,12 @@ class ShipDriver(Driver):
         return any((tx + a, ty + b) in self.reach for a in (-2, -1, 0, 1, 2) for b in (-1, 0, 1))
 
     def walk_keys(self, e, s, tx, ty):
-        """walk()'s steering toward (tx, ty) without completing the goal"""
+        """walk()'s steering toward (tx, ty) without completing the goal (out of a Destroyer's flame first)"""
+        k = self.flame_guard(e, s)
+        if k is None:
+            k = self.block_guard(e, s)
+        if k is not None:
+            return k
         saved = self.next_goal
         hit = []
         self.next_goal = lambda: hit.append(1)

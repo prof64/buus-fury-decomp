@@ -64,6 +64,8 @@ def main():
         for i, b in enumerate(ring):
             e.load(b)
             e.save_file(str(out / f'fail{i}.ss'))
+        if '--log' in a:
+            (out / 'keys.json').write_text(json.dumps({'from': frm, 'keys': keys, 'failed': True}))
         raise
     f, last, seg_f = st['f'], st['last'], st['seg']
     print(f'{last}: {f - seg_f} frames -> {status(e)}')

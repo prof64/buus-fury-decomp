@@ -619,10 +619,14 @@ export function create(n: AiNodeJ, c: AiController): RNode {
     case 'IfPlayerBlastIncoming':
       return new Cond(n, c, () => e.blastIncoming())
     case 'IfPlayerInLineOfFire':
+      // 0x080331EC: only while IsAnim(0); the footprint centres more than 16 px apart along the facing, less than 16
+      // across (Earth segment 3-2: a tank that just started driving does not roll its Chance)
       return new Cond(n, c, () => {
+        if (!e.isAnim(0)) return false
         const [dx, dy] = e.toPlayer()
-        const [fx, fy] = DIR_VEC[e.facing]
-        return fx ? Math.sign(dx) === fx && Math.abs(dy) < 16 : Math.sign(dy) === fy && Math.abs(dx) < 16
+        const ax = Math.abs(dx)
+        const ay = Math.abs(dy)
+        return e.facing === 0 ? ax < 16 && dy > 16 : e.facing === 1 ? ax < 16 && dy < -16 : e.facing === 2 ? ay < 16 && dx < -16 : ay < 16 && dx > 16
       })
     case 'IfContactHit':
       return new Cond(n, c, () => e.meleeStrike(1024, false))
@@ -1141,6 +1145,7 @@ export function create(n: AiNodeJ, c: AiController): RNode {
           const [mx, my] = e.facing === 0 ? [cx, e.py] : e.facing === 1 ? [cx, cy] : e.facing === 2 ? [b.x0, cy] : [b.x1, cy]
           const s = kiBlast(e.ctx, e, e.facing, 0, mx << 8, my << 8, undefined, undefined, e.w)
           s.o.box = [8, 8, 16, 16]
+          s.o.recBox = true
           e.w.add(s)
         },
       })
@@ -1154,8 +1159,27 @@ export function create(n: AiNodeJ, c: AiController): RNode {
       return timed(n, c, [17, 3], 24, { 8: () => e.shot('wrap') })
     case 'MummyWrapBurst':
       return timed(n, c, [17, 3], 24, { 8: () => e.shot('burst') }, false)
-    case 'TankShoot':
-      return new Instant(n, c, () => e.shot('shell'))
+    case 'TankShoot': {
+      // controller 0x030030EC (tick 0x0802E278): SetAnimRaw(0x13) once, 8 ticks per frame, then SetAnim(0); the shell
+      // when the frame reaches 2 (tick 16); finished once the controller is gone (Earth segment 3-14)
+      let raw = -1
+      let fired = false
+      return new Act(
+        n, c,
+        () => {
+          e.setAnim(18, true, false, { rule: 'once', shift: 3, end: 'idle' })
+          raw = e.ea.pos.raw
+          fired = false
+        },
+        (f) => {
+          if (!fired && e.ea.pos.raw === raw && e.ea.pos.frame === 2) {
+            fired = true
+            e.shot('shell')
+          }
+          return f > 1 && e.ea.pos.raw !== raw
+        },
+      )
+    }
     case 'SoldierThrow':
     case 'TurretFire': {
       // motion controllers: SoldierThrow 0x080266D8 (state 0x03002FCC, SetAnimRaw(0x13), tick 0x08026618) and
@@ -1215,13 +1239,18 @@ export function create(n: AiNodeJ, c: AiController): RNode {
         },
       })
       const enter = t.enter.bind(t)
+      let raw = -1
       t.enter = () => {
         enter()
+        raw = e.ea.pos.raw
         const p = e.player
         const cl = (v: number) => Math.max(-128, Math.min(128, v))
         d.x = p && e.facing >= 2 ? cl(p.px - e.px) : 0
         d.y = p && e.facing < 2 ? cl(p.py - e.py) : 0
       }
+      // a hit's reaction replaced the controller: no bomb, finished (Earth segment 2-10: a bomber hurt mid-throw)
+      const update = t.update.bind(t)
+      t.update = () => (e.ea.pos.raw !== raw ? 1 : update())
       return t
     }
     case 'FlameBreath':

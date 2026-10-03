@@ -890,6 +890,7 @@ export class Player extends Actor implements PlayerLike {
     this.blast = kiBlast(this.ctx, this, this.facing, 1, mx << 8, my << 8, undefined, undefined, w)
     // the player's blast (vtable 0x0804B454) tests a 16 x 16 box centred on its position (obj+0x28..+0x34, emulator)
     this.blast.o.box = [8, 8, 16, 16]
+    this.blast.o.recBox = true
     w.add(this.blast)
   }
 

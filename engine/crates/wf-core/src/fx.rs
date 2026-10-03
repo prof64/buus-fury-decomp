@@ -126,8 +126,8 @@ pub fn puff_rng(w: &mut World, x: i32, y: i32) {
     puff(w, x, y, r);
 }
 /// explosion 0x08712FDC (4 records)
-pub fn explosion(w: &mut World, x: i32, y: i32, rate: i32) {
-    fx_anim(w, 0x0871_2fdc, x, y, 0, 4, rate);
+pub fn explosion(w: &mut World, x: i32, y: i32, rate: i32) -> EntityId {
+    fx_anim(w, 0x0871_2fdc, x, y, 0, 4, rate)
 }
 pub fn beam_charge(w: &mut World, owner: EntityId, off: [(i32, i32); 4], set: BeamSet) -> EntityId {
     add(w, Fx::BeamCharge { owner, off, set, t: 0 })

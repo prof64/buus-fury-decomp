@@ -107,6 +107,7 @@ impl Session {
                 return;
             }
             if !std::mem::take(&mut w.menu.resume) {
+                w.menu.closed_this_frame = !crate::menu::active(w);
                 // scripts a menu starts (item use) run where the game runs them: right after its step
                 Self::run_hook(&mut self.hook, &mut self.world, 0);
                 return;
@@ -121,11 +122,18 @@ impl Session {
     /// the objects' update and the cutscene systems (second part of [`Session::step_world`])
     pub fn step_update(&mut self) {
         let w = &mut self.world;
+        if std::mem::take(&mut w.menu.closed_this_frame) {
+            return;
+        }
         if crate::menu::active(w) {
             if w.field.is_some() && crate::menu::minigame::world_runs(w) {
                 // the players get no input: the mode reads the keys (menu_parity mg_power: no punches)
                 w.input = [InputFrame::default(); MAX_PLAYERS];
                 w.step_entities();
+            } else if w.field.is_some() && matches!(w.menu.phase, crate::menu::Phase::FadeOut { .. }) {
+                // a screen opening over the field: its fade-out leaves the objects still, the cameras keep easing
+                // (segment sb 21-14: the save point's party menu, the follow camera reaches its target under it)
+                crate::field::world_mode_cameras(w);
             }
             return;
         }

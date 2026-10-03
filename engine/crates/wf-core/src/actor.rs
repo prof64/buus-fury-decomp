@@ -67,6 +67,11 @@ impl Actor {
         let b = self.body[self.facing as usize & 3];
         Rect::new(self.px() + b[0], self.py() + b[1] + self.z, self.px() + b[2], self.py() + b[3] + self.z)
     }
+    /// the body box at the ground position (no height)
+    pub fn body_box_ground(&self) -> Rect {
+        let b = self.body[self.facing as usize & 3];
+        Rect::new(self.px() + b[0], self.py() + b[1], self.px() + b[2], self.py() + b[3])
+    }
     pub fn foot_box(&self) -> Rect {
         Rect::new(self.px(), self.py(), self.px() + self.foot_w, self.py() + self.foot_h)
     }

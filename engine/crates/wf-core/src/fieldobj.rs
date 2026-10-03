@@ -289,6 +289,13 @@ fn break_done(w: &mut World, id: EntityId) {
     });
     if let Some(run) = cb {
         w.events.push(Event::Field(FieldEvent::Run { run, cause: Cause::Break { obj, x, y }, slot: 0 }));
+        let frame = w.frame + 1;
+        if let Some(f) = w.field.as_mut() {
+            f.busy_pre_pass = frame;
+            // run before the objects update, like a queued event: the enemies run their update in its last frame
+            // (segment sb 21-11)
+            f.queued_event = true;
+        }
     }
 }
 
@@ -523,6 +530,11 @@ pub fn item_get_step(w: &mut World) {
     }
     if let Some((run, cause)) = g.then {
         w.events.push(Event::Field(FieldEvent::Run { run, cause, slot: g.slot }));
+        // the map item's event runs inside the presentation's caller (the player's update): the frame it ends in
+        // completes the interrupted object pass (4-30: the scientist thinks in the frame s197's text box closes)
+        if let Some(f) = w.field.as_mut().filter(|f| f.host) {
+            f.held_event = true;
+        }
     }
 }
 
