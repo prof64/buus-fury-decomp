@@ -1336,6 +1336,26 @@ two Python hash seeds, gives identical key logs (13,000 frames); the earlier run
 * Gates in data/segments: `pg_g82_001_08_02` (380, the L100 gate's s517), `pg_g233_006_02_14` (277),
   `pg_g233_007_02_33` (385, the s518 gate), `rj_arena_000_18_14` (515: the allocator check stops it there - exact to
   6,940 with `SEGMENT_VRAM=0`), `rj_back1_000_18_10` (241, allocator; exact to 382 without).
+* More legs (same tool): g87 (8-2's L100 gate first - the way to 8-7 is behind it - then 8-1's save point ->
+  Vegeta -> 8-3 .. 8-6 -> 8-7's per-visit gate, Vegeta L120), g111 (8-1's save point -> Gohan, 8-1's take-off pad
+  (A) -> the world map -> Diablo Desert 11-1's tier-2 gate, Gohan L100, flag 170), **hidden** (from g233's end: the
+  East District hidden dungeon 2-34 .. 2-47 - 2-39's house door (walk up from x 201; the exit rect is x 192..208),
+  the Key in 2-47 (s118, A facing up at (90, 96) under the dresser), back, 2-35's rock (breakable, 3 punches from
+  the west at (230, 128) facing right) to reach 2-40 .. 2-46, the Z-Fighter Exhibit chest in 2-46 (s117, item 71,
+  flag 193) - **18 / 18 cuts exact**), **heaven** (Kami's Lookout 6-1 -> 6-14's pad (A, flag 149) -> the Other World
+  map (cursor on Earth; one LEFT = Heaven, A) -> 22-1: Dabura - the first map NPC, wandering - gives the Crystal
+  O-Yoroi, s490, flag 152; driver goal `talknpc`), **xj6** (`tools/side/xj6.py`: Flying Mega-Fortress XJ-6 on the
+  dungeon B agent's DbDriver - the lift at 12-27 wants x >= 104 (walk (108, 358) + UP), the boss is an Ultra Bio
+  Mech (0x83, 8,945 HP) idle until within 80 px (walk up to it), s389 = the Hercule Exhibit (item 58, flag 151) and
+  the countdown, out to 12-1's pad: 24,803 frames; 36 / 54 cuts exact, the boss fight inside the 12-27 cut exact).
+  Gates added: `pg_g87_006_08_07` (367), `pg_hidden_005_02_47` (96), `pg_hidden_010_02_35` (375),
+  `pg_hidden_015_02_44` (425), `pg_hidden_017_02_46` (119), `pg_heaven_001_06_02` (196), `pg_heaven_002_06_14`
+  (336), `pg_xj6_000_12_02` (565), `pg_xj6_025_12_27` (892), `pg_xj6_051_12_02` (211), `pg_xj6_052_12_01` (264) -
+  each at its allocator-on length (exact to the end with `SEGMENT_VRAM=0`).
+* **For the dungeon B agent (airship shooters):** XJ-6's 12-3 f165 (`work/side/pgseg/xj6/pg_xj6_001_12_03`): an
+  enemy shot (shots kind 11, from the type-140 shooter at (275, 525)) hits our Goku walking up past it (a draw, his
+  facing turns) and misses the game's; the same rooms' 12-20 f405, 12-9 f117, 12-8 f89 stop at the same kind of
+  thing. XJ-5's rooms are yours - probably one shot-vs-player rule.
 * Gate mechanics as recorded: a gate is an A-button script trigger (s517's 8-2 / 11-1 rects also want facing up);
   the position (footprint top-left) must be inside the rect - stand up against it; s518's open_area leaves a
   32-px opening (2-33: x 216..248), so a character beside it stays blocked by the posts.

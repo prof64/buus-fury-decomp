@@ -468,6 +468,17 @@ fn build_returned(_data: &Arc<GameData>, ram: &GbaRam, runner: &mut StoryHost, e
         p.a.facing = ram.r8(po + 0x10);
     }
     if let (Some(&(_, raw, cel, tick)), Some(pi)) = (rows.get(&ram.player()), w.player_idx(0)) {
+        // a script's frame-range controller (0x0804DE58: +4 pass, +8 ticks a cel, +0xC passes, +0x10 loop start,
+        // +0x14 last cel) runs the leader as a scene puppet
+        let st = ram.r32(ram.player() + 0x14);
+        if ram.valid(st) && ram.r32(st) == 0x0804_DE58 {
+            let mode = wf_core::scene::AnimMode::Frames { each: ram.s32(st + 8), loops: ram.s32(st + 0xC), loop_start: ram.s32(st + 0x10), last: ram.s32(st + 0x14), pass: ram.s32(st + 4) };
+            wf_core::player::script_pose(&mut w, pi, raw.clamp(0, 24) as usize, cel);
+            let id = w.ents[pi].id;
+            let anim = wf_core::scene::ActAnim { raw, frame: cel, tick, mode, ..wf_core::scene::ActAnim::of(raw) };
+            w.scene.puppets.retain(|p| p.id != id);
+            w.scene.puppets.push(wf_core::scene::Puppet { id, anim });
+        }
         let p = w.pl(pi);
         p.ap.raw = raw;
         p.ap.frame = cel;

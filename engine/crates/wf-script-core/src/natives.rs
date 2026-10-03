@@ -81,7 +81,7 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
     let n = c.native;
     let a = c.args;
     if std::env::var_os("T_NAT").is_some() {
-        eprintln!("  t-nat f{} 0x{n:02x} {:?}", h.w.frame, &a[..4]);
+        eprintln!("  t-nat f{} 0x{n:02x} {:?}", h.w.frame, a.iter().take(4).collect::<Vec<_>>());
     }
     match n {
         0x00..=0x07 => Err(format!("native 0x{n:02x} is handled by the VM")),
