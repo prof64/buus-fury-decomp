@@ -121,3 +121,23 @@ fn original_pacing_holds_after_a_load_only_when_enabled() {
         }
     }
 }
+
+/// `return_to_field` turns the load count back to the saved field's: script-moved props of the scene loaded in
+/// between must not survive as the next real load's props (14-22's switch shrine -> 14-21's bridge).
+#[test]
+fn return_to_field_drops_the_scenes_props() {
+    let Some(p) = packs() else { return };
+    let mut s = StorySim::new(&p, (1, 1), vec![], 3).expect("story");
+    let mut ev = vec![];
+    for _ in 0..20 {
+        s.step(&[0], &mut ev);
+    }
+    let w = &mut s.session.world;
+    let saved = wf_core::field::save_world(w);
+    let loads = w.field.as_ref().unwrap().loads;
+    // a scene load in between and one of its props moved by a script
+    w.field.as_mut().unwrap().loads = loads + 1;
+    w.scene.props.push(wf_core::scene::Prop { id: 0, x: 144 << 8, y: 8 << 8, visible: true, frame: 0, vy: 0, load: loads + 1 });
+    wf_core::field::restore_world(w, saved);
+    assert!(w.scene.props.iter().all(|p| p.load <= loads), "a scene's prop survived return_to_field");
+}

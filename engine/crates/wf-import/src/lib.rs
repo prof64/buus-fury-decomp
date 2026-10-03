@@ -419,6 +419,16 @@ fn build_event_entry(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner:
         w.scene.screen.black = 16;
         w.scene.screen.dim = 256;
     }
+    // the event stands at its load action, blocked on it (warp_fade: until the fade-in ends; warp: until the
+    // arrival) - positioned before the load: the node's queries read the world before it (the leader exists)
+    {
+        use wf_script_core::Pending;
+        match probe {
+            Some((k, 0x76)) => runner.continue_event(&mut w, ev.0, ev.1, ev.2, k, Some(Pending::Transition)),
+            Some((k, _)) => runner.continue_event(&mut w, ev.0, ev.1, ev.2, k, Some(Pending::Arrival)),
+            None => {}
+        }
+    }
     let mut evs: Vec<Event>;
     if fading {
         // warp_fade 0x76: the field's fade-out ends in this frame's post step with the load (no idle draw of its own:
@@ -449,20 +459,9 @@ fn build_event_entry(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner:
         }
         evs = std::mem::take(&mut w.events);
     }
-    // the event blocked on its load action (warp_fade: until the fade-in ends; warp: until the arrival), the load's
-    // scripts nested over it; a node that began after the load (a jump's scene) runs from its start once they end
-    use wf_script_core::Pending;
+    // (the event blocked on its load action - placed before the load, below: the load's scripts nest over it)
     match probe {
-        Some((k, 0x76)) => {
-            runner.continue_event(&mut w, ev.0, ev.1, ev.2, k, Some(Pending::Transition));
-            if std::env::var("DBG_EV").is_ok() { eprintln!("EV after continue {} evs {}", runner.thread_summary(), evs.len()); }
-            runner.nest_over(&mut w, &evs);
-            if std::env::var("DBG_EV").is_ok() { eprintln!("EV after nest {}", runner.thread_summary()); }
-        }
-        Some((k, _)) => {
-            runner.continue_event(&mut w, ev.0, ev.1, ev.2, k, Some(Pending::Arrival));
-            runner.nest_over(&mut w, &evs);
-        }
+        Some(_) => runner.nest_over(&mut w, &evs),
         None => {
             runner.run_nested(&mut w, &evs);
             runner.continue_event(&mut w, ev.0, ev.1, ev.2, 0, None);

@@ -438,7 +438,11 @@ pub struct Save {
 /// iteration over 121.4 frames) ends with the palettes cleared, shown in its last frame (`leave_black`)
 pub const LIST_FRAMES: u8 = 1;
 pub const POPUP_FRAMES: u8 = 3;
-pub const WRITE_FRAMES: u8 = 120;
+/// the write's iteration: from the VBlank it starts at (the popup's iteration ended in time) to its end, sound
+/// update included; no sound interrupt runs meanwhile, so the frame count is this length alone (the frames after
+/// the first: the redraw lag)
+pub const WRITE_CYCLES: i64 = 34_103_267;
+pub const WRITE_FRAMES: u8 = (WRITE_CYCLES / crate::sndsim::FRAME - 1) as u8;
 
 impl Save {
     pub fn new(w: &World, flag: bool) -> Save {

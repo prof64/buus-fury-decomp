@@ -406,6 +406,20 @@ belongs to the actor state 0x0804C690 and stops in Kid Buu's second update after
 f12346 / f12347, retracts from f12348); the beam pose is that state's - cels 0, 1, 2, then 1 / 2 alternating every
 8 ticks until the state ends (no one-shot end, no idle). Battles keep the reference for all three. `sb_041` stays
 66,219 / 66,219. Next stop f13417: an actor (sprite 47) raw 13 vs the game's idle.
+*In-event kinds, round 2 (A):* **warp_fade (0x76) and 3D world-map arrivals import too.** The importer now
+probes the node (`StoryHost::probe_event`: the handler runs with every queued action dropped, queries answer from
+the world before the load, across its `next` steps) for the warp / warp_fade into the cut's area (variant 0 = the
+area's default); the event is placed **blocked on that action before the load** (`continue_event` with
+`Pending::Arrival` for a warp, `Pending::Transition` for a warp_fade), the load is built the way the native makes it
+(warp: players idle + `load_area`; warp_fade: the field's fade-out at its last step, the load in the post step,
+`nest_fade`), and the load's on-enter scripts **nest over the blocked event** (`StoryHost::nest_over`, the
+natives' own `nest_loads` mechanism; the event resumes when they end / when the fade-in ends). Held arrival frames
+(a blocking on-enter script) are played like an exit arrival's. A screen blacked by a script's fade_out applies to
+the warp kind only (a warp_fade's darkness is the field's own fade). Proof: the real route's s515 take-off onto the
+world map, **`rkb_001_0-50` 3,690 / 3,690 exact** (gated); s463's warp_fade to 0-50 (`kbr_013`) imports and matches
+92 frames (stop: the flyer's animation under a text box - the 3D-map sprite-memory purge, Super Buu agent's area).
+The opening proofs stay exact. Runtime: a dropped action's skip is applied before the queue hold (inert outside
+imports: both fields default off; wf-script-core lockstep / events incl. `shop` green on this tree).
 The refused kinds: the s462 / s463 cuts are `return_to_field` (0x75) - the field restored after a scene is a
 mid-area state (its objects keep their pre-scene AI / positions), not a load; they need mid-area import.
 
@@ -1057,6 +1071,15 @@ page's own cycles built from its draw list; opt-in as before (`init.snd_phase`),
     `alignBlocked`; TS dumps regenerated, cross_ts green). The rule itself is unchanged.
   - A fade from white (scene `FadeKind::White`, in) clears the black level at its first step: the palette is
     written from white toward the target (8-66 f18,226: the load left the screen black, the game shows the white).
+  - Save write (for the side-content agent's 18-13 note): measured on the emulator (`rj_h13_001_18_13` f1349) -
+    one main-loop iteration of 34.05 M cycles with **no sound interrupt** (interrupts off through the flash loop),
+    ending 34,103,267 cycles after the VBlank it starts at, palettes cleared. `save.rs` now derives the lag from
+    that length (`WRITE_CYCLES` -> 120 frames after the first; the sound predictor does not apply) and the page's
+    last write frame is black (`leave_black`). 18-13 now matches to f1484 (the close's camera step and one black
+    frame too many at the close - the scripted-screen reload, next). Only one save write is recorded so far; the
+    start offset is the VBlank whenever the popup's iteration fits its frame.
+  - Script lockstep `shop`: exact on this tree. It fails exactly when `scene::window_fades` returns true on 1-1
+    (map bldcnt 0x1041 -> no fade); a content cache without the new `bldcnt` map property (=0) turns it red.
 
 **Side-content catalogue** (data survey 2026-10-02; flags = story flags): Broly turns out to be **mainline** (Dragon
 Ball saga: his defeat s436 sets flag 111, which Dragon Ball #4 s439 needs) — shared with the Super Buu agent, whose main line
@@ -1837,3 +1860,29 @@ the tournament, East District, Babidi's ship stages 1 - 3 ...) to 8-14, where th
 past it, so the Continue-keeps-matching test there waits for that model or a second checkpoint start after the menu.
 Not mine, seen on the way: `wf-script-core` lockstep scenario `shop` fails on the current tree with or without my
 edits (an in-flight menu change).
+
+**§11 update 8 (B): Save -> Continue on real play state; dungeons and post-ball chain in the app.**
+*Second ship checkpoint* (`shipr_237`, 8-15, after the 8-14 pause menu; master `work/db57/shipmaster/ship_master2.json`,
+95,000 rows to 8-67): the app follows **all 95,000 rows** (Babidi's ship to Dabura and beyond, past 8-66). The real
+route never saves (8-66's save point is used for Switch Character), so `soak --save-at 86320 --continue-on-save`
+makes the app save there through the real Save screen (683-byte slot), builds a fresh title session with that file,
+chooses Continue through the title's menus (194 frames) and compares: **story state identical** (flags, supplies,
+equipment, zenie, script words, all nine records), same area, the leader at the save point's stored spot. The
+continued session then follows the real key log through the rest stretch and the second Switch Character with every
+area on the recording's row for ~8,000 rows (to 94,409); what differs comes from the restart itself (the leader at
+the stored spot, y 298, where the game's never-reloaded player stood at 303; a fresh RNG / bench-regen phase).
+*Dungeons / post-ball (checkpoint = each local run's first cut, continuous masters `master_{5,6,7,x}.json`):*
+| chapter | rows | result |
+|---|---|---|
+| db6 Ninja Stronghold | 17,963 | all rows match |
+| dbx post-ball chain (summoning, Goku vs Buu, fusion, Gotenks vs Buu) | 46,404 | all rows match |
+| db7 Kyodai Pyramid | 26,904 | to the 14-20 heal menu (row 15,853, menu timing); areas in step to 21,235 |
+| db5 Airship | 27,598 | to the 12-19 heal menu (row 8,097, menu timing) |
+One more app-only bug (fixed, regression test `carried_state::return_to_field_drops_the_scenes_props`):
+**`return_to_field` turned the load count back but kept the scene's script-moved props** (`field::restore_world`):
+14-22's switch shrine s415 (`load_scene`, prop moves, `return_to_field`) left its props keyed by the count the next
+real load reused, and 14-21's bridge props started from the shrine's positions (s418 never finished). The
+`become_map_object` fix (update 7) has no standalone regression test yet - the ship soak covers it.
+*Web shell:* launcher Settings row "Original pacing" (shared Rust launcher, both shells); `wf_app_set_pacing` export
+in wf-web, applied from the saved settings by `web/app/app.js`. `web/app/wf_web.wasm` needs a rebuild
+(`web/app/build.sh`) to carry the export; app.js calls it optionally, so the current artifact keeps working.

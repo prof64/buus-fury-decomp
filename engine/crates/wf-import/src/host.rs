@@ -33,6 +33,7 @@ struct Outer {
     pending: Option<wf_script_core::Pending>,
     from_wait: bool,
     cause: Option<Cause>,
+    inline_ai: bool,
 }
 
 pub struct StoryHost {
@@ -52,6 +53,8 @@ pub struct StoryHost {
     pub started: Vec<(usize, String)>,
     /// held keys of the previous logic frame (input edges)
     pub prev_held: u16,
+    /// the running script is an object's inline script (an AI InlineScript node, `Cause::Ai` + `Callback::Script`)
+    inline_ai: bool,
     /// logic frames stepped
     pub frame: usize,
 }
@@ -64,7 +67,7 @@ impl StoryHost {
         let rt = Runtime::new(files, Box::new(shared.clone()))?;
         let stepped = files.iter().filter(|(_, src)| src.contains("fn step_0()")).map(|(p, _)| p.clone()).collect();
         let hs = HostState { nest_area_enter: true, ..HostState::default() };
-        Ok(StoryHost { rt, shared, hs, queue: VecDeque::new(), running: false, cause: None, outer: vec![], stepped, errors: vec![], started: vec![], prev_held: 0, frame: 0 })
+        Ok(StoryHost { rt, shared, hs, queue: VecDeque::new(), running: false, cause: None, outer: vec![], stepped, errors: vec![], started: vec![], prev_held: 0, inline_ai: false, frame: 0 })
     }
 
     /// a session around an imported / built world (no hook: the host runs the queue itself)
@@ -161,6 +164,7 @@ impl StoryHost {
                 self.hs.pending = o.pending;
                 self.hs.from_wait = o.from_wait;
                 self.cause = o.cause;
+                self.inline_ai = o.inline_ai;
                 self.running = true;
             }
         }
@@ -177,7 +181,7 @@ impl StoryHost {
         let k = (from..w.events.len()).find(|&k| matches!(&w.events[k], Event::Field(FieldEvent::Run { cause: Cause::AreaEnter, .. })));
         let Some(k) = k else { return };
         let Event::Field(FieldEvent::Run { run, .. }) = w.events.remove(k) else { return };
-        let o = Outer { thread: self.rt.state(), pending: self.hs.pending.take(), from_wait: std::mem::take(&mut self.hs.from_wait), cause: self.cause.take() };
+        let o = Outer { thread: self.rt.state(), pending: self.hs.pending.take(), from_wait: std::mem::take(&mut self.hs.from_wait), cause: self.cause.take(), inline_ai: self.inline_ai };
         self.outer.push(o);
         self.running = false;
         self.queue.push_front(Job { run, cause: Cause::AreaEnter });
@@ -313,7 +317,7 @@ impl StoryHost {
             _ => None,
         }).collect();
         if !runs.is_empty() {
-            let o = Outer { thread: self.rt.state(), pending: self.hs.pending.take(), from_wait: std::mem::take(&mut self.hs.from_wait), cause: self.cause.take() };
+            let o = Outer { thread: self.rt.state(), pending: self.hs.pending.take(), from_wait: std::mem::take(&mut self.hs.from_wait), cause: self.cause.take(), inline_ai: self.inline_ai };
             self.outer.push(o);
             self.running = false;
             for j in runs.into_iter().rev() {
@@ -328,7 +332,7 @@ impl StoryHost {
     /// run a load's scripts nested inside a script (import of a warp inside an event): the field stays held when they
     /// end, as under the warp that made the load
     pub fn run_nested(&mut self, w: &mut World, evs: &[Event]) {
-        self.outer.push(Outer { thread: self.rt.state(), pending: None, from_wait: false, cause: None });
+        self.outer.push(Outer { thread: self.rt.state(), pending: None, from_wait: false, cause: None, inline_ai: false });
         self.collect(evs);
         self.run_queue(w);
         // (still running nested: it stays on top of the placeholder; ended: the placeholder came back - drop it)
@@ -360,6 +364,7 @@ impl StoryHost {
             g.g = w.story.g;
             self.rt.set_globals(g);
             self.cause = Some(job.cause.clone());
+            self.inline_ai = matches!((&job.cause, &job.run), (Cause::Ai { .. }, Callback::Script(_)));
             match &job.run {
                 Callback::Script(id) => {
                     let path = format!("scripts/inline/{id}.rhai");
@@ -438,13 +443,25 @@ impl StoryHost {
         let before = self.started.len();
         self.run_queue(&mut sess.world);
         let fresh = self.started.len() > before;
+        // An object's inline script (AI InlineScript, 0x08004038) runs its bytecode inside that object's update: a
+        // wait it blocks on is a nested frame loop, and when the wait ends the rest runs in the object's update of
+        // the next frame - before the objects the list updates after it (the player, created first). So it resumes
+        // here, before the objects pass, on the state the last frame left (Earth 4-25, Vegeta's 0x0870EA28:
+        // play_anim on the player x 3, face_actor - the player's control runs in that frame: held RIGHT walks).
+        let early = !fresh && self.running && self.inline_ai && self.outer.is_empty();
+        if early {
+            wf_script_core::tick_timers(&mut sess.world, &mut self.hs);
+            self.resume_blocked(&mut sess.world);
+        }
         let n0 = sess.world.events.len();
         sess.step_update();
-        wf_script_core::tick_timers(&mut sess.world, &mut self.hs);
+        if !early {
+            wf_script_core::tick_timers(&mut sess.world, &mut self.hs);
+        }
         // the running script resumes from its wait (not one this frame's start began: its first wait counts from the
         // next frame), then the scripts the update started (NPC talk)
         let evs: Vec<Event> = sess.world.events[n0..].to_vec();
-        if !fresh {
+        if !fresh && !early {
             self.resume_blocked(&mut sess.world);
         }
         self.collect(&evs);
@@ -476,6 +493,7 @@ pub struct HostSnapshot {
     errors: usize,
     started: usize,
     prev_held: u16,
+    inline_ai: bool,
     frame: usize,
 }
 
@@ -498,6 +516,7 @@ impl StoryHost {
             errors: self.errors.len(),
             started: self.started.len(),
             prev_held: self.prev_held,
+            inline_ai: self.inline_ai,
             frame: self.frame,
         }
     }
@@ -512,6 +531,7 @@ impl StoryHost {
         self.errors.truncate(s.errors);
         self.started.truncate(s.started);
         self.prev_held = s.prev_held;
+        self.inline_ai = s.inline_ai;
         self.frame = s.frame;
     }
 }

@@ -142,3 +142,7 @@ segment (stretch): matched / frames, category - first divergence
 * `r069_161_14-2` (069_k05_vegeta150): 166 / 2,174, **position / facing** - Some((166, "pos: #3 sprite 256: (89.8203125, 130.578125) vs game (91.8203125, 130.578125)"))
 * `r069_167_14-2` (069_k05_vegeta150): 623 / 914, **RNG** - Some((623, "rng: [4f5723e8, edd9719e] vs game [bffb91c7, cb05f4c1]"))
 * `r069_168_14-1` (069_k05_vegeta150): 413 / 55,831, **screen fade** - Some((438, "fade: black false vs game true"))
+
+Update (A): **warp_fade (0x76) and 3D world-map arrivals inside events now import** (gate `rkb_001_0-50`: the real
+route's s515 take-off, 3,690 frames exact). Re-cut with `--events`. Still refused: `return_to_field` (mid-area
+state; next on A's list) and scene loads 0x72 .. 0x74.
