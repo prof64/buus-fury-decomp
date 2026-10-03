@@ -312,7 +312,7 @@ class SideDriver(ShipDriver):
 W4 = [(x, 32) for x in range(11, 19)]                      # 18-4's wall (x 88..151, y 256): hidden by 18-2's switch
 ROCK = [(x, y) for x in range(50, 54) for y in range(7, 10)]  # 18-10's boulder (400..432, 56..80): punched from the east
 A_, B_, L_, R_, U_, D_ = 1, 2, 32, 16, 64, 128
-# save point menu -> Switch Characters -> LEFT / RIGHT -> A (re/buu/ship/ship_route.py charsel)
+# on a save point's pad (the player's position inside its trigger rect), A: menu -> Switch Characters -> LEFT / RIGHT -> A (re/buu/ship/ship_route.py charsel)
 def charsel(moves):
     d = R_ if moves > 0 else L_
     k = [(A_, 3, 40), (D_, 3, 12), (A_, 3, 80)] + [(d, 3, 20)] * abs(moves) + [(A_, 3, 60)]
@@ -340,10 +340,14 @@ ROUTE = [
     ('exitat', 24, 72, 'L'), ('walk', 433, 66), ('face', 'L'), ('keys', [(A_, 2, 10)] * 4), ('wait', 20),
     # (no room fights on the way back: a fight beside an exit pushes through it; the enemies near the path are
     # still fought, hand_guard)
-    ('goto', '18-1', 104, 272, False), *charsel(-1), ('wait', 20), ('mark', 'veg1'),
-    ('goto', '18-12', 88, 52, False), ('face', 'U'), ('press', A_), ('events',), ('wait', 30), ('mark', 'gate'),
-    # 18-13: s448 (Pikkon) on the way in, then its save point: Goku again
-    ('exitat', 96, 28, 'U'), ('wait', 20), ('events',), ('wait', 30), ('walk', 120, 204), *charsel(1), ('wait', 20),
+    # (the menu's row: Goku, Gohan, Goten, Trunks, Vegeta - four steps)
+    ('goto', '18-1', 104, 272, False), ('walk', 107, 240), *charsel(4), ('wait', 20), ('mark', 'veg1'),
+    # (A with the position inside the gate's rect (73, 33, 47, 15): up against it)
+    ('goto', '18-12', 88, 52, False), ('keys', [(U_, 12, 5), (A_, 3, 60)]), ('events',), ('wait', 30),
+    ('mark', 'gate'),
+    # 18-13: s448 (Pikkon) on the way in, then its save point's pad. (No switch back: in the constructed start
+    # state the menu has Goku greyed out - to be checked against the real-route state.)
+    ('exitat', 96, 28, 'U'), ('wait', 20), ('events',), ('wait', 30), ('walk', 120, 170), ('wait', 20),
     ('mark', 'h13'),
 ]
 

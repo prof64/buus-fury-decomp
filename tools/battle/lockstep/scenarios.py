@@ -169,6 +169,19 @@ def holds():
     out.append(vs(2, 'hold_wraps', [['', 200]] + MASH_DPAD * 30 + [['', 200]], at=(80, 0), etype=0x4D, real=True, ehp=None))
     out.append(vs(2, 'hold_latch', [['', 200]] + MASH * 20 + [['', 200]], at=(7, -12), etype=0x18, real=True, ehp=None))
     out.append(vs(2, 'hold_vampire', [['', 150]] + MASH * 20 + [['', 200]], at=(30, 0), etype=0x85, real=True, ehp=None))
+    # held keys do not count for the vampire's grab (input manager +4 = the press edge): A held 200 frames keeps it,
+    # B held likewise, then separate presses (2 frames apart) free the player
+    out.append(vs(2, 'hold_vampire_held', [['', 150], ['A', 200], ['', 12], ['B', 100], ['', 12]] + [['A', 1], ['', 1], ['B', 1], ['', 1]] * 10 + [['', 200]], at=(30, 0), etype=0x85, real=True, ehp=None))
+    # the other escapes with keys held instead of pressed (they read the press ring 0x08040284: held keys are no
+    # presses): 200 frames of a held d-pad / A, then the mash
+    HELD = [['LEFT', 100], ['', 4], ['A', 100], ['', 4]]
+    out.append(vs(2, 'hold_hug_held', [['', 120]] + HELD + MASH_DPAD * 30 + [['', 200]], at=(14, 0), etype=0x6F, real=True, ehp=None, state=0x22E,
+                  partner={'type': 0x93, 'at': [60, 24]}))
+    # (kept short: Dabura's fight after the stone diverges at frame 532 of the long form - enemy / RNG, not the hold)
+    out.append(vs(2, 'hold_stone_held', [['', 120]] + HELD + MASH * 10 + [['', 60]], at=(80, 0), etype=0x12, real=True, ehp=None, state=0x7C))
+    out.append(vs(2, 'hold_freeze_held', [['', 150]] + HELD + MASH * 20 + [['', 200]], at=(48, 0), etype=0x0E, real=True, ehp=None))
+    out.append(vs(2, 'hold_wraps_held', [['', 200]] + HELD + MASH_DPAD * 30 + [['', 200]], at=(80, 0), etype=0x4D, real=True, ehp=None))
+    out.append(vs(2, 'hold_latch_held', [['', 200]] + HELD + MASH * 20 + [['', 200]], at=(7, -12), etype=0x18, real=True, ehp=None))
     out.append(vs(2, 'hold_candy', [['', 60], ['UP', 40], ['', 20], ['DOWN', 40], ['', 440]], at=(80, 0), etype=0x1A, real=True, ehp=None, state=0xBB))
     return out
 

@@ -51,7 +51,9 @@ for p in sorted(src.glob('*.json')):
         continue
     doc = json.loads(p.read_text())
     doc['frames'] = doc['frames'][:n]
-    doc['expect'] = {'matched': n}
+    # a window cut out of a longer recording can end inside a multi-frame stretch (a load's or a menu's lag frames)
+    # whose rows only match once it completes: such a gate expects 32 frames less than it holds
+    doc['expect'] = {'matched': n if n == frames else n - 32}
     doc['full'] = {'frames': frames, 'matched': frames if exact else matched}
     sg.save(seg, doc)
     tot[3] += n

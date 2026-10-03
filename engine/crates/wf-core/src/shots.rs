@@ -2323,15 +2323,23 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
             }
             false
         }
+        // the bullets' handlers 0x0802764E (gun) / 0x080278E2 (rifle) / 0x0802C8AE (shuriken): the same - any message
+        // of kind 0 but its own (msg+0x30) overlapping its box ends it (gun 0x08027516 / rifle 0x0802770C: the wall
+        // end's sound and explosion; the shuriken is just removed) and is accepted, whatever the sender's team or
+        // attack kind (the real route, Diablo Desert Express 11-21: Trunks' ki blast meets a gunman's bullet - the
+        // bullet bursts, the blast counts the hit, the player is not hit)
         ShotKind::Straight(o) => {
-            if o.fragile && o.dead < 0 && msg.team == 1 && msg.atk.kind == 0 && msg.source != me && overlaps(&msg.rect, &rect(w, i)) {
-                let sfx_end = o.sfx_end;
+            if o.fragile && o.dead < 0 && !msg.foot && msg.source != me && !w.ents[i].removed && overlaps(&msg.rect, &rect(w, i)) {
+                let (sfx_end, explode) = (o.sfx_end, o.explode);
                 w.ents[i].removed = true;
                 if sfx_end >= 0 {
                     w.sfx(sfx_end, 64);
                 }
-                let (px, py) = (w.shot_ref(i).px(), w.shot_ref(i).py());
-                fx::explosion(w, px, py, 0x2000);
+                if explode {
+                    let (px, py) = (w.shot_ref(i).px(), w.shot_ref(i).py());
+                    fx::explosion(w, px, py, 0x2000);
+                }
+                return true;
             }
             false
         }

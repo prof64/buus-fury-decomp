@@ -262,6 +262,9 @@ pub struct Container {
     pub sel: i32,
     /// +0x110: drawn (false = redraw at the next update)
     pub drawn: bool,
+    /// drawn at least once (the timing model: a page's first redraw carries its enter)
+    #[serde(default)]
+    pub ever: bool,
     /// the page's own cursor point (page vt +0x1C overrides, e.g. the shop list); `Some(None)` = no cursor;
     /// None = ask the children
     #[serde(default)]

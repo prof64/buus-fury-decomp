@@ -149,7 +149,7 @@ impl Session {
                 // the players get no input: the mode reads the keys (menu_parity mg_power: no punches)
                 w.input = [InputFrame::default(); MAX_PLAYERS];
                 w.step_entities();
-            } else if w.field.is_some() && matches!(w.menu.phase, crate::menu::Phase::FadeOut { .. }) {
+            } else if w.field.is_some() && matches!(w.menu.phase, crate::menu::Phase::FadeOut { .. } | crate::menu::Phase::FadeIn { .. }) {
                 // a screen opening over the field: its fade-out leaves the objects still, the cameras keep easing
                 // (segment sb 21-14: the save point's party menu, the follow camera reaches its target under it)
                 crate::field::world_mode_cameras(w);
@@ -168,6 +168,8 @@ impl Session {
                 // the task list (screen shakes) keeps running while an inline event holds the objects' update (the
                 // real route, Southwest Forest 8-3: a crit shake draws its offsets through the level-up popup)
                 w.tick_shakes();
+                // and the coins fly on (fieldobj.rs coin_move)
+                crate::fieldobj::held_moves(w);
             }
             // the leader's KO timer: the death / Lazarus Crystal hook (menu/gameover.rs)
             crate::menu::gameover::tick(w);

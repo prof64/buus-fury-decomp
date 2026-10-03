@@ -340,6 +340,9 @@ pub struct VramState {
     /// effects whose block outlives the entity by a frame (`linger`)
     #[serde(default)]
     pub late: Vec<crate::world::EntityId>,
+    /// actors whose shadow a script set (`shadow_set`): the shared graphic's index, None = no shadow
+    #[serde(default)]
+    pub shadow_set: Vec<(crate::world::EntityId, Option<u8>)>,
     /// what a purge suspended, in order (`suspended` = its entities)
     #[serde(default)]
     pub susp: Vec<Susp>,
@@ -437,7 +440,39 @@ pub fn shared_release(w: &mut World, k: usize) {
 fn sprite_of(w: &World, i: usize) -> Option<(i32, Shares)> {
     let s = w.actor(i)?.sprite?;
     let sp = w.data.sprite(s)?;
-    Some((sp.tile_bytes, shares_of(sp)))
+    let mut sh = shares_of(sp);
+    let id = w.ents[i].id;
+    if let Some(o) = w.field.as_ref().and_then(|f| f.vram.as_ref()).and_then(|v| v.shadow_set.iter().find(|o| o.0 == id)) {
+        sh.1 = o.1.map(|k| k as usize);
+    }
+    Some((sp.tile_bytes, sh))
+}
+
+/// `set_attachment` (`0x0800ECB0`): the actor's shadow record becomes the one of (w, h) in `0x086B759C` (none: no
+/// shadow) - the old shared graphic's reference goes, the new one's is taken (segment db7 14-1 -> 0-9: s019's
+/// detach frees the shadow graphic)
+pub fn shadow_set(w: &mut World, i: usize, key: (i32, i32)) {
+    if w.field.as_ref().is_none_or(|f| f.vram.is_none()) {
+        return;
+    }
+    let id = w.ents[i].id;
+    let old = sprite_of(w, i).and_then(|s| s.1 .1);
+    let new = SHADOWS.iter().position(|s| (s.0 as i32, s.1 as i32) == key);
+    let live = st(w).is_some_and(|v| !v.suspended.contains(&id) && v.owners.iter().any(|o| o.1 == Owner::Ent(id)));
+    if live {
+        if let Some(k) = old {
+            shared_release(w, k);
+        }
+    }
+    if let Some(v) = st(w) {
+        v.shadow_set.retain(|o| o.0 != id);
+        v.shadow_set.push((id, new.map(|k| k as u8)));
+    }
+    if live {
+        if let Some(k) = new {
+            shared_acquire(w, k);
+        }
+    }
 }
 
 fn map_3d(w: &World) -> bool {

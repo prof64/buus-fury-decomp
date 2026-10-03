@@ -223,6 +223,14 @@ pub struct Field {
     /// script; 3-1's robbers: s126 8 frames after the KO): (due frame, callback, cause)
     #[serde(default)]
     pub defeat_later: Vec<(u32, Callback, Cause)>,
+    /// death effects waiting behind one whose callback event started in its update (they run the frame after)
+    #[serde(default)]
+    pub defeat_wait: Vec<EntityId>,
+    #[serde(skip)]
+    pub drop_held: bool,
+    /// this frame's held pass moved the coins (fieldobj.rs held_moves)
+    #[serde(skip)]
+    pub coins_moved: bool,
     /// event objects an object queued on the world's event list (+0x610: RunScript, Goten's rock hit): (due frame,
     /// callback, cause); the next frame's list pass starts them, the script's first command runs the frame after
     /// (2-90: s121 starts the frame after Goten's RunScript)
@@ -398,7 +406,8 @@ fn renew_player(w: &World, old: &Player) -> Player {
     p.boost = old.boost;
     p.regen_timer = old.regen_timer;
     p.hp_regen_acc = old.hp_regen_acc;
-    p.hp_acc = old.hp_acc.clone();
+    // (the hit-damage remainder `hp_acc` is the player object's: a load's new player starts it at 0 - app soak of
+    // the real route: carried across loads, Goku's HP ran 1 below the game's from 1-13 on)
     p.ep_acc = old.ep_acc;
     p.story_cnt = old.story_cnt;
     p.fus_cnt = old.fus_cnt;
@@ -437,6 +446,9 @@ fn new_field() -> Field {
         xp_due: vec![],
         defeat_runs: vec![],
         defeat_later: vec![],
+        defeat_wait: vec![],
+        drop_held: false,
+        coins_moved: false,
         queued_runs: vec![],
         queued_event: false,
         held: false,
@@ -657,6 +669,8 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
     w.scene.puppets.retain(|p| !players.contains(&p.id));
     // their object tiles too (the players' objects are re-created at the arrival), the HUD's and the banner's
     // first; nothing left: re-initialised
+    // (an imported state's objects of classes the model does not know go with the area too: ship 7-2 -> 7-4)
+    crate::vram::release(w, crate::vram::Owner::Foreign);
     crate::vram::release(w, crate::vram::Owner::Hud);
     crate::vram::release(w, crate::vram::Owner::Map3d);
     crate::vram::release(w, crate::vram::Owner::HudOut);
@@ -664,6 +678,8 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
         v.hud_out.clear();
         v.popups.clear();
         v.delayed.clear();
+        v.late.clear();
+        v.shadow_set.clear();
         let keys: Vec<u32> = v.keyed.drain(..).map(|k| k.0).collect();
         for k in keys {
             v.owners.retain(|o| o.1 != crate::vram::Owner::Keyed(k) || {
@@ -1045,6 +1061,9 @@ pub fn free_arrival(w: &World) -> bool {
 /// before the entity update: the deferred calls due (start of the world update); the item-get presentation holds the
 /// players' input
 pub fn pre_step(w: &mut World) {
+    if let Some(f) = w.field.as_mut() {
+        f.coins_moved = false;
+    }
     let pos: Vec<(i32, i32)> = (0..w.players.len()).filter_map(|s| w.player_idx(s)).map(|i| (w.pl_ref(i).a.x, w.pl_ref(i).a.y)).collect();
     if let Some(f) = w.field.as_mut() {
         f.frame_start_pos = pos;
@@ -1124,18 +1143,61 @@ pub fn pre_step(w: &mut World) {
             f.held_event = true;
         }
     }
-    run_due_drops(w);
-    // death effects whose delay is over run their enemy's on-defeat callback after its drop script (frame numbering
-    // as run_due_drops; 3-1's robbers: the loot draws, then s126), holding the rest of the frame like defeat_runs
+    death_effects(w, event_held);
+}
+
+/// the death effects' drop scripts and on-defeat callbacks that are due (pre step; again in the post step for the
+/// effects that waited behind another one's event)
+fn death_effects(w: &mut World, event_held: bool) {
     let next = w.frame + 1;
     // an event holding the field holds the on-defeat callback's countdown (the drop script still runs on time):
     // Diablo Desert Express 11-24 - a robber's event s373, 8 frames after the KO, comes 7 frames after the level-up
     // popup that started the frame after the KO has closed
     if let Some(f) = w.field.as_mut().filter(|_| event_held) {
         for d in f.defeat_later.iter_mut() {
-            d.0 += 1;
+            d.0 = d.0.saturating_add(1);
         }
     }
+    // the death effects run one after the other (drop script, then the callback): one whose callback is an event
+    // starts it inside its update - the effects after it wait for the next frame (11-24, the real route: two robbers
+    // down in one frame - the second one's drop script draws a frame after the first one's, under s373)
+    if let Some(f) = w.field.as_mut() {
+        let first = f.defeat_later.iter().position(|d| d.0 <= next && matches!(d.1, Callback::Event(_)));
+        if let Some(k) = first {
+            let ent = match &f.defeat_later[k].2 {
+                Cause::Defeat { entity, .. } => Some(*entity),
+                _ => None,
+            };
+            // (the hold flag of this frame keeps them out; from the next frame's start on they are due whatever the
+            // pass counter says - the event's frame runs no object pass)
+            let hold = f.defeat_wait.is_empty();
+            if hold {
+                for d in f.defeat_later.iter().skip(k + 1).filter(|d| d.0 <= next) {
+                    if let Cause::Defeat { entity, .. } = &d.2 {
+                        f.defeat_wait.push(*entity);
+                    }
+                }
+                if let Some(at) = ent.and_then(|e| f.pending_drops.iter().position(|d| d.1 == e)) {
+                    let later: Vec<EntityId> = f.pending_drops.iter().skip(at + 1).filter(|d| d.0 <= next).map(|d| d.1).collect();
+                    for e in later {
+                        if !f.defeat_wait.contains(&e) {
+                            f.defeat_wait.push(e);
+                        }
+                    }
+                }
+                let wait = f.defeat_wait.clone();
+                for d in f.defeat_later.iter_mut().filter(|d| matches!(&d.2, Cause::Defeat { entity, .. } if wait.contains(entity))) {
+                    d.0 = u32::MAX;
+                }
+                for d in f.pending_drops.iter_mut().filter(|d| wait.contains(&d.1)) {
+                    d.0 = u32::MAX;
+                }
+            }
+        }
+    }
+    run_due_drops(w);
+    // death effects whose delay is over run their enemy's on-defeat callback after its drop script (frame numbering
+    // as run_due_drops; 3-1's robbers: the loot draws, then s126), holding the rest of the frame like defeat_runs
     let later: Vec<(Callback, Cause)> = match w.field.as_mut() {
         Some(f) if f.defeat_later.iter().any(|d| d.0 <= next) => {
             let (due, keep): (Vec<_>, Vec<_>) = std::mem::take(&mut f.defeat_later).into_iter().partition(|d| d.0 <= next);
@@ -1224,12 +1286,37 @@ pub fn post_step(w: &mut World) {
     // playthrough: the coins drop 7 frames after the level-up popup closes, 8 updates after the KO)
     if let Some(f) = w.field.as_mut().filter(|f| f.held_event) {
         for d in f.pending_drops.iter_mut() {
-            d.0 += 1;
+            d.0 = d.0.saturating_add(1);
         }
     }
     // an inline hook's event ended this frame: the update it interrupted completes now
     // the next queued event of the held frame started at once (story playthrough: s003's level-up ends, Pikkon's
     // defeat scene s103 starts in the same frame): the frame stays held until that one ends too
+    // the same for the death effects that waited behind this one's event (`death_effects`): the interrupted pass
+    // goes on with them, and the next one's event holds it again (11-24: the second robber's drop script and s373
+    // come a frame after the first one's; the rest of the pass runs when the last event ends)
+    if w.field.as_ref().is_some_and(|f| f.resume_held && !f.busy && !f.defeat_wait.is_empty()) {
+        if let Some(f) = w.field.as_mut() {
+            let wait = std::mem::take(&mut f.defeat_wait);
+            for d in f.defeat_later.iter_mut().filter(|d| matches!(&d.2, Cause::Defeat { entity, .. } if wait.contains(entity))) {
+                d.0 = 0;
+            }
+            for d in f.pending_drops.iter_mut().filter(|d| wait.contains(&d.1)) {
+                d.0 = 0;
+            }
+        }
+        // (their coins make the frame's move, their age starts with the pass that completes later)
+        if let Some(f) = w.field.as_mut() {
+            f.drop_held = true;
+        }
+        death_effects(w, false);
+        if let Some(f) = w.field.as_mut() {
+            f.drop_held = false;
+            if f.held_event {
+                f.resume_held = false;
+            }
+        }
+    }
     if w.field.as_ref().is_some_and(|f| f.resume_held && f.busy) {
         if let Some(f) = w.field.as_mut() {
             f.resume_held = false;

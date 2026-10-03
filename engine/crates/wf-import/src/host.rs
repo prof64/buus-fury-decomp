@@ -266,10 +266,22 @@ impl StoryHost {
 
     /// one logic frame with the leader's held keys (the playthrough's host order)
     pub fn step(&mut self, sess: &mut Session, keys: u16) {
-        self.frame += 1;
         let mut inputs = [InputFrame::default(); MAX_PLAYERS];
         inputs[0] = InputFrame::from_held(keys, self.prev_held);
         self.prev_held = keys;
+        self.step_inputs(sess, inputs);
+    }
+
+    /// the world's creation events (the first area's load scripts: gates, doors, bridges) before frame 0
+    pub fn start(&mut self, sess: &mut Session) {
+        let evs: Vec<Event> = sess.world.events.clone();
+        self.collect(&evs);
+        self.run_queue(&mut sess.world);
+    }
+
+    /// one logic frame with every player's input frame (the app's story mode: wf-app `StorySim`)
+    pub fn step_inputs(&mut self, sess: &mut Session, inputs: [InputFrame; MAX_PLAYERS]) {
+        self.frame += 1;
         // the frame's start (deferred calls: drop scripts, kill XP): their scripts run before the objects' update
         sess.step_begin(inputs);
         let pre: Vec<Event> = sess.world.events.clone();

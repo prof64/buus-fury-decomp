@@ -791,6 +791,7 @@ fn drop(w: &mut World, index: i32, item: i32) -> bool {
         z: 0x2000,
         vz: 0x800,
         t: 0,
+        mv: 0,
         landed: false,
         phase: 0,
         bx: [cx - 8, cy - 16, cx + 8, cy],

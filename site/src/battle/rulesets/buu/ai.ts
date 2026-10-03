@@ -1459,7 +1459,9 @@ export function create(n: AiNodeJ, c: AiController): RNode {
       // [facing] ((0,16) (0,-16) (-16,0) (16,0) px for down / up / left / right); vampire SetAnimRaw(0x12) + its own
       // state (vtable 0x0804C3CC: frames 0..3, then 2 / 3 looping).
       // update 0x08033A2A: done when there is no player, the player's HP <= 0 or the player left 0x03001B00. Keys
-      // [0x03003300]+4 & 0xF3 (A/B/d-pad held) -> stamp, count + 1, count > 8 -> player SetAnim(0), done; no keys for
+      // [0x03003300]+4 & 0xF3 (A/B/d-pad PRESSED this frame: +4 is the press edge, +2 the held keys; the real game
+      // keeps the grab through 200 frames of held A/B and lets go after nine presses) -> stamp, count + 1, count > 8 ->
+      // player SetAnim(0), done; no press for
       // > 10 frames -> count 0. Frame counter 0x03000F94 & 15 == 0 -> player vfunc +0x5C (HP -= POW << 10, no formula)
       // and vampire vfunc +0x60 (heals POW << 10). Done when the player's HP <= 0.
       // exit 0x08033AF6: obj+0x294 (crit) = 0, obj+0x290 (hit dir) = facing ^ 1 (the KnockbackSlide that follows
@@ -1481,7 +1483,7 @@ export function create(n: AiNodeJ, c: AiController): RNode {
         const p = e.player
         if (!p || p.hp <= 0 || p.heldBy !== e) return true
         const now = e.ctx.clock(e.w)
-        if (e.w.input.held & 0xf3) {
+        if (e.w.input.pressed & 0xf3) {
           a.data.t = now
           if (++a.data.n > 8) {
             p.release(e.w)

@@ -412,6 +412,53 @@ The fat Buu arc's real route in order, with its total: d00 -> d16 (ship_route.go
 + 1,005 + 1,195 + 11,327 + 9,264 + 12,827 frames), db2 19,972, flight 685, db5 14,045 + 1,379 + 1,279 + 12,862,
 flight 888, db6 18,522, flight 1,134, db7 1,213 + 9,141 + 4,215 (+ 11 punches) + 12,578, back for man 2 6,803 (+
 flight), Nataday 914 + db4 to j_down + 13,893, West City 2,411 + 225, dbx 18,282 + 965 + 1,177 + 29,206.
+**Janemba saga, real route (from `fat/dbx/end.ss`; states + key logs in `work/ship/jan/`, `<name>.ss` +
+`<name>.keys.json` = the keys from the previous checkpoint):**
+
+| checkpoint | where | frames from the previous |
+|---|---|---|
+| `j00_yemma` | 1-1 (Snakeway), Goku controllable: the prologue 0-96 -> 0-16 (the ogre, character 8, walks up into s022) -> 1-1 | 6,143 |
+| `j01_hfil` | **HFIL 18-1**: 1-2 -> 1-5 (s066, flag 121), the pad -> Other World map 0-51 (LEFT, A) -> 18-1. Goku level 83 (430 HP) | 3,969 |
+| `j02_goku90` | 18-12, Goku level 90 (550 HP): 18-1 <-> 18-12, one Janemba Hand a room | 44,792 |
+| `j03_goku120` | 18-2, Goku level 120 (1236 HP, STR 115 / END 112): 18-1 <-> 18-2, three Living Dead a visit (21,465 XP each; from level 90 on they do not touch him) | 48,693 |
+| `h_switch` | 18-2 after the Instant Transmission switch (flag 181); the side agent's `tools/side/hfil.py` ROUTE from here on, run by `re/buu/ship/jan_hfil.py` (its driver + `jan_side.RealSide`) | `h_switch.keys.json` (from j03) |
+| `h_maze` | 18-10's entry (18-3 .. 18-9 cleared; the Annihilator of 18-6 needs the flame guard) | `h_maze.keys.json` (from h_switch) |
+| `h_maze_punched`, `h_statues` | 8 punches in the air first (luck search `jan_luck.py`: 3 of 12 counts get through the maze's four Poltergeists), the gate maze, the boulder, 18-11 | `h_maze_punched.keys.json`, `h_statues.keys.json` (from h_maze_punched) |
+| `h_vegeta` | 18-11 after s446 (Vegeta joins, flag 123) | `h_vegeta.keys.json` (from h_statues) |
+| `h_back1` | 18-1's save point again, Goku level 126 (`work/ship/jan/back.py`: the route's boulder steps, 18-9, 18-8's east strip, straight down 70 frames in 18-7 before any fight, 18-6 .. 18-2 with room fights) | `b_keys.json` (10,083 frames from h_vegeta) |
+| `h_veg0` | the same spot, Vegeta active (Switch Characters: four RIGHT; UP 6 frames first to stand in reach) | `h_veg0.keys.json` (356) |
+| `h_veg1` | the same spot, **Vegeta level 120** (1357 HP; 18-12's gate wants 100, and he fights Super Janemba's first round): 18-1 <-> 18-2 | `h_veg1.keys.json` (44,918) |
+| `h_h13` | 18-13 (the route from `veg1`: the gate, flag 183; s448, flag 124) | `h_h13.keys.json` (2,239 from h_veg1) |
+| `j10_arena` | 18-13's save point, Goku active again (four LEFT), his 24 points spent: Goku 126 (1444 HP, STR 126 / END 112) | `j10_arena.keys.json` (1,061) |
+| `j_janemba`, `j_sj1`, `j_sj2` | the side agent's arena route (`re/buu/ship/jan_arena.py`: `jroute.py` ARENA without its first `expect`): 18-14 after s449; after Janemba (s450); after Vegeta's round with Super Janemba (s451, the fusion) | `a_keys_arena_fail.json` (first 716 / 4,176 / 7,119 frames) |
+| **`j_arena_end`** | 18-14 after Gogeta's round and s452 (**flag 125**: the Janemba saga done), Goku controllable; the last fight with `--wait 2` (wait 0 loses; 11 of 12 other waits win) | `a_keys_sj2.json` (2,125 from j_sj2) |
+
+Findings (HFIL): 18-8 is two pieces - its east strip (x >= 192) joins 18-9 and 18-7's east strip only; coming back,
+18-7 is entered at (273, 4) right under that exit with five Living Dead around: a fight there is knocked back up
+through the exit (the side agent's 18-7 <-> 18-8 loop) - walk down first. A Poltergeist is solid while invisible
+(states 0xD4 .. 0xD6: it stands in the way and cannot be hit) and a visible one hits from 27 px, past the punch's 21.
+The Annihilator (type 1) is a Destroyer (states 0x82 .. 0x86, flames).
+
+Finding: the real Goku arrives at level 83 against HFIL's level 116 .. 125 rooms. Every HFIL room has one Janemba
+Hand (type 57, 50 HP, 1,125 XP) that is back on each entry: 18-1 <-> 18-12 (nothing else in either) is a safe
+level grind (`('grind', level, [(18, 1), (18, 12)])`, ~3.7 XP a frame; the hand dies to a punch at its spot even
+while hidden, state 0x114 / 0x118).
+
+**Super Buu saga, real route (from `jan/j_arena_end.ss`; `work/ship/sb/`; the Super Buu agent's
+`tools/superbuu/sbroute.py` ROUTE unchanged, run by `re/buu/ship/sb_real.py`: `m_<mark>.ss`, keys `sbk_<from>.json`):**
+
+| checkpoint | where | frames |
+|---|---|---|
+| `sb_start` | 18-13 (down from the arena), Goku 126 | 125 from `j_arena_end` (`sb_start.keys.json`) |
+| `m_ow_map`, `m_zsword` | Other World map; 19-7 before the Z-Sword (King Yemma s059, s067; Gohan, level 100) | 731 / 12,525 from sb_start (`sbk_start.json`) |
+| `m_lookout` | Kami's Lookout 6-5 after the Z-Sword scenes (Trunks, level 81) | 22,252 |
+| `m_gotenks` | 6-9, Gotenks (937 HP, STR 92 / END 81) against Super Buu (35,330 HP) after the spar and the fusion | 33,492 |
+
+Finding: the real party is far below the Super Buu agent's constructed one (Goku / Vegeta 180, Gohan 160, Goten /
+Trunks 165 there; real: 126 / 120 / 100 / 117 / 81). Gotenks' two fights cannot be prepared for any more at this
+point (Goten and Trunks were last free on the world map before s017); 20-4's gate wants Gohan at 140 and s473 Goku
+at 140 - both can still level (Ultimate Gohan has the world map from 8-1; Goku the Wasteland).
+
 **Dungeon agents, note:** `re/buu/ship/ship_driver.py` (the base of your drivers) changed on 2026-10-03 - Ghosts
 are no longer hunted (blasted / punched only when visible and in the way), a Vampire's grab is mashed out of, the
 flame guard has a wider line and falls back to a guard (R), `walk` takes the free axis at a wall corner, `nav` taps A
@@ -544,8 +591,8 @@ Results (90 segments, 104,026 video frames): **84 exact to their end**, 94,718 f
 gated in `data/segments/earth_*.json`.
 
 Open: 7-2 f1432 (portrait OBJ purge - the Super Buu agent's model; 7-3 is exact since it landed); 3-3 #4 f1479
-(a soldier's AlignWithPlayer); 2-9 #13 / 2-11 #4 / 3-15 #4 now past their status pages, at the pause menu's close
-(per-area black frames, below).
+(a soldier's AlignWithPlayer: its bullet is missing when Gohan's blast should hit it). 2-9 #13 / 2-11 #4 /
+3-15 #4 are exact with the redraw + reload timing model below (88 / 90).
 
 **Note to the ship agent (from the Earth agent): the status-page redraw timing model is built** (below). To use
 it on a segment: (1) content with `audio/` + `portraits/` (the default segment content now extracts both; my local
@@ -607,6 +654,29 @@ added to tools/emu). How the input landing is decided:
     to their pause menu's close (554 / 1021 / 977 frames, from 403 / 899 / 905): the close takes 23 / 27+ / 27
     frames against the model's 25 - a 5.6 M..6.7 M-cycle area reload plus 6..8 interrupt mixes (`timing/leave.py`),
     the next thing to model (per-area reload cost).
+  - **The pause menu's close (built; `sndsim::reload_frames`, `menu::close_with`)**: the world restore is one
+    main-loop iteration, ~95 % of it the map loader's decompression. Per map the extractor writes
+    `maps/<id>/collision.json` `reload` (wf-maps `reload_json`, costs from `wf_rom::deccost`): `fixed` = minimap,
+    tile list, the tile chunks it names (16 KB each, ~450-500 k cycles), frame 0 of the tile animations; per layer
+    the chunk grid with each chunk's cycles. A layer of at most 2 x 2 chunks is loaded whole (EWRAM slots); a larger
+    one loads the chunks under a 256 x 256 px window centred on the screen centre at the layer's scroll (camera x
+    rate + offset), through an IWRAM buffer (+7 k per chunk). VERIFIED call by call against emulator profiles
+    (`timing/leaveprof.py`, wf-maps `examples/reloadinfo.rs`) on 2-9, 3-15, 8-6, 8-3 (two cameras).
+    Iteration = (rest + decompression x 1.0035) x 1.00523 (interrupt handlers) + a 928-sample interrupt mix every
+    time the play position runs that far ahead (6-8 of them) + the catch-up update; rest = 225.2 k for START
+    (the done check restores in the same iteration), 201.7 k for a prompt's close (B: the restore is the next
+    iteration; its start varies 17-31 k, not modelled). Black frames = iteration frames + 1. Model vs emulator
+    before the mixes: 2-9 5,377,880 / 5,377,145; 3-15 6,412,145 / 6,414,682; 8-3 7,210 k / 7,207 k and
+    7,333 k / 7,353 k. Error bound ~+-20 k cycles (7 % of a frame): one in ~7 closes is that near a frame
+    boundary, e.g. 2-9 #13 ends 5.5 k before one.
+  - Camera: the restore ends with a camera update and the cameras keep easing through the menu's fade-in
+    (`Session::step_update`, `menu::step` Leave): a follow camera still easing when the menu opened (17 ship cuts).
+  - Results: 2-9 #13, 2-11 #4 (34 black frames, not used for the fit), 3-15 #4 exact to their end and gated;
+    ship menu-timing list 28 / 30 exact (from 0; `work/earth/bin/shipmenu.sh`), left: shipr_236 (8-14: the
+    camera x jumps 0.8 px at the close, f485) and shipr_266 (an NPC's animation at f6007, not timing).
+    Dungeons: db7_023 (14-20) still closes later in the game than the model's 17 frames by more than 100 k
+    cycles - its reload does something these four maps do not (to profile with `leaveprof.py`; its owner's cut).
+    Other transitions (shops, save points, the map screen) keep their constants.
   - Tools (`work/earth/timing/`): `sndlog.py` (driver / DMA / redraw log), `timeline.py`, `cmp_core.py` (core
     decisions vs the game), `fit_base.py`, `prof.py` (per-bucket cycles of a redraw), `decmeas.py` / `decmodel.py`
     (decompressor), `mkvariant.py` (a segment with other keys), `mkshipstate.py` (savestate of a ship route cut).

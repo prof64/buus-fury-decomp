@@ -1484,6 +1484,8 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
                 // the NPC's destructor lifts its grid mark (story playthrough s101: Pikkon's spot at (376, 384)
                 // stays walkable once he is the enemy)
                 crate::fieldnpc::script_move_mark(w, i, false);
+                // (its tiles go before the map object takes its own: segment sb 21-19, the same block)
+                crate::vram::entity_gone(w, i);
                 w.ents[i].removed = true;
                 // the remaining queued commands move to the map object (0x080192BA), as for change_sprite
                 if let Some(id) = become_map_object(w, *index, px, py, dir) {
@@ -1608,6 +1610,7 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
         }
         Cmd::SetAttachment { kind, variant, dx, dy } => {
             if let Some(i) = i {
+                crate::vram::shadow_set(w, i, (*kind, *variant));
                 if let Body::Npc(n) = &mut w.ents[i].body {
                     n.attach = if *kind == 0 && *variant == 0 { None } else { Some([*kind, *variant, *dx, *dy]) };
                 }

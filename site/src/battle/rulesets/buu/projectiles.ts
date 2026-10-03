@@ -225,10 +225,16 @@ export class StraightShot extends Shot {
       }
       return false
     }
-    if (this.o.fragile && this.dead < 0 && msg.team === 1 && msg.atk.kind === 0 && msg.source !== this && overlaps(msg.rect, this.rect())) {
+    // the bullets' handlers 0x0802764E (gun) / 0x080278E2 (rifle) / 0x0802C8AE (shuriken): the same - any message of
+    // kind 0 but its own (msg+0x30) overlapping its box ends it (gun 0x08027516 / rifle 0x0802770C: the wall end's
+    // sound and explosion; the shuriken is just removed) and is accepted, whatever the sender's team or attack kind
+    // (the real route, Diablo Desert Express 11-21: Trunks' ki blast meets a gunman's bullet - the bullet bursts,
+    // the blast counts the hit, the player is not hit)
+    if (this.o.fragile && this.dead < 0 && !msg.foot && msg.source !== this && !this.removed && overlaps(msg.rect, this.rect())) {
       this.removed = true
       if (this.o.sfxEnd != null) audioEvent('sfx', { id: this.o.sfxEnd, vol: 64 })
-      this.ctx.explosion(_w, this.px, this.py)
+      if (this.o.explode !== false) this.ctx.explosion(_w, this.px, this.py)
+      return true
     }
     return false
   }

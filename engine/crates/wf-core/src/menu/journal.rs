@@ -186,6 +186,10 @@ impl Page for Journal {
     fn redraw_cost(&self) -> u8 {
         REDRAW_FRAMES
     }
+    /// journal_scroll / journal_start / journal_new_game: 36 redraws, residual std 1.5k, max 6k (the empty list)
+    fn redraw_time(&self, w: &World, d: &MenuData) -> Option<crate::sndsim::Redraw> {
+        Some(super::page_time(d, &self.view(w, d), !self.c.ever, 4_641, 184_670, 882, 597, 188_273))
+    }
 }
 
 /// `0x080051B0` (status.rs has the same): the vertical green separator

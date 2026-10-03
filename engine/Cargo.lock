@@ -5147,6 +5147,7 @@ dependencies = [
  "wf-content",
  "wf-core",
  "wf-extract",
+ "wf-import",
  "wf-modscript",
  "wf-net",
  "wf-render",

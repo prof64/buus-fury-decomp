@@ -161,6 +161,11 @@ pub trait Page {
     fn redraw_time(&self, _w: &World, _d: &MenuData) -> Option<crate::sndsim::Redraw> {
         None
     }
+    /// cycles of the page's idle step (frame start to the main loop's sound update) when measured; None = the
+    /// status page's
+    fn idle_cycles(&self) -> Option<i64> {
+        None
+    }
     /// the page's name in the timing model's log
     fn name(&self) -> &'static str {
         std::any::type_name::<Self>().rsplit("::").next().unwrap_or("?")
@@ -550,6 +555,11 @@ pub fn step(w: &mut World) {
                     crate::vram::world_show(w);
                 }
             }
+            // the world restore ends with a camera update: a follow camera still easing when the menu opened is
+            // one step further in the last black frame (ship cuts 8-6 / 8-3: closed while the camera eased)
+            if t + 2 == w.menu.tr.leave && w.menu.tr.fade_in != 0 && w.field.is_some() {
+                crate::field::world_mode_cameras(w);
+            }
             if t + 1 >= w.menu.tr.leave.max(1) {
                 let st = w.menu.tr.fade_in;
                 if st == 0 {
@@ -575,6 +585,24 @@ pub fn step(w: &mut World) {
             }
         }
     }
+}
+
+/// A page's long iteration for the timing model (sndsim.rs), from its draw list: `k` the page's constant part
+/// (backgrounds, panels, surface copies, the step), `line` per shadowed text line, `gn_milli` cycles per 1000
+/// glyph-routine instructions beyond `sndsim::layer_cycles`' 3.17 each (wrapped text costs more), `enter` the
+/// page's enter when this is its first redraw. Constants: emulator measurements of the menu scenarios
+/// (`re/buu/menu/cycles.py`, fitted by `cycles_fit.py`).
+pub(crate) fn page_time(d: &MenuData, v: &MenuView, fresh: bool, t0: i64, k: i64, line: i64, gn_milli: i64, enter: i64) -> crate::sndsim::Redraw {
+    let mut own = k + if fresh { enter } else { 0 };
+    for l in &v.layers {
+        own += crate::sndsim::layer_cycles(&d.text, &l.ops, line) + crate::sndsim::ops_cost(&d.text, &l.ops).0 * gn_milli / 1000;
+    }
+    crate::sndsim::Redraw { t0, base: own - t0 }
+}
+
+/// the open page's idle step cycles for the sound model (sndsim.rs)
+pub fn idle_cycles(w: &World) -> Option<i64> {
+    w.menu.stack.last().and_then(|s| s.page().idle_cycles())
 }
 
 /// one iteration of the mode loop, from the input read: input, step (widgets, page logic), then the next
@@ -605,15 +633,16 @@ fn redraw(w: &mut World, first: bool) {
         top.before_draw(w);
         top.container().drawn = true;
         let mut cost = if first { 1 } else { top.redraw_cost().max(1) };
+        if crate::sndsim::debug() && !first {
+            if let Some(d) = w.data.menu.clone() {
+                let timed = top.page().redraw_time(w, &d);
+                let v = top.page().view(w, &d);
+                let l: Vec<String> = v.layers.iter().map(|l| format!("{:?} tc{:?} {}", crate::sndsim::ops_cost(&d.text, &l.ops), crate::sndsim::text_counts(&d.text, &l.ops), crate::sndsim::ops_summary(&l.ops))).collect();
+                eprintln!("menu redraw f{} {} const {} timed {:?} pressed {:#x} released {:#x} objs {} | {}", w.frame, top.page().name(), cost, timed.map(|t| (t.t0, t.base)), w.menu.pressed, w.menu.released, v.objs.len(), l.join(" || "));
+            }
+        }
         if cost > 1 && w.data.sound.is_some() {
             let timed = w.data.menu.clone().and_then(|d| top.page().redraw_time(w, &d));
-            if crate::sndsim::debug() {
-                if let Some(d) = w.data.menu.clone() {
-                    let v = top.page().view(w, &d);
-                    let l: Vec<String> = v.layers.iter().map(|l| format!("{:?} {}", crate::sndsim::ops_cost(&d.text, &l.ops), crate::sndsim::ops_summary(&l.ops))).collect();
-                    eprintln!("menu redraw f{} {} const {} timed {:?} pressed {:#x} released {:#x} objs {} | {}", w.frame, top.page().name(), cost, timed.map(|t| (t.t0, t.base)), w.menu.pressed, w.menu.released, v.objs.len(), l.join(" || "));
-                }
-            }
             match timed {
                 Some(r) => match crate::sndsim::redraw_frames(w, r) {
                     Some(f) => cost = f,
@@ -641,6 +670,7 @@ fn redraw(w: &mut World, first: bool) {
             w.menu.lag = cost - 1;
         }
         top.after_draw(w);
+        top.container().ever = true;
     }
     w.menu.stack.push(top);
 }
@@ -699,7 +729,7 @@ fn step_screen(w: &mut World) {
             }
             Action::Close => close(w),
             Action::Done => {
-                close(w);
+                close_with(w, true);
                 w.menu.phase = Phase::Leave { t: 1 };
             }
             Action::PopDone(r) => {
@@ -718,11 +748,16 @@ fn step_screen(w: &mut World) {
 }
 
 fn close(w: &mut World) {
+    close_with(w, false)
+}
+
+/// `done`: the mode's done check ended it (START): the world restore runs in this same iteration
+fn close_with(w: &mut World, done: bool) {
     w.menu.stack.clear();
     w.menu.phase = Phase::Leave { t: 0 };
     // the pause menu's black frames = the area reload's CPU time (sndsim.rs): the iteration's frames + this one
     if w.menu.tr == PAUSE {
-        if let Some(n) = crate::sndsim::reload_frames(w) {
+        if let Some(n) = crate::sndsim::reload_frames(w, done) {
             w.menu.tr.leave = n as u16 + 1;
         }
     }

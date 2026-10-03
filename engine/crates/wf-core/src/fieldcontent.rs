@@ -189,8 +189,25 @@ pub struct MapDef {
     pub three_d: bool,
     /// the props object's object tiles (vram.rs; 0 = no props object)
     pub prop_tile_bytes: i32,
-    /// CPU cycles of the map loader's decompression (`collision.json` reload_cycles; 0 = unknown): sndsim.rs
-    pub reload_cycles: u64,
+    /// CPU cycles of the map loader's decompression (`collision.json` reload; None = unknown): sndsim.rs
+    pub reload: Option<Reload>,
+}
+
+/// see wf-maps `reload_json`
+#[derive(Clone, Debug, Default)]
+pub struct Reload {
+    pub fixed: i64,
+    pub layers: Vec<ReloadLayer>,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct ReloadLayer {
+    pub cols: i32,
+    pub rows: i32,
+    pub rate: (i64, i64),
+    pub offset: (i64, i64),
+    pub ew: Vec<i64>,
+    pub iw: Vec<i64>,
 }
 
 #[derive(Clone, Debug)]
@@ -481,13 +498,32 @@ impl FieldData {
                 })
                 .collect();
             let (mut walk, mut shot, mut cw, mut ch) = (String::new(), String::new(), 1, 1);
-            let mut reload_cycles = 0;
+            let mut reload = None;
             if let Some(c) = read_json(src, &format!("{dir}/collision.json")).map(rows_collision) {
                 walk = c["walk"].as_str().unwrap_or("").to_string();
                 shot = c["shot"].as_str().unwrap_or("").to_string();
                 cw = int(&c["width"]).max(1) as usize;
                 ch = int(&c["height"]).max(1) as usize;
-                reload_cycles = c["reload_cycles"].as_u64().unwrap_or(0);
+                if c["reload"].is_object() {
+                    let nums = |v: &serde_json::Value| -> Vec<i64> { v.as_array().into_iter().flatten().map(|x| x.as_i64().unwrap_or(0)).collect() };
+                    let pair = |v: &serde_json::Value| (v[0].as_i64().unwrap_or(0), v[1].as_i64().unwrap_or(0));
+                    reload = Some(Reload {
+                        fixed: c["reload"]["fixed"].as_i64().unwrap_or(0),
+                        layers: c["reload"]["layers"]
+                            .as_array()
+                            .into_iter()
+                            .flatten()
+                            .map(|l| ReloadLayer {
+                                cols: l["cols"].as_i64().unwrap_or(0) as i32,
+                                rows: l["rows"].as_i64().unwrap_or(0) as i32,
+                                rate: pair(&l["rate"]),
+                                offset: pair(&l["offset"]),
+                                ew: nums(&l["ew"]),
+                                iw: nums(&l["iw"]),
+                            })
+                            .collect(),
+                    });
+                }
             }
             let (mut ww, mut wh) = (0, 0);
             let mut cmax = (-1, -1);
@@ -517,7 +553,7 @@ impl FieldData {
             if cmax.0 < 0 {
                 cmax = ((ww - 240).max(0), (wh - 160).max(0));
             }
-            fd.maps.insert(id.clone(), MapDef { id, start_pos: sp, exits, props, walk, shot, cw, ch, world_w: ww, world_h: wh, camera_max: cmax, three_d, prop_tile_bytes, reload_cycles });
+            fd.maps.insert(id.clone(), MapDef { id, start_pos: sp, exits, props, walk, shot, cw, ch, world_w: ww, world_h: wh, camera_max: cmax, three_d, prop_tile_bytes, reload });
         }
         // per-area files (mods): `world/areas/<W-A>.json` adds an area or changes one (fields given replace,
         // `objects` replaces the object list, `add_objects` appends to it)

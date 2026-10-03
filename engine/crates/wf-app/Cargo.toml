@@ -13,6 +13,7 @@ wf-audio = { path = "../wf-audio" }
 wf-core = { path = "../wf-core" }
 wf-script = { path = "../wf-script" }
 wf-script-core = { path = "../wf-script-core" }
+wf-import = { path = "../wf-import" }
 wf-script-rhai = { path = "../wf-script-rhai" }
 wf-modscript = { path = "../wf-modscript" }
 wf-replay = { path = "../wf-replay" }

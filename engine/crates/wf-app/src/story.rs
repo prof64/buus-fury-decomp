@@ -10,40 +10,22 @@
 //! the load instead of inside it (the core's synchronous hook must be `Send`; the Rhai runtime is not), which only
 //! matters for RNG draws inside those scripts.
 
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use wf_content::Packs;
 use wf_core::content::GameData;
-use wf_core::field::{Cause, FieldConfig, FieldEvent};
-use wf_core::fieldcontent::Callback;
+use wf_core::field::FieldConfig;
 use wf_core::input::InputFrame;
 use wf_core::session::Session;
-use wf_core::world::{Event, World, MAX_PLAYERS};
-use wf_script::vm::Globals;
-use wf_script_core::{poll, CoreState, HostState, SharedHost};
-use wf_script_rhai::{Runtime, Status, UnitRef};
+use wf_core::world::{World, MAX_PLAYERS};
 use wf_view::{Buttons, RenderView, Sim, SimEvent};
-
-
-/// A script waiting to run.
-#[derive(Clone, Debug)]
-struct Job {
-    run: Callback,
-    cause: Cause,
-}
 
 pub struct StorySim {
     pub session: Session,
-    rt: Runtime,
-    host: SharedHost,
-    hs: HostState,
-    globals: Globals,
-    stepped: std::collections::BTreeSet<String>,
-    queue: VecDeque<Job>,
-    running: bool,
-    /// why the running script started (an enemy AI node waits for its script's end)
-    cause: Option<Cause>,
+    /// the script host: the same glue the segment harness replays the real game with (`wf_import::StoryHost`:
+    /// nested on-enter scripts inside a script's warp, defeat-callback holds, the countdown ...)
+    host: wf_import::StoryHost,
     prev: [u16; MAX_PLAYERS],
     /// scripts that failed to compile / run (shown by the shells' logs)
     pub errors: Vec<String>,
@@ -105,132 +87,23 @@ impl StorySim {
         if files.is_empty() {
             return Err("this content has no scripts/ (re-extract with the current extractor)".into());
         }
-        let stepped = files.iter().filter(|(_, src)| src.contains("fn step_0()")).map(|(p, _)| p.clone()).collect();
         wf_core::field::attach_host(&mut session.world, true);
-        let spare = session.world.clone();
-        let host = SharedHost(std::rc::Rc::new(std::cell::RefCell::new(CoreState { world: spare, story: HostState::default() })));
-        let rt = Runtime::new(&files, Box::new(host.clone()))?;
-        let mut s = StorySim {
-            session,
-            rt,
-            host,
-            hs: HostState::default(),
-            globals: Globals::default(),
-            stepped,
-            queue: VecDeque::new(),
-            running: false,
-            cause: None,
-            prev: [0; MAX_PLAYERS],
-            errors: Vec::new(),
-            init_events: Vec::new(),
-            presenter: Default::default(),
-        };
+        let mut host = wf_import::StoryHost::new(&session.data, &files)?;
+        let mut init_events = Vec::new();
+        wf_core::view::sim_events(&session.world, &mut init_events);
         // the first area's load scripts (gates, doors, bridges) before frame 0
-        let evs: Vec<Event> = s.session.world.events.clone();
-        wf_core::view::sim_events(&s.session.world, &mut s.init_events);
-        s.collect(&evs);
-        s.run_queue();
-        Ok(s)
-    }
-
-    fn collect(&mut self, evs: &[Event]) {
-        for e in evs {
-            if let Event::Field(FieldEvent::Run { run, cause, .. }) = e {
-                self.queue.push_back(Job { run: run.clone(), cause: cause.clone() });
-            }
-        }
-    }
-
-    /// run `op` with the shared host holding the session's world and the host state, then move them back
-    fn with_host<T>(&mut self, op: impl FnOnce(&mut Runtime) -> T) -> T {
-        {
-            let mut st = self.host.0.borrow_mut();
-            std::mem::swap(&mut st.world, &mut self.session.world);
-            std::mem::swap(&mut st.story, &mut self.hs);
-        }
-        let r = op(&mut self.rt);
-        let mut st = self.host.0.borrow_mut();
-        std::mem::swap(&mut st.world, &mut self.session.world);
-        std::mem::swap(&mut st.story, &mut self.hs);
-        r
-    }
-
-    fn finish(&mut self, st: Result<Status, String>) {
-        if !matches!(st, Ok(Status::Blocked)) {
-            match self.cause.take() {
-                Some(Cause::Ai { entity }) => wf_core::scene::ai_script_done(&mut self.session.world, entity),
-                // the load waits for its on-enter script (field::finish_arrival)
-                Some(Cause::AreaEnter) => wf_core::field::finish_arrival(&mut self.session.world),
-                _ => {}
-            }
-        }
-        match st {
-            Ok(Status::Blocked) => {
-                // a map trigger's blocking inline script holds the field in the VM's nested loop (field::hold_nested)
-                if matches!(self.cause, Some(Cause::Trigger { .. })) {
-                    wf_core::field::hold_nested(&mut self.session.world);
-                }
-                // a blocking on-defeat inline script holds the field when no event of this frame does yet (wf-import
-                // host.rs: 12-28's Warlord after the level-up popup)
-                if matches!(self.cause, Some(Cause::Defeat { .. })) && !self.session.world.field.as_ref().is_some_and(|f| f.busy) {
-                    wf_core::field::set_busy(&mut self.session.world, true);
-                }
-                self.running = true
-            }
-            Ok(Status::Finished) => {
-                self.running = false;
-                self.globals = self.rt.globals();
-                self.session.world.story.g = self.globals.g;
-                // a blocking event releases the field when it ends
-                wf_core::field::set_busy(&mut self.session.world, false);
-            }
-            Err(e) => {
-                self.errors.push(e);
-                self.running = false;
-                wf_core::field::set_busy(&mut self.session.world, false);
-            }
-        }
-    }
-
-    /// Start queued scripts while none is blocked.
-    fn run_queue(&mut self) {
-        while !self.running {
-            let Some(job) = self.queue.pop_front() else { break };
-            self.hs.talk_event = matches!(job.cause, Cause::Talk { .. });
-            match &job.cause {
-                Cause::Talk { npc } => self.hs.talk_target = Some(*npc),
-                Cause::Break { x, y, .. } | Cause::Defeat { x, y, .. } => self.hs.loot_pos = (*x, *y),
-                _ => {}
-            }
-            wf_core::field::start_cause(&mut self.session.world, &job.cause);
-            self.globals.g = self.session.world.story.g;
-            self.rt.set_globals(self.globals.clone());
-            self.cause = Some(job.cause.clone());
-            match &job.run {
-                Callback::Script(id) => {
-                    let path = format!("scripts/inline/{id}.rhai");
-                    let steps = self.stepped.contains(&path);
-                    self.hs.in_unit = true;
-                    self.rt.start_unit(UnitRef::new(id.clone(), "", steps), [0; 4]);
-                }
-                Callback::Event(id) => match self.rt.event_id(id).ok_or(()) {
-                    Ok(n) => {
-                        self.hs.in_unit = false;
-                        self.rt.start_event(n, [0; 4])
-                    },
-                    Err(_) => {
-                        self.errors.push(format!("unknown event id {id}"));
-                        continue;
-                    }
-                },
-            }
-            let st = self.with_host(|rt| rt.run().map_err(|e| e.to_string()));
-            self.finish(st);
-        }
+        host.start(&mut session);
+        let errors = host.errors.clone();
+        Ok(StorySim { session, host, prev: [0; MAX_PLAYERS], errors, init_events, presenter: Default::default() })
     }
 
     pub fn world(&self) -> &World {
         &self.session.world
+    }
+
+    /// the script host's state (timers, pending wait; harnesses)
+    pub fn host(&self) -> &wf_import::StoryHost {
+        &self.host
     }
 }
 
@@ -244,37 +117,14 @@ impl Sim for StorySim {
             *f = InputFrame::from_held(h, self.prev[k]);
             self.prev[k] = h;
         }
-        // the frame's start (deferred calls: drop scripts, kill XP, defeat scenes) runs its scripts before the
-        // objects' update; a script started there takes its first wait from the next frame
-        self.session.step_begin(frames);
-        let pre: Vec<Event> = self.session.world.events.clone();
-        let was_running = self.running;
-        self.collect(&pre);
-        self.run_queue();
-        let fresh = !was_running && self.running;
-        let n0 = self.session.world.events.len();
-        self.session.step_update();
-        wf_script_core::tick_timers(&mut self.session.world, &mut self.hs);
-        // the blocked script resumes when its wait is over, then the scripts this frame's update started (NPC talk)
-        // start; the trigger check's events start right after step_post (an event's first node runs a frame later:
-        // the story playthrough lockstep, wf-script-core tests/playthrough.rs)
-        let evs: Vec<Event> = self.session.world.events[n0..].to_vec();
-        if self.running && !fresh {
-            let mut hs = std::mem::take(&mut self.hs);
-            let r = poll(&mut self.session.world, &mut hs);
-            self.hs = hs;
-            if let Some(v) = r {
-                let st = self.with_host(|rt| rt.resume(v).map_err(|e| e.to_string()));
-                self.finish(st);
-                self.run_queue();
-            }
-        }
-        self.collect(&evs);
-        self.run_queue();
-        let k = self.session.world.events.len();
-        let post: Vec<Event> = self.session.step_post()[k..].to_vec();
-        self.collect(&post);
-        self.run_queue();
+        // one logic frame in the playthrough's host order (wf-import host.rs `step_inputs`)
+        let seen = self.host.errors.len();
+        // the title's New Game / Continue (and a game over's return to the title) replace the world: the new field
+        // is this host's too (without the mark the core does not hold the field for talk / defeat / level-up events:
+        // Yemma's office NPCs kept wandering in the frame s048 started)
+        wf_core::field::attach_host(&mut self.session.world, true);
+        self.host.step_inputs(&mut self.session, frames);
+        self.errors.extend(self.host.errors[seen.min(self.host.errors.len())..].iter().cloned());
         wf_core::view::sim_events(&self.session.world, events);
     }
 

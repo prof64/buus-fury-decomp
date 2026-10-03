@@ -130,7 +130,13 @@ pub fn end_frame(w: &mut World) {
         if w.sound.skip > 0 {
             w.sound.skip -= 1;
         } else {
-            let at = if menu { UPDATE_AT_MENU } else { UPDATE_AT_FIELD };
+            // a page with its own measured idle step (the DMA interrupts before it delay it by 187 each)
+            let page = if menu { crate::menu::idle_cycles(w) } else { None };
+            let at = match page {
+                Some(t) => t + if (w.sound.phase as i64) < t { 187 } else { 0 },
+                None if menu => UPDATE_AT_MENU,
+                None => UPDATE_AT_FIELD,
+            };
             let p = pos_at(&w.sound, at);
             let n = p.wrapping_sub(w.sound.last) & 1023;
             if debug() {
@@ -253,21 +259,53 @@ pub fn redraw_frames(w: &mut World, r: Redraw) -> Option<u8> {
     })
 }
 
-/// The pause menu's close: the world is rebuilt in one main-loop iteration - the map loader's decompression
-/// (`MapDef.reload_cycles`, +0.35 % for the sound DMA's stolen cycles), ~267 k cycles of everything else, and an
-/// interrupt mix every 928 samples. Returns the video frames the iteration takes (None: unknown map / no sound
-/// content / uncalibrated). Measured: 2-9 22 frames (R 252 k), 3-15 26 (R 281 k); the object-dependent part of R
-/// is not modelled (+-15 k cycles).
-pub fn reload_frames(w: &mut World) -> Option<u8> {
+/// The pause menu's close: the world is rebuilt in one main-loop iteration. Its cycles: the map loader's
+/// decompression (`MapDef.reload_cycles`, +0.35 % for the sound DMA's stolen cycles; ~95 % of it), ~206 k of
+/// everything else plus two small sprite-frame streams (~19 k; the first depends on the character, 14.3 k / 17.1 k
+/// measured, not modelled), +0.52 % of the elapsed time for the VBlank / DMA interrupt handlers, and an interrupt
+/// mix every 928 samples. Returns the video frames the iteration takes (None: unknown map / no sound content /
+/// uncalibrated). Against the emulator (work/earth/timing/leaveprof.py): 2-9 5,377,882 vs 5,377,145 cycles
+/// before the mixes, 3-15 6,412,147 vs 6,414,682.
+pub fn reload_frames(w: &mut World, done: bool) -> Option<u8> {
     let f = w.field.as_ref()?;
-    let c = w.data.field.as_ref()?.maps.get(&f.map)?.reload_cycles as i64;
-    if c == 0 {
-        return None;
+    let fd = w.data.field.clone()?;
+    let rl = fd.maps.get(&f.map)?.reload.as_ref()?;
+    let (cx, cy) = (w.cameras[0].rect.x0 as i64, w.cameras[0].rect.y0 as i64);
+    let mut c = rl.fixed;
+    let mut extra = 0;
+    for l in &rl.layers {
+        if l.cols <= 2 && l.rows <= 2 {
+            // loaded whole into the layer's four chunk slots
+            c += l.ew.iter().sum::<i64>();
+            continue;
+        }
+        // a larger layer: the chunks under the 256 x 256 px tile screen centred on the screen's centre at the
+        // layer's scroll, through a buffer (~7 k cycles of copying per chunk). VERIFIED on
+        // 8-3 at camera (0, 347): layer offsets 0 / 128 / 192 px load columns {0} / {0, 1} / {0, 1}, rows {1, 2}
+        let sx = ((cx * l.rate.0 + l.offset.0) >> 10) + 120 - 128;
+        let sy = ((cy * l.rate.1 + l.offset.1) >> 10) + 80 - 128;
+        extra += 800;
+        for row in (sy >> 8)..=((sy + 255) >> 8) {
+            for col in (sx >> 8)..=((sx + 255) >> 8) {
+                if (0..l.cols as i64).contains(&col) && (0..l.rows as i64).contains(&row) {
+                    let v = l.iw.get((row * l.cols as i64 + col) as usize).copied().unwrap_or(0);
+                    if v != 0 {
+                        c += v;
+                        extra += 7_000;
+                    }
+                }
+            }
+        }
     }
-    redraw_frames(w, Redraw { t0: 0, base: RELOAD_REST + c * 10_035 / 10_000 })
+    if debug() {
+        eprintln!("snd reload: map {} cam ({cx}, {cy}) decompression {c} + {extra}", f.map);
+    }
+    // a close by a prompt (B) restores in the iteration after the event's: 18..29 k cycles less before it
+    let rest = if done { RELOAD_REST } else { RELOAD_REST - 23_500 };
+    redraw_frames(w, Redraw { t0: 0, base: (rest + extra + c * 10_035 / 10_000) * 100_523 / 100_000 })
 }
 
-const RELOAD_REST: i64 = 266_800;
+const RELOAD_REST: i64 = 225_200;
 
 /// the iteration makes the VBlank when it ends this many cycles before it at the latest (the wait's own entry)
 const CUTOFF: i64 = 0;
@@ -384,13 +422,43 @@ pub fn ops_cost(t: &crate::menu::text::TextData, ops: &[MenuOp]) -> (i64, i64, i
     (gn, small, extra)
 }
 
+/// shadowed text of a draw list: (glyphs drawn, their columns, set pixels, lines)
+pub fn text_counts(t: &crate::menu::text::TextData, ops: &[MenuOp]) -> (i64, i64, i64, i64) {
+    let (mut g, mut c, mut b, mut l) = (0, 0, 0, 0);
+    for op in ops {
+        if let MenuOp::Text { font, shadow: Some(_), text, .. } = op {
+            let fm = t.font(*font);
+            l += 1;
+            let mut k = 0;
+            while k < text.len() {
+                let ch = text[k];
+                if ch == 8 && k + 1 < text.len() {
+                    k += 2;
+                    continue;
+                }
+                k += 1;
+                if ch < 0xFF && fm.has.get(ch as usize).copied().unwrap_or(false) {
+                    let cols = fm.cols.get(ch as usize).map(|v| v.as_slice()).unwrap_or(&[]);
+                    g += 1;
+                    c += cols.len() as i64;
+                    b += cols.iter().map(|x| x.count_ones() as i64).sum::<i64>();
+                }
+            }
+        }
+    }
+    (g, c, b, l)
+}
+
 /// Cycles of a draw list for the pages whose constant part is measured per page (inventory, journal, ...): the
 /// shadowed glyphs (3.5664 per glyph-routine instruction), the pictures (16 x 16: 7,284, the keyed cursor 6,596,
 /// others 28.45 per pixel: the blit `0x0803F922`), and the plain text / fills / pixels of [`ops_cost`]. The
 /// backgrounds, panels and the surface copies are part of the page's constant.
-pub fn layer_cycles(t: &crate::menu::text::TextData, ops: &[MenuOp]) -> i64 {
+pub fn layer_cycles(t: &crate::menu::text::TextData, ops: &[MenuOp], line: i64) -> i64 {
     let (gn, small, extra) = ops_cost(t, ops);
-    let mut c = gn * 35_664 / 10_000 + small * 7_284 + extra;
+    let lines = text_counts(t, ops).3;
+    // the shadowed glyph routine: 3.17 cycles per counted instruction + `line` per text line (the caller's part,
+    // fitted per page: six inventory lists agree within 250 cycles; the status page's 3.5664 is its own fit)
+    let mut c = gn * 31_700 / 10_000 + lines * line + small * 7_284 + extra;
     for op in ops {
         if let MenuOp::Image { path, fw, fh, .. } = op {
             if (*fw, *fh) != (16, 16) {

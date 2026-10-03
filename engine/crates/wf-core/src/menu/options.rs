@@ -237,6 +237,13 @@ impl Page for Options {
     fn redraw_cost(&self) -> u8 {
         REDRAW_FRAMES
     }
+    /// options_sliders / options_pages / journal_scroll: 51 redraws, residual std 0.7k, max 1.7k
+    fn redraw_time(&self, w: &World, d: &MenuData) -> Option<crate::sndsim::Redraw> {
+        if self.blank {
+            return None;
+        }
+        Some(super::page_time(d, &self.view(w, d), !self.c.ever, 4_641, 232_905, 0, 0, 100_222))
+    }
 }
 
 /// a harness opening this screen from JSON (`menu::open_from_json`): `{"kind": "options"}`

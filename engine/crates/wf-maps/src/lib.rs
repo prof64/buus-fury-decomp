@@ -115,24 +115,32 @@ pub fn tileset(ctx: &mut Ctx, h: &Header) -> Tileset {
     Tileset { tiles, n_listed: n, anim_frames }
 }
 
-/// CPU cycles the map loader's decompression takes for a header (`wf_rom::deccost`): every tilemap chunk of the
-/// four layers and the tile chunks the tile list names (into EWRAM buffers), the tile list and frame 0 of every
-/// tile animation (into IWRAM). It is ~95 % of an area (re)load - the black frames when the pause menu closes
-/// (wf-core `sndsim.rs`); the streams and their order match an emulator profile call by call
-/// (`examples/reloadinfo.rs`, work/earth/timing/leaveprof.py).
-pub fn reload_cycles(rom: &Rom, h: &Header) -> u64 {
+/// CPU cycles of the map loader's decompression for a header (`wf_rom::deccost`), as `collision.json` `reload`:
+/// `fixed` = the minimap, the tile list, the tile chunks it names and frame 0 of every tile animation; per layer
+/// its chunk grid with each chunk's cycles into EWRAM (`ew`: a layer of at most 2 x 2 chunks is loaded whole into
+/// its four slots) and into IWRAM (`iw`: a larger layer loads the chunks around the camera through a buffer).
+/// Decompression is ~95 % of an area (re)load - the black frames when the pause menu closes (wf-core
+/// `sndsim.rs`); streams and order match emulator profiles call by call (`examples/reloadinfo.rs`,
+/// work/earth/timing/leaveprof.py).
+pub fn reload_json(rom: &Rom, h: &Header) -> Value {
     let cyc = |p: u32, ew: bool| wf_rom::deccost::decode_cycles_to(rom.data(), (p & 0x01FF_FFFF) as usize, ew).unwrap_or(0) as u64;
-    let mut total = 0;
+    let mut layers = Vec::new();
     for &r in &h.res {
         let Some(res) = rom_maps::resource(rom, r) else { continue };
-        for &c in &res.chunks {
-            if rom.isptr(c) {
-                total += cyc(c + 8, true);
-            }
+        if res.chunks.is_empty() {
+            continue;
         }
+        let ew: Vec<u64> = res.chunks.iter().map(|&c| if rom.isptr(c) { cyc(c + 8, true) } else { 0 }).collect();
+        let iw: Vec<u64> = res.chunks.iter().map(|&c| if rom.isptr(c) { cyc(c + 8, false) } else { 0 }).collect();
+        layers.push(json!({"cols": res.cols, "rows": res.rows, "rate": [res.rate.0, res.rate.1],
+                           "offset": [res.offset.0, res.offset.1], "ew": ew, "iw": iw}));
+    }
+    let mut fixed = 0;
+    if rom.isptr(h.minimap) {
+        fixed += cyc(h.minimap + 8, true);
     }
     if rom.isptr(h.tile_list) {
-        total += cyc(h.tile_list + 8, false);
+        fixed += cyc(h.tile_list + 8, false);
         let list = rom.lz(h.tile_list).unwrap_or_default();
         let n = (list.len() / 2).min(VRAM_TILES);
         let (mut e, mut last) = (0u16, u32::MAX);
@@ -144,7 +152,7 @@ pub fn reload_cycles(rom: &Rom, h: &Header) -> u64 {
                 last = c;
                 let p = rom.u32(h.tile_chunks + 4 * c);
                 if rom.isptr(p) {
-                    total += cyc(p + 8, true);
+                    fixed += cyc(p + 8, true);
                 }
             }
         }
@@ -152,11 +160,11 @@ pub fn reload_cycles(rom: &Rom, h: &Header) -> u64 {
     for a in &h.anims {
         if let Some(&(_, p)) = a.frames.first() {
             if rom.isptr(p) {
-                total += cyc(p, false);
+                fixed += cyc(p, false);
             }
         }
     }
-    total
+    json!({"fixed": fixed, "layers": layers})
 }
 
 /// One map = one distinct map header.
@@ -256,7 +264,7 @@ pub fn extract(rom: &Rom, out: &mut Content) -> wf_rom::Result<()> {
 
         let coll = collision::grids(&mut ctx, h);
         let mut cj = collision::to_json(&coll, h);
-        cj["reload_cycles"] = json!(reload_cycles(rom, h));
+        cj["reload"] = reload_json(rom, h);
         out.put_json(format!("maps/{}/collision.json", m.id), &cj);
 
         let map_json = tiled::map_json(m, &layers, &res, &ts_id, &ts, &ctx.pal);

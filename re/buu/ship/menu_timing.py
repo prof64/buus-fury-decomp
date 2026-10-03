@@ -23,22 +23,11 @@ import ship_driver  # noqa: E402,F401
 from route import start_emu  # noqa: E402
 
 UPDATE, OBJ = 0x0803F296, 0x03003898
+MAIN_LR = 0x0803D814
 
 
-def main():
-    a = [x for x in sys.argv[1:] if not x.startswith('--')]
-    prof = '--prof' in sys.argv
-    every = '--all' in sys.argv
-    d, name, fa, fb, out = Path(a[0]).resolve(), a[1], int(a[2]), int(a[3]), a[4]
-    lines = (d / f'{name}.json').read_text().split('\n')
-    keys = [json.loads(ln.rstrip(','))['keys'] for ln in lines[1:] if ln.startswith('{')]
-    st = d / 'states' / f'{name}.ss'
-    if not st.exists():
-        st = Path(__file__).resolve().parents[3] / 'work' / 'segments' / f'{name}.ss'
-    e = start_emu(str(st))
-    for k in range(fa):
-        e.set_keys(keys[k])
-        e.run(1)
+def measure(e, keys, fa, fb, prof=False, every=False):
+    """the iterations of video frames fa..fb; `e` stands at the start of frame fa, keys[k] = the keys of frame k"""
     f0 = e.frame
     cur = fa
     e.set_keys(keys[cur])
@@ -48,6 +37,7 @@ def main():
     prev_hit = False
     it = None            # the running iteration: {'f0', 'irq', 'prof'}
     start_next = None    # the frame the next iteration starts in
+    main_mode = 0x10     # the CPU mode the main loop runs in (user; system in states made from a BIOS-less boot)
     while e.frame - f0 < fb - fa:
         raw = e.reg(15) & ~1
         mode = e.reg(16) & 0x1f
@@ -61,10 +51,14 @@ def main():
                 it['prof'] = collections.Counter()
         if new and upd is None:
             n = (e.r32(OBJ + 4) - e.r32(OBJ + 8)) & 1023
-            upd = [c, n, mode]
+            # the main loop's call (return address 0x0803D814) or the DMA interrupt's nested one
+            main = (e.reg(14) & ~1) == MAIN_LR
+            upd = [c, n, 0x10 if main else 0x1f]
+            if main:
+                main_mode = mode
         e.step()
         c2 = e.cycles()
-        if prof and it is not None and mode == 0x10 and upd is None:
+        if prof and it is not None and mode == main_mode and upd is None:
             it['prof'][raw >> 6 << 6] += c2 - c
         if upd is not None and e.r32(OBJ) == 0 and c2 - upd[0] > 40:
             if upd[2] == 0x10:
@@ -90,6 +84,24 @@ def main():
             fstart[cur] = c2
             if cur < len(keys):
                 e.set_keys(keys[cur])
+    return res
+
+
+def main():
+    a = [x for x in sys.argv[1:] if not x.startswith('--')]
+    prof = '--prof' in sys.argv
+    every = '--all' in sys.argv
+    d, name, fa, fb, out = Path(a[0]).resolve(), a[1], int(a[2]), int(a[3]), a[4]
+    lines = (d / f'{name}.json').read_text().split('\n')
+    keys = [json.loads(ln.rstrip(','))['keys'] for ln in lines[1:] if ln.startswith('{')]
+    st = d / 'states' / f'{name}.ss'
+    if not st.exists():
+        st = Path(__file__).resolve().parents[3] / 'work' / 'segments' / f'{name}.ss'
+    e = start_emu(str(st))
+    for k in range(fa):
+        e.set_keys(keys[k])
+        e.run(1)
+    res = measure(e, keys, fa, fb, prof, every)
     json.dump(res, open(out, 'w'))
     for r in res:
         print(r['f0'], 'k%x' % r['keys'], 'pre', r['pre'], 'own', r['own'], 'irq', r['irq'], 'post', r['post'], 'end', r['end'], 'frames', r['frames'])

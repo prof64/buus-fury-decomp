@@ -36,6 +36,9 @@ pub struct Pickup {
     pub vz: i32,
     /// frames alive
     pub t: i32,
+    /// moves made in frames an event held (the flight's counter is `t + mv`)
+    #[serde(default)]
+    pub mv: i32,
     pub landed: bool,
     /// coin animation phase (the constructor's raw next())
     pub phase: u32,
@@ -162,6 +165,7 @@ pub fn spawn_map_item(w: &mut World, o: &crate::fieldcontent::ObjDef) -> Option<
         z: 0,
         vz: 0,
         t: 0,
+        mv: 0,
         landed: true,
         phase: 0,
         bx: [*x, *y, x + 16, y + 16],
@@ -348,7 +352,7 @@ pub fn drop_zenie(w: &mut World, size: i32) -> Option<EntityId> {
     let (x, y) = (lx << 8, ly << 8);
     let x0 = (x >> 8) - sw / 2;
     let y0 = (y >> 8) + yoff;
-    let mut p = Pickup { kind: PickupKind::Zenie(size), x, y, vx, vy, z: 0, vz: 0x80, t: 0, landed: false, phase, bx: [x0, y0, x0 + bw, y0 + bh], solid: None, spawn: None };
+    let mut p = Pickup { kind: PickupKind::Zenie(size), x, y, vx, vy, z: 0, vz: 0x80, t: 0, mv: 0, landed: false, phase, bx: [x0, y0, x0 + bw, y0 + bh], solid: None, spawn: None };
     if w.field.as_ref().is_some_and(|f| f.pre_update) {
         p.spawn = Some((w.frame + 1, p.coin_rect()));
     }
@@ -369,7 +373,7 @@ pub fn drop_item(w: &mut World, item: i32) -> Option<EntityId> {
     let (vx, vy) = scatter(w, lvx, lvy);
     let kind = if item >= 0 { PickupKind::Supply(item) } else { PickupKind::Equipment(-item) };
     let (x, y) = ((lx - 8) << 8, (ly - 16) << 8);
-    let p = Pickup { kind, x, y, vx, vy, z: 0x2000, vz: 0x800, t: 0, landed: false, phase: 0, bx: [lx - 8, ly - 16, lx + 8, ly], solid: None, spawn: None };
+    let p = Pickup { kind, x, y, vx, vy, z: 0x2000, vz: 0x800, t: 0, mv: 0, landed: false, phase: 0, bx: [lx - 8, ly - 16, lx + 8, ly], solid: None, spawn: None };
     let id = w.add(Body::Pickup(Box::new(p)));
     if !w.field.as_ref().is_some_and(|f| f.pre_update) {
         if let Some(k) = w.find(id) {
@@ -382,10 +386,67 @@ pub fn drop_item(w: &mut World, item: i32) -> Option<EntityId> {
 // ---------------------------------------------------------------------------------------------------------------
 // pickups
 
+/// a coin's move of one frame (0x0801809E: the move counter +0x2C runs 0..59 - sixty moves, then it lies)
+fn coin_fly(w: &World, p: &mut Pickup) {
+    if p.t + p.mv <= 60 {
+        let (nx, ny) = (p.x + p.vx, p.y + p.vy);
+        let (ddx, ddy) = ((nx >> 8) - (p.x >> 8), (ny >> 8) - (p.y >> 8));
+        // 0x0801809E: the step is kept only when it reaches a new pixel (and the box there is free); a step
+        // within the pixel is dropped, so a coin slower than 1 px per frame that starts on a whole pixel never
+        // moves (story playthrough: 3 of the fighters' 4 coins stay where they dropped)
+        if (ddx != 0 || ddy != 0) && walk_free(w, [p.bx[0] + ddx, p.bx[1] + ddy, p.bx[2] + ddx, p.bx[3] + ddy]) {
+            p.x = nx;
+            p.y = ny;
+            p.bx = [p.bx[0] + ddx, p.bx[1] + ddy, p.bx[2] + ddx, p.bx[3] + ddy];
+        }
+        p.vz -= 4;
+        p.z += p.vz;
+        if p.z <= 0 {
+            p.z = -p.z;
+            p.vz = 0x80;
+        }
+    } else {
+        p.z = 0;
+        p.landed = true;
+    }
+}
+
+/// a coin's move in a frame an event holds: the flight goes on, the age does not count
+fn coin_move(w: &mut World, i: usize) {
+    let Body::Pickup(p) = &w.ents[i].body else { return };
+    if !matches!(p.kind, PickupKind::Zenie(_)) || p.landed {
+        return;
+    }
+    let mut p = (**p).clone();
+    p.mv += 1;
+    coin_fly(w, &mut p);
+    if let Body::Pickup(q) = &mut w.ents[i].body {
+        **q = p;
+    }
+}
+
+/// the coins' moves of a frame whose object pass an inline event holds (session.rs)
+pub fn held_moves(w: &mut World) {
+    if let Some(f) = w.field.as_mut() {
+        f.coins_moved = true;
+    }
+    for i in 0..w.ents.len() {
+        if !w.ents[i].removed && matches!(w.ents[i].body, Body::Pickup(_)) {
+            coin_move(w, i);
+        }
+    }
+}
+
 pub fn pickup_update(w: &mut World, i: usize) {
     // an event holding the field stops the pickups (story playthrough: a coin's age does not run during the level-up
-    // popup, so it outlives the 600-frame limit by the popup's length)
-    if w.field.as_ref().is_some_and(|f| f.busy) {
+    // popup, so it outlives the 600-frame limit by the popup's length) - but not a coin's flight: its sixty moves
+    // (counter +0x2C) run in every frame, the age (+0x24) only in the objects' own pass (Diablo Desert Express
+    // 11-24: the coins of two robbers fly on and land under their event s373 and the scene after it)
+    if w.field.as_ref().is_some_and(|f| f.busy || f.held || f.drop_held) {
+        // (one move per frame: the pass an inline event's end completes comes after the held frame's moves)
+        if w.field.as_ref().is_some_and(|f| f.drop_held || !f.coins_moved) {
+            coin_move(w, i);
+        }
         return;
     }
     let Body::Pickup(p) = &w.ents[i].body else { return };
@@ -397,28 +458,7 @@ pub fn pickup_update(w: &mut World, i: usize) {
     p.t += 1;
     match p.kind {
         PickupKind::Zenie(_) => {
-            // 0x0801809E: the move counter (+0x2C) runs 0..59 - sixty moves
-            if p.t <= 60 {
-                let (nx, ny) = (p.x + p.vx, p.y + p.vy);
-                let (ddx, ddy) = ((nx >> 8) - (p.x >> 8), (ny >> 8) - (p.y >> 8));
-                // 0x0801809E: the step is kept only when it reaches a new pixel (and the box there is free); a step
-                // within the pixel is dropped, so a coin slower than 1 px per frame that starts on a whole pixel never
-                // moves (story playthrough: 3 of the fighters' 4 coins stay where they dropped)
-                if (ddx != 0 || ddy != 0) && walk_free(w, [p.bx[0] + ddx, p.bx[1] + ddy, p.bx[2] + ddx, p.bx[3] + ddy]) {
-                    p.x = nx;
-                    p.y = ny;
-                    p.bx = [p.bx[0] + ddx, p.bx[1] + ddy, p.bx[2] + ddx, p.bx[3] + ddy];
-                }
-                p.vz -= 4;
-                p.z += p.vz;
-                if p.z <= 0 {
-                    p.z = -p.z;
-                    p.vz = 0x80;
-                }
-            } else {
-                p.z = 0;
-                p.landed = true;
-            }
+            coin_fly(w, &mut p);
             if p.t >= 600 {
                 w.ents[i].removed = true;
             }

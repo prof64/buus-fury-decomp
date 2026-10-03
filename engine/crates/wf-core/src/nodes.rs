@@ -1491,8 +1491,19 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                     return true;
                 }
             }
-            // field: the puff came with the node's enter (below)
+            // field: the puff came with the node's enter; the form's sprite changes here, on the update (the
+            // Nosferatu, type 0x52: gfx 203 the bat, 202 the vampire - 0x0800EE64 writes the object's gfx def)
             if w.field.is_some() {
+                // ... and the bat is off the enemy grid (obj+0x291 = 1: it flies over walls), the vampire back on it
+                if matches!(kind(c, n), K::VampireSummon) {
+                    en::swap_gfx(w, i);
+                    en::unmark_self(w, i);
+                    w.en(i).detached = true;
+                } else if matches!(kind(c, n), K::VampireSummon2) {
+                    en::swap_gfx(w, i);
+                    w.en(i).detached = false;
+                    en::mark_self(w, i);
+                }
                 return true;
             }
             let (cx, cy) = w.en_ref(i).a.center();
@@ -2090,14 +2101,20 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             false
         }
         // ---- grabs
-        // update 0x08033A2A: done when the player's HP <= 0 or the player left the hold; keys A/B/d-pad held -> stamp,
-        // count + 1, > 8 -> player SetAnim(0), done; no keys for > 10 frames -> count 0; the frame counter & 15 == 0 ->
+        // update 0x08033A2A: done when the player's HP <= 0 or the player left the hold; keys A/B/d-pad pressed this
+        // frame (input manager +4, the press edge: held keys do not count - real route, Pilaf's Castle) -> stamp,
+        // count + 1, > 8 -> player SetAnim(0), done; no press for > 10 frames -> count 0; the frame counter & 15 == 0 ->
         // the player loses POW HP (no formula) and the vampire heals the same
         K::VampireGrab => {
             let Some(pi) = en::player(w, i).filter(|&pi| w.pl_ref(pi).hp() > 0 && w.pl_ref(pi).held_by == me) else { return true };
+            // update 0x08033A2A: the player's state object (player +0x14) is no longer the held one -> finished
+            // (field: an exit that fired under the held player started the autowalk; HFIL 18-8, sc_hfil)
+            if w.field.is_some() && matches!(w.pl_ref(pi).gs, player::Gs::AutoWalk) {
+                return true;
+            }
             let now = w.g.clock(w.frame) as i32;
             let slot = w.pl_ref(pi).slot as usize;
-            if w.input[slot].held & 0xf3 != 0 {
+            if w.input[slot].pressed & 0xf3 != 0 {
                 r.d[1] = now;
                 r.d[0] += 1;
                 if r.d[0] > 8 {
@@ -2637,9 +2654,13 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                 let bb = w.en_ref(i).a.body_box();
                 if en::area_hit(w, i, bb, atk(2), 0x400) {
                     r.d[0] = 1;
+                    // 0x0803B3D8: the strike that landed plays sound 48 + rand(2) (HFIL 18-12, sc_hfil)
+                    let s = 48 + w.rng.rand(2);
+                    w.sfx(s, 64);
                 }
             }
-            f >= 106
+            // (the strike's animation ends at tick 0x68, 0x0803B3FC; the state after it is entered the next frame)
+            f >= 105
         }
         K::HandAmbush => {
             if (80..=103).contains(&f) && r.d[0] == 0 {
@@ -2652,6 +2673,14 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         }
         K::HandSink => {
             w.en(i).a.alpha = (256 - f * 256 / 107).max(51);
+            // field: the one-shot controller's end (0x0800EE78) leaves the hand in the walk state - an event that
+            // starts during the Wait after it idles it (message 0xF: SetAnim(0), one draw; HFIL 18-12, sc_hfil)
+            if w.field.is_some() {
+                if f >= 105 {
+                    en::set_walk_state(w, i);
+                }
+                return f >= 105;
+            }
             f >= 107
         }
         K::SuperJanembaWave => {

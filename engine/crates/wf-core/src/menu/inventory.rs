@@ -24,11 +24,25 @@ use wf_view::{MenuFont, MenuView};
 /// video frames one redraw of the page / the dialog takes (measured: `re/buu/menu/timing.py`)
 pub const REDRAW_FRAMES: u8 = 4;
 pub const DIALOG_FRAMES: u8 = 2;
-/// the timing model (sndsim.rs): the list redraw's constant part, the page's enter, the dialog's enter + surface
-const LIST_CYCLES: i64 = 210_710;
-const ENTER_CYCLES: i64 = 142_026;
-const DIALOG_CYCLES: i64 = 202_242;
-const T0: i64 = 4_641;
+/// the timing model (sndsim.rs; emulator measurements `re/buu/ship/menu_timing.py` on the real route's heal menus
+/// 8-14 / 8-51 / 8-64, six lists: fit within 250 cycles): the list redraw's constant part, per listed row, per text
+/// line; the page's enter (its first redraw); the Use dialog's first iteration on top of the page's redraw; a redraw
+/// of the dialog alone (its buttons' press: the dialog surface, not the page under it) and its text lines
+const LIST_CYCLES: i64 = 192_506;
+const ROW_CYCLES: i64 = 2_933;
+const LINE_CYCLES: i64 = 1_251;
+/// cycles per 1000 glyph-routine instructions beyond `sndsim::layer_cycles`' 3.17 each (joint fit: the three
+/// route menus and the inventory_use scenario's 5-row lists, residuals within 2.5k)
+const LIST_GN_MILLI: i64 = 439;
+const ENTER_CYCLES: i64 = 141_636;
+/// (six dialogs: the redraw alone = 113,741 + 4,000 per line + 3.617 per glyph instruction + pictures; the first
+/// iteration = the page's redraw + the dialog's + 60,200, seven cases within 600)
+const DIALOG_CYCLES: i64 = 60_200;
+const DIALOG_REDRAW_CYCLES: i64 = 113_741;
+const DIALOG_LINE_CYCLES: i64 = 4_000;
+const DIALOG_GN_MILLI: i64 = 447;
+/// the idle step (frame start to the sound update)
+const T0: i64 = 3_240;
 
 /// supply def strings and flags (`items/*.json`: name = def +4, plural = +6, description = +8)
 #[derive(Clone, Debug, Default)]
@@ -80,6 +94,9 @@ impl InvData {
 pub struct UseDialog {
     pub c: Container,
     pub item: i32,
+    /// drawn once (the timing model: later redraws are the dialog surface alone)
+    #[serde(default)]
+    pub shown: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -419,7 +436,7 @@ impl UseDialog {
         let bx = t.font(MenuFont::Menu).measure(use_s) + 0x1E;
         c.add(Widget::Button(Button::new(BTN_B, bx, 0x4C, 1, true, false)));
         c.add(Widget::Label(Label { x: bx + 0x10, y: 0x58, text: t.s(26).to_vec(), colour: 5, align: 0, font: Font::Menu }));
-        UseDialog { c, item }
+        UseDialog { c, item, shown: false }
     }
 
     /// redraw `0x0801E318`: 208x104
@@ -480,21 +497,35 @@ impl Page for Inventory {
             REDRAW_FRAMES
         }
     }
+    fn idle_cycles(&self) -> Option<i64> {
+        Some(T0)
+    }
     fn after_draw(&mut self, _w: &World) {
         self.fresh = false;
+        if let Some(dl) = self.dialog.as_mut() {
+            dl.shown = true;
+        }
     }
     /// the iteration's own cycles (emulator measurements `re/buu/ship/menu_timing.py`, real route 8-51: the list
     /// 502,271 / 508,867 with the cursor, the first redraw after the page switch 650,893, the Use dialog's first
     /// iteration 1,009,750): the page's constant part + its draw list (`sndsim::layer_cycles`)
     fn redraw_time(&self, w: &World, d: &MenuData) -> Option<crate::sndsim::Redraw> {
         let v = self.draw(w, d);
-        let layer = |k: usize| v.layers.get(k).map(|l| crate::sndsim::layer_cycles(&d.text, &l.ops)).unwrap_or(0);
-        let mut own = LIST_CYCLES + layer(0);
+        let layer = |k: usize, line: i64| v.layers.get(k).map(|l| crate::sndsim::layer_cycles(&d.text, &l.ops, line)).unwrap_or(0);
+        let rows = (self.list().len() as i64 - self.top as i64).clamp(0, 5);
+        let gn0 = v.layers.first().map(|l| crate::sndsim::ops_cost(&d.text, &l.ops).0).unwrap_or(0);
+        let mut own = LIST_CYCLES + ROW_CYCLES * rows + layer(0, LINE_CYCLES) + gn0 * LIST_GN_MILLI / 1000;
         if self.fresh {
             own += ENTER_CYCLES;
         }
-        if self.dialog.is_some() {
-            own += DIALOG_CYCLES + layer(1);
+        if let Some(dl) = self.dialog.as_ref() {
+            let gn1 = v.layers.get(1).map(|l| crate::sndsim::ops_cost(&d.text, &l.ops).0).unwrap_or(0);
+            let dlg = DIALOG_REDRAW_CYCLES + layer(1, DIALOG_LINE_CYCLES) + gn1 * DIALOG_GN_MILLI / 1000;
+            if dl.shown {
+                own = dlg;
+            } else {
+                own += DIALOG_CYCLES + dlg;
+            }
         }
         Some(crate::sndsim::Redraw { t0: T0, base: own - T0 })
     }

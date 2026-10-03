@@ -405,7 +405,9 @@ pub fn update(w: &mut World, i: usize) {
     // held like any others; 0-21, s026's warp_fade: Majin Buu's tree draws nothing until the event ends)
     let id = w.ents[i].id;
     let own_load = crate::fieldworld::flying(w) && w.field.as_ref().is_some_and(|f| f.load_ids.0 <= id && id < f.load_ids.1);
-    if w.field.as_ref().is_some_and(|f| f.busy && !own_load || f.arrival.is_some()) {
+    // (the item-get presentation holds them the same way, all 60 frames: Diablo Desert Express 11-22 - a Mad
+    // Bomber's Wait(90) does not count while the player holds a dropped item up; shots fly on)
+    if w.field.as_ref().is_some_and(|f| f.busy && !own_load || f.arrival.is_some() || f.item_get.as_ref().is_some_and(|g| g.left > 0)) {
         tick_anim(w, i);
         if w.en_ref(i).part && matches!(w.en_ref(i).ty, 0x34 | 0x35 | 0x37) {
             part_hurt_end(w, i);
@@ -1334,7 +1336,8 @@ pub fn footstep(w: &mut World, i: usize, path: bool) {
         w.sfx(52, 64);
     }
 }
-/// MechTransform 0x080314DC: swap to the paired graphics set (0xBB / 0xBC, 0xE6 / 0xE7, 0x85 / 0x86) via 0x0800EDF8
+/// MechTransform 0x080314DC: swap to the paired graphics set (0xBB / 0xBC, 0xE6 / 0xE7, 0x85 / 0x86, 0xCA / 0xCB)
+/// via 0x0800EDF8
 pub fn swap_gfx(w: &mut World, i: usize) {
     let d = Arc::clone(&w.data);
     let g = if w.en_ref(i).gfx_now >= 0 { Some(w.en_ref(i).gfx_now) } else { d.enemy(w.en_ref(i).ty).and_then(|t| t.gfx) };
@@ -1345,6 +1348,9 @@ pub fn swap_gfx(w: &mut World, i: usize) {
         Some(0xe7) => 0xe6,
         Some(0x85) => 0x86,
         Some(0x86) => 0x85,
+        // the Nosferatu's bat form (field: nodes VampireSummon / VampireSummon2)
+        Some(0xca) => 0xcb,
+        Some(0xcb) => 0xca,
         _ => return,
     };
     let idx = to - crate::content::GFX_OFFSET;
@@ -1364,6 +1370,10 @@ pub fn stop_msg(w: &mut World, i: usize) {
     if w.en_ref(i).a.anim_name(&d) == Some("walk") {
         set_anim(w, i, &[n(0)], true, Some(true));
     }
+}
+/// the end of a one-shot animation controller (0x0800EE78): the walk state
+pub fn set_walk_state(w: &mut World, i: usize) {
+    set_anim(w, i, &[n(1)], true, Some(true));
 }
 /// a node that ends a movement: SetAnim(0) if walking (IsAnim(1), 0x0801CE58)
 pub fn stop_walk(w: &mut World, i: usize) {
@@ -2422,6 +2432,9 @@ pub fn die(w: &mut World, i: usize, explode: bool) {
     if explode {
         let (cx, cy) = w.en_ref(i).a.center();
         let rate = 0x1000 + w.rng.rand(0x1000);
+        // the enemy's sprite instance is destroyed first (`0x0800EC34`): the explosion can take its tiles
+        // (segments sb 20-6, side 18-2: a dying enemy's block is free before the explosion's is taken)
+        crate::vram::entity_gone(w, i);
         crate::fx::explosion(w, cx, cy, rate);
     }
     // the object's destruction frees its enemy-grid cells (removed entities are not re-synced: story playthrough, a
