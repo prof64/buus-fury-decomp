@@ -86,6 +86,9 @@ export class BuuCtx {
   buuPacified = 0
   /** 0x030032E4: 0 active, 1 destroyed, 2 fading, 3 expired */
   sphereState = 0
+  /** the soldier-throw controller 0x03002FCC is one object for every soldier: +4 = the wave the last throw spawned
+   *  (entity id); a throw ends (tick >= 32) once THAT wave is gone (emulator: Babidi's ship 8-34 segment) */
+  soldierWave = 0
   /** 0x030032EC */
   waypoint = 0
   /** 0x03003228 TeleportChain4 counter */

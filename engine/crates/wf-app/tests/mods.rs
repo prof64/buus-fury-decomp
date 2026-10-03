@@ -23,9 +23,11 @@ fn base_dir() -> Option<PathBuf> {
             return Some(PathBuf::from(d));
         }
         let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("wf-app-mods-content");
-        if dir.join(".complete").exists() {
+        // the marker records the extractor's source hash: an extractor change re-extracts (wf_extract::cache)
+        if wf_extract::cache::fresh(&dir, &[]) {
             return Some(dir);
         }
+        let _ = std::fs::remove_dir_all(&dir);
         let rom = wf_rom::testutil::rom()?;
         let (c, _) = wf_extract::extract_rom(&rom, &Default::default(), &mut |_| {});
         for (p, b) in &c.files {
@@ -33,7 +35,7 @@ fn base_dir() -> Option<PathBuf> {
             std::fs::create_dir_all(f.parent().unwrap()).unwrap();
             std::fs::write(f, b).unwrap();
         }
-        std::fs::write(dir.join(".complete"), b"").unwrap();
+        std::fs::write(dir.join(".complete"), wf_extract::cache::stamp(&[])).unwrap();
         Some(dir)
     })
     .clone()

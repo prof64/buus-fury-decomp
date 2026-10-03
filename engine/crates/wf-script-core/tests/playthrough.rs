@@ -43,25 +43,14 @@ fn content_dir() -> PathBuf {
     if let Ok(d) = std::env::var("WF_FIELD_CONTENT") {
         return PathBuf::from(d);
     }
+    // the field-test extraction shared by the test crates; `wf_extract::cache` re-extracts it when the extractor's
+    // source hash in its `.complete` marker differs (no stale content after an extractor change)
+    let only = ["tables", "sprites", "effects", "maps", "world", "items", "scripts"];
     let shared = repo().join("engine/target/tmp/wf-core-field-content");
-    if shared.join(".complete").exists() {
+    if wf_extract::cache::fresh(&shared, &only) {
         return shared;
     }
-    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("wf-script-core-field-content");
-    if dir.join(".complete").exists() {
-        return dir;
-    }
-    let rom = std::fs::read(repo().join("roms/buu.gba")).expect("roms/buu.gba");
-    let only = ["tables", "sprites", "effects", "maps", "world", "items", "scripts"];
-    let opts = wf_extract::Options { only: only.iter().map(|s| s.to_string()).collect() };
-    let (content, _) = wf_extract::extract(rom, &opts).expect("extract");
-    for (path, data) in &content.files {
-        let p = dir.join(path.strip_prefix("base/").unwrap_or(path));
-        std::fs::create_dir_all(p.parent().unwrap()).unwrap();
-        std::fs::write(&p, data).unwrap();
-    }
-    std::fs::write(dir.join(".complete"), b"ok").unwrap();
-    dir
+    wf_extract::cache::ensure(&shared, &repo().join("roms/buu.gba"), &only)
 }
 
 fn hex(s: &str) -> Vec<u8> {

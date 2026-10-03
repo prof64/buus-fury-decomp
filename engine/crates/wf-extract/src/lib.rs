@@ -3,6 +3,8 @@
 //! tree, written to disk by `wf-cli` or handed to JavaScript by `wf-wasm`.
 
 pub mod annotations;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod cache;
 pub mod effects;
 pub mod field_gfx;
 pub mod fx_extra;

@@ -30,7 +30,7 @@ ROUTE = [
     ('wait', 30), ('walk', 224, 450), ('hold', DOWN, 30), ('area', 1, 5), ('wait', 40), ('walke', 336, 200),
     ('events',), ('wait', 60), ('mark', 'zsword'),
     # 19-7: the Z-Sword (s464): mash to pull it, swing at the boulder / the Katchin 47 frames after the throw starts
-    ('walk', 152, 96), ('hold', UP, 2), ('wait', 3), ('hold', A, 3), ('wait', 5), ('fastmash', 1200),
+    ('walk', 152, 90), ('hold', UP, 2), ('wait', 3), ('hold', A, 3), ('wait', 5), ('fastmash', 1200),
     ('node', 's464', 19, 47, A, 3), ('node', 's464', 33, 47, A, 3), ('events',), ('wait', 30), ('mark', 'lookout'),
     # Kami's Lookout 6-5 (Trunks): the bed (s224) -> HTC 6-9: spar with Goten (s225 / s226) -> 6-7
     ('walk', 120, 100), ('talk', 'R'), ('wait', 30), ('hold', A, 3), ('wait', 5), ('events',), ('wait', 30),
@@ -46,7 +46,8 @@ ROUTE = [
     # 8-1 capsule (A) -> world map 0-50: fly to the Giant Crater spot (633, 1065) and land (inline_0x08073799 -> s234)
     ('walk', 280, 256), ('talk', 'U'), ('fly', 648, 1076), ('events',), ('wait', 30), ('mark', 'gohan_vs_buu'),
     # Ultimate Gohan vs Super Buu (6-16) -> Buu blows himself up (s466) -> Barren Wasteland 20-1
-    ('boss', 40000), ('events',), ('wait', 30), ('mark', 'wasteland'),
+    # (beams from 70 px: Electric Kamehameha, slot 2, held 120 frames - melee loses to Buu's counters)
+    ('beam', 40000, 2, 120, 70), ('events',), ('wait', 30), ('mark', 'wasteland'),
 ]
 
 

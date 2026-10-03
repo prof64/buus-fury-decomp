@@ -445,7 +445,9 @@ impl Player {
         self.skills.get(self.sel).copied().unwrap_or(7)
     }
     pub fn attacking(&self) -> bool {
-        matches!(self.state, PState::Punch | PState::Skill | PState::Dash)
+        // the Ki Blast state (0x0804DC14) does not count (2-9: a criminal walking in on Gohan's blast runs no
+        // IfPlayerAttackingMe chance)
+        matches!(self.state, PState::Punch | PState::Skill | PState::Dash) && self.gs != Gs::Skill(7)
     }
     /// the state's vfunc +0x1C (IfInPlayerBeamLine 0x08029B30): Ki Blast (0x0804FA30) = the refire request or anim
     /// tick < 16 (until the blast leaves the hand); other skills: INFERRED any skill state

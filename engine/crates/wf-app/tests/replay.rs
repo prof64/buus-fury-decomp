@@ -17,9 +17,12 @@ fn content_dir() -> Option<PathBuf> {
         return Some(PathBuf::from(d));
     }
     let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("wf-app-replay-content");
-    if dir.join(".complete").exists() {
+    let only = ["tables", "sprites", "effects", "items", "maps", "ui"];
+    // the marker records the extractor's source hash: an extractor change re-extracts (wf_extract::cache)
+    if wf_extract::cache::fresh(&dir, &only) {
         return Some(dir);
     }
+    let _ = std::fs::remove_dir_all(&dir);
     let rom = wf_rom::testutil::rom()?;
     let opts = wf_extract::Options { only: ["tables", "sprites", "effects", "items", "maps", "ui"].map(String::from).to_vec() };
     let (c, _) = wf_extract::extract_rom(&rom, &opts, &mut |_| {});
@@ -28,7 +31,7 @@ fn content_dir() -> Option<PathBuf> {
         std::fs::create_dir_all(f.parent().unwrap()).unwrap();
         std::fs::write(f, d).unwrap();
     }
-    std::fs::write(dir.join(".complete"), b"ok").unwrap();
+    std::fs::write(dir.join(".complete"), wf_extract::cache::stamp(&only)).unwrap();
     Some(dir)
 }
 

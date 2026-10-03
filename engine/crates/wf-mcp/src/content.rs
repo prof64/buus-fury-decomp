@@ -55,7 +55,7 @@ fn pack_ok(dir: &Path) -> bool {
     std::fs::read(dir.join("pack.json"))
         .ok()
         .and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok())
-        .is_some_and(|v| v["generated_by"] == EXTRACTOR && dir.join(".complete").exists())
+        .is_some_and(|v| v["generated_by"] == EXTRACTOR && wf_extract::cache::fresh(dir, &[]))
 }
 
 /// the content/base directory (extracting when needed)
@@ -78,7 +78,7 @@ pub fn content_dir() -> Result<PathBuf, String> {
         std::fs::create_dir_all(p.parent().unwrap()).map_err(|e| e.to_string())?;
         std::fs::write(&p, data).map_err(|e| e.to_string())?;
     }
-    std::fs::write(tmp.join(".complete"), b"ok").map_err(|e| e.to_string())?;
+    std::fs::write(tmp.join(".complete"), wf_extract::cache::stamp(&[])).map_err(|e| e.to_string())?;
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::rename(&tmp, &dir).map_err(|e| e.to_string())?;
     Ok(dir)

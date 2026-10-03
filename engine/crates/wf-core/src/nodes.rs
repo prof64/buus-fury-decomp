@@ -1530,8 +1530,11 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                 let dir = w.en_ref(i).a.facing;
                 let s = shots::energy_wave(w, me, dir, x, y);
                 r.d[0] = shots::add(w, s) as i32;
+                if soldier {
+                    w.g.soldier_wave = r.d[0];
+                }
             }
-            if if soldier { f >= 32 && !alive(w, r.d[0]) } else { f >= 72 } {
+            if if soldier { f >= 32 && !alive(w, w.g.soldier_wave) } else { f >= 72 } {
                 set_anim(w, i, &[nm("idle")], true, Some(true));
                 return true;
             }

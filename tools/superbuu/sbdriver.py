@@ -19,6 +19,18 @@ def _objs_avoid(e):
 
 
 driver.objs = _objs_avoid
+_walk = driver.Driver.walk
+
+
+def _walk_tol(self, e, s, tx, ty):
+    # fast walkers (high SPD) step more than 1 px a frame: done within 2 px
+    if s['p'] is not None and abs(s['p'][0] - tx) <= 2 and abs(s['p'][1] - ty) <= 2 and self.goals[self.k][0] == 'walk':
+        self.next_goal()
+        return None
+    return _walk(self, e, s, tx, ty)
+
+
+driver.Driver.walk = _walk_tol
 
 
 def avoid_exits(here, keep):
@@ -228,6 +240,94 @@ def step(self, e):
                 return key
             return self.walk(e, s, tx, ty) if self.k == self.k else 0
         return key
+    if kind == 'beam':         # ('beam', cap, skill_slot, hold, dist): select skill slot (record +0x15) with L, then
+        # line up `dist` px from the nearest enemy on its row, facing it, hold B `hold` frames, release; repeat
+        s = status(e)
+        if s['scene'] > 0:
+            return self.mash_a()
+        rec = 0x03001560 + 0x68 * e.r8(0x03001068)
+        if e.r8(rec + 0x15) != g[2]:
+            return 512 if self.t % 8 < 2 else 0
+        from common_field import objs
+        ens = [o for o in objs(e) if o[0] == 'enemy' and o[2] is not None]
+        if not ens:
+            self.idle += 1
+            if self.idle >= 30 or self.t >= g[1]:
+                self.next_goal()
+                return None
+            return 0
+        self.idle = 0
+        if self.t >= g[1]:
+            raise RuntimeError(f'beam not over after {g[1]} frames')
+        if s['p'] is None:
+            return 0
+        hb = getattr(self, '_hold', 0)
+        if hb > 0:
+            self._hold = hb - 1
+            return 2 if hb > 1 else 0
+        x, y = s['p'][0], s['p'][1]
+        en = min(ens, key=lambda o: abs(o[2] - x) + abs(o[3] - y))
+        ex, ey = en[2], en[3]
+        side = -1 if x < ex else 1
+        tx, ty = ex + side * g[4], ey
+        if abs(y - ty) > 3 or abs(x - tx) > 30:
+            k = 0
+            if tx > x + 2:
+                k |= 16
+            elif tx < x - 2:
+                k |= 32
+            if ty > y + 2:
+                k |= 128
+            elif ty < y - 2:
+                k |= 64
+            return k
+        if s['p'][2] != (3 if side < 0 else 2):
+            return 16 if side < 0 else 32
+        self._hold = g[3] + 6
+        return 2
+    if kind in ('zap', 'zapx'):  # ('zap', cap, dist): like 'boss' but keeps `dist` px away on the enemy's row and fires
+        # the selected skill (B) while lined up; 'zapx' ends at the first event instead of when no enemy is left
+        s = status(e)
+        if s['scene'] > 0:
+            if kind == 'zapx':
+                self.next_goal()
+                return None
+            return self.mash_a()
+        from common_field import objs
+        ens = [o for o in objs(e) if o[0] == 'enemy' and o[2] is not None]
+        if not ens:
+            self.idle += 1
+            if self.idle >= 30 or self.t >= g[1]:
+                self.next_goal()
+                return None
+            return 0
+        self.idle = 0
+        if self.t >= g[1]:
+            raise RuntimeError(f'zap not over after {g[1]} frames')
+        if s['p'] is None:
+            return 0
+        x, y = s['p'][0], s['p'][1]
+        en = min(ens, key=lambda o: abs(o[2] - x) + abs(o[3] - y))
+        ex, ey = en[2], en[3]
+        dist = g[2] if len(g) > 2 else 64
+        side = -1 if x < ex else 1
+        tx, ty = ex + side * dist, ey
+        k = 0
+        if abs(y - ty) > 3 or abs(x - tx) > 24:
+            if tx > x + 2:
+                k |= 16
+            elif tx < x - 2:
+                k |= 32
+            if ty > y + 2:
+                k |= 128
+            elif ty < y - 2:
+                k |= 64
+            return k
+        want = 16 if side < 0 else 32
+        if s['p'][2] != (3 if side < 0 else 2):
+            return want
+        self.mash += 1
+        return 2 if self.mash % 12 < 2 else 0
     if kind == 'mash':
         if self.t >= g[1]:
             self.next_goal()

@@ -310,7 +310,9 @@ export class Player extends Actor implements PlayerLike {
 
   // ---- PlayerLike ------------------------------------------------------------------------------------------
   attacking() {
-    return this.state === 'punch' || this.state === 'skill' || this.state === 'dash'
+    // the Ki Blast state (0x0804DC14) does not count for IfPlayerAttackingMe (emulator: Earth 2-9 segments, a
+    // criminal walking in on Gohan's blast runs no Chance node)
+    return (this.state === 'punch' || this.state === 'skill' || this.state === 'dash') && this.gs !== 'skill7'
   }
   charging() {
     // the state's vfunc +0x1C (IfInPlayerBeamLine 0x08029B30). Ki Blast (state vtable 0x0804DC14): 0x0804FA30 =

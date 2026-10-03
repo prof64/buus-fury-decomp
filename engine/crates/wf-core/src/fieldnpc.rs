@@ -60,8 +60,10 @@ pub struct Wander {
 /// create a map NPC: SetAnim(0) (rand(255)); talk NPCs mark their footprint blocked on the walk grid + enemy layer
 pub fn spawn(w: &mut World, o: &ObjDef) -> Option<EntityId> {
     let ObjKind::Npc { x, y, sprite, talk, behaviour } = &o.kind else { return None };
-    // the def stores the script sprite id (content sprite index + 9), like `spawn_actor`
-    let mut n = Npc::new(&w.data, *sprite, *x, *y, 0);
+    // the def stores the script sprite id (content sprite index + 9), like `spawn_actor`; 1..=8 are characters
+    // 0..7 in their current form (Babidi's ship 8-27 / 8-67: the def's 1 shows Goku)
+    let sid = if (1..=8).contains(sprite) { char_sprite(w, *sprite - 1).unwrap_or(*sprite) } else { *sprite };
+    let mut n = Npc::new(&w.data, sid, *x, *y, 0);
     n.talk = talk.as_ref().and_then(|t| t.trim_start_matches('s').parse().ok());
     n.tag = match o.at {
         ObjRef::List(_, k) => Some(k as i32),
@@ -76,6 +78,28 @@ pub fn spawn(w: &mut World, o: &ObjDef) -> Option<EntityId> {
         mark(w, f, 0);
     }
     Some(id)
+}
+
+/// script sprite id of character `c`'s current form: the live player's form when one plays it, else the story
+/// record's (wf-script-core `char_sprite`)
+pub fn char_sprite(w: &World, c: i32) -> Option<i32> {
+    let mut form = None;
+    for &id in &w.players {
+        if let Some(i) = w.find(id) {
+            let f = w.pl_ref(i).form;
+            if w.data.form(f).map(|x| x.char_) == Some(c) {
+                form = Some(f);
+            }
+        }
+    }
+    let form = form.or_else(|| {
+        let cs = w.story.chars.get(c.max(0) as usize)?;
+        if cs.form != 0 || w.data.form(0).is_some_and(|f| f.char_ == c) {
+            return Some(cs.form);
+        }
+        w.data.chars.iter().find(|x| x.index == c).map(|x| x.form)
+    })?;
+    w.data.form(form).map(|f| f.gfx)
 }
 
 fn foot(n: &Npc) -> [i32; 4] {

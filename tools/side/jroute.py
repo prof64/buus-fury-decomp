@@ -2,7 +2,7 @@
 
 Goals: tools/story_playthrough/driver.py + tools/superbuu/sbdriver.py. ('mark', name) saves work/side/j_<name>.ss.
 
-usage: jroute.py [--from MARK] [--to MARK] [--cap N] [--keys out.json]"""
+usage: jroute.py [--route janemba|arena] [--from MARK] [--to MARK] [--cap N] [--keys out.json] [--wait N]"""
 import json
 import sys
 from pathlib import Path
@@ -31,9 +31,23 @@ ROUTE = [
 ]
 
 
-def run(frm=None, to=None, cap=10 ** 7, keys_out=None):
-    goals = ROUTE
-    st = OUT / 'janemba_start.ss'
+# the arena (mksave_side.py janemba_arena -> work/side/arena_start.ss): s448 on the load (Pikkon down), up to 18-14:
+# s449, Janemba (the minis first; dodge the hand strikes 0x36), s450 = the handover to Super Janemba (fought by the
+# other one of Goku / Vegeta), s451 the fusion (Watch This!) -> Gogeta vs Super Janemba, s452 (flag 125)
+ARENA_WAIT = 0   # frames before the last fight (route search: a continuous run must win)
+ARENA = [
+    ('mark', 'arena'),
+    ('expect', 100), ('wait', 30), ('exitto', '18-14'), ('expect', 200), ('wait', 20), ('mark', 'janemba'),
+    ('bosst', [0x38, 0x33], 40000, [0x36]), ('events',), ('wait', 30), ('mark', 'sj1'),
+    ('bosst', [0x7a], 60000), ('eventsw', 240), ('wait', 30), ('mark', 'sj2'),
+    ('wait', 'ARENA_WAIT'), ('bosst', [0x7a], 60000), ('events',), ('wait', 60), ('mark', 'arena_end'),
+]
+ROUTES = {'janemba': (ROUTE, 'janemba_start.ss'), 'arena': (ARENA, 'arena_start.ss')}
+
+
+def run(frm=None, to=None, cap=10 ** 7, keys_out=None, route='janemba', wait=0):
+    goals = [g if g != ('wait', 'ARENA_WAIT') else ('wait', wait) for g in ROUTES[route][0]]
+    st = OUT / ROUTES[route][1]
     if frm:
         i = goals.index(('mark', frm))
         goals = goals[i + 1:]
@@ -69,4 +83,5 @@ def run(frm=None, to=None, cap=10 ** 7, keys_out=None):
 if __name__ == '__main__':
     a = sys.argv
     opt = lambda n: a[a.index(n) + 1] if n in a else None
-    run(opt('--from'), opt('--to'), int(opt('--cap') or 10 ** 7), opt('--keys'))
+    run(opt('--from'), opt('--to'), int(opt('--cap') or 10 ** 7), opt('--keys'), opt('--route') or 'janemba',
+        int(opt('--wait') or 0))

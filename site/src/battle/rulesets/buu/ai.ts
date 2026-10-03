@@ -1168,8 +1168,12 @@ export function create(n: AiNodeJ, c: AiController): RNode {
         e.facePlayer()
         e.setAnim(soldier ? [19, 3] : [20, 3], true, false, { rule: 'once_stop', shift: 3, end: 'none' })
       }, (f, a) => {
-        if (f === 8) a.data.wave = e.w.add(new EnergyWave(e.ctx, e, e.facing, ...e.muzzleFix(soldier ? 'soldier' : 'turret'))).id
-        const live = e.w.entities.some((x) => x.id === a.data.wave && !x.removed)
+        if (f === 8) {
+          a.data.wave = e.w.add(new EnergyWave(e.ctx, e, e.facing, ...e.muzzleFix(soldier ? 'soldier' : 'turret'))).id
+          if (soldier) e.ctx.soldierWave = a.data.wave
+        }
+        // the soldiers share one controller: the last thrown wave decides (see context.ts soldierWave)
+        const live = e.w.entities.some((x) => x.id === (soldier ? e.ctx.soldierWave : a.data.wave) && !x.removed)
         if (soldier ? f >= 32 && !live : f >= 72) {
           e.setAnim('idle', true, true)
           return true

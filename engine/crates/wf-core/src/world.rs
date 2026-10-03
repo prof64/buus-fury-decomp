@@ -183,6 +183,11 @@ pub struct Globals {
     /// 0x030030BC: the next stuck mummy bandage's slot (0..7)
     #[serde(default)]
     pub wrap_slot: i32,
+    /// the soldier-throw controller 0x03002FCC is one object for every soldier: +4 holds the wave the last throw
+    /// spawned (an entity id here). A throw ends (tick >= 32, 0x08026618) once THAT wave is gone, whoever threw it
+    /// (Babidi's ship 8-34: a soldier keeps its throw pose until the other soldier's wave dies)
+    #[serde(default)]
+    pub soldier_wave: i32,
     /// the Buu fragment's state object 0x03003158 (one IWRAM singleton shared by every fragment): (mode, vx, vy)
     #[serde(default)]
     pub frag: (i32, i32, i32),
@@ -832,6 +837,8 @@ impl World {
                 break;
             }
         }
+        // the HUD (an early object of the area's list: updated after the actors)
+        crate::field::hud_tick(self);
         // the task list (screen shakes) runs after the objects
         self.tick_shakes();
         self.ents.retain(|e| !e.removed);

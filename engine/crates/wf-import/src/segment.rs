@@ -172,7 +172,9 @@ pub fn compare(w: &World, fr: &Value, es: &[String], map: &mut BTreeMap<usize, E
         }
     }
     let shown: Vec<EntityId> = fr["actors"].as_array().into_iter().flatten().filter_map(|a| map.get(&Row(a).k()).copied()).collect();
-    for (ei, e) in w.ents.iter().enumerate().filter(|(_, e)| !e.removed) {
+    // a pause-menu page replaces the object world in the game (saved and restored around it): no actors to match
+    let menu_page = wf_core::menu::active(w) && fr["actors"].as_array().is_none_or(|a| a.is_empty());
+    for (ei, e) in w.ents.iter().enumerate().filter(|(_, e)| !e.removed && !menu_page) {
         let is_actor = matches!(e.body, Body::Npc(_) | Body::Player(_) | Body::Enemy(_));
         if is_actor && !shown.contains(&e.id) {
             rep.bad(k, "extra", format!("entity {} sprite {:?} ({}) not in the game", e.id, scene::sprite_id(w, ei), if matches!(e.body, Body::Npc(_)) { "npc" } else if matches!(e.body, Body::Player(_)) { "player" } else { "enemy" }));
@@ -325,12 +327,13 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
                     .filter(|&i| !w.ents[i].removed)
                     .filter_map(|i| match &w.ents[i].body {
                         wf_core::world::Body::Enemy(e) => Some(format!(
-                            "({},{} {:x?} s{:?} hp{})",
+                            "({},{} {:x?} s{:?} hp{} anim{:?})",
                             e.a.x >> 8,
                             e.a.y >> 8,
                             e.ai.stack.iter().map(|s| s.state).collect::<Vec<_>>(),
                             e.a.sprite,
-                            e.hp1024 >> 10
+                            e.hp1024 >> 10,
+                            (e.ea.pos.raw, e.ea.pos.frame, e.ea.pos.tick)
                         )),
                         wf_core::world::Body::Shot(sh) => Some(format!("shot({},{} t{} dir{} {:?})", sh.x >> 8, sh.y >> 8, sh.t, sh.dir, std::mem::discriminant(&sh.kind))),
                         wf_core::world::Body::Fx(_) => Some("fx".into()),
@@ -339,8 +342,8 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
                         _ => None,
                     })
                     .collect();
-                let pst = w.player_idx(0).map(|pi| w.pl_ref(pi).a.stats);
-                eprintln!("      player stats {:?}", pst);
+                let pst = w.player_idx(0).map(|pi| (w.pl_ref(pi).ap.raw, w.pl_ref(pi).ap.frame, w.pl_ref(pi).ap.tick, w.pl_ref(pi).a.stats.str_));
+                eprintln!("      player anim (raw, frame, tick, str) {:?} held {:?}", pst, w.field.as_ref().map(|f| (f.held, f.held_event, f.resume_held, f.event_ended, f.busy)));
                 eprintln!("      loot {:?} enemies {}", w.field.as_ref().map(|f| f.loot), ens.join(" "));
             }
         }

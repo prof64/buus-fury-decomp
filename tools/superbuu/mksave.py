@@ -138,12 +138,12 @@ def set_flags(e, upto):
 def spend_points(e, c):
     """the Status screen's allocation: 35 % STR, 25 % POW, 25 % END, rest SPD (1:1 into the base stats)"""
     r = REC + 0x68 * c
-    pts = e.r8(r + 0x2C)
+    pts = e.r16(r + 0x2C)
     a = [pts * 35 // 100, pts * 25 // 100, pts * 25 // 100]
     a.append(pts - sum(a))
     for i in range(4):
         e.w8(r + 0x28 + i, min(255, e.r8(r + 0x28 + i) + a[i]))
-    e.w8(r + 0x2C, 0)
+    e.w16(r + 0x2C, 0)
     call_long(e, 0x08013C66, (r, 0, 0, 0))
 
 

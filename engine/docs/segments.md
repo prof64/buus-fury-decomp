@@ -245,3 +245,69 @@ Open (dev run): Pui Pui / Yakon / Dabura are reached through scene loads inside 
 8-26 f286, 8-38 f306, 8-66 f291 — the warped-in player entity), the SoldierThrow end (8-51 f307: the game's idle
 enter draws nothing, 2 frames later), coin pickups in a few rooms, Destroyer (type 20) RNG in 8-50 / 8-56, the
 8-15 charsel swap (Switch Character in a save point), 8-16's s319 anim at f4805.
+
+## 9. Earth chapters: Gohan, Great Saiyaman, Videl, Goten & Trunks, the World Tournament (owner: the Earth agent)
+
+**Start state** `work/earth/chapter_start.ss` (= `ow_end.ss`): the story playthrough route (route.py intro + goals)
+**played by the real game** from the soft reset to Earth 2-1 (Gohan controllable, lf 40,415); end state
+`work/earth/earth_end.ss`: Goku in 7-2 after the tournament (Spopovich / Yamu take Gohan's energy, s306 -> s260,
+flag 50, lf 192,179) — the real start for the Babidi's ship chapter. Both rebuild from the committed key log
+`data/story_playthrough/earth_route_keys.json` (`start`: 42,275 frames after the soft reset; `chapter`: 160,503).
+
+**Route** (all played by the real game, closed-loop goals, `tools/story_playthrough/earth_route.py` +
+`earth_driver.py`; `earth_play.py` plays it and saves `work/earth/seg_<name>.ss` per segment, `earth_keys.py` checks
+the chain and writes the key log, `earth_savekeys.py` the data file): house -> lunch (s110) -> Nimbus (s111 / s124)
+-> the bank robbers (s125) -> the lecture (s159) -> s129 -> world map circle (s130 -> #515, the 3D map flown to West
+City: `fly` goal) -> Bulma (s193) -> the 2402 capsule (map item, s197) -> the Great Saiyaman (s194) -> s131 ->
+late for class (s141 / s160) -> the circus clowns (s142) -> training in East District 439 (Energy Blasts from range,
+level-ups refill HP: `levelup` goal) -> the circus fight (s143, five fighters) -> Musuka (s169) -> the tank (s168,
+sniped from 90 px, waiting out of its row for EP) -> Videl (s132 / s133) -> s134 -> Chi-Chi (s106 / s113) -> the
+level-65 gate -> Goten's rock drill (s119: dodge 10 thrown rocks) -> Goten SS fight -> Trunks vs Vegeta in the
+gravity chamber (dash in and punch: he keeps 60 px away) -> Bulma (s184) -> Papaya Island: register Trunks and
+Gohan (s239), s262, the punching machine (0xA7), the Junior Division, s288 -> Videl vs Spopovich (melee) -> s304 ..
+s306 -> 7-2. Stat points: STR / POW through the Status page (`alloc`), a Rice Ball through the Inventory (`menu`).
+
+**Segments**: master recording `work/earth/rec/earth_all.json` (segment.py record from the chapter start with the
+key log), cut at every importable area entry by `earth_cuts.py` into `work/earth/segs/e_W_A_n.json` (local; run with
+`SEGMENT_DIR=work/earth/segs`).
+
+Rules found (wf-core / wf-script-core / wf-import; playthrough, lockstep, cross_ts, field_lockstep, data segments green):
+* a map trigger's inline script that blocks (prop_hide / prop_show at Capsule Corp's doors) holds the field in the
+  VM's nested loop: no object thinks, animations tick, a walking player keeps its walk state (`field::hold_nested`,
+  set by the hosts when a `Cause::Trigger` script blocks).
+* `prop_hide` / `prop_show` of a prop the area does not have is dropped at once (3-10's on-enter: no hold).
+* a script's immediate `warp` inside an event defers the arrival to the new area's on-enter script when the host
+  nests (`Field.nest_load`; 3-1's on-enter prop_hide: the player appears 2 frames after s124 / s129's warps).
+* `set_character` always re-enters idle (one rand(255)), also with the same sprite (s124).
+* on-defeat callbacks of SelfDestruct enemies run from the death effect after its delay, after the drop script
+  (`Field.defeat_later`; 3-1's robbers: s126 8 frames after the KO); the trivial event releases the held update.
+* an event a script starts (run_event from a trigger's code: the world map circles -> s515) stops the field like an
+  event trigger (`fieldnpc::start_event` in `begin_event` at depth 0 when nothing holds the field yet).
+* an item-get started in the player's update holds the rest of the object pass; map NPC behaviours pause while it
+  shows (4-30's scientist).
+* `warp_fade` (0x76): the player goes idle at the call, the script camera stays until the load, a 64-frame fade-out
+  (brightness by 4, starting a frame after the call), no destructor idle draw; objects an area load makes inside an
+  event are not held by it (`Field.load_ids`: the world map's patrolling encounters), the world map flyer reads the
+  keys during an event; the 3D fade-in is 64 frames (brightness by 4).
+* the Ki Blast state is not "attacking" for IfPlayerAttackingMe (TS reference updated, cross_ts green).
+* the HUD's low-HP beep: HP <= max / 5 (not 0), sound 41 at volume 32, more than 60 logic frames after the last one
+  (stamp = the area load's frame), after the actors' update.
+* a held `face_actor` keeps turning toward its target until the wait mode it finished in ends (`Track.live`; s160's
+  class follows the announcer's walk in the same batch, s084 still holds).
+* harness: the 3D world map compares `Flight.cam`; actors are not compared while a pause-menu page replaces the world;
+  `SEGMENT_RNG=1` with `SEGMENT_TRACE=a..b` prints every RNG call's source location.
+* content: `fieldcontent` also takes a map with `mode7.json` as the 3D world map (re-extracted content lists no
+  unsupported panorama layer any more: field_lockstep world_map was red).
+
+Results (90 segments from the master recording, 104,026 video frames): **68 exact to their end**, 74,702 frames
+continuously matched. Run them with menu content (the shared dirs have no `ui/`; adding it turns lockstep's `shop`
+red because the real shop screen replaces the model): `WF_FIELD_CONTENT=engine/target/tmp/earth-content`
+(= wf-core-field-content + `wf-extract --only ui,portraits`). Gated in `data/segments/`: `earth_4_20_2`
+(the door trigger's nested hold), `earth_3_3_1`, `earth_2_9_3` (Ki Blast vs a criminal), `earth_2_9_17` (low-HP
+beep), `earth_3_3_2` (s160's live face_actor, 3,523 frames).
+
+Open: Status-page allocation sounds (`play 40` on A in the core, not in the game: menus), the world map after the
+take-off (flyer facing at the arrival, airship patrol facing), coin pickup timing in 3-17, a Ki blast that hits a
+walking criminal in the core but passes it in the game (2-9 #9), Spopovich / tournament ring scenes (7-2 f1200 an
+NPC the game removed, 7-3 f2241 an anim cel), s128's camera pan start (2-8 #1 f5646), Goten's rock drill NPC cel
+(2-90 #2 f182), the tank's sound 28 (3-14 #5).

@@ -533,8 +533,10 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
                 let new_sprite = gfx(h.w, p.form) != gfx(h.w, form);
                 p.apply_form(h.w, form);
                 *h.w.pl(i) = p;
-                // the active character's sprite is rebuilt, then vt+0x28(0) (s067: set_char_form(1, 108))
-                if new_sprite && leader(h.w) == Some(i) {
+                // the active character's sprite is rebuilt, then vt+0x28(0) (s067: set_char_form(1, 108)); also with
+                // the same sprite (s328: set_char_form(4, 279) on Vegeta already in form 279 draws once)
+                let _ = new_sprite;
+                if leader(h.w) == Some(i) {
                     wf_core::player::set_idle(h.w, i);
                 }
             }

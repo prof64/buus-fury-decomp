@@ -50,23 +50,9 @@ fn extracted(name: &str, only: &[&str]) -> PathBuf {
             return PathBuf::from(d);
         }
     }
+    // re-extracted when the extractor's source hash in the `.complete` marker differs (wf_extract::cache)
     let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(name);
-    let marker = dir.join(".complete");
-    if marker.exists() {
-        return dir;
-    }
-    let rom = repo().join("roms/buu.gba");
-    let bytes = std::fs::read(&rom).unwrap_or_else(|e| panic!("ROM {}: {e} (set WF_CONTENT to an extracted content/base)", rom.display()));
-    let opts = wf_extract::Options { only: only.iter().map(|s| s.to_string()).collect() };
-    let (content, _) = wf_extract::extract(bytes, &opts).expect("extract");
-    for (path, data) in &content.files {
-        let rel = path.strip_prefix("base/").unwrap_or(path);
-        let p = dir.join(rel);
-        std::fs::create_dir_all(p.parent().unwrap()).unwrap();
-        std::fs::write(&p, data).unwrap();
-    }
-    std::fs::write(&marker, b"ok").unwrap();
-    dir
+    wf_extract::cache::ensure(&dir, &repo().join("roms/buu.gba"), only)
 }
 
 pub fn data() -> Arc<GameData> {

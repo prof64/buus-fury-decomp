@@ -20,24 +20,10 @@ fn content_dir(rom: &[u8]) -> PathBuf {
     if let Ok(d) = std::env::var("WF_CONTENT") {
         return PathBuf::from(d);
     }
-    // reuse wf-core's field-test extraction when present (same options)
-    let shared = wf_rom::testutil::repo_root().join("engine/target/tmp/wf-core-field-content");
-    if shared.join(".complete").exists() {
-        return shared;
-    }
-    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("wf-script-core-field-content");
-    if dir.join(".complete").exists() {
-        return dir;
-    }
-    let opts = wf_extract::Options { only: ["tables", "sprites", "effects", "maps", "world", "items", "scripts"].iter().map(|s| s.to_string()).collect() };
-    let (content, _) = wf_extract::extract(rom.to_vec(), &opts).expect("extract");
-    for (path, data) in &content.files {
-        let p = dir.join(path.strip_prefix("base/").unwrap_or(path));
-        std::fs::create_dir_all(p.parent().unwrap()).unwrap();
-        std::fs::write(&p, data).unwrap();
-    }
-    std::fs::write(dir.join(".complete"), b"ok").unwrap();
-    dir
+    // the field-test extraction shared by the test crates (re-extracted when the extractor changed)
+    let _ = rom;
+    let root = wf_rom::testutil::repo_root();
+    wf_extract::cache::ensure(&root.join("engine/target/tmp/wf-core-field-content"), &root.join("roms/buu.gba"), &["tables", "sprites", "effects", "maps", "world", "items", "scripts"])
 }
 
 struct Fixture {

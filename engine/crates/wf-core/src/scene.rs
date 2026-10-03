@@ -596,6 +596,10 @@ pub struct Track {
     pub started: bool,
     /// the head finished and holds (FaceActor)
     pub holding: bool,
+    /// the held FaceActor still turns toward its target until the wait mode it finished in ends (s160: the class
+    /// follows the Red Shark announcer's walk in the same batch; s084: not in a later one)
+    #[serde(default)]
+    pub live: bool,
 }
 
 /// the director's wait mode (run_mode on WaitAll 0x0804C0C4 or the group 0x0804DEEC)
@@ -1028,7 +1032,7 @@ fn track_index(w: &mut World, owner: Owner) -> usize {
     if let Some(k) = w.scene.tracks.iter().position(|t| t.owner == owner) {
         return k;
     }
-    w.scene.tracks.push(Track { owner, queue: Vec::new(), started: false, holding: false });
+    w.scene.tracks.push(Track { owner, queue: Vec::new(), started: false, holding: false, live: false });
     w.scene.tracks.len() - 1
 }
 
@@ -2121,6 +2125,9 @@ fn tick_tracks(w: &mut World) {
         }
     }
     if all_idle {
+        for t in w.scene.tracks.iter_mut() {
+            t.live = false;
+        }
         w.scene.director.wait = None;
         w.scene.director.done = true;
         if let Some(prev) = w.scene.director.prev_modal.take() {
@@ -2150,6 +2157,15 @@ fn tick_track(w: &mut World, k: usize) -> bool {
     // a held command (face_actor left at the head) no longer updates: the actor keeps the facing it got
     // (story playthrough: s084, Goku does not follow Pikkon's later walk)
     if w.scene.tracks[k].holding {
+        if w.scene.tracks[k].live {
+            if let Some(Cmd::FaceActor { target }) = w.scene.tracks[k].queue.first().cloned() {
+                let i = match owner {
+                    Owner::Entity(id) => w.find(id),
+                    _ => None,
+                };
+                face_toward(w, i, target);
+            }
+        }
         return true;
     }
     let mut cmd = w.scene.tracks[k].queue[0].clone();
@@ -2165,6 +2181,7 @@ fn tick_track(w: &mut World, k: usize) -> bool {
     }
     if w.scene.tracks[k].queue.len() == 1 && hold_cmd(&cmd) {
         w.scene.tracks[k].holding = true;
+        w.scene.tracks[k].live = true;
         return true;
     }
     w.scene.tracks[k].queue.remove(0);

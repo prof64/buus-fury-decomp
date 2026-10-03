@@ -249,6 +249,9 @@ pub struct Field {
     /// run while it holds (the world map's patrolling encounters during s515's warp_fade fade-in)
     #[serde(default)]
     pub load_ids: (u32, u32),
+    /// the HUD object's low-HP beep stamp (hud +0x10: logic frame of the last beep, the load's at creation)
+    #[serde(default)]
+    pub hud_beep: u32,
 }
 
 /// how a field session starts
@@ -374,6 +377,7 @@ fn new_field() -> Field {
         on_enter_queued: false,
         nest_load: false,
         load_ids: (0, 0),
+        hud_beep: 0,
     }
 }
 
@@ -543,8 +547,14 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
     let from = w.field.as_ref().map(|f| f.area).unwrap_or_default();
     let had_area = w.field.as_ref().is_some_and(|f| f.loads > 0);
     // a load inside a running event (script warp / scene load) keeps the field held until the event ends
-    let keep_busy = w.scene.depth > 0 && w.field.as_ref().is_some_and(|f| f.busy);
+    // also a script that holds an interrupted frame (a defeat callback's script: Pui Pui's warps to 8-28): its end still
+    // completes that frame's update (Babidi's ship 8-27 -> 8-28: the new player's idle ticks twice when it ends)
+    let keep_busy = (w.scene.depth > 0 || w.field.as_ref().is_some_and(|f| f.held_event)) && w.field.as_ref().is_some_and(|f| f.busy);
     let load_lo = w.next_id;
+    let now = w.frame;
+    if let Some(f) = w.field.as_mut() {
+        f.hud_beep = now;
+    }
     // the label entity of a travel menu is an object of the old area
     w.scene.dest_label = None;
     // every object goes; the players are re-created below (same entity ids)
@@ -997,6 +1007,15 @@ pub fn post_step(w: &mut World) {
     // playthrough: s100, armed during s099, fires only once Instant Transmission's return has turned the checks
     // back on). A held update (defeat scene) instead completes after its event, check included (s090 -> s091).
     let ended_before = w.field.as_ref().is_some_and(|f| f.event_ended) && !resumed;
+    if ended_before && std::env::var("EN_REL").is_ok() {
+        // the enemies' update of the exit frame runs past the busy check (enemy::release_update)
+        let n = w.ents.len();
+        for k in (0..n).rev() {
+            if !w.ents[k].removed && matches!(w.ents[k].body, Body::Enemy(_)) {
+                crate::enemy::release_update(w, k);
+            }
+        }
+    }
     let mode = w.field.as_ref().map(|f| f.mode.clone()).unwrap_or(Mode::Normal);
     crate::fieldobj::item_get_step(w);
     crate::fieldobj::debris_step(w);
@@ -1377,6 +1396,28 @@ fn exit_to(w: &mut World, slot: usize, to: Dest, push: Dir, rect: Rect, edge: bo
     }
     let dest = AreaId { world: to.world, area: to.area, variant: to.variant };
     begin_fade_out(w, dest, x, y, Some(facing));
+}
+
+/// the HUD object's update (0x0800BA34; after the actors in the frame's update): HP at or below a fifth of
+/// the maximum (and not 0) beeps sound 41 at volume 32 once more than 60 logic frames passed since the last beep
+/// (2-9 / 2-8: Gohan low on HP after the circus)
+pub fn hud_tick(w: &mut World) {
+    if w.scene.hud_hidden {
+        return;
+    }
+    let Some(pi) = w.player_idx(0) else { return };
+    let (hp, max) = (w.pl_ref(pi).rec.hp, w.pl_ref(pi).rec.max_hp);
+    if hp == 0 || hp * 5 > max {
+        return;
+    }
+    let now = w.frame;
+    let due = w.field.as_ref().is_some_and(|f| now.wrapping_sub(f.hud_beep) as i32 > 60);
+    if due {
+        if let Some(f) = w.field.as_mut() {
+            f.hud_beep = now;
+        }
+        w.sfx(41, 32);
+    }
 }
 
 /// brightness level (0..256 = black) of the fade-in after k frames: the 3D world map's arrival fades by 4 (64

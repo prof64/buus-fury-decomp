@@ -498,6 +498,11 @@ impl FieldData {
                     wh = (int(&mj["height"]) * int(&mj["tileheight"]).max(8)) as i32;
                 }
             }
+            // the 3D world map: its panorama layer (0x08007B63) listed as unsupported by older extracts, or the
+            // mode-7 export the extractor writes for it now
+            if !three_d && src.read(&format!("{dir}/mode7.json")).is_some() {
+                three_d = true;
+            }
             let sp = xy(&o["start_pos"]);
             if cmax.0 < 0 {
                 cmax = ((ww - 240).max(0), (wh - 160).max(0));

@@ -378,6 +378,20 @@ pub fn update(w: &mut World, i: usize) {
         return;
     }
     tick_anim(w, i);
+    update_rest(w, i);
+}
+
+/// the frame an event ended in (field): an enemy that only ticked its animation while the event held the field runs
+/// the rest of its update (the game's event exits before the objects update; sc_janemba: Janemba's parts are placed by
+/// their AI node in the exit frame)
+pub fn release_update(w: &mut World, i: usize) {
+    if crate::scene::is_puppet(w, w.ents[i].id) {
+        return;
+    }
+    update_rest(w, i);
+}
+
+fn update_rest(w: &mut World, i: usize) {
     if w.en_ref(i).spit_ctl >= 0 {
         let c = w.en_ref(i).spit_ctl;
         w.en(i).spit_ctl = c + 1;
@@ -403,6 +417,9 @@ pub fn update(w: &mut World, i: usize) {
             }
             return;
         }
+    }
+    if w.en_ref(i).part && w.field.is_some() && matches!(w.en_ref(i).ty, 0x34 | 0x35 | 0x37) {
+        return janemba_part_field(w, i);
     }
     if w.en_ref(i).part {
         let par = w.en_ref(i).parent;
@@ -1612,11 +1629,72 @@ pub fn kid_buu_merge(w: &mut World, i: usize) {
     oe.defeated = true;
     oe.primary = false;
 }
+/// field Janemba's body parts (sc_janemba segment, emulator: 0x0803D0C4 / 0x0803CE94): part 0x37's AI node
+/// (PartMirrorAnim) places the chain every frame its AI runs (not while an event holds the field: they keep their
+/// place) at the body + (16, -40) / (-12, -21) / (44, -21), plus a y delta by the body's animation cel read before
+/// the body's own tick: hurt (raw 10) [-1, -2, -1], raw 20 [15, -3, -5], else [0, 1, 0, -1] px. The parts are
+/// created at (-16, -16) / (48, -16) / (16, -40) (the spawn's own frame). Battle keeps the measured fixed offsets
+/// (the TypeScript cross-check reference; engine/docs/segments.md §7).
+fn janemba_part_field(w: &mut World, i: usize) {
+    let par = w.en_ref(i).parent;
+    let Some((pi, (raw, cel, x, y, z, f))) = w
+        .enemy_by_id(par)
+        .filter(|(pi, p)| !w.ents[*pi].removed && !p.defeated)
+        .map(|(pi, p)| (pi, (p.ea.pos.raw, p.ea.pos.frame, p.a.x, p.a.y, p.a.z, p.a.facing)))
+    else {
+        w.ents[i].removed = true;
+        return;
+    };
+    let _ = pi;
+    {
+        let e = w.en(i);
+        e.a.z = z;
+        e.a.facing = f;
+    }
+    if w.en_ref(i).ty != 0x37 {
+        return;
+    }
+    let table: &[i32] = match raw {
+        10 => &[-1, -2, -1],
+        20 => &[15, -3, -5],
+        _ => &[0, 1, 0, -1],
+    };
+    let dy = table.get(cel as usize).copied().unwrap_or(0);
+    let parts: Vec<(usize, i32)> = (0..w.ents.len())
+        .filter(|&k| !w.ents[k].removed)
+        .filter_map(|k| match &w.ents[k].body {
+            Body::Enemy(e) if e.part && e.parent == par => Some((k, e.ty)),
+            _ => None,
+        })
+        .collect();
+    for (k, t) in parts {
+        let (ox, oy) = match t {
+            0x37 => (16, -40),
+            0x34 => (-12, -21),
+            0x35 => (44, -21),
+            _ => continue,
+        };
+        let e = w.en(k);
+        e.a.x = x + (ox << 8);
+        e.a.y = y + ((oy + dy) << 8);
+    }
+}
 pub fn janemba_parts(w: &mut World, i: usize) {
     let me = w.ents[i].id;
+    let field = w.field.is_some();
     for (t, ox, oy) in [(0x34, -12, -22), (0x35, 44, -22), (0x37, 16, -41)] {
         let (px, py) = (w.en_ref(i).a.px(), w.en_ref(i).a.py());
-        if let Some(pi) = crate::battle::spawn_enemy(w, t, px + ox, py + oy, me, Some(-1)) {
+        // field: the parts appear at their spawn offsets; 0x37's node places them from the next frame
+        let (sx, sy) = if field {
+            match t {
+                0x34 => (-16, -16),
+                0x35 => (48, -16),
+                _ => (16, -40),
+            }
+        } else {
+            (ox, oy)
+        };
+        if let Some(pi) = crate::battle::spawn_enemy_at(w, t, px + sx, py + sy, me, Some(-1), field) {
             let p = w.en(pi);
             p.part = true;
             p.part_offset = (ox, oy);

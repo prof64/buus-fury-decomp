@@ -180,7 +180,8 @@ pub fn spawn_map_sprite(w: &mut World, o: &crate::fieldcontent::ObjDef) -> Optio
 
 /// message 0 (an attack): needs a solid prop, mult != 0, a strict box overlap and the attack type in the mask
 pub fn breakable_message(w: &mut World, k: usize, msg: &mut HitMsg) -> bool {
-    if msg.team != 1 || msg.mult == 0 {
+    // any sender's attack message (a laser turret's wave breaks crates too: Babidi's ship 8-22)
+    if msg.mult == 0 {
         return false;
     }
     let Body::Breakable(b) = &mut w.ents[k].body else { return false };
