@@ -396,7 +396,7 @@ pub fn acquire(w: &mut World, owner: Owner, bytes: i32) {
     let stamp = w.next_id;
     if let (Some(h), Some(v)) = (h, st(w)) {
         v.owners.push((h, owner));
-        if matches!(owner, Owner::Hud | Owner::Banner | Owner::BossBar | Owner::StatMark | Owner::Sign(_)) && !v.objs.iter().any(|o| o.0 == owner) {
+        if matches!(owner, Owner::Hud | Owner::Banner | Owner::BossBar | Owner::StatMark | Owner::Sign(_) | Owner::Map3d | Owner::Timer) && !v.objs.iter().any(|o| o.0 == owner) {
             v.objs.push((owner, stamp, bytes));
         }
     }
@@ -710,6 +710,9 @@ fn own_act(o: Owner, level: i32) -> Act {
         // the stat-points mark from 3 (`0x0800B5C2`)
         Owner::StatMark => 3,
         Owner::Hud | Owner::BossBar | Owner::Sign(_) => 4,
+        // the 3D world map's HUD and the timer HUD: the generic answer, from 15 (`0x0801155C`; segment sb 21-25
+        // f64781: the map HUD, the list's last object, goes before the flyer)
+        Owner::Map3d | Owner::Timer => 15,
         _ => return Act::Keep,
     };
     if level >= n {

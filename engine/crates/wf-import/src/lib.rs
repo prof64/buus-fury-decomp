@@ -517,7 +517,7 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
     let stamp = w.next_id;
     let objs: Vec<(Owner, u32, i32)> = owners
         .iter()
-        .filter(|o| matches!(o.1, Owner::Hud | Owner::Banner | Owner::BossBar | Owner::StatMark | Owner::Sign(_)))
+        .filter(|o| matches!(o.1, Owner::Hud | Owner::Banner | Owner::BossBar | Owner::StatMark | Owner::Sign(_) | Owner::Map3d | Owner::Timer))
         .map(|o| (o.1, stamp, a.e[a.idx[(o.0 >> 1) as usize & 511] as usize].size as i32 * 64))
         .collect();
     if let Some(f) = w.field.as_mut() {

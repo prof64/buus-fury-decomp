@@ -1710,3 +1710,12 @@ first ship cut, `work/db57/shipmaster/`).
 *Row 33,189 (1-20) - closed, lag frame:* the game's logic frame 32,478 spans two video rows (33,189 / 33,190) and
 the scene's `set_pos` shows in the second; the app runs one display frame per logic frame (lag-frame option 1), so
 it shows the new position one row earlier. Same position, same RNG, areas and flags; no state difference.
+*"Original pacing" (lag-frame option 2) - built, off by default.* `wf_view::Sim::lag_hint()` (default 0: display
+frames the GBA would have spent without a logic frame after the last step); `StorySim` answers with the measured
+load length when the step loaded an area (`crates/wf-app/src/load_lag.json`: median per destination area over 161
+loads of the real route, default 27; regenerate with `tools/db57/load_lag.py`); `App.original_pacing` (Settings
+`original_pacing`, serde-default false; applied by the native shell) holds the picture and skips the sim step for
+that many steps - the audio keeps playing, no sim state changes, replays / netplay unaffected. Not covered yet: text
+box opens (4 - 7 frames), menu redraws, the pause menu's close (the Earth agent's cost model could feed the same
+hint). Test: `carried_state::original_pacing_holds_after_a_load_only_when_enabled`. The web shell does not expose
+the toggle yet.

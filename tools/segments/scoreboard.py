@@ -138,9 +138,27 @@ def do_extend(jobs):
             print(j, msg, flush=True)
 
 
+EXE = None   # the segments test binary, built once per board (one snapshot of the tree for every directory)
+
+
+def build():
+    global EXE
+    r = subprocess.run(CARGO + ['--no-run', '--message-format=json'], capture_output=True, text=True,
+                       cwd=ROOT / 'engine')
+    for ln in r.stdout.splitlines():
+        try:
+            j = json.loads(ln)
+        except ValueError:
+            continue
+        if j.get('reason') == 'compiler-artifact' and j.get('executable') and j['target']['name'] == 'segments':
+            EXE = j['executable']
+    if not EXE:
+        raise SystemExit('the segments test does not build:\n' + r.stderr[-3000:])
+
+
 def replay_one(d):
     env = dict(os.environ, SEGMENT_DIR=str(d), SEGMENT_STRICT='0')
-    r = subprocess.run(CARGO + ['--', '--nocapture'], capture_output=True,
+    r = subprocess.run([EXE, '--nocapture'], capture_output=True,
                        text=True, cwd=ROOT / 'engine', env=env)
     rows = []
     for ln in r.stderr.splitlines():
@@ -152,8 +170,7 @@ def replay_one(d):
 
 
 def board(jobs):
-    subprocess.run(CARGO + ['--no-run'], check=True,
-                   cwd=ROOT / 'engine', capture_output=True)
+    build()
     cuts = json.loads((REAL / 'cuts.json').read_text())
     dirs = [d for d in sorted((REAL / 'segs').iterdir()) if d.is_dir() and any(d.glob('*.json'))]
     res = {}

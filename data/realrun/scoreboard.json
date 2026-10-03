@@ -37,12 +37,13 @@
   "ship": {
    "cats": {
     "RNG": 2,
+    "position / facing": 1,
     "screen fade": 1
    },
    "cut_frames": 395616,
-   "exact": 335,
+   "exact": 334,
    "frames": 395616,
-   "matched": 343436,
+   "matched": 347645,
    "run_frames": 398194,
    "segments": 338,
    "stretches": 2
@@ -69,12 +70,12 @@
  "dirty": true,
  "total": {
   "cut_frames": 1430814,
-  "exact": 1336,
+  "exact": 1335,
   "frames": 1430814,
-  "matched": 1139962,
+  "matched": 1144171,
   "run_frames": 1465272,
   "segments": 1412,
   "stretches": 73
  },
- "tree": "6fdb448"
+ "tree": "4c0a913"
 }
