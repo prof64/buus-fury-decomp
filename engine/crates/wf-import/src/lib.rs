@@ -490,6 +490,10 @@ fn import_grids(w: &mut World, ram: &GbaRam) {
 /// flyer and camera, the 2-D camera
 fn field_from_ram(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
     import_objects(w, ram, notes);
+    // (shots an enemy's node had made - a beam in flight - are newer than every actor: the list's end)
+    let (shots, rest): (Vec<_>, Vec<_>) = std::mem::take(&mut w.ents).into_iter().partition(|e| matches!(e.body, Body::Shot(_)));
+    w.ents = rest;
+    w.ents.extend(shots);
     let rows: std::collections::BTreeMap<u32, (i32, i32, i32, i32)> = ram.actor_rows.iter().map(|r| (r.0, (r.1, r.2, r.3, r.4))).collect();
     patch_leader(w, ram, notes);
     // the walk and enemy grids as they stand (map object +0xA8 / +0xB0: bitmaps, 32 bytes a row, bit = free)
@@ -712,6 +716,7 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
         let r = ram.r32(o + 0x238 + 8 + 8 * lvl as u32);
         import_ai_rt(w, ei, lvl, ram, r, notes);
     }
+    import_enemy_beam(w, ei, ram, o, notes);
     let d = Arc::clone(&w.data);
     let e = w.en(ei);
     e.a.x = ram.s32(o + 0x1A0);
@@ -752,6 +757,41 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
     }
     wf_core::enemy::sync_mark(w, ei);
     import_patrol(w, ei, ram, o);
+}
+
+/// Kid Buu's beam in flight at the cut (the KidBuuKamehameha node; the beam object vt 0x0804AEF8, owner +0x50:
+/// +0x10 fired, +0x11 head stopped, +0x14 next hit-effect frame, +0x18 ticks since it was made, +0x20 / +0x24 origin
+/// px, +0x38 length, +0x3C direction): the shot rebuilt with those numbers, the node's frame count = the beam's
+/// ticks (it is made in the node's enter)
+fn import_enemy_beam(w: &mut World, ei: usize, ram: &GbaRam, o: u32, notes: &mut Vec<String>) {
+    use wf_core::ai::K;
+    let Some(b) = ram.ewram_with(0x0804_AEF8).into_iter().find(|&b| ram.r32(b + 0x50) == o) else { return };
+    let spots: Vec<(usize, usize)> = w.en_ref(ei).ai.stack.iter().enumerate().flat_map(|(l, s)| s.tree.nodes.iter().enumerate().filter(|(_, n)| n.k == K::KidBuuKamehameha).map(move |(n, _)| (l, n))).collect();
+    let Some(&(lvl, n)) = spots.first() else {
+        notes.push("a beam object of this enemy outside a KidBuuKamehameha node: not imported".into());
+        return;
+    };
+    let me = w.ents[ei].id;
+    let (x, y, dir) = (ram.s32(b + 0x20), ram.s32(b + 0x24), ram.r8(b + 0x3C));
+    let vt = ram.s32(b + 0x18);
+    let id = wf_core::shots::add(w, wf_core::shots::kame_beam_enemy(me, dir, x, y, ram.s32(b + 0x14) as i64, wf_core::damage::atk(5), 41));
+    if let Some(k) = w.find(id) {
+        let s = w.shot(k);
+        s.t = vt as i64;
+        if let wf_core::shots::ShotKind::Kame(kb) = &mut s.kind {
+            kb.len = ram.s32(b + 0x38);
+            kb.vt = vt;
+            kb.stopped = ram.r8(b + 0x11) != 0;
+            kb.next = ram.s32(b + 0x14) as i64;
+            kb.charging = ram.r8(b + 0x10) == 0;
+        }
+    }
+    let e = w.en(ei);
+    e.beam = id;
+    if let Some(r) = e.ai.stack.get_mut(lvl).and_then(|s| s.rt.get_mut(n)) {
+        r.d[0] = id as i32;
+        r.f = vt;
+    }
 }
 
 /// a patrol's runner (enemy +0x22C current step object): the world map's 3-D move (`cutscene_move` step, vt

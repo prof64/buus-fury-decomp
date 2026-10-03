@@ -1775,7 +1775,8 @@ export function create(n: AiNodeJ, c: AiController): RNode {
     case 'SuperBuuPowerUp':
       return new Act(n, c, () => {
         e.powered = true
-        e.setAnim(11, true, false)
+        // anim 0x0C under the idle controller 0x03001B30 (once, 8 ticks a cel; segment sb 6-6 on 6-1: raw 13)
+        e.setAnim(12, true, false, GENERIC_STATES['0x03001B30'])
       }, (f) => f >= 32 && e.animDone())
     case 'ThrowBigBall':
       return new Act(n, c, () => {

@@ -787,6 +787,12 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
         // it (app soak: warp_fade to the world map, then a circle's immediate warp into 2-8 left it set, and the
         // door script's nested hold no longer kept the walking player's state)
         f.script_fade_in = false;
+        // "the running event came from the queue" belongs to that event: a load outside any event drops it (app
+        // soak of the real route, HFIL 18-10 -> 18-7: a breakable's instant callback at 18-10 left it set, and
+        // the hit event at 18-7 then ended with the queued exit frame's extra player tick - knockback 1 frame short)
+        if !keep_busy {
+            f.queued_event = false;
+        }
     }
     // the props object (`0x0800D15A`, before the area's objects)
     if m.prop_tile_bytes > 0 {

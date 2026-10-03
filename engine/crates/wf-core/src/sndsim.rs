@@ -109,11 +109,19 @@ fn apply_events(w: &mut World, d: &mut Driver) {
             // no PlaySong 0x0803F110 call, the sequencer runs on - sb 21-13 -> 21-14)
             Event::Song { id } => {
                 let st = d.state();
+                if debug() {
+                    eprintln!("snd song {id} f{}: playing {} song {:?}", w.frame, st.player.playing, st.player.song);
+                }
                 if !(st.player.playing && st.player.song == Some(*id as usize)) {
                     d.play_song(*id as usize);
                 }
             }
-            Event::SongStop => d.stop_song(),
+            Event::SongStop => {
+                if debug() {
+                    eprintln!("snd songstop f{}", w.frame);
+                }
+                d.stop_song()
+            }
             Event::MasterVolumes { music, sfx } => d.set_master_volumes(*music as u8, *sfx as u8),
             _ => {}
         }

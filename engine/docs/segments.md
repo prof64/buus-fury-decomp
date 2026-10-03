@@ -1308,6 +1308,17 @@ page's own cycles built from its draw list; opt-in as before (`init.snd_phase`),
     / r069_168 Switch Character +67k / +83k). The scoreboard's 14-1 rows (r067_136, r069_168: one black frame
     short) and 18-1 (r044_015: one long) are this map term; the Switch Character extras are not involved (the
     leader term is 6k).
+  - `shipr_002`, sound state at the Switch Character close (Earth agent, `timing/cmp_irq.py` against a sndlog of
+    the close, savestate `x_ship002` from `mkshipstate.py`): same song (28, started at f16,808 in both), but the
+    core's sequencer is **4 rows ahead** (row 50 vs 46 of order 4 at the first interrupt mix) and the music voices'
+    gains are about **twice** the game's (0x11000F vs 0x80007): the game's music runs quieter and has lost 4 rows
+    by the close - the Switch Character screen (or its fade) lowers the music volume and holds the sequencer for a
+    while, which the core does not model. Next: sndlog over the screen's open / close to see when the rows stop
+    and the master volume changes.
+  - `shipr_328` f33,890 (sprite 106 facing during s003's dialogue after its warp 8-70 -> 8-71): not the 4-25 rules
+    - the segment fails the same with the parallel-block release, the player-control release and the talk-pass
+    resume each switched off; the cause is elsewhere in 1a97d5c's or later commits' other files (session.rs,
+    world.rs, wf-import lib.rs - not the Earth agent's).
   - `shipr_002` (7-2 pause, then 8-1 Switch Character): with `snd_phase` (work file) it runs to f18,475; the close
     there (game 26 frames, ours 27) has the right own time (6,358,863 vs 6,351,398) but the interrupt mixes cost
     954k in the model vs 787k in the game (7 mixes each) - the sound driver's state, Earth's.
@@ -2063,6 +2074,13 @@ drill and the Super Saiyan Goten fight into 4-25).
 *Regression tests* (no soak needed): `crates/wf-app/tests/carried_state.rs` - the host mark after the title's New
 Game; a load resets the hit-damage remainder, the regen count, the drain fraction and a pending script fade-in;
 `set_character` takes the new character's own skill slot.
+*Earth 7-3, the real run (`rE2__090_7-3`, Earth agent):* f6,658 -> f44,306 of 52,416. Rule: a talk started in
+the player's update whose event loaded another area (s288 -> warp 7-6 -> s303) and ended at the end of a frame (a
+frame wait, not a top-of-frame return) resumes the interrupted objects pass by list index in the new list: the
+objects below the player's old index (the game's list: the props object first, then the actors) get this frame's
+update a second time (`field::resume_pass_after_load`, `Field.talk_pass`; 117 / 279 / 222 / 112 and the player
+tick twice, the rest once). An index past the new list's end ends the pass (4-20 #5: 4-20's props object has 9
+children, 7-1's list is 2 long). Next stop f44,316: an NPC (sprite 252) ours keeps that the game removed.
 *4-25 closed (Earth agent):* `x_trunks425` is exact to its end (6,900 / 6,900 with `SEGMENT_VRAM=0`). Rules:
 an AI InlineScript's parallel block that ends in `scene::tick` hands its enemy the rest of its update in the same
 frame (`ai_script_done`, out of the puppets, `enemy::release_update`: Vegeta's GotoState(0x310) / StandStill idle
