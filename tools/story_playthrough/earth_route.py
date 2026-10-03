@@ -89,6 +89,48 @@ SEGMENTS = [
         ('walk', 4, 90), ('hold', L, 30), ('area', 2, 11), ('wait', 30), ('fight2', 3000), ('wait', 30),
         ('walk', 210, 450), ('hold', D, 30), ('area', 2, 10), ('wait', 30), ('fight2', 3000), ('wait', 30),
         ('walk', 4, 200), ('hold', L, 30), ('area', 2, 9), ('wait', 30), ('fight2', 3000), ('wait', 30),
+        ('walk', 450, 220), ('hold', R, 30), ('area', 2, 10), ('wait', 30), ('fight2', 3000), ('wait', 30),
+        ('walk', 4, 200), ('hold', L, 30), ('area', 2, 9), ('wait', 30), ('fight2', 3000), ('wait', 30),
+
+        ('walk', 450, 220), ('hold', R, 30), ('area', 2, 10), ('wait', 30), ('fight2', 3000), ('wait', 30),
+        ('walk', 4, 200), ('hold', L, 30), ('area', 2, 9), ('wait', 30), ('fight2', 3000), ('wait', 30),
         ('alloc', 0),
+    ]),
+    # the circus fight: 2-9 -> 2-8, the world map circle -> Hercule City 3-1 -> 3-2 -> 3-3: s143 (five fighters,
+    # their defeat events s144-s148, flags 29-33) -> s149 (flag 34) -> 3-2
+    ('circus', [
+        ('walk', 248, 8), ('hold', U, 30), ('area', 2, 8), ('wait', 30),
+        ('walk', 176, 380), ('talk', 'U'), ('wait', 60),
+        ('fly', 2441, 1065, 127, 135), ('wait', 30),
+        ('walk', 500, 10), ('hold', U, 30), ('area', 3, 2), ('wait', 30),
+        ('walk', 540, 10), ('hold', U, 30), ('area', 3, 3), ('wait', 30),
+        ('walk', 300, 180), ('hold', L, 20), ('expect', 100), ('wait', 20),
+        ('fight2', 12000), ('wait', 30), ('until', 3, 2), ('wait', 30),
+    ]),
+    # the Musuka Circus: 3-2 -> 3-14 -> 3-15 (fighters) -> 3-17 (fighters) -> 3-19 (three thugs): Musuka (s169,
+    # flag 36)
+    ('musuka', [
+        ('walk', 4, 140), ('hold', L, 30), ('area', 3, 14), ('wait', 30),
+        ('walk', 400, 8), ('hold', U, 30), ('area', 3, 15), ('wait', 30), ('fight2', 4000), ('wait', 30),
+        ('walk', 160, 8), ('hold', U, 30), ('area', 3, 17), ('wait', 30), ('fight2', 4000), ('wait', 30),
+        ('walk', 160, 8), ('hold', U, 30), ('area', 3, 19), ('wait', 30), ('fight2', 6000), ('wait', 30),
+        ('talkto', 224, 48, 'D'), ('wait', 30),
+    ]),
+    # back through the circus: 3-19 -> 3-17 -> 3-15 -> 3-14: s168 "Stop that man!" (flag 37) and the tank
+    ('tank', [
+        ('walk', 400, 128), ('hold', D, 30), ('area', 3, 17), ('wait', 30), ('fight2', 3000, 'melee'), ('wait', 30),
+        ('walk', 160, 290), ('hold', D, 30), ('area', 3, 15), ('wait', 30), ('fight2', 3000, 'melee'), ('wait', 30),
+        ('alloc', 1),
+        ('walk', 160, 290), ('hold', D, 30), ('area', 3, 14), ('wait', 30),
+        ('walk', 400, 48), ('walk', 300, 140), ('events',), ('wait', 20), ('fight2', 12000, 'snipe'), ('wait', 30),
+        ('events',), ('wait', 30),
+    ]),
+    # 3-14 -> 3-2 -> 3-1: s132 "Well, well! Look who it is!" (Videl, s133: flag 38); the world map circle (s130 ->
+    # s134: the World Tournament, flag 39)
+    ('videl', [
+        ('walk', 450, 140), ('hold', R, 30), ('area', 3, 2), ('wait', 30),
+        ('walk', 520, 210), ('hold', D, 30), ('area', 3, 1), ('wait', 30),
+        ('walk', 230, 150), ('walk', 150, 150), ('events',), ('wait', 30),
+        ('walk', 40, 150), ('talk', 'L'), ('wait', 60),
     ]),
 ]

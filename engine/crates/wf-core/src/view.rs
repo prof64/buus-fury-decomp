@@ -287,6 +287,7 @@ pub fn sim_events(w: &World, out: &mut Vec<SimEvent>) {
             Event::Song { id } => out.push(SimEvent::Audio(AudioEvent::PlaySong(*id as u16))),
             Event::SfxStopAll => out.push(SimEvent::Audio(AudioEvent::StopAllSfx)),
             Event::SongStop => out.push(SimEvent::Audio(AudioEvent::StopSong)),
+            Event::MasterVolumes { music, sfx } => out.push(SimEvent::Audio(AudioEvent::SetMasterVolumes { music: *music as u8, sfx: *sfx as u8 })),
             _ => {}
         }
     }

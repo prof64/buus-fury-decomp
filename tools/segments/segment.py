@@ -16,7 +16,7 @@ input, report the first divergence). Spec: engine/docs/segments.md.
   save    write the emulator save state at a playthrough frame / area cut (no recording)
             segment.py save --from ... --at area:1-13#2 --out work/states/x.ss
 
-Output: data/segments/NAME.json (one frame per line) =
+Output: data/segments/NAME.json (or $SEGMENT_DIR/NAME.json; one frame per line) =
   {kind: 'segment', name, source, init: {lf, keys (input manager held keys at the cut = the previous logic frame's
    input), area, rng, actors, objs, ram: {iwram, ewram} (zlib + base64)}, objs, frames: [rows as the playthrough]}
 and work/segments/NAME.ss (the start save state; local only, like every .ss).
@@ -24,6 +24,7 @@ The playthrough row format: tools/story_playthrough/record.py."""
 import argparse
 import base64
 import json
+import os
 import sys
 import time
 import zlib
@@ -62,8 +63,10 @@ def area_cuts(frames, limit=None):
     for j, f in enumerate(frames):
         a = tuple(f['area'])
         if prev is not None and a != prev:
+            # the first complete logic frame with the leader in the new area (a blocking on-enter script holds the
+            # arrival for some logic frames: the leader appears later)
             k = j
-            while k + 1 < len(frames) and frames[k + 1]['lf'] == frames[j]['lf']:
+            while k + 1 < len(frames) and (frames[k + 1]['lf'] == frames[k]['lf'] or frames[k]['p'] is None):
                 k += 1
             key = (a[0], a[1])
             seen[key] = seen.get(key, 0) + 1
@@ -88,11 +91,15 @@ def parse_at(at, frames):
 
 
 def replay_to(head, frames, k):
-    """the emulator after video frame k of a playthrough recording (soft reset + intro + the recorded keys)"""
-    e = start_emu('reset')
-    for f in range(head['skip']):
-        e.set_keys(intro_keys(f))
-        e.run(1)
+    """the emulator after video frame k of a recording: a playthrough (soft reset + intro + the recorded keys) or a
+    segment (its start state work/segments/NAME.ss + the recorded keys)"""
+    if head.get('kind') == 'segment':
+        e = start_emu(str(STATES / f"{head['name']}.ss"))
+    else:
+        e = start_emu('reset')
+        for f in range(head['skip']):
+            e.set_keys(intro_keys(f))
+            e.run(1)
     for j in range(k + 1):
         e.set_keys(frames[j]['keys'])
         e.run(1)
@@ -145,8 +152,9 @@ def record(e, keys_of, n, stop=None):
 
 
 def save(name, doc):
-    OUT.mkdir(parents=True, exist_ok=True)
-    p = OUT / f'{name}.json'
+    out = Path(os.environ.get('SEGMENT_DIR', OUT))
+    out.mkdir(parents=True, exist_ok=True)
+    p = out / f'{name}.json'
     frames = doc.pop('frames')
     head = json.dumps(doc, separators=(',', ':'))
     body = ',\n'.join(json.dumps(f, separators=(',', ':')) for f in frames)

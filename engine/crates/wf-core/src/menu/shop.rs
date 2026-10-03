@@ -272,9 +272,11 @@ fn eff_with(w: &World, cs: &crate::story::CharState, slot: Option<(usize, i32)>)
     [e.str_, e.pow, e.end, e.spd]
 }
 
-/// unequipped copies of an equipment item (`0x080043EE`): the story's owned list holds unequipped copies only
+/// unequipped copies of an equipment item (`0x080043EE`): entries without a wearer mark (the story's list holds
+/// every copy; the marks come from the characters' slots, `equip::marks`)
 pub fn owned_free(w: &World, item: i32) -> i32 {
-    w.story.equipment.iter().filter(|&&e| e == item).count() as i32
+    let m = super::equip::marks(w);
+    w.story.equipment.iter().enumerate().filter(|&(k, &e)| e == item && m.get(k).copied().unwrap_or(0) == 0).count() as i32
 }
 
 impl Shop {
@@ -370,7 +372,9 @@ impl Shop {
                         }
                     } else {
                         for _ in 0..self.count {
-                            if let Some(p) = w.story.equipment.iter().position(|&x| x == e.item) {
+                            // the first unequipped copy (take_equipment 0x08004468 skips marked entries)
+                            let m = super::equip::marks(w);
+                            if let Some(p) = w.story.equipment.iter().enumerate().position(|(k, &x)| x == e.item && m.get(k).copied().unwrap_or(0) == 0) {
                                 w.story.equipment.remove(p);
                             }
                         }

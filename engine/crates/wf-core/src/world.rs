@@ -114,6 +114,8 @@ pub enum Event {
     SfxStopAll,
     /// the music sequencer stopped (script native 0x24)
     SongStop,
+    /// the Options page changed the master volumes (raw 0..8: `0x0803E42A` / `0x0803F18C`)
+    MasterVolumes { music: i32, sfx: i32 },
     Song { id: i32 },
     /// a player attack connected (the reference's 'hit' cue)
     Hit,

@@ -173,7 +173,7 @@ impl Status {
         let p = w.menu.pressed;
         if p & crate::input::START != 0 {
             w.sfx(super::SFX_MENU, 64);
-            return Action::Close;
+            return Action::Done;
         }
         if self.alloc {
             let sel = self.c.sel.clamp(1, 3) as usize;

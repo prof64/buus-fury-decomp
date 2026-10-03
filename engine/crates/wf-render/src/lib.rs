@@ -314,7 +314,7 @@ impl Renderer {
         if let Some(mv) = view.menu.as_ref() {
             // a menu screen replaces everything: the 240x160 picture centred in the view, black around it
             let mr = self.menu.get_or_insert_with(|| menu::MenuRenderer::load(packs));
-            let pic = mr.render(packs, mv, mv.fade.or(view.palette_fade), if mv.fade_black > 0 { mv.fade_black } else { view.fade_black });
+            let pic = mr.render(packs, mv, mv.fade.or(view.palette_fade), if mv.fade_black > 0 || mv.fade.is_some() { mv.fade_black } else { view.fade_black });
             self.fb.fill(0xFF00_0000);
             let (ox, oy) = ((w as i32 - GBA_W) / 2, (h as i32 - GBA_H) / 2);
             for y in 0..GBA_H {

@@ -57,13 +57,31 @@ frames where the VRAM copy raced the scanout (a picture differing from both neig
 Everything else — logic, input edges, events, sounds, every pixel — is compared exactly. `MENU_PARITY_FREE=1`
 runs the remake's own frame-cost model instead (reported as agreement).
 
-| scenario | what | exact |
-|---|---|---|
-| status_open_close | START, the page, B, back to the field | 63 / 63 frames, sounds |
-| status_alloc | LevelUp! blink, Use Points, LEFT / RIGHT points, Accept / Cancel, cursor blink | 236 / 236, sounds |
-| status_tabs | five party members, LEFT / RIGHT through the tabs | 139 / 139, sounds |
+Strict (must be exact, `STRICT` in the test): `status_*`, `inventory_*`, `equip_*`, `options_*`, `journal_*`,
+`skills_*`, `cr_*` (credits), `mg_*` (mini-games) — every compared frame and every sound exact. The shop / save /
+title / character-switch / game-over and map-screen scenarios are reported but not strict until their screens are
+finished (`charsel_*`, `map_*` open no screen yet; `shop_*` / `save_*` differ only on their first black frame,
+`title_*` on the continue / new-game hand-over). The world restore's length after a screen (CPU time: 24 or 25
+black frames) is taken from the trace too.
+
+## 4b. Integration
+
+* **Script natives** (`wf-script-core/src/natives.rs`): 0x8C `save::open_save`, 0xA7 / 0xC6 / 0xC7
+  `minigame::open_watch` / `open_power` / `open_punch`, 0xCE / 0xCF `shop::open_shop_buy` / `open_shop_sell`, 0xD1
+  `credits::open_credits`; the script blocks (`Pending::Menu`) until `menu::take_result` (after the fade-in) and
+  pushes `result − 1` where the game does. The screens apply their effects (purchases, saves) themselves. Without
+  `ui/` content the old models in `scene.rs` still run. 0x8D (character switch) still uses the scene model.
+* **Equipment model**: `Story.equipment` holds every owned copy; wearers come from the characters' slots
+  (`equip::marks`), unequipped copies = unmarked entries (shop sell, take_equipment).
+* **Options**: `World.menu.settings` (text speed, SFX / music volume, raw 0..8, global like the game's `0x03001914`);
+  a slider change emits `Event::MasterVolumes` → `AudioEvent::SetMasterVolumes`.
 
 ## 5. Gaps
+
+* The dialogue typewriter does not read `menu::options::settings(w).text_speed` yet (fixed default speed); the
+  frontend should also send the stored volumes at session start (only changes are evented).
+* Character switch (0x8D), game over, the map screen and the title hand-over are being finished (see the per-area
+  notes `re/buu/menu/NOTES_*.md`).
 
 * Redraw CPU time is modelled per screen (frame counts), not per cycle: the sound driver's IRQ load is not
   modelled, so a long redraw can take one frame more or less than on the GBA and the picture of a frame where the

@@ -431,7 +431,11 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
             if leader(h.w).is_none() {
                 return Ok(NativeResult::Done(None)); // the game pushes nothing without a player object
             }
-            scene::open_menu(h.w, MenuKind::Save);
+            if h.w.data.menu.is_some() {
+                wf_core::menu::save::open_save(h.w, arg(a, 0) != 0);
+            } else {
+                scene::open_menu(h.w, MenuKind::Save);
+            }
             block(h.s, Pending::Menu { native: n, push: true })
         }
         0x8d => {
@@ -526,7 +530,11 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
             done(lv)
         }
         0xa7 => {
-            scene::open_menu(h.w, MenuKind::WatchThis { level: arg(a, 0) });
+            if h.w.data.menu.is_some() {
+                wf_core::menu::minigame::open_watch(h.w, arg(a, 0));
+            } else {
+                scene::open_menu(h.w, MenuKind::WatchThis { level: arg(a, 0) });
+            }
             block(h.s, Pending::Menu { native: n, push: true })
         }
         0xa8 => {
@@ -622,11 +630,19 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
             unit()
         }
         0xc6 => {
-            scene::open_menu(h.w, MenuKind::PowerStruggle);
+            if h.w.data.menu.is_some() {
+                wf_core::menu::minigame::open_power(h.w);
+            } else {
+                scene::open_menu(h.w, MenuKind::PowerStruggle);
+            }
             block(h.s, Pending::Menu { native: n, push: false })
         }
         0xc7 => {
-            scene::open_menu(h.w, MenuKind::Punch { mode: arg(a, 0) });
+            if h.w.data.menu.is_some() {
+                wf_core::menu::minigame::open_punch(h.w, arg(a, 0));
+            } else {
+                scene::open_menu(h.w, MenuKind::Punch { mode: arg(a, 0) });
+            }
             block(h.s, Pending::Menu { native: n, push: true })
         }
         0xc9 => {
@@ -658,11 +674,19 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
             unit()
         }
         0xce => {
-            scene::open_menu(h.w, MenuKind::ShopBuy);
+            if h.w.data.menu.is_some() {
+                wf_core::menu::shop::open_shop_buy(h.w);
+            } else {
+                scene::open_menu(h.w, MenuKind::ShopBuy);
+            }
             block(h.s, Pending::Menu { native: n, push: false })
         }
         0xcf => {
-            scene::open_menu(h.w, MenuKind::ShopSell { percent: arg(a, 0) });
+            if h.w.data.menu.is_some() {
+                wf_core::menu::shop::open_shop_sell(h.w, arg(a, 0));
+            } else {
+                scene::open_menu(h.w, MenuKind::ShopSell { percent: arg(a, 0) });
+            }
             block(h.s, Pending::Menu { native: n, push: false })
         }
         0xd0 => {
@@ -676,8 +700,12 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
             unit()
         }
         0xd1 => {
-            scene::open_menu(h.w, MenuKind::Credits);
-            h.w.scene.requests.push(scene::Request::Credits);
+            if h.w.data.menu.is_some() {
+                wf_core::menu::credits::open_credits(h.w);
+            } else {
+                scene::open_menu(h.w, MenuKind::Credits);
+                h.w.scene.requests.push(scene::Request::Credits);
+            }
             block(h.s, Pending::Menu { native: n, push: false })
         }
         0xd2 => done((h.w.scene.keys[0].pressed & A != 0) as i32),

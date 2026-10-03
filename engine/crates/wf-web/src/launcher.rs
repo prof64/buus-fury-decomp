@@ -38,6 +38,7 @@ pub fn slots(cfg: &serde_json::Value) -> Vec<Vec<u8>> {
 pub fn launch_app(cfg: &serde_json::Value, packs: Packs) -> Option<Result<App, String>> {
     let l = &cfg["launch"];
     match l["kind"].as_str()? {
+        "title" => Some(wf_app::launcher::title_app(packs, &slots(cfg), cfg["seed"].as_u64().unwrap_or(1) as u32)),
         "story" => Some(wf_app::launcher::story_app(packs, &slots(cfg), l["slot"].as_u64().map(|v| v as usize), cfg["seed"].as_u64().unwrap_or(1) as u32)),
         "battle" => Some(serde_json::from_value(l["config"].clone()).map_err(|e| e.to_string()).and_then(|c| App::battle(packs, c))),
         _ => None,

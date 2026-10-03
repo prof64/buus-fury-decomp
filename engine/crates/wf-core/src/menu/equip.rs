@@ -640,6 +640,11 @@ impl List {
 fn close_nested(w: &mut World) {
     if let Some(Screen::Equip(e)) = w.menu.shown.as_deref_mut() {
         if let Some(l) = e.list.as_mut() {
+            // the BG2 surface under the nested mode is the list as it was on screen (e.g. its A prompt still
+            // pressed from the press that opened the dialog) until the next redraw
+            if let Some(u) = l.under.take() {
+                *l = *u;
+            }
             l.dialog = None;
             l.cant = None;
         }

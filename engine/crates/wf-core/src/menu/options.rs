@@ -180,6 +180,10 @@ impl Options {
                     1 => st.music = v,
                     _ => st.text_speed = v,
                 }
+                if k < 2 {
+                    let st = w.menu.settings;
+                    w.events.push(crate::world::Event::MasterVolumes { music: st.music as i32, sfx: st.sfx as i32 });
+                }
                 (true, None)
             }
             _ => (false, None),

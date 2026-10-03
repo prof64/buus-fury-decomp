@@ -149,6 +149,8 @@ pub enum MenuOp {
     /// `0x0803F9D4`: every pixel of (x0, y0)-(x1, y1) (exclusive) replaced by `table[pixel]` (the title menu's
     /// darkened box)
     Remap { x0: i32, y0: i32, x1: i32, y1: i32, table: Vec<u8> },
+    /// one 8x8 tile of a tile sheet (`path`: tiles 8x8 left to right, rows top to bottom) at (x, y), index 0 skipped
+    Tile { path: String, tile: u16, x: i32, y: i32, hflip: bool, vflip: bool },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
@@ -187,6 +189,12 @@ pub struct MenuObj {
     pub vflip: bool,
     /// palette bank offset added to the picture's indices (OBJ half = 256)
     pub pal: u16,
+    /// a sprite sheet (`sprites/<id>`, `effects/<id>`) instead of `path`: `frame` = the sheet's frame index,
+    /// (x, y) = the anchor position (the frame's anchor lands there; `hflip` mirrors about it like the field)
+    pub sheet: String,
+    /// the object's colour remap (`0x0800EECC`: OBJ pixel index -> table[index]; e.g. the silhouette `0x0805682C`);
+    /// empty = none
+    pub remap: Vec<u8>,
 }
 
 /// The dialogue box OBJs zoom about the box centre while opening / closing (affine PA = PD = 2048 / scale) and

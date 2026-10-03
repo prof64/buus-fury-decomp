@@ -107,6 +107,8 @@ struct Args {
     battle_cfg: Option<wf_app::battle::BattleConfig>,
     /// launcher: open the replay list once the game is up
     open_replays: bool,
+    /// launcher: story mode on the game's title screen
+    title_launch: bool,
 }
 
 /// Running from a macOS `.app` bundle (Finder gives no terminal, which would otherwise mean "automation, headless").
@@ -157,6 +159,7 @@ fn parse_args() -> Args {
         story_launch: None,
         battle_cfg: None,
         open_replays: false,
+        title_launch: false,
     };
     if a.headless && in_app_bundle() && std::env::var_os("WF_HEADLESS").is_none() && std::env::var_os("WF_AGENT").is_none() && std::env::var_os("CI").is_none() {
         a.headless = false;
@@ -359,6 +362,9 @@ fn spawn_extract(rom: Vec<u8>, content: PathBuf, data: PathBuf) -> mpsc::Receive
 
 /// The simulation: `wf-core`'s battle by default, the frontend demo world with `--demo`.
 fn make_app(a: &Args, packs: Packs) -> Result<App, String> {
+    if a.title_launch {
+        return wf_app::launcher::title_app(packs, &read_slots(&a.data), a.seed);
+    }
     if let Some(slot) = a.story_launch {
         return wf_app::launcher::story_app(packs, &read_slots(&a.data), slot, a.seed);
     }
@@ -512,7 +518,7 @@ fn new_launcher(a: &Args, packs: &Packs) -> wf_app::launcher::Launcher {
 /// What a launcher choice means for the next boot (false = not a game start).
 fn apply_choice(a: &mut Args, l: &wf_app::launcher::Launcher, c: &wf_app::launcher::Choice) -> bool {
     use wf_app::launcher::Choice;
-    let start = matches!(c, Choice::Story { .. } | Choice::Battle(_) | Choice::Online | Choice::Replays);
+    let start = matches!(c, Choice::Story { .. } | Choice::Title | Choice::Battle(_) | Choice::Online | Choice::Replays);
     if !start {
         return false;
     }
@@ -520,11 +526,13 @@ fn apply_choice(a: &mut Args, l: &wf_app::launcher::Launcher, c: &wf_app::launch
     a.battle_cfg = None;
     a.online = false;
     a.open_replays = false;
+    a.title_launch = false;
     if !a.view_given {
         a.mode = l.settings.mode();
     }
     match c {
         Choice::Story { slot } => a.story_launch = Some(*slot),
+        Choice::Title => a.title_launch = true,
         Choice::Battle(cfg) => a.battle_cfg = Some(cfg.clone()),
         Choice::Online => {
             a.battle_cfg = Some(l.battle_config());
@@ -1197,7 +1205,7 @@ fn headless(a: &mut Args) -> Result<(), String> {
             let (w, h) = (240usize, 160usize);
             let mut fb = vec![0u32; w * h];
             l.draw(&packs, &mut fb, w, h);
-            eprintln!("launcher screen {:?}, {} enemies / fighters loaded", l.screen, if l.battle_config().players.is_empty() { 0 } else { 1 });
+            eprintln!("launcher screen {:?}", l.screen);
             if let Some(p) = &a.shot {
                 write_ppm(p, &fb, w, h);
                 eprintln!("wrote {}", p.display());

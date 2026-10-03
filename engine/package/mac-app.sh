@@ -50,12 +50,6 @@ cat > "$APP/Contents/Info.plist" <<EOF
   <key>LSApplicationCategoryType</key><string>public.app-category.action-games</string>
   <key>NSHighResolutionCapable</key><true/>
   <key>LSEnvironment</key><dict><key>WF_WINDOW</key><string>1</string></dict>
-  <key>CFBundleDocumentTypes</key>
-  <array><dict>
-    <key>CFBundleTypeName</key><string>Game Boy Advance ROM</string>
-    <key>CFBundleTypeExtensions</key><array><string>gba</string></array>
-    <key>CFBundleTypeRole</key><string>Viewer</string>
-  </dict></array>
 </dict>
 </plist>
 EOF

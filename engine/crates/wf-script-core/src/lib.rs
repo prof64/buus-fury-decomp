@@ -381,6 +381,13 @@ pub fn poll(w: &mut World, s: &mut HostState) -> Option<Option<i32>> {
         }
         Pending::Menu { native, push } => {
             let (native, push) = (*native, *push);
+            // the real screens (wf_core::menu): their effects are applied by the screen; the result after the fade-in
+            if let Some(r) = wf_core::menu::take_result(w) {
+                return {
+                    s.pending = None;
+                    Some(push.then_some(r - 1))
+                };
+            }
             match scene::menu_result(w) {
                 Some((r, log)) => {
                     natives::menu_closed(w, s, native, r, &log);

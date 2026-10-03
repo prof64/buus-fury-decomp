@@ -54,7 +54,8 @@ fn setup() -> Option<(Arc<GameData>, BTreeMap<String, String>)> {
 
 #[test]
 fn segments_match_the_game() {
-    let dir = repo().join("data/segments");
+    // SEGMENT_DIR: another directory of segments (e.g. long local proof runs under work/)
+    let dir = std::env::var("SEGMENT_DIR").map(PathBuf::from).unwrap_or_else(|_| repo().join("data/segments"));
     let Ok(rd) = std::fs::read_dir(&dir) else { return };
     let mut paths: Vec<PathBuf> = rd.filter_map(|e| e.ok()).map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "json")).collect();
     paths.sort();

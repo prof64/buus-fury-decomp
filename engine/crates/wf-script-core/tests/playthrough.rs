@@ -33,7 +33,7 @@ use wf_script_core::{poll, CoreState, HostState, SharedHost};
 use wf_script_rhai::{Runtime, Status, UnitRef};
 
 /// frames of `opening.json` that must match continuously (the verdict)
-const MIN_MATCHED: usize = 26651; // New Game -> Olibu -> the level-65 gate -> the Cave of the Ancients 1-17
+const MIN_MATCHED: usize = 32434; // New Game -> Olibu -> the level-65 gate -> the Cave of the Ancients 1-17
 
 fn repo() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..")

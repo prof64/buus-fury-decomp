@@ -871,7 +871,7 @@ pub fn post_step(w: &mut World) {
     crate::fieldobj::debris_step(w);
     // Instant Transmission's pick (a modal loop of the game, player.rs `start_it`) replaces the frame: no trigger
     // check, the cameras hold (story playthrough: the camera stops on the frame B is pressed)
-    let modal = w.modal.is_some();
+    let modal = w.modal.is_some() && crate::player::it_picking(w);
     match mode {
         Mode::Normal if modal || ended_before => {}
         Mode::Normal => trigger_check(w),

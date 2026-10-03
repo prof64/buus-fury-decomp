@@ -71,7 +71,7 @@ pub fn story_from(d: &wf_core::content::GameData, s: &Value) -> Story {
         }
     }
     // the remake's owned list holds unequipped copies (equipped ones are the characters' slots): marked entries out
-    st.equipment = s["equipment"].as_array().map(|a| a.iter().filter(|v| (i(v) >> 28) == 0).map(|v| (i(v) & 0x0FFF_FFFF) as i32).collect()).unwrap_or_default();
+    st.equipment = s["equipment"].as_array().map(|a| a.iter().map(|v| (i(v) & 0x0FFF_FFFF) as i32).collect()).unwrap_or_default();
     st.zenie = i(&s["zenie"]) as u32;
     st.play_frames = (i(&s["counter"]) + i(&s["play_base"])).max(0) as u64;
     if let Some(cs) = s["chars"].as_array() {
@@ -121,7 +121,7 @@ fn traces() -> PathBuf {
 }
 
 /// scenarios that must be exact (prefixes)
-const STRICT: &[&str] = &["status_open_close", "status_alloc", "status_tabs", "mg_", "options_", "journal_", "skills_"];
+const STRICT: &[&str] = &["status_", "inventory_", "equip_", "cr_", "mg_", "options_", "journal_", "skills_", "cr_"];
 
 /// the capture's picture hash: sha1 of the RGB bytes, first 16 hex digits
 fn hash(fb: &[u32]) -> String {
@@ -148,6 +148,22 @@ fn run(packs: &Packs, data: &Arc<wf_core::content::GameData>, name: &str) -> Opt
     let rows = frames["frames"].as_array()?;
     // script-opened screens: the remake opens the screen the frame the emulator's script did
     let meta = &tr["meta"];
+    // the save slots (the game's EEPROM cache, title scenarios): `meta.saves[k]` = a story dict + location
+    if let Some(sv) = meta["saves"].as_array() {
+        for (k, s) in sv.iter().enumerate() {
+            let d = (!s.is_null()).then(|| wf_core::menu::save::SaveData {
+                story: story_from(data, s),
+                world: i(&s["world"]) as i32,
+                area: i(&s["area"]) as i32,
+                variant: i(&s["variant"]) as i32,
+                x: i(&s["x"]) as i32,
+                y: i(&s["y"]) as i32,
+                flag: s["flag"].as_bool().unwrap_or(false),
+            });
+            sim.session.world.saves.set(k, d);
+        }
+        sim.session.world.saves.generation = 0;
+    }
     let mut r = Renderer::new();
     let log = std::env::var("MENU_PARITY_LOG").is_ok();
     let out = std::env::var("MENU_PARITY_OUT").ok().map(PathBuf::from);
@@ -194,11 +210,28 @@ fn run(packs: &Packs, data: &Arc<wf_core::content::GameData>, name: &str) -> Opt
                 m.lag = if ticks { 0 } else { quiet.saturating_add(1) };
             }
         }
+        // the world restore's length is CPU time too: the fade-in starts the frame the emulator's counter moves again
+        if oracle && k > 0 {
+            if let wf_core::menu::Phase::Leave { t } = sim.world().menu.phase {
+                let leave = sim.world().menu.tr.leave;
+                if t >= 1 && lf[k] > lf[k - 1] && t + 1 < leave {
+                    sim.session.world.menu.phase = wf_core::menu::Phase::Leave { t: leave - 1 };
+                }
+            }
+        }
         ev.clear();
         if k == 0 && meta["open"].is_object() {
-            assert!(wf_core::menu::open_from_json(&mut sim.session.world, &meta["open"]), "{name}: no screen opens {}", meta["open"]);
+            if !wf_core::menu::open_from_json(&mut sim.session.world, &meta["open"]) {
+                // the screen is not implemented (yet): nothing to compare (a STRICT scenario then fails: 0 frames)
+                println!("menu {name}: no screen opens {}; skipped", meta["open"]);
+                return Some((0, 0, vec!["not openable".into()], Vec::new()));
+            }
         }
         sim.step(&[keys], &mut ev);
+        if std::env::var("MENU_PARITY_STORY").is_ok_and(|v| v.split(',').any(|x| x.parse::<usize>().ok() == Some(k))) {
+            let st = &sim.world().story;
+            eprintln!("{name} {k}: equipment {:?} equip {:?} supplies {:?}", st.equipment, st.chars.iter().map(|c| c.equip).collect::<Vec<_>>(), st.supplies.iter().enumerate().filter(|(_, n)| **n > 0).collect::<Vec<_>>());
+        }
         // sounds of menu frames (and the START frame): the emulator's play calls vs ours
         let mut v = RenderView::default();
         sim.view(&mut v);
@@ -270,7 +303,8 @@ fn run(packs: &Packs, data: &Arc<wf_core::content::GameData>, name: &str) -> Opt
             }
         }
         if log {
-            eprintln!("{name} {k:4} keys {keys:03x} {:?} diff {diff}", sim.world().menu.phase);
+            let m = &sim.world().menu;
+            eprintln!("{name} {k:4} keys {keys:03x} {:?} diff {diff} lag {} top-focus {:?} shown-focus {:?} pending {} fade {:?}", m.phase, m.lag, m.stack.last().map(|s| s.container_ref().focus), m.shown.as_ref().map(|s| s.container_ref().focus), m.pending.is_some(), v.menu.as_ref().and_then(|x| x.fade).map(|f| f.level));
         }
     }
     let _ = menu_seen;

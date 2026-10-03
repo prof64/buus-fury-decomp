@@ -142,6 +142,11 @@ pub trait Page {
     fn enter_lag(&self) -> u8 {
         0
     }
+    /// a long redraw whose visible change happens at once (registers written before the slow drawing: the
+    /// credits' page change at EVA 0): the new state shows in the redraw's first frame
+    fn show_at_once(&self) -> bool {
+        false
+    }
 }
 
 macro_rules! screens {
@@ -235,7 +240,13 @@ pub fn open_from_json(w: &mut World, v: &serde_json::Value) -> bool {
     ];
     for f in tries {
         if let Some((sc, tr, scripted)) = f(w, v) {
+            // `"prev": {...}`: the screen was opened mid-redraw; this one's picture is on screen meanwhile
+            let prev = v.get("prev").filter(|p| p.is_object()).and_then(|p| tries.iter().find_map(|g| g(w, p)));
             open(w, sc, tr, scripted);
+            if let Some((mut ps, _, _)) = prev {
+                ps.before_draw(w);
+                w.menu.boot_shown = Some(Box::new(ps));
+            }
             return true;
         }
     }
@@ -350,6 +361,9 @@ pub struct Menu {
     pub overlay: Option<Box<Screen>>,
     #[serde(default)]
     pub overlay_until: u32,
+    /// harnesses: the picture on screen when a screen is opened mid-redraw (the first redraw becomes `pending`)
+    #[serde(default)]
+    pub boot_shown: Option<Box<Screen>>,
 }
 
 /// How a menu screen comes and goes (all measured per screen kind): the field fades out by `fade_out` per frame
@@ -535,12 +549,20 @@ fn redraw(w: &mut World, first: bool) {
         top.before_draw(w);
         top.container().drawn = true;
         let cost = if first { 1 } else { top.redraw_cost().max(1) };
-        if cost == 1 {
+        if let Some(prev) = w.menu.boot_shown.take().filter(|_| first) {
+            w.menu.shown = Some(prev);
+            w.menu.pending = Some(Box::new(top.clone()));
+            w.menu.lag = 1;
+        } else if cost == 1 {
             w.menu.shown = Some(Box::new(top.clone()));
             w.menu.pending = None;
             if first {
                 w.menu.lag = top.page().enter_lag();
             }
+        } else if top.page().show_at_once() {
+            w.menu.shown = Some(Box::new(top.clone()));
+            w.menu.pending = None;
+            w.menu.lag = cost - 1;
         } else {
             w.menu.pending = Some(Box::new(top.clone()));
             w.menu.lag = cost - 1;
@@ -638,7 +660,17 @@ pub fn view(w: &World) -> Option<MenuView> {
         Phase::Enter { .. } | Phase::Leave { .. } => return Some(MenuView { backdrop: 0, palette: vec![(0, 0)], ..Default::default() }),
         Phase::Idle => {
             let o = w.menu.overlay.as_deref().filter(|_| w.frame < w.menu.overlay_until)?;
-            return Some(o.view(w, w.data.menu.as_ref()?));
+            let mut v = o.view(w, w.data.menu.as_ref()?);
+            // the script's palette fade (`0x08007074`) darkens the picture still on screen; the fade mode writes the
+            // palette before the frame is shown (one step ahead of the field's presenter)
+            let mut dim = w.scene.screen.dim.clamp(0, 256);
+            if let Some(f) = w.scene.screen.fade.as_ref().filter(|f| f.kind == crate::scene::FadeKind::Black && f.out) {
+                dim = (256 * (f.t + 1).min(f.len) / f.len.max(1)).clamp(0, 256);
+            }
+            if dim > 0 {
+                v.fade = Some(wf_view::PaletteFade { level: dim as u16, target: 0 });
+            }
+            return Some(v);
         }
         _ => return None,
     }

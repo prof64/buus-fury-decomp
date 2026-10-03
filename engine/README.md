@@ -51,7 +51,9 @@ content, mods, saves and replays stay in the browser (OPFS / IndexedDB / localSt
 
 Arrows / Enter / Esc (or the game's A = **X**, B = **Z**; gamepad d-pad, A, B):
 
-* **Story** — New Game, or Continue from one of three save slots (the game saves at its own save points).
+* **Story** — *Title screen* hands over to the game's own title (START → Single Player → New Game with the
+  prologue, or Continue / Delete Game on the three save slots); or continue a slot / quick-start at Snakeway
+  directly. The game saves at its own save points.
 * **Battle** — any fighter, form and level (50–200) against any enemy or boss (bosses first; L/R or PageUp/PageDown
   jump 10), how many, or a story preset (Kid Buu, Janemba → Super Janemba, Pui Pui → Yakon → Dabura, …); any
   arena (or automatic); 1–4 local players (gamepads).

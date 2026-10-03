@@ -38,6 +38,8 @@ pub struct Credits {
     pub page: i32,
     /// EVA (BLDALPHA, written directly: on screen at once)
     pub eva: i32,
+    /// frames the current page's draw takes (1 or 2, [`page_cost`])
+    pub page_cost: u8,
 }
 
 impl Credits {
@@ -46,7 +48,7 @@ impl Credits {
         Credits::with(false)
     }
     pub fn with(unskippable: bool) -> Credits {
-        Credits { c: Container::default(), t: 0x90, quit: false, unskippable, idx: FIRST, page: FIRST, eva: 0 }
+        Credits { c: Container::default(), t: 0x90, quit: false, unskippable, idx: FIRST, page: FIRST, eva: 0, page_cost: 2 }
     }
 }
 
@@ -85,6 +87,7 @@ impl Page for Credits {
                     return Action::Pop(1);
                 }
                 self.page = self.idx;
+                self.page_cost = w.data.menu.as_ref().map(|d| page_cost(&d.text, self.page)).unwrap_or(2);
             }
         } else if self.t <= 0xA0 {
             self.eva = (self.t + 0x70) & 0xFF;
@@ -98,10 +101,13 @@ impl Page for Credits {
     fn enter_lag(&self) -> u8 {
         1
     }
+    fn show_at_once(&self) -> bool {
+        true
+    }
     /// a new pair drawn (two surfaces + 2 x 15 KB uploads) makes the iteration take 2 frames
     fn redraw_cost(&self) -> u8 {
         if self.t == 0x90 {
-            2
+            self.page_cost
         } else {
             1
         }
@@ -152,4 +158,21 @@ pub fn open_json(_w: &World, v: &serde_json::Value) -> Option<(super::Screen, su
     }
     let c = Credits::with(!v["skippable"].as_bool().unwrap_or(false));
     Some((Screen::Credits(c), Transition { enter: 1, ..CUT }, true))
+}
+
+/// Frames a page's draw takes (fitted on `cr_native_fast`, all 47 pages): the glyph routine's work grows with
+/// the glyphs' widths, the heading's (dialog font, 16 rows) about twice the names' (small font); the iteration
+/// spills into a second frame when `2 * width(heading) + width(names) > 158` (glyph widths without the advance's
+/// +1; the sound IRQ's load varies by a few lines, the nearest pages are 153 / 163). Pages measured: 47 / 47.
+pub fn page_cost(t: &super::text::TextData, page: i32) -> u8 {
+    let w = |f: wf_view::MenuFont, s: &[u16]| -> i32 {
+        let fm = t.font(f);
+        s.iter().filter(|&&c| c != 0x0A && c < 0xFF && fm.has.get(c as usize).copied().unwrap_or(false)).map(|&c| fm.w[c as usize] as i32).sum()
+    };
+    let cost = 2 * w(MenuFont::Dialog, t.s(page as usize)) + w(MenuFont::Small, t.s(page as usize + 1));
+    if cost > 158 {
+        2
+    } else {
+        1
+    }
 }

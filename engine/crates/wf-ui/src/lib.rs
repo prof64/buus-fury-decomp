@@ -125,6 +125,8 @@ pub fn extract(rom: &Rom, out: &mut Content) -> wf_rom::Result<()> {
     let (_, wm) = mapscreen::world_map(rom);
     out.put("ui/mapscreen/world_map.png", wm.png(&pal, false));
     out.put_json("ui/mapscreen.json", &mapscreen::json());
+    mapscreen::area_maps(rom, out, &pal);
+    mapscreen::frame_variants(rom, out, &pal);
 
     // menu primitives
     out.put("ui/menu/page_skeleton.png", menu::page_skeleton().png(&pal, false));

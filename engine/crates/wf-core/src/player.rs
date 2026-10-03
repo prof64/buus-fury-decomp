@@ -695,6 +695,11 @@ pub fn set_idle(w: &mut World, i: usize) {
     set_anim_id(w, i, 0);
 }
 
+/// a player is in Instant Transmission's target pick (the selector's modal loop replaces the frame)
+pub fn it_picking(w: &World) -> bool {
+    (0..w.ents.len()).any(|k| !w.ents[k].removed && matches!(&w.ents[k].body, Body::Player(p) if p.it_sel.is_some()))
+}
+
 /// the item-get pose ends while Instant Transmission's field run waits for the event its arrival fired: the run's
 /// state comes back (story playthrough s099: raw 20 cel 0), the vanish resumes after the event
 pub fn resume_it(w: &mut World, i: usize) -> bool {

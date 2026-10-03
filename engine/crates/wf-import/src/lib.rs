@@ -226,9 +226,8 @@ fn patch_leader(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
     let (ss, ss3, ctl_addr) = w.data.form(form).map(|f| (f.ss, f.ss3, f.controller)).unwrap_or((false, false, 0));
     let story_form = ctl_addr == 0x3001b88 || ctl_addr == 0x3001b8c;
     let ctl = if p != 0 { ram.r32(p + 0x22C) } else { 0 };
-    if p != 0 && ctl != ctl_addr && ram.valid(ctl) {
-        notes.push(format!("form {form}: controller {ctl:#x} in RAM vs {ctl_addr:#x}"));
-    }
+    // (the form's controller object: the player's +0x22C, a heap object; content's `controller` names its type)
+    let _ = (form, &notes);
     let pl = w.pl(pi);
     pl.ss_gauge = ram.r16(rec + 0x1E) as i32;
     pl.ss3_gauge = (ram.r16(rec + 0x20) as i64) << 16;

@@ -32,6 +32,21 @@ const readMeta = async () => {
   return b ? JSON.parse(dec.decode(b)) : {};
 };
 const writeMeta = (m) => store.put('meta.json', enc.encode(JSON.stringify(m)));
+// launcher settings (wf_app::launcher::Settings) and the story save slots (hex) live in localStorage
+const lsGet = (k) => {
+  try {
+    return JSON.parse(localStorage.getItem(k));
+  } catch {
+    return null;
+  }
+};
+const lsSet = (k, v) => {
+  try {
+    localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v));
+  } catch {}
+};
+const readSlots = () => [0, 1, 2].map((i) => localStorage.getItem(`wf.save.${i}`) || '');
+
 
 // ------------------------------------------------------------------ ROM check (friendly errors)
 
@@ -148,21 +163,6 @@ function romScreen() {
   });
 }
 
-// launcher settings (wf_app::launcher::Settings) and the story save slots (hex) live in localStorage
-const lsGet = (k) => {
-  try {
-    return JSON.parse(localStorage.getItem(k));
-  } catch {
-    return null;
-  }
-};
-const lsSet = (k, v) => {
-  try {
-    localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v));
-  } catch {}
-};
-const readSlots = () => [0, 1, 2].map((i) => localStorage.getItem(`wf.save.${i}`) || '');
-
 // a picked mod folder -> mods/<id>.tar in the store (Settings panel and the launcher's Mods page)
 async function installMod(files) {
   if (!files.length) return;
@@ -266,7 +266,7 @@ async function boot(baseTarBytes) {
           $('modpick').click();
         } else if (c.kind === 'online') {
           location.search = '?net';
-        } else if (c.kind === 'story' || c.kind === 'battle' || c.kind === 'replays') {
+        } else if (c.kind === 'story' || c.kind === 'title' || c.kind === 'battle' || c.kind === 'replays') {
           done = true;
           removeEventListener('keydown', onKey);
           x.wf_launcher_close();

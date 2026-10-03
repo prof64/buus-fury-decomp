@@ -1,7 +1,7 @@
 // Headless smoke test of the web build (headless Chrome, muted, via the DevTools protocol; no npm deps):
 //   python3 package/serve.py --dir <dir with dist + rom.gba> &  node package/web_check.mjs http://localhost:8370 out/
 // Drops the ROM through the ?devrom= hook, waits for the launcher, screenshots it, then drives
-// Battle -> START and Story -> New Game and checks the game runs (frames advance) in each.
+// Battle -> START, Story -> title screen and Story -> Quick start and checks the game runs (frames advance) in each.
 import { spawn } from 'node:child_process';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -47,6 +47,8 @@ try {
   await new Promise((r) => (ws.onopen = r));
   ws.onmessage = (m) => {
     const d = JSON.parse(m.data);
+    if (d.method === 'Runtime.exceptionThrown') console.log('page exception:', d.params.exceptionDetails.exception?.description || d.params.exceptionDetails.text);
+    if (d.method === 'Runtime.consoleAPICalled' && ['error', 'warning'].includes(d.params.type)) console.log('console', d.params.type, d.params.args.map((a) => a.value ?? a.description).join(' ').slice(0, 300));
     if (d.id && pending.has(d.id)) {
       const p = pending.get(d.id);
       pending.delete(d.id);
@@ -61,22 +63,25 @@ try {
       await sleep(60);
     }
   };
-  const run = async (label, list) => {
+  const run = async (label, list, ready = 'window.wfStats && window.wfStats.frame > 120') => {
     await send('Page.navigate', { url: `${base}/app/?devrom=/rom.gba` });
     await until('window.wfLauncher === true', 120000, 'launcher');
     await sleep(500);
     if (label === 'battle') await shot('web-launcher.png');
     await keys(list);
-    await until('window.wfStats && window.wfStats.frame > 120', 60000, `${label} running`);
+    await until(ready, 60000, `${label} running`);
+    await sleep(1500);
     const st = await evalJs('JSON.stringify({frame: wfStats.frame, fps: wfStats.fps, view: wfStats.view, audio: wfStats.timings.audio})');
     console.log(label, st);
     await shot(`web-${label}.png`);
   };
   await run('battle', ['ArrowDown', 'Enter', 'ArrowRight', 'Enter']); // Battle > Fight: kind stays, cursor on START
-  await run('story', ['Enter', 'Enter']); // Story > New Game
+  await run('title', ['Enter', 'Enter'], 'window.wfStats && window.wfStats.fps > 10'); // Story > the game's title screen
+  await run('story', ['Enter', 'ArrowUp', 'ArrowUp', 'Enter']); // Story > Quick start (Snakeway)
   console.log('web check OK');
 } catch (e) {
   console.error('web check FAILED:', e.message);
+  if (ws) console.error('page:', await evalJs("[...document.querySelectorAll('.screen.on')].map(s=>s.id).join(',') + ' | ' + document.getElementById('romerr').textContent + ' | ' + document.getElementById('ptext').textContent").catch((x) => x.message));
   process.exitCode = 1;
 } finally {
   chrome.kill();

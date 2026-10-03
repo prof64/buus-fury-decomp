@@ -2,7 +2,8 @@
 //! content (`ui/images/screen_title.png`), the game's `menu` font, one platform-independent state machine both
 //! shells drive with W3C key codes, exactly like the lobby / controls / replay overlays.
 //!
-//! Title → Story (New Game, Continue from a save slot) · Battle (any fighter / form / level vs any enemy, boss or
+//! Title → Story (the game's own title screen — New Game with the prologue / Continue / Delete Game on the save
+//! slots — or a quick continue / new game from here) · Battle (any fighter / form / level vs any enemy, boss or
 //! story preset, any arena, 1-4 local players) · Online (the lobby, [`crate::netmenu`]) · Replays · Mods (turn
 //! mods on / off, open or add the mods folder) · Settings (view / zoom, volume, fullscreen, controls).
 //!
@@ -11,8 +12,8 @@
 //! Save slots: the story session's `World.saves` (the game's Save Game screen writes them); shells persist a slot
 //! file per slot whenever [`saves_of`] reports a new generation and pass the files back in [`story_app`].
 //!
-//! When the core's title screen (`wf_core::menu::title`) is complete, Story should start a session on it (New
-//! Game / Continue / Delete there, from the same slots) instead of this launcher's Story page.
+//! Story → "Title screen" hands over to the core's title (`wf_core::menu::title`, [`title_app`]): the session then
+//! builds the new world itself (`menu::title::boot`) and the in-game Save screen writes the same slots.
 
 use std::sync::Arc;
 
@@ -164,6 +165,8 @@ pub enum Choice {
     None,
     /// story mode: a new game (None) or continue from a slot
     Story { slot: Option<usize> },
+    /// story mode on the game's own title screen (New Game / Continue / Delete Game there)
+    Title,
     Battle(BattleConfig),
     /// the online lobby
     Online,
@@ -185,6 +188,7 @@ impl Choice {
         match self {
             Choice::None => json!({"kind": "none"}),
             Choice::Story { slot } => json!({"kind": "story", "slot": slot}),
+            Choice::Title => json!({"kind": "title"}),
             Choice::Battle(c) => json!({"kind": "battle", "config": c}),
             Choice::Online => json!({"kind": "online"}),
             Choice::Replays => json!({"kind": "replays"}),
@@ -215,6 +219,7 @@ enum Row {
     Mods,
     Settings,
     Quit,
+    TitleScreen,
     NewGame,
     Slot(usize),
     Kind,
@@ -345,9 +350,9 @@ impl Launcher {
                 v
             }
             Screen::Story => {
-                let mut v = vec![Row::NewGame];
+                let mut v = vec![Row::TitleScreen];
                 v.extend((0..SLOTS).map(Row::Slot));
-                v.push(Row::Back);
+                v.extend([Row::NewGame, Row::Back]);
                 v
             }
             Screen::Battle => {
@@ -528,6 +533,7 @@ impl Launcher {
             Row::Settings => self.show(Screen::Settings),
             Row::Quit => return Choice::Quit,
             Row::NewGame => return Choice::Story { slot: None },
+            Row::TitleScreen => return Choice::Title,
             Row::Slot(i) => {
                 if self.slots.get(i).is_some_and(|s| s.is_some()) {
                     return Choice::Story { slot: Some(i) };
@@ -560,8 +566,9 @@ impl Launcher {
             Row::Mods => (t("Mods"), String::new()),
             Row::Settings => (t("Settings"), String::new()),
             Row::Quit => (t("Quit"), String::new()),
-            Row::NewGame => (t("New Game"), String::new()),
-            Row::Slot(i) => (format!("Slot {}", i + 1), self.slots.get(i).cloned().flatten().unwrap_or_else(|| t("- empty -"))),
+            Row::TitleScreen => (t("Title screen"), t("New Game / Continue")),
+            Row::NewGame => (t("Quick start"), t("Snakeway, no prologue")),
+            Row::Slot(i) => (format!("Continue {}", i + 1), self.slots.get(i).cloned().flatten().unwrap_or_else(|| t("- empty -"))),
             Row::Kind => (t("Fight"), if b.preset_mode { t("< Story preset >") } else { t("< Any enemy >") }),
             Row::Fighter => (t("Fighter"), format!("< {} >", self.fighters.get(self.fighter_idx()).map(|f| f.1.as_str()).unwrap_or("?"))),
             Row::Form => {
@@ -633,18 +640,18 @@ impl Launcher {
         if main {
             // a compact column under the logo, like the game's START / OPTIONS
             let n = rows.len() as i32;
-            let (pw, ph) = (92, n * 11 + 6);
-            let (px, py) = (ox + 74, oy + 156 - ph - 8);
+            let (pw, ph) = (92, n * 10 + 4);
+            let (px, py) = (ox + 74, oy + 145 - ph);
             tiny::fill_rect(fb, w, h, px, py, pw, ph, 0xC010_1820);
             for p in [py, py + ph - 1] {
                 tiny::fill_rect(fb, w, h, px, p, pw, 1, ACCENT);
             }
             for (k, &row) in rows.iter().enumerate() {
                 let (l, _) = self.label(row);
-                let y = py + 3 + k as i32 * 11;
+                let y = py + 2 + k as i32 * 10;
                 let sel = k == self.cursor;
                 if sel {
-                    tiny::fill_rect(fb, w, h, px + 3, y - 1, pw - 6, 11, 0xFF2E_3A48);
+                    tiny::fill_rect(fb, w, h, px + 3, y - 1, pw - 6, 10, 0xFF2E_3A48);
                 }
                 text(fb, &l, px + (pw - width(&l)) / 2, y, if sel { 0xFFFF_FFFF } else { 0xFFB8_B8B8 });
             }
@@ -668,7 +675,7 @@ impl Launcher {
         let note = match self.screen {
             Screen::Mods if self.mods.is_empty() => "No mods yet. A mod is a folder with a pack.json.",
             Screen::Mods => "Changes apply to the next game you start.",
-            Screen::Story => "The game saves at the save points (journal).",
+            Screen::Story => "Save at the game's save points.",
             _ => "",
         };
         if !note.is_empty() {
@@ -738,6 +745,26 @@ pub fn story_app(packs: Packs, slots: &[Vec<u8>], slot: Option<usize>, seed: u32
     saves.generation = 0;
     session.world.saves = saves;
     let s = crate::story::StorySim::with_session(&packs, session)?;
+    Ok(App::new(packs, Box::new(s)))
+}
+
+/// Story mode on the game's title screen (START → Single Player → Select Game: New Game with the prologue, Continue,
+/// Delete Game) with the slot files loaded; the world under the title is a placeholder the title's boot replaces.
+pub fn title_app(packs: Packs, slots: &[Vec<u8>], seed: u32) -> Result<App, String> {
+    let data = crate::battle::load_data(&packs)?;
+    if data.field.is_none() {
+        return Err("this content has no world/ data (re-extract with the current extractor)".into());
+    }
+    let mut saves = Saves::default();
+    for (i, b) in slots.iter().enumerate().take(SLOTS) {
+        saves.set_slot_bytes(i, b);
+    }
+    let cfg = FieldConfig { world: 1, area: 1, rng: RngInit::Seed(seed), ..Default::default() };
+    let mut session = Session::new_field(data, cfg);
+    session.world.saves = saves;
+    let mut s = crate::story::StorySim::with_session(&packs, session)?;
+    wf_core::menu::title::open_title(&mut s.session.world);
+    s.skip_area_banner();
     Ok(App::new(packs, Box::new(s)))
 }
 

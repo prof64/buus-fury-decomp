@@ -7,7 +7,9 @@
 //! * **Command tracks** (`actor+0x18C`, B3.2): one queue per actor plus the camera track; commands start, update
 //!   once per frame and report done; a finished head is popped and the next one starts in the same tick; a track
 //!   that popped its last command still reports busy for that tick (the game's tick returns 2), so a lone instant
-//!   command keeps a blocking native busy for 2 frames. Tracks only run while a director wait mode runs.
+//!   command keeps a blocking native busy for 2 frames. A head the tick itself starts (not chained) is not updated
+//!   in that tick, and a refresh command popped at its start (set_pos) leaves the next for the next tick (story
+//!   playthrough s101). Tracks only run while a director wait mode runs.
 //! * **Director** (`0x03002BAC`, B3.3): batch flag, `wait_for_actor` group, the wait mode (all tracks / the group +
 //!   camera) whose completion resumes the script.
 //! * **Camera control**: follow another actor, modal scrolls, queued pans / sets (the default stays the player
@@ -1176,7 +1178,9 @@ fn start_head(w: &mut World, k: usize) {
             if t.queue.is_empty() {
                 return;
             }
-            continue;
+            // fresh (not chained): the next command starts in the next tick (story playthrough s101: set_pos ->
+            // face(60, 0) -> walk_to_speed: the face lands a frame after the block starts, the walk a frame later)
+            return;
         }
         if let Some(c) = t.queue.first_mut() {
             *c = cmd;
@@ -2090,6 +2094,8 @@ fn tick_track(w: &mut World, k: usize) -> bool {
     }
     if !w.scene.tracks[k].started {
         start_head(w, k);
+        // a head started by the tick is not updated in it (s101: the face of a block's second command)
+        return w.scene.tracks.get(k).is_none_or(|t| t.queue.is_empty());
     }
     // a held command (face_actor left at the head) no longer updates: the actor keeps the facing it got
     // (story playthrough: s084, Goku does not follow Pikkon's later walk)

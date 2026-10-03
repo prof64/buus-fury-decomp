@@ -196,7 +196,7 @@ pub unsafe extern "C" fn wf_app_init(cfg_ptr: *const u8, cfg_len: usize) -> u32 
     if let Some(n) = cfg["launch"]["config"]["players"].as_array().map(|a| a.len()) {
         dc.players = n.clamp(1, 4);
     }
-    let made = if matches!(cfg["launch"]["kind"].as_str(), Some("story" | "battle")) {
+    let made = if matches!(cfg["launch"]["kind"].as_str(), Some("story" | "title" | "battle")) {
         launcher::launch_app(&cfg, packs).unwrap_or_else(|| Err("bad launch".into()))
     } else if let Some(sim) = net::take_sim(&cfg, &packs) {
         sim.map(|s| App::new(packs, s))

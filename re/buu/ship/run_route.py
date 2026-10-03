@@ -22,6 +22,7 @@ def main():
         # the points split is computed from the chapter start state
         segs = ship_route.segments(start_emu(str(out / 'start.ss')) if (out / 'start.ss').exists() else e)
         segs = segs[[s[0] for s in segs].index(frm):]
+        e = start_emu(str(out / f'{frm}.ss'))
     else:
         e.save_file(str(out / 'start.ss'))
     f = 0

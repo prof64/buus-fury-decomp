@@ -112,6 +112,9 @@ fn panel(s: &mut Surface, x0: i32, y0: i32, x1: i32, y1: i32) {
 }
 
 pub struct MenuRenderer {
+    sheets: HashMap<String, Option<std::sync::Arc<wf_content::sprite::Sheet>>>,
+    /// colour -> the in-game OBJ palette's first index with it (`maps/palette.json`)
+    obj_rev: Option<HashMap<u32, u8>>,
     fonts: Vec<Option<ColFont>>,
     images: HashMap<String, Option<Indexed>>,
     /// UI palette, 0xRRGGBB
@@ -136,12 +139,43 @@ impl MenuRenderer {
             .ok()
             .and_then(|v| v["colors"].as_array().map(|a| a.iter().map(|c| u32::from_str_radix(c.as_str().unwrap_or("#000000").trim_start_matches('#'), 16).unwrap_or(0)).collect()))
             .unwrap_or_else(|| vec![0; 256]);
-        MenuRenderer { fonts, images: HashMap::new(), pal }
+        MenuRenderer { sheets: HashMap::new(), obj_rev: None, fonts, images: HashMap::new(), pal }
     }
 
     /// an indexed picture with the game's raw indices: pictures exported with their own compact palette
     /// (portraits, icons) are mapped back by colour (the UI palette's colours are unique except black: index 1;
     /// the transparent entry -> 0)
+    fn sheet(&mut self, packs: &Packs, key: &str) -> Option<std::sync::Arc<wf_content::sprite::Sheet>> {
+        if !self.sheets.contains_key(key) {
+            let sh = wf_content::sprite::Sheet::load(packs, key).ok().map(std::sync::Arc::new);
+            self.sheets.insert(key.to_string(), sh);
+        }
+        self.sheets.get(key).cloned().flatten()
+    }
+
+    /// an RGBA sprite pixel's OBJ palette index
+    fn obj_index(&mut self, packs: &Packs, rgb: u32) -> u8 {
+        if self.obj_rev.is_none() {
+            let mut m = HashMap::new();
+            if let Ok(v) = packs.json::<serde_json::Value>("maps/palette.json") {
+                let cols = v["obj"].as_array().or_else(|| v["colors"].as_array().filter(|a| a.len() >= 512).map(|a| a.as_slice()).map(|_| v["colors"].as_array().unwrap()));
+                if let Some(a) = cols {
+                    let off = if v["obj"].is_array() { 0 } else { 256 };
+                    for k in 1..256usize {
+                        if let Some(c) = a.get(off + k).and_then(|c| c.as_str()).and_then(|c| u32::from_str_radix(c.trim_start_matches('#'), 16).ok()) {
+                            m.entry(c).or_insert(k as u8);
+                        }
+                    }
+                }
+            }
+            for k in 1..256usize {
+                m.entry(self.pal[k]).or_insert(k as u8);
+            }
+            self.obj_rev = Some(m);
+        }
+        self.obj_rev.as_ref().and_then(|m| m.get(&rgb).copied()).unwrap_or(1)
+    }
+
     fn image(&mut self, packs: &Packs, path: &str) -> Option<&Indexed> {
         if !self.images.contains_key(path) {
             let mut img = packs.read(path).and_then(|b| decode_indexed(&b).ok());
@@ -304,6 +338,23 @@ impl MenuRenderer {
                     }
                 }
                 MenuOp::Text { font, x, y, colour, shadow, clip, text } => self.text(&mut s, *font, *x, *y, *colour, *shadow, *clip, text),
+                MenuOp::Tile { path, tile, x, y, hflip, vflip } => {
+                    let Some(img) = self.image(packs, path) else { continue };
+                    let per_row = (img.w / 8).max(1) as i32;
+                    let (tx, ty) = ((*tile as i32 % per_row) * 8, (*tile as i32 / per_row) * 8);
+                    for yy in 0..8 {
+                        for xx in 0..8 {
+                            let (sx, sy) = (tx + if *hflip { 7 - xx } else { xx }, ty + if *vflip { 7 - yy } else { yy });
+                            if sx >= img.w as i32 || sy >= img.h as i32 {
+                                continue;
+                            }
+                            let c = img.idx[(sy * img.w as i32 + sx) as usize];
+                            if c != 0 {
+                                s.set(x + xx, y + yy, c);
+                            }
+                        }
+                    }
+                }
                 MenuOp::TextOutline { font, x, y, colour, outline, clip, text } => self.text_outline(&mut s, *font, *x, *y, *colour, *outline, *clip, text),
                 MenuOp::AffineObjs { pieces, pa } => {
                     let tex = std::mem::replace(&mut s.px, vec![0; (s.w * s.h).max(0) as usize]);
@@ -367,55 +418,96 @@ impl MenuRenderer {
         // lists layers back to front)
         // overlay screens (mini-games): u16::MAX = nothing drawn, the field shows through (alpha 0 in the output)
         let mut idx: Vec<u16> = vec![if mv.overlay { u16::MAX } else { mv.backdrop }; 240 * 160];
-        let mut order: Vec<usize> = (0..mv.layers.len()).collect();
-        order.sort_by_key(|&i| std::cmp::Reverse(mv.layers[i].priority));
+        let order: Vec<usize> = (0..mv.layers.len()).collect();
         let surfaces: Vec<Surface> = mv.layers.iter().map(|l| self.surface(packs, l)).collect();
         // which layer is on top / under it per pixel (blending): 254 = backdrop, 255 = OBJ
         let mut top_l: Vec<u8> = vec![254; 240 * 160];
         let mut under: Vec<(u16, u8)> = vec![(mv.backdrop, 254); 240 * 160];
-        for &li in &order {
-            let l = &mv.layers[li];
-            let s = &surfaces[li];
-            for y in 0..160 {
-                for x in 0..240 {
-                    let (sx, sy) = (x - l.x, y - l.y);
-                    if sx < 0 || sy < 0 || sx >= s.w || sy >= s.h {
-                        continue;
-                    }
-                    let c = s.px[(sy * s.w + sx) as usize];
-                    if c != 0 {
-                        let k = (y * 240 + x) as usize;
-                        under[k] = (idx[k], top_l[k]);
-                        idx[k] = c as u16;
-                        top_l[k] = li.min(253) as u8;
+        // the PPU's order: priority 3 down to 0; per priority the BGs (view order: later on top), then the OBJs of
+        // that priority (last OAM entry first so index 0 ends on top)
+        for p in (0..=3u8).rev() {
+            for &li in &order {
+                let l = &mv.layers[li];
+                if l.priority.min(3) != p {
+                    continue;
+                }
+                let s = &surfaces[li];
+                for y in 0..160 {
+                    for x in 0..240 {
+                        let (sx, sy) = (x - l.x, y - l.y);
+                        if sx < 0 || sy < 0 || sx >= s.w || sy >= s.h {
+                            continue;
+                        }
+                        let c = s.px[(sy * s.w + sx) as usize];
+                        if c != 0 {
+                            let k = (y * 240 + x) as usize;
+                            under[k] = (idx[k], top_l[k]);
+                            idx[k] = c as u16;
+                            top_l[k] = li.min(253) as u8;
+                        }
                     }
                 }
             }
-        }
-        // OBJs: last OAM entry first so index 0 ends on top
-        for o in mv.objs.iter().rev() {
-            let Some(img) = self.image(packs, &o.path) else { continue };
-            let (iw, ih) = (img.w as i32, img.h as i32);
-            let (fw, fh) = (o.fw as i32, o.fh as i32);
-            let per_row = (iw / fw.max(1)).max(1);
-            let fx = (o.frame as i32 % per_row) * fw;
-            let fy = (o.frame as i32 / per_row) * fh;
-            for yy in 0..fh {
-                for xx in 0..fw {
-                    let sx = fx + if o.hflip { fw - 1 - xx } else { xx };
-                    let sy = fy + if o.vflip { fh - 1 - yy } else { yy };
-                    if sx >= iw || sy >= ih {
-                        continue;
+            for o in mv.objs.iter().rev() {
+                if o.priority.min(3) != p {
+                    continue;
+                }
+                if !o.sheet.is_empty() {
+                    // a sprite-sheet frame: RGBA pixels back to OBJ palette indices (the in-game OBJ palette the sheets
+                    // were exported with; the UI palette as fallback), the object's remap, shown through the screen's
+                    // palette (both halves = the UI palette in these screens)
+                    let Some(sh) = self.sheet(packs, &o.sheet) else { continue };
+                    let Some(f) = sh.def.frames.get(o.frame as usize) else { continue };
+                    let img = &sh.image;
+                    for j in 0..f.h as i32 {
+                        let py = o.y - f.anchor.y + j;
+                        if !(0..160).contains(&py) {
+                            continue;
+                        }
+                        for i in 0..f.w as i32 {
+                            let px = if o.hflip { o.x + f.anchor.x - 1 - i } else { o.x - f.anchor.x + i };
+                            if !(0..240).contains(&px) {
+                                continue;
+                            }
+                            let c = img.px[((f.y as i32 + j) as u32 * img.w + f.x + i as u32) as usize];
+                            if c >> 24 == 0 {
+                                continue;
+                            }
+                            let mut ci = self.obj_index(packs, c & 0xFF_FFFF) as usize;
+                            if let Some(&r) = o.remap.get(ci) {
+                                ci = r as usize;
+                            }
+                            let k = (py * 240 + px) as usize;
+                            under[k] = (idx[k], top_l[k]);
+                            idx[k] = 256 + ci as u16;
+                            top_l[k] = 255;
+                        }
                     }
-                    let c = img.idx[(sy * iw + sx) as usize];
-                    let (px, py) = (o.x + xx, o.y + yy);
-                    if c == 0 || !(0..240).contains(&px) || !(0..160).contains(&py) {
-                        continue;
+                    continue;
+                }
+                let Some(img) = self.image(packs, &o.path) else { continue };
+                let (iw, ih) = (img.w as i32, img.h as i32);
+                let (fw, fh) = (o.fw as i32, o.fh as i32);
+                let per_row = (iw / fw.max(1)).max(1);
+                let fx = (o.frame as i32 % per_row) * fw;
+                let fy = (o.frame as i32 / per_row) * fh;
+                for yy in 0..fh {
+                    for xx in 0..fw {
+                        let sx = fx + if o.hflip { fw - 1 - xx } else { xx };
+                        let sy = fy + if o.vflip { fh - 1 - yy } else { yy };
+                        if sx >= iw || sy >= ih {
+                            continue;
+                        }
+                        let c = img.idx[(sy * iw + sx) as usize];
+                        let (px, py) = (o.x + xx, o.y + yy);
+                        if c == 0 || !(0..240).contains(&px) || !(0..160).contains(&py) {
+                            continue;
+                        }
+                        let k = (py * 240 + px) as usize;
+                        under[k] = (idx[k], top_l[k]);
+                        idx[k] = c as u16 + o.pal;
+                        top_l[k] = 255;
                     }
-                    let k = (py * 240 + px) as usize;
-                    under[k] = (idx[k], top_l[k]);
-                    idx[k] = c as u16 + o.pal;
-                    top_l[k] = 255;
                 }
             }
         }

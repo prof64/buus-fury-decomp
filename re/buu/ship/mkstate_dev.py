@@ -30,7 +30,9 @@ def build(out, levels=None):
     for c, lv in levels.items():
         items += [c, lv, N(LEVEL_TO)]
     items += [N(HEAL)]
-    r = run_code(e, asm(items), max_frames=60)
+    for _ in range(12):
+        items += [21, N(0x80)]          # give_item: 12 Senzu Beans (a stocked-up player)
+    r = run_code(e, asm(items), max_frames=3000)
     print('setup', r)
     r = run_code(e, asm([314, N(RUN_EVENT)]), max_frames=6000, keys=lambda f: KEY.A if f % 30 < 4 else 0)
     print('s314', r)
