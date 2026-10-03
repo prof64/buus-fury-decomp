@@ -721,6 +721,51 @@ added to tools/emu). How the input landing is decided:
     decisions vs the game), `fit_base.py`, `prof.py` (per-bucket cycles of a redraw), `decmeas.py` / `decmodel.py`
     (decompressor), `mkvariant.py` (a segment with other keys), `mkshipstate.py` (savestate of a ship route cut).
 
+**Redraw timing, the other pages (ship fix agent, 2026-10-03).** Same predictor (`sndsim::redraw_frames`), each
+page's own cycles built from its draw list; opt-in as before (`init.snd_phase`), constants otherwise (menu_parity
+45 / 45 unchanged).
+* Measuring any page: `re/buu/ship/menu_timing.py SEGDIR NAME a b OUT.json [--prof] [--all]` logs every main-loop
+  iteration that does not fit its frame, page-agnostic (iteration = frame start .. the main loop's sound update,
+  recognised by its return address 0x0803D814; interrupt mixes inside; `own` = the step's + redraw's cycles;
+  `--prof` = cycles per 0x40-byte code bucket). `re/buu/menu/cycles.py [scenario ...]` does the same for the
+  menu_parity scenarios (`work/buu/menu/cycles/*.json`: charsel, credits, equip, inventory, journal, options,
+  save, shop, skills measured). `re/buu/ship/menu_cmp.py LOG TIMING.json [skip]` puts the model's redraws (a
+  `WF_SND_DEBUG` log: every page now prints `menu redraw ... | (gn, small, extra) tc(glyphs, cols, bits, lines)
+  ops`) beside the measured ones; `re/buu/menu/cycles_fit.py --dir LOGDIR CYCLESDIR [--rows]` fits per page
+  (rest = K + per line + per 1000 glyph instructions + enter) and prints the model's error.
+* Generic part `sndsim::layer_cycles(text, ops, line)`: 3.17 cycles per shadowed-glyph instruction (profiles of the
+  routine alone: 3.27 .. 3.31 with its caller; the status page's 3.5664 is its own fit) + `line` per text line +
+  7,284 per 16 x 16 picture (the keyed cursor 6,596) + 28.45 per pixel of other pictures + the plain text / fills
+  / pixels of `ops_cost`. `menu::page_time(d, view, fresh, t0, K, line, gn_milli, enter)` adds a page's constant,
+  its extra per-instruction cost and the page's enter on its first redraw (`Container.ever`).
+* **Inventory** (`menu/inventory.rs`): list = 192,506 + 2,933 per row + 1,251 per line + 3.609 per glyph
+  instruction (joint fit of the route's heal menus 8-14 / 8-51 / 8-64 and the inventory scenarios' 5-row lists:
+  105 scenario redraws mean -1.1k, std 1.5k, within +-3.5k; the route's six lists within 0.9k); first redraw
+  after the page switch +141,636; the Use dialog redrawn alone (its buttons' press) = 113,741 + 4,000 per line +
+  3.617 per instruction + pictures; its first iteration = the page's redraw + the dialog's + 60,200 (12 scenario
+  dialogs within -3.3k .. +0.6k). The page's idle step is 3,240 cycles (status: 4,579): `Page::idle_cycles` ->
+  `sndsim::end_frame`'s update time, which decides the 16-sample chunk a catch-up update gets (without it one in
+  five post updates was 16 samples off). Result: the list is 3 frames (2 with a light mixer: 8-64 f535, margin
+  0.2k .. 2k on that cut - all 19 decisions right), the dialog's first iteration 5, its redraw 2.
+* **Journal**: 184,670 + 882 per line + 3.767 per instruction, enter 188,273 (36 redraws of three scenarios: std
+  1.5k, max 6k on the empty list). **Options**: 232,905 + generic, enter 100,222 (51 redraws: std 0.7k, max 1.7k).
+  Their idle step is not measured yet (the status value is used).
+* Not modelled yet (constants kept; measurements in `work/buu/menu/cycles/`): Equip, Skills, Shop, Save - their
+  redraws have sub-states (compare panels, popups, quantity / confirm boxes) the per-page fit does not separate
+  (residuals 20k .. 40k); Switch Character's redraw is 2 frames with > 70k margin (own 350k .. 390k, end 415k ..
+  490k against 562k), its first iteration 3 (651k + post = 783k against 842k).
+* Script-opened screens (Switch Character / save / shop): the fade-out's hold frame (level 256) does not ease the
+  field cameras (one step too many before; the world restore's step at the close stays), and their close takes the
+  pause menu's reload time (`sndsim::reload_frames`, was only used for `PAUSE`): save-point cuts 8-1 / 8-26 / 7-2
+  now exact, 8-66 to f18,226.
+* Ship route with the models (the six save-point cuts got `snd_phase` too): **332 / 338 exact, 289,193 frames**
+  (was 301). Left: `shipr_056` (its close is 27 frames with 7.4k cycles of margin on 7.31M: the model says 26),
+  `shipr_236` (pause close, camera at the reload), `shipr_328` from f18,226 (a later menu), `shipr_266` f6007 (a
+  hurt animation cel right after the menu: a field divergence the menu no longer hides), `shipr_002` (crowd /
+  sprite memory) and `shipr_004` f299 (the player is hit: appeared with another agent's uncommitted battle edits,
+  not a menu). Dungeon heal menus: db2_013 / db2_015 exact, db1_004 / db2_009 / db3_014 / db3_020 run to the pause
+  close, db3_013 stops at a status redraw decision (f2604; `snd_phase` added to those seven files).
+
 **Side-content catalogue** (data survey 2026-10-02; flags = story flags): Broly turns out to be **mainline** (Dragon
 Ball saga: his defeat s436 sets flag 111, which Dragon Ball #4 s439 needs) — shared with the Super Buu agent, whose main line
 reaches it: **whoever reaches Broly first takes it** and notes it here (not taken yet, 2026-10-03). The optional
