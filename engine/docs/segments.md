@@ -639,7 +639,10 @@ that shifted the RNG; a failed attempt's keys are not in the logs.
 `engine/docs/scoreboard.md` (+ `data/realrun/scoreboard.json`): the real run cut at every importable area entry and
 replayed on wf-core - per chapter and overall: segments / exact, frames / matched, and every non-exact segment's
 first divergence with a category. One command after an engine change: `.venv/bin/python tools/segments/scoreboard.py`
-(builds into `engine/target-route`); the cuts (`scoreboard.py cut`, hours of emulation, ~GBs) stay under `work/real/`.
+(builds the segments test once into `engine/target-route`, then replays 1,412 segments / 1.43 M frames in ~2 minutes
+on 10 jobs); the cuts (`scoreboard.py cut`: `realrun.py runs`, `rec_segments.py` per stretch, `snd_phase.py`, then
+`extend` - each stretch's last segment re-recorded across the key-log boundary up to the next importable entry; hours
+of emulation, ~1 GB) stay under `work/real/`.
 
 **Dungeon agents, note:** `re/buu/ship/ship_driver.py` (the base of your drivers) changed on 2026-10-03 - Ghosts
 are no longer hunted (blasted / punched only when visible and in the way), a Vampire's grab is mashed out of, the

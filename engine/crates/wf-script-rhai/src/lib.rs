@@ -115,6 +115,12 @@ pub struct ThreadState {
     #[serde(default)]
     pub who: i32,
     pub ops: u64,
+    /// importing a running event (wf-import): stop before executing the first queued action (the host inspects the
+    /// queue), then drop the first `skip` actions unexecuted (the game ran them before the cut)
+    #[serde(default)]
+    pub hold_queue: bool,
+    #[serde(default)]
+    pub skip: usize,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -311,6 +317,18 @@ impl Runtime {
         self.start_event_by(event, params, 0);
     }
 
+    /// Start event `event` at graph node `node` (wf-import: an event running at a cut)
+    pub fn start_event_at(&self, event: u16, node: u16, params: [i32; 4]) {
+        let mut c = self.ctx.borrow_mut();
+        c.t = ThreadState { params: vec![params], ..Default::default() };
+        c.t.frames.push(Frame::Event { event, node, params: 0, in_node: false, entered: true });
+    }
+
+    /// the running thread, mutable (wf-import: queue inspection / skips)
+    pub fn with_thread<T>(&self, f: impl FnOnce(&mut ThreadState) -> T) -> T {
+        f(&mut self.ctx.borrow_mut().t)
+    }
+
     /// Start a whole event triggered by player `who` (1-based; NPC talk, trigger touch, on-defeat by).
     pub fn start_event_by(&self, event: u16, params: [i32; 4], who: i32) {
         let mut c = self.ctx.borrow_mut();
@@ -354,6 +372,15 @@ impl Runtime {
                 return Ok(Status::Blocked);
             }
             // 1. queued actions first
+            if c.t.hold_queue && !c.t.queue.is_empty() {
+                return Ok(Status::Blocked);
+            }
+            if c.t.skip > 0 && !c.t.queue.is_empty() {
+                c.t.skip -= 1;
+                c.t.queue.pop_front();
+                c.t.last = None;
+                continue;
+            }
             if let Some(a) = c.t.queue.pop_front() {
                 let Ctx { host, globals, t } = &mut *c;
                 match &a {

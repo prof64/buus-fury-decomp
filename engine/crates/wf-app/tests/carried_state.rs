@@ -82,11 +82,15 @@ fn set_character_takes_the_characters_own_skill_slot() {
     let w = &mut s.session.world;
     let pi = w.player_idx(0).expect("leader");
     w.pl(pi).sel = 2;
+    // the hit-damage remainder (player +0x228) stays: the same player object (emulator trace of the native and of
+    // the save point's Switch Character; the real Janemba arena cut needs it)
+    w.pl(pi).hp_acc.acc = 600;
     let want = w.story.chars[1].sel.max(0) as usize;
     assert_ne!(want, 2, "the test needs Gohan's stored slot to differ");
     wf_script_core::natives::switch_character(w, 1).expect("set_character(1)");
     let pi = w.player_idx(0).expect("leader");
     assert_eq!(w.pl_ref(pi).sel, want, "the previous leader's skill slot followed to the new character");
+    assert_eq!(w.pl_ref(pi).hp_acc.acc, 600, "set_character must keep the hit-damage remainder");
 }
 
 /// "Original pacing" holds the picture for the GBA's load length after a step that loaded an area, without

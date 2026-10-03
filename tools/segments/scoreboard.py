@@ -232,7 +232,9 @@ def board(jobs):
     for c, name, r, cat in bad:
         m = re.search(r'"(\w+): (?:#\d+ )?(sprite \d+)?', r['first'])
         key = (m.group(1) + (' ' + m.group(2) if m.group(2) else '')) if m else cat
-        if m and m.group(1) in ('snd', 'text', 'fade'):
+        if m and m.group(1) == 'snd':
+            key = 'snd ' + (re.search(r'play \d+', r['first']) or re.search(r'snd', r['first'])).group(0)
+        elif m and m.group(1) in ('text', 'fade'):
             key = re.search(r'"([^"]{0,60})', r['first']).group(1)
         groups.setdefault(key, []).append(r['segment'])
     rec = sorted(((k, v) for k, v in groups.items() if len(v) >= 3), key=lambda kv: (-len(kv[1]), kv[0]))

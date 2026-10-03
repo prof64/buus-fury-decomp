@@ -72,6 +72,12 @@ impl StoryHost {
         Session { data: data.clone(), world, config: Default::default(), prev: [0; MAX_PLAYERS], outcome: wf_core::battle::Outcome::Running, hook: None, presenter: Default::default() }
     }
 
+    /// the running thread's frames, queue and blocked action (debugging: SEGMENT_HOST)
+    pub fn thread_summary(&self) -> String {
+        let t = self.rt.state();
+        format!("frames {:?} queue {:?} blocked {:?} pending {:?} outer {}", t.frames, t.queue, t.blocked, self.hs.pending, self.outer.len())
+    }
+
     /// a script is blocked (waiting for frames / input / a fade ...)
     pub fn running(&self) -> bool {
         self.running

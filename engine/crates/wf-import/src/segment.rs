@@ -374,6 +374,9 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
             if (a..=b).contains(&k) {
                 let w = &sess.world;
                 let p = w.player_idx(0).map(|pi| (w.pl_ref(pi).a.x, w.pl_ref(pi).a.y, w.pl_ref(pi).a.facing, w.pl_ref(pi).gs.name()));
+                if std::env::var("SEGMENT_HOST").is_ok() {
+                    eprintln!("  t{k} host {}", host.thread_summary());
+                }
                 if std::env::var("SEGMENT_TIMERS").is_ok() {
                     eprintln!("  t{k} timers {:?}", host.hs.timers);
                 }
