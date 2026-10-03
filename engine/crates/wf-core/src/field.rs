@@ -244,11 +244,15 @@ pub struct Field {
     /// from inside the breakable's own update, as a nested loop of the game: while its script waits for a track
     /// command (HFIL 18-10's boulder: `puff_at`) the frames are the loop's - no object pass (`break_modal`) - and in
     /// the frame the wait is over the interrupted pass goes on with the objects after the breakable: the players
+    /// and the enemies' held update (animation, controller); the frame after, the enemies' animations tick twice
     /// (the real route, rj_back1 18-10: f202 the puff only, f203 the player only, f204 everything)
     #[serde(default)]
     pub break_event: u32,
     #[serde(default)]
     pub break_modal: bool,
+    /// the frame after the resumed pass: the enemies' animations tick once more before their update
+    #[serde(default)]
+    pub break_extra: bool,
     /// a level-up hook started at the start of this frame's update: it runs inline (a nested loop), nothing else
     /// updates this frame
     pub held: bool,
@@ -462,6 +466,7 @@ fn new_field() -> Field {
         queued_event: false,
         break_event: 0,
         break_modal: false,
+        break_extra: false,
         held: false,
         held_event: false,
         resume_held: false,

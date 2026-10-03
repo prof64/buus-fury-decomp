@@ -318,6 +318,16 @@ pub fn reload_frames_with(w: &mut World, done: bool, more: i64) -> Option<u8> {
             extra += 4_000;
         }
     }
+    // an on-screen item on the ground: its two 16 x 16 pictures (measured 6,845 + 7,077 cycles, 8-6)
+    let cam = w.cameras[0].rect;
+    for e in w.ents.iter().filter(|e| !e.removed) {
+        if let crate::world::Body::Pickup(p) = &e.body {
+            let (x, y) = (p.x >> 8, (p.y >> 8) - (p.z >> 10));
+            if !matches!(p.kind, crate::fieldobj::PickupKind::Zenie(_)) && x < cam.x1 && cam.x0 < x + 16 && y < cam.y1 && cam.y0 < y + 16 {
+                frames += 13_900;
+            }
+        }
+    }
     c += frames;
     if debug() {
         eprintln!("snd reload: map {} cam ({cx}, {cy}) decompression {c} ({actors} actors' frames {frames}) + {extra}", f.map);

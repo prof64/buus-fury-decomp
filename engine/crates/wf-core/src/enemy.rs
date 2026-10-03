@@ -445,6 +445,16 @@ pub fn smash_dust(w: &mut World, i: usize) {
     }
 }
 
+/// a held update on its own (field.rs `break_event`: the frames around a breakable callback's nested loop): the
+/// animation tick and the running controller, no AI
+pub fn held_update(w: &mut World, i: usize) {
+    if crate::scene::is_puppet(w, w.ents[i].id) {
+        return;
+    }
+    tick_anim(w, i);
+    crate::nodes::busy_controller(w, i);
+}
+
 /// the frame an event ended in (field): an enemy that only ticked its animation while the event held the field runs
 /// the rest of its update (the game's event exits before the objects update; sc_janemba: Janemba's parts are placed by
 /// their AI node in the exit frame)

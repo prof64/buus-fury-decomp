@@ -184,12 +184,27 @@ impl Session {
                 w.tick_shakes();
                 crate::fieldobj::held_moves(w);
             } else if brk == 2 {
+                for k in (0..w.ents.len()).rev() {
+                    if !w.ents[k].removed && matches!(w.ents[k].body, crate::world::Body::Enemy(_)) {
+                        crate::enemy::held_update(w, k);
+                    }
+                }
+                if let Some(f) = w.field.as_mut() {
+                    f.break_extra = true;
+                }
                 for s in 0..w.players.len() {
                     if let Some(pi) = w.player_idx(s) {
                         crate::player::release_passive(w, pi);
                     }
                 }
             } else if !crate::field::frozen(w) && !crate::scene::frozen(w) && !watch_closing {
+                if w.field.as_mut().is_some_and(|f| std::mem::take(&mut f.break_extra)) {
+                    for k in (0..w.ents.len()).rev() {
+                        if !w.ents[k].removed && matches!(w.ents[k].body, crate::world::Body::Enemy(_)) {
+                            crate::enemy::held_update(w, k);
+                        }
+                    }
+                }
                 battle::pre_step(w);
                 w.step_entities();
             } else if crate::field::frozen(w) && !watch_closing {

@@ -1418,3 +1418,22 @@ fresh game's (few flags, one character), and no real recording passes through a 
 recording after Continue" is not shown yet - the ship route's 8-66 save is the first real log that does.
 Decision recorded (coordinator): lag-frame option 1 stays the default; option 2 ("original pacing", presentation
 only, a Settings toggle, never sim state) is to be built - not started.
+
+**§11 update 3 (B): the 3-1 soak finding and the next one.** The Earth agent was right that 3-1's Energy Blast was
+a selection difference: two more state-carry bugs the harness cannot see (every cut re-imports them):
+* **`set_character` kept the previous character's selected skill slot** (`switch_character`: `Player.sel` now comes
+  from the new character's record, +0x15): Goku's L-cycled slot 2 followed to Gohan, who fired slot 2 in 3-1.
+* **`Field.script_fade_in` stayed set after a `warp_fade` to the 3D map** (it is cleared at a 2D fade-in's end only):
+  the next immediate warp (a map circle into 2-8) inherited it, and a door script's nested hold no longer kept the
+  walking player's state (one frame lost at Gohan's house door, the exit missed). Cleared at every load now.
+With both, the chained soak (title -> New Game -> Other World -> Earth) follows the real recording for **137,054
+rows** (41,423 + 95,631 of Earth: Hercule City, the Great Saiyaman, school, the circus, Musuka, the tank, Videl,
+Chi-Chi, the level-65 gate) with every area on the recording's row and equal story flags (the soak now compares
+the rows' `flags`). Next stop, not analysed: **2-90, Goten's rock drill / fight, row 137,054** - the app's Gohan is at
+133 HP where the game's has 136 (a hit the game does not take), RNG from 137,094, flag 281 set in the app only. Also
+seen and not analysed: one HP report at row 122,530 (app 39 vs the row's 201 for 30+ rows while everything else
+stays in step - probably the row's `hp` during a character-specific scene). Reproduce: `soak opening.json
+earth_all.json --sync 1-1 --show 137040..137060`.
+Not done from the coordinator's list: the playthrough test on `StoryHost`; the emulator trace of the damage
+remainder field (candy respawn, set_character); ship / dungeons / post-ball in the app; row 33,189; the "original
+pacing" presentation mode.
