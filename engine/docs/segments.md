@@ -909,3 +909,23 @@ Open (mine unless noted):
 * seen in the HUD-less first round, not in the gated cuts: a **stale enemy-grid mark** (15-14: tile (24, 31) stays
   blocked after a Skeleton's reaction state 0x213 moved it; the path follower's wall-follow then differs) and Broly's
   JumpSmash (controller 0x0804D310@0x0300325C: the animation is held to tick 248, ours ends the one-shot at 148).
+
+**10.1 update (B, later 2026-10-03).** `dbx_004` is now exact to its end: **26,635 / 26,635** (s026, Goku vs Majin
+Buu, s027, s218 with its fusions, Gotenks' flight on 0-50, s020, Gotenks vs Buu in 0-15, the aftermath on 6-1); with
+`dbx_002` the whole chain after the seventh ball is 46,284 / 46,284 frames exact (full cuts in `work/db57/segsx`; the
+data gates keep their first 6,000 / 7,500 frames). The paragraph above about the ship agent's death-frame rule is
+resolved by one rule that fits both recordings:
+* **A field enemy whose death node is Idle stays on the enemy grid** (`enemy::attached`: `defeated` with `ko < 0` is
+  still attached). The dying enemy takes the pass's step as the ship agent found (8-71: a free slide moves once
+  more), and that step is collision-checked like the ones before it: in 0-21 Majin Buu's KnockbackSlide had been
+  blocked at the wall for 4 frames and stays blocked on the killing frame (our detached dead enemy slid through:
+  (-0.53, +0.17)). `shipr_338_8-16` (19,591) and `dbx_004` both exact.
+* **A held pass completes in the 3D fade-in's last frame** when the event that holds it ends its `warp_fade` to the
+  world map (`field::post_step`, FadeIn flying branch): s027 -> s218 has held the pass since Buu's defeat in 0-21; in
+  the frame Gotenks' arrival fade ends, the map's objects and the flyer update twice.
+* Battle suites: the transform aura's same-frame removal (segment sb 19-3) is field-only (battles keep the TS
+  reference's entity list: cross_ts 13 scenarios); the lockstep harness stamps the recorded mark ages on the AI clock
+  (`fc0 - age`, after the nodes moved to `Globals::clock`): 703 / 703.
+Open: `db7_041` f765 - at s019's portrait box (node 9, speaker 62; the game lags 7 video frames building it) ours
+stops actor 123's idle tick for 5 frames, the game does not: the OBJ purge model (§6 blocker, Super Buu agent)
+suspends an actor here that the game keeps. The three db5 cuts and db7_023 that end at a heal menu (Earth agent).

@@ -1250,6 +1250,7 @@ pub fn post_step(w: &mut World) {
         // started it, the objects after it (the players included, when a death effect at the head of the list ran
         // the hook) update normally (12-28: RIGHT held through the Warlord's defeat script - the walk starts in
         // the script's last frame)
+        if std::env::var("DBG_RES").is_ok() { eprintln!("DBG resumed frame {} raw {:?} ended {}", w.frame, w.field.as_ref().and_then(|f| f.raw_input.map(|r| (r[0].held, r[0].pressed))), ended); }
         if let Some(raw) = w.field.as_mut().and_then(|f| f.raw_input.take()) {
             w.input = raw;
         }
@@ -1268,6 +1269,7 @@ pub fn post_step(w: &mut World) {
     // playthrough: s100, armed during s099, fires only once Instant Transmission's return has turned the checks
     // back on). A held update (defeat scene) instead completes after its event, check included (s090 -> s091).
     let ended_before = w.field.as_ref().is_some_and(|f| f.event_ended) && !resumed;
+    if std::env::var("DBG_RES").is_ok() { eprintln!("DBG post frame {} resumed {resumed} ended_before {ended_before} held {:?}", w.frame, w.field.as_ref().map(|f| (f.held, f.held_event, f.busy, f.queued_event))); }
     let queued = ended_before && w.field.as_ref().is_some_and(|f| f.queued_event);
     if ended_before {
         if let Some(f) = w.field.as_mut() {
