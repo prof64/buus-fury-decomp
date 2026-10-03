@@ -1328,6 +1328,7 @@ fn leaf_exit(w: &mut World, c: &C, n: u16, _r: &mut NodeRt) {
         let e = w.en(i);
         e.a.x = _r.d[0];
         e.a.y = _r.d[1];
+        e.jitter = false;
     }
     match kind(c, n) {
         K::Block => {
@@ -1693,6 +1694,7 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             let e = w.en(i);
             e.a.x = r.d[0] + dx;
             e.a.y = r.d[1] + dy;
+            e.jitter = true;
             false
         }
         // ---- melee

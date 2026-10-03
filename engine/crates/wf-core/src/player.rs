@@ -445,9 +445,11 @@ impl Player {
         self.skills.get(self.sel).copied().unwrap_or(7)
     }
     pub fn attacking(&self) -> bool {
-        // the Ki Blast state (0x0804DC14) does not count (2-9: a criminal walking in on Gohan's blast runs no
-        // IfPlayerAttackingMe chance)
-        matches!(self.state, PState::Punch | PState::Skill | PState::Dash) && self.gs != Gs::Skill(7)
+        // IfPlayerAttackingMe's test 0x08029B58: the player's state object (+0x14) is the punch state 0x03001B50 -
+        // no other state counts: not the Ki Blast (2-9: a criminal walking in on Gohan's blast runs no chance), not
+        // the dash (0x03002B3C; the real route, Pilaf's Castle 10-14: a gunman dashed into draws no dodge chance),
+        // not the skills (their states are heap objects)
+        self.state == PState::Punch
     }
     /// the state's vfunc +0x1C (IfInPlayerBeamLine 0x08029B30): Ki Blast (0x0804FA30) = the refire request or anim
     /// tick < 16 (until the blast leaves the hand); other skills: INFERRED any skill state
@@ -1768,6 +1770,7 @@ fn walk_try(w: &mut World, i: usize, vx: i32, vy: i32, flags: i32) {
     let ny24 = y + vy;
     let mut nx = nx24 >> 8;
     let ny = ny24 >> 8;
+    if std::env::var("DBG_WALK").is_ok() { for e in &w.ents { if let Body::Rock { x: rx, y: ry, .. } = e.body { eprintln!("      DBGROCK {} {} removed {}", rx, ry, e.removed); } } let a=&pr(w,i).a; let c=w.col.as_ref(); eprintln!("      DBGWALK f{} to ({},{}) foot {}x{} fits {} bounds {:?} walk {:?} enemy {:?} ", w.frame, nx, ny, a.foot_w, a.foot_h, fits(w,i,nx,ny), w.arena.bounds, c.map(|c| c.test(crate::world::Layer::Walk, nx, ny, nx + a.foot_w, ny + a.foot_h)), c.map(|c| c.test(crate::world::Layer::Enemy, nx, ny, nx + a.foot_w, ny + a.foot_h))); }
     if fits(w, i, nx, ny) {
         let pl = p(w, i);
         pl.a.x = nx24;

@@ -2328,7 +2328,7 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
         // end's sound and explosion; the shuriken is just removed) and is accepted, whatever the sender's team or
         // attack kind (the real route, Diablo Desert Express 11-21: Trunks' ki blast meets a gunman's bullet - the
         // bullet bursts, the blast counts the hit, the player is not hit)
-        ShotKind::Straight(o) => {
+        ShotKind::Straight(o) => { if std::env::var("TMPDBG").is_ok() && o.fragile { eprintln!("TMPDBG f{} msg {:?} foot {} src {} me {} shot {:?} dead {}", w.frame, msg.rect, msg.foot, msg.source, me, rect(w, i), o.dead); }
             if o.fragile && o.dead < 0 && !msg.foot && msg.source != me && !w.ents[i].removed && overlaps(&msg.rect, &rect(w, i)) {
                 let (sfx_end, explode) = (o.sfx_end, o.explode);
                 w.ents[i].removed = true;

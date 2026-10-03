@@ -102,6 +102,9 @@ pub struct Enemy {
     /// clouds each, before the AI (field; Volcano Summit 15-32)
     #[serde(default)]
     pub smash_puffs: u8,
+    /// a RandomStep node is moving the actor around its kept position: the grid mark stays at that position (field)
+    #[serde(default)]
+    pub jitter: bool,
     /// the running motion-controller leaf (state serial, node): its controller ticks with the animation, also while
     /// an event holds the field and the AI does not think (nodes.rs `busy_controller`)
     #[serde(default)]
@@ -183,6 +186,7 @@ impl Enemy {
             gfx_now: -1,
             detached: false,
             smash_puffs: 0,
+            jitter: false,
             ctl: (0, 0),
         };
         // the constructor's SetAnim(0) runs before the object is in the world: no RNG draw
@@ -872,6 +876,12 @@ pub fn unmark_self(w: &mut World, i: usize) {
 }
 pub fn sync_mark(w: &mut World, i: usize) {
     if w.field.is_some() && crate::fieldpatrol::holds_mark(w, i) {
+        return;
+    }
+    // RandomStep (0x0804B1C0) writes the position only: the game's enemy grid keeps the mark of the kept position
+    // while the bones rattle (the real route, Volcano 15-14: a Skeleton's pile next to a wall - a mark following the
+    // jitter would free the wall's tile when it moves back)
+    if w.field.is_some() && w.en_ref(i).jitter && w.en_ref(i).marked.is_some() {
         return;
     }
     let e = w.en_ref(i);

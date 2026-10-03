@@ -233,17 +233,52 @@ Rules found inside Buu (VERIFIED by the cuts above; battle code mirrored in the 
   event over the world map holds the flyer (its animation ticks) except a warp's fade-in and the frame after.
 * Switch Character's chosen leader is rebuilt (one idle rand(255)) when the screen closes (its 2nd leave frame).
 
-**Blocker: OBJ VRAM purge** (`0x08011732(world, need)`): a text box (`0x08012030`: 0x1000 / 0x1000 / (portrait)
-0x1000 / 0x800 bytes) needs room in the object tile allocator (best-fit blocks at world+0x694, 512 units of 64
-bytes; room = largest free block << 6, `0x080116FC`). Short of room it suspends objects from the end of the list by
-level (vfunc +0x18: actors 13 off screen / 14 on screen, the camera's object 15, effects lower) until it fits, and
-brings them back later. It fires in crowded scenes: the world map's question boxes (sb_041 f11454: 6 patrols gone)
-and every box of the ending gathering 4-24 (sb_044 f1985: 1-4 NPCs). Needs a model of every object's tile block
-(sizes 1 / 4 / 8 / 16 / 64 units, allocation order) — not started.
+**OBJ tile allocator model** (`wf-core/src/vram.rs`, state `Field.vram`, snapshot-safe; recordings made since
+2026-10-03 carry `vram` rows and the segment test compares the allocator's used blocks and free / spare lists every
+frame - `SEGMENT_VRAM=0` skips it, `VRAM_DBG=1` prints our owners at a mismatch, `DBG_VRAM=1` every alloc / free).
 
-Open: `sb_029` f703 / `sb_030` f490 — Switch Character's leave lasts 16 frames here vs 25 (the world restore's CPU
-time; lag frames). `sb_034` f619 —
-s502's sprite swap (`change_sprite` Buu 123 -> 126) is 1 frame late and the white fade timing. `sb_041` / `sb_044`: the OBJ VRAM purge above.
+* Allocator (struct at world `0x03001C4C`): 512 units of 64 bytes, 138 entries; `alloc 0x0801124C` (exact fit at
+  once, else the smallest larger block, the allocation takes its top), `free 0x0801142A` (merges with free address
+  neighbours), `room 0x080116FC`; an area load frees every object and starts fresh. VERIFIED against emulator RAM on
+  the whole 190,593-frame route (`tools/superbuu/vramsim.py`).
+* Purge `0x08011732(world, need)` (before each text-box block and after any failed alloc): levels 0, 1, ...; the
+  world list from its end; vfunc +0x18 says destroy / suspend: damage number at any level; animated effect destroyed
+  from 2; banner suspended from 2; projectiles destroyed from 3; HUD / boss bar suspended from 4; actors 13 off
+  screen / 14 on screen; the player and everything else 15; from level 11 the room is re-checked after each object.
+  Restore `0x08011E94` (text box close): last suspended first, re-appended to the list, tiles / halo / shadow taken
+  again. VERIFIED: sb 21-25 world-map question boxes (HUD + 6 patrols), ending 4-24, ship 7-2 f5528 (HUD + 13
+  crowd blocks, exact), Earth 7-3 (6000 / 6000).
+* Tile users (bytes): actor = sprite def +2, + the shared halo (0x80) and shadow graphics (`0x086B759C`: 0x40 /
+  0x40 / 0x40 / 0x100, refcounted; `set_attachment` `0x0800ECB0` swaps the shadow); text box 0x1000 / 0x1000 /
+  (portrait 0x1000) / 0x800, choice cursor 0x100; HUD 0x500; banner 0xF00 (239 logic frames; a frame that does not
+  advance the world still ages it); 3D map HUD 0xF00; damage number 0x100 (made by ApplyDamage `0x0800FA2A`, not by
+  the hit: an on-hit tree without it shows none; reused within 8 frames, 16 frames long); animated effect 0x400
+  (freed in its own update: later-updated objects can take the block); boss bar 0x200; emote / markers 0x40; ki
+  blast 0x100; beam class `0x080206B8` 0x300; lobbed ball 0x1000; flame 0x40; debris chips one shared 0x40; props
+  from their graphics header.
+* Order rules found with it: removed objects' blocks go in update order (list from the end); a dying enemy's
+  instance is destroyed before its explosion is made (the explosion takes the same block: sb 20-6, side 18-2 f128);
+  `become_map_object` frees the NPC before the map object takes its tiles; the transform aura is deleted by the
+  state's exit (same frame); a broken object's explosion keeps its block one frame past our entity (MEASURED, cause
+  not decoded); unknown imported objects go at the next load.
+* Not modelled yet (allocator-only stops; the cut's other checks go on - those gates carry no `vram` rows): enemy
+  drops (3 x 0x40 + 0x100 at a kill: sb 20-6 f155, side 18-2 f160), a 61-unit object at 18-12 / 18-1, 20-2..20-5
+  and 1-3 / 1-5 / 6-6 objects, 21-11 f252, the fight objects after sb 21-25 f21210 (free-list order).
+
+Other rules of this round: the BG sphere effect (`0x0803AA58`) draws rand(4) per row past the third every frame,
+before the objects, and ends with its area; an NPC's script anims 10 / 11 play once (8 ticks a cel) and stay on the
+last cel (own state `0x03001B30` in `0x080727C8`); a scripted `play_anim(player, 23)` makes the transform aura.
+
+Results (2026-10-03, with the allocator check where the gate has `vram` rows): 21-2..21-10, 21-12, 21-15..21-17,
+21-20..21-24 exact; `sb_041` (21-25, Kid Buu) **21,210** (was 11,442; without the allocator check 21,479: an enemy
+object missing); `sb_044` (ending 4-20) **23,962 / 24,101** (was 1,974). Open: `sb_029` f703 / `sb_030` f490 -
+Switch Character's leave lasts 16 frames in the game vs 25 (lag frames of the world restore); `sb_034` f1134 /
+`sb_035` f882 - after the fight the player is stopped by something at (148, 208) that the game does not have (no
+actor there: a stale grid mark?); `sb_044` f23962 - the credits' page 74 (cost 163) takes 1 frame in the ending vs 2
+in `page_cost` (menus); Earth 7-2 f1432 and db7_041 f765 are not purges (allocator exact up to them): 7-2 - at f1386
+an actor's instance is destroyed (`0x0800ECA0` via `0x08017CE1`) and actor #17's animation stands at tick 29 until it
+reads tick 41 at f1432; db7_041 - at f579 actors 123 and 269 enter idle in one frame and their two rand(255) draws
+are in the other order (ticks 74 / 79 swapped), the cel shows it at f765.
 
 ## 7. Side content (owner: the side-content agent, from 2026-10-02)
 
@@ -256,6 +291,9 @@ segment.py`, `wf-import`. Side-content segments are named `sc_*` (`data/segments
 Status and the side-content catalogue follow below as they are recorded.
 
 ## 8. Babidi's ship chapter (owner: the ship / Majin Buu chapter agent, 2026-10-02)
+
+(Side-content agent, for the real route into HFIL: the corridor 18-1 .. 18-13 has a working bot and its notes in §7,
+"HFIL corridor" - `tools/side/hfil.py`: the maze, the save-point menu, the level-100 gate, what the hands take.)
 
 **Real route** (replaces the dev state): `re/buu/ship/run_route.py work/earth/earth_end.ss work/ship/real4 --real --log
 --to c14_s342` plays the real game from the Earth agent's end state (Goku in 7-2 after the tournament) for 378,903
@@ -453,6 +491,8 @@ while hidden, state 0x114 / 0x118).
 | `m_ow_map`, `m_zsword` | Other World map; 19-7 before the Z-Sword (King Yemma s059, s067; Gohan, level 100) | 731 / 12,525 from sb_start (`sbk_start.json`) |
 | `m_lookout` | Kami's Lookout 6-5 after the Z-Sword scenes (Trunks, level 81) | 22,252 |
 | `m_gotenks` | 6-9, Gotenks (937 HP, STR 92 / END 81) against Super Buu (35,330 HP) after the spar and the fusion | 33,492 |
+| `m_gotenks_punched`, `m_after_gotenks`, `m_ult_gohan` | two punches in the air first (`sb_luck.py gotenks ult_gohan 0 12 6 punch`: 4 of 12 counts win both Gotenks fights; without them he loses with Buu at 7,482 HP); after the Lookout fight; **8-1, Ultimate Gohan** (the story's XP: level 129, 93 points unspent) | `m_gotenks_punched.keys.json`, `sbk_gotenks.json` (14,807 from m_gotenks_punched) |
+| `g01_nataday` | Nataday Village 15-1: Gohan's points spent (STR 129 / END 119), the capsule, the flight | `g01_nataday.keys.json` (3,006) |
 
 Finding: the real party is far below the Super Buu agent's constructed one (Goku / Vegeta 180, Gohan 160, Goten /
 Trunks 165 there; real: 126 / 120 / 100 / 117 / 81). Gotenks' two fights cannot be prepared for any more at this
@@ -754,7 +794,7 @@ Rules found (field only where battle is pinned by the TypeScript cross-check):
   the objects.
 * Debug: `SEGMENT_PUPPETS=1` in the segment trace prints the scene puppets' animations and the director's tracks.
 
-**HFIL corridor 18-1 .. 18-13 (in progress, 2026-10-03).** Start state `janemba` rebuilt with a player's supplies
+**HFIL corridor 18-1 .. 18-13 (played end to end, 2026-10-03).** Start state `janemba` rebuilt with a player's supplies
 (3 Senzu Beans, 4 Three Course Meals, 5 Curry Plates; Goku 140, Vegeta 100). Route `tools/side/hfil.py --route`
 (marks -> `work/side/h_<mark>.ss` + `h_<mark>.keys.json`), driver = a frozen copy of the ship chapter's
 `ShipDriver` (`tools/side/shipdrv.py`, `sidenav.py`) + `SideDriver`. Reproducible: the same leg run three times,
@@ -771,29 +811,63 @@ two Python hash seeds, gives identical key logs (13,000 frames); the earlier run
   spiral from the entry column out to the ring, the ring's lanes beside the spikes lead to the boulder, which
   breaks from its east side only (flag 284: the shortcut; it is back after every reload); 18-11: the real Vegeta is
   the NPC at (208, 128) (s446, ~9,300 frames of scenes); 18-12's gate wants Vegeta at level 100 (s517).
-* Played so far by the real game: 18-1 -> the switch -> 18-10 -> the maze -> the boulder -> 18-11 -> s446 (marks
-  hfil / switch / maze / statues / vegeta). Open: the way back to 18-1 (the driver loops between 18-7 and 18-8 /
-  gets worn down without room fights), the character switch at 18-1's save point, the gate, 18-13.
-* Segments of the first leg (18-1 -> 18-10, 12,665 frames, 30 cuts in `work/side/hseg`, local): 20 exact with the
-  tile-allocator check off (`SEGMENT_VRAM=0`), 3 with it. Rules found: HandAmbush in the field does its enter work
-  on the node's first update (side draw, jump to the player's 24.8 position of that frame); the node the AI dump
-  calls SpawnPuff only detaches the enemy from the grid in the field (no effect object, no tiles); an armed
-  `save_field_on_next_scene` is taken at the `load_scene_fade` call, before its fade (the world list is empty for
-  the 64 frames; 18-2's switch scene, exact: IT pick, scene, return).
+* Played by the real game, whole corridor (2026-10-03): 18-1 -> the switch -> 18-10 -> the maze -> the boulder ->
+  18-11 -> s446 -> back to 18-1 (the boulder again, from its east) -> Vegeta at the save point -> 18-12's gate ->
+  18-13 (s448) -> its save pad. Marks hfil / switch / maze / statues / vegeta / veg1 / gate / h13; ~45,500 frames.
+  Each leg replays from its own start state (`h_<from>.ss` + `h_<mark>.keys.json`); the legs do not chain into one
+  recording from `j_hfil.ss` (the first legs' states were rebuilt) - `tools/side/hfil_record.py` records and cuts
+  them leg by leg (`work/side/seg/sc_hfil_<mark>.json`, cuts in `work/side/hseg2/<mark>/`).
+* **Corridor knowledge for the real-route agent (use `tools/side/hfil.py` / `maze.py` / `maze10.py` rather than a
+  second bot; `SideDriver` takes any start state: `hfil.py --route` or `hfil.py STATE "GOALS"`):**
+  - `maze10` is closed-loop: every frame it re-plans from the player's position and the live gate state (walk grid
+    tile (41, 35)), walks to the plan's next spot, and inserts an `it` goal for each switch toggle; level-up popups
+    are mashed through. It needs Instant Transmission on Goku (skill slot 2) and ~2,000 HP of slack at level 140
+    (Poltergeists); a weaker party should expect to heal in the maze.
+  - Way back: no room fights (`goto ..., False`), or a fight beside an exit pushes the player through it; the
+    boulder is back after the reload and must be punched again from (433, 66) facing left.
+  - Save point = a pad, not an obstacle: A works with the player's position inside its trigger rect (18-1:
+    (90, 225, 35, 43), stand at (107, 240); 18-13: (105, 145, ..), stand at (120, 170)). Menu: A, Down, A opens
+    Switch Character; the row is Goku, Gohan, Goten, Trunks, Vegeta; RIGHT x 4 then A gives Vegeta. In the
+    constructed start state Goku is greyed out in that menu afterwards (so the route stays on Vegeta) - check on a
+    real state whether he can be picked again.
+  - 18-12's gate: A with the position *inside* the gate's rect (73, 33, 47, 15) - walk up against it ((89, 40));
+    at (89, 48) nothing happens. Needs Vegeta active at level >= 100 (s517, flag 183), then exit up at (96, 28).
+  - A Janemba Hand takes damage only while it is up (state 0x115: its on-hit tree); in 0x114 / 0x117 / 0x118 a punch
+    computes damage (draws) but no HP goes - do not wait for it to die there.
+* Segments (local, `SEGMENT_VRAM=0`): first leg `work/side/hseg` 24 / 30 exact (2 mid-load cuts unsupported, 3 stop
+  at the inventory heal's sound 39, 18-8 at f340 of 392 - see below); the later legs `work/side/hseg2` 14 / 18 exact
+  (18-12 with the gate scene and 18-13 with s448 exact; open: 18-10 f121 camera at the boulder, 18-2 f819 / 18-1
+  f635 camera by 1/1024 px, one heal sound). Rules found:
+  - HandAmbush in the field does its enter work on the node's first update (side draw, jump to the player's 24.8
+    position of that frame); its strike lands with one more draw (sound 48 + rand(2), 0x0803B3D8); the node ends
+    when the animation's tick reaches 0x68 (one frame earlier than the battle reference's 106), and so does the
+    second strike of state 0x117 (the dump's "HandSink": the same controller 0x0804DBA8), whose end (0x0800EE78)
+    leaves the hand in the walk state: an event starting during the Wait after it idles it (message 0xF, one
+    draw) and the Wait does not count during the event. These fixed the RNG divergences in 18-3 / 18-4 / 18-7.
+  - the node the AI dump calls SpawnPuff only detaches the enemy from the grid in the field (no effect, no tiles);
+    an armed `save_field_on_next_scene` is taken at the `load_scene_fade` call, before its fade.
+  - Nosferatu (0x52): VampireSummon / VampireSummon2 are the bat transformation and its reverse - enter: a puff
+    with a drawn rate (0x1000 + rand(0x1000), 0x0804E714); first update: the graphics set swaps (202 <-> 203,
+    0x0800EE64) and the bat leaves the enemy grid (obj+0x291 = 1: it flies over walls; back on it as a vampire).
+    VampireGrab ends when the player's state is no longer the held one (an exit firing under the held player:
+    update 0x08033A2A).
+  - Not modelled (18-8 f340): KnockbackSlide's blocked step ends the slide when obj+0x294 (crit) or obj+0x298
+    (splat) is set - both are only written by a hit (0x0800FC66) and are *uninitialised* heap memory before the
+    first one (0xF0 / a stale pointer here), so a never-hit enemy's slide after a grab depends on the heap's
+    history.
 * **For the Super Buu agent (OBJ tile allocator, `vram.rs` - not changed by the side-content agent):** in
   `work/side/hseg/sb_000_18_02` (HFIL 18-2) the Janemba Hand (type 0x39, 0x400 tile bytes, block (439, 16)) is
   killed by a punch at f128. The game's allocator row of that frame still has (439, 16) used and nothing new:
   the explosion (0x0804C904) got the very block the hand's object gave back, i.e. the dead enemy's tiles are freed
   *before* the explosion allocates (exact fit taken at once). Ours allocates the explosion first ((381, 16)) and
   frees (439, 16) at the reap. Calling `vram::entity_gone(w, i)` in `enemy::die` before `fx::explosion` (field only)
-  fixes f128 and keeps every gated segment green (tried, then reverted - yours to decide); the next difference is
+  fixes f128 and keeps every gated segment green (now in `enemy::die`, with sb 20-6); the next difference is
   then f160 of the same cut ("game only" blocks: the explosion / death-effect 0x0804A2C0 / drop objects keep a
   block longer than ours), and (421, 4)-sized blocks at 18-3 f274 (a damage number). `SEGMENT_VRAM=0` skips the
   check; `VRAM_DBG=1` prints our owners at the first mismatch.
-* Open in those cuts: the tile allocator after a Janemba Hand's death (the explosion / death-effect blocks'
-  lifetime, from f160 of 18-2), RNG at 18-4 f209 / 18-3 f656 / 18-7 f395 / 18-8 f110 (Living Dead / Poltergeist /
-  Nosferatu rules not looked at yet), the inventory heal's sound 39 (the menu timing the Earth agent documents),
-  two mid-load cuts the importer refuses.
+* Open: the tile allocator after a Janemba Hand's death (the explosion / death-effect blocks' lifetime, from f160
+  of 18-2; with the check on only a few cuts pass), the inventory heal's sound 39 (the menu timing the Earth agent
+  documents), the two mid-load cuts the importer refuses.
 
 * Script tracks (shared rule, 0x080193AE msg 0x0C): when a track's last command finishes, the director asks its
   vt+0x10; set_pos / prop_set_pos / camera_set* / camera_set_param* answer 1 like face_actor (`mov r0, #1` at
