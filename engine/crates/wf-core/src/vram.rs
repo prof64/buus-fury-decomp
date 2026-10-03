@@ -521,9 +521,11 @@ pub fn actor_destroyed(w: &mut World, id: EntityId, sh: Shares) {
     if w.field.as_ref().is_none_or(|f| f.vram.is_none()) {
         return;
     }
-    // the destructor (`0x0800F76E`) deletes the boss bar showing this actor first (`0x08052538`; segment sb 6-6
-    // f8397: bar, shadow, tiles)
-    if w.scene.boss_bar.as_ref().is_some_and(|b| b.entity == id) {
+    // the destructor (`0x0800F76E`) deletes the boss bar still showing this actor first (`0x08052538`; segment sb
+    // 6-6 f8397, a script's removal: bar, shadow, tiles); a defeated enemy's bar is already fading out on its own
+    // (post-game XJ-6 12-27 f883: the bar outlives the kill)
+    let defeated = w.find(id).is_some_and(|k| matches!(&w.ents[k].body, Body::Enemy(e) if e.defeated));
+    if !defeated && w.scene.boss_bar.as_ref().is_some_and(|b| b.entity == id) {
         w.scene.boss_bar = None;
         release(w, Owner::BossBar);
     }

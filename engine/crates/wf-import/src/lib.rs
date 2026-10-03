@@ -821,6 +821,25 @@ fn import_player_state(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
     if !ram.valid(st) {
         return;
     }
+    // a script's animation state (the only animation id with that state: 0x0804DCA4 SsUp = anim 23, 0x0804A730
+    // OnceHold = anim 16): the scene's SetAnim (the player is its puppet), then the RAM's cel / tick
+    let scripted = match ram.r32(st) {
+        0x0804_DCA4 => Some(23),
+        0x0804_A730 => Some(16),
+        _ => None,
+    };
+    if let Some(aid) = scripted {
+        let rng = w.rng.clone();
+        wf_core::scene::set_state(w, pi, aid);
+        w.rng = rng;
+        if let Some(&(_, _, raw, cel, tick)) = ram.actor_rows.iter().find(|r| r.0 == po) {
+            let p = w.pl(pi);
+            p.ap.raw = raw;
+            p.ap.frame = cel;
+            p.ap.tick = tick;
+        }
+        return;
+    }
     let gs = match ram.r32(st) {
         0x0804_C790 => Gs::Idle,
         0x0804_A77C => Gs::Idle2,
@@ -942,7 +961,7 @@ fn build_mid_event(_data: &Arc<GameData>, ram: &GbaRam, runner: &mut StoryHost, 
 /// 0x08004038 keeps it in the pushed r1 slot); the node's code found at its ROM address or (compressed) as the
 /// decompressed copy in EWRAM around the PC. Queries (natives that answer a value) are left out: the script asks
 /// them again. None = no interpreter stands in the node's code
-fn natives_run(ram: &GbaRam, runner: &StoryHost, ev: (u16, u16, [i32; 4])) -> Option<Vec<u8>> {
+fn natives_run(ram: &GbaRam, runner: &StoryHost, ev: (u16, u16, [i32; 4])) -> Option<Vec<(u8, Option<Vec<i32>>)>> {
     let (addr, code) = runner.step_code.get(&(ev.0, ev.1))?;
     let depth = ram.r32(0x0300_1034).min(8);
     let mut pc_off = None;
@@ -964,17 +983,35 @@ fn natives_run(ram: &GbaRam, runner: &StoryHost, ev: (u16, u16, [i32; 4])) -> Op
         }
     }
     let pc_off = pc_off?;
-    let insns = wf_script::bytecode::decode_reachable(code).ok()?;
-    let ran: Vec<u8> = insns
-        .values()
-        .filter(|i| i.off < pc_off)
-        .filter_map(|i| match i.op {
-            wf_script::bytecode::Op::Native(n) => Some(n),
-            _ => None,
-        })
-        .filter(|&n| !(wf_script::natives::sig(n).pushes && !wf_script::steps::is_result_action(n)))
-        .filter(|&n| !(wf_script::natives::RUN_SCRIPT..=wf_script::natives::RUN_SCRIPT_P0_P1).contains(&n))
-        .collect();
+    use wf_script::bytecode::Op;
+    let insns: Vec<wf_script::bytecode::Insn> = wf_script::bytecode::decode_reachable(code).ok()?.into_values().filter(|i| i.off < pc_off).collect();
+    let mut ran = vec![];
+    for (k, i) in insns.iter().enumerate() {
+        let Op::Native(n) = i.op else { continue };
+        if wf_script::natives::sig(n).pushes && !wf_script::steps::is_result_action(n) || (wf_script::natives::RUN_SCRIPT..=wf_script::natives::RUN_SCRIPT_P0_P1).contains(&n) {
+            continue;
+        }
+        // its arguments when the instructions before it push constants
+        let pops = wf_script::natives::sig(n).pops as usize;
+        let mut vals: Vec<i32> = vec![];
+        for j in insns[..k].iter().rev() {
+            if vals.len() >= pops {
+                break;
+            }
+            match &j.op {
+                Op::PushU8(v) => vals.insert(0, *v as i32),
+                Op::Push(v) => vals.insert(0, *v),
+                Op::PushN(vs) => {
+                    for v in vs.iter().rev() {
+                        vals.insert(0, *v);
+                    }
+                }
+                _ => break,
+            }
+        }
+        let args = (vals.len() >= pops).then(|| vals[vals.len() - pops..].to_vec());
+        ran.push((n, args));
+    }
     (!ran.is_empty()).then_some(ran)
 }
 
@@ -984,13 +1021,43 @@ fn natives_run(ram: &GbaRam, runner: &StoryHost, ev: (u16, u16, [i32; 4])) -> Op
 /// natives before it dropped; what the replayed group started is then set to the RAM's: the RNG and the screen
 /// shakes as they were (shake objects vt 0x0804A720 the game no longer has: their commands dropped), an actor's
 /// animation command playing at its RAM cel / tick
-fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4]), mut w: World, calls0: u32, ran: &[u8], notes: &mut Vec<String>) -> Built {
+fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4]), mut w: World, calls0: u32, ran: &[(u8, Option<Vec<i32>>)], notes: &mut Vec<String>) -> Built {
     use wf_core::scene::{Cmd, Owner};
-    let last = ran.len() - 1;
-    let from = if ran[last] == 0x3A { ran[..last].iter().rposition(|&n| n == 0x38).unwrap_or(last) } else { last };
+    // the waiting native among our queued actions (a branch the script did not take has natives in the bytecode
+    // but not in the queue): its k-th occurrence by id and constant arguments
+    let (wn, wargs) = ran[ran.len() - 1].clone();
+    let k = ran.iter().filter(|(n, a)| *n == wn && (wargs.is_none() || *a == wargs)).count();
+    let seen = std::cell::RefCell::new(vec![]);
+    let hits = std::cell::Cell::new(0usize);
+    let found = runner.probe_queued(&mut w, ev.0, ev.1, ev.2, &|n, a| {
+        let m = n == wn && wargs.as_ref().is_none_or(|x| x.as_slice() == a);
+        if m {
+            hits.set(hits.get() + 1);
+        }
+        let hit = m && hits.get() == k;
+        if !hit {
+            seen.borrow_mut().push(n);
+        }
+        hit
+    });
+    let Some((idx, _)) = found else {
+        notes.push(format!("unsupported: event s{:03} node {}: the waiting native {wn:#04x} is not among the node's actions", ev.0, ev.1));
+        let draws = w.rng.calls.wrapping_sub(calls0);
+        return Built { world: w, draws, held: 0, finished: false };
+    };
+    let queued = seen.into_inner();
+    let last = idx;
+    let from = if wn == 0x3A { queued[..idx.min(queued.len())].iter().rposition(|&n| n == 0x38).unwrap_or(idx) } else { idx };
     let (rng, shakes) = (w.rng.clone(), w.g.shakes.clone());
     runner.continue_mid_node(&mut w, ev.0, ev.1, ev.2, from);
     w.rng = rng;
+    // `wait(n)` (0x88): the main loop's mode is the wait object (0x03000F90 -> vt 0x08049978, +4 frames left)
+    let mode = ram.r32(0x0300_0F90);
+    if wn == 0x88 && ram.valid(mode) && ram.r32(mode) == 0x0804_9978 {
+        if let Some(wf_script_core::Pending::Frames { left, .. }) = runner.hs.pending.as_mut() {
+            *left = ram.s32(mode + 4);
+        }
+    }
     // the screen shake (the camera slot 0x03002BE0 -> vt 0x0804A720: +4 intensity, +5 period, +6 count, +8 frames
     // left): the group's shake commands before the running one are done, the running one is the RAM's
     w.g.shakes = shakes;
@@ -1045,7 +1112,7 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
             notes.push(format!("mid-code: entity {id:?}'s animation command keeps its start"));
         }
     }
-    notes.push(format!("event s{:03} at node {}: mid-code after {} natives (from #{from}, {:#04x} waiting)", ev.0, ev.1, ran.len(), ran[last]));
+    notes.push(format!("event s{:03} at node {}: mid-code, action #{last} {wn:#04x} waiting (replayed from #{from})", ev.0, ev.1));
     let draws = w.rng.calls.wrapping_sub(calls0);
     Built { world: w, draws, held: 0, finished: true }
 }

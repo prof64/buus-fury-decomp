@@ -411,6 +411,7 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
                     }).collect();
                     let game: Vec<String> = fr["actors"].as_array().into_iter().flatten().map(|a| format!("{}:{}/{}", a[1], a[6], a[8])).collect();
                     eprintln!("  t{k} npcs {} | game {}", npcs.join(" "), game.join(" "));
+                    if std::env::var("DBG_NPC").is_ok() { for e in &w.ents { if let Body::Npc(n) = &e.body { eprintln!("DBG_NPC {:?} anim {:?} beh {}", e.id, n.anim, n.behaviour.is_some()); } } eprintln!("DBG_NPC modal {:?} puppets {:?} tracks {:?}", w.modal, w.scene.puppets.iter().map(|p| p.id).collect::<Vec<_>>(), w.scene.tracks.iter().map(|t| (t.owner, t.started, t.queue.len())).collect::<Vec<_>>()); }
                 }
                 if std::env::var("SEGMENT_FORM").is_ok() {
                     if let Some(pi) = w.player_idx(0) {

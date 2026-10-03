@@ -273,10 +273,20 @@ impl StoryHost {
 
     /// `probe_event` for the first queued action `is_load(native, args)` accepts
     pub fn probe_event_for(&mut self, w: &mut World, event: u16, node: u16, params: [i32; 4], is_load: &dyn Fn(u8, &[i32]) -> bool) -> Option<(usize, u8)> {
+        self.probe_queue(w, event, node, params, false, is_load)
+    }
+
+    /// `probe_event_for` with every instant native queued too (the order `continue_mid_node` drops in)
+    pub fn probe_queued(&mut self, w: &mut World, event: u16, node: u16, params: [i32; 4], is_load: &dyn Fn(u8, &[i32]) -> bool) -> Option<(usize, u8)> {
+        self.probe_queue(w, event, node, params, true, is_load)
+    }
+
+    fn probe_queue(&mut self, w: &mut World, event: u16, node: u16, params: [i32; 4], instants: bool, is_load: &dyn Fn(u8, &[i32]) -> bool) -> Option<(usize, u8)> {
         let saved = self.rt.state();
         // (the probe's queries must not move the generator: the placement run replays them; immediate natives with
         // effects - `save_field_on_next_scene` arms the host - ran before the cut in the game: their state is RAM's)
         let rng = w.rng.clone();
+        let w0 = w.clone();
         let (hs0, story0) = (self.hs.clone(), w.story.clone());
         let mut g = self.rt.globals();
         g.g = w.story.g;
@@ -285,7 +295,10 @@ impl StoryHost {
         let mut done = 0usize;
         let mut out = None;
         for _ in 0..4096 {
-            self.rt.with_thread(|t| t.hold_queue = true);
+            self.rt.with_thread(|t| {
+                t.hold_queue = true;
+                t.queue_instants = instants;
+            });
             let st = self.with_host(w, |rt| rt.run().map_err(|e| e.to_string()));
             let (found, n, held) = self.rt.with_thread(|t| {
                 let f = t.queue.iter().enumerate().find_map(|(k, a)| match a {
@@ -311,6 +324,9 @@ impl StoryHost {
             });
         }
         self.rt.restore(saved);
+        // (the world as it was: an instant native at the handler's front ran during the probe - `begin_parallel`
+        // left a batch open, `hide_hud` hid the HUD - mid_10000, s459 node 0)
+        *w = w0;
         w.rng = rng;
         self.hs = hs0;
         w.story = story0;
