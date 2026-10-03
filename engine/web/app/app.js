@@ -148,10 +148,42 @@ function romScreen() {
   });
 }
 
+// launcher settings (wf_app::launcher::Settings) and the story save slots (hex) live in localStorage
+const lsGet = (k) => {
+  try {
+    return JSON.parse(localStorage.getItem(k));
+  } catch {
+    return null;
+  }
+};
+const lsSet = (k, v) => {
+  try {
+    localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v));
+  } catch {}
+};
+const readSlots = () => [0, 1, 2].map((i) => localStorage.getItem(`wf.save.${i}`) || '');
+
+// a picked mod folder -> mods/<id>.tar in the store (Settings panel and the launcher's Mods page)
+async function installMod(files) {
+  if (!files.length) return;
+  const root = files[0].webkitRelativePath.split('/')[0];
+  const map = new Map();
+  for (const f of files) map.set(f.webkitRelativePath.slice(root.length + 1), new Uint8Array(await f.arrayBuffer()));
+  if (!map.has('pack.json')) map.set('pack.json', enc.encode(JSON.stringify({ id: root, name: root, format_version: 1, depends: ['base'] })));
+  if (!map.has('files.json')) map.set('files.json', enc.encode(JSON.stringify([...map.keys()])));
+  const id = JSON.parse(dec.decode(map.get('pack.json'))).id || root;
+  await store.put(`mods/${id}.tar`, tar(map));
+  const mm = await readMeta();
+  mm.mods = [...new Set([...(mm.mods || []), id])];
+  await writeMeta(mm);
+  location.reload();
+}
+
 async function loadMods() {
   const m = await readMeta();
   const out = [];
-  for (const name of m.mods || []) {
+  const off = lsGet('wf.launcher')?.disabled_mods || [];
+  for (const name of (m.mods || []).filter((n) => !off.includes(n))) {
     const t = await store.get(`mods/${name}.tar`);
     if (t) out.push({ name, files: untar(t) });
   }
@@ -195,6 +227,88 @@ async function boot(baseTarBytes) {
     x.wf_dealloc(p, b.length);
     return r;
   };
+  // the launcher (wf_app::launcher, drawn by the wasm in the game's font) unless the URL already picks a mode
+  const MODE_QS = ['story', 'demo', 'area', 'arena', 'enemy', 'fighter', 'net', 'autostart', 'nolauncher'];
+  let launch = null;
+  if (!MODE_QS.some((k) => qs.has(k))) {
+    launch = await runLauncher();
+    if (!launch) return; // went to the online lobby (reload)
+  }
+  async function runLauncher() {
+    const all = (await readMeta()).mods || [];
+    const settings = lsGet('wf.launcher') || {};
+    const off = settings.disabled_mods || [];
+    const init = { settings, slots: readSlots(), mods: all.map((name) => ({ name, enabled: !off.includes(name) })), bindings: lsGet('wf.bindings') };
+    if (withStr(JSON.stringify(init), (p, n) => x.wf_launcher_init(p, n)) !== 0) return { error: str() };
+    $('stage').hidden = false;
+    show('');
+    const canvas = $('screen');
+    const g = canvas.getContext('2d', { alpha: false });
+    canvas.width = 240;
+    canvas.height = 160;
+    window.wfLauncher = true;
+    return new Promise((resolve) => {
+      let done = false;
+      let prevPad = 0;
+      const PAD = [[12, 'ArrowUp'], [13, 'ArrowDown'], [14, 'ArrowLeft'], [15, 'ArrowRight'], [0, 'Enter'], [9, 'Enter'], [1, 'Escape'], [4, 'PageUp'], [5, 'PageDown']];
+      const key = (code) => {
+        if (done || !withStr(code, (p, n) => x.wf_launcher_key(p, n))) return;
+        const out = JSON.parse(str());
+        lsSet('wf.launcher', out.settings);
+        lsSet('wf.bindings', out.bindings);
+        const pr = lsGet('wf.prefs') || {};
+        pr.mode = out.settings.view;
+        pr.vol = out.settings.volume / 100;
+        lsSet('wf.prefs', pr);
+        const c = out.choice;
+        if (c.kind === 'add_mod') {
+          $('modpick').onchange = (e) => installMod([...e.target.files]);
+          $('modpick').click();
+        } else if (c.kind === 'online') {
+          location.search = '?net';
+        } else if (c.kind === 'story' || c.kind === 'battle' || c.kind === 'replays') {
+          done = true;
+          removeEventListener('keydown', onKey);
+          x.wf_launcher_close();
+          window.wfLauncher = false;
+          resolve(c.kind === 'replays' ? { kind: 'battle', config: out.battle, replays: true } : c);
+        }
+        window.wfLauncherLast = out; // automation hook (tests)
+      };
+      const onKey = (e) => {
+        if (e.repeat && !e.code.startsWith('Arrow')) return;
+        e.preventDefault();
+        key(e.code);
+      };
+      addEventListener('keydown', onKey);
+      window.wfLauncherKey = key; // automation hook (tests)
+      const tick = () => {
+        if (done) return;
+        let bits = 0;
+        for (const p of navigator.getGamepads ? navigator.getGamepads() : []) {
+          if (p && p.connected) p.buttons.forEach((b, i) => b.pressed && i < 32 && (bits |= 1 << i));
+        }
+        for (const [i, code] of PAD) if (bits & ~prevPad & (1 << i)) key(code);
+        prevPad = bits;
+        const dpr = window.devicePixelRatio || 1;
+        const s = x.wf_launcher_frame(Math.floor(innerWidth * dpr), Math.floor(innerHeight * dpr));
+        if (done) return;
+        g.putImageData(new ImageData(new Uint8ClampedArray(mem.buffer, x.wf_launcher_fb_ptr(), 240 * 160 * 4).slice(), 240, 160), 0, 0);
+        canvas.style.width = `${(240 * s) / dpr}px`;
+        canvas.style.height = `${(160 * s) / dpr}px`;
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+  }
+  if (launch?.error) {
+    show('rom');
+    $('romerr').textContent = `Could not start the launcher: ${launch.error}`;
+    return;
+  }
+  // mods toggled in the launcher: rebuild the pack list the game reads
+  if (launch) packs.splice(1, packs.length - 1, ...(await loadMods()).map((m) => m.files));
+
   let bindings = null;
   try {
     bindings = JSON.parse(localStorage.getItem('wf.bindings'));
@@ -204,6 +318,8 @@ async function boot(baseTarBytes) {
     hotkeys = JSON.parse(localStorage.getItem('wf.hotkeys'));
   } catch {}
   const cfg = { players: Number(qs.get('players') || 1), bindings, hotkeys, now: Date.now() / 1000 };
+  // the launcher's pick: story (new game / a save slot) or a battle config; the save slots go along
+  if (launch) Object.assign(cfg, { launch, slots: readSlots() });
   // real battle by default (?arena=forest&enemy=t68&count=1&fighter=goku&seed=1); ?demo or ?area=8-3 = demo world
   if (qs.has('demo') || qs.has('area')) Object.assign(cfg, { demo: true, area: qs.get('area') || '8-3' });
   // ?story or ?story=W-A: story mode (new game, field + the game's scripts)
@@ -238,6 +354,7 @@ async function boot(baseTarBytes) {
     return r;
   };
   const replays = replaysUi();
+  if (launch?.replays) setTimeout(() => replays.show(), 0);
 
   // settings that live in the browser
   const prefs = (() => {
@@ -291,7 +408,7 @@ async function boot(baseTarBytes) {
 
   // stage + loop
   $('stage').hidden = false;
-  show(qs.has('autostart') || net ? '' : 'start');
+  show(qs.has('autostart') || net || launch ? '' : 'start');
   const canvas = $('screen');
   const g = canvas.getContext('2d', { alpha: false });
   let running = false;
@@ -299,6 +416,7 @@ async function boot(baseTarBytes) {
   let fpsT = performance.now();
   let fps = 0;
   let statsOn = qs.has('stats');
+  let savesGen = 0;
   $('stats').style.display = statsOn ? 'block' : 'none';
 
   const start = async () => {
@@ -333,7 +451,7 @@ async function boot(baseTarBytes) {
     })();
   };
   $('start').onclick = start;
-  if (qs.has('autostart') || net) start();
+  if (qs.has('autostart') || net || launch) start();
 
   function pollPads() {
     const pads = navigator.getGamepads ? navigator.getGamepads() : [];
@@ -385,6 +503,12 @@ async function boot(baseTarBytes) {
       fps = (frames * 1000) / (now - fpsT);
       frames = 0;
       fpsT = now;
+      // story mode: persist the save slots when the game saved
+      const gen = x.wf_app_saves();
+      if (gen !== -1 && gen !== 0xffffffff && gen !== savesGen) {
+        savesGen = gen;
+        JSON.parse(str()).forEach((h, i) => (h ? lsSet(`wf.save.${i}`, h) : localStorage.removeItem(`wf.save.${i}`)));
+      }
       x.wf_app_stats();
       const st = JSON.parse(str());
       if (audio) {
@@ -428,6 +552,12 @@ async function boot(baseTarBytes) {
       if (e.code !== 'Escape') withStr(btn, (bp, bl) => withStr(e.code, (cp, cl) => x.wf_app_rebind(bp, bl, cp, cl)));
       saveBindings();
       renderBinds();
+      return;
+    }
+    // Shift+Esc: back to the launcher (the recording is saved first)
+    if (e.code === 'Escape' && e.shiftKey && !net) {
+      x.wf_app_finalize();
+      replays.pump().then(() => (location.href = location.pathname));
       return;
     }
     if (e.code === 'Escape') {
@@ -595,21 +725,7 @@ async function boot(baseTarBytes) {
     $('storeinfo').textContent = `Stored locally (${store.kind === 'opfs' ? 'Origin Private File System' : 'IndexedDB'}).`;
   }
   $('addmod').onclick = () => $('modpick').click();
-  $('modpick').onchange = async (e) => {
-    const files = [...e.target.files];
-    if (!files.length) return;
-    const root = files[0].webkitRelativePath.split('/')[0];
-    const map = new Map();
-    for (const f of files) map.set(f.webkitRelativePath.slice(root.length + 1), new Uint8Array(await f.arrayBuffer()));
-    if (!map.has('pack.json')) map.set('pack.json', enc.encode(JSON.stringify({ id: root, name: root, format_version: 1, depends: ['base'] })));
-    if (!map.has('files.json')) map.set('files.json', enc.encode(JSON.stringify([...map.keys()])));
-    const id = JSON.parse(dec.decode(map.get('pack.json'))).id || root;
-    await store.put(`mods/${id}.tar`, tar(map));
-    const mm = await readMeta();
-    mm.mods = [...new Set([...(mm.mods || []), id])];
-    await writeMeta(mm);
-    location.reload();
-  };
+  $('modpick').onchange = (e) => installMod([...e.target.files]);
   $('forget').onclick = async () => {
     if (!confirm('Delete the stored ROM, extracted content and mods from this browser?')) return;
     for (const k of await store.keys('')) await store.del(k);

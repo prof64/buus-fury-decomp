@@ -93,7 +93,17 @@ impl Session {
         // a menu screen runs instead of the world (menu/mod.rs): nothing else updates
         if crate::menu::active(w) {
             crate::menu::step(w);
-            return;
+            // the title's New Game / Continue: a new field world (menu/title.rs); its load events stay for the host
+            if let Some(nw) = crate::menu::title::boot(&self.data, w) {
+                *w = nw;
+                self.presenter.reset();
+                return;
+            }
+            if !std::mem::take(&mut w.menu.resume) {
+                // scripts a menu starts (item use) run where the game runs them: right after its step
+                Self::run_hook(&mut self.hook, &mut self.world, 0);
+                return;
+            }
         }
         crate::scene::pre_step(w);
         if w.field.is_some() {
@@ -129,6 +139,7 @@ impl Session {
     pub fn step_post(&mut self) -> &[Event] {
         let w = &mut self.world;
         if crate::menu::active(w) && !crate::menu::opened_this_frame(w) {
+            crate::menu::post(w);
             return &self.world.events;
         }
         if w.field.is_some() {

@@ -5142,6 +5142,7 @@ dependencies = [
  "png",
  "serde",
  "serde_json",
+ "sha1",
  "wf-audio",
  "wf-content",
  "wf-core",
@@ -5209,6 +5210,22 @@ dependencies = [
  "wf-tables",
  "wf-ui",
  "wf-world",
+]
+
+[[package]]
+name = "wf-import"
+version = "0.1.0"
+dependencies = [
+ "miniz_oxide 0.8.9",
+ "serde",
+ "serde_json",
+ "wf-core",
+ "wf-extract",
+ "wf-rom",
+ "wf-script",
+ "wf-script-core",
+ "wf-script-rhai",
+ "wf-ui",
 ]
 
 [[package]]

@@ -128,6 +128,9 @@ pub fn extract(rom: &Rom, out: &mut Content) -> wf_rom::Result<()> {
 
     // menu primitives
     out.put("ui/menu/page_skeleton.png", menu::page_skeleton().png(&pal, false));
+    menupics::minigame::extract(rom, out, &pal);
+    menupics::opts::extract(rom, out, &pal);
+    menupics::screens::extract(rom, out);
     // the menu screens' pictures (menupics/): raw indices, frames stacked vertically
     let mut mp = Vec::new();
     for p in menupics::all() {

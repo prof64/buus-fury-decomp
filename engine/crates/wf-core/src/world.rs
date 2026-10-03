@@ -505,6 +505,9 @@ pub struct World {
     pub modk: crate::modkit::ModState,
     /// menu screens (pause menu pages, shops, save, ...): menu/mod.rs; idle = nothing
     pub menu: crate::menu::Menu,
+    /// the save slots (menu/save.rs): given at session start by the frontend, written by the Save Game screen,
+    /// read by the title's Select Game; the frontend persists a slot when `generation` changes
+    pub saves: crate::menu::save::Saves,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -550,6 +553,9 @@ impl Hash for World {
         // only hashed while a menu is up or has left a result: menu-less hashes stay what they were
         if self.menu != crate::menu::Menu::default() {
             self.menu.hash(h);
+        }
+        if self.saves != crate::menu::save::Saves::default() {
+            self.saves.hash(h);
         }
     }
 }
@@ -611,6 +617,7 @@ impl World {
             scene: Default::default(),
             modk: Default::default(),
             menu: Default::default(),
+            saves: Default::default(),
         }
     }
 

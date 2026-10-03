@@ -311,4 +311,123 @@ impl Canvas {
         let s = sprintf(fmt, args);
         self.text(t, pen, &s);
     }
+    /// `0x0803DD66(pen, max_w, s)`: word-wrapped text: per line (leading spaces skipped) the units up to the
+    /// end, a new line (kept in the line), or the last space before the width passes `max_w` (colour codes take
+    /// no width here); lines aligned like `draw_string`, drawn only while the glyph top is inside the clip
+    /// (y > clip y0 - 16), the pen y moving by the line height every line.
+    pub fn text_wrapped(&mut self, t: &TextData, pen: &mut Pen, max_w: i32, s: &[u16]) {
+        let fm = t.font(pen.font);
+        let at = |k: usize| s.get(k).copied().unwrap_or(0);
+        let mut pos = 0usize;
+        let mut y0 = pen.y - 12;
+        while y0 < pen.clip[3] {
+            while at(pos) == 0x20 {
+                pos += 1;
+            }
+            if at(pos) == 0 {
+                break;
+            }
+            let mut end = pos;
+            let mut acc = 0;
+            let mut sp: Option<usize> = None;
+            loop {
+                let c = at(end);
+                if c == 0 {
+                    break;
+                }
+                if c == 0x0A {
+                    end += 1;
+                    break;
+                }
+                if c == 8 {
+                    end += 2;
+                    continue;
+                }
+                if c == 0x20 {
+                    sp = Some(end);
+                }
+                acc += fm.measure_n(&[c], 1);
+                if acc > max_w {
+                    if let Some(p) = sp {
+                        end = p;
+                    }
+                    break;
+                }
+                end += 1;
+            }
+            let end = end.min(s.len());
+            let line = &s[pos..end];
+            if !line.is_empty() && y0 > pen.clip[1] - 16 {
+                let w = fm.measure_n(line, line.len());
+                let x = match pen.align & 3 {
+                    1 => pen.x - ((w + 1) >> 1),
+                    2 => pen.x - w,
+                    _ => pen.x,
+                };
+                self.ops.push(MenuOp::Text { font: pen.font, x, y: pen.y, colour: pen.colour, shadow: pen.shadow, clip: pen.clip, text: line.to_vec() });
+                let mut k = 0;
+                while k < line.len() {
+                    if line[k] == 8 && k + 1 < line.len() {
+                        pen.colour = line[k + 1] as u8;
+                        k += 2;
+                    } else {
+                        k += 1;
+                    }
+                }
+            }
+            y0 += pen.line_h;
+            pen.y += pen.line_h;
+            pos = end;
+        }
+    }
+}
+
+/// `0x0803DE6A` the line fitter from unit `start`: leading spaces / line breaks / 0x0B skipped, then units up to
+/// the end (done), a new line, 0x0B (done), or the last space before the width passes `max_w` (a longer word is
+/// cut where it stops fitting). Returns (line start, line end, width, done).
+pub fn line_fit(fm: &FontMetrics, s: &[u16], start: usize, max_w: i32) -> (usize, usize, i32, bool) {
+    let at = |k: usize| s.get(k).copied().unwrap_or(0);
+    let mut p = start;
+    while matches!(at(p), 0x20 | 0x0A | 0x0B) {
+        p += 1;
+    }
+    let first = p;
+    let mut w = 0;
+    let mut space: Option<(usize, i32)> = None;
+    loop {
+        let c = at(p);
+        match c {
+            0 | 0x0B => return (first, p, w, true),
+            0x0A => return (first, p, w, false),
+            8 => {
+                p += 2;
+                continue;
+            }
+            0x20 => space = Some((p, w)),
+            _ => {}
+        }
+        let nw = w + fm.measure_n(&[c], 1);
+        if nw > max_w {
+            return match space {
+                Some((sp, sw)) => (first, sp, sw, false),
+                None => (first, p, w, false),
+            };
+        }
+        p += 1;
+        w = nw;
+    }
+}
+
+/// the number of `line_fit` calls until it reports the end (how the Journal centres its entries)
+pub fn count_lines(fm: &FontMetrics, s: &[u16], max_w: i32) -> i32 {
+    let mut n = 0;
+    let mut p = 0;
+    loop {
+        let (_, e, _, done) = line_fit(fm, s, p, max_w);
+        n += 1;
+        if done || n > 64 {
+            return n;
+        }
+        p = e;
+    }
 }

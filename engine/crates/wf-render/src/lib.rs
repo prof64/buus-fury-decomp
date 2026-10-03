@@ -291,6 +291,26 @@ impl Renderer {
     /// Compose the view for local player `player` into `self.fb` (`w` x `h` world pixels).
     pub fn render(&mut self, packs: &Packs, view: &RenderView, player: usize, w: usize, h: usize) -> &[u32] {
         self.resize(w, h);
+        if let Some(mv) = view.menu.as_ref().filter(|m| m.overlay) {
+            // a screen over the field (mini-games): the normal picture, then the screen's pixels on top
+            let mv = mv.clone();
+            let mut v2 = view.clone();
+            v2.menu = None;
+            self.render(packs, &v2, player, w, h);
+            let mr = self.menu.get_or_insert_with(|| menu::MenuRenderer::load(packs));
+            let pic = mr.render(packs, &mv, mv.fade.or(view.palette_fade), if mv.fade_black > 0 { mv.fade_black } else { view.fade_black });
+            let (ox, oy) = ((w as i32 - GBA_W) / 2, (h as i32 - GBA_H) / 2);
+            for y in 0..GBA_H {
+                for x in 0..GBA_W {
+                    let (fx, fy) = (ox + x, oy + y);
+                    let c = pic[(y * GBA_W + x) as usize];
+                    if c >> 24 != 0 && fx >= 0 && fy >= 0 && (fx as usize) < w && (fy as usize) < h {
+                        self.fb[fy as usize * w + fx as usize] = c;
+                    }
+                }
+            }
+            return &self.fb;
+        }
         if let Some(mv) = view.menu.as_ref() {
             // a menu screen replaces everything: the 240x160 picture centred in the view, black around it
             let mr = self.menu.get_or_insert_with(|| menu::MenuRenderer::load(packs));

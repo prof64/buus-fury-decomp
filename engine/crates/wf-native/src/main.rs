@@ -14,6 +14,11 @@
 //! Headless: `--replay FILE` verifies and plays a recording, `--record FILE` writes the run's recording.
 //! Mods (engine/docs/modding.md): every folder in `<content>/mods/` loads; `--mod DIR` (repeatable) adds a mod
 //! folder from anywhere (e.g. `--mod engine/mods-examples/new-skill`), `--no-mods` loads only those given.
+//! Launcher (`wf_app::launcher`): with no mode flag (`--story`, `--arena`/`--enemy`/`--fighter`, `--area`/`--demo`,
+//! `--online`, `--net-*`, `--replay`) the game opens on the launcher (Story / Battle / Online / Replays / Mods /
+//! Settings); `--launcher` forces it, `--no-launcher` skips it. Shift+Esc in a game returns to it. Settings live in
+//! `<data dir>/settings.json`, story save slots in `<data dir>/saves/slot{1,2,3}.sav`. Headless: `--launcher`
+//! renders it (`--shot`), `--launcher-keys ArrowDown,Enter` drives it first (a chosen game then runs as usual).
 
 use std::num::NonZeroU32;
 use std::path::{Path, PathBuf};
@@ -88,6 +93,25 @@ struct Args {
     online: bool,
     /// `--signal` was given (overrides the lobby menu's saved server)
     signal_given: bool,
+    /// a mode flag was given on the command line (no launcher unless `--launcher`)
+    cli_mode: bool,
+    /// `--launcher` (Some(true)) / `--no-launcher` (Some(false))
+    launcher: Option<bool>,
+    /// headless: keys fed to the launcher (`--launcher-keys ArrowDown,Enter`)
+    launcher_keys: Vec<String>,
+    /// `--gba` / `--zoom` given (else the launcher settings' view)
+    view_given: bool,
+    /// launcher: story mode with the save slots (None = new game, Some(i) = continue slot i)
+    story_launch: Option<Option<usize>>,
+    /// launcher: this battle instead of the `--arena` / `--enemy` ... flags
+    battle_cfg: Option<wf_app::battle::BattleConfig>,
+    /// launcher: open the replay list once the game is up
+    open_replays: bool,
+}
+
+/// Running from a macOS `.app` bundle (Finder gives no terminal, which would otherwise mean "automation, headless").
+fn in_app_bundle() -> bool {
+    std::env::current_exe().ok().is_some_and(|p| p.to_string_lossy().contains(".app/Contents/MacOS/"))
 }
 
 fn parse_args() -> Args {
@@ -126,7 +150,17 @@ fn parse_args() -> Args {
         net: Default::default(),
         online: false,
         signal_given: false,
+        cli_mode: false,
+        launcher: None,
+        launcher_keys: Vec::new(),
+        view_given: false,
+        story_launch: None,
+        battle_cfg: None,
+        open_replays: false,
     };
+    if a.headless && in_app_bundle() && std::env::var_os("WF_HEADLESS").is_none() && std::env::var_os("WF_AGENT").is_none() && std::env::var_os("CI").is_none() {
+        a.headless = false;
+    }
     if a.headless {
         a.mute = true;
     }
@@ -143,28 +177,51 @@ fn parse_args() -> Args {
                 a.data = PathBuf::from(next(&mut i));
                 a.content = a.data.join("content");
             }
+            "--launcher" => a.launcher = Some(true),
+            "--no-launcher" => a.launcher = Some(false),
+            "--launcher-keys" => a.launcher_keys = next(&mut i).split(',').filter(|s| !s.is_empty()).map(String::from).collect(),
             "--area" => {
                 a.area = next(&mut i);
                 a.demo = true;
+                a.cli_mode = true;
             }
-            "--demo" => a.demo = true,
+            "--demo" => {
+                a.demo = true;
+                a.cli_mode = true;
+            }
             "--story" => {
+                a.cli_mode = true;
                 let v = v.get(i + 1).filter(|n| wf_app::story::parse_area(n).is_some()).cloned();
                 if v.is_some() {
                     i += 1;
                 }
                 a.story = Some(v.unwrap_or_else(|| "1-1".into()));
             }
-            "--arena" => a.arena = next(&mut i),
-            "--enemy" => a.enemy = next(&mut i),
+            "--arena" => {
+                a.arena = next(&mut i);
+                a.cli_mode = true;
+            }
+            "--enemy" => {
+                a.enemy = next(&mut i);
+                a.cli_mode = true;
+            }
             "--count" => a.count = next(&mut i).parse().unwrap_or(1),
-            "--fighter" => a.fighter = next(&mut i),
+            "--fighter" => {
+                a.fighter = next(&mut i);
+                a.cli_mode = true;
+            }
             "--form" => a.form = next(&mut i).parse().ok(),
             "--level" => a.level = next(&mut i).parse().ok(),
             "--seed" => a.seed = next(&mut i).parse().unwrap_or(1),
             "--players" => a.players = next(&mut i).parse().unwrap_or(1),
-            "--gba" => a.mode = ViewMode::Gba { scale: 0 },
-            "--zoom" => a.mode = ViewMode::Pc { zoom: next(&mut i).parse().unwrap_or(0) },
+            "--gba" => {
+                a.mode = ViewMode::Gba { scale: 0 };
+                a.view_given = true;
+            }
+            "--zoom" => {
+                a.mode = ViewMode::Pc { zoom: next(&mut i).parse().unwrap_or(0) };
+                a.view_given = true;
+            }
             "--reextract" => a.reextract = true,
             "--mute" => a.mute = true,
             "--headless" => {
@@ -189,7 +246,10 @@ fn parse_args() -> Args {
             "--show-controls" => a.show_controls = true,
             "--show-online" => a.show_online = Some(next(&mut i)),
             "--frames" => a.frames = next(&mut i).parse().ok(),
-            "--replay" => a.replay = Some(PathBuf::from(next(&mut i))),
+            "--replay" => {
+                a.replay = Some(PathBuf::from(next(&mut i)));
+                a.cli_mode = true;
+            }
             "--record" => a.record = Some(PathBuf::from(next(&mut i))),
             "--shot" => a.shot = Some(PathBuf::from(next(&mut i))),
             "--mod" => a.mods.push(PathBuf::from(next(&mut i))),
@@ -199,8 +259,12 @@ fn parse_args() -> Args {
                 println!("{}", wf_net::cli::HELP);
                 std::process::exit(0);
             }
-            "--online" => a.online = true,
+            "--online" => {
+                a.online = true;
+                a.cli_mode = true;
+            }
             s if s.starts_with("--net") || matches!(s, "--pvp" | "--pvp-enemies" | "--signal" | "--room") => {
+                a.cli_mode = true;
                 a.signal_given |= s == "--signal";
                 a.net.flag(s, &mut || next(&mut i));
             }
@@ -295,6 +359,12 @@ fn spawn_extract(rom: Vec<u8>, content: PathBuf, data: PathBuf) -> mpsc::Receive
 
 /// The simulation: `wf-core`'s battle by default, the frontend demo world with `--demo`.
 fn make_app(a: &Args, packs: Packs) -> Result<App, String> {
+    if let Some(slot) = a.story_launch {
+        return wf_app::launcher::story_app(packs, &read_slots(&a.data), slot, a.seed);
+    }
+    if let Some(cfg) = &a.battle_cfg {
+        return App::battle(packs, cfg.clone());
+    }
     if let Some(area) = &a.story {
         let at = wf_app::story::parse_area(area).ok_or_else(|| format!("--story: bad area {area} (W-A)"))?;
         return wf_app::story::app(packs, at, vec![], a.seed);
@@ -314,7 +384,9 @@ fn make_app(a: &Args, packs: Packs) -> Result<App, String> {
 }
 
 fn load_packs(a: &Args) -> wf_app::wf_content::Result<Packs> {
+    let off = load_settings(&a.data).disabled_mods;
     let mut mods = if a.no_mods { Vec::new() } else { wf_app::mods::mod_dirs(&a.content.join("mods")) };
+    mods.retain(|m| !m.file_name().is_some_and(|n| off.iter().any(|o| o.as_str() == n.to_string_lossy())));
     mods.extend(a.mods.iter().cloned());
     let packs = wf_app::mods::load(&a.content.join("base"), &mods)?;
     if packs.packs.len() > 1 {
@@ -326,7 +398,7 @@ fn load_packs(a: &Args) -> wf_app::wf_content::Result<Packs> {
     Ok(packs)
 }
 
-fn start_audio(packs: &Packs) -> Result<(cpal::Stream, mpsc::Sender<AudioEvent>), String> {
+fn start_audio(packs: &Packs, gain: f32) -> Result<(cpal::Stream, mpsc::Sender<AudioEvent>), String> {
     let bank = wf_app::wf_content::audio::load_bank(packs).map_err(|e| e.to_string())?;
     let bank: &'static _ = Box::leak(Box::new(bank));
     let dev = cpal::default_host().default_output_device().ok_or("no audio output device")?;
@@ -335,6 +407,7 @@ fn start_audio(packs: &Packs) -> Result<(cpal::Stream, mpsc::Sender<AudioEvent>)
     let ch = cfg.channels() as usize;
     let (tx, rx) = mpsc::channel::<AudioEvent>();
     let mut eng = AudioEngine::new(bank, rate);
+    eng.gain *= gain;
     let mut tmp: Vec<f32> = Vec::new();
     let stream = dev
         .build_output_stream(
@@ -380,6 +453,129 @@ struct Running {
     mods: Mods,
     /// the online lobby menu / room / match switching
     online: online::Online,
+    /// story mode: the save slots' generation last written to disk
+    saves_gen: u32,
+}
+
+// ------------------------------------------------------------------ launcher support (settings, save slots)
+
+fn load_settings(data: &Path) -> wf_app::launcher::Settings {
+    std::fs::read_to_string(data.join("settings.json")).ok().and_then(|s| wf_app::launcher::Settings::from_json(&s)).unwrap_or_default()
+}
+
+fn save_settings(data: &Path, s: &wf_app::launcher::Settings) {
+    let _ = std::fs::create_dir_all(data);
+    let _ = std::fs::write(data.join("settings.json"), s.to_json());
+}
+
+fn slot_path(data: &Path, i: usize) -> PathBuf {
+    data.join("saves").join(format!("slot{}.sav", i + 1))
+}
+
+/// the story save slots on disk (empty = no game)
+fn read_slots(data: &Path) -> Vec<Vec<u8>> {
+    (0..wf_app::launcher::SLOTS).map(|i| std::fs::read(slot_path(data, i)).unwrap_or_default()).collect()
+}
+
+/// write the story save slots when the game saved (the in-game Save screen bumps the generation)
+fn persist_saves(data: &Path, app: &App, last: &mut u32) {
+    if let Some((g, files)) = wf_app::launcher::saves_of(app) {
+        if g != *last {
+            *last = g;
+            let _ = std::fs::create_dir_all(data.join("saves"));
+            for (i, b) in files.iter().enumerate() {
+                let p = slot_path(data, i);
+                if b.is_empty() {
+                    let _ = std::fs::remove_file(&p);
+                } else {
+                    let _ = std::fs::write(&p, b);
+                }
+            }
+            eprintln!("saved the story slots ({})", data.join("saves").display());
+        }
+    }
+}
+
+fn new_launcher(a: &Args, packs: &Packs) -> wf_app::launcher::Launcher {
+    let mut l = wf_app::launcher::Launcher::new(packs, load_settings(&a.data), true);
+    l.set_slots(&read_slots(&a.data));
+    let off = l.settings.disabled_mods.clone();
+    l.mods = wf_app::mods::mod_dirs(&a.content.join("mods"))
+        .iter()
+        .filter_map(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()))
+        .map(|name| wf_app::launcher::ModEntry { enabled: !off.contains(&name), name })
+        .collect();
+    l.bindings = std::fs::read_to_string(a.data.join("bindings.json")).ok().and_then(|s| Bindings::from_json(&s)).unwrap_or_default();
+    l
+}
+
+/// What a launcher choice means for the next boot (false = not a game start).
+fn apply_choice(a: &mut Args, l: &wf_app::launcher::Launcher, c: &wf_app::launcher::Choice) -> bool {
+    use wf_app::launcher::Choice;
+    let start = matches!(c, Choice::Story { .. } | Choice::Battle(_) | Choice::Online | Choice::Replays);
+    if !start {
+        return false;
+    }
+    a.story_launch = None;
+    a.battle_cfg = None;
+    a.online = false;
+    a.open_replays = false;
+    if !a.view_given {
+        a.mode = l.settings.mode();
+    }
+    match c {
+        Choice::Story { slot } => a.story_launch = Some(*slot),
+        Choice::Battle(cfg) => a.battle_cfg = Some(cfg.clone()),
+        Choice::Online => {
+            a.battle_cfg = Some(l.battle_config());
+            a.online = true;
+        }
+        _ => {
+            a.battle_cfg = Some(l.battle_config());
+            a.open_replays = true;
+        }
+    }
+    true
+}
+
+/// open a folder in the platform's file browser (a user action in the launcher)
+fn open_folder(p: &Path) {
+    let _ = std::fs::create_dir_all(p);
+    #[cfg(target_os = "macos")]
+    let cmd = "open";
+    #[cfg(target_os = "windows")]
+    let cmd = "explorer";
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    let cmd = "xdg-open";
+    let _ = std::process::Command::new(cmd).arg(p).spawn();
+}
+
+struct LauncherState {
+    l: wf_app::launcher::Launcher,
+    packs: Packs,
+    gilrs: Option<gilrs::Gilrs>,
+}
+
+/// gamepad buttons -> launcher key codes (d-pad, South = confirm, East = back, triggers = page)
+fn pad_codes(g: &mut gilrs::Gilrs) -> Vec<&'static str> {
+    use gilrs::{Button as B, EventType};
+    let mut v = Vec::new();
+    while let Some(ev) = g.next_event() {
+        if let EventType::ButtonPressed(b, _) = ev.event {
+            v.push(match b {
+                B::DPadUp => "ArrowUp",
+                B::DPadDown => "ArrowDown",
+                B::DPadLeft => "ArrowLeft",
+                B::DPadRight => "ArrowRight",
+                B::South | B::Start => "Enter",
+                B::East | B::Select => "Escape",
+                B::LeftTrigger => "PageUp",
+                B::RightTrigger => "PageDown",
+                _ => continue,
+            });
+        }
+    }
+    v
 }
 
 fn now_unix() -> u64 {
@@ -398,6 +594,7 @@ fn load_hotkeys(data: &Path) -> Hotkeys {
 
 enum Phase {
     NeedRom(Option<String>),
+    Launcher(Box<LauncherState>),
     Extracting(mpsc::Receiver<Progress>, String, f32),
     Ready(Box<Running>),
     Failed(String),
@@ -410,9 +607,66 @@ struct Shell {
     phase: Phase,
     last: Instant,
     ui: Vec<u32>,
+    /// the launcher's Quit (exits on the next event-loop turn)
+    quit: bool,
 }
 
 impl Shell {
+    /// the launcher unless a mode flag was given (`--launcher` / `--no-launcher` override)
+    fn want_launcher(&self) -> bool {
+        self.args.launcher.unwrap_or(!self.args.cli_mode)
+    }
+
+    /// content is ready: the launcher or straight into the game
+    fn start(&mut self) {
+        if self.want_launcher() {
+            self.enter_launcher();
+        } else {
+            self.boot();
+        }
+    }
+
+    fn enter_launcher(&mut self) {
+        match load_packs(&self.args) {
+            Ok(packs) => {
+                let l = new_launcher(&self.args, &packs);
+                self.phase = Phase::Launcher(Box::new(LauncherState { l, packs, gilrs: gilrs::Gilrs::new().ok() }));
+            }
+            Err(e) => self.phase = Phase::Failed(e.to_string()),
+        }
+    }
+
+    fn launcher_key(&mut self, code: &str) {
+        use wf_app::launcher::Choice;
+        let Phase::Launcher(ls) = &mut self.phase else { return };
+        let c = ls.l.key(code);
+        match &c {
+            Choice::None => {}
+            Choice::Settings => {
+                save_settings(&self.args.data, &ls.l.settings);
+                if let Some(w) = &self.window {
+                    let want = ls.l.settings.fullscreen;
+                    if want != w.fullscreen().is_some() {
+                        w.set_fullscreen(if want { Some(Fullscreen::Borderless(None)) } else { None });
+                    }
+                }
+            }
+            Choice::Bindings => {
+                let _ = std::fs::create_dir_all(&self.args.data);
+                let _ = std::fs::write(self.args.data.join("bindings.json"), ls.l.bindings.to_json());
+            }
+            Choice::OpenModsFolder => open_folder(&self.args.content.join("mods")),
+            Choice::AddMod => {}
+            Choice::Quit => self.quit = true,
+            _ => {
+                save_settings(&self.args.data, &ls.l.settings);
+                if apply_choice(&mut self.args, &ls.l, &c) {
+                    self.boot();
+                }
+            }
+        }
+    }
+
     fn begin_extract(&mut self, rom: Vec<u8>) {
         if let Some(e) = rom_problem(&rom) {
             self.phase = Phase::NeedRom(Some(e));
@@ -433,7 +687,7 @@ impl Shell {
         for w in &packs.warnings {
             eprintln!("content: {w}");
         }
-        let audio = match if self.args.mute { Err("muted".to_string()) } else { start_audio(&packs) } {
+        let audio = match if self.args.mute { Err("muted".to_string()) } else { start_audio(&packs, load_settings(&self.args.data).gain()) } {
             Ok(a) => Some(a),
             Err(e) => {
                 eprintln!("audio disabled: {e}");
@@ -484,7 +738,13 @@ impl Shell {
                     menu: Default::default(),
                     bindings_path: bpath.clone(),
                     fps: (0, Instant::now(), 0.0),
+                    saves_gen: 0,
                 }));
+                if self.args.open_replays {
+                    if let Phase::Ready(r) = &mut self.phase {
+                        r.replay_menu.show(r.store.list());
+                    }
+                }
             }
             Err(e) => self.phase = Phase::Failed(e),
         }
@@ -545,7 +805,7 @@ impl Shell {
                 }
             }
             match next {
-                Some(None) => self.boot(),
+                Some(None) => self.start(),
                 Some(Some(e)) => self.phase = Phase::NeedRom(Some(e)),
                 None => {}
             }
@@ -597,6 +857,7 @@ impl Shell {
                 if r.ctl.advance(&mut r.app, dt, &live) > 0 {
                     r.keys.consumed();
                 }
+                persist_saves(&self.args.data, &r.app, &mut r.saves_gen);
                 if let Some((_, tx)) = &r.audio {
                     for e in r.app.take_audio() {
                         let _ = tx.send(e);
@@ -652,6 +913,20 @@ impl Shell {
                     }
                 }
                 (vw, vh, f.scale as usize, false)
+            }
+            Phase::Launcher(ls) => {
+                let codes = ls.gilrs.as_mut().map(pad_codes).unwrap_or_default();
+                let (w, h) = (240usize, 160usize);
+                self.ui.clear();
+                self.ui.resize(w * h, 0xFF00_0000);
+                ls.l.draw(&ls.packs, &mut self.ui, w, h);
+                for c in codes {
+                    self.launcher_key(c);
+                }
+                if !matches!(self.phase, Phase::Launcher(_)) {
+                    return; // a game started: drawn from the next frame
+                }
+                (w, h, ((ww as usize / w).min(wh as usize / h)).max(1), true)
             }
             Phase::NeedRom(err) => {
                 let mut l = vec![
@@ -709,6 +984,9 @@ impl ApplicationHandler for Shell {
             .with_title("Buu's Fury")
             .with_inner_size(winit::dpi::LogicalSize::new(960.0, 640.0));
         let win = Rc::new(el.create_window(attrs).expect("window"));
+        if load_settings(&self.args.data).fullscreen {
+            win.set_fullscreen(Some(Fullscreen::Borderless(None)));
+        }
         let ctx = softbuffer::Context::new(win.clone()).expect("softbuffer context");
         self.surface = Some(softbuffer::Surface::new(&ctx, win.clone()).expect("surface"));
         self.window = Some(win);
@@ -766,6 +1044,15 @@ impl ApplicationHandler for Shell {
                     }
                     return;
                 }
+                if matches!(self.phase, Phase::Launcher(_)) {
+                    if down {
+                        self.launcher_key(&format!("{code:?}"));
+                        if self.quit {
+                            el.exit();
+                        }
+                    }
+                    return;
+                }
                 if down && code == KeyCode::F11 {
                     if let Some(w) = &self.window {
                         w.set_fullscreen(if w.fullscreen().is_some() { None } else { Some(Fullscreen::Borderless(None)) });
@@ -773,6 +1060,14 @@ impl ApplicationHandler for Shell {
                     return;
                 }
                 let Phase::Ready(r) = &mut self.phase else { return };
+                // Shift+Esc: back to the launcher (the run's replay is kept)
+                if down && code == KeyCode::Escape && r.mods.shift && !r.online.in_match {
+                    r.ctl.finalize(&r.app);
+                    replays::service(&r.store, &mut r.ctl, &mut r.app, &mut r.replay_menu);
+                    persist_saves(&self.args.data, &r.app, &mut r.saves_gen);
+                    self.enter_launcher();
+                    return;
+                }
                 // the online lobby menu (F12; Esc in an online match): every key goes to it while open
                 if down && (code == KeyCode::F12 || (code == KeyCode::Escape && r.online.in_match && !r.online.menu.open)) {
                     r.online.toggle(&mut r.app);
@@ -850,6 +1145,10 @@ impl ApplicationHandler for Shell {
     }
 
     fn about_to_wait(&mut self, el: &ActiveEventLoop) {
+        if self.quit {
+            el.exit();
+            return;
+        }
         if let Some(w) = &self.window {
             w.request_redraw();
         }
@@ -862,7 +1161,7 @@ impl ApplicationHandler for Shell {
 /// the `--input` script (`R60,D40,RU10`: letters R L U D A B S(tart) E(select), then frames), render a
 /// `--size` window-sized frame on demand, write `--shot` (PPM). `--spectate ADDR` serves a read-only viewer
 /// (http://ADDR/) and paces the simulation in real time; `--realtime` paces without a viewer.
-fn headless(a: &Args) -> Result<(), String> {
+fn headless(a: &mut Args) -> Result<(), String> {
     let t0 = Instant::now();
     if a.reextract || !content_ok(&a.content) {
         let rom = match &a.rom {
@@ -881,7 +1180,32 @@ fn headless(a: &Args) -> Result<(), String> {
             }
         }
     }
-    let packs = load_packs(&a).map_err(|e| e.to_string())?;
+    let mut packs = load_packs(a).map_err(|e| e.to_string())?;
+    // the launcher: feed it `--launcher-keys`; a chosen game runs below, otherwise its picture is the shot
+    if a.launcher == Some(true) || (!a.cli_mode && !a.launcher_keys.is_empty()) {
+        let mut l = new_launcher(a, &packs);
+        let mut started = false;
+        for k in a.launcher_keys.clone() {
+            let c = l.key(&k);
+            eprintln!("launcher: {k} -> {:?}", c.to_json()["kind"]);
+            if apply_choice(a, &l, &c) {
+                started = true;
+                break;
+            }
+        }
+        if !started {
+            let (w, h) = (240usize, 160usize);
+            let mut fb = vec![0u32; w * h];
+            l.draw(&packs, &mut fb, w, h);
+            eprintln!("launcher screen {:?}, {} enemies / fighters loaded", l.screen, if l.battle_config().players.is_empty() { 0 } else { 1 });
+            if let Some(p) = &a.shot {
+                write_ppm(p, &fb, w, h);
+                eprintln!("wrote {}", p.display());
+            }
+            return Ok(());
+        }
+        packs = load_packs(a).map_err(|e| e.to_string())?;
+    }
     if a.net.active() {
         // headless netplay / sync test: real-time match with the --input script (or --net-random-input), JSON result
         let cfg = wf_app::battle::config(&a.arena, &a.enemy, a.count, &a.fighter, a.form, a.level, a.players, a.seed);
@@ -894,6 +1218,7 @@ fn headless(a: &Args) -> Result<(), String> {
     let bank = wf_app::wf_content::audio::load_bank(&packs).ok().map(|b| &*Box::leak(Box::new(b)));
     let mut app = make_app(a, packs)?;
     app.mode = a.mode;
+    let mut saves_gen = 0;
     let mut s = wf_app::session::Session::new(app, bank);
     eprintln!("content ready + world loaded in {:.0} ms (headless, muted)", t0.elapsed().as_secs_f64() * 1e3);
     let mut script: Vec<u16> = Vec::new();
@@ -970,6 +1295,7 @@ fn headless(a: &Args) -> Result<(), String> {
             }
         }
     }
+    persist_saves(&a.data, &s.app, &mut saves_gen);
     let step_ms = t1.elapsed().as_secs_f64() * 1e3 / frames.max(1) as f64;
     let (ww, wh) = a.size;
     let t2 = Instant::now();
@@ -1098,15 +1424,15 @@ s.textContent=await (await fetch('/state')).text();requestAnimationFrame(f)}f()<
 }
 
 fn main() {
-    let args = parse_args();
+    let mut args = parse_args();
     if args.headless {
-        if let Err(e) = headless(&args) {
+        if let Err(e) = headless(&mut args) {
             eprintln!("{e}");
             std::process::exit(1);
         }
         return;
     }
-    let mut shell = Shell { phase: Phase::NeedRom(None), window: None, surface: None, last: Instant::now(), ui: Vec::new(), args };
+    let mut shell = Shell { phase: Phase::NeedRom(None), window: None, surface: None, last: Instant::now(), ui: Vec::new(), args, quit: false };
     let stored_rom = shell.args.data.join("rom.gba");
     if let Some(p) = shell.args.rom.clone() {
         match std::fs::read(&p) {
@@ -1114,7 +1440,7 @@ fn main() {
             Err(e) => shell.phase = Phase::NeedRom(Some(format!("cannot read {}: {e}", p.display()))),
         }
     } else if content_ok(&shell.args.content) && !shell.args.reextract {
-        shell.boot();
+        shell.start();
     } else if let Ok(b) = std::fs::read(&stored_rom) {
         shell.begin_extract(b);
     }

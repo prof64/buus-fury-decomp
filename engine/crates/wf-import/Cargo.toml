@@ -1,0 +1,20 @@
+[package]
+name = "wf-import"
+description = "Seed a wf-core story / field World from a real-game emulator RAM snapshot (any point of the campaign) + the segment harness (record the game from there, replay on wf-core, first divergence). Spec: engine/docs/segments.md"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+wf-core = { path = "../wf-core" }
+wf-script = { path = "../wf-script" }
+wf-script-core = { path = "../wf-script-core" }
+wf-script-rhai = { path = "../wf-script-rhai" }
+serde.workspace = true
+serde_json.workspace = true
+miniz_oxide = "0.8"
+
+[dev-dependencies]
+wf-rom.workspace = true
+wf-extract = { path = "../wf-extract" }
+wf-ui = { path = "../wf-ui" }

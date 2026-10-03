@@ -1,12 +1,15 @@
-//! Menu screens vs the emulator, frame by frame (headless, muted; skipped without the ROM or without the captures
-//! of `re/buu/menu/capture.py` in `<repo>/work/buu/menu/<scenario>/`, `WF_MENU_DIR` overrides).
+//! Menu screens vs the emulator, tick by tick and frame by frame (headless, muted; skipped without the ROM).
 //!
-//! Each scenario starts from a save state; the capture decodes the GameData block at the START frame
-//! (`story.json`), the remake's story session gets that state, then both run the same keys from that frame on.
-//! Compared per video frame: the sounds the menu plays and, while the remake shows a menu screen, the whole
-//! 240x160 picture (wf-core menu view -> wf-render). `MENU_PARITY_OUT=<dir>` writes emulator | ours | diff strips
-//! of differing frames; `MENU_PARITY_LOG=1` prints every frame.
+//! Traces: `<repo>/data/menu/<scenario>.json` (`re/buu/menu/capture.py`: keys, the mode loop's frame counter,
+//! sound calls and the sha1 of the emulator's screen per video frame, the GameData block decoded at frame 0 and how
+//! the screen opens). The remake's story session gets that state, then both run the same keys. Compared per video
+//! frame: the sounds and, while the remake shows a menu screen, the sha1 of the 240x160 picture (wf-core menu view
+//! -> wf-render). CPU time is an oracle from the trace (see `run`). Pictures for diffs: `work/buu/menu/<scenario>/`
+//! (git-ignored, ROM-derived; `WF_MENU_DIR` overrides): `MENU_PARITY_OUT=<dir>` writes emulator | ours | diff
+//! strips of differing frames; `MENU_PARITY_LOG=1` prints every frame; `MENU_PARITY_ONLY=<substring>` filters.
+//! Scenarios whose names start with a `STRICT` prefix must be exact (sounds and every compared frame).
 
+use sha1::{Digest, Sha1};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -67,13 +70,14 @@ pub fn story_from(d: &wf_core::content::GameData, s: &Value) -> Story {
             st.flags[k] = u8::from_str_radix(&h[2 * k..2 * k + 2], 16).unwrap();
         }
     }
-    st.equipment = s["equipment"].as_array().map(|a| a.iter().map(|v| (i(v) & 0x0FFF_FFFF) as i32).collect()).unwrap_or_default();
+    // the remake's owned list holds unequipped copies (equipped ones are the characters' slots): marked entries out
+    st.equipment = s["equipment"].as_array().map(|a| a.iter().filter(|v| (i(v) >> 28) == 0).map(|v| (i(v) & 0x0FFF_FFFF) as i32).collect()).unwrap_or_default();
     st.zenie = i(&s["zenie"]) as u32;
     st.play_frames = (i(&s["counter"]) + i(&s["play_base"])).max(0) as u64;
     if let Some(cs) = s["chars"].as_array() {
         for (k, c) in cs.iter().enumerate().take(st.chars.len()) {
             let skills: Vec<i32> = c["skills"].as_array().map(|a| a.iter().map(|v| i(v) as i32).collect()).unwrap_or_default();
-            let levels: Vec<i32> = c["skill_levels"].as_array().map(|a| a.iter().map(|v| i(v) as i32).collect()).unwrap_or_default();
+            let levels: Vec<i32> = c.get("skill_max").unwrap_or(&c["skill_levels"]).as_array().map(|a| a.iter().map(|v| i(v) as i32).collect()).unwrap_or_default();
             let eq: Vec<i32> = c["equip"].as_array().map(|a| a.iter().map(|v| i(v) as i32).collect()).unwrap_or_default();
             let mut rec = st.chars[k].rec.clone();
             rec.hp = i(&c["hp"]) as i32;
@@ -96,6 +100,7 @@ pub fn story_from(d: &wf_core::content::GameData, s: &Value) -> Story {
                 equip: [eq[0], eq[1], eq[2], eq[3]],
                 ss_cooldown: i(&c["ss_cooldown"]) as i32,
                 flags: i(&c["flags"]) as u8,
+                skill_cur: c["skill_cur"].as_array().map(|a| a.iter().map(|v| i(v) as i32).collect()).unwrap_or_default(),
             };
         }
     }
@@ -111,17 +116,38 @@ fn dir() -> PathBuf {
     std::env::var("WF_MENU_DIR").map(PathBuf::from).unwrap_or_else(|_| wf_rom::testutil::repo_root().join("work/buu/menu"))
 }
 
+fn traces() -> PathBuf {
+    wf_rom::testutil::repo_root().join("data/menu")
+}
+
+/// scenarios that must be exact (prefixes)
+const STRICT: &[&str] = &["status_open_close", "status_alloc", "status_tabs", "mg_", "options_", "journal_", "skills_"];
+
+/// the capture's picture hash: sha1 of the RGB bytes, first 16 hex digits
+fn hash(fb: &[u32]) -> String {
+    let mut h = Sha1::new();
+    let mut rgb = Vec::with_capacity(240 * 160 * 3);
+    for &c in fb.iter().take(240 * 160) {
+        rgb.extend_from_slice(&[(c >> 16) as u8, (c >> 8) as u8, c as u8]);
+    }
+    h.update(&rgb);
+    h.finalize().iter().take(8).map(|b| format!("{b:02x}")).collect()
+}
+
 /// result of one scenario: (frames compared, frames exact, sound mismatches)
 fn run(packs: &Packs, data: &Arc<wf_core::content::GameData>, name: &str) -> Option<(usize, usize, Vec<String>, Vec<usize>)> {
     let d = dir().join(name);
-    let frames: Value = serde_json::from_slice(&std::fs::read(d.join("frames.json")).ok()?).ok()?;
-    let sj: Value = serde_json::from_slice(&std::fs::read(d.join("story.json")).ok()?).ok()?;
-    let story = story_from(data, &sj);
+    let tr: Value = serde_json::from_slice(&std::fs::read(traces().join(format!("{name}.json"))).ok()?).ok()?;
+    let frames = &tr;
+    let sj = &tr["story"];
+    let story = story_from(data, sj);
     let cfg = FieldConfig { world: 1, area: 1, story: Some(story), rng: wf_core::battle::RngInit::Seed(1), ..Default::default() };
     let session = Session::new_field(Arc::clone(data), cfg);
     let mut sim = StorySim::with_session(packs, session).expect("story sim");
     sim.skip_area_banner();
     let rows = frames["frames"].as_array()?;
+    // script-opened screens: the remake opens the screen the frame the emulator's script did
+    let meta = &tr["meta"];
     let mut r = Renderer::new();
     let log = std::env::var("MENU_PARITY_LOG").is_ok();
     let out = std::env::var("MENU_PARITY_OUT").ok().map(PathBuf::from);
@@ -157,7 +183,10 @@ fn run(packs: &Packs, data: &Arc<wf_core::content::GameData>, name: &str) -> Opt
                 // picture differs from both neighbours is a VRAM copy racing the scanout: shown from the next one)
                 let changed = hs[k] != hs[k - 1] && !tear(&hs, k);
                 if changed {
-                    if let Some(p) = m.pending.take() {
+                    // an intermediate picture of the same iteration first (`Menu.pre`)
+                    if let Some(p) = m.pre.take() {
+                        m.shown = Some(p);
+                    } else if let Some(p) = m.pending.take() {
                         m.shown = Some(p);
                     }
                 }
@@ -166,6 +195,9 @@ fn run(packs: &Packs, data: &Arc<wf_core::content::GameData>, name: &str) -> Opt
             }
         }
         ev.clear();
+        if k == 0 && meta["open"].is_object() {
+            assert!(wf_core::menu::open_from_json(&mut sim.session.world, &meta["open"]), "{name}: no screen opens {}", meta["open"]);
+        }
         sim.step(&[keys], &mut ev);
         // sounds of menu frames (and the START frame): the emulator's play calls vs ours
         let mut v = RenderView::default();
@@ -185,25 +217,56 @@ fn run(packs: &Packs, data: &Arc<wf_core::content::GameData>, name: &str) -> Opt
             }
             continue;
         }
-        let Some(emu) = load_png(&d.join(format!("f{k:04}.png"))) else { continue };
-        if k > 0 && tear(&hs, k) {
+        // (overlay screens animate every frame: no tear rule for them)
+        // a torn picture needs a VRAM copy still running at the scanout: only around a long iteration (frames
+        // without a mode-loop tick); screens redrawn every frame (overlays, credits) never tear
+        let long_iter = lf[k] == lf[k - 1.min(k)] || (k + 1 < lf.len() && lf[k + 1] == lf[k]);
+        if k > 0 && tear(&hs, k) && long_iter && !v.menu.as_ref().is_some_and(|m| m.overlay) {
             tears += 1;
             if log {
                 eprintln!("{name} {k:4} keys {keys:03x} tear frame (VRAM copy during the scanout), not compared");
             }
             continue;
         }
+        if let Some(mv) = v.menu.as_ref().filter(|m| m.overlay) {
+            // a screen over the frozen field (mini-games): only its own pixels are compared with the capture's
+            // picture (the field under it is the field renderer's, tests/field_parity.rs); needs work/ PNGs
+            let mut mr = wf_render::menu::MenuRenderer::load(packs);
+            let pic = mr.render(packs, mv, None, 0);
+            let Some(emu) = load_png(&d.join(format!("f{k:04}.png"))) else { continue };
+            compared += 1;
+            let diff = pic.iter().zip(&emu).filter(|(o, e)| **o >> 24 != 0 && (**o & 0xFF_FFFF) != (**e & 0xFF_FFFF)).count();
+            if diff == 0 {
+                exact += 1;
+            } else {
+                bad_frames.push(k);
+                if let Some(o) = &out {
+                    std::fs::create_dir_all(o).ok();
+                    let ours = r.render(packs, &v, 0, 240, 160).to_vec();
+                    let dm: Vec<u32> = pic.iter().zip(&emu).map(|(a, b)| if *a >> 24 == 0 || (*a & 0xFF_FFFF) == (*b & 0xFF_FFFF) { 0xFF00_0000 } else { 0xFFFF_00FF }).collect();
+                    save(&o.join(format!("{name}_{k:04}.png")), &[&emu, &ours, &dm]);
+                }
+            }
+            if log {
+                eprintln!("{name} {k:4} keys {keys:03x} {:?} overlay diff {diff}", sim.world().menu.phase);
+            }
+            continue;
+        }
         let ours = r.render(packs, &v, 0, 240, 160).to_vec();
-        let diff = emu.iter().zip(&ours).filter(|(a, b)| a != b).count();
         compared += 1;
-        if diff == 0 {
+        let same = hash(&ours) == hs[k];
+        let mut diff = 0;
+        if same {
             exact += 1;
         } else {
             bad_frames.push(k);
-            if let Some(o) = &out {
-                std::fs::create_dir_all(o).ok();
-                let dm: Vec<u32> = emu.iter().zip(&ours).map(|(a, b)| if a == b { 0xFF00_0000 } else { 0xFFFF_00FF }).collect();
-                save(&o.join(format!("{name}_{k:04}.png")), &[&emu, &ours, &dm]);
+            if let Some(emu) = load_png(&d.join(format!("f{k:04}.png"))) {
+                diff = emu.iter().zip(&ours).filter(|(a, b)| a != b).count();
+                if let Some(o) = &out {
+                    std::fs::create_dir_all(o).ok();
+                    let dm: Vec<u32> = emu.iter().zip(&ours).map(|(a, b)| if a == b { 0xFF00_0000 } else { 0xFFFF_00FF }).collect();
+                    save(&o.join(format!("{name}_{k:04}.png")), &[&emu, &ours, &dm]);
+                }
             }
         }
         if log {
@@ -211,6 +274,13 @@ fn run(packs: &Packs, data: &Arc<wf_core::content::GameData>, name: &str) -> Opt
         }
     }
     let _ = menu_seen;
+    // natives that push the screen's result (mini-games: code - 1): the capture's push
+    if let Some(want) = meta.get("native_push").and_then(|x| x.as_i64()) {
+        let got = sim.world().menu.result.as_ref().map(|r| r.code as i64 - 1);
+        if got != Some(want) {
+            snd_bad.push(format!("{name}: native push {want}, ours {got:?}"));
+        }
+    }
     println!("menu {name}: lag model agrees on {} / {} menu frames; {tears} tear frames skipped", lag_pred.0, lag_pred.1);
     Some((compared, exact, snd_bad, bad_frames))
 }
@@ -218,29 +288,33 @@ fn run(packs: &Packs, data: &Arc<wf_core::content::GameData>, name: &str) -> Opt
 #[test]
 fn menus_match_emulator() {
     let Some(rom) = wf_rom::testutil::rom() else { return };
-    if !dir().exists() {
+    if !traces().exists() {
         return;
     }
     let (c, _) = wf_extract::extract_rom(&rom, &Default::default(), &mut |_| {});
     let packs = Packs::new(vec![Box::new(MemSource(c.files)) as Box<dyn FileSource>]).unwrap();
     let data: Arc<wf_core::content::GameData> = wf_app::battle::load_data(&packs).expect("data");
-    let mut names: Vec<String> = std::fs::read_dir(dir()).unwrap().filter_map(|e| e.ok()).filter(|e| e.path().join("frames.json").exists()).map(|e| e.file_name().to_string_lossy().to_string()).collect();
+    let mut names: Vec<String> = std::fs::read_dir(traces())
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .filter_map(|e| e.file_name().to_string_lossy().strip_suffix(".json").map(String::from))
+        .collect();
     names.sort();
     if let Ok(only) = std::env::var("MENU_PARITY_ONLY") {
         names.retain(|n| n.contains(&only));
     }
-    let mut all_ok = true;
+    let mut failed = Vec::new();
+    let strict_all = std::env::var("MENU_PARITY_STRICT").is_ok();
     for n in &names {
         let Some((cmp, ex, snd, bad)) = run(&packs, &data, n) else { continue };
         println!("menu {n}: {ex} / {cmp} frames exact; sound mismatches {}; differing frames {:?}", snd.len(), &bad[..bad.len().min(40)]);
         for s in snd.iter().take(10) {
             println!("  {s}");
         }
-        if ex != cmp || !snd.is_empty() {
-            all_ok = false;
+        let strict = strict_all || STRICT.iter().any(|p| n.starts_with(p));
+        if strict && (ex != cmp || !snd.is_empty()) {
+            failed.push(n.clone());
         }
     }
-    if std::env::var("MENU_PARITY_STRICT").is_ok() {
-        assert!(all_ok);
-    }
+    assert!(failed.is_empty(), "menu scenarios not exact: {failed:?}");
 }

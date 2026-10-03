@@ -16,6 +16,7 @@ import numpy as np
 
 GD = 0x03001068
 REC = GD + 0x4F8
+DATA = Path(__file__).resolve().parents[3] / 'data' / 'menu'
 
 
 def s16(v):
@@ -31,6 +32,7 @@ def record(e, i):
         ss=s16(e.r16(a + 0x1E)), ss3=s16(e.r16(a + 0x20)), xp=e.r32(a + 0x24),
         str=e.r8(a + 0x28), pow=e.r8(a + 0x29), end=e.r8(a + 0x2A), spd=e.r8(a + 0x2B), points=e.r16(a + 0x2C),
         skills=[e.r8(a + 0xD + k) for k in range(n)], skill_levels=[e.r8(a + 0x2E + k) for k in range(n)],
+        skill_cur=[e.r8(a + 0x2E + 2 * k) for k in range(n)], skill_max=[e.r8(a + 0x2F + 2 * k) for k in range(n)],
         equip=[e.r32(a + 0x3C + 4 * k) for k in range(4)],
         eff=[e.r16(a + 0x4C + 2 * k) for k in range(5)],
         raw=e.read(a, 0x68).hex())
@@ -53,62 +55,52 @@ def probe(e):
     return dict(lf=e.r32(0x03000F94), mode=e.r32(0x03000F90))
 
 
-def setup_points(n):
-    def f(e):
-        e.w16(REC + 0x2C, n)
-    return f
-
-
-def setup_party(chars):
-    def f(e):
-        for c in chars:
-            e.w8(REC + 0x68 * c, e.r8(REC + 0x68 * c) | 1)
-    return f
-
-
-def chain(*fs):
-    def f(e):
-        for g in fs:
-            g(e)
-    return f
-
-
-# name: (state, setup, pre keys, keys from the START frame on)
-SCENARIOS = {
-    # open the pause menu, look at Status, close with B
-    'status_open_close': ('buu_snakeway_start.ss', None, ['-:2'], ['START:1', '-:50', 'B:1', '-:60']),
-    # R / L page switches from Status, back, START closes
-    'status_pages': ('buu_snakeway_start.ss', None, ['-:2'], ['START:1', '-:40', 'R:1', '-:30', 'L:1', '-:30', 'L:1', '-:30', 'R:1', '-:30', 'START:1', '-:60']),
-    # stat points: the blinking LevelUp!, Use Points (A), move points, accept / cancel
-    'status_alloc': ('buu_snakeway_start.ss', setup_points(5), ['-:2'],
-                     ['START:1', '-:36', 'A:2', '-:12', 'RIGHT:2', '-:12', 'RIGHT:2', '-:12', 'DOWN:2', '-:12', 'RIGHT:2', '-:12',
-                      'LEFT:2', '-:12', 'UP:2', '-:12', 'A:2', '-:30', 'A:2', '-:12', 'RIGHT:2', '-:12', 'B:2', '-:30', 'B:2', '-:60']),
-    # party tabs: Goku + Gohan + Goten + Trunks + Vegeta in the party, LEFT / RIGHT through them
-    'status_tabs': ('buu_snakeway_start.ss', setup_party([1, 2, 3, 4]), ['-:2'],
-                    ['START:1', '-:40', 'RIGHT:2', '-:12', 'RIGHT:2', '-:12', 'RIGHT:2', '-:12', 'RIGHT:2', '-:12', 'RIGHT:2', '-:12',
-                     'LEFT:2', '-:12', 'B:2', '-:60']),
-}
+# scenarios: every scenarios_<area>.py next to this file (menuhelp.py has the RAM setup helpers)
+SCENARIOS = {}
+for _f in sorted(Path(__file__).resolve().parent.glob('scenarios_*.py')):
+    _m = __import__(_f.stem)
+    SCENARIOS.update(_m.SCENARIOS)
 
 
 def run(name):
-    state, setup, pre, keys = SCENARIOS[name]
+    """a scenario = (state, setup, pre, keys[, extra]); extra: {"open": {...} (JSON: the remake opens this screen at
+    frame 0 via wf_core::menu::open_from_json instead of a key), "trigger": fn(e) (emulator side, called right
+    before frame 0, e.g. an injected script call)}"""
+    state, setup, pre, keys, *rest = SCENARIOS[name]
+    extra = rest[0] if rest else {}
     c = Cap(state)
     if setup:
         setup(c.e)
     for k in program(pre):
         c.step(k, keep=False)
     st = story(c.e)
+    if extra.get('trigger'):
+        extra['trigger'](c.e)
     c.frames = []
     c.screens = []
+    pr = probe
+    if extra.get('probe'):
+        pr = lambda e: dict(probe(e), **extra['probe'](e))  # noqa: E731
     for k in program(keys):
-        c.step(k, probe)
+        c.step(k, pr)
+    if extra.get('finish'):
+        # scenario hook: patch extra (e.g. the "open" JSON with values read from the run)
+        extra['finish'](c.frames, extra)
     d = OUT / name
     d.mkdir(parents=True, exist_ok=True)
     from PIL import Image
+    for f in d.glob('f*.png'):
+        f.unlink()
     for i, s in enumerate(c.screens):
         Image.fromarray(s).save(d / f'f{i:04d}.png')
     (d / 'story.json').write_text(json.dumps(st))
     (d / 'frames.json').write_text(json.dumps(dict(state=state, frames=c.frames)))
+    meta = {k: v for k, v in extra.items() if not callable(v)}
+    (d / 'meta.json').write_text(json.dumps(meta))
+    # the committed trace (no pictures: screen sha1s) for engine/crates/wf-app/tests/menu_parity.rs
+    DATA.mkdir(parents=True, exist_ok=True)
+    rows = [dict(keys=f['keys'], lf=f['lf'], snd=f['snd'], h=f['h']) for f in c.frames]
+    (DATA / f'{name}.json').write_text(json.dumps(dict(scenario=name, state=state, meta=meta, story=st, frames=rows), separators=(',', ':')))
     print(name, len(c.frames), 'frames ->', d)
 
 

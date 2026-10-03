@@ -44,11 +44,19 @@ pub struct CharState {
     pub ss_cooldown: i32,
     /// character flags (party membership bit 0, script flag 2 bit 1; `join_party` / `set_char_flag2`)
     pub flags: u8,
+    /// the level chosen in the Skills popup per known skill (record +0x2E + 2i; `skill_levels` is +0x2F + 2i, the
+    /// learned level, which `set_skill_level` sets both to); empty / missing entries = the learned level
+    #[serde(default)]
+    pub skill_cur: Vec<i32>,
 }
 
 impl CharState {
     pub fn in_party(&self) -> bool {
         self.flags & 1 != 0
+    }
+    /// the chosen level of the k-th known skill (record +0x2E + 2k)
+    pub fn skill_cur(&self, k: usize) -> i32 {
+        self.skill_cur.get(k).copied().unwrap_or_else(|| self.skill_levels.get(k).copied().unwrap_or(0))
     }
     pub fn skill_level(&self, skill: i32) -> i32 {
         self.skills.iter().position(|&s| s == skill).and_then(|k| self.skill_levels.get(k).copied()).unwrap_or(0)
@@ -127,6 +135,7 @@ impl Story {
                 equip: c.equip.unwrap_or([0, 44, 77, 112]),
                 ss_cooldown: 0,
                 flags: c.in_party as u8,
+                skill_cur: Vec::new(),
             };
         }
         s.chars[0].flags |= 1;

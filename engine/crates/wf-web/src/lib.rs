@@ -16,6 +16,8 @@ use std::collections::VecDeque;
 
 /// online multiplayer (wf-net): lobby + rollback session behind `wf_net_*` exports
 mod net;
+/// the launcher (title / story / battle / online / replays / mods / settings) before the game starts
+mod launcher;
 
 use wf_app::audio::AudioEngine;
 use wf_app::control::{Control, Request};
@@ -190,7 +192,13 @@ pub unsafe extern "C" fn wf_app_init(cfg_ptr: *const u8, cfg_len: usize) -> u32 
     // the real battle (wf-core) unless {"demo": true} / an `area` is asked for
     let demo = cfg["demo"].as_bool().unwrap_or(false) || cfg["area"].is_string();
     // {"net": true}: the online match / sync test prepared by wf_net_lobby (net.rs)
-    let made = if let Some(sim) = net::take_sim(&cfg, &packs) {
+    // {"launch": ...}: what the launcher picked (launcher.rs)
+    if let Some(n) = cfg["launch"]["config"]["players"].as_array().map(|a| a.len()) {
+        dc.players = n.clamp(1, 4);
+    }
+    let made = if matches!(cfg["launch"]["kind"].as_str(), Some("story" | "battle")) {
+        launcher::launch_app(&cfg, packs).unwrap_or_else(|| Err("bad launch".into()))
+    } else if let Some(sim) = net::take_sim(&cfg, &packs) {
         sim.map(|s| App::new(packs, s))
     } else if let Some(area) = cfg["story"].as_str() {
         // story mode: a new game at area "W-A" (field + scripts)

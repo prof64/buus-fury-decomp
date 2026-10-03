@@ -234,6 +234,19 @@ pub struct ItSel {
     pub vx: i32,
     pub vy: i32,
     pub cursor: bool,
+    /// field: the trigger candidates after the enemies (a trigger whose test is `0x0804AA08`, made by activation
+    /// `0x0802266F`, answers the pick: rect (x0 + 15, y0 + 7, x1, y1)), picked flag
+    #[serde(default)]
+    pub tcand: Vec<(crate::fieldcontent::ObjRef, Rect, bool)>,
+    /// field: every pick in order (enemies and triggers)
+    #[serde(default)]
+    pub order: Vec<ItPick>,
+}
+/// one Instant Transmission pick in the field (the selector's out list {kind byte, object}: kind 1 = trigger)
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ItPick {
+    Ent(EntityId),
+    Trig(crate::fieldcontent::ObjRef),
 }
 #[derive(Clone, Debug, Hash, Serialize, Deserialize)]
 pub struct ItRun {
@@ -243,6 +256,9 @@ pub struct ItRun {
     pub targets: Vec<EntityId>,
     pub origin: (i32, i32),
     pub t: i32,
+    /// field: the picks in order (the field's run, `ctl_it_field`)
+    #[serde(default)]
+    pub picks: Vec<ItPick>,
 }
 
 /// the partner record that takes over at a cutscene fusion's defuse
@@ -677,6 +693,20 @@ pub fn start_autowalk(w: &mut World, i: usize) {
 /// the end of a fade: the player goes idle (SetAnim(0): idle enter, 1 x rand(255))
 pub fn set_idle(w: &mut World, i: usize) {
     set_anim_id(w, i, 0);
+}
+
+/// the item-get pose ends while Instant Transmission's field run waits for the event its arrival fired: the run's
+/// state comes back (story playthrough s099: raw 20 cel 0), the vanish resumes after the event
+pub fn resume_it(w: &mut World, i: usize) -> bool {
+    if w.field.is_none() || pr(w, i).it.is_none() {
+        return false;
+    }
+    enter_state(w, i, Gs::Skill(14));
+    let pl = p(w, i);
+    pl.state = PState::Skill;
+    pl.ap.raw = 20;
+    pl.ap.frame = 0;
+    true
 }
 
 /// scripts: SetAnim(id) with a script anim id (table 0x08072670 applied by ANIM_RAW / ANIM_STATE)
@@ -2946,9 +2976,27 @@ fn start_it(w: &mut World, i: usize, lv: i32) {
             }
         }
     }
+    // field: then the trigger list (0x08012846, the game's list order = our scan order reversed): a trigger whose
+    // test answers the pick (only `0x0804AA08`, activation 0x0802266F) with its rect (x0 + 15, y0 + 7, x1, y1) on
+    // camera; 16 candidates in all
+    let mut tcand = vec![];
+    if let Some(f) = w.field.as_ref() {
+        for t in f.triggers.iter().rev() {
+            if cand.len() + tcand.len() >= 16 {
+                break;
+            }
+            if t.act != crate::fieldcontent::Activation::Unknown(0x0802_266F) {
+                continue;
+            }
+            let r = Rect::new(t.rect.x0 + 15, t.rect.y0 + 7, t.rect.x1, t.rect.y1);
+            if overlaps(&r, &cam) {
+                tcand.push((t.obj, r, false));
+            }
+        }
+    }
     let (cx, cy) = pr(w, i).a.center();
     let serial = w.next_serial();
-    p(w, i).it_sel = Some(ItSel { serial, n: (lv + 1).min(tier), cand, picks: vec![], x: cx << 8, y: cy << 8, vx: 0, vy: 0, cursor: true });
+    p(w, i).it_sel = Some(ItSel { serial, n: (lv + 1).min(tier), cand, picks: vec![], x: cx << 8, y: cy << 8, vx: 0, vy: 0, cursor: true, tcand, order: vec![] });
     let me = w.ents[i].id;
     let f = fx::add(w, Fx::ItMarkers { t: 0, alive: Alive::It { p: me, serial } });
     w.modal = Some(vec![me, f]);
@@ -2959,13 +3007,13 @@ fn it_select(w: &mut World, i: usize) {
     if h & btn::B == 0 {
         w.modal = None;
         p(w, i).it_sel = None;
-        if s.picks.is_empty() {
+        if s.picks.is_empty() && s.order.is_empty() {
             return set_anim_id(w, i, 0);
         }
         let (dir, px, py) = (pr(w, i).a.facing, pr(w, i).a.px(), pr(w, i).a.py());
         {
             let pl = p(w, i);
-            pl.it = Some(ItRun { serial: s.serial, dir, idx: 0, targets: s.picks.clone(), origin: (px, py), t: -24 });
+            pl.it = Some(ItRun { serial: s.serial, dir, idx: 0, targets: s.picks.clone(), origin: (px, py), t: -24, picks: s.order.clone() });
             pl.a.hittable = false;
             pl.ap.raw = 20;
         }
@@ -2982,9 +3030,21 @@ fn it_select(w: &mut World, i: usize) {
                     px >= b.x0 && px < b.x1 && py >= b.y0 && py < b.y1
                 })
         });
+        // the field's trigger candidates follow the enemies in the selector's list (first match wins)
+        let hitt = if hitk.is_none() { s.tcand.iter().position(|&(_, b, picked)| !picked && px >= b.x0 && px < b.x1 && py >= b.y0 && py < b.y1) } else { None };
         if let Some(k) = hitk {
             s.cand[k].1 = true;
             s.picks.push(s.cand[k].0);
+            if w.field.is_some() {
+                s.order.push(ItPick::Ent(s.cand[k].0));
+            }
+            s.n -= 1;
+            if s.n == 0 {
+                s.cursor = false;
+            }
+        } else if let Some(k) = hitt {
+            s.tcand[k].2 = true;
+            s.order.push(ItPick::Trig(s.tcand[k].0));
             s.n -= 1;
             if s.n == 0 {
                 s.cursor = false;
@@ -3008,7 +3068,122 @@ fn it_select(w: &mut World, i: usize) {
     }
     p(w, i).it_sel = Some(s);
 }
+/// the field's Instant Transmission run (state vt 0x0804E334, update 0x0801BB1A): t from -24; t < 0 vanish (trigger
+/// checks off, list +0xD0), at -23 the pick's EP (40 / 80 / 480, only while a pick is left) and sfx 31 (always); t 0
+/// appear at the pick (a trigger: centre of (x0, y0, x1 + 15, y1 + 7) - (8, -4), facing down; an enemy: below it) or
+/// back at the origin; t >= 24 checks on: a trigger pick is armed to fire in this frame's check (0x080125FA), the
+/// next pick at t -24; an enemy pick punches like the battle run; no pick left: idle
+fn ctl_it_field(w: &mut World, i: usize) {
+    let Some(mut it) = pr(w, i).it.clone() else { return set_anim_id(w, i, 0) };
+    p(w, i).a.hittable = false;
+    // the event the arrival fired holds the run (story playthrough: s099's item pose, then the vanish resumes on the
+    // frame after the event ends)
+    if w.field.as_ref().is_some_and(|f| f.busy) {
+        return;
+    }
+    it.t += 1;
+    let t = it.t;
+    let save = |w: &mut World, it: ItRun| p(w, i).it = Some(it);
+    let checks = |w: &mut World, on: bool| {
+        if let Some(f) = w.field.as_mut() {
+            f.trig_off = !on;
+        }
+    };
+    if t < 0 {
+        if t == -23 {
+            if it.picks.len() > it.idx {
+                let c = [40, 80, 480][it.idx.min(2)];
+                spend(w, i, c, false);
+            }
+            sfx(w, 31, 64);
+        }
+        checks(w, false);
+        let pl = p(w, i);
+        pl.ap.raw = 20;
+        pl.ap.frame = -t >> 3;
+        return save(w, it);
+    }
+    if t == 0 {
+        loop {
+            if it.idx >= it.picks.len() {
+                let pl = p(w, i);
+                pl.a.x = it.origin.0 << 8;
+                pl.a.y = it.origin.1 << 8;
+                pl.a.facing = it.dir;
+                return save(w, it);
+            }
+            match it.picks[it.idx] {
+                ItPick::Trig(o) => {
+                    let r = w.field.as_ref().and_then(|f| f.triggers.iter().find(|t| t.obj == o)).map(|t| t.rect);
+                    if let Some(r) = r {
+                        let (cx, cy) = ((r.x0 + r.x1 + 15) >> 1, (r.y0 + r.y1 + 7) >> 1);
+                        let pl = p(w, i);
+                        pl.a.x = (cx - 8) << 8;
+                        pl.a.y = (cy + 4) << 8;
+                        pl.a.facing = 1;
+                        return save(w, it);
+                    }
+                }
+                ItPick::Ent(e) => {
+                    if let Some(e) = w.actor_by_id(e).filter(|_| !w.is_removed(e)).cloned() {
+                        let pl = p(w, i);
+                        pl.a.x = (((e.px() * 2 + e.foot_w) >> 1) - 8) << 8;
+                        pl.a.y = (e.py() + e.foot_h + 8) << 8;
+                        pl.a.facing = 1;
+                        return save(w, it);
+                    }
+                }
+            }
+            it.idx += 1;
+        }
+    }
+    if t < 24 {
+        p(w, i).ap.frame = (24 - t) >> 3;
+        return save(w, it);
+    }
+    checks(w, true);
+    if it.idx >= it.picks.len() {
+        p(w, i).it = None;
+        return set_anim_id(w, i, 0);
+    }
+    match it.picks[it.idx] {
+        ItPick::Trig(o) => {
+            if let Some(t) = w.field.as_mut().and_then(|f| f.triggers.iter_mut().find(|t| t.obj == o)) {
+                t.forced = true;
+            }
+            it.idx += 1;
+            it.t = -24;
+            save(w, it)
+        }
+        ItPick::Ent(e) => {
+            if t == 24 {
+                let a = &pr(w, i).a;
+                let rect = Rect::at(PUNCH_RECT[a.facing as usize], a.px(), a.py());
+                let me = w.ents[i].id;
+                let mut m = HitMsg { team: 1, rect, dir: a.facing, mult: 0x600, atk: atk(2), attacker: me, att_stats: a.stats, att_is_player: true, source: me, crit: false, raw: 0, dmg: 0, no_react: false, foot: false };
+                if broadcast(w, &mut m, false) {
+                    let r = 48 + w.rng.rand(2);
+                    sfx(w, r, 64);
+                }
+            }
+            let _ = e;
+            p(w, i).ap.frame = (t - 24) >> 2;
+            if pr(w, i).ap.frame >= pr(w, i).anim_n(w) {
+                let pl = p(w, i);
+                pl.ap.frame = 0;
+                pl.ap.raw = 20;
+                it.idx += 1;
+                it.t = -24;
+            }
+            save(w, it)
+        }
+    }
+}
+
 fn ctl_it(w: &mut World, i: usize) {
+    if w.field.is_some() {
+        return ctl_it_field(w, i);
+    }
     let Some(mut it) = pr(w, i).it.clone() else { return set_anim_id(w, i, 0) };
     p(w, i).a.hittable = false;
     it.t += 1;

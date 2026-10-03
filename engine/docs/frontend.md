@@ -240,6 +240,24 @@ to pick a GBA button, Enter then the new key (Esc cancels), "Reset to defaults",
 the screen, so a bad binding cannot lock you out. Saved to `<data>/bindings.json`. Headless preview:
 `buus-fury --headless --show-controls --shot out.ppm`. (The web shell keeps its HTML settings panel.)
 
+## 9a. Launcher and packaging (`wf_app::launcher`, `engine/package/`)
+
+Both shells open on a launcher drawn over the title art (`ui/images/screen_title.png`) in the game's `menu` font:
+Story (New Game / Continue slot 1-3), Battle (fighter, form, level, enemy or story preset, count, arena, 1-4
+players), Online (the lobby), Replays, Mods (on / off, mods folder), Settings (view, volume, fullscreen, controls).
+One state machine fed W3C key codes returns a `Choice`; the shell builds the app (`launcher::story_app` with the
+save slots, `App::battle`). Story save slots are `World.saves` (the game's own Save screen writes them): shells
+persist them when `launcher::saves_of` reports a new generation (native `<data>/saves/slotN.sav`, web localStorage
+`wf.save.N`) and pass them back on the next start. Native: no mode flag = launcher (`--launcher` / `--no-launcher`),
+Shift+Esc returns to it, headless `--launcher [--launcher-keys K,K] --shot` renders / drives it. Web: no mode query
+parameter = launcher (exports `wf_launcher_*`, `wf_app_saves`); `?nolauncher` skips it.
+
+Packaging: `package/mac-app.sh` (release build → `dist/Buu's Fury.app`, generated generic icon, ad-hoc signed,
+`LSEnvironment WF_WINDOW=1` and a bundle-path check so Finder launches are never treated as headless automation),
+`package/web-dist.sh` (→ `web/dist/`, static), `package/serve.py` (local server), `package/web_check.mjs` (headless
+Chrome smoke test). Quickstart: `engine/README.md`. When the core's title screen (`wf_core::menu::title`) is done,
+Story should hand over to it (its New Game / Continue / Delete on the same slots).
+
 ## 9b. World map (mode 7) — `wf_render::mode7` / `mode7_draw`
 
 When `MapView.mode7` is set (area 0-50), the renderer draws the game's mode-1 picture itself from content

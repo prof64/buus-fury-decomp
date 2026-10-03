@@ -56,6 +56,10 @@ pub enum Cause {
     /// a level-up (kill XP): the engine's level-up hook, event #3 ("%s has reached level %d!", stat points,
     /// skills learned), run where the game runs it inline
     LevelUp { entity: EntityId },
+    /// a closed menu queued it (Options -> Sleep: event s007, menu/options.rs)
+    Menu,
+    /// a supply used in the Inventory (its use script, supply def +0x30; `menu/inventory.rs`)
+    ItemUse { item: i32 },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -87,6 +91,11 @@ pub struct TriggerRt {
     pub act: Activation,
     /// the check pass this trigger was last tested in (the "on entry" test `0x08007791`)
     pub last: u32,
+    /// armed by Instant Transmission's arrival (0x080125FA: the test is wrapped by `0x0804CF94` and the rect spans
+    /// the world): the next check fires it wherever the player is, then the wrapper restores the test and rect and
+    /// runs the original activation
+    #[serde(default)]
+    pub forced: bool,
 }
 
 /// a map prop's live state (header +0x24 list; breakables and scripts change it)
@@ -199,6 +208,10 @@ pub struct Field {
     pub entered: u32,
     /// number of area loads (touch_once triggers survive only within one)
     pub loads: u32,
+    /// the trigger list's enable flag (+0xD0) is clear: Instant Transmission's run turns the checks off while Goku is
+    /// away (player.rs `ctl_it_field`)
+    #[serde(default)]
+    pub trig_off: bool,
 }
 
 /// how a field session starts
@@ -317,6 +330,7 @@ fn new_field() -> Field {
         pre_pickups: 0,
         entered: 0,
         loads: 0,
+        trig_off: false,
     }
 }
 
@@ -409,7 +423,7 @@ pub fn spawn_object(w: &mut World, o: &ObjDef) -> Option<EntityId> {
     match &o.kind {
         ObjKind::Trigger { rect, act, .. } => {
             if let Some(f) = w.field.as_mut() {
-                f.triggers.push(TriggerRt { obj: o.at, rect: *rect, act: *act, last: u32::MAX });
+                f.triggers.push(TriggerRt { obj: o.at, rect: *rect, act: *act, last: u32::MAX, forced: false });
             }
             None
         }
@@ -840,16 +854,26 @@ pub fn post_step(w: &mut World) {
         }
     }
     // an inline hook's event ended this frame: the update it interrupted completes now
-    if w.field.as_ref().is_some_and(|f| f.resume_held) {
+    let resumed = w.field.as_ref().is_some_and(|f| f.resume_held);
+    if resumed {
         if let Some(f) = w.field.as_mut() {
             f.resume_held = false;
         }
         w.step_entities();
     }
+    // an event that ended in this frame's script phase was still running when the game's trigger check ran (deferred
+    // calls, player update, trigger check, the other objects, then the scripts): no check this frame (story
+    // playthrough: s100, armed during s099, fires only once Instant Transmission's return has turned the checks
+    // back on). A held update (defeat scene) instead completes after its event, check included (s090 -> s091).
+    let ended_before = w.field.as_ref().is_some_and(|f| f.event_ended) && !resumed;
     let mode = w.field.as_ref().map(|f| f.mode.clone()).unwrap_or(Mode::Normal);
     crate::fieldobj::item_get_step(w);
     crate::fieldobj::debris_step(w);
+    // Instant Transmission's pick (a modal loop of the game, player.rs `start_it`) replaces the frame: no trigger
+    // check, the cameras hold (story playthrough: the camera stops on the frame B is pressed)
+    let modal = w.modal.is_some();
     match mode {
+        Mode::Normal if modal || ended_before => {}
         Mode::Normal => trigger_check(w),
         // the load is waiting for its on-enter script: the screen stays black
         Mode::FadeOut { .. } if w.field.as_ref().is_some_and(|f| f.arrival.is_some()) => {}
@@ -904,12 +928,12 @@ pub fn post_step(w: &mut World) {
         }
     }
     // the script camera (scene.rs) owns player 0's camera while a script drives it
-    let scripted = crate::scene::camera(w);
+    let scripted = if modal { crate::scene::camera_owned(w) } else { crate::scene::camera(w) };
     if crate::fieldworld::flying(w) {
         crate::fieldworld::camera(w);
     }
     for s in 0..w.players.len() {
-        if s == 0 && (scripted || crate::fieldworld::flying(w)) {
+        if s == 0 && (scripted || crate::fieldworld::flying(w)) || modal {
             continue;
         }
         camera(w, s);
@@ -1042,6 +1066,11 @@ pub fn trigger_check(w: &mut World) {
     if f.busy || f.item_get.is_some() {
         return;
     }
+    // the list's enable flag (+0xD0) is tested first
+    if f.trig_off {
+        f.check_fired = false;
+        return;
+    }
     f.check_fired = false;
     // the list's check counter (+0xC4), frozen while an event runs
     f.checks = f.checks.wrapping_add(1);
@@ -1064,6 +1093,16 @@ pub fn trigger_check(w: &mut World) {
         }
         for (k, t) in trigs.iter().enumerate() {
             let r = t.rect;
+            if t.forced {
+                // the wrapper's rect spans the world and its test passes: restore, then the original activation
+                if let Some(x) = w.field.as_mut().and_then(|f| f.triggers.get_mut(k)) {
+                    x.forced = false;
+                }
+                let mut t = t.clone();
+                t.forced = false;
+                fire(w, s, k, &t);
+                return;
+            }
             if !(r.x0 <= px && px < r.x1 && r.y0 <= py && py < r.y1) {
                 continue;
             }

@@ -501,7 +501,9 @@ pub fn item_get_step(w: &mut World) {
         // the presentation ends: the player leaves the hold pose (SetAnim(0)); the count and the event follow a frame later
         let slot = g.slot as usize;
         if let Some(pi) = w.player_idx(slot) {
-            crate::player::set_idle(w, pi);
+            if !crate::player::resume_it(w, pi) {
+                crate::player::set_idle(w, pi);
+            }
         }
         return;
     }

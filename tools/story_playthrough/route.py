@@ -136,4 +136,14 @@ ROUTE_GOALS = [
     ('walk', 112, 140), ('hold', KEY.UP, 2), ('wait', 5), ('hold', KEY.L, 2), ('wait', 10), ('hold', KEY.B, 120),
     ('wait', 40), ('events',), ('walk', 112, 124), ('hold', KEY.UP, 40), ('area', 1, 17), ('expect', 200),
     ('wait', 60),
+    # --- part 3 ---
+    # 1-17: the Katchin wall. L to Instant Transmission (slot 2), hold B (aim cursor), steer it right then down onto
+    # free floor beside the chest (a blocked spot does nothing), release: Goku lands at (200, 228) inside s099 (the
+    # chest), then teleports back; s100 ("Amazing, Goku!") warps to Grand Kai's Mansion 1-10 (a long scene)
+    ('walk', 112, 212), ('hold', KEY.L, 2), ('wait', 10), ('hold', KEY.B, 20), ('hold', KEY.B | KEY.RIGHT, 23),
+    ('hold', KEY.B | KEY.DOWN, 12), ('expect', 60), ('wait', 20), ('expect', 200), ('wait', 30),
+    # 1-10: up into s101 (the tournament, flag 12) -> 1-20, the bracket scene; the final: Pikkon (a field enemy);
+    # his defeat scene -> 0-22 / 0-96 cutscenes -> Earth 2-1 (end of Other World)
+    ('walk', 272, 172), ('hold', KEY.UP, 10), ('expect', 100), ('wait', 30), ('fight', 8000), ('wait', 30),
+    ('events',), ('wait', 60),
 ]

@@ -69,6 +69,13 @@ impl Status {
                     tb.push(t, t.s(158 + i), i as i32);
                 }
             }
+            // mod party members (characters/*.json index 9+) after the game's eight, named from their content
+            for i in 9..w.story.chars.len() {
+                if w.story.chars[i].flags & 1 != 0 {
+                    let name = w.data.chars.iter().find(|c| c.index == i as i32).map(|c| super::text::units(&c.name)).unwrap_or_default();
+                    tb.push(t, &name, i as i32);
+                }
+            }
         }
         let mut s = Status { c, alloc: false, blink: 0, orig: [0; 4], vals: [0; 4], skills_btn, tabs, cursor: None, prompts: [None; 4], time: w.story.play_frames };
         s.prepare_tabs();
@@ -312,7 +319,7 @@ impl Status {
         let lv = level(w, r);
         let form = d.forms.get(cs.form.max(0) as usize).cloned().unwrap_or_default();
         let mut p = Pen::new(MenuFont::Bold, 0x10, 0x37, 0, 5, Some(1));
-        cv.textf(t, &mut p, t.s(40), &[Arg::S(t.s(form.upper_str as usize)), Arg::I(lv)]);
+        cv.textf(t, &mut p, t.s(40), &[Arg::S(&form.upper), Arg::I(lv)]);
         p.font = MenuFont::Menu;
         let rows: [(i32, usize, Vec<Arg>); 6] = [
             (0x43, 41, vec![Arg::I(r.hp), Arg::I(r.max_hp)]),

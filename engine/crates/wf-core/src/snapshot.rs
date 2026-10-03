@@ -37,6 +37,7 @@ struct WorldSer {
     walk_layer: Option<Vec<u8>>,
     modk: crate::modkit::ModState,
     menu: crate::menu::Menu,
+    saves: crate::menu::save::Saves,
 }
 
 pub fn to_bytes(w: &World) -> Vec<u8> {
@@ -64,6 +65,7 @@ pub fn to_bytes(w: &World) -> Vec<u8> {
         walk_layer: w.col.as_ref().and_then(|c| c.walk.clone()),
         modk: w.modk.clone(),
         menu: w.menu.clone(),
+        saves: w.saves.clone(),
     };
     postcard::to_allocvec(&s).unwrap_or_default()
 }
@@ -111,6 +113,7 @@ pub fn from_bytes(data: &Arc<GameData>, bytes: &[u8]) -> Option<World> {
     w.field = s.field;
     w.modk = s.modk;
     w.menu = s.menu;
+    w.saves = s.saves;
     for e in w.ents.iter_mut() {
         if let Body::Enemy(en) = &mut e.body {
             for st in en.ai.stack.iter_mut() {

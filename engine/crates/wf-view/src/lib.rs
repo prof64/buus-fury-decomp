@@ -91,6 +91,23 @@ pub struct MenuView {
     /// these are not set
     pub fade: Option<PaletteFade>,
     pub fade_black: u8,
+    /// the screen is drawn over the field picture (mini-games: the world stays on screen, the game adds OBJs): no
+    /// backdrop, the renderer composes the normal view first, then these layers / OBJs on top
+    pub overlay: bool,
+    /// BLDCNT / BLDALPHA alpha blending (the credits' fades): None = off
+    pub blend: Option<MenuBlend>,
+}
+
+/// GBA alpha blending: where the top pixel's layer is a first target and the pixel under it a second target,
+/// colour = min(255, (top * eva + under * evb) >> 4) per 8-bit channel (mGBA's math, docs/frontend.md)
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub struct MenuBlend {
+    /// first targets: bit i = `layers[i]`, bit 31 = OBJs
+    pub first: u32,
+    /// second targets: bit i = `layers[i]`, bit 31 = OBJs, bit 30 = the backdrop
+    pub second: u32,
+    pub eva: u8,
+    pub evb: u8,
 }
 
 /// One background: a `w` x `h` 8bpp surface built from `ops` (in order), shown at screen (x, y).
@@ -122,6 +139,16 @@ pub enum MenuOp {
     /// frame `frame` of a content picture (`path` = an indexed PNG in the pack, e.g. `ui/menu/button_a.png`; frames
     /// side by side, `fw` x `fh` each) copied to (x, y) (`0x0803F922`: index 0 skipped when `key0`)
     Image { path: String, frame: u16, fw: u16, fh: u16, x: i32, y: i32, key0: bool },
+    /// one text line with the outlined glyph routine `0x0803F70C`: each glyph covers (x - 1 .. x + w, top ..
+    /// top + 17); glyph pixels take the colour, their 4-neighbours (left / right / above / below) `outline`
+    TextOutline { font: MenuFont, x: i32, y: i32, colour: u8, outline: u8, clip: [i32; 4], text: Vec<u16> },
+    /// the layer drawn so far becomes a texture shown as affine OBJs (no double size, PA = PD = `pa`, PB = PC = 0):
+    /// each piece (src x, src y, w, h, dst x, dst y) samples `(pa * (screen - centre) >> 8) + w / 2` from its rect;
+    /// the first piece is on top (OAM order); the layer is cleared to transparent first
+    AffineObjs { pieces: Vec<[i32; 6]>, pa: i32 },
+    /// `0x0803F9D4`: every pixel of (x0, y0)-(x1, y1) (exclusive) replaced by `table[pixel]` (the title menu's
+    /// darkened box)
+    Remap { x0: i32, y0: i32, x1: i32, y1: i32, table: Vec<u8> },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]

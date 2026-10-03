@@ -169,6 +169,51 @@ impl MenuRenderer {
         self.images.get(path).and_then(|o| o.as_ref())
     }
 
+    /// `0x0803F70C` per glyph: columns x - 1 ..= x + w, rows top .. top + 17; glyph bit -> colour, else a bit of the
+    /// 4-neighbourhood (columns k - 1 / k + 1, rows above / below in column k) -> outline colour
+    fn text_outline(&self, s: &mut Surface, font: MenuFont, x: i32, y: i32, colour: u8, outline: u8, clip: [i32; 4], text: &[u16]) {
+        let Some(Some(f)) = self.fonts.get(font_slot(font)) else { return };
+        let mut colour = colour;
+        let mut pen = x;
+        let top = y - 12;
+        let (cx0, cy0, cx1, cy1) = (clip[0].max(0), clip[1].max(0), clip[2].min(s.w), clip[3].min(s.h));
+        let mut i = 0;
+        while i < text.len() {
+            let c = text[i];
+            if c == 8 {
+                if let Some(&n) = text.get(i + 1) {
+                    colour = n as u8;
+                }
+                i += 2;
+                continue;
+            }
+            i += 1;
+            let Some(Some((w, cols))) = f.glyphs.get(c as usize) else { continue };
+            let w = *w as i32;
+            let col = |k: i32| -> u32 { if k >= 0 && k < w { cols[k as usize] } else { 0 } };
+            for k in -1..=w {
+                let main = col(k);
+                let ol = col(k - 1) | col(k + 1) | (col(k) >> 1) | (col(k) << 1);
+                let px = pen + k;
+                if px < cx0 || px >= cx1 {
+                    continue;
+                }
+                for dy in 0..17 {
+                    let py = top + dy;
+                    if py < cy0 || py >= cy1 {
+                        continue;
+                    }
+                    if main >> dy & 1 != 0 {
+                        s.px[(py * s.w + px) as usize] = colour;
+                    } else if ol >> dy & 1 != 0 {
+                        s.px[(py * s.w + px) as usize] = outline;
+                    }
+                }
+            }
+            pen += w + 1;
+        }
+    }
+
     /// draw one text line like `0x0803DADA`'s per-unit loop (colour codes switch the colour; units without a
     /// glyph draw nothing and do not advance)
     fn text(&self, s: &mut Surface, font: MenuFont, x: i32, y: i32, colour: u8, shadow: Option<u8>, clip: [i32; 4], text: &[u16]) {
@@ -250,7 +295,39 @@ impl MenuRenderer {
                     }
                 }
                 MenuOp::Pixel { x, y, colour } => s.set(*x, *y, *colour),
+                MenuOp::Remap { x0, y0, x1, y1, table } => {
+                    for y in (*y0).max(0)..(*y1).min(s.h) {
+                        for x in (*x0).max(0)..(*x1).min(s.w) {
+                            let k = (y * s.w + x) as usize;
+                            s.px[k] = table.get(s.px[k] as usize).copied().unwrap_or(s.px[k]);
+                        }
+                    }
+                }
                 MenuOp::Text { font, x, y, colour, shadow, clip, text } => self.text(&mut s, *font, *x, *y, *colour, *shadow, *clip, text),
+                MenuOp::TextOutline { font, x, y, colour, outline, clip, text } => self.text_outline(&mut s, *font, *x, *y, *colour, *outline, *clip, text),
+                MenuOp::AffineObjs { pieces, pa } => {
+                    let tex = std::mem::replace(&mut s.px, vec![0; (s.w * s.h).max(0) as usize]);
+                    for p in pieces.iter().rev() {
+                        let [sx0, sy0, w, h, dx0, dy0] = *p;
+                        for y in 0..h {
+                            for x in 0..w {
+                                let tx = ((pa * (x - w / 2)) >> 8) + w / 2;
+                                let ty = ((pa * (y - h / 2)) >> 8) + h / 2;
+                                if tx < 0 || ty < 0 || tx >= w || ty >= h {
+                                    continue;
+                                }
+                                let (ax, ay) = (sx0 + tx, sy0 + ty);
+                                if ax < 0 || ay < 0 || ax >= s.w || ay >= s.h {
+                                    continue;
+                                }
+                                let c = tex[(ay * s.w + ax) as usize];
+                                if c != 0 {
+                                    s.set(dx0 + x, dy0 + y, c);
+                                }
+                            }
+                        }
+                    }
+                }
                 MenuOp::Image { path, frame, fw, fh, x, y, key0 } => {
                     let (fw, fh) = (*fw as i32, *fh as i32);
                     let Some(img) = self.image(packs, path) else { continue };
@@ -288,10 +365,14 @@ impl MenuRenderer {
         }
         // layers by priority (3 first), equal priority: later layers on top (BG0 is drawn last on the GBA, the view
         // lists layers back to front)
-        let mut idx: Vec<u16> = vec![mv.backdrop; 240 * 160];
+        // overlay screens (mini-games): u16::MAX = nothing drawn, the field shows through (alpha 0 in the output)
+        let mut idx: Vec<u16> = vec![if mv.overlay { u16::MAX } else { mv.backdrop }; 240 * 160];
         let mut order: Vec<usize> = (0..mv.layers.len()).collect();
         order.sort_by_key(|&i| std::cmp::Reverse(mv.layers[i].priority));
         let surfaces: Vec<Surface> = mv.layers.iter().map(|l| self.surface(packs, l)).collect();
+        // which layer is on top / under it per pixel (blending): 254 = backdrop, 255 = OBJ
+        let mut top_l: Vec<u8> = vec![254; 240 * 160];
+        let mut under: Vec<(u16, u8)> = vec![(mv.backdrop, 254); 240 * 160];
         for &li in &order {
             let l = &mv.layers[li];
             let s = &surfaces[li];
@@ -303,7 +384,10 @@ impl MenuRenderer {
                     }
                     let c = s.px[(sy * s.w + sx) as usize];
                     if c != 0 {
-                        idx[(y * 240 + x) as usize] = c as u16;
+                        let k = (y * 240 + x) as usize;
+                        under[k] = (idx[k], top_l[k]);
+                        idx[k] = c as u16;
+                        top_l[k] = li.min(253) as u8;
                     }
                 }
             }
@@ -328,14 +412,40 @@ impl MenuRenderer {
                     if c == 0 || !(0..240).contains(&px) || !(0..160).contains(&py) {
                         continue;
                     }
-                    idx[(py * 240 + px) as usize] = c as u16 + o.pal;
+                    let k = (py * 240 + px) as usize;
+                    under[k] = (idx[k], top_l[k]);
+                    idx[k] = c as u16 + o.pal;
+                    top_l[k] = 255;
                 }
             }
         }
         let fb = fade_black.min(16) as u32;
+        let bit = |l: u8| -> u32 {
+            match l {
+                255 => 1 << 31,
+                254 => 1 << 30,
+                n => 1 << n,
+            }
+        };
         idx.iter()
-            .map(|&i| {
+            .enumerate()
+            .map(|(k, &i)| {
+                if i == u16::MAX {
+                    return 0;
+                }
                 let mut c = pal.get(i as usize).copied().unwrap_or(0);
+                if let Some(b) = mv.blend {
+                    let (ui, ul) = under[k];
+                    if b.first & bit(top_l[k]) != 0 && b.second & bit(ul) != 0 && top_l[k] != 254 {
+                        let d = if ui == u16::MAX { 0 } else { pal.get(ui as usize).copied().unwrap_or(0) };
+                        let mut o = 0;
+                        for sh in [16, 8, 0] {
+                            let v = ((((c >> sh) & 0xFF) * b.eva as u32 + ((d >> sh) & 0xFF) * b.evb as u32) >> 4).min(255);
+                            o |= v << sh;
+                        }
+                        c = o;
+                    }
+                }
                 if let Some(f) = fade.filter(|f| f.level > 0) {
                     c = palette_fade5(c, f.level as u32, f.target);
                 }

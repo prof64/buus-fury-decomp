@@ -33,3 +33,8 @@ impl Page for MapScreen {
         self.stub.draw_stub(w, d)
     }
 }
+
+/// a harness opening this screen from JSON (`menu::open_from_json`); None = not this screen's kind
+pub fn open_json(_w: &World, _v: &serde_json::Value) -> Option<(super::Screen, super::Transition, bool)> {
+    None
+}

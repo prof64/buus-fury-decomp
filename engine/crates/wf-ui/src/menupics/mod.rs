@@ -3,6 +3,7 @@
 //! transparent), frames stacked vertically. One table per screen family (files in this directory).
 
 pub mod minigame;
+pub mod opts;
 pub mod pause;
 pub mod screens;
 
@@ -20,5 +21,5 @@ pub struct MenuPic {
 }
 
 pub fn all() -> Vec<&'static MenuPic> {
-    pause::PICS.iter().chain(screens::PICS.iter()).chain(minigame::PICS.iter()).collect()
+    pause::PICS.iter().chain(screens::PICS.iter()).chain(minigame::PICS.iter()).chain(opts::PICS.iter()).collect()
 }

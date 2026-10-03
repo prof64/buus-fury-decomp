@@ -273,6 +273,10 @@ impl Sim for StorySim {
     fn players(&self) -> usize {
         self.session.world.players.len().max(1)
     }
+    /// the launcher reads the save slots (`launcher::saves_of`)
+    fn as_any(&self) -> Option<&dyn std::any::Any> {
+        Some(self)
+    }
 }
 
 /// `App` running story mode.

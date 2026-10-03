@@ -1636,7 +1636,11 @@ fn update_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) -> bool {
             *t += 1;
             if *t >= 60 {
                 if let Some(i) = i {
-                    set_state(w, i, 0);
+                    // a player in Instant Transmission's field run goes back to the run's state (s099)
+                    let it = matches!(w.ents[i].body, Body::Player(_)) && crate::player::resume_it(w, i);
+                    if !it {
+                        set_state(w, i, 0);
+                    }
                     if let Body::Npc(n) = &mut w.ents[i].body {
                         n.hold_item = None;
                     }

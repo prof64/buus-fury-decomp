@@ -45,13 +45,20 @@ pub struct MenuData {
     pub portraits: Vec<String>,
     /// per form (form table `0x086B82EC`, 24 bytes): name string id (+4), portrait bytes (+0x10..+0x15)
     pub forms: Vec<FormUi>,
+    /// supplies' and equipment's menu data (names, descriptions, icons, prices, slots): shop.rs
+    pub items: shop::ItemsUi,
+    /// the skill table's and the quest table's menu data (`ui/menu/opts.json`): options.rs
+    pub opts: options::OptsData,
+    /// supplies' inventory data (def +4 name, +6 plural, +8 description, icon, story flag, use script): inventory.rs
+    pub inv: inventory::InvData,
 }
 
 #[derive(Clone, Debug, Default)]
 pub struct FormUi {
     pub name_str: u16,
+    pub name: Vec<u16>,
     /// +4: the upper-case name (Status page)
-    pub upper_str: u16,
+    pub upper: Vec<u16>,
     pub portraits: [u8; 6],
 }
 
@@ -88,13 +95,16 @@ impl MenuData {
                     pb[k] = x.as_u64().unwrap_or(0) as u8;
                 }
             }
-            // form +4: the upper-case name's string id (content has its text: find it in the string table)
-            let upper = v["upper_name"].as_str().map(text::units).unwrap_or_default();
+            // form +4: the upper-case name (content has its text; mod forms without one: the name upper-cased)
+            let name = v["name"].as_str().unwrap_or("");
+            let upper = v["upper_name"].as_str().map(text::units).unwrap_or_else(|| text::units(&name.to_uppercase()));
             let name_str = v["name_string"].as_u64().unwrap_or(0) as u16;
-            let upper_str = text.strings.iter().position(|s| !upper.is_empty() && *s == upper).map(|k| k as u16).unwrap_or(name_str);
-            forms[i] = FormUi { name_str, upper_str, portraits: pb };
+            forms[i] = FormUi { name_str, name: text::units(name), upper, portraits: pb };
         }
-        Some(Arc::new(MenuData { text, portraits, forms }))
+        let items = shop::ItemsUi::load(src);
+        let opts = options::OptsData::load(src);
+        let inv = inventory::InvData::load(src);
+        Some(Arc::new(MenuData { text, portraits, forms, items, opts, inv }))
     }
 }
 
@@ -109,17 +119,28 @@ pub trait Page {
     fn update(&mut self, _w: &World) {}
     /// draw-time side effects and values sampled when the surface is drawn (kept in the shown copy)
     fn before_draw(&mut self, _w: &World) {}
+    /// draw-time side effects the game applies after the part of the surface that shows them (the state shown
+    /// keeps the old values; the live state takes the new ones)
+    fn after_draw(&mut self, _w: &World) {}
     /// the mode's step (input, logic, done check)
     fn step(&mut self, w: &mut World) -> Action;
     /// a nested mode this one ran returned `r`
     fn child_result(&mut self, _w: &mut World, _r: i32) -> Action {
         Action::None
     }
+    /// the scripts this screen started in its step (`FieldEvent::Run`, run by the host after the step: item use) are
+    /// done: apply what the game does after them in the same iteration (see [`post`])
+    fn after_scripts(&mut self, _w: &World) {}
     /// the screen as drawn from this state (pure)
     fn view(&self, w: &World, d: &MenuData) -> MenuView;
     /// video frames one redraw takes (CPU time; `re/buu/menu/timing.py`)
     fn redraw_cost(&self) -> u8 {
         1
+    }
+    /// frames the mode's enter + first update take beyond the first one (its picture shows at once; no
+    /// iteration in them): credits / Watch This! 1
+    fn enter_lag(&self) -> u8 {
+        0
     }
 }
 
@@ -177,6 +198,9 @@ impl Screen {
     fn before_draw(&mut self, w: &World) {
         self.page_mut().before_draw(w)
     }
+    fn after_draw(&mut self, w: &World) {
+        self.page_mut().after_draw(w)
+    }
     fn step(&mut self, w: &mut World) -> Action {
         self.page_mut().step(w)
     }
@@ -189,6 +213,33 @@ impl Screen {
     fn redraw_cost(&self) -> u8 {
         self.page().redraw_cost()
     }
+}
+
+/// Open a screen described by JSON (test harnesses: `menu_parity.rs` opens script-started screens the frame the
+/// emulator's script did): `{"kind": "...", ...}`, handled by the screen modules' `open_json`.
+pub fn open_from_json(w: &mut World, v: &serde_json::Value) -> bool {
+    let tries: [fn(&World, &serde_json::Value) -> Option<(Screen, Transition, bool)>; 13] = [
+        inventory::open_json,
+        equip::open_json,
+        options::open_json,
+        journal::open_json,
+        skills::open_json,
+        shop::open_json,
+        save::open_json,
+        title::open_json,
+        charsel::open_json,
+        gameover::open_json,
+        credits::open_json,
+        minigame::open_json,
+        mapscreen::open_json,
+    ];
+    for f in tries {
+        if let Some((sc, tr, scripted)) = f(w, v) {
+            open(w, sc, tr, scripted);
+            return true;
+        }
+    }
+    false
 }
 
 /// the pause page L (`right` = false) / R of page `from` (Status 0, Inventory 1, Equip 2, Options 3, Journal 4)
@@ -218,6 +269,8 @@ pub fn surface_view(cv: text::Canvas) -> MenuView {
         backdrop: 0,
         fade: None,
         fade_black: 0,
+        overlay: false,
+        blend: None,
     }
 }
 
@@ -254,6 +307,13 @@ pub struct Menu {
     pub shown: Option<Box<Screen>>,
     /// a redraw in progress (on screen when its lag frames end)
     pub pending: Option<Box<Screen>>,
+    /// a picture copied before `pending` within the same iteration (a page redrawn by an event handler before a
+    /// nested mode draws: the Inventory's Use dialog); shown first, dropped when `pending` shows
+    #[serde(default)]
+    pub pre: Option<Box<Screen>>,
+    /// the top screen ran scripts through the host this frame (item use): `post` refreshes its redraw after them
+    #[serde(default)]
+    pub after_scripts: bool,
     /// video frames the mode loop is still busy (no logic, no input read)
     pub lag: u8,
     /// buttons at the mode loop's last input read (edges are computed between reads)
@@ -266,6 +326,61 @@ pub struct Menu {
     pub result: Option<MenuResult>,
     /// opened by a script (the script waits for `result`) rather than by START
     pub scripted: bool,
+    /// the screen change around this menu (fade steps, black frames)
+    pub tr: Transition,
+    /// the menu closed this frame with a transition that hands the frame back to the world (`leave` 1, `fade_in` 0:
+    /// screens drawn over the field): the world updates in this same frame
+    #[serde(default)]
+    pub resume: bool,
+    /// the game options (`0x03001914`: text speed, SFX volume, music volume, 0; the cartridge's options block,
+    /// shared by every save): kept across menus (options.rs)
+    #[serde(default)]
+    pub settings: options::Settings,
+    /// an event the closed menu queued for the field (`GD+0x610` deferred scripts: Options -> Sleep = s007); run
+    /// in the first field frame after the menu
+    #[serde(default)]
+    pub then: Option<String>,
+    /// a nested mode ended with this result (`0x0803D876`): its exit stub runs one more iteration (input read, no
+    /// draw) before the parent's step resumes
+    #[serde(default)]
+    pub exit_stub: Option<i32>,
+    /// a screen picture left on screen after the menu is gone, while the world runs below it until `World.frame`
+    /// reaches `overlay_until` (New Game: the prologue script fades the title's Select Game picture out; title.rs)
+    #[serde(default)]
+    pub overlay: Option<Box<Screen>>,
+    #[serde(default)]
+    pub overlay_until: u32,
+}
+
+/// How a menu screen comes and goes (all measured per screen kind): the field fades out by `fade_out` per frame
+/// (palette fade level 0 -> 256), `enter` black frames (world save, mode enter, first draw: the page shows on the
+/// last), the menu runs, `leave` frames after the closing iteration (the first still shows the page, then black:
+/// the world restore), the field fades in by `fade_in` per frame. A step of 0 = no fade (the screen cuts).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct Transition {
+    pub fade_out: u16,
+    pub enter: u16,
+    pub leave: u16,
+    pub fade_in: u16,
+}
+
+impl Default for Transition {
+    fn default() -> Self {
+        PAUSE
+    }
+}
+
+/// the pause menu (START): see [`step`]
+pub const PAUSE: Transition = Transition { fade_out: 16, enter: 5, leave: 25, fade_in: 16 };
+
+/// Open a menu screen with a transition (`scripted`: a script waits for `World.menu.result`). The field fades out
+/// from the next frame.
+pub fn open(w: &mut World, screen: Screen, tr: Transition, scripted: bool) {
+    let settings = w.menu.settings;
+    w.menu = Menu { phase: Phase::FadeOut { level: 0 }, stack: vec![screen], scripted, tr, settings, ..Menu::default() };
+    if tr.fade_out == 0 {
+        w.menu.phase = Phase::Enter { t: 0 };
+    }
 }
 
 /// is a menu screen up (the world does not update)?
@@ -281,7 +396,13 @@ pub const SFX_ACCEPT: i32 = 41;
 /// Field main loop `0x08006E3C`: START pressed with the current character's HP != 0 opens the pause menu (sound
 /// 40, then the 16-frame fade). Called after the field rules of a normal field frame.
 pub fn check_pause(w: &mut World) -> bool {
-    if active(w) || w.menu.result.is_some() {
+    // a closed menu's queued event (options.rs Sleep) runs in the first field frame after it
+    if !active(w) {
+        if let Some(ev) = w.menu.then.take() {
+            w.events.push(crate::world::Event::Field(crate::field::FieldEvent::Run { run: crate::fieldcontent::Callback::Event(ev), cause: crate::field::Cause::Menu, slot: 0 }));
+        }
+    }
+    if active(w) || w.menu.scripted {
         return false;
     }
     let Some(f) = w.field.as_ref() else { return false };
@@ -308,7 +429,7 @@ pub fn check_pause(w: &mut World) -> bool {
     }
     w.sfx(SFX_MENU, 64);
     let page = status::Status::new(w);
-    w.menu = Menu { phase: Phase::FadeOut { level: 0 }, stack: vec![Screen::Status(page)], ..Menu::default() };
+    open(w, Screen::Status(page), PAUSE, false);
     true
 }
 
@@ -318,9 +439,6 @@ pub fn check_pause(w: &mut World) -> bool {
 ///   VRAM copy mid-scanout, not modelled: black here), the page at frame 21, the first input read at 22;
 /// * the closing iteration still shows the page; then 24 black frames (the exit stub's iteration + the world
 ///   restore), the 16-frame fade-in (levels 240..0), the world runs again the frame after.
-pub const FADE_STEP: u16 = 16;
-pub const ENTER_FRAMES: u16 = 5;
-pub const LEAVE_FRAMES: u16 = 25;
 
 /// One video frame of an active menu (called instead of the world update).
 pub fn step(w: &mut World) {
@@ -331,11 +449,11 @@ pub fn step(w: &mut World) {
             // the fade mode's iteration reads the input (edges of the first menu read are relative to it)
             w.menu.held = held;
             w.story.play_frames += 1;
-            let l = level + FADE_STEP;
+            let l = level + w.menu.tr.fade_out.max(1);
             w.menu.phase = if l >= 256 { Phase::Enter { t: 0 } } else { Phase::FadeOut { level: l } };
         }
         Phase::Enter { t } => {
-            if t + 1 >= ENTER_FRAMES {
+            if t + 1 >= w.menu.tr.enter.max(1) {
                 w.menu.phase = Phase::Run;
                 // the first update draws during the black frames: on screen now, no lag after it
                 redraw(w, true);
@@ -351,6 +469,7 @@ pub fn step(w: &mut World) {
                     if let Some(p) = w.menu.pending.take() {
                         w.menu.shown = Some(p);
                     }
+                    w.menu.pre = None;
                 }
                 return;
             }
@@ -361,8 +480,15 @@ pub fn step(w: &mut World) {
                 // the exit stub's iteration (counts a logic frame)
                 w.story.play_frames += 1;
             }
-            if t + 1 >= LEAVE_FRAMES {
-                w.menu.phase = Phase::FadeIn { level: 256 - FADE_STEP };
+            if t + 1 >= w.menu.tr.leave.max(1) {
+                let st = w.menu.tr.fade_in;
+                if st == 0 {
+                    w.menu.phase = Phase::Idle;
+                    w.menu.shown = None;
+                    w.menu.resume = w.menu.tr.leave <= 1;
+                } else {
+                    w.menu.phase = Phase::FadeIn { level: 256u16.saturating_sub(st) };
+                }
                 w.story.play_frames += 1;
             } else {
                 w.menu.phase = Phase::Leave { t: t + 1 };
@@ -370,7 +496,7 @@ pub fn step(w: &mut World) {
         }
         Phase::FadeIn { level } => {
             w.story.play_frames += 1;
-            let l = level.saturating_sub(FADE_STEP);
+            let l = level.saturating_sub(w.menu.tr.fade_in.max(1));
             if l == 0 {
                 w.menu.phase = Phase::Idle;
                 w.menu.shown = None;
@@ -400,6 +526,9 @@ fn tick(w: &mut World) {
 /// update(): the mode's counters, then a redraw of the top screen when its container is not drawn. A redraw
 /// costing n frames leaves n - 1 lag frames and the surface on screen in the last of them.
 fn redraw(w: &mut World, first: bool) {
+    if w.menu.exit_stub.is_some() {
+        return;
+    }
     let Some(mut top) = w.menu.stack.pop() else { return };
     top.update(w);
     if !top.container_ref().drawn {
@@ -409,10 +538,14 @@ fn redraw(w: &mut World, first: bool) {
         if cost == 1 {
             w.menu.shown = Some(Box::new(top.clone()));
             w.menu.pending = None;
+            if first {
+                w.menu.lag = top.page().enter_lag();
+            }
         } else {
             w.menu.pending = Some(Box::new(top.clone()));
             w.menu.lag = cost - 1;
         }
+        top.after_draw(w);
     }
     w.menu.stack.push(top);
 }
@@ -429,11 +562,28 @@ pub enum Action {
     Pop(i32),
     /// close the whole menu
     Close,
+    /// close the whole menu from the mode's done check (its step returned non-zero, e.g. START): no exit stub
+    /// iteration, the screen goes black in this frame
+    Done,
+    /// a nested mode's done check returned `r` (`run_mode` returns at once, no exit stub): the parent's handler
+    /// continues in this frame
+    PopDone(i32),
 }
 
 fn step_screen(w: &mut World) {
     let Some(mut top) = w.menu.stack.pop() else { return };
-    let mut act = top.step(w);
+    let mut act = match w.menu.exit_stub.take() {
+        // the nested mode's exit stub iteration is over: the parent's handler continues with the result
+        Some(r) => match w.menu.stack.pop() {
+            Some(mut parent) => {
+                let a = parent.child_result(w, r);
+                top = parent;
+                a
+            }
+            None => Action::Pop(r),
+        },
+        None => top.step(w),
+    };
     loop {
         match act {
             Action::None => w.menu.stack.push(top),
@@ -443,14 +593,30 @@ fn step_screen(w: &mut World) {
                 w.menu.stack.push(s);
             }
             Action::Pop(r) => {
+                if !w.menu.stack.is_empty() {
+                    // one more iteration of the ended mode (its exit stub) before the parent resumes
+                    w.menu.exit_stub = Some(r);
+                    w.menu.stack.push(top);
+                    break;
+                }
+                close(w);
+                w.menu.result = Some(MenuResult { code: r });
+            }
+            Action::Close => close(w),
+            Action::Done => {
+                close(w);
+                w.menu.phase = Phase::Leave { t: 1 };
+            }
+            Action::PopDone(r) => {
                 if let Some(mut parent) = w.menu.stack.pop() {
                     act = parent.child_result(w, r);
                     top = parent;
                     continue;
                 }
                 close(w);
+                w.menu.phase = Phase::Leave { t: 1 };
+                w.menu.result = Some(MenuResult { code: r });
             }
-            Action::Close => close(w),
         }
         break;
     }
@@ -470,11 +636,26 @@ pub fn view(w: &World) -> Option<MenuView> {
         // the closing iteration still shows the page
         Phase::Run | Phase::Leave { t: 0 } => {}
         Phase::Enter { .. } | Phase::Leave { .. } => return Some(MenuView { backdrop: 0, palette: vec![(0, 0)], ..Default::default() }),
+        Phase::Idle => {
+            let o = w.menu.overlay.as_deref().filter(|_| w.frame < w.menu.overlay_until)?;
+            return Some(o.view(w, w.data.menu.as_ref()?));
+        }
         _ => return None,
     }
     let d = w.data.menu.as_ref()?;
     let s = w.menu.shown.as_deref()?;
     Some(s.view(w, d))
+}
+
+/// A script-opened menu has finished (the fade-in after it is over): its result code (the native's push / effect
+/// is decided by the screen). Clears it.
+pub fn take_result(w: &mut World) -> Option<i32> {
+    if !w.menu.scripted || w.menu.phase != Phase::Idle {
+        return None;
+    }
+    let r = w.menu.result.take()?;
+    w.menu.scripted = false;
+    Some(r.code)
 }
 
 /// the menu was opened during this frame (its first fade frame is the next one): the frame finishes normally
@@ -490,4 +671,26 @@ pub fn field_fade(w: &World) -> Option<u16> {
         Phase::Enter { .. } | Phase::Leave { .. } => None,
         _ => None,
     }
+}
+
+/// The rest of an active menu's frame (`Session::step_post`): when the top screen ran scripts through the host this
+/// frame (they run after `step`, the game runs them inside its event handler), let it apply their results and redo
+/// the iteration's redraw snapshot.
+pub fn post(w: &mut World) {
+    if !w.menu.after_scripts {
+        return;
+    }
+    w.menu.after_scripts = false;
+    let Some(mut top) = w.menu.stack.pop() else { return };
+    top.page_mut().after_scripts(w);
+    if top.container_ref().drawn {
+        top.before_draw(w);
+        let snap = Some(Box::new(top.clone()));
+        if w.menu.pending.is_some() {
+            w.menu.pending = snap;
+        } else if w.menu.shown.is_some() {
+            w.menu.shown = snap;
+        }
+    }
+    w.menu.stack.push(top);
 }

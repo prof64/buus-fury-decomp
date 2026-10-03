@@ -1,0 +1,105 @@
+//! Segments (`data/segments/*.json`, recorder `tools/segments/segment.py`, spec `engine/docs/segments.md`): each
+//! starts at a real-game emulator state, is imported into wf-core (`wf_import::import_emulator_state`) and replayed
+//! with the recording's input; the verdict per segment is the first divergence.
+//!
+//! `SEGMENT=name[,name]` runs only those; `SEGMENT_VERBOSE=N` / `SEGMENT_TRACE=a..b` (wf_import::segment);
+//! `SEGMENT_STRICT=0` reports without failing. A segment is held to `"expect": {"matched": N}` in its file when
+//! present (frames that must match continuously), else to the whole recording.
+
+use std::collections::BTreeMap;
+use std::path::PathBuf;
+use std::sync::Arc;
+use wf_core::content::{DirSource, GameData};
+
+fn repo() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..")
+}
+
+fn content_dir() -> PathBuf {
+    if let Ok(d) = std::env::var("WF_FIELD_CONTENT") {
+        return PathBuf::from(d);
+    }
+    for shared in [repo().join("engine/target/tmp/wf-core-field-content"), repo().join("engine/target/tmp/wf-script-core-field-content")] {
+        if shared.join(".complete").exists() {
+            return shared;
+        }
+    }
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("wf-import-field-content");
+    if dir.join(".complete").exists() {
+        return dir;
+    }
+    let rom = std::fs::read(repo().join("roms/buu.gba")).expect("roms/buu.gba");
+    let only = ["tables", "sprites", "effects", "maps", "world", "items", "scripts"];
+    let opts = wf_extract::Options { only: only.iter().map(|s| s.to_string()).collect() };
+    let (content, _) = wf_extract::extract(rom, &opts).expect("extract");
+    for (path, data) in &content.files {
+        let p = dir.join(path.strip_prefix("base/").unwrap_or(path));
+        std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+        std::fs::write(&p, data).unwrap();
+    }
+    std::fs::write(dir.join(".complete"), b"ok").unwrap();
+    dir
+}
+
+fn setup() -> Option<(Arc<GameData>, BTreeMap<String, String>)> {
+    let rom = wf_rom::testutil::rom()?;
+    let font = wf_ui::font::Font::load(&rom, "dialog", 0x0806_EE6C);
+    wf_script_core::text::set_dialog_font((0..256u16).map(|c| font.advance(c)).collect());
+    let data = Arc::new(GameData::load(&DirSource { root: content_dir() }).expect("content"));
+    let set = wf_script::ScriptSet::load_all(&rom);
+    let (files, errs) = wf_script::export::export(&rom, &set);
+    assert!(errs.is_empty(), "decompile errors: {errs:?}");
+    Some((data, files))
+}
+
+#[test]
+fn segments_match_the_game() {
+    let dir = repo().join("data/segments");
+    let Ok(rd) = std::fs::read_dir(&dir) else { return };
+    let mut paths: Vec<PathBuf> = rd.filter_map(|e| e.ok()).map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "json")).collect();
+    paths.sort();
+    if let Ok(only) = std::env::var("SEGMENT") {
+        let names: Vec<&str> = only.split(',').collect();
+        paths.retain(|p| names.iter().any(|n| p.file_stem().is_some_and(|s| s == *n)));
+    }
+    if paths.is_empty() {
+        return;
+    }
+    let Some((data, files)) = setup() else { return };
+    let strict = std::env::var("SEGMENT_STRICT").map(|v| v != "0").unwrap_or(true);
+    let mut failed = vec![];
+    for p in &paths {
+        let doc = wf_import::segment::load(p).unwrap();
+        let name = p.file_stem().unwrap().to_string_lossy().to_string();
+        let t = std::time::Instant::now();
+        let rep = wf_import::segment::replay(&data, &files, &doc);
+        let need = doc.get("expect").and_then(|e| e["matched"].as_u64()).map(|n| n as usize).unwrap_or(rep.frames).min(rep.frames);
+        let ok = rep.compared >= need;
+        eprintln!(
+            "segment {name}: {} video frames ({} logic), matched {} / {} | first divergence {:?} | import held {} draws {} | {} actor checks | {:.2}s{}",
+            rep.frames,
+            rep.logic,
+            rep.compared,
+            need,
+            rep.first,
+            rep.import.0,
+            rep.import.1,
+            rep.actors,
+            t.elapsed().as_secs_f64(),
+            if ok { "" } else { "  <-- FAIL" }
+        );
+        for n in &rep.notes {
+            eprintln!("    import note: {n}");
+        }
+        for e in &rep.errors {
+            eprintln!("    script error: {e}");
+        }
+        if !ok {
+            eprintln!("    counts {:?}", rep.counts);
+            failed.push(name);
+        }
+    }
+    if strict {
+        assert!(failed.is_empty(), "segments below their expected match: {failed:?}");
+    }
+}
