@@ -309,6 +309,9 @@ fn build_area_entry(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner: 
     w.g.presses[0].pressed = 0;
     import_globals(&mut w, ram);
     w.scene.song = song(ram);
+    // the HUD: GameData +1 bit 1 (hide_hud 0x30 clears it: the HUD object removes itself and stays away through the
+    // loads until a show_hud - a save made on the world map loads without one; dungeon chapters db2 / db3)
+    w.scene.hud_hidden = w.story.game_bits & 2 == 0;
     // the banner: shown by this load when the RAM has a banner object (its name id then differed from the last one)
     let banner_obj = ram.objects().iter().any(|&o| ram.r32(o) == VT_BANNER);
     let name = data.field.as_ref().and_then(|fd| fd.area(to.world, to.area)).map(|a| a.name_id).unwrap_or(0);
@@ -379,12 +382,19 @@ pub fn import_emulator_state(data: &Arc<GameData>, ram: &GbaRam, runner: &mut St
     check(&mut world, ram, &mut notes);
     import_vram(&mut world, ram);
     // a banner object of an earlier load still showing: its countdown (obj +0x10) -> our age
-    if world.scene.banner.is_none() {
+    {
+        world.scene.banner_made = u32::MAX;
         if let Some(o) = ram.objects().into_iter().find(|&o| ram.r32(o) == VT_BANNER) {
             let rem = ram.r16(o + 0x10) as u32;
             let text = data.field.as_ref().and_then(|fd| fd.area(info.area.world, info.area.area)).map(|a| a.banner.clone()).unwrap_or_default();
             world.scene.banner = Some((text, 239u32.saturating_sub(rem)));
         }
+    }
+    // the script countdown (GD+0x4D4, running = GD+1 bit 2): the host's timer (12-x: the Airship's self destruct)
+    {
+        let gd = ram.read(GD, 0x4D8);
+        runner.hs.timers.countdown = u32le(&gd, 0x4D4) as i32;
+        runner.hs.timers.countdown_on = gd[1] & 4 != 0;
     }
     Ok(Imported { world, prev_keys: ram.r16(INPUT + 2) & 0x3FF, lf: info.lf, kind: info.kind, held_frames: b.held, draws: b.draws, notes })
 }
@@ -487,9 +497,10 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
             owners.push((h, Owner::Ent(w.ents[k].id)));
         }
     }
-    let mut shared_rc = [0u8; 4];
+    let mut shared_rc = [0u8; 5];
     for (k, rc) in shared_rc.iter_mut().enumerate() {
-        let p = 0x0300_2B88 + 4 * k as u32;
+        // the shadows' records, then the halo's (`0x03001BA8`)
+        let p = if k == wf_core::vram::HALO { 0x0300_1BA8 } else { 0x0300_2B88 + 4 * k as u32 };
         *rc = ram.r8(p);
         if *rc > 0 {
             owners.push((ram.r16(p + 2), Owner::Shared(k as u8)));
@@ -500,7 +511,14 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
             owners.push((b.start << 1, Owner::Foreign));
         }
     }
+    // the purgeable non-actor objects (made by the load after the players: at the list's end)
+    let stamp = w.next_id;
+    let objs: Vec<(Owner, u32, i32)> = owners
+        .iter()
+        .filter(|o| matches!(o.1, Owner::Hud | Owner::Banner | Owner::BossBar))
+        .map(|o| (o.1, stamp, a.e[a.idx[(o.0 >> 1) as usize & 511] as usize].size as i32 * 64))
+        .collect();
     if let Some(f) = w.field.as_mut() {
-        f.vram = Some(VramState { a, owners, shared_rc, suspended: vec![], hud_out: vec![] });
+        f.vram = Some(VramState { a, owners, shared_rc, suspended: vec![], hud_out: vec![], popups: vec![], keyed: vec![], stashed: None, delayed: vec![], objs, susp: vec![] });
     }
 }

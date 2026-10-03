@@ -254,6 +254,90 @@ pub struct Driver<'a> {
     scratch: Vec<u32>,
 }
 
+/// Work counters of the driver's code paths (for the CPU-cost model, `cost.rs`): filled while a profile is
+/// installed with [`profile_begin`].
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Profile {
+    /// cycles of the ARM inner loop `0x03000868` over all runs (see [`inner_cycles`])
+    pub inner: u64,
+    /// inner-loop calls / calls skipped for gain 0
+    pub runs: u32,
+    pub silent_runs: u32,
+    /// voices whose mix function ran (flag bit 0 set), tracks / SFX
+    pub track_mix: u32,
+    pub sfx_mix: u32,
+    /// loop / end splits (BIOS Div)
+    pub splits: u32,
+    /// voice updates that applied a change: volume, entry load, restart, pitch
+    pub upd_vol: u32,
+    pub upd_entry: u32,
+    pub upd_restart: u32,
+    pub upd_pitch: u32,
+    /// voice update calls on a live voice
+    pub upd_live: u32,
+    /// sequencer ticks / rows loaded / cells loaded / per-tick handlers run / row effects with a handler
+    pub ticks: u32,
+    pub rows: u32,
+    pub cells: u32,
+    pub tick_fns: u32,
+    /// mix chunks (calls of the music mixer `0x0803F07C`), samples
+    pub chunks: u32,
+    pub samples: u32,
+    /// music segments mixed (a chunk is cut at every tick)
+    pub segments: u32,
+}
+
+thread_local! {
+    static PROFILE: std::cell::Cell<Option<Profile>> = const { std::cell::Cell::new(None) };
+}
+
+/// Start counting the driver's work on this thread.
+pub fn profile_begin() {
+    PROFILE.with(|p| p.set(Some(Profile::default())));
+}
+/// Stop counting and return the counters.
+pub fn profile_end() -> Profile {
+    PROFILE.with(|p| p.take()).unwrap_or_default()
+}
+#[inline]
+fn prof(f: impl FnOnce(&mut Profile)) {
+    PROFILE.with(|p| {
+        if let Some(mut x) = p.get() {
+            f(&mut x);
+            p.set(Some(x));
+        }
+    });
+}
+
+/// Cycles of one call of the ARM inner loop `0x03000868` (IWRAM code, sample bytes from ROM; measured on mGBA's
+/// timing, WAITCNT 0x4314): `k` samples from `pos` (18.14) with `step`.
+/// * integer step != 0 (and backwards): 14 per sample + 2 per block of 8 + a remainder term;
+/// * step < 1.0: 8 per sample + 5 per conditional reload (a carry out of the fraction; the first sample of an odd
+///   run uses the generic head and its carry costs nothing) + 2 per block of 8 + a remainder term.
+pub fn inner_cycles(k: u32, pos: i32, step: i32) -> u64 {
+    if k == 0 {
+        return 0;
+    }
+    let (q, r) = ((k / 8) as u64, (k % 8) as usize);
+    let short = q == 0 && r < 4;
+    if step >> 14 != 0 {
+        const S: [u64; 8] = [36, 38, 37, 39, 41, 43, 42, 44];
+        return 14 * k as u64 + 2 * q + S[r] + if short { 2 } else { 0 };
+    }
+    const F: [u64; 8] = [44, 52, 45, 53, 49, 57, 50, 58];
+    let mut f = (pos as u32) << 18;
+    let st = (step as u32) << 18;
+    let mut carries = 0u64;
+    for i in 0..k {
+        let (nf, c) = f.overflowing_add(st);
+        f = nf;
+        if c && !(i == 0 && k & 1 == 1) {
+            carries += 1;
+        }
+    }
+    8 * k as u64 + 5 * carries + 2 * q + F[r] + if short { 2 } else { 0 }
+}
+
 #[inline]
 fn div(a: i32, b: i32) -> i32 {
     // BIOS Div (SWI 6): signed, truncating
@@ -271,6 +355,13 @@ impl Voice {
         if f & 1 == 0 {
             return;
         }
+        prof(|p| {
+            p.upd_live += 1;
+            p.upd_vol += (f >> 4 & 1) as u32;
+            p.upd_entry += (f >> 3 & 1) as u32;
+            p.upd_restart += (f >> 2 & 1) as u32;
+            p.upd_pitch += (f >> 1 & 1) as u32;
+        });
         if f & 0x10 != 0 {
             let vol = self.master as i32 * self.volume as i32;
             let p = self.pan as i32;
@@ -312,8 +403,13 @@ impl Voice {
     #[inline]
     fn mix_run(&self, bank: &SoundBank, buf: &mut [u32], k: usize) {
         if self.gain == 0 {
+            prof(|p| p.silent_runs += 1);
             return;
         }
+        prof(|p| {
+            p.runs += 1;
+            p.inner += inner_cycles(k as u32, self.pos, self.step);
+        });
         let pcm: &[i8] = match self.sample {
             Some(s) => &bank.samples[s].pcm,
             None => &[],
@@ -333,6 +429,8 @@ impl Voice {
         if self.flags & 1 == 0 {
             return false;
         }
+        let track = self.is_track;
+        prof(|p| if track { p.track_mix += 1 } else { p.sfx_mix += 1 });
         let mut n = n as i32;
         let mut off = 0usize;
         if self.loop_mode & 1 == 0 {
@@ -343,6 +441,7 @@ impl Voice {
                 self.pos = end;
                 return false;
             }
+            prof(|p| p.splits += 1);
             let k = div(self.end + self.step_mag - 1 - self.pos, self.step_mag);
             self.mix_run(bank, &mut buf[off..], k.max(0) as usize);
             self.flags = 0;
@@ -357,7 +456,8 @@ impl Voice {
                     self.pos = end;
                     return false;
                 }
-                let k = div(self.end + self.step_mag - 1 - self.pos, self.step_mag);
+                prof(|p| p.splits += 1);
+            let k = div(self.end + self.step_mag - 1 - self.pos, self.step_mag);
                 let np = self.pos + self.step_mag * k - (self.end - self.loop_start);
                 self.mix_run(bank, &mut buf[off..], k.max(0) as usize);
                 off += k.max(0) as usize;
@@ -377,7 +477,8 @@ impl Voice {
                     self.pos = end;
                     return false;
                 }
-                let k = div(self.pos + self.step_mag - 1 - self.loop_start, self.step_mag);
+                prof(|p| p.splits += 1);
+            let k = div(self.pos + self.step_mag - 1 - self.loop_start, self.step_mag);
                 let np = 2 * self.loop_start - self.pos + self.step_mag * k;
                 self.mix_run(bank, &mut buf[off..], k.max(0) as usize);
                 off += k.max(0) as usize;
@@ -391,7 +492,8 @@ impl Voice {
                     self.pos = end;
                     return false;
                 }
-                let k = div(self.end + self.step_mag - 1 - self.pos, self.step_mag);
+                prof(|p| p.splits += 1);
+            let k = div(self.end + self.step_mag - 1 - self.pos, self.step_mag);
                 let np = 2 * self.end - self.pos - self.step_mag * k - 1;
                 self.mix_run(bank, &mut buf[off..], k.max(0) as usize);
                 off += k.max(0) as usize;
@@ -860,6 +962,15 @@ impl<'a> Driver<'a> {
         }
     }
 
+    /// `0x0803E32C`: every voice playing `id`.
+    pub fn stop_matching_sfx(&mut self, id: u8) {
+        for v in self.voices.iter_mut() {
+            if v.flags & 1 != 0 && v.entry == EntryRef::Sfx(id) {
+                v.flags &= !1;
+            }
+        }
+    }
+
     pub fn stop_all_sfx(&mut self) {
         for v in self.voices.iter_mut() {
             v.flags &= !1;
@@ -892,6 +1003,11 @@ impl<'a> Driver<'a> {
         let pat = &song.patterns[p.pattern];
         let cells: &[Cell] = pat.rows.get(p.row_in_pattern).map(|r| r.as_slice()).unwrap_or(&[]);
         p.row_in_pattern += 1;
+        let nc = cells.len() as u32;
+        prof(|p| {
+            p.rows += 1;
+            p.cells += nc;
+        });
         for c in cells {
             let Some(t) = p.tracks.get_mut(c.channel as usize) else { continue };
             t.cflags = c.flags;
@@ -1160,6 +1276,7 @@ impl<'a> Driver<'a> {
     /// `0x0803EFD0`: one sequencer tick.
     pub(crate) fn tick(&mut self) {
         let bank = self.bank;
+        prof(|p| p.ticks += 1);
         self.player.ticks_left = self.player.ticks_left.wrapping_sub(1);
         if self.player.ticks_left == 0 {
             self.next_row();
@@ -1174,6 +1291,7 @@ impl<'a> Driver<'a> {
                     continue;
                 }
                 if let Some(f) = t.tick {
+                    prof(|p| p.tick_fns += 1);
                     t.run_tick(f, bank);
                 }
             }
@@ -1185,6 +1303,7 @@ impl<'a> Driver<'a> {
 
     pub(crate) fn mix_tracks(&mut self, off: usize, n: usize) {
         let bank = self.bank;
+        prof(|p| p.segments += 1);
         if self.scratch.len() < self.mixbuf.len() {
             self.scratch.resize(self.mixbuf.len(), 0);
         }
@@ -1259,6 +1378,10 @@ impl<'a> Driver<'a> {
         }
         self.mixbuf.clear();
         self.mixbuf.resize(n, 0);
+        prof(|p| {
+            p.chunks += 1;
+            p.samples += n as u32;
+        });
         self.mix_music(n);
         for v in self.voices.iter_mut() {
             v.mix(bank, &mut self.mixbuf, n);
@@ -1271,6 +1394,25 @@ impl<'a> Driver<'a> {
         self.clock += n as u64;
     }
 
+
+    /// One mix chunk of `n` samples without output (the state advances exactly as in [`Driver::render_into`]).
+    pub fn advance(&mut self, n: usize) {
+        let bank = self.bank;
+        for v in self.voices.iter_mut() {
+            v.update(bank);
+        }
+        self.mixbuf.clear();
+        self.mixbuf.resize(n, 0);
+        prof(|p| {
+            p.chunks += 1;
+            p.samples += n as u32;
+        });
+        self.mix_music(n);
+        for v in self.voices.iter_mut() {
+            v.mix(bank, &mut self.mixbuf, n);
+        }
+        self.clock += n as u64;
+    }
 
     /// Render `n` samples of the 8-bit hardware output in driver updates of `chunk` samples (the game mixes
     /// once per frame, ~267 samples; music is chunk-independent, SFX start on chunk boundaries).

@@ -431,7 +431,18 @@ impl Shot {
 }
 
 pub fn add(w: &mut World, s: Shot) -> EntityId {
-    w.add(Body::Shot(Box::new(s)))
+    // the projectile base ctor `0x08019B04` takes the class's object tiles (vram.rs): the ki blast 0x080197B4
+    // 0x100, the lobbed ball 0x08021280 0x1000, the flame / energy shot 0x080246B4 0x40 (VERIFIED sizes; other
+    // classes not measured yet)
+    let tiles = match &s.kind {
+        ShotKind::Straight(o) if o.name == SName::KiBlast => 0x100,
+        ShotKind::SuperBall { .. } | ShotKind::MasenkoBall(_) => 0x1000,
+        ShotKind::Flame { .. } => 0x40,
+        _ => 0,
+    };
+    let id = w.add(Body::Shot(Box::new(s)));
+    crate::vram::acquire(w, crate::vram::Owner::Ent(id), tiles);
+    id
 }
 pub fn add_straight(w: &mut World, owner: EntityId, dir: Dir, team: u8, x: i32, y: i32, o: StraightOpts) -> EntityId {
     add(w, Shot::new(owner, dir, team, x, y, ShotKind::Straight(Box::new(o))))
@@ -1120,6 +1131,12 @@ fn straight_update(w: &mut World, i: usize) {
         return straight_end(w, i, true);
     }
     let hit_p = w.shot_ref(i).team != 1;
+    // field: while an event holds the field an enemy's shot flies on (its trail too) but sends no hit message
+    // (Thieves Den 9-4: a Hessian's rocket crosses the player during the level-up popup; the player's handler
+    // 0x08010DDE gets no kind-0 message in those frames)
+    if hit_p && w.field.as_ref().is_some_and(|f| f.busy) {
+        return;
+    }
     if hit(w, i, r, o.a, o.mult, true) {
         let rr = if o.rng_hit > 0 { w.rng.rand(o.rng_hit) } else { 0 };
         if o.sfx_hit >= 0 {

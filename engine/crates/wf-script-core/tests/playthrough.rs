@@ -261,6 +261,12 @@ impl Host {
                 if matches!(self.cause, Some(Cause::Trigger { .. })) {
                     wf_core::field::hold_nested(w);
                 }
+                // an on-defeat inline script that blocks runs in the VM's nested loop like any callback: it holds the
+                // field when no event of this frame does yet (the level-up popup #3 that ran before it has ended:
+                // 12-28's Warlord - the other enemies do not update in the popup's exit frame)
+                if matches!(self.cause, Some(Cause::Defeat { .. })) && !w.field.as_ref().is_some_and(|f| f.busy) {
+                    wf_core::field::set_busy(w, true);
+                }
                 self.running = true
             }
             Ok(Status::Finished) => {
@@ -579,6 +585,7 @@ fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Value) -
                 eprintln!("    after begin: pickups {c:?} running {}", host.running);
             }
             sess.step_update();
+            wf_script_core::tick_timers(&sess.world, &mut host.hs);
             if std::env::var("DBG_PICK").ok().and_then(|v| v.parse::<usize>().ok()) == Some(k) {
                 let c = sess.world.ents.iter().filter(|e| matches!(e.body, Body::Pickup(_))).map(|e| (e.id, e.removed)).collect::<Vec<_>>();
                 eprintln!("    after update: pickups {c:?}");

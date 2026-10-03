@@ -114,7 +114,7 @@ class ShipDriver(Driver):
     # the boss in 8-71, not a target)
     AVOID = (20, 64, 4, 29)
     HEALS = (21, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)  # the HP ones: Senzu, then food (10 .. 19 are drinks: EP only)
-    FLAMERS = (20,)             # Destroyer: FlameBreath (state 0x86) along its facing once the player is within 88 px
+    FLAMERS = (20,)                 # Destroyer: FlameBreath (state 0x86) along its facing once the player is within 88 px
 
     THROWS = (0x156, 0x1E2, 0x1E8)   # Majin Soldier / Shield Soldier: AlignWithPlayer + SoldierThrow (an energy wave)
 
@@ -162,14 +162,16 @@ class ShipDriver(Driver):
             if o[5] not in self.FLAMERS:
                 continue
             st = ai_state(e, o[0])
-            if not st or st[-1] != 0x86:
+            # a Destroyer breathing fire; a Juggernaut (tank, type 58) driving / shelling along its facing
+            if not st or st[-1] not in ((0x86,) if o[5] == 20 else (0x2E3, 0x2E4)):
                 continue
             ex, ey, f = o[1], o[2], o[3]
             if f >= 2:
                 ahead, side = (x - ex) * (1 if f == 3 else -1), y - ey
             else:
                 ahead, side = (y - ey) * (1 if f == 0 else -1), x - ex
-            if not (-16 < ahead < 260 and abs(side) < 44):
+            # (positions are top-left corners: the flames reach further on the right / lower side)
+            if not (-16 < ahead < 260 and -44 < side < 64):
                 continue
 
             def free(px, py):
@@ -177,8 +179,8 @@ class ShipDriver(Driver):
                     q[0] != o[0] and abs(q[1] - px) < 16 and abs(q[2] - py) < 12 for q in ens)
             # a direction that did not move the player (a wall the grid missed) is out for a while
             dead = getattr(self, 'guard_dead', {})
-            need = 44 - abs(side) + 8
-            for sd in ((1, -1) if side >= 0 else (-1, 1)):
+            for sd in ((1, -1) if side >= 10 else (-1, 1)):
+                need = (64 - side if sd > 0 else side + 44) + 8
                 ddx, ddy = (0, sd) if f >= 2 else (sd, 0)
                 k = (KEY.DOWN if sd > 0 else KEY.UP) if f >= 2 else (KEY.RIGHT if sd > 0 else KEY.LEFT)
                 if dead.get(k, -1) > self.t:
@@ -188,6 +190,23 @@ class ShipDriver(Driver):
             k = self.flee(e, s, ex, ey)
             return self.guard_key(k, x, y) if k else None
         return None
+
+    def in_flame(self, e, px, py, margin=44):
+        """is (px, py) in the line of a Destroyer breathing fire?"""
+        for o in enemies(e):
+            if o[5] != 20:
+                continue
+            st = ai_state(e, o[0])
+            if not st or st[-1] != 0x86:
+                continue
+            ex, ey, f = o[1], o[2], o[3]
+            if f >= 2:
+                ahead, side = (px - ex) * (1 if f == 3 else -1), py - ey
+            else:
+                ahead, side = (py - ey) * (1 if f == 0 else -1), px - ex
+            if -16 < ahead < 260 and -margin < side < margin + 20:
+                return True
+        return False
 
     def guard_key(self, k, x, y):
         """remember the guard's key; held 8 frames without moving: that direction is blocked for 90 frames"""
@@ -482,11 +501,19 @@ class ShipDriver(Driver):
                 return self.walk_keys(e, s, px, py)
             self.mash += 1
             return KEY.A if self.mash % 20 < 2 else 0
+        if s['area'][:2] == [4, 1]:
+            # West City (landing there brings the airships back: flags 388 .. 392 cleared): heal, take off again
+            if self.maybe_heal(e, s, 0.6):
+                return self.heal_step(e) or 0
+            self.mash += 1
+            return KEY.A if self.mash % 30 < 2 else 0
         if s['area'][:2] != [0, 50]:
             return self.mash_a()
         p = e.r32(0x03001C34)
         if not p:
             return 0
+        if not any(o[5] == 141 and e.r32(o[0] + 0x58) == 0x086A89D0 for o in enemies(e)):
+            return self.fly(e, s, ('fly', 1137, 1137, 71, 119))
         sv = lambda v: v - (1 << 32) if v & 0x80000000 else v  # noqa: E731
         x, y = sv(e.r32(p + 0x1A0)) / 256, sv(e.r32(p + 0x1A4)) / 256
         z, h = sv(e.r32(p + 0x1A8)) / 1024, sv(e.r32(p + 0x1AC)) / 1024
@@ -495,7 +522,7 @@ class ShipDriver(Driver):
         pats = [o for o in enemies(e) if o[5] == 141 and e.r32(o[0] + 0x58) == 0x086A89D0
                 and not self.over_pad(o[1], o[2])]
         if not pats:
-            return KEY.UP
+            return self.fly(e, s, ('fly', 1137, 1137, 71, 119))
         o = min(pats, key=lambda o: math.hypot(o[1] - x, o[2] - y))
         dx, dy = o[1] - x, o[2] - y
         wantd = math.degrees(math.atan2(dx, -dy)) * 256 / 360
@@ -595,15 +622,46 @@ class ShipDriver(Driver):
                     to, rect, push = x
                     break
         tx, ty = navm.approach(rect, push)
+        if self.grid is not None and self.grid_key == tuple(s['area']):
+            # an edge exit whose approach tile is a wall (Pilaf's Castle 10-2): start the push from further inside
+            ddx, ddy = navm.DIRS.get(push, (0, 0))
+            for _ in range(4):
+                if self.grid.ok_box(tx // 8, ty // 8):
+                    break
+                tx, ty = tx - ddx * 8, ty - ddy * 8
         x, y = s['p'][0], s['p'][1]
         # pushing into an exit is sticky (an exit fires after the direction is held for a while)
         if self.push_t is None or self.t - self.push_t > 150:
             if abs(x - tx) > 8 or abs(y - ty) > 8:
                 self.push_t = None
+                if abs(x - tx) <= 24 and abs(y - ty) <= 24 and (x, y) == getattr(self, 'nav_last', None):
+                    # held up just short of the exit (Pilaf's Castle 10-15: a door to break, A facing it)
+                    self.nav_still = getattr(self, 'nav_still', 0) + 1
+                    if self.nav_still > 40:
+                        pk = {'up': KEY.UP, 'down': KEY.DOWN, 'left': KEY.LEFT, 'right': KEY.RIGHT}[push]
+                        return KEY.A if self.nav_still % 24 < 3 else pk if self.nav_still % 24 < 8 else 0
+                else:
+                    self.nav_still = 0
+                self.nav_last = (x, y)
                 return self.walk_keys(e, s, tx, ty)
             if self.push_t is None:
                 self.push_t = self.t
         k = {'up': KEY.UP, 'down': KEY.DOWN, 'left': KEY.LEFT, 'right': KEY.RIGHT}[push]
+        if self.push_t is not None and self.t - self.push_t > 40 and (self.t - self.push_t) % 24 < 3:
+            return KEY.A        # (a door to break first: Pilaf's Castle 10-15)
+        if self.grid is not None and self.grid_key == tuple(s['area']) and self.t - self.push_t > 20:
+            # the way ahead is shut at the exit's centre but open a tile or two beside it (a broken door's gap)
+            if self.t % 16 == 0:
+                self.live_walk(e)
+            ddx, ddy = navm.DIRS.get(push, (0, 0))
+            for off in (0, 8, -8, 16, -16):
+                cx_, cy_ = (tx + off, y + ddy * 8) if ddy else (x + ddx * 8, ty + off)
+                if self.grid.ok_box(cx_ // 8, cy_ // 8):
+                    if ddy:
+                        tx = (cx_ // 8) * 8 if off else tx
+                    else:
+                        ty = (cy_ // 8) * 8 if off else ty
+                    break
         # keep lined up with the exit's centre while pushing
         if push in ('up', 'down') and abs(x - tx) > 2:
             k |= KEY.RIGHT if tx > x else KEY.LEFT
@@ -663,7 +721,26 @@ class ShipDriver(Driver):
             self.live_walk(e)
         elif s['p'] is not None and self.grid is not None and (self.path is None or self.t - self.path_at >= 16):
             self.live_walk(e)
-        return super().walk(e, s, tx, ty)
+        k = super().walk(e, s, tx, ty)
+        if k and s['p'] is not None and self.grid is not None:
+            # a diagonal step into a wall corner does not slide: take the axis that is free (pixel-exact footprint)
+            v, h = k & (KEY.UP | KEY.DOWN), k & (KEY.LEFT | KEY.RIGHT)
+            if v and h:
+                x, y = s['p'][0], s['p'][1]
+                g = self.grid
+
+                def free(px, py):
+                    return all(0 <= cx < g.w and 0 <= cy < g.h and g.walk[cy * g.w + cx]
+                               for cx in range(px // 8, (px + 15) // 8 + 1) for cy in range(py // 8, (py + 7) // 8 + 1))
+                dx = 2 if h == KEY.RIGHT else -2
+                dy = 2 if v == KEY.DOWN else -2
+                if not free(x + dx, y + dy):
+                    if free(x, y + dy):
+                        k = v
+                    elif free(x + dx, y):
+                        k = h
+                    self.held = k
+        return k
 
     def fightp(self, e, s, g):
         """('fightp', cap[, radius]): punch enemies (nearest first) until none is left within `radius` px of the
@@ -677,7 +754,14 @@ class ShipDriver(Driver):
         x, y = s['p'][0], s['p'][1]
         ens = [o for o in enemies(e) if abs(o[1] - x) + abs(o[2] - y) <= radius and o[0] not in self.skip
                and o[5] not in self.AVOID]
-        ens = [o for o in ens if self.reachable(e, s, o[1], o[2])]
+        # Ghosts (invisible and untouchable most of the time, slow): never hunted, only blasted out of the way
+        far = [o for o in ens if o[5] in self.GHOSTS
+               or o[5] not in self.TANKS and not self.reachable(e, s, o[1], o[2])]
+        ens = [o for o in ens if o not in far]
+        # one out of reach (a Ghost hovering inside a wall) but close and in line: a ki blast (B, 23 EP)
+        k = self.blast(e, s, far)
+        if k is not None:
+            return k
         if not ens or self.t >= cap:
             if self.t >= cap and ens:
                 raise RuntimeError(f'fight not over after {cap} frames: {ens}')
@@ -692,6 +776,8 @@ class ShipDriver(Driver):
         self.idle = 0
         en = min(ens, key=lambda o: abs(o[1] - x) + abs(o[2] - y))
         ex, ey = en[1], en[2]
+        if en[5] in self.TANKS:
+            return self.tank(e, s, en)
         # an enemy that takes no damage over 400 frames of being the target (out of reach, invulnerable) is skipped
         tg = self.tgt.setdefault(en[0], [en[4], 0])
         if en[4] < tg[0]:
@@ -707,6 +793,20 @@ class ShipDriver(Driver):
             return k
         dx, dy = ex - x, ey - y
         per = g[3] if len(g) > 3 else 10
+        # straight above / below it (a corridor one footprint wide: Pilaf's Castle 10-21): the punch reaches ~26 px
+        # both ways
+        if abs(dx) <= 6 and 8 <= abs(dy) <= 26:
+            face, turn = (1, KEY.UP) if dy < 0 else (0, KEY.DOWN)
+            if s['p'][2] != face:
+                self.mash = 0
+                return turn
+            self.mash += 1
+            return KEY.A if self.mash % per < 2 else 0
+        if tg[1] > 60:
+            # not getting at it (knocked back at each approach): a ki blast when it is in line
+            k = self.blast(e, s, [en])
+            if k is not None:
+                return k
         # in reach of the melee box (right: (16,-24)-(24,8), left: (-8,-24)-(0,8) around the footprint)
         if -20 <= dy <= 4 and 3 <= abs(dx) <= 21:
             face = 3 if dx > 0 else 2
@@ -734,6 +834,97 @@ class ShipDriver(Driver):
         if abs(y - ty) > 1:
             k |= KEY.DOWN if ty > y else KEY.UP
         return k
+
+    GHOSTS = (32, 133)
+
+    def blast(self, e, s, ens):
+        x, y, pf = s['p']
+        rec = 0x03001560 + 0x68 * e.r8(0x03001068)
+        if e.r16(rec + 0x1A) < 23:
+            return None
+        for o in ens:
+            dx, dy = o[1] - x, o[2] - y
+            if not e.r8(o[0] + 0x1CC) or o[4] <= 0:
+                continue
+            if o[5] in self.GHOSTS:
+                st = ai_state(e, o[0])
+                if not st or st[-1] not in (0xD9, 0xDA, 0xDB) or abs(dx) + abs(dy) > 56:
+                    continue
+            if abs(dy) <= 10 and 8 <= abs(dx) <= 90:
+                face, turn = (3, KEY.RIGHT) if dx > 0 else (2, KEY.LEFT)
+            elif abs(dx) <= 10 and 8 <= abs(dy) <= 90:
+                face, turn = (0, KEY.DOWN) if dy > 0 else (1, KEY.UP)
+            else:
+                continue
+            if pf != face:
+                return turn if self.t % 6 < 2 else 0
+            return KEY.B if self.t % 30 < 3 else 0
+        return None
+
+    TANKS = (58,)       # Juggernaut: TankDrive lines up on the nearer axis (0.25 px/f), shells along its facing
+
+    def tank(self, e, s, en):
+        """a tank (64 x 64 footprint at its position) lines its centre up with the player's on the nearer axis
+        (TankDrive, 0.25 px/f) and shells along its facing only once stopped and lined up within 16 px. So: stand
+        just under it (the up punch reaches ~24 px) or beside it, the centres 20 px apart - it keeps driving and
+        never fires -, punch into it, and change sides whenever it gets within 8 px of lining up"""
+        x, y, pf = s['p']
+        ex, ey = en[1], en[2]
+        cx, cy = ex + 32, ey + 32
+        if getattr(self, 'tank_side', 0) == 0 or getattr(self, 'tank_id', None) != en[0]:
+            self.tank_id = en[0]
+            self.tank_side = 1 if x + 8 >= cx else -1
+        ok = (lambda px, py: self.grid is None or self.grid.ok_box(px // 8, py // 8))
+        if y + 4 > ey + 64:
+            # from below: punch up
+            d = (x + 8) - cx
+            st = getattr(self, 'tank_stuck', None)
+            # the other side once it has nearly lined up on this one, or a wall is in the way
+            if st and st[1] > 8 and abs(d) < 14:
+                self.tank_side = -self.tank_side
+                self.tank_stuck = None
+            tx = cx + self.tank_side * 20 - 8
+            ty = ey + 64 + 16
+            k = 0
+            if abs(x - tx) > 2:
+                k |= KEY.RIGHT if tx > x else KEY.LEFT
+            st = getattr(self, 'tank_stuck', None)
+            if (abs(d) >= 14 or y > ty + 10 or st and st[1] > 8) and abs(y - ty) > 10:
+                # (pinned in a narrow doorway: up and out, lined up or not)
+                k |= KEY.DOWN if ty > y else KEY.UP
+            face, turn = 1, KEY.UP
+        else:
+            # from the side (coming from above: round its corner first): punch across, off its centre row
+            right = x + 8 >= cx
+            d = (y + 4) - cy
+            if getattr(self, 'tank_mode', None) != en[0]:
+                self.tank_mode = en[0]
+                self.tank_side = 1                # the lower half of its flank first (9-5: the pocket by the palm)
+            tx = ex + 64 + 2 if right else ex - 16 - 2
+            ty = cy + self.tank_side * 20 - 4
+            k = 0
+            # both at once: round its corner on the diagonal (9-5: one pixel of room beside it)
+            if abs(y - ty) > 2:
+                k |= KEY.DOWN if ty > y else KEY.UP
+            if abs(x - tx) > 2:
+                k |= KEY.RIGHT if tx > x else KEY.LEFT
+            face, turn = (2, KEY.LEFT) if right else (3, KEY.RIGHT)
+        if k:
+            self.mash = 0
+            # pushing into a wall the grid does not show: the other side
+            st = getattr(self, 'tank_stuck', None)
+            if st and st[0] == (x, y):
+                self.tank_stuck = ((x, y), st[1] + 1)
+                if st[1] > 60:
+                    self.tank_side = -self.tank_side
+                    self.tank_stuck = None
+            else:
+                self.tank_stuck = ((x, y), 0)
+            return k
+        if pf != face:
+            return turn
+        self.mash += 1
+        return KEY.A if self.mash % 6 < 2 else 0
 
     def flee(self, e, s, ex, ey):
         """keys moving away from (ex, ey) on the live walk grid (the free direction that gains the most distance)"""
@@ -916,6 +1107,9 @@ class ShipDriver(Driver):
         k = self.flame_guard(e, s)
         if k is None:
             k = self.block_guard(e, s)
+        if k is None and s['p'] is not None:
+            # a visible Ghost in the way (its touch knocks back): a ki blast
+            k = self.blast(e, s, [o for o in enemies(e) if o[5] in self.GHOSTS])
         if k is not None:
             return k
         saved = self.next_goal
@@ -932,4 +1126,12 @@ class ShipDriver(Driver):
             self.path = None
             self.stuck = 0
             return 0
+        if k and s['p'] is not None:
+            # never walk back into the flames just stepped out of: wait them out (124 frames)
+            x, y = s['p'][0], s['p'][1]
+            nx = x + (10 if k & KEY.RIGHT else -10 if k & KEY.LEFT else 0)
+            ny = y + (10 if k & KEY.DOWN else -10 if k & KEY.UP else 0)
+            if self.in_flame(e, nx, ny, 48) and not self.in_flame(e, x, y, 44):
+                self.stuck = 0
+                return 0
         return k or 0

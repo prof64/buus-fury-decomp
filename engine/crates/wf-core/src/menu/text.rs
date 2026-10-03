@@ -16,6 +16,9 @@ pub struct FontMetrics {
     pub w: Vec<u8>,
     pub has: Vec<bool>,
     pub wide_w: u32,
+    /// the glyphs' column bitmaps (`cols` of the font file: one u16 per pixel column, bit 0 = top row); empty when
+    /// the content lacks them (only the redraw timing model reads them, `sndsim.rs`)
+    pub cols: Vec<Vec<u16>>,
 }
 
 impl FontMetrics {
@@ -91,13 +94,14 @@ impl TextData {
         for f in [MenuFont::Small, MenuFont::Dialog, MenuFont::Digits, MenuFont::Menu, MenuFont::Bold] {
             let b = src.read(&format!("ui/fonts/{}.json", f.id()))?;
             let v: Value = serde_json::from_slice(&b).ok()?;
-            let mut m = FontMetrics { w: vec![0; 256], has: vec![false; 256], wide_w: v["wide_glyphs"]["width"].as_u64().unwrap_or(0) as u32 };
+            let mut m = FontMetrics { w: vec![0; 256], has: vec![false; 256], wide_w: v["wide_glyphs"]["width"].as_u64().unwrap_or(0) as u32, cols: vec![Vec::new(); 256] };
             if let Some(g) = v["glyphs"].as_object() {
                 for (k, gv) in g {
                     if let Ok(c) = k.parse::<usize>() {
                         if c < 256 {
                             m.w[c] = gv["w"].as_u64().unwrap_or(0) as u8;
                             m.has[c] = true;
+                            m.cols[c] = gv["cols"].as_array().map(|a| a.iter().map(|x| x.as_u64().unwrap_or(0) as u16).collect()).unwrap_or_default();
                         }
                     }
                 }

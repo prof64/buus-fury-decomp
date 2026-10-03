@@ -108,6 +108,12 @@ impl StoryHost {
                 Some(Cause::Ai { entity }) => scene::ai_script_done(w, entity),
                 // the load waits for its on-enter script
                 Some(Cause::AreaEnter) => wf_core::field::finish_arrival(w),
+                // an on-defeat callback that ran from the death effect and ended without starting an event (13-45's
+                // Samurai once flag 156 is set): nothing held the frame, its update runs (not after the drop script
+                // queued before the callback: that one must not release the hold)
+                Some(Cause::Defeat { .. }) if matches!(st, Ok(Status::Finished)) && self.outer.is_empty() && !self.queue.iter().any(|j| matches!(j.cause, Cause::Defeat { .. })) => {
+                    wf_core::field::release_unstarted_hold(w)
+                }
                 _ => {}
             }
         }
@@ -118,6 +124,12 @@ impl StoryHost {
                 // walk stops 2 frames)
                 if matches!(self.cause, Some(Cause::Trigger { .. })) && self.outer.is_empty() {
                     wf_core::field::hold_nested(w);
+                }
+                // an on-defeat inline script that blocks runs in the VM's nested loop like any callback: it holds the
+                // field when no event of this frame does yet (the level-up popup #3 that ran before it has ended:
+                // 12-28's Warlord - the other enemies do not update in the popup's exit frame)
+                if matches!(self.cause, Some(Cause::Defeat { .. })) && self.outer.is_empty() && !w.field.as_ref().is_some_and(|f| f.busy) {
+                    wf_core::field::set_busy(w, true);
                 }
                 self.running = true
             }
@@ -267,6 +279,7 @@ impl StoryHost {
         let fresh = self.started.len() > before;
         let n0 = sess.world.events.len();
         sess.step_update();
+        wf_script_core::tick_timers(&sess.world, &mut self.hs);
         // the running script resumes from its wait (not one this frame's start began: its first wait counts from the
         // next frame), then the scripts the update started (NPC talk)
         let evs: Vec<Event> = sess.world.events[n0..].to_vec();

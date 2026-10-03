@@ -307,19 +307,79 @@ and stat / heal menus: shipr_024, 058, 059, 061, 063, 065, 068, 072, 076, 081, 0
 176, 179, 183, 188, 194, 200, 208, 218, 236, 266, 281, 308, 312; save point / Switch Character: 056, 172, 226, 227,
 250, 328.
 
-Open (mine): 8-16 s319's Kibito (sprite 258) idle tick after `return_to_field` (f4893), s342's 8-17
-camera scroll one frame early after fade_in_white (Buu-fight segment f2911; our logic-frame count is 2 behind the
-game's by then), a Majin Soldier's recovery 3 frames early (8-31 f905, 8-32, 8-50), a fighter's knockback position
-(8-33 f412), East District bandit position (2-9 f34).
+Round 4 (ship fix agent; rsegs 301 / 338 exact, 235,899 frames; gated: shipr_001 first 2,000, 007, 238, 254, 265, and
+the Buu fight `shipr_338_8-16` first 6,900 - it is exact to 6,935 of 19,591, was 2,869):
+* IfHpBelow (node enter 0x0804E6A0, on-hit 0x080299FE): threshold = ((frac * whole max HP) >> 16) << 10 (2-9's
+  bandits at 11 / 115 HP are not "below 10%"). TS updated.
+* SoldierThrow / TurretFire: the node (0x08026726) is finished as soon as the controller is no longer the actor's
+  state object - a soldier hurt mid-throw moves on when it recovers (8-31 / 8-32). TS updated.
+* the ApplyDamage node (0x080187A4) stores the hit direction (obj+0x290), not the message handler: an on-hit tree
+  without it slides along the old one (Babidi). TS updated.
+* Babidi (type 0x1D): hover = SetAnimRaw(0x13) under controller 0x03003014, no idle draws, not hittable until the
+  state changes, pacified cleared; landing controller 0x03003024; the hit state 0xC9 (`PlayAnimTimed`) sets
+  pacified and never finishes; 0xCA (`PlayAnimHold`) ends at tick 0x60 with SetAnim(0); FollowMajinBuu (0x0802B3EA)
+  uses the footprint centres, always faces Buu and steps d * 256 / max(|dx|, |dy|) from 50 px on; `IfUnknown`
+  (0x0804EE24) = Buu is not pacified. TS updated (cross_ts `majin_buu` regenerated).
+* Majin Buu eating the candy: a follow object on the eater takes the camera while the player is gone (field only);
+  a candy player's sprite def is 0x36; the harness does not expect a player that is eaten.
+* `return_to_field` restores the saved field's puppets (a map NPC a script walked keeps its scripted animation:
+  8-16 s319's Kibito).
+* scripted shots: the muzzle (0x0800FF44) facing down is (box centre x, actor y); `shoot_at_actor` aims at the centre
+  of the target's shown frame box (0x0800FE34); `fire_ball_at` (0x0803C4DC / 0x0803C576) = 5-way throw direction k from
+  the footprint centre, cel 2k + 1 / 2k + 2, the ball leaves at tick 8 from position + 0x0877C454[k] and lives
+  (max(|dx|, |dy|) >> 1) + 1 ticks, done from tick 24 once it is gone.
+* a camera scroll started after the frame's camera update (a trigger's script) takes its first step at once
+  (`CamCtl.stepped`; 8-16's ship entrance, and the Buu segment's s342 scroll).
+* a script's `warp_fade` into a 2D area: no autowalk, brightness by 4, the new player idle and under control (not
+  held by the trigger's nested loop, not a puppet), it ends as the 64th frame starts with one idle draw and the
+  script goes on in that frame (`Field.script_fade_in`; 6-1 -> 6-13).
+* `load_scene*`'s camera is placed inside the new map's camera limits (s273: (1, 1) shows (1, 0)).
+* the logic-frame counter: `World.frame` does not advance on frames the world is frozen (a modal camera scroll,
+  `scene::frozen`), the game's counter does - that is where the Buu segment's count falls behind (3 by f4037). Only
+  differences are used so far (state stamps, cooldowns); a freeze between a stamp and its test would show.
 
-**Majin Buu arc** (`ship_route.goals_fatbuu`, from `work/ship/real4b/c15_after_buu.ss`): played so far by the real
-game: capsule -> Kami's Lookout s214 (flag 76, Goten) -> West City -> Bulma's Dragon Radar s193 (flag 77) ->
-Trunks at the save point, his stat points, Hamburgers at the Z-Mart. The main line then needs all seven Dragon
-Balls (flags 112 .. 118: seven dungeons, worlds 9 .. 15) before s017 (119) and Gotenks vs Buu s218 (120); the
-Janemba saga (121 .. 125) follows, then §6's start. First gate found: the Thieves Den wants a Bandana worn
-(equipment 126), dropped only by the Stolen Airship encounter's low-level group (current character <= level 70:
-Trunks) - `('hunt', 126)` flies into world-map encounters, fights and returns; Trunks (190 HP) does not survive the
-Rogue Submarine's Mercenary yet. Not reached: Super Buu's appearance; no end state to hand over yet.
+Open: 7-2 `shipr_002` from f5528 (the tournament crowd: a portrait text box takes object tiles and 12 of 24 actors
+leave the game's list - the sprite-memory model's); the Buu fight from f6935: the eat controller's first tick is in
+the frame the state is entered (heal at +23, sound 11 at +31, respawn at +119, end at +159 after the GotoState; ours
+and the TS lockstep count one later while the placement and removal frames match), then s344 / s345 (`set_character`
+with no player object in the scene).
+
+**Majin Buu arc, real route** (`ship_route.goals_fatbuu`; `run_route.py work/ship/real4b/c15_after_buu.ss
+work/ship/fat --fat [--from MARK] --log`). Checkpoints = `work/ship/fat/<mark>.ss`, every input from the driver:
+
+| mark | state | keys |
+|---|---|---|
+| `d00_8-70` | Goku in Rocky Canyon after Vegeta vs Buu (= `real4b/c15_after_buu.ss`) | `fat/keys_d00_d04.json` (29,219 frames from d00) |
+| `d01_goten` | Kami's Lookout after s214 (flag 76): Goten | |
+| `d02_radar` | Bulma's House after s193 (flag 77, Dragon Radar) | |
+| `d03_city` | West City: Trunks active, 15 points spent, 5 Hamburgers | |
+| `d04_bandana` | world map, Trunks (level 67) with the Bandana (equipment 126) | |
+| `d05_grind` | Southwest Forest's save point: Trunks ground to 80 (the Thieves Den's rock, s517 (3, 80)), now Goten | `fat/keys_d04_fail.json` (from d04; its first 93,659 frames reach d06) |
+| `d06_thieves` | **Thieves Den entrance 9-1**, Goten 95 | `fat/keys_d06_d10.json` (19,856 frames from d06) |
+| `d07_guards` | 9-10 after the guards let the Bandana wearer pass (s350, flag 80; 9-5's Juggernaut tank killed on the way) | |
+| `d08_bandit_king` | 9-15 after s357 (the Bandit King's meeting) | |
+| `d09_ball1` | 9-15 right after s362: 1-Star Dragon Ball (flag 112), the gang (Hooligan, Mad Bomber, Sniper, Goon) attacking | |
+| `d10_map` | 9-1's pad, taking off (flag 82) | `fat/keys_d10_d11.json` (1,005 frames) |
+| `d11_pilaf` | **Pilaf's Castle entrance 10-1** | `fat/keys_d11_d11b.json` (1,195) |
+| `d11b_rock` | 10-1 after Trunks' level-80 rock (flag 166), Goten again, his 12 points spent | `fat/keys_d11b_d13.json` (11,327 from d11b) |
+| `d12_pilaf_boss` | 10-30 (the save point before the boss), Goten 96, HP 401 | |
+| `d13_pilaf_won` | 10-31 after Pilaf's Guardian (type 63, 10,605 HP; s365, flag 94) | |
+
+Findings: the Dragon Ball hunt is the main line (flags 112 .. 118: Thieves Den 9, Diablo Desert 11, Pilaf's
+Castle 10, the Airship 12, Fukurou Forest 13, Kyodai Pyramid 14, Nataday Village 15), then s017 (119) and Gotenks vs
+Buu s218 (120); the Janemba saga (121 .. 125) follows, then §6's start. The Bandana (s348 / s349 guards in 9-10)
+drops only from the Stolen Airship encounter 0-55 (world-map patrols with graphics def 0x086A89D0; on-defeat
+0x08073EFC, 25%, enemy slots 0 .. 3), whose s508 spawns those slots only for a current character of level <= 70
+(Trunks, 65; 22,025 XP = level 71 ends it). Each airship is used up by its flag (388 .. 392; 75% are treasure
+rooms) until a landing in a town clears them. RNG only moves on draws, so `hunt_search.py` varies the number of
+punches thrown in West City before take-off (32: the Bandana after 19,521 frames).
+
+Thieves Den: the rock in 9-1 needs Trunks at level 80 (s517 (3, 80)); the Bandana goes on Goten from the pause
+menu's Equip page (accessory row) once the landing's jump-in is over (~200 frames). 9-5's Juggernaut tank (type 58,
+64 x 64 footprint) drives to line its centre up with the player's on the nearer axis and shells only once stopped and
+lined up within 16 px, so the bot stands just under it (or beside it) 20 px off its centre and punches; it respawns
+on the way back and lets three enemies out when it breaks. 9-11's door fires on UP held at x = 268; the Dragon
+Ball's trigger is the rect under it (stand at (104, 146), face up, A).
 
 Round 1 (dev state, kept for reference): placed field enemies stand exactly at the def position; AlignWithPlayer keeps
 the facing on a blocked step; shield graphics swap on node enter; loot x = position + foot_w / 2; breakable crit /

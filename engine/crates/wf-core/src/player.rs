@@ -642,12 +642,12 @@ fn set_resist(w: &mut World, i: usize, v: i32) {
     if pr(w, i).resist == v {
         return;
     }
-    p(w, i).resist = v;
-    let d = Arc::clone(&w.data);
-    let _ = d;
-    let mut pl = pr(w, i).clone();
-    pl.refresh_stats(w);
-    *p(w, i) = pl;
+    // the resist bytes only (obj+0x1B8 / +0x1B9): no RecalcStats - equipment a script took off meanwhile
+    // (unequip_slot 0xF1) keeps counting until the next recalculation (Thieves Den 9-15)
+    let pl = p(w, i);
+    pl.resist = v;
+    pl.a.stats.res_m = v;
+    pl.a.stats.res_e = v;
 }
 fn refresh(w: &mut World, i: usize) {
     let mut pl = pr(w, i).clone();
@@ -656,8 +656,10 @@ fn refresh(w: &mut World, i: usize) {
 }
 fn apply_form(w: &mut World, i: usize, id: i32) {
     let mut pl = pr(w, i).clone();
+    let old = pl.a.sprite;
     pl.apply_form(w, id);
     *p(w, i) = pl;
+    crate::vram::sprite_changed(w, i, old);
 }
 
 /// Actor.setAnim for the skill code: the named animation (n -> raw n + 1 / name) becomes obj+0x50
@@ -1321,7 +1323,11 @@ pub fn update(w: &mut World, i: usize) {
         crate::scene::player_frames_tick(w, i);
     }
     // a trigger script's nested loop: the state's control does not run (field::hold_nested)
-    let nested = w.field.as_ref().is_some_and(|f| f.nested);
+    // (not during its warp_fade's fade-in: the player the load created is under control, 6-1 -> 6-13)
+    // an inline hook's event (a defeat callback's script: the VM's nested loop too, held path 0x0800F5E0) ticks the
+    // state's animation only: a hurt player's knockback does not move in the held frame (13-45: s393 from a
+    // Samurai's defeat - tick 5 -> 7 in the exit frame, one knockback step)
+    let nested = w.field.as_ref().is_some_and(|f| f.nested && !f.script_fade_in || f.held_event && f.busy);
     if !pr(w, i).dead && !puppet && !nested {
         control(w, i);
     }
@@ -1782,6 +1788,18 @@ fn cycle_skill(w: &mut World, i: usize) {
 pub fn release_passive(w: &mut World, i: usize) {
     if pr(w, i).ko_at < 0 && !pr(w, i).dead {
         passive(w, i);
+        // the player is an object after the event's in the list pass: its own update follows the held tick in the
+        // same frame - a second animation tick and the state's control with the frame's input (Kyodai Pyramid
+        // 14-21: the idle tick advances by 2 in the frame the bridge switch's event s418 ends)
+        if pr(w, i).it_sel.is_none() && !pr(w, i).gone && pr(w, i).defuse.is_none() && !crate::fieldworld::flying(w) {
+            anim_tick(w, i);
+            if !crate::scene::is_puppet(w, w.ents[i].id) {
+                control(w, i);
+            }
+            let mut pl = pr(w, i).clone();
+            pl.sync_anim(w);
+            *p(w, i) = pl;
+        }
     }
 }
 
@@ -3428,6 +3446,7 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
         w.events.push(Event::DamageRoll { target: w.ents[i].id, dmg: res.unblocked });
     }
     w.events.push(Event::Damage { target: w.ents[i].id, attacker: msg.attacker, dmg, crit: res.crit });
+    crate::vram::damage_number(w, w.ents[i].id);
     if msg.team == 1 {
         // PvP: the attacker's hit cue and on-hit hooks, as when it hits an enemy
         w.events.push(Event::Hit);

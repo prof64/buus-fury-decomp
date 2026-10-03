@@ -94,6 +94,10 @@ pub struct Enemy {
     pub anim_seq: u32,
     /// the shown graphics set when MechTransform swapped it (gfx id; -1 = the type's)
     pub gfx_now: i32,
+    /// obj+0x291 set by a node (0x0800F924 from the Detach node's enter 0x0804E53C - the Ghost's first state): off
+    /// the enemy grid for good (no marks, every spot fits)
+    #[serde(default)]
+    pub detached: bool,
     /// the running motion-controller leaf (state serial, node): its controller ticks with the animation, also while
     /// an event holds the field and the AI does not think (nodes.rs `busy_controller`)
     #[serde(default)]
@@ -173,6 +177,7 @@ impl Enemy {
             spit_ctl: -1,
             anim_seq: 0,
             gfx_now: -1,
+            detached: false,
             ctl: (0, 0),
         };
         // the constructor's SetAnim(0) runs before the object is in the world: no RNG draw
@@ -391,8 +396,11 @@ pub fn update(w: &mut World, i: usize) {
     // fighters a cutscene hands over with become_map_object start their AI when the event ends)
     // a load waiting for its on-enter script holds them too (like the map NPCs; segment sb 21-4: the Blister's spawn
     // timer starts after the 2 held frames)
+    // (the objects a load made inside the event run on - the 3D world map's patrols only: a 2D area's enemies are
+    // held like any others; 0-21, s026's warp_fade: Majin Buu's tree draws nothing until the event ends)
     let id = w.ents[i].id;
-    if w.field.as_ref().is_some_and(|f| f.busy && !(f.load_ids.0 <= id && id < f.load_ids.1) || f.arrival.is_some()) {
+    let own_load = crate::fieldworld::flying(w) && w.field.as_ref().is_some_and(|f| f.load_ids.0 <= id && id < f.load_ids.1);
+    if w.field.as_ref().is_some_and(|f| f.busy && !own_load || f.arrival.is_some()) {
         tick_anim(w, i);
         if w.en_ref(i).part && matches!(w.en_ref(i).ty, 0x34 | 0x35 | 0x37) {
             part_hurt_end(w, i);
@@ -819,7 +827,7 @@ pub fn attached(w: &World, i: usize) -> bool {
     let e = w.en_ref(i);
     let held = ctx_player(w, i).is_some_and(|pi| w.pl_ref(pi).held_by == w.ents[i].id && w.ents[i].id != 0);
     // field: the height does not detach (sc_janemba: a hopping Mini-Janemba keeps marking the enemy grid)
-    !e.part && e.prev == 0 && !e.defeated && !w.ents[i].removed && (e.a.z == 0 || w.field.is_some()) && !held
+    !e.part && e.prev == 0 && !e.defeated && !e.detached && !w.ents[i].removed && (e.a.z == 0 || w.field.is_some()) && !held
 }
 pub fn mark_self(w: &mut World, i: usize) {
     if w.col.is_none() || w.en_ref(i).marked.is_some() || !attached(w, i) {
@@ -838,6 +846,9 @@ pub fn unmark_self(w: &mut World, i: usize) {
     w.en(i).marked = None;
 }
 pub fn sync_mark(w: &mut World, i: usize) {
+    if w.field.is_some() && crate::fieldpatrol::holds_mark(w, i) {
+        return;
+    }
     let e = w.en_ref(i);
     if let Some(m) = e.marked {
         if attached(w, i) && m[0] == e.a.px() && m[1] == e.a.py() {
@@ -868,6 +879,12 @@ pub fn passable(w: &mut World, i: usize, x: i32, y: i32) -> bool {
 }
 /// footprint inside the arena bounds and passable
 pub fn fits(w: &mut World, i: usize, x: i32, y: i32) -> bool {
+    // field: a detached enemy (obj+0x291: a Ghost) fits anywhere - the game's test is the enemy grid alone, which
+    // it is off for good (Pilaf's Castle 10-27: a Ghost chases straight at a player standing in the doorway
+    // outside the walk bounds); battles keep the arena bounds the TypeScript reference tests
+    if w.field.is_some() && w.en_ref(i).detached {
+        return true;
+    }
     let b = w.arena.bounds;
     let a = &w.en_ref(i).a;
     x >= b.x0 && y >= b.y0 && x + a.foot_w <= b.x1 && y + a.foot_h <= b.y1 && passable(w, i, x, y)
@@ -1184,6 +1201,12 @@ pub fn walk_to_player(w: &mut World, i: usize, speed: i32, st: &mut i32, anim_fr
 
 /// Wander update 0x0802B708
 pub fn wander_step(w: &mut World, i: usize, speed: i32, turn_p: i64) {
+    // field: the update starts with SetAnim(1) unless IsAnim(1) (0x0802B710..): whatever is showing is replaced - a
+    // hurt animation still running when the reaction state has popped (Northern Wilderness 15-8: a Ghoul walks on
+    // without the hurt's end going through idle). Battles keep the reference (the walk follows the move)
+    if w.field.is_some() && !w.en_ref(i).is_anim(1) {
+        set_anim(w, i, &[AnimRef::N(1)], true, Some(true));
+    }
     w.en(i).moving = true;
     if w.rng.chance(turn_p) {
         let d = w.rng.rand(4) as Dir;
@@ -1300,7 +1323,9 @@ pub fn swap_gfx(w: &mut World, i: usize) {
     }
     let e = w.en(i);
     e.gfx_now = to;
+    let old = e.a.sprite;
     e.a.set_sprite(&d, Some(idx));
+    crate::vram::sprite_changed(w, i, old);
 }
 /// message 0xF (0x0800F44A, the death script's freeze): the walk state's vfunc +0x10 SetAnim(0)s (0x0800E050); other
 /// states: INFERRED nothing
@@ -1426,6 +1451,26 @@ pub fn melee_strike(w: &mut World, i: usize, mult: i32, face: bool, adjacent: bo
     let mut m = msg_from(w, i, 0, rect, w.en_ref(i).a.facing, mult, a);
     player::on_message(w, pi, &mut m)
 }
+/// The hit nodes' condition 0x080361B8 (IfContactHit 0x0803634F / IfMeleeHit 0x08036303, field): the strike rect
+/// toward the player on the body-box centres' dominant axis (as `strike_rect` with the turn), the message carries
+/// that direction; `restore` (node +0x10: IfContactHit, a tank's crush) puts the enemy's own facing back before the
+/// message is sent; accepted -> sound 48 + rand(2)
+pub fn contact_strike(w: &mut World, i: usize, mult: i32, restore: bool) -> bool {
+    let Some(pi) = player(w, i) else { return false };
+    let saved = w.en_ref(i).a.facing;
+    let Some(rect) = strike_rect(w, i, true) else { return false };
+    let dir = w.en_ref(i).a.facing;
+    if restore {
+        w.en(i).a.facing = saved;
+    }
+    let mut m = msg_from(w, i, 0, rect, dir, mult, atk(2));
+    if player::on_message(w, pi, &mut m) {
+        let s = 48 + w.rng.rand(2);
+        w.sfx(s, 64);
+        return true;
+    }
+    false
+}
 /// HeavyStrike 0x0802F77C: sound 62 first (0x0802F7B2), the hit; accepted -> 48 + rand(2) (0x0802F8AC)
 pub fn heavy_strike(w: &mut World, i: usize) -> bool {
     let Some(pi) = player(w, i) else { return false };
@@ -1433,6 +1478,19 @@ pub fn heavy_strike(w: &mut World, i: usize) -> bool {
         return false;
     }
     w.sfx(62, 64);
+    // field: 0x0802F7B6.. is the standard strike - the turn and the rect from the body-box centres' dominant axis
+    // (`strike_rect`; Northern Wilderness 15-12: a Knight Destroyer, 64 px wide, turns left toward a player its
+    // top-left position has above it). Battles keep the reference's rect
+    if w.field.is_some() {
+        let Some(rect) = strike_rect(w, i, true) else { return true };
+        let dir = w.en_ref(i).a.facing;
+        let mut m = msg_from(w, i, 0, rect, dir, 0x400, atk(2));
+        if player::on_message(w, pi, &mut m) {
+            let s = 48 + w.rng.rand(2);
+            w.sfx(s, 64);
+        }
+        return true;
+    }
     face_player(w, i);
     let a = &w.en_ref(i).a;
     let b = a.body_box();
@@ -2160,6 +2218,7 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
         w.events.push(Event::DamageRoll { target: w.ents[i].id, dmg: res.unblocked });
     }
     w.events.push(Event::Damage { target: w.ents[i].id, attacker: msg.attacker, dmg: res.dmg, crit: res.crit });
+    crate::vram::damage_number(w, w.ents[i].id);
     if msg.att_is_player {
         w.events.push(Event::Hit);
         if res.dmg > 0 {
@@ -2172,7 +2231,6 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
     }
     {
         let e = w.en(i);
-        e.last_hit_dir = msg.dir;
         e.crit_hit = res.crit;
         e.splat_hit = msg.atk.sub == 3;
     }
@@ -2182,6 +2240,9 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
 
 /// ApplyDamage -> vfunc +0x58 (0x0800FA2A): true when this hit killed the enemy
 pub fn take_hit(w: &mut World, i: usize, msg: &HitMsg) -> bool {
+    // the ApplyDamage node (0x080187A4) stores the hit's direction (obj+0x290) before the call: an on-hit tree
+    // without it keeps the old one (real route 8-71: Babidi's hit state slides him along his first direction)
+    w.en(i).last_hit_dir = msg.dir;
     // 0x0800FA2A: only HP == 0 counts as already dead; a negative HP (see heal) still takes the hit and dies
     if w.en_ref(i).hp1024 == 0 {
         return true;
@@ -2298,6 +2359,27 @@ fn on_death(w: &mut World, i: usize) {
         w.en(i).ko = 0;
     } else {
         die(w, i, true);
+        if death == "special" && w.field.is_some() {
+            if let Some(k) = TANKS.iter().position(|&t| t == ty) {
+                tank_crew(w, i, k);
+            }
+        }
+    }
+}
+/// the tanks (death node 0x080333C4, param = def +0xC): Battle Tank variant 0x7F (0), Juggernaut 0x3A (1), 0x8C (2)
+pub const TANKS: [i32; 3] = [0x7f, 0x3a, 0x8c];
+/// crew (enemy type, graphics) per rand(2) and tank (tables 0x087592DC / +0x18)
+const TANK_CREW: [[(i32, i32); 3]; 2] = [[(8, 0x22), (0x43, 0xab), (0x2b, 0x88)], [(0x0f, 0x46), (0x2f, 0x8d), (0x61, 0xeb)]];
+/// A destroyed tank's crew (0x080333C4, field): after the defeat handler, the removal and the puff, four enemies
+/// from the template 0x087592BC (ctor 0x0800FD55, no callback, standing) at the tank's position + (0, 0), (24, 0),
+/// (24, 24), (0, 24), each a rand(2) pick of the tank's two crew types; battles keep the reference (no crew)
+fn tank_crew(w: &mut World, i: usize, tank: usize) {
+    use crate::fieldcontent::{Cond, ObjDef, ObjKind, ObjRef};
+    let (x, y) = (w.en_ref(i).a.px(), w.en_ref(i).a.py());
+    for (dx, dy) in [(0, 0), (24, 0), (24, 24), (0, 24)] {
+        let (ty, gfx) = TANK_CREW[w.rng.rand(2) as usize & 1][tank];
+        let o = ObjDef { at: ObjRef::List(0xff, ty as u16), cond: Cond::Always, kind: ObjKind::Enemy { ty, x: x + dx, y: y + dy, sprite: gfx, on_defeat: None, behaviour: vec![] }, rom: 0x0875_92bc };
+        crate::field::spawn_object(w, &o);
     }
 }
 pub fn die(w: &mut World, i: usize, explode: bool) {

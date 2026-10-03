@@ -75,7 +75,9 @@ pub fn flyer_update(w: &mut World, i: usize) -> bool {
     // an event over the running map (a circle's question s480, a circle's inline script: Earth 3-1 / 4-1) holds the
     // flyer, its animation ticks; a warp's fade-in and the frame after it do not (s479 / s515: the event ends then)
     let frame = w.frame;
-    if w.field.as_ref().is_some_and(|f| f.busy && matches!(f.mode, crate::field::Mode::Normal) && f.fade_end + 1 != frame) {
+    // (also through an event's `warp_fade` away from the map: s026's fade-out, step 4)
+    let script_fade = |m: &crate::field::Mode| matches!(m, crate::field::Mode::FadeOut { step: 4, .. });
+    if w.field.as_ref().is_some_and(|f| f.busy && (matches!(f.mode, crate::field::Mode::Normal) && f.fade_end + 1 != frame || script_fade(&f.mode))) {
         // (its animation keeps ticking)
         let f = w.field.as_mut().unwrap().flight.as_mut().unwrap();
         f.tick = (f.tick + 1) & 0xFFFF;

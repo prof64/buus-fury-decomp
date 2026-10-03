@@ -22,7 +22,7 @@ pub const NODE_NOTES: &[(&str, &str)] = &[
     ("MoveToFormationA", "formation offset tables 0x0877AE80/0x0877AECC not decoded: ring of 8 slots at 40/24 px"),
     ("TankDrive", "turn helpers not decoded: axis-aligned drive toward the player at 0.5 px/frame"),
     ("EnergyBarrage", "barrage flight path not decoded: short 4 px/frame shots, 12 frames"),
-    ("IfUnknown", "condition 0x0804EE25 not decoded: false"),
+    ("IfUnknown", "condition 0x0804EE25: Majin Buu is not pacified (1 - [0x0300302C])"),
     ("ShockStun", "electric-shock stun length not decoded: 48 frames"),
     ("VolleyballLaunch", "launched ball flight not decoded: 4 px/frame for 30 frames, hits other enemies"),
     ("InlineScript", "queued once as a script run (the game re-runs the inline bytecode each update until it returns 1)"),
@@ -60,6 +60,8 @@ fn kind(c: &C, n: u16) -> K {
 fn par(c: &C, n: u16, p: P, d: i64) -> i64 {
     c.tree.nodes[n as usize].p.get(p, d)
 }
+/// the Skeleton's collapse node (the first of state 0x213's two PlayAnimOnce defs)
+const SKELETON_COLLAPSE: u32 = 0x0875_9370;
 fn an(v: i32) -> AnimRef {
     AnimRef::N(v)
 }
@@ -213,7 +215,8 @@ fn enter(w: &mut World, c: &C, n: u16) {
             }
             if k == K::IfHpBelow {
                 let e = w.en_ref(c.i);
-                let thr = (par(c, n, P::Frac, 0) * e.max_hp1024).div_euclid(65536);
+                // 0x0804E6A0: (frac * whole max HP) >> 16 whole HP, tested as << 10 (0x0804EDD8)
+                let thr = ((par(c, n, P::Frac, 0) * (e.max_hp1024 >> 10)) >> 16) << 10;
                 if let Some(r) = rt(w, c, n) {
                     // threshold kept in 64 bits across two scratch words
                     r.d[1] = (thr >> 32) as i32;
@@ -229,7 +232,7 @@ fn enter(w: &mut World, c: &C, n: u16) {
                 r.d = [0; 8];
             }
             let mut r = *r;
-            if is_controller(kind(c, n)) || (w.field.is_some() && matches!(kind(c, n), K::MiniHopToward | K::MiniHopFlee)) {
+            if is_ctl(w, kind(c, n)) || (w.field.is_some() && matches!(kind(c, n), K::MiniHopToward | K::MiniHopFlee)) {
                 w.en(c.i).ctl = (c.serial, n);
             }
             leaf_enter(w, c, n, &mut r);
@@ -265,7 +268,7 @@ fn exit(w: &mut World, c: &C, n: u16) {
             }
         }
         _ => {
-            if is_controller(kind(c, n)) && w.en_ref(c.i).ctl == (c.serial, n) {
+            if is_ctl(w, kind(c, n)) && w.en_ref(c.i).ctl == (c.serial, n) {
                 w.en(c.i).ctl = (0, 0);
             }
             let Some(r) = rt(w, c, n) else { return };
@@ -350,9 +353,10 @@ fn update(w: &mut World, c: &C, n: u16) -> i32 {
             0
         }
         _ => {
+            let ctl = is_ctl(w, kind(c, n));
             let Some(r) = rt(w, c, n) else { return 0 };
             // a motion controller that already ran out while the field was held: the node only reports it
-            if is_controller(kind(c, n)) && r.d[7] != 0 {
+            if ctl && r.d[7] != 0 {
                 return 1;
             }
             r.f += 1;
@@ -372,6 +376,14 @@ fn update(w: &mut World, c: &C, n: u16) -> i32 {
 /// GrappleArm 0x03003294, BombThrow 0x0203DD04
 fn is_controller(k: K) -> bool {
     matches!(k, K::FlameBreath | K::SoldierThrow | K::TurretFire | K::CyborgShot | K::GrappleArm | K::BombThrow)
+}
+/// `is_controller` + the field's other shot states, which are the same kind of actor state object (GunShot
+/// 0x03002FC4, RifleShot 0x03002FD8, KiBlast 0x03003068, NinjaStarThrow 0x03003074, MummyWrapShot 0x030030A8 / Burst
+/// 0x030030B0: the actor's own update ticks them, so a shot leaves at its tick while an event holds the field -
+/// Thieves Den 9-4: a Hessian's rocket during the level-up popup; WindupMelee 0x03003214: a Skeleton's swing turns
+/// to the player at tick 32 inside a dart trap's event, Kyodai Pyramid 14-4); battles keep the reference's set
+fn is_ctl(w: &World, k: K) -> bool {
+    is_controller(k) || (w.field.is_some() && matches!(k, K::GunShot | K::RifleShot | K::KiBlast | K::NinjaStarThrow | K::MummyWrapShot | K::MummyWrapBurst | K::WindupMelee))
 }
 
 /// an event holds the field: the AI does not think, but the running motion controller keeps ticking (a turret's fire
@@ -393,7 +405,7 @@ pub fn busy_controller(w: &mut World, i: usize) {
         }
         return;
     }
-    if c.serial != serial || !is_controller(kind(&c, n)) {
+    if c.serial != serial || !is_ctl(w, kind(&c, n)) {
         return;
     }
     let Some(r) = rt(w, &c, n) else { return };
@@ -442,6 +454,8 @@ fn cond(w: &mut World, c: &C, n: u16) -> bool {
         K::IfCounterEq => w.en_ref(i).counter == par(c, n, P::N, 0),
         K::IfGlobalFlag => w.g.candy > 0,
         K::IfBuuPacified => w.g.buu_pacified != 0,
+        // 0x0804EE24: 1 - [0x0300302C] - Majin Buu is not pacified (his hurt states under Babidi's spell pop at once)
+        K::IfUnknown => w.g.buu_pacified != 1,
         K::IfAxisAligned => {
             let Some(pi) = en::player(w, i) else { return false };
             if !w.pl_ref(pi).a.hittable {
@@ -472,6 +486,10 @@ fn cond(w: &mut World, c: &C, n: u16) -> bool {
                 _ => dy.abs() < 16 && dx > 16,
             }
         }
+        // the field: the game's shared condition 0x080361B8 (IfContactHit restores the facing, IfMeleeHit keeps the
+        // turn); battles keep the rule cross_ts pins
+        K::IfContactHit if w.field.is_some() => en::contact_strike(w, i, 1024, true),
+        K::IfMeleeHit if w.field.is_some() => en::contact_strike(w, i, 1024, false),
         K::IfContactHit | K::IfMeleeHit => en::melee_strike(w, i, 1024, false, false, atk(2)),
         K::IfContactExplode => en::contact_explode(w, i),
         K::IfLandedOnRock => en::land_on_rock(w, i),
@@ -584,6 +602,19 @@ fn one_idle(w: &mut World, i: usize) {
     if e.a.anim_name(&d) != Some("idle") || !e.anim_ended {
         set_anim(w, i, &[nm("idle")], true, Some(true));
     }
+}
+/// The enemy's pose setter (vt+0x30, 0x0800ED3E, and the nodes that do the same by hand): the raw only (the tick
+/// stays), the given frame, under the hold state 0x03001B00 (nothing ticks)
+fn hold_pose(w: &mut World, i: usize, raw: i32, frame: i32) {
+    let d = Arc::clone(&w.data);
+    let e = w.en(i);
+    e.set_raw(&d, raw);
+    e.ea.pos.frame = frame;
+    e.ea.rule = d.anim.hold;
+    e.ea.done = false;
+    e.own_state = true;
+    e.anim_ended = false;
+    e.anim_seq = e.anim_seq.wrapping_add(1);
 }
 /// enemy SetAnim id -> raw (0x08072670 + 1)
 const SETANIM_RAW: [i32; 23] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 19, 20, 21, 22, 23, 24];
@@ -782,7 +813,12 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             let h = w.data.anim.hold;
             set_anim_r(w, i, &[an(4)], false, h);
         }
-        K::RandomStep => r.d[0] = w.rng.rand(4),
+        // RandomStep (create 0x08037C06, vtable 0x0804B1C0; the Skeleton's bones rattle before they rise): enter
+        // 0x0804E824 keeps the position
+        K::RandomStep => {
+            r.d[0] = w.en_ref(i).a.x;
+            r.d[1] = w.en_ref(i).a.y;
+        }
         K::MeleeAttack => {
             // hit test (an accepted hit plays its sound), then SetAnim(4 + rand(punch animations))
             if en::melee_strike(w, i, 0x400, true, false, atk(2)) {
@@ -815,7 +851,14 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
         K::HeavyStrike => {
             r.d[0] = en::player(w, i).is_some_and(|pi| w.pl_ref(pi).a.hittable) as i32;
             if r.d[0] != 0 {
-                en::face_player(w, i);
+                // field: the enter 0x0802F74C only poses - vt+0x30(4, 0): SetAnim id 4's raw, frame 0, held - and
+                // starts the 60-frame count; the facing is what IfPlayerInMeleeRange's turn left (Northern Wilderness
+                // 15-12: a Knight Destroyer winds up facing left). Battles keep the reference (a turn, no pose)
+                if w.field.is_some() {
+                    hold_pose(w, i, SETANIM_RAW[4], 0);
+                } else {
+                    en::face_player(w, i);
+                }
             }
         }
         K::ChargedPunch => {
@@ -842,6 +885,7 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             let r0 = w.data.anim.once_stop3;
             let a = if kind(c, n) == K::SoldierThrow { 19 } else { 20 };
             set_anim_r(w, i, &[an(a), an(3)], false, r0);
+            r.d[2] = w.en_ref(i).ea.pos.raw;
         }
         // controller state 0x03003108 (enter 0x0802F6A8: face, SetAnimRaw(0x12))
         K::CyborgShot => {
@@ -937,6 +981,19 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
                 w.en(i).a.hittable = false;
                 r.d[2] = w.en_ref(i).ea.pos.raw;
             }
+        }
+        // field: the enter 0x0802C1B0 - SetAnimRaw(0x12) (the raw only: the tick stays), frame = rand(the animation's
+        // frame count) (which prop the ninja poses as), SetState(0x03001B00: a state that holds); it runs when the
+        // state is entered (Northern Wilderness 15-7: in the frame of the GotoState). Battles keep the reference's
+        // rule (no draw, the animation set by the update)
+        K::NinjaDisguise if w.field.is_some() => {
+            let d = Arc::clone(&w.data);
+            let cnt = {
+                let e = w.en_ref(i);
+                e.a.sprite.and_then(|s| d.sprite(s)).and_then(|s| s.anim_raw(19)).map(|a| a.steps(e.a.facing).len() as u32).unwrap_or(0)
+            };
+            let fr = w.rng.rand(cnt);
+            hold_pose(w, i, 19, fr);
         }
         K::NinjaReveal => {
             r.d[0] = w.en_ref(i).a.x;
@@ -1041,8 +1098,19 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
         }
         K::SummonMinion => timed_enter(w, i, &[an(17)], false),
         K::KidBuuSplitAnim => set_anim(w, i, &[an(11)], true, Some(false)),
-        K::BabidiHover => w.g.buu_pacified = 0,
-        K::BabidiGesture => set_anim(w, i, &[an(18)], true, Some(true)),
+        // Babidi (real route 8-71, Vegeta vs Majin Buu). Hover enter 0x0802AD88: SetAnimRaw(0x13) under the
+        // controller 0x03003014 (no idle draw), Buu is no longer pacified, not hittable (obj+0x1CC = 0)
+        K::BabidiHover => {
+            w.g.buu_pacified = 0;
+            let h = w.data.anim.hold;
+            set_anim_r(w, i, &[an(19)], true, h);
+            w.en(i).a.hittable = false;
+        }
+        // the landing, enter 0x0802AE76: SetAnimRaw(0x13) under the controller 0x03003024
+        K::BabidiGesture => {
+            let h = w.data.anim.hold;
+            set_anim_r(w, i, &[an(19)], true, h);
+        }
         // field (sc_janemba): the arm part plays the strike (raw 19), the body keeps its idle; battle keeps the
         // reference's body animation (cross_ts)
         K::JanembaHandStrikeA | K::JanembaHandStrikeB if w.field.is_some() => {
@@ -1117,21 +1185,51 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
         K::SuperJanembaWave => timed_enter(w, i, &[an(18), an(3)], true),
         K::JumpSmash => set_anim(w, i, &[an(18)], true, Some(true)),
         K::FinishLandingAnim => set_anim(w, i, &[nm("idle")], true, Some(true)),
+        // node 0x0874CA2C (Ronin / Samurai / Shogun guard): the enemy's SetAnim(0x11) (vfunc +0x28 -> 0x0800FAB6):
+        // raw 19 under the one-shot state 0x03001B18 (16 ticks, then SetAnim(0)); restarted by every enter
+        // (13-51: the Samurai's stance restarts every 3 frames while its state loops, and runs out when it does not).
+        // Field only: battles keep the rule the TypeScript cross-check pins
+        K::SelfMessage11 if w.field.is_some() => set_anim(w, i, &[an(18)], true, Some(false)),
+        // Babidi's state 0xCA, enter 0x0802ADF0: SetAnimRaw(0x15) under the controller 0x0300301C
+        K::PlayAnimHold if w.en_ref(i).ty == 0x1d => {
+            let h = w.data.anim.hold;
+            set_anim_r(w, i, &[an(21)], true, h);
+        }
         K::StunnedAnim | K::StunnedAnim21 | K::PlayAnimHold => set_anim(w, i, &[an(20)], true, Some(true)),
         K::RecoverAnim => set_anim(w, i, &[an(19)], true, Some(false)),
         // create 0x080315A4: SetAnimRaw(0x15) under the one-shot state 0x03001B30
         K::MechTransform => set_anim(w, i, &[an(20)], true, Some(false)),
         // enter 0x0804E5E8 installs the fragment state 0x03003158
         K::PlayAnim0 => en::frag_enter(w, i),
-        K::PlayAnim12 | K::PlayAnim12b | K::PlayAnim12Swarm | K::PlayAnim12Yakon | K::PlayAnim12Yakon2 | K::GhostAnimA | K::GhostAnimB => set_anim(w, i, &[an(17)], true, Some(false)),
-        K::PlayAnim13 | K::PlayAnim13Yakon | K::PlayAnimOnce => set_anim(w, i, &[an(18)], true, Some(false)),
+        K::PlayAnim12 | K::PlayAnim12b | K::PlayAnim12Swarm | K::PlayAnim12Yakon | K::PlayAnim12Yakon2 => set_anim(w, i, &[an(17)], true, Some(false)),
+        // GhostAnimA / B: enters 0x0804EBC8 / 0x0804EB38 = SetAnimRaw(0x12) under the one-shot state 0x03001B30
+        // the Skeleton's collapse (state 0x213's first node, def 0x08759370, singleton 0x0300320C): enter 0x0804EAA0 =
+        // not hittable (obj+0x1CC = 0) + SetAnimRaw(0x11) under the one-shot state 0x03001B38; its second
+        // PlayAnimOnce (def 0x0875938C, the rise) is SetAnimRaw(0x12), and its exit 0x0804F6CC makes it hittable again
+        // (0x03001B38 = {vtable 0x0804E0AC, shift 2}: 4 ticks a cel, the last one stays)
+        K::PlayAnimOnce => {
+            let collapse = c.tree.nodes[n as usize].addr == SKELETON_COLLAPSE;
+            if collapse {
+                w.en(i).a.hittable = false;
+            }
+            let rule = w.data.anim.once_stop2;
+            set_anim_r(w, i, &[an(if collapse { 17 } else { 18 })], false, rule);
+        }
+        K::PlayAnim13 | K::PlayAnim13Yakon | K::GhostAnimA | K::GhostAnimB => set_anim(w, i, &[an(18)], true, Some(false)),
         // field (sc_janemba, Super Janemba's state 0x2DD: a hit cuts the teleport): the landing animation (0x13)
         // played backwards from its end, then the vanish (0x11) backwards - 71 frames, then a SetAnim(0)
-        K::PlayAnimTimed if w.field.is_some() => {
+        K::PlayAnimTimed if w.field.is_some() && w.en_ref(i).ty != 0x1d => {
             let hold = w.data.anim.hold;
             en::set_anim_rule(w, i, &[an(19)], true, Some(false), Some(hold));
             // no hits until its end
             w.en(i).a.hittable = false;
+        }
+        // Babidi's state 0xC9 (hit on the ground), enter 0x0802AEDA: SetAnimRaw(0x14) under the controller
+        // 0x03003030 (4 cels of 8 ticks, looping) and Majin Buu is pacified (0x0300302C = 1)
+        K::PlayAnimTimed if w.en_ref(i).ty == 0x1d => {
+            let h = w.data.anim.hold;
+            set_anim_r(w, i, &[an(20)], true, h);
+            w.g.buu_pacified = 1;
         }
         K::PlayAnimTimed => set_anim(w, i, &[an(19)], true, Some(true)),
         K::DarkSphere => {
@@ -1199,6 +1297,11 @@ fn leaf_exit(w: &mut World, c: &C, n: u16, _r: &mut NodeRt) {
     if kind(c, n) == K::RunMotionController {
         crate::fieldpatrol::pause(w, i);
     }
+    if kind(c, n) == K::RandomStep {
+        let e = w.en(i);
+        e.a.x = _r.d[0];
+        e.a.y = _r.d[1];
+    }
     match kind(c, n) {
         K::Block => {
             w.en(i).a.blocking = false;
@@ -1206,6 +1309,8 @@ fn leaf_exit(w: &mut World, c: &C, n: u16, _r: &mut NodeRt) {
             w.en(i).state_stamp = f;
         }
         K::ChargedPunch => w.en(i).a.hittable = true,
+        // Babidi can be hit again once he leaves the hover (obj+0x1CC back to 1 with the state change to 0xC6)
+        K::BabidiHover => w.en(i).a.hittable = true,
         K::KidBuuKamehameha => stop_enemy_beam(w, i),
         // exit 0x08033AF6: crit = 0, hit dir = facing ^ 1 (the KnockbackSlide that follows slides it backwards), SetAnim(9)
         K::VampireGrab => {
@@ -1348,6 +1453,12 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             true
         }
         K::SpawnPuff | K::VampireSummon | K::VampireSummon2 => {
+            // the node enemy_ai.json calls SpawnPuff (create 0x0802F21C, singleton 0x030030FC, vtable 0x08049A5C):
+            // its enter 0x0804E53C detaches the enemy from the enemy grid (0x0800F924: obj+0x291 = 1, tiles freed)
+            if matches!(kind(c, n), K::SpawnPuff) {
+                en::unmark_self(w, i);
+                w.en(i).detached = true;
+            }
             let (cx, cy) = w.en_ref(i).a.center();
             crate::fx::puff(w, cx, cy, 0x1800);
             true
@@ -1450,12 +1561,13 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             en::walk_by(w, i, vx, vy, vx != 0 || vy != 0);
             false
         }
-        // update 0x080313EA: the counter 48 first, 0 -> finished without moving (47 moves)
+        // update 0x080313EA: the counter 48 first, 0 -> finished without moving (47 moves); a step = both
+        // components at once, taken back whole when the footprint does not fit (no sliding along a wall)
         K::BackStep => {
             if f >= 48 {
                 return true;
             }
-            en::move_by(w, i, r.d[0], r.d[1]);
+            en::try_move(w, i, r.d[0], r.d[1], 0, 0);
             false
         }
         K::KnockbackSlide => {
@@ -1476,12 +1588,23 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         K::FollowMajinBuu => {
             let buu = w.live_enemies().into_iter().find(|&o| matches!(w.en_ref(o).ty, 0x1a | 0x1b | 0x1c));
             let Some(b) = buu else { return false };
-            let (bx, by) = w.en_ref(b).a.center();
-            let (x, y) = w.en_ref(i).a.center();
+            // update 0x0802B3EA: d = Buu's footprint centre - own (0x0800FDFA); always faces him (horizontal only
+            // when |dx| > |dy|); from `dist` px on the dominant axis on: one step of d * 256 / max(|dx|, |dy|), taken
+            // only when the whole step is free (real route 8-71: Babidi turns before he follows)
+            let (bx, by) = w.en_ref(b).a.fc();
+            let (x, y) = w.en_ref(i).a.fc();
             let (dx, dy) = (bx - x, by - y);
-            if dx.abs().max(dy.abs()) as i64 > par(c, n, P::Dist, 50) {
-                en::walk_by(w, i, dx.signum() * 256, dy.signum() * 256, dx != 0 || dy != 0);
-                w.en(i).a.facing = facing_toward(dx, dy);
+            w.en(i).a.facing = if dx.abs() > dy.abs() {
+                if dx > 0 { 3 } else { 2 }
+            } else if dy > 0 {
+                0
+            } else {
+                1
+            };
+            let m = dx.abs().max(dy.abs());
+            if m as i64 >= par(c, n, P::Dist, 50) && m > 0 {
+                w.en(i).moving = true;
+                en::try_move(w, i, (dx << 8) / m, (dy << 8) / m, 0, 0);
             }
             false
         }
@@ -1515,10 +1638,15 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             }
             false
         }
+        // update 0x08037BBC: the kept position + (rand(3) - 1, rand(3) - 1) px, written straight to the actor (no
+        // grid test), never finished; exit 0x0804F638 puts the kept position back
         K::RandomStep => {
-            let (dx, dy) = DIR_VEC[r.d[0] as usize & 3];
-            en::walk_by(w, i, dx * 256, dy * 256, true);
-            f >= 16
+            let dx = (w.rng.rand(3) - 1) << 8;
+            let dy = (w.rng.rand(3) - 1) << 8;
+            let e = w.en(i);
+            e.a.x = r.d[0] + dx;
+            e.a.y = r.d[1] + dy;
+            false
         }
         // ---- melee
         // update 0x0802A276 = IsAnim(0): done once back in the idle state (the punch state's end SetAnim(0))
@@ -1551,6 +1679,9 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             if w.en_ref(i).anim_seq as i32 != r.d[0] {
                 return true;
             }
+            // tick 0x08033CF0: not hittable (obj+0x1CC = 0) from the swing at 32 until the last cel starts at
+            // 32 + 8 * (frames - 2) (Kyodai Pyramid 14-20: a punch passes through a swinging Skeleton)
+            w.en(i).a.hittable = !(f >= 32 && f < r.d[1] - 32);
             if f == 32 && en::melee_strike(w, i, 0x400, true, false, atk(2)) {
                 w.sfx(62, 64);
             }
@@ -1677,6 +1808,11 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         // gone, the turret's at 72: SetAnim(0)
         K::SoldierThrow | K::TurretFire => {
             let soldier = kind(c, n) == K::SoldierThrow;
+            // the node's update (0x08026726) is finished as soon as the controller is no longer the actor's state
+            // object: a hit's reaction replaced it (real route 8-31: a soldier hurt mid-throw moves on once it recovers)
+            if w.en_ref(i).ea.pos.raw != r.d[2] {
+                return true;
+            }
             if f == 8 {
                 let (x, y) = en::muzzle_fix(w, i, !soldier);
                 let dir = w.en_ref(i).a.facing;
@@ -1878,6 +2014,10 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             f % 72 == 0 && w.g.tele_chain % 4 == 0
         }
         K::NinjaDisguise => {
+            // field: the node's enter did it (leaf_enter)
+            if w.field.is_some() {
+                return true;
+            }
             set_anim(w, i, &[an(17)], true, Some(true));
             true
         }
@@ -1890,6 +2030,15 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                 e.a.y = r.d[1] + jy * 256;
             }
             if f >= 64 {
+                // field (13-48): the controller 0x03003080 (update 0x0802C36A) ends at tick 64 with SetAnim(0) - the
+                // position stays where the last jitter put it; the node (0x0802C3D2) then puffs at the box centre
+                // with the rate 0x1000 + rand(0x1000). Battles keep the rule the TypeScript cross-check pins
+                if w.field.is_some() {
+                    set_anim(w, i, &[an(0)], true, Some(true));
+                    let (cx, cy) = w.en_ref(i).a.center();
+                    crate::fx::puff_rng(w, cx, cy);
+                    return true;
+                }
                 {
                     let e = w.en(i);
                     e.a.x = r.d[0];
@@ -2086,6 +2235,12 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                     if let Some(pi) = p {
                         player::candy_gone(w, pi);
                     }
+                    // 0x0802AFC0: a follow object (0x0804D300) on the eater takes the camera before the player object
+                    // goes (real route 8-71: the camera eases to Buu while Vegeta is eaten); the new player object
+                    // takes it back. Field only: battles keep the reference's camera
+                    if w.field.is_some() {
+                        crate::scene::follow(w, me);
+                    }
                 }
                 w.en(i).ea.pos.frame = f >> 3;
             } else if f < 112 {
@@ -2113,6 +2268,9 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                 if f == 120 {
                     if let Some(pi) = p {
                         player::candy_respawn(w, pi, (r.d[0] >> 8) << 8, (r.d[1] >> 8) << 8, r.d[2] != 0);
+                        if w.field.is_some() && w.scene.cam.mode == crate::scene::CamMode::Follow(me) {
+                            w.scene.cam.mode = crate::scene::CamMode::Player;
+                        }
                     }
                 }
             } else if f >= 160 {
@@ -2220,10 +2378,28 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         K::BabidiHover => {
             let z = (w.en_ref(i).a.z - 1).max(-50);
             w.en(i).a.z = z;
-            set_anim(w, i, &[an(if f & 8 != 0 { 1 } else { 0 })], false, Some(true));
+            // controller tick 0x0802AD58: the tick runs 0..23, then 8..23 again; cel = tick >> 3 (no draw)
+            let t = if f < 24 { f } else { 8 + (f - 8) % 16 };
+            let e = w.en(i);
+            e.ea.pos.tick = t;
+            e.ea.pos.frame = t >> 3;
             false
         }
-        K::BabidiGesture => false,
+        // controller tick 0x0802AE3A: down 1 px a frame; on the ground 8 ticks, then SetAnim(0) (the idle's
+        // rand(255)) - the node (0x0802AE98) is finished once the controller is gone
+        K::BabidiGesture => {
+            if w.en_ref(i).a.z < 0 {
+                w.en(i).a.z += 1;
+                return false;
+            }
+            r.d[0] += 1;
+            if r.d[0] >= 8 {
+                set_anim(w, i, &[an(0)], true, Some(true));
+                return true;
+            }
+            w.en(i).ea.pos.frame = r.d[0] >> 3;
+            false
+        }
         // ---- Janemba
         K::JanembaSpawnParts => {
             en::janemba_parts(w, i);
@@ -2455,6 +2631,18 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             false
         }
         K::FinishLandingAnim => f >= 11,
+        // Babidi's controller tick 0x0802ADC8: cel = (tick >> 3) & 3; at tick 0x60: SetAnim(0) (idle rand(255)), and
+        // the node (0x0802AE06) is finished
+        K::PlayAnimHold if w.en_ref(i).ty == 0x1d => {
+            if f >= 0x60 {
+                set_anim(w, i, &[an(0)], true, Some(true));
+                return true;
+            }
+            let e = w.en(i);
+            e.ea.pos.tick = f;
+            e.ea.pos.frame = (f >> 3) & 3;
+            false
+        }
         K::StunnedAnim | K::StunnedAnim21 | K::PlayAnimHold => false,
         K::RecoverAnim => {
             let d = Arc::clone(&w.data);
@@ -2462,11 +2650,31 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         }
         // update 0x0804FF0C: done once the actor left the fragment state
         K::PlayAnim0 => w.en_ref(i).hook != en::Hook::Fragment,
-        K::PlayAnim12 | K::PlayAnim12b | K::PlayAnim12Swarm | K::PlayAnim12Yakon | K::PlayAnim12Yakon2 | K::GhostAnimA | K::GhostAnimB | K::PlayAnim13 | K::PlayAnim13Yakon | K::PlayAnimOnce => {
+        // GhostAnimA / B (updates 0x0802DFD8 / 0x0802E040): once the one-shot state is over, the paired graphics set
+        // through 0x0800EDF8 - A: the shown set -> the unseen one (0x60 -> 0x5E, 0xDC -> 0xDB, 0xE5 -> 0xE4), B back
+        K::GhostAnimA | K::GhostAnimB => {
             let d = Arc::clone(&w.data);
-            f >= 16 && w.en_ref(i).anim_done(&d)
+            if !(f >= 16 && w.en_ref(i).anim_done(&d)) {
+                return false;
+            }
+            if matches!(kind(c, n), K::GhostAnimA) {
+                ghost_gfx(w, i, &[(0x60, 0x5e), (0xdc, 0xdb), (0xe5, 0xe4)]);
+            } else {
+                ghost_gfx(w, i, &[(0x5e, 0x60), (0xdb, 0xdc), (0xe4, 0xe5)]);
+            }
+            true
         }
-        K::PlayAnimTimed if w.field.is_some() => {
+        K::PlayAnim12 | K::PlayAnim12b | K::PlayAnim12Swarm | K::PlayAnim12Yakon | K::PlayAnim12Yakon2 | K::PlayAnim13 | K::PlayAnim13Yakon | K::PlayAnimOnce => {
+            let d = Arc::clone(&w.data);
+            let done = f >= 16 && w.en_ref(i).anim_done(&d);
+            if done && matches!(kind(c, n), K::PlayAnimOnce) && c.tree.nodes[n as usize].addr != SKELETON_COLLAPSE {
+                // the rise's exit 0x0804F6CC: SetAnim(0) (the idle enter's rand(255)), hittable again
+                set_anim(w, i, &[an(0)], true, Some(true));
+                w.en(i).a.hittable = true;
+            }
+            done
+        }
+        K::PlayAnimTimed if w.field.is_some() && w.en_ref(i).ty != 0x1d => {
             if f == 36 {
                 let hold = w.data.anim.hold;
                 en::set_anim_rule(w, i, &[an(17)], true, Some(false), Some(hold));
@@ -2477,6 +2685,13 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             }
             // (the sequence's PopState runs in the next frame)
             f >= 71
+        }
+        // Babidi's controller tick 0x0802AEC0: the tick wraps at 0x20, cel = tick >> 3; the node never finishes
+        K::PlayAnimTimed if w.en_ref(i).ty == 0x1d => {
+            let e = w.en(i);
+            e.ea.pos.tick = f & 0x1f;
+            e.ea.pos.frame = (f & 0x1f) >> 3;
+            false
         }
         K::PlayAnimTimed => f >= 32,
         K::DarkSphere => w.g.sphere_state == 1 || w.g.sphere_state == 3,
@@ -2673,6 +2888,22 @@ fn hit_node(w: &mut World, i: usize, t: &Arc<BehTree>, n: u16, msg: &HitMsg) -> 
                 1
             }
         }
+        // on-hit 0x08032F84 (the tanks' armour: Juggernaut ...): as ApplyDamage, with the damage / 4 (0x08046E58, the
+        // signed divide) when the hit's direction is the tank's facing
+        K::TankDamage => {
+            if msg.mult == 0 {
+                return 0;
+            }
+            let mut m = msg.clone();
+            if w.en_ref(i).a.facing == msg.dir {
+                m.dmg /= 4;
+            }
+            if en::take_hit(w, i, &m) {
+                2
+            } else {
+                1
+            }
+        }
         // on-hit 0x0803999D (field, sc_janemba): the body parts play the hurt animation from the hit's frame; battle
         // keeps the reference (no part flash)
         K::JanembaPartFlash => {
@@ -2727,7 +2958,8 @@ fn hit_node(w: &mut World, i: usize, t: &Arc<BehTree>, n: u16, msg: &HitMsg) -> 
         }
         K::IfHpBelow => {
             let e = w.en_ref(i);
-            if e.hp1024 < (p.g(P::Frac) * e.max_hp1024).div_euclid(65536) {
+            // 0x080299FE: ((frac * whole max HP) >> 16) << 10
+            if e.hp1024 < ((p.g(P::Frac) * (e.max_hp1024 >> 10)) >> 16) << 10 {
                 kid(w, 0)
             } else {
                 0
@@ -2870,6 +3102,20 @@ fn tank_drive(w: &mut World, i: usize, d: u8, r: &mut NodeRt) {
         set_anim(w, i, &[nm("idle")], true, Some(true));
     }
     en::mark_self(w, i);
+}
+
+/// Ghost / Phantom vanish and appear (GhostAnimA / GhostAnimB): the graphics set changes like the shield soldiers',
+/// with the object tile bookkeeping of SetSprite
+fn ghost_gfx(w: &mut World, i: usize, map: &[(i32, i32)]) {
+    let old = w.en_ref(i).a.sprite;
+    shield_gfx(w, i, map);
+    if w.en_ref(i).a.sprite != old {
+        crate::vram::sprite_changed(w, i, old);
+        // 0x0800EDF8: the new set's first animation from its start (obj+0x34 = the def's table, +0x38 / +0x30 = 0):
+        // the idle animation with no rand(255) draw (the one-shot state had already handed back to the normal one)
+        let d = Arc::clone(&w.data);
+        w.en(i).set_anim_with(&d, &[nm("idle")], true, Some(true), None, None, &mut Vec::new());
+    }
 }
 
 /// shield soldiers' graphics swaps (RaiseShield 0x0802CD7D / LowerShield 0x0802CDE1 / ShieldBreak 0x0802D49F): the

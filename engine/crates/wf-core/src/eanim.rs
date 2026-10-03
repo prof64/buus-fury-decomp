@@ -153,6 +153,8 @@ pub struct AnimRules {
     pub hold: u32,
     pub loop3: u32,
     pub once_stop3: u32,
+    /// the one-shot state 0x03001B38 (vtable 0x0804E0AC, shift 2): 4 ticks a cel, stops on the last one
+    pub once_stop2: u32,
     pub once_hold3: u32,
 }
 
@@ -196,7 +198,8 @@ impl AnimRules {
         let loop3 = push(EAnimRule::simple(RuleKind::Loop, 3, None, false), &mut rules);
         let once_stop3 = push(EAnimRule::simple(RuleKind::OnceStop, 3, Some(End::None), false), &mut rules);
         let once_hold3 = push(EAnimRule::simple(RuleKind::Once, 3, Some(End::Hold), false), &mut rules);
-        AnimRules { rules, setanim, generic, types, keep, reverse, fallback_loop, fallback_once, idle, hold, loop3, once_stop3, once_hold3 }
+        let once_stop2 = push(EAnimRule::simple(RuleKind::OnceStop, 2, Some(End::None), false), &mut rules);
+        AnimRules { rules, setanim, generic, types, keep, reverse, fallback_loop, fallback_once, idle, hold, loop3, once_stop3, once_hold3, once_stop2 }
     }
     /// the rule of a SetState(controller) for a type (tests): shared object, else the type's recorded rule
     pub fn for_controller(&self, ctl: &str, ty: i32) -> Option<u32> {

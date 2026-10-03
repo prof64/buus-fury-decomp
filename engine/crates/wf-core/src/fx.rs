@@ -105,7 +105,13 @@ impl Fx {
 }
 
 pub fn add(w: &mut World, f: Fx) -> EntityId {
-    w.add(Body::Fx(Box::new(f)))
+    // the generic animated effect object (`0x0802A81C`, vtable 0x0804CF3C) holds 0x400 of object tiles
+    let tiles = matches!(f, Fx::Anim { .. } | Fx::Loop { .. });
+    let id = w.add(Body::Fx(Box::new(f)));
+    if tiles {
+        crate::vram::acquire(w, crate::vram::Owner::Ent(id), 0x400);
+    }
+    id
 }
 pub fn fx_anim(w: &mut World, id: u32, x: i32, y: i32, start: i32, n: i32, rate: i32) -> EntityId {
     add(w, Fx::Anim { id, x, y, rec: start, left: n, rate, acc: 0 })

@@ -213,7 +213,21 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
                 0x8a => (0, arg(a, 0)),
                 _ => (3, arg(a, 0)),
             };
-            if h.w.field.is_some() {
+            if n == 0xaa && h.w.field.is_some() {
+                // spawn_map_item: the item is thrown from the loot block (fieldobj::throw_map_item)
+                let at = wf_core::fieldcontent::ObjRef::List(list, idx as u16);
+                wf_core::field::throw_map_item(h.w, at);
+            } else if n == 0xa9 && h.w.field.is_some() {
+                // spawn_map_item_at (0x0800262A): the same dropped-item constructor (4 RNG draws) from the position
+                // (x, y) with the zero velocity 0x08054FF8; the loot block is not touched (13-53: the 6-Star ball)
+                let at = wf_core::fieldcontent::ObjRef::List(list, idx as u16);
+                let keep = h.w.field.as_ref().map(|f| f.loot);
+                wf_core::fieldobj::set_loot(h.w, arg(a, 1), arg(a, 2), 0, 0);
+                wf_core::field::throw_map_item(h.w, at);
+                if let (Some(f), Some(l)) = (h.w.field.as_mut(), keep) {
+                    f.loot = l;
+                }
+            } else if h.w.field.is_some() {
                 let at = wf_core::fieldcontent::ObjRef::List(list, idx as u16);
                 let id = wf_core::field::spawn_map_object(h.w, at, true);
                 if n == 0xa9 {
@@ -498,10 +512,13 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
             let Some(id) = entity_of(h, arg(a, 0)) else { return unit() };
             let (x, y) = if n == 0x90 { (arg(a, 1), arg(a, 2)) } else { (0, 100) };
             h.w.scene.boss_bar = Some(scene::BossBar { entity: id, a: x, b: y });
+            wf_core::vram::release(h.w, wf_core::vram::Owner::BossBar);
+            wf_core::vram::acquire(h.w, wf_core::vram::Owner::BossBar, 0x200);
             unit()
         }
         0x91 => {
             h.w.scene.boss_bar = None;
+            wf_core::vram::release_later(h.w, wf_core::vram::Owner::BossBar, wf_core::vram::BOSS_BAR_OUT);
             unit()
         }
         0x92 => done(h.w.story.equipment_count(arg(a, 0))),
@@ -546,8 +563,10 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
                 let mut p = h.w.pl_ref(i).clone();
                 let gfx = |w: &World, f: i32| w.data.form(f).map(|f| f.gfx);
                 let new_sprite = gfx(h.w, p.form) != gfx(h.w, form);
+                let old = p.a.sprite;
                 p.apply_form(h.w, form);
                 *h.w.pl(i) = p;
+                wf_core::vram::sprite_changed(h.w, i, old);
                 // the active character's sprite is rebuilt, then vt+0x28(0) (s067: set_char_form(1, 108)); also with
                 // the same sprite (s328: set_char_form(4, 279) on Vegeta already in form 279 draws once)
                 let _ = new_sprite;
@@ -559,11 +578,17 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
         }
         0x9e | 0x9f => {
             let kind = if n == 0x9e { VisualKind::MarkerA } else { VisualKind::MarkerB };
-            h.w.scene.visuals.push(Visual { kind, x: arg(a, 0), y: arg(a, 1), owner: 0, t: 0, life: -1, vid: 0 });
+            // the marker object (`0x08050690`): 0x40 of object tiles
+            let vid = h.w.next_serial();
+            h.w.scene.visuals.push(Visual { kind, x: arg(a, 0), y: arg(a, 1), owner: 0, t: 0, life: -1, vid });
+            wf_core::vram::acquire(h.w, wf_core::vram::Owner::Visual(vid), 0x40);
             unit()
         }
         0xa0 => {
-            h.w.scene.visuals.push(Visual { kind: VisualKind::Box { w: arg(a, 2), h: arg(a, 3) }, x: arg(a, 0), y: arg(a, 1), owner: 0, t: 0, life: -1, vid: 0 });
+            // the box object (`0x080279E0`): 0x40
+            let vid = h.w.next_serial();
+            h.w.scene.visuals.push(Visual { kind: VisualKind::Box { w: arg(a, 2), h: arg(a, 3) }, x: arg(a, 0), y: arg(a, 1), owner: 0, t: 0, life: -1, vid });
+            wf_core::vram::acquire(h.w, wf_core::vram::Owner::Visual(vid), 0x40);
             unit()
         }
         0xa1..=0xa3 => {
@@ -855,10 +880,10 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
                 let old = h.w.pl_ref(i).equip[slot];
                 if old != DEFAULT[slot] {
                     h.w.story.equipment.push(old);
-                    let mut p = h.w.pl_ref(i).clone();
-                    p.equip[slot] = DEFAULT[slot];
-                    p.refresh_stats(h.w);
-                    *h.w.pl(i) = p;
+                    // 0x08004544 changes the record's slot and the owned list only: the live fighter keeps its
+                    // stats until the next recalculation (Thieves Den 9-15: after s362's monkey takes the Bandana
+                    // the player object still has STR 67 / POW 46 / END 53 for the bandits' fight)
+                    h.w.pl(i).equip[slot] = DEFAULT[slot];
                 }
             } else if let Some(cs) = h.w.story.chars.get_mut(c as usize) {
                 let old = cs.equip[slot];
@@ -972,7 +997,33 @@ fn add_supply_u8(w: &mut World, item: i32, n: i32, saturate: bool) {
 
 /// `set_character`: the leader becomes character `c` (its persistent record, form, equipment and skills)
 pub fn switch_character(w: &mut World, c: i32) -> Result<(), String> {
-    let i = leader(w).ok_or("native 0x95: no player")?;
+    let Some(i) = leader(w) else {
+        // no player object (offstage during a cutscene scene: s217's set_character(0) between its load_scene and
+        // its warp): the current character changes and the player kept offstage becomes it - no idle draw; the
+        // next load builds the new character (6-1: Goku, and the NPC whose condition reads get_character())
+        let cs = w.story.chars.get(c as usize).cloned().ok_or("native 0x95: character")?;
+        let form = if w.data.form(cs.form).is_some_and(|f| f.char_ == c) {
+            cs.form
+        } else {
+            w.data.chars.iter().find(|x| x.index == c).map(|x| x.form).ok_or("character")?
+        };
+        if let Some(k) = w.scene.offstage.iter().position(|e| matches!(e.body, Body::Player(_))) {
+            let Body::Player(old) = &w.scene.offstage[k].body else { unreachable!() };
+            let mut p = (**old).clone();
+            if cs.rec.max_hp > 0 {
+                p.rec = cs.rec.clone();
+                p.equip = cs.equip;
+                if !cs.skills.is_empty() {
+                    p.skills = cs.skills.clone();
+                }
+            }
+            p.holy_left = 0;
+            p.apply_form(w, form);
+            w.scene.offstage[k].body = Body::Player(Box::new(p));
+        }
+        w.story.current = c;
+        return Ok(());
+    };
     wf_core::story::sync_from_players(w);
     let cs = w.story.chars.get(c as usize).cloned().ok_or("native 0x95: character")?;
     let form = if w.data.form(cs.form).is_some_and(|f| f.char_ == c) {
@@ -991,8 +1042,10 @@ pub fn switch_character(w: &mut World, c: i32) -> Result<(), String> {
     p.holy_left = 0;
     let gfx = |w: &World, f: i32| w.data.form(f).map(|f| f.gfx);
     let new_sprite = gfx(w, p.form) != gfx(w, form);
+    let old = p.a.sprite;
     p.apply_form(w, form);
     *w.pl(i) = p;
+    wf_core::vram::sprite_changed(w, i, old);
     w.story.current = c;
     // 0x08010692 rebuilds the player and ends with vt+0x28(0): the idle state is entered again (rand(255); s067:
     // Goku -> Gohan on the Planet of the Kais; also with the same sprite: s124's set_character(1) right after its
@@ -1133,6 +1186,9 @@ fn load_scene(w: &mut World, s: &mut HostState, world: i32, map: i32, variant: i
         };
         s.saved_field = Some(SavedField { area, x: px, y: py, facing, cam: (w.cameras[0].x, w.cameras[0].y) });
         if w.field.is_some() {
+            // the kept field's objects give their shared graphics back and its tile allocator is set aside: the
+            // scene gets a fresh one (message 0xA; segment sb 21-5's s483)
+            wf_core::vram::world_hide(w);
             w.scene.saved_world = Some(Box::new(wf_core::field::save_world(w)));
         }
     }
@@ -1152,7 +1208,12 @@ fn load_scene(w: &mut World, s: &mut HostState, world: i32, map: i32, variant: i
         w.scene.requests.push(scene::Request::LoadScene { world, map, variant, x, y, objects });
     }
     w.scene.cam.mode = scene::CamMode::Fixed;
-    wf_core::battle::set_camera(w, 0, x << 10, y << 10);
+    if w.field.is_some() {
+        // inside the new map's camera limits (7-2 s273: load_scene(7, 4, 1, 1, 1) shows (1, 0))
+        scene::set_scene_camera(w, x, y);
+    } else {
+        wf_core::battle::set_camera(w, 0, x << 10, y << 10);
+    }
 }
 
 fn return_to_field(w: &mut World, s: &mut HostState) {
@@ -1164,6 +1225,8 @@ fn return_to_field(w: &mut World, s: &mut HostState) {
     if let Some(sw) = w.scene.saved_world.take() {
         if w.field.is_some() {
             wf_core::field::restore_world(w, *sw);
+            // its allocator back, the objects take their shared graphics again (message 0xB)
+            wf_core::vram::world_show(w);
             let _ = f;
             return;
         }
@@ -1336,8 +1399,10 @@ pub fn ext(h: &mut CoreHost, c: &ExtCall) -> R {
             if let Some(i) = pl(h, arg(a, 0)) {
                 if let Some(form) = h.w.data.chars.iter().find(|x| x.index == arg(a, 1)).map(|x| x.form) {
                     let mut p = h.w.pl_ref(i).clone();
+                    let old = p.a.sprite;
                     p.apply_form(h.w, form);
                     *h.w.pl(i) = p;
+                    wf_core::vram::sprite_changed(h.w, i, old);
                 }
             }
             unit()

@@ -5194,6 +5194,7 @@ dependencies = [
  "postcard",
  "serde",
  "serde_json",
+ "wf-audio",
  "wf-extract",
  "wf-rom",
  "wf-view",

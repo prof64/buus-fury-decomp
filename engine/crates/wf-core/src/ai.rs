@@ -68,7 +68,7 @@ kinds!(
     // reaction states
     StunHold, DeathBlink, ShockStun, VolleyballTransform, VolleyballRestore, VolleyballLaunch,
     // on-hit only
-    IfAttack, ApplyDamage, IfHitFromFront, SetHitDir, HealFraction, FreezeHelperHit, ShieldHit,
+    IfAttack, ApplyDamage, TankDamage, IfHitFromFront, SetHitDir, HealFraction, FreezeHelperHit, ShieldHit,
     // mods (modkit.rs): a condition / action node whose code is a Rhai function (`call`: "file.rhai:fn")
     ModCondition, ModAction,
 );

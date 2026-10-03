@@ -1260,7 +1260,6 @@ export class Enemy extends Actor implements EnemyLike {
     msg.dmg = res.dmg
     if (msg.attacker.kind === 'player') audioEvent('hit')
     if (res.dmg > 0 && msg.attacker.kind === 'player') (msg.attacker as unknown as { onDealt?: (w: World, m: HitMsg, d: number) => void }).onDealt?.(w, msg, res.dmg)
-    this.lastHitDir = msg.dir
     // 0x0800FC62: obj+0x294 = the crit flag, obj+0x298 = (attack sub == 3), then the on-hit tree
     this.critHit = !!res.crit
     this.splatHit = msg.atk.sub === 3
@@ -1270,6 +1269,9 @@ export class Enemy extends Actor implements EnemyLike {
   /** ApplyDamage -> vfunc +0x58 (0x0800FA2A): HP -= the computed damage; true when this hit killed the enemy */
   takeHit(msg: HitMsg): boolean {
     const w = this.w
+    // the ApplyDamage node (0x080187A4) stores the hit's direction (obj+0x290) before the call: an on-hit tree
+    // without it keeps the old one (emulator: real route 8-71, Babidi's hit state)
+    this.lastHitDir = msg.dir
     // 0x0800FA2A: only HP == 0 counts as already dead; a negative HP (see heal) still takes the hit and dies
     if (this.hp1024 === 0) return true
     const dmg = msg.dmg ?? 0

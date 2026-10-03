@@ -146,6 +146,11 @@ pub fn compare(w: &World, fr: &Value, es: &[String], map: &mut BTreeMap<usize, E
     }
     for a in fr["actors"].as_array().into_iter().flatten().filter(|_| !menu_screen) {
         let r = Row(a);
+        // not an actor: a damage number (vt 0x0804C904) in freed actor memory - the recorder reads a stale sprite id
+        // at the actor's offset; no animation (raw -1), position (0, 0) (dungeon segment db4 15-31)
+        if r.raw() < 0 && r.x() == 0 && r.y() == 0 {
+            continue;
+        }
         let id = match map.get(&r.k()).copied().filter(|&id| w.find(id).is_some_and(|i| !w.ents[i].removed)) {
             Some(id) => Some(id),
             None => {
@@ -187,7 +192,12 @@ pub fn compare(w: &World, fr: &Value, es: &[String], map: &mut BTreeMap<usize, E
     // a pause-menu page replaces the object world in the game (saved and restored around it): no actors to match
     let menu_page = menu_screen || wf_core::menu::active(w) && fr["actors"].as_array().is_none_or(|a| a.is_empty());
     for (ei, e) in w.ents.iter().enumerate().filter(|(_, e)| !e.removed && !menu_page && !wf_core::vram::suspended(w, e.id)) {
-        let is_actor = matches!(e.body, Body::Npc(_) | Body::Player(_) | Body::Enemy(_));
+        // (a player Majin Buu ate is out of the game's object world until he spits it out)
+        let is_actor = match &e.body {
+            Body::Player(p) => !p.gone,
+            Body::Npc(_) | Body::Enemy(_) => true,
+            _ => false,
+        };
         if is_actor && !shown.contains(&e.id) {
             rep.bad(k, "extra", format!("entity {} sprite {:?} ({}) not in the game", e.id, scene::sprite_id(w, ei), if matches!(e.body, Body::Npc(_)) { "npc" } else if matches!(e.body, Body::Player(_)) { "player" } else { "enemy" }));
             break;
@@ -276,8 +286,16 @@ fn range_env(name: &str) -> Option<(usize, usize)> {
 pub fn start(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Value) -> Result<(Imported, StoryHost), String> {
     let ram = GbaRam::from_json(&doc["init"]["ram"])?;
     let mut host = StoryHost::new(data, files)?;
-    let imp = import_emulator_state(data, &ram, &mut host).map_err(|e| e.to_string())?;
+    let mut imp = import_emulator_state(data, &ram, &mut host).map_err(|e| e.to_string())?;
     host.prev_held = imp.prev_keys;
+    // the sound driver (wf-core sndsim.rs): its RAM, the play position and the cycles to the next DMA interrupt
+    // (`init.snd_phase`, tools/segments/snd_phase.py; without it the redraw timing is approximate)
+    if data.sound.is_some() {
+        let u32_ = |a: u32| u32::from_le_bytes(ram.read(a, 4).try_into().unwrap_or([0; 4]));
+        let phase = doc["init"]["snd_phase"].as_u64().map(|p| p as u32);
+        let dram = [ram.read(0x0300_38A4, 0x18 + 15 * 0x60), ram.read(0x0300_3898 + 0x5C4, 16 * 0x40)].concat();
+        wf_core::sndsim::import(&mut imp.world, &dram, u32_(0x0300_389C), u32_(0x0300_38A0), phase);
+    }
     Ok((imp, host))
 }
 
@@ -298,7 +316,8 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
     let mut sess = StoryHost::session(data, imp.world);
     let game_snd = game_sounds(doc);
     let trace = range_env("SEGMENT_TRACE");
-    let vram_check = std::env::var("SEGMENT_VRAM").is_ok();
+    // recordings with `vram` rows check the object tile allocator too (SEGMENT_VRAM=0 turns it off)
+    let vram_check = std::env::var("SEGMENT_VRAM").map(|v| v != "0").unwrap_or(true);
     let mut game_vram = doc["init"].get("vram").cloned().unwrap_or(Value::Null);
     let mut lf_prev = i(&doc["init"]["lf"]);
     let mut presented = host.hs.present.len();
@@ -322,11 +341,16 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
             host.step(&mut sess, keys);
         } else {
             sess.world.events.clear();
+            // the game's lag frame: the sound hardware's frame passes without the main loop's update
+            wf_core::sndsim::lag_frame(&mut sess.world);
         }
         if let Some((a, b)) = trace {
             if (a..=b).contains(&k) {
                 let w = &sess.world;
                 let p = w.player_idx(0).map(|pi| (w.pl_ref(pi).a.x, w.pl_ref(pi).a.y, w.pl_ref(pi).a.facing, w.pl_ref(pi).gs.name()));
+                if std::env::var("SEGMENT_TIMERS").is_ok() {
+                    eprintln!("  t{k} timers {:?}", host.hs.timers);
+                }
                 if std::env::var("SEGMENT_NPC").is_ok() {
                     let npcs: Vec<String> = (0..w.ents.len()).filter(|&i| !w.ents[i].removed).filter_map(|i| match &w.ents[i].body {
                         Body::Npc(n) => Some(format!("{}:{}/{}", n.sprite_id, n.anim.raw, n.anim.tick)),
@@ -426,7 +450,7 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
             continue;
         }
         compare(w, fr, &game_snd[k], &mut map, k, &mut rep);
-        // SEGMENT_VRAM=1: the object tile allocator vs the game's (recordings with `vram` rows)
+        // the object tile allocator vs the game's (recordings with `vram` rows)
         if vram_check && !game_vram.is_null() {
             if let Some(v) = w.field.as_ref().and_then(|f| f.vram.as_ref()) {
                 let ours = vram_json(&v.a);

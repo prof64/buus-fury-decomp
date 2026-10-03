@@ -44,6 +44,8 @@ pub struct MenuData {
     pub text: TextData,
     /// portraits/index.json: dialog portrait table index -> content path
     pub portraits: Vec<String>,
+    /// portraits/index.json `decode_cycles`: CPU cycles the game's decompressor takes on each (0 = unknown)
+    pub portrait_cycles: Vec<u32>,
     /// per form (form table `0x086B82EC`, 24 bytes): name string id (+4), portrait bytes (+0x10..+0x15)
     pub forms: Vec<FormUi>,
     /// supplies' and equipment's menu data (names, descriptions, icons, prices, slots): shop.rs
@@ -69,6 +71,7 @@ impl MenuData {
     pub fn load(src: &dyn crate::content::ContentSource) -> Option<Arc<MenuData>> {
         let text = TextData::load(src)?;
         let mut portraits = Vec::new();
+        let mut portrait_cycles: Vec<u32> = Vec::new();
         if let Some(b) = src.read("portraits/index.json") {
             if let Ok(v) = serde_json::from_slice::<serde_json::Value>(&b) {
                 if let Some(a) = v["portraits"].as_array().or_else(|| v.as_array()) {
@@ -79,6 +82,10 @@ impl MenuData {
                             portraits.resize(i + 1, String::new());
                         }
                         portraits[i] = if f.starts_with("portraits/") { f } else { format!("portraits/{f}") };
+                        if portrait_cycles.len() <= i {
+                            portrait_cycles.resize(i + 1, 0);
+                        }
+                        portrait_cycles[i] = p["decode_cycles"].as_u64().unwrap_or(0) as u32;
                     }
                 }
             }
@@ -107,7 +114,7 @@ impl MenuData {
         let items = shop::ItemsUi::load(src);
         let opts = options::OptsData::load(src);
         let inv = inventory::InvData::load(src);
-        Some(Arc::new(MenuData { text, portraits, forms, items, opts, inv, maps: mapscreen::MapData::load(src) }))
+        Some(Arc::new(MenuData { text, portraits, portrait_cycles, forms, items, opts, inv, maps: mapscreen::MapData::load(src) }))
     }
 }
 
@@ -148,6 +155,11 @@ pub trait Page {
     /// video frames one redraw takes (CPU time; `re/buu/menu/timing.py`)
     fn redraw_cost(&self) -> u8 {
         1
+    }
+    /// the redraw for the CPU-time model (sndsim.rs): with sound content its frames come from the mixer's load
+    /// instead of `redraw_cost`
+    fn redraw_time(&self, _w: &World, _d: &MenuData) -> Option<crate::sndsim::Redraw> {
+        None
     }
     /// frames the mode's enter + first update take beyond the first one (its picture shows at once; no
     /// iteration in them): credits / Watch This! 1
@@ -526,6 +538,14 @@ pub fn step(w: &mut World) {
                 // the exit stub's iteration (counts a logic frame)
                 w.story.play_frames += 1;
             }
+            // Switch Character's figures go and the object world is back in the 2nd leave frame (segment sb 21-14)
+            if t == 0 {
+                if let Some(Screen::CharSelect(c)) = w.menu.shown.as_deref() {
+                    let sprites: Vec<i32> = c.figs.iter().map(|f| f.sprite).collect();
+                    crate::vram::figures_gone(w, &sprites);
+                    crate::vram::world_show(w);
+                }
+            }
             if t + 1 >= w.menu.tr.leave.max(1) {
                 let st = w.menu.tr.fade_in;
                 if st == 0 {
@@ -580,7 +600,17 @@ fn redraw(w: &mut World, first: bool) {
     if !top.container_ref().drawn {
         top.before_draw(w);
         top.container().drawn = true;
-        let cost = if first { 1 } else { top.redraw_cost().max(1) };
+        let mut cost = if first { 1 } else { top.redraw_cost().max(1) };
+        if cost > 1 && w.data.sound.is_some() {
+            let timed = w.data.menu.clone().and_then(|d| top.page().redraw_time(w, &d));
+            match timed {
+                Some(r) => match crate::sndsim::redraw_frames(w, r) {
+                    Some(f) => cost = f,
+                    None => crate::sndsim::long_iteration(w, cost),
+                },
+                None => crate::sndsim::long_iteration(w, cost),
+            }
+        }
         if let Some(prev) = w.menu.boot_shown.take().filter(|_| first) {
             w.menu.shown = Some(prev);
             w.menu.pending = Some(Box::new(top.clone()));

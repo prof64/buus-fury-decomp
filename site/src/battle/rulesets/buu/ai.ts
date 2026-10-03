@@ -158,6 +158,11 @@ function onHit(n: AiNodeJ, c: AiController, msg: HitMsg): number {
     case 'ApplyDamage':
       if (msg.mult === 0) return 0
       return e.takeHit(msg) ? 2 : 1
+    case 'TankDamage':
+      // 0x08032F84 (the tanks' armour): as ApplyDamage, the damage / 4 (signed divide 0x08046E58) when the hit's
+      // direction is the tank's facing
+      if (msg.mult === 0) return 0
+      return e.takeHit(e.facing === msg.dir ? { ...msg, dmg: Math.trunc((msg.dmg ?? 0) / 4) } : msg) ? 2 : 1
     case 'GotoState':
       c.replaceTop(P(n, 'state'))
       return 1
@@ -180,7 +185,8 @@ function onHit(n: AiNodeJ, c: AiController, msg: HitMsg): number {
     case 'IfCooldownOver':
       return w.frame - e.mark1 > P(n, 'frames') ? kid() : 0
     case 'IfHpBelow':
-      return e.hp1024 < Math.floor((P(n, 'frac') * e.maxHp1024) / 65536) ? kid() : 0
+      // 0x080299FE: ((frac * whole max HP) >> 16) whole HP
+      return e.hp1024 < Math.floor((P(n, 'frac') * (e.maxHp1024 >> 10)) / 65536) * 1024 ? kid() : 0
     case 'IfHitFromFront':
       return (msg.dir ^ 1) === e.facing ? kid() : 0
     case 'Succeed':
@@ -608,7 +614,7 @@ export function create(n: AiNodeJ, c: AiController): RNode {
       })
     case 'IfHpBelow': {
       let thr = 0
-      return new Cond(n, c, () => e.hp1024 < thr, () => (thr = Math.floor((P(n, 'frac') * e.maxHp1024) / 65536)))
+      return new Cond(n, c, () => e.hp1024 < thr, () => (thr = Math.floor((P(n, 'frac') * (e.maxHp1024 >> 10)) / 65536) * 1024))
     }
     case 'IfPlayerInFront':
       return new Cond(n, c, () => e.playerInFront(48))
@@ -693,7 +699,8 @@ export function create(n: AiNodeJ, c: AiController): RNode {
         return !!spo && spo.ea.r === GENERIC_STATES['0x03001B30'] && isAnimId(spo, 0x12)
       })
     case 'IfUnknown':
-      return new Cond(n, c, () => false)
+      // 0x0804EE24: 1 - [0x0300302C] - Majin Buu is not pacified (his hurt states under Babidi's spell pop at once)
+      return new Cond(n, c, () => e.ctx.buuPacified !== 1)
 
     // ---- simple actions ---------------------------------------------------------------------------------------------
     case 'Succeed':
@@ -880,7 +887,8 @@ export function create(n: AiNodeJ, c: AiController): RNode {
         e.setAnim(1, true, true)
       }, (f, a) => {
         if (f >= 48) return true
-        e.moveBy(e.w, a.data.vx, a.data.vy)
+        // 0x080313EA adds both components and takes the step back whole when the footprint does not fit: no slide
+        e.tryMove(a.data.vx, a.data.vy, 0, 0)
         return false
       })
     case 'KnockbackSlide': {
@@ -908,13 +916,18 @@ export function create(n: AiNodeJ, c: AiController): RNode {
       return new Act(n, c, () => undefined, () => {
         const buu = e.ctx.liveEnemies().find((o) => [0x1a, 0x1b, 0x1c].includes(o.type.type))
         if (!buu) return false
-        const [bx, by] = buu.center()
-        const [x, y] = e.center()
+        // update 0x0802B3EA: d = Buu's footprint centre - own (0x0800FDFA); always faces him (horizontal only when
+        // |dx| > |dy|); from `dist` px on the dominant axis on: one step of d * 256 / max(|dx|, |dy|), taken only
+        // when the whole step is free (emulator: real route 8-71)
+        const [bx, by] = buu.footCenter()
+        const [x, y] = e.footCenter()
         const dx = bx - x
         const dy = by - y
-        if (Math.max(Math.abs(dx), Math.abs(dy)) > P(n, 'dist', 50)) {
-          e.walkBy(Math.sign(dx) * 256, Math.sign(dy) * 256)
-          e.facing = facingToward(dx, dy)
+        e.facing = (Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 3 : 2) : dy > 0 ? 0 : 1) as Dir
+        const m = Math.max(Math.abs(dx), Math.abs(dy))
+        if (m >= P(n, 'dist', 50) && m > 0) {
+          e.moving = true
+          e.tryMove(Math.trunc((dx * 256) / m), Math.trunc((dy * 256) / m), 0, 0)
         }
         return false
       })
@@ -1188,10 +1201,14 @@ export function create(n: AiNodeJ, c: AiController): RNode {
       // the soldier's ends at tick >= 32 once its wave is gone, the turret's at tick 72 (wave or not): SetAnim(0),
       // and the node is finished (lockstep f02_vs_enemy_t45: entered 32, SetAnim(0) at 64; t40: 51 -> 123)
       const soldier = n.name === 'SoldierThrow'
-      return new Act(n, c, () => {
+      return new Act(n, c, (a) => {
         e.facePlayer()
         e.setAnim(soldier ? [19, 3] : [20, 3], true, false, { rule: 'once_stop', shift: 3, end: 'none' })
+        a.data.raw = e.ea.pos.raw
       }, (f, a) => {
+        // the node's update (0x08026726) is finished as soon as the controller is no longer the actor's state object:
+        // a hit's reaction replaced it (real route 8-31: a soldier hurt mid-throw moves on once it recovers)
+        if (e.ea.pos.raw !== a.data.raw) return true
         if (f === 8) {
           a.data.wave = e.w.add(new EnergyWave(e.ctx, e, e.facing, ...e.muzzleFix(soldier ? 'soldier' : 'turret'))).id
           if (soldier) e.ctx.soldierWave = a.data.wave
@@ -1768,13 +1785,37 @@ export function create(n: AiNodeJ, c: AiController): RNode {
     case 'KidBuuMerge':
       return new Instant(n, c, () => e.kidBuuMerge())
     case 'BabidiHover':
-      return new Act(n, c, () => (e.ctx.buuPacified = 0), (f) => {
+      // Babidi (emulator: real route 8-71, Vegeta vs Majin Buu). Enter 0x0802AD88: SetAnimRaw(0x13) under the
+      // controller 0x03003014 (no idle draw), Buu is no longer pacified, not hittable (obj+0x1CC = 0, back to 1 when
+      // the state changes). Controller tick 0x0802AD58: up 1 px a frame to 50; the tick runs 0..23, then 8..23 again,
+      // cel = tick >> 3. The node never finishes
+      return new Act(n, c, () => {
+        e.ctx.buuPacified = 0
+        e.setAnim(19, true, true, { rule: 'hold' })
+        e.hittable = false
+      }, (f) => {
         e.z = Math.max(-50, e.z - 1)
-        e.setAnim(f & 8 ? 1 : 0, false, true)
+        const t = f < 24 ? f : 8 + ((f - 8) % 16)
+        e.ea.pos.tick = t
+        e.ea.pos.frame = t >> 3
+        return false
+      }, () => (e.hittable = true))
+    case 'BabidiGesture':
+      // the landing. Enter 0x0802AE76: SetAnimRaw(0x13) under the controller 0x03003024; tick 0x0802AE3A: down 1 px
+      // a frame; on the ground 8 ticks, then SetAnim(0) (idle rand(255)) and the node (0x0802AE98) is finished
+      return new Act(n, c, () => e.setAnim(19, true, true, { rule: 'hold' }), (_f, a) => {
+        if (e.z < 0) {
+          e.z += 1
+          return false
+        }
+        a.data.t = (a.data.t ?? 0) + 1
+        if (a.data.t >= 8) {
+          e.setAnim(0, true, true)
+          return true
+        }
+        e.ea.pos.frame = a.data.t >> 3
         return false
       })
-    case 'BabidiGesture':
-      return new Act(n, c, () => e.setAnim(18, true, true), () => false)
 
     // ---- Janemba ------------------------------------------------------------------------------------------------------
     case 'JanembaSpawnParts':
@@ -1941,6 +1982,18 @@ export function create(n: AiNodeJ, c: AiController): RNode {
     case 'StunnedAnim':
     case 'StunnedAnim21':
     case 'PlayAnimHold':
+      // Babidi's state 0xCA: enter 0x0802ADF0 SetAnimRaw(0x15) under the controller 0x0300301C; tick 0x0802ADC8:
+      // cel = (tick >> 3) & 3, at tick 0x60 SetAnim(0) (idle rand(255)) and the node (0x0802AE06) is finished
+      if (e.type.type === 0x1d)
+        return new Act(n, c, () => e.setAnim(21, true, true, { rule: 'hold' }), (f) => {
+          if (f >= 0x60) {
+            e.setAnim(0, true, true)
+            return true
+          }
+          e.ea.pos.tick = f
+          e.ea.pos.frame = (f >> 3) & 3
+          return false
+        })
       return playAnim(n, c, 20, true)
     case 'RecoverAnim':
       return playAnim(n, c, 19, false, 8)
@@ -1959,6 +2012,18 @@ export function create(n: AiNodeJ, c: AiController): RNode {
     case 'PlayAnimOnce':
       return playAnim(n, c, 18, false, 16)
     case 'PlayAnimTimed':
+      // Babidi's state 0xC9 (hit on the ground): enter 0x0802AEDA SetAnimRaw(0x14) under the controller 0x03003030
+      // and Majin Buu is pacified (0x0300302C = 1); tick 0x0802AEC0: the tick wraps at 0x20, cel = tick >> 3; the
+      // node never finishes
+      if (e.type.type === 0x1d)
+        return new Act(n, c, () => {
+          e.setAnim(20, true, true, { rule: 'hold' })
+          e.ctx.buuPacified = 1
+        }, (f) => {
+          e.ea.pos.tick = f & 0x1f
+          e.ea.pos.frame = (f & 0x1f) >> 3
+          return false
+        })
       return wait(n, c, 32, 19)
     case 'DarkSphere':
       return new Act(n, c, () => {

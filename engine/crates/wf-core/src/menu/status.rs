@@ -17,6 +17,21 @@ use wf_view::{MenuFont, MenuView};
 /// route's stat allocations: the blinking LevelUp! redraw holds the loop 4 frames every 8 updates, the Use Points
 /// press lands in the iteration before it; menu_parity stays exact, Earth / ship segments match more frames)
 pub const REDRAW_FRAMES: u8 = 5;
+/// the redraw's CPU cycles (sndsim.rs; fit on 39 redraws of segment e_2_9_13, work/earth/timing): constant part,
+/// per 10,000 glyph-routine instructions, the cursor picture; cycles before the redraw in its frame
+const REDRAW_BASE: i64 = 347_354;
+const REDRAW_BASE_ALLOC: i64 = 347_113;
+const REDRAW_GLYPH: i64 = 35_664;
+const REDRAW_CURSOR: i64 = 7_284;
+/// a portrait without `decode_cycles` (older content): a typical one
+const PORTRAIT_CYCLES: u32 = 100_000;
+const T0_IDLE: i64 = 4_641;
+const T0_IDLE_ALLOC: i64 = 4_733;
+const T0_HELD: i64 = 1_954;
+const T0_NAV: i64 = 2_838;
+const T0_DIR: i64 = 5_260;
+const T0_ENTER: i64 = 52_600;
+const T0_ACCEPT: i64 = 28_400;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Status {
@@ -490,5 +505,55 @@ impl Page for Status {
     }
     fn redraw_cost(&self) -> u8 {
         REDRAW_FRAMES
+    }
+    fn redraw_time(&self, w: &World, d: &MenuData) -> Option<crate::sndsim::Redraw> {
+        let v = self.draw(w, d);
+        let (gn, small) = v.layers.first().map(|l| crate::sndsim::ops_cost(&d.text, &l.ops)).unwrap_or((0, 0));
+        // the step before the redraw (cycles from the VBlank to the redraw; work/earth/timing/pre.py)
+        let m = &w.menu;
+        let sfx = |id: i32| w.events.iter().any(|e| matches!(e, crate::world::Event::Sfx { id: i, .. } if *i == id));
+        let dir = crate::input::LEFT | crate::input::RIGHT;
+        let nav = crate::input::UP | crate::input::DOWN;
+        let t0 = if m.released & crate::input::A != 0 && self.alloc {
+            // the A prompt's event: the cursor is built (its picture loaded)
+            T0_ENTER
+        } else if sfx(super::SFX_ACCEPT) {
+            // the points are applied (RecalcStats)
+            T0_ACCEPT
+        } else if self.c.focus.is_some() && m.pressed == 0 {
+            // a held prompt takes the input alone
+            T0_HELD
+        } else if self.alloc && m.pressed & nav != 0 {
+            T0_NAV
+        } else if self.alloc && m.pressed & dir != 0 {
+            T0_DIR
+        } else if m.pressed & crate::input::A != 0 {
+            if self.alloc {
+                T0_IDLE_ALLOC + 298
+            } else {
+                T0_IDLE + 103
+            }
+        } else if self.alloc {
+            T0_IDLE_ALLOC
+        } else {
+            T0_IDLE
+        };
+        let base = if self.alloc { REDRAW_BASE_ALLOC } else { REDRAW_BASE };
+        // the portrait's decompression (every redraw; data dependent)
+        let ci = self.char_index();
+        let pb = w.story.chars.get(ci.max(0) as usize).and_then(|cs| d.forms.get(cs.form.max(0) as usize)).map(|f| f.portraits[0] as i32).unwrap_or(0);
+        let dec = if pb >= 8 { d.portrait_cycles.get((pb - 8) as usize).copied().filter(|&c| c != 0).unwrap_or(PORTRAIT_CYCLES) } else { 0 } as i64;
+        if crate::sndsim::debug() {
+            eprintln!(
+                "status redraw: gn {gn} small {small} dec {dec} pressed {:#x} released {:#x} alloc {} focus {:?} events {} img {:?}",
+                m.pressed,
+                m.released,
+                self.alloc,
+                self.c.focus,
+                w.events.len(),
+                v.layers.first().map(|l| crate::sndsim::ops_summary(&l.ops)).unwrap_or_default()
+            );
+        }
+        Some(crate::sndsim::Redraw { t0, base: base + dec + gn * REDRAW_GLYPH / 10_000 + small * REDRAW_CURSOR })
     }
 }

@@ -26,7 +26,11 @@ mksave.EXTRA_SET.setdefault(123, set()).update({181, 183, 284})
 
 # after the story ops: the player switches to Goku (the status menu's character switch) before saving - the Janemba
 # saga is Goku's (Other World; the Instant Transmission pads are his)
-EXTRA_OPS = {'janemba': [('set_character', 0)], 'janemba_arena': [('set_character', 0)]}
+# ... and carries what a player has by then (bought with the zenie: the food stalls sell these): 3 Senzu Beans,
+# 4 Three Course Meals, 5 Curry Plates (native 0x81 add_item: the supply counts, silently)
+mksave.N['add_item'] = 0x81
+EXTRA_OPS = {'janemba': [('set_character', 0), ('add_item', 21, 3), ('add_item', 8, 4), ('add_item', 5, 5)],
+             'janemba_arena': [('set_character', 0)]}
 
 if __name__ == '__main__':
     mksave.CHAPTERS.update(SIDE)

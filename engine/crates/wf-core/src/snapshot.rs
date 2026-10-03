@@ -38,6 +38,7 @@ struct WorldSer {
     modk: crate::modkit::ModState,
     menu: crate::menu::Menu,
     saves: crate::menu::save::Saves,
+    sound: crate::sndsim::SoundSim,
 }
 
 pub fn to_bytes(w: &World) -> Vec<u8> {
@@ -66,6 +67,7 @@ pub fn to_bytes(w: &World) -> Vec<u8> {
         modk: w.modk.clone(),
         menu: w.menu.clone(),
         saves: w.saves.clone(),
+        sound: w.sound.clone(),
     };
     postcard::to_allocvec(&s).unwrap_or_default()
 }
@@ -114,6 +116,7 @@ pub fn from_bytes(data: &Arc<GameData>, bytes: &[u8]) -> Option<World> {
     w.modk = s.modk;
     w.menu = s.menu;
     w.saves = s.saves;
+    w.sound = s.sound;
     for e in w.ents.iter_mut() {
         if let Body::Enemy(en) = &mut e.body {
             for st in en.ai.stack.iter_mut() {

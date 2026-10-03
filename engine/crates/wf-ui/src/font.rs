@@ -229,7 +229,7 @@ pub fn atlas(font: &Font) -> (Surface, serde_json::Value) {
         glyphs.insert(
             format!("{}", g.code),
             json!({"char": ch, "x": cx, "y": cy, "w": g.width, "advance": g.width + 1, "rows": rows,
-                   "rom": wf_rom::hx(g.rom)}),
+                   "rom": wf_rom::hx(g.rom), "cols": g.cols}),
         );
     }
     let desc = FONTS.iter().find(|f| f.0 == font.id).map(|f| f.2).unwrap_or("");

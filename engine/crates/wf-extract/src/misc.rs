@@ -57,7 +57,9 @@ pub fn portraits(rom: &Rom, out: &mut Content, names: &Names) {
         out.put(format!("portraits/{id}.png"), im.to_png());
         index.push(json!({"id": id, "portrait_index": i, "name": name.unwrap_or(format!("Portrait {i}")),
                           "name_confidence": conf, "png": format!("{id}.png"),
-                          "rom": {"table": hx(PORTRAITS + 4 * i), "gfx": hx(p)}}));
+                          "rom": {"table": hx(PORTRAITS + 4 * i), "gfx": hx(p)},
+                          // CPU cycles the game spends decompressing it (the stream follows an 8-byte header; deccost.rs)
+                          "decode_cycles": crate::deccost::decode_cycles(rom.data(), (p & 0x01FF_FFFF) as usize + 8)}));
     }
     out.put_json("portraits/index.json", &Value::Array(index));
 }

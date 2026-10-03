@@ -170,6 +170,11 @@ impl StorySim {
                 if matches!(self.cause, Some(Cause::Trigger { .. })) {
                     wf_core::field::hold_nested(&mut self.session.world);
                 }
+                // a blocking on-defeat inline script holds the field when no event of this frame does yet (wf-import
+                // host.rs: 12-28's Warlord after the level-up popup)
+                if matches!(self.cause, Some(Cause::Defeat { .. })) && !self.session.world.field.as_ref().is_some_and(|f| f.busy) {
+                    wf_core::field::set_busy(&mut self.session.world, true);
+                }
                 self.running = true
             }
             Ok(Status::Finished) => {
@@ -249,6 +254,7 @@ impl Sim for StorySim {
         let fresh = !was_running && self.running;
         let n0 = self.session.world.events.len();
         self.session.step_update();
+        wf_script_core::tick_timers(&self.session.world, &mut self.hs);
         // the blocked script resumes when its wait is over, then the scripts this frame's update started (NPC talk)
         // start; the trigger check's events start right after step_post (an event's first node runs a frame later:
         // the story playthrough lockstep, wf-script-core tests/playthrough.rs)

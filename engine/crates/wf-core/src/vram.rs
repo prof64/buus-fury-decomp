@@ -283,8 +283,22 @@ pub enum Owner {
     Props,
     /// the HUD object (vtable 0x08049FEC, ctor `0x0800B854`: 0x500)
     Hud,
+    /// the 3D world map's HUD object
+    Map3d,
     /// a HUD object sliding out (`hud_out`)
     HudOut,
+    /// a damage number (`popups`)
+    Popup,
+    /// an ended effect object's block (`delayed`)
+    Ending,
+    /// the boss HP bar (`show_boss_bar` 0x8F / 0x90, vtable 0x0804CE28: 0x200)
+    BossBar,
+    /// a menu screen's character figure
+    Figure(u32),
+    /// a cutscene ki blast (`fire_blast`, class 0x08027CBC: 0x100) of the shooting actor
+    Blast(crate::world::EntityId),
+    /// a keyed shared graphic (`keyed`)
+    Keyed(u32),
     /// the area-name banner (vtable 0x0804B528, ctor `0x0800BF34`: 0xF00)
     Banner,
     /// an import's block of an object the remake does not model
@@ -300,11 +314,39 @@ pub const SHADOWS: [(u8, u8, i32); 4] = [(4, 2, 0x40), (10, 4, 0x40), (16, 6, 0x
 pub struct VramState {
     pub a: ObjVram,
     pub owners: Vec<(u16, Owner)>,
-    pub shared_rc: [u8; 4],
+    pub shared_rc: [u8; 5],
     pub suspended: Vec<crate::world::EntityId>,
     /// HUD objects sliding out after `hide_hud` (handle, updates left; the object deletes itself at the end)
     #[serde(default)]
     pub hud_out: Vec<(u16, i32)>,
+    /// damage-number objects (`0x0800AD3E`, vtable 0x0804C904, 0x100 tiles): (target, frame of the target's last
+    /// new number, handle, last frame it shows)
+    #[serde(default)]
+    pub popups: Vec<(crate::world::EntityId, u32, u16, u32)>,
+    /// other refcounted shared graphics (`0x0804E490` records): (key, users)
+    #[serde(default)]
+    pub keyed: Vec<(u32, u32)>,
+    /// the object world's allocator while a menu screen's own object world has taken its place (`world_hide`):
+    /// allocator, owners, shared counts
+    #[serde(default)]
+    pub stashed: Option<Box<(ObjVram, Vec<(u16, Owner)>, [u8; 5])>>,
+    /// blocks of effect objects that ended (the object deletes itself in its next update): (handle, frame)
+    #[serde(default)]
+    pub delayed: Vec<(u16, u32)>,
+    /// the non-actor objects with tiles a purge can take (HUD, banner, boss bar): owner, the entity id the next
+    /// object got when it was made (its place in the world list), its tile bytes
+    #[serde(default)]
+    pub objs: Vec<(Owner, u32, i32)>,
+    /// what a purge suspended, in order (`suspended` = its entities)
+    #[serde(default)]
+    pub susp: Vec<Susp>,
+}
+
+/// an object a purge suspended
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum Susp {
+    Ent(crate::world::EntityId),
+    Own(Owner, u32, i32),
 }
 
 use crate::world::{Body, EntityId, World};
@@ -331,8 +373,12 @@ pub fn acquire(w: &mut World, owner: Owner, bytes: i32) {
             st(w).and_then(|v| v.a.alloc(bytes))
         }
     };
+    let stamp = w.next_id;
     if let (Some(h), Some(v)) = (h, st(w)) {
         v.owners.push((h, owner));
+        if matches!(owner, Owner::Hud | Owner::Banner | Owner::BossBar) && !v.objs.iter().any(|o| o.0 == owner) {
+            v.objs.push((owner, stamp, bytes));
+        }
     }
 }
 
@@ -341,13 +387,28 @@ pub fn release(w: &mut World, owner: Owner) {
     let Some(v) = st(w) else { return };
     let hs: Vec<u16> = v.owners.iter().filter(|o| o.1 == owner).map(|o| o.0).collect();
     v.owners.retain(|o| o.1 != owner);
+    v.objs.retain(|o| o.0 != owner);
+    v.susp.retain(|x| !matches!(x, Susp::Own(o, _, _) if *o == owner));
     for h in hs {
         v.a.free(h);
     }
 }
 
-fn shadow_index(key: (u8, u8)) -> Option<usize> {
-    SHADOWS.iter().position(|s| (s.0, s.1) == key)
+/// the shared graphics an actor's sprite uses: its halo (def +0x50: `0x03001BA8`, 0x80 bytes) and its shadow
+/// (`0x086B759C` by def +0xA / +0xB)
+pub type Shares = (bool, Option<usize>);
+/// index of the halo's shared graphic in `shared_rc`
+pub const HALO: usize = 4;
+
+fn shares_of(sp: &crate::content::Sprite) -> Shares {
+    (sp.halo, SHADOWS.iter().position(|s| (s.0, s.1) == sp.shadow_key))
+}
+fn shared_bytes(k: usize) -> i32 {
+    if k == HALO {
+        0x80
+    } else {
+        SHADOWS[k].2
+    }
 }
 
 /// `0x0804E490`: the first user of a shared graphic allocates it
@@ -355,7 +416,7 @@ pub fn shared_acquire(w: &mut World, k: usize) {
     let Some(v) = st(w) else { return };
     v.shared_rc[k] = v.shared_rc[k].wrapping_add(1);
     if v.shared_rc[k] == 1 {
-        acquire(w, Owner::Shared(k as u8), SHADOWS[k].2);
+        acquire(w, Owner::Shared(k as u8), shared_bytes(k));
     }
 }
 /// `0x0804FE20`: the last user frees it
@@ -370,27 +431,39 @@ pub fn shared_release(w: &mut World, k: usize) {
     }
 }
 
-fn sprite_of(w: &World, i: usize) -> Option<(i32, (u8, u8))> {
+fn sprite_of(w: &World, i: usize) -> Option<(i32, Shares)> {
     let s = w.actor(i)?.sprite?;
     let sp = w.data.sprite(s)?;
-    Some((sp.tile_bytes, sp.shadow_key))
+    Some((sp.tile_bytes, shares_of(sp)))
 }
 
-/// an actor's sprite instance (`0x0800EB60`): its tiles (def +2), then its shadow's shared graphic
+fn map_3d(w: &World) -> bool {
+    w.field.as_ref().is_some_and(|f| w.data.field.as_ref().and_then(|d| d.maps.get(&f.map)).is_some_and(|m| m.three_d))
+}
+
+/// tiles, halo, shadow (the ctor `0x0800EB60` and the re-acquire `0x0800F4E6`)
+fn take(w: &mut World, id: EntityId, bytes: i32, sh: Shares) {
+    acquire(w, Owner::Ent(id), bytes);
+    if sh.0 {
+        shared_acquire(w, HALO);
+    }
+    if let Some(k) = sh.1 {
+        shared_acquire(w, k);
+    }
+}
+
+/// an actor's sprite instance (`0x0800EB60`): its tiles (def +2), its halo's and its shadow's shared graphics
 pub fn actor_created(w: &mut World, i: usize) {
     if w.field.as_ref().is_none_or(|f| f.vram.is_none()) {
         return;
     }
     let id = w.ents[i].id;
-    let Some((bytes, key)) = sprite_of(w, i) else { return };
-    acquire(w, Owner::Ent(id), bytes);
-    if let Some(k) = shadow_index(key) {
-        shared_acquire(w, k);
-    }
+    let Some((bytes, sh)) = sprite_of(w, i) else { return };
+    take(w, id, bytes, sh);
 }
 
-/// an actor's instance destroyed (`0x0800EC34`): its tiles, then its shadow's reference
-pub fn actor_destroyed(w: &mut World, id: EntityId, key: (u8, u8)) {
+/// an actor's instance destroyed (`0x0800EC34`): its shadow's reference, its halo's, then its tiles
+pub fn actor_destroyed(w: &mut World, id: EntityId, sh: Shares) {
     if w.field.as_ref().is_none_or(|f| f.vram.is_none()) {
         return;
     }
@@ -398,15 +471,33 @@ pub fn actor_destroyed(w: &mut World, id: EntityId, key: (u8, u8)) {
     let was_suspended = st(w).is_some_and(|v| v.suspended.contains(&id));
     if let Some(v) = st(w) {
         v.suspended.retain(|&s| s != id);
+        v.susp.retain(|x| *x != Susp::Ent(id));
     }
     if !owned || was_suspended {
         return;
     }
-    // the shadow's reference first, then the own block (load frees: 21-5 shared, actor, actor, ...)
-    if let Some(k) = shadow_index(key) {
+    if let Some(k) = sh.1 {
         shared_release(w, k);
     }
+    if sh.0 {
+        shared_release(w, HALO);
+    }
     release(w, Owner::Ent(id));
+}
+
+/// frames the boss bar object lives after `hide_boss_bar` (it slides out, then deletes itself: Kid Buu's 21-26)
+pub const BOSS_BAR_OUT: u32 = 17;
+
+/// an owner's blocks go `frames` object updates from now (an object that ends by itself)
+pub fn release_later(w: &mut World, owner: Owner, frames: u32) {
+    let at = w.frame + frames;
+    let Some(v) = st(w) else { return };
+    let hs: Vec<u16> = v.owners.iter().filter(|o| o.1 == owner).map(|o| o.0).collect();
+    for h in hs {
+        v.owners.retain(|o| o.0 != h);
+        v.owners.push((h, Owner::Ending));
+        v.delayed.push((h, at));
+    }
 }
 
 /// the blocks of entity `i` go (its object is destroyed)
@@ -415,8 +506,22 @@ pub fn entity_gone(w: &mut World, i: usize) {
         return;
     }
     let id = w.ents[i].id;
-    let key = sprite_of(w, i).map(|s| s.1).unwrap_or((0, 0));
-    actor_destroyed(w, id, key);
+    // an animated effect that played out deletes itself in its next update (segment sb 21-5: the explosion's
+    // block lives one frame longer)
+    if matches!(w.ents[i].body, Body::Fx(_)) && w.ents[i].removed {
+        let at = w.frame + 1;
+        if let Some(v) = st(w) {
+            let hs: Vec<u16> = v.owners.iter().filter(|o| o.1 == Owner::Ent(id)).map(|o| o.0).collect();
+            for h in hs {
+                v.owners.retain(|o| o.0 != h);
+                v.owners.push((h, Owner::Ending));
+                v.delayed.push((h, at));
+            }
+        }
+        return;
+    }
+    let sh = sprite_of(w, i).map(|s| s.1).unwrap_or((false, None));
+    actor_destroyed(w, id, sh);
 }
 
 /// the offstage players' blocks go (a scene load destroys their objects)
@@ -424,20 +529,20 @@ pub fn offstage_gone(w: &mut World) {
     if w.field.as_ref().is_none_or(|f| f.vram.is_none()) {
         return;
     }
-    let off: Vec<(EntityId, (u8, u8))> = w
+    let off: Vec<(EntityId, Shares)> = w
         .scene
         .offstage
         .iter()
         .map(|e| {
-            let key = match &e.body {
-                Body::Player(p) => p.a.sprite.and_then(|s| w.data.sprite(s)).map(|s| s.shadow_key).unwrap_or((0, 0)),
-                _ => (0, 0),
+            let sh = match &e.body {
+                Body::Player(p) => p.a.sprite.and_then(|s| w.data.sprite(s)).map(shares_of).unwrap_or((false, None)),
+                _ => (false, None),
             };
-            (e.id, key)
+            (e.id, sh)
         })
         .collect();
-    for (id, key) in off {
-        actor_destroyed(w, id, key);
+    for (id, sh) in off {
+        actor_destroyed(w, id, sh);
     }
 }
 
@@ -453,31 +558,66 @@ pub fn reap(w: &mut World) {
     }
 }
 
-/// a sprite change of an actor (`0x0801183E`): the old block freed, the new size allocated (purging if needed)
-pub fn actor_resized(w: &mut World, i: usize) {
+/// SetSprite (`0x0800EDF8`) of actor `i`, whose sprite was `old`: the old def's halo reference goes; a different
+/// tile size frees the block and allocates the new size (`0x0801183E`, purging if needed); the new def's halo
+/// reference comes. The shadow stays the old one's.
+pub fn sprite_changed(w: &mut World, i: usize, old: Option<i32>) {
     if w.field.as_ref().is_none_or(|f| f.vram.is_none()) {
         return;
     }
     let id = w.ents[i].id;
-    let Some((bytes, _)) = sprite_of(w, i) else { return };
-    release(w, Owner::Ent(id));
-    acquire(w, Owner::Ent(id), bytes);
+    if !st(w).is_some_and(|v| v.owners.iter().any(|o| o.1 == Owner::Ent(id))) {
+        return;
+    }
+    let (ob, oh) = old.and_then(|s| w.data.sprite(s)).map(|sp| (sp.tile_bytes, sp.halo)).unwrap_or((0, false));
+    let Some((bytes, sh)) = sprite_of(w, i) else { return };
+    if oh {
+        shared_release(w, HALO);
+    }
+    if ob != bytes {
+        release(w, Owner::Ent(id));
+        acquire(w, Owner::Ent(id), bytes);
+    }
+    if sh.0 {
+        shared_acquire(w, HALO);
+    }
 }
 
-/// the purge level at which an object is suspended (vfunc +0x18; 2 = suspend): the player 15 (`0x08011050`); an
-/// actor 15 when it is the camera's object (`0x03001BAC`), else 14 on screen / 13 off screen (`0x0800F4C0`);
-/// other objects 15 (`0x0801155C`)
-fn purge_level(w: &World, i: usize) -> i32 {
+/// what a purge does with an object at a level (vfunc +0x18)
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Act {
+    Keep,
+    /// 1: the object is destroyed
+    Destroy,
+    /// 2: suspended (out of the list until the text box closes)
+    Suspend,
+}
+
+/// an entity's answer: the player from level 15 (`0x08011050`); an actor from 14 on screen / 13 off screen
+/// (`0x0800F4C0`; 15 when it is the camera's object `0x03001BAC`); an animated effect is destroyed from level 2
+/// (`0x0802A9EC`), a projectile from 3 (`0x08019D00`); other objects are suspended from 15 (`0x0801155C`)
+fn ent_act(w: &World, i: usize, level: i32) -> Act {
+    let at = |n: i32, a: Act| if level >= n { a } else { Act::Keep };
     match &w.ents[i].body {
-        Body::Player(_) => 15,
-        Body::Npc(_) | Body::Enemy(_) => {
-            if on_screen(w, i) {
-                14
-            } else {
-                13
-            }
-        }
-        _ => 15,
+        Body::Player(_) => at(15, Act::Suspend),
+        Body::Npc(_) | Body::Enemy(_) => at(if on_screen(w, i) { 14 } else { 13 }, Act::Suspend),
+        Body::Fx(f) if matches!(**f, crate::fx::Fx::Anim { .. } | crate::fx::Fx::Loop { .. }) => at(2, Act::Destroy),
+        Body::Shot(_) => at(3, Act::Destroy),
+        _ => Act::Keep,
+    }
+}
+/// a non-actor object's: the banner is suspended from level 2 (`0x0800C060`), the HUD and the boss bar from 4
+/// (`0x0800BD86` / `0x0801978C`)
+fn own_act(o: Owner, level: i32) -> Act {
+    let n = match o {
+        Owner::Banner => 2,
+        Owner::Hud | Owner::BossBar => 4,
+        _ => return Act::Keep,
+    };
+    if level >= n {
+        Act::Suspend
+    } else {
+        Act::Keep
     }
 }
 
@@ -491,27 +631,84 @@ pub fn on_screen(w: &World, i: usize) -> bool {
     x0 < r.x1 && r.x0 < x1 && y0 < r.y1 && r.y0 < y1
 }
 
-/// `0x08011732`: until the largest free block holds `need`, suspend objects from the end of the world list, level
-/// by level (from level 11 the room is checked after each one)
+/// `0x08011732`: until the largest free block holds `need`, go through the world list from its end, level by level
+/// (0, 1, ...), asking every object (vfunc +0x18): destroyed or suspended ones give their tiles; from level 11 the
+/// room is checked after each one. A damage number is destroyed at any level (`0x0800AD10`).
 pub fn purge(w: &mut World, need: i32) {
     let objects = |w: &World| w.ents.iter().filter(|e| !e.removed && !suspended(w, e.id)).count();
     let room = |w: &World| w.field.as_ref().and_then(|f| f.vram.as_ref()).map(|v| v.a.room(objects(w))).unwrap_or(i32::MAX);
     if room(w) >= need {
         return;
     }
+    #[derive(Clone, Copy)]
+    enum Item {
+        Ent(EntityId),
+        Own(Owner, u32, i32),
+        Popup(u16),
+    }
     let mut level = 0;
     while room(w) < need && level < 64 {
-        let mut k = w.ents.len();
-        while k > 0 {
-            k -= 1;
-            if w.ents[k].removed || suspended(w, w.ents[k].id) {
-                continue;
-            }
-            if level >= purge_level(w, k) {
-                suspend(w, k);
-                if level >= 11 && room(w) >= need {
-                    break;
+        // the list now: the entities in order, each non-actor object before the first entity made after it; the
+        // damage numbers by their handles' entities (after their targets: made later)
+        let mut items: Vec<Item> = vec![];
+        {
+            let Some(v) = w.field.as_ref().and_then(|f| f.vram.as_ref()) else { return };
+            let mut owns: Vec<(Owner, u32, i32)> = v.objs.iter().filter(|o| !v.susp.iter().any(|x| matches!(x, Susp::Own(a, _, _) if *a == o.0))).copied().collect();
+            owns.sort_by_key(|o| o.1);
+            let mut k = 0;
+            for e in w.ents.iter().filter(|e| !e.removed && !v.suspended.contains(&e.id)) {
+                while k < owns.len() && owns[k].1 <= e.id {
+                    items.push(Item::Own(owns[k].0, owns[k].1, owns[k].2));
+                    k += 1;
                 }
+                items.push(Item::Ent(e.id));
+            }
+            for o in &owns[k..] {
+                items.push(Item::Own(o.0, o.1, o.2));
+            }
+            for p in &v.popups {
+                items.push(Item::Popup(p.2));
+            }
+        }
+        for it in items.into_iter().rev() {
+            let acted = match it {
+                Item::Popup(h) => {
+                    if let Some(v) = st(w) {
+                        v.popups.retain(|p| p.2 != h);
+                        v.owners.retain(|o| o.0 != h);
+                        v.a.free(h);
+                    }
+                    true
+                }
+                Item::Own(o, stamp, bytes) => {
+                    if own_act(o, level) == Act::Suspend {
+                        release(w, o);
+                        if let Some(v) = st(w) {
+                            v.susp.push(Susp::Own(o, stamp, bytes));
+                        }
+                        true
+                    } else {
+                        false
+                    }
+                }
+                Item::Ent(id) => {
+                    let Some(i) = w.find(id) else { continue };
+                    match ent_act(w, i, level) {
+                        Act::Keep => false,
+                        Act::Suspend => {
+                            suspend(w, i);
+                            true
+                        }
+                        Act::Destroy => {
+                            release(w, Owner::Ent(id));
+                            w.ents[i].removed = true;
+                            true
+                        }
+                    }
+                }
+            };
+            if acted && level >= 11 && room(w) >= need {
+                break;
             }
         }
         level += 1;
@@ -524,30 +721,38 @@ fn suspend(w: &mut World, i: usize) {
     if std::env::var("DBG_VRAM").is_ok() {
         eprintln!("SUSPEND f{} ent {} idx {} sprite {:?} onscreen {}", w.frame, id, i, crate::scene::sprite_id(w, i), on_screen(w, i));
     }
-    let key = sprite_of(w, i).map(|s| s.1);
-    if let Some(k) = key.and_then(shadow_index) {
+    // halo, shadow, tiles
+    let sh = sprite_of(w, i).map(|s| s.1).unwrap_or((false, None));
+    if sh.0 {
+        shared_release(w, HALO);
+    }
+    if let Some(k) = sh.1 {
         shared_release(w, k);
     }
     release(w, Owner::Ent(id));
     if let Some(v) = st(w) {
         v.suspended.push(id);
+        v.susp.push(Susp::Ent(id));
     }
 }
 
 /// `0x08011E94`: the suspended objects come back (last suspended first), appended to the world list, each taking
-/// its tiles and shadow again (vfunc +0x20 `0x0800F4E6`, purging if needed)
+/// its tiles again (vfunc +0x20: an actor `0x0800F4E6` tiles, halo, shadow; purging if needed)
 pub fn restore(w: &mut World) {
     let Some(v) = st(w) else { return };
-    let list = std::mem::take(&mut v.suspended);
-    for &id in list.iter().rev() {
-        let Some(i) = w.find(id) else { continue };
-        let e = w.ents.remove(i);
-        w.ents.push(e);
-        let i = w.ents.len() - 1;
-        let Some((bytes, key)) = sprite_of(w, i) else { continue };
-        acquire(w, Owner::Ent(id), bytes);
-        if let Some(k) = shadow_index(key) {
-            shared_acquire(w, k);
+    let list = std::mem::take(&mut v.susp);
+    v.suspended.clear();
+    for it in list.into_iter().rev() {
+        match it {
+            Susp::Ent(id) => {
+                let Some(i) = w.find(id) else { continue };
+                let e = w.ents.remove(i);
+                w.ents.push(e);
+                let i = w.ents.len() - 1;
+                let Some((bytes, sh)) = sprite_of(w, i) else { continue };
+                take(w, id, bytes, sh);
+            }
+            Susp::Own(o, _, bytes) => acquire(w, o, bytes),
         }
     }
 }
@@ -592,10 +797,28 @@ pub fn text_close(w: &mut World) {
 
 /// the HUD object of an arrival (after the players; none while the HUD is hidden)
 pub fn hud_created(w: &mut World) {
-    if w.field.as_ref().is_none_or(|f| f.vram.is_none()) || w.scene.hud_hidden {
+    if w.field.as_ref().is_none_or(|f| f.vram.is_none()) {
+        return;
+    }
+    // the 3D world map's own object (`0x0800C0C8`, vtable 0x0804D8C8, 0xF00), whatever `hide_hud` said
+    if map_3d(w) {
+        acquire(w, Owner::Map3d, 0xF00);
+        return;
+    }
+    if w.scene.hud_hidden {
         return;
     }
     acquire(w, Owner::Hud, 0x500);
+}
+
+/// every scene visual's object goes (an area load)
+pub fn visuals_gone(w: &mut World) {
+    let Some(v) = st(w) else { return };
+    let hs: Vec<u16> = v.owners.iter().filter(|o| matches!(o.1, Owner::Visual(_) | Owner::Blast(_))).map(|o| o.0).collect();
+    v.owners.retain(|o| !matches!(o.1, Owner::Visual(_) | Owner::Blast(_)));
+    for h in hs {
+        v.a.free(h);
+    }
 }
 
 /// HUD frames of the slide-out after `hide_hud` before the object deletes itself (VERIFIED 4-21: 25)
@@ -619,9 +842,160 @@ pub fn hud_shown(w: &mut World, on: bool) {
     }
 }
 
-/// the HUD objects' update (after the actors): a sliding-out one goes at the end of its slide
-pub fn hud_tick(w: &mut World) {
+/// a menu screen takes the object world's place (message 0xA to every object, `0x0800F45C`): the actors give
+/// their halo's and shadow's shared graphics back (their tiles stay); the message goes through the list from its
+/// end, like the update (the leader first)
+pub fn world_hide(w: &mut World) {
+    if w.field.as_ref().is_none_or(|f| f.vram.is_none()) {
+        return;
+    }
+    for i in (0..w.ents.len()).rev() {
+        if w.ents[i].removed || suspended(w, w.ents[i].id) {
+            continue;
+        }
+        let Some((_, sh)) = sprite_of(w, i) else { continue };
+        if sh.0 {
+            shared_release(w, HALO);
+        }
+        if let Some(k) = sh.1 {
+            shared_release(w, k);
+        }
+    }
+    // the screen's object world has its own (fresh) allocator; the field's is kept as it is
+    if let Some(v) = st(w) {
+        let a = std::mem::replace(&mut v.a, ObjVram::fresh());
+        let o = std::mem::take(&mut v.owners);
+        let rc = std::mem::replace(&mut v.shared_rc, [0; 5]);
+        v.stashed = Some(Box::new((a, o, rc)));
+    }
+}
+/// the object world is back (message 0xB, `0x0800F478`): its allocator, then halo, shadow again
+pub fn world_show(w: &mut World) {
+    if w.field.as_ref().is_none_or(|f| f.vram.is_none()) {
+        return;
+    }
+    if let Some(v) = st(w) {
+        if let Some(s) = v.stashed.take() {
+            let (a, o, rc) = *s;
+            v.a = a;
+            v.owners = o;
+            v.shared_rc = rc;
+        }
+    }
+    for i in (0..w.ents.len()).rev() {
+        if w.ents[i].removed || suspended(w, w.ents[i].id) {
+            continue;
+        }
+        let Some((_, sh)) = sprite_of(w, i) else { continue };
+        if sh.0 {
+            shared_acquire(w, HALO);
+        }
+        if let Some(k) = sh.1 {
+            shared_acquire(w, k);
+        }
+    }
+}
+/// a menu screen's character figure `k` (an actor object of sprite `sprite`): tiles, halo, shadow
+pub fn figure_created(w: &mut World, k: u32, sprite: i32) {
+    if w.field.as_ref().is_none_or(|f| f.vram.is_none()) {
+        return;
+    }
+    let Some((bytes, sh)) = w.data.sprite(sprite).map(|sp| (sp.tile_bytes, shares_of(sp))) else { return };
+    acquire(w, Owner::Figure(k), bytes);
+    if sh.0 {
+        shared_acquire(w, HALO);
+    }
+    if let Some(s) = sh.1 {
+        shared_acquire(w, s);
+    }
+}
+/// the figures go with their screen, last made first (each: shadow, halo, tiles)
+pub fn figures_gone(w: &mut World, sprites: &[i32]) {
+    if w.field.as_ref().is_none_or(|f| f.vram.is_none()) {
+        return;
+    }
+    for (k, &sprite) in sprites.iter().enumerate().rev() {
+        let Some(sh) = w.data.sprite(sprite).map(shares_of) else { continue };
+        if let Some(s) = sh.1 {
+            shared_release(w, s);
+        }
+        if sh.0 {
+            shared_release(w, HALO);
+        }
+        release(w, Owner::Figure(k as u32));
+    }
+}
+
+/// key of the breakables' debris chip graphic (4 chips per hit share it, 0x40 bytes; `0x0800C454`)
+pub const KEY_DEBRIS: u32 = 1;
+
+/// a user of a keyed shared graphic appears: the first one allocates it
+pub fn keyed_acquire(w: &mut World, key: u32, bytes: i32) {
     let Some(v) = st(w) else { return };
+    match v.keyed.iter_mut().find(|k| k.0 == key) {
+        Some(k) => k.1 += 1,
+        None => {
+            v.keyed.push((key, 1));
+            acquire(w, Owner::Keyed(key), bytes);
+        }
+    }
+}
+/// ... and goes: the last one frees it
+pub fn keyed_release(w: &mut World, key: u32) {
+    let Some(v) = st(w) else { return };
+    let Some(k) = v.keyed.iter_mut().find(|k| k.0 == key) else { return };
+    k.1 -= 1;
+    if k.1 == 0 {
+        v.keyed.retain(|k| k.0 != key);
+        release(w, Owner::Keyed(key));
+    }
+}
+
+/// a damage number over an actor (`0x0800E8E6`): within 8 frames of the actor's last new number the number object
+/// is reused (its 16 frames start again); else a new object, when 0x100 bytes are free (`0x0800AD3E`)
+pub fn damage_number(w: &mut World, target: EntityId) {
+    let now = w.frame;
+    let objects = w.ents.iter().filter(|e| !e.removed).count();
+    let Some(v) = st(w) else { return };
+    if let Some(p) = v.popups.iter_mut().find(|p| p.0 == target && now.wrapping_sub(p.1) < 8) {
+        p.3 = now + POPUP_LIFE;
+        return;
+    }
+    v.popups.retain(|p| p.0 != target || p.3 >= now);
+    if v.a.room(objects) < 0x100 {
+        return;
+    }
+    if let Some(h) = v.a.alloc(0x100) {
+        v.owners.push((h, Owner::Popup));
+        v.popups.push((target, now, h, now + POPUP_LIFE));
+    }
+}
+/// frames a damage number lives after its (re)start
+pub const POPUP_LIFE: u32 = 16;
+
+/// the HUD objects' update (after the actors): a sliding-out one goes at the end of its slide; the damage numbers
+/// end
+pub fn hud_tick(w: &mut World) {
+    let now = w.frame;
+    let Some(v) = st(w) else { return };
+    let ended: Vec<u16> = v.delayed.iter().filter(|d| d.1 <= now).map(|d| d.0).collect();
+    if !ended.is_empty() {
+        v.delayed.retain(|d| d.1 > now);
+        // (the list updates from its end: the later object's block goes first)
+        for h in ended.into_iter().rev() {
+            v.owners.retain(|o| o.0 != h);
+            v.a.free(h);
+        }
+    }
+    let gone: Vec<u16> = v.popups.iter().filter(|p| p.3 <= now).map(|p| p.2).collect();
+    if !gone.is_empty() {
+        // the entry stays for the reuse window's frame stamp only while the object lives
+        v.popups.retain(|p| p.3 > now);
+        for h in gone {
+            v.owners.retain(|o| o.0 != h);
+            v.a.free(h);
+        }
+    }
     if v.hud_out.is_empty() {
         return;
     }
@@ -639,6 +1013,9 @@ pub fn hud_tick(w: &mut World) {
 pub fn banner(w: &mut World, on: bool) {
     if w.field.as_ref().is_none_or(|f| f.vram.is_none()) {
         return;
+    }
+    if std::env::var("DBG_VRAM").is_ok() {
+        eprintln!("  banner {on} frame {}", w.frame);
     }
     release(w, Owner::Banner);
     if on {
@@ -666,7 +1043,7 @@ pub fn load_reset(w: &mut World) {
     if let Some(v) = st(w) {
         if v.owners.is_empty() {
             v.a = ObjVram::fresh();
-            v.shared_rc = [0; 4];
+            v.shared_rc = [0; 5];
         }
     }
 }

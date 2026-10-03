@@ -5,6 +5,7 @@
 pub mod annotations;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod cache;
+pub mod deccost;
 pub mod effects;
 pub mod field_gfx;
 pub mod fx_extra;

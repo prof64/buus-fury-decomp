@@ -208,6 +208,8 @@ pub struct Field {
     /// field enemies' patrol runners (def +0x18 steps; run by the AI node RunMotionController)
     pub patrols: Vec<crate::fieldpatrol::Patrol>,
     /// placed enemies alive: (entity, object, last position px)
+    /// (an enemy created at run time through the placed-enemy constructor - a destroyed tank's crew - has the
+    /// reference `ObjRef::List(0xff, enemy type)`)
     pub placed: Vec<(EntityId, ObjRef, i32, i32)>,
     /// per placed enemy, its loot block while alive (footprint centre, 1 px per frame along the last hit): what its
     /// death's deferred drop object stores (the entity can be gone when the defeat is noticed)
@@ -237,6 +239,10 @@ pub struct Field {
     /// the frame it ends (story playthrough: the fighters move in the frame the level-up popup closes)
     pub held_event: bool,
     pub resume_held: bool,
+    /// the frame's input as it was before an event's hold cleared it (`pre_step`): the pass an inline event
+    /// interrupted completes with it (`post_step`, resumed)
+    #[serde(default)]
+    pub raw_input: Option<[crate::input::InputFrame; crate::world::MAX_PLAYERS]>,
     /// between the frame's start (deferred calls) and the objects' update: objects created now get their first
     /// update in this frame's world update
     pub pre_update: bool,
@@ -275,6 +281,10 @@ pub struct Field {
     /// a script's `warp_fade` whose host nests the load's on-enter script (`nest_load` at the fade's load)
     #[serde(default)]
     pub nest_fade: bool,
+    /// the running fade-in is a script's `warp_fade` arrival (0x76): brightness by 4 (64 frames), the player idle
+    /// and under control, no autowalk (6-1 -> 6-13, the tournament grounds' gate)
+    #[serde(default)]
+    pub script_fade_in: bool,
     /// the object tile allocator (vram.rs)
     #[serde(default)]
     pub vram: Option<crate::vram::VramState>,
@@ -416,6 +426,7 @@ fn new_field() -> Field {
         held: false,
         held_event: false,
         resume_held: false,
+        raw_input: None,
         pre_update: false,
         arrival: None,
         check_fired: false,
@@ -428,6 +439,7 @@ fn new_field() -> Field {
         on_enter_queued: false,
         nest_load: false,
         nest_fade: false,
+        script_fade_in: false,
         vram: Some(crate::vram::VramState::default()),
         fade_end: 0,
         defer_objects: false,
@@ -541,7 +553,10 @@ pub fn spawn_object(w: &mut World, o: &ObjDef) -> Option<EntityId> {
                 let content = *sprite - crate::scene::SPRITE_BASE;
                 if *sprite > 0 && w.data.sprite(content).is_some() && w.en_ref(i).a.sprite != Some(content) {
                     let d = w.data.clone();
+                    // (the ctor allocates the placement's sprite: the type's tiles are given back first)
+                    crate::vram::entity_gone(w, i);
                     w.en(i).a.set_sprite(&d, Some(content));
+                    crate::vram::actor_created(w, i);
                 }
             }
             // the world map (3584 x 2560, beyond the 2048-px grids): placed exactly at the def position
@@ -617,13 +632,32 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
     w.scene.dest_label = None;
     // every object goes; the players are re-created below (same entity ids)
     let players = w.players.clone();
+    // a re-created player is a new object: not under the script's control until a command takes it again (6-1's
+    // gate script walks the player, warp_fades to 6-13: the new player walks on the pad during the fade-in)
+    w.scene.puppets.retain(|p| !players.contains(&p.id));
     // their object tiles too (the players' objects are re-created at the arrival), the HUD's and the banner's
     // first; nothing left: re-initialised
     crate::vram::release(w, crate::vram::Owner::Hud);
+    crate::vram::release(w, crate::vram::Owner::Map3d);
     crate::vram::release(w, crate::vram::Owner::HudOut);
     if let Some(v) = w.field.as_mut().and_then(|f| f.vram.as_mut()) {
         v.hud_out.clear();
+        v.popups.clear();
+        v.delayed.clear();
+        let keys: Vec<u32> = v.keyed.drain(..).map(|k| k.0).collect();
+        for k in keys {
+            v.owners.retain(|o| o.1 != crate::vram::Owner::Keyed(k) || {
+                v.a.free(o.0);
+                false
+            });
+        }
     }
+    crate::vram::release(w, crate::vram::Owner::Popup);
+    crate::vram::visuals_gone(w);
+    // the BG sphere effect is an object of the old area too (segment sb 20-8 -> 20-9: its redraws stop)
+    w.scene.visuals.retain(|v| v.kind != crate::scene::VisualKind::EnergySphere);
+    crate::vram::release(w, crate::vram::Owner::Ending);
+    crate::vram::release(w, crate::vram::Owner::BossBar);
     crate::vram::release(w, crate::vram::Owner::Banner);
     for i in 0..w.ents.len() {
         crate::vram::entity_gone(w, i);
@@ -885,10 +919,11 @@ fn arrive(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<Dir>) {
     }
     // the HUD object after the players (`0x0800B854`), then the banner object (segment sb 4-21); a cutscene's
     // backdrop (the players offstage, `0x08009030`) has neither (segment sb 4-24)
-    if w.scene.offstage.is_empty() {
+    let scene = !w.scene.offstage.is_empty();
+    if !scene {
         crate::vram::hud_created(w);
-        crate::scene::banner_load(w, a, m.three_d);
     }
+    crate::scene::banner_load(w, a, m.three_d, scene);
     w.story.variant_byte = variant;
     w.events.push(Event::Field(FieldEvent::AreaEnter { area: to, key: a.key.clone() }));
 }
@@ -981,6 +1016,12 @@ pub fn camera(w: &mut World, slot: usize) {
 // ---------------------------------------------------------------------------------------------------------------
 // per frame
 
+/// the player a script's `warp_fade` built into a 2D area, during its fade-in: a free object that reads the keys
+/// (the event that warped does not hold it; the script's next command on it takes it)
+pub fn free_arrival(w: &World) -> bool {
+    w.field.as_ref().is_some_and(|f| f.script_fade_in && matches!(f.mode, Mode::FadeIn { .. }) && f.item_get.is_none()) && !crate::fieldworld::flying(w)
+}
+
 /// before the entity update: the deferred calls due (start of the world update); the item-get presentation holds the
 /// players' input
 pub fn pre_step(w: &mut World) {
@@ -988,8 +1029,27 @@ pub fn pre_step(w: &mut World) {
     if let Some(f) = w.field.as_mut() {
         f.frame_start_pos = pos;
     }
+    // a script's warp_fade arrival in a 2D area ends as its 64th frame starts: the players go idle (1 x rand(255)
+    // each), the script goes on in this frame (6-1 -> 6-13: the walk to the pad starts on the fully lit frame)
+    if w.field.as_ref().is_some_and(|f| f.script_fade_in && matches!(f.mode, Mode::FadeIn { k } if k >= crate::fieldworld::FADE_IN_3D - 1)) && !crate::fieldworld::flying(w) {
+        if let Some(f) = w.field.as_mut() {
+            f.mode = Mode::Normal;
+            f.script_fade_in = false;
+        }
+        for s in 0..w.players.len() {
+            if let Some(i) = w.player_idx(s) {
+                player::set_idle(w, i);
+            }
+        }
+    }
     // an event (nested loop inside the player update) or the item-get holds the players; the raw keys stay in scene.keys
-    if w.field.as_ref().is_some_and(|f| f.item_get.is_some() || f.busy) {
+    // (not the player a script's `warp_fade` just built: until the fade-in ends and the script takes it again it is a
+    // free object that reads the keys, event or not - 0-21, s026: A punches during the 64-frame fade-in)
+    if w.field.as_ref().is_some_and(|f| f.item_get.is_some() || f.busy) && !free_arrival(w) {
+        let raw = w.input;
+        if let Some(f) = w.field.as_mut() {
+            f.raw_input = Some(raw);
+        }
         // the world map's flyer reads the keys itself, event or not (s515's warp_fade: it answers A / B during the
         // arrival fade-in)
         let flying = crate::fieldworld::flying(w) && w.field.as_ref().is_some_and(|f| f.item_get.is_none());
@@ -1098,8 +1158,9 @@ fn begin_fade_in(w: &mut World) {
     if let Some(f) = w.field.as_mut() {
         f.mode = Mode::FadeIn { k: 0 };
     }
-    // the world map's fade-in has no autowalk: the flyer is under control
-    if crate::fieldworld::flying(w) {
+    // the world map's fade-in has no autowalk: the flyer is under control; a script's warp_fade arrival neither
+    // (the player the load created stays idle, under control)
+    if crate::fieldworld::flying(w) || w.field.as_ref().is_some_and(|f| f.script_fade_in) {
         return;
     }
     for s in 0..w.players.len() {
@@ -1155,7 +1216,19 @@ pub fn post_step(w: &mut World) {
             f.resume_held = false;
             f.event_ended = false;
         }
+        // the interrupted pass goes on with the frame's own input: the nested loop returned inside the object that
+        // started it, the objects after it (the players included, when a death effect at the head of the list ran
+        // the hook) update normally (12-28: RIGHT held through the Warlord's defeat script - the walk starts in
+        // the script's last frame)
+        if let Some(raw) = w.field.as_mut().and_then(|f| f.raw_input.take()) {
+            w.input = raw;
+        }
+        // the task list (screen shakes) already ran in this frame's held pass (session.rs): the completed pass is
+        // only the objects after the hook (13-45: a crit shake draws once in the frame s393 ends)
+        let shakes = std::mem::take(&mut w.g.shakes);
         w.step_entities();
+        let new = std::mem::replace(&mut w.g.shakes, shakes);
+        w.g.shakes.extend(new);
         if let Some(f) = w.field.as_mut() {
             f.event_ended = ended;
         }
@@ -1224,6 +1297,7 @@ pub fn post_step(w: &mut World) {
                 load_area(w, to, x, y, facing);
                 if let Some(f) = w.field.as_mut() {
                     f.nest_load = false;
+                    f.script_fade_in = step != 0;
                 }
                 // a load waiting for its on-enter script fades in when it completes (finish_arrival)
                 match w.field.as_mut().and_then(|f| f.arrival.as_mut()) {
@@ -1242,7 +1316,14 @@ pub fn post_step(w: &mut World) {
         Mode::FadeIn { k } => {
             let k = k + 1;
             let flying = crate::fieldworld::flying(w);
-            if flying && k >= crate::fieldworld::FADE_IN_3D {
+            let scripted = !flying && w.field.as_ref().is_some_and(|f| f.script_fade_in);
+            if scripted {
+                // a script's warp_fade into a 2D area: brightness by 4 like the 3D arrival, the player under control;
+                // it ends at the start of the 64th frame (`pre_step`)
+                if let Some(f) = w.field.as_mut() {
+                    f.mode = Mode::FadeIn { k };
+                }
+            } else if flying && k >= crate::fieldworld::FADE_IN_3D {
                 let frame = w.frame;
                 if let Some(f) = w.field.as_mut() {
                     f.mode = Mode::Normal;
@@ -1297,8 +1378,18 @@ pub fn trigger_self(w: &mut World, i: usize) {
         _ => None,
     });
     w.events.push(Event::Field(FieldEvent::Defeated { entity: id, ty, x, y }));
-    if let Some(run) = cb {
-        w.events.push(Event::Field(FieldEvent::Run { run, cause: Cause::Defeat { entity: id, ty, x, y, loot: None }, slot: 0 }));
+    match cb {
+        // callback 0x0800424F (run event): the event object joins the world's list and runs in the next frame's pass,
+        // which it holds from its start (0-50's airship marker -> s017: the flyer's animation skips that frame's
+        // tick, the event's first command runs a frame later)
+        Some(run @ Callback::Event(_)) if w.field.as_ref().is_some_and(|f| f.host) => {
+            if let Some(f) = w.field.as_mut() {
+                f.defeat_runs.push((run, Cause::Defeat { entity: id, ty, x, y, loot: None }));
+            }
+        }
+        // callback 0x0800421F (run bytecode): inline, at once
+        Some(run) => w.events.push(Event::Field(FieldEvent::Run { run, cause: Cause::Defeat { entity: id, ty, x, y, loot: None }, slot: 0 })),
+        None => {}
     }
 }
 
@@ -1335,14 +1426,20 @@ fn defeats(w: &mut World) {
                 let def = fd.area(area.0, area.1).and_then(|a| a.objects.iter().find(|o| o.at == obj));
                 let (ty, cb) = match def.map(|d| &d.kind) {
                     Some(ObjKind::Enemy { ty, on_defeat, .. }) => (*ty, on_defeat.clone()),
-                    _ => (-1, None),
+                    // no area def: a run-time enemy (a tank's crew, `ObjRef::List(0xff, type)`) keeps its type's
+                    // drop script
+                    _ => (if let ObjRef::List(0xff, t) = obj { t as i32 } else { -1 }, None),
                 };
-                // the dying enemy sets the loot position (0x03001010) for its drop script; INFERRED: its position, no velocity
-                crate::fieldobj::set_loot(w, x, y, 0, 0);
+                // the dying enemy sets the loot block (0x03001010 position, 0x03001018 velocity) for its drop script and
+                // its on-defeat callback: the footprint's centre x / bottom y and 1 px per frame along the killing hit
+                // (VERIFIED 12-28: the Warlord last at (141, 88), punched rightwards -> (157, 104), (256, 0), read by
+                // his callback's spawn_map_item)
+                crate::fieldobj::set_loot(w, fx, fy, fvx, fvy);
                 w.events.push(Event::Field(FieldEvent::Defeated { entity: id, ty, x, y }));
+                // (a tank's death node 0x080333C4 passes its def +0x10 = 8 to the same handler)
                 // the type's drop script (def +0x18), run by the death effect after its delay (SelfDestruct param:
                 // story playthrough, the fighters on Grand Kai's planet drop 4 coins 8 frames after the KO)
-                let (ds, delay) = w.data.enemy(ty).map(|t| (t.drop_script, if t.death_name == "SelfDestruct" { t.death_param as u32 } else { 0 })).unwrap_or((0, 0));
+                let (ds, delay) = w.data.enemy(ty).map(|t| (t.drop_script, if t.death_name == "SelfDestruct" { t.death_param as u32 } else if crate::enemy::TANKS.contains(&ty) { 8 } else { 0 })).unwrap_or((0, 0));
                 if ds != 0 {
                     let due = w.frame + delay;
                     if let Some(f) = w.field.as_mut() {
@@ -1353,9 +1450,9 @@ fn defeats(w: &mut World) {
                     let due = w.frame + delay;
                     if let Some(f) = w.field.as_mut() {
                         if delay > 0 {
-                            f.defeat_later.push((due, run, Cause::Defeat { entity: id, ty, x, y, loot: Some((x, y, 0, 0)) }));
+                            f.defeat_later.push((due, run, Cause::Defeat { entity: id, ty, x, y, loot: Some((fx, fy, fvx, fvy)) }));
                         } else {
-                            f.defeat_runs.push((run, Cause::Defeat { entity: id, ty, x, y, loot: Some((x, y, 0, 0)) }));
+                            f.defeat_runs.push((run, Cause::Defeat { entity: id, ty, x, y, loot: Some((fx, fy, fvx, fvy)) }));
                         }
                     }
                 }
@@ -1616,7 +1713,8 @@ pub fn hud_tick(w: &mut World) {
 /// brightness level (0..256 = black) of the fade-in after k frames: the 3D world map's arrival fades by 4 (64
 /// frames), the 2D areas' by 8
 pub fn fade_in_level(w: &World, k: i32) -> i32 {
-    let step = if crate::fieldworld::flying(w) { 256 / crate::fieldworld::FADE_IN_3D } else { 8 };
+    let slow = crate::fieldworld::flying(w) || w.field.as_ref().is_some_and(|f| f.script_fade_in);
+    let step = if slow { 256 / crate::fieldworld::FADE_IN_3D } else { 8 };
     (256 - step * k).clamp(0, 256)
 }
 
@@ -1636,12 +1734,29 @@ pub fn warp_fade_slow(w: &mut World, world: i32, area: i32, variant: i32, x: i32
     if w.field.is_none() {
         return;
     }
+    // the 3D map's flyer takes the call in its flight state: no idle draw; it turns north and its animation restarts
+    // (0-50 -> 0-21, s026: facing 3 -> 1, tick 0, the banking raw kept), then it is held through the fade
+    // (`fieldworld::flyer_update`)
+    let flying = crate::fieldworld::flying(w);
     for s in 0..w.players.len() {
         if let Some(i) = w.player_idx(s) {
-            player::set_idle(w, i);
+            if flying {
+                if s == 0 {
+                    if let Some(fl) = w.field.as_mut().and_then(|f| f.flight.as_mut()) {
+                        fl.tick = 0;
+                        fl.frame = 0;
+                    }
+                    let p = w.pl(i);
+                    p.a.facing = 1;
+                    p.ap.frame = 0;
+                }
+            } else {
+                player::set_idle(w, i);
+            }
         }
     }
-    begin_fade_out(w, AreaId { world, area, variant }, x, y, None);
+    // (a flyer's facing is not a walker's: the player the load builds faces down - 0-21's arrival)
+    begin_fade_out(w, AreaId { world, area, variant }, x, y, flying.then_some(0));
     // the fade object's brightness starts moving two frames after the call (s515 at 3-1: idle at the call, black 63
     // frames later)
     if let Some(Mode::FadeOut { step, k, .. }) = w.field.as_mut().map(|f| &mut f.mode) {
@@ -1684,6 +1799,15 @@ pub fn spawn_map_object(w: &mut World, at: ObjRef, force: bool) -> Option<Entity
         return None;
     }
     spawn_object(w, &o)
+}
+
+/// script `spawn_map_item` (0xAA): the area's item object `at`, thrown from the loot block
+pub fn throw_map_item(w: &mut World, at: ObjRef) -> Option<EntityId> {
+    let fd = field_data(w);
+    let f = w.field.as_ref()?;
+    let a = fd.area(f.area.world, f.area.area)?;
+    let o = a.objects.iter().find(|o| o.at == at)?.clone();
+    crate::fieldobj::throw_map_item(w, &o)
 }
 
 /// script `refresh_map_triggers` (0x8B, 0x08008AA0(area, 0)): clear the trigger list and re-create the area's
@@ -1764,6 +1888,16 @@ pub fn queue_run(w: &mut World, run: Callback, cause: Cause) {
     }
 }
 
+/// a held frame (`held_event` set for a death effect's on-defeat callback, field.rs `defeat_later`) whose scripts all
+/// ended without starting an event: the frame's update runs after all (the game ran the callback inline, nothing
+/// blocked)
+pub fn release_unstarted_hold(w: &mut World) {
+    if let Some(f) = w.field.as_mut().filter(|f| f.held && f.held_event && !f.busy) {
+        f.held_event = false;
+        f.resume_held = true;
+    }
+}
+
 pub fn hold_nested(w: &mut World) {
     set_busy(w, true);
     if let Some(f) = w.field.as_mut() {
@@ -1791,6 +1925,10 @@ pub struct SavedWorld {
     pub walk_layer: Option<Vec<u8>>,
     /// the camera control (the scene load fixes it; the restore gives the follow camera back)
     pub cam: crate::scene::CamCtl,
+    /// the actors under script control (a map NPC the event walked keeps its scripted animation after the return:
+    /// 8-16 s319's Kibito)
+    #[serde(default)]
+    pub puppets: Vec<crate::scene::Puppet>,
 }
 
 pub fn save_world(w: &World) -> SavedWorld {
@@ -1805,6 +1943,7 @@ pub fn save_world(w: &World) -> SavedWorld {
         enemy_layer: w.col.as_ref().map(|c| c.enemy.clone()),
         walk_layer: w.col.as_ref().and_then(|c| c.walk.clone()),
         cam: w.scene.cam.clone(),
+        puppets: w.scene.puppets.clone(),
     }
 }
 
@@ -1815,6 +1954,20 @@ pub fn restore_world(w: &mut World, s: SavedWorld) {
     w.ents = s.ents;
     w.enemies = s.enemies;
     w.field = s.field;
+    // the save was taken inside the `load_scene` that replaced the field: that call's transient load flags are not
+    // part of the field it keeps (s215 saves the Lookout in a nested load_scene; after return_to_field, s216's
+    // warp spawned 6-1's NPCs after the player instead of before)
+    if let Some(f) = w.field.as_mut() {
+        f.defer_objects = false;
+        f.pending_objects = None;
+        f.nest_load = false;
+        f.scene_load = false;
+    }
+    for p in s.puppets {
+        if w.find(p.id).is_some() && !crate::scene::is_puppet(w, p.id) {
+            w.scene.puppets.push(p);
+        }
+    }
     for (k, c) in s.cameras.into_iter().enumerate().take(w.cameras.len()) {
         w.cameras[k] = c;
     }

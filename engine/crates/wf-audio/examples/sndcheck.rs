@@ -36,6 +36,10 @@ fn main() {
     let mut out = Vec::new();
     let mut updates = 0;
     let mut last_n = 0;
+    let mut prof = wf_audio::driver::Profile::default();
+    let mut mode = 0;
+    let dump = std::env::args().nth(2);
+    let mut rows = Vec::new();
     for e in j["events"].as_array().unwrap() {
         let k = e[0].as_str().unwrap();
         match k {
@@ -44,12 +48,24 @@ fn main() {
                 // chunks of <= 512 like 0x0803F296
                 // fewer than 64 pending samples: the update returns without mixing
                 let mut left = if last_n < 64 { 0 } else { last_n };
+                wf_audio::driver::profile_begin();
                 while left > 0 {
                     let c = left.min(512);
                     d.render_into(&mut out, c);
                     left -= c;
                 }
                 updates += 1;
+                prof = wf_audio::driver::profile_end();
+                mode = e[5].as_u64().unwrap();
+            }
+            "ram" => {
+                if let Some(c) = e.get(3).and_then(|c| c.as_u64()) {
+                    let p = &prof;
+                    rows.push(format!(
+                        "{} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {}",
+                        e[1], last_n, mode, c, p.inner, p.runs, p.silent_runs, p.track_mix, p.sfx_mix, p.splits, p.upd_vol, p.upd_entry, p.upd_restart, p.upd_pitch, p.upd_live, p.ticks, p.rows, p.cells, p.tick_fns, p.chunks, p.segments
+                    ));
+                }
             }
             "sfx" => {
                 let id = ((e[3].as_u64().unwrap() - SFX_TABLE) / 12) as u8;
@@ -79,4 +95,7 @@ fn main() {
         }
     }
     println!("{updates} updates match");
+    if let Some(d) = dump {
+        std::fs::write(d, rows.join("\n")).unwrap();
+    }
 }

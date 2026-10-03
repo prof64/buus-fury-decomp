@@ -518,6 +518,8 @@ pub struct World {
     /// the save slots (menu/save.rs): given at session start by the frontend, written by the Save Game screen,
     /// read by the title's Select Game; the frontend persists a slot when `generation` changes
     pub saves: crate::menu::save::Saves,
+    /// the sound driver and the hardware's play position (sndsim.rs); idle without sound content
+    pub sound: crate::sndsim::SoundSim,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -566,6 +568,10 @@ impl Hash for World {
         }
         if self.saves != crate::menu::save::Saves::default() {
             self.saves.hash(h);
+        }
+        // only with sound content
+        if self.sound.drv.is_some() {
+            self.sound.hash(h);
         }
     }
 }
@@ -628,6 +634,7 @@ impl World {
             modk: Default::default(),
             menu: Default::default(),
             saves: Default::default(),
+            sound: Default::default(),
         }
     }
 

@@ -50,6 +50,10 @@ pub enum StepRt {
         #[serde(default)]
         h: i32,
     },
+    /// world-map marker (step 0x0803A053, update 0x08039F4E): kept on the circle of radius `r` around (cx, cy), on
+    /// the side of the leader (0-50's airship marker, s017); never finishes
+    #[serde(alias = "ring")]
+    Ring { cx: i32, cy: i32, r: i32 },
     /// steps not modelled for NPCs (enemy walk_to, cutscene moves): never finish
     Other,
 }
@@ -272,7 +276,7 @@ fn create(w: &mut World, i: usize, st: &Step) -> StepRt {
 /// one step update; true = done
 fn update_step(w: &mut World, i: usize, s: &mut StepRt) -> bool {
     match s {
-        StepRt::Stand | StepRt::Other | StepRt::Move3 { .. } => false,
+        StepRt::Stand | StepRt::Other | StepRt::Move3 { .. } | StepRt::Ring { .. } => false,
         StepRt::Wait { count } => {
             *count -= 1;
             *count < 0
@@ -554,7 +558,9 @@ pub fn start_event(w: &mut World) {
             Body::Player(p) if p.gs == crate::player::Gs::Walk => crate::player::set_idle(w, k),
             // a walking enemy stops: idle state (story playthrough: a fighter walking when the level-up hook starts
             // goes idle with a fresh idle tick; a hurt one keeps its state)
-            Body::Enemy(e) if !e.defeated => crate::enemy::stop_msg(w, k),
+            // (a defeated enemy that stays for its on-defeat event - ko < 0, a boss - is still an actor: Totenhotep
+            // walking when the last punch lands goes idle as the level-up event starts, Kyodai Pyramid 14-24)
+            Body::Enemy(e) if !e.defeated || e.ko < 0 => crate::enemy::stop_msg(w, k),
             _ => {}
         }
     }

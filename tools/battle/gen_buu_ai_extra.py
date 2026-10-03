@@ -52,6 +52,7 @@ AUX_ONLY = {
     0x0803C8E1: dict(name='SetHitDir', sem='obj+0x290 = hit direction (knockback dir), 1'),
     0x08034109: dict(name='IfHitFromFront', children=[0xC], sem='(hit dir ^ 1) == facing -> child'),
     0x0803A79D: dict(name='HealFraction', params=[(0xC, 'frac', 'frac16')], sem='heal final damage * frac >> 16 (mult 0 -> 1)'),
+    0x08032F85: dict(name='TankDamage', sem='tank armour: hit mult 0 -> 0; obj+0x290 = hit dir; damage / 4 when the hit dir == facing; then as ApplyDamage'),
 }
 # onHit function of registry nodes (word +4 of the def), with the behaviour we implement
 ONHIT_NAMES = {

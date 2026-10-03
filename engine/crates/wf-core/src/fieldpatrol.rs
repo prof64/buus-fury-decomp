@@ -144,6 +144,8 @@ fn create(w: &mut World, i: usize, st: &Step, z: i32) -> StepRt {
             let ang = ((dy as f64).atan2(dx as f64) as f32) * f32::from_bits(0x3E22_F984) * 1024.0f32;
             StepRt::Move3 { tx, ty, tz, n, vx: (dx << 8) / n, vy: (dy << 8) / n, vz: (dz << 10) / n, h: ang as i32 }
         }
+        // 0x0803A053: +4 s16 centre x, +6 y, +8 s16 radius (and (radius + 0x180)^2, not read by the update)
+        0x0803_A053 => StepRt::Ring { cx: (wd(0) & 0xFFFF) as i16 as i32, cy: (wd(0) >> 16) as i16 as i32, r: (wd(1) & 0xFFFF) as i16 as i32 },
         _ => StepRt::Other,
     }
 }
@@ -151,6 +153,24 @@ fn create(w: &mut World, i: usize, st: &Step, z: i32) -> StepRt {
 fn update_step(w: &mut World, i: usize, s: &mut StepRt, z: &mut i32) -> bool {
     match s {
         StepRt::Stand | StepRt::Other => false,
+        // update 0x08039F4E: nothing without a leader; height = the leader's (obj+0x1A8); d = leader px - centre,
+        // position = centre + radius * d / isqrt(|d|^2) (signed integer divisions), whole pixels; never done.
+        // (The heading obj+0x1AC by d's octant is set by the caller, `run`.)
+        StepRt::Ring { cx, cy, r } => {
+            let Some(pi) = w.player_idx(0) else { return false };
+            let (px, py) = (w.pl_ref(pi).a.x >> 8, w.pl_ref(pi).a.y >> 8);
+            if let Some(fz) = w.field.as_ref().and_then(|f| f.flight.as_ref()).map(|fl| fl.z) {
+                *z = fz;
+            }
+            let (dx, dy) = (px - *cx, py - *cy);
+            let d = crate::fixed::isqrt((dx as i64) * (dx as i64) + (dy as i64) * (dy as i64)) as i32;
+            if d != 0 {
+                let a = &mut w.en(i).a;
+                a.x = (*cx + *r * dx / d) << 8;
+                a.y = (*cy + *r * dy / d) << 8;
+            }
+            false
+        }
         StepRt::Move3 { tx, ty, tz, n, vx, vy, vz, .. } => {
             *n -= 1;
             let a = &mut w.en(i).a;
@@ -263,6 +283,11 @@ fn wander(w: &mut World, i: usize, s: &mut Wander) {
                 emark(w, i, o, 1);
                 let ok = etest(w, i, new);
                 emark(w, i, if ok { new } else { o }, 0);
+                // the step's mark is its destination until it ends (`holds_mark`: no per-frame foot mark on the
+                // way - Kyodai Pyramid 14-10, the game's enemy grid during a Mummy's step)
+                if ok && grid(w, i) {
+                    w.en(i).marked = Some(new);
+                }
                 ok
             }
         };
@@ -301,6 +326,14 @@ fn wander_end(w: &mut World, i: usize, s: &Wander) {
     }
 }
 
+/// a wander step under way whose destination rect is the enemy's mark (set at the step's start, replaced by the foot
+/// mark at its end / pause): the per-frame mark sync leaves it alone
+pub fn holds_mark(w: &World, i: usize) -> bool {
+    let id = w.ents[i].id;
+    let Some(p) = w.field.as_ref().and_then(|f| f.patrols.iter().find(|p| p.entity == id)) else { return false };
+    matches!(&p.cur, Some(StepRt::Wander(s)) if s.left != 0 && s.rect.is_none() && w.en_ref(i).marked == Some(s.new))
+}
+
 /// RunMotionController update: one runner pass (`0x0800A95A`)
 pub fn run(w: &mut World, i: usize) {
     let Some(mut p) = take(w, i) else { return };
@@ -308,6 +341,21 @@ pub fn run(w: &mut World, i: usize) {
     for _ in 0..64 {
         if let Some(mut cur) = p.cur.take() {
             let done = update_step(w, i, &mut cur, &mut p.z);
+            if let StepRt::Ring { cx, cy, .. } = cur {
+                // the marker's heading (0x08039FEC ..): by the octant of leader - centre
+                if let Some(pi) = w.player_idx(0) {
+                    let (dx, dy) = ((w.pl_ref(pi).a.x >> 8) - cx, (w.pl_ref(pi).a.y >> 8) - cy);
+                    p.h = if dx.abs() > dy.abs() {
+                        if dx > 0 { if dy > 0 { 0x50 } else { 0x30 } } else if dy > 0 { 0xB0 } else { 0xD0 }
+                    } else if dy > 0 {
+                        if dx > 0 { 0x70 } else { 0x90 }
+                    } else if dx > 0 {
+                        0x10
+                    } else {
+                        0xF0
+                    };
+                }
+            }
             p.cur = Some(cur);
             if !done {
                 break;

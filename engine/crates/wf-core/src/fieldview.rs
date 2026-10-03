@@ -41,7 +41,7 @@ pub fn pickup(w: &World, id: u32, p: &Pickup, out: &mut RenderView) {
             put(out, id, "effects/field_items".into(), item_frame(item), p.bx[0], p.bx[1] - (p.z >> 10), 3, SpriteEffect::None);
             put(out, id, "effects/shadow_10x4".into(), 0, p.bx[0], p.bx[1] + 10, 3, SpriteEffect::SemiTransparent);
         }
-        PickupKind::MapItem { item, .. } => put(out, id, "effects/field_items".into(), item_frame(item), p.bx[0], p.bx[1], 3, SpriteEffect::None),
+        PickupKind::MapItem { item, .. } => put(out, id, "effects/field_items".into(), item_frame(item), p.bx[0], p.bx[1] - (p.z >> 10), 3, SpriteEffect::None),
     }
 }
 
@@ -92,7 +92,7 @@ pub fn front(w: &World, out: &mut RenderView) {
             put(out, 0, "effects/field_items".into(), item_frame(item), a.px(), a.py() - 40 - ((k + 2) >> 4), 2, SpriteEffect::None);
         }
     }
-    for d in &f.debris {
+    for d in f.debris.iter().filter(|d| d.t < 32) {
         put(out, 0, "effects/debris".into(), 0, d.x >> 8, d.y >> 8, 3, SpriteEffect::None);
     }
 }

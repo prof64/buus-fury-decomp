@@ -37,6 +37,7 @@ pub mod tables;
 pub mod world;
 pub mod observe;
 pub mod session;
+pub mod sndsim;
 pub mod snapshot;
 pub mod view;
 pub mod vram;

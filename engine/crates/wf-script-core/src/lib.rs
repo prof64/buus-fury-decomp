@@ -259,7 +259,9 @@ impl Host for CoreHost<'_> {
     fn native(&mut self, call: Call<'_>) -> Result<NativeResult, String> {
         // any native between a wait's end and the event's exit: the exit no longer happens at the top of the frame
         // (story playthrough: s073 end_parallel -> camera_follow -> exit, no NPC catch-up)
-        let keeps = self.s.talk_event && (matches!(binding::binding(call.native).at, binding::Where::Story | binding::Where::Vm) || matches!(call.native, 0x2f | 0x30));
+        // (refresh_map_objects 0x8B keeps it too: Nataday Village 15-1, s431's walk -> face -> set_flag ->
+        // refresh_map_objects -> exit, the villagers wander in the exit frame)
+        let keeps = self.s.talk_event && (matches!(binding::binding(call.native).at, binding::Where::Story | binding::Where::Vm) || matches!(call.native, 0x2f | 0x30 | 0x8b));
         if !keeps {
             self.s.from_wait = false;
         }
@@ -375,16 +377,34 @@ fn release_field_npcs(w: &mut World, watermark: EntityId) {
         let id = w.ents[i].id;
         if !w.ents[i].removed && matches!(&w.ents[i].body, wf_core::world::Body::Npc(n) if n.behaviour.is_some()) && !scene::is_puppet(w, id) && id <= watermark {
             wf_core::fieldnpc::release_update(w, i);
+        } else if !w.ents[i].removed && matches!(&w.ents[i].body, wf_core::world::Body::Enemy(_)) && id <= watermark {
+            // the enemies older than the event are objects of the same pass: their AI runs in this frame too
+            // (Kyodai Pyramid 14-10: the Mummies step and draw in the frame s414's last text box closes)
+            wf_core::enemy::release_update(w, i);
         }
     }
 }
 
-/// Per-frame poll of the pending action, after the World stepped. `Some(result)` = resume the thread now with
-/// `result`; `None` = still waiting. Also ticks the script timers (call every frame).
-pub fn poll(w: &mut World, s: &mut HostState) -> Option<Option<i32>> {
-    if s.timers.countdown_on && s.timers.countdown > 0 {
+/// the field runs free (no event holds it, no transition): None outside the field
+fn self_field_free(w: &World) -> Option<bool> {
+    let f = w.field.as_ref()?;
+    Some(!f.busy && f.item_get.is_none() && matches!(f.mode, wf_core::field::Mode::Normal))
+}
+
+/// the script timers' logic frame (hosts call it once per frame after the world update, a script running or not)
+pub fn tick_timers(w: &World, s: &mut HostState) {
+    if s.timers.countdown_on && s.timers.countdown > 0 && self_field_free(w).unwrap_or(true) {
         s.timers.countdown -= 1;
     }
+}
+
+/// Per-frame poll of the pending action, after the World stepped. `Some(result)` = resume the thread now with
+/// `result`; `None` = still waiting. Also ticks the stopwatch / boost timers.
+pub fn poll(w: &mut World, s: &mut HostState) -> Option<Option<i32>> {
+    // the countdown (GD+0x4D4) is an object of the field: it counts the logic frames in which the field runs free -
+    // not while an event / an inline script holds it, nor during an exit's fades and the walk-in (MEASURED 12-28 ..
+    // 12-26, the Airship's self destruct: 10781 -> ... one per frame only between the lifts' scripts and the loads)
+    // (`tick_timers`, called by the hosts once per logic frame)
     if s.timers.stopwatch_on {
         s.timers.stopwatch += 1;
     }

@@ -106,6 +106,11 @@ impl CharSelect {
         }
         w.rng = rng;
         self.oam = self.figs.clone();
+        // the object world gives way to the figures (their object tiles: vram.rs)
+        crate::vram::world_hide(w);
+        for (k, f) in self.figs.iter().enumerate() {
+            crate::vram::figure_created(w, k as u32, f.sprite);
+        }
     }
 
     /// `0x0802EC00` / `0x0802EBBE`: the previous / next choosable figure

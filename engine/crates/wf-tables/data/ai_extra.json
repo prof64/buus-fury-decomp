@@ -75,6 +75,10 @@
     ]
    ],
    "sem": "heal final damage * frac >> 16 (mult 0 -> 1)"
+  },
+  "0x8032f85": {
+   "name": "TankDamage",
+   "sem": "tank armour: hit mult 0 -> 0; obj+0x290 = hit dir; damage / 4 when the hit dir == facing; then as ApplyDamage"
   }
  },
  "extra_nodes": {

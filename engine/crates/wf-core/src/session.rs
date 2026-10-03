@@ -165,13 +165,18 @@ impl Session {
     }
     /// the rest of the frame: cameras and the field / battle rules after the update
     pub fn step_post(&mut self) -> &[Event] {
+        self.step_post_world();
+        crate::sndsim::end_frame(&mut self.world);
+        &self.world.events
+    }
+    fn step_post_world(&mut self) {
         let w = &mut self.world;
         if crate::menu::active(w) && !crate::menu::opened_this_frame(w) {
             if w.field.is_some() && (crate::menu::minigame::world_runs(w) || crate::menu::minigame::watch_closing(w)) {
                 crate::field::world_mode_cameras(w);
             }
             crate::menu::post(w);
-            return &self.world.events;
+            return;
         }
         if w.field.is_some() {
             let k = w.events.len();
@@ -182,14 +187,13 @@ impl Session {
             crate::menu::mapscreen::check_select(&mut self.world);
             // the frame's music events keep `Scene.song` current inside the state (byte snapshots carry no events)
             crate::scene::note_events(&mut self.world);
-            return &self.world.events;
+            return;
         }
         battle::post_step(w);
         if self.outcome == Outcome::Running {
             self.outcome = battle::outcome(w);
         }
         crate::scene::note_events(&mut self.world);
-        &self.world.events
     }
     /// call the hook for the Run events from index `from` on (events the hook itself adds are not re-dispatched)
     fn run_hook(hook: &mut Option<FieldHook>, w: &mut World, from: usize) {

@@ -551,6 +551,8 @@ pub fn sprite_id(w: &World, i: usize) -> Option<i32> {
     match &w.ents[i].body {
         Body::Npc(n) => Some(n.sprite_id),
         // the player object's sprite def is its form's (gfx id), even where the content lacks that sheet
+        // (Majin Buu's candy: SetDef(0x36), the sweets)
+        Body::Player(p) if p.candy_def => Some(0x36),
         Body::Player(p) => w.data.form(p.form).map(|f| f.gfx),
         _ => w.actor(i).and_then(|a| a.sprite).map(|s| s + SPRITE_BASE),
     }
@@ -733,6 +735,10 @@ pub struct CamCtl {
     /// is removed (story playthrough: Olibu walks off and is removed while the camera follows him)
     #[serde(default)]
     pub follow_last: Option<(i32, i32)>,
+    /// this frame's camera update already ran (set by `camera`, cleared at the frame's start): a scroll started
+    /// after it (a trigger's script) takes its first step at once
+    #[serde(default)]
+    pub stepped: bool,
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -1050,6 +1056,9 @@ pub struct Scene {
     pub banner: Option<(String, u32)>,
     /// the last area name id shown (RAM 0x03001984, kept across loads)
     pub banner_last: i64,
+    /// the frame a load made the banner in (its age starts after that frame's end)
+    #[serde(default)]
+    pub banner_made: u32,
     /// the running event's speaker anchor (scene object +0xC / +0x10, ctor `0x0801246E`): a map NPC's talk event
     /// (`0x08017D44`) passes player - NPC (24.8), every other event (-1, -1). Places text boxes ([`speaker_layout`])
     #[serde(default = "no_anchor")]
@@ -1094,6 +1103,7 @@ impl Default for Scene {
             ai_wait: Vec::new(),
             banner: None,
             banner_last: 0,
+            banner_made: u32::MAX,
             keys: [InputFrame::default(); MAX_PLAYERS],
             talk_anchor: NO_ANCHOR,
         }
@@ -1232,22 +1242,28 @@ pub fn box_center(w: &World, i: usize) -> (i32, i32) {
     w.actor(i).map(|a| a.center()).unwrap_or((0, 0))
 }
 
-/// a shot's target point on an actor (0x0800FDFA): the centre of its facing-down body box (fits the recorded
-/// flight times; one target sample)
+/// a shot's target point on an actor (ShootAtActor's start 0x08027BE6): the centre of the shown frame record's box
+/// (0x0800FE34; Babidi's ship 8-16 s319: Dabura's spit at the Supreme Kai flies to (232, 136)); the facing-down
+/// body box when the record is unknown
 pub fn target_center(w: &World, i: usize) -> (i32, i32) {
     let Some(a) = w.actor(i) else { return (0, 0) };
+    if let Some(b) = cel_box(w, i) {
+        let (x0, y0) = (a.px() + b[0], a.py() + b[1]);
+        return ((x0 + x0 + b[2]) >> 1, (y0 + y0 + b[3]) >> 1);
+    }
     let b = a.body[0];
     ((a.px() * 2 + b[0] + b[2]) >> 1, (a.py() * 2 + b[1] + b[3]) >> 1)
 }
 
-/// where a scripted ki blast leaves the actor (measured on 24 shots, 4 facings): the body box's leading edge
-/// (left / right) or centre (up / down) at its middle height, + 7 down when facing down
+/// where a scripted ki blast leaves the actor (0x0800FF44, from the facing's body box 0x0800FE78): its leading edge
+/// (left / right) at the middle height, its centre (up), or the centre x at the actor's own y (down: 8-16 s319,
+/// Dabura's box is not the standard one)
 pub fn muzzle(w: &World, i: usize) -> (i32, i32) {
     let Some(a) = w.actor(i) else { return (0, 0) };
     let b = a.body_box();
     let (cx, cy) = ((b.x0 + b.x1) >> 1, (b.y0 + b.y1) >> 1);
     match a.facing {
-        0 => (cx, cy + 7),
+        0 => (cx, a.py()),
         1 => (cx, cy),
         2 => (b.x0, cy),
         _ => (b.x1, cy),
@@ -1386,11 +1402,14 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
         }
         Cmd::SetPos { x, y } => {
             if let Some(i) = i {
+                // a map NPC's walk mark moves with it (Nataday Village 15-1: the on-enter script puts the elder
+                // beside the gate, the spot he was placed on is free)
+                crate::fieldnpc::script_move_mark(w, i, false);
                 if let Some(a) = actor_mut(w, i) {
                     a.x = *x << 8;
                     a.y = *y << 8;
                 }
-
+                crate::fieldnpc::script_move_mark(w, i, true);
             }
         }
         Cmd::Puff { x, y, absolute } => {
@@ -1403,8 +1422,10 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
                 };
                 // the dust cloud's rate is 0x1000 + rand(0x1000) (0x08019554; story playthrough: the gate's puffs)
                 crate::fx::puff_rng(w, cx, cy);
+                puff_first_update(w);
             } else if *absolute && matches!(owner, Owner::Prop(_)) {
                 crate::fx::puff_rng(w, *x, *y);
+                puff_first_update(w);
             }
         }
         Cmd::HitFlash => {
@@ -1433,6 +1454,7 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
                 }
                 if w.scene.boss_bar.as_ref().is_some_and(|b| b.entity == w.ents[i].id) {
                     w.scene.boss_bar = None;
+                    crate::vram::release(w, crate::vram::Owner::BossBar);
                 }
             }
         }
@@ -1440,6 +1462,8 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
             if let Some(i) = i {
                 let (px, py) = actor_pos(w, i);
                 let dir = w.actor(i).map(|a| a.facing).unwrap_or(0);
+                // the old actor's object is destroyed first: its tiles are free for the new one (segment sb 20-8)
+                crate::vram::entity_gone(w, i);
                 // same place and facing (0x080192BA moves the queue)
                 let id = spawn_npc(w, *sprite, px, py, dir);
                 let old = w.ents[i].id;
@@ -1537,11 +1561,31 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
                         w.sfx(snd, 64);
                         let (nn, _, _) = step_math(*x - cx, *y - cy, *speed, 8);
                         *n = nn;
+                        // its object tiles (base ctor `0x08019B04`: 0x100) while it flies
+                        let id = w.ents[i].id;
+                        crate::vram::acquire(w, crate::vram::Owner::Blast(id), 0x100);
                     }
                     ShootKind::Ball => {
-                        // the throw state (raw 21); TODO: the ball's flight time (0x0802E444) is fixed here
+                        // start 0x0803C4DC: SetAnimRaw(0x14); the throw direction k (5-way, from the footprint
+                        // centre to the point) is kept in `speed`, the cel is 2k + 1 with the tick at 0; `n` = the
+                        // ball's frames left (none yet)
                         set_state(w, i, 19);
-                        *n = 29;
+                        let (fx, fy) = w.actor(i).map(|a| a.foot_center()).unwrap_or((0, 0));
+                        let (dx, dy) = (*x - fx, *y - fy);
+                        let k = if 2 * dx < -5 * dy {
+                            0
+                        } else if 12 * dx < -5 * dy {
+                            1
+                        } else if 2 * dx > 5 * dy {
+                            4
+                        } else if 12 * dx > 5 * dy {
+                            3
+                        } else {
+                            2
+                        };
+                        *speed = k;
+                        *n = 0;
+                        ball_cel(w, i, 2 * k + 1, 0);
                     }
                 }
             }
@@ -1659,6 +1703,18 @@ fn beam_anim(kind: BeamKind) -> i32 {
 }
 
 /// one update of the head; true = done
+/// fire_ball_at drives the thrower's cel and tick itself (actor +0x11 / +0x12): a frozen cel of the throw state
+fn ball_cel(w: &mut World, i: usize, cel: i32, tick: i32) {
+    if matches!(w.ents[i].body, Body::Player(_)) {
+        return;
+    }
+    if let Some(m) = anim_mut(w, i) {
+        m.mode = AnimMode::Pose;
+        m.frame = cel;
+        m.tick = tick;
+    }
+}
+
 fn update_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) -> bool {
     let i = owner_index(w, owner);
     match cmd {
@@ -1843,9 +1899,37 @@ fn update_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) -> bool {
             }
             false
         }
+        // fire_ball_at's tick 0x0803C576 / done 0x0803C65C: the ball (0x0802E444) leaves at tick 8 from the position
+        // + 0x0877C454[k] and lives (max(|dx|, |dy|) >> 1) + 1 ticks; cel 2k + 2 from tick 8, 2k + 1 again from 16;
+        // done from tick 24 on once the ball is gone (8-16 s319: Dabura's spits, 57 and 41 ticks)
+        Cmd::Shoot { kind: ShootKind::Ball, x, y, speed, t, n } => {
+            const OFF: [(i32, i32); 5] = [(0, -32), (0, -32), (8, -32), (16, -32), (16, -32)];
+            *t += 1;
+            let k = (*speed).clamp(0, 4);
+            if *n > 0 {
+                *n -= 1;
+            }
+            if let Some(i) = i {
+                if *t == 8 {
+                    let (px, py) = actor_pos(w, i);
+                    let (sx, sy) = (px + OFF[k as usize].0, py + OFF[k as usize].1);
+                    *n = (((*x - sx).abs().max((*y - sy).abs())) >> 1) + 1;
+                }
+                let cel = if (8..16).contains(t) { 2 * k + 2 } else { 2 * k + 1 };
+                ball_cel(w, i, cel, *t);
+            }
+            *t >= 24 && *n == 0
+        }
         Cmd::Shoot { t, n, .. } => {
             *t += 1;
-            *t >= *n
+            let done = *t >= *n;
+            if done {
+                if let Owner::Entity(id) = owner {
+                    // the blast object's end effect plays 16 more frames
+                    crate::vram::release_later(w, crate::vram::Owner::Blast(id), 16);
+                }
+            }
+            done
         }
         Cmd::PropMoveTo { x, y, n, t, sx, sy, .. } => {
             if let Owner::Prop(p) = owner {
@@ -2059,6 +2143,15 @@ fn become_map_object(w: &mut World, index: i32, x: i32, y: i32, dir: Dir) -> Opt
 // ---------------------------------------------------------------------------------------------------------------
 // per frame
 
+/// a script's puff exists before the frame's object pass in the game (scripts run before the objects): its first
+/// update is the creation frame's (segment sb 21-26: its tiles go one frame earlier than an effect made in the pass)
+fn puff_first_update(w: &mut World) {
+    let i = w.ents.len() - 1;
+    if matches!(w.ents[i].body, Body::Fx(_)) {
+        crate::fx::update(w, i);
+    }
+}
+
 /// the frame's music events (any source: area loads, scripts) keep `Scene.song` current; called at the end of the
 /// frame (`Session::step_post`) and after a session is created
 pub fn note_events(w: &mut World) {
@@ -2105,46 +2198,33 @@ pub fn bring_back(w: &mut World) {
 /// it, and starts one when the new area's name id differs from the last one shown and is not 0 (the 3D world map
 /// only records the id). Called with the music bookkeeping at the end of the frame / after a session is created.
 pub fn banner_step(w: &mut World) {
+    // the banner a load of this frame made shows from now (t = 0)
+    if w.scene.banner.is_some() && w.scene.banner_made == w.frame {
+        return;
+    }
     if let Some((_, t)) = w.scene.banner.as_mut() {
         *t += 1;
-        let t = *t;
-        if t > 238 {
+        if *t > 238 {
             w.scene.banner = None;
             crate::vram::banner(w, false);
         }
     }
-    let loads: Vec<crate::field::AreaId> = w
-        .events
-        .iter()
-        .filter_map(|e| match e {
-            crate::world::Event::Field(crate::field::FieldEvent::AreaEnter { area, .. }) => Some(*area),
-            _ => None,
-        })
-        .collect();
-    let Some(fd) = w.data.field.clone() else { return };
-    // a cutscene's backdrop load (`load_scene`) shows no banner (no banner object: segment sb 4-24)
-    let scene_load = w.field.as_ref().is_some_and(|f| f.scene_load);
-    for area in loads {
-        if scene_load {
-            continue;
-        }
-        w.scene.banner = None;
-        let Some(a) = fd.area(area.world, area.area) else { continue };
-        let three_d = a.maps.iter().any(|m| fd.maps.get(m).is_some_and(|m| m.three_d));
-        if three_d {
-            w.scene.banner_last = a.name_id;
-        } else if a.name_id != 0 && a.name_id != w.scene.banner_last {
-            w.scene.banner_last = a.name_id;
-            w.scene.banner = Some((a.banner.clone(), 0));
-        }
-    }
 }
 
-/// the load creates the banner object (its tiles) with the area's music, between its object lists 0 and 1
-/// (`banner_step` shows it at the frame's end; segment sb 7-2)
-pub fn banner_load(w: &mut World, a: &crate::fieldcontent::AreaDef, three_d: bool) {
-    let scene_load = w.field.as_ref().is_some_and(|f| f.scene_load);
-    if !scene_load && !three_d && a.name_id != 0 && a.name_id != w.scene.banner_last {
+/// a load's banner (the arrival, after the HUD object: segment sb 4-21): the old one went with the old area's
+/// objects; a new one when the area's name id differs from the last one shown and is not 0 (the 3D world map only
+/// records the id; a cutscene's backdrop load has no banner object: segment sb 4-24)
+pub fn banner_load(w: &mut World, a: &crate::fieldcontent::AreaDef, three_d: bool, scene: bool) {
+    if scene {
+        return;
+    }
+    w.scene.banner = None;
+    if three_d {
+        w.scene.banner_last = a.name_id;
+    } else if a.name_id != 0 && a.name_id != w.scene.banner_last {
+        w.scene.banner_last = a.name_id;
+        w.scene.banner = Some((a.banner.clone(), 0));
+        w.scene.banner_made = w.frame;
         crate::vram::banner(w, true);
     }
 }
@@ -2165,7 +2245,14 @@ pub fn play_song(w: &mut World, id: i32) {
 /// start of the frame: keep the raw input for the scripts; players get none while an event graph runs, a modal
 /// fade / dialog / menu is up, or the director waits
 pub fn pre_step(w: &mut World) {
+    // the BG sphere effect (`0x0803AA58`) redraws every frame with jittered rows, before the objects update: rand(4)
+    // for each row past the third (radius - 3 draws; VERIFIED segment sb 20-8, Kid Buu's planet burst)
+    let jitter: i32 = w.scene.visuals.iter().filter(|v| v.kind == VisualKind::EnergySphere).map(|v| (v.owner as i32 - 3).max(0)).sum();
+    for _ in 0..jitter {
+        w.rng.rand(4);
+    }
     w.scene.keys = w.input;
+    w.scene.cam.stepped = false;
     if w.scene.depth == 0 && !w.scene.puppets.is_empty() && w.scene.director.wait.is_none() {
         // outside a scene a player's input ends its leftover frame-range animation
         let held: Vec<(EntityId, bool)> = w.players.iter().enumerate().map(|(s, &id)| (id, w.input[s.min(MAX_PLAYERS - 1)].held != 0)).collect();
@@ -2174,8 +2261,10 @@ pub fn pre_step(w: &mut World) {
     if w.scene.depth > 0 || w.scene.menu.is_some() {
         // the world map's flyer reads the keys itself during an event (s515's arrival fade-in)
         let flyer = w.scene.menu.is_none() && crate::fieldworld::flying(w);
+        // a warp_fade's arrival too, through its fade-in (`field::free_arrival`: 0-21, s026)
+        let free = w.scene.menu.is_none() && crate::field::free_arrival(w);
         for s in 0..w.players.len().min(MAX_PLAYERS) {
-            if !(flyer && s == 0) {
+            if !(flyer && s == 0) && !free {
                 w.input[s] = InputFrame::default();
             }
         }
@@ -2296,6 +2385,7 @@ fn tick_track(w: &mut World, k: usize) -> bool {
 }
 
 fn tick_visuals(w: &mut World) {
+
     for v in w.scene.visuals.iter_mut() {
         v.t += 1;
         if v.life > 0 {
@@ -2305,7 +2395,8 @@ fn tick_visuals(w: &mut World) {
     // a fired beam's effect object ends with its sound changing (32 -> 33)
     let ended: Vec<u32> = w.scene.visuals.iter().filter(|v| v.life == 0 && v.vid != 0).map(|v| v.vid).collect();
     w.scene.visuals.retain(|v| v.life != 0);
-    for o in ended {
+    // (the objects update from the list's end: the later one goes first)
+    for o in ended.into_iter().rev() {
         crate::vram::release(w, crate::vram::Owner::Visual(o));
     }
 }
@@ -2329,6 +2420,14 @@ fn cam_clamp(w: &World, x: i32, y: i32) -> (i32, i32) {
 fn clamp_cam(w: &World, x: i32, y: i32) -> (i32, i32) {
     let (cx, cy) = cam_clamp(w, x << 10, y << 10);
     (cx >> 10, cy >> 10)
+}
+
+/// a scene load's camera (`load_scene*` x, y px): placed inside the new map's camera limits (7-2 s273:
+/// load_scene(7, 4, 1, 1, 1) shows (1, 0))
+pub fn set_scene_camera(w: &mut World, x: i32, y: i32) {
+    cam_put(w, x << 10, y << 10);
+    let c = &mut w.cameras[0];
+    c.shown = c.rect;
 }
 
 fn cam_put(w: &mut World, x: i32, y: i32) {
@@ -2360,6 +2459,11 @@ pub fn start_scroll(w: &mut World, x: i32, y: i32, speed: i32) {
     w.scene.cam.mode = CamMode::Fixed;
     w.scene.cam.scroll = Some(Scroll { tx: x, ty: y, sx, sy, n, t: 0 });
     w.scene.freeze = true;
+    // the mover's first step belongs to the frame it starts in: a script the trigger check started (after the
+    // frame's camera update) steps here (8-16's ship entrance: the camera is on the player the frame A is pressed)
+    if w.scene.cam.stepped {
+        scroll_step(w);
+    }
 }
 
 fn scroll_step(w: &mut World) {
@@ -2436,6 +2540,7 @@ pub fn camera_owned(w: &World) -> bool {
 /// player-0 camera under script control. Returns true when the script owns the camera this frame (the caller
 /// skips the player camera).
 pub fn camera(w: &mut World) -> bool {
+    w.scene.cam.stepped = true;
     if w.scene.cam.hold {
         w.scene.cam.hold = false;
         let c = &mut w.cameras[0];

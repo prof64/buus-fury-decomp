@@ -170,6 +170,20 @@ pub fn spawn_map_item(w: &mut World, o: &crate::fieldcontent::ObjDef) -> Option<
     }))))
 }
 
+/// script `spawn_map_item(i)` (0xAA, 0x080090E6 -> 0x0800DCDC with the loot block 0x03001010 / 0x03001018): the area's
+/// item `i` built by the dropped-item constructor 0x0800D30E at the loot position with the loot velocity (4 RNG
+/// draws, the flight of `drop_item`), then given the map item's vtable 0x0804C508 (A takes it, its event runs).
+/// VERIFIED 12-28: the Warlord's ball starts at (loot x - 8, loot y - 16), z 0x2000, and flies (239, 118) / frame.
+pub fn throw_map_item(w: &mut World, o: &crate::fieldcontent::ObjDef) -> Option<EntityId> {
+    let ObjKind::Item { item, .. } = &o.kind else { return None };
+    let id = drop_item(w, *item)?;
+    let k = w.find(id)?;
+    if let Body::Pickup(p) = &mut w.ents[k].body {
+        p.kind = PickupKind::MapItem { obj: o.at, item: *item };
+    }
+    Some(id)
+}
+
 pub fn spawn_map_sprite(w: &mut World, o: &crate::fieldcontent::ObjDef) -> Option<EntityId> {
     let ObjKind::MapSprite { x, y, sprite, params, label } = &o.kind else { return None };
     Some(w.add(Body::MapSprite(Box::new(MapSprite { x: *x, y: *y, sprite: *sprite, params: *params, t: 0, label: *label }))))
@@ -195,6 +209,9 @@ pub fn breakable_message(w: &mut World, k: usize, msg: &mut HitMsg) -> bool {
     b.hp -= 1;
     let (cx, cy) = ((b.bx[0] + b.bx[2]) >> 1, (b.bx[1] + b.bx[3]) >> 1);
     spawn_debris(w.field.as_mut(), cx, cy);
+    for _ in 0..4 {
+        crate::vram::keyed_acquire(w, crate::vram::KEY_DEBRIS, 0x40);
+    }
     let Body::Breakable(b) = &mut w.ents[k].body else { return false };
     // the melee's crit slot is not written for breakables: alone, every recorded hit shook the screen (15, 75) (the
     // stack slot's stale value); with an enemy hit by the same punch the enemy's ComputeDamage wrote it (Babidi's
@@ -405,7 +422,7 @@ pub fn pickup_update(w: &mut World, i: usize) {
                 w.ents[i].removed = true;
             }
         }
-        PickupKind::Supply(_) | PickupKind::Equipment(_) if !p.landed => {
+        PickupKind::Supply(_) | PickupKind::Equipment(_) | PickupKind::MapItem { .. } if !p.landed => {
             let (nx, ny) = (p.x + p.vx, p.y + p.vy);
             let (ddx, ddy) = ((nx >> 8) - (p.x >> 8), (ny >> 8) - (p.y >> 8));
             // collision sub-box inside the 16x16 icon (`0x0800DB64` from the icon's pixels: content `sub_box`)
@@ -550,6 +567,8 @@ fn sub_box(w: &World, kind: PickupKind) -> [i32; 4] {
     let b = match kind {
         PickupKind::Supply(i) => fd.and_then(|f| f.supply_box.get(&i).copied()),
         PickupKind::Equipment(e) => fd.and_then(|f| f.equip_box.get(&e).copied()),
+        PickupKind::MapItem { item, .. } if item >= 0 => fd.and_then(|f| f.supply_box.get(&item).copied()),
+        PickupKind::MapItem { item, .. } => fd.and_then(|f| f.equip_box.get(&-item).copied()),
         _ => None,
     };
     b.unwrap_or([0, 8, 16, 16])
@@ -583,5 +602,10 @@ pub fn debris_step(w: &mut World) {
         d.vy += 2;
         d.t += 1;
     }
-    f.debris.retain(|d| d.t < 32);
+    // a chip object lives 2 updates past its 32 shown frames (its shared tiles: segment sb 21-5)
+    let gone = f.debris.iter().filter(|d| d.t >= 34).count();
+    f.debris.retain(|d| d.t < 34);
+    for _ in 0..gone {
+        crate::vram::keyed_release(w, crate::vram::KEY_DEBRIS);
+    }
 }

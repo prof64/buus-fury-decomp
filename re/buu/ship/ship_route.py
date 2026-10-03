@@ -23,11 +23,23 @@ def charsel(moves):
     return [('face', 'U'), ('keys', k), ('events',)]
 
 
+def rest_at(x, y, c=2, other=1):
+    """at a save point (standing spot x, y): the other kid stands in until character c is full again"""
+    return [('unstick',), ('walk', x, y), *charsel(other), ('rest', c), ('unstick',), ('walk', x, y), *charsel(-other)]
+
+
 def shop(x, y, row, n):
     """a food stall (\"Want something to eat?\" -Sure): row `row` of the buy list, A `n` times (one item each while
     the zenie lasts), B out, the goodbye text"""
     k = [(A, 3, 60), (A, 3, 100)] + [(D, 3, 15)] * row + [(A, 3, 40)] * n + [(B, 3, 100), (A, 3, 60)]
     return [('walk', x, y), ('face', 'U'), ('keys', k), ('events',), ('wait', 30)]
+
+
+def equip(slot, row=0):
+    """pause menu -> Equip (R R) -> slot row (body / hands / feet / accessory) -> list row -> Equip to <char>"""
+    k = [(KEY.START, 2, 60), (KEY.R, 3, 40), (KEY.R, 3, 40)] + [(D, 3, 16)] * slot + [(A, 3, 40)] + \
+        [(D, 3, 16)] * row + [(A, 3, 40), (A, 3, 40), (B, 3, 40), (KEY.START, 2, 100)]
+    return [('keys', k), ('wait', 20)]
 
 
 def split(n):
@@ -214,7 +226,68 @@ def goals_fatbuu(e):
         ('keys', [(A, 3, 60), (A, 3, 60), (A, 3, 100), (D, 3, 15), (D, 3, 15)] + [(A, 3, 40)] * 5 +
          [(B, 3, 80), (B, 3, 60), (D, 3, 15), (D, 3, 15), (A, 3, 60), (A, 3, 60)]), ('events',), ('wait', 30),
         ('unstick',), ('walk', 112, 212), ('hold', D, 40), ('wait', 30),
+        ('mark', 'd03_city'),
+        # 32 punches in the air: each draws the RNG, so the airships' rolls change (re/buu/ship/hunt_search.py found
+        # this count: the Bandana drops after 19,521 frames with Trunks still level <= 70; waiting changes nothing)
+        ('wait', 90), ('keys', [(A, 2, 34)] * 32 + [(0, 1, 1)]),
         ('unstick',), ('walk', 416, 360), ('face', 'U'), ('press', A), ('wait', 60),
         ('mark', 'd03_hunt'),
         ('hunt', 126),                                                         # world map encounters: the Bandana
+        ('mark', 'd04_bandana'),
+        # Goten for the dungeons (their enemies are level 80+): Southwest Forest's save point, the fighters of 8-3 / 8-6
+        # Trunks first, to 80: the rock at the Thieves Den's entrance is his (s517 (3, 80, 1) in 9-1)
+        ('fly', 849, 1785, 31, 23), ('wait', 30),
+        ('grind', 80, [(8, 3), (8, 6)]),
+        nav(8, 1, False), ('unstick',), ('walk', 148, 186), *charsel(-1),
+        ('mark', 'd05_grind'),
+        ('grind', 95, [(8, 3), (8, 6)]),
+        nav(8, 1, False), ('unstick',), ('walk', 280, 266), ('face', 'U'), ('press', A), ('wait', 60),
+        ('fly', 3145, 2001, 95, 79), ('wait', 30),                             # Thieves Den 9-1
+        ('mark', 'd06_thieves'),
+        # --- Thieves Den: the Bandana on, the guards of 9-10 (s348 -> s350, flag 80), the hideout 9-11 .. 9-15, the
+        # 1-Star Dragon Ball (s362, flag 112: the monkey takes the Bandana, the Bandit King's gang attacks) -----------
+        ('wait', 200), ('unstick',), ('walk', 68, 188), *charsel(1),                  # Trunks: the rock (level 80)
+        ('walk', 232, 170), ('face', 'U'), ('press', A), ('events',), ('wait', 30),
+        ('unstick',), ('walk', 68, 188), *charsel(-1), *equip(3),                     # Goten, the Bandana on
+        nav(9, 10), ('unstick',), ('walk', 112, 82), ('talk', 'U'), ('events',), ('wait', 30),
+        ('mark', 'd07_guards'),
+        nav(9, 11, False), ('unstick',), ('walk', 268, 96), ('hold', U, 80), ('wait', 30),  # the door (UP held)
+        nav(9, 14, False), ('unstick',), ('walk', 176, 44), ('hold', U, 40), ('events',), ('wait', 30),  # 9-15: s357
+        ('mark', 'd08_bandit_king'),
+        ('unstick',), ('walk', 104, 146), ('face', 'U'), ('press', A), ('wait', 30), ('events',),
+        ('mark', 'd09_ball1'),                    # flag 112; the gang (Hooligan, Mad Bomber, Sniper, Goon) attacks
+        nav(9, 1), ('unstick',), ('walk', 40, 244), ('face', 'U'), ('press', A), ('wait', 120),
+        ('mark', 'd10_map'),
+        # --- Pilaf's Castle 10: Trunks' rock in 10-1 (s517 (3, 80, 0)), the castle to 10-31 (s364, the boss type 63:
+        # on-defeat s365, flag 94), the 3-Star Dragon Ball lying there (s366, flag 114) ------------------------------
+        ('fly', 2289, 1561, 31, 23), ('wait', 200),
+        ('mark', 'd11_pilaf'),
+        ('unstick',), ('walk', 196, 122), *charsel(1),
+        ('unstick',), ('walk', 256, 76), ('face', 'U'), ('press', A), ('events',), ('wait', 30),
+        ('unstick',), ('walk', 196, 122), *charsel(-1),
+        alloc_keys([(0, [6, 0, 6, 0])]),
+        ('mark', 'd11b_rock'),
+        nav(10, 30),
+        ('mark', 'd12_pilaf_boss'),
+        nav(10, 31, False), ('story', 10, 31, True),
+        ('mark', 'd13_pilaf_won'),
+        # the ball only lies there once the room is entered with flag 94 set: out and in again
+        nav(10, 30, False), nav(10, 31, False), ('unstick',), ('walk', 200, 228), ('hold', D, 20),
+        ('press', A), ('wait', 30), ('events',), ('wait', 60), ('events',), ('wait', 30),   # (a story item: A on it)
+        ('mark', 'd14_ball3'),
+        nav(10, 30, False), ('fightp', 20000), *rest_at(60, 109),
+        nav(10, 1), ('unstick',), ('walk', 88, 98), ('face', 'U'), ('press', A), ('wait', 120),
+        ('mark', 'd15_map'),
+        # --- Diablo Desert 11: Goten's level-80 gate in 11-1 (flag 169), the four switches (11-2 flag 89, 11-4 flag
+        # 90, 11-5 flag 91, 11-10 flag 92), the train from 11-13 (11-17: s372, flag 93), the five robbers of 11-24
+        # (s373 .. s377 -> s378: the 2-Star Dragon Ball, flag 113), out by 11-20's pad ------------------------------
+        ('fly', 1505, 985, 143, 159), ('wait', 200),
+        ('mark', 'd16_desert'),
+        ('unstick',), ('walk', 224, 196), ('face', 'U'), ('press', A), ('events',), ('wait', 30),
+        nav(11, 2), ('unstick',), ('walk', 416, 288), ('wait', 30), ('events',), ('wait', 30),
+        nav(11, 4), ('unstick',), ('walk', 200, 240), ('wait', 30), ('events',), ('wait', 30),
+        nav(11, 5), ('unstick',), ('walk', 88, 96), ('wait', 30), ('events',), ('wait', 30),
+        nav(11, 10), ('unstick',), ('walk', 408, 48), ('wait', 30), ('events',), ('wait', 30),
+        nav(11, 13),
+        ('mark', 'd17_station'),
     ]
