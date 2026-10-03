@@ -432,7 +432,13 @@ ids / animation indices need the ROM's sprite-def tables: the recording's `init.
 (`GbaRam.actor_rows`). The event: blocked in the return's fade-in phase (`Pending::Phases`, fade started at the
 cut). Proof - the real route's Kid Buu run, cut with `--events`: **9 / 14 cuts exact**, the eight `return_to_field`
 ones gated (`rkb_003`, `004`, `005`, `006`, `007`, `009`, `010`, `011`: up to 2,000 frames each, allocator check on).
-Open: `kbr_008` (s462 node 60) matches 1,579 / 7,596 - after the event the copies fight on from imported runtimes
+Increment 1b: building the enemies enters their states (path followers take the stagger): the stagger byte
+0x030032E5 is re-read after them - `kbr_008` 1,579 -> **6,629 / 7,596**. Its stop is the Kid Buu minute's start:
+the countdown set in the event's exit frame reads 3600 there (the game's nested event loop ended inside the frame:
+the field frame 0x08006E3C, whose 0x0800425C counts it down, does not run in it), while `sb_041`'s reads 3599 (its
+event ended at the frame's top: 0x08006E3C ran after the set). Our host runs both sets at the same point; the rule
+that tells them apart (where the Director wait ends relative to the field frame) is open - `Timers.fresh` keeps
+`sb_041` exact. Was: `kbr_008` (s462 node 60) matches 1,579 / 7,596 - after the event the copies fight on from imported runtimes
 and stay exact 1,500 frames, then a path re-plan's waypoint differs by 1 px (stagger / plan state - next); `kbr_014`
 (a return_to_field onto the 3D map: the flyer is not rebuilt); `kbr_012` (s463 node 64: another kind); `kbr_002`
 f13417 (the animation-13 actor - not looked at yet).
