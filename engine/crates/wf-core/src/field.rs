@@ -2147,6 +2147,11 @@ pub fn restore_world(w: &mut World, s: SavedWorld) {
     w.ents = s.ents;
     w.enemies = s.enemies;
     w.field = s.field;
+    // script-moved props of the scenes loaded since the save are gone with them (they are keyed by the load count,
+    // which the restored field turns back: the next real load would reuse the scene's count and its props - 14-22's
+    // switch shrine s415 -> 14-21: the bridge props started from the shrine's positions; app soak of dungeon 7)
+    let loads = w.field.as_ref().map(|f| f.loads).unwrap_or(0);
+    w.scene.props.retain(|p| p.load <= loads);
     // the save was taken inside the `load_scene` that replaced the field: that call's transient load flags are not
     // part of the field it keeps (s215 saves the Lookout in a nested load_scene; after return_to_field, s216's
     // warp spawned 6-1's NPCs after the player instead of before)

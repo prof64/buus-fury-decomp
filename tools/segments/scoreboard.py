@@ -46,8 +46,29 @@ OWNER = {'menu timing': 'Earth agent (redraw / mixer timing)', 'sound': 'Earth a
          'screen fade': 'cutscene / script-host agent', 'camera': 'chapter agent (camera scroll)',
          'animation': 'chapter agent', 'position / facing': 'chapter agent (enemy AI / knockback)',
          'object set': 'chapter agent (spawns / removal)', 'other': '-'}
-CHAPTER_OWNER = {'ship': 'ship agent', 'fat': 'dungeon agents A / B (+ ship agent: Thieves Den, Pilaf)',
+CHAPTER_OWNER = {'opening': 'Earth agent (title, New Game, Other World)', 'earth': 'Earth agent', 'ship': 'ship agent', 'fat': 'dungeon agents A / B (+ ship agent: Thieves Den, Pilaf)',
                  'janemba': 'side-content agent', 'superbuu': 'Super Buu agent'}
+
+
+# what is known about a segment's first divergence (investigated; shown with it on the board)
+NOTES = {
+    'r069_168_14-1': 'Switch Character closed at the 14-1 save point (Vegeta -> Goku): the world restore\'s black lasts '
+                     '26 frames, sndsim::reload_frames_with predicts 25 (end 6,961,842 cycles, 60,558 short of the '
+                     '26th frame)',
+    'r067_136_14-1': 'Switch Character at 14-1 (Goku -> Vegeta): game 25 black frames, predicted 24 (46,986 short); '
+                     'the same save point\'s Trunks <-> Goten switches (r017_037) predict right with margins 86 k / 50 k',
+    'r044_015_18-1': 'Switch Character at 18-1 (Goku -> Vegeta): predicted 23 black frames, the game 22 (over by '
+                     '>= 21,578 cycles)',
+    'r064_017_21-14': 'Switch Character at 21-14 (Vegeta -> Goku, 4 figures): predicted 15, the game 14 (over by '
+                      '>= 99 k cycles: CHARSEL_CLOSE_SPRITE x 4?)',
+    'r038_002_18-2': 'a heal menu closed in 18-2: predicted 21 black frames 208 cycles before the 22nd',
+    'r047_002_18-13': 'heal menu / Switch Character in 18-13: one frame short',
+}
+
+
+def owner_of(ch, cat):
+    o = OWNER.get(cat, '-')
+    return CHAPTER_OWNER.get(ch, ch) if o.startswith('chapter agent') else o
 
 
 def category(text):
@@ -78,10 +99,20 @@ def cut_one(d):
     return d.name, len(files), cut, tail
 
 
+def run_dirs():
+    """the run dirs in playing order: E1_opening, E2_earth, then 000_ .. (the real run's stretches)"""
+    return sorted((d for d in (REAL / 'runs').iterdir() if d.is_dir()), key=lambda d: (not d.name.startswith('E'), d.name))
+
+
 def do_cut(jobs, only):
     subprocess.run([PY, str(ROOT / 'tools/segments/realrun.py'), 'runs', str(REAL / 'runs')], check=True, cwd=ROOT)
     man = {f'{m["n"]:03d}_{m["name"]}': m for m in json.loads((DATA / 'manifest.json').read_text())}
-    dirs = [d for d in sorted((REAL / 'runs').iterdir()) if d.is_dir() and (not only or d.name[:3] in only)]
+    sys.path.insert(0, str(ROOT / 'tools' / 'segments'))
+    sys.path.insert(0, str(ROOT / 'tools' / 'story_playthrough'))
+    sys.path.insert(0, str(ROOT / 'tools' / 'field'))
+    import realrun
+    man.update(realrun.pre_manifest())
+    dirs = [d for d in run_dirs() if not only or d.name[:3] in only or d.name[:2] in only]
     p = REAL / 'cuts.json'
     cuts = json.loads(p.read_text()) if p.exists() else {}
     with ThreadPoolExecutor(jobs) as ex:
@@ -117,7 +148,7 @@ def extend_one(job):
 
 
 def do_extend(jobs):
-    runs = sorted(d for d in (REAL / 'runs').iterdir() if d.is_dir())
+    runs = run_dirs()
     keys = {d.name: json.loads((d / 'keys.json').read_text())['keys'] for d in runs}
     names = [d.name for d in runs]
     work = []
@@ -211,7 +242,7 @@ def board(jobs):
          'extend`). "not cut" = frames in no segment (the run\'s start up to its first importable entry) - a chapter\'s',
          'frames are counted where its segments start.', '',
          '| chapter | owner | run frames | not cut | segments | exact | frames | matched | % |', '|---|---|---|---|---|---|---|---|---|']
-    order = [c for c in ('ship', 'fat', 'janemba', 'superbuu') if c in chapters]
+    order = [c for c in ('opening', 'earth', 'ship', 'fat', 'janemba', 'superbuu') if c in chapters]
     for k in order + ['**all**']:
         c = tot if k == '**all**' else chapters[k]
         pct = 100.0 * c['matched'] / c['frames'] if c['frames'] else 0.0
@@ -223,6 +254,18 @@ def board(jobs):
         row = [chapters[c]['cats'].get(cat, 0) for c in order]
         if sum(row):
             L.append(f"| {cat} | {OWNER[cat]} | " + ' | '.join(str(x) for x in row) + f' | {sum(row)} |')
+    L += ['', '## Top items per owner', '', 'The five biggest losses each owner can take (unmatched frames; the full list below).', '']
+    by = {}
+    for c, name, r, cat in bad:
+        by.setdefault(owner_of(c, cat), []).append((r['frames'] - r['matched'], r, cat, name))
+    for o in sorted(by, key=lambda o: -sum(x[0] for x in by[o])):
+        items = sorted(by[o], key=lambda x: -x[0])
+        L.append(f"**{o}** - {len(items)} segments, {sum(x[0] for x in items):,} frames lost")
+        L.append('')
+        for lost, r, cat, name in items[:5]:
+            note = NOTES.get(r['segment'])
+            L.append(f"* `{r['segment']}` ({name}, {cat}): {lost:,} lost - {r['first'][:120]}" + (f' **Known:** {note}' if note else ''))
+        L.append('')
     L += ['', '## Biggest losses (unmatched frames)', '', '| segment | stretch | category | lost | first divergence |',
           '|---|---|---|---|---|']
     for c, name, r, cat in sorted(bad, key=lambda b: -(b[2]['frames'] - b[2]['matched']))[:15]:
@@ -248,7 +291,9 @@ def board(jobs):
         L.append('')
         for c, name, r, cat in bad:
             if c == ch:
-                L.append(f"* `{r['segment']}` ({name}): {r['matched']:,} / {r['frames']:,}, **{cat}** - {r['first'][:160]}")
+                note = NOTES.get(r['segment'])
+                L.append(f"* `{r['segment']}` ({name}): {r['matched']:,} / {r['frames']:,}, **{cat}** - {r['first'][:160]}"
+                         + (f' **Known:** {note}' if note else ''))
         L.append('')
     (ROOT / 'engine' / 'docs' / 'scoreboard.md').write_text('\n'.join(L))
     (DATA / 'scoreboard.json').write_text(json.dumps({'tree': head, 'dirty': dirty, 'total': tot, 'chapters': chapters}, indent=1, sort_keys=True))

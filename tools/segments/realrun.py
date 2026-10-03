@@ -4,7 +4,8 @@ usage: realrun.py pack [JOBS]          verify every stretch of CHAIN against its
                                        (replay the keys from the stretch's start state, find the frame where the
                                        game is in the end state) and write data/realrun/NNN_<name>.keys.gz + manifest.json
        realrun.py rebuild OUTDIR [FIRST.ss]   replay the packed logs in order from the first state (default: the
-                                       ship's start, work/ship/real4/start.ss); OUTDIR/NNN_<name>.ss at every stretch
+                                       soft reset + data/story_playthrough/earth_route_keys.json = the ship's start
+                                       work/ship/real4/start.ss); OUTDIR/NNN_<name>.ss at every stretch
                                        end, each checked against the manifest's end status
        realrun.py runs OUTDIR          OUTDIR/NNN_<name>/{start.ss, keys.json}: one rec_segments.py run dir a stretch
                                        (needs the local states)
@@ -171,6 +172,37 @@ def sig_eq(e, want):
     return sig(e) == want
 
 
+# before the ship: the Earth agent's committed route (data/story_playthrough/earth_route_keys.json) from the soft
+# reset of work/states/buu_menus.ss - 'start' = the title, New Game, the Other World opening to Earth 2-1;
+# 'chapter' = Earth to Goku in 7-2 after the World Tournament, whose end is work/ship/real4/start.ss byte for byte
+# (EWRAM, IWRAM, VRAM). Run dirs E1_opening / E2_earth (named to sort as chapters before the ship's 000_).
+PRE = [('opening', 'E1_opening', 'start'), ('earth', 'E2_earth', 'chapter')]
+
+
+def pre_keys():
+    d = json.loads((ROOT / 'data' / 'story_playthrough' / 'earth_route_keys.json').read_text())
+    return {part: unrle(d[part]) for _, _, part in PRE}
+
+
+def pre_runs(out):
+    from route import start_emu
+    keys = pre_keys()
+    e = start_emu('reset')
+    for ch, name, part in PRE:
+        d = out / name
+        d.mkdir(parents=True, exist_ok=True)
+        e.save_file(str(d / 'start.ss'))
+        (d / 'keys.json').write_text(json.dumps({'from': None, 'keys': keys[part]}))
+        for k in keys[part]:
+            e.set_keys(k)
+            e.run(1)
+
+
+def pre_manifest():
+    keys = pre_keys()
+    return {name: {'chapter': ch, 'frames': len(keys[part])} for ch, name, part in PRE}
+
+
 def main():
     a = sys.argv[1:]
     if a[0] == 'pack':
@@ -190,7 +222,17 @@ def main():
         out = Path(a[1]).resolve()
         out.mkdir(parents=True, exist_ok=True)
         man = json.loads((DATA / 'manifest.json').read_text())
-        e = emu(a[2] if len(a) > 2 else W / 'real4/start.ss')
+        if len(a) > 2:
+            e = emu(a[2])
+        else:
+            # from the soft reset: the Earth agent's opening + Earth keys, then the ship's stretches
+            from route import start_emu
+            e = start_emu('reset')
+            for part in pre_keys().values():
+                for k in part:
+                    e.set_keys(k)
+                    e.run(1)
+            print('opening + Earth:', status(e), flush=True)
         for m in man:
             keys = unrle(json.loads(gzip.open(DATA / f'{m["n"]:03d}_{m["name"]}.keys.gz', 'rt').read()))
             for k in keys:
@@ -204,6 +246,7 @@ def main():
                 raise SystemExit(1)
     elif a[0] == 'runs':
         out = Path(a[1]).resolve()
+        pre_runs(out)
         man = json.loads((DATA / 'manifest.json').read_text())
         for m in man:
             d = out / f'{m["n"]:03d}_{m["name"]}'

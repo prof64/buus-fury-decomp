@@ -298,6 +298,20 @@ to end (66,219 / 66,219)**, **ending 4-20 exact to the title (24,101)**, 4-21 (2
 -> Earth agent, db7_041 f765 -> dungeons 5-7 agent (both: allocator exact up to them). Not mine (checked): the red
 gates earth_3_3_4 f1589 / shipr_320_8-45 f938 draw in enemy animation / AI code this round did not touch.
 
+**Real-route cuts (Super Buu agent, 2026-10-03):** `work/ship/sb/i01_21-2.ss` + `sbk_inside_buu_skip.json`
+(36,890 frames) and `m_kid_buu_punched.ss` + `sbk_kid_buu.json` (69,459) recorded with allocator rows
+(`work/superbuu/real/rsb_in.json`, `rsb_kb.json`), cut by `tools/superbuu/mkcuts.py --prefix rsbi / rsbk`: 25 of 33
+exact and gated (`data/segments/rsbi_*`, `rsbk_001_04_20`, `rsbk_002_04_21`), 4 more gated to their stop:
+* `rsbi_003_21_06` 240 (was 176: the Latch's drain hit (`0x08029902`) goes through the player's apply-damage and
+  makes a damage number - fixed); f240 is an enzyme's position (80, 176) vs (168, 280), not looked at.
+* `rsbi_000_21_03` 764 / `rsbi_001_21_04` 483: a freshly spawned Enzyme (type 0x18, spawned on the Blister's spot)
+  takes its first ChasePlayer step straight down in the game (0, +0.5), diagonally in ours (+0.5, +0.33): the path
+  planner (`path.rs` `plan`, `0x0803B6EA`) sees a different enemy grid there - the Blister's mark at the spawn
+  point is the suspect (`SpawnEnzymes` restores it after the free check). Enemy AI with a TS reference: open.
+* `rsbi_016_21_14` 611: a fade frame (black vs not), after Switch Character - the menu agent's area.
+* `rsbi_027_21_25` / `rsbi_028_21_26` stop at f20,555 / f20,387 inside the (first, lost) Kid Buu fight on a sound
+  (`play 50` vs the game's `play 51`): **for the Kid Buu fight agent**. `rsbk_000_04_01` is a refused load kind.
+
 **Claim (dungeon agent A, 2026-10-03, by the coordinator): the Kid Buu fight itself in `sb_041` (21-25).** A works
 with the allocator check off (`SEGMENT_VRAM=0`): the enemy object missing at f21479 and every divergence after it
 through the three phases (Kid Buu's AI / attacks, the Spirit Bomb sequence, the script hand-overs, Uub). The Super

@@ -356,6 +356,11 @@ pub fn running_event(ram: &GbaRam, runner: &StoryHost) -> Option<(u16, u16, [i32
     None
 }
 
+/// the 3D world map (an area whose load makes the flyer)
+fn is_3d(_data: &GameData, to: AreaId) -> bool {
+    (to.world, to.area) == (0, 50)
+}
+
 /// one build of an area entry INSIDE an event (a script's warp): the leader before the load, the event held, the
 /// load as warp 0x77 makes it (the players go idle, EnterArea re-creates them facing down, the on-enter scripts run
 /// nested), then the event continues from its node after the warp (`StoryHost::continue_event`)
@@ -400,42 +405,86 @@ fn build_event_entry(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner:
     // the event holds the field (a load inside it keeps it held)
     w.scene.depth = 1;
     field::set_busy(&mut w, true);
-    // warp 0x77 (wf-script-core natives): the players go idle, the script camera ends, EnterArea
-    w.scene.cam.mode = wf_core::scene::CamMode::Player;
-    w.scene.cam.scroll = None;
-    for s in 0..w.players.len() {
-        if let Some(i) = w.player_idx(s) {
-            wf_core::player::set_idle(&mut w, i);
+    let areat = (to.world, to.area, to.variant);
+    // which load: the node's own warp / warp_fade into this area, or (none in the node) the one before a `jump`
+    let probe = runner.probe_event(&mut w, ev.0, ev.1, ev.2, areat);
+    let fading = match probe {
+        Some((_, 0x76)) => true,
+        Some(_) => false,
+        None if ev.1 == 0 && !is_3d(data, to) => false,
+        None => {
+            notes.push(format!("unsupported: event s{:03} node {}: no warp into {:?} in the node (scene load / return_to_field / an earlier scene's warp_fade)", ev.0, ev.1, areat));
+            let draws = w.rng.calls.wrapping_sub(calls0);
+            return Built { world: w, draws, held: 0, finished: false };
+        }
+    };
+    let mut evs: Vec<Event>;
+    if fading {
+        // warp_fade 0x76: the field's fade-out ends in this frame's post step with the load (no idle draw of its own:
+        // the call made it), its on-enter script nested; the script waits for the fade-in (`Pending::Transition`)
+        if let Some(f) = w.field.as_mut() {
+            f.mode = Mode::FadeOut { k: field::fade_len(4) - 1, to, x, y, facing: Some(0), step: 4 };
+            f.nest_fade = true;
+        }
+        let mut sess = Session { data: data.clone(), world: w, config: Default::default(), prev: [0; wf_core::world::MAX_PLAYERS], outcome: wf_core::battle::Outcome::Running, hook: None, presenter: Default::default() };
+        evs = sess.step_post().to_vec();
+        w = sess.world;
+        w.events.clear();
+    } else {
+        // warp 0x77 (wf-script-core natives): the players go idle, the script camera ends, EnterArea
+        w.scene.cam.mode = wf_core::scene::CamMode::Player;
+        w.scene.cam.scroll = None;
+        for s in 0..w.players.len() {
+            if let Some(i) = w.player_idx(s) {
+                wf_core::player::set_idle(&mut w, i);
+            }
+        }
+        if let Some(f) = w.field.as_mut() {
+            f.nest_load = true;
+        }
+        field::load_area(&mut w, to, x, y, Some(0));
+        if let Some(f) = w.field.as_mut() {
+            f.nest_load = false;
+        }
+        evs = std::mem::take(&mut w.events);
+    }
+    // the event blocked on its load action (warp_fade: until the fade-in ends; warp: until the arrival), the load's
+    // scripts nested over it; a node that began after the load (a jump's scene) runs from its start once they end
+    use wf_script_core::Pending;
+    match probe {
+        Some((k, 0x76)) => {
+            runner.continue_event(&mut w, ev.0, ev.1, ev.2, k, Some(Pending::Transition));
+            runner.nest_over(&mut w, &evs);
+        }
+        Some((k, _)) => {
+            runner.continue_event(&mut w, ev.0, ev.1, ev.2, k, Some(Pending::Arrival));
+            runner.nest_over(&mut w, &evs);
+        }
+        None => {
+            runner.run_nested(&mut w, &evs);
+            runner.continue_event(&mut w, ev.0, ev.1, ev.2, 0, None);
         }
     }
-    if let Some(f) = w.field.as_mut() {
-        f.nest_load = true;
+    let skipped = probe.map(|p| p.0).unwrap_or(0);
+    // a nested on-enter script that blocks holds the load: wf-core plays the held frames (no input) until the leader
+    // arrives (as an exit arrival's, `build_area_entry`)
+    let mut held = 0;
+    let arriving = |w: &World| w.field.as_ref().is_some_and(|f| f.arrival.is_some());
+    if arriving(&w) {
+        let mut sess = Session { data: data.clone(), world: w, config: Default::default(), prev: [0; wf_core::world::MAX_PLAYERS], outcome: wf_core::battle::Outcome::Running, hook: None, presenter: Default::default() };
+        while arriving(&sess.world) && held < 600 {
+            held += 1;
+            runner.step(&mut sess, 0);
+        }
+        w = sess.world;
     }
-    field::load_area(&mut w, to, x, y, Some(0));
-    if let Some(f) = w.field.as_mut() {
-        f.nest_load = false;
-    }
-    // (the 3D world map's arrival is a warp_fade's: its flyer and fade are not rebuilt here)
-    if wf_core::fieldworld::flying(&w) {
-        notes.push(format!("unsupported: event s{:03} node {}: a load of the 3D world map (warp_fade)", ev.0, ev.1));
-        let draws = w.rng.calls.wrapping_sub(calls0);
-        return Built { world: w, draws, held: 0, finished: false };
-    }
-    let evs: Vec<Event> = std::mem::take(&mut w.events);
-    runner.run_nested(&mut w, &evs);
-    let Some(skipped) = runner.continue_event(&mut w, ev.0, ev.1, ev.2, (to.world, to.area, to.variant)) else {
-        notes.push(format!("unsupported: event s{:03} node {}: the load is not a warp 0x77 this import rebuilds (scene load / warp_fade)", ev.0, ev.1));
-        let draws = w.rng.calls.wrapping_sub(calls0);
-        return Built { world: w, draws, held: 0, finished: false };
-    };
-
     // the load frame's end: the cameras (a modal scroll the continuation started takes its step; the script sees it
     // done in the next frame - the game's PC is still in camera_scroll_to at the cut: opening 1-10, s068)
     field::world_mode_cameras(&mut w);
     notes.retain(|n| !n.starts_with("event "));
     notes.push(format!("event s{:03} continues at node {} ({} actions before the cut dropped)", ev.0, ev.1, skipped));
     let draws = w.rng.calls.wrapping_sub(calls0);
-    Built { world: w, draws, held: 0, finished: true }
+    Built { world: w, draws, held, finished: true }
 }
 
 /// Import a real-game state (work RAM) as a wf-core World ready to continue from the next logic frame.

@@ -216,41 +216,111 @@ impl StoryHost {
         g.iter().find(|(_, n)| matches!(n, wf_script_rhai::GNode::Code { .. }) && nx(n) == Some(next)).or_else(|| g.iter().find(|(_, n)| nx(n) == Some(next))).map(|(k, _)| *k)
     }
 
-    /// Import: continue event `event` from graph node `node` as the game runs it at an area entry inside the event.
-    /// The node's handler queues its actions; those up to and including the load into `area` (warp 0x76 / 0x77 with
-    /// that target) ran before the cut and are dropped; with no such load in the node it started after the load
-    /// (a `jump` into a new scene): all of it runs now. Returns the actions dropped; None = not a load this import
-    /// rebuilds (only warp 0x77, or node 0 of a scene a jump entered after one)
-    pub fn continue_event(&mut self, w: &mut World, event: u16, node: u16, params: [i32; 4], area: (i32, i32, i32)) -> Option<usize> {
+    /// Import: where event `event`'s node `node` stands relative to the load into `area`: its handler runs with
+    /// every queued action dropped unexecuted (queries answer from `w`) until a warp (0x77) / warp_fade (0x76) into
+    /// `area` is queued: Some((actions before it, native)); None = the node has no such load (it began after it: the
+    /// first node of a scene a `jump` entered). The thread is left as it was.
+    pub fn probe_event(&mut self, w: &mut World, event: u16, node: u16, params: [i32; 4], area: (i32, i32, i32)) -> Option<(usize, u8)> {
+        let saved = self.rt.state();
+        let mut g = self.rt.globals();
+        g.g = w.story.g;
+        self.rt.set_globals(g);
+        self.rt.start_event_at(event, node, params);
+        let mut done = 0usize;
+        let mut out = None;
+        for _ in 0..64 {
+            self.rt.with_thread(|t| t.hold_queue = true);
+            let st = self.with_host(w, |rt| rt.run().map_err(|e| e.to_string()));
+            let (found, n, held) = self.rt.with_thread(|t| {
+                let f = t.queue.iter().enumerate().find_map(|(k, a)| match a {
+                    wf_script_rhai::Act::Native { native: n @ (0x76 | 0x77), args, .. } if args.len() >= 3 && (args[0], args[1]) == (area.0, area.1) && (args[2] == area.2 || args[2] == 0) => Some((k, *n)),
+                    _ => None,
+                });
+                (f, t.queue.len(), t.blocked.is_none() && !t.queue.is_empty())
+            });
+            if let Some((k, n)) = found {
+                out = Some((done + k, n));
+                break;
+            }
+            // (the node only goes past its queue by running through it; a frame-spanning wait the probe cannot pass)
+            if st.is_err() || !held || self.rt.with_thread(|t| t.frames.iter().all(|f| !matches!(f, wf_script_rhai::Frame::Event { event: e, node: nd, .. } if *e == event && *nd == node))) {
+                break;
+            }
+            done += n;
+            self.rt.with_thread(|t| {
+                t.hold_queue = false;
+                t.skip = n;
+            });
+        }
+        self.rt.restore(saved);
+        out
+    }
+
+    /// Import: continue event `event` from graph node `node` after the load into `area` (see `probe_event`): `skip`
+    /// actions dropped (the game ran them), then the node runs on until its first wait; `blocked` = the load action
+    /// itself is the one waiting (a warp_fade's: `Pending::Transition`, its fade-in still to run)
+    pub fn continue_event(&mut self, w: &mut World, event: u16, node: u16, params: [i32; 4], skip: usize, blocked: Option<wf_script_core::Pending>) {
         let mut g = self.rt.globals();
         g.g = w.story.g;
         self.rt.set_globals(g);
         self.hs.in_unit = false;
         self.rt.start_event_at(event, node, params);
-        self.rt.with_thread(|t| t.hold_queue = true);
-        let st = self.with_host(w, |rt| rt.run().map_err(|e| e.to_string()));
-        if let Err(e) = st {
-            self.errors.push(e);
-            return None;
-        }
-        let found = self.rt.with_thread(|t| {
-            t.hold_queue = false;
-            t.queue.iter().enumerate().find_map(|(k, a)| match a {
-                wf_script_rhai::Act::Native { native: n @ 0x70..=0x77, args, .. } if args.len() >= 3 && (args[0], args[1], args[2]) == area => Some((k, *n)),
-                _ => None,
-            })
-        });
-        let skip = match found {
-            Some((k, 0x77)) => k + 1,
-            None if node == 0 => 0,
-            _ => return None,
-        };
-        self.rt.with_thread(|t| t.skip = skip);
         self.started.push((self.frame, format!("s{event:03}@{node}")));
         self.cause = None;
+        if let Some(pending) = blocked {
+            // run the handler(s) up to the load action without executing anything, then block on it
+            let mut left = skip;
+            for _ in 0..64 {
+                self.rt.with_thread(|t| t.hold_queue = true);
+                let st = self.with_host(w, |rt| rt.run().map_err(|e| e.to_string()));
+                if st.is_err() {
+                    break;
+                }
+                let n = self.rt.with_thread(|t| t.queue.len());
+                if n > left {
+                    self.rt.with_thread(|t| {
+                        t.hold_queue = false;
+                        for _ in 0..left {
+                            t.queue.pop_front();
+                        }
+                        t.blocked = t.queue.pop_front();
+                    });
+                    self.hs.pending = Some(pending);
+                    self.running = true;
+                    return;
+                }
+                left -= n;
+                self.rt.with_thread(|t| {
+                    t.hold_queue = false;
+                    t.skip = n;
+                });
+            }
+            return;
+        }
+        // (actions in later handler steps: dropped as the steps queue them)
+        self.rt.with_thread(|t| t.skip = skip);
         let st = self.with_host(w, |rt| rt.run().map_err(|e| e.to_string()));
         self.finish(w, st);
-        Some(skip)
+    }
+
+    /// a load's scripts run nested over the blocked script that made the load (import: `nest_loads` for an imported
+    /// warp); a warp's `Pending::Arrival` returns when they end (at once without any)
+    pub fn nest_over(&mut self, w: &mut World, evs: &[Event]) {
+        let runs: Vec<Job> = evs.iter().filter_map(|e| match e {
+            Event::Field(FieldEvent::Run { run, cause, .. }) => Some(Job { run: run.clone(), cause: cause.clone() }),
+            _ => None,
+        }).collect();
+        if !runs.is_empty() {
+            let o = Outer { thread: self.rt.state(), pending: self.hs.pending.take(), from_wait: std::mem::take(&mut self.hs.from_wait), cause: self.cause.take() };
+            self.outer.push(o);
+            self.running = false;
+            for j in runs.into_iter().rev() {
+                self.queue.push_front(j);
+            }
+            self.run_queue(w);
+        } else {
+            self.resume_outer(w);
+        }
     }
 
     /// run a load's scripts nested inside a script (import of a warp inside an event): the field stays held when they

@@ -1,6 +1,6 @@
 # Parity scoreboard: the real playthrough on wf-core
 
-Tree: `8c91aff` + uncommitted engine changes. Regenerate: `.venv/bin/python tools/segments/scoreboard.py`
+Tree: `470633b` + uncommitted engine changes. Regenerate: `.venv/bin/python tools/segments/scoreboard.py`
 (the cuts: `scoreboard.py cut`, local under `work/real/`; the run itself: `tools/segments/realrun.py`, §"How to replay
 the real run" in `engine/docs/segments.md`). A segment = the real game from one importable area entry (an exit
 arrival with nothing running) to the next; an entry by a script warp / in a cutscene is not a cut - its frames
@@ -10,22 +10,21 @@ frames are counted where its segments start.
 
 | chapter | owner | run frames | not cut | segments | exact | frames | matched | % |
 |---|---|---|---|---|---|---|---|---|
-| ship | ship agent | 398,194 | 2,578 | 338 | 335 | 395,616 | 353,337 | 89.3 |
-| fat | dungeon agents A / B (+ ship agent: Thieves Den, Pilaf) | 388,646 | 8,440 | 371 | 358 | 380,206 | 316,560 | 83.3 |
+| ship | ship agent | 398,194 | 2,578 | 338 | 336 | 395,616 | 385,691 | 97.5 |
+| fat | dungeon agents A / B (+ ship agent: Thieves Den, Pilaf) | 388,646 | 8,440 | 371 | 361 | 380,206 | 319,265 | 84.0 |
 | janemba | side-content agent | 199,703 | 12,412 | 255 | 244 | 187,291 | 173,534 | 92.7 |
-| superbuu | Super Buu agent | 478,729 | 11,028 | 448 | 399 | 467,701 | 306,432 | 65.5 |
-| **all** |  | 1,465,272 | 34,458 | 1412 | 1336 | 1,430,814 | 1,149,863 | 80.4 |
+| superbuu | Super Buu agent | 478,729 | 11,028 | 448 | 399 | 467,701 | 307,629 | 65.8 |
+| **all** |  | 1,465,272 | 34,458 | 1412 | 1340 | 1,430,814 | 1,186,119 | 82.9 |
 
 ## Non-exact segments by category
 
 | category | owner | ship | fat | janemba | superbuu | all |
 |---|---|---|---|---|---|---|
-| sound | Earth agent (sound timing) / audio | 0 | 1 | 1 | 1 | 3 |
-| RNG | chapter agent (who draws first: enemy AI / hits) | 2 | 3 | 3 | 15 | 23 |
-| script / text | cutscene / script-host agent | 0 | 3 | 0 | 0 | 3 |
-| screen fade | cutscene / script-host agent | 1 | 0 | 3 | 3 | 7 |
-| camera | chapter agent (camera scroll) | 0 | 3 | 1 | 5 | 9 |
-| animation | chapter agent | 0 | 1 | 0 | 1 | 2 |
+| sound | Earth agent (sound timing) / audio | 1 | 1 | 1 | 1 | 4 |
+| RNG | chapter agent (who draws first: enemy AI / hits) | 0 | 3 | 3 | 16 | 22 |
+| screen fade | cutscene / script-host agent | 0 | 0 | 3 | 3 | 6 |
+| camera | chapter agent (camera scroll) | 1 | 3 | 1 | 5 | 10 |
+| animation | chapter agent | 0 | 1 | 0 | 0 | 1 |
 | position / facing | chapter agent (enemy AI / knockback) | 0 | 2 | 2 | 23 | 27 |
 | object set | chapter agent (spawns / removal) | 0 | 0 | 1 | 1 | 2 |
 
@@ -34,29 +33,27 @@ frames are counted where its segments start.
 | segment | stretch | category | lost | first divergence |
 |---|---|---|---|---|
 | `r069_168_14-1` | 069_k05_vegeta150 | screen fade | 55,418 | Some((438, "fade: black false vs game true")) |
-| `r000_328_8-66` | 000_ship_c14 | screen fade | 29,134 | Some((18226, "fade: black true vs game false")) |
 | `r033_002_6-1` | 033_x05_s026 | RNG | 27,271 | Some((9545, "rng: [c2d3b888, 84363a11] vs game [2238ed2a, 1a9ae680]")) |
 | `r062_001_20-6` | 062_m_inside_buu | object set | 24,004 | Some((2173, "missing: obj #26 sprite 280 has no entity (ours there: sprite Some(282))")) |
 | `r052_006_6-9` | 052_m_gotenks | RNG | 19,801 | Some((4688, "rng: [ee2b9523, 199f850f] vs game [e968d49b, 3a47d41c]")) |
 | `r002_006_4-1` | 002_d04_bandana | animation | 18,573 | Some((1763, "anim: #122 sprite 269: raw 17 cel 0 vs game raw 17 cel 3 tick 223")) |
-| `r000_002_7-2` | 000_ship_c14 | RNG | 12,911 | Some((6948, "rng: [519aa3ad, ce1d7ce0] vs game [9a7b1cfe, ed65a3eb]")) |
 | `r061_004_20-5` | 061_g05_goku141 | sound | 11,191 | Some((5251, "snd: [] vs game [\"play 41 32\"]")) |
 | `r009_006_4-1` | 009_d16_desert | camera | 9,089 | Some((458, "cam: (36.2890625, 509.953125) vs game (36.3359375, 509.943359375)")) |
 | `r052_004_1-5` | 052_m_gotenks | camera | 8,527 | Some((11575, "cam: (0, 44) vs game (0.375, 43.71875)")) |
+| `r000_328_8-66` | 000_ship_c14 | sound | 8,516 | Some((38844, "snd: [] vs game [\"play 54 64\"]")) |
 | `r064_029_21-26` | 064_m_kid_buu_saga | camera | 7,777 | Some((12784, "cam: (37.1884765625, 502.986328125) vs game (37.208984375, 502.9853515625)")) |
 | `r040_021_18-10` | 040_h_maze | position / facing | 6,977 | Some((568, "pos: #95 sprite 229: (225.5, 244) vs game (225, 244)")) |
-| `r057_066_14-1` | 057_g03_gohan141 | animation | 5,021 | Some((2306, "anim: #246 sprite 123: raw 1 cel 1 tick 255 vs game raw 1 cel 0 tick 256")) |
+| `r057_066_14-1` | 057_g03_gohan141 | RNG | 3,824 | Some((3503, "rng: [2203fea3, a2a3ad3b] vs game [140b8563, e41e1348]")) |
 | `r069_161_14-2` | 069_k05_vegeta150 | position / facing | 2,008 | Some((166, "pos: #3 sprite 256: (89.8203125, 130.578125) vs game (91.8203125, 130.578125)")) |
 | `r069_125_14-2` | 069_k05_vegeta150 | RNG | 1,925 | Some((87, "rng: [5f0fda5a, 018eaccf] vs game [60553a04, 72fd0483]")) |
+| `r067_071_14-2` | 067_k03_goku158 | camera | 1,722 | Some((693, "cam: (36.1904296875, 126.6875) vs game (36.4619140625, 126.919921875)")) |
 
 ## Recurring first divergences (3+ segments)
 
-* 23 x `rng`: `r000_002_7-2`, `r000_320_8-45`, `r012_020_12-27`, `r017_009_13-45`, `r033_002_6-1`, `r036_002_1-5`, `r037_084_18-1`, `r046_045_18-2` ...
+* 22 x `rng`: `r012_020_12-27`, `r017_009_13-45`, `r033_002_6-1`, `r036_002_1-5`, `r037_084_18-1`, `r046_045_18-2`, `r052_006_6-9`, `r057_011_14-2` ...
 * 19 x `pos sprite 256`: `r057_005_14-2`, `r057_013_14-2`, `r057_015_14-2`, `r057_021_14-2`, `r057_059_14-2`, `r069_003_14-2`, `r069_013_14-2`, `r069_021_14-2` ...
-* 9 x `cam`: `r002_004_4-1`, `r004_022_9-1`, `r009_006_4-1`, `r038_001_18-1`, `r052_004_1-5`, `r061_017_20-6`, `r061_019_20-6`, `r064_029_21-26` ...
+* 10 x `cam`: `r000_002_7-2`, `r002_004_4-1`, `r004_022_9-1`, `r009_006_4-1`, `r038_001_18-1`, `r052_004_1-5`, `r061_017_20-6`, `r061_019_20-6` ...
 * 4 x `fade: black false vs game true`: `r038_002_18-2`, `r047_002_18-13`, `r067_136_14-1`, `r069_168_14-1`
-* 3 x `fade: black true vs game false`: `r000_328_8-66`, `r044_015_18-1`, `r064_017_21-14`
-* 3 x `text: game opens a text box: false, ours: true`: `r002_005_0-92`, `r009_005_0-92`, `r029_001_0-92`
 
 ## Every non-exact segment
 
@@ -64,24 +61,20 @@ segment (stretch): matched / frames, category - first divergence
 
 ### ship
 
-* `r000_002_7-2` (000_ship_c14): 6,948 / 19,859, **RNG** - Some((6948, "rng: [519aa3ad, ce1d7ce0] vs game [9a7b1cfe, ed65a3eb]"))
-* `r000_320_8-45` (000_ship_c14): 938 / 1,172, **RNG** - Some((938, "rng: [93217d54, f54049f0] vs game [3c58fa55, ac05cb92]"))
-* `r000_328_8-66` (000_ship_c14): 18,226 / 47,360, **screen fade** - Some((18226, "fade: black true vs game false"))
+* `r000_002_7-2` (000_ship_c14): 18,450 / 19,859, **camera** - Some((18475, "cam: (37.44140625, 102.95703125) vs game (37.419921875, 102.9599609375)"))
+* `r000_328_8-66` (000_ship_c14): 38,844 / 47,360, **sound** - Some((38844, "snd: [] vs game [\"play 54 64\"]"))
 
 ### fat
 
 * `r002_004_4-1` (002_d04_bandana): 679 / 1,530, **camera** - Some((741, "cam: (37.5556640625, 512.0166015625) vs game (37.642578125, 512.0224609375)"))
-* `r002_005_0-92` (002_d04_bandana): 156 / 1,023, **script / text** - Some((156, "text: game opens a text box: false, ours: true"))
 * `r002_006_4-1` (002_d04_bandana): 1,763 / 20,336, **animation** - Some((1763, "anim: #122 sprite 269: raw 17 cel 0 vs game raw 17 cel 3 tick 223"))
 * `r003_090_8-1` (003_d06_thieves): 2,769 / 3,199, **sound** - Some((2769, "snd: [] vs game [\"play 40 64\"]"))
 * `r004_022_9-1` (004_d10_map): 1,580 / 2,671, **camera** - Some((1605, "cam: (80.8525390625, 0) vs game (80.6982421875, 0)"))
-* `r009_005_0-92` (009_d16_desert): 156 / 1,066, **script / text** - Some((156, "text: game opens a text box: false, ours: true"))
 * `r009_006_4-1` (009_d16_desert): 396 / 9,485, **camera** - Some((458, "cam: (36.2890625, 509.953125) vs game (36.3359375, 509.943359375)"))
 * `r012_014_12-19` (012_db5_a01): 1,493 / 3,122, **position / facing** - Some((1493, "pos: #27 sprite 188: (294.08984375, 121.76171875) vs game (294.38671875, 122.05859375)"))
 * `r012_020_12-27` (012_db5_a01): 1,856 / 3,411, **RNG** - Some((1856, "rng: [942926ee, 25aeea64] vs game [de77fbf0, 756a9e8f]"))
 * `r017_009_13-45` (017_db6_fukurou): 270 / 519, **RNG** - Some((270, "rng: [241c8739, 76b433d9] vs game [1824eac4, 5b21630a]"))
 * `r017_022_13-47` (017_db6_fukurou): 225 / 428, **position / facing** - Some((225, "pos: #4 sprite 238: (351.90625, 207.46875) vs game (347.90625, 203.46875)"))
-* `r029_001_0-92` (029_x01_city): 156 / 1,084, **script / text** - Some((156, "text: game opens a text box: false, ours: true"))
 * `r033_002_6-1` (033_x05_s026): 9,545 / 36,816, **RNG** - Some((9545, "rng: [c2d3b888, 84363a11] vs game [2238ed2a, 1a9ae680]"))
 
 ### janemba
@@ -110,7 +103,7 @@ segment (stretch): matched / frames, category - first divergence
 * `r057_031_14-2` (057_g03_gohan141): 564 / 864, **RNG** - Some((564, "rng: [7d11f712, 74a63311] vs game [0b7b8092, a01ff008]"))
 * `r057_035_14-2` (057_g03_gohan141): 626 / 914, **RNG** - Some((626, "rng: [e2c5877d, 6e8ce462] vs game [8b1da78c, f1845cae]"))
 * `r057_059_14-2` (057_g03_gohan141): 650 / 1,800, **position / facing** - Some((650, "pos: #4 sprite 256: (180.078125, 200.984375) vs game (179.28125, 200.984375)"))
-* `r057_066_14-1` (057_g03_gohan141): 2,306 / 7,327, **animation** - Some((2306, "anim: #246 sprite 123: raw 1 cel 1 tick 255 vs game raw 1 cel 0 tick 256"))
+* `r057_066_14-1` (057_g03_gohan141): 3,503 / 7,327, **RNG** - Some((3503, "rng: [2203fea3, a2a3ad3b] vs game [140b8563, e41e1348]"))
 * `r061_004_20-5` (061_g05_goku141): 5,251 / 16,442, **sound** - Some((5251, "snd: [] vs game [\"play 41 32\"]"))
 * `r061_017_20-6` (061_g05_goku141): 897 / 1,183, **camera** - Some((911, "cam: (32, 80.9140625) vs game (32, 80)"))
 * `r061_019_20-6` (061_g05_goku141): 841 / 1,135, **camera** - Some((855, "cam: (21, 80.796875) vs game (21, 80.7060546875)"))
@@ -149,13 +142,3 @@ segment (stretch): matched / frames, category - first divergence
 * `r069_161_14-2` (069_k05_vegeta150): 166 / 2,174, **position / facing** - Some((166, "pos: #3 sprite 256: (89.8203125, 130.578125) vs game (91.8203125, 130.578125)"))
 * `r069_167_14-2` (069_k05_vegeta150): 623 / 914, **RNG** - Some((623, "rng: [4f5723e8, edd9719e] vs game [bffb91c7, cb05f4c1]"))
 * `r069_168_14-1` (069_k05_vegeta150): 413 / 55,831, **screen fade** - Some((438, "fade: black false vs game true"))
-
-## Note from dungeon agent A: in-event entries (2026-10-03)
-
-`wf-import` now imports one kind of area entry **inside a running event**: a script's immediate warp (native 0x77),
-including the first node of a scene a `jump` enters after such a warp (proof: the opening's 1-1 and 1-10, gates
-`ow_ev_1_1` / `ow_ev_1_10`; the real Kid Buu fight's entry into 19-3). Cut them with `rec_segments.py ... --events`
-(or `segment.py cut` at the entry). The other in-event kinds are still refused with `import: unsupported cut: ...`:
-`return_to_field` (0x75: the restored field is a mid-area state - its objects keep their pre-scene state),
-scene loads (0x72 .. 0x74), `warp_fade` (0x76) and the 3D world map. Re-cut with `--events` now for the warp kind;
-A will add a line here as each further kind lands.
