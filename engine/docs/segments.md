@@ -456,6 +456,35 @@ ids / animation indices need the ROM's sprite-def tables: the recording's `init.
 (`GbaRam.actor_rows`). The event: blocked in the return's fade-in phase (`Pending::Phases`, fade started at the
 cut). Proof - the real route's Kid Buu run, cut with `--events`: **9 / 14 cuts exact**, the eight `return_to_field`
 ones gated (`rkb_003`, `004`, `005`, `006`, `007`, `009`, `010`, `011`: up to 2,000 frames each, allocator check on).
+Increment 5 (A): **events mid-node, follow camera, cutscene maps** - the scoreboard can cut every N frames
+(§"Scoreboard"). Measured on the real Kid Buu fight (`kbr_002`, 24 cuts every 1,000 frames, 600 frames each):
+**17 / 24 exact** (was 1 / 8 at every 3,000).
+* **Text box state** (`build_mid_event`): an event standing at a node with no load in it runs over a standing field:
+  the area loaded at the leader, `field_from_ram`, the leader's state, the node restarted (a text node opens its
+  box), then the box set from RAM - the box object (vt 0x08049F60, ctor 0x08012030): +0x10 text, +0x14 typing
+  pointer (u16 units; one character a frame, the space a line wrap skips rides along); its +0x1C / +0x20 count the
+  game's own lines / scroll, **not** our A-wait pages, so the page and characters typed come from our line fitter
+  (`wf_script_core::text::typed_at`). **Closing**: the box object shows nothing of it - the last page typed out and
+  an A press (input ring 0x03003300 +0x88 stamps vs the counter 0x03000F94) within `DIALOG_CLOSE` frames -> Closing
+  with t = frames since the press. Its sprite blocks: +0x78 / +0x7A / +0x7C text, +0x7E portrait (imported as
+  `Owner::Text` / `TextPortrait`: as foreign blocks the next box purged the leader).
+* **An event that started inside the object pass** (a defeat callback / hook run inline: the world list's update
+  return 0x08011A5F on the stack under the VM) holds that frame: `held_event` set, so its end runs the frame's
+  remaining updates (f12000: Kid Buu's Selector re-evaluates in s459's exit frame). The same marker sends an event
+  in its **node 0** with no load to the mid-node import instead of the area-entry fallback (the opening 1-10 and
+  `rkb_001` entries have no such frame on the stack).
+* **Playerless cutscene maps** (s462 on 0-19, players offstage): `send_offstage`, `load_area_with`, the map's actors
+  from RAM, the node and box as above (f24000 exact).
+* **BG energy sphere** (`show_energy_sphere` 0xF4): the effect slot 0x03001990 -> object vt 0x080493B4 (+0xA the
+  4th argument, +0xB radius, +0x10 / +0x14 centre) -> `VisualKind::EnergySphere` (its radius - 3 jitter draws a
+  frame; f21000).
+* **Follow camera**: with no event running nothing holds the camera (the "fixed if not where following puts it" rule
+  applies only at depth > 0: a camera still easing toward the leader follows on); mid-node, a camera within 16 px of
+  the follow target is the player camera (INFERRED; the return cuts keep the old rule - `kbr_011`'s script camera
+  sits a fraction of a pixel off).
+* Left (7 / 24): an event **stopped inside a code node** - a script's walk / animation / screen shakes running (s457
+  n60, s458 n0, s459 n0, s460 n0, s461 n2 / n18) or a walk from an earlier node still running under a text box (s457
+  n17, f16000): needs the interpreter's position inside the node and the running commands' state from RAM.
 Increment 4 (A):
 * **`kbr_012` settled - not a host rule**: the game keeps the actors at s463 node 66's `load_scene_fade` because
   nothing armed a field save there; ours was armed by the *import*: the probe / placement replay node 64's handler,
@@ -840,11 +869,28 @@ whose end is the ship route's start byte for byte (EWRAM / IWRAM / VRAM); `realr
 Tools for a divergence: `tools/segments/segrows.py SEG.json [A B] [fields]` (the recorded rows where they change),
 `tools/segments/romdis.py ADDR [N]` (Thumb disassembly with literal pools).
 
+**Any-frame cuts are ready (dungeon agent A, 2026-10-03)** - the board can cut the real run every N frames, not only
+at area entries: `tools/segments/segment.py cut --from REC --at FRAME --frames N` (or `tools/dungeons/midcuts.sh
+SRC.json OUTDIR LEN F1 F2 ...`) and replay as usual. What imports (§6, "Increment 5"): any frame with no event
+running; an event standing at a **text node** (box open, typing, waiting for A, or closing), on a standing field or a
+playerless cutscene map; an event that loaded its area (warp / warp_fade / 3D map / return_to_field). Measured on
+the real Kid Buu fight (24 cuts, one every 1,000 frames, 600 frames each): **17 / 24 exact**. Still refused or
+diverging at once: an event **stopped inside a code node** (a script's walk / animation / screen shake running at
+the cut - 7 of the 24; the script's position inside the node is not read from RAM yet). Suggest: cut every N
+frames, report the "imports at all" rate separately from "exact", and keep the area-entry segments as they are.
+
 Fixed from the board (2026-10-03): **message windows** (event node kind 3) fade in / out only when the current
 BLDCNT has no first-target layer (`0x08030ED2`: then BLDCNT := 0x3E41 and BLDALPHA is ramped 16 steps by the
 callback 0x08030BF5); the event continues 17 frames after the closing A instead of 2 (`scene::window_fades`, map
 property `bldcnt`, `MapDef.bldcnt`): the West City Z-Mart (0-92, map BLDCNT 0x1040) - three identical failures - now
 exact; event 34's lockstep scenario (1-1, 0x1041) keeps its 2.
+
+Also fixed from the board: **a pause menu's frames advance the game clock** 0x03000F94 (`menu::step`): an enemy's
+`IfTimeInState(90)` reads it, so after a heal menu Majin Buu's hit tree (state 0xB3) takes its 60% branch (0-21,
+r033_002_6-1: 9,904 -> 24,002). **An enemy's on-defeat callback** (a unit script, `StoryState::defeat_job`) that shows
+or hides a map prop in its first run (the frame the enemy dies) finishes that command a frame later, so the next
+queued job (the drop script) is a frame later too (0-55's bandits, r002_006_4-1: 4,178 -> 10,596); an event callback,
+or a prop command after a wait, is unaffected (gated ow_1_15, sb_041, db6_009 / db6_023 stay exact).
 
 **Dungeon agents, note:** `re/buu/ship/ship_driver.py` (the base of your drivers) changed on 2026-10-03 - Ghosts
 are no longer hunted (blasted / punched only when visible and in the way), a Vampire's grab is mashed out of, the
@@ -1466,10 +1512,26 @@ two Python hash seeds, gives identical key logs (13,000 frames); the earlier run
   `pg_hidden_015_02_44` (425), `pg_hidden_017_02_46` (119), `pg_heaven_001_06_02` (196), `pg_heaven_002_06_14`
   (336), `pg_xj6_000_12_02` (565), `pg_xj6_025_12_27` (892), `pg_xj6_051_12_02` (211), `pg_xj6_052_12_01` (264) -
   each at its allocator-on length (exact to the end with `SEGMENT_VRAM=0`).
-* **For the dungeon B agent (airship shooters):** XJ-6's 12-3 f165 (`work/side/pgseg/xj6/pg_xj6_001_12_03`): an
-  enemy shot (shots kind 11, from the type-140 shooter at (275, 525)) hits our Goku walking up past it (a draw, his
-  facing turns) and misses the game's; the same rooms' 12-20 f405, 12-9 f117, 12-8 f89 stop at the same kind of
-  thing. XJ-5's rooms are yours - probably one shot-vs-player rule.
+* Airship rules (side-content agent, field only): an energy wave (0x0802A2EC: the turret's / cyborg's / soldier's) is
+  frozen while a script holds the field - its message-0xC handler runs the update with the "live" flag clear (no
+  move, growth, wall or hit test; 12-3: the lift's inline script); TurretClose makes the turret hittable at its
+  end, not its start (12-20: a punch into the gun coming out passes through). XJ-6 now 39 / 53 exact; 12-9 f117 is
+  the game recorder counting a flame-breath piece (object kind 0x0804BFCC, its +0x1A0 holds a pointer) as an
+  actor - a harness misread, not a rule.
+* Exhibit hand-ins (leg `cafe`, from XJ-6's end): the Hercule Cafe 3-20 (s170, A inside (121, 209, 63, 39)) - the
+  first talk only tells the story (flag 19), each later "Yes" takes one exhibit (flag bits 341 count them): the
+  real start's exhibit 65 and XJ-6's 58 handed in; 3-2 / 3-20 cuts exact. The Z-Fighter Museum 4-23 (s189, same
+  scheme, bits 346; leg `museum` from the hidden dungeon's end): not done - Gohan, with no supplies, dies on the way
+  back at 2-35 (an Ultra Bio Mech-class beast, type 0x13, 12,248 HP, beside the rock that is back after every
+  reload: punch it again from the east at (282, 136) facing left). Needs heal items bought first.
+* Instant Transmission picks (shared rule): a trigger answers the pick when its activation's vt+8 says "A pressed" -
+  the 0x0802266F activation and the plain A-button one (0x0800770D, vt+8 0x080076F5: the same code). HFIL 18-10's
+  centre switch is an A-button trigger: the real route's maze IT (`r040_021_18-10`) picked it, ours went idle. The
+  A-facing activation (0x0800774F) adds a facing test in vt+8 - not seen in a pick, not taken.
+* The Janemba Hand's second strike (HandSink) sinks on through an event (its one-shot controller ticks in the
+  object's held update): real route 18-10, the switch scene - the hand is in its walk state when the scene ends.
+  With the two rules `r040_021_18-10` (the scoreboard's biggest side row, 6,977 lost) is exact: 7,545 / 7,545.
+
 * Gate mechanics as recorded: a gate is an A-button script trigger (s517's 8-2 / 11-1 rects also want facing up);
   the position (footprint top-left) must be inside the rect - stand up against it; s518's open_area leaves a
   32-px opening (2-33: x 216..248), so a character beside it stays blocked by the posts.
@@ -2072,3 +2134,38 @@ real load reused, and 14-21's bridge props started from the shrine's positions (
 *Web shell:* launcher Settings row "Original pacing" (shared Rust launcher, both shells); `wf_app_set_pacing` export
 in wf-web, applied from the saved settings by `web/app/app.js`. `web/app/wf_web.wasm` needs a rebuild
 (`web/app/build.sh`) to carry the export; app.js calls it optionally, so the current artifact keeps working.
+
+**§11 update 9 (B): Earth past 4-25; dungeons 1-4 in the app; the arc master's join.**
+*Arc master* (`arc_master.json`, 4-20 to dbx_end): the recording itself left the real route inside stretch 003
+(Thieves Den): it matches the manifest exactly at the end of 002 (row 23,118) and drifts after - the keys are right
+(packed = manifest = run lengths for all stretches), the continuous replay is not the per-stretch start states
+(481 IWRAM bytes differ at 003's start: the stretches were packed from separately recorded runs). So the West City
+"row 2,285 stop" is not an app bug: per-stretch masters are the checkpoints now (`work/db57/scratch/
+stretch_masters.sh`: `m_<run>.json` from each stretch's first cut to its end, ending in the stretch's own end area).
+*Dungeons 1-4 in the app (per-stretch masters):*
+| stretch | rows | result |
+|---|---|---|
+| 007 Pilaf's Castle (after the fight) | 11,163 | all rows match |
+| 010 Diablo Desert | 19,273 | all rows match |
+| 027 Nataday / Broly (15-33 -> Broly 15-32 -> 15-19) | 37,331 | all rows match (after the rock fix below) |
+| 028 after Broly (to 0-50) | 13,044 | all rows match |
+| 003 Thieves Den | 92,783 | to row 699: a heal-item menu (opened row 373) closes one frame early in the app (menu timing, Earth agent's close model) |
+*Fixed (core, field only):* **Broly's rocks.** BrolySpawnRocks (0x08035F81) spawns on *enter* (Broly's initial state
+0x33, i.e. with Broly at the load) and each rock object holds a 0x1000-byte tile block: the game's 15-32 allocator at
+the entry has the three blocks right below Broly's, before the player's and HUD's. Ours spawned them in the first
+update and without tiles; the portrait text box that follows then purged differently, Broly kept his place in the
+update list (the game's purge-and-restore puts him last, so he plans his chase from the player's *previous*
+position), and his chase line differed by 1/256 px from row 29,388 -> a hit the game never took. Now the allocator
+matches the game's at the entry block for block and the whole stretch is exact. Battles keep the update-time spawn
+(the TypeScript reference); cross_ts untouched.
+*Earth soak past 4-25:* fixed on the way (core): **the story form countdown (form 24/25, player form object +0xC) does
+not tick while an AI inline script commands the player** (emulator trace `work/db57/scratch/storycnt.py`: Trunks'
+countdown holds at 200 from Vegeta's first play_anim to the frame he is let go, then ticks in that frame) - ours ran on
+and Trunks reverted at row 140,040 in the app. The Earth soak now follows the real route to **row 149,694** (7-2, after
+the tournament). Stop there (Earth agent's open 7-2 item, harness `e_7_2_1` f1432 is the same area): at row 149,695
+(cut frame 2007) the game draws one extra RNG value from an actor's idle re-enter (0x0800A2A8 wander step ->
+vt+0x18 -> 0x0800A446 -> SetState 0x0800ED18 -> 0x08011162 re-enter, idle rand(255)); ours draws only the wanders'
+chance. Trace: `tools/segments/rngcalls.py work/earth/segs/e_7_2_1.json work/segments/e_7_2_1.ss 2003 2008`.
+*Soak tooling:* `--dump-at A..B` (leader record, enemies, `SOAK_AI=1` node runtimes), `--diff-seg FILE` or
+`--diff-seg @LIST` (ROW=FILE,..): the app's world vs a fresh import of that cut (enemy / walk grids, enemies, list
+order, tile allocator owners).

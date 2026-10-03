@@ -406,6 +406,8 @@ impl StoryHost {
             let from = w.events.len();
             let depth = self.outer.len();
             let st = self.with_host(w, |rt| rt.run().map_err(|e| e.to_string()));
+            // (only the callback's first run, the frame its enemy dies: a prop command after a wait is a plain one)
+            self.hs.defeat_job = false;
             self.finish(w, st);
             self.nest_loads(w, from);
             if self.outer.len() < depth {

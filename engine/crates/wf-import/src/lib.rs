@@ -859,8 +859,14 @@ fn import_player_state(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
 fn build_mid_event(_data: &Arc<GameData>, ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4]), mut w: World, calls0: u32, notes: &mut Vec<String>) -> Built {
     let to = w.field.as_ref().map(|f| f.area).unwrap_or_default();
     let po = ram.player();
-    let (x, y, facing) = (ram.s32(po + 0x1A0) >> 8, ram.s32(po + 0x1A4) >> 8, ram.r8(po + 0x10));
-    field::load_area(&mut w, to, x, y, Some(facing));
+    if po == 0 {
+        // a cutscene map with the players offstage (`load_scene*`: no player object): the map's objects from RAM
+        wf_core::scene::send_offstage(&mut w);
+        field::load_area_with(&mut w, to, 120, 120, None, true);
+    } else {
+        let (x, y, facing) = (ram.s32(po + 0x1A0) >> 8, ram.s32(po + 0x1A4) >> 8, ram.r8(po + 0x10));
+        field::load_area(&mut w, to, x, y, Some(facing));
+    }
     w.events.clear();
     field::finish_arrival(&mut w);
     if let Some(f) = w.field.as_mut() {
@@ -883,6 +889,14 @@ fn build_mid_event(_data: &Arc<GameData>, ram: &GbaRam, runner: &mut StoryHost, 
             w.scene.cam.mode = wf_core::scene::CamMode::Player;
         }
     }
+    // an event started from inside the frame's object pass (a defeat callback / hook run inline: the world list's
+    // update call 0x08011A5E is on the stack under the VM) holds that frame: when it ends, the frame's remaining
+    // updates run (`held_event`; mid_12000: Kid Buu's AI re-evaluates in s459's exit frame)
+    if (0x0300_7000u32..0x0300_8000).step_by(4).any(|a| ram.r32(a) == 0x0801_1A5F) {
+        if let Some(f) = w.field.as_mut() {
+            f.held_event = true;
+        }
+    }
     runner.continue_event(&mut w, ev.0, ev.1, ev.2, 0, None);
     // the text box as the RAM shows it
     let tb = ram.objects().into_iter().find(|&o| ram.r32(o) == 0x0804_9F60);
@@ -896,11 +910,24 @@ fn build_mid_event(_data: &Arc<GameData>, ram: &GbaRam, runner: &mut StoryHost, 
             d.typed = typed as i32;
             d.phase = wf_core::scene::DialogPhase::Shown;
             d.t = 64;
+            // the last page typed out and A pressed within the close's frames: closing (the box object shows
+            // nothing of it: the press's stamp in the input ring 0x03003300 +0x88 against the counter 0x03000F94; mid_24000)
+            let need = d.typing.get(d.page as usize).copied().unwrap_or(0) as i32;
+            if d.page + 1 >= d.pages && d.typed >= need {
+                let now = ram.r32(0x0300_0F94) as i64;
+                if let Some(&(_, at)) = press_ring(ram).iter().rev().find(|e| e.0 & 1 != 0) {
+                    let t = now - at;
+                    if (0..wf_core::scene::DIALOG_CLOSE as i64).contains(&t) {
+                        d.result = Some(0);
+                        d.phase = wf_core::scene::DialogPhase::Closing;
+                        d.t = t as i32;
+                    }
+                }
+            }
         }
         (None, Some(_)) => notes.push("mid-area: the event's text box is not open in RAM (opening / closing)".into()),
         _ => {}
     }
-    if let Some(pi) = w.player_idx(0) { let p = w.pl(pi); eprintln!("DBG_AP {:?} {:?} {:?}", p.gs, p.state, p.ap); }
     notes.push(format!("event s{:03} at node {}: mid-node over a standing field (mid-area)", ev.0, ev.1));
     let draws = w.rng.calls.wrapping_sub(calls0);
     Built { world: w, draws, held: 0, finished: true }
@@ -958,6 +985,11 @@ fn build_event_entry(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner:
         if let Some((k, _)) = runner.probe_event_for(&mut w, ev.0, ev.1, ev.2, &|n, _| n == 0x75) {
             return build_returned(data, ram, runner, ev, k, w, calls0, notes);
         }
+    }
+    // an event in its first node that started inside the frame's object pass (the world list's update call
+    // 0x08011A5E under the VM: a defeat callback / hook, not an area's entry) runs over a standing field
+    if probe.is_none() && ev.1 == 0 && (0x0300_7000u32..0x0300_8000).step_by(4).any(|a| ram.r32(a) == 0x0801_1A5F) {
+        return build_mid_event(data, ram, runner, ev, w, calls0, notes);
     }
     let fading = match probe {
         Some((_, 0x76)) => true,
@@ -1050,7 +1082,8 @@ fn build_event_entry(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner:
 pub fn import_emulator_state(data: &Arc<GameData>, ram: &GbaRam, runner: &mut StoryHost) -> Result<Imported, ImportError> {
     let info = inspect(ram);
     // an area entry inside a running event (a script's warp): the event's position from the scene objects
-    let in_event = (info.kind == CutKind::MidArea && info.depth > 0 && info.leader.is_some()).then(|| running_event(ram, runner)).flatten();
+    // (no leader: a cutscene map the event loaded with the players offstage)
+    let in_event = (info.kind == CutKind::MidArea && info.depth > 0).then(|| running_event(ram, runner)).flatten();
     match info.kind {
         CutKind::AreaEntry => {}
         CutKind::MidArea if in_event.is_some() => {}

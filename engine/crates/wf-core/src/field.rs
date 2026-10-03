@@ -2074,8 +2074,13 @@ pub fn resume_pass_after_load(w: &mut World) {
         return;
     }
     // (list indices as the game's: the props object, when the map has one, is the list's first object)
-    let k = k.saturating_sub(props_object(w) as usize);
     let live: Vec<usize> = (0..w.ents.len()).filter(|&i| !w.ents[i].removed).collect();
+    // the resumed index is past the new list's end: the pass ends (4-20 #5: the talk's player at index 12 of 4-20's
+    // list - the props object and its 9 children - and 7-1's list is 2 long; no second update)
+    if k > live.len() + props_object(w) as usize {
+        return;
+    }
+    let k = k.saturating_sub(props_object(w) as usize);
     for &i in live.iter().take(k).rev() {
         match &w.ents[i].body {
             Body::Npc(_) => crate::scene::npc_update(w, i),

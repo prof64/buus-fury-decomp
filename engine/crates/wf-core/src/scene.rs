@@ -2945,7 +2945,6 @@ fn tick_dialog(w: &mut World) {
         return;
     }
     let need = d.typing.get(d.page as usize).copied().unwrap_or(0) as i32;
-    if std::env::var("DBG_DLG").is_ok() { eprintln!("DBG_DLG wf{} page {}/{} typing {:?} typed {} {:?} t {}", w.frame, d.page, d.pages, d.typing, d.typed, d.phase, d.t); }
     match d.phase {
         DialogPhase::Opening => {
             if d.t >= DIALOG_OPEN {

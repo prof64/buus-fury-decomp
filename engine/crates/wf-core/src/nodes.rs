@@ -382,8 +382,10 @@ fn is_controller(k: K) -> bool {
 /// 0x030030B0: the actor's own update ticks them, so a shot leaves at its tick while an event holds the field -
 /// Thieves Den 9-4: a Hessian's rocket during the level-up popup; WindupMelee 0x03003214: a Skeleton's swing turns
 /// to the player at tick 32 inside a dart trap's event, Kyodai Pyramid 14-4); battles keep the reference's set
+/// (HandSink, the Janemba Hand's second strike: its one-shot controller 0x0804DBA8 sinks on through an event - the real
+/// route's 18-10, the switch scene: the hand is in its walk state when the scene ends)
 fn is_ctl(w: &World, k: K) -> bool {
-    is_controller(k) || (w.field.is_some() && matches!(k, K::GunShot | K::RifleShot | K::KiBlast | K::NinjaStarThrow | K::MummyWrapShot | K::MummyWrapBurst | K::WindupMelee))
+    is_controller(k) || (w.field.is_some() && matches!(k, K::GunShot | K::RifleShot | K::KiBlast | K::NinjaStarThrow | K::MummyWrapShot | K::MummyWrapBurst | K::WindupMelee | K::HandSink))
 }
 
 /// an event holds the field: the AI does not think, but the running motion controller keeps ticking (a turret's fire
@@ -728,12 +730,33 @@ fn kb_set(r: &mut NodeRt, k: &KnockState) {
 }
 
 
+/// BrolySpawnRocks (0x08035F81): three rock obstacles (ctor 0x08036A44) at map px (200,136), (112,272), (296,240)
+/// unless rocks exist; in the field each rock object holds its own 0x1000-byte tile block
+fn spawn_rocks(w: &mut World) {
+    if w.ents.iter().any(|e| matches!(e.body, Body::Rock { .. })) {
+        return;
+    }
+    for (x, y) in [(200, 136), (112, 272), (296, 240)] {
+        let b = w.arena.bounds;
+        if x + 16 >= b.x0 && x + 48 <= b.x1 && y + 16 >= b.y0 && y + 48 <= b.y1 {
+            let id = w.add(Body::Rock { x, y, hp: 2 });
+            crate::vram::acquire(w, crate::vram::Owner::Ent(id), 0x1000);
+        }
+    }
+}
+
 fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
     let i = c.i;
     let frame = w.frame as i64;
     match kind(c, n) {
         // node 0x080716F4: enter no-op, update 0 - no animation change
         K::Idle => {}
+        // BrolySpawnRocks spawns on enter (Broly's initial state 0x33: the rocks are made with Broly - the game's
+        // 15-32 allocator at the area entry holds their three blocks right below Broly's own, before the player's
+        // and the HUD's; spawned later, the portrait text box that follows purges differently and Broly's place
+        // in the update list changes - app soak of the real route, 15-32). Field only: the battle keeps the
+        // update-time spawn the TypeScript reference has.
+        K::BrolySpawnRocks if w.field.is_some() => spawn_rocks(w),
         // shield soldiers: the graphics swap runs on enter (seen on the GotoState frame)
         K::RaiseShield => {
             w.en(i).shield = 1;
@@ -2777,19 +2800,7 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         }
         // ---- others
         K::BrolySpawnRocks => {
-            if w.ents.iter().any(|e| matches!(e.body, Body::Rock { .. })) {
-                return true;
-            }
-            for (x, y) in [(200, 136), (112, 272), (296, 240)] {
-                let b = w.arena.bounds;
-                if x + 16 >= b.x0 && x + 48 <= b.x1 && y + 16 >= b.y0 && y + 48 <= b.y1 {
-                    let id = w.add(Body::Rock { x, y, hp: 2 });
-                    // (field: each rock object holds its own 0x2000-byte tile block - the game's 15-32 allocator
-                    // at the area entry: three 128-unit blocks no actor owns; without them the portrait text box
-                    // that follows purges nothing and Broly keeps his place in the update list)
-                    crate::vram::acquire(w, crate::vram::Owner::Ent(id), 0x2000);
-                }
-            }
+            spawn_rocks(w);
             true
         }
         K::JumpSmash => {

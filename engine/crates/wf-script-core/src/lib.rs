@@ -141,7 +141,8 @@ pub struct HostState {
     pub nest_area_enter: bool,
     /// the running job is an enemy's on-defeat callback (field `Cause::Defeat`): it runs inside the death handler's
     /// nested loop, where a map prop's track command completes a frame later than in a scene (real route 0-55, the
-    /// Stolen Airship's bandits: 0x08073EFC's chance(25) comes 2 frames after s506's prop_show)
+    /// Stolen Airship's bandits: 0x08073EFC's chance(25) comes 2 frames after s506's prop_show). Only the callback's
+    /// first run (the host clears it when the run blocks): db6 13-45's prop_show after a wait is a plain one
     #[serde(default)]
     pub defeat_job: bool,
     /// the running job is a unit script (inline code): an event it starts (`run_event`) is the VM's nested loop, not
@@ -312,7 +313,6 @@ impl Host for CoreHost<'_> {
                 end_event(self.w);
                 // (an exit at the end of a frame's held pass - a frame wait, not one of the top-of-frame returns above:
                 // the interrupted pass goes on after it, `resume_pass_after_load`; 4-20 #5's text-box exit does not)
-                if std::env::var("TMPDBG").is_ok() { eprintln!("TMPDBG exit f{} fw {} fs {} unit {} pend {:?}", self.w.frame, self.s.from_wait, self.s.from_scroll, self.s.in_unit, self.s.pending); }
                 if self.w.scene.depth == 0 && self.s.talk_event && !self.s.from_wait {
                     wf_core::field::resume_pass_after_load(self.w);
                 } else if self.w.scene.depth == 0 {
