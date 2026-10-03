@@ -277,6 +277,24 @@ fn main() {
             if let Some(pi) = w.player_idx(0) {
                 let pl = w.pl_ref(pi);
                 for (ei, e) in w.ents.iter().enumerate() { if let wf_core::world::Body::Enemy(en) = &e.body { if !e.removed { println!("  row {k} enemy #{} ty {} pos ({}, {}) hp {} anim {:?} ai {:?}", ei, en.ty, en.a.x, en.a.y, en.hp1024 >> 10, en.ea.pos, en.ai.stack.iter().map(|s| s.state).collect::<Vec<_>>()); if std::env::var("SOAK_AI").is_ok() { if let Some(st) = en.ai.stack.last() { for (ni, (n, r)) in st.tree.nodes.iter().zip(st.rt.iter()).enumerate() { if true { println!("    node {ni} {} {:?} f {} i {} on {} d {:?}", n.name, n.p, r.f, r.i, r.on, r.d); } } } } } } }
+                if let Some(seg) = opt("--diff-seg") {
+                    let doc: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&seg).expect("read")).expect("json");
+                    let fresh = StorySim::from_segment(&packs, &doc).expect("import");
+                    let v = fresh.world();
+                    let (a, b) = (w.col.as_ref(), v.col.as_ref());
+                    if let (Some(a), Some(b)) = (a, b) {
+                        let g = wf_core::content::GRID;
+                        let de: Vec<(usize, usize, u8, u8)> = a.enemy.iter().zip(b.enemy.iter()).enumerate().filter(|(_, (x, y))| x != y).map(|(j, (x, y))| (j % g, j / g, *x, *y)).take(40).collect();
+                        println!("  enemy grid diffs (x, y, app, import): {} {:?}", a.enemy.iter().zip(b.enemy.iter()).filter(|(x, y)| x != y).count(), de);
+                        let wa = a.walk.clone().unwrap_or_else(|| a.map.walk.clone());
+                        let wb = b.walk.clone().unwrap_or_else(|| b.map.walk.clone());
+                        let dw: Vec<(usize, usize, u8, u8)> = wa.iter().zip(wb.iter()).enumerate().filter(|(_, (x, y))| x != y).map(|(j, (x, y))| (j % g, j / g, *x, *y)).take(40).collect();
+                        println!("  walk grid diffs: {} {:?}", wa.iter().zip(wb.iter()).filter(|(x, y)| x != y).count(), dw);
+                    }
+                    for (ei, e) in v.ents.iter().enumerate() { if let wf_core::world::Body::Enemy(en) = &e.body { if !e.removed { println!("  import enemy #{} ty {} pos ({}, {}) hp {} marked {:?} anim {:?} ai {:?}", ei, en.ty, en.a.x, en.a.y, en.hp1024 >> 10, en.marked, en.ea.pos, en.ai.stack.iter().map(|s| (s.state, s.rt.iter().map(|r| r.path).collect::<Vec<_>>())).collect::<Vec<_>>()); } } }
+                    for (ei, e) in w.ents.iter().enumerate() { if let wf_core::world::Body::Enemy(en) = &e.body { if !e.removed { println!("  app    enemy #{} ty {} pos ({}, {}) hp {} marked {:?} anim {:?} ai {:?}", ei, en.ty, en.a.x, en.a.y, en.hp1024 >> 10, en.marked, en.ea.pos, en.ai.stack.iter().map(|s| (s.state, s.rt.iter().map(|r| r.path).collect::<Vec<_>>())).collect::<Vec<_>>()); } } }
+                    println!("  g app {:?}\n  g imp {:?}", w.g, v.g);
+                }
                 println!("leader at row {k}: rec {:?} equip {:?} skills {:?} form {} eff {:?} story equipment {:?}", pl.rec, pl.equip, pl.skills, pl.form, pl.eff, w.story.equipment);
             }
         }

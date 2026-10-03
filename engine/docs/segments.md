@@ -312,6 +312,17 @@ exact and gated (`data/segments/rsbi_*`, `rsbk_001_04_20`, `rsbk_002_04_21`), 4 
 * `rsbi_027_21_25` / `rsbi_028_21_26` stop at f20,555 / f20,387 inside the (first, lost) Kid Buu fight on a sound
   (`play 50` vs the game's `play 51`): **for the Kid Buu fight agent**. `rsbk_000_04_01` is a refused load kind.
 
+**20-6 f2015 - leftover heap memory (Super Buu agent, investigated, not modelled):** s473's
+`become_map_object(5, 3)` makes Vegeta a WanderToRandomPoint enemy (sprite id 5 now resolves to Vegeta's current
+form, fixed: f2012 -> f2015). The node's path object (create `0x0803BD64`, heap `0x0803D5B8(0x24)`) sets speed,
+budget and valid only; its waypoint (+0x0C / +0x10) and re-plan counter (+0x18) keep what the heap block held. In
+`sb_012` the block (`0x0203DFC8`) last held another class's object: waypoint words `0x0803F445` (a code pointer)
+and `0x02029A3C` (a heap address), counter 0x40. Through the step's int32 wrap (`path.rs` `step`) those give
+exactly the game's first 8 frames: v = (-12, +12) / 256 px, facing right, then the first re-plan. So the values
+are deterministic, but they are other objects' internals (code / heap pointers) - reproducing them needs the
+whole object heap with real addresses and every class's field writes. Not modelled; `tools/superbuu/heapnode.py`
+prints a new node's leftover words. (The side-content agent's Nosferatu 18-8 case is likely the same kind.)
+
 **Claim (dungeon agent A, 2026-10-03, by the coordinator): the Kid Buu fight itself in `sb_041` (21-25).** A works
 with the allocator check off (`SEGMENT_VRAM=0`): the enemy object missing at f21479 and every divergence after it
 through the three phases (Kid Buu's AI / attacks, the Spirit Bomb sequence, the script hand-overs, Uub). The Super
@@ -432,6 +443,24 @@ ids / animation indices need the ROM's sprite-def tables: the recording's `init.
 (`GbaRam.actor_rows`). The event: blocked in the return's fade-in phase (`Pending::Phases`, fade started at the
 cut). Proof - the real route's Kid Buu run, cut with `--events`: **9 / 14 cuts exact**, the eight `return_to_field`
 ones gated (`rkb_003`, `004`, `005`, `006`, `007`, `009`, `010`, `011`: up to 2,000 frames each, allocator check on).
+Increment 3 (A):
+* **World-map patrol steps import** (`import_patrol`): the runner's current step object (enemy +0x22C, vt
+  0x0804A800 = `cutscene_move`: +4 s16 target x / y, +8 s16 z / u16 speed, +0xC / +0x10 / +0x14 velocity, +0x18
+  frames left) -> `StepRt::Move3`; the step index = the record with the same target words; height +0x1A8, heading
+  +0x1AC. **`kbr_014` exact (522 / 522)**, gated `rkb_014_0-50`: 11 / 14 Kid Buu cuts exact.
+* `kbr_012` f490 is not a placement problem: the event's `load_scene` (0x72) after `save_field_on_next_scene`
+  empties the world list in ours at the call (the HFIL rule), the game keeps actor 115 (Goku) there - open (script
+  host rule, not the import); the PC -> step mapping is therefore not needed for it.
+* **Any-frame import, first cut** (`build_mid`, `field_from_ram`): a RAM state with no event running and no load
+  pending (`CutKind::MidArea`, depth 0) imports - the area loaded at the leader, the players arrived, the field's
+  live state from RAM (actors by match and patch with their AI stacks / runtimes / timers, the leader, grids,
+  stagger, flyer, camera); object classes the import does not rebuild are listed in a note. Tried on the real
+  Kid Buu fight cut every 3,000 frames (`tools/dungeons/midcuts.sh`): f9000 imports (RNG, actors, camera equal)
+  and matches 2 frames (the leader mid-punch: the player's own state machine is not imported yet); f3000 / f6000
+  / f12000 stand inside dialog events (in-event mid-area: not yet). **Not ready for the scoreboard yet** - still
+  missing: the player's state (punch / skill / hurt counters), projectiles / effects / pickups (classes
+  0x08049FEC, 0x0804BA78, 0x0804C070, 0x0804C904, 0x0804CE28, 0x0804D1E4 listed at f9000), node runtimes beyond
+  Sequence / Selector / path (PopState, KnockbackSlide ...), and events running mid-node.
 Increment 2 (A): **match and patch** (`import_objects`) - the general shape of the any-frame import: every RAM
 actor is matched to an entity the area's own load made (same enemy type / NPC sprite, nearest unclaimed), patched
 to the RAM's state (position, facing, HP, AI stack re-entered + runtimes + timers, sprite, animation; NPCs: anim,

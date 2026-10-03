@@ -387,75 +387,7 @@ fn build_returned(_data: &Arc<GameData>, ram: &GbaRam, runner: &mut StoryHost, e
     // (the event still holds the field: the arrival does not release it)
     w.scene.depth = 1;
     field::set_busy(&mut w, true);
-    import_objects(&mut w, ram, notes);
-    let rows: std::collections::BTreeMap<u32, (i32, i32, i32, i32)> = ram.actor_rows.iter().map(|r| (r.0, (r.1, r.2, r.3, r.4))).collect();
-    patch_leader(&mut w, ram, notes);
-    // the walk and enemy grids as they stand (map object +0xA8 / +0xB0: bitmaps, 32 bytes a row, bit = free)
-    import_grids(&mut w, ram);
-    // (building the enemies entered their states: the path stagger as the RAM has it)
-    w.g.path_stagger = (ram.r8(0x0300_32E5) & 7) as i32;
-    // the leader as it stands: its 24.8 position (the load put it on the pixel) and animation (an idle's tick runs
-    // on through the scene)
-    if let Some(pi) = w.player_idx(0) {
-        let po = ram.player();
-        let p = w.pl(pi);
-        p.a.x = ram.s32(po + 0x1A0);
-        p.a.y = ram.s32(po + 0x1A4);
-        p.a.facing = ram.r8(po + 0x10);
-    }
-    if let (Some(&(_, raw, cel, tick)), Some(pi)) = (rows.get(&ram.player()), w.player_idx(0)) {
-        // a script's frame-range controller (0x0804DE58: +4 pass, +8 ticks a cel, +0xC passes, +0x10 loop start,
-        // +0x14 last cel) runs the leader as a scene puppet
-        let st = ram.r32(ram.player() + 0x14);
-        if ram.valid(st) && ram.r32(st) == 0x0804_DE58 {
-            let mode = wf_core::scene::AnimMode::Frames { each: ram.s32(st + 8), loops: ram.s32(st + 0xC), loop_start: ram.s32(st + 0x10), last: ram.s32(st + 0x14), pass: ram.s32(st + 4) };
-            let aid = wf_core::player::ANIM_RAW.iter().position(|&r| r == raw).unwrap_or(0);
-            wf_core::player::script_pose(&mut w, pi, aid, cel);
-            let id = w.ents[pi].id;
-            let anim = wf_core::scene::ActAnim { raw, frame: cel, tick, mode, ..wf_core::scene::ActAnim::of(aid as i32) };
-            w.scene.puppets.retain(|p| p.id != id);
-            w.scene.puppets.push(wf_core::scene::Puppet { id, anim });
-        }
-        let p = w.pl(pi);
-        p.ap.raw = raw;
-        p.ap.frame = cel;
-        p.ap.tick = tick;
-    }
-    // the 3D map's flyer: altitude +0x1A8, heading +0x1AC, the flight state (+4 reversing, +8 speed, +0xC turn), its
-    // animation, the 3D camera (map object +0 x, +4 y, +8 height, +0xC heading, +0x10 pitch)
-    if wf_core::fieldworld::flying(&w) {
-        let po = ram.player();
-        let st = ram.r32(po + 0x14);
-        let row = rows.get(&po).copied();
-        if let Some(fl) = w.field.as_mut().and_then(|f| f.flight.as_mut()) {
-            fl.z = ram.s32(po + 0x1A8);
-            fl.h = ram.s32(po + 0x1AC);
-            if ram.valid(st) {
-                fl.rev = ram.r32(st + 4) != 0;
-                fl.spd = ram.s32(st + 8);
-                fl.turn = ram.s32(st + 0xC);
-            }
-            fl.tick = ram.r16(po + 0x12) as i32;
-            fl.frame = ram.r8(po + 0x11) as i32;
-            if let Some((_, raw, _, _)) = row {
-                fl.raw = raw;
-            }
-            fl.cam = [ram.s32(CAM), ram.s32(CAM + 4), ram.s32(CAM + 8), ram.s32(CAM + 0xC), ram.s32(CAM + 0x10)];
-            // (the camera object caches the altitude of its last pitch: the pitch stays until z changes)
-            fl.zc = Some(fl.z);
-        }
-    }
-    // the camera as the field left it (`return_to_field` puts the saved one back)
-    w.scene.cam.mode = wf_core::scene::CamMode::Player;
-    wf_core::battle::set_camera(&mut w, 0, ram.s32(CAM), ram.s32(CAM + 4));
-    // (a camera that is not where following the leader keeps it was held by a script before the scene: fixed)
-    {
-        let mut probe = w.clone();
-        field::world_mode_cameras(&mut probe);
-        if (probe.cameras[0].x, probe.cameras[0].y) != (w.cameras[0].x, w.cameras[0].y) {
-            w.scene.cam.mode = wf_core::scene::CamMode::Fixed;
-        }
-    }
+    field_from_ram(&mut w, ram, notes);
     notes.push(format!("event s{:03} at node {}: return_to_field, {} actions before it dropped; mid-area objects from RAM", ev.0, ev.1, k));
     let draws = w.rng.calls.wrapping_sub(calls0);
     Built { world: w, draws, held: 0, finished: true }
@@ -541,6 +473,81 @@ fn import_grids(w: &mut World, ram: &GbaRam) {
             if wk != c.map.walk {
                 c.walk = Some(wk);
             }
+        }
+    }
+}
+
+/// the field's live state from RAM (mid-area imports: a field restored after a scene, or any frame): the actors by
+/// match and patch, the leader's 24.8 position / animation / script pose, the grids, the stagger, the 3-D map's
+/// flyer and camera, the 2-D camera
+fn field_from_ram(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
+    import_objects(w, ram, notes);
+    let rows: std::collections::BTreeMap<u32, (i32, i32, i32, i32)> = ram.actor_rows.iter().map(|r| (r.0, (r.1, r.2, r.3, r.4))).collect();
+    patch_leader(w, ram, notes);
+    // the walk and enemy grids as they stand (map object +0xA8 / +0xB0: bitmaps, 32 bytes a row, bit = free)
+    import_grids(w, ram);
+    // (building the enemies entered their states: the path stagger as the RAM has it)
+    w.g.path_stagger = (ram.r8(0x0300_32E5) & 7) as i32;
+    // the leader as it stands: its 24.8 position (the load put it on the pixel) and animation (an idle's tick runs
+    // on through the scene)
+    if let Some(pi) = w.player_idx(0) {
+        let po = ram.player();
+        let p = w.pl(pi);
+        p.a.x = ram.s32(po + 0x1A0);
+        p.a.y = ram.s32(po + 0x1A4);
+        p.a.facing = ram.r8(po + 0x10);
+    }
+    if let (Some(&(_, raw, cel, tick)), Some(pi)) = (rows.get(&ram.player()), w.player_idx(0)) {
+        // a script's frame-range controller (0x0804DE58: +4 pass, +8 ticks a cel, +0xC passes, +0x10 loop start,
+        // +0x14 last cel) runs the leader as a scene puppet
+        let st = ram.r32(ram.player() + 0x14);
+        if ram.valid(st) && ram.r32(st) == 0x0804_DE58 {
+            let mode = wf_core::scene::AnimMode::Frames { each: ram.s32(st + 8), loops: ram.s32(st + 0xC), loop_start: ram.s32(st + 0x10), last: ram.s32(st + 0x14), pass: ram.s32(st + 4) };
+            let aid = wf_core::player::ANIM_RAW.iter().position(|&r| r == raw).unwrap_or(0);
+            wf_core::player::script_pose(w, pi, aid, cel);
+            let id = w.ents[pi].id;
+            let anim = wf_core::scene::ActAnim { raw, frame: cel, tick, mode, ..wf_core::scene::ActAnim::of(aid as i32) };
+            w.scene.puppets.retain(|p| p.id != id);
+            w.scene.puppets.push(wf_core::scene::Puppet { id, anim });
+        }
+        let p = w.pl(pi);
+        p.ap.raw = raw;
+        p.ap.frame = cel;
+        p.ap.tick = tick;
+    }
+    // the 3D map's flyer: altitude +0x1A8, heading +0x1AC, the flight state (+4 reversing, +8 speed, +0xC turn), its
+    // animation, the 3D camera (map object +0 x, +4 y, +8 height, +0xC heading, +0x10 pitch)
+    if wf_core::fieldworld::flying(w) {
+        let po = ram.player();
+        let st = ram.r32(po + 0x14);
+        let row = rows.get(&po).copied();
+        if let Some(fl) = w.field.as_mut().and_then(|f| f.flight.as_mut()) {
+            fl.z = ram.s32(po + 0x1A8);
+            fl.h = ram.s32(po + 0x1AC);
+            if ram.valid(st) {
+                fl.rev = ram.r32(st + 4) != 0;
+                fl.spd = ram.s32(st + 8);
+                fl.turn = ram.s32(st + 0xC);
+            }
+            fl.tick = ram.r16(po + 0x12) as i32;
+            fl.frame = ram.r8(po + 0x11) as i32;
+            if let Some((_, raw, _, _)) = row {
+                fl.raw = raw;
+            }
+            fl.cam = [ram.s32(CAM), ram.s32(CAM + 4), ram.s32(CAM + 8), ram.s32(CAM + 0xC), ram.s32(CAM + 0x10)];
+            // (the camera object caches the altitude of its last pitch: the pitch stays until z changes)
+            fl.zc = Some(fl.z);
+        }
+    }
+    // the camera as the field left it (`return_to_field` puts the saved one back)
+    w.scene.cam.mode = wf_core::scene::CamMode::Player;
+    wf_core::battle::set_camera(w, 0, ram.s32(CAM), ram.s32(CAM + 4));
+    // (a camera that is not where following the leader keeps it was held by a script before the scene: fixed)
+    {
+        let mut probe = w.clone();
+        field::world_mode_cameras(&mut probe);
+        if (probe.cameras[0].x, probe.cameras[0].y) != (w.cameras[0].x, w.cameras[0].y) {
+            w.scene.cam.mode = wf_core::scene::CamMode::Fixed;
         }
     }
 }
@@ -721,6 +728,61 @@ fn import_patrol(w: &mut World, ei: usize, ram: &GbaRam, o: u32) {
     });
 }
 
+/// **a cut at any frame with no event running** (mid-area): the area loaded at the leader, the players arrived, the
+/// field's live state from RAM (`field_from_ram`); objects the import does not model yet are listed in notes
+fn build_mid(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner: &mut StoryHost, rng0: [u32; 2], frame0: u32, notes: &mut Vec<String>) -> Built {
+    let story = import_story(data, ram);
+    let (x, y, facing) = info.leader.unwrap_or((120, 120, 0));
+    let to = info.area;
+    let cfg = FieldConfig { world: to.world, area: to.area, variant: to.variant, pos: Some((x, y)), facing, chars: vec![story.current], story: Some(story.clone()), rng: wf_core::battle::RngInit::State(rng0[0], rng0[1]), xp: true, arrive: false };
+    let mut w = field::create(data.clone(), &cfg);
+    let players = w.players.clone();
+    w.ents.retain(|e| players.contains(&e.id));
+    w.enemies.clear();
+    w.story = story;
+    if let Some(f) = w.field.as_mut() {
+        f.placed.clear();
+        f.placed_loot.clear();
+        f.triggers.clear();
+        f.patrols.clear();
+        f.deferred.clear();
+        f.loads = 0;
+        f.mode = Mode::Normal;
+    }
+    field::attach_host(&mut w, true);
+    patch_leader(&mut w, ram, notes);
+    w.frame = frame0;
+    w.g.fc0 = 0;
+    w.g.presses[0].ring = press_ring(ram);
+    w.g.presses[0].pressed = 0;
+    import_globals(&mut w, ram);
+    w.scene.song = song(ram);
+    w.scene.hud_hidden = w.story.game_bits & 2 == 0;
+    w.scene.banner = None;
+    w.scene.banner_last = -1;
+    w.rng = Rng::new(rng0[0], rng0[1]);
+    w.events.clear();
+    let calls0 = w.rng.calls;
+    field::load_area(&mut w, to, x, y, Some(facing));
+    // (the load's on-enter scripts ran long ago: their effects are in RAM)
+    w.events.clear();
+    field::finish_arrival(&mut w);
+    if let Some(f) = w.field.as_mut() {
+        f.arrival = None;
+        f.mode = Mode::Normal;
+    }
+    field_from_ram(&mut w, ram, notes);
+    // what the RAM has that the import does not rebuild yet
+    let known = [VT_PLAYER, VT_ENEMY, VT_NPC, VT_NPC_TALK, VT_BANNER];
+    let other: std::collections::BTreeSet<u32> = ram.objects().into_iter().map(|o| ram.r32(o)).filter(|v| !known.contains(v)).collect();
+    if !other.is_empty() {
+        notes.push(format!("mid-area: objects of classes {:x?} are not imported", other));
+    }
+    let _ = runner;
+    let draws = w.rng.calls.wrapping_sub(calls0);
+    Built { world: w, draws, held: 0, finished: true }
+}
+
 /// the 3D world map (an area whose load makes the flyer)
 fn is_3d(_data: &GameData, to: AreaId) -> bool {
     (to.world, to.area) == (0, 50)
@@ -872,6 +934,8 @@ pub fn import_emulator_state(data: &Arc<GameData>, ram: &GbaRam, runner: &mut St
     match info.kind {
         CutKind::AreaEntry => {}
         CutKind::MidArea if in_event.is_some() => {}
+        // (any frame with nothing running: the mid-area import)
+        CutKind::MidArea if info.depth == 0 && info.leader.is_some() => {}
         CutKind::LoadPending => return Err(ImportError::Unsupported(format!("area {:?}: the load's on-enter script is still blocked (no leader); cut at the frame the leader appears", info.area))),
         CutKind::MidArea => return Err(ImportError::Unsupported(format!("area {:?}: mid-area (mode {:#x} brightness {}, depth {}); only area-entry cuts are importable so far", info.area, info.mode.0, info.mode.1, info.depth))),
     }
@@ -887,6 +951,7 @@ pub fn import_emulator_state(data: &Arc<GameData>, ram: &GbaRam, runner: &mut St
         let frame0 = info.lf.wrapping_sub(last.as_ref().map(|b| b.held).unwrap_or(0));
         let b = match in_event {
             Some(ev) => build_event_entry(data, ram, &info, runner, ev, guess, frame0, &mut n),
+            None if info.kind == CutKind::MidArea => build_mid(data, ram, &info, runner, guess, frame0, &mut n),
             None => build_area_entry(data, ram, &info, runner, guess, frame0, 600, &mut n),
         };
         let ok = b.world.rng.state() == target;
