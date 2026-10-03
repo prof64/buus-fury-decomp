@@ -1,64 +1,86 @@
 {
  "chapters": {
+  "earth": {
+   "cats": {
+    "RNG": 1,
+    "animation": 2
+   },
+   "cut_frames": 157565,
+   "exact": 87,
+   "frames": 157565,
+   "matched": 107546,
+   "run_frames": 160503,
+   "segments": 90,
+   "stretches": 1
+  },
   "fat": {
    "cats": {
-    "RNG": 3,
+    "RNG": 1,
     "animation": 1,
-    "camera": 3,
-    "position / facing": 2,
-    "sound": 1
+    "camera": 1,
+    "position / facing": 3,
+    "sound": 2
    },
-   "cut_frames": 380206,
-   "exact": 361,
-   "frames": 380206,
-   "matched": 319265,
+   "cut_frames": 481874,
+   "exact": 363,
+   "frames": 481874,
+   "matched": 340804,
    "run_frames": 388646,
    "segments": 371,
    "stretches": 33
   },
   "janemba": {
    "cats": {
-    "RNG": 3,
-    "camera": 1,
+    "RNG": 2,
+    "camera": 2,
     "object set": 1,
-    "position / facing": 2,
-    "screen fade": 3,
-    "sound": 1
+    "position / facing": 1,
+    "screen fade": 1
    },
-   "cut_frames": 187291,
-   "exact": 244,
-   "frames": 187291,
-   "matched": 173534,
+   "cut_frames": 168376,
+   "exact": 248,
+   "frames": 168376,
+   "matched": 156630,
    "run_frames": 199703,
    "segments": 255,
    "stretches": 16
+  },
+  "opening": {
+   "cats": {},
+   "cut_frames": 34377,
+   "exact": 17,
+   "frames": 34377,
+   "matched": 34377,
+   "run_frames": 42275,
+   "segments": 17,
+   "stretches": 1
   },
   "ship": {
    "cats": {
     "camera": 1,
     "sound": 1
    },
-   "cut_frames": 395616,
+   "cut_frames": 370065,
    "exact": 336,
-   "frames": 395616,
-   "matched": 385691,
+   "frames": 370065,
+   "matched": 360140,
    "run_frames": 398194,
    "segments": 338,
    "stretches": 2
   },
   "superbuu": {
    "cats": {
-    "RNG": 16,
-    "camera": 5,
-    "object set": 1,
-    "position / facing": 23,
-    "screen fade": 3,
+    "RNG": 15,
+    "camera": 4,
+    "other": 1,
+    "position / facing": 22,
+    "screen fade": 1,
     "sound": 1
    },
-   "cut_frames": 467701,
-   "exact": 399,
-   "frames": 467701,
-   "matched": 307629,
+   "cut_frames": 364707,
+   "exact": 404,
+   "frames": 364707,
+   "matched": 299655,
    "run_frames": 478729,
    "segments": 448,
    "stretches": 22
@@ -66,13 +88,13 @@
  },
  "dirty": true,
  "total": {
-  "cut_frames": 1430814,
-  "exact": 1340,
-  "frames": 1430814,
-  "matched": 1186119,
-  "run_frames": 1465272,
-  "segments": 1412,
-  "stretches": 73
+  "cut_frames": 1576964,
+  "exact": 1455,
+  "frames": 1576964,
+  "matched": 1299152,
+  "run_frames": 1668050,
+  "segments": 1519,
+  "stretches": 75
  },
- "tree": "470633b"
+ "tree": "604927f"
 }

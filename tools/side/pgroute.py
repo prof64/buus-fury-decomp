@@ -57,6 +57,12 @@ LEGS = {
                               ('openwall', '2-35', [(x, y) for x in range(31, 35) for y in range(16, 18)]),
                               ('goto', '2-46', 64, 105), ('keys', [(A_, 3, 60)]), ('events',),
                               ('wait', 30)]),
+    # Kami's Lookout (flag 149: 6-1) -> 6-14's pad (A, flag 149) -> the Other World map (cursor on Earth; one LEFT =
+    # Heaven) -> 22-1: Dabura (the first map NPC, wandering) gives the Crystal O-Yoroi (s490, flag 152)
+    'heaven': [('fly', 633, 1065, 31, 23), ('wait', 60), ('goto', '6-14', 150, 190, False), ('keys', [(A_, 3, 200)]),
+               ('keys', [(32, 3, 40), (A_, 3, 200)]), ('wait', 30), ('talknpc', 0), ('wait', 30)],
+    # the airship marker (flag 149, not 151: Flying Mega-Fortress XJ-6) -> 12-1; the dungeon itself: tools/side/xj6.py
+    'xj6a': [('fly', 1929, 401, 95, 79), ('wait', 200)],
 }
 
 
@@ -66,6 +72,9 @@ def start_of(leg):
 
 
 def record(leg):
+    # (legs driven by another script: xj6 = tools/side/xj6.py from pg_xj6a.ss)
+    if leg not in LEGS:
+        LEGS[leg] = ('pg_xj6a.ss', [])
     keys = json.loads((D / f'pg_{leg}.keys.json').read_text())
     keys = keys['keys'] if isinstance(keys, dict) else keys
     kf = D / f'k_pg_{leg}.json'

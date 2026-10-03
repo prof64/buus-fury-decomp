@@ -560,13 +560,18 @@ fn run_hook(w: &mut World, i: usize) {
         Hook::Latch { ox, oy } => {
             let Some(pi) = player(w, i) else { return };
             let (px, py) = (w.pl_ref(pi).a.x, w.pl_ref(pi).a.y);
-            unmark_self(w, i);
-            {
-                let e = w.en(i);
-                e.a.x = px + ox;
-                e.a.y = py + oy;
+            // the think `0x080298A2` writes the position only: the enemy grid keeps the mark where the enzyme
+            // latched on (VERIFIED real route 21-6: an enzyme dragged through a wall leaves the wall's tiles blocked)
+            // (the game's free / mark `0x0800F740` works on the current footprint: once the enzyme lets go, its next
+            // step frees the tiles where it is, not where it latched on - so its mark is taken to be the current
+            // footprint, the grid untouched)
+            let e = w.en(i);
+            e.a.x = px + ox;
+            e.a.y = py + oy;
+            if e.marked.is_some() {
+                let (x, y) = (e.a.px(), e.a.py());
+                e.marked = Some([x, y, x + e.a.foot_w, y + e.a.foot_h]);
             }
-            mark_self(w, i);
         }
         Hook::Fragment => {
             frag_tick(w, i);

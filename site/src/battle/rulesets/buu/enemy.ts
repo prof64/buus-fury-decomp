@@ -278,10 +278,13 @@ export class Enemy extends Actor implements EnemyLike {
       run: () => {
         const q = this.player
         if (!q) return
-        this.unmarkSelf()
+        // the think 0x080298A2 writes the position only: the enemy grid keeps the mark where it latched on (real
+        // route 21-6)
         this.x = q.x + ox
         this.y = q.y + oy
-        this.markSelf()
+        // (the game's free / mark 0x0800F740 works on the current footprint: the mark is taken to be here, the grid
+        // untouched)
+        if (this.marked) this.marked = [this.px, this.py, this.px + this.footW, this.py + this.footH]
       },
     }
   }

@@ -1344,9 +1344,17 @@ pub fn update(w: &mut World, i: usize) {
         *p(w, i) = pl;
         return;
     }
+    // an object's inline script that does not hold the field (an AI InlineScript's parallel block: Earth 4-25,
+    // Vegeta's play_anim x 3 on the player) commands the player only while its animation runs: once that ended
+    // (the frame before) the player's own state takes the control back while the script goes on
+    let free = crate::scene::is_puppet(w, w.ents[i].id)
+        && !w.field.as_ref().is_some_and(|f| f.busy)
+        && w.scene.depth == 0
+        && !w.scene.ai_wait.is_empty()
+        && script_anim_done(w, i);
     anim_tick(w, i);
     // a script commanding the player (scene.rs puppet): the states it sets run, the controller does not
-    let puppet = crate::scene::is_puppet(w, w.ents[i].id);
+    let puppet = crate::scene::is_puppet(w, w.ents[i].id) && !free;
     if puppet {
         crate::scene::player_frames_tick(w, i);
     }

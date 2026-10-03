@@ -10,7 +10,7 @@ import segment as sg  # noqa: E402
 
 p, name = Path(sys.argv[1]), sys.argv[2]
 doc = json.loads(p.read_text())
-n = int(sys.argv[3]) if len(sys.argv) > 3 else len(doc['frames'])
+n = min(int(sys.argv[3]), len(doc['frames'])) if len(sys.argv) > 3 else len(doc['frames'])
 full = len(doc['frames'])
 doc['frames'] = doc['frames'][:n]
 doc['name'] = name

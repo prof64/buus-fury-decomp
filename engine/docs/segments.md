@@ -420,6 +420,28 @@ world map, **`rkb_001_0-50` 3,690 / 3,690 exact** (gated); s463's warp_fade to 0
 92 frames (stop: the flyer's animation under a text box - the 3D-map sprite-memory purge, Super Buu agent's area).
 The opening proofs stay exact. Runtime: a dropped action's skip is applied before the queue hold (inert outside
 imports: both fields default off; wf-script-core lockstep / events incl. `shop` green on this tree).
+*Mid-area import, increment 1 (A): `return_to_field` cuts.* A field restored after a cutscene scene is a mid-area
+state: `build_returned` (wf-import) loads the area at the leader, then **replaces every non-player object with the
+RAM's actors** - enemies by type (obj+0x224), 24.8 position, facing, HP (+0x28C), the AI state stack (+0x238), the
+AI timers (state entry +0x210, MarkTime +0x1E8, counter +0x1E4) and the **node runtimes** (`import_ai_rt`:
+Sequence 0x0804AAF4 +4 cursor / +0xC children, Selector 0x0804A710 +8 children, path followers +4 .. +0x20; other
+node kinds stay fresh with a note); NPCs by sprite id, position, facing, animation (raw / cel / tick) and a held pose
+(state 0x03001B00 -> `AnimMode::Pose`); the leader's 24.8 position and animation; the **walk / enemy grids from RAM**
+(map object +0xA8 / +0xB0 bitmaps); the camera (fixed when it is not where following the leader keeps it). Sprite
+ids / animation indices need the ROM's sprite-def tables: the recording's `init.actors` rows supply them
+(`GbaRam.actor_rows`). The event: blocked in the return's fade-in phase (`Pending::Phases`, fade started at the
+cut). Proof - the real route's Kid Buu run, cut with `--events`: **9 / 14 cuts exact**, the eight `return_to_field`
+ones gated (`rkb_003`, `004`, `005`, `006`, `007`, `009`, `010`, `011`: up to 2,000 frames each, allocator check on).
+Open: `kbr_008` (s462 node 60) matches 1,579 / 7,596 - after the event the copies fight on from imported runtimes
+and stay exact 1,500 frames, then a path re-plan's waypoint differs by 1 px (stagger / plan state - next); `kbr_014`
+(a return_to_field onto the 3D map: the flyer is not rebuilt); `kbr_012` (s463 node 64: another kind); `kbr_002`
+f13417 (the animation-13 actor - not looked at yet).
+
+**For the Super Buu agent (A, handed over by the coordinator):** `work/db/kbr4/segs/kbr_013_0-50` (the real route,
+s463's warp_fade onto the world map after Kid Buu; in-event import, `SEGMENT_VRAM=0`) stops at **f92**: the
+flyer's animation (sprite 115, raw 16) cel 1 vs the game's cel 2 under s463's text box - our purge before the
+portrait box takes the 3D map's objects out of the update, the game keeps updating them (the same case as `sb_041`
+f64786, which your fix covers there; here the flyer is the one suspended).
 The refused kinds: the s462 / s463 cuts are `return_to_field` (0x75) - the field restored after a scene is a
 mid-area state (its objects keep their pre-scene AI / positions), not a load; they need mid-area import.
 
@@ -1784,6 +1806,16 @@ drill and the Super Saiyan Goten fight into 4-25).
 *Regression tests* (no soak needed): `crates/wf-app/tests/carried_state.rs` - the host mark after the title's New
 Game; a load resets the hit-damage remainder, the regen count, the drain fraction and a pending script fade-in;
 `set_character` takes the new character's own skill slot.
+*4-25, update (Earth agent):* the player part is fixed - row 139,937 now walks on the game's frame
+(`player::update`: a player puppet of an AI inline script that holds no field event gets its control back the
+frame after its commanded animation ended, while the script goes on; Vegeta's InlineScript is the only such case
+seen). Resuming the inline script before the objects pass (tried) is not it: the script waits on its parallel
+block (Director), whose tracks run in `scene::tick` after the objects. What is left is one frame on Vegeta's own
+side: in the game his InlineScript node returns 1 in his update of f6646 (the tracks' last commands - face_actor,
+jump_to on himself - are instant there) and GotoState(0x310) / StandStill's idle draw follow in the same update;
+ours sees the script end after the objects pass and goes to 0x310 at f6647 (`x_trunks425` f6646: one RNG draw, then
+Vegeta's facing at f6648). Closing it needs the scene's tracks of an AI inline script to step inside that enemy's
+update. Soak agent: Earth can continue past row 139,937 for the player; expect this RNG frame at 139,937.
 *4-25 (Earth agent, 2026-10-04):* cut `work/earth/segs/x_trunks425.json` (Earth master 91,867 = 2-90 #2,
 6,900 frames, `SEGMENT_VRAM=0`: the allocator differs from f1258, Super Buu agent's) - two rules fixed on the way:
 `set_form` refreshes the player through 0x08010692, which builds the form object twice before its SetAnim(0)

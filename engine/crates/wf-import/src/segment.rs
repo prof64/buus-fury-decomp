@@ -303,6 +303,16 @@ pub fn start(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Value
     let mut ram = GbaRam::from_json(&doc["init"]["ram"])?;
     // the display at the cut: the first recorded row's probe (the screen does not change before its logic frame)
     ram.screen_black = doc["frames"].get(0).and_then(|f| f["io"].get(5)).and_then(|v| v.as_i64()).map(|v| v == 0);
+    // the actors' sprite ids / animations at the cut (rows [obj#, sprite, x, y, z, dir, raw, cel, tick])
+    if let (Some(objs), Some(rows)) = (doc["init"]["objs"].as_array(), doc["init"]["actors"].as_array()) {
+        for r in rows {
+            let k = i(&r[0]) as usize;
+            let ptr = objs.get(k).and_then(|o| o["ptr"].as_str()).and_then(|s| u32::from_str_radix(s.trim_start_matches("0x"), 16).ok());
+            if let Some(ptr) = ptr {
+                ram.actor_rows.push((ptr, i(&r[1]) as i32, i(&r[6]) as i32, i(&r[7]) as i32, i(&r[8]) as i32));
+            }
+        }
+    }
     let mut host = StoryHost::new(data, files)?;
     let mut imp = import_emulator_state(data, &ram, &mut host).map_err(|e| e.to_string())?;
     host.prev_held = imp.prev_keys;

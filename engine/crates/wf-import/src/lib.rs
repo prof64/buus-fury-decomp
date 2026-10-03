@@ -356,6 +356,221 @@ pub fn running_event(ram: &GbaRam, runner: &StoryHost) -> Option<(u16, u16, [i32
     None
 }
 
+/// a field restored by `return_to_field` inside an event (its objects keep their state from before the scene): the
+/// area loaded at the leader, every non-player object replaced by the RAM's actors (enemies: type, 24.8 position,
+/// facing, HP, AI state stack; NPCs: sprite, position, facing, animation from the recording's rows), the event
+/// blocked in the return's fade-in phase
+#[allow(clippy::too_many_arguments)]
+fn build_returned(_data: &Arc<GameData>, ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4]), k: usize, mut w: World, calls0: u32, notes: &mut Vec<String>) -> Built {
+    use wf_script_core::{Pending, Phase};
+    let to = w.field.as_ref().map(|f| f.area).unwrap_or_default();
+    let (x, y, facing) = (ram.s32(ram.player() + 0x1A0) >> 8, ram.s32(ram.player() + 0x1A4) >> 8, ram.r8(ram.player() + 0x10));
+    let list = vec![
+        Phase::Fade { kind: wf_core::scene::FadeKind::Black, out: true, frames: 16 },
+        Phase::ReturnToField,
+        Phase::Fade { kind: wf_core::scene::FadeKind::Black, out: false, frames: 16 },
+    ];
+    // (the return's fade-in started in the load's frame)
+    runner.continue_event(&mut w, ev.0, ev.1, ev.2, k, Some(Pending::Phases { list, k: 2, started: true }));
+    w.scene.screen.black = 16;
+    w.scene.screen.dim = 256;
+    wf_core::scene::start_fade(&mut w, wf_core::scene::FadeKind::Black, false, 16);
+    field::load_area(&mut w, to, x, y, Some(facing));
+    let evs: Vec<Event> = std::mem::take(&mut w.events);
+    let _ = evs;
+    if let Some(f) = w.field.as_mut() {
+        f.arrival = None;
+        f.mode = Mode::Normal;
+        f.triggers.retain(|_| true);
+    }
+    // the area's own objects go: the RAM's are the field as the scene left it
+    let players = w.players.clone();
+    for e in w.ents.iter_mut().filter(|e| !players.contains(&e.id)) {
+        e.removed = true;
+    }
+    w.ents.retain(|e| !e.removed);
+    w.enemies.clear();
+    if let Some(f) = w.field.as_mut() {
+        f.placed.clear();
+        f.patrols.clear();
+    }
+    let rows: std::collections::BTreeMap<u32, (i32, i32, i32, i32)> = ram.actor_rows.iter().map(|r| (r.0, (r.1, r.2, r.3, r.4))).collect();
+    // the world list is updated last to first: RAM order = our entity order
+    for o in ram.objects() {
+        let vt = ram.r32(o);
+        let (ox, oy, of) = (ram.s32(o + 0x1A0), ram.s32(o + 0x1A4), ram.r8(o + 0x10));
+        match vt {
+            VT_ENEMY => {
+                let ty = ((ram.r32(o + 0x224).wrapping_sub(0x0871_1274)) / 28) as i32;
+                let states: Vec<i32> = {
+                    let st = o + 0x238;
+                    let n = ram.r32(st + 4).min(8);
+                    (0..n).map(|i| (ram.r32(st + 12 + 8 * i).wrapping_sub(0x0870_F514) / 8) as i32).collect()
+                };
+                let Some(ei) = wf_core::battle::spawn_enemy_at(&mut w, ty, ox >> 8, oy >> 8, 0, states.first().copied(), true) else {
+                    notes.push(format!("enemy type {ty} at ({ox}, {oy}) not built"));
+                    continue;
+                };
+                for &s in states.iter().skip(1) {
+                    wf_core::nodes::push(&mut w, ei, s as u16);
+                }
+                // the node runtimes of every stack entry (obj+0x238 +8: {runtime, def} per level)
+                for lvl in 0..states.len() {
+                    let r = ram.r32(o + 0x238 + 8 + 8 * lvl as u32);
+                    import_ai_rt(&mut w, ei, lvl, ram, r, notes);
+                }
+                let e = w.en(ei);
+                e.a.x = ox;
+                e.a.y = oy;
+                e.a.facing = of;
+                e.hp1024 = ram.s32(o + 0x28C) as i64;
+                // the AI's timers on the frame counter (the World's clock = the logic counter here): state entry
+                // +0x210, MarkTime +0x1E8, the counter +0x1E4
+                e.state_stamp = ram.s32(o + 0x210) as i64;
+                e.mark1 = ram.s32(o + 0x1E8) as i64;
+                e.counter = ram.s32(o + 0x1E4) as i64;
+                if let Some(&(_, raw, cel, tick)) = rows.get(&o) {
+                    e.ea.pos.raw = raw;
+                    e.ea.pos.frame = cel;
+                    e.ea.pos.tick = tick;
+                }
+                wf_core::enemy::sync_mark(&mut w, ei);
+            }
+            VT_NPC | VT_NPC_TALK => {
+                let Some(&(sprite, raw, cel, tick)) = rows.get(&o) else { continue };
+                let mut n = wf_core::scene::Npc::new(&w.data, sprite, ox >> 8, oy >> 8, of);
+                n.a.x = ox;
+                n.a.y = oy;
+                n.anim.raw = raw;
+                n.anim.frame = cel;
+                n.anim.tick = tick;
+                // the hold state 0x03001B00 (`set_pose`): frozen on its cel
+                if ram.r32(o + 0x14) == 0x0300_1B00 {
+                    n.anim.mode = wf_core::scene::AnimMode::Pose;
+                }
+                w.add(Body::Npc(Box::new(n)));
+            }
+            _ => {}
+        }
+    }
+    patch_leader(&mut w, ram, notes);
+    // the walk and enemy grids as they stand (map object +0xA8 / +0xB0: bitmaps, 32 bytes a row, bit = free)
+    import_grids(&mut w, ram);
+    // the leader as it stands: its 24.8 position (the load put it on the pixel) and animation (an idle's tick runs
+    // on through the scene)
+    if let Some(pi) = w.player_idx(0) {
+        let po = ram.player();
+        let p = w.pl(pi);
+        p.a.x = ram.s32(po + 0x1A0);
+        p.a.y = ram.s32(po + 0x1A4);
+        p.a.facing = ram.r8(po + 0x10);
+    }
+    if let (Some(&(_, raw, cel, tick)), Some(pi)) = (rows.get(&ram.player()), w.player_idx(0)) {
+        let p = w.pl(pi);
+        p.ap.raw = raw;
+        p.ap.frame = cel;
+        p.ap.tick = tick;
+    }
+    // the camera as the field left it (`return_to_field` puts the saved one back)
+    w.scene.cam.mode = wf_core::scene::CamMode::Player;
+    wf_core::battle::set_camera(&mut w, 0, ram.s32(CAM), ram.s32(CAM + 4));
+    // (a camera that is not where following the leader keeps it was held by a script before the scene: fixed)
+    {
+        let mut probe = w.clone();
+        field::world_mode_cameras(&mut probe);
+        if (probe.cameras[0].x, probe.cameras[0].y) != (w.cameras[0].x, w.cameras[0].y) {
+            w.scene.cam.mode = wf_core::scene::CamMode::Fixed;
+        }
+    }
+    notes.push(format!("event s{:03} at node {}: return_to_field, {} actions before it dropped; mid-area objects from RAM", ev.0, ev.1, k));
+    let draws = w.rng.calls.wrapping_sub(calls0);
+    Built { world: w, draws, held: 0, finished: true }
+}
+
+/// an enemy's AI node runtimes from RAM (mid-area imports): the game's runtime tree mirrors the state's definition
+/// tree - Sequence (vt 0x0804AAF4): +4 cursor, +8 count, +0xC child runtimes; Selector (0x0804A710): +4 count, +8
+/// children; the path followers (ChasePlayer ...: +4 speed, +8 budget, +0xC / +0x10 waypoint, +0x14 valid, +0x18
+/// re-plan counter, +0x1C / +0x20 goal); other node kinds keep a fresh runtime (a note says which)
+fn import_ai_rt(w: &mut World, ei: usize, lvl: usize, ram: &GbaRam, r: u32, notes: &mut Vec<String>) {
+    use wf_core::ai::K;
+    let Some(tree) = w.en_ref(ei).ai.stack.get(lvl).map(|s| Arc::clone(&s.tree)) else { return };
+    let mut todo = vec![(0usize, r)];
+    let mut rts: Vec<(usize, wf_core::ai::NodeRt)> = vec![];
+    while let Some((n, r)) = todo.pop() {
+        if !ram.valid(r) || n >= tree.nodes.len() {
+            continue;
+        }
+        let node = &tree.nodes[n];
+        let mut rt = wf_core::ai::NodeRt::default();
+        match node.k {
+            K::Sequence => {
+                rt.i = ram.s32(r + 4);
+                for (k, &c) in node.kids.iter().enumerate() {
+                    todo.push((c as usize, ram.r32(r + 0xC + 4 * k as u32)));
+                }
+            }
+            K::Selector => {
+                for (k, &c) in node.kids.iter().enumerate() {
+                    todo.push((c as usize, ram.r32(r + 8 + 4 * k as u32)));
+                }
+            }
+            K::ChasePlayer | K::ChasePlayerThroughRocks | K::MoveToPoint | K::WanderToRandomPoint => {
+                rt.path = wf_core::ai::PathRt {
+                    speed: ram.s32(r + 4),
+                    budget: ram.s32(r + 8),
+                    wx: ram.s32(r + 0xC),
+                    wy: ram.s32(r + 0x10),
+                    valid: ram.r8(r + 0x14) as i32,
+                    counter: ram.r8(r + 0x18) as i32,
+                    gx: ram.s32(r + 0x1C),
+                    gy: ram.s32(r + 0x20),
+                };
+            }
+            K::Chance | K::GotoState | K::SubState | K::IfPlayerWithin | K::IfPlayerFarther | K::IfPlayerInMeleeRange | K::IfTimeInState | K::IfCooldownOver | K::IfLastKidBuu => {}
+            k => notes.push(format!("ai runtime of {k:?} (state {:#x} node {n}) not imported", tree.state)),
+        }
+        rts.push((n, rt));
+    }
+    let e = w.en(ei);
+    if let Some(st) = e.ai.stack.get_mut(lvl) {
+        for (n, rt) in rts {
+            if let Some(x) = st.rt.get_mut(n) {
+                *x = rt;
+            }
+        }
+    }
+}
+
+/// the live walk / enemy grids from RAM (mid-area imports)
+fn import_grids(w: &mut World, ram: &GbaRam) {
+    let g = wf_core::content::GRID;
+    let read = |off: u32| -> Option<Vec<u8>> {
+        let b = ram.r32(CAM + off);
+        if !ram.valid(b) {
+            return None;
+        }
+        let bytes = ram.read(b, 32 * g.min(256));
+        let mut out = vec![0u8; g * g];
+        for ty in 0..g.min(256) {
+            for tx in 0..g.min(256) {
+                out[ty * g + tx] = (bytes[ty * 32 + (tx >> 3)] >> (tx & 7)) & 1;
+            }
+        }
+        Some(out)
+    };
+    let (walk, enemy) = (read(0xA8), read(0xB0));
+    if let Some(c) = w.col.as_mut() {
+        if let Some(e) = enemy {
+            c.enemy = e;
+        }
+        if let Some(wk) = walk {
+            if wk != c.map.walk {
+                c.walk = Some(wk);
+            }
+        }
+    }
+}
+
 /// the 3D world map (an area whose load makes the flyer)
 fn is_3d(_data: &GameData, to: AreaId) -> bool {
     (to.world, to.area) == (0, 50)
@@ -403,6 +618,12 @@ fn build_event_entry(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner:
     let areat = (to.world, to.area, to.variant);
     // which load: the node's own warp / warp_fade into this area, or (none in the node) the one before a `jump`
     let probe = runner.probe_event(&mut w, ev.0, ev.1, ev.2, areat);
+    // a return_to_field (0x75) in the node: the field the scene left, restored - a mid-area state (`build_returned`)
+    if probe.is_none() {
+        if let Some((k, _)) = runner.probe_event_for(&mut w, ev.0, ev.1, ev.2, &|n, _| n == 0x75) {
+            return build_returned(data, ram, runner, ev, k, w, calls0, notes);
+        }
+    }
     let fading = match probe {
         Some((_, 0x76)) => true,
         Some(_) => false,
@@ -429,7 +650,7 @@ fn build_event_entry(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner:
             None => {}
         }
     }
-    let mut evs: Vec<Event>;
+    let evs: Vec<Event>;
     if fading {
         // warp_fade 0x76: the field's fade-out ends in this frame's post step with the load (no idle draw of its own:
         // the call made it), its on-enter script nested; the script waits for the fade-in (`Pending::Transition`)

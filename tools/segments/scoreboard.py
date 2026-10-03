@@ -133,7 +133,7 @@ def extend_one(job):
     import shutil
     shutil.copyfile(seg / 'states' / (last.stem + '.ss'), run / 'start.ss')
     (run / 'keys.json').write_text(json.dumps({'from': None, 'keys': tail_keys}))
-    n = int(last.stem.split('_')[1])
+    n = int(re.search(r'_(\d{3})_', last.stem).group(1))
     tmp = REAL / 'ext' / (j + '_out')
     if tmp.exists():
         shutil.rmtree(tmp)
@@ -143,7 +143,13 @@ def extend_one(job):
     if len(new) != 1 or new[0].name != last.name:
         return j, f'extension failed: {[x.name for x in new]}'
     subprocess.run([PY, str(ROOT / 'tools/segments/snd_phase.py'), str(new[0])], capture_output=True, text=True, cwd=ROOT)
-    shutil.move(str(new[0]), str(last))
+    # keep the stretch's own source (run dir + key frame of the cut): what `extend` reads the next time (idempotent)
+    # and what snd_phase.py derives the same phase from
+    old_src = re.search(r'"source":\{[^}]*\}', open(last).readline()).group(0)
+    s = new[0].read_text()
+    nl = s.index('\n')
+    last.write_text(re.sub(r'"source":\{[^}]*\}', lambda m: old_src, s[:nl], count=1) + s[nl:])
+    new[0].unlink()
     return j, f'{last.name} extended over {len(tail_keys)} frames'
 
 

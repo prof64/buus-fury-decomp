@@ -150,7 +150,7 @@ class SideDriver(ShipDriver):
 
     def step(self, e):
         g = self.goals[self.k]
-        if g[0] in ('walk', 'goto', 'exitat', 'talkto') or g[0] == 'it' and getattr(self, '_it', None) is None:
+        if g[0] in ('walk', 'goto', 'exitat', 'talkto', 'talknpc') or g[0] == 'it' and getattr(self, '_it', None) is None:
             k = self.hand_guard(e, status(e))
             if k:
                 return k
@@ -283,6 +283,39 @@ class SideDriver(ShipDriver):
                     return self.walk_keys(e, s, g[1], g[2])
                 self._ex_push = True
             return k
+        if g[0] == 'talknpc':
+            # ('talknpc', k): the k-th map NPC of the object list (oldest first) - a wandering one: stand below it,
+            # face up, A; done 20 quiet frames after the talk's scene
+            from common_field import objs
+            s = status(e)
+            if s['scene'] > 0:
+                self.idle = 0
+                self._talked = True
+                return self.mash_a()
+            if getattr(self, '_talked', False):
+                self.idle += 1
+                if self.idle >= 20:
+                    self._talked = False
+                    self.next_goal()
+                    return None
+                return 0
+            if s['p'] is None:
+                return 0
+            npcs = [o for o in objs(e) if o[0] == 'npc']
+            if len(npcs) <= g[1]:
+                return 0
+            nx, ny = npcs[g[1]][2], npcs[g[1]][3]
+            x, y, pf = s['p']
+            tx, ty = nx, ny + 16
+            if abs(x - tx) > 3 or abs(y - ty) > 3:
+                if self.stuck > 60:
+                    self.stuck = 0
+                    self.path = None
+                return self.walk_keys(e, s, tx, ty)
+            if pf != 1:
+                return KEY.UP
+            self.mash += 1
+            return KEY.A if self.mash % 20 < 2 else 0
         if g[0] == 'talkto':
             s = status(e)
             if s['scene'] > 0:

@@ -141,3 +141,27 @@ fn return_to_field_drops_the_scenes_props() {
     wf_core::field::restore_world(w, saved);
     assert!(w.scene.props.iter().all(|p| p.load <= loads), "a scene's prop survived return_to_field");
 }
+
+/// `become_map_object` replaces a placed enemy with another of the area's objects: the replaced one is not defeated,
+/// its on-defeat event does not run (7-6: Spopovich #8 -> #11 in s309; the engine ran #8's s308 too).
+#[test]
+fn become_map_object_is_not_a_defeat() {
+    let Some(p) = packs() else { return };
+    let mut s = StorySim::new(&p, (7, 6), vec![], 3).expect("story");
+    let mut ev = vec![];
+    for _ in 0..30 {
+        s.step(&[0], &mut ev);
+    }
+    let started = s.host().started.len();
+    let w = &mut s.session.world;
+    let id = wf_core::field::spawn_map_object(w, wf_core::fieldcontent::ObjRef::List(1, 8), true).expect("Spopovich #8");
+    assert!(w.field.as_ref().unwrap().placed.iter().any(|p| p.0 == id));
+    wf_core::scene::enqueue(w, wf_core::scene::Owner::Entity(id), wf_core::scene::Cmd::BecomeMapObject { index: 11 });
+    for _ in 0..30 {
+        s.step(&[0], &mut ev);
+    }
+    let w = s.world();
+    assert!(!w.field.as_ref().unwrap().placed.iter().any(|p| p.0 == id), "the replaced enemy is still placed");
+    let ran: Vec<&String> = s.host().started[started..].iter().map(|(_, n)| n).collect();
+    assert!(!ran.iter().any(|n| n.as_str() == "s308"), "its on-defeat event ran: {ran:?}");
+}
