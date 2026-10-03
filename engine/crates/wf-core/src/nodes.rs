@@ -1149,7 +1149,10 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
         K::AbsorbPose | K::AbsorbPose2 => set_anim(w, i, &[an(20)], true, Some(false)),
         K::SuperBuuPowerUp => {
             w.en(i).powered = true;
-            set_anim(w, i, &[an(11)], true, Some(false));
+            // anim 0x0C under the idle controller 0x03001B30 (once, 8 ticks a cel; segment sb 6-6 on 6-1: raw 13
+            // to its 7th cel at tick 56)
+            let g = w.data.anim.generic["0x03001B30"];
+            set_anim_r(w, i, &[an(12)], false, g);
         }
         K::ThrowBigBall => {
             set_anim(w, i, &[an(15)], true, Some(true));

@@ -411,7 +411,6 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
                     }).collect();
                     let game: Vec<String> = fr["actors"].as_array().into_iter().flatten().map(|a| format!("{}:{}/{}", a[1], a[6], a[8])).collect();
                     eprintln!("  t{k} npcs {} | game {}", npcs.join(" "), game.join(" "));
-                    if std::env::var("DBG_NPC").is_ok() { for e in &w.ents { if let Body::Npc(n) = &e.body { eprintln!("DBG_NPC {:?} anim {:?} beh {}", e.id, n.anim, n.behaviour.is_some()); } } eprintln!("DBG_NPC modal {:?} puppets {:?} tracks {:?}", w.modal, w.scene.puppets.iter().map(|p| p.id).collect::<Vec<_>>(), w.scene.tracks.iter().map(|t| (t.owner, t.started, t.queue.len())).collect::<Vec<_>>()); }
                 }
                 if std::env::var("SEGMENT_FORM").is_ok() {
                     if let Some(pi) = w.player_idx(0) {
@@ -483,7 +482,6 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
                     .collect();
                 let pst = w.player_idx(0).map(|pi| (w.pl_ref(pi).ap.raw, w.pl_ref(pi).ap.frame, w.pl_ref(pi).ap.tick, w.pl_ref(pi).a.stats.str_));
                 eprintln!("      player anim (raw, frame, tick, str) {:?} held {:?}", pst, w.field.as_ref().map(|f| (f.held, f.held_event, f.resume_held, f.event_ended, f.busy)));
-                if std::env::var("DBG_EN").is_ok() { for e in w.ents.iter() { if let wf_core::world::Body::Enemy(en) = &e.body { eprintln!("DBG_EN ea {:?} stack {:?}", en.ea, en.ai.stack.iter().map(|s| (s.state, s.rt.iter().map(|r| (r.f, r.i, r.on, r.done, r.d)).collect::<Vec<_>>())).collect::<Vec<_>>()); } } }
                 if std::env::var("SEGMENT_TRACKS").is_ok() {
                     eprintln!("      tracks {:?} wait {:?} done {}", w.scene.tracks.iter().map(|t| (t.owner, t.queue.len(), t.started, t.holding, t.queue.first().map(|c| format!("{c:?}").chars().take(40).collect::<String>()))).collect::<Vec<_>>(), w.scene.director.wait, w.scene.director.done);
                 }

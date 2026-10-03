@@ -311,14 +311,20 @@ fn main() {
                         oa.sort(); ob.sort();
                         println!("  vram app owners {:?} rc {:?} susp {}\n  vram imp owners {:?} rc {:?} susp {}", oa, a.shared_rc, a.suspended.len(), ob, b.shared_rc, b.suspended.len());
                     }
+                    if let (Some(pa), Some(pb)) = (w.player_idx(0), v.player_idx(0)) {
+                        let (sa, sb) = (format!("{:?}", w.pl_ref(pa)), format!("{:?}", v.pl_ref(pb)));
+                        let (ta, tb): (Vec<&str>, Vec<&str>) = (sa.split(", ").collect(), sb.split(", ").collect());
+                        let d: Vec<String> = ta.iter().zip(tb.iter()).filter(|(x, y)| x != y).map(|(x, y)| format!("{x} | imp {y}")).take(30).collect();
+                        println!("  player diffs ({} vs {} fields): {:?}", ta.len(), tb.len(), d);
+                    }
                     if std::env::var("SOAK_G").is_ok() { println!("  g app {:?}\n  g imp {:?}", w.g, v.g); }
                 }
                 println!("leader at row {k}: rec {:?} equip {:?} skills {:?} form {} eff {:?} story equipment {:?}", pl.rec, pl.equip, pl.skills, pl.form, pl.eff, w.story.equipment);
             }
         }
         if show.is_some_and(|(a, b)| a <= k && k <= b) {
-            let pl = w.player_idx(0).map(|pi| w.pl_ref(pi)).map(|p| (p.a.x, p.a.y, p.a.facing, p.gs.name(), p.rec.hp, p.rec.ep, (p.form, p.ss_gauge, p.ss_acc, p.ss3_gauge, p.ss_cooldown, p.regen_timer, p.story_cnt)));
-            println!("row {k} loads {:?} props {:?} started {:?} keys {keys:x} app {pl:?} pending {:?} tracks {:?} busy {:?} depth {} | game p {} hp {} depth {}", w.field.as_ref().map(|f| f.loads), w.scene.props.iter().map(|p| (p.id, p.x >> 8, p.y >> 8, p.load)).collect::<Vec<_>>(), app.host().started.iter().rev().take(3).collect::<Vec<_>>(), app.host().hs.pending, w.scene.tracks.iter().filter(|t| !t.queue.is_empty()).map(|t| (t.owner, format!("{:?}", t.queue), t.started, t.live)).collect::<Vec<_>>(), w.field.as_ref().map(|f| (f.busy, f.nested, f.held, f.held_event)), w.scene.depth, r["p"], r["hp"], r["depth"]);
+            let pl = w.player_idx(0).map(|pi| w.pl_ref(pi)).map(|p| (p.a.x, p.a.y, p.a.facing, p.gs.name(), p.rec.hp, p.rec.ep, (p.form, p.ss_gauge, p.ss_acc, p.ss3_gauge, p.ss_cooldown, p.regen_timer, p.story_cnt), (p.ap.raw, p.ap.frame, p.ap.tick)));
+            println!("row {k} loads {:?} props {:?} started {:?} keys {keys:x} app {pl:?} pending {:?} tracks {:?} busy {:?} depth {} | game p {} hp {} depth {}", w.field.as_ref().map(|f| f.loads), w.scene.props.iter().map(|p| (p.id, p.x >> 8, p.y >> 8, p.load)).collect::<Vec<_>>(), app.host().started.iter().rev().take(3).collect::<Vec<_>>(), app.host().hs.pending, w.scene.tracks.iter().filter(|t| !t.queue.is_empty()).map(|t| (t.owner, format!("{:?}", t.queue), t.started, t.live)).collect::<Vec<_>>(), w.field.as_ref().map(|f| (f.busy, f.nested, f.held, f.held_event, f.event_ended, f.queued_event, f.break_event, f.queued_runs.len())), w.scene.depth, r["p"], r["hp"], r["depth"]);
         }
         if let Some(gr) = r["rng"].as_array() {
             let g = [gr[0].as_u64().unwrap_or(0) as u32, gr[1].as_u64().unwrap_or(0) as u32];

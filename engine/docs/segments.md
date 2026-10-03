@@ -479,12 +479,45 @@ Increment 5 (A): **events mid-node, follow camera, cutscene maps** - the scorebo
   4th argument, +0xB radius, +0x10 / +0x14 centre) -> `VisualKind::EnergySphere` (its radius - 3 jitter draws a
   frame; f21000).
 * **Follow camera**: with no event running nothing holds the camera (the "fixed if not where following puts it" rule
-  applies only at depth > 0: a camera still easing toward the leader follows on); mid-node, a camera within 16 px of
-  the follow target is the player camera (INFERRED; the return cuts keep the old rule - `kbr_011`'s script camera
-  sits a fraction of a pixel off).
-* Left (7 / 24): an event **stopped inside a code node** - a script's walk / animation / screen shakes running (s457
-  n60, s458 n0, s459 n0, s460 n0, s461 n2 / n18) or a walk from an earlier node still running under a text box (s457
-  n17, f16000): needs the interpreter's position inside the node and the running commands' state from RAM.
+  applies only at depth > 0: a camera still easing toward the leader follows on). Superseded for recognised
+  controllers by Increment 6's camera slot.
+* Left (7 / 24) then: events stopped inside a code node - Increment 6.
+Increment 6 (A): **events stopped mid-step** - the real Kid Buu fight at every 1,000 frames: **22 / 24 exact** (the
+every-3,000 set 8 / 8; `kbr_002` .. `kbr_014` still 12 / 14; all 473 gates, battle lockstep, cross_ts, script tests
+green).
+* **Where the interpreter stands** (`natives_run`): the interpreters on the context stack 0x03001034, each one's PC
+  in the stack word after the one holding it; the node's original bytecode (content `scripts/bytecode.json`, loaded
+  once by the segments harness: `host::set_step_code`) at its ROM address or, compressed, as its decompressed copy
+  in EWRAM around the PC; `wf_script::bytecode` decodes it and the natives before the PC ran (queries left out),
+  each with its constant arguments (the pushes before it). The last one is the one waiting. Its place among **our**
+  queued actions is found by id + arguments (`probe_queued`, the k-th such): a branch not taken has natives in the
+  bytecode but not in our queue (s459 node 0's `if is_super_saiyan()`).
+* **Replay from the group** (`build_mid_code`, `StoryHost::continue_mid_node`): the node runs again from the waiting
+  native - or from its batch's `begin_parallel` when it waits in `end_parallel` - with every native before it
+  dropped unexecuted (the rhai thread's new `queue_instants`: instant natives are queued too, so none runs twice);
+  the RNG as it was. Then each command the group started takes the game's progress:
+  - **screen shake** (the mode's camera slot 0x03002BE0 -> vt 0x0804A720: +4 intensity, +5 period, +6 count, +8
+    frames left): the track's shakes before the running one are done; the running one's t = frames - 1 - left;
+  - **walk / glide** (heap object vt 0x0804D0A4, matched by its target +0x14 / +0x18: +0xC / +0x10 24.8 step, +0x1C
+    steps left) and **jump** (vt 0x0804AE5C, target +0x18 / +0x1C: +8 x step, +0xC y velocity, +0x38 air frames,
+    +0x3C frames run - 8 crouch, the flight, 8 landing): the track's commands before it are done, it starts
+    (`scene::import_start_head`: its walk state, facing) and takes the object's numbers;
+  - **`wait(n)`** (0x88): the main loop's mode object 0x03000F90 is the wait (vt 0x08049978, +4 frames left);
+  - the track actors' animations (and their scene puppets') from the RAM rows.
+* **The leader's script animation states**: vt 0x0804DCA4 = SsUp (anim 23), 0x0804A730 = OnceHold (anim 16), each the
+  only anim with that state: `scene::set_state` (the player is the script's puppet), then the RAM cel / tick.
+* **The camera controller** (all mid-area imports): the mode's camera slot 0x03002BE0 - vt 0x0804D300 follows the
+  actor at +4 (the leader: the player camera), vt 0x0804BE08 holds it still (`kbr_004` / `kbr_011`'s script
+  cameras); anything else (a shake there) falls back to the old rule.
+* **Enemy animation rule from its state object**: the shared state objects (obj+0x14 = an IWRAM singleton: idle
+  0x03001B0C, the loops / one-shots of `eanim::generic_states`) give the rule; a node the import re-entered had set
+  another (f7000: a knockback's one-shot over the idle the RAM shows -> a spurious idle re-entry draw).
+* **The load probe leaves the world as it was** (`probe_queue` restores the whole World): an instant native at a
+  handler's front ran during the probe (`begin_parallel` left a batch open, `hide_hud` hid the HUD: f10000).
+* Left (2 / 24): f16000 - Kid Buu's beam in flight at the cut (beam object vt 0x0804AEF8 owned via +0x50, the
+  KidBuuKamehameha node runtime vt 0x0804A6C0 -> pose state 0x0804C690 +0x10 -> the beam): the beam's fields are not
+  mapped to `KameBeam` yet; f22000 - s461 node 18 is a `steps` node with a loop (`n18_step_2` / `_3`): the PC's
+  natives in bytecode order are not our queue's for a loop.
 Increment 4 (A):
 * **`kbr_012` settled - not a host rule**: the game keeps the actors at s463 node 66's `load_scene_fade` because
   nothing armed a field save there; ours was armed by the *import*: the probe / placement replay node 64's handler,
@@ -874,10 +907,11 @@ at area entries: `tools/segments/segment.py cut --from REC --at FRAME --frames N
 SRC.json OUTDIR LEN F1 F2 ...`) and replay as usual. What imports (§6, "Increment 5"): any frame with no event
 running; an event standing at a **text node** (box open, typing, waiting for A, or closing), on a standing field or a
 playerless cutscene map; an event that loaded its area (warp / warp_fade / 3D map / return_to_field). Measured on
-the real Kid Buu fight (24 cuts, one every 1,000 frames, 600 frames each): **17 / 24 exact**. Still refused or
-diverging at once: an event **stopped inside a code node** (a script's walk / animation / screen shake running at
-the cut - 7 of the 24; the script's position inside the node is not read from RAM yet). Suggest: cut every N
-frames, report the "imports at all" rate separately from "exact", and keep the area-entry segments as they are.
+the real Kid Buu fight (24 cuts, one every 1,000 frames, 600 frames each): **22 / 24 exact** (Increment 6: events
+stopped mid-step - walks, jumps, animations, screen shakes, waits - import too). Still diverging: an enemy beam in
+flight at the cut, a looping `steps` node. Suggest: cut every N frames, report the "imports at all" rate separately
+from "exact", and keep the area-entry segments as they are. The step bytecode comes from the content's
+`scripts/bytecode.json` (the segments test loads it: `wf_import::host::set_step_code`).
 
 Fixed from the board (2026-10-03): **message windows** (event node kind 3) fade in / out only when the current
 BLDCNT has no first-target layer (`0x08030ED2`: then BLDCNT := 0x3E41 and BLDALPHA is ramped 16 steps by the
