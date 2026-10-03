@@ -528,6 +528,17 @@ impl Page for Save {
     fn leave_black(&self) -> bool {
         self.black || self.stage == Stage::Done
     }
+    /// the popup ("Saving..."): the list's and the popup's draw lists + 261,163 (save_slot / save_cancel, emulator); the write's own
+    /// length is `WRITE_CYCLES` (no sound interrupt runs in it); the list keeps its constant
+    fn redraw_time(&self, w: &World, d: &MenuData) -> Option<crate::sndsim::Redraw> {
+        if self.stage != Stage::Popup || self.black {
+            return None;
+        }
+        let v = self.view(w, d);
+        // (the list's surface is drawn again under the popup)
+        let own = 261_163 + v.layers.iter().map(|l| crate::sndsim::layer_cycles(&d.text, &l.ops, 0)).sum::<i64>();
+        Some(crate::sndsim::Redraw { t0: 4_641, base: own - 4_641 })
+    }
     fn redraw_cost(&self) -> u8 {
         match self.stage {
             Stage::List => LIST_FRAMES,

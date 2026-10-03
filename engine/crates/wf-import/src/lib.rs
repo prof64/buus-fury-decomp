@@ -689,6 +689,36 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
         e.ea.pos.tick = tick;
     }
     wf_core::enemy::sync_mark(w, ei);
+    import_patrol(w, ei, ram, o);
+}
+
+/// a patrol's runner (enemy +0x22C current step object): the world map's 3-D move (`cutscene_move` step, vt
+/// 0x0804A800: +4 s16 target x / y, +8 s16 z / u16 speed, +0xC / +0x10 / +0x14 velocity, +0x18 frames left); the
+/// step's index is the record whose target words are the object's; the height obj+0x1A8, heading +0x1AC
+fn import_patrol(w: &mut World, ei: usize, ram: &GbaRam, o: u32) {
+    let id = w.ents[ei].id;
+    let st = ram.r32(o + 0x22C);
+    let Some(f) = w.field.as_mut() else { return };
+    let Some(p) = f.patrols.iter_mut().find(|p| p.entity == id) else { return };
+    p.z = ram.s32(o + 0x1A8);
+    p.h = ram.s32(o + 0x1AC);
+    if !ram.valid(st) || ram.r32(st) != 0x0804_A800 {
+        return;
+    }
+    let (w0, w1) = (ram.r32(st + 4), ram.r32(st + 8));
+    if let Some(k) = p.steps.iter().position(|s| s.func == 0x0803_9F09 && s.words.first() == Some(&w0) && s.words.get(1) == Some(&w1)) {
+        p.idx = k as i32;
+    }
+    p.cur = Some(wf_core::fieldnpc::StepRt::Move3 {
+        tx: (w0 & 0xFFFF) as i16 as i32,
+        ty: (w0 >> 16) as i16 as i32,
+        tz: (w1 & 0xFFFF) as i16 as i32,
+        n: ram.s32(st + 0x18),
+        vx: ram.s32(st + 0xC),
+        vy: ram.s32(st + 0x10),
+        vz: ram.s32(st + 0x14),
+        h: ram.s32(o + 0x1AC),
+    });
 }
 
 /// the 3D world map (an area whose load makes the flyer)

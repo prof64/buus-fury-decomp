@@ -2,13 +2,12 @@
  "chapters": {
   "earth": {
    "cats": {
-    "RNG": 1,
     "animation": 2
    },
    "cut_frames": 157565,
-   "exact": 87,
+   "exact": 88,
    "frames": 157565,
-   "matched": 107546,
+   "matched": 110970,
    "run_frames": 160503,
    "segments": 90,
    "stretches": 1
@@ -17,13 +16,12 @@
    "cats": {
     "RNG": 3,
     "camera": 3,
-    "position / facing": 3,
-    "sound": 1
+    "position / facing": 3
    },
    "cut_frames": 380206,
-   "exact": 361,
+   "exact": 362,
    "frames": 380206,
-   "matched": 322039,
+   "matched": 322469,
    "run_frames": 388646,
    "segments": 371,
    "stretches": 33
@@ -71,14 +69,14 @@
    "cats": {
     "RNG": 16,
     "camera": 5,
-    "menu timing": 3,
+    "menu timing": 2,
     "position / facing": 23,
     "sound": 1
    },
    "cut_frames": 467701,
-   "exact": 400,
+   "exact": 401,
    "frames": 467701,
-   "matched": 307684,
+   "matched": 307986,
    "run_frames": 478729,
    "segments": 448,
    "stretches": 22
@@ -87,12 +85,12 @@
  "dirty": true,
  "total": {
   "cut_frames": 1622756,
-  "exact": 1447,
+  "exact": 1450,
   "frames": 1622756,
-  "matched": 1340840,
+  "matched": 1344996,
   "run_frames": 1668050,
   "segments": 1519,
   "stretches": 75
  },
- "tree": "2e039b7"
+ "tree": "f1a156b"
 }
