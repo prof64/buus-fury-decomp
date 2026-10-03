@@ -1737,7 +1737,8 @@ pub fn fits(w: &World, i: usize, x: i32, y: i32) -> bool {
             return false;
         }
     }
-    for e in &w.ents {
+    // (the field's rocks are no obstacle of their own: Broly's summit 15-32, see nodes.rs `rock_msg`)
+    for e in w.ents.iter().filter(|_| w.field.is_none()) {
         if let Body::Rock { x: rx, y: ry, .. } = e.body {
             if !e.removed {
                 let r = Rect::new(rx + 16, ry + 16, rx + 48, ry + 48);
@@ -1770,7 +1771,6 @@ fn walk_try(w: &mut World, i: usize, vx: i32, vy: i32, flags: i32) {
     let ny24 = y + vy;
     let mut nx = nx24 >> 8;
     let ny = ny24 >> 8;
-    if std::env::var("DBG_WALK").is_ok() { for e in &w.ents { if let Body::Rock { x: rx, y: ry, .. } = e.body { eprintln!("      DBGROCK {} {} removed {}", rx, ry, e.removed); } } let a=&pr(w,i).a; let c=w.col.as_ref(); eprintln!("      DBGWALK f{} to ({},{}) foot {}x{} fits {} bounds {:?} walk {:?} enemy {:?} ", w.frame, nx, ny, a.foot_w, a.foot_h, fits(w,i,nx,ny), w.arena.bounds, c.map(|c| c.test(crate::world::Layer::Walk, nx, ny, nx + a.foot_w, ny + a.foot_h)), c.map(|c| c.test(crate::world::Layer::Enemy, nx, ny, nx + a.foot_w, ny + a.foot_h))); }
     if fits(w, i, nx, ny) {
         let pl = p(w, i);
         pl.a.x = nx24;

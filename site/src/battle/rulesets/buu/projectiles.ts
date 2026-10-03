@@ -230,7 +230,18 @@ export class StraightShot extends Shot {
     // sound and explosion; the shuriken is just removed) and is accepted, whatever the sender's team or attack kind
     // (the real route, Diablo Desert Express 11-21: Trunks' ki blast meets a gunman's bullet - the bullet bursts,
     // the blast counts the hit, the player is not hit)
-    if (this.o.fragile && this.dead < 0 && !msg.foot && msg.source !== this && !this.removed && overlaps(msg.rect, this.rect())) {
+    // The bullet tests the message in its own update, after it moved (Earth 3-3 #4 f1495: a ki blast created later
+    // in the list - updated earlier in the frame - meets the bullet's box of this frame): a bullet that has not had
+    // its update this frame is tested where this frame's move puts it.
+    const ents = _w.entities
+    const ahead = ents.indexOf(msg.source as never) > ents.indexOf(this as never) && !(this.o.delay && this.t < this.o.delay)
+    let r = this.rect()
+    if (ahead) {
+      const dx = ((this.x + this.o.vx) >> 8) - this.px
+      const dy = ((this.y + this.o.vy) >> 8) - this.py
+      r = { x0: r.x0 + dx, y0: r.y0 + dy, x1: r.x1 + dx, y1: r.y1 + dy }
+    }
+    if (this.o.fragile && this.dead < 0 && !msg.foot && msg.source !== this && !this.removed && overlaps(msg.rect, r)) {
       this.removed = true
       if (this.o.sfxEnd != null) audioEvent('sfx', { id: this.o.sfxEnd, vol: 64 })
       if (this.o.explode !== false) this.ctx.explosion(_w, this.px, this.py)

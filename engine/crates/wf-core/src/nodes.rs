@@ -433,6 +433,24 @@ fn face_player_routine(w: &mut World, i: usize) {
     }
 }
 
+/// the ThroughRocks wrapper (update 0x080369D0) broadcasts message 0x22 before and after its child's update; a
+/// rock's handler 0x08036C4E answers it by writing its 32 x 32 rect (x + 16, y + 16) into the walk and the enemy
+/// grid: free, both times, for an intact or cracked rock (state index < 2). The rocks mark nothing when they
+/// appear, so in the field they block nobody, and each chase update frees the tiles under them - the part of
+/// Broly's own mark inside a rock's rect included, until his next re-plan marks it again (the real route, Volcano
+/// Summit 15-32: the player walks through a rock's place; Broly's mark shrinks to the tiles outside it)
+fn rock_msg(w: &mut World) {
+    let rects: Vec<[i32; 4]> = w.ents.iter().filter(|e| !e.removed).filter_map(|e| match e.body {
+        Body::Rock { x, y, .. } => Some([x + 16, y + 16, x + 48, y + 48]),
+        _ => None,
+    }).collect();
+    if let Some(c) = w.col.as_mut() {
+        for r in rects {
+            c.mark_both(r, 1);
+        }
+    }
+}
+
 // ---- conditions ------------------------------------------------------------------------------------------------------
 
 fn cond(w: &mut World, c: &C, n: u16) -> bool {
@@ -1528,6 +1546,10 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         // ---- movement
         K::ChasePlayer | K::ChasePlayerThroughRocks => {
             let Some(pi) = en::player(w, i) else { return false };
+            let rocks = kind(c, n) == K::ChasePlayerThroughRocks && w.field.is_some();
+            if rocks {
+                rock_msg(w);
+            }
             r.path.gx = w.pl_ref(pi).a.x;
             r.path.gy = w.pl_ref(pi).a.y;
             let dx = r.path.gx.wrapping_sub(w.en_ref(i).a.x);
@@ -1535,11 +1557,17 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             if ((dx.wrapping_mul(dx) >> 8) as i64) + ((dy.wrapping_mul(dy) >> 8) as i64) <= 0x400 {
                 // 0x0802A086: within range SetAnim(0) on every update (the idle enter draws rand(255) each frame)
                 set_anim(w, i, &[nm("idle")], true, Some(true));
+                if rocks {
+                    rock_msg(w);
+                }
                 return false;
             }
             let mut p = r.path;
             crate::path::update(w, i, &mut p);
             r.path = p;
+            if rocks {
+                rock_msg(w);
+            }
             false
         }
         K::BackOffFacingPlayer | K::BackOffFacingPlayerThroughRocks => en::step_from_player(w, i, speed, true),

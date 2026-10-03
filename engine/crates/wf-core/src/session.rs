@@ -149,7 +149,7 @@ impl Session {
                 // the players get no input: the mode reads the keys (menu_parity mg_power: no punches)
                 w.input = [InputFrame::default(); MAX_PLAYERS];
                 w.step_entities();
-            } else if w.field.is_some() && matches!(w.menu.phase, crate::menu::Phase::FadeOut { .. } | crate::menu::Phase::FadeIn { .. }) {
+            } else if w.field.is_some() && matches!(w.menu.phase, crate::menu::Phase::FadeOut { level } if level < 256) || w.field.is_some() && matches!(w.menu.phase, crate::menu::Phase::FadeIn { .. }) {
                 // a screen opening over the field: its fade-out leaves the objects still, the cameras keep easing
                 // (segment sb 21-14: the save point's party menu, the follow camera reaches its target under it)
                 crate::field::world_mode_cameras(w);

@@ -756,7 +756,9 @@ fn close_with(w: &mut World, done: bool) {
     w.menu.stack.clear();
     w.menu.phase = Phase::Leave { t: 0 };
     // the pause menu's black frames = the area reload's CPU time (sndsim.rs): the iteration's frames + this one
-    if w.menu.tr == PAUSE {
+    // (the script-opened screens - Switch Character, save, shops - restore the world the same way: real route
+    // save-point cuts 8-1 / 8-26 / 8-66, 27 black frames against the constant's 25)
+    if w.menu.tr == PAUSE || w.menu.tr.leave == 25 && w.menu.tr.fade_out & FADE_HOLD != 0 {
         if let Some(n) = crate::sndsim::reload_frames(w, done) {
             w.menu.tr.leave = n as u16 + 1;
         }

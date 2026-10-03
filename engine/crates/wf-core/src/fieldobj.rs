@@ -196,14 +196,16 @@ pub fn spawn_map_sprite(w: &mut World, o: &crate::fieldcontent::ObjDef) -> Optio
 // ---------------------------------------------------------------------------------------------------------------
 // breakables
 
-/// message 0 (an attack): needs a solid prop, mult != 0, a strict box overlap and the attack type in the mask
+/// message 0 (an attack): needs mult != 0, a strict box overlap and the attack type in the mask
 pub fn breakable_message(w: &mut World, k: usize, msg: &mut HitMsg) -> bool {
     // any sender's attack message (a laser turret's wave breaks crates too: Babidi's ship 8-22)
     if msg.mult == 0 {
         return false;
     }
     let Body::Breakable(b) = &mut w.ents[k].body else { return false };
-    if b.broken || !b.solid || !ov(b.bx, [msg.rect.x0, msg.rect.y0, msg.rect.x1, msg.rect.y1]) {
+    // (a breakable bound to a non-solid prop takes hits too: HFIL 18-10's boulder is prop 13, hidden and not solid,
+    // under the solid prop 12 - punched, it shakes the screen and breaks; sc_hfil)
+    if b.broken || !ov(b.bx, [msg.rect.x0, msg.rect.y0, msg.rect.x1, msg.rect.y1]) {
         return false;
     }
     if b.mask & ((1 << msg.atk.kind) | (1 << msg.atk.sub)) == 0 {

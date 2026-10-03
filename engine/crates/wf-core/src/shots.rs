@@ -2328,8 +2328,21 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
         // end's sound and explosion; the shuriken is just removed) and is accepted, whatever the sender's team or
         // attack kind (the real route, Diablo Desert Express 11-21: Trunks' ki blast meets a gunman's bullet - the
         // bullet bursts, the blast counts the hit, the player is not hit)
-        ShotKind::Straight(o) => { if std::env::var("TMPDBG").is_ok() && o.fragile { eprintln!("TMPDBG f{} msg {:?} foot {} src {} me {} shot {:?} dead {}", w.frame, msg.rect, msg.foot, msg.source, me, rect(w, i), o.dead); }
-            if o.fragile && o.dead < 0 && !msg.foot && msg.source != me && !w.ents[i].removed && overlaps(&msg.rect, &rect(w, i)) {
+        // The bullet tests the message in its own update, after it moved (rifle 0x08027826 moves, then the message
+        // handler runs; 3-3 #4 f1495: a ki blast created later in the list - updated earlier in the frame - meets
+        // the bullet's box of this frame, emulator write order work/earth/timing/order.py): a bullet that has not
+        // had its update this frame is tested where this frame's move puts it.
+        ShotKind::Straight(o) => {
+            let ahead = w.find(msg.source).is_some_and(|j| j > i) && !(o.delay > 0 && w.shot_ref(i).t < o.delay);
+            let r = if ahead {
+                let s = w.shot_ref(i);
+                let (px, py) = ((s.x + o.vx) >> 8, (s.y + o.vy) >> 8);
+                let b = rect(w, i);
+                Rect::new(b.x0 + px - s.px(), b.y0 + py - s.py(), b.x1 + px - s.px(), b.y1 + py - s.py())
+            } else {
+                rect(w, i)
+            };
+            if o.fragile && o.dead < 0 && !msg.foot && msg.source != me && !w.ents[i].removed && overlaps(&msg.rect, &r) {
                 let (sfx_end, explode) = (o.sfx_end, o.explode);
                 w.ents[i].removed = true;
                 if sfx_end >= 0 {

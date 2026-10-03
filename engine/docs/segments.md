@@ -1113,3 +1113,79 @@ resolved by one rule that fits both recordings:
 Open: `db7_041` f765 - at s019's portrait box (node 9, speaker 62; the game lags 7 video frames building it) ours
 stops actor 123's idle tick for 5 frames, the game does not: the OBJ purge model (§6 blocker, Super Buu agent)
 suspends an actor here that the game keeps. The three db5 cuts and db7_023 that end at a heal menu (Earth agent).
+
+**10.1 update 2 (B): the Airship's self destruct running out.** `tools/db57/routes.py db5t` (from db5's mark
+`a04_escape`): wait by 12-27's save point, walk to the empty lift room 12-22, let the countdown reach 0 - 12,988
+frames to the game over. The countdown reaching 0 runs the engine hook **#9** (OnTimerFinished: flag 277 -> s461,
+278 -> s463, flag 95 = the Airship: sound 17, white fade, `set_hp(0)`) in that frame; `set_hp(0)` is a KO like a
+hit's (the player lies down in the event's exit frame; the death script #0 and song 8 follow 200 frames later, then
+0-2). `wf_script_core::tick_timers` (the hook; the walk-in's last frame counts as free), `player::script_set_hp`,
+`fieldnpc::start_event` (the stop message idles a *bored* player too: one draw). 4 cuts, all exact (4,448 frames);
+gated: `db5t_004_12-22` (2,170 frames: the last 1,717 countdown frames, #9, the KO, #0, the game over).
+
+## 11. Story-mode soak of the app (agent B, 2026-10-03)
+
+**What it is.** `cargo run --release -p wf-app --example soak -- REC.json [REC2.json ..] [--sync W-A] [--frames N]
+[--rng A..B] [--show A..B]` (headless, muted, no window / audio device; `engine/crates/wf-app/examples/soak.rs`): the
+launcher's title path (`wf_core::menu::title::open_title` on a `StorySim`, exactly what `launcher::title_app`
+builds) fed the REAL route's recorded keys, compared row by row with the recording (area, leader position, leader
+HP, RNG, songs, script errors). Nothing is imported: the app boots at the title, starts New Game through the game's
+own menus and carries its state across every load. Recordings chain (opening.json, then the Earth master
+`work/earth/rec/earth_all.json`).
+
+**How far it gets today.** Title -> Single Player -> New Game -> prologue (#4 .. the Snakeway warp) -> the whole
+Other World chapter -> Earth 2-1 as Gohan: **every area transition on the recording's row, no RNG divergence, the
+end state's flags (1 - 13, 157), character and zenie equal to the game's** (41,423 rows). Chained into the Earth
+chapter it stays exact for another 23,535 rows (house, lunch, Nimbus, Hercule City, s125) and stops in 3-1's robbers
+fight (below). Ship / dungeons / post-ball were not chained (they start from other states: see gaps 5 / 6).
+
+**Fixed (B's glue):**
+1. *Three script hosts.* wf-app's `StorySim` had its own copy of the host loop without the nested on-enter scripts
+   (`nest_area_enter`, the `outer` stack), `release_unstarted_hold`, the on-defeat hold: everything the segments
+   verify ran on `wf_import::StoryHost` only. `StorySim` now runs on `StoryHost` (`step_inputs`, `start`); wf-app
+   depends on wf-import. The playthrough test keeps its own (older) copy - owner: script-host maintainers; it should
+   move to `StoryHost` too.
+2. *Host mark lost at New Game / Continue.* The title's boot replaces the world; the new field had `Field.host =
+   false`, so talk / defeat / level-up events did not hold the field (Yemma's office NPCs kept wandering in the
+   frame s048 started; a fight later went wrong and the run ended in a game over). `StorySim::step` re-attaches.
+3. *Hit-damage remainder across loads.* `Field` carried `Player.hp_acc` into the new area's player; the game's
+   remainder is the player object's and starts at 0 after a load (Goku's HP ran 1 below the game's from 1-13 on;
+   five 1-HP divergences in Other World, none after the fix). The harness never saw it: the importer starts the
+   remainder at 0 at every cut and HP is not compared.
+4. The countdown: ticked by the host every frame, imported at a cut, its timeout hook (above).
+
+**Gaps found (not fixed), with owners:**
+1. **Title / prologue phase** (menus: Earth agent; cutscene timing: side-content agent). From the soft reset the
+   app reaches each prologue scene later than the game (0-2 at row 190 vs 66; Snakeway at 3,995 vs 3,815): the
+   recording's first rows are the boot logos the app's title does not have (about 124 rows), the rest is text-box
+   A-mash phase (30-row quanta). The soak therefore syncs once, at the first row the recording walks in 1-1 (`--sync
+   1-1`): it lets the app finish the prologue (70 extra frames), checks the leader stands where the game's does and
+   takes the recording's RNG - the only harness-only setup left. A real player is unaffected; a key log is not
+   replayable from the reset until the title has the boot logos' frames and the prologue's boxes open on the game's
+   frames.
+2. **RNG at New Game** (owner: title / launcher). The game's generator state when the prologue starts comes from
+   the boot; the app seeds from `seed`. Needed for a log-exact run from the title (not for play).
+3. **Lag frames** (owner: frontend / Earth agent's timing work). The app steps one logic frame per call; the game
+   drops video frames at loads, text boxes and menus. The soak uses the recording's logic counter to know which rows
+   are logic frames. Real-time pacing of the app is therefore not the GBA's (loads are instant, 30-60 frames in the
+   game).
+4. **3-1 after s125 (Earth agent).** Recording row 64,958 (Earth master frame 23,535): Gohan's Energy Blast state
+   (`skill6`, game state vt 0x0804DC14) ends 4 frames earlier in the app (idle at 64,958, the game's at 64,962), the
+   walk starts early, a robber's shot then hits and the run diverges (RNG from 65,044). No segment covers this
+   stretch (the 3-1 cuts are #4 at frame 30,003 and #6 at 66,145: the load before it is inside an event, not
+   importable), so the harness never saw it. Reproduce: `soak opening.json earth_all.json --sync 1-1 --frames 64965
+   --show 64936..64962`.
+5. **Save / Continue round trip not soaked** (owner: B next, then menus: Earth agent). `launcher::story_app`
+   continues a slot, and the soak takes `--slot FILE` / `--save-out FILE`, but no run has gone through the in-game
+   Save screen and back through Continue yet (it needs the save point's menu keys from a real log: the ship route has
+   them at 8-66). Unknown until run: whether a `SaveData` round trip keeps everything a load must keep (flags,
+   records, equipment list, G / L script words, play time, the save location's variant).
+6. **Chapter hand-offs** (owner: B / ship agent). Earth -> ship -> dungeons -> post-ball use different start states
+   (the ship's real route starts from `earth_end.ss`, the dungeons from constructed saves): a single chained soak
+   needs either the Earth gap above closed (then the ship's key log follows directly) or Continue from a slot file
+   written by the app (gap 5).
+7. **Leader HP is not compared by the segment harness** (owner: wf-import). The soak compares it; adding `hp` to
+   `segment::compare` would have caught fix 3.
+8. **One transient position mismatch** at row 33,189 in 1-20 (King Kai's planet): the leader stands elsewhere than
+   the recording's player for fewer than 150 rows while areas / RNG stay equal - a scene where the row's "player" is
+   another object, or a puppet position; not looked at.
