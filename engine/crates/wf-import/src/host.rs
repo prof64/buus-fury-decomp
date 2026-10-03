@@ -229,8 +229,10 @@ impl StoryHost {
     /// `probe_event` for the first queued action `is_load(native, args)` accepts
     pub fn probe_event_for(&mut self, w: &mut World, event: u16, node: u16, params: [i32; 4], is_load: &dyn Fn(u8, &[i32]) -> bool) -> Option<(usize, u8)> {
         let saved = self.rt.state();
-        // (the probe's queries must not move the generator: the placement run replays them)
+        // (the probe's queries must not move the generator: the placement run replays them; immediate natives with
+        // effects - `save_field_on_next_scene` arms the host - ran before the cut in the game: their state is RAM's)
         let rng = w.rng.clone();
+        let (hs0, story0) = (self.hs.clone(), w.story.clone());
         let mut g = self.rt.globals();
         g.g = w.story.g;
         self.rt.set_globals(g);
@@ -265,6 +267,8 @@ impl StoryHost {
         }
         self.rt.restore(saved);
         w.rng = rng;
+        self.hs = hs0;
+        w.story = story0;
         out
     }
 
@@ -279,6 +283,7 @@ impl StoryHost {
         self.rt.start_event_at(event, node, params);
         self.started.push((self.frame, format!("s{event:03}@{node}")));
         self.cause = None;
+        let (hs0, story0) = (self.hs.clone(), w.story.clone());
         if let Some(pending) = blocked {
             // run the handler(s) up to the load action without executing anything, then block on it
             let mut left = skip;
@@ -297,6 +302,10 @@ impl StoryHost {
                         }
                         t.blocked = t.queue.pop_front();
                     });
+                    // (the immediate natives the placement replayed ran before the cut: the host and the story as
+                    // they were - RAM's)
+                    self.hs = hs0;
+                    w.story = story0;
                     self.hs.pending = Some(pending);
                     self.running = true;
                     return;

@@ -1731,6 +1731,7 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
             w.scene.cam.mode = CamMode::Fixed;
         }
         Cmd::CamPanTo { x, y, speed, n, t, sx, sy } => {
+            camera_mode_set(w);
             w.scene.cam.mode = CamMode::Fixed;
             let c = &w.cameras[0];
             let (cx, cy) = (c.x >> 10, c.y >> 10);
@@ -2629,7 +2630,18 @@ fn follow_step(w: &mut World, id: EntityId) {
 }
 
 /// `camera_follow` / `camera_follow_wait`: the follow object takes the camera (it steps with the frame's camera)
+/// a script camera command sets the camera object's mode (`0x08021094`: the old mode's exit, the new one's enter).
+/// A screen shake is a mode pushed on that camera (`0x0800797C` -> `0x080210D6`): replaced, it ends - no more
+/// offset draws (VERIFIED segment sb 6-6 f4694: Gotenks' crit shake stops at s228's camera_pan_to)
+pub fn camera_mode_set(w: &mut World) {
+    if !w.g.shakes.is_empty() {
+        w.g.shakes.clear();
+        w.g.shake_off = (0, 0);
+    }
+}
+
 pub fn follow(w: &mut World, id: EntityId) {
+    camera_mode_set(w);
     w.scene.cam.follow_last = None;
     w.scene.cam.mode = CamMode::Follow(id);
     w.scene.cam.scroll = None;

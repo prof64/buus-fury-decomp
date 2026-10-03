@@ -221,6 +221,9 @@ impl Session {
             if !ticked {
                 crate::scene::tick(w);
             }
+            if std::env::var("SHAKE_LATE").is_ok() && w.g.shakes_ticked != w.frame && !crate::field::frozen(w) {
+                w.tick_shakes();
+            }
             return;
         }
         let w = &mut self.world;
