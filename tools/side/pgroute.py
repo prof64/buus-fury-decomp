@@ -65,7 +65,9 @@ LEGS = {
     'xj6a': [('fly', 1929, 401, 95, 79), ('wait', 200)],
     # the Hercule Cafe 3-20 (s170: "Did you find any of the exhibits?" - Yes hands one in, flag bits 341 count them):
     # from XJ-6's end (the real start's exhibit 65 + XJ-6's 58)
-    'cafe': ('pg_xj6.ss', [('fly', 2441, 1065, 127, 135), ('wait', 30), ('goto', '3-20', 150, 225, False),
+    'cafe': ('pg_xj6.ss', [('fly', 2441, 1065, 127, 135), ('wait', 30), ('goto', '3-20', 150, 240, False), ('face', 'U'),
+                           # (the first talk only tells the story, flag 19; the second asks)
+                           ('keys', [(A_, 3, 60)]), ('events',), ('wait', 30),
                            ('keys', [(A_, 3, 60)]), ('events',), ('wait', 30)]),
 }
 

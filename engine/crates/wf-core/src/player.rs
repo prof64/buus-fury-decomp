@@ -3000,12 +3000,12 @@ fn upd_transform(w: &mut World, i: usize) {
 fn aura_form(w: &World, i: usize) -> bool {
     [0x3001b68, 0x3001b6c, 0x3001b78, 0x3001b7c, 0x3001b80, 0x3001b84, 0x3001b8c].contains(&pr(w, i).form_ref(w).controller)
 }
-fn form_enter(w: &mut World, i: usize) {
+pub fn form_enter(w: &mut World, i: usize) {
     if aura_form(w, i) {
         sfx(w, 54, 64);
     }
 }
-fn form_exit(w: &mut World, i: usize) {
+pub fn form_exit(w: &mut World, i: usize) {
     if aura_form(w, i) {
         sfx_stop(w, 54);
     }

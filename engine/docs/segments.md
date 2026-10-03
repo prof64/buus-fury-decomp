@@ -432,6 +432,16 @@ ids / animation indices need the ROM's sprite-def tables: the recording's `init.
 (`GbaRam.actor_rows`). The event: blocked in the return's fade-in phase (`Pending::Phases`, fade started at the
 cut). Proof - the real route's Kid Buu run, cut with `--events`: **9 / 14 cuts exact**, the eight `return_to_field`
 ones gated (`rkb_003`, `004`, `005`, `006`, `007`, `009`, `010`, `011`: up to 2,000 frames each, allocator check on).
+Increment 1d: a leader under a script's frame-range controller (0x0804DE58: +4 pass, +8 ticks a cel, +0xC passes,
++0x10 loop start, +0x14 last cel) is rebuilt as a scene puppet (`AnimMode::Frames`); the probe no longer moves the
+generator (its queries' `rand`s are replayed by the placement run: probe and placement saw different draws, so a
+rand-driven step loop placed the event elsewhere). `kbr_012` 1 -> **490 / 1,024** (stop: an actor (sprite 115)
+the game's script spawns later is missing on ours - the step loop's rand-driven branches see our rewound generator,
+not the one the game had at those script frames: a limit of placing a running step loop by replay).
+`kbr_002` f13417 (looked at): a punch kills one Kid Buu copy (HP 2,989) while the other lives; the game starts no
+event and both copies leave the enemy list (the survivor idles on), ours starts Kid Buu's on-defeat event in the
+next frame (the dying copy took the last-copy path) - the copy-death path while the other copy lives needs the
+death node's disassembly (0x08032D44); not fixed yet.
 Increment 1c: **the countdown-set difference is the event's cause** (the Earth agent's hint): `kbr_008`'s event chain
 is the countdown hook's (s009 -> s461 -> s462), run by the field frame's timer update 0x0800425C itself - it ends
 mid-frame and that frame's timer update does not run again; `sb_041`'s is an on-defeat callback (s460), ending at

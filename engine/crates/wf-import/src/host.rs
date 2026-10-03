@@ -229,6 +229,8 @@ impl StoryHost {
     /// `probe_event` for the first queued action `is_load(native, args)` accepts
     pub fn probe_event_for(&mut self, w: &mut World, event: u16, node: u16, params: [i32; 4], is_load: &dyn Fn(u8, &[i32]) -> bool) -> Option<(usize, u8)> {
         let saved = self.rt.state();
+        // (the probe's queries must not move the generator: the placement run replays them)
+        let rng = w.rng.clone();
         let mut g = self.rt.globals();
         g.g = w.story.g;
         self.rt.set_globals(g);
@@ -262,6 +264,7 @@ impl StoryHost {
             });
         }
         self.rt.restore(saved);
+        w.rng = rng;
         out
     }
 

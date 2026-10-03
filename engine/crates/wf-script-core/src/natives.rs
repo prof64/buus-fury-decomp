@@ -80,9 +80,6 @@ fn mv(x: i32, y: i32, speed: i32, state: i32) -> Cmd {
 pub fn call(h: &mut CoreHost, c: &Call) -> R {
     let n = c.native;
     let a = c.args;
-    if std::env::var_os("T_NAT").is_some() {
-        eprintln!("  t-nat f{} 0x{n:02x} {:?}", h.w.frame, a.iter().take(4).collect::<Vec<_>>());
-    }
     match n {
         0x00..=0x07 => Err(format!("native 0x{n:02x} is handled by the VM")),
         0x08..=0x0b => done(h.w.story.l[n as usize - 8]),
@@ -1094,8 +1091,12 @@ pub fn switch_character(w: &mut World, c: i32) -> Result<(), String> {
     let gfx = |w: &World, f: i32| w.data.form(f).map(|f| f.gfx);
     let new_sprite = gfx(w, p.form) != gfx(w, form);
     let old = p.a.sprite;
+    // the old form's graphics are released (0x0801712C: an aura form stops sfx 54) and the new one's loaded
+    // (0x0801711C: an aura form plays it - real route 8-66 f38,844, set_character(4))
+    wf_core::player::form_exit(w, i);
     p.apply_form(w, form);
     *w.pl(i) = p;
+    wf_core::player::form_enter(w, i);
     wf_core::vram::sprite_changed(w, i, old);
     w.story.current = c;
     // 0x08010692 rebuilds the player and ends with vt+0x28(0): the idle state is entered again (rand(255); s067:
