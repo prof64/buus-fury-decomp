@@ -1224,7 +1224,12 @@ export function create(n: AiNodeJ, c: AiController): RNode {
       // 0x0802B701 / 0x0802B8B5: SetAnimRaw(0x13 / 0x12) under the one-shot state 0x03001B30 (8 ticks a frame, the
       // last frame kept); finished on the update that sees the anim frame (obj+0x11) at 3 (lockstep
       // f02_vs_enemy_t40: open entered at 1, the next state at 25; close entered at 26, the next state at 51)
-      return new Act(n, c, () => e.setAnim(n.name === 'TurretOpen' ? 19 : 18, true, false, { rule: 'once_stop', shift: 3, end: 'none' }), () => e.ea.pos.frame >= 3)
+      // TurretOpen draws the gun into the wall: not hittable (obj+0x1CC = 0) until TurretClose (emulator: real route
+      // segment 8-36)
+      return new Act(n, c, () => {
+        e.setAnim(n.name === 'TurretOpen' ? 19 : 18, true, false, { rule: 'once_stop', shift: 3, end: 'none' })
+        e.hittable = n.name !== 'TurretOpen'
+      }, () => e.ea.pos.frame >= 3)
     case 'BombThrow': {
       // controller 0x0203DD04 (SetAnimRaw(0x12)): the bomb at tick 16, SetAnim(0) at 24 (lockstep f02_vs_enemy_bomb).
       // Enter 0x08026A26 (after facing the player): d = the player's position - own (top-left px), the component

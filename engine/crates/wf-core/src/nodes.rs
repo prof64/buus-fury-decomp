@@ -850,9 +850,13 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             set_anim_r(w, i, &[an(18), an(3)], false, r0);
         }
         // 0x0802B701 / 0x0802B8B5: SetAnimRaw(0x13 / 0x12) under the one-shot state 0x03001B30
+        // TurretOpen draws the gun into the wall: not hittable (obj+0x1CC = 0) until TurretClose brings it out
+        // (real route 8-36: a punch beside a retracted turret only hits the fighter)
         K::TurretOpen | K::TurretClose => {
             let r0 = w.data.anim.once_stop3;
-            set_anim_r(w, i, &[an(if kind(c, n) == K::TurretOpen { 19 } else { 18 })], false, r0);
+            let open = kind(c, n) == K::TurretOpen;
+            set_anim_r(w, i, &[an(if open { 19 } else { 18 })], false, r0);
+            w.en(i).a.hittable = !open;
         }
         // the shell controller 0x030030EC: SetAnimRaw(0x13) played once (8 ticks per frame), then SetAnim(0)
         K::TankShoot => {
@@ -928,9 +932,14 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
         }
         K::TeleportChain4 => {
             set_anim(w, i, &[an(17)], true, Some(false));
-            // field: the vanish takes hits off (as TeleportNearPlayer's)
+            // field: the vanish takes hits off (as TeleportNearPlayer's). The node's update (0x08034502) steps the
+            // persistent side counter (0x03003228) whenever it finds the boss out of the vanish / landing animations
+            // and restarts the teleport unless the counter is round; a hurt that cuts the vanish before the node's
+            // first update shows here as re-entries: the first update then steps it once (sc_janemba: 0 -> 1 at
+            // 33,981, 1 -> 2 at 37,297; a plain enter at 37,459 does not)
             if w.field.is_some() {
                 w.en(i).a.hittable = false;
+                w.en(i).chain_enters += 1;
             }
         }
         K::NinjaReveal => {
@@ -1813,14 +1822,14 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             f >= 54
         }
         K::TeleportChain4 => {
-            // field (sc_janemba): the controller counts from the frame after the node's (the jump 37 frames after
-            // the enter, hittable again 18 later); its first update steps the persistent side counter (0x03003228)
-            // and the jump goes to the new side (counter 0 -> 1: above the player; a chain re-entered before its
-            // first update counts once). Battle keeps the reference's
-            if w.field.is_some() && f == 1 {
+            // field (sc_janemba): the jump 36 frames after the vanish shows, to side = counter & 3, hittable again 18
+            // later. Battle keeps the reference's
+            // (a re-entered chain's restart is the game's next frame: its controller counts from there)
+            if w.field.is_some() && std::mem::take(&mut w.en(i).chain_enters) >= 2 {
                 w.g.tele_chain = (w.g.tele_chain + 1) % 12;
+                r.d[1] = 1;
             }
-            let f = if w.field.is_some() { f - 1 } else { f };
+            let f = if w.field.is_some() { f - r.d[1] } else { f };
             if w.field.is_some() && f % 72 == 54 {
                 w.en(i).a.hittable = true;
             }
@@ -1828,11 +1837,16 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                 if f % 72 == 36 {
                     en::teleport_beside(w, i, w.g.tele_chain & 3);
                 }
+                // the landing animation's end (36 frames) SetAnim(0)s the boss; the node steps the counter: a round
+                // counter ends the chain, else the next vanish (anim 0x11, hits off)
                 if f > 0 && f % 72 == 0 {
+                    en::set_anim(w, i, &[an(0)], true, Some(true));
+                    w.g.tele_chain = (w.g.tele_chain + 1) % 12;
                     if w.g.tele_chain % 4 == 0 {
                         return true;
                     }
-                    w.g.tele_chain = (w.g.tele_chain + 1) % 12;
+                    set_anim(w, i, &[an(17)], true, Some(false));
+                    w.en(i).a.hittable = false;
                 }
                 return false;
             }

@@ -183,8 +183,35 @@ pub fn label_image(rom: &Rom, text: &str, colour: u8, pal: &[Rgb]) -> Image {
     linear_image(&idx, 32, 16, pal, false)
 }
 
+/// `show_title_text`'s strings (table 0x0806BCE8) measured in their font (`[0x08753A1C]`, `0x0803FFE8`: a code
+/// >= 0xFF is font +4 + 1 wide, others glyph width + 1) -> `world/title_widths.json` (the object's tiles: vram.rs)
+fn title_widths(rom: &Rom, out: &mut Content) {
+    let font = rom.u32(0x0875_3A1C);
+    let (glyphs, wide) = (rom.u32(font), rom.u32(font + 4));
+    let mut v = Vec::new();
+    for k in 0..512u32 {
+        let p = rom.u32(0x0806_BCE8 + 4 * k);
+        if !rom.isptr(p) {
+            break;
+        }
+        let mut w = 0u32;
+        let mut a = p;
+        for _ in 0..256 {
+            let c = rom.u16(a) as u32;
+            if c == 0 {
+                break;
+            }
+            a += 2;
+            w += if c >= 0xFF { wide + 1 } else { rom.u16(glyphs + 2 * rom.u16(glyphs + 2 * c) as u32) as u32 + 1 };
+        }
+        v.push(w);
+    }
+    out.put_json("world/title_widths.json", &json!(v));
+}
+
 /// `world` category (after wf-world): prop sheets + boxes, label sheet, objects.json annotations.
 pub fn world(rom: &Rom, out: &mut Content) {
+    title_widths(rom, out);
     let pal = palette(rom, OBJ_PALETTE, 256);
     let areas = wf_maps::rom_maps::areas(rom);
     let maps = wf_maps::maps(rom, &areas);
@@ -198,6 +225,10 @@ pub fn world(rom: &Rom, out: &mut Content) {
         let recs = rom.u32(h + 0x28);
         let g = rom.u32(h + 0x2C);
         let alt = rom.u32(h + 0x3C) != 0;
+        // the props object's object tiles (`0x0800D15A`: graphics header +4; created when the map has props)
+        if n > 0 && rom.isptr(g) {
+            oj.insert("prop_tile_bytes".into(), json!(rom.u32(g + 4)));
+        }
         let blob = if n > 0 && rom.isptr(g) { rom.lz(g).ok() } else { None };
         let mut frames: Vec<(Image, i32, i32)> = Vec::new();
         let mut props = oj.get("props").and_then(|p| p.as_array()).cloned().unwrap_or_default();

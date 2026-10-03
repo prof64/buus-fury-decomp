@@ -72,6 +72,9 @@ pub struct Enemy {
     /// ... and the hand it made (0 = none)
     #[serde(default)]
     pub strike_hand: EntityId,
+    /// field: TeleportChain4 enters since its last update (2+: the game's restart after a cut)
+    #[serde(default)]
+    pub chain_enters: i32,
     pub script_hits: i32,
     /// tiles this enemy marked blocked on the enemy grid
     pub marked: Option<[i32; 4]>,
@@ -162,6 +165,7 @@ impl Enemy {
             mirror_prev: 0,
             strike: (0, false),
             strike_hand: 0,
+            chain_enters: 0,
             script_hits: 0,
             marked: None,
             stepped: false,

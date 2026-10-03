@@ -377,6 +377,14 @@ pub fn import_emulator_state(data: &Arc<GameData>, ram: &GbaRam, runner: &mut St
     }
     check(&mut world, ram, &mut notes);
     import_vram(&mut world, ram);
+    // a banner object of an earlier load still showing: its countdown (obj +0x10) -> our age
+    if world.scene.banner.is_none() {
+        if let Some(o) = ram.objects().into_iter().find(|&o| ram.r32(o) == VT_BANNER) {
+            let rem = ram.r16(o + 0x10) as u32;
+            let text = data.field.as_ref().and_then(|fd| fd.area(info.area.world, info.area.area)).map(|a| a.banner.clone()).unwrap_or_default();
+            world.scene.banner = Some((text, 239u32.saturating_sub(rem)));
+        }
+    }
     Ok(Imported { world, prev_keys: ram.r16(INPUT + 2) & 0x3FF, lf: info.lf, kind: info.kind, held_frames: b.held, draws: b.draws, notes })
 }
 
@@ -450,6 +458,13 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
     let mut used_ents: Vec<wf_core::world::EntityId> = vec![];
     for o in ram.objects() {
         let vt = ram.r32(o);
+        if vt == 0x0804_D1E4 {
+            let h = ram.r16(o + 0x16);
+            if h != 0xFFFF {
+                owners.push((h, Owner::Props));
+            }
+            continue;
+        }
         if vt == VT_HUD || vt == VT_BANNER {
             let h = ram.r16(o + 0xC);
             if h != 0xFFFF {
@@ -485,6 +500,6 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
         }
     }
     if let Some(f) = w.field.as_mut() {
-        f.vram = Some(VramState { a, owners, shared_rc, suspended: vec![] });
+        f.vram = Some(VramState { a, owners, shared_rc, suspended: vec![], hud_out: vec![] });
     }
 }

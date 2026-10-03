@@ -187,6 +187,8 @@ pub struct MapDef {
     pub camera_max: (i32, i32),
     /// the 3D world map (map header +0x3C: mode-7 ground layer kind 0x08007B63): flying player, 3D camera
     pub three_d: bool,
+    /// the props object's object tiles (vram.rs; 0 = no props object)
+    pub prop_tile_bytes: i32,
 }
 
 #[derive(Clone, Debug)]
@@ -211,6 +213,8 @@ pub struct FieldData {
     pub visited: Vec<(i32, i32, i32)>,
     /// bytecode of the spawn-condition scripts (`scripts/bytecode.json`), evaluated by `story::eval_condition`
     pub cond_code: BTreeMap<String, Vec<u8>>,
+    /// `show_title_text` strings' widths in px (`world/title_widths.json`)
+    pub title_widths: Vec<i32>,
 }
 
 fn dir_of(s: &str) -> Option<Dir> {
@@ -408,6 +412,7 @@ impl FieldData {
     pub fn load(src: &dyn ContentSource, all: &[String]) -> Result<Option<FieldData>, LoadError> {
         let Some(wa) = read_json(src, "world/areas.json") else { return Ok(None) };
         let mut fd = FieldData::default();
+        fd.title_widths = read_json(src, "world/title_widths.json").and_then(|v| v.as_array().map(|a| a.iter().map(|x| x.as_i64().unwrap_or(0) as i32).collect())).unwrap_or_default();
         // songs from the maps category's areas.json
         let mut songs: BTreeMap<String, Song> = BTreeMap::new();
         let mut combat: BTreeMap<String, bool> = BTreeMap::new();
@@ -457,6 +462,7 @@ impl FieldData {
                 }
             }
             let exits = o["map_triggers"].as_array().into_iter().flatten().map(|v| obj(v, list_ref(&v["list"]))).collect();
+            let prop_tile_bytes = o["prop_tile_bytes"].as_i64().unwrap_or(0) as i32;
             let props = o["props"]
                 .as_array()
                 .into_iter()
@@ -507,7 +513,7 @@ impl FieldData {
             if cmax.0 < 0 {
                 cmax = ((ww - 240).max(0), (wh - 160).max(0));
             }
-            fd.maps.insert(id.clone(), MapDef { id, start_pos: sp, exits, props, walk, shot, cw, ch, world_w: ww, world_h: wh, camera_max: cmax, three_d });
+            fd.maps.insert(id.clone(), MapDef { id, start_pos: sp, exits, props, walk, shot, cw, ch, world_w: ww, world_h: wh, camera_max: cmax, three_d, prop_tile_bytes });
         }
         // per-area files (mods): `world/areas/<W-A>.json` adds an area or changes one (fields given replace,
         // `objects` replaces the object list, `add_objects` appends to it)

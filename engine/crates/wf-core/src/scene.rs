@@ -2099,7 +2099,8 @@ pub fn bring_back(w: &mut World) {
 pub fn banner_step(w: &mut World) {
     if let Some((_, t)) = w.scene.banner.as_mut() {
         *t += 1;
-        if *t > 238 {
+        let t = *t;
+        if t > 238 {
             w.scene.banner = None;
             crate::vram::banner(w, false);
         }
@@ -2553,6 +2554,8 @@ pub fn open_text(w: &mut World, text: &str, text_ref: u32, portrait: u8, kind: u
     }
     let last = body.split('\u{b}').last().unwrap_or("");
     let options = last.lines().filter(|l| l.trim_start().starts_with('-')).count() as i32;
+    // the box object's tiles (`0x08012030`; a portrait unless the box kind is 0 / 7)
+    crate::vram::text_open(w, portrait != 0 && portrait != 7);
     let pages = (typing.len().max(1)) as u16;
     w.scene.dialog = Some(Dialog {
         text: body.to_string(),
@@ -2662,6 +2665,7 @@ fn tick_dialog(w: &mut World) {
             DialogPhase::Closing => {
                 if d.t >= WINDOW_CLOSE {
                     d.phase = DialogPhase::Closed;
+                    crate::vram::text_close(w);
                 }
             }
             DialogPhase::Closed => {}
@@ -2674,6 +2678,10 @@ fn tick_dialog(w: &mut World) {
             if d.t >= DIALOG_OPEN {
                 d.phase = DialogPhase::Shown;
                 d.typed = 1.min(need);
+                // a choice box's cursor object (`0x080178C8`, 0x100 tiles) appears with the text
+                if d.options > 0 {
+                    crate::vram::acquire(w, crate::vram::Owner::Cursor, 0x100);
+                }
             }
         }
         DialogPhase::Shown => {
@@ -2687,12 +2695,18 @@ fn tick_dialog(w: &mut World) {
                     d.result = Some(if d.options > 0 { d.cursor } else { 0 });
                     d.phase = DialogPhase::Closing;
                     d.t = 0;
+                    crate::vram::release(w, crate::vram::Owner::Cursor);
                 }
             }
         }
         DialogPhase::Closing => {
+            // the box object goes a frame before the event continues
+            let gone = d.t == DIALOG_CLOSE - 1;
             if d.t >= DIALOG_CLOSE {
                 d.phase = DialogPhase::Closed;
+            }
+            if gone {
+                crate::vram::text_close(w);
             }
         }
         DialogPhase::Closed => {}

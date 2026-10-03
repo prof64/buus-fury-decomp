@@ -620,10 +620,17 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
     // their object tiles too (the players' objects are re-created at the arrival), the HUD's and the banner's
     // first; nothing left: re-initialised
     crate::vram::release(w, crate::vram::Owner::Hud);
+    crate::vram::release(w, crate::vram::Owner::HudOut);
+    if let Some(v) = w.field.as_mut().and_then(|f| f.vram.as_mut()) {
+        v.hud_out.clear();
+    }
     crate::vram::release(w, crate::vram::Owner::Banner);
     for i in 0..w.ents.len() {
         crate::vram::entity_gone(w, i);
     }
+    // the players a scene load sent offstage are destroyed with the objects too (4-21 -> s190's 4-24 scene)
+    crate::vram::offstage_gone(w);
+    crate::vram::release(w, crate::vram::Owner::Props);
     crate::vram::load_reset(w);
     w.ents.retain(|e| players.contains(&e.id));
     w.enemies.clear();
@@ -661,6 +668,10 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
         f.entered = w.frame;
         f.loads += 1;
         f.on_enter_queued = false;
+    }
+    // the props object (`0x0800D15A`, before the area's objects)
+    if m.prop_tile_bytes > 0 {
+        crate::vram::acquire(w, crate::vram::Owner::Props, m.prop_tile_bytes);
     }
     for s in 0..w.players.len().max(1) {
         snap_camera(w, s, x, y);
@@ -1578,6 +1589,7 @@ fn exit_to(w: &mut World, slot: usize, to: Dest, push: Dir, rect: Rect, edge: bo
 /// the maximum (and not 0) beeps sound 41 at volume 32 once more than 60 logic frames passed since the last beep
 /// (2-9 / 2-8: Gohan low on HP after the circus)
 pub fn hud_tick(w: &mut World) {
+    crate::vram::hud_tick(w);
     if w.scene.hud_hidden {
         return;
     }

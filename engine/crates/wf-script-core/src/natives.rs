@@ -80,7 +80,6 @@ fn mv(x: i32, y: i32, speed: i32, state: i32) -> Cmd {
 pub fn call(h: &mut CoreHost, c: &Call) -> R {
     let n = c.native;
     let a = c.args;
-    if std::env::var("NATIVE_DBG").is_ok() { eprintln!("native wf {} 0x{n:02x} {:?}", h.w.frame, a); }
     match n {
         0x00..=0x07 => Err(format!("native 0x{n:02x} is handled by the VM")),
         0x08..=0x0b => done(h.w.story.l[n as usize - 8]),
@@ -175,7 +174,11 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
             unit()
         }
         0x2f | 0x30 => {
+            let was = h.w.scene.hud_hidden;
             h.w.scene.hud_hidden = n == 0x30;
+            if was != h.w.scene.hud_hidden {
+                wf_core::vram::hud_shown(h.w, n == 0x2f);
+            }
             unit()
         }
         0x31 => {
@@ -626,10 +629,12 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
         }
         0xb2 => {
             h.w.scene.title = Some(scene::TitleText { string: arg(a, 0), x: arg(a, 1), y: arg(a, 2) });
+            wf_core::vram::title_shown(h.w, arg(a, 0));
             unit()
         }
         0xef => {
             h.w.scene.title = None;
+            wf_core::vram::release(h.w, wf_core::vram::Owner::Title);
             block(h.s, Pending::Frames { left: 1, result: None })
         }
         0xb3 => done(scene::sin_scale(arg(a, 0), arg(a, 1))),
@@ -1060,10 +1065,13 @@ fn fuse(w: &mut World, fused: i32, kind: i32, ma: i32, mb: i32, seconds: i32) {
     f.rec.hp = mix(a.rec.hp, b.rec.hp);
     f.rec.max_ep = mix(a.rec.max_ep, b.rec.max_ep);
     f.rec.ep = mix(a.rec.ep, b.rec.ep);
-    f.rec.str_ = mix(a.rec.str_, b.rec.str_);
-    f.rec.pow = mix(a.rec.pow, b.rec.pow);
-    f.rec.end = mix(a.rec.end, b.rec.end);
-    f.rec.spd = mix(a.rec.spd, b.rec.spd);
+    // base stats: the components' mean + 10 (SPD + 16), as `progression::fuse` (sc_janemba: Gogeta from Goku 84 / 68
+    // / 67 / 75 and Vegeta 88 / 61 / 75 / 65 is 96 / 74 / 81 / 86 in the game's record)
+    let half = |x: i32, y: i32| (x + y) / 2;
+    f.rec.str_ = half(a.rec.str_, b.rec.str_) + 10;
+    f.rec.pow = half(a.rec.pow, b.rec.pow) + 10;
+    f.rec.end = half(a.rec.end, b.rec.end) + 10;
+    f.rec.spd = half(a.rec.spd, b.rec.spd) + 16;
     f.flags |= 3;
     f.ss_cooldown = if seconds == -1 { -1 } else { seconds * 60 };
     let _ = kind;

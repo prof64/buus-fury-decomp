@@ -261,8 +261,16 @@ pub enum Owner {
     Shared(u8),
     /// the text box's blocks (`0x08012030`)
     Text,
+    /// a title text object (`show_title_text` 0xB2, vtable 0x0804B3D8: ((width + 0x21) >> 5 << 5) * 32 bytes)
+    Title,
+    /// a choice box's cursor (vtable 0x0804C974, `0x080178C8`: 0x100)
+    Cursor,
+    /// the map's props object (vtable 0x0804D1E4, `0x0800D15A`: the props' graphics size)
+    Props,
     /// the HUD object (vtable 0x08049FEC, ctor `0x0800B854`: 0x500)
     Hud,
+    /// a HUD object sliding out (`hud_out`)
+    HudOut,
     /// the area-name banner (vtable 0x0804B528, ctor `0x0800BF34`: 0xF00)
     Banner,
     /// an import's block of an object the remake does not model
@@ -280,6 +288,9 @@ pub struct VramState {
     pub owners: Vec<(u16, Owner)>,
     pub shared_rc: [u8; 4],
     pub suspended: Vec<crate::world::EntityId>,
+    /// HUD objects sliding out after `hide_hud` (handle, updates left; the object deletes itself at the end)
+    #[serde(default)]
+    pub hud_out: Vec<(u16, i32)>,
 }
 
 use crate::world::{Body, EntityId, World};
@@ -392,6 +403,28 @@ pub fn entity_gone(w: &mut World, i: usize) {
     let id = w.ents[i].id;
     let key = sprite_of(w, i).map(|s| s.1).unwrap_or((0, 0));
     actor_destroyed(w, id, key);
+}
+
+/// the offstage players' blocks go (a scene load destroys their objects)
+pub fn offstage_gone(w: &mut World) {
+    if w.field.as_ref().is_none_or(|f| f.vram.is_none()) {
+        return;
+    }
+    let off: Vec<(EntityId, (u8, u8))> = w
+        .scene
+        .offstage
+        .iter()
+        .map(|e| {
+            let key = match &e.body {
+                Body::Player(p) => p.a.sprite.and_then(|s| w.data.sprite(s)).map(|s| s.shadow_key).unwrap_or((0, 0)),
+                _ => (0, 0),
+            };
+            (e.id, key)
+        })
+        .collect();
+    for (id, key) in off {
+        actor_destroyed(w, id, key);
+    }
 }
 
 /// the removed entities' blocks go, in list order (before the list drops them)
@@ -523,22 +556,64 @@ pub fn text_open(w: &mut World, portrait: bool) {
     }
 }
 
-/// the text box closes: its blocks freed, the suspended objects restored (`0x08012180`)
+/// the text box closes: its blocks freed (last allocated first), the suspended objects restored (`0x08012180`)
 pub fn text_close(w: &mut World) {
-    if w.field.as_ref().is_none_or(|f| f.vram.is_none()) {
+    let Some(v) = st(w) else { return };
+    let hs: Vec<u16> = v.owners.iter().filter(|o| o.1 == Owner::Text).map(|o| o.0).collect();
+    if hs.is_empty() {
         return;
     }
-    release(w, Owner::Text);
+    v.owners.retain(|o| o.1 != Owner::Text);
+    for h in hs.into_iter().rev() {
+        v.a.free(h);
+    }
     restore(w);
 }
 
-/// the HUD object of an arrival (after the players)
+/// the HUD object of an arrival (after the players; none while the HUD is hidden)
 pub fn hud_created(w: &mut World) {
+    if w.field.as_ref().is_none_or(|f| f.vram.is_none()) || w.scene.hud_hidden {
+        return;
+    }
+    acquire(w, Owner::Hud, 0x500);
+}
+
+/// HUD frames of the slide-out after `hide_hud` before the object deletes itself (VERIFIED 4-21: 25)
+pub const HUD_OUT: i32 = 25;
+
+/// `show_hud` (`0x080046F4`): a new HUD object when the HUD was hidden; `hide_hud` (`0x08004764`): the object slides
+/// out and goes `HUD_OUT` updates later
+pub fn hud_shown(w: &mut World, on: bool) {
     if w.field.as_ref().is_none_or(|f| f.vram.is_none()) {
         return;
     }
-    release(w, Owner::Hud);
-    acquire(w, Owner::Hud, 0x500);
+    if on {
+        acquire(w, Owner::Hud, 0x500);
+    } else if let Some(v) = st(w) {
+        let hs: Vec<u16> = v.owners.iter().filter(|o| o.1 == Owner::Hud).map(|o| o.0).collect();
+        for h in hs {
+            v.owners.retain(|o| o.0 != h);
+            v.owners.push((h, Owner::HudOut));
+            v.hud_out.push((h, HUD_OUT));
+        }
+    }
+}
+
+/// the HUD objects' update (after the actors): a sliding-out one goes at the end of its slide
+pub fn hud_tick(w: &mut World) {
+    let Some(v) = st(w) else { return };
+    if v.hud_out.is_empty() {
+        return;
+    }
+    for o in v.hud_out.iter_mut() {
+        o.1 -= 1;
+    }
+    let gone: Vec<u16> = v.hud_out.iter().filter(|o| o.1 <= 0).map(|o| o.0).collect();
+    v.hud_out.retain(|o| o.1 > 0);
+    for h in gone {
+        v.owners.retain(|o| o.0 != h);
+        v.a.free(h);
+    }
 }
 /// the area banner starts / ends
 pub fn banner(w: &mut World, on: bool) {
@@ -548,6 +623,21 @@ pub fn banner(w: &mut World, on: bool) {
     release(w, Owner::Banner);
     if on {
         acquire(w, Owner::Banner, 0xF00);
+    }
+}
+
+/// `show_title_text` (`0x0802BFBC`): its string's width rounded up to 32 px (+1) * 32 bytes, purging first
+pub fn title_shown(w: &mut World, string: i32) {
+    if w.field.as_ref().is_none_or(|f| f.vram.is_none()) {
+        return;
+    }
+    let width = w.data.field.as_ref().and_then(|f| f.title_widths.get(string as usize).copied()).unwrap_or(0);
+    let bytes = ((width + 0x21) >> 5 << 5) << 5;
+    purge(w, bytes);
+    if let Some(v) = st(w) {
+        if let Some(h) = v.a.alloc(bytes) {
+            v.owners.push((h, Owner::Title));
+        }
     }
 }
 

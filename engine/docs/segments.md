@@ -406,15 +406,30 @@ duration is page work (~217-222k instructions, varies with the drawn text) plus 
 0x03000880.., ~118-140k instructions over the window, varying with the active voices). Please don't change
 `menu::REDRAW_FRAMES` handling meanwhile; tell me (here) which ship segments grind on it.
 
-Cycle measurements (tools/emu `Emu.cycles()`, scripts in /tmp during the study; 39 status-page redraws of 2-9 #13):
-a redraw window is ~1.05-1.10 M cycles = page code ~542 k (+-1.5 k) + IWRAM copy/decode ~296.8 k (+-0.3 k) + glyph
-blit 0x0803F940 128.7 k or 135.1 k (two page states) + sound driver ROM code 13-23 k + the mixer inner loop
-0x03000868 47-112 k + IRQ ~2 k. The decision margin is 2-3 scanlines (~3 k cycles). The sound work inside the window
-is not one update per frame: the driver is preempted / catches up (frames with no mixing, then a 3-frame burst),
-so the mixed sample count inside the window depends on where the updates fall - an exact prediction needs the
-driver's update cadence and per-call cycle costs (identical calls cost two values, +183 cycles) as well as the voice
-state. Status: not modelled yet; this needs a cycle-level model of the driver + page and its integration (the
-driver state in the world).
+Redraw timing study (2026-10-03; scripts and data in `work/earth/timing/`, emulator cycle counter `Emu.cycles()`
+added to tools/emu). How the input landing is decided:
+* The page iteration that redraws (0x080154D4) starts at scanline 163/164; the next iteration lands 3 frames later
+  when the redraw ends by line ~118 of its third frame, 4 when it ends at line >= ~121 (39/39 consistent).
+* Sound: the driver update 0x0803F296 mixes (pos - last) mod 1024 samples in chunks of <= 512. pos advances by 16 in
+  the DMA2 completion IRQ (0x03000AE0, every 16 samples = 16 800 cycles; timer 0 reload 0xFBE6 = 1050 cycles per
+  sample; IE = VBlank | DMA2). The main loop updates once per frame (~267 samples); while a redraw holds the main loop
+  the IRQ calls the update itself (nested, system mode) when the buffer is 96 samples from running dry: one 928-sample
+  mix (512 + 416) inside every redraw. Its cost is the variable part: 79 k..156 k cycles, from the voices mixed
+  (inner loop 0x03000868: ~14.4 cycles/sample for integer-step voices, ~8.4 + 5 per carry for sub-sample steps, gain
+  0 skips the voice) plus ROM-side voice handling.
+* Page: ~810 k cycles of page code incl. the glyph renderer 0x0803F6A0 (per-column bit loop: cost depends on each
+  glyph's bitmap - the play-time digits change it) and the blit 0x0803F940 (128.7 k / 135.1 k, two page states).
+* Why a cycle-exact model is not achievable outside an emulator: the same instruction costs different cycles from
+  run to run (per-PC excess of +2 / +6 cycles on ~10 000 / ~29 000 executions per window: mGBA's ROM prefetch
+  buffer and wait-state sequencing, WAITCNT 0x4314 = prefetch on), and the FIFO DMAs (58 cycles per pair, ~45 per
+  window) land at fixed times inside whatever code runs and change its prefetch state - the "183-cycle bimodal" mix
+  calls are exactly such DMA steals (3 x 58 + IRQ). So the page's work has no fixed cycle cost; exactness needs an
+  instruction-level ARM/Thumb timing model of the executed code (an emulator core).
+* What a deterministic predictor can do: with the mixer cost known, redraw length = 376.4 k + 4.238 x glyph-loop
+  instructions + 7 345 x (page state) + 1.011 x mixer cycles fits the 39 redraws with std 400 / max 1 484 cycles;
+  the 3-vs-4 decision margin is ~3 700 cycles, so all 39 classify correctly - but it is a bounded-error model, not
+  exact, and it needs the sound driver (wf-audio) inside the world plus a glyph-cost table and a mixer cost model.
+  Not built pending a decision.
 
 **Side-content catalogue** (data survey 2026-10-02; flags = story flags): Broly turns out to be **mainline** (Dragon
 Ball saga: his defeat s436 sets flag 111, which Dragon Ball #4 s439 needs) — shared with the Super Buu agent, whose main line
