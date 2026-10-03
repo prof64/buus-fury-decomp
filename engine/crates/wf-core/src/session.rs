@@ -125,7 +125,8 @@ impl Session {
         if std::mem::take(&mut w.menu.closed_this_frame) {
             return;
         }
-        if crate::menu::active(w) {
+        let watch_closing = w.field.is_some() && crate::menu::minigame::watch_closing(w);
+        if crate::menu::active(w) && !watch_closing {
             if w.field.is_some() && crate::menu::minigame::world_runs(w) {
                 // the players get no input: the mode reads the keys (menu_parity mg_power: no punches)
                 w.input = [InputFrame::default(); MAX_PLAYERS];
@@ -141,7 +142,8 @@ impl Session {
             f.pre_update = false;
         }
         if w.field.is_some() {
-            if !crate::field::frozen(w) && !crate::scene::frozen(w) {
+            // Watch This!'s closing frame runs the scene's tracks, the script and the cameras, not the objects
+            if !crate::field::frozen(w) && !crate::scene::frozen(w) && !watch_closing {
                 battle::pre_step(w);
                 w.step_entities();
             }
@@ -161,7 +163,7 @@ impl Session {
     pub fn step_post(&mut self) -> &[Event] {
         let w = &mut self.world;
         if crate::menu::active(w) && !crate::menu::opened_this_frame(w) {
-            if w.field.is_some() && crate::menu::minigame::world_runs(w) {
+            if w.field.is_some() && (crate::menu::minigame::world_runs(w) || crate::menu::minigame::watch_closing(w)) {
                 crate::field::world_mode_cameras(w);
             }
             crate::menu::post(w);

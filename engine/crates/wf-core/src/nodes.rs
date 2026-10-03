@@ -1814,10 +1814,9 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         }
         K::TeleportChain4 => {
             // field (sc_janemba): the controller counts from the frame after the node's (the jump 37 frames after
-            // the enter, hittable again 18 later); battle keeps the reference's
-            // field: the controller's first update steps the persistent side counter (0x03003228) and the jump goes
-            // to the new side (sc_janemba: counter 0 -> 1, above the player; a chain re-entered before its first
-            // update counts once)
+            // the enter, hittable again 18 later); its first update steps the persistent side counter (0x03003228)
+            // and the jump goes to the new side (counter 0 -> 1: above the player; a chain re-entered before its
+            // first update counts once). Battle keeps the reference's
             if w.field.is_some() && f == 1 {
                 w.g.tele_chain = (w.g.tele_chain + 1) % 12;
             }

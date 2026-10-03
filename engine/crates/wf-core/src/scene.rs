@@ -2421,7 +2421,10 @@ pub fn camera(w: &mut World) -> bool {
 
 /// the world update is suspended (modal camera scroll, mosaic): only the camera / screen run
 pub fn frozen(w: &World) -> bool {
-    w.scene.freeze
+    // field: frames that pass while a batch is open (begin_parallel .. end_parallel: a fade inside it) do not run
+    // the world update (sc_janemba: Gogeta's split, flash_white(10) + fade_to_white(5) between 0x38 and 0x3A - every
+    // object holds its animation)
+    w.scene.freeze || (w.field.is_some() && w.scene.director.batch)
 }
 
 // ---------------------------------------------------------------------------------------------------------------

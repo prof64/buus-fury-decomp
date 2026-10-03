@@ -130,12 +130,38 @@ def row_extras(e, row, flags_prev):
     return fl
 
 
+VRAM = 0x03001C4C
+
+
+def vram_state(e):
+    """the object tile allocator (wf-core vram.rs): free list head, spare head, then per entry
+    [used, start, size, hi, lo, fnext, fprev] (spare entries: [255, hi, lo])"""
+    b = e.read(VRAM + 0x694, 138 * 10)
+    out = [e.r8(VRAM), e.r8(VRAM + 1)]
+    for i in range(138):
+        x = b[10 * i:10 * i + 10]
+        if x[0] == 0xFF:
+            out.append([255, x[6], x[7]])
+        else:
+            out.append([x[0], x[2] | x[3] << 8, x[4] | x[5] << 8, x[6], x[7], x[8], x[9]])
+    return out
+
+
+def row_vram(e, row, prev):
+    v = vram_state(e)
+    if v != prev:
+        row['vram'] = v
+    return v
+
+
 def record(e, keys_of, n, stop=None):
     """record n video frames; keys_of(j, e) -> keys of segment frame j (None = stop)"""
     init, rec = init_of(e)
     rec.arm()
     rows = []
     fl = e.read(GD + 0x55, 0x80).hex()
+    vr = vram_state(e)
+    init['vram'] = vr
     for j in range(n):
         k = keys_of(j, e)
         if k is None:
@@ -144,6 +170,7 @@ def record(e, keys_of, n, stop=None):
         e.run(1)
         row = rec.row(k)
         fl = row_extras(e, row, fl)
+        vr = row_vram(e, row, vr)
         rows.append(row)
         if stop and stop(e):
             break

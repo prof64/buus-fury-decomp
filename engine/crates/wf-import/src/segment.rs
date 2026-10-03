@@ -333,6 +333,11 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
                     let game: Vec<String> = fr["actors"].as_array().into_iter().flatten().map(|a| format!("{}:{}/{}", a[1], a[6], a[8])).collect();
                     eprintln!("  t{k} npcs {} | game {}", npcs.join(" "), game.join(" "));
                 }
+                if std::env::var("SEGMENT_PUPPETS").is_ok() {
+                    let pp: Vec<String> = w.scene.puppets.iter().map(|p| format!("{}:{}/{}/{}", p.id, p.anim.raw, p.anim.frame, p.anim.tick)).collect();
+                    let tr: Vec<String> = w.scene.tracks.iter().map(|t| format!("{:?}:{}{}{}", t.owner, t.queue.len(), if t.started { "s" } else { "" }, if t.holding { "h" } else { "" })).collect();
+                    eprintln!("  t{k} puppets {} | wait {:?} done {} batch {} tracks {}", pp.join(" "), w.scene.director.wait.is_some(), w.scene.director.done, w.scene.director.batch, tr.join(" "));
+                }
                 if wf_core::menu::active(w) {
                     eprintln!("  t{k} menu {:?} lag {} ticks {} play {} game lf {} snd {}", w.menu.phase, w.menu.lag, w.menu.ticks, w.story.play_frames, lf, fr["snd"]);
                 }
@@ -373,14 +378,15 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
                     .filter(|&i| !w.ents[i].removed)
                     .filter_map(|i| match &w.ents[i].body {
                         wf_core::world::Body::Enemy(e) => Some(format!(
-                            "({},{} {:x?} s{:?} hp{} anim{:?} m{:?})",
+                            "({},{} {:x?} s{:?} hp{} anim{:?} m{:?} t{})",
                             e.a.x >> 8,
                             e.a.y >> 8,
                             e.ai.stack.iter().map(|s| s.state).collect::<Vec<_>>(),
                             e.a.sprite,
                             e.hp1024 >> 10,
                             (e.ea.pos.raw, e.ea.pos.frame, e.ea.pos.tick),
-                            e.marked
+                            e.marked,
+                            e.a.anim_t
                         )),
                         wf_core::world::Body::Shot(sh) => Some(format!("shot({},{} t{} dir{} {:?})", sh.x >> 8, sh.y >> 8, sh.t, sh.dir, std::mem::discriminant(&sh.kind))),
                         wf_core::world::Body::Fx(_) => Some("fx".into()),

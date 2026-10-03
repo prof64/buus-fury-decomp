@@ -787,8 +787,15 @@ pub fn finish_arrival(w: &mut World) {
             // a follow camera found no target in the frame's camera step
             crate::scene::follow_owed(w);
         }
+        // the 3D map's camera too (a warp_fade's nested load: Earth 2-8 #15 / 3-1 / 4-1 world-map arrivals)
+        if crate::fieldworld::flying(w) {
+            crate::fieldworld::camera(w);
+        }
+        // (not under a script that warped: its next command owns the camera this frame - Earth 3-1 / 3-11: a world
+        // map circle's warp, then camera_pan_to from the snap)
+        let held = w.field.as_ref().is_some_and(|f| f.busy);
         for s in 0..w.players.len() {
-            if s == 0 && (scripted || crate::fieldworld::flying(w)) {
+            if s == 0 && (scripted || crate::fieldworld::flying(w) || held) {
                 continue;
             }
             camera(w, s);
@@ -847,6 +854,8 @@ fn arrive(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<Dir>) {
             p.ap.raw = 16;
             p.ap.frame = 0;
         }
+        // the 3D map object's camera exists from the load, behind the flyer (3-1: the load inside s130's warp)
+        crate::fieldworld::camera(w);
     }
     w.story.variant_byte = variant;
     w.events.push(Event::Field(FieldEvent::AreaEnter { area: to, key: a.key.clone() }));

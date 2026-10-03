@@ -212,7 +212,7 @@ if __name__ == '__main__':
             else:
                 sim.free(r[1], e)
         real = Alloc.read(e)
-        if hs:
+        if hs or real.key() != sim.key():
             if real.key() != sim.key():
                 # an area load resets the allocator after the old objects' frees: fresh, then the frame's later allocs
                 for cut in range(len(hs), -1, -1):

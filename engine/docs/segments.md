@@ -401,7 +401,8 @@ Open, with what was found:
   AlignWithPlayer stalls in the core while the game's keeps cycling states; 2-8 #15 / 4-1 #2: 3D map (see above).
 
 **Side-content catalogue** (data survey 2026-10-02; flags = story flags): Broly turns out to be **mainline** (Dragon
-Ball saga: his defeat s436 sets flag 111, which Dragon Ball #4 s439 needs) — kept here as assigned. The optional
+Ball saga: his defeat s436 sets flag 111, which Dragon Ball #4 s439 needs) — shared with the Super Buu agent, whose main line
+reaches it: **whoever reaches Broly first takes it** and notes it here (not taken yet, 2026-10-03). The optional
 content: the dungeon level-gate tiers (s517: tier 2 after flag 128, tier 3 after 149 at 8-2 / 10-1 / 11-1 / 14-1 /
 15-1, 9-1), per-visit gates (s518: 2-33 Gohan L140, 8-7 Vegeta L120, 13-1), the East District hidden dungeon
 (2-33..2-47), Hercule Exhibits (25, s170 at 3-20) and Z-Fighter Exhibits (15, s189 at 4-23) -> Gogeta's Fusion Dance,
@@ -425,7 +426,8 @@ s452 (flag 125). Master `work/side/seg/sc_arena_master.json` (local), segments c
 
 | segment | from | frames | matched |
 |---|---|---|---|
-| `sc_janemba` | 18-14 entry | 6,000 | 5,223 (gate) |
+| `sc_janemba` | 18-14 entry | 6,000 | 6,000 (gate) |
+| `sc_janemba_full` (local, 22 MB) | 18-14 entry | 40,688 | 35,925: Janemba, the handover, Super Janemba, the fusion |
 
 Rules found (field only where battle is pinned by the TypeScript cross-check):
 * Janemba's body parts: created at body + (-16, -16) / (48, -16) / (16, -40); then part 0x37's AI node (0x0803D0C4)
@@ -433,12 +435,26 @@ Rules found (field only where battle is pinned by the TypeScript cross-check):
   raw 10 [-1, -2, -1], raw 20 [15, -3, -5], else [0, 1, 0, -1] (0x0803CF46 / 0x0803D046 / 0x0803CFC2; read before
   the body's tick; a switch into raw 20 shows a frame late, and under it the previous frame's cel). Battle keeps the
   measured fixed offsets (-12, -22) ... until the TypeScript reference is updated.
-* Hand strikes: the arm part (A 0x34 / B 0x35) plays raw 19 (8 frames a cel, no start draw), the body stays idle; the
-  hand is gfx 0x96 (spawn record 0x0877B050) at the player's frame-start position (+4 / -20), the arm's SetAnim(0)
-  ends the strike.
+* Hand strikes: the node's first update gives the arm part (A 0x34 / B 0x35) the strike controller: raw 19 (8 frames
+  a cel, no start draw), the hand (gfx 0x96, spawn record 0x0877B050, at the player's frame-start position + 4 / -20)
+  on its 16th tick - before the player's update, so a punch that hurts Janemba in that frame meets it - and on its
+  56th the hand's SetAnim(0) + its tiles freed, then the arm's SetAnim(0). JanembaPartFlash cuts a running strike:
+  the controller's exit idles (rand(255)) and destroys its hand; the node ends with it. A hand takes the player's hits
+  (crit chance + roll, nothing else) only until its controller ends.
+* Janemba's parts are enemy objects for hits too: a hit under one computes its damage (crit chance + roll) only.
+* Field hit tests (the player's melee on enemies, MiniRollAttack's hit, IfPlayerNearAndHittable's centres) use the
+  body box 0x0800FE78 at the ground position: the height does not lift it (Janemba 66 px up in the ascent, hopping
+  minis).
 * Ascend = raw 20 one pass (cel 0 shows 9 frames); descend rises from its 2nd frame, lands after 67, the animation
   plays back (cel 1 for 8 frames, then cel 0), 16 frames later the shake (0x46, 0x1E) and a puff per missing mini
-  (rate 0x1000 + rand(0x1000)), 16 more: the minis and SetAnim(0) (229 frames after the ascent began).
+  (rate 0x1000 + rand(0x1000)), 16 more: that many minis (a mini killed in between is not replaced) and SetAnim(0).
+* A mini's hop counter is its controller's: it counts on while an event holds the field (no moves).
+* A Janemba part's hurt end (SetAnim(0)) also runs while an event holds the field (the defeat scene).
+* Super Janemba: TeleportNearPlayer / TeleportChain4 take hits off from the vanish until 18 frames after the jump; the
+  jump lands at the player's whole-pixel position + the side offset, moved to the first walkable tile-aligned spot of
+  0x08009816's square spiral, keeps the facing, and leaves the grid alone (the old footprint stays marked, the new one
+  is taken as its own); TeleportNearPlayer ends with the landing animation (36 frames, SetAnim(0)); the chain's
+  controller counts from the frame after the enter, its first update steps the side counter 0x03003228.
 * The field's shake slot holds one shake at a time: a newer one suspends the older until it ends.
 * Mini-Janemba: the roll's dash is a collision-checked step without sliding; a hopping enemy meets the walls.
 * Remove / become_map_object / glide lift an NPC's walk mark (s101); the field enemies' AI does not run in an event's
@@ -446,11 +462,17 @@ Rules found (field only where battle is pinned by the TypeScript cross-check):
 * Enemy grid (field, checked by dumping the live grid, map object [0x080726AC + 8] + 0xB0, against ours with
   `SEGMENT_GRID` / `SEGMENT_ORDER` in the segment trace): a hopping enemy keeps its marks (height does not detach);
   every enemy constructor marks its footprint - the body parts once where they are created (the mirror node moves them
-  without marks), the strike hands too (cleared on their tick 40, holes in walls and Janemba's mark included).
-  Unmarking clears whatever shares the tiles, which is what later steps collide with.
+  without marks), the strike hands too. Unmarking clears whatever shares the tiles, which is what later steps collide
+  with.
 * JanembaPartFlash (0x0803999D, Janemba's on-hit tree): every part plays the hurt animation from the hit; each part's
   own end SetAnim(0)s it (idle draw). ShockStun (state 0x0A's reaction) lasts the hurt animation, then PopState
   (0x104 resumes: WaitMinisDefeated -> the strikes).
-Open at 5,223: a Mini-Janemba's re-aim (0x080346FC at hop counter 0: chance(0x4000), quadrant from the footprint
-centres) faces left in the game where ours keeps facing up (dy = 0 with the player's position of that frame); which
-player position the game reads there is not settled.
+* Scenes: `screen_rect_x/y_at_actor` (0xCB / 0xCC) centre on the footprint centre in the field (Gogeta's split
+  places the walk from it); frames passing while a batch is open (0x38 .. 0x3A, here flash_white + fade_to_white)
+  do not run the world update; Watch This!'s closing frame runs the scene's tracks, the script and the cameras but not
+  the objects.
+* Debug: `SEGMENT_PUPPETS=1` in the segment trace prints the scene puppets' animations and the director's tracks.
+
+Open at 35,925 (full run): after the batch commit an instant command pair (face, set_pos) finishes a frame later in
+ours than in the game (the director's wait ends one frame late; shared scene code, s101 / s073 rules pin the current
+order).

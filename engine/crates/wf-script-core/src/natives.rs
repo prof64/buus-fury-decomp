@@ -80,9 +80,6 @@ fn mv(x: i32, y: i32, speed: i32, state: i32) -> Cmd {
 pub fn call(h: &mut CoreHost, c: &Call) -> R {
     let n = c.native;
     let a = c.args;
-    if std::env::var("NATIVE_DBG").is_ok() {
-        eprintln!("native wf {} 0x{n:02x} {:?}", h.w.frame, a);
-    }
     match n {
         0x00..=0x07 => Err(format!("native 0x{n:02x} is handled by the VM")),
         0x08..=0x0b => done(h.w.story.l[n as usize - 8]),
@@ -369,8 +366,10 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
                 if n == 0x77 {
                     // the immediate warp: the player goes idle first (vt+0x28(0): 1 x rand(255)), then EnterArea
                     // re-creates it facing down (story playthrough: s061 -> Grand Kai's Mansion)
+                    // (not the 3D map's flyer: its flight state takes no SetAnim(0) - Earth 3-1 / 3-11, a circle's warp)
+                    let flying = wf_core::fieldworld::flying(h.w);
                     for s in 0..h.w.players.len() {
-                        if let Some(i) = h.w.player_idx(s) {
+                        if let Some(i) = h.w.player_idx(s).filter(|_| !flying) {
                             wf_core::player::set_idle(h.w, i);
                         }
                     }
@@ -566,9 +565,6 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
         0xa1..=0xa3 => {
             let Some(i) = resolve_actor(h.w, h.s, arg(a, 0)) else { return done(0) };
             let ac = h.w.actor(i).ok_or("actor")?;
-            if std::env::var("NATIVE_DBG").is_ok() {
-                eprintln!("  actor {} -> ent {} kind {} pos ({},{})", arg(a, 0), i, h.w.ents[i].kind(), ac.px(), ac.py());
-            }
             done(match n {
                 0xa1 => ac.px(),
                 0xa2 => ac.py(),
@@ -719,9 +715,6 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
         0xcb | 0xcc => {
             let Some(i) = resolve_actor(h.w, h.s, arg(a, 0)) else { return done(0) };
             let (x, y) = scene::screen_rect_at(h.w, i, arg(a, 1), arg(a, 2));
-            if std::env::var("NATIVE_DBG").is_ok() {
-                eprintln!("  rect -> ({x},{y})");
-            }
             done(if n == 0xcb { x } else { y })
         }
         0xcd => {

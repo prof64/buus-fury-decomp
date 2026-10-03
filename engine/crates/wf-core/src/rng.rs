@@ -42,9 +42,6 @@ impl Rng {
         self.calls = self.calls.wrapping_add(1);
         if TRACE.load(std::sync::atomic::Ordering::Relaxed) {
             eprintln!("      rng call at {}", std::panic::Location::caller());
-            if std::env::var("RNG_BT").is_ok() {
-                eprintln!("{}", std::backtrace::Backtrace::force_capture());
-            }
         }
         self.step()
     }
