@@ -432,6 +432,15 @@ ids / animation indices need the ROM's sprite-def tables: the recording's `init.
 (`GbaRam.actor_rows`). The event: blocked in the return's fade-in phase (`Pending::Phases`, fade started at the
 cut). Proof - the real route's Kid Buu run, cut with `--events`: **9 / 14 cuts exact**, the eight `return_to_field`
 ones gated (`rkb_003`, `004`, `005`, `006`, `007`, `009`, `010`, `011`: up to 2,000 frames each, allocator check on).
+Increment 1c: **the countdown-set difference is the event's cause** (the Earth agent's hint): `kbr_008`'s event chain
+is the countdown hook's (s009 -> s461 -> s462), run by the field frame's timer update 0x0800425C itself - it ends
+mid-frame and that frame's timer update does not run again; `sb_041`'s is an on-defeat callback (s460), ending at
+the frame's top. `HostState.timer_event` (set when the hook fires, cleared once the field is free; imported from the
+hook's return address 0x08004289 on the IWRAM stack) turns the first-tick double count off. **`kbr_008` exact
+(7,596 / 7,596)**, gated `rkb_008_19-3` (3,000); `sb_041` stays exact. `kbr_012` (s463 node 64, a `load_scene` /
+`return_to_field` step loop): the probe now runs long step loops (4,096 iterations) and finds its return - it
+imports; stop f1: the leader is under a script animation (state 0x0804DE58: frames mode, cel = tick / 5) the
+mid-area import does not rebuild yet.
 Increment 1b: building the enemies enters their states (path followers take the stagger): the stagger byte
 0x030032E5 is re-read after them - `kbr_008` 1,579 -> **6,629 / 7,596**. Its stop is the Kid Buu minute's start:
 the countdown set in the event's exit frame reads 3600 there (the game's nested event loop ended inside the frame:

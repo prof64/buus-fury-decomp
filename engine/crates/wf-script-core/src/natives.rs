@@ -80,6 +80,9 @@ fn mv(x: i32, y: i32, speed: i32, state: i32) -> Cmd {
 pub fn call(h: &mut CoreHost, c: &Call) -> R {
     let n = c.native;
     let a = c.args;
+    if std::env::var_os("T_NAT").is_some() {
+        eprintln!("  t-nat f{} 0x{n:02x} {:?}", h.w.frame, &a[..4]);
+    }
     match n {
         0x00..=0x07 => Err(format!("native 0x{n:02x} is handled by the VM")),
         0x08..=0x0b => done(h.w.story.l[n as usize - 8]),
@@ -657,8 +660,10 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
             h.s.timers.countdown = arg(a, 0) * 60;
             // (a countdown switched on makes its object, whose first update counts at once; one already on - at 0
             // after its hook - is only set: 21-25's second minute reads 3600 in the frame it is set)
-            if std::env::var("DBG_CD").is_ok() { eprintln!("DBGCD talk {} in_unit {} from_wait {}", h.s.talk_event, h.s.in_unit, h.s.from_wait); }
-            h.s.timers.fresh = !h.s.timers.countdown_on;
+            // (not inside the countdown hook's own event: that runs within the field frame's timer update
+            // 0x0800425C, so it ends mid-frame and the field frame does not run again in its exit frame - the real
+            // route's second minute, s009 -> s461 -> s462, reads 3600 in the set frame)
+            h.s.timers.fresh = !h.s.timers.countdown_on && !h.s.timer_event;
             h.s.timers.countdown_on = true;
             unit()
         }

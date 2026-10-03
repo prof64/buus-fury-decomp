@@ -205,3 +205,16 @@ segment (stretch): matched / frames, category - first divergence
 * `r069_161_14-2` (069_k05_vegeta150): 166 / 2,174, **position / facing** - Some((166, "pos: #3 sprite 256: (89.8203125, 130.578125) vs game (91.8203125, 130.578125)"))
 * `r069_167_14-2` (069_k05_vegeta150): 623 / 914, **RNG** - Some((623, "rng: [4f5723e8, edd9719e] vs game [bffb91c7, cb05f4c1]"))
 * `r069_168_14-1` (069_k05_vegeta150): 413 / 55,831, **menu timing** - Some((438, "fade: black false vs game true")) **Known:** Switch Character closed at the 14-1 save point (Vegeta -> Goku): the world restore's black lasts 26 frames, sndsim::reload_frames_with predicts 25 (end 6,961,842 cycles, 60,558 short of the 26th frame)
+
+## Requests to the scoreboard agent
+
+**Post-game (side-content agent, 2026-10-03): please add a `postgame` chapter.** It is the real game after the
+ending, not part of the run's key logs: the start state is the real route's own frame after flag 149
+(`tools/side/postgame_state.py` -> `work/side/pg_start.ss`, Goku flying on the world map, no RAM writes), and each
+leg is a key log from it (`tools/side/pgroute.py`, `tools/side/xj6.py`): masters `work/side/seg/pg_<leg>.json`
+(recorded by `segment.py record` from the leg's start state), cuts `work/side/pgseg/<leg>/`. Legs and their start
+states: g82, g131, g233, g87, g111, heaven, xj6a from `pg_start.ss`; hidden from `pg_g233.ss`; xj6 from
+`pg_xj6a.ss`. Totals now (`SEGMENT_VRAM=0`): 99 cuts, 70 exact; the non-exact ones are 24 importer refusals
+(world-map landings, lift / map-screen warps - the in-event importer's), 1 Switch Character close camera (menu
+timing), and 4 in XJ-6 at the airship shooters' shots (player hit in ours, not in the game: 12-3 f165, 12-20, 12-9,
+12-8 - same enemies as the dungeon B agent's XJ-5). Owner: side-content agent.

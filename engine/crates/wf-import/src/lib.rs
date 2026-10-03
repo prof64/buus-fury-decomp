@@ -774,6 +774,9 @@ pub fn import_emulator_state(data: &Arc<GameData>, ram: &GbaRam, runner: &mut St
             world.scene.banner = Some((text, 239u32.saturating_sub(rem)));
         }
     }
+    // an event run by the countdown's hook (#9 from the timer update 0x0800425C: its return address 0x08004289 on
+    // the stack)
+    runner.hs.timer_event = (0x0300_7000u32..0x0300_8000).step_by(4).any(|a| ram.r32(a) == 0x0800_4289);
     // the script countdown (GD+0x4D4, running = GD+1 bit 2): the host's timer (12-x: the Airship's self destruct)
     {
         let gd = ram.read(GD, 0x4D8);

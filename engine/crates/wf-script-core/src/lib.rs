@@ -149,6 +149,9 @@ pub struct HostState {
     /// s073 / s159)
     #[serde(default)]
     pub talk_event: bool,
+    /// the running event was started by the countdown's hook #9 (inside the field frame's timer update)
+    #[serde(default)]
+    pub timer_event: bool,
     /// a talk event resumed from a modal scroll this frame: the scroll mode returned at the top of the frame, so an
     /// exit now leaves this frame's world update to run (4-20: s184 ends on its scroll, the NPCs tick in that frame;
     /// map-trigger cutscenes do not, 3-3 / 7-3)
@@ -409,12 +412,16 @@ pub fn tick_timers(w: &mut World, s: &mut HostState) {
     // 21-25: 3600 set in the event's exit frame reads 3599 in it; the hook runs 3599 frames later) - our scripts
     // run after the update, so its first free tick counts twice
     let fresh = std::mem::take(&mut s.timers.fresh);
+    if self_field_free(w).unwrap_or(true) {
+        s.timer_event = false;
+    }
     if s.timers.countdown_on && s.timers.countdown > 0 && self_field_free(w).unwrap_or(true) {
         if fresh && s.timers.countdown > 1 {
             s.timers.countdown -= 1;
         }
         s.timers.countdown -= 1;
         if s.timers.countdown == 0 && w.field.as_ref().is_some_and(|f| f.host) {
+            s.timer_event = true;
             w.events.push(wf_core::world::Event::Field(wf_core::field::FieldEvent::Run {
                 run: wf_core::fieldcontent::Callback::Event("s009".into()),
                 cause: wf_core::field::Cause::Menu,

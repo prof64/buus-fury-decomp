@@ -235,7 +235,7 @@ impl StoryHost {
         self.rt.start_event_at(event, node, params);
         let mut done = 0usize;
         let mut out = None;
-        for _ in 0..64 {
+        for _ in 0..4096 {
             self.rt.with_thread(|t| t.hold_queue = true);
             let st = self.with_host(w, |rt| rt.run().map_err(|e| e.to_string()));
             let (found, n, held) = self.rt.with_thread(|t| {
@@ -279,7 +279,7 @@ impl StoryHost {
         if let Some(pending) = blocked {
             // run the handler(s) up to the load action without executing anything, then block on it
             let mut left = skip;
-            for _ in 0..64 {
+            for _ in 0..4096 {
                 self.rt.with_thread(|t| t.hold_queue = true);
                 let st = self.with_host(w, |rt| rt.run().map_err(|e| e.to_string()));
                 if st.is_err() {

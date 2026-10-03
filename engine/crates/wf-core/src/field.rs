@@ -1569,6 +1569,17 @@ pub fn trigger_self(w: &mut World, i: usize) {
                 f.defeat_runs.push((run, Cause::Defeat { entity: id, ty, x, y, loot: None }));
             }
         }
+        // the world map's patrol airships (type 141; on-defeat bytecode `run_event(509, flag)`): the event it starts
+        // is a scene object the same way - it runs from the next frame's pass, holding it (real route, the Bandana
+        // hunt: s509 -> s508 starts a logic frame after the touch; the flyer's raw 17 skips that frame's tick)
+        Some(run @ Callback::Script(_))
+            if w.field.as_ref().is_some_and(|f| f.host)
+                && w.data.field.as_ref().and_then(|d| w.field.as_ref().and_then(|f| d.maps.get(&f.map))).is_some_and(|m| m.three_d) =>
+        {
+            if let Some(f) = w.field.as_mut() {
+                f.defeat_runs.push((run, Cause::Defeat { entity: id, ty, x, y, loot: None }));
+            }
+        }
         // callback 0x0800421F (run bytecode): inline, at once
         Some(run) => w.events.push(Event::Field(FieldEvent::Run { run, cause: Cause::Defeat { entity: id, ty, x, y, loot: None }, slot: 0 })),
         None => {}
