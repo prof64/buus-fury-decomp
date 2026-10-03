@@ -191,6 +191,10 @@ pub struct Field {
     /// exist: a blocking command in it suspends the load; story playthrough, Grand Kai's planet 1-15 `prop_show`).
     /// The host calls `finish_arrival` when the script is over.
     pub arrival: Option<Arrival>,
+    /// the last trigger check fired a trigger (or collected a coin): it was the frame's one activation
+    pub check_fired: bool,
+    /// pickups in the world when this frame's deferred calls started (coins they drop are checked before the update)
+    pub pre_pickups: u32,
     /// frame of the last area load
     pub entered: u32,
     /// number of area loads (touch_once triggers survive only within one)
@@ -309,6 +313,8 @@ fn new_field() -> Field {
         resume_held: false,
         pre_update: false,
         arrival: None,
+        check_fired: false,
+        pre_pickups: 0,
         entered: 0,
         loads: 0,
     }
@@ -488,6 +494,8 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
     w.modal = None;
     w.g.shakes.clear();
     w.g.shake_off = (0, 0);
+    // the follow camera's remembered target belongs to the old area
+    w.scene.cam.follow_last = None;
     // 2. map-screen visited bits: story flag 0x1C0 + bit (table 0x0874CA24) — TODO: the table is not exported yet
     // 2. the map-screen visited bit (story flag 0x1C0 + bit)
     crate::fieldworld::mark_visited(w, to.world, to.area);
@@ -739,6 +747,10 @@ pub fn pre_step(w: &mut World) {
     if let Some(f) = w.field.as_mut() {
         f.pre_update = true;
         f.held = false;
+    }
+    let pickups_before = w.ents.iter().filter(|e| !e.removed && matches!(e.body, Body::Pickup(_))).count();
+    if let Some(f) = w.field.as_mut() {
+        f.pre_pickups = pickups_before as u32;
     }
     crate::fieldobj::run_deferred(w);
     let runs = w.field.as_mut().map(|f| std::mem::take(&mut f.defeat_runs)).unwrap_or_default();
@@ -1030,6 +1042,7 @@ pub fn trigger_check(w: &mut World) {
     if f.busy || f.item_get.is_some() {
         return;
     }
+    f.check_fired = false;
     // the list's check counter (+0xC4), frozen while an event runs
     f.checks = f.checks.wrapping_add(1);
     let checks = f.checks;
@@ -1044,6 +1057,9 @@ pub fn trigger_check(w: &mut World) {
         let inp = w.input[s];
         // coins' touch triggers were appended last: scanned first
         if crate::fieldobj::coin_check(w, px, py, s as u8) {
+            if let Some(f) = w.field.as_mut() {
+                f.check_fired = true;
+            }
             return;
         }
         for (k, t) in trigs.iter().enumerate() {
@@ -1080,6 +1096,9 @@ pub fn trigger_check(w: &mut World) {
 }
 
 fn fire(w: &mut World, slot: usize, k: usize, t: &TriggerRt) {
+    if let Some(f) = w.field.as_mut() {
+        f.check_fired = true;
+    }
     let loads = w.field.as_ref().map(|f| f.loads).unwrap_or(0);
     let Some(def) = trigger_def(w, t.obj) else { return };
     let ObjKind::Trigger { kind, .. } = def.kind else { return };

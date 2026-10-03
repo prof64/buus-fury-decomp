@@ -503,6 +503,8 @@ pub struct World {
     pub scene: crate::scene::Scene,
     /// mod runtime state: scripted skills, cooldowns, AI script variables (modkit.rs; empty without mods)
     pub modk: crate::modkit::ModState,
+    /// menu screens (pause menu pages, shops, save, ...): menu/mod.rs; idle = nothing
+    pub menu: crate::menu::Menu,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -545,6 +547,10 @@ impl Hash for World {
         self.scene.hash(h);
         // hashes nothing while empty (games without scripted mod content)
         self.modk.hash(h);
+        // only hashed while a menu is up or has left a result: menu-less hashes stay what they were
+        if self.menu != crate::menu::Menu::default() {
+            self.menu.hash(h);
+        }
     }
 }
 
@@ -604,6 +610,7 @@ impl World {
             field: None,
             scene: Default::default(),
             modk: Default::default(),
+            menu: Default::default(),
         }
     }
 
@@ -765,6 +772,10 @@ impl World {
     pub fn step_entities(&mut self) {
         self.frame += 1;
         self.stats.frames += 1;
+        if self.field.is_some() {
+            self.step_entities_list();
+            return;
+        }
         let n = self.ents.len();
         for i in (0..n).rev() {
             if self.ents[i].removed {
@@ -777,6 +788,32 @@ impl World {
             }
             self.update_entity(i);
         }
+        self.ents.retain(|e| !e.removed);
+    }
+
+    /// the field's world list (0x080115B0): updated from the last object to the first by index into a list that
+    /// compacts at once when an object is destroyed; objects created during the pass are appended (not updated this
+    /// frame). An object that destroys one before it in the list therefore gets its update again (it moved down
+    /// into the next index): story playthrough, the player's punch that destroys a fighter loaded before it ticks
+    /// its animation twice in that frame.
+    fn step_entities_list(&mut self) {
+        let live = |w: &World| -> Vec<usize> { (0..w.ents.len()).filter(|&k| !w.ents[k].removed).collect() };
+        let start = live(self).len();
+        let mut c = start as i64 - 1;
+        while c >= 0 {
+            let l = live(self);
+            let Some(&i) = l.get(c as usize) else {
+                c -= 1;
+                continue;
+            };
+            let skip = self.modal.as_ref().is_some_and(|m| !m.contains(&self.ents[i].id));
+            if !skip {
+                self.update_entity(i);
+            }
+            c -= 1;
+        }
+        // the task list (screen shakes) runs after the objects
+        self.tick_shakes();
         self.ents.retain(|e| !e.removed);
     }
 

@@ -1263,7 +1263,8 @@ pub fn update(w: &mut World, i: usize) {
         w.events.push(Event::Song { id: 8 });
     }
     // the task list (screen shakes) runs after the objects; the first player is the last object updated
-    if pr(w, i).slot == 0 {
+    // (field: once after the whole pass, World::step_entities_list - the player can be updated twice in a frame)
+    if pr(w, i).slot == 0 && w.field.is_none() {
         w.tick_shakes();
     }
 }
@@ -1701,6 +1702,8 @@ fn cycle_skill(w: &mut World, i: usize) {
     if !pl.skills.is_empty() {
         pl.sel = (pl.sel + 1) % pl.skills.len();
     }
+    // the switch's click (story playthrough: L in the Cave of the Ancients)
+    sfx(w, 40, 64);
 }
 
 fn passive(w: &mut World, i: usize) {

@@ -33,7 +33,7 @@ use wf_script_core::{poll, CoreState, HostState, SharedHost};
 use wf_script_rhai::{Runtime, Status, UnitRef};
 
 /// frames of `opening.json` that must match continuously (the verdict)
-const MIN_MATCHED: usize = 18826;
+const MIN_MATCHED: usize = 26651; // New Game -> Olibu -> the level-65 gate -> the Cave of the Ancients 1-17
 
 fn repo() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..")
@@ -517,7 +517,10 @@ fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Value) -
             let lf = i(&fr["lf"]);
             let logic = k == 0 || lf != prev_lf;
             prev_lf = lf;
-            let to = if !logic || prev_lag { last } else { k };
+            // a non-logic (lag) video frame's sounds belong to the logic frame it continues; the next logic frame
+            // keeps its own (a coin collected right after a lag frame: frame 21,363)
+            let _ = prev_lag;
+            let to = if !logic { last } else { k };
             game_snd[to].extend(emu_sounds(fr));
             game_snd[to].sort();
             if logic {
@@ -570,7 +573,15 @@ fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Value) -
             host.run_queue(&mut sess.world, k);
             let fresh = host.started.len() > before;
             let n0 = sess.world.events.len();
+            if std::env::var("DBG_PICK").ok().and_then(|v| v.parse::<usize>().ok()) == Some(k) {
+                let c = sess.world.ents.iter().filter(|e| matches!(e.body, Body::Pickup(_))).map(|e| (e.id, e.removed)).collect::<Vec<_>>();
+                eprintln!("    after begin: pickups {c:?} running {}", host.running);
+            }
             sess.step_update();
+            if std::env::var("DBG_PICK").ok().and_then(|v| v.parse::<usize>().ok()) == Some(k) {
+                let c = sess.world.ents.iter().filter(|e| matches!(e.body, Body::Pickup(_))).map(|e| (e.id, e.removed)).collect::<Vec<_>>();
+                eprintln!("    after update: pickups {c:?}");
+            }
             // the running script resumes from its wait (not one this frame's start began: its first wait counts from
             // the next frame), then the scripts the update started (NPC talk) start: an event's scene object steps
             // its first node in the next frame (Host::scene Enter blocks a frame)
@@ -582,7 +593,15 @@ fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Value) -
             host.run_queue(&mut sess.world, k);
             // the trigger check (post step) starts its event in this frame too
             let n = sess.world.events.len();
+            if std::env::var("DBG_PICK").ok().and_then(|v| v.parse::<usize>().ok()) == Some(k) {
+                let c = sess.world.ents.iter().filter(|e| matches!(e.body, Body::Pickup(_))).map(|e| (e.id, e.removed)).collect::<Vec<_>>();
+                eprintln!("    before post: pickups {c:?} zenie {}", sess.world.story.zenie);
+            }
             let post: Vec<Event> = sess.step_post()[n..].to_vec();
+            if std::env::var("DBG_PICK").ok().and_then(|v| v.parse::<usize>().ok()) == Some(k) {
+                let c = sess.world.ents.iter().filter(|e| matches!(e.body, Body::Pickup(_))).map(|e| (e.id, e.removed)).collect::<Vec<_>>();
+                eprintln!("    after post: pickups {c:?} zenie {} events {:?}", sess.world.story.zenie, post);
+            }
             host.collect(&post);
             host.run_queue(&mut sess.world, k);
         }
@@ -603,6 +622,10 @@ fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Value) -
                     eprintln!("    enemies {ens:?}");
                 }
                 eprintln!("    field mode {:?} arrival {:?}", w.field.as_ref().map(|f| f.mode.clone()), w.field.as_ref().map(|f| f.arrival.is_some()));
+                if let Some(pi) = w.player_idx(0) {
+                    let pl = w.pl_ref(pi);
+                    eprintln!("    skills {:?} levels {:?} sel {}", pl.skills, pl.skill_level, pl.sel);
+                }
                 if !w.g.shakes.is_empty() {
                     eprintln!("    shakes {:?} cam {:?}", w.g.shakes, (w.cameras[0].x, w.cameras[0].y));
                 }

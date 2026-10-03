@@ -87,6 +87,10 @@ pub struct MenuView {
     pub palette: Vec<(u16, u32)>,
     /// backdrop colour index (palette entry shown where every layer is transparent)
     pub backdrop: u16,
+    /// the screen's own palette fade (`0x08007074`) / BLDY fade; `RenderView.palette_fade` / `fade_black` apply when
+    /// these are not set
+    pub fade: Option<PaletteFade>,
+    pub fade_black: u8,
 }
 
 /// One background: a `w` x `h` 8bpp surface built from `ops` (in order), shown at screen (x, y).

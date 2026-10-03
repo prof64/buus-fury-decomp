@@ -636,6 +636,10 @@ pub struct CamCtl {
     /// skip this frame's camera update (an area load snapped the camera within the frame)
     pub hold: bool,
     pub param12: i32,
+    /// the follow object's target position of its last step (px): it keeps easing there when the followed actor
+    /// is removed (story playthrough: Olibu walks off and is removed while the camera follows him)
+    #[serde(default)]
+    pub follow_last: Option<(i32, i32)>,
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -1291,9 +1295,10 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
                     let (bx, by) = box_center(w, i);
                     (bx + *x, by + *y)
                 };
-                crate::fx::puff(w, cx, cy, 0x1000);
+                // the dust cloud's rate is 0x1000 + rand(0x1000) (0x08019554; story playthrough: the gate's puffs)
+                crate::fx::puff_rng(w, cx, cy);
             } else if *absolute && matches!(owner, Owner::Prop(_)) {
-                crate::fx::puff(w, *x, *y, 0x1000);
+                crate::fx::puff_rng(w, *x, *y);
             }
         }
         Cmd::HitFlash => {
@@ -2207,10 +2212,18 @@ pub fn center_on(w: &World, i: usize) -> (i32, i32) {
 
 /// one step of the follow object (0x0804D300): the player camera's easing (3/64, 9/128) toward another actor
 fn follow_step(w: &mut World, id: EntityId) {
-    let Some(i) = w.find(id).filter(|&i| !w.ents[i].removed) else { return };
-    let a = w.actor(i).cloned().unwrap_or_default();
-    let tx = ((a.px() * 2 + a.foot_w) >> 1) - 120;
-    let ty = ((a.py() * 2 + a.foot_h) >> 1) - 84;
+    let (tx, ty) = match w.find(id).filter(|&i| !w.ents[i].removed) {
+        Some(i) => {
+            let a = w.actor(i).cloned().unwrap_or_default();
+            let t = (((a.px() * 2 + a.foot_w) >> 1) - 120, ((a.py() * 2 + a.foot_h) >> 1) - 84);
+            w.scene.cam.follow_last = Some(t);
+            t
+        }
+        None => match w.scene.cam.follow_last {
+            Some(t) => t,
+            None => return,
+        },
+    };
     let c = &w.cameras[0];
     let x = c.x + ((((tx << 10) - c.x) * 3) >> 6);
     let y = c.y + ((((ty << 10) - c.y) * 9) >> 7);
@@ -2219,6 +2232,7 @@ fn follow_step(w: &mut World, id: EntityId) {
 
 /// `camera_follow` / `camera_follow_wait`: the follow object takes the camera (it steps with the frame's camera)
 pub fn follow(w: &mut World, id: EntityId) {
+    w.scene.cam.follow_last = None;
     w.scene.cam.mode = CamMode::Follow(id);
     w.scene.cam.scroll = None;
 }

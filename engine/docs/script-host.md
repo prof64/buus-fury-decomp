@@ -433,7 +433,17 @@ Counts: VM 16, core 32, field 22, partial 13, scene 112, story 53
   0xF); a dead enemy frees its grid cells; FacePlayer = 0x0801599C (24.8 difference, ties horizontal; field only);
   the step-away walk overrides any animation; a shake takes the camera slot (follow holds, plus one frame);
   an area load whose on-enter script blocks waits for it (players offstage, screen black, NPCs held).
-  Next divergence: frame 18,826, the boss (Olibu, death node Idle) idles at the KO in the game.
+  Round 4 (recording extended to 26,651 frames: Olibu's defeat scene, a level-65 grind over the respawning fighters
+  of 1-13 / 1-14, the Character Gate, the Cave of the Ancients up to 1-17): **all 26,651 frames exact**. Rules
+  added: a field death node Idle changes nothing (no hurt anim, no fade / removal); the follow camera keeps easing
+  to a removed target's last position (cleared on loads); the field world list updates last to first in a list that
+  compacts at once (an object that destroys one before it is updated again; `World::step_entities_list`), with the
+  shake task once after the pass; the trigger check runs after the player's update and before the other objects',
+  so coins are tested with their rect from before the frame's step (or where they dropped); coins move 60 frames;
+  pickups stop while an event holds the field; scripted puffs draw their rate (0x1000 + rand(0x1000)); skill
+  edits reach a player offstage in a cutscene scene; L plays sound 40. Route helpers: `tools/story_playthrough/`
+  `try_route.py` (goals from a save state), `endstate.py`, `objdump.py`, `lootwatch.py`. Next on the route: the
+  Instant Transmission puzzle in 1-17 (s098), then the rest of Other World.
 
 ## 10. Field core status (field agent, 2026-10-02; details docs/core.md §10)
 

@@ -947,7 +947,23 @@ fn skill_edit(w: &mut World, n: u8, c: i32, x: i32, y: i32) {
     }
     let skills = cs.skills.clone();
     if let Some(i) = fighter_of(w, c) {
-        w.pl(i).skills = skills;
+        w.pl(i).skills = skills.clone();
+    }
+    // a player out of the world during a cutscene scene (scene::send_offstage) is the same record (story playthrough:
+    // the prologue's forget_skill(0, 20) while Goku is offstage)
+    let forms: Vec<i32> = w.scene.offstage.iter().filter_map(|e| match &e.body {
+        Body::Player(p) => Some(p.form),
+        _ => None,
+    }).collect();
+    for (k, form) in forms.into_iter().enumerate() {
+        if char_of_form(w, form) == Some(c) {
+            if let Body::Player(p) = &mut w.scene.offstage[k].body {
+                p.skills = skills.clone();
+                if p.sel >= p.skills.len() {
+                    p.sel = 0;
+                }
+            }
+        }
     }
 }
 

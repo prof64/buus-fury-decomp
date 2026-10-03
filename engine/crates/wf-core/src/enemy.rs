@@ -389,7 +389,10 @@ pub fn update(w: &mut World, i: usize) {
         if e.contact_cd > 0 {
             e.contact_cd -= 1;
         }
-        if e.defeated {
+        if e.defeated && e.ko < 0 {
+            // field Idle death: no fade, no removal (its animation ticked above)
+            return;
+        } else if e.defeated {
             e.ko += 1;
             if e.ko > 150 {
                 e.a.alpha = (256 - (e.ko - 150) * 256 / 30).max(0);
@@ -1919,7 +1922,11 @@ fn on_death(w: &mut World, i: usize) {
             }
         }
     }
-    if death == "Idle" {
+    if death == "Idle" && w.field.is_some() {
+        // field: the death node Idle (0x080716F4) changes nothing - the enemy stays as it is (its defeat scene
+        // takes it over; story playthrough: Olibu stays idle at the KO punch)
+        w.en(i).ko = -1;
+    } else if death == "Idle" {
         set_anim(w, i, &[nm("knockdown"), nm("ko"), nm("hurt")], true, Some(false));
         w.en(i).ko = 0;
     } else {

@@ -87,6 +87,11 @@ pub fn render_view(w: &World, out: &mut RenderView) {
             out.palette_fade = Some(wf_view::PaletteFade { level: level as u16, target: 0 });
         }
     }
+    // menu screens (menu/mod.rs): the field fading out / in around them, or the menu screen itself
+    if let Some(level) = crate::menu::field_fade(w) {
+        out.palette_fade = Some(wf_view::PaletteFade { level, target: 0 });
+    }
+    out.menu = crate::menu::view(w);
     // the world map: script prop visibility against the content's flags, the mini-map box (spawn_box); the BG
     // camera and the flyer come from `Presenter` / the renderer
     if let (Some(f), Some(_)) = (w.field.as_ref(), mode7.as_ref()) {

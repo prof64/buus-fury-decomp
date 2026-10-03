@@ -443,6 +443,8 @@ pub struct GameData {
     /// the script hooks of mod content (skills, projectiles, AI nodes), attached by the frontend after loading
     /// (`wf-modscript`); None = no scripted content
     pub hooks: Option<Arc<dyn crate::modkit::ModHooks>>,
+    /// menu screens' content (fonts' metrics, string table, portraits, forms' UI bytes); None without `ui/`
+    pub menu: Option<Arc<crate::menu::MenuData>>,
 }
 
 #[derive(Debug)]
@@ -752,7 +754,7 @@ impl GameData {
             }
         }
         let (fighters, arenas) = battle_defs(src, &all)?;
-        let mut d = GameData { sprites, records, record_frames, areas, effects, enemies, states, aux, chars, forms, skills, equipment, xp_table, maps: BTreeMap::new(), anim: crate::eanim::AnimRules::load(ENEMY_ANIM), field: crate::fieldcontent::FieldData::load(src, &all)?.map(Arc::new), fighters, arenas, projectiles: crate::modkit::load_projectiles(src, &all)?, hooks: None };
+        let mut d = GameData { sprites, records, record_frames, areas, effects, enemies, states, aux, chars, forms, skills, equipment, xp_table, maps: BTreeMap::new(), anim: crate::eanim::AnimRules::load(ENEMY_ANIM), field: crate::fieldcontent::FieldData::load(src, &all)?.map(Arc::new), fighters, arenas, projectiles: crate::modkit::load_projectiles(src, &all)?, hooks: None, menu: crate::menu::MenuData::load(src) };
         // new enemy types animate like the type they name (`anim_as`)
         let borrow: Vec<(i32, i32)> = d.enemies.iter().filter_map(|e| e.anim_as.map(|b| (e.ty, b))).collect();
         for (ty, base) in borrow {

@@ -90,6 +90,11 @@ impl Session {
         w.events.clear();
         w.g.shake_ended = false;
         w.input = inputs;
+        // a menu screen runs instead of the world (menu/mod.rs): nothing else updates
+        if crate::menu::active(w) {
+            crate::menu::step(w);
+            return;
+        }
         crate::scene::pre_step(w);
         if w.field.is_some() {
             crate::field::pre_step(w);
@@ -99,6 +104,9 @@ impl Session {
     /// the objects' update and the cutscene systems (second part of [`Session::step_world`])
     pub fn step_update(&mut self) {
         let w = &mut self.world;
+        if crate::menu::active(w) {
+            return;
+        }
         if let Some(f) = w.field.as_mut() {
             f.pre_update = false;
         }
@@ -120,10 +128,15 @@ impl Session {
     /// the rest of the frame: cameras and the field / battle rules after the update
     pub fn step_post(&mut self) -> &[Event] {
         let w = &mut self.world;
+        if crate::menu::active(w) && !crate::menu::opened_this_frame(w) {
+            return &self.world.events;
+        }
         if w.field.is_some() {
             let k = w.events.len();
             crate::field::post_step(w);
             Self::run_hook(&mut self.hook, &mut self.world, k);
+            // START: the pause menu (the field main loop checks it after the objects, triggers and scripts)
+            crate::menu::check_pause(&mut self.world);
             // the frame's music events keep `Scene.song` current inside the state (byte snapshots carry no events)
             crate::scene::note_events(&mut self.world);
             return &self.world.events;

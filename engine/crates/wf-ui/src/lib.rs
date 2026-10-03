@@ -12,6 +12,7 @@ pub mod hud;
 pub mod images;
 pub mod mapscreen;
 pub mod menu;
+pub mod menupics;
 pub mod surface;
 
 use serde_json::{json, Value};
@@ -127,7 +128,29 @@ pub fn extract(rom: &Rom, out: &mut Content) -> wf_rom::Result<()> {
 
     // menu primitives
     out.put("ui/menu/page_skeleton.png", menu::page_skeleton().png(&pal, false));
-    out.put_json("ui/menu.json", &menu_json());
+    // the menu screens' pictures (menupics/): raw indices, frames stacked vertically
+    let mut mp = Vec::new();
+    for p in menupics::all() {
+        let n = (p.w * p.h) as usize;
+        let mut px = Vec::with_capacity(n * p.frames as usize);
+        for k in 0..p.frames {
+            if p.stride == 0 {
+                let mut d = rom.lz(p.rom).unwrap_or_default();
+                d.resize(n * p.frames as usize, 0);
+                px = d;
+                break;
+            }
+            let mut d = rom.lz(p.rom + k * p.stride).unwrap_or_default();
+            d.resize(n, 0);
+            px.extend_from_slice(&d);
+        }
+        out.put(format!("ui/menu/{}.png", p.id), Surface::from_vec(p.w, p.h * p.frames, px).png(&pal, true));
+        mp.push(json!({"id": p.id, "png": format!("menu/{}.png", p.id), "size": [p.w, p.h], "frames": p.frames,
+                       "layout": "frames stacked vertically", "rom": hx(p.rom), "desc": p.desc}));
+    }
+    let mut mj = menu_json();
+    mj["pictures"] = Value::Array(mp);
+    out.put_json("ui/menu.json", &mj);
 
     index.insert(
         "files".into(),

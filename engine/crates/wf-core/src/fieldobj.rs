@@ -43,6 +43,12 @@ pub struct Pickup {
     pub bx: [i32; 4],
     /// map items: the box written blocked into the walk + enemy grids
     pub solid: Option<[i32; 4]>,
+    /// the coin's touch rect for the trigger check of frame `.0` (`World.frame` during the update): the game's
+    /// trigger check runs after the player's update and before the other objects', so it sees a coin where it was
+    /// before this frame's step (or where it dropped, for a coin the frame's deferred calls dropped; story
+    /// playthrough).
+    #[serde(default)]
+    pub spawn: Option<(u32, [i32; 4])>,
 }
 
 impl Pickup {
@@ -160,6 +166,7 @@ pub fn spawn_map_item(w: &mut World, o: &crate::fieldcontent::ObjDef) -> Option<
         phase: 0,
         bx: [*x, *y, x + 16, y + 16],
         solid: Some(solid),
+        spawn: None,
     }))))
 }
 
@@ -306,7 +313,10 @@ pub fn drop_zenie(w: &mut World, size: i32) -> Option<EntityId> {
     let (x, y) = (lx << 8, ly << 8);
     let x0 = (x >> 8) - sw / 2;
     let y0 = (y >> 8) + yoff;
-    let p = Pickup { kind: PickupKind::Zenie(size), x, y, vx, vy, z: 0, vz: 0x80, t: 0, landed: false, phase, bx: [x0, y0, x0 + bw, y0 + bh], solid: None };
+    let mut p = Pickup { kind: PickupKind::Zenie(size), x, y, vx, vy, z: 0, vz: 0x80, t: 0, landed: false, phase, bx: [x0, y0, x0 + bw, y0 + bh], solid: None, spawn: None };
+    if w.field.as_ref().is_some_and(|f| f.pre_update) {
+        p.spawn = Some((w.frame + 1, p.coin_rect()));
+    }
     let id = w.add(Body::Pickup(Box::new(p)));
     // the first physics step in the frame it spawns: the world update gives it when it is created before that
     // update (deferred calls, drop scripts at the frame's start), else now
@@ -324,7 +334,7 @@ pub fn drop_item(w: &mut World, item: i32) -> Option<EntityId> {
     let (vx, vy) = scatter(w, lvx, lvy);
     let kind = if item >= 0 { PickupKind::Supply(item) } else { PickupKind::Equipment(-item) };
     let (x, y) = ((lx - 8) << 8, (ly - 16) << 8);
-    let p = Pickup { kind, x, y, vx, vy, z: 0x2000, vz: 0x800, t: 0, landed: false, phase: 0, bx: [lx - 8, ly - 16, lx + 8, ly], solid: None };
+    let p = Pickup { kind, x, y, vx, vy, z: 0x2000, vz: 0x800, t: 0, landed: false, phase: 0, bx: [lx - 8, ly - 16, lx + 8, ly], solid: None, spawn: None };
     let id = w.add(Body::Pickup(Box::new(p)));
     if !w.field.as_ref().is_some_and(|f| f.pre_update) {
         if let Some(k) = w.find(id) {
@@ -338,12 +348,22 @@ pub fn drop_item(w: &mut World, item: i32) -> Option<EntityId> {
 // pickups
 
 pub fn pickup_update(w: &mut World, i: usize) {
+    // an event holding the field stops the pickups (story playthrough: a coin's age does not run during the level-up
+    // popup, so it outlives the 600-frame limit by the popup's length)
+    if w.field.as_ref().is_some_and(|f| f.busy) {
+        return;
+    }
     let Body::Pickup(p) = &w.ents[i].body else { return };
     let mut p = (**p).clone();
+    // the frame's trigger check (after the player's update, before this one) sees the coin where it was
+    if matches!(p.kind, PickupKind::Zenie(_)) {
+        p.spawn = Some((w.frame, p.coin_rect()));
+    }
     p.t += 1;
     match p.kind {
         PickupKind::Zenie(_) => {
-            if p.t < 60 {
+            // 0x0801809E: the move counter (+0x2C) runs 0..59 - sixty moves
+            if p.t <= 60 {
                 let (nx, ny) = (p.x + p.vx, p.y + p.vy);
                 let (ddx, ddy) = ((nx >> 8) - (p.x >> 8), (ny >> 8) - (p.y >> 8));
                 // 0x0801809E: the step is kept only when it reaches a new pixel (and the box there is free); a step
@@ -410,7 +430,10 @@ pub fn coin_check(w: &mut World, px: i32, py: i32, slot: u8) -> bool {
         if !matches!(p.kind, PickupKind::Zenie(_)) {
             continue;
         }
-        let r = p.coin_rect();
+        let r = match p.spawn {
+            Some((f, r)) if f == w.frame => r,
+            _ => p.coin_rect(),
+        };
         if r[0] <= px && px < r[2] && r[1] <= py && py < r[3] {
             collect(w, k, slot);
             return true;

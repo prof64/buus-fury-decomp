@@ -12,6 +12,7 @@
 
 pub mod banner;
 pub mod font;
+pub mod menu;
 pub mod mode7;
 pub mod mode7_draw;
 pub mod ui;
@@ -106,6 +107,8 @@ pub struct Renderer {
     /// world-map data per map id (mode7.rs)
     mode7: HashMap<String, Option<Arc<wf_content::mode7::Mode7Data>>>,
     strings: Option<Vec<String>>,
+    /// menu screens (`RenderView.menu`)
+    menu: Option<menu::MenuRenderer>,
 }
 
 impl Default for Renderer {
@@ -224,11 +227,13 @@ impl Renderer {
             blend_math: BlendMath::default(),
             mode7: HashMap::new(),
             strings: None,
+            menu: None,
         }
     }
 
     /// Drop cached assets (content / mods changed).
     pub fn clear_cache(&mut self) {
+        self.menu = None;
         self.sheets.clear();
         self.maps.clear();
     }
@@ -286,6 +291,22 @@ impl Renderer {
     /// Compose the view for local player `player` into `self.fb` (`w` x `h` world pixels).
     pub fn render(&mut self, packs: &Packs, view: &RenderView, player: usize, w: usize, h: usize) -> &[u32] {
         self.resize(w, h);
+        if let Some(mv) = view.menu.as_ref() {
+            // a menu screen replaces everything: the 240x160 picture centred in the view, black around it
+            let mr = self.menu.get_or_insert_with(|| menu::MenuRenderer::load(packs));
+            let pic = mr.render(packs, mv, mv.fade.or(view.palette_fade), if mv.fade_black > 0 { mv.fade_black } else { view.fade_black });
+            self.fb.fill(0xFF00_0000);
+            let (ox, oy) = ((w as i32 - GBA_W) / 2, (h as i32 - GBA_H) / 2);
+            for y in 0..GBA_H {
+                for x in 0..GBA_W {
+                    let (fx, fy) = (ox + x, oy + y);
+                    if fx >= 0 && fy >= 0 && (fx as usize) < w && (fy as usize) < h {
+                        self.fb[fy as usize * w + fx as usize] = pic[(y * GBA_W + x) as usize];
+                    }
+                }
+            }
+            return &self.fb;
+        }
         let (vx, vy, cx, cy) = Self::view_origin(view, player, w, h);
         let map = view.map.as_ref().and_then(|m| self.map(packs, &m.id).map(|g| (g, m.anim_frame, m.shake)));
         let backdrop = map.as_ref().map(|(m, _, _)| m.backdrop).unwrap_or(0xFF00_0000);

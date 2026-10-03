@@ -121,4 +121,19 @@ ROUTE_GOALS = [
     ('fight', 6000), ('wait', 30),
     ('walk', 296, 220), ('hold', KEY.RIGHT, 30), ('area', 1, 15), ('expect', 400), ('fight', 12000), ('wait', 60),
     ('events',), ('wait', 30),
+    # --- part 2 (recording extended 2026-10-02) ---
+    # the Character Gate to the cave (1-15, level 65 for Goku): grind the fighters, which come back on every load
+    # of 1-14 (4) and 1-13 (3): 15 -> 14 -> 13 -> 14 -> 13 -> 14 -> 15
+    ('walk', 12, 116), ('hold', KEY.LEFT, 30), ('area', 1, 14), ('wait', 30), ('fight', 6000), ('wait', 30),
+    ('walk', 40, 10), ('hold', KEY.UP, 30), ('area', 1, 13), ('wait', 30), ('fight', 6000), ('wait', 30),
+    ('walk', 290, 240), ('hold', KEY.DOWN, 30), ('area', 1, 14), ('wait', 30), ('fight', 6000), ('wait', 30),
+    ('walk', 40, 10), ('hold', KEY.UP, 30), ('area', 1, 13), ('wait', 30), ('fight', 6000), ('wait', 30),
+    ('walk', 290, 240), ('hold', KEY.DOWN, 30), ('area', 1, 14), ('wait', 30), ('fight', 6000), ('wait', 30),
+    ('walk', 296, 220), ('hold', KEY.RIGHT, 30), ('area', 1, 15), ('wait', 60),
+    # the gate (s091 explains it on the way; A facing up opens it at level 65), the Cave of the Ancients 1-16
+    ('walk', 256, 134), ('talk', 'U'), ('wait', 30), ('hold', KEY.UP, 60), ('area', 1, 16), ('events',), ('wait', 30),
+    # 1-16: the door (s094: Kamehameha tutorial): face up, L to the Kamehameha icon, hold B; then up to 1-17 (s096)
+    ('walk', 112, 140), ('hold', KEY.UP, 2), ('wait', 5), ('hold', KEY.L, 2), ('wait', 10), ('hold', KEY.B, 120),
+    ('wait', 40), ('events',), ('walk', 112, 124), ('hold', KEY.UP, 40), ('area', 1, 17), ('expect', 200),
+    ('wait', 60),
 ]
