@@ -298,6 +298,10 @@ pub struct Player {
     /// the form controller was held by an event in this frame's object pass (`passive_after_scripts` runs it after
     /// the scripts when the event ended in between)
     pub passive_held: bool,
+    /// this frame's form tick ran in the object pass although an AI's event, started from that pass, holds the
+    /// game's (`ai_event_started`): the next tick is skipped - the same ticks, one frame apart only while held
+    #[serde(default)]
+    pub tick_owed: bool,
     pub hp_regen_acc: i32,
     pub dead: bool,
     pub held_by: EntityId,
@@ -385,6 +389,7 @@ impl Player {
             ep_acc: 0,
             regen_timer: 0,
             passive_held: false,
+            tick_owed: false,
             hp_regen_acc: 0,
             dead: false,
             held_by: 0,
@@ -1440,10 +1445,7 @@ pub fn update(w: &mut World, i: usize) {
             && !script_anim_done(w, i);
     p(w, i).passive_held = false;
     if since_ko < 199 && (!pr(w, i).dead || pr(w, i).story_form(w)) {
-        let defer = std::env::var_os("T_DEFER").is_some() && w.field.is_some() && !pr(w, i).story_form(w) && !crate::scene::is_puppet(w, w.ents[i].id);
-        if defer && !w.field.as_ref().is_some_and(|f| f.item_get.is_some()) {
-            p(w, i).passive_held = true;
-        } else if !held {
+        if !held {
             passive(w, i);
         } else if w.field.as_ref().is_some_and(|f| f.busy && f.item_get.is_none()) {
             p(w, i).passive_held = true;
@@ -1975,6 +1977,23 @@ pub fn release_passive(w: &mut World, i: usize) {
     }
 }
 
+/// an enemy's AI started an event in this frame's object pass (its RunScript): the game's form tick, in the callback
+/// list after the pass, is held by it - ours ran in the player's update (Earth 2-90 rE2__087 f1,753, s121 from the
+/// AI: the game's regen count stays, ours stepped)
+pub fn ai_event_started(w: &mut World) {
+    let frame = w.frame;
+    if w.field.as_ref().is_some_and(|f| f.busy || f.item_get.is_some() || f.busy_since == frame) {
+        return;
+    }
+    for s in 0..w.players.len() {
+        if let Some(i) = w.player_idx(s) {
+            if !pr(w, i).story_form(w) {
+                p(w, i).tick_owed = true;
+            }
+        }
+    }
+}
+
 /// a script whose end does not release the held form tick in this frame (`passive_after_scripts`)
 pub fn no_tick_after_scripts(w: &mut World) {
     for s in 0..w.players.len() {
@@ -2005,6 +2024,9 @@ pub fn passive_after_scripts(w: &mut World) {
 fn passive(w: &mut World, i: usize) {
     // (this frame's tick: a held pass's second update in `field::post_step` makes it - none after the scripts)
     p(w, i).passive_held = false;
+    if std::mem::take(&mut p(w, i).tick_owed) {
+        return;
+    }
     if pr(w, i).story_form(w) {
         return story_tick(w, i);
     }

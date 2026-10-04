@@ -561,10 +561,6 @@ impl StoryHost {
                 Cause::Break { x, y, .. } | Cause::Defeat { x, y, .. } => self.hs.loot_pos = (*x, *y),
                 _ => {}
             }
-            // (the form objects' tick comes before the trigger / talk checks that start these)
-            if matches!(job.cause, Cause::Trigger { .. } | Cause::Talk { .. }) && self.outer.is_empty() {
-                wf_core::player::passive_after_scripts(w);
-            }
             wf_core::field::start_cause(w, &job.cause);
             let mut g = self.rt.globals();
             g.g = w.story.g;
@@ -587,6 +583,9 @@ impl StoryHost {
                         // starts its event at the exit value of its last run (its resume slot, wf-core `resume_node`)
                         if self.outer.is_empty() {
                             self.hs.no_resume_save = false;
+                        }
+                        if matches!(job.cause, Cause::Ai { .. }) && self.outer.is_empty() {
+                            wf_core::player::ai_event_started(w);
                         }
                         let node = wf_core::field::resume_node(w, &job.cause);
                         // an AI's RunScript hands the event the enemy's +0x214 block as its parameters
@@ -680,10 +679,6 @@ impl StoryHost {
         // next frame), then the scripts the update started (NPC talk)
         let evs: Vec<Event> = sess.world.events[n0..].to_vec();
         if !fresh {
-            // (a map trigger's inline script runs after the form objects' tick: 7-3 rE2__090 f32, s262's run_scene)
-            if matches!(self.cause, Some(Cause::Trigger { .. })) && self.outer.is_empty() {
-                wf_core::player::passive_after_scripts(&mut sess.world);
-            }
             self.resume_blocked(&mut sess.world);
         }
         self.collect(&evs);
