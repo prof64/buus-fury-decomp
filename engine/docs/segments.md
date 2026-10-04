@@ -1765,6 +1765,28 @@ two Python hash seeds, gives identical key logs (13,000 frames); the earlier run
   object's held update): real route 18-10, the switch scene - the hand is in its walk state when the scene ends.
   With the two rules `r040_021_18-10` (the scoreboard's biggest side row, 6,977 lost) is exact: 7,545 / 7,545.
 
+* **Level grinds and the rest of the gates (pgroute, from the real post-game state).** `hfil_grind(char, level)`:
+  Kami's Lookout 6-14's pad -> the Other World map (from Earth: DOWN = Yemma's Office, LEFT = HFIL; LEFT stops at
+  the Planet of the Kais) -> 18-1's save point (the character) -> 18-1 <-> 18-2 (three Living Dead, ~21,000 XP each,
+  and a Janemba Hand a room, back on each entry); `TO_EARTH`: 18-1's pad -> the map (RIGHT, UP = Earth) -> 6-14's
+  exit -> 6-1's take-off pad. Grinds (frames): Goten 118 -> 120 (4,402), Trunks 91 -> 110 (18,542), Vegeta 150 ->
+  155 (23,780), Trunks -> 135 (62,430), Goten -> 145 (60,619), Gohan 141 -> 165 (102,073), Goku 158 -> 175 (103,270).
+  (`shipdrv` grind: a character whose STR / END are at their cap keeps its stat points - the allocation is tried once
+  per point count, or the grind reopened the Status page for ever.) Gates opened: 10-1 Goten L120 (167) and L145
+  (168), 14-1 Vegeta L155 (177), 11-1 Trunks L135 (171, after Gohan's L100 tier), 20-4 Goku L175 (186, "the Barren
+  gate": world 20 is the marker under Kami's Lookout at altitude 0 .. 16, goal `flyalt`). Tier-3 conditions also want
+  **flag 408 clear**: opening a tier-2 gate sets it, only the take-off pads of 8-1, 10-1, 11-1, 15-1 (and one more
+  area) clear it - so a leg opens tier 2, leaves by that dungeon's pad, comes back. Not possible in this save: 8-2
+  Gotenks L125 and 15-1 Gotenks L140 (Gotenks is not in the save point's menu - only the five base characters - he
+  exists as a fusion), hence 15-1 Gohan L165 (its condition wants Gotenks' flag 179); 13-1 Trunks L110 is a pre-ending
+  gate (its condition wants flag 149 clear).
+* Open (mine): the arrival on Kami's Lookout through the Other World map with a leader other than Goku (s511's other
+  branch: the leader walks beside the Kai) keeps the Instant Transmission pose in ours (raw 20 vs the game's 1, f21
+  of the 0-51 cuts of g141 / g101b / g111b); the real route's 18-11 row (`r042_001_18-11` f9672): Vegeta's s446 runs
+  inside the talk trigger's unit script and ends on `fade_out(100)`; a Janemba Hand in its ambush node makes the
+  node's first update (side draw, jump to the player) in the game's exit frame, ours a frame later. Tried: an exit
+  out of a fade wait (inside a unit script, or any) releases the field's objects like a command wait's - 18-11
+  exact, but 12 gates lose (db7 14-17/22/19, earth 3-12-1 / 4-1-2, sb 21-5/6/11/25, ...): reverted.
 * Gate mechanics as recorded: a gate is an A-button script trigger (s517's 8-2 / 11-1 rects also want facing up);
   the position (footprint top-left) must be inside the rect - stand up against it; s518's open_area leaves a
   32-px opening (2-33: x 216..248), so a character beside it stays blocked by the posts.
