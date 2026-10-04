@@ -11,9 +11,9 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-for d in ('tools/superbuu', 'tools/story_playthrough', 'tools/field', 're/buu'):
+for d in ('tools/superbuu', 'tools/story_playthrough', 'tools/field', 'tools/segments', 're/buu'):
     sys.path.insert(0, str(ROOT / d))
-from sbemu import sd_read  # noqa: E402,F401  (the savedata-capable emulator lib first)
+from sbemu import sd_read  # noqa: E402  (the savedata-capable emulator lib first)
 from common import emu  # noqa: E402
 from flashlib import call_long  # noqa: E402
 from route import status  # noqa: E402
@@ -47,9 +47,49 @@ def title_continue_first(e, log):
         k(KEY.A if i % 20 < 3 else 0, 1)
 
 
+READY = ROOT / 'work' / 'wholerun' / 'savecheck_cuts'
+PHASE = ('import sys; from pathlib import Path; R = Path(%r); '
+         'sys.path.insert(0, str(R / "tools/story_playthrough")); sys.path.insert(0, str(R / "tools/field")); '
+         'from route import start_emu; e = start_emu(sys.argv[1]); c0, p0 = e.cycles(), e.r32(0x0300389C)\n'
+         'for _ in range(200000):\n'
+         '    e.step()\n'
+         '    if e.r32(0x0300389C) != p0: print(e.cycles() - c0); break') % str(ROOT)
+
+
+def ready_cut(e, name):
+    """the save's moment as an importable cut: the end of a game iteration with the leader in the field (a cut state
+    can stand inside a long iteration - an area load, no leader yet: whole-run cut 631,386 in 8-3, which the importer
+    rightly refuses; the save menu is never open there). Runs on (no keys) to the first iteration end with a leader
+    and no event, saves that state and records a short doc from it (`segment.record`, rows to two iteration ends)."""
+    import segment as sg
+    from route import start_emu
+    lf0 = e.r32(0x03000F94)
+    for _ in range(1200):
+        st = status(e)
+        # the iteration ended: the counter moved since the last check and the next frame starts a new one
+        if st['p'] is not None and st['scene'] == 0 and e.r32(0x03000F94) != lf0:
+            break
+        e.set_keys(0)
+        e.run(1)
+    READY.mkdir(parents=True, exist_ok=True)
+    ss = READY / f'{name}.ss'
+    e.save_file(str(ss))
+    e2 = start_emu(str(ss))
+    init, objs, rows = sg.record(e2, lambda j, _e: 0, 64)
+    ends = [k for k in range(len(rows) - 1) if rows[k + 1]['lf'] != rows[k]['lf']]
+    rows = rows[:ends[1] + 1] if len(ends) >= 2 else rows
+    # cycles to the next sound-DMA interrupt (tools/segments/snd_phase.py's measure; a separate process - the
+    # savedata emulator library loaded here lacks the cycle counter)
+    import subprocess
+    init['snd_phase'] = int(subprocess.run([sys.executable, '-c', PHASE, str(ss)], capture_output=True, text=True, check=True).stdout)
+    doc = {'kind': 'segment', 'name': f'save_{name}', 'source': {'kind': 'state', 'state': str(ss)}, 'init': init, 'objs': objs, 'frames': rows}
+    (READY / f'{name}.json').write_text(json.dumps(doc, separators=(',', ':')))
+    return emu(str(ss)), str(ss)
+
+
 def one(st):
     e = emu(str(Path(st).resolve()))
-    e.run(1)
+    e, st = ready_cut(e, Path(st).stem)
     s0 = status(e)
     if s0['p'] is None:
         return {'state': str(Path(st).resolve()), 'skip': 'no leader'}
@@ -57,7 +97,11 @@ def one(st):
     e.w32(SCRATCH, x)
     e.w32(SCRATCH + 4, y)
     call_long(e, 0x08004962, (GD, 0, SCRATCH, 0))
-    saved = e.read(GD, 0x8A8).hex()
+    # the slot as written to the EEPROM (bytes 0x10.., each 8-byte block reversed), not GameData in RAM: the hook
+    # (`call_long`) runs the rest of the game iteration after the save, and an area that drains HP has changed RAM by
+    # then (whole-run cut 787,315: 454 in RAM, 457 saved)
+    ee = sd_read(e)
+    saved = b''.join(ee[k:k + 8][::-1] for k in range(0, len(ee), 8))[0x10:0x10 + 0x8A8].hex()
     log = []
     title_continue_first(e, log)
     s1 = status(e)

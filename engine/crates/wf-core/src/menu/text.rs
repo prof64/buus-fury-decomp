@@ -63,6 +63,8 @@ fn font_index(f: MenuFont) -> usize {
         MenuFont::Bold => 4,
         // (the timer display's digits are drawn by the renderer only: no menu measures them)
         MenuFont::Timer => 2,
+        // (the title text too)
+        MenuFont::Title => 1,
     }
 }
 

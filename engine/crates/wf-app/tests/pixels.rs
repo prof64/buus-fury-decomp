@@ -23,31 +23,63 @@ fn hash(px: &[u32]) -> u64 {
     h
 }
 
-/// `view` with `from`'s palette state (as `examples/pixels.rs` `with_pal`: the field's fade / scale / BLDY, a menu's)
-fn with_pal(view: &RenderView, from: &RenderView) -> RenderView {
+/// `view` with `from`'s register state (as `examples/pixels.rs` `with_pal` / `tear_candidates`): `pal` the palette
+/// (the field's fade / scale / BLDY, a menu's), `scroll` the BG scroll (cameras, the map's drift / shake)
+fn with_prev(view: &RenderView, from: &RenderView, pal: bool, scroll: bool) -> RenderView {
     let mut o = view.clone();
-    o.palette_fade = from.palette_fade;
-    o.palette_scale = from.palette_scale;
-    o.fade_black = from.fade_black;
-    if let (Some(m), Some(f)) = (o.menu.as_mut(), from.menu.as_ref()) {
-        m.fade = f.fade;
-        m.fade_black = f.fade_black;
+    if pal {
+        o.palette_fade = from.palette_fade;
+        o.palette_scale = from.palette_scale;
+        o.fade_black = from.fade_black;
+        if let (Some(m), Some(f)) = (o.menu.as_mut(), from.menu.as_ref()) {
+            m.fade = f.fade;
+            m.fade_black = f.fade_black;
+        }
+    }
+    if scroll {
+        o.cameras = from.cameras.clone();
+        o.map = from.map.clone();
     }
     o
 }
 
-/// a torn frame from our new- and old-palette pictures and the lock's line masks
-fn compose(new: &[u32], old: &[u32], masks: &[String]) -> Vec<u32> {
+/// a torn frame from our pictures and the lock's line specs: "" the new line, "o" / "s" / "b" the line with the
+/// previous palette / BG scroll / both, else a hex mask of the pixels showing the previous palette ("o"'s picture)
+fn compose(r: &mut Renderer, packs: &Packs, view: &RenderView, prev: &RenderView, new: &[u32], masks: &[String]) -> Vec<u32> {
+    let mut pics: BTreeMap<&str, Vec<u32>> = BTreeMap::new();
+    let mut pic = |r: &mut Renderer, l: &'static str| -> Vec<u32> {
+        pics.entry(l)
+            .or_insert_with(|| {
+                let v = match l {
+                    "s" => with_prev(view, prev, false, true),
+                    "b" => with_prev(view, prev, true, true),
+                    _ => with_prev(view, prev, true, false),
+                };
+                r.render(packs, &v, 0, 240, 160).to_vec()
+            })
+            .clone()
+    };
     let mut out = new.to_vec();
     for (y, m) in masks.iter().enumerate().take(160) {
-        let r = y * 240..(y + 1) * 240;
-        if m == "o" {
-            out[r.clone()].copy_from_slice(&old[r]);
-        } else if !m.is_empty() {
-            for x in 0..240 {
-                let b = u8::from_str_radix(m.get(x / 8 * 2..x / 8 * 2 + 2).unwrap_or("00"), 16).unwrap_or(0);
-                if b >> (x % 8) & 1 != 0 {
-                    out[y * 240 + x] = old[y * 240 + x];
+        let rg = y * 240..(y + 1) * 240;
+        match m.as_str() {
+            "" => {}
+            "o" | "s" | "b" => {
+                let l: &'static str = match m.as_str() {
+                    "o" => "o",
+                    "s" => "s",
+                    _ => "b",
+                };
+                let p = pic(r, l);
+                out[rg.clone()].copy_from_slice(&p[rg]);
+            }
+            _ => {
+                let p = pic(r, "o");
+                for x in 0..240 {
+                    let b = u8::from_str_radix(m.get(x / 8 * 2..x / 8 * 2 + 2).unwrap_or("00"), 16).unwrap_or(0);
+                    if b >> (x % 8) & 1 != 0 {
+                        out[y * 240 + x] = p[y * 240 + x];
+                    }
                 }
             }
         }
@@ -116,10 +148,7 @@ fn locked_segments_render_as_the_game() {
                 let new = renderer.render(&packs, &view, 0, 240, 160).to_vec();
                 let ok = hash(&new) == h
                     || match (masks.get(&k), before) {
-                        (Some(m), Some(b)) => {
-                            let old = renderer.render(&packs, &with_pal(&view, &b), 0, 240, 160).to_vec();
-                            hash(&compose(&new, &old, m)) == h
-                        }
+                        (Some(m), Some(b)) => hash(&compose(&mut renderer, &packs, &view, &b, &new, m)) == h,
                         _ => false,
                     };
                 if !ok {

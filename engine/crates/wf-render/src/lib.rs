@@ -387,6 +387,14 @@ impl Renderer {
                 let mr = self.menu.get_or_insert_with(|| menu::MenuRenderer::load(packs));
                 screen.push((1, w as i32 - 72, 8, 64, 16, mr.timer(packs, t)));
             }
+            // a script's title text (`show_title_text`): OBJs at (x - w / 2, y - 16), priority 0
+            for tv in &view.title {
+                let mr = self.menu.get_or_insert_with(|| menu::MenuRenderer::load(packs));
+                let (tw, px) = mr.title(packs, &tv.text);
+                if tw > 0 {
+                    screen.push((0, ox + tv.x - tw / 2, oy + tv.y - 16, tw as usize, 32, px));
+                }
+            }
             if let Some(bv) = &view.banner {
                 if self.banner.is_none() {
                     self.banner = Some(banner::Banner::load(packs));

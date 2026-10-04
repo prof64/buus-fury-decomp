@@ -61,8 +61,7 @@ fn main() {
         };
         app.session.world.opts.no_lag = true;
         let mut ev: Vec<SimEvent> = vec![];
-        // the cut's first row (the emulator saved after one frame)
-        app.step(&[0], &mut ev);
+        // (the state is savecheck.py's ready cut: the game saved there, no frame run)
         let w = &mut app.session.world;
         let d = wf_core::menu::save::save_data(w, false);
         let before = story_json(w);
@@ -75,11 +74,12 @@ fn main() {
         w.saves.pending = Some(wf_core::menu::title::Boot::Continue { slot: 0, chosen });
         ev.clear();
         app.step(&[0], &mut ev);
-        // until the leader is controllable (no menu, the field free)
+        // until the title's menu is gone and the leader is in the field (the field free, or the area's own event
+        // starting as the Continue's fade ends - the game's too: whole-run cut 756,163, Pilaf's in 10-31)
         let mut n = 0;
         while n < 2000 {
             let w = &app.session.world;
-            if !wf_core::menu::active(w) && w.player_idx(0).is_some() && w.scene.depth == 0 {
+            if !wf_core::menu::active(w) && w.player_idx(0).is_some() {
                 break;
             }
             ev.clear();

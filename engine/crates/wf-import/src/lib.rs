@@ -452,6 +452,11 @@ fn build_returned(_data: &Arc<GameData>, ram: &GbaRam, runner: &mut StoryHost, e
     w.scene.screen.black = 16;
     w.scene.screen.dim = 256;
     wf_core::scene::start_fade(&mut w, wf_core::scene::FadeKind::Black, false, 16);
+    // (the field the scene left was entered before it: its name is the last banner shown - the return shows none;
+    // Kid Buu chapter cuts rkb_003 .. 012 at 19-3, the game's screen has no banner)
+    if let Some(name) = _data.field.as_ref().and_then(|fd| fd.area(to.world, to.area)).map(|a| a.name_id) {
+        w.scene.banner_last = name;
+    }
     field::load_area(&mut w, to, x, y, Some(facing));
     let evs: Vec<Event> = std::mem::take(&mut w.events);
     let _ = evs;

@@ -195,11 +195,14 @@ loop while the screen is being drawn - the fade routine `0x08007074` (512 colour
 and the IWRAM palette copy (pc `0x03000818..`), starting 30 k .. 90 k cycles after the VBlank depending on the
 frame's work - so the lines drawn before or during the rewrite show the previous frame's palette, mixed per pixel on
 the lines drawn while it runs. That is CPU time, which the app does not model (as the lag frames); the app renders
-each frame with its new palette in full. **The tear rule** (pixel comparison, `examples/pixels.rs` / `tests/pixels.rs`):
-on a frame whose palette state (field fade / scale / BLDY, a menu's fade) changed since the previous frame, a pixel is
-accepted when it equals our render with the new palette or with the previous frame's; such frames are reported as
-"torn (hardware)", and the pixel gate locks them with per-line masks of the old-palette pixels (`""` new line, `"o"`
-old line, else a 240-bit hex mask) next to the game picture's hash.
+each frame with its new palette in full. The same holds for the BG scroll: the top lines can show the previous
+frame's scroll (the registers written late in the frame). **The tear rule** (pixel comparison, `examples/pixels.rs` /
+`tests/pixels.rs`): on a frame whose palette state (field fade / scale / BLDY, a menu's fade) or BG scroll state (the
+cameras, the map's drift / shake) changed since the previous frame, a line is accepted when it equals our render with
+the new state, the previous palette, the previous scroll or both previous; on a line drawn while the palette rewrite
+runs, a pixel is accepted when it equals the new or the previous-palette picture. Such frames are reported as "torn
+(hardware)", and the pixel gate locks them with per-line specs (`""` new, `"o"` previous palette, `"s"` previous
+scroll, `"b"` both, else a 240-bit hex mask of the previous-palette pixels) next to the game picture's hash.
 
 ## 9. Coordination (in progress, 2026-10-02)
 

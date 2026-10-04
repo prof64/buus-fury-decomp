@@ -790,11 +790,10 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
         K::PushState => r.d[0] = 0,
         // enter 0x0804E50C: SetAnim(0) (the idle enter draws its start tick)
         K::StandStill => set_anim(w, i, &[nm("idle")], true, Some(true)),
-        // enter 0x08018CE0: SetAnimRaw(1) + state 0x03002B9C, the walk cycle played backwards
-        K::BackOffFacingPlayer | K::BackOffFacingPlayerThroughRocks => {
-            let rev = w.data.anim.reverse;
-            en::set_anim_rule(w, i, &[an(1)], true, Some(true), Some(rev));
-        }
+        // no enter: the step (0x08018CE2) sets SetAnimRaw(1) + state 0x03002B9C (the walk cycle played backwards) when
+        // that is not already the state - a back-off entered again keeps the reversed walk running (real route db5
+        // 12-3 f77 .. f100: one count-down through two back-offs)
+        K::BackOffFacingPlayer | K::BackOffFacingPlayerThroughRocks => {}
         K::Block => {
             w.en(i).a.blocking = true;
             set_anim(w, i, &[an(7)], true, Some(true));
@@ -850,7 +849,6 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             let side = ((w.rng.rand(32768) - 16384) * s) >> 12;
             r.d[0] = -dx * 8 * s + if dx != 0 { 0 } else { side };
             r.d[1] = -dy * 8 * s + if dy != 0 { 0 } else { side };
-            set_anim(w, i, &[an(1)], true, Some(true));
         }
         K::KnockbackSlide => {
             let mut kb = KnockState { n: 16, ..Default::default() };
@@ -942,7 +940,11 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             r.d[6] = w.en_ref(i).anim_seq as i32;
         }
         K::NinjaStarThrow => {
-            timed_enter(w, i, &[an(18), an(4)], true);
+            // controller 0x03003074: anim 0x13 (raw 20; real route db6 13-32 f117), a frame per 8 ticks; the star, its
+            // sound and the end are the node's (not the recorded sequence rule's cue / end)
+            en::face_player(w, i);
+            let r0 = w.data.anim.once_stop3;
+            set_anim_r(w, i, &[an(19), an(4)], false, r0);
             r.d[6] = w.en_ref(i).anim_seq as i32;
         }
         // SoldierThrow 0x080266D8 (SetAnimRaw(0x13)) / TurretFire 0x0802B684 (SetAnimRaw(0x14)): face the player
@@ -1770,9 +1772,14 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         }
         // update 0x080313EA: the counter 48 first, 0 -> finished without moving (47 moves); a step = both
         // components at once, taken back whole when the footprint does not fit (no sliding along a wall)
+        // update 0x080313EA: SetAnimRaw(1) + state 0x03002B9C (the reversed walk) unless already in it (db5 12-9 f222)
         K::BackStep => {
             if f >= 48 {
                 return true;
+            }
+            if w.en_ref(i).ea.rule != w.data.anim.reverse {
+                let rev = w.data.anim.reverse;
+                en::set_anim_rule(w, i, &[an(1)], true, Some(true), Some(rev));
             }
             en::try_move(w, i, r.d[0], r.d[1], 0, 0);
             false
@@ -2035,6 +2042,10 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             if w.en_ref(i).ea.pos.raw != r.d[2] {
                 return true;
             }
+            // the turret's frame (controller tick 0x0802B5EA): tick >> 3 below 16, 1 up to 64, then 2
+            if !soldier {
+                w.en(i).ea.pos.frame = if f < 16 { f >> 3 } else if f > 64 { 2 } else { 1 };
+            }
             if f == 8 {
                 let (x, y) = en::muzzle_fix(w, i, !soldier);
                 let dir = w.en_ref(i).a.facing;
@@ -2089,6 +2100,11 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         }
         // the controller 0x03002FA8 spawns a flame every tick 4..127; at 128: SetAnim(0) and the sound 63 stopped
         K::FlameBreath => {
+            // its frame (tick 0x08023F0E): 0 below tick 4, then (tick >> 2) & 3 with 0 shown as 2 (1, 2, 3, 2, 1 ...)
+            if f < 128 {
+                let g = (f >> 2) & 3;
+                w.en(i).ea.pos.frame = if f < 4 { 0 } else if g == 0 { 2 } else { g };
+            }
             if (4..128).contains(&f) {
                 const NOZ: [(i32, i32); 4] = [(46, 10), (16, -48), (-6, -12), (74, -12)];
                 let a = &w.en_ref(i).a;

@@ -85,30 +85,35 @@ fn with_pal(v: &RenderView, p: &Pal) -> RenderView {
 /// app does not recreate. A frame whose palette state changed since the previous frame is accepted when every line
 /// equals our render with the new palette or with the old one; the per-line hashes of the game's picture are what
 /// the gate locks for it. Returns those hashes when the frame is torn-accepted (some line only matches the old)
-/// our pictures of the frame with the previous frame's register state: "o" palette and scroll, "s" scroll only, "p"
-/// palette only (the ones that differ from the new state)
+/// our pictures of the frame with the previous frame's register state: "o" the palette, "s" the BG scroll, "b" both
+/// (the ones that differ from the new state)
 fn tear_candidates(renderer: &mut Renderer, packs: &Packs, view: &RenderView, prev: &Pal) -> Vec<(&'static str, Vec<u32>)> {
     let now = pal_of(view);
     let scroll_moved = (&prev.cameras, &prev.map) != (&now.cameras, &now.map);
     let pal_moved = (prev.fade, prev.scale, prev.black, prev.menu) != (now.fade, now.scale, now.black, now.menu);
-    let mut out = vec![("o", renderer.render(packs, &with_pal(view, prev), 0, W, H).to_vec())];
-    if scroll_moved && pal_moved {
+    let mut out = vec![];
+    if pal_moved {
+        let p = Pal { cameras: now.cameras.clone(), map: now.map.clone(), ..prev.clone() };
+        out.push(("o", renderer.render(packs, &with_pal(view, &p), 0, W, H).to_vec()));
+    }
+    if scroll_moved {
         let s = Pal { fade: now.fade, scale: now.scale, black: now.black, menu: now.menu, ..prev.clone() };
         out.push(("s", renderer.render(packs, &with_pal(view, &s), 0, W, H).to_vec()));
-        let p = Pal { cameras: now.cameras.clone(), map: now.map.clone(), ..prev.clone() };
-        out.push(("p", renderer.render(packs, &with_pal(view, &p), 0, W, H).to_vec()));
+    }
+    if scroll_moved && pal_moved {
+        out.push(("b", renderer.render(packs, &with_pal(view, prev), 0, W, H).to_vec()));
     }
     out
 }
 
 fn torn(game: &[u32], new: &[u32], olds: &[(&str, Vec<u32>)]) -> Option<Vec<String>> {
     let mut any_old = false;
-    // a whole line may show a previous register state: the candidates in order - "o" the previous palette and scroll,
-    // "s" the previous scroll only, "p" the previous palette only. The line drawn while the palette rewrite runs mixes
-    // the two palettes per colour (each pixel's entry flips at its own time): per pixel then against the previous
-    // palette's picture (the candidate "p" when there, else "o") - a hex mask of the pixels showing it
+    // a whole line may show a previous register state: the candidates in order - "o" the previous palette, "s" the
+    // previous BG scroll, "b" both. The line drawn while the palette rewrite runs mixes the two palettes per colour
+    // (each pixel's entry flips at its own time): per pixel then against the previous palette's picture ("o") - a
+    // hex mask of the pixels showing it
     let mut masks = vec![];
-    let px_old = olds.iter().find(|c| c.0 == "p").or_else(|| olds.iter().find(|c| c.0 == "o")).map(|c| &c.1);
+    let px_old = olds.iter().find(|c| c.0 == "o").map(|c| &c.1);
     'line: for y in 0..H {
         let (g, nw) = (&game[y * W..(y + 1) * W], &new[y * W..(y + 1) * W]);
         if g == nw {
@@ -262,8 +267,18 @@ fn main() {
         // the previous video frame's palette state (the tear rule) and the torn-accepted frames' line hashes
         let mut prev_pal: Option<Pal> = None;
         let mut torn_rows: BTreeMap<usize, Vec<String>> = BTreeMap::new();
+        // the late present (tear rule): the picture shown before the running iteration's step (the previous video
+        // frame's, presenter applied) and the frame the last step ran in - a sampled frame after it with no step is
+        // inside the iteration, whose redraw the game shows only at its end
+        let mut last_view: Option<RenderView> = None;
+        let mut iter_view: Option<RenderView> = None;
+        let mut stepped = usize::MAX;
         let rep = wf_import::segment::replay_with(&data, &files, &doc, &mut |f| match f {
-            wf_import::segment::Frame::Before(_, w) => presenter.before_step(w),
+            wf_import::segment::Frame::Before(k, w) => {
+                presenter.before_step(w);
+                iter_view = last_view.clone();
+                stepped = k;
+            }
             wf_import::segment::Frame::After(k, w) => {
                 // PIX_TRACE=a-b: the view's screen-space extras per frame (boss bars) for frame-by-frame checks
                 if let Some((a, b)) = std::env::var("PIX_TRACE").ok().and_then(|v| {
@@ -284,10 +299,11 @@ fn main() {
                 let mut view = RenderView::default();
                 wf_core::view::render_view(w, &mut view);
                 let old_pal = prev_pal.replace(pal_of(&view));
-                let Some(&i) = at.get(&k) else { return };
                 if std::env::var_os("PIX_NOPRES").is_none() {
                     presenter.apply(&mut view);
                 }
+                last_view = Some(view.clone());
+                let Some(&i) = at.get(&k) else { return };
                 if std::env::var_os("PIX_NOSPR").is_some() {
                     view.sprites.clear();
                 }
@@ -311,8 +327,17 @@ fn main() {
                 // the tear rule: a palette / BG scroll change this frame - lines matching the previous frame's are the
                 // hardware's
                 if n > 0 && std::env::var_os("PIX_NOTEAR").is_none() {
-                    if let Some(op) = old_pal.as_ref().filter(|p| **p != pal_of(&view)) {
-                        let olds = tear_candidates(&mut renderer, &packs, &view, op);
+                    let mut olds = match old_pal.as_ref().filter(|p| **p != pal_of(&view)) {
+                        Some(op) => tear_candidates(&mut renderer, &packs, &view, op),
+                        None => vec![],
+                    };
+                    // ("v": inside a long iteration, the picture from before its step)
+                    if stepped != k {
+                        if let Some(v) = iter_view.as_ref() {
+                            olds.push(("v", renderer.render(&packs, v, 0, W, H).to_vec()));
+                        }
+                    }
+                    if !olds.is_empty() {
                         if let Some(rows) = torn(&game[i], &ours, &olds) {
                             torn_rows.insert(k, rows);
                             class = "torn (hardware)".into();

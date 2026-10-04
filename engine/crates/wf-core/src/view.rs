@@ -64,7 +64,11 @@ pub fn actor_cel(w: &World, i: usize) -> Option<(u16, bool, Option<(i32, i32)>)>
         }
         Body::Npc(n) => n.a.sprite.and_then(|s| w.data.sprite(s)).and_then(|sp| pick(sp, n.anim.raw, n.anim.frame, n.a.facing)),
         // an enemy by its animation controller's position (`eanim`: raw, cel - obj+0x10's state as the game draws it)
-        Body::Enemy(n) => n.a.sprite.and_then(|s| w.data.sprite(s)).and_then(|sp| pick(sp, n.ea.pos.raw, n.ea.pos.frame, n.a.facing)),
+        // (a script's puppet: the scene animation - the controller holds still under it; Kid Buu's scenes, 14-1)
+        Body::Enemy(n) => {
+            let (raw, frame) = crate::scene::scene_anim(w, i).map(|a| (a.raw, a.frame)).unwrap_or((n.ea.pos.raw, n.ea.pos.frame));
+            n.a.sprite.and_then(|s| w.data.sprite(s)).and_then(|sp| pick(sp, raw, frame, n.a.facing))
+        }
         Body::Hand(h) => h.a.sprite.and_then(|s| w.data.sprite(s)).and_then(|sp| h.a.anim.and_then(|k| sp.anims.get(k as usize))).and_then(|a| {
             a.step_index_at(h.a.facing, h.a.anim_t, false).map(|k| (a.steps(h.a.facing)[k].frame, a.steps(h.a.facing)[k].flip, None))
         }),
@@ -151,6 +155,10 @@ pub fn render_view(w: &World, out: &mut RenderView) {
         out.world_map = Some(wm);
     }
     // the countdown / stopwatch display (`show_timer_hud` 0xB0 / 0xBC: object 0x0802FCA0)
+    // a script's title text (`show_title_text` 0xB2)
+    if let Some(d) = w.data.menu.as_ref() {
+        out.title = w.scene.titles.iter().map(|t| wf_view::TitleView { text: d.text.s(t.string.max(0) as usize).to_vec(), x: t.x, y: t.y }).collect();
+    }
     out.timer = w.scene.timer_hud.map(|k| match k {
         crate::scene::TimerHud::Countdown => w.scene.timers.countdown,
         crate::scene::TimerHud::Stopwatch => w.scene.timers.stopwatch,
@@ -408,7 +416,7 @@ pub fn sim_events(w: &World, out: &mut Vec<SimEvent>) {
 #[derive(Clone, Debug, Default)]
 pub struct Presenter {
     #[allow(clippy::type_complexity)]
-    prev: Option<(Vec<SpriteDraw>, Vec<HudView>, Option<wf_view::BannerView>, Option<wf_view::DialogView>, Option<wf_view::DialogAnim>, Vec<wf_view::BossBarView>, Option<i32>)>,
+    prev: Option<(Vec<SpriteDraw>, Vec<HudView>, Option<wf_view::BannerView>, Option<wf_view::DialogView>, Option<wf_view::DialogAnim>, Vec<wf_view::BossBarView>, Option<i32>, Vec<wf_view::TitleView>)>,
     prev_mode7: Option<wf_view::Mode7View>,
 }
 
@@ -417,14 +425,16 @@ impl Presenter {
         let mut v = RenderView::default();
         render_view(w, &mut v);
         self.prev_mode7 = v.map.as_ref().and_then(|m| m.mode7.clone());
-        self.prev = Some((v.sprites, v.hud, v.banner, v.dialog, v.dialog_anim, v.boss_bars, v.timer));
+        self.prev = Some((v.sprites, v.hud, v.banner, v.dialog, v.dialog_anim, v.boss_bars, v.timer, v.title));
     }
     /// the session started mid-area (harnesses): nothing of the previous build to show
     pub fn reset(&mut self) {
         *self = Presenter::default();
     }
     pub fn apply(&self, out: &mut RenderView) {
-        if let Some((sprites, hud, banner, dialog, anim, boss_bars, timer)) = &self.prev {
+        if let Some((sprites, hud, banner, dialog, anim, boss_bars, timer, title)) = &self.prev {
+            // (an OBJ: a frame late)
+            out.title = title.clone();
             out.sprites = sprites.clone();
             out.hud = hud.clone();
             out.boss_bars = boss_bars.clone();

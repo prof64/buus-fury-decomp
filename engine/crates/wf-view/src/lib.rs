@@ -57,6 +57,10 @@ pub struct RenderView {
     pub boss_bars: Vec<BossBarView>,
     /// The countdown / stopwatch display's value in frames (two 32x16 OBJs at (168, 8), priority 1), if shown.
     pub timer: Option<i32>,
+    /// A script's title text (`show_title_text` 0xB2, "Chapter 12 ..." / "Match 2 Fight!"): the string's units,
+    /// centred at (x, y) (object `0x0802BECC`: a 32-px-high surface, the title font outlined, OBJs at (x - w / 2,
+    /// y - 16)).
+    pub title: Vec<TitleView>,
     /// Screen brightness fade: 0 = normal, 16 = black (GBA BLDY semantics, applied after composition).
     pub fade_black: u8,
     /// The dialogue box, if one is open (drawn above everything, like the game's priority-0 OBJs).
@@ -171,6 +175,8 @@ pub enum MenuFont {
     Bold,
     /// the countdown / stopwatch display's digits
     Timer,
+    /// the big title text (`show_title_text`)
+    Title,
 }
 
 impl MenuFont {
@@ -182,6 +188,7 @@ impl MenuFont {
             MenuFont::Menu => "menu",
             MenuFont::Bold => "bold",
             MenuFont::Timer => "timer",
+            MenuFont::Title => "title",
         }
     }
 }
@@ -313,6 +320,7 @@ impl RenderView {
         self.palette_scale = None;
         self.boss_bars.clear();
         self.timer = None;
+        self.title.clear();
         self.banner = None;
         self.world_map = None;
         self.dialog_anim = None;
@@ -431,6 +439,15 @@ pub struct HudView {
     /// The stat-points mark ("STAT" + arrow, 16x16 at screen x 92 beside the HUD) while the leader has points to
     /// spend: its animation frame 0..3 (`ui/hud/stat_mark.png`), `None` = no mark.
     pub stat_mark: Option<u8>,
+}
+
+/// A script's title text (see `RenderView::title`).
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
+pub struct TitleView {
+    /// the string's UTF-16 units (control pairs included)
+    pub text: Vec<u16>,
+    pub x: i32,
+    pub y: i32,
 }
 
 /// A boss HP bar (script `show_boss_bar`, object vtable 0x0804CE28).

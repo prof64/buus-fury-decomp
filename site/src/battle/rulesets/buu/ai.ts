@@ -17,7 +17,7 @@ import {
 import { BeamGfx } from './fx'
 import { FINAL_FLASH_TABLES } from './skillfx'
 import { audioEvent } from '../../audio/bus'
-import { ENEMY_SETANIM, GENERIC_STATES } from './eanim'
+import { ENEMY_SETANIM, GENERIC_STATES, type EAnimRule } from './eanim'
 
 export const NODE_NOTES: Record<string, string> = {
   IfPlayerInZone: 'sniper zone rectangle not decoded: true within 160 px',
@@ -461,12 +461,12 @@ function playAnim(n: AiNodeJ, c: AiController, anim: number | (string | number)[
 }
 
 /** standard facing + controller action: anim, events at frames, done at `len` */
-function timed(n: AiNodeJ, c: AiController, anim: number | (string | number)[], len: number, events: Record<number, () => void>, face = true) {
+function timed(n: AiNodeJ, c: AiController, anim: number | (string | number)[], len: number, events: Record<number, () => void>, face = true, rule?: EAnimRule) {
   return new Act(
     n, c,
     () => {
       if (face) c.e.facePlayer()
-      c.e.setAnim(anim, true, false)
+      c.e.setAnim(anim, true, false, rule)
     },
     (f) => {
       events[f]?.()
@@ -802,8 +802,9 @@ export function create(n: AiNodeJ, c: AiController): RNode {
     // enemy_ai.json: StepTowardPlayer (renamed in data.ts AI_RENAME): the game backs off, facing the player
     case 'BackOffFacingPlayer':
     case 'BackOffFacingPlayerThroughRocks':
-      // enter 0x08018CE0: SetAnimRaw(1) + state 0x03002B9C, the walk cycle played backwards (tick 0x08018C24)
-      return new Act(n, c, () => e.setAnim(1, true, true, { rule: 'reverse' }), () => e.stepFromPlayer(speed, true))
+      // no enter: the step (0x08018CE2) sets SetAnimRaw(1) + state 0x03002B9C (the walk cycle played backwards, tick
+      // 0x08018C24) when that is not already the state (a back-off entered again keeps the reversed walk running)
+      return new Act(n, c, () => undefined, () => e.stepFromPlayer(speed, true))
     case 'StepAwayFromPlayer':
       return new Act(n, c, () => undefined, () => e.stepFromPlayer(speed, false))
     case 'WalkToPlayer': {
@@ -895,9 +896,9 @@ export function create(n: AiNodeJ, c: AiController): RNode {
         const side = ((e.w.rng.rand(32768, 'backstep side') - 16384) * s) >> 12
         a.data.vx = -dx * 8 * s + (dx ? 0 : side)
         a.data.vy = -dy * 8 * s + (dy ? 0 : side)
-        e.setAnim(1, true, true)
       }, (f, a) => {
         if (f >= 48) return true
+        if (e.ea.r.rule !== 'reverse') e.setAnim(1, true, true, { rule: 'reverse' })
         // 0x080313EA adds both components and takes the step back whole when the footprint does not fit: no slide
         e.tryMove(a.data.vx, a.data.vy, 0, 0)
         return false
@@ -1196,7 +1197,9 @@ export function create(n: AiNodeJ, c: AiController): RNode {
     case 'RifleShot':
       return timed(n, c, [17, 3], 32, { 8: () => e.shot('rifle') })
     case 'NinjaStarThrow':
-      return timed(n, c, [18, 4], 32, { 8: () => e.shot('star') })
+      // controller 0x03003074: anim 0x13 (raw 20; real route db6 13-32 f117)
+      // a frame per 8 ticks; the star, its sound and the end are the node's (not the recorded sequence's cue / end)
+      return timed(n, c, [19, 4], 32, { 8: () => e.shot('star') }, true, { rule: 'once_stop', shift: 3, end: 'none' })
     case 'MummyWrapShot':
       return timed(n, c, [17, 3], 24, { 8: () => e.shot('wrap') })
     case 'MummyWrapBurst':
@@ -1238,6 +1241,8 @@ export function create(n: AiNodeJ, c: AiController): RNode {
         // the node's update (0x08026726) is finished as soon as the controller is no longer the actor's state object:
         // a hit's reaction replaced it (real route 8-31: a soldier hurt mid-throw moves on once it recovers)
         if (e.ea.pos.raw !== a.data.raw) return true
+        // the turret's frame (controller tick 0x0802B5EA): tick >> 3 below 16, 1 up to 64, then 2
+        if (!soldier) e.ea.pos.frame = f < 16 ? f >> 3 : f > 64 ? 2 : 1
         if (f === 8) {
           a.data.wave = e.w.add(new EnergyWave(e.ctx, e, e.facing, ...e.muzzleFix(soldier ? 'soldier' : 'turret'))).id
           if (soldier) e.ctx.soldierWave = a.data.wave
@@ -1313,6 +1318,11 @@ export function create(n: AiNodeJ, c: AiController): RNode {
       }, (f) => {
         // the controller 0x03002FA8 spawns a flame every tick 4..127; at 128 it ends: SetAnim(0) and the sound 63
         // stopped (0x0803E32C) (lockstep f02_vs_enemy_flames)
+        // its frame (tick 0x08023F0E): 0 below tick 4, then (tick >> 2) & 3 with 0 shown as 2
+        if (f < 128) {
+          const g = (f >> 2) & 3
+          e.ea.pos.frame = f < 4 ? 0 : g === 0 ? 2 : g
+        }
         if (f >= 4 && f < 128) {
           const NOZ = [[46, 10], [16, -48], [-6, -12], [74, -12]]
           const [ox, oy] = NOZ[e.facing]

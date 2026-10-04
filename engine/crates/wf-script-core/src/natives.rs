@@ -741,12 +741,12 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
             unit()
         }
         0xb2 => {
-            h.w.scene.title = Some(scene::TitleText { string: arg(a, 0), x: arg(a, 1), y: arg(a, 2) });
+            h.w.scene.titles.push(scene::TitleText { string: arg(a, 0), x: arg(a, 1), y: arg(a, 2) });
             wf_core::vram::title_shown(h.w, arg(a, 0));
             unit()
         }
         0xef => {
-            h.w.scene.title = None;
+            h.w.scene.titles.clear();
             wf_core::vram::release(h.w, wf_core::vram::Owner::Title);
             block(h.s, Pending::Frames { left: 1, result: None })
         }

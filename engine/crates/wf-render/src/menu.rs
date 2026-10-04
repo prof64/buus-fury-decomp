@@ -129,12 +129,13 @@ fn font_slot(f: MenuFont) -> usize {
         MenuFont::Menu => 3,
         MenuFont::Bold => 4,
         MenuFont::Timer => 5,
+        MenuFont::Title => 6,
     }
 }
 
 impl MenuRenderer {
     pub fn load(packs: &Packs) -> MenuRenderer {
-        let fonts = [MenuFont::Small, MenuFont::Dialog, MenuFont::Digits, MenuFont::Menu, MenuFont::Bold, MenuFont::Timer].iter().map(|f| ColFont::load(packs, f.id())).collect();
+        let fonts = [MenuFont::Small, MenuFont::Dialog, MenuFont::Digits, MenuFont::Menu, MenuFont::Bold, MenuFont::Timer, MenuFont::Title].iter().map(|f| ColFont::load(packs, f.id())).collect();
         let pal: Vec<u32> = packs
             .json::<serde_json::Value>("ui/palette.json")
             .ok()
@@ -427,6 +428,31 @@ impl MenuRenderer {
         let ops: Vec<MenuOp> = put.into_iter().map(|(x, c)| MenuOp::TextOutline { font: MenuFont::Timer, x, y: 12, colour: 5, outline: 1, clip: [0, 0, 64, 16], text: vec![c] }).collect();
         let s = self.surface(packs, &wf_view::MenuLayer { w: 64, h: 16, x: 0, y: 0, priority: 1, ops });
         s.px.iter().map(|&c| if c == 0 { 0 } else { 0xFF00_0000 | (self.pal.get(c as usize).copied().unwrap_or(0) & 0xFF_FFFF) }).collect()
+    }
+
+    /// A script's title text (`0x0802BECC`): (width, 32-px-high ARGB) - w = (the title font's width + 33) rounded
+    /// down to 32, the text centred at (w / 2, 22), colour 2 outlined with 1 (`0x0803F70C`), like the minigames'
+    /// label (`0x08030860`) one font and 16 px taller
+    pub fn title(&mut self, packs: &Packs, text: &[u16]) -> (i32, Vec<u32>) {
+        let adv = |c: u16| -> i32 {
+            self.fonts.get(font_slot(MenuFont::Title)).and_then(|f| f.as_ref()).and_then(|f| f.glyphs.get(c as usize).cloned().flatten()).map(|g| g.0 as i32 + 1).unwrap_or(0)
+        };
+        let mut m = 0;
+        let mut k = 0;
+        while k < text.len() {
+            if text[k] == 8 {
+                k += 2;
+                continue;
+            }
+            m += adv(text[k]);
+            k += 1;
+        }
+        let w = ((m + 0x21) >> 5) << 5;
+        let x = w / 2 - ((m + 1) >> 1);
+        let ops = vec![MenuOp::TextOutline { font: MenuFont::Title, x, y: 22, colour: 2, outline: 1, clip: [0, 0, w, 32], text: text.to_vec() }];
+        let s = self.surface(packs, &wf_view::MenuLayer { w: w as u16, h: 32, x: 0, y: 0, priority: 0, ops });
+        // (the top byte: the OBJ palette entry, for the palette fade)
+        (w, s.px.iter().map(|&c| if c == 0 { 0 } else { (c as u32) << 24 | (self.pal.get(c as usize).copied().unwrap_or(0) & 0xFF_FFFF) }).collect())
     }
 
     /// the 240x160 screen (0xFFRRGGBB), with the game's palette fade (`0x08007074`) and BLDY fade applied

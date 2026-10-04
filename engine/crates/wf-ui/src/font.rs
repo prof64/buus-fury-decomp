@@ -21,6 +21,7 @@ pub const FONTS: &[(&str, u32, &str)] = &[
     ("menu", 0x0807_012C, "menus (item / equipment / status lines, title screen menu)"),
     ("bold", 0x082B_9BA0, "bold, menu page titles ('Status', 'Inventory', …)"),
     ("timer", 0x0806_F4F4, "the countdown / stopwatch display's thick digits (0x0802FCA0, drawn outlined)"),
+    ("title", 0x0875_48DC, "the big title text (`show_title_text` 0xB2: 0x0802BFBC -> 0x0802BECC, drawn outlined)"),
 ];
 
 /// Glyph-cell top relative to the pen y passed to the drawer.

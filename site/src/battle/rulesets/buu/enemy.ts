@@ -655,8 +655,9 @@ export class Enemy extends Actor implements EnemyLike {
       this.facing = faceToward ? (dy < 0 ? 1 : 0) : dy > 0 ? 1 : 0
     }
     if (!m) return false
-    // the back-off runs under its own reversed-walk state (set by its enter): its step makes no SetAnim(1)
+    // the back-off runs under its own reversed-walk state, set by its step unless already the state (0x08018CE2)
     if (!faceToward) this.markMoving()
+    else if (this.ea.r.rule !== 'reverse') this.setAnim(1, true, true, { rule: 'reverse' })
     this.tryMove(-Math.trunc((dx * speed) / m), -Math.trunc((dy * speed) / m), dx >= 0 ? -speed : speed, dy >= 0 ? -speed : speed)
     return !this.stepped
   }

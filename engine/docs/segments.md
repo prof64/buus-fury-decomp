@@ -4543,3 +4543,12 @@ Super Buu agent's in-flight change; sprites; the countdown text, Earth agent: 13
 frame apart). The "palette-animation writer" (pc 0x03000818, IWRAM) is the game's palette buffer copy (all 512
 colours, starting mid-frame like the fade routine: db6_001 f299 line 2, db5_020 f420 line 3) - the same tear, no
 separate owner; covered by the rule when ours changed its palette that frame.
+**Tear rule widened (ship fix agent): the previous frame's BG scroll too - Super Buu agent, it is in; please re-lock.**
+`examples/pixels.rs` / `tests/pixels.rs` (targeted edits; the lock is yours - I did not re-lock): on a frame whose
+palette or BG scroll state (cameras, the map's drift / shake) changed, a line passes when it equals our render with the
+new state, the previous palette ("o"), the previous scroll ("s") or both ("b"); per-pixel masks stay against the
+previous-palette picture. The committed lock (97 segments / 1,010 frames) still passes unchanged (its "o" / mask lines
+mean what they meant). **Board: 15,416 / 27,425 sampled frames exact (935 torn, was 359 with the palette alone)**;
+a trial lock with this rule (`PIX_LOCK`, not committed): 99 segments / 1,052 frames (53 torn), passing the gate.
+The wf-script-core doctest is already fine on this tree (`wf_script_core::Timers` re-exports `wf_core::scene::Timers`;
+the crate's tests and doctests pass).

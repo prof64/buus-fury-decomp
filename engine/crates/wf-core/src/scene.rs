@@ -1127,7 +1127,10 @@ pub struct Scene {
     /// a hidden boss bar still sliding out
     #[serde(default)]
     pub boss_bar_out: Option<BossBarOut>,
-    pub title: Option<TitleText>,
+    /// the title texts shown (`show_title_text` 0xB2: each call makes its own object, "Chapter 12" + "A New
+    /// Beginning"; 0xEF deletes them all)
+    #[serde(default)]
+    pub titles: Vec<TitleText>,
     pub timer_hud: Option<TimerHud>,
     /// the script countdown / stopwatch in frames (GameData +0x4D4 / +0x4D8, running = game bits 2 / 4): set and
     /// ticked by the script natives / `wf_script_core::tick_timers`, read by the display (`RenderView.timer`)
@@ -1196,7 +1199,7 @@ impl Default for Scene {
             hud_hidden: false,
             boss_bar: None,
             boss_bar_out: None,
-            title: None,
+            titles: Vec::new(),
             timer_hud: None,
             timers: Timers::default(),
             dest_label: None,
@@ -2843,6 +2846,9 @@ fn tick_screen(w: &mut World) {
         (FadeKind::Black, false) => {
             s.black = 16 - lvl;
             s.dim = 256 - fine;
+            // the fade from black writes the palette from the stored colours: a white left by an earlier
+            // fade_out_white is gone (earth_2_2_2 f5,023: fade_out_white, fade_out, the load, fade_in)
+            s.white = 0;
         }
         (FadeKind::White, true) => s.white = lvl,
         (FadeKind::White, false) => {
