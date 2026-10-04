@@ -14,7 +14,7 @@ p = Path(name)
 if not p.exists():
     p = ROOT / 'data' / 'segments' / f'{name}.json'
 head, frames = load_doc(p)
-e = start_emu(str(ROOT / 'work' / 'segments' / f"{head['name']}.ss"))
+e = start_emu(sys.argv[4] if len(sys.argv) > 4 else str(ROOT / "work" / "segments" / f"{head['name']}.ss"))
 for k in range(a):
     e.set_keys(frames[k]['keys'])
     e.run(1)

@@ -29,6 +29,8 @@ macro_rules! kinds {
 
 kinds!(
     Sequence, Selector, ParallelAll, ParallelAny, GotoState, PushState, PopState, SubState,
+    // Pyramid 14-2: the sidestep out of the player's beam line (state 0x15A)
+    BeamDodge,
     // conditions
     Chance, IfPlayerWithin, IfPlayerWithin2, IfPlayerFarther, IfPlayerInMeleeRange, IfPlayerAttackingMe, IfInPlayerBeamLine,
     IfTimeInState, IfCooldownOver, IfCooldown2Over, IfCounterEq, IfGlobalFlag, IfBuuPacified, IfAxisAligned, IfHpBelow,

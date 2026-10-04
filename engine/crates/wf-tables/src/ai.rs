@@ -10,6 +10,8 @@ use std::collections::{BTreeSet, HashMap};
 pub const STATE_TABLE: u32 = 0x0870_F514;
 const GOTO_STATE: u32 = 0x0801_890B;
 const SUB_STATE: u32 = 0x0801_9285;
+/// PushState: its state is reachable too (Pyramid 14-2: IfInPlayerBeamLine pushes 0x15A, the beam dodge)
+const PUSH_STATE: u32 = 0x0801_8877;
 
 const A_AI: &str = include_str!("../data/ai.json");
 
@@ -155,7 +157,7 @@ pub fn walk_states(c: &Ctx, reg: &Registry, start: u32) -> Vec<u32> {
             }
             vis.insert(d);
             let fnc = c.u32(d);
-            if fnc == GOTO_STATE || fnc == SUB_STATE {
+            if fnc == GOTO_STATE || fnc == SUB_STATE || fnc == PUSH_STATE {
                 todo.push_back(c.u32(d + 0xC));
                 continue;
             }

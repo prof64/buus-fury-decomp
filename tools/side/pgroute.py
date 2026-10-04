@@ -129,6 +129,33 @@ LEGS['trade'] = ('pg_shopt.ss', [('walk', 120, 200), ('keys', [(D_, 60, 60)]), (
                                  ('keys', [(A_, 3, 240)]), ('fly', 3145, 2001, 95, 79), ('wait', 30),
                                  ('goto', '9-9', 112, 96), *[('talkto', 112, 96, 'U')] * 5, ('wait', 30)])
 
+# the last two trades: the Bandana can't be had in the real post-game (the bandits of 0-55 spawn only for a leader of
+# level <= 70; s508), so not 9-11's Z-Mart but the Planet of the Kais one (19-5 -> 0-94, s033: Dinosaur Tail, Super
+# Elixir): Thieves Den 9-1's take-off pad, Kami's Lookout 6-14's pad, the Other World map (Earth, two LEFT = the
+# Planet of the Kais)
+LEGS['kais'] = ('pg_trade.ss', [('goto', '9-1', 40, 235), ('keys', [(A_, 3, 240)]),
+                                ('fly', 633, 1065, 31, 23), ('wait', 60), ('goto', '6-14', 150, 190, False),
+                                ('keys', [(A_, 3, 200)]), ('keys', [(32, 3, 40), (32, 3, 40), (A_, 3, 200)]),
+                                ('wait', 30), ('goto', '19-5', 166, 90, False)])
+
+# the Kais Z-Mart (0-94: 19-5's gate - A facing up at (163, 89) - then up through the door): sell one Curry Plate
+# (1,000; the list's first row) for the missing zenie, then Buy, Items: rows 0 Steak, 1 Turkey, 2 Three Course Meal,
+# 3 Dinosaur Tail, 4 Hercule-ade, 5 Elixir, 6 Super Elixir
+LEGS['kaisbuy'] = ('pg_kais.ss', [('keys', [(U_, 10, 5), (A_, 3, 150), (U_, 60, 60)]), ('walk', 100, 123),
+                                  ('walk', 88, 123),
+                                  ('keys', [(32, 20, 10), (A_, 3, 60), (D_, 12, 40), (A_, 3, 240), (A_, 12, 60),
+                                            (B_, 12, 60), (A_, 3, 60), (A_, 3, 240)]),
+                                  ('zbuy', [(3, 9, 1), (6, 18, 1)]), ('events',), ('wait', 30)])
+
+# back to the keeper: out of the shop, 19-1's pad (A) -> the Other World map (two RIGHT = Earth) -> Kami's Lookout
+# 6-14 -> 6-1's take-off pad (s515, A at (312, 560)) -> Thieves Den 9-9: the last two trades
+LEGS['trade2'] = ('pg_kaisbuy.ss', [('walk', 120, 200), ('keys', [(D_, 60, 60)]), ('goto', '19-1', 200, 250, False),
+                                    ('keys', [(A_, 3, 200)]), ('keys', [(16, 3, 40), (16, 3, 40), (A_, 3, 200)]),
+                                    ('wait', 60), ('walk', 114, 208), ('keys', [(D_, 40, 60)]),
+                                    ('goto', '6-1', 312, 560, False), ('keys', [(A_, 3, 240)]),
+                                    ('fly', 3145, 2001, 95, 79), ('wait', 30), ('goto', '9-9', 112, 96),
+                                    *[('talkto', 112, 96, 'U')] * 2, ('wait', 30)])
+
 
 def start_of(leg):
     v = LEGS[leg]

@@ -1747,6 +1747,18 @@
    "kind": "action",
    "status": "INFERRED",
    "sem": "sends message 0x11 to the enemy itself (vfunc +0x28) and returns 1 at once"
+  },
+  "0x8018e5f": {
+   "name": "PopState",
+   "kind": "transition",
+   "status": "DISASM",
+   "sem": "pop the enemy AI stack (vfunc +0x70); returns 2 (singleton runtime 0x03002BA4)"
+  },
+  "0x8029837": {
+   "name": "BeamDodge",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "Pyramid 14-2 (state 0x15A, pushed by IfInPlayerBeamLine): sidestep out of the player's line (player facing down/up: left if the player's x is greater, else right; left/right: up if the player's y is greater, else down); SetAnim(0x12), controller vt 0x0804A758: tick + 1, from tick 8 cel 1 and a 2 px step (table 0x0875021C, vfunc +0x54), blocked or tick 24 -> vfunc +0x28(0); finished when the enemy leaves that state"
   }
  },
  "unit_desc": {

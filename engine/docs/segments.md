@@ -323,7 +323,7 @@ are deterministic, but they are other objects' internals (code / heap pointers) 
 whole object heap with real addresses and every class's field writes. Not modelled; `tools/superbuu/heapnode.py`
 prints a new node's leftover words. (The side-content agent's Nosferatu 18-8 case is likely the same kind.)
 
-**6-6 (Gotenks; Super Buu agent, 2026-10-03): 4,694 -> 11,326.**
+**6-6 (Gotenks; Super Buu agent, 2026-10-03): 4,694 -> 18,183.**
 * A screen shake is a camera mode: `0x0800797C` pushes it on the camera object's mode stack (`0x080210D6`), and a
   script camera command sets a new mode (`0x08021094`: the old one's exit) - `camera_pan_to` (via `0x080211A8`)
   and `camera_follow` end a running shake (`scene::camera_mode_set`). The shake is updated with the camera, after
@@ -340,7 +340,12 @@ prints a new node's leftover words. (The side-content agent's Nosferatu 18-8 cas
   a script's removal; a defeated enemy's bar fades out on its own (post-game XJ-6 12-27 keeps it).
 * f11137 (fixed, battle too - TS mirrored, dumps regenerated): Super Buu's power-up plays anim 0x0C (raw 13) under
   the idle controller 0x03001B30 (once, 8 ticks a cel), as the AI data says; both engines had anim 11 at 16 ticks.
-* Now 11,326 (was 4,694): next, random numbers at f11326 - not looked at.
+* f11326 (fixed): `camera_center_on` / `camera_scroll_to` (mover `0x08015B68` -> `0x08021094`) end a shake too.
+* f18182 (fixed): the player's beam skills (15, 16, 6, 1, 3) build their beam object at the press (0x300 tiles in
+  the skill's enter, `Owner::BeamObj`; the firing at tick 24 takes the block, a cancel frees it).
+* Now **18,183** (was 4,694; 6-9 18,065): f18183 - Super Buu (state 591, its sub-state 602) blocks at once when
+  the player starts a Kamehameha; the game goes on drifting and changes state at f18187 with one 0.8% chance
+  drawn - the order of the sub-state's checks vs the parent's isn't matched yet (enemy AI; not changed).
 
 **Claim (dungeon agent A, 2026-10-03, by the coordinator): the Kid Buu fight itself in `sb_041` (21-25).** A works
 with the allocator check off (`SEGMENT_VRAM=0`): the enemy object missing at f21479 and every divergence after it
@@ -913,11 +918,34 @@ at area entries: `tools/segments/segment.py cut --from REC --at FRAME --frames N
 SRC.json OUTDIR LEN F1 F2 ...`) and replay as usual. What imports (§6, "Increment 5"): any frame with no event
 running; an event standing at a **text node** (box open, typing, waiting for A, or closing), on a standing field or a
 playerless cutscene map; an event that loaded its area (warp / warp_fade / 3D map / return_to_field). Measured on
-the real Kid Buu fight (24 cuts, one every 1,000 frames, 600 frames each): **22 / 24 exact** (Increment 6: events
-stopped mid-step - walks, jumps, animations, screen shakes, waits - import too). Still diverging: an enemy beam in
-flight at the cut, a looping `steps` node. Suggest: cut every N frames, report the "imports at all" rate separately
-from "exact", and keep the area-entry segments as they are. The step bytecode comes from the content's
-`scripts/bytecode.json` (the segments test loads it: `wf_import::host::set_step_code`).
+the real Kid Buu fight (24 cuts, one every 1,000 frames, 600 frames each): **24 / 24 exact** (Increment 6: events
+stopped mid-step - walks, glides, jumps, animations, screen shakes, waits; an enemy beam in flight). Suggest: cut
+every N frames, report the "imports at all" rate separately from "exact", and keep the area-entry segments as they
+are. The step bytecode comes from the content's `scripts/bytecode.json` (the segments test loads it:
+`wf_import::host::set_step_code`). Cut with `tools/dungeons/midcuts2.sh SRC.json OUTDIR PREFIX LEN F...` (unique
+names, states kept for the python tools).
+
+**Chapter cuts (A, 2026-10-04)** - per-cut first divergences for the owning agents (600-frame cuts, sprite-memory
+check off; "import" = a gap of the any-frame import, mine; the rest are rules for the owner). Local dirs under
+`work/db/` (e73, sb206, sb205, sb69, pyr).
+* **Earth `rE2__090_7-3`** (52,416 frames, every 2,000): **12 / 26 exact**. **The board's big loss is real and
+  pinned: the cut at 46,000 diverges at its frame 425 with RNG [528efd5c, 5e494666] vs [0b13ffab, f36ef4ea] - the
+  board's f46,426 value - so the Earth agent can debug it from `work/db/e73/segs/mid_46000` (600 frames, 425 in).**
+  Others: 2,000 f323 RNG (7-3, s266 node 18 running); 4,000 f599 the player entity still exists where the game
+  removed it (s274 mid-code); 6,000 f0 camera 0.001 px off (import: easing sub-pixel); 8,000 f12 RNG; 10,000 f89
+  player y 280.5 vs 281.25; 12,000 f0 HP 152 vs 157 (import: HP of an active fighter); 22,000 f44 fade (game black,
+  ours not); 24,000 f369 tournament fighter (sprite 261) y 311.02 vs 310.42; 26,000 f311 NPC 143 facing 2 vs 1
+  (wander); 38,000 f25 text box opens in the game; 40,000 f30 NPC 138 anim raw 19 vs idle; 48,000 import refused
+  (s306 node 2: a waiting `end_parallel` not among our node's actions - import); 51,800 f0 extra player entity (the
+  game has none: import). Import fix made here: map NPCs the area load did not spawn (their condition) are rebuilt
+  from the area's own definition (behaviour included), and a wander step in progress (step object vt 0x0804D848:
+  +8 frames left, +0x18 / +0x1C velocity, +0x20 / +0x24 target) is carried over (`fieldnpc::import_step`) - the
+  7-6 fight cuts went from 0 to exact.
+* **Super Buu 20-6 `r062_001_20-6`** (every 2,000): **2 / 14 exact**; **the board's f2,176 divergence is real** (cut
+  at 2,000, its f175: player sprite 280 x 214.59 vs 214.48 - Super Buu agent). The rest are mostly import gaps for
+  this map's enemies (sprite 52): 8,000-16,000 and 20,000 refuse (import RNG mismatch: 10-26 draws at the cut,
+  enemy builds / AI enters not matching the RAM's), 4,000 / 6,000 / 18,000 f0 enemy 52 position (a node runtime
+  not imported), 1,000 f0 fade, 22,000 f102 enemy 52 x 400.74 vs 399.54.
 
 Fixed from the board (2026-10-03): **message windows** (event node kind 3) fade in / out only when the current
 BLDCNT has no first-target layer (`0x08030ED2`: then BLDCNT := 0x3E41 and BLDALPHA is ramped 16 steps by the
@@ -1630,8 +1658,14 @@ two Python hash seeds, gives identical key logs (13,000 frames); the earlier run
   Turkey, Hercule-ade, Elixir -> four trades, four Hercule Exhibits (52, 60, 51, 56; flags 363 .. 366): the 9-9 cut
   (2,561 frames, all four trades) exact; gates `pg_trade_000_03_01` (970), `pg_trade_009_09_09` (563, allocator).
   The last two (Dinosaur Tail 9, Super Elixir 18) are sold only at 9-11's Z-Mart (0-95): its doorway is held by a
-  guard (s355, NPC at (264, 80) after flag 82) who steps aside only for a wearer of the Bandana (`is_equipped(126)`
-  - the real route put it on Goten); also 860 zenie short (10,390 left, 11,250 needed). Open: the Equip menu.
+  guard (s355, NPC at (264, 80) after flag 82) who steps aside only when the leader wears the Bandana
+  (`is_equipped(126)`); also 860 zenie short (10,390 left, 11,250 needed). The real post-game state owns no Bandana
+  (owned equipment, GameData +0xE4 count / +0xE8 list, top nibble = wearer mark: Cotton Gi, Dirty Gi, Super Cape;
+  nobody wears anything) - the monkey took it (s362, `take_equipment(126)`). Its only source: the Airship Bandits
+  of the world-map airship encounter 0-55 (`inline_0x08073EFC`: `chance(25)` -> `drop_equipment(126)`, flag 76);
+  the airships are used up by flags 388 .. 392, which the XJ-6 entry script clears again (`set_flag_bits(388, 5,
+  0)`). Next: a world-map patrol-fight leg until a Bandana drops (also earns the zenie), then Equip (pause, R R,
+  accessories) and 9-11.
 * Instant Transmission picks (shared rule): a trigger answers the pick when its activation's vt+8 says "A pressed" -
   the 0x0802266F activation and the plain A-button one (0x0800770D, vt+8 0x080076F5: the same code). HFIL 18-10's
   centre switch is an A-button trigger: the real route's maze IT (`r040_021_18-10`) picked it, ours went idle. The

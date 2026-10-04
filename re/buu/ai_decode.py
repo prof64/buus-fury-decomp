@@ -143,6 +143,15 @@ REGISTRY = {
 }
 
 REGISTRY.update({
+    0x08018E5F: dict(name='PopState', kind='transition', status='DISASM',
+                     sem='pop the enemy AI stack (vfunc +0x70); returns 2 (singleton runtime 0x03002BA4)'),
+    0x08029837: dict(name='BeamDodge', kind='action', status='VERIFIED',
+                     sem='Pyramid 14-2 (state 0x15A, pushed by IfInPlayerBeamLine): sidestep out of the player\'s line - '
+                         'the player faces down/up: left if the player is right of the enemy (obj+0x1A0), else right; '
+                         'faces left/right: up if the player is below (+0x1A4), else down; SetAnim(0x12), controller '
+                         'vt 0x0804A758 (tick + 1; from tick 8 cel 1 and a 2 px step (table 0x0875021C) through vfunc '
+                         '+0x54, a blocked step or tick 24 ends it with vfunc +0x28(0)); finished when the enemy leaves '
+                         'that state. VERIFIED real run 14-2 r057_015 f340..'),
     0x08018877: dict(name='PushState', kind='transition', params=[(0xC, 'state', 'state')], status='DISASM',
                      sem='push AI state <state> on the enemy AI stack (vfunc +0x6C); returns 0'),
     0x0802D091: dict(name='WalkToPlayer', kind='action', params=[(0xC, 'speed', 'speed256')], status='DISASM',

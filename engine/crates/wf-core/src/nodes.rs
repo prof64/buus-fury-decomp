@@ -944,6 +944,24 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             set_anim_r(w, i, &[an(a), an(3)], false, r0);
             r.d[2] = w.en_ref(i).ea.pos.raw;
         }
+        // BeamDodge 0x08029778 (state 0x15A, pushed by IfInPlayerBeamLine): away from the player's line - the player
+        // facing down / up: left when the player's x (24.8) is greater, else right; facing left / right: up when
+        // the player's y is greater, else down; SetAnim(0x12) under the controller vt 0x0804A758 (real run 14-2)
+        K::BeamDodge => {
+            if let Some(pi) = en::player(w, i) {
+                let pa = &w.pl_ref(pi).a;
+                let ea = &w.en_ref(i).a;
+                r.d[0] = if pa.facing <= 1 {
+                    if pa.x > ea.x { 2 } else { 3 }
+                } else if pa.y > ea.y {
+                    1
+                } else {
+                    0
+                };
+            }
+            let h = w.data.anim.hold;
+            set_anim_r(w, i, &[an(17)], true, h);
+        }
         // controller state 0x03003108 (enter 0x0802F6A8: face, SetAnimRaw(0x12))
         K::CyborgShot => {
             face_player_routine(w, i);
@@ -2787,6 +2805,13 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             f >= 106
         }
         K::HandSink => {
+            // update 0x0803B30E: unless the hand still shows its ambush strike (the object's current animation =
+            // its def's animation table entry 0x54 / 4) the node is done at once - no sink. Real route 18-1
+            // (r037_084): a hand hit by a ki blast while it rose stays in the hit's hold state; its state 0x117
+            // lasts the Wait alone (182 frames, not 287)
+            if w.field.is_some() && f == 1 && w.en_ref(i).ea.pos.raw != 18 {
+                return true;
+            }
             w.en(i).a.alpha = (256 - f * 256 / 107).max(51);
             // field: the one-shot controller's end (0x0800EE78) leaves the hand in the walk state - an event that
             // starts during the Wait after it idles it (message 0xF: SetAnim(0), one draw; HFIL 18-12, sc_hfil)
@@ -2925,6 +2950,29 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             }
             // (the sequence's PopState runs in the next frame)
             f >= 71
+        }
+        // controller 0x080296C0 (ticks before the AI): tick + 1; at 24 SetAnim(0) - the node finishes as the enemy
+        // left its state; from tick 8 cel 1 and a 2 px step in the direction (table 0x0875021C) through the
+        // footprint test (vfunc +0x54), a blocked step ends it the same way
+        K::BeamDodge => {
+            if f >= 24 {
+                set_anim(w, i, &[an(0)], true, Some(true));
+                return true;
+            }
+            {
+                let e = w.en(i);
+                e.ea.pos.tick = f;
+                e.ea.pos.frame = (f >> 3).min(1);
+            }
+            if f >= 8 {
+                const STEP: [(i32, i32); 4] = [(0, 512), (0, -512), (-512, 0), (512, 0)];
+                let (dx, dy) = STEP[(r.d[0] & 3) as usize];
+                if !en::try_move(w, i, dx, dy, 0, 0) {
+                    set_anim(w, i, &[an(0)], true, Some(true));
+                    return true;
+                }
+            }
+            false
         }
         // Babidi's controller tick 0x0802AEC0: the tick wraps at 0x20, cel = tick >> 3; the node never finishes
         K::PlayAnimTimed if w.en_ref(i).ty == 0x1d => {

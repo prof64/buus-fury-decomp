@@ -284,7 +284,7 @@ class SideDriver(ShipDriver):
                 self._ex_push = True
             return k
         if g[0] == 'zbuy':
-            # ('zbuy', [(row, item, n), ...]) in an open shop list, closed loop. The list cursor (0x02033B90 - the shop's list object on the heap; 0x03003300 counts moves, clamped ones too - its
+            # ('zbuy', [(row, item, n), ...]) in an open shop list, closed loop. The list cursor ([0x03000F90] + 0x114: the shop's list object on the heap, found through that word in both Z-Marts; 0x03003300 counts moves, clamped ones too - its
             # value at the goal's start = row 0) is written at the menu's next input read, and a press can be dropped
             # (lag frames, redraws): each step is a press (3 frames), 40 frames, then SELECT (no-op) so the next read
             # shows it, 40 frames, then the check - the cursor for a move, the held count (GameData + 2 + item) for
@@ -301,7 +301,7 @@ class SideDriver(ShipDriver):
                     st['q'][0] = (key, n - 1)
                 return key
             if st['base'] is None:
-                st['base'] = e.r8(0x02033B90)
+                st['base'] = e.r8(e.r32(0x03000F90) + 0x114)
             if st['k'] >= len(g[1]):
                 if st['out'] < 4:
                     st['out'] += 1
@@ -311,7 +311,7 @@ class SideDriver(ShipDriver):
                 self.next_goal()
                 return None
             row, item, n = g[1][st['k']]
-            cur = e.r8(0x02033B90) - st['base']
+            cur = e.r8(e.r32(0x03000F90) + 0x114) - st['base']
             have = e.r8(0x03001068 + 2 + item)
             if st['cnt'] is None:
                 st['cnt'] = have

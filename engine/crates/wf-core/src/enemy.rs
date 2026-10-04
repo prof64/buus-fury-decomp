@@ -870,6 +870,9 @@ fn corridor(b: &Rect, dir: Dir) -> Rect {
 pub fn in_player_beam_line(w: &World, i: usize) -> bool {
     let Some(pi) = player(w, i) else { return false };
     let p = w.pl_ref(pi);
+    if std::env::var_os("T_BEAM").is_some() {
+        eprintln!("  t-beam frame {} en {} charging {} gs {:?} tick {} facing {} pbox {:?} ebox {:?} corr {:?}", w.frame, i, p.charging(), p.gs, p.ap.tick, p.a.facing, p.a.body_box(), w.en_ref(i).a.body_box(), corridor(&p.a.body_box(), p.a.facing));
+    }
     if !p.charging() {
         return false;
     }

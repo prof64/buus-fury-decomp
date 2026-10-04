@@ -235,6 +235,12 @@ fn main() {
             app.step(&[keys], &mut ev);
             wf_core::rng::TRACE.store(false, std::sync::atomic::Ordering::Relaxed);
             stepped += 1;
+        } else {
+            // the game's lag frame (a load's or a long script's): the sound hardware's frame passes (DMA position,
+            // interrupt mixes, a load's song at its last lag frame) as in the segment harness - the app's sound
+            // state (and with it the menus' redraw / close timing) follows the game
+            let last = rows.get(k + 1).is_some_and(|n| n["lf"].as_i64().unwrap_or(0) != lf);
+            wf_core::sndsim::lag_frame_ex(&mut app.session.world, last);
         }
         let s = &app;
         if s.errors.len() > errors {
