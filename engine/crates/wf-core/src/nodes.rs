@@ -1699,8 +1699,16 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             kb_set(r, &kb);
             done
         }
-        // update 0x08037A56: while anim 4 shows step 4 px in the current facing (no re-aim); never finishes
+        // update 0x08037A56: no player -> done; else face the player (0x0801599C, the face_actor routine: the
+        // dominant axis of the 24.8 difference) every update, then while anim 4 shows step 4 px in that facing;
+        // never finishes (real route 13-47: a ninja lunges left at the player, not on in the facing it had)
         K::LungeStep => {
+            if en::player(w, i).is_none() {
+                return true;
+            }
+            if w.field.is_some() {
+                en::face_player_exact(w, i);
+            }
             if w.en_ref(i).ea.pos.raw != 5 {
                 return false;
             }

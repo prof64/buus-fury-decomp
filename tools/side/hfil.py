@@ -150,7 +150,7 @@ class SideDriver(ShipDriver):
 
     def step(self, e):
         g = self.goals[self.k]
-        if g[0] in ('walk', 'goto', 'exitat', 'talkto', 'talknpc') or g[0] == 'it' and getattr(self, '_it', None) is None:
+        if g[0] in ('walk', 'goto', 'exitat', 'talkto', 'talknpc', 'zbuy') or g[0] == 'it' and getattr(self, '_it', None) is None:
             k = self.hand_guard(e, status(e))
             if k:
                 return k
@@ -283,6 +283,49 @@ class SideDriver(ShipDriver):
                     return self.walk_keys(e, s, g[1], g[2])
                 self._ex_push = True
             return k
+        if g[0] == 'zbuy':
+            # ('zbuy', [(row, item, n), ...]) in an open shop list, closed loop. The list cursor (0x02033B90 - the shop's list object on the heap; 0x03003300 counts moves, clamped ones too - its
+            # value at the goal's start = row 0) is written at the menu's next input read, and a press can be dropped
+            # (lag frames, redraws): each step is a press (3 frames), 40 frames, then SELECT (no-op) so the next read
+            # shows it, 40 frames, then the check - the cursor for a move, the held count (GameData + 2 + item) for
+            # an A. At the end B out of the list and the menus.
+            st = getattr(self, '_zb', None)
+            if st is None:
+                st = self._zb = {'base': None, 'k': 0, 'got': 0, 'q': [(0, 60), (4, 12), (0, 30)], 'cnt': None,
+                                 'out': 0}
+            if st['q']:
+                key, n = st['q'][0]
+                if n <= 1:
+                    st['q'].pop(0)
+                else:
+                    st['q'][0] = (key, n - 1)
+                return key
+            if st['base'] is None:
+                st['base'] = e.r8(0x02033B90)
+            if st['k'] >= len(g[1]):
+                if st['out'] < 4:
+                    st['out'] += 1
+                    st['q'] = [(KEY.B, 3), (0, 60)]
+                    return 0
+                self._zb = None
+                self.next_goal()
+                return None
+            row, item, n = g[1][st['k']]
+            cur = e.r8(0x02033B90) - st['base']
+            have = e.r8(0x03001068 + 2 + item)
+            if st['cnt'] is None:
+                st['cnt'] = have
+            if have > st['cnt']:
+                st['got'] += have - st['cnt']
+                st['cnt'] = have
+            if st['got'] >= n:
+                st['k'] += 1
+                st['got'] = 0
+                st['cnt'] = None
+                return 0
+            key = (KEY.DOWN if cur < row else KEY.UP) if cur != row else KEY.A
+            st['q'] = [(key, 12), (0, 30), (4, 12), (0, 30)]
+            return 0
         if g[0] == 'talknpc':
             # ('talknpc', k): the k-th map NPC of the object list (oldest first) - a wandering one: stand below it,
             # face up, A; done 20 quiet frames after the talk's scene

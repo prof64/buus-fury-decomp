@@ -2362,7 +2362,16 @@ fn skill_enter(w: &mut World, i: usize, id: i32, lv: i32, mult: i32) {
     let facing = pr(w, i).a.facing;
     let serial = pr(w, i).sk.as_ref().map(|s| s.serial).unwrap_or(0);
     match id {
-        15 | 16 | 6 | 1 | 3 | 10 | 11 => sfx(w, 3, 64),
+        15 | 16 | 6 | 1 | 3 | 10 | 11 => {
+            sfx(w, 3, 64);
+            // the beam classes' object (`0x080206B8`) is built at the press: its 0x300 tile bytes now (segment sb
+            // 6-6 f18182); the firing at tick 24 takes the block (shots.rs), a cancel frees it (end of the skill)
+            if matches!(id, 15 | 16 | 6 | 1 | 3) {
+                let me = w.ents[i].id;
+                crate::vram::release(w, crate::vram::Owner::BeamObj(me));
+                crate::vram::acquire(w, crate::vram::Owner::BeamObj(me), 0x300);
+            }
+        }
         2 => {
             let (bx, by) = shots::BIGBANG_POS[facing as usize];
             let (px, py) = (pr(w, i).a.px(), pr(w, i).a.py());
@@ -2524,6 +2533,9 @@ fn end_skill(w: &mut World, i: usize) {
         }
     }
     p(w, i).sk = None;
+    // a beam object built at the press and never fired goes with the skill
+    let me = w.ents[i].id;
+    crate::vram::release(w, crate::vram::Owner::BeamObj(me));
 }
 
 fn upd_skill(w: &mut World, i: usize) {

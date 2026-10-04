@@ -109,7 +109,22 @@ LEGS['museums'] = ('pg_hiddens.ss', _m[:_k] + [('goto', '2-33', 226, 60, False),
 # Root Beer (flag 362); each later talk with the asked item takes it and gives a Hercule Exhibit, then asks for the
 # next (Root Beer 15 -> Turkey 6 -> Hercule-ade 16 -> Elixir 17 -> Dinosaur Tail 9 -> Super Elixir 18; flags
 # 363 .. 368). The Hercule City Z-Mart has the first four (the last two: the Z-Marts 0-94 / 0-95).
-LEGS['shopt'] = [('fly', 2441, 1065, 127, 135), ('wait', 30), *zmart([(5, 1), (3, 1), (6, 1), (7, 1)])]
+# (closed loop: open the list by keys, then hfil's `zbuy` - rows of the post-game list, item ids, counts)
+ZOPEN = [('goto', '0-91', 100, 123, False), ('walk', 88, 123), ('keys', [(32, 20, 10), (A_, 3, 60), (A_, 3, 60), (A_, 3, 120)])]
+# (the list takes one step per press - hold length does not matter - and its cursor byte 0x03003300 / the screen
+# show a press only at the next input read: presses 3 frames, 40 frames apart, counted open loop)
+def zkeys(buys):
+    # (the first press after the list opens, and after a purchase, is dropped: a throwaway SELECT there)
+    SEL = (4, 3, 40)
+    k, row = [(0, 1, 60), SEL], 0
+    for r, n in buys:
+        k += [(D_ if r > row else U_, 3, 40)] * abs(r - row) + [(A_, 3, 60)] * n + [SEL]
+        row = r
+    return ('keys', k + [(B_, 3, 60)] * 4)
+
+
+LEGS['shopt'] = [('fly', 2441, 1065, 127, 135), ('wait', 30), *ZOPEN,
+                 ('zbuy', [(1, 5, 3), (3, 6, 1), (5, 15, 1), (6, 16, 1), (7, 17, 1)]), ('events',), ('wait', 30)]
 LEGS['trade'] = ('pg_shopt.ss', [('walk', 120, 200), ('keys', [(D_, 60, 60)]), ('goto', '3-1', 30, 150, False),
                                  ('keys', [(A_, 3, 240)]), ('fly', 3145, 2001, 95, 79), ('wait', 30),
                                  ('goto', '9-9', 112, 96), *[('talkto', 112, 96, 'U')] * 5, ('wait', 30)])

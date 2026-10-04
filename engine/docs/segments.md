@@ -2333,3 +2333,11 @@ cooldown keeps counting, which looked like a Gohan record difference at 3-10.)
 callback at 18-10 set it and nothing cleared it, so the hit event at 18-7 three areas later ended with the queued
 exit frame's extra player tick (knockback one frame short). A load outside any event now drops it; regression
 assert in `carried_state::a_load_resets_the_player_objects_accumulators`. HFIL 044 now matches all 10,203 rows.
+
+**Claim (dungeon agent B, 2026-10-04, by the coordinator): real-route engine fixes** - in this order, each taken
+when started; others please add a line here before touching one: (1) Janemba stops the side-content agent has not
+reached: `r036_002_1-5` (f2595 RNG), `r037_084_18-1` (f465 RNG), `r038_045_18-1` (f251 object set), `r038_001_18-1`
+(f589 camera); (2) the fat chapter's B rows: `r012_014_12-19` (f1518 RNG, after a heal menu), `r012_020_12-27`
+(f1856 RNG), `r009_006_4-1` (f458 camera). Done: `r017_022_13-47` (Ninja Stronghold, real route) - LungeStep's update
+faces the player each frame (0x08037A56 calls the face_actor routine 0x0801599C before the step; ours stepped on in
+the old facing): exact (428), gated `rdb6_022_13-47`; the app soak of stretch 017-018 now matches all 19,362 rows.
