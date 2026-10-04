@@ -881,11 +881,11 @@ pub fn view(w: &World) -> Option<MenuView> {
         Phase::Idle => {
             let o = w.menu.overlay.as_deref().filter(|_| w.frame < w.menu.overlay_until)?;
             let mut v = o.view(w, w.data.menu.as_ref()?);
-            // the script's palette fade (`0x08007074`) darkens the picture still on screen; the fade mode writes the
-            // palette before the frame is shown (one step ahead of the field's presenter)
+            // the script's palette fade (`0x08007074`) darkens the picture still on screen; a step's palette shows from
+            // the next frame (title_newgame: the fade's first frame 144 still shows level 0, 145 shows 4)
             let mut dim = w.scene.screen.dim.clamp(0, 256);
             if let Some(f) = w.scene.screen.fade.as_ref().filter(|f| f.kind == crate::scene::FadeKind::Black && f.out) {
-                dim = (256 * (f.t + 1).min(f.len) / f.len.max(1)).clamp(0, 256);
+                dim = (256 * f.t.min(f.len) / f.len.max(1)).clamp(0, 256);
             }
             if dim > 0 {
                 v.fade = Some(wf_view::PaletteFade { level: dim as u16, target: 0 });

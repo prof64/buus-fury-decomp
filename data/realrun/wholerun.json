@@ -1,5 +1,5 @@
 {
- "tree": "77ce73f",
+ "tree": "7c55272",
  "modes": [
   {
    "lag": "recorded",
@@ -62,9 +62,9 @@
      "what": "app [00000000, 00000000] game [1b2001d2, 96df8700]"
     }
    },
-   "sim_lag": 3764,
-   "sim_lag_on_logic": 3653,
-   "recorded_lag_replayed": 19143,
+   "sim_lag": 3514,
+   "sim_lag_on_logic": 3432,
+   "recorded_lag_replayed": 19250,
    "script_errors": 0
   }
  ],

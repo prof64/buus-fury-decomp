@@ -518,10 +518,17 @@ pub fn on_title(w: &World) -> bool {
 /// title screen with the save slots and the options kept. The world under the title is a placeholder (Snakeway's
 /// first area) the title's New Game / Continue replaces.
 pub fn title_world(data: &Arc<crate::content::GameData>, w: &World) -> World {
+    // the game data stays as the session left it (current character, zenie, supplies, equipment, every record) until
+    // New Game resets it or Continue reads a slot (real run: after the credits the title holds the cleared game -
+    // r072_002_4-21 / sb_044_04_20, the records compared row by row); the placeholder's player is built from it
+    let mut old = w.clone();
+    crate::story::sync_from_players(&mut old);
     let cfg = crate::field::FieldConfig {
         world: 1,
         area: 1,
         rng: crate::battle::RngInit::State(w.rng.a, w.rng.b),
+        story: Some(old.story.clone()),
+        chars: vec![old.story.current],
         ..Default::default()
     };
     let mut nw = crate::field::create(Arc::clone(data), &cfg);
@@ -537,6 +544,7 @@ pub fn title_world(data: &Arc<crate::content::GameData>, w: &World) -> World {
     nw.saves = w.saves.clone();
     nw.saves.pending = None;
     nw.menu.settings = w.menu.settings.clone();
+    nw.story = old.story;
     nw.events.retain(|e| !matches!(e, crate::world::Event::Field(crate::field::FieldEvent::Run { .. })));
     nw.events.insert(0, crate::world::Event::SongStop);
     open_title(&mut nw);
