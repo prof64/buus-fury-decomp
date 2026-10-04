@@ -1176,6 +1176,12 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             let g = w.data.anim.generic["0x03001B30"];
             set_anim_r(w, i, &[an(12)], false, g);
         }
+        // SuperBuuAnim0C (node runtime vtable 0x0804A100, enter 0x0804E5B8): SetAnim(0x0C) under 0x03001B30, as the
+        // power-up without its flag (real run 20-6 r062_001 tile +8,000: state 0x2A5 after s475, raw 13 to f771)
+        K::SuperBuuAnim0C => {
+            let g = w.data.anim.generic["0x03001B30"];
+            set_anim_r(w, i, &[an(12)], false, g);
+        }
         K::ThrowBigBall => {
             set_anim(w, i, &[an(15)], true, Some(true));
             let id = w.ents[i].id;
@@ -2597,7 +2603,7 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         // update 0x0804FEC4: finished once the object's controller is no longer the one-shot 0x03001B30 - also when
         // another node replaced it (real run 6-9 r052_006 f15,334: state 0x251's sub-state jumps to 0x259 and the old
         // tree's Sequence still enters its KiBlast that frame - controller 0x03003068 - so the power-up ends next frame)
-        K::SuperBuuPowerUp => {
+        K::SuperBuuPowerUp | K::SuperBuuAnim0C => {
             let d = Arc::clone(&w.data);
             let g = w.data.anim.generic["0x03001B30"];
             w.en_ref(i).ea.rule != g || (f >= 32 && w.en_ref(i).anim_done(&d))

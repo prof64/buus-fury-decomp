@@ -41,7 +41,7 @@ master = W / 'master.jsonl'
 idx = json.loads((W / 'master.jsonl.index.json').read_text())
 n_rows = idx['rows']
 subprocess.run(['cargo', 'build', '--release', '--target-dir', str(ROOT / 'engine' / 'target-wholerun'), '-p', 'wf-app', '--example', 'wholerun'],
-               cwd=ROOT / 'engine', check=True)
+               cwd=ROOT / 'engine', check=False)
 exe = ROOT / 'engine' / 'target-wholerun' / 'release' / 'examples' / 'wholerun'
 
 # the chain's keys (as record.py)

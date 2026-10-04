@@ -292,6 +292,7 @@ impl Session {
             }
             let k = w.events.len();
             crate::field::post_step(w);
+            crate::player::passive_after_scripts(w);
             Self::run_hook(&mut self.hook, &mut self.world, k);
             // START: the pause menu (the field main loop checks it after the objects, triggers and scripts)
             crate::menu::check_pause(&mut self.world);

@@ -613,6 +613,9 @@ pub fn boot(data: &Arc<crate::content::GameData>, w: &mut World) -> Option<World
             nw
         }
     };
+    // the boot counter (0x03000F94) runs on through the GameData reset / slot read: the new play time's bias is the
+    // counter now minus the new play time (whole run 7-3: the punch marker's blink phase, 764 boot + title frames)
+    nw.story.lf_bias = w.story.play_frames as i64 + w.story.lf_bias - nw.story.play_frames as i64;
     crate::scene::note_events(&mut nw);
     saves.pending = None;
     nw.saves = saves;

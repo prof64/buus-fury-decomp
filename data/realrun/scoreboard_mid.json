@@ -1,34 +1,45 @@
 {
  "chapters": {
-  "fat": {
-   "diverged": 5049,
-   "exact_tiles": 14,
-   "frames": 25385,
-   "own": 12214,
+  "earth": {
+   "diverged": 2019,
+   "exact_tiles": 6,
+   "frames": 10070,
+   "own": 3689,
    "refused": 0,
-   "segments": 2,
-   "tiles": 24,
+   "segments": 1,
+   "tiles": 9,
    "uncovered": 0,
-   "verified": 20336
+   "verified": 8051
+  },
+  "fat": {
+   "diverged": 2126,
+   "exact_tiles": 16,
+   "frames": 20338,
+   "own": 10596,
+   "refused": 0,
+   "segments": 1,
+   "tiles": 20,
+   "uncovered": 0,
+   "verified": 18212
   },
   "superbuu": {
-   "diverged": 17971,
-   "exact_tiles": 6,
+   "diverged": 15702,
+   "exact_tiles": 8,
    "frames": 28592,
    "own": 2869,
    "refused": 0,
    "segments": 2,
    "tiles": 27,
    "uncovered": 0,
-   "verified": 10621
+   "verified": 12890
   }
  },
  "segments": [
   {
    "chapter": "fat",
-   "diverged": 2618,
-   "exact_tiles": 13,
-   "frames": 20336,
+   "diverged": 2126,
+   "exact_tiles": 16,
+   "frames": 20338,
    "own": 10596,
    "own_first": "Some((10623, \"cam: (178.77734375, 237.79296875) vs game (178.9638671875, 237.7021484375)\"))",
    "refused": 0,
@@ -42,25 +53,11 @@
      7000
     ],
     [
-     7192,
-     "sprite memory",
-     "Some((192, \"vram: free / spare lists differ (same used blocks): [3] ours [1,371,1,2,16,255,255] game [1,371,1,2,15,255,255], [12] ours [1,155,4,11,15,255,255] game [1,155,4,11,16,255,255], [13] ours [0,151,3,15,14,4,255] game [0,151,3,16,14,4,255], [15] ours [1,154,1,12,13,255,255] game [1,367,4,3,17,255,255]\"))",
-     7000,
-     8000
-    ],
-    [
      10596,
      "camera",
      "Some((623, \"cam: (178.77734375, 237.79296875) vs game (178.9638671875, 237.7021484375)\"))",
      10000,
      11000
-    ],
-    [
-     17816,
-     "sprite memory",
-     "Some((816, \"vram: free / spare lists differ (same used blocks): [7] ours [1,351,4,9,15,8,255] game [1,154,1,12,13,8,255], [8] ours [1,154,1,12,13,5,10] game [1,351,4,9,15,5,10], [9] ours [1,355,16,3,7,255,255] game [1,355,16,3,8,255,255], [12] ours [1,155,4,11,8,255,255] game [1,155,4,11,7,255,255]\"))",
-     17000,
-     18000
     ],
     [
      18014,
@@ -75,74 +72,23 @@
      "Some((292, \"vram: used blocks (start, size) ours only [], game only [(151, 4)]\"))",
      19000,
      20000
-    ],
-    [
-     20026,
-     "camera",
-     "Some((0, \"cam: (160.75, 96.30859375) vs game (160, 101.875)\"))",
-     20026,
-     20336
     ]
    ],
    "stretch": "002_d04_bandana",
    "tiles": 20,
    "uncovered": 0,
-   "verified": 17718
-  },
-  {
-   "chapter": "fat",
-   "diverged": 2431,
-   "exact_tiles": 1,
-   "frames": 5049,
-   "own": 1618,
-   "own_first": "Some((1640, \"cam: (240, 34.45703125) vs game (240, 34.71875)\"))",
-   "refused": 0,
-   "segment": "r010_011_11-13",
-   "spots": [
-    [
-     1116,
-     "animation",
-     "Some((16, \"anim: #3 sprite 123: raw 1 cel 0 vs game raw 2 cel 0 tick 0\"))",
-     1100,
-     2000
-    ],
-    [
-     2000,
-     "camera",
-     "Some((1, \"cam: (185.0546875, 25) vs game (185.0517578125, 25)\"))",
-     2000,
-     3000
-    ],
-    [
-     4000,
-     "camera",
-     "Some((0, \"cam: (0, 21.1728515625) vs game (0, 28.78125)\"))",
-     4000,
-     5000
-    ]
-   ],
-   "stretch": "010_db2_desert",
-   "tiles": 4,
-   "uncovered": 0,
-   "verified": 2618
+   "verified": 18212
   },
   {
    "chapter": "superbuu",
-   "diverged": 16865,
-   "exact_tiles": 5,
+   "diverged": 14596,
+   "exact_tiles": 7,
    "frames": 26177,
    "own": 2176,
    "own_first": "Some((2176, \"pos: #26 sprite 280: (214.58984375, 289.30078125) vs game (214.484375, 289.30078125)\"))",
    "refused": 0,
    "segment": "r062_001_20-6",
    "spots": [
-    [
-     1139,
-     "animation",
-     "Some((2, \"anim: #2 sprite 280: raw 1 cel 0 tick 254 vs game raw 1 cel 1 tick 255\"))",
-     1137,
-     2000
-    ],
     [
      2176,
      "position / facing",
@@ -151,9 +97,9 @@
      3000
     ],
     [
-     3002,
-     "sprite memory",
-     "Some((2, \"vram: used blocks (start, size) ours only [], game only [(369, 8)]\"))",
+     3060,
+     "camera",
+     "Some((60, \"cam: (28.67578125, 183.9755859375) vs game (28.72265625, 182.9912109375)\"))",
      3000,
      4000
     ],
@@ -179,23 +125,23 @@
      7000
     ],
     [
-     7026,
-     "RNG",
-     "Some((26, \"rng: [f5d56a63, 0f12b499] vs game [3fb5b6f3, 20803777]\"))",
+     7027,
+     "position / facing",
+     "Some((27, \"pos: #2 sprite 280: (234.90625, 266.58203125) vs game (234.20703125, 267.14453125)\"))",
      7000,
      8000
     ],
     [
-     8165,
-     "script / text",
-     "Some((165, \"text: game opens a text box: true, ours: false\"))",
+     8920,
+     "position / facing",
+     "Some((920, \"pos: #2 sprite 280: (197.12109375, 235.3125) vs game (197.921875, 234.61328125)\"))",
      8000,
      9000
     ],
     [
-     9025,
-     "RNG",
-     "Some((25, \"rng: [a2751507, ee424df4] vs game [e69709d9, 799d8819]\"))",
+     9036,
+     "position / facing",
+     "Some((36, \"pos: #2 sprite 280: (167.4453125, 270.2734375) vs game (167.1875, 268.875)\"))",
      9000,
      10000
     ],
@@ -214,9 +160,9 @@
      12000
     ],
     [
-     12034,
-     "RNG",
-     "Some((34, \"rng: [501e3619, ba16b501] vs game [d5dcc46b, 232dd0a3]\"))",
+     12035,
+     "position / facing",
+     "Some((35, \"pos: #2 sprite 280: (164.8828125, 236.5625) vs game (164.359375, 235.86328125)\"))",
      12000,
      13000
     ],
@@ -256,23 +202,16 @@
      18000
     ],
     [
-     18099,
-     "sprite memory",
-     "Some((99, \"vram: used blocks (start, size) ours only [], game only [(369, 8)]\"))",
+     18158,
+     "camera",
+     "Some((158, \"cam: (27.6591796875, 183.8671875) vs game (27.7060546875, 182.8828125)\"))",
      18000,
      19000
     ],
     [
-     20011,
+     21813,
      "sprite memory",
-     "Some((11, \"vram: used blocks (start, size) ours only [], game only [(408, 1)]\"))",
-     20000,
-     21000
-    ],
-    [
-     21418,
-     "sound",
-     "Some((418, \"snd: [\\\"play 48 64\\\", \\\"play 50 64\\\"] vs game [\\\"play 48 64\\\", \\\"play 50 64\\\", \\\"stop 3\\\"]\"))",
+     "Some((813, \"vram: used blocks (start, size) ours only [], game only [(373, 1), (374, 1)]\"))",
      21000,
      22000
     ]
@@ -280,7 +219,7 @@
    "stretch": "062_m_inside_buu",
    "tiles": 25,
    "uncovered": 0,
-   "verified": 9312
+   "verified": 11581
   },
   {
    "chapter": "superbuu",
@@ -304,25 +243,62 @@
    "tiles": 2,
    "uncovered": 0,
    "verified": 1309
+  },
+  {
+   "chapter": "earth",
+   "diverged": 2019,
+   "exact_tiles": 6,
+   "frames": 10070,
+   "own": 3689,
+   "own_first": "Some((3689, \"anim: #11 sprite 113: raw 12 cel 0 vs game raw 1 cel 0 tick 177\"))",
+   "refused": 0,
+   "segment": "rE2__087_2-90",
+   "spots": [
+    [
+     1068,
+     "sprite memory",
+     "Some((68, \"vram: used blocks (start, size) ours only [(439, 16)], game only []\"))",
+     1000,
+     2000
+    ],
+    [
+     5051,
+     "sprite memory",
+     "Some((51, \"vram: used blocks (start, size) ours only [(447, 16)], game only []\"))",
+     5000,
+     6000
+    ],
+    [
+     9000,
+     "camera",
+     "Some((0, \"cam: (40, 442.96875) vs game (40, 442.703125)\"))",
+     9000,
+     10000
+    ]
+   ],
+   "stretch": "E2_earth",
+   "tiles": 9,
+   "uncovered": 0,
+   "verified": 8051
   }
  ],
  "tile": 1000,
  "total": {
-  "diverged": 23020,
-  "exact_tiles": 20,
-  "frames": 53977,
-  "own": 15083,
+  "diverged": 19847,
+  "exact_tiles": 30,
+  "frames": 59000,
+  "own": 17154,
   "refused": 0,
   "segments": 4,
-  "tiles": 51,
+  "tiles": 56,
   "uncovered": 0,
-  "verified": 30957,
+  "verified": 39153,
   "whole_game": {
-   "diverged": 24454,
-   "frames": 1668050,
-   "uncovered": 38482,
-   "verified": 1605114
+   "diverged": 21281,
+   "frames": 1668052,
+   "uncovered": 38481,
+   "verified": 1608290
   }
  },
- "tree": "0dab418"
+ "tree": "00e82a5"
 }

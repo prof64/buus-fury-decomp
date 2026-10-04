@@ -2,11 +2,11 @@
 
 usage: realrun.py pack [JOBS]          verify every stretch of CHAIN against its local states / key logs under work/
                                        (replay the keys from the stretch's start state, find the frame where the
-                                       game is in the end state) and write data/realrun/NNN_<name>.keys.gz + manifest.json
+                                       game is in the end state byte for byte) and write data/realrun/NNN_<name>.keys.gz + manifest.json
        realrun.py rebuild OUTDIR [FIRST.ss]   replay the packed logs in order from the first state (default: the
                                        soft reset + data/story_playthrough/earth_route_keys.json = the ship's start
                                        work/ship/real4/start.ss); OUTDIR/NNN_<name>.ss at every stretch
-                                       end, each checked against the manifest's end status
+                                       end, each checked against the manifest's end status (and the local end state byte for byte)
        realrun.py runs OUTDIR          OUTDIR/NNN_<name>/{start.ss, keys.json}: one rec_segments.py run dir a stretch
                                        (needs the local states)
 A packed log: gzip of JSON [[keys, count], ...] (run-length), frames = sum of the counts. Headless, muted."""
@@ -145,24 +145,34 @@ def unrle(r):
 def pack_one(i):
     ch, name, st, kf, n, en = CHAIN[i]
     keys = load_keys(kf)
-    want = sig(emu(W / en))
+    end = emu(W / en)
+    want = sig(end)
+    # the end state byte for byte (IWRAM, EWRAM, the CPU's cycle count): the next stretch starts from that file, so
+    # the chain replays continuously from power-on only if this stretch ends exactly there - the status signature
+    # alone matched a load's lag frame one video frame early (002 d04_bandana, 034 dbx_end: the replay from the reset
+    # then drifted from 003 on and ended in a game over)
+    exact = (end.cycles(), bytes(end.iwram()), bytes(end.ewram()))
     e = emu(W / st)
     from route import status
     s0 = status(e)
-    hit = 0 if sig_eq(e, want) and not keys else None
+    is_end = lambda e: e.cycles() == exact[0] and bytes(e.iwram()) == exact[1] and bytes(e.ewram()) == exact[2]
+    hit = 0 if is_end(e) else None
     for f, k in enumerate(keys):
+        if hit is not None:
+            break
         e.set_keys(k)
         e.run(1)
-        if sig_eq(e, want):
+        if is_end(e):
             hit = f + 1
-            if n is None and hit < len(keys) - 2:
-                continue        # (a whole log: its last match)
-            break
     if hit is None:
         return i, name, None, f'END STATE NOT REACHED (log {len(keys)} frames)'
     DATA.mkdir(parents=True, exist_ok=True)
-    with gzip.open(DATA / f'{i:03d}_{name}.keys.gz', 'wt') as fh:
-        json.dump(rle(keys[:hit]), fh, separators=(',', ':'))
+    # (written only when the keys change, with no gzip timestamp: a re-pack leaves unchanged logs byte-identical)
+    p = DATA / f'{i:03d}_{name}.keys.gz'
+    old = unrle(json.loads(gzip.open(p, 'rt').read())) if p.exists() else None
+    if old != keys[:hit]:
+        with open(p, 'wb') as raw, gzip.GzipFile(filename='', mode='wb', fileobj=raw, mtime=0) as fh:
+            fh.write(json.dumps(rle(keys[:hit]), separators=(',', ':')).encode())
     return i, name, {'n': i, 'chapter': ch, 'name': name, 'frames': hit, 'start': s0, 'end': json.loads(want)[0],
                      'local_start': 'work/ship/' + st, 'local_end': 'work/ship/' + en}, 'ok'
 
@@ -239,9 +249,16 @@ def main():
                 e.set_keys(k)
                 e.run(1)
             ok = status(e) == m['end']
+            # (with the local states: the stretch's end byte for byte - the next stretch's start)
+            local = ROOT / m['local_end']
+            same = None
+            if local.exists():
+                t = emu(local)
+                same = e.cycles() == t.cycles() and bytes(e.iwram()) == bytes(t.iwram()) and bytes(e.ewram()) == bytes(t.ewram())
+                ok = ok and same
             e.save_file(str(out / f'{m["n"]:03d}_{m["name"]}.ss'))
             print(f'{m["n"]:03d} {m["name"]}: {len(keys)} frames', 'ok' if ok else f'MISMATCH {status(e)} != {m["end"]}',
-                  flush=True)
+                  '' if same is None else '(= local end state)' if same else '(NOT the local end state)', flush=True)
             if not ok:
                 raise SystemExit(1)
     elif a[0] == 'runs':

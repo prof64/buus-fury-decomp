@@ -234,13 +234,14 @@ fn main() {
             }
         }
         if show.is_some_and(|(a, b)| a <= k && k <= b) {
-            println!("row {k} keys {keys:x} logic {logic} menu {menu} app area {aa:?} p {ap:?} rng {:08x?} depth {} | game area {ga:?} p {} rng {} depth {gd} lf {lf}", w.rng.state(), w.scene.depth, r["p"], r["rng"]);
+            println!("row {k} keys {keys:x} logic {logic} menu {menu} app area {aa:?} p {ap:?} rng {:08x?} depth {} | game area {ga:?} p {} rng {} depth {gd} lf {lf} ourlf {}", w.rng.state(), w.scene.depth, r["p"], r["rng"], w.story.play_frames as i64 + w.story.lf_bias);
             if std::env::var("WR_HOST").is_ok() {
                 println!("    host started {:?} pending {:?} fade {:?}", app.host().started.iter().rev().take(2).collect::<Vec<_>>(), app.host().hs.pending, w.scene.screen.fade);
             }
             if menu || std::env::var("WR_MENU").is_ok() {
                 let page = match w.menu.stack.last() {
                     Some(wf_core::menu::Screen::Title(t)) => format!("title {:?} leaving {:?}", t.page, t.leaving),
+                    Some(wf_core::menu::Screen::Minigame(m)) => format!("minigame counter {} wait {} done {} peak {} pos {} | play_frames+bias {} clock {} ticks {} pf {}", m.counter, m.wait, m.g.done, m.g.peak, m.g.pos, w.story.play_frames as i64 + w.story.lf_bias, w.g.clock(w.frame), w.menu.ticks, w.story.play_frames),
                     Some(s) => format!("other {:?} busy {:?} scripted {}", std::mem::discriminant(s), w.field.as_ref().map(|f| f.busy), w.menu.scripted),
                     None => format!("- busy {:?} raw {:?}", w.field.as_ref().map(|f| f.busy), w.field.as_ref().map(|f| f.raw_input.is_some())),
                 };

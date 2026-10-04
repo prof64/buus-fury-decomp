@@ -916,16 +916,26 @@ at 140 - both can still level (Ultimate Gohan has the world map from 8-1; Goku t
 The whole real playthrough from the ship chapter's start to the title screen after the credits is committed as 73
 packed key logs, `data/realrun/NNN_<name>.keys.gz` (gzip of JSON `[[keys, count], ...]`, one entry per run of equal
 frames) + `data/realrun/manifest.json` (per stretch: chapter, frames, the game status at its start and end);
-1,465,272 frames in all. `tools/segments/realrun.py`:
+1,465,274 frames in all. `tools/segments/realrun.py`:
 
-* `realrun.py rebuild OUTDIR [FIRST.ss]` - one emulator, the logs in order from the first state (default
-  `work/ship/real4/start.ss`, the ship route's start: Papaya Island 7-1 after the Earth chapter's real end);
-  `OUTDIR/NNN_<name>.ss` at every stretch end, each checked against the manifest. Any checkpoint of the tables above
+* `realrun.py rebuild OUTDIR [FIRST.ss]` - one emulator, the logs in order from the first state (default: the soft
+  reset, then the Earth agent's opening + Earth keys `data/story_playthrough/earth_route_keys.json`, whose end is
+  `work/ship/real4/start.ss` byte for byte); `OUTDIR/NNN_<name>.ss` at every stretch end, each checked against the
+  manifest and, where the local states exist, against the stretch's local end state byte for byte.
+  **Continuous from power-on to the credits**: all 73 stretch ends equal the next stretch's start state (IWRAM,
+  EWRAM, cycle count) - 2026-10-04, after 002 `d04_bandana` and 034 `dbx_end` were re-packed one frame longer
+  (below). Any checkpoint of the tables above
   is the end state of the stretch of the same name (or a mark inside it: replay that stretch's log up to the frame
   count given in the table).
 * `realrun.py pack` - what wrote the logs: every stretch replayed from its local start state until the game is in
-  its local end state (status + logic frame counter + player pointer); the valid length of each key file is found
-  that way, not taken from notes. Run it again after adding a stretch to `CHAIN`.
+  its local end state **byte for byte** (IWRAM, EWRAM, the CPU's cycle count); the valid length of each key file is
+  found that way, not taken from notes. Run it again after adding a stretch to `CHAIN` (unchanged logs are left as
+  they are: no gzip timestamp). *Until 2026-10-04 the end test was the status signature (status + logic frame counter
+  + player pointer): it matched one video frame early on two stretches whose end is inside an area load's lag
+  frame - 002 `d04_bandana` (29,218 -> 29,219) and 034 `dbx_end` (29,205 -> 29,206). The replay from the reset was
+  then one frame short at 003 (Thieves Den: same counter and RNG, 481 IWRAM / 6,811 EWRAM bytes apart, 280,897
+  cycles) and 003's keys ended in a game over (the side-content agent's whole-run replay). Every other stretch was
+  already byte-exact; the cuts of 002 / 034 and the extensions were re-recorded and the three boards regenerated.*
 * `realrun.py runs OUTDIR` - one `rec_segments.py` run directory a stretch (what `scoreboard.py cut` uses).
 
 Nothing but key presses goes in: no RAM write, no save edit. The stretches that begin "punched" replay the punches
@@ -3518,3 +3528,22 @@ form object, so Rust's next 3 % tick came later. `player.ts newFormObject` now z
 (engine/target and target-soak `wf-core-ts-dumps`); **cross_ts 46,800 frames, 0 failures**; wf-core suite green.
 The red earth_2_x gates on the current tree end on the camera (`cam: ... vs game (136, 320)`) - another agent's
 in-flight `field.rs` / `world.rs` camera-last-target edit, not these.
+*20-6 remaining stops (A, 2026-10-04) - three of them are engine rules, for the Super Buu agent:*
+* **+8,000 f771 is not an import gap:** the cutscene's launcher imports right (state 0x2A4: Sequence [RunScript s475,
+  GotoState 0x2A5] with its index 1, the event held the AI). After s475 ends, state 0x2A5 is Sequence
+  [**SuperBuuAnim0C** (node fn 0x0803C0BD, def 0x0877B1F0: returns the static state object 0x030032F0 - SetAnim(0x12)
+  ...), GotoState 0x2A6]; ours maps the unknown node name to `K::Never`, so Super Buu stays in 0x2A5 for good. The game
+  plays the animation (raw 13) to its end at f771, its idle enter draws rand(255) (0x0800DFC9), then 0x2A6. To model:
+  the node, `ai.rs` / `nodes.rs`.
+* **+3,000 / +18,000 (IT): 2 -> 60 and 99 -> 158** (in 00e82a5): each IT pick makes a marker object (`0x080222E0`,
+  vtable 0x0804E120, 0x200 bytes; `vram::Owner::ItPick`), and the markers - the cursor's and the picks' - go when the
+  selection closes, also with picks (MEASURED f3,002 alloc, f3,010 frees 0x2F2 then 0x2E2); the import maps 0x0804E120
+  blocks. Both now stop on the camera after the run's teleport (game y eases to 182.99 and stops - the area's camera
+  bound is about 1 px lower than ours: ours reaches 183.98) - a 20-7 camera-limit rule.
+* **+21,000 f813, the coin:** not imported - the coin drops at the tile's f213 and the game frees it at f814 (601
+  frames later), ours at f813 (600): the coin's age model (`fieldobj` pickup update: its creation frame / held frames).
+Tiles before / after this round (51): +3,000 / +18,000 better, none worse; gates green on HEAD's data/segments.
+
+**Claim (dungeon agent A, 2026-10-04, by the coordinator; taken from the Super Buu agent's queue): the three 20-6
+engine items above** - the SuperBuuAnim0C node, the 20-7 camera limit after the IT teleport, the coin's 601-frame
+age. Super Buu agent: leave these to A (you keep the heap per-site rules).

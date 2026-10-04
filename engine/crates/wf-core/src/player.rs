@@ -295,6 +295,9 @@ pub struct Player {
     pub hp_acc: HpAcc,
     pub ep_acc: i32,
     pub regen_timer: i32,
+    /// the form controller was held by an event in this frame's object pass (`passive_after_scripts` runs it after
+    /// the scripts when the event ended in between)
+    pub passive_held: bool,
     pub hp_regen_acc: i32,
     pub dead: bool,
     pub held_by: EntityId,
@@ -381,6 +384,7 @@ impl Player {
             hp_acc: HpAcc::default(),
             ep_acc: 0,
             regen_timer: 0,
+            passive_held: false,
             hp_regen_acc: 0,
             dead: false,
             held_by: 0,
@@ -856,6 +860,7 @@ fn enter_state(w: &mut World, i: usize, gs: Gs) {
                 pl.ap.tick = 0;
                 pl.ap.frame = 0;
             }
+            if crate::rng::TRACE.load(std::sync::atomic::Ordering::Relaxed) { eprintln!("DBGBT {}", std::backtrace::Backtrace::force_capture()); }
             let s = 50 + w.rng.rand(2);
             sfx(w, s, 64);
         }
@@ -1431,8 +1436,13 @@ pub fn update(w: &mut World, i: usize) {
             && w.scene.depth == 0
             && !w.scene.ai_wait.is_empty()
             && !script_anim_done(w, i);
-    if since_ko < 199 && (!pr(w, i).dead || pr(w, i).story_form(w)) && !held {
-        passive(w, i);
+    p(w, i).passive_held = false;
+    if since_ko < 199 && (!pr(w, i).dead || pr(w, i).story_form(w)) {
+        if !held {
+            passive(w, i);
+        } else if w.field.as_ref().is_some_and(|f| f.busy && f.item_get.is_none()) {
+            p(w, i).passive_held = true;
+        }
     }
     if pr(w, i).defuse.is_some() {
         let mut pl = pr(w, i).clone();
@@ -1954,6 +1964,25 @@ pub fn release_passive(w: &mut World, i: usize) {
             let mut pl = pr(w, i).clone();
             pl.sync_anim(w);
             *p(w, i) = pl;
+        }
+    }
+}
+
+/// the form controller's tick (0x08010BD2, the field's second callback list 0x08011A1E; not run while an event
+/// holds the field) after an event that ended in this frame's script step from a modal frame wait (`run_mode`,
+/// natives 0x88 / 0xEF): the tick runs in that frame (emulator: Earth 7-3 rE2__090 f6,622, s289's last 0xEF -
+/// Trunks' regen count steps in the end frame; the bench's 5 % tick at f7,217 then lands on the game's frame). Not
+/// after a text box's close (7-2 rE2__089 f1,492, the Switch Characters message: no tick in the end frame) nor a
+/// fade's end (2-8 f5,748: the held pass's second update in `field::post_step` is that tick)
+pub fn passive_after_scripts(w: &mut World) {
+    for s in 0..w.players.len() {
+        let Some(i) = w.player_idx(s) else { continue };
+        if !std::mem::take(&mut p(w, i).passive_held) {
+            continue;
+        }
+        let frame = w.frame;
+        if w.field.as_ref().is_some_and(|f| !f.busy && f.item_get.is_none() && f.wait_end == Some(frame)) {
+            passive(w, i);
         }
     }
 }

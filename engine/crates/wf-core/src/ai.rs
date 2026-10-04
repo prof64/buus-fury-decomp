@@ -56,7 +56,7 @@ kinds!(
     // grabs
     VampireGrab, LatchDrain, LatchRelease, GrabWindup, BearHug, EnergyDrain, FreezePlayer, EatCandy,
     // Buu
-    BuuStretchPunch, CandyBeam, AbsorbStance, AbsorbPose, AbsorbPose2, SuperBuuPowerUp, ThrowBigBall, GlideToWaypoint,
+    BuuStretchPunch, CandyBeam, AbsorbStance, AbsorbPose, AbsorbPose2, SuperBuuPowerUp, SuperBuuAnim0C, ThrowBigBall, GlideToWaypoint,
     SummonMinion, KidBuuSplitAnim, KidBuuSplit, KidBuuMerge, BabidiHover, BabidiGesture,
     // Janemba
     JanembaSpawnParts, JanembaHandStrikeA, JanembaHandStrikeB, JanembaAscend, JanembaDescendSummon, WaitMinisDefeated,

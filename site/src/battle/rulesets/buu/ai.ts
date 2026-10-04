@@ -1782,6 +1782,11 @@ export function create(n: AiNodeJ, c: AiController): RNode {
         // update 0x0804FEC4: finished once the controller is no longer 0x03001B30 - also when another node replaced
         // it (real run 6-9 r052_006 f15,334: the old tree's KiBlast enter in the frame of the jump to 0x259)
       }, (f) => e.ea.r !== GENERIC_STATES['0x03001B30'] || (f >= 32 && e.animDone()))
+    case 'SuperBuuAnim0C':
+      // node runtime vtable 0x0804A100 (enter 0x0804E5B8): the power-up's animation without its flag
+      return new Act(n, c, () => {
+        e.setAnim(12, true, false, GENERIC_STATES['0x03001B30'])
+      }, (f) => e.ea.r !== GENERIC_STATES['0x03001B30'] || (f >= 32 && e.animDone()))
     case 'ThrowBigBall':
       // the throw's controller ends 32 frames after the throw with SetAnim(0) (an idle draw); an exit while the ball
       // still charges removes it (real run 20-6 r062_001)
