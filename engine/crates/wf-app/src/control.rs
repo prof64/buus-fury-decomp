@@ -13,6 +13,10 @@
 //! The host feeds key events ([`Control::key`]), wall time ([`Control::advance`]) and the current wall clock
 //! (`now_unix`, metadata only), renders through [`Control::render`] and services [`Control::take_requests`]
 //! (file system on desktop, OPFS / IndexedDB on the web).
+//!
+//! Two kinds of sim record: the battle (`CoreSim`, header `sim` [`SIM_KIND`], config = the `BattleConfig`) and story
+//! mode (`StorySim`, header `sim` [`STORY_KIND`], config = its `StorySim::start`: the title with the slot files, a
+//! slot's game or a new game at an area, + the seed). Ghosts and the training overlay are battle-only.
 
 use std::collections::VecDeque;
 
@@ -26,6 +30,7 @@ use wf_view::{AudioEvent, RenderView, Sim, SpriteEffect, GBA_FPS};
 use crate::battle::{self, CoreSim, SIM_KIND};
 use crate::hotkeys::{Action, Hotkeys, Mods};
 use crate::overlay::{self, Text};
+use crate::story::{StorySim, STORY_KIND};
 use crate::App;
 
 /// Playback / game speeds (index 3 = normal).
@@ -127,6 +132,18 @@ pub fn parse_replay(bytes: &[u8]) -> Result<Replay, String> {
     Ok(r)
 }
 
+/// The live sim's recordable start: (header `sim` kind, config, seed, title). None = it cannot be recorded.
+fn start_of(app: &App) -> Option<(&'static str, serde_json::Value, u64, String)> {
+    if let Some(s) = CoreSim::of(app.sim.as_ref()) {
+        return Some((SIM_KIND, serde_json::to_value(&s.config).ok()?, battle::seed(&s.config), battle::title(&s.config)));
+    }
+    let st = app.sim.as_any()?.downcast_ref::<StorySim>()?;
+    let c = st.start.clone()?;
+    let seed = c["seed"].as_u64().unwrap_or(0);
+    let title = StorySim::start_title(&c);
+    Some((STORY_KIND, c, seed, title))
+}
+
 fn outcome_name(o: Outcome) -> &'static str {
     match o {
         Outcome::Running => "",
@@ -137,7 +154,7 @@ fn outcome_name(o: Outcome) -> &'static str {
 
 impl Control {
     pub fn new(app: &mut App, hotkeys: Hotkeys, now_unix: u64) -> Control {
-        let enabled = CoreSim::of(app.sim.as_ref()).is_some() && app.sim.snapshot().is_some();
+        let enabled = start_of(app).is_some() && app.sim.snapshot().is_some();
         let mut c = Control {
             enabled,
             content: battle::content_id(&app.packs),
@@ -185,15 +202,15 @@ impl Control {
     }
 
     fn header(&self, app: &App, branch: Option<Branch>) -> Option<Header> {
-        let s = Self::session(app)?;
+        let (kind, config, seed, title) = start_of(app)?;
         Some(Header {
-            sim: SIM_KIND.into(),
+            sim: kind.into(),
             content: self.content.clone(),
-            config: serde_json::to_value(&s.config).ok()?,
-            seed: battle::seed(&s.config),
+            config,
+            seed,
             players: app.sim.players() as u8,
             hash_interval: wf_replay::DEFAULT_HASH_INTERVAL,
-            title: battle::title(&s.config),
+            title,
             created: self.now_unix,
             branch,
             ..Default::default()
@@ -540,7 +557,16 @@ impl Control {
         self.autosave(app);
     }
 
-    fn build_sim(&self, app: &App, config: &serde_json::Value) -> Result<CoreSim, String> {
+    /// A fresh sim of a header's kind and config (battle or story).
+    fn build_sim(&self, app: &App, kind: &str, config: &serde_json::Value) -> Result<Box<dyn Sim>, String> {
+        match kind {
+            STORY_KIND => Ok(Box::new(StorySim::from_start(&app.packs, config)?)),
+            SIM_KIND => Ok(Box::new(self.build_core(app, config)?)),
+            k => Err(format!("cannot rebuild a \"{k}\" simulation")),
+        }
+    }
+
+    fn build_core(&self, app: &App, config: &serde_json::Value) -> Result<CoreSim, String> {
         let cfg: BattleConfig = serde_json::from_value(config.clone()).map_err(|e| format!("config: {e}"))?;
         let data = match Self::session(app) {
             Some(s) => s.data.clone(),
@@ -555,8 +581,8 @@ impl Control {
     }
 
     /// Replace the app's sim (new config): stop sounds, re-render, music if not starting at frame 0.
-    fn install(&mut self, app: &mut App, sim: CoreSim) {
-        app.sim = Box::new(sim);
+    fn install(&mut self, app: &mut App, sim: Box<dyn Sim>) {
+        app.sim = sim;
         app.inputs = vec![0; app.sim.players()];
         self.last_inputs = app.inputs.clone();
         app.audio_out.push(AudioEvent::StopAllSfx);
@@ -569,7 +595,8 @@ impl Control {
         if app.sim.frame() == 0 {
             return; // the first step starts it
         }
-        let song = Self::session(app).and_then(|s| s.world.data.areas.get(&s.world.arena.map).and_then(|a| a.1));
+        let story = app.sim.as_any().and_then(|a| a.downcast_ref::<StorySim>()).map(|s| s.session.world.scene.song).filter(|&s| s > 0).map(|s| s as u16);
+        let song = story.or_else(|| Self::session(app).and_then(|s| s.world.data.areas.get(&s.world.arena.map).and_then(|a| a.1)));
         if let Some(id) = song {
             app.audio_out.push(AudioEvent::PlaySong(id));
         }
@@ -578,23 +605,20 @@ impl Control {
     /// Snapshot of the replay's start (frame 0 from its config, or its start state) so seeks before the
     /// current frame work after loading mid-recording.
     fn seed_start(&mut self, app: &App, r: &Replay) {
-        if let Ok(mut s) = self.build_sim(app, &r.header.config) {
+        if let Ok(mut s) = self.build_sim(app, &r.header.sim, &r.header.config) {
             if r.start_state.as_ref().is_none_or(|st| s.restore(st)) {
-                self.timeline.capture(&s);
+                self.timeline.capture(s.as_ref());
             }
         }
     }
 
     /// Play a replay file (`id` = its name, for branches / listings).
     pub fn play_replay(&mut self, app: &mut App, id: &str, bytes: &[u8]) -> Result<(), String> {
-        if !self.enabled {
-            return Err("replays need the wf-core battle".into());
-        }
         let r = parse_replay(bytes)?;
-        if r.header.sim != SIM_KIND {
-            return Err(format!("not a battle replay ({})", r.header.sim));
+        if r.header.sim != SIM_KIND && r.header.sim != STORY_KIND {
+            return Err(format!("not a battle or story replay ({})", r.header.sim));
         }
-        let mut sim = self.build_sim(app, &r.header.config)?;
+        let mut sim = self.build_sim(app, &r.header.sim, &r.header.config)?;
         if let Some(s) = &r.start_state {
             if !sim.restore(s) {
                 return Err("the replay's start state does not fit this engine".into());
@@ -656,7 +680,7 @@ impl Control {
     }
 
     pub fn make_state(&self, app: &App, slot: u8) -> Option<SaveState> {
-        let s = Self::session(app)?;
+        let (kind, config, _, title) = start_of(app)?;
         let snapshot = app.sim.snapshot()?;
         let f = app.sim.frame();
         let mut replay = match (&self.play, &self.rec) {
@@ -668,14 +692,14 @@ impl Control {
         replay.checkpoints.retain(|c| c.0 <= f);
         Some(SaveState {
             header: StateHeader {
-                sim: SIM_KIND.into(),
+                sim: kind.into(),
                 content: self.content.clone(),
-                config: serde_json::to_value(&s.config).ok()?,
+                config,
                 frame: f,
                 hash: format!("{:016x}", app.sim.state_hash()),
                 created: self.now_unix,
                 slot: slot as u32,
-                title: battle::title(&s.config),
+                title,
             },
             snapshot,
             replay: (replay.end_frame() == f).then_some(replay),
@@ -684,17 +708,14 @@ impl Control {
 
     /// Load a save state (any session / config; across app restarts). Recording continues from it.
     pub fn load_state(&mut self, app: &mut App, bytes: &[u8]) -> Result<(), String> {
-        if !self.enabled {
-            return Err("save states need the wf-core battle".into());
-        }
         let st = SaveState::from_bytes(bytes).map_err(|e| e.to_string())?;
-        if st.header.sim != SIM_KIND {
-            return Err(format!("not a battle save state ({})", st.header.sim));
+        if st.header.sim != SIM_KIND && st.header.sim != STORY_KIND {
+            return Err(format!("not a battle or story save state ({})", st.header.sim));
         }
-        let same = Self::session(app).is_some_and(|s| serde_json::to_value(&s.config).ok().as_ref() == Some(&st.header.config));
+        let same = start_of(app).is_some_and(|(k, c, _, _)| k == st.header.sim && c == st.header.config);
         let mut fresh = None;
         if !same {
-            fresh = Some(self.build_sim(app, &st.header.config)?);
+            fresh = Some(self.build_sim(app, &st.header.sim, &st.header.config)?);
         }
         self.finalize(app);
         if let Some(sim) = fresh {
@@ -745,9 +766,9 @@ impl Control {
     pub fn set_ghost(&mut self, app: &App, id: &str, bytes: &[u8]) -> Result<(), String> {
         let r = parse_replay(bytes)?;
         if r.header.sim != SIM_KIND {
-            return Err(format!("not a battle replay ({})", r.header.sim));
+            return Err(format!("ghosts are battle replays (this is {})", r.header.sim));
         }
-        let mut sim = self.build_sim(app, &r.header.config)?;
+        let mut sim = self.build_core(app, &r.header.config)?;
         if let Some(s) = &r.start_state {
             if !sim.restore(s) {
                 return Err("the ghost's start state does not fit this engine".into());
@@ -776,8 +797,8 @@ impl Control {
     /// Headless verification of a replay file against this build and content.
     pub fn verify(&self, app: &App, bytes: &[u8]) -> Result<VerifyReport, String> {
         let r = parse_replay(bytes)?;
-        let mut sim = self.build_sim(app, &r.header.config)?;
-        Ok(wf_replay::verify(&r, &mut sim))
+        let mut sim = self.build_sim(app, &r.header.sim, &r.header.config)?;
+        Ok(wf_replay::verify(&r, sim.as_mut()))
     }
 
     // ------------------------------------------------------------------------------------------- drawing

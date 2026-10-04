@@ -3741,6 +3741,12 @@ fn finish_transform(w: &mut World, i: usize) {
     } else {
         pr(w, i).transform_to
     };
+    // (the field only: a script's power-up animation played on a form with nothing above it - no form to change to
+    // - ends in the idle with the form kept, as `finish_revert` does on the bottom form; reached only off the game's
+    // path so far, a whole-run cut at 185,000 after its divergence; not checked against the game)
+    if w.field.is_some() && (to < 0 || to == 255 || w.data.form(to).is_none()) {
+        return set_anim_id(w, i, 0);
+    }
     form_exit(w, i);
     apply_form(w, i, to);
     form_enter(w, i);

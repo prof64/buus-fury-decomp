@@ -734,7 +734,13 @@ pub fn slot_summary(bytes: &[u8], d: &GameData) -> Option<String> {
 /// A story app: a new game (`slot` None) or the game saved in `slots[slot]`. `slots` = the slot files (empty = no
 /// game); they are loaded into the session so the in-game Save screen lists and overwrites them.
 pub fn story_app(packs: Packs, slots: &[Vec<u8>], slot: Option<usize>, seed: u32) -> Result<App, String> {
-    let data = crate::battle::load_data(&packs)?;
+    let s = story_sim(&packs, slots, slot, seed)?;
+    Ok(App::new(packs, Box::new(s)))
+}
+
+/// [`story_app`]'s sim (its start recorded in `StorySim::start`: replays and save states rebuild it)
+pub fn story_sim(packs: &Packs, slots: &[Vec<u8>], slot: Option<usize>, seed: u32) -> Result<crate::story::StorySim, String> {
+    let data = crate::battle::load_data(packs)?;
     if data.field.is_none() {
         return Err("this content has no world/ data (re-extract with the current extractor)".into());
     }
@@ -753,14 +759,21 @@ pub fn story_app(packs: Packs, slots: &[Vec<u8>], slot: Option<usize>, seed: u32
     saves.current = slot.unwrap_or_else(|| (0..SLOTS).find(|&i| saves.slot(i).is_none()).unwrap_or(0)) as i32;
     saves.generation = 0;
     session.world.saves = saves;
-    let s = crate::story::StorySim::with_session(&packs, session)?;
-    Ok(App::new(packs, Box::new(s)))
+    let mut s = crate::story::StorySim::with_session(packs, session)?;
+    s.start = Some(serde_json::json!({"kind": "slots", "slots": crate::story::hex_slots(slots), "slot": slot, "seed": seed}));
+    Ok(s)
 }
 
 /// Story mode on the game's title screen (START → Single Player → Select Game: New Game with the prologue, Continue,
 /// Delete Game) with the slot files loaded; the world under the title is a placeholder the title's boot replaces.
 pub fn title_app(packs: Packs, slots: &[Vec<u8>], seed: u32) -> Result<App, String> {
-    let data = crate::battle::load_data(&packs)?;
+    let s = title_sim(&packs, slots, seed)?;
+    Ok(App::new(packs, Box::new(s)))
+}
+
+/// [`title_app`]'s sim (its start recorded in `StorySim::start`)
+pub fn title_sim(packs: &Packs, slots: &[Vec<u8>], seed: u32) -> Result<crate::story::StorySim, String> {
+    let data = crate::battle::load_data(packs)?;
     if data.field.is_none() {
         return Err("this content has no world/ data (re-extract with the current extractor)".into());
     }
@@ -774,9 +787,10 @@ pub fn title_app(packs: Packs, slots: &[Vec<u8>], seed: u32) -> Result<App, Stri
     session.world.saves = saves;
     // before the sim takes the creation events: the title's song replaces the placeholder area's
     wf_core::menu::title::open_title(&mut session.world);
-    let mut s = crate::story::StorySim::with_session(&packs, session)?;
+    let mut s = crate::story::StorySim::with_session(packs, session)?;
     s.skip_area_banner();
-    Ok(App::new(packs, Box::new(s)))
+    s.start = Some(serde_json::json!({"kind": "title", "slots": crate::story::hex_slots(slots), "seed": seed}));
+    Ok(s)
 }
 
 /// A running story app's save slots: (generation, the slot files). None = not story mode.

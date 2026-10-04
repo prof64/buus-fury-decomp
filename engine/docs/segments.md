@@ -24,6 +24,32 @@ both). Reports per leg: `work/wholerun/check_none_<start>.json`. On a failure, `
 route it (below). Status 2026-10-04: EXACT (two legs: 1,261,523 + 291,558 logic iterations, known range
 1,339,017..1,354,524 skipped).
 
+**Run 2: a second real playthrough (side-content agent, 2026-10-04).** `tools/run2/route2.py` (goals,
+`COVERAGE` lists the targeted paths), `run2_driver.py` (+ intro / newgame / die / save / reset / continue / bout /
+keys goals), `play2.py` (plays from the soft reset in one emulator session - the save slot is EEPROM, save states
+do not carry it), `pack2.py` -> `data/realrun2/NNN_<seg>.keys.gz` + manifest; `tools/wholerun/chains.py` names
+the chains (`--chain run2` on record.py / sounds.py / resync.py / check.py; check.sh runs both by default).
+Recorded so far: power-on -> Other World -> Earth -> 7-2 (217,993 rows); the ship chapter's variant route is in
+progress (`re/buu/ship/ship_route2.py`). Paths run 1 never took, all in the real game's input only: a game over with
+no save -> title -> a **second New Game in the same power-on** (the game keeps the first game's zenie); the prologue
+at 37 / 45-frame A rhythms; Options (SFX volume -2, **text speed +2**), Skills page, Journal tabs; Save Game (1-10,
+3-1) + soft reset + title Continue, and a death with a save -> title -> Continue; stat points into SPD / END; the
+Cotton Gi equipped; the Hercule City Z-Mart (buy, sell); an item dropped; a side NPC talk; six training level-ups.
+*Status:* the app is exact from power-on through both game overs, the second New Game and the Options menu, to
+**row 31,497** (first stop). Resync over the chain (80 stops, `work/wholerun/run2/stops_none.jsonl`): nearly all
+follow one cause - **the Options text speed is not modelled**: `menu::options` stores `text_speed`, but nothing
+reads it (the typewriter is one character per frame at every speed, `scene::open_text`), and the importer does not
+take the options word `0x03001914` either, so every cut after the change diverges at its next text box (31,497:
+"Game Saved" closes 9 frames after A in the game, still typing in ours; then s073 / s086 / s087 facing, flag and RNG
+stops). -> **Earth agent** (text boxes: the typewriter's rate from the text speed, the game's reader is among the
+`0x03001914` literal users 0x0800543C / 0x08014768 / 0x08014C34 / 0x08017114 / 0x0801DFA8) and **importer agent**
+(import the options word). Also: 35,806 (Continue after the game over: flag 1) - the cut taken after the in-game
+save has no save slot in the app (the importer does not carry the EEPROM slot) -> **importer agent**; s102 node 5
+"waiting native 0x3c" and on-enter-load cuts -> importer. Re-run the resync once text speed lands.
+*Gate meanwhile:* run 1 stays strict; run 2 is a ratchet - `data/realrun2/expected.json` holds its first
+difference row (31,497); check.sh fails only when run 2's first difference (stop or sound) comes earlier, prints
+`IMPROVED` and bumps the file when it comes later. Remove the file once run 2 is exact.
+
 ## 1. One-command workflow
 
 ```
@@ -4587,7 +4613,18 @@ Gates green; wf-app / wf-core / wf-net suites (see the coordinator's commit).
   mode in the app has no replays / rewind / save states** - `wf_app::control::Control` enables them only for a
   `CoreSim` (battles); a story app runs with `ctl.enabled = false` (`--record` says "this simulation does not
   record"). `StorySim` itself supports them (update 22); Control's recorder / replay header / verify need a story start
-  (title + seed + slot files) to use them.
+  (title + seed + slot files) to use them. **-> Fixed in update 24.**
+
+**§11 update 24 (B): story mode records, rewinds and saves states in the app (both shells).** `StorySim::start`
+(the title with its slot files / a slot's game / a new game at an area, + seed; set by `launcher::title_sim`,
+`launcher::story_sim`, `StorySim::new`) is the replay / save-state header's config under `sim: "wf-app/story"`;
+`StorySim::from_start` rebuilds it. `Control` records any sim with a start (battle or story), rebuilds either kind
+for playback / verify / load_state (a story state loads into an app running a battle and back), restarts the story's
+song after a cross-session load; ghosts and the training overlay stay battle-only. Checks: `tests/story_control.rs`
+(title -> prologue 2,400 steps: seeks back to 5 points + resume, a save state loaded after diverging, the recording
+verified and played on a fresh battle app, the state loaded there - every hash equal to the straight run), and the
+native binary headless + muted (`work/byor/replay_check.py`): launcher Story -> title, 4,000 steps `--record` ->
+`--replay`: verify OK over 68 checkpoints, the same final state hash and the same audio log.
 **Done (ship fix agent, by the coordinator's decision): the pixel comparison is tear-tolerant; the fade bucket split.**
 `examples/pixels.rs` / `tests/pixels.rs` (Super Buu agent: I edited your tool and the gate - the tear rule only, the
 rest untouched): the tear rule as in core.md's known differences - a frame whose palette state changed since the
@@ -4663,3 +4700,37 @@ same bug), BG 241
 (rclose_002's world-map flight frames: mode 7, not fades), sprites 113.
 **Super Buu agent: please re-lock `data/segments/pixels.json`** (102 segments all-exact on my run; the committed lock
 passes unchanged).
+
+**Claim (ship agent, 2026-10-04, by the coordinator): whole-run 7-6 camera scroll one frame early** (the importer
+agent's item: a cut at row 185,000 - or 186,200 - starts a scroll at 186,301 a frame early, RNG at 186,316; the
+continuous no-lag run passes there).
+*Claimed by A (coordinator, from Run 2):* import the game's Options word (0x03001914: text speed, SFX / BGM volume
+...) on every cut; carry the save slot (EEPROM) into an imported app session (run 2 row 35,806, Continue after a game
+over); the unsupported run-2 cuts (an area load's on-enter script; s102 node 5 waiting native 0x3c). The typewriter's
+rate from text speed stays with the Earth agent.
+*Result (A, on a4aadbc; uncommitted - wf-core fieldobj.rs / player.rs, wf-import lib.rs / host.rs):*
+- **Zenie coin, ship (497,351):** the game picks the coin up the same frame as ours; what came a frame late was its
+  tile block - the game destroys the coin object at once, ours freed it in the next frame's cleanup. `collect()`
+  releases the coin's tiles and shadow at pickup (field). 300-row run from 497,351: 154 -> 300 / 300.
+- **Exit-fade misses, all fixed** (cuts 2 frames into the fade, /tmp/xc2: 143 -> 151 / 152 on a4aadbc): a **map item**
+  lying in the destination (vt 0x0804A314, made by 0x0800DCDC) takes a 4-block icon after the props block -
+  `spawn_map_item` now allocates it (rule; 8-57, 4-30); coins on the ground imported (vt 0x08049CC4: box
+  +0x14..+0x20, age +0x24, phase +0x28, move counter +0x2C, height / speed +0x30 / +0x34, position +0x50 / +0x54,
+  velocity +0x58 / +0x5C, def +0x60 -> 0x086FC260 / 378 / 790 / 8A8) with their tile blocks (14-2 x4); an enemy off
+  the enemy grid (+0x291) imported (15-23 bat, 18-10 ghost); the Blister's enzyme timer (SpawnEnzymes runtime +4,
+  vt 0x0804AD18) and count (+0x204) (21-6 / 21-8); HandAmbush's first-update flag (+4); debris chips (vt 0x08049F38)
+  and their shared graphic.
+- **rkb_001_0-50:** the 14-1 trigger script standing after its `run_event(515)` is kept (`StoryHost::after_event`) and
+  goes on when s515 ends: flag 408 at f64 as the game; world compare 2 -> 0 differences, gate 3,690 / 3,690.
+- **Cut at 185,000 (7-6):** the panic was the app ~2,000 frames in (after a divergence): a power-up with no form
+  above the current one - now ends idle, keeps the form (field guard, NOT verified against the game); the HP
+  remainder (+0x228) imported on every state path; the transformation aura's block (vt 0x0804B9E0) owned by our aura.
+  2,200-row recording from 185,000: 164 -> 1,301 rows; tiles rE2__087_2-90+001000 68 -> 258, +005000 51 -> 1000.
+  **Open:** from 185,000 and 186,200 alike, s300 node 6's camera scroll at row 186,301 moves a frame early in ours
+  (RNG off at 186,316) - a rule, Earth chapter.
+- **m_pg_g131: no difference.** The 13-2 load iteration is ~36 video frames; the game draws once at its start and 3
+  more when the leader appears in the same iteration (4, as ours, same state after). The old master ended 10 frames
+  into it. Replaced `work/db57/shipmaster/m_pg_g131.json` with an 855-row recording into 13-2: exact (soak no-lag and
+  recorded, harness 855 / 855).
+Checks: gates green; whole-run cut points 311 / 315 (unchanged); area-entry cuts + tiles only gains (above +
+r067_071_14-2+001000 374 -> 788); wf-core battle rules untouched.

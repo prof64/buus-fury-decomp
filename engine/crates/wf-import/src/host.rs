@@ -67,6 +67,11 @@ pub struct StoryHost {
     /// `started.len()` when an on-break inline script (`Cause::Break`, `Callback::Script`) started: it is the running
     /// script while no other started after it (an on-break *event* - 14-21's s418 - resumes as events do)
     break_inline: Option<usize>,
+    /// an inline script the cut found standing on its `run_event` of the imported event (a map trigger's script -
+    /// gate `rkb_001_0-50`: 14-1's `inline_0x08087498` runs s515, then `set_flag(408)`): (its id, the actions it ran
+    /// with that `run_event`) - when the event ends it goes on past them (`continue_inline`), as the game's
+    /// interpreter returns into it
+    pub after_event: Option<(String, usize)>,
 }
 
 /// the cause of an event the import continues: a fusion component's level-up hook (s003 cut while
@@ -249,7 +254,7 @@ impl StoryHost {
         let rt = Runtime::new(files, Box::new(shared.clone()))?;
         let stepped = files.iter().filter(|(_, src)| src.contains("fn step_0()")).map(|(p, _)| p.clone()).collect();
         let hs = HostState { nest_area_enter: true, ..HostState::default() };
-        Ok(StoryHost { rt, shared, hs, queue: VecDeque::new(), running: false, cause: None, outer: vec![], stepped, errors: vec![], started: vec![], prev_held: 0, frame: 0, step_code: STEP_CODE.get().cloned().unwrap_or_default(), text_open_due: None, break_due: None, break_inline: None })
+        Ok(StoryHost { rt, shared, hs, queue: VecDeque::new(), running: false, cause: None, outer: vec![], stepped, errors: vec![], started: vec![], prev_held: 0, frame: 0, step_code: STEP_CODE.get().cloned().unwrap_or_default(), text_open_due: None, break_due: None, break_inline: None, after_event: None })
     }
 
     /// a session around an imported / built world (no hook: the host runs the queue itself)
@@ -294,6 +299,7 @@ impl StoryHost {
     }
 
     fn finish(&mut self, w: &mut World, st: Result<Status, String>) {
+        let finished = matches!(st, Ok(Status::Finished));
         // a trigger's / talking NPC's event ended: its end node's value goes to the starter's resume slot unless a
         // warp / refresh_map_triggers / return to title set the no-save word (`0x08012546`)
         if matches!(st, Ok(Status::Finished)) && !self.hs.in_unit && !self.hs.no_resume_save {
@@ -385,6 +391,12 @@ impl StoryHost {
                 self.hs.from_wait = o.from_wait;
                 self.cause = o.cause;
                 self.running = true;
+            }
+        }
+        // the imported event ended: the inline script that ran it goes on (`after_event`)
+        if finished && !self.running && self.outer.is_empty() {
+            if let Some((id, drop)) = self.after_event.take() {
+                self.continue_inline(w, &id, drop);
             }
         }
     }
@@ -809,6 +821,8 @@ pub struct HostSnapshot {
     break_due: Option<Option<i32>>,
     #[serde(default)]
     break_inline: Option<usize>,
+    #[serde(default)]
+    after_event: Option<(String, usize)>,
 }
 
 impl StoryHost {
@@ -834,6 +848,7 @@ impl StoryHost {
             text_open_due: self.text_open_due,
             break_due: self.break_due,
             break_inline: self.break_inline,
+            after_event: self.after_event.clone(),
         }
     }
     pub fn restore(&mut self, s: &HostSnapshot) {
@@ -848,6 +863,7 @@ impl StoryHost {
         self.started.truncate(s.started);
         self.prev_held = s.prev_held;
         self.frame = s.frame;
+        self.after_event = s.after_event.clone();
         self.text_open_due = s.text_open_due;
         self.break_due = s.break_due;
         self.break_inline = s.break_inline;

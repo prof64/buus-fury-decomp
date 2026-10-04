@@ -103,6 +103,9 @@ def _earth():
 
 
 SEGMENTS += _earth()
+# the ship chapter (7-2 -> Babidi's ship -> Majin Buu): re/buu/ship/ship_route2.py goals_run2, built from the
+# state reached here (play2.py drives it with its ShipDriver2)
+SEGMENTS.append(('s_ship', 'SHIP2'))
 
 
 def chapter_of(name):

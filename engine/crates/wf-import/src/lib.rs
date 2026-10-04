@@ -475,6 +475,9 @@ fn build_returned(_data: &Arc<GameData>, ram: &GbaRam, runner: &mut StoryHost, e
     Built { world: w, draws, held: 0, finished: true }
 }
 
+/// (a HandAmbush runtime past its first update, its count set from the animation later)
+const HAND_STARTED: i32 = -1000;
+
 /// an enemy's AI node runtimes from RAM (mid-area imports): the game's runtime tree mirrors the state's definition
 /// tree - Sequence (vt 0x0804AAF4): +4 cursor, +8 count, +0xC child runtimes; Selector (0x0804A710): +4 count, +8
 /// children; the path followers (ChasePlayer ...: +4 speed, +8 budget, +0xC / +0x10 waypoint, +0x14 valid, +0x18
@@ -560,6 +563,13 @@ fn import_ai_rt(w: &mut World, ei: usize, lvl: usize, ram: &GbaRam, r: u32, note
                 rt.d[1] = ram.s32(r + 8);
                 rt.f = 48 - ram.s32(r + 0x10);
             }
+            // SpawnEnzymes (vt 0x0804AD18): +4 the frames to the next spawn (one off each update, a spawn at 0, then 120 -
+            // ours: the enemy's `enz_timer`); the spawn count is the enemy's +0x204 (`patch_enemy`) (exit-fade sweep
+            // 21-6 / 21-8: both Blisters 4 frames from a spawn at the cut, ours 120)
+            K::SpawnEnzymes => w.en(ei).enz_timer = ram.s32(r + 4),
+            // HandAmbush (vt 0x0804C174): +4 set by its first update (the side draw and the jump to the player done):
+            // the frame count is then the strike animation's (`patch_enemy`, after the rows)
+            K::HandAmbush if ram.s32(r + 4) != 0 => rt.f = HAND_STARTED,
             K::PopState | K::PushState => {}
             K::Chance | K::GotoState | K::SubState | K::IfPlayerWithin | K::IfPlayerFarther | K::IfPlayerInMeleeRange | K::IfTimeInState | K::IfCooldownOver | K::IfLastKidBuu => {}
             // ThrowBigBall: a singleton runtime (0x030032E8); its frame count comes from the ball (`import_super_ball`)
@@ -763,6 +773,7 @@ fn field_from_ram(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
     }
     import_death_effects(w, ram, notes);
     import_player_blasts(w, ram);
+    import_coins(w, ram);
     // the camera as the field left it (`return_to_field` puts the saved one back)
     w.scene.cam.mode = wf_core::scene::CamMode::Player;
     wf_core::battle::set_camera(w, 0, ram.s32(CAM), ram.s32(CAM + 4));
@@ -1099,6 +1110,10 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
         wf_core::enemy::unmark_self(w, ei);
         w.en(ei).detached = true;
     }
+    // the Blister's spawn count (obj+0x204, +1 a spawn: SpawnEnzymes stops at 8)
+    if w.en_ref(ei).ai.stack.iter().any(|st| st.tree.nodes.iter().any(|n| n.k == wf_core::ai::K::SpawnEnzymes)) {
+        w.en(ei).spawned = ram.s32(o + 0x204);
+    }
     import_enemy_beam(w, ei, ram, o, notes);
     import_super_ball(w, ei, ram, o, notes);
     import_bombs(w, ei, ram, o);
@@ -1114,6 +1129,13 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
     e.state_stamp = ram.s32(o + 0x210) as i64;
     e.mark1 = ram.s32(o + 0x1E8) as i64;
     e.counter = ram.s32(o + 0x1E4) as i64;
+    // off the enemy grid (obj+0x291 = 1, `0x0800F924`: a bat-form Nosferatu, a Blood Cell, a puff): it fits anywhere
+    // and marks no tiles - the imported grid has none of its own (exit-fade sweep 15-23: a bat's chase re-planned
+    // into the walls it flies over, ours wall-followed)
+    e.detached = ram.r8(o + 0x291) != 0;
+    if e.detached {
+        e.marked = None;
+    }
     if let Some((sprite, raw, cel, tick)) = row {
         // (the sprite the object shows: the world map's circles pick theirs by the place's state)
         if e.a.sprite != Some(sprite - wf_core::scene::SPRITE_BASE) {
@@ -1156,6 +1178,11 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
                 // Ball 2's desert: tick 41, a flame a frame)
                 if st.tree.nodes.get(n).is_some_and(|x| x.k == wf_core::ai::K::FlameBreath) {
                     rt.f = tick;
+                }
+                // a HandAmbush past its first update (exit-fade sweep 18-10: the hand already at the player; ours drew
+                // its side again): the count follows the strike animation (set on that first update, tick 0)
+                if st.tree.nodes.get(n).is_some_and(|x| x.k == wf_core::ai::K::HandAmbush) && rt.f == HAND_STARTED {
+                    rt.f = tick + 1;
                 }
                 // a SoldierThrow in progress (the controller 0x03002FCC, as FlameBreath): its frame count is the tick,
                 // its state the throw's raw animation (whole-run cut 497,351: Babidi's ship soldier mid-throw)
@@ -1398,6 +1425,14 @@ fn import_npc_step(w: &mut World, i: usize, ram: &GbaRam, o: u32, row: Option<(i
 fn import_effects(w: &mut World, ram: &GbaRam) {
     for o in ram.objects() {
         let vt = ram.r32(o);
+        // a debris chip (vt 0x08049F38, `0x0800C912` / a bomb's burst): +0x18 the updates left, +0x1C / +0x20 the 24.8
+        // position, +0x24 / +0x28 the velocity (each update: velocity, then position) - our chip with the same numbers,
+        // its age 32 - left (exit-fade sweep 18-10: four chips of a statue's hit, their shared tiles foreign in ours)
+        if vt == 0x0804_9F38 {
+            let f = wf_core::fx::Fx::Debris { x: ram.s32(o + 0x1C), y: ram.s32(o + 0x20), vx: ram.s32(o + 0x24), vy: ram.s32(o + 0x28), t: 32 - ram.s32(o + 0x18) };
+            w.add(Body::Fx(Box::new(f)));
+            continue;
+        }
         if vt != 0x0804_A2C0 && vt != 0x0804_CF3C {
             continue;
         }
@@ -1625,6 +1660,39 @@ fn inline_running(ram: &GbaRam) -> Option<(String, Vec<(u8, Option<Vec<i32>>)>)>
 /// counting down from 15 - MEASURED on real-run segments r010_001 / r012_014 / r015_006): our straight shot with the
 /// same numbers (its end spark counts up to 16: dead = 16 - left); its tile block goes with it (`import_vram`;
 /// whole-run cut 809,790: a blast in its last spark frame)
+/// the coins lying or flying at the cut (`0x08017F5A`, vt 0x08049CC4: +0x14 .. +0x20 the pickup box, +0x24 the age,
+/// +0x28 the animation phase, +0x2C the move counter (60 moves), +0x30 / +0x34 z and its speed, +0x50 / +0x54 the
+/// 24.8 position, +0x58 / +0x5C the velocity, +0x60 the def (0x086FC250 + 4 size: +0xC the value) - MEASURED on the
+/// exit-fade cuts 14-2 -> 14-1, real run r067_085: a 50 Z coin of age 587 goes at 601, 14 frames into the fade);
+/// its tiles (+0xC) go to it in `import_vram`, its shadow is a shared graphic (refcounts)
+fn import_coins(w: &mut World, ram: &GbaRam) {
+    use wf_core::fieldobj::{Pickup, PickupKind};
+    for o in ram.objects().into_iter().filter(|&o| ram.r32(o) == 0x0804_9CC4) {
+        let def = ram.r32(o + 0x60);
+        let Some(size) = [0x086F_C260u32, 0x086F_C378, 0x086F_C790, 0x086F_C8A8].iter().position(|&d| d == def) else { continue };
+        let t = ram.s32(o + 0x24);
+        let moves = ram.s32(o + 0x2C);
+        let z = ram.s32(o + 0x30);
+        let p = Pickup {
+            kind: PickupKind::Zenie(size as i32),
+            x: ram.s32(o + 0x50),
+            y: ram.s32(o + 0x54),
+            vx: ram.s32(o + 0x58),
+            vy: ram.s32(o + 0x5C),
+            z,
+            vz: ram.s32(o + 0x34),
+            t,
+            mv: moves - t,
+            landed: moves >= 60 && z == 0,
+            phase: ram.r32(o + 0x28),
+            bx: [ram.s32(o + 0x14), ram.s32(o + 0x18), ram.s32(o + 0x1C), ram.s32(o + 0x20)],
+            solid: None,
+            spawn: None,
+        };
+        w.add(Body::Pickup(Box::new(p)));
+    }
+}
+
 fn import_player_blasts(w: &mut World, ram: &GbaRam) {
     let po = ram.player();
     let Some(pi) = w.player_idx(0).filter(|_| po != 0) else { return };
@@ -1766,6 +1834,11 @@ fn import_player_state(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
     use wf_core::player::Gs;
     let Some(pi) = w.player_idx(0) else { return };
     let po = ram.player();
+    // the hit-damage remainder in 1/1024 HP (player object +0x228) - whatever the state (whole-run cut 185,000: the
+    // leader in a scripted transformation, 193 / 1024 carried into the next hit)
+    if po != 0 {
+        w.pl(pi).hp_acc.acc = ram.s32(po + 0x228) as i64;
+    }
     let st = ram.r32(po + 0x14);
     if !ram.valid(st) {
         return;
@@ -1888,8 +1961,6 @@ fn import_player_state(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
     p.resist = ram.r8(po + 0x1B8) as i32;
     p.a.stats.res_m = ram.r8(po + 0x1B8) as i32;
     p.a.stats.res_e = ram.r8(po + 0x1B9) as i32;
-    // the hit-damage remainder in 1/1024 HP (player object +0x228)
-    p.hp_acc.acc = ram.s32(po + 0x228) as i64;
 }
 
 /// **an event running mid-node over a standing field** (mid-area in-event): the field from RAM as `build_mid`
@@ -2739,6 +2810,22 @@ pub fn import_emulator_state(data: &Arc<GameData>, ram: &GbaRam, runner: &mut St
     if in_event.is_some() {
         patch_patrols(&mut world, ram, &mut notes);
     }
+    // the inline script under the event: an interpreter standing just after its `run_event` of the event (or of the
+    // outermost event of a nested chain) - it goes on when the event ends (gate rkb_001_0-50: 14-1's trigger script,
+    // run_event(515) then set_flag(408))
+    runner.after_event = None;
+    if let (Some(ev), true) = (in_event, runner.running()) {
+        let outermost = outer_event(ram, runner, ev).map(|(o, _)| o.0).unwrap_or(ev.0);
+        if let Some((id, ran)) = inline_running(ram) {
+            let runs = ran.last().is_some_and(|(n, a)| {
+                (wf_script::natives::RUN_EVENT..=wf_script::natives::RUN_EVENT_P0_P3).contains(n) && a.as_ref().is_none_or(|x| x.first().is_some_and(|&e| e == ev.0 as i32 || e == outermost as i32))
+            });
+            if runs {
+                notes.push(format!("{id} under the event: goes on after its run_event (action #{})", ran.len() - 1));
+                runner.after_event = Some((id, ran.len()));
+            }
+        }
+    }
     if !b.finished {
         notes.push("the load's scripts are still running at the cut (host state carries over)".into());
     }
@@ -2973,6 +3060,22 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
             }
             continue;
         }
+        // a transformation's aura effect (vt 0x0804B9E0, the SS-up state's ctor `0x0801C3EC`): its block belongs to our
+        // aura effect of that player (`Alive::Transform`, made when the import entered the state) - the state deletes
+        // it at its end (whole-run cut 185,000: 7-6's scripted transformation, the block freed at f164)
+        if vt == 0x0804_B9E0 {
+            let h = ram.r16(o + 0xC);
+            let ent = (0..w.ents.len()).find(|&k| {
+                !w.ents[k].removed
+                    && !used_ents.contains(&w.ents[k].id)
+                    && matches!(&w.ents[k].body, Body::Fx(f) if matches!(**f, wf_core::fx::Fx::Loop { alive: wf_core::fx::Alive::Transform { .. }, .. }))
+            });
+            if let (Some(k), true) = (ent, h != 0xFFFF) {
+                used_ents.push(w.ents[k].id);
+                owners.push((h, Owner::Ent(w.ents[k].id)));
+                continue;
+            }
+        }
         // the leader's Ki Blast (vt 0x0804B454, `import_player_blasts`): its block belongs to the blast at its position
         if vt == 0x0804_B454 {
             let h = ram.r16(o + 0xC);
@@ -3005,6 +3108,28 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
             let h = ram.r16(o + 0xC);
             let (x, y) = (ram.s32(o + 0x20), ram.s32(o + 0x24));
             let ent = (0..w.ents.len()).find(|&k| !used_ents.contains(&w.ents[k].id) && matches!(&w.ents[k].body, Body::Shot(s) if matches!(s.kind, wf_core::shots::ShotKind::Bomb { .. }) && s.x == x && s.y == y));
+            if let (Some(k), true) = (ent, h != 0xFFFF) {
+                used_ents.push(w.ents[k].id);
+                owners.push((h, Owner::Ent(w.ents[k].id)));
+            }
+            continue;
+        }
+        // a coin (vt 0x08049CC4, `import_coins`): its block belongs to the coin at its 24.8 position
+        if vt == 0x0804_9CC4 {
+            let h = ram.r16(o + 0xC);
+            let (x, y) = (ram.s32(o + 0x50), ram.s32(o + 0x54));
+            let ent = (0..w.ents.len()).find(|&k| !w.ents[k].removed && !used_ents.contains(&w.ents[k].id) && matches!(&w.ents[k].body, Body::Pickup(p) if matches!(p.kind, wf_core::fieldobj::PickupKind::Zenie(_)) && p.x == x && p.y == y));
+            if let (Some(k), true) = (ent, h != 0xFFFF) {
+                used_ents.push(w.ents[k].id);
+                owners.push((h, Owner::Ent(w.ents[k].id)));
+            }
+            continue;
+        }
+        // a map item lying in the area (vt 0x0804A314, ctor `0x0800DCDC`): its icon's block (+0xC) belongs to our
+        // map item pickup (in object order)
+        if vt == 0x0804_A314 {
+            let h = ram.r16(o + 0xC);
+            let ent = (0..w.ents.len()).find(|&k| !w.ents[k].removed && !used_ents.contains(&w.ents[k].id) && matches!(&w.ents[k].body, Body::Pickup(p) if matches!(p.kind, wf_core::fieldobj::PickupKind::MapItem { .. }) && p.landed && p.spawn.is_none()));
             if let (Some(k), true) = (ent, h != 0xFFFF) {
                 used_ents.push(w.ents[k].id);
                 owners.push((h, Owner::Ent(w.ents[k].id)));
@@ -3064,6 +3189,11 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
     if ram.r8(0x0300_2FB8) > 0 && ram.r16(0x0300_2FBA) != 0xFFFF {
         owners.push((ram.r16(0x0300_2FBA), Owner::Keyed(wf_core::vram::KEY_FLAME)));
         keyed.push((wf_core::vram::KEY_FLAME, ram.r8(0x0300_2FB8) as u32));
+    }
+    // the debris chips' shared graphic (`0x0800C454`: 0x03001AF8 its users, +2 its handle; `import_effects`)
+    if ram.r8(0x0300_1AF8) > 0 && ram.r16(0x0300_1AFA) != 0xFFFF {
+        owners.push((ram.r16(0x0300_1AFA), Owner::Keyed(wf_core::vram::KEY_DEBRIS)));
+        keyed.push((wf_core::vram::KEY_DEBRIS, ram.r8(0x0300_1AF8) as u32));
     }
     for b in &a.e {
         if b.used == 1 && !owners.iter().any(|o| o.0 == b.start << 1) {

@@ -29,10 +29,14 @@ def paths(chain):
     if chain == 'run1':
         return {'master': W / 'master.jsonl', 'sounds': ROOT / 'data' / 'realrun' / 'sounds.json.gz',
                 'known': ROOT / 'data' / 'realrun' / 'known_stops.json', 'cuts': W / 'cuts', 'dir': W,
-                'manifest': ROOT / 'data' / 'realrun' / 'manifest.json'}
+                'manifest': ROOT / 'data' / 'realrun' / 'manifest.json',
+                # run 1 is strict: no ratchet file
+                'expected': ROOT / 'data' / 'realrun' / 'no_expected.json'}
     d = ROOT / 'data' / 'realrun2'
     return {'master': W / 'run2' / 'master.jsonl', 'sounds': d / 'sounds.json.gz', 'known': d / 'known_stops.json',
-            'cuts': W / 'run2' / 'cuts', 'dir': W / 'run2', 'manifest': d / 'manifest.json'}
+            'cuts': W / 'run2' / 'cuts', 'dir': W / 'run2', 'manifest': d / 'manifest.json',
+            # check.py's ratchet: fail only if the first difference comes earlier than this
+            'expected': d / 'expected.json'}
 
 
 def parts(chain):

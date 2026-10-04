@@ -45,7 +45,14 @@ def main():
                 e.run(1)
             continue
         t0 = time.time()
-        d = Run2Driver(goals)
+        if goals == 'SHIP2':
+            # the ship chapter: re/buu/ship/ship_route2.py's goals, built from the state here, its own driver
+            sys.path.insert(0, str(ROOT / 're' / 'buu' / 'ship'))
+            from ship_route2 import ShipDriver2, goals_run2
+            d = ShipDriver2(goals_run2(e))
+            cap = max(cap, 1200000)
+        else:
+            d = Run2Driver(goals)
         log = []
         try:
             while not d.done():

@@ -40,6 +40,31 @@ pub struct StorySim {
     /// steps taken (`Sim::frame`: replays, rewind and rollback index their input logs by it - `World.frame` counts
     /// object passes and stands still in menus, holds and loads)
     steps: u64,
+    /// how this sim was started (the title with its slot files, a slot's game, a new game at an area): the replay /
+    /// save-state header's config (`control.rs`, [`STORY_KIND`]); [`StorySim::from_start`] rebuilds it. None =
+    /// a harness start (an imported checkpoint): not recorded.
+    pub start: Option<serde_json::Value>,
+}
+
+/// replay / save-state header `sim` of story mode (the config is [`StorySim::start`])
+pub const STORY_KIND: &str = "wf-app/story";
+
+/// slot files as hex strings (a story start's config)
+pub fn hex_slots(slots: &[Vec<u8>]) -> Vec<String> {
+    slots.iter().map(|b| b.iter().map(|x| format!("{x:02x}")).collect()).collect()
+}
+
+fn unhex_slots(v: &serde_json::Value) -> Vec<Vec<u8>> {
+    v.as_array()
+        .map(|a| {
+            a.iter()
+                .map(|s| {
+                    let s = s.as_str().unwrap_or("");
+                    (0..s.len() / 2).filter_map(|i| u8::from_str_radix(&s[2 * i..2 * i + 2], 16).ok()).collect()
+                })
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 /// [`StorySim::save_mem`]'s state
@@ -60,6 +85,7 @@ pub fn parse_area(s: &str) -> Option<(i32, i32)> {
 impl StorySim {
     /// A new game at `area` (`"1-1"` = Snakeway, where the game's play starts), or `story` to continue.
     pub fn new(packs: &Packs, area: (i32, i32), chars: Vec<i32>, seed: u32) -> Result<StorySim, String> {
+        let start = serde_json::json!({"kind": "area", "area": [area.0, area.1], "chars": chars, "seed": seed});
         let data: Arc<GameData> = crate::battle::load_data(packs)?;
         if data.field.is_none() {
             return Err("this content has no world/ data (re-extract with the current extractor)".into());
@@ -81,7 +107,38 @@ impl StorySim {
         let mut session = Session::new_field(Arc::clone(&data), cfg);
         // the app recreates no hardware slowdown: one step per game logic iteration (`Options::no_lag`)
         session.world.opts.no_lag = true;
-        Self::with_session(packs, session)
+        let mut s = Self::with_session(packs, session)?;
+        s.start = Some(start);
+        Ok(s)
+    }
+
+    /// Rebuild a sim from its [`StorySim::start`] (a replay's / save state's header config).
+    pub fn from_start(packs: &Packs, start: &serde_json::Value) -> Result<StorySim, String> {
+        let seed = start["seed"].as_u64().unwrap_or(1) as u32;
+        let slots = unhex_slots(&start["slots"]);
+        match start["kind"].as_str() {
+            Some("title") => crate::launcher::title_sim(packs, &slots, seed),
+            Some("slots") => crate::launcher::story_sim(packs, &slots, start["slot"].as_u64().map(|x| x as usize), seed),
+            Some("area") => {
+                let a = &start["area"];
+                let area = (a[0].as_i64().unwrap_or(1) as i32, a[1].as_i64().unwrap_or(1) as i32);
+                let chars = start["chars"].as_array().map(|v| v.iter().filter_map(|x| x.as_i64()).map(|x| x as i32).collect()).unwrap_or_default();
+                StorySim::new(packs, area, chars, seed)
+            }
+            k => Err(format!("unknown story start {k:?}")),
+        }
+    }
+
+    /// a header title for a story start
+    pub fn start_title(start: &serde_json::Value) -> String {
+        match start["kind"].as_str() {
+            Some("title") => "Story (title)".into(),
+            Some("slots") => match start["slot"].as_u64() {
+                Some(i) => format!("Story (slot {})", i + 1),
+                None => "Story (new game)".into(),
+            },
+            _ => format!("Story ({}-{})", start["area"][0], start["area"][1]),
+        }
     }
 
     /// The in-process snapshot (rollback netcode, rewind): the session, the script host's between-frames state, the
@@ -124,7 +181,7 @@ impl StorySim {
         // the first area's load scripts (gates, doors, bridges) before frame 0
         host.start(&mut session);
         let errors = host.errors.clone();
-        Ok(StorySim { session, host, prev: [0; MAX_PLAYERS], errors, init_events, presenter: Default::default(), steps: 0 })
+        Ok(StorySim { session, host, prev: [0; MAX_PLAYERS], errors, init_events, presenter: Default::default(), steps: 0, start: None })
     }
 
     /// Story mode from a real-game checkpoint: the RAM of an area-entry cut imported ONCE (`wf_import`), then the
@@ -149,7 +206,7 @@ impl StorySim {
         let errors = host.errors.clone();
         let mut prev = [0; MAX_PLAYERS];
         prev[0] = imp.prev_keys;
-        Ok(StorySim { session, host, prev, errors, init_events: Vec::new(), presenter: Default::default(), steps: 0 })
+        Ok(StorySim { session, host, prev, errors, init_events: Vec::new(), presenter: Default::default(), steps: 0, start: None })
     }
 
     pub fn from_import(packs: &Packs, ram: &wf_import::GbaRam) -> Result<StorySim, String> {
@@ -172,7 +229,7 @@ impl StorySim {
         let errors = host.errors.clone();
         let mut prev = [0; MAX_PLAYERS];
         prev[0] = imp.prev_keys;
-        Ok(StorySim { session, host, prev, errors, init_events: Vec::new(), presenter: Default::default(), steps: 0 })
+        Ok(StorySim { session, host, prev, errors, init_events: Vec::new(), presenter: Default::default(), steps: 0, start: None })
     }
 
     pub fn world(&self) -> &World {

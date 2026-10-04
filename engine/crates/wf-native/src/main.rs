@@ -11,7 +11,7 @@
 //! Replays / rewind / save states / training (`wf_app::control`, docs/replays.md): hold ` rewind, hold Tab fast
 //! forward, P pause, N frame advance, -/= speed, [ ] seek, Home start, F6-F9 load / Shift+F6-F9 save state, F10
 //! replays, B take over, I input display, F4 training overlay, G ghost; rebindable in `<data dir>/hotkeys.json`.
-//! Headless: `--replay FILE` verifies and plays a recording, `--record FILE` writes the run's recording.
+//! Headless: `--replay FILE` verifies and plays a recording, `--record FILE` writes the run's recording (battles and story mode).
 //! Mods (engine/docs/modding.md): every folder in `<content>/mods/` loads; `--mod DIR` (repeatable) adds a mod
 //! folder from anywhere (e.g. `--mod engine/mods-examples/new-skill`), `--no-mods` loads only those given.
 //! Launcher (`wf_app::launcher`): with no mode flag (`--story`, `--arena`/`--enemy`/`--fighter`, `--area`/`--demo`,

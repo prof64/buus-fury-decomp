@@ -202,7 +202,11 @@ def goals_run2(e):
         nav(8, 2, False), ('walk', 104, 56), ('face', 'U'), ('press', A), ('events',),      # s517: the gate
         nav(8, 1, False), ('walk', 148, 186), *charsel(1),                                   # Gohan
         ('mark', 'r03_grind_gohan'),
+        # Gohan carries the ship: his points two thirds END (run 1: half STR, half END; a POW / SPD Gohan ate all
+        # his food by stage 3 and died there)
+        ('mode', 'split', lambda n: [n - 2 * n // 3, 0, 2 * n // 3, 0]),
         ('grind', 103, [(8, 3), (8, 6)]),
+        ('mode', 'split', split2),
         nav(8, 1, False), ('walk', 148, 186), *charsel(1),                                   # Vegeta
         ('mark', 'r04_grind_vegeta'),
         ('mode', 'blasty', True),
@@ -210,13 +214,13 @@ def goals_run2(e):
         ('mode', 'blasty', False),
         nav(8, 1, False), ('walk', 148, 186), *charsel(-1),                                  # Gohan
         # --- Papaya Island: the equipment stall (run 1 never bought or wore any here): Leather Gloves, Leather
-        # Moccasins, worn by Gohan; then food: Miso Soup, a Rice Ball, two Onigiri ---------------------------------
+        # Moccasins, worn by Gohan; then food: Miso Soup, a Rice Ball, four Onigiri ---------------------------------
         nav(8, 1, False), ('walk', 280, 266), ('face', 'U'), ('press', A), ('wait', 60),
         ('fly', 1953, 2041, 143, 159), ('wait', 30),                                         # Papaya Island 7-1
         nav(7, 2, False), ('mark', 'r05_shop'),
         *stall(188, 472, [(0, 1), (2, 1)]),
         equip2(1), equip2(2),
-        *stall(276, 592, [(0, 1), (1, 1), (3, 2)]),
+        *stall(276, 592, [(0, 1), (1, 1), (3, 4)]),
         nav(7, 1, False), ('walk', 224, 340), ('face', 'U'), ('press', A), ('wait', 60),
         ('fly', 849, 1785, 31, 23), ('wait', 30),                                            # Southwest Forest
         nav(8, 16, False), ('wait', 30),

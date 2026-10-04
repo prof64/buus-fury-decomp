@@ -28,9 +28,11 @@ checksums. Integers in the body are LEB128 varints.
 
 **Replay `.wfr`** (`WFRP`): `blob(header JSON) | flags | [blob(lz start state)] | input log | checkpoints`.
 
-* `Header`: `sim` (`wf-core/battle`), `content` (`ContentId`: engine build `wf-core 0.1.0`, extractor =
+* `Header`: `sim` (`wf-core/battle`, or `wf-app/story` for story mode), `content` (`ContentId`: engine build `wf-core 0.1.0`, extractor =
   base `pack.json.generated_by`, ROM SHA-1, mod ids in load order, `mods_hash` = FNV-1a over every mod's id, file
-  paths and bytes), `config` (the sim's own JSON: wf-core `BattleConfig`), `seed`, `players`, `hash_interval`,
+  paths and bytes), `config` (the sim's own JSON: wf-core `BattleConfig`; story mode: `StorySim::start` =
+  `{kind: "title" | "slots" | "area", slots (the slot files, hex), slot, area, chars, seed}`, rebuilt by
+  `StorySim::from_start`), `seed`, `players`, `hash_interval`,
   `title`, `created` (wall clock, metadata only), `branch` (`{parent id, frame}` for take-overs / loaded states),
   `outcome`, `frames`, `final_hash` (listing fields).
 * Start state: optional serialized snapshot (recordings that begin mid-session); normally absent = frame 0 of
@@ -60,6 +62,10 @@ same incrementally (any speed / seeks) and the view shows `DESYNC ...`. Differen
 
 ## 3. In the app (`wf_app::control::Control`, both shells)
 
+* **Story mode** (launcher Story / title, `--story`): recorded, rewound, saved and loaded like a battle (the
+  snapshot carries the script host: `StorySim::snapshot`); ghosts and the training overlay stay battle-only.
+  `tests/story_control.rs`; headless `buus-fury --launcher --launcher-keys Enter,Enter --input .. --record F` then
+  `--replay F` gives the same state hash.
 * **Recording**: every live wf-core session; autosaved every 30 s, on win / loss, before switching sessions and on
   exit / page hide. Desktop `<data>/replays/<id>.wfr` (newest `keep_replays` = 50 kept), `replays/kept/` never
   pruned; web: store keys `replays/<id>.wfr`, `kept/<id>.wfr` (OPFS, IndexedDB fallback).

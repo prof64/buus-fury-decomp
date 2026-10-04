@@ -24,10 +24,11 @@ fn fonts_decode() {
     let fs = font::Font::all(&rom);
     let counts: Vec<usize> = fs.iter().map(|f| f.glyphs.iter().flatten().count()).collect();
     println!("fonts: {:?}", fs.iter().map(|f| f.id).zip(counts.iter()).collect::<Vec<_>>());
-    assert_eq!(counts, vec![221, 223, 26, 223, 223, 32]);
+    assert_eq!(counts, vec![221, 223, 26, 223, 223, 32, 223]);
     for f in &fs {
         for g in f.glyphs.iter().flatten() {
-            assert!(g.width <= 16 && g.cols.len() == g.width as usize);
+            // (the title font's A M O Q W are wider than 16, W 22)
+            assert!(g.width <= 22 && g.cols.len() == g.width as usize);
         }
     }
 }

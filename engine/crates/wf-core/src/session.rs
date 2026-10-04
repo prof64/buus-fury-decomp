@@ -338,7 +338,15 @@ impl Session {
                 w.tick_shakes();
             }
             let k = w.events.len();
+            // (the frame a menu screen's fade-in ended in is the menu's iteration: its play frame is counted by the
+            // menu step, not again by the field's rules - real run 18-1 rclose_044_015 f592, Status TIME one second
+            // ahead at the next pause menu)
+            let closed = w.g.clock_mark.is_none();
+            let p0 = w.story.play_frames;
             crate::field::post_step(w);
+            if closed && w.story.play_frames > p0 {
+                w.story.play_frames -= 1;
+            }
             crate::player::passive_after_scripts(w);
             Self::run_hook(&mut self.hook, &mut self.world, k);
             // START: the pause menu (the field main loop checks it after the objects, triggers and scripts)

@@ -214,7 +214,7 @@ pub fn spawn_map_item(w: &mut World, o: &crate::fieldcontent::ObjDef) -> Option<
     if let Some(c) = w.col.as_mut() {
         c.mark_both(solid, 0);
     }
-    Some(w.add(Body::Pickup(Box::new(Pickup {
+    let id = w.add(Body::Pickup(Box::new(Pickup {
         kind: PickupKind::MapItem {
             obj: o.at,
             item: *item,
@@ -232,7 +232,13 @@ pub fn spawn_map_item(w: &mut World, o: &crate::fieldcontent::ObjDef) -> Option<
         bx: [*x, *y, x + 16, y + 16],
         solid: Some(solid),
         spawn: None,
-    }))))
+    })));
+    // its icon's tiles (ctor `0x0800DCDC`, vt 0x0804A314 +0xC: 4 blocks (0x100 bytes), no shadow; exit-fade cuts
+    // 8-56 -> 8-57 / 4-24 -> 4-30: the block right after the props', before the player's)
+    if w.field.as_ref().is_some_and(|f| f.vram.is_some()) {
+        crate::vram::acquire(w, crate::vram::Owner::Ent(id), 0x100);
+    }
+    Some(id)
 }
 
 /// script `spawn_map_item(i)` (0xAA, 0x080090E6 -> 0x0800DCDC with the loot block 0x03001010 / 0x03001018): the area's
@@ -704,6 +710,10 @@ pub fn collect(w: &mut World, k: usize, slot: u8) {
     let mut then = None;
     let item = match kind {
         PickupKind::Zenie(size) => {
+            // the touch trigger destroys the coin object at once: its tiles and its shadow's reference go in this
+            // frame, not at the next pass's reap (whole-run cut 497,351 +154: the game's block (423, 4) free in the
+            // frame the coin is touched)
+            crate::vram::entity_gone(w, k);
             w.story
                 .add_zenie(COIN_VALUE[size.clamp(0, 3) as usize] as i64);
             w.sfx(44, 64);

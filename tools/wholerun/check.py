@@ -96,6 +96,24 @@ with ThreadPoolExecutor(max(1, len(legs))) as ex:
             probs.append(f"sound at row {sf['row']:,} ({sf['stretch']}): {sf['what'][:160]} ({r['sounds_bad']} iterations)")
         if r['script_errors']:
             probs.append(f"{r['script_errors']} script errors")
+        # a chain with an expected.json (a ratchet: run 2 while its stops are being fixed) passes when its first
+        # difference (stop or sound) is no earlier than the recorded one; later = an improvement, the file is bumped
+        exp_p = chains.paths(chain)['expected']
+        if probs and s == 0 and exp_p.exists() and lag == 'none':
+            exp = json.loads(exp_p.read_text())
+            first = min(r['exact_to'], sf['row'] if sf else e)
+            if r['script_errors']:
+                pass
+            elif first < exp['first_diff']:
+                probs.insert(0, f"WORSE than expected (first difference row {first:,} < {exp['first_diff']:,})")
+            else:
+                if first > exp['first_diff']:
+                    print(f"IMPROVED {name}: first difference row {exp['first_diff']:,} -> {first:,} "
+                          f"({exp_p.relative_to(ROOT)} bumped)")
+                    exp_p.write_text(json.dumps({**exp, 'first_diff': first, 'stop': r['first'],
+                                                 'stretch': r['exact_stretch']}, indent=1) + '\n')
+                print(f"ok   {name} .. {e:,}: as expected, first difference row {first:,} - " + ' | '.join(probs))
+                continue
         if probs:
             bad += 1
             print(f'FAIL {name} .. {e:,}: ' + ' | '.join(probs))
