@@ -76,7 +76,7 @@ pub fn render_view(w: &World, out: &mut RenderView) {
     // tile animations run on the map's own timers, which start at the area load (field_parity)
     // (the play clock: they run while a scene holds the world, not while the area loads)
     let anim_frame = w.field.as_ref().map(|f| w.frame.saturating_sub(f.entered)).unwrap_or(w.frame);
-    let tile_frame = w.field.as_ref().map(|f| w.story.play_frames.saturating_sub(f.entered_play) as u32).filter(|&t| t != anim_frame);
+    let tile_frame = w.field.as_ref().map(|f| f.iters.saturating_sub(f.entered_iter)).filter(|&t| t != anim_frame);
     // a script's BG control (hide / priority / blend targets / weights: scene::Layers)
     let sl = &w.scene.screen.layers;
     let layers = (*sl != crate::scene::Layers::default()).then(|| wf_view::BgLayers { visible: sl.visible, priority: sl.priority, blend: sl.blend, alpha: sl.alpha });
@@ -303,7 +303,8 @@ fn stat_mark_frame(w: &World) -> Option<u8> {
     if !v.owners.iter().any(|o| o.1 == crate::vram::Owner::StatMark) {
         return None;
     }
-    Some((((w.story.play_frames as u32).wrapping_sub(v.stat_at) >> 3) & 3) as u8)
+    let it = w.field.as_ref().map(|f| f.iters).unwrap_or(0);
+    Some(((it.wrapping_sub(v.stat_at) >> 3) & 3) as u8)
 }
 
 /// the script screen fades as the palette writes they make each update (`t` steps of `len`, l = t * 256 / len):

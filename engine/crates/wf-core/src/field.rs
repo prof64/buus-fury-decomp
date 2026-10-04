@@ -282,6 +282,11 @@ pub struct Field {
     /// state reset later in the frame comes before that pass's flyer update in the game
     #[serde(default)]
     pub resumed_at: Option<u32>,
+    /// a touch-once trigger whose activation started an event: the game removes it when the activation returns -
+    /// the event's end (the event runs inside it) - unless the trigger list was rebuilt meanwhile (list +0xC8: a
+    /// load or `refresh_map_triggers`)
+    #[serde(default)]
+    pub once_pending: Option<ObjRef>,
     /// the frame's input as it was before an event's hold cleared it (`pre_step`): the pass an inline event
     /// interrupted completes with it (`post_step`, resumed)
     #[serde(default)]
@@ -307,11 +312,15 @@ pub struct Field {
     pub pre_pickups: u32,
     /// frame of the last area load
     pub entered: u32,
-    /// the play clock (`story.play_frames`) at the last area load: the map's tile animations tick with it
-    /// (`0x0800965C` -> `0x08009CC2`, every game iteration the map runs - a frozen world's too: segment sb 21-25
-    /// f4880..4960, a scene holding the world while the flowers keep turning)
+    /// field iterations (one per field frame, a world held by a scene too; not menu screens): the clock of what
+    /// the game updates / draws every iteration whatever the world does - the map's tile animations (`0x0800965C`
+    /// -> `0x08009CC2`: segment sb 21-25 f4880..4960, a scene holding the world while the flowers keep turning),
+    /// the stat-points mark's draw counter
     #[serde(default)]
-    pub entered_play: u64,
+    pub iters: u32,
+    /// `iters` at the last area load (the tile animations' start)
+    #[serde(default)]
+    pub entered_iter: u32,
     /// number of area loads (touch_once triggers survive only within one)
     pub loads: u32,
     /// a talk started in the player's update: (the player's live list index, `loads`) - the event's nested loop
@@ -513,6 +522,7 @@ fn new_field() -> Field {
         held_event: false,
         resume_held: false,
         resumed_at: None,
+        once_pending: None,
         raw_input: None,
         pre_update: false,
         arrival: None,
@@ -521,7 +531,8 @@ fn new_field() -> Field {
         cam_before: None,
         pre_pickups: 0,
         entered: 0,
-        entered_play: 0,
+        iters: 0,
+        entered_iter: 0,
         loads: 0,
         talk_pass: None,
         trig_off: false,
@@ -815,6 +826,7 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
         f.placed.clear();
         f.placed_loot.clear();
         f.triggers.clear();
+        f.once_pending = None;
         f.deferred.clear();
         f.debris.clear();
         f.label = None;
@@ -824,7 +836,8 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
         f.mode = Mode::Normal;
         f.busy = keep_busy;
         f.entered = w.frame;
-        f.entered_play = w.story.play_frames;
+        // (a load inside a field frame: the animations start with the next iteration - its tick comes after)
+        f.entered_iter = f.iters.wrapping_add(1);
         f.loads += 1;
         f.on_enter_queued = false;
         // a script fade-in belongs to the load its `warp_fade` made (set after this returns): any other load ends
@@ -1662,10 +1675,8 @@ pub fn post_step(w: &mut World) {
     }
     story::sync_from_players(w);
     w.story.play_frames += 1;
-    // an area loaded within this field frame: its animations start with the next iteration (segment sb 6-6 f13843)
-    let play = w.story.play_frames;
-    if let Some(f) = w.field.as_mut().filter(|f| f.entered == w.frame && f.entered_play + 1 == play) {
-        f.entered_play = play;
+    if let Some(f) = w.field.as_mut() {
+        f.iters = f.iters.wrapping_add(1);
     }
 }
 
@@ -1952,6 +1963,8 @@ fn fire(w: &mut World, slot: usize, k: usize, t: &TriggerRt) {
     let obj = t.obj;
     let s8 = slot as u8;
     let region = matches!(kind, TriggerKind::Region);
+    // (an event's touch-once trigger goes when the event ends: `Field::once_pending`)
+    let event = matches!(kind, TriggerKind::Event(_) | TriggerKind::SavePoint(_));
     match kind {
         TriggerKind::Exit { to, push } | TriggerKind::EdgeExit { to, push } => {
             if w.input[slot].held & PUSH_KEY[push as usize & 3] == 0 {
@@ -1983,6 +1996,14 @@ fn fire(w: &mut World, slot: usize, k: usize, t: &TriggerRt) {
     // touch_once: removed after firing unless an area load happened meanwhile
     // (a region (vt 0x080499D4) stays: the game's trigger lists keep it after the player crossed it - 2-8, 14-2,
     // 15-33 ...; the list's length counts for the drops' "< 45 triggers")
+    if event && matches!(t.act, Activation::TouchOnce | Activation::Unknown(0x0800_71A7) | Activation::Unknown(0x0802_266F)) {
+        if let Some(f) = w.field.as_mut() {
+            if f.loads == loads {
+                f.once_pending = Some(t.obj);
+            }
+        }
+        return;
+    }
     if !region && matches!(t.act, Activation::TouchOnce | Activation::Unknown(0x0800_71A7) | Activation::Unknown(0x0802_266F)) {
         if let Some(f) = w.field.as_mut() {
             if f.loads == loads && k < f.triggers.len() && f.triggers[k].obj == t.obj {
@@ -2203,6 +2224,7 @@ pub fn refresh_triggers(w: &mut World) {
     let Some(f) = w.field.as_mut() else { return };
     let (world, area, map) = (f.area.world, f.area.area, f.map.clone());
     f.triggers.clear();
+    f.once_pending = None;
     let Some(a) = fd.area(world, area) else { return };
     let exits = fd.maps.get(&map).map(|m| m.exits.clone()).unwrap_or_default();
     let list: Vec<ObjDef> = a.objects.iter().filter(|o| list_of(o) == 0).cloned().chain(exits).collect();
@@ -2278,6 +2300,11 @@ pub fn set_busy(w: &mut World, busy: bool) {
         }
         if !busy && f.busy {
             f.event_ended = true;
+            if let Some(obj) = f.once_pending.take() {
+                if let Some(k) = f.triggers.iter().position(|t| t.obj == obj) {
+                    f.triggers.remove(k);
+                }
+            }
             if std::mem::take(&mut f.break_cb) {
                 f.break_owed = frame + 1;
             }

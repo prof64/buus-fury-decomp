@@ -4129,3 +4129,8 @@ needs the trigger generation counter; next); walk-grid changes in a few 3-x / 4-
   `resync.py` also takes `--log FILE` (a private stop log; `--lag none` works as for wholerun.rs). **Side-content
   agent:** these are targeted edits to your resync.py / board.py - re-check if you have local changes there.
   **B owns the Super / Kid Buu no-lag stops from 1,354,525 on** (the Super Buu agent is on pixel comparison).
+  *Result:* `resync.py --lag none --from 1354525 --log work/db57/stops_none_b.jsonl`: **0 stops - the no-lag run from
+  the cut after the known range is exact (RNG, area, position, depth, flags, and the leader's HP with `WR_HP=1`) on
+  every logic row to the recording's end, 1,668,052 (072_the_end, the credits)** - the rest of Super Buu, Kid Buu and
+  the ending need no fix. With the 191,430 run (exact to 1,339,017) and the known range, the no-lag whole run from
+  Earth 7-x to the credits has no open stop of B's.

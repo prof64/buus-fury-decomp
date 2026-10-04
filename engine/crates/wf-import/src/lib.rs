@@ -2505,7 +2505,7 @@ fn check(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
 /// reference count, handle +2); other blocks stay foreign
 /// the map's tile animations (0x03001A68: +4 the count, +8 + 8 i: s16 frame, s16 countdown, descriptor; ticked by
 /// `0x08009CC2`, set up by `0x08009B80` with frame 0 and countdown i + 1) -> the ticks since the load T they imply
-/// (the smallest one all agree on, within one common period of our build's) -> `Field.entered_play`
+/// (the smallest one all agree on: the pictures repeat with the periods) -> `Field.entered_iter`
 fn import_tile_anims(w: &mut World, ram: &GbaRam) {
     const A: u32 = 0x0300_1A68;
     let n = ram.r32(A + 4).min(64);
@@ -2539,9 +2539,8 @@ fn import_tile_anims(w: &mut World, ram: &GbaRam) {
         return;
     }
     let Some(t) = (0..200_000u32).find(|&t| fits(t)) else { return };
-    let play = w.story.play_frames;
     if let Some(f) = w.field.as_mut() {
-        f.entered_play = play.saturating_sub(t as u64);
+        f.entered_iter = f.iters.wrapping_sub(t);
     }
 }
 
@@ -2770,8 +2769,8 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
         // (made before anything the replay makes: a stamp below the next object's)
         let popup_at = pops.iter().map(|&(h, _, _)| (h, stamp.saturating_sub(1))).collect();
         // the stat-points mark's draw counter (vt 0x0804C070 +0x14)
-        let play = w.story.play_frames as u32;
-        let stat_at = ram.objects().into_iter().find(|&o| ram.r32(o) == 0x0804_C070).map(|o| play.wrapping_sub(ram.r32(o + 0x14))).unwrap_or(0);
+        let it = f.iters;
+        let stat_at = ram.objects().into_iter().find(|&o| ram.r32(o) == 0x0804_C070).map(|o| it.wrapping_sub(ram.r32(o + 0x14))).unwrap_or(0);
         f.vram = Some(VramState { a, owners, shared_rc, suspended: vec![], hud_out: vec![], popups, keyed, stashed: None, delayed: vec![], objs, susp: vec![], shadow_set: vec![], popup_at, pass_at: 0, stat_at });
     }
 }

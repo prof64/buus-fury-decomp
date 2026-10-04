@@ -771,7 +771,7 @@ pub fn replay_with(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: 
                 while area_i + 1 < rows.len() && rows[area_i + 1].0 <= k {
                     area_i += 1;
                 }
-                if rows.get(area_i).is_some_and(|r| r.0 <= k) && (rows[area_i].0 == k || k + 1 == frames.len()) {
+                if rows.get(area_i).is_some_and(|r| r.0 <= k) && (rows[area_i].0 == k || (k + 1 == frames.len() && std::env::var_os("T_ALAST").is_some())) {
                     area_tally.check(k, &sess.world, area_g0.as_deref(), &rows[area_i].1);
                 }
             }

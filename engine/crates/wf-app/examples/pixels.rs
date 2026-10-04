@@ -5,7 +5,9 @@
 //! compared pixel for pixel. Only frames inside the segment's matched prefix count (an actor difference is the
 //! harness's, not the picture's). Per segment: frames compared, pixel-exact frames, and the differing pixels sorted
 //! into classes; `PIX_OUT=dir` writes `game | ours | diff` PNGs of differing frames (`PIX_MAX` per segment, 4),
-//! `PIX_FB=dir` the .fb directory, `PIX_JSON=file` the per-frame results.
+//! `PIX_FB=dir` the .fb directory, `PIX_JSON=file` the per-frame results, `PIX_LOCK=file` the pixel gate's lock
+//! (`data/segments/pixels.json`, read by `tests/pixels.rs`): every segment whose sampled frames are all exact, with
+//! each frame's hash of the game's picture.
 
 use std::collections::BTreeMap;
 use std::io::{BufRead, Read};
@@ -34,6 +36,18 @@ fn read_fb(p: &Path) -> Option<(Vec<usize>, Vec<Vec<u32>>)> {
         out.push(b.chunks(3).map(|c| 0xFF00_0000 | (c[0] as u32) << 16 | (c[1] as u32) << 8 | c[2] as u32).collect());
     }
     Some((frames, out))
+}
+
+/// FNV-1a 64 over the picture's ARGB words (little-endian): the pixel gate's frame hash (tests/pixels.rs)
+fn hash(px: &[u32]) -> u64 {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for c in px {
+        for b in c.to_le_bytes() {
+            h ^= b as u64;
+            h = h.wrapping_mul(0x0100_0000_01b3);
+        }
+    }
+    h
 }
 
 fn save(p: &Path, imgs: &[&[u32]]) {
@@ -138,6 +152,7 @@ fn main() {
     let mut renderer = Renderer::new();
     let mut all: BTreeMap<String, (usize, usize)> = BTreeMap::new();
     let mut json_out = vec![];
+    let mut lock = serde_json::Map::new();
     let (mut tot_frames, mut tot_exact) = (0usize, 0usize);
     for a in &args {
         let p = PathBuf::from(a);
@@ -241,11 +256,22 @@ fn main() {
             counted.iter().find(|r| r.2 > 0).map(|r| (r.0, r.1.clone(), r.2)),
             classes
         );
+        if !counted.is_empty() && exact == counted.len() {
+            let fr: Vec<serde_json::Value> = counted.iter().map(|r| serde_json::json!([r.0, format!("{:016x}", hash(&game[at[&r.0]]))])).collect();
+            lock.insert(name.clone(), serde_json::Value::Array(fr));
+        }
         json_out.push(serde_json::json!({"segment": name, "frames": counted.len(), "exact": exact, "results": counted.iter().map(|r| serde_json::json!([r.0, r.1, r.2])).collect::<Vec<_>>()}));
     }
     println!("total: {tot_exact} / {tot_frames} sampled frames pixel-exact");
     for (c, (frames, firsts)) in &all {
         println!("  {c}: {frames} frames{}", if *firsts > 0 { format!(", first of {firsts} segments") } else { String::new() });
+    }
+    if let Ok(p) = std::env::var("PIX_LOCK") {
+        let doc = serde_json::json!({
+            "note": "pixel gate (engine/crates/wf-app/tests/pixels.rs): segments whose sampled frames all render exactly as the game's screen; per segment [video frame, FNV-1a 64 of the game's 240x160 ARGB picture]. Written by `PIX_LOCK=data/segments/pixels.json cargo run --release -p wf-app --example pixels -- data/segments/*.json` (screens: work/superbuu/pix/dump.py)",
+            "segments": lock,
+        });
+        std::fs::write(p, serde_json::to_string_pretty(&doc).unwrap()).unwrap();
     }
     if let Ok(p) = std::env::var("PIX_JSON") {
         std::fs::write(p, serde_json::to_string(&json_out).unwrap()).unwrap();

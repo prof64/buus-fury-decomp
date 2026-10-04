@@ -82,15 +82,9 @@ pub fn diff(w: &World, g0: Option<&[u8]>, game: &BTreeMap<String, Value>) -> Vec
         let _ = VT_EVENT;
         theirs.push((a[1], a[2], a[3], a[4], a[5]));
     }
+    // (ours is the game's list reversed: the game scans its list last to first, ours first to last - the same order)
     let mut ours = ours;
-    match std::env::var("T_AORD").as_deref() {
-        Ok("rev") => ours.reverse(),
-        Ok("sort") => {
-            ours.sort();
-            theirs.sort();
-        }
-        _ => {}
-    }
+    ours.reverse();
     if ours != theirs {
         let fmt = |v: &[(i64, i64, i64, i64, i64)]| v.iter().map(|t| format!("({},{},{},{} r{})", t.0, t.1, t.2, t.3, t.4)).collect::<Vec<_>>().join(" ");
         // the first difference and the counts (whole lists are long)
