@@ -946,7 +946,7 @@ fn import_objects(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
         match key.0 {
             0 => {
                 patch_enemy(w, i, ram, o, rows.get(&o).copied(), notes);
-                place_enemy(w, id, key.1, ox, oy);
+                place_enemy(w, id, key.1, ox, oy, rows.get(&o).map(|r| r.0));
             }
             _ => {
                 let mut pup = None;
@@ -1016,7 +1016,10 @@ fn import_objects(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
 /// area's nearest unclaimed def of its type (its on-defeat callback), else a run-time enemy `ObjRef::List(0xff, type)`
 /// - so its death runs the type's drop script and the callback like the load's (real run 4-1 tile r002_006+11,000:
 /// a bandit knocked down at f32 is gone at f49; the game's drop script draws 4 x rand / 6 x chance at f57)
-fn place_enemy(w: &mut World, id: wf_core::world::EntityId, ty: i32, ox: i32, oy: i32) {
+/// (`sprite`: the RAM actor's sprite - placements of one type at one spot differ by it and by their callbacks: real
+/// run 7-6, the tournament's two Trunks placements (list 1 #2 sprite 123 -> s300, #3 sprite 124 -> s301, both made by
+/// scripts at (344, 600)); the nearest of the matching sprite first)
+fn place_enemy(w: &mut World, id: wf_core::world::EntityId, ty: i32, ox: i32, oy: i32, sprite: Option<i32>) {
     let Some(f) = w.field.as_ref() else { return };
     if f.placed.iter().any(|p| p.0 == id) {
         return;
@@ -1028,7 +1031,9 @@ fn place_enemy(w: &mut World, id: wf_core::world::EntityId, ty: i32, ox: i32, oy
         .iter()
         .filter(|d| !claimed.contains(&d.at))
         .filter_map(|d| match &d.kind {
-            wf_core::fieldcontent::ObjKind::Enemy { ty: t, x, y, .. } if *t == ty => Some((d.at, ((*x - (ox >> 8)).abs() + (*y - (oy >> 8)).abs()) as i64)),
+            wf_core::fieldcontent::ObjKind::Enemy { ty: t, x, y, sprite: sp, .. } if *t == ty => {
+                Some((d.at, (sprite.is_some_and(|s| s != *sp), ((*x - (ox >> 8)).abs() + (*y - (oy >> 8)).abs()) as i64)))
+            }
             _ => None,
         })
         .min_by_key(|x| x.1)

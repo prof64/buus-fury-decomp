@@ -36,6 +36,41 @@ class ShipDriver2(ShipDriver):
     blasty = False
     split = staticmethod(split2)
 
+    def in_flame(self, e, px, py, margin=44):
+        """ShipDriver's, but never at the room's left edge: walk_keys waited there for a Destroyer's flames to stop
+        (a step left into the exit stays in their line) while it walked up and burned Gohan (8-59's left exit)"""
+        if px < 40:
+            return False
+        return super().in_flame(e, px, py, margin)
+
+    def flame_guard(self, e, s):
+        """ShipDriver's, but not at the room's left edge (as in_flame): with the wall behind, the guard turned Gohan
+        to block the flames instead of stepping out through the exit"""
+        if s['p'] is not None and s['p'][0] < 40:
+            return None
+        return super().flame_guard(e, s)
+
+    def heal_step(self, e):
+        """ShipDriver's healing menu with the DOWN presses 50 frames apart (20 apart some are dropped: with more than
+        one kind of food in the Inventory the wrong row - Miso Soup, 20 HP - was eaten)"""
+        h = self.heal
+        if h is None or h['phase'] != 'open':
+            return super().heal_step(e)
+        h['t'] += 1
+        if h['t'] <= 2:
+            return KEY.START
+        if status(e)['p'] is None:
+            prog = [(0, 0, 70), (RS, 3, 60)] + [(D, 3, 50)] * h['row'] + [(A, 3, 40), (A, 3, 80), (B, 3, 60)]
+            self.prog = []
+            for m, on, off in prog:
+                self.prog += [m] * on + [0] * off
+            self.heal = None
+            return self.prog.pop(0)
+        if h['t'] > 40:
+            self.heal = None
+            self.heal_cool = 20
+        return 0
+
     def fightp(self, e, s, g):
         # 'blasty': the selected skill first, at any enemy in line, while the EP lasts (run 1 punched)
         if self.blasty and s['p'] is not None and s['scene'] == 0:
@@ -214,13 +249,13 @@ def goals_run2(e):
         ('mode', 'blasty', False),
         nav(8, 1, False), ('walk', 148, 186), *charsel(-1),                                  # Gohan
         # --- Papaya Island: the equipment stall (run 1 never bought or wore any here): Leather Gloves, Leather
-        # Moccasins, worn by Gohan; then food: Miso Soup, a Rice Ball, four Onigiri ---------------------------------
+        # Moccasins, worn by Gohan; then food: four Onigiri, a Miso Soup ---------------------------------
         nav(8, 1, False), ('walk', 280, 266), ('face', 'U'), ('press', A), ('wait', 60),
         ('fly', 1953, 2041, 143, 159), ('wait', 30),                                         # Papaya Island 7-1
         nav(7, 2, False), ('mark', 'r05_shop'),
         *stall(188, 472, [(0, 1), (2, 1)]),
         equip2(1), equip2(2),
-        *stall(276, 592, [(0, 1), (1, 1), (3, 4)]),
+        *stall(276, 592, [(4, 4)]), *stall(276, 592, [(0, 1)]),     # (a DOWN right after a purchase is dropped)
         nav(7, 1, False), ('walk', 224, 340), ('face', 'U'), ('press', A), ('wait', 60),
         ('fly', 849, 1785, 31, 23), ('wait', 30),                                            # Southwest Forest
         nav(8, 16, False), ('wait', 30),
@@ -239,10 +274,10 @@ def ship_main(e):
                       ('until', 8, 28), ('wait', 30), ('mark', 'c07c_continued'),
                       ('unstick',), ('walk', 60, 306), *charsel(-2)]
     k = g.index(('mark', 'c09_8-41'))
-    # Gohan; run 2's Gohan (less END than run 1's) died in stage 3 at level 103: the six fighters next door (8-42)
-    # to level 106 first, points now END-heavy, then rest at the save point
-    g[k + 1:k + 1] = [('walk', 60, 314), *charsel(1), ('mark', 'c09b_grind'),
-                      ('mode', 'split', lambda n: [n // 4, 0, n - n // 4, 0]),
-                      ('grind', 106, [(8, 42), (8, 41)]), nav(8, 41, False),
-                      *rest_at(60, 314, 1, 1)]
+    # Gohan, rested full at the save point first (Goten stands in)
+    g[k + 1:k + 1] = [('walk', 60, 314), *charsel(1), ('mark', 'c09b_rest'), *rest_at(60, 314, 1, 1)]
+    # stage 3 walked past the room fights (run 1 fought them): the fight guards kept Gohan blocking a Destroyer's
+    # flames beside 8-59's exit until he died
+    k1 = g.index(('mark', 'c11_8-66'))
+    g[k:k1] = [('nav', x[1], x[2], False) if x[0] == 'nav' else x for x in g[k:k1]]
     return g

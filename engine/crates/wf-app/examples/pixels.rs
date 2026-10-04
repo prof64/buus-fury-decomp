@@ -303,6 +303,9 @@ fn main() {
                                 eprintln!("  ent {} sprite {:?} anim {:?} t {} facing {} shown {:?}", e.id, a.sprite, a.anim, a.anim_t, a.facing, wf_core::scene::shown_anim(w, i));
                             }
                         }
+                        for v in &w.scene.visuals {
+                            eprintln!("  visual {:?} at ({}, {}) owner {} t {} cam {:?}", v.kind, v.x, v.y, v.owner, v.t, (w.cameras[0].x, w.cameras[0].y));
+                        }
                         eprintln!("trace {k} frame {} fc0 {} play {} menu {} anim {:?} stat {:?} boss {:?} screen {:?} fade_black {} pal {:?}", w.frame, w.g.fc0, w.story.play_frames, view.menu.is_some(), view.map.as_ref().map(|m| (m.anim_frame, m.tile_frame)), (view.hud.first().map(|h| h.stat_mark), w.field.as_ref().and_then(|f| f.vram.as_ref()).map(|v| v.stat_at)), view.boss_bars, w.scene.screen, view.fade_black, view.palette_fade);
                     }
                 }

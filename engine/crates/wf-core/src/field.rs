@@ -3110,6 +3110,11 @@ pub struct SavedWorld {
     /// 8-16 s319's Kibito)
     #[serde(default)]
     pub puppets: Vec<crate::scene::Puppet>,
+    /// the script's BG control: the snapshot copies the scene object with its DISPCNT / BGxCNT / BLDCNT shadows, so
+    /// the return writes them back (sb_006 6-6: hide_bg(0) before the Watch This! scene in 6-1; after the return the
+    /// Time Chamber's BG0 capsule stayed hidden, shadow 0x030019A4+0xA2 restored by the copy at f2,077)
+    #[serde(default)]
+    pub layers: Option<crate::scene::Layers>,
 }
 
 pub fn save_world(w: &World) -> SavedWorld {
@@ -3125,6 +3130,7 @@ pub fn save_world(w: &World) -> SavedWorld {
         walk_layer: w.col.as_ref().and_then(|c| c.walk.clone()),
         cam: w.scene.cam.clone(),
         puppets: w.scene.puppets.clone(),
+        layers: Some(w.scene.screen.layers.clone()),
     }
 }
 
@@ -3132,6 +3138,9 @@ pub fn save_world(w: &World) -> SavedWorld {
 pub fn restore_world(w: &mut World, s: SavedWorld) {
     w.scene.offstage.clear();
     w.scene.cam = s.cam;
+    if let Some(l) = s.layers {
+        w.scene.screen.layers = l;
+    }
     w.ents = s.ents;
     w.enemies = s.enemies;
     w.field = s.field;

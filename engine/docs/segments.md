@@ -49,6 +49,15 @@ save has no save slot in the app (the importer does not carry the EEPROM slot) -
 *Gate meanwhile:* run 1 stays strict; run 2 is a ratchet - `data/realrun2/expected.json` holds its first
 difference row (31,497); check.sh fails only when run 2's first difference (stop or sound) comes earlier, prints
 `IMPROVED` and bumps the file when it comes later. Remove the file once run 2 is exact.
+*Claim (dungeon agent B, 2026-10-04, by the coordinator): run 2's fat-Buu and Janemba chapters* - segments after
+`s_ship` in `route2.SEGMENTS` (names `f_*` fat, `j_*` Janemba), driven by `tools/run2/fat2.py` (my file; it calls the
+dungeon / ship drivers, it does not change them) and appended to `work/run2/keys.json` through `play2.py` (one
+small hook there: a segment whose goals are `('EXT', name)` is driven by `fat2.drive`). Side-content agent: route2.py
+/ play2.py stay yours - I add only the SEGMENTS entries and that hook, and say so here when I touch them. Choices
+(input only, all different from run 1): dungeon order Airship -> Fukurou -> Pyramid -> Desert -> Pilaf -> Thieves ->
+Nataday (run 1: Thieves, Pilaf, Desert, Airship, Fukurou, Pyramid, Nataday), grinding elsewhere, other party
+leaders in the dungeons, supplies bought / used, a death with Continue. Developed on run 1's fat start
+(`work/ship/real4b/c15_after_buu.ss`) until `s_ship` is recorded, then played from run 2's own ship end.
 
 ## 1. One-command workflow
 
@@ -4734,3 +4743,17 @@ rate from text speed stays with the Earth agent.
   recorded, harness 855 / 855).
 Checks: gates green; whole-run cut points 311 / 315 (unchanged); area-entry cuts + tiles only gains (above +
 r067_071_14-2+001000 374 -> 788); wf-core battle rules untouched.
+
+**Ship fix agent, 2026-10-04: play time after a menu; the Time Chamber capsule (by the coordinator).**
+* **Play time on a menu's close frame** (session.rs `step_post_world`): the iteration a menu screen's fade-in ends
+  in is the menu's; its play frame is counted by the menu step, so the field's rules (`field::post_step`) do not
+  count it again. Our play time ran one frame ahead after each pause menu (rclose_044_015 f592 -> Status TIME 4:56
+  vs 4:57 at the next pause menu, f690 exact now).
+* **The "Watch This prop" was BG0, not a prop** (sb_006 6-6 / sb_007 6-9): the Time Chamber map's BG0 holds the
+  capsule; the event hides it (`hide_bg(0)`, f117), then `load_scene` to 6-1 (Watch This!) and `return_to_field`.
+  The game's snapshot copies the scene object with its DISPCNT / BGxCNT / BLDCNT shadows (0x030019A4+0xA2), and the
+  restore (f2,077) writes them back: BG0 stays hidden. Ours reset the BG control at the scene's area load and never
+  got it back - `SavedWorld.layers` (field.rs) now carries `scene.screen.layers` through the save / restore.
+  sb_006 268 -> 349 / 856 exact, sb_007 340 / 852. The props themselves were already where the game's OAM has them.
+Checks: verify.sh green (wf-core / wf-script-core, gated segments, menu_parity, wf-app incl. tests/pixels.rs with the
+committed lock, ship rsegs 338 divergence None, cross_ts 36). Not re-locked (Super Buu agent: sb_006 / sb_007 gain).
