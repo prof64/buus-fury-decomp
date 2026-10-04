@@ -2809,6 +2809,7 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             // its def's animation table entry 0x54 / 4) the node is done at once - no sink. Real route 18-1
             // (r037_084): a hand hit by a ki blast while it rose stays in the hit's hold state; its state 0x117
             // lasts the Wait alone (182 frames, not 287)
+            if std::env::var("DBG_SINK").is_ok() && f == 1 { eprintln!("HANDSINK raw {} own {} hook {:?}", w.en_ref(i).ea.pos.raw, w.en_ref(i).own_state, w.en_ref(i).hook); }
             if w.field.is_some() && f == 1 && w.en_ref(i).ea.pos.raw != 18 {
                 return true;
             }

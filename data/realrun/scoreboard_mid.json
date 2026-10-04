@@ -1,29 +1,29 @@
 {
  "chapters": {
   "earth": {
-   "diverged": 40771,
-   "exact_tiles": 8,
+   "diverged": 3574,
+   "exact_tiles": 25,
    "frames": 52415,
    "own": 46426,
    "refused": 1,
    "segments": 1,
    "tiles": 52,
    "uncovered": 1000,
-   "verified": 10644
+   "verified": 47841
   },
   "fat": {
-   "diverged": 47644,
+   "diverged": 25119,
    "exact_tiles": 16,
    "frames": 75841,
    "own": 41039,
    "refused": 5,
    "segments": 6,
    "tiles": 72,
-   "uncovered": 3418,
-   "verified": 24657
+   "uncovered": 1747,
+   "verified": 48975
   },
   "janemba": {
-   "diverged": 6349,
+   "diverged": 1495,
    "exact_tiles": 1,
    "frames": 9123,
    "own": 7628,
@@ -31,35 +31,35 @@
    "segments": 1,
    "tiles": 8,
    "uncovered": 0,
-   "verified": 2651
+   "verified": 7628
   },
   "ship": {
-   "diverged": 6103,
+   "diverged": 0,
    "exact_tiles": 10,
    "frames": 19859,
    "own": 19859,
    "refused": 2,
    "segments": 1,
    "tiles": 19,
-   "uncovered": 2000,
-   "verified": 11756
+   "uncovered": 0,
+   "verified": 19859
   },
   "superbuu": {
-   "diverged": 83341,
+   "diverged": 64089,
    "exact_tiles": 68,
    "frames": 190533,
    "own": 64526,
    "refused": 16,
    "segments": 18,
    "tiles": 178,
-   "uncovered": 15008,
-   "verified": 91588
+   "uncovered": 14008,
+   "verified": 112436
   }
  },
  "segments": [
   {
    "chapter": "ship",
-   "diverged": 6103,
+   "diverged": 0,
    "exact_tiles": 10,
    "frames": 19859,
    "own": 19859,
@@ -115,12 +115,12 @@
    ],
    "stretch": "000_ship_c14",
    "tiles": 19,
-   "uncovered": 2000,
-   "verified": 11756
+   "uncovered": 0,
+   "verified": 19859
   },
   {
    "chapter": "fat",
-   "diverged": 15567,
+   "diverged": 7857,
    "exact_tiles": 2,
    "frames": 20336,
    "own": 10596,
@@ -222,7 +222,7 @@
    "stretch": "002_d04_bandana",
    "tiles": 20,
    "uncovered": 336,
-   "verified": 4433
+   "verified": 12143
   },
   {
    "chapter": "fat",
@@ -242,8 +242,8 @@
    ],
    "stretch": "004_d10_map",
    "tiles": 2,
-   "uncovered": 671,
-   "verified": 2000
+   "uncovered": 0,
+   "verified": 2671
   },
   {
    "chapter": "fat",
@@ -303,7 +303,7 @@
   },
   {
    "chapter": "fat",
-   "diverged": 1000,
+   "diverged": 604,
    "exact_tiles": 0,
    "frames": 3122,
    "own": 1518,
@@ -325,11 +325,11 @@
    "stretch": "012_db5_a01",
    "tiles": 2,
    "uncovered": 1000,
-   "verified": 1000
+   "verified": 1518
   },
   {
    "chapter": "fat",
-   "diverged": 1956,
+   "diverged": 1144,
    "exact_tiles": 0,
    "frames": 3411,
    "own": 1856,
@@ -356,11 +356,11 @@
    "stretch": "012_db5_a01",
    "tiles": 3,
    "uncovered": 411,
-   "verified": 1044
+   "verified": 1856
   },
   {
    "chapter": "fat",
-   "diverged": 20517,
+   "diverged": 6910,
    "exact_tiles": 12,
    "frames": 36816,
    "own": 24002,
@@ -429,9 +429,9 @@
      "Some((152, \"text: game opens a text box: true, ours: false\"))"
     ],
     [
-     17087,
-     "position / facing",
-     "Some((87, \"dir: #21 sprite 123: 0 vs game 1\"))"
+     17000,
+     "animation",
+     "Some((0, \"anim: #21 sprite 123: raw 22 cel 8 tick 69 vs game raw 22 cel 10 tick 68\"))"
     ],
     [
      18001,
@@ -491,12 +491,12 @@
    ],
    "stretch": "033_x05_s026",
    "tiles": 36,
-   "uncovered": 1000,
-   "verified": 15299
+   "uncovered": 0,
+   "verified": 29906
   },
   {
    "chapter": "janemba",
-   "diverged": 6349,
+   "diverged": 1495,
    "exact_tiles": 1,
    "frames": 9123,
    "own": 7628,
@@ -543,11 +543,11 @@
    "stretch": "049_j_sj2",
    "tiles": 8,
    "uncovered": 0,
-   "verified": 2651
+   "verified": 7628
   },
   {
    "chapter": "superbuu",
-   "diverged": 4575,
+   "diverged": 3157,
    "exact_tiles": 13,
    "frames": 20084,
    "own": 11557,
@@ -589,11 +589,11 @@
    "stretch": "052_m_gotenks",
    "tiles": 19,
    "uncovered": 0,
-   "verified": 15425
+   "verified": 16927
   },
   {
    "chapter": "superbuu",
-   "diverged": 10206,
+   "diverged": 7531,
    "exact_tiles": 6,
    "frames": 24489,
    "own": 4688,
@@ -695,7 +695,7 @@
    "stretch": "052_m_gotenks",
    "tiles": 24,
    "uncovered": 3000,
-   "verified": 11283
+   "verified": 13958
   },
   {
    "chapter": "superbuu",
@@ -720,7 +720,7 @@
   },
   {
    "chapter": "superbuu",
-   "diverged": 2743,
+   "diverged": 2357,
    "exact_tiles": 3,
    "frames": 7327,
    "own": 3527,
@@ -752,11 +752,11 @@
    "stretch": "057_g03_gohan141",
    "tiles": 7,
    "uncovered": 1000,
-   "verified": 3584
+   "verified": 3970
   },
   {
    "chapter": "superbuu",
-   "diverged": 5196,
+   "diverged": 3196,
    "exact_tiles": 9,
    "frames": 16442,
    "own": 5251,
@@ -803,11 +803,11 @@
    "stretch": "061_g05_goku141",
    "tiles": 16,
    "uncovered": 0,
-   "verified": 11246
+   "verified": 13246
   },
   {
    "chapter": "superbuu",
-   "diverged": 13773,
+   "diverged": 12950,
    "exact_tiles": 3,
    "frames": 26177,
    "own": 2176,
@@ -929,11 +929,11 @@
    "stretch": "062_m_inside_buu",
    "tiles": 25,
    "uncovered": 8000,
-   "verified": 4227
+   "verified": 5227
   },
   {
    "chapter": "superbuu",
-   "diverged": 15529,
+   "diverged": 7277,
    "exact_tiles": 4,
    "frames": 20500,
    "own": 12723,
@@ -1025,7 +1025,7 @@
    "stretch": "064_m_kid_buu_saga",
    "tiles": 20,
    "uncovered": 0,
-   "verified": 4971
+   "verified": 13223
   },
   {
    "chapter": "superbuu",
@@ -1076,7 +1076,7 @@
   },
   {
    "chapter": "superbuu",
-   "diverged": 1424,
+   "diverged": 1573,
    "exact_tiles": 0,
    "frames": 2149,
    "own": 576,
@@ -1181,7 +1181,7 @@
   },
   {
    "chapter": "superbuu",
-   "diverged": 1913,
+   "diverged": 1925,
    "exact_tiles": 0,
    "frames": 2012,
    "own": 87,
@@ -1223,7 +1223,7 @@
   },
   {
    "chapter": "superbuu",
-   "diverged": 1828,
+   "diverged": 2002,
    "exact_tiles": 0,
    "frames": 2174,
    "own": 166,
@@ -1244,7 +1244,7 @@
   },
   {
    "chapter": "superbuu",
-   "diverged": 18499,
+   "diverged": 14466,
    "exact_tiles": 30,
    "frames": 55831,
    "own": 20168,
@@ -1348,9 +1348,9 @@
      "Some((522, \"area: (4, 1, 1) vs game (19, 3, 1)\"))"
     ],
     [
-     44099,
-     "other",
-     "Some((122, \"area: (4, 1, 1) vs game (19, 3, 1)\"))"
+     44008,
+     "animation",
+     "Some((8, \"anim: #14 sprite 181: raw 13 cel 1 tick 8 vs game raw 13 cel 0 tick 152\"))"
     ],
     [
      47011,
@@ -1380,13 +1380,13 @@
    ],
    "stretch": "069_k05_vegeta150",
    "tiles": 55,
-   "uncovered": 1000,
-   "verified": 36332
+   "uncovered": 0,
+   "verified": 41365
   },
   {
    "chapter": "earth",
-   "diverged": 40771,
-   "exact_tiles": 8,
+   "diverged": 3574,
+   "exact_tiles": 25,
    "frames": 52415,
    "own": 46426,
    "own_first": "Some((46426, \"rng: [528efd5c, 5e494666] vs game [0b13ffab, f36ef4ea]\"))",
@@ -1419,19 +1419,9 @@
      "Some((0, \"cam: (243.19140625, 332.447265625) vs game (243.1923828125, 332.44921875)\"))"
     ],
     [
-     7000,
+     8013,
      "RNG",
-     "Some((0, \"rng: [b2f3b2c2, 233b72f4] vs game [96841dc7, b68a7277]\"))"
-    ],
-    [
-     8000,
-     "RNG",
-     "Some((0, \"rng: [e3e4e62a, 7074bc66] vs game [96c41efd, 1f1ca5bf]\"))"
-    ],
-    [
-     9000,
-     "RNG",
-     "Some((0, \"rng: [6e377127, 455d05ae] vs game [345e2836, 05452db7]\"))"
+     "Some((13, \"rng: [1de73f0b, 43d27031] vs game [63608b4d, 47a6d2d4]\"))"
     ],
     [
      10029,
@@ -1439,59 +1429,24 @@
      "Some((29, \"vram: used blocks (start, size) ours only [], game only [(333, 8)]\"))"
     ],
     [
-     11000,
-     "RNG",
-     "Some((0, \"rng: [98f455c7, 882734cd] vs game [13e726f5, 548b588e]\"))"
-    ],
-    [
      12000,
      "position / facing",
      "Some((0, \"hp: 152 vs game 157\"))"
     ],
     [
-     13000,
-     "RNG",
-     "Some((0, \"rng: [58bf15ea, 2ded2ded] vs game [7667ffb6, 03fbb8ce]\"))"
+     14642,
+     "position / facing",
+     "Some((642, \"pos: #14 sprite 261: (355.28125, 302.7109375) vs game (355.171875, 302.11328125)\"))"
     ],
     [
-     14000,
-     "RNG",
-     "Some((0, \"rng: [b851491f, 0e2c77d1] vs game [b5317241, c2a7e4d6]\"))"
+     19007,
+     "sprite memory",
+     "Some((7, \"vram: used blocks (start, size) ours only [(285, 4)], game only []\"))"
     ],
     [
-     15625,
+     21932,
      "RNG",
-     "Some((625, \"rng: [9af586c9, c0fba661] vs game [5d3ae55b, 532aee46]\"))"
-    ],
-    [
-     16000,
-     "RNG",
-     "Some((0, \"rng: [d69e4b32, 1ff6017a] vs game [c69c06d9, c37ee506]\"))"
-    ],
-    [
-     17000,
-     "RNG",
-     "Some((0, \"rng: [24006711, ffbc7a09] vs game [d970598b, dd66f1d5]\"))"
-    ],
-    [
-     18000,
-     "RNG",
-     "Some((0, \"rng: [58c2b2f1, 2ca4a119] vs game [772ace7b, 1c7d2ea3]\"))"
-    ],
-    [
-     19000,
-     "RNG",
-     "Some((0, \"rng: [db69e91c, d41d218b] vs game [0a288406, ad33606b]\"))"
-    ],
-    [
-     20360,
-     "RNG",
-     "Some((360, \"rng: [a7397921, f74c5fe2] vs game [5d496a70, 9ddcbd56]\"))"
-    ],
-    [
-     21000,
-     "RNG",
-     "Some((0, \"rng: [a8df9b6b, 9cbb2d74] vs game [37107aa8, db1c391b]\"))"
+     "Some((932, \"rng: [866fa560, d2512e0c] vs game [ed1832e0, 24362f57]\"))"
     ],
     [
      22045,
@@ -1499,69 +1454,29 @@
      "Some((45, \"fade: black false vs game true\"))"
     ],
     [
-     23000,
-     "RNG",
-     "Some((0, \"rng: [92c79b15, e21c6e82] vs game [778f3904, 60997522]\"))"
-    ],
-    [
-     24000,
-     "RNG",
-     "Some((0, \"rng: [064f9ad6, 54ce90fd] vs game [5dd5c7ba, f1729843]\"))"
-    ],
-    [
-     25000,
-     "RNG",
-     "Some((0, \"rng: [c2af64dc, 25e6724b] vs game [36923619, 809e959c]\"))"
-    ],
-    [
-     26000,
-     "RNG",
-     "Some((0, \"rng: [ce72fe34, 4638f922] vs game [97064387, a0fce2a6]\"))"
-    ],
-    [
-     27000,
-     "RNG",
-     "Some((0, \"rng: [5999d11d, cf35f64a] vs game [93507bc4, ecb2f1a1]\"))"
-    ],
-    [
-     28000,
+     24370,
      "position / facing",
-     "Some((0, \"dir: #10 sprite 143: 3 vs game 2\"))"
+     "Some((370, \"pos: #14 sprite 261: (349.23046875, 311.01953125) vs game (349.2109375, 310.421875)\"))"
     ],
     [
-     29000,
-     "RNG",
-     "Some((0, \"rng: [5215c170, f1e8020a] vs game [a5097feb, 307b978d]\"))"
-    ],
-    [
-     30131,
+     26312,
      "position / facing",
-     "Some((131, \"dir: #9 sprite 143: 2 vs game 0\"))"
+     "Some((312, \"dir: #10 sprite 143: 2 vs game 1\"))"
     ],
     [
-     31000,
+     29008,
      "RNG",
-     "Some((0, \"rng: [4187a1b3, 81379c94] vs game [c564c2b0, ca8b7e03]\"))"
+     "Some((8, \"rng: [9cb66103, 9e07d4db] vs game [f3a53164, 367da352]\"))"
     ],
     [
-     32000,
-     "RNG",
-     "Some((0, \"rng: [9d46664c, 6f9cfc23] vs game [cf8ede9e, 4c9467b4]\"))"
+     33340,
+     "position / facing",
+     "Some((340, \"pos: #13 sprite 123: (344.47265625, 333.265625) vs game (344.54296875, 332.66796875)\"))"
     ],
     [
-     33000,
+     35462,
      "RNG",
-     "Some((0, \"rng: [a430d8e7, 18bd2c05] vs game [be41b95d, 725d816a]\"))"
-    ],
-    [
-     34327,
-     "RNG",
-     "Some((327, \"rng: [25570ac2, 7ff28398] vs game [57d044ab, 5216b079]\"))"
-    ],
-    [
-     35000,
-     "RNG",
-     "Some((0, \"rng: [565267ed, 5e7803bb] vs game [076627e5, fe94d20c]\"))"
+     "Some((462, \"rng: [70002231, b5ae6dd0] vs game [db7106ce, 939f5312]\"))"
     ],
     [
      38026,
@@ -1617,26 +1532,26 @@
    "stretch": "E2_earth",
    "tiles": 52,
    "uncovered": 1000,
-   "verified": 10644
+   "verified": 47841
   }
  ],
  "tile": 1000,
  "total": {
-  "diverged": 184208,
-  "exact_tiles": 103,
+  "diverged": 94277,
+  "exact_tiles": 120,
   "frames": 347771,
   "own": 179478,
   "refused": 24,
   "segments": 27,
   "tiles": 329,
-  "uncovered": 21426,
-  "verified": 141296,
+  "uncovered": 16755,
+  "verified": 236739,
   "whole_game": {
-   "diverged": 201718,
+   "diverged": 111787,
    "frames": 1668050,
-   "uncovered": 286452,
-   "verified": 1398771
+   "uncovered": 62049,
+   "verified": 1494214
   }
  },
- "tree": "f0e253f"
+ "tree": "dd201a8"
 }

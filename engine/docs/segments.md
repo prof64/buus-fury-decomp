@@ -1388,6 +1388,12 @@ page's own cycles built from its draw list; opt-in as before (`init.snd_phase`),
     nearest-boundary close allows (real run 2-9 rE2__050, 3.4k) and fixes the board's 18-2 row (r038_002, needed
     +1.7k). All 49 close cuts keep their result (the ones red now are an NPC facing regression from in-flight
     edits, the same with the old constant).
+  - **Thieves Den row 699, answered (Earth agent):** the soak stepped only the recording's logic rows, so the app's
+    sound hardware lost every lag frame (8-2 -> 8-3's load alone is 31): the DMA position and the load's song start
+    drifted from the game's. The soak now passes each lag row to `sndsim::lag_frame_ex` as the harness does - the
+    m_003 Thieves Den stretch matches in the app for all 92,783 rows (was 699). **The shipping app itself has no
+    lag-frame model** (a load is one frame there), so its menu timing still drifts after loads; giving it the
+    load's lag (an area-entry iteration estimate, like the close model's) is the open item.
   - **To the Earth agent (sound-driver state):** the soak's Thieves Den row 699 (§11 update 9) is the close at
     master frame 652: the reload base is identical in the app and the segment harness (7,214,210) but the app's
     interrupt mixes cost 956,804 + update 101,041 vs the harness's 1,127,537 + 124,251 (30 frames vs 31, the
