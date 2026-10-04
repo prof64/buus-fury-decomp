@@ -3157,3 +3157,8 @@ rule a 20-6 tile shows after its import is right goes to you via this doc.
   1,519 cuts and every gate unchanged otherwise; cross_ts and the battle lockstep green.
   My fat-arc import claim is done; left for the importer agent: the defeat job queued behind a running event
   (r002_006 +6,000).
+
+**Claim (side-content agent, 2026-10-04, by the coordinator): the whole-run end-to-end test** - the real run's key
+logs fed to the app from power-on (the soft reset, the board's start) with no RAM import anywhere, once with the
+recorded lag injected and once with the sim's own lag (`Options::sim_lag`), compared row by row with the emulator's
+whole-run recording (`tools/wholerun/`). Rows it stops on that belong to others go to their owners here.

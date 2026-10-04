@@ -465,7 +465,8 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
                 }
             }
             // SEGMENT_LAGCENSUS: each replayed lag run at its first frame - its length and what the sim was doing
-            if std::env::var_os("SEGMENT_LAGCENSUS").is_some() && k > 0 && i(&frames[k - 1]["lf"]) != lf || (k == 0 && std::env::var_os("SEGMENT_LAGCENSUS").is_some()) {
+            let run_start = k < 2 || i(&frames[k - 1]["lf"]) != i(&frames[k - 2]["lf"]);
+            if std::env::var_os("SEGMENT_LAGCENSUS").is_some() && run_start {
                 let n = frames[k..].iter().take_while(|n| i(&n["lf"]) == lf).count();
                 let w = &sess.world;
                 let prev_steps = if k > 0 { frames[k - 1]["steps"].to_string() } else { String::new() };

@@ -1362,7 +1362,10 @@ fn begin_fade_in(w: &mut World) {
     if let Some(f) = w.field.as_mut() {
         f.mode = Mode::FadeIn { k: 0 };
     }
-    if w.field.as_ref().is_some_and(|f| f.script_fade_in) && !crate::fieldworld::flying(w) && w.scene.screen.fade.is_none() && std::env::var_os("T_LC").is_some() {
+    // a script's warp_fade arrival writes the new area's palette up from black: a script's black screen from before
+    // the load is gone (1-5 f11,578: s464's fade_to_black, then warp_fade into 6-5 - it brightens with no
+    // fade_from_black; exits and the world map keep theirs)
+    if w.field.as_ref().is_some_and(|f| f.script_fade_in) && !crate::fieldworld::flying(w) && w.scene.screen.fade.is_none() {
         w.scene.screen.black = 0;
         w.scene.screen.dim = 0;
     }

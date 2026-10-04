@@ -74,6 +74,10 @@ def cut_one(job):
     e = start_emu(str(REAL / 'segs' / d / 'states' / f'{seg}.ss'))
     m = min(g1 + AFTER, len(KEYS)) - g0
     init, objs, rows = sg.record(e, lambda j, _e: KEYS[g0 + j], m)
+    # (compared as the main board's segments: rec_segments.py records no sprite-allocator rows)
+    init.pop('vram', None)
+    for r in rows:
+        r.pop('vram', None)
     # the load: the rows between this segment's end and the next one's start (kind from the game's rows)
     a, b = rows[n - 1], rows[min(g1 - g0, len(rows) - 1)]
     depth = max(r.get('depth', 0) for r in rows[n:g1 - g0]) if g1 - g0 > n else 0

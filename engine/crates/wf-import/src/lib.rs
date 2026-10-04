@@ -1016,44 +1016,52 @@ fn import_enemy_beam(w: &mut World, ei: usize, ram: &GbaRam, o: u32, notes: &mut
     }
 }
 
-/// Super Buu's ball in flight at the cut (the ThrowBigBall node; builder 0x08021280, vt 0x0804A33C, owner +0x1C:
-/// +0x20 / +0x24 24.8 position, +0x40 ticks since it was made, +0x44 thrown, +0x48 / +0x4C the throw's step): the
-/// shot rebuilt with those numbers (thrown: its start the position at the throw = now - step x ticks since, its
-/// target the start + 43 steps), the node's frame count = the ball's ticks (it is made in the node's enter)
+/// Super Buu's balls at the cut (the ThrowBigBall node; builder 0x08021280, vt 0x0804A33C in the world list, owner
+/// +0x1C: +0x20 / +0x24 24.8 position, +0x40 ticks, +0x44 thrown, +0x48 burst, +0x4C / +0x50 the throw's step):
+/// * charging: the shot with those ticks (ours counts one behind: the shot is first updated the frame after its
+///   enter), the node's frame count = the ball's ticks (it is made in the node's enter);
+/// * thrown: its start the position at the throw (tick 0x3D) = now - step x ticks since, its target start + 43 steps;
+/// * bursting: the ball's own blast animation (6 records x 4 ticks, +0x40 the ticks since the impact) - ours the
+///   effect the impact made. Their blocks are the ball's (`import_vram`).
 fn import_super_ball(w: &mut World, ei: usize, ram: &GbaRam, o: u32, notes: &mut Vec<String>) {
     use wf_core::ai::K;
-    if std::env::var("DBGB").is_ok() { eprintln!("DBGB o {o:#x} balls {:x?}", ram.ewram_with(0x0804_A33C).iter().map(|&b| (b, ram.r32(b + 0x1C))).collect::<Vec<_>>()); }
-    let Some(b) = ram.ewram_with(0x0804_A33C).into_iter().find(|&b| ram.r32(b + 0x1C) == o) else { return };
-    let spots: Vec<(usize, usize)> = w.en_ref(ei).ai.stack.iter().enumerate().flat_map(|(l, s)| s.tree.nodes.iter().enumerate().filter(|(_, n)| n.k == K::ThrowBigBall).map(move |(n, _)| (l, n))).collect();
-    let Some(&(lvl, n)) = spots.first() else {
-        notes.push("a ball object of this enemy outside a ThrowBigBall node: not imported".into());
-        return;
-    };
+    const THROW: i32 = 0x3d;
     let me = w.ents[ei].id;
-    let (x, y, t, thrown) = (ram.s32(b + 0x20), ram.s32(b + 0x24), ram.s32(b + 0x40), ram.r8(b + 0x44) != 0);
-    if std::env::var("DBGB").is_ok() { eprintln!("DBGB ball t {t} thrown {thrown} spots {spots:?}"); }
-    let id = wf_core::shots::add(w, wf_core::shots::super_ball(me));
-    if let Some(k) = w.find(id) {
-        let s = w.shot(k);
-        s.x = x;
-        s.y = y;
-        if thrown {
-            let (vx, vy) = (ram.s32(b + 0x48), ram.s32(b + 0x4C));
-            let since = t - BALL_THROW;
-            let (sx, sy) = (x - vx * since, y - vy * since);
-            let (tx, ty) = (((sx + vx * 43 + 128) >> 8) << 8, ((sy + vy * 43 + 128) >> 8) << 8);
-            s.kind = wf_core::shots::ShotKind::SuperBall { phase: 1, sx, sy, tx, ty };
-            s.t = since as i64;
-        } else {
-            s.t = t as i64 - _env("BT0", 1);
+    for b in ram.objects().into_iter().filter(|&b| ram.r32(b) == 0x0804_A33C && ram.r32(b + 0x1C) == o) {
+        let (x, y, t, thrown) = (ram.s32(b + 0x20), ram.s32(b + 0x24), ram.s32(b + 0x40), ram.r8(b + 0x44) != 0);
+        if ram.r8(b + 0x48) != 0 {
+            let f = wf_core::fx::Fx::Anim { id: 0x0872_a5dc, x: x >> 8, y: y >> 8, rec: 9 + t / 4, left: 6 - t / 4, rate: 0x4000, acc: (t % 4) << 14 };
+            w.add(Body::Fx(Box::new(f)));
+            continue;
+        }
+        let id = wf_core::shots::add(w, wf_core::shots::super_ball(me));
+        if let Some(k) = w.find(id) {
+            let s = w.shot(k);
+            s.x = x;
+            s.y = y;
+            if thrown {
+                let (vx, vy) = (ram.s32(b + 0x4C), ram.s32(b + 0x50));
+                let since = t - THROW;
+                let (sx, sy) = (x - vx * since, y - vy * since);
+                let (tx, ty) = (((sx + vx * 43 + 128) >> 8) << 8, ((sy + vy * 43 + 128) >> 8) << 8);
+                s.kind = wf_core::shots::ShotKind::SuperBall { phase: 1, sx, sy, tx, ty };
+                s.t = since as i64;
+            } else {
+                s.t = t as i64 - 1;
+            }
+        }
+        let spots: Vec<(usize, usize)> = w.en_ref(ei).ai.stack.iter().enumerate().flat_map(|(l, s)| s.tree.nodes.iter().enumerate().filter(|(_, n)| n.k == K::ThrowBigBall).map(move |(n, _)| (l, n))).collect();
+        match spots.first() {
+            Some(&(lvl, n)) => {
+                if let Some(r) = w.en(ei).ai.stack.get_mut(lvl).and_then(|s| s.rt.get_mut(n)) {
+                    r.f = t;
+                }
+            }
+            None if !thrown => notes.push("a charging ball of this enemy outside a ThrowBigBall node".into()),
+            None => {}
         }
     }
-    if let Some(r) = w.en(ei).ai.stack.get_mut(lvl).and_then(|s| s.rt.get_mut(n)) {
-        r.f = t + _env("NT0", 0) as i32;
-    }
 }
-const BALL_THROW: i32 = 0x3d;
-fn _env(k: &str, d: i64) -> i64 { std::env::var(k).ok().and_then(|v| v.parse().ok()).unwrap_or(d) }
 
 /// a map NPC's behaviour step from RAM (talk-NPC object: +0x1B0 the current step object): a wander (vt 0x0804D848:
 /// +8 frames left, +0x18 / +0x1C 24.8 velocity, +0x20 / +0x24 target px) -> the behaviour's wander step, created as
@@ -1204,6 +1212,57 @@ fn build_mid(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner: &mut St
     Built { world: w, draws, held: 0, finished: true }
 }
 
+/// an Instant Transmission selection at the cut (the main loop's mode 0x0804D260, the world held): +4 the picks
+/// left, +8 the marker object (vt 0x0804E41C: +0x38 its frames, +0x3C / +0x40 the cursor 24.8, +0x44 / +0x48 its
+/// velocity), +0xC the candidates' count, +0x10 + 0x1C k a candidate {rect, +0x10 picked, +0x18 the object}. The
+/// picks' order is not kept here: picked candidates in list order (r062_001_20-6 +3,000 / +12,000)
+fn import_it_select(w: &mut World, pi: usize, ram: &GbaRam, notes: &mut Vec<String>) {
+    let mode = ram.r32(0x0300_0F90);
+    if !ram.valid(mode) || ram.r32(mode) != 0x0804_D260 {
+        return;
+    }
+    let mk = ram.r32(mode + 8);
+    let n = ram.s32(mode + 0xC).clamp(0, 16) as u32;
+    let mut cand = vec![];
+    for k in 0..n {
+        let r = mode + 0x10 + 0x1C * k;
+        let o = ram.r32(r + 0x18);
+        let (x, y) = (ram.s32(o + 0x1A0), ram.s32(o + 0x1A4));
+        match (0..w.ents.len()).find(|&e| !w.ents[e].removed && w.actor(e).is_some_and(|a| a.x == x && a.y == y)) {
+            Some(e) => cand.push((w.ents[e].id, ram.r32(r + 0x10) & 0xFF != 0)),
+            None => {
+                notes.push(format!("mid-area: Instant Transmission candidate {k} ({o:#x}) has no entity here (a trigger?)"));
+                return;
+            }
+        }
+    }
+    let picks: Vec<_> = cand.iter().filter(|c| c.1).map(|c| c.0).collect();
+    let left = ram.s32(mode + 4);
+    let serial = w.next_serial();
+    let sel = wf_core::player::ItSel {
+        serial,
+        n: left,
+        cand,
+        order: picks.iter().map(|&e| wf_core::player::ItPick::Ent(e)).collect(),
+        picks,
+        x: ram.s32(mk + 0x3C),
+        y: ram.s32(mk + 0x40),
+        vx: ram.s32(mk + 0x44),
+        vy: ram.s32(mk + 0x48),
+        cursor: left > 0,
+        tcand: vec![],
+    };
+    wf_core::player::import_state(w, pi, wf_core::player::Gs::Hold);
+    let me = w.ents[pi].id;
+    {
+        let p = w.pl(pi);
+        p.it_sel = Some(sel);
+        p.state = wf_core::player::PState::Skill;
+    }
+    let f = wf_core::fx::add(w, wf_core::fx::Fx::ItMarkers { t: ram.s32(mk + 0x38), alive: wf_core::fx::Alive::It { p: me, serial } });
+    w.modal = Some(vec![me, f]);
+}
+
 /// the leader's state machine (mid-area imports): the state object (+0x14) by its vtable -> our state, the
 /// animation from the recording's row (the animation-driven states - punch, hurt, once, ko - run on it)
 fn import_player_state(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
@@ -1221,6 +1280,39 @@ fn import_player_state(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
         0x0804_A730 => Some(16),
         _ => None,
     };
+    import_it_select(w, pi, ram, notes);
+    // an Instant Transmission run (state 0x0804E334, update 0x0801BB1A): +4 the facing at its start, +5 the pick it
+    // is on, +8 the picks' count, +0xC + 8k {kind byte (1 = a trigger), +4 the object}, +0x3C / +0x40 the px it
+    // returns to, +0x44 its frame count (-24 vanish, 0 the jump, 24 the punch); r062_001_20-6 +10,000
+    if ram.r32(st) == 0x0804_E334 {
+        let n = ram.s32(st + 8).clamp(0, 8) as u32;
+        let mut picks = vec![];
+        for k in 0..n {
+            let (kind, o) = (ram.r8(st + 0xC + 8 * k), ram.r32(st + 0x10 + 8 * k));
+            let (x, y) = (ram.s32(o + 0x1A0), ram.s32(o + 0x1A4));
+            let ent = (kind != 1).then(|| (0..w.ents.len()).find(|&e| !w.ents[e].removed && w.actor(e).is_some_and(|a| a.x == x && a.y == y))).flatten();
+            match ent {
+                Some(e) => picks.push(wf_core::player::ItPick::Ent(w.ents[e].id)),
+                None => {
+                    notes.push(format!("mid-area: Instant Transmission pick {k} (kind {kind}, {o:#x}) has no entity / trigger here"));
+                    return;
+                }
+            }
+        }
+        let targets = picks.iter().filter_map(|p| if let wf_core::player::ItPick::Ent(e) = p { Some(*e) } else { None }).collect();
+        let run = wf_core::player::ItRun { serial: 0, dir: ram.r8(st + 4) as _, idx: ram.r8(st + 5) as usize, targets, origin: (ram.s32(st + 0x3C), ram.s32(st + 0x40)), t: ram.s32(st + 0x44), picks };
+        wf_core::player::import_state(w, pi, Gs::Skill(14));
+        let row = ram.actor_rows.iter().find(|r| r.0 == po).copied();
+        let p = w.pl(pi);
+        p.it = Some(run);
+        p.a.hittable = false;
+        if let Some((_, _, raw, cel, tick)) = row {
+            p.ap.raw = raw;
+            p.ap.frame = cel;
+            p.ap.tick = tick;
+        }
+        return;
+    }
     if let Some(aid) = scripted {
         let rng = w.rng.clone();
         wf_core::scene::set_state(w, pi, aid);
@@ -1992,6 +2084,22 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
             if h != 0xFFFF {
                 owners.push((h, Owner::Popup));
                 pops.push((h, ram.s32(o + 0x10)));
+            }
+            continue;
+        }
+        // Super Buu's ball (vt 0x0804A33C, `import_super_ball`): its block belongs to the ball shot at its position
+        // (bursting: to its blast effect)
+        if vt == 0x0804_A33C {
+            let h = ram.r16(o + 0xC);
+            let (x, y) = (ram.s32(o + 0x20), ram.s32(o + 0x24));
+            let ent = (0..w.ents.len()).find(|&k| !used_ents.contains(&w.ents[k].id) && match &w.ents[k].body {
+                Body::Shot(s) => matches!(s.kind, wf_core::shots::ShotKind::SuperBall { .. }) && s.x == x && s.y == y,
+                Body::Fx(f) => matches!(**f, wf_core::fx::Fx::Anim { id: 0x0872_a5dc, x: fx, y: fy, .. } if fx == x >> 8 && fy == y >> 8),
+                _ => false,
+            });
+            if let (Some(k), true) = (ent, h != 0xFFFF) {
+                used_ents.push(w.ents[k].id);
+                owners.push((h, Owner::Ent(w.ents[k].id)));
             }
             continue;
         }

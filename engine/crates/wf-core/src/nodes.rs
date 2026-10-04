@@ -1447,7 +1447,26 @@ fn leaf_exit(w: &mut World, c: &C, n: u16, _r: &mut NodeRt) {
         K::ShockStun => w.en(i).stunned = false,
         // exit 0x0803BD06 (vt 0x0804ADC0 +8): SetAnim(0) - the idle enter's rand(255) (real run 20-6 r062_001 tile
         // +5,000 f45: Vegeta reaches his waypoint)
-        K::WanderToRandomPoint if w.field.is_some() => set_anim(w, i, &[nm("idle")], true, Some(true)),
+        // then the actor showing sprite def 0x34 (`0x08000158(0x34)`: Super Buu's graphics) answers message 5 and the
+        // wanderer turns toward it (0x0801599C: 24.8 difference, ties horizontal; real run 20-6 tiles: Vegeta faces
+        // Super Buu at each waypoint)
+        K::WanderToRandomPoint if w.field.is_some() => {
+            set_anim(w, i, &[nm("idle")], true, Some(true));
+            let me = w.ents[i].id;
+            let target = w.ents.iter().position(|e| !e.removed && e.id != me && w.actor_by_id(e.id).is_some_and(|a| a.sprite == Some(0x34)));
+            if std::env::var("DBGW").is_ok() { eprintln!("DBGW f{} wander exit en {} target {:?} sprites {:?}", w.frame, i, target, w.ents.iter().map(|e| w.actor_by_id(e.id).and_then(|a| a.sprite)).collect::<Vec<_>>()); }
+            if let Some(k) = target {
+                let (tx, ty) = { let a = w.actor(k).unwrap(); (a.x, a.y) };
+                let (dx, dy) = (tx - w.en_ref(i).a.x, ty - w.en_ref(i).a.y);
+                w.en(i).a.facing = if dx.abs() >= dy.abs() {
+                    if dx > 0 { 3 } else { 2 }
+                } else if dy > 0 {
+                    0
+                } else {
+                    1
+                };
+            }
+        }
         _ => {}
     }
 }
@@ -2572,7 +2591,14 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             let g = w.data.anim.generic["0x03001B30"];
             w.en_ref(i).ea.rule != g || (f >= 32 && w.en_ref(i).anim_done(&d))
         }
-        K::ThrowBigBall => f >= 92,
+        K::ThrowBigBall => {
+            // the throw's controller (0x0804D6CC) ends 32 frames after the throw with SetAnim(0) - the idle enter's
+            // rand(255) - and the node finishes in the same update (real run 20-6 r062_001 tile +5,000 f52)
+            if f >= 92 {
+                set_anim(w, i, &[nm("idle")], true, Some(true));
+            }
+            f >= 92
+        }
         K::GlideToWaypoint => {
             // (field: after its 60 moves a 61st update ends it - the exit 0x0803C064 puts it on the nearest whole
             // pixel and SetAnim(0)s it (an idle draw); the state change after it comes the next frame (real run

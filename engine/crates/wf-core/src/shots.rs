@@ -2316,7 +2316,11 @@ fn superball_update(w: &mut World, i: usize) {
         if t >= 43 {
             w.ents[i].removed = true;
             let (px, py) = (x >> 8, y >> 8);
-            fx::fx_anim(w, 0x0872_a5dc, px, py, 9, 6, 0x4000);
+            // the burst is the ball object's own animation (records 0x0872A648, 6 x 4 ticks) on the ball's tiles,
+            // freed when it ends (real run 20-6 r062_001 tile +5,000: impact f64, the block freed at f88)
+            let ball = w.ents[i].id;
+            let fid = w.add(Body::Fx(Box::new(fx::Fx::Anim { id: 0x0872_a5dc, x: px, y: py, rec: 9, left: 6, rate: 0x4000, acc: 0 })));
+            crate::vram::rekey(w, crate::vram::Owner::Ent(ball), crate::vram::Owner::Ent(fid));
             add(w, area_hit(owner, 0, 0, centered(px, py, 32, 32), 16, 100, atk(7), 16589, 2));
         }
     }
