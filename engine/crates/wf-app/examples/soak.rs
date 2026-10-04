@@ -237,9 +237,18 @@ fn main() {
                 sim_lag_bad = Some(k);
             }
             sim_lag_rows += 1;
+            let starting = app.world().g.load_pending;
             let mut ev = vec![];
             app.step(&[keys], &mut ev);
             stepped += 1;
+            if starting {
+                // the game's lag run from this row (rows whose logic counter stays): the sim's iteration vs the game's
+                let lf0 = rows[k - 1]["lf"].as_i64().unwrap_or(0);
+                let game = rows[k..].iter().take_while(|n| n["lf"].as_i64().unwrap_or(0) == lf0).count();
+                let w = app.world();
+                let sim = w.g.lag as usize + 1;
+                println!("simlag-load row {k} area {:?} map {} sim {sim} game {game}{}", w.field.as_ref().map(|f| (f.area.world, f.area.area)), w.field.as_ref().map(|f| f.map.clone()).unwrap_or_default(), if sim != game { "  <-- DIFF" } else { "" });
+            }
         } else if logic || menu {
             let mut ev = vec![];
             let trace = rng_rows.is_some_and(|(a, b)| a <= k && k <= b);

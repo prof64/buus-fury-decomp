@@ -1105,6 +1105,10 @@ pub fn switch_character(w: &mut World, c: i32) -> Result<(), String> {
                 }
                 p.sel = (cs.sel.max(0) as usize).min(p.skills.len().saturating_sub(1));
             }
+            if let Some(ch) = w.data.chars.iter().find(|x| x.index == c) {
+                p.forms_allowed = ch.forms.clone();
+            }
+            p.ss_cooldown = cs.ss_cooldown;
             p.holy_left = 0;
             p.regen_timer = 0;
             p.apply_form(w, form);
@@ -1131,6 +1135,13 @@ pub fn switch_character(w: &mut World, c: i32) -> Result<(), String> {
         // (app soak, 3-1 after s125: Gohan fired skill slot 2 instead of his slot 0)
         p.sel = (cs.sel.max(0) as usize).min(p.skills.len().saturating_sub(1));
     }
+    // the new character's own transformations and Super Saiyan cooldown (as a load's `make_player` builds them;
+    // app soak, Earth 7-3: Gohan kept Goku's form list and a 0 cooldown after s266's set_character - the game's
+    // player has Gohan's forms 9.. and his record's cooldown 121,087)
+    if let Some(ch) = w.data.chars.iter().find(|x| x.index == c) {
+        p.forms_allowed = ch.forms.clone();
+    }
+    p.ss_cooldown = cs.ss_cooldown;
     p.holy_left = 0;
     // the new character's form controller starts its regen count (+0xC) at 0 (Kid Buu's arena: after s-script
     // hand-overs the bench's 5% tick comes 596 pass frames after the event that switched)

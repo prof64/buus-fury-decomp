@@ -3197,3 +3197,18 @@ length model). Bisect (private copies, every commit rebuilt): 8be1037 exact (5,0
 d6f6a82 with only that gate restored: exact. At f1,640 (11-13) the camera after that extra step is (240, 34.457), the
 game's (240, 34.719). **Gated now:
 `rfat_010_011_11-13` (expect 5,049) - red until the rule is narrowed.**
+*West City r002_006 +6,000 (A, B's update-16 item):* the pending drop is not in the script queue - it is a **death
+effect still counting down** in the delayed-call list 0x0300225C (object vt 0x0804955C: +4 frames left, +8 / +0xC
+loot px, +0x10 / +0x14 velocity, +0x18 the type's drop script; the countdown holds while s003 runs). The import now
+takes it as `pending_drops` (`import_death_effects`; an event holding the field at the cut holds it one frame more).
+Our drop now runs at f8 like the game's with the same first five draws (chance 1 %, rand 100, chance 5 %, chance
+85 %, rand 400). It still stops there: after s500's `drop_zenie` the game draws chance(25 %) and drops an item
+(`0x0800D30E` scatter) where ours ends - and both allocators' largest free block is 159 units (< 0x3000 bytes, the
+coin's room check 0x08018356 fails in both). Engine side (script loop / drop natives), not import: **for B or the
+West City owner**. Tiles unchanged (+6,000 stays f8, now on the drop's contents); gates as HEAD
+(`rfat_010_011_11-13` red on HEAD itself, noted in its commit).
+*Frame 0-2 sweep of the every-N board (A, 63 tiles on the current board):* 7 tiles stop at f0-2 - no common cause:
+camera at f0 `r002_006_4-1+020026` and `r052_004_1-5+006000` (the latter the Earth agent's 1-5), fade at f0
+`r052_004_1-5+018000` (Earth agent), `r062_001_20-6` +1,137 f2 (sprite 280's idle cel) and +9,000 f2 (sprite memory
+(257, 64) ours only), +3,000 f2 / +12,000 f20 (IT, above). The 20-6 ones are the Super Buu agent's now; A takes
+`r002_006_4-1+020026` (camera at f0) next unless the scoreboard agent has it.

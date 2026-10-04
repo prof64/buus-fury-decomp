@@ -388,6 +388,7 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
     sess.world.opts.sim_lag = sim_lag;
     sess.world.g.load_pending = false;
     let (mut own_lag, mut lag_bad, mut replayed) = (0usize, 0usize, 0usize);
+    let mut prev_sim = false;
     // (replayed lag: the area loads counted before the last logic frame; the camera's frame of a load iteration - the
     // count of its lag frames still to come, `Session::lag_step`'s `lag_cam`)
     let field_loads = |w: &wf_core::world::World| w.field.as_ref().map(|f| f.loads);
@@ -402,8 +403,12 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
             loads_before = field_loads(&sess.world);
             load_cam = None;
         }
-        let starting = sim_lag && sess.world.g.load_pending && !wf_core::menu::active(&sess.world);
-        if sim_lag && !wf_core::menu::active(&sess.world) && (sess.world.g.lag > 0 || sess.world.g.load_pending) && sess.lag_step() {
+        let kind = if sess.world.g.load_pending { "load" } else { "iter" };
+        let total = sess.world.g.lag + 1;
+        let starting = sim_lag && !prev_sim && !wf_core::menu::active(&sess.world) && (sess.world.g.load_pending || sess.world.g.lag > 0);
+        let is_sim = sim_lag && !wf_core::menu::active(&sess.world) && (sess.world.g.lag > 0 || sess.world.g.load_pending) && sess.lag_step();
+        prev_sim = is_sim;
+        if is_sim {
             if starting {
                 // the recording's lag run from here
                 let mut n = 0;
@@ -416,7 +421,8 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
                     n += 1;
                 }
                 let map = sess.world.field.as_ref().map(|f| f.map.clone()).unwrap_or_default();
-                eprintln!("simlag-load f{k} {map} sim {} game {n}", sess.world.g.lag + 1);
+                let sim_n = if kind == "load" { sess.world.g.lag + 1 } else { total - 1 };
+                eprintln!("simlag-{kind} f{k} {map} sim {sim_n} game {n}");
             }
             own_lag += 1;
             if logic {

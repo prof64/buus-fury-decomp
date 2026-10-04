@@ -591,8 +591,9 @@ fn field_from_ram(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
     patch_leader(w, ram, notes);
     // the walk and enemy grids as they stand (map object +0xA8 / +0xB0: bitmaps, 32 bytes a row, bit = free)
     import_grids(w, ram);
-    // (building the enemies entered their states: the path stagger as the RAM has it)
-    w.g.path_stagger = (ram.r8(0x0300_32E5) & 7) as i32;
+    // (building the enemies entered their states: the path stagger, the glide's waypoint index ... as the RAM has
+    // them - real run 20-6 tile +7,000: the imported glide's enter had stepped the index)
+    import_globals(w, ram);
     // the BG sphere effect (`show_energy_sphere` 0xF4; the effect slot 0x03001990 -> object vt 0x080493B4: +0xA the
     // script's 4th argument, +0xB radius, +0x10 / +0x14 centre; drawn by 0x0803AA58 with radius - 3 jitter draws)
     w.scene.visuals.retain(|v| v.kind != wf_core::scene::VisualKind::EnergySphere);
@@ -652,6 +653,7 @@ fn field_from_ram(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
             fl.zc = Some(fl.z);
         }
     }
+    import_death_effects(w, ram, notes);
     // the camera as the field left it (`return_to_field` puts the saved one back)
     w.scene.cam.mode = wf_core::scene::CamMode::Player;
     wf_core::battle::set_camera(w, 0, ram.s32(CAM), ram.s32(CAM + 4));
@@ -926,8 +928,12 @@ fn patch_patrols(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
 /// an enemy entity set to a RAM enemy object's state
 fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32, i32, i32, i32)>, notes: &mut Vec<String>) {
     let states = ai_states(ram, o);
-    // the state stack as the RAM has it (re-entered: their runtimes come next)
+    // the state stack as the RAM has it (re-entered: their runtimes come next); the build's own states go without
+    // their exits (nothing of them ran in the game: a wander's exit would idle and turn the enemy)
     if let Some(&first) = states.first() {
+        let e = w.en(ei);
+        let old: Vec<_> = e.ai.stack.drain(..).collect();
+        e.ai.orphans.extend(old);
         wf_core::nodes::reset(w, ei, first as u16);
         for &s in states.iter().skip(1) {
             wf_core::nodes::push(w, ei, s as u16);
@@ -1210,6 +1216,31 @@ fn build_mid(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner: &mut St
     let _ = runner;
     let draws = w.rng.calls.wrapping_sub(calls0);
     Built { world: w, draws, held: 0, finished: true }
+}
+
+/// a death effect still counting down at the cut (the delayed-call list 0x0300225C: count, then objects; vt
+/// 0x0804955C: +4 frames left, +8 / +0xC the loot px, +0x10 / +0x14 its velocity, +0x18 the type's drop script; the
+/// countdown holds while an event runs): our `pending_drops` (real run West City r002_006 +6,000: the level-up event
+/// s003 runs at the cut, the drop comes 8 updates after it - B's §11 update 16)
+fn import_death_effects(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
+    let n = ram.r32(0x0300_225C).min(32);
+    for k in 0..n {
+        let o = ram.r32(0x0300_2260 + 4 * k);
+        if !ram.valid(o) || ram.r32(o) != 0x0804_955C {
+            continue;
+        }
+        let script = ram.r32(o + 0x18);
+        let Some(ty) = w.data.enemies.iter().find(|t| t.drop_script == script).map(|t| t.ty) else {
+            notes.push(format!("mid-area: a death effect's drop script {script:#x} is no enemy type's"));
+            continue;
+        };
+        // (an event holding the field at the cut holds the countdown in the cut's frame too: it ends in it)
+        let due = w.frame + ram.s32(o + 4).max(0) as u32 + (w.scene.depth > 0) as u32;
+        let d = (due, wf_core::world::EntityId::MAX, ty, ram.s32(o + 8), ram.s32(o + 0xC), ram.s32(o + 0x10), ram.s32(o + 0x14));
+        if let Some(f) = w.field.as_mut() {
+            f.pending_drops.push(d);
+        }
+    }
 }
 
 /// an Instant Transmission selection at the cut (the main loop's mode 0x0804D260, the world held): +4 the picks
@@ -2084,6 +2115,16 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
             if h != 0xFFFF {
                 owners.push((h, Owner::Popup));
                 pops.push((h, ram.s32(o + 0x10)));
+            }
+            continue;
+        }
+        // the Instant Transmission markers (vt 0x0804E41C, `import_it_select`): its block belongs to our markers
+        if vt == 0x0804_E41C {
+            let h = ram.r16(o + 0xC);
+            let ent = (0..w.ents.len()).find(|&k| !used_ents.contains(&w.ents[k].id) && matches!(&w.ents[k].body, Body::Fx(f) if matches!(**f, wf_core::fx::Fx::ItMarkers { .. })));
+            if let (Some(k), true) = (ent, h != 0xFFFF) {
+                used_ents.push(w.ents[k].id);
+                owners.push((h, Owner::Ent(w.ents[k].id)));
             }
             continue;
         }

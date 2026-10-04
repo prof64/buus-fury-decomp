@@ -12,13 +12,13 @@
   },
   "fat": {
    "cats": {
-    "camera": 1,
+    "camera": 2,
     "screen fade": 1
    },
    "cut_frames": 380206,
-   "exact": 369,
+   "exact": 368,
    "frames": 380206,
-   "matched": 369911,
+   "matched": 366480,
    "run_frames": 388646,
    "segments": 371,
    "stretches": 33
@@ -58,13 +58,13 @@
   },
   "superbuu": {
    "cats": {
-    "camera": 2,
+    "camera": 1,
     "position / facing": 1
    },
    "cut_frames": 467701,
-   "exact": 445,
+   "exact": 446,
    "frames": 467701,
-   "matched": 433451,
+   "matched": 441978,
    "run_frames": 478729,
    "segments": 448,
    "stretches": 22
@@ -75,10 +75,10 @@
   "cut_frames": 1622756,
   "exact": 1512,
   "frames": 1622756,
-  "matched": 1577332,
+  "matched": 1582428,
   "run_frames": 1668050,
   "segments": 1519,
   "stretches": 75
  },
- "tree": "90fa3f7"
+ "tree": "0dab418"
 }

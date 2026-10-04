@@ -2867,6 +2867,14 @@ pub fn open_text(w: &mut World, text: &str, text_ref: u32, portrait: u8, kind: u
             d.fades = f;
         }
     }
+    // the box's creation is a long main-loop iteration (`Options::sim_lag`): `sndsim::dialog_frames`
+    if w.opts.sim_lag && kind != 3 {
+        let chars = w.scene.dialog.as_ref().map(|d| d.typing.first().copied().unwrap_or(0) as i64).unwrap_or(0);
+        if let Some(n) = crate::sndsim::dialog_frames(w, portrait, chars) {
+            w.g.lag = (n as u16).saturating_sub(1);
+            w.g.lag_cam = u16::MAX;
+        }
+    }
 }
 
 /// A text box's placement and portrait side from its prefix, the node `arg` and the event's speaker anchor

@@ -404,6 +404,13 @@ pub struct Menu {
     /// frames the restore's camera update comes before the last black frame (sndsim `wrap`)
     #[serde(default)]
     pub leave_cam: u16,
+    /// power-on: video frames of the boot screens still to run before the title (title.rs `open_title_boot`; the
+    /// screens read no input)
+    #[serde(default)]
+    pub boot: u16,
+    /// the title after the boot: its first page draw is a long update (lag) - set by `open_title_boot`
+    #[serde(default)]
+    pub boot_draw: Option<()>,
 }
 
 /// How a menu screen comes and goes (all measured per screen kind): the field fades out by `fade_out` per frame
@@ -518,6 +525,14 @@ fn step_inner(w: &mut World) {
         DEBUG_FRAMES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
     let held = w.input[0].held;
+    if w.menu.boot > 0 {
+        w.menu.boot -= 1;
+        w.menu.held = held;
+        if w.menu.boot == 0 {
+            crate::scene::play_song(w, title::TITLE_SONG);
+        }
+        return;
+    }
     match w.menu.phase {
         Phase::Idle => {}
         Phase::FadeOut { level } => {
@@ -553,8 +568,11 @@ fn step_inner(w: &mut World) {
         Phase::Enter { t } => {
             if t + 1 >= w.menu.tr.enter.max(1) {
                 w.menu.phase = Phase::Run;
-                // the first update draws during the black frames: on screen now, no lag after it
-                redraw(w, true);
+                // the first update draws during the black frames: on screen now, no lag after it (the title after the
+                // boot screens: its first iteration draws with the long update's lag, frames the input is not read)
+                let first = w.menu.boot_draw.is_none();
+                w.menu.boot_draw = None;
+                redraw(w, first);
             } else {
                 w.menu.phase = Phase::Enter { t: t + 1 };
             }

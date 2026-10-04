@@ -3255,6 +3255,16 @@ fn start_it(w: &mut World, i: usize, lv: i32) {
     let f = fx::add(w, Fx::ItMarkers { t: 0, alive: Alive::It { p: me, serial } });
     w.modal = Some(vec![me, f]);
 }
+/// the Instant Transmission markers go with the skill's state: the idle it ends in deletes them (their tiles freed in
+/// the player's update - real run 20-6 r062_001 tile +11,000 f51)
+fn it_markers_end(w: &mut World, i: usize) {
+    let me = w.ents[i].id;
+    let ks: Vec<usize> = (0..w.ents.len()).filter(|&k| !w.ents[k].removed && matches!(&w.ents[k].body, Body::Fx(f) if matches!(**f, Fx::ItMarkers { alive: Alive::It { p, .. }, .. } if p == me))).collect();
+    for k in ks {
+        w.ents[k].removed = true;
+        crate::vram::release(w, crate::vram::Owner::Ent(w.ents[k].id));
+    }
+}
 fn it_select(w: &mut World, i: usize) {
     let mut s = pr(w, i).it_sel.clone().unwrap();
     let h = inp(w, i).held;
@@ -3262,7 +3272,8 @@ fn it_select(w: &mut World, i: usize) {
         w.modal = None;
         p(w, i).it_sel = None;
         if s.picks.is_empty() && s.order.is_empty() {
-            return set_anim_id(w, i, 0);
+            set_anim_id(w, i, 0);
+            return it_markers_end(w, i);
         }
         let (dir, px, py) = (pr(w, i).a.facing, pr(w, i).a.px(), pr(w, i).a.py());
         {
@@ -3398,7 +3409,8 @@ fn ctl_it_field(w: &mut World, i: usize) {
     checks(w, true);
     if it.idx >= it.picks.len() {
         p(w, i).it = None;
-        return set_anim_id(w, i, 0);
+        set_anim_id(w, i, 0);
+        return it_markers_end(w, i);
     }
     match it.picks[it.idx] {
         ItPick::Trig(o) => {
@@ -3478,7 +3490,8 @@ fn ctl_it(w: &mut World, i: usize) {
     }
     if it.idx >= it.targets.len() {
         p(w, i).it = None;
-        return set_anim_id(w, i, 0);
+        set_anim_id(w, i, 0);
+        return it_markers_end(w, i);
     }
     if t == 24 {
         let a = &pr(w, i).a;

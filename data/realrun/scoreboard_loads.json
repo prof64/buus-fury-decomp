@@ -2,8 +2,8 @@
  "kinds": {
   "exit": {
    "after the load": 0,
-   "before the load": 1,
-   "exact": 1510,
+   "before the load": 0,
+   "exact": 1511,
    "load": 0,
    "loads": 1511
   }
@@ -9991,26 +9991,6 @@
   },
   {
    "at": null,
-   "first": "Some((1640, \"cam: (240, 34.45703125) vs game (240, 34.71875)\"))",
-   "from": [
-    11,
-    21,
-    1
-   ],
-   "gap": 16,
-   "kind": "exit",
-   "logic_gap": 2,
-   "off": null,
-   "result": "before the load",
-   "segment": "r010_011_11-13",
-   "to": [
-    11,
-    22,
-    1
-   ]
-  },
-  {
-   "at": null,
    "first": "",
    "from": [
     11,
@@ -19286,6 +19266,26 @@
    "to": [
     1,
     5,
+    1
+   ]
+  },
+  {
+   "at": null,
+   "first": "",
+   "from": [
+    6,
+    7,
+    1
+   ],
+   "gap": 24,
+   "kind": "exit",
+   "logic_gap": 2,
+   "off": null,
+   "result": "exact",
+   "segment": "r052_004_1-5",
+   "to": [
+    6,
+    6,
     1
    ]
   },
@@ -30232,10 +30232,10 @@
  ],
  "total": {
   "after the load": 0,
-  "before the load": 1,
-  "exact": 1510,
+  "before the load": 0,
+  "exact": 1511,
   "load": 0,
   "loads": 1511
  },
- "tree": "de485a4"
+ "tree": "0dab418"
 }

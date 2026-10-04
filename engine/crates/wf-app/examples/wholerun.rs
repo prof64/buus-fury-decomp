@@ -37,10 +37,30 @@ fn main() {
     let data = wf_app::battle::load_data(&packs).expect("data");
     let cfg = wf_core::field::FieldConfig { world: 1, area: 1, rng: wf_core::battle::RngInit::Seed(1), ..Default::default() };
     let mut session = wf_core::session::Session::new_field(data, cfg);
-    wf_core::menu::title::open_title(&mut session.world);
+    // (--no-boot: the title at once, as the launcher opens it today)
+    if args.iter().any(|a| a == "--no-boot") {
+        wf_core::menu::title::open_title(&mut session.world);
+    } else {
+        wf_core::menu::title::open_title_boot(&mut session.world);
+    }
+    // --power-on FILE (tools/wholerun/power_on.py): the sound hardware at the reset - the driver's RAM as the boot code
+    // sets it (the same after every reset) and the reset moment's play position and timer phase. Nothing else.
+    if let Some(p) = opt("--power-on") {
+        let v: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&p).expect("power-on")).expect("json");
+        let hex = v["driver"].as_str().unwrap_or("");
+        let dram: Vec<u8> = (0..hex.len() / 2).map(|k| u8::from_str_radix(&hex[2 * k..2 * k + 2], 16).unwrap_or(0)).collect();
+        let n = |k: &str| v[k].as_u64().unwrap_or(0) as u32;
+        if session.world.data.sound.is_some() {
+            wf_core::sndsim::import(&mut session.world, &dram, n("pos"), n("last"), Some(n("phase")));
+            println!("power-on sound: pos {} last {} phase {}", n("pos"), n("last"), n("phase"));
+        } else {
+            println!("power-on sound: no sound data loaded - ignored");
+        }
+    }
     let mut app = StorySim::with_session(&packs, session).expect("story sim");
     app.skip_area_banner();
     app.session.world.opts.sim_lag = sim_lag;
+    println!("sound model: driver {} calibrated {} phase {}", app.world().sound.drv.is_some(), !app.world().sound.uncalibrated, app.world().sound.phase);
 
     let rd = BufReader::new(std::fs::File::open(&master).expect("master"));
     let mut lines = rd.lines().map(|l| serde_json::from_str::<serde_json::Value>(&l.expect("line")).expect("row")).peekable();
@@ -142,6 +162,14 @@ fn main() {
         }
         if show.is_some_and(|(a, b)| a <= k && k <= b) {
             println!("row {k} keys {keys:x} logic {logic} menu {menu} app area {aa:?} p {ap:?} rng {:08x?} depth {} | game area {ga:?} p {} rng {} depth {gd} lf {lf}", w.rng.state(), w.scene.depth, r["p"], r["rng"]);
+            if menu || std::env::var("WR_MENU").is_ok() {
+                let page = match w.menu.stack.last() {
+                    Some(wf_core::menu::Screen::Title(t)) => format!("title {:?} leaving {:?}", t.page, t.leaving),
+                    Some(_) => "other".to_string(),
+                    None => "-".to_string(),
+                };
+                println!("    menu phase {:?} lag {} boot {} page {page} pending {} shown {}", w.menu.phase, w.menu.lag, w.menu.boot, w.menu.pending.is_some(), w.menu.shown.is_some());
+            }
         }
         k += 1;
     }

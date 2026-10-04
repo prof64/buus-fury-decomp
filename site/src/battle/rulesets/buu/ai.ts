@@ -1789,7 +1789,8 @@ export function create(n: AiNodeJ, c: AiController): RNode {
       }, (f) => f >= 92)
     case 'GlideToWaypoint':
       return new Act(n, c, (a) => {
-        const WP = [[224, 104], [344, 128], [120, 128], [264, 112], [144, 144]]
+        // the waypoint table 0x0877B1BC (ROM)
+        const WP = [[224, 104], [344, 128], [304, 256], [120, 264], [112, 144]]
         e.ctx.waypoint = (e.ctx.waypoint + (e.w.rng.rand(2, 'waypoint') ? 1 : 4)) % 5
         const [tx, ty] = WP[e.ctx.waypoint]
         a.data.vx = Math.trunc((((tx - e.px) << 8) / 60))

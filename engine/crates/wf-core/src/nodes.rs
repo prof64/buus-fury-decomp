@@ -1184,7 +1184,8 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             w.sfx(3, 64);
         }
         K::GlideToWaypoint => {
-            const WP: [(i32, i32); 5] = [(224, 104), (344, 128), (120, 128), (264, 112), (144, 144)];
+            // the waypoint table 0x0877B1BC (24.8 pairs; real run 20-6 r062_001 tile +7,000: index 2 is (304, 256))
+            const WP: [(i32, i32); 5] = [(224, 104), (344, 128), (304, 256), (120, 264), (112, 144)];
             let step = if w.rng.rand(2) != 0 { 1 } else { 4 };
             w.g.waypoint = (w.g.waypoint + step) % 5;
             let (tx, ty) = WP[w.g.waypoint as usize];
@@ -1450,7 +1451,7 @@ fn leaf_exit(w: &mut World, c: &C, n: u16, _r: &mut NodeRt) {
         // then the actor showing sprite def 0x34 (`0x08000158(0x34)`: Super Buu's graphics) answers message 5 and the
         // wanderer turns toward it (0x0801599C: 24.8 difference, ties horizontal; real run 20-6 tiles: Vegeta faces
         // Super Buu at each waypoint)
-        K::WanderToRandomPoint if w.field.is_some() => {
+        K::WanderToRandomPoint if w.field.is_some() && std::env::var("NOWEXIT").is_err() => {
             set_anim(w, i, &[nm("idle")], true, Some(true));
             let me = w.ents[i].id;
             let target = (0..w.ents.len()).find(|&k| !w.ents[k].removed && w.ents[k].id != me && crate::scene::sprite_id(w, k) == Some(0x34)).filter(|_| std::env::var("NOFACE").is_err());
@@ -2594,7 +2595,7 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         K::ThrowBigBall => {
             // the throw's controller (0x0804D6CC) ends 32 frames after the throw with SetAnim(0) - the idle enter's
             // rand(255) - and the node finishes in the same update (real run 20-6 r062_001 tile +5,000 f52)
-            if f >= 92 {
+            if f >= 92 && std::env::var("NOTBI").is_err() {
                 set_anim(w, i, &[nm("idle")], true, Some(true));
             }
             f >= 92

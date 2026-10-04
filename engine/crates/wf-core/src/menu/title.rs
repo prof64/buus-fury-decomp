@@ -433,6 +433,22 @@ impl Page for Title {
             }
         }
     }
+    /// the title / mode page's redraw decodes the whole title picture: a long iteration whose end (6 or 7 frames)
+    /// the mixer's load decides (whole run from the soft reset, `menu_timing.measure` on video frames 705 .. 800: own
+    /// cycles title 1,343,860 .. 1,351,045, its first draw after the boot 1,404,063, mode page 1,389,795 .. 1,406,658)
+    fn redraw_time(&self, w: &World, _d: &super::MenuData) -> Option<crate::sndsim::Redraw> {
+        if self.leaving != Leaving::No || self.confirm.is_some() {
+            return None;
+        }
+        let own: i64 = match self.page {
+            // (nothing on screen yet: the first draw after the boot screens)
+            TPage::Title if w.menu.shown.is_none() => 1_404_063,
+            TPage::Title => 1_347_000,
+            TPage::Mode => 1_398_000,
+            TPage::Select => return None,
+        };
+        Some(crate::sndsim::Redraw { t0: 4_641, base: own - 4_641 })
+    }
     fn redraw_cost(&self) -> u8 {
         match (self.page, self.leaving) {
             // the release redraw (A up) shows a frame late; the fade then shows one picture per frame
@@ -459,6 +475,22 @@ pub fn open_title(w: &mut World) {
     w.scene.song = -1;
     crate::scene::play_song(w, TITLE_SONG);
 }
+
+/// Power-on: the boot screens, then the title. Both screens are fixed-length main-loop modes that read no input:
+/// the legal screen (vt `0x08049354`, update `0x08004EA6`: fade in 16, hold to 150, fade out to 166, done at 180) and
+/// the logos (vt `0x080492B8`, update `0x08017AE6`: Atari / FUNimation, Webfoot loaded at 320, done after 516), with
+/// the mode switches between them; the title's first iteration is video frame [`BOOT_FRAMES`] after the soft reset
+/// (the real run's recording, `tools/wholerun/record.py`). The title waits under the boot (its song with it).
+pub fn open_title_boot(w: &mut World) {
+    open_title(w);
+    w.events.retain(|e| !matches!(e, crate::world::Event::Song { .. }));
+    w.scene.song = -1;
+    w.menu.boot = BOOT_FRAMES;
+    w.menu.boot_draw = Some(());
+}
+
+/// video frames from the soft reset to the title's first iteration (the boot screens' modes and switches)
+pub const BOOT_FRAMES: u16 = 705;
 
 /// the title's song (`0x080053CC`)
 pub const TITLE_SONG: i32 = 45;

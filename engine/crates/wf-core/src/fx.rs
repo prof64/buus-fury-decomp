@@ -107,9 +107,15 @@ impl Fx {
 pub fn add(w: &mut World, f: Fx) -> EntityId {
     // the generic animated effect object (`0x0802A81C`, vtable 0x0804CF3C) holds 0x400 of object tiles
     let tiles = matches!(f, Fx::Anim { .. } | Fx::Loop { .. });
+    // the Instant Transmission target markers (ctor `0x080222E0`, records 0x0872BF04: 16 x 32 -> 0x200 bytes; real
+    // run 20-6 r062_001 tile +11,000 f6)
+    let markers = matches!(f, Fx::ItMarkers { .. });
     let id = w.add(Body::Fx(Box::new(f)));
     if tiles {
         crate::vram::acquire(w, crate::vram::Owner::Ent(id), 0x400);
+    }
+    if markers {
+        crate::vram::acquire(w, crate::vram::Owner::Ent(id), 0x200);
     }
     id
 }
@@ -495,6 +501,7 @@ fn update_one(w: &mut World, i: usize) {
             }
             if !alive(w, al) {
                 w.ents[i].removed = true;
+                crate::vram::release(w, crate::vram::Owner::Ent(w.ents[i].id));
             }
         }
         Fx::BigBangBoom { .. } => {

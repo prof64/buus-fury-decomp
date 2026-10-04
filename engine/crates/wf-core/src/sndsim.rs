@@ -372,6 +372,24 @@ pub fn load_frames(w: &mut World) -> Option<u8> {
     redraw_frames(w, Redraw { t0: 0, base })
 }
 
+/// A text box's creation (`scene::open_text`, the script's step): one main-loop iteration of 1,928,650 cycles + 128
+/// per character of the first page + the portrait's decompression (portraits/index.json `decode_cycles`; none for 0 /
+/// 7). 30 opens of the real run on the emulator (work/shipfix/dlg_measure.py, dlg_join.py): std 10.9 k, max 28 k.
+/// Returns the iteration's video frames (None: uncalibrated / no sound)
+pub fn dialog_frames(w: &mut World, portrait: u8, first_chars: i64) -> Option<u8> {
+    let dec = if portrait == 0 || portrait == 7 {
+        0
+    } else {
+        w.data.menu.as_ref().and_then(|m| m.portrait_cycles.get(portrait as usize - 8).copied()).unwrap_or(0) as i64
+    };
+    let base = DIALOG_OPEN_REST + 128 * first_chars + dec;
+    if debug() {
+        eprintln!("snd dialog: portrait {portrait} chars {first_chars} decode {dec} base {base}");
+    }
+    redraw_frames(w, Redraw { t0: 0, base })
+}
+const DIALOG_OPEN_REST: i64 = 1_928_650;
+
 /// The map rebuild's cycles for the current area / camera / actors (pure): (decompression incl. the actors' frames,
 /// the other per-item work). The close's reload and an area load (`load_frames`) both rebuild the map this way
 pub fn reload_parts(w: &World) -> Option<(i64, i64)> {
