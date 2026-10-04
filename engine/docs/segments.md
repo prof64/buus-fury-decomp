@@ -2605,6 +2605,9 @@ dodge - no state 0x15A in that cut).
   broadcast) and bursts, and the player behind it is still hit. `r069_101_14-2` and `r069_139_14-2` exact
   (1,406 / 1,252), Rust + TS (the battle wave too), dumps regenerated.*
 
+**Claim (ship fix agent, 2026-10-04, by the coordinator): `r052_004_1-5` f11575 - the area-load fade-in camera step
+(load arrivals' camera across the load iteration; nobody else owns load arrivals now).**
+
 **Claim (ship fix agent, 2026-10-04, by the coordinator): the camera-at-close rows** - `r038_001_18-1` f589,
 `r009_006_4-1` f458, `r002_004_4-1` f741, `r002_006_4-1` f10623, `r052_004_1-5` f11575, `r064_029_21-26` f12784,
 `r067_071_14-2` f693 (the menu-close timing / camera across a close; Earth agent: the close code in `menu/mod.rs` and
@@ -2638,7 +2641,16 @@ the reload map terms, the sound parts stay yours).
   in): from f252 ChasePlayer steps it 0.5 px down at f254 while the game's stays (anim reset to frame 0 tick 0, no
   move) - the enemy grid / chase around a breakable it overlaps; the Enzyme's latch / re-mark rules are dungeon
   agent B's (`Enzyme pathing traced` commit). Left.
-- `r002_006_4-1` f10623: not looked at yet.
+- `r002_006_4-1` f10623: a pause close on 0-55 (4-1's map), one frame SHORT here: game own 6,921,787 vs model
+  6,827,943 (-94k). Measured decompression 6,400,156 (25 calls, incl. 0x08072494 43.9k and 0x0829DE6C 138k) against the
+  model's 6,449,745 that includes "3 actors' frames 117,170".
+- **The actor-frame question (both directions):** the reload's work outside the decompressor ("other" = game own -
+  measured decompression) is 451k on 14-2 (`r067_071`) and 522k on 0-55 (`r002_006`); the model's other part is
+  380k / 321k, and its decompression total carries 67k / 117k of actor frames that the decompressor never sees in
+  14-2. So the actors cost is real but outside 0x03000044 - most likely the object pass after the reload (an IWRAM
+  routine in 0x03000400..0x03000BFF entered from 0x08011B7A with the world list 0x03001C54); my per-call window ran
+  past the iteration's end, so its share is not measured yet. Next: time that pass inside the reload iteration only
+  and fit it per actor (sprite / frame size) instead of `cel_dec`.
 
 **§11 update 11 (B): the Janemba saga plays start to finish in the app.** Three core fixes (field only; battles and
 cross_ts untouched), each from an emulator trace, gated:
@@ -2702,7 +2714,16 @@ AI's enters; the game drew nothing at the cut) and their number depends on the s
 seed guesses did not converge; a mid-area build now takes the RAM's generator as it is (`import_emulator_state`;
 area entries keep the guess loop - their load's draws are the game's). The nine run 0 - 165 frames, mostly into
 Super Buu's attack states (0x29D, 0x2A7, 0x2A8 ThrowBigBall, charge sounds 3 / 34, an object class 0x0804E41C):
-for the Super Buu agent.
+for the Super Buu agent. The class 0x0804E41C is **not** Super Buu's: it is the leader's Instant Transmission
+target markers (records 0x0872BF04, `Fx::ItMarkers`), with the leader in the IT run state (vt 0x0804E334: +0x10 /
++0x1C the target objects; its fields stay constant ~6-10 frames, then idle - the run's counter is not in this
+object). Importing an IT selection / run in flight (the leader's `it_sel` / `it` and the markers) is left open: one
+tile (+10,000), and the frame-0 stops of +3,000 / +12,000 are Super Buu's glide in states 0x29D / 0x2A7 (the
+Super Buu agent's).
+
+**Claim (dungeon agent A, 2026-10-04): `r000_261_8-32`** (Babidi's ship 8-32, f326: sprite 117's y 167 vs 167.75;
+754 lost) - nobody held it. Others please add a line here before touching it. *Already exact on b13b68c (1,080 /
+1,080; fixed after the board's tree 32e189d) - released.*
 
 **Claim (dungeon agent B, 2026-10-04, by the coordinator): the fat chapter's every-N rows** - `r033_002_6-1`
 (Goku vs Majin Buu, 6,910 diverged), `r002_006_4-1` (West City / the Bandana hunt, 7,857 diverged), the tiles of
