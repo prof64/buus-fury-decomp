@@ -3073,7 +3073,9 @@ player sprite 126, ours 269: import the form / sprite the game shows).
 exact too (11,498). s464 fades to black (native 120) and warp_fades into 6-5 with no fade_from_black. Two rules, both
 only for a **script's warp_fade arrival** (`script_fade_in`, not the world map): (1) the load iteration's world
 restore ends with a camera update in its last lag frame (`wrap` = a frame earlier) - the replay harness's lag frames
-now do it (`segment.rs`, `Session::lag_step`'s rule; exits and other loads step no camera there - 50 gates say so);
+now do it (`segment.rs`, `Session::lag_step`'s rule; exits and other loads step no camera there - 50 gates say so;
+narrowed again to an **event's** warp_fade, a scene running: `rfat_010_011_11-13` f1,640's inline trigger script
+warp_fade at depth 0 steps none - both exact);
 (2) the arrival's fade-in writes the palette up from black, so the script's black screen is cleared at
 `begin_fade_in` (exits keep it). The 6-9 tile form: the import now finds the fusion the player object shows when the
 current character is a component inside its level-up hook (s003 cut: `levelup_fusion`, the host continues the hook
@@ -3275,3 +3277,7 @@ on the context stack whose PC lies in an inline script's code (bytecode.json `in
 trigger's (`hold_nested`); (2) `import_cam_pan`: the pan object (vt 0x0804B8C0: +4 / +8 target, +0xC speed, +0x10
 / +0x14 step in 1/1024 px, +0x20 steps left) sets the replayed `CamPanTo`'s step and count, the camera stays the
 RAM's. 51 board tiles: 1 better, 0 worse; gates as HEAD (`rfat_010_011_11-13` red on HEAD itself).
+
+**Claim (dungeon agent A, 2026-10-04, by the coordinator, from the Super Buu agent's queue): the sprite allocator's
+free / spare list order** (`wf-core` vram.rs `ObjVram` alloc / free, and the importer's reading of the live lists) -
+West City tiles r002_006 +4,000 / +5,000 / +14,000 / +7,000 / +17,000.

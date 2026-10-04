@@ -1783,10 +1783,17 @@ export function create(n: AiNodeJ, c: AiController): RNode {
         // it (real run 6-9 r052_006 f15,334: the old tree's KiBlast enter in the frame of the jump to 0x259)
       }, (f) => e.ea.r !== GENERIC_STATES['0x03001B30'] || (f >= 32 && e.animDone()))
     case 'ThrowBigBall':
+      // the throw's controller ends 32 frames after the throw with SetAnim(0) (an idle draw); an exit while the ball
+      // still charges removes it (real run 20-6 r062_001)
       return new Act(n, c, () => {
         e.setAnim(15, true, true)
         e.w.add(new SuperBall(e.ctx, e))
-      }, (f) => f >= 92)
+      }, (f) => {
+        if (f >= 92) e.setAnim(0, true, true)
+        return f >= 92
+      }, () => {
+        for (const x of e.w.entities) if (x instanceof SuperBall && x.owner === e && x.phase === 0 && !x.removed) x.removed = true
+      })
     case 'GlideToWaypoint':
       return new Act(n, c, (a) => {
         // the waypoint table 0x0877B1BC (ROM)

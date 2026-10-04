@@ -1635,7 +1635,8 @@ export class SuperBall extends Shot {
       this.x = (this.owner.px + 8) << 8
       this.y = (this.owner.py) << 8
       this.z = -40
-      if (this.t >= 60) {
+      // (thrown in the update whose tick count reaches 0x3D: real run 20-6 r062_001)
+      if (this.t >= 61) {
         const p = this.ctx.player
         const [tx, ty] = p ? p.footCenter() : [this.px, this.py]
         this.sx = this.x

@@ -1962,6 +1962,12 @@ export class Player extends Actor implements PlayerLike {
    *  the world while B is held: a cursor from the body centre (v = v * 3/4, +-256 per d-pad direction, clamped to the
    *  camera) marks the candidate box it touches. Released: no pick -> idle, else the teleport state (0x0804E334). */
   itSel: { n: number; cand: { e: Actor; picked: boolean }[]; picks: Actor[]; x: number; y: number; vx: number; vy: number; cursor: boolean } | null = null
+  /** the markers object: deleted by the idle the skill ends in (its destructor runs in the player's update) */
+  itFx: ItMarkersFx | null = null
+  private itMarkersEnd() {
+    if (this.itFx) this.itFx.removed = true
+    this.itFx = null
+  }
   it: { dir: Dir; idx: number; targets: Actor[]; origin: [number, number]; t: number } | null = null
   private startIT(w: World, lv: number) {
     this.ap.raw = 20
@@ -1977,7 +1983,7 @@ export class Player extends Actor implements PlayerLike {
       .map((e) => ({ e: e as Actor, picked: false }))
     const [cx, cy] = this.center()
     const sel = (this.itSel = { n: Math.min(lv + 1, tier), cand, picks: [] as Actor[], x: cx << 8, y: cy << 8, vx: 0, vy: 0, cursor: true })
-    const fx = w.add(new ItMarkersFx(this.ctx, () => (sel.cursor ? [sel.x >> 8, sel.y >> 8] : null), () => sel.picks.map((e) => e.center()), () => this.itSel === sel || (!!this.it && this.it.targets === sel.picks)))
+    const fx = (this.itFx = w.add(new ItMarkersFx(this.ctx, () => (sel.cursor ? [sel.x >> 8, sel.y >> 8] : null), () => sel.picks.map((e) => e.center()), () => this.itSel === sel || (!!this.it && this.it.targets === sel.picks))))
     w.modal = [this, fx]
   }
   private itSelect(w: World) {
@@ -1985,7 +1991,10 @@ export class Player extends Actor implements PlayerLike {
     if (!(w.input.held & BTN.B)) {
       w.modal = null
       this.itSel = null
-      if (!s.picks.length) return this.setAnimId(w, 0)
+      if (!s.picks.length) {
+        this.setAnimId(w, 0)
+        return this.itMarkersEnd()
+      }
       this.it = { dir: this.facing, idx: 0, targets: s.picks, origin: [this.px, this.py], t: -24 }
       this.hittable = false
       this.ap.raw = 20
@@ -2060,7 +2069,8 @@ export class Player extends Actor implements PlayerLike {
     }
     if (it.idx >= it.targets.length) {
       this.it = null
-      return this.setAnimId(w, 0)
+      this.setAnimId(w, 0)
+      return this.itMarkersEnd()
     }
     if (t === 24) {
       const rect = rectAt(PUNCH_RECT[this.facing], this.px, this.py)
