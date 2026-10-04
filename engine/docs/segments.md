@@ -2648,8 +2648,13 @@ after its 60 moves the exit 0x0803C064 (emulator write watch) puts Super Buu on 
 SetAnim(0)s him (an idle draw), the GotoState after it takes the next frame (StandStill's draw) - battles keep the
 reference's 60. Tiles +4,000 / +6,000 / +7,000 / +18,000 now run to f14 / f36 / f21 / f52 and stop in state 0x2A3's
 attack (charge sound 3, facing) - **for the Super Buu agent** (their attack-node area: not taken further). The 20-6
-tiles refused on "import mismatch: RNG after N draws" (+3,000, +8,000, +10,000, +12,000..+16,000, +20,000) are an
-import gap of this map's enemies, left open.
+tiles refused on "import mismatch: RNG after N draws" (+3,000, +8,000, +10,000, +12,000..+16,000, +20,000) **now
+import**: no per-enemy random state was missing - a mid-area build's draws are its own (the area load's spawns, the
+AI's enters; the game drew nothing at the cut) and their number depends on the seed (rejection loops), so the
+seed guesses did not converge; a mid-area build now takes the RAM's generator as it is (`import_emulator_state`;
+area entries keep the guess loop - their load's draws are the game's). The nine run 0 - 165 frames, mostly into
+Super Buu's attack states (0x29D, 0x2A7, 0x2A8 ThrowBigBall, charge sounds 3 / 34, an object class 0x0804E41C):
+for the Super Buu agent.
 
 **Claim (dungeon agent B, 2026-10-04, by the coordinator): the fat chapter's every-N rows** - `r033_002_6-1`
 (Goku vs Majin Buu, 6,910 diverged), `r002_006_4-1` (West City / the Bandana hunt, 7,857 diverged), the tiles of

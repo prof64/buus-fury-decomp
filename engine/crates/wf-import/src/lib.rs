@@ -1517,8 +1517,17 @@ pub fn import_emulator_state(data: &Arc<GameData>, ram: &GbaRam, runner: &mut St
     if let Some(n) = notes.iter().find(|n| n.starts_with("unsupported: ")) {
         return Err(ImportError::Unsupported(n.trim_start_matches("unsupported: ").to_string()));
     }
+    let mut b = b;
     if b.world.rng.state() != target {
-        return Err(ImportError::Mismatch(format!("RNG {:08x?} after {} draws vs RAM {:08x?}", b.world.rng.state(), b.draws, target)));
+        // a mid-area build draws only for itself (the area load's spawns, the AI's enters - the game drew nothing at
+        // the cut) and how many depends on the seed (rejection loops: WanderToRandomPoint's goal, spawn spots), so
+        // the guesses may not converge: the generator is the RAM's (real run 20-6 r062_001 tiles, inside Buu)
+        if info.kind == CutKind::MidArea {
+            notes.push(format!("the build's {} draws did not land on the RAM's generator: set to it", b.draws));
+            b.world.rng = Rng::new(target[0], target[1]);
+        } else {
+            return Err(ImportError::Mismatch(format!("RNG {:08x?} after {} draws vs RAM {:08x?}", b.world.rng.state(), b.draws, target)));
+        }
     }
     let mut world = b.world;
     if !b.finished {

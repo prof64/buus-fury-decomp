@@ -2390,6 +2390,11 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
             if o.dead >= 0 || msg.foot || msg.source == me || w.ents[i].removed || msg.atk.kind != 1 || msg.atk.sub == 0xd {
                 return false;
             }
+            // (a blast still in the player's hand catches nothing: real route 14-2 f862, a Majin Soldier's wave
+            // spawned beside a player holding a Ki Blast hits the player - ship fix agent's trace)
+            if o.delay > 0 && w.shot_ref(i).t < o.delay {
+                return false;
+            }
             if !overlaps(&msg.rect, &rect(w, i)) {
                 return false;
             }
