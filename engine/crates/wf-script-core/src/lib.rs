@@ -131,9 +131,6 @@ pub struct HostState {
     /// the top of the frame in the game (before the objects update)
     #[serde(default)]
     pub from_wait: bool,
-    /// the thread is resuming from a fade wait this frame (an exit now releases the field's objects, see `from_wait`)
-    #[serde(default)]
-    pub from_fade: bool,
     /// the newest entity when the outermost event started: older objects update after the event's scene object
     /// (the world updates newest first), so only they see a release at the top of the frame
     #[serde(default)]
@@ -332,11 +329,7 @@ impl Host for CoreHost<'_> {
                 }
                 // the event ended straight out of a command wait: in the game the wait loop returned at the top of
                 // this frame, so the field's NPCs already ran this frame's update unfrozen
-                // (an event that ends right out of its fade wait returns at the top of the frame as well, also inside a
-                // unit script: the real route 18-11, s446 run from Vegeta's trigger script ends on fade_out(100) - a
-                // Janemba Hand older than the event makes its ambush's first update in the exit frame)
-                let from_fade = std::mem::take(&mut self.s.from_fade);
-                if (self.s.from_wait && !self.s.in_unit || from_fade) && self.w.scene.depth == 0 {
+                if self.s.from_wait && self.w.scene.depth == 0 && !self.s.in_unit {
                     release_field_npcs(self.w, self.s.event_watermark);
                 }
                 Ok(NativeResult::Done(None))
@@ -497,9 +490,7 @@ pub fn poll(w: &mut World, s: &mut HostState) -> Option<Option<i32>> {
             done.then_some(None)
         }
         Pending::Fade => {
-            let done = scene::fade_done(w);
-            s.from_fade = done;
-            done.then_some(None)
+            scene::fade_done(w).then_some(None)
         }
         Pending::Scroll => {
             let done = scene::scroll_done(w);

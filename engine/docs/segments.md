@@ -2500,6 +2500,12 @@ a run-time placed enemy (`ObjRef::List(0xff, 14)`, like a tank's crew), so its d
 0x08710F99 (loot s496). (3) **`set_char_form` also re-forms a player kept offstage** by a cutscene scene: s470
 sets Goku's record form (2 -> 0, sprite 117 -> 115) while `load_scene` has the players offstage; the warp at f13,987
 brings him back in the record's form (`scene.offstage`, natives 0x9D).
+*`r062_001_20-6` f2,176: a heap leftover, not taken further* - s473's `become_map_object(5, 3)` makes Vegeta (sprite
+280) enemy #3 in state 0x313 (WanderToRandomPoint, Wait 60). The node's create (0x0803BD64) allocates its 0x24-byte
+runtime and sets only speed 0xB3, budget 0x32 and +0x14 valid = 0: the re-plan counter (+0x18) and the waypoint
+(+0xC / +0x10) are the heap's leftovers, so the first step heads for a leftover waypoint (here about (0, 0): x step
+-132 / 256 instead of -105) and the re-plan comes a frame later. Ours re-plans at once. The class the Super Buu
+agent documented as "heap leftovers: deterministic but unmodelled".
 
 **Claim (ship fix agent, 2026-10-04, by the coordinator): the Pyramid 14-2 cluster** - the real run's 14-2 rows
 with sprite 256 (position / facing / RNG: `r057_005/011/013/015/021/031/035/059_14-2`, `r069_003/011/013/021/027/
@@ -2564,3 +2570,16 @@ exact), gated `rdb5_020_12-27`. Open on the claim: `r038_001_18-1` (camera), `r0
 all clean. *wf-app `dialog_portrait_parity`* (red since f11daf9): `begin_event` now runs the event-start message under
 a field a script already holds, and that cleared the talk's speaker anchor the talk had just set (Yemma's Office:
 text box bottom / portrait right instead of top / left). The anchor survives the second start; the test is green.
+
+**Claim update (B, 2026-10-04): the two camera rows are menu-close timing, handed to its owners.** Both stop on the
+first steps of the follow camera after a menu closes, at frames the reload model (`sndsim::reload_frames_with`,
+`Menu.leave_cam`) decides - no camera rule of their own:
+* `r038_001_18-1` f589 (pause menu, 18-1): the restore's camera update matches (f588; reload 23 frames, `wrap` 1,
+  margin 266 k cycles); at f589, the first logic frame, the game's follow camera steps again and ours does not
+  (54,354 vs 54,350 in 1/1024 px).
+* `r009_006_4-1` f458 (shop screen, native 141, closing through FadeIn): the game's camera steps from the third
+  FadeIn frame (f458, the logic counter still frozen; it resumes at f459); ours makes no restore camera update in a
+  FadeIn close (the `Menu.leave_cam` test is in the Leave phase only).
+The other recurring `cam` rows on the scoreboard (`r002_004/006_4-1`, `r052_004_1-5`, `r064_029_21-26`,
+`r067_071_14-2`) are worth checking against these two cases. Not changed here: the menu-close model is the Earth /
+ship-fix agents' (its latest refit f0e253f).
