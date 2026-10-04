@@ -84,6 +84,7 @@ fn main() {
     let _ = rec;
     let mut prev_lf = -1i64;
     let mut nolag_first: Option<usize> = None;
+    let (mut snd_bad, mut snd_iters) = (0usize, 0usize);
     let mut rng_bad = 0usize;
     let mut flag_check: Option<(usize, String)> = None;
     let mut flag_reports = 0usize;
@@ -255,6 +256,47 @@ fn main() {
                 app.step(&[keys], &mut ev);
                 wf_core::rng::TRACE.store(false, std::sync::atomic::Ordering::Relaxed);
                 stepped += 1;
+                // the iteration's sound requests against the game's (rows with this counter; the rows' `snd`), every
+                // logic row after the sync - counted, the first 30 printed (SND lines)
+                if synced && rows[k].get("snd").is_some() {
+                    let mut game: Vec<String> = rows[k..]
+                        .iter()
+                        .take_while(|n| n["lf"].as_i64().unwrap_or(0) == lf)
+                        .flat_map(|n| n["snd"].as_array().cloned().unwrap_or_default())
+                        .filter_map(|s| {
+                            let a = s.as_array()?.clone();
+                            let x = |j: usize| a.get(j).and_then(|v| v.as_i64()).unwrap_or(0);
+                            Some(match a.first()?.as_str()? {
+                                "play" => format!("play {} {}", x(1), x(2)),
+                                "stop" | "stopmatch" => format!("stop {}", x(1)),
+                                "stopall" => "stopall".into(),
+                                "song" => format!("song {}", x(1)),
+                                o => o.to_string(),
+                            })
+                        })
+                        .collect();
+                    game.sort();
+                    let mut ours: Vec<String> = app
+                        .world()
+                        .events
+                        .iter()
+                        .filter_map(|e| match e {
+                            wf_core::world::Event::Sfx { id, vol } => Some(format!("play {id} {vol}")),
+                            wf_core::world::Event::SfxStop { id } | wf_core::world::Event::SfxStopMatch { id } => Some(format!("stop {id}")),
+                            wf_core::world::Event::SfxStopAll => Some("stopall".into()),
+                            wf_core::world::Event::Song { id } => Some(format!("song {id}")),
+                            _ => None,
+                        })
+                        .collect();
+                    ours.sort();
+                    snd_iters += 1;
+                    if ours != game {
+                        snd_bad += 1;
+                        if snd_bad <= 30 {
+                            println!("SND row {k} (lf {lf}, menu {}): app {ours:?} game {game:?}", wf_core::menu::active(app.world()));
+                        }
+                    }
+                }
                 // (a --sync chain is compared from its sync point: before it the app runs open loop)
                 if nolag_first.is_none() && synced {
                     // the game's row recorded at the iteration's end: its last video frame (a long iteration - a load,
@@ -490,6 +532,7 @@ fn main() {
     println!("rows {} stepped {} | script errors {}", rows.len().min(limit), stepped, s.errors.len());
     if std::env::var_os("SOAK_NOLAG").is_some() {
         println!("no-lag: {}", match nolag_first { Some(k) => format!("first divergence at row {k}"), None => "exact on every logic row".into() });
+        println!("no-lag sounds: {snd_bad} of {snd_iters} logic iterations differ");
     }
     if std::env::var_os("SOAK_SIMLAG").is_some() {
         println!("sim lag: {sim_lag_rows} rows, first on a game logic row: {sim_lag_bad:?}");

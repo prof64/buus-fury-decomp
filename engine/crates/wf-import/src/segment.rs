@@ -429,7 +429,9 @@ pub fn replay_with(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: 
     let (mut world_i, mut world_tally) = (0usize, crate::world::Tally::default());
     // SEGMENT_AREA: the game's area-local rows (tools/segments/area.py; a gate with "area_exact" always)
     let area_rows = (std::env::var_os("SEGMENT_AREA").is_some() || doc["area_exact"].as_bool() == Some(true)).then(|| crate::area::load(doc)).flatten();
-    let (mut area_i, mut area_tally, mut area_g0) = (0usize, crate::area::Tally::default(), None::<Vec<u8>>);
+    let (mut area_i, mut area_tally) = (0usize, crate::area::Tally::default());
+    // (the game's changes are against its grid before row 0's frame: ours as imported)
+    let area_g0 = area_rows.as_ref().and_then(|_| crate::area::walk_grid(&sess.world));
     let mut was_leaving = false;
     for (k, fr) in frames.iter().enumerate() {
         let keys = i(&fr["keys"]) as u16;
@@ -765,13 +767,11 @@ pub fn replay_with(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: 
             // SEGMENT_AREA (report only): the area's own lists at the rows where the game's changed, and the last row
             // (the walk grid's changes relative to ours after row 0, as the game's)
             if let Some(rows) = area_rows.as_ref() {
-                if k == 0 {
-                    area_g0 = crate::area::walk_grid(&sess.world);
-                }
                 while area_i + 1 < rows.len() && rows[area_i + 1].0 <= k {
                     area_i += 1;
                 }
-                if rows.get(area_i).is_some_and(|r| r.0 <= k) && (rows[area_i].0 == k || (k + 1 == frames.len() && std::env::var_os("T_ALAST").is_some())) {
+                if rows.get(area_i).is_some_and(|r| r.0 <= k) && rows[area_i].0 == k {
+                    // (change rows only: the segment's last row is often inside the next load, the game's list torn down)
                     area_tally.check(k, &sess.world, area_g0.as_deref(), &rows[area_i].1);
                 }
             }

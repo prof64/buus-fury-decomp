@@ -890,7 +890,13 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
         }
     }
     if let Some(s) = song_of(a) {
-        w.events.push(Event::Song { id: s });
+        // the area's song is requested only when another one plays (the game's PlaySong 0x0803F110 is not called for
+        // the song already on: whole-run sound requests, Diablo Desert 10-x loads keep song 27 without a request)
+        if std::env::var_os("OLD_SONG").is_some() {
+            w.events.push(Event::Song { id: s });
+        } else {
+            crate::scene::play_song(w, s);
+        }
     }
     for o in a.objects.iter().filter(|o| objects && list_of(o) == 1) {
         if cond_holds(w, &o.cond) {

@@ -125,6 +125,42 @@ fn main() {
     let mut k = from_row;
     let mut lfd_last: Option<i64> = None;
     let mut hp_bad = false;
+    // --sounds FILE: the game's sound requests per row (tools/wholerun/sounds.py; .json or .json.gz) - compared per
+    // logic iteration in no-lag mode; SND lines for the first `--sounds-show N` (default 40) differing iterations
+    let game_snd: Option<std::collections::HashMap<usize, Vec<String>>> = opt("--sounds").map(|p| {
+        let txt = if p.ends_with(".gz") {
+            String::from_utf8(std::process::Command::new("gzip").args(["-dc", &p]).output().expect("gzip").stdout).expect("utf8")
+        } else {
+            std::fs::read_to_string(&p).expect("sounds")
+        };
+        let v: serde_json::Value = serde_json::from_str(&txt).expect("sounds json");
+        v["ev"]
+            .as_array()
+            .expect("ev")
+            .iter()
+            .map(|r| {
+                let evs = r[1]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|s| {
+                        let a = s.as_array()?;
+                        let n = |k: usize| a.get(k).and_then(|x| x.as_i64()).unwrap_or(0);
+                        Some(match a[0].as_str()? {
+                            "play" => format!("play {} {}", n(1), n(2)),
+                            "stop" | "stopmatch" => format!("stop {}", n(1)),
+                            "stopall" => "stopall".into(),
+                            "song" => format!("song {}", n(1)),
+                            o => o.to_string(),
+                        })
+                    })
+                    .collect();
+                (r[0].as_u64().unwrap_or(0) as usize, evs)
+            })
+            .collect()
+    });
+    let snd_show: usize = opt("--sounds-show").and_then(|v| v.parse().ok()).unwrap_or(40);
+    let (mut snd_bad, mut snd_iters) = (0usize, 0usize);
     let mut sup_last: Option<Vec<(usize, u8)>> = None;
     while let Some(r) = lines.next() {
         if k >= limit {
@@ -186,6 +222,39 @@ fn main() {
             let mut ev = vec![];
             app.step(&[keys], &mut ev);
             stepped += 1;
+            // --sounds FILE (tools/wholerun/sounds.py): this iteration's sound requests against the game's - the
+            // game's of every row with this logic counter (a request in a long iteration lands on one of its rows)
+            if let Some(gs) = game_snd.as_ref().filter(|_| logic && no_lag) {
+                let mut game: Vec<String> = vec![];
+                let mut j = k;
+                while j < lfs.len() && lfs[j] == lf {
+                    if let Some(v) = gs.get(&j) {
+                        game.extend(v.iter().cloned());
+                    }
+                    j += 1;
+                }
+                game.sort();
+                let mut ours: Vec<String> = app
+                    .world()
+                    .events
+                    .iter()
+                    .filter_map(|e| match e {
+                        wf_core::world::Event::Sfx { id, vol } => Some(format!("play {id} {vol}")),
+                        wf_core::world::Event::SfxStop { id } | wf_core::world::Event::SfxStopMatch { id } => Some(format!("stop {id}")),
+                        wf_core::world::Event::SfxStopAll => Some("stopall".into()),
+                        wf_core::world::Event::Song { id } => Some(format!("song {id}")),
+                        _ => None,
+                    })
+                    .collect();
+                ours.sort();
+                if ours != game {
+                    snd_bad += 1;
+                    if snd_bad <= snd_show {
+                        println!("SND row {k} ({}) lf {lf} menu {menu}: app {ours:?} game {game:?}", stretch_of(k));
+                    }
+                }
+                snd_iters += 1;
+            }
         } else {
             // the game's lag frame (recorded): the sound hardware's frame only
             if sim_lag {
@@ -370,6 +439,9 @@ fn main() {
     }
     let exact_to = first_exact.as_ref().map(|f| f.0).unwrap_or(k);
     println!("rows {k} stepped {stepped} | sim lag {own_lag} (on game logic rows {lag_bad}), recorded lag replayed {replayed_lag} | script errors {errors}");
+    if game_snd.is_some() {
+        println!("sounds: {snd_bad} of {snd_iters} logic iterations differ");
+    }
     println!("whole run, no imports ({} lag): exact to row {exact_to} of {k} ({})", mode_name, stretch_of(exact_to));
     for l in &lasting {
         println!("  first lasting {}: {:?}", l.0, l.3.as_ref().map(|(r, d)| (r, stretch_of(*r), d)));

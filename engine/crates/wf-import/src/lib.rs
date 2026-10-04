@@ -639,6 +639,17 @@ fn open_pause_page(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
             s.orig[k] = ram.s32(m + 0x134 + 4 * k as u32);
             s.vals[k] = ram.s32(m + 0x144 + 4 * k as u32);
         }
+        // the party tabs (+0x12C, vt 0x08049C68): +0x34 first shown, +0x38 end, +0x3C current, +0x40 marked, +0x48 x
+        let tb = ram.r32(m + 0x12C);
+        if ram.valid(tb) {
+            if let Some(wf_core::menu::kit::Widget::Tabs(t)) = s.c.kids.get_mut(s.tabs) {
+                t.first = ram.s32(tb + 0x34);
+                t.end = ram.s32(tb + 0x38);
+                t.cur = ram.s32(tb + 0x3C);
+                t.mark = ram.s32(tb + 0x40);
+                t.x0 = ram.s32(tb + 0x48);
+            }
+        }
         wf_core::menu::Screen::Status(s)
     } else {
         let inv = if vt == MODE_INVENTORY {
