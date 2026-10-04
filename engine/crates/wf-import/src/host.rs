@@ -20,14 +20,14 @@ use wf_core::world::{Event, World, MAX_PLAYERS};
 use wf_script_core::{poll, CoreState, HostState, SharedHost};
 use wf_script_rhai::{Runtime, Status, UnitRef};
 
-#[derive(Clone)]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 struct Job {
     run: Callback,
     cause: Cause,
 }
 
 /// a blocked script suspended while a nested one runs (an area load's on-enter script inside a script's warp)
-#[derive(Clone)]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 struct Outer {
     thread: wf_script_rhai::ThreadState,
     pending: Option<wf_script_core::Pending>,
@@ -64,6 +64,9 @@ pub struct StoryHost {
     pub text_open_due: Option<bool>,
     /// a breakable's on-break callback whose command wait ended this frame: it resumes in the next one (`resume_blocked`)
     break_due: Option<Option<i32>>,
+    /// `started.len()` when an on-break inline script (`Cause::Break`, `Callback::Script`) started: it is the running
+    /// script while no other started after it (an on-break *event* - 14-21's s418 - resumes as events do)
+    break_inline: Option<usize>,
 }
 
 /// the cause of an event the import continues: a fusion component's level-up hook (s003 cut while
@@ -185,6 +188,9 @@ impl StoryHost {
         self.hs.in_unit = true;
         self.rt.start_unit(UnitRef::new(id.to_string(), "", steps), [0; 4]);
         self.started.push((self.frame, id.to_string()));
+        if !hold {
+            self.break_inline = Some(self.started.len());
+        }
         self.cause = None;
         self.rt.with_thread(|t| {
             t.skip = drop;
@@ -243,7 +249,7 @@ impl StoryHost {
         let rt = Runtime::new(files, Box::new(shared.clone()))?;
         let stepped = files.iter().filter(|(_, src)| src.contains("fn step_0()")).map(|(p, _)| p.clone()).collect();
         let hs = HostState { nest_area_enter: true, ..HostState::default() };
-        Ok(StoryHost { rt, shared, hs, queue: VecDeque::new(), running: false, cause: None, outer: vec![], stepped, errors: vec![], started: vec![], prev_held: 0, frame: 0, step_code: STEP_CODE.get().cloned().unwrap_or_default(), text_open_due: None, break_due: None })
+        Ok(StoryHost { rt, shared, hs, queue: VecDeque::new(), running: false, cause: None, outer: vec![], stepped, errors: vec![], started: vec![], prev_held: 0, frame: 0, step_code: STEP_CODE.get().cloned().unwrap_or_default(), text_open_due: None, break_due: None, break_inline: None })
     }
 
     /// a session around an imported / built world (no hook: the host runs the queue itself)
@@ -622,6 +628,9 @@ impl StoryHost {
                     let path = format!("scripts/inline/{id}.rhai");
                     let steps = self.stepped.contains(&path);
                     self.started.push((k, id.clone()));
+                    if matches!(job.cause, Cause::Break { .. }) {
+                        self.break_inline = Some(self.started.len());
+                    }
                     self.hs.in_unit = true;
                     self.rt.start_unit(UnitRef::new(id.clone(), "", steps), [0; 4]);
                 }
@@ -681,7 +690,7 @@ impl StoryHost {
         if let Some(v) = self.break_due.take() {
             r = Some(v);
             self.hs.from_wait = true;
-        } else if director && r.is_some() && self.outer.is_empty() && matches!(self.cause, Some(Cause::Break { .. })) {
+        } else if director && r.is_some() && self.outer.is_empty() && self.break_inline == Some(self.started.len()) {
             self.break_due = r.take();
         }
         if let Some(v) = r {
@@ -779,7 +788,7 @@ impl StoryHost {
 }
 
 /// a [`StoryHost`]'s between-frames state (the script thread, globals, host state, queue)
-#[derive(Clone)]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct HostSnapshot {
     thread: wf_script_rhai::ThreadState,
     globals: wf_script::vm::Globals,
@@ -792,6 +801,14 @@ pub struct HostSnapshot {
     started: usize,
     prev_held: u16,
     frame: usize,
+    // (the pending breakable callback and the import's text-box flag: a rewind across a breakable's callback wait
+    // lost them - the whole run's save-state check, step 50,727: the player did not walk after the restore)
+    #[serde(default)]
+    text_open_due: Option<bool>,
+    #[serde(default)]
+    break_due: Option<Option<i32>>,
+    #[serde(default)]
+    break_inline: Option<usize>,
 }
 
 impl StoryHost {
@@ -814,6 +831,9 @@ impl StoryHost {
             started: self.started.len(),
             prev_held: self.prev_held,
             frame: self.frame,
+            text_open_due: self.text_open_due,
+            break_due: self.break_due,
+            break_inline: self.break_inline,
         }
     }
     pub fn restore(&mut self, s: &HostSnapshot) {
@@ -828,5 +848,8 @@ impl StoryHost {
         self.started.truncate(s.started);
         self.prev_held = s.prev_held;
         self.frame = s.frame;
+        self.text_open_due = s.text_open_due;
+        self.break_due = s.break_due;
+        self.break_inline = s.break_inline;
     }
 }

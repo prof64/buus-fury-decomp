@@ -20,6 +20,7 @@ pub const FONTS: &[(&str, u32, &str)] = &[
     ("digits", 0x0806_F150, "digits 0-9 only (counters)"),
     ("menu", 0x0807_012C, "menus (item / equipment / status lines, title screen menu)"),
     ("bold", 0x082B_9BA0, "bold, menu page titles ('Status', 'Inventory', …)"),
+    ("timer", 0x0806_F4F4, "the countdown / stopwatch display's thick digits (0x0802FCA0, drawn outlined)"),
 ];
 
 /// Glyph-cell top relative to the pen y passed to the drawer.

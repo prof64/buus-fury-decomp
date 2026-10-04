@@ -837,6 +837,10 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
     let col = fd.collision(m);
     w.arena = arena_of(a, m, &col);
     w.col = Some(Collision::new(col));
+    // the collision overrides (`open_area` / `block_area`) were the old map's: a snapshot restore re-applies the list to
+    // the map it rebuilds, so it holds this map's only (kept across loads, a restore applied an earlier area's blocks:
+    // the whole run's save-state check, step 50,727 - the restored player could not walk)
+    w.scene.area_ops.clear();
     {
         let f = w.field.as_mut().expect("field");
         f.area = to;
@@ -2490,5 +2494,7 @@ pub fn restore_world(w: &mut World, s: SavedWorld) {
         }
         c.walk = s.walk_layer;
         w.col = Some(c);
+        // (the rebuilt map has none of the overrides: the list starts again - see load_area)
+        w.scene.area_ops.clear();
     }
 }

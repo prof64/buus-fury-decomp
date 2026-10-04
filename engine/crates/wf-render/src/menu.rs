@@ -128,12 +128,13 @@ fn font_slot(f: MenuFont) -> usize {
         MenuFont::Digits => 2,
         MenuFont::Menu => 3,
         MenuFont::Bold => 4,
+        MenuFont::Timer => 5,
     }
 }
 
 impl MenuRenderer {
     pub fn load(packs: &Packs) -> MenuRenderer {
-        let fonts = [MenuFont::Small, MenuFont::Dialog, MenuFont::Digits, MenuFont::Menu, MenuFont::Bold].iter().map(|f| ColFont::load(packs, f.id())).collect();
+        let fonts = [MenuFont::Small, MenuFont::Dialog, MenuFont::Digits, MenuFont::Menu, MenuFont::Bold, MenuFont::Timer].iter().map(|f| ColFont::load(packs, f.id())).collect();
         let pal: Vec<u32> = packs
             .json::<serde_json::Value>("ui/palette.json")
             .ok()
@@ -394,6 +395,38 @@ impl MenuRenderer {
             }
         }
         s
+    }
+
+    /// The countdown / stopwatch display (object 0x0802FCA0, draw 0x0802FD16) for `t` frames, as 64x16 ARGB (0 =
+    /// transparent): the value in hundredths `(t * 53) >> 5` as M:SS:CC (9:59:99 from 36,000 frames on), each
+    /// character in the thick timer font, outlined (colour 5, outline 1: `0x0803F70C`), right-aligned at the
+    /// columns 12 / 27 / 37 / 52 / 62 by the dialogue font's advance (`0x0804F9A4`), the colons at 17 / 42 less theirs;
+    /// a leading 0 minute and its colon are left out
+    pub fn timer(&mut self, packs: &Packs, t: i32) -> Vec<u32> {
+        let ch: [u16; 5] = if t >= 36_000 {
+            [b'9' as u16, b'5' as u16, b'9' as u16, b'9' as u16, b'9' as u16]
+        } else {
+            let v = ((t.max(0) as u32 * 53) >> 5) as u32;
+            let (m, r) = (v / 6000, v % 6000);
+            [b'0' as u16 + m as u16, b'0' as u16 + (r / 1000 % 10) as u16, b'0' as u16 + (r / 100 % 10) as u16, b'0' as u16 + (r / 10 % 10) as u16, b'0' as u16 + (r % 10) as u16]
+        };
+        let adv = |c: u16| -> i32 {
+            self.fonts.get(font_slot(MenuFont::Dialog)).and_then(|f| f.as_ref()).and_then(|f| f.glyphs.get(c as usize).cloned().flatten()).map(|g| g.0 as i32 + 1).unwrap_or(1)
+        };
+        let colon = b':' as u16;
+        let mut put: Vec<(i32, u16)> = vec![];
+        if ch[0] != b'0' as u16 {
+            put.push((12 - adv(ch[0]), ch[0]));
+            put.push((17 - adv(colon), colon));
+        }
+        put.push((27 - adv(ch[1]), ch[1]));
+        put.push((37 - adv(ch[2]), ch[2]));
+        put.push((42 - adv(colon), colon));
+        put.push((52 - adv(ch[3]), ch[3]));
+        put.push((62 - adv(ch[4]), ch[4]));
+        let ops: Vec<MenuOp> = put.into_iter().map(|(x, c)| MenuOp::TextOutline { font: MenuFont::Timer, x, y: 12, colour: 5, outline: 1, clip: [0, 0, 64, 16], text: vec![c] }).collect();
+        let s = self.surface(packs, &wf_view::MenuLayer { w: 64, h: 16, x: 0, y: 0, priority: 1, ops });
+        s.px.iter().map(|&c| if c == 0 { 0 } else { 0xFF00_0000 | (self.pal.get(c as usize).copied().unwrap_or(0) & 0xFF_FFFF) }).collect()
     }
 
     /// the 240x160 screen (0xFFRRGGBB), with the game's palette fade (`0x08007074`) and BLDY fade applied

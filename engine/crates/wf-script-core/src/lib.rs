@@ -491,6 +491,7 @@ pub fn tick_timers(w: &mut World, s: &mut HostState) {
             }));
         }
     }
+    w.scene.timers_shown = (s.timers.countdown, s.timers.stopwatch);
 }
 
 /// Per-frame poll of the pending action, after the World stepped. `Some(result)` = resume the thread now with
@@ -503,6 +504,7 @@ pub fn poll(w: &mut World, s: &mut HostState) -> Option<Option<i32>> {
     if s.timers.stopwatch_on {
         s.timers.stopwatch += 1;
     }
+    w.scene.timers_shown = (s.timers.countdown, s.timers.stopwatch);
     if s.boost[0] > 0 {
         s.boost[0] -= 1;
     }

@@ -55,6 +55,8 @@ pub struct RenderView {
     pub hud: Vec<HudView>,
     /// Boss HP bars (`ui/hud/boss_bar.png`): two 32x8 OBJs at screen x 160 / 192, priority 1.
     pub boss_bars: Vec<BossBarView>,
+    /// The countdown / stopwatch display's value in frames (two 32x16 OBJs at (168, 8), priority 1), if shown.
+    pub timer: Option<i32>,
     /// Screen brightness fade: 0 = normal, 16 = black (GBA BLDY semantics, applied after composition).
     pub fade_black: u8,
     /// The dialogue box, if one is open (drawn above everything, like the game's priority-0 OBJs).
@@ -167,6 +169,8 @@ pub enum MenuFont {
     #[default]
     Menu,
     Bold,
+    /// the countdown / stopwatch display's digits
+    Timer,
 }
 
 impl MenuFont {
@@ -177,6 +181,7 @@ impl MenuFont {
             MenuFont::Digits => "digits",
             MenuFont::Menu => "menu",
             MenuFont::Bold => "bold",
+            MenuFont::Timer => "timer",
         }
     }
 }
@@ -212,6 +217,9 @@ pub struct DialogAnim {
     /// visible characters of the current page drawn so far (colour pairs and an option's "- " take none);
     /// `None` = all
     pub typed: Option<u32>,
+    /// a choice's cursor object (`0x080178C8`): its draws so far - it is made when the typing reaches the page's
+    /// first option line, and its draw (`0x0801794C`) counts +1 and hides it while bit 3 is set (8 shown / 8 hidden)
+    pub cursor_draws: Option<u32>,
 }
 
 /// Exact world-map presentation state (docs/frontend.md "World map"). Every field is optional; without it the
@@ -304,6 +312,7 @@ impl RenderView {
         self.palette_fade = None;
         self.palette_scale = None;
         self.boss_bars.clear();
+        self.timer = None;
         self.banner = None;
         self.world_map = None;
         self.dialog_anim = None;

@@ -1250,6 +1250,12 @@ pub fn hud_tick(w: &mut World) {
         v.a.free(h);
     }
 }
+/// a non-actor object (banner, HUD, boss bar ...) is out of the world list: suspended by a purge until the text box
+/// closes - not drawn, not updated
+pub fn owner_suspended(w: &World, o: Owner) -> bool {
+    w.field.as_ref().and_then(|f| f.vram.as_ref()).is_some_and(|v| v.susp.iter().any(|x| matches!(x, Susp::Own(a, _, _) if *a == o)))
+}
+
 /// the area banner starts / ends
 pub fn banner(w: &mut World, on: bool) {
     if w.field.as_ref().is_none_or(|f| f.vram.is_none()) {

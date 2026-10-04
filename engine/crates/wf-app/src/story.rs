@@ -37,6 +37,9 @@ pub struct StorySim {
     /// the screen's one-frame lags (wf-core view::Presenter; the core's view does banner, fades, tile timers, the
     /// greyed icon, the dialogue animation)
     presenter: wf_core::view::Presenter,
+    /// steps taken (`Sim::frame`: replays, rewind and rollback index their input logs by it - `World.frame` counts
+    /// object passes and stands still in menus, holds and loads)
+    steps: u64,
 }
 
 /// `areas.json` key `"W-A"` -> (world, area)
@@ -99,7 +102,7 @@ impl StorySim {
         // the first area's load scripts (gates, doors, bridges) before frame 0
         host.start(&mut session);
         let errors = host.errors.clone();
-        Ok(StorySim { session, host, prev: [0; MAX_PLAYERS], errors, init_events, presenter: Default::default() })
+        Ok(StorySim { session, host, prev: [0; MAX_PLAYERS], errors, init_events, presenter: Default::default(), steps: 0 })
     }
 
     /// Story mode from a real-game checkpoint: the RAM of an area-entry cut imported ONCE (`wf_import`), then the
@@ -124,7 +127,7 @@ impl StorySim {
         let errors = host.errors.clone();
         let mut prev = [0; MAX_PLAYERS];
         prev[0] = imp.prev_keys;
-        Ok(StorySim { session, host, prev, errors, init_events: Vec::new(), presenter: Default::default() })
+        Ok(StorySim { session, host, prev, errors, init_events: Vec::new(), presenter: Default::default(), steps: 0 })
     }
 
     pub fn from_import(packs: &Packs, ram: &wf_import::GbaRam) -> Result<StorySim, String> {
@@ -147,7 +150,7 @@ impl StorySim {
         let errors = host.errors.clone();
         let mut prev = [0; MAX_PLAYERS];
         prev[0] = imp.prev_keys;
-        Ok(StorySim { session, host, prev, errors, init_events: Vec::new(), presenter: Default::default() })
+        Ok(StorySim { session, host, prev, errors, init_events: Vec::new(), presenter: Default::default(), steps: 0 })
     }
 
     pub fn world(&self) -> &World {
@@ -201,6 +204,7 @@ impl Sim for StorySim {
         self.host.step_inputs(&mut self.session, frames);
         self.errors.extend(self.host.errors[seen.min(self.host.errors.len())..].iter().cloned());
         wf_core::view::sim_events(&self.session.world, events);
+        self.steps += 1;
     }
 
     fn view(&self, out: &mut RenderView) {
@@ -208,10 +212,54 @@ impl Sim for StorySim {
         self.presenter.apply(out);
     }
     fn frame(&self) -> u64 {
-        self.session.world.frame as u64
+        self.steps
     }
     fn state_hash(&self) -> u64 {
         self.session.world.state_hash()
+    }
+    /// save states / rewind / rollback for story mode: the session (world, its input edges, outcome), the script
+    /// host's between-frames state (the running thread, globals, host state, queue, suspended scripts) and this sim's
+    /// input edges. "WFS1", u32 session length, the session bytes, u32 host length, the host (JSON), 4 x u16 prev, u64
+    /// steps.
+    /// The presenter's one-frame view lag is not kept: the first frame after a restore shows the restored state.
+    fn snapshot(&self) -> Option<Vec<u8>> {
+        let mut v = b"WFS1".to_vec();
+        let s = self.session.snapshot_bytes();
+        v.extend((s.len() as u32).to_le_bytes());
+        v.extend(s);
+        let h = serde_json::to_vec(&self.host.snapshot()).ok()?;
+        v.extend((h.len() as u32).to_le_bytes());
+        v.extend(h);
+        for p in self.prev {
+            v.extend(p.to_le_bytes());
+        }
+        v.extend(self.steps.to_le_bytes());
+        Some(v)
+    }
+    fn restore(&mut self, b: &[u8]) -> bool {
+        let rd = |o: usize| -> Option<usize> { Some(u32::from_le_bytes(b.get(o..o + 4)?.try_into().ok()?) as usize) };
+        if b.get(..4) != Some(b"WFS1".as_slice()) {
+            return false;
+        }
+        let Some(sn) = rd(4) else { return false };
+        let Some(sb) = b.get(8..8 + sn) else { return false };
+        let Some(hn) = rd(8 + sn) else { return false };
+        let Some(hb) = b.get(12 + sn..12 + sn + hn) else { return false };
+        let Ok(hs) = serde_json::from_slice::<wf_import::host::HostSnapshot>(hb) else { return false };
+        let o = 12 + sn + hn;
+        if b.len() < o + 2 * MAX_PLAYERS || !self.session.restore_bytes(sb) {
+            return false;
+        }
+        self.host.restore(&hs);
+        for k in 0..MAX_PLAYERS {
+            self.prev[k] = u16::from_le_bytes([b[o + 2 * k], b[o + 2 * k + 1]]);
+        }
+        self.init_events.clear();
+        self.presenter.reset();
+        if let Some(s) = b.get(o + 2 * MAX_PLAYERS..o + 2 * MAX_PLAYERS + 8) {
+            self.steps = u64::from_le_bytes(s.try_into().unwrap_or([0; 8]));
+        }
+        true
     }
     fn players(&self) -> usize {
         self.session.world.players.len().max(1)

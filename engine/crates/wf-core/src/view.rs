@@ -149,6 +149,11 @@ pub fn render_view(w: &World, out: &mut RenderView) {
         });
         out.world_map = Some(wm);
     }
+    // the countdown / stopwatch display (`show_timer_hud` 0xB0 / 0xBC: object 0x0802FCA0)
+    out.timer = w.scene.timer_hud.map(|k| match k {
+        crate::scene::TimerHud::Countdown => w.scene.timers_shown.0,
+        crate::scene::TimerHud::Stopwatch => w.scene.timers_shown.1,
+    });
     // boss HP bars (the shown one, one sliding out)
     if let Some(b) = &w.scene.boss_bar {
         out.boss_bars.push(wf_view::BossBarView { y: b.y(w.frame), fill: b.fill(w).clamp(0, 53) as u8 });
@@ -156,7 +161,8 @@ pub fn render_view(w: &World, out: &mut RenderView) {
     if let Some((b, y)) = w.scene.boss_bar_out.as_ref().and_then(|b| Some((b, b.y_at(w.frame)?))) {
         out.boss_bars.push(wf_view::BossBarView { y, fill: b.fill.clamp(0, 53) as u8 });
     }
-    if let Some((text, t)) = w.scene.banner.as_ref().filter(|b| b.1 <= 238) {
+    // (a purge for a text box suspends the banner object: not drawn while the box is up - rkb_006 19-3 f30)
+    if let Some((text, t)) = w.scene.banner.as_ref().filter(|b| b.1 <= 238).filter(|_| !crate::vram::owner_suspended(w, crate::vram::Owner::Banner)) {
         out.banner = Some(wf_view::BannerView { text: text.clone(), t: *t });
     }
     // the draw order: the world-list objects by (layer, depth) - the actors and the field's props (each prop its own
@@ -401,7 +407,7 @@ pub fn sim_events(w: &World, out: &mut Vec<SimEvent>) {
 #[derive(Clone, Debug, Default)]
 pub struct Presenter {
     #[allow(clippy::type_complexity)]
-    prev: Option<(Vec<SpriteDraw>, Vec<HudView>, Option<wf_view::BannerView>, Option<wf_view::DialogView>, Option<wf_view::DialogAnim>, Vec<wf_view::BossBarView>)>,
+    prev: Option<(Vec<SpriteDraw>, Vec<HudView>, Option<wf_view::BannerView>, Option<wf_view::DialogView>, Option<wf_view::DialogAnim>, Vec<wf_view::BossBarView>, Option<i32>)>,
     prev_mode7: Option<wf_view::Mode7View>,
 }
 
@@ -410,17 +416,19 @@ impl Presenter {
         let mut v = RenderView::default();
         render_view(w, &mut v);
         self.prev_mode7 = v.map.as_ref().and_then(|m| m.mode7.clone());
-        self.prev = Some((v.sprites, v.hud, v.banner, v.dialog, v.dialog_anim, v.boss_bars));
+        self.prev = Some((v.sprites, v.hud, v.banner, v.dialog, v.dialog_anim, v.boss_bars, v.timer));
     }
     /// the session started mid-area (harnesses): nothing of the previous build to show
     pub fn reset(&mut self) {
         *self = Presenter::default();
     }
     pub fn apply(&self, out: &mut RenderView) {
-        if let Some((sprites, hud, banner, dialog, anim, boss_bars)) = &self.prev {
+        if let Some((sprites, hud, banner, dialog, anim, boss_bars, timer)) = &self.prev {
             out.sprites = sprites.clone();
             out.hud = hud.clone();
             out.boss_bars = boss_bars.clone();
+            // (its OAM a frame late; the digits are drawn into its tiles in the draw itself: the current value)
+            out.timer = timer.and(out.timer);
             out.banner = banner.clone();
             out.dialog = dialog.clone();
             // the box OBJs are a frame late; the text surface is redrawn and uploaded every frame (the typewriter
@@ -465,10 +473,33 @@ pub fn dialog_anim(w: &World) -> Option<wf_view::DialogAnim> {
         P::Closing => (8 - d.t, None),
         P::Closed => return None,
     };
+    // the cursor object's age: made when the typing reaches the first option line (`0x0800AF8A`)
+    let cursor_draws = (d.options > 0 && d.phase == P::Shown).then(|| {
+        let page = d.text.split('\u{b}').nth(d.page as usize).unwrap_or("");
+        let mut s = 0i32;
+        for line in page.split('\n') {
+            if line.starts_with('-') {
+                break;
+            }
+            let mut n = 0i32;
+            let mut it = line.chars();
+            while let Some(c) = it.next() {
+                if c == '\u{8}' {
+                    it.next();
+                } else {
+                    n += 1;
+                }
+            }
+            s += n;
+        }
+        let need = d.typing.get(d.page as usize).copied().unwrap_or(0) as i32;
+        let age = if d.typed < need { d.typed - s } else { (need - s) + (d.t - d.typed_t) };
+        (age >= 0).then_some(age as u32)
+    }).flatten();
     if scale < 1 {
-        return Some(wf_view::DialogAnim { scale: 0xFF, typed });
+        return Some(wf_view::DialogAnim { scale: 0xFF, typed, cursor_draws });
     }
-    Some(wf_view::DialogAnim { scale: scale.min(8) as u8, typed })
+    Some(wf_view::DialogAnim { scale: scale.min(8) as u8, typed, cursor_draws })
 }
 
 impl Sim for Session {

@@ -1,12 +1,12 @@
 {
- "tree": "fb38f36",
+ "tree": "9fb67ca",
  "modes": [
   {
    "lag": "recorded",
    "rows": 1668052,
-   "exact_to": 848743,
-   "exact_stretch": "017_db6_fukurou",
-   "first": "flags: flag 187 app only",
+   "exact_to": 1339017,
+   "exact_stretch": "062_m_inside_buu",
+   "first": "rng: app [b460ebed, 721626b0] game [699cd8d3, d8087ea9]",
    "lasting": {
     "area": {
      "row": 1340399,
@@ -42,9 +42,9 @@
   {
    "lag": "none",
    "rows": 1668052,
-   "exact_to": 848743,
-   "exact_stretch": "017_db6_fukurou",
-   "first": "flags: flag 187 app only",
+   "exact_to": 1339017,
+   "exact_stretch": "062_m_inside_buu",
+   "first": "rng: app [b460ebed, 721626b0] game [699cd8d3, d8087ea9]",
    "lasting": {
     "area": {
      "row": 1340399,

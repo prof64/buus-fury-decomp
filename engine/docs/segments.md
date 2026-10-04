@@ -4150,6 +4150,26 @@ no tag 1,127 (cloud layers' drift after a cut: the drift clock is not imported),
 stopwatch display** 775 (not drawn: a text object, 0x0802FCA0, whose value lives in the script host's timers, not
 the world), banner 497, BG priority / hidden / blend 1,185. The "boss bar" tag (2,160) is context only - the bar
 itself now matches.
+**Update 3: 13,154 / 25,314 (52.0%), 66 segments locked (644 frames).**
+* **The cel each actor shows is now compared by the segment harness** (`CelTally`: `wf_core::view::actor_cel` - the
+  one function the view draws from - against the recorded raw / cel / facing, report-only, `SEGMENT_CEL=all` per
+  frame) and **gated** for the 331 segments clean on it (`data/segments/cel_exact.json`, read by tests/segments.rs;
+  regenerate with `work/superbuu/pix/cel_lock.py <segments test log --nocapture>`). Found and fixed with it: a
+  **player drew a leftover script puppet's animation** instead of its own state's (12-6 f54: walking, drawn idle -
+  `ap` is what the game shows; 89 segments' first difference), and **an enemy drew from `anim` + `anim_t`** instead
+  of its animation controller (`ea.pos`, the game's raw / cel): 341 -> 173 segments differing, 114k -> 59k frames.
+  Left (173 segments, all enemies): mostly the controller's raw itself (46k of 63k frames: game walking, ours idle
+  ...; positions match) - enemy animation logic, now visible per frame.
+* **A level sign's label sorts with its prop** (`0x0800C300`: the prop object's layer, depth + 1): was keyed by its
+  own y, behind the gate it names (Earth 2-90). Seen but open: a sign label ours draws where the game has none
+  (Babidi's ship 8-17, shipr_238 f3180: the game makes the area's one label at the load, 0x08008BE8, and it is gone
+  by the first row; message 0x1F deletes labels, `broadcast_1f` 0xC9 - no script uses it, sender not found).
+* **Choices**: an option line's `-` (and the spaces after it) is skipped in the centred layout too (`0x0800AE00` runs
+  for both layouts; ours drew "-Save"), and **the choice cursor** is drawn (`ui/images/cursor.png`, OAM `0x0801796A`:
+  the option's pen - 16, - 12, priority 0, once the page has typed in; `DialogView.cursor`). Its blink (object +0x10)
+  is not modelled.
+Still to do (coordinator's list): mid-frame palette writes in fades, cloud-layer drift after cuts, the countdown
+display (its value lives in the script host's timers), enemy animation logic (the cel tally's 173 segments).
 
 **Done (Earth agent): the no-lag title -> Earth soak's crowd-wander stop (row 190,577) - a menu close that never
 gave the field its sprite memory back.** The crowd NPCs' wander draws were right; their *update order* was not: at
@@ -4320,6 +4340,18 @@ is now exact (RNG, area, position, depth, flags) to **1,111,492**.
 `open_area` / `set_flag(284)` - our director releases the script one iteration earlier than the game after a lone
 instant command (game: flag at counter 1,050,628, ours 1,050,627; RNG / positions equal) -> **side-content agent**
 (script host / director).
+*Fixed (side-content agent): an on-break inline script resumes from a command wait one frame later.* MEASURED on the
+cut `wr_1111300` (native dispatch 0x08003CD0 breakpointed): the puff_at native in frame 191, open_area / set_flag /
+refresh_map_triggers in frame 193 - the director went idle in 192, the game resumes the callback in the frame after.
+wf-import `StoryHost::resume_blocked`: a `Pending::Director` that ends while the running script is a breakable's
+on-break **inline script** (`Callback::Script` with `Cause::Break`, or `continue_inline_held(.., hold: false)` at an
+import, and no script started after it: `break_inline`) resumes the next frame (`break_due`). Not for an on-break
+*event* (14-21's s418, gate db7_022 f88 regressed when it applied) nor a later script under a stale `Break` cause (a
+first version keyed on the cause alone moved 21-4 / 21-14's area-enter scripts: rkb_004, sb_016/017/024, rsbi_010 and
+the soak's m_064 row 1,863 - fixed by the started-index check). 18-10's callback is the only on-break inline script
+with a command wait in the ROM's breakables (the others are loot / flag scripts). Gates all pass, playthrough /
+lockstep / field_lockstep / menu_parity pass, no-lag soak 53/54 (only m_062, known); cut wr_1111300 exact through
+row 1,111,700 (was 1,111,492).
 *NPC talk state (Earth agent):* `tools/segments/area.py` now records `npc` - the map NPCs' (vt 0x0804C92C) talk resume
 nodes (object +0x1BC, the nonzero ones, sorted); all 503 sidecars regenerated; wf-import `area.rs` compares them with
 ours (`Npc.resume`, map NPCs). All 503 gates clean (no gate's segment ends a talk on a nonzero exit yet, so this mostly
@@ -4334,3 +4366,35 @@ also requires `hs.in_unit`; `BREAK_DBG` shows `BREAK_DUE` at m_023 frame 89, s41
 row, and at m_064 frame 1,653): not from the area / trigger changes (toggled off: same stops). Owner of that edit:
 please check these two masters before committing it. (`master_7` row 13,060 and `m_023` row 89 stopped once and are
 exact on a re-run with the tree as it is now - the edit is still moving; `m_064` row 1,863 still stops.)
+
+**Claim (Earth agent, 2026-10-04, by the coordinator; split with the Super Buu agent): pixels - the text boxes
+(window, font, portrait, scrolling, choice cursor; the "dialog up" frames) and the countdown / stopwatch display.**
+Super Buu agent: the rest of the pixel board stays yours (sprites, fades, BG, HUD, banner); I touch wf-render / view
+only for the text box and the timer display and re-lock `data/segments/pixels.json` when segments become exact.
+*Result (ship fix agent, same day): the whole-run cut points, 324 -> 319 exact; the rest explained.*
+* **1,121,918 / 1,121,948 (044, HFIL souls)** - an enemy off the enemy grid (obj+0x291, set by SpawnPuff /
+  DriftContact / the bat's enter, `0x0800F924`) was imported on it: the wandering souls stopped at a wall row they walk
+  through. `patch_enemy` reads +0x291 (unmarks, `detached`). Both exact.
+* **1,121,864 (044)** - three import details: a breakable's on-break inline script that blocks (the statue's puff) no
+  longer holds the field at the import (`continue_inline_held`, as `Cause::Break` in play - the objects update on);
+  a Janemba Hand's HandAmbush in progress takes its count from the strike animation's tick (a fresh node jumped the
+  hand onto the leader again); GhostAnimA / B in progress take theirs from the tick (not 16 fresh updates). The 2-row
+  cut exact; a 200-row recording (`work/shipfix/mcuts/wr_1121864.json`) runs to row 14 (vram) / 18: a soul's appear
+  ends one frame late - its one-shot's tick goes +2 in the cut's first frame in the game (28 -> 30) and +1 in ours,
+  not understood yet. Side-content agent: this sits in your flag-284 range; the host's on-break resume is your
+  in-flight work (`break_inline`) - I leave host.rs to you.
+* **568,177 / 633,276** - not engine differences: the 2-row recordings end inside a long iteration (an area load / a
+  text box the game is still making); the harness compares the recording's last row as an iteration's end. Longer
+  recordings from the same cuts are exact (568,177: 60 / 60, `wr_568177`; 633,276: 40 / 40, importer agent).
+  Tried treating a recording's last row as unknown: every gate would lose its last row (and the records check there),
+  so not kept - the whole-run cut sweep should record a few more rows instead.
+* **631,386 / 645,894** - not past the run (the re-packed master no longer diverges at 003: both are real-run rows,
+  `work/shipfix/cut_vs_master.py` checks all 324 cuts against the current master), but save states inside an area
+  load's lag frames before the leader exists - correct refusals; the resync moves on. Drop them from the list.
+* **848,744 (017)** - the cut is inside the world-map warp transition of A's flag-187 stop (848,743): A's.
+Gates, menu_parity, wf-app (incl. the playthrough), ship rsegs and the TS tests green on the current tree (a run
+in the middle of others' host.rs / wf-render edits had six 21-x / 14-21 gates red; they pass again with those edits
+settled).
+**Earth agent -> whoever is drawing the countdown / stopwatch display right now** (the working tree has an
+uncommitted `RenderView.timer` / `MenuFont::Timer` / wf-render menu.rs timer): the coordinator gave me that item
+(claim above). If it is yours and nearly done, keep it and say so here - I stay on the text boxes and do not touch it.

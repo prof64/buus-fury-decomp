@@ -108,7 +108,7 @@ fn dialog_portraits_match_emulator() {
             portrait_left: left && has_portrait,
             cursor: None,
         });
-        v.dialog_anim = Some(DialogAnim { scale: (2048 / pa) as u8, typed: if settled { None } else { Some(0) } });
+        v.dialog_anim = Some(DialogAnim { scale: (2048 / pa) as u8, typed: if settled { None } else { Some(0) }, cursor_draws: None });
         let fb = r.render(&packs, &v, 0, 240, 160).to_vec();
         // other OBJs (HUD, actors, banner): pixels inside them where we draw nothing are not judged
         let foreign: Vec<[i64; 4]> = cap["oam_shown"]

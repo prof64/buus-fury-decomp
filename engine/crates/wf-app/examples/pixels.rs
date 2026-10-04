@@ -200,6 +200,18 @@ fn main() {
                 if std::env::var("PIX_VIEW").ok().and_then(|v| v.parse::<usize>().ok()) == Some(k) {
                     eprintln!("{view:#?}");
                 }
+                // PIX_TIMERFIT: which value offset makes the timer display (168..232, 8..24) match the game's
+                if let (Some(t), true) = (view.timer, std::env::var_os("PIX_TIMERFIT").is_some()) {
+                    let fit: Vec<i32> = (-4..=4)
+                        .filter(|d| {
+                            let mut v2 = view.clone();
+                            v2.timer = Some(t + d);
+                            let px = renderer.render(&packs, &v2, 0, W, H).to_vec();
+                            (8..24).all(|y| (168..232).all(|x| px[y * W + x] == game[i][y * W + x]))
+                        })
+                        .collect();
+                    eprintln!("timerfit {name} f{k} t {t} offsets {fit:?}");
+                }
                 let ours = renderer.render(&packs, &view, 0, W, H).to_vec();
                 let (mut class, n) = classify(&view, &game[i], &ours);
                 // what the world shows that the view may not carry (the picture's likely cause)

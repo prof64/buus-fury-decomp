@@ -573,8 +573,13 @@ impl Ui {
 
     /// The choice cursor's place for option `sel` of the page (the pen (x, y) of that option's line in the box
     /// picture: the spots the text object records, `0x0800AFF2`); `None` without that many options
-    pub fn dialog_cursor_spot(&self, dv: &DialogView, sel: u8) -> Option<(i32, i32)> {
+    /// - once the page has typed in (`typed` visible characters so far; `None` = all)
+    pub fn dialog_cursor_spot(&self, dv: &DialogView, sel: u8, typed: Option<u32>) -> Option<(i32, i32)> {
         let (_, lines) = self.dialog_layout(dv)?;
+        let total: u32 = lines.iter().map(|l| (l.0.len() - 2 * l.0.iter().filter(|&&c| c == 8).count()) as u32).sum();
+        if typed.is_some_and(|t| t < total) {
+            return None;
+        }
         lines.iter().filter(|l| l.3).nth(sel as usize).map(|l| (l.1, l.2))
     }
 

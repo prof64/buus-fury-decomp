@@ -382,6 +382,11 @@ impl Renderer {
                     screen.push((1, w as i32 - 80, bb.y, 64, 8, px));
                 }
             }
+            // the countdown / stopwatch display: OAM (168, 8), two 32x16 OBJs, priority 1; top-right anchored; over the boss bar
+            if let Some(t) = view.timer {
+                let mr = self.menu.get_or_insert_with(|| menu::MenuRenderer::load(packs));
+                screen.push((1, w as i32 - 72, 8, 64, 16, mr.timer(packs, t)));
+            }
             if let Some(bv) = &view.banner {
                 if self.banner.is_none() {
                     self.banner = Some(banner::Banner::load(packs));
@@ -410,14 +415,18 @@ impl Renderer {
                         wf_view::DialogPos::Bottom => h as i32 - (GBA_H - ui::Ui::dialog_y(dv.position)),
                     };
                     let bx = ox + ui::DIALOG_CX - sw as i32 / 2;
+                    screen.push((ui::DIALOG_PRIORITY, bx, y, sw, 64, px));
                     // the choice cursor at its option's pen (x - 16, y - 12; OAM 0x0801796A), in front of the box
-                    if let (Some(sel), 0) = (dv.cursor, anim.scale) {
+                    if let (Some(sel), 0 | 8) = (dv.cursor, anim.scale) {
                         let box_x = bx + if dv.portrait.is_some() && dv.portrait_left { ui::PORTRAIT_W as i32 } else { 0 };
-                        if let (Some((cx, cy)), Some(cur)) = (u.dialog_cursor_spot(dv, sel), u.cursor()) {
+                        // the cursor object's blink (`0x0801794C`: +1 a draw, hidden while bit 3 is set), counted from
+                        // its creation - the typing reaching the first option line (`DialogAnim::cursor_draws`)
+                        let off: u32 = std::env::var("T_CURK").ok().and_then(|v| v.parse().ok()).unwrap_or(0);
+                        let shown = anim.cursor_draws.is_some_and(|n| (n + off) & 8 == 0);
+                        if let (Some((cx, cy)), Some(cur), true) = (u.dialog_cursor_spot(dv, sel, None), u.cursor(), shown) {
                             screen.push((ui::DIALOG_PRIORITY, box_x + cx - 16, y + cy - 12, 16, 16, cur));
                         }
                     }
-                    screen.push((ui::DIALOG_PRIORITY, bx, y, sw, 64, px));
                 }
             }
         }

@@ -981,6 +981,9 @@ pub struct Dialog {
     /// a message window (kind 3) that fades in / out ([`window_fades`], decided when it opens)
     #[serde(default)]
     pub fades: bool,
+    /// `t` when the current page finished typing (the choice cursor's age after it)
+    #[serde(default)]
+    pub typed_t: i32,
 }
 
 /// the first character appears this many frames after the box is created; the event continues this many frames
@@ -1115,6 +1118,10 @@ pub struct Scene {
     pub boss_bar_out: Option<BossBarOut>,
     pub title: Option<TitleText>,
     pub timer_hud: Option<TimerHud>,
+    /// the script host's (countdown, stopwatch) in frames as the display reads them (GameData +0x4D4 / +0x4D8;
+    /// mirrored by wf-script-core after its timer updates - the host keeps the timers)
+    #[serde(default)]
+    pub timers_shown: (i32, i32),
     /// destination label set (0xD9) and its 32 entries (0xDA)
     pub dest_label: Option<(i32, Vec<i32>)>,
     /// the travel menu's selection (label entity vt 0x0804BAF4 +0x10): an index into `Field.triggers` (= the label
@@ -1180,6 +1187,7 @@ impl Default for Scene {
             boss_bar_out: None,
             title: None,
             timer_hud: None,
+            timers_shown: (0, 0),
             dest_label: None,
             dest_sel: 0,
             radar: None,
@@ -2909,6 +2917,7 @@ pub fn open_text(w: &mut World, text: &str, text_ref: u32, portrait: u8, kind: u
         result: None,
         portrait_left,
         fades: false,
+        typed_t: 0,
     });
     if kind == 3 {
         let f = window_fades(w);
@@ -3037,6 +3046,9 @@ fn tick_dialog(w: &mut World) {
         DialogPhase::Shown => {
             if d.typed < need {
                 d.typed += 1;
+                if d.typed == need {
+                    d.typed_t = d.t;
+                }
             } else if k & A != 0 {
                 if d.page + 1 < d.pages {
                     d.page += 1;
@@ -3251,10 +3263,28 @@ fn apply_area(w: &mut World, r: [i32; 4], main: bool, open: bool) {
     }
 }
 
-/// re-apply the collision overrides after the static grids were re-attached (byte snapshot restore)
+/// re-apply the collision overrides after the static grids were re-attached (byte snapshot restore): to the map's
+/// copy only - the live walk / enemy layers come from the snapshot as they stood, with every mark made after the
+/// override (re-applying them there undid an actor's mark on an opened tile: the whole run's save-state check, Earth
+/// 2-x at step 23,151, a restored world one byte row apart in the enemy layer)
 pub fn reapply_areas(w: &mut World) {
-    for op in w.scene.area_ops.clone() {
-        apply_area(w, op.rect, op.main, op.open);
+    let ops = w.scene.area_ops.clone();
+    let Some(col) = w.col.as_mut() else { return };
+    let g = crate::content::GRID as i32;
+    let m = std::sync::Arc::make_mut(&mut col.map);
+    for op in ops {
+        let r = op.rect;
+        let (tx0, ty0, tx1, ty1) = ((r[0] >> 3).max(0), (r[1] >> 3).max(0), ((r[2] + 7) >> 3).min(g), ((r[3] + 7) >> 3).min(g));
+        for ty in ty0..ty1 {
+            for tx in tx0..tx1 {
+                let k = (ty * g + tx) as usize;
+                if op.main {
+                    m.walk[k] = op.open as u8;
+                } else {
+                    m.shot[k] = op.open as u8;
+                }
+            }
+        }
     }
 }
 

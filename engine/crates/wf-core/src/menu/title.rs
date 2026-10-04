@@ -549,6 +549,7 @@ pub fn title_world(data: &Arc<crate::content::GameData>, w: &World) -> World {
     nw.saves = w.saves.clone();
     nw.saves.pending = None;
     nw.menu.settings = w.menu.settings.clone();
+    nw.opts = w.opts.clone();
     nw.story = old.story;
     // (and its HUD-shown bit, GameData bits & 2: the ending's hide_hud leaves it clear under the title - sb_044_04_20,
     // rsbk_002_04_21 world-state rows)
@@ -556,8 +557,10 @@ pub fn title_world(data: &Arc<crate::content::GameData>, w: &World) -> World {
     nw.events.retain(|e| !matches!(e, crate::world::Event::Field(crate::field::FieldEvent::Run { .. })));
     nw.events.insert(0, crate::world::Event::SongStop);
     open_title(&mut nw);
-    // (the title song was requested by return_to_title's own frame: playing already)
-    nw.events.retain(|e| !matches!(e, crate::world::Event::Song { .. } | crate::world::Event::SongStop));
+    // (the title song was requested by return_to_title's own frame (native 0x8E): playing already)
+    if w.scene.song == TITLE_SONG {
+        nw.events.retain(|e| !matches!(e, crate::world::Event::Song { .. } | crate::world::Event::SongStop));
+    }
     crate::scene::note_events(&mut nw);
     nw
 }
@@ -640,6 +643,9 @@ pub fn boot(data: &Arc<crate::content::GameData>, w: &mut World) -> Option<World
     saves.pending = None;
     nw.saves = saves;
     nw.menu.settings = settings;
+    // the app's options (no lag, sim lag, XP, PvP) are the session's, not the new world's defaults (Continue lost
+    // `no_lag`: the app modelled the menus' and loads' lag frames again after it)
+    nw.opts = w.opts.clone();
     Some(nw)
 }
 
