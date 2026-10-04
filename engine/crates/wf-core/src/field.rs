@@ -221,6 +221,11 @@ pub struct Field {
     pub placed_loot: Vec<(EntityId, i32, i32, i32, i32)>,
     /// kill XP waiting for the next frame's update (player entity, enemy XP)
     pub xp_due: Vec<(EntityId, i64)>,
+    /// kill XP of the same frame after one that levelled: the level-up hook (#3) runs inline in the kill routine,
+    /// the next kill's XP is added when it ends (`player::levelup_hook_done`; real run 14-2 r057_029: two enemies
+    /// down in one punch, Gohan's level at f512, the second kill's 22,375 at the hook's end f760)
+    #[serde(default)]
+    pub xp_after_hook: Vec<(EntityId, i64)>,
     /// on-defeat callbacks of placed enemies, run at the start of the next frame's update (the dying enemy's death
     /// handler runs there; story playthrough: the first boss's defeat scene starts the frame after the KO)
     pub defeat_runs: Vec<(Callback, Cause)>,
@@ -486,6 +491,7 @@ fn new_field() -> Field {
         placed: vec![],
         placed_loot: vec![],
         xp_due: vec![],
+        xp_after_hook: vec![],
         defeat_runs: vec![],
         defeat_later: vec![],
         defeat_wait: vec![],
@@ -1207,8 +1213,11 @@ pub fn pre_step(w: &mut World) {
     // animate in that frame)
     // (an event already holding the field when the frame starts: see the on-defeat countdown below)
     let event_held = w.field.as_ref().is_some_and(|f| f.busy);
-    let due = w.field.as_mut().map(|f| std::mem::take(&mut f.xp_due)).unwrap_or_default();
-    for (pid, exp) in due {
+    // (the newest death effect first: r057_029 f512 - of two kills in one punch the later one's XP levels up, the
+    // earlier one's comes after the hook)
+    let mut due = w.field.as_mut().map(|f| std::mem::take(&mut f.xp_due)).unwrap_or_default();
+    due.reverse();
+    for (k, &(pid, exp)) in due.iter().enumerate() {
         if let Some(pi) = w.find(pid) {
             let n = w.events.len();
             crate::player::gain_xp(w, pi, exp);
@@ -1218,7 +1227,10 @@ pub fn pre_step(w: &mut World) {
                 if let Some(f) = w.field.as_mut() {
                     f.held = true;
                     f.held_event = true;
+                    // the rest of this frame's kill XP waits for the hook's end
+                    f.xp_after_hook.extend_from_slice(&due[k + 1..]);
                 }
+                break;
             }
         }
     }

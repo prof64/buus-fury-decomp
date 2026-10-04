@@ -364,6 +364,10 @@ pub struct VramState {
     /// the damage numbers' places in the world list: (handle, the id the next entity got when it was made)
     #[serde(default)]
     pub popup_at: Vec<(u16, u32)>,
+    /// the stat-points mark's draw count base: its counter (+0x14, one per draw, the first in its creation frame) is
+    /// `World.frame - stat_at` (the picture's animation frame, `view::render_view`)
+    #[serde(default)]
+    pub stat_at: u32,
     /// the entity the object pass is updating (0 outside the pass)
     #[serde(default)]
     pub pass_at: u32,
@@ -968,6 +972,10 @@ pub fn stat_mark(w: &mut World) {
         .unwrap_or((false, false));
     if hud && !mark && points != 0 {
         acquire(w, Owner::StatMark, 0x100);
+        let f = w.frame;
+        if let Some(v) = st(w) {
+            v.stat_at = f.wrapping_sub(1);
+        }
     }
 }
 

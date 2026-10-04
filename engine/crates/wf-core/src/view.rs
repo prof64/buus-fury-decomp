@@ -114,12 +114,19 @@ pub fn render_view(w: &World, out: &mut RenderView) {
     if let Some((text, t)) = w.scene.banner.as_ref().filter(|b| b.1 <= 238) {
         out.banner = Some(wf_view::BannerView { text: text.clone(), t: *t });
     }
-    let mut order: Vec<usize> = (0..w.ents.len()).filter(|&i| !w.ents[i].removed && !crate::vram::suspended(w, w.ents[i].id)).collect();
-    order.sort_by_key(|&i| draw_key(w, i));
-    // field: the debris chips, the item-get icon (front-most), then the props after the actors (behind them)
+    // the draw order: the world-list objects by (layer, depth) - the actors and the field's props (each prop its own
+    // object, `fieldview::prop_keys`); at an equal key a prop is behind
+    let mut order: Vec<((i32, i32, u32), Option<usize>, usize)> = (0..w.ents.len()).filter(|&i| !w.ents[i].removed && !crate::vram::suspended(w, w.ents[i].id)).map(|i| (draw_key(w, i), Some(i), 0)).collect();
+    order.extend(crate::fieldview::prop_keys(w).into_iter().map(|(k, d)| ((0, d, 0), None, k)));
+    order.sort_by_key(|o| o.0);
+    // field: the debris chips, the item-get icon (front-most), then the actors and props
     crate::fieldview::front(w, out);
     // OAM order: front-most first
-    for &i in order.iter().rev() {
+    for &(_, ent, prop) in order.iter().rev() {
+        let Some(i) = ent else {
+            crate::fieldview::prop(w, prop, out);
+            continue;
+        };
         let e = &w.ents[i];
         let id = e.id;
         match &e.body {
@@ -220,8 +227,6 @@ pub fn render_view(w: &World, out: &mut RenderView) {
             Body::Mod(m) => crate::modkit::draw(w, id, m, out),
         }
     }
-    // field: the map props (and breakables) and level signs behind the actors
-    crate::fieldview::props(w, out);
     // cutscene presentation: fade, dialog box
     out.fade_black = crate::scene::fade_black(w);
     if let Some(d) = &w.scene.dialog {
@@ -273,9 +278,19 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                 // areas without combat (towns, offices) grey the icon out (emulator HUD)
                 skill_alt: !crate::player::can_use_skill(w, pi, skill) || w.field.as_ref().is_some_and(|f| !f.combat),
                 hidden: w.scene.hud_hidden,
+                stat_mark: stat_mark_frame(w),
             });
         }
     }
+}
+
+/// the stat-points mark's animation frame (draw 0x0800B55C: (counter >> 3) & 3), while it exists
+fn stat_mark_frame(w: &World) -> Option<u8> {
+    let v = w.field.as_ref()?.vram.as_ref()?;
+    if !v.owners.iter().any(|o| o.1 == crate::vram::Owner::StatMark) {
+        return None;
+    }
+    Some(((w.frame.wrapping_sub(v.stat_at) >> 3) & 3) as u8)
 }
 
 /// the frame's events as frontend events

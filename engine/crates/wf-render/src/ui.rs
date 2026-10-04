@@ -261,6 +261,8 @@ pub struct DialogStyle {
 
 pub struct Ui {
     frame: Indexed,
+    /// the stat-points mark's four 16x16 frames side by side (`ui/hud/stat_mark.png`; older content has none)
+    stat_mark: Option<Indexed>,
     ss: Indexed,
     ss3: Indexed,
     hp: Vec<Vec<(u32, u32)>>,
@@ -403,6 +405,7 @@ impl Ui {
         }
         Ok(Ui {
             frame: png(packs, "ui/hud/frame.png")?,
+            stat_mark: png(packs, "ui/hud/stat_mark.png").ok(),
             ss: png(packs, "ui/hud/gauge_ss.png")?,
             ss3: png(packs, "ui/hud/gauge_ss3.png")?,
             hp: steps(&h["steps"]["hp"]),
@@ -429,6 +432,21 @@ impl Ui {
             self.icons.insert(key.clone(), v);
         }
         self.icons.get(&key).and_then(|x| x.as_ref())
+    }
+
+    /// The stat-points mark's frame `k` as 16x16 ARGB (alpha 0 = transparent; OBJ palette order like the HUD)
+    pub fn stat_mark(&self, k: u8) -> Option<Vec<u32>> {
+        let im = self.stat_mark.as_ref()?;
+        let mut out = vec![0u32; 16 * 16];
+        for y in 0..16usize {
+            for x in 0..16usize {
+                let c = *im.idx.get(y * im.w as usize + k as usize * 16 + x)?;
+                if c != 0 {
+                    out[y * 16 + x] = (im.palette.get(c as usize).copied().unwrap_or(0) & 0xFF_FFFF) | (c as u32) << 24;
+                }
+            }
+        }
+        Some(out)
     }
 
     /// The 80x16 HUD picture as ARGB (alpha 0 = transparent), exactly as `0x0800B99C` composes its OBJ tiles: the

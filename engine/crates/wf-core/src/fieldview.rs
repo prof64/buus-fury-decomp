@@ -61,25 +61,38 @@ pub fn map_sprite(w: &World, id: u32, m: &MapSprite, out: &mut RenderView) {
 
 /// map props (`0x0800CF7A`, visible ones, at the rect top-left; a shaking breakable adds its offset)
 pub fn props(w: &World, out: &mut RenderView) {
+    for (k, _) in prop_keys(w) {
+        prop(w, k, out);
+    }
+}
+
+/// the visible props with their draw sort depth: each prop is a world-list object of its own (vtable 0x0804D1E4)
+/// sorted with the actors by (layer +8, depth +4) - its depth the rect's bottom (+0x30), an actor's its y + 4
+/// (0x08052EE0's keys, emulator: Earth 7-2's drinks stand, the counter props at depth 704 drawn over the girl at
+/// 700). `view::render_view` merges them into the actors' order (depth here on the actors' y scale: bottom - 4)
+pub fn prop_keys(w: &World) -> Vec<(usize, i32)> {
+    let Some(f) = w.field.as_ref() else { return vec![] };
+    let Some(md) = w.data.field.as_ref().and_then(|d| d.maps.get(&f.map)) else { return vec![] };
+    f.props.iter().enumerate().filter(|(k, p)| p.visible && md.props.get(*k).is_some_and(|d| d.frame.is_some())).map(|(k, p)| (k, p.rect.y1 - 4)).collect()
+}
+
+/// one prop (and its breakable's shake)
+pub fn prop(w: &World, k: usize, out: &mut RenderView) {
     let Some(f) = w.field.as_ref() else { return };
     let Some(md) = w.data.field.as_ref().and_then(|d| d.maps.get(&f.map)) else { return };
-    for (k, p) in f.props.iter().enumerate() {
-        if !p.visible {
-            continue;
-        }
-        let Some(def) = md.props.get(k) else { continue };
-        let Some(frame) = def.frame else { continue };
-        let (mut dx, mut dy) = (0, 0);
-        for e in &w.ents {
-            if let Body::Breakable(b) = &e.body {
-                if b.prop == k as i32 && !e.removed {
-                    dx = b.dx;
-                    dy = b.dy;
-                }
+    let Some(p) = f.props.get(k) else { return };
+    let Some(def) = md.props.get(k) else { return };
+    let Some(frame) = def.frame else { return };
+    let (mut dx, mut dy) = (0, 0);
+    for e in &w.ents {
+        if let Body::Breakable(b) = &e.body {
+            if b.prop == k as i32 && !e.removed {
+                dx = b.dx;
+                dy = b.dy;
             }
         }
-        put(out, 0, format!("effects/props_{}", f.map), frame, p.rect.x0 + dx, p.rect.y0 + dy, def.priority, SpriteEffect::None);
     }
+    put(out, 0, format!("effects/props_{}", f.map), frame, p.rect.x0 + dx, p.rect.y0 + dy, def.priority, SpriteEffect::None);
 }
 
 /// the debris chips and the item-get icon (priority 2, rising 1 px per 16 frames above the player)

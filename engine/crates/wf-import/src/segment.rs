@@ -341,6 +341,18 @@ pub fn start(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Value
 
 /// replay a segment from its imported start state: the first divergence and the matched span
 pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Value) -> Report {
+    replay_with(data, files, doc, &mut |_| {})
+}
+
+/// a replay observer (`replay_with`): `Before(k, world)` right before the harness steps video frame k (a logic or menu
+/// step; none on a lag frame), `After(k, world)` after every video frame (the picture comparison, wf-app example
+/// `pixels`: the renderer's presenter keeps the previous step's OBJ build)
+pub enum Frame<'a> {
+    Before(usize, &'a wf_core::world::World),
+    After(usize, &'a wf_core::world::World),
+}
+
+pub fn replay_with(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Value, hook: &mut dyn FnMut(Frame)) -> Report {
     let frames = doc["frames"].as_array().cloned().unwrap_or_default();
     let mut rep = Report { frames: frames.len(), ..Default::default() };
     let (imp, mut host) = match start(data, files, doc) {
@@ -458,6 +470,7 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
                 eprintln!("  rng calls of t{k}:");
                 wf_core::rng::TRACE.store(true, std::sync::atomic::Ordering::Relaxed);
             }
+            hook(Frame::Before(k, &sess.world));
             host.step(&mut sess, keys);
             wf_core::rng::TRACE.store(false, std::sync::atomic::Ordering::Relaxed);
         } else if !no_lag
@@ -472,6 +485,7 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
             // opening fade-out is still the field's loop - the logic counter runs, and a lag frame there is a frame
             // without an update (the cameras keep easing through the fade: dungeon segments db3 10-14, db4 15-17 /
             // 15-29); a script-opened menu (the save point's Switch Characters) fades inside its own loop
+            hook(Frame::Before(k, &sess.world));
             host.step(&mut sess, keys);
         } else {
             sess.world.events.clear();
@@ -704,6 +718,7 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
         if fr.get("vram").is_some() {
             game_vram = fr["vram"].clone();
         }
+        hook(Frame::After(k, &sess.world));
         let complete = frames.get(k + 1).is_none_or(|n| i(&n["lf"]) != lf);
         // SEGMENT_LF=1: where `World.frame` leaves the game's logic counter (0x03000F94)
         if logic && std::env::var("SEGMENT_LF").is_ok() {

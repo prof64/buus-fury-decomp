@@ -250,7 +250,10 @@ fn run(packs: &Packs, data: &Arc<wf_core::content::GameData>, name: &str) -> Opt
                 return Some((0, 0, vec!["not openable".into()], Vec::new()));
             }
         }
-        if logic {
+        // (a script-opened screen: the opening is the script's iteration, row 0 - its fade starts with the next one,
+        // as START's open in the field)
+        let opened_fade = k == 0 && meta["open"].is_object() && matches!(sim.world().menu.phase, wf_core::menu::Phase::FadeOut { .. });
+        if logic && !opened_fade {
             sim.step(&[keys], &mut ev);
         }
         // the RNG once the screen is open (the field frame before may draw differently)

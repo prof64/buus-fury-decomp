@@ -561,7 +561,9 @@ fn step_inner(w: &mut World) {
                 w.tick_shakes();
             }
             let step = (w.menu.tr.fade_out & !FADE_HOLD).max(1);
-            let end = if w.menu.tr.fade_out & FADE_HOLD != 0 { 256 + step } else { 256 };
+            // (no lag frames: the hold is part of the last fade step's iteration - real run 18-13 r047_002 lf
+            // 1,113,367: full black, the hold and the page's draw in one)
+            let end = if w.menu.tr.fade_out & FADE_HOLD != 0 && !w.opts.no_lag { 256 + step } else { 256 };
             let l = level + step;
             // the screen black: the mode switch builds the new screen (Switch Character's figures enter idle)
             if level < 256 && l >= 256 {
@@ -830,6 +832,12 @@ fn step_screen(w: &mut World) {
                 close(w);
                 w.menu.phase = Phase::Leave { t: 1 };
                 w.menu.result = Some(MenuResult { code: r });
+                // (no lag frames: this iteration is the world restore, which ends with a camera update - real run
+                // 18-13 r047_002 lf 1,113,370 after the save)
+                if w.opts.no_lag && w.menu.reload_close && w.menu.tr.fade_in != 0 && w.field.is_some() {
+                    w.tick_shakes();
+                    crate::field::world_mode_cameras(w);
+                }
             }
         }
         break;
@@ -910,6 +918,9 @@ pub fn screen_black(w: &World) -> bool {
     match w.menu.phase {
         Phase::Leave { t: 0 } => w.menu.shown.as_deref().is_some_and(|s| s.page().leave_black()),
         Phase::Leave { .. } => true,
+        // (no lag frames: the save's write iteration ends black and the close is the next iteration - real run
+        // 18-13 r047_002 f1,470)
+        Phase::Run if w.opts.no_lag => w.menu.stack.last().is_some_and(|s| matches!(s, Screen::Save(_)) && s.page().leave_black()),
         _ => false,
     }
 }

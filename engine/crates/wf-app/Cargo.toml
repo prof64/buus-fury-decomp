@@ -26,3 +26,4 @@ png = { workspace = true }
 sha1 = { workspace = true }
 wf-rom = { workspace = true }
 wf-extract = { path = "../wf-extract" }
+miniz_oxide = "0.8"

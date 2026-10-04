@@ -33,10 +33,10 @@ def header(p):
         return None
 
 
-def state_of(p, h):
+def candidates(p, h):
     src = h.get('source', {})
     if src.get('state') and (ROOT / src['state']).exists():
-        return ROOT / src['state']
+        yield ROOT / src['state']
     if src.get('kind') == 'route':
         d = ROOT / 'work' / 'real' / 'segs' / Path(src['run']).name
         for q in d.glob('*.json'):
@@ -44,12 +44,63 @@ def state_of(p, h):
             if hq and hq.get('source', {}).get('frame') == src.get('frame'):
                 s = d / 'states' / (q.stem + '.ss')
                 if s.exists():
-                    return s
-    s = ROOT / 'work' / 'segments' / (h['name'] + '.ss')
-    if s.exists():
-        return s
+                    yield s
+    for d in (ROOT / 'work' / 'segments', ROOT / 'work' / 'recs_states'):
+        s = d / (h['name'] + '.ss')
+        if s.exists():
+            yield s
     # the recorders' own state folders (work/db57/segs5/states, work/db/dr1/segs/states, ...): by the cut's name
-    return ss_index().get(h['name'] + '.ss')
+    s = ss_index().get(h['name'] + '.ss')
+    if s:
+        yield s
+
+
+def seg_lf(p):
+    """the segment's logic counter at its start (the first "lf" of the file: init's, else the first row's)"""
+    with open(p) as f:
+        m = re.search(r'"lf":(\d+)', f.read(400000))
+    return int(m.group(1)) if m else None
+
+
+def state_of(p, h):
+    """the first candidate state whose logic counter (0x03000F94) is the segment's start (a state file can be
+    overwritten by a later save of the same name - sb_000_18_12's held counter 1,111,684 for a cut at 1,208; a
+    rebuilt one goes to work/recs_states/<name>.ss: `segment.py save --from SOURCE --at AT --out ...`)"""
+    from route import start_emu
+    lf = seg_lf(p)
+    for s in candidates(p, h):
+        if lf is None:
+            return s
+        c = start_emu(str(s)).r32(0x03000F94)
+        if 0 <= lf - c <= 2:
+            return s
+    return route_state(h, lf)
+
+
+def route_state(h, lf):
+    """a route cut with no usable state: its run's start.ss + keys.json replayed to the cut's frame (the run dir is
+    the source's `run` up to a space - `work/db/db2 (tools/...)`), saved as work/recs_states/<name>.ss when the
+    counter is the segment's"""
+    from route import start_emu
+    src = h.get('source', {})
+    if src.get('kind') != 'route' or not src.get('run') or src.get('frame') is None:
+        return None
+    d = ROOT / src['run'].split(' ')[0]
+    if not (d / 'start.ss').exists() or not (d / 'keys.json').exists():
+        return None
+    keys = json.loads((d / 'keys.json').read_text())['keys']
+    e = start_emu(str(d / 'start.ss'))
+    for k in range(src['frame']):
+        if k >= len(keys):
+            return None
+        e.set_keys(keys[k])
+        e.run(1)
+    if lf is not None and not 0 <= lf - e.r32(0x03000F94) <= 2:
+        return None
+    out = ROOT / 'work' / 'recs_states' / (h['name'] + '.ss')
+    out.parent.mkdir(parents=True, exist_ok=True)
+    e.save_file(str(out))
+    return out
 
 
 _SS = None

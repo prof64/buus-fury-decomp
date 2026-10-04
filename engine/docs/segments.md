@@ -3917,3 +3917,37 @@ match in all 488 gates.
 **Soak agent (B):** the world sidecars use your recs.py start rules (imported, not copied); if you change
 `start_of` / `state_of`, world.py follows. Re-pack after new gates: `world.py <gate>.json` -> run the gates with
 `SEGMENT_WORLD=1 ... --nocapture > R` -> `world_lock.py R`.
+**Split (B, 2026-10-04, by the coordinator) - B takes the extraction side, the Earth agent the harness side:**
+(1) start states: `state_of` checks the state's logic counter (0x03000F94) against the segment's `init` before using
+it, and finds / rebuilds one for the gates with none or a wrong one (`rsbk_002_04_21`, `sb_000_18_12`, `sb_044_04_20`,
+the 13 `rkb_*`, `db2_013` / `db2_015`) - then both sidecar sets are re-packed for them; (2) the area-local state
+your "not covered yet" lists (a trigger's resume node, NPC talk slots, broken breakables, picked-up items - the
+field's own lists in the area object): RAM layout and a third sidecar `data/segments/area/<name>.json` with the same
+delta format. **Earth agent:** the harness / lock side of (2) is yours once the layout and files land here.
+*(1) done (B):* `recs.py state_of` now takes the first candidate state whose logic counter (0x03000F94) is the
+segment's first `lf` (0..2 frames before), searching also `work/recs_states/<name>.ss`; with none, a route cut is
+rebuilt from its run's `start.ss` + `keys.json` replayed to the cut's frame (`route_state`, saved to
+work/recs_states/, counter checked). `world.py` follows (it imports `state_of`). Results: `sb_000_18_12` - its
+`work/segments/sb_000_18_12.ss` holds a later save (counter 1,111,684 vs 1,208); rebuilt with `segment.py save --from
+work/superbuu/seg/sb_master.json --at 105 --out work/recs_states/sb_000_18_12.ss` -> records 271 checks / world 4, 0
+differ, locked. The 13 `rkb_*`, `rkb_004_21-6` (r064_004), `rkb_168_14-1`, `db2_013` / `db2_015`: states rebuilt,
+records and world sidecars extracted - records 0 differ in all 17 (13 more gates locked `recs_exact`, 14
+`world_exact`). Left: `rkb_001_0-50` world `-408` at f64 (story flag 408 set by the game, not by ours) -> **Earth
+agent** (world side); `rkb_168_14-1` countdown 3600 vs 3599 (known, side-content agent); `rsbk_002_04_21` /
+`sb_044_04_20` game bits (known, Super Buu agent). Their records are 0 differ (`sb_000` / `rsbk_002` / `sb_044`
+locked). Gates green. (Note: the work/recs_states/ states are local, like every other state file; `recs.py` rebuilds
+them.)
+*(2) done, extraction side (B):* `tools/segments/area.py SEG.json.. | --dir D [-j N] [--out DIR]` (recs.py's start
+rules) writes the tracked `data/segments/area/<name>.json` for all 503 segment files (432 KB), `{"v":1,"rows":[[row,
+delta]...]}` - row 0 whole, later rows only the changed fields, each whole (`area.unpack` restores):
+* `trig`: the trigger list 0x03002A64 in list order, `[vt, x0, y0, x1, y1, v]` - rect s16 at +4..+0xA; `v` = an event
+  trigger's (vt 0x08049BD4) resume node +0x10 (u16), else 0; a coin's / dropped item's touch trigger (0x0804A0C0) is
+  `[vt,0,0,0,0,0]` (its rect follows the coin in flight). Exits / edges are 0x08049BC4. Our side: `field.triggers`
+  (event triggers' `resume`, matched by rect as `import_trigger_resume` does) and the pickups' touch triggers.
+* `wg`: walk-grid tiles changed since the segment's start (map object 0x030019A4 +0xA8, 32 bytes a row, 256 rows,
+  bit = free): sorted `ty * 256 + tx`; null from the first row in another area than the start's (a load rebuilds the
+  grid) and where +0xA8 is not a walk grid (world maps: > 512 bits a frame). Our side: the walk grid (`col.walk`, else
+  `col.map.walk`) against our own grid at row 0 (the importer copies the game's).
+1,393 trigger-change rows, 724 grid-change rows over the 503 files. **Not extracted (yet):** the NPC talk slots (the
+talk-event pass state lives in the NPC objects - the importer's match; no list of its own found).
+**Earth agent:** the harness side (`SEGMENT_AREA`, the compare, an `area_exact` lock) is yours as agreed.

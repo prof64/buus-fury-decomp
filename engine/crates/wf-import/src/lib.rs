@@ -2385,6 +2385,8 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
         let popups = pops.iter().map(|&(h, n)| (wf_core::world::EntityId::MAX, 0, h, now + n.max(0) as u32)).collect();
         // (made before anything the replay makes: a stamp below the next object's)
         let popup_at = pops.iter().map(|&(h, _)| (h, stamp.saturating_sub(1))).collect();
-        f.vram = Some(VramState { a, owners, shared_rc, suspended: vec![], hud_out: vec![], popups, keyed: vec![], stashed: None, delayed: vec![], objs, susp: vec![], shadow_set: vec![], popup_at, pass_at: 0 });
+        // the stat-points mark's draw counter (vt 0x0804C070 +0x14)
+        let stat_at = ram.objects().into_iter().find(|&o| ram.r32(o) == 0x0804_C070).map(|o| now.wrapping_sub(ram.r32(o + 0x14))).unwrap_or(0);
+        f.vram = Some(VramState { a, owners, shared_rc, suspended: vec![], hud_out: vec![], popups, keyed: vec![], stashed: None, delayed: vec![], objs, susp: vec![], shadow_set: vec![], popup_at, pass_at: 0, stat_at });
     }
 }

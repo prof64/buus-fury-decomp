@@ -100,6 +100,17 @@ pub fn extract(rom: &Rom, out: &mut Content) -> wf_rom::Result<()> {
     out.put("ui/hud/frame.png", hud::to_picture(&frame).png(&pal, true));
     out.put("ui/hud/gauge_ss.png", hud::to_picture(&h.img_ss).png(&pal, true));
     out.put("ui/hud/gauge_ss3.png", hud::to_picture(&h.img_ss3).png(&pal, true));
+    // the stat-points mark (object 0x0800BCC8, draw 0x0800B55C): 16x16 8bpp OBJ frames at 0x087144D8 + 0x100 k (2 x 2
+    // tiles of 64 bytes), k = (draws >> 3) & 3; side by side
+    let mut sm = Surface::new(64, 16);
+    for k in 0..4u32 {
+        let b = rom.bytes(0x0871_44D8 + 0x100 * k, 0x100);
+        for (o, &c) in b.iter().enumerate() {
+            let (t, p) = (o as u32 / 64, o as u32 % 64);
+            sm.set((k * 16 + (t % 2) * 8 + p % 8) as i32, ((t / 2) * 8 + p / 8) as i32, c);
+        }
+    }
+    out.put("ui/hud/stat_mark.png", sm.png(&pal, true));
     out.put_json("ui/hud.json", &hud::json(&h));
 
     // area-name banner (layout constants from its object, vt 0x0804B528)

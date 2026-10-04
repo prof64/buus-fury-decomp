@@ -394,6 +394,9 @@ pub struct HudView {
     pub skill_alt: bool,
     /// The game hides the HUD during dialogue / cut-scenes.
     pub hidden: bool,
+    /// The stat-points mark ("STAT" + arrow, 16x16 at screen x 92 beside the HUD) while the leader has points to
+    /// spend: its animation frame 0..3 (`ui/hud/stat_mark.png`), `None` = no mark.
+    pub stat_mark: Option<u8>,
 }
 
 /// Non-state outputs of a step, in emission order.

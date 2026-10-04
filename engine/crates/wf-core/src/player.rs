@@ -1764,6 +1764,21 @@ pub fn levelup_hook_done(w: &mut World) {
     if let Some(i) = w.player_idx(0) {
         new_form_object(w, i);
     }
+    // the kill XP held behind the hook (`Field::xp_after_hook`): added now, one after the other; another level-up
+    // queues its own hook and holds the rest again
+    let held = w.field.as_mut().map(|f| std::mem::take(&mut f.xp_after_hook)).unwrap_or_default();
+    for (k, &(pid, exp)) in held.iter().enumerate() {
+        let Some(pi) = w.find(pid) else { continue };
+        let n = w.events.len();
+        gain_xp(w, pi, exp);
+        let leveled = w.events[n..].iter().any(|e| matches!(e, crate::world::Event::Field(crate::field::FieldEvent::Run { cause: crate::field::Cause::LevelUp { .. }, .. })));
+        if leveled {
+            if let Some(f) = w.field.as_mut() {
+                f.xp_after_hook.extend_from_slice(&held[k + 1..]);
+            }
+            break;
+        }
+    }
 }
 /// the cutscene fusions' defuse (script s014, run by the form object when its countdown goes negative)
 fn defuse_step(w: &mut World, i: usize) {
