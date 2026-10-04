@@ -2563,13 +2563,25 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         }
         K::ThrowBigBall => f >= 92,
         K::GlideToWaypoint => {
+            // (field: after its 60 moves a 61st update ends it - the exit 0x0803C064 puts it on the nearest whole
+            // pixel and SetAnim(0)s it (an idle draw); the state change after it comes the next frame (real run
+            // 20-6/20-7 r062_001, Super Buu inside Buu: 303.98 -> 304, 127.91 -> 128, 112.03 -> 112)
+            if w.field.is_some() && f > 60 {
+                {
+                    let e = w.en(i);
+                    e.a.x = (e.a.x + 128) & !0xFF;
+                    e.a.y = (e.a.y + 128) & !0xFF;
+                }
+                set_anim(w, i, &[nm("idle")], true, Some(true));
+                return true;
+            }
             {
                 let e = w.en(i);
                 e.a.x += r.d[0];
                 e.a.y += r.d[1];
             }
             en::clamp_inside(w, i);
-            f >= 60
+            w.field.is_none() && f >= 60
         }
         K::SummonMinion => {
             if f == 40 {

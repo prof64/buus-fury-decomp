@@ -323,7 +323,7 @@ are deterministic, but they are other objects' internals (code / heap pointers) 
 whole object heap with real addresses and every class's field writes. Not modelled; `tools/superbuu/heapnode.py`
 prints a new node's leftover words. (The side-content agent's Nosferatu 18-8 case is likely the same kind.)
 
-**6-6 (Gotenks; Super Buu agent, 2026-10-04): 4,694 -> 22,177.**
+**6-6 (Gotenks; Super Buu agent, 2026-10-04): 4,694 -> exact (25,633).**
 * A screen shake is a camera mode: `0x0800797C` pushes it on the camera object's mode stack (`0x080210D6`), and a
   script camera command sets a new mode (`0x08021094`: the old one's exit) - `camera_pan_to` (via `0x080211A8`)
   and `camera_follow` end a running shake (`scene::camera_mode_set`). The shake is updated with the camera, after
@@ -355,9 +355,11 @@ prints a new node's leftover words. (The side-content agent's Nosferatu 18-8 cas
 * f19062 (fixed, field): BuuStretchPunch, like CandyBeam / KiBlast: a hit before the arm leaves ends the node.
 * f19197 (fixed, battle too): the beam skills' "charging" (state vfunc +0x1C, `0x0804FA7C`) is true only while the
   beam object is in phase 0 - from the press until it fires; a firing beam does not make Super Buu dodge.
-* Now **22,177** (was 4,694): Super Buu's defeat - in the game the boss whose HP reached 0 still takes the beam's
-  body message with a damage roll (ApplyDamage of its on-hit tree) in the next frame; ours rejects it once
-  `defeated`. Not changed yet (enemy hit acceptance, battle-shared).
+* f22177 (fixed, field): the enemy hit handler (`0x0800FBE6`) tests the sender class, the hittable flag (+0x1CC)
+  and the body box only - no HP. The field's Idle death node leaves the enemy hittable and in its states (RAM:
+  Super Buu at 0 HP, +0x1CC = 1, stack [596, 2]), so later hits still roll damage. Battles unchanged.
+* f22178 (fixed): the event-start stop message (0xF) also stops a player firing a beam skill: idle, one draw.
+* **6-6 exact end to end: 25,633 / 25,633** (was 4,694).
 
 **Claim (dungeon agent A, 2026-10-03, by the coordinator): the Kid Buu fight itself in `sb_041` (21-25).** A works
 with the allocator check off (`SEGMENT_VRAM=0`): the enemy object missing at f21479 and every divergence after it
@@ -1780,13 +1782,17 @@ two Python hash seeds, gives identical key logs (13,000 frames); the earlier run
   Gotenks L125 and 15-1 Gotenks L140 (Gotenks is not in the save point's menu - only the five base characters - he
   exists as a fusion), hence 15-1 Gohan L165 (its condition wants Gotenks' flag 179); 13-1 Trunks L110 is a pre-ending
   gate (its condition wants flag 149 clear).
-* Open (mine): the arrival on Kami's Lookout through the Other World map with a leader other than Goku (s511's other
-  branch: the leader walks beside the Kai) keeps the Instant Transmission pose in ours (raw 20 vs the game's 1, f21
-  of the 0-51 cuts of g141 / g101b / g111b); the real route's 18-11 row (`r042_001_18-11` f9672): Vegeta's s446 runs
-  inside the talk trigger's unit script and ends on `fade_out(100)`; a Janemba Hand in its ambush node makes the
-  node's first update (side draw, jump to the player) in the game's exit frame, ours a frame later. Tried: an exit
-  out of a fade wait (inside a unit script, or any) releases the field's objects like a command wait's - 18-11
-  exact, but 12 gates lose (db7 14-17/22/19, earth 3-12-1 / 4-1-2, sb 21-5/6/11/25, ...): reverted.
+* **An event ending right out of a flash fade's wait (native 0x7E) returns at the top of the frame** (shared rule,
+  `wf-script-core` lib.rs): the enemies older than the event run that frame's update (`release_field_enemies`). The
+  real route's 18-11 (`r042_001_18-11`): Vegeta's s446, run inside the talk trigger's unit script, ends on 0x7E (the
+  decompiler's `fade_out(100)`); a Janemba Hand in its ambush node makes the node's first update (side draw, jump to
+  the player) in the exit frame - 9,928 / 9,928 exact. The fade-ins 0x79 / 0x7B do not (an all-fades version cost 12
+  gates: db7 14-17 / 14-22 / 14-19, sb 21-5 / 21-6 / 21-11 / 21-25, rkb 14-1, ... - their enemies stand still in the
+  exit frame), nor do the map NPCs here (not seen).
+* Not mine (in-event import): the arrival on Kami's Lookout through the Other World map with a leader other than Goku
+  (`pg_g141_001` / `pg_g101b_001` / `pg_g111b_001`, f21): those cuts start in 6-14 while s512 is still running (its
+  spawned Goku stands in pose 18 - raw 20 - beside the leader), and the import has no script thread (depth 0), so its
+  `fade_in_white(20)` -> `play_anim(1, 0)` never comes; the game's Goku goes idle at f21.
 * Gate mechanics as recorded: a gate is an A-button script trigger (s517's 8-2 / 11-1 rects also want facing up);
   the position (footprint top-left) must be inside the rect - stand up against it; s518's open_area leaves a
   32-px opening (2-33: x 216..248), so a character beside it stays blocked by the posts.
@@ -2567,6 +2573,25 @@ dodge - no state 0x15A in that cut).
   reaches the blast. With the rule disabled the row gets past the player's hurt but then our blast pushes the
   enemy 0.375 px the game does not - both point at the wave/blast interaction. Not changed by me.
 
+**Claim (ship fix agent, 2026-10-04, by the coordinator): the camera-at-close rows** - `r038_001_18-1` f589,
+`r009_006_4-1` f458, `r002_004_4-1` f741, `r002_006_4-1` f10623, `r052_004_1-5` f11575, `r064_029_21-26` f12784,
+`r067_071_14-2` f693 (the menu-close timing / camera across a close; Earth agent: the close code in `menu/mod.rs` and
+the reload map terms, the sound parts stay yours).
+- `r009_006_4-1`: not a camera rule - the shop's close reload is 63 frames and `sndsim::redraw_frames` clamped its
+  frame count to 60 (`.clamp(1, 60)` -> 250); exact now (9,485).
+- `r038_001_18-1`: the camera already steps in the last black frame as the game's does; the close is one frame
+  long (game own 5,448,454 vs model 5,463,599, the second 18-1 close over by 15-20k with `r044_015`: an 18-1 map
+  term, open).
+- The 60-frame clamp also made `r002_004_4-1` and `r064_029_21-26` exact (closes of 61+ frames).
+- `r067_071_14-2` f693: same shape - the camera's step in the last black frame is right, the close one frame long:
+  game own 5,975,322 vs model 5,992,307, end 6,745,216 against the 24-frame boundary 6,741,504 (3.7k over). Every
+  decompression of that close measured on the emulator (30 calls: 12 tile chunks, 15 buffered layer chunks, tile
+  list, 2 small) totals 5,523,928, within 0.4% of `deccost`; NONE of them is an actor frame, while the model's
+  decompression includes "3 actors' frames 66,720" (+ 3 x 4,000) - the actors' frames are not redrawn through this
+  decoder; what they cost instead is open (the remaining per-map spread of +-15k is the same question). A constant
+  cannot fix it: `RELOAD_REST` would need <= 115.6k here and >= 118.5k for `r038_002_18-2`.
+- `r002_006_4-1` f10623 and `r052_004_1-5` f11575: not looked at yet.
+
 **§11 update 11 (B): the Janemba saga plays start to finish in the app.** Three core fixes (field only; battles and
 cross_ts untouched), each from an emulator trace, gated:
 * **An inline script outside any event releases the actors it commanded when it ends** (`wf-import` host: no
@@ -2605,6 +2630,26 @@ first steps of the follow camera after a menu closes, at frames the reload model
 The other recurring `cam` rows on the scoreboard (`r002_004/006_4-1`, `r052_004_1-5`, `r064_029_21-26`,
 `r067_071_14-2`) are worth checking against these two cases. Not changed here: the menu-close model is the Earth /
 ship-fix agents' (its latest refit f0e253f).
+
+**Claim (dungeon agent A, 2026-10-04, by the coordinator): next Super Buu / fat rows nobody holds** - `r049_001_18-14`
+(f7,628 the low-HP beep; 1,495 diverged), `r067_071_14-2` (f693 camera; handed over by the ship fix agent), then the
+tiles of `r062_001_20-6` past its f2,176 heap leftover (12,950 diverged, 8,000 uncovered). Not the 6-x Gotenks rows
+(Super Buu agent) nor the fat rows B holds. Others please add a line here before touching one.
+*Done: `r049_001_18-14` exact (9,123), gated `rj_049_001_18-14`* - **the HUD's low-HP beep runs on the game's logic
+counter** (hud +0x10 stamps 0x03000F94: `World.g.clock`, this frame's = the start mark + 1; `World.frame` stands
+through frames without an object pass - s452's modal `camera_center_on`, f7,599..7,613), and **a hidden HUD still
+beeps while it slides out** (`hide_hud`: the object lives on 38 updates with +0x14 = -1; a beep 29 frames after the
+hide at f7,628). `rsb_061_004_20-5` stays exact. *`r067_071_14-2` f693: the menu-close camera class* agent B found
+(`r038_001_18-1` f589): the pause menu's reload ends at f692, the game's follow camera steps on the first logic frame
+(f693), ours does not - left with the menu-close model's owners (Earth / ship fix agents).
+*`r062_001_20-6` tiles (Super Buu inside Buu, states 0x2A1 / 0x2A2):* the import now carries GlideToWaypoint's
+runtime (vt 0x0804B678: +4 / +8 velocity, +0xC moves left of 60), and **the glide ends in a 61st update** (field):
+after its 60 moves the exit 0x0803C064 (emulator write watch) puts Super Buu on the nearest whole pixel and
+SetAnim(0)s him (an idle draw), the GotoState after it takes the next frame (StandStill's draw) - battles keep the
+reference's 60. Tiles +4,000 / +6,000 / +7,000 / +18,000 now run to f14 / f36 / f21 / f52 and stop in state 0x2A3's
+attack (charge sound 3, facing) - **for the Super Buu agent** (their attack-node area: not taken further). The 20-6
+tiles refused on "import mismatch: RNG after N draws" (+3,000, +8,000, +10,000, +12,000..+16,000, +20,000) are an
+import gap of this map's enemies, left open.
 
 **Claim (dungeon agent B, 2026-10-04, by the coordinator): the fat chapter's every-N rows** - `r033_002_6-1`
 (Goku vs Majin Buu, 6,910 diverged), `r002_006_4-1` (West City / the Bandana hunt, 7,857 diverged), the tiles of

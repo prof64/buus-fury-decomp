@@ -571,6 +571,9 @@ pub fn start_event(w: &mut World) {
             }
             // (the bored pose too: 12-22, the countdown's hook #9 starts on a player standing bored - idle, one draw)
             Body::Player(p) if matches!(p.gs, crate::player::Gs::Walk | crate::player::Gs::Bored) => crate::player::set_idle(w, k),
+            // (a beam skill too: its state stops, idle with one draw - segment sb 6-6 f22178, Gotenks firing when
+            // Super Buu's defeat event starts)
+            Body::Player(p) if matches!(p.gs, crate::player::Gs::Skill(15 | 16 | 6 | 1 | 3)) => crate::player::set_idle(w, k),
             // a walking enemy stops: idle state (story playthrough: a fighter walking when the level-up hook starts
             // goes idle with a fresh idle tick; a hurt one keeps its state)
             // (a defeated enemy that stays for its on-defeat event - ko < 0, a boss - is still an actor: Totenhotep

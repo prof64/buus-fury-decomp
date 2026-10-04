@@ -2327,7 +2327,8 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
     {
         let e = w.en_ref(i);
         // (the handler `0x0800FBE6` takes sender classes 1 and 2)
-        if !matches!(msg.team, 1 | 2) || e.part || e.defeated || w.ents[i].removed || !e.a.hittable {
+        let idle_dead = w.field.is_some() && e.ko == -1;
+        if !matches!(msg.team, 1 | 2) || e.part || (e.defeated && !idle_dead) || w.ents[i].removed || !e.a.hittable {
             return false;
         }
         // field: the body box (0x0800FE78) is at the ground position - the height does not lift it (sc_janemba:
@@ -2508,7 +2509,12 @@ fn on_death(w: &mut World, i: usize) {
     let last_copy = death == "special" && (ty == 0x3c || ty == 0x3d);
     if (death == "Idle" || last_copy) && w.field.is_some() {
         // field: the death node Idle (0x080716F4) changes nothing - the enemy stays as it is (its defeat scene
-        // takes it over; story playthrough: Olibu stays idle at the KO punch)
+        // takes it over; story playthrough: Olibu stays idle at the KO punch). It stays hittable (+0x1CC): the hit
+        // handler 0x0800FBE6 tests no HP, so later hits still roll their damage (VERIFIED segment sb 6-6 f22177:
+        // Super Buu at 0 HP takes the beam's body message the next frame)
+        if death == "Idle" {
+            w.en(i).a.hittable = true;
+        }
         w.en(i).ko = -1;
     } else if death == "Idle" {
         set_anim(w, i, &[nm("knockdown"), nm("ko"), nm("hurt")], true, Some(false));

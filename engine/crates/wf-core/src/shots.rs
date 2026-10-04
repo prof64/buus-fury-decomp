@@ -2441,7 +2441,10 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
         // facing each other) turns it back (mode 1) without a puff of its own: the sender's wave puffs on the
         // accepted hit (Babidi's ship 8-36: one rand(0x1000) for two colliding waves; 8-51: a punch, no draw)
         ShotKind::EnergyWave { len, mode, .. } => {
-            if msg.source == me || *mode != 0 {
+            // (a wave turning back - mode 1 - still takes a head-on punch: Pyramid 14-2, the real route r069_077 f264:
+            // the wave hits the player and Goku's punch meets it in the same frame - the punch's hit sound 48 +
+            // rand(2), 0x080199C4)
+            if msg.source == me {
                 return false;
             }
             let s = w.shot_ref(i);

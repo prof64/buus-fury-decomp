@@ -447,6 +447,12 @@ fn import_ai_rt(w: &mut World, ei: usize, lvl: usize, ram: &GbaRam, r: u32, note
                 e.vx = vx;
                 e.vy = vy;
             }
+            // GlideToWaypoint (vt 0x0804B678): +4 / +8 the velocity, +0xC the moves left of its 60 (ours counts up)
+            K::GlideToWaypoint => {
+                rt.d[0] = ram.s32(r + 4);
+                rt.d[1] = ram.s32(r + 8);
+                rt.f = 60 - ram.s32(r + 0xC);
+            }
             // Wait (vt 0x080497D4): +4 the frames counted (ours: the node's frame count)
             K::Wait => rt.f = ram.s32(r + 4),
             K::PopState | K::PushState => {}
@@ -624,7 +630,16 @@ fn import_objects(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
         (0..w.ents.len()).filter(|&i| !w.ents[i].removed && !players.contains(&w.ents[i].id)).filter_map(|i| key_of(w, i).map(|k| (w.ents[i].id, k))).collect();
     let mut order: Vec<wf_core::world::EntityId> = vec![];
     // the world list is updated last to first: RAM order = our entity order
+    // (the leader's object takes its place among the actors too: real run 0-21 tile r033_002+25000 - Majin Buu is
+    // before the player in the list, so the player updates first and Buu's IfPlayerWithin2 sees this frame's step)
+    let leader_obj = ram.r32(0x0300_1C34);
     for o in ram.objects() {
+        if o == leader_obj && std::env::var("NOLEAD").is_err() {
+            if let Some(&pid) = players.first() {
+                order.push(pid);
+            }
+            continue;
+        }
         let vt = ram.r32(o);
         let (ox, oy, of) = (ram.s32(o + 0x1A0), ram.s32(o + 0x1A4), ram.r8(o + 0x10));
         let key = match vt {
@@ -830,8 +845,10 @@ fn import_enemy_beam(w: &mut World, ei: usize, ram: &GbaRam, o: u32, notes: &mut
 /// the runner would, with that progress; the animation as the row shows it (the step's create sets one)
 fn import_npc_step(w: &mut World, i: usize, ram: &GbaRam, o: u32, row: Option<(i32, i32, i32, i32)>) {
     let st = ram.r32(o + 0x1B0);
-    if std::env::var("DBG_NPCSTEP").is_ok() { eprintln!("NPCSTEP obj {o:#x} step {st:#x} vt {:#x} row {row:?} funcs {:?}", if ram.valid(st) { ram.r32(st) } else { 0 }, match &w.ents[i].body { Body::Npc(n) => n.behaviour.as_ref().map(|b| b.steps.iter().map(|s| format!("{:#x}", s.func)).collect::<Vec<_>>()), _ => None }); }
-    if !ram.valid(st) || ram.r32(st) != 0x0804_D848 {
+    // (and the walk-grid wander, vt 0x0804D4E4 / update 0x0800A2A8: the same words, plus the footprint it left at
+    // +0x28 and the one it walks to at +0x38, px - real run 4-1, West City's walkers: the r009_006 every-N tiles)
+    let svt = if ram.valid(st) { ram.r32(st) } else { 0 };
+    if svt != 0x0804_D848 && svt != 0x0804_D4E4 {
         return;
     }
     let Body::Npc(n) = &w.ents[i].body else { return };
@@ -849,6 +866,10 @@ fn import_npc_step(w: &mut World, i: usize, ram: &GbaRam, o: u32, row: Option<(i
             s.tx = ram.s32(st + 0x20);
             s.ty = ram.s32(st + 0x24);
             s.dir = facing;
+            if svt == 0x0804_D4E4 {
+                s.old = [0, 4, 8, 12].map(|k| ram.s32(st + 0x28 + k));
+                s.new = [0, 4, 8, 12].map(|k| ram.s32(st + 0x38 + k));
+            }
         }
         if let Some((_, raw, cel, tick)) = row {
             (b.raw, b.frame, b.tick) = (raw, cel, tick);

@@ -310,7 +310,7 @@ pub fn redraw_frames(w: &mut World, r: Redraw) -> Option<u8> {
         }
         let end = t + post;
         // the iteration ends before the VBlank it then waits for
-        let frames = ((end - CUTOFF).div_euclid(FRAME) + 1).clamp(1, 60);
+        let frames = ((end - CUTOFF).div_euclid(FRAME) + 1).clamp(1, 250);
         s.wrap = (frames - 1 - t.div_euclid(FRAME)).clamp(0, 3) as u8;
         let margin = frames * FRAME + CUTOFF - end;
         let near = margin.min(FRAME - margin) < NEAR;

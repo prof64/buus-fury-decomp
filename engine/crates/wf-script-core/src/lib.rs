@@ -133,6 +133,9 @@ pub struct HostState {
     pub from_wait: bool,
     #[serde(default)]
     pub from_fade: bool,
+    /// the last fade native run (0x78 .. 0x7E)
+    #[serde(default)]
+    pub last_fade: i32,
     /// the newest entity when the outermost event started: older objects update after the event's scene object
     /// (the world updates newest first), so only they see a release at the top of the frame
     #[serde(default)]
@@ -334,12 +337,14 @@ impl Host for CoreHost<'_> {
                 if self.s.from_wait && self.w.scene.depth == 0 && !self.s.in_unit {
                     release_field_npcs(self.w, self.s.event_watermark);
                 }
+                // an event that ends right out of a flash fade's wait (native 0x7E) returns at the top of the frame
+                // too: the enemies older than it run this frame's update (the real route 18-11, Vegeta's s446 - its
+                // last command is 0x7E: a Janemba Hand's ambush makes the node's first update in the exit frame). The
+                // fade-ins (0x79 / 0x7B) do not (db7 14-17 / 14-22, sb 21-5 / 21-6 / 21-11 / 21-25, rkb 14-1: the
+                // enemies still in the exit frame)
                 let from_fade = std::mem::take(&mut self.s.from_fade);
-                if from_fade && self.w.scene.depth == 0 && std::env::var("FADE_X").is_ok() {
-                    let mode = std::env::var("FADE_X").unwrap_or_default();
-                    if mode != "unit" || self.s.in_unit {
-                        release_field_enemies(self.w, self.s.event_watermark);
-                    }
+                if from_fade && self.s.last_fade == 0x7e && self.w.scene.depth == 0 && self.w.field.is_some() {
+                    release_field_enemies(self.w, self.s.event_watermark);
                 }
                 Ok(NativeResult::Done(None))
             }

@@ -181,6 +181,10 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
                 if n == 0x2f && h.w.field.is_some() {
                     wf_core::field::hud_beep(h.w);
                 }
+                let frame = h.w.frame;
+                if let Some(f) = h.w.field.as_mut() {
+                    f.hud_hidden_at = (n == 0x30).then_some(frame);
+                }
             }
             unit()
         }
@@ -450,6 +454,7 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
                 _ => (FadeKind::Flash, true),
             };
             scene::start_fade(h.w, kind, out, arg(a, 0));
+            h.s.last_fade = n as i32;
             block(h.s, Pending::Fade)
         }
         0x7f => done(h.w.story.supply(arg(a, 0))),

@@ -358,9 +358,13 @@ pub struct Field {
     /// the area is a cutscene's backdrop (`load_scene`): its objects are held by the event like any other
     #[serde(default)]
     pub scene_load: bool,
-    /// the HUD object's low-HP beep stamp (hud +0x10: logic frame of the last beep, the load's at creation)
+    /// the HUD object's low-HP beep stamp (hud +0x10: the logic counter at the last beep, the load's at creation)
     #[serde(default)]
     pub hud_beep: u32,
+    /// `hide_hud`'s logic frame: the HUD object slides out and lives on 38 more updates (hud +0x14 = -1), its low-HP
+    /// beep still running (real run 18-14 r049_001: hidden at f7,599, a beep at f7,628, the object gone at f7,638)
+    #[serde(default)]
+    pub hud_hidden_at: Option<u32>,
 }
 
 /// how a field session starts
@@ -515,6 +519,7 @@ fn new_field() -> Field {
         load_ids: (0, 0),
         scene_load: false,
         hud_beep: 0,
+        hud_hidden_at: None,
     }
 }
 
@@ -695,7 +700,8 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
     // completes that frame's update (Babidi's ship 8-27 -> 8-28: the new player's idle ticks twice when it ends)
     let keep_busy = (w.scene.depth > 0 || w.field.as_ref().is_some_and(|f| f.held_event)) && w.field.as_ref().is_some_and(|f| f.busy);
     let load_lo = w.next_id;
-    let now = w.frame;
+    // (the HUD's beep stamp is on the game's logic counter, 0x03000F94: `World.g.clock`)
+    let now = w.g.clock(w.frame) as u32;
     if let Some(f) = w.field.as_mut() {
         f.hud_beep = now;
     }
@@ -1925,14 +1931,22 @@ pub fn hud_tick(w: &mut World) {
 /// and the beep sounds in that frame)
 pub fn hud_beep(w: &mut World) {
     if w.scene.hud_hidden {
-        return;
+        // (a hidden HUD's object still updates while it slides out)
+        let now = w.frame;
+        if !w.field.as_ref().and_then(|f| f.hud_hidden_at).is_some_and(|h| now.wrapping_sub(h) <= 38) {
+            return;
+        }
     }
     let Some(pi) = w.player_idx(0) else { return };
     let (hp, max) = (w.pl_ref(pi).rec.hp, w.pl_ref(pi).rec.max_hp);
     if hp == 0 || hp * 5 > max {
         return;
     }
-    let now = w.frame;
+    // (the game's logic counter: it runs on through frames without an object pass - a modal camera scroll, real run
+    // 18-14 r049_001 f7,599..7,613 - where `World.frame` stands)
+    // (this frame's count: the mark taken at its start + 1 - also from a script that runs before the frame's object
+    // pass advanced `World.frame`: `show_hud` in 20-5 r061_004 f5,251)
+    let now = w.g.clock_mark.map(|c| c + 1).unwrap_or(w.g.clock(w.frame)) as u32;
     let due = w.field.as_ref().is_some_and(|f| now.wrapping_sub(f.hud_beep) as i32 > 60);
     if due {
         if let Some(f) = w.field.as_mut() {
