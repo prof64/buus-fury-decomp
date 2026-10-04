@@ -979,6 +979,9 @@ pub fn broadcast(w: &mut World, msg: &mut HitMsg, first: bool) -> bool {
             continue;
         }
         if deliver(w, k, msg) {
+            if std::env::var("DBG_DELIVER").is_ok() {
+                eprintln!("  delivered to {} ({}) from {} team {} frame {}", w.ents[k].id, w.ents[k].kind(), msg.source, msg.team, w.frame);
+            }
             any = true;
             if first {
                 break;
