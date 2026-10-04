@@ -704,7 +704,9 @@ fn bind_api(e: &mut Engine, ctx: &Rc<RefCell<Ctx>>, lib: &Rc<RefCell<Option<Rc<L
                 b.t.queue.push_back(Act::Native { native: n, args: a, params: p, script });
                 return Ok(Dynamic::UNIT);
             }
-            if query && !b.t.queue.is_empty() {
+            // (importing mid-node with instants queued: the queued actions ran before the cut in the game - the query
+            // answers from the imported world)
+            if query && !b.t.queue.is_empty() && !b.t.queue_instants {
                 return err(format!(
                     "query native 0x{n:02x} called while actions are queued; end the handler with `return next(k)` first"
                 ));

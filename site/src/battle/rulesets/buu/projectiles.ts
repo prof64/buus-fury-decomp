@@ -648,6 +648,13 @@ export class KameBeam extends Shot {
     const [hx, hy] = this.head()
     return { x0: Math.min(this.px, hx) - 6, y0: Math.min(this.py, hy) - 6, x1: Math.max(this.px, hx) + 6, y1: Math.max(this.py, hy) + 6 }
   }
+  /** handler 0x08020FC4: a hit message (kind 0) of another object from the other team that overlaps the head +- 12
+   *  is taken - the sender (an enemy ki blast) bursts on the beam (segment sb 6-6 f18799) */
+  onMessage(_w: World, msg: HitMsg): boolean {
+    if (msg.foot || msg.source === this || msg.team !== (this.team ^ 1)) return false
+    const [hx, hy] = this.head()
+    return overlaps(msg.rect, { x0: hx - 12, y0: hy - 12, x1: hx + 12, y1: hy + 12 })
+  }
   update(w: World) {
     this.t++
     this.vt++

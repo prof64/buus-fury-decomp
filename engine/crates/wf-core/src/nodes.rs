@@ -463,13 +463,7 @@ fn cond(w: &mut World, c: &C, n: u16) -> bool {
             let p = par(c, n, P::Prob, 0);
             w.rng.chance(p)
         }
-        K::IfPlayerWithin | K::IfPlayerWithin2 => {
-            if std::env::var_os("T_DIST").is_some() {
-                let pi = en::player(w, i);
-                eprintln!("  t-dist frame {} en {} d2 {} r2 {} to {:?} pfoot {:?} efoot {:?}", w.frame, i, en::dist2(w, i), par(c, n, P::R2, 0), en::to_player(w, i), pi.map(|p| w.pl_ref(p).a.foot_box()), w.en_ref(i).a.foot_box());
-            }
-            en::dist2(w, i) <= par(c, n, P::R2, 0)
-        }
+        K::IfPlayerWithin | K::IfPlayerWithin2 => en::dist2(w, i) <= par(c, n, P::R2, 0),
         K::IfPlayerFarther => en::player(w, i).is_some() && en::dist2(w, i) > par(c, n, P::R2, 0),
         K::IfPlayerInMeleeRange => en::in_melee_range(w, i),
         K::IfPlayerAttackingMe => en::player_attacking_me(w, i),
@@ -967,6 +961,7 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             }
             let h = w.data.anim.hold;
             set_anim_r(w, i, &[an(17)], true, h);
+            r.d[6] = w.en_ref(i).anim_seq as i32;
         }
         // controller state 0x03003108 (enter 0x0802F6A8: face, SetAnimRaw(0x12))
         K::CyborgShot => {
@@ -1480,7 +1475,10 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             true
         }
         K::PushState => {
-            if r.d[0] != 0 {
+            // field: the update 0x08018860 pushes on every call and returns 0 - a condition holding it pushes again
+            // the next time its tree runs (real run 14-2 r069_059 f334: the beam dodge pushed again after the
+            // first was cut short and popped); battles keep the reference's once-per-entry push
+            if r.d[0] != 0 && w.field.is_none() {
                 return true;
             }
             r.d[0] = 1;
@@ -2804,8 +2802,10 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                     w.sfx(s, 64);
                 }
             }
-            // (the strike's animation ends at tick 0x68, 0x0803B3FC; the state after it is entered the next frame)
-            f >= 105
+            // (the strike's animation ends at tick 0x68, 0x0803B3FC: done in that update, so the next state (0x117,
+            // HandSink) is the one the game shows in the following frame - real route 18-1 r038_045: a punch in that
+            // frame meets the sinking hand, not a still-striking one; HandSink runs one frame longer to keep the total)
+            f >= 104
         }
         K::HandAmbush => {
             if (80..=103).contains(&f) && r.d[0] == 0 {
@@ -2828,10 +2828,10 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             // field: the one-shot controller's end (0x0800EE78) leaves the hand in the walk state - an event that
             // starts during the Wait after it idles it (message 0xF: SetAnim(0), one draw; HFIL 18-12, sc_hfil)
             if w.field.is_some() {
-                if f >= 105 {
+                if f >= 106 {
                     en::set_walk_state(w, i);
                 }
-                return f >= 105;
+                return f >= 106;
             }
             f >= 107
         }
@@ -2967,6 +2967,12 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         // left its state; from tick 8 cel 1 and a 2 px step in the direction (table 0x0875021C) through the
         // footprint test (vfunc +0x54), a blocked step ends it the same way
         K::BeamDodge => {
+            // the node finishes once the enemy left the controller's state: another node's SetAnim replaced it (real
+            // run 14-2 r069_059 f331: the pushing selector runs on to StandStill, whose SetAnim(0) ends the dodge
+            // before it moved - popped two frames later)
+            if w.en_ref(i).anim_seq as i32 != r.d[6] {
+                return true;
+            }
             if f >= 24 {
                 set_anim(w, i, &[an(0)], true, Some(true));
                 return true;

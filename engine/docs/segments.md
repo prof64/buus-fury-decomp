@@ -957,6 +957,24 @@ check off; "import" = a gap of the any-frame import, mine; the rest are rules fo
   enemy builds / AI enters not matching the RAM's), 4,000 / 6,000 / 18,000 f0 enemy 52 position (a node runtime
   not imported), 1,000 f0 fade, 22,000 f102 enemy 52 x 400.74 vs 399.54.
 
+**Every-N board refusals (A, 2026-10-04)** - `engine/docs/scoreboard-mid.md`'s refused tiles by reason:
+* **"the load's on-enter script is still blocked (no leader)" (9 tiles) = a menu screen, not a load**: the tile starts
+  inside the Status page (main-loop mode vt 0x0804AC88) / Inventory (0x08049D48) - the field is torn down while a
+  page shows (no player object, PLAYER 0x03001C34 = 0) and the import cannot rebuild a saved world. The tile cutter
+  (`scoreboard.py mid cut`, `mid_cut_one`) now starts such a tile at the first frame the field is back and lit (the
+  menu frames before it stay uncovered). Re-cut: r000_002 +18,217, r012_014 +2,042, r012_020 +3,055, r057_059
+  +1,256, r067_071 +2,173, r069_117 +1,210 - all import; r000_002 and r067_071 exact, the rest stop on import details
+  (r057_059 f53: the game frees the sprite blocks of object classes 0x08049CC4 / 0x0804A2C0 / 0x0804B428 the import
+  does not rebuild; r012_014 f0 enemy 188 sub-pixel; r012_020 f0 NPC 123 animation; r069_117 f14 the leader's idle
+  tick after the menu). Importer side: a no-event cut with the field's mode and a black screen is a menu's return
+  (`menu::Phase::FadeIn`, the pause transition).
+* **"the waiting native ... is not among the node's actions" (6 tiles)**: an instant native queued by the mid-node
+  import (`queue_instants`) before a query made the runtime refuse the query (s306 node 2: `hide_hud` ... `actor_y`);
+  under `queue_instants` the query now answers from the imported world (the queued actions ran before the cut). 5 of 6
+  import (e73 48,000 and r069_168 +4,000 exact; r000_002 +5,000 f14 RNG, r057_066 +4,000 f0 NPC 123 position). Left:
+  r004_022 +2,000 - inside the save point's script-opened Switch Characters menu (s011 node 3, native 0x8D): the
+  same "inside a menu" class.
+
 Fixed from the board (2026-10-03): **message windows** (event node kind 3) fade in / out only when the current
 BLDCNT has no first-target layer (`0x08030ED2`: then BLDCNT := 0x3E41 and BLDALPHA is ramped 16 steps by the
 callback 0x08030BF5); the event continues 17 frames after the closing A instead of 2 (`scene::window_fades`, map
@@ -1686,6 +1704,10 @@ two Python hash seeds, gives identical key logs (13,000 frames); the earlier run
   Other World map arrivals import now); open: a world-map landing camera (importer) and `pg_kaisbuy_000` f518, the
   Sell's purchase a frame early in ours (menu timing). Gates `pg_kais_015_19_05` (163), `pg_trade2_016_09_09`
   (213, allocator).
+* **For the ship-fixes agent (menu timing):** `work/side/pgseg/kaisbuy/pg_kaisbuy_000_00_94` f518 - the Planet of the
+  Kais Z-Mart's Sell list (s033 -> Sell, A on the first row, a Curry Plate): ours credits the 1,000 zenie a frame
+  before the game does (zenie 11455 vs game 10455 at f518, the game's the frame after); the same press timing
+  question as the Buy list's (a press can land in a lag frame). Local cut, recorded from the real post-game state.
 * The shop row byte is not at a fixed heap address: it is [0x03000F90] + 0x114 (the list object, found through that
   word in both Z-Marts); `zbuy` reads it there.
 * Instant Transmission picks (shared rule): a trigger answers the pick when its activation's vt+8 says "A pressed" -

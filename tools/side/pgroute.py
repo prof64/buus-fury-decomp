@@ -157,6 +157,28 @@ LEGS['trade2'] = ('pg_kaisbuy.ss', [('walk', 120, 200), ('keys', [(D_, 60, 60)])
                                     *[('talkto', 112, 96, 'U')] * 2, ('wait', 30)])
 
 
+# level grinds for the gates (the real route's way: HFIL 18-1 <-> 18-2, a Janemba Hand a room and three Living Dead
+# in 18-2, ~21,000 XP each, back on each entry): Kami's Lookout 6-14's pad -> the Other World map (from Earth: DOWN =
+# Yemma's Office, LEFT = HFIL) -> 18-1's save point: the character (menu row Goku, Gohan, Goten, Trunks, Vegeta)
+def hfil_grind(moves, level):
+    return [('fly', 633, 1065, 31, 23), ('wait', 60), ('goto', '6-14', 150, 190, False), ('keys', [(A_, 3, 200)]),
+            ('keys', [(D_, 3, 40), (32, 3, 40), (A_, 3, 200)]), ('wait', 30), ('goto', '18-1', 107, 240, False),
+            *hfil.charsel(moves), ('wait', 20), ('grind', level, [(18, 1), (18, 2)])]
+
+
+LEGS['goten120'] = hfil_grind(2, 120)
+LEGS['vegeta155'] = hfil_grind(4, 155)
+LEGS['trunks110'] = hfil_grind(3, 110)
+# back to Earth: 18-1's pad (A) -> the map (from HFIL: RIGHT = Yemma's Office, UP = Earth) -> 6-14 -> its exit ->
+# 6-1's take-off pad -> the world map
+TO_EARTH = [('goto', '18-1', 190, 262, False), ('keys', [(A_, 3, 200)]), ('keys', [(16, 3, 40), (U_, 3, 40), (A_, 3, 200)]),
+            ('wait', 60), ('walk', 114, 208), ('keys', [(D_, 40, 60)]), ('goto', '6-1', 312, 560, False),
+            ('keys', [(A_, 3, 240)])]
+# Pilaf's Castle 10-1: the tier-2 gate, Goten L120 (s517, flag 167), facing up at (256, 72)
+LEGS['g101'] = ('pg_goten120.ss', [*TO_EARTH, ('fly', 2289, 1561, 31, 23), ('wait', 200),
+                                   ('goto', '10-1', 256, 72, False), *GATE, ('keys', [(U_, 60, 10)]), ('wait', 30)])
+
+
 def start_of(leg):
     v = LEGS[leg]
     return (D / v[0], list(v[1])) if isinstance(v, tuple) else (D / 'pg_start.ss', list(v))

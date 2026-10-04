@@ -371,12 +371,11 @@ impl Host for SharedHost {
 pub fn begin_event(w: &mut World) {
     // an event a script starts (run_event from a trigger's inline code: West City's world map circle -> s515) stops
     // the field like an event trigger / talk does at its fire (walking map NPCs go idle, the player stops)
-    if w.scene.depth == 0 && w.field.as_ref().is_some_and(|f| f.host && !f.busy) {
+    // (also when a script already holds the field without an event: the event start's world message 0x0F still
+    // reaches a map NPC whose walk controller runs - Earth 7-2 f1432: s495 starts under a scroll script and the
+    // walking NPC 233 goes idle with its draw, 0x0800F446 -> 0x0800E050)
+    if w.scene.depth == 0 && w.field.as_ref().is_some_and(|f| f.host && (!f.busy || std::env::var("T_OLDBUSY").is_err())) {
         wf_core::fieldnpc::start_event(w);
-    }
-    if std::env::var("TMPDBG").is_ok() {
-        let v: Vec<String> = w.ents.iter().filter_map(|e| match &e.body { wf_core::world::Body::Npc(n) => Some(format!("{}:{} beh {:?} puppet {} anim {:?}", e.id, n.sprite_id, n.behaviour.as_ref().map(|b| b.anim), scene::is_puppet(w, e.id), (n.anim.raw, n.anim.mode.clone()))), _ => None }).collect();
-        eprintln!("TMPDBG begin f{} depth {} busy {:?} | {}", w.frame, w.scene.depth, w.field.as_ref().map(|f| f.busy), v.join(" ; "));
     }
     w.scene.depth += 1;
     // the field holds still while an event runs: no triggers / talk, map NPCs freeze (their animations tick)

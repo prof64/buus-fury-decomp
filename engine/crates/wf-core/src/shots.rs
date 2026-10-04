@@ -2327,6 +2327,16 @@ fn sphere_update(w: &mut World, i: usize) {
 pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
     let me = w.ents[i].id;
     match &w.shot_ref(i).kind {
+        // the beam class's handler 0x08020FC4: a hit message (kind 0) of another object from the other team that
+        // overlaps the head +- 12 is taken - the sender (an enemy ki blast) bursts on the beam (segment sb 6-6 f18799)
+        ShotKind::Kame(b) => {
+            let team = w.shot_ref(i).team;
+            if msg.foot || msg.source == me || msg.team != team ^ 1 {
+                return false;
+            }
+            let (hx, hy) = kame_head(w.shot_ref(i), b.len);
+            overlaps(&msg.rect, &Rect::new(hx - 12, hy - 12, hx + 12, hy + 12))
+        }
         // an Energy Blast message (attack sub 4, another object) overlapping the ball's box and its centre +- size*3/4
         ShotKind::BigBang(b) => {
             if !b.launched || msg.atk.sub != 4 || msg.source == me {
