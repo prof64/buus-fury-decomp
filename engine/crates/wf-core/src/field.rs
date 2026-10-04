@@ -758,6 +758,12 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
     // the label entity of a travel menu is an object of the old area
     w.scene.dest_label = None;
     crate::vram::release(w, crate::vram::Owner::Dest);
+    // an enemy breathing flames as the area goes: its controller's destructor stops sound 63 (whole-run sound requests,
+    // Airship 12-16 -> 12-17: StopMatch(63) in the exit's load iteration)
+    let flames = w.enemies.clone().into_iter().filter_map(|id| w.find(id)).filter(|&k| !w.ents[k].removed && matches!(w.ents[k].body, Body::Enemy(_)) && crate::nodes::flame_running(w, k)).count();
+    for _ in 0..flames {
+        w.events.push(Event::SfxStopMatch { id: 63 });
+    }
     // every object goes; the players are re-created below (same entity ids)
     let players = w.players.clone();
     // a re-created player is a new object: not under the script's control until a command takes it again (6-1's

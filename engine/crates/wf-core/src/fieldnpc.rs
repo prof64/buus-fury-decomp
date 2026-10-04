@@ -484,7 +484,9 @@ pub fn update(w: &mut World, i: usize) {
 /// a map NPC's footprint on the walk grid (marked by the NPC itself): a script command moving it lifts the mark at
 /// its start and sets it where the NPC stops (story playthrough: the Yemma office ogre's walk_to frees the door)
 pub fn script_move_mark(w: &mut World, i: usize, set: bool) {
-    if !matches!(&w.ents[i].body, Body::Npc(n) if n.behaviour.is_some()) {
+    // (a talk NPC only - the one whose spawn marked the grid: 3-12 s159 walks nine plain crowd NPCs to (240, 200)
+    // and removes them, the game's walk grid never changes - emulator write watch on their tiles)
+    if !matches!(&w.ents[i].body, Body::Npc(n) if n.behaviour.as_ref().is_some_and(|b| b.talk)) {
         return;
     }
     let f = foot(npc_ref(w, i));

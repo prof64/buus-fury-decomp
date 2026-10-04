@@ -388,6 +388,15 @@ fn is_ctl(w: &World, k: K) -> bool {
     is_controller(k) || (w.field.is_some() && matches!(k, K::GunShot | K::RifleShot | K::KiBlast | K::NinjaStarThrow | K::MummyWrapShot | K::MummyWrapBurst | K::WindupMelee | K::HandSink))
 }
 
+/// the enemy's running controller is a flame breath (its sound 63 still on)
+pub fn flame_running(w: &World, i: usize) -> bool {
+    let (serial, n) = w.en_ref(i).ctl;
+    if serial == 0 {
+        return false;
+    }
+    w.en_ref(i).ai.stack.iter().any(|s| s.serial == serial && s.tree.nodes.get(n as usize).is_some_and(|nd| nd.k == K::FlameBreath) && s.rt.get(n as usize).is_some_and(|r| r.f < 128))
+}
+
 /// an event holds the field: the AI does not think, but the running motion controller keeps ticking (a turret's fire
 /// ends on time, a Destroyer keeps breathing flames; Babidi's ship 8-53 / 8-59 door scripts). Once it has run out,
 /// the node finishes on the AI's next update without running again
