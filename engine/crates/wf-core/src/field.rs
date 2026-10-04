@@ -1219,7 +1219,11 @@ pub fn pre_step(w: &mut World) {
     let runs = w.field.as_mut().map(|f| std::mem::take(&mut f.defeat_runs)).unwrap_or_default();
     let any = !runs.is_empty();
     for (run, cause) in runs {
-        w.events.push(Event::Field(FieldEvent::Run { run, cause, slot: 0 }));
+        // each death effect runs its drop script, then its callback: a callback that starts an event holds the pass,
+        // the next death's drop waits for it (real route 13-45, r017_009: two Samurai die in one frame - the first's
+        // drop, its callback's s393, the second's drop only after it). Placed after this frame's drop of the same
+        // enemy when there is one; the host runs the queue in order and stops at a blocking job
+        push_callback(w, run, cause);
     }
     // the defeat callback's scene runs inside the death handler (a nested loop): the rest of the frame is held, like
     // the level-up hook below (story playthrough: the player's punch does not animate in the frame the boss's
@@ -1239,6 +1243,23 @@ pub fn pre_step(w: &mut World) {
 
 /// the death effects' drop scripts and on-defeat callbacks that are due (pre step; again in the post step for the
 /// effects that waited behind another one's event)
+/// an on-defeat callback's run, queued right after this frame's drop script of the same enemy when there is one: each
+/// death effect runs its drop script, then its callback, and a callback that starts an event holds the pass - the
+/// next death's drop waits for it (the host runs the queue in order and stops at a blocking job). Real route 13-45
+/// (r017_009): two Samurai die in one frame - the first's drop, its inline callback's s393, the second's drop only
+/// after the event (an `Event` callback's wait is `death_effects`' own rule)
+fn push_callback(w: &mut World, run: Callback, cause: Cause) {
+    let at = match &cause {
+        Cause::Defeat { entity, .. } => w.events.iter().rposition(|e| matches!(e, Event::Field(FieldEvent::Run { cause: Cause::Defeat { entity: d, .. }, .. }) if d == entity)),
+        _ => None,
+    };
+    let ev = Event::Field(FieldEvent::Run { run, cause, slot: 0 });
+    match at {
+        Some(k) => w.events.insert(k + 1, ev),
+        None => w.events.push(ev),
+    }
+}
+
 fn death_effects(w: &mut World, event_held: bool) {
     let next = w.frame + 1;
     // an event holding the field holds the on-defeat callback's countdown (the drop script still runs on time):
@@ -1299,7 +1320,7 @@ fn death_effects(w: &mut World, event_held: bool) {
     };
     if !later.is_empty() {
         for (run, cause) in later {
-            w.events.push(Event::Field(FieldEvent::Run { run, cause, slot: 0 }));
+            push_callback(w, run, cause);
         }
         // the hold without start_event's busy: the drop script queued before it ends first and must not release
         // the held update (set_busy(false)); the event's scene start holds the field

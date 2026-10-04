@@ -364,8 +364,8 @@ pub fn load_frames(w: &mut World) -> Option<u8> {
     let (c, extra) = reload_parts(w)?;
     let grids = w.field.as_ref().and_then(|f| w.data.field.as_ref()?.maps.get(&f.map)?.reload.as_ref().map(|r| r.grids)).unwrap_or(0);
     let c = c + grids;
-    let tiles = w.field.as_ref().and_then(|f| w.data.field.as_ref()?.maps.get(&f.map)?.reload.as_ref().map(|r| r.tiles)).unwrap_or(0);
-    let base = (LOAD_REST + LOAD_TILE * tiles + extra + c * 10_035 / 10_000) * 100_523 / 100_000;
+    let map = w.field.as_ref().map(|f| f.map.clone()).unwrap_or_default();
+    let base = (extra + c * 10_035 / 10_000) * 100_523 / 100_000 + load_rest(&map);
     if debug() {
         eprintln!("snd load: c {c} extra {extra} base {base}");
     }
@@ -447,10 +447,19 @@ pub fn reload_parts(w: &World) -> Option<(i64, i64)> {
 /// +6,563, median +6,610; bounded by real run 2-9 rE2__050, 3.4 k from its boundary, and 18-2 r038_002, 1.7 k)
 const RELOAD_REST: i64 = 119_300;
 const SIGN_LABEL: i64 = 25_300;
-/// an area load beyond the map rebuild and the walk / shot grids: 231.9 k + 109 per listed tile (115 measured loads
-/// of the real run, 21 maps: std 40 k, the rest per map - work/shipfix/loadfit.py)
-const LOAD_REST: i64 = 231_900;
-const LOAD_TILE: i64 = 109;
+/// An area load's work beyond the map rebuild and the walk / shot grids (the area's setup: object lists, load scripts,
+/// HUD): measured per destination map on every load between the real run's cuts (745 loads, 206 maps; the median per
+/// map, the loads into one map agree within +-16 k std) - no map feature tested (tiles, layers, chunks, actors,
+/// sprites, signs) explains it across maps (std 80 k). Unmeasured maps: the median of all (load_rest.json)
+fn load_rest(map: &str) -> i64 {
+    static T: std::sync::OnceLock<(i64, std::collections::HashMap<String, i64>)> = std::sync::OnceLock::new();
+    let (d, m) = T.get_or_init(|| {
+        let v: serde_json::Value = serde_json::from_str(include_str!("load_rest.json")).unwrap_or_default();
+        let maps = v["maps"].as_object().map(|o| o.iter().map(|(k, x)| (k.clone(), x.as_i64().unwrap_or(0))).collect()).unwrap_or_default();
+        (v["default"].as_i64().unwrap_or(260_000), maps)
+    });
+    m.get(map).copied().unwrap_or(*d)
+}
 
 /// the iteration makes the VBlank when it ends this many cycles before it at the latest (the wait's own entry)
 const CUTOFF: i64 = 0;

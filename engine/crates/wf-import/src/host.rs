@@ -60,6 +60,13 @@ pub struct StoryHost {
     pub step_code: StepCode,
 }
 
+/// the cause of an event the import continues: a fusion component's level-up hook (s003 cut while
+/// `Story::levelup_char` is set - the importer's `levelup_fusion`) re-fuses when it ends; anything else has none
+fn imported_cause(w: &World, event: u16) -> Option<Cause> {
+    let entity = w.player_idx(0).map(|i| w.ents[i].id)?;
+    (event == 3 && w.story.levelup_char.is_some()).then_some(Cause::LevelUp { entity })
+}
+
 type StepCode = BTreeMap<(u16, u16), (Option<u32>, Vec<u8>)>;
 static STEP_CODE: std::sync::OnceLock<StepCode> = std::sync::OnceLock::new();
 
@@ -94,7 +101,7 @@ impl StoryHost {
         self.hs.in_unit = false;
         self.rt.start_event_at(event, node, params);
         self.started.push((self.frame, format!("s{event:03}@{node}")));
-        self.cause = None;
+        self.cause = imported_cause(w, event);
         self.rt.with_thread(|t| {
             t.skip = drop;
             t.queue_instants = true;
@@ -163,7 +170,6 @@ impl StoryHost {
         // warp / refresh_map_triggers / return to title set the no-save word (`0x08012546`)
         if matches!(st, Ok(Status::Finished)) && !self.hs.in_unit && !self.hs.no_resume_save {
             if let (Some(c @ (Cause::Trigger { .. } | Cause::Talk { .. })), Some(v)) = (self.cause.as_ref(), self.rt.with_thread(|t| t.event_result)) {
-                if std::env::var("RESUME_LOG").is_ok() { eprintln!("RESUME save {v} cause {c:?} frame {}", w.frame); }
                 wf_core::field::set_resume_node(w, c, v);
             }
         }
@@ -174,8 +180,6 @@ impl StoryHost {
                 Some(Cause::AreaEnter) => wf_core::field::finish_arrival(w),
                 // a fusion component's level-up hook: the fusion is current again, re-fused
                 // (the second component's XP comes now: its own hook runs next, in this frame)
-                // (an imported hook - the cut inside s003 - continues with no cause: `levelup_char` says it is one)
-                None if w.story.levelup_char.is_some() && self.outer.is_empty() => wf_core::player::fusion_levelup_done(w),
                 Some(Cause::LevelUp { .. }) => {
                     let from = w.events.len();
                     wf_core::player::fusion_levelup_done(w);
@@ -379,7 +383,7 @@ impl StoryHost {
         self.hs.in_unit = false;
         self.rt.start_event_at(event, node, params);
         self.started.push((self.frame, format!("s{event:03}@{node}")));
-        self.cause = None;
+        self.cause = imported_cause(w, event);
         let (hs0, story0) = (self.hs.clone(), w.story.clone());
         if let Some(pending) = blocked {
             // run the handler(s) up to the load action without executing anything, then block on it
@@ -496,8 +500,7 @@ impl StoryHost {
                         if self.outer.is_empty() {
                             self.hs.no_resume_save = false;
                         }
-                        let node = if std::env::var("NO_RESUME").is_ok() { 0 } else { wf_core::field::resume_node(w, &job.cause) };
-                        if std::env::var("RESUME_LOG").is_ok() { eprintln!("RESUME start s{n:03} at {node} cause {:?} frame {}", job.cause, w.frame); }
+                        let node = wf_core::field::resume_node(w, &job.cause);
                         self.rt.start_event_from(n, node, [0; 4], 0)
                     }
                     }

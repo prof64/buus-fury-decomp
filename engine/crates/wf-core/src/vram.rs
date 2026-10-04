@@ -636,6 +636,11 @@ pub fn entity_gone(w: &mut World, i: usize) {
         keyed_release(w, KEY_FLAME);
         return;
     }
+    // a bomb's chip holds a reference of the shared debris graphic only (shots.rs `bomb_update`)
+    if matches!(&w.ents[i].body, Body::Fx(f) if matches!(**f, crate::fx::Fx::Debris { .. })) {
+        keyed_release(w, KEY_DEBRIS);
+        return;
+    }
     // an animated effect's block goes in the update that ends it (`0x0802A8AA` -> `0x08011944`: the object is
     // deleted at once); other effect kinds keep one more frame (not measured apart)
     let exact = match &w.ents[i].body {
@@ -1255,10 +1260,14 @@ pub fn title_shown(w: &mut World, string: i32) {
     }
 }
 
-/// an area load after the old objects went: nothing left allocated -> the allocator is re-initialised
+/// an area load after the old objects went: nothing left allocated -> the allocator is re-initialised. A shared
+/// graphic still referenced here has no user left either: every object of the old area is gone, and a reference
+/// only an imported cut can leave behind belongs to an object class we do not build (r002_006 4-1 +2,000 /
+/// +13,000: the 0-55 take-off's three script objects 0x0804B428 hold 3 of shadow 1's 4 references; s515's warp_fade
+/// into 0-50 starts from a fresh allocator in the game)
 pub fn load_reset(w: &mut World) {
     if let Some(v) = st(w) {
-        if v.owners.is_empty() {
+        if v.owners.iter().all(|o| matches!(o.1, Owner::Shared(_))) {
             v.a = ObjVram::fresh();
             v.shared_rc = [0; 5];
         }

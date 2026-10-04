@@ -633,6 +633,12 @@ fn field_from_ram(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
     // object there (a screen shake) hides it: then a camera not where following the leader keeps it was held by a
     // script before the scene (fixed); with no event running nothing holds it
     let slot = ram.r32(0x0300_2BE0);
+    // a screen shake running there (vt 0x0804A720: +4 intensity, +5 period, +6 count, +8 frames left, +0xC / +0x10
+    // the offset): it draws two RNG values each period (r033_002_6-1 +7,000: every 2 frames, 0x080079F2)
+    if ram.valid(slot) && ram.r32(slot) == 0x0804_A720 && ram.s32(slot + 8) > 0 {
+        w.g.shakes = vec![wf_core::world::Shake { intensity: ram.r8(slot + 4) as i32, period: ram.r8(slot + 5) as i32, cnt: ram.r8(slot + 6) as i32, left: ram.s32(slot + 8) }];
+        w.g.shake_off = (ram.s32(slot + 0xC), ram.s32(slot + 0x10));
+    }
     match ram.valid(slot).then(|| ram.r32(slot)) {
         Some(0x0804_D300) => {
             let a = ram.r32(slot + 4);
@@ -761,6 +767,7 @@ fn import_objects(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
                 place_enemy(w, id, key.1, ox, oy);
             }
             _ => {
+                let mut pup = None;
                 if let Body::Npc(n) = &mut w.ents[i].body {
                     n.a.x = ox;
                     n.a.y = oy;
@@ -776,13 +783,22 @@ fn import_objects(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
                         }
                     }
                     // the hold state 0x03001B00 (`set_pose`): frozen on its cel
-                    if ram.r32(o + 0x14) == 0x0300_1B00 {
+                    let held = ram.r32(o + 0x14) == 0x0300_1B00;
+                    if held {
                         n.anim.mode = wf_core::scene::AnimMode::Pose;
+                    }
+                    // ... and, inside an event, an actor the script holds: its own behaviour waits for the event's
+                    // end (r033_002_6-1 +17,000: s502's fusion pose, sprite 123 frozen on cel 10)
+                    if held && n.behaviour.is_some() {
+                        pup = Some(n.anim.clone());
                     }
                     // a map NPC's talk resume node (+0x1BC: the exit value of its last talk)
                     if vt == VT_NPC && n.talk.is_some() {
                         n.resume = ram.r16(o + 0x1BC);
                     }
+                }
+                if let Some(anim) = pup.filter(|_| w.scene.depth > 0 && !w.scene.puppets.iter().any(|p| p.id == id)) {
+                    w.scene.puppets.push(wf_core::scene::Puppet { id, anim });
                 }
                 import_npc_step(w, i, ram, o, rows.get(&o).copied());
             }
@@ -1378,6 +1394,8 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
         }
     }
     if let Some(l) = live {
+        // (the mid-area import already took it: once)
+        w.g.shakes.retain(|s| *s != l);
         w.g.shakes.push(l);
     }
     w.scene.tracks.retain(|t| !t.queue.is_empty() || t.holding);
@@ -1869,11 +1887,12 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
             }
             continue;
         }
-        // the boss HP bar (`show_boss_bar`, vtable 0x0804CE28, 0x200)
-        if vt == 0x0804_CE28 {
+        // the boss HP bar (`show_boss_bar`, vtable 0x0804CE28, 0x200) and the 3D world map's own object
+        // (`0x0800C0C8`, vtable 0x0804D8C8, 0xF00: a purge's level-15 object - kbr_013 f87, s463's portrait box)
+        if vt == 0x0804_CE28 || vt == 0x0804_D8C8 {
             let h = ram.r16(o + 0xC);
             if h != 0xFFFF {
-                owners.push((h, Owner::BossBar));
+                owners.push((h, if vt == 0x0804_CE28 { Owner::BossBar } else { Owner::Map3d }));
             }
             continue;
         }

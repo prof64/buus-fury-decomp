@@ -449,7 +449,7 @@ pub fn add(w: &mut World, s: Shot) -> EntityId {
         ShotKind::CandyBeam { .. } => 0xC0,
         // a thrown bomb (real run 4-1 tiles r002_006+14,000 f85 / +7,000 / +17,000: the game's allocator takes a
         // 4-unit block, (151, 4), in the frame the bomb is made)
-        ShotKind::Bomb { .. } if std::env::var("NO_BOMBVRAM").is_err() => 0x100,
+        ShotKind::Bomb { .. } => 0x100,
         _ => 0,
     };
     let flame = matches!(s.kind, ShotKind::Flame { .. });
@@ -2229,6 +2229,10 @@ fn bomb_update(w: &mut World, i: usize) {
     }
     if t >= 71 {
         w.ents[i].removed = true;
+        // the bomb's own block is freed before its burst's chips and explosion allocate (r002_006+7,000 f192: the
+        // chips' shared graphic takes the last unit of the bomb's freed (151, 4), the explosion then (351, 16))
+        let id = w.ents[i].id;
+        crate::vram::release(w, crate::vram::Owner::Ent(id));
         let r = rect(w, i);
         if w.field.is_some() {
             // field: the blast's message is of sender class 2, which the enemies' handler (0x0800FBE6: class 1 or 2)
@@ -2250,6 +2254,9 @@ fn bomb_update(w: &mut World, i: usize) {
         for k in 0..4 {
             let (dvx, dvy) = [(96, 0), (-96, 0), (0, 64), (0, -64)][k];
             fx::add(w, fx::Fx::Debris { x: (px - 4) << 8, y: (py - 4) << 8, vx: dvx, vy: dvy, t: 0 });
+            // each chip takes a reference of the shared debris graphic (0x40), like a breakable's chips (real run
+            // 4-1 tile r002_006+7,000 f192: the bomb's burst allocates (154, 1))
+            crate::vram::keyed_acquire(w, crate::vram::KEY_DEBRIS, 0x40);
         }
         let rate = 0x1000 + w.rng.rand(0x1000);
         fx::explosion(w, px, py, rate);

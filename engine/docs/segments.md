@@ -1893,9 +1893,12 @@ two Python hash seeds, gives identical key logs (13,000 frames); the earlier run
   (wf-script-rhai), the host's start / finish (wf-import), and the importer reads both slots from RAM
   (`import_trigger_resume`, NPC +0x1BC). A first version also resumed the save point (s011 exits at 5): the
   18-13 soak (`m_047_h_h13`) lost its RNG at row 2,110 - hence the save-point exclusion, from the code above.
-  Result: `pg_museums_019_04_23` 467 -> 665; gated suite, playthrough, both lockstep suites, every reachable cut set
-  (A/B with `NO_RESUME=1`, `work/side/probe/abcuts.py`) and all soak masters + the title-to-Earth chain unchanged
-  otherwise.
+  Result: `pg_museums_019_04_23` 467 -> 665; gated suite, playthrough, both lockstep suites green; every reachable
+  cut set A/B (203 directories, 5,671 cuts, rule on / off: `work/side/probe/abcuts.py`, results
+  `work/side/ab_resume.txt`): 1 better (that one), none worse (5 first reported worse were other agents' edits
+  landing between the two runs - equal on one binary, `recheck.py`); `work/db/sb69/segs` and the 052 every-N tiles
+  hang with the rule off too (the known "replay hung" tile). All 48 soak masters and the title-to-Earth chain:
+  identical on / off.
 * Not mine (in-event import): the arrival on Kami's Lookout through the Other World map with a leader other than Goku
   (`pg_g141_001` / `pg_g101b_001` / `pg_g111b_001`, f21): those cuts start in 6-14 while s512 is still running (its
   spawned Goku stands in pose 18 - raw 20 - beside the leader), and the import has no script thread (depth 0), so its
@@ -2774,6 +2777,17 @@ driver, incl. the song start at a load's finish; I own the load / close lengths)
 - Next: per-map remainders measured for every map the real run loads (all loads of the run, ~1,500, emulator-only
   batch) as data in the map content, then the sweep of in-cut loads with `SEGMENT_SIMLAG=1`; then the other long
   iterations by kind.
+- *Done (same day):* 745 loads between the real run's cuts measured (73 stretches, `work/shipfix/loads_*.json`);
+  the remainder is a per-map constant (206 maps; loads into one map agree, std 16 k, 668 of 745 within 20 k), no
+  feature explains it across maps (std 80 k). `LOAD_REST` / `LOAD_TILE` replaced by the measured per-map median
+  (`wf-core/src/load_rest.json`, built by `work/shipfix/mk_loadrest.py`; unmeasured maps: the median, 260 k).
+  Iteration semantics from the masters: the load runs in its logic frame's iteration (the logic counter moves at
+  its start), so the lag frames are the iteration's frames minus one - exit loads and script loads alike.
+  First master check (`m_003_d06_thieves`, `SEGMENT_VRAM=0`): the 8-2 -> 8-3 exit load's own time is right
+  (model 7,761,113 vs game 7,763,348) but the iteration ends 7 k before the 32nd frame's VBlank in the game, and our
+  main-loop sound update at its end is 608 samples / 92 k against the game's 336 / 47 k - a sound-position question
+  (**Earth agent**: the play position / last update across the load's mixes decides this frame); one lag frame
+  long there. r052_004's script loads are right or one off on the same kind of margin.
 - (The NPC-facing regression seen on 2026-10-04 in `r000_072/081/095/103/113/188/194/218_8-x`, `r046_*_18-2` and
   `r057_*_14-2` - "dir: #N sprite 112 / 279 / 280 / 110: 0 vs game 3" at f139..f870 - came from in-flight edits and is
   gone on f75b097: those cuts are exact again.)
@@ -3049,3 +3063,10 @@ acquires are no-ops), cross_ts untouched.
 Still open on the claim: the in-event patrol rebuild (r002_006 +9,000 / +17,000 frame 0), the 0x57 wait (r033_002
 +15,000), r033_002 +7,000 / +17,000 frame 0; r002_006 +4,000 / +5,000 / +14,000 now stop on free-list order (the
 allocator's spare lists - Super Buu agent's model) and +7,000 on a second bomb's block.
+* (update 15, continued) **r002_006+6,000 f8** (cut inside s003, mid-node): at row 6,008 the game runs a drop
+  script (script-VM rand x 2 / chance x 4, then `0x0800D30E`'s 4 scatter draws: an item) - a kill just before the
+  cut whose death-effect delay is still running; ours has no pending drop after the import. Next step: find the
+  death-effect object in RAM (its remaining delay, the enemy type) and import it as `Field.pending_drops`. The tile's
+  `init.objs` pointers for the effect classes do not hold their vtable at +0 in `init.ram` (stale at the snapshot?) -
+  check the recorder before trusting them. The r033_002 tiles were dropped from the regenerated board (no longer
+  among the rows that lose > 1,000 frames), so its items are not reproducible on the current board.
