@@ -989,6 +989,9 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
     }
     wf_core::enemy::sync_mark(w, ei);
     import_patrol(w, ei, ram, o);
+    // the +0x214 word an AI RunScript hands its event (Super Buu's waypoint index; after the state rebuild, whose
+    // glide enter stepped it)
+    w.en(ei).p214 = ram.s32(o + 0x214);
 }
 
 /// Kid Buu's beam in flight at the cut (the KidBuuKamehameha node; the beam object vt 0x0804AEF8, owner +0x50:

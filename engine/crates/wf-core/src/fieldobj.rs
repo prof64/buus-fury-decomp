@@ -472,7 +472,9 @@ pub fn pickup_update(w: &mut World, i: usize) {
     match p.kind {
         PickupKind::Zenie(_) => {
             coin_fly(w, &mut p);
-            if p.t >= 600 {
+            // (the age counts its creation frame's update; the coin goes when it reaches 601 - MEASURED real run 20-6 r062_001
+            // f21,213 .. f21,814: age 600 at f21,813, still alive)
+            if p.t > 600 {
                 w.ents[i].removed = true;
             }
         }

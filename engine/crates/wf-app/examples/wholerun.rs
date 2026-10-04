@@ -23,6 +23,10 @@ fn main() {
     let opt = |name: &str| args.iter().position(|a| a == name).and_then(|i| args.get(i + 1)).cloned();
     let limit: usize = opt("--frames").and_then(|v| v.parse().ok()).unwrap_or(usize::MAX);
     let sim_lag = opt("--lag").as_deref() == Some("sim");
+    // --lag none: no lag frames at all - one app step per game logic iteration (the keys the game sampled at its
+    // start, the row where the counter moved), compared at the iteration's end; nothing for the lag rows
+    let no_lag = opt("--lag").as_deref() == Some("none");
+    let mode_name = if sim_lag { "sim" } else if no_lag { "none" } else { "recorded" };
     let range = |name: &str| opt(name).and_then(|v| v.split_once("..").and_then(|(a, b)| Some((a.parse::<usize>().ok()?, b.parse::<usize>().ok()?))));
     let show = range("--show");
     let rng_rows = range("--rng");
@@ -82,11 +86,13 @@ fn main() {
         app.skip_area_banner();
     }
     app.session.world.opts.sim_lag = sim_lag;
+    app.session.world.opts.no_lag = no_lag;
     println!("sound model: driver {} calibrated {} phase {}", app.world().sound.drv.is_some(), !app.world().sound.uncalibrated, app.world().sound.phase);
 
     let rd = BufReader::new(std::fs::File::open(&master).expect("master"));
     let mut raw = rd.lines();
-    let mut prev_lf = -1i64;
+    // (no lag: row 0 is not an iteration - the counter is 0 there)
+    let mut prev_lf = if no_lag { 0 } else { -1i64 };
     // (skip to the import's row without parsing; the row before it gives the logic counter)
     for j in 0..from_row {
         let l = raw.next().expect("rows").expect("line");
@@ -101,6 +107,7 @@ fn main() {
     let (mut stepped, mut own_lag, mut replayed_lag, mut lag_bad) = (0usize, 0usize, 0usize, 0usize);
     let mut errors = 0usize;
     let (mut load_watch, mut load_bad): (Option<(usize, usize)>, usize) = (None, 0);
+    let mut clock_reported = false;
     let mut k = from_row;
     let mut lfd_last: Option<i64> = None;
     while let Some(r) = lines.next() {
@@ -120,6 +127,7 @@ fn main() {
         wf_core::rng::TRACE.store(trace, std::sync::atomic::Ordering::Relaxed);
         // (the option is the app's: a world the title builds (New Game) starts without it)
         app.session.world.opts.sim_lag = sim_lag;
+        app.session.world.opts.no_lag = no_lag;
         // (sim lag: each load's lag run against the recording's lag run from the same row)
         if sim_lag {
             if logic {
@@ -148,7 +156,7 @@ fn main() {
                     println!("sim lag frame on a game logic row {k} ({}): app area {:?} lag left {}", stretch_of(k), app.world().field.as_ref().map(|f| (f.area.world, f.area.area)), app.world().g.lag);
                 }
             }
-        } else if logic || menu {
+        } else if logic || (menu && !no_lag) {
             let mut ev = vec![];
             app.step(&[keys], &mut ev);
             stepped += 1;
@@ -177,6 +185,11 @@ fn main() {
         // row moves the logic counter; a long iteration's rows show it half done: an area load's half-built player,
         // a draw made in its lag frames. Those rows are compared, the others not)
         let complete = next_lf.map_or(true, |n| n != lf);
+        // the frame counter 0x03000F94 (`Globals::clock`; the punch marker's blink, enemy state stamps): reported once
+        if complete && !clock_reported && !menu && w.field.is_some() && w.g.clock(w.frame) != lf {
+            clock_reported = true;
+            println!("clock differs from row {k} ({}): app {} game {lf}", stretch_of(k), w.g.clock(w.frame));
+        }
         let in_field = ga != (0, 0) && !r["p"].is_null() && complete;
         if !menu && in_field && aa != ga {
             bad.push(("area", format!("app {aa:?} game {ga:?}")));
@@ -243,7 +256,7 @@ fn main() {
             }
         }
         if show.is_some_and(|(a, b)| a <= k && k <= b) {
-            println!("row {k} keys {keys:x} logic {logic} menu {menu} app area {aa:?} p {ap:?} rng {:08x?} depth {} | game area {ga:?} p {} rng {} depth {gd} lf {lf} ourlf {}", w.rng.state(), w.scene.depth, r["p"], r["rng"], w.story.play_frames as i64 + w.story.lf_bias);
+            println!("row {k} keys {keys:x} logic {logic} menu {menu} app area {aa:?} p {ap:?} rng {:08x?} depth {} | game area {ga:?} p {} rng {} depth {gd} lf {lf} ourlf {} clock {}", w.rng.state(), w.scene.depth, r["p"], r["rng"], w.story.play_frames as i64 + w.story.lf_bias, w.g.clock(w.frame));
             if std::env::var("WR_HOST").is_ok() {
                 println!("    host started {:?} pending {:?} fade {:?}", app.host().started.iter().rev().take(2).collect::<Vec<_>>(), app.host().hs.pending, w.scene.screen.fade);
             }
@@ -262,13 +275,13 @@ fn main() {
     }
     let exact_to = first_exact.as_ref().map(|f| f.0).unwrap_or(k);
     println!("rows {k} stepped {stepped} | sim lag {own_lag} (on game logic rows {lag_bad}), recorded lag replayed {replayed_lag} | script errors {errors}");
-    println!("whole run, no imports ({} lag): exact to row {exact_to} of {k} ({})", if sim_lag { "sim" } else { "recorded" }, stretch_of(exact_to));
+    println!("whole run, no imports ({} lag): exact to row {exact_to} of {k} ({})", mode_name, stretch_of(exact_to));
     for l in &lasting {
         println!("  first lasting {}: {:?}", l.0, l.3.as_ref().map(|(r, d)| (r, stretch_of(*r), d)));
     }
     if let Some(out) = opt("--report") {
         let rep = serde_json::json!({
-            "lag": if sim_lag { "sim" } else { "recorded" },
+            "lag": mode_name,
             "rows": k,
             "exact_to": exact_to,
             "exact_stretch": stretch_of(exact_to),

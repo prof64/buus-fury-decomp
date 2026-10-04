@@ -77,6 +77,10 @@ pub struct Enemy {
     #[serde(default)]
     pub strike_hand: EntityId,
     pub script_hits: i32,
+    /// the enemy's +0x214 word: the parameter block an AI RunScript hands its event (p(0)); Super Buu's glide writes
+    /// its waypoint index there (0x0803C07B: real run 20-6 r062_001 tile +3,000, s474's p(0) = 3 picks its y)
+    #[serde(default)]
+    pub p214: i32,
     /// tiles this enemy marked blocked on the enemy grid
     pub marked: Option<[i32; 4]>,
     pub stepped: bool,
@@ -182,6 +186,7 @@ impl Enemy {
             strike: (0, false),
             strike_hand: 0,
             script_hits: 0,
+            p214: 0,
             marked: None,
             stepped: false,
             target: 0,
@@ -362,6 +367,10 @@ pub fn mark_moving(w: &mut World, i: usize) {
 }
 
 pub fn set_anim_rule(w: &mut World, i: usize, refs: &[AnimRef], restart: bool, looped: Option<bool>, rule: Option<u32>) {
+    if w.field.is_some() && !matches!(refs.first(), Some(AnimRef::N(15))) {
+        let id = w.ents[i].id;
+        crate::shots::drop_charging_ball(w, id);
+    }
     let d = Arc::clone(&w.data);
     let mut ev = std::mem::take(&mut w.events);
     let mut rng = w.rng;

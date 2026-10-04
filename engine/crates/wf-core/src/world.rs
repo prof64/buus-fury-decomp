@@ -551,6 +551,10 @@ pub struct Options {
     /// replaying them from a recording
     #[serde(default)]
     pub sim_lag: bool,
+    /// no lag frames at all (the app's target: hardware slowdowns are not recreated) - menu redraws take no frames
+    /// beyond their iteration, the boot screens count their logic frames only; one step = one game logic iteration
+    #[serde(default)]
+    pub no_lag: bool,
 }
 impl Hash for Options {
     fn hash<H: Hasher>(&self, h: &mut H) {
@@ -561,6 +565,9 @@ impl Hash for Options {
         }
         if self.sim_lag {
             self.sim_lag.hash(h);
+        }
+        if self.no_lag {
+            self.no_lag.hash(h);
         }
     }
 }

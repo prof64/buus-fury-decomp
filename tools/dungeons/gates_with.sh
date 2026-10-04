@@ -12,5 +12,5 @@ cd $R && git archive "$C" engine | tar -x -m -C $B
 [ -e $B/roms/buu.gba ] || ln -s $R/roms/buu.gba $B/roms/buu.gba
 for f in "$@"; do cp $R/engine/$f $B/engine/$f; done
 cd $B/engine || exit 1
-SEGMENT_DIR=$R/data/segments SEGMENT_STRICT=1 cargo test --target-dir /tmp/bis-target -p wf-import --test segments -- --nocapture > /tmp/gates_with.log 2>&1
+SEGMENT_DIR=${GATES_DIR:-$R/data/segments} SEGMENT_STRICT=1 cargo test --target-dir /tmp/bis-target -p wf-import --test segments -- --nocapture > /tmp/gates_with.log 2>&1
 grep "test result\|segments below" /tmp/gates_with.log | cut -c1-600

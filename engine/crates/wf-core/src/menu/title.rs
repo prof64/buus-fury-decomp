@@ -496,15 +496,19 @@ pub fn open_title_boot(w: &mut World) {
     open_title(w);
     w.events.retain(|e| !matches!(e, crate::world::Event::Song { .. }));
     w.scene.song = -1;
-    w.menu.boot = BOOT_FRAMES;
+    w.menu.boot = if w.opts.no_lag { BOOT_LOGIC as u16 } else { BOOT_FRAMES };
     w.menu.boot_draw = Some(());
 }
 
 /// video frames from the soft reset to the title's first iteration (the boot screens' modes and switches)
 pub const BOOT_FRAMES: u16 = 705;
+/// the frame counter 0x03000F94 before the title's first iteration (the boot screens' logic frames)
+pub const BOOT_LOGIC: i64 = 696;
 /// the logos' mode starts song 45 in its first frame after the reset's legal screen (song player 0 from video frame
 /// 181 on; the title's enter then finds it playing)
 pub const BOOT_SONG_AT: u16 = 181;
+/// the same in logic frames (no lag: the legal screen's 180 iterations)
+pub const BOOT_SONG_AT_LOGIC: u16 = 180;
 
 /// the title's song (`0x080053CC`)
 pub const TITLE_SONG: i32 = 45;
@@ -566,6 +570,7 @@ pub fn boot(data: &Arc<crate::content::GameData>, w: &mut World) -> Option<World
     let settings = w.menu.settings.clone();
     let rng = crate::battle::RngInit::State(w.rng.a, w.rng.b);
     let rng0 = (w.rng.a, w.rng.b);
+    let clock0 = w.g.clock(w.frame);
     let shown = w.menu.shown.clone();
     let mut nw = match &b {
         Boot::NewGame { slot } => {
@@ -591,6 +596,8 @@ pub fn boot(data: &Arc<crate::content::GameData>, w: &mut World) -> Option<World
             // the new field's build is ours only (the game's GameData reset draws nothing): the RNG as the title left
             // it (the whole run from the reset: [0, 0] until the prologue's first draw)
             nw.rng = crate::rng::Rng::new(rng0.0, rng0.1);
+            // the frame counter 0x03000F94 runs on from the title (it counts since the reset)
+            nw.g.fc0 = clock0 - nw.frame as i64;
             nw
         }
         Boot::Continue { slot, chosen } => {

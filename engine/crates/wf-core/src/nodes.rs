@@ -1194,6 +1194,7 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             const WP: [(i32, i32); 5] = [(224, 104), (344, 128), (304, 256), (120, 264), (112, 144)];
             let step = if w.rng.rand(2) != 0 { 1 } else { 4 };
             w.g.waypoint = (w.g.waypoint + step) % 5;
+            w.en(i).p214 = w.g.waypoint;
             let (tx, ty) = WP[w.g.waypoint as usize];
             let (px, py) = (w.en_ref(i).a.px(), w.en_ref(i).a.py());
             r.d[0] = ((tx - px) << 8) / 60;
@@ -1454,7 +1455,8 @@ fn leaf_exit(w: &mut World, c: &C, n: u16, _r: &mut NodeRt) {
         K::ShockStun => w.en(i).stunned = false,
         // the throw interrupted while the ball charges (a hit's state change): the ball goes, its destructor stops
         // the charge sound (real run 20-6 r062_001 tile +21,000 f418: stop 3 with the punch's sounds)
-        K::ThrowBigBall => {
+        // (battles; the field drops the ball with its controller: shots::drop_charging_ball)
+        K::ThrowBigBall if w.field.is_none() => {
             let me = w.ents[i].id;
             let balls: Vec<usize> = (0..w.ents.len()).filter(|&k| !w.ents[k].removed && matches!(&w.ents[k].body, Body::Shot(s) if s.owner == me && matches!(s.kind, shots::ShotKind::SuperBall { phase: 0, .. }))).collect();
             for k in balls {

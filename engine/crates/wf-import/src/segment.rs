@@ -447,32 +447,6 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
             }
             host.step(&mut sess, keys);
             wf_core::rng::TRACE.store(false, std::sync::atomic::Ordering::Relaxed);
-            // SEGMENT_FIELDCOST: per logic frame, the on-screen actors and the decompression of the cels newly shown
-            if std::env::var_os("SEGMENT_FIELDCOST").is_some() && sess.world.field.is_some() {
-                use std::collections::HashMap;
-                static CELS: std::sync::Mutex<Option<HashMap<u64, (i64, i64, i64, i64)>>> = std::sync::Mutex::new(None);
-                let w = &sess.world;
-                let mut g = CELS.lock().unwrap();
-                let prev = g.get_or_insert_with(HashMap::new);
-                let (mut on, mut dec, mut newc) = (0, 0i64, 0);
-                let mut now = HashMap::new();
-                for i in 0..w.ents.len() {
-                    if w.ents[i].removed || w.actor(i).is_none() || !wf_core::vram::on_screen(w, i) {
-                        continue;
-                    }
-                    let a = w.actor(i).unwrap();
-                    let (raw, fr) = wf_core::scene::shown_anim(w, i).unwrap_or((a.anim.map(|x| x as i32 + 100_000).unwrap_or(-1), 0));
-                    let key = (a.sprite.map(|s| s as i64).unwrap_or(-1), raw as i64, fr as i64, a.facing as i64);
-                    on += 1;
-                    if prev.get(&(w.ents[i].id as u64)) != Some(&key) {
-                        dec += wf_core::scene::cel_dec(w, i) as i64;
-                        newc += 1;
-                    }
-                    now.insert(w.ents[i].id as u64, key);
-                }
-                *prev = now;
-                eprintln!("fieldcost {} f{k} on {on} new {newc} dec {dec} ents {}", doc["name"].as_str().unwrap_or("?"), w.ents.iter().filter(|e| !e.removed).count());
-            }
         } else if wf_core::menu::active(&sess.world)
             && !(matches!(sess.world.menu.phase, wf_core::menu::Phase::FadeOut { .. }) && !sess.world.menu.scripted)
             // (a power gauge that ended inside the last world frame: the lag after it is the script's - sb 21-25
@@ -544,19 +518,6 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
                         d.typing.first().copied().unwrap_or(0),
                         d.options,
                         d.text.chars().take(40).collect::<String>()
-                    );
-                    let on = (0..w.ents.len()).filter(|&i| !w.ents[i].removed && w.actor(i).is_some() && wf_core::vram::on_screen(w, i)).count();
-                    let all = w.ents.iter().filter(|e| !e.removed).count();
-                    eprintln!(
-                        "lagdlg2 {} f{k} on {on} ents {all} dim {} black {} white {} fade {} flash {} depth {} field {}",
-                        doc["name"].as_str().unwrap_or("?"),
-                        w.scene.screen.dim,
-                        w.scene.screen.black,
-                        w.scene.screen.white,
-                        w.scene.screen.fade.is_some(),
-                        w.scene.screen.flash.is_some(),
-                        w.scene.depth,
-                        w.field.as_ref().map(|f| f.map.as_str()).unwrap_or("-")
                     );
                 }
             }

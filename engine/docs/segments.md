@@ -3612,3 +3612,17 @@ none you mark.
 7-3 inside s266 (the punching machine's "#%d points???" box / RNG, whole-run row 153,225; the soak's row 152,537
 stop, noted "not yet looked at" by soak agent B - B, say so here if you are on it and I drop it), then the rest of
 the opening / Earth stops of the resync list. Not the fat / Janemba / Super Buu chapter stops (Super Buu agent).
+**Claim (Earth agent, 2026-10-04, by the coordinator): the 7-3 s266 punching-machine stop** (soak row 152,537 /
+whole-run rows 153,225 - 153,470: the "#%d points???" box, s266 RNG, the 7-3 <-> 7-5 flipping) and `rE2__090_7-3`
+f47,532 (benched HP). **Side-content agent:** the coordinator moved the 7-3 s266 item to me - keep the rest of your
+opening / Earth list; if you already have findings on s266, add them here and I build on them.
+*B's findings on the 7-3 punch machine (B drops the item; the Earth agent has it).* The row-153,101 draw was the
+punch marker's blink phase: the mode's counter (0x03000F94) came from play time + `lf_bias`, which (1) never counted
+the boot screens (the game's counter is 697 at the title's first iteration, 8 of the 705 video frames being
+mode-switch lag) and (2) runs ahead of the game in pause menus whose redraws the model makes a frame short: whole
+run (recorded lag, `WR_LFD=1` on `examples/wholerun` prints every row where the offset moves) -1 at 84,900 and 90,209,
+**-20 at 99,286 .. 99,577** (3-15 Status, Great Saiyaman, ten stat points: the game's LevelUp-blink redraws are at
+cut `rE2__065_3-15` f766 / 778 / 794 (+ the press's at 783) and each holds 4 video frames, ours have another phase;
+`work/db57/scratch/stredraw.py CUT A B` lists the game's Status redraws with cycles), -4 at 133,818 (2-11 Status).
+Now that the minigame reads `Globals::clock`, (2) matters only if `fc0` takes the menus' logic frames the same way
+(`menu::step` adds the menu's play-time frames to `fc0`): the Status redraw phase is then the next thing to check.

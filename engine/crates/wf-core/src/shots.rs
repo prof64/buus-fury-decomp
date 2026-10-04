@@ -2278,6 +2278,19 @@ fn bomb_chips(w: &mut World, px: i32, py: i32) {
     }
 }
 
+/// Super Buu's charging ball belongs to the throw's controller (0x0804D6CC, the enemy's obj+0x14): when another
+/// animation state replaces it (a hurt, a script's set_pose / play_anim) the controller's destructor deletes the ball,
+/// stopping the charge sound; the AI's own state change (a hit handler's GotoState) keeps it (real run 20-6 r062_001:
+/// tile +3,000 f58 the IT punch's goto 0x29F, the ball goes at f62 with s474's commands; tile +21,000 f418 a punch)
+pub fn drop_charging_ball(w: &mut World, owner: EntityId) {
+    let balls: Vec<usize> = (0..w.ents.len()).filter(|&k| !w.ents[k].removed && matches!(&w.ents[k].body, Body::Shot(s) if s.owner == owner && matches!(s.kind, ShotKind::SuperBall { phase: 0, .. }))).collect();
+    for k in balls {
+        w.ents[k].removed = true;
+        crate::vram::entity_gone(w, k);
+        w.sfx_stop(3);
+    }
+}
+
 fn superball_update(w: &mut World, i: usize) {
     let t = {
         let s = w.shot(i);

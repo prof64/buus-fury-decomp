@@ -528,8 +528,14 @@ fn step_inner(w: &mut World) {
     if w.menu.boot > 0 {
         w.menu.boot -= 1;
         w.menu.held = held;
+        // the boot screens' iterations count on 0x03000F94 too: the title's first iteration is logic frame
+        // BOOT_LOGIC (the reset's recording: 697 at video frame 705)
+        if w.menu.boot == 0 {
+            w.g.fc0 = title::BOOT_LOGIC - w.frame as i64;
+        }
         // the logos' mode starts the title song (it plays on into the title, whose enter finds it playing)
-        if w.menu.boot == title::BOOT_FRAMES - title::BOOT_SONG_AT - 1 {
+        let (total, song_at) = if w.opts.no_lag { (title::BOOT_LOGIC as u16, title::BOOT_SONG_AT_LOGIC) } else { (title::BOOT_FRAMES, title::BOOT_SONG_AT) };
+        if w.menu.boot == total - song_at - 1 {
             crate::scene::play_song(w, title::TITLE_SONG);
         }
         return;
@@ -687,7 +693,8 @@ fn redraw(w: &mut World, first: bool) {
     if !top.container_ref().drawn {
         top.before_draw(w);
         top.container().drawn = true;
-        let mut cost = if first { 1 } else { top.redraw_cost().max(1) };
+        // (no lag frames: the redraw is part of its iteration - `Options::no_lag`)
+        let mut cost = if first || w.opts.no_lag { 1 } else { top.redraw_cost().max(1) };
         if crate::sndsim::debug() && !first {
             if let Some(d) = w.data.menu.clone() {
                 let timed = top.page().redraw_time(w, &d);

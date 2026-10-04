@@ -579,7 +579,12 @@ impl StoryHost {
                             self.hs.no_resume_save = false;
                         }
                         let node = wf_core::field::resume_node(w, &job.cause);
-                        self.rt.start_event_from(n, node, [0; 4], 0)
+                        // an AI's RunScript hands the event the enemy's +0x214 block as its parameters
+                        let params = match &job.cause {
+                            Cause::Ai { entity } => [w.enemy_by_id(*entity).map(|(_, e)| e.p214).unwrap_or(0), 0, 0, 0],
+                            _ => [0; 4],
+                        };
+                        self.rt.start_event_from(n, node, params, 0)
                     }
                     }
                     None => {

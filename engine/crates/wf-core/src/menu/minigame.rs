@@ -67,8 +67,10 @@ pub struct Minigame {
     /// OAM of the previous draw (on screen now) / of the last draw
     pub oam_shown: Oam,
     pub oam_last: Oam,
-    /// the mode loop's frame counter (`0x03000F94` since boot; the punch marker's blink): the remake has no boot
-    /// counter, it starts from the play time (a harness passes the capture's)
+    /// the mode loop's frame counter (`0x03000F94` since boot; the punch marker's blink): from the world's clock
+    /// (`Globals::clock`), not play time + `lf_bias` - that one is a frame short in a cut taken inside the event
+    /// (whole run 7-3, s266, cut `e73 mid_2000`: the third wait ends at the game's 143,921, hidden - a fourth wait,
+    /// the punch at f354; ours had 143,920 and punched at f323) (a harness passes the capture's)
     pub counter: u32,
     pub watch: Option<Watch>,
     /// Watch This!: the construction (VRAM eviction, box decode) makes the first iteration 2 frames long
@@ -80,7 +82,7 @@ pub struct Minigame {
 
 impl Minigame {
     fn base(kind: Kind, g: Gauge, w: &World) -> Minigame {
-        Minigame { c: Container::default(), kind, g, wait: 0, oam_shown: None, oam_last: None, counter: (w.story.play_frames as i64 + w.story.lf_bias) as u32, watch: None, enter_lag: 0, waited: false }
+        Minigame { c: Container::default(), kind, g, wait: 0, oam_shown: None, oam_last: None, counter: w.g.clock(w.frame) as u32, watch: None, enter_lag: 0, waited: false }
     }
     /// `0x0803018C`: the gauge at (72, 144), empty, peak 0
     pub fn power(w: &World) -> Minigame {

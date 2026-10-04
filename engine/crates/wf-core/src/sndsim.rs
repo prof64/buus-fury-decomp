@@ -400,23 +400,43 @@ pub fn load_frames(w: &mut World) -> Option<u8> {
     r
 }
 
-/// A text box's creation (`scene::open_text`, the script's step): one main-loop iteration of 1,928,650 cycles + 128
-/// per character of the first page + the portrait's decompression (portraits/index.json `decode_cycles`; none for 0 /
-/// 7). 30 opens of the real run on the emulator (work/shipfix/dlg_measure.py, dlg_join.py): std 10.9 k, max 28 k.
-/// Returns the iteration's video frames (None: uncalibrated / no sound)
+/// A text box's creation (`scene::open_text`, the script's step): one main-loop iteration of the map's box constant
+/// (`dialog_rest.json`: the box's own work - window, font, the window graphics' decompression, ~1.82 M - plus the
+/// scene's per-frame work on that map, which differs by ~25 k between maps) + 128 per character of the first page +
+/// the portrait's decompression (portraits/index.json `decode_cycles`; none for 0 / 7) + the palette fade's last pass
+/// when a screen fade runs or ends in this frame (`fade`, 35.7 k). 683 opens measured on the emulator (every real-run
+/// cut + the whole run's prologue; work/shipfix/dlg_measure2.py, mk_dlgrest.py): per-map constants leave 469 within
+/// 5 k. Returns the iteration's video frames (None: uncalibrated / no sound)
 pub fn dialog_frames(w: &mut World, portrait: u8, first_chars: i64) -> Option<u8> {
     let dec = if portrait == 0 || portrait == 7 {
         0
     } else {
         w.data.menu.as_ref().and_then(|m| m.portrait_cycles.get(portrait as usize - 8).copied()).unwrap_or(0) as i64
     };
-    let base = DIALOG_OPEN_REST + 128 * first_chars + dec;
+    let (default, fade_pass, maps) = dialog_table();
+    let rest = w.field.as_ref().and_then(|f| maps.get(&f.map).copied()).unwrap_or(*default);
+    // (a fade that ended earlier in this frame also runs its last pass in the iteration - not tracked: sim lag is
+    // deprecated, segments.md §9)
+    let fade = if w.scene.screen.fade.is_some() { *fade_pass } else { 0 };
+    let base = rest + 128 * first_chars + dec + fade;
     if debug() {
-        eprintln!("snd dialog: portrait {portrait} chars {first_chars} decode {dec} base {base}");
+        eprintln!(
+            "snd dialog: portrait {portrait} chars {first_chars} decode {dec} rest {rest} fade {fade} base {base} map {}",
+            w.field.as_ref().map(|f| f.map.as_str()).unwrap_or("-"),
+        );
     }
     redraw_frames(w, Redraw { t0: 0, base })
 }
-const DIALOG_OPEN_REST: i64 = 1_928_650;
+
+/// dialog_rest.json: (default, the fade pass, per-map constants)
+fn dialog_table() -> &'static (i64, i64, std::collections::HashMap<String, i64>) {
+    static T: std::sync::OnceLock<(i64, i64, std::collections::HashMap<String, i64>)> = std::sync::OnceLock::new();
+    T.get_or_init(|| {
+        let v: serde_json::Value = serde_json::from_str(include_str!("dialog_rest.json")).unwrap_or_default();
+        let maps = v["maps"].as_object().map(|o| o.iter().map(|(k, x)| (k.clone(), x.as_i64().unwrap_or(0))).collect()).unwrap_or_default();
+        (v["default"].as_i64().unwrap_or(1_928_650), v["fade"].as_i64().unwrap_or(0), maps)
+    })
+}
 
 /// The map rebuild's cycles for the current area / camera / actors (pure): (decompression incl. the actors' frames,
 /// the other per-item work). The close's reload and an area load (`load_frames`) both rebuild the map this way

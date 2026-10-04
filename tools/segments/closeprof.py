@@ -29,6 +29,11 @@ def rows_of(path):
     return out
 
 
+def is_veneer(a):
+    # the call stubs: `bx r0` .. `bx r7` at 0x08046AA0, the Thumb -> ARM long-call stubs at 0x08049100..
+    return 0x08046AA0 <= a < 0x08046AB0 or 0x08049100 <= a < 0x08049200
+
+
 def profile(seg, state, frame):
     rows = rows_of(seg)
     lf = rows[frame]['lf']
@@ -74,16 +79,32 @@ def profile(seg, state, frame):
         seq = npc in (pc + 2, pc + 4)
         if not seq:
             top_ret = stack[-1][1]
-            if top_ret is not None and npc == (top_ret & ~1):
+            tgt = npc + 2 if e.reg(16) & 0x20 else npc + 4
+            # (right after a branch r15 is the target + 2, not + 4: the address read is up to 4 short)
+            if top_ret is not None and 0 <= (top_ret & ~1) - npc <= 4:
                 stack.pop()
-            elif lr != lr0 and (lr & ~1) in (pc + 2, pc + 4):
-                key = hex(npc)
+            elif lr != lr0 and 0 <= (lr & ~1) - pc <= 6:
+                key = 'veneer' if is_veneer(tgt) else hex(tgt)
                 parent = stack[-1][0]
                 ch = parent['k'].get(key)
                 if ch is None:
                     ch = parent['k'][key] = {'f': key, 'c': 0, 'n': 0, 'k': {}}
                 ch['n'] += 1
                 stack.append((ch, lr))
+            elif stack[-1][0]['f'] == 'veneer' and not is_veneer(tgt):
+                # a call stub (`bx rN`, or Thumb -> ARM `bx pc` + a long jump) reached its target: the frame is the
+                # target's (its cycles so far stay with the parent)
+                v, ret = stack.pop()
+                parent = stack[-1][0]
+                v['n'] -= 1
+                if v['n'] == 0 and not v['k']:
+                    parent['k'].pop('veneer', None)
+                key = hex(tgt)
+                ch = parent['k'].get(key)
+                if ch is None:
+                    ch = parent['k'][key] = {'f': key, 'c': 0, 'n': 0, 'k': {}}
+                ch['n'] += 1
+                stack.append((ch, ret))
         pc, lr0 = npc, lr
         if e.frame != f0:
             row += 1
