@@ -216,11 +216,27 @@ pub fn compare(w: &World, fr: &Value, es: &[String], map: &mut BTreeMap<usize, E
             if let Some(g) = game {
                 rep.cel.checks += 1;
                 let ours = wf_core::view::actor_cel(w, i).map(|c| (c.0, c.1));
+                if std::env::var_os("SEGMENT_CELALT").is_some() {
+                    if let Body::Enemy(n) = &w.ents[i].body {
+                        let alt = n.a.sprite.and_then(|s| w.data.sprite(s)).and_then(|sp| n.a.anim.and_then(|k| sp.anims.get(k as usize))).and_then(|a| {
+                            let looped = n.a.anim_loop.unwrap_or(a.looped);
+                            a.step_index_at(n.a.facing, n.a.anim_t, looped).map(|k| (a.steps(n.a.facing)[k].frame, a.steps(n.a.facing)[k].flip))
+                        });
+                        let araw = n.a.anim.and_then(|k| n.a.sprite.and_then(|s| w.data.sprite(s)).and_then(|sp| sp.anims.get(k as usize))).map(|a| a.raw);
+                        eprintln!("    celalt ea {} at {} rawmatch {} game_raw {} ea_raw {} a_raw {:?}", ours == Some(g), alt == Some(g), araw == Some(n.ea.pos.raw), r.raw(), n.ea.pos.raw, araw);
+                    }
+                }
                 if ours != Some(g) && cel_row != Some(k) {
                     cel_row = Some(k);
                     rep.cel.bad_rows += 1;
                     if rep.cel.first.is_none() {
-                        rep.cel.first = Some((k, format!("#{} sprite {}: cel {ours:?} vs game {g:?} (raw {} cel {} dir {})", r.k(), r.sprite(), r.raw(), r.frame(), r.dir())));
+                        let kind = match &w.ents[i].body {
+                            Body::Player(_) => "player",
+                            Body::Enemy(_) => "enemy",
+                            Body::Npc(_) => "npc",
+                            _ => "other",
+                        };
+                        rep.cel.first = Some((k, format!("{kind} #{} sprite {}: cel {ours:?} vs game {g:?} (raw {} cel {} dir {}) ours shown {:?}", r.k(), r.sprite(), r.raw(), r.frame(), r.dir(), scene::shown_anim(w, i))));
                     }
                     if std::env::var("SEGMENT_CEL").is_ok_and(|v| v == "all") {
                         eprintln!("    cel f{k} #{} sprite {}: {ours:?} vs game {g:?} (raw {} cel {} dir {})", r.k(), r.sprite(), r.raw(), r.frame(), r.dir());
@@ -803,7 +819,9 @@ pub fn replay_with(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: 
                 while area_i + 1 < rows.len() && rows[area_i + 1].0 <= k {
                     area_i += 1;
                 }
-                if rows.get(area_i).is_some_and(|r| r.0 <= k) && rows[area_i].0 == k {
+                // (not in a load's frame - the recorded area changed: the game's list is the old area's until its load rebuilds it later in that iteration; 12-22 -> 0-2 at the self-destruct's end)
+                let loading = k > 0 && frames[k]["area"] != frames[k - 1]["area"];
+                if rows.get(area_i).is_some_and(|r| r.0 <= k) && rows[area_i].0 == k && !loading {
                     // (change rows only: the segment's last row is often inside the next load, the game's list torn down)
                     area_tally.check(k, &sess.world, area_g0.as_deref(), &rows[area_i].1);
                 }

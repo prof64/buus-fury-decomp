@@ -51,19 +51,15 @@ pub fn actor_cel(w: &World, i: usize) -> Option<(u16, bool, Option<(i32, i32)>)>
     };
     match &w.ents[i].body {
         Body::Player(p) => {
-            // a script's puppet plays the scene animation instead of the player state's
-            let (raw, frame) = match crate::scene::scene_anim(w, i) {
-                Some(a) => (a.raw, a.frame),
-                None => (p.ap.raw, p.ap.frame),
-            };
+            // the player state's animation (a script's commands reach it too: `player::script_pose`, the frame-range
+            // ticks - the leftover puppet of an ended command does not show; real route 12-6 f54: walking)
+            let (raw, frame) = (p.ap.raw, p.ap.frame);
             let s = if p.candy_def { Some(45) } else { p.a.sprite };
             s.and_then(|s| w.data.sprite(s)).and_then(|sp| pick(sp, raw, frame, p.a.facing))
         }
         Body::Npc(n) => n.a.sprite.and_then(|s| w.data.sprite(s)).and_then(|sp| pick(sp, n.anim.raw, n.anim.frame, n.a.facing)),
-        Body::Enemy(n) => n.a.sprite.and_then(|s| w.data.sprite(s)).and_then(|sp| n.a.anim.and_then(|k| sp.anims.get(k as usize))).and_then(|a| {
-            let looped = n.a.anim_loop.unwrap_or(a.looped);
-            a.step_index_at(n.a.facing, n.a.anim_t, looped).map(|k| (a.steps(n.a.facing)[k].frame, a.steps(n.a.facing)[k].flip, a.steps(n.a.facing)[k].attach))
-        }),
+        // an enemy by its animation controller's position (`eanim`: raw, cel - obj+0x10's state as the game draws it)
+        Body::Enemy(n) => n.a.sprite.and_then(|s| w.data.sprite(s)).and_then(|sp| pick(sp, n.ea.pos.raw, n.ea.pos.frame, n.a.facing)),
         Body::Hand(h) => h.a.sprite.and_then(|s| w.data.sprite(s)).and_then(|sp| h.a.anim.and_then(|k| sp.anims.get(k as usize))).and_then(|a| {
             a.step_index_at(h.a.facing, h.a.anim_t, false).map(|k| (a.steps(h.a.facing)[k].frame, a.steps(h.a.facing)[k].flip, None))
         }),

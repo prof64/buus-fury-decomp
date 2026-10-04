@@ -4243,3 +4243,40 @@ Resync stop queue (`resync.py --lag none`, allow-list on): 10 stops.
   (`inline_0x0808C880`: puff, open_area, set_flag(284), refresh_map_triggers). The rng / import stops at 1,121,864 ..
   1,122,008 are cuts taken inside that frame difference. -> **side-content agent** (mine, Janemba chapter: next).
 * 1,339,017 - known (Vegeta's wander, allow-listed).
+*Also claimed by A (coordinator):* the whole run's row 848,743 (flag 187: 13-1's on-enter script runs during the
+world-map warp out of 0-50 in the game, at the load in ours - the engine rule); the importer's panic on the player's
+form (player.rs:508) for a cut at row 185,000 (7-6, in the tournament event); `rkb_001_0-50` (the cut inside a 14-1
+trigger script that runs s515 then sets flag 408: restore the calling trigger script, not only s515).
+
+**Done (ship fix agent, 2026-10-04): cuts inside the pause pages import** (the importer agent's hand-off above).
+`GbaRam::with_saved_world`: when the live object list is empty, PLAYER is 0 and the world save's block
+(`0x03001C4C + 0xBF8`, 0xE00 bytes, `0x08011DB4`) is in EWRAM, the RAM with that block copied back and PLAYER set
+(what `0x08011E0E` + message 0xB do at the close; the objects stay intact in the heap meanwhile).
+`import_emulator_state` then imports the field from it as a mid-area cut and opens the page over it
+(`open_pause_page`; wf-core `menu::open_imported`: Run, drawn, the field's sprite blocks freed): Status
+(vt 0x0804AC88: +0x130 allocating, +0x134 / +0x144 values, +0x154 blink, the party tabs at +0x12C), Inventory
+(vt 0x08049D48: +0x11C tab, +0x120 top, +0x124 selection; `Inventory::imported`) and its Use dialog (vt 0x0804ACB4,
+the Inventory found in the mode stack's saved modes), and the mode switch right after the opening fade (vt 0x080493C8
+with +4 0x0804956C: our fade one step from black, the blocks already freed). The recorder's start snapshot
+(`tools/script_lockstep/capture.py` `snapshot`) lists the saved world's actors at such a cut (the rows keep the live,
+empty list), so the import gets the actors' animations (`work/shipfix/reinit.py DOC STATE` re-takes an existing doc's
+init). **Results:** whole-run recordings from 967,102 (400 rows: Status, R to Inventory, a Senzu used in the fight,
+B, the restore and fade-in) and 968,262 (300 rows, the mode switch) both exact; every whole-run cut point
+(`work/wholerun/cuts`, 324) 316 exact - the menu ones (967,102 / 967,162 / 967,282 / 516,577 / 516,697) all, the 8
+left are others' (sub-pixel positions in 044 / 017, 568,177 an extra NPC, two real loads past the chain's divergence,
+633,276's text box). Gates, menu_parity, wf-app, ship rsegs green. The latest no-lag resync list
+(`work/wholerun/stops_none.jsonl`) has no menu stop.
+**Save's frozen counter:** not a logic difference - the 122 frozen rows are the save's write iteration (checksum +
+flash loop with interrupts off, `save::WRITE_CYCLES`), keys pressed meanwhile are never read by the game; one
+iteration in both. Nothing to change.
+*Area-local: the open ones closed (Earth agent) - all 503 gates clean on the area state.*
+* **Walk-grid footprints (3-12 / 3-3, core):** emulator write watch on the tiles of s159's crowd (`work/earth/timing/
+  gridwatch.py SEG TX TY a b`): the game never writes them - plain map NPCs (no talk) mark nothing, neither at spawn
+  (ours already) nor on a script walk / remove. `fieldnpc::script_move_mark` now applies to talk NPCs only.
+* **Trigger order after a script spawn (7-3, 4-1, 18-10, core):** a trigger made alone (`spawn_map_object` /
+  `_force`, 0x36 / 0x8A - 7-3 s262's `spawn_map_object_force(1)`) is appended to the game's list, i.e. scanned first:
+  it goes to the front of ours (ours is the game's list reversed). Full builds (load, refresh) unchanged.
+* **12-22 at the self-destruct's end:** not a model difference - the row is the load's frame (area 12-22 -> 0-2), the
+  game's list still the old area's until its load rebuilds it later in that iteration; the harness skips the trigger
+  check in a frame whose recorded area changed.
+* **NPC talk state:** waiting for the soak agent's area.py to carry it (object +0x1BC, see above).

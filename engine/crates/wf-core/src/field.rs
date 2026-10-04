@@ -2184,7 +2184,17 @@ pub fn spawn_map_object(w: &mut World, at: ObjRef, force: bool) -> Option<Entity
     if !force && !cond_holds(w, &o.cond) {
         return None;
     }
-    spawn_object(w, &o)
+    let n = w.field.as_ref().map_or(0, |f| f.triggers.len());
+    let r = spawn_object(w, &o);
+    // a trigger made alone is appended to the game's list - scanned first: the front of ours (ours is the game's
+    // list reversed; 7-3 s262's spawn_map_object_force(1): the new event trigger after the exits in the game's)
+    if let Some(f) = w.field.as_mut() {
+        if f.triggers.len() == n + 1 {
+            let t = f.triggers.pop().expect("trigger");
+            f.triggers.insert(0, t);
+        }
+    }
+    r
 }
 
 /// script `spawn_map_item` (0xAA): the area's item object `at`, thrown from the loot block

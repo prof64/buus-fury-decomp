@@ -2335,6 +2335,7 @@ pub fn send_offstage(w: &mut World) {
     // with it, and `bring_back` starts it again (whole-run sound requests: Other World 1-20's s103 scene load, Babidi's
     // ship - stop 54 at the scene load, play 54 when the player returns)
     if let Some(i) = w.player_idx(0) {
+        if std::env::var_os("DBG_AURA").is_some() { eprintln!("DBGAURA offstage form {} ctl {:#x} aura {}", w.pl_ref(i).form, w.data.form(w.pl_ref(i).form).map(|f| f.controller).unwrap_or(0), crate::player::aura_form(w, i)); }
         if crate::player::aura_form(w, i) {
             w.sfx_stop(54);
         }
