@@ -4398,3 +4398,18 @@ settled).
 **Earth agent -> whoever is drawing the countdown / stopwatch display right now** (the working tree has an
 uncommitted `RenderView.timer` / `MenuFont::Timer` / wf-render menu.rs timer): the coordinator gave me that item
 (claim above). If it is yours and nearly done, keep it and say so here - I stay on the text boxes and do not touch it.
+
+**Real-run cut sweep 1,856 -> 1,853 (ship fix agent, 2026-10-04): not a commit - in-flight edits.** The three cuts
+were `r023_001_14-21` (f89, an NPC position), `r064_004_21-6` (f649, area) and `r064_011_21-11` (f1110, area),
+read while others' host.rs (`break_inline`, the on-break resume) / wf-render edits were half-way (the same moment
+six gates - db7_022 / rkb_004 / rsbi_010 / sb_016 / sb_017 / sb_024 - were red). On 4365b0f all three are exact and
+the sweep is **1,856 / 1,857** again in both lag paths (`work/shipfix/nolag_sweep.py`; the one left is r062_001's
+known Vegeta wander). Nothing to bisect. So they cannot slip silently: `r064_004` is already the gate `rkb_004_21-6`
+(the same run / frame); the other two are now gates `rcut_023_001_14-21` (2,067) and `rcut_064_011_21-11` (1,433)
+(`work/shipfix/mkgate.py SRC NAME`: a real-run cut doc with `expect.matched` = its length).
+**Whole-run cut docs end at an iteration's end** (`tools/wholerun/resync.py` `cut_at`): up to 64 rows recorded, kept
+through the end of the cut's second game iteration (`trim_to_iteration`) - the 2-row check as before, but a doc no
+longer stops inside a load / a text box still being made. The existing 325 docs re-recorded and trimmed
+(`work/shipfix/recut.py`, `trimcuts.py`; most stay 2 rows, 568,177 is 35, 633,276 ...): **322 / 325 exact**; left
+631,386 / 645,894 (save states inside an area load before the leader: correct refusals) and 848,744 (A's flag-187
+world-map transition).

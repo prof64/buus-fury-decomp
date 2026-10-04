@@ -77,8 +77,22 @@ e = start_emu('reset')
 cur = 0
 
 
+CUT_ROWS = 64
+CUT_ITERATIONS = 2
+
+
+def trim_to_iteration(rows, n=CUT_ITERATIONS):
+    """the rows through the end of the cut's n-th game iteration (the last row before the logic counter moves the n-th
+    time): the import's check, as the 2-row docs were, but never ending inside a long iteration - the segment harness
+    compares a doc's last row as an iteration's end, and a 2-row doc that stopped inside a load / a text box still
+    being made read a miss there the app does not have (whole-run cuts 568,177 / 633,276)"""
+    ends = [k for k in range(len(rows) - 1) if rows[k + 1]['lf'] != rows[k]['lf']]
+    return rows[:ends[n - 1] + 1] if len(ends) >= n else rows
+
+
 def cut_at(r):
-    """the game's state before row r: a segment doc the importer reads (RAM + sound phase), 2 recorded rows"""
+    """the game's state before row r: a segment doc the importer reads (RAM + sound phase) and up to CUT_ROWS recorded
+    rows, ending at an iteration's end (`trim_to_iteration`)"""
     global cur, e
     while cur < r:
         e.set_keys(keys[cur])
@@ -87,7 +101,8 @@ def cut_at(r):
     st = CUTS / f'c{r}.ss'
     e.save_file(str(st))
     e2 = start_emu(str(st))
-    init, objs, rows = sg.record(e2, lambda j, _e: keys[r + j] if r + j < len(keys) else None, 2)
+    init, objs, rows = sg.record(e2, lambda j, _e: keys[r + j] if r + j < len(keys) else None, CUT_ROWS)
+    rows = trim_to_iteration(rows)
     init['snd_phase'] = phase(st)
     doc = {'kind': 'segment', 'name': f'wr_{r}', 'source': {'kind': 'state', 'state': str(st)}, 'init': init, 'objs': objs, 'frames': rows}
     p = CUTS / f'c{r}.json'
