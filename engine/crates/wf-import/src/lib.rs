@@ -532,6 +532,13 @@ fn import_ai_rt(w: &mut World, ei: usize, lvl: usize, ram: &GbaRam, r: u32, note
             // one off each update, finished at 0 (ours counts the updates up: frames - left; real run 20-6 tile
             // +7,000, Vegeta's Wait(60) with 27 left)
             K::Wait => rt.f = (node.p.g(wf_core::ai::P::Frames) as i32 - ram.s32(r + 4)).max(0),
+            // BackStep (enter 0x08031388, update 0x080313EA): +4 / +8 the hop step, +0x10 the counter (48 at the enter,
+            // one off each update, finished at 0; ours counts the updates up)
+            K::BackStep => {
+                rt.d[0] = ram.s32(r + 4);
+                rt.d[1] = ram.s32(r + 8);
+                rt.f = 48 - ram.s32(r + 0x10);
+            }
             K::PopState | K::PushState => {}
             K::Chance | K::GotoState | K::SubState | K::IfPlayerWithin | K::IfPlayerFarther | K::IfPlayerInMeleeRange | K::IfTimeInState | K::IfCooldownOver | K::IfLastKidBuu => {}
             // ThrowBigBall: a singleton runtime (0x030032E8); its frame count comes from the ball (`import_super_ball`)

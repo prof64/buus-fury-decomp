@@ -451,7 +451,7 @@ pub fn update(w: &mut World, i: usize) {
     // (an event an AI's RunScript queued last frame: its object, at the list's end, runs first in this pass and
     // holds the objects after it - real run 20-6 r062_001 tile +3,000 f59: Super Buu's tree stays in 0x29F until
     // s474 ends)
-    let queued = std::env::var("QHOLD").is_ok() && w.field.as_ref().is_some_and(|f| f.queued_runs.iter().any(|q| q.0 <= w.frame && matches!(q.2, crate::field::Cause::Ai { .. })));
+    let queued = w.field.as_ref().is_some_and(|f| f.queued_runs.iter().any(|q| q.0 <= w.frame && matches!(q.2, crate::field::Cause::Ai { .. })));
     if queued || w.field.as_ref().is_some_and(|f| f.busy && !own_load || f.arrival.is_some() || f.item_get.as_ref().is_some_and(|g| g.left > 0)) {
         tick_anim(w, i);
         if w.en_ref(i).part && matches!(w.en_ref(i).ty, 0x34 | 0x35 | 0x37) {

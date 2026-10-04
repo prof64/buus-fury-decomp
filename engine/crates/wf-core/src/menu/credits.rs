@@ -156,7 +156,7 @@ pub fn open_credits(w: &mut World) {
     if let Some(Screen::Credits(mut m)) = w.menu.stack.pop() {
         m.c.drawn = true;
         w.menu.shown = Some(Box::new(Screen::Credits(m.clone())));
-        w.menu.lag = m.enter_lag();
+        w.menu.lag = if w.opts.no_lag { 0 } else { m.enter_lag() };
         w.menu.stack.push(Screen::Credits(m));
     }
 }

@@ -389,6 +389,11 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
     // ones that disagree with the recording, the recording's lag frames still replayed
     let sim_lag = std::env::var_os("SEGMENT_SIMLAG").is_some();
     sess.world.opts.sim_lag = sim_lag;
+    // the app's pacing (`Options::no_lag`, segments.md: the lag interface): menus step once per recorded logic frame
+    // like the field, the recording's other rows are lag frames (the redraws' and the close's black frames);
+    // SEGMENT_MENULAG=1 keeps the old per-video-frame menus with the redraw / close lag model
+    let no_lag = !sim_lag && std::env::var_os("SEGMENT_MENULAG").is_none();
+    sess.world.opts.no_lag = no_lag;
     sess.world.g.load_pending = false;
     let (mut own_lag, mut lag_bad, mut replayed) = (0usize, 0usize, 0usize);
     let mut prev_sim = false;
@@ -448,7 +453,8 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
             }
             host.step(&mut sess, keys);
             wf_core::rng::TRACE.store(false, std::sync::atomic::Ordering::Relaxed);
-        } else if wf_core::menu::active(&sess.world)
+        } else if !no_lag
+            && wf_core::menu::active(&sess.world)
             && !(matches!(sess.world.menu.phase, wf_core::menu::Phase::FadeOut { .. }) && !sess.world.menu.scripted)
             // (a power gauge that ended inside the last world frame: the lag after it is the script's - sb 21-25
             // f61646, 9 lag frames after the Spirit Bomb's gauge filled - and the screen's last step is the next
@@ -530,7 +536,8 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
         // next logic frame - as an area load's replayed lag does (`Menu.tr.leave`; the camera's restore step in the
         // frame the game shows it, `Menu.leave_cam`)
         let leaving = matches!(sess.world.menu.phase, wf_core::menu::Phase::Leave { .. }) && sess.world.menu.tr.fade_in != 0;
-        if leaving && !was_leaving && sess.world.menu.reload_close && sess.world.menu.phase == (wf_core::menu::Phase::Leave { t: 0 }) && k + 1 < frames.len() {
+        // (under `no_lag` the close's black frames are the recording's lag rows themselves: nothing to set)
+        if !no_lag && leaving && !was_leaving && sess.world.menu.reload_close && sess.world.menu.phase == (wf_core::menu::Phase::Leave { t: 0 }) && k + 1 < frames.len() {
             // the frames after the exit stub's logic frame with one logic counter value: the iteration's video frames
             let lf1 = i(&frames[k + 1]["lf"]);
             let run = frames[k + 1..].iter().take_while(|n| i(&n["lf"]) == lf1).count();

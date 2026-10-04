@@ -518,7 +518,10 @@ pub fn step(w: &mut World) {
     // the screen's logic frames (its mode loop's iterations, counted in `play_frames`) count on 0x03000F94 too: an
     // enemy's state stamp is that much older after a pause menu (real route 0-21, Goku vs Majin Buu: the on-hit
     // IfTimeInState(90) of Buu's state 0xB3 is true after a heal menu - its Chance draws)
-    if w.field.is_some() {
+    // (a mini-game whose mode loop runs the world's object pass under it - `minigame::world_runs`, the session's
+    // `step_entities` - is counted by that pass: real run 6-9 rows 1,202,528 .. 1,202,580, the power struggle, 53
+    // iterations counted twice)
+    if w.field.is_some() && !crate::menu::minigame::world_runs(w) && !w.menu.resume {
         // (no lag frames: every step of the mode loop is one of its iterations)
         w.g.fc0 += if w.opts.no_lag { 1 } else { w.story.play_frames.wrapping_sub(p0) as i64 };
     }
@@ -719,6 +722,11 @@ fn redraw(w: &mut World, first: bool) {
                 None => crate::sndsim::long_iteration(w, cost),
             }
         }
+        // (no lag frames: the first draw shows at once and no enter lag follows - `Options::no_lag`)
+        let no_lag = w.opts.no_lag;
+        if no_lag {
+            w.menu.boot_shown = None;
+        }
         if let Some(prev) = w.menu.boot_shown.take().filter(|_| first) {
             w.menu.shown = Some(prev);
             w.menu.pending = Some(Box::new(top.clone()));
@@ -726,7 +734,7 @@ fn redraw(w: &mut World, first: bool) {
         } else if cost == 1 {
             w.menu.shown = Some(Box::new(top.clone()));
             w.menu.pending = None;
-            if first {
+            if first && !no_lag {
                 w.menu.lag = top.page().enter_lag();
             }
         } else if top.page().show_at_once() {
@@ -865,7 +873,10 @@ fn close_with(w: &mut World, done: bool) {
         }
         w.menu.leave_cam = 0;
         w.menu.reload_close = true;
-        if let Some(n) = crate::sndsim::reload_frames_with(w, done, extra) {
+        if w.opts.no_lag {
+            // (no lag frames: the exit stub's iteration and the restore's, nothing for the restore's CPU time)
+            w.menu.tr.leave = 2;
+        } else if let Some(n) = crate::sndsim::reload_frames_with(w, done, extra) {
             w.menu.tr.leave = n as u16 + 1;
             w.menu.leave_cam = w.sound.wrap as u16;
         }

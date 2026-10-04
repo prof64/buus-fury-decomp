@@ -1,33 +1,36 @@
 {
  "chapters": {
   "earth": {
-   "cats": {
-    "animation": 1
-   },
+   "cats": {},
    "cut_frames": 157565,
-   "exact": 89,
+   "exact": 90,
    "frames": 157565,
-   "matched": 151185,
+   "matched": 157565,
    "run_frames": 160503,
    "segments": 90,
    "stretches": 1
   },
   "fat": {
-   "cats": {},
+   "cats": {
+    "object set": 7
+   },
    "cut_frames": 380209,
-   "exact": 371,
+   "exact": 364,
    "frames": 380209,
-   "matched": 380209,
+   "matched": 365618,
    "run_frames": 388648,
    "segments": 371,
    "stretches": 33
   },
   "janemba": {
-   "cats": {},
+   "cats": {
+    "position / facing": 1,
+    "screen fade": 1
+   },
    "cut_frames": 187291,
-   "exact": 255,
+   "exact": 253,
    "frames": 187291,
-   "matched": 187291,
+   "matched": 184981,
    "run_frames": 199703,
    "segments": 255,
    "stretches": 16
@@ -43,23 +46,27 @@
    "stretches": 1
   },
   "ship": {
-   "cats": {},
+   "cats": {
+    "object set": 5,
+    "position / facing": 2
+   },
    "cut_frames": 395616,
-   "exact": 338,
+   "exact": 331,
    "frames": 395616,
-   "matched": 395616,
+   "matched": 344290,
    "run_frames": 398194,
    "segments": 338,
    "stretches": 2
   },
   "superbuu": {
    "cats": {
-    "position / facing": 1
+    "object set": 2,
+    "position / facing": 3
    },
    "cut_frames": 467701,
-   "exact": 447,
+   "exact": 443,
    "frames": 467701,
-   "matched": 443700,
+   "matched": 379133,
    "run_frames": 478729,
    "segments": 448,
    "stretches": 22
@@ -68,12 +75,12 @@
  "dirty": true,
  "total": {
   "cut_frames": 1622759,
-  "exact": 1517,
+  "exact": 1498,
   "frames": 1622759,
-  "matched": 1592378,
+  "matched": 1465964,
   "run_frames": 1668052,
   "segments": 1519,
   "stretches": 75
  },
- "tree": "78590a3"
+ "tree": "aba7278"
 }
