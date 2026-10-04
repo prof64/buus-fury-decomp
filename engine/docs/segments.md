@@ -1789,10 +1789,38 @@ two Python hash seeds, gives identical key logs (13,000 frames); the earlier run
   the player) in the exit frame - 9,928 / 9,928 exact. The fade-ins 0x79 / 0x7B do not (an all-fades version cost 12
   gates: db7 14-17 / 14-22 / 14-19, sb 21-5 / 21-6 / 21-11 / 21-25, rkb 14-1, ... - their enemies stand still in the
   exit frame), nor do the map NPCs here (not seen).
+* **For the menu-timing agents:** the scoreboard's last side-content row, `r038_001_18-1` (camera, f589), is a menu
+  close: the real route's grind opened the Status page (stat allocation), B at f561, the close runs f567 .. f587 with
+  the logic counter stopped, and the game's camera starts easing in the first field frame after it (f588: 54359 ->
+  54354 / 1024 px); ours starts a frame later. Same family as the Switch Character close's camera step.
+* **PROPOSAL (shared script rule, not applied yet): an event resumes at its last exit value.** 4-23 f467 (the
+  Z-Fighter Museum's second talk, `pg_museums_019_04_23`) is not a director-ordering question. The recorder's
+  `steps` rows (SCENE_STEP 0x08012538: `['step', node + 1, kind, ...]`, SCENE_RUN, `['exit', value]`) show the first
+  talk running node 0 (code: `walk_to` + `face`), node 1 (text), `exit 3`; the second talk's first entry is node 3
+  (the text "Did you find any exhibits?") at f467 - node 0 is not run, so no walk / face, and the text box opens in
+  the frame the talk starts. Ours always starts an event at node 0 (`wf-script-rhai` `start_event_by`), runs the
+  walk and the face, and opens the box frames later. Every exit -> next-run pair in the gated data plus my post-game
+  cuts (`work/side/probe/resume.py data/segments ...`): 19 runs after `exit 0` start at 0 (so the rule changes
+  nothing for them); the only re-runs after a non-zero exit are three, all `end: 3`: the museum's second talk (starts
+  at 3), the Hercule Cafe's second talk (`pg_cafe_002_03_20` f475, starts at 3 - our node 0 there has no command,
+  so we match anyway), and the cafe's third talk (f707, starts at **0**) - after the second talk's hand-in ran
+  `refresh_map_triggers()` (s170 node 5), which rebuilds the area's trigger objects. The other 17 "different start"
+  cases are runs entered at a callback / named node after `exit 0` (defeat callbacks, boss events) - not resumes.
+  So the proposed rule: the exit value is kept on the object that started the event (the event / script trigger or
+  the NPC; `Cause::Talk` / `Cause::Trigger`), its next activation starts the event at that node; the object's
+  rebuild (an area load, `refresh_map_triggers`) resets it to 0. Not applied: only two cases support it, both mine,
+  and it touches every talk / trigger start; to be agreed before it goes in.
 * Not mine (in-event import): the arrival on Kami's Lookout through the Other World map with a leader other than Goku
   (`pg_g141_001` / `pg_g101b_001` / `pg_g111b_001`, f21): those cuts start in 6-14 while s512 is still running (its
   spawned Goku stands in pose 18 - raw 20 - beside the leader), and the import has no script thread (depth 0), so its
   `fade_in_white(20)` -> `play_anim(1, 0)` never comes; the game's Goku goes idle at f21.
+  **Done (A, 2026-10-04): all three exact, gated `pg_g141_002_06_14` / `pg_g101b_002_06_14` / `pg_g111b_002_06_14`.**
+  s512 runs as a `run_script` scene: the scene depth reads 0 and its scene object's state word is no node number
+  (0x40E1). The importer now looks for a script at depth 0 too, but only when a live interpreter's PC is inside one
+  of its nodes (`running_event_live`; stale stack words cannot trigger it), takes the furthest of two interpreter
+  slots pointing into the node (one sits at the code's start), and a cut whose interpreter is already past the
+  node's warp - and whose screen is not black (a cut at the load itself keeps the load path: opening 1-1) - is
+  placed mid-step (`build_mid_event` -> the waiting `fade_in_white`, 0x51).
 * Gate mechanics as recorded: a gate is an A-button script trigger (s517's 8-2 / 11-1 rects also want facing up);
   the position (footprint top-left) must be inside the rect - stand up against it; s518's open_area leaves a
   32-px opening (2-33: x 216..248), so a character beside it stays blocked by the posts.
@@ -2594,7 +2622,23 @@ the reload map terms, the sound parts stay yours).
   decompression includes "3 actors' frames 66,720" (+ 3 x 4,000) - the actors' frames are not redrawn through this
   decoder; what they cost instead is open (the remaining per-map spread of +-15k is the same question). A constant
   cannot fix it: `RELOAD_REST` would need <= 115.6k here and >= 118.5k for `r038_002_18-2`.
-- `r002_006_4-1` f10623 and `r052_004_1-5` f11575: not looked at yet.
+- `r052_004_1-5` f11575: not a menu - an area load's fade-in (field `FadeIn`, script transition). The game's camera
+  (with its shake offsets) makes its first step in the load iteration's LAST LAG frame (f11574, the logic counter
+  still at the load's value; song 21 starts the same frame), ours in the first logic frame (f11576): one step late,
+  the same "world restore ends with a camera update" the menu close models with `Menu.leave_cam`, but for the area
+  load's long iteration. Owner of the load / arrival code to take; not changed by me.
+- `r057_066_14-1` f3527 and `r069_077_14-2` f264 are the same root, **to the Earth agent (sound driver)**: the game's
+  sound mixer draws the game RNG while a voice plays (rngcalls: callers 0x0803E423 = the 16-voice loop 0x0803E40C ->
+  0x0803E152, and 0x0803E24F, the voice's sample callback). In r057_066 that draw happens every frame from 3526 on
+  with no sound event recorded (a voice still playing); our two Chance draws at 3526 happened to equal the game's
+  sound draw + GotoState draw in count, so the RNG split only shows at 3527. The enemy's own decision (its state
+  0x25D: ours IfPlayerInMeleeRange -> Chance 90% fails -> Chance 4% -> 0x25F; the game reaches 0x25F without a Chance
+  draw, i.e. through IfPlayerInFront) also differs - check after the sound draw is modelled.
+- `r064_004_21-6` f254: inside Buu, an Enzyme (en4) hit by the player's punch (which also breaks a box it stands
+  in): from f252 ChasePlayer steps it 0.5 px down at f254 while the game's stays (anim reset to frame 0 tick 0, no
+  move) - the enemy grid / chase around a breakable it overlaps; the Enzyme's latch / re-mark rules are dungeon
+  agent B's (`Enzyme pathing traced` commit). Left.
+- `r002_006_4-1` f10623: not looked at yet.
 
 **§11 update 11 (B): the Janemba saga plays start to finish in the app.** Three core fixes (field only; battles and
 cross_ts untouched), each from an emulator trace, gated:

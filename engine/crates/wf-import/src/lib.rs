@@ -1393,6 +1393,14 @@ fn build_event_entry(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner:
     field::set_busy(&mut w, true);
     let areat = (to.world, to.area, to.variant);
     // which load: the node's own warp / warp_fade into this area, or (none in the node) the one before a `jump`
+    // the interpreter already past the node's warp (a later wait in it - Kami's Lookout s512's fade_in_white after its
+    // warp to 6-14): the field stands, the node continues mid-step
+    // (a cut at the load itself - the screen still black, the load path: opening 1-1, s038's set_pos after its warp)
+    if let Some(ran) = natives_run(ram, runner, ev).filter(|_| ram.screen_black != Some(true)) {
+        if ran[..ran.len() - 1].iter().any(|(n, _)| matches!(n, 0x76 | 0x77)) {
+            return build_mid_event(data, ram, runner, ev, w, calls0, notes);
+        }
+    }
     let probe = runner.probe_event(&mut w, ev.0, ev.1, ev.2, areat);
     // a return_to_field (0x75) in the node: the field the scene left, restored - a mid-area state (`build_returned`)
     if probe.is_none() {
