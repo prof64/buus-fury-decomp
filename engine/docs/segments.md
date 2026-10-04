@@ -3891,7 +3891,42 @@ save routine 0x08011DB4 copies 0xE00 bytes of the world struct into a heap buffe
 and clears the live list; 0x08011E0E restores it. So an importer would (1) rebuild the field from that heap copy
 instead of the live list, then (2) open our page with its RAM state - Status / Inventory cursors, the use dialog's
 selection, the fade phase. No page has a RAM importer today (`inventory::open_json` returns None; Status has none).
-The same cycle recurs at row 968,262.
+The same cycle recurs at row 968,262. The other pause-page cuts in the sweep are the same thing: 516,577 (Status) /
+516,697 (item use) in 8-50, 631,476 / 631,596 / 640,123 (8-3) and 643,974 / 646,843 (8-6) - mode vts 0x0804AC88 /
+0x0804ACB4 / 0x08049D48, no world objects.
+
+*Whole-run cut points, round 2 (A, on ec8ed97):* the remaining non-exact cuts (40 of 315, 2-row docs) -> **301 / 315
+exact**, all in wf-import (`lib.rs`, `host.rs`); longer recordings (120 .. 300 rows) from every fixed cut exact
+except 497,351 (below). Fixed:
+- an area arrival's fade-in with the leader still walking in (main mode vt 0x0804B57C): our arrival fade resumes at
+  its frame (48,862 / 94,050 / 72,310 / 59,619); an NPC's wait step (vt 0x0804D4D4, +4 frames left; its step number
+  at the NPC's +0x1B4) and a walk-to-point step mid-way (vt 0x0804B964: target +0xC / +0xE, velocity +4 / +8,
+  frames left +0x10) (59,619 / 48,892); Super Saiyan's revert state (vt 0x0804CC58) (137,896);
+- a script fade mid-way takes its progress from the fade mode (vt 0x0804C588: +4 steps run, +8 length) (41,565 /
+  41,625 / 225,225); a black screen after a warp whose waiting action is the fade-in goes the mid-node path (41,535 /
+  225,200); the begin_parallel search counts the node's skipped `run_event`s (225,250 .. 225,340); a skipped
+  fade_out with no fade_in after it leaves the screen black (568,177); no extra camera step after held frames
+  (600,329); the area banner's countdown is a byte (+0x10; +0x11 is heap leftovers);
+- an `actor_wait` before a walk (actor +0x18C = vt 0x0804AB58: +4 the walk object, +8 frames left) (142,491 /
+  146,673 .. 146,763); a wait + walk both already done are dropped; the event's actors (puppets too) take RAM's
+  facing and their anim id follows RAM's anim state (146,883); the replay's `rand()` draws are rewound until the
+  script words match RAM (628,017); SoldierThrow's tick from the controller (497,351);
+- a steps node past a modal call (`is_result_action`: s266's punch minigame) resumes at `step_<k>(p(0))`
+  (`continue_mid_step`, 153,226 / 153,227); a `run_event` whose event has not stepped yet (`continue_mid_nested_at`,
+  s508 -> s494, 612,541 / 620,017), the script words put back from RAM on that path only.
+Not fixed: the 10 pause-page cuts (hand-off above); 631,386 / 645,894 are save states inside an area load's lag
+frames (mid-iteration) - correct refusals, the no-lag resync never cuts there; 633,276 (2 rows end before the game
+makes its text box - 40 rows exact); 497,351's 300-row run stops at row 154 on a **rule**: a dropped Zenie coin
+(piled at x 48) is picked up a frame later than the game's -> ship agent. All 1,577 area-entry cuts + tiles
+unchanged; gates green.
+*Exit fades (A):* cuts 2 / 4 / 10 frames into the exit fade-out (main mode vt 0x0804BB74) at the end of 152 real-run
+area segments, ~80 rows each through the load: 141 / 152 exact at 2 frames; **all 10 edge exits exact** with the
+round-2 fixes (the 2 that failed were an NPC's half pixel at f0, now fixed). The 11 others are not about the exit:
+8-56 -> 8-57 (our 8-57 load allocates no 4-block tile set at 492 the game makes - a load rule, ship agent), 14-2
+cuts (vram: a 1-block ours only), 18-10, 15-23 (pos fractions at f2 .. f6), 21-6 / 21-8 (sprite 87 missing), 4-24.
+`m_pg_g131` re-recorded from 13-1's cut (`pg_masters.py g131`, 455 rows): exact to row 445, the load into 13-2
+(the game draws once in that iteration, ours 4: an NPC wander and two load draws - the game's on-enter script runs
+first and blocks the leader's creation) -> post-game leg owner.
 
 **Claim (dungeon agent B, 2026-10-04): the whole run's Janemba-chapter rule stops** (stretches 035_j00_yemma ..
 the last j / h / HFIL stretch before Super Buu's 051_sb_start), from 1,107,691 (042_h_statues) on. **Super Buu
@@ -4085,8 +4120,36 @@ wf-render / view fixes it finds.** Tools (headless, muted, private target dir):
 renderer), a fade 1,482, BG with no tag 1,429, HUD with no tag 989, **the countdown / stopwatch display** 799 (11:
 not drawn), BG priority / hidden / blend 1,672 (left after the fixes above), the area banner 639, **the white fade**
 313 (32: `screen.white`, not in the view), menus 200, **the palette flash** 86 (`screen.flash`, not in the view),
-BG offset 24. Next: the boss bar, the timer display, white fade / palette flash, then the untagged sprite class.
-Not a gate condition yet (no segment is held to pixels until its whole sample is exact).
+BG offset 24.
+**Update 2: 12,031 / 25,355 (47.5%; 494 segments - 9 dumped segments were renamed since), 64 segments exact on every
+sample, now a gate.** Fixed:
+* **The boss HP bar** (object vtable 0x0804CE28): extracted as `ui/hud/boss_bar.png` (54 fill levels of the 64x8
+  8bpp picture at 0x087196E4, steps cleared to colour 1 by the table at 0x087198E4), `RenderView.boss_bars` (y,
+  fill), drawn as the two 32x8 OBJs at x 160 / 192, priority 1, a frame late like the HUD. Fill = `a * 53 / 100` +
+  the enemy's `(hp >> 10) * (b * 53 / 100 - a * 53 / 100) / max hp` (0x0804F874); slides in from y -8 by 1 per
+  update to 8 (`BossBar.at`), and `hide_boss_bar` leaves it sliding out with its fill frozen (`scene.boss_bar_out`,
+  message 0x13). Imported from the object (+0x15 / +0x16 / +0x17 / +0x18, the enemy by position).
+* **The script fades as the game writes the palette**: fade_out / fade_out_white scale the palette as it was per
+  5-bit channel (`0x080176D6` / `0x0801774C`: `RenderView.palette_scale`), fade_in / fade_in_white / flash_white /
+  screen_flash go through the fade routine 0x08007074 from the stored colours (`palette_fade`), l = t * 256 / len
+  (flash: up then down over 2 n; screen_flash's counter, 0x08015A30); a finished white fade stays white. Was: a
+  coarse BLDY darken for black, nothing for white / flashes.
+* **The map's tile animations and the stat mark run on field iterations** (`Field.iters`): the game ticks them every
+  iteration the field runs, a world held by a scene too (sb 21-25 f4880: the flowers turn while the scene holds the
+  world; 14-1: the STAT arrow bobs on). The layer drift stays on the world clock (`MapView.tile_frame` apart from
+  `anim_frame`). Cuts import the animations' phase from 0x03001A68 (frame / countdown per animation -> the ticks
+  since the load) instead of starting them at the build.
+**The gate:** `data/segments/pixels.json` (64 segments, 595 frames: FNV-1a 64 of the game's picture per sampled
+frame), checked by `engine/crates/wf-app/tests/pixels.rs` (the harness replay + wf-render; ~9 s). Regenerate with
+`PIX_LOCK=data/segments/pixels.json` on the pixels example over all dumped segments (a segment joins when all its
+samples are exact).
+**Left (by world tag):** sprites with no tag 3,521 (mostly animation frames: our actor's sprite frame vs the game's -
+the harness compares positions, not frames; also the **level signs' labels** over map sprites, object 0x0800C300 /
+vt 0x0804D878, not drawn), a dialog up 2,727, a fade 1,213 (much of it the mid-frame palette write tearing), BG with
+no tag 1,127 (cloud layers' drift after a cut: the drift clock is not imported), HUD 932, **the countdown /
+stopwatch display** 775 (not drawn: a text object, 0x0802FCA0, whose value lives in the script host's timers, not
+the world), banner 497, BG priority / hidden / blend 1,185. The "boss bar" tag (2,160) is context only - the bar
+itself now matches.
 
 **Done (Earth agent): the no-lag title -> Earth soak's crowd-wander stop (row 190,577) - a menu close that never
 gave the field its sprite memory back.** The crowd NPCs' wander draws were right; their *update order* was not: at

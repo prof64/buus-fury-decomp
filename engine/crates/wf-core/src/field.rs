@@ -743,6 +743,15 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
     let load_lo = w.next_id;
     // (the HUD's beep stamp is on the game's logic counter, 0x03000F94: `World.g.clock`)
     let now = w.g.clock(w.frame) as u32;
+    // the area's new HUD object beeps in its first update, inside the load's iteration, whatever the last beep
+    // (whole-run sound requests, Earth 2-9 -> 2-8 -> 2-9 with Gohan low on HP: sound 41 at volume 32 in each load's
+    // iteration, the next 61 logic frames later)
+    if had_area && std::env::var_os("NO_LOAD_BEEP").is_none() {
+        if let Some(f) = w.field.as_mut() {
+            f.hud_beep = now.wrapping_sub(61);
+        }
+        hud_beep(w);
+    }
     if let Some(f) = w.field.as_mut() {
         f.hud_beep = now;
     }
@@ -889,14 +898,19 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
             spawn_object(w, o);
         }
     }
-    if let Some(s) = song_of(a) {
+    // a selector script's song (Song::Script, evaluated on the story state like a condition script)
+    let song = song_of(a).or_else(|| match &a.song {
+        crate::fieldcontent::Song::Script(id) => {
+            let key = if id.starts_with("inline_") { id.clone() } else { format!("inline_{id}") };
+            let cur = leader_char(w);
+            field_data(w).cond_code.get(&key).and_then(|code| story::eval_value(code, &w.story, cur)).filter(|&v| v > 0)
+        }
+        _ => None,
+    });
+    if let Some(s) = song {
         // the area's song is requested only when another one plays (the game's PlaySong 0x0803F110 is not called for
         // the song already on: whole-run sound requests, Diablo Desert 10-x loads keep song 27 without a request)
-        if std::env::var_os("OLD_SONG").is_some() {
-            w.events.push(Event::Song { id: s });
-        } else {
-            crate::scene::play_song(w, s);
-        }
+        crate::scene::play_song(w, s);
     }
     for o in a.objects.iter().filter(|o| objects && list_of(o) == 1) {
         if cond_holds(w, &o.cond) {

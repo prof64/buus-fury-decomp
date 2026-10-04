@@ -133,6 +133,41 @@ impl StoryHost {
         });
         self.finish(w, st);
     }
+    /// Import: event `event`'s `steps` node `node` past a modal call that returned (`run_punch_minigame` ..): its
+    /// handler continues at `step_<step>(last)` with its first `drop` actions dropped (the game ran them) - the
+    /// probe cannot pass the modal (a frame-spanning wait), so the node's later step is entered directly (whole-run
+    /// cut 153,226: s266 node 19, the punching machine's result shown, waiting in `end_parallel`)
+    pub fn continue_mid_step(&mut self, w: &mut World, event: u16, node: u16, params: [i32; 4], step: i32, last: i32, drop: usize) -> bool {
+        let Some(wf_script_rhai::GNode::Code { prefix, steps: true, next }) = self.rt.library().graphs.get(&event).and_then(|g| g.get(&node)).cloned() else { return false };
+        let mut g = self.rt.globals();
+        g.g = w.story.g;
+        self.rt.set_globals(g);
+        self.hs.in_unit = false;
+        self.rt.start_event_at(event, node, params);
+        self.started.push((self.frame, format!("s{event:03}@{node}")));
+        self.cause = imported_cause(w, event);
+        self.rt.with_thread(|t| {
+            if let Some(wf_script_rhai::Frame::Event { node: cur, in_node, .. }) = t.frames.last_mut() {
+                *cur = next;
+                *in_node = true;
+            }
+            let unit = wf_script_rhai::UnitRef::new(format!("s{event:03}"), prefix, true);
+            t.frames.push(wf_script_rhai::Frame::Unit { unit, step: Some(step), locals: vec![], params: 0, role: wf_script_rhai::Role::EventNode, done: None });
+            t.last = Some(last);
+            t.skip = drop;
+            t.queue_instants = true;
+        });
+        let st = self.with_host(w, |rt| rt.run().map_err(|e| e.to_string()));
+        self.rt.with_thread(|t| t.queue_instants = false);
+        self.finish(w, st);
+        true
+    }
+    /// Import: the runtime's script words (`g`) set to `g` (the RAM's, after a replay re-set them)
+    pub fn set_script_g(&mut self, g: [i32; 4]) {
+        let mut gl = self.rt.globals();
+        gl.g = g;
+        self.rt.set_globals(gl);
+    }
     /// Import: an inline script (an area / map-event script, no event graph) stopped in its code at a cut: it runs
     /// again from its start with its first `drop` actions dropped (the game ran them), the rest as usual
     pub fn continue_inline(&mut self, w: &mut World, id: &str, drop: usize) {
@@ -162,6 +197,11 @@ impl StoryHost {
     /// the cut: its scene start does not wait the frame a fresh one does), then the inner event's first `drop_inner`
     /// actions are dropped too. The parameters are the ones at the outer node's `run_event` (it writes the inner's).
     pub fn continue_mid_nested(&mut self, w: &mut World, outer: (u16, u16, [i32; 4]), drop_outer: usize, drop_inner: usize) {
+        self.continue_mid_nested_at(w, outer, drop_outer, drop_inner, true)
+    }
+    /// `continue_mid_nested`; `entered` = false: the nested event has not stepped yet (its scene start - the run_event
+    /// mode 0x08049D18's frame - still to come: whole-run cut 620,017, s508 -> s494)
+    pub fn continue_mid_nested_at(&mut self, w: &mut World, outer: (u16, u16, [i32; 4]), drop_outer: usize, drop_inner: usize, entered: bool) {
         let mut g = self.rt.globals();
         g.g = w.story.g;
         self.rt.set_globals(g);
@@ -175,7 +215,7 @@ impl StoryHost {
             t.through_events = true;
         });
         let mut st = self.with_host(w, |rt| rt.run().map_err(|e| e.to_string()));
-        for _ in 0..4 {
+        for _ in 0..if entered { 4 } else { 0 } {
             let at_enter = self.rt.with_thread(|t| matches!(t.blocked, Some(wf_script_rhai::Act::Scene { .. })));
             if !at_enter || st.is_err() {
                 break;

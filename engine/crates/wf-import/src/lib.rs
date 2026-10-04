@@ -614,12 +614,16 @@ fn import_grids(w: &mut World, ram: &GbaRam) {
 const MODE_STATUS: u32 = 0x0804_AC88;
 const MODE_INVENTORY: u32 = 0x0804_9D48;
 const MODE_USE: u32 = 0x0804_ACB4;
+/// the mode switch after the pause menu's fade-out (vt 0x080493C8, +4 0x0804956C; whole run 968,262): the world is
+/// saved, this iteration builds and draws the Status page
+const MODE_SWITCH: u32 = 0x0804_93C8;
 
 /// the pause page running at the cut: (its mode vtable, its object)
 fn pause_page(ram: &GbaRam) -> Option<(u32, u32)> {
     let m = ram.r32(MODE);
     let vt = ram.mode_vt();
-    [MODE_STATUS, MODE_INVENTORY, MODE_USE].contains(&vt).then_some((vt, m))
+    let switch = vt == MODE_SWITCH && ram.r32(m + 4) == 0x0804_956C;
+    ([MODE_STATUS, MODE_INVENTORY, MODE_USE].contains(&vt) || switch).then_some((vt, m))
 }
 
 /// the page the cut is in (`pause_page`), opened over the imported field: Status (`+0x130` allocating, `+0x134`
@@ -629,6 +633,17 @@ fn pause_page(ram: &GbaRam) -> Option<(u32, u32)> {
 fn open_pause_page(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
     let Some((vt, m)) = pause_page(ram) else { return };
     if w.data.menu.is_none() {
+        return;
+    }
+    if vt == MODE_SWITCH {
+        // the fade-out's last step to come (ours: the step that reaches black builds and draws the page)
+        let page = wf_core::menu::status::Status::new(w);
+        wf_core::menu::open(w, wf_core::menu::Screen::Status(page), wf_core::menu::PAUSE, false);
+        w.menu.phase = wf_core::menu::Phase::FadeOut { level: 240 };
+        w.menu.held = ram.r16(0x0300_3300 + 2);
+        // (the world save freed the field's sprite blocks already)
+        wf_core::vram::world_hide(w);
+        notes.push("the pause menu's mode switch (the Status page next): the field from the saved world".into());
         return;
     }
     let screen = if vt == MODE_STATUS {
@@ -1116,6 +1131,7 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
     // the cut, tick 49 - the import's fresh node ended at once and idled, a draw the game does not make)
     {
         let tick = w.en_ref(ei).ea.pos.tick;
+        let raw_now = w.en_ref(ei).ea.pos.raw;
         let e = w.en_ref(ei);
         let nf = e.a.anim_raw(&d).and_then(|raw| e.a.sprite.and_then(|s| d.sprite(s)).and_then(|s| s.anim_raw(raw))).map(|a| a.steps(e.a.facing).len() as i32);
         for st in w.en(ei).ai.stack.iter_mut() {
@@ -1128,6 +1144,12 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
                 // Ball 2's desert: tick 41, a flame a frame)
                 if st.tree.nodes.get(n).is_some_and(|x| x.k == wf_core::ai::K::FlameBreath) {
                     rt.f = tick;
+                }
+                // a SoldierThrow in progress (the controller 0x03002FCC, as FlameBreath): its frame count is the tick,
+                // its state the throw's raw animation (whole-run cut 497,351: Babidi's ship soldier mid-throw)
+                if st.tree.nodes.get(n).is_some_and(|x| x.k == wf_core::ai::K::SoldierThrow) {
+                    rt.f = tick;
+                    rt.d[2] = raw_now;
                 }
             }
         }
@@ -1268,6 +1290,53 @@ fn import_npc_step(w: &mut World, i: usize, ram: &GbaRam, o: u32, row: Option<(i
     // (the plain talk wander 0x0800A75B's object, vt 0x0804B974: the same words and footprints - MEASURED on the
     // whole-run cuts 885,660 .. 886,110, Nataday Village's walkers)
     let svt = if ram.valid(st) { ram.r32(st) } else { 0 };
+    // a walk to a point (step 0x0800A1AF, object vt 0x0804B964: +4 / +8 24.8 velocity, +0xC / +0xE s16 target px,
+    // +0x10 u16 frames left - MEASURED on whole-run cut 48,892, East District 3-3's two walkers): that step with the
+    // same target, the RAM's velocity and count (a fresh create recomputes them from where the walker is now)
+    // a wait (step 0x0800A223, object vt 0x0804D4D4: +4 the count left; the NPC's step index is obj +0x1B4) - whole-run
+    // cut 59,619, Pilaf Castle 4-20's guard idle 93 frames before its walk
+    if svt == 0x0804_D4D4 {
+        let idx = ram.r8(o + 0x1B4) as usize;
+        let Body::Npc(n) = &w.ents[i].body else { return };
+        if !n.behaviour.as_ref().is_some_and(|b| b.steps.get(idx).is_some_and(|s| s.func == 0x0800_A223)) {
+            return;
+        }
+        let rng = w.rng.clone();
+        wf_core::fieldnpc::import_step(w, i, idx);
+        w.rng = rng;
+        let Body::Npc(n) = &mut w.ents[i].body else { return };
+        if let Some(b) = n.behaviour.as_mut() {
+            if let Some(wf_core::fieldnpc::StepRt::Wait { count }) = b.cur.as_mut() {
+                *count = ram.s32(st + 4);
+            }
+            if let Some((_, raw, cel, tick)) = row {
+                (b.raw, b.frame, b.tick) = (raw, cel, tick);
+                b.anim = if raw == 1 { 0 } else { 1 };
+            }
+        }
+        return;
+    }
+    if svt == 0x0804_B964 {
+        let (tx, ty) = (ram.r16(st + 0xC) as i16 as i32, ram.r16(st + 0xE) as i16 as i32);
+        let Body::Npc(n) = &w.ents[i].body else { return };
+        let Some(idx) = n.behaviour.as_ref().and_then(|b| b.steps.iter().position(|s| s.func == 0x0800_A1AF && matches!(s.op, wf_core::fieldcontent::StepOp::WalkTo { x, y, .. } if x == tx && y == ty))) else { return };
+        let rng = w.rng.clone();
+        wf_core::fieldnpc::import_step(w, i, idx);
+        w.rng = rng;
+        let Body::Npc(n) = &mut w.ents[i].body else { return };
+        if let Some(b) = n.behaviour.as_mut() {
+            if let Some(wf_core::fieldnpc::StepRt::WalkTo { n: cnt, vx, vy, .. }) = b.cur.as_mut() {
+                *cnt = ram.r16(st + 0x10) as i32;
+                *vx = ram.s32(st + 4);
+                *vy = ram.s32(st + 8);
+            }
+            if let Some((_, raw, cel, tick)) = row {
+                (b.raw, b.frame, b.tick) = (raw, cel, tick);
+                b.anim = if raw == 1 { 0 } else { 1 };
+            }
+        }
+        return;
+    }
     if svt != 0x0804_D848 && svt != 0x0804_D4E4 && svt != 0x0804_B974 {
         return;
     }
@@ -1421,6 +1490,16 @@ fn build_mid(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner: &mut St
     // the facing - and the fade k frames in (whole-run cut 886,110: Nataday Village's door, 18 frames in)
     if ram.valid(mode) && ram.r32(mode) == MODE_FADE_OUT && ram.r32(mode + 0xC) == ram.player() && ram.s32(mode + 8) == 8 {
         import_exit_fade(&mut w, ram, ram.s32(mode + 4), notes);
+    }
+    // an exit arrival's fade-in under way (the main-loop mode vt 0x0804B57C: +4 the brightness up from 0, +8 its step 8;
+    // the leader autowalking in): our arrival fade k frames in - no trigger check until it ends (whole-run cuts 48,862
+    // / 94,050: 4 and 15 frames in, ours fired the exit the leader stands on)
+    if ram.valid(mode) && ram.r32(mode) == MODE_FADE_IN && ram.s32(mode + 8) == 8 && ram.s32(mode + 4) > 0 && autowalk(ram, ram.player()) {
+        let k = ram.s32(mode + 4) / 8;
+        if let Some(f) = w.field.as_mut().filter(|f| matches!(f.mode, Mode::Normal)) {
+            f.mode = Mode::FadeIn { k };
+            notes.push(format!("mid-area: an exit arrival's fade-in, {k} frames in"));
+        }
     }
     // an inline script (an area's / a map event's, no event graph) running at the cut outside any event: its
     // interpreter's PC on the context stack lies in its code (r002_006 +20,026: the world map's landing script
@@ -1740,6 +1819,9 @@ fn import_player_state(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
         0x0804_C744 => Gs::Block,
         0x0804_D75C => Gs::Hurt,
         0x0804_C768 => Gs::Ko,
+        // the revert out of a Super Saiyan form (vt 0x0804CC58, anim 24 = raw 12, one pass at 16 ticks a cel; not
+        // hittable): gameplay's (the energy ran out) - whole-run cut 137,896, the leader 3 cels in
+        0x0804_CC58 => Gs::SsRevert,
         // the Energy Blast state (vt 0x0804DC14, update 0x0801AF3C: the player's tick +0x12 counts, the blast at 16,
         // at 40 a refire if +4 (set by a B press, 0x0801AFE2) else idle) - the selected skill's (whole-run cut
         // 809,832: a blast thrown, refire pending)
@@ -1765,6 +1847,9 @@ fn import_player_state(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
         p.ap.tick = tick;
     }
     p.a.blocking = gs == Gs::Block;
+    if gs == Gs::SsRevert {
+        p.a.hittable = false;
+    }
     // the idle state's boredom counter (state object +4, `0x08013022`: bored past 1024; whole-run cut 885,660 - the
     // game's leader got bored 66 frames in)
     if gs == Gs::Idle {
@@ -1803,6 +1888,12 @@ fn build_mid_event(_data: &Arc<GameData>, ram: &GbaRam, runner: &mut StoryHost, 
     field::set_busy(&mut w, true);
     field_from_ram(&mut w, ram, notes);
     import_player_state(&mut w, ram, notes);
+    // the screen an earlier fade_out left black (a fade the node's replay runs sets its own): black (whole-run cut
+    // 628,017: s508 places the map objects under node 0's fade_out(30), node 9 fades in)
+    if ram.screen_black == Some(true) {
+        w.scene.screen.black = 16;
+        w.scene.screen.dim = 256;
+    }
     // a touch-once trigger running its event: the game removes it when the event returns (still in the RAM's list),
     // ours when it fires - gone (whole-run cut 887,156: s437 fired again after its end)
     let name = format!("s{:03}", ev.0);
@@ -1821,6 +1912,12 @@ fn build_mid_event(_data: &Arc<GameData>, ram: &GbaRam, runner: &mut StoryHost, 
         }
     }
     import_talk_pass(ram, runner, &mut w, notes);
+    // a script's fade_out before it: the screen stays black (whole-run cut 612,541: s508's node 0 faded out and
+    // warped to 0-55, node 1 runs under the black screen)
+    if ram.screen_black == Some(true) && w.scene.screen.black == 0 {
+        w.scene.screen.black = 16;
+        w.scene.screen.dim = 256;
+    }
     // stopped inside the node's code: the natives its interpreter has run (the PC after the one that blocks)
     if let Some(ran) = natives_run(ram, runner, ev) {
         return build_mid_code(ram, runner, ev, w, calls0, &ran, notes);
@@ -1986,28 +2083,121 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
         }
         hit
     });
-    let Some((idx, _)) = found else {
-        notes.push(format!("unsupported: event s{:03} node {}: the waiting native {wn:#04x} is not among the node's actions", ev.0, ev.1));
-        let draws = w.rng.calls.wrapping_sub(calls0);
-        return Built { world: w, draws, held: 0, finished: false };
-    };
-    let queued = seen.into_inner();
-    let last = idx;
-    let from = if wn == 0x3A { queued[..idx.min(queued.len())].iter().rposition(|&n| n == 0x38).unwrap_or(idx) } else { idx };
-    let (rng, shakes) = (w.rng.clone(), w.g.shakes.clone());
-    match outer_event(ram, runner, ev) {
-        Some((outer, k)) => {
-            notes.push(format!("nested in s{:03} node {} (its run_event after {k} actions)", outer.0, outer.1));
-            runner.continue_mid_nested(&mut w, outer, k, from);
+    // the probe cannot see the waiting native: (a) a `run_event` whose event object is on the stack but has not
+    // stepped yet (its state word 0 - whole-run cut 612,541: s508 node 1 ran `run_event(494, ..)`, s494's node 0
+    // runs in the next frame): the node continues past its actions before it, the nested event from its start;
+    // (b) a `steps` node past a modal call (`is_result_action`: its result fed to the next step) the probe stops at
+    let modal = ran[..ran.len() - 1].iter().rposition(|(n, _)| wf_script::steps::is_result_action(*n));
+    let nested_new = found.is_none()
+        && (wf_script::natives::RUN_EVENT..=wf_script::natives::RUN_EVENT_P0_P3).contains(&wn)
+        && wargs.as_ref().and_then(|a| a.first()).is_some_and(|&e| (0x0300_7000u32..0x0300_8000 - 0x18).step_by(4).any(|a| runner.event_of_header(ram.r32(a)) == Some(e as u16) && ram.r16(a + 8) == 0));
+    let (rng, shakes, g0) = (w.rng.clone(), w.g.shakes.clone(), w.story.g);
+    // (the leader's state as imported from RAM, before the replayed group's commands)
+    let leader_gs = w.player_idx(0).map(|pi| (pi, w.pl_ref(pi).gs));
+    let (last, from) = match found {
+        Some((idx, _)) => {
+            let queued = seen.into_inner();
+            let last = idx;
+            // (`idx` counts every action the probe passed, `queued` only the ones it asked about - a node's `run_event` is
+            // not among them: s314 node 0, whole-run cuts 225,250 .. 225,340 - the batch's begin_parallel is offset by those)
+            let off = idx.saturating_sub(queued.len());
+            let from = if wn == 0x3A { queued[..idx.min(queued.len())].iter().rposition(|&n| n == 0x38).map(|p| p + off).unwrap_or(idx) } else { idx };
+            let outer = outer_event(ram, runner, ev);
+            if let Some((o, k)) = outer {
+                notes.push(format!("nested in s{:03} node {} (its run_event after {k} actions)", o.0, o.1));
+            }
+            // the replay re-runs the node's code before the waiting native: its `rand()` draws were made by the game before
+            // the cut, so the replay starts from the generator rewound by them - found by the script words g0..g3 the replay
+            // sets matching the RAM's (whole-run cut 628,017: s508 node 7, set_pos(-1 - g(0), 262 + rand(53), 78 + rand(134))
+            // waiting, the map object already placed)
+            let ram_g: Vec<i32> = (0..4u32).map(|k| ram.s32(WORDS_G + 4 * k)).collect();
+            let snap = runner.snapshot();
+            let mut chosen = None;
+            for m in 0..=64u32 {
+                let mut w2 = w.clone();
+                w2.rng.set_state(rewind(rng.state(), m));
+                match outer {
+                    Some((o, k)) => runner.continue_mid_nested(&mut w2, o, k, from),
+                    None => runner.continue_mid_node(&mut w2, ev.0, ev.1, ev.2, from, last),
+                }
+                if w2.story.g[..4] == ram_g[..] {
+                    chosen = Some(w2);
+                    break;
+                }
+                runner.restore(&snap);
+            }
+            match chosen {
+                Some(w2) => w = w2,
+                None => match outer {
+                    Some((o, k)) => runner.continue_mid_nested(&mut w, o, k, from),
+                    None => runner.continue_mid_node(&mut w, ev.0, ev.1, ev.2, from, last),
+                },
+            }
+            (last, from)
         }
-        None => runner.continue_mid_node(&mut w, ev.0, ev.1, ev.2, from, last),
-    }
+        None if nested_new => {
+            notes.push(format!("mid-area: s{:03} node {} waits in a run_event whose event has not stepped yet", ev.0, ev.1));
+            runner.continue_mid_nested_at(&mut w, ev, ran.len() - 1, 0, false);
+            (ran.len() - 1, 0)
+        }
+        None if modal.is_some() => {
+            let r = modal.unwrap_or(0);
+            let step = ran[..=r].iter().filter(|(n, _)| wf_script::steps::is_result_action(*n)).count() as i32;
+            let rest = &ran[r + 1..];
+            let idx = rest.len() - 1;
+            let from = if wn == 0x3A { rest[..idx].iter().rposition(|(n, _)| *n == 0x38).unwrap_or(idx) } else { idx };
+            // (the modal's result: the node keeps it in p(0) before its next native - s266's `set_p(0, result)`)
+            if !runner.continue_mid_step(&mut w, ev.0, ev.1, ev.2, step, ev.2[0], from) {
+                notes.push(format!("unsupported: event s{:03} node {}: past a modal, not a steps node", ev.0, ev.1));
+                let draws = w.rng.calls.wrapping_sub(calls0);
+                return Built { world: w, draws, held: 0, finished: false };
+            }
+            notes.push(format!("mid-area: s{:03} node {} at step_{step} (past its modal), action {from}", ev.0, ev.1));
+            (idx, from)
+        }
+        None => {
+            notes.push(format!("unsupported: event s{:03} node {}: the waiting native {wn:#04x} is not among the node's actions", ev.0, ev.1));
+            let draws = w.rng.calls.wrapping_sub(calls0);
+            return Built { world: w, draws, held: 0, finished: false };
+        }
+    };
     w.rng = rng;
+    // the script words the replayed part set (`set_g(0, rand(3))` - s508 node 1: its draw replays on the cut's
+    // generator, another value) are the RAM's - when the whole replayed part ran before the cut (a run_event not yet
+    // stepped: nothing after it has run); elsewhere code past the cut sets them too (s512's)
+    if nested_new {
+        w.story.g = g0;
+        runner.set_script_g(g0);
+    }
     // `wait(n)` (0x88): the main loop's mode is the wait object (0x03000F90 -> vt 0x08049978, +4 frames left)
     let mode = ram.r32(0x0300_0F90);
     if wn == 0x88 && ram.valid(mode) && ram.r32(mode) == 0x0804_9978 {
         if let Some(wf_script_core::Pending::Frames { left, .. }) = runner.hs.pending.as_mut() {
             *left = ram.s32(mode + 4);
+        }
+    }
+    // a fade_out (0x78) among the dropped natives, not undone by a fade_in after it: the screen stays black (whole-run
+    // cut 568,177: s341 node 0 waits on its set_pos after fade_out(50))
+    if ran[..ran.len() - 1].iter().rev().find(|(n, _)| (0x78..=0x79).contains(n)).is_some_and(|(n, _)| *n == 0x78) && w.scene.screen.fade.is_none() {
+        w.scene.screen.black = 16;
+        w.scene.screen.dim = 256;
+    }
+    // a script fade waiting (0x78 .. 0x7e): the main loop's mode is the fade object (vt 0x0804C588: +4 the steps run,
+    // +8 the length - opening s103 node 18's fade_in(100), whole-run cuts 41,565 / 41,625; s314's fade_in(50) 225,225):
+    // the replayed fade restarted from its first step - it takes the RAM's progress
+    if (0x78..=0x7E).contains(&wn) && ram.valid(mode) && ram.r32(mode) == 0x0804_C588 {
+        if let Some(f) = w.scene.screen.fade.as_mut().filter(|f| f.len == ram.s32(mode + 8) && f.kind == wf_core::scene::FadeKind::Black) {
+            f.t = ram.s32(mode + 4).clamp(0, f.len);
+            let (t, len, out) = (f.t, f.len, f.out);
+            let (lvl, fine) = ((16 * t / len.max(1)).clamp(0, 16), (256 * t / len.max(1)).clamp(0, 256));
+            let s = &mut w.scene.screen;
+            if out {
+                s.black = s.black.max(lvl);
+                s.dim = s.dim.max(fine);
+            } else {
+                s.black = 16 - lvl;
+                s.dim = 256 - fine;
+            }
         }
     }
     // the screen shake (the camera slot 0x03002BE0 -> vt 0x0804A720: +4 intensity, +5 period, +6 count, +8 frames
@@ -2064,6 +2254,8 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
     let walks = ram.ewram_with(0x0804_D0A4);
     let glides = ram.ewram_with(0x0804_AE84);
     let jumps = ram.ewram_with(0x0804_AE5C);
+    // the actors' running `actor_wait` objects (an actor's state +0x18C)
+    let waits: Vec<u32> = ram.objects().into_iter().map(|a| ram.r32(a + 0x18C)).filter(|&s| ram.valid(s) && ram.r32(s) == 0x0804_AB58).collect();
     let rng = w.rng.clone();
     for k in 0..w.scene.tracks.len() {
         let live = |c: &Cmd| -> Option<u32> {
@@ -2094,18 +2286,34 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
         // so does a walk at the head with no walk object for it and its actor on the target: the walk object went in
         // its last step (its idle SetAnim drawn), the script goes on in the cut's frame (whole-run cut 887,156:
         // s437 node 10, the priest's walk back ended, `remove_actor` next)
+        // (an `actor_wait` before it ended too: no wait object is left, the walk's object is made by the wait - whole-run
+        // cut 146,883: s237's actor_wait(269, 15) + walk_to(269, 210, 63) both over)
         if found.is_none() {
-            if let (Some(Cmd::MoveTo { x, y, .. }), Owner::Entity(id)) = (w.scene.tracks[k].queue.first(), w.scene.tracks[k].owner) {
+            let skip = w.scene.tracks[k].queue.iter().take_while(|c| matches!(c, Cmd::Wait { .. })).count();
+            if let (Some(Cmd::MoveTo { x, y, .. }), Owner::Entity(id)) = (w.scene.tracks[k].queue.get(skip), w.scene.tracks[k].owner) {
                 let (x, y) = (*x, *y);
                 let at = w.find(id).and_then(|i| w.actor(i)).is_some_and(|a| a.x == x << 8 && a.y == y << 8);
                 if at && !walks.iter().any(|&o| ram.s32(o + 0x14) == x && ram.s32(o + 0x18) == y) {
-                    w.scene.tracks[k].queue.remove(0);
+                    w.scene.tracks[k].queue.drain(..=skip);
                     w.scene.tracks[k].started = false;
                     continue;
                 }
             }
         }
         let Some((pos, o)) = found else { continue };
+        // `actor_wait` before the walk (0x4A: the actor's state +0x18C is the wait object vt 0x0804AB58, +4 the walk
+        // object it starts at the end - already made, not stepped - +8 the frames left): the wait runs, the walk is
+        // the command after it (whole-run cut 142,491: s172 node 0, Vegeta's actor_wait(279, 20) 1 frame in)
+        if let Some(wo) = waits.iter().copied().find(|&a| ram.r32(a + 4) == o) {
+            if pos > 0 && matches!(w.scene.tracks[k].queue.get(pos - 1), Some(Cmd::Wait { .. })) {
+                w.scene.tracks[k].queue.drain(..pos - 1);
+                if let Some(Cmd::Wait { left }) = w.scene.tracks[k].queue.first_mut() {
+                    *left = ram.s32(wo + 8);
+                }
+                w.scene.tracks[k].started = true;
+            }
+            continue;
+        }
         if let Some(Cmd::GlideTo { x, y, .. }) = w.scene.tracks[k].queue.get_mut(pos) {
             (*x, *y) = (ram.s32(o + 0x14), ram.s32(o + 0x18));
         }
@@ -2124,11 +2332,46 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
             _ => {}
         }
     }
+    // a replayed `play_anim` on the leader that already ended in the game (the RAM's leader is back in the state it
+    // imported with: whole-run cut 153,226, s266's punch anim done, the group still waiting on its prop poof): the
+    // command is done, the leader's state the RAM's
+    if let Some((pi, gs)) = leader_gs {
+        let me = w.ents[pi].id;
+        if w.pl_ref(pi).gs != gs {
+            let mut hit = false;
+            for t in w.scene.tracks.iter_mut() {
+                if t.owner == Owner::Entity(me) && matches!(t.queue.first(), Some(Cmd::PlayAnim { anim }) if *anim != 0) {
+                    t.queue.remove(0);
+                    t.started = false;
+                    hit = true;
+                }
+            }
+            if hit {
+                wf_core::player::import_state(&mut w, pi, gs);
+                if let Some(r) = ram.actor_rows.iter().find(|r| r.0 == ram.player()) {
+                    let p = w.pl(pi);
+                    (p.ap.raw, p.ap.frame, p.ap.tick) = (r.2, r.3, r.4);
+                }
+            }
+        }
+    }
+    w.scene.tracks.retain(|t| !t.queue.is_empty() || t.holding);
+    // a prop's poof playing (the command object vt 0x0804E0FC, +8 its frame count: done at 8 x its steps - whole-run
+    // cut 153,226: s266's machine poof 32 frames in): the replayed one at the RAM's count
+    let mut poofs = ram.ewram_with(0x0804_E0FC).into_iter();
+    for t in w.scene.tracks.iter_mut() {
+        if let Some(Cmd::PropPoof { t: pt, .. }) = t.queue.first_mut() {
+            if let Some(o) = poofs.next() {
+                *pt = ram.s32(o + 8);
+            }
+        }
+    }
     w.rng = rng;
     // the track actors' animations as the RAM rows show them (a started command restarted its animation): the
     // RAM object at the entity's 24.8 position
     let rows: std::collections::BTreeMap<u32, (i32, i32, i32, i32)> = ram.actor_rows.iter().map(|r| (r.0, (r.1, r.2, r.3, r.4))).collect();
-    let owners: Vec<wf_core::world::EntityId> = w
+    // (and the event's puppets without a track left: an actor whose walk ended - whole-run cut 146,883, s237's Baba)
+    let mut owners: Vec<wf_core::world::EntityId> = w
         .scene
         .tracks
         .iter()
@@ -2137,14 +2380,40 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
             _ => None,
         })
         .collect();
+    for p in &w.scene.puppets {
+        if !owners.contains(&p.id) {
+            owners.push(p.id);
+        }
+    }
     for id in owners {
         let Some(i) = w.find(id) else { continue };
         let Some((x, y)) = w.actor(i).map(|a| (a.x, a.y)) else { continue };
         let o = if Some(i) == w.player_idx(0) { Some(ram.player()) } else { rows.keys().copied().find(|&o| ram.s32(o + 0x1A0) == x && ram.s32(o + 0x1A4) == y) };
+        // (and the facing: a walk the replay found already ended is dropped unstarted, so its turn is not made -
+        // whole-run cut 146,883: s237's Baba (222) at the end of her walk up, facing 1 in RAM)
+        if let Some(o) = o {
+            let f = ram.r8(o + 0x10) & 3;
+            match &mut w.ents[i].body {
+                wf_core::world::Body::Player(p) => p.a.facing = f,
+                wf_core::world::Body::Npc(n) => n.a.facing = f,
+                wf_core::world::Body::Enemy(e) => e.a.facing = f,
+                _ => {}
+            }
+        }
         let Some(&(_, raw, cel, tick)) = o.and_then(|o| rows.get(&o)) else { continue };
         let d = Arc::clone(&w.data);
+        // (the state's script anim id follows the RAM's state - raw = anim_state(id) + 1 - when ours is another
+        // state's: it picks how the state ticks; whole-run cut 146,883: Baba idle in RAM, ours still the walk's id)
+        let id_for = |cur: i32| -> i32 {
+            if wf_core::scene::anim_state(cur) + 1 == raw {
+                cur
+            } else {
+                (0..25).find(|&a| wf_core::scene::anim_state(a) + 1 == raw).unwrap_or(cur)
+            }
+        };
         if let Some(pp) = w.scene.puppets.iter_mut().find(|p| p.id == id) {
             (pp.anim.raw, pp.anim.frame, pp.anim.tick) = (raw, cel, tick);
+            pp.anim.id = id_for(pp.anim.id);
         }
         match &mut w.ents[i].body {
             wf_core::world::Body::Player(p) => {
@@ -2152,6 +2421,7 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
             }
             wf_core::world::Body::Npc(n) => {
                 (n.anim.raw, n.anim.frame, n.anim.tick) = (raw, cel, tick);
+                n.anim.id = id_for(n.anim.id);
             }
             wf_core::world::Body::Enemy(e) => {
                 e.set_raw(&d, raw);
@@ -2228,7 +2498,12 @@ fn build_event_entry(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner:
     // the interpreter already past the node's warp (a later wait in it - Kami's Lookout s512's fade_in_white after its
     // warp to 6-14): the field stands, the node continues mid-step
     // (a cut at the load itself - the screen still black, the load path: opening 1-1, s038's set_pos after its warp)
-    if let Some(ran) = natives_run(ram, runner, ev).filter(|_| ram.screen_black != Some(true)) {
+    // (a black screen with the node past its warp and waiting in a fade_in started after it - the actors it spawned
+    // are in RAM: whole-run cut 225,200, s314 node 0's fade_in(50) in its first step - is mid-node too)
+    let fade_after_warp = |ran: &Vec<(u8, Option<Vec<i32>>)>| {
+        ran.last().is_some_and(|(n, _)| (0x78..=0x7E).contains(n)) && ran[..ran.len() - 1].iter().any(|(n, _)| matches!(n, 0x76 | 0x77))
+    };
+    if let Some(ran) = natives_run(ram, runner, ev).filter(|r| ram.screen_black != Some(true) || fade_after_warp(r)) {
         if ran[..ran.len() - 1].iter().any(|(n, _)| matches!(n, 0x76 | 0x77)) {
             return build_mid_event(data, ram, runner, ev, w, calls0, notes);
         }
@@ -2339,7 +2614,11 @@ fn build_event_entry(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner:
     }
     // the load frame's end: the cameras (a modal scroll the continuation started takes its step; the script sees it
     // done in the next frame - the game's PC is still in camera_scroll_to at the cut: opening 1-10, s068)
-    field::world_mode_cameras(&mut w);
+    // (not after held frames: the arrival's last held frame ran the cameras - whole-run cut 600,329, s345 node 22
+    // after its warp to 8-70, 2 held frames, set_pose waiting)
+    if held == 0 {
+        field::world_mode_cameras(&mut w);
+    }
     notes.retain(|n| !n.starts_with("event "));
     notes.push(format!("event s{:03} continues at node {} ({} actions before the cut dropped)", ev.0, ev.1, skipped));
     let draws = w.rng.calls.wrapping_sub(calls0);
@@ -2440,11 +2719,12 @@ pub fn import_emulator_state(data: &Arc<GameData>, ram: &GbaRam, runner: &mut St
     if let Some(p) = runner.text_open_due.take() {
         wf_core::vram::text_open(&mut world, p);
     }
-    // a banner object of an earlier load still showing: its countdown (obj +0x10) -> our age
+    // a banner object of an earlier load still showing: its countdown (obj +0x10, a byte: the bytes above are heap
+    // leftovers - whole-run cut 146,673: word 0x0203DECE, 206 frames left; the object goes the frame after 1) -> our age
     {
         world.scene.banner_made = u32::MAX;
         if let Some(o) = ram.objects().into_iter().find(|&o| ram.r32(o) == VT_BANNER) {
-            let rem = ram.r16(o + 0x10) as u32;
+            let rem = ram.r8(o + 0x10) as u32;
             let text = data.field.as_ref().and_then(|fd| fd.area(info.area.world, info.area.area)).map(|a| a.banner.clone()).unwrap_or_default();
             world.scene.banner = Some((text, 239u32.saturating_sub(rem)));
         }

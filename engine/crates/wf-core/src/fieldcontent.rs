@@ -677,6 +677,10 @@ impl FieldData {
                     want.push(id.clone());
                 }
             }
+            // an area song chosen by a selector script (Hercule City 3-1 .. 3-3: flag 26 and not 27 -> 29, else 6)
+            if let Song::Script(s) = &a.song {
+                want.push(if s.starts_with("inline_") { s.clone() } else { format!("inline_{s}") });
+            }
         }
         if !want.is_empty() {
             if let Some(bc) = read_json(src, "scripts/bytecode.json") {

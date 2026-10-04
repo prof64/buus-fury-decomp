@@ -18,7 +18,10 @@ for p in sorted(SEG.glob('*.json')):
     s = p.read_text()
     nl = s.index('\n')
     head = s[:nl]
-    name = re.search(r'"name":"([^"]+)"', head).group(1)
+    m = re.search(r'"name":"([^"]+)"', head)
+    if not m:
+        continue
+    name = m.group(1)
     if p.stem not in clean and name not in clean:
         continue
     if '"expect"' not in head or '"area_exact"' in head or not (SEG / 'area' / f'{name}.json').exists():

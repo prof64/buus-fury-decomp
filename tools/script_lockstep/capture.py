@@ -65,6 +65,16 @@ def world_objects(e):
     return out
 
 
+def saved_world_objects(e):
+    """a pause page's cut: the object world saved by 0x08011DB4 (the 0xE00-byte block at [WORLD + 0xBF8], the live
+    list cleared, the objects intact) - its list; [] when the world is live"""
+    b = e.r32(WORLD + 0xBF8)
+    if e.r32(WORLD + 4) != 0 or e.r32(PLAYER) != 0 or not (0x02000000 <= b < 0x02040000):
+        return []
+    n = e.r32(b + 4)
+    return [e.r32(b + 8 + 4 * i) for i in range(min(n, 256))]
+
+
 def anim_raw(e, o):
     d = e.r32(o + 0x58)
     a = e.r32(o + 0x50)
@@ -107,13 +117,13 @@ class Recorder:
                               'player': o == self.e.r32(PLAYER)})
         return self.index[k]
 
-    def actors(self):
+    def actors(self, objects=None):
         """actor rows [obj#, sprite, x, y, z, dir, raw, frame, tick]; non-actor objects go to self.others"""
         e = self.e
         defs = sprite_defs()
         out = []
         self.others = []
-        for o in world_objects(e):
+        for o in (world_objects(e) if objects is None else objects):
             if not (0x02000000 <= o < 0x04000000):
                 continue
             d = e.r32(o + 0x58)
@@ -191,7 +201,9 @@ def snapshot(e):
     char +0, supplies +2.., flags +0x55.., equipment list +0xE4, zenie +0x4F4), the 9 character records
     0x03001560 (0x68 each), script words G 0x03001058 and L 0x03001020, the map size (area manager)"""
     r = Recorder(e)
-    acts = r.actors()
+    # (a cut inside a pause page: the saved world's actors - the importer rebuilds the field from that block; the
+    # rows keep the live list, empty while the page shows)
+    acts = r.actors(saved_world_objects(e) or None)
     return {'objs': r.objs, 'actors': acts, 'cam': [s32v(e.r32(CAM)), s32v(e.r32(CAM + 4))],
             'area': [e.r8(0x0300197C + k) for k in range(3)],
             'rng': [e.r32(0x03004A5C), e.r32(0x03004A60)], 'lf': e.r32(0x03000F94), 'song': ((e.r32(0x030038A4 + 0xC) - SONG_TABLE) // 20) if e.r8(0x030038A4 + 5) == 1 else -1,

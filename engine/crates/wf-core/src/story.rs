@@ -283,6 +283,11 @@ fn varint(code: &[u8], pc: &mut usize) -> Option<i32> {
 
 /// evaluate a condition script's bytecode on the story state (`current` = the leader's character): Some(stack[0] != 0)
 pub fn eval_condition(code: &[u8], s: &Story, current: i32) -> Option<bool> {
+    eval_value(code, s, current).map(|v| v != 0)
+}
+
+/// the same bytecode's value (stack[0] at its end: an area song selector's `return 29`)
+pub fn eval_value(code: &[u8], s: &Story, current: i32) -> Option<i32> {
     let mut st: Vec<i32> = Vec::with_capacity(16);
     let mut pc = 0usize;
     let mut steps = 0;
@@ -379,5 +384,5 @@ pub fn eval_condition(code: &[u8], s: &Story, current: i32) -> Option<bool> {
             _ => return None,
         }
     }
-    Some(st.first().copied().unwrap_or(0) != 0)
+    Some(st.first().copied().unwrap_or(0))
 }
