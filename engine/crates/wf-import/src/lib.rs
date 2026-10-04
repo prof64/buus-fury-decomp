@@ -726,7 +726,10 @@ fn import_objects(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
         let Some(i) = w.find(id) else { continue };
         order.push(id);
         match key.0 {
-            0 => patch_enemy(w, i, ram, o, rows.get(&o).copied(), notes),
+            0 => {
+                patch_enemy(w, i, ram, o, rows.get(&o).copied(), notes);
+                place_enemy(w, id, key.1, ox, oy);
+            }
             _ => {
                 if let Body::Npc(n) = &mut w.ents[i].body {
                     n.a.x = ox;
@@ -779,6 +782,33 @@ fn import_objects(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
         }
     }
     w.ents.extend(actors);
+}
+
+/// an imported enemy the field does not track as a placement yet (built bare by the mid-area import) becomes one: the
+/// area's nearest unclaimed def of its type (its on-defeat callback), else a run-time enemy `ObjRef::List(0xff, type)`
+/// - so its death runs the type's drop script and the callback like the load's (real run 4-1 tile r002_006+11,000:
+/// a bandit knocked down at f32 is gone at f49; the game's drop script draws 4 x rand / 6 x chance at f57)
+fn place_enemy(w: &mut World, id: wf_core::world::EntityId, ty: i32, ox: i32, oy: i32) {
+    let Some(f) = w.field.as_ref() else { return };
+    if f.placed.iter().any(|p| p.0 == id) {
+        return;
+    }
+    let area = f.area;
+    let claimed: Vec<wf_core::fieldcontent::ObjRef> = f.placed.iter().map(|p| p.1).collect();
+    let defs = w.data.field.as_ref().and_then(|fd| fd.area(area.world, area.area)).map(|a| a.objects.clone()).unwrap_or_default();
+    let at = defs
+        .iter()
+        .filter(|d| !claimed.contains(&d.at))
+        .filter_map(|d| match &d.kind {
+            wf_core::fieldcontent::ObjKind::Enemy { ty: t, x, y, .. } if *t == ty => Some((d.at, ((*x - (ox >> 8)).abs() + (*y - (oy >> 8)).abs()) as i64)),
+            _ => None,
+        })
+        .min_by_key(|x| x.1)
+        .map(|x| x.0)
+        .unwrap_or(wf_core::fieldcontent::ObjRef::List(0xff, ty as u16));
+    if let Some(f) = w.field.as_mut() {
+        f.placed.push((id, at, ox >> 8, oy >> 8));
+    }
 }
 
 /// an enemy's AI state stack (obj+0x238: +4 depth, +8 {runtime, def} per level; def = 0x0870F514 + 8 * state)
@@ -1321,14 +1351,20 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
         w.g.shakes.push(l);
     }
     w.scene.tracks.retain(|t| !t.queue.is_empty() || t.holding);
-    // `become_map_object` waiting (0x4F, its frame): the RAM already has the map object - the command has started,
-    // its next tick ends it (r062 20-6 +21,000: s476 node 19 exits in the cut's first frame)
+    // `become_map_object` waiting (0x4F): the RAM already has the map object (imported) - the replayed command is
+    // dropped and its wait ended in the cut's frame: the script goes on in the next (r062 20-6 +21,000: s476 node 19
+    // exits in the cut's first frame)
     if wn == 0x4F {
         for t in w.scene.tracks.iter_mut() {
-            if matches!(t.queue.front(), Some(Cmd::BecomeMapObject { .. })) {
-                t.started = true;
+            if matches!(t.queue.first(), Some(Cmd::BecomeMapObject { .. })) {
+                t.queue.remove(0);
+                t.started = false;
             }
         }
+    }
+    if wn == 0x4F && w.scene.tracks.iter().all(|t| t.queue.is_empty()) {
+        w.scene.director.wait = None;
+        w.scene.director.done = true;
     }
     // each track's running command from its game object (heap objects matched by their target): a walk (vt
     // 0x0804D0A4; a glide 0x0804AE84 the same: +0xC / +0x10 24.8 step, +0x14 / +0x18 target, +0x1C steps left), a jump (vt 0x0804AE5C: +8 x
@@ -1406,6 +1442,9 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
 }
 
 /// the 3D world map (an area whose load makes the flyer)
+/// the 3-D map's arrival fade-in (main-loop mode object vtable)
+const MODE_FADE_IN_3D: u32 = 0x0804_95B4;
+
 fn is_3d(_data: &GameData, to: AreaId) -> bool {
     (to.world, to.area) == (0, 50)
 }
@@ -1456,6 +1495,12 @@ fn build_event_entry(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner:
     // (a cut at the load itself - the screen still black, the load path: opening 1-1, s038's set_pos after its warp)
     if let Some(ran) = natives_run(ram, runner, ev).filter(|_| ram.screen_black != Some(true)) {
         if ran[..ran.len() - 1].iter().any(|(n, _)| matches!(n, 0x76 | 0x77)) {
+            return build_mid_event(data, ram, runner, ev, w, calls0, notes);
+        }
+        // the node has run actions and none of them loads (its warp, if any, is still ahead): the event is running
+        // mid-node over the field it started on, not at an area entry (real route 4-1, s515's take-off from a
+        // trigger: tiles r002_006+2000 / +13000 cut in its glide, the warp_fade to 0-50 two steps later)
+        if std::env::var_os("XNOMID").is_none() && !ran.is_empty() && !ran.iter().any(|(n, _)| (0x70..=0x77).contains(n)) {
             return build_mid_event(data, ram, runner, ev, w, calls0, notes);
         }
     }
@@ -1544,6 +1589,18 @@ fn build_event_entry(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner:
             runner.step(&mut sess, 0);
         }
         w = sess.world;
+    }
+    // a warp_fade into the 3-D map cut during the arrival's fade-in (mode vt 0x080495B4: +4 brightness, 4 a frame):
+    // the load is behind, the map has run since - its objects, the flyer and the camera from RAM, the fade's
+    // progress (real route 0-55 -> 0-50, s515's take-off: tiles r002_006+9000 / +17000, 53 frames into the fade)
+    if fading && is_3d(data, to) && ram.mode_vt() == MODE_FADE_IN_3D {
+        let b = ram.s32(ram.r32(MODE) + 4);
+        if b > 0 {
+            field_from_ram(&mut w, ram, notes);
+            if let Some(f) = w.field.as_mut() {
+                f.mode = Mode::FadeIn { k: b / 4 };
+            }
+        }
     }
     // the load frame's end: the cameras (a modal scroll the continuation started takes its step; the script sees it
     // done in the next frame - the game's PC is still in camera_scroll_to at the cut: opening 1-10, s068)
@@ -1718,6 +1775,7 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
     let mut owners: Vec<(u16, Owner)> = vec![];
     let mut used_ents: Vec<wf_core::world::EntityId> = vec![];
     let mut signs = 0u32;
+    let mut pops: Vec<(u16, i32)> = vec![];
     for o in ram.objects() {
         let vt = ram.r32(o);
         if vt == 0x0804_D1E4 {
@@ -1748,6 +1806,24 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
                 if h != 0xFFFF && h != 0 && live {
                     owners.push((h, if k == 3 { Owner::TextPortrait } else { Owner::Text }));
                 }
+            }
+            continue;
+        }
+        // a damage number in flight (`0x0800AD3E`, vtable 0x0804C904, 0x100 tiles): its updates left (+0x10, one a
+        // frame; the object goes at 0) - r033_002_6-1 tiles +8,000 .. +12,000. Its target is not known: no restart
+        if vt == 0x0804_C904 {
+            let h = ram.r16(o + 0xC);
+            if h != 0xFFFF {
+                owners.push((h, Owner::Popup));
+                pops.push((h, ram.s32(o + 0x10)));
+            }
+            continue;
+        }
+        // the boss HP bar (`show_boss_bar`, vtable 0x0804CE28, 0x200)
+        if vt == 0x0804_CE28 {
+            let h = ram.r16(o + 0xC);
+            if h != 0xFFFF {
+                owners.push((h, Owner::BossBar));
             }
             continue;
         }
@@ -1795,6 +1871,9 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
         .map(|o| (o.1, stamp, a.e[a.idx[(o.0 >> 1) as usize & 511] as usize].size as i32 * 64))
         .collect();
     if let Some(f) = w.field.as_mut() {
-        f.vram = Some(VramState { a, owners, shared_rc, suspended: vec![], hud_out: vec![], popups: vec![], keyed: vec![], stashed: None, delayed: vec![], objs, susp: vec![], shadow_set: vec![], popup_at: vec![], pass_at: 0 });
+        let now = w.frame;
+        let popups = pops.iter().map(|&(h, n)| (wf_core::world::EntityId::MAX, 0, h, now + n.max(0) as u32)).collect();
+        let popup_at = pops.iter().map(|&(h, _)| (h, stamp)).collect();
+        f.vram = Some(VramState { a, owners, shared_rc, suspended: vec![], hud_out: vec![], popups, keyed: vec![], stashed: None, delayed: vec![], objs, susp: vec![], shadow_set: vec![], popup_at, pass_at: 0 });
     }
 }

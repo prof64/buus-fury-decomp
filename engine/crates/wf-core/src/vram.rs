@@ -1003,6 +1003,19 @@ pub fn world_hide(w: &mut World) {
     if w.field.as_ref().is_none_or(|f| f.vram.is_none()) {
         return;
     }
+    // a damage number answers the hide message (0xA) by deleting itself (`0x0800AD14` -> `0x08011944`): its block
+    // goes before the stash (real run 6-1 tile r033_002+10,000: a pause menu right after a hit; the numbers are not
+    // back after the close). The list's end first: the numbers (newest first), then the actors
+    if let Some(v) = st(w) {
+        let mut gone: Vec<(u32, u16)> = v.popups.iter().map(|p| (v.popup_at.iter().find(|q| q.0 == p.2).map(|q| q.1).unwrap_or(0), p.2)).collect();
+        gone.sort();
+        for (_, h) in gone.into_iter().rev() {
+            v.popups.retain(|p| p.2 != h);
+            v.popup_at.retain(|p| p.0 != h);
+            v.owners.retain(|o| o.0 != h);
+            v.a.free(h);
+        }
+    }
     for i in (0..w.ents.len()).rev() {
         if w.ents[i].removed || suspended(w, w.ents[i].id) {
             continue;

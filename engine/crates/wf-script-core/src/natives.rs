@@ -1229,7 +1229,9 @@ fn fuse(w: &mut World, fused: i32, kind: i32, ma: i32, mb: i32, seconds: i32) {
     f.rec.spd = half(a.rec.spd, b.rec.spd) + 16;
     f.flags |= 3;
     f.ss_cooldown = if seconds == -1 { -1 } else { seconds * 60 };
-    f.fusion = ((ma & 15) | (mb & 15) << 4 | (kind & 0xff) << 8) as u16;
+    // the native (0x08002EE2) calls Fusion(fused, record(b), record(a), kind): b's character is the low nibble - the
+    // component whose kill XP comes first (`player::gain_xp`; Gotenks = fuse(5, 3, 3, 2): 0x332, Goten first)
+    f.fusion = ((mb & 15) | (ma & 15) << 4 | (kind & 0xff) << 8) as u16;
     if let Some(x) = w.story.chars.get_mut(ma as usize) {
         x.flags &= !1;
     }

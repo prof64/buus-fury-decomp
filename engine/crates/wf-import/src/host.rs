@@ -173,7 +173,13 @@ impl StoryHost {
                 // the load waits for its on-enter script
                 Some(Cause::AreaEnter) => wf_core::field::finish_arrival(w),
                 // a fusion component's level-up hook: the fusion is current again, re-fused
-                Some(Cause::LevelUp { .. }) => wf_core::player::fusion_levelup_done(w),
+                // (the second component's XP comes now: its own hook runs next, in this frame)
+                Some(Cause::LevelUp { .. }) => {
+                    let from = w.events.len();
+                    wf_core::player::fusion_levelup_done(w);
+                    let evs: Vec<Event> = w.events[from..].to_vec();
+                    self.collect(&evs);
+                }
                 // an on-defeat callback that ran from the death effect and ended without starting an event (13-45's
                 // Samurai once flag 156 is set): nothing held the frame, its update runs (not after the drop script
                 // queued before the callback: that one must not release the hold)

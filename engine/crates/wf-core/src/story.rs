@@ -105,6 +105,10 @@ pub struct Story {
     /// kill levels Trunks: GD+0 5 -> 3 for the hook's 242 frames, then 5 with the re-fused record at full HP)
     #[serde(default)]
     pub levelup_char: Option<i32>,
+    /// the fusion's second component and the kill's XP gain, still to be added when the first component's level-up
+    /// hook ends (`0x08013914` handles the components one after the other: add, roll, hook #3 as a nested scene)
+    #[serde(default)]
+    pub fusion_xp_left: Option<(i32, i64)>,
 }
 
 impl Default for Story {
@@ -124,6 +128,7 @@ impl Default for Story {
             play_frames: 0,
             lf_bias: 0,
             levelup_char: None,
+            fusion_xp_left: None,
         }
     }
 }

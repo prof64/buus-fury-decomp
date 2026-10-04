@@ -1201,36 +1201,30 @@ pub fn gain_xp(w: &mut World, i: usize, exp: i64) {
         let ch = pr(w, i).form_ref(w).char_;
         let fu = if pr(w, i).form_ref(w).fusion { w.story.chars.get(ch as usize).map(|c| c.fusion).unwrap_or(0) } else { 0 };
         if fu != 0 {
-            let mut leveled = None;
-            for c in [(fu & 15) as usize, ((fu >> 4) & 15) as usize] {
-                let growth = w.data.chars.iter().find(|x| x.index == c as i32).map(|x| x.growth);
-                let xt = Arc::clone(&w.data);
-                let Some(cs) = w.story.chars.get_mut(c) else { continue };
-                cs.rec.xp += g;
-                let nl = level_of(cs.rec.xp, &xt.xp_table);
-                if nl > cs.rec.level {
-                    if let Some(gr) = growth {
-                        let old = cs.rec.level;
-                        level_up(&mut cs.rec, &gr, old, nl, &mut w.rng);
+            // 0x08013914: the components one after the other (low nibble first) - add, roll, and on a level the hook
+            // #3 as a nested scene with that component current; the second component's XP comes after that hook
+            // (real run 6-9 r052_006 f13,077: Goten's level rolls, Trunks' three levels after the popup, f13,315)
+            let host = w.field.as_ref().is_some_and(|f| f.host);
+            let comps = [(fu & 15) as i32, ((fu >> 4) & 15) as i32];
+            if std::env::var("FUXP").is_ok() { eprintln!("FUXP char {ch} fu {fu:#x}"); }
+            let mut leveled = false;
+            for (k, &c) in comps.iter().enumerate() {
+                if !component_xp(w, c, g) {
+                    continue;
+                }
+                leveled = true;
+                if host {
+                    if k == 0 {
+                        w.story.fusion_xp_left = Some((comps[1], g));
                     }
-                    cs.rec.level = nl;
-                    leveled = leveled.or(Some(c as i32));
+                    levelup_hook(w, i, c);
+                    return;
                 }
             }
-            // a component levelled: hook #3 runs for it (as the current character), then the fusion re-fuses
-            if let Some(c) = leveled {
-                if w.field.as_ref().is_some_and(|f| f.host) {
-                    w.story.levelup_char = Some(c);
-                    let entity = w.ents[i].id;
-                    w.events.push(crate::world::Event::Field(crate::field::FieldEvent::Run {
-                        run: crate::fieldcontent::Callback::Event("s003".into()),
-                        cause: crate::field::Cause::LevelUp { entity },
-                        slot: pr(w, i).slot,
-                    }));
-                } else {
-                    refuse(w, i);
-                    sfx(w, 36, 64);
-                }
+            // (no script host: both at once, the jingle stands in for the hooks)
+            if leveled {
+                refuse(w, i);
+                sfx(w, 36, 64);
             }
             return;
         }
@@ -1287,9 +1281,45 @@ pub fn fusion_levelup_done(w: &mut World) {
     if w.story.levelup_char.take().is_none() {
         return;
     }
-    if let Some(i) = w.player_idx(0) {
-        refuse(w, i);
+    let Some(i) = w.player_idx(0) else { return };
+    // the second component's turn (its own hook when it levels; the re-fuse after the last hook)
+    if let Some((c, g)) = w.story.fusion_xp_left.take() {
+        if component_xp(w, c, g) {
+            levelup_hook(w, i, c);
+            return;
+        }
     }
+    refuse(w, i);
+}
+
+/// a fusion component's XP gain (its record in the story): true when it levelled (the levels' rolls drawn)
+fn component_xp(w: &mut World, c: i32, g: i64) -> bool {
+    let growth = w.data.chars.iter().find(|x| x.index == c).map(|x| x.growth);
+    let xt = Arc::clone(&w.data);
+    let Some(cs) = w.story.chars.get_mut(c as usize) else { return false };
+    if std::env::var("FUXP").is_ok() { eprintln!("FUXP c {c} xp {} + {g} level {} -> {}", cs.rec.xp, cs.rec.level, level_of(cs.rec.xp + g, &xt.xp_table)); }
+    cs.rec.xp += g;
+    let nl = level_of(cs.rec.xp, &xt.xp_table);
+    if nl <= cs.rec.level {
+        return false;
+    }
+    if let Some(gr) = growth {
+        let old = cs.rec.level;
+        level_up(&mut cs.rec, &gr, old, nl, &mut w.rng);
+    }
+    cs.rec.level = nl;
+    true
+}
+
+/// hook #3 (event s003) for a fusion component that levelled, the component current while it runs
+fn levelup_hook(w: &mut World, i: usize, c: i32) {
+    w.story.levelup_char = Some(c);
+    let entity = w.ents[i].id;
+    w.events.push(crate::world::Event::Field(crate::field::FieldEvent::Run {
+        run: crate::fieldcontent::Callback::Event("s003".into()),
+        cause: crate::field::Cause::LevelUp { entity },
+        slot: pr(w, i).slot,
+    }));
 }
 
 /// `give_xp` (0xC2): the kill-XP routine without the hook (the script native runs hook #3 inline itself); true when
