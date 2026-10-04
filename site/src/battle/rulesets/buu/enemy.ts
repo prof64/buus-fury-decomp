@@ -478,10 +478,12 @@ export class Enemy extends Actor implements EnemyLike {
   }
   inPlayerBeamLine() {
     const p = this.player
-    if (!p || !p.charging()) return false
+    // 0x08029A60: the enemy faces the player (facing === the player's ^ 1), the player charging, and the enemy's body
+    // box overlaps the player's body box stretched 240 px forward (+-4 across; the player's own box included)
+    if (!p || !p.charging() || this.facing !== (p.facing ^ 1)) return false
     const pb = p.bodyBox()
-    const [dx, dy] = DIR_VEC[p.facing]
-    const cor: Rect = dx > 0 ? { x0: pb.x1, y0: pb.y0 - 4, x1: pb.x1 + 240, y1: pb.y1 + 4 } : dx < 0 ? { x0: pb.x0 - 240, y0: pb.y0 - 4, x1: pb.x0, y1: pb.y1 + 4 } : dy > 0 ? { x0: pb.x0 - 4, y0: pb.y1, x1: pb.x1 + 4, y1: pb.y1 + 240 } : { x0: pb.x0 - 4, y0: pb.y0 - 240, x1: pb.x1 + 4, y1: pb.y0 }
+    const f = p.facing
+    const cor: Rect = f === 0 ? { x0: pb.x0 - 4, y0: pb.y0, x1: pb.x1 + 4, y1: pb.y1 + 240 } : f === 1 ? { x0: pb.x0 - 4, y0: pb.y0 - 240, x1: pb.x1 + 4, y1: pb.y1 } : f === 2 ? { x0: pb.x0 - 240, y0: pb.y0 - 4, x1: pb.x1, y1: pb.y1 + 4 } : { x0: pb.x0, y0: pb.y0 - 4, x1: pb.x1 + 240, y1: pb.y1 + 4 }
     return overlaps(cor, this.bodyBox())
   }
   blastIncoming() {

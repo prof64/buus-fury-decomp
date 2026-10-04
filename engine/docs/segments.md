@@ -925,6 +925,16 @@ are. The step bytecode comes from the content's `scripts/bytecode.json` (the seg
 `wf_import::host::set_step_code`). Cut with `tools/dungeons/midcuts2.sh SRC.json OUTDIR PREFIX LEN F...` (unique
 names, states kept for the python tools).
 
+**The every-N board (ship agent, 2026-10-04)**: `scoreboard.py mid cut 1000 [JOBS] [SEG ...]` re-records every
+area-entry segment that loses more than 1,000 frames from its start state and cuts it into 1,000-frame tiles
+(local, `work/real/mid/`); `scoreboard.py mid [JOBS]` replays each tile on its own (10 min limit: a hang is
+reported, not waited on) -> `engine/docs/scoreboard-mid.md` + `data/realrun/scoreboard_mid.json`: per frame of the
+run, **verified exact** (an exact segment, a segment's matched prefix or a tile's), **diverged**, or **not covered**
+(before the run's first importable entry, or a refused tile), per chapter, the refusals by reason, and every tile's
+divergence. The main board (`scoreboard.py`) then lists the top divergences inside tiles per chapter owner and the
+tiles that differ at their first frame (import gaps) for the importer. Order after an engine change: `scoreboard.py`
+(writes the segment list the tiles come from), `scoreboard.py mid`, `scoreboard.py` again.
+
 **Chapter cuts (A, 2026-10-04)** - per-cut first divergences for the owning agents (600-frame cuts, sprite-memory
 check off; "import" = a gap of the any-frame import, mine; the rest are rules for the owner). Local dirs under
 `work/db/` (e73, sb206, sb205, sb69, pyr).
@@ -1663,15 +1673,21 @@ two Python hash seeds, gives identical key logs (13,000 frames); the earlier run
 * Lighthouse Keeper (s347, Thieves Den 9-9, legs `shopt` -> `trade`): the Hercule City Z-Mart's Root Beer,
   Turkey, Hercule-ade, Elixir -> four trades, four Hercule Exhibits (52, 60, 51, 56; flags 363 .. 366): the 9-9 cut
   (2,561 frames, all four trades) exact; gates `pg_trade_000_03_01` (970), `pg_trade_009_09_09` (563, allocator).
-  The last two (Dinosaur Tail 9, Super Elixir 18) are sold only at 9-11's Z-Mart (0-95): its doorway is held by a
-  guard (s355, NPC at (264, 80) after flag 82) who steps aside only when the leader wears the Bandana
-  (`is_equipped(126)`); also 860 zenie short (10,390 left, 11,250 needed). The real post-game state owns no Bandana
-  (owned equipment, GameData +0xE4 count / +0xE8 list, top nibble = wearer mark: Cotton Gi, Dirty Gi, Super Cape;
-  nobody wears anything) - the monkey took it (s362, `take_equipment(126)`). Its only source: the Airship Bandits
-  of the world-map airship encounter 0-55 (`inline_0x08073EFC`: `chance(25)` -> `drop_equipment(126)`, flag 76);
-  the airships are used up by flags 388 .. 392, which the XJ-6 entry script clears again (`set_flag_bits(388, 5,
-  0)`). Next: a world-map patrol-fight leg until a Bandana drops (also earns the zenie), then Equip (pause, R R,
-  accessories) and 9-11.
+  The last two (Dinosaur Tail 9, Super Elixir 18): 9-11's Z-Mart (0-95) is out of reach in the real post-game - its
+  doorway guard (s355) wants the leader wearing the Bandana, the party owns none (owned equipment, GameData +0xE4
+  count / +0xE8 list: Cotton Gi, Dirty Gi, Super Cape; the monkey took the Bandana, s362), and its only source, the
+  Airship Bandits of the world-map encounter 0-55 (25% drop), spawn only for a leader of level <= 70 (s508; the
+  party's lowest is Trunks 91). The Planet of the Kais Z-Mart has both: legs `kais` (Thieves Den 9-1's take-off
+  pad, Kami's Lookout 6-14's pad, the Other World map: two LEFT from Earth = the Planet of the Kais, 19-1 -> 19-5;
+  19-5's gate is an A at (163, 89) facing up, then up through the door to 0-94), `kaisbuy` (Sell: the first row, a
+  Curry Plate for 1,000, then Buy - rows 3 Dinosaur Tail, 6 Super Elixir), `trade2` (19-1's pad, the Other World
+  map two RIGHT = Earth (6-14), 6-14's exit at (114, 208) down, 6-1's take-off pad (A at (312, 560)), Thieves Den,
+  the last two trades: flags 367, 368). **All six trades done**, six Hercule Exhibits. 31 / 34 cuts exact (the
+  Other World map arrivals import now); open: a world-map landing camera (importer) and `pg_kaisbuy_000` f518, the
+  Sell's purchase a frame early in ours (menu timing). Gates `pg_kais_015_19_05` (163), `pg_trade2_016_09_09`
+  (213, allocator).
+* The shop row byte is not at a fixed heap address: it is [0x03000F90] + 0x114 (the list object, found through that
+  word in both Z-Marts); `zbuy` reads it there.
 * Instant Transmission picks (shared rule): a trigger answers the pick when its activation's vt+8 says "A pressed" -
   the 0x0802266F activation and the plain A-button one (0x0800770D, vt+8 0x080076F5: the same code). HFIL 18-10's
   centre switch is an A-button trigger: the real route's maze IT (`r040_021_18-10`) picked it, ours went idle. The

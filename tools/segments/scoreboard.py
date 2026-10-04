@@ -218,6 +218,56 @@ def replay_one(d):
     return d.name, rows, r.returncode
 
 
+def mid_section(top=5):
+    """the every-N board's divergences (data/realrun/scoreboard_mid.json, `scoreboard.py mid`) per chapter, with
+    their owners: each tile divergence is a separate cause, weighed by the frames it leaves unverified up to the next
+    cut"""
+    p = DATA / 'scoreboard_mid.json'
+    if not p.exists():
+        return []
+    m = json.loads(p.read_text())
+    n = m['tile']
+    wg = m['total'].get('whole_game')
+    L = ['', '## Where long segments really diverge (every-N board)', '',
+         f'From `engine/docs/scoreboard-mid.md` (tree `{m["tree"]}`, tiles of {n:,} frames'
+         + (f'; the whole run {100.0 * wg["verified"] / wg["frames"]:.1f}% verified exact' if wg else '') + '). Each',
+         'divergence below is where a tile (a cut inside a long segment) first differs; "lost" = its frames up to the next',
+         'cut. A divergence at a tile\'s frame 0 is usually the any-frame import, not the game rule - say so to the importer',
+         'agent.', '']
+    by, imp = {}, {}
+    for sg in m['segments']:
+        for k, cat, t in sg['spots']:
+            if cat == 'refused':
+                continue
+            lost = min(sg['frames'], (k // n + 1) * n) - k
+            if k % n == 0:
+                # at the tile's own first frame: what the import rebuilt differs from RAM (not a game rule)
+                kind = re.sub(r'#\d+ |[-\d.]+', '', t.split('"', 2)[1] if '"' in t else t)[:40].strip(' :,()')
+                w = imp.setdefault((cat, kind), [0, 0, set()])
+                w[0] += 1
+                w[1] += lost
+                w[2].add(sg['chapter'])
+                continue
+            by.setdefault(sg['chapter'], []).append((lost, sg['segment'], k, cat, t))
+    for ch in ('opening', 'earth', 'ship', 'fat', 'janemba', 'superbuu'):
+        if ch not in by:
+            continue
+        items = sorted(by[ch], key=lambda x: (-x[0], x[1], x[2]))
+        L.append(f"**{ch}** ({CHAPTER_OWNER.get(ch, '')}) - {len(items)} divergences inside tiles, "
+                 f"{sum(x[0] for x in items):,} frames")
+        L.append('')
+        for lost, seg, k, cat, t in items[:top]:
+            o = owner_of(ch, cat)
+            L.append(f"* `{seg}` frame {k:,} ({cat}{'' if o == CHAPTER_OWNER.get(ch) else ', ' + o}): {lost:,} lost - {t[:120]}")
+        L.append('')
+    if imp:
+        L += ['**importer** (any-frame import) - tiles that differ at their first frame, by kind:', '']
+        for (cat, kind), (c, f, chs) in sorted(imp.items(), key=lambda x: -x[1][1])[:10]:
+            L.append(f"* {cat} `{kind}`: {c} tiles, {f:,} frames ({', '.join(sorted(chs))})")
+        L.append('')
+    return L
+
+
 def board(jobs):
     build()
     cuts = json.loads((REAL / 'cuts.json').read_text())
@@ -289,6 +339,7 @@ def board(jobs):
             note = NOTES.get(r['segment'])
             L.append(f"* `{r['segment']}` ({name}, {cat}): {lost:,} lost - {r['first'][:120]}" + (f' **Known:** {note}' if note else ''))
         L.append('')
+    L += mid_section()
     L += ['', '## Biggest losses (unmatched frames)', '', '| segment | stretch | category | lost | first divergence |',
           '|---|---|---|---|---|']
     for c, name, r, cat in sorted(bad, key=lambda b: -(b[2]['frames'] - b[2]['matched']))[:15]:
@@ -352,6 +403,20 @@ def mid_cut_one(job):
     k, made, bad = n, 0, None
     while k + n // 4 < len(frames):
         m = min(n, len(frames) - k)
+        # a tile that would start inside a menu screen (no leader: the field is torn down while the page shows) starts
+        # at the first frame the field is back and lit (the import cannot rebuild a saved world; the skipped frames
+        # stay not covered - dungeon agent A, scoreboard-mid "on-enter script is still blocked")
+        if not frames[k].get('p'):
+            j = k
+            while j < k + m and not (frames[j].get('p') and (frames[j].get('io') or [1] * 6)[5] != 0):
+                e.set_keys(frames[j]['keys'])
+                e.run(1)
+                j += 1
+            if j >= k + m:
+                k += m
+                continue
+            m -= j - k
+            k = j
         init, objs, rows = sg.record(e, lambda j, _e: frames[k + j]['keys'], m)
         for j, r in enumerate(rows):
             f = frames[k + j]

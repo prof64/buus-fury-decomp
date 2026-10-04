@@ -463,7 +463,13 @@ fn cond(w: &mut World, c: &C, n: u16) -> bool {
             let p = par(c, n, P::Prob, 0);
             w.rng.chance(p)
         }
-        K::IfPlayerWithin | K::IfPlayerWithin2 => en::dist2(w, i) <= par(c, n, P::R2, 0),
+        K::IfPlayerWithin | K::IfPlayerWithin2 => {
+            if std::env::var_os("T_DIST").is_some() {
+                let pi = en::player(w, i);
+                eprintln!("  t-dist frame {} en {} d2 {} r2 {} to {:?} pfoot {:?} efoot {:?}", w.frame, i, en::dist2(w, i), par(c, n, P::R2, 0), en::to_player(w, i), pi.map(|p| w.pl_ref(p).a.foot_box()), w.en_ref(i).a.foot_box());
+            }
+            en::dist2(w, i) <= par(c, n, P::R2, 0)
+        }
         K::IfPlayerFarther => en::player(w, i).is_some() && en::dist2(w, i) > par(c, n, P::R2, 0),
         K::IfPlayerInMeleeRange => en::in_melee_range(w, i),
         K::IfPlayerAttackingMe => en::player_attacking_me(w, i),
@@ -1162,6 +1168,7 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
                 let h = w.data.anim.hold;
                 set_anim_r(w, i, &[an(if kind(c, n) == K::BuuStretchPunch { 19 } else { 18 })], true, h);
             }
+            r.d[6] = w.en_ref(i).anim_seq as i32;
         }
         K::AbsorbStance => set_anim(w, i, &[an(20)], true, Some(false)),
         K::AbsorbPose | K::AbsorbPose2 => set_anim(w, i, &[an(20)], true, Some(false)),
@@ -2512,6 +2519,11 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             if r.d[0] == 0 {
                 return true;
             }
+            // field: the beam is the work of the animation's controller (0x0300304C); a hit's hurt state replaced it
+            // meanwhile - the node is over (segment sb 6-6 f18331, like the shot nodes)
+            if w.field.is_some() && f < 32 && r.d[6] != w.en_ref(i).anim_seq as i32 {
+                return true;
+            }
             if f < 32 {
                 w.en(i).ea.pos.frame = f >> 3;
                 if f == 16 {
@@ -2807,10 +2819,9 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         K::HandSink => {
             // update 0x0803B30E: unless the hand still shows its ambush strike (the object's current animation =
             // its def's animation table entry 0x54 / 4) the node is done at once - no sink. Real route 18-1
-            // (r037_084): a hand hit by a ki blast while it rose stays in the hit's hold state; its state 0x117
-            // lasts the Wait alone (182 frames, not 287)
-            if std::env::var("DBG_SINK").is_ok() && f == 1 { eprintln!("HANDSINK raw {} own {} hook {:?}", w.en_ref(i).ea.pos.raw, w.en_ref(i).own_state, w.en_ref(i).hook); }
-            if w.field.is_some() && f == 1 && w.en_ref(i).ea.pos.raw != 18 {
+            // (r037_084): a hand hit by a ki blast while it rose stays in the hit's hold state (looping, stunned);
+            // its state 0x117 lasts the Wait alone (182 frames, not 287). Ours: the strike is the one-shot
+            if w.field.is_some() && f == 1 && w.en_ref(i).a.anim_loop != Some(false) {
                 return true;
             }
             w.en(i).a.alpha = (256 - f * 256 / 107).max(51);

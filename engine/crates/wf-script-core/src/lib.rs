@@ -374,6 +374,10 @@ pub fn begin_event(w: &mut World) {
     if w.scene.depth == 0 && w.field.as_ref().is_some_and(|f| f.host && !f.busy) {
         wf_core::fieldnpc::start_event(w);
     }
+    if std::env::var("TMPDBG").is_ok() {
+        let v: Vec<String> = w.ents.iter().filter_map(|e| match &e.body { wf_core::world::Body::Npc(n) => Some(format!("{}:{} beh {:?} puppet {} anim {:?}", e.id, n.sprite_id, n.behaviour.as_ref().map(|b| b.anim), scene::is_puppet(w, e.id), (n.anim.raw, n.anim.mode.clone()))), _ => None }).collect();
+        eprintln!("TMPDBG begin f{} depth {} busy {:?} | {}", w.frame, w.scene.depth, w.field.as_ref().map(|f| f.busy), v.join(" ; "));
+    }
     w.scene.depth += 1;
     // the field holds still while an event runs: no triggers / talk, map NPCs freeze (their animations tick)
     wf_core::field::set_busy(w, true);

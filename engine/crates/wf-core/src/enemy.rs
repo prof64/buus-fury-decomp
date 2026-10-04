@@ -870,13 +870,21 @@ fn corridor(b: &Rect, dir: Dir) -> Rect {
 pub fn in_player_beam_line(w: &World, i: usize) -> bool {
     let Some(pi) = player(w, i) else { return false };
     let p = w.pl_ref(pi);
-    if std::env::var_os("T_BEAM").is_some() {
-        eprintln!("  t-beam frame {} en {} charging {} gs {:?} tick {} facing {} pbox {:?} ebox {:?} corr {:?}", w.frame, i, p.charging(), p.gs, p.ap.tick, p.a.facing, p.a.body_box(), w.en_ref(i).a.body_box(), corridor(&p.a.body_box(), p.a.facing));
-    }
-    if !p.charging() {
+    // `0x08029A60`: the enemy faces the player (facing == the player's ^ 1), the player's state says charging
+    // (vfunc +0x1C), and the enemy's body box overlaps the player's body box stretched 240 px forward (+-4 px
+    // across; the player's own box included). VERIFIED segment sb 6-6 f18183: Super Buu facing up beside a
+    // Gotenks charging to the left does not dodge
+    if !p.charging() || w.en_ref(i).a.facing != (p.a.facing ^ 1) {
         return false;
     }
-    overlaps(&corridor(&p.a.body_box(), p.a.facing), &w.en_ref(i).a.body_box())
+    let b = p.a.body_box();
+    let r = match p.a.facing {
+        0 => Rect::new(b.x0 - 4, b.y0, b.x1 + 4, b.y1 + 240),
+        1 => Rect::new(b.x0 - 4, b.y0 - 240, b.x1 + 4, b.y1),
+        2 => Rect::new(b.x0 - 240, b.y0 - 4, b.x1, b.y1 + 4),
+        _ => Rect::new(b.x0, b.y0 - 4, b.x1 + 240, b.y1 + 4),
+    };
+    overlaps(&r, &w.en_ref(i).a.body_box())
 }
 pub fn blast_incoming(w: &World, i: usize) -> bool {
     let Some(pi) = player(w, i) else { return false };

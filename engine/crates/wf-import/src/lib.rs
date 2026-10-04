@@ -925,6 +925,12 @@ fn build_mid(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner: &mut St
     if !other.is_empty() {
         notes.push(format!("mid-area: objects of classes {:x?} are not imported", other));
     }
+    // the field's mode with the screen still black and nothing running: a pause menu's return (the world restored,
+    // the palette fade-in to come - 16 steps; the objects hold still, the cameras ease: menu `Phase::FadeIn`)
+    if ram.screen_black == Some(true) {
+        w.menu = wf_core::menu::Menu { phase: wf_core::menu::Phase::FadeIn { level: 256 }, tr: wf_core::menu::PAUSE, ..Default::default() };
+        notes.push("mid-area: a menu's return (black, fading in)".into());
+    }
     let _ = runner;
     let draws = w.rng.calls.wrapping_sub(calls0);
     Built { world: w, draws, held: 0, finished: true }

@@ -15,32 +15,32 @@
   },
   "fat": {
    "cats": {
-    "RNG": 3,
+    "RNG": 2,
     "animation": 1,
     "camera": 3,
-    "position / facing": 1
+    "screen fade": 1
    },
    "cut_frames": 380206,
-   "exact": 363,
+   "exact": 364,
    "frames": 380206,
-   "matched": 344101,
+   "matched": 345353,
    "run_frames": 388646,
    "segments": 371,
    "stretches": 33
   },
   "janemba": {
    "cats": {
-    "RNG": 2,
+    "RNG": 6,
     "camera": 1,
     "menu timing": 1,
     "object set": 1,
-    "position / facing": 1,
+    "position / facing": 2,
     "sound": 1
    },
    "cut_frames": 187291,
-   "exact": 248,
+   "exact": 243,
    "frames": 187291,
-   "matched": 183067,
+   "matched": 174290,
    "run_frames": 199703,
    "segments": 255,
    "stretches": 16
@@ -67,15 +67,15 @@
   },
   "superbuu": {
    "cats": {
-    "RNG": 15,
+    "RNG": 17,
     "camera": 3,
-    "position / facing": 25,
+    "position / facing": 13,
     "sound": 1
    },
    "cut_frames": 467701,
-   "exact": 404,
+   "exact": 414,
    "frames": 467701,
-   "matched": 329054,
+   "matched": 337135,
    "run_frames": 478729,
    "segments": 448,
    "stretches": 22
@@ -84,12 +84,12 @@
  "dirty": true,
  "total": {
   "cut_frames": 1622756,
-  "exact": 1458,
+  "exact": 1464,
   "frames": 1622756,
-  "matched": 1436953,
+  "matched": 1437509,
   "run_frames": 1668050,
   "segments": 1519,
   "stretches": 75
  },
- "tree": "fb96f39"
+ "tree": "e53f369"
 }
