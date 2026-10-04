@@ -3,9 +3,9 @@
   "exit": {
    "after the load": 0,
    "before the load": 0,
-   "exact": 1516,
+   "exact": 1517,
    "load": 0,
-   "loads": 1516
+   "loads": 1517
   }
  },
  "loads": [
@@ -19254,6 +19254,26 @@
    "first": "",
    "from": [
     18,
+    13,
+    1
+   ],
+   "gap": 18,
+   "kind": "exit",
+   "logic_gap": 2,
+   "off": null,
+   "result": "exact",
+   "segment": "r047_002_18-13",
+   "to": [
+    18,
+    14,
+    1
+   ]
+  },
+  {
+   "at": null,
+   "first": "",
+   "from": [
+    18,
     14,
     1
    ],
@@ -30333,9 +30353,9 @@
  "total": {
   "after the load": 0,
   "before the load": 0,
-  "exact": 1516,
+  "exact": 1517,
   "load": 0,
-  "loads": 1516
+  "loads": 1517
  },
- "tree": "836475d"
+ "tree": "a4aadbc"
 }

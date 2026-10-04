@@ -1,6 +1,6 @@
 # Parity scoreboard: the real playthrough on wf-core
 
-Tree: `943752f` + uncommitted engine changes. Regenerate: `.venv/bin/python tools/segments/scoreboard.py`
+Tree: `a4aadbc` + uncommitted engine changes. Regenerate: `.venv/bin/python tools/segments/scoreboard.py`
 (the cuts: `scoreboard.py cut`, local under `work/real/`; the run itself: `tools/segments/realrun.py`, §"How to replay
 the real run" in `engine/docs/segments.md`). A segment = the real game from one importable area entry (an exit
 arrival with nothing running) to the next; an entry by a script warp / in a cutscene is not a cut - its frames
@@ -18,9 +18,9 @@ frames are counted where its segments start.
 | superbuu | Super Buu agent | 478,729 | 11,028 | 448 | 447 | 467,701 | 443,700 | 94.9 |
 | **all** |  | 1,668,052 | 45,293 | 1519 | 1518 | 1,622,759 | 1,598,758 | 98.5 |
 
-**Whole run, no imports, no lag frames (the target: one step per game logic iteration): exact to frame 848,743** of 1,668,052 recorded (017_db6_fukurou; first divergence: flags: flag 187 app only). Tree `fb38f36`, `tools/wholerun/board.py`.
+**Whole run, no imports, no lag frames (the target: one step per game logic iteration): exact to frame 1,339,017** of 1,668,052 recorded (062_m_inside_buu; first divergence: rng: app [b460ebed, 721626b0] game [699cd8d3, d8087ea9]). Tree `9fb67ca`, `tools/wholerun/board.py`.
 
-**Whole run, no imports, recorded lag injected (alignment check): exact to frame 848,743** of 1,668,052 recorded (017_db6_fukurou; first divergence: flags: flag 187 app only). Tree `fb38f36`, `tools/wholerun/board.py`.
+**Whole run, no imports, recorded lag injected (alignment check): exact to frame 1,339,017** of 1,668,052 recorded (062_m_inside_buu; first divergence: rng: app [b460ebed, 721626b0] game [699cd8d3, d8087ea9]). Tree `9fb67ca`, `tools/wholerun/board.py`.
 
 ## Whole run with resync: every stop, per owner
 
@@ -68,14 +68,10 @@ The five biggest losses each owner can take (unmatched frames; the full list bel
 
 ## Where long segments really diverge (every-N board)
 
-From `engine/docs/scoreboard-mid.md` (tree `836475d`, tiles of 1,000 frames; the whole run 96.9% verified exact). Each
+From `engine/docs/scoreboard-mid.md` (tree `a4aadbc`, tiles of 1,000 frames; the whole run 96.9% verified exact). Each
 divergence below is where a tile (a cut inside a long segment) first differs; "lost" = its frames up to the next
 cut. A divergence at a tile's frame 0 is usually the any-frame import, not the game rule - say so to the importer
 agent.
-
-**janemba** (side-content agent) - 1 divergences inside tiles, 760 frames
-
-* `r047_002_18-13` frame 1,240 (animation): 760 lost - Some((240, "anim: #3 sprite 280: raw 1 cel 0 vs game raw 2 cel 0 tick 0"))
 
 **superbuu** (Super Buu agent) - 16 divergences inside tiles, 12,485 frames
 

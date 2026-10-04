@@ -1,16 +1,5 @@
 {
  "chapters": {
-  "janemba": {
-   "diverged": 1220,
-   "exact_tiles": 1,
-   "frames": 2802,
-   "own": 1349,
-   "refused": 0,
-   "segments": 1,
-   "tiles": 2,
-   "uncovered": 0,
-   "verified": 1582
-  },
   "superbuu": {
    "diverged": 12662,
    "exact_tiles": 9,
@@ -24,29 +13,6 @@
   }
  },
  "segments": [
-  {
-   "chapter": "janemba",
-   "diverged": 1220,
-   "exact_tiles": 1,
-   "frames": 2802,
-   "own": 1349,
-   "own_first": "Some((1470, \"fade: black false vs game true\"))",
-   "refused": 0,
-   "segment": "r047_002_18-13",
-   "spots": [
-    [
-     1240,
-     "animation",
-     "Some((240, \"anim: #3 sprite 280: raw 1 cel 0 vs game raw 2 cel 0 tick 0\"))",
-     1000,
-     2000
-    ]
-   ],
-   "stretch": "047_h_h13",
-   "tiles": 2,
-   "uncovered": 0,
-   "verified": 1582
-  },
   {
    "chapter": "superbuu",
    "diverged": 12662,
@@ -178,21 +144,21 @@
  ],
  "tile": 1000,
  "total": {
-  "diverged": 13882,
-  "exact_tiles": 10,
-  "frames": 28979,
-  "own": 3525,
+  "diverged": 12662,
+  "exact_tiles": 9,
+  "frames": 26177,
+  "own": 2176,
   "refused": 0,
-  "segments": 2,
-  "tiles": 27,
+  "segments": 1,
+  "tiles": 25,
   "uncovered": 0,
-  "verified": 15097,
+  "verified": 13515,
   "whole_game": {
-   "diverged": 13882,
+   "diverged": 12662,
    "frames": 1668052,
    "uncovered": 38481,
-   "verified": 1615689
+   "verified": 1616909
   }
  },
- "tree": "836475d"
+ "tree": "a4aadbc"
 }

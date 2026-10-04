@@ -1,6 +1,6 @@
 # Parity scoreboard, every-N-frames cuts
 
-Tree: `836475d`. Tiles of 1,000 frames. Regenerate: `scoreboard.py` (the area-entry board, which lists the
+Tree: `a4aadbc`. Tiles of 1,000 frames. Regenerate: `scoreboard.py` (the area-entry board, which lists the
 segments), `scoreboard.py mid cut 1000` (local, under `work/real/mid/`), `scoreboard.py mid`.
 
 Every area-entry segment that loses more than 1,000 frames on the main board, cut again at its frame 1,000,
@@ -10,9 +10,8 @@ tile's first divergence; **not covered** when its tile was refused by the import
 
 | chapter | segments | frames | exact on the main board | verified exact | diverged | not covered | tiles | exact tiles | refused |
 |---|---|---|---|---|---|---|---|---|---|
-| janemba | 1 | 2,802 | 1,349 (48.1%) | 1,582 (56.5%) | 1,220 | 0 | 2 | 1 | 0 |
 | superbuu | 1 | 26,177 | 2,176 (8.3%) | 13,515 (51.6%) | 12,662 | 0 | 25 | 9 | 0 |
-| **all** | 2 | 28,979 | 3,525 (12.2%) | 15,097 (52.1%) | 13,882 | 0 | 27 | 10 | 0 |
+| **all** | 1 | 26,177 | 2,176 (8.3%) | 13,515 (51.6%) | 12,662 | 0 | 25 | 9 | 0 |
 
 ## The whole game
 
@@ -27,19 +26,14 @@ story playthrough test (same keys from power-on, every row compared, no import: 
 | earth | 160,503 | 157,565 (98.2%) | 0 | 2,938 (1.8%) |
 | ship | 398,194 | 395,616 (99.4%) | 0 | 2,578 (0.6%) |
 | fat | 388,648 | 380,209 (97.8%) | 0 | 8,439 (2.2%) |
-| janemba | 199,703 | 186,071 (93.2%) | 1,220 | 12,412 (6.2%) |
+| janemba | 199,703 | 187,291 (93.8%) | 0 | 12,412 (6.2%) |
 | superbuu | 478,729 | 455,039 (95.1%) | 12,662 | 11,028 (2.3%) |
-| **all** | 1,668,052 | 1,615,689 (96.9%) | 13,882 | 38,481 (2.3%) |
+| **all** | 1,668,052 | 1,616,909 (96.9%) | 12,662 | 38,481 (2.3%) |
 
 ## Per segment: where it really diverges
 
 segment: main-board matched / frames (its first divergence) -> verified / diverged / not covered; then each
 tile divergence (segment frame: category) - a tile that diverges is a separate cause from the one before it
-
-### janemba
-
-* `r047_002_18-13` (047_h_h13): 1,349 / 2,802 (Some((1470, "fade: black false vs game true"))) -> **1,582** / 1,220 / 0; 1 / 2 tiles exact
-  * 1,240: animation - Some((240, "anim: #3 sprite 280: raw 1 cel 0 vs game raw 2 cel 0 tick 0"))
 
 ### superbuu
 
