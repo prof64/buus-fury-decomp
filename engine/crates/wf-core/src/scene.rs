@@ -981,9 +981,9 @@ pub struct Dialog {
     /// a message window (kind 3) that fades in / out ([`window_fades`], decided when it opens)
     #[serde(default)]
     pub fades: bool,
-    /// `t` when the current page finished typing (the choice cursor's age after it)
+    /// `t` at the current page's first typed character (a choice page's cursor object is made then)
     #[serde(default)]
-    pub typed_t: i32,
+    pub page_t: i32,
 }
 
 /// the first character appears this many frames after the box is created; the event continues this many frames
@@ -2917,7 +2917,7 @@ pub fn open_text(w: &mut World, text: &str, text_ref: u32, portrait: u8, kind: u
         result: None,
         portrait_left,
         fades: false,
-        typed_t: 0,
+        page_t: 0,
     });
     if kind == 3 {
         let f = window_fades(w);
@@ -3037,6 +3037,7 @@ fn tick_dialog(w: &mut World) {
             if d.t >= DIALOG_OPEN {
                 d.phase = DialogPhase::Shown;
                 d.typed = 1.min(need);
+                d.page_t = d.t;
                 // a choice box's cursor object (`0x080178C8`, 0x100 tiles) appears with the text
                 if d.options > 0 {
                     crate::vram::acquire(w, crate::vram::Owner::Cursor, 0x100);
@@ -3046,13 +3047,11 @@ fn tick_dialog(w: &mut World) {
         DialogPhase::Shown => {
             if d.typed < need {
                 d.typed += 1;
-                if d.typed == need {
-                    d.typed_t = d.t;
-                }
             } else if k & A != 0 {
                 if d.page + 1 < d.pages {
                     d.page += 1;
                     d.typed = 0;
+                    d.page_t = d.t + 1;
                 } else {
                     d.result = Some(if d.options > 0 { d.cursor } else { 0 });
                     d.phase = DialogPhase::Closing;

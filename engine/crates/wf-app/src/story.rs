@@ -42,6 +42,15 @@ pub struct StorySim {
     steps: u64,
 }
 
+/// [`StorySim::save_mem`]'s state
+#[derive(Clone)]
+pub struct StoryState {
+    pub session: wf_core::session::Snapshot,
+    pub host: wf_import::HostSnapshot,
+    pub prev: [u16; MAX_PLAYERS],
+    pub steps: u64,
+}
+
 /// `areas.json` key `"W-A"` -> (world, area)
 pub fn parse_area(s: &str) -> Option<(i32, i32)> {
     let (w, a) = s.split_once('-')?;
@@ -73,6 +82,19 @@ impl StorySim {
         // the app recreates no hardware slowdown: one step per game logic iteration (`Options::no_lag`)
         session.world.opts.no_lag = true;
         Self::with_session(packs, session)
+    }
+
+    /// The in-process snapshot (rollback netcode, rewind): the session, the script host's between-frames state, the
+    /// input edges and the step count - `Sim::snapshot` is its byte form.
+    pub fn save_mem(&self) -> StoryState {
+        StoryState { session: self.session.snapshot(), host: self.host.snapshot(), prev: self.prev, steps: self.steps }
+    }
+    pub fn load_mem(&mut self, s: &StoryState) {
+        self.session.restore(&s.session);
+        self.host.restore(&s.host);
+        self.prev = s.prev;
+        self.steps = s.steps;
+        self.init_events.clear();
     }
 
     /// The session started mid-area (harnesses): no area banner for the current area.

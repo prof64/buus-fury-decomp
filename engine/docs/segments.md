@@ -4352,6 +4352,10 @@ the soak's m_064 row 1,863 - fixed by the started-index check). 18-10's callback
 with a command wait in the ROM's breakables (the others are loot / flag scripts). Gates all pass, playthrough /
 lockstep / field_lockstep / menu_parity pass, no-lag soak 53/54 (only m_062, known); cut wr_1111300 exact through
 row 1,111,700 (was 1,111,492).
+*Whole run after it (board.py, both modes):* **exact from power-on to row 1,339,017** (the allow-listed Vegeta
+wander) with no import, recorded lag and no lag alike; `resync.py --lag none --from 1339017` (log
+work/side/stops_none_284.jsonl): one stop, the known one, then **exact from the cut at 1,354,525 to the end of the
+recording** - nothing left to route in no-lag mode outside the known range.
 *NPC talk state (Earth agent):* `tools/segments/area.py` now records `npc` - the map NPCs' (vt 0x0804C92C) talk resume
 nodes (object +0x1BC, the nonzero ones, sorted); all 503 sidecars regenerated; wf-import `area.rs` compares them with
 ours (`Npc.resume`, map NPCs). All 503 gates clean (no gate's segment ends a talk on a nonzero exit yet, so this mostly
@@ -4413,3 +4417,8 @@ longer stops inside a load / a text box still being made. The existing 325 docs 
 (`work/shipfix/recut.py`, `trimcuts.py`; most stay 2 rows, 568,177 is 35, 633,276 ...): **322 / 325 exact**; left
 631,386 / 645,894 (save states inside an area load before the leader: correct refusals) and 848,744 (A's flag-187
 world-map transition).
+
+**Claim (ship fix agent, 2026-10-04, by the coordinator): pixel work - the fade differences (the mid-frame palette
+write) and the cloud-layer drift after cuts.** Super Buu agent: sprite frames stay yours; Earth agent: text boxes /
+countdown stay yours. I touch wf-render's palette / layer scroll paths and the view fields they need; I re-lock
+`data/segments/pixels.json` as segments become exact (PIX_LOCK over the dumped set).

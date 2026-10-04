@@ -573,14 +573,18 @@ impl Ui {
 
     /// The choice cursor's place for option `sel` of the page (the pen (x, y) of that option's line in the box
     /// picture: the spots the text object records, `0x0800AFF2`); `None` without that many options
-    /// - once the page has typed in (`typed` visible characters so far; `None` = all)
+    /// - once the typing has reached that option's line (`typed` visible characters so far; `None` = all): the
+    /// spot is recorded as the line starts typing (emulator: shipr_227 7-2, the cursor hidden while the line above
+    /// still types)
     pub fn dialog_cursor_spot(&self, dv: &DialogView, sel: u8, typed: Option<u32>) -> Option<(i32, i32)> {
         let (_, lines) = self.dialog_layout(dv)?;
-        let total: u32 = lines.iter().map(|l| (l.0.len() - 2 * l.0.iter().filter(|&&c| c == 8).count()) as u32).sum();
-        if typed.is_some_and(|t| t < total) {
+        let vis = |l: &Vec<u16>| (l.len() - 2 * l.iter().filter(|&&c| c == 8).count()) as u32;
+        let k = lines.iter().enumerate().filter(|(_, l)| l.3).nth(sel as usize)?.0;
+        let before: u32 = lines[..k].iter().map(|l| vis(&l.0)).sum();
+        if typed.is_some_and(|t| t <= before) {
             return None;
         }
-        lines.iter().filter(|l| l.3).nth(sel as usize).map(|l| (l.1, l.2))
+        Some((lines[k].1, lines[k].2))
     }
 
     /// The choice cursor (`ui/images/cursor.png`, 16x16, `0x080178C8`) as ARGB

@@ -423,7 +423,7 @@ impl Renderer {
                         // its creation - the typing reaching the first option line (`DialogAnim::cursor_draws`)
                         let off: u32 = std::env::var("T_CURK").ok().and_then(|v| v.parse().ok()).unwrap_or(0);
                         let shown = anim.cursor_draws.is_some_and(|n| (n + off) & 8 == 0);
-                        if let (Some((cx, cy)), Some(cur), true) = (u.dialog_cursor_spot(dv, sel, None), u.cursor(), shown) {
+                        if let (Some((cx, cy)), Some(cur), true) = (u.dialog_cursor_spot(dv, sel, anim.typed), u.cursor(), shown) {
                             screen.push((ui::DIALOG_PRIORITY, box_x + cx - 16, y + cy - 12, 16, 16, cur));
                         }
                     }

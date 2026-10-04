@@ -473,29 +473,10 @@ pub fn dialog_anim(w: &World) -> Option<wf_view::DialogAnim> {
         P::Closing => (8 - d.t, None),
         P::Closed => return None,
     };
-    // the cursor object's age: made when the typing reaches the first option line (`0x0800AF8A`)
-    let cursor_draws = (d.options > 0 && d.phase == P::Shown).then(|| {
-        let page = d.text.split('\u{b}').nth(d.page as usize).unwrap_or("");
-        let mut s = 0i32;
-        for line in page.split('\n') {
-            if line.starts_with('-') {
-                break;
-            }
-            let mut n = 0i32;
-            let mut it = line.chars();
-            while let Some(c) = it.next() {
-                if c == '\u{8}' {
-                    it.next();
-                } else {
-                    n += 1;
-                }
-            }
-            s += n;
-        }
-        let need = d.typing.get(d.page as usize).copied().unwrap_or(0) as i32;
-        let age = if d.typed < need { d.typed - s } else { (need - s) + (d.t - d.typed_t) };
-        (age >= 0).then_some(age as u32)
-    }).flatten();
+    // the choice cursor object (`0x080178C8`): the text object makes it with the first typed character of the page
+    // with the options (`0x0800AF8A`, any line - emulator: shipr_227 7-2 row 173, the draw count 1 with the typing
+    // pointer at 1; earth_4_27_2 row 2,285, the second page's first character) and its draw counts +1 a frame
+    let cursor_draws = (d.options > 0 && d.phase == P::Shown).then(|| (d.t - d.page_t + 1).max(0) as u32);
     if scale < 1 {
         return Some(wf_view::DialogAnim { scale: 0xFF, typed, cursor_draws });
     }
