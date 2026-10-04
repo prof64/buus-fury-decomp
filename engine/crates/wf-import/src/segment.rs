@@ -393,7 +393,7 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
     // count of its lag frames still to come, `Session::lag_step`'s `lag_cam`)
     let field_loads = |w: &wf_core::world::World| w.field.as_ref().map(|f| f.loads);
     let mut loads_before = field_loads(&sess.world);
-    let mut load_cam: Option<Option<usize>> = None;
+    let mut load_cam: Option<Option<(usize, (i32, i32))>> = None;
     for (k, fr) in frames.iter().enumerate() {
         let keys = i(&fr["keys"]) as u16;
         let lf = i(&fr["lf"]);
@@ -459,13 +459,23 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
             // an area load's iteration (the last logic frame loaded an area): its world restore ends with a camera
             // update, shown in the iteration's last frame (a frame earlier when the last sound update ran over a
             // VBlank) - `Session::lag_step`'s rule for the sim's own lag (1-5 f11,575: the arrival camera's shake)
+            // (the game's camera makes ONE step in the load's iteration: none here when ours already stepped after the
+            // arrival - Diablo Desert 11-13 f1,640, a cutscene's fade-in warp whose arrival frame ran the camera update -
+            // so the rule only applies to a camera still at the position it had at the iteration's first lag frame)
+            let cam_now = (sess.world.cameras[0].x, sess.world.cameras[0].y);
             let cam_at = *load_cam.get_or_insert_with(|| {
                 let now = field_loads(&sess.world);
-                (now.is_some() && now != loads_before).then_some(sess.world.sound.wrap as usize)
+                (now.is_some() && now != loads_before).then_some((sess.world.sound.wrap as usize, cam_now))
             });
-            if let Some(c) = cam_at {
+            if let Some((c, at)) = cam_at {
                 let left = frames[k + 1..].iter().take_while(|n| i(&n["lf"]) == lf).count();
-                if left == c && sess.world.field.as_ref().is_some_and(|f| f.script_fade_in && matches!(f.mode, wf_core::field::Mode::FadeIn { .. })) {
+                if std::env::var_os("T_CAMDBG").is_some() {
+                    eprintln!("  t-lc f{k} left {left} c {c} cam {:?} at {:?} script_fade_in {:?} mode {:?}", cam_now, at, sess.world.field.as_ref().map(|f| f.script_fade_in), sess.world.field.as_ref().map(|f| f.mode.clone()));
+                }
+                let snapped = cam_now == at && std::env::var_os("T_LCALL").is_none();
+                if left == c && !snapped && false {
+                }
+                if left == c && cam_now == at && sess.world.field.as_ref().is_some_and(|f| f.script_fade_in && matches!(f.mode, wf_core::field::Mode::FadeIn { .. })) {
                     sess.world.tick_shakes();
                     wf_core::field::world_mode_cameras(&mut sess.world);
                 }

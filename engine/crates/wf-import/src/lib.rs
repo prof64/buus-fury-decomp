@@ -526,8 +526,10 @@ fn import_ai_rt(w: &mut World, ei: usize, lvl: usize, ram: &GbaRam, r: u32, note
                 rt.d[1] = ram.s32(r + 8);
                 rt.f = 60 - ram.s32(r + 0xC);
             }
-            // Wait (vt 0x080497D4): +4 the frames counted (ours: the node's frame count)
-            K::Wait => rt.f = ram.s32(r + 4),
+            // Wait (vt 0x080497D4, update 0x08018BF0): +4 the frames left - set to the node's count at the enter,
+            // one off each update, finished at 0 (ours counts the updates up: frames - left; real run 20-6 tile
+            // +7,000, Vegeta's Wait(60) with 27 left)
+            K::Wait => rt.f = (node.p.g(wf_core::ai::P::Frames) as i32 - ram.s32(r + 4)).max(0),
             K::PopState | K::PushState => {}
             K::Chance | K::GotoState | K::SubState | K::IfPlayerWithin | K::IfPlayerFarther | K::IfPlayerInMeleeRange | K::IfTimeInState | K::IfCooldownOver | K::IfLastKidBuu => {}
             // ThrowBigBall: a singleton runtime (0x030032E8); its frame count comes from the ball (`import_super_ball`)
@@ -1213,9 +1215,69 @@ fn build_mid(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner: &mut St
         w.menu = wf_core::menu::Menu { phase: wf_core::menu::Phase::FadeIn { level }, tr: wf_core::menu::PAUSE, ..Default::default() };
         notes.push(format!("mid-area: a menu's return (fading in, level {level})"));
     }
-    let _ = runner;
+    // an inline script (an area's / a map event's, no event graph) running at the cut outside any event: its
+    // interpreter's PC on the context stack lies in its code (r002_006 +20,026: the world map's landing script
+    // 0x08073424 for Babidi's ship, stopped in its camera_pan_to after the warp, the screen still black)
+    if info.depth == 0 {
+        if let Some((id, ran)) = inline_running(ram) {
+            let drop = ran.len().saturating_sub(1);
+            w.menu = Default::default();
+            if ram.screen_black == Some(true) {
+                w.scene.screen.black = 16;
+                w.scene.screen.dim = 256;
+            }
+            runner.continue_inline(&mut w, &id, drop);
+            import_cam_pan(&mut w, ram);
+            notes.push(format!("mid-area: inline script {id} at its action #{drop} {:#04x}", ran[drop].0));
+        }
+    }
     let draws = w.rng.calls.wrapping_sub(calls0);
     Built { world: w, draws, held: 0, finished: true }
+}
+
+/// a camera pan in progress (`camera_pan_to`, object vt 0x0804B8C0: +4 / +8 the target px, +0xC speed, +0x10 /
+/// +0x14 the step in 1/1024 px, +0x20 the steps left): the track's replayed pan takes the RAM's step and count, the
+/// camera the RAM's position (the replay's start re-ran the pan's first step)
+fn import_cam_pan(w: &mut World, ram: &GbaRam) {
+    use wf_core::scene::Cmd;
+    let Some(o) = ram.ewram_with(0x0804_B8C0).into_iter().find(|&o| ram.s32(o + 0xC) > 0 && ram.s32(o + 0x20) >= 0) else { return };
+    let (px, py) = (ram.s32(o + 4), ram.s32(o + 8));
+    let mut hit = false;
+    for t in w.scene.tracks.iter_mut() {
+        if let Some(Cmd::CamPanTo { x, y, n, t: tt, sx, sy, .. }) = t.queue.first_mut() {
+            if (*x, *y) == (px, py) {
+                (*sx, *sy, *n, *tt) = (ram.s32(o + 0x10), ram.s32(o + 0x14), ram.s32(o + 0x20), 0);
+                t.started = true;
+                hit = true;
+            }
+        }
+    }
+    if hit {
+        wf_core::battle::set_camera(w, 0, ram.s32(CAM), ram.s32(CAM + 4));
+    }
+}
+
+/// an inline script stopped in its code: (id, the natives its interpreter has run - the last the waiting one)
+fn inline_running(ram: &GbaRam) -> Option<(String, Vec<(u8, Option<Vec<i32>>)>)> {
+    let depth = ram.r32(0x0300_1034).min(8);
+    for k in 1..=depth {
+        let it = ram.r32(0x0300_1034 + 4 * k);
+        for a in (0x0300_7000u32..0x0300_7FFC).step_by(4) {
+            if ram.r32(a) != it {
+                continue;
+            }
+            let pc = ram.r32(a + 4);
+            if pc >> 24 != 8 {
+                continue;
+            }
+            if let Some((id, base, code)) = host::inline_at(pc) {
+                if let Some(ran) = natives_before(&code, (pc - base) as usize) {
+                    return Some((id, ran));
+                }
+            }
+        }
+    }
+    None
 }
 
 /// a death effect still counting down at the cut (the delayed-call list 0x0300225C: count, then objects; vt
@@ -1514,7 +1576,11 @@ fn natives_run(ram: &GbaRam, runner: &StoryHost, ev: (u16, u16, [i32; 4])) -> Op
             }
         }
     }
-    let pc_off = pc_off?;
+    natives_before(code, pc_off?)
+}
+
+/// the natives (in order, with constant arguments) a script's code runs before offset `pc_off` (queries left out)
+fn natives_before(code: &[u8], pc_off: usize) -> Option<Vec<(u8, Option<Vec<i32>>)>> {
     use wf_script::bytecode::Op;
     let insns: Vec<wf_script::bytecode::Insn> = wf_script::bytecode::decode_reachable(code).ok()?.into_values().filter(|i| i.off < pc_off).collect();
     let mut ran = vec![];

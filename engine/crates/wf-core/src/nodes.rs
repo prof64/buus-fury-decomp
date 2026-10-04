@@ -1446,6 +1446,17 @@ fn leaf_exit(w: &mut World, c: &C, n: u16, _r: &mut NodeRt) {
         }
         K::DarkSphere => w.en(i).a.hittable = true,
         K::ShockStun => w.en(i).stunned = false,
+        // the throw interrupted while the ball charges (a hit's state change): the ball goes, its destructor stops
+        // the charge sound (real run 20-6 r062_001 tile +21,000 f418: stop 3 with the punch's sounds)
+        K::ThrowBigBall => {
+            let me = w.ents[i].id;
+            let balls: Vec<usize> = (0..w.ents.len()).filter(|&k| !w.ents[k].removed && matches!(&w.ents[k].body, Body::Shot(s) if s.owner == me && matches!(s.kind, shots::ShotKind::SuperBall { phase: 0, .. }))).collect();
+            for k in balls {
+                w.ents[k].removed = true;
+                crate::vram::entity_gone(w, k);
+                w.sfx_stop(3);
+            }
+        }
         // exit 0x0803BD06 (vt 0x0804ADC0 +8): SetAnim(0) - the idle enter's rand(255) (real run 20-6 r062_001 tile
         // +5,000 f45: Vegeta reaches his waypoint)
         // then the actor showing sprite def 0x34 (`0x08000158(0x34)`: Super Buu's graphics) answers message 5 and the

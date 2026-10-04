@@ -69,6 +69,15 @@ fn imported_cause(w: &World, event: u16) -> Option<Cause> {
 
 type StepCode = BTreeMap<(u16, u16), (Option<u32>, Vec<u8>)>;
 static STEP_CODE: std::sync::OnceLock<StepCode> = std::sync::OnceLock::new();
+/// the inline scripts' bytecode by ROM address: (script id, code) - a script running at a cut outside any event
+static INLINE_CODE: std::sync::OnceLock<BTreeMap<u32, (String, Vec<u8>)>> = std::sync::OnceLock::new();
+
+/// the inline script whose code holds ROM address `pc`: (id, its address, code)
+pub fn inline_at(pc: u32) -> Option<(String, u32, Vec<u8>)> {
+    let m = INLINE_CODE.get()?;
+    let (&a, (id, code)) = m.range(..=pc).next_back()?;
+    (pc <= a + code.len() as u32).then(|| (id.clone(), a, code.clone()))
+}
 
 /// the events' step bytecode from the content's `scripts/bytecode.json`, for every host made after (see
 /// `StoryHost::step_code`; the segments harness calls it once)
@@ -86,6 +95,12 @@ pub fn set_step_code(json: &[u8]) {
         }
     }
     let _ = STEP_CODE.set(m);
+    let mut im = BTreeMap::new();
+    for (id, e) in v["inline"].as_object().into_iter().flatten() {
+        let (Some(addr), Some(code)) = (e["code_addr"].as_str().and_then(|a| u32::from_str_radix(a.trim_start_matches("0x"), 16).ok()), e["code"].as_str()) else { continue };
+        im.insert(addr, (id.clone(), hex(code)));
+    }
+    let _ = INLINE_CODE.set(im);
 }
 
 impl StoryHost {
@@ -112,6 +127,25 @@ impl StoryHost {
             t.queue_instants = false;
             t.params_done = None;
         });
+        self.finish(w, st);
+    }
+    /// Import: an inline script (an area / map-event script, no event graph) stopped in its code at a cut: it runs
+    /// again from its start with its first `drop` actions dropped (the game ran them), the rest as usual
+    pub fn continue_inline(&mut self, w: &mut World, id: &str, drop: usize) {
+        let mut g = self.rt.globals();
+        g.g = w.story.g;
+        self.rt.set_globals(g);
+        let steps = self.stepped.contains(&format!("scripts/inline/{id}.rhai"));
+        self.hs.in_unit = true;
+        self.rt.start_unit(UnitRef::new(id.to_string(), "", steps), [0; 4]);
+        self.started.push((self.frame, id.to_string()));
+        self.cause = None;
+        self.rt.with_thread(|t| {
+            t.skip = drop;
+            t.queue_instants = true;
+        });
+        let st = self.with_host(w, |rt| rt.run().map_err(|e| e.to_string()));
+        self.rt.with_thread(|t| t.queue_instants = false);
         self.finish(w, st);
     }
     /// Import: an event stopped inside a node of an event it runs (`run_event`, a scene depth of 2): the outer node

@@ -436,15 +436,18 @@ impl Page for Title {
     /// the title / mode page's redraw decodes the whole title picture: a long iteration whose end (6 or 7 frames)
     /// the mixer's load decides (whole run from the soft reset, `menu_timing.measure` on video frames 705 .. 800: own
     /// cycles title 1,343,860 .. 1,351,045, its first draw after the boot 1,404,063, mode page 1,389,795 .. 1,406,658)
-    fn redraw_time(&self, w: &World, _d: &super::MenuData) -> Option<crate::sndsim::Redraw> {
+    fn redraw_time(&self, w: &World, d: &super::MenuData) -> Option<crate::sndsim::Redraw> {
         if self.leaving != Leaving::No || self.confirm.is_some() {
             return None;
         }
+        // the blinking cursor drawn this time (its OBJ copy): + ~7 k (title 1,351,045 with, 1,343,860 / 1,344,002
+        // without; mode page 1,397,808 with, 1,389,795 without)
+        let cursor = self.view(w, d).layers.iter().any(|l| crate::sndsim::ops_summary(&l.ops).contains("cursor"));
         let own: i64 = match self.page {
             // (nothing on screen yet: the first draw after the boot screens)
             TPage::Title if w.menu.shown.is_none() => 1_404_063,
-            TPage::Title => 1_347_000,
-            TPage::Mode => 1_398_000,
+            TPage::Title => if cursor { 1_351_045 } else { 1_343_931 },
+            TPage::Mode => if cursor { 1_397_808 } else { 1_389_795 },
             TPage::Select => return None,
         };
         Some(crate::sndsim::Redraw { t0: 4_641, base: own - 4_641 })
@@ -491,6 +494,9 @@ pub fn open_title_boot(w: &mut World) {
 
 /// video frames from the soft reset to the title's first iteration (the boot screens' modes and switches)
 pub const BOOT_FRAMES: u16 = 705;
+/// the logos' mode starts song 45 in its first frame after the reset's legal screen (song player 0 from video frame
+/// 181 on; the title's enter then finds it playing)
+pub const BOOT_SONG_AT: u16 = 181;
 
 /// the title's song (`0x080053CC`)
 pub const TITLE_SONG: i32 = 45;

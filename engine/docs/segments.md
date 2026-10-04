@@ -3212,3 +3212,39 @@ camera at f0 `r002_006_4-1+020026` and `r052_004_1-5+006000` (the latter the Ear
 `r052_004_1-5+018000` (Earth agent), `r062_001_20-6` +1,137 f2 (sprite 280's idle cel) and +9,000 f2 (sprite memory
 (257, 64) ours only), +3,000 f2 / +12,000 f20 (IT, above). The 20-6 ones are the Super Buu agent's now; A takes
 `r002_006_4-1+020026` (camera at f0) next unless the scoreboard agent has it.
+
+**Claim (dungeon agent A, 2026-10-04, by the coordinator): `r002_006_4-1+020026`** (West City tile, camera at f0).
+
+**§11 update 17 (B): the app soak on HEAD and with the sim-made load lag** (`work/db57/scratch/soakall.py TAG
+[ENV=..]`: all 53 masters + the title -> Earth chain, 8 at a time; `soakcmp.py`, `simlagfirst.py`; the soak's
+`SOAK_SIMLAG=1` = the harness's `SEGMENT_SIMLAG`: the app steps the rows where the sim is in its own lag frame and
+prints `simlag-load row .. map .. sim N game M` per load).
+*HEAD:* every master that was clean is still clean (the Janemba saga, dungeons, post-ball, ending, post-game legs).
+Stops: Airship 12-19 heal menu (master_5 8,514 / m_012 9,912) and ship 8-14 pause menu (ship_master 239,946) - menu
+timing, as before; m_062 inside Buu 2,401, m_067 Goku L158 40,747 - the known engine rows (scoreboard, agent A / ship
+fix agent); m_pg_g111 31 - a world-map-landing checkpoint. **Title -> Earth now runs to row 152,597** (was 149,694)
+and stops there on an app-only cause, found and partly fixed:
+* **Fixed - `set_character` keeps the old character's transformation list and Super Saiyan cooldown** (wf-script-core
+  `switch_character`, both the live and the offstage branch): the player is now given the new character's own form
+  list and its record's cooldown, as a load's `make_player` does. Earth 7-3 (s266 switches to Gohan): ours had
+  Goku's forms 0..8 and cooldown 0, the game's player forms 9.. and 121,087 (the soak's `--diff-seg` against the
+  `rE2__090_7-3` import). Gates unchanged (the one red gate, `rfat_010_011_11-13`, is the known load-lag camera row
+  of 0dab418).
+* **Open - Gohan's EP, invisible to the harness (EP is not compared):** the app's Gohan has 16 EP at 7-3, the game's
+  12. Traced against the game's character records (`work/db57/scratch/recep.py`, the real run's E2 stretch): the
+  app gains +4 EP at row 134,959 (Gohan in form 16) where the game gains it at 136,658, and +4 again at 137,084, one
+  frame after a skill use, which the game never does. The fade at 7-3 then lasts 121 frames instead of 70 (s266's
+  path). To the Earth agent (EP regen / refund in forms 10 / 16); **suggestion for the harness owner: compare the
+  leader's EP like HP** - the segments are exact while EP drifts.
+*With `SOAK_SIMLAG=1`:* 34 of the 54 soaks stop early, each at its first sim-made load whose length differs from the
+game's - almost always the sim **one frame longer** (13-3 sim 38 / game 37, 8-3 32 / 31, 9-10 22 / 21, 14-2 26 / 25,
+18-1 / 18-2 23 / 22 ...), a few one shorter (0-91, 15-2, 18-1 in 036, 1-5, 7-2), 8-17 two short (ship), 0-50 five
+short. The harness with `SEGMENT_SIMLAG` gives the same lengths on the same loads (r017_001 13-3: sim 38 / game
+37, stop at f414 "sim lag frame vs game logic"), so this is the load-time model, not the app: **to the ship fix
+agent** (the full first-mismatch list: `work/db57/soakall/simlag2/*.log`, `simlagfirst.py simlag2`). Where a soak's
+loads all match (m_009, m_029, m_033, m_036, m_042, m_047, m_052, m_072, the post-game g233, buu338), the sim-lag
+run stops where the HEAD run does or not at all.
+*For the whole-run replay (side-content agent, `tools/wholerun/`):* replaying the stretches' key logs one after
+another drifts from the stretches' own start states at 003 (Thieves Den: the continuous replay at 002's end differs
+from `runs/003/start.ss` in 481 IWRAM bytes; the stretch end then misses the manifest) - the per-stretch end checks
+in `record.py` will show where; the app masters here start each stretch from its own first cut for that reason.
