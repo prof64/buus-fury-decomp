@@ -60,21 +60,48 @@ fn main() {
             println!("power-on sound: no sound data loaded - ignored");
         }
     }
-    let mut app = StorySim::with_session(&packs, session).expect("story sim");
-    app.skip_area_banner();
+    // --import SEG.json --from-row K (the resync mode, tools/wholerun/board.py --resync): the game's state cut at row K
+    // of the chain (its RAM before row K) instead of the power-on; the rows before K are skipped. --stop-first: end at
+    // the first exact divergence with a `STOP {json}` line (an import the importer refuses: `STOP` with "import")
+    let from_row: usize = opt("--from-row").and_then(|v| v.parse().ok()).unwrap_or(0);
+    let stop_first = args.iter().any(|a| a == "--stop-first");
+    let mut app = match opt("--import") {
+        Some(seg) => {
+            let doc: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&seg).expect("read")).expect("json");
+            match StorySim::from_segment(&packs, &doc) {
+                Ok(a) => a,
+                Err(e) => {
+                    println!("STOP {}", serde_json::json!({"row": from_row, "field": "import", "what": e}));
+                    return;
+                }
+            }
+        }
+        None => StorySim::with_session(&packs, session).expect("story sim"),
+    };
+    if opt("--import").is_none() {
+        app.skip_area_banner();
+    }
     app.session.world.opts.sim_lag = sim_lag;
     println!("sound model: driver {} calibrated {} phase {}", app.world().sound.drv.is_some(), !app.world().sound.uncalibrated, app.world().sound.phase);
 
     let rd = BufReader::new(std::fs::File::open(&master).expect("master"));
-    let mut lines = rd.lines().map(|l| serde_json::from_str::<serde_json::Value>(&l.expect("line")).expect("row")).peekable();
+    let mut raw = rd.lines();
     let mut prev_lf = -1i64;
+    // (skip to the import's row without parsing; the row before it gives the logic counter)
+    for j in 0..from_row {
+        let l = raw.next().expect("rows").expect("line");
+        if j + 1 == from_row {
+            prev_lf = serde_json::from_str::<serde_json::Value>(&l).expect("row")["lf"].as_i64().unwrap_or(-1);
+        }
+    }
+    let mut lines = raw.map(|l| serde_json::from_str::<serde_json::Value>(&l.expect("line")).expect("row")).peekable();
     let mut first_exact: Option<(usize, String)> = None;
     // lasting divergences per field: (count of consecutive bad rows, first row of the run, reported)
     let mut lasting: Vec<(&str, usize, usize, Option<(usize, String)>)> = ["area", "pos", "rng", "depth"].iter().map(|n| (*n, 0, 0, None)).collect();
     let (mut stepped, mut own_lag, mut replayed_lag, mut lag_bad) = (0usize, 0usize, 0usize, 0usize);
     let mut errors = 0usize;
     let (mut load_watch, mut load_bad): (Option<(usize, usize)>, usize) = (None, 0);
-    let mut k = 0usize;
+    let mut k = from_row;
     while let Some(r) = lines.next() {
         if k >= limit {
             break;
@@ -176,6 +203,19 @@ fn main() {
             if let Some((f, d)) = bad.first() {
                 first_exact = Some((k, format!("{f}: {d}")));
                 println!("first exact divergence: row {k} ({}): {f}: {d}", stretch_of(k));
+                if stop_first {
+                    let w = app.world();
+                    let menu_open = wf_core::menu::active(w);
+                    let leader = w.player_idx(0).map(|pi| (w.pl_ref(pi).gs.name().to_string(), w.pl_ref(pi).form));
+                    println!("STOP {}", serde_json::json!({
+                        "row": k, "stretch": stretch_of(k), "field": f, "what": d,
+                        "all": bad.iter().map(|b| format!("{}: {}", b.0, b.1)).collect::<Vec<_>>(),
+                        "app_depth": w.scene.depth, "game_depth": r["depth"], "menu": menu_open,
+                        "game_p": r["p"], "app_leader": leader, "logic": logic,
+                        "started": app.host().started.iter().rev().take(2).map(|s| s.1.clone()).collect::<Vec<_>>(),
+                    }));
+                    return;
+                }
             }
         }
         for l in lasting.iter_mut() {
@@ -201,8 +241,8 @@ fn main() {
             if menu || std::env::var("WR_MENU").is_ok() {
                 let page = match w.menu.stack.last() {
                     Some(wf_core::menu::Screen::Title(t)) => format!("title {:?} leaving {:?}", t.page, t.leaving),
-                    Some(_) => "other".to_string(),
-                    None => "-".to_string(),
+                    Some(s) => format!("other {:?} busy {:?} scripted {}", std::mem::discriminant(s), w.field.as_ref().map(|f| f.busy), w.menu.scripted),
+                    None => format!("- busy {:?} raw {:?}", w.field.as_ref().map(|f| f.busy), w.field.as_ref().map(|f| f.raw_input.is_some())),
                 };
                 println!("    menu phase {:?} lag {} boot {} page {page} pending {} shown {}", w.menu.phase, w.menu.lag, w.menu.boot, w.menu.pending.is_some(), w.menu.shown.is_some());
             }

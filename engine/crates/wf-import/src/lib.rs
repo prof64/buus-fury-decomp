@@ -2216,6 +2216,14 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
             }
             continue;
         }
+        // Instant Transmission's pick markers (vtable 0x0804E120): +0xC their 0x200 block
+        if vt == 0x0804_E120 {
+            let h = ram.r16(o + 0xC);
+            if h != 0xFFFF {
+                owners.push((h, Owner::ItPick));
+            }
+            continue;
+        }
         // the boss HP bar (`show_boss_bar`, vtable 0x0804CE28, 0x200) and the 3D world map's own object
         // (`0x0800C0C8`, vtable 0x0804D8C8, 0xF00: a purge's level-15 object - kbr_013 f87, s463's portrait box)
         if vt == 0x0804_CE28 || vt == 0x0804_D8C8 {

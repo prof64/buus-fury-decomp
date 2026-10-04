@@ -2379,7 +2379,10 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
         // overlaps the head +- 12 is taken - the sender (an enemy ki blast) bursts on the beam (segment sb 6-6 f18799)
         ShotKind::Kame(b) => {
             let team = w.shot_ref(i).team;
-            if msg.foot || msg.source == me || msg.team != team ^ 1 {
+            // the handler compares the message's team with the beam's +0x3C ^ 1, a word the fire (0x080207D4) writes:
+            // while the beam charges it holds the heap's leftover, which matches no team - a charging beam accepts
+            // nothing (heap census: 0x08020FF2, the Kid Buu fight 14-1)
+            if b.charging || msg.foot || msg.source == me || msg.team != team ^ 1 {
                 return false;
             }
             let (hx, hy) = kame_head(w.shot_ref(i), b.len);

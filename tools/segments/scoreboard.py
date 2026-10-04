@@ -330,6 +330,24 @@ def board(jobs):
                      f"({m['exact_stretch']}; first divergence: {m['first']}). Tree `{w.get('tree', '?')}`, `tools/wholerun/board.py`.")
         if w.get('note'):
             L.append(w['note'])
+    # the whole run's stop queue (resync at every stop: tools/wholerun/resync.py, board.py --rank)
+    ws = ROOT / 'data' / 'realrun' / 'wholerun_stops.json'
+    if ws.exists():
+        st = json.loads(ws.read_text())
+        L += ['', '## Whole run with resync: every stop, per owner', '',
+              'The app from the reset; at each stop the game\'s state is cut at the next row and the run goes on '
+              '(`tools/wholerun/resync.py`). "rule" = the app diverged from a state it had right; "import" = the cut '
+              'was refused or diverged in its first rows (importer). Each group: count, first stop.', '']
+        for lag, s in st.items():
+            L.append(f"**{lag} lag:** {s['stops']} stops ({s['rule']} rule, {s['import']} import)")
+            L.append('')
+            L.append('| count | kind | field | chapter | owner | first row | first stop |')
+            L.append('|---|---|---|---|---|---|---|')
+            for g in s['groups'][:40]:
+                f0 = g['stops'][0]
+                L.append(f"| {g['count']} | {g['kind']} | {g['field']} | {g['chapter']} | {g['owner']} | {f0['row']:,} | "
+                         f"{f0['what'][:90].replace('|', '/')} |")
+            L.append('')
     L += ['', '## Non-exact segments by category', '', '| category | owner | ' + ' | '.join(order) + ' | all |', '|---|---|' + '---|' * (len(order) + 1)]
     names = [n for n, _ in CATS] + ['other']
     for cat in names:

@@ -3492,3 +3492,29 @@ exact (11 -> 1,000). +8,000 f771 (RNG): the enemy's RunScript AI node is not imp
 next for A. 51 tiles: 3 better, 0 worse; 1,519 area-entry cuts unchanged; gates green (HEAD's data/segments: the
 working tree's gate files are another agent's in-flight edits). `r017_027`'s EP fraction: 0 differ on the shared
 tree now (B's in-flight EP work), left to B.
+
+**§11 update 19 (B): the game's records are tracked; gates lock on them; Goten's EP in the dungeons.**
+*Tracked records.* `tools/segments/recs_pack.py` packs each gate's work/recs rows (from `recs.py`) into
+`data/segments/recs/<gate>.json`, delta-encoded (`{"v":1,"rows":[[row, delta]...]}`: row 0 whole, later rows only
+what changed; 485 files, ~0.8 MB; `--check` round-trips). wf-import `recs.rs` reads the sidecar first (work/recs
+second; a tile reads its parent's rows from its offset). A gate with `"recs_exact":true` in its header is checked on
+every run and **fails on any record difference**; the others stay report-only (`SEGMENT_RECS=1`).
+`tools/segments/recs_lock.py REPORT` sets the flag on every gate the report shows clean. Re-pack + lock after new
+gates: `recs.py <gate>.json` -> `recs_pack.py` -> run the gates with `SEGMENT_RECS=1 ... --nocapture > R` ->
+`recs_lock.py R`. Locked: 477 gates. Report-only: `rfat_033_002_6-1` (current character at f27,267),
+`rsb_052_006_6-9` (bench HP), `rsbk_002_04_21` / `sb_000_18_12` / `sb_044_04_20` (start state is from another
+moment - A's note above; to do in recs.py: compare the logic counter 0x03000F94 with `init.ram` first), 13 `rkb_*`
+(no start state for recs.py).
+*Goten's EP (dungeons), two rules, emulator-verified:* (1) **the item-get holds the form controller** - the game's
+regen count (form object +0xC) stays at 24,310 through all 61 frames of a chest's item-get (r010_016 f220..280; ours
+ticked on and the 3 % tick came 61 frames early). `player::update`: `held` includes `field.item_get`. (2) **a knocked
+enemy's wall-splat body hit runs the melee EP hook for the player** (r023_003 f698: +1 for each of the two enemies a
+launched one hits; a write watch on the record shows the same hook as a punch's, `0x08003CF5` from the enemy
+handler). `enemy.rs` hit handler, mirrored in `enemy.ts`. r010_016, r017_027, r023_003 now 0 differ; r008_009,
+r017_023, r027_008, r027_024 were already clean.
+*cross_ts (coordinator's 85 vs 83 / 87 vs 85 at frame 596 / 1192):* not the EP rules above - A's
+`new_form_object` zeroing `regen_timer` (in 7c55272) had no TS mirror; a battle's Super Saiyan revert makes a new
+form object, so Rust's next 3 % tick came later. `player.ts newFormObject` now zeroes `regenTimer`; dumps regenerated
+(engine/target and target-soak `wf-core-ts-dumps`); **cross_ts 46,800 frames, 0 failures**; wf-core suite green.
+The red earth_2_x gates on the current tree end on the camera (`cam: ... vs game (136, 320)`) - another agent's
+in-flight `field.rs` / `world.rs` camera-last-target edit, not these.

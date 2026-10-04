@@ -631,6 +631,7 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
                 // the same sprite (s328: set_char_form(4, 279) on Vegeta already in form 279 draws once)
                 let _ = new_sprite;
                 if leader(h.w) == Some(i) {
+                    wf_core::player::rebuilt_form_object(h.w, i);
                     wf_core::player::set_idle(h.w, i);
                 }
             }

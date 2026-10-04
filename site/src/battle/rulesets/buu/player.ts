@@ -1012,6 +1012,8 @@ export class Player extends Actor implements PlayerLike {
       // a story form's transformation ending after a KO: the player is idle again (HP 0, hittable, controllable)
       this.dead = false
     }
+    // the regen tick's accumulator is the form object's (+0xC): a new object counts from 0 (wf-core new_form_object)
+    this.regenTimer = 0
   }
   /** the cutscene fusions' defuse (script s014 0x0877D028, run synchronously by the form object 0x0800E638 when its
    *  countdown goes negative; t = frames since): only the state tick runs (not at t 90..94), t 85 the partner's

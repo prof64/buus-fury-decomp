@@ -324,6 +324,9 @@ pub enum Owner {
     Banner,
     /// an import's block of an object the remake does not model
     Foreign,
+    /// an Instant Transmission pick's marker (`0x080222E0`, record 0x0872BF04, vtable 0x0804E120: 0x200, one per pick;
+    /// the cursor's is the markers effect's own), freed after the cursor's when the selection closes (`0x08052D8C`)
+    ItPick,
 }
 
 /// the shared shadow graphics (`0x086B759C`: w, h, bytes)

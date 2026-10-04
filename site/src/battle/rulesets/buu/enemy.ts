@@ -1310,6 +1310,11 @@ export class Enemy extends Actor implements EnemyLike {
     msg.dmg = res.dmg
     if (msg.attacker.kind === 'player') audioEvent('hit')
     if (res.dmg > 0 && msg.attacker.kind === 'player') (msg.attacker as unknown as { onDealt?: (w: World, m: HitMsg, d: number) => void }).onDealt?.(w, msg, res.dmg)
+    // a knocked enemy's wall-splat body hit runs the melee EP hook too, for the player (wf-core enemy.rs, r023_003)
+    else if (res.dmg > 0 && msg.atk.sub === 3 && this.player) {
+      const p = this.player
+      ;(p as unknown as { onDealt?: (w: World, m: HitMsg, d: number) => void }).onDealt?.(w, { ...msg, source: p } as HitMsg, res.dmg)
+    }
     // 0x0800FC62: obj+0x294 = the crit flag, obj+0x298 = (attack sub == 3), then the on-hit tree
     this.critHit = !!res.crit
     this.splatHit = msg.atk.sub === 3

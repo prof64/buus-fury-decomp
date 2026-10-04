@@ -2352,6 +2352,15 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
                 }
             }
         }
+    } else if msg.atk.sub == 3 && res.dmg > 0 {
+        // a knocked enemy's wall-splat body hit (attacker: that enemy) runs the melee EP hook too, for the player
+        // (Dragon Ball dungeon 14-19, r023_003 f698: Goten +1 EP for each of the two enemies a launched one hits -
+        // emulator watch on the record's EP, the same hook path as his punches)
+        if let Some(pi) = player(w, i) {
+            let mut m = msg.clone();
+            m.source = w.ents[pi].id;
+            player::on_dealt(w, pi, &m, res.dmg);
+        }
     }
     {
         let e = w.en(i);

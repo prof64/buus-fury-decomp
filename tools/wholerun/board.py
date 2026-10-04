@@ -21,6 +21,38 @@ W = ROOT / 'work' / 'wholerun'
 PY = sys.executable
 a = sys.argv[1:]
 master = W / 'master.jsonl'
+
+
+def rank():
+    """--rank: the resync runs' stops (work/wholerun/stops_<lag>.jsonl from resync.py) ranked per owner: rule stops
+    first (by how many of a kind), then import stops -> data/realrun/wholerun_stops.json"""
+    out = {}
+    for lag in ('rec', 'sim'):
+        p = W / f'stops_{lag}.jsonl'
+        if not p.exists():
+            continue
+        stops = [json.loads(x) for x in p.read_text().splitlines() if x.strip()]
+        groups = {}
+        for s in stops:
+            what = str(s.get('what', ''))
+            # the kind: the field and its first words (app / game values left out)
+            key = (s['owner'], s['kind'], s['field'], s.get('chapter', '?'))
+            groups.setdefault(key, []).append({'row': s['row'], 'stretch': s.get('stretch', ''), 'what': what[:160],
+                                               'menu': s.get('menu'), 'started': s.get('started'), 'from': s.get('from')})
+        ranked = sorted(groups.items(), key=lambda kv: (kv[0][1] != 'rule', -len(kv[1]), kv[1][0]['row']))
+        out[lag] = {'stops': len(stops), 'rule': sum(1 for s in stops if s['kind'] == 'rule'),
+                    'import': sum(1 for s in stops if s['kind'] == 'import'),
+                    'groups': [{'owner': k[0], 'kind': k[1], 'field': k[2], 'chapter': k[3], 'count': len(v), 'stops': v} for k, v in ranked]}
+        print(f"{lag}: {len(stops)} stops ({out[lag]['rule']} rule, {out[lag]['import']} import)")
+        for g in out[lag]['groups'][:20]:
+            print(f"  {g['count']:4d} {g['kind']:6s} {g['field']:6s} {g['chapter']:8s} {g['owner']} - first row {g['stops'][0]['row']}: {g['stops'][0]['what'][:80]}")
+    (ROOT / 'data' / 'realrun' / 'wholerun_stops.json').write_text(json.dumps(out, indent=1))
+    print('wrote data/realrun/wholerun_stops.json')
+
+
+if '--rank' in a:
+    rank()
+    sys.exit(0)
 if '--record' in a or not master.exists():
     subprocess.run([PY, str(ROOT / 'tools' / 'wholerun' / 'record.py'), str(master)], check=False)
 if not (W / 'power_on.json').exists():

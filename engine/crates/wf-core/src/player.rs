@@ -1424,7 +1424,9 @@ pub fn update(w: &mut World, i: usize) {
     // - and so does an AI inline script commanding the player while its animation runs (Earth 4-25, emulator trace
     // work/db57/scratch/storycnt.py: Trunks' form-25 countdown stays at 200 from Vegeta's first play_anim to the
     // frame the player is let go, then ticks again in that frame)
-    let held = w.field.as_ref().is_some_and(|f| f.busy)
+    // - and the item-get presentation (its loop replaces the player update: Goten's regen count in the Dragon Ball
+    // dungeon 11-22, r010_016, stays at 24,310 through the 61 frames of a chest's item-get)
+    let held = w.field.as_ref().is_some_and(|f| f.busy || f.item_get.is_some())
         || crate::scene::is_puppet(w, w.ents[i].id)
             && w.scene.depth == 0
             && !w.scene.ai_wait.is_empty()
@@ -3150,6 +3152,14 @@ pub fn script_set_form(w: &mut World, i: usize, form: i32) {
     new_form_object(w, i);
     set_anim_id(w, i, 0);
 }
+/// the player rebuilt by 0x08010692 (script `set_char_form` on the active character): its form object is built
+/// again twice, as `script_set_form`'s refresh - the regen count (+0xC) restarts at 0 (emulator, Earth 3-3
+/// `earth_3_3_4` f370: s143's set_char_form to the Great Saiyaman, the timer 0x59CE -> 0 on the same object address;
+/// ours kept counting and Gohan's 3 % EP tick came 380 frames early)
+pub fn rebuilt_form_object(w: &mut World, i: usize) {
+    new_form_object(w, i);
+    new_form_object(w, i);
+}
 fn finish_transform(w: &mut World, i: usize) {
     {
         let pl = p(w, i);
@@ -3274,6 +3284,8 @@ fn it_markers_end(w: &mut World, i: usize) {
         w.ents[k].removed = true;
         crate::vram::release(w, crate::vram::Owner::Ent(w.ents[k].id));
     }
+    // the picks' markers (vtable 0x0804E120) after the cursor's
+    crate::vram::release(w, crate::vram::Owner::ItPick);
 }
 fn it_select(w: &mut World, i: usize) {
     let mut s = pr(w, i).it_sel.clone().unwrap();
@@ -3285,6 +3297,9 @@ fn it_select(w: &mut World, i: usize) {
             set_anim_id(w, i, 0);
             return it_markers_end(w, i);
         }
+        // with picks the markers go when the selection closes too: the cursor's block, then the picks' markers
+        // (MEASURED real run 20-6 r062_001 f3,010: free 0x2F2 from 0x08052E8C, then 0x2E2 from 0x08052D8C)
+        it_markers_end(w, i);
         let (dir, px, py) = (pr(w, i).a.facing, pr(w, i).a.px(), pr(w, i).a.py());
         {
             let pl = p(w, i);
@@ -3307,6 +3322,10 @@ fn it_select(w: &mut World, i: usize) {
         });
         // the field's trigger candidates follow the enemies in the selector's list (first match wins)
         let hitt = if hitk.is_none() { s.tcand.iter().position(|&(_, b, picked)| !picked && px >= b.x0 && px < b.x1 && py >= b.y0 && py < b.y1) } else { None };
+        if hitk.is_some() || hitt.is_some() {
+            // the pick's marker (r062_001 f3,002)
+            crate::vram::acquire(w, crate::vram::Owner::ItPick, 0x200);
+        }
         if let Some(k) = hitk {
             s.cand[k].1 = true;
             s.picks.push(s.cand[k].0);

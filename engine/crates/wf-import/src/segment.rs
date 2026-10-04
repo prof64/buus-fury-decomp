@@ -545,6 +545,19 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
                         d.options,
                         d.text.chars().take(40).collect::<String>()
                     );
+                    let on = (0..w.ents.len()).filter(|&i| !w.ents[i].removed && w.actor(i).is_some() && wf_core::vram::on_screen(w, i)).count();
+                    let all = w.ents.iter().filter(|e| !e.removed).count();
+                    eprintln!(
+                        "lagdlg2 {} f{k} on {on} ents {all} dim {} black {} white {} fade {} flash {} depth {} field {}",
+                        doc["name"].as_str().unwrap_or("?"),
+                        w.scene.screen.dim,
+                        w.scene.screen.black,
+                        w.scene.screen.white,
+                        w.scene.screen.fade.is_some(),
+                        w.scene.screen.flash.is_some(),
+                        w.scene.depth,
+                        w.field.as_ref().map(|f| f.map.as_str()).unwrap_or("-")
+                    );
                 }
             }
             wf_core::sndsim::lag_frame_ex(&mut sess.world, last);

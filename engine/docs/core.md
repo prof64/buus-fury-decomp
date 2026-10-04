@@ -152,6 +152,21 @@ controllers whose length the game decides (shield / charge), the INFERRED nodes 
 adapter draws actors, shadows, halos, effects and most projectile records; beam piece chains, the Final Flash affine
 pieces and the dark sphere disc are not drawn yet.
 
+**Uninitialised heap reads (by design, bounded).** The game reads heap bytes its objects never wrote at 18 code sites
+over the whole real run (census: `segments.md` "Heap census"). Draw order, voice slots and redraw caches are not
+modelled (no gameplay effect). The two gameplay sites with a fixed outcome are covered: the camera object reading a freed
+actor's last position (`0x080077EC`) eases toward where that actor stood - in all 7 real-run cases the camera is
+already there, which is what ours does by holding the camera while no player exists (a rule that kept easing toward
+the last target instead broke ~70 gates at loads: not added); a charging enemy beam accepts no message (its team word
+is unset until the fire; `shots::on_message`, Rust + TS). **The one site whose value matters is not modelled: WanderToRandomPoint's path runtime** (`0x0803BD64` sets
+speed, budget and valid = 0 only; the first step reads the heap block's leftover waypoint +0xC / +0x10 and re-plan
+counter +0x18 - another object's bytes, different at each create). Its only user in the main story is Vegeta inside
+Buu (20-6, state 0x313). A wander running at an import's cut takes those words from RAM (`wf-import` `import_ai_rt`,
+the path followers' runtime); a wander created after the cut, or anywhere in a replay from power-on, starts from a
+cleared runtime - so **a from-power-on run diverges from the game at Vegeta's first wander step in 20-6** (sub-pixel
+positions, then the re-plan timing and the RNG). Reproducing it needs a byte-level model of every heap object (not
+planned).
+
 ## 9. Coordination (in progress, 2026-10-02)
 
 Two agents extend `World` concurrently; keep changes additive and re-read before editing.

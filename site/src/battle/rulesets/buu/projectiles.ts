@@ -665,7 +665,8 @@ export class KameBeam extends Shot {
   /** handler 0x08020FC4: a hit message (kind 0) of another object from the other team that overlaps the head +- 12
    *  is taken - the sender (an enemy ki blast) bursts on the beam (segment sb 6-6 f18799) */
   onMessage(_w: World, msg: HitMsg): boolean {
-    if (msg.foot || msg.source === this || msg.team !== (this.team ^ 1)) return false
+    // (the team word +0x3C is written by the fire: a charging beam holds a heap leftover there and accepts nothing)
+    if (this.charging || msg.foot || msg.source === this || msg.team !== (this.team ^ 1)) return false
     const [hx, hy] = this.head()
     if (!overlaps(msg.rect, { x0: hx - 12, y0: hy - 12, x1: hx + 12, y1: hy + 12 })) return false
     if (msg.source instanceof StraightShot) msg.source.beamHit = true
