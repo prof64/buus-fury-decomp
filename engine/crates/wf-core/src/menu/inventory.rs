@@ -178,6 +178,27 @@ impl Inventory {
         p
     }
 
+    /// an imported page (wf-import, a cut inside it): the RAM's tab / scroll top / selection, and its Use dialog when
+    /// that mode runs (the cursor hidden as the A press left it)
+    pub fn imported(w: &World, tab: u8, top: i32, cur: i32, dialog: bool) -> Inventory {
+        let mut p = Inventory::new(w);
+        if tab != p.tab {
+            p.set_tab(tab);
+        }
+        p.top = top;
+        p.cur = cur;
+        if dialog {
+            if let Some(&item) = p.list().get(cur.max(0) as usize) {
+                if let Some(Widget::Cursor(c)) = p.c.kids.get_mut(p.cursor) {
+                    c.t = 8;
+                }
+                p.sample(w);
+                p.dialog = Some(UseDialog::new(w, item));
+            }
+        }
+        p
+    }
+
     /// `0x080164D0`
     fn rebuild(&mut self, w: &World) {
         self.lists = [list_of(w, false), list_of(w, true)];

@@ -560,13 +560,16 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
         0x8f | 0x90 => {
             let Some(id) = entity_of(h, arg(a, 0)) else { return unit() };
             let (x, y) = if n == 0x90 { (arg(a, 1), arg(a, 2)) } else { (0, 100) };
-            h.w.scene.boss_bar = Some(scene::BossBar { entity: id, a: x, b: y });
+            h.w.scene.boss_bar = Some(scene::BossBar { entity: id, a: x, b: y, at: h.w.frame });
             wf_core::vram::release(h.w, wf_core::vram::Owner::BossBar);
             wf_core::vram::acquire(h.w, wf_core::vram::Owner::BossBar, 0x200);
             unit()
         }
         0x91 => {
-            h.w.scene.boss_bar = None;
+            if let Some(b) = h.w.scene.boss_bar.take() {
+                let f = h.w.frame;
+                h.w.scene.boss_bar_out = Some(scene::BossBarOut { fill: b.fill(h.w), y: b.y(f), at: f });
+            }
             wf_core::vram::release_later(h.w, wf_core::vram::Owner::BossBar, wf_core::vram::BOSS_BAR_OUT);
             unit()
         }

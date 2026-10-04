@@ -111,6 +111,27 @@ pub fn extract(rom: &Rom, out: &mut Content) -> wf_rom::Result<()> {
         }
     }
     out.put("ui/hud/stat_mark.png", sm.png(&pal, true));
+    // the boss HP bar (draw 0x08019658): base 0x200 bytes at 0x087196E4 (8 tiles 8x8 8bpp: two 32x8 OBJs); fill f
+    // clears steps f..53 to colour 1 (4 byte offsets each at 0x087198E4 + 16 step); row f of the sheet = fill f
+    let base = rom.bytes(0x0871_96E4, 0x200).to_vec();
+    let steps = rom.bytes(0x0871_98E4, 53 * 16).to_vec();
+    let mut bb = Surface::new(64, 8 * 54);
+    for f in 0..54usize {
+        let mut b = base.clone();
+        for s in f..53 {
+            for j in 0..4 {
+                let o = u32::from_le_bytes(steps[s * 16 + j * 4..s * 16 + j * 4 + 4].try_into().unwrap()) as usize;
+                if let Some(c) = b.get_mut(o) {
+                    *c = 1;
+                }
+            }
+        }
+        for (o, &c) in b.iter().enumerate() {
+            let (t, p) = (o / 64, o % 64);
+            bb.set((t * 8 + p % 8) as i32, (f * 8 + p / 8) as i32, c);
+        }
+    }
+    out.put("ui/hud/boss_bar.png", bb.png(&pal, true));
     out.put_json("ui/hud.json", &hud::json(&h));
 
     // area-name banner (layout constants from its object, vt 0x0804B528)

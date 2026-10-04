@@ -376,6 +376,12 @@ impl Renderer {
                     }
                 }
             }
+            // boss HP bars: OAM x 160 (two 32x8 OBJs), priority 1; anchored to the view's top-right corner
+            for bb in &view.boss_bars {
+                if let Some(px) = u.boss_bar(bb.fill) {
+                    screen.push((1, w as i32 - 80, bb.y, 64, 8, px));
+                }
+            }
             if let Some(bv) = &view.banner {
                 if self.banner.is_none() {
                     self.banner = Some(banner::Banner::load(packs));
@@ -477,6 +483,24 @@ impl Renderer {
             for i in 0..w * h {
                 self.top[i] = f(self.top[i], self.top_l[i]);
                 self.bot[i] = f(self.bot[i], self.bot_l[i]);
+            }
+        }
+        // a script fade out: the palette as it was, scaled per 5-bit channel toward the target
+        if let Some(ps) = view.palette_scale.filter(|f| f.level > 0) {
+            let l = ps.level.min(256) as u32;
+            let f = |e: u32| -> u32 {
+                let mut out = 0xFF00_0000;
+                for sh in [16, 8, 0] {
+                    let x = c5(e, sh) >> 3;
+                    let t = c5(ps.target, sh) >> 3;
+                    let v = ((x * (256 - l) + t * l) >> 8).min(31);
+                    out |= ((v << 3) | (v >> 2)) << sh;
+                }
+                out
+            };
+            for i in 0..w * h {
+                self.top[i] = f(self.top[i]);
+                self.bot[i] = f(self.bot[i]);
             }
         }
         for i in 0..w * h {

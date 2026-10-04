@@ -842,6 +842,47 @@ pub struct BossBar {
     pub entity: EntityId,
     pub a: i32,
     pub b: i32,
+    /// the frame it was shown (`0x080195A8`: y -8, velocity +1 per update up to 8: `0x08019628`)
+    #[serde(default)]
+    pub at: u32,
+}
+
+/// a hidden boss bar sliding out (`hide_boss_bar`: message 0x13, velocity -1, the value frozen, the entity link
+/// gone; the object deletes itself below y -8)
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct BossBarOut {
+    /// the frozen fill (0..53 steps)
+    pub fill: i32,
+    /// y at frame `at`
+    pub y: i32,
+    pub at: u32,
+}
+
+impl BossBar {
+    /// its y on frame `frame` (slides in from -8 to 8)
+    pub fn y(&self, frame: u32) -> i32 {
+        (-8 + frame.wrapping_sub(self.at) as i32).min(8)
+    }
+
+    /// its fill in steps of 53 (draw `0x08019658`: `a * 53 / 100` + the entity's vfunc +0x64 with
+    /// `b * 53 / 100 - a * 53 / 100`; an enemy's (`0x0804F874`): `(hp >> 10) * arg / max hp`)
+    pub fn fill(&self, w: &World) -> i32 {
+        let lo = self.a * 53 / 100;
+        let span = self.b * 53 / 100 - lo;
+        let hp = w.find(self.entity).and_then(|k| match &w.ents[k].body {
+            Body::Enemy(e) if e.max_hp1024 >> 10 != 0 => Some((e.hp1024 >> 10) * span as i64 / (e.max_hp1024 >> 10)),
+            _ => None,
+        });
+        lo + hp.unwrap_or(0) as i32
+    }
+}
+
+impl BossBarOut {
+    /// its y on frame `frame`; None once deleted
+    pub fn y_at(&self, frame: u32) -> Option<i32> {
+        let y = self.y - frame.wrapping_sub(self.at) as i32;
+        (y >= -8).then_some(y)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -1069,6 +1110,9 @@ pub struct Scene {
     pub screen: Screen,
     pub hud_hidden: bool,
     pub boss_bar: Option<BossBar>,
+    /// a hidden boss bar still sliding out
+    #[serde(default)]
+    pub boss_bar_out: Option<BossBarOut>,
     pub title: Option<TitleText>,
     pub timer_hud: Option<TimerHud>,
     /// destination label set (0xD9) and its 32 entries (0xDA)
@@ -1133,6 +1177,7 @@ impl Default for Scene {
             screen: Screen::default(),
             hud_hidden: false,
             boss_bar: None,
+            boss_bar_out: None,
             title: None,
             timer_hud: None,
             dest_label: None,

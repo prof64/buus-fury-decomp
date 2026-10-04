@@ -610,6 +610,52 @@ fn import_grids(w: &mut World, ram: &GbaRam) {
 /// the field's live state from RAM (mid-area imports: a field restored after a scene, or any frame): the actors by
 /// match and patch, the leader's 24.8 position / animation / script pose, the grids, the stagger, the 3-D map's
 /// flyer and camera, the 2-D camera
+/// the pause pages' main-loop mode vtables: Status, Inventory, the Inventory's Use dialog
+const MODE_STATUS: u32 = 0x0804_AC88;
+const MODE_INVENTORY: u32 = 0x0804_9D48;
+const MODE_USE: u32 = 0x0804_ACB4;
+
+/// the pause page running at the cut: (its mode vtable, its object)
+fn pause_page(ram: &GbaRam) -> Option<(u32, u32)> {
+    let m = ram.r32(MODE);
+    let vt = ram.mode_vt();
+    [MODE_STATUS, MODE_INVENTORY, MODE_USE].contains(&vt).then_some((vt, m))
+}
+
+/// the page the cut is in (`pause_page`), opened over the imported field: Status (`+0x130` allocating, `+0x134`
+/// the values when it started, `+0x144` the values being allocated, `+0x154` the blink counter), Inventory (`+0x11C`
+/// tab, `+0x120` scroll top, `+0x124` selection) with its Use dialog when that mode runs (the Inventory then in
+/// the mode stack's saved modes, `0x03000F9C`..)
+fn open_pause_page(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
+    let Some((vt, m)) = pause_page(ram) else { return };
+    if w.data.menu.is_none() {
+        return;
+    }
+    let screen = if vt == MODE_STATUS {
+        let mut s = wf_core::menu::status::Status::new(w);
+        s.alloc = ram.r32(m + 0x130) != 0;
+        s.blink = ram.r32(m + 0x154);
+        for k in 0..4 {
+            s.orig[k] = ram.s32(m + 0x134 + 4 * k as u32);
+            s.vals[k] = ram.s32(m + 0x144 + 4 * k as u32);
+        }
+        wf_core::menu::Screen::Status(s)
+    } else {
+        let inv = if vt == MODE_INVENTORY {
+            Some(m)
+        } else {
+            let depth = ram.r32(MODE + 8).min(8);
+            (0..depth).map(|k| ram.r32(MODE + 0xC + 4 * k)).find(|&o| ram.valid(o) && ram.r32(o) == MODE_INVENTORY)
+        };
+        let Some(inv) = inv else { return };
+        let p = wf_core::menu::inventory::Inventory::imported(w, ram.r32(inv + 0x11C) as u8, ram.s32(inv + 0x120), ram.s32(inv + 0x124), vt == MODE_USE);
+        wf_core::menu::Screen::Inventory(p)
+    };
+    wf_core::menu::open_imported(w, screen);
+    w.menu.held = ram.r16(0x0300_3300 + 2);
+    notes.push(format!("a pause page (mode {vt:#x}): the field from the saved world"));
+}
+
 fn field_from_ram(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
     import_objects(w, ram, notes);
     import_trigger_resume(w, ram);
@@ -2295,6 +2341,12 @@ fn build_event_entry(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner:
 /// the load's scripts and plays the held frames of a blocking on-enter script; keep using the same host for the
 /// replay (its running script / queue are part of the state).
 pub fn import_emulator_state(data: &Arc<GameData>, ram: &GbaRam, runner: &mut StoryHost) -> Result<Imported, ImportError> {
+    // a cut inside a pause page (Status / Inventory / its Use dialog): the field from the saved world, then the page
+    if let Some(page_ram) = pause_page(ram).and(ram.with_saved_world()) {
+        let mut imp = import_emulator_state(data, &page_ram, runner)?;
+        open_pause_page(&mut imp.world, ram, &mut imp.notes);
+        return Ok(imp);
+    }
     let info = inspect(ram);
     runner.text_open_due = None;
     // an area entry inside a running event (a script's warp): the event's position from the scene objects
@@ -2371,6 +2423,7 @@ pub fn import_emulator_state(data: &Arc<GameData>, ram: &GbaRam, runner: &mut St
     }
     check(&mut world, ram, &mut notes);
     import_vram(&mut world, ram);
+    import_boss_bar(&mut world, ram);
     // a text box opened by the import whose object the game makes later in the cut's iteration: its tiles now
     if let Some(p) = runner.text_open_due.take() {
         wf_core::vram::text_open(&mut world, p);
@@ -2449,6 +2502,31 @@ fn check(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
 /// the object tile allocator (`0x03001C4C`, vram.rs) as the RAM holds it; the actors' blocks (obj +0xC) belong to
 /// their entities (matched by position like `check`), the shadows' to their shared graphics (`0x03002B88` + 4k:
 /// reference count, handle +2); other blocks stay foreign
+/// the boss HP bar object (vtable 0x0804CE28) -> `scene.boss_bar` / `boss_bar_out`: +0x10 the enemy (matched by
+/// position), +0x15 / +0x16 the fill's base and span (`a * 53 / 100`, `b * 53 / 100 - base`: a / b recovered as the
+/// smallest percentages giving them), +0x17 the velocity (+1 sliding in, 0 shown, -1 hidden: sliding out with the
+/// fill frozen in +0x15), +0x18 y
+fn import_boss_bar(w: &mut World, ram: &GbaRam) {
+    w.scene.boss_bar_out = None;
+    let Some(o) = ram.objects().into_iter().find(|&o| ram.r32(o) == 0x0804_CE28) else {
+        w.scene.boss_bar = None;
+        return;
+    };
+    let (lo, span, vel, y) = (ram.r8(o + 0x15) as i32, ram.r8(o + 0x16) as i32, ram.s8(o + 0x17), ram.s8(o + 0x18));
+    if vel < 0 {
+        w.scene.boss_bar = None;
+        w.scene.boss_bar_out = Some(wf_core::scene::BossBarOut { fill: lo, y, at: w.frame });
+        return;
+    }
+    let e = ram.r32(o + 0x10);
+    let (ex, ey) = (ram.s32(e + 0x1A0), ram.s32(e + 0x1A4));
+    let ent = w.ents.iter().find(|t| !t.removed && matches!(&t.body, Body::Enemy(n) if n.a.x == ex && n.a.y == ey)).map(|t| t.id);
+    let Some(entity) = ent.or(w.scene.boss_bar.as_ref().map(|b| b.entity)) else { return };
+    let pct = |v: i32| (v * 100 + 52) / 53;
+    // y = -8 + (frame - at), capped at 8
+    w.scene.boss_bar = Some(wf_core::scene::BossBar { entity, a: pct(lo), b: pct(lo + span), at: w.frame.wrapping_sub((y + 8) as u32) });
+}
+
 fn import_vram(w: &mut World, ram: &GbaRam) {
     use wf_core::vram::{ObjVram, Owner, VramState, ENTRIES, UNITS};
     const A: u32 = 0x0300_1C4C;

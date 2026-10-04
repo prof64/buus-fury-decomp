@@ -263,6 +263,8 @@ pub struct Ui {
     frame: Indexed,
     /// the stat-points mark's four 16x16 frames side by side (`ui/hud/stat_mark.png`; older content has none)
     stat_mark: Option<Indexed>,
+    /// the boss HP bar's 54 fill levels, 64x8 each, stacked (`ui/hud/boss_bar.png`)
+    boss_bar: Option<Indexed>,
     ss: Indexed,
     ss3: Indexed,
     hp: Vec<Vec<(u32, u32)>>,
@@ -406,6 +408,7 @@ impl Ui {
         Ok(Ui {
             frame: png(packs, "ui/hud/frame.png")?,
             stat_mark: png(packs, "ui/hud/stat_mark.png").ok(),
+            boss_bar: png(packs, "ui/hud/boss_bar.png").ok(),
             ss: png(packs, "ui/hud/gauge_ss.png")?,
             ss3: png(packs, "ui/hud/gauge_ss3.png")?,
             hp: steps(&h["steps"]["hp"]),
@@ -432,6 +435,21 @@ impl Ui {
             self.icons.insert(key.clone(), v);
         }
         self.icons.get(&key).and_then(|x| x.as_ref())
+    }
+
+    /// The boss HP bar at fill `k` (0..=53) as 64x8 ARGB (alpha 0 = transparent)
+    pub fn boss_bar(&self, k: u8) -> Option<Vec<u32>> {
+        let im = self.boss_bar.as_ref()?;
+        let mut out = vec![0u32; 64 * 8];
+        for y in 0..8usize {
+            for x in 0..64usize {
+                let c = *im.idx.get((k as usize * 8 + y) * im.w as usize + x)?;
+                if c != 0 {
+                    out[y * 64 + x] = (im.palette.get(c as usize).copied().unwrap_or(0) & 0xFF_FFFF) | (c as u32) << 24;
+                }
+            }
+        }
+        Some(out)
     }
 
     /// The stat-points mark's frame `k` as 16x16 ARGB (alpha 0 = transparent; OBJ palette order like the HUD)

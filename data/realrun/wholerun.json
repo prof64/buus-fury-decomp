@@ -1,32 +1,37 @@
 {
- "tree": "af746f9",
+ "tree": "ec8ed97",
  "modes": [
   {
    "lag": "recorded",
    "rows": 1668052,
-   "exact_to": 153132,
-   "exact_stretch": "E2_earth",
-   "first": "rng: app [ddf7897e, 38c3c1f0] game [234beb00, fbe02e0f]",
+   "exact_to": 848743,
+   "exact_stretch": "017_db6_fukurou",
+   "first": "flags: flag 187 app only",
    "lasting": {
     "area": {
-     "row": 191502,
-     "stretch": "E2_earth",
-     "what": "app (7, 6) game (7, 5)"
+     "row": 1340399,
+     "stretch": "062_m_inside_buu",
+     "what": "app (18, 13) game (20, 7)"
     },
     "depth": {
-     "row": 157288,
-     "stretch": "E2_earth",
+     "row": 1339675,
+     "stretch": "062_m_inside_buu",
      "what": "app 0 game 1"
     },
+    "flags": {
+     "row": 1340399,
+     "stretch": "062_m_inside_buu",
+     "what": "flag 125 game only"
+    },
     "pos": {
-     "row": 153481,
-     "stretch": "E2_earth",
-     "what": "app (75106, 26371, 2) game (89866, 22591, 2)"
+     "row": 1339278,
+     "stretch": "062_m_inside_buu",
+     "what": "app (67616, 65888, 1) game (66208, 62176, 1)"
     },
     "rng": {
-     "row": 155477,
-     "stretch": "E2_earth",
-     "what": "app [fe64f9df, 2182bc82] game [c4108aa3, b1d2d47c]"
+     "row": 1339017,
+     "stretch": "062_m_inside_buu",
+     "what": "app [1ef9a3fb, 690f82db] game [fd587251, 077b5510]"
     }
    },
    "sim_lag": 0,
@@ -37,29 +42,34 @@
   {
    "lag": "none",
    "rows": 1668052,
-   "exact_to": 191429,
-   "exact_stretch": "E2_earth",
-   "first": "rng: app [86a66828, bd6dac89] game [bd49b949, 46b31d92]",
+   "exact_to": 848743,
+   "exact_stretch": "017_db6_fukurou",
+   "first": "flags: flag 187 app only",
    "lasting": {
     "area": {
-     "row": 218948,
-     "stretch": "000_ship_c14",
-     "what": "app (0, 1) game (7, 6)"
+     "row": 1340399,
+     "stretch": "062_m_inside_buu",
+     "what": "app (18, 13) game (20, 7)"
     },
     "depth": {
-     "row": 215895,
-     "stretch": "000_ship_c14",
+     "row": 1339675,
+     "stretch": "062_m_inside_buu",
      "what": "app 0 game 1"
     },
+    "flags": {
+     "row": 1340399,
+     "stretch": "062_m_inside_buu",
+     "what": "flag 125 game only"
+    },
     "pos": {
-     "row": 198600,
-     "stretch": "E2_earth",
-     "what": "app (111264, 96639, 3) game (79350, 94803, 2)"
+     "row": 1339278,
+     "stretch": "062_m_inside_buu",
+     "what": "app (67616, 65888, 1) game (66208, 62176, 1)"
     },
     "rng": {
-     "row": 191502,
-     "stretch": "E2_earth",
-     "what": "app [6f555d36, 5e868b48] game [c1658938, 7a86e4b8]"
+     "row": 1339017,
+     "stretch": "062_m_inside_buu",
+     "what": "app [1ef9a3fb, 690f82db] game [fd587251, 077b5510]"
     }
    },
    "sim_lag": 0,

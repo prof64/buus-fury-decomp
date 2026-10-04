@@ -141,7 +141,10 @@ fn main() {
     let (mut tot_frames, mut tot_exact) = (0usize, 0usize);
     for a in &args {
         let p = PathBuf::from(a);
-        let doc = wf_import::segment::load(&p).expect("segment");
+        let Ok(doc) = wf_import::segment::load(&p) else {
+            println!("{a}: no segment");
+            continue;
+        };
         let name = doc["name"].as_str().unwrap_or("?").to_string();
         let Some((want, game)) = read_fb(&fb_dir.join(format!("{name}.fb"))) else {
             println!("{name}: no screen dump");
@@ -154,6 +157,17 @@ fn main() {
         let rep = wf_import::segment::replay_with(&data, &files, &doc, &mut |f| match f {
             wf_import::segment::Frame::Before(_, w) => presenter.before_step(w),
             wf_import::segment::Frame::After(k, w) => {
+                // PIX_TRACE=a-b: the view's screen-space extras per frame (boss bars) for frame-by-frame checks
+                if let Some((a, b)) = std::env::var("PIX_TRACE").ok().and_then(|v| {
+                    let (a, b) = v.split_once('-')?;
+                    Some((a.parse::<usize>().ok()?, b.parse::<usize>().ok()?))
+                }) {
+                    if (a..=b).contains(&k) {
+                        let mut view = RenderView::default();
+                        wf_core::view::render_view(w, &mut view);
+                        eprintln!("trace {k} frame {} fc0 {} play {} menu {} anim {:?} boss {:?} screen {:?} fade_black {} pal {:?}", w.frame, w.g.fc0, w.story.play_frames, view.menu.is_some(), view.map.as_ref().map(|m| m.anim_frame), view.boss_bars, w.scene.screen, view.fade_black, view.palette_fade);
+                    }
+                }
                 let Some(&i) = at.get(&k) else { return };
                 let mut view = RenderView::default();
                 wf_core::view::render_view(w, &mut view);

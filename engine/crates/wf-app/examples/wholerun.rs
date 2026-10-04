@@ -116,7 +116,8 @@ fn main() {
     let mut lines = raw.map(|l| serde_json::from_str::<serde_json::Value>(&l.expect("line")).expect("row")).peekable();
     let mut first_exact: Option<(usize, String)> = None;
     // lasting divergences per field: (count of consecutive bad rows, first row of the run, reported)
-    let mut lasting: Vec<(&str, usize, usize, Option<(usize, String)>)> = ["area", "pos", "rng", "depth"].iter().map(|n| (*n, 0, 0, None)).collect();
+    let mut game_flags: Vec<u8> = Vec::new();
+    let mut lasting: Vec<(&str, usize, usize, Option<(usize, String)>)> = ["area", "pos", "rng", "depth", "flags"].iter().map(|n| (*n, 0, 0, None)).collect();
     let (mut stepped, mut own_lag, mut replayed_lag, mut lag_bad) = (0usize, 0usize, 0usize, 0usize);
     let mut errors = 0usize;
     let (mut load_watch, mut load_bad): (Option<(usize, usize)>, usize) = (None, 0);
@@ -264,6 +265,20 @@ fn main() {
         if !menu && in_field && (w.scene.depth as i64 > 0) != (gd > 0) {
             bad.push(("depth", format!("app {} game {gd}", w.scene.depth)));
         }
+        if let (Some(fl), true) = (std::env::var("WR_FLAG").ok().and_then(|v| v.parse::<usize>().ok()), show.is_some_and(|(a, b)| a <= k && k <= b)) {
+            println!("    flag {fl}: app {}", (w.story.flags.get(fl >> 3).copied().unwrap_or(0) >> (fl & 7)) & 1);
+        }
+        // the story flags (GameData +0x55; a row carries them when they changed): every flag, both ways
+        if let Some(h) = r.get("flags").and_then(|v| v.as_str()) {
+            game_flags = (0..h.len() / 2).filter_map(|j| u8::from_str_radix(&h[2 * j..2 * j + 2], 16).ok()).collect();
+        }
+        if complete && !menu && w.field.is_some() && !game_flags.is_empty() {
+            let n = game_flags.len().min(w.story.flags.len());
+            if let Some(f) = (0..n * 8).find(|&f| (game_flags[f >> 3] >> (f & 7)) & 1 != (w.story.flags[f >> 3] >> (f & 7)) & 1) {
+                let game_on = (game_flags[f >> 3] >> (f & 7)) & 1 != 0;
+                bad.push(("flags", format!("flag {f} {}", if game_on { "game only" } else { "app only" })));
+            }
+        }
         if first_exact.is_none() {
             if let Some((f, d)) = bad.first() {
                 first_exact = Some((k, format!("{f}: {d}")));
@@ -302,6 +317,9 @@ fn main() {
         if std::env::var("WR_STORY").ok().and_then(|v| v.parse::<usize>().ok()) == Some(k) {
             let st = &w.story;
             println!("STORY row {k} flags {} l {:?} g {:?} current {} zenie {}", st.flags.iter().map(|b| format!("{b:02x}")).collect::<String>(), st.l, st.g, st.current, st.zenie);
+            let mut c = w.clone();
+            wf_core::story::sync_from_players(&mut c);
+            println!("STORY row {k} chars {:?}", c.story.chars.iter().enumerate().map(|(i, ch)| (i, ch.rec.hp, ch.rec.max_hp, ch.rec.ep, ch.rec.max_ep, ch.rec.xp, ch.rec.level)).collect::<Vec<_>>());
         }
         // WR_SUP=1: our supplies whenever they change (the game's rows carry none: compare with a cut's RAM)
         if std::env::var_os("WR_SUP").is_some() {
@@ -316,7 +334,7 @@ fn main() {
         if std::env::var_os("WR_HP").is_some() && logic && next_lf.is_some_and(|n| n != lf) && !menu {
             let mut c = w.clone();
             wf_core::story::sync_from_players(&mut c);
-            let ours = c.story.chars.get(c.story.current.max(0) as usize).map(|ch| ch.rec.hp as i64);
+            let ours = c.story.chars.get(c.story.levelup_char.unwrap_or(c.story.current).max(0) as usize).map(|ch| ch.rec.hp as i64);
             let game = r["hp"].as_i64();
             let bad = ours.is_some() && game.is_some() && ours != game;
             if bad != hp_bad {

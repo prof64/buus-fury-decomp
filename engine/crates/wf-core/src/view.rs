@@ -114,6 +114,13 @@ pub fn render_view(w: &World, out: &mut RenderView) {
         });
         out.world_map = Some(wm);
     }
+    // boss HP bars (the shown one, one sliding out)
+    if let Some(b) = &w.scene.boss_bar {
+        out.boss_bars.push(wf_view::BossBarView { y: b.y(w.frame), fill: b.fill(w).clamp(0, 53) as u8 });
+    }
+    if let Some((b, y)) = w.scene.boss_bar_out.as_ref().and_then(|b| Some((b, b.y_at(w.frame)?))) {
+        out.boss_bars.push(wf_view::BossBarView { y, fill: b.fill.clamp(0, 53) as u8 });
+    }
     if let Some((text, t)) = w.scene.banner.as_ref().filter(|b| b.1 <= 238) {
         out.banner = Some(wf_view::BannerView { text: text.clone(), t: *t });
     }
@@ -232,6 +239,7 @@ pub fn render_view(w: &World, out: &mut RenderView) {
     }
     // cutscene presentation: fade, dialog box
     out.fade_black = crate::scene::fade_black(w);
+    script_fade(w, out);
     if let Some(d) = &w.scene.dialog {
         if d.phase != crate::scene::DialogPhase::Closed {
             let text_box = d.kind != 3;
@@ -296,6 +304,56 @@ fn stat_mark_frame(w: &World) -> Option<u8> {
     Some(((w.frame.wrapping_sub(v.stat_at) >> 3) & 3) as u8)
 }
 
+/// the script screen fades as the palette writes they make each update (`t` steps of `len`, l = t * 256 / len):
+/// fade_out (`0x080177D2` -> `0x080176D6`) / fade_out_white (`0x0801782C` -> `0x0801774C`) scale the palette as
+/// it was toward black / white by l; fade_in (`0x08017806` -> `0x080070CC`) / fade_in_white (`0x0801785C` ->
+/// `0x080070DA`) write the fade routine `0x08007074` from the stored colours at 256 - l toward black / white;
+/// flash_white (`0x08017888`, len = 2 n) toward white at t * 256 / n, then (2 n - t) * 256 / n. A finished fade to
+/// white leaves the palette white (`Screen.white` 16)
+fn script_fade(w: &World, out: &mut RenderView) {
+    use crate::scene::FadeKind;
+    let s = &w.scene.screen;
+    const WHITE: u32 = 0xFF_FFFF;
+    let pf = |level: i32, target: u32| wf_view::PaletteFade { level: level.clamp(0, 256) as u16, target };
+    match &s.fade {
+        Some(f) => {
+            let t = f.t.clamp(0, f.len);
+            let l = t * 256 / f.len.max(1);
+            match (f.kind, f.out) {
+                (FadeKind::Black, true) => {
+                    out.palette_scale = Some(pf(l, 0));
+                    out.fade_black = 0;
+                }
+                (FadeKind::Black, false) => {
+                    out.palette_fade = Some(pf(256 - l, 0));
+                    out.fade_black = 0;
+                }
+                (FadeKind::White, true) => out.palette_scale = Some(pf(l, WHITE)),
+                (FadeKind::White, false) => {
+                    out.palette_fade = Some(pf(256 - l, WHITE));
+                    out.fade_black = 0;
+                }
+                (FadeKind::Flash, _) => {
+                    let n = (f.len / 2).max(1);
+                    out.palette_fade = Some(pf(if t <= n { t * 256 / n } else { (2 * n - t) * 256 / n }, WHITE));
+                }
+                (FadeKind::Mosaic, _) => {}
+            }
+        }
+        None if s.white >= 16 => out.palette_scale = Some(pf(256, WHITE)),
+        None => {}
+    }
+    // screen_flash (0x4C, command vtable 0x0804C800): counter c = len - t, level (256 / (len / 2)) * (c while
+    // c <= len / 2, else len - c) toward (r, g, b) through `0x08007074` (update 0x08015A30)
+    if let Some(fl) = &s.flash {
+        let half = (fl.len / 2).max(1);
+        let c = fl.len - fl.t;
+        let x = if c <= half { c } else { fl.len - c };
+        let (r, g, b) = fl.rgb;
+        out.palette_fade = Some(pf((256 / half) * x, (r as u32) << 16 | (g as u32) << 8 | b as u32));
+    }
+}
+
 /// the frame's events as frontend events
 pub fn sim_events(w: &World, out: &mut Vec<SimEvent>) {
     for e in &w.events {
@@ -319,7 +377,7 @@ pub fn sim_events(w: &World, out: &mut Vec<SimEvent>) {
 #[derive(Clone, Debug, Default)]
 pub struct Presenter {
     #[allow(clippy::type_complexity)]
-    prev: Option<(Vec<SpriteDraw>, Vec<HudView>, Option<wf_view::BannerView>, Option<wf_view::DialogView>, Option<wf_view::DialogAnim>)>,
+    prev: Option<(Vec<SpriteDraw>, Vec<HudView>, Option<wf_view::BannerView>, Option<wf_view::DialogView>, Option<wf_view::DialogAnim>, Vec<wf_view::BossBarView>)>,
     prev_mode7: Option<wf_view::Mode7View>,
 }
 
@@ -328,16 +386,17 @@ impl Presenter {
         let mut v = RenderView::default();
         render_view(w, &mut v);
         self.prev_mode7 = v.map.as_ref().and_then(|m| m.mode7.clone());
-        self.prev = Some((v.sprites, v.hud, v.banner, v.dialog, v.dialog_anim));
+        self.prev = Some((v.sprites, v.hud, v.banner, v.dialog, v.dialog_anim, v.boss_bars));
     }
     /// the session started mid-area (harnesses): nothing of the previous build to show
     pub fn reset(&mut self) {
         *self = Presenter::default();
     }
     pub fn apply(&self, out: &mut RenderView) {
-        if let Some((sprites, hud, banner, dialog, anim)) = &self.prev {
+        if let Some((sprites, hud, banner, dialog, anim, boss_bars)) = &self.prev {
             out.sprites = sprites.clone();
             out.hud = hud.clone();
+            out.boss_bars = boss_bars.clone();
             out.banner = banner.clone();
             out.dialog = dialog.clone();
             // the box OBJs are a frame late; the text surface is redrawn and uploaded every frame (the typewriter

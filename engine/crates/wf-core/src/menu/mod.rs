@@ -452,6 +452,19 @@ pub fn open(w: &mut World, screen: Screen, tr: Transition, scripted: bool) {
     }
 }
 
+/// A pause page shown at an import's cut (wf-import: a cut inside the Status / Inventory pages, the world saved):
+/// the page as the game holds it - running, its surface drawn and on screen, the field's sprite blocks freed
+pub fn open_imported(w: &mut World, mut screen: Screen) {
+    w.menu = Menu { phase: Phase::Run, tr: PAUSE, settings: w.menu.settings, ..Menu::default() };
+    crate::vram::world_hide(w);
+    screen.page_mut().before_draw(w);
+    screen.container().drawn = true;
+    screen.container().ever = true;
+    w.menu.shown = Some(Box::new(screen.clone()));
+    screen.page_mut().after_draw(w);
+    w.menu.stack = vec![screen];
+}
+
 /// is a menu screen up (the world does not update)?
 pub fn active(w: &World) -> bool {
     w.menu.phase != Phase::Idle

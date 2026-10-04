@@ -769,6 +769,8 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
     w.scene.visuals.retain(|v| v.kind != crate::scene::VisualKind::EnergySphere);
     crate::vram::release(w, crate::vram::Owner::Ending);
     crate::vram::release(w, crate::vram::Owner::BossBar);
+    w.scene.boss_bar = None;
+    w.scene.boss_bar_out = None;
     crate::vram::release(w, crate::vram::Owner::Banner);
     for i in 0..w.ents.len() {
         crate::vram::entity_gone(w, i);

@@ -146,6 +146,25 @@ impl GbaRam {
         (0..self.ewram.len() / 4).map(|k| 0x0200_0000 + 4 * k as u32).filter(|&a| self.r32(a) == vt).collect()
     }
 
+    /// A pause page's cut: the field torn down while the page shows. The world save `0x08011DB4` copies the object
+    /// world (0xE00 bytes at [`OBJW`]) into a heap block (pointer at `OBJW + 0xBF8`) and clears the live lists; the
+    /// objects themselves stay in the heap, and `0x08011E0E` copies the block back on the close. This RAM with the
+    /// block restored and the leader pointer set (the close's message 0xB does that): None when the world is live
+    pub fn with_saved_world(&self) -> Option<GbaRam> {
+        let saved = self.r32(OBJW + 0xBF8);
+        if self.r32(OBJW + 4) != 0 || !(EWRAM..EWRAM + EWRAM_SIZE as u32).contains(&saved) || self.r32(PLAYER) != 0 {
+            return None;
+        }
+        let block = self.read(saved, 0xE00);
+        let mut r = self.clone();
+        let o = (OBJW - IWRAM) as usize;
+        r.iwram[o..o + 0xE00].copy_from_slice(&block);
+        let p = r.objects().into_iter().find(|&o| r.r32(o) == VT_PLAYER)?;
+        let po = (PLAYER - IWRAM) as usize;
+        r.iwram[po..po + 4].copy_from_slice(&p.to_le_bytes());
+        Some(r)
+    }
+
     /// the object world's pointers in list order (the game updates them last to first)
     pub fn objects(&self) -> Vec<u32> {
         let n = (self.r32(OBJW + 4) as usize).min(256);

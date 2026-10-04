@@ -3880,6 +3880,18 @@ player (MeleeAttack on enter); IT runs past a trigger pick / a gone pick; the le
 its text box (40 rows: 0 -> 40 / 40). **Not done:** 967,102 .. 967,282 (and 968,262) are the pause menu's Status /
 Inventory / item-use pages with the field torn down (world saved to the heap by 0x08011DB4) - needs page-state
 importers for those menus; resync loses nothing (it resumes at 967,522).
+*Hand-off to the ship-fixes agent (menu owner, by the coordinator): pause-menu page importers.* What A found
+(whole-run cuts `work/wholerun/cuts/c967102.ss`, `c967162.ss`, `c967282.ss`; private copies with 2-row docs in
+`/tmp/wrcuts`): the game is in the pause menu using an item mid-fight. Main-loop mode (0x03000F90) vts: Status page
+0x0804AC88, Inventory 0x08049D48, the item-use dialog 0x0804ACB4, between the menu's fade modes 0x0804A920 (opening
+fade-out: +4 brightness left from 256, +8 step 16 - already imported as `Phase::FadeOut` in `build_mid`), 0x080493C8
+and 0x0804956C. While a page is up the field is torn down: the world list is empty and there is no player, which is
+why the importer reports "the load's on-enter script is still blocked (no leader)". The field is recoverable: the
+save routine 0x08011DB4 copies 0xE00 bytes of the world struct into a heap buffer (pointer at world +0xBC0 +0x38)
+and clears the live list; 0x08011E0E restores it. So an importer would (1) rebuild the field from that heap copy
+instead of the live list, then (2) open our page with its RAM state - Status / Inventory cursors, the use dialog's
+selection, the fade phase. No page has a RAM importer today (`inventory::open_json` returns None; Status has none).
+The same cycle recurs at row 968,262.
 
 **Claim (dungeon agent B, 2026-10-04): the whole run's Janemba-chapter rule stops** (stretches 035_j00_yemma ..
 the last j / h / HFIL stretch before Super Buu's 051_sb_start), from 1,107,691 (042_h_statues) on. **Super Buu
@@ -4075,3 +4087,39 @@ not drawn), BG priority / hidden / blend 1,672 (left after the fixes above), the
 313 (32: `screen.white`, not in the view), menus 200, **the palette flash** 86 (`screen.flash`, not in the view),
 BG offset 24. Next: the boss bar, the timer display, white fade / palette flash, then the untagged sprite class.
 Not a gate condition yet (no segment is held to pixels until its whole sample is exact).
+
+**Done (Earth agent): the no-lag title -> Earth soak's crowd-wander stop (row 190,577) - a menu close that never
+gave the field its sprite memory back.** The crowd NPCs' wander draws were right; their *update order* was not: at
+row 190,435 (7-5, s302's text box) our purge suspended and re-appended five NPCs (`vram::restore`), the game's list
+stayed in creation order, so the wander RNG went to the wrong NPCs from 190,577. The purge came from **dead owners in
+the field's sprite memory** (entities 538 / 539 from 3-2, 815 .. 840 from 7-3; soak `SOAK_VLEAK=1` prints the first
+rows): a pause page closed by its done check (START, `Action::Done`) or a `PopDone` close jumps to `Leave { t: 1 }`,
+skipping the leave's first frame, where `world_show` gives back the stashed allocator - the field then ran on the
+page's fresh allocator, and the next menu's close restored the old stash (row 83,684 Status page -> row 89,299).
+`menu::world_back` (the old t == 0 block) now also runs in those two close paths. **The whole title -> Earth chain
+(201,926 rows) is now exact on every logic row in no-lag mode**; recorded-lag mode still stops at 152,537 (the punch
+machine's counter under recorded lag - not recreated by design). Soak tools added: `SOAK_NPC=1` (NPCs and story
+flags, app vs import, with `--diff-seg`), `SOAK_VLEAK=1`.
+*Area-local harness side (in progress):* wf-import `area.rs` compares the soak agent's `data/segments/area` rows
+(`SEGMENT_AREA=1`; not yet locked): 466 / 503 gates clean with the trigger list compared in reverse order (ours is
+the game's list reversed - to confirm before locking). Open so far: event triggers with touch-once activation that the
+game keeps in its list after they fired while ours removes them (dr4_001, earth_2_8_1, db7_001, 7-3 s262, 8-16
+s319 ...; keeping them refires in ours - the game's removal rule "unless list+0xC8 changed during the activation"
+needs the trigger generation counter; next); walk-grid changes in a few 3-x / 4-1 / 1-3 cuts; rkb cuts (import).
+
+**No-lag whole run, B's stops (2026-10-04).**
+* **813,244 (012_db5_a01, pos: ours KO'd, the game hurt) - fixed: a stale shop list.** The BUY screen's item list
+  (`shop_add_item` 0xCD into `scene.shop`) was cleared only by `menu_closed`, which the real menu screens never reach
+  (`wf_core::menu::take_result` path): every later shop showed the earlier shops' entries first. West City 4-1's
+  Z-Mart listed the Earth shop's five supplies before its own, so the route's cursor bought Mix Seed (supply 2, +80
+  HP) instead of Seed of Life (3, +120); 11,000 rows later the heal left the player 40 HP short and a hit KO'd him.
+  `wf-script-core` lib.rs: the BUY native's result clears the list. With it the no-lag run from cut 191,430 is exact
+  (RNG, area, position **and the leader's HP on every logic row**, `WR_HP=1`) to **1,339,017**.
+* `examples/wholerun.rs` diagnosis switches: `WR_HP=1` (leader HP vs the row's, by the levelling fusion member as
+  GameData+0), `WR_SUP=1` (our supplies when they change), `WR_STORY=ROW` (flags, script words, every record).
+* **1,339,017 (inside Buu, s473): the WanderToRandomPoint heap leftover** (Super Buu agent's write-up above):
+  Vegeta's first wander step heads for whatever the freed heap block held (here the text box's glyph-writer words:
+  x step -132 vs ours -105 from f2,176 of `m_062`), so ours is 7 frames ahead on his path and enters idle (its
+  rand(255)) at 2,401. Every no-lag stop in 062 (1,339,017 .. 1,354,524) is this wander. Reproducing it from power-on
+  needs a byte-level heap model (every allocation in order with its size and the bytes each object leaves) - the
+  Super Buu agent's recommendation was not to; **decision for the coordinator** (B has not started it).

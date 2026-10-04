@@ -53,6 +53,8 @@ pub struct RenderView {
     pub cameras: Vec<CameraView>,
     /// HUD values per player slot.
     pub hud: Vec<HudView>,
+    /// Boss HP bars (`ui/hud/boss_bar.png`): two 32x8 OBJs at screen x 160 / 192, priority 1.
+    pub boss_bars: Vec<BossBarView>,
     /// Screen brightness fade: 0 = normal, 16 = black (GBA BLDY semantics, applied after composition).
     pub fade_black: u8,
     /// The dialogue box, if one is open (drawn above everything, like the game's priority-0 OBJs).
@@ -63,6 +65,10 @@ pub struct RenderView {
     /// original RGB888 colours), used by area transitions (brightness 256 -> 0 by 8 per frame) and screen fades.
     /// Applied to every colour before composition; `None` = no fade. Takes precedence over `fade_black`.
     pub palette_fade: Option<PaletteFade>,
+    /// The script fades out (`fade_out` / `fade_out_white`: `0x080176D6` / `0x0801774C`), which scale the palette
+    /// as it was (BGR555) toward the target: `(c5 * (256 - level) + t5 * level) >> 8` per 5-bit channel (t5 = 31 for
+    /// white). Applied like `palette_fade`; `None` = none.
+    pub palette_scale: Option<PaletteFade>,
     /// World-map (mode 7) extras the renderer cannot derive from `MapView.mode7` alone; `None` = defaults (see
     /// [`WorldMapView`]).
     pub world_map: Option<WorldMapView>,
@@ -294,6 +300,8 @@ impl RenderView {
         self.fade_black = 0;
         self.dialog = None;
         self.palette_fade = None;
+        self.palette_scale = None;
+        self.boss_bars.clear();
         self.banner = None;
         self.world_map = None;
         self.dialog_anim = None;
@@ -409,6 +417,15 @@ pub struct HudView {
     /// The stat-points mark ("STAT" + arrow, 16x16 at screen x 92 beside the HUD) while the leader has points to
     /// spend: its animation frame 0..3 (`ui/hud/stat_mark.png`), `None` = no mark.
     pub stat_mark: Option<u8>,
+}
+
+/// A boss HP bar (script `show_boss_bar`, object vtable 0x0804CE28).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub struct BossBarView {
+    /// screen y of its top (slides in from -8 to 8)
+    pub y: i32,
+    /// filled steps 0..=53 (row `fill` of `ui/hud/boss_bar.png`)
+    pub fill: u8,
 }
 
 /// Non-state outputs of a step, in emission order.
