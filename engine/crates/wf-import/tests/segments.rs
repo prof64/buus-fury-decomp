@@ -96,7 +96,14 @@ fn segments_match_the_game() {
         }
         if !ok {
             eprintln!("    counts {:?}", rep.counts);
-            failed.push(name);
+            failed.push(name.clone());
+        }
+        // SEGMENT_RECS=1 (report only): the characters' state against the game's (tools/segments/recs.py rows;
+        // wf_import::recs) at the rows where the game's changed, while the segment matches
+        if let Some(t) = &rep.recs {
+            eprintln!("    recs {name}: {} checks, {} differ{}{}", t.checks, t.bad_rows, t.first.as_ref().map(|f| format!(" - first at f{} {:?}", f.0, f.1)).unwrap_or_default(), if t.fields.is_empty() { String::new() } else { format!(" fields {:?}", t.fields) });
+        } else if rep.recs_missing {
+            eprintln!("    recs {name}: no game rows (tools/segments/recs.py)");
         }
     }
     if strict {

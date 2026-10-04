@@ -645,7 +645,11 @@ impl StoryHost {
         self.collect(&pre);
         let before = self.started.len();
         self.run_queue(&mut sess.world);
-        let fresh = self.started.len() > before;
+        // (the title's New Game: the prologue hook #4 ran in the New Game iteration, whose lag frames come before
+        // this first field frame - its scene enter is over now, as the playthrough harness starts it two video
+        // frames earlier: the whole run from the reset, f852 / f854)
+        let new_game = pre.iter().any(|e| matches!(e, Event::Field(FieldEvent::Run { run: Callback::Event(id), cause: Cause::Menu, .. }) if id == "s004"));
+        let fresh = self.started.len() > before && !new_game;
         let n0 = sess.world.events.len();
         sess.step_update();
         wf_script_core::tick_timers(&mut sess.world, &mut self.hs);

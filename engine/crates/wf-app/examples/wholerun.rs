@@ -35,8 +35,11 @@ fn main() {
     let (c, _) = wf_extract::extract_rom(&rom, &Default::default(), &mut |_| {});
     let packs = Packs::new(vec![Box::new(MemSource(c.files)) as Box<dyn FileSource>]).unwrap();
     let data = wf_app::battle::load_data(&packs).expect("data");
-    let cfg = wf_core::field::FieldConfig { world: 1, area: 1, rng: wf_core::battle::RngInit::Seed(1), ..Default::default() };
+    // (the RNG words at power-on: cleared RAM, [0, 0] - the game draws nothing until the prologue)
+    let cfg = wf_core::field::FieldConfig { world: 1, area: 1, rng: wf_core::battle::RngInit::State(0, 0), ..Default::default() };
     let mut session = wf_core::session::Session::new_field(data, cfg);
+    // (the placeholder field under the title is ours only: its build's draws are not the game's - as `title_world`)
+    session.world.rng = wf_core::rng::Rng::new(0, 0);
     // (--no-boot: the title at once, as the launcher opens it today)
     if args.iter().any(|a| a == "--no-boot") {
         wf_core::menu::title::open_title(&mut session.world);
@@ -116,14 +119,16 @@ fn main() {
         let mut bad: Vec<(&str, String)> = vec![];
         let ga = (r["area"][0].as_i64().unwrap_or(-1), r["area"][1].as_i64().unwrap_or(-1));
         let aa = w.field.as_ref().map(|f| (f.area.world as i64, f.area.area as i64)).unwrap_or((-1, -1));
-        let in_field = ga != (0, 0) && !r["p"].is_null();
+        // (a lag row's RAM is the middle of a long iteration - an area load's half-built player and its draws: only
+        // the logic rows are compared)
+        let in_field = ga != (0, 0) && !r["p"].is_null() && logic;
         if !menu && in_field && aa != ga {
             bad.push(("area", format!("app {aa:?} game {ga:?}")));
         }
         let ap = w.player_idx(0).map(|pi| (w.pl_ref(pi).a.x as i64, w.pl_ref(pi).a.y as i64, w.pl_ref(pi).a.facing as i64));
         if let (Some(p), Some(g)) = (ap, r["p"].as_array()) {
             let g = (g[0].as_i64().unwrap_or(0), g[1].as_i64().unwrap_or(0), g[2].as_i64().unwrap_or(0));
-            if !menu && p != g {
+            if !menu && logic && p != g {
                 bad.push(("pos", format!("app {p:?} game {g:?}")));
             }
         } else if !menu && in_field && ap.is_none() != r["p"].is_null() {

@@ -69,6 +69,9 @@ pub struct Report {
     /// scripts started (logic frame, id)
     pub started: Vec<(usize, String)>,
     shown: usize,
+    /// `SEGMENT_RECS`: the per-character comparison (`recs.rs`), or no game rows for this segment
+    pub recs: Option<crate::recs::Tally>,
+    pub recs_missing: bool,
 }
 
 impl Report {
@@ -394,6 +397,9 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
     let field_loads = |w: &wf_core::world::World| w.field.as_ref().map(|f| f.loads);
     let mut loads_before = field_loads(&sess.world);
     let mut load_cam: Option<Option<(usize, (i32, i32))>> = None;
+    // SEGMENT_RECS: the game's per-character state rows (tools/segments/recs.py)
+    let recs_rows = std::env::var_os("SEGMENT_RECS").and_then(|_| crate::recs::load(doc));
+    let (mut recs_i, mut recs_tally) = (0usize, crate::recs::Tally::default());
     for (k, fr) in frames.iter().enumerate() {
         let keys = i(&fr["keys"]) as u16;
         let lf = i(&fr["lf"]);
@@ -672,7 +678,22 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
         }
         if rep.first.is_none() {
             rep.compared = k + 1;
+            // SEGMENT_RECS (report only): the characters' state at the rows where the game's changed, and the last
+            // row - while the segment still matches (`recs.rs`)
+            if let Some(rows) = recs_rows.as_ref() {
+                while recs_i + 1 < rows.len() && rows[recs_i + 1].0 <= k {
+                    recs_i += 1;
+                }
+                if rows.get(recs_i).is_some_and(|r| r.0 <= k) && (rows[recs_i].0 == k || k + 1 == frames.len()) {
+                    recs_tally.check(k, &sess.world, &rows[recs_i].1);
+                }
+            }
         }
+    }
+    if let Some(_) = recs_rows.as_ref() {
+        rep.recs = Some(recs_tally);
+    } else if std::env::var_os("SEGMENT_RECS").is_some() {
+        rep.recs_missing = true;
     }
     if sim_lag {
         eprintln!("simlag {}: sim lag frames {own_lag} disagreeing {lag_bad} replayed from the recording {replayed}", doc["name"].as_str().unwrap_or("?"));

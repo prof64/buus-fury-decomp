@@ -557,6 +557,7 @@ pub fn boot(data: &Arc<crate::content::GameData>, w: &mut World) -> Option<World
     let mut saves = w.saves.clone();
     let settings = w.menu.settings.clone();
     let rng = crate::battle::RngInit::State(w.rng.a, w.rng.b);
+    let rng0 = (w.rng.a, w.rng.b);
     let shown = w.menu.shown.clone();
     let mut nw = match &b {
         Boot::NewGame { slot } => {
@@ -579,6 +580,9 @@ pub fn boot(data: &Arc<crate::content::GameData>, w: &mut World) -> Option<World
             }));
             nw.menu.overlay = shown;
             nw.menu.overlay_until = NEWGAME_OVERLAY;
+            // the new field's build is ours only (the game's GameData reset draws nothing): the RNG as the title left
+            // it (the whole run from the reset: [0, 0] until the prologue's first draw)
+            nw.rng = crate::rng::Rng::new(rng0.0, rng0.1);
             nw
         }
         Boot::Continue { slot, chosen } => {

@@ -172,7 +172,9 @@ pub fn end_frame(w: &mut World) {
         }
         // an area load with a song (the load iteration runs past this frame's update point: the update is the
         // load's end, `lag_frame_ex`)
-        let load_song = loading && w.sound.pending_song.is_some();
+        // (the sim's own load lag, `Options::sim_lag`: every area load's iteration runs past this frame's update
+        // point - its update is the iteration's end, `load_frames`)
+        let load_song = loading && (w.sound.pending_song.is_some() || (w.g.load_pending && std::env::var_os("T_SL0").is_none()));
         if w.sound.skip > 0 {
             w.sound.skip -= 1;
         } else if load_song {
@@ -265,6 +267,12 @@ pub fn lag_frame_ex(w: &mut World, last: bool) {
 /// A main-loop iteration with a redraw starting now: the interrupt's mix inside it, the update after it; returns
 /// the video frames it takes (None without sound content: the caller keeps its constant).
 pub fn redraw_frames(w: &mut World, r: Redraw) -> Option<u8> {
+    redraw_frames_irq(w, r, 10_065)
+}
+
+/// [`redraw_frames`] with the interrupt mixes' cycles scaled by `irq_scale` / 10,000 (their entry / exit; an area load's
+/// base already carries them)
+fn redraw_frames_irq(w: &mut World, r: Redraw, irq_scale: i64) -> Option<u8> {
     if w.sound.uncalibrated {
         return None;
     }
@@ -295,7 +303,7 @@ pub fn redraw_frames(w: &mut World, r: Redraw) -> Option<u8> {
             if debug() {
                 dump("irq", IRQ_MIX, d);
             }
-            let c = wf_audio::cost::update(d, IRQ_MIX) * 10_065 / 10_000;
+            let c = wf_audio::cost::update(d, IRQ_MIX) * irq_scale / 10_000;
             s.last = s.last.wrapping_add(IRQ_MIX);
             t1 += c;
             irq = (t, irq.1 + c);
@@ -369,7 +377,26 @@ pub fn load_frames(w: &mut World) -> Option<u8> {
     if debug() {
         eprintln!("snd load: c {c} extra {extra} base {base}");
     }
-    redraw_frames(w, Redraw { t0: 0, base })
+    if std::env::var_os("T_SL0").is_some() {
+        return redraw_frames(w, Redraw { t0: 0, base });
+    }
+    // the iteration started with the load's logic frame (`Session::lag_step` asks one frame later): the sound
+    // hardware as it was at that frame's start (Thieves Den 8-2 -> 8-3: the mixes and the end's update - 336
+    // samples, not 608 - land where the game's do)
+    let (pos, phase) = (w.sound.pos, w.sound.phase as i64);
+    let p0 = (phase + FRAME) % DMA;
+    let k = (phase + FRAME - p0) / DMA;
+    w.sound.phase = p0 as u32;
+    w.sound.pos = pos.wrapping_sub(16 * k as u32);
+    let sc = std::env::var("T_SLIRQ").ok().and_then(|v| v.parse().ok()).unwrap_or(10_065);
+    let r = redraw_frames_irq(w, Redraw { t0: 0, base }, sc);
+    w.sound.pos = pos;
+    w.sound.phase = phase as u32;
+    // (that frame is over: the skip counts the lag frames still to come)
+    if r.is_some() {
+        w.sound.skip = w.sound.skip.saturating_sub(1);
+    }
+    r
 }
 
 /// A text box's creation (`scene::open_text`, the script's step): one main-loop iteration of 1,928,650 cycles + 128

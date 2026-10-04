@@ -15,6 +15,7 @@
 
 pub mod host;
 pub mod ram;
+pub mod recs;
 pub mod segment;
 
 pub use host::{HostSnapshot, StoryHost};
