@@ -178,6 +178,9 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
             h.w.scene.hud_hidden = n == 0x30;
             if was != h.w.scene.hud_hidden {
                 wf_core::vram::hud_shown(h.w, n == 0x2f);
+                if n == 0x2f && h.w.field.is_some() {
+                    wf_core::field::hud_beep(h.w);
+                }
             }
             unit()
         }
@@ -578,6 +581,22 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
             let Some(form) = h.w.data.forms.iter().find(|f| f.char_ == c && f.gfx == sprite).map(|f| f.id) else { return unit() };
             if let Some(cs) = h.w.story.chars.get_mut(c as usize) {
                 cs.form = form;
+            }
+            // a player kept offstage by a cutscene scene comes back in the record's form (real run 20-5 r061_004:
+            // s470 sets Goku's form while the scene has the players offstage; the warp at f13,987 brings him back as
+            // sprite 115, not his old 117)
+            for k in 0..h.w.scene.offstage.len() {
+                let mine = match &h.w.scene.offstage[k].body {
+                    wf_core::world::Body::Player(p) => h.w.data.form(p.form).map(|f| f.char_) == Some(c),
+                    _ => false,
+                };
+                if mine {
+                    if let wf_core::world::Body::Player(p) = &h.w.scene.offstage[k].body {
+                        let mut p = (**p).clone();
+                        p.apply_form(h.w, form);
+                        h.w.scene.offstage[k].body = wf_core::world::Body::Player(Box::new(p));
+                    }
+                }
             }
             if let Some(i) = fighter_of(h.w, c) {
                 let mut p = h.w.pl_ref(i).clone();

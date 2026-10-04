@@ -457,6 +457,12 @@ impl Player {
         if self.gs == Gs::Skill(7) {
             return self.sk.as_ref().is_some_and(|s| s.refire) || self.ap.tick < 16;
         }
+        // the beam skills' state (vtable 0x0804E2D8, vfunc +0x1C 0x0804FA7C): its beam object exists and is still
+        // in phase 0 (+0x10) - true from the press until the firing (segment sb 6-6 f19197: a firing beam does not
+        // make Super Buu dodge)
+        if matches!(self.gs, Gs::Skill(15 | 16 | 6 | 1 | 3)) {
+            return self.sk.as_ref().is_some_and(|s| s.proj == 0);
+        }
         self.state == PState::Skill
     }
     /// IfPlayerPetrified 0x0803AE65: the stone pose

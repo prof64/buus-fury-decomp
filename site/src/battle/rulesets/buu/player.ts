@@ -322,6 +322,9 @@ export class Player extends Actor implements PlayerLike {
     // blast leaves the hand (lockstep f02_vs_hold_stone: Dabura's guard 0x75 / 0x77). Other skills: INFERRED any
     // skill state.
     if (this.gs === 'skill7') return !!this.sk?.refire || this.ap.tick < 16
+    // the beam skills' state (vtable 0x0804E2D8, vfunc +0x1C 0x0804FA7C): its beam object still in phase 0 - from the
+    // press until the firing (segment sb 6-6 f19197)
+    if (['skill15', 'skill16', 'skill6', 'skill1', 'skill3'].includes(this.gs)) return !!this.sk && !this.sk.proj
     return this.state === 'skill'
   }
   isStone() {

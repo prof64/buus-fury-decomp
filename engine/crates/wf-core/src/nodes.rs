@@ -2492,6 +2492,11 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             if r.d[0] == 0 {
                 return true;
             }
+            // field: the arm is the work of the animation's controller; a hit's hurt state replaced it - the node is
+            // over after the pop (segment sb 6-6 f19062, as CandyBeam / KiBlast)
+            if w.field.is_some() && f < 72 && r.d[6] != w.en_ref(i).anim_seq as i32 {
+                return true;
+            }
             if f < 72 {
                 w.en(i).ea.pos.frame = if f < 8 {
                     0
@@ -3336,6 +3341,26 @@ fn hit_node(w: &mut World, i: usize, t: &Arc<BehTree>, n: u16, msg: &HitMsg) -> 
             if w.en_ref(i).script_hits >= 3 {
                 en::scripted_defeat(w, i);
             }
+            1
+        }
+        // FreezeHelperHit (hit handler 0x0803044C, field): unless a Buu fragment already answers message 5, and when
+        // a fragment's footprint 64 px below is on walkable tiles (0x08009904), the enemy ctor 0x0800F68C builds a
+        // fragment (type 14 "freezes the player", def 0x087113FC, sprite 45) at this enemy's pixel position (real
+        // run 20-5 r061_004 f6,130: Super Buu, Gotenks absorbed, hit by a punch)
+        K::FreezeHelperHit if w.field.is_some() => {
+            if w.live_enemies().into_iter().any(|o| w.en_ref(o).ty == 14) {
+                return 1;
+            }
+            let (x, y) = (w.en_ref(i).a.x, w.en_ref(i).a.y);
+            let (fw, fh) = w.data.sprite(45 - crate::scene::SPRITE_BASE).map(|s| s.foot).unwrap_or((16, 8));
+            let (px, py) = (x >> 8, (y + 0x4000) >> 8);
+            if w.col.as_ref().is_some_and(|c| !c.test(crate::world::Layer::Walk, px, py, px + fw, py + fh)) {
+                return 1;
+            }
+            // (a run-time placed enemy like a tank's crew: its death runs the type's drop script, 0x08710F99)
+            use crate::fieldcontent::{Cond, ObjDef, ObjKind, ObjRef};
+            let o = ObjDef { at: ObjRef::List(0xff, 14), cond: Cond::Always, kind: ObjKind::Enemy { ty: 14, x: x >> 8, y: y >> 8, sprite: 45, on_defeat: None, behaviour: vec![] }, rom: 0x0875_819c };
+            crate::field::spawn_object(w, &o);
             1
         }
         K::AbsorbPose | K::AbsorbPose2 | K::FreezeHelperHit | K::ShieldHit => 1,

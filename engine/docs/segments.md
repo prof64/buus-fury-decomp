@@ -323,7 +323,7 @@ are deterministic, but they are other objects' internals (code / heap pointers) 
 whole object heap with real addresses and every class's field writes. Not modelled; `tools/superbuu/heapnode.py`
 prints a new node's leftover words. (The side-content agent's Nosferatu 18-8 case is likely the same kind.)
 
-**6-6 (Gotenks; Super Buu agent, 2026-10-03): 4,694 -> 19,065.**
+**6-6 (Gotenks; Super Buu agent, 2026-10-04): 4,694 -> 22,177.**
 * A screen shake is a camera mode: `0x0800797C` pushes it on the camera object's mode stack (`0x080210D6`), and a
   script camera command sets a new mode (`0x08021094`: the old one's exit) - `camera_pan_to` (via `0x080211A8`)
   and `camera_follow` end a running shake (`scene::camera_mode_set`). The shake is updated with the camera, after
@@ -352,7 +352,12 @@ prints a new node's leftover words. (The side-content agent's Nosferatu 18-8 cas
   (`0x08020FC4`); a ki blast takes energy messages (sub != 0xD) touching its box and bursts (`0x080199F6`). A blast
   whose message a beam took only sets its hit flag (`+0x54`) and flies on, so the beam's head message bursts it in
   the same frame - both stop, the beam makes its impact effect.
-* Now **19,065** (was 4,694; 6-9 18,947): next, random numbers at f19065 - not looked at.
+* f19062 (fixed, field): BuuStretchPunch, like CandyBeam / KiBlast: a hit before the arm leaves ends the node.
+* f19197 (fixed, battle too): the beam skills' "charging" (state vfunc +0x1C, `0x0804FA7C`) is true only while the
+  beam object is in phase 0 - from the press until it fires; a firing beam does not make Super Buu dodge.
+* Now **22,177** (was 4,694): Super Buu's defeat - in the game the boss whose HP reached 0 still takes the beam's
+  body message with a damage roll (ApplyDamage of its on-hit tree) in the next frame; ours rejects it once
+  `defeated`. Not changed yet (enemy hit acceptance, battle-shared).
 
 **Claim (dungeon agent A, 2026-10-03, by the coordinator): the Kid Buu fight itself in `sb_041` (21-25).** A works
 with the allocator check off (`SEGMENT_VRAM=0`): the enemy object missing at f21479 and every divergence after it
@@ -2474,6 +2479,27 @@ nobody holds** - in this order: `r069_168_14-1` (the Kid Buu fight: f20,168 Kid 
 `kbr_002` f15,749; 14,466 frames diverged), `r064_029_21-26` (f12,784 camera), `r061_004_20-5` (f5,251 sound), then
 `r062_001_20-6` (inside Buu: f2,176 the player's x sub-pixel; 8,000 uncovered by import gaps). Not the 6-x Gotenks
 rows (Super Buu agent) nor 14-2 (ship fix agent). Others please add a line here before touching one.
+*Done: `r069_168_14-1` exact (55,831 / 55,831, sprite check on), gated `rkb_168_14-1`* - **a defeated enemy keeps
+its enemy-grid mark while a script walks / glides it** (`enemy::sync_mark`, field): s461 walks a defeated Kid Buu
+copy to (280, 200) at f18,474; the game's cell (30, 27) under its old place stays blocked through f20,000 and on (an
+emulator trace of the grid bit, `tools/dungeons/gridbit.py`), ours followed the walk and freed it, so Kid Buu's
+chase re-plan at f20,167 took another waypoint (y step 80 vs 114 / 256). An alive enemy walked by a script re-marks
+(`rdb5_020`), and a defeated one's own death slide too (`db5_020`) - both gated. Found by the every-N tiles: the
+tile at f20,000 (state from RAM) was exact while the long replay was not; diffing the replayed vs imported world at
+that frame (enemy grid) pointed at it. The old `kbr_002` (f15,749, same divergence) is exact now too.
+*`r064_029_21-26` f12,784: handed to the ship fix agent* - the save point's Switch Characters closes 2 frames early
+in ours (the reload-time estimate, 21-26), so the follow camera's steps after the reload come early.
+*`r061_004_20-5`: exact (16,442 / 16,442, was 5,251), gated `rsb_061_004_20-5`* (field only; battles / cross_ts
+untouched) - three rules:
+(1) **`show_hud` runs the HUD's low-HP beep check at once** (`field::hud_beep`): the new HUD object updates in the
+frame's object pass after the resumed script (s469's last node; the game beeps sound 41 in that frame, ours a frame
+later). (2) **FreezeHelperHit** (Super Buu, Gotenks absorbed: hit tree of state 0x29A, 10 %; handler 0x0803044C):
+unless a fragment already answers message 5, and when a fragment's footprint 64 px below is walkable (0x08009904),
+it builds a **Buu fragment** (enemy type 14 "freezes the player", def 0x087113FC, sprite 45) at its pixel position -
+a run-time placed enemy (`ObjRef::List(0xff, 14)`, like a tank's crew), so its death runs the type's drop script
+0x08710F99 (loot s496). (3) **`set_char_form` also re-forms a player kept offstage** by a cutscene scene: s470
+sets Goku's record form (2 -> 0, sprite 117 -> 115) while `load_scene` has the players offstage; the warp at f13,987
+brings him back in the record's form (`scene.offstage`, natives 0x9D).
 
 **Claim (ship fix agent, 2026-10-04, by the coordinator): the Pyramid 14-2 cluster** - the real run's 14-2 rows
 with sprite 256 (position / facing / RNG: `r057_005/011/013/015/021/031/035/059_14-2`, `r069_003/011/013/021/027/
@@ -2490,7 +2516,28 @@ on a blocked step with SetAnim(0); it finishes early when another SetAnim replac
 StandStill, whose SetAnim(0) cut the first dodge (popped at 333), and the still-true condition pushed again at 334.
 Battles keep the TypeScript reference's once-per-entry push. Left: `r069_077_14-2` f264 - a thrown object hits the
 player: the game draws the RNG for the damage and twice in the sound mixer's callback (0x0803E24A, `play 49`), ours
-for the damage and a puff (`fx::puff_rng`); not taken further.
+for the damage and a puff (`fx::puff_rng`); not taken further. **To the Earth agent (sound driver):** that
+`r069_077_14-2` f264 row is yours - the two game RNG calls come from the sound mixer's sample callback (`bl` via
+[r4 + 0x18] at 0x0803E24A, stack 0x0803E24F; `play 49` starts that frame), so the mixer's noise / random source
+draws the game RNG; ours does not model it (`tools/segments/rngcalls.py` on the cut shows the three calls).
+*Census (2026-10-04):* with the walker following PushState, the extraction has 823 states; 0x15A is the only state
+reachable solely through PushState (the only PushState target in the whole table), used by the six soldier types
+(Majin / Elite Majin / Super Majin Soldier, Majin / Elite / Super Shield Soldier; types 22, 23, 69, 103, 124, 125)
+through state 0x15B. Board rows rerun after it: the 22 Pyramid rows above, plus `r012_020_12-27` and `r069_168_14-1`
+now exact (no other board row changed through it; `rE2__090_7-3` moves with in-flight NPC-wander edits, not the
+dodge - no state 0x15A in that cut).
+
+**Claim (ship fix agent, 2026-10-04): `r069_101_14-2` (f862), `r069_139_14-2` (f630), `r057_066_14-1` (f3527),
+`r064_004_21-6` (f254)** - the remaining Pyramid / 21-6 position rows (`r067_071_14-2` stays with the Kid Buu agent).
+- `r069_101_14-2` f862 and `r069_139_14-2` f630 are one case, **to the agent of 3b0f80f (the ki-blast catch rule,
+  `shots::on_message` KiBlast arm)**: a Majin Soldier's energy wave (0x08049C98, attack 0x086B8090 = sub 1 kind 1)
+  spawns beside the player who holds a Ki Blast (0x0804B454 at (198, 176)); the game hits the PLAYER on the wave's
+  first update (hurt, sound, damage roll 0x08010889). Ours: the wave's `hit(.., first)` reaches the player's blast
+  first (newest-first order) and the new rule takes it - the wave stops, the player is not hit. On the emulator the
+  blast's handler 0x080199F6 is NOT called by the wave's message that frame (its only calls at 862 come through
+  0x08011C0C, lr 0x08011C3B; at 860/861 through 0x08011C70 from something else), so the wave's message never
+  reaches the blast. With the rule disabled the row gets past the player's hurt but then our blast pushes the
+  enemy 0.375 px the game does not - both point at the wave/blast interaction. Not changed by me.
 
 **§11 update 11 (B): the Janemba saga plays start to finish in the app.** Three core fixes (field only; battles and
 cross_ts untouched), each from an emulator trace, gated:
@@ -2507,3 +2554,13 @@ cross_ts untouched), each from an emulator trace, gated:
 App soak (checklist rows updated): 036 HFIL entry 3,295, 037 Goku L90 grind 44,268, 038-039 Goku L120 grind 49,301 -
 **all rows match**; with the rest of 040-050 the whole saga from 1-2 to the Janemba arena is clean. Still open in the
 saga's harness cuts (not on the soaked route): `r038_001_18-1` f589 camera (1/256 px).
+
+**§11 update 12 (B): claim progress; dialog parity.** Done from the claim above: `r036_002_1-5`, `r037_084_18-1`,
+`r038_045_18-1` (update 11) and **`r012_020_12-27`** - a defeat callback's hold is not an event start: no world
+message 0xF (a soldier walking when the punch killed it keeps its walk frame; ours idled it with a rand(255) the
+game never draws). All 1,519 real-route cuts compared with and without: only this one changes (1,856 -> 3,411
+exact), gated `rdb5_020_12-27`. Open on the claim: `r038_001_18-1` (camera), `r012_014_12-19` (after a heal menu),
+`r009_006_4-1` (camera). Checklist rows changed: 012-014 Airship stops later (12-19 heal menu only); Janemba 036-050
+all clean. *wf-app `dialog_portrait_parity`* (red since f11daf9): `begin_event` now runs the event-start message under
+a field a script already holds, and that cleared the talk's speaker anchor the talk had just set (Yemma's Office:
+text box bottom / portrait right instead of top / left). The anchor survives the second start; the test is green.

@@ -131,6 +131,9 @@ pub struct HostState {
     /// the top of the frame in the game (before the objects update)
     #[serde(default)]
     pub from_wait: bool,
+    /// the thread is resuming from a fade wait this frame (an exit now releases the field's objects, see `from_wait`)
+    #[serde(default)]
+    pub from_fade: bool,
     /// the newest entity when the outermost event started: older objects update after the event's scene object
     /// (the world updates newest first), so only they see a release at the top of the frame
     #[serde(default)]
@@ -329,7 +332,11 @@ impl Host for CoreHost<'_> {
                 }
                 // the event ended straight out of a command wait: in the game the wait loop returned at the top of
                 // this frame, so the field's NPCs already ran this frame's update unfrozen
-                if self.s.from_wait && self.w.scene.depth == 0 && !self.s.in_unit {
+                // (an event that ends right out of its fade wait returns at the top of the frame as well, also inside a
+                // unit script: the real route 18-11, s446 run from Vegeta's trigger script ends on fade_out(100) - a
+                // Janemba Hand older than the event makes its ambush's first update in the exit frame)
+                let from_fade = std::mem::take(&mut self.s.from_fade);
+                if (self.s.from_wait && !self.s.in_unit || from_fade) && self.w.scene.depth == 0 {
                     release_field_npcs(self.w, self.s.event_watermark);
                 }
                 Ok(NativeResult::Done(None))
@@ -374,8 +381,15 @@ pub fn begin_event(w: &mut World) {
     // (also when a script already holds the field without an event: the event start's world message 0x0F still
     // reaches a map NPC whose walk controller runs - Earth 7-2 f1432: s495 starts under a scroll script and the
     // walking NPC 233 goes idle with its draw, 0x0800F446 -> 0x0800E050)
-    if w.scene.depth == 0 && w.field.as_ref().is_some_and(|f| f.host && (!f.busy || std::env::var("T_OLDBUSY").is_err())) {
+    if w.scene.depth == 0 && w.field.as_ref().is_some_and(|f| f.host) {
+        // (a talk already started its event at the fire and set the speaker anchor: the scene the talk's event
+        // begins keeps it - Yemma's Office text box top / portrait left, wf-app dialog_portrait_parity)
+        let anchor = w.scene.talk_anchor;
+        let busy = w.field.as_ref().is_some_and(|f| f.busy);
         wf_core::fieldnpc::start_event(w);
+        if busy {
+            w.scene.talk_anchor = anchor;
+        }
     }
     w.scene.depth += 1;
     // the field holds still while an event runs: no triggers / talk, map NPCs freeze (their animations tick)
@@ -483,12 +497,8 @@ pub fn poll(w: &mut World, s: &mut HostState) -> Option<Option<i32>> {
             done.then_some(None)
         }
         Pending::Fade => {
-            // a talk event's fade wait returns at the top of the frame too, like its text box (the real route 18-11:
-            // Vegeta's s446 ends on fade_out(100) - a Janemba Hand's ambush makes its first update in the exit frame)
             let done = scene::fade_done(w);
-            if done && s.talk_event {
-                s.from_wait = true;
-            }
+            s.from_fade = done;
             done.then_some(None)
         }
         Pending::Scroll => {

@@ -1917,6 +1917,13 @@ fn exit_to(w: &mut World, slot: usize, to: Dest, push: Dir, rect: Rect, edge: bo
 /// (2-9 / 2-8: Gohan low on HP after the circus)
 pub fn hud_tick(w: &mut World) {
     crate::vram::hud_tick(w);
+    hud_beep(w);
+}
+
+/// the HUD's low-HP beep check (its update's part; also run by `show_hud`, whose new HUD object updates in the
+/// frame's object pass after the resumed script - real run 20-5 r061_004 f5,251: s469's last node shows the HUD
+/// and the beep sounds in that frame)
+pub fn hud_beep(w: &mut World) {
     if w.scene.hud_hidden {
         return;
     }
