@@ -2793,6 +2793,24 @@ driver, incl. the song start at a load's finish; I own the load / close lengths)
   main-loop sound update at its end is 608 samples / 92 k against the game's 336 / 47 k - a sound-position question
   (**Earth agent**: the play position / last update across the load's mixes decides this frame); one lag frame
   long there. r052_004's script loads are right or one off on the same kind of margin.
+- **The other long iterations (census of every replayed lag frame, `SEGMENT_LAGCENSUS=1`, all 1,519 real cuts:
+  36,992 frames in 9,268 runs; work/shipfix/lagcensus.py):** text-box openings are the largest kind (~16k frames:
+  runs of 7 / 8 after a `show_text` step), then 1-frame lags with nothing pending (4.6k, 4,086 single frames),
+  Director / scene-setup runs (3.2k + 1.9k), Phases, Fade, Scroll, Transition.
+- **Text-box opening modelled** (`sndsim::dialog_frames`, called from `scene::open_text` with `sim_lag`): one
+  iteration of 1,928,650 + 128 per first-page character + the portrait's `decode_cycles` (none for portrait 0 / 7),
+  measured on 30 openings (std 10.9k, max 28k; work/shipfix/dlg_measure.py, dlg_join.py); the 7-vs-8 split comes
+  from the sound timing (`redraw_frames`), not the cost. Kind-3 menu windows are excluded.
+- Sweep with `SEGMENT_SIMLAG=1` on all 1,519 cuts (work/shipfix/simlag_sweep.py): the sim made 26,706 lag frames
+  itself (2,574 text boxes + 265 loads), 15,052 still replayed. Text boxes: 1,921 exact, 236 one short, 43 one
+  long, ~40 off by 2-4, and 335 "+6/+7" = boxes whose opening the game does NOT lag for (to classify: probably
+  the boxes opened while another iteration is running). Loads: 113 exact, 57 within one, the rest off by up to
+  -6 / +40 (in-cut loads whose recorded lag the harness replays partly). 1,463 cuts exact in sim mode against 1,512
+  in replay mode (51 worse, none better) - sim mode stays opt-in until those classes are closed.
+- Menu-close lengths (4-1 r002_006, 14-2 r067_071, 18-1 r038_001 / r044_015): the close remainder does not follow
+  the map's load remainder (8-3: load 478k, close -2k; 8-6: 262k, +22k); 18-1 is over by 15-20k in both closes;
+  r067_071's model carries 79k of actor-frame terms the game's decompressor never runs, while the game spends ~62k
+  elsewhere there. Not closed.
 - (The NPC-facing regression seen on 2026-10-04 in `r000_072/081/095/103/113/188/194/218_8-x`, `r046_*_18-2` and
   `r057_*_14-2` - "dir: #N sprite 112 / 279 / 280 / 110: 0 vs game 3" at f139..f870 - came from in-flight edits and is
   gone on f75b097: those cuts are exact again.)
@@ -3248,3 +3266,12 @@ run stops where the HEAD run does or not at all.
 another drifts from the stretches' own start states at 003 (Thieves Den: the continuous replay at 002's end differs
 from `runs/003/start.ss` in 481 IWRAM bytes; the stretch end then misses the manifest) - the per-stretch end checks
 in `record.py` will show where; the app masters here start each stretch from its own first cut for that reason.
+*`r002_006_4-1+020026` (A, done): **exact** (310 / 310, was 0).* The tile starts inside the world map's landing
+script for Babidi's ship (inline 0x08073424, 0-50 list0[14]: fade_out, warp to 8-1, camera_pan_to(160, 176, 500),
+fade_in, wait, jump_to ...), stopped in its pan with the screen black - an inline script at depth 0, which the
+import did not see (it took the black screen for a menu's return). Now: (1) `inline_running` finds an interpreter
+on the context stack whose PC lies in an inline script's code (bytecode.json `inline`, `host::inline_at`) and
+`continue_inline` replays it with the actions before the waiting one dropped; a blocked one holds the field like a
+trigger's (`hold_nested`); (2) `import_cam_pan`: the pan object (vt 0x0804B8C0: +4 / +8 target, +0xC speed, +0x10
+/ +0x14 step in 1/1024 px, +0x20 steps left) sets the replayed `CamPanTo`'s step and count, the camera stays the
+RAM's. 51 board tiles: 1 better, 0 worse; gates as HEAD (`rfat_010_011_11-13` red on HEAD itself).

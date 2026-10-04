@@ -462,6 +462,8 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
             // (the game's camera makes ONE step in the load's iteration: none here when ours already stepped after the
             // arrival - Diablo Desert 11-13 f1,640, a cutscene's fade-in warp whose arrival frame ran the camera update -
             // so the rule only applies to a camera still at the position it had at the iteration's first lag frame)
+            // (and only for an event's warp_fade - a scene running, 1-5's s464; an inline trigger script's warp_fade
+            // steps no camera in the iteration: 11-13 f1,640, depth 0)
             let cam_now = (sess.world.cameras[0].x, sess.world.cameras[0].y);
             let cam_at = *load_cam.get_or_insert_with(|| {
                 let now = field_loads(&sess.world);
@@ -475,7 +477,7 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
                 let snapped = cam_now == at && std::env::var_os("T_LCALL").is_none();
                 if left == c && !snapped && false {
                 }
-                if left == c && cam_now == at && sess.world.field.as_ref().is_some_and(|f| f.script_fade_in && matches!(f.mode, wf_core::field::Mode::FadeIn { .. })) {
+                if left == c && cam_now == at && sess.world.field.as_ref().is_some_and(|f| f.script_fade_in && matches!(f.mode, wf_core::field::Mode::FadeIn { .. })) && sess.world.scene.depth > 0 {
                     sess.world.tick_shakes();
                     wf_core::field::world_mode_cameras(&mut sess.world);
                 }
@@ -528,6 +530,10 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
                 if std::env::var("SEGMENT_ORDER").is_ok() {
                     let v: Vec<String> = w.ents.iter().filter(|e| !e.removed).map(|e| format!("{}:{}", e.id, w.find(e.id).and_then(|i| w.actor(i)).and_then(|a| a.sprite).unwrap_or(-1))).collect();
                     eprintln!("  t{k} order {}", v.join(" "));
+                    if std::env::var("SEGMENT_ORDER").as_deref() == Ok("2") {
+                        let kinds: Vec<String> = w.ents.iter().filter(|e| !e.removed).map(|e| format!("{}:{:?}", e.id, e.body).chars().take(90).collect()).collect();
+                        eprintln!("  t{k} kinds {}", kinds.join(" | "));
+                    }
                 }
                 if std::env::var("SEGMENT_FADEDBG").is_ok() {
                     eprintln!("  t{k} fadedbg {:?} dim {} black {}", w.scene.screen.fade, w.scene.screen.dim, w.scene.screen.black);

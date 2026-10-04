@@ -147,6 +147,11 @@ impl StoryHost {
         let st = self.with_host(w, |rt| rt.run().map_err(|e| e.to_string()));
         self.rt.with_thread(|t| t.queue_instants = false);
         self.finish(w, st);
+        // (a map trigger's inline script that blocks holds the field like an event, `finish` for `Cause::Trigger`:
+        // the landing script's player stands through its pan, wait and jump)
+        if self.running && self.outer.is_empty() {
+            wf_core::field::hold_nested(w);
+        }
     }
     /// Import: an event stopped inside a node of an event it runs (`run_event`, a scene depth of 2): the outer node
     /// starts again with its first `drop_outer` actions dropped, its `run_event` runs (the inner event started before

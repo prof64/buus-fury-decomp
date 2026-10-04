@@ -529,7 +529,7 @@ fn step_inner(w: &mut World) {
         w.menu.boot -= 1;
         w.menu.held = held;
         // the logos' mode starts the title song (it plays on into the title, whose enter finds it playing)
-        if w.menu.boot == title::BOOT_FRAMES - title::BOOT_SONG_AT {
+        if w.menu.boot == title::BOOT_FRAMES - title::BOOT_SONG_AT - 1 {
             crate::scene::play_song(w, title::TITLE_SONG);
         }
         return;
