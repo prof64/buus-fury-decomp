@@ -4285,3 +4285,52 @@ iteration in both. Nothing to change.
 1,121,918 / 1,121,948 (044 sub-pixel), 848,744 (017 sub-pixel), 568,177 (extra NPC), 633,276 (text-box timing; importer
 agent: yours were flag 187 and the 185,000 panic - I take this one), and checking 631,386 / 645,894 (loads past the
 chain's divergence).
+
+**§11 update 21 (B): sound requests compared per logic frame (whole run + soaks).**
+*Extraction:* `tools/wholerun/sounds.py` replays the whole chain from the reset (as record.py) with breakpoints on the
+sound driver's request functions (PlaySfx 0x0803E378, StopSfx 0x0803E302, StopAll 0x0803E2EC, StopMatch 0x0803E32C,
+PlaySong 0x0803F110) and writes the tracked `data/realrun/sounds.json.gz` (90 KB: 22,280 rows with requests of
+1,668,052; `{"rows", "ev": [[row, [["play", id, vol] | ["stop", id] | ["stopmatch", id] | ["stopall"] | ["song",
+id]]]]}`). *Compare:* `examples/wholerun.rs --lag none --sounds data/realrun/sounds.json.gz [--sounds-show N]`
+and `SOAK_NOLAG=1` on the soak (the masters' own `snd` rows): per logic iteration, our requests of the step vs the
+game's of every row with that logic counter (a long iteration's request lands on one of its rows); `SND` lines and
+`sounds: X of Y logic iterations differ`. (The segment harness compares `snd` per video frame, but on the last row of
+a long iteration only - loads were never compared.)
+*Fixed (gates, wf-app, script, core suites run after):*
+* **Area songs:** a load requests its song only when another one plays (`scene::play_song`; ours requested it at
+  every load), and a **selector-script song** (Hercule City 3-1 .. 3-3: flag 26 and not 27 -> 29, else 6) is now
+  evaluated (`story::eval_value`: the condition evaluator returning its value).
+* **Low-HP beep at loads:** the area's new HUD object beeps (41, vol 32) in its first update, inside the load's
+  iteration, whatever the last beep (Earth 2-9 <-> 2-8).
+* **Aura loop (54) on the hide / show messages:** a menu or a saved field's scene sends 0xA / 0xB to the objects; an
+  aura form's leader stops / restarts sound 54 (`player::aura_message` from `vram::world_hide` / `world_show`; Other
+  World s103, the fat arc's pause menus). A plain cutscene scene load (no saved field) does not.
+* **Fire breathers:** an interrupted FlameBreath (a hit) and one still breathing as the area goes stop sound 63
+  (`nodes` leaf exit, `field::load_area`).
+* **Beams:** a sounding scripted beam still out as the area goes runs its destructor's stop 32 / play 33 (ship 7-6).
+* **return_to_title:** StopAll + PlaySong(45) in its own iteration (the ending); the title world does not request it
+  again. **Boot:** the logos' song one iteration earlier in no-lag mode (`BOOT_SONG_AT_LOGIC` 179).
+* **On-leave scripts** (the ROM's three, all flag scripts) run inside the load (`story::run_flag_script`), also in an
+  event's warp - flag 187 (Fukurou Forest 13-1 -> 0-50) stayed set until the event ended.
+*Result:* **every soak 0 sound differences** (54 runs; m_062 only after the known Vegeta range; master_x's last row is
+the recording's cut-off), and the **no-lag whole run from power-on: 0 sound differences in 1,261,523 logic
+iterations up to 1,339,017, and 0 in 291,558 from the cut after the known range to the credits.** The power-on run
+is now exact (RNG, area, position, depth, flags) to **1,111,492**.
+*Routed:* 1,111,492 (Janemba, HFIL 18-10, flag 284 one iteration early): inline 0x0808C880 `puff_at(0, ..)` then
+`open_area` / `set_flag(284)` - our director releases the script one iteration earlier than the game after a lone
+instant command (game: flag at counter 1,050,628, ours 1,050,627; RNG / positions equal) -> **side-content agent**
+(script host / director).
+*NPC talk state (Earth agent):* `tools/segments/area.py` now records `npc` - the map NPCs' (vt 0x0804C92C) talk resume
+nodes (object +0x1BC, the nonzero ones, sorted); all 503 sidecars regenerated; wf-import `area.rs` compares them with
+ours (`Npc.resume`, map NPCs). All 503 gates clean (no gate's segment ends a talk on a nonzero exit yet, so this mostly
+guards). The `npc_talk` objects (vt 0x0804CEF4) hold something else at +0x1BC (varying words) - not compared.
+*No-lag app soak, all 54 masters on HEAD 2837ee6 + the working tree (`work/earth/bin/soakall_earth.py earth_nolag
+SOAK_NOLAG=1 SOAK_VLEAK=1`, summary work/db57/soakall/earth_nolag.txt):* 51 exact on every logic row, including
+**title_earth (whole chain), m_pg_g111 and m_pg_g131** (both stopped before). No sprite-memory leak, no story-flag
+report, no script error in any run. Stops: `m_062_m_inside_buu` row 2,401 (known, Super Buu agent); **new vs the soak
+agent's snd3 run (13:55): `m_023_db7_end` row 89 (pos) and `m_064_m_kid_buu_saga` row 1,863 (area 21-4 vs 21-6)** -
+both come from the **uncommitted `wf-import/src/host.rs` edit in the shared tree** (the Break-cause `break_due` now
+also requires `hs.in_unit`; `BREAK_DBG` shows `BREAK_DUE` at m_023 frame 89, s418 under a breakable's drop, the stop
+row, and at m_064 frame 1,653): not from the area / trigger changes (toggled off: same stops). Owner of that edit:
+please check these two masters before committing it. (`master_7` row 13,060 and `m_023` row 89 stopped once and are
+exact on a re-run with the tree as it is now - the edit is still moving; `m_064` row 1,863 still stops.)
