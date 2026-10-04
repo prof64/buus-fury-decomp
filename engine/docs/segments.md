@@ -3802,3 +3802,19 @@ Also the punch mini-game's blink counter now reads `Globals::clock` (`minigame.r
 * Note: on 836475d these gates are red on a clean export **without** any of A's changes (no-lag commit?):
   dr3_016_10-30, rclose_044_015_18-1, rkb_168_14-1, rsbi_016_21_14, sb_029_21_13, sb_030_21_14, shipr_056_8-1,
   shipr_172_8-1 (a player sprite 115 / 117 "has no entity" or far off).
+
+**Whole-run fat-arc stops, part 2 (dungeon agent B).** Resync stops 809,831 (rng) / 809,832 (import), Dragon Ball
+dungeon 5 (012_db5_a01): the cut at 809,790 (right after the 809,789 close row) was imported without two Mechanoid
+details - **fixed in wf-import**: (1) the `BackStep` node's runtime (+4 / +8 the hop step, +0x10 the counter from 48;
+the enemy hopped from its enter again), (2) a Mechanoid already in its swapped form (sprite 188): `gfx_now` now comes
+from the sprite shown, so `MechTransform`'s swap goes back to 187 at f23 as the game's does (ours "swapped" 187 ->
+188); `MechTransform` has no runtime words. The cut (`segment.py record` from `work/wholerun/cuts/c809790.ss`, 70
+rows) matches every frame except the tile allocator: **the player's Ki Blast in flight (vt 0x0804B454, block 435) is
+not imported** (it ends in the cut's first frame; ours keeps its block as foreign) - next for B or the importer.
+With these the recorded-lag run from 809,790 is exact (rows, RNG, positions) to **1,107,691** (042_h_statues, HFIL -
+not the fat arc; its owner per the board). So with the bomb fix, the fat arc's whole-run stops are all closed except
+the alignment rows the per-logic-frame board removes. Gates green.
+
+**Claim (dungeon agent A, 2026-10-04, by the coordinator): import side of the whole-run stops** - first the player's
+Ki Blast in flight at a cut (vt 0x0804B454, B's 809,790 note above); then the next whole-run import stops past B's
+1,107,691 as the resync list shows them. B / Super Buu agent: the rule stops stay yours.
