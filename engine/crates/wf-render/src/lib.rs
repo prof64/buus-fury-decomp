@@ -413,8 +413,11 @@ impl Renderer {
                 self.draw_mode7_bgs(f, prio, ox, oy);
             }
             if let Some((m, af, shake)) = &map {
-                // BGs of this priority, higher BG index further back
-                let mut bgs: Vec<usize> = (0..m.layers.len()).filter(|&i| m.layers[i].priority == prio).collect();
+                // BGs of this priority, higher BG index further back (a script's BG control: hidden layers, priorities)
+                let sl = view.map.as_ref().and_then(|v| v.layers.as_ref());
+                let shown = |i: usize| sl.is_none_or(|l| l.visible.get(m.layers[i].bg as usize).copied().unwrap_or(true));
+                let pr = |i: usize| sl.and_then(|l| l.priority.get(m.layers[i].bg as usize).copied().flatten()).unwrap_or(m.layers[i].priority);
+                let mut bgs: Vec<usize> = (0..m.layers.len()).filter(|&i| shown(i) && pr(i) == prio).collect();
                 bgs.sort_by(|&a, &b| m.layers[b].bg.cmp(&m.layers[a].bg));
                 for li in bgs {
                     self.draw_layer(m, li, *af, cx + shake.0, cy + shake.1, vx, vy);
@@ -438,7 +441,19 @@ impl Renderer {
         }
 
         // blending + output
-        let (bld, eva, evb) = map.as_ref().map(|(m, _, _)| (m.bldcnt as u32, m.eva as u32, m.evb as u32)).unwrap_or((0, 16, 0));
+        let (mut bld, mut eva, mut evb) = map.as_ref().map(|(m, _, _)| (m.bldcnt as u32, m.eva as u32, m.evb as u32)).unwrap_or((0, 16, 0));
+        // a script's blend targets / weights over the map's (BLDCNT bit b / 8 + b, BLDALPHA)
+        if let Some(sl) = view.map.as_ref().and_then(|v| v.layers.as_ref()) {
+            for (b, t) in sl.blend.iter().enumerate() {
+                if let Some(t) = t {
+                    bld = (bld & !(1 << b) & !(1 << (8 + b))) | ((*t as u32 & 1) << b) | (((*t as u32 >> 1) & 1) << (8 + b));
+                }
+            }
+            if let Some((a, c)) = sl.alpha {
+                eva = a as u32;
+                evb = c as u32;
+            }
+        }
         let mode = (bld >> 6) & 3;
         let fade = view.fade_black.min(16) as u32;
         let bm = self.blend_math;

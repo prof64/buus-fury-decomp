@@ -704,6 +704,10 @@ pub fn load_area(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<Dir>)
 /// 0x74 `load_scene_fade_noobj`, 0x08009030 first flag 0). A cutscene scene load calls this after
 /// `scene::send_offstage` (no player object: no player re-creation, no draws).
 pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<Dir>, objects: bool) {
+    // the map load writes the map's own BG control (DISPCNT layers, BGxCNT priorities, BLDCNT / BLDALPHA from its
+    // header): what a script set before is gone (rkb_168 14-1: the Kid Buu scene's BG0 priority 3 / blend targets,
+    // the game's registers back to the map's after the next load)
+    w.scene.screen.layers = crate::scene::Layers::default();
     // the load's main-loop iteration follows this logic frame (`Session::lag_step`)
     if w.opts.sim_lag {
         w.g.load_pending = true;
@@ -1933,8 +1937,7 @@ fn fire(w: &mut World, slot: usize, k: usize, t: &TriggerRt) {
     let host = w.field.as_ref().is_some_and(|f| f.host);
     let obj = t.obj;
     let s8 = slot as u8;
-    let region = matches!(kind, TriggerKind::Region) || (matches!(kind, TriggerKind::Event(_)) && std::env::var_os("T_KEEPEV").is_some());
-    let kdbg = format!("{kind:?}");
+    let region = matches!(kind, TriggerKind::Region);
     match kind {
         TriggerKind::Exit { to, push } | TriggerKind::EdgeExit { to, push } => {
             if w.input[slot].held & PUSH_KEY[push as usize & 3] == 0 {
@@ -1969,7 +1972,6 @@ fn fire(w: &mut World, slot: usize, k: usize, t: &TriggerRt) {
     if !region && matches!(t.act, Activation::TouchOnce | Activation::Unknown(0x0800_71A7) | Activation::Unknown(0x0802_266F)) {
         if let Some(f) = w.field.as_mut() {
             if f.loads == loads && k < f.triggers.len() && f.triggers[k].obj == t.obj {
-                if std::env::var_os("T_TRDBG").is_some() { eprintln!("TRDBG remove f{} {:?} act {:?} region {} kind {}", w.frame, f.triggers[k].rect, f.triggers[k].act, region, kdbg); }
                 f.triggers.remove(k);
             }
         }

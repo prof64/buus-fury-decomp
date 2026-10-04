@@ -87,6 +87,7 @@ fn main() {
     let mut rng_bad = 0usize;
     let mut flag_check: Option<(usize, String)> = None;
     let mut flag_reports = 0usize;
+    let (mut vleak_reports, mut vleak_last) = (0usize, Vec::<u32>::new());
     let (mut hp_bad, mut hp_reports) = (0usize, 0usize);
     let mut pos_bad = 0usize;
     let (mut stepped, mut first_area, mut first_pos, mut first_rng) = (0usize, None, None, None);
@@ -389,6 +390,18 @@ fn main() {
                 println!("flags differ at row {k}: {diff:?}");
             }
         }
+        // SOAK_VLEAK=1: the first rows where sprite memory has an owner entity that no longer exists (in the world or
+        // offstage / suspended)
+        if std::env::var_os("SOAK_VLEAK").is_some() {
+            if let Some(v) = w.field.as_ref().and_then(|f| f.vram.as_ref()) {
+                let dead: Vec<u32> = v.owners.iter().filter_map(|o| match o.1 { wf_core::vram::Owner::Ent(id) if w.find(id).is_none() && !w.scene.offstage.iter().any(|e| e.id == id) => Some(id), _ => None }).collect();
+                if !dead.is_empty() && vleak_reports < 12 && dead != vleak_last {
+                    vleak_reports += 1;
+                    println!("vram leak at row {k}: owners of gone entities {dead:?} (area {:?})", w.field.as_ref().map(|f| (f.area.world, f.area.area)));
+                    vleak_last = dead;
+                }
+            }
+        }
         if dump_at.is_some_and(|(a, b)| a <= k && k <= b) {
             if let Some(pi) = w.player_idx(0) {
                 let pl = w.pl_ref(pi);
@@ -434,6 +447,15 @@ fn main() {
                         println!("  player diffs ({} vs {} fields): {:?}", ta.len(), tb.len(), d);
                     }
                     if std::env::var("SOAK_G").is_ok() { println!("  g app {:?}\n  g imp {:?}", w.g, v.g); }
+                    // SOAK_NPC=1: every NPC, app vs import (by list position; the wander state in full)
+                    if std::env::var("SOAK_NPC").is_ok() {
+                        let npcs = |ww: &wf_core::world::World| -> Vec<String> { ww.ents.iter().filter(|e| !e.removed).filter_map(|e| match &e.body { wf_core::world::Body::Npc(n) => Some(format!("N{} ({}, {}) f{} {:?}", n.sprite_id, n.a.x, n.a.y, n.a.facing, n.behaviour)), _ => None }).collect() };
+                        let fd: Vec<String> = (0..w.story.flags.len().min(v.story.flags.len()) * 8).filter(|&f| (w.story.flags[f >> 3] ^ v.story.flags[f >> 3]) >> (f & 7) & 1 != 0).map(|f| format!("{f}:{}", if v.story.flags[f >> 3] >> (f & 7) & 1 != 0 { "imp only" } else { "app only" })).collect();
+                        println!("  story flags app vs import: {fd:?} | L {:?} vs {:?}", w.story.l, v.story.l);
+                        for (x, y) in npcs(w).iter().zip(npcs(v).iter()) {
+                            println!("  npc {}\n      imp {}", x, if x == y { "same".to_string() } else { y.clone() });
+                        }
+                    }
                 }
                 println!("leader at row {k}: rec {:?} equip {:?} skills {:?} form {} eff {:?} story equipment {:?}", pl.rec, pl.equip, pl.skills, pl.form, pl.eff, w.story.equipment);
                 if let Some(f) = w.field.as_ref() {

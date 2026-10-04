@@ -75,7 +75,10 @@ pub fn render_view(w: &World, out: &mut RenderView) {
     let mode7 = w.field.as_ref().and_then(|f| f.flight.as_ref().map(|fl| wf_view::Mode7View { x: fl.cam[0], y: fl.cam[1], height: fl.cam[2], heading: fl.cam[3], pitch: fl.cam[4], label: f.label.map(|l| l as i32) }));
     // tile animations run on the map's own timers, which start at the area load (field_parity)
     let anim_frame = w.field.as_ref().map(|f| w.frame.saturating_sub(f.entered)).unwrap_or(w.frame);
-    out.map = Some(MapView { id: map_id, anim_frame, shake: w.g.shake_off, mode7: mode7.clone() });
+    // a script's BG control (hide / priority / blend targets / weights: scene::Layers)
+    let sl = &w.scene.screen.layers;
+    let layers = (*sl != crate::scene::Layers::default()).then(|| wf_view::BgLayers { visible: sl.visible, priority: sl.priority, blend: sl.blend, alpha: sl.alpha });
+    out.map = Some(MapView { id: map_id, anim_frame, shake: w.g.shake_off, mode7: mode7.clone(), layers });
     // the area transition's palette fade (field FadeOut k -> level 8k, FadeIn k -> 256 - 8k; 0x08006D98 / 0x08006DD6)
     if let Some(f) = w.field.as_ref() {
         let level = match f.mode {

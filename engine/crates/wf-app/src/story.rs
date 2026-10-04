@@ -117,6 +117,7 @@ impl StorySim {
             .filter(|p| p.starts_with("scripts/") && p.ends_with(".rhai"))
             .filter_map(|p| packs.read(&p).and_then(|b| String::from_utf8(b).ok()).map(|s| (p, s)))
             .collect();
+        step_code(packs);
         let (imp, host) = wf_import::segment::start(&data, &files, doc)?;
         let mut session = wf_import::StoryHost::session(&data, imp.world);
         wf_core::field::attach_host(&mut session.world, true);
@@ -137,6 +138,7 @@ impl StorySim {
             .filter(|p| p.starts_with("scripts/") && p.ends_with(".rhai"))
             .filter_map(|p| packs.read(&p).and_then(|b| String::from_utf8(b).ok()).map(|s| (p, s)))
             .collect();
+        step_code(packs);
         let mut host = wf_import::StoryHost::new(&data, &files)?;
         let imp = wf_import::import_emulator_state(&data, ram, &mut host).map_err(|e| format!("{e:?}"))?;
         host.prev_held = imp.prev_keys;
@@ -155,6 +157,16 @@ impl StorySim {
     /// the script host's state (timers, pending wait; harnesses)
     pub fn host(&self) -> &wf_import::StoryHost {
         &self.host
+    }
+}
+
+/// the content's event / inline-script bytecode for the importer (`wf_import::host::set_step_code`, as the segment
+/// harness's setup): a cut inside a running event node or an area's inline script continues from the action the
+/// game's interpreter is at (without it the import drops the script - soak m_pg_g111: the world map landing's
+/// inline script 0x0807364C holding the leader 67 frames)
+fn step_code(packs: &Packs) {
+    if let Some(b) = packs.read("scripts/bytecode.json") {
+        wf_import::host::set_step_code(&b);
     }
 }
 

@@ -1,26 +1,476 @@
 {
  "rec": {
-  "stops": 19,
-  "rule": 10,
-  "import": 9,
+  "stops": 60,
+  "rule": 60,
+  "import": 0,
   "groups": [
+   {
+    "owner": "Super Buu agent",
+    "kind": "rule",
+    "field": "rng",
+    "chapter": "superbuu",
+    "count": 53,
+    "stops": [
+     {
+      "row": 1339017,
+      "stretch": "062_m_inside_buu",
+      "what": "app [b460ebed, 721626b0] game [699cd8d3, d8087ea9]",
+      "menu": false,
+      "started": [
+       "s473",
+       "inline_0x08711151"
+      ],
+      "from": 813245
+     },
+     {
+      "row": 1339177,
+      "stretch": "062_m_inside_buu",
+      "what": "app [075f7bd2, 4552fb5d] game [fd587251, 077b5510]",
+      "menu": false,
+      "started": [],
+      "from": 1339018
+     },
+     {
+      "row": 1339418,
+      "stretch": "062_m_inside_buu",
+      "what": "app [241fe664, 8f5fc246] game [4df29375, 74a1a982]",
+      "menu": false,
+      "started": [],
+      "from": 1339178
+     },
+     {
+      "row": 1339637,
+      "stretch": "062_m_inside_buu",
+      "what": "app [73f516da, f2ef07d5] game [79de3589, 0f5ce720]",
+      "menu": false,
+      "started": [],
+      "from": 1339419
+     },
+     {
+      "row": 1340687,
+      "stretch": "062_m_inside_buu",
+      "what": "app [6eee4018, 29f01e28] game [5849e2a1, 0dfa2bf1]",
+      "menu": false,
+      "started": [
+       "s474"
+      ],
+      "from": 1339638
+     },
+     {
+      "row": 1341068,
+      "stretch": "062_m_inside_buu",
+      "what": "app [7200100b, e25cde53] game [40797251, 31453ec9]",
+      "menu": false,
+      "started": [],
+      "from": 1340688
+     },
+     {
+      "row": 1341250,
+      "stretch": "062_m_inside_buu",
+      "what": "app [7643016b, 73b05615] game [86ef5215, fff80fed]",
+      "menu": false,
+      "started": [],
+      "from": 1341069
+     },
+     {
+      "row": 1341895,
+      "stretch": "062_m_inside_buu",
+      "what": "app [61298198, 65aeb332] game [1c174e5a, 7fca8b53]",
+      "menu": false,
+      "started": [],
+      "from": 1341251
+     },
+     {
+      "row": 1342031,
+      "stretch": "062_m_inside_buu",
+      "what": "app [6ae4a4d1, e3ed753c] game [b7f2bf79, d05adf3b]",
+      "menu": false,
+      "started": [],
+      "from": 1341896
+     },
+     {
+      "row": 1342158,
+      "stretch": "062_m_inside_buu",
+      "what": "app [de6596d0, 05e05eb2] game [a2040c69, 7aaa5e0a]",
+      "menu": false,
+      "started": [],
+      "from": 1342032
+     },
+     {
+      "row": 1342466,
+      "stretch": "062_m_inside_buu",
+      "what": "app [6f78923c, 85b83e2d] game [311d6c4b, 5c91ba80]",
+      "menu": false,
+      "started": [],
+      "from": 1342159
+     },
+     {
+      "row": 1342684,
+      "stretch": "062_m_inside_buu",
+      "what": "app [adac706d, b32a0179] game [03522da7, 9cd0ce7b]",
+      "menu": false,
+      "started": [],
+      "from": 1342467
+     },
+     {
+      "row": 1342899,
+      "stretch": "062_m_inside_buu",
+      "what": "app [89b30e84, 19d12d98] game [362b2b74, b145e961]",
+      "menu": false,
+      "started": [],
+      "from": 1342685
+     },
+     {
+      "row": 1343116,
+      "stretch": "062_m_inside_buu",
+      "what": "app [a18cdbe3, 5519fab0] game [3974d65a, 9dcc4928]",
+      "menu": false,
+      "started": [],
+      "from": 1342900
+     },
+     {
+      "row": 1343193,
+      "stretch": "062_m_inside_buu",
+      "what": "app [7eab4517, 9a1ea97f] game [c64dd7ad, 05476479]",
+      "menu": false,
+      "started": [],
+      "from": 1343117
+     },
+     {
+      "row": 1343515,
+      "stretch": "062_m_inside_buu",
+      "what": "app [92636d36, e816db74] game [5b8bccd0, f2761e01]",
+      "menu": false,
+      "started": [],
+      "from": 1343194
+     },
+     {
+      "row": 1343829,
+      "stretch": "062_m_inside_buu",
+      "what": "app [5c981aaa, d34b5f96] game [eae05a9e, b1340da5]",
+      "menu": false,
+      "started": [],
+      "from": 1343516
+     },
+     {
+      "row": 1344134,
+      "stretch": "062_m_inside_buu",
+      "what": "app [521926fd, 23fa1b6c] game [1ca36ddc, 4d760cb0]",
+      "menu": false,
+      "started": [],
+      "from": 1343830
+     },
+     {
+      "row": 1345535,
+      "stretch": "062_m_inside_buu",
+      "what": "app [5fce1f33, 3b421013] game [e53f1b37, 37c86a3b]",
+      "menu": false,
+      "started": [
+       "s475"
+      ],
+      "from": 1344135
+     },
+     {
+      "row": 1345681,
+      "stretch": "062_m_inside_buu",
+      "what": "app [5fad721f, a2591b52] game [7e8983c7, def83227]",
+      "menu": false,
+      "started": [],
+      "from": 1345536
+     },
+     {
+      "row": 1345845,
+      "stretch": "062_m_inside_buu",
+      "what": "app [9811caec, 838bb9f9] game [57f17d1b, c2acf360]",
+      "menu": false,
+      "started": [],
+      "from": 1345682
+     },
+     {
+      "row": 1346027,
+      "stretch": "062_m_inside_buu",
+      "what": "app [79b51a0f, c727d937] game [4bf32af9, 370bfd65]",
+      "menu": false,
+      "started": [],
+      "from": 1345846
+     },
+     {
+      "row": 1346270,
+      "stretch": "062_m_inside_buu",
+      "what": "app [f06d643e, 1cf9773c] game [89d586ef, 7ccc275e]",
+      "menu": false,
+      "started": [],
+      "from": 1346028
+     },
+     {
+      "row": 1346635,
+      "stretch": "062_m_inside_buu",
+      "what": "app [dc932f42, 98c848ee] game [788a8240, a7c511f3]",
+      "menu": false,
+      "started": [],
+      "from": 1346271
+     },
+     {
+      "row": 1346947,
+      "stretch": "062_m_inside_buu",
+      "what": "app [b3695714, 3a60c80f] game [2067d384, 905ad8e1]",
+      "menu": false,
+      "started": [],
+      "from": 1346636
+     },
+     {
+      "row": 1347040,
+      "stretch": "062_m_inside_buu",
+      "what": "app [7e5a3c26, f57b128f] game [2bfc3a84, 509dcad3]",
+      "menu": false,
+      "started": [],
+      "from": 1346948
+     },
+     {
+      "row": 1347274,
+      "stretch": "062_m_inside_buu",
+      "what": "app [fe2468d8, f7323a90] game [dbac4b2e, 205c6f47]",
+      "menu": false,
+      "started": [],
+      "from": 1347041
+     },
+     {
+      "row": 1347743,
+      "stretch": "062_m_inside_buu",
+      "what": "app [755830f3, 65866ce3] game [51418402, 21557080]",
+      "menu": false,
+      "started": [],
+      "from": 1347275
+     },
+     {
+      "row": 1347943,
+      "stretch": "062_m_inside_buu",
+      "what": "app [a1608af6, 989d45f2] game [044e17b7, a6795ede]",
+      "menu": false,
+      "started": [],
+      "from": 1347744
+     },
+     {
+      "row": 1348788,
+      "stretch": "062_m_inside_buu",
+      "what": "app [4b4b807d, b23f90ea] game [5257eafb, 1e682711]",
+      "menu": false,
+      "started": [],
+      "from": 1348486
+     },
+     {
+      "row": 1348872,
+      "stretch": "062_m_inside_buu",
+      "what": "app [a20e654f, e5f4dc9a] game [676add06, c838fc38]",
+      "menu": false,
+      "started": [],
+      "from": 1348789
+     },
+     {
+      "row": 1349100,
+      "stretch": "062_m_inside_buu",
+      "what": "app [93d7eeca, 72a42e2d] game [85f43760, 1b681d1b]",
+      "menu": false,
+      "started": [],
+      "from": 1348873
+     },
+     {
+      "row": 1349211,
+      "stretch": "062_m_inside_buu",
+      "what": "app [531397c0, 0f304cf8] game [76e1fb34, 2abe2065]",
+      "menu": false,
+      "started": [],
+      "from": 1349101
+     },
+     {
+      "row": 1349681,
+      "stretch": "062_m_inside_buu",
+      "what": "app [0649708b, 6e37f748] game [6722dbb4, 10d049e6]",
+      "menu": false,
+      "started": [],
+      "from": 1349212
+     },
+     {
+      "row": 1350004,
+      "stretch": "062_m_inside_buu",
+      "what": "app [994db17f, d6729c1a] game [4a6bf1ea, f3ac490f]",
+      "menu": false,
+      "started": [],
+      "from": 1349682
+     },
+     {
+      "row": 1350235,
+      "stretch": "062_m_inside_buu",
+      "what": "app [ad1b76c4, 9364fc9c] game [8747241c, 27099649]",
+      "menu": false,
+      "started": [],
+      "from": 1350005
+     },
+     {
+      "row": 1350631,
+      "stretch": "062_m_inside_buu",
+      "what": "app [1d472e6a, 7187ca97] game [cecb3386, ccd1c19d]",
+      "menu": false,
+      "started": [],
+      "from": 1350236
+     },
+     {
+      "row": 1350748,
+      "stretch": "062_m_inside_buu",
+      "what": "app [4908ccd1, 1db24118] game [fe0c7df5, 49d0f6b7]",
+      "menu": false,
+      "started": [],
+      "from": 1350632
+     },
+     {
+      "row": 1350993,
+      "stretch": "062_m_inside_buu",
+      "what": "app [abe022aa, 5b77ac41] game [33e0f800, 9d4c96db]",
+      "menu": false,
+      "started": [],
+      "from": 1350749
+     },
+     {
+      "row": 1351264,
+      "stretch": "062_m_inside_buu",
+      "what": "app [be3dde6f, 91c8084c] game [3839c53c, 85385fc2]",
+      "menu": false,
+      "started": [],
+      "from": 1350994
+     },
+     {
+      "row": 1351475,
+      "stretch": "062_m_inside_buu",
+      "what": "app [fa6d538a, f93cf5f6] game [4302cdd6, bfa3d9cd]",
+      "menu": false,
+      "started": [],
+      "from": 1351265
+     },
+     {
+      "row": 1351901,
+      "stretch": "062_m_inside_buu",
+      "what": "app [45e90125, 5975f0cb] game [a45885ad, e2cd433b]",
+      "menu": false,
+      "started": [],
+      "from": 1351476
+     },
+     {
+      "row": 1352061,
+      "stretch": "062_m_inside_buu",
+      "what": "app [51570379, 1de7034e] game [56ccea0b, 08cfa505]",
+      "menu": false,
+      "started": [],
+      "from": 1351902
+     },
+     {
+      "row": 1352305,
+      "stretch": "062_m_inside_buu",
+      "what": "app [14d02487, 39af1b93] game [ad6debf6, a4e98ce0]",
+      "menu": false,
+      "started": [],
+      "from": 1352062
+     },
+     {
+      "row": 1352581,
+      "stretch": "062_m_inside_buu",
+      "what": "app [e280ac91, b1c3bbb8] game [a856ef01, 49a207e3]",
+      "menu": false,
+      "started": [],
+      "from": 1352306
+     },
+     {
+      "row": 1352695,
+      "stretch": "062_m_inside_buu",
+      "what": "app [f2c45990, 5779c5cb] game [5e6944a8, 93f15889]",
+      "menu": false,
+      "started": [],
+      "from": 1352582
+     },
+     {
+      "row": 1352901,
+      "stretch": "062_m_inside_buu",
+      "what": "app [10db4670, 7a61af7f] game [197e87df, 0c910220]",
+      "menu": false,
+      "started": [],
+      "from": 1352696
+     },
+     {
+      "row": 1353408,
+      "stretch": "062_m_inside_buu",
+      "what": "app [f68339d4, aeab383a] game [19f1e07e, ea3ea53b]",
+      "menu": false,
+      "started": [],
+      "from": 1352902
+     },
+     {
+      "row": 1353845,
+      "stretch": "062_m_inside_buu",
+      "what": "app [b36abab0, 16779f40] game [7dec369b, 33dd49bc]",
+      "menu": false,
+      "started": [],
+      "from": 1353409
+     },
+     {
+      "row": 1353945,
+      "stretch": "062_m_inside_buu",
+      "what": "app [cbce3744, 37bf7608] game [723e3df2, bec7cd27]",
+      "menu": false,
+      "started": [],
+      "from": 1353846
+     },
+     {
+      "row": 1354142,
+      "stretch": "062_m_inside_buu",
+      "what": "app [1c928a2a, c75581ee] game [a3544feb, bab28676]",
+      "menu": false,
+      "started": [],
+      "from": 1353946
+     },
+     {
+      "row": 1354390,
+      "stretch": "062_m_inside_buu",
+      "what": "app [16bc88c0, 29ad67c7] game [0edbadae, 071be2df]",
+      "menu": false,
+      "started": [],
+      "from": 1354143
+     },
+     {
+      "row": 1354524,
+      "stretch": "062_m_inside_buu",
+      "what": "app [06e14012, e2a79908] game [7a5803c2, 7bc28021]",
+      "menu": false,
+      "started": [],
+      "from": 1354391
+     }
+    ]
+   },
    {
     "owner": "Earth agent",
     "kind": "rule",
     "field": "rng",
     "chapter": "earth",
-    "count": 2,
+    "count": 3,
     "stops": [
      {
-      "row": 153225,
+      "row": 153132,
       "stretch": "E2_earth",
-      "what": "app [ddf7897e, 38c3c1f0] game [d800841f, 1450638f]",
+      "what": "app [ddf7897e, 38c3c1f0] game [234beb00, fbe02e0f]",
       "menu": false,
       "started": [
        "s266",
        "s262"
       ],
       "from": 0
+     },
+     {
+      "row": 153226,
+      "stretch": "E2_earth",
+      "what": "app [ddf7897e, 38c3c1f0] game [d800841f, 1450638f]",
+      "menu": false,
+      "started": [
+       "s266@19"
+      ],
+      "from": 153133
      },
      {
       "row": 153281,
@@ -30,7 +480,7 @@
       "started": [
        "s266@19"
       ],
-      "from": 153226
+      "from": 153227
      }
     ]
    },
@@ -68,695 +518,482 @@
     "kind": "rule",
     "field": "pos",
     "chapter": "fat",
-    "count": 2,
-    "stops": [
-     {
-      "row": 621338,
-      "stretch": "002_d04_bandana",
-      "what": "app (73530, 81716, 3) game (73722, 81716, 3)",
-      "menu": false,
-      "started": [
-       "inline_0x083BBC13",
-       "inline_0x08072F48"
-      ],
-      "from": 608824
-     },
-     {
-      "row": 621395,
-      "stretch": "002_d04_bandana",
-      "what": "app (72329, 82470, 3) game (72329, 82278, 0)",
-      "menu": false,
-      "started": [
-       "inline_0x08073EFC",
-       "inline_0x08711211"
-      ],
-      "from": 621369
-     }
-    ]
-   },
-   {
-    "owner": "ship agent",
-    "kind": "rule",
-    "field": "pos",
-    "chapter": "ship",
     "count": 1,
     "stops": [
      {
-      "row": 519616,
-      "stretch": "000_ship_c14",
-      "what": "app (23980, 22486, 0) game (23980, 22102, 0)",
+      "row": 813244,
+      "stretch": "012_db5_a01",
+      "what": "app (78214, 23608, 3) game (78022, 23608, 3)",
       "menu": false,
       "started": [
-       "inline_0x083BBC34",
-       "inline_0x087110A7"
+       "inline_0x08710F5E",
+       "inline_0x08710FB7"
       ],
       "from": 153471
      }
     ]
    },
    {
-    "owner": "ship agent",
+    "owner": "Super Buu agent",
     "kind": "rule",
-    "field": "rng",
-    "chapter": "ship",
+    "field": "pos",
+    "chapter": "superbuu",
     "count": 1,
     "stops": [
      {
-      "row": 519665,
-      "stretch": "000_ship_c14",
-      "what": "app [24dbf79b, 815a72e5] game [a6fdc6e9, b7fba9d2]",
+      "row": 1348485,
+      "stretch": "062_m_inside_buu",
+      "what": "app (51200, 59648, 1) game (52480, 58880, 1)",
       "menu": false,
       "started": [],
-      "from": 519617
-     }
-    ]
-   },
-   {
-    "owner": "dungeon agents A / B",
-    "kind": "rule",
-    "field": "rng",
-    "chapter": "fat",
-    "count": 1,
-    "stops": [
-     {
-      "row": 608823,
-      "stretch": "002_d04_bandana",
-      "what": "app [2b6668bc, 0ae5d8e3] game [77786984, bc24e457]",
-      "menu": false,
-      "started": [
-       "s011",
-       "inline_0x080782FC"
-      ],
-      "from": 519666
-     }
-    ]
-   },
-   {
-    "owner": "dungeon agents A / B",
-    "kind": "rule",
-    "field": "depth",
-    "chapter": "fat",
-    "count": 1,
-    "stops": [
-     {
-      "row": 642083,
-      "stretch": "003_d06_thieves (chain diverges from the real run here)",
-      "what": "app 1 game 0",
-      "menu": false,
-      "started": [
-       "inline_0x0807457C",
-       "s004"
-      ],
-      "from": 621396
-     }
-    ]
-   },
-   {
-    "owner": "importer agent",
-    "kind": "import",
-    "field": "area",
-    "chapter": "fat",
-    "count": 6,
-    "stops": [
-     {
-      "row": 642084,
-      "stretch": "003_d06_thieves (chain diverges from the real run here)",
-      "what": "app (8, 3) game (1, 1)",
-      "menu": false,
-      "started": [],
-      "from": 642084
-     },
-     {
-      "row": 642114,
-      "stretch": "003_d06_thieves (chain diverges from the real run here)",
-      "what": "app (8, 3) game (1, 1)",
-      "menu": false,
-      "started": [],
-      "from": 642114
-     },
-     {
-      "row": 642174,
-      "stretch": "003_d06_thieves (chain diverges from the real run here)",
-      "what": "app (8, 3) game (1, 1)",
-      "menu": false,
-      "started": [],
-      "from": 642174
-     },
-     {
-      "row": 642294,
-      "stretch": "003_d06_thieves (chain diverges from the real run here)",
-      "what": "app (8, 3) game (1, 1)",
-      "menu": false,
-      "started": [],
-      "from": 642294
-     },
-     {
-      "row": 642534,
-      "stretch": "003_d06_thieves (chain diverges from the real run here)",
-      "what": "app (8, 3) game (1, 1)",
-      "menu": false,
-      "started": [],
-      "from": 642534
-     },
-     {
-      "row": 643014,
-      "stretch": "003_d06_thieves (chain diverges from the real run here)",
-      "what": "app (8, 3) game (1, 1)",
-      "menu": false,
-      "started": [],
-      "from": 643014
-     }
-    ]
-   },
-   {
-    "owner": "importer agent",
-    "kind": "import",
-    "field": "import",
-    "chapter": "?",
-    "count": 2,
-    "stops": [
-     {
-      "row": 643974,
-      "stretch": "",
-      "what": "unsupported cut: area AreaId { world: 8, area: 6, variant: 1 }: the load's on-enter script is still blocked (no leader); cut at the frame the leader appears",
-      "menu": null,
-      "started": null,
-      "from": 643974
-     },
-     {
-      "row": 645894,
-      "stretch": "",
-      "what": "unsupported cut: area AreaId { world: 8, area: 6, variant: 1 }: the load's on-enter script is still blocked (no leader); cut at the frame the leader appears",
-      "menu": null,
-      "started": null,
-      "from": 645894
-     }
-    ]
-   },
-   {
-    "owner": "importer agent",
-    "kind": "import",
-    "field": "rng",
-    "chapter": "fat",
-    "count": 1,
-    "stops": [
-     {
-      "row": 621339,
-      "stretch": "002_d04_bandana",
-      "what": "app [2302d396, 28b8d03c] game [40e67a74, 60b0e573]",
-      "menu": false,
-      "started": [],
-      "from": 621339
+      "from": 1347944
      }
     ]
    }
   ]
  },
- "sim": {
-  "stops": 120,
-  "rule": 76,
-  "import": 44,
+ "none": {
+  "stops": 56,
+  "rule": 56,
+  "import": 0,
   "groups": [
    {
-    "owner": "ship agent",
+    "owner": "Super Buu agent",
     "kind": "rule",
     "field": "rng",
-    "chapter": "ship",
-    "count": 18,
+    "chapter": "superbuu",
+    "count": 53,
     "stops": [
      {
-      "row": 208396,
-      "stretch": "000_ship_c14",
-      "what": "app [17d43d9c, abb04a12] game [b12fb01f, d29a98bb]",
+      "row": 1339017,
+      "stretch": "062_m_inside_buu",
+      "what": "app [b460ebed, 721626b0] game [699cd8d3, d8087ea9]",
+      "menu": false,
+      "started": [
+       "s473",
+       "inline_0x08711151"
+      ],
+      "from": 813245
+     },
+     {
+      "row": 1339177,
+      "stretch": "062_m_inside_buu",
+      "what": "app [075f7bd2, 4552fb5d] game [fd587251, 077b5510]",
       "menu": false,
       "started": [],
-      "from": 208366
+      "from": 1339018
      },
      {
-      "row": 225199,
-      "stretch": "000_ship_c14",
-      "what": "app [2af8353b, 876ef8f8] game [389abf16, e2949328]",
-      "menu": false,
-      "started": [
-       "s308",
-       "s003"
-      ],
-      "from": 208397
-     },
-     {
-      "row": 225224,
-      "stretch": "000_ship_c14",
-      "what": "app [b8fdd231, ae214c5c] game [389abf16, e2949328]",
-      "menu": false,
-      "started": [
-       "s314@0"
-      ],
-      "from": 225200
-     },
-     {
-      "row": 225249,
-      "stretch": "000_ship_c14",
-      "what": "app [b8fdd231, ae214c5c] game [389abf16, e2949328]",
-      "menu": false,
-      "started": [
-       "s314@0"
-      ],
-      "from": 225225
-     },
-     {
-      "row": 228278,
-      "stretch": "000_ship_c14",
-      "what": "app [db1e5e53, cef1db85] game [131bc141, 6eda757c]",
+      "row": 1339418,
+      "stretch": "062_m_inside_buu",
+      "what": "app [241fe664, 8f5fc246] game [4df29375, 74a1a982]",
       "menu": false,
       "started": [],
-      "from": 228248
+      "from": 1339178
      },
      {
-      "row": 254248,
-      "stretch": "000_ship_c14",
-      "what": "app [bbabb816, ec2bb224] game [525cc6a3, 35ccaf95]",
+      "row": 1339637,
+      "stretch": "062_m_inside_buu",
+      "what": "app [73f516da, f2ef07d5] game [79de3589, 0f5ce720]",
       "menu": false,
       "started": [],
-      "from": 254218
+      "from": 1339419
      },
      {
-      "row": 271019,
-      "stretch": "000_ship_c14",
-      "what": "app [c944db10, 609570d4] game [ac85e755, a65bb9e7]",
+      "row": 1340687,
+      "stretch": "062_m_inside_buu",
+      "what": "app [6eee4018, 29f01e28] game [5849e2a1, 0dfa2bf1]",
+      "menu": false,
+      "started": [
+       "s474"
+      ],
+      "from": 1339638
+     },
+     {
+      "row": 1341068,
+      "stretch": "062_m_inside_buu",
+      "what": "app [7200100b, e25cde53] game [40797251, 31453ec9]",
       "menu": false,
       "started": [],
-      "from": 270989
+      "from": 1340688
      },
      {
-      "row": 365766,
-      "stretch": "000_ship_c14",
-      "what": "app [26c1ed85, 476bdc45] game [6ee675b3, 2f77cf8a]",
+      "row": 1341250,
+      "stretch": "062_m_inside_buu",
+      "what": "app [7643016b, 73b05615] game [86ef5215, fff80fed]",
       "menu": false,
       "started": [],
-      "from": 365736
+      "from": 1341069
      },
      {
-      "row": 376011,
-      "stretch": "000_ship_c14",
-      "what": "app [b34715f6, e9295e2b] game [5f3b8c4c, 10464522]",
+      "row": 1341895,
+      "stretch": "062_m_inside_buu",
+      "what": "app [61298198, 65aeb332] game [1c174e5a, 7fca8b53]",
       "menu": false,
       "started": [],
-      "from": 375981
+      "from": 1341251
      },
      {
-      "row": 378397,
-      "stretch": "000_ship_c14",
-      "what": "app [70b1b211, 6b9eaedc] game [18e3c05e, 7bcb8eac]",
+      "row": 1342031,
+      "stretch": "062_m_inside_buu",
+      "what": "app [6ae4a4d1, e3ed753c] game [b7f2bf79, d05adf3b]",
       "menu": false,
       "started": [],
-      "from": 378367
+      "from": 1341896
      },
      {
-      "row": 435341,
-      "stretch": "000_ship_c14",
-      "what": "app [11488306, e90a9d5c] game [fd1ea22b, b39960dd]",
+      "row": 1342158,
+      "stretch": "062_m_inside_buu",
+      "what": "app [de6596d0, 05e05eb2] game [a2040c69, 7aaa5e0a]",
       "menu": false,
       "started": [],
-      "from": 435311
+      "from": 1342032
      },
      {
-      "row": 437124,
-      "stretch": "000_ship_c14",
-      "what": "app [9ada77d8, 1ec10089] game [836734c0, 7f5de897]",
+      "row": 1342466,
+      "stretch": "062_m_inside_buu",
+      "what": "app [6f78923c, 85b83e2d] game [311d6c4b, 5c91ba80]",
       "menu": false,
       "started": [],
-      "from": 437094
+      "from": 1342159
      },
      {
-      "row": 442783,
-      "stretch": "000_ship_c14",
-      "what": "app [425f525d, 8aaa2284] game [cf812c4a, 9402c079]",
+      "row": 1342684,
+      "stretch": "062_m_inside_buu",
+      "what": "app [adac706d, b32a0179] game [03522da7, 9cd0ce7b]",
       "menu": false,
       "started": [],
-      "from": 442753
+      "from": 1342467
      },
      {
-      "row": 490562,
-      "stretch": "000_ship_c14",
-      "what": "app [259a262f, 5e1073eb] game [7675914b, 80c3e622]",
+      "row": 1342899,
+      "stretch": "062_m_inside_buu",
+      "what": "app [89b30e84, 19d12d98] game [362b2b74, b145e961]",
       "menu": false,
       "started": [],
-      "from": 490532
+      "from": 1342685
      },
      {
-      "row": 547557,
-      "stretch": "000_ship_c14",
-      "what": "app [878e4ed1, aae1ec8d] game [5e7e7ff3, a87fca59]",
-      "menu": false,
-      "started": [
-       "s337",
-       "s336"
-      ],
-      "from": 490563
-     },
-     {
-      "row": 566646,
-      "stretch": "000_ship_c14",
-      "what": "app [e7d96a7b, 1b702ee3] game [f1d5080f, 10614728]",
-      "menu": false,
-      "started": [
-       "s340@13"
-      ],
-      "from": 564446
-     },
-     {
-      "row": 568125,
-      "stretch": "000_ship_c14",
-      "what": "app [a2b09ddc, 9345a587] game [24fd1564, 85784c09]",
-      "menu": false,
-      "started": [
-       "s325"
-      ],
-      "from": 566647
-     },
-     {
-      "row": 578279,
-      "stretch": "000_ship_c14",
-      "what": "app [f8d3022b, 2e188421] game [d5863abd, a370c3a5]",
+      "row": 1343116,
+      "stretch": "062_m_inside_buu",
+      "what": "app [a18cdbe3, 5519fab0] game [3974d65a, 9dcc4928]",
       "menu": false,
       "started": [],
-      "from": 578249
-     }
-    ]
-   },
-   {
-    "owner": "ship agent",
-    "kind": "rule",
-    "field": "pos",
-    "chapter": "ship",
-    "count": 15,
-    "stops": [
-     {
-      "row": 208365,
-      "stretch": "000_ship_c14",
-      "what": "app (57344, 197632, 1) game (57344, 197504, 1)",
-      "menu": false,
-      "started": [
-       "inline_0x08079C70",
-       "inline_0x080733A0"
-      ],
-      "from": 153471
+      "from": 1342900
      },
      {
-      "row": 228247,
-      "stretch": "000_ship_c14",
-      "what": "app (63232, 11008, 0) game (63232, 11136, 0)",
-      "menu": false,
-      "started": [
-       "inline_0x0807600C",
-       "inline_0x08073104"
-      ],
-      "from": 225460
-     },
-     {
-      "row": 254217,
-      "stretch": "000_ship_c14",
-      "what": "app (112384, 56320, 2) game (112256, 56320, 2)",
-      "menu": false,
-      "started": [
-       "inline_0x08710F7C",
-       "inline_0x08710F7C"
-      ],
-      "from": 228279
-     },
-     {
-      "row": 270988,
-      "stretch": "000_ship_c14",
-      "what": "app (18432, 93184, 1) game (18432, 93056, 1)",
-      "menu": false,
-      "started": [
-       "inline_0x087110A7",
-       "inline_0x087110A7"
-      ],
-      "from": 254249
-     },
-     {
-      "row": 365735,
-      "stretch": "000_ship_c14",
-      "what": "app (18432, 93184, 1) game (18432, 93056, 1)",
-      "menu": false,
-      "started": [
-       "inline_0x087110A7",
-       "inline_0x087110A7"
-      ],
-      "from": 271020
-     },
-     {
-      "row": 375980,
-      "stretch": "000_ship_c14",
-      "what": "app (72192, 7168, 0) game (72192, 7296, 0)",
-      "menu": false,
-      "started": [
-       "inline_0x0807AB24",
-       "inline_0x087110A7"
-      ],
-      "from": 365767
-     },
-     {
-      "row": 378366,
-      "stretch": "000_ship_c14",
-      "what": "app (18432, 93184, 1) game (18432, 93056, 1)",
-      "menu": false,
-      "started": [
-       "inline_0x087110A7",
-       "inline_0x087110A7"
-      ],
-      "from": 376012
-     },
-     {
-      "row": 435310,
-      "stretch": "000_ship_c14",
-      "what": "app (72192, 7168, 0) game (72192, 7296, 0)",
-      "menu": false,
-      "started": [
-       "inline_0x0807AB24",
-       "inline_0x087110A7"
-      ],
-      "from": 378398
-     },
-     {
-      "row": 437093,
-      "stretch": "000_ship_c14",
-      "what": "app (57344, 197632, 1) game (57344, 197504, 1)",
-      "menu": false,
-      "started": [
-       "inline_0x08079C70",
-       "inline_0x080733A0"
-      ],
-      "from": 435342
-     },
-     {
-      "row": 442752,
-      "stretch": "000_ship_c14",
-      "what": "app (47104, 72704, 1) game (47104, 72576, 1)",
-      "menu": false,
-      "started": [
-       "inline_0x0807B3C7",
-       "inline_0x0807B3B0"
-      ],
-      "from": 437125
-     },
-     {
-      "row": 490531,
-      "stretch": "000_ship_c14",
-      "what": "app (98304, 34816, 2) game (98176, 34816, 2)",
-      "menu": false,
-      "started": [
-       "inline_0x087110A7",
-       "inline_0x087111A2"
-      ],
-      "from": 442784
-     },
-     {
-      "row": 568176,
-      "stretch": "000_ship_c14",
-      "what": "app (24064, 58592, 2) game (70400, 29440, 2)",
-      "menu": false,
-      "started": [
-       "s341@0"
-      ],
-      "from": 568156
-     },
-     {
-      "row": 573155,
-      "stretch": "000_ship_c14",
-      "what": "app leader None game [70400,29440,2,\"idle\"]",
-      "menu": false,
-      "started": [
-       "s341@0"
-      ],
-      "from": 568177
-     },
-     {
-      "row": 578248,
-      "stretch": "000_ship_c14",
-      "what": "app (69632, 52224, 1) game (69632, 52096, 1)",
-      "menu": false,
-      "started": [
-       "inline_0x0807B3B0",
-       "inline_0x087110A7"
-      ],
-      "from": 573156
-     },
-     {
-      "row": 600328,
-      "stretch": "001_ship_c15",
-      "what": "app leader None game [52224,56832,0,\"hold\"]",
-      "menu": false,
-      "started": [
-       "inline_0x0807F128",
-       "inline_0x0807C044"
-      ],
-      "from": 578280
-     }
-    ]
-   },
-   {
-    "owner": "Earth agent",
-    "kind": "rule",
-    "field": "pos",
-    "chapter": "earth",
-    "count": 13,
-    "stops": [
-     {
-      "row": 48858,
-      "stretch": "E2_earth",
-      "what": "app (24832, 79872, 1) game (24832, 79744, 1)",
-      "menu": false,
-      "started": [
-       "inline_0x08076ECC",
-       "s127"
-      ],
-      "from": 41745
-     },
-     {
-      "row": 48861,
-      "stretch": "E2_earth",
-      "what": "app (24832, 79360, 0) game (24832, 79360, 1)",
+      "row": 1343193,
+      "stretch": "062_m_inside_buu",
+      "what": "app [7eab4517, 9a1ea97f] game [c64dd7ad, 05476479]",
       "menu": false,
       "started": [],
-      "from": 48859
+      "from": 1343117
      },
      {
-      "row": 58401,
-      "stretch": "E2_earth",
-      "what": "app (38912, 76800, 1) game (38912, 76672, 1)",
-      "menu": false,
-      "started": [
-       "inline_0x08078814",
-       "inline_0x0807874C"
-      ],
-      "from": 48892
-     },
-     {
-      "row": 59592,
-      "stretch": "E2_earth",
-      "what": "app (59392, 17408, 0) game (59392, 17536, 0)",
-      "menu": false,
-      "started": [
-       "inline_0x08078538",
-       "inline_0x08078814"
-      ],
-      "from": 58433
-     },
-     {
-      "row": 59618,
-      "stretch": "E2_earth",
-      "what": "app (59392, 20736, 0) game (59392, 20864, 0)",
-      "menu": false,
-      "started": [
-       "inline_0x08078678"
-      ],
-      "from": 59593
-     },
-     {
-      "row": 70214,
-      "stretch": "E2_earth",
-      "what": "app (38912, 35840, 0) game (38912, 35968, 0)",
-      "menu": false,
-      "started": [
-       "inline_0x080775D0",
-       "s141"
-      ],
-      "from": 59816
-     },
-     {
-      "row": 72279,
-      "stretch": "E2_earth",
-      "what": "app (133376, 0, 0) game (133376, 128, 0)",
-      "menu": false,
-      "started": [
-       "inline_0x08076C3F",
-       "inline_0x08076ECC"
-      ],
-      "from": 70246
-     },
-     {
-      "row": 73601,
-      "stretch": "E2_earth",
-      "what": "app (63232, 11008, 0) game (63232, 11136, 0)",
-      "menu": false,
-      "started": [
-       "inline_0x0807600C",
-       "inline_0x08073104"
-      ],
-      "from": 73210
-     },
-     {
-      "row": 94035,
-      "stretch": "E2_earth",
-      "what": "app (102400, 0, 0) game (102400, 128, 0)",
-      "menu": false,
-      "started": [
-       "inline_0x08710FA3",
-       "inline_0x08710F7C"
-      ],
-      "from": 73633
-     },
-     {
-      "row": 94049,
-      "stretch": "E2_earth",
-      "what": "app (102400, 1920, 1) game (102400, 1920, 0)",
+      "row": 1343515,
+      "stretch": "062_m_inside_buu",
+      "what": "app [92636d36, e816db74] game [5b8bccd0, f2761e01]",
       "menu": false,
       "started": [],
-      "from": 94036
+      "from": 1343194
      },
      {
-      "row": 94993,
-      "stretch": "E2_earth",
-      "what": "app (37120, 79872, 1) game (37120, 79744, 1)",
+      "row": 1343829,
+      "stretch": "062_m_inside_buu",
+      "what": "app [5c981aaa, d34b5f96] game [eae05a9e, b1340da5]",
       "menu": false,
-      "started": [
-       "inline_0x08076ECC"
-      ],
-      "from": 94126
+      "started": [],
+      "from": 1343516
      },
      {
-      "row": 142490,
-      "stretch": "E2_earth",
-      "what": "app (47360, 106496, 0) game (47296, 106741, 0)",
+      "row": 1344134,
+      "stretch": "062_m_inside_buu",
+      "what": "app [521926fd, 23fa1b6c] game [1ca36ddc, 4d760cb0]",
       "menu": false,
-      "started": [
-       "inline_0x080782FC",
-       "s192"
-      ],
-      "from": 123427
+      "started": [],
+      "from": 1343830
      },
      {
-      "row": 146672,
-      "stretch": "E2_earth",
-      "what": "app (48640, 61952, 1) game (48640, 61952, 0)",
+      "row": 1345535,
+      "stretch": "062_m_inside_buu",
+      "what": "app [5fce1f33, 3b421013] game [e53f1b37, 37c86a3b]",
       "menu": false,
       "started": [
-       "s184",
-       "inline_0x08078538"
+       "s475"
       ],
-      "from": 142701
+      "from": 1344135
+     },
+     {
+      "row": 1345681,
+      "stretch": "062_m_inside_buu",
+      "what": "app [5fad721f, a2591b52] game [7e8983c7, def83227]",
+      "menu": false,
+      "started": [],
+      "from": 1345536
+     },
+     {
+      "row": 1345845,
+      "stretch": "062_m_inside_buu",
+      "what": "app [9811caec, 838bb9f9] game [57f17d1b, c2acf360]",
+      "menu": false,
+      "started": [],
+      "from": 1345682
+     },
+     {
+      "row": 1346027,
+      "stretch": "062_m_inside_buu",
+      "what": "app [79b51a0f, c727d937] game [4bf32af9, 370bfd65]",
+      "menu": false,
+      "started": [],
+      "from": 1345846
+     },
+     {
+      "row": 1346270,
+      "stretch": "062_m_inside_buu",
+      "what": "app [f06d643e, 1cf9773c] game [89d586ef, 7ccc275e]",
+      "menu": false,
+      "started": [],
+      "from": 1346028
+     },
+     {
+      "row": 1346635,
+      "stretch": "062_m_inside_buu",
+      "what": "app [dc932f42, 98c848ee] game [788a8240, a7c511f3]",
+      "menu": false,
+      "started": [],
+      "from": 1346271
+     },
+     {
+      "row": 1346947,
+      "stretch": "062_m_inside_buu",
+      "what": "app [b3695714, 3a60c80f] game [2067d384, 905ad8e1]",
+      "menu": false,
+      "started": [],
+      "from": 1346636
+     },
+     {
+      "row": 1347040,
+      "stretch": "062_m_inside_buu",
+      "what": "app [7e5a3c26, f57b128f] game [2bfc3a84, 509dcad3]",
+      "menu": false,
+      "started": [],
+      "from": 1346948
+     },
+     {
+      "row": 1347274,
+      "stretch": "062_m_inside_buu",
+      "what": "app [fe2468d8, f7323a90] game [dbac4b2e, 205c6f47]",
+      "menu": false,
+      "started": [],
+      "from": 1347041
+     },
+     {
+      "row": 1347743,
+      "stretch": "062_m_inside_buu",
+      "what": "app [755830f3, 65866ce3] game [51418402, 21557080]",
+      "menu": false,
+      "started": [],
+      "from": 1347275
+     },
+     {
+      "row": 1347943,
+      "stretch": "062_m_inside_buu",
+      "what": "app [a1608af6, 989d45f2] game [044e17b7, a6795ede]",
+      "menu": false,
+      "started": [],
+      "from": 1347744
+     },
+     {
+      "row": 1348788,
+      "stretch": "062_m_inside_buu",
+      "what": "app [4b4b807d, b23f90ea] game [5257eafb, 1e682711]",
+      "menu": false,
+      "started": [],
+      "from": 1348486
+     },
+     {
+      "row": 1348872,
+      "stretch": "062_m_inside_buu",
+      "what": "app [a20e654f, e5f4dc9a] game [676add06, c838fc38]",
+      "menu": false,
+      "started": [],
+      "from": 1348789
+     },
+     {
+      "row": 1349100,
+      "stretch": "062_m_inside_buu",
+      "what": "app [93d7eeca, 72a42e2d] game [85f43760, 1b681d1b]",
+      "menu": false,
+      "started": [],
+      "from": 1348873
+     },
+     {
+      "row": 1349211,
+      "stretch": "062_m_inside_buu",
+      "what": "app [531397c0, 0f304cf8] game [76e1fb34, 2abe2065]",
+      "menu": false,
+      "started": [],
+      "from": 1349101
+     },
+     {
+      "row": 1349681,
+      "stretch": "062_m_inside_buu",
+      "what": "app [0649708b, 6e37f748] game [6722dbb4, 10d049e6]",
+      "menu": false,
+      "started": [],
+      "from": 1349212
+     },
+     {
+      "row": 1350004,
+      "stretch": "062_m_inside_buu",
+      "what": "app [994db17f, d6729c1a] game [4a6bf1ea, f3ac490f]",
+      "menu": false,
+      "started": [],
+      "from": 1349682
+     },
+     {
+      "row": 1350235,
+      "stretch": "062_m_inside_buu",
+      "what": "app [ad1b76c4, 9364fc9c] game [8747241c, 27099649]",
+      "menu": false,
+      "started": [],
+      "from": 1350005
+     },
+     {
+      "row": 1350631,
+      "stretch": "062_m_inside_buu",
+      "what": "app [1d472e6a, 7187ca97] game [cecb3386, ccd1c19d]",
+      "menu": false,
+      "started": [],
+      "from": 1350236
+     },
+     {
+      "row": 1350748,
+      "stretch": "062_m_inside_buu",
+      "what": "app [4908ccd1, 1db24118] game [fe0c7df5, 49d0f6b7]",
+      "menu": false,
+      "started": [],
+      "from": 1350632
+     },
+     {
+      "row": 1350993,
+      "stretch": "062_m_inside_buu",
+      "what": "app [abe022aa, 5b77ac41] game [33e0f800, 9d4c96db]",
+      "menu": false,
+      "started": [],
+      "from": 1350749
+     },
+     {
+      "row": 1351264,
+      "stretch": "062_m_inside_buu",
+      "what": "app [be3dde6f, 91c8084c] game [3839c53c, 85385fc2]",
+      "menu": false,
+      "started": [],
+      "from": 1350994
+     },
+     {
+      "row": 1351475,
+      "stretch": "062_m_inside_buu",
+      "what": "app [fa6d538a, f93cf5f6] game [4302cdd6, bfa3d9cd]",
+      "menu": false,
+      "started": [],
+      "from": 1351265
+     },
+     {
+      "row": 1351901,
+      "stretch": "062_m_inside_buu",
+      "what": "app [45e90125, 5975f0cb] game [a45885ad, e2cd433b]",
+      "menu": false,
+      "started": [],
+      "from": 1351476
+     },
+     {
+      "row": 1352061,
+      "stretch": "062_m_inside_buu",
+      "what": "app [51570379, 1de7034e] game [56ccea0b, 08cfa505]",
+      "menu": false,
+      "started": [],
+      "from": 1351902
+     },
+     {
+      "row": 1352305,
+      "stretch": "062_m_inside_buu",
+      "what": "app [14d02487, 39af1b93] game [ad6debf6, a4e98ce0]",
+      "menu": false,
+      "started": [],
+      "from": 1352062
+     },
+     {
+      "row": 1352581,
+      "stretch": "062_m_inside_buu",
+      "what": "app [e280ac91, b1c3bbb8] game [a856ef01, 49a207e3]",
+      "menu": false,
+      "started": [],
+      "from": 1352306
+     },
+     {
+      "row": 1352695,
+      "stretch": "062_m_inside_buu",
+      "what": "app [f2c45990, 5779c5cb] game [5e6944a8, 93f15889]",
+      "menu": false,
+      "started": [],
+      "from": 1352582
+     },
+     {
+      "row": 1352901,
+      "stretch": "062_m_inside_buu",
+      "what": "app [10db4670, 7a61af7f] game [197e87df, 0c910220]",
+      "menu": false,
+      "started": [],
+      "from": 1352696
+     },
+     {
+      "row": 1353408,
+      "stretch": "062_m_inside_buu",
+      "what": "app [f68339d4, aeab383a] game [19f1e07e, ea3ea53b]",
+      "menu": false,
+      "started": [],
+      "from": 1352902
+     },
+     {
+      "row": 1353845,
+      "stretch": "062_m_inside_buu",
+      "what": "app [b36abab0, 16779f40] game [7dec369b, 33dd49bc]",
+      "menu": false,
+      "started": [],
+      "from": 1353409
+     },
+     {
+      "row": 1353945,
+      "stretch": "062_m_inside_buu",
+      "what": "app [cbce3744, 37bf7608] game [723e3df2, bec7cd27]",
+      "menu": false,
+      "started": [],
+      "from": 1353846
+     },
+     {
+      "row": 1354142,
+      "stretch": "062_m_inside_buu",
+      "what": "app [1c928a2a, c75581ee] game [a3544feb, bab28676]",
+      "menu": false,
+      "started": [],
+      "from": 1353946
+     },
+     {
+      "row": 1354390,
+      "stretch": "062_m_inside_buu",
+      "what": "app [16bc88c0, 29ad67c7] game [0edbadae, 071be2df]",
+      "menu": false,
+      "started": [],
+      "from": 1354143
+     },
+     {
+      "row": 1354524,
+      "stretch": "062_m_inside_buu",
+      "what": "app [06e14012, e2a79908] game [7a5803c2, 7bc28021]",
+      "menu": false,
+      "started": [],
+      "from": 1354391
      }
     ]
    },
@@ -765,868 +1002,55 @@
     "kind": "rule",
     "field": "rng",
     "chapter": "earth",
-    "count": 7,
-    "stops": [
-     {
-      "row": 58432,
-      "stretch": "E2_earth",
-      "what": "app [6724459b, 4a4e8f46] game [23be8d4a, 7b19df0b]",
-      "menu": false,
-      "started": [],
-      "from": 58402
-     },
-     {
-      "row": 59762,
-      "stretch": "E2_earth",
-      "what": "app [2ef8f20d, 0fd0afa6] game [3e1401d8, baac54e7]",
-      "menu": false,
-      "started": [
-       "inline_0x08078698"
-      ],
-      "from": 59649
-     },
-     {
-      "row": 70245,
-      "stretch": "E2_earth",
-      "what": "app [796c8817, 5927fd41] game [251fb9c9, ea6d7bd0]",
-      "menu": false,
-      "started": [],
-      "from": 70215
-     },
-     {
-      "row": 73632,
-      "stretch": "E2_earth",
-      "what": "app [da603855, 9ee37b2c] game [43c88fea, be863e99]",
-      "menu": false,
-      "started": [],
-      "from": 73602
-     },
-     {
-      "row": 95024,
-      "stretch": "E2_earth",
-      "what": "app [e966bf77, 0a5a5028] game [e6682bc0, bf6d728f]",
-      "menu": false,
-      "started": [],
-      "from": 94994
-     },
-     {
-      "row": 153163,
-      "stretch": "E2_earth",
-      "what": "app [ddf7897e, 38c3c1f0] game [234beb00, fbe02e0f]",
-      "menu": false,
-      "started": [
-       "s266",
-       "s262"
-      ],
-      "from": 147123
-     },
-     {
-      "row": 153314,
-      "stretch": "E2_earth",
-      "what": "app [ddf7897e, 38c3c1f0] game [d800841f, 1450638f]",
-      "menu": false,
-      "started": [
-       "s266@19"
-      ],
-      "from": 153164
-     }
-    ]
-   },
-   {
-    "owner": "dungeon agents A / B",
-    "kind": "rule",
-    "field": "pos",
-    "chapter": "fat",
-    "count": 7,
-    "stops": [
-     {
-      "row": 610699,
-      "stretch": "002_d04_bandana",
-      "what": "app (68608, 75776, 0) game (68608, 75904, 0)",
-      "menu": false,
-      "started": [
-       "inline_0x080782FC",
-       "s030"
-      ],
-      "from": 609361
-     },
-     {
-      "row": 615105,
-      "stretch": "002_d04_bandana",
-      "what": "app leader None game [212992,106496,1,\"vt_0804D038\"]",
-      "menu": false,
-      "started": [
-       "inline_0x08072A48",
-       "inline_0x080741AC"
-      ],
-      "from": 612541
-     },
-     {
-      "row": 618503,
-      "stretch": "002_d04_bandana",
-      "what": "app leader None game [722432,480256,1,\"vt_0804D038\"]",
-      "menu": false,
-      "started": [
-       "inline_0x08072A48",
-       "inline_0x080741AC"
-      ],
-      "from": 615106
-     },
-     {
-      "row": 621338,
-      "stretch": "002_d04_bandana",
-      "what": "app (73530, 81716, 3) game (73722, 81716, 3)",
-      "menu": false,
-      "started": [
-       "inline_0x083BBC13",
-       "inline_0x08072F48"
-      ],
-      "from": 620017
-     },
-     {
-      "row": 621395,
-      "stretch": "002_d04_bandana",
-      "what": "app (72329, 82470, 3) game (72329, 82278, 0)",
-      "menu": false,
-      "started": [
-       "inline_0x08073EFC",
-       "inline_0x08711211"
-      ],
-      "from": 621369
-     },
-     {
-      "row": 630207,
-      "stretch": "003_d06_thieves (chain diverges from the real run here)",
-      "what": "app leader None game [161792,528384,1,\"vt_0804D038\"]",
-      "menu": false,
-      "started": [
-       "inline_0x08072A48",
-       "inline_0x080741AC"
-      ],
-      "from": 628017
-     },
-     {
-      "row": 631385,
-      "stretch": "003_d06_thieves (chain diverges from the real run here)",
-      "what": "app (110592, 134656, 1) game (110592, 134528, 1)",
-      "menu": false,
-      "started": [
-       "inline_0x0807AB24",
-       "inline_0x08073424"
-      ],
-      "from": 630208
-     }
-    ]
-   },
-   {
-    "owner": "Earth agent",
-    "kind": "rule",
-    "field": "area",
-    "chapter": "earth",
-    "count": 5,
-    "stops": [
-     {
-      "row": 59815,
-      "stretch": "E2_earth",
-      "what": "app (4, 20) game (4, 27)",
-      "menu": false,
-      "started": [],
-      "from": 59793
-     },
-     {
-      "row": 94125,
-      "stretch": "E2_earth",
-      "what": "app (3, 14) game (3, 15)",
-      "menu": false,
-      "started": [],
-      "from": 94080
-     },
-     {
-      "row": 123426,
-      "stretch": "E2_earth",
-      "what": "app (0, 96) game (2, 8)",
-      "menu": false,
-      "started": [
-       "s106",
-       "inline_0x08076098"
-      ],
-      "from": 95025
-     },
-     {
-      "row": 153419,
-      "stretch": "E2_earth",
-      "what": "app (7, 5) game (7, 3)",
-      "menu": false,
-      "started": [
-       "s266@24"
-      ],
-      "from": 153315
-     },
-     {
-      "row": 153470,
-      "stretch": "E2_earth",
-      "what": "app (7, 3) game (7, 5)",
-      "menu": false,
-      "started": [
-       "s266@29"
-      ],
-      "from": 153420
-     }
-    ]
-   },
-   {
-    "owner": "dungeon agents A / B",
-    "kind": "rule",
-    "field": "rng",
-    "chapter": "fat",
-    "count": 5,
-    "stops": [
-     {
-      "row": 609360,
-      "stretch": "002_d04_bandana",
-      "what": "app [d762541a, 35a3204f] game [04569d93, 290569ac]",
-      "menu": false,
-      "started": [
-       "s011",
-       "inline_0x080782FC"
-      ],
-      "from": 600329
-     },
-     {
-      "row": 610730,
-      "stretch": "002_d04_bandana",
-      "what": "app [f62a6de3, a7fd18e1] game [5f0b32b5, 1910ada9]",
-      "menu": false,
-      "started": [],
-      "from": 610700
-     },
-     {
-      "row": 612540,
-      "stretch": "002_d04_bandana",
-      "what": "app [7821d132, 84d0e3aa] game [d38db110, 49da0275]",
-      "menu": false,
-      "started": [
-       "inline_0x08073058",
-       "inline_0x08072A48"
-      ],
-      "from": 610731
-     },
-     {
-      "row": 620016,
-      "stretch": "002_d04_bandana",
-      "what": "app [e0edacae, 1fe96b0b] game [06358cf6, c991e758]",
-      "menu": false,
-      "started": [
-       "inline_0x08073058",
-       "inline_0x08072A48"
-      ],
-      "from": 618504
-     },
-     {
-      "row": 628016,
-      "stretch": "002_d04_bandana",
-      "what": "app [0ae41dff, 31d95b78] game [c0588a95, c20eadd5]",
-      "menu": false,
-      "started": [
-       "inline_0x08073058",
-       "inline_0x08072A48"
-      ],
-      "from": 621396
-     }
-    ]
-   },
-   {
-    "owner": "Earth agent",
-    "kind": "rule",
-    "field": "rng",
-    "chapter": "opening",
-    "count": 2,
-    "stops": [
-     {
-      "row": 21437,
-      "stretch": "E1_opening",
-      "what": "app [12607523, fe6402b0] game [eb483324, 121adeb2]",
-      "menu": false,
-      "started": [],
-      "from": 21407
-     },
-     {
-      "row": 41534,
-      "stretch": "E1_opening",
-      "what": "app [b5d7f8ff, 1f277ace] game [a784cfbe, 58ea61c1]",
-      "menu": false,
-      "started": [
-       "s103",
-       "s003"
-      ],
-      "from": 21438
-     }
-    ]
-   },
-   {
-    "owner": "Earth agent",
-    "kind": "rule",
-    "field": "area",
-    "chapter": "opening",
     "count": 1,
     "stops": [
      {
-      "row": 4691,
-      "stretch": "E1_opening",
-      "what": "app (0, 96) game (1, 1)",
+      "row": 191429,
+      "stretch": "E2_earth",
+      "what": "app [86a66828, bd6dac89] game [bd49b949, 46b31d92]",
       "menu": false,
       "started": [
-       "inline_0x0807457C",
-       "s004"
+       "s302",
+       "s301"
       ],
       "from": 0
      }
     ]
    },
    {
-    "owner": "Earth agent",
-    "kind": "rule",
-    "field": "pos",
-    "chapter": "opening",
-    "count": 1,
-    "stops": [
-     {
-      "row": 21406,
-      "stretch": "E1_opening",
-      "what": "app (75776, 66560, 1) game (75776, 66432, 1)",
-      "menu": false,
-      "started": [
-       "inline_0x08711129",
-       "inline_0x08711129"
-      ],
-      "from": 4692
-     }
-    ]
-   },
-   {
-    "owner": "ship agent",
-    "kind": "rule",
-    "field": "area",
-    "chapter": "ship",
-    "count": 1,
-    "stops": [
-     {
-      "row": 564445,
-      "stretch": "000_ship_c14",
-      "what": "app (8, 71) game (8, 70)",
-      "menu": false,
-      "started": [
-       "s340",
-       "s003"
-      ],
-      "from": 548008
-     }
-    ]
-   },
-   {
     "owner": "dungeon agents A / B",
     "kind": "rule",
-    "field": "area",
+    "field": "pos",
     "chapter": "fat",
     "count": 1,
     "stops": [
      {
-      "row": 639192,
-      "stretch": "003_d06_thieves (chain diverges from the real run here)",
-      "what": "app (8, 3) game (1, 1)",
+      "row": 813244,
+      "stretch": "012_db5_a01",
+      "what": "app (78214, 23608, 3) game (78022, 23608, 3)",
       "menu": false,
       "started": [
-       "inline_0x087110A7",
-       "s003"
+       "inline_0x08710F5E",
+       "inline_0x08710FB7"
       ],
-      "from": 635196
+      "from": 191430
      }
     ]
    },
    {
-    "owner": "importer agent",
-    "kind": "import",
+    "owner": "Super Buu agent",
+    "kind": "rule",
     "field": "pos",
-    "chapter": "earth",
-    "count": 13,
-    "stops": [
-     {
-      "row": 48862,
-      "stretch": "E2_earth",
-      "what": "app (24832, 79232, 0) game (24832, 79232, 1)",
-      "menu": false,
-      "started": [],
-      "from": 48862
-     },
-     {
-      "row": 59620,
-      "stretch": "E2_earth",
-      "what": "app (59392, 20992, 0) game (59392, 21120, 0)",
-      "menu": false,
-      "started": [
-       "inline_0x08078678"
-      ],
-      "from": 59619
-     },
-     {
-      "row": 59764,
-      "stretch": "E2_earth",
-      "what": "app (92160, 52400, 1) game (92160, 52038, 1)",
-      "menu": false,
-      "started": [
-       "inline_0x08078698"
-      ],
-      "from": 59763
-     },
-     {
-      "row": 72311,
-      "stretch": "E2_earth",
-      "what": "app (133376, 4224, 0) game (133376, 4096, 0)",
-      "menu": false,
-      "started": [],
-      "from": 72310
-     },
-     {
-      "row": 72730,
-      "stretch": "E2_earth",
-      "what": "app (9728, 30464, 0) game (9934, 29946, 2)",
-      "menu": false,
-      "started": [
-       "s515@0",
-       "inline_0x08076C3F"
-      ],
-      "from": 72730
-     },
-     {
-      "row": 94050,
-      "stretch": "E2_earth",
-      "what": "app (102400, 2048, 1) game (102400, 2048, 0)",
-      "menu": false,
-      "started": [],
-      "from": 94050
-     },
-     {
-      "row": 142491,
-      "stretch": "E2_earth",
-      "what": "app (47104, 106496, 0) game (47232, 106986, 0)",
-      "menu": false,
-      "started": [
-       "inline_0x080782FC",
-       "s172@0"
-      ],
-      "from": 142491
-     },
-     {
-      "row": 142521,
-      "stretch": "E2_earth",
-      "what": "app (45312, 113920, 0) game (45312, 114336, 0)",
-      "menu": false,
-      "started": [
-       "inline_0x080782FC",
-       "s172@0"
-      ],
-      "from": 142521
-     },
-     {
-      "row": 142581,
-      "stretch": "E2_earth",
-      "what": "app (41472, 128768, 0) game (41472, 129036, 0)",
-      "menu": false,
-      "started": [
-       "inline_0x080782FC",
-       "s172@0"
-      ],
-      "from": 142581
-     },
-     {
-      "row": 146673,
-      "stretch": "E2_earth",
-      "what": "app (48640, 61952, 0) game (48640, 61952, 1)",
-      "menu": false,
-      "started": [
-       "s237@0"
-      ],
-      "from": 146673
-     },
-     {
-      "row": 146703,
-      "stretch": "E2_earth",
-      "what": "app (49408, 54528, 0) game (49480, 54362, 1)",
-      "menu": false,
-      "started": [
-       "s237@0"
-      ],
-      "from": 146703
-     },
-     {
-      "row": 146763,
-      "stretch": "E2_earth",
-      "what": "app (50944, 39424, 0) game (51160, 39182, 1)",
-      "menu": false,
-      "started": [
-       "s237@0"
-      ],
-      "from": 146763
-     },
-     {
-      "row": 146883,
-      "stretch": "E2_earth",
-      "what": "app (53760, 16128, 0) game (53760, 16128, 1)",
-      "menu": false,
-      "started": [
-       "s237@0"
-      ],
-      "from": 146883
-     }
-    ]
-   },
-   {
-    "owner": "importer agent",
-    "kind": "import",
-    "field": "area",
-    "chapter": "fat",
-    "count": 7,
-    "stops": [
-     {
-      "row": 639193,
-      "stretch": "003_d06_thieves (chain diverges from the real run here)",
-      "what": "app (8, 3) game (1, 1)",
-      "menu": false,
-      "started": [],
-      "from": 639193
-     },
-     {
-      "row": 639223,
-      "stretch": "003_d06_thieves (chain diverges from the real run here)",
-      "what": "app (8, 3) game (1, 1)",
-      "menu": false,
-      "started": [],
-      "from": 639223
-     },
-     {
-      "row": 639283,
-      "stretch": "003_d06_thieves (chain diverges from the real run here)",
-      "what": "app (8, 3) game (1, 1)",
-      "menu": false,
-      "started": [],
-      "from": 639283
-     },
-     {
-      "row": 639403,
-      "stretch": "003_d06_thieves (chain diverges from the real run here)",
-      "what": "app (8, 3) game (1, 1)",
-      "menu": false,
-      "started": [],
-      "from": 639403
-     },
-     {
-      "row": 639643,
-      "stretch": "003_d06_thieves (chain diverges from the real run here)",
-      "what": "app (8, 3) game (1, 1)",
-      "menu": false,
-      "started": [
-       "s003@1"
-      ],
-      "from": 639643
-     },
-     {
-      "row": 641083,
-      "stretch": "003_d06_thieves (chain diverges from the real run here)",
-      "what": "app (8, 6) game (1, 1)",
-      "menu": false,
-      "started": [
-       "s003@0"
-      ],
-      "from": 641083
-     },
-     {
-      "row": 643003,
-      "stretch": "003_d06_thieves (chain diverges from the real run here)",
-      "what": "app (8, 3) game (1, 1)",
-      "menu": false,
-      "started": [],
-      "from": 643003
-     }
-    ]
-   },
-   {
-    "owner": "importer agent",
-    "kind": "import",
-    "field": "import",
-    "chapter": "?",
-    "count": 5,
-    "stops": [
-     {
-      "row": 631386,
-      "stretch": "",
-      "what": "unsupported cut: area AreaId { world: 8, area: 3, variant: 1 }: the load's on-enter script is still blocked (no leader); cut at the frame the leader appears",
-      "menu": null,
-      "started": null,
-      "from": 631386
-     },
-     {
-      "row": 631476,
-      "stretch": "",
-      "what": "unsupported cut: area AreaId { world: 8, area: 3, variant: 1 }: the load's on-enter script is still blocked (no leader); cut at the frame the leader appears",
-      "menu": null,
-      "started": null,
-      "from": 631476
-     },
-     {
-      "row": 631596,
-      "stretch": "",
-      "what": "unsupported cut: area AreaId { world: 8, area: 3, variant: 1 }: the load's on-enter script is still blocked (no leader); cut at the frame the leader appears",
-      "menu": null,
-      "started": null,
-      "from": 631596
-     },
-     {
-      "row": 640123,
-      "stretch": "",
-      "what": "unsupported cut: area AreaId { world: 8, area: 3, variant: 1 }: the load's on-enter script is still blocked (no leader); cut at the frame the leader appears",
-      "menu": null,
-      "started": null,
-      "from": 640123
-     },
-     {
-      "row": 646843,
-      "stretch": "",
-      "what": "unsupported cut: area AreaId { world: 8, area: 6, variant: 1 }: the load's on-enter script is still blocked (no leader); cut at the frame the leader appears",
-      "menu": null,
-      "started": null,
-      "from": 646843
-     }
-    ]
-   },
-   {
-    "owner": "importer agent",
-    "kind": "import",
-    "field": "pos",
-    "chapter": "ship",
-    "count": 4,
-    "stops": [
-     {
-      "row": 225250,
-      "stretch": "000_ship_c14",
-      "what": "app (49152, 13312, 0) game (49152, 13565, 0)",
-      "menu": false,
-      "started": [
-       "s314@0"
-      ],
-      "from": 225250
-     },
-     {
-      "row": 225280,
-      "stretch": "000_ship_c14",
-      "what": "app (49152, 20736, 0) game (49152, 21155, 0)",
-      "menu": false,
-      "started": [
-       "s314@0"
-      ],
-      "from": 225280
-     },
-     {
-      "row": 225340,
-      "stretch": "000_ship_c14",
-      "what": "app (49152, 35840, 0) game (49152, 36335, 0)",
-      "menu": false,
-      "started": [
-       "s314@0"
-      ],
-      "from": 225340
-     },
-     {
-      "row": 547768,
-      "stretch": "000_ship_c14",
-      "what": "app (87040, 95232, 0) game (87040, 95232, 3)",
-      "menu": false,
-      "started": [
-       "s313@0"
-      ],
-      "from": 547768
-     }
-    ]
-   },
-   {
-    "owner": "importer agent",
-    "kind": "import",
-    "field": "rng",
-    "chapter": "ship",
-    "count": 4,
-    "stops": [
-     {
-      "row": 547558,
-      "stretch": "000_ship_c14",
-      "what": "app [4f056e4f, 515cd154] game [5e7e7ff3, a87fca59]",
-      "menu": false,
-      "started": [
-       "s313@0"
-      ],
-      "from": 547558
-     },
-     {
-      "row": 547588,
-      "stretch": "000_ship_c14",
-      "what": "app [4f056e4f, 515cd154] game [5e7e7ff3, a87fca59]",
-      "menu": false,
-      "started": [
-       "s313@0"
-      ],
-      "from": 547588
-     },
-     {
-      "row": 547648,
-      "stretch": "000_ship_c14",
-      "what": "app [4f056e4f, 515cd154] game [5e7e7ff3, a87fca59]",
-      "menu": false,
-      "started": [
-       "s313@0"
-      ],
-      "from": 547648
-     },
-     {
-      "row": 568127,
-      "stretch": "000_ship_c14",
-      "what": "app [24fd1564, 85784c09] game [3639ffca, 9659fb81]",
-      "menu": false,
-      "started": [
-       "s341@0"
-      ],
-      "from": 568126
-     }
-    ]
-   },
-   {
-    "owner": "importer agent",
-    "kind": "import",
-    "field": "pos",
-    "chapter": "fat",
-    "count": 4,
-    "stops": [
-     {
-      "row": 631416,
-      "stretch": "003_d06_thieves (chain diverges from the real run here)",
-      "what": "app (110592, 130816, 1) game (110592, 130560, 1)",
-      "menu": false,
-      "started": [],
-      "from": 631416
-     },
-     {
-      "row": 631836,
-      "stretch": "003_d06_thieves (chain diverges from the real run here)",
-      "what": "app (112100, 122912, 2) game (112100, 122158, 2)",
-      "menu": false,
-      "started": [],
-      "from": 631836
-     },
-     {
-      "row": 632316,
-      "stretch": "003_d06_thieves (chain diverges from the real run here)",
-      "what": "app (77685, 63346, 3) game (75674, 65231, 2)",
-      "menu": false,
-      "started": [
-       "s003@0"
-      ],
-      "from": 632316
-     },
-     {
-      "row": 633276,
-      "stretch": "003_d06_thieves (chain diverges from the real run here)",
-      "what": "app (15202, 117772, 0) game (73137, 111924, 1)",
-      "menu": false,
-      "started": [
-       "s003@1"
-      ],
-      "from": 633276
-     }
-    ]
-   },
-   {
-    "owner": "importer agent",
-    "kind": "import",
-    "field": "rng",
-    "chapter": "opening",
-    "count": 3,
-    "stops": [
-     {
-      "row": 41536,
-      "stretch": "E1_opening",
-      "what": "app [f2baedee, 3f3f0bf7] game [a784cfbe, 58ea61c1]",
-      "menu": false,
-      "started": [
-       "s103@18"
-      ],
-      "from": 41535
-     },
-     {
-      "row": 41566,
-      "stretch": "E1_opening",
-      "what": "app [f2baedee, 3f3f0bf7] game [a784cfbe, 58ea61c1]",
-      "menu": false,
-      "started": [
-       "s103@18"
-      ],
-      "from": 41565
-     },
-     {
-      "row": 41626,
-      "stretch": "E1_opening",
-      "what": "app [f2baedee, 3f3f0bf7] game [a784cfbe, 58ea61c1]",
-      "menu": false,
-      "started": [
-       "s103@18"
-      ],
-      "from": 41625
-     }
-    ]
-   },
-   {
-    "owner": "importer agent",
-    "kind": "import",
-    "field": "rng",
-    "chapter": "earth",
-    "count": 3,
-    "stops": [
-     {
-      "row": 72280,
-      "stretch": "E2_earth",
-      "what": "app [ad37d6f5, ce7018ac] game [e3c98bcb, 4ba29ec9]",
-      "menu": false,
-      "started": [],
-      "from": 72280
-     },
-     {
-      "row": 72370,
-      "stretch": "E2_earth",
-      "what": "app [da1a4603, 44045d3f] game [661b71f5, b2fd6865]",
-      "menu": false,
-      "started": [],
-      "from": 72370
-     },
-     {
-      "row": 72490,
-      "stretch": "E2_earth",
-      "what": "app [faa47235, 1941e6e0] game [a6e6097d, b7f7acd2]",
-      "menu": false,
-      "started": [],
-      "from": 72490
-     }
-    ]
-   },
-   {
-    "owner": "importer agent",
-    "kind": "import",
-    "field": "rng",
-    "chapter": "fat",
+    "chapter": "superbuu",
     "count": 1,
     "stops": [
      {
-      "row": 621339,
-      "stretch": "002_d04_bandana",
-      "what": "app [2302d396, 28b8d03c] game [40e67a74, 60b0e573]",
+      "row": 1348485,
+      "stretch": "062_m_inside_buu",
+      "what": "app (51200, 59648, 1) game (52480, 58880, 1)",
       "menu": false,
       "started": [],
-      "from": 621339
+      "from": 1347944
      }
     ]
    }

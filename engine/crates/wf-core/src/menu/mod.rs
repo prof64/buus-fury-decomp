@@ -629,13 +629,7 @@ fn step_inner(w: &mut World) {
             }
             // Switch Character's figures go and the object world is back in the 2nd leave frame (segment sb 21-14)
             if t == 0 {
-                if let Some(Screen::CharSelect(c)) = w.menu.shown.as_deref() {
-                    let sprites: Vec<i32> = c.figs.iter().map(|f| f.sprite).collect();
-                    crate::vram::figures_gone(w, &sprites);
-                    crate::vram::world_show(w);
-                } else if w.field.as_ref().is_some_and(|f| f.vram.as_ref().is_some_and(|v| v.stashed.is_some())) {
-                    crate::vram::world_show(w);
-                }
+                world_back(w);
             }
             // the world restore ends with a camera update: a follow camera still easing when the menu opened is
             // one step further in the last black frame (ship cuts 8-6 / 8-3: closed while the camera eased)
@@ -821,6 +815,7 @@ fn step_screen(w: &mut World) {
             Action::Close => close(w),
             Action::Done => {
                 close_with(w, true);
+                world_back(w);
                 w.menu.phase = Phase::Leave { t: 1 };
             }
             Action::PopDone(r) => {
@@ -830,6 +825,7 @@ fn step_screen(w: &mut World) {
                     continue;
                 }
                 close(w);
+                world_back(w);
                 w.menu.phase = Phase::Leave { t: 1 };
                 w.menu.result = Some(MenuResult { code: r });
                 // (no lag frames: this iteration is the world restore, which ends with a camera update - real run
@@ -841,6 +837,21 @@ fn step_screen(w: &mut World) {
             }
         }
         break;
+    }
+}
+
+/// the object world's sprite memory is back (Switch Character's figures freed first): the leave's first frame - or
+/// at once for a close whose restore runs in the done iteration (`Action::Done` / `PopDone` start at the leave's
+/// second frame: without this the field kept the page's fresh allocator, and the next menu's close restored the
+/// stale stash - app soak title -> Earth: a Status page closed with START at 3-2 row 83,684, the world's blocks lost,
+/// dead owners back at row 89,299; 7-3's text box then purged the crowd and reordered it, row 190,577)
+fn world_back(w: &mut World) {
+    if let Some(Screen::CharSelect(c)) = w.menu.shown.as_deref() {
+        let sprites: Vec<i32> = c.figs.iter().map(|f| f.sprite).collect();
+        crate::vram::figures_gone(w, &sprites);
+        crate::vram::world_show(w);
+    } else if w.field.as_ref().is_some_and(|f| f.vram.as_ref().is_some_and(|v| v.stashed.is_some())) {
+        crate::vram::world_show(w);
     }
 }
 

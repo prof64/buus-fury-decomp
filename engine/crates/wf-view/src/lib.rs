@@ -311,6 +311,18 @@ pub struct MapView {
     pub shake: (i32, i32),
     /// The world map (area 0-50, map header "3D" flag): the mode-7 ground camera; None on 2D maps.
     pub mode7: Option<Mode7View>,
+    /// Script BG control over the map's own (DISPCNT / BGxCNT / BLDCNT / BLDALPHA writes); None = the map's.
+    pub layers: Option<BgLayers>,
+}
+
+/// BG state a script set (wf-core `scene::Layers`): per BG0..3 shown, priority, blend targets (bit 0 first target,
+/// bit 1 second); the blend weights.
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct BgLayers {
+    pub visible: [bool; 4],
+    pub priority: [Option<u8>; 4],
+    pub blend: [Option<u8>; 4],
+    pub alpha: Option<(u8, u8)>,
 }
 
 /// The world map's 3D camera (map object `0x030019A4`, re/buu/notes.md "Field: world map"): the renderer projects

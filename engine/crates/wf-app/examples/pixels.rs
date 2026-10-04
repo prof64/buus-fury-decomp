@@ -167,7 +167,30 @@ fn main() {
                     eprintln!("{view:#?}");
                 }
                 let ours = renderer.render(&packs, &view, 0, W, H).to_vec();
-                let (class, n) = classify(&view, &game[i], &ours);
+                let (mut class, n) = classify(&view, &game[i], &ours);
+                // what the world shows that the view may not carry (the picture's likely cause)
+                if n > 0 {
+                    let sc = &w.scene.screen;
+                    let vram_has = |o: wf_core::vram::Owner| w.field.as_ref().and_then(|f| f.vram.as_ref()).is_some_and(|v| v.owners.iter().any(|x| x.1 == o));
+                    let mut tags = vec![];
+                    if sc.white > 0 { tags.push("white fade"); }
+                    if sc.mosaic > 0 { tags.push("mosaic"); }
+                    if sc.flash.is_some() { tags.push("palette flash"); }
+                    let dl = wf_core::scene::Layers::default();
+                    if sc.layers.visible != dl.visible { tags.push("BG hidden"); }
+                    if sc.layers.priority != dl.priority { tags.push("BG priority"); }
+                    if sc.layers.blend != dl.blend || sc.layers.alpha != dl.alpha { tags.push("BG blend"); }
+                    if sc.layers.offset != dl.offset { tags.push("BG offset"); }
+                    if w.scene.boss_bar.is_some() { tags.push("boss bar"); }
+                    if vram_has(wf_core::vram::Owner::Timer) { tags.push("timer HUD"); }
+                    if sc.black > 0 || sc.dim > 0 || view.palette_fade.is_some() { tags.push("fade"); }
+                    if view.dialog.is_some() { tags.push("dialog"); }
+                    if view.menu.is_some() { tags.push("menu"); }
+                    if view.banner.is_some() { tags.push("banner"); }
+                    if !tags.is_empty() {
+                        class = format!("{class} [{}]", tags.join(", "));
+                    }
+                }
                 let at_ok = std::env::var("PIX_AT").map(|v| v.split(',').any(|x| x.parse::<usize>().ok() == Some(k))).unwrap_or(true);
                 if n > 0 && pngs < max_png && at_ok {
                     if let Some(o) = &out_dir {

@@ -571,6 +571,13 @@ pub fn poll(w: &mut World, s: &mut HostState) -> Option<Option<i32>> {
                     let c = w.story.current;
                     let _ = natives::switch_character(w, c);
                 }
+                // the BUY screen used up the list `shop_add_item` built: the next shop starts from an empty one (the
+                // real screens skip `menu_closed`, which cleared it for the scene menus - whole run, no lag: West City
+                // 4-1's Z-Mart showed the Earth shop's five supplies first, the route's cursor bought Mix Seed (2)
+                // instead of Seed of Life (3), 40 HP short at the heal 11,000 rows later)
+                if native == 0xce {
+                    w.scene.shop.clear();
+                }
                 // "Watch This!" gives its tile bytes back; the purged objects return (`0x08027E00`)
                 if native == 0xa7 {
                     wf_core::vram::release(w, wf_core::vram::Owner::Minigame);

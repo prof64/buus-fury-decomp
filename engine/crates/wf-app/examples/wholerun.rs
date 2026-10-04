@@ -25,8 +25,11 @@ fn main() {
     let sim_lag = opt("--lag").as_deref() == Some("sim");
     // --lag none: no lag frames at all - one app step per game logic iteration (the keys the game sampled at its
     // start, the row where the counter moved), compared at the iteration's end; nothing for the lag rows
-    let no_lag = opt("--lag").as_deref() == Some("none");
-    let mode_name = if sim_lag { "sim" } else if no_lag { "none" } else { "recorded" };
+    // (recorded lag too, as the segment harness now: the sim runs without lag (menus step on the recorded logic rows
+    // only), the recording's lag rows - load iterations, menu redraws and closes - replayed as plain lag frames)
+    let no_lag = !sim_lag && std::env::var("WR_MENULAG").is_err();
+    let rec_lag = opt("--lag").as_deref() != Some("none") && !sim_lag;
+    let mode_name = if sim_lag { "sim" } else if rec_lag { "recorded" } else { "none" };
     let range = |name: &str| opt(name).and_then(|v| v.split_once("..").and_then(|(a, b)| Some((a.parse::<usize>().ok()?, b.parse::<usize>().ok()?))));
     let show = range("--show");
     let rng_rows = range("--rng");
@@ -120,6 +123,8 @@ fn main() {
     let mut clock_reported = false;
     let mut k = from_row;
     let mut lfd_last: Option<i64> = None;
+    let mut hp_bad = false;
+    let mut sup_last: Option<Vec<(usize, u8)>> = None;
     while let Some(r) = lines.next() {
         if k >= limit {
             break;
@@ -185,7 +190,10 @@ fn main() {
             if sim_lag {
                 replayed_lag += 1;
             }
-            wf_core::sndsim::lag_frame_ex(&mut app.session.world, next_lf.is_some_and(|n| n != lf));
+            // (no lag: nothing happens in the app for a lag row - not even the sound hardware's frame)
+            if rec_lag || sim_lag {
+                wf_core::sndsim::lag_frame_ex(&mut app.session.world, next_lf.is_some_and(|n| n != lf));
+            }
         }
         wf_core::rng::TRACE.store(false, std::sync::atomic::Ordering::Relaxed);
         // a menu close's black frames (the world restore's long iteration) are alignment, not logic - as the segment
@@ -288,6 +296,32 @@ fn main() {
                     }
                 }
                 None => l.1 = 0,
+            }
+        }
+        // WR_STORY=ROW: our story flags (hex, GameData +0x55 layout), the script words and the chapter-ish state at ROW
+        if std::env::var("WR_STORY").ok().and_then(|v| v.parse::<usize>().ok()) == Some(k) {
+            let st = &w.story;
+            println!("STORY row {k} flags {} l {:?} g {:?} current {} zenie {}", st.flags.iter().map(|b| format!("{b:02x}")).collect::<String>(), st.l, st.g, st.current, st.zenie);
+        }
+        // WR_SUP=1: our supplies whenever they change (the game's rows carry none: compare with a cut's RAM)
+        if std::env::var_os("WR_SUP").is_some() {
+            let s: Vec<(usize, u8)> = w.story.supplies.iter().enumerate().filter(|(_, &n)| n != 0).map(|(i, &n)| (i, n)).collect();
+            if Some(&s) != sup_last.as_ref() {
+                println!("SUP row {k} ({}): {s:?}", stretch_of(k));
+                sup_last = Some(s);
+            }
+        }
+        // WR_HP=1: the rows where the leader's HP (the current record's, the row's `hp`) starts / stops differing - on
+        // a logic row at the iteration's end (the next row with another counter is the next iteration)
+        if std::env::var_os("WR_HP").is_some() && logic && next_lf.is_some_and(|n| n != lf) && !menu {
+            let mut c = w.clone();
+            wf_core::story::sync_from_players(&mut c);
+            let ours = c.story.chars.get(c.story.current.max(0) as usize).map(|ch| ch.rec.hp as i64);
+            let game = r["hp"].as_i64();
+            let bad = ours.is_some() && game.is_some() && ours != game;
+            if bad != hp_bad {
+                println!("HP {} at row {k} ({}): app {ours:?} game {game:?}", if bad { "differs" } else { "equal again" }, stretch_of(k));
+                hp_bad = bad;
             }
         }
         // WR_LFD=1: the rows where the game's logic counter (0x03000F94) and ours (play time + bias) change offset

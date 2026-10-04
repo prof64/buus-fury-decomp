@@ -3985,5 +3985,93 @@ Super / Kid Buu and post-game masters but these):
   (state "hold") - the cut is taken inside a hold the import does not restore; same in recorded-lag mode ->
   **importer agent** (post-game leg).
 * `m_pg_g131`: refused cut (13-2's on-enter script blocked, no leader) -> **importer agent** (known).
+*Dungeon agent A on both:* **m_pg_g111 fixed - exact on every row** (397 / 397, recorded-lag and no-lag). The app never
+loaded the importer's script bytecode (`wf_import::host::set_step_code`, which only the segments harness's setup
+called), so a cut inside a running event node or inline script dropped the script - here the world-map landing's
+inline script 0x0807364C that holds the leader (the harness was already exact). `StorySim::from_segment` /
+`from_import` now load `scripts/bytecode.json` from the packs; this also applies to the whole run's resync cuts.
+wf-app tests green. **m_pg_g131 is not an import gap:** its master has 0 rows (empty `keys_pg_g131.json`), and its
+state is mid-load (main mode vt 0x080494AC, no objects, then 4 HUD-type objects and still no leader for 380+ frames
+with no keys). It needs a new recording cut at the frame the leader appears, not an importer change.
 No menu-related stop: every menu in the 50 runs (pause, heal, save, Switch Character, shops, the punch machine)
 steps per logic frame like the game's. Nothing for the ship-fixes agent from this run.
+
+*Countdown fixed (side-content agent, by the coordinator - the world-state comparison's "countdown off by one" and
+the countdown game bit):* all 24 countdown gates (Airship `db5_020` .. `db5_039`, `db5t_004`, `rdb5_020`, Kid Buu's
+arena `rkb_168_14-1`, `sb_041_21_25`) world-exact with `SEGMENT_WORLD=1`; 18 newly locked (`world_lock.py`). Three
+frame-order rules in `StoryHost::step_inputs` (the count is taken after the update, before the script's resume and
+the post step - the game's countdown object sees the field state at its own update):
+* the frame the post step's trigger check holds the field does not count - a script it starts (db5_022 f51, the
+  lift's inline trigger) or an exit's walk-out (db5_028 f282);
+* the frame an event ends in at the frame's top (resumed before the post step) counts (db5_023 f569, the level-up
+  popup's last box) - this replaces the old `Timers.fresh` double tick ("counts in the set frame");
+* not for an event the countdown's own hook started (it runs inside the countdown object's update: the arena's
+  s009 -> s461 -> s462 reads 3600 in its set frame).
+And the countdown switches itself off at 0, before its hook (GameData +1 bit 2 clear in the hook's first frame:
+db5t_004 f1717, rkb_168 / sb_041 - ours had kept it on). Gated suite, playthrough, both lockstep suites,
+menu_parity green.
+
+**Hand-off (coordinator, 2026-10-04): `m_062_m_inside_buu` row 2,401 = whole-run 1,339,017 (inside Buu, s473) moves
+from the Super Buu agent (now on pixel comparison) to dungeon agent B.** Then B takes the no-lag whole run's next
+rule stops as they appear - **side-content agent:** you own the no-lag board; mark here the stops you take, B
+takes the others after 1,339,017 in row order.
+
+**Done (ship fix agent, 2026-10-04): the app's menus run without recreated lag; menu tests per logic frame.** Under
+`Options::no_lag` (now set by the app's sessions: `StorySim::new`, the launcher's slot and title apps) every menu
+phase is counted in game iterations, each rule from the emulator: the pause menu's / map screen's black enter frames
+are the mode switch's long iteration - the page is built and drawn in the fade's last step (menu_parity status_tabs
+lf 9,355); a script-opened screen's hold frame is part of that step too (real run 18-13 r047_002 lf 1,113,367), and
+Switch Character's figures take one more enter iteration before their first tick (charsel_alone); a world-restore
+close is the exit stub + the restore (2), any other close one iteration (map screen's 24 black frames: map_left lf
+9,555), the save's close after the write is the restore itself (`PopDone`, save_cancel lf 9,359) and that restore
+ends with the camera update (18-13 lf 1,113,370); Continue's 29 black frames are 4 iterations (title_continue lf
+996 .. 998); no page enter lag, no boot hand-over lag, no redraw lag (as `no_lag` had). The harness runs with `no_lag`
+on (`SEGMENT_MENULAG=1`: the old per-video-frame path with the redraw / close model and the real-route agent's
+recorded-close injection) and `compare` treats a held black fade (Switch Character's figures built) as the menu's
+object world. `menu_parity` steps on the rows where the counter moved and compares each iteration's last frame;
+two presentation rules for long iterations (the remake shows its draw at once): a picture the emulator has not
+presented by the iteration's end (unchanged since the previous one: the status tabs' R highlight) and a step whose
+redraw is the next long iteration's update (title_delete lf 975) are accepted. **Results:** menu_parity all green
+(STRICT); gated segments identical in both paths (0 FAIL); 1,857 real-run + ship cuts: 1,856 exact with `no_lag`
+= the old path's 1,856; whole run with `--lag none`: exact to row 191,429 (was 90,251 - the Earth 3-2 pause open);
+191,429 is an RNG stop in Earth stretch E2 (the recorded-lag run's lasting area stop at 191,502 is the same place).
+Open: the save write's own loop - lf frozen 122 frames in the game - is one iteration in both.
+**14-2 records (coordinator's list):** the Vegeta / Gohan energy drift is gone on the current tree (r069_* / r057_*
+0 differ); the last 14-2 item, `r057_029` Gohan's XP at f512, was two kills in one punch: the game runs the level-up
+hook (#3) inline in the first kill's XP routine - the newest death effect first - and the second kill's XP comes when
+the hook ends (f760). `Field::xp_after_hook` + `player::levelup_hook_done`; xp_due processed newest first. Real-run
+records sweep: 1,518 / 1,519 clean (r033_002 6-1, the fusion record, not mine).
+
+**Claim (Super Buu agent, 2026-10-04, by the coordinator): the picture against the game (pixel comparison) and the
+wf-render / view fixes it finds.** Tools (headless, muted, private target dir):
+* `work/superbuu/pix/dump.py [-j N] [--every K] SEG.json..` - the emulator's screen at frame 0, every K-th (30) and
+  the last video frame of each segment, from its start state (recs.py's `state_of`), zlib per frame ->
+  `work/superbuu/pix/fb/<name>.fb` (all 503 gated segments: 27,425 frames, 244 MB).
+* `engine/crates/wf-app/examples/pixels.rs SEG.json..` - the segment harness's own replay
+  (`wf_import::segment::replay_with`, a new observer hook: `Frame::Before(k)` before a step, `Frame::After(k)` after
+  every video frame; `replay` is `replay_with` with a no-op) renders our view (`view::render_view` + the
+  presenter's one-frame OBJ delay) with wf-render at 240x160 and compares it with the dump, counting only frames
+  inside the segment's actor-level match. Per segment: pixel-exact frames; per differing frame a region class and
+  tags from the world (what the view may not carry). `PIX_OUT=dir` game | ours | diff PNGs, `PIX_AT=k,..`,
+  `PIX_JSON=file`, `PIX_VIEW=k` dumps the view, `PIX_NOSPR` / `PIX_NOPRES` for experiments.
+* `work/superbuu/pix/oam.py SEG FRAME` (OAM, BGxCNT, BLDCNT ..) and `keys.py SEG FRAME` (the draw sort keys).
+**First board (gated segments, every 30th frame): 8,667 / 27,425 sampled frames pixel-exact (31.6%) -> now 11,662
+(42.5%), 62 segments exact on every sample.** Fixed (each from an emulator frame):
+* **The stat-points mark** ("STAT" + arrow beside the HUD; the most common difference: 2,104 frames in 287
+  segments): extracted (`ui/hud/stat_mark.png`, 4 frames of 16x16 8bpp at 0x087144D8), `HudView.stat_mark` = (draws
+  >> 3) & 3 from the mark's creation (`VramState.stat_at`, imported from its +0x14 counter), drawn at x 92.
+* **The props in the draw order**: each prop is a world-list object sorted with the actors (comparator 0x08052EE0:
+  layer byte +8, then depth +4); a prop's layer is its record's byte +0x16 (0x38 like the actors / 0x3C behind),
+  its depth the rect's bottom; an actor's depth is its y + 4. Was: props always behind (7-2's drinks-stand girl
+  over the counter; 12-17's lift over the player when drawn in front).
+* **A BG darken (BLDY) on 5-bit channels**, expanded after (a scene's black fade; 8-bit math left every pixel 1 off).
+* **A script's BG control reaches the renderer** (`MapView.layers`: hidden BGs, BGxCNT priority, BLDCNT targets,
+  BLDALPHA weights from `scene::Layers`), and **a map load resets it to the map's** (the header writes the
+  registers; ours kept a scene's settings for good - also fixes `window_fades`' BLDCNT; no gate or cut changed).
+**What the remaining differing frames show (by world tag; a frame can have several):** sprites with no tag 3,542
+(359 segments: to sort out next), a dialog up 3,403, **the boss HP bar** 3,255 (31 segments: not drawn by the
+renderer), a fade 1,482, BG with no tag 1,429, HUD with no tag 989, **the countdown / stopwatch display** 799 (11:
+not drawn), BG priority / hidden / blend 1,672 (left after the fixes above), the area banner 639, **the white fade**
+313 (32: `screen.white`, not in the view), menus 200, **the palette flash** 86 (`screen.flash`, not in the view),
+BG offset 24. Next: the boss bar, the timer display, white fade / palette flash, then the untagged sprite class.
+Not a gate condition yet (no segment is held to pixels until its whole sample is exact).
