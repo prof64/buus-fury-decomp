@@ -62,6 +62,8 @@ pub struct StoryHost {
     /// inside that iteration: real run 007, whole-run cut 756,613 - s003's node 2 after its first node's box): the
     /// portrait flag of `vram::text_open`; its tiles are taken after the allocator is rebuilt from RAM (the importer)
     pub text_open_due: Option<bool>,
+    /// a breakable's on-break callback whose command wait ended this frame: it resumes in the next one (`resume_blocked`)
+    break_due: Option<Option<i32>>,
 }
 
 /// the cause of an event the import continues: a fusion component's level-up hook (s003 cut while
@@ -241,7 +243,7 @@ impl StoryHost {
         let rt = Runtime::new(files, Box::new(shared.clone()))?;
         let stepped = files.iter().filter(|(_, src)| src.contains("fn step_0()")).map(|(p, _)| p.clone()).collect();
         let hs = HostState { nest_area_enter: true, ..HostState::default() };
-        Ok(StoryHost { rt, shared, hs, queue: VecDeque::new(), running: false, cause: None, outer: vec![], stepped, errors: vec![], started: vec![], prev_held: 0, frame: 0, step_code: STEP_CODE.get().cloned().unwrap_or_default(), text_open_due: None })
+        Ok(StoryHost { rt, shared, hs, queue: VecDeque::new(), running: false, cause: None, outer: vec![], stepped, errors: vec![], started: vec![], prev_held: 0, frame: 0, step_code: STEP_CODE.get().cloned().unwrap_or_default(), text_open_due: None, break_due: None })
     }
 
     /// a session around an imported / built world (no hook: the host runs the queue itself)
@@ -668,9 +670,20 @@ impl StoryHost {
         if !self.running {
             return;
         }
+        let director = matches!(self.hs.pending, Some(wf_script_core::Pending::Director));
         let mut hs = std::mem::take(&mut self.hs);
-        let r = poll(w, &mut hs);
+        let mut r = poll(w, &mut hs);
         self.hs = hs;
+        // a breakable's on-break callback (`Cause::Break`, no event holds the field) that waits on its commands sees
+        // them done one frame later than an event: the game resumes it in the frame after the director went idle
+        // (whole run, no lag, HFIL 18-10 row 1,111,491: inline_0x0808C880's puff_at in frame 191 of cut
+        // wr_1111300, open_area / set_flag(284) / refresh_map_triggers in frame 193 - native dispatches MEASURED)
+        if let Some(v) = self.break_due.take() {
+            r = Some(v);
+            self.hs.from_wait = true;
+        } else if director && r.is_some() && self.outer.is_empty() && matches!(self.cause, Some(Cause::Break { .. })) {
+            self.break_due = r.take();
+        }
         if let Some(v) = r {
             let from = w.events.len();
             let depth = self.outer.len();

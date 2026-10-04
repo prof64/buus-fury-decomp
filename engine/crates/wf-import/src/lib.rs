@@ -1164,6 +1164,12 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
                 if field && st.tree.nodes.get(n).is_some_and(|x| x.k == wf_core::ai::K::HandAmbush) && raw_now >= 0 && tick > 0 {
                     rt.f = tick + 1;
                 }
+                // GhostAnimA / B in progress (no runtime words; the one-shot state's tick): ours counts its updates
+                // (at least 16 before the end test) - from the animation's tick (whole-run cut 1,121,864, HFIL 18-10: a
+                // soul's appear at tick 29, the paired graphics 9 frames later)
+                if st.tree.nodes.get(n).is_some_and(|x| matches!(x.k, wf_core::ai::K::GhostAnimA | wf_core::ai::K::GhostAnimB)) && tick > 0 {
+                    rt.f = tick;
+                }
             }
         }
     }

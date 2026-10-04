@@ -100,6 +100,23 @@ pub fn diff(w: &World, g0: Option<&[u8]>, game: &BTreeMap<String, Value>) -> Vec
     if coins != their_coins {
         out.push(format!("coin touch triggers: {coins} vs {their_coins}"));
     }
+    // the map NPCs' talk resume nodes (the nonzero ones, sorted)
+    if let Some(gn) = game.get("npc").and_then(|x| x.as_array()) {
+        let theirs: Vec<i64> = gn.iter().filter_map(|x| x.as_i64()).collect();
+        let mut ours: Vec<i64> = w
+            .ents
+            .iter()
+            .filter(|e| !e.removed)
+            .filter_map(|e| match &e.body {
+                Body::Npc(n) if n.behaviour.is_some() && n.resume != 0 => Some(n.resume as i64),
+                _ => None,
+            })
+            .collect();
+        ours.sort();
+        if ours != theirs {
+            out.push(format!("npc talk resume nodes: {ours:?} vs {theirs:?}"));
+        }
+    }
     // the walk grid's changes since the segment's start
     if let (Some(gw), Some(g0), Some(g)) = (game.get("wg").and_then(|x| x.as_array()), g0, walk_grid(w)) {
         let theirs: Vec<i64> = gw.iter().filter_map(|x| x.as_i64()).collect();

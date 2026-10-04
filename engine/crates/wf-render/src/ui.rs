@@ -265,6 +265,8 @@ pub struct Ui {
     stat_mark: Option<Indexed>,
     /// the boss HP bar's 54 fill levels, 64x8 each, stacked (`ui/hud/boss_bar.png`)
     boss_bar: Option<Indexed>,
+    /// the choice cursor (`ui/images/cursor.png`)
+    cursor: Option<Indexed>,
     ss: Indexed,
     ss3: Indexed,
     hp: Vec<Vec<(u32, u32)>>,
@@ -409,6 +411,7 @@ impl Ui {
             frame: png(packs, "ui/hud/frame.png")?,
             stat_mark: png(packs, "ui/hud/stat_mark.png").ok(),
             boss_bar: png(packs, "ui/hud/boss_bar.png").ok(),
+            cursor: png(packs, "ui/images/cursor.png").ok(),
             ss: png(packs, "ui/hud/gauge_ss.png")?,
             ss3: png(packs, "ui/hud/gauge_ss3.png")?,
             hp: steps(&h["steps"]["hp"]),
@@ -531,8 +534,11 @@ impl Ui {
         self.dialog_typed(dv, None)
     }
 
-    /// Like [`Ui::dialog`], drawing only the first `typed` visible characters of the page (typewriter).
-    pub fn dialog_typed(&self, dv: &DialogView, typed: Option<u32>) -> Option<Vec<u32>> {
+    /// The page's lines as the box draws them: (line, pen x, pen y, option) in the box picture. An option line
+    /// (`-` first: the `-` and the spaces after it skipped, `0x0800AE00`, in both layouts) fits the wrap width - 0x14
+    /// and is indented by 0x14 beside a portrait; centred (no portrait, or `^` first: `0x0800AFDE`) it fits the
+    /// full width and is centred like any line.
+    fn dialog_layout(&self, dv: &DialogView) -> Option<(&DialogStyle, Vec<(Vec<u16>, i32, i32, bool)>)> {
         let st = self.styles.get(dv.style as usize).or(self.styles.first())?;
         let mut text = units(&dv.text);
         // `^` first: consumed, the text stays centred even beside a portrait (0x0800B16A)
@@ -541,26 +547,17 @@ impl Ui {
             text.remove(0);
         }
         let centred = dv.portrait.is_none() || caret;
-        // (line, width, option): the centred layout keeps an option's "- " in the line (drawn), the portrait
-        // layout skips it and indents the line (0x0800AFDE / 0x0800B02E)
         let mut pages: Vec<Vec<(Vec<u16>, u32, bool)>> = Vec::new();
         for chunk in text.split(|&c| c == 0x0B) {
-            let lines: Vec<(Vec<u16>, u32, bool)> = if centred {
-                wrap(&self.dialog_font, chunk, st.wrap).into_iter().map(|(l, w)| (l, w, false)).collect()
-            } else {
-                wrap_options(&self.dialog_font, chunk, st.wrap, OPTION_INDENT)
-            };
+            let lines = wrap_options(&self.dialog_font, chunk, st.wrap, if centred { 0 } else { OPTION_INDENT });
             for p in lines.chunks(st.max_lines.max(1) as usize) {
                 pages.push(p.to_vec());
             }
         }
         let page = pages.get(dv.page as usize)?;
-        let (w, h) = (st.image.w as usize, st.image.h as usize);
-        let mut idx = st.image.idx.clone();
         let n = page.len() as i32;
         let mut y = if centred { st.y + 7 * (st.max_lines as i32 - n) } else { st.y };
-        let mut color = self.text_color;
-        let mut left = typed.unwrap_or(u32::MAX);
+        let mut out = Vec::with_capacity(page.len());
         for (line, lw, opt) in page {
             // lines keep their full-width centring while they type in
             let x = if centred {
@@ -568,12 +565,36 @@ impl Ui {
             } else {
                 st.x + if *opt { OPTION_INDENT as i32 } else { 0 }
             };
+            out.push((line.clone(), x, y, *opt));
+            y += self.line_h;
+        }
+        Some((st, out))
+    }
+
+    /// The choice cursor's place for option `sel` of the page (the pen (x, y) of that option's line in the box
+    /// picture: the spots the text object records, `0x0800AFF2`); `None` without that many options
+    pub fn dialog_cursor_spot(&self, dv: &DialogView, sel: u8) -> Option<(i32, i32)> {
+        let (_, lines) = self.dialog_layout(dv)?;
+        lines.iter().filter(|l| l.3).nth(sel as usize).map(|l| (l.1, l.2))
+    }
+
+    /// The choice cursor (`ui/images/cursor.png`, 16x16, `0x080178C8`) as ARGB
+    pub fn cursor(&self) -> Option<Vec<u32>> {
+        let im = self.cursor.as_ref()?;
+        Some(im.idx.iter().take(16 * 16).map(|&c| if c == 0 { 0 } else { (im.palette.get(c as usize).copied().unwrap_or(0) & 0xFF_FFFF) | (c as u32) << 24 }).collect())
+    }
+
+    /// Like [`Ui::dialog`], drawing only the first `typed` visible characters of the page (typewriter).
+    pub fn dialog_typed(&self, dv: &DialogView, typed: Option<u32>) -> Option<Vec<u32>> {
+        let (st, page) = self.dialog_layout(dv)?;
+        let (w, h) = (st.image.w as usize, st.image.h as usize);
+        let mut idx = st.image.idx.clone();
+        let mut color = self.text_color;
+        let mut left = typed.unwrap_or(u32::MAX);
+        for (line, x, y, _) in &page {
+            let (x, y) = (*x, *y);
             let mut shown: Vec<u16> = Vec::with_capacity(line.len());
             let mut k = 0;
-            if line.len() >= 2 && line[0] == '-' as u16 && line[1] == ' ' as u16 {
-                shown.extend_from_slice(&line[..2]);
-                k = 2;
-            }
             while k < line.len() {
                 if line[k] == 8 {
                     shown.extend_from_slice(&line[k..(k + 2).min(line.len())]);
@@ -588,7 +609,6 @@ impl Ui {
                 k += 1;
             }
             self.dialog_font.draw_line(&mut idx, w, h, &shown, x, y, &mut color);
-            y += self.line_h;
         }
         let pal = &st.image.palette;
         Some(idx.iter().map(|&c| if c == 0 { 0 } else { (pal.get(c as usize).copied().unwrap_or(0) & 0xFF_FFFF) | (c as u32) << 24 }).collect())

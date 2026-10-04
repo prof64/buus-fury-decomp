@@ -80,9 +80,6 @@ fn mv(x: i32, y: i32, speed: i32, state: i32) -> Cmd {
 pub fn call(h: &mut CoreHost, c: &Call) -> R {
     let n = c.native;
     let a = c.args;
-    if std::env::var("PUFF_DBG").is_ok() && (1050620..=1050632).contains(&h.w.g.clock(h.w.frame)) {
-        eprintln!("NATIVE frame {} 0x{n:02x} {:?}", h.w.frame, a);
-    }
     // the warps, return to title and refresh_map_triggers set the no-save word 0x03002A58 (0x0800232C / 0x080023EA /
     // 0x0800286A / 0x08002714): the running event's end does not write its exit value to its starter's resume slot
     if matches!(n, 0x76 | 0x77 | 0x8b | 0x8e) {
@@ -314,13 +311,7 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
             let Some(t) = entity_of(h, arg(a, 1)) else { return enqueue_owner(h, None, Cmd::HitFlash) };
             enqueue(h, arg(a, 0), Cmd::FaceActor { target: t })
         }
-        0x48 => {
-            if std::env::var("PUFF_DBG").is_ok() {
-                let o = resolve_actor(h.w, h.s, arg(a, 0)).map(|i| h.w.ents[i].id);
-                eprintln!("PUFF frame {} batch {} pending {:?} actor {} -> {:?} tracks {:?}", h.w.frame, h.w.scene.director.batch, h.s.pending, arg(a, 0), o, h.w.scene.tracks.iter().map(|t| (t.owner, t.queue.len(), t.started, t.live)).collect::<Vec<_>>());
-            }
-            enqueue(h, arg(a, 0), Cmd::Puff { x: arg(a, 1), y: arg(a, 2), absolute: true })
-        }
+        0x48 => enqueue(h, arg(a, 0), Cmd::Puff { x: arg(a, 1), y: arg(a, 2), absolute: true }),
         0x49 => enqueue(h, arg(a, 0), Cmd::GlideTo { x: arg(a, 1), y: arg(a, 2), speed: arg(a, 3), n: 0, t: 0, sx: 0, sy: 0 }),
         0x4a => enqueue(h, arg(a, 0), Cmd::Wait { left: arg(a, 1) }),
         0x4b => enqueue(h, arg(a, 0), Cmd::Sfx { id: arg(a, 1) }),

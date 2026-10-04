@@ -276,6 +276,8 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                 },
                 portrait: if text_box { dialog_portrait(w, d.portrait) } else { None },
                 portrait_left: d.portrait_left,
+                // a choice's cursor once the box is up
+                cursor: (d.options > 0 && d.phase == crate::scene::DialogPhase::Shown).then_some(d.cursor.max(0) as u8),
             });
         }
     }

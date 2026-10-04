@@ -14,6 +14,7 @@ State (what lives in the field's own lists, not in GameData - a map's state befo
         a row, 256 x 256, bit = free): sorted tile indices ty * 256 + tx whose bit differs from row 0's (null from the
         first row in another area than the start's: a load rebuilds the grid) - broken
         breakables, opened doors, script-set blocks (the start's grid is the importer's, `import_grids`)
+  npc   the map NPCs' talk resume nodes (object +0x1BC, the nonzero ones, sorted; Earth agent)
 The segment harness side (compare ours at each row the game's changed, lock clean gates) is the Earth agent's."""
 import json
 import sys
@@ -45,6 +46,20 @@ def trig_list(e):
             continue
         out.append([vt, s16(4), s16(6), s16(8), s16(10), int.from_bytes(b[0x10:0x12], 'little') if vt == 0x08049BD4 else 0])
     return out
+
+
+def npc_talk(e):
+    """the map NPCs' (object vt 0x0804C92C) talk resume nodes (+0x1BC, u16: the exit value of each one's last talk),
+    the nonzero ones, sorted (order-free: the NPCs' list positions shift with spawns)"""
+    n = min(e.r32(0x03001C4C + 4), 256)
+    out = []
+    for k in range(n):
+        o = e.r32(0x03001C4C + 8 + 4 * k)
+        if 0x02000000 <= o < 0x02040000 and e.r32(o) == 0x0804C92C:
+            v = e.r16(o + 0x1BC)
+            if v:
+                out.append(v)
+    return sorted(out)
 
 
 def walk_grid(e):
@@ -91,7 +106,7 @@ def one(p, out=OUT):
         # frame: not tracked from there on)
         if wg is not None and len(wg) > 512:
             g0, wg = None, None
-        s = {'trig': trig_list(e), 'wg': wg}
+        s = {'trig': trig_list(e), 'wg': wg, 'npc': npc_talk(e)}
         if s != prev:
             packed.append([k, s if prev is None else {f: v for f, v in s.items() if v != prev[f]}])
             prev = s

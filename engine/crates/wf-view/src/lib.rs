@@ -280,6 +280,8 @@ pub struct DialogView {
     pub portrait: Option<u16>,
     /// The portrait sits left of the box (else right).
     pub portrait_left: bool,
+    /// A choice's cursor (the selected option of the page, `0x080178C8`), while it shows.
+    pub cursor: Option<u8>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]

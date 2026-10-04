@@ -409,7 +409,15 @@ impl Renderer {
                         wf_view::DialogPos::Middle => oy + ui::Ui::dialog_y(dv.position),
                         wf_view::DialogPos::Bottom => h as i32 - (GBA_H - ui::Ui::dialog_y(dv.position)),
                     };
-                    screen.push((ui::DIALOG_PRIORITY, ox + ui::DIALOG_CX - sw as i32 / 2, y, sw, 64, px));
+                    let bx = ox + ui::DIALOG_CX - sw as i32 / 2;
+                    // the choice cursor at its option's pen (x - 16, y - 12; OAM 0x0801796A), in front of the box
+                    if let (Some(sel), 0) = (dv.cursor, anim.scale) {
+                        let box_x = bx + if dv.portrait.is_some() && dv.portrait_left { ui::PORTRAIT_W as i32 } else { 0 };
+                        if let (Some((cx, cy)), Some(cur)) = (u.dialog_cursor_spot(dv, sel), u.cursor()) {
+                            screen.push((ui::DIALOG_PRIORITY, box_x + cx - 16, y + cy - 12, 16, 16, cur));
+                        }
+                    }
+                    screen.push((ui::DIALOG_PRIORITY, bx, y, sw, 64, px));
                 }
             }
         }

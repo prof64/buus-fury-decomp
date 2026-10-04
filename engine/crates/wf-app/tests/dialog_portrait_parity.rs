@@ -106,6 +106,7 @@ fn dialog_portraits_match_emulator() {
             },
             portrait: has_portrait.then(|| global as u16 - 8),
             portrait_left: left && has_portrait,
+            cursor: None,
         });
         v.dialog_anim = Some(DialogAnim { scale: (2048 / pa) as u8, typed: if settled { None } else { Some(0) } });
         let fb = r.render(&packs, &v, 0, 240, 160).to_vec();
