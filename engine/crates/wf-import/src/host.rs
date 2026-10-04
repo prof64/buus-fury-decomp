@@ -174,6 +174,8 @@ impl StoryHost {
                 Some(Cause::AreaEnter) => wf_core::field::finish_arrival(w),
                 // a fusion component's level-up hook: the fusion is current again, re-fused
                 // (the second component's XP comes now: its own hook runs next, in this frame)
+                // (an imported hook - the cut inside s003 - continues with no cause: `levelup_char` says it is one)
+                None if w.story.levelup_char.is_some() && self.outer.is_empty() => wf_core::player::fusion_levelup_done(w),
                 Some(Cause::LevelUp { .. }) => {
                     let from = w.events.len();
                     wf_core::player::fusion_levelup_done(w);

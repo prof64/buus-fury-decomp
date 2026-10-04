@@ -621,7 +621,7 @@ pub fn entity_gone(w: &mut World, i: usize) {
             return;
         }
         // a dropped item (vt 0x0804B428): its icon's tiles and its 10 x 4 shadow, like a big coin's
-        if matches!(p.kind, crate::fieldobj::PickupKind::Supply(_) | crate::fieldobj::PickupKind::Equipment(_)) && std::env::var("NO_ITEMVRAM").is_err() {
+        if matches!(p.kind, crate::fieldobj::PickupKind::Supply(_) | crate::fieldobj::PickupKind::Equipment(_)) {
             if st(w).is_some_and(|v| v.owners.iter().any(|o| o.1 == Owner::Ent(id))) {
                 if let Some(k) = coin_shadow(true) {
                     shared_release(w, k);
@@ -954,7 +954,7 @@ pub fn hud_created(w: &mut World) {
 /// the HUD's update (`0x0800BCC8`): the stat-points mark is made when the leader has points to spend, a HUD
 /// exists and there is no mark
 pub fn stat_mark(w: &mut World) {
-    let points = w.story.chars.get(w.story.current.max(0) as usize).map(|c| c.rec.points).unwrap_or(0);
+    let points = w.story.chars.get(w.story.levelup_char.unwrap_or(w.story.current).max(0) as usize).map(|c| c.rec.points).unwrap_or(0);
     let (hud, mark) = st(w)
         .map(|v| (v.owners.iter().any(|o| o.1 == Owner::Hud), v.owners.iter().any(|o| o.1 == Owner::StatMark) || v.susp.iter().any(|x| matches!(x, Susp::Own(Owner::StatMark, _, _)))))
         .unwrap_or((false, false));
@@ -1199,8 +1199,9 @@ pub fn hud_tick(w: &mut World) {
     }
     popups_tick(w, None);
     // the HUD's update (`0x0800BCC8`) makes the stat-points mark when the leader has points to spend and there is
-    // none; the mark deletes itself when the points are spent (`0x0800B530`)
-    let points = w.story.chars.get(w.story.current.max(0) as usize).map(|c| c.rec.points).unwrap_or(0);
+    // none; the mark deletes itself when the points are spent (`0x0800B530`). (GameData +0's character: a fusion
+    // component's level-up hook makes the component current - its points, Gotenks 6-9 tile +6,000)
+    let points = w.story.chars.get(w.story.levelup_char.unwrap_or(w.story.current).max(0) as usize).map(|c| c.rec.points).unwrap_or(0);
     if points == 0 {
         release(w, Owner::StatMark);
     } else {

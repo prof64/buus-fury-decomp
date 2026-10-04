@@ -447,6 +447,9 @@ pub fn add(w: &mut World, s: Shot) -> EntityId {
         ShotKind::Kame(_) => 0x300,
         // Majin Buu's candy beam `0x080286D4` (segment sb 1-3 f6210)
         ShotKind::CandyBeam { .. } => 0xC0,
+        // a thrown bomb (real run 4-1 tiles r002_006+14,000 f85 / +7,000 / +17,000: the game's allocator takes a
+        // 4-unit block, (151, 4), in the frame the bomb is made)
+        ShotKind::Bomb { .. } if std::env::var("NO_BOMBVRAM").is_err() => 0x100,
         _ => 0,
     };
     let flame = matches!(s.kind, ShotKind::Flame { .. });

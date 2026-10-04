@@ -161,6 +161,8 @@ pub struct Sprite {
     pub shadow_key: (u8, u8),
     /// the sprite has a halo attachment (def +0x50): its instances use the shared halo graphic
     pub halo: bool,
+    /// the ROM sprite def (`rom.def`; 0 = unknown): an object's +0x58 points at it (imports)
+    pub def_addr: u32,
 }
 
 impl Sprite {
@@ -936,7 +938,8 @@ fn parse_sprite(s: &Value, index: i32, timing: Option<&Value>) -> Sprite {
     let sh = h["shadow"].as_array();
     let shadow_key = sh.map(|a| (a.get(2).and_then(|v| v.as_u64()).unwrap_or(0) as u8, a.get(3).and_then(|v| v.as_u64()).unwrap_or(0) as u8)).unwrap_or((0, 0));
     let halo = anims.iter().any(|a| a.dirs.iter().any(|d| d.iter().any(|st| st.attach.is_some())));
-    Sprite { index, id: gets(s, "id"), anims, by_raw, by_name, body, foot, shadow, tile_bytes, shadow_key, halo }
+    let def_addr = s["rom"]["def"].as_str().and_then(|v| u32::from_str_radix(v.trim_start_matches("0x"), 16).ok()).unwrap_or(0);
+    Sprite { index, id: gets(s, "id"), anims, by_raw, by_name, body, foot, shadow, tile_bytes, shadow_key, halo, def_addr }
 }
 
 /// the reference loader's graphics fallbacks (data.ts): Janemba body parts from their spawn records, placeholders

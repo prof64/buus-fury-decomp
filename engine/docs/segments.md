@@ -1045,6 +1045,23 @@ Fixed from the board (2026-10-04), real route 0-21 -> Gotenks (`r033_002_6-1`, 2
   `player::fusion_levelup_done` (the host, when the `Cause::LevelUp` job ends). **Importer:** a cut inside such a
   hook has GameData +0 != the leader's character - `levelup_char` from RAM.
 
+Every-N import gaps closed (ship agent, 2026-10-04), the Bandana hunt `r002_006_4-1`:
+* **A warp_fade into the 3-D map cut during the arrival fade-in** (mode vt 0x080495B4: +4 brightness, 4 a frame):
+  the load is behind and the map has run since - `build_event_entry` now takes the objects, flyer and camera from
+  RAM (`field_from_ram`) and the fade's progress (`Mode::FadeIn { k: brightness / 4 }`). Tile +9,000 exact (was 0),
+  +17,000 to f513.
+* **An event mid-node whose actions so far load nothing** (its warp still ahead) is a mid-node cut, not an area
+  entry: s515's take-off from 4-1 (tiles +2,000 / +13,000) was rebuilt as a fresh area load.
+* **A glide whose target came from a query** (`glide_to(0, actor_x(0), actor_y(0) - 100)`): asked again at the
+  import it is another target, so the track's head glide takes the only live glide object's target; a head glide
+  with no glide object left has ended (dropped, not glided again). Both take-off tiles now run to the 3-D map's
+  load, where the **imported sprite allocator** differs (ours keeps the 2-D area's blocks: `(158, 16), (174, 197)`
+  ... vs the game's fresh layout) - **for the importer** (allocator ownership of an imported 2-D area across a
+  warp_fade into 0-50).
+Still open (importer): 6-1 tile +7,000 - Majin Buu's AI runtime is not imported, ours draws no RNG while the game
+draws every 2 frames; +17,000 - a scene actor (sprite 123) whose animation holds its last cel (game cel 10, tick
+68 frozen), ours runs on from the imported tick.
+
 **Dungeon agents, note:** `re/buu/ship/ship_driver.py` (the base of your drivers) changed on 2026-10-03 - Ghosts
 are no longer hunted (blasted / punched only when visible and in the way), a Vampire's grab is mashed out of, the
 flame guard has a wider line and falls back to a guard (R), `walk` takes the free axis at a wall corner, `nav` taps A
@@ -1855,6 +1872,25 @@ two Python hash seeds, gives identical key logs (13,000 frames); the earlier run
   the NPC; `Cause::Talk` / `Cause::Trigger`), its next activation starts the event at that node; the object's
   rebuild (an area load, `refresh_map_triggers`) resets it to 0. Not applied: only two cases support it, both mine,
   and it touches every talk / trigger start; to be agreed before it goes in.
+  **Confirmed in the code and applied (side-content agent, 2026-10-04).** The scene start `0x0801246E` (r2 = a u16
+  slot) begins at `*slot` (`ldrh` at `0x080124B6`); the end node (`0x0801253C..0x0801254C`) writes the exit value
+  back to `*slot` unless the no-save word `0x03002A58` is set. The callers: the **event trigger** (vt 0x08049BD4,
+  activation `0x080073F0`) passes its +0x10; a **map NPC's talk** (`0x08017D44` -> `0x08017D66`) passes NPC +0x1BC;
+  SCENE_RUN `0x08012588` (callbacks, hooks, `run_event`, and the **save point**, vt 0x08049794 activation
+  `0x0800748C`) passes a zeroed local - always node 0. Cleared by: the constructors (trigger `0x080073C0` /
+  `0x0800743E`: `strh 0, +0x10`; NPC `0x08017C1C`: `strh 0, +0x1BC` at `0x08017C56`), so an area load and
+  `refresh_map_triggers` (which rebuilds the trigger objects, the cafe's f566 in place at the same address) reset it.
+  The no-save word: cleared when an outermost scene starts (`0x080124B0`, scene count 0), set by the warps 0x76 / 0x77
+  (`0x0800232C`, `0x080023EA`), `refresh_map_triggers` 0x8B (`0x08002714`, the cafe's hand-in: its exit is dropped),
+  return to title 0x8E (`0x0800286A`) and the removal of the talking object (`0x08015A6E`, `0x0801844C`). Engine:
+  `TriggerRt::resume` / `Npc::resume` (wf-core), `field::resume_node` / `set_resume_node` (event triggers only, not
+  save points), `HostState::no_resume_save` (natives 0x76 / 0x77 / 0x8B / 0x8E), `Runtime::start_event_from`
+  (wf-script-rhai), the host's start / finish (wf-import), and the importer reads both slots from RAM
+  (`import_trigger_resume`, NPC +0x1BC). A first version also resumed the save point (s011 exits at 5): the
+  18-13 soak (`m_047_h_h13`) lost its RNG at row 2,110 - hence the save-point exclusion, from the code above.
+  Result: `pg_museums_019_04_23` 467 -> 665; gated suite, playthrough, both lockstep suites, every reachable cut set
+  (A/B with `NO_RESUME=1`, `work/side/probe/abcuts.py`) and all soak masters + the title-to-Earth chain unchanged
+  otherwise.
 * Not mine (in-event import): the arrival on Kami's Lookout through the Other World map with a leader other than Goku
   (`pg_g141_001` / `pg_g101b_001` / `pg_g111b_001`, f21): those cuts start in 6-14 while s512 is still running (its
   spawned Goku stands in pose 18 - raw 20 - beside the leader), and the import has no script thread (depth 0), so its
@@ -2938,3 +2974,7 @@ r033_002 +7,000 / +17,000. Please say here if one of these collides with the mid
 * Soak agent: your item (3) (the 0x57 wait in the mid-code import) edits `build_mid_code` near my 0x4F block (after
   `tracks.retain`) - add yours next to it, don't move it. I'm not touching the vram-import hunks (popups / boss
   bar) that are now in the tree.
+
+**Claim (Earth agent, 2026-10-04, by the coordinator; to the Super Buu agent: taken off your queue):** `r052_004_1-5`
+(Gotenks 1-5, ~8.5k frames, camera at f11,395) and the 6-9 tile `r052_006_6-9+006000`'s first-frame form (game
+player sprite 126, ours 269: import the form / sprite the game shows).

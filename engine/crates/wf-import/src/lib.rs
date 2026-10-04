@@ -124,12 +124,42 @@ fn autowalk(ram: &GbaRam, p: u32) -> bool {
     ram.valid(st) && ram.r32(st) == ST_AUTOWALK
 }
 
+/// A fusion component's level-up hook (#3) in flight: the game made the component current (GameData +0) while the
+/// player object still shows the fusion (`Story::levelup_char`; Gotenks 6-9 tile +6,000: current Trunks (3), the
+/// player Gotenks' sprite). The player's sprite def (+0x58) names the fusion: it is current, the component is
+/// `levelup_char`. Called before the records are read (the fusion's own record follows).
+fn levelup_fusion(data: &GameData, ram: &GbaRam, st: &mut Story) {
+    let p = ram.player();
+    if !ram.valid(p) {
+        return;
+    }
+    let def = ram.r32(p + 0x58);
+    let comp = st.current;
+    let shown = |c: usize| -> bool {
+        let form = ram.r8(REC0 + 0x68 * c as u32 + 0x14) as i32;
+        data.form(form).and_then(|f| data.sprite(f.gfx - 9)).is_some_and(|s| s.def_addr == def)
+    };
+    if comp < 0 || shown(comp as usize) {
+        return;
+    }
+    for f in 0..9usize {
+        let fus = ram.r16(REC0 + 0x68 * f as u32 + 2);
+        let parts = [(fus & 0xFF) as i32, (fus >> 8) as i32];
+        if fus != 0 && parts.contains(&comp) && shown(f) {
+            st.levelup_char = Some(comp);
+            st.current = f as i32;
+            return;
+        }
+    }
+}
+
 /// the persistent state: GameData `0x03001068` (character, game bits, supplies, flags, equipment, zenie, play time),
 /// the 9 character records `0x03001560`, script words L / G, `get_variant_byte`
 pub fn import_story(data: &GameData, ram: &GbaRam) -> Story {
     let gd = ram.read(GD, 0x8A8);
     let mut st = Story::new_game(data);
     st.current = gd[0] as i32;
+    levelup_fusion(data, ram, &mut st);
     st.game_bits = gd[1] as u32;
     for k in 0..st.supplies.len().min(83) {
         st.supplies[k] = gd[2 + k];

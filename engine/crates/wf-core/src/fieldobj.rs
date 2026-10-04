@@ -387,9 +387,7 @@ pub fn drop_item(w: &mut World, item: i32) -> Option<EntityId> {
     let id = w.add(Body::Pickup(Box::new(p)));
     // its icon's tiles (0x100 bytes) and the 10 x 4 shadow, like a big coin (real run 4-1 tile r002_006+11,000 f104:
     // the drop's object takes block (135, 4) in the game's allocator)
-    if std::env::var("NO_ITEMVRAM").is_err() {
-        crate::vram::coin_created(w, id, true);
-    }
+    crate::vram::coin_created(w, id, true);
     if !w.field.as_ref().is_some_and(|f| f.pre_update) {
         if let Some(k) = w.find(id) {
             pickup_update(w, k);

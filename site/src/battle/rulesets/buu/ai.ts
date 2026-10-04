@@ -1779,7 +1779,9 @@ export function create(n: AiNodeJ, c: AiController): RNode {
         e.powered = true
         // anim 0x0C under the idle controller 0x03001B30 (once, 8 ticks a cel; segment sb 6-6 on 6-1: raw 13)
         e.setAnim(12, true, false, GENERIC_STATES['0x03001B30'])
-      }, (f) => f >= 32 && e.animDone())
+        // update 0x0804FEC4: finished once the controller is no longer 0x03001B30 - also when another node replaced
+        // it (real run 6-9 r052_006 f15,334: the old tree's KiBlast enter in the frame of the jump to 0x259)
+      }, (f) => e.ea.r !== GENERIC_STATES['0x03001B30'] || (f >= 32 && e.animDone()))
     case 'ThrowBigBall':
       return new Act(n, c, () => {
         e.setAnim(15, true, true)

@@ -2559,9 +2559,13 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             let d = Arc::clone(&w.data);
             f >= 8 && w.en_ref(i).anim_done(&d)
         }
+        // update 0x0804FEC4: finished once the object's controller is no longer the one-shot 0x03001B30 - also when
+        // another node replaced it (real run 6-9 r052_006 f15,334: state 0x251's sub-state jumps to 0x259 and the old
+        // tree's Sequence still enters its KiBlast that frame - controller 0x03003068 - so the power-up ends next frame)
         K::SuperBuuPowerUp => {
             let d = Arc::clone(&w.data);
-            f >= 32 && w.en_ref(i).anim_done(&d)
+            let g = w.data.anim.generic["0x03001B30"];
+            w.en_ref(i).ea.rule != g || (f >= 32 && w.en_ref(i).anim_done(&d))
         }
         K::ThrowBigBall => f >= 92,
         K::GlideToWaypoint => {
