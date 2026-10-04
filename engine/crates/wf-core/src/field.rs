@@ -1362,6 +1362,10 @@ fn begin_fade_in(w: &mut World) {
     if let Some(f) = w.field.as_mut() {
         f.mode = Mode::FadeIn { k: 0 };
     }
+    if w.field.as_ref().is_some_and(|f| f.script_fade_in) && !crate::fieldworld::flying(w) && w.scene.screen.fade.is_none() && std::env::var_os("T_LC").is_some() {
+        w.scene.screen.black = 0;
+        w.scene.screen.dim = 0;
+    }
     // the world map's fade-in has no autowalk: the flyer is under control; a script's warp_fade arrival neither
     // (the player the load created stays idle, under control)
     if crate::fieldworld::flying(w) || w.field.as_ref().is_some_and(|f| f.script_fade_in) {

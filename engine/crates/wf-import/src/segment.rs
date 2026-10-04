@@ -459,10 +459,25 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
             });
             if let Some(c) = cam_at {
                 let left = frames[k + 1..].iter().take_while(|n| i(&n["lf"]) == lf).count();
-                if left == c && sess.world.field.as_ref().is_some_and(|f| f.script_fade_in && matches!(f.mode, wf_core::field::Mode::FadeIn { .. })) && std::env::var_os("T_LC").is_some() {
+                if left == c && sess.world.field.as_ref().is_some_and(|f| f.script_fade_in && matches!(f.mode, wf_core::field::Mode::FadeIn { .. })) {
                     sess.world.tick_shakes();
                     wf_core::field::world_mode_cameras(&mut sess.world);
                 }
+            }
+            // SEGMENT_LAGCENSUS: each replayed lag run at its first frame - its length and what the sim was doing
+            if std::env::var_os("SEGMENT_LAGCENSUS").is_some() && k > 0 && i(&frames[k - 1]["lf"]) != lf || (k == 0 && std::env::var_os("SEGMENT_LAGCENSUS").is_some()) {
+                let n = frames[k..].iter().take_while(|n| i(&n["lf"]) == lf).count();
+                let w = &sess.world;
+                let prev_steps = if k > 0 { frames[k - 1]["steps"].to_string() } else { String::new() };
+                eprintln!(
+                    "lagrun {} f{k} len {n} pending {:?} mode {:?} depth {} dialog {} steps {}",
+                    doc["name"].as_str().unwrap_or("?"),
+                    host.hs.pending,
+                    w.field.as_ref().map(|f| f.mode.clone()),
+                    w.scene.depth,
+                    w.scene.dialog.is_some(),
+                    prev_steps.chars().take(160).collect::<String>()
+                );
             }
             wf_core::sndsim::lag_frame_ex(&mut sess.world, last);
             replayed += 1;
@@ -488,6 +503,9 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
                     for i in 0..w.ents.len() {
                         if let Body::Enemy(e) = &w.ents[i].body {
                             for se in &e.ai.stack {
+                                if std::env::var("SEGMENT_AITREE").is_ok() {
+                                    eprintln!("  t{k} tree en{i} st{} {:?}", se.state, se.tree.nodes.iter().map(|n| (n.name.clone(), n.kids.clone(), format!("{:?}", n.p))).collect::<Vec<_>>());
+                                }
                                 eprintln!("  t{k} ai en{i} st{} {}", se.state, { let kids = &se.tree.nodes[0].kids; let ci = se.rt[0].i as usize; let ks: Vec<String> = kids.iter().enumerate().map(|(n, &kk)| format!("{}{}", if n == ci { "*" } else { "" }, se.tree.nodes[kk as usize].name)).collect(); let kk = kids.get(ci).copied().unwrap_or(0) as usize; let r = &se.rt[kk]; format!("{} | cur {} f{} i{} d{:?} p{:?}", ks.join(","), se.tree.nodes[kk].name, r.f, r.i, &r.d[..4], se.tree.nodes[kk].p) });
                             }
                         }

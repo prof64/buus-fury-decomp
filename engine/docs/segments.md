@@ -3105,3 +3105,10 @@ Both are re-applied verbatim from your transcript (builds); please check the fil
   (`load_cam`, "fade: black false vs game true"), not from these import changes (area-entry cuts never take the
   in-event path).
 Open on my claim: the second bomb's block at r002_006 +7,000 f192 / +17,000 f816.
+*Nested cutscene import (A, done):* `r033_002_6-1` +17,000 **exact** (was f87). A cut inside an event that another
+event started with `run_event` (scene depth 2: s218 node 14 runs s502) now carries both: `outer_event` finds the
+next event object up the stack whose interpreter stands just after `run_event(inner, ..)`; `continue_mid_nested`
+(host) restarts the outer node, drops its actions before the `run_event`, runs it (rhai `through_events`: the skip
+passes over it; the inner scene's start does not wait the frame a fresh one would), then drops the inner's actions
+before its waiting one. Parameters: the RAM block both share (the outer's `run_event` writes the inner's). 96 tiles
+before / after: 1 better, 0 worse; segment gates green on a clean HEAD export.

@@ -2234,7 +2234,7 @@ fn bomb_update(w: &mut World, i: usize) {
         let id = w.ents[i].id;
         crate::vram::release(w, crate::vram::Owner::Ent(id));
         let r = rect(w, i);
-        if std::env::var("OLD_BOMB").is_err() {
+        {
             let (px, py) = (w.shot_ref(i).px(), w.shot_ref(i).py());
             bomb_chips(w, px, py);
         }
@@ -2255,9 +2255,6 @@ fn bomb_update(w: &mut World, i: usize) {
             hit(w, i, r, atk(1), 1024, true);
         }
         let (px, py) = (w.shot_ref(i).px(), w.shot_ref(i).py());
-        if std::env::var("OLD_BOMB").is_ok() {
-            bomb_chips(w, px, py);
-        }
         let rate = 0x1000 + w.rng.rand(0x1000);
         fx::explosion(w, px, py, rate);
         w.sfx(24, 64);
