@@ -12,7 +12,10 @@
 //! Kept quirk: the first row shown follows the selection only down to (sel & ~1) - 4 (`0x08017392`), so with five
 //! or more skills the selection can leave the two visible rows.
 
-use super::kit::{self, Button, Container, Cursor, Font, Label, Widget, BTN_A, BTN_B, BTN_DOWN, BTN_L, BTN_LEFT, BTN_R, BTN_RIGHT, BTN_UP};
+use super::kit::{
+    self, Button, Container, Cursor, Font, Label, Widget, BTN_A, BTN_B, BTN_DOWN, BTN_L, BTN_LEFT,
+    BTN_R, BTN_RIGHT, BTN_UP,
+};
 use super::text::{Arg, Canvas, Pen};
 use super::{Action, MenuData, Page, Screen};
 use crate::world::World;
@@ -68,24 +71,74 @@ impl Skills {
     /// `0x08017160` + enter `0x080171A8`
     pub fn new(w: &World, ci: i32) -> Skills {
         let t = &w.data.menu.as_ref().expect("menu content").text;
-        let count = w.story.chars.get(ci.max(0) as usize).map(|c| c.skills.len() as i32).unwrap_or(0);
+        let count = w
+            .story
+            .chars
+            .get(ci.max(0) as usize)
+            .map(|c| c.skills.len() as i32)
+            .unwrap_or(0);
         let mut c = Container::default();
-        let a_btn = c.add(Widget::Button(Button::new(BTN_A, 0xC, 0x84, 0, true, false)));
-        c.add(Widget::Label(Label { x: 0x1C, y: 0x90, text: t.s(23).to_vec(), colour: 5, align: 0, font: Font::Menu }));
+        let a_btn = c.add(Widget::Button(Button::new(
+            BTN_A, 0xC, 0x84, 0, true, false,
+        )));
+        c.add(Widget::Label(Label {
+            x: 0x1C,
+            y: 0x90,
+            text: t.s(23).to_vec(),
+            colour: 5,
+            align: 0,
+            font: Font::Menu,
+        }));
         let x = t.font(MenuFont::Menu).measure(t.s(23)) + 0x1E;
         c.add(Widget::Button(Button::new(BTN_B, x, 0x84, 1, true, false)));
-        c.add(Widget::Label(Label { x: x + 0x10, y: 0x90, text: t.s(26).to_vec(), colour: 5, align: 0, font: Font::Menu }));
+        c.add(Widget::Label(Label {
+            x: x + 0x10,
+            y: 0x90,
+            text: t.s(26).to_vec(),
+            colour: 5,
+            align: 0,
+            font: Font::Menu,
+        }));
         let (mut up, mut down) = (None, None);
         if count > 2 {
-            up = Some(c.add(Widget::Button(Button::new(BTN_UP, 0xD4, 0x28, 2, false, false))));
-            down = Some(c.add(Widget::Button(Button::new(BTN_DOWN, 0xD4, 0x70, 3, true, false))));
+            up = Some(c.add(Widget::Button(Button::new(
+                BTN_UP, 0xD4, 0x28, 2, false, false,
+            ))));
+            down = Some(c.add(Widget::Button(Button::new(
+                BTN_DOWN, 0xD4, 0x70, 3, true, false,
+            ))));
         }
         c.add(Widget::Button(Button::new(BTN_L, 8, 8, 6, true, false)));
         c.add(Widget::Button(Button::new(BTN_R, 0xD0, 8, 7, true, false)));
-        c.add(Widget::Label(Label { x: 0x22, y: 0x14, text: t.s(30).to_vec(), colour: 2, align: 0, font: Font::Menu }));
-        c.add(Widget::Label(Label { x: 0xCE, y: 0x14, text: t.s(33).to_vec(), colour: 2, align: 2, font: Font::Menu }));
+        c.add(Widget::Label(Label {
+            x: 0x22,
+            y: 0x14,
+            text: t.s(30).to_vec(),
+            colour: 2,
+            align: 0,
+            font: Font::Menu,
+        }));
+        c.add(Widget::Label(Label {
+            x: 0xCE,
+            y: 0x14,
+            text: t.s(33).to_vec(),
+            colour: 2,
+            align: 2,
+            font: Font::Menu,
+        }));
         c.add(Widget::Cursor(Cursor { t: 0 }));
-        Skills { c, ci, count, first: 0, sel: 0, a_btn, up, down, popup: None, cursor_first: 0 }
+        Skills {
+            c,
+            ci,
+            count,
+            first: 0,
+            sel: 0,
+            a_btn,
+            up,
+            down,
+            popup: None,
+            cursor_first: 0,
+        }
     }
 
     /// `0x0801765E`: the cursor point of the selected skill
@@ -111,11 +164,14 @@ impl Skills {
             }
             1 | 6 | 7 => {
                 w.sfx(super::SFX_MENU, 64);
-                (true, Some(Action::Pop(match code {
-                    1 => 1,
-                    6 => 2,
-                    _ => 3,
-                })))
+                (
+                    true,
+                    Some(Action::Pop(match code {
+                        1 => 1,
+                        6 => 2,
+                        _ => 3,
+                    })),
+                )
             }
             2 => {
                 w.sfx(super::SFX_CURSOR, 64);
@@ -158,7 +214,12 @@ impl Skills {
             hsep(&mut cv, 0x28, 0x50, 0x58);
             hsep(&mut cv, 0x88, 0x50, 0xB8);
         }
-        let cs = w.story.chars.get(self.ci.max(0) as usize).cloned().unwrap_or_default();
+        let cs = w
+            .story
+            .chars
+            .get(self.ci.max(0) as usize)
+            .cloned()
+            .unwrap_or_default();
         let mut p = Pen::new(MenuFont::Menu, 0, 0, 1, 2, Some(1));
         p.line_h = 12;
         for k in 0..4 {
@@ -169,7 +230,12 @@ impl Skills {
             let x = (k & 1) * 0x60 + 0x40;
             let y = (k >> 1) * 0x34 + 0x28;
             let sid = skill_id(w, self.ci, idx);
-            let sk = d.opts.skills.get(sid.max(0) as usize).cloned().unwrap_or_default();
+            let sk = d
+                .opts
+                .skills
+                .get(sid.max(0) as usize)
+                .cloned()
+                .unwrap_or_default();
             p.x = x;
             p.y = y;
             p.colour = if self.sel == idx { 6 } else { 2 };
@@ -177,7 +243,12 @@ impl Skills {
             cv.image(&sk.icon, 0, 24, 11, p.x - 12, p.y - 8);
             if sk.level_byte != 0xFF {
                 p.y += 12;
-                cv.textf(t, &mut p, t.s(151), &[Arg::I(cs.skill_cur(idx as usize) + 1)]);
+                cv.textf(
+                    t,
+                    &mut p,
+                    t.s(151),
+                    &[Arg::I(cs.skill_cur(idx as usize) + 1)],
+                );
             }
         }
         super::surface_view(cv)
@@ -203,21 +274,46 @@ impl Popup {
         let d = w.data.menu.as_ref().expect("menu content");
         let t = &d.text;
         let mut c = Container::default();
-        c.add(Widget::Button(Button::new(BTN_B, 0xC, 0x4C, 1, true, false)));
-        c.add(Widget::Label(Label { x: 0x1C, y: 0x58, text: t.s(26).to_vec(), colour: 5, align: 0, font: Font::Menu }));
+        c.add(Widget::Button(Button::new(
+            BTN_B, 0xC, 0x4C, 1, true, false,
+        )));
+        c.add(Widget::Label(Label {
+            x: 0x1C,
+            y: 0x58,
+            text: t.s(26).to_vec(),
+            colour: 5,
+            align: 0,
+            font: Font::Menu,
+        }));
         let sid = skill_id(w, s.ci, s.sel);
-        let leveled = d.opts.skills.get(sid.max(0) as usize).is_some_and(|k| k.level_byte != 0xFF);
+        let leveled = d
+            .opts
+            .skills
+            .get(sid.max(0) as usize)
+            .is_some_and(|k| k.level_byte != 0xFF);
         let (mut left, mut right) = (None, None);
         if leveled {
-            left = Some(c.add(Widget::Button(Button::new(BTN_LEFT, 0x8C, 0x4D, 4, true, false))));
-            right = Some(c.add(Widget::Button(Button::new(BTN_RIGHT, 0xB4, 0x4D, 5, true, false))));
+            left = Some(c.add(Widget::Button(Button::new(
+                BTN_LEFT, 0x8C, 0x4D, 4, true, false,
+            ))));
+            right = Some(c.add(Widget::Button(Button::new(
+                BTN_RIGHT, 0xB4, 0x4D, 5, true, false,
+            ))));
         }
-        Popup { c, left, right, under, closing: false }
+        Popup {
+            c,
+            left,
+            right,
+            under,
+            closing: false,
+        }
     }
 }
 
 fn set_cur(w: &mut World, ci: i32, k: i32, delta: i32) {
-    let Some(cs) = w.story.chars.get_mut(ci.max(0) as usize) else { return };
+    let Some(cs) = w.story.chars.get_mut(ci.max(0) as usize) else {
+        return;
+    };
     let k = k.max(0) as usize;
     if cs.skill_cur.len() < cs.skills.len() {
         let mut v: Vec<i32> = (0..cs.skills.len()).map(|i| cs.skill_cur(i)).collect();
@@ -251,9 +347,17 @@ impl Page for Skills {
     }
     fn before_draw(&mut self, w: &World) {
         if self.popup.is_some() {
-            let cs = w.story.chars.get(self.ci.max(0) as usize).cloned().unwrap_or_default();
+            let cs = w
+                .story
+                .chars
+                .get(self.ci.max(0) as usize)
+                .cloned()
+                .unwrap_or_default();
             let k = self.sel.max(0) as usize;
-            let (cur, max) = (cs.skill_cur(k), cs.skill_levels.get(k).copied().unwrap_or(0));
+            let (cur, max) = (
+                cs.skill_cur(k),
+                cs.skill_levels.get(k).copied().unwrap_or(0),
+            );
             let p = self.popup.as_mut().unwrap();
             if let (Some(l), Some(r)) = (p.left, p.right) {
                 if let Some(Widget::Button(b)) = p.c.kids.get_mut(l) {
@@ -301,19 +405,24 @@ impl Page for Skills {
             }
             let (ci, sel) = (self.ci, self.sel);
             let mut close = false;
-            let (_c, act) = kit::run_step(&mut *p, w, |p| &mut p.c, |p, w, _src, code| match code {
-                1 => {
-                    w.sfx(super::SFX_MENU, 64);
-                    close = true;
-                    (true, None)
-                }
-                4 | 5 => {
-                    set_cur(w, ci, sel, if code == 4 { -1 } else { 1 });
-                    p.c.drawn = false;
-                    (false, None)
-                }
-                _ => (false, None),
-            });
+            let (_c, act) = kit::run_step(
+                &mut *p,
+                w,
+                |p| &mut p.c,
+                |p, w, _src, code| match code {
+                    1 => {
+                        w.sfx(super::SFX_MENU, 64);
+                        close = true;
+                        (true, None)
+                    }
+                    4 | 5 => {
+                        set_cur(w, ci, sel, if code == 4 { -1 } else { 1 });
+                        p.c.drawn = false;
+                        (false, None)
+                    }
+                    _ => (false, None),
+                },
+            );
             debug_assert!(act.is_none());
             if close {
                 // the popup's dtor hides BG0 at once: the page as last drawn shows until its redraw lands
@@ -326,7 +435,8 @@ impl Page for Skills {
             self.popup = Some(p);
             return Action::None;
         }
-        let (consumed, act) = kit::run_step(self, w, |p| &mut p.c, |p, w, _src, code| p.event(w, code));
+        let (consumed, act) =
+            kit::run_step(self, w, |p| &mut p.c, |p, w, _src, code| p.event(w, code));
         if let Some(a) = act {
             return a;
         }
@@ -353,7 +463,14 @@ impl Page for Skills {
             None => self.draw(w, d),
             Some(p) => {
                 let mut v = p.under.draw(w, d);
-                v.layers.push(MenuLayer { w: 208, h: 104, x: 16, y: 40, priority: 0, ops: p.draw(w, d, self).ops });
+                v.layers.push(MenuLayer {
+                    w: 208,
+                    h: 104,
+                    x: 16,
+                    y: 40,
+                    priority: 0,
+                    ops: p.draw(w, d, self).ops,
+                });
                 v
             }
         }
@@ -373,11 +490,27 @@ impl Page for Skills {
             let v = self.view(w, d);
             let top = v.layers.get(1)?;
             let gn = crate::sndsim::ops_cost(&d.text, &top.ops).0;
-            let k = if self.container_ref().ever { 129_600 + gn * 567 / 1000 } else { 239_500 + gn * 63 / 1000 };
+            let k = if self.container_ref().ever {
+                129_600 + gn * 567 / 1000
+            } else {
+                239_500 + gn * 63 / 1000
+            };
             let own = k + crate::sndsim::layer_cycles(&d.text, &top.ops, 0);
-            return Some(crate::sndsim::Redraw { t0: 4_641, base: own - 4_641 });
+            return Some(crate::sndsim::Redraw {
+                t0: 4_641,
+                base: own - 4_641,
+            });
         }
-        Some(super::page_time(d, &self.view(w, d), !self.c.ever, 4_641, 146_570, 0, 1_371, 129_107))
+        Some(super::page_time(
+            d,
+            &self.view(w, d),
+            !self.c.ever,
+            4_641,
+            146_570,
+            0,
+            1_371,
+            129_107,
+        ))
     }
 }
 
@@ -394,7 +527,12 @@ impl Popup {
         cv.background(12, 4, sw - 24, sh - 16);
         cv.panel(8, 0, sw - 8, sh - 8);
         let sid = skill_id(w, s.ci, s.sel);
-        let sk = d.opts.skills.get(sid.max(0) as usize).cloned().unwrap_or_default();
+        let sk = d
+            .opts
+            .skills
+            .get(sid.max(0) as usize)
+            .cloned()
+            .unwrap_or_default();
         cv.image(&sk.icon, 0, 24, 11, 0x0E, 6);
         let mut p = Pen::new(MenuFont::Menu, 0x28, 0x0F, 0, 5, Some(1));
         p.line_h = 12;
@@ -405,12 +543,22 @@ impl Popup {
         p.y = 0x1B;
         cv.text_wrapped(t, &mut p, 0xB4, t.s(sk.desc as usize));
         if sk.level_byte != 0xFF {
-            let cs = w.story.chars.get(s.ci.max(0) as usize).cloned().unwrap_or_default();
+            let cs = w
+                .story
+                .chars
+                .get(s.ci.max(0) as usize)
+                .cloned()
+                .unwrap_or_default();
             p.colour = 3;
             p.x = 0xA9;
             p.y = 0x58;
             p.align = 1;
-            cv.textf(t, &mut p, &[0x25, 0x64], &[Arg::I(cs.skill_cur(s.sel.max(0) as usize) + 1)]);
+            cv.textf(
+                t,
+                &mut p,
+                &[0x25, 0x64],
+                &[Arg::I(cs.skill_cur(s.sel.max(0) as usize) + 1)],
+            );
         }
         self.c.draw(t, &mut cv);
         cv
@@ -419,5 +567,11 @@ impl Popup {
 
 /// a harness opening this screen from JSON (`menu::open_from_json`): `{"kind": "skills", "char": n}`
 pub fn open_json(w: &World, v: &serde_json::Value) -> Option<(Screen, super::Transition, bool)> {
-    (v["kind"] == "skills").then(|| (Screen::Skills(Skills::new(w, v["char"].as_i64().unwrap_or(0) as i32)), super::PAUSE, false))
+    (v["kind"] == "skills").then(|| {
+        (
+            Screen::Skills(Skills::new(w, v["char"].as_i64().unwrap_or(0) as i32)),
+            super::PAUSE,
+            false,
+        )
+    })
 }

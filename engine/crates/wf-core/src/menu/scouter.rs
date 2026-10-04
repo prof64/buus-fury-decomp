@@ -50,7 +50,8 @@ pub struct ScoutData {
 
 impl ScoutData {
     pub fn load(src: &dyn crate::content::ContentSource) -> Option<Arc<ScoutData>> {
-        let v: serde_json::Value = serde_json::from_slice(&src.read("ui/menu/scouter.json")?).ok()?;
+        let v: serde_json::Value =
+            serde_json::from_slice(&src.read("ui/menu/scouter.json")?).ok()?;
         let i = |x: &serde_json::Value| x.as_i64().unwrap_or(0) as i32;
         let db = v["db"]
             .as_array()?
@@ -61,20 +62,50 @@ impl ScoutData {
                 def: i(&e["def"]),
                 portrait: i(&e["portrait"]),
                 stats: i(&e["stats"]),
-                enemy: e.get("enemy").filter(|x| x.is_object()).map(|x| [i(&x["hp"]), i(&x["str"]), i(&x["pow"]), i(&x["end"])]),
+                enemy: e
+                    .get("enemy")
+                    .filter(|x| x.is_object())
+                    .map(|x| [i(&x["hp"]), i(&x["str"]), i(&x["pow"]), i(&x["end"])]),
             })
             .collect();
-        let remaps = v["remaps"].as_array()?.iter().map(|t| t.as_array().into_iter().flatten().map(|x| x.as_u64().unwrap_or(0) as u8).collect()).collect();
+        let remaps = v["remaps"]
+            .as_array()?
+            .iter()
+            .map(|t| {
+                t.as_array()
+                    .into_iter()
+                    .flatten()
+                    .map(|x| x.as_u64().unwrap_or(0) as u8)
+                    .collect()
+            })
+            .collect();
         let mut arrows = [(0u16, 0u16); 2];
-        for (k, x) in v["arrows"]["oam"].as_array().into_iter().flatten().take(2).enumerate() {
+        for (k, x) in v["arrows"]["oam"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .take(2)
+            .enumerate()
+        {
             let w = x.as_u64().unwrap_or(0) as u32;
             arrows[k] = (w as u16, (w >> 16) as u16);
         }
         let mut info_dirs = [0u8; 4];
-        for (k, x) in v["info_dirs"].as_array().into_iter().flatten().take(4).enumerate() {
+        for (k, x) in v["info_dirs"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .take(4)
+            .enumerate()
+        {
             info_dirs[k] = x.as_u64().unwrap_or(0) as u8;
         }
-        Some(Arc::new(ScoutData { db, remaps, arrows, info_dirs }))
+        Some(Arc::new(ScoutData {
+            db,
+            remaps,
+            arrows,
+            info_dirs,
+        }))
     }
 
     /// `0x08027948`: the database entry of an actor with sprite def `def` (enemies: of their type)
@@ -82,7 +113,11 @@ impl ScoutData {
         let def = if def == 0x95 { 0x92 } else { def };
         match enemy_type {
             Some(t) => self.db.iter().position(|e| e.def == def && e.stats == t),
-            None => self.db.iter().position(|e| e.def == def && e.stats < 0).or_else(|| self.db.iter().position(|e| e.def == def)),
+            None => self
+                .db
+                .iter()
+                .position(|e| e.def == def && e.stats < 0)
+                .or_else(|| self.db.iter().position(|e| e.def == def)),
         }
     }
 }
@@ -132,7 +167,11 @@ pub fn data(w: &World) -> Option<Arc<ScoutData>> {
 impl Scout {
     /// construction (the records) + enter (the blips, the cursor)
     pub fn new(w: &mut World) -> Scout {
-        let mut s = Scout { cx: 120 << 8, cy: 80 << 8, ..Default::default() };
+        let mut s = Scout {
+            cx: 120 << 8,
+            cy: 80 << 8,
+            ..Default::default()
+        };
         let Some(d) = data(w) else { return s };
         let cam = w.cameras[0].rect;
         let mut found = Vec::new();
@@ -147,16 +186,33 @@ impl Scout {
                 _ => continue,
             };
             let Some(si) = a.sprite else { continue };
-            let Some(db) = d.lookup(si + 9, ety) else { continue };
+            let Some(db) = d.lookup(si + 9, ety) else {
+                continue;
+            };
             found.push((db, hp, a.facing, (a.x >> 8) - cam.x0, (a.y >> 8) - cam.y0));
         }
         for (db, hp, dir, x, y) in found {
             let sprite = d.db[db].def - 9;
             let mut anim = ActAnim::of(0);
             anim.tick = w.rng.rand(255);
-            let fb = w.data.sprite(sprite).and_then(|sp| sp.frame_box(anim.raw, dir, 0)).unwrap_or([0; 4]);
+            let fb = w
+                .data
+                .sprite(sprite)
+                .and_then(|sp| sp.frame_box(anim.raw, dir, 0))
+                .unwrap_or([0; 4]);
             let rect = [x + fb[0], y + fb[1], x + fb[0] + fb[2], y + fb[1] + fb[3]];
-            s.recs.push(Rec { db: db as u16, hp, dir, x, y, rect, sprite, anim, prio: 0x38, fx: None });
+            s.recs.push(Rec {
+                db: db as u16,
+                hp,
+                dir,
+                x,
+                y,
+                rect,
+                sprite,
+                anim,
+                prio: 0x38,
+                fx: None,
+            });
         }
         s
     }
@@ -194,7 +250,13 @@ impl Scout {
     /// the update before the VBlank: the selection (+0x3C), then the objects
     pub fn update(&mut self, w: &World) {
         use crate::input::{A, DOWN, LEFT, RIGHT, UP};
-        self.oam = Some((((self.cx >> 8) - 16, (self.cy >> 8) - 16), self.recs.iter().map(|r| (r.prio, r.anim.frame, r.fx)).collect()));
+        self.oam = Some((
+            ((self.cx >> 8) - 16, (self.cy >> 8) - 16),
+            self.recs
+                .iter()
+                .map(|r| (r.prio, r.anim.frame, r.fx))
+                .collect(),
+        ));
         self.select();
         let (held, pressed, released) = (w.menu.held, w.menu.pressed, w.menu.released);
         if pressed & A != 0 {
@@ -259,26 +321,72 @@ impl Scout {
 
     /// the OBJs (OAM order: the cursor, then the blips last to first)
     pub fn objs(&self, w: &World, out: &mut Vec<MenuObj>) {
-        let Some((cur, prios)) = self.oam.as_ref() else { return };
+        let Some((cur, prios)) = self.oam.as_ref() else {
+            return;
+        };
         let d = data(w);
-        out.push(MenuObj { path: "ui/menu/scouter_cursor.png".into(), frame: self.ring_frame as u16, fw: 32, fh: 32, x: cur.0, y: cur.1, priority: 1, ..Default::default() });
+        out.push(MenuObj {
+            path: "ui/menu/scouter_cursor.png".into(),
+            frame: self.ring_frame as u16,
+            fw: 32,
+            fh: 32,
+            x: cur.0,
+            y: cur.1,
+            priority: 1,
+            ..Default::default()
+        });
         for (k, r) in self.recs.iter().enumerate().rev() {
-            let Some(sp) = w.data.sprite(r.sprite) else { continue };
-            let Some(an) = sp.anim_raw(r.anim.raw) else { continue };
+            let Some(sp) = w.data.sprite(r.sprite) else {
+                continue;
+            };
+            let Some(an) = sp.anim_raw(r.anim.raw) else {
+                continue;
+            };
             let steps = an.steps(r.dir);
-            let (prio, frame, fx) = prios.get(k).copied().unwrap_or((r.prio, r.anim.frame, r.fx));
-            let Some(st) = steps.get((frame.max(0) as usize).min(steps.len().saturating_sub(1))) else { continue };
+            let (prio, frame, fx) = prios
+                .get(k)
+                .copied()
+                .unwrap_or((r.prio, r.anim.frame, r.fx));
+            let Some(st) = steps.get((frame.max(0) as usize).min(steps.len().saturating_sub(1)))
+            else {
+                continue;
+            };
             let prio = prio >> 4;
             let remap = match (fx, d.as_ref()) {
-                (Some(c), Some(d)) => d.remaps.get(((c >> 2) & 7) as usize).cloned().unwrap_or_default(),
+                (Some(c), Some(d)) => d
+                    .remaps
+                    .get(((c >> 2) & 7) as usize)
+                    .cloned()
+                    .unwrap_or_default(),
                 _ => Vec::new(),
             };
             if let Some((hx, hy)) = st.attach {
-                out.push(MenuObj { sheet: "effects/halo".into(), x: r.x + hx, y: r.y + hy, priority: prio, ..Default::default() });
+                out.push(MenuObj {
+                    sheet: "effects/halo".into(),
+                    x: r.x + hx,
+                    y: r.y + hy,
+                    priority: prio,
+                    ..Default::default()
+                });
             }
-            out.push(MenuObj { sheet: format!("sprites/{}", sp.id), frame: st.frame, hflip: st.flip, x: r.x, y: r.y, priority: prio, remap, ..Default::default() });
+            out.push(MenuObj {
+                sheet: format!("sprites/{}", sp.id),
+                frame: st.frame,
+                hflip: st.flip,
+                x: r.x,
+                y: r.y,
+                priority: prio,
+                remap,
+                ..Default::default()
+            });
             if let Some(sh) = sp.shadow.as_ref().filter(|sh| sh.as_str() != "shadow_0x0") {
-                out.push(MenuObj { sheet: format!("effects/{sh}"), x: r.x, y: r.y, priority: prio, ..Default::default() });
+                out.push(MenuObj {
+                    sheet: format!("effects/{sh}"),
+                    x: r.x,
+                    y: r.y,
+                    priority: prio,
+                    ..Default::default()
+                });
             }
         }
     }
@@ -344,13 +452,21 @@ const DESC_H: i32 = 0x38;
 
 impl Info {
     pub fn new(w: &mut World, rec: &Rec) -> Info {
-        let mut s = Info { db: rec.db, hp: rec.hp, ..Default::default() };
+        let mut s = Info {
+            db: rec.db,
+            hp: rec.hp,
+            ..Default::default()
+        };
         // the scouted bit (GD +0xC5 + db / 8: story flag 0x380 + db)
         w.story.set_flag(0x380 + rec.db as i32, true);
         let Some(d) = data(w) else { return s };
         let e = d.db[rec.db as usize].clone();
         if let Some(md) = w.data.menu.clone() {
-            let lines = super::text::count_lines(md.text.font(wf_view::MenuFont::Dialog), md.text.s(e.desc as usize), DESC_W);
+            let lines = super::text::count_lines(
+                md.text.font(wf_view::MenuFont::Dialog),
+                md.text.s(e.desc as usize),
+                DESC_W,
+            );
             s.max = (lines * 16 - DESC_H).max(0);
         }
         s.sprite = e.def - 9;
@@ -358,20 +474,44 @@ impl Info {
         // sprite has a walk; the state ticks (8 per cel, looping) the idle's cels, the picture stays the idle's
         let mut anim = ActAnim::of(0);
         anim.tick = w.rng.rand(255);
-        if w.data.sprite(s.sprite).is_some_and(|sp| sp.anim_raw(2).is_some()) {
-            anim = ActAnim { raw: 1, id: 1, ..Default::default() };
+        if w.data
+            .sprite(s.sprite)
+            .is_some_and(|sp| sp.anim_raw(2).is_some())
+        {
+            anim = ActAnim {
+                raw: 1,
+                id: 1,
+                ..Default::default()
+            };
         }
         s.anim = anim;
         s.place(w);
-        s.arrows = [Arrow { active: s.scroll > 0, ..Default::default() }, Arrow { active: s.scroll < s.max, ..Default::default() }];
+        s.arrows = [
+            Arrow {
+                active: s.scroll > 0,
+                ..Default::default()
+            },
+            Arrow {
+                active: s.scroll < s.max,
+                ..Default::default()
+            },
+        ];
         s
     }
 
     /// `0x080272AC`: the position from the current cel's frame record
     fn place(&mut self, w: &World) {
-        let fb = w.data.sprite(self.sprite).and_then(|sp| sp.frame_box(self.anim.raw, self.dir, self.anim.frame)).unwrap_or([0; 4]);
+        let fb = w
+            .data
+            .sprite(self.sprite)
+            .and_then(|sp| sp.frame_box(self.anim.raw, self.dir, self.anim.frame))
+            .unwrap_or([0; 4]);
         self.x = 0x38 - fb[2] / 2 - fb[0];
-        self.y = if fb[3] > 32 { 0x38 - fb[3] / 2 - fb[1] } else { 0x40 };
+        self.y = if fb[3] > 32 {
+            0x38 - fb[3] / 2 - fb[1]
+        } else {
+            0x40
+        };
     }
 
     pub fn update(&mut self, w: &World) {
@@ -414,9 +554,16 @@ impl Info {
             return [self.hp, -1, -1, -1];
         }
         let ci = (-2 - e.stats) as usize;
-        let Some(cs) = w.story.chars.get(ci) else { return [-1; 4] };
+        let Some(cs) = w.story.chars.get(ci) else {
+            return [-1; 4];
+        };
         let eff = super::status::effective(w, cs);
-        [if self.hp == -1 { cs.rec.hp } else { self.hp }, eff[0], eff[1], eff[2]]
+        [
+            if self.hp == -1 { cs.rec.hp } else { self.hp },
+            eff[0],
+            eff[1],
+            eff[2],
+        ]
     }
 
     pub fn view(&self, w: &World, md: &super::MenuData) -> (Vec<wf_view::MenuLayer>, Vec<MenuObj>) {
@@ -424,7 +571,10 @@ impl Info {
         use wf_view::{MenuFont, MenuLayer};
         let t = &md.text;
         let d = data(w);
-        let e = d.as_ref().and_then(|d| d.db.get(self.db as usize).cloned()).unwrap_or_default();
+        let e = d
+            .as_ref()
+            .and_then(|d| d.db.get(self.db as usize).cloned())
+            .unwrap_or_default();
         let mut cv = Canvas::new();
         cv.image("ui/menu/scouter_info.png", 0, 240, 160, 0, 0);
         let mut p = Pen::new(MenuFont::Small, 0x38, 0x90, 1, 2, Some(1));
@@ -445,7 +595,11 @@ impl Info {
                 cv.textf(t, &mut p, &[0x25, 0x64], &[Arg::I(vals[k])]);
             }
         }
-        match md.portraits.get((e.portrait - 8).max(0) as usize).filter(|s| e.portrait >= 8 && !s.is_empty()) {
+        match md
+            .portraits
+            .get((e.portrait - 8).max(0) as usize)
+            .filter(|s| e.portrait >= 8 && !s.is_empty())
+        {
             Some(path) => cv.image(path, 0, 64, 64, 168, 8),
             None => {
                 let mut p = Pen::new(MenuFont::Small, 0xC8, 0x22, 1, 2, Some(1));
@@ -453,13 +607,27 @@ impl Info {
                 cv.text_wrapped(t, &mut p, 0x38, t.s(194));
             }
         }
-        let bg3 = MenuLayer { w: 240, h: 160, x: 0, y: 0, priority: 3, ops: cv.ops };
+        let bg3 = MenuLayer {
+            w: 240,
+            h: 160,
+            x: 0,
+            y: 0,
+            priority: 3,
+            ops: cv.ops,
+        };
         let mut dc = Canvas::new();
         let mut p = Pen::new(MenuFont::Dialog, 0, 0xE - self.scroll, 0, 2, None);
         p.line_h = 16;
         p.clip = [0, 0, DESC_W, DESC_H];
         dc.text_wrapped(t, &mut p, DESC_W, t.s(e.desc as usize));
-        let bg2 = MenuLayer { w: DESC_W as u16, h: DESC_H as u16, x: 120, y: 88, priority: 3, ops: dc.ops };
+        let bg2 = MenuLayer {
+            w: DESC_W as u16,
+            h: DESC_H as u16,
+            x: 120,
+            y: 88,
+            priority: 3,
+            ops: dc.ops,
+        };
         let mut objs = Vec::new();
         if let Some(d) = d.as_ref() {
             // the arrows (OAM words 0x0874D248 +8 up, +4 down; frames of the up tiles)
@@ -482,13 +650,35 @@ impl Info {
         if let (Some((x, y, dir, frame)), Some(sp)) = (self.oam, w.data.sprite(self.sprite)) {
             if let Some(an) = sp.anim_raw(self.anim.raw) {
                 let steps = an.steps(dir);
-                if let Some(st) = steps.get((frame.max(0) as usize).min(steps.len().saturating_sub(1))) {
+                if let Some(st) =
+                    steps.get((frame.max(0) as usize).min(steps.len().saturating_sub(1)))
+                {
                     if let Some((hx, hy)) = st.attach {
-                        objs.push(MenuObj { sheet: "effects/halo".into(), x: x + hx, y: y + hy, priority: 3, ..Default::default() });
+                        objs.push(MenuObj {
+                            sheet: "effects/halo".into(),
+                            x: x + hx,
+                            y: y + hy,
+                            priority: 3,
+                            ..Default::default()
+                        });
                     }
-                    objs.push(MenuObj { sheet: format!("sprites/{}", sp.id), frame: st.frame, hflip: st.flip, x, y, priority: 3, ..Default::default() });
+                    objs.push(MenuObj {
+                        sheet: format!("sprites/{}", sp.id),
+                        frame: st.frame,
+                        hflip: st.flip,
+                        x,
+                        y,
+                        priority: 3,
+                        ..Default::default()
+                    });
                     if let Some(sh) = sp.shadow.as_ref().filter(|sh| sh.as_str() != "shadow_0x0") {
-                        objs.push(MenuObj { sheet: format!("effects/{sh}"), x, y, priority: 3, ..Default::default() });
+                        objs.push(MenuObj {
+                            sheet: format!("effects/{sh}"),
+                            x,
+                            y,
+                            priority: 3,
+                            ..Default::default()
+                        });
                     }
                 }
             }

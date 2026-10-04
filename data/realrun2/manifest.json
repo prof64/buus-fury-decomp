@@ -1,0 +1,1114 @@
+[
+ {
+  "n": 0,
+  "chapter": "opening",
+  "name": "intro",
+  "frames": 6801,
+  "start": {
+   "area": [
+    0,
+    0,
+    0
+   ],
+   "p": null,
+   "scene": 0,
+   "lf": 0,
+   "hp": 135,
+   "zenie": 0
+  },
+  "end": {
+   "area": [
+    1,
+    1,
+    1
+   ],
+   "p": [
+    144,
+    152,
+    2
+   ],
+   "scene": 1,
+   "lf": 6434,
+   "hp": 135,
+   "zenie": 0
+  }
+ },
+ {
+  "n": 1,
+  "chapter": "opening",
+  "name": "snakeway",
+  "frames": 6040,
+  "start": {
+   "area": [
+    1,
+    1,
+    1
+   ],
+   "p": [
+    144,
+    152,
+    2
+   ],
+   "scene": 1,
+   "lf": 6434,
+   "hp": 135,
+   "zenie": 0
+  },
+  "end": {
+   "area": [
+    1,
+    10,
+    1
+   ],
+   "p": [
+    272,
+    248,
+    0
+   ],
+   "scene": 0,
+   "lf": 12103,
+   "hp": 135,
+   "zenie": 100
+  }
+ },
+ {
+  "n": 2,
+  "chapter": "opening",
+  "name": "gameover",
+  "frames": 5442,
+  "start": {
+   "area": [
+    1,
+    10,
+    1
+   ],
+   "p": [
+    272,
+    248,
+    0
+   ],
+   "scene": 0,
+   "lf": 12103,
+   "hp": 135,
+   "zenie": 100
+  },
+  "end": {
+   "area": [
+    0,
+    2,
+    1
+   ],
+   "p": null,
+   "scene": 0,
+   "lf": 17276,
+   "hp": 0,
+   "zenie": 100
+  }
+ },
+ {
+  "n": 3,
+  "chapter": "opening",
+  "name": "newgame2",
+  "frames": 6325,
+  "start": {
+   "area": [
+    0,
+    2,
+    1
+   ],
+   "p": null,
+   "scene": 0,
+   "lf": 17276,
+   "hp": 0,
+   "zenie": 100
+  },
+  "end": {
+   "area": [
+    1,
+    1,
+    1
+   ],
+   "p": [
+    144,
+    152,
+    2
+   ],
+   "scene": 0,
+   "lf": 23251,
+   "hp": 135,
+   "zenie": 100
+  }
+ },
+ {
+  "n": 4,
+  "chapter": "opening",
+  "name": "snakeway2",
+  "frames": 6017,
+  "start": {
+   "area": [
+    1,
+    1,
+    1
+   ],
+   "p": [
+    144,
+    152,
+    2
+   ],
+   "scene": 0,
+   "lf": 23251,
+   "hp": 135,
+   "zenie": 100
+  },
+  "end": {
+   "area": [
+    1,
+    10,
+    1
+   ],
+   "p": [
+    272,
+    248,
+    0
+   ],
+   "scene": 0,
+   "lf": 28906,
+   "hp": 135,
+   "zenie": 100
+  }
+ },
+ {
+  "n": 5,
+  "chapter": "opening",
+  "name": "save1",
+  "frames": 933,
+  "start": {
+   "area": [
+    1,
+    10,
+    1
+   ],
+   "p": [
+    272,
+    248,
+    0
+   ],
+   "scene": 0,
+   "lf": 28906,
+   "hp": 135,
+   "zenie": 100
+  },
+  "end": {
+   "area": [
+    1,
+    10,
+    1
+   ],
+   "p": [
+    269,
+    359,
+    1
+   ],
+   "scene": 0,
+   "lf": 29542,
+   "hp": 135,
+   "zenie": 100
+  }
+ },
+ {
+  "n": 6,
+  "chapter": "opening",
+  "name": "die",
+  "frames": 4121,
+  "start": {
+   "area": [
+    1,
+    10,
+    1
+   ],
+   "p": [
+    269,
+    359,
+    1
+   ],
+   "scene": 0,
+   "lf": 29542,
+   "hp": 135,
+   "zenie": 100
+  },
+  "end": {
+   "area": [
+    0,
+    2,
+    1
+   ],
+   "p": null,
+   "scene": 0,
+   "lf": 33383,
+   "hp": 0,
+   "zenie": 100
+  }
+ },
+ {
+  "n": 7,
+  "chapter": "opening",
+  "name": "continue",
+  "frames": 235,
+  "start": {
+   "area": [
+    0,
+    2,
+    1
+   ],
+   "p": null,
+   "scene": 0,
+   "lf": 33383,
+   "hp": 0,
+   "zenie": 100
+  },
+  "end": {
+   "area": [
+    1,
+    10,
+    1
+   ],
+   "p": [
+    269,
+    359,
+    0
+   ],
+   "scene": 0,
+   "lf": 33536,
+   "hp": 135,
+   "zenie": 100
+  }
+ },
+ {
+  "n": 8,
+  "chapter": "opening",
+  "name": "otherworld",
+  "frames": 24932,
+  "start": {
+   "area": [
+    1,
+    10,
+    1
+   ],
+   "p": [
+    269,
+    359,
+    0
+   ],
+   "scene": 0,
+   "lf": 33536,
+   "hp": 135,
+   "zenie": 100
+  },
+  "end": {
+   "area": [
+    2,
+    1,
+    1
+   ],
+   "p": [
+    136,
+    112,
+    0
+   ],
+   "scene": 0,
+   "lf": 57116,
+   "hp": 85,
+   "zenie": 170
+  }
+ },
+ {
+  "n": 9,
+  "chapter": "earth",
+  "name": "e_house",
+  "frames": 3126,
+  "start": {
+   "area": [
+    2,
+    1,
+    1
+   ],
+   "p": [
+    136,
+    112,
+    0
+   ],
+   "scene": 0,
+   "lf": 57116,
+   "hp": 85,
+   "zenie": 170
+  },
+  "end": {
+   "area": [
+    3,
+    1,
+    1
+   ],
+   "p": [
+    120,
+    88,
+    3
+   ],
+   "scene": 0,
+   "lf": 59900,
+   "hp": 85,
+   "zenie": 170
+  }
+ },
+ {
+  "n": 10,
+  "chapter": "earth",
+  "name": "e_robbers",
+  "frames": 2685,
+  "start": {
+   "area": [
+    3,
+    1,
+    1
+   ],
+   "p": [
+    120,
+    88,
+    3
+   ],
+   "scene": 0,
+   "lf": 59900,
+   "hp": 85,
+   "zenie": 170
+  },
+  "end": {
+   "area": [
+    3,
+    2,
+    1
+   ],
+   "p": [
+    520,
+    200,
+    1
+   ],
+   "scene": 0,
+   "lf": 62436,
+   "hp": 70,
+   "zenie": 175
+  }
+ },
+ {
+  "n": 11,
+  "chapter": "earth",
+  "name": "e_school",
+  "frames": 5111,
+  "start": {
+   "area": [
+    3,
+    2,
+    1
+   ],
+   "p": [
+    520,
+    200,
+    1
+   ],
+   "scene": 0,
+   "lf": 62436,
+   "hp": 70,
+   "zenie": 175
+  },
+  "end": {
+   "area": [
+    3,
+    1,
+    1
+   ],
+   "p": [
+    112,
+    152,
+    2
+   ],
+   "scene": 0,
+   "lf": 67083,
+   "hp": 70,
+   "zenie": 175
+  }
+ },
+ {
+  "n": 12,
+  "chapter": "earth",
+  "name": "e_westcity",
+  "frames": 2762,
+  "start": {
+   "area": [
+    3,
+    1,
+    1
+   ],
+   "p": [
+    112,
+    152,
+    2
+   ],
+   "scene": 0,
+   "lf": 67083,
+   "hp": 70,
+   "zenie": 175
+  },
+  "end": {
+   "area": [
+    4,
+    27,
+    1
+   ],
+   "p": [
+    146,
+    152,
+    0
+   ],
+   "scene": 0,
+   "lf": 69659,
+   "hp": 70,
+   "zenie": 175
+  }
+ },
+ {
+  "n": 13,
+  "chapter": "earth",
+  "name": "e_capsule",
+  "frames": 4682,
+  "start": {
+   "area": [
+    4,
+    27,
+    1
+   ],
+   "p": [
+    146,
+    152,
+    0
+   ],
+   "scene": 0,
+   "lf": 69659,
+   "hp": 70,
+   "zenie": 175
+  },
+  "end": {
+   "area": [
+    4,
+    27,
+    1
+   ],
+   "p": [
+    144,
+    158,
+    3
+   ],
+   "scene": 0,
+   "lf": 74000,
+   "hp": 70,
+   "zenie": 175
+  }
+ },
+ {
+  "n": 14,
+  "chapter": "earth",
+  "name": "e_stickup",
+  "frames": 3536,
+  "start": {
+   "area": [
+    4,
+    27,
+    1
+   ],
+   "p": [
+    144,
+    158,
+    3
+   ],
+   "scene": 0,
+   "lf": 74000,
+   "hp": 70,
+   "zenie": 175
+  },
+  "end": {
+   "area": [
+    3,
+    1,
+    1
+   ],
+   "p": [
+    258,
+    142,
+    0
+   ],
+   "scene": 0,
+   "lf": 77227,
+   "hp": 92,
+   "zenie": 175
+  }
+ },
+ {
+  "n": 15,
+  "chapter": "earth",
+  "name": "e_lateclass",
+  "frames": 4399,
+  "start": {
+   "area": [
+    3,
+    1,
+    1
+   ],
+   "p": [
+    258,
+    142,
+    0
+   ],
+   "scene": 0,
+   "lf": 77227,
+   "hp": 92,
+   "zenie": 175
+  },
+  "end": {
+   "area": [
+    3,
+    3,
+    1
+   ],
+   "p": [
+    470,
+    59,
+    0
+   ],
+   "scene": 0,
+   "lf": 81195,
+   "hp": 87,
+   "zenie": 175
+  }
+ },
+ {
+  "n": 16,
+  "chapter": "earth",
+  "name": "e_training",
+  "frames": 23167,
+  "start": {
+   "area": [
+    3,
+    3,
+    1
+   ],
+   "p": [
+    470,
+    59,
+    0
+   ],
+   "scene": 0,
+   "lf": 81195,
+   "hp": 87,
+   "zenie": 175
+  },
+  "end": {
+   "area": [
+    2,
+    9,
+    1
+   ],
+   "p": [
+    247,
+    59,
+    0
+   ],
+   "scene": 0,
+   "lf": 102184,
+   "hp": 138,
+   "zenie": 225
+  }
+ },
+ {
+  "n": 17,
+  "chapter": "earth",
+  "name": "e_circus",
+  "frames": 9128,
+  "start": {
+   "area": [
+    2,
+    9,
+    1
+   ],
+   "p": [
+    247,
+    59,
+    0
+   ],
+   "scene": 0,
+   "lf": 102184,
+   "hp": 138,
+   "zenie": 225
+  },
+  "end": {
+   "area": [
+    3,
+    2,
+    1
+   ],
+   "p": null,
+   "scene": 0,
+   "lf": 110384,
+   "hp": 132,
+   "zenie": 275
+  }
+ },
+ {
+  "n": 18,
+  "chapter": "earth",
+  "name": "e_musuka",
+  "frames": 3076,
+  "start": {
+   "area": [
+    3,
+    2,
+    1
+   ],
+   "p": null,
+   "scene": 0,
+   "lf": 110384,
+   "hp": 132,
+   "zenie": 275
+  },
+  "end": {
+   "area": [
+    3,
+    19,
+    1
+   ],
+   "p": [
+    224,
+    65,
+    1
+   ],
+   "scene": 0,
+   "lf": 113300,
+   "hp": 155,
+   "zenie": 285
+  }
+ },
+ {
+  "n": 19,
+  "chapter": "earth",
+  "name": "e_tank",
+  "frames": 12994,
+  "start": {
+   "area": [
+    3,
+    19,
+    1
+   ],
+   "p": [
+    224,
+    65,
+    1
+   ],
+   "scene": 0,
+   "lf": 113300,
+   "hp": 155,
+   "zenie": 285
+  },
+  "end": {
+   "area": [
+    3,
+    14,
+    1
+   ],
+   "p": [
+    376,
+    115,
+    3
+   ],
+   "scene": 0,
+   "lf": 126068,
+   "hp": 55,
+   "zenie": 400
+  }
+ },
+ {
+  "n": 20,
+  "chapter": "earth",
+  "name": "e_videl",
+  "frames": 8820,
+  "start": {
+   "area": [
+    3,
+    14,
+    1
+   ],
+   "p": [
+    376,
+    115,
+    3
+   ],
+   "scene": 0,
+   "lf": 126068,
+   "hp": 55,
+   "zenie": 400
+  },
+  "end": {
+   "area": [
+    0,
+    50,
+    1
+   ],
+   "p": [
+    2512,
+    1128,
+    1
+   ],
+   "scene": 0,
+   "lf": 2003,
+   "hp": 31,
+   "zenie": 385
+  }
+ },
+ {
+  "n": 21,
+  "chapter": "earth",
+  "name": "e_chichi",
+  "frames": 6554,
+  "start": {
+   "area": [
+    0,
+    50,
+    1
+   ],
+   "p": [
+    2512,
+    1128,
+    1
+   ],
+   "scene": 0,
+   "lf": 2003,
+   "hp": 31,
+   "zenie": 385
+  },
+  "end": {
+   "area": [
+    2,
+    8,
+    1
+   ],
+   "p": [
+    248,
+    248,
+    0
+   ],
+   "scene": 0,
+   "lf": 8027,
+   "hp": 31,
+   "zenie": 385
+  }
+ },
+ {
+  "n": 22,
+  "chapter": "earth",
+  "name": "e_rocks",
+  "frames": 3045,
+  "start": {
+   "area": [
+    2,
+    8,
+    1
+   ],
+   "p": [
+    248,
+    248,
+    0
+   ],
+   "scene": 0,
+   "lf": 8027,
+   "hp": 31,
+   "zenie": 385
+  },
+  "end": {
+   "area": [
+    2,
+    90,
+    1
+   ],
+   "p": [
+    96,
+    274,
+    1
+   ],
+   "scene": 0,
+   "lf": 10879,
+   "hp": 148,
+   "zenie": 530
+  }
+ },
+ {
+  "n": 23,
+  "chapter": "earth",
+  "name": "e_gate",
+  "frames": 4598,
+  "start": {
+   "area": [
+    2,
+    90,
+    1
+   ],
+   "p": [
+    96,
+    274,
+    1
+   ],
+   "scene": 0,
+   "lf": 10879,
+   "hp": 148,
+   "zenie": 530
+  },
+  "end": {
+   "area": [
+    2,
+    90,
+    1
+   ],
+   "p": [
+    96,
+    224,
+    1
+   ],
+   "scene": 0,
+   "lf": 15139,
+   "hp": 161,
+   "zenie": 600
+  }
+ },
+ {
+  "n": 24,
+  "chapter": "earth",
+  "name": "e_goten",
+  "frames": 5488,
+  "start": {
+   "area": [
+    2,
+    90,
+    1
+   ],
+   "p": [
+    96,
+    224,
+    1
+   ],
+   "scene": 0,
+   "lf": 15139,
+   "hp": 161,
+   "zenie": 600
+  },
+  "end": {
+   "area": [
+    4,
+    25,
+    1
+   ],
+   "p": [
+    168,
+    136,
+    2
+   ],
+   "scene": 0,
+   "lf": 20357,
+   "hp": 136,
+   "zenie": 600
+  }
+ },
+ {
+  "n": 25,
+  "chapter": "earth",
+  "name": "e_vegeta",
+  "frames": 2457,
+  "start": {
+   "area": [
+    4,
+    25,
+    1
+   ],
+   "p": [
+    168,
+    136,
+    2
+   ],
+   "scene": 0,
+   "lf": 20357,
+   "hp": 136,
+   "zenie": 600
+  },
+  "end": {
+   "area": [
+    4,
+    1,
+    1
+   ],
+   "p": [
+    160,
+    552,
+    0
+   ],
+   "scene": 0,
+   "lf": 22675,
+   "hp": 136,
+   "zenie": 600
+  }
+ },
+ {
+  "n": 26,
+  "chapter": "earth",
+  "name": "e_totournament",
+  "frames": 3739,
+  "start": {
+   "area": [
+    4,
+    1,
+    1
+   ],
+   "p": [
+    160,
+    552,
+    0
+   ],
+   "scene": 0,
+   "lf": 22675,
+   "hp": 136,
+   "zenie": 600
+  },
+  "end": {
+   "area": [
+    7,
+    1,
+    1
+   ],
+   "p": [
+    210,
+    63,
+    0
+   ],
+   "scene": 0,
+   "lf": 26081,
+   "hp": 136,
+   "zenie": 600
+  }
+ },
+ {
+  "n": 27,
+  "chapter": "earth",
+  "name": "e_register",
+  "frames": 2495,
+  "start": {
+   "area": [
+    7,
+    1,
+    1
+   ],
+   "p": [
+    210,
+    63,
+    0
+   ],
+   "scene": 0,
+   "lf": 26081,
+   "hp": 136,
+   "zenie": 600
+  },
+  "end": {
+   "area": [
+    7,
+    3,
+    1
+   ],
+   "p": [
+    280,
+    200,
+    3
+   ],
+   "scene": 0,
+   "lf": 28380,
+   "hp": 151,
+   "zenie": 600
+  }
+ },
+ {
+  "n": 28,
+  "chapter": "earth",
+  "name": "e_prelims",
+  "frames": 36157,
+  "start": {
+   "area": [
+    7,
+    3,
+    1
+   ],
+   "p": [
+    280,
+    200,
+    3
+   ],
+   "scene": 0,
+   "lf": 28380,
+   "hp": 151,
+   "zenie": 600
+  },
+  "end": {
+   "area": [
+    7,
+    5,
+    1
+   ],
+   "p": [
+    145,
+    111,
+    0
+   ],
+   "scene": 0,
+   "lf": 63799,
+   "hp": 171,
+   "zenie": 600
+  }
+ },
+ {
+  "n": 29,
+  "chapter": "earth",
+  "name": "e_tournament",
+  "frames": 9128,
+  "start": {
+   "area": [
+    7,
+    5,
+    1
+   ],
+   "p": [
+    145,
+    111,
+    0
+   ],
+   "scene": 0,
+   "lf": 63799,
+   "hp": 171,
+   "zenie": 600
+  },
+  "end": {
+   "area": [
+    7,
+    2,
+    1
+   ],
+   "p": [
+    232,
+    168,
+    1
+   ],
+   "scene": 0,
+   "lf": 72227,
+   "hp": 201,
+   "zenie": 600
+  }
+ }
+]

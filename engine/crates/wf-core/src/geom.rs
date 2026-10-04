@@ -55,5 +55,10 @@ pub fn facing_toward(dx: i32, dy: i32) -> Dir {
 
 /// box of size w x h centred on (x, y) (the reference `centered`)
 pub fn centered(x: i32, y: i32, w: i32, h: i32) -> Rect {
-    Rect::new(x - (w >> 1), y - (h >> 1), x - (w >> 1) + w, y - (h >> 1) + h)
+    Rect::new(
+        x - (w >> 1),
+        y - (h >> 1),
+        x - (w >> 1) + w,
+        y - (h >> 1) + h,
+    )
 }

@@ -226,7 +226,13 @@ impl Summary {
     }
 }
 
-pub const STOP_ON: [&str; 6] = ["hurt", "kill", "hit", "phase", "danger", "no_damage"];
+pub const STOP_ON: [&str; 8] = ["hurt", "kill", "hit", "phase", "danger", "no_damage", "event", "area"];
+
+/// story sessions: the field is not the player's (an event, a dialogue box or a menu screen)
+pub fn story_busy(a: &Agent) -> bool {
+    let w = a.w();
+    a.story.is_some() && (w.scene.depth > 0 || w.scene.dialog.is_some() || wf_core::menu::active(w))
+}
 
 /// run a policy for at most `max` frames on `slot`; stops early on the battle's end or a `stop_on` condition
 pub fn run_policy(a: &mut Agent, slot: usize, p: &mut dyn Policy, max: u32, stop_on: &[String]) -> Summary {
@@ -245,9 +251,26 @@ pub fn run_policy(a: &mut Agent, slot: usize, p: &mut dyn Policy, max: u32, stop
                 break;
             }
         };
+        let busy0 = story_busy(a);
+        let area0 = a.w().field.as_ref().map(|f| (f.area.world, f.area.area));
         let d = a.step(slot, m);
         s.frames += 1;
         s.add(&d);
+        // an exit taken: the macro's targets were the old area's
+        let area1 = a.w().field.as_ref().map(|f| (f.area.world, f.area.area));
+        if area1 != area0 && has("area") {
+            s.stopped = format!("area changed: now in {}-{}", area1.map_or(0, |x| x.0), area1.map_or(0, |x| x.1));
+            break;
+        }
+        if has("event") && !busy0 && story_busy(a) {
+            let w = a.w();
+            s.stopped = match (&w.scene.dialog, wf_core::menu::active(w)) {
+                (Some(_), _) => "event: a dialogue box opened (observe, then A)".into(),
+                (None, true) => "event: a menu screen opened (observe)".into(),
+                _ => "event: an event took over the field (wait / observe)".into(),
+            };
+            break;
+        }
         if has("hurt") && d.hp_lost > 0 {
             s.stopped = "hurt".into();
             break;
@@ -477,6 +500,58 @@ pub fn walk_to(tx: i32, ty: i32, tol: i32) -> Box<dyn Policy> {
     })
 }
 
+/// take an exit: walk next to its rect (a door sits in a wall: the walk stops at the closest point), then keep
+/// walking into it - toward its centre, and once on it into the wall / border it sits at - until the area changes
+/// (the run's `area` stop ends it). `rect` = the exit trigger's rect (world px).
+pub fn take_exit(rect: [i32; 4], fw: i32, fh: i32) -> Box<dyn Policy> {
+    let (cx, cy) = ((rect[0] + rect[2]) / 2, (rect[1] + rect[3]) / 2);
+    let mut walk = Some(walk_to(cx - (fw >> 1), cy - (fh >> 1), 1));
+    pol(move |a, slot| {
+        if let Some(w) = walk.as_mut() {
+            match w.next(a, slot) {
+                Step::Press(m) => return Step::Press(m),
+                Step::Done(_) => walk = None,
+            }
+        }
+        let Some(p) = a.player(slot) else { return Step::Done("no player".into()) };
+        if !can_act(p) {
+            return Step::Press(0);
+        }
+        let (fx, fy) = p.a.foot_center();
+        let on = fx >= rect[0] && fx <= rect[2] && fy >= rect[1] && fy <= rect[3];
+        if !on {
+            // toward its centre on the axes that are free (a diagonal into a corridor's corner sticks)
+            let (dx, dy) = (cx - (fw >> 1) - p.a.px(), cy - (fh >> 1) - p.a.py());
+            let (sx, sy) = (dx.signum(), dy.signum());
+            let mut m = 0;
+            if dx.abs() > 1 && fits(a, slot, p.a.px() + sx, p.a.py()) {
+                m |= if sx > 0 { RIGHT } else { LEFT };
+            }
+            if dy.abs() > 1 && fits(a, slot, p.a.px(), p.a.py() + sy) {
+                m |= if sy > 0 { DOWN } else { UP };
+            }
+            if m != 0 {
+                return Step::Press(m);
+            }
+        }
+        // into the exit: across its short side (a tall strip at a map's left / right edge, a wide one at the top /
+        // bottom), toward the nearer wall or border; a square door: the nearest wall
+        let free = |dx: i32, dy: i32| (1..=96).take_while(|k| fits(a, slot, p.a.px() + dx * k, p.a.py() + dy * k)).count() as i32;
+        let (w, h) = (rect[2] - rect[0], rect[3] - rect[1]);
+        let mut cands: Vec<(i32, u16)> = Vec::new();
+        if h >= w {
+            cands.push((free(-1, 0), LEFT));
+            cands.push((free(1, 0), RIGHT));
+        }
+        if w >= h {
+            cands.push((free(0, -1), UP));
+            cands.push((free(0, 1), DOWN));
+        }
+        cands.sort_by_key(|c| c.0);
+        Step::Press(cands[0].1)
+    })
+}
+
 // ---- melee ----------------------------------------------------------------------------------------------------
 
 /// footprint top-left spots from which a punch with facing f overlaps the enemy body, nearest first
@@ -682,6 +757,88 @@ pub fn face(dir: Option<usize>, target: Option<u32>) -> Box<dyn Policy> {
             return Step::Press(0);
         }
         Step::Done(String::new())
+    })
+}
+
+/// a field NPC's foot centre (None: gone)
+pub fn npc_pos(a: &Agent, id: u32) -> Option<(i32, i32)> {
+    let i = a.w().find(id)?;
+    match &a.w().ents[i].body {
+        wf_core::world::Body::Npc(n) => Some(n.a.foot_center()),
+        _ => None,
+    }
+}
+
+/// talk to a field NPC: walk up to it (the walk stops next to it - an NPC is solid), turn to it with a tap, press A
+/// (the run's `event` stop ends the macro when its talk event starts)
+pub fn talk(id: u32) -> Box<dyn Policy> {
+    let mut walk: Option<Box<dyn Policy>> = None;
+    let mut phase = 0;
+    let mut k = 0;
+    pol(move |a, slot| {
+        let Some(p) = a.player(slot) else { return Step::Done("no player".into()) };
+        let Some((nx, ny)) = npc_pos(a, id) else { return Step::Done("the NPC is gone".into()) };
+        let (fx, fy) = p.a.foot_center();
+        let (dx, dy) = (nx - fx, ny - fy);
+        if phase == 0 {
+            if dx.abs() <= 24 && dy.abs() <= 20 {
+                phase = 1;
+            } else {
+                let w = walk.get_or_insert_with(|| walk_to(nx - (p.a.foot_w >> 1), ny - (p.a.foot_h >> 1), 1));
+                match w.next(a, slot) {
+                    Step::Press(m) => return Step::Press(m),
+                    Step::Done(_) => phase = 1,
+                }
+            }
+        }
+        if !can_act(p) {
+            k += 1;
+            return if k > 120 { Step::Done("could not act".into()) } else { Step::Press(0) };
+        }
+        let d = if dx.abs() >= dy.abs() { if dx > 0 { 3 } else { 2 } } else if dy > 0 { 0 } else { 1 };
+        phase += 1;
+        match phase {
+            2 if p.a.facing as usize != d => Step::Press(DIR_BTN[d]),
+            2 | 3 => Step::Press(0),
+            4 => Step::Press(A),
+            5..=30 => Step::Press(0),
+            _ => Step::Done("no reaction (not facing it, too far, or it has nothing to say)".into()),
+        }
+    })
+}
+
+/// use a button trigger (a desk, a sign, a door that wants A): walk into its rect, turn to `facing` (None: as you
+/// are) with a tap, press A (the run's `event` stop ends the macro when its event starts)
+pub fn use_trigger(rect: [i32; 4], facing: Option<usize>) -> Box<dyn Policy> {
+    let (cx, cy) = ((rect[0] + rect[2]) / 2, (rect[1] + rect[3]) / 2);
+    let mut walk: Option<Box<dyn Policy>> = None;
+    let mut phase = 0;
+    let mut k = 0;
+    pol(move |a, slot| {
+        let Some(p) = a.player(slot) else { return Step::Done("no player".into()) };
+        let (fx, fy) = p.a.foot_center();
+        let on = fx >= rect[0] && fx <= rect[2] && fy >= rect[1] && fy <= rect[3];
+        if phase == 0 {
+            if !on {
+                let w = walk.get_or_insert_with(|| walk_to(cx - (p.a.foot_w >> 1), cy - (p.a.foot_h >> 1), 1));
+                if let Step::Press(m) = w.next(a, slot) {
+                    return Step::Press(m);
+                }
+            }
+            phase = 1;
+        }
+        if !can_act(p) {
+            k += 1;
+            return if k > 120 { Step::Done("could not act".into()) } else { Step::Press(0) };
+        }
+        phase += 1;
+        match (phase, facing) {
+            (2, Some(d)) if p.a.facing as usize != d => Step::Press(DIR_BTN[d]),
+            (2 | 3, _) => Step::Press(0),
+            (4, _) => Step::Press(A),
+            (5..=30, _) => Step::Press(0),
+            _ => Step::Done(if on { "no reaction".into() } else { "no reaction (could not reach the trigger)".into() }),
+        }
     })
 }
 

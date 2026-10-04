@@ -46,7 +46,15 @@ impl ObjVram {
     /// the state an area load leaves: entry 0 = the whole free block, 1.. spare in order
     pub fn fresh() -> ObjVram {
         let mut e = vec![Block::default(); ENTRIES];
-        e[0] = Block { used: 0, start: 0, size: UNITS, hi: FF, lo: FF, fnext: FF, fprev: FF };
+        e[0] = Block {
+            used: 0,
+            start: 0,
+            size: UNITS,
+            hi: FF,
+            lo: FF,
+            fnext: FF,
+            fprev: FF,
+        };
         for (i, b) in e.iter_mut().enumerate().skip(1) {
             *b = Block {
                 used: FF,
@@ -58,7 +66,12 @@ impl ObjVram {
                 fprev: FF,
             };
         }
-        ObjVram { free_head: 0, spare_head: 1, e, idx: vec![0; UNITS as usize] }
+        ObjVram {
+            free_head: 0,
+            spare_head: 1,
+            e,
+            idx: vec![0; UNITS as usize],
+        }
     }
 
     /// `0x080116FC`: the largest free block in bytes (0 when the object list is full, 0x80 objects)
@@ -248,7 +261,10 @@ impl ObjVram {
         }
         self.unlink(hi);
         let h = self.e[hi as usize];
-        self.e[lo as usize].size = b.size.wrapping_add(h.size).wrapping_add(self.e[lo as usize].size);
+        self.e[lo as usize].size = b
+            .size
+            .wrapping_add(h.size)
+            .wrapping_add(self.e[lo as usize].size);
         self.e[lo as usize].hi = h.hi;
         if h.hi != FF {
             self.e[h.hi as usize].lo = b.lo;
@@ -261,7 +277,11 @@ impl ObjVram {
     pub fn key(&self) -> Vec<(u8, u16, u16, u8, u8, u8, u8)> {
         let mut v = vec![(self.free_head, 0, 0, self.spare_head, 0, 0, 0)];
         for b in &self.e {
-            v.push(if b.used == FF { (FF, 0, 0, b.hi, b.lo, 0, 0) } else { (b.used, b.start, b.size, b.hi, b.lo, b.fnext, b.fprev) });
+            v.push(if b.used == FF {
+                (FF, 0, 0, b.hi, b.lo, 0, 0)
+            } else {
+                (b.used, b.start, b.size, b.hi, b.lo, b.fnext, b.fprev)
+            });
         }
         v
     }
@@ -330,7 +350,8 @@ pub enum Owner {
 }
 
 /// the shared shadow graphics (`0x086B759C`: w, h, bytes)
-pub const SHADOWS: [(u8, u8, i32); 4] = [(4, 2, 0x40), (10, 4, 0x40), (16, 6, 0x40), (24, 10, 0x100)];
+pub const SHADOWS: [(u8, u8, i32); 4] =
+    [(4, 2, 0x40), (10, 4, 0x40), (16, 6, 0x40), (24, 10, 0x100)];
 
 /// the field's object tile state: the allocator, its blocks' owners (allocation order), the shared graphics'
 /// reference counts, the objects a purge suspended (`world +0x40C`, in suspension order)
@@ -395,7 +416,10 @@ fn st(w: &mut World) -> Option<&mut VramState> {
 
 /// an object is out of the world list (a purge suspended it)
 pub fn suspended(w: &World, id: EntityId) -> bool {
-    w.field.as_ref().and_then(|f| f.vram.as_ref()).is_some_and(|v| v.suspended.contains(&id))
+    w.field
+        .as_ref()
+        .and_then(|f| f.vram.as_ref())
+        .is_some_and(|v| v.suspended.contains(&id))
 }
 
 /// `0x08011818`-style: alloc, else purge for it and alloc again
@@ -414,7 +438,17 @@ pub fn acquire(w: &mut World, owner: Owner, bytes: i32) {
     let stamp = w.next_id;
     if let (Some(h), Some(v)) = (h, st(w)) {
         v.owners.push((h, owner));
-        if matches!(owner, Owner::Hud | Owner::Banner | Owner::BossBar | Owner::StatMark | Owner::Sign(_) | Owner::Map3d | Owner::Timer) && !v.objs.iter().any(|o| o.0 == owner) {
+        if matches!(
+            owner,
+            Owner::Hud
+                | Owner::Banner
+                | Owner::BossBar
+                | Owner::StatMark
+                | Owner::Sign(_)
+                | Owner::Map3d
+                | Owner::Timer
+        ) && !v.objs.iter().any(|o| o.0 == owner)
+        {
             v.objs.push((owner, stamp, bytes));
         }
     }
@@ -423,10 +457,16 @@ pub fn acquire(w: &mut World, owner: Owner, bytes: i32) {
 /// free every block of an owner (allocation order)
 pub fn release(w: &mut World, owner: Owner) {
     let Some(v) = st(w) else { return };
-    let hs: Vec<u16> = v.owners.iter().filter(|o| o.1 == owner).map(|o| o.0).collect();
+    let hs: Vec<u16> = v
+        .owners
+        .iter()
+        .filter(|o| o.1 == owner)
+        .map(|o| o.0)
+        .collect();
     v.owners.retain(|o| o.1 != owner);
     v.objs.retain(|o| o.0 != owner);
-    v.susp.retain(|x| !matches!(x, Susp::Own(o, _, _) if *o == owner));
+    v.susp
+        .retain(|x| !matches!(x, Susp::Own(o, _, _) if *o == owner));
     for h in hs {
         v.a.free(h);
     }
@@ -439,7 +479,10 @@ pub type Shares = (bool, Option<usize>);
 pub const HALO: usize = 4;
 
 fn shares_of(sp: &crate::content::Sprite) -> Shares {
-    (sp.halo, SHADOWS.iter().position(|s| (s.0, s.1) == sp.shadow_key))
+    (
+        sp.halo,
+        SHADOWS.iter().position(|s| (s.0, s.1) == sp.shadow_key),
+    )
 }
 fn shared_bytes(k: usize) -> i32 {
     if k == HALO {
@@ -474,7 +517,12 @@ fn sprite_of(w: &World, i: usize) -> Option<(i32, Shares)> {
     let sp = w.data.sprite(s)?;
     let mut sh = shares_of(sp);
     let id = w.ents[i].id;
-    if let Some(o) = w.field.as_ref().and_then(|f| f.vram.as_ref()).and_then(|v| v.shadow_set.iter().find(|o| o.0 == id)) {
+    if let Some(o) = w
+        .field
+        .as_ref()
+        .and_then(|f| f.vram.as_ref())
+        .and_then(|v| v.shadow_set.iter().find(|o| o.0 == id))
+    {
         sh.1 = o.1.map(|k| k as usize);
     }
     Some((sp.tile_bytes, sh))
@@ -490,7 +538,9 @@ pub fn shadow_set(w: &mut World, i: usize, key: (i32, i32)) {
     let id = w.ents[i].id;
     let old = sprite_of(w, i).and_then(|s| s.1 .1);
     let new = SHADOWS.iter().position(|s| (s.0 as i32, s.1 as i32) == key);
-    let live = st(w).is_some_and(|v| !v.suspended.contains(&id) && v.owners.iter().any(|o| o.1 == Owner::Ent(id)));
+    let live = st(w).is_some_and(|v| {
+        !v.suspended.contains(&id) && v.owners.iter().any(|o| o.1 == Owner::Ent(id))
+    });
     if live {
         if let Some(k) = old {
             shared_release(w, k);
@@ -508,7 +558,13 @@ pub fn shadow_set(w: &mut World, i: usize, key: (i32, i32)) {
 }
 
 fn map_3d(w: &World) -> bool {
-    w.field.as_ref().is_some_and(|f| w.data.field.as_ref().and_then(|d| d.maps.get(&f.map)).is_some_and(|m| m.three_d))
+    w.field.as_ref().is_some_and(|f| {
+        w.data
+            .field
+            .as_ref()
+            .and_then(|d| d.maps.get(&f.map))
+            .is_some_and(|m| m.three_d)
+    })
 }
 
 /// tiles, halo, shadow (the ctor `0x0800EB60` and the re-acquire `0x0800F4E6`)
@@ -528,7 +584,9 @@ pub fn actor_created(w: &mut World, i: usize) {
         return;
     }
     let id = w.ents[i].id;
-    let Some((bytes, sh)) = sprite_of(w, i) else { return };
+    let Some((bytes, sh)) = sprite_of(w, i) else {
+        return;
+    };
     take(w, id, bytes, sh);
 }
 
@@ -540,7 +598,9 @@ pub fn actor_destroyed(w: &mut World, id: EntityId, sh: Shares) {
     // the destructor (`0x0800F76E`) deletes the boss bar still showing this actor first (`0x08052538`; segment sb
     // 6-6 f8397, a script's removal: bar, shadow, tiles); a defeated enemy's bar is already fading out on its own
     // (post-game XJ-6 12-27 f883: the bar outlives the kill)
-    let defeated = w.find(id).is_some_and(|k| matches!(&w.ents[k].body, Body::Enemy(e) if e.defeated));
+    let defeated = w
+        .find(id)
+        .is_some_and(|k| matches!(&w.ents[k].body, Body::Enemy(e) if e.defeated));
     if !defeated && w.scene.boss_bar.as_ref().is_some_and(|b| b.entity == id) {
         w.scene.boss_bar = None;
         release(w, Owner::BossBar);
@@ -570,7 +630,12 @@ pub const BOSS_BAR_OUT: u32 = 17;
 pub fn release_later(w: &mut World, owner: Owner, frames: u32) {
     let at = w.frame + frames;
     let Some(v) = st(w) else { return };
-    let hs: Vec<u16> = v.owners.iter().filter(|o| o.1 == owner).map(|o| o.0).collect();
+    let hs: Vec<u16> = v
+        .owners
+        .iter()
+        .filter(|o| o.1 == owner)
+        .map(|o| o.0)
+        .collect();
     for h in hs {
         v.owners.retain(|o| o.0 != h);
         v.owners.push((h, Owner::Ending));
@@ -592,12 +657,17 @@ pub fn rekey(w: &mut World, from: Owner, to: Owner) -> bool {
 /// the room check of the current allocator (None: no model)
 pub fn room_of(w: &World) -> Option<i32> {
     let objects = w.ents.iter().filter(|e| !e.removed).count();
-    w.field.as_ref().and_then(|f| f.vram.as_ref()).map(|v| v.a.room(objects))
+    w.field
+        .as_ref()
+        .and_then(|f| f.vram.as_ref())
+        .map(|v| v.a.room(objects))
 }
 
 /// a coin's shadow graphic key: (4, 2) small, (10, 4) big
 fn coin_shadow(big: bool) -> Option<usize> {
-    SHADOWS.iter().position(|s| (s.0, s.1) == if big { (10, 4) } else { (4, 2) })
+    SHADOWS
+        .iter()
+        .position(|s| (s.0, s.1) == if big { (10, 4) } else { (4, 2) })
 }
 
 /// a coin object (`0x08017F5A`): its tiles, then its shadow's shared graphic
@@ -629,7 +699,10 @@ pub fn entity_gone(w: &mut World, i: usize) {
             return;
         }
         // a dropped item (vt 0x0804B428): its icon's tiles and its 10 x 4 shadow, like a big coin's
-        if matches!(p.kind, crate::fieldobj::PickupKind::Supply(_) | crate::fieldobj::PickupKind::Equipment(_)) {
+        if matches!(
+            p.kind,
+            crate::fieldobj::PickupKind::Supply(_) | crate::fieldobj::PickupKind::Equipment(_)
+        ) {
             if st(w).is_some_and(|v| v.owners.iter().any(|o| o.1 == Owner::Ent(id))) {
                 if let Some(k) = coin_shadow(true) {
                     shared_release(w, k);
@@ -640,7 +713,8 @@ pub fn entity_gone(w: &mut World, i: usize) {
         }
     }
     // a flame shot holds a reference of the shared flame graphic only
-    if matches!(&w.ents[i].body, Body::Shot(sh) if matches!(sh.kind, crate::shots::ShotKind::Flame { .. })) {
+    if matches!(&w.ents[i].body, Body::Shot(sh) if matches!(sh.kind, crate::shots::ShotKind::Flame { .. }))
+    {
         keyed_release(w, KEY_FLAME);
         return;
     }
@@ -658,7 +732,12 @@ pub fn entity_gone(w: &mut World, i: usize) {
     if exact && w.ents[i].removed {
         let at = w.frame + 1;
         if let Some(v) = st(w) {
-            let hs: Vec<u16> = v.owners.iter().filter(|o| o.1 == Owner::Ent(id)).map(|o| o.0).collect();
+            let hs: Vec<u16> = v
+                .owners
+                .iter()
+                .filter(|o| o.1 == Owner::Ent(id))
+                .map(|o| o.0)
+                .collect();
             for h in hs {
                 v.owners.retain(|o| o.0 != h);
                 v.owners.push((h, Owner::Ending));
@@ -682,7 +761,12 @@ pub fn offstage_gone(w: &mut World) {
         .iter()
         .map(|e| {
             let sh = match &e.body {
-                Body::Player(p) => p.a.sprite.and_then(|s| w.data.sprite(s)).map(shares_of).unwrap_or((false, None)),
+                Body::Player(p) => {
+                    p.a.sprite
+                        .and_then(|s| w.data.sprite(s))
+                        .map(shares_of)
+                        .unwrap_or((false, None))
+                }
                 _ => (false, None),
             };
             (e.id, sh)
@@ -717,8 +801,13 @@ pub fn sprite_changed(w: &mut World, i: usize, old: Option<i32>) {
     if !st(w).is_some_and(|v| v.owners.iter().any(|o| o.1 == Owner::Ent(id))) {
         return;
     }
-    let (ob, oh) = old.and_then(|s| w.data.sprite(s)).map(|sp| (sp.tile_bytes, sp.halo)).unwrap_or((0, false));
-    let Some((bytes, sh)) = sprite_of(w, i) else { return };
+    let (ob, oh) = old
+        .and_then(|s| w.data.sprite(s))
+        .map(|sp| (sp.tile_bytes, sp.halo))
+        .unwrap_or((0, false));
+    let Some((bytes, sh)) = sprite_of(w, i) else {
+        return;
+    };
     if oh {
         shared_release(w, HALO);
     }
@@ -749,7 +838,9 @@ fn ent_act(w: &World, i: usize, level: i32) -> Act {
     match &w.ents[i].body {
         Body::Player(_) => at(15, Act::Suspend),
         Body::Npc(_) | Body::Enemy(_) => at(if on_screen(w, i) { 14 } else { 13 }, Act::Suspend),
-        Body::Fx(f) if matches!(**f, crate::fx::Fx::Anim { .. } | crate::fx::Fx::Loop { .. }) => at(2, Act::Destroy),
+        Body::Fx(f) if matches!(**f, crate::fx::Fx::Anim { .. } | crate::fx::Fx::Loop { .. }) => {
+            at(2, Act::Destroy)
+        }
         Body::Shot(_) => at(3, Act::Destroy),
         _ => Act::Keep,
     }
@@ -788,8 +879,19 @@ pub fn on_screen(w: &World, i: usize) -> bool {
 /// (0, 1, ...), asking every object (vfunc +0x18): destroyed or suspended ones give their tiles; from level 11 the
 /// room is checked after each one. A damage number is destroyed at any level (`0x0800AD10`).
 pub fn purge(w: &mut World, need: i32) {
-    let objects = |w: &World| w.ents.iter().filter(|e| !e.removed && !suspended(w, e.id)).count();
-    let room = |w: &World| w.field.as_ref().and_then(|f| f.vram.as_ref()).map(|v| v.a.room(objects(w))).unwrap_or(i32::MAX);
+    let objects = |w: &World| {
+        w.ents
+            .iter()
+            .filter(|e| !e.removed && !suspended(w, e.id))
+            .count()
+    };
+    let room = |w: &World| {
+        w.field
+            .as_ref()
+            .and_then(|f| f.vram.as_ref())
+            .map(|v| v.a.room(objects(w)))
+            .unwrap_or(i32::MAX)
+    };
     if room(w) >= need {
         return;
     }
@@ -805,11 +907,26 @@ pub fn purge(w: &mut World, need: i32) {
         // damage numbers by their handles' entities (after their targets: made later)
         let mut items: Vec<Item> = vec![];
         {
-            let Some(v) = w.field.as_ref().and_then(|f| f.vram.as_ref()) else { return };
-            let mut owns: Vec<(Owner, u32, i32)> = v.objs.iter().filter(|o| !v.susp.iter().any(|x| matches!(x, Susp::Own(a, _, _) if *a == o.0))).copied().collect();
+            let Some(v) = w.field.as_ref().and_then(|f| f.vram.as_ref()) else {
+                return;
+            };
+            let mut owns: Vec<(Owner, u32, i32)> = v
+                .objs
+                .iter()
+                .filter(|o| {
+                    !v.susp
+                        .iter()
+                        .any(|x| matches!(x, Susp::Own(a, _, _) if *a == o.0))
+                })
+                .copied()
+                .collect();
             owns.sort_by_key(|o| o.1);
             let mut k = 0;
-            for e in w.ents.iter().filter(|e| !e.removed && !v.suspended.contains(&e.id)) {
+            for e in w
+                .ents
+                .iter()
+                .filter(|e| !e.removed && !v.suspended.contains(&e.id))
+            {
                 while k < owns.len() && owns[k].1 <= e.id {
                     items.push(Item::Own(owns[k].0, owns[k].1, owns[k].2));
                     k += 1;
@@ -872,7 +989,14 @@ pub fn purge(w: &mut World, need: i32) {
 fn suspend(w: &mut World, i: usize) {
     let id = w.ents[i].id;
     if std::env::var("DBG_VRAM").is_ok() {
-        eprintln!("SUSPEND f{} ent {} idx {} sprite {:?} onscreen {}", w.frame, id, i, crate::scene::sprite_id(w, i), on_screen(w, i));
+        eprintln!(
+            "SUSPEND f{} ent {} idx {} sprite {:?} onscreen {}",
+            w.frame,
+            id,
+            i,
+            crate::scene::sprite_id(w, i),
+            on_screen(w, i)
+        );
     }
     // halo, shadow, tiles
     let sh = sprite_of(w, i).map(|s| s.1).unwrap_or((false, None));
@@ -902,7 +1026,9 @@ pub fn restore(w: &mut World) {
                 let e = w.ents.remove(i);
                 w.ents.push(e);
                 let i = w.ents.len() - 1;
-                let Some((bytes, sh)) = sprite_of(w, i) else { continue };
+                let Some((bytes, sh)) = sprite_of(w, i) else {
+                    continue;
+                };
                 take(w, id, bytes, sh);
             }
             Susp::Own(o, _, bytes) => acquire(w, o, bytes),
@@ -926,7 +1052,14 @@ pub fn text_open(w: &mut World, portrait: bool) {
         purge(w, n);
         if let Some(v) = st(w) {
             if let Some(h) = v.a.alloc(n) {
-                v.owners.push((h, if portrait && k == n_sizes - 2 { Owner::TextPortrait } else { Owner::Text }));
+                v.owners.push((
+                    h,
+                    if portrait && k == n_sizes - 2 {
+                        Owner::TextPortrait
+                    } else {
+                        Owner::Text
+                    },
+                ));
             }
         }
     }
@@ -936,12 +1069,24 @@ pub fn text_open(w: &mut World, portrait: bool) {
 /// suspended objects restored (`0x08012180`; segment sb 4-24)
 pub fn text_close(w: &mut World) {
     let Some(v) = st(w) else { return };
-    let mut hs: Vec<u16> = v.owners.iter().filter(|o| o.1 == Owner::TextPortrait).map(|o| o.0).collect();
-    hs.extend(v.owners.iter().filter(|o| o.1 == Owner::Text).map(|o| o.0).rev());
+    let mut hs: Vec<u16> = v
+        .owners
+        .iter()
+        .filter(|o| o.1 == Owner::TextPortrait)
+        .map(|o| o.0)
+        .collect();
+    hs.extend(
+        v.owners
+            .iter()
+            .filter(|o| o.1 == Owner::Text)
+            .map(|o| o.0)
+            .rev(),
+    );
     if hs.is_empty() {
         return;
     }
-    v.owners.retain(|o| o.1 != Owner::Text && o.1 != Owner::TextPortrait);
+    v.owners
+        .retain(|o| o.1 != Owner::Text && o.1 != Owner::TextPortrait);
     for h in hs {
         v.a.free(h);
     }
@@ -967,9 +1112,22 @@ pub fn hud_created(w: &mut World) {
 /// the HUD's update (`0x0800BCC8`): the stat-points mark is made when the leader has points to spend, a HUD
 /// exists and there is no mark
 pub fn stat_mark(w: &mut World) {
-    let points = w.story.chars.get(w.story.levelup_char.unwrap_or(w.story.current).max(0) as usize).map(|c| c.rec.points).unwrap_or(0);
+    let points = w
+        .story
+        .chars
+        .get(w.story.levelup_char.unwrap_or(w.story.current).max(0) as usize)
+        .map(|c| c.rec.points)
+        .unwrap_or(0);
     let (hud, mark) = st(w)
-        .map(|v| (v.owners.iter().any(|o| o.1 == Owner::Hud), v.owners.iter().any(|o| o.1 == Owner::StatMark) || v.susp.iter().any(|x| matches!(x, Susp::Own(Owner::StatMark, _, _)))))
+        .map(|v| {
+            (
+                v.owners.iter().any(|o| o.1 == Owner::Hud),
+                v.owners.iter().any(|o| o.1 == Owner::StatMark)
+                    || v.susp
+                        .iter()
+                        .any(|x| matches!(x, Susp::Own(Owner::StatMark, _, _))),
+            )
+        })
         .unwrap_or((false, false));
     if hud && !mark && points != 0 {
         acquire(w, Owner::StatMark, 0x100);
@@ -984,10 +1142,16 @@ pub fn stat_mark(w: &mut World) {
 /// the level signs' labels go (an area load)
 pub fn signs_gone(w: &mut World) {
     let Some(v) = st(w) else { return };
-    let hs: Vec<u16> = v.owners.iter().filter(|o| matches!(o.1, Owner::Sign(_))).map(|o| o.0).collect();
+    let hs: Vec<u16> = v
+        .owners
+        .iter()
+        .filter(|o| matches!(o.1, Owner::Sign(_)))
+        .map(|o| o.0)
+        .collect();
     v.owners.retain(|o| !matches!(o.1, Owner::Sign(_)));
     v.objs.retain(|o| !matches!(o.0, Owner::Sign(_)));
-    v.susp.retain(|x| !matches!(x, Susp::Own(Owner::Sign(_), _, _)));
+    v.susp
+        .retain(|x| !matches!(x, Susp::Own(Owner::Sign(_), _, _)));
     for h in hs {
         v.a.free(h);
     }
@@ -996,8 +1160,14 @@ pub fn signs_gone(w: &mut World) {
 /// every scene visual's object goes (an area load)
 pub fn visuals_gone(w: &mut World) {
     let Some(v) = st(w) else { return };
-    let hs: Vec<u16> = v.owners.iter().filter(|o| matches!(o.1, Owner::Visual(_) | Owner::Blast(_) | Owner::BeamObj(_))).map(|o| o.0).collect();
-    v.owners.retain(|o| !matches!(o.1, Owner::Visual(_) | Owner::Blast(_) | Owner::BeamObj(_)));
+    let hs: Vec<u16> = v
+        .owners
+        .iter()
+        .filter(|o| matches!(o.1, Owner::Visual(_) | Owner::Blast(_) | Owner::BeamObj(_)))
+        .map(|o| o.0)
+        .collect();
+    v.owners
+        .retain(|o| !matches!(o.1, Owner::Visual(_) | Owner::Blast(_) | Owner::BeamObj(_)));
     for h in hs {
         v.a.free(h);
     }
@@ -1015,7 +1185,12 @@ pub fn hud_shown(w: &mut World, on: bool) {
     if on {
         acquire(w, Owner::Hud, 0x500);
     } else if let Some(v) = st(w) {
-        let hs: Vec<u16> = v.owners.iter().filter(|o| o.1 == Owner::Hud).map(|o| o.0).collect();
+        let hs: Vec<u16> = v
+            .owners
+            .iter()
+            .filter(|o| o.1 == Owner::Hud)
+            .map(|o| o.0)
+            .collect();
         for h in hs {
             v.owners.retain(|o| o.0 != h);
             v.owners.push((h, Owner::HudOut));
@@ -1039,7 +1214,20 @@ pub fn world_hide(w: &mut World) {
     // goes before the stash (real run 6-1 tile r033_002+10,000: a pause menu right after a hit; the numbers are not
     // back after the close). The list's end first: the numbers (newest first), then the actors
     if let Some(v) = st(w) {
-        let mut gone: Vec<(u32, u16)> = v.popups.iter().map(|p| (v.popup_at.iter().find(|q| q.0 == p.2).map(|q| q.1).unwrap_or(0), p.2)).collect();
+        let mut gone: Vec<(u32, u16)> = v
+            .popups
+            .iter()
+            .map(|p| {
+                (
+                    v.popup_at
+                        .iter()
+                        .find(|q| q.0 == p.2)
+                        .map(|q| q.1)
+                        .unwrap_or(0),
+                    p.2,
+                )
+            })
+            .collect();
         gone.sort_by_key(|g| g.0);
         for (_, h) in gone.into_iter().rev() {
             v.popups.retain(|p| p.2 != h);
@@ -1052,7 +1240,9 @@ pub fn world_hide(w: &mut World) {
         if w.ents[i].removed || suspended(w, w.ents[i].id) {
             continue;
         }
-        let Some((_, sh)) = sprite_of(w, i) else { continue };
+        let Some((_, sh)) = sprite_of(w, i) else {
+            continue;
+        };
         if sh.0 {
             shared_release(w, HALO);
         }
@@ -1086,7 +1276,9 @@ pub fn world_show(w: &mut World) {
         if w.ents[i].removed || suspended(w, w.ents[i].id) {
             continue;
         }
-        let Some((_, sh)) = sprite_of(w, i) else { continue };
+        let Some((_, sh)) = sprite_of(w, i) else {
+            continue;
+        };
         if sh.0 {
             shared_acquire(w, HALO);
         }
@@ -1100,7 +1292,13 @@ pub fn figure_created(w: &mut World, k: u32, sprite: i32) {
     if w.field.as_ref().is_none_or(|f| f.vram.is_none()) {
         return;
     }
-    let Some((bytes, sh)) = w.data.sprite(sprite).map(|sp| (sp.tile_bytes, shares_of(sp))) else { return };
+    let Some((bytes, sh)) = w
+        .data
+        .sprite(sprite)
+        .map(|sp| (sp.tile_bytes, shares_of(sp)))
+    else {
+        return;
+    };
     acquire(w, Owner::Figure(k), bytes);
     if sh.0 {
         shared_acquire(w, HALO);
@@ -1115,7 +1313,9 @@ pub fn figures_gone(w: &mut World, sprites: &[i32]) {
         return;
     }
     for (k, &sprite) in sprites.iter().enumerate().rev() {
-        let Some(sh) = w.data.sprite(sprite).map(shares_of) else { continue };
+        let Some(sh) = w.data.sprite(sprite).map(shares_of) else {
+            continue;
+        };
         if let Some(s) = sh.1 {
             shared_release(w, s);
         }
@@ -1146,7 +1346,9 @@ pub fn keyed_acquire(w: &mut World, key: u32, bytes: i32) {
 /// ... and goes: the last one frees it
 pub fn keyed_release(w: &mut World, key: u32) {
     let Some(v) = st(w) else { return };
-    let Some(k) = v.keyed.iter_mut().find(|k| k.0 == key) else { return };
+    let Some(k) = v.keyed.iter_mut().find(|k| k.0 == key) else {
+        return;
+    };
     k.1 -= 1;
     if k.1 == 0 {
         v.keyed.retain(|k| k.0 != key);
@@ -1161,11 +1363,20 @@ pub fn damage_number(w: &mut World, target: EntityId) {
     let stamp = w.next_id;
     let objects = w.ents.iter().filter(|e| !e.removed).count();
     let Some(v) = st(w) else { return };
-    if let Some(k) = v.popups.iter().position(|p| p.0 == target && now.wrapping_sub(p.1) < 8) {
+    if let Some(k) = v
+        .popups
+        .iter()
+        .position(|p| p.0 == target && now.wrapping_sub(p.1) < 8)
+    {
         // its 16 updates start again (`0x0800AB54`); a number older than the object being updated still gets this
         // frame's update (segment sb 20-3 f211: a flame's hit, the number ends a frame earlier)
         let h = v.popups[k].2;
-        let at = v.popup_at.iter().find(|p| p.0 == h).map(|p| p.1).unwrap_or(0);
+        let at = v
+            .popup_at
+            .iter()
+            .find(|p| p.0 == h)
+            .map(|p| p.1)
+            .unwrap_or(0);
         let pending = v.pass_at != 0 && at <= v.pass_at;
         v.popups[k].3 = now + POPUP_LIFE - pending as u32;
         return;
@@ -1192,8 +1403,20 @@ pub fn popups_tick(w: &mut World, after: Option<EntityId>) {
     let now = w.frame;
     let Some(v) = st(w) else { return };
     v.pass_at = after.unwrap_or(0);
-    let at = |v: &VramState, h: u16| v.popup_at.iter().find(|p| p.0 == h).map(|p| p.1).unwrap_or(0);
-    let mut gone: Vec<(u32, u16)> = v.popups.iter().filter(|p| p.3 <= now).map(|p| (at(v, p.2), p.2)).filter(|g| after.is_none_or(|a| g.0 > a)).collect();
+    let at = |v: &VramState, h: u16| {
+        v.popup_at
+            .iter()
+            .find(|p| p.0 == h)
+            .map(|p| p.1)
+            .unwrap_or(0)
+    };
+    let mut gone: Vec<(u32, u16)> = v
+        .popups
+        .iter()
+        .filter(|p| p.3 <= now)
+        .map(|p| (at(v, p.2), p.2))
+        .filter(|g| after.is_none_or(|a| g.0 > a))
+        .collect();
     if !gone.is_empty() {
         // (two numbers made by one object pass share a stamp: the later-made goes first - r002_006 tile +4,000 f77)
         gone.sort_by_key(|g| g.0);
@@ -1212,7 +1435,12 @@ pub fn popups_tick(w: &mut World, after: Option<EntityId>) {
 pub fn hud_tick(w: &mut World) {
     let now = w.frame;
     let Some(v) = st(w) else { return };
-    let ended: Vec<u16> = v.delayed.iter().filter(|d| d.1 <= now).map(|d| d.0).collect();
+    let ended: Vec<u16> = v
+        .delayed
+        .iter()
+        .filter(|d| d.1 <= now)
+        .map(|d| d.0)
+        .collect();
     if !ended.is_empty() {
         v.delayed.retain(|d| d.1 > now);
         // (the list updates from its end: the later object's block goes first)
@@ -1225,7 +1453,12 @@ pub fn hud_tick(w: &mut World) {
     // the HUD's update (`0x0800BCC8`) makes the stat-points mark when the leader has points to spend and there is
     // none; the mark deletes itself when the points are spent (`0x0800B530`). (GameData +0's character: a fusion
     // component's level-up hook makes the component current - its points, Gotenks 6-9 tile +6,000)
-    let points = w.story.chars.get(w.story.levelup_char.unwrap_or(w.story.current).max(0) as usize).map(|c| c.rec.points).unwrap_or(0);
+    let points = w
+        .story
+        .chars
+        .get(w.story.levelup_char.unwrap_or(w.story.current).max(0) as usize)
+        .map(|c| c.rec.points)
+        .unwrap_or(0);
     if points == 0 {
         release(w, Owner::StatMark);
     } else {
@@ -1253,7 +1486,14 @@ pub fn hud_tick(w: &mut World) {
 /// a non-actor object (banner, HUD, boss bar ...) is out of the world list: suspended by a purge until the text box
 /// closes - not drawn, not updated
 pub fn owner_suspended(w: &World, o: Owner) -> bool {
-    w.field.as_ref().and_then(|f| f.vram.as_ref()).is_some_and(|v| v.susp.iter().any(|x| matches!(x, Susp::Own(a, _, _) if *a == o)))
+    w.field
+        .as_ref()
+        .and_then(|f| f.vram.as_ref())
+        .is_some_and(|v| {
+            v.susp
+                .iter()
+                .any(|x| matches!(x, Susp::Own(a, _, _) if *a == o))
+        })
 }
 
 /// the area banner starts / ends
@@ -1275,7 +1515,12 @@ pub fn title_shown(w: &mut World, string: i32) {
     if w.field.as_ref().is_none_or(|f| f.vram.is_none()) {
         return;
     }
-    let width = w.data.field.as_ref().and_then(|f| f.title_widths.get(string as usize).copied()).unwrap_or(0);
+    let width = w
+        .data
+        .field
+        .as_ref()
+        .and_then(|f| f.title_widths.get(string as usize).copied())
+        .unwrap_or(0);
     let bytes = ((width + 0x21) >> 5 << 5) << 5;
     purge(w, bytes);
     if let Some(v) = st(w) {

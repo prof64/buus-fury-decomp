@@ -5249,10 +5249,13 @@ dependencies = [
  "rhai",
  "serde",
  "serde_json",
+ "wf-app",
  "wf-content",
  "wf-core",
  "wf-extract",
+ "wf-import",
  "wf-render",
+ "wf-script-core",
  "wf-view",
 ]
 

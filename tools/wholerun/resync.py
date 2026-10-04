@@ -34,11 +34,16 @@ a = sys.argv[1:]
 lag = a[a.index('--lag') + 1] if '--lag' in a else 'rec'
 max_stops = int(a[a.index('--max-stops') + 1]) if '--max-stops' in a else 5000
 start_row = int(a[a.index('--from') + 1]) if '--from' in a else 0
-W = ROOT / 'work' / 'wholerun'
-CUTS = W / 'cuts'
+sys.path.insert(0, str(ROOT / 'tools' / 'wholerun'))
+import chains  # noqa: E402
+# --chain run1|run2 (chains.py): which real run (default run1)
+chain = chains.chain_arg(a)
+P = chains.paths(chain)
+W = P['dir']
+CUTS = P['cuts']
 CUTS.mkdir(parents=True, exist_ok=True)
-master = W / 'master.jsonl'
-idx = json.loads((W / 'master.jsonl.index.json').read_text())
+master = P['master']
+idx = json.loads((master.parent / (master.name + '.index.json')).read_text())
 n_rows = idx['rows']
 subprocess.run(['cargo', 'build', '--release', '--target-dir', str(ROOT / 'engine' / 'target-wholerun'), '-p', 'wf-app', '--example', 'wholerun'],
                cwd=ROOT / 'engine', check=False)
@@ -46,13 +51,11 @@ exe = ROOT / 'engine' / 'target-wholerun' / 'release' / 'examples' / 'wholerun'
 
 # the chain's keys (as record.py)
 keys = []
-for _, name, part in realrun.PRE:
-    keys += realrun.pre_keys()[part]
-for m in json.loads((ROOT / 'data' / 'realrun' / 'manifest.json').read_text()):
-    keys += realrun.unrle(json.loads(gzip.open(ROOT / 'data' / 'realrun' / f'{m["n"]:03d}_{m["name"]}.keys.gz', 'rt').read()))
+for _, ks, _ in chains.parts(chain):
+    keys += ks
 keys = keys[:n_rows]
 
-man = {f'{m["n"]:03d}_{m["name"]}': m['chapter'] for m in json.loads((ROOT / 'data' / 'realrun' / 'manifest.json').read_text())}
+man = {f'{m["n"]:03d}_{m["name"]}': m['chapter'] for m in json.loads(P['manifest'].read_text())}
 OWNER = {'opening': 'Earth agent', 'earth': 'Earth agent', 'ship': 'ship agent', 'fat': 'dungeon agents A / B',
          'janemba': 'side-content agent', 'superbuu': 'Super Buu agent'}
 
@@ -113,7 +116,7 @@ def cut_at(r):
 def run(from_row, seg):
     cmd = [str(exe), str(master), '--lag', lag, '--stop-first']
     if seg is None:
-        cmd += ['--power-on', str(W / 'power_on.json')]
+        cmd += ['--power-on', str(chains.W / 'power_on.json')]
     else:
         cmd += ['--import', str(seg), '--from-row', str(from_row)]
     out = subprocess.run(cmd, cwd=ROOT / 'engine', capture_output=True, text=True).stdout
@@ -125,7 +128,7 @@ def run(from_row, seg):
 
 # known differences by design (each documented in engine/docs/segments.md): a rule stop inside one is not chased -
 # the run is cut again after the range's end
-KNOWN = json.loads((ROOT / 'data' / 'realrun' / 'known_stops.json').read_text())['stops']
+KNOWN = json.loads(P['known'].read_text())['stops'] if P['known'].exists() else []
 log = Path(a[a.index('--log') + 1]) if '--log' in a else W / f'stops_{lag}.jsonl'
 if start_row == 0:
     log.write_text('')

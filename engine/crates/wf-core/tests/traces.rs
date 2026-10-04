@@ -11,17 +11,35 @@ use wf_core::session::Session;
 use wf_core::world::Body;
 
 fn sim(enemy: &str, count: i32, arena: &str) -> Session {
-    let cfg = BattleConfig { arena: arena.into(), phases: vec![Phase { enemy: enemy.into(), count }], rng: RngInit::State(12345, 12345 * 3 + 1), ..Default::default() };
+    let cfg = BattleConfig {
+        arena: arena.into(),
+        phases: vec![Phase {
+            enemy: enemy.into(),
+            count,
+        }],
+        rng: RngInit::State(12345, 12345 * 3 + 1),
+        ..Default::default()
+    };
     Session::new(data(), cfg)
 }
 fn enemies(s: &Session) -> Vec<usize> {
-    s.world.ents.iter().enumerate().filter(|(_, e)| matches!(e.body, Body::Enemy(_))).map(|(i, _)| i).collect()
+    s.world
+        .ents
+        .iter()
+        .enumerate()
+        .filter(|(_, e)| matches!(e.body, Body::Enemy(_)))
+        .map(|(i, _)| i)
+        .collect()
 }
 fn player(s: &Session) -> usize {
     s.world.player_idx(0).unwrap()
 }
 fn i32s(v: &Value) -> Vec<i32> {
-    v.as_array().unwrap().iter().map(|x| x.as_i64().unwrap() as i32).collect()
+    v.as_array()
+        .unwrap()
+        .iter()
+        .map(|x| x.as_i64().unwrap() as i32)
+        .collect()
 }
 fn pair(v: &Value) -> (i32, i32) {
     let a = i32s(v);
@@ -52,7 +70,10 @@ fn player_try_move_vs_emulator() {
         }
         let pi = player(&s);
         let fp = pair(&tr["footprint"]);
-        assert_eq!((s.world.pl_ref(pi).a.foot_w, s.world.pl_ref(pi).a.foot_h), fp);
+        assert_eq!(
+            (s.world.pl_ref(pi).a.foot_w, s.world.pl_ref(pi).a.foot_h),
+            fp
+        );
         let (sx, sy) = pair(&tr["start"]);
         {
             let p = s.world.pl(pi);
@@ -63,14 +84,21 @@ fn player_try_move_vs_emulator() {
         let mut got = Vec::new();
         let mut prev = 0u16;
         for k in tr["keys"].as_array().unwrap() {
-            let held = input::parse_keys(&k[0].as_str().unwrap().chars().map(|c| match c {
-                'L' => "LEFT+",
-                'R' => "RIGHT+",
-                'U' => "UP+",
-                'D' => "DOWN+",
-                'A' => "A+",
-                _ => "",
-            }).collect::<String>());
+            let held = input::parse_keys(
+                &k[0]
+                    .as_str()
+                    .unwrap()
+                    .chars()
+                    .map(|c| match c {
+                        'L' => "LEFT+",
+                        'R' => "RIGHT+",
+                        'U' => "UP+",
+                        'D' => "DOWN+",
+                        'A' => "A+",
+                        _ => "",
+                    })
+                    .collect::<String>(),
+            );
             for _ in 0..k[1].as_i64().unwrap() {
                 let w = &mut s.world;
                 w.events.clear();
@@ -99,17 +127,31 @@ fn enemy_path_follower_vs_emulator() {
         s.world.ents[e].removed = false;
         enemy::unmark_self(&mut s.world, e);
         mark_tiles(&mut s, &r["marked"], 0);
-        assert_eq!((s.world.en_ref(e).a.foot_w, s.world.en_ref(e).a.foot_h), pair(&r["footprint"]));
+        assert_eq!(
+            (s.world.en_ref(e).a.foot_w, s.world.en_ref(e).a.foot_h),
+            pair(&r["footprint"])
+        );
         let (sx, sy) = pair(&r["start"]);
         s.world.en(e).a.x = sx;
         s.world.en(e).a.y = sy;
         enemy::mark_self(&mut s.world, e);
         let (gx, gy) = pair(&r["goal"]);
-        let mut p = PathRt { speed: r["speed"].as_i64().unwrap() as i32, budget: 50, gx: gx << 8, gy: gy << 8, ..Default::default() };
+        let mut p = PathRt {
+            speed: r["speed"].as_i64().unwrap() as i32,
+            budget: 50,
+            gx: gx << 8,
+            gy: gy << 8,
+            ..Default::default()
+        };
         let pos = r["pos"].as_array().unwrap();
         for f in 0..pos.len() {
             wf_core::path::update(&mut s.world, e, &mut p);
-            assert_eq!((p.wx, p.wy), pair(&r["waypoint"][f]), "{} frame {f} waypoint", r["name"]);
+            assert_eq!(
+                (p.wx, p.wy),
+                pair(&r["waypoint"][f]),
+                "{} frame {f} waypoint",
+                r["name"]
+            );
             let a = &s.world.en_ref(e).a;
             assert_eq!((a.x, a.y), pair(&pos[f]), "{} frame {f}", r["name"]);
         }
@@ -125,8 +167,14 @@ fn enemy_steps_vs_emulator() {
         let pi = player(&s);
         enemy::unmark_self(&mut s.world, e);
         mark_tiles(&mut s, &r["marked"], 0);
-        assert_eq!((s.world.en_ref(e).a.foot_w, s.world.en_ref(e).a.foot_h), pair(&r["footprint"]));
-        assert_eq!((s.world.pl_ref(pi).a.foot_w, s.world.pl_ref(pi).a.foot_h), pair(&r["playerFootprint"]));
+        assert_eq!(
+            (s.world.en_ref(e).a.foot_w, s.world.en_ref(e).a.foot_h),
+            pair(&r["footprint"])
+        );
+        assert_eq!(
+            (s.world.pl_ref(pi).a.foot_w, s.world.pl_ref(pi).a.foot_h),
+            pair(&r["playerFootprint"])
+        );
         let (px, py) = pair(&r["player"]);
         s.world.pl(pi).a.x = px;
         s.world.pl(pi).a.y = py;
@@ -153,16 +201,37 @@ fn enemy_steps_vs_emulator() {
                     enemy::wander_step(&mut s.world, e, speed, r["param2"].as_i64().unwrap());
                     None
                 }
-                _ => Some(enemy::walk_to_player(&mut s.world, e, speed, &mut st, g["b11"].as_i64().unwrap() as i32)),
+                _ => Some(enemy::walk_to_player(
+                    &mut s.world,
+                    e,
+                    speed,
+                    &mut st,
+                    g["b11"].as_i64().unwrap() as i32,
+                )),
             };
             let a = &s.world.en_ref(e).a;
             let (gx, gy) = pair(&g["pos"]);
-            assert_eq!((a.x, a.y, a.facing as i64), (gx, gy, g["face"].as_i64().unwrap()), "{} frame {f}", r["name"]);
+            assert_eq!(
+                (a.x, a.y, a.facing as i64),
+                (gx, gy, g["face"].as_i64().unwrap()),
+                "{} frame {f}",
+                r["name"]
+            );
             if fname == "0x0802CDE8" {
-                assert_eq!(st as i64, g["n8"].as_i64().unwrap(), "{} frame {f} n8", r["name"]);
+                assert_eq!(
+                    st as i64,
+                    g["n8"].as_i64().unwrap(),
+                    "{} frame {f} n8",
+                    r["name"]
+                );
             }
             if let Some(ret) = ret {
-                assert_eq!(ret as i64, g["ret"].as_i64().unwrap(), "{} frame {f} ret", r["name"]);
+                assert_eq!(
+                    ret as i64,
+                    g["ret"].as_i64().unwrap(),
+                    "{} frame {f} ret",
+                    r["name"]
+                );
             }
         }
     }
@@ -181,7 +250,10 @@ fn knockback_vs_emulator() {
         mark_tiles(&mut s, &r["marked"], 0);
         mark_tiles(&mut s, &r["holes"], 1);
         let e = es[0];
-        assert_eq!((s.world.en_ref(e).a.foot_w, s.world.en_ref(e).a.foot_h), pair(&r["footprint"]));
+        assert_eq!(
+            (s.world.en_ref(e).a.foot_w, s.world.en_ref(e).a.foot_h),
+            pair(&r["footprint"])
+        );
         let updates = r["updates"].as_array().unwrap();
         if other {
             let o = es[1];
@@ -203,9 +275,15 @@ fn knockback_vs_emulator() {
             x.a.blocking = en["blocking"].as_i64().unwrap() != 0;
         }
         s.world.rng.set_state(u32pair(&en["rng"]));
-        let mut kb = KnockState { n: 16, ..Default::default() };
+        let mut kb = KnockState {
+            n: 16,
+            ..Default::default()
+        };
         enemy::knock_start(&mut s.world, e, en["K"].as_i64().unwrap() as i32, &mut kb);
-        assert_eq!(s.world.en_ref(e).a.facing as i64, en["hitDir"].as_i64().unwrap() ^ 1);
+        assert_eq!(
+            s.world.en_ref(e).a.facing as i64,
+            en["hitDir"].as_i64().unwrap() ^ 1
+        );
         let mut done: i64 = -1;
         let mut k = 0;
         while k < updates.len() + 4 && done < 0 {
@@ -223,7 +301,9 @@ fn knockback_vs_emulator() {
         assert_eq!(done, updates.len() as i64 - 1, "{}", r["name"]);
         if other {
             let o = es[1];
-            let want = r["other"]["hp_after_splat"].as_i64().unwrap_or_else(|| updates.last().unwrap()["otherHp"].as_i64().unwrap());
+            let want = r["other"]["hp_after_splat"]
+                .as_i64()
+                .unwrap_or_else(|| updates.last().unwrap()["otherHp"].as_i64().unwrap());
             assert_eq!(s.world.en_ref(o).hp1024, want, "{} splat damage", r["name"]);
         }
     }

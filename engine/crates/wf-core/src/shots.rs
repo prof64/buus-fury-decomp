@@ -6,12 +6,12 @@
 //! kept as f64 using only IEEE-754 exact operations (+ - * / sqrt, comparisons, the JS rounding rule) so results are
 //! bit-identical on every target (native, wasm32); no transcendental functions are used anywhere in the sim.
 
-use serde::{Deserialize, Serialize};
 use crate::damage::{atk, AttackType};
 use crate::fx;
 use crate::geom::{centered, overlaps, Dir, Rect, DIR_VEC};
 use crate::player;
 use crate::world::{broadcast, Body, EntityId, HitMsg, Layer, World};
+use serde::{Deserialize, Serialize};
 use std::hash::{Hash, Hasher};
 
 /// an f64 that hashes by its bits (fitted reference models only, see the module docs)
@@ -350,30 +350,66 @@ pub enum ShotKind {
     /// the player's beam family (KameBeam)
     Kame(Box<KameBeam>),
     /// Ultra Volleyball wave
-    Volley { len: i32, done: bool, n: i32 },
+    Volley {
+        len: i32,
+        done: bool,
+        n: i32,
+    },
     MasenkoCursor(Box<MasenkoCursor>),
     MasenkoBall(Box<MasenkoBall>),
     Ghost(Box<Ghost>),
     /// mummy bandage 0x0802D79C
     Wrap(Box<MummyWrap>),
     /// energy wave 0x08049C98: segment tail..head, grows 4/frame to 48 then moves 4 px/frame (`life` +0x1C)
-    EnergyWave { len: i32, mode: i32, life: i32 },
+    EnergyWave {
+        len: i32,
+        mode: i32,
+        life: i32,
+    },
     /// flame 0x0804BFCC: 16x16, 20 frames, one hit
-    Flame { vx: i32, vy: i32, done: bool },
+    Flame {
+        vx: i32,
+        vy: i32,
+        done: bool,
+    },
     /// bomb 0x0804A2E8: thrown in a screen-space arc (40 moves), explodes at counter 71
-    Bomb { vx: i32, vy: i32, landed: i64 },
+    Bomb {
+        vx: i32,
+        vy: i32,
+        landed: i64,
+    },
     /// Buu stretch arm 0x08028C04 (origin = the position; phase 0 extend, 1 retract)
-    StretchArm { len: i32, phase: i32 },
+    StretchArm {
+        len: i32,
+        phase: i32,
+    },
     /// Majin Buu candy beam 0x080286D4 (origin = the position; phase 0 grow / slide, 1 retract)
-    CandyBeam { len: i32, phase: i32, cnt: i32 },
+    CandyBeam {
+        len: i32,
+        phase: i32,
+        cnt: i32,
+    },
     /// Super Buu lobbed ball 0x08021280
-    SuperBall { phase: i32, sx: i32, sy: i32, tx: i32, ty: i32 },
+    SuperBall {
+        phase: i32,
+        sx: i32,
+        sy: i32,
+        tx: i32,
+        ty: i32,
+    },
     /// Super Janemba energy wave 0x080359D4
     SjWave,
     /// Dabura's dark sphere 0x0803AEA8 (radius in 1/256 px)
-    DarkSphere { r256: i32 },
+    DarkSphere {
+        r256: i32,
+    },
     /// Bio Mech grapple arm 0x0804B380 (phase 0 extend, 1 retract, 2 reel the player in; (gx, gy) the grip, px)
-    GrappleArm { len: i32, phase: i32, gx: i32, gy: i32 },
+    GrappleArm {
+        len: i32,
+        phase: i32,
+        gx: i32,
+        gy: i32,
+    },
 }
 
 #[derive(Clone, Debug, Hash, Serialize, Deserialize)]
@@ -390,7 +426,15 @@ pub struct Shot {
 
 impl Shot {
     pub fn new(owner: EntityId, dir: Dir, team: u8, x: i32, y: i32, kind: ShotKind) -> Shot {
-        let mut s = Shot { t: 0, x, y, owner, dir, team, kind };
+        let mut s = Shot {
+            t: 0,
+            x,
+            y,
+            owner,
+            dir,
+            team,
+            kind,
+        };
         if let ShotKind::Straight(o) = &mut s.kind {
             o.x0 = x;
             o.y0 = y;
@@ -456,7 +500,13 @@ pub fn add(w: &mut World, s: Shot) -> EntityId {
     let kame_owner = matches!(s.kind, ShotKind::Kame(_)).then_some(s.owner);
     let id = w.add(Body::Shot(Box::new(s)));
     // a scripted beam's object exists from its command's start (scene.rs `Cmd::Beam`): the shot takes its block
-    if let Some(o) = kame_owner.filter(|&o| crate::vram::rekey(w, crate::vram::Owner::BeamObj(o), crate::vram::Owner::Ent(id))) {
+    if let Some(o) = kame_owner.filter(|&o| {
+        crate::vram::rekey(
+            w,
+            crate::vram::Owner::BeamObj(o),
+            crate::vram::Owner::Ent(id),
+        )
+    }) {
         let _ = o;
     } else {
         crate::vram::acquire(w, crate::vram::Owner::Ent(id), tiles);
@@ -469,15 +519,49 @@ pub fn add(w: &mut World, s: Shot) -> EntityId {
     }
     id
 }
-pub fn add_straight(w: &mut World, owner: EntityId, dir: Dir, team: u8, x: i32, y: i32, o: StraightOpts) -> EntityId {
-    add(w, Shot::new(owner, dir, team, x, y, ShotKind::Straight(Box::new(o))))
+pub fn add_straight(
+    w: &mut World,
+    owner: EntityId,
+    dir: Dir,
+    team: u8,
+    x: i32,
+    y: i32,
+    o: StraightOpts,
+) -> EntityId {
+    add(
+        w,
+        Shot::new(owner, dir, team, x, y, ShotKind::Straight(Box::new(o))),
+    )
 }
 
 /// player / enemy ki blast class 0x080197B4 (3 px/frame): the ctor and an accepted hit pick a sound with rand(2)
 #[allow(clippy::too_many_arguments)]
-pub fn ki_blast(w: &mut World, owner: EntityId, dir: Dir, team: u8, x: i32, y: i32, a: AttackType, mult: i32, spawn_now: bool) -> EntityId {
+pub fn ki_blast(
+    w: &mut World,
+    owner: EntityId,
+    dir: Dir,
+    team: u8,
+    x: i32,
+    y: i32,
+    a: AttackType,
+    mult: i32,
+    spawn_now: bool,
+) -> EntityId {
     let (dx, dy) = DIR_VEC[dir as usize];
-    let o = StraightOpts { vx: dx * 0x300, vy: dy * 0x300, b: [6, 6, 12, 12], a, mult, name: SName::KiBlast, fx_end: 16, rng_spawn: 2, rng_hit: 2, sfx_spawn: 20, sfx_hit: 48, ..Default::default() };
+    let o = StraightOpts {
+        vx: dx * 0x300,
+        vy: dy * 0x300,
+        b: [6, 6, 12, 12],
+        a,
+        mult,
+        name: SName::KiBlast,
+        fx_end: 16,
+        rng_spawn: 2,
+        rng_hit: 2,
+        sfx_spawn: 20,
+        sfx_hit: 48,
+        ..Default::default()
+    };
     let id = add_straight(w, owner, dir, team, x, y, o);
     if spawn_now {
         let i = w.find(id).unwrap();
@@ -516,37 +600,122 @@ pub fn spawn_rng(w: &mut World, i: usize) {
 /// enemy energy wave 0x0802A2EC (Cyborg / turret / soldier): the ctor plays sound 35
 pub fn energy_wave(w: &mut World, owner: EntityId, dir: Dir, x: i32, y: i32) -> Shot {
     w.sfx(35, 64);
-    Shot::new(owner, dir, 0, x, y, ShotKind::EnergyWave { len: 8, mode: 0, life: 0 })
+    Shot::new(
+        owner,
+        dir,
+        0,
+        x,
+        y,
+        ShotKind::EnergyWave {
+            len: 8,
+            mode: 0,
+            life: 0,
+        },
+    )
 }
 /// bandage velocities (24.8 per frame) by facing, straight and diagonal (0x08756B74)
-const WRAP_VEL: [[i32; 4]; 4] = [[0, 448, -316, 316], [0, -448, 316, -316], [-448, 0, -316, -316], [448, 0, 316, 316]];
+const WRAP_VEL: [[i32; 4]; 4] = [
+    [0, 448, -316, 316],
+    [0, -448, 316, -316],
+    [-448, 0, -316, -316],
+    [448, 0, 316, 316],
+];
 /// a stuck bandage's offset above the player's position by slot (0x08756BB4)
 const WRAP_SLOT_Y: [i32; 8] = [-2, -10, 2, 18, 6, 10, -6, 14];
 pub fn mummy_wrap(owner: EntityId, dir: Dir, x: i32, y: i32, diag: bool) -> Shot {
     let v = WRAP_VEL[dir as usize];
     let (vx, vy) = if diag { (v[2], v[3]) } else { (v[0], v[1]) };
-    Shot::new(owner, dir, 0, x, y, ShotKind::Wrap(Box::new(MummyWrap { vx, vy, diag, tick: 0, stuck: false, delay: 0, off_x: 0, off_y: 0 })))
+    Shot::new(
+        owner,
+        dir,
+        0,
+        x,
+        y,
+        ShotKind::Wrap(Box::new(MummyWrap {
+            vx,
+            vy,
+            diag,
+            tick: 0,
+            stuck: false,
+            delay: 0,
+            off_x: 0,
+            off_y: 0,
+        })),
+    )
 }
 pub fn flame(w: &mut World, owner: EntityId, dir: Dir, x: i32, y: i32) -> Shot {
     let (dx, dy) = DIR_VEC[dir as usize];
     let vx = dx * 512 + w.rng.rand(192) - 96;
     let vy = dy * 512 + w.rng.rand(192) - 96;
-    Shot::new(owner, dir, 0, x, y, ShotKind::Flame { vx, vy, done: false })
+    Shot::new(
+        owner,
+        dir,
+        0,
+        x,
+        y,
+        ShotKind::Flame {
+            vx,
+            vy,
+            done: false,
+        },
+    )
 }
 /// (ddx, ddy): the thrower's aim offset (px, clamped, one axis; BombThrow)
 pub fn bomb(owner: EntityId, dir: Dir, x: i32, y: i32, ddx: i32, ddy: i32) -> Shot {
-    Shot::new(owner, dir, 0, x, y, ShotKind::Bomb { vx: (ddx * 0x71d) >> 8, vy: ((ddy * 0x71d) >> 8) - 0x200, landed: -1 })
+    Shot::new(
+        owner,
+        dir,
+        0,
+        x,
+        y,
+        ShotKind::Bomb {
+            vx: (ddx * 0x71d) >> 8,
+            vy: ((ddy * 0x71d) >> 8) - 0x200,
+            landed: -1,
+        },
+    )
 }
 /// Buu stretch arm (class 0x0804CDD4, builder 0x08028C04) at the integer position (x, y)
 pub fn stretch_arm(owner: EntityId, dir: Dir, x: i32, y: i32) -> Shot {
-    Shot::new(owner, dir, 0, x << 8, y << 8, ShotKind::StretchArm { len: 8, phase: 0 })
+    Shot::new(
+        owner,
+        dir,
+        0,
+        x << 8,
+        y << 8,
+        ShotKind::StretchArm { len: 8, phase: 0 },
+    )
 }
 /// Majin Buu candy beam (class 0x0804B3AC, builder 0x080286D4) at the integer position (x, y)
 pub fn candy_beam(owner: EntityId, dir: Dir, x: i32, y: i32) -> Shot {
-    Shot::new(owner, dir, 0, x << 8, y << 8, ShotKind::CandyBeam { len: 8, phase: 0, cnt: 0 })
+    Shot::new(
+        owner,
+        dir,
+        0,
+        x << 8,
+        y << 8,
+        ShotKind::CandyBeam {
+            len: 8,
+            phase: 0,
+            cnt: 0,
+        },
+    )
 }
 pub fn super_ball(owner: EntityId) -> Shot {
-    Shot::new(owner, 3, 0, 0, 0, ShotKind::SuperBall { phase: 0, sx: 0, sy: 0, tx: 0, ty: 0 })
+    Shot::new(
+        owner,
+        3,
+        0,
+        0,
+        0,
+        ShotKind::SuperBall {
+            phase: 0,
+            sx: 0,
+            sy: 0,
+            tx: 0,
+            ty: 0,
+        },
+    )
 }
 pub fn sj_wave(owner: EntityId, dir: Dir, x: i32, y: i32) -> Shot {
     Shot::new(owner, dir, 0, x, y, ShotKind::SjWave)
@@ -556,15 +725,87 @@ pub fn dark_sphere(w: &mut World, owner: EntityId, x: i32, y: i32) -> Shot {
     Shot::new(owner, 0, 0, x, y, ShotKind::DarkSphere { r256: 256 })
 }
 pub fn grapple_arm(owner: EntityId, dir: Dir, x: i32, y: i32) -> Shot {
-    Shot::new(owner, dir, 0, x, y, ShotKind::GrappleArm { len: 8, phase: 0, gx: 0, gy: 0 })
+    Shot::new(
+        owner,
+        dir,
+        0,
+        x,
+        y,
+        ShotKind::GrappleArm {
+            len: 8,
+            phase: 0,
+            gx: 0,
+            gy: 0,
+        },
+    )
 }
 #[allow(clippy::too_many_arguments)]
-pub fn full_beam(owner: EntityId, dir: Dir, team: u8, x: i32, y: i32, a: AttackType, mult: i32, life: i64, table: Option<u8>, vis_pos: Option<[(i32, i32); 4]>, hits: Option<(i64, i64)>) -> Shot {
-    Shot::new(owner, dir, team, x << 8, y << 8, ShotKind::FullBeam(Box::new(FullBeam { len: 0, life, a, mult, width: 24, table, vis_pos, scale: 0, ending: false, vis: None, hit_win: hits, game: false, next: 0, end_t: 0 })))
+pub fn full_beam(
+    owner: EntityId,
+    dir: Dir,
+    team: u8,
+    x: i32,
+    y: i32,
+    a: AttackType,
+    mult: i32,
+    life: i64,
+    table: Option<u8>,
+    vis_pos: Option<[(i32, i32); 4]>,
+    hits: Option<(i64, i64)>,
+) -> Shot {
+    Shot::new(
+        owner,
+        dir,
+        team,
+        x << 8,
+        y << 8,
+        ShotKind::FullBeam(Box::new(FullBeam {
+            len: 0,
+            life,
+            a,
+            mult,
+            width: 24,
+            table,
+            vis_pos,
+            scale: 0,
+            ending: false,
+            vis: None,
+            hit_win: hits,
+            game: false,
+            next: 0,
+            end_t: 0,
+        })),
+    )
 }
-pub fn area_hit(owner: EntityId, dir: Dir, team: u8, b: Rect, life: i64, every: i64, a: AttackType, mult: i32, grow: i32) -> Shot {
+pub fn area_hit(
+    owner: EntityId,
+    dir: Dir,
+    team: u8,
+    b: Rect,
+    life: i64,
+    every: i64,
+    a: AttackType,
+    mult: i32,
+    grow: i32,
+) -> Shot {
     let (cx, cy) = b.center();
-    Shot::new(owner, dir, team, cx << 8, cy << 8, ShotKind::AreaHit(Box::new(AreaHit { b, life, every, a, mult, grow, first: false, dragon: false })))
+    Shot::new(
+        owner,
+        dir,
+        team,
+        cx << 8,
+        cy << 8,
+        ShotKind::AreaHit(Box::new(AreaHit {
+            b,
+            life,
+            every,
+            a,
+            mult,
+            grow,
+            first: false,
+            dragon: false,
+        })),
+    )
 }
 
 fn muzzle_pos(w: &World, owner: EntityId, dir: Dir, m: Muzzle) -> Option<(i32, i32)> {
@@ -583,11 +824,56 @@ fn muzzle_pos(w: &World, owner: EntityId, dir: Dir, m: Muzzle) -> Option<(i32, i
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn grow_beam(w: &World, owner: EntityId, dir: Dir, team: u8, muzzle: Muzzle, a: AttackType, mult: i32, width: i32, speed256: i32, max_len256: i32, gfx: bool, vis_pos: Option<[(i32, i32); 4]>, game: bool, start_len256: i32) -> Shot {
-    grow_beam_f(w, owner, dir, team, muzzle, a, mult, width, speed256 as f64 / 256.0, max_len256 as f64 / 256.0, gfx, vis_pos, game, start_len256 as f64 / 256.0)
+pub fn grow_beam(
+    w: &World,
+    owner: EntityId,
+    dir: Dir,
+    team: u8,
+    muzzle: Muzzle,
+    a: AttackType,
+    mult: i32,
+    width: i32,
+    speed256: i32,
+    max_len256: i32,
+    gfx: bool,
+    vis_pos: Option<[(i32, i32); 4]>,
+    game: bool,
+    start_len256: i32,
+) -> Shot {
+    grow_beam_f(
+        w,
+        owner,
+        dir,
+        team,
+        muzzle,
+        a,
+        mult,
+        width,
+        speed256 as f64 / 256.0,
+        max_len256 as f64 / 256.0,
+        gfx,
+        vis_pos,
+        game,
+        start_len256 as f64 / 256.0,
+    )
 }
 #[allow(clippy::too_many_arguments)]
-pub fn grow_beam_f(w: &World, owner: EntityId, dir: Dir, team: u8, muzzle: Muzzle, a: AttackType, mult: i32, width: i32, speed: f64, max_len: f64, gfx: bool, vis_pos: Option<[(i32, i32); 4]>, game: bool, start_len: f64) -> Shot {
+pub fn grow_beam_f(
+    w: &World,
+    owner: EntityId,
+    dir: Dir,
+    team: u8,
+    muzzle: Muzzle,
+    a: AttackType,
+    mult: i32,
+    width: i32,
+    speed: f64,
+    max_len: f64,
+    gfx: bool,
+    vis_pos: Option<[(i32, i32); 4]>,
+    game: bool,
+    start_len: f64,
+) -> Shot {
     let (x, y) = muzzle_pos(w, owner, dir, muzzle).unwrap_or((0, 0));
     let b = GrowBeam {
         len: F(start_len),
@@ -610,7 +896,14 @@ pub fn grow_beam_f(w: &World, owner: EntityId, dir: Dir, team: u8, muzzle: Muzzl
         gstop: false,
         last: (x, y),
     };
-    Shot::new(owner, dir, team, x << 8, y << 8, ShotKind::GrowBeam(Box::new(b)))
+    Shot::new(
+        owner,
+        dir,
+        team,
+        x << 8,
+        y << 8,
+        ShotKind::GrowBeam(Box::new(b)),
+    )
 }
 
 pub fn beam_stop(w: &mut World, i: usize) {
@@ -677,10 +970,28 @@ pub fn hit(w: &mut World, i: usize, rect: Rect, a: AttackType, mult: i32, first:
     }
     let (owner, dir) = (s.owner, s.dir);
     let (stats, is_player) = match w.find(owner) {
-        Some(oi) => (w.actor(oi).map(|a| a.stats).unwrap_or_default(), matches!(w.ents[oi].body, Body::Player(_))),
+        Some(oi) => (
+            w.actor(oi).map(|a| a.stats).unwrap_or_default(),
+            matches!(w.ents[oi].body, Body::Player(_)),
+        ),
         None => (Default::default(), false),
     };
-    let mut m = HitMsg { team, rect, dir, mult, atk: a, attacker: owner, att_stats: stats, att_is_player: is_player, source: w.ents[i].id, crit: false, raw: 0, dmg: 0, no_react: false, foot: false };
+    let mut m = HitMsg {
+        team,
+        rect,
+        dir,
+        mult,
+        atk: a,
+        attacker: owner,
+        att_stats: stats,
+        att_is_player: is_player,
+        source: w.ents[i].id,
+        crit: false,
+        raw: 0,
+        dmg: 0,
+        no_react: false,
+        foot: false,
+    };
     broadcast(w, &mut m, first)
 }
 
@@ -693,7 +1004,12 @@ pub fn rect(w: &World, i: usize) -> Rect {
             let b = ki_blast_box(s.dir as i32, s.t as i32);
             Rect::new(px - b[0], py - b[1], px - b[0] + b[2], py - b[1] + b[3])
         }
-        ShotKind::Straight(o) => Rect::new(px - o.b[0], py - o.b[1], px - o.b[0] + o.b[2], py - o.b[1] + o.b[3]),
+        ShotKind::Straight(o) => Rect::new(
+            px - o.b[0],
+            py - o.b[1],
+            px - o.b[0] + o.b[2],
+            py - o.b[1] + o.b[3],
+        ),
         ShotKind::GrowBeam(b) => {
             let h = b.width >> 1;
             let l = js_round(b.len.0) as i32;
@@ -722,14 +1038,27 @@ pub fn rect(w: &World, i: usize) -> Rect {
         ShotKind::MasenkoBall(_) => masenko_flight_rect(w, i),
         ShotKind::Kame(k) => {
             let (hx, hy) = kame_head(s, k.len);
-            Rect::new(px.min(hx) - 6, py.min(hy) - 6, px.max(hx) + 6, py.max(hy) + 6)
+            Rect::new(
+                px.min(hx) - 6,
+                py.min(hy) - 6,
+                px.max(hx) + 6,
+                py.max(hy) + 6,
+            )
         }
         ShotKind::Volley { len, .. } => {
             let (hx, hy) = (px + dx * len, py + dy * len);
-            Rect::new(px.min(hx) - 2, py.min(hy) - 2, px.max(hx) + 2, py.max(hy) + 2)
+            Rect::new(
+                px.min(hx) - 2,
+                py.min(hy) - 2,
+                px.max(hx) + 2,
+                py.max(hy) + 2,
+            )
         }
         ShotKind::Ghost(g) => {
-            let b = w.data.sprite(GHOST_SPRITE).and_then(|sp| sp.frame_box(g.ea.pos.raw, g.facing, g.ea.pos.frame));
+            let b = w
+                .data
+                .sprite(GHOST_SPRITE)
+                .and_then(|sp| sp.frame_box(g.ea.pos.raw, g.facing, g.ea.pos.frame));
             match b {
                 Some(b) => Rect::new(px + b[0], py + b[1], px + b[0] + b[2], py + b[1] + b[3]),
                 None => centered(px, py, 12, 12),
@@ -748,7 +1077,12 @@ pub fn rect(w: &World, i: usize) -> Rect {
         }
         ShotKind::EnergyWave { len, .. } => {
             let (hx, hy) = (px + dx * len, py + dy * len);
-            Rect::new(px.min(hx) - 4, py.min(hy) - 4, px.max(hx) + 4, py.max(hy) + 4)
+            Rect::new(
+                px.min(hx) - 4,
+                py.min(hy) - 4,
+                px.max(hx) + 4,
+                py.max(hy) + 4,
+            )
         }
         ShotKind::GrappleArm { len, .. } => {
             let (hx, hy) = (px + dx * len, py + dy * len);
@@ -868,7 +1202,9 @@ fn shot_head(w: &World, i: usize, len: i32) -> (i32, i32) {
 /// message (melee 0x086B8088, x1.0) -> 1; else len < 80 -> + 4, else 1. Phase 1: len - 4, <= 0 -> removed
 fn stretch_update(w: &mut World, i: usize) {
     w.shot(i).t += 1;
-    let ShotKind::StretchArm { len, phase } = w.shot_ref(i).kind else { return };
+    let ShotKind::StretchArm { len, phase } = w.shot_ref(i).kind else {
+        return;
+    };
     if phase == 1 {
         let l = len - 4;
         set_kind(w, i, ShotKind::StretchArm { len: l, phase });
@@ -882,7 +1218,18 @@ fn stretch_update(w: &mut World, i: usize) {
         set_kind(w, i, ShotKind::StretchArm { len, phase: 1 });
         return;
     }
-    set_kind(w, i, if len < 80 { ShotKind::StretchArm { len: len + 4, phase } } else { ShotKind::StretchArm { len, phase: 1 } });
+    set_kind(
+        w,
+        i,
+        if len < 80 {
+            ShotKind::StretchArm {
+                len: len + 4,
+                phase,
+            }
+        } else {
+            ShotKind::StretchArm { len, phase: 1 }
+        },
+    );
 }
 
 /// Majin Buu candy beam (update 0x080287AD): phase 0: box (head +- 8); a projectile wall -> 1; an accepted kind-0
@@ -890,7 +1237,9 @@ fn stretch_update(w: &mut World, i: usize) {
 /// 4 px along; counter + 1 > 240 -> 1. Phase 1: the origin moves 4 px along, len - 4; <= 0 -> removed
 fn candy_update(w: &mut World, i: usize) {
     w.shot(i).t += 1;
-    let ShotKind::CandyBeam { len, phase, cnt } = w.shot_ref(i).kind else { return };
+    let ShotKind::CandyBeam { len, phase, cnt } = w.shot_ref(i).kind else {
+        return;
+    };
     let (dx, dy) = DIR_VEC[w.shot_ref(i).dir as usize];
     let advance = |w: &mut World| {
         let s = w.shot(i);
@@ -926,7 +1275,15 @@ fn candy_update(w: &mut World, i: usize) {
         advance(w);
     }
     let c = cnt + 1;
-    set_kind(w, i, ShotKind::CandyBeam { len: l, phase: if c > 240 { 1 } else { 0 }, cnt: c });
+    set_kind(
+        w,
+        i,
+        ShotKind::CandyBeam {
+            len: l,
+            phase: if c > 240 { 1 } else { 0 },
+            cnt: c,
+        },
+    );
 }
 
 /// the player an enemy-owned object plays against (its owner's target; else slot 0)
@@ -944,22 +1301,60 @@ fn target_player(w: &World, owner: EntityId) -> Option<usize> {
 /// like 1. Phase 1 retract: len - 4; <= 0 -> (phase 2: the player SetAnim(0)) removed
 fn grapple_update(w: &mut World, i: usize) {
     w.shot(i).t += 1;
-    let ShotKind::GrappleArm { len, phase, gx, gy } = w.shot_ref(i).kind else { return };
+    let ShotKind::GrappleArm { len, phase, gx, gy } = w.shot_ref(i).kind else {
+        return;
+    };
     let (dir, owner) = (w.shot_ref(i).dir, w.shot_ref(i).owner);
     let (dx, dy) = DIR_VEC[dir as usize];
     let pi = target_player(w, owner);
     if phase == 0 {
         let r = rect(w, i);
         if in_wall(w, i, &r) {
-            set_kind(w, i, ShotKind::GrappleArm { len, phase: 1, gx, gy });
+            set_kind(
+                w,
+                i,
+                ShotKind::GrappleArm {
+                    len,
+                    phase: 1,
+                    gx,
+                    gy,
+                },
+            );
             return;
         }
         if !hit(w, i, r, atk(0), 1024, false) {
-            set_kind(w, i, if len >= 80 { ShotKind::GrappleArm { len, phase: 1, gx, gy } } else { ShotKind::GrappleArm { len: len + 4, phase, gx, gy } });
+            set_kind(
+                w,
+                i,
+                if len >= 80 {
+                    ShotKind::GrappleArm {
+                        len,
+                        phase: 1,
+                        gx,
+                        gy,
+                    }
+                } else {
+                    ShotKind::GrappleArm {
+                        len: len + 4,
+                        phase,
+                        gx,
+                        gy,
+                    }
+                },
+            );
             return;
         }
         let Some(pi) = pi.filter(|&pi| w.pl_ref(pi).hp() > 0) else {
-            set_kind(w, i, ShotKind::GrappleArm { len, phase: 1, gx, gy });
+            set_kind(
+                w,
+                i,
+                ShotKind::GrappleArm {
+                    len,
+                    phase: 1,
+                    gx,
+                    gy,
+                },
+            );
             return;
         };
         let (hx, hy) = shot_head(w, i, len);
@@ -968,7 +1363,16 @@ fn grapple_update(w: &mut World, i: usize) {
         // a front block (blocking flag and facing the arm) stops the grab
         let p = w.pl_ref(pi);
         if p.a.blocking && p.a.facing == (dir ^ 1) {
-            set_kind(w, i, ShotKind::GrappleArm { len, phase: 1, gx: ngx, gy: ngy });
+            set_kind(
+                w,
+                i,
+                ShotKind::GrappleArm {
+                    len,
+                    phase: 1,
+                    gx: ngx,
+                    gy: ngy,
+                },
+            );
             return;
         }
         if player::fits(w, pi, ngx, ngy) {
@@ -976,9 +1380,27 @@ fn grapple_update(w: &mut World, i: usize) {
             let p = w.pl(pi);
             p.a.x = ngx << 8;
             p.a.y = ngy << 8;
-            set_kind(w, i, ShotKind::GrappleArm { len, phase: 2, gx: ngx, gy: ngy });
+            set_kind(
+                w,
+                i,
+                ShotKind::GrappleArm {
+                    len,
+                    phase: 2,
+                    gx: ngx,
+                    gy: ngy,
+                },
+            );
         } else {
-            set_kind(w, i, ShotKind::GrappleArm { len, phase: 1, gx: ngx, gy: ngy });
+            set_kind(
+                w,
+                i,
+                ShotKind::GrappleArm {
+                    len,
+                    phase: 1,
+                    gx: ngx,
+                    gy: ngy,
+                },
+            );
         }
         return;
     }
@@ -998,7 +1420,16 @@ fn grapple_update(w: &mut World, i: usize) {
         }
     }
     let l = len - 4;
-    set_kind(w, i, ShotKind::GrappleArm { len: l, phase: ph, gx, gy });
+    set_kind(
+        w,
+        i,
+        ShotKind::GrappleArm {
+            len: l,
+            phase: ph,
+            gx,
+            gy,
+        },
+    );
     if l > 0 {
         return;
     }
@@ -1019,7 +1450,9 @@ fn wrap_update(w: &mut World, i: usize) {
     let owner = w.shot_ref(i).owner;
     let pi = target_player(w, owner);
     wrap_reapply(w, pi);
-    let ShotKind::Wrap(m) = &w.shot_ref(i).kind else { return };
+    let ShotKind::Wrap(m) = &w.shot_ref(i).kind else {
+        return;
+    };
     let mut m = (**m).clone();
     if m.stuck {
         if let Some(pi) = pi {
@@ -1166,7 +1599,11 @@ fn straight_update(w: &mut World, i: usize) {
         return;
     }
     if hit(w, i, r, o.a, o.mult, true) {
-        let rr = if o.rng_hit > 0 { w.rng.rand(o.rng_hit) } else { 0 };
+        let rr = if o.rng_hit > 0 {
+            w.rng.rand(o.rng_hit)
+        } else {
+            0
+        };
         if o.sfx_hit >= 0 {
             w.sfx(o.sfx_hit + rr, 64);
         }
@@ -1220,7 +1657,9 @@ pub fn launch(w: &mut World, i: usize, x: i32, y: i32) {
 
 fn grow_visual(w: &World, i: usize) -> (i32, i32, i32) {
     let s = w.shot_ref(i);
-    let ShotKind::GrowBeam(b) = &s.kind else { return (0, 0, 0) };
+    let ShotKind::GrowBeam(b) = &s.kind else {
+        return (0, 0, 0);
+    };
     if let Some(r) = b.retract {
         return r;
     }
@@ -1357,7 +1796,9 @@ fn grow_update(w: &mut World, i: usize) {
 fn grow_hit_fx(w: &mut World, i: usize) {
     let frame = w.frame as i64;
     let next = {
-        let ShotKind::GrowBeam(b) = &mut w.shot(i).kind else { return };
+        let ShotKind::GrowBeam(b) = &mut w.shot(i).kind else {
+            return;
+        };
         b.stopped = true;
         if b.next_fx < 0 {
             b.next_fx = frame - 1;
@@ -1383,8 +1824,29 @@ fn grow_hit_fx(w: &mut World, i: usize) {
 
 /// the player's Final Flash: the beam object at player + FINAL_FLASH_POS, built now (frame `built`)
 #[allow(clippy::too_many_arguments)]
-pub fn final_flash(owner: EntityId, dir: Dir, x: i32, y: i32, a: AttackType, mult: i32, table: u8, built: i64) -> Shot {
-    let mut s = full_beam(owner, dir, 1, x, y, a, mult, 1 << 30, Some(table), Some(FINAL_FLASH_POS), None);
+pub fn final_flash(
+    owner: EntityId,
+    dir: Dir,
+    x: i32,
+    y: i32,
+    a: AttackType,
+    mult: i32,
+    table: u8,
+    built: i64,
+) -> Shot {
+    let mut s = full_beam(
+        owner,
+        dir,
+        1,
+        x,
+        y,
+        a,
+        mult,
+        1 << 30,
+        Some(table),
+        Some(FINAL_FLASH_POS),
+        None,
+    );
     if let ShotKind::FullBeam(b) = &mut s.kind {
         b.game = true;
         b.next = built;
@@ -1396,7 +1858,12 @@ pub fn final_flash(owner: EntityId, dir: Dir, x: i32, y: i32, a: AttackType, mul
 /// width 8 * scale >> 8, one message per tick; accepted with now - next > 0: next = now + 3 + rand(5), sound 48 +
 /// rand(2). Released: no hits, scale -0x20 per tick, removed after 8 ticks
 fn final_flash_update(w: &mut World, i: usize, t: i64) {
-    let (dir, owner, px, py) = (w.shot_ref(i).dir, w.shot_ref(i).owner, w.shot_ref(i).px(), w.shot_ref(i).py());
+    let (dir, owner, px, py) = (
+        w.shot_ref(i).dir,
+        w.shot_ref(i).owner,
+        w.shot_ref(i).px(),
+        w.shot_ref(i).py(),
+    );
     let (dx, dy) = DIR_VEC[dir as usize];
     if t == 1 {
         let mut l = 8;
@@ -1407,7 +1874,15 @@ fn final_flash_update(w: &mut World, i: usize, t: i64) {
             }
             l += 8;
         }
-        let vis = w.actor_by_id(owner).map(|a| (a.px() + FINAL_FLASH_POS[dir as usize].0, a.py() + FINAL_FLASH_POS[dir as usize].1)).unwrap_or((px, py));
+        let vis = w
+            .actor_by_id(owner)
+            .map(|a| {
+                (
+                    a.px() + FINAL_FLASH_POS[dir as usize].0,
+                    a.py() + FINAL_FLASH_POS[dir as usize].1,
+                )
+            })
+            .unwrap_or((px, py));
         if let ShotKind::FullBeam(b) = &mut w.shot(i).kind {
             b.len = l;
             b.vis = Some(vis);
@@ -1430,13 +1905,22 @@ fn final_flash_update(w: &mut World, i: usize, t: i64) {
         }
         return;
     }
-    let scale = if b.scale < 0x100 { b.scale + 0x20 } else { b.scale };
+    let scale = if b.scale < 0x100 {
+        b.scale + 0x20
+    } else {
+        b.scale
+    };
     if let ShotKind::FullBeam(x) = &mut w.shot(i).kind {
         x.scale = scale;
     }
     let hw = (8 * scale) >> 8;
     let (ex, ey) = (px + dx * b.len, py + dy * b.len);
-    let r = Rect::new(px.min(ex) - hw, py.min(ey) - hw, px.max(ex) + hw, py.max(ey) + hw);
+    let r = Rect::new(
+        px.min(ex) - hw,
+        py.min(ey) - hw,
+        px.max(ex) + hw,
+        py.max(ey) + hw,
+    );
     if hit(w, i, r, b.a, b.mult, false) && w.frame as i64 - b.next > 0 {
         let nf = w.frame as i64 + 3 + w.rng.rand(5) as i64;
         if let ShotKind::FullBeam(x) = &mut w.shot(i).kind {
@@ -1456,7 +1940,12 @@ fn full_update(w: &mut World, i: usize) {
     if matches!(&w.shot_ref(i).kind, ShotKind::FullBeam(b) if b.game) {
         return final_flash_update(w, i, t);
     }
-    let (dir, owner, px, py) = (w.shot_ref(i).dir, w.shot_ref(i).owner, w.shot_ref(i).px(), w.shot_ref(i).py());
+    let (dir, owner, px, py) = (
+        w.shot_ref(i).dir,
+        w.shot_ref(i).owner,
+        w.shot_ref(i).px(),
+        w.shot_ref(i).py(),
+    );
     if t == 1 {
         let len = wall_dist(w, dir, px, py, 8, 400);
         let vp = match &w.shot_ref(i).kind {
@@ -1530,30 +2019,72 @@ fn area_update(w: &mut World, i: usize) {
     }
 }
 
-const BB_DEF: [(i32, i32, u32); 3] = [(4, 4, 0x0876_4e00), (6, 6, 0x0876_4e00), (7, 10, 0x0876_aae0)];
+const BB_DEF: [(i32, i32, u32); 3] = [
+    (4, 4, 0x0876_4e00),
+    (6, 6, 0x0876_4e00),
+    (7, 10, 0x0876_aae0),
+];
 const BB_SIZE: [i32; 10] = [4, 6, 8, 12, 16, 24, 28, 32, 32, 32];
-const BB_REC: [[i32; 4]; 10] = [[8, 4, 16, 16], [8, 2, 16, 16], [8, 0, 16, 16], [16, 4, 32, 32], [16, 0, 32, 32], [32, 8, 64, 64], [32, 4, 64, 64], [32, 0, 64, 64], [32, 0, 64, 64], [32, 0, 64, 64]];
+const BB_REC: [[i32; 4]; 10] = [
+    [8, 4, 16, 16],
+    [8, 2, 16, 16],
+    [8, 0, 16, 16],
+    [16, 4, 32, 32],
+    [16, 0, 32, 32],
+    [32, 8, 64, 64],
+    [32, 4, 64, 64],
+    [32, 0, 64, 64],
+    [32, 0, 64, 64],
+    [32, 0, 64, 64],
+];
 /// ball position relative to the player position while charging, per facing (0x0871DD9C)
 pub const BIGBANG_POS: [(i32, i32); 4] = [(2, 2), (12, -22), (-5, -6), (21, -6)];
 
 /// Big Bang ball (class 0x08037480, update 0x08037650, launch 0x080378A0, explode 0x0803756E, handler 0x080378F4)
 pub fn big_bang(owner: EntityId, dir: Dir, x: i32, y: i32, lv: i32) -> Shot {
-    Shot::new(owner, dir, 1, x, y, ShotKind::BigBang(Box::new(BigBangBall { charge256: 0, launched: false, lv: lv.clamp(0, 2), u: 0, f: 0 })))
+    Shot::new(
+        owner,
+        dir,
+        1,
+        x,
+        y,
+        ShotKind::BigBang(Box::new(BigBangBall {
+            charge256: 0,
+            launched: false,
+            lv: lv.clamp(0, 2),
+            u: 0,
+            f: 0,
+        })),
+    )
 }
 fn bb_cap(b: &mut BigBangBall) {
     let (lo, hi, _) = BB_DEF[b.lv as usize];
     if b.f >= lo {
-        b.f = if hi == lo { lo } else { lo + ((b.u >> 2) % (hi - lo)) };
+        b.f = if hi == lo {
+            lo
+        } else {
+            lo + ((b.u >> 2) % (hi - lo))
+        };
     }
 }
 /// the record box of the ball's current frame (falls back to the facing-down boxes)
 fn bb_rect(w: &World, s: &Shot, b: &BigBangBall) -> Rect {
-    let g = w.data.record(BB_DEF[b.lv as usize].2 + s.dir as u32 * 120 + 12 * b.f as u32).unwrap_or(BB_REC[(b.f as usize).min(9)]);
-    Rect::new(s.px() - g[0], s.py() - g[1], s.px() - g[0] + g[2], s.py() - g[1] + g[3])
+    let g = w
+        .data
+        .record(BB_DEF[b.lv as usize].2 + s.dir as u32 * 120 + 12 * b.f as u32)
+        .unwrap_or(BB_REC[(b.f as usize).min(9)]);
+    Rect::new(
+        s.px() - g[0],
+        s.py() - g[1],
+        s.px() - g[0] + g[2],
+        s.py() - g[1] + g[3],
+    )
 }
 fn bb_around(w: &World, i: usize, sz: i32) -> Rect {
     let s = w.shot_ref(i);
-    let ShotKind::BigBang(b) = &s.kind else { return Rect::default() };
+    let ShotKind::BigBang(b) = &s.kind else {
+        return Rect::default();
+    };
     let (cx, cy) = bb_rect(w, s, b).center();
     Rect::new(cx - sz, cy - sz, cx + sz, cy + sz)
 }
@@ -1599,7 +2130,9 @@ fn bigbang_update(w: &mut World, i: usize) {
     // past the camera edge on the side it flies to (0x08019B7C)
     let r = {
         let s = w.shot_ref(i);
-        let ShotKind::BigBang(b) = &s.kind else { return };
+        let ShotKind::BigBang(b) = &s.kind else {
+            return;
+        };
         bb_rect(w, s, b)
     };
     let c = w.camera(owner_slot(w, owner));
@@ -1646,7 +2179,15 @@ fn bigbang_explode(w: &mut World, i: usize) {
     hit(w, i, around, atk(13), (81 * charge) as i32, false);
     w.sfx(23, 64);
     let (cx, cy) = around.center();
-    fx::add(w, fx::Fx::BigBangBoom { n: 60, x0: cx - s, y0: cy - s, s });
+    fx::add(
+        w,
+        fx::Fx::BigBangBoom {
+            n: 60,
+            x0: cx - s,
+            y0: cy - s,
+            s,
+        },
+    );
 }
 
 /// Masenko (skill 17): the cursor (ctor 0x08021594, update 0x0802163A) at the body-box centre + dir * d and the ball
@@ -1656,7 +2197,21 @@ const MASENKO_SPARK: [i32; 3] = [9, 9, 12];
 const MASENKO_N: [i32; 3] = [4, 5, 6];
 
 pub fn masenko(owner: EntityId, dir: Dir, mult: i32, lv: i32) -> Shot {
-    Shot::new(owner, dir, 1, 0, 0, ShotKind::MasenkoCursor(Box::new(MasenkoCursor { d: 0, step: 2, released: -1, mult, lv: lv.clamp(0, 2), ball: 0 })))
+    Shot::new(
+        owner,
+        dir,
+        1,
+        0,
+        0,
+        ShotKind::MasenkoCursor(Box::new(MasenkoCursor {
+            d: 0,
+            step: 2,
+            released: -1,
+            mult,
+            lv: lv.clamp(0, 2),
+            ball: 0,
+        })),
+    )
 }
 fn masenko_pos(w: &World, owner: EntityId, dir: Dir, d: i32) -> (i32, i32) {
     let (cx, cy) = w.actor_by_id(owner).map(|a| a.center()).unwrap_or((0, 0));
@@ -1702,9 +2257,28 @@ fn masenko_update(w: &mut World, i: usize) {
     };
     if c.ball == 0 {
         let (mx, my) = MASENKO_MUZZLE[dir as usize];
-        let (opx, opy) = w.actor_by_id(owner).map(|a| (a.px(), a.py())).unwrap_or((0, 0));
+        let (opx, opy) = w
+            .actor_by_id(owner)
+            .map(|a| (a.px(), a.py()))
+            .unwrap_or((0, 0));
         let me = w.ents[i].id;
-        let ball = Shot::new(owner, dir, 1, (opx + mx) << 8, (opy + my) << 8, ShotKind::MasenkoBall(Box::new(MasenkoBall { cursor: me, lv: c.lv, phase: MPhase::Charge, vx: 0, vy: 0, a: 0, b: 0, tb: 0 })));
+        let ball = Shot::new(
+            owner,
+            dir,
+            1,
+            (opx + mx) << 8,
+            (opy + my) << 8,
+            ShotKind::MasenkoBall(Box::new(MasenkoBall {
+                cursor: me,
+                lv: c.lv,
+                phase: MPhase::Charge,
+                vx: 0,
+                vy: 0,
+                a: 0,
+                b: 0,
+                tb: 0,
+            })),
+        );
         let id = add(w, ball);
         if let ShotKind::MasenkoCursor(x) = &mut w.shot(i).kind {
             x.ball = id;
@@ -1745,10 +2319,18 @@ fn masenko_update(w: &mut World, i: usize) {
 }
 fn masenko_flight_rect(w: &World, i: usize) -> Rect {
     let s = w.shot_ref(i);
-    let ShotKind::MasenkoBall(b) = &s.kind else { return Rect::default() };
-    let rec = 0x0872_1164 + 12 * (MASENKO_SPARK[b.lv as usize] + 1 + ((s.t as i32 >> 3) & 1)) as u32;
+    let ShotKind::MasenkoBall(b) = &s.kind else {
+        return Rect::default();
+    };
+    let rec =
+        0x0872_1164 + 12 * (MASENKO_SPARK[b.lv as usize] + 1 + ((s.t as i32 >> 3) & 1)) as u32;
     match w.data.record(rec) {
-        Some(g) => Rect::new(s.px() - g[0], s.py() - g[1], s.px() - g[0] + g[2], s.py() - g[1] + g[3]),
+        Some(g) => Rect::new(
+            s.px() - g[0],
+            s.py() - g[1],
+            s.px() - g[0] + g[2],
+            s.py() - g[1] + g[3],
+        ),
         None => centered(s.px(), s.py(), 16, 16),
     }
 }
@@ -1762,10 +2344,15 @@ fn masenko_ball_update(w: &mut World, i: usize) {
         MPhase::Charge => {
             let gone = match w.find(b.cursor) {
                 None => true,
-                Some(ci) => w.ents[ci].removed && matches!(&w.shot_ref(ci).kind, ShotKind::MasenkoCursor(c) if c.released < 0),
+                Some(ci) => {
+                    w.ents[ci].removed
+                        && matches!(&w.shot_ref(ci).kind, ShotKind::MasenkoCursor(c) if c.released < 0)
+                }
             };
             // the cursor removed without a release (the skill ended): the charging ball goes too
-            let released = w.find(b.cursor).is_some_and(|ci| matches!(&w.shot_ref(ci).kind, ShotKind::MasenkoCursor(c) if c.released >= 0));
+            let released = w.find(b.cursor).is_some_and(
+                |ci| matches!(&w.shot_ref(ci).kind, ShotKind::MasenkoCursor(c) if c.released >= 0),
+            );
             if gone && !released {
                 w.ents[i].removed = true;
             }
@@ -1819,12 +2406,65 @@ fn masenko_ball_update(w: &mut World, i: usize) {
 /// Released: moves 3 px per tick, len -= 3, removed once len < 0 (destructor sounds: the owner's beam_end).
 /// a hit message's sender class that no object accepts (an NPC's beam: scene.rs)
 pub const TEAM_NONE: u8 = 0xEC;
-pub fn kame_beam(owner: EntityId, dir: Dir, x: i32, y: i32, built: i64, a: AttackType, mult: i32, gfx: bool) -> Shot {
-    Shot::new(owner, dir, 1, x << 8, y << 8, ShotKind::Kame(Box::new(KameBeam { len: 8, done: false, a, mult, gfx, vt: 0, stopped: false, next: built, charging: false, sounds: false })))
+pub fn kame_beam(
+    owner: EntityId,
+    dir: Dir,
+    x: i32,
+    y: i32,
+    built: i64,
+    a: AttackType,
+    mult: i32,
+    gfx: bool,
+) -> Shot {
+    Shot::new(
+        owner,
+        dir,
+        1,
+        x << 8,
+        y << 8,
+        ShotKind::Kame(Box::new(KameBeam {
+            len: 8,
+            done: false,
+            a,
+            mult,
+            gfx,
+            vt: 0,
+            stopped: false,
+            next: built,
+            charging: false,
+            sounds: false,
+        })),
+    )
 }
 /// an enemy's beam of the player's class (Kid Buu's Kamehameha): team 0, charging until `kame_fire`, its own sounds
-pub fn kame_beam_enemy(owner: EntityId, dir: Dir, x: i32, y: i32, built: i64, a: AttackType, mult: i32) -> Shot {
-    Shot::new(owner, dir, 0, x << 8, y << 8, ShotKind::Kame(Box::new(KameBeam { len: 8, done: false, a, mult, gfx: true, vt: 0, stopped: false, next: built, charging: true, sounds: true })))
+pub fn kame_beam_enemy(
+    owner: EntityId,
+    dir: Dir,
+    x: i32,
+    y: i32,
+    built: i64,
+    a: AttackType,
+    mult: i32,
+) -> Shot {
+    Shot::new(
+        owner,
+        dir,
+        0,
+        x << 8,
+        y << 8,
+        ShotKind::Kame(Box::new(KameBeam {
+            len: 8,
+            done: false,
+            a,
+            mult,
+            gfx: true,
+            vt: 0,
+            stopped: false,
+            next: built,
+            charging: true,
+            sounds: true,
+        })),
+    )
 }
 fn kame_head(s: &Shot, len: i32) -> (i32, i32) {
     let (dx, dy) = DIR_VEC[s.dir as usize];
@@ -1902,13 +2542,26 @@ fn kame_update(w: &mut World, i: usize) {
 /// Ultra Volleyball Attack wave (Gotenks skill 23, update 0x080384C2): box origin .. origin + dir * len expanded by 2;
 /// a wall or an accepted message ends it; else len += 4 up to 48, then the origin moves 4 px per tick; 240 ticks max
 pub fn volley_wave(owner: EntityId, dir: Dir, x: i32, y: i32) -> Shot {
-    Shot::new(owner, dir, 1, x << 8, y << 8, ShotKind::Volley { len: 8, done: false, n: 0 })
+    Shot::new(
+        owner,
+        dir,
+        1,
+        x << 8,
+        y << 8,
+        ShotKind::Volley {
+            len: 8,
+            done: false,
+            n: 0,
+        },
+    )
 }
 fn volley_update(w: &mut World, i: usize) {
     let dir = w.shot_ref(i).dir;
     let (dx, dy) = DIR_VEC[dir as usize];
     w.shot(i).t += 1;
-    let ShotKind::Volley { done, .. } = w.shot_ref(i).kind else { return };
+    let ShotKind::Volley { done, .. } = w.shot_ref(i).kind else {
+        return;
+    };
     if done {
         let s = w.shot(i);
         s.x += dx * 4 * 256;
@@ -1950,7 +2603,12 @@ fn volley_update(w: &mut World, i: usize) {
 }
 
 pub const GHOST_SPAWN: [(i32, i32); 4] = [(6, 1), (-4, -8), (-16, -6), (16, -6)];
-const GHOST_SLOTS: [[(i32, i32); 3]; 4] = [[(-26, 17), (38, 17), (6, 25)], [(-36, -24), (28, -24), (-4, -32)], [(-32, -38), (-32, 26), (-40, -6)], [(32, -38), (32, 26), (40, -6)]];
+const GHOST_SLOTS: [[(i32, i32); 3]; 4] = [
+    [(-26, 17), (38, 17), (6, 25)],
+    [(-36, -24), (28, -24), (-4, -32)],
+    [(-32, -38), (-32, 26), (-40, -6)],
+    [(32, -38), (32, 26), (40, -6)],
+];
 pub const GHOST_SPRITE: i32 = 148;
 /// the ghost's animation host: sprite 148, the game RNG
 struct GHost<'a> {
@@ -1960,7 +2618,11 @@ struct GHost<'a> {
 }
 impl crate::eanim::Host for GHost<'_> {
     fn nframes(&mut self, raw: i32) -> i32 {
-        self.d.sprite(GHOST_SPRITE).and_then(|s| s.anim_raw(raw)).map(|a| a.steps(self.facing).len() as i32).unwrap_or(0)
+        self.d
+            .sprite(GHOST_SPRITE)
+            .and_then(|s| s.anim_raw(raw))
+            .map(|a| a.steps(self.facing).len() as i32)
+            .unwrap_or(0)
     }
     fn rand(&mut self, n: u32) -> i32 {
         self.rng.rand(n)
@@ -1971,7 +2633,11 @@ fn ghost_enter(w: &mut World, i: usize, raw: i32, rule: u32) {
     let d = std::sync::Arc::clone(&w.data);
     let mut rng = w.rng;
     if let ShotKind::Ghost(g) = &mut w.shot(i).kind {
-        let mut h = GHost { d: &d, facing: g.facing, rng: &mut rng };
+        let mut h = GHost {
+            d: &d,
+            facing: g.facing,
+            rng: &mut rng,
+        };
         g.ea.enter(&d.anim.rules, raw, rule, &mut h);
     }
     w.rng = rng;
@@ -1980,7 +2646,24 @@ fn ghost_enter(w: &mut World, i: usize, raw: i32, rule: u32) {
 /// rand(255)), then the appear animation raw 19 (once, shift 3, its end SetAnim(0) again)
 pub fn ghost(w: &mut World, owner: EntityId, dir: Dir, x: i32, y: i32, slot: i32) -> EntityId {
     let facing = w.actor_by_id(owner).map(|a| a.facing).unwrap_or(dir);
-    let id = add(w, Shot::new(owner, dir, 1, x, y, ShotKind::Ghost(Box::new(Ghost { free: false, wait: 0, slot, ea: Default::default(), facing, boom: false }))));
+    let id = add(
+        w,
+        Shot::new(
+            owner,
+            dir,
+            1,
+            x,
+            y,
+            ShotKind::Ghost(Box::new(Ghost {
+                free: false,
+                wait: 0,
+                slot,
+                ea: Default::default(),
+                facing,
+                boom: false,
+            })),
+        ),
+    );
     let i = w.find(id).unwrap();
     let (idle, once) = (w.data.anim.setanim[&1], w.data.anim.setanim[&4]);
     ghost_enter(w, i, 1, idle);
@@ -1990,14 +2673,22 @@ pub fn ghost(w: &mut World, owner: EntityId, dir: Dir, x: i32, y: i32, slot: i32
 /// PvP rule set (`World::opts.pvp`, multiplayer only): the other players a player's homing shot may chase - alive,
 /// hittable, not being eaten (`player::pvp_targetable`), in slot order. Empty without PvP or for an enemy's shot.
 pub fn pvp_homing_targets(w: &World, owner: EntityId) -> Vec<usize> {
-    if !w.opts.pvp || !w.find(owner).is_some_and(|k| matches!(w.ents[k].body, Body::Player(_))) {
+    if !w.opts.pvp
+        || !w
+            .find(owner)
+            .is_some_and(|k| matches!(w.ents[k].body, Body::Player(_)))
+    {
         return Vec::new();
     }
     w.players
         .iter()
         .filter(|&&id| id != owner)
         .filter_map(|&id| w.find(id))
-        .filter(|&k| !w.ents[k].removed && matches!(w.ents[k].body, Body::Player(_)) && player::pvp_targetable(w, k))
+        .filter(|&k| {
+            !w.ents[k].removed
+                && matches!(w.ents[k].body, Body::Player(_))
+                && player::pvp_targetable(w, k)
+        })
         .collect()
 }
 
@@ -2012,7 +2703,11 @@ fn ghost_update(w: &mut World, i: usize) {
     let tick = {
         let mut rng = w.rng;
         let r = if let ShotKind::Ghost(g) = &mut w.shot(i).kind {
-            let mut h = GHost { d: &d, facing: g.facing, rng: &mut rng };
+            let mut h = GHost {
+                d: &d,
+                facing: g.facing,
+                rng: &mut rng,
+            };
             matches!(g.ea.tick(&d.anim.rules, &mut h), crate::eanim::Tick::Idle)
         } else {
             false
@@ -2024,10 +2719,14 @@ fn ghost_update(w: &mut World, i: usize) {
         ghost_enter(w, i, 1, d.anim.setanim[&1]);
     }
     let owner = w.shot_ref(i).owner;
-    let ShotKind::Ghost(g) = &w.shot_ref(i).kind else { return };
+    let ShotKind::Ghost(g) = &w.shot_ref(i).kind else {
+        return;
+    };
     let g = (**g).clone();
     if !g.free {
-        let Some(a) = w.actor_by_id(owner) else { return };
+        let Some(a) = w.actor_by_id(owner) else {
+            return;
+        };
         let (of, opx, opy) = (a.facing, a.px(), a.py());
         if let ShotKind::Ghost(x) = &mut w.shot(i).kind {
             x.facing = of;
@@ -2099,7 +2798,9 @@ fn ghost_update(w: &mut World, i: usize) {
             }
         }
     }
-    let Some((dx, dy)) = best else { return set_boom(w) };
+    let Some((dx, dy)) = best else {
+        return set_boom(w);
+    };
     let (ax, ay) = (dx.abs(), dy.abs());
     let facing: Dir = if ax > ay {
         if dx > 0 {
@@ -2134,7 +2835,9 @@ fn wave_update(w: &mut World, i: usize) {
     let dir = w.shot_ref(i).dir;
     let (dx, dy) = DIR_VEC[dir as usize];
     w.shot(i).t += 1;
-    let ShotKind::EnergyWave { len, mode, life } = w.shot_ref(i).kind else { return };
+    let ShotKind::EnergyWave { len, mode, life } = w.shot_ref(i).kind else {
+        return;
+    };
     if mode == 1 {
         let s = w.shot(i);
         s.x += dx * 4 * 256;
@@ -2177,7 +2880,15 @@ fn wave_update(w: &mut World, i: usize) {
         s.y += dy * 4 * 256;
     }
     let life = life + 1;
-    set_kind(w, i, ShotKind::EnergyWave { len: l, mode: if life > 240 { 1 } else { 0 }, life });
+    set_kind(
+        w,
+        i,
+        ShotKind::EnergyWave {
+            len: l,
+            mode: if life > 240 { 1 } else { 0 },
+            life,
+        },
+    );
 }
 
 fn flame_update(w: &mut World, i: usize) {
@@ -2201,7 +2912,22 @@ fn flame_update(w: &mut World, i: usize) {
         if let Some(pi) = target_player(w, owner) {
             let r = rect(w, i);
             let stats = w.actor_by_id(owner).map(|a| a.stats).unwrap_or_default();
-            let mut m = HitMsg { team: 0, rect: r, dir: w.shot_ref(i).dir, mult: 51, atk: atk(4), attacker: owner, att_stats: stats, att_is_player: false, source: w.ents[i].id, crit: false, raw: 0, dmg: 0, no_react: true, foot: false };
+            let mut m = HitMsg {
+                team: 0,
+                rect: r,
+                dir: w.shot_ref(i).dir,
+                mult: 51,
+                atk: atk(4),
+                attacker: owner,
+                att_stats: stats,
+                att_is_player: false,
+                source: w.ents[i].id,
+                crit: false,
+                raw: 0,
+                dmg: 0,
+                no_react: true,
+                foot: false,
+            };
             if player::on_message(w, pi, &mut m) {
                 if let ShotKind::Flame { done, .. } = &mut w.shot(i).kind {
                     *done = true;
@@ -2219,12 +2945,18 @@ fn bomb_update(w: &mut World, i: usize) {
         s.t += 1;
         s.t
     };
-    let ShotKind::Bomb { vx, vy, .. } = w.shot_ref(i).kind else { return };
+    let ShotKind::Bomb { vx, vy, .. } = w.shot_ref(i).kind else {
+        return;
+    };
     if t <= 40 {
         let s = w.shot(i);
         s.x += vx;
         s.y += vy;
-        s.kind = ShotKind::Bomb { vx, vy: vy + 0x20, landed: if t == 40 { t } else { -1 } };
+        s.kind = ShotKind::Bomb {
+            vx,
+            vy: vy + 0x20,
+            landed: if t == 40 { t } else { -1 },
+        };
         return;
     }
     if t >= 71 {
@@ -2247,8 +2979,26 @@ fn bomb_update(w: &mut World, i: usize) {
             // the knockback). Battles keep the reference (the player only)
             let s = w.shot_ref(i);
             let (owner, dir) = (s.owner, s.dir);
-            let stats = w.find(owner).and_then(|oi| w.actor(oi).map(|a| a.stats)).unwrap_or_default();
-            let mut m = HitMsg { team: 2, rect: r, dir, mult: 1024, atk: atk(1), attacker: owner, att_stats: stats, att_is_player: false, source: w.ents[i].id, crit: false, raw: 0, dmg: 0, no_react: false, foot: false };
+            let stats = w
+                .find(owner)
+                .and_then(|oi| w.actor(oi).map(|a| a.stats))
+                .unwrap_or_default();
+            let mut m = HitMsg {
+                team: 2,
+                rect: r,
+                dir,
+                mult: 1024,
+                atk: atk(1),
+                attacker: owner,
+                att_stats: stats,
+                att_is_player: false,
+                source: w.ents[i].id,
+                crit: false,
+                raw: 0,
+                dmg: 0,
+                no_react: false,
+                foot: false,
+            };
             // a dead thrower's bomb still bursts but hits nobody (as `hit`: real route 2-10, the bomber punched out
             // while its bomb is in the air - the blast beside the player does nothing)
             if !owner_dead(w, owner) {
@@ -2273,7 +3023,16 @@ fn bomb_update(w: &mut World, i: usize) {
 fn bomb_chips(w: &mut World, px: i32, py: i32) {
     for k in 0..4 {
         let (dvx, dvy) = [(96, 0), (-96, 0), (0, 64), (0, -64)][k];
-        fx::add(w, fx::Fx::Debris { x: (px - 4) << 8, y: (py - 4) << 8, vx: dvx, vy: dvy, t: 0 });
+        fx::add(
+            w,
+            fx::Fx::Debris {
+                x: (px - 4) << 8,
+                y: (py - 4) << 8,
+                vx: dvx,
+                vy: dvy,
+                t: 0,
+            },
+        );
         crate::vram::keyed_acquire(w, crate::vram::KEY_DEBRIS, 0x40);
     }
 }
@@ -2298,7 +3057,16 @@ fn superball_update(w: &mut World, i: usize) {
         s.t
     };
     let owner = w.shot_ref(i).owner;
-    let ShotKind::SuperBall { phase, sx, sy, tx, ty } = w.shot_ref(i).kind else { return };
+    let ShotKind::SuperBall {
+        phase,
+        sx,
+        sy,
+        tx,
+        ty,
+    } = w.shot_ref(i).kind
+    else {
+        return;
+    };
     if phase == 0 {
         if let Some(a) = w.actor_by_id(owner) {
             let (x, y) = ((a.px() + 8) << 8, a.py() << 8);
@@ -2316,7 +3084,13 @@ fn superball_update(w: &mut World, i: usize) {
             };
             let s = w.shot(i);
             let (x, y) = (s.x, s.y);
-            s.kind = ShotKind::SuperBall { phase: 1, sx: x, sy: y, tx: tx << 8, ty: ty << 8 };
+            s.kind = ShotKind::SuperBall {
+                phase: 1,
+                sx: x,
+                sy: y,
+                tx: tx << 8,
+                ty: ty << 8,
+            };
             s.t = 0;
             // the throw (0x080214DA): the charge sound stops, sound 34 (0x0802154E / 0x0802155E; real run 20-6
             // r062_001 tile +4,000 f75)
@@ -2340,9 +3114,34 @@ fn superball_update(w: &mut World, i: usize) {
             // the burst is the ball object's own animation (records 0x0872A648, 6 x 4 ticks) on the ball's tiles,
             // freed when it ends (real run 20-6 r062_001 tile +5,000: impact f64, the block freed at f88)
             let ball = w.ents[i].id;
-            let fid = w.add(Body::Fx(Box::new(fx::Fx::Anim { id: 0x0872_a5dc, x: px, y: py, rec: 9, left: 6, rate: 0x4000, acc: 0 })));
-            crate::vram::rekey(w, crate::vram::Owner::Ent(ball), crate::vram::Owner::Ent(fid));
-            add(w, area_hit(owner, 0, 0, centered(px, py, 32, 32), 16, 100, atk(7), 16589, 2));
+            let fid = w.add(Body::Fx(Box::new(fx::Fx::Anim {
+                id: 0x0872_a5dc,
+                x: px,
+                y: py,
+                rec: 9,
+                left: 6,
+                rate: 0x4000,
+                acc: 0,
+            })));
+            crate::vram::rekey(
+                w,
+                crate::vram::Owner::Ent(ball),
+                crate::vram::Owner::Ent(fid),
+            );
+            add(
+                w,
+                area_hit(
+                    owner,
+                    0,
+                    0,
+                    centered(px, py, 32, 32),
+                    16,
+                    100,
+                    atk(7),
+                    16589,
+                    2,
+                ),
+            );
         }
     }
 }
@@ -2354,7 +3153,9 @@ fn sphere_update(w: &mut World, i: usize) {
         w.ents[i].removed = true;
         return;
     }
-    let ShotKind::DarkSphere { mut r256 } = w.shot_ref(i).kind else { return };
+    let ShotKind::DarkSphere { mut r256 } = w.shot_ref(i).kind else {
+        return;
+    };
     if w.g.sphere_state == 0 {
         r256 = (64 * 256).min(r256 + 51);
         if r256 >= 64 * 256 {
@@ -2427,7 +3228,12 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
         // (0x0801C978: explosion, rate 0x2000) and is accepted (3-14: Gohan's ki blast shoots a shell down, its hit
         // sound plays)
         ShotKind::Straight(o) if o.name == SName::Shell => {
-            if o.dead < 0 && !msg.foot && msg.source != me && !w.ents[i].removed && overlaps(&msg.rect, &rect(w, i)) {
+            if o.dead < 0
+                && !msg.foot
+                && msg.source != me
+                && !w.ents[i].removed
+                && overlaps(&msg.rect, &rect(w, i))
+            {
                 w.ents[i].removed = true;
                 let (px, py) = (w.shot_ref(i).px(), w.shot_ref(i).py());
                 fx::explosion(w, px, py, 0x2000);
@@ -2439,7 +3245,13 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
         // object overlapping its box bursts it (its spark, +0x4C = 16) and is taken (segment sb 6-6 f18799: Super
         // Buu's blast flies into Gotenks' beam head - both stop)
         ShotKind::Straight(o) if o.name == SName::KiBlast && o.fx_end == 16 && !o.fragile => {
-            if o.dead >= 0 || msg.foot || msg.source == me || w.ents[i].removed || msg.atk.kind != 1 || msg.atk.sub == 0xd {
+            if o.dead >= 0
+                || msg.foot
+                || msg.source == me
+                || w.ents[i].removed
+                || msg.atk.kind != 1
+                || msg.atk.sub == 0xd
+            {
                 return false;
             }
             if !overlaps(&msg.rect, &rect(w, i)) {
@@ -2458,16 +3270,28 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
         // the bullet's box of this frame, emulator write order work/earth/timing/order.py): a bullet that has not
         // had its update this frame is tested where this frame's move puts it.
         ShotKind::Straight(o) => {
-            let ahead = w.find(msg.source).is_some_and(|j| j > i) && !(o.delay > 0 && w.shot_ref(i).t < o.delay);
+            let ahead = w.find(msg.source).is_some_and(|j| j > i)
+                && !(o.delay > 0 && w.shot_ref(i).t < o.delay);
             let r = if ahead {
                 let s = w.shot_ref(i);
                 let (px, py) = ((s.x + o.vx) >> 8, (s.y + o.vy) >> 8);
                 let b = rect(w, i);
-                Rect::new(b.x0 + px - s.px(), b.y0 + py - s.py(), b.x1 + px - s.px(), b.y1 + py - s.py())
+                Rect::new(
+                    b.x0 + px - s.px(),
+                    b.y0 + py - s.py(),
+                    b.x1 + px - s.px(),
+                    b.y1 + py - s.py(),
+                )
             } else {
                 rect(w, i)
             };
-            if o.fragile && o.dead < 0 && !msg.foot && msg.source != me && !w.ents[i].removed && overlaps(&msg.rect, &r) {
+            if o.fragile
+                && o.dead < 0
+                && !msg.foot
+                && msg.source != me
+                && !w.ents[i].removed
+                && overlaps(&msg.rect, &r)
+            {
                 let (sfx_end, explode) = (o.sfx_end, o.explode);
                 w.ents[i].removed = true;
                 if sfx_end >= 0 {
@@ -2483,7 +3307,8 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
         }
         // a flying bandage is destroyed by any other object's hit message overlapping its box (message 0)
         ShotKind::Wrap(m) => {
-            if msg.source == me || m.stuck || w.ents[i].removed || !overlaps(&msg.rect, &rect(w, i)) {
+            if msg.source == me || m.stuck || w.ents[i].removed || !overlaps(&msg.rect, &rect(w, i))
+            {
                 return false;
             }
             wrap_burst(w, i);
@@ -2502,7 +3327,9 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
             let s = w.shot_ref(i);
             let (dx, dy) = DIR_VEC[s.dir as usize];
             let (hx, hy) = (s.px() + dx * len, s.py() + dy * len);
-            if msg.dir == (s.dir ^ 1) && overlaps(&msg.rect, &Rect::new(hx - 12, hy - 12, hx + 12, hy + 12)) {
+            if msg.dir == (s.dir ^ 1)
+                && overlaps(&msg.rect, &Rect::new(hx - 12, hy - 12, hx + 12, hy + 12))
+            {
                 if let ShotKind::EnergyWave { mode, .. } = &mut w.shot(i).kind {
                     *mode = 1;
                 }
@@ -2524,7 +3351,11 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
                 w.ents[i].removed = true;
                 let (px, py) = (w.shot_ref(i).px(), w.shot_ref(i).py());
                 for k in 0..4 {
-                    fx::puff_rng(w, px + if k & 1 != 0 { 50 } else { -50 }, py + if k & 2 != 0 { 50 } else { -50 });
+                    fx::puff_rng(
+                        w,
+                        px + if k & 1 != 0 { 50 } else { -50 },
+                        py + if k & 2 != 0 { 50 } else { -50 },
+                    );
                 }
             }
             false

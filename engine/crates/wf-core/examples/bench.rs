@@ -12,8 +12,14 @@ fn load() -> Arc<GameData> {
         return Arc::new(GameData::load(&DirSource { root: dir.into() }).expect("content"));
     }
     let rom = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../roms/buu.gba");
-    let opts = wf_extract::Options { only: ["tables", "sprites", "effects", "maps"].iter().map(|s| s.to_string()).collect() };
-    let (c, _) = wf_extract::extract(std::fs::read(rom).expect("roms/buu.gba"), &opts).expect("extract");
+    let opts = wf_extract::Options {
+        only: ["tables", "sprites", "effects", "maps"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
+    };
+    let (c, _) =
+        wf_extract::extract(std::fs::read(rom).expect("roms/buu.gba"), &opts).expect("extract");
     Arc::new(GameData::load(&MapSource::new(c.files)).expect("content"))
 }
 
@@ -26,12 +32,27 @@ fn main() {
     let t = Instant::now();
     let data = load();
     println!("content load: {:.0} ms", t.elapsed().as_secs_f64() * 1e3);
-    for (name, enemy, count, arena) in [("4 Majin Fighters", "t68", 4, "forest"), ("Janemba + parts", "t51", 1, "crater"), ("Kid Buu", "t60", 1, "wasteland"), ("12 Majin Fighters", "t68", 12, "plateau")] {
-        let cfg = BattleConfig { arena: arena.into(), players: vec![FighterSetup::default()], phases: vec![Phase { enemy: enemy.into(), count }], rng: RngInit::Seed(9), xp: false };
+    for (name, enemy, count, arena) in [
+        ("4 Majin Fighters", "t68", 4, "forest"),
+        ("Janemba + parts", "t51", 1, "crater"),
+        ("Kid Buu", "t60", 1, "wasteland"),
+        ("12 Majin Fighters", "t68", 12, "plateau"),
+    ] {
+        let cfg = BattleConfig {
+            arena: arena.into(),
+            players: vec![FighterSetup::default()],
+            phases: vec![Phase {
+                enemy: enemy.into(),
+                count,
+            }],
+            rng: RngInit::Seed(9),
+            xp: false,
+        };
         let mut s = Session::new(Arc::clone(&data), cfg);
         let n = 3600u32;
         let t = Instant::now();
-        let (mut ents, mut snap_ns, mut bytes_ns, mut restore_ns, mut hash_ns, mut size) = (0usize, 0u128, 0u128, 0u128, 0u128, 0usize);
+        let (mut ents, mut snap_ns, mut bytes_ns, mut restore_ns, mut hash_ns, mut size) =
+            (0usize, 0u128, 0u128, 0u128, 0u128, 0usize);
         let mut step_ns = 0u128;
         for f in 0..n {
             let t0 = Instant::now();

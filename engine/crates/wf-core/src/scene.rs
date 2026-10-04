@@ -44,7 +44,10 @@ pub const SPRITE_BASE: i32 = 9;
 
 /// script anim id -> actor state id (`0x08072670`); raw anim = state + 1
 pub fn anim_state(anim: i32) -> i32 {
-    const T: [i32; 25] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x0a, 0x0b];
+    const T: [i32; 25] = [
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16,
+        0x17, 0x0a, 0x0b,
+    ];
     T.get(anim.max(0) as usize).copied().unwrap_or(anim)
 }
 
@@ -72,13 +75,28 @@ pub fn tick_kind(id: i32) -> TickKind {
         // (an NPC's 10 / 11 are their own state `0x03001B30` in its table `0x080727C8`: played once, 8 ticks a
         // cel, then it stays on the last one (no idle enter); segment sb 19-3: s457's play_anim(5, 10) ends after
         // 11 cels without the idle's draw)
-        10 | 11 => TickKind::Once { shift: 3, hold: true },
-        3 | 9 => TickKind::Once { shift: 3, hold: false },
-        4..=6 => TickKind::Once { shift: 2, hold: false },
+        10 | 11 => TickKind::Once {
+            shift: 3,
+            hold: true,
+        },
+        3 | 9 => TickKind::Once {
+            shift: 3,
+            hold: false,
+        },
+        4..=6 => TickKind::Once {
+            shift: 2,
+            hold: false,
+        },
         7 => TickKind::Hold,
         8 => TickKind::Bored,
-        16 => TickKind::Once { shift: 5, hold: true },
-        _ => TickKind::Once { shift: 4, hold: false },
+        16 => TickKind::Once {
+            shift: 5,
+            hold: true,
+        },
+        _ => TickKind::Once {
+            shift: 4,
+            hold: false,
+        },
     }
 }
 
@@ -90,7 +108,13 @@ pub enum AnimMode {
     /// `set_pose` / held cels of a command: frozen on a cel
     Pose,
     /// `play_anim_frames`: cels 0..last, each `each` frames, restart at `loop_start`, `loops` passes (0 = forever)
-    Frames { each: i32, loops: i32, loop_start: i32, last: i32, pass: i32 },
+    Frames {
+        each: i32,
+        loops: i32,
+        loop_start: i32,
+        last: i32,
+        pass: i32,
+    },
     /// an enemy's SetAnim: the enemy state table's rule for the raw (eanim.rs `setanim_table`; 2-90: play_anim(123,
     /// 10) on Goten plays raw 11 once and stops on its last cel, then the script goes on)
     Enemy,
@@ -124,14 +148,25 @@ pub enum AnimOut {
 
 impl ActAnim {
     pub fn idle() -> ActAnim {
-        ActAnim { raw: 1, ..Default::default() }
+        ActAnim {
+            raw: 1,
+            ..Default::default()
+        }
     }
     /// SetAnim(id) without the enter side effects (see [`set_state`])
     pub fn of(id: i32) -> ActAnim {
-        ActAnim { raw: anim_state(id) + 1, id, ..Default::default() }
+        ActAnim {
+            raw: anim_state(id) + 1,
+            id,
+            ..Default::default()
+        }
     }
     fn cels(&self, d: &GameData, sprite: Option<i32>, dir: Dir) -> i32 {
-        sprite.and_then(|s| d.sprite(s)).and_then(|sp| sp.anim_raw(self.raw)).map(|a| a.steps(dir).len() as i32).unwrap_or(0)
+        sprite
+            .and_then(|s| d.sprite(s))
+            .and_then(|sp| sp.anim_raw(self.raw))
+            .map(|a| a.steps(dir).len() as i32)
+            .unwrap_or(0)
     }
     /// one frame of the state's tick
     pub fn tick(&mut self, d: &GameData, sprite: Option<i32>, dir: Dir) -> AnimOut {
@@ -140,7 +175,14 @@ impl ActAnim {
             AnimMode::Pose => AnimOut::None,
             AnimMode::Enemy => {
                 use crate::eanim::{End, RuleKind};
-                let Some(r) = d.anim.setanim.get(&self.raw).map(|&k| &d.anim.rules[k as usize]) else { return AnimOut::None };
+                let Some(r) = d
+                    .anim
+                    .setanim
+                    .get(&self.raw)
+                    .map(|&k| &d.anim.rules[k as usize])
+                else {
+                    return AnimOut::None;
+                };
                 self.tick = (self.tick + 1) & 0xffff;
                 match r.kind {
                     RuleKind::Idle => {
@@ -186,7 +228,13 @@ impl ActAnim {
                 }
                 AnimOut::None
             }
-            AnimMode::Frames { each, loops, loop_start, last, pass } => {
+            AnimMode::Frames {
+                each,
+                loops,
+                loop_start,
+                last,
+                pass,
+            } => {
                 // the frame-range controller (0x0804DE58): cels 0..last, `each` ticks per cel, later passes from
                 // `loop_start` (its tick restarts at loop_start * each); a controller created by a track's
                 // pop-and-start waits a frame before its first tick (a new world object)
@@ -214,7 +262,13 @@ impl ActAnim {
                     }
                 }
                 self.frame = c;
-                self.mode = AnimMode::Frames { each, loops, loop_start, last, pass };
+                self.mode = AnimMode::Frames {
+                    each,
+                    loops,
+                    loop_start,
+                    last,
+                    pass,
+                };
                 AnimOut::None
             }
             AnimMode::Table => {
@@ -319,7 +373,20 @@ impl Npc {
         a.x = x << 8;
         a.y = y << 8;
         a.facing = dir;
-        Npc { a, sprite_id, tag: None, anim: ActAnim::idle(), tint: None, attach: None, speed: 0, byte8: 0x38, hold_item: None, talk: None, behaviour: None, resume: 0 }
+        Npc {
+            a,
+            sprite_id,
+            tag: None,
+            anim: ActAnim::idle(),
+            tint: None,
+            attach: None,
+            speed: 0,
+            byte8: 0x38,
+            hold_item: None,
+            talk: None,
+            behaviour: None,
+            resume: 0,
+        }
     }
 }
 
@@ -335,7 +402,9 @@ pub fn spawn_npc(w: &mut World, sprite_id: i32, x: i32, y: i32, dir: Dir) -> Ent
 }
 
 pub fn npc_update(w: &mut World, i: usize) {
-    if matches!(&w.ents[i].body, Body::Npc(n) if n.behaviour.is_some()) && !is_puppet(w, w.ents[i].id) {
+    if matches!(&w.ents[i].body, Body::Npc(n) if n.behaviour.is_some())
+        && !is_puppet(w, w.ents[i].id)
+    {
         return crate::field::npc_update(w, i);
     }
     let d = w.data.clone();
@@ -374,7 +443,10 @@ pub fn is_puppet(w: &World, id: EntityId) -> bool {
 fn make_puppet(w: &mut World, i: usize) {
     let id = w.ents[i].id;
     if !is_puppet(w, id) {
-        w.scene.puppets.push(Puppet { id, anim: ActAnim::idle() });
+        w.scene.puppets.push(Puppet {
+            id,
+            anim: ActAnim::idle(),
+        });
     }
 }
 
@@ -384,7 +456,9 @@ pub fn puppet_update(w: &mut World, i: usize) -> bool {
     if !matches!(w.ents[i].body, Body::Enemy(_)) {
         return false;
     }
-    let Some(k) = w.scene.puppets.iter().position(|p| p.id == id) else { return false };
+    let Some(k) = w.scene.puppets.iter().position(|p| p.id == id) else {
+        return false;
+    };
     let (s, f) = match w.actor(i) {
         Some(a) => (a.sprite, a.facing),
         None => return false,
@@ -403,7 +477,12 @@ pub fn shown_anim(w: &World, i: usize) -> Option<(i32, i32)> {
     match &w.ents[i].body {
         Body::Npc(n) => Some((n.anim.raw, n.anim.frame)),
         Body::Player(p) => Some((p.ap.raw, p.ap.frame)),
-        _ => w.scene.puppets.iter().find(|p| p.id == w.ents[i].id).map(|p| (p.anim.raw, p.anim.frame)),
+        _ => w
+            .scene
+            .puppets
+            .iter()
+            .find(|p| p.id == w.ents[i].id)
+            .map(|p| (p.anim.raw, p.anim.frame)),
     }
 }
 
@@ -413,30 +492,56 @@ pub fn cel_box(w: &World, i: usize) -> Option<[i32; 4]> {
     let sp = w.data.sprite(a.sprite?)?;
     let (raw, frame) = match shown_anim(w, i) {
         Some(x) => x,
-        None => (a.anim.and_then(|k| sp.anims.get(k as usize)).map(|an| an.raw).unwrap_or(1), 0),
+        None => (
+            a.anim
+                .and_then(|k| sp.anims.get(k as usize))
+                .map(|an| an.raw)
+                .unwrap_or(1),
+            0,
+        ),
     };
     let an = sp.anim_raw(raw)?;
-    let st = an.steps(a.facing).get(frame.max(0) as usize).or_else(|| an.steps(a.facing).first())?;
+    let st = an
+        .steps(a.facing)
+        .get(frame.max(0) as usize)
+        .or_else(|| an.steps(a.facing).first())?;
     st.fbox
 }
 
 /// decompression cycles of the cel an actor shows (`AnimStep.dec`; 0 = unknown / no sprite)
 pub fn cel_dec(w: &World, i: usize) -> u32 {
     let Some(a) = w.actor(i) else { return 0 };
-    let Some(sp) = a.sprite.and_then(|s| w.data.sprite(s)) else { return 0 };
+    let Some(sp) = a.sprite.and_then(|s| w.data.sprite(s)) else {
+        return 0;
+    };
     let (raw, frame) = match shown_anim(w, i) {
         Some(x) => x,
-        None => (a.anim.and_then(|k| sp.anims.get(k as usize)).map(|an| an.raw).unwrap_or(1), 0),
+        None => (
+            a.anim
+                .and_then(|k| sp.anims.get(k as usize))
+                .map(|an| an.raw)
+                .unwrap_or(1),
+            0,
+        ),
     };
     let Some(an) = sp.anim_raw(raw) else { return 0 };
-    an.steps(a.facing).get(frame.max(0) as usize).or_else(|| an.steps(a.facing).first()).map(|s| s.dec).unwrap_or(0)
+    an.steps(a.facing)
+        .get(frame.max(0) as usize)
+        .or_else(|| an.steps(a.facing).first())
+        .map(|s| s.dec)
+        .unwrap_or(0)
 }
 
 /// the scene animation of an Npc / enemy puppet
 pub fn scene_anim(w: &World, i: usize) -> Option<&ActAnim> {
     match &w.ents[i].body {
         Body::Npc(n) => Some(&n.anim),
-        _ => w.scene.puppets.iter().find(|p| p.id == w.ents[i].id).map(|p| &p.anim),
+        _ => w
+            .scene
+            .puppets
+            .iter()
+            .find(|p| p.id == w.ents[i].id)
+            .map(|p| &p.anim),
     }
 }
 
@@ -458,7 +563,11 @@ fn anim_mut(w: &mut World, i: usize) -> Option<&mut ActAnim> {
             _ => None,
         }
     } else {
-        w.scene.puppets.iter_mut().find(|p| p.id == id).map(|p| &mut p.anim)
+        w.scene
+            .puppets
+            .iter_mut()
+            .find(|p| p.id == id)
+            .map(|p| &mut p.anim)
     }
 }
 
@@ -512,7 +621,11 @@ pub fn set_pose(w: &mut World, i: usize, id: i32, frame: i32) {
         crate::player::script_pose(w, i, id.clamp(0, 24) as usize, frame);
         return;
     }
-    let a = ActAnim { frame, mode: AnimMode::Pose, ..ActAnim::of(id) };
+    let a = ActAnim {
+        frame,
+        mode: AnimMode::Pose,
+        ..ActAnim::of(id)
+    };
     if let Some(m) = anim_mut(w, i) {
         *m = a;
     }
@@ -520,7 +633,11 @@ pub fn set_pose(w: &mut World, i: usize, id: i32, frame: i32) {
 
 fn set_frames(w: &mut World, i: usize, id: i32, mode: AnimMode) {
     let player = matches!(w.ents[i].body, Body::Player(_));
-    let a = ActAnim { mode, fresh: w.scene.chaining, ..ActAnim::of(id) };
+    let a = ActAnim {
+        mode,
+        fresh: w.scene.chaining,
+        ..ActAnim::of(id)
+    };
     if let Some(m) = anim_mut(w, i) {
         *m = a;
     }
@@ -545,7 +662,11 @@ pub fn release_puppets(w: &mut World) {
         .scene
         .puppets
         .iter()
-        .map(|p| matches!(p.anim.mode, AnimMode::Frames { .. }) && w.find(p.id).is_some_and(|i| matches!(w.ents[i].body, Body::Player(_))))
+        .map(|p| {
+            matches!(p.anim.mode, AnimMode::Frames { .. })
+                && w.find(p.id)
+                    .is_some_and(|i| matches!(w.ents[i].body, Body::Player(_)))
+        })
         .collect();
     // map NPCs go back to their field behaviour with the animation the script left (one animation state in the
     // game: obj+0x50 / +0x11 / +0x12)
@@ -553,7 +674,9 @@ pub fn release_puppets(w: &mut World) {
         if k {
             continue;
         }
-        let Some(i) = w.ents.iter().position(|e| e.id == p.id) else { continue };
+        let Some(i) = w.ents.iter().position(|e| e.id == p.id) else {
+            continue;
+        };
         if let Body::Npc(n) = &mut w.ents[i].body {
             let (raw, tick, frame) = (n.anim.raw, n.anim.tick, n.anim.frame);
             let pose = n.anim.mode == AnimMode::Pose;
@@ -597,63 +720,183 @@ pub enum Owner {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Cmd {
     /// 0x4A actor_wait, 0x68 prop_wait
-    Wait { left: i32 },
+    Wait {
+        left: i32,
+    },
     /// 0x3C play_anim (anim 0: instant)
-    PlayAnim { anim: i32 },
+    PlayAnim {
+        anim: i32,
+    },
     /// 0x3D set_anim
-    SetAnim { anim: i32 },
+    SetAnim {
+        anim: i32,
+    },
     /// 0x51 set_pose
-    SetPose { anim: i32, frame: i32 },
+    SetPose {
+        anim: i32,
+        frame: i32,
+    },
     /// 0x59 play_anim_frames
-    PlayAnimFrames { anim: i32, each: i32, loops: i32, wait: bool, loop_start: i32, last: i32 },
+    PlayAnimFrames {
+        anim: i32,
+        each: i32,
+        loops: i32,
+        wait: bool,
+        loop_start: i32,
+        last: i32,
+    },
     /// 0x53 face
-    Face { dir: i32 },
+    Face {
+        dir: i32,
+    },
     /// 0x47 face_actor (holds: stays the track's head)
-    FaceActor { target: EntityId },
+    FaceActor {
+        target: EntityId,
+    },
     /// 0x44 walk_to (state 0xF), 0x50 move_to (state 2), 0x60 / 0x61 walk (state 1), 0x5F walk_to_actor;
     /// straight line at speed/100 px per frame (step math 0x080192CE), snapped at the end
-    MoveTo { x: i32, y: i32, speed: i32, state: i32, target: Option<(EntityId, i32, i32)>, n: i32, t: i32, sx: i32, sy: i32 },
+    MoveTo {
+        x: i32,
+        y: i32,
+        speed: i32,
+        state: i32,
+        target: Option<(EntityId, i32, i32)>,
+        n: i32,
+        t: i32,
+        sx: i32,
+        sy: i32,
+    },
     /// 0x49 glide_to: as MoveTo without animation or facing change
-    GlideTo { x: i32, y: i32, speed: i32, n: i32, t: i32, sx: i32, sy: i32 },
+    GlideTo {
+        x: i32,
+        y: i32,
+        speed: i32,
+        n: i32,
+        t: i32,
+        sx: i32,
+        sy: i32,
+    },
     /// 0x45 jump_to: 8 crouch frames, `air` frames of arc, 8 landing frames
-    JumpTo { x: i32, y: i32, air: i32, t: i32, sx: i32, vy: i32 },
+    JumpTo {
+        x: i32,
+        y: i32,
+        air: i32,
+        t: i32,
+        sx: i32,
+        vy: i32,
+    },
     /// 0x5D set_pos
-    SetPos { x: i32, y: i32 },
+    SetPos {
+        x: i32,
+        y: i32,
+    },
     /// 0x3F puff / 0x40 puff_offset (box centre + offset), 0x48 puff_at / 0x65 prop_effect_at (absolute)
-    Puff { x: i32, y: i32, absolute: bool },
+    Puff {
+        x: i32,
+        y: i32,
+        absolute: bool,
+    },
     /// 0x43 hit_flash
     HitFlash,
     /// 0x52 tint
-    Tint { r: i32, g: i32, b: i32, a: i32 },
+    Tint {
+        r: i32,
+        g: i32,
+        b: i32,
+        a: i32,
+    },
     /// 0x4D remove_actor
     Remove,
     /// 0x4E change_sprite
-    ChangeSprite { sprite: i32 },
+    ChangeSprite {
+        sprite: i32,
+    },
     /// 0x4F become_map_object
-    BecomeMapObject { index: i32 },
+    BecomeMapObject {
+        index: i32,
+    },
     /// 0x4B queue_sfx
-    Sfx { id: i32 },
+    Sfx {
+        id: i32,
+    },
     /// 0x4C screen_flash
-    ScreenFlash { r: i32, g: i32, b: i32, frames: i32, t: i32 },
+    ScreenFlash {
+        r: i32,
+        g: i32,
+        b: i32,
+        frames: i32,
+        t: i32,
+    },
     /// 0x57 shake_screen
-    Shake { intensity: i32, frames: i32, t: i32 },
+    Shake {
+        intensity: i32,
+        frames: i32,
+        t: i32,
+    },
     /// 0x58 show_item_get / 0x80 give_item / 0x93 give_equipment (60 frames)
-    ItemGet { item: i32, t: i32 },
+    ItemGet {
+        item: i32,
+        t: i32,
+    },
     /// 0x5A emote_wait / 0x5B emote
-    Emote { emote: i32, wait: bool, t: i32 },
+    Emote {
+        emote: i32,
+        wait: bool,
+        t: i32,
+    },
     /// 0x3B fire_wave_beam, 0x46 fire_beam, 0x5C fire_beam_alt, 0x5E fire_blast
-    Beam { kind: BeamKind, dir: i32, frames: i32, t: i32 },
+    Beam {
+        kind: BeamKind,
+        dir: i32,
+        frames: i32,
+        t: i32,
+    },
     /// 0x3E fire_ball_at, 0x41 shoot_at_actor, 0x42 shoot_at
-    Shoot { kind: ShootKind, x: i32, y: i32, speed: i32, t: i32, n: i32 },
+    Shoot {
+        kind: ShootKind,
+        x: i32,
+        y: i32,
+        speed: i32,
+        t: i32,
+        n: i32,
+    },
     /// 0x54 set_actor_speed, 0x56 set_actor_byte8, 0x55 set_attachment
-    SetSpeed { v: i32 },
-    SetByte8 { v: i32 },
-    SetAttachment { kind: i32, variant: i32, dx: i32, dy: i32 },
+    SetSpeed {
+        v: i32,
+    },
+    SetByte8 {
+        v: i32,
+    },
+    SetAttachment {
+        kind: i32,
+        variant: i32,
+        dx: i32,
+        dy: i32,
+    },
     /// props: 0x62 poof, 0x63/0x64 hide/show, 0x66 move, 0x67 jump, 0x69 set pos
-    PropPoof { vanish: bool, t: i32 },
-    PropShow { on: bool },
-    PropMoveTo { x: i32, y: i32, speed: i32, n: i32, t: i32, sx: i32, sy: i32 },
-    PropJumpTo { x: i32, y: i32, t: i32, vx: i32, vy: i32 },
+    PropPoof {
+        vanish: bool,
+        t: i32,
+    },
+    PropShow {
+        on: bool,
+    },
+    PropMoveTo {
+        x: i32,
+        y: i32,
+        speed: i32,
+        n: i32,
+        t: i32,
+        sx: i32,
+        sy: i32,
+    },
+    PropJumpTo {
+        x: i32,
+        y: i32,
+        t: i32,
+        vx: i32,
+        vy: i32,
+    },
     /// `solo`: enqueued outside a batch (done at its start: s464 n12); inside a batch it takes its tick (s464 n36:
     /// 80 positions of the Katchin block, one per frame plus the batch's start)
     PropSetPos {
@@ -663,11 +906,31 @@ pub enum Cmd {
         solo: bool,
     },
     /// camera track: 0x6A follow + wait, 0x6B pan, 0x6C release + wait, 0x6D / 0x6E params, 0x6F / 0x70 set
-    CamFollowWait { target: EntityId, left: i32 },
-    CamPanTo { x: i32, y: i32, speed: i32, n: i32, t: i32, sx: i32, sy: i32 },
-    CamReleaseWait { left: i32 },
-    CamParam { which: i32, v: i32 },
-    CamSet { x: i32, y: i32, z: Option<i32> },
+    CamFollowWait {
+        target: EntityId,
+        left: i32,
+    },
+    CamPanTo {
+        x: i32,
+        y: i32,
+        speed: i32,
+        n: i32,
+        t: i32,
+        sx: i32,
+        sy: i32,
+    },
+    CamReleaseWait {
+        left: i32,
+    },
+    CamParam {
+        which: i32,
+        v: i32,
+    },
+    CamSet {
+        x: i32,
+        y: i32,
+        z: Option<i32>,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -814,7 +1077,13 @@ pub struct Layers {
 
 impl Default for Layers {
     fn default() -> Self {
-        Layers { visible: [true; 4], priority: [None; 4], blend: [None; 4], alpha: None, offset: [(0, 0); 4] }
+        Layers {
+            visible: [true; 4],
+            priority: [None; 4],
+            blend: [None; 4],
+            alpha: None,
+            offset: [(0, 0); 4],
+        }
     }
 }
 
@@ -833,7 +1102,15 @@ pub struct Screen {
 
 impl Default for Screen {
     fn default() -> Self {
-        Screen { fade: None, black: 0, white: 0, mosaic: 0, dim: 0, flash: None, layers: Layers::default() }
+        Screen {
+            fade: None,
+            black: 0,
+            white: 0,
+            mosaic: 0,
+            dim: 0,
+            flash: None,
+            layers: Layers::default(),
+        }
     }
 }
 
@@ -870,7 +1147,9 @@ impl BossBar {
         let lo = self.a * 53 / 100;
         let span = self.b * 53 / 100 - lo;
         let hp = w.find(self.entity).and_then(|k| match &w.ents[k].body {
-            Body::Enemy(e) if e.max_hp1024 >> 10 != 0 => Some((e.hp1024 >> 10) * span as i64 / (e.max_hp1024 >> 10)),
+            Body::Enemy(e) if e.max_hp1024 >> 10 != 0 => {
+                Some((e.hp1024 >> 10) * span as i64 / (e.max_hp1024 >> 10))
+            }
             _ => None,
         });
         lo + hp.unwrap_or(0) as i32
@@ -1002,8 +1281,17 @@ pub const WINDOW_FADE_CLOSE: i32 = 17;
 /// BLDCNT here = the map's (`bldcnt` property: 0-91 / 0-92 0x1040 fade; 1-1, 4-1 0x1041 not) with the scripts'
 /// layer overrides.
 pub fn window_fades(w: &World) -> bool {
-    let Some(f) = w.field.as_ref() else { return false };
-    let Some(m) = w.data.field.as_ref().and_then(|d| d.maps.get(&f.map).map(|m| m.bldcnt)) else { return false };
+    let Some(f) = w.field.as_ref() else {
+        return false;
+    };
+    let Some(m) = w
+        .data
+        .field
+        .as_ref()
+        .and_then(|d| d.maps.get(&f.map).map(|m| m.bldcnt))
+    else {
+        return false;
+    };
     let mut first = m & 0x3F;
     for (i, b) in w.scene.screen.layers.blend.iter().enumerate() {
         if let Some(b) = b {
@@ -1071,12 +1359,29 @@ pub enum Request {
     Credits,
     Sleep,
     /// battle mode has no field: scene loads / warps are reported (field mode handles them in field.rs)
-    LoadScene { world: i32, map: i32, variant: i32, x: i32, y: i32, objects: bool },
-    Warp { world: i32, map: i32, variant: i32, x: i32, y: i32 },
+    LoadScene {
+        world: i32,
+        map: i32,
+        variant: i32,
+        x: i32,
+        y: i32,
+        objects: bool,
+    },
+    Warp {
+        world: i32,
+        map: i32,
+        variant: i32,
+        x: i32,
+        y: i32,
+    },
     SaveField,
     ReturnToField,
     /// engine broadcasts with unknown receivers (0xC9, 0xDC, 0xF0)
-    Broadcast { msg: i32, a: i32, b: i32 },
+    Broadcast {
+        msg: i32,
+        a: i32,
+        b: i32,
+    },
 }
 
 /// a collision override (`open_area` / `block_area`): re-applied when a byte snapshot is restored
@@ -1235,7 +1540,13 @@ fn track_index(w: &mut World, owner: Owner) -> usize {
     if let Some(k) = w.scene.tracks.iter().position(|t| t.owner == owner) {
         return k;
     }
-    w.scene.tracks.push(Track { owner, queue: Vec::new(), started: false, holding: false, live: false });
+    w.scene.tracks.push(Track {
+        owner,
+        queue: Vec::new(),
+        started: false,
+        holding: false,
+        live: false,
+    });
     w.scene.tracks.len() - 1
 }
 
@@ -1281,7 +1592,11 @@ pub fn batch_group(w: &mut World, owner: Owner) {
 pub fn commit(w: &mut World) {
     let group = std::mem::take(&mut w.scene.director.group);
     w.scene.director.batch = false;
-    let mode = if group.is_empty() { WaitMode::All } else { WaitMode::Group(group) };
+    let mode = if group.is_empty() {
+        WaitMode::All
+    } else {
+        WaitMode::Group(group)
+    };
     begin_wait(w, mode);
 }
 
@@ -1300,10 +1615,19 @@ fn begin_wait(w: &mut World, mode: WaitMode) {
     // keep the track order: sb 21-25). INFERRED from those two recordings.
     // (only actors a `set_pose` holds: their SetAnim leaves the pose in the object's own turn)
     let posed = |w: &World, o: Owner| match o {
-        Owner::Entity(id) => w.find(id).is_some_and(|i| matches!(&w.ents[i].body, Body::Npc(n) if matches!(n.anim.mode, AnimMode::Pose))),
+        Owner::Entity(id) => w.find(id).is_some_and(
+            |i| matches!(&w.ents[i].body, Body::Npc(n) if matches!(n.anim.mode, AnimMode::Pose)),
+        ),
         _ => false,
     };
-    let is_anim = |t: &Track| !t.started && matches!(t.queue.first(), Some(Cmd::PlayAnim { .. } | Cmd::SetAnim { .. })) && posed(w, t.owner);
+    let is_anim = |t: &Track| {
+        !t.started
+            && matches!(
+                t.queue.first(),
+                Some(Cmd::PlayAnim { .. } | Cmd::SetAnim { .. })
+            )
+            && posed(w, t.owner)
+    };
     let key = |w: &World, o: Owner| -> i64 {
         match o {
             Owner::Entity(id) => -(w.find(id).map(|i| i as i64).unwrap_or(-1)),
@@ -1311,14 +1635,18 @@ fn begin_wait(w: &mut World, mode: WaitMode) {
         }
     };
     let mut owners: Vec<Owner> = w.scene.tracks.iter().map(|t| t.owner).collect();
-    let slots: Vec<usize> = (0..owners.len()).filter(|&k| in_mode(&mode, owners[k]) && is_anim(&w.scene.tracks[k])).collect();
+    let slots: Vec<usize> = (0..owners.len())
+        .filter(|&k| in_mode(&mode, owners[k]) && is_anim(&w.scene.tracks[k]))
+        .collect();
     let mut anim: Vec<Owner> = slots.iter().map(|&k| owners[k]).collect();
     anim.sort_by_key(|&o| key(w, o));
     for (j, &k) in slots.iter().enumerate() {
         owners[k] = anim[j];
     }
     for o in owners {
-        let Some(k) = w.scene.tracks.iter().position(|t| t.owner == o) else { continue };
+        let Some(k) = w.scene.tracks.iter().position(|t| t.owner == o) else {
+            continue;
+        };
         if !in_mode(&mode, w.scene.tracks[k].owner) {
             continue;
         }
@@ -1328,7 +1656,16 @@ fn begin_wait(w: &mut World, mode: WaitMode) {
     }
     // the group mode (0x0804DEEC) updates only the group's actors (msg 0x0E), not the whole world
     if let WaitMode::Group(g) = &mode {
-        let ids: Vec<EntityId> = g.iter().filter_map(|o| if let Owner::Entity(id) = o { Some(*id) } else { None }).collect();
+        let ids: Vec<EntityId> = g
+            .iter()
+            .filter_map(|o| {
+                if let Owner::Entity(id) = o {
+                    Some(*id)
+                } else {
+                    None
+                }
+            })
+            .collect();
         if w.scene.director.prev_modal.is_none() {
             w.scene.director.prev_modal = Some(w.modal.take());
         }
@@ -1350,7 +1687,10 @@ pub fn wait_done(w: &mut World) -> bool {
 
 /// is anything still queued for this owner
 pub fn track_busy(w: &World, owner: Owner) -> bool {
-    w.scene.tracks.iter().any(|t| t.owner == owner && !t.queue.is_empty() && !t.holding)
+    w.scene
+        .tracks
+        .iter()
+        .any(|t| t.owner == owner && !t.queue.is_empty() && !t.holding)
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -1372,7 +1712,11 @@ pub fn step_math(dx: i32, dy: i32, speed: i32, shift: u32) -> (i32, i32, i32) {
     let s = crate::fixed::isqrt(d2);
     let n = ((100 * s) / speed.max(1) as i64 >> 8) as i32 + 1;
     let n = n.max(1);
-    (n, (((dx as i64) << shift) / n as i64) as i32, (((dy as i64) << shift) / n as i64) as i32)
+    (
+        n,
+        (((dx as i64) << shift) / n as i64) as i32,
+        (((dy as i64) << shift) / n as i64) as i32,
+    )
 }
 
 fn actor_pos(w: &World, i: usize) -> (i32, i32) {
@@ -1394,7 +1738,10 @@ pub fn target_center(w: &World, i: usize) -> (i32, i32) {
         return ((x0 + x0 + b[2]) >> 1, (y0 + y0 + b[3]) >> 1);
     }
     let b = a.body[0];
-    ((a.px() * 2 + b[0] + b[2]) >> 1, (a.py() * 2 + b[1] + b[3]) >> 1)
+    (
+        (a.px() * 2 + b[0] + b[2]) >> 1,
+        (a.py() * 2 + b[1] + b[3]) >> 1,
+    )
 }
 
 /// where a scripted ki blast leaves the actor (0x0800FF44, from the facing's body box 0x0800FE78): its leading edge
@@ -1417,7 +1764,14 @@ pub fn muzzle(w: &World, i: usize) -> (i32, i32) {
 fn done_at_start(cmd: &Cmd) -> bool {
     // remove_actor deletes the actor and its track with it (1 frame, trace boss_janemba_handover)
     // prop_set_pos too (s464: the boulder placed between Goku's walk and his pose: 1 frame)
-    matches!(cmd, Cmd::SetPos { .. } | Cmd::CamSet { .. } | Cmd::CamParam { .. } | Cmd::Remove | Cmd::PropSetPos { solo: true, .. })
+    matches!(
+        cmd,
+        Cmd::SetPos { .. }
+            | Cmd::CamSet { .. }
+            | Cmd::CamParam { .. }
+            | Cmd::Remove
+            | Cmd::PropSetPos { solo: true, .. }
+    )
 }
 
 /// wf-import (an event imported mid-node): start track `k`'s head as its tick would (the importer then sets the
@@ -1428,16 +1782,22 @@ pub fn import_start_head(w: &mut World, k: usize) {
 
 fn start_head(w: &mut World, k: usize) {
     loop {
-        let Some(t) = w.scene.tracks.get_mut(k) else { return };
+        let Some(t) = w.scene.tracks.get_mut(k) else {
+            return;
+        };
         t.started = true;
         t.holding = false;
         let owner = t.owner;
-        let Some(mut cmd) = t.queue.first().cloned() else { return };
+        let Some(mut cmd) = t.queue.first().cloned() else {
+            return;
+        };
         start_cmd(w, owner, &mut cmd);
         // an instant command reached by a track's pop-and-start keeps the track for this tick; the next command
         // starts in the next one (story playthrough: s073 walk_to -> set_pos -> face(206, 2))
         let chained = w.scene.chaining;
-        let Some(t) = w.scene.tracks.get_mut(k) else { return };
+        let Some(t) = w.scene.tracks.get_mut(k) else {
+            return;
+        };
         if done_at_start(&cmd) && !chained {
             if !t.queue.is_empty() {
                 t.queue.remove(0);
@@ -1466,7 +1826,6 @@ pub fn camera_update(w: &mut World) {
     }
 }
 
-
 fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
     let i = owner_index(w, owner);
     match cmd {
@@ -1488,9 +1847,27 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
                 set_pose(w, i, *anim, *frame);
             }
         }
-        Cmd::PlayAnimFrames { anim, each, loops, loop_start, last, .. } => {
+        Cmd::PlayAnimFrames {
+            anim,
+            each,
+            loops,
+            loop_start,
+            last,
+            ..
+        } => {
             if let Some(i) = i {
-                set_frames(w, i, *anim, AnimMode::Frames { each: *each, loops: *loops, loop_start: *loop_start, last: *last, pass: 0 });
+                set_frames(
+                    w,
+                    i,
+                    *anim,
+                    AnimMode::Frames {
+                        each: *each,
+                        loops: *loops,
+                        loop_start: *loop_start,
+                        last: *last,
+                        pass: 0,
+                    },
+                );
             }
         }
         Cmd::Face { dir } => {
@@ -1500,7 +1877,17 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
         }
         // FaceActor's start does nothing: its update turns the actor (0x0801599D)
         Cmd::FaceActor { .. } => {}
-        Cmd::MoveTo { x, y, speed, state, target, n, t, sx, sy } => {
+        Cmd::MoveTo {
+            x,
+            y,
+            speed,
+            state,
+            target,
+            n,
+            t,
+            sx,
+            sy,
+        } => {
             if let Some(i) = i {
                 if let Some((tid, dx, dy)) = *target {
                     if let Some(ti) = w.find(tid) {
@@ -1516,12 +1903,24 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
                 if let Some(a) = actor_mut(w, i) {
                     // the facing from the whole-pixel difference; none (a sub-pixel walk) faces down (story
                     // playthrough: Yemma's s048 walk_to(0, 232, 360) from y 360.625)
-                    a.facing = if *x == px && *y == py { 0 } else { facing_toward(*x - px, *y - py) };
+                    a.facing = if *x == px && *y == py {
+                        0
+                    } else {
+                        facing_toward(*x - px, *y - py)
+                    };
                 }
                 set_state(w, i, *state);
             }
         }
-        Cmd::GlideTo { x, y, speed, n, t, sx, sy } => {
+        Cmd::GlideTo {
+            x,
+            y,
+            speed,
+            n,
+            t,
+            sx,
+            sy,
+        } => {
             if let Some(i) = i {
                 let (px, py) = actor_pos(w, i);
                 let (nn, ssx, ssy) = step_math(*x - px, *y - py, *speed, 8);
@@ -1531,7 +1930,14 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
                 crate::fieldnpc::script_move_mark(w, i, false);
             }
         }
-        Cmd::JumpTo { x, y, air, t, sx, vy } => {
+        Cmd::JumpTo {
+            x,
+            y,
+            air,
+            t,
+            sx,
+            vy,
+        } => {
             if let Some(i) = i {
                 let (px, py) = actor_pos(w, i);
                 let a = (*air).max(1);
@@ -1598,7 +2004,11 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
                         f.player_removed = true;
                     }
                 }
-                if w.scene.boss_bar.as_ref().is_some_and(|b| b.entity == w.ents[i].id) {
+                if w.scene
+                    .boss_bar
+                    .as_ref()
+                    .is_some_and(|b| b.entity == w.ents[i].id)
+                {
                     w.scene.boss_bar = None;
                     crate::vram::release(w, crate::vram::Owner::BossBar);
                 }
@@ -1617,7 +2027,12 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
                 let old = w.ents[i].id;
                 w.ents[i].removed = true;
                 // the remaining queued commands move to the new actor (0x080192BA)
-                if let Some(t) = w.scene.tracks.iter_mut().find(|t| t.owner == Owner::Entity(old)) {
+                if let Some(t) = w
+                    .scene
+                    .tracks
+                    .iter_mut()
+                    .find(|t| t.owner == Owner::Entity(old))
+                {
                     t.owner = Owner::Entity(id);
                 }
             }
@@ -1641,7 +2056,12 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
                 }
                 // the remaining queued commands move to the map object (0x080192BA), as for change_sprite
                 if let Some(id) = become_map_object(w, *index, px, py, dir) {
-                    if let Some(t) = w.scene.tracks.iter_mut().find(|t| t.owner == Owner::Entity(old)) {
+                    if let Some(t) = w
+                        .scene
+                        .tracks
+                        .iter_mut()
+                        .find(|t| t.owner == Owner::Entity(old))
+                    {
                         t.owner = Owner::Entity(id);
                     }
                 }
@@ -1650,10 +2070,18 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
         Cmd::Sfx { id } => w.sfx(*id, 64),
         Cmd::ScreenFlash { r, g, b, frames, t } => {
             let len = (*frames).max(2);
-            w.scene.screen.flash = Some(PalFlash { rgb: (*r as u8, *g as u8, *b as u8), t: 0, len });
+            w.scene.screen.flash = Some(PalFlash {
+                rgb: (*r as u8, *g as u8, *b as u8),
+                t: 0,
+                len,
+            });
             *t = 0;
         }
-        Cmd::Shake { intensity, frames, t } => {
+        Cmd::Shake {
+            intensity,
+            frames,
+            t,
+        } => {
             // the shake object (0x0804A720) is updated in the frame it is created: its first tick (and RNG
             // draws) happen now; later ticks in the world update (story playthrough, Yemma's s048)
             // field: the shake it suspends did not tick in this frame (the game makes the script's shake before the
@@ -1683,7 +2111,15 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
                 }
                 let (x, y) = actor_pos(w, i);
                 let owner = w.ents[i].id;
-                w.scene.visuals.push(Visual { kind: VisualKind::ItemIcon(*item), x, y: y - 32, owner, t: 0, life: 60, vid: 0 });
+                w.scene.visuals.push(Visual {
+                    kind: VisualKind::ItemIcon(*item),
+                    x,
+                    y: y - 32,
+                    owner,
+                    t: 0,
+                    life: 60,
+                    vid: 0,
+                });
             }
         }
         Cmd::Emote { emote, t, .. } => {
@@ -1692,7 +2128,15 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
                 let (x, y) = actor_pos(w, i);
                 let owner = w.ents[i].id;
                 let vid = w.next_serial();
-                w.scene.visuals.push(Visual { kind: VisualKind::Emote(*emote), x, y: y - 32, owner, t: 0, life: emote_len(*emote), vid });
+                w.scene.visuals.push(Visual {
+                    kind: VisualKind::Emote(*emote),
+                    x,
+                    y: y - 32,
+                    owner,
+                    t: 0,
+                    life: emote_len(*emote),
+                    vid,
+                });
                 // the emote object's tiles (`0x08016304`, vtable 0x0804A298: 0x40)
                 crate::vram::acquire(w, crate::vram::Owner::Visual(vid), 0x40);
             }
@@ -1717,7 +2161,14 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
                 }
             }
         }
-        Cmd::Shoot { kind, x, y, speed, t, n } => {
+        Cmd::Shoot {
+            kind,
+            x,
+            y,
+            speed,
+            t,
+            n,
+        } => {
             *t = 0;
             if let Some(i) = i {
                 let (cx, cy) = muzzle(w, i);
@@ -1773,11 +2224,20 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
                 }
             }
         }
-        Cmd::SetAttachment { kind, variant, dx, dy } => {
+        Cmd::SetAttachment {
+            kind,
+            variant,
+            dx,
+            dy,
+        } => {
             if let Some(i) = i {
                 crate::vram::shadow_set(w, i, (*kind, *variant));
                 if let Body::Npc(n) = &mut w.ents[i].body {
-                    n.attach = if *kind == 0 && *variant == 0 { None } else { Some([*kind, *variant, *dx, *dy]) };
+                    n.attach = if *kind == 0 && *variant == 0 {
+                        None
+                    } else {
+                        Some([*kind, *variant, *dx, *dy])
+                    };
                 }
             }
         }
@@ -1793,7 +2253,15 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
                 pr.y = *y << 8;
             }
         }
-        Cmd::PropMoveTo { x, y, speed, n, t, sx, sy } => {
+        Cmd::PropMoveTo {
+            x,
+            y,
+            speed,
+            n,
+            t,
+            sx,
+            sy,
+        } => {
             if let Owner::Prop(p) = owner {
                 let pr = prop_mut(w, p).clone();
                 let (nn, ssx, ssy) = step_math(*x - (pr.x >> 8), *y - (pr.y >> 8), *speed, 8);
@@ -1815,7 +2283,15 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
         Cmd::CamReleaseWait { .. } => {
             w.scene.cam.mode = CamMode::Fixed;
         }
-        Cmd::CamPanTo { x, y, speed, n, t, sx, sy } => {
+        Cmd::CamPanTo {
+            x,
+            y,
+            speed,
+            n,
+            t,
+            sx,
+            sy,
+        } => {
             camera_mode_set(w);
             w.scene.cam.mode = CamMode::Fixed;
             let c = &w.cameras[0];
@@ -1862,7 +2338,9 @@ const BEAM_CHARGE: [(i32, i32); 4] = [(8, -2), (12, -2), (12, -2), (4, -2)];
 fn remove_charge(w: &mut World, owner: crate::world::EntityId) -> bool {
     let mut any = false;
     for e in w.ents.iter_mut() {
-        if !e.removed && matches!(&e.body, Body::Fx(f) if matches!(**f, crate::fx::Fx::BeamCharge { owner: o, .. } if o == owner)) {
+        if !e.removed
+            && matches!(&e.body, Body::Fx(f) if matches!(**f, crate::fx::Fx::BeamCharge { owner: o, .. } if o == owner))
+        {
             e.removed = true;
             any = true;
         }
@@ -1919,7 +2397,9 @@ fn update_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) -> bool {
             face_toward(w, i, *target);
             true
         }
-        Cmd::MoveTo { x, y, n, t, sx, sy, .. } => {
+        Cmd::MoveTo {
+            x, y, n, t, sx, sy, ..
+        } => {
             let Some(i) = i else { return true };
             *t += 1;
             if let Some(a) = actor_mut(w, i) {
@@ -1938,7 +2418,9 @@ fn update_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) -> bool {
             }
             false
         }
-        Cmd::GlideTo { x, y, n, t, sx, sy, .. } => {
+        Cmd::GlideTo {
+            x, y, n, t, sx, sy, ..
+        } => {
             let Some(i) = i else { return true };
             *t += 1;
             if let Some(a) = actor_mut(w, i) {
@@ -1992,7 +2474,8 @@ fn update_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) -> bool {
             if *t >= 60 {
                 if let Some(i) = i {
                     // a player in Instant Transmission's field run goes back to the run's state (s099)
-                    let it = matches!(w.ents[i].body, Body::Player(_)) && crate::player::resume_it(w, i);
+                    let it =
+                        matches!(w.ents[i].body, Body::Player(_)) && crate::player::resume_it(w, i);
                     if !it {
                         set_state(w, i, 0);
                     }
@@ -2011,14 +2494,19 @@ fn update_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) -> bool {
             *t += 1;
             *t >= emote_len(*emote)
         }
-        Cmd::Beam { frames, t, kind, .. } => {
+        Cmd::Beam {
+            frames, t, kind, ..
+        } => {
             *t += 1;
             let kind = *kind;
             if kind == BeamKind::Wave {
                 if let Some(i) = i {
                     if *t < *frames {
                         // 8 ticks per cel, held on cel 3 (or the sprite's last; s025: sprites 43 / 42)
-                        let (sp, dir) = w.actor(i).map(|a| (a.sprite, a.facing)).unwrap_or((None, 0));
+                        let (sp, dir) = w
+                            .actor(i)
+                            .map(|a| (a.sprite, a.facing))
+                            .unwrap_or((None, 0));
                         let n = ActAnim::of(17).cels(&w.data, sp, dir).max(1);
                         set_pose(w, i, 17, (*t >> 3).min(3).min(n - 1));
                     }
@@ -2026,11 +2514,23 @@ fn update_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) -> bool {
                         let (x, y) = actor_pos(w, i);
                         let owner = w.ents[i].id;
                         let dir = w.actor(i).map(|a| a.facing as i32).unwrap_or(0);
-                        w.scene.visuals.push(Visual { kind: VisualKind::Beam { kind, dir }, x, y, owner, t: 0, life: (*frames - 16).max(1), vid: 0 });
+                        w.scene.visuals.push(Visual {
+                            kind: VisualKind::Beam { kind, dir },
+                            x,
+                            y,
+                            owner,
+                            t: 0,
+                            life: (*frames - 16).max(1),
+                            vid: 0,
+                        });
                         // the beam object (`0x080286D4` from `0x0803C494`, 0xC0 tile bytes) lives the command's
                         // frame count (segment sb 1-3 f6210 / f6246: s025's two fire_wave_beam(.., 35))
                         crate::vram::acquire(w, crate::vram::Owner::Blast(owner), 0xC0);
-                        crate::vram::release_later(w, crate::vram::Owner::Blast(owner), (*frames).max(1) as u32);
+                        crate::vram::release_later(
+                            w,
+                            crate::vram::Owner::Blast(owner),
+                            (*frames).max(1) as u32,
+                        );
                     }
                 }
             } else if *t == 24 {
@@ -2038,14 +2538,28 @@ fn update_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) -> bool {
                 // grows 3 px per tick while its head is on screen and retracts 3 px per tick after the command
                 // (destructor: stop 32, sound 33) - the player's beam class (shots::KameBeam)
                 if let Some(i) = i {
-                    set_pose(w, i, beam_anim(kind), if kind == BeamKind::Beam { 2 } else { 1 });
+                    set_pose(
+                        w,
+                        i,
+                        beam_anim(kind),
+                        if kind == BeamKind::Beam { 2 } else { 1 },
+                    );
                     let owner = w.ents[i].id;
                     remove_charge(w, owner);
                     let a = w.actor(i).expect("actor");
                     let dir = a.facing;
                     let (fx0, fy0) = crate::shots::BEAM_POS_KAME_FIRE[dir as usize];
                     let (x, y) = (a.px() + fx0, a.py() + fy0);
-                    let mut shot = crate::shots::kame_beam(owner, dir, x, y, w.frame as i64 - 23, crate::damage::atk(5), 328, true);
+                    let mut shot = crate::shots::kame_beam(
+                        owner,
+                        dir,
+                        x,
+                        y,
+                        w.frame as i64 - 23,
+                        crate::damage::atk(5),
+                        328,
+                        true,
+                    );
                     // the beam's hit message takes its sender class from the owner's +0x1D0: a map NPC's object has
                     // no such field there (Piccolo's reads 0x030032EC), and the enemies take classes 1 and 2 only -
                     // an NPC's scripted beam hurts nobody (VERIFIED segment sb 6-6 f5795: s228's fire_beam_alt)
@@ -2087,7 +2601,14 @@ fn update_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) -> bool {
         // fire_ball_at's tick 0x0803C576 / done 0x0803C65C: the ball (0x0802E444) leaves at tick 8 from the position
         // + 0x0877C454[k] and lives (max(|dx|, |dy|) >> 1) + 1 ticks; cel 2k + 2 from tick 8, 2k + 1 again from 16;
         // done from tick 24 on once the ball is gone (8-16 s319: Dabura's spits, 57 and 41 ticks)
-        Cmd::Shoot { kind: ShootKind::Ball, x, y, speed, t, n } => {
+        Cmd::Shoot {
+            kind: ShootKind::Ball,
+            x,
+            y,
+            speed,
+            t,
+            n,
+        } => {
             const OFF: [(i32, i32); 5] = [(0, -32), (0, -32), (8, -32), (16, -32), (16, -32)];
             *t += 1;
             let k = (*speed).clamp(0, 4);
@@ -2100,7 +2621,11 @@ fn update_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) -> bool {
                     let (sx, sy) = (px + OFF[k as usize].0, py + OFF[k as usize].1);
                     *n = (((*x - sx).abs().max((*y - sy).abs())) >> 1) + 1;
                 }
-                let cel = if (8..16).contains(t) { 2 * k + 2 } else { 2 * k + 1 };
+                let cel = if (8..16).contains(t) {
+                    2 * k + 2
+                } else {
+                    2 * k + 1
+                };
                 ball_cel(w, i, cel, *t);
             }
             *t >= 24 && *n == 0
@@ -2116,7 +2641,9 @@ fn update_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) -> bool {
             }
             done
         }
-        Cmd::PropMoveTo { x, y, n, t, sx, sy, .. } => {
+        Cmd::PropMoveTo {
+            x, y, n, t, sx, sy, ..
+        } => {
             if let Owner::Prop(p) = owner {
                 *t += 1;
                 let pr = prop_mut(w, p);
@@ -2160,7 +2687,9 @@ fn update_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) -> bool {
             }
             false
         }
-        Cmd::CamPanTo { x, y, n, t, sx, sy, .. } => {
+        Cmd::CamPanTo {
+            x, y, n, t, sx, sy, ..
+        } => {
             if *t >= *n {
                 return true;
             }
@@ -2181,13 +2710,24 @@ fn update_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) -> bool {
 /// camera_set_param* (vt+0x10 = `mov r0, #1`: 0x0804ED2D / 35 / 39 / 3D / 31 / 41; sc_janemba: Gogeta's split
 /// face -> set_pos ends the wait in set_pos's tick); the others return 0 (pop, idle on the next tick)
 fn hold_cmd(cmd: &Cmd) -> bool {
-    matches!(cmd, Cmd::FaceActor { .. } | Cmd::SetPos { .. } | Cmd::CamSet { .. } | Cmd::CamParam { .. } | Cmd::PropSetPos { .. })
+    matches!(
+        cmd,
+        Cmd::FaceActor { .. }
+            | Cmd::SetPos { .. }
+            | Cmd::CamSet { .. }
+            | Cmd::CamParam { .. }
+            | Cmd::PropSetPos { .. }
+    )
 }
 
 /// FaceActor's update (0x0801599D): the dominant axis of the 24.8 position difference, ties horizontal
 fn face_toward(w: &mut World, i: Option<usize>, target: EntityId) {
-    let (Some(i), Some(ti)) = (i, w.find(target)) else { return };
-    let (Some(a), Some(b)) = (w.actor(i), w.actor(ti)) else { return };
+    let (Some(i), Some(ti)) = (i, w.find(target)) else {
+        return;
+    };
+    let (Some(a), Some(b)) = (w.actor(i), w.actor(ti)) else {
+        return;
+    };
     let (dx, dy) = (b.x - a.x, b.y - a.y);
     let dir = if dx.abs() >= dy.abs() {
         if dx > 0 {
@@ -2214,19 +2754,27 @@ pub const EMOTE_LEN: i32 = 24;
 /// 0xC0 -> 24, measured; emote 4: 0x180 -> 48, measured in the story playthrough, Yemma's s048)
 pub fn emote_len(emote: i32) -> i32 {
     const BYTES: [i32; 5] = [0x140, 0x100, 0xC0, 0x100, 0x180];
-    BYTES.get(emote as usize).map(|b| b / 8).unwrap_or(EMOTE_LEN)
+    BYTES
+        .get(emote as usize)
+        .map(|b| b / 8)
+        .unwrap_or(EMOTE_LEN)
 }
 
 /// a player playing a frame range (`play_anim_frames`): the scene copy ticks in the player's update and is shown
 /// as a pose of the player's own state (called by player.rs after its state tick)
 pub fn player_frames_tick(w: &mut World, i: usize) {
     let id = w.ents[i].id;
-    let Some(k) = w.scene.puppets.iter().position(|p| p.id == id) else { return };
+    let Some(k) = w.scene.puppets.iter().position(|p| p.id == id) else {
+        return;
+    };
     let p = w.scene.puppets[k].clone();
     if !matches!(p.anim.mode, AnimMode::Frames { .. }) {
         return;
     }
-    let (s, f) = w.actor(i).map(|a| (a.sprite, a.facing)).unwrap_or((None, 0));
+    let (s, f) = w
+        .actor(i)
+        .map(|a| (a.sprite, a.facing))
+        .unwrap_or((None, 0));
     let d = w.data.clone();
     let mut a = p.anim.clone();
     let out = a.tick(&d, s, f);
@@ -2290,7 +2838,15 @@ fn prop_mut(w: &mut World, id: i32) -> &mut Prop {
         .and_then(|f| f.props.get(id.max(0) as usize))
         .map(|p| (p.rect.x0 << 8, p.rect.y0 << 8, p.visible))
         .unwrap_or((0, 0, true));
-    w.scene.props.push(Prop { id, x, y, visible, frame: 0, vy: 0, load });
+    w.scene.props.push(Prop {
+        id,
+        x,
+        y,
+        visible,
+        frame: 0,
+        vy: 0,
+        load,
+    });
     w.scene.props.last_mut().unwrap()
 }
 
@@ -2302,10 +2858,17 @@ pub fn sync_props(w: &mut World) {
         if p.load != f.loads {
             continue;
         }
-        let Some(r) = f.props.get_mut(p.id.max(0) as usize) else { continue };
+        let Some(r) = f.props.get_mut(p.id.max(0) as usize) else {
+            continue;
+        };
         r.visible = p.visible;
         let (dx, dy) = ((p.x >> 8) - r.rect.x0, (p.y >> 8) - r.rect.y0);
-        r.rect = Rect::new(r.rect.x0 + dx, r.rect.y0 + dy, r.rect.x1 + dx, r.rect.y1 + dy);
+        r.rect = Rect::new(
+            r.rect.x0 + dx,
+            r.rect.y0 + dy,
+            r.rect.x1 + dx,
+            r.rect.y1 + dy,
+        );
     }
 }
 
@@ -2409,11 +2972,12 @@ pub fn banner_load(w: &mut World, a: &crate::fieldcontent::AreaDef, three_d: boo
 
 /// `play_music`: start a song unless it is already playing
 pub fn play_song(w: &mut World, id: i32) {
-    let playing = w.scene.song == id || w.events.iter().rev().find_map(|e| match e {
-        crate::world::Event::Song { id: s } => Some(*s == id),
-        crate::world::Event::SongStop => Some(false),
-        _ => None,
-    }) == Some(true);
+    let playing = w.scene.song == id
+        || w.events.iter().rev().find_map(|e| match e {
+            crate::world::Event::Song { id: s } => Some(*s == id),
+            crate::world::Event::SongStop => Some(false),
+            _ => None,
+        }) == Some(true);
     if !playing {
         w.events.push(crate::world::Event::Song { id });
         w.scene.song = id;
@@ -2423,7 +2987,13 @@ pub fn play_song(w: &mut World, id: i32) {
 /// the BG sphere effect's draws of a frame (also under the power gauge minigame, whose loop runs the world update:
 /// Kid Buu's arena 21-25, the Spirit Bomb's push under s-script's `power_minigame`)
 pub fn sphere_jitter(w: &mut World) {
-    let jitter: i32 = w.scene.visuals.iter().filter(|v| v.kind == VisualKind::EnergySphere).map(|v| (v.owner as i32 - 3).max(0)).sum();
+    let jitter: i32 = w
+        .scene
+        .visuals
+        .iter()
+        .filter(|v| v.kind == VisualKind::EnergySphere)
+        .map(|v| (v.owner as i32 - 3).max(0))
+        .sum();
     for _ in 0..jitter {
         w.rng.rand(4);
     }
@@ -2439,8 +3009,15 @@ pub fn pre_step(w: &mut World) {
     w.scene.cam.stepped = false;
     if w.scene.depth == 0 && !w.scene.puppets.is_empty() && w.scene.director.wait.is_none() {
         // outside a scene a player's input ends its leftover frame-range animation
-        let held: Vec<(EntityId, bool)> = w.players.iter().enumerate().map(|(s, &id)| (id, w.input[s.min(MAX_PLAYERS - 1)].held != 0)).collect();
-        w.scene.puppets.retain(|p| !held.iter().any(|&(id, h)| id == p.id && h));
+        let held: Vec<(EntityId, bool)> = w
+            .players
+            .iter()
+            .enumerate()
+            .map(|(s, &id)| (id, w.input[s.min(MAX_PLAYERS - 1)].held != 0))
+            .collect();
+        w.scene
+            .puppets
+            .retain(|p| !held.iter().any(|&(id, h)| id == p.id && h));
     }
     if w.scene.depth > 0 || w.scene.menu.is_some() {
         // the world map's flyer reads the keys itself during an event (s515's arrival fade-in)
@@ -2469,7 +3046,12 @@ pub fn tick(w: &mut World) {
     // GotoState(0x310) and StandStill's idle draw in that frame). The host ends the script after the objects.
     if blocked && w.scene.director.wait.is_none() && w.field.is_some() && w.scene.depth == 0 {
         for id in w.scene.ai_wait.clone() {
-            let Some(i) = w.find(id).filter(|&i| !w.ents[i].removed && matches!(w.ents[i].body, Body::Enemy(_))) else { continue };
+            let Some(i) = w
+                .find(id)
+                .filter(|&i| !w.ents[i].removed && matches!(w.ents[i].body, Body::Enemy(_)))
+            else {
+                continue;
+            };
             ai_script_done(w, id);
             w.scene.puppets.retain(|p| p.id != id);
             crate::enemy::release_update(w, i);
@@ -2478,18 +3060,28 @@ pub fn tick(w: &mut World) {
     sync_props(w);
     // dropped owners
     let gone: Vec<usize> = (0..w.scene.tracks.len())
-        .filter(|&k| matches!(w.scene.tracks[k].owner, Owner::Entity(id) if !w.alive(id)) && w.scene.tracks[k].queue.is_empty())
+        .filter(|&k| {
+            matches!(w.scene.tracks[k].owner, Owner::Entity(id) if !w.alive(id))
+                && w.scene.tracks[k].queue.is_empty()
+        })
         .collect();
     for k in gone.into_iter().rev() {
         w.scene.tracks.remove(k);
     }
-    let live: Vec<bool> = w.scene.puppets.iter().map(|p| w.find(p.id).is_some()).collect();
+    let live: Vec<bool> = w
+        .scene
+        .puppets
+        .iter()
+        .map(|p| w.find(p.id).is_some())
+        .collect();
     let mut it = live.into_iter();
     w.scene.puppets.retain(|_| it.next().unwrap_or(false));
 }
 
 fn tick_tracks(w: &mut World) {
-    let Some(mode) = w.scene.director.wait.clone() else { return };
+    let Some(mode) = w.scene.director.wait.clone() else {
+        return;
+    };
     let mut all_idle = true;
     // the actors' tracks tick in the world list's update order (last object first), the camera track first (story
     // playthrough s103: three NPCs ending their walks in one frame draw their idle ticks newest object first).
@@ -2497,7 +3089,9 @@ fn tick_tracks(w: &mut World) {
     // member in the world list's order, first object first - dbx_004_6-1 f18,270: the player, then Goten)
     let key = |w: &World, o: Owner| -> i64 {
         match o {
-            Owner::Entity(id) if matches!(&mode, WaitMode::Group(g) if g.contains(&o)) => w.find(id).map(|i| i as i64).unwrap_or(-1),
+            Owner::Entity(id) if matches!(&mode, WaitMode::Group(g) if g.contains(&o)) => {
+                w.find(id).map(|i| i as i64).unwrap_or(-1)
+            }
             Owner::Entity(id) => -(w.find(id).map(|i| i as i64).unwrap_or(-1)),
             _ => i64::MIN,
         }
@@ -2505,7 +3099,9 @@ fn tick_tracks(w: &mut World) {
     let mut owners: Vec<Owner> = w.scene.tracks.iter().map(|t| t.owner).collect();
     owners.sort_by_key(|&o| key(w, o));
     for o in owners {
-        let Some(k) = w.scene.tracks.iter().position(|t| t.owner == o) else { continue };
+        let Some(k) = w.scene.tracks.iter().position(|t| t.owner == o) else {
+            continue;
+        };
         if !in_mode(&mode, o) {
             continue;
         }
@@ -2560,8 +3156,14 @@ fn tick_track(w: &mut World, k: usize) -> bool {
     let mut cmd = w.scene.tracks[k].queue[0].clone();
     let done = update_cmd(w, owner, &mut cmd);
     // the command may have moved its track (change_sprite moves the queue to the new actor)
-    let owner = if w.scene.tracks.get(k).is_some_and(|t| t.owner == owner) { owner } else { w.scene.tracks.get(k).map(|t| t.owner).unwrap_or(owner) };
-    let Some(k) = w.scene.tracks.iter().position(|t| t.owner == owner) else { return true };
+    let owner = if w.scene.tracks.get(k).is_some_and(|t| t.owner == owner) {
+        owner
+    } else {
+        w.scene.tracks.get(k).map(|t| t.owner).unwrap_or(owner)
+    };
+    let Some(k) = w.scene.tracks.iter().position(|t| t.owner == owner) else {
+        return true;
+    };
     if let Some(c) = w.scene.tracks[k].queue.first_mut() {
         *c = cmd.clone();
     }
@@ -2585,7 +3187,6 @@ fn tick_track(w: &mut World, k: usize) -> bool {
 }
 
 fn tick_visuals(w: &mut World) {
-
     for v in w.scene.visuals.iter_mut() {
         v.t += 1;
         if v.life > 0 {
@@ -2593,7 +3194,13 @@ fn tick_visuals(w: &mut World) {
         }
     }
     // a fired beam's effect object ends with its sound changing (32 -> 33)
-    let ended: Vec<u32> = w.scene.visuals.iter().filter(|v| v.life == 0 && v.vid != 0).map(|v| v.vid).collect();
+    let ended: Vec<u32> = w
+        .scene
+        .visuals
+        .iter()
+        .filter(|v| v.life == 0 && v.vid != 0)
+        .map(|v| v.vid)
+        .collect();
     w.scene.visuals.retain(|v| v.life != 0);
     // (the objects update from the list's end: the later one goes first)
     for o in ended.into_iter().rev() {
@@ -2607,11 +3214,22 @@ fn tick_visuals(w: &mut World) {
 /// the camera clamp in 22.10: field areas use their camera_max (0..=max px), battle arenas the view rect
 fn cam_clamp(w: &World, x: i32, y: i32) -> (i32, i32) {
     if let Some(f) = w.field.as_ref() {
-        let c = |v: i32, max: i32| if v < 0 { 0 } else if (v >> 10) > max { max << 10 } else { v };
+        let c = |v: i32, max: i32| {
+            if v < 0 {
+                0
+            } else if (v >> 10) > max {
+                max << 10
+            } else {
+                v
+            }
+        };
         return (c(x, f.camera_max.0), c(y, f.camera_max.1));
     }
     match w.arena.view {
-        Some(v) => ((v.x0 << 10).max(x.min(v.x0.max(v.x1 - GBA_W) << 10)), (v.y0 << 10).max(y.min(v.y0.max(v.y1 - GBA_H) << 10))),
+        Some(v) => (
+            (v.x0 << 10).max(x.min(v.x0.max(v.x1 - GBA_W) << 10)),
+            (v.y0 << 10).max(y.min(v.y0.max(v.y1 - GBA_H) << 10)),
+        ),
         None => (x, y),
     }
 }
@@ -2667,7 +3285,14 @@ pub fn start_scroll(w: &mut World, x: i32, y: i32, speed: i32) {
     let n = (dx.abs().max(dy.abs()) >> 10) / speed.max(1) + 1;
     let (sx, sy) = (dx / n, dy / n);
     w.scene.cam.mode = CamMode::Fixed;
-    w.scene.cam.scroll = Some(Scroll { tx: x, ty: y, sx, sy, n, t: 0 });
+    w.scene.cam.scroll = Some(Scroll {
+        tx: x,
+        ty: y,
+        sx,
+        sy,
+        n,
+        t: 0,
+    });
     w.scene.freeze = true;
     // the mover's first step belongs to the frame it starts in: a script the trigger check started (after the
     // frame's camera update) steps here (8-16's ship entrance: the camera is on the player the frame A is pressed)
@@ -2677,7 +3302,9 @@ pub fn start_scroll(w: &mut World, x: i32, y: i32, speed: i32) {
 }
 
 fn scroll_step(w: &mut World) {
-    let Some(s) = w.scene.cam.scroll.clone() else { return };
+    let Some(s) = w.scene.cam.scroll.clone() else {
+        return;
+    };
     if s.t >= s.n {
         // arrived: the host's poll ends the mode (and the freeze)
         return;
@@ -2710,7 +3337,10 @@ fn follow_step(w: &mut World, id: EntityId) {
     let (tx, ty) = match w.find(id).filter(|&i| !w.ents[i].removed) {
         Some(i) => {
             let a = w.actor(i).cloned().unwrap_or_default();
-            let t = (((a.px() * 2 + a.foot_w) >> 1) - 120, ((a.py() * 2 + a.foot_h) >> 1) - 84);
+            let t = (
+                ((a.px() * 2 + a.foot_w) >> 1) - 120,
+                ((a.py() * 2 + a.foot_h) >> 1) - 84,
+            );
             w.scene.cam.follow_last = Some(t);
             t
         }
@@ -2810,7 +3440,12 @@ pub fn start_fade(w: &mut World, kind: FadeKind, out: bool, frames: i32) {
         FadeKind::Flash => 2 * frames.max(2),
         _ => frames.max(1),
     };
-    w.scene.screen.fade = Some(Fade { kind, out, t: 0, len });
+    w.scene.screen.fade = Some(Fade {
+        kind,
+        out,
+        t: 0,
+        len,
+    });
     // the mosaic modes do not run the world update; mosaic_in restores the palette at once
     if kind == FadeKind::Mosaic {
         w.scene.freeze = true;
@@ -2831,7 +3466,9 @@ fn tick_screen(w: &mut World) {
             w.scene.screen.flash = None;
         }
     }
-    let Some(mut f) = w.scene.screen.fade.clone() else { return };
+    let Some(mut f) = w.scene.screen.fade.clone() else {
+        return;
+    };
     f.t += 1;
     let lvl = (16 * f.t.min(f.len) / f.len.max(1)).clamp(0, 16);
     let s = &mut w.scene.screen;
@@ -2862,7 +3499,11 @@ fn tick_screen(w: &mut World) {
         (FadeKind::Mosaic, false) => s.mosaic = 16 - lvl,
         (FadeKind::Flash, _) => {
             let half = f.len / 2;
-            s.white = if f.t <= half { 16 * f.t / half.max(1) } else { 16 * (f.len - f.t).max(0) / half.max(1) };
+            s.white = if f.t <= half {
+                16 * f.t / half.max(1)
+            } else {
+                16 * (f.len - f.t).max(0) / half.max(1)
+            };
         }
     }
     if f.t >= f.len {
@@ -2886,7 +3527,11 @@ fn tick_screen(w: &mut World) {
 pub fn palette_black(w: &World) -> bool {
     let s = &w.scene.screen;
     // a black fade in progress scales the palette by its fine level; otherwise the coarse level (menus, mosaic)
-    let dim = if s.fade.as_ref().is_some_and(|f| f.kind == FadeKind::Black) { s.dim } else { s.dim.max(s.black * 16) };
+    let dim = if s.fade.as_ref().is_some_and(|f| f.kind == FadeKind::Black) {
+        s.dim
+    } else {
+        s.dim.max(s.black * 16)
+    };
     (31 * (256 - dim.min(256))) >> 8 == 0
 }
 
@@ -2902,18 +3547,32 @@ pub fn fade_black(w: &World) -> u8 {
 /// `typing` = per page, the frames the typewriter needs (one visible character per frame, the line fitter's
 /// skipped spaces / new lines / option markers ride along; computed by the host with the dialogue font). A page
 /// whose lines start with '-' is a choice (options = those lines).
-pub fn open_text(w: &mut World, text: &str, text_ref: u32, portrait: u8, kind: u8, typing: Vec<u16>) {
+pub fn open_text(
+    w: &mut World,
+    text: &str,
+    text_ref: u32,
+    portrait: u8,
+    kind: u8,
+    typing: Vec<u16>,
+) {
     let (mut pos, body) = split_pos(text);
     let mut portrait_left = false;
     // text boxes place themselves by speaker; the menu / message window (kind 3) is another object
     if kind != 3 {
         let prefix = (body.len() != text.len()).then_some(pos);
         // nested scenes (run_scene natives, depth > 1) are built with (-1, -1)
-        let anchor = if w.scene.depth <= 1 { w.scene.talk_anchor } else { NO_ANCHOR };
+        let anchor = if w.scene.depth <= 1 {
+            w.scene.talk_anchor
+        } else {
+            NO_ANCHOR
+        };
         (pos, portrait_left) = speaker_layout(prefix, portrait, anchor);
     }
     let last = body.split('\u{b}').last().unwrap_or("");
-    let options = last.lines().filter(|l| l.trim_start().starts_with('-')).count() as i32;
+    let options = last
+        .lines()
+        .filter(|l| l.trim_start().starts_with('-'))
+        .count() as i32;
     // the box object's tiles (`0x08012030`; a portrait unless the box kind is 0 / 7)
     crate::vram::text_open(w, portrait != 0 && portrait != 7);
     let pages = (typing.len().max(1)) as u16;
@@ -2944,7 +3603,12 @@ pub fn open_text(w: &mut World, text: &str, text_ref: u32, portrait: u8, kind: u
     }
     // the box's creation is a long main-loop iteration (`Options::sim_lag`): `sndsim::dialog_frames`
     if w.opts.sim_lag && kind != 3 {
-        let chars = w.scene.dialog.as_ref().map(|d| d.typing.first().copied().unwrap_or(0) as i64).unwrap_or(0);
+        let chars = w
+            .scene
+            .dialog
+            .as_ref()
+            .map(|d| d.typing.first().copied().unwrap_or(0) as i64)
+            .unwrap_or(0);
         if let Some(n) = crate::sndsim::dialog_frames(w, portrait, chars) {
             w.g.lag = (n as u16).saturating_sub(1);
             w.g.lag_cam = u16::MAX;
@@ -3013,7 +3677,9 @@ pub fn dialog_result(w: &mut World) -> Option<i32> {
 /// closes and the event continues [`DIALOG_CLOSE`] frames after the A. A choice cursor moves with UP / DOWN.
 fn tick_dialog(w: &mut World) {
     let k = w.scene.keys[0].pressed;
-    let Some(d) = w.scene.dialog.as_mut() else { return };
+    let Some(d) = w.scene.dialog.as_mut() else {
+        return;
+    };
     d.t += 1;
     if d.options > 0 && matches!(d.phase, DialogPhase::Opening | DialogPhase::Shown) {
         if k & DOWN != 0 {
@@ -3039,7 +3705,13 @@ fn tick_dialog(w: &mut World) {
                 }
             }
             DialogPhase::Closing => {
-                if d.t >= if d.fades { WINDOW_FADE_CLOSE } else { WINDOW_CLOSE } {
+                if d.t
+                    >= if d.fades {
+                        WINDOW_FADE_CLOSE
+                    } else {
+                        WINDOW_CLOSE
+                    }
+                {
                     d.phase = DialogPhase::Closed;
                     crate::vram::text_close(w);
                 }
@@ -3098,7 +3770,17 @@ fn tick_dialog(w: &mut World) {
 pub const MENU_FADE: i32 = 16;
 
 pub fn open_menu(w: &mut World, kind: MenuKind) {
-    w.scene.menu = Some(Menu { kind, cursor: 0, t: 0, gauge: 0, fade: MENU_FADE, closing: false, result: None, log: Vec::new(), pending: None });
+    w.scene.menu = Some(Menu {
+        kind,
+        cursor: 0,
+        t: 0,
+        gauge: 0,
+        fade: MENU_FADE,
+        closing: false,
+        result: None,
+        log: Vec::new(),
+        pending: None,
+    });
     // the world is saved and hidden while the menu screen runs (0x08011DB4 / 0x08011E0E)
     w.scene.freeze = true;
 }
@@ -3139,7 +3821,16 @@ fn tick_menu(w: &mut World) {
 
 #[allow(clippy::too_many_arguments)]
 #[allow(clippy::too_many_arguments)]
-fn menu_step(m: &mut Menu, k: u16, held: u16, shop: &[ShopItem], zenie: i64, nchars: i32, black: &mut Option<i32>, sound: &mut Option<i32>) {
+fn menu_step(
+    m: &mut Menu,
+    k: u16,
+    held: u16,
+    shop: &[ShopItem],
+    zenie: i64,
+    nchars: i32,
+    black: &mut Option<i32>,
+    sound: &mut Option<i32>,
+) {
     m.t += 1;
     // the screen change: MENU_FADE frames to black, the menu screen; on leaving, the world is restored (black for
     // one frame, two frames after the closing press) and fades in over MENU_FADE frames (measured on the shop)
@@ -3259,7 +3950,12 @@ fn apply_area(w: &mut World, r: [i32; 4], main: bool, open: bool) {
     // 0x2E) set the shot grid only (re/buu/notes.md "Field: live collision grids", all 458 area loads verified)
     let Some(col) = w.col.as_mut() else { return };
     let g = crate::content::GRID as i32;
-    let (tx0, ty0, tx1, ty1) = ((r[0] >> 3).max(0), (r[1] >> 3).max(0), ((r[2] + 7) >> 3).min(g), ((r[3] + 7) >> 3).min(g));
+    let (tx0, ty0, tx1, ty1) = (
+        (r[0] >> 3).max(0),
+        (r[1] >> 3).max(0),
+        ((r[2] + 7) >> 3).min(g),
+        ((r[3] + 7) >> 3).min(g),
+    );
     let v = open as u8;
     let m = std::sync::Arc::make_mut(&mut col.map);
     for ty in ty0..ty1 {
@@ -3290,7 +3986,12 @@ pub fn reapply_areas(w: &mut World) {
     let m = std::sync::Arc::make_mut(&mut col.map);
     for op in ops {
         let r = op.rect;
-        let (tx0, ty0, tx1, ty1) = ((r[0] >> 3).max(0), (r[1] >> 3).max(0), ((r[2] + 7) >> 3).min(g), ((r[3] + 7) >> 3).min(g));
+        let (tx0, ty0, tx1, ty1) = (
+            (r[0] >> 3).max(0),
+            (r[1] >> 3).max(0),
+            ((r[2] + 7) >> 3).min(g),
+            ((r[3] + 7) >> 3).min(g),
+        );
         for ty in ty0..ty1 {
             for tx in tx0..tx1 {
                 let k = (ty * g + tx) as usize;
@@ -3326,26 +4027,30 @@ pub fn screen_rect_at(w: &World, i: usize, rw: i32, rh: i32) -> (i32, i32) {
 
 /// the game's sine table 0x087B6EEC (256 entries per turn, 16.16; truncated, so not `sin()` rounded)
 pub const SIN_TABLE: [i32; 256] = [
-    0, 1608, 3215, 4821, 6423, 8022, 9616, 11204, 12785, 14359, 15923, 17479, 19024, 20557, 22078, 23586,
-    25079, 26557, 28020, 29465, 30893, 32302, 33692, 35061, 36409, 37736, 39039, 40319, 41575, 42806, 44011, 45189,
-    46340, 47464, 48558, 49624, 50660, 51665, 52639, 53581, 54491, 55368, 56212, 57022, 57797, 58538, 59243, 59913,
-    60547, 61144, 61705, 62228, 62714, 63162, 63571, 63943, 64276, 64571, 64826, 65043, 65220, 65358, 65457, 65516,
-    65536, 65516, 65457, 65358, 65220, 65043, 64826, 64571, 64276, 63943, 63571, 63162, 62714, 62228, 61705, 61144,
-    60547, 59913, 59243, 58538, 57797, 57022, 56212, 55368, 54491, 53581, 52639, 51665, 50660, 49624, 48558, 47464,
-    46340, 45189, 44011, 42806, 41575, 40319, 39039, 37736, 36409, 35061, 33692, 32302, 30893, 29465, 28020, 26557,
-    25079, 23586, 22078, 20557, 19024, 17479, 15923, 14359, 12785, 11204, 9616, 8022, 6423, 4821, 3215, 1608,
-    0, -1608, -3215, -4821, -6423, -8022, -9616, -11204, -12785, -14359, -15923, -17479, -19024, -20557, -22078, -23586,
-    -25079, -26557, -28020, -29465, -30893, -32302, -33692, -35061, -36409, -37736, -39039, -40319, -41575, -42806, -44011, -45189,
-    -46340, -47464, -48558, -49624, -50660, -51665, -52639, -53581, -54491, -55368, -56212, -57022, -57797, -58538, -59243, -59913,
-    -60547, -61144, -61705, -62228, -62714, -63162, -63571, -63943, -64276, -64571, -64826, -65043, -65220, -65358, -65457, -65516,
-    -65536, -65516, -65457, -65358, -65220, -65043, -64826, -64571, -64276, -63943, -63571, -63162, -62714, -62228, -61705, -61144,
-    -60547, -59913, -59243, -58538, -57797, -57022, -56212, -55368, -54491, -53581, -52639, -51665, -50660, -49624, -48558, -47464,
-    -46340, -45189, -44011, -42806, -41575, -40319, -39039, -37736, -36409, -35061, -33692, -32302, -30893, -29465, -28020, -26557,
-    -25079, -23586, -22078, -20557, -19024, -17479, -15923, -14359, -12785, -11204, -9616, -8022, -6423, -4821, -3215, -1608,
+    0, 1608, 3215, 4821, 6423, 8022, 9616, 11204, 12785, 14359, 15923, 17479, 19024, 20557, 22078,
+    23586, 25079, 26557, 28020, 29465, 30893, 32302, 33692, 35061, 36409, 37736, 39039, 40319,
+    41575, 42806, 44011, 45189, 46340, 47464, 48558, 49624, 50660, 51665, 52639, 53581, 54491,
+    55368, 56212, 57022, 57797, 58538, 59243, 59913, 60547, 61144, 61705, 62228, 62714, 63162,
+    63571, 63943, 64276, 64571, 64826, 65043, 65220, 65358, 65457, 65516, 65536, 65516, 65457,
+    65358, 65220, 65043, 64826, 64571, 64276, 63943, 63571, 63162, 62714, 62228, 61705, 61144,
+    60547, 59913, 59243, 58538, 57797, 57022, 56212, 55368, 54491, 53581, 52639, 51665, 50660,
+    49624, 48558, 47464, 46340, 45189, 44011, 42806, 41575, 40319, 39039, 37736, 36409, 35061,
+    33692, 32302, 30893, 29465, 28020, 26557, 25079, 23586, 22078, 20557, 19024, 17479, 15923,
+    14359, 12785, 11204, 9616, 8022, 6423, 4821, 3215, 1608, 0, -1608, -3215, -4821, -6423, -8022,
+    -9616, -11204, -12785, -14359, -15923, -17479, -19024, -20557, -22078, -23586, -25079, -26557,
+    -28020, -29465, -30893, -32302, -33692, -35061, -36409, -37736, -39039, -40319, -41575, -42806,
+    -44011, -45189, -46340, -47464, -48558, -49624, -50660, -51665, -52639, -53581, -54491, -55368,
+    -56212, -57022, -57797, -58538, -59243, -59913, -60547, -61144, -61705, -62228, -62714, -63162,
+    -63571, -63943, -64276, -64571, -64826, -65043, -65220, -65358, -65457, -65516, -65536, -65516,
+    -65457, -65358, -65220, -65043, -64826, -64571, -64276, -63943, -63571, -63162, -62714, -62228,
+    -61705, -61144, -60547, -59913, -59243, -58538, -57797, -57022, -56212, -55368, -54491, -53581,
+    -52639, -51665, -50660, -49624, -48558, -47464, -46340, -45189, -44011, -42806, -41575, -40319,
+    -39039, -37736, -36409, -35061, -33692, -32302, -30893, -29465, -28020, -26557, -25079, -23586,
+    -22078, -20557, -19024, -17479, -15923, -14359, -12785, -11204, -9616, -8022, -6423, -4821,
+    -3215, -1608,
 ];
 
 /// `sin_scale(radius, angle)` = radius * sin_table[angle & 0xFF] >> 16 (`cos_scale`: angle + 64)
 pub fn sin_scale(radius: i32, angle: i32) -> i32 {
     (radius.wrapping_mul(SIN_TABLE[(angle & 0xff) as usize])) >> 16
 }
-

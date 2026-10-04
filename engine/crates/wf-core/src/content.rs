@@ -29,13 +29,19 @@ impl ContentSource for DirSource {
     fn list(&self) -> Vec<String> {
         if let Some(b) = self.read("files.json") {
             if let Ok(Value::Array(a)) = serde_json::from_slice::<Value>(&b) {
-                let mut v: Vec<String> = a.iter().filter_map(|x| x.as_str().map(String::from)).collect();
+                let mut v: Vec<String> = a
+                    .iter()
+                    .filter_map(|x| x.as_str().map(String::from))
+                    .collect();
                 v.sort();
                 return v;
             }
             if let Ok(Value::Object(o)) = serde_json::from_slice::<Value>(&b) {
                 if let Some(Value::Array(a)) = o.get("files") {
-                    let mut v: Vec<String> = a.iter().filter_map(|x| x.as_str().map(String::from)).collect();
+                    let mut v: Vec<String> = a
+                        .iter()
+                        .filter_map(|x| x.as_str().map(String::from))
+                        .collect();
                     v.sort();
                     return v;
                 }
@@ -66,7 +72,10 @@ pub struct MapSource {
 }
 impl MapSource {
     pub fn new(files: BTreeMap<String, Vec<u8>>) -> MapSource {
-        let files = files.into_iter().map(|(k, v)| (k.strip_prefix("base/").map(String::from).unwrap_or(k), v)).collect();
+        let files = files
+            .into_iter()
+            .map(|(k, v)| (k.strip_prefix("base/").map(String::from).unwrap_or(k), v))
+            .collect();
         MapSource { files }
     }
 }
@@ -114,7 +123,11 @@ impl Anim {
         if !d.is_empty() {
             return d;
         }
-        self.dirs.iter().find(|d| !d.is_empty()).map(|v| v.as_slice()).unwrap_or(&[])
+        self.dirs
+            .iter()
+            .find(|d| !d.is_empty())
+            .map(|v| v.as_slice())
+            .unwrap_or(&[])
     }
     pub fn length(&self, dir: u8) -> u32 {
         self.steps(dir).iter().map(|s| s.dur).sum()
@@ -126,7 +139,11 @@ impl Anim {
             return None;
         }
         let len = (steps.iter().map(|s| s.dur).sum::<u32>() as i32).max(1);
-        let mut k = if looped { t.rem_euclid(len) } else { t.clamp(0, len - 1) };
+        let mut k = if looped {
+            t.rem_euclid(len)
+        } else {
+            t.clamp(0, len - 1)
+        };
         for (i, s) in steps.iter().enumerate() {
             if k < s.dur as i32 {
                 return Some(i);
@@ -137,7 +154,12 @@ impl Anim {
     }
     /// nframes of the animation struct (max steps over the directions)
     pub fn nframes(&self) -> i32 {
-        self.dirs.iter().map(|d| d.len() as i32).max().unwrap_or(0).max(1)
+        self.dirs
+            .iter()
+            .map(|d| d.len() as i32)
+            .max()
+            .unwrap_or(0)
+            .max(1)
     }
 }
 
@@ -344,9 +366,22 @@ fn skill_engine(e: &Value) -> Option<SkillEngine> {
         fire_frame: opt("fire_frame"),
         recovery: opt("recovery"),
         speed: opt("speed"),
-        hit_box: e["hit_box"].as_array().filter(|a| a.len() >= 2).map(|a| (int(&a[0]) as i32, int(&a[1]) as i32)),
+        hit_box: e["hit_box"]
+            .as_array()
+            .filter(|a| a.len() >= 2)
+            .map(|a| (int(&a[0]) as i32, int(&a[1]) as i32)),
         drain: int_list(&e["drain"]),
-        anim: e["anim"].as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(|s| &*Box::leak(s.to_string().into_boxed_str()))).collect()).unwrap_or_default(),
+        anim: e["anim"]
+            .as_array()
+            .map(|a| {
+                a.iter()
+                    .filter_map(|x| {
+                        x.as_str()
+                            .map(|s| &*Box::leak(s.to_string().into_boxed_str()))
+                    })
+                    .collect()
+            })
+            .unwrap_or_default(),
         script: e["script"].as_str().map(String::from),
         cooldown: opt("cooldown"),
         anim_shift: opt("anim_shift"),
@@ -468,13 +503,18 @@ impl std::fmt::Display for LoadError {
 }
 
 fn json(src: &dyn ContentSource, path: &str) -> Result<Value, LoadError> {
-    let b = src.read(path).ok_or_else(|| LoadError(format!("missing content file {path}")))?;
+    let b = src
+        .read(path)
+        .ok_or_else(|| LoadError(format!("missing content file {path}")))?;
     serde_json::from_slice(&b).map_err(|e| LoadError(format!("{path}: {e}")))
 }
 
 pub(crate) fn int(v: &Value) -> i64 {
     match v {
-        Value::Number(n) => n.as_i64().or_else(|| n.as_f64().map(|f| f as i64)).unwrap_or(0),
+        Value::Number(n) => n
+            .as_i64()
+            .or_else(|| n.as_f64().map(|f| f as i64))
+            .unwrap_or(0),
         Value::String(s) => {
             let s = s.trim();
             if let Some(h) = s.strip_prefix("0x").or_else(|| s.strip_prefix("0X")) {
@@ -495,11 +535,17 @@ fn gets(v: &Value, k: &str) -> String {
 }
 
 fn files_under(all: &[String], dir: &str, suffix: &str) -> Vec<String> {
-    all.iter().filter(|p| p.starts_with(dir) && p.ends_with(suffix)).cloned().collect()
+    all.iter()
+        .filter(|p| p.starts_with(dir) && p.ends_with(suffix))
+        .cloned()
+        .collect()
 }
 
 /// the arena maps loaded with the data
-pub const ARENA_MAPS: [&str; 15] = ["8-71", "15-32", "18-14", "20-7", "8-68", "8-70", "8-40", "6-16", "6-9", "7-6", "8-3", "19-3", "15-1", "5-1", "20-5"];
+pub const ARENA_MAPS: [&str; 15] = [
+    "8-71", "15-32", "18-14", "20-7", "8-68", "8-70", "8-40", "6-16", "6-9", "7-6", "8-3", "19-3",
+    "15-1", "5-1", "20-5",
+];
 
 /// the player animation durations the game's states use (data/battle/buu_anim_timing.json `durations`; our decode
 /// of the state code, applied to the sprites the player forms use - the reference does the same). TODO: move into
@@ -537,11 +583,24 @@ impl GameData {
                 end: geti(ng, "END") as i32,
                 spd: geti(ng, "SPD") as i32,
                 form: geti(ng, "form") as i32,
-                skills: ng["skills"].as_array().map(|a| a.iter().map(|x| int(x) as i32).collect()).unwrap_or_default(),
+                skills: ng["skills"]
+                    .as_array()
+                    .map(|a| a.iter().map(|x| int(x) as i32).collect())
+                    .unwrap_or_default(),
                 xp: geti(ng, "xp"),
                 growth,
-                forms: c["forms"].as_array().map(|a| a.iter().map(|x| int(x) as i32).collect()).unwrap_or_default(),
-                equip: ng["equip"].as_array().filter(|a| a.len() == 4).map(|a| [int(&a[0]) as i32, int(&a[1]) as i32, int(&a[2]) as i32, int(&a[3]) as i32]),
+                forms: c["forms"]
+                    .as_array()
+                    .map(|a| a.iter().map(|x| int(x) as i32).collect())
+                    .unwrap_or_default(),
+                equip: ng["equip"].as_array().filter(|a| a.len() == 4).map(|a| {
+                    [
+                        int(&a[0]) as i32,
+                        int(&a[1]) as i32,
+                        int(&a[2]) as i32,
+                        int(&a[3]) as i32,
+                    ]
+                }),
                 in_party: ng["in_party"].as_bool().unwrap_or(false),
             });
         }
@@ -574,7 +633,13 @@ impl GameData {
                 controller: int(&f["controller_slot"]) as u32,
                 portraits: {
                     let mut p = [0u8; 6];
-                    for (k, v) in f["portrait_or_anim_bytes"].as_array().into_iter().flatten().take(6).enumerate() {
+                    for (k, v) in f["portrait_or_anim_bytes"]
+                        .as_array()
+                        .into_iter()
+                        .flatten()
+                        .take(6)
+                        .enumerate()
+                    {
                         p[k] = int(v) as u8;
                     }
                     p
@@ -592,12 +657,31 @@ impl GameData {
             let costs: Vec<i32> = if let Some(a) = ep["ep_cost_by_level"].as_array() {
                 a.iter().map(|x| int(x) as i32).collect()
             } else {
-                let v = ep.get("canuse_min_ep").filter(|v| !v.is_null()).or_else(|| ep.get("spend").filter(|v| !v.is_null())).map(int).unwrap_or(0);
+                let v = ep
+                    .get("canuse_min_ep")
+                    .filter(|v| !v.is_null())
+                    .or_else(|| ep.get("spend").filter(|v| !v.is_null()))
+                    .map(int)
+                    .unwrap_or(0);
                 vec![v as i32]
             };
-            let min_ep = ep.get("canuse_min_ep").filter(|v| !v.is_null()).map(|v| int(v) as i32).unwrap_or(costs.first().copied().unwrap_or(0));
+            let min_ep = ep
+                .get("canuse_min_ep")
+                .filter(|v| !v.is_null())
+                .map(|v| int(v) as i32)
+                .unwrap_or(costs.first().copied().unwrap_or(0));
             let id = geti(&s, "skill") as i32;
-            skills.insert(id, Skill { id, name: gets(&s, "name"), max_level: geti(&s, "max_level") as i32, costs, min_ep, engine: skill_engine(&s["engine"]) });
+            skills.insert(
+                id,
+                Skill {
+                    id,
+                    name: gets(&s, "name"),
+                    max_level: geti(&s, "max_level") as i32,
+                    costs,
+                    min_ep,
+                    engine: skill_engine(&s["engine"]),
+                },
+            );
         }
         let mut equipment = Vec::new();
         for p in files_under(&all, "equipment/", ".json") {
@@ -656,16 +740,28 @@ impl GameData {
         }
         equipment.sort_by_key(|e| e.id);
         let levels = json(src, "levels.json")?;
-        let xp_table: Vec<i64> = levels["levels"].as_array().map(|a| a.iter().map(|l| geti(l, "total_xp")).collect()).unwrap_or_default();
+        let xp_table: Vec<i64> = levels["levels"]
+            .as_array()
+            .map(|a| a.iter().map(|l| geti(l, "total_xp")).collect())
+            .unwrap_or_default();
 
         // ---- sprites (+ the player-state timing on the sprites the forms use)
         let timing: Value = serde_json::from_str(PLAYER_TIMING).unwrap_or(Value::Null);
-        let form_sprites: std::collections::BTreeSet<i32> = forms.iter().map(|f| f.gfx - 9).collect();
+        let form_sprites: std::collections::BTreeSet<i32> =
+            forms.iter().map(|f| f.gfx - 9).collect();
         let mut sprites = BTreeMap::new();
         for p in files_under(&all, "sprites/", "/sprite.json") {
             let s = json(src, &p)?;
             let index = geti(&s, "sprite_index") as i32;
-            let spr = parse_sprite(&s, index, if form_sprites.contains(&index) { Some(&timing["durations"]) } else { None });
+            let spr = parse_sprite(
+                &s,
+                index,
+                if form_sprites.contains(&index) {
+                    Some(&timing["durations"])
+                } else {
+                    None
+                },
+            );
             sprites.insert(index, spr);
         }
         // ---- effects: record geometry by ROM address
@@ -683,9 +779,16 @@ impl GameData {
                             for st in steps.as_array().into_iter().flatten() {
                                 if let Some(obj) = st["obj"].as_array() {
                                     let rom = int(&st["rom"]) as u32;
-                                    record_frames.entry(rom).or_insert((eid.clone(), geti(st, "frame") as u16));
+                                    record_frames
+                                        .entry(rom)
+                                        .or_insert((eid.clone(), geti(st, "frame") as u16));
                                     if rom != 0 && obj.len() >= 4 {
-                                        records.entry(rom).or_insert([int(&obj[0]) as i32, int(&obj[1]) as i32, int(&obj[2]) as i32, int(&obj[3]) as i32]);
+                                        records.entry(rom).or_insert([
+                                            int(&obj[0]) as i32,
+                                            int(&obj[1]) as i32,
+                                            int(&obj[2]) as i32,
+                                            int(&obj[3]) as i32,
+                                        ]);
                                     }
                                 }
                             }
@@ -710,9 +813,18 @@ impl GameData {
             .iter()
             .map(|e| {
                 let ty = geti(e, "type") as i32;
-                let name = e.get("display_name").and_then(|v| v.as_str()).or_else(|| e.get("name").and_then(|v| v.as_str())).map(String::from).unwrap_or_else(|| format!("Type 0x{ty:X}"));
+                let name = e
+                    .get("display_name")
+                    .and_then(|v| v.as_str())
+                    .or_else(|| e.get("name").and_then(|v| v.as_str()))
+                    .map(String::from)
+                    .unwrap_or_else(|| format!("Type 0x{ty:X}"));
                 let death = &e["death"];
-                let (dn, dp) = if death.is_object() { (gets(death, "name"), geti(death, "param")) } else { ("SelfDestruct".to_string(), 8) };
+                let (dn, dp) = if death.is_object() {
+                    (gets(death, "name"), geti(death, "param"))
+                } else {
+                    ("SelfDestruct".to_string(), 8)
+                };
                 EnemyType {
                     ty,
                     name,
@@ -724,13 +836,36 @@ impl GameData {
                     end: geti(e, "END") as i32,
                     res_m: geti(e, "resist_melee") as i32,
                     res_e: geti(e, "resist_energy") as i32,
-                    gfx: e["gfx_ids"].as_array().and_then(|a| a.first()).map(|v| int(v) as i32),
+                    gfx: e["gfx_ids"]
+                        .as_array()
+                        .and_then(|a| a.first())
+                        .map(|v| int(v) as i32),
                     sprite: None,
                     death_name: dn,
                     death_param: dp,
-                    spawns: e["spawn_points"].as_array().map(|a| a.iter().map(|s| (geti(s, "world") as i32, geti(s, "map") as i32, geti(s, "x") as i32, geti(s, "y") as i32)).collect()).unwrap_or_default(),
-                    drop_script: e["drop_script"].as_str().and_then(|s| u32::from_str_radix(s.trim_start_matches("0x"), 16).ok()).unwrap_or(0),
-                    anim_as: e.get("anim_as").filter(|v| !v.is_null()).map(|v| int(v) as i32),
+                    spawns: e["spawn_points"]
+                        .as_array()
+                        .map(|a| {
+                            a.iter()
+                                .map(|s| {
+                                    (
+                                        geti(s, "world") as i32,
+                                        geti(s, "map") as i32,
+                                        geti(s, "x") as i32,
+                                        geti(s, "y") as i32,
+                                    )
+                                })
+                                .collect()
+                        })
+                        .unwrap_or_default(),
+                    drop_script: e["drop_script"]
+                        .as_str()
+                        .and_then(|s| u32::from_str_radix(s.trim_start_matches("0x"), 16).ok())
+                        .unwrap_or(0),
+                    anim_as: e
+                        .get("anim_as")
+                        .filter(|v| !v.is_null())
+                        .map(|v| int(v) as i32),
                 }
             })
             .collect();
@@ -755,20 +890,60 @@ impl GameData {
         for &id in beh_json.keys() {
             states.insert(id, Arc::new(compile_behaviour(id, &beh_json)));
         }
-        let aux = aux_json.iter().map(|(&k, v)| (k, Arc::new(compile_onhit(v)))).collect();
+        let aux = aux_json
+            .iter()
+            .map(|(&k, v)| (k, Arc::new(compile_onhit(v))))
+            .collect();
 
         let mut areas = BTreeMap::new();
         if let Ok(a) = json(src, "areas.json") {
             for x in a["areas"].as_array().into_iter().flatten() {
                 let key = gets(x, "key");
-                let map = x["maps"].get(0).and_then(|m| m.as_str()).unwrap_or("").to_string();
+                let map = x["maps"]
+                    .get(0)
+                    .and_then(|m| m.as_str())
+                    .unwrap_or("")
+                    .to_string();
                 areas.insert(key, (map, x["song"].as_u64().map(|v| v as u16)));
             }
         }
         let (fighters, arenas) = battle_defs(src, &all)?;
-        let mut d = GameData { sprites, records, record_frames, areas, effects, enemies, states, aux, chars, forms, skills, equipment, xp_table, maps: BTreeMap::new(), anim: crate::eanim::AnimRules::load(ENEMY_ANIM), field: crate::fieldcontent::FieldData::load(src, &all)?.map(Arc::new), fighters, arenas, projectiles: crate::modkit::load_projectiles(src, &all)?, hooks: None, menu: crate::menu::MenuData::load(src), sound: if src.read("audio/index.json").is_some() { wf_audio::content::load_bank(&|p| src.read(p)).ok().map(Arc::new) } else { None } };
+        let mut d = GameData {
+            sprites,
+            records,
+            record_frames,
+            areas,
+            effects,
+            enemies,
+            states,
+            aux,
+            chars,
+            forms,
+            skills,
+            equipment,
+            xp_table,
+            maps: BTreeMap::new(),
+            anim: crate::eanim::AnimRules::load(ENEMY_ANIM),
+            field: crate::fieldcontent::FieldData::load(src, &all)?.map(Arc::new),
+            fighters,
+            arenas,
+            projectiles: crate::modkit::load_projectiles(src, &all)?,
+            hooks: None,
+            menu: crate::menu::MenuData::load(src),
+            sound: if src.read("audio/index.json").is_some() {
+                wf_audio::content::load_bank(&|p| src.read(p))
+                    .ok()
+                    .map(Arc::new)
+            } else {
+                None
+            },
+        };
         // new enemy types animate like the type they name (`anim_as`)
-        let borrow: Vec<(i32, i32)> = d.enemies.iter().filter_map(|e| e.anim_as.map(|b| (e.ty, b))).collect();
+        let borrow: Vec<(i32, i32)> = d
+            .enemies
+            .iter()
+            .filter_map(|e| e.anim_as.map(|b| (e.ty, b)))
+            .collect();
         for (ty, base) in borrow {
             if let Some(m) = d.anim.types.get(&base).cloned() {
                 d.anim.types.insert(ty, m);
@@ -778,7 +953,12 @@ impl GameData {
             d.load_map(src, m)?;
         }
         // arenas added by content (their maps' collision)
-        let extra: Vec<String> = d.arenas.iter().map(|a| a.map.clone()).filter(|m| !d.maps.contains_key(m)).collect();
+        let extra: Vec<String> = d
+            .arenas
+            .iter()
+            .map(|a| a.map.clone())
+            .filter(|m| !d.maps.contains_key(m))
+            .collect();
         for m in extra {
             d.load_map(src, &m)?;
         }
@@ -805,7 +985,10 @@ impl GameData {
 
     /// load one map's collision ("world-map", e.g. "8-71", or a map directory id such as "mod_cave")
     pub fn load_map(&mut self, src: &dyn ContentSource, map: &str) -> Result<(), LoadError> {
-        let dir = match map.split_once('-').and_then(|(w, m)| Some((w.parse::<i32>().ok()?, m.parse::<i32>().ok()?))) {
+        let dir = match map
+            .split_once('-')
+            .and_then(|(w, m)| Some((w.parse::<i32>().ok()?, m.parse::<i32>().ok()?)))
+        {
             Some((w, m)) => format!("maps/area_{w:02}_{m:03}"),
             None => format!("maps/{map}"),
         };
@@ -828,7 +1011,15 @@ impl GameData {
                 wh = (geti(&mj, "height") * geti(&mj, "tileheight").max(8)) as i32;
             }
         }
-        self.maps.insert(map.to_string(), Arc::new(MapCollision { walk, shot, world_w: ww, world_h: wh }));
+        self.maps.insert(
+            map.to_string(),
+            Arc::new(MapCollision {
+                walk,
+                shot,
+                world_w: ww,
+                world_h: wh,
+            }),
+        );
         Ok(())
     }
 
@@ -843,7 +1034,10 @@ impl GameData {
             return None;
         }
         // the game's types are a dense table; types added by mods may leave gaps
-        self.enemies.get(ty as usize).filter(|e| e.ty == ty).or_else(|| self.enemies.iter().find(|e| e.ty == ty))
+        self.enemies
+            .get(ty as usize)
+            .filter(|e| e.ty == ty)
+            .or_else(|| self.enemies.iter().find(|e| e.ty == ty))
     }
     /// effect / OBJ record geometry by ROM address
     pub fn record(&self, addr: u32) -> Option<[i32; 4]> {
@@ -859,14 +1053,22 @@ fn parse_sprite(s: &Value, index: i32, timing: Option<&Value>) -> Sprite {
             let raw = geti(a, "raw_index") as i32;
             let mut looped = a["loop"].as_bool().unwrap_or(false);
             let any = a["directions"].get("any");
-            let td = timing.and_then(|t| t.get(raw.to_string())).filter(|v| v.is_object());
+            let td = timing
+                .and_then(|t| t.get(raw.to_string()))
+                .filter(|v| v.is_object());
             if let Some(td) = td {
                 if let Some(l) = td["loop"].as_bool() {
                     looped = l;
                 }
             }
             let dirs: [Vec<AnimStep>; 4] = std::array::from_fn(|i| {
-                let steps = a["directions"].get(DIRS[i]).filter(|v| !v.is_null()).or(any).and_then(|v| v.as_array()).cloned().unwrap_or_default();
+                let steps = a["directions"]
+                    .get(DIRS[i])
+                    .filter(|v| !v.is_null())
+                    .or(any)
+                    .and_then(|v| v.as_array())
+                    .cloned()
+                    .unwrap_or_default();
                 let n = steps.len();
                 steps
                     .iter()
@@ -883,17 +1085,60 @@ fn parse_sprite(s: &Value, index: i32, timing: Option<&Value>) -> Sprite {
                                 dur = int(e);
                             }
                         }
-                        AnimStep { frame: geti(st, "frame") as u16, dur: dur.max(1) as u32, rom: int(&st["rom"]) as u32, flip: st["flip"].as_bool().unwrap_or(false), attach: st["attach"].as_array().filter(|a| a.len() >= 2).map(|a| (int(&a[0]) as i32, int(&a[1]) as i32)), fbox: st["box"].as_array().filter(|a| a.len() >= 4).map(|a| [int(&a[0]) as i32, int(&a[1]) as i32, int(&a[2]) as i32, int(&a[3]) as i32]), dec: st["decode_cycles"].as_u64().unwrap_or(0) as u32 }
+                        AnimStep {
+                            frame: geti(st, "frame") as u16,
+                            dur: dur.max(1) as u32,
+                            rom: int(&st["rom"]) as u32,
+                            flip: st["flip"].as_bool().unwrap_or(false),
+                            attach: st["attach"]
+                                .as_array()
+                                .filter(|a| a.len() >= 2)
+                                .map(|a| (int(&a[0]) as i32, int(&a[1]) as i32)),
+                            fbox: st["box"].as_array().filter(|a| a.len() >= 4).map(|a| {
+                                [
+                                    int(&a[0]) as i32,
+                                    int(&a[1]) as i32,
+                                    int(&a[2]) as i32,
+                                    int(&a[3]) as i32,
+                                ]
+                            }),
+                            dec: st["decode_cycles"].as_u64().unwrap_or(0) as u32,
+                        }
                     })
                     .collect()
             });
-            anims.push(Anim { name: name.clone(), raw, looped, dirs, canon_raw: raw });
+            anims.push(Anim {
+                name: name.clone(),
+                raw,
+                looped,
+                dirs,
+                canon_raw: raw,
+            });
         }
     }
     // canonical raw: the lowest raw index with the same ROM records in every direction listed
     let keys: Vec<Vec<Vec<u32>>> = s["animations"]
         .as_object()
-        .map(|o| o.values().map(|a| a["directions"].as_object().map(|d| d.values().map(|v| v.as_array().into_iter().flatten().map(|q| int(&q["rom"]) as u32).collect()).collect()).unwrap_or_default()).collect())
+        .map(|o| {
+            o.values()
+                .map(|a| {
+                    a["directions"]
+                        .as_object()
+                        .map(|d| {
+                            d.values()
+                                .map(|v| {
+                                    v.as_array()
+                                        .into_iter()
+                                        .flatten()
+                                        .map(|q| int(&q["rom"]) as u32)
+                                        .collect()
+                                })
+                                .collect()
+                        })
+                        .unwrap_or_default()
+                })
+                .collect()
+        })
         .unwrap_or_default();
     for i in 0..anims.len() {
         let mut best = anims[i].raw;
@@ -916,7 +1161,12 @@ fn parse_sprite(s: &Value, index: i32, timing: Option<&Value>) -> Sprite {
             let b = bb.get(*d).or_else(|| bb.values().next());
             if let Some(a) = b.and_then(|v| v.as_array()) {
                 if a.len() >= 4 {
-                    let r = [int(&a[0]) as i32, int(&a[1]) as i32, int(&a[2]) as i32, int(&a[3]) as i32];
+                    let r = [
+                        int(&a[0]) as i32,
+                        int(&a[1]) as i32,
+                        int(&a[2]) as i32,
+                        int(&a[3]) as i32,
+                    ];
                     // an empty rect stays empty (0x0800FE78: nothing hits that facing, e.g. the Enzyme's body exists
                     // only facing down); only a sprite without any box keeps the default
                     body[i] = r;
@@ -934,12 +1184,40 @@ fn parse_sprite(s: &Value, index: i32, timing: Option<&Value>) -> Sprite {
     }
     let shadow = s["shadow"].as_str().map(String::from);
     let h = &s["header"];
-    let tile_bytes = (h["flags2"].as_i64().unwrap_or(0) | h["flags3"].as_i64().unwrap_or(0) << 8) as i32;
+    let tile_bytes =
+        (h["flags2"].as_i64().unwrap_or(0) | h["flags3"].as_i64().unwrap_or(0) << 8) as i32;
     let sh = h["shadow"].as_array();
-    let shadow_key = sh.map(|a| (a.get(2).and_then(|v| v.as_u64()).unwrap_or(0) as u8, a.get(3).and_then(|v| v.as_u64()).unwrap_or(0) as u8)).unwrap_or((0, 0));
-    let halo = anims.iter().any(|a| a.dirs.iter().any(|d| d.iter().any(|st| st.attach.is_some())));
-    let def_addr = s["rom"]["def"].as_str().and_then(|v| u32::from_str_radix(v.trim_start_matches("0x"), 16).ok()).unwrap_or(0);
-    Sprite { index, id: gets(s, "id"), anims, by_raw, by_name, body, foot, shadow, tile_bytes, shadow_key, halo, def_addr }
+    let shadow_key = sh
+        .map(|a| {
+            (
+                a.get(2).and_then(|v| v.as_u64()).unwrap_or(0) as u8,
+                a.get(3).and_then(|v| v.as_u64()).unwrap_or(0) as u8,
+            )
+        })
+        .unwrap_or((0, 0));
+    let halo = anims.iter().any(|a| {
+        a.dirs
+            .iter()
+            .any(|d| d.iter().any(|st| st.attach.is_some()))
+    });
+    let def_addr = s["rom"]["def"]
+        .as_str()
+        .and_then(|v| u32::from_str_radix(v.trim_start_matches("0x"), 16).ok())
+        .unwrap_or(0);
+    Sprite {
+        index,
+        id: gets(s, "id"),
+        anims,
+        by_raw,
+        by_name,
+        body,
+        foot,
+        shadow,
+        tile_bytes,
+        shadow_key,
+        halo,
+        def_addr,
+    }
 }
 
 /// the reference loader's graphics fallbacks (data.ts): Janemba body parts from their spawn records, placeholders
@@ -980,10 +1258,21 @@ fn resolve_enemy_gfx(en: &mut [EnemyType], sprites: &BTreeMap<i32, Sprite>) {
         }
         if en[i].gfx.is_none() {
             let me = strip(&en[i].name);
-            let same = en.iter().find(|o| o.gfx.is_some() && strip(&o.name) == me).and_then(|o| o.gfx);
+            let same = en
+                .iter()
+                .find(|o| o.gfx.is_some() && strip(&o.name) == me)
+                .and_then(|o| o.gfx);
             let name = en[i].name.clone();
-            let prev = if ty >= 1 { en.get((ty - 1) as usize).filter(|p| p.gfx.is_some()).and_then(|p| p.gfx) } else { None };
-            let borrow = ["variant", "Kid Buu", "Broly", "Super Buu", "Worm"].iter().any(|k| name.contains(k));
+            let prev = if ty >= 1 {
+                en.get((ty - 1) as usize)
+                    .filter(|p| p.gfx.is_some())
+                    .and_then(|p| p.gfx)
+            } else {
+                None
+            };
+            let borrow = ["variant", "Kid Buu", "Broly", "Super Buu", "Worm"]
+                .iter()
+                .any(|k| name.contains(k));
             en[i].gfx = same.or(if borrow { prev } else { None });
             if en[i].gfx.is_none() && (ty == 0x8f || ty == 0x90) {
                 en[i].gfx = en.get(0x8e).and_then(|e| e.gfx);
@@ -998,28 +1287,75 @@ fn resolve_enemy_gfx(en: &mut [EnemyType], sprites: &BTreeMap<i32, Sprite>) {
 }
 
 /// the built-in fighters / arenas, then the content's `battle/fighters/*.json` / `battle/arenas/*.json`
-fn battle_defs(src: &dyn ContentSource, all: &[String]) -> Result<(Vec<FighterDef>, Vec<ArenaDef>), LoadError> {
+fn battle_defs(
+    src: &dyn ContentSource,
+    all: &[String],
+) -> Result<(Vec<FighterDef>, Vec<ArenaDef>), LoadError> {
     let mut fighters: Vec<FighterDef> = crate::battle::FIGHTERS
         .iter()
-        .map(|f| FighterDef { id: f.0.to_string(), name: f.0.to_string(), character: f.1, fusion: f.2, forms: f.3.to_vec(), default_form: f.4, skills: if f.1 == 8 { Some(vec![7]) } else { None } })
+        .map(|f| FighterDef {
+            id: f.0.to_string(),
+            name: f.0.to_string(),
+            character: f.1,
+            fusion: f.2,
+            forms: f.3.to_vec(),
+            default_form: f.4,
+            skills: if f.1 == 8 { Some(vec![7]) } else { None },
+        })
         .collect();
-    let mut arenas: Vec<ArenaDef> =
-        crate::battle::ARENAS.iter().map(|a| ArenaDef { id: a.0.to_string(), name: a.2.to_string(), map: a.1.to_string(), spawn: a.3, bounds: a.4 }).collect();
+    let mut arenas: Vec<ArenaDef> = crate::battle::ARENAS
+        .iter()
+        .map(|a| ArenaDef {
+            id: a.0.to_string(),
+            name: a.2.to_string(),
+            map: a.1.to_string(),
+            spawn: a.3,
+            bounds: a.4,
+        })
+        .collect();
     for p in files_under(all, "battle/fighters/", ".json") {
         if p.ends_with("index.json") {
             continue;
         }
         let v = json(src, &p)?;
-        let id = v["id"].as_str().map(String::from).unwrap_or_else(|| p["battle/fighters/".len()..p.len() - 5].to_string());
+        let id = v["id"]
+            .as_str()
+            .map(String::from)
+            .unwrap_or_else(|| p["battle/fighters/".len()..p.len() - 5].to_string());
         let old = fighters.iter().position(|f| f.id == id);
         let prev = old.map(|k| fighters[k].clone());
-        let forms = v.get("forms").map(int_list).or_else(|| prev.as_ref().map(|f| f.forms.clone())).unwrap_or_default();
+        let forms = v
+            .get("forms")
+            .map(int_list)
+            .or_else(|| prev.as_ref().map(|f| f.forms.clone()))
+            .unwrap_or_default();
         let f = FighterDef {
-            name: v["name"].as_str().map(String::from).or_else(|| prev.as_ref().map(|f| f.name.clone())).unwrap_or_else(|| id.clone()),
-            character: v.get("character").map(|x| int(x) as i32).or(prev.as_ref().map(|f| f.character)).unwrap_or(0),
-            fusion: v["fusion"].as_array().filter(|a| a.len() == 2).map(|a| (int(&a[0]) as i32, int(&a[1]) as i32)).or(prev.as_ref().and_then(|f| f.fusion)),
-            default_form: v.get("default_form").map(|x| int(x) as i32).or(prev.as_ref().map(|f| f.default_form)).or(forms.first().copied()).unwrap_or(0),
-            skills: v.get("skills").filter(|x| !x.is_null()).map(int_list).or(prev.as_ref().and_then(|f| f.skills.clone())),
+            name: v["name"]
+                .as_str()
+                .map(String::from)
+                .or_else(|| prev.as_ref().map(|f| f.name.clone()))
+                .unwrap_or_else(|| id.clone()),
+            character: v
+                .get("character")
+                .map(|x| int(x) as i32)
+                .or(prev.as_ref().map(|f| f.character))
+                .unwrap_or(0),
+            fusion: v["fusion"]
+                .as_array()
+                .filter(|a| a.len() == 2)
+                .map(|a| (int(&a[0]) as i32, int(&a[1]) as i32))
+                .or(prev.as_ref().and_then(|f| f.fusion)),
+            default_form: v
+                .get("default_form")
+                .map(|x| int(x) as i32)
+                .or(prev.as_ref().map(|f| f.default_form))
+                .or(forms.first().copied())
+                .unwrap_or(0),
+            skills: v
+                .get("skills")
+                .filter(|x| !x.is_null())
+                .map(int_list)
+                .or(prev.as_ref().and_then(|f| f.skills.clone())),
             forms,
             id,
         };
@@ -1036,14 +1372,24 @@ fn battle_defs(src: &dyn ContentSource, all: &[String]) -> Result<(Vec<FighterDe
             continue;
         }
         let v = json(src, &p)?;
-        let id = v["id"].as_str().map(String::from).unwrap_or_else(|| p["battle/arenas/".len()..p.len() - 5].to_string());
+        let id = v["id"]
+            .as_str()
+            .map(String::from)
+            .unwrap_or_else(|| p["battle/arenas/".len()..p.len() - 5].to_string());
         let sp = &v["spawn"];
         let b = int_list(&v["bounds"]);
         let a = ArenaDef {
             name: v["name"].as_str().unwrap_or(&id).to_string(),
-            map: v["map"].as_str().ok_or_else(|| LoadError(format!("{p}: an arena needs \"map\"")))?.to_string(),
+            map: v["map"]
+                .as_str()
+                .ok_or_else(|| LoadError(format!("{p}: an arena needs \"map\"")))?
+                .to_string(),
             spawn: (int(&sp[0]) as i32, int(&sp[1]) as i32),
-            bounds: if b.len() == 4 { [b[0], b[1], b[2], b[3]] } else { [0, 0, 2048, 2048] },
+            bounds: if b.len() == 4 {
+                [b[0], b[1], b[2], b[3]]
+            } else {
+                [0, 0, 2048, 2048]
+            },
             id,
         };
         match arenas.iter().position(|x| x.id == a.id) {
@@ -1057,7 +1403,9 @@ fn battle_defs(src: &dyn ContentSource, all: &[String]) -> Result<(Vec<FighterDe
 /// `collision.json` in the mod-friendly row form (`"rows": ["##..", ...]`: '.' open, '#' wall, '~' blocks
 /// walking but not shots) converted to the extractor's run-length form; other files are returned unchanged
 pub(crate) fn rows_collision(c: Value) -> Value {
-    let Some(rows) = c["rows"].as_array() else { return c };
+    let Some(rows) = c["rows"].as_array() else {
+        return c;
+    };
     let rows: Vec<&str> = rows.iter().filter_map(|r| r.as_str()).collect();
     let w = rows.iter().map(|r| r.len()).max().unwrap_or(1).max(1);
     let h = rows.len().max(1);
@@ -1097,7 +1445,9 @@ fn rle_b64(flat: &[u8]) -> String {
     const T: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut s = String::new();
     for c in bytes.chunks(3) {
-        let v = (c[0] as u32) << 16 | (*c.get(1).unwrap_or(&0) as u32) << 8 | *c.get(2).unwrap_or(&0) as u32;
+        let v = (c[0] as u32) << 16
+            | (*c.get(1).unwrap_or(&0) as u32) << 8
+            | *c.get(2).unwrap_or(&0) as u32;
         for k in 0..=c.len() {
             s.push(T[(v >> (18 - 6 * k)) as usize & 63] as char);
         }

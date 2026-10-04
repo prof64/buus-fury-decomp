@@ -2,8 +2,10 @@
 //! player slots), keyframe snapshots for O(1) rewinds, named save states, structured events since the last
 //! observation, per-slot autopilots (the slots the agent is not driving this frame) and replays.
 //!
-//! Time travel uses true snapshots (`Session::snapshot` = a `World` clone, ~2 µs); the input log is kept so a replay
-//! (config + inputs) can always re-simulate the session from frame 0 and check the state hash.
+//! Time travel uses true snapshots (`Session::snapshot` = a `World` clone, ~2 µs; story sessions add the script
+//! host's state); the input log is kept so a replay (config + inputs) can always re-simulate the session from frame 0
+//! and check the state hash. A session's frame is the number of steps taken (= the input log's length): in story
+//! sessions and across field area loads `World.frame` (the object passes) stands still in menus, holds and loads.
 
 use crate::macros::{Policy, Step};
 use serde::{Deserialize, Serialize};
@@ -19,6 +21,28 @@ use wf_core::session::{Session, Snapshot};
 use wf_core::world::{Body, Event, World, MAX_PLAYERS};
 
 pub type Held = [u16; MAX_PLAYERS];
+
+/// a session's state: the core session, and for story sessions the script host's between-frames state
+#[derive(Clone)]
+pub struct Snap {
+    pub s: Snapshot,
+    pub host: Option<Box<wf_import::HostSnapshot>>,
+}
+
+/// a story session's script host (the app's story mode, wf-app `StorySim`: the same `wf_import::StoryHost`)
+pub struct Story {
+    pub host: wf_import::StoryHost,
+    /// the content's scripts (a fork builds its own host from them)
+    pub files: Arc<BTreeMap<String, String>>,
+    pub start: StoryStart,
+}
+
+/// how a story session started (replays re-create it)
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct StoryStart {
+    /// RNG seed of the session (the title's boot carries it into the new game)
+    pub seed: u32,
+}
 const KEYFRAME_EVERY: u32 = 120;
 const MAX_EVENTS: usize = 400;
 
@@ -43,9 +67,9 @@ pub struct Agent {
     /// the new_battle arguments after resolution (for listing / evaluate_controller)
     pub spec: Value,
     pub inputs: Vec<Held>,
-    initial: Snapshot,
-    keyframes: Vec<(u32, Snapshot)>,
-    pub named: BTreeMap<String, (Snapshot, Vec<Held>)>,
+    initial: Snap,
+    keyframes: Vec<(u32, Snap)>,
+    pub named: BTreeMap<String, (Snap, Vec<Held>)>,
     /// structured events since the last draining observation
     pub events: Vec<Value>,
     pub events_dropped: usize,
@@ -63,6 +87,8 @@ pub struct Agent {
     pub state_since: BTreeMap<u32, (u16, u32, u32)>,
     /// field sessions: how it started (battle sessions: None, the config is `s.config`)
     pub field_cfg: Option<FieldConfig>,
+    /// story sessions: the script host (title, New Game, the story's events and dialogue, saves)
+    pub story: Option<Story>,
 }
 
 pub fn coarse(s: PState) -> &'static str {
@@ -123,7 +149,66 @@ impl Agent {
         Agent::from_session(id, Session::new_field(data, config.clone()), Some(config), label, spec)
     }
 
+    /// a story session on the game's title screen (START -> Single Player -> New Game), as the app's
+    /// `launcher::title_app`: headless, one step per game logic iteration (`Options::no_lag`)
+    pub fn new_story(id: String, data: Arc<GameData>, files: Arc<BTreeMap<String, String>>, start: StoryStart) -> Result<Agent, String> {
+        let mut s = Self::story_session(&data, &start);
+        wf_core::field::attach_host(&mut s.world, true);
+        let mut host = wf_import::StoryHost::new(&s.data, &files)?;
+        host.start(&mut s);
+        // (as the app's title: the placeholder area under the title shows no area banner)
+        s.world.scene.banner = None;
+        let mut a = Agent::from_session(id, s, None, "story".into(), json!({"story": start}));
+        a.story = Some(Story { host, files, start });
+        a.initial = a.snap();
+        Ok(a)
+    }
+
+    fn story_session(data: &Arc<GameData>, start: &StoryStart) -> Session {
+        let cfg = FieldConfig { world: 1, area: 1, rng: wf_core::battle::RngInit::Seed(start.seed), ..Default::default() };
+        let mut s = Session::new_field(Arc::clone(data), cfg);
+        s.world.opts.no_lag = true;
+        // the three slot files, empty (as the app's title: its hash covers the slot list)
+        for i in 0..wf_core::menu::save::SLOTS {
+            s.world.saves.set_slot_bytes(i, &[]);
+        }
+        wf_core::menu::title::open_title(&mut s.world);
+        s
+    }
+
+    /// the session's state (story sessions: with the script host's)
+    pub fn snap(&self) -> Snap {
+        Snap { s: self.s.snapshot(), host: self.story.as_ref().map(|st| Box::new(st.host.snapshot())) }
+    }
+    fn restore_snap(&mut self, sn: &Snap) {
+        self.s.restore(&sn.s);
+        if let (Some(st), Some(h)) = (self.story.as_mut(), sn.host.as_ref()) {
+            st.host.restore(h);
+        }
+    }
+
+    /// one frame of the core (story sessions: in the script host's order, as the app's story mode)
+    fn raw_step(&mut self, held: &Held) -> Vec<Event> {
+        match self.story.as_mut() {
+            None => self.s.step(held).to_vec(),
+            Some(st) => {
+                let mut frames = [wf_core::input::InputFrame::default(); MAX_PLAYERS];
+                for (k, f) in frames.iter_mut().enumerate() {
+                    *f = wf_core::input::InputFrame::from_held(held[k], self.s.prev[k]);
+                    self.s.prev[k] = held[k];
+                }
+                // (the title's New Game / Continue replace the world: the new field is the host's too)
+                wf_core::field::attach_host(&mut self.s.world, true);
+                st.host.step_inputs(&mut self.s, frames);
+                self.s.world.events.clone()
+            }
+        }
+    }
+
     fn make_session(&self) -> Session {
+        if let Some(st) = &self.story {
+            return Self::story_session(&self.s.data, &st.start);
+        }
         match &self.field_cfg {
             Some(f) => Session::new_field(Arc::clone(&self.s.data), f.clone()),
             None => Session::new(Arc::clone(&self.s.data), self.s.config.clone()),
@@ -133,6 +218,7 @@ impl Agent {
     fn from_session(id: String, s: Session, field_cfg: Option<FieldConfig>, label: String, spec: Value) -> Agent {
         let initial = s.snapshot();
         let n = s.world.players.len().max(1);
+        let initial = Snap { s: initial, host: None };
         Agent {
             id,
             s,
@@ -152,6 +238,7 @@ impl Agent {
             record: true,
             state_since: BTreeMap::new(),
             field_cfg,
+            story: None,
         }
     }
 
@@ -161,8 +248,9 @@ impl Agent {
     pub fn w(&self) -> &World {
         &self.s.world
     }
+    /// steps taken (the input log's length; `World.frame` stands still in menus, holds and loads)
     pub fn frame(&self) -> u32 {
-        self.s.world.frame
+        self.inputs.len() as u32
     }
     pub fn slots(&self) -> usize {
         self.s.world.players.len().max(1)
@@ -205,12 +293,13 @@ impl Agent {
 
     /// advance one frame with explicit buttons for every slot; the delta is computed for `view_slot`
     pub fn step_held(&mut self, held: Held, view_slot: usize) -> Delta {
-        let f = self.s.world.frame;
+        let f = self.frame();
         if f.is_multiple_of(KEYFRAME_EVERY) && f > 0 && self.keyframes.last().is_none_or(|k| k.0 < f) {
-            self.keyframes.push((f, self.s.snapshot()));
+            let sn = self.snap();
+            self.keyframes.push((f, sn));
         }
         if !self.record {
-            self.s.step(&held);
+            self.raw_step(&held);
             self.inputs.push(held);
             self.track_states();
             return Delta::default();
@@ -239,9 +328,11 @@ impl Agent {
         let out0 = self.s.outcome;
         let me = self.player_id(view_slot);
 
-        let evs: Vec<Event> = self.s.step(&held).to_vec();
+        let evs: Vec<Event> = self.raw_step(&held);
         self.inputs.push(held);
         self.track_states();
+        // (events carry the session's frame: the step count `rewind {to_frame}` takes)
+        let fr = self.inputs.len() as u32;
 
         let w = &self.s.world;
         let name = |id: u32| -> String { if w.find(id).is_some() { describe(w, id, me) } else { names0.get(&id).cloned().unwrap_or_else(|| describe(w, id, me)) } };
@@ -256,7 +347,7 @@ impl Agent {
                         let hp1 = w.find(pid).map(|i| w.pl_ref(i).hp()).unwrap_or(0);
                         let lost = (hp0 - hp1).max(0) as i64;
                         let blocked = w.find(pid).is_some_and(|i| w.pl_ref(i).a.blocking);
-                        let mut v = json!({"f": w.frame, "type": "hurt", "by": name(*attacker), "hp": -lost});
+                        let mut v = json!({"f": fr, "type": "hurt", "by": name(*attacker), "hp": -lost});
                         if Some(pid) != me {
                             v["type"] = json!("ally_hurt");
                             v["target"] = json!(describe(w, pid, me));
@@ -304,7 +395,7 @@ impl Agent {
                                 d.no_damage_hits += 1;
                             }
                         }
-                        let mut v = json!({"f": w.frame, "type": "hit", "by": name(*attacker), "target": name(eid), "effect": effect, "hp_change": -change, "computed": raw, "target_hp": (hp1 / 1024).max(-9999)});
+                        let mut v = json!({"f": fr, "type": "hit", "by": name(*attacker), "target": name(eid), "effect": effect, "hp_change": -change, "computed": raw, "target_hp": (hp1 / 1024).max(-9999)});
                         if *crit {
                             v["crit"] = json!(true);
                         }
@@ -312,13 +403,13 @@ impl Agent {
                     }
                 }
                 Event::SkillStart { id } => {
-                    out.push(json!({"f": w.frame, "type": "skill", "name": crate::catalog::skill_name(&w.data, *id)}));
+                    out.push(json!({"f": fr, "type": "skill", "name": crate::catalog::skill_name(&w.data, *id)}));
                 }
-                Event::Info { text } => out.push(json!({"f": w.frame, "type": "info", "text": text})),
+                Event::Info { text } => out.push(json!({"f": fr, "type": "info", "text": text})),
                 Event::Field(fe) => {
                     let mut v = serde_json::to_value(fe).unwrap_or(Value::Null);
                     if let Value::Object(m) = &mut v {
-                        m.insert("f".into(), json!(w.frame));
+                        m.insert("f".into(), json!(fr));
                         m.insert("type".into(), json!("field"));
                     }
                     out.push(v);
@@ -332,9 +423,9 @@ impl Agent {
                 match before.iter().find(|b| b.0 == e.id) {
                     Some(b) if !b.2 && dead => {
                         d.kills += 1;
-                        out.push(json!({"f": w.frame, "type": "defeated", "target": name(e.id)}));
+                        out.push(json!({"f": fr, "type": "defeated", "target": name(e.id)}));
                     }
-                    None if !en.part && !dead => out.push(json!({"f": w.frame, "type": "spawn", "target": describe(w, e.id, me)})),
+                    None if !en.part && !dead => out.push(json!({"f": fr, "type": "spawn", "target": describe(w, e.id, me)})),
                     _ => {}
                 }
             }
@@ -342,7 +433,7 @@ impl Agent {
         for b in &before {
             if !b.2 && w.find(b.0).is_none() {
                 d.kills += 1;
-                out.push(json!({"f": w.frame, "type": "defeated", "target": name(b.0)}));
+                out.push(json!({"f": fr, "type": "defeated", "target": name(b.0)}));
             }
         }
         for &(pid, _, dead0, st0) in &php {
@@ -350,19 +441,19 @@ impl Agent {
                 let p = w.pl_ref(i);
                 let who = if Some(pid) == me { "you".to_string() } else { describe(w, pid, me) };
                 if p.dead && !dead0 {
-                    out.push(json!({"f": w.frame, "type": "ko", "who": who}));
+                    out.push(json!({"f": fr, "type": "ko", "who": who}));
                 }
                 if p.state == PState::Held && st0 != PState::Held {
-                    out.push(json!({"f": w.frame, "type": "grabbed", "who": who, "by": describe(w, p.held_by, me), "hint": "mash buttons / wait"}));
+                    out.push(json!({"f": fr, "type": "grabbed", "who": who, "by": describe(w, p.held_by, me), "hint": "mash buttons / wait"}));
                 }
             }
         }
         if w.battle.phase != phase0 {
             d.phase = true;
-            out.push(json!({"f": w.frame, "type": "phase", "phase": w.battle.phase, "of": w.battle.phases.len()}));
+            out.push(json!({"f": fr, "type": "phase", "phase": w.battle.phase, "of": w.battle.phases.len()}));
         }
         if self.s.outcome != out0 {
-            out.push(json!({"f": w.frame, "type": "outcome", "outcome": outcome_str(self.s.outcome)}));
+            out.push(json!({"f": fr, "type": "outcome", "outcome": outcome_str(self.s.outcome)}));
         }
         self.last_events = out.clone();
         self.events.extend(out);
@@ -415,7 +506,7 @@ impl Agent {
             Some((f, s)) => (*f, s.clone()),
             None => (0, self.initial.clone()),
         };
-        self.s.restore(&snap);
+        self.restore_snap(&snap);
         let rec = self.record;
         self.record = false;
         let log: Vec<Held> = self.inputs[f0 as usize..target as usize].to_vec();
@@ -428,7 +519,8 @@ impl Agent {
     }
 
     pub fn save(&mut self, name: &str) {
-        self.named.insert(name.to_string(), (self.s.snapshot(), self.inputs.clone()));
+        let sn = self.snap();
+        self.named.insert(name.to_string(), (sn, self.inputs.clone()));
     }
 
     pub fn load(&mut self, name: &str) -> Result<(), String> {
@@ -438,8 +530,8 @@ impl Agent {
     }
 
     /// restore a snapshot taken after `inputs` (its own input log, possibly another branch)
-    pub fn restore_with(&mut self, snap: &Snapshot, inputs: Vec<Held>) {
-        self.s.restore(snap);
+    pub fn restore_with(&mut self, snap: &Snap, inputs: Vec<Held>) {
+        self.restore_snap(snap);
         // keyframes belong to the previous branch: keep only those on the common input prefix
         let common = self.inputs.iter().zip(inputs.iter()).take_while(|(a, b)| a == b).count() as u32;
         self.keyframes.retain(|k| k.0 <= common);
@@ -453,7 +545,12 @@ impl Agent {
     /// a copy of this session (same state, inputs, saves) under a new id
     pub fn fork(&self, id: String) -> Agent {
         let mut a = Agent::from_session(id, self.make_session(), self.field_cfg.clone(), self.label.clone(), self.spec.clone());
-        a.s.restore(&self.s.snapshot());
+        if let Some(st) = &self.story {
+            // (the host compiles the same scripts; its state comes with the snapshot below)
+            let host = wf_import::StoryHost::new(&self.s.data, &st.files).expect("the scripts compiled for this session");
+            a.story = Some(Story { host, files: Arc::clone(&st.files), start: st.start.clone() });
+        }
+        a.restore_snap(&self.snap());
         a.inputs = self.inputs.clone();
         a.initial = self.initial.clone();
         a.keyframes = self.keyframes.clone();
@@ -464,6 +561,10 @@ impl Agent {
     /// look ahead `frames` frames from the current state with `slot` holding `hold` and every other slot idle,
     /// without changing anything: the first frame the slot's player loses HP -> (frames from now, attacker, HP)
     pub fn forecast(&self, slot: usize, frames: u32, hold: u16) -> Option<(u32, String, i32)> {
+        // (story sessions: the look-ahead would need its own script host; not forecast)
+        if self.story.is_some() {
+            return None;
+        }
         let me = self.player_id(slot)?;
         let mut sc = self.scratch.borrow_mut();
         if sc.is_none() {
@@ -503,7 +604,7 @@ impl Agent {
                 _ => rle.push((v, 1)),
             }
         }
-        Replay { format: "wf-agent-replay/1".into(), config: self.s.config.clone(), field: self.field_cfg.clone(), slots: n, inputs: rle, frames: self.inputs.len() as u32, hash: self.hash(), outcome: outcome_str(self.s.outcome).into() }
+        Replay { format: "wf-agent-replay/1".into(), config: self.s.config.clone(), field: self.field_cfg.clone(), story: self.story.as_ref().map(|st| st.start.clone()), slots: n, inputs: rle, frames: self.inputs.len() as u32, hash: self.hash(), outcome: outcome_str(self.s.outcome).into() }
     }
 }
 
@@ -514,6 +615,9 @@ pub struct Replay {
     /// a field session's start (then `config` is unused)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub field: Option<FieldConfig>,
+    /// a story session's start (title screen, seed)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub story: Option<StoryStart>,
     pub slots: usize,
     /// run-length encoded held buttons: [[mask per slot], frames]
     pub inputs: Vec<(Vec<u16>, u32)>,

@@ -60,9 +60,17 @@ impl Ctx {
 pub enum Cmd {
     /// spawn projectile `proj` at the actor's hand / centre + (ox, oy) px, flying along (vx, vy) (any length; None =
     /// the facing direction)
-    Fire { proj: String, ox: i32, oy: i32, v: Option<(i32, i32)> },
+    Fire {
+        proj: String,
+        ox: i32,
+        oy: i32,
+        v: Option<(i32, i32)>,
+    },
     /// play an animation of the actor's sprite by name (looping or once-and-hold)
-    Anim { name: String, looping: bool },
+    Anim {
+        name: String,
+        looping: bool,
+    },
     Sfx(i32),
     SfxStop(i32),
     /// skill: end it (back to idle); AI action: (the result decides)
@@ -74,7 +82,11 @@ pub enum Cmd {
     /// move the actor to (x, y) px (footprint position) if it fits there
     Teleport(i32, i32),
     /// a hit box of w x h px in front of the actor's body, damage multiplier in 1/1024
-    Strike { w: i32, h: i32, mult: i32 },
+    Strike {
+        w: i32,
+        h: i32,
+        mult: i32,
+    },
     FaceTarget,
     Face(i32),
     /// AI stack
@@ -84,7 +96,11 @@ pub enum Cmd {
     /// whole HP
     Heal(i32),
     /// spawn an enemy of `ty` at (x, y) px relative to the actor
-    Summon { ty: i32, x: i32, y: i32 },
+    Summon {
+        ty: i32,
+        x: i32,
+        y: i32,
+    },
     Shake(i32, i32),
     /// an explosion effect at (x, y) px relative to the actor
     Explode(i32, i32),
@@ -163,7 +179,9 @@ fn opt_i(v: &Value, k: &str, d: i32) -> i32 {
     v.get(k).filter(|x| !x.is_null()).map(int).unwrap_or(d)
 }
 fn cels(v: &Value) -> Vec<u16> {
-    v.as_array().map(|a| a.iter().map(|x| int(x) as u16).collect()).unwrap_or_default()
+    v.as_array()
+        .map(|a| a.iter().map(|x| int(x) as u16).collect())
+        .unwrap_or_default()
 }
 
 pub fn parse_projectile(id: &str, v: &Value) -> ProjDef {
@@ -177,7 +195,10 @@ pub fn parse_projectile(id: &str, v: &Value) -> ProjDef {
     let speed = opt_i(v, "speed", 768);
     ProjDef {
         id: v["id"].as_str().unwrap_or(id).to_string(),
-        sheet: v["sheet"].as_str().unwrap_or("effects/fx_0871370c").to_string(),
+        sheet: v["sheet"]
+            .as_str()
+            .unwrap_or("effects/fx_0871370c")
+            .to_string(),
         anim: v["anim"].as_str().map(String::from),
         frames,
         rate: opt_i(v, "rate", 4).max(1),
@@ -191,7 +212,11 @@ pub fn parse_projectile(id: &str, v: &Value) -> ProjDef {
         homing_range: opt_i(v, "homing_range", 200),
         homing_delay: opt_i(v, "homing_delay", 0),
         life: opt_i(v, "life", 0),
-        hit_box: v["hit_box"].as_array().filter(|a| a.len() >= 2).map(|a| (int(&a[0]), int(&a[1]))).unwrap_or((12, 12)),
+        hit_box: v["hit_box"]
+            .as_array()
+            .filter(|a| a.len() >= 2)
+            .map(|a| (int(&a[0]), int(&a[1])))
+            .unwrap_or((12, 12)),
         pierce: opt_i(v, "pierce", 0),
         wall: match v["wall"].as_str() {
             Some("vanish") => WallMode::Vanish,
@@ -202,10 +227,26 @@ pub fn parse_projectile(id: &str, v: &Value) -> ProjDef {
         offscreen: v["offscreen"].as_bool().unwrap_or(false),
         damage: opt_i(v, "damage", 1024),
         attack_sub: opt_i(v, "attack_sub", 4) as u8,
-        explode_radius: if ex.is_object() { opt_i(ex, "radius", 0) } else { 0 },
-        explode_damage: if ex.is_object() { opt_i(ex, "damage", 512) } else { 0 },
-        explode_fx: if ex.is_object() { ex["fx"].as_bool().unwrap_or(true) } else { v["explode_fx"].as_bool().unwrap_or(true) },
-        explode_on_expire: if ex.is_object() { ex["on_expire"].as_bool().unwrap_or(false) } else { false },
+        explode_radius: if ex.is_object() {
+            opt_i(ex, "radius", 0)
+        } else {
+            0
+        },
+        explode_damage: if ex.is_object() {
+            opt_i(ex, "damage", 512)
+        } else {
+            0
+        },
+        explode_fx: if ex.is_object() {
+            ex["fx"].as_bool().unwrap_or(true)
+        } else {
+            v["explode_fx"].as_bool().unwrap_or(true)
+        },
+        explode_on_expire: if ex.is_object() {
+            ex["on_expire"].as_bool().unwrap_or(false)
+        } else {
+            false
+        },
         sfx_spawn: opt_i(v, "sfx_spawn", -1),
         sfx_hit: opt_i(v, "sfx_hit", -1),
         sfx_end: opt_i(v, "sfx_end", -1),
@@ -214,10 +255,17 @@ pub fn parse_projectile(id: &str, v: &Value) -> ProjDef {
 }
 
 /// `projectiles/*.json` (a mod category; the base pack has none)
-pub fn load_projectiles(src: &dyn ContentSource, all: &[String]) -> Result<BTreeMap<String, ProjDef>, LoadError> {
+pub fn load_projectiles(
+    src: &dyn ContentSource,
+    all: &[String],
+) -> Result<BTreeMap<String, ProjDef>, LoadError> {
     let mut out = BTreeMap::new();
-    for p in all.iter().filter(|p| p.starts_with("projectiles/") && p.ends_with(".json") && !p.ends_with("index.json")) {
-        let b = src.read(p).ok_or_else(|| LoadError(format!("missing content file {p}")))?;
+    for p in all.iter().filter(|p| {
+        p.starts_with("projectiles/") && p.ends_with(".json") && !p.ends_with("index.json")
+    }) {
+        let b = src
+            .read(p)
+            .ok_or_else(|| LoadError(format!("missing content file {p}")))?;
         let v: Value = serde_json::from_slice(&b).map_err(|e| LoadError(format!("{p}: {e}")))?;
         let id = p["projectiles/".len()..p.len() - 5].to_string();
         let d = parse_projectile(&id, &v);
@@ -292,7 +340,12 @@ impl Hash for ModState {
 }
 
 fn vars_of(w: &World, id: EntityId) -> [i32; NVARS] {
-    w.modk.vars.iter().find(|v| v.0 == id).map(|v| v.1).unwrap_or_default()
+    w.modk
+        .vars
+        .iter()
+        .find(|v| v.0 == id)
+        .map(|v| v.1)
+        .unwrap_or_default()
 }
 fn set_var(w: &mut World, id: EntityId, k: usize, v: i32) {
     if k >= NVARS {
@@ -350,7 +403,9 @@ fn unit(x: i32, y: i32) -> (i32, i32) {
 }
 
 fn report(w: &mut World, what: &str, e: String) {
-    w.events.push(Event::Info { text: format!("mod script {what}: {e}") });
+    w.events.push(Event::Info {
+        text: format!("mod script {what}: {e}"),
+    });
 }
 
 fn split_call(call: &str) -> Option<(&str, &str)> {
@@ -434,7 +489,10 @@ fn target_vals(w: &World, ctx: &mut Ctx, from: (i32, i32), k: Option<usize>) {
             ctx.set("tcy", cy);
             ctx.set("tdx", dx);
             ctx.set("tdy", dy);
-            ctx.set("tdist", isqrt(dx as i64 * dx as i64 + dy as i64 * dy as i64) as i32);
+            ctx.set(
+                "tdist",
+                isqrt(dx as i64 * dx as i64 + dy as i64 * dy as i64) as i32,
+            );
             ctx.set("tfacing", a.facing as i32);
             let (hp, max) = match &w.ents[k].body {
                 Body::Enemy(e) => ((e.hp1024 >> 10) as i32, (e.max_hp1024 >> 10) as i32),
@@ -473,7 +531,16 @@ fn actor_vals(w: &World, i: usize, ctx: &mut Ctx) {
             ctx.set("max_hp", (e.max_hp1024 >> 10) as i32);
             ctx.set("type", e.ty);
             ctx.set("counter", e.counter as i32);
-            ctx.set("children", e.children.iter().filter(|&&c| w.enemy_by_id(c).is_some_and(|(k, e)| !w.ents[k].removed && !e.defeated)).count() as i32);
+            ctx.set(
+                "children",
+                e.children
+                    .iter()
+                    .filter(|&&c| {
+                        w.enemy_by_id(c)
+                            .is_some_and(|(k, e)| !w.ents[k].removed && !e.defeated)
+                    })
+                    .count() as i32,
+            );
         }
         _ => {}
     }
@@ -503,7 +570,9 @@ fn apply(w: &mut World, i: usize, src: Src, cmds: Vec<Cmd>) -> bool {
                     report(w, "fire", format!("unknown projectile {proj}"));
                     continue;
                 };
-                let Some(a) = actor_of(w, i).cloned() else { continue };
+                let Some(a) = actor_of(w, i).cloned() else {
+                    continue;
+                };
                 let (hx, hy) = match &w.ents[i].body {
                     Body::Player(p) => p.hand_point(),
                     _ => a.center(),
@@ -518,7 +587,8 @@ fn apply(w: &mut World, i: usize, src: Src, cmds: Vec<Cmd>) -> bool {
                         let lv = crate::player::mod_skill_lv(w, i, id);
                         let e = w.data.skill_engine(id);
                         (
-                            e.and_then(|e| crate::content::SkillEngine::pick(&e.damage, lv)).unwrap_or(def.damage),
+                            e.and_then(|e| crate::content::SkillEngine::pick(&e.damage, lv))
+                                .unwrap_or(def.damage),
                             e.and_then(|e| e.attack_sub).unwrap_or(def.attack_sub),
                             id,
                         )
@@ -526,7 +596,23 @@ fn apply(w: &mut World, i: usize, src: Src, cmds: Vec<Cmd>) -> bool {
                     _ => (def.damage, def.attack_sub, 0),
                 };
                 let team = if is_player { 1 } else { 0 };
-                let s = ModShot { def: def.id.clone(), owner: me, team, x: (hx + ox) << 8, y: (hy + oy) << 8, ux, uy, speed: def.speed, t: 0, target: 0, hits: vec![], dead: -1, mult, sub, skill };
+                let s = ModShot {
+                    def: def.id.clone(),
+                    owner: me,
+                    team,
+                    x: (hx + ox) << 8,
+                    y: (hy + oy) << 8,
+                    ux,
+                    uy,
+                    speed: def.speed,
+                    t: 0,
+                    target: 0,
+                    hits: vec![],
+                    dead: -1,
+                    mult,
+                    sub,
+                    skill,
+                };
                 w.add(Body::Mod(Box::new(s)));
                 if def.sfx_spawn >= 0 {
                     w.sfx(def.sfx_spawn, 64);
@@ -549,10 +635,23 @@ fn apply(w: &mut World, i: usize, src: Src, cmds: Vec<Cmd>) -> bool {
                 let mut spots = vec![(x, y)];
                 for r in 1..=6 {
                     let d = 4 * r;
-                    spots.extend([(x - d, y), (x + d, y), (x, y - d), (x, y + d), (x - d, y - d), (x + d, y - d), (x - d, y + d), (x + d, y + d)]);
+                    spots.extend([
+                        (x - d, y),
+                        (x + d, y),
+                        (x, y - d),
+                        (x, y + d),
+                        (x - d, y - d),
+                        (x + d, y - d),
+                        (x - d, y + d),
+                        (x + d, y + d),
+                    ]);
                 }
                 for (sx, sy) in spots {
-                    let ok = if is_player { crate::player::mod_fits(w, i, sx, sy) } else { is_enemy && crate::enemy::fits(w, i, sx, sy) };
+                    let ok = if is_player {
+                        crate::player::mod_fits(w, i, sx, sy)
+                    } else {
+                        is_enemy && crate::enemy::fits(w, i, sx, sy)
+                    };
                     if ok {
                         match &mut w.ents[i].body {
                             Body::Player(p) => (p.a.x, p.a.y) = (sx << 8, sy << 8),
@@ -567,7 +666,9 @@ fn apply(w: &mut World, i: usize, src: Src, cmds: Vec<Cmd>) -> bool {
                 }
             }
             Cmd::Strike { w: sw, h: sh, mult } => {
-                let Some(a) = actor_of(w, i).cloned() else { continue };
+                let Some(a) = actor_of(w, i).cloned() else {
+                    continue;
+                };
                 let b = a.body_box();
                 let (cx, cy) = b.center();
                 let rect = match a.facing & 3 {
@@ -577,17 +678,42 @@ fn apply(w: &mut World, i: usize, src: Src, cmds: Vec<Cmd>) -> bool {
                     _ => Rect::new(cx - sw / 2, b.y0 - sh, cx + sw - sw / 2, b.y0),
                 };
                 let sub = match src {
-                    Src::Skill(id) => w.data.skill_engine(id).and_then(|e| e.attack_sub).unwrap_or(2),
+                    Src::Skill(id) => w
+                        .data
+                        .skill_engine(id)
+                        .and_then(|e| e.attack_sub)
+                        .unwrap_or(2),
                     _ => 2,
                 };
-                let mut m = HitMsg { team: if is_player { 1 } else { 0 }, rect, dir: a.facing, mult, atk: atk(sub), attacker: me, att_stats: a.stats, att_is_player: is_player, source: me, crit: false, raw: 0, dmg: 0, no_react: false, foot: false };
+                let mut m = HitMsg {
+                    team: if is_player { 1 } else { 0 },
+                    rect,
+                    dir: a.facing,
+                    mult,
+                    atk: atk(sub),
+                    attacker: me,
+                    att_stats: a.stats,
+                    att_is_player: is_player,
+                    source: me,
+                    crit: false,
+                    raw: 0,
+                    dmg: 0,
+                    no_react: false,
+                    foot: false,
+                };
                 // (the receivers report their own `Hit` events)
                 crate::world::broadcast(w, &mut m, false);
             }
             Cmd::FaceTarget => {
-                let Some(a) = actor_of(w, i).cloned() else { continue };
+                let Some(a) = actor_of(w, i).cloned() else {
+                    continue;
+                };
                 let (cx, cy) = a.center();
-                let t = if is_player { nearest_enemy(w, cx, cy, 0) } else { crate::enemy::player(w, i) };
+                let t = if is_player {
+                    nearest_enemy(w, cx, cy, 0)
+                } else {
+                    crate::enemy::player(w, i)
+                };
                 if let Some(k) = t {
                     let (tx, ty) = actor_of(w, k).map(|t| t.center()).unwrap_or((cx, cy));
                     face(w, i, facing_toward(tx - cx, ty - cy));
@@ -606,13 +732,17 @@ fn apply(w: &mut World, i: usize, src: Src, cmds: Vec<Cmd>) -> bool {
                 }
             }
             Cmd::Summon { ty, x, y } => {
-                let Some(a) = actor_of(w, i).cloned() else { continue };
+                let Some(a) = actor_of(w, i).cloned() else {
+                    continue;
+                };
                 let parent = if is_player { 0 } else { me };
                 crate::battle::spawn_enemy(w, ty, a.px() + x, a.py() + y, parent, None);
             }
             Cmd::Shake(d, n) => w.shake(d, n),
             Cmd::Explode(x, y) => {
-                let Some(a) = actor_of(w, i).cloned() else { continue };
+                let Some(a) = actor_of(w, i).cloned() else {
+                    continue;
+                };
                 crate::fx::explosion(w, a.px() + x, a.py() + y, 0x2000);
             }
             Cmd::Flash(n) => match &mut w.ents[i].body {
@@ -642,8 +772,12 @@ fn face(w: &mut World, i: usize, d: u8) {
 /// an animation of the actor's own sprite by name
 fn anim(w: &mut World, i: usize, name: &str, looping: bool) {
     let Some(a) = actor_of(w, i) else { return };
-    let Some(sp) = a.sprite.and_then(|s| w.data.sprite(s)) else { return };
-    let Some(&k) = sp.by_name.get(name) else { return };
+    let Some(sp) = a.sprite.and_then(|s| w.data.sprite(s)) else {
+        return;
+    };
+    let Some(&k) = sp.by_name.get(name) else {
+        return;
+    };
     let raw = sp.anims[k as usize].raw;
     match &w.ents[i].body {
         Body::Player(_) => {
@@ -681,7 +815,10 @@ fn skill_ctx(w: &World, i: usize, rt: &SkillRt) -> Ctx {
 }
 
 fn on_cooldown(w: &World, id: EntityId, real: i32) -> bool {
-    w.modk.cooldowns.iter().any(|c| c.0 == id && c.1 == real && w.frame < c.2)
+    w.modk
+        .cooldowns
+        .iter()
+        .any(|c| c.0 == id && c.1 == real && w.frame < c.2)
 }
 
 /// can_use_skill for a scripted skill: not cooling down, enough energy for `check` (else `cost`)
@@ -691,7 +828,9 @@ pub fn skill_ready(w: &World, i: usize, real: i32) -> bool {
     }
     let lv = crate::player::mod_skill_lv(w, i, real);
     let e = w.data.skill_engine(real);
-    let need = e.and_then(|e| crate::content::SkillEngine::pick(&e.check, lv)).unwrap_or_else(|| crate::player::mod_skill_cost(w, i, real));
+    let need = e
+        .and_then(|e| crate::content::SkillEngine::pick(&e.check, lv))
+        .unwrap_or_else(|| crate::player::mod_skill_cost(w, i, real));
     crate::player::mod_can_afford(w, i, need)
 }
 
@@ -703,10 +842,24 @@ pub fn skill_start(w: &mut World, i: usize, real: i32, _lv: i32) {
     let id = w.ents[i].id;
     let e = w.data.skill_engine(real).cloned().unwrap_or_default();
     w.modk.skills.retain(|s| s.player != id);
-    w.modk.skills.push(SkillRt { player: id, skill: real, t: 0, held: true, released: -1, looping: false, shift: e.anim_shift.unwrap_or(3).clamp(0, 6) as u8 });
-    let names: Vec<&'static str> = if e.anim.is_empty() { vec!["kiblast"] } else { e.anim.clone() };
+    w.modk.skills.push(SkillRt {
+        player: id,
+        skill: real,
+        t: 0,
+        held: true,
+        released: -1,
+        looping: false,
+        shift: e.anim_shift.unwrap_or(3).clamp(0, 6) as u8,
+    });
+    let names: Vec<&'static str> = if e.anim.is_empty() {
+        vec!["kiblast"]
+    } else {
+        e.anim.clone()
+    };
     crate::player::mod_set_anim(w, i, &names);
-    let Some(script) = skill_script(w, real) else { return };
+    let Some(script) = skill_script(w, real) else {
+        return;
+    };
     let rt = w.modk.skills.last().cloned().unwrap();
     let ctx = skill_ctx(w, i, &rt);
     if let Some((_, cmds)) = run(w, &script, "on_start", &ctx) {
@@ -733,9 +886,23 @@ pub fn skill_update(w: &mut World, i: usize, held_now: bool) {
         r
     };
     let real = w.modk.skills[k].skill;
-    let Some(script) = skill_script(w, real) else { return crate::player::mod_to_idle(w, i) };
-    for f in [if released_now { Some("on_release") } else { None }, Some("on_frame")].into_iter().flatten() {
-        let Some(rt) = w.modk.skills.iter().find(|s| s.player == id).cloned() else { return };
+    let Some(script) = skill_script(w, real) else {
+        return crate::player::mod_to_idle(w, i);
+    };
+    for f in [
+        if released_now {
+            Some("on_release")
+        } else {
+            None
+        },
+        Some("on_frame"),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        let Some(rt) = w.modk.skills.iter().find(|s| s.player == id).cloned() else {
+            return;
+        };
         let ctx = skill_ctx(w, i, &rt);
         if let Some((r, cmds)) = run(w, &script, f, &ctx) {
             let ended = apply(w, i, Src::Skill(real), cmds);
@@ -744,12 +911,22 @@ pub fn skill_update(w: &mut World, i: usize, held_now: bool) {
                 return crate::player::mod_to_idle(w, i);
             }
         }
-        if crate::player::mod_energy_left(w, i) <= 0 && w.data.skill_engine(real).is_some_and(|e| !e.drain.is_empty()) {
+        if crate::player::mod_energy_left(w, i) <= 0
+            && w.data
+                .skill_engine(real)
+                .is_some_and(|e| !e.drain.is_empty())
+        {
             return crate::player::mod_to_idle(w, i);
         }
     }
     // a skill without on_frame ends with its animation
-    if !w.data.hooks.as_ref().is_some_and(|h| h.has(&script, "on_frame")) && crate::player::mod_anim_done(w, i) {
+    if !w
+        .data
+        .hooks
+        .as_ref()
+        .is_some_and(|h| h.has(&script, "on_frame"))
+        && crate::player::mod_anim_done(w, i)
+    {
         crate::player::mod_to_idle(w, i);
     }
 }
@@ -757,9 +934,16 @@ pub fn skill_update(w: &mut World, i: usize, held_now: bool) {
 /// end_skill for a scripted skill (any way out of the skill state): `on_end`, the cooldown
 pub fn skill_end(w: &mut World, i: usize) {
     let id = w.ents[i].id;
-    let Some(k) = w.modk.skills.iter().position(|s| s.player == id) else { return };
+    let Some(k) = w.modk.skills.iter().position(|s| s.player == id) else {
+        return;
+    };
     let rt = w.modk.skills.remove(k);
-    if let Some(cd) = w.data.skill_engine(rt.skill).and_then(|e| e.cooldown).filter(|&c| c > 0) {
+    if let Some(cd) = w
+        .data
+        .skill_engine(rt.skill)
+        .and_then(|e| e.cooldown)
+        .filter(|&c| c > 0)
+    {
         w.modk.cooldowns.retain(|c| !(c.0 == id && c.1 == rt.skill));
         w.modk.cooldowns.push((id, rt.skill, w.frame + cd as u32));
     }
@@ -768,7 +952,12 @@ pub fn skill_end(w: &mut World, i: usize) {
         let ctx = skill_ctx(w, i, &rt);
         if let Some((_, cmds)) = run(w, &script, "on_end", &ctx) {
             // (already leaving the state: `End` means nothing here)
-            apply(w, i, Src::Skill(rt.skill), cmds.into_iter().filter(|c| *c != Cmd::End).collect());
+            apply(
+                w,
+                i,
+                Src::Skill(rt.skill),
+                cmds.into_iter().filter(|c| *c != Cmd::End).collect(),
+            );
         }
     }
 }
@@ -776,7 +965,12 @@ pub fn skill_end(w: &mut World, i: usize) {
 /// the running skill's animation mode: (looping, frames-per-cel shift)
 pub fn anim_mode(w: &World, i: usize) -> (bool, i32) {
     let id = w.ents[i].id;
-    w.modk.skills.iter().find(|s| s.player == id).map(|s| (s.looping, s.shift as i32)).unwrap_or((true, 3))
+    w.modk
+        .skills
+        .iter()
+        .find(|s| s.player == id)
+        .map(|s| (s.looping, s.shift as i32))
+        .unwrap_or((true, 3))
 }
 
 // ---- scripted AI nodes -------------------------------------------------------------------------------------------------
@@ -784,7 +978,9 @@ pub fn anim_mode(w: &World, i: usize) -> (bool, i32) {
 /// a ModCondition / ModAction node: `call` = "file.rhai:fn", `f` = frames since the action entered (0 for
 /// conditions); returns the hook's result (condition: non-zero = true; action: non-zero = done)
 pub fn ai_hook(w: &mut World, i: usize, call: &str, args: &[i32], f: i32) -> i32 {
-    let Some((script, func)) = split_call(call) else { return 0 };
+    let Some((script, func)) = split_call(call) else {
+        return 0;
+    };
     let mut c = Ctx::default();
     actor_vals(w, i, &mut c);
     c.set("f", f);
@@ -833,13 +1029,23 @@ fn owner_gone(w: &World, owner: EntityId) -> bool {
 
 /// hit message from the shot to every receiver under `rect` not hit before (the broadcast's order); returns the
 /// receivers that accepted
-fn hit(w: &mut World, i: usize, rect: Rect, mult: i32, limit: usize, explosion: bool) -> Vec<EntityId> {
+fn hit(
+    w: &mut World,
+    i: usize,
+    rect: Rect,
+    mult: i32,
+    limit: usize,
+    explosion: bool,
+) -> Vec<EntityId> {
     let s = shot(w, i).clone();
     if owner_gone(w, s.owner) && s.team != 1 {
         return vec![];
     }
     let (stats, is_player) = match w.find(s.owner) {
-        Some(k) => (actor_of(w, k).map(|a| a.stats).unwrap_or_default(), matches!(w.ents[k].body, Body::Player(_))),
+        Some(k) => (
+            actor_of(w, k).map(|a| a.stats).unwrap_or_default(),
+            matches!(w.ents[k].body, Body::Player(_)),
+        ),
         None => (Default::default(), false),
     };
     let dir = facing_toward(s.ux, s.uy);
@@ -856,7 +1062,22 @@ fn hit(w: &mut World, i: usize, rect: Rect, mult: i32, limit: usize, explosion: 
         if (!explosion && s.hits.contains(&id)) || id == s.owner {
             continue;
         }
-        let mut m = HitMsg { team: s.team, rect, dir, mult, atk: atk(s.sub), attacker: s.owner, att_stats: stats, att_is_player: is_player, source: me, crit: false, raw: 0, dmg: 0, no_react: false, foot: false };
+        let mut m = HitMsg {
+            team: s.team,
+            rect,
+            dir,
+            mult,
+            atk: atk(s.sub),
+            attacker: s.owner,
+            att_stats: stats,
+            att_is_player: is_player,
+            source: me,
+            crit: false,
+            raw: 0,
+            dmg: 0,
+            no_react: false,
+            foot: false,
+        };
         if deliver(w, k, &mut m) {
             got.push(id);
             if got.len() >= limit {
@@ -869,7 +1090,9 @@ fn hit(w: &mut World, i: usize, rect: Rect, mult: i32, limit: usize, explosion: 
 
 fn shot_hook(w: &mut World, i: usize, func: &str, other: EntityId) {
     let s = shot(w, i).clone();
-    let Some(d) = w.data.projectiles.get(&s.def) else { return };
+    let Some(d) = w.data.projectiles.get(&s.def) else {
+        return;
+    };
     let script = match &d.script {
         Some(x) => x.clone(),
         None => match w.data.skill_engine(s.skill).and_then(|e| e.script.clone()) {
@@ -890,9 +1113,21 @@ fn shot_hook(w: &mut World, i: usize, func: &str, other: EntityId) {
     c.vars = vars_of(w, s.owner);
     if let Some((_, cmds)) = run(w, &script, func, &c) {
         // commands act for the owner (a hit can chain: fire from the owner, sounds, variables)
-        if let Some(k) = w.find(s.owner).filter(|&k| !w.ents[k].removed && actor_of(w, k).is_some()) {
-            let src = if s.skill != 0 { Src::Skill(s.skill) } else { Src::Shot };
-            apply(w, k, src, cmds.into_iter().filter(|c| *c != Cmd::End).collect());
+        if let Some(k) = w
+            .find(s.owner)
+            .filter(|&k| !w.ents[k].removed && actor_of(w, k).is_some())
+        {
+            let src = if s.skill != 0 {
+                Src::Skill(s.skill)
+            } else {
+                Src::Shot
+            };
+            apply(
+                w,
+                k,
+                src,
+                cmds.into_iter().filter(|c| *c != Cmd::End).collect(),
+            );
         } else {
             for c in cmds {
                 if let Cmd::Sfx(id) = c {
@@ -916,7 +1151,12 @@ fn end(w: &mut World, i: usize, explode: bool) {
             w.sfx(d.sfx_end, 64);
         }
         if d.explode_radius > 0 {
-            let r = centered(s.x >> 8, s.y >> 8, d.explode_radius * 2, d.explode_radius * 2);
+            let r = centered(
+                s.x >> 8,
+                s.y >> 8,
+                d.explode_radius * 2,
+                d.explode_radius * 2,
+            );
             hit(w, i, r, d.explode_damage, usize::MAX, true);
         }
         if d.explode_fx {
@@ -960,7 +1200,11 @@ pub fn shot_update(w: &mut World, i: usize) {
             })
         };
         if target == 0 || !alive(w, target) {
-            let k = if s.team == 1 { nearest_enemy(w, px, py, d.homing_range) } else { nearest_player(w, px, py, d.homing_range) };
+            let k = if s.team == 1 {
+                nearest_enemy(w, px, py, d.homing_range)
+            } else {
+                nearest_player(w, px, py, d.homing_range)
+            };
             target = k.map(|k| w.ents[k].id).unwrap_or(0);
         }
         if let Some(a) = w.find(target).and_then(|k| actor_of(w, k)) {
@@ -1018,8 +1262,20 @@ pub fn shot_update(w: &mut World, i: usize) {
                 m.x -= vx;
                 m.y -= vy;
                 let s2 = shot(w, i).clone();
-                let rx = shot_rect(&d, &ModShot { x: s2.x + vx, ..s2.clone() });
-                let ry = shot_rect(&d, &ModShot { y: s2.y + vy, ..s2.clone() });
+                let rx = shot_rect(
+                    &d,
+                    &ModShot {
+                        x: s2.x + vx,
+                        ..s2.clone()
+                    },
+                );
+                let ry = shot_rect(
+                    &d,
+                    &ModShot {
+                        y: s2.y + vy,
+                        ..s2.clone()
+                    },
+                );
                 let (bx, by) = (blocked_rect(w, &rx), blocked_rect(w, &ry));
                 let m = shot_mut(w, i);
                 if bx {
@@ -1031,7 +1287,8 @@ pub fn shot_update(w: &mut World, i: usize) {
             }
         }
     }
-    let left = (d.pierce + 1).max(1) as usize - shot(w, i).hits.len().min((d.pierce + 1).max(1) as usize);
+    let left =
+        (d.pierce + 1).max(1) as usize - shot(w, i).hits.len().min((d.pierce + 1).max(1) as usize);
     if left == 0 {
         return;
     }
@@ -1059,20 +1316,48 @@ fn blocked_rect(w: &World, r: &Rect) -> bool {
 
 /// the shot's OBJ
 pub fn draw(w: &World, id: u32, m: &ModShot, out: &mut wf_view::RenderView) {
-    let Some(d) = w.data.projectiles.get(&m.def) else { return };
+    let Some(d) = w.data.projectiles.get(&m.def) else {
+        return;
+    };
     let dir = facing_toward(m.ux, m.uy);
     let frame = if m.dead >= 0 {
         if d.end_frames.is_empty() {
             return;
         }
         let k = ((m.dead / d.rate) as usize).min(d.end_frames.len() - 1);
-        wf_view::FrameSel::Frame { index: d.end_frames[k], flip: false }
+        wf_view::FrameSel::Frame {
+            index: d.end_frames[k],
+            flip: false,
+        }
     } else if let Some(a) = &d.anim {
-        wf_view::FrameSel::Anim { anim: a.clone(), dir, t: m.t.max(0) as u32, looping: true }
+        wf_view::FrameSel::Anim {
+            anim: a.clone(),
+            dir,
+            t: m.t.max(0) as u32,
+            looping: true,
+        }
     } else {
-        let list = d.frames.get(dir as usize).filter(|_| d.frames.len() == 4).or(d.frames.first());
-        let Some(list) = list.filter(|l| !l.is_empty()) else { return };
-        wf_view::FrameSel::Frame { index: list[((m.t / d.rate) as usize) % list.len()], flip: false }
+        let list = d
+            .frames
+            .get(dir as usize)
+            .filter(|_| d.frames.len() == 4)
+            .or(d.frames.first());
+        let Some(list) = list.filter(|l| !l.is_empty()) else {
+            return;
+        };
+        wf_view::FrameSel::Frame {
+            index: list[((m.t / d.rate) as usize) % list.len()],
+            flip: false,
+        }
     };
-    out.sprites.push(wf_view::SpriteDraw { entity: id, sheet: d.sheet.clone(), frame, x: m.x >> 8, y: m.y >> 8, priority: d.priority, mirror: false, effect: wf_view::SpriteEffect::None });
+    out.sprites.push(wf_view::SpriteDraw {
+        entity: id,
+        sheet: d.sheet.clone(),
+        frame,
+        x: m.x >> 8,
+        y: m.y >> 8,
+        priority: d.priority,
+        mirror: false,
+        effect: wf_view::SpriteEffect::None,
+    });
 }

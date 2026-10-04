@@ -17,17 +17,16 @@ for d in ('tools/story_playthrough', 'tools/field', 'tools/segments', 're/buu'):
     sys.path.insert(0, str(ROOT / d))
 from route import start_emu, status  # noqa: E402
 from common_field import PLAY_SFX, STOP_SFX, STOP_ALL, STOP_MATCH, PLAY_SONG, SFX_TABLE, SONG_TABLE  # noqa: E402
-import realrun  # noqa: E402
+sys.path.insert(0, str(ROOT / 'tools' / 'wholerun'))
+import chains  # noqa: E402
 
+# --chain run1|run2 (chains.py): which real run (default run1)
 a = sys.argv[1:]
-out = Path(a[0]) if a and not a[0].startswith('--') else ROOT / 'data' / 'realrun' / 'sounds.json.gz'
+chain = chains.chain_arg(a)
+out = Path(a[0]) if a and not a[0].startswith('--') else chains.paths(chain)['sounds']
 limit = int(a[a.index('--frames') + 1]) if '--frames' in a else None
 
-parts = [(name, realrun.pre_keys()[part], None) for _, name, part in realrun.PRE]
-man = json.loads((ROOT / 'data' / 'realrun' / 'manifest.json').read_text())
-for m in man:
-    keys = realrun.unrle(json.loads(gzip.open(ROOT / 'data' / 'realrun' / f'{m["n"]:03d}_{m["name"]}.keys.gz', 'rt').read()))
-    parts.append((f'{m["n"]:03d}_{m["name"]}', keys, m['end']))
+parts = chains.parts(chain)
 
 e = start_emu('reset')
 for addr in (PLAY_SFX, STOP_SFX, STOP_ALL, STOP_MATCH, PLAY_SONG):

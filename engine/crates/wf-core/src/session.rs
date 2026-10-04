@@ -40,17 +40,37 @@ impl Session {
     pub fn new(data: Arc<GameData>, config: BattleConfig) -> Session {
         let mut world = battle::create(Arc::clone(&data), &config);
         crate::scene::note_events(&mut world);
-        Session { data, world, config, prev: [0; MAX_PLAYERS], outcome: Outcome::Running, hook: None, presenter: Default::default() }
+        Session {
+            data,
+            world,
+            config,
+            prev: [0; MAX_PLAYERS],
+            outcome: Outcome::Running,
+            hook: None,
+            presenter: Default::default(),
+        }
     }
     /// a field session (the overworld game): new game or saved story, start area
     pub fn new_field(data: Arc<GameData>, config: crate::field::FieldConfig) -> Session {
         let mut world = crate::field::create(Arc::clone(&data), &config);
         crate::scene::note_events(&mut world);
-        Session { data, world, config: BattleConfig::default(), prev: [0; MAX_PLAYERS], outcome: Outcome::Running, hook: None, presenter: Default::default() }
+        Session {
+            data,
+            world,
+            config: BattleConfig::default(),
+            prev: [0; MAX_PLAYERS],
+            outcome: Outcome::Running,
+            hook: None,
+            presenter: Default::default(),
+        }
     }
     /// a field session with the script host's hook attached from the start: the first area's load scripts (on-enter:
     /// gates / doors / bridges through open_area / block_area, 48 area variants) run before frame 0
-    pub fn new_field_hooked(data: Arc<GameData>, config: crate::field::FieldConfig, hook: FieldHook) -> Session {
+    pub fn new_field_hooked(
+        data: Arc<GameData>,
+        config: crate::field::FieldConfig,
+        hook: FieldHook,
+    ) -> Session {
         let mut s = Session::new_field(data, config);
         s.hook = Some(hook);
         Self::run_hook(&mut s.hook, &mut s.world, 0);
@@ -124,7 +144,11 @@ impl Session {
         w.g.shake_ended = false;
         w.input = inputs;
         // `return_to_title` (0x8E) last frame: the session restarts on the title screen (menu/title.rs)
-        if w.scene.requests.iter().any(|r| matches!(r, crate::scene::Request::ReturnToTitle)) {
+        if w.scene
+            .requests
+            .iter()
+            .any(|r| matches!(r, crate::scene::Request::ReturnToTitle))
+        {
             *w = crate::menu::title::title_world(&self.data, w);
             w.input = inputs;
             self.presenter.reset();
@@ -184,7 +208,15 @@ impl Session {
                 // (the BG sphere effect redraws before the objects, as in a frame of the field)
                 crate::scene::sphere_jitter(w);
                 w.step_entities();
-            } else if w.field.is_some() && matches!(w.menu.phase, crate::menu::Phase::FadeOut { level } if level < 256) || w.field.is_some() && matches!(w.menu.phase, crate::menu::Phase::FadeIn { .. }) {
+                // (the map updates under the mini-game too: its clock - tile animations, the clouds' drift - runs
+                // on; sb 1-5 f4230, the punch game)
+                if let Some(f) = w.field.as_mut() {
+                    f.iters = f.iters.wrapping_add(1);
+                }
+            } else if w.field.is_some()
+                && matches!(w.menu.phase, crate::menu::Phase::FadeOut { level } if level < 256)
+                || w.field.is_some() && matches!(w.menu.phase, crate::menu::Phase::FadeIn { .. })
+            {
                 // a screen opening over the field: its fade-out leaves the objects still, the cameras keep easing
                 // (segment sb 21-14: the save point's party menu, the follow camera reaches its target under it)
                 crate::field::world_mode_cameras(w);
@@ -199,7 +231,10 @@ impl Session {
             // a breakable's callback waiting for a track command (field.rs `break_event`): the nested loop's frames
             // have no object pass; the frame after its wait is the rest of the interrupted pass - the players
             // (a later frame of the loop ticks the tracks first: the wait that ends there returns into the pass)
-            let ticked = w.field.as_ref().is_some_and(|f| f.break_event != 0 && f.break_modal);
+            let ticked = w
+                .field
+                .as_ref()
+                .is_some_and(|f| f.break_event != 0 && f.break_modal);
             if ticked {
                 crate::scene::tick(w);
             }
@@ -211,7 +246,11 @@ impl Session {
                 }
                 Some(f) if f.break_event != 0 => {
                     f.break_event = 0;
-                    if std::mem::take(&mut f.break_modal) { 2 } else { 0 }
+                    if std::mem::take(&mut f.break_modal) {
+                        2
+                    } else {
+                        0
+                    }
                 }
                 _ => 0,
             };
@@ -220,7 +259,8 @@ impl Session {
                 crate::fieldobj::held_moves(w);
             } else if brk == 2 {
                 for k in (0..w.ents.len()).rev() {
-                    if !w.ents[k].removed && matches!(w.ents[k].body, crate::world::Body::Enemy(_)) {
+                    if !w.ents[k].removed && matches!(w.ents[k].body, crate::world::Body::Enemy(_))
+                    {
                         crate::enemy::held_update(w, k);
                     }
                 }
@@ -233,9 +273,14 @@ impl Session {
                     }
                 }
             } else if !crate::field::frozen(w) && !crate::scene::frozen(w) && !watch_closing {
-                if w.field.as_mut().is_some_and(|f| std::mem::take(&mut f.break_extra)) {
+                if w.field
+                    .as_mut()
+                    .is_some_and(|f| std::mem::take(&mut f.break_extra))
+                {
                     for k in (0..w.ents.len()).rev() {
-                        if !w.ents[k].removed && matches!(w.ents[k].body, crate::world::Body::Enemy(_)) {
+                        if !w.ents[k].removed
+                            && matches!(w.ents[k].body, crate::world::Body::Enemy(_))
+                        {
                             crate::enemy::held_update(w, k);
                         }
                     }
@@ -278,7 +323,9 @@ impl Session {
     fn step_post_world(&mut self) {
         let w = &mut self.world;
         if crate::menu::active(w) && !crate::menu::opened_this_frame(w) {
-            if w.field.is_some() && (crate::menu::minigame::world_runs(w) || crate::menu::minigame::watch_closing(w)) {
+            if w.field.is_some()
+                && (crate::menu::minigame::world_runs(w) || crate::menu::minigame::watch_closing(w))
+            {
                 crate::field::world_mode_cameras(w);
             }
             crate::menu::post(w);
@@ -322,7 +369,11 @@ impl Session {
         observe(&self.world, player)
     }
     pub fn snapshot(&self) -> Snapshot {
-        Snapshot { world: self.world.clone(), prev: self.prev, outcome: self.outcome }
+        Snapshot {
+            world: self.world.clone(),
+            prev: self.prev,
+            outcome: self.outcome,
+        }
     }
     pub fn restore(&mut self, s: &Snapshot) {
         self.world = s.world.clone();

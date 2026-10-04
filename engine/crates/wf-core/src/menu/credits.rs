@@ -24,7 +24,12 @@ pub const END: i32 = 0x5A9;
 /// sound of a skip (`0x08319470`)
 pub const SFX_SKIP: i32 = 38;
 /// no fades around it: the mode replaces the screen at once; the world gets the frame it ends in
-pub const CUT: Transition = Transition { fade_out: 0, enter: 0, leave: 1, fade_in: 0 };
+pub const CUT: Transition = Transition {
+    fade_out: 0,
+    enter: 0,
+    leave: 1,
+    fade_in: 0,
+};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Credits {
@@ -48,7 +53,16 @@ impl Credits {
         Credits::with(false)
     }
     pub fn with(unskippable: bool) -> Credits {
-        Credits { c: Container::default(), t: 0x90, quit: false, unskippable, idx: FIRST, page: FIRST, eva: 0, page_cost: 2 }
+        Credits {
+            c: Container::default(),
+            t: 0x90,
+            quit: false,
+            unskippable,
+            idx: FIRST,
+            page: FIRST,
+            eva: 0,
+            page_cost: 2,
+        }
     }
 }
 
@@ -87,7 +101,12 @@ impl Page for Credits {
                     return Action::Pop(1);
                 }
                 self.page = self.idx;
-                self.page_cost = w.data.menu.as_ref().map(|d| page_cost(&d.text, self.page)).unwrap_or(2);
+                self.page_cost = w
+                    .data
+                    .menu
+                    .as_ref()
+                    .map(|d| page_cost(&d.text, self.page))
+                    .unwrap_or(2);
             }
         } else if self.t <= 0xA0 {
             self.eva = (self.t + 0x70) & 0xFF;
@@ -120,7 +139,16 @@ impl Page for Credits {
         if self.t != 0x90 {
             return None;
         }
-        Some(super::page_time(d, &self.view(w, d), false, 4_641, 141_207, -85, 387, 0))
+        Some(super::page_time(
+            d,
+            &self.view(w, d),
+            false,
+            4_641,
+            141_207,
+            -85,
+            387,
+            0,
+        ))
     }
     fn view(&self, _w: &World, d: &MenuData) -> MenuView {
         let t = &d.text;
@@ -137,11 +165,30 @@ impl Page for Credits {
         names.text(t, &mut p, t.s(self.page as usize + 1));
         MenuView {
             layers: vec![
-                MenuLayer { w: 240, h: 64, x: 0, y: 48, priority: 3, ops: title.ops },
-                MenuLayer { w: 240, h: 64, x: 0, y: 80, priority: 3, ops: names.ops },
+                MenuLayer {
+                    w: 240,
+                    h: 64,
+                    x: 0,
+                    y: 48,
+                    priority: 3,
+                    ops: title.ops,
+                },
+                MenuLayer {
+                    w: 240,
+                    h: 64,
+                    x: 0,
+                    y: 80,
+                    priority: 3,
+                    ops: names.ops,
+                },
             ],
             backdrop: 0,
-            blend: Some(MenuBlend { first: 0b11, second: 1 << 30, eva: self.eva.clamp(0, 16) as u8, evb: 0 }),
+            blend: Some(MenuBlend {
+                first: 0b11,
+                second: 1 << 30,
+                eva: self.eva.clamp(0, 16) as u8,
+                evb: 0,
+            }),
             ..Default::default()
         }
     }
@@ -162,7 +209,10 @@ pub fn open_credits(w: &mut World) {
 }
 
 /// a harness opening this screen from JSON (`menu::open_from_json`): `{"kind": "credits", "skippable": bool}`
-pub fn open_json(_w: &World, v: &serde_json::Value) -> Option<(super::Screen, super::Transition, bool)> {
+pub fn open_json(
+    _w: &World,
+    v: &serde_json::Value,
+) -> Option<(super::Screen, super::Transition, bool)> {
     if v["kind"].as_str()? != "credits" {
         return None;
     }
@@ -177,9 +227,13 @@ pub fn open_json(_w: &World, v: &serde_json::Value) -> Option<(super::Screen, su
 pub fn page_cost(t: &super::text::TextData, page: i32) -> u8 {
     let w = |f: wf_view::MenuFont, s: &[u16]| -> i32 {
         let fm = t.font(f);
-        s.iter().filter(|&&c| c != 0x0A && c < 0xFF && fm.has.get(c as usize).copied().unwrap_or(false)).map(|&c| fm.w[c as usize] as i32).sum()
+        s.iter()
+            .filter(|&&c| c != 0x0A && c < 0xFF && fm.has.get(c as usize).copied().unwrap_or(false))
+            .map(|&c| fm.w[c as usize] as i32)
+            .sum()
     };
-    let cost = 2 * w(MenuFont::Dialog, t.s(page as usize)) + w(MenuFont::Small, t.s(page as usize + 1));
+    let cost =
+        2 * w(MenuFont::Dialog, t.s(page as usize)) + w(MenuFont::Small, t.s(page as usize + 1));
     if cost > 158 {
         2
     } else {

@@ -18,7 +18,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / 'tools' / 'story_playthrough'))
 from ship_driver import ShipDriver, alloc_keys, enemies, level_of, KEY, status  # noqa: E402
-from ship_route import nav, charsel, switch, button, item, panel  # noqa: E402,F401
+from ship_route import nav, charsel, switch, button, item, panel, rest_at  # noqa: E402,F401
 from earth_driver import EarthDriver  # noqa: E402
 
 U, D, L, R, A, B = KEY.UP, KEY.DOWN, KEY.LEFT, KEY.RIGHT, KEY.A, KEY.B
@@ -26,8 +26,9 @@ S, E, LS, RS = KEY.START, KEY.SELECT, KEY.L, KEY.R
 
 
 def split2(n):
-    """run 2's grind split (run 1: half STR, half END): a third STR, a third POW, the rest SPD"""
-    return [n // 3, n // 3, 0, n - 2 * (n // 3)]
+    """run 2's grind split (run 1: half STR, half END): a third STR, a sixth POW, a third END, the rest SPD (END
+    stays: the ship's stage 3 killed a Vegeta grown without it)"""
+    return [n // 3, n // 6, n // 3, n - n // 3 - n // 6 - n // 3]
 
 
 class ShipDriver2(ShipDriver):
@@ -134,16 +135,17 @@ def stall(x, y, picks):
     previous pick, buys)], B out, the goodbye text"""
     k = [(A, 3, 60), (A, 3, 100)]
     for down, n in picks:
-        k += [(D, 3, 15)] * down + [(A, 3, 40)] * n
-    k += [(B, 3, 100), (A, 3, 60)]
+        k += [(D, 3, 50)] * down + [(A, 3, 40)] * n      # (a D soon after the last is not always taken)
+    k += [(B, 3, 100), (B, 3, 100)]      # B leaves the list, B closes the goodbye (an A here talks again)
     return [('unstick',), ('walk', x, y), ('face', 'U'), ('keys', k), ('events',), ('wait', 30)]
 
 
 def equip2(slot):
     """pause menu -> Equip (shoulder R twice) -> slot row (body / hands / feet / accessory) -> the first item ->
     Equip to the active character"""
-    k = [(S, 2, 60), (RS, 3, 40), (RS, 3, 40)] + [(D, 3, 16)] * slot + [(A, 3, 40), (A, 3, 40), (A, 3, 40),
-                                                                       (B, 3, 40), (S, 2, 100)]
+    # (A on the item: "Equip to <char>" / "Drop"; A equips and returns to the slot list; B closes the menu)
+    k = [(S, 2, 60), (RS, 3, 40), (RS, 3, 40)] + [(D, 3, 50)] * slot + [(A, 3, 40), (A, 3, 40), (A, 3, 60),
+                                                                       (B, 3, 80)]
     return ('keys', k)
 
 
@@ -200,7 +202,7 @@ def goals_run2(e):
         nav(8, 2, False), ('walk', 104, 56), ('face', 'U'), ('press', A), ('events',),      # s517: the gate
         nav(8, 1, False), ('walk', 148, 186), *charsel(1),                                   # Gohan
         ('mark', 'r03_grind_gohan'),
-        ('grind', 100, [(8, 3), (8, 6)]),
+        ('grind', 103, [(8, 3), (8, 6)]),
         nav(8, 1, False), ('walk', 148, 186), *charsel(1),                                   # Vegeta
         ('mark', 'r04_grind_vegeta'),
         ('mode', 'blasty', True),
@@ -208,13 +210,13 @@ def goals_run2(e):
         ('mode', 'blasty', False),
         nav(8, 1, False), ('walk', 148, 186), *charsel(-1),                                  # Gohan
         # --- Papaya Island: the equipment stall (run 1 never bought or wore any here): Leather Gloves, Leather
-        # Moccasins, Topaz Amulet, worn by Gohan; then food (four kinds) ----------------------------------------
+        # Moccasins, worn by Gohan; then food: Miso Soup, a Rice Ball, two Onigiri ---------------------------------
         nav(8, 1, False), ('walk', 280, 266), ('face', 'U'), ('press', A), ('wait', 60),
         ('fly', 1953, 2041, 143, 159), ('wait', 30),                                         # Papaya Island 7-1
         nav(7, 2, False), ('mark', 'r05_shop'),
-        *stall(188, 472, [(0, 1), (2, 1), (4, 1)]),
-        equip2(1), equip2(2), equip2(3),
-        *stall(276, 592, [(0, 1), (1, 1), (1, 1), (1, 1), (1, 6)]),
+        *stall(188, 472, [(0, 1), (2, 1)]),
+        equip2(1), equip2(2),
+        *stall(276, 592, [(0, 1), (1, 1), (3, 2)]),
         nav(7, 1, False), ('walk', 224, 340), ('face', 'U'), ('press', A), ('wait', 60),
         ('fly', 849, 1785, 31, 23), ('wait', 30),                                            # Southwest Forest
         nav(8, 16, False), ('wait', 30),
@@ -233,5 +235,10 @@ def ship_main(e):
                       ('until', 8, 28), ('wait', 30), ('mark', 'c07c_continued'),
                       ('unstick',), ('walk', 60, 306), *charsel(-2)]
     k = g.index(('mark', 'c09_8-41'))
-    g[k + 1:k + 1] = [('walk', 60, 314), *charsel(1)]
+    # Gohan; run 2's Gohan (less END than run 1's) died in stage 3 at level 103: the six fighters next door (8-42)
+    # to level 106 first, points now END-heavy, then rest at the save point
+    g[k + 1:k + 1] = [('walk', 60, 314), *charsel(1), ('mark', 'c09b_grind'),
+                      ('mode', 'split', lambda n: [n // 4, 0, n - n // 4, 0]),
+                      ('grind', 106, [(8, 42), (8, 41)]), nav(8, 41, False),
+                      *rest_at(60, 314, 1, 1)]
     return g

@@ -14,7 +14,9 @@
 //! pickups, busy). Spawn conditions are evaluated in the core (`story::eval_condition`).
 
 use crate::battle;
-use crate::fieldcontent::{Activation, AreaDef, Callback, Cond, Dest, MapDef, ObjDef, ObjKind, ObjRef, TriggerKind};
+use crate::fieldcontent::{
+    Activation, AreaDef, Callback, Cond, Dest, MapDef, ObjDef, ObjKind, ObjRef, TriggerKind,
+};
 use crate::geom::{Dir, Rect};
 use crate::player::{self, Player, PlayerInit};
 use crate::story::{self, Story};
@@ -38,13 +40,23 @@ pub struct AreaId {
 #[serde(rename_all = "snake_case")]
 pub enum Cause {
     /// a script / event / save-point trigger fired (object of the area or the map header)
-    Trigger { obj: ObjRef },
+    Trigger {
+        obj: ObjRef,
+    },
     /// A facing a talking NPC
-    Talk { npc: EntityId },
+    Talk {
+        npc: EntityId,
+    },
     /// a map item was collected (its "You found ..." event)
-    Pickup { obj: ObjRef },
+    Pickup {
+        obj: ObjRef,
+    },
     /// a breakable prop broke (loot script; loot position = x, y)
-    Break { obj: ObjRef, x: i32, y: i32 },
+    Break {
+        obj: ObjRef,
+        x: i32,
+        y: i32,
+    },
     /// a placed enemy was defeated (on-defeat callback; loot position = x, y). `loot`: the field loot block (position,
     /// velocity) this run starts with - the type's drop script runs with its own enemy's (two enemies dying in one
     /// frame drop where each died; Babidi's ship 8-62)
@@ -61,32 +73,59 @@ pub enum Cause {
     AreaLeave,
     /// an enemy AI node queued a script (RunScript: `run` = `header_0xADDR`, the event whose header is ADDR;
     /// InlineScript: `inline_0xADDR`)
-    Ai { entity: EntityId },
+    Ai {
+        entity: EntityId,
+    },
     /// a level-up (kill XP): the engine's level-up hook, event #3 ("%s has reached level %d!", stat points,
     /// skills learned), run where the game runs it inline
-    LevelUp { entity: EntityId },
+    LevelUp {
+        entity: EntityId,
+    },
     /// a closed menu queued it (Options -> Sleep: event s007, menu/options.rs)
     Menu,
     /// a supply used in the Inventory (its use script, supply def +0x30; `menu/inventory.rs`)
-    ItemUse { item: i32 },
+    ItemUse {
+        item: i32,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(tag = "event", rename_all = "snake_case")]
 pub enum FieldEvent {
     /// an area finished loading (objects created)
-    AreaEnter { area: AreaId, key: String },
-    AreaLeave { area: AreaId },
+    AreaEnter {
+        area: AreaId,
+        key: String,
+    },
+    AreaLeave {
+        area: AreaId,
+    },
     /// run a script / event (the host resolves `run` ids: `inline_0xADDR` / `sNNN`); `slot` = the player concerned
-    Run { run: Callback, cause: Cause, slot: u8 },
+    Run {
+        run: Callback,
+        cause: Cause,
+        slot: u8,
+    },
     /// a pickup was collected (already applied to `World.story` unless it is a map item, whose event gives it)
-    Collected { kind: PickupKind, slot: u8 },
+    Collected {
+        kind: PickupKind,
+        slot: u8,
+    },
     /// a placed enemy was defeated (also when it has no callback)
-    Defeated { entity: EntityId, ty: i32, x: i32, y: i32 },
+    Defeated {
+        entity: EntityId,
+        ty: i32,
+        x: i32,
+        y: i32,
+    },
     /// a spawn condition the core could not evaluate (treated as false)
-    ConditionUnknown { script: String },
+    ConditionUnknown {
+        script: String,
+    },
     /// an exit / warp started its fade-out toward `to`
-    Transition { to: AreaId },
+    Transition {
+        to: AreaId,
+    },
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -155,7 +194,9 @@ pub enum Mode {
         step: i32,
     },
     /// fade-in (`0x08006DD6`): k = fade frames done; the player goes idle at the end of the 32nd
-    FadeIn { k: i32 },
+    FadeIn {
+        k: i32,
+    },
 }
 
 /// fade length in logic frames (brightness 256 by 8)
@@ -321,6 +362,10 @@ pub struct Field {
     /// `iters` at the last area load (the tile animations' start)
     #[serde(default)]
     pub entered_iter: u32,
+    /// the camera counter's base when it differs from the tile animations' (0x030019A4 +0x40 is the camera
+    /// object's, not the map's: a scene's load can keep it running - a cut imports it); `None` = `entered_iter`
+    #[serde(default)]
+    pub drift_iter: Option<u32>,
     /// number of area loads (touch_once triggers survive only within one)
     pub loads: u32,
     /// a talk started in the player's update: (the player's live list index, `loads`) - the event's nested loop
@@ -426,7 +471,18 @@ fn yes() -> bool {
 }
 impl Default for FieldConfig {
     fn default() -> Self {
-        FieldConfig { world: 8, area: 3, variant: 0, pos: None, facing: 0, chars: vec![], story: None, rng: battle::RngInit::Seed(1), xp: true, arrive: false }
+        FieldConfig {
+            world: 8,
+            area: 3,
+            variant: 0,
+            pos: None,
+            facing: 0,
+            chars: vec![],
+            story: None,
+            rng: battle::RngInit::Seed(1),
+            xp: true,
+            arrive: false,
+        }
     }
 }
 
@@ -434,7 +490,12 @@ impl Default for FieldConfig {
 // setup
 
 fn field_data(w: &World) -> Arc<crate::fieldcontent::FieldData> {
-    Arc::clone(w.data.field.as_ref().expect("content pack without world/ (field data)"))
+    Arc::clone(
+        w.data
+            .field
+            .as_ref()
+            .expect("content pack without world/ (field data)"),
+    )
 }
 
 /// a player of a character from the story records
@@ -442,11 +503,32 @@ pub fn make_player(w: &World, slot: u8, ch: i32) -> Player {
     let cs = &w.story.chars[(ch.max(0) as usize).min(w.story.chars.len() - 1)];
     let c = w.data.chars.iter().find(|c| c.index == ch);
     let forms = c.map(|c| c.forms.clone()).unwrap_or_default();
-    let form = if w.data.form(cs.form).is_some() { cs.form } else { c.map(|c| c.form).unwrap_or(2) };
-    let skills = if cs.skills.is_empty() { vec![7] } else { cs.skills.clone() };
+    let form = if w.data.form(cs.form).is_some() {
+        cs.form
+    } else {
+        c.map(|c| c.form).unwrap_or(2)
+    };
+    let skills = if cs.skills.is_empty() {
+        vec![7]
+    } else {
+        cs.skills.clone()
+    };
     let sel = (cs.sel.max(0) as usize).min(skills.len() - 1);
     let lv = cs.skill_level(skills[sel]);
-    let mut p = Player::new(w, PlayerInit { slot, form, rec: cs.rec.clone(), equip: cs.equip, skills, skill_level: lv, sel, holy_water: false, forms_allowed: forms });
+    let mut p = Player::new(
+        w,
+        PlayerInit {
+            slot,
+            form,
+            rec: cs.rec.clone(),
+            equip: cs.equip,
+            skills,
+            skill_level: lv,
+            sel,
+            holy_water: false,
+            forms_allowed: forms,
+        },
+    );
     p.ss_cooldown = cs.ss_cooldown;
     p
 }
@@ -456,7 +538,17 @@ pub fn make_player(w: &World, slot: u8, ch: i32) -> Player {
 fn renew_player(w: &World, old: &Player) -> Player {
     let mut p = Player::new(
         w,
-        PlayerInit { slot: old.slot, form: old.form, rec: old.rec.clone(), equip: old.equip, skills: old.skills.clone(), skill_level: old.skill_level, sel: old.sel, holy_water: false, forms_allowed: old.forms_allowed.clone() },
+        PlayerInit {
+            slot: old.slot,
+            form: old.form,
+            rec: old.rec.clone(),
+            equip: old.equip,
+            skills: old.skills.clone(),
+            skill_level: old.skill_level,
+            sel: old.sel,
+            holy_water: false,
+            forms_allowed: old.forms_allowed.clone(),
+        },
     );
     p.ss_gauge = old.ss_gauge;
     // the form controller (player +0x22C) is a new object after a load: its regen count (+0xC) and its Super Saiyan
@@ -533,6 +625,7 @@ fn new_field() -> Field {
         entered: 0,
         iters: 0,
         entered_iter: 0,
+        drift_iter: None,
         loads: 0,
         talk_pass: None,
         trig_off: false,
@@ -562,11 +655,21 @@ pub fn create(data: Arc<crate::content::GameData>, cfg: &FieldConfig) -> World {
         battle::RngInit::Seed(s) => crate::rng::Rng::from_seed(s),
         battle::RngInit::State(a, b) => crate::rng::Rng::new(a, b),
     };
-    let arena = ArenaRt { id: String::new(), map: String::new(), bounds: Rect::new(0, 0, 2048, 2048), region: None, view: None };
+    let arena = ArenaRt {
+        id: String::new(),
+        map: String::new(),
+        bounds: Rect::new(0, 0, 2048, 2048),
+        region: None,
+        view: None,
+    };
     let mut w = World::new(Arc::clone(&data), rng, arena);
     w.opts.xp = cfg.xp;
     w.story = cfg.story.clone().unwrap_or_else(|| Story::new_game(&data));
-    let chars = if cfg.chars.is_empty() { vec![w.story.current] } else { cfg.chars.clone() };
+    let chars = if cfg.chars.is_empty() {
+        vec![w.story.current]
+    } else {
+        cfg.chars.clone()
+    };
     for (slot, &ch) in chars.iter().enumerate().take(MAX_PLAYERS) {
         let mut p = make_player(&w, slot as u8, ch);
         p.a.facing = cfg.facing;
@@ -578,8 +681,19 @@ pub fn create(data: Arc<crate::content::GameData>, cfg: &FieldConfig) -> World {
     }
     w.field = Some(Box::new(new_field()));
     let fd = field_data(&w);
-    let pos = cfg.pos.or_else(|| fd.area(cfg.world, cfg.area).and_then(|a| fd.map_of(a, cfg.variant.max(1))).map(|m| m.start_pos)).unwrap_or((120, 120));
-    let to = AreaId { world: cfg.world, area: cfg.area, variant: cfg.variant };
+    let pos = cfg
+        .pos
+        .or_else(|| {
+            fd.area(cfg.world, cfg.area)
+                .and_then(|a| fd.map_of(a, cfg.variant.max(1)))
+                .map(|m| m.start_pos)
+        })
+        .unwrap_or((120, 120));
+    let to = AreaId {
+        world: cfg.world,
+        area: cfg.area,
+        variant: cfg.variant,
+    };
     load_area(&mut w, to, pos.0, pos.1, Some(cfg.facing));
     if cfg.arrive {
         // the load frame's camera update (the game eases once before the first fade-in frame)
@@ -623,10 +737,16 @@ fn cond_holds(w: &mut World, c: &Cond) -> bool {
         Cond::Script(id) => {
             let fd = field_data(w);
             let cur = leader_char(w);
-            match fd.cond_code.get(id).and_then(|code| story::eval_condition(code, &w.story, cur)) {
+            match fd
+                .cond_code
+                .get(id)
+                .and_then(|code| story::eval_condition(code, &w.story, cur))
+            {
                 Some(b) => b,
                 None => {
-                    w.events.push(Event::Field(FieldEvent::ConditionUnknown { script: id.clone() }));
+                    w.events.push(Event::Field(FieldEvent::ConditionUnknown {
+                        script: id.clone(),
+                    }));
                     false
                 }
             }
@@ -636,7 +756,9 @@ fn cond_holds(w: &mut World, c: &Cond) -> bool {
 
 /// the leader's character index
 pub fn leader_char(w: &World) -> i32 {
-    w.player_idx(0).and_then(|i| story::char_of_form(&w.data, w.pl_ref(i).form)).unwrap_or(w.story.current)
+    w.player_idx(0)
+        .and_then(|i| story::char_of_form(&w.data, w.pl_ref(i).form))
+        .unwrap_or(w.story.current)
 }
 
 /// create one placed object of the object world (not triggers: see `TriggerRt`); returns its entity
@@ -645,7 +767,14 @@ pub fn spawn_object(w: &mut World, o: &ObjDef) -> Option<EntityId> {
     match &o.kind {
         ObjKind::Trigger { rect, act, .. } => {
             if let Some(f) = w.field.as_mut() {
-                f.triggers.push(TriggerRt { obj: o.at, rect: *rect, act: *act, last: u32::MAX, forced: false, resume: 0 });
+                f.triggers.push(TriggerRt {
+                    obj: o.at,
+                    rect: *rect,
+                    act: *act,
+                    last: u32::MAX,
+                    forced: false,
+                    resume: 0,
+                });
             }
             None
         }
@@ -658,9 +787,16 @@ pub fn spawn_object(w: &mut World, o: &ObjDef) -> Option<EntityId> {
             if let ObjKind::Enemy { sprite, .. } = &o.kind {
                 // (the sprite id goes through the resolver `0x08000158`: 1 ..= 8 are the characters' current
                 // forms - segment sb 20-6 f2012: s473's become_map_object(5, 3) keeps Vegeta's sprite 280)
-                let sprite = &if (1..=8).contains(sprite) { crate::fieldnpc::char_sprite(w, *sprite - 1).unwrap_or(*sprite) } else { *sprite };
+                let sprite = &if (1..=8).contains(sprite) {
+                    crate::fieldnpc::char_sprite(w, *sprite - 1).unwrap_or(*sprite)
+                } else {
+                    *sprite
+                };
                 let content = *sprite - crate::scene::SPRITE_BASE;
-                if *sprite > 0 && w.data.sprite(content).is_some() && w.en_ref(i).a.sprite != Some(content) {
+                if *sprite > 0
+                    && w.data.sprite(content).is_some()
+                    && w.en_ref(i).a.sprite != Some(content)
+                {
                     let d = w.data.clone();
                     // (the ctor allocates the placement's sprite: the type's tiles are given back first)
                     crate::vram::entity_gone(w, i);
@@ -669,7 +805,15 @@ pub fn spawn_object(w: &mut World, o: &ObjDef) -> Option<EntityId> {
                 }
             }
             // the world map (3584 x 2560, beyond the 2048-px grids): placed exactly at the def position
-            if w.field.as_ref().is_some_and(|f| f.camera_max.0 > 2048 || f.camera_max.1 > 2048) || w.data.field.as_ref().and_then(|d| w.field.as_ref().and_then(|f| d.maps.get(&f.map))).is_some_and(|m| m.three_d) {
+            if w.field
+                .as_ref()
+                .is_some_and(|f| f.camera_max.0 > 2048 || f.camera_max.1 > 2048)
+                || w.data
+                    .field
+                    .as_ref()
+                    .and_then(|d| w.field.as_ref().and_then(|f| d.maps.get(&f.map)))
+                    .is_some_and(|m| m.three_d)
+            {
                 let e = w.en(i);
                 e.a.x = *x << 8;
                 e.a.y = *y << 8;
@@ -720,7 +864,14 @@ pub fn load_area(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<Dir>)
 /// the area load with `objects` = false: the map's conditional objects are not spawned (script load_scene
 /// 0x74 `load_scene_fade_noobj`, 0x08009030 first flag 0). A cutscene scene load calls this after
 /// `scene::send_offstage` (no player object: no player re-creation, no draws).
-pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<Dir>, objects: bool) {
+pub fn load_area_with(
+    w: &mut World,
+    to: AreaId,
+    x: i32,
+    y: i32,
+    facing: Option<Dir>,
+    objects: bool,
+) {
     // the map load writes the map's own BG control (DISPCNT layers, BGxCNT priorities, BLDCNT / BLDALPHA from its
     // header): what a script set before is gone (rkb_168 14-1: the Kid Buu scene's BG0 priority 3 / blend targets,
     // the game's registers back to the map's after the next load)
@@ -730,16 +881,21 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
         w.g.load_pending = true;
     }
     let fd = field_data(w);
-    let Some(a) = fd.area(to.world, to.area) else { return };
+    let Some(a) = fd.area(to.world, to.area) else {
+        return;
+    };
     let variant = resolve_variant(a, to.variant);
-    let Some(m) = fd.map_of(a, variant) else { return };
+    let Some(m) = fd.map_of(a, variant) else {
+        return;
+    };
     let to = AreaId { variant, ..to };
     let from = w.field.as_ref().map(|f| f.area).unwrap_or_default();
     let had_area = w.field.as_ref().is_some_and(|f| f.loads > 0);
     // a load inside a running event (script warp / scene load) keeps the field held until the event ends
     // also a script that holds an interrupted frame (a defeat callback's script: Pui Pui's warps to 8-28): its end still
     // completes that frame's update (Babidi's ship 8-27 -> 8-28: the new player's idle ticks twice when it ends)
-    let keep_busy = (w.scene.depth > 0 || w.field.as_ref().is_some_and(|f| f.held_event)) && w.field.as_ref().is_some_and(|f| f.busy);
+    let keep_busy = (w.scene.depth > 0 || w.field.as_ref().is_some_and(|f| f.held_event))
+        && w.field.as_ref().is_some_and(|f| f.busy);
     let load_lo = w.next_id;
     // (the HUD's beep stamp is on the game's logic counter, 0x03000F94: `World.g.clock`)
     let now = w.g.clock(w.frame) as u32;
@@ -760,7 +916,17 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
     crate::vram::release(w, crate::vram::Owner::Dest);
     // an enemy breathing flames as the area goes: its controller's destructor stops sound 63 (whole-run sound requests,
     // Airship 12-16 -> 12-17: StopMatch(63) in the exit's load iteration)
-    let flames = w.enemies.clone().into_iter().filter_map(|id| w.find(id)).filter(|&k| !w.ents[k].removed && matches!(w.ents[k].body, Body::Enemy(_)) && crate::nodes::flame_running(w, k)).count();
+    let flames = w
+        .enemies
+        .clone()
+        .into_iter()
+        .filter_map(|id| w.find(id))
+        .filter(|&k| {
+            !w.ents[k].removed
+                && matches!(w.ents[k].body, Body::Enemy(_))
+                && crate::nodes::flame_running(w, k)
+        })
+        .count();
     for _ in 0..flames {
         w.events.push(Event::SfxStopMatch { id: 63 });
     }
@@ -796,16 +962,20 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
         v.shadow_set.clear();
         let keys: Vec<u32> = v.keyed.drain(..).map(|k| k.0).collect();
         for k in keys {
-            v.owners.retain(|o| o.1 != crate::vram::Owner::Keyed(k) || {
-                v.a.free(o.0);
-                false
+            v.owners.retain(|o| {
+                o.1 != crate::vram::Owner::Keyed(k) || {
+                    v.a.free(o.0);
+                    false
+                }
             });
         }
     }
     crate::vram::release(w, crate::vram::Owner::Popup);
     crate::vram::visuals_gone(w);
     // the BG sphere effect is an object of the old area too (segment sb 20-8 -> 20-9: its redraws stop)
-    w.scene.visuals.retain(|v| v.kind != crate::scene::VisualKind::EnergySphere);
+    w.scene
+        .visuals
+        .retain(|v| v.kind != crate::scene::VisualKind::EnergySphere);
     crate::vram::release(w, crate::vram::Owner::Ending);
     crate::vram::release(w, crate::vram::Owner::BossBar);
     w.scene.boss_bar = None;
@@ -817,6 +987,7 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
     // the players a scene load sent offstage are destroyed with the objects too (4-21 -> s190's 4-24 scene)
     crate::vram::offstage_gone(w);
     crate::vram::release(w, crate::vram::Owner::Title);
+    w.scene.titles.clear();
     crate::vram::release(w, crate::vram::Owner::Props);
     crate::vram::load_reset(w);
     w.ents.retain(|e| players.contains(&e.id));
@@ -848,7 +1019,15 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
         f.map = m.id.clone();
         f.camera_max = m.camera_max;
         f.combat = a.combat;
-        f.props = m.props.iter().map(|p| PropRt { rect: p.rect, visible: p.visible, dx: 0 }).collect();
+        f.props = m
+            .props
+            .iter()
+            .map(|p| PropRt {
+                rect: p.rect,
+                visible: p.visible,
+                dx: 0,
+            })
+            .collect();
         f.placed.clear();
         f.placed_loot.clear();
         f.triggers.clear();
@@ -864,6 +1043,7 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
         f.entered = w.frame;
         // (a load inside a field frame: the animations start with the next iteration - its tick comes after)
         f.entered_iter = f.iters.wrapping_add(1);
+        f.drift_iter = None;
         f.loads += 1;
         f.on_enter_queued = false;
         // a script fade-in belongs to the load its `warp_fade` made (set after this returns): any other load ends
@@ -887,14 +1067,23 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
     // 4. map sprites, breakables, items (forward, conditions), then the trigger list (map header triggers, area
     // triggers; scanned area first), the song, the actors. A nested scene load spawns the objects after the on-enter
     // script (`defer_objects`)
-    let defer = objects && a.on_enter.is_some() && w.field.as_ref().is_some_and(|f| f.defer_objects);
+    let defer =
+        objects && a.on_enter.is_some() && w.field.as_ref().is_some_and(|f| f.defer_objects);
     if let Some(f) = w.field.as_mut() {
         f.pending_objects = defer.then_some(to);
     }
     let objects = objects && !defer;
     // the level signs' label objects (area list +0x20, `0x0800C300`: 0x200 tile bytes each) come first
     // (segment sb 20-3 -> 20-4)
-    let signs = a.objects.iter().filter(|o| objects && matches!(o.kind, ObjKind::MapSprite { label: Some(_), .. }) && cond_holds(w, &o.cond)).count();
+    let signs = a
+        .objects
+        .iter()
+        .filter(|o| {
+            objects
+                && matches!(o.kind, ObjKind::MapSprite { label: Some(_), .. })
+                && cond_holds(w, &o.cond)
+        })
+        .count();
     for k in 0..signs {
         crate::vram::acquire(w, crate::vram::Owner::Sign(k as u32), 0x200);
     }
@@ -910,7 +1099,12 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
             }
         }
     }
-    for o in a.objects.iter().filter(|o| objects && list_of(o) == 0).chain(m.exits.iter()) {
+    for o in a
+        .objects
+        .iter()
+        .filter(|o| objects && list_of(o) == 0)
+        .chain(m.exits.iter())
+    {
         if cond_holds(w, &o.cond) {
             spawn_object(w, o);
         }
@@ -918,9 +1112,17 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
     // a selector script's song (Song::Script, evaluated on the story state like a condition script)
     let song = song_of(a).or_else(|| match &a.song {
         crate::fieldcontent::Song::Script(id) => {
-            let key = if id.starts_with("inline_") { id.clone() } else { format!("inline_{id}") };
+            let key = if id.starts_with("inline_") {
+                id.clone()
+            } else {
+                format!("inline_{id}")
+            };
             let cur = leader_char(w);
-            field_data(w).cond_code.get(&key).and_then(|code| story::eval_value(code, &w.story, cur)).filter(|&v| v > 0)
+            field_data(w)
+                .cond_code
+                .get(&key)
+                .and_then(|code| story::eval_value(code, &w.story, cur))
+                .filter(|&v| v > 0)
         }
         _ => None,
     });
@@ -935,13 +1137,21 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
         }
     }
     if let Some(f) = w.field.as_mut() {
-        f.load_ids = if keep_busy { (load_lo, w.next_id) } else { (0, 0) };
+        f.load_ids = if keep_busy {
+            (load_lo, w.next_id)
+        } else {
+            (0, 0)
+        };
         f.scene_load = false;
     }
     // 5. the old area's on-leave, the new area's on-enter (both before the player exists)
     if had_area {
-        w.events.push(Event::Field(FieldEvent::AreaLeave { area: from }));
-        if let Some(sc) = fd.area(from.world, from.area).and_then(|a| a.on_leave.clone()) {
+        w.events
+            .push(Event::Field(FieldEvent::AreaLeave { area: from }));
+        if let Some(sc) = fd
+            .area(from.world, from.area)
+            .and_then(|a| a.on_leave.clone())
+        {
             // the three on-leave scripts are flag scripts the load runs at once, also inside an event's warp (whole run,
             // Fukurou Forest 13-1 -> 0-50 in s518's event: flag 187 cleared in the load's iteration; ours had queued
             // the script until the event ended)
@@ -953,25 +1163,46 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
                 ok
             });
             if !done {
-                w.events.push(Event::Field(FieldEvent::Run { run: Callback::Script(sc), cause: Cause::AreaLeave, slot: 0 }));
+                w.events.push(Event::Field(FieldEvent::Run {
+                    run: Callback::Script(sc),
+                    cause: Cause::AreaLeave,
+                    slot: 0,
+                }));
             }
         }
     }
     if let Some(sc) = &a.on_enter {
-        w.events.push(Event::Field(FieldEvent::Run { run: Callback::Script(sc.clone()), cause: Cause::AreaEnter, slot: 0 }));
+        w.events.push(Event::Field(FieldEvent::Run {
+            run: Callback::Script(sc.clone()),
+            cause: Cause::AreaEnter,
+            slot: 0,
+        }));
         if let Some(f) = w.field.as_mut() {
             f.on_enter_queued = true;
         }
         // with a script host the rest of the load waits for the script (the players stay out of the world). Not
         // while an event holds the field: its host runs one script at a time, and the event waits for this load
         // (the game nests the on-enter script; scripts that block on load are not known inside events yet)
-        if w.field.as_ref().is_some_and(|f| f.host && (!f.busy && w.scene.depth == 0 || f.nest_load)) && objects {
+        if w.field
+            .as_ref()
+            .is_some_and(|f| f.host && (!f.busy && w.scene.depth == 0 || f.nest_load))
+            && objects
+        {
             // the players are already offstage: a cutscene scene load
-            let scene = !w.scene.offstage.is_empty() && !w.players.iter().any(|&id| w.find(id).is_some());
+            let scene =
+                !w.scene.offstage.is_empty() && !w.players.iter().any(|&id| w.find(id).is_some());
             crate::scene::send_offstage(w);
             let three_d = m.three_d;
             if let Some(f) = w.field.as_mut() {
-                f.arrival = Some(Arrival { to, x, y, facing, fade_in: false, frame: w.frame, scene });
+                f.arrival = Some(Arrival {
+                    to,
+                    x,
+                    y,
+                    facing,
+                    fade_in: false,
+                    frame: w.frame,
+                    scene,
+                });
                 // the 3D map object's camera exists from the load, at the arrival point (segment sb 21-25)
                 if three_d {
                     let mut fl = crate::fieldworld::Flight::arrive();
@@ -989,9 +1220,13 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
 /// the objects a nested scene load deferred to its on-enter script (`defer_objects`), in the load's list order; made
 /// while an event holds the field, they run like the load's own (`load_ids`)
 fn spawn_pending_objects(w: &mut World) {
-    let Some(to) = w.field.as_mut().and_then(|f| f.pending_objects.take()) else { return };
+    let Some(to) = w.field.as_mut().and_then(|f| f.pending_objects.take()) else {
+        return;
+    };
     let fd = field_data(w);
-    let Some(a) = fd.area(to.world, to.area) else { return };
+    let Some(a) = fd.area(to.world, to.area) else {
+        return;
+    };
     let lo = w.next_id;
     for list in [4, 2, 3, 0, 1] {
         for o in a.objects.iter().filter(|o| list_of(o) == list) {
@@ -1029,7 +1264,9 @@ pub fn world_mode_cameras(w: &mut World) {
 /// exit's fade-in starts. No-op without a pending arrival.
 pub fn finish_arrival(w: &mut World) {
     spawn_pending_objects(w);
-    let Some(ar) = w.field.as_mut().and_then(|f| f.arrival.take()) else { return };
+    let Some(ar) = w.field.as_mut().and_then(|f| f.arrival.take()) else {
+        return;
+    };
     if !ar.scene {
         crate::scene::bring_back(w);
     }
@@ -1070,9 +1307,13 @@ pub fn finish_arrival(w: &mut World) {
 
 fn arrive(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<Dir>) {
     let fd = field_data(w);
-    let Some(a) = fd.area(to.world, to.area) else { return };
+    let Some(a) = fd.area(to.world, to.area) else {
+        return;
+    };
     let variant = to.variant;
-    let Some(m) = fd.map_of(a, variant) else { return };
+    let Some(m) = fd.map_of(a, variant) else {
+        return;
+    };
     let players = w.players.clone();
     // the player objects at the destination (leader first; partners next to it), after the actors in the list: they
     // update before them. Each new player draws 2 x rand(255).
@@ -1081,7 +1322,9 @@ fn arrive(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<Dir>) {
         let (mut p, old_facing) = match w.ents.iter().position(|e| e.id == pid) {
             Some(k) => {
                 let ent = w.ents.remove(k);
-                let Body::Player(old) = ent.body else { continue };
+                let Body::Player(old) = ent.body else {
+                    continue;
+                };
                 (renew_player(w, &old), old.a.facing)
             }
             None if slot == 0 && w.field.as_ref().is_some_and(|f| f.player_removed) => {
@@ -1095,11 +1338,27 @@ fn arrive(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<Dir>) {
             None => continue,
         };
         let (fw, fh) = (p.a.foot_w, p.a.foot_h);
-        let (sx, sy) = if slot == 0 { (x, y) } else { w.col.as_ref().unwrap().free_spot(crate::world::Layer::Walk, x + 24 * slot as i32, y, fw, fh, None, None) };
+        let (sx, sy) = if slot == 0 {
+            (x, y)
+        } else {
+            w.col.as_ref().unwrap().free_spot(
+                crate::world::Layer::Walk,
+                x + 24 * slot as i32,
+                y,
+                fw,
+                fh,
+                None,
+                None,
+            )
+        };
         p.a.x = sx << 8;
         p.a.y = sy << 8;
         p.a.facing = facing.unwrap_or(old_facing);
-        w.ents.push(crate::world::Entity { id: pid, removed: false, body: Body::Player(Box::new(p)) });
+        w.ents.push(crate::world::Entity {
+            id: pid,
+            removed: false,
+            body: Body::Player(Box::new(p)),
+        });
         let pi = w.ents.len() - 1;
         crate::vram::actor_created(w, pi);
         // the idle state is entered twice; the second draw is the idle tick that stays (intro lockstep: the
@@ -1136,7 +1395,10 @@ fn arrive(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<Dir>) {
     // (the variant byte 0x03002BB0 is not the area's variant: a load leaves it - 0 through all 488 gates' loads in
     // the game's world-state rows; only the script setter 17 writes it)
     let _ = variant;
-    w.events.push(Event::Field(FieldEvent::AreaEnter { area: to, key: a.key.clone() }));
+    w.events.push(Event::Field(FieldEvent::AreaEnter {
+        area: to,
+        key: a.key.clone(),
+    }));
 }
 
 fn song_of(a: &AreaDef) -> Option<i32> {
@@ -1147,7 +1409,10 @@ fn song_of(a: &AreaDef) -> Option<i32> {
 }
 
 /// the arena runtime + collision of a field state (byte snapshots re-attach the static map)
-pub fn rebuild_arena(data: &crate::content::GameData, f: &Field) -> Option<(ArenaRt, Arc<crate::content::MapCollision>)> {
+pub fn rebuild_arena(
+    data: &crate::content::GameData,
+    f: &Field,
+) -> Option<(ArenaRt, Arc<crate::content::MapCollision>)> {
     let fd = data.field.as_ref()?;
     let a = fd.area(f.area.world, f.area.area)?;
     let m = fd.maps.get(&f.map)?;
@@ -1157,8 +1422,23 @@ pub fn rebuild_arena(data: &crate::content::GameData, f: &Field) -> Option<(Aren
 
 fn arena_of(a: &AreaDef, m: &MapDef, col: &crate::content::MapCollision) -> ArenaRt {
     // the game's walk test only bounds the box to 0..2048 (0x08009324); the camera clamps to the map
-    let side = if m.three_d { m.world_w.max(m.world_h).max(2048) } else { 2048 };
-    ArenaRt { id: a.key.clone(), map: m.id.clone(), bounds: Rect::new(0, 0, side, side), region: None, view: Some(Rect::new(0, 0, col.world_w.max(GBA_W), col.world_h.max(GBA_H))) }
+    let side = if m.three_d {
+        m.world_w.max(m.world_h).max(2048)
+    } else {
+        2048
+    };
+    ArenaRt {
+        id: a.key.clone(),
+        map: m.id.clone(),
+        bounds: Rect::new(0, 0, side, side),
+        region: None,
+        view: Some(Rect::new(
+            0,
+            0,
+            col.world_w.max(GBA_W),
+            col.world_h.max(GBA_H),
+        )),
+    }
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -1230,7 +1510,9 @@ pub fn camera(w: &mut World, slot: usize) {
 /// the player a script's `warp_fade` built into a 2D area, during its fade-in: a free object that reads the keys
 /// (the event that warped does not hold it; the script's next command on it takes it)
 pub fn free_arrival(w: &World) -> bool {
-    w.field.as_ref().is_some_and(|f| f.script_fade_in && matches!(f.mode, Mode::FadeIn { .. }) && f.item_get.is_none()) && !crate::fieldworld::flying(w)
+    w.field.as_ref().is_some_and(|f| {
+        f.script_fade_in && matches!(f.mode, Mode::FadeIn { .. }) && f.item_get.is_none()
+    }) && !crate::fieldworld::flying(w)
 }
 
 /// before the entity update: the deferred calls due (start of the world update); the item-get presentation holds the
@@ -1239,13 +1521,20 @@ pub fn pre_step(w: &mut World) {
     if let Some(f) = w.field.as_mut() {
         f.coins_moved = false;
     }
-    let pos: Vec<(i32, i32)> = (0..w.players.len()).filter_map(|s| w.player_idx(s)).map(|i| (w.pl_ref(i).a.x, w.pl_ref(i).a.y)).collect();
+    let pos: Vec<(i32, i32)> = (0..w.players.len())
+        .filter_map(|s| w.player_idx(s))
+        .map(|i| (w.pl_ref(i).a.x, w.pl_ref(i).a.y))
+        .collect();
     if let Some(f) = w.field.as_mut() {
         f.frame_start_pos = pos;
     }
     // a script's warp_fade arrival in a 2D area ends as its 64th frame starts: the players go idle (1 x rand(255)
     // each), the script goes on in this frame (6-1 -> 6-13: the walk to the pad starts on the fully lit frame)
-    if w.field.as_ref().is_some_and(|f| f.script_fade_in && matches!(f.mode, Mode::FadeIn { k } if k >= crate::fieldworld::FADE_IN_3D - 1)) && !crate::fieldworld::flying(w) {
+    if w.field.as_ref().is_some_and(|f| {
+        f.script_fade_in
+            && matches!(f.mode, Mode::FadeIn { k } if k >= crate::fieldworld::FADE_IN_3D - 1)
+    }) && !crate::fieldworld::flying(w)
+    {
         if let Some(f) = w.field.as_mut() {
             f.mode = Mode::Normal;
             f.script_fade_in = false;
@@ -1259,14 +1548,19 @@ pub fn pre_step(w: &mut World) {
     // an event (nested loop inside the player update) or the item-get holds the players; the raw keys stay in scene.keys
     // (not the player a script's `warp_fade` just built: until the fade-in ends and the script takes it again it is a
     // free object that reads the keys, event or not - 0-21, s026: A punches during the 64-frame fade-in)
-    if w.field.as_ref().is_some_and(|f| f.item_get.is_some() || f.busy) && !free_arrival(w) {
+    if w.field
+        .as_ref()
+        .is_some_and(|f| f.item_get.is_some() || f.busy)
+        && !free_arrival(w)
+    {
         let raw = w.input;
         if let Some(f) = w.field.as_mut() {
             f.raw_input = Some(raw);
         }
         // the world map's flyer reads the keys itself, event or not (s515's warp_fade: it answers A / B during the
         // arrival fade-in)
-        let flying = crate::fieldworld::flying(w) && w.field.as_ref().is_some_and(|f| f.item_get.is_none());
+        let flying =
+            crate::fieldworld::flying(w) && w.field.as_ref().is_some_and(|f| f.item_get.is_none());
         for s in 0..w.input.len() {
             if !(flying && s == 0) {
                 w.input[s] = Default::default();
@@ -1277,7 +1571,11 @@ pub fn pre_step(w: &mut World) {
         f.pre_update = true;
         f.held = false;
     }
-    let pickups_before = w.ents.iter().filter(|e| !e.removed && matches!(e.body, Body::Pickup(_))).count();
+    let pickups_before = w
+        .ents
+        .iter()
+        .filter(|e| !e.removed && matches!(e.body, Body::Pickup(_)))
+        .count();
     if let Some(f) = w.field.as_mut() {
         f.pre_pickups = pickups_before as u32;
     }
@@ -1290,13 +1588,25 @@ pub fn pre_step(w: &mut World) {
     let event_held = w.field.as_ref().is_some_and(|f| f.busy);
     // (the newest death effect first: r057_029 f512 - of two kills in one punch the later one's XP levels up, the
     // earlier one's comes after the hook)
-    let mut due = w.field.as_mut().map(|f| std::mem::take(&mut f.xp_due)).unwrap_or_default();
+    let mut due = w
+        .field
+        .as_mut()
+        .map(|f| std::mem::take(&mut f.xp_due))
+        .unwrap_or_default();
     due.reverse();
     for (k, &(pid, exp)) in due.iter().enumerate() {
         if let Some(pi) = w.find(pid) {
             let n = w.events.len();
             crate::player::gain_xp(w, pi, exp);
-            let leveled = w.events[n..].iter().any(|e| matches!(e, Event::Field(FieldEvent::Run { cause: Cause::LevelUp { .. }, .. })));
+            let leveled = w.events[n..].iter().any(|e| {
+                matches!(
+                    e,
+                    Event::Field(FieldEvent::Run {
+                        cause: Cause::LevelUp { .. },
+                        ..
+                    })
+                )
+            });
             if leveled {
                 crate::fieldnpc::start_event(w);
                 if let Some(f) = w.field.as_mut() {
@@ -1309,7 +1619,11 @@ pub fn pre_step(w: &mut World) {
             }
         }
     }
-    let runs = w.field.as_mut().map(|f| std::mem::take(&mut f.defeat_runs)).unwrap_or_default();
+    let runs = w
+        .field
+        .as_mut()
+        .map(|f| std::mem::take(&mut f.defeat_runs))
+        .unwrap_or_default();
     let any = !runs.is_empty();
     for (run, cause) in runs {
         // each death effect runs its drop script, then its callback: a callback that starts an event holds the pass,
@@ -1346,7 +1660,11 @@ fn push_callback(w: &mut World, run: Callback, cause: Cause) {
         Cause::Defeat { entity, .. } => w.events.iter().rposition(|e| matches!(e, Event::Field(FieldEvent::Run { cause: Cause::Defeat { entity: d, .. }, .. }) if d == entity)),
         _ => None,
     };
-    let ev = Event::Field(FieldEvent::Run { run, cause, slot: 0 });
+    let ev = Event::Field(FieldEvent::Run {
+        run,
+        cause,
+        slot: 0,
+    });
     match at {
         Some(k) => w.events.insert(k + 1, ev),
         None => w.events.push(ev),
@@ -1367,7 +1685,10 @@ fn death_effects(w: &mut World, event_held: bool) {
     // starts it inside its update - the effects after it wait for the next frame (11-24, the real route: two robbers
     // down in one frame - the second one's drop script draws a frame after the first one's, under s373)
     if let Some(f) = w.field.as_mut() {
-        let first = f.defeat_later.iter().position(|d| d.0 <= next && matches!(d.1, Callback::Event(_)));
+        let first = f
+            .defeat_later
+            .iter()
+            .position(|d| d.0 <= next && matches!(d.1, Callback::Event(_)));
         if let Some(k) = first {
             let ent = match &f.defeat_later[k].2 {
                 Cause::Defeat { entity, .. } => Some(*entity),
@@ -1383,7 +1704,13 @@ fn death_effects(w: &mut World, event_held: bool) {
                     }
                 }
                 if let Some(at) = ent.and_then(|e| f.pending_drops.iter().position(|d| d.1 == e)) {
-                    let later: Vec<EntityId> = f.pending_drops.iter().skip(at + 1).filter(|d| d.0 <= next).map(|d| d.1).collect();
+                    let later: Vec<EntityId> = f
+                        .pending_drops
+                        .iter()
+                        .skip(at + 1)
+                        .filter(|d| d.0 <= next)
+                        .map(|d| d.1)
+                        .collect();
                     for e in later {
                         if !f.defeat_wait.contains(&e) {
                             f.defeat_wait.push(e);
@@ -1391,7 +1718,9 @@ fn death_effects(w: &mut World, event_held: bool) {
                     }
                 }
                 let wait = f.defeat_wait.clone();
-                for d in f.defeat_later.iter_mut().filter(|d| matches!(&d.2, Cause::Defeat { entity, .. } if wait.contains(entity))) {
+                for d in f.defeat_later.iter_mut().filter(
+                    |d| matches!(&d.2, Cause::Defeat { entity, .. } if wait.contains(entity)),
+                ) {
                     d.0 = u32::MAX;
                 }
                 for d in f.pending_drops.iter_mut().filter(|d| wait.contains(&d.1)) {
@@ -1405,7 +1734,9 @@ fn death_effects(w: &mut World, event_held: bool) {
     // as run_due_drops; 3-1's robbers: the loot draws, then s126), holding the rest of the frame like defeat_runs
     let later: Vec<(Callback, Cause)> = match w.field.as_mut() {
         Some(f) if f.defeat_later.iter().any(|d| d.0 <= next) => {
-            let (due, keep): (Vec<_>, Vec<_>) = std::mem::take(&mut f.defeat_later).into_iter().partition(|d| d.0 <= next);
+            let (due, keep): (Vec<_>, Vec<_>) = std::mem::take(&mut f.defeat_later)
+                .into_iter()
+                .partition(|d| d.0 <= next);
             f.defeat_later = keep;
             due.into_iter().map(|d| (d.1, d.2)).collect()
         }
@@ -1458,7 +1789,10 @@ fn begin_fade_in(w: &mut World) {
     // a script's warp_fade arrival writes the new area's palette up from black: a script's black screen from before
     // the load is gone (1-5 f11,578: s464's fade_to_black, then warp_fade into 6-5 - it brightens with no
     // fade_from_black; exits and the world map keep theirs)
-    if w.field.as_ref().is_some_and(|f| f.script_fade_in) && !crate::fieldworld::flying(w) && w.scene.screen.fade.is_none() {
+    if w.field.as_ref().is_some_and(|f| f.script_fade_in)
+        && !crate::fieldworld::flying(w)
+        && w.scene.screen.fade.is_none()
+    {
         w.scene.screen.black = 0;
         w.scene.screen.dim = 0;
     }
@@ -1480,7 +1814,9 @@ pub fn post_step(w: &mut World) {
     let now = w.frame;
     let due: Vec<(u32, Callback, Cause)> = match w.field.as_mut() {
         Some(f) if f.queued_runs.iter().any(|q| q.0 <= now) => {
-            let (due, keep) = std::mem::take(&mut f.queued_runs).into_iter().partition(|q| q.0 <= now);
+            let (due, keep) = std::mem::take(&mut f.queued_runs)
+                .into_iter()
+                .partition(|q| q.0 <= now);
             f.queued_runs = keep;
             due
         }
@@ -1492,7 +1828,11 @@ pub fn post_step(w: &mut World) {
         }
     }
     for (_, run, cause) in due {
-        w.events.push(Event::Field(FieldEvent::Run { run, cause, slot: 0 }));
+        w.events.push(Event::Field(FieldEvent::Run {
+            run,
+            cause,
+            slot: 0,
+        }));
     }
     // the death effect whose update runs an inline hook is suspended with it: its drop countdown waits (story
     // playthrough: the coins drop 7 frames after the level-up popup closes, 8 updates after the KO)
@@ -1507,10 +1847,17 @@ pub fn post_step(w: &mut World) {
     // the same for the death effects that waited behind this one's event (`death_effects`): the interrupted pass
     // goes on with them, and the next one's event holds it again (11-24: the second robber's drop script and s373
     // come a frame after the first one's; the rest of the pass runs when the last event ends)
-    if w.field.as_ref().is_some_and(|f| f.resume_held && !f.busy && !f.defeat_wait.is_empty()) {
+    if w.field
+        .as_ref()
+        .is_some_and(|f| f.resume_held && !f.busy && !f.defeat_wait.is_empty())
+    {
         if let Some(f) = w.field.as_mut() {
             let wait = std::mem::take(&mut f.defeat_wait);
-            for d in f.defeat_later.iter_mut().filter(|d| matches!(&d.2, Cause::Defeat { entity, .. } if wait.contains(entity))) {
+            for d in f
+                .defeat_later
+                .iter_mut()
+                .filter(|d| matches!(&d.2, Cause::Defeat { entity, .. } if wait.contains(entity)))
+            {
                 d.0 = 0;
             }
             for d in f.pending_drops.iter_mut().filter(|d| wait.contains(&d.1)) {
@@ -1592,7 +1939,11 @@ pub fn post_step(w: &mut World) {
             }
         }
     }
-    let mode = w.field.as_ref().map(|f| f.mode.clone()).unwrap_or(Mode::Normal);
+    let mode = w
+        .field
+        .as_ref()
+        .map(|f| f.mode.clone())
+        .unwrap_or(Mode::Normal);
     crate::fieldobj::item_get_step(w);
     crate::fieldobj::debris_step(w);
     // Instant Transmission's pick (a modal loop of the game, player.rs `start_it`) replaces the frame: no trigger
@@ -1603,7 +1954,14 @@ pub fn post_step(w: &mut World) {
         Mode::Normal => trigger_check(w),
         // the load is waiting for its on-enter script: the screen stays black
         Mode::FadeOut { .. } if w.field.as_ref().is_some_and(|f| f.arrival.is_some()) => {}
-        Mode::FadeOut { k, to, x, y, facing, step } => {
+        Mode::FadeOut {
+            k,
+            to,
+            x,
+            y,
+            facing,
+            step,
+        } => {
             let k = k + 1;
             if k >= fade_len(step) {
                 // a script's fading warp rebuilds the player and its camera at the load: the script camera ends
@@ -1635,13 +1993,27 @@ pub fn post_step(w: &mut World) {
                     Some(ar) => {
                         ar.fade_in = true;
                         if let Some(f) = w.field.as_mut() {
-                            f.mode = Mode::FadeOut { k, to, x, y, facing, step };
+                            f.mode = Mode::FadeOut {
+                                k,
+                                to,
+                                x,
+                                y,
+                                facing,
+                                step,
+                            };
                         }
                     }
                     None => begin_fade_in(w),
                 }
             } else if let Some(f) = w.field.as_mut() {
-                f.mode = Mode::FadeOut { k, to, x, y, facing, step };
+                f.mode = Mode::FadeOut {
+                    k,
+                    to,
+                    x,
+                    y,
+                    facing,
+                    step,
+                };
             }
         }
         Mode::FadeIn { k } => {
@@ -1676,7 +2048,11 @@ pub fn post_step(w: &mut World) {
                     if let Some(f) = w.field.as_mut() {
                         f.fade_end = frame;
                     }
-                } else if w.field.as_ref().is_some_and(|f| f.resumed_at == Some(frame)) {
+                } else if w
+                    .field
+                    .as_ref()
+                    .is_some_and(|f| f.resumed_at == Some(frame))
+                {
                     // the interrupted pass already completed this frame (the event's end, before this): in the game
                     // it runs after the SetAnim - the fresh flight state's first tick is that pass's (real route
                     // 6-1 -> 0-50: s026 from Majin Buu's defeat callback, the flyer's cels from the fade's end)
@@ -1703,11 +2079,18 @@ pub fn post_step(w: &mut World) {
         }
     }
     // the script camera (scene.rs) owns player 0's camera while a script drives it
-    let scripted = if modal { crate::scene::camera_owned(w) } else { crate::scene::camera(w) };
+    let scripted = if modal {
+        crate::scene::camera_owned(w)
+    } else {
+        crate::scene::camera(w)
+    };
     if crate::fieldworld::flying(w) {
         crate::fieldworld::camera(w);
     }
-    let button = w.field.as_mut().is_some_and(|f| std::mem::take(&mut f.button_fired));
+    let button = w
+        .field
+        .as_mut()
+        .is_some_and(|f| std::mem::take(&mut f.button_fired));
     let before = w.cameras.first().map(|c| (c.x, c.y));
     if let Some(f) = w.field.as_mut() {
         f.cam_before = if button { before } else { None };
@@ -1734,19 +2117,36 @@ pub fn post_step(w: &mut World) {
 pub fn trigger_self(w: &mut World, i: usize) {
     let id = w.ents[i].id;
     let (x, y, ty) = (w.en_ref(i).a.px(), w.en_ref(i).a.py(), w.en_ref(i).ty);
-    let obj = w.field.as_ref().and_then(|f| f.placed.iter().find(|p| p.0 == id).map(|p| p.1));
+    let obj = w
+        .field
+        .as_ref()
+        .and_then(|f| f.placed.iter().find(|p| p.0 == id).map(|p| p.1));
     let cb = obj.and_then(|o| area_obj(w, o)).and_then(|d| match d.kind {
         ObjKind::Enemy { on_defeat, .. } => on_defeat,
         _ => None,
     });
-    w.events.push(Event::Field(FieldEvent::Defeated { entity: id, ty, x, y }));
+    w.events.push(Event::Field(FieldEvent::Defeated {
+        entity: id,
+        ty,
+        x,
+        y,
+    }));
     match cb {
         // callback 0x0800424F (run event): the event object joins the world's list and runs in the next frame's pass,
         // which it holds from its start (0-50's airship marker -> s017: the flyer's animation skips that frame's
         // tick, the event's first command runs a frame later)
         Some(run @ Callback::Event(_)) if w.field.as_ref().is_some_and(|f| f.host) => {
             if let Some(f) = w.field.as_mut() {
-                f.defeat_runs.push((run, Cause::Defeat { entity: id, ty, x, y, loot: None }));
+                f.defeat_runs.push((
+                    run,
+                    Cause::Defeat {
+                        entity: id,
+                        ty,
+                        x,
+                        y,
+                        loot: None,
+                    },
+                ));
             }
         }
         // the world map's patrol airships (type 141; on-defeat bytecode `run_event(509, flag)`): the event it starts
@@ -1754,25 +2154,56 @@ pub fn trigger_self(w: &mut World, i: usize) {
         // hunt: s509 -> s508 starts a logic frame after the touch; the flyer's raw 17 skips that frame's tick)
         Some(run @ Callback::Script(_))
             if w.field.as_ref().is_some_and(|f| f.host)
-                && w.data.field.as_ref().and_then(|d| w.field.as_ref().and_then(|f| d.maps.get(&f.map))).is_some_and(|m| m.three_d) =>
+                && w.data
+                    .field
+                    .as_ref()
+                    .and_then(|d| w.field.as_ref().and_then(|f| d.maps.get(&f.map)))
+                    .is_some_and(|m| m.three_d) =>
         {
             if let Some(f) = w.field.as_mut() {
-                f.defeat_runs.push((run, Cause::Defeat { entity: id, ty, x, y, loot: None }));
+                f.defeat_runs.push((
+                    run,
+                    Cause::Defeat {
+                        entity: id,
+                        ty,
+                        x,
+                        y,
+                        loot: None,
+                    },
+                ));
             }
         }
         // callback 0x0800421F (run bytecode): inline, at once
-        Some(run) => w.events.push(Event::Field(FieldEvent::Run { run, cause: Cause::Defeat { entity: id, ty, x, y, loot: None }, slot: 0 })),
+        Some(run) => w.events.push(Event::Field(FieldEvent::Run {
+            run,
+            cause: Cause::Defeat {
+                entity: id,
+                ty,
+                x,
+                y,
+                loot: None,
+            },
+            slot: 0,
+        })),
         None => {}
     }
 }
 
 /// placed enemies that are gone: defeated (their on-defeat callback runs with the loot position)
 fn defeats(w: &mut World) {
-    let placed = w.field.as_ref().map(|f| f.placed.clone()).unwrap_or_default();
+    let placed = w
+        .field
+        .as_ref()
+        .map(|f| f.placed.clone())
+        .unwrap_or_default();
     let mut keep = Vec::with_capacity(placed.len());
     let mut loot_keep = Vec::with_capacity(placed.len());
     let fd = field_data(w);
-    let area = w.field.as_ref().map(|f| (f.area.world, f.area.area)).unwrap_or_default();
+    let area = w
+        .field
+        .as_ref()
+        .map(|f| (f.area.world, f.area.area))
+        .unwrap_or_default();
     for (id, obj, lx, ly) in placed {
         match w.enemy_by_id(id) {
             Some((_, e)) if !e.defeated => {
@@ -1794,25 +2225,59 @@ fn defeats(w: &mut World) {
                         let v = crate::geom::DIR_VEC[e.last_hit_dir as usize & 3];
                         (cx, cy, v.0 << 8, v.1 << 8)
                     }
-                    None => w.field.as_ref().and_then(|f| f.placed_loot.iter().find(|l| l.0 == id)).map(|l| (l.1, l.2, l.3, l.4)).unwrap_or((lx, ly, 0, 0)),
+                    None => w
+                        .field
+                        .as_ref()
+                        .and_then(|f| f.placed_loot.iter().find(|l| l.0 == id))
+                        .map(|l| (l.1, l.2, l.3, l.4))
+                        .unwrap_or((lx, ly, 0, 0)),
                 };
-                let def = fd.area(area.0, area.1).and_then(|a| a.objects.iter().find(|o| o.at == obj));
+                let def = fd
+                    .area(area.0, area.1)
+                    .and_then(|a| a.objects.iter().find(|o| o.at == obj));
                 let (ty, cb) = match def.map(|d| &d.kind) {
                     Some(ObjKind::Enemy { ty, on_defeat, .. }) => (*ty, on_defeat.clone()),
                     // no area def: a run-time enemy (a tank's crew, `ObjRef::List(0xff, type)`) keeps its type's
                     // drop script
-                    _ => (if let ObjRef::List(0xff, t) = obj { t as i32 } else { -1 }, None),
+                    _ => (
+                        if let ObjRef::List(0xff, t) = obj {
+                            t as i32
+                        } else {
+                            -1
+                        },
+                        None,
+                    ),
                 };
                 // the dying enemy sets the loot block (0x03001010 position, 0x03001018 velocity) for its drop script and
                 // its on-defeat callback: the footprint's centre x / bottom y and 1 px per frame along the killing hit
                 // (VERIFIED 12-28: the Warlord last at (141, 88), punched rightwards -> (157, 104), (256, 0), read by
                 // his callback's spawn_map_item)
                 crate::fieldobj::set_loot(w, fx, fy, fvx, fvy);
-                w.events.push(Event::Field(FieldEvent::Defeated { entity: id, ty, x, y }));
+                w.events.push(Event::Field(FieldEvent::Defeated {
+                    entity: id,
+                    ty,
+                    x,
+                    y,
+                }));
                 // (a tank's death node 0x080333C4 passes its def +0x10 = 8 to the same handler)
                 // the type's drop script (def +0x18), run by the death effect after its delay (SelfDestruct param:
                 // story playthrough, the fighters on Grand Kai's planet drop 4 coins 8 frames after the KO)
-                let (ds, delay) = w.data.enemy(ty).map(|t| (t.drop_script, if t.death_name == "SelfDestruct" { t.death_param as u32 } else if crate::enemy::TANKS.contains(&ty) { 8 } else { 0 })).unwrap_or((0, 0));
+                let (ds, delay) = w
+                    .data
+                    .enemy(ty)
+                    .map(|t| {
+                        (
+                            t.drop_script,
+                            if t.death_name == "SelfDestruct" {
+                                t.death_param as u32
+                            } else if crate::enemy::TANKS.contains(&ty) {
+                                8
+                            } else {
+                                0
+                            },
+                        )
+                    })
+                    .unwrap_or((0, 0));
                 if ds != 0 {
                     let due = w.frame + delay;
                     if let Some(f) = w.field.as_mut() {
@@ -1823,9 +2288,28 @@ fn defeats(w: &mut World) {
                     let due = w.frame + delay;
                     if let Some(f) = w.field.as_mut() {
                         if delay > 0 {
-                            f.defeat_later.push((due, run, Cause::Defeat { entity: id, ty, x, y, loot: Some((fx, fy, fvx, fvy)) }));
+                            f.defeat_later.push((
+                                due,
+                                run,
+                                Cause::Defeat {
+                                    entity: id,
+                                    ty,
+                                    x,
+                                    y,
+                                    loot: Some((fx, fy, fvx, fvy)),
+                                },
+                            ));
                         } else {
-                            f.defeat_runs.push((run, Cause::Defeat { entity: id, ty, x, y, loot: Some((fx, fy, fvx, fvy)) }));
+                            f.defeat_runs.push((
+                                run,
+                                Cause::Defeat {
+                                    entity: id,
+                                    ty,
+                                    x,
+                                    y,
+                                    loot: Some((fx, fy, fvx, fvy)),
+                                },
+                            ));
                         }
                     }
                 }
@@ -1836,7 +2320,12 @@ fn defeats(w: &mut World) {
         f.placed = keep;
         f.placed_loot = loot_keep;
     }
-    let alive: Vec<EntityId> = w.enemies.iter().copied().filter(|&id| w.find(id).is_some()).collect();
+    let alive: Vec<EntityId> = w
+        .enemies
+        .iter()
+        .copied()
+        .filter(|&id| w.find(id).is_some())
+        .collect();
     w.enemies = alive;
 }
 
@@ -1846,7 +2335,17 @@ fn defeats(w: &mut World) {
 fn run_due_drops(w: &mut World) {
     // the frame number this update will have (the entities' update advances it)
     let frame = w.frame + 1;
-    let due: Vec<(u32, EntityId, i32, i32, i32, i32, i32)> = w.field.as_ref().map(|f| f.pending_drops.iter().copied().filter(|d| d.0 <= frame).collect()).unwrap_or_default();
+    let due: Vec<(u32, EntityId, i32, i32, i32, i32, i32)> = w
+        .field
+        .as_ref()
+        .map(|f| {
+            f.pending_drops
+                .iter()
+                .copied()
+                .filter(|d| d.0 <= frame)
+                .collect()
+        })
+        .unwrap_or_default();
     if !due.is_empty() {
         if let Some(f) = w.field.as_mut() {
             f.pending_drops.retain(|d| d.0 > frame);
@@ -1855,7 +2354,17 @@ fn run_due_drops(w: &mut World) {
             let ds = w.data.enemy(ty).map(|t| t.drop_script).unwrap_or(0);
             crate::fieldobj::set_loot(w, x, y, vx, vy);
             let run = Callback::Script(format!("inline_0x{ds:08X}"));
-            w.events.push(Event::Field(FieldEvent::Run { run, cause: Cause::Defeat { entity: id, ty, x, y, loot: Some((x, y, vx, vy)) }, slot: 0 }));
+            w.events.push(Event::Field(FieldEvent::Run {
+                run,
+                cause: Cause::Defeat {
+                    entity: id,
+                    ty,
+                    x,
+                    y,
+                    loot: Some((x, y, vx, vy)),
+                },
+                slot: 0,
+            }));
         }
     }
 }
@@ -1863,20 +2372,33 @@ fn run_due_drops(w: &mut World) {
 /// a host starts a queued run: the loot block it carries becomes the field's (drop scripts queued in one frame each
 /// drop at their own enemy)
 pub fn start_cause(w: &mut World, c: &Cause) {
-    if let Cause::Defeat { loot: Some((x, y, vx, vy)), .. } = c {
+    if let Cause::Defeat {
+        loot: Some((x, y, vx, vy)),
+        ..
+    } = c
+    {
         crate::fieldobj::set_loot(w, *x, *y, *vx, *vy);
     }
 }
 
 /// input mask of a push direction (`0x080707D8`): down, up, left, right
-const PUSH_KEY: [u16; 4] = [crate::input::DOWN, crate::input::UP, crate::input::LEFT, crate::input::RIGHT];
+const PUSH_KEY: [u16; 4] = [
+    crate::input::DOWN,
+    crate::input::UP,
+    crate::input::LEFT,
+    crate::input::RIGHT,
+];
 
 pub fn trigger_def(w: &World, obj: ObjRef) -> Option<ObjDef> {
     let fd = field_data(w);
     let f = w.field.as_ref()?;
     let a = fd.area(f.area.world, f.area.area)?;
     match obj {
-        ObjRef::Header(_) => fd.maps.get(&f.map).and_then(|m| m.exits.iter().find(|o| o.at == obj)).cloned(),
+        ObjRef::Header(_) => fd
+            .maps
+            .get(&f.map)
+            .and_then(|m| m.exits.iter().find(|o| o.at == obj))
+            .cloned(),
         _ => a.objects.iter().find(|o| o.at == obj).cloned(),
     }
 }
@@ -1931,9 +2453,17 @@ pub fn trigger_check(w: &mut World) {
             }
             let ok = match t.act {
                 Activation::Touch | Activation::TouchOnce => true,
-                Activation::Button(d) => inp.pressed & crate::input::A != 0 && d.is_none_or(|d| d == facing),
+                Activation::Button(d) => {
+                    inp.pressed & crate::input::A != 0 && d.is_none_or(|d| d == facing)
+                }
                 // the world-map flyer's altitude (22.10, exclusive bounds); no other player has one
-                Activation::Altitude(lo, hi) => w.field.as_ref().and_then(|f| f.flight.as_ref()).is_some_and(|f| (lo << 10) < f.z && f.z < (hi << 10)) || (z > lo && z < hi && z != 0),
+                Activation::Altitude(lo, hi) => {
+                    w.field
+                        .as_ref()
+                        .and_then(|f| f.flight.as_ref())
+                        .is_some_and(|f| (lo << 10) < f.z && f.z < (hi << 10))
+                        || (z > lo && z < hi && z != 0)
+                }
                 // on entry: not tested in the previous pass
                 Activation::Unknown(0x0800_7791) => {
                     let fresh = t.last.wrapping_add(1) != checks;
@@ -1967,12 +2497,19 @@ pub fn dest_menu(w: &mut World) {
     let trigs: Vec<TriggerRt> = f.triggers.clone();
     let centre = |r: &Rect| ((r.x0 + r.x1 + 15) >> 1, (r.y0 + r.y1 + 7) >> 1);
     // (key, direction vector 0x0807268C)
-    for (key, (dx, dy)) in [(crate::input::LEFT, (-1, 0)), (crate::input::RIGHT, (1, 0)), (crate::input::UP, (0, -1)), (crate::input::DOWN, (0, 1))] {
+    for (key, (dx, dy)) in [
+        (crate::input::LEFT, (-1, 0)),
+        (crate::input::RIGHT, (1, 0)),
+        (crate::input::UP, (0, -1)),
+        (crate::input::DOWN, (0, 1)),
+    ] {
         if pressed & key == 0 {
             continue;
         }
         let cur = w.scene.dest_sel;
-        let Some(c) = trigs.get(cur as usize) else { continue };
+        let Some(c) = trigs.get(cur as usize) else {
+            continue;
+        };
         let (cx, cy) = centre(&c.rect);
         let mut best = i64::from(i32::MAX);
         for (k, t) in trigs.iter().enumerate() {
@@ -2006,8 +2543,12 @@ fn fire(w: &mut World, slot: usize, k: usize, t: &TriggerRt) {
         f.check_fired = true;
     }
     let loads = w.field.as_ref().map(|f| f.loads).unwrap_or(0);
-    let Some(def) = trigger_def(w, t.obj) else { return };
-    let ObjKind::Trigger { kind, .. } = def.kind else { return };
+    let Some(def) = trigger_def(w, t.obj) else {
+        return;
+    };
+    let ObjKind::Trigger { kind, .. } = def.kind else {
+        return;
+    };
     let host = w.field.as_ref().is_some_and(|f| f.host);
     let obj = t.obj;
     let s8 = slot as u8;
@@ -2027,12 +2568,20 @@ fn fire(w: &mut World, slot: usize, k: usize, t: &TriggerRt) {
             if let Some(f) = w.field.as_mut() {
                 f.button_fired = true;
             }
-            w.events.push(Event::Field(FieldEvent::Run { run: Callback::Script(s), cause: Cause::Trigger { obj }, slot: s8 }))
+            w.events.push(Event::Field(FieldEvent::Run {
+                run: Callback::Script(s),
+                cause: Cause::Trigger { obj },
+                slot: s8,
+            }))
         }
         TriggerKind::Event(s) | TriggerKind::SavePoint(s) => {
             let _ = host;
             crate::fieldnpc::start_event(w);
-            w.events.push(Event::Field(FieldEvent::Run { run: Callback::Event(s), cause: Cause::Trigger { obj }, slot: s8 }));
+            w.events.push(Event::Field(FieldEvent::Run {
+                run: Callback::Event(s),
+                cause: Cause::Trigger { obj },
+                slot: s8,
+            }));
         }
         // message 0x17: the world map's bottom label (string id)
         TriggerKind::Message { value, .. } => {
@@ -2045,7 +2594,14 @@ fn fire(w: &mut World, slot: usize, k: usize, t: &TriggerRt) {
     // touch_once: removed after firing unless an area load happened meanwhile
     // (a region (vt 0x080499D4) stays: the game's trigger lists keep it after the player crossed it - 2-8, 14-2,
     // 15-33 ...; the list's length counts for the drops' "< 45 triggers")
-    if event && matches!(t.act, Activation::TouchOnce | Activation::Unknown(0x0800_71A7) | Activation::Unknown(0x0802_266F)) {
+    if event
+        && matches!(
+            t.act,
+            Activation::TouchOnce
+                | Activation::Unknown(0x0800_71A7)
+                | Activation::Unknown(0x0802_266F)
+        )
+    {
         if let Some(f) = w.field.as_mut() {
             if f.loads == loads {
                 f.once_pending = Some(t.obj);
@@ -2053,7 +2609,14 @@ fn fire(w: &mut World, slot: usize, k: usize, t: &TriggerRt) {
         }
         return;
     }
-    if !region && matches!(t.act, Activation::TouchOnce | Activation::Unknown(0x0800_71A7) | Activation::Unknown(0x0802_266F)) {
+    if !region
+        && matches!(
+            t.act,
+            Activation::TouchOnce
+                | Activation::Unknown(0x0800_71A7)
+                | Activation::Unknown(0x0802_266F)
+        )
+    {
         if let Some(f) = w.field.as_mut() {
             if f.loads == loads && k < f.triggers.len() && f.triggers[k].obj == t.obj {
                 f.triggers.remove(k);
@@ -2067,15 +2630,27 @@ fn fire(w: &mut World, slot: usize, k: usize, t: &TriggerRt) {
 fn exit_to(w: &mut World, slot: usize, to: Dest, push: Dir, rect: Rect, edge: bool) {
     let Some(pi) = w.player_idx(slot) else { return };
     let (px, py) = (w.pl_ref(pi).a.px(), w.pl_ref(pi).a.py());
-    let (x, y) = if edge || to.relative { (px - rect.x0 + to.x, py - rect.y0 + to.y) } else { (to.x, to.y) };
-    let facing = if edge { push } else { to.facing.unwrap_or(push) };
+    let (x, y) = if edge || to.relative {
+        (px - rect.x0 + to.x, py - rect.y0 + to.y)
+    } else {
+        (to.x, to.y)
+    };
+    let facing = if edge {
+        push
+    } else {
+        to.facing.unwrap_or(push)
+    };
     for s in 0..w.players.len() {
         if let Some(i) = w.player_idx(s) {
             w.pl(i).a.facing = push;
             player::start_autowalk(w, i);
         }
     }
-    let dest = AreaId { world: to.world, area: to.area, variant: to.variant };
+    let dest = AreaId {
+        world: to.world,
+        area: to.area,
+        variant: to.variant,
+    };
     begin_fade_out(w, dest, x, y, Some(facing));
 }
 
@@ -2094,7 +2669,12 @@ pub fn hud_beep(w: &mut World) {
     if w.scene.hud_hidden {
         // (a hidden HUD's object still updates while it slides out)
         let now = w.frame;
-        if !w.field.as_ref().and_then(|f| f.hud_hidden_at).is_some_and(|h| now.wrapping_sub(h) <= 38) {
+        if !w
+            .field
+            .as_ref()
+            .and_then(|f| f.hud_hidden_at)
+            .is_some_and(|h| now.wrapping_sub(h) <= 38)
+        {
             return;
         }
     }
@@ -2108,7 +2688,10 @@ pub fn hud_beep(w: &mut World) {
     // (this frame's count: the mark taken at its start + 1 - also from a script that runs before the frame's object
     // pass advanced `World.frame`: `show_hud` in 20-5 r061_004 f5,251)
     let now = w.g.clock_mark.map(|c| c + 1).unwrap_or(w.g.clock(w.frame)) as u32;
-    let due = w.field.as_ref().is_some_and(|f| now.wrapping_sub(f.hud_beep) as i32 > 60);
+    let due = w
+        .field
+        .as_ref()
+        .is_some_and(|f| now.wrapping_sub(f.hud_beep) as i32 > 60);
     if due {
         if let Some(f) = w.field.as_mut() {
             f.hud_beep = now;
@@ -2121,7 +2704,11 @@ pub fn hud_beep(w: &mut World) {
 /// frames), the 2D areas' by 8
 pub fn fade_in_level(w: &World, k: i32) -> i32 {
     let slow = crate::fieldworld::flying(w) || w.field.as_ref().is_some_and(|f| f.script_fade_in);
-    let step = if slow { 256 / crate::fieldworld::FADE_IN_3D } else { 8 };
+    let step = if slow {
+        256 / crate::fieldworld::FADE_IN_3D
+    } else {
+        8
+    };
     (256 - step * k).clamp(0, 256)
 }
 
@@ -2165,7 +2752,17 @@ pub fn warp_fade_slow(w: &mut World, world: i32, area: i32, variant: i32, x: i32
     // the player the load builds faces down, whatever the old one faced (a flyer: 0-21's arrival; a walker: Diablo
     // Desert Express 11-17 -> 11-18, facing left at the call)
     let _ = flying;
-    begin_fade_out(w, AreaId { world, area, variant }, x, y, Some(0));
+    begin_fade_out(
+        w,
+        AreaId {
+            world,
+            area,
+            variant,
+        },
+        x,
+        y,
+        Some(0),
+    );
     // the fade object's brightness starts moving two frames after the call (s515 at 3-1: idle at the call, black 63
     // frames later)
     if let Some(Mode::FadeOut { step, k, .. }) = w.field.as_mut().map(|f| &mut f.mode) {
@@ -2176,7 +2773,14 @@ pub fn warp_fade_slow(w: &mut World, world: i32, area: i32, variant: i32, x: i32
 
 fn begin_fade_out(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<Dir>) {
     if let Some(f) = w.field.as_mut() {
-        f.mode = Mode::FadeOut { k: 0, to, x, y, facing, step: 0 };
+        f.mode = Mode::FadeOut {
+            k: 0,
+            to,
+            x,
+            y,
+            facing,
+            step: 0,
+        };
     }
     w.events.push(Event::Field(FieldEvent::Transition { to }));
 }
@@ -2186,7 +2790,11 @@ fn begin_fade_out(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<Dir>
 
 /// `warp(world, area, variant, x, y)` (immediate load) / `warp_fade` (fade-out first)
 pub fn warp(w: &mut World, world: i32, area: i32, variant: i32, x: i32, y: i32, fade: bool) {
-    let to = AreaId { world, area, variant };
+    let to = AreaId {
+        world,
+        area,
+        variant,
+    };
     if w.field.is_none() {
         return;
     }
@@ -2237,14 +2845,26 @@ pub fn is_event_trigger(w: &World, obj: ObjRef) -> bool {
 }
 
 fn slot_trigger(w: &World, obj: ObjRef) -> bool {
-    trigger_def(w, obj).is_some_and(|d| matches!(d.kind, ObjKind::Trigger { kind: TriggerKind::Event(_), .. }))
+    trigger_def(w, obj).is_some_and(|d| {
+        matches!(
+            d.kind,
+            ObjKind::Trigger {
+                kind: TriggerKind::Event(_),
+                ..
+            }
+        )
+    })
 }
 
 /// the resume node an event started by `cause` begins at (`TriggerRt::resume` / `Npc::resume`); 0 for every other
 /// start (the scene runner `0x08012588` passes a zeroed local: callbacks, queued and nested events, save points)
 pub fn resume_node(w: &World, cause: &Cause) -> u16 {
     match cause {
-        Cause::Trigger { obj } if slot_trigger(w, *obj) => w.field.as_ref().and_then(|f| f.triggers.iter().find(|t| t.obj == *obj)).map_or(0, |t| t.resume),
+        Cause::Trigger { obj } if slot_trigger(w, *obj) => w
+            .field
+            .as_ref()
+            .and_then(|f| f.triggers.iter().find(|t| t.obj == *obj))
+            .map_or(0, |t| t.resume),
         Cause::Talk { npc } => match w.find(*npc).map(|i| &w.ents[i]) {
             Some(e) if !e.removed => match &e.body {
                 Body::Npc(n) => n.resume,
@@ -2260,7 +2880,11 @@ pub fn resume_node(w: &World, cause: &Cause) -> u16 {
 pub fn set_resume_node(w: &mut World, cause: &Cause, v: u16) {
     match cause {
         Cause::Trigger { obj } if slot_trigger(w, *obj) => {
-            if let Some(t) = w.field.as_mut().and_then(|f| f.triggers.iter_mut().find(|t| t.obj == *obj)) {
+            if let Some(t) = w
+                .field
+                .as_mut()
+                .and_then(|f| f.triggers.iter_mut().find(|t| t.obj == *obj))
+            {
                 t.resume = v;
             }
         }
@@ -2284,9 +2908,21 @@ pub fn refresh_triggers(w: &mut World) {
     let (world, area, map) = (f.area.world, f.area.area, f.map.clone());
     f.triggers.clear();
     f.once_pending = None;
-    let Some(a) = fd.area(world, area) else { return };
-    let exits = fd.maps.get(&map).map(|m| m.exits.clone()).unwrap_or_default();
-    let list: Vec<ObjDef> = a.objects.iter().filter(|o| list_of(o) == 0).cloned().chain(exits).collect();
+    let Some(a) = fd.area(world, area) else {
+        return;
+    };
+    let exits = fd
+        .maps
+        .get(&map)
+        .map(|m| m.exits.clone())
+        .unwrap_or_default();
+    let list: Vec<ObjDef> = a
+        .objects
+        .iter()
+        .filter(|o| list_of(o) == 0)
+        .cloned()
+        .chain(exits)
+        .collect();
     for o in &list {
         if cond_holds(w, &o.cond) {
             spawn_object(w, o);
@@ -2299,14 +2935,32 @@ pub fn refresh_triggers(w: &mut World) {
 pub fn respawn_breakables(w: &mut World) {
     let fd = field_data(w);
     let Some(f) = w.field.as_ref() else { return };
-    let Some(a) = fd.area(f.area.world, f.area.area) else { return };
-    for o in a.objects.iter().filter(|o| matches!(o.kind, ObjKind::Breakable { .. })) {
-        let exists = w.ents.iter().any(|e| !e.removed && matches!(&e.body, Body::Breakable(b) if b.obj == o.at));
+    let Some(a) = fd.area(f.area.world, f.area.area) else {
+        return;
+    };
+    for o in a
+        .objects
+        .iter()
+        .filter(|o| matches!(o.kind, ObjKind::Breakable { .. }))
+    {
+        let exists = w
+            .ents
+            .iter()
+            .any(|e| !e.removed && matches!(&e.body, Body::Breakable(b) if b.obj == o.at));
         if !exists && cond_holds(w, &o.cond) {
             // its map prop shows again (a break hid it)
             if let ObjKind::Breakable { prop, .. } = &o.kind {
-                let vis = fd.maps.get(&w.field.as_ref().unwrap().map).and_then(|m| m.props.get(*prop as usize)).map(|p| p.visible).unwrap_or(true);
-                if let Some(p) = w.field.as_mut().and_then(|f| f.props.get_mut(*prop as usize)) {
+                let vis = fd
+                    .maps
+                    .get(&w.field.as_ref().unwrap().map)
+                    .and_then(|m| m.props.get(*prop as usize))
+                    .map(|p| p.visible)
+                    .unwrap_or(true);
+                if let Some(p) = w
+                    .field
+                    .as_mut()
+                    .and_then(|f| f.props.get_mut(*prop as usize))
+                {
                     p.visible = vis;
                 }
             }
@@ -2317,8 +2971,12 @@ pub fn respawn_breakables(w: &mut World) {
 
 /// the current map has the props object (`0x0800D15A`, the first object of the area's list; not an entity here)
 pub fn props_object(w: &World) -> bool {
-    let (Some(f), Some(fd)) = (w.field.as_ref(), w.data.field.as_ref()) else { return false };
-    fd.maps.get(&f.map).is_some_and(|m| m.prop_tile_bytes > 0 || !m.props.is_empty())
+    let (Some(f), Some(fd)) = (w.field.as_ref(), w.data.field.as_ref()) else {
+        return false;
+    };
+    fd.maps
+        .get(&f.map)
+        .is_some_and(|m| m.prop_tile_bytes > 0 || !m.props.is_empty())
 }
 
 /// The event a talk started (inside the player's update, list index `k`) loaded another area and has ended: the
@@ -2326,7 +2984,9 @@ pub fn props_object(w: &World) -> bool {
 /// the objects below `k` get this frame's update a second time (Earth 7-3, the real run: s288 -> warp to 7-6 ->
 /// s303; the four NPCs and the player at indices 0..4 tick twice in its exit frame, the rest once).
 pub fn resume_pass_after_load(w: &mut World) {
-    let Some((k, loads)) = w.field.as_mut().and_then(|f| f.talk_pass.take()) else { return };
+    let Some((k, loads)) = w.field.as_mut().and_then(|f| f.talk_pass.take()) else {
+        return;
+    };
     if w.field.as_ref().is_some_and(|f| f.loads == loads) {
         return;
     }
@@ -2336,7 +2996,11 @@ pub fn resume_pass_after_load(w: &mut World) {
     // so the pass runs on down to index 0 and every object gets its second update (the real run's 7-6, s304's exit:
     // the null object's update 9 times, then Spopovich - his idle starts, rand(255) - Hercule and the player). A
     // text box's exit is the held update instead (`resume_held`, the same pass; 4-20 #5 -> 7-1: the player once).
-    if k > live.len() + props_object(w) as usize && w.field.as_ref().is_some_and(|f| f.held_event || f.resume_held) {
+    if k > live.len() + props_object(w) as usize
+        && w.field
+            .as_ref()
+            .is_some_and(|f| f.held_event || f.resume_held)
+    {
         return;
     }
     let k = k.saturating_sub(props_object(w) as usize);
@@ -2393,7 +3057,11 @@ pub fn set_busy(w: &mut World, busy: bool) {
 pub fn queue_run(w: &mut World, run: Callback, cause: Cause) {
     match w.field.as_mut() {
         Some(f) => f.queued_runs.push((w.frame + 1, run, cause)),
-        None => w.events.push(Event::Field(FieldEvent::Run { run, cause, slot: 0 })),
+        None => w.events.push(Event::Field(FieldEvent::Run {
+            run,
+            cause,
+            slot: 0,
+        })),
     }
 }
 
@@ -2401,7 +3069,11 @@ pub fn queue_run(w: &mut World, run: Callback, cause: Cause) {
 /// ended without starting an event: the frame's update runs after all (the game ran the callback inline, nothing
 /// blocked)
 pub fn release_unstarted_hold(w: &mut World) {
-    if let Some(f) = w.field.as_mut().filter(|f| f.held && f.held_event && !f.busy) {
+    if let Some(f) = w
+        .field
+        .as_mut()
+        .filter(|f| f.held && f.held_event && !f.busy)
+    {
         f.held_event = false;
         f.resume_held = true;
     }

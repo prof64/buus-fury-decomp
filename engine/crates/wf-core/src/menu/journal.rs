@@ -6,7 +6,9 @@
 //! LEFT / RIGHT pick the list (tab headers `0x08015C62`), the UP / DOWN prompts scroll it (3 entries shown, each
 //! word-wrapped to 176 px and centred on its row by its line count, with its star), L → Options, R → Status.
 
-use super::kit::{self, Button, Container, Font, Label, TabBox, Widget, BTN_B, BTN_DOWN, BTN_L, BTN_R, BTN_UP};
+use super::kit::{
+    self, Button, Container, Font, Label, TabBox, Widget, BTN_B, BTN_DOWN, BTN_L, BTN_R, BTN_UP,
+};
 use super::text::{count_lines, Canvas, Pen};
 use super::{Action, MenuData, Page, Screen};
 use crate::world::World;
@@ -17,7 +19,11 @@ use wf_view::{MenuFont, MenuView};
 pub const REDRAW_FRAMES: u8 = 4;
 
 /// star pictures by the quest's star byte (`0x086B8028`)
-const STARS: [&str; 3] = ["ui/images/star_gold.png", "ui/images/star_silver.png", "ui/images/star_bronze.png"];
+const STARS: [&str; 3] = [
+    "ui/images/star_gold.png",
+    "ui/images/star_silver.png",
+    "ui/images/star_bronze.png",
+];
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Journal {
@@ -60,19 +66,55 @@ impl Journal {
             }
         }
         let mut c = Container::default();
-        c.add(Widget::Button(Button::new(BTN_B, 0xC, 0x84, 1, true, false)));
-        c.add(Widget::Label(Label { x: 0x1C, y: 0x90, text: t.s(26).to_vec(), colour: 5, align: 0, font: Font::Menu }));
+        c.add(Widget::Button(Button::new(
+            BTN_B, 0xC, 0x84, 1, true, false,
+        )));
+        c.add(Widget::Label(Label {
+            x: 0x1C,
+            y: 0x90,
+            text: t.s(26).to_vec(),
+            colour: 5,
+            align: 0,
+            font: Font::Menu,
+        }));
         c.add(Widget::Button(Button::new(BTN_L, 8, 8, 6, true, false)));
         c.add(Widget::Button(Button::new(BTN_R, 0xD0, 8, 7, true, false)));
-        c.add(Widget::Label(Label { x: 0x22, y: 0x14, text: t.s(2).to_vec(), colour: 2, align: 0, font: Font::Menu }));
-        c.add(Widget::Label(Label { x: 0xCE, y: 0x14, text: t.s(28).to_vec(), colour: 2, align: 2, font: Font::Menu }));
-        let up = c.add(Widget::Button(Button::new(BTN_UP, 0xD4, 0x28, 2, true, false)));
-        let down = c.add(Widget::Button(Button::new(BTN_DOWN, 0xD4, 0x70, 3, true, false)));
+        c.add(Widget::Label(Label {
+            x: 0x22,
+            y: 0x14,
+            text: t.s(2).to_vec(),
+            colour: 2,
+            align: 0,
+            font: Font::Menu,
+        }));
+        c.add(Widget::Label(Label {
+            x: 0xCE,
+            y: 0x14,
+            text: t.s(28).to_vec(),
+            colour: 2,
+            align: 2,
+            font: Font::Menu,
+        }));
+        let up = c.add(Widget::Button(Button::new(
+            BTN_UP, 0xD4, 0x28, 2, true, false,
+        )));
+        let down = c.add(Widget::Button(Button::new(
+            BTN_DOWN, 0xD4, 0x70, 3, true, false,
+        )));
         let t0 = TabBox::new(t, 0x18, 0x20, t.s(31), true);
         let x1 = t0.rect[2] - t0.rect[0] + 0x1C;
         let tab0 = c.add(Widget::TabBox(t0));
         let tab1 = c.add(Widget::TabBox(TabBox::new(t, x1, 0x20, t.s(32), false)));
-        Journal { c, tab: 0, scroll: 0, goals, done, up, down, tabs: [tab0, tab1] }
+        Journal {
+            c,
+            tab: 0,
+            scroll: 0,
+            goals,
+            done,
+            up,
+            down,
+            tabs: [tab0, tab1],
+        }
     }
 
     fn list(&self) -> &[(u8, u16)] {
@@ -111,23 +153,31 @@ impl Page for Journal {
         }
     }
     fn step(&mut self, w: &mut World) -> Action {
-        let (consumed, act) = kit::run_step(self, w, |p| &mut p.c, |p, w, _src, code| match code {
-            1 => {
-                w.sfx(super::SFX_MENU, 64);
-                (true, Some(Action::Close))
-            }
-            2 | 3 => {
-                p.scroll += if code == 2 { -1 } else { 1 };
-                w.sfx(super::SFX_CURSOR, 64);
-                p.c.drawn = false;
-                (false, None)
-            }
-            6 | 7 => {
-                w.sfx(super::SFX_MENU, 64);
-                (true, Some(Action::Replace(super::page_screen(w, 4, code == 7))))
-            }
-            _ => (false, None),
-        });
+        let (consumed, act) = kit::run_step(
+            self,
+            w,
+            |p| &mut p.c,
+            |p, w, _src, code| match code {
+                1 => {
+                    w.sfx(super::SFX_MENU, 64);
+                    (true, Some(Action::Close))
+                }
+                2 | 3 => {
+                    p.scroll += if code == 2 { -1 } else { 1 };
+                    w.sfx(super::SFX_CURSOR, 64);
+                    p.c.drawn = false;
+                    (false, None)
+                }
+                6 | 7 => {
+                    w.sfx(super::SFX_MENU, 64);
+                    (
+                        true,
+                        Some(Action::Replace(super::page_screen(w, 4, code == 7))),
+                    )
+                }
+                _ => (false, None),
+            },
+        );
         if let Some(a) = act {
             return a;
         }
@@ -192,7 +242,16 @@ impl Page for Journal {
         Some(2_784)
     }
     fn redraw_time(&self, w: &World, d: &MenuData) -> Option<crate::sndsim::Redraw> {
-        Some(super::page_time(d, &self.view(w, d), !self.c.ever, 2_784, 184_670, 882, 597, 188_273))
+        Some(super::page_time(
+            d,
+            &self.view(w, d),
+            !self.c.ever,
+            2_784,
+            184_670,
+            882,
+            597,
+            188_273,
+        ))
     }
 }
 

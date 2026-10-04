@@ -59,7 +59,17 @@ pub struct Button {
 
 impl Button {
     pub fn new(btn: u8, x: i32, y: i32, code: i32, enabled: bool, repeat: bool) -> Button {
-        Button { btn, x, y, code, enabled, repeat, visible: true, countdown: 0, interval: 0 }
+        Button {
+            btn,
+            x,
+            y,
+            code,
+            enabled,
+            repeat,
+            visible: true,
+            countdown: 0,
+            interval: 0,
+        }
     }
 }
 
@@ -207,7 +217,11 @@ pub struct TabBox {
 impl TabBox {
     pub fn new(t: &TextData, x: i32, y: i32, text: &[u16], active: bool) -> TabBox {
         let w = t.font(MenuFont::Small).measure(text);
-        TabBox { rect: [x, y, x + w + 6, y + 10], text: text.to_vec(), active }
+        TabBox {
+            rect: [x, y, x + w + 6, y + 10],
+            text: text.to_vec(),
+            active,
+        }
     }
 }
 
@@ -215,7 +229,11 @@ impl Slider {
     /// `0x080068B8`: fill = value * w / max; row 0 and 4 the top / bottom edges, rows 1..3 the bar
     pub fn draw(&self, cv: &mut Canvas) {
         let (x0, y, w) = (self.x0, self.y, self.w);
-        let f = if self.max != 0 { self.value * w / self.max } else { 0 };
+        let f = if self.max != 0 {
+            self.value * w / self.max
+        } else {
+            0
+        };
         let hl = |cv: &mut Canvas, x: i32, y: i32, n: i32, c: u8| {
             if n > 0 {
                 cv.fill(x, y, x + n, y + 1, c);
@@ -288,7 +306,12 @@ pub enum Input {
     /// done: whether a child consumed the input
     Done(bool),
     /// child `src` sent `code`; the dispatch resumes at `next` unless it is consumed
-    Event { src: usize, code: i32, mode: EvMode, next: usize },
+    Event {
+        src: usize,
+        code: i32,
+        mode: EvMode,
+        next: usize,
+    },
 }
 
 impl Container {
@@ -334,13 +357,25 @@ impl Container {
                 return Input::Done(true);
             }
             return match self.input(f, k, sfx) {
-                (_, Some((code, mode))) => Input::Event { src: f, code, mode, next: usize::MAX },
+                (_, Some((code, mode))) => Input::Event {
+                    src: f,
+                    code,
+                    mode,
+                    next: usize::MAX,
+                },
                 (c, None) => Input::Done(c),
             };
         }
         for i in start..self.kids.len() {
             match self.input(i, k, sfx) {
-                (_, Some((code, mode))) => return Input::Event { src: i, code, mode, next: i + 1 },
+                (_, Some((code, mode))) => {
+                    return Input::Event {
+                        src: i,
+                        code,
+                        mode,
+                        next: i + 1,
+                    }
+                }
                 (true, None) => return Input::Done(true),
                 _ => {}
             }
@@ -434,7 +469,9 @@ impl Container {
                 let left = t.left;
                 // 0x08016188: only when the arrow buttons are hidden (all tabs fit); never consumes
                 let arrows = matches!(self.kids.get(left), Some(Widget::Button(b)) if b.visible);
-                let Widget::Tabs(t) = &mut self.kids[i] else { unreachable!() };
+                let Widget::Tabs(t) = &mut self.kids[i] else {
+                    unreachable!()
+                };
                 if arrows {
                     return (false, None);
                 }
@@ -565,7 +602,8 @@ impl Container {
                 Widget::TabBox(tb) => {
                     let c = TAB_COLOURS[tb.active as usize];
                     tab_box(cv, tb.rect[0], tb.rect[1], tb.rect[2], tb.rect[3], c);
-                    let mut p = Pen::new(MenuFont::Small, tb.rect[0] + 3, tb.rect[1] + 8, 0, 2, None);
+                    let mut p =
+                        Pen::new(MenuFont::Small, tb.rect[0] + 3, tb.rect[1] + 8, 0, 2, None);
                     cv.text(t, &mut p, &tb.text);
                 }
             }
@@ -582,7 +620,11 @@ pub fn run_step<P>(
     c: fn(&mut P) -> &mut Container,
     mut h: impl FnMut(&mut P, &mut crate::world::World, usize, i32) -> (bool, Option<super::Action>),
 ) -> (bool, Option<super::Action>) {
-    let k = Keys { held: w.menu.held, pressed: w.menu.pressed, released: w.menu.released };
+    let k = Keys {
+        held: w.menu.held,
+        pressed: w.menu.pressed,
+        released: w.menu.released,
+    };
     c(p).step_children();
     let mut start = 0;
     loop {
@@ -593,7 +635,12 @@ pub fn run_step<P>(
         }
         match r {
             Input::Done(consumed) => return (consumed, None),
-            Input::Event { src, code, mode, next } => {
+            Input::Event {
+                src,
+                code,
+                mode,
+                next,
+            } => {
                 let (answer, act) = h(p, w, src, code);
                 if act.is_some() {
                     return (true, act);
@@ -614,7 +661,12 @@ pub fn run_step<P>(
 
 /// `0x08005FD4`: UP / DOWN / LEFT / RIGHT (in that priority) to a neighbour id >= 0
 fn nav_move(nav: &[i32; 4], pressed: u16) -> Option<i32> {
-    for (bit, to) in [(UP, nav[0]), (DOWN, nav[1]), (LEFT, nav[2]), (RIGHT, nav[3])] {
+    for (bit, to) in [
+        (UP, nav[0]),
+        (DOWN, nav[1]),
+        (LEFT, nav[2]),
+        (RIGHT, nav[3]),
+    ] {
         if pressed & bit != 0 {
             return if to >= 0 { Some(to) } else { None };
         }
@@ -627,12 +679,30 @@ const TAB_COLOURS: [[u8; 4]; 2] = [[0x44, 0x0A, 0x03, 0x21], [0x1E, 0x35, 0x06, 
 
 impl Tabs {
     pub fn new(id: i32, rect: [i32; 4], code: i32, left: usize, right: usize) -> Tabs {
-        Tabs { id, nav: [-1; 4], rect, code, tabs: Vec::new(), first: 0, end: 0, cur: 0, mark: 0, x0: 0, laid_out: false, left, right }
+        Tabs {
+            id,
+            nav: [-1; 4],
+            rect,
+            code,
+            tabs: Vec::new(),
+            first: 0,
+            end: 0,
+            cur: 0,
+            mark: 0,
+            x0: 0,
+            laid_out: false,
+            left,
+            right,
+        }
     }
     /// `0x08015FFC`
     pub fn push(&mut self, t: &TextData, text: &[u16], value: i32) {
         let w = t.font(MenuFont::Small).measure(text);
-        self.tabs.push(Tab { text: text.to_vec(), value, w });
+        self.tabs.push(Tab {
+            text: text.to_vec(),
+            value,
+            w,
+        });
         self.laid_out = false;
     }
     fn n(&self) -> i32 {
@@ -655,7 +725,10 @@ impl Tabs {
         }
     }
     pub fn value(&self) -> i32 {
-        self.tabs.get(self.cur as usize).map(|t| t.value).unwrap_or(0)
+        self.tabs
+            .get(self.cur as usize)
+            .map(|t| t.value)
+            .unwrap_or(0)
     }
     /// shown range and x of the first tab after a scroll (`0x08015E94` / `0x08015F1C` tail): end grows while the
     /// tabs fit in width - 40, tabs centred
@@ -768,31 +841,72 @@ pub fn page_frame(t: &TextData, cv: &mut Canvas, title: usize) {
 }
 
 /// the pause pages in L / R order with their title string ids
-pub const PAGES: [usize; 5] = [28 /* Status */, 33 /* Inventory */, 36 /* Equip */, 39 /* Options: "Pause" */, 30 /* Journal */];
+pub const PAGES: [usize; 5] = [
+    28, /* Status */
+    33, /* Inventory */
+    36, /* Equip */
+    39, /* Options: "Pause" */
+    30, /* Journal */
+];
 
 /// page header children (`0x08014DC2` and the other pages' enter): L / R prompts at (8, 8) / (208, 8) (codes 6 / 7),
 /// the previous page's name at (34, 20) and the next one's right-aligned at (206, 20), menu font, colour 2
 pub fn page_header(c: &mut Container, t: &TextData, prev: usize, next: usize) {
     c.add(Widget::Button(Button::new(BTN_L, 8, 8, 6, true, false)));
     c.add(Widget::Button(Button::new(BTN_R, 0xD0, 8, 7, true, false)));
-    c.add(Widget::Label(Label { x: 0x22, y: 0x14, text: t.s(prev).to_vec(), colour: 2, align: 0, font: Font::Menu }));
-    c.add(Widget::Label(Label { x: 0xCE, y: 0x14, text: t.s(next).to_vec(), colour: 2, align: 2, font: Font::Menu }));
+    c.add(Widget::Label(Label {
+        x: 0x22,
+        y: 0x14,
+        text: t.s(prev).to_vec(),
+        colour: 2,
+        align: 0,
+        font: Font::Menu,
+    }));
+    c.add(Widget::Label(Label {
+        x: 0xCE,
+        y: 0x14,
+        text: t.s(next).to_vec(),
+        colour: 2,
+        align: 2,
+        font: Font::Menu,
+    }));
 }
 
 /// `0x08014C5C(page, a_str, b_str)`: the A / B prompts at the bottom: A icon at (12, 0x84) + its label at (0x1C, 0x90),
 /// B icon after it (x = width(a label) + 0x20) + label 16 px right; menu font colour 5. Returns the child indices
 /// (a button, b button, a label, b label).
-pub fn ab_prompts(c: &mut Container, t: &TextData, a_str: usize, b_str: usize) -> [Option<usize>; 4] {
+pub fn ab_prompts(
+    c: &mut Container,
+    t: &TextData,
+    a_str: usize,
+    b_str: usize,
+) -> [Option<usize>; 4] {
     let mut out = [None; 4];
     let mut x = 0xC;
     if a_str != 0 {
-        out[0] = Some(c.add(Widget::Button(Button::new(BTN_A, 0xC, 0x84, 0, true, false))));
-        out[2] = Some(c.add(Widget::Label(Label { x: 0x1C, y: 0x90, text: t.s(a_str).to_vec(), colour: 5, align: 0, font: Font::Menu })));
+        out[0] = Some(c.add(Widget::Button(Button::new(
+            BTN_A, 0xC, 0x84, 0, true, false,
+        ))));
+        out[2] = Some(c.add(Widget::Label(Label {
+            x: 0x1C,
+            y: 0x90,
+            text: t.s(a_str).to_vec(),
+            colour: 5,
+            align: 0,
+            font: Font::Menu,
+        })));
         x = t.font(MenuFont::Menu).measure(t.s(a_str)) + 0x20;
     }
     if b_str != 0 {
         out[1] = Some(c.add(Widget::Button(Button::new(BTN_B, x, 0x84, 1, true, false))));
-        out[3] = Some(c.add(Widget::Label(Label { x: x + 0x10, y: 0x90, text: t.s(b_str).to_vec(), colour: 5, align: 0, font: Font::Menu })));
+        out[3] = Some(c.add(Widget::Label(Label {
+            x: x + 0x10,
+            y: 0x90,
+            text: t.s(b_str).to_vec(),
+            colour: 5,
+            align: 0,
+            font: Font::Menu,
+        })));
     }
     out
 }
@@ -809,22 +923,39 @@ impl StubPage {
         let t = &w.data.menu.as_ref().expect("menu content").text;
         let mut c = Container::default();
         let n = PAGES.len();
-        page_header(&mut c, t, PAGES[(page as usize + n - 1) % n], PAGES[(page as usize + 1) % n]);
+        page_header(
+            &mut c,
+            t,
+            PAGES[(page as usize + n - 1) % n],
+            PAGES[(page as usize + 1) % n],
+        );
         ab_prompts(&mut c, t, 0, 26);
         StubPage { page, c }
     }
     pub fn step_stub(&mut self, w: &mut crate::world::World) -> super::Action {
-        let (consumed, act) = run_step(self, w, |p| &mut p.c, |p, w, _src, code| match code {
-            1 => {
-                w.sfx(super::SFX_MENU, 64);
-                (true, Some(super::Action::Close))
-            }
-            6 | 7 => {
-                w.sfx(super::SFX_MENU, 64);
-                (true, Some(super::Action::Replace(super::page_screen(w, p.page, code == 7))))
-            }
-            _ => (false, None),
-        });
+        let (consumed, act) = run_step(
+            self,
+            w,
+            |p| &mut p.c,
+            |p, w, _src, code| match code {
+                1 => {
+                    w.sfx(super::SFX_MENU, 64);
+                    (true, Some(super::Action::Close))
+                }
+                6 | 7 => {
+                    w.sfx(super::SFX_MENU, 64);
+                    (
+                        true,
+                        Some(super::Action::Replace(super::page_screen(
+                            w,
+                            p.page,
+                            code == 7,
+                        ))),
+                    )
+                }
+                _ => (false, None),
+            },
+        );
         if let Some(a) = act {
             return a;
         }

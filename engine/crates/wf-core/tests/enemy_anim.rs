@@ -24,7 +24,8 @@ impl Host for H<'_> {
         match self.rq.pop_front() {
             Some(v) => v.unwrap_or(0),
             None => {
-                self.bad.get_or_insert(format!("tick {}: unexpected rand({n})", self.tick));
+                self.bad
+                    .get_or_insert(format!("tick {}: unexpected rand({n})", self.tick));
                 0
             }
         }
@@ -57,22 +58,65 @@ fn enemy_animation_model_vs_emulator() {
     let (mut total, mut skipped_all, mut n) = (0, 0, 0);
     let mut fails = vec![];
     for tr in t["traces"].as_array().unwrap() {
-        let name = format!("{} {}", tr["name"].as_str().unwrap(), tr["label"].as_str().unwrap_or(""));
+        let name = format!(
+            "{} {}",
+            tr["name"].as_str().unwrap(),
+            tr["label"].as_str().unwrap_or("")
+        );
         let ty = tr["type"].as_i64().unwrap() as i32;
-        let rows: Vec<(i32, i32)> = rle(&tr["rows"], |x| (x[0].as_i64().unwrap() as i32, x[1].as_i64().unwrap() as i32));
+        let rows: Vec<(i32, i32)> = rle(&tr["rows"], |x| {
+            (x[0].as_i64().unwrap() as i32, x[1].as_i64().unwrap() as i32)
+        });
         let defs: Vec<String> = rle(&tr["defs"], |x| x[0].as_str().unwrap().to_string());
-        let nf: BTreeMap<String, BTreeMap<i32, i32>> = tr["nframes"].as_object().unwrap().iter().map(|(k, v)| (k.clone(), v.as_object().unwrap().iter().map(|(r, n)| (r.parse().unwrap(), n.as_i64().unwrap() as i32)).collect())).collect();
-        let canon: BTreeMap<String, BTreeMap<i32, i32>> = tr["canon"].as_object().unwrap().iter().map(|(k, v)| (k.clone(), v.as_object().unwrap().iter().map(|(r, n)| (r.parse().unwrap(), n.as_i64().unwrap() as i32)).collect())).collect();
+        let nf: BTreeMap<String, BTreeMap<i32, i32>> = tr["nframes"]
+            .as_object()
+            .unwrap()
+            .iter()
+            .map(|(k, v)| {
+                (
+                    k.clone(),
+                    v.as_object()
+                        .unwrap()
+                        .iter()
+                        .map(|(r, n)| (r.parse().unwrap(), n.as_i64().unwrap() as i32))
+                        .collect(),
+                )
+            })
+            .collect();
+        let canon: BTreeMap<String, BTreeMap<i32, i32>> = tr["canon"]
+            .as_object()
+            .unwrap()
+            .iter()
+            .map(|(k, v)| {
+                (
+                    k.clone(),
+                    v.as_object()
+                        .unwrap()
+                        .iter()
+                        .map(|(r, n)| (r.parse().unwrap(), n.as_i64().unwrap() as i32))
+                        .collect(),
+                )
+            })
+            .collect();
         let empty = BTreeMap::new();
         let init = tr["init"].as_array().unwrap();
-        let mut ea = EnemyAnim { pos: AnimPos { raw: init[0].as_i64().unwrap() as i32, frame: init[1].as_i64().unwrap() as i32, tick: init[2].as_i64().unwrap() as i32 }, ..Default::default() };
+        let mut ea = EnemyAnim {
+            pos: AnimPos {
+                raw: init[0].as_i64().unwrap() as i32,
+                frame: init[1].as_i64().unwrap() as i32,
+                tick: init[2].as_i64().unwrap() as i32,
+            },
+            ..Default::default()
+        };
         let ctl0 = init[3].as_str().unwrap();
         let r0 = ar.for_controller(ctl0, ty);
         ea.rule = r0.unwrap_or(ar.keep);
         let mut known = r0.is_some();
         let mut cmds: BTreeMap<usize, Vec<&Value>> = BTreeMap::new();
         for c in tr["cmds"].as_array().unwrap() {
-            cmds.entry(c[0].as_u64().unwrap() as usize).or_default().push(c);
+            cmds.entry(c[0].as_u64().unwrap() as usize)
+                .or_default()
+                .push(c);
         }
         let mut skip_at = BTreeMap::new();
         let mut reenter_at = BTreeMap::new();
@@ -86,9 +130,18 @@ fn enemy_animation_model_vs_emulator() {
         }
         let mut rand_at: BTreeMap<usize, Vec<Option<i32>>> = BTreeMap::new();
         for r in tr["rand"].as_array().unwrap() {
-            rand_at.entry(r[0].as_u64().unwrap() as usize).or_default().push(r[2].as_i64().map(|v| v as i32));
+            rand_at
+                .entry(r[0].as_u64().unwrap() as usize)
+                .or_default()
+                .push(r[2].as_i64().map(|v| v as i32));
         }
-        let mut h = H { nf: &empty, rq: VecDeque::new(), tick: 0, sfx: vec![], bad: None };
+        let mut h = H {
+            nf: &empty,
+            rq: VecDeque::new(),
+            tick: 0,
+            sfx: vec![],
+            bad: None,
+        };
         let (mut compared, mut skipped) = (0, 0);
         let mut bad: Option<String> = None;
         for tick in 1..rows.len() {
@@ -99,7 +152,10 @@ fn enemy_animation_model_vs_emulator() {
                 h.rq.push_back(*v);
             }
             let cs: Vec<&Value> = cmds.get(&tick).cloned().unwrap_or_default();
-            let mut apply = |c: &Value, ea: &mut EnemyAnim, h: &mut H, known: &mut bool| match c[2].as_str().unwrap() {
+            let mut apply = |c: &Value, ea: &mut EnemyAnim, h: &mut H, known: &mut bool| match c[2]
+                .as_str()
+                .unwrap()
+            {
                 "anim" => {
                     let (raw, r) = setanim(c[3].as_u64().unwrap() as usize);
                     ea.enter(&ar.rules, raw, r, h);
@@ -127,7 +183,11 @@ fn enemy_animation_model_vs_emulator() {
             }
             let end_cmd = cs.iter().any(|c| c[1].as_str() == Some("end"));
             let sk = skip_at.get(&tick).copied();
-            let mut res = if sk == Some(0) { Tick::None } else { ea.tick(&ar.rules, &mut h) };
+            let mut res = if sk == Some(0) {
+                Tick::None
+            } else {
+                ea.tick(&ar.rules, &mut h)
+            };
             if sk == Some(2) && matches!(res, Tick::None) {
                 res = ea.tick(&ar.rules, &mut h);
             }
@@ -135,7 +195,9 @@ fn enemy_animation_model_vs_emulator() {
             if idle || end_cmd {
                 let r = &ar.rules[ea.rule as usize];
                 if !idle && r.kind == wf_core::eanim::RuleKind::Seq && r.fixed != Some(false) {
-                    bad = Some(format!("tick {tick}: the game ended the fixed-length state, the model did not"));
+                    bad = Some(format!(
+                        "tick {tick}: the game ended the fixed-length state, the model did not"
+                    ));
                     break;
                 }
                 let (raw, r) = setanim(0);
@@ -158,18 +220,33 @@ fn enemy_animation_model_vs_emulator() {
                 skipped += 1;
                 continue;
             }
-            let c = canon.get(&defs[tick]).and_then(|m| m.get(&ea.pos.raw)).copied().unwrap_or(ea.pos.raw);
+            let c = canon
+                .get(&defs[tick])
+                .and_then(|m| m.get(&ea.pos.raw))
+                .copied()
+                .unwrap_or(ea.pos.raw);
             compared += 1;
             if c != eraw || ea.pos.frame != eframe {
-                bad = Some(format!("tick {tick}: emulator raw {eraw} frame {eframe}, model raw {c} frame {}", ea.pos.frame));
+                bad = Some(format!(
+                    "tick {tick}: emulator raw {eraw} frame {eframe}, model raw {c} frame {}",
+                    ea.pos.frame
+                ));
                 break;
             }
         }
         if let Some(b) = h.bad.take().or(bad) {
             fails.push(format!("{name}: {b}"));
         } else {
-            assert!(compared * 10 > 9 * (compared + skipped), "{name}: too few modelled ticks");
-            let got: Vec<String> = h.sfx.iter().filter(|s| s.0 > 0).map(|s| format!("{}:{}", s.0, s.1)).collect();
+            assert!(
+                compared * 10 > 9 * (compared + skipped),
+                "{name}: too few modelled ticks"
+            );
+            let got: Vec<String> = h
+                .sfx
+                .iter()
+                .filter(|s| s.0 > 0)
+                .map(|s| format!("{}:{}", s.0, s.1))
+                .collect();
             for s in tr["sfx"].as_array().unwrap() {
                 let want = format!("{}:{}", s[0].as_i64().unwrap(), s[1].as_i64().unwrap());
                 if !got.contains(&want) {
@@ -182,7 +259,10 @@ fn enemy_animation_model_vs_emulator() {
         skipped_all += skipped;
         n += 1;
     }
-    eprintln!("enemy anim: {n} traces, {total} ticks compared, {skipped_all} not modelled, {} failures", fails.len());
+    eprintln!(
+        "enemy anim: {n} traces, {total} ticks compared, {skipped_all} not modelled, {} failures",
+        fails.len()
+    );
     for f in &fails {
         eprintln!("  FAIL {f}");
     }
@@ -199,10 +279,22 @@ fn yakon_energy_absorb() {
     use wf_core::world::{Body, HitMsg};
     let rec = json("buu_yakon_absorb.json");
     for run in rec["runs"].as_array().unwrap() {
-        let cfg = BattleConfig { arena: "yakon".into(), phases: vec![Phase { enemy: "t145".into(), count: 1 }], rng: RngInit::State(1, 4), ..Default::default() };
+        let cfg = BattleConfig {
+            arena: "yakon".into(),
+            phases: vec![Phase {
+                enemy: "t145".into(),
+                count: 1,
+            }],
+            rng: RngInit::State(1, 4),
+            ..Default::default()
+        };
         let mut s = Session::new(data(), cfg);
         let w = &mut s.world;
-        let e = w.ents.iter().position(|x| matches!(x.body, Body::Enemy(_))).unwrap();
+        let e = w
+            .ents
+            .iter()
+            .position(|x| matches!(x.body, Body::Enemy(_)))
+            .unwrap();
         w.en(e).hp1024 = run["hp_start"].as_i64().unwrap();
         let hits = run["hits"].as_array().unwrap();
         let (mut got, mut want) = (vec![], vec![]);
@@ -217,12 +309,36 @@ fn yakon_energy_absorb() {
             let pid = w.players[0];
             let a = wf_core::damage::atk(h["sub"].as_i64().unwrap() as u8);
             assert_eq!(a.kind as i64, h["kind"].as_i64().unwrap());
-            let msg = HitMsg { team: 1, rect: w.en_ref(e).a.body_box(), dir: 3, mult: h["mult"].as_i64().unwrap() as i32, atk: a, attacker: pid, att_stats: Default::default(), att_is_player: true, source: pid, crit: false, raw: 0, dmg: h["dmg"].as_i64().unwrap(), no_react: false, foot: false };
+            let msg = HitMsg {
+                team: 1,
+                rect: w.en_ref(e).a.body_box(),
+                dir: 3,
+                mult: h["mult"].as_i64().unwrap() as i32,
+                atk: a,
+                attacker: pid,
+                att_stats: Default::default(),
+                att_is_player: true,
+                source: pid,
+                crit: false,
+                raw: 0,
+                dmg: h["dmg"].as_i64().unwrap(),
+                no_react: false,
+                foot: false,
+            };
             wf_core::nodes::on_hit(w, e, &msg);
             got.push(w.en_ref(e).hp1024);
-            want.push(if k + 1 < hits.len() { hits[k + 1]["hp"].as_i64().unwrap() } else { run["hp_end"].as_i64().unwrap() });
+            want.push(if k + 1 < hits.len() {
+                hits[k + 1]["hp"].as_i64().unwrap()
+            } else {
+                run["hp_end"].as_i64().unwrap()
+            });
         }
         assert_eq!(got, want, "{}", run["name"]);
-        assert_eq!(w.en_ref(e).defeated, run["dead"].as_bool().unwrap(), "{}", run["name"]);
+        assert_eq!(
+            w.en_ref(e).defeated,
+            run["dead"].as_bool().unwrap(),
+            "{}",
+            run["name"]
+        );
     }
 }

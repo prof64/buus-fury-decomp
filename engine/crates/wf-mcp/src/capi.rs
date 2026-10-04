@@ -15,7 +15,6 @@ use serde_json::{json, Value};
 use std::cell::RefCell;
 use std::ffi::{c_char, CStr, CString};
 use wf_core::battle::{Outcome, RngInit};
-use wf_core::session::Snapshot;
 use wf_core::world::Body;
 
 thread_local! {
@@ -36,7 +35,7 @@ unsafe fn cstr<'a>(p: *const c_char) -> &'a str {
 }
 
 pub struct GymSnap {
-    s: Snapshot,
+    s: crate::env::Snap,
     inputs: Vec<crate::env::Held>,
 }
 
@@ -316,7 +315,7 @@ pub unsafe extern "C" fn wf_gym_observe(g: *mut Gym, slot: u32, flags: u32) -> *
 #[no_mangle]
 pub unsafe extern "C" fn wf_gym_snapshot(g: *const Gym) -> *mut GymSnap {
     let a = &(*g).agent;
-    Box::into_raw(Box::new(GymSnap { s: a.s.snapshot(), inputs: a.inputs.clone() }))
+    Box::into_raw(Box::new(GymSnap { s: a.snap(), inputs: a.inputs.clone() }))
 }
 /// restore a snapshot (with its input log, so replays stay consistent)
 /// # Safety

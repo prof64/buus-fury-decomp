@@ -8,7 +8,16 @@ use wf_core::session::Session;
 use wf_core::world::{Body, Event};
 
 fn session(world: i32, area: i32, pos: (i32, i32)) -> Session {
-    Session::new_field(common::field_data(), FieldConfig { world, area, pos: Some(pos), rng: RngInit::Seed(7), ..Default::default() })
+    Session::new_field(
+        common::field_data(),
+        FieldConfig {
+            world,
+            area,
+            pos: Some(pos),
+            rng: RngInit::Seed(7),
+            ..Default::default()
+        },
+    )
 }
 
 fn count(s: &Session, kind: &str) -> usize {
@@ -22,17 +31,59 @@ fn area(s: &Session) -> AreaId {
 #[test]
 fn loads_area_objects_by_condition() {
     let s = session(8, 3, (100, 192));
-    assert_eq!(area(&s), AreaId { world: 8, area: 3, variant: 1 });
+    assert_eq!(
+        area(&s),
+        AreaId {
+            world: 8,
+            area: 3,
+            variant: 1
+        }
+    );
     // Southwest Forest: 4 Majin Fighters while flag 163 is clear, the script-conditioned ones need 163 && !164
-    let enemies = s.world.ents.iter().filter(|e| matches!(&e.body, Body::Enemy(n) if n.ty == 68)).count();
+    let enemies = s
+        .world
+        .ents
+        .iter()
+        .filter(|e| matches!(&e.body, Body::Enemy(n) if n.ty == 68))
+        .count();
     assert_eq!(enemies, 4);
-    assert!(s.world.field.as_ref().unwrap().triggers.len() >= 3, "map header exits");
+    assert!(
+        s.world.field.as_ref().unwrap().triggers.len() >= 3,
+        "map header exits"
+    );
     let mut st = s.world.story.clone();
     st.set_flag(163, true);
-    let s2 = Session::new_field(common::field_data(), FieldConfig { world: 8, area: 3, pos: Some((100, 192)), story: Some(st), rng: RngInit::Seed(7), ..Default::default() });
-    let e2: Vec<i32> = s2.world.ents.iter().filter_map(|e| if let Body::Enemy(n) = &e.body { Some(n.ty) } else { None }).collect();
-    assert!(!e2.contains(&68), "flag 163 set removes the Majin Fighters: {e2:?}");
-    assert!(e2.contains(&21), "the inline condition get_flag(163) && not_flag(164) spawns type 21: {e2:?}");
+    let s2 = Session::new_field(
+        common::field_data(),
+        FieldConfig {
+            world: 8,
+            area: 3,
+            pos: Some((100, 192)),
+            story: Some(st),
+            rng: RngInit::Seed(7),
+            ..Default::default()
+        },
+    );
+    let e2: Vec<i32> = s2
+        .world
+        .ents
+        .iter()
+        .filter_map(|e| {
+            if let Body::Enemy(n) = &e.body {
+                Some(n.ty)
+            } else {
+                None
+            }
+        })
+        .collect();
+    assert!(
+        !e2.contains(&68),
+        "flag 163 set removes the Majin Fighters: {e2:?}"
+    );
+    assert!(
+        e2.contains(&21),
+        "the inline condition get_flag(163) && not_flag(164) spawns type 21: {e2:?}"
+    );
 }
 
 #[test]
@@ -59,7 +110,18 @@ fn exit_moves_to_destination_area() {
 
 #[test]
 fn deterministic_with_snapshots() {
-    let keys = |f: u32| [0u16, input::UP, input::LEFT, input::RIGHT, input::DOWN, input::A, 0, input::B][((f / 13).wrapping_mul(2654435761) >> 9) as usize % 8];
+    let keys = |f: u32| {
+        [
+            0u16,
+            input::UP,
+            input::LEFT,
+            input::RIGHT,
+            input::DOWN,
+            input::A,
+            0,
+            input::B,
+        ][((f / 13).wrapping_mul(2654435761) >> 9) as usize % 8]
+    };
     let mut a = session(8, 3, (200, 300));
     let mut b = session(8, 3, (200, 300));
     let mut hashes = vec![];
@@ -93,17 +155,46 @@ fn deterministic_with_snapshots() {
 fn view_draws_field_objects() {
     use wf_view::{FrameSel, RenderView};
     // 8-1, below breakable #0 (prop 1, hit box (233,88)-(263,104)) facing up, as objects_breakable_8_1
-    let mut s = Session::new_field(common::field_data(), FieldConfig { world: 8, area: 1, pos: Some((240, 104)), facing: 1, rng: RngInit::Seed(3), ..Default::default() });
+    let mut s = Session::new_field(
+        common::field_data(),
+        FieldConfig {
+            world: 8,
+            area: 1,
+            pos: Some((240, 104)),
+            facing: 1,
+            rng: RngInit::Seed(3),
+            ..Default::default()
+        },
+    );
     let mut v = RenderView::default();
     wf_core::view::render_view(&s.world, &mut v);
-    let props: Vec<_> = v.sprites.iter().filter(|d| d.sheet == "effects/props_area_08_001").collect();
+    let props: Vec<_> = v
+        .sprites
+        .iter()
+        .filter(|d| d.sheet == "effects/props_area_08_001")
+        .collect();
     assert!(!props.is_empty(), "props drawn");
-    assert!(props.iter().any(|d| (d.x, d.y) == (232, 72) && d.frame == FrameSel::Frame { index: 1, flip: false }), "prop 1 at its rect");
+    assert!(
+        props.iter().any(|d| (d.x, d.y) == (232, 72)
+            && d.frame
+                == FrameSel::Frame {
+                    index: 1,
+                    flip: false
+                }),
+        "prop 1 at its rect"
+    );
     // punch: debris chips + shake
     s.step(&[0]);
     s.step(&[input::A]);
     wf_core::view::render_view(&s.world, &mut v);
-    assert_eq!(v.sprites.iter().filter(|d| d.sheet == "effects/debris").count(), 4, "debris chips");
+    assert_eq!(
+        v.sprites
+            .iter()
+            .filter(|d| d.sheet == "effects/debris")
+            .count(),
+        4,
+        "debris chips"
+    );
     // loot: coins and a dropped supply at the loot point
     wf_core::fieldobj::set_loot(&mut s.world, 330, 170, 0, 0);
     wf_core::fieldobj::drop_zenie(&mut s.world, 1);
@@ -111,7 +202,12 @@ fn view_draws_field_objects() {
     s.step(&[0]);
     wf_core::view::render_view(&s.world, &mut v);
     assert!(v.sprites.iter().any(|d| d.sheet == "effects/coin_1"));
-    assert!(v.sprites.iter().any(|d| d.sheet == "effects/field_items" && d.frame == FrameSel::Frame { index: 5, flip: false }));
+    assert!(v.sprites.iter().any(|d| d.sheet == "effects/field_items"
+        && d.frame
+            == FrameSel::Frame {
+                index: 5,
+                flip: false
+            }));
     assert!(v.sprites.iter().any(|d| d.sheet == "effects/shadow_10x4"));
 }
 
@@ -120,10 +216,25 @@ fn visited_flags_and_world_map() {
     // entering 8-3 sets its map-screen bit (story flag 0x1C0 + bit)
     let s = session(8, 3, (100, 192));
     let fd = s.world.data.field.clone().unwrap();
-    let bit = fd.visited.iter().find(|v| v.0 == 8 && v.1 == 3).map(|v| v.2).expect("8-3 in the visited table");
+    let bit = fd
+        .visited
+        .iter()
+        .find(|v| v.0 == 8 && v.1 == 3)
+        .map(|v| v.2)
+        .expect("8-3 in the visited table");
     assert!(s.world.story.flag(0x1C0 + bit));
     // the world map 0-50: the flyer climbs with B, turns, and the view carries the mode-7 camera
-    let mut w = Session::new_field(common::field_data(), FieldConfig { world: 0, area: 50, pos: Some((872, 1800)), arrive: true, rng: RngInit::Seed(1), ..Default::default() });
+    let mut w = Session::new_field(
+        common::field_data(),
+        FieldConfig {
+            world: 0,
+            area: 50,
+            pos: Some((872, 1800)),
+            arrive: true,
+            rng: RngInit::Seed(1),
+            ..Default::default()
+        },
+    );
     assert!(w.world.field.as_ref().unwrap().flight.is_some());
     for _ in 0..100 {
         w.step(&[input::B | input::UP | input::RIGHT]);

@@ -13,7 +13,11 @@ use wf_core::session::Session;
 use wf_core::world::{Body, World};
 
 fn dumps_dir() -> Option<PathBuf> {
-    let d = std::env::var("WF_TS_DUMPS").map(PathBuf::from).unwrap_or_else(|_| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/wf-core-ts-dumps"));
+    let d = std::env::var("WF_TS_DUMPS")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| {
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/wf-core-ts-dumps")
+        });
     d.is_dir().then_some(d)
 }
 
@@ -23,7 +27,11 @@ const ID_OFF: u32 = 1;
 fn frame_state(w: &World) -> Value {
     let pi = w.player_idx(0).unwrap();
     let p = w.pl_ref(pi);
-    let held = if p.held_by != 0 { p.held_by + ID_OFF } else { 0 };
+    let held = if p.held_by != 0 {
+        p.held_by + ID_OFF
+    } else {
+        0
+    };
     let mut e = vec![];
     let mut s = vec![];
     let mut k = vec![];
@@ -33,7 +41,22 @@ fn frame_state(w: &World) -> Value {
         }
         k.push(format!("{}:{}", x.id + ID_OFF, x.kind()));
         match &x.body {
-            Body::Enemy(n) => e.push(json!([x.id + ID_OFF, n.ty, n.a.x, n.a.y, n.a.z, n.a.facing, n.hp1024, n.defeated as i32, n.a.hittable as i32, n.ai.states().iter().map(|s| format!("{s:x}")).collect::<Vec<_>>().join(">")])),
+            Body::Enemy(n) => e.push(json!([
+                x.id + ID_OFF,
+                n.ty,
+                n.a.x,
+                n.a.y,
+                n.a.z,
+                n.a.facing,
+                n.hp1024,
+                n.defeated as i32,
+                n.a.hittable as i32,
+                n.ai.states()
+                    .iter()
+                    .map(|s| format!("{s:x}"))
+                    .collect::<Vec<_>>()
+                    .join(">")
+            ])),
             Body::Shot(sh) => s.push(json!([x.id + ID_OFF, sh.kind_name(), sh.x, sh.y])),
             Body::Hand(_) => {}
             _ => {}
@@ -56,12 +79,23 @@ fn norm_ts(f: &Value) -> Value {
     let mut f = f.clone();
     if let Some(es) = f["e"].as_array_mut() {
         for e in es {
-            let st = e[9].as_str().unwrap_or("").split('>').filter(|x| !x.is_empty()).map(|x| format!("{:x}", x.parse::<u32>().unwrap_or(0))).collect::<Vec<_>>().join(">");
+            let st = e[9]
+                .as_str()
+                .unwrap_or("")
+                .split('>')
+                .filter(|x| !x.is_empty())
+                .map(|x| format!("{:x}", x.parse::<u32>().unwrap_or(0)))
+                .collect::<Vec<_>>()
+                .join(">");
             e[9] = json!(st);
         }
     }
     let gs = f["p"][5].as_str().unwrap_or("").to_string();
-    f["p"][5] = json!(if gs == "idle2" { "idle".to_string() } else { gs });
+    f["p"][5] = json!(if gs == "idle2" {
+        "idle".to_string()
+    } else {
+        gs
+    });
     f
 }
 
@@ -82,7 +116,12 @@ fn cross_check_vs_typescript_sim() {
         return;
     };
     let only = std::env::var("CROSS").ok();
-    let mut files: Vec<_> = std::fs::read_dir(&dir).unwrap().flatten().map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "json")).collect();
+    let mut files: Vec<_> = std::fs::read_dir(&dir)
+        .unwrap()
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.extension().is_some_and(|x| x == "json"))
+        .collect();
     files.sort();
     let mut fails = vec![];
     let mut total = 0;
@@ -94,10 +133,29 @@ fn cross_check_vs_typescript_sim() {
             continue;
         }
         let seed = sc["seed"].as_u64().unwrap() as u32;
-        let fighter = FighterSetup { fighter: sc["fighterId"].as_str().unwrap_or("goku").into(), form: sc["form"].as_i64().unwrap_or(2) as i32, level: sc["level"].as_i64().unwrap_or(60) as i32, ..Default::default() };
-        let cfg = BattleConfig { arena: sc["arena"].as_str().unwrap().into(), players: vec![fighter], phases: vec![Phase { enemy: sc["enemy"].as_str().unwrap().into(), count: sc["count"].as_i64().unwrap_or(1) as i32 }], rng: RngInit::State(seed, seed.wrapping_mul(3).wrapping_add(1)), xp: false };
+        let fighter = FighterSetup {
+            fighter: sc["fighterId"].as_str().unwrap_or("goku").into(),
+            form: sc["form"].as_i64().unwrap_or(2) as i32,
+            level: sc["level"].as_i64().unwrap_or(60) as i32,
+            ..Default::default()
+        };
+        let cfg = BattleConfig {
+            arena: sc["arena"].as_str().unwrap().into(),
+            players: vec![fighter],
+            phases: vec![Phase {
+                enemy: sc["enemy"].as_str().unwrap().into(),
+                count: sc["count"].as_i64().unwrap_or(1) as i32,
+            }],
+            rng: RngInit::State(seed, seed.wrapping_mul(3).wrapping_add(1)),
+            xp: false,
+        };
         let mut s = Session::new(data(), cfg);
-        let inputs: Vec<u16> = d["inputs"].as_array().unwrap().iter().map(|x| x.as_u64().unwrap() as u16).collect();
+        let inputs: Vec<u16> = d["inputs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|x| x.as_u64().unwrap() as u16)
+            .collect();
         let frames = d["frames"].as_array().unwrap();
         let mut bad = None;
         for (k, held) in inputs.iter().enumerate() {
@@ -126,6 +184,9 @@ fn cross_check_vs_typescript_sim() {
     for f in &fails {
         eprintln!("cross_ts FAIL {f}");
     }
-    eprintln!("cross_ts: {total} frames compared, {} scenario failures", fails.len());
+    eprintln!(
+        "cross_ts: {total} frames compared, {} scenario failures",
+        fails.len()
+    );
     assert!(fails.is_empty());
 }

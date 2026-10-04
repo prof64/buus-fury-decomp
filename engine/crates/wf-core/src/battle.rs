@@ -9,42 +9,137 @@ use crate::geom::Rect;
 use crate::player::{Player, PlayerInit};
 use crate::progression::{fuse, record_at_level, GrowthMode, Record};
 use crate::rng::Rng;
-use crate::world::{walk_region, ArenaRt, Body, Collision, EntityId, Event, World, GBA_H, GBA_W, MAX_PLAYERS};
+use crate::world::{
+    walk_region, ArenaRt, Body, Collision, EntityId, Event, World, GBA_H, GBA_W, MAX_PLAYERS,
+};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 /// curated arena list: map, player spawn (walkable footprint), fallback bounds when a map has no collision
 pub const ARENAS: &[(&str, &str, &str, (i32, i32), [i32; 4])] = &[
-    ("crater", "8-71", "Giant Crater", (96, 216), [56, 72, 424, 360]),
-    ("volcano", "15-32", "Volcano Summit", (80, 216), [40, 96, 440, 376]),
+    (
+        "crater",
+        "8-71",
+        "Giant Crater",
+        (96, 216),
+        [56, 72, 424, 360],
+    ),
+    (
+        "volcano",
+        "15-32",
+        "Volcano Summit",
+        (80, 216),
+        [40, 96, 440, 376],
+    ),
     ("hfil", "18-14", "HFIL", (64, 248), [24, 80, 300, 304]),
-    ("wasteland", "20-7", "Barren Wasteland", (88, 232), [40, 72, 440, 420]),
-    ("demon", "8-68", "Demon World", (120, 184), [96, 76, 400, 330]),
-    ("canyon", "8-70", "Rocky Canyon", (120, 280), [88, 168, 470, 400]),
-    ("yakon", "8-40", "Yakon's Planet", (112, 200), [72, 92, 380, 390]),
-    ("crater2", "6-16", "Giant Crater (after the blast)", (96, 216), [56, 72, 424, 360]),
-    ("htc", "6-9", "Hyperbolic Time Chamber", (104, 152), [72, 64, 328, 240]),
-    ("stadium", "7-6", "World Tournament Stadium", (264, 384), [232, 256, 488, 512]),
-    ("forest", "8-3", "Southwest Forest", (96, 248), [40, 40, 520, 520]),
-    ("plateau", "19-3", "Rocky Plateau", (240, 280), [40, 200, 660, 432]),
-    ("village", "15-1", "Nataday Village", (200, 304), [96, 120, 760, 560]),
-    ("kamehouse", "5-1", "Kame House island", (160, 472), [72, 368, 648, 560]),
+    (
+        "wasteland",
+        "20-7",
+        "Barren Wasteland",
+        (88, 232),
+        [40, 72, 440, 420],
+    ),
+    (
+        "demon",
+        "8-68",
+        "Demon World",
+        (120, 184),
+        [96, 76, 400, 330],
+    ),
+    (
+        "canyon",
+        "8-70",
+        "Rocky Canyon",
+        (120, 280),
+        [88, 168, 470, 400],
+    ),
+    (
+        "yakon",
+        "8-40",
+        "Yakon's Planet",
+        (112, 200),
+        [72, 92, 380, 390],
+    ),
+    (
+        "crater2",
+        "6-16",
+        "Giant Crater (after the blast)",
+        (96, 216),
+        [56, 72, 424, 360],
+    ),
+    (
+        "htc",
+        "6-9",
+        "Hyperbolic Time Chamber",
+        (104, 152),
+        [72, 64, 328, 240],
+    ),
+    (
+        "stadium",
+        "7-6",
+        "World Tournament Stadium",
+        (264, 384),
+        [232, 256, 488, 512],
+    ),
+    (
+        "forest",
+        "8-3",
+        "Southwest Forest",
+        (96, 248),
+        [40, 40, 520, 520],
+    ),
+    (
+        "plateau",
+        "19-3",
+        "Rocky Plateau",
+        (240, 280),
+        [40, 200, 660, 432],
+    ),
+    (
+        "village",
+        "15-1",
+        "Nataday Village",
+        (200, 304),
+        [96, 120, 760, 560],
+    ),
+    (
+        "kamehouse",
+        "5-1",
+        "Kame House island",
+        (160, 472),
+        [72, 368, 648, 560],
+    ),
 ];
 fn arena_for_map<'a>(d: &'a GameData, map: &str) -> Option<&'a str> {
     if map == "20-5" {
         return Some("wasteland");
     }
-    d.arenas.iter().find(|a| a.map == map).map(|a| a.id.as_str())
+    d.arenas
+        .iter()
+        .find(|a| a.map == map)
+        .map(|a| a.id.as_str())
 }
 
 /// (id, record character, fusion parts, forms, default form)
 pub const FIGHTERS: &[(&str, i32, Option<(i32, i32)>, &[i32], i32)] = &[
     ("goku", 0, None, &[2, 0, 1, 3, 4, 5, 6, 7, 8], 2),
-    ("gohan", 1, None, &[10, 9, 11, 12, 13, 14, 15, 16, 17, 18], 10),
+    (
+        "gohan",
+        1,
+        None,
+        &[10, 9, 11, 12, 13, 14, 15, 16, 17, 18],
+        10,
+    ),
     ("goten", 2, None, &[19, 20], 19),
     ("trunks", 3, None, &[21, 22, 23, 24, 25], 21),
     ("vegeta", 4, None, &[26, 27, 28, 29, 30], 26),
-    ("gotenks", 5, Some((2, 3)), &[31, 32, 33, 34, 35, 36, 37, 38], 31),
+    (
+        "gotenks",
+        5,
+        Some((2, 3)),
+        &[31, 32, 33, 34, 35, 36, 37, 38],
+        31,
+    ),
     ("vegito", 6, Some((0, 4)), &[39, 40], 39),
     ("gogeta", 7, Some((0, 4)), &[41, 42, 43, 44], 41),
     ("f46", 8, None, &[46], 46),
@@ -95,7 +190,18 @@ fn d_lv() -> i32 {
 }
 impl Default for FighterSetup {
     fn default() -> Self {
-        FighterSetup { fighter: "goku".into(), form: 2, level: 60, growth: d_growth(), growth_seed: 0, auto_spend: d_spend(), bonus: [0; 4], equip: d_equip(), skill_level: 0, holy_water: false }
+        FighterSetup {
+            fighter: "goku".into(),
+            form: 2,
+            level: 60,
+            growth: d_growth(),
+            growth_seed: 0,
+            auto_spend: d_spend(),
+            bonus: [0; 4],
+            equip: d_equip(),
+            skill_level: 0,
+            holy_water: false,
+        }
     }
 }
 
@@ -125,7 +231,16 @@ pub struct BattleConfig {
 }
 impl Default for BattleConfig {
     fn default() -> Self {
-        BattleConfig { arena: "forest".into(), players: vec![FighterSetup::default()], phases: vec![Phase { enemy: "t68".into(), count: 1 }], rng: RngInit::Seed(1), xp: false }
+        BattleConfig {
+            arena: "forest".into(),
+            players: vec![FighterSetup::default()],
+            phases: vec![Phase {
+                enemy: "t68".into(),
+                count: 1,
+            }],
+            rng: RngInit::Seed(1),
+            xp: false,
+        }
     }
 }
 
@@ -145,7 +260,15 @@ pub enum Outcome {
 }
 
 fn parse_enemy_id(s: &str) -> Vec<(i32, bool)> {
-    s.split('+').filter_map(|p| p.trim_start_matches('~').trim_start_matches('t').parse::<i32>().ok().map(|t| (t, !p.starts_with('~')))).collect()
+    s.split('+')
+        .filter_map(|p| {
+            p.trim_start_matches('~')
+                .trim_start_matches('t')
+                .parse::<i32>()
+                .ok()
+                .map(|t| (t, !p.starts_with('~')))
+        })
+        .collect()
 }
 
 /// a fighter's record + skills at a level (index.ts build())
@@ -187,7 +310,10 @@ pub fn build_record(d: &GameData, f: &FighterSetup) -> (Record, Vec<i32>, Vec<i3
             }
         }
         "STR" | "POW" | "END" | "SPD" => {
-            let k = ["STR", "POW", "END", "SPD"].iter().position(|x| *x == f.auto_spend).unwrap();
+            let k = ["STR", "POW", "END", "SPD"]
+                .iter()
+                .position(|x| *x == f.auto_spend)
+                .unwrap();
             spent[k] += free;
             free = 0;
         }
@@ -198,7 +324,10 @@ pub fn build_record(d: &GameData, f: &FighterSetup) -> (Record, Vec<i32>, Vec<i3
     rec.end = 255.min(rec.end + spent[2]);
     rec.spd = 255.min(rec.spd + spent[3]);
     rec.points = free;
-    let skills = fd.skills.clone().unwrap_or_else(|| ch(fd.character).skills.clone());
+    let skills = fd
+        .skills
+        .clone()
+        .unwrap_or_else(|| ch(fd.character).skills.clone());
     (rec, skills, fd.forms.clone())
 }
 
@@ -217,7 +346,16 @@ pub fn arena_runtime(d: &GameData, id: &str) -> (ArenaRt, Option<(i32, i32)>) {
             view = Some(Rect::new(0, 0, m.world_w, m.world_h));
         }
     }
-    (ArenaRt { id: a.id.clone(), map: a.map.clone(), bounds, region, view }, Some(a.spawn))
+    (
+        ArenaRt {
+            id: a.id.clone(),
+            map: a.map.clone(),
+            bounds,
+            region,
+            view,
+        },
+        Some(a.spawn),
+    )
 }
 
 /// spawn an enemy of `ty` at px (x, y); parent = 0 for none; start: None = the type's AI state, Some(-1) = no AI
@@ -236,14 +374,29 @@ pub fn push_initial(w: &mut World, i: usize, st: u16) -> usize {
     i
 }
 
-pub fn spawn_enemy(w: &mut World, ty: i32, x: i32, y: i32, parent: EntityId, start: Option<i32>) -> Option<usize> {
+pub fn spawn_enemy(
+    w: &mut World,
+    ty: i32,
+    x: i32,
+    y: i32,
+    parent: EntityId,
+    start: Option<i32>,
+) -> Option<usize> {
     spawn_enemy_at(w, ty, x, y, parent, start, false)
 }
 
 /// spawn_enemy; `exact`: at (x, y) as given, no free-spot search (the field's placed enemies: the constructor
 /// 0x0800FD55 takes the def position as it is, VERIFIED Babidi's ship 8-12 / 8-21 / 8-42, where a def overlaps a
 /// marked tile)
-pub fn spawn_enemy_at(w: &mut World, ty: i32, x: i32, y: i32, parent: EntityId, start: Option<i32>, exact: bool) -> Option<usize> {
+pub fn spawn_enemy_at(
+    w: &mut World,
+    ty: i32,
+    x: i32,
+    y: i32,
+    parent: EntityId,
+    start: Option<i32>,
+    exact: bool,
+) -> Option<usize> {
     w.data.enemy(ty)?;
     let mut e = Enemy::new(w, ty);
     e.a.x = x << 8;
@@ -256,7 +409,15 @@ pub fn spawn_enemy_at(w: &mut World, ty: i32, x: i32, y: i32, parent: EntityId, 
         if let Some(c) = &w.col {
             let a = &w.en_ref(i).a;
             let region = w.arena.region.clone();
-            let (fx, fy) = c.free_spot(crate::world::Layer::Enemy, a.px(), a.py(), a.foot_w, a.foot_h, Some(&w.arena.bounds), region.as_deref().map(|v| v.as_slice()));
+            let (fx, fy) = c.free_spot(
+                crate::world::Layer::Enemy,
+                a.px(),
+                a.py(),
+                a.foot_w,
+                a.foot_h,
+                Some(&w.arena.bounds),
+                region.as_deref().map(|v| v.as_slice()),
+            );
             let e = w.en(i);
             e.a.x = fx << 8;
             e.a.y = fy << 8;
@@ -271,10 +432,18 @@ pub fn spawn_enemy_at(w: &mut World, ty: i32, x: i32, y: i32, parent: EntityId, 
     }
     w.enemies.push(id);
     // the enemy constructor's SetAnim(0): the idle state's enter draws its start tick (rand(255))
-    enemy::set_anim(w, i, &[crate::content::AnimRef::Name("idle")], true, Some(true));
+    enemy::set_anim(
+        w,
+        i,
+        &[crate::content::AnimRef::Name("idle")],
+        true,
+        Some(true),
+    );
     enemy::mark_self(w, i);
     if start != Some(-1) {
-        let st = start.map(|s| s as u16).unwrap_or(w.data.enemy(ty).unwrap().ai);
+        let st = start
+            .map(|s| s as u16)
+            .unwrap_or(w.data.enemy(ty).unwrap().ai);
         let f = w.g.clock(w.frame);
         {
             // obj+0x1E8 / +0x1EC are stamped with the frame counter at creation (obj+0x210 only by Block's exit)
@@ -303,12 +472,37 @@ pub fn create(data: Arc<GameData>, cfg: &BattleConfig) -> World {
     for (slot, f) in cfg.players.iter().enumerate().take(MAX_PLAYERS) {
         let (rec, skills, forms) = build_record(&data, f);
         let fd = data.fighter(&f.fighter).unwrap_or(&data.fighters[0]);
-        let form = if forms.contains(&f.form) { f.form } else { fd.default_form };
-        let mut pl = Player::new(&w, PlayerInit { slot: slot as u8, form, rec, equip: f.equip, skills, skill_level: f.skill_level, sel: 0, holy_water: f.holy_water, forms_allowed: forms });
+        let form = if forms.contains(&f.form) {
+            f.form
+        } else {
+            fd.default_form
+        };
+        let mut pl = Player::new(
+            &w,
+            PlayerInit {
+                slot: slot as u8,
+                form,
+                rec,
+                equip: f.equip,
+                skills,
+                skill_level: f.skill_level,
+                sel: 0,
+                holy_water: f.holy_water,
+                forms_allowed: forms,
+            },
+        );
         let (sx, sy) = match (&w.col, spawn) {
             (Some(c), Some((x, y))) => {
                 let region = w.arena.region.clone();
-                c.free_spot(crate::world::Layer::Walk, x + 24 * slot as i32, y, pl.a.foot_w, pl.a.foot_h, Some(&b), region.as_deref().map(|v| v.as_slice()))
+                c.free_spot(
+                    crate::world::Layer::Walk,
+                    x + 24 * slot as i32,
+                    y,
+                    pl.a.foot_w,
+                    pl.a.foot_h,
+                    Some(&b),
+                    region.as_deref().map(|v| v.as_slice()),
+                )
             }
             _ => (b.x0 + 32 + 24 * slot as i32, (b.y0 + b.y1) >> 1),
         };
@@ -318,7 +512,11 @@ pub fn create(data: Arc<GameData>, cfg: &BattleConfig) -> World {
         let id = w.add(Body::Player(Box::new(pl)));
         w.players.push(id);
     }
-    w.battle.phases = cfg.phases.iter().map(|p| (parse_enemy_id(&p.enemy), p.count)).collect();
+    w.battle.phases = cfg
+        .phases
+        .iter()
+        .map(|p| (parse_enemy_id(&p.enemy), p.count))
+        .collect();
     spawn_phase(&mut w, 0);
     // the game's object list (0x08011A1E) updates newest first and the player object is added after the area's
     // actors: the players update before the enemies placed at the start (objects spawned later update before them)
@@ -336,7 +534,9 @@ pub fn create(data: Arc<GameData>, cfg: &BattleConfig) -> World {
 }
 
 fn spawn_phase(w: &mut World, ph: usize) {
-    let Some((parts, count)) = w.battle.phases.get(ph).cloned() else { return };
+    let Some((parts, count)) = w.battle.phases.get(ph).cloned() else {
+        return;
+    };
     let n = count.clamp(1, 12);
     let b = w.arena.bounds;
     let Some(pi) = w.player_idx(0) else { return };
@@ -344,14 +544,33 @@ fn spawn_phase(w: &mut World, ph: usize) {
     let mut k = 0;
     let nplayers = w.players.len().max(1);
     for &(ty, primary) in &parts {
-        let Some(t) = w.data.enemy(ty).cloned() else { continue };
+        let Some(t) = w.data.enemy(ty).cloned() else {
+            continue;
+        };
         for _ in 0..n {
-            let sp = t.spawns.iter().find(|s| arena_for_map(&w.data, &format!("{}-{}", s.0, s.1)) == Some(w.arena.id.as_str()) && s.2 > 0 && s.3 > 0);
+            let sp = t.spawns.iter().find(|s| {
+                arena_for_map(&w.data, &format!("{}-{}", s.0, s.1)) == Some(w.arena.id.as_str())
+                    && s.2 > 0
+                    && s.3 > 0
+            });
             let (x, y) = match sp {
-                Some(s) if n == 1 && s.2 >= b.x0 && s.2 < b.x1 && s.3 >= b.y0 && s.3 < b.y1 && (s.2 - ppx).abs() > 60 => (s.2, s.3),
+                Some(s)
+                    if n == 1
+                        && s.2 >= b.x0
+                        && s.2 < b.x1
+                        && s.3 >= b.y0
+                        && s.3 < b.y1
+                        && (s.2 - ppx).abs() > 60 =>
+                {
+                    (s.2, s.3)
+                }
                 _ => {
                     let x = (b.x1 - 40).min(ppx + 120 + (k / 4) * 30);
-                    let base = if w.col.is_some() { ppy } else { (b.y0 + b.y1) >> 1 };
+                    let base = if w.col.is_some() {
+                        ppy
+                    } else {
+                        (b.y0 + b.y1) >> 1
+                    };
                     // ((k % 4) - (min(n * parts, 4) - 1) / 2) * 34, rounded as the reference (Math.round)
                     let m = (n as i64 * parts.len() as i64).min(4);
                     let num = (2 * (k as i64 % 4) - (m - 1)) * 34;
@@ -413,7 +632,14 @@ pub fn set_camera(w: &mut World, slot: usize, x: i32, y: i32) {
 }
 
 fn live_primary(w: &World) -> Vec<EntityId> {
-    w.enemies.iter().copied().filter(|&id| w.enemy_by_id(id).is_some_and(|(i, e)| e.primary && !e.defeated && !w.ents[i].removed)).collect()
+    w.enemies
+        .iter()
+        .copied()
+        .filter(|&id| {
+            w.enemy_by_id(id)
+                .is_some_and(|(i, e)| e.primary && !e.defeated && !w.ents[i].removed)
+        })
+        .collect()
 }
 
 /// before the world update: enemy grid marks follow positions set outside the enemy steps
@@ -446,7 +672,10 @@ pub fn post_step(w: &mut World) {
             w.events.push(Event::Sfx { id: 41, vol: 32 });
         }
     }
-    let all_dead = w.players.iter().all(|&id| w.find(id).is_none_or(|i| w.pl_ref(i).dead));
+    let all_dead = w
+        .players
+        .iter()
+        .all(|&id| w.find(id).is_none_or(|i| w.pl_ref(i).dead));
     let nph = w.battle.phases.len();
     if live_primary(w).is_empty() && w.battle.phase + 1 < nph && !all_dead {
         if w.battle.next_phase_at == 0 {
@@ -466,7 +695,16 @@ pub fn post_step(w: &mut World) {
             spawn_phase(w, ph);
         }
     }
-    let keep: Vec<EntityId> = w.enemies.iter().copied().filter(|&id| w.enemy_by_id(id).is_some_and(|(i, e)| !w.ents[i].removed || e.primary) || false).collect();
+    let keep: Vec<EntityId> = w
+        .enemies
+        .iter()
+        .copied()
+        .filter(|&id| {
+            w.enemy_by_id(id)
+                .is_some_and(|(i, e)| !w.ents[i].removed || e.primary)
+                || false
+        })
+        .collect();
     // primary enemies stay listed after removal (the reference keeps the object); removed ones are gone here
     w.enemies = keep;
 }
@@ -483,7 +721,9 @@ pub fn pvp_winner(w: &World) -> Option<usize> {
     if !w.opts.pvp || outcome(w) != Outcome::Won {
         return None;
     }
-    w.players.iter().position(|&id| w.find(id).is_some_and(|i| !w.pl_ref(i).dead))
+    w.players
+        .iter()
+        .position(|&id| w.find(id).is_some_and(|i| !w.pl_ref(i).dead))
 }
 
 const INVULNERABLE: [i32; 2] = [0x1a, 0x1b];
@@ -492,21 +732,40 @@ const SURVIVE: u32 = 3600;
 pub fn outcome(w: &World) -> Outcome {
     let players: Vec<usize> = w.players.iter().filter_map(|&id| w.find(id)).collect();
     if !players.is_empty() && players.iter().all(|&i| w.pl_ref(i).dead) {
-        let ko = players.iter().map(|&i| w.pl_ref(i).ko_at).max().unwrap_or(-1);
-        return if ko < 0 || w.frame as i64 - ko >= 200 { Outcome::Lost } else { Outcome::Running };
+        let ko = players
+            .iter()
+            .map(|&i| w.pl_ref(i).ko_at)
+            .max()
+            .unwrap_or(-1);
+        return if ko < 0 || w.frame as i64 - ko >= 200 {
+            Outcome::Lost
+        } else {
+            Outcome::Running
+        };
     }
     if w.opts.pvp {
         // last fighter standing (200 frames after the last KO, like the loss); enemies, if any, do not count
         let alive = players.iter().filter(|&&i| !w.pl_ref(i).dead).count();
-        let ko = players.iter().map(|&i| w.pl_ref(i).ko_at).max().unwrap_or(-1);
-        return if players.len() > 1 && alive <= 1 && ko >= 0 && w.frame as i64 - ko >= 200 { Outcome::Won } else { Outcome::Running };
+        let ko = players
+            .iter()
+            .map(|&i| w.pl_ref(i).ko_at)
+            .max()
+            .unwrap_or(-1);
+        return if players.len() > 1 && alive <= 1 && ko >= 0 && w.frame as i64 - ko >= 200 {
+            Outcome::Won
+        } else {
+            Outcome::Running
+        };
     }
     let live = live_primary(w);
     if w.battle.phase + 1 >= w.battle.phases.len() {
         if live.is_empty() {
             return Outcome::Won;
         }
-        let all_inv = live.iter().all(|&id| w.enemy_by_id(id).is_some_and(|(_, e)| INVULNERABLE.contains(&e.ty)));
+        let all_inv = live.iter().all(|&id| {
+            w.enemy_by_id(id)
+                .is_some_and(|(_, e)| INVULNERABLE.contains(&e.ty))
+        });
         if all_inv && w.frame - w.battle.phase_start >= SURVIVE {
             return Outcome::Won;
         }

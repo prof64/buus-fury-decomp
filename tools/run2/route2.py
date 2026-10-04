@@ -84,8 +84,12 @@ def _earth():
             # West City 4-1: talk to the woman by the road (s179, a side NPC run 1 passed)
             g = _ins(g, ('walk', 850, 360), [('walk', 272, 96), ('talk', 'U'), ('wait', 30)])
         if name == 'training':
-            # stat points into SPD (run 1: STR)
-            g = [x if x != ('alloc', 0) else ('alloc', 3) for x in g]
+            # two more levels than run 1 before the circus (stat points into STR as run 1: the five fighters need it)
+            g = [('levelup', 6, x[2]) if x[0] == 'levelup' else x for x in g]
+        if name == 'circus':
+            # a fighter can outlast fight2's first cap here (weaker STR): fight on
+            k = g.index(('until', 3, 2))
+            g = g[:k] + [('menu', earth_route.USE_FIRST_SUPPLY), ('fight2', 12000, 'stay'), ('wait', 30)] + g[k:]
         if name in ('tank', 'gate'):
             # END (tank) / SPD (gate) - run 1: POW both times
             g = [x if x != ('alloc', 1) else ('alloc', 2 if name == 'tank' else 3) for x in g]
@@ -100,12 +104,33 @@ def _earth():
 
 SEGMENTS += _earth()
 
+
+def chapter_of(name):
+    """the chapter a segment belongs to (routing: segments.md's owners)"""
+    if name.startswith('e_'):
+        return 'earth'
+    if name.startswith('s_'):
+        return 'ship'
+    return 'opening'
+
+
 COVERAGE = """
-- Options menu: SFX volume lowered (the sound requests' volume), text speed raised (every later text box types at
-  another rate); Skills page, Journal's Completed Goals tab (pause menu pages run 1 never opened)
-- In-game Save Game (save point menu, EEPROM write) -> soft reset -> title -> Single Player -> Game 1 (Continue: the
-  boot + slot load path)
-- Field death -> "You have died!" -> title (game over), then Continue from the save
-- The prologue's text read at another A rhythm (RNG / box timing differ from the first box)
-- A wall push on Snakeway (blocked walking)
+Opening (Other World):
+- a game over with no save: death among 1-12's fighters -> "You have died!" -> the title
+- a second New Game in the same power-on session (Game 1 still empty), the prologue at another A rhythm (37 / 45
+  frames; run 1: 30) - and the zenie the first game left (100 at the second 1-1, the game does not clear it)
+- pause menu pages run 1 never opened: Status -> Skills, Journal -> Completed Goals; Options: SFX volume -2, text
+  speed +2 (every later text box types at another rate; the sound requests' volume)
+- in-game Save Game at 1-10's save point (EEPROM write); a second death, now with a save -> title -> Single Player
+  -> Game 1: Continue (the boot + slot load path) in a session that has played two games
+- stat points spent (SPD before the Character Gate, END before the tournament; run 1 spent none in Other World)
+- a wall push on Snakeway (blocked walking)
+Earth:
+- Equip (pause menu): the Cotton Gi on (run 1 never equipped on Earth)
+- a side NPC talk in West City 4-1 (s179)
+- six level-ups of training in 2-9 (run 1: four); the circus fight with a supply used mid-fight and fought on at low
+  HP ('stay')
+- the Hercule City Z-Mart (0-91): Buy -> Items (Miso Soup), Sell (a supply); an Inventory supply Dropped
+- a second save (3-1) -> soft reset (A+B+START+SELECT) -> title -> Continue mid-chapter
+- stat points into END (circus tank) and SPD (Goten's gate) - run 1: POW
 """

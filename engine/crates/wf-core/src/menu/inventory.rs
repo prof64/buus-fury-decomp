@@ -12,7 +12,10 @@
 //! script host runs it right after, `menu::post` rebuilds the lists like the game after the dialog returns 1);
 //! Cancel plays 40. UP / DOWN in the dialog only toggle an unused selection (sound 39, redraw).
 
-use super::kit::{self, Button, Container, Cursor, Font, Label, TabBox, Widget, BTN_A, BTN_B, BTN_DOWN, BTN_L, BTN_R, BTN_UP};
+use super::kit::{
+    self, Button, Container, Cursor, Font, Label, TabBox, Widget, BTN_A, BTN_B, BTN_DOWN, BTN_L,
+    BTN_R, BTN_UP,
+};
 use super::shop::{text_wrap, vsep};
 use super::text::{units, Arg, Canvas, Pen};
 use super::{Action, MenuData, Page, Screen};
@@ -64,8 +67,12 @@ impl InvData {
                 continue;
             }
             let Some(b) = src.read(&p) else { continue };
-            let Ok(v) = serde_json::from_slice::<Value>(&b) else { continue };
-            let Some(i) = v["item"].as_u64() else { continue };
+            let Ok(v) = serde_json::from_slice::<Value>(&b) else {
+                continue;
+            };
+            let Some(i) = v["item"].as_u64() else {
+                continue;
+            };
             let i = i as usize;
             if d.name.len() <= i {
                 let n = i + 1;
@@ -78,11 +85,21 @@ impl InvData {
             }
             let s = |k: &str| super::text::decode_escaped(v[k].as_str().unwrap_or(""));
             d.name[i] = s("name");
-            d.plural[i] = if v["plural"].is_string() { s("plural") } else { s("name") };
+            d.plural[i] = if v["plural"].is_string() {
+                s("plural")
+            } else {
+                s("name")
+            };
             d.desc[i] = s("description");
             d.icon[i] = v["icon"].as_str().unwrap_or("").to_string();
             d.story[i] = v["story_item"].as_bool().unwrap_or(false);
-            let sc = v["use_script"].as_str().map(|h| u32::from_str_radix(h.trim_start_matches("0x").trim_start_matches("0X"), 16).unwrap_or(0)).unwrap_or(0);
+            let sc = v["use_script"]
+                .as_str()
+                .map(|h| {
+                    u32::from_str_radix(h.trim_start_matches("0x").trim_start_matches("0X"), 16)
+                        .unwrap_or(0)
+                })
+                .unwrap_or(0);
             d.script[i] = (sc != 0).then(|| format!("inline_0x{sc:08X}"));
         }
         d
@@ -147,7 +164,11 @@ pub fn leader_rec(w: &World) -> crate::progression::Record {
             }
         }
     }
-    w.story.chars.get(cur.max(0) as usize).map(|c| c.rec.clone()).unwrap_or_default()
+    w.story
+        .chars
+        .get(cur.max(0) as usize)
+        .map(|c| c.rec.clone())
+        .unwrap_or_default()
 }
 
 impl Inventory {
@@ -157,23 +178,76 @@ impl Inventory {
         let mut c = Container::default();
         c.sel = 2;
         let sel_s = t.s(23);
-        c.add(Widget::Button(Button::new(BTN_A, 0xC, 0x84, 0, true, false)));
-        c.add(Widget::Label(Label { x: 0x1C, y: 0x90, text: sel_s.to_vec(), colour: 5, align: 0, font: Font::Menu }));
+        c.add(Widget::Button(Button::new(
+            BTN_A, 0xC, 0x84, 0, true, false,
+        )));
+        c.add(Widget::Label(Label {
+            x: 0x1C,
+            y: 0x90,
+            text: sel_s.to_vec(),
+            colour: 5,
+            align: 0,
+            font: Font::Menu,
+        }));
         let bx = t.font(MenuFont::Menu).measure(sel_s) + 0x1E;
         c.add(Widget::Button(Button::new(BTN_B, bx, 0x84, 1, true, false)));
-        c.add(Widget::Label(Label { x: bx + 0x10, y: 0x90, text: t.s(26).to_vec(), colour: 5, align: 0, font: Font::Menu }));
+        c.add(Widget::Label(Label {
+            x: bx + 0x10,
+            y: 0x90,
+            text: t.s(26).to_vec(),
+            colour: 5,
+            align: 0,
+            font: Font::Menu,
+        }));
         c.add(Widget::Button(Button::new(BTN_L, 8, 8, 6, true, false)));
         c.add(Widget::Button(Button::new(BTN_R, 0xD0, 8, 7, true, false)));
-        c.add(Widget::Label(Label { x: 0x22, y: 0x14, text: t.s(28).to_vec(), colour: 2, align: 0, font: Font::Menu }));
-        c.add(Widget::Label(Label { x: 0xCE, y: 0x14, text: t.s(36).to_vec(), colour: 2, align: 2, font: Font::Menu }));
-        let up = c.add(Widget::Button(Button::new(BTN_UP, 0xD4, 0x28, 2, true, true)));
-        let down = c.add(Widget::Button(Button::new(BTN_DOWN, 0xD4, 0x70, 3, true, true)));
+        c.add(Widget::Label(Label {
+            x: 0x22,
+            y: 0x14,
+            text: t.s(28).to_vec(),
+            colour: 2,
+            align: 0,
+            font: Font::Menu,
+        }));
+        c.add(Widget::Label(Label {
+            x: 0xCE,
+            y: 0x14,
+            text: t.s(36).to_vec(),
+            colour: 2,
+            align: 2,
+            font: Font::Menu,
+        }));
+        let up = c.add(Widget::Button(Button::new(
+            BTN_UP, 0xD4, 0x28, 2, true, true,
+        )));
+        let down = c.add(Widget::Button(Button::new(
+            BTN_DOWN, 0xD4, 0x70, 3, true, true,
+        )));
         let t0 = TabBox::new(t, 0x18, 0x20, t.s(34), true);
         let x1 = (t0.rect[2] - t0.rect[0]) + 0x1C;
         let a = c.add(Widget::TabBox(t0));
         let b = c.add(Widget::TabBox(TabBox::new(t, x1, 0x20, t.s(35), false)));
         let cursor = c.add(Widget::Cursor(Cursor { t: 0 }));
-        let mut p = Inventory { c, lists: [Vec::new(), Vec::new()], tab: 0, top: 0, cur: 0, up, down, tabs: [a, b], cursor, counts: Vec::new(), gauge: (0, 0), dialog: None, stub: None, fresh: true, hold: Container { drawn: true, ..Container::default() } };
+        let mut p = Inventory {
+            c,
+            lists: [Vec::new(), Vec::new()],
+            tab: 0,
+            top: 0,
+            cur: 0,
+            up,
+            down,
+            tabs: [a, b],
+            cursor,
+            counts: Vec::new(),
+            gauge: (0, 0),
+            dialog: None,
+            stub: None,
+            fresh: true,
+            hold: Container {
+                drawn: true,
+                ..Container::default()
+            },
+        };
         p.rebuild(w);
         p
     }
@@ -234,7 +308,10 @@ impl Inventory {
             }
         }
         self.top = top;
-        for (i, en) in [(self.up, n > 0 && cur != 0), (self.down, n > 0 && cur != n - 1)] {
+        for (i, en) in [
+            (self.up, n > 0 && cur != 0),
+            (self.down, n > 0 && cur != n - 1),
+        ] {
             if let Some(Widget::Button(b)) = self.c.kids.get_mut(i) {
                 b.visible = n > 0;
                 b.enabled = en;
@@ -242,7 +319,11 @@ impl Inventory {
         }
         // 0x08016928: (0x14, (cur - top) * 18 + 0x36), none with an empty list
         self.c.point = Some((n > 0).then_some((0x14, (cur - top) * 18 + 0x36)));
-        self.counts = self.list().iter().map(|&i| w.story.supplies.get(i as usize).copied().unwrap_or(0)).collect();
+        self.counts = self
+            .list()
+            .iter()
+            .map(|&i| w.story.supplies.get(i as usize).copied().unwrap_or(0))
+            .collect();
         let r = leader_rec(w);
         let step = |v: i32, m: i32| if m > 0 { (v * 41 / m).clamp(0, 41) } else { 0 };
         self.gauge = (step(r.hp, r.max_hp), step(r.ep, r.max_ep));
@@ -301,10 +382,15 @@ impl Inventory {
         if self.dialog.is_some() {
             return self.step_dialog(w);
         }
-        let (consumed, act) = kit::run_step(self, w, |p| &mut p.c, |p, w, _src, code| match p.event(w, code) {
-            Some(a) => (true, Some(a)),
-            None => (false, None),
-        });
+        let (consumed, act) = kit::run_step(
+            self,
+            w,
+            |p| &mut p.c,
+            |p, w, _src, code| match p.event(w, code) {
+                Some(a) => (true, Some(a)),
+                None => (false, None),
+            },
+        );
         if let Some(a) = act {
             return a;
         }
@@ -329,25 +415,42 @@ impl Inventory {
     fn step_dialog(&mut self, w: &mut World) -> Action {
         let mut d = self.dialog.take().expect("dialog");
         let mut result = None;
-        let (consumed, _) = kit::run_step(&mut d, w, |p| &mut p.c, |p, w, _src, code| {
-            match code {
-                0 => {
-                    w.sfx(super::SFX_ACCEPT, 64);
-                    // 0x0801E14C: the supply's use script, run synchronously by the game
-                    if let Some(sc) = w.data.menu.as_ref().and_then(|m| m.inv.script.get(p.item as usize).cloned()).flatten() {
-                        let run = crate::fieldcontent::Callback::Script(sc);
-                        w.events.push(crate::world::Event::Field(crate::field::FieldEvent::Run { run, cause: crate::field::Cause::ItemUse { item: p.item }, slot: 0 }));
+        let (consumed, _) = kit::run_step(
+            &mut d,
+            w,
+            |p| &mut p.c,
+            |p, w, _src, code| {
+                match code {
+                    0 => {
+                        w.sfx(super::SFX_ACCEPT, 64);
+                        // 0x0801E14C: the supply's use script, run synchronously by the game
+                        if let Some(sc) = w
+                            .data
+                            .menu
+                            .as_ref()
+                            .and_then(|m| m.inv.script.get(p.item as usize).cloned())
+                            .flatten()
+                        {
+                            let run = crate::fieldcontent::Callback::Script(sc);
+                            w.events.push(crate::world::Event::Field(
+                                crate::field::FieldEvent::Run {
+                                    run,
+                                    cause: crate::field::Cause::ItemUse { item: p.item },
+                                    slot: 0,
+                                },
+                            ));
+                        }
+                        result = Some(1);
                     }
-                    result = Some(1);
+                    1 => {
+                        w.sfx(super::SFX_MENU, 64);
+                        result = Some(2);
+                    }
+                    _ => {}
                 }
-                1 => {
-                    w.sfx(super::SFX_MENU, 64);
-                    result = Some(2);
-                }
-                _ => {}
-            }
-            (result.is_some(), None)
-        });
+                (result.is_some(), None)
+            },
+        );
         if let Some(r) = result {
             // the dialog's mode ends: BG0 off (the page's last picture shows), then the page goes on
             if let Some(Screen::Inventory(s)) = w.menu.shown.as_deref_mut() {
@@ -405,10 +508,25 @@ impl Inventory {
                 let item = list[idx as usize] as usize;
                 let icon = d.inv.icon.get(item).cloned().unwrap_or_default();
                 let (iw, ih) = (16, 16);
-                cv.image(&icon, 0, iw, ih, 0x25 - (iw as i32 / 2), 18 * k + 0x34 - (ih as i32 / 2));
+                cv.image(
+                    &icon,
+                    0,
+                    iw,
+                    ih,
+                    0x25 - (iw as i32 / 2),
+                    18 * k + 0x34 - (ih as i32 / 2),
+                );
                 let cnt = self.counts.get(idx as usize).copied().unwrap_or(0);
-                let name = if cnt > 1 { d.inv.plural.get(item) } else { d.inv.name.get(item) };
-                pen.colour = if self.c.sel == 2 && self.cur == idx { 6 } else { 2 };
+                let name = if cnt > 1 {
+                    d.inv.plural.get(item)
+                } else {
+                    d.inv.name.get(item)
+                };
+                pen.colour = if self.c.sel == 2 && self.cur == idx {
+                    6
+                } else {
+                    2
+                };
                 pen.x = 0x38;
                 pen.y = 18 * k + 0x38;
                 cv.text(t, &mut pen, name.map(|v| v.as_slice()).unwrap_or(&[]));
@@ -422,14 +540,28 @@ impl Inventory {
         let (gx, gy) = (0xAC, 0x88);
         cv.image("ui/images/gauge_hp_ep.png", 0, 53, 9, gx, gy);
         let (hp, ep) = self.gauge;
-        for (row, col0, v) in [(1, 9, hp), (2, 8, hp), (3, 7, hp), (5, 5, ep), (6, 4, ep), (7, 3, ep)] {
+        for (row, col0, v) in [
+            (1, 9, hp),
+            (2, 8, hp),
+            (3, 7, hp),
+            (5, 5, ep),
+            (6, 4, ep),
+            (7, 3, ep),
+        ] {
             if v < 41 {
                 cv.fill(gx + col0 + v, gy + row, gx + col0 + 41, gy + row + 1, 1);
             }
         }
         let mut mv = super::surface_view(cv);
         if let Some(dl) = &self.dialog {
-            mv.layers.push(wf_view::MenuLayer { w: 208, h: 104, x: 16, y: 40, priority: 0, ops: dl.draw(d).ops });
+            mv.layers.push(wf_view::MenuLayer {
+                w: 208,
+                h: 104,
+                x: 16,
+                y: 40,
+                priority: 0,
+                ops: dl.draw(d).ops,
+            });
         }
         mv
     }
@@ -453,11 +585,29 @@ impl UseDialog {
         let has = d.inv.script.get(item as usize).is_some_and(|s| s.is_some());
         let use_s = t.s(77);
         c.add(Widget::Button(Button::new(BTN_A, 0xC, 0x4C, 0, has, false)));
-        c.add(Widget::Label(Label { x: 0x1C, y: 0x58, text: use_s.to_vec(), colour: 5, align: 0, font: Font::Menu }));
+        c.add(Widget::Label(Label {
+            x: 0x1C,
+            y: 0x58,
+            text: use_s.to_vec(),
+            colour: 5,
+            align: 0,
+            font: Font::Menu,
+        }));
         let bx = t.font(MenuFont::Menu).measure(use_s) + 0x1E;
         c.add(Widget::Button(Button::new(BTN_B, bx, 0x4C, 1, true, false)));
-        c.add(Widget::Label(Label { x: bx + 0x10, y: 0x58, text: t.s(26).to_vec(), colour: 5, align: 0, font: Font::Menu }));
-        UseDialog { c, item, shown: false }
+        c.add(Widget::Label(Label {
+            x: bx + 0x10,
+            y: 0x58,
+            text: t.s(26).to_vec(),
+            colour: 5,
+            align: 0,
+            font: Font::Menu,
+        }));
+        UseDialog {
+            c,
+            item,
+            shown: false,
+        }
     }
 
     /// redraw `0x0801E318`: 208x104
@@ -467,15 +617,32 @@ impl UseDialog {
         dialog_frame(&mut cv, 208, 104);
         let i = self.item as usize;
         let (iw, ih) = (16, 16);
-        cv.image(d.inv.icon.get(i).map(|s| s.as_str()).unwrap_or(""), 0, iw as u16, ih as u16, 0x10, 6);
+        cv.image(
+            d.inv.icon.get(i).map(|s| s.as_str()).unwrap_or(""),
+            0,
+            iw as u16,
+            ih as u16,
+            0x10,
+            6,
+        );
         let mut pen = Pen::new(MenuFont::Menu, iw + 0x12, ih / 2 + 0xC, 0, 5, Some(1));
         pen.line_h = 0xC;
         pen.clip = [0, 0, 208, 104];
-        cv.text(t, &mut pen, d.inv.name.get(i).map(|v| v.as_slice()).unwrap_or(&[]));
+        cv.text(
+            t,
+            &mut pen,
+            d.inv.name.get(i).map(|v| v.as_slice()).unwrap_or(&[]),
+        );
         pen.colour = 0x75;
         pen.x = 0x12;
         pen.y = ih + 0x12;
-        text_wrap(&mut cv, t, &mut pen, 0xB0, d.inv.desc.get(i).map(|v| v.as_slice()).unwrap_or(&[]));
+        text_wrap(
+            &mut cv,
+            t,
+            &mut pen,
+            0xB0,
+            d.inv.desc.get(i).map(|v| v.as_slice()).unwrap_or(&[]),
+        );
         self.c.draw(t, &mut cv);
         cv
     }
@@ -532,28 +699,49 @@ impl Page for Inventory {
     /// iteration 1,009,750): the page's constant part + its draw list (`sndsim::layer_cycles`)
     fn redraw_time(&self, w: &World, d: &MenuData) -> Option<crate::sndsim::Redraw> {
         let v = self.draw(w, d);
-        let layer = |k: usize, line: i64| v.layers.get(k).map(|l| crate::sndsim::layer_cycles(&d.text, &l.ops, line)).unwrap_or(0);
+        let layer = |k: usize, line: i64| {
+            v.layers
+                .get(k)
+                .map(|l| crate::sndsim::layer_cycles(&d.text, &l.ops, line))
+                .unwrap_or(0)
+        };
         let rows = (self.list().len() as i64 - self.top as i64).clamp(0, 5);
-        let gn0 = v.layers.first().map(|l| crate::sndsim::ops_cost(&d.text, &l.ops).0).unwrap_or(0);
-        let mut own = LIST_CYCLES + ROW_CYCLES * rows + layer(0, LINE_CYCLES) + gn0 * LIST_GN_MILLI / 1000;
+        let gn0 = v
+            .layers
+            .first()
+            .map(|l| crate::sndsim::ops_cost(&d.text, &l.ops).0)
+            .unwrap_or(0);
+        let mut own =
+            LIST_CYCLES + ROW_CYCLES * rows + layer(0, LINE_CYCLES) + gn0 * LIST_GN_MILLI / 1000;
         if self.fresh {
             own += ENTER_CYCLES;
         }
         if let Some(dl) = self.dialog.as_ref() {
-            let gn1 = v.layers.get(1).map(|l| crate::sndsim::ops_cost(&d.text, &l.ops).0).unwrap_or(0);
-            let dlg = DIALOG_REDRAW_CYCLES + layer(1, DIALOG_LINE_CYCLES) + gn1 * DIALOG_GN_MILLI / 1000;
+            let gn1 = v
+                .layers
+                .get(1)
+                .map(|l| crate::sndsim::ops_cost(&d.text, &l.ops).0)
+                .unwrap_or(0);
+            let dlg =
+                DIALOG_REDRAW_CYCLES + layer(1, DIALOG_LINE_CYCLES) + gn1 * DIALOG_GN_MILLI / 1000;
             if dl.shown {
                 own = dlg;
             } else {
                 own += DIALOG_CYCLES + dlg;
             }
         }
-        Some(crate::sndsim::Redraw { t0: T0, base: own - T0 })
+        Some(crate::sndsim::Redraw {
+            t0: T0,
+            base: own - T0,
+        })
     }
 }
 
 /// a harness opening this screen from JSON (`menu::open_from_json`); None = not this screen's kind
-pub fn open_json(_w: &World, _v: &serde_json::Value) -> Option<(super::Screen, super::Transition, bool)> {
+pub fn open_json(
+    _w: &World,
+    _v: &serde_json::Value,
+) -> Option<(super::Screen, super::Transition, bool)> {
     None
 }
 

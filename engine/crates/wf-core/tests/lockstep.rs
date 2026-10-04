@@ -35,11 +35,24 @@ struct Row {
     e: Option<(i64, i64, i64, i64)>,
 }
 
-const FIGHTER_OF_CHAR: [&str; 8] = ["goku", "gohan", "goten", "trunks", "vegeta", "gotenks", "vegito", "gogeta"];
+const FIGHTER_OF_CHAR: [&str; 8] = [
+    "goku", "gohan", "goten", "trunks", "vegeta", "gotenks", "vegito", "gogeta",
+];
 
 /// scenarios whose divergence is understood and not modelled (the reference's KNOWN list)
 fn known(name: &str) -> bool {
-    ["f32_ssdrain", "f33_ssdrain", "f23_bump", "f23_move", "f23_punch", "f23_skill11", "f46_punch", "f14_skill20", "f14_ssdrain"].contains(&name)
+    [
+        "f32_ssdrain",
+        "f33_ssdrain",
+        "f23_bump",
+        "f23_move",
+        "f23_punch",
+        "f23_skill11",
+        "f46_punch",
+        "f14_skill20",
+        "f14_ssdrain",
+    ]
+    .contains(&name)
 }
 
 fn i(v: &Value) -> i64 {
@@ -47,22 +60,54 @@ fn i(v: &Value) -> i64 {
 }
 
 fn expand(t: &Value) -> Vec<Row> {
-    let states: Vec<String> = t["states"].as_array().unwrap().iter().map(|s| s.as_str().unwrap().to_string()).collect();
+    let states: Vec<String> = t["states"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|s| s.as_str().unwrap().to_string())
+        .collect();
     let mut out = Vec::new();
     for g in t["rows"].as_array().unwrap() {
         let g: Vec<i64> = g.as_array().unwrap().iter().map(i).collect();
         for k in 0..g[0] {
-            out.push(Row { x: g[1] + g[3] * k, y: g[2] + g[4] * k, dir: g[5], raw: g[6], frame: g[7], state: states[g[8] as usize].clone(), hp: g[9], ep: g[10], form: g[11], rom: g[12], rng: g.get(13).copied(), sfx: vec![], dmg: vec![], e: None });
+            out.push(Row {
+                x: g[1] + g[3] * k,
+                y: g[2] + g[4] * k,
+                dir: g[5],
+                raw: g[6],
+                frame: g[7],
+                state: states[g[8] as usize].clone(),
+                hp: g[9],
+                ep: g[10],
+                form: g[11],
+                rom: g[12],
+                rng: g.get(13).copied(),
+                sfx: vec![],
+                dmg: vec![],
+                e: None,
+            });
         }
     }
     for s in t["sfx"].as_array().unwrap() {
         let a = s.as_array().unwrap();
         let f = i(&a[0]) as usize;
-        let Some(r) = out.get_mut(f.wrapping_sub(1)) else { continue };
+        let Some(r) = out.get_mut(f.wrapping_sub(1)) else {
+            continue;
+        };
         if a[1].as_str() == Some("dmg") {
             r.dmg.push(format!("{}:{}", i(&a[2]), i(&a[3])));
         } else {
-            r.sfx.push(a[1..].iter().map(|x| x.as_str().map(String::from).unwrap_or_else(|| x.to_string())).collect::<Vec<_>>().join(":"));
+            r.sfx.push(
+                a[1..]
+                    .iter()
+                    .map(|x| {
+                        x.as_str()
+                            .map(String::from)
+                            .unwrap_or_else(|| x.to_string())
+                    })
+                    .collect::<Vec<_>>()
+                    .join(":"),
+            );
         }
     }
     if let Some(er) = t["erows"].as_array() {
@@ -84,7 +129,9 @@ fn expand(t: &Value) -> Vec<Row> {
 /// 0x087043F8) r2 = -1 (never) unless the scenario wants aggro; a target dummy: state 0x14B's on-hit tree replaced by
 /// the bare ApplyDamage node 0x086FDA00 (HP loss only, no reaction)
 fn patched(aggro: bool, dummy: bool) -> Arc<GameData> {
-    static CACHE: OnceLock<std::sync::Mutex<std::collections::BTreeMap<(bool, bool), Arc<GameData>>>> = OnceLock::new();
+    static CACHE: OnceLock<
+        std::sync::Mutex<std::collections::BTreeMap<(bool, bool), Arc<GameData>>>,
+    > = OnceLock::new();
     let c = CACHE.get_or_init(Default::default);
     if let Some(d) = c.lock().unwrap().get(&(aggro, dummy)) {
         return d.clone();
@@ -102,10 +149,21 @@ fn patched(aggro: bool, dummy: bool) -> Arc<GameData> {
         }
     }
     if dummy {
-        let node = d.aux.values().flat_map(|t| t.nodes.iter()).find(|n| n.addr == 0x086f_da00).cloned();
+        let node = d
+            .aux
+            .values()
+            .flat_map(|t| t.nodes.iter())
+            .find(|n| n.addr == 0x086f_da00)
+            .cloned();
         if let Some(mut n) = node {
             n.kids.clear();
-            d.aux.insert(0x14b, Arc::new(BehTree { state: 0x14b, nodes: vec![n] }));
+            d.aux.insert(
+                0x14b,
+                Arc::new(BehTree {
+                    state: 0x14b,
+                    nodes: vec![n],
+                }),
+            );
         }
     }
     let d = Arc::new(d);
@@ -123,28 +181,57 @@ fn setup(t: &Value) -> Setup {
     let ini = &t["init"];
     let rec = &ini["rec"];
     let en = t["scenario"].get("enemy").filter(|v| !v.is_null());
-    let d = patched(en.is_none_or(|e| e["aggro"].as_bool().unwrap_or(false)), en.is_some_and(|e| e["dummy"].as_bool() != Some(false)));
+    let d = patched(
+        en.is_none_or(|e| e["aggro"].as_bool().unwrap_or(false)),
+        en.is_some_and(|e| e["dummy"].as_bool() != Some(false)),
+    );
     let scn_form = i(&t["scenario"]["form"]) as i32;
     let form = rec.get("form").map(i).unwrap_or(scn_form as i64) as i32;
     let ch = d.form(scn_form).unwrap().char_;
-    let eq: Vec<i32> = rec["equip"].as_array().unwrap().iter().map(|x| i(x) as i32).collect();
+    let eq: Vec<i32> = rec["equip"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|x| i(x) as i32)
+        .collect();
     let levels: Vec<i64> = rec["levels"].as_array().unwrap().iter().map(i).collect();
     let fighter = FighterSetup {
-        fighter: if ch == 8 { format!("f{form}") } else { FIGHTER_OF_CHAR[ch as usize].to_string() },
+        fighter: if ch == 8 {
+            format!("f{form}")
+        } else {
+            FIGHTER_OF_CHAR[ch as usize].to_string()
+        },
         form,
         level: 60,
         equip: [eq[0], eq[1], eq[2], eq[3]],
         skill_level: *levels.first().unwrap_or(&0) as i32,
         ..Default::default()
     };
-    let ety = ini.get("enemy").filter(|v| !v.is_null()).map(|e| i(&e["type"])).or_else(|| en.map(|e| i(&e["type"]))).unwrap_or(-1);
+    let ety = ini
+        .get("enemy")
+        .filter(|v| !v.is_null())
+        .map(|e| i(&e["type"]))
+        .or_else(|| en.map(|e| i(&e["type"])))
+        .unwrap_or(-1);
     let i2 = ini.get("enemy2").filter(|v| !v.is_null());
-    let arena = t["scenario"]["arena"].as_str().unwrap_or(if en.is_some() { "forest" } else { "htc" }).to_string();
+    let arena = t["scenario"]["arena"]
+        .as_str()
+        .unwrap_or(if en.is_some() { "forest" } else { "htc" })
+        .to_string();
     let phase = match i2 {
         Some(e2) => format!("t{ety}+t{}", i(&e2["type"])),
         None => format!("t{ety}"),
     };
-    let cfg = BattleConfig { arena, players: vec![fighter], phases: vec![Phase { enemy: phase, count: 1 }], rng: RngInit::State(0, 0), xp: false };
+    let cfg = BattleConfig {
+        arena,
+        players: vec![fighter],
+        phases: vec![Phase {
+            enemy: phase,
+            count: 1,
+        }],
+        rng: RngInit::State(0, 0),
+        xp: false,
+    };
     let mut s = Session::new(d, cfg);
     let w = &mut s.world;
     let pi = w.player_idx(0).unwrap();
@@ -154,12 +241,22 @@ fn setup(t: &Value) -> Setup {
         p.rec.max_hp = i(&rec["maxHp"]) as i32;
         p.rec.ep = i(&rec["ep"]) as i32;
         p.rec.max_ep = i(&rec["maxEp"]) as i32;
-        let base: Vec<i32> = rec["base"].as_array().unwrap().iter().map(|x| i(x) as i32).collect();
+        let base: Vec<i32> = rec["base"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|x| i(x) as i32)
+            .collect();
         p.rec.str_ = base[0];
         p.rec.pow = base[1];
         p.rec.end = base[2];
         p.rec.spd = base[3];
-        let skills: Vec<i32> = rec["skills"].as_array().unwrap().iter().map(|x| i(x) as i32).collect();
+        let skills: Vec<i32> = rec["skills"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|x| i(x) as i32)
+            .collect();
         p.skills = if skills.is_empty() { vec![7] } else { skills };
         p.sel = i(&rec["slot"]) as usize;
         p.skill_level = *levels.first().unwrap_or(&0) as i32;
@@ -172,7 +269,14 @@ fn setup(t: &Value) -> Setup {
     p.a.y = i(&ini["y"]) as i32;
     p.a.facing = i(&ini["dir"]) as u8;
     *w.pl(pi) = p;
-    player::lockstep_init(w, pi, i(&ini["raw"]) as i32, i(&ini["frame"]) as i32, i(&ini["tick"]) as i32, ini["state"].as_str().unwrap_or("idle"));
+    player::lockstep_init(
+        w,
+        pi,
+        i(&ini["raw"]) as i32,
+        i(&ini["frame"]) as i32,
+        i(&ini["tick"]) as i32,
+        ini["state"].as_str().unwrap_or("idle"),
+    );
     let obj = &ini["obj"];
     let has = |k: &str| obj.get(k).filter(|v| !v.is_null()).cloned();
     let (ss, ss3, ctl) = {
@@ -189,7 +293,12 @@ fn setup(t: &Value) -> Setup {
             p.fus_cnt = i(&v) as i32;
         }
         if let Some(pt) = ini.get("partner").filter(|v| !v.is_null()) {
-            let base: Vec<i32> = pt["base"].as_array().unwrap().iter().map(|x| i(x) as i32).collect();
+            let base: Vec<i32> = pt["base"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|x| i(x) as i32)
+                .collect();
             p.partner = Some(Partner {
                 form: i(&pt["form"]) as i32,
                 hp: i(&pt["hp"]) as i32,
@@ -197,9 +306,18 @@ fn setup(t: &Value) -> Setup {
                 ep: i(&pt["ep"]) as i32,
                 max_ep: i(&pt["maxEp"]) as i32,
                 base: [base[0], base[1], base[2], base[3]],
-                skills: pt["skills"].as_array().unwrap().iter().map(|x| i(x) as i32).collect(),
+                skills: pt["skills"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|x| i(x) as i32)
+                    .collect(),
                 slot: i(&pt["slot"]) as usize,
-                level0: pt["levels"].as_array().and_then(|l| l.first()).map(i).unwrap_or(0) as i32,
+                level0: pt["levels"]
+                    .as_array()
+                    .and_then(|l| l.first())
+                    .map(i)
+                    .unwrap_or(0) as i32,
                 ss_gauge: i(&pt["ssGauge"]) as i32,
                 ss3_gauge: i(&pt["ss3Gauge"]),
                 cooldown: i(&pt["cooldown"]) as i32,
@@ -228,14 +346,24 @@ fn setup(t: &Value) -> Setup {
         w.g.last_beep = -i(&v);
     }
     // the frame counter 0x03000F94 at frame 0: every f02_vs_enemy recording starts from the same setup, 9634
-    w.g.fc0 = ini.get("fc").filter(|v| !v.is_null()).map(i).unwrap_or(if ini.get("enemy").is_some_and(|v| !v.is_null()) { 9634 } else { 0 });
+    w.g.fc0 = ini.get("fc").filter(|v| !v.is_null()).map(i).unwrap_or(
+        if ini.get("enemy").is_some_and(|v| !v.is_null()) {
+            9634
+        } else {
+            0
+        },
+    );
     // the recorded mark ages are relative to the frame counter (the AI's clock = fc0 + frame, `Globals::clock`)
     let fc0 = w.g.fc0;
     let mut ai_starts: Vec<(u32, EntityId, u16)> = vec![];
     let mut enemy = None;
     if let (Some(_), Some(ie)) = (en, ini.get("enemy").filter(|v| !v.is_null())) {
         // the recorded enemy: the fight's own (not a part it spawned; Worm Head's segments come before it in the list)
-        if let Some(ei) = w.ents.iter().position(|e| matches!(&e.body, Body::Enemy(x) if x.parent == 0)) {
+        if let Some(ei) = w
+            .ents
+            .iter()
+            .position(|e| matches!(&e.body, Body::Enemy(x) if x.parent == 0))
+        {
             wf_core::enemy::unmark_self(w, ei);
             {
                 let e = w.en(ei);
@@ -249,10 +377,18 @@ fn setup(t: &Value) -> Setup {
             e.hp1024 = i(&ie["hp"]);
             let raw = ie.get("raw").map(i).unwrap_or(0) as i32;
             if raw > 0 {
-                if let Some(&k) = e.a.sprite.and_then(|s| dd.sprite(s)).and_then(|s| s.by_raw.get(&raw)) {
+                if let Some(&k) =
+                    e.a.sprite
+                        .and_then(|s| dd.sprite(s))
+                        .and_then(|s| s.by_raw.get(&raw))
+                {
                     e.a.anim = Some(k);
                 }
-                e.ea.pos = player::AnimPos { raw, frame: ie.get("frame").map(i).unwrap_or(0) as i32, tick: ie.get("tick").map(i).unwrap_or(0) as i32 };
+                e.ea.pos = player::AnimPos {
+                    raw,
+                    frame: ie.get("frame").map(i).unwrap_or(0) as i32,
+                    tick: ie.get("tick").map(i).unwrap_or(0) as i32,
+                };
             }
             if let Some(a) = ie.get("mark1Age").map(i).filter(|&a| a < 1_000_000) {
                 e.mark1 = fc0 - a;
@@ -265,13 +401,21 @@ fn setup(t: &Value) -> Setup {
             // a real enemy starts its AI fresh at frame 1 (the emulator's injected GotoState(initial state))
             if scn["dummy"].as_bool() == Some(false) {
                 let ty = w.en_ref(ei).ty;
-                let st = scn.get("state").filter(|v| !v.is_null()).map(|v| i(v) as u16).unwrap_or_else(|| w.data.enemy(ty).unwrap().ai);
+                let st = scn
+                    .get("state")
+                    .filter(|v| !v.is_null())
+                    .map(|v| i(v) as u16)
+                    .unwrap_or_else(|| w.data.enemy(ty).unwrap().ai);
                 ai_starts.push((1, w.ents[ei].id, st));
             }
             if let Some(e2i) = i2 {
                 let t2 = i(&e2i["type"]) as i32;
                 let me = w.ents[ei].id;
-                if let Some(k) = w.ents.iter().position(|x| x.id != me && matches!(&x.body, Body::Enemy(e) if e.ty == t2)) {
+                if let Some(k) = w
+                    .ents
+                    .iter()
+                    .position(|x| x.id != me && matches!(&x.body, Body::Enemy(e) if e.ty == t2))
+                {
                     wf_core::enemy::unmark_self(w, k);
                     {
                         let e = w.en(k);
@@ -293,9 +437,17 @@ fn setup(t: &Value) -> Setup {
                     let e = w.en(k);
                     let raw = i(&e2i["raw"]) as i32;
                     if raw > 0 {
-                        if let Some(&a) = e.a.sprite.and_then(|s| dd.sprite(s)).and_then(|s| s.by_raw.get(&raw)) {
+                        if let Some(&a) =
+                            e.a.sprite
+                                .and_then(|s| dd.sprite(s))
+                                .and_then(|s| s.by_raw.get(&raw))
+                        {
                             e.a.anim = Some(a);
-                            e.ea.pos = player::AnimPos { raw, frame: e2i.get("frame").map(i).unwrap_or(0) as i32, tick: e2i.get("tick").map(i).unwrap_or(0) as i32 };
+                            e.ea.pos = player::AnimPos {
+                                raw,
+                                frame: e2i.get("frame").map(i).unwrap_or(0) as i32,
+                                tick: e2i.get("tick").map(i).unwrap_or(0) as i32,
+                            };
                         }
                     }
                     if let Some(a) = e2i.get("mark1Age").map(i).filter(|&a| a < 1_000_000) {
@@ -306,14 +458,21 @@ fn setup(t: &Value) -> Setup {
                     }
                     if let Some(pt) = partner {
                         let ty = w.en_ref(k).ty;
-                        let st = pt.get("state").filter(|v| !v.is_null()).map(|v| i(v) as u16).unwrap_or_else(|| w.data.enemy(ty).unwrap().ai);
+                        let st = pt
+                            .get("state")
+                            .filter(|v| !v.is_null())
+                            .map(|v| i(v) as u16)
+                            .unwrap_or_else(|| w.data.enemy(ty).unwrap().ai);
                         ai_starts.push((2, w.ents[k].id, st));
                     }
                 }
             }
         }
     }
-    w.rng.set_state([ini["rng"][0].as_u64().unwrap() as u32, ini["rng"][1].as_u64().unwrap() as u32]);
+    w.rng.set_state([
+        ini["rng"][0].as_u64().unwrap() as u32,
+        ini["rng"][1].as_u64().unwrap() as u32,
+    ]);
     let hits: Vec<InjectedHit> = t["scenario"]["hits"]
         .as_array()
         .map(|a| {
@@ -330,7 +489,12 @@ fn setup(t: &Value) -> Setup {
         })
         .unwrap_or_default();
     let pid = w.ents[pi].id;
-    let injector = w.add(Body::Injector(Box::new(Injector { hits, player: pid, now: 0, ai: ai_starts })));
+    let injector = w.add(Body::Injector(Box::new(Injector {
+        hits,
+        player: pid,
+        now: 0,
+        ai: ai_starts,
+    })));
     Setup { s, enemy, injector }
 }
 
@@ -338,15 +502,43 @@ fn row(w: &World, sfx: Vec<String>, dmg: Vec<String>, enemy: Option<EntityId>) -
     let pi = w.player_idx(0).unwrap();
     let p = w.pl_ref(pi);
     let (state, raw, frame, rom) = player::lockstep_view(w, pi);
-    let e = enemy.and_then(|id| w.enemy_by_id(id)).map(|(_, e)| (e.a.x as i64, e.a.y as i64, e.a.facing as i64, e.hp1024));
+    let e = enemy
+        .and_then(|id| w.enemy_by_id(id))
+        .map(|(_, e)| (e.a.x as i64, e.a.y as i64, e.a.facing as i64, e.hp1024));
     // the eaten player: the recorder finds no player object (position / facing 0)
-    let (x, y, dir) = if p.gone { (0, 0, 0) } else { (p.a.x as i64, p.a.y as i64, p.a.facing as i64) };
-    Row { x, y, dir, raw: raw as i64, frame: frame as i64, state, hp: p.hp() as i64, ep: p.ep() as i64, form: p.form as i64, rom: rom as i64, rng: Some(w.rng.a as i64), sfx, dmg, e }
+    let (x, y, dir) = if p.gone {
+        (0, 0, 0)
+    } else {
+        (p.a.x as i64, p.a.y as i64, p.a.facing as i64)
+    };
+    Row {
+        x,
+        y,
+        dir,
+        raw: raw as i64,
+        frame: frame as i64,
+        state,
+        hp: p.hp() as i64,
+        ep: p.ep() as i64,
+        form: p.form as i64,
+        rom: rom as i64,
+        rng: Some(w.rng.a as i64),
+        sfx,
+        dmg,
+        e,
+    }
 }
 
 fn replay(t: &Value) -> Vec<Row> {
-    let Setup { mut s, enemy, injector } = setup(t);
-    let lag: std::collections::BTreeSet<u32> = t["lag"].as_array().map(|a| a.iter().map(|x| i(x) as u32).collect()).unwrap_or_default();
+    let Setup {
+        mut s,
+        enemy,
+        injector,
+    } = setup(t);
+    let lag: std::collections::BTreeSet<u32> = t["lag"]
+        .as_array()
+        .map(|a| a.iter().map(|x| i(x) as u32).collect())
+        .unwrap_or_default();
     let pid = s.world.players[0];
     // the last known enemy row (an enemy removed from the world keeps its last values in the reference)
     let mut last_e = None;
@@ -388,20 +580,44 @@ fn replay(t: &Value) -> Vec<Row> {
                     Event::DamageRoll { dmg: d, .. } => roll = Some(*d),
                     Event::Damage { target, dmg: d, .. } => {
                         let d = roll.take().unwrap_or(*d);
-                        dmg.push(format!("{}:{d}", if *target == pid { 0 } else if Some(*target) == enemy { 1 } else { -1 }))
+                        dmg.push(format!(
+                            "{}:{d}",
+                            if *target == pid {
+                                0
+                            } else if Some(*target) == enemy {
+                                1
+                            } else {
+                                -1
+                            }
+                        ))
                     }
                     _ => {}
                 }
             }
             if let Ok(range) = std::env::var("LOCKSTEP_TRACE") {
                 // debugging: per frame in FROM-TO the RNG calls and every enemy's AI stack / animation
-                let (a, b) = range.split_once('-').map(|(a, b)| (a.parse().unwrap_or(0), b.parse().unwrap_or(0))).unwrap_or((0, 0));
+                let (a, b) = range
+                    .split_once('-')
+                    .map(|(a, b)| (a.parse().unwrap_or(0), b.parse().unwrap_or(0)))
+                    .unwrap_or((0, 0));
                 if f >= a && f <= b {
                     let w = &s.world;
                     let mut line = format!("{f} rng#{} {:08x}", w.rng.calls, w.rng.a);
                     for k in 0..w.ents.len() {
                         if let Body::Enemy(e) = &w.ents[k].body {
-                            line += &format!(" | e{} t{:x} {:x?} raw{} f{} t{} rule{} {},{} d{}", w.ents[k].id, e.ty, e.ai.states(), e.ea.pos.raw, e.ea.pos.frame, e.ea.pos.tick, e.ea.rule, e.a.x, e.a.y, e.a.facing);
+                            line += &format!(
+                                " | e{} t{:x} {:x?} raw{} f{} t{} rule{} {},{} d{}",
+                                w.ents[k].id,
+                                e.ty,
+                                e.ai.states(),
+                                e.ea.pos.raw,
+                                e.ea.pos.frame,
+                                e.ea.pos.tick,
+                                e.ea.rule,
+                                e.a.x,
+                                e.a.y,
+                                e.a.facing
+                            );
                         } else {
                             line += &format!(" | {}", w.ents[k].kind());
                         }
@@ -427,7 +643,9 @@ fn compare(exp: &[Row], got: &[Row]) -> Option<(usize, Vec<&'static str>)> {
         if e.state == "vt_00000000" && e.rom == 0 && e.hp == 0 && k > 0 && exp[k - 1].hp == 0 {
             break;
         }
-        let Some(g) = got.get(k) else { return Some((k + 1, vec!["missing"])) };
+        let Some(g) = got.get(k) else {
+            return Some((k + 1, vec!["missing"]));
+        };
         let no_anim = g.raw == -1 && (e.raw <= 0 || e.rom == 0);
         let swapped = e.raw == -1 && e.rom != 0 && e.rom == g.rom;
         let mut bad = vec![];
@@ -467,7 +685,12 @@ fn compare(exp: &[Row], got: &[Row]) -> Option<(usize, Vec<&'static str>)> {
 fn lockstep_vs_emulator() {
     let dir = battle_data("buu_lockstep");
     let filter = std::env::var("LOCKSTEP").ok();
-    let mut files: Vec<_> = std::fs::read_dir(&dir).unwrap().flatten().map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "json")).collect();
+    let mut files: Vec<_> = std::fs::read_dir(&dir)
+        .unwrap()
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.extension().is_some_and(|x| x == "json"))
+        .collect();
     files.sort();
     let (mut pass, mut fail, mut skipped) = (Vec::new(), Vec::new(), 0);
     let mut frames = 0usize;
@@ -490,9 +713,17 @@ fn lockstep_vs_emulator() {
                 None => pass.push(name),
                 Some((fr, fields)) => {
                     if filter.is_some() {
-                        eprintln!("{name}: first divergence at frame {fr} ({})", fields.join(", "));
+                        eprintln!(
+                            "{name}: first divergence at frame {fr} ({})",
+                            fields.join(", ")
+                        );
                         for k in fr.saturating_sub(4)..(fr + 1).min(exp.len()) {
-                            eprintln!("  {:5} emu {:?}\n        sim {:?}", k + 1, exp[k], got.get(k));
+                            eprintln!(
+                                "  {:5} emu {:?}\n        sim {:?}",
+                                k + 1,
+                                exp[k],
+                                got.get(k)
+                            );
                         }
                     }
                     fail.push(format!("{name}: frame {fr} ({})", fields.join(", ")));
@@ -500,15 +731,28 @@ fn lockstep_vs_emulator() {
             }
         }
     }
-    eprintln!("lockstep: {} pass, {} fail, {} known-skipped, {frames} frames compared", pass.len(), fail.len(), skipped);
+    eprintln!(
+        "lockstep: {} pass, {} fail, {} known-skipped, {frames} frames compared",
+        pass.len(),
+        fail.len(),
+        skipped
+    );
     for f in fail.iter().take(60) {
         eprintln!("  FAIL {f}");
     }
     if let Ok(p) = std::env::var("LOCKSTEP_EXPECT") {
-        let want: std::collections::BTreeSet<String> = std::fs::read_to_string(p).unwrap().lines().filter(|l| !l.is_empty()).map(String::from).collect();
+        let want: std::collections::BTreeSet<String> = std::fs::read_to_string(p)
+            .unwrap()
+            .lines()
+            .filter(|l| !l.is_empty())
+            .map(String::from)
+            .collect();
         let got: std::collections::BTreeSet<String> = pass.iter().cloned().collect();
         let missing: Vec<_> = want.difference(&got).collect();
-        assert!(missing.is_empty(), "reference passes these, wf-core does not: {missing:?}");
+        assert!(
+            missing.is_empty(),
+            "reference passes these, wf-core does not: {missing:?}"
+        );
     }
     if filter.is_none() {
         assert!(fail.is_empty(), "{} lockstep failures", fail.len());

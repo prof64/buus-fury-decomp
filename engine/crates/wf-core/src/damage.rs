@@ -20,7 +20,15 @@ pub struct AttackType {
 }
 
 pub const fn atk(sub: u8) -> AttackType {
-    AttackType { sub, kind: if sub == 0 || sub == 2 || sub == 3 { 0 } else { 1 }, power: if sub == 16 { 0 } else { 1024 } }
+    AttackType {
+        sub,
+        kind: if sub == 0 || sub == 2 || sub == 3 {
+            0
+        } else {
+            1
+        },
+        power: if sub == 16 { 0 } else { 1024 },
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -40,7 +48,16 @@ pub struct CombatStats {
 
 impl Default for CombatStats {
     fn default() -> Self {
-        CombatStats { str_: 1, pow: 1, end: 0, end2: 0, res_m: 128, res_e: 128, crit_bonus: 0, block_factor: 0x1000 }
+        CombatStats {
+            str_: 1,
+            pow: 1,
+            end: 0,
+            end2: 0,
+            res_m: 128,
+            res_e: 128,
+            crit_bonus: 0,
+            block_factor: 0x1000,
+        }
     }
 }
 
@@ -64,7 +81,16 @@ pub fn effective_def(d: i64) -> i64 {
 /// draws: crit chance (melee, sub != 3), then rand(26). `roll` overrides the RNG (formula-coverage tests).
 #[allow(clippy::too_many_arguments)]
 pub fn compute_damage_raw(
-    kind: u8, sub: u8, power: i64, mult: i64, s: i64, crit_bonus: i64, d: i64, resist: i64, blocking: bool, block_factor: i64,
+    kind: u8,
+    sub: u8,
+    power: i64,
+    mult: i64,
+    s: i64,
+    crit_bonus: i64,
+    d: i64,
+    resist: i64,
+    blocking: bool,
+    block_factor: i64,
     rng: &mut dyn FnMut(Draw) -> i64,
 ) -> DamageResult {
     let mut p = power;
@@ -89,7 +115,12 @@ pub fn compute_damage_raw(
     if blocking && dmg != 0 {
         dmg = (dmg * block_factor) >> 16;
     }
-    DamageResult { crit, raw, dmg, unblocked }
+    DamageResult {
+        crit,
+        raw,
+        dmg,
+        unblocked,
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -106,7 +137,14 @@ pub fn rng_draw(rng: &mut Rng) -> impl FnMut(Draw) -> i64 + '_ {
 }
 
 /// attacker / defender form: picks STR/END/resist by kind; `blocking` must include the frontal test
-pub fn compute_damage(a: AttackType, mult: i32, att: &CombatStats, def: &CombatStats, blocking: bool, rng: &mut Rng) -> DamageResult {
+pub fn compute_damage(
+    a: AttackType,
+    mult: i32,
+    att: &CombatStats,
+    def: &CombatStats,
+    blocking: bool,
+    rng: &mut Rng,
+) -> DamageResult {
     let melee = a.kind == 0;
     compute_damage_raw(
         a.kind,

@@ -22,7 +22,9 @@ pub struct GameOver {
 
 impl GameOver {
     pub fn new(w: &World) -> GameOver {
-        GameOver { stub: StubPage::new(w, 0) }
+        GameOver {
+            stub: StubPage::new(w, 0),
+        }
     }
 }
 
@@ -42,7 +44,10 @@ impl Page for GameOver {
 }
 
 /// a harness opening this screen from JSON (`menu::open_from_json`); None = not this screen's kind
-pub fn open_json(_w: &World, _v: &serde_json::Value) -> Option<(super::Screen, super::Transition, bool)> {
+pub fn open_json(
+    _w: &World,
+    _v: &serde_json::Value,
+) -> Option<(super::Screen, super::Transition, bool)> {
     None
 }
 
@@ -61,13 +66,19 @@ pub fn tick(w: &mut World) {
         return;
     }
     let form = w.pl_ref(i).form;
-    let to = w.data.form(form).filter(|f| f.flags & 0x40 != 0 && w.data.form(f.down).is_some()).map(|f| f.down).unwrap_or(form);
+    let to = w
+        .data
+        .form(form)
+        .filter(|f| f.flags & 0x40 != 0 && w.data.form(f.down).is_some())
+        .map(|f| f.down)
+        .unwrap_or(form);
     let mut pl = w.pl_ref(i).clone();
     pl.apply_form(w, to);
     *w.pl(i) = pl;
-    w.events.push(crate::world::Event::Field(crate::field::FieldEvent::Run {
-        run: crate::fieldcontent::Callback::Event("s000".into()),
-        cause: crate::field::Cause::Menu,
-        slot: 0,
-    }));
+    w.events
+        .push(crate::world::Event::Field(crate::field::FieldEvent::Run {
+            run: crate::fieldcontent::Callback::Event("s000".into()),
+            cause: crate::field::Cause::Menu,
+            slot: 0,
+        }));
 }

@@ -84,33 +84,87 @@ pub struct Step {
 pub enum StepOp {
     Stand,
     /// frames (s16), facing (u8, engine dir)
-    Wait { frames: i32, face: u8 },
+    Wait {
+        frames: i32,
+        face: u8,
+    },
     /// variant 0 = `0x0800A1AF`, 1 = `0x0800A1D5`
-    WalkTo { x: i32, y: i32, param: i32, variant: u8 },
+    WalkTo {
+        x: i32,
+        y: i32,
+        param: i32,
+        variant: u8,
+    },
     /// variant 0..3 = `0x0800A75B` / `A7DF` / `A82D` / `A8E9`
-    Wander { period: i32, variant: u8 },
+    Wander {
+        period: i32,
+        variant: u8,
+    },
     /// variant 0..2 = `0x0800A7A1` / `A811` / `A85F`
-    WanderRect { period: i32, rect: Rect, variant: u8 },
-    CutsceneMove { x: i32, y: i32, param: u32 },
+    WanderRect {
+        period: i32,
+        rect: Rect,
+        variant: u8,
+    },
+    CutsceneMove {
+        x: i32,
+        y: i32,
+        param: u32,
+    },
     Unknown,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ObjKind {
-    Trigger { rect: Rect, act: Activation, kind: TriggerKind },
-    Enemy { ty: i32, x: i32, y: i32, sprite: i32, on_defeat: Option<Callback>, behaviour: Vec<Step> },
-    Npc { x: i32, y: i32, sprite: i32, talk: Option<String>, behaviour: Vec<Step> },
-    Breakable { prop: i32, param_a: i32, hits: i32, on_break: Option<Callback> },
+    Trigger {
+        rect: Rect,
+        act: Activation,
+        kind: TriggerKind,
+    },
+    Enemy {
+        ty: i32,
+        x: i32,
+        y: i32,
+        sprite: i32,
+        on_defeat: Option<Callback>,
+        behaviour: Vec<Step>,
+    },
+    Npc {
+        x: i32,
+        y: i32,
+        sprite: i32,
+        talk: Option<String>,
+        behaviour: Vec<Step>,
+    },
+    Breakable {
+        prop: i32,
+        param_a: i32,
+        hits: i32,
+        on_break: Option<Callback>,
+    },
     /// item >= 0 supply, < 0 equipment (as the def stores it)
-    Item { item: i32, x: i32, y: i32, on_pickup: Option<Callback> },
+    Item {
+        item: i32,
+        x: i32,
+        y: i32,
+        on_pickup: Option<Callback>,
+    },
     /// a level sign: `label` = (frame of `effects/field_labels`, prop index it hangs on)
-    MapSprite { x: i32, y: i32, sprite: i32, params: [i32; 3], label: Option<(i32, i32)> },
+    MapSprite {
+        x: i32,
+        y: i32,
+        sprite: i32,
+        params: [i32; 3],
+        label: Option<(i32, i32)>,
+    },
     Unknown,
 }
 
 /// where a placed object comes from: an area list (0 triggers, 1 actors, 2 breakables, 3 items, 4 map sprites) or the
 /// map header's exits
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
 pub enum ObjRef {
     Header(u16),
     List(u8, u16),
@@ -255,7 +309,10 @@ fn dir_of(s: &str) -> Option<Dir> {
 
 fn hexs(v: &Value) -> u32 {
     match v {
-        Value::String(s) => u32::from_str_radix(s.trim_start_matches("0x").trim_start_matches("0X"), 16).unwrap_or(0),
+        Value::String(s) => {
+            u32::from_str_radix(s.trim_start_matches("0x").trim_start_matches("0X"), 16)
+                .unwrap_or(0)
+        }
         _ => int(v) as u32,
     }
 }
@@ -283,7 +340,9 @@ fn callback(v: &Value) -> Option<Callback> {
     if let Some(s) = v.get("script").and_then(|s| s.as_str()) {
         return Some(Callback::Script(s.to_string()));
     }
-    v.get("event").and_then(|s| s.as_str()).map(|s| Callback::Event(s.to_string()))
+    v.get("event")
+        .and_then(|s| s.as_str())
+        .map(|s| Callback::Event(s.to_string()))
 }
 
 fn rect(v: &Value) -> Rect {
@@ -318,23 +377,52 @@ fn steps(v: &Value) -> Vec<Step> {
     for s in v.as_array().into_iter().flatten() {
         let rom = &s["rom"];
         let func = hexs(&rom["fn"]);
-        let words: Vec<u32> = rom["words"].as_array().into_iter().flatten().map(hexs).collect();
+        let words: Vec<u32> = rom["words"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(hexs)
+            .collect();
         let w = |i: usize| words.get(i).copied().unwrap_or(0);
         let lo = |x: u32| (x & 0xFFFF) as i16 as i32;
         let hi = |x: u32| (x >> 16) as i16 as i32;
         let op = match func {
             0x0800_A26F => StepOp::Stand,
-            0x0800_A223 => StepOp::Wait { frames: lo(w(0)), face: ((w(0) >> 16) & 0xFF) as u8 },
-            0x0800_A1AF | 0x0800_A1D5 => StepOp::WalkTo { x: lo(w(0)), y: hi(w(0)), param: w(1) as i32, variant: (func == 0x0800_A1D5) as u8 },
-            0x0800_A75B | 0x0800_A7DF | 0x0800_A82D | 0x0800_A8E9 => {
-                StepOp::Wander { period: w(0) as i32, variant: [0x0800_A75B, 0x0800_A7DF, 0x0800_A82D, 0x0800_A8E9].iter().position(|&f| f == func).unwrap_or(0) as u8 }
-            }
+            0x0800_A223 => StepOp::Wait {
+                frames: lo(w(0)),
+                face: ((w(0) >> 16) & 0xFF) as u8,
+            },
+            0x0800_A1AF | 0x0800_A1D5 => StepOp::WalkTo {
+                x: lo(w(0)),
+                y: hi(w(0)),
+                param: w(1) as i32,
+                variant: (func == 0x0800_A1D5) as u8,
+            },
+            0x0800_A75B | 0x0800_A7DF | 0x0800_A82D | 0x0800_A8E9 => StepOp::Wander {
+                period: w(0) as i32,
+                variant: [0x0800_A75B, 0x0800_A7DF, 0x0800_A82D, 0x0800_A8E9]
+                    .iter()
+                    .position(|&f| f == func)
+                    .unwrap_or(0) as u8,
+            },
             0x0800_A7A1 | 0x0800_A811 | 0x0800_A85F => StepOp::WanderRect {
                 period: w(0) as i32,
-                rect: Rect::new((w(1) & 0xFFFF) as i32, (w(1) >> 16) as i32, (w(2) & 0xFFFF) as i32, (w(2) >> 16) as i32),
-                variant: [0x0800_A7A1, 0x0800_A811, 0x0800_A85F].iter().position(|&f| f == func).unwrap_or(0) as u8,
+                rect: Rect::new(
+                    (w(1) & 0xFFFF) as i32,
+                    (w(1) >> 16) as i32,
+                    (w(2) & 0xFFFF) as i32,
+                    (w(2) >> 16) as i32,
+                ),
+                variant: [0x0800_A7A1, 0x0800_A811, 0x0800_A85F]
+                    .iter()
+                    .position(|&f| f == func)
+                    .unwrap_or(0) as u8,
             },
-            0x0803_9F09 => StepOp::CutsceneMove { x: lo(w(0)), y: hi(w(0)), param: w(1) },
+            0x0803_9F09 => StepOp::CutsceneMove {
+                x: lo(w(0)),
+                y: hi(w(0)),
+                param: w(1),
+            },
             _ => StepOp::Unknown,
         };
         out.push(Step { op, func, words });
@@ -349,41 +437,100 @@ fn xy(v: &Value) -> (i32, i32) {
 fn obj(v: &Value, at: ObjRef) -> ObjDef {
     let ty = v["type"].as_str().unwrap_or("");
     let kind = match ty {
-        "script_trigger" | "event_trigger" | "exit" | "edge_exit" | "save_point" | "message_trigger" | "region" | "trigger_unknown" => {
+        "script_trigger" | "event_trigger" | "exit" | "edge_exit" | "save_point"
+        | "message_trigger" | "region" | "trigger_unknown" => {
             let kind = match ty {
-                "script_trigger" => TriggerKind::Script(v["script"].as_str().unwrap_or("").to_string()),
-                "event_trigger" => TriggerKind::Event(v["event"].as_str().unwrap_or("").to_string()),
-                "exit" => TriggerKind::Exit { to: dest(&v["to"]), push: v["push"].as_str().and_then(dir_of).unwrap_or(0) },
-                "edge_exit" => TriggerKind::EdgeExit { to: dest(&v["to"]), push: v["push"].as_str().and_then(dir_of).unwrap_or(0) },
-                "save_point" => TriggerKind::SavePoint(v["event"].as_str().unwrap_or("s011").to_string()),
-                "message_trigger" => TriggerKind::Message { id: int(&v["message"]["id"]) as i32, value: int(&v["message"]["value"]) },
+                "script_trigger" => {
+                    TriggerKind::Script(v["script"].as_str().unwrap_or("").to_string())
+                }
+                "event_trigger" => {
+                    TriggerKind::Event(v["event"].as_str().unwrap_or("").to_string())
+                }
+                "exit" => TriggerKind::Exit {
+                    to: dest(&v["to"]),
+                    push: v["push"].as_str().and_then(dir_of).unwrap_or(0),
+                },
+                "edge_exit" => TriggerKind::EdgeExit {
+                    to: dest(&v["to"]),
+                    push: v["push"].as_str().and_then(dir_of).unwrap_or(0),
+                },
+                "save_point" => {
+                    TriggerKind::SavePoint(v["event"].as_str().unwrap_or("s011").to_string())
+                }
+                "message_trigger" => TriggerKind::Message {
+                    id: int(&v["message"]["id"]) as i32,
+                    value: int(&v["message"]["value"]),
+                },
                 "region" => TriggerKind::Region,
                 _ => TriggerKind::Unknown(hexs(&v["vtable_ctor"])),
             };
-            ObjKind::Trigger { rect: rect(&v["rect"]), act: activation(&v["activation"]), kind }
+            ObjKind::Trigger {
+                rect: rect(&v["rect"]),
+                act: activation(&v["activation"]),
+                kind,
+            }
         }
         "enemy" => {
             let (x, y) = xy(&v["pos"]);
-            ObjKind::Enemy { ty: int(&v["enemy_type"]) as i32, x, y, sprite: int(&v["sprite_index"]) as i32, on_defeat: callback(&v["on_defeat"]), behaviour: steps(&v["behaviour"]) }
+            ObjKind::Enemy {
+                ty: int(&v["enemy_type"]) as i32,
+                x,
+                y,
+                sprite: int(&v["sprite_index"]) as i32,
+                on_defeat: callback(&v["on_defeat"]),
+                behaviour: steps(&v["behaviour"]),
+            }
         }
         "npc" => {
             let (x, y) = xy(&v["pos"]);
-            ObjKind::Npc { x, y, sprite: int(&v["sprite_index"]) as i32, talk: v["talk"]["event"].as_str().map(String::from), behaviour: steps(&v["behaviour"]) }
+            ObjKind::Npc {
+                x,
+                y,
+                sprite: int(&v["sprite_index"]) as i32,
+                talk: v["talk"]["event"].as_str().map(String::from),
+                behaviour: steps(&v["behaviour"]),
+            }
         }
-        "breakable" => ObjKind::Breakable { prop: int(&v["prop"]) as i32, param_a: int(&v["param_a"]) as i32, hits: int(&v["hits"]) as i32, on_break: callback(&v["on_break"]) },
+        "breakable" => ObjKind::Breakable {
+            prop: int(&v["prop"]) as i32,
+            param_a: int(&v["param_a"]) as i32,
+            hits: int(&v["hits"]) as i32,
+            on_break: callback(&v["on_break"]),
+        },
         "item" => {
             let (x, y) = xy(&v["pos"]);
-            ObjKind::Item { item: int(&v["item"]) as i32, x, y, on_pickup: callback(&v["on_pickup"]) }
+            ObjKind::Item {
+                item: int(&v["item"]) as i32,
+                x,
+                y,
+                on_pickup: callback(&v["on_pickup"]),
+            }
         }
         "map_sprite" => {
             let (x, y) = xy(&v["pos"]);
             let p = &v["params"];
-            let label = v["label"].as_object().map(|l| (l.get("frame").map(int).unwrap_or(0) as i32, l.get("prop").map(int).unwrap_or(-1) as i32));
-            ObjKind::MapSprite { x, y, sprite: int(&v["sprite"]) as i32, params: [int(&p[0]) as i32, int(&p[1]) as i32, int(&p[2]) as i32], label }
+            let label = v["label"].as_object().map(|l| {
+                (
+                    l.get("frame").map(int).unwrap_or(0) as i32,
+                    l.get("prop").map(int).unwrap_or(-1) as i32,
+                )
+            });
+            ObjKind::MapSprite {
+                x,
+                y,
+                sprite: int(&v["sprite"]) as i32,
+                params: [int(&p[0]) as i32, int(&p[1]) as i32, int(&p[2]) as i32],
+                label,
+            }
         }
         _ => ObjKind::Unknown,
     };
-    ObjDef { at, cond: cond(&v["condition"]), kind, rom: hexs(&v["rom"]["def"]) }
+    ObjDef {
+        at,
+        cond: cond(&v["condition"]),
+        kind,
+        rom: hexs(&v["rom"]["def"]),
+    }
 }
 
 fn list_ref(v: &Value) -> ObjRef {
@@ -412,7 +559,11 @@ fn objs_after(have: &[ObjDef], list: &[Value]) -> Vec<ObjDef> {
             list_ref(&v["list"])
         } else {
             let l = list_of_type(v["type"].as_str().unwrap_or(""));
-            let n = have.iter().chain(out.iter()).filter(|o| matches!(o.at, ObjRef::List(k, _) if k == l)).count();
+            let n = have
+                .iter()
+                .chain(out.iter())
+                .filter(|o| matches!(o.at, ObjRef::List(k, _) if k == l))
+                .count();
             ObjRef::List(l, n as u16)
         };
         out.push(obj(v, at));
@@ -436,23 +587,44 @@ fn mod_name_id(text: &str) -> i64 {
 impl FieldData {
     /// None when the pack has no world category (`world/areas.json`)
     pub fn load(src: &dyn ContentSource, all: &[String]) -> Result<Option<FieldData>, LoadError> {
-        let Some(wa) = read_json(src, "world/areas.json") else { return Ok(None) };
+        let Some(wa) = read_json(src, "world/areas.json") else {
+            return Ok(None);
+        };
         let mut fd = FieldData::default();
-        fd.title_widths = read_json(src, "world/title_widths.json").and_then(|v| v.as_array().map(|a| a.iter().map(|x| x.as_i64().unwrap_or(0) as i32).collect())).unwrap_or_default();
+        fd.title_widths = read_json(src, "world/title_widths.json")
+            .and_then(|v| {
+                v.as_array()
+                    .map(|a| a.iter().map(|x| x.as_i64().unwrap_or(0) as i32).collect())
+            })
+            .unwrap_or_default();
         // songs from the maps category's areas.json
         let mut songs: BTreeMap<String, Song> = BTreeMap::new();
         let mut combat: BTreeMap<String, bool> = BTreeMap::new();
         let mut banners: BTreeMap<String, (i64, String)> = BTreeMap::new();
         if let Some(a) = read_json(src, "areas.json") {
             for x in a["areas"].as_array().into_iter().flatten() {
-                banners.insert(x["key"].as_str().unwrap_or("").to_string(), (x["name_string_id"].as_i64().unwrap_or(0), x["name"].as_str().unwrap_or("").to_string()));
+                banners.insert(
+                    x["key"].as_str().unwrap_or("").to_string(),
+                    (
+                        x["name_string_id"].as_i64().unwrap_or(0),
+                        x["name"].as_str().unwrap_or("").to_string(),
+                    ),
+                );
                 let s = match &x["song"] {
                     Value::Null => Song::None,
-                    Value::Object(o) => Song::Script(o.get("script").and_then(|s| s.as_str()).unwrap_or("").to_string()),
+                    Value::Object(o) => Song::Script(
+                        o.get("script")
+                            .and_then(|s| s.as_str())
+                            .unwrap_or("")
+                            .to_string(),
+                    ),
                     v => Song::Id(int(v) as i32),
                 };
                 songs.insert(x["key"].as_str().unwrap_or("").to_string(), s);
-                combat.insert(x["key"].as_str().unwrap_or("").to_string(), x["rom"]["word08"].as_u64().is_none_or(|v| v & 0xFF != 0));
+                combat.insert(
+                    x["key"].as_str().unwrap_or("").to_string(),
+                    x["rom"]["word08"].as_u64().is_none_or(|v| v & 0xFF != 0),
+                );
             }
         }
         for x in wa["areas"].as_array().into_iter().flatten() {
@@ -461,7 +633,12 @@ impl FieldData {
                 world: int(&x["world"]) as i32,
                 area: int(&x["area"]) as i32,
                 name: x["name"].as_str().map(String::from),
-                maps: x["maps"].as_array().into_iter().flatten().filter_map(|m| m.as_str().map(String::from)).collect(),
+                maps: x["maps"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|m| m.as_str().map(String::from))
+                    .collect(),
                 variant_selector: int(&x["variant_selector"]),
                 on_enter: x["on_enter"]["script"].as_str().map(String::from),
                 on_leave: x["on_leave"]["script"].as_str().map(String::from),
@@ -475,19 +652,35 @@ impl FieldData {
             };
             fd.areas.insert((a.world, a.area), a);
         }
-        for p in all.iter().filter(|p| p.starts_with("maps/") && p.ends_with("/objects.json")) {
+        for p in all
+            .iter()
+            .filter(|p| p.starts_with("maps/") && p.ends_with("/objects.json"))
+        {
             let Some(o) = read_json(src, p) else { continue };
             let dir = &p[..p.len() - "/objects.json".len()];
-            let id = o["map"].as_str().map(String::from).unwrap_or_else(|| dir["maps/".len()..].to_string());
+            let id = o["map"]
+                .as_str()
+                .map(String::from)
+                .unwrap_or_else(|| dir["maps/".len()..].to_string());
             for a in o["areas"].as_array().into_iter().flatten() {
                 let key = a["key"].as_str().unwrap_or("");
-                let Some(ad) = fd.areas.values_mut().find(|x| x.key == key) else { continue };
+                let Some(ad) = fd.areas.values_mut().find(|x| x.key == key) else {
+                    continue;
+                };
                 // the objects belong to the area (every map of a multi-variant area lists the same ones): first wins
                 if ad.objects.is_empty() {
-                    ad.objects = objs_after(&[], a["objects"].as_array().map(|v| v.as_slice()).unwrap_or(&[]));
+                    ad.objects = objs_after(
+                        &[],
+                        a["objects"].as_array().map(|v| v.as_slice()).unwrap_or(&[]),
+                    );
                 }
             }
-            let exits = o["map_triggers"].as_array().into_iter().flatten().map(|v| obj(v, list_ref(&v["list"]))).collect();
+            let exits = o["map_triggers"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .map(|v| obj(v, list_ref(&v["list"])))
+                .collect();
             let prop_tile_bytes = o["prop_tile_bytes"].as_i64().unwrap_or(0) as i32;
             let props = o["props"]
                 .as_array()
@@ -501,7 +694,14 @@ impl FieldData {
                     frame: v["gfx"]["frame"].as_i64().map(|f| f as i32),
                     visible: v["visible"].as_bool().unwrap_or(true),
                     priority: v["priority"].as_u64().unwrap_or(3) as u8,
-                    hit_box: v["hit_box"].as_array().filter(|a| a.len() == 4).map(|a| [int(&a[0]) as i32, int(&a[1]) as i32, int(&a[2]) as i32, int(&a[3]) as i32]),
+                    hit_box: v["hit_box"].as_array().filter(|a| a.len() == 4).map(|a| {
+                        [
+                            int(&a[0]) as i32,
+                            int(&a[1]) as i32,
+                            int(&a[2]) as i32,
+                            int(&a[3]) as i32,
+                        ]
+                    }),
                 })
                 .collect();
             let (mut walk, mut shot, mut cw, mut ch) = (String::new(), String::new(), 1, 1);
@@ -512,8 +712,16 @@ impl FieldData {
                 cw = int(&c["width"]).max(1) as usize;
                 ch = int(&c["height"]).max(1) as usize;
                 if c["reload"].is_object() {
-                    let nums = |v: &serde_json::Value| -> Vec<i64> { v.as_array().into_iter().flatten().map(|x| x.as_i64().unwrap_or(0)).collect() };
-                    let pair = |v: &serde_json::Value| (v[0].as_i64().unwrap_or(0), v[1].as_i64().unwrap_or(0));
+                    let nums = |v: &serde_json::Value| -> Vec<i64> {
+                        v.as_array()
+                            .into_iter()
+                            .flatten()
+                            .map(|x| x.as_i64().unwrap_or(0))
+                            .collect()
+                    };
+                    let pair = |v: &serde_json::Value| {
+                        (v[0].as_i64().unwrap_or(0), v[1].as_i64().unwrap_or(0))
+                    };
                     reload = Some(Reload {
                         fixed: c["reload"]["fixed"].as_i64().unwrap_or(0),
                         grids: c["reload"]["grids"].as_i64().unwrap_or(0),
@@ -546,7 +754,11 @@ impl FieldData {
                         Some("camera_max_x") => cmax.0 = int(&p["value"]) as i32,
                         Some("camera_max_y") => cmax.1 = int(&p["value"]) as i32,
                         Some("bldcnt") => bldcnt = int(&p["value"]) as u16,
-                        Some("unsupported_layers") => three_d = p["value"].as_str().is_some_and(|v| v.contains("0x08007B63")),
+                        Some("unsupported_layers") => {
+                            three_d = p["value"]
+                                .as_str()
+                                .is_some_and(|v| v.contains("0x08007B63"))
+                        }
                         _ => {}
                     }
                 }
@@ -564,14 +776,44 @@ impl FieldData {
             if cmax.0 < 0 {
                 cmax = ((ww - 240).max(0), (wh - 160).max(0));
             }
-            fd.maps.insert(id.clone(), MapDef { id, start_pos: sp, exits, props, walk, shot, cw, ch, world_w: ww, world_h: wh, camera_max: cmax, three_d, prop_tile_bytes, reload, bldcnt });
+            fd.maps.insert(
+                id.clone(),
+                MapDef {
+                    id,
+                    start_pos: sp,
+                    exits,
+                    props,
+                    walk,
+                    shot,
+                    cw,
+                    ch,
+                    world_w: ww,
+                    world_h: wh,
+                    camera_max: cmax,
+                    three_d,
+                    prop_tile_bytes,
+                    reload,
+                    bldcnt,
+                },
+            );
         }
         // per-area files (mods): `world/areas/<W-A>.json` adds an area or changes one (fields given replace,
         // `objects` replaces the object list, `add_objects` appends to it)
-        for p in all.iter().filter(|p| p.starts_with("world/areas/") && p.ends_with(".json")) {
-            let Some(x) = read_json(src, p) else { return Err(LoadError(format!("{p}: not JSON"))) };
-            let key = x["key"].as_str().map(String::from).unwrap_or_else(|| p["world/areas/".len()..p.len() - 5].to_string());
-            let (w, ar) = key.split_once('-').and_then(|(a, b)| Some((a.parse::<i32>().ok()?, b.parse::<i32>().ok()?))).ok_or_else(|| LoadError(format!("{p}: area key must be \"world-area\"")))?;
+        for p in all
+            .iter()
+            .filter(|p| p.starts_with("world/areas/") && p.ends_with(".json"))
+        {
+            let Some(x) = read_json(src, p) else {
+                return Err(LoadError(format!("{p}: not JSON")));
+            };
+            let key = x["key"]
+                .as_str()
+                .map(String::from)
+                .unwrap_or_else(|| p["world/areas/".len()..p.len() - 5].to_string());
+            let (w, ar) = key
+                .split_once('-')
+                .and_then(|(a, b)| Some((a.parse::<i32>().ok()?, b.parse::<i32>().ok()?)))
+                .ok_or_else(|| LoadError(format!("{p}: area key must be \"world-area\"")))?;
             let fresh = !fd.areas.contains_key(&(w, ar));
             let a = fd.areas.entry((w, ar)).or_insert_with(|| AreaDef {
                 world: w,
@@ -589,7 +831,11 @@ impl FieldData {
                 name_id: 0,
                 banner: String::new(),
             });
-            let script = |v: &Value| v.as_str().map(String::from).or_else(|| v["script"].as_str().map(String::from));
+            let script = |v: &Value| {
+                v.as_str()
+                    .map(String::from)
+                    .or_else(|| v["script"].as_str().map(String::from))
+            };
             if let Some(n) = x["name"].as_str() {
                 a.name = Some(n.to_string());
             }
@@ -609,7 +855,10 @@ impl FieldData {
                 }
             }
             if let Some(m) = x["maps"].as_array() {
-                a.maps = m.iter().filter_map(|m| m.as_str().map(String::from)).collect();
+                a.maps = m
+                    .iter()
+                    .filter_map(|m| m.as_str().map(String::from))
+                    .collect();
             }
             if x.get("on_enter").is_some() {
                 a.on_enter = script(&x["on_enter"]);
@@ -633,8 +882,12 @@ impl FieldData {
                 a.objects.extend(more);
             }
         }
-        for p in all.iter().filter(|p| p.starts_with("items/") && p.ends_with(".json") && !p.ends_with("index.json")) {
-            let Some(it) = read_json(src, p) else { continue };
+        for p in all.iter().filter(|p| {
+            p.starts_with("items/") && p.ends_with(".json") && !p.ends_with("index.json")
+        }) {
+            let Some(it) = read_json(src, p) else {
+                continue;
+            };
             if it.get("item").is_none() {
                 continue;
             }
@@ -643,14 +896,23 @@ impl FieldData {
                 name: it["name"].as_str().unwrap_or("").to_string(),
                 story: it["story_item"].as_bool().unwrap_or(false),
                 price: int(&it["price"]) as i32,
-                use_script: it["use_script"].as_str().map(|s| format!("inline_0x{:08X}", hexs(&Value::String(s.to_string())))),
+                use_script: it["use_script"]
+                    .as_str()
+                    .map(|s| format!("inline_0x{:08X}", hexs(&Value::String(s.to_string())))),
             });
         }
         fd.supplies.sort_by_key(|s| s.index);
         if let Some(Value::Array(icons)) = read_json(src, "icons/index.json") {
             for ic in icons {
-                let Some(b) = ic["sub_box"].as_array().filter(|a| a.len() == 4) else { continue };
-                let b = [int(&b[0]) as i32, int(&b[1]) as i32, int(&b[2]) as i32, int(&b[3]) as i32];
+                let Some(b) = ic["sub_box"].as_array().filter(|a| a.len() == 4) else {
+                    continue;
+                };
+                let b = [
+                    int(&b[0]) as i32,
+                    int(&b[1]) as i32,
+                    int(&b[2]) as i32,
+                    int(&b[3]) as i32,
+                ];
                 let k = int(&ic["index"]) as i32;
                 match ic["kind"].as_str() {
                     Some("supply") => {
@@ -666,7 +928,11 @@ impl FieldData {
         if let Some(v) = read_json(src, "world/visited.json") {
             for r in v["records"].as_array().into_iter().flatten() {
                 for a in r["areas"].as_array().into_iter().flatten() {
-                    fd.visited.push((int(&a["world"]) as i32, int(&a["area"]) as i32, int(&a["bit"]) as i32));
+                    fd.visited.push((
+                        int(&a["world"]) as i32,
+                        int(&a["area"]) as i32,
+                        int(&a["bit"]) as i32,
+                    ));
                 }
             }
         }
@@ -683,14 +949,20 @@ impl FieldData {
                 want.push(s.clone());
             }
             if let Song::Script(s) = &a.song {
-                want.push(if s.starts_with("inline_") { s.clone() } else { format!("inline_{s}") });
+                want.push(if s.starts_with("inline_") {
+                    s.clone()
+                } else {
+                    format!("inline_{s}")
+                });
             }
         }
         if !want.is_empty() {
             if let Some(bc) = read_json(src, "scripts/bytecode.json") {
                 for id in want {
                     if let Some(code) = bc["inline"][id.as_str()]["code"].as_str() {
-                        let b: Vec<u8> = (0..code.len() / 2).filter_map(|k| u8::from_str_radix(&code[2 * k..2 * k + 2], 16).ok()).collect();
+                        let b: Vec<u8> = (0..code.len() / 2)
+                            .filter_map(|k| u8::from_str_radix(&code[2 * k..2 * k + 2], 16).ok())
+                            .collect();
                         fd.cond_code.insert(id, b);
                     }
                 }
@@ -710,6 +982,11 @@ impl FieldData {
     }
     /// decode a map's collision (walk + shot grids, world size)
     pub fn collision(&self, m: &MapDef) -> Arc<MapCollision> {
-        Arc::new(MapCollision { walk: unrle_grid(&m.walk, m.cw, m.ch), shot: unrle_grid(&m.shot, m.cw, m.ch), world_w: m.world_w, world_h: m.world_h })
+        Arc::new(MapCollision {
+            walk: unrle_grid(&m.walk, m.cw, m.ch),
+            shot: unrle_grid(&m.shot, m.cw, m.ch),
+            world_w: m.world_w,
+            world_h: m.world_h,
+        })
     }
 }

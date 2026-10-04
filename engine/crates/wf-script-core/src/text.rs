@@ -41,7 +41,12 @@ pub fn resolve(w: &World, v: i32) -> String {
     match Handle::decode(v) {
         Some(Handle::FormName(f)) => w.data.form(f).map(|f| f.name.clone()).unwrap_or_default(),
         Some(Handle::FormLabel(f)) => w.data.form(f).map(|f| f.name.to_uppercase()).unwrap_or_default(),
-        Some(Handle::String(s)) => format!("#{s}"),
+        // (the string table `0x0806BCE8`, loaded with the menu content; `#<id>` without it - real run, the ending's
+        // "Your Dragon Ranking Is :" with string 1479 "Trainee", rsbk_002_04_21 f23,790)
+        Some(Handle::String(s)) => match w.data.menu.as_ref().map(|m| m.text.s(s.max(0) as usize)).filter(|u| !u.is_empty()) {
+            Some(u) => String::from_utf16_lossy(u),
+            None => format!("#{s}"),
+        },
         None => v.to_string(),
     }
 }

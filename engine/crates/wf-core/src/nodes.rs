@@ -5,9 +5,9 @@
 use crate::ai::{new_rt, BehTree, NodeRt, PathRt, StackEntry, K, P};
 use crate::content::AnimRef;
 use crate::damage::atk;
+use crate::eanim::RuleKind;
 use crate::enemy::{self as en, set_anim, KnockState, ShotType};
 use crate::fixed::{round_div_sqrt, HOP_ARC8};
-use crate::eanim::RuleKind;
 use crate::geom::{facing_toward, overlaps, Rect, DIR_VEC};
 use crate::player::{self, HoldKind};
 use crate::shots;
@@ -46,7 +46,10 @@ fn rt<'a>(w: &'a mut World, c: &C, n: u16) -> Option<&'a mut NodeRt> {
                 return Some(&mut ai.stack[c.lvl].rt[n as usize]);
             }
             // replaced / popped during this evaluation: the tree finishes its update on its own runtime
-            ai.orphans.iter_mut().find(|s| s.serial == c.serial).map(|s| &mut s.rt[n as usize])
+            ai.orphans
+                .iter_mut()
+                .find(|s| s.serial == c.serial)
+                .map(|s| &mut s.rt[n as usize])
         }
         _ => None,
     }
@@ -75,12 +78,22 @@ fn ctx_top(w: &World, i: usize) -> Option<C> {
     let e = w.en_ref(i);
     let lvl = e.ai.stack.len().checked_sub(1)?;
     let s = &e.ai.stack[lvl];
-    Some(C { i, lvl, serial: s.serial, tree: Arc::clone(&s.tree) })
+    Some(C {
+        i,
+        lvl,
+        serial: s.serial,
+        tree: Arc::clone(&s.tree),
+    })
 }
 /// a state's tree is built (the reference's `create` of every node, in tree order): the nodes that do work at
 /// creation (DriftContact's velocity draws, IfButtonMashed's counter state)
 fn build(w: &mut World, i: usize, id: u16) -> StackEntry {
-    let tree = w.data.states.get(&id).cloned().unwrap_or_else(|| Arc::new(crate::ai::compile_behaviour(id, &Default::default())));
+    let tree = w
+        .data
+        .states
+        .get(&id)
+        .cloned()
+        .unwrap_or_else(|| Arc::new(crate::ai::compile_behaviour(id, &Default::default())));
     let serial = w.next_serial();
     let mut rt = new_rt(&tree);
     for (k, n) in tree.nodes.iter().enumerate() {
@@ -103,7 +116,12 @@ fn build(w: &mut World, i: usize, id: u16) -> StackEntry {
         }
     }
     let _ = i;
-    StackEntry { state: id, serial, rt, tree }
+    StackEntry {
+        state: id,
+        serial,
+        rt,
+        tree,
+    }
 }
 /// (the reference's history log; the state stamp obj+0x210 is only written by the Block node's exit)
 fn note(_w: &mut World, _i: usize) {}
@@ -186,12 +204,42 @@ pub fn is_cond(k: K) -> bool {
     use K::*;
     matches!(
         k,
-        Chance | IfPlayerWithin | IfPlayerWithin2 | IfPlayerFarther | IfPlayerInMeleeRange | IfPlayerAttackingMe | IfInPlayerBeamLine
-            | IfTimeInState | IfCooldownOver | IfCooldown2Over | IfCounterEq | IfGlobalFlag | IfBuuPacified | IfAxisAligned | IfHpBelow
-            | IfPlayerInFront | IfPlayerInZone | IfPlayerInRoomZone | IfPlayerBlastIncoming | IfPlayerInLineOfFire | IfContactHit
-            | IfMeleeHit | IfContactExplode | IfLandedOnRock | IfPlayerPetrified | IfPlayerNotPetrified | IfSphereDestroyed
-            | IfPlayerNearAndHittable | IfLastKidBuu | IfChildCount | IfLatchOverlap | IfButtonMashed | IfPlayerOnTop
-            | IfPartnerHolding | IfUnknown | ModCondition
+        Chance
+            | IfPlayerWithin
+            | IfPlayerWithin2
+            | IfPlayerFarther
+            | IfPlayerInMeleeRange
+            | IfPlayerAttackingMe
+            | IfInPlayerBeamLine
+            | IfTimeInState
+            | IfCooldownOver
+            | IfCooldown2Over
+            | IfCounterEq
+            | IfGlobalFlag
+            | IfBuuPacified
+            | IfAxisAligned
+            | IfHpBelow
+            | IfPlayerInFront
+            | IfPlayerInZone
+            | IfPlayerInRoomZone
+            | IfPlayerBlastIncoming
+            | IfPlayerInLineOfFire
+            | IfContactHit
+            | IfMeleeHit
+            | IfContactExplode
+            | IfLandedOnRock
+            | IfPlayerPetrified
+            | IfPlayerNotPetrified
+            | IfSphereDestroyed
+            | IfPlayerNearAndHittable
+            | IfLastKidBuu
+            | IfChildCount
+            | IfLatchOverlap
+            | IfButtonMashed
+            | IfPlayerOnTop
+            | IfPartnerHolding
+            | IfUnknown
+            | ModCondition
     )
 }
 
@@ -232,7 +280,9 @@ fn enter(w: &mut World, c: &C, n: u16) {
                 r.d = [0; 8];
             }
             let mut r = *r;
-            if is_ctl(w, kind(c, n)) || (w.field.is_some() && matches!(kind(c, n), K::MiniHopToward | K::MiniHopFlee)) {
+            if is_ctl(w, kind(c, n))
+                || (w.field.is_some() && matches!(kind(c, n), K::MiniHopToward | K::MiniHopFlee))
+            {
                 w.en(c.i).ctl = (c.serial, n);
             }
             leaf_enter(w, c, n, &mut r);
@@ -287,7 +337,9 @@ fn update(w: &mut World, c: &C, n: u16) -> i32 {
         // entering the first child again. A state change inside does not stop the evaluation
         K::Sequence => {
             let ks = kids(c, n).to_vec();
-            let Some(cur) = rt(w, c, n).map(|r| r.i as usize) else { return 0 };
+            let Some(cur) = rt(w, c, n).map(|r| r.i as usize) else {
+                return 0;
+            };
             if cur >= ks.len() {
                 if let Some(x) = rt(w, c, n) {
                     x.i = 0;
@@ -331,7 +383,9 @@ fn update(w: &mut World, c: &C, n: u16) -> i32 {
         // condition holds)
         k if is_cond(k) => {
             if cond(w, c, n) {
-                let Some(&kid) = kids(c, n).first() else { return 1 };
+                let Some(&kid) = kids(c, n).first() else {
+                    return 1;
+                };
                 let on = rt(w, c, n).map(|r| r.on).unwrap_or(true);
                 if !on {
                     enter(w, c, kid);
@@ -375,7 +429,15 @@ fn update(w: &mut World, c: &C, n: u16) -> i32 {
 /// before the AI): FlameBreath 0x03002FA8, SoldierThrow 0x03002FCC, TurretFire 0x0300305C, CyborgShot 0x03003108,
 /// GrappleArm 0x03003294, BombThrow 0x0203DD04
 fn is_controller(k: K) -> bool {
-    matches!(k, K::FlameBreath | K::SoldierThrow | K::TurretFire | K::CyborgShot | K::GrappleArm | K::BombThrow)
+    matches!(
+        k,
+        K::FlameBreath
+            | K::SoldierThrow
+            | K::TurretFire
+            | K::CyborgShot
+            | K::GrappleArm
+            | K::BombThrow
+    )
 }
 /// `is_controller` + the field's other shot states, which are the same kind of actor state object (GunShot
 /// 0x03002FC4, RifleShot 0x03002FD8, KiBlast 0x03003068, NinjaStarThrow 0x03003074, MummyWrapShot 0x030030A8 / Burst
@@ -385,7 +447,19 @@ fn is_controller(k: K) -> bool {
 /// (HandSink, the Janemba Hand's second strike: its one-shot controller 0x0804DBA8 sinks on through an event - the real
 /// route's 18-10, the switch scene: the hand is in its walk state when the scene ends)
 fn is_ctl(w: &World, k: K) -> bool {
-    is_controller(k) || (w.field.is_some() && matches!(k, K::GunShot | K::RifleShot | K::KiBlast | K::NinjaStarThrow | K::MummyWrapShot | K::MummyWrapBurst | K::WindupMelee | K::HandSink))
+    is_controller(k)
+        || (w.field.is_some()
+            && matches!(
+                k,
+                K::GunShot
+                    | K::RifleShot
+                    | K::KiBlast
+                    | K::NinjaStarThrow
+                    | K::MummyWrapShot
+                    | K::MummyWrapBurst
+                    | K::WindupMelee
+                    | K::HandSink
+            ))
 }
 
 /// the enemy's running controller is a flame breath (its sound 63 still on)
@@ -394,7 +468,14 @@ pub fn flame_running(w: &World, i: usize) -> bool {
     if serial == 0 {
         return false;
     }
-    w.en_ref(i).ai.stack.iter().any(|s| s.serial == serial && s.tree.nodes.get(n as usize).is_some_and(|nd| nd.k == K::FlameBreath) && s.rt.get(n as usize).is_some_and(|r| r.f < 128))
+    w.en_ref(i).ai.stack.iter().any(|s| {
+        s.serial == serial
+            && s.tree
+                .nodes
+                .get(n as usize)
+                .is_some_and(|nd| nd.k == K::FlameBreath)
+            && s.rt.get(n as usize).is_some_and(|r| r.f < 128)
+    })
 }
 
 /// an event holds the field: the AI does not think, but the running motion controller keeps ticking (a turret's fire
@@ -408,11 +489,18 @@ pub fn busy_controller(w: &mut World, i: usize) {
     let Some(c) = ctx_top(w, i) else { return };
     // field: a mini's hop counter is its controller's (0x0300322C): it counts on through an event, the hop's moves
     // are the AI's (sc_janemba: after the defeat scene the minis resume mid-cycle)
-    if c.serial == serial && w.field.is_some() && matches!(kind(&c, n), K::MiniHopToward | K::MiniHopFlee) {
+    if c.serial == serial
+        && w.field.is_some()
+        && matches!(kind(&c, n), K::MiniHopToward | K::MiniHopFlee)
+    {
         if let Some(r) = rt(w, &c, n) {
             r.d[0] = (r.d[0] + 8) & 0xff;
             let ph = r.d[0];
-            w.en(i).a.z = if ph >= 0x80 { -HOP_ARC8[((ph - 0x80) >> 3) as usize] } else { 0 };
+            w.en(i).a.z = if ph >= 0x80 {
+                -HOP_ARC8[((ph - 0x80) >> 3) as usize]
+            } else {
+                0
+            };
         }
         return;
     }
@@ -451,10 +539,15 @@ fn face_player_routine(w: &mut World, i: usize) {
 /// Broly's own mark inside a rock's rect included, until his next re-plan marks it again (the real route, Volcano
 /// Summit 15-32: the player walks through a rock's place; Broly's mark shrinks to the tiles outside it)
 fn rock_msg(w: &mut World) {
-    let rects: Vec<[i32; 4]> = w.ents.iter().filter(|e| !e.removed).filter_map(|e| match e.body {
-        Body::Rock { x, y, .. } => Some([x + 16, y + 16, x + 48, y + 48]),
-        _ => None,
-    }).collect();
+    let rects: Vec<[i32; 4]> = w
+        .ents
+        .iter()
+        .filter(|e| !e.removed)
+        .filter_map(|e| match e.body {
+            Body::Rock { x, y, .. } => Some([x + 16, y + 16, x + 48, y + 48]),
+            _ => None,
+        })
+        .collect();
     if let Some(c) = w.col.as_mut() {
         for r in rects {
             c.mark_both(r, 1);
@@ -486,7 +579,9 @@ fn cond(w: &mut World, c: &C, n: u16) -> bool {
         // 0x0804EE24: 1 - [0x0300302C] - Majin Buu is not pacified (his hurt states under Babidi's spell pop at once)
         K::IfUnknown => w.g.buu_pacified != 1,
         K::IfAxisAligned => {
-            let Some(pi) = en::player(w, i) else { return false };
+            let Some(pi) = en::player(w, i) else {
+                return false;
+            };
             if !w.pl_ref(pi).a.hittable {
                 return false;
             }
@@ -494,7 +589,9 @@ fn cond(w: &mut World, c: &C, n: u16) -> bool {
             dx.abs() < 16 || dy.abs() < 16
         }
         K::IfHpBelow => {
-            let thr = rt(w, c, n).map(|r| ((r.d[1] as i64) << 32) | (r.d[2] as u32 as i64)).unwrap_or(0);
+            let thr = rt(w, c, n)
+                .map(|r| ((r.d[1] as i64) << 32) | (r.d[2] as u32 as i64))
+                .unwrap_or(0);
             w.en_ref(i).hp1024 < thr
         }
         K::IfPlayerInFront => en::player_in_front(w, i, 48),
@@ -526,7 +623,9 @@ fn cond(w: &mut World, c: &C, n: u16) -> bool {
         K::IfPlayerNotPetrified => en::player(w, i).is_some_and(|pi| !w.pl_ref(pi).is_stone()),
         K::IfSphereDestroyed => w.g.sphere_state == 1,
         K::IfPlayerNearAndHittable => {
-            let Some(pi) = en::player(w, i) else { return false };
+            let Some(pi) = en::player(w, i) else {
+                return false;
+            };
             if !w.pl_ref(pi).a.hittable {
                 return false;
             }
@@ -542,14 +641,28 @@ fn cond(w: &mut World, c: &C, n: u16) -> bool {
             }
             dx.abs() <= 47 && dy.abs() <= 47
         }
-        K::IfLastKidBuu => w.live_enemies().iter().filter(|&&o| matches!(w.en_ref(o).ty, 0x3c | 0x3d)).count() == 1,
+        K::IfLastKidBuu => {
+            w.live_enemies()
+                .iter()
+                .filter(|&&o| matches!(w.en_ref(o).ty, 0x3c | 0x3d))
+                .count()
+                == 1
+        }
         K::IfChildCount => {
             let kids = w.en_ref(i).children.clone();
-            let live = kids.iter().filter(|&&k| w.enemy_by_id(k).is_some_and(|(ki, e)| !w.ents[ki].removed && !e.defeated)).count();
+            let live = kids
+                .iter()
+                .filter(|&&k| {
+                    w.enemy_by_id(k)
+                        .is_some_and(|(ki, e)| !w.ents[ki].removed && !e.defeated)
+                })
+                .count();
             live as i64 == par(c, n, P::N, 0)
         }
         K::IfLatchOverlap => {
-            let Some(pi) = en::player(w, i) else { return false };
+            let Some(pi) = en::player(w, i) else {
+                return false;
+            };
             let p = w.pl_ref(pi);
             let e = &w.en_ref(i).a;
             // 0x08037B96 (vtable 0x0804B0F8, condition 0x08037B48): a pure overlap test (no hold on the player: several
@@ -580,20 +693,30 @@ fn cond(w: &mut World, c: &C, n: u16) -> bool {
         }
         // cond 0x08036EA4 (world-map encounters): px distances <= 16 and |player z - own z| < 16 px (obj+0x1A8, 22.10)
         K::IfPlayerOnTop => {
-            let Some(pi) = w.player_idx(0) else { return false };
+            let Some(pi) = w.player_idx(0) else {
+                return false;
+            };
             let (pa, ea) = (&w.pl_ref(pi).a, &w.en_ref(i).a);
             let (dx, dy) = (pa.px() - ea.px(), pa.py() - ea.py());
             if dx.abs() > 16 || dy.abs() > 16 {
                 return false;
             }
-            let pz = w.field.as_ref().and_then(|f| f.flight.as_ref()).map(|f| f.z).unwrap_or(0);
+            let pz = w
+                .field
+                .as_ref()
+                .and_then(|f| f.flight.as_ref())
+                .map(|f| f.z)
+                .unwrap_or(0);
             let dz = (pz - crate::fieldpatrol::z_of(w, i)) >> 10;
             dz.abs() < 16
         }
         // 0x0802F945: the first Spopovich is in 0x03001B30 (the end of GrabWindup) showing anim id 0x12's animation
         K::IfPartnerHolding => {
             let g = w.data.anim.generic["0x03001B30"];
-            w.live_enemies().into_iter().find(|&o| matches!(w.en_ref(o).ty, 0x6d..=0x70)).is_some_and(|o| w.en_ref(o).ea.rule == g && is_anim_id(w, o, 0x12))
+            w.live_enemies()
+                .into_iter()
+                .find(|&o| matches!(w.en_ref(o).ty, 0x6d..=0x70))
+                .is_some_and(|o| w.en_ref(o).ea.rule == g && is_anim_id(w, o, 0x12))
         }
         K::ModCondition => {
             let node = &c.tree.nodes[n as usize];
@@ -645,7 +768,9 @@ fn hold_pose(w: &mut World, i: usize, raw: i32, frame: i32) {
     e.anim_seq = e.anim_seq.wrapping_add(1);
 }
 /// enemy SetAnim id -> raw (0x08072670 + 1)
-const SETANIM_RAW: [i32; 23] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 19, 20, 21, 22, 23, 24];
+const SETANIM_RAW: [i32; 23] = [
+    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 19, 20, 21, 22, 23, 24,
+];
 /// 0x0800EEB0(obj, id): the actor shows SetAnim(id)'s animation (the shown raw)
 fn is_anim_id(w: &World, i: usize, id: usize) -> bool {
     let raw = w.en_ref(i).a.anim_raw(&w.data);
@@ -690,7 +815,16 @@ fn line_mover(w: &mut World, i: usize, tx: i32, ty: i32, speed: i32) -> PathRt {
     }
     w.en(i).a.facing = dir;
     set_anim(w, i, &[nm("walk")], true, Some(true));
-    PathRt { speed: vx, budget: vy, wx: tx, wy: ty, valid: n, counter: dir as i32, gx: 0, gy: 0 }
+    PathRt {
+        speed: vx,
+        budget: vy,
+        wx: tx,
+        wy: ty,
+        valid: n,
+        counter: dir as i32,
+        gx: 0,
+        gy: 0,
+    }
 }
 /// step 0x0800A01D: blocked -> SetAnim(0) unless already; else move, SetAnim(1) unless walking, face, n - 1; 0 ->
 /// exactly at the target, arrived
@@ -728,7 +862,12 @@ fn line_mover_step(w: &mut World, i: usize, m: &mut PathRt) -> bool {
     true
 }
 fn kb_of(r: &NodeRt) -> KnockState {
-    KnockState { vx: r.d[0], vy: r.d[1], n: r.d[2], anim: r.d[3] }
+    KnockState {
+        vx: r.d[0],
+        vy: r.d[1],
+        n: r.d[2],
+        anim: r.d[3],
+    }
 }
 fn kb_set(r: &mut NodeRt, k: &KnockState) {
     r.d[0] = k.vx;
@@ -736,7 +875,6 @@ fn kb_set(r: &mut NodeRt, k: &KnockState) {
     r.d[2] = k.n;
     r.d[3] = k.anim;
 }
-
 
 /// BrolySpawnRocks (0x08035F81): three rock obstacles (ctor 0x08036A44) at map px (200,136), (112,272), (296,240)
 /// unless rocks exist; in the field each rock object holds its own 0x1000-byte tile block
@@ -776,7 +914,18 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
         }
         K::ShieldBreak => {
             w.en(i).shield = -1;
-            shield_gfx(w, i, &[(0xB0, 0xB1), (0xAF, 0xB1), (0x102, 0x100), (0xB2, 0x100), (0x56, 0x55), (0xAC, 0x55)]);
+            shield_gfx(
+                w,
+                i,
+                &[
+                    (0xB0, 0xB1),
+                    (0xAF, 0xB1),
+                    (0x102, 0x100),
+                    (0xB2, 0x100),
+                    (0x56, 0x55),
+                    (0xAC, 0x55),
+                ],
+            );
             let (cx, cy) = w.en_ref(i).a.center();
             crate::fx::puff_rng(w, cx, cy);
         }
@@ -824,7 +973,9 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
                 }
                 let dx = gx - w.en_ref(i).a.x;
                 let dy = gy - w.en_ref(i).a.y;
-                if ((dx.wrapping_mul(dx) >> 8) as i64) + ((dy.wrapping_mul(dy) >> 8) as i64) < 0x5000 {
+                if ((dx.wrapping_mul(dx) >> 8) as i64) + ((dy.wrapping_mul(dy) >> 8) as i64)
+                    < 0x5000
+                {
                     continue;
                 }
                 r.path.gx = gx;
@@ -851,7 +1002,10 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             r.d[1] = -dy * 8 * s + if dy != 0 { 0 } else { side };
         }
         K::KnockbackSlide => {
-            let mut kb = KnockState { n: 16, ..Default::default() };
+            let mut kb = KnockState {
+                n: 16,
+                ..Default::default()
+            };
             en::knock_start(w, i, par(c, n, P::Frames, 0) as i32, &mut kb);
             kb_set(r, &kb);
         }
@@ -881,7 +1035,14 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             timed_enter(w, i, &[an(4), an(5)], true);
             let d = Arc::clone(&w.data);
             let e = w.en_ref(i);
-            let nf = e.a.anim_raw(&d).and_then(|raw| e.a.sprite.and_then(|s| d.sprite(s)).and_then(|s| s.anim_raw(raw))).map(|a| a.steps(e.a.facing).len() as i32);
+            let nf =
+                e.a.anim_raw(&d)
+                    .and_then(|raw| {
+                        e.a.sprite
+                            .and_then(|s| d.sprite(s))
+                            .and_then(|s| s.anim_raw(raw))
+                    })
+                    .map(|a| a.steps(e.a.facing).len() as i32);
             r.d[0] = 48 + 8 * nf.unwrap_or(2);
         }
         // singleton 0x03003210: enter 0x0804E808 = SetAnimRaw(4) + SetState(0x03003214) (no facing change); finished as
@@ -890,7 +1051,12 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             set_anim(w, i, &[an(4), an(5)], true, Some(false));
             let d = Arc::clone(&w.data);
             let e = w.en_ref(i);
-            let nf = e.a.sprite.and_then(|s| d.sprite(s)).and_then(|s| s.anim_raw(e.ea.pos.raw)).map(|a| a.steps(e.a.facing).len() as i32).unwrap_or(0);
+            let nf =
+                e.a.sprite
+                    .and_then(|s| d.sprite(s))
+                    .and_then(|s| s.anim_raw(e.ea.pos.raw))
+                    .map(|a| a.steps(e.a.facing).len() as i32)
+                    .unwrap_or(0);
             r.d[0] = e.anim_seq as i32;
             r.d[1] = 64 + ((nf.max(2) - 2) << 3);
         }
@@ -953,7 +1119,11 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
         K::SoldierThrow | K::TurretFire => {
             face_player_routine(w, i);
             let r0 = w.data.anim.once_stop3;
-            let a = if kind(c, n) == K::SoldierThrow { 19 } else { 20 };
+            let a = if kind(c, n) == K::SoldierThrow {
+                19
+            } else {
+                20
+            };
             set_anim_r(w, i, &[an(a), an(3)], false, r0);
             r.d[2] = w.en_ref(i).ea.pos.raw;
         }
@@ -965,7 +1135,11 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
                 let pa = &w.pl_ref(pi).a;
                 let ea = &w.en_ref(i).a;
                 r.d[0] = if pa.facing <= 1 {
-                    if pa.x > ea.x { 2 } else { 3 }
+                    if pa.x > ea.x {
+                        2
+                    } else {
+                        3
+                    }
                 } else if pa.y > ea.y {
                     1
                 } else {
@@ -1009,8 +1183,16 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             if let Some(pi) = en::player(w, i) {
                 let (ppx, ppy) = (w.pl_ref(pi).a.px(), w.pl_ref(pi).a.py());
                 let a = &w.en_ref(i).a;
-                r.d[0] = if a.facing >= 2 { (ppx - a.px()).clamp(-128, 128) } else { 0 };
-                r.d[1] = if a.facing < 2 { (ppy - a.py()).clamp(-128, 128) } else { 0 };
+                r.d[0] = if a.facing >= 2 {
+                    (ppx - a.px()).clamp(-128, 128)
+                } else {
+                    0
+                };
+                r.d[1] = if a.facing < 2 {
+                    (ppy - a.py()).clamp(-128, 128)
+                } else {
+                    0
+                };
             }
         }
         // enter 0x08023FA8: SetAnimRaw(0x12) under the flame controller 0x03002FA8 (no swing), sound 63
@@ -1093,7 +1275,11 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             let d = Arc::clone(&w.data);
             let cnt = {
                 let e = w.en_ref(i);
-                e.a.sprite.and_then(|s| d.sprite(s)).and_then(|s| s.anim_raw(19)).map(|a| a.steps(e.a.facing).len() as u32).unwrap_or(0)
+                e.a.sprite
+                    .and_then(|s| d.sprite(s))
+                    .and_then(|s| s.anim_raw(19))
+                    .map(|a| a.steps(e.a.facing).len() as u32)
+                    .unwrap_or(0)
             };
             let fr = w.rng.rand(cnt);
             hold_pose(w, i, 19, fr);
@@ -1133,15 +1319,25 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             set_anim_r(w, i, &[an(18)], true, h);
             let d = Arc::clone(&w.data);
             let e = w.en_ref(i);
-            let nf = e.a.sprite.and_then(|s| d.sprite(s)).and_then(|s| s.anim_raw(19)).filter(|_| e.a.anim_raw(&d) == Some(19)).map(|a| a.nframes());
+            let nf =
+                e.a.sprite
+                    .and_then(|s| d.sprite(s))
+                    .and_then(|s| s.anim_raw(19))
+                    .filter(|_| e.a.anim_raw(&d) == Some(19))
+                    .map(|a| a.nframes());
             r.d[0] = nf.unwrap_or(0);
         }
         // enter 0x0802C4C9: keep the player's position, SetAnimRaw(0x14) frame 0 under 0x03001B00 at Spopovich + (8, -16);
         // partner = the first Yamu
         K::BearHug => {
-            let yamu = w.live_enemies().into_iter().find(|&o| matches!(w.en_ref(o).ty, 0x93 | 0x94));
+            let yamu = w
+                .live_enemies()
+                .into_iter()
+                .find(|&o| matches!(w.en_ref(o).ty, 0x93 | 0x94));
             r.d[3] = yamu.map(|o| w.ents[o].id as i32).unwrap_or(0);
-            let Some(pi) = en::player(w, i).filter(|&pi| !w.pl_ref(pi).dead) else { return };
+            let Some(pi) = en::player(w, i).filter(|&pi| !w.pl_ref(pi).dead) else {
+                return;
+            };
             r.d[4] = w.pl_ref(pi).a.x;
             r.d[5] = w.pl_ref(pi).a.y;
             player::hold_pose(w, pi, 21, 0);
@@ -1169,12 +1365,23 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
         // enter 0x0802ACB3 / 0x0802B333: the player HP > 0 and hittable -> face, SetAnimRaw(0x13 / 0x12) under the
         // node's controller
         K::BuuStretchPunch | K::CandyBeam => {
-            let ok = en::player(w, i).is_some_and(|pi| w.pl_ref(pi).hp() > 0 && w.pl_ref(pi).a.hittable);
+            let ok =
+                en::player(w, i).is_some_and(|pi| w.pl_ref(pi).hp() > 0 && w.pl_ref(pi).a.hittable);
             r.d[0] = ok as i32;
             if ok {
                 en::face_player(w, i);
                 let h = w.data.anim.hold;
-                set_anim_r(w, i, &[an(if kind(c, n) == K::BuuStretchPunch { 19 } else { 18 })], true, h);
+                set_anim_r(
+                    w,
+                    i,
+                    &[an(if kind(c, n) == K::BuuStretchPunch {
+                        19
+                    } else {
+                        18
+                    })],
+                    true,
+                    h,
+                );
             }
             r.d[6] = w.en_ref(i).anim_seq as i32;
         }
@@ -1202,7 +1409,8 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
         }
         K::GlideToWaypoint => {
             // the waypoint table 0x0877B1BC (24.8 pairs; real run 20-6 r062_001 tile +7,000: index 2 is (304, 256))
-            const WP: [(i32, i32); 5] = [(224, 104), (344, 128), (304, 256), (120, 264), (112, 144)];
+            const WP: [(i32, i32); 5] =
+                [(224, 104), (344, 128), (304, 256), (120, 264), (112, 144)];
             let step = if w.rng.rand(2) != 0 { 1 } else { 4 };
             w.g.waypoint = (w.g.waypoint + step) % 5;
             w.en(i).p214 = w.g.waypoint;
@@ -1232,7 +1440,9 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
         // reference's body animation (cross_ts)
         // (the arm's animation starts with its controller, on the node's first update)
         K::JanembaHandStrikeA | K::JanembaHandStrikeB if w.field.is_some() => {}
-        K::JanembaHandStrikeA | K::JanembaHandStrikeB => set_anim(w, i, &[an(17)], true, Some(false)),
+        K::JanembaHandStrikeA | K::JanembaHandStrikeB => {
+            set_anim(w, i, &[an(17)], true, Some(false))
+        }
         // field (sc_janemba): anim 0x13 = raw 20, one pass at 8 frames a cel, held on its last cel through the rise and
         // the descent; battle keeps the reference's
         K::JanembaAscend if w.field.is_some() => {
@@ -1318,13 +1528,19 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             let h = w.data.anim.hold;
             set_anim_r(w, i, &[an(21)], true, h);
         }
-        K::StunnedAnim | K::StunnedAnim21 | K::PlayAnimHold => set_anim(w, i, &[an(20)], true, Some(true)),
+        K::StunnedAnim | K::StunnedAnim21 | K::PlayAnimHold => {
+            set_anim(w, i, &[an(20)], true, Some(true))
+        }
         K::RecoverAnim => set_anim(w, i, &[an(19)], true, Some(false)),
         // create 0x080315A4: SetAnimRaw(0x15) under the one-shot state 0x03001B30
         K::MechTransform => set_anim(w, i, &[an(20)], true, Some(false)),
         // enter 0x0804E5E8 installs the fragment state 0x03003158
         K::PlayAnim0 => en::frag_enter(w, i),
-        K::PlayAnim12 | K::PlayAnim12b | K::PlayAnim12Swarm | K::PlayAnim12Yakon | K::PlayAnim12Yakon2 => set_anim(w, i, &[an(17)], true, Some(false)),
+        K::PlayAnim12
+        | K::PlayAnim12b
+        | K::PlayAnim12Swarm
+        | K::PlayAnim12Yakon
+        | K::PlayAnim12Yakon2 => set_anim(w, i, &[an(17)], true, Some(false)),
         // GhostAnimA / B: enters 0x0804EBC8 / 0x0804EB38 = SetAnimRaw(0x12) under the one-shot state 0x03001B30
         // the Skeleton's collapse (state 0x213's first node, def 0x08759370, singleton 0x0300320C): enter 0x0804EAA0 =
         // not hittable (obj+0x1CC = 0) + SetAnimRaw(0x11) under the one-shot state 0x03001B38; its second
@@ -1340,7 +1556,9 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
         }
         // field: the Yakon pose's SetAnim runs in the node's first update (below)
         K::PlayAnim13Yakon if w.field.is_some() => {}
-        K::PlayAnim13 | K::PlayAnim13Yakon | K::GhostAnimA | K::GhostAnimB => set_anim(w, i, &[an(18)], true, Some(false)),
+        K::PlayAnim13 | K::PlayAnim13Yakon | K::GhostAnimA | K::GhostAnimB => {
+            set_anim(w, i, &[an(18)], true, Some(false))
+        }
         // field (sc_janemba, Super Janemba's state 0x2DD: a hit cuts the teleport): the landing animation (0x13)
         // played backwards from its end, then the vanish (0x11) backwards - 71 frames, then a SetAnim(0)
         K::PlayAnimTimed if w.field.is_some() && w.en_ref(i).ty != 0x1d => {
@@ -1488,12 +1706,23 @@ fn leaf_exit(w: &mut World, c: &C, n: u16, _r: &mut NodeRt) {
         K::WanderToRandomPoint if w.field.is_some() => {
             set_anim(w, i, &[nm("idle")], true, Some(true));
             let me = w.ents[i].id;
-            let target = (0..w.ents.len()).find(|&k| !w.ents[k].removed && w.ents[k].id != me && crate::scene::sprite_id(w, k) == Some(0x34));
+            let target = (0..w.ents.len()).find(|&k| {
+                !w.ents[k].removed
+                    && w.ents[k].id != me
+                    && crate::scene::sprite_id(w, k) == Some(0x34)
+            });
             if let Some(k) = target {
-                let (tx, ty) = { let a = w.actor(k).unwrap(); (a.x, a.y) };
+                let (tx, ty) = {
+                    let a = w.actor(k).unwrap();
+                    (a.x, a.y)
+                };
                 let (dx, dy) = (tx - w.en_ref(i).a.x, ty - w.en_ref(i).a.y);
                 w.en(i).a.facing = if dx.abs() >= dy.abs() {
-                    if dx > 0 { 3 } else { 2 }
+                    if dx > 0 {
+                        3
+                    } else {
+                        2
+                    }
                 } else if dy > 0 {
                     0
                 } else {
@@ -1572,11 +1801,14 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                     let run = crate::fieldcontent::Callback::Event(format!("header_0x{sc:08X}"));
                     crate::field::queue_run(w, run, crate::field::Cause::Ai { entity: me });
                 } else {
-                    w.events.push(crate::world::Event::Field(crate::field::FieldEvent::Run {
-                        run: crate::fieldcontent::Callback::Script(format!("inline_0x{sc:08X}")),
-                        cause: crate::field::Cause::Ai { entity: me },
-                        slot: 0,
-                    }));
+                    w.events
+                        .push(crate::world::Event::Field(crate::field::FieldEvent::Run {
+                            run: crate::fieldcontent::Callback::Script(format!(
+                                "inline_0x{sc:08X}"
+                            )),
+                            cause: crate::field::Cause::Ai { entity: me },
+                            slot: 0,
+                        }));
                 }
                 return !w.scene.ai_wait.contains(&me);
             }
@@ -1678,7 +1910,9 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         K::Block => false,
         // ---- movement
         K::ChasePlayer | K::ChasePlayerThroughRocks => {
-            let Some(pi) = en::player(w, i) else { return false };
+            let Some(pi) = en::player(w, i) else {
+                return false;
+            };
             let rocks = kind(c, n) == K::ChasePlayerThroughRocks && w.field.is_some();
             if rocks {
                 rock_msg(w);
@@ -1703,7 +1937,9 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             }
             false
         }
-        K::BackOffFacingPlayer | K::BackOffFacingPlayerThroughRocks => en::step_from_player(w, i, speed, true),
+        K::BackOffFacingPlayer | K::BackOffFacingPlayerThroughRocks => {
+            en::step_from_player(w, i, speed, true)
+        }
         K::StepAwayFromPlayer => en::step_from_player(w, i, speed, false),
         K::WalkToPlayer => {
             let af = w.en_ref(i).anim_frame();
@@ -1713,7 +1949,9 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             res
         }
         K::FlyToPlayer => en::fly_to_player(w, i, speed),
-        K::AlignWithPlayer | K::LineUpForShot => en::align(w, i, if speed != 0 { speed } else { 0x73 }),
+        K::AlignWithPlayer | K::LineUpForShot => {
+            en::align(w, i, if speed != 0 { speed } else { 0x73 })
+        }
         K::Wander => {
             en::wander_step(w, i, speed, par(c, n, P::TurnP, 0));
             false
@@ -1808,7 +2046,10 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             false
         }
         K::FollowMajinBuu => {
-            let buu = w.live_enemies().into_iter().find(|&o| matches!(w.en_ref(o).ty, 0x1a | 0x1b | 0x1c));
+            let buu = w
+                .live_enemies()
+                .into_iter()
+                .find(|&o| matches!(w.en_ref(o).ty, 0x1a | 0x1b | 0x1c));
             let Some(b) = buu else { return false };
             // update 0x0802B3EA: d = Buu's footprint centre - own (0x0800FDFA); always faces him (horizontal only
             // when |dx| > |dy|); from `dist` px on the dominant axis on: one step of d * 256 / max(|dx|, |dy|), taken
@@ -1817,7 +2058,11 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             let (x, y) = w.en_ref(i).a.fc();
             let (dx, dy) = (bx - x, by - y);
             w.en(i).a.facing = if dx.abs() > dy.abs() {
-                if dx > 0 { 3 } else { 2 }
+                if dx > 0 {
+                    3
+                } else {
+                    2
+                }
             } else if dy > 0 {
                 0
             } else {
@@ -1876,7 +2121,8 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         K::MeleeAttack => {
             let d = Arc::clone(&w.data);
             let e = w.en_ref(i);
-            e.a.anim_name(&d) == Some("idle") && d.anim.rules[e.ea.rule as usize].kind == RuleKind::Idle
+            e.a.anim_name(&d) == Some("idle")
+                && d.anim.rules[e.ea.rule as usize].kind == RuleKind::Idle
         }
         // controller 0x0804C6B4: at counter 16 the hit (standard melee x1.0; accepted -> 48 + rand(2)); ends at 40
         K::BioMechPunch => {
@@ -1970,7 +2216,22 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             }
             if let Some(pi) = en::player(w, i) {
                 let a = &w.en_ref(i).a;
-                let mut m = HitMsg { team: 0, rect: a.body_box(), dir: a.facing, mult: 0x400, atk: atk(2), attacker: me, att_stats: a.stats, att_is_player: false, source: me, crit: false, raw: 0, dmg: 0, no_react: false, foot: true };
+                let mut m = HitMsg {
+                    team: 0,
+                    rect: a.body_box(),
+                    dir: a.facing,
+                    mult: 0x400,
+                    atk: atk(2),
+                    attacker: me,
+                    att_stats: a.stats,
+                    att_is_player: false,
+                    source: me,
+                    crit: false,
+                    raw: 0,
+                    dmg: 0,
+                    no_react: false,
+                    foot: true,
+                };
                 if player::on_message(w, pi, &mut m) {
                     r.d[2] = 16;
                 }
@@ -1998,7 +2259,11 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         }
         // field: the shot is the actor's animation state's (controller) work - a state that was replaced meanwhile
         // (a hurt animation: Volcano 15-25, a Cursed One punched mid-throw) fires nothing and the node is over
-        K::GunShot | K::RifleShot | K::NinjaStarThrow | K::MummyWrapShot | K::MummyWrapBurst if w.field.is_some() && r.d[6] != w.en_ref(i).anim_seq as i32 => true,
+        K::GunShot | K::RifleShot | K::NinjaStarThrow | K::MummyWrapShot | K::MummyWrapBurst
+            if w.field.is_some() && r.d[6] != w.en_ref(i).anim_seq as i32 =>
+        {
+            true
+        }
         K::GunShot => {
             if f == 4 {
                 en::shot(w, i, ShotType::Gun);
@@ -2019,7 +2284,15 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         }
         K::MummyWrapShot | K::MummyWrapBurst => {
             if f == 8 {
-                en::shot(w, i, if kind(c, n) == K::MummyWrapShot { ShotType::Wrap } else { ShotType::Burst });
+                en::shot(
+                    w,
+                    i,
+                    if kind(c, n) == K::MummyWrapShot {
+                        ShotType::Wrap
+                    } else {
+                        ShotType::Burst
+                    },
+                );
             }
             timed_end(w, i, f, 24)
         }
@@ -2044,7 +2317,13 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             }
             // the turret's frame (controller tick 0x0802B5EA): tick >> 3 below 16, 1 up to 64, then 2
             if !soldier {
-                w.en(i).ea.pos.frame = if f < 16 { f >> 3 } else if f > 64 { 2 } else { 1 };
+                w.en(i).ea.pos.frame = if f < 16 {
+                    f >> 3
+                } else if f > 64 {
+                    2
+                } else {
+                    1
+                };
             }
             if f == 8 {
                 let (x, y) = en::muzzle_fix(w, i, !soldier);
@@ -2055,7 +2334,11 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                     w.g.soldier_wave = r.d[0];
                 }
             }
-            if if soldier { f >= 32 && !alive(w, w.g.soldier_wave) } else { f >= 72 } {
+            if if soldier {
+                f >= 32 && !alive(w, w.g.soldier_wave)
+            } else {
+                f >= 72
+            } {
                 set_anim(w, i, &[nm("idle")], true, Some(true));
                 return true;
             }
@@ -2103,7 +2386,13 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             // its frame (tick 0x08023F0E): 0 below tick 4, then (tick >> 2) & 3 with 0 shown as 2 (1, 2, 3, 2, 1 ...)
             if f < 128 {
                 let g = (f >> 2) & 3;
-                w.en(i).ea.pos.frame = if f < 4 { 0 } else if g == 0 { 2 } else { g };
+                w.en(i).ea.pos.frame = if f < 4 {
+                    0
+                } else if g == 0 {
+                    2
+                } else {
+                    g
+                };
             }
             if (4..128).contains(&f) {
                 const NOZ: [(i32, i32); 4] = [(46, 10), (16, -48), (-6, -12), (74, -12)];
@@ -2123,7 +2412,13 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         // position + 0x0876CCB4[dir]; from 32 SetAnim(0) once the arm is gone
         K::GrappleArm => {
             if f < 32 {
-                w.en(i).ea.pos.frame = if f < 24 { (f >> 2) & 1 } else if f < 28 { 2 } else { 3 };
+                w.en(i).ea.pos.frame = if f < 24 {
+                    (f >> 2) & 1
+                } else if f < 28 {
+                    2
+                } else {
+                    3
+                };
                 if f == 28 {
                     const O: [(i32, i32); 4] = [(7, 16), (-12, -56), (-24, -20), (48, -20)];
                     let a = &w.en_ref(i).a;
@@ -2144,7 +2439,17 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                 let (mx, my) = en::muzzle(w, i, 10);
                 let dir = w.en_ref(i).a.facing;
                 let (dx, dy) = DIR_VEC[dir as usize];
-                let o = shots::StraightOpts { vx: dx * 1024, vy: dy * 1024, b: [4, 4, 8, 8], a: atk(4), mult: 51, life: 12, explode: false, name: shots::SName::Barrage, ..Default::default() };
+                let o = shots::StraightOpts {
+                    vx: dx * 1024,
+                    vy: dy * 1024,
+                    b: [4, 4, 8, 8],
+                    a: atk(4),
+                    mult: 51,
+                    life: 12,
+                    explode: false,
+                    name: shots::SName::Barrage,
+                    ..Default::default()
+                };
                 shots::add_straight(w, me, dir, 0, mx << 8, my << 8, o);
             }
             f >= 48
@@ -2153,14 +2458,32 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             if f == 24 {
                 let (mx, my) = en::muzzle(w, i, 14);
                 let dir = w.en_ref(i).a.facing;
-                shots::add(w, shots::full_beam(me, dir, 0, mx, my, atk(11), 328, 156, Some(2), None, None));
+                shots::add(
+                    w,
+                    shots::full_beam(me, dir, 0, mx, my, atk(11), 328, 156, Some(2), None, None),
+                );
             }
             timed_end(w, i, f, 180)
         }
         K::MouthBeamDown => {
             if f == 32 {
                 let (px, py) = (w.en_ref(i).a.px(), w.en_ref(i).a.py());
-                shots::add(w, shots::full_beam(me, 0, 0, px + 32, py - 16, atk(11), 328, 253, Some(2), None, None));
+                shots::add(
+                    w,
+                    shots::full_beam(
+                        me,
+                        0,
+                        0,
+                        px + 32,
+                        py - 16,
+                        atk(11),
+                        328,
+                        253,
+                        Some(2),
+                        None,
+                        None,
+                    ),
+                );
             }
             f >= 301
         }
@@ -2310,7 +2633,11 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         // count + 1, > 8 -> player SetAnim(0), done; no press for > 10 frames -> count 0; the frame counter & 15 == 0 ->
         // the player loses POW HP (no formula) and the vampire heals the same
         K::VampireGrab => {
-            let Some(pi) = en::player(w, i).filter(|&pi| w.pl_ref(pi).hp() > 0 && w.pl_ref(pi).held_by == me) else { return true };
+            let Some(pi) =
+                en::player(w, i).filter(|&pi| w.pl_ref(pi).hp() > 0 && w.pl_ref(pi).held_by == me)
+            else {
+                return true;
+            };
             // update 0x08033A2A: the player's state object (player +0x14) is no longer the held one -> finished
             // (field: an exit that fired under the held player started the autowalk; HFIL 18-8, sc_hfil)
             if w.field.is_some() && matches!(w.pl_ref(pi).gs, player::Gs::AutoWalk) {
@@ -2337,7 +2664,11 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         }
         // update 0x08029902: no player / KO -> finished; the frame counter & 63 == 0 -> 1 HP (no formula)
         K::LatchDrain => {
-            let Some(pi) = en::player(w, i).filter(|&pi| !w.pl_ref(pi).dead && w.pl_ref(pi).hp() > 0) else { return true };
+            let Some(pi) =
+                en::player(w, i).filter(|&pi| !w.pl_ref(pi).dead && w.pl_ref(pi).hp() > 0)
+            else {
+                return true;
+            };
             if w.g.clock(w.frame) & 63 == 0 {
                 // through the player's apply-damage (vfunc -> `0x08010BF2`): its damage number too (real route 21-6
                 // f176; field only - the number is a tile user)
@@ -2361,7 +2692,13 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         // 0x08040284(d-pad, 20, 90) success counts, the 5th releases. Release: the player back at the kept position,
         // SetAnim(0), Spopovich SetAnim(9), phase 1: 60 more ticks
         K::BearHug => {
-            let Some(yamu) = w.live_enemies().into_iter().find(|&o| w.ents[o].id as i32 == r.d[3] && r.d[3] != 0) else { return true };
+            let Some(yamu) = w
+                .live_enemies()
+                .into_iter()
+                .find(|&o| w.ents[o].id as i32 == r.d[3] && r.d[3] != 0)
+            else {
+                return true;
+            };
             if r.d[0] == 1 {
                 let c0 = r.d[1];
                 r.d[1] -= 1;
@@ -2428,7 +2765,10 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                 return false;
             }
             if r.d[1] == 0 {
-                let spo = w.live_enemies().into_iter().find(|&o| matches!(w.en_ref(o).ty, 0x6d..=0x70));
+                let spo = w
+                    .live_enemies()
+                    .into_iter()
+                    .find(|&o| matches!(w.en_ref(o).ty, 0x6d..=0x70));
                 r.d[3] = spo.map(|o| w.ents[o].id as i32).unwrap_or(0);
                 let Some(spo) = spo else { return true };
                 let (sx, sy) = (w.en_ref(spo).a.x, w.en_ref(spo).a.y);
@@ -2449,7 +2789,10 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                     r.d[5] = 1;
                 }
             }
-            let spo = w.live_enemies().into_iter().find(|&o| r.d[3] != 0 && w.ents[o].id as i32 == r.d[3]);
+            let spo = w
+                .live_enemies()
+                .into_iter()
+                .find(|&o| r.d[3] != 0 && w.ents[o].id as i32 == r.d[3]);
             if spo.is_some_and(|s| is_anim_id(w, s, 9)) {
                 return true;
             }
@@ -2469,7 +2812,9 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             let h = w.data.anim.hold;
             set_anim_r(w, i, &[an(18)], true, h);
             r.d[4] = match p {
-                Some(pi) if w.pl_ref(pi).ep() > w.pl_ref(pi).max_ep() >> 2 => w.pl_ref(pi).ep() - (w.pl_ref(pi).max_ep() >> 2),
+                Some(pi) if w.pl_ref(pi).ep() > w.pl_ref(pi).max_ep() >> 2 => {
+                    w.pl_ref(pi).ep() - (w.pl_ref(pi).max_ep() >> 2)
+                }
                 _ => 0,
             };
             false
@@ -2537,8 +2882,16 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                 w.en(i).ea.pos.frame = 5 + ((f - 112) >> 3);
                 if f == 120 {
                     if let Some(pi) = p {
-                        player::candy_respawn(w, pi, (r.d[0] >> 8) << 8, (r.d[1] >> 8) << 8, r.d[2] != 0);
-                        if w.field.is_some() && w.scene.cam.mode == crate::scene::CamMode::Follow(me) {
+                        player::candy_respawn(
+                            w,
+                            pi,
+                            (r.d[0] >> 8) << 8,
+                            (r.d[1] >> 8) << 8,
+                            r.d[2] != 0,
+                        );
+                        if w.field.is_some()
+                            && w.scene.cam.mode == crate::scene::CamMode::Follow(me)
+                        {
                             w.scene.cam.mode = crate::scene::CamMode::Player;
                         }
                         // the new player object is the list's newest: not updated in this pass; its hit-damage
@@ -2581,7 +2934,11 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                 };
                 if f == 64 {
                     let gfx = w.data.enemy(w.en_ref(i).ty).and_then(|t| t.gfx);
-                    let o: [(i32, i32); 4] = if gfx == Some(0x2b) { [(9, 16), (15, -56), (-24, -16), (48, -16)] } else { [(9, 16), (15, -56), (-24, -26), (48, -26)] };
+                    let o: [(i32, i32); 4] = if gfx == Some(0x2b) {
+                        [(9, 16), (15, -56), (-24, -16), (48, -16)]
+                    } else {
+                        [(9, 16), (15, -56), (-24, -26), (48, -26)]
+                    };
                     let a = &w.en_ref(i).a;
                     let (ox, oy) = o[a.facing as usize];
                     let (dir, x, y) = (a.facing, a.px() + ox, a.py() + oy);
@@ -2813,7 +3170,11 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         K::MiniHopToward => {
             r.d[0] = (r.d[0] + 8) & 0xff;
             let ph = r.d[0];
-            w.en(i).a.z = if ph >= 0x80 { -HOP_ARC8[((ph - 0x80) >> 3) as usize] } else { 0 };
+            w.en(i).a.z = if ph >= 0x80 {
+                -HOP_ARC8[((ph - 0x80) >> 3) as usize]
+            } else {
+                0
+            };
             if ph == 0 && w.rng.chance(0x4000) {
                 mini_aim(w, i);
             }
@@ -2828,7 +3189,11 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             r.d[0] = (r.d[0] + 8) & 0xff;
             let ph = r.d[0];
             let air = ph >= 0x80;
-            w.en(i).a.z = if air { -HOP_ARC8[((ph - 0x80) >> 3) as usize] } else { 0 };
+            w.en(i).a.z = if air {
+                -HOP_ARC8[((ph - 0x80) >> 3) as usize]
+            } else {
+                0
+            };
             if kind(c, n) == K::Hop {
                 return false;
             }
@@ -2860,7 +3225,14 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                 } else {
                     let (dx, dy) = en::to_player(w, i);
                     let s = dx as i64 * dx as i64 + dy as i64 * dy as i64;
-                    let (vx, vy) = if s == 0 { (0, 0) } else { (round_div_sqrt(dx as i64 * 128, s) as i32, round_div_sqrt(dy as i64 * 128, s) as i32) };
+                    let (vx, vy) = if s == 0 {
+                        (0, 0)
+                    } else {
+                        (
+                            round_div_sqrt(dx as i64 * 128, s) as i32,
+                            round_div_sqrt(dy as i64 * 128, s) as i32,
+                        )
+                    };
                     en::move_by(w, i, -vx, -vy);
                 }
             }
@@ -2879,7 +3251,11 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             if f == 32 {
                 // field: the hit box is 0x0800FE78's, at the ground position (sc_janemba: a mini mid-hop hits)
                 let a = &w.en_ref(i).a;
-                let bb = if w.field.is_some() { a.body_box_ground() } else { a.body_box() };
+                let bb = if w.field.is_some() {
+                    a.body_box_ground()
+                } else {
+                    a.body_box()
+                };
                 en::area_hit(w, i, bb, atk(0), 0x400);
                 return true;
             }
@@ -2897,10 +3273,24 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                     e.a.y = py;
                     e.a.facing = if left { 2 } else { 3 };
                 }
-                set_anim(w, i, &[an(17)], true, Some(false));
+                // anim 0x12 (raw 19) under the controller 0x0804D714 (real route 18-1 f236: the Janemba hand)
+                let h = w.data.anim.hold;
+                set_anim_r(w, i, &[an(18), an(17)], false, h);
                 w.en(i).a.alpha = 256;
             }
             let f = f - 1;
+            // the controller's cels: 8 ticks each up to the last (the hand's strike pose)
+            if f >= 0 {
+                let n = w
+                    .en_ref(i)
+                    .a
+                    .sprite
+                    .and_then(|s| w.data.sprite(s))
+                    .and_then(|s| s.anim_raw(w.en_ref(i).ea.pos.raw))
+                    .map(|a| a.steps(w.en_ref(i).a.facing).len() as i32)
+                    .unwrap_or(1);
+                w.en(i).ea.pos.frame = (f >> 3).min(12).min(n - 1).max(0);
+            }
             if (80..=103).contains(&f) && r.d[0] == 0 {
                 let bb = w.en_ref(i).a.body_box();
                 if en::area_hit(w, i, bb, atk(2), 0x400) {
@@ -2933,6 +3323,19 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                 return true;
             }
             w.en(i).a.alpha = (256 - f * 256 / 107).max(51);
+            // field: the sink's controller plays the strike backwards - tick from 104 down by one from the node's
+            // second update, the cel its tick >> 3 (real route 18-1 rj03 f249 .. f355)
+            if w.field.is_some() {
+                let n = w
+                    .en_ref(i)
+                    .a
+                    .sprite
+                    .and_then(|s| w.data.sprite(s))
+                    .and_then(|s| s.anim_raw(w.en_ref(i).ea.pos.raw))
+                    .map(|a| a.steps(w.en_ref(i).a.facing).len() as i32)
+                    .unwrap_or(1);
+                w.en(i).ea.pos.frame = ((105 - f).clamp(0, 104) >> 3).min(n - 1);
+            }
             // field: the one-shot controller's end (0x0800EE78) leaves the hand in the walk state - an event that
             // starts during the Wait after it idles it (message 0xF: SetAnim(0), one draw; HFIL 18-12, sc_hfil)
             if w.field.is_some() {
@@ -2950,7 +3353,10 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                 let (ox, oy) = OFF[a.facing as usize];
                 let b = a.body_box();
                 let dir = a.facing;
-                shots::add(w, shots::sj_wave(me, dir, (b.x0 + ox) << 8, (b.y0 + oy + 24) << 8));
+                shots::add(
+                    w,
+                    shots::sj_wave(me, dir, (b.x0 + ox) << 8, (b.y0 + oy + 24) << 8),
+                );
             }
             timed_end(w, i, f, 40)
         }
@@ -3049,10 +3455,20 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             }
             f >= 33
         }
-        K::PlayAnim12 | K::PlayAnim12b | K::PlayAnim12Swarm | K::PlayAnim12Yakon | K::PlayAnim12Yakon2 | K::PlayAnim13 | K::PlayAnim13Yakon | K::PlayAnimOnce => {
+        K::PlayAnim12
+        | K::PlayAnim12b
+        | K::PlayAnim12Swarm
+        | K::PlayAnim12Yakon
+        | K::PlayAnim12Yakon2
+        | K::PlayAnim13
+        | K::PlayAnim13Yakon
+        | K::PlayAnimOnce => {
             let d = Arc::clone(&w.data);
             let done = f >= 16 && w.en_ref(i).anim_done(&d);
-            if done && matches!(kind(c, n), K::PlayAnimOnce) && c.tree.nodes[n as usize].addr != SKELETON_COLLAPSE {
+            if done
+                && matches!(kind(c, n), K::PlayAnimOnce)
+                && c.tree.nodes[n as usize].addr != SKELETON_COLLAPSE
+            {
                 // the rise's exit 0x0804F6CC: SetAnim(0) (the idle enter's rand(255)), hittable again
                 set_anim(w, i, &[an(0)], true, Some(true));
                 w.en(i).a.hittable = true;
@@ -3155,7 +3571,10 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                 let (x, y) = (px + off.0, py + off.1);
                 // 0x0802F458: the Enzyme's footprint (sprite def 0x57) must be free on the enemy grid, the Blister
                 // detached (vfunc +0x48); else no spawn and a retry next frame (VERIFIED segment sb 21-7)
-                let foot = w.data.sprite(0x57 - crate::content::GFX_OFFSET).map(|s| s.foot);
+                let foot = w
+                    .data
+                    .sprite(0x57 - crate::content::GFX_OFFSET)
+                    .map(|s| s.foot);
                 let free = match (foot, w.col.is_some()) {
                     (Some((fw, fh)), true) => {
                         let marked = w.en_ref(i).marked;
@@ -3185,10 +3604,16 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         K::RaiseShield | K::LowerShield | K::ShieldBreak => true,
         K::WaitFormationSlot => w.en_ref(i).slot != 0,
         K::MoveToFormationA | K::MoveToFormationB => {
-            let Some(pi) = en::player(w, i) else { return true };
+            let Some(pi) = en::player(w, i) else {
+                return true;
+            };
             let slot = w.en_ref(i).slot;
             let k = ((if slot != 0 { slot } else { 1 }) - 1).clamp(0, 7) as usize;
-            let (ox, oy) = if kind(c, n) == K::MoveToFormationA { RING40[k] } else { RING24[k] };
+            let (ox, oy) = if kind(c, n) == K::MoveToFormationA {
+                RING40[k]
+            } else {
+                RING24[k]
+            };
             let (px, py) = w.pl_ref(pi).a.foot_center();
             let (fw, fh) = (w.en_ref(i).a.foot_w, w.en_ref(i).a.foot_h);
             en::move_to_point(w, i, px + ox - (fw >> 1), py + oy - (fh >> 1), 0x100)
@@ -3242,8 +3667,12 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
 
 /// the top state's aux tree; 0 = not handled, 1 = handled, 2 = stop
 pub fn on_hit(w: &mut World, i: usize, msg: &HitMsg) -> i32 {
-    let Some(st) = w.en_ref(i).ai.top_state() else { return 0 };
-    let Some(aux) = w.data.aux.get(&st).cloned() else { return 0 };
+    let Some(st) = w.en_ref(i).ai.top_state() else {
+        return 0;
+    };
+    let Some(aux) = w.data.aux.get(&st).cloned() else {
+        return 0;
+    };
     let n0 = w.en_ref(i).ai.orphans.len();
     let r = hit_node(w, i, &aux, 0, msg);
     if let Body::Enemy(e) = &mut w.ents[i].body {
@@ -3425,7 +3854,11 @@ fn hit_node(w: &mut World, i: usize, t: &Arc<BehTree>, n: u16, msg: &HitMsg) -> 
             }
             // 0x0803A79C: (s32)(dmg * frac) >> 16, a 32-bit product (Yakon's 100% absorb wraps negative for damage
             // with bit 15 set: re/buu/YAKON.md)
-            en::heal(w, i, ((msg.dmg as i32).wrapping_mul(p.g(P::Frac) as i32) >> 16) as i64);
+            en::heal(
+                w,
+                i,
+                ((msg.dmg as i32).wrapping_mul(p.g(P::Frac) as i32) >> 16) as i64,
+            );
             1
         }
         K::GlideToWaypoint => {
@@ -3449,14 +3882,33 @@ fn hit_node(w: &mut World, i: usize, t: &Arc<BehTree>, n: u16, msg: &HitMsg) -> 
                 return 1;
             }
             let (x, y) = (w.en_ref(i).a.x, w.en_ref(i).a.y);
-            let (fw, fh) = w.data.sprite(45 - crate::scene::SPRITE_BASE).map(|s| s.foot).unwrap_or((16, 8));
+            let (fw, fh) = w
+                .data
+                .sprite(45 - crate::scene::SPRITE_BASE)
+                .map(|s| s.foot)
+                .unwrap_or((16, 8));
             let (px, py) = (x >> 8, (y + 0x4000) >> 8);
-            if w.col.as_ref().is_some_and(|c| !c.test(crate::world::Layer::Walk, px, py, px + fw, py + fh)) {
+            if w.col
+                .as_ref()
+                .is_some_and(|c| !c.test(crate::world::Layer::Walk, px, py, px + fw, py + fh))
+            {
                 return 1;
             }
             // (a run-time placed enemy like a tank's crew: its death runs the type's drop script, 0x08710F99)
             use crate::fieldcontent::{Cond, ObjDef, ObjKind, ObjRef};
-            let o = ObjDef { at: ObjRef::List(0xff, 14), cond: Cond::Always, kind: ObjKind::Enemy { ty: 14, x: x >> 8, y: y >> 8, sprite: 45, on_defeat: None, behaviour: vec![] }, rom: 0x0875_819c };
+            let o = ObjDef {
+                at: ObjRef::List(0xff, 14),
+                cond: Cond::Always,
+                kind: ObjKind::Enemy {
+                    ty: 14,
+                    x: x >> 8,
+                    y: y >> 8,
+                    sprite: 45,
+                    on_defeat: None,
+                    behaviour: vec![],
+                },
+                rom: 0x0875_819c,
+            };
             crate::field::spawn_object(w, &o);
             1
         }
@@ -3464,7 +3916,6 @@ fn hit_node(w: &mut World, i: usize, t: &Arc<BehTree>, n: u16, msg: &HitMsg) -> 
         _ => 0,
     }
 }
-
 
 // ---- TankDrive helpers (node 0x08049E20; r.d[0] = the turn timer +4) ---------------------------------------------------
 
@@ -3494,7 +3945,9 @@ fn tank_turn(w: &mut World, i: usize, d: u8, r: &mut NodeRt) -> bool {
 /// probe 0x08032948: n = (|player pos - own pos| >> 8) / 8 on the axis (top-left positions; direction 1 measures x, a
 /// game quirk), n steps of 8 px along dir must all fit
 fn tank_probe(w: &mut World, i: usize, d: u8) -> bool {
-    let Some(pi) = en::player(w, i) else { return false };
+    let Some(pi) = en::player(w, i) else {
+        return false;
+    };
     let (px, py) = (w.pl_ref(pi).a.x, w.pl_ref(pi).a.y);
     let (ex, ey) = (w.en_ref(i).a.x, w.en_ref(i).a.y);
     let diff = if d == 0 { py - ey } else { px - ex };
@@ -3548,7 +4001,15 @@ fn ghost_gfx(w: &mut World, i: usize, map: &[(i32, i32)]) {
         // 0x0800EDF8: the new set's first animation from its start (obj+0x34 = the def's table, +0x38 / +0x30 = 0):
         // the idle animation with no rand(255) draw (the one-shot state had already handed back to the normal one)
         let d = Arc::clone(&w.data);
-        w.en(i).set_anim_with(&d, &[nm("idle")], true, Some(true), None, None, &mut Vec::new());
+        w.en(i).set_anim_with(
+            &d,
+            &[nm("idle")],
+            true,
+            Some(true),
+            None,
+            None,
+            &mut Vec::new(),
+        );
     }
 }
 
@@ -3556,9 +4017,15 @@ fn ghost_gfx(w: &mut World, i: usize, map: &[(i32, i32)]) {
 /// enemy's graphics set changes (gfx ids: shield down / up / broken); the animation carries on
 fn shield_gfx(w: &mut World, i: usize, map: &[(i32, i32)]) {
     let d = w.data.clone();
-    let g = if w.en_ref(i).gfx_now >= 0 { Some(w.en_ref(i).gfx_now) } else { d.enemy(w.en_ref(i).ty).and_then(|t| t.gfx) };
+    let g = if w.en_ref(i).gfx_now >= 0 {
+        Some(w.en_ref(i).gfx_now)
+    } else {
+        d.enemy(w.en_ref(i).ty).and_then(|t| t.gfx)
+    };
     let Some(g) = g else { return };
-    let Some(&(_, to)) = map.iter().find(|(from, _)| *from == g) else { return };
+    let Some(&(_, to)) = map.iter().find(|(from, _)| *from == g) else {
+        return;
+    };
     let idx = to - crate::content::GFX_OFFSET;
     if d.sprite(idx).is_none() {
         return;

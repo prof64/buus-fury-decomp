@@ -32,15 +32,28 @@ pub fn attach(w: &mut World, entity: EntityId, steps: &[Step]) {
     }
     // the enemy ctor 0x0800F68C puts type 141 (world-map encounters) at z = 60 px; 0-50's map event lowers the
     // ground ones to 0 (set_actor_field_1a8)
-    let z = w.find(entity).filter(|&k| matches!(&w.ents[k].body, crate::world::Body::Enemy(e) if e.ty == 141)).map(|_| 60 << 10).unwrap_or(0);
+    let z = w
+        .find(entity)
+        .filter(|&k| matches!(&w.ents[k].body, crate::world::Body::Enemy(e) if e.ty == 141))
+        .map(|_| 60 << 10)
+        .unwrap_or(0);
     if let Some(f) = w.field.as_mut() {
-        f.patrols.push(Patrol { entity, steps: steps.to_vec(), idx: -1, cur: None, z, h: 0 });
+        f.patrols.push(Patrol {
+            entity,
+            steps: steps.to_vec(),
+            idx: -1,
+            cur: None,
+            z,
+            h: 0,
+        });
     }
 }
 
 pub fn has(w: &World, i: usize) -> bool {
     let id = w.ents[i].id;
-    w.field.as_ref().is_some_and(|f| f.patrols.iter().any(|p| p.entity == id))
+    w.field
+        .as_ref()
+        .is_some_and(|f| f.patrols.iter().any(|p| p.entity == id))
 }
 
 fn take(w: &mut World, i: usize) -> Option<Patrol> {
@@ -80,10 +93,16 @@ fn emark_foot(w: &mut World, i: usize, v: u8) {
 }
 /// vt+0x50: the enemy layer free under a rect
 fn etest(w: &World, i: usize, r: [i32; 4]) -> bool {
-    !grid(w, i) || w.col.as_ref().unwrap().test(Layer::Enemy, r[0], r[1], r[2], r[3])
+    !grid(w, i)
+        || w.col
+            .as_ref()
+            .unwrap()
+            .test(Layer::Enemy, r[0], r[1], r[2], r[3])
 }
 fn wtest(w: &World, r: [i32; 4]) -> bool {
-    w.col.as_ref().is_none_or(|c| c.test(Layer::Walk, r[0], r[1], r[2], r[3]))
+    w.col
+        .as_ref()
+        .is_none_or(|c| c.test(Layer::Walk, r[0], r[1], r[2], r[3]))
 }
 
 /// SetAnim(k) (0 idle: tick = rand(255); 1 walk); `force` = even when already in it (vt+0x34 check otherwise)
@@ -101,36 +120,86 @@ fn create(w: &mut World, i: usize, st: &Step, z: i32) -> StepRt {
         0x0800_A223 => {
             anim(w, i, 0, false);
             w.en(i).a.facing = ((wd(0) >> 16) & 3) as u8;
-            StepRt::Wait { count: (wd(0) & 0xFFFF) as i16 as i32 }
+            StepRt::Wait {
+                count: (wd(0) & 0xFFFF) as i16 as i32,
+            }
         }
         0x0800_A8E9 | 0x0800_A90F => {
             anim(w, i, if st.func == 0x0800_A8E9 { 0 } else { 1 }, true);
-            StepRt::FacePlayer { count: wd(0) as i32 }
+            StepRt::FacePlayer {
+                count: wd(0) as i32,
+            }
         }
         0x0800_A1D5 | 0x0800_A1AF => {
-            let StepOp::WalkTo { x: tx, y: ty, .. } = st.op else { return StepRt::Other };
+            let StepOp::WalkTo { x: tx, y: ty, .. } = st.op else {
+                return StepRt::Other;
+            };
             let a = &w.en_ref(i).a;
             let (dx, dy) = ((tx << 8) - a.x, (ty << 8) - a.y);
-            let (d, major) = if dx.abs() >= dy.abs() { (if dx >= 0 { 3 } else { 2 }, dx.abs()) } else { (if dy >= 0 { 0 } else { 1 }, dy.abs()) };
+            let (d, major) = if dx.abs() >= dy.abs() {
+                (if dx >= 0 { 3 } else { 2 }, dx.abs())
+            } else {
+                (if dy >= 0 { 0 } else { 1 }, dy.abs())
+            };
             let spd = (wd(1) & 0xFFFF) as i64;
-            let mut cnt = if spd == 0 { 0 } else { ((((major as i64) << 8) / spd) >> 8) as i32 & 0xFFFF };
+            let mut cnt = if spd == 0 {
+                0
+            } else {
+                ((((major as i64) << 8) / spd) >> 8) as i32 & 0xFFFF
+            };
             w.en(i).a.facing = d;
             let (vx, vy) = if cnt != 0 {
-                ((((dx as i64) << 8) / ((cnt as i64) << 8)) as i32, (((dy as i64) << 8) / ((cnt as i64) << 8)) as i32)
+                (
+                    (((dx as i64) << 8) / ((cnt as i64) << 8)) as i32,
+                    (((dy as i64) << 8) / ((cnt as i64) << 8)) as i32,
+                )
             } else {
                 cnt = 1;
                 (0, 0)
             };
             anim(w, i, 1, true);
-            StepRt::WalkTo { tx, ty, dir: d, n: cnt, vx, vy }
+            StepRt::WalkTo {
+                tx,
+                ty,
+                dir: d,
+                n: cnt,
+                vx,
+                vy,
+            }
         }
         0x0800_A82D | 0x0800_A85F => {
             anim(w, i, 0, true);
             let spd = wd(0) as i32;
             let r = ((spd << 5) + 0x7FF) & !0x7FF;
-            let rect = (st.func == 0x0800_A85F).then(|| Rect::new((wd(1) & 0xFFFF) as i32, (wd(1) >> 16) as i32, (wd(2) & 0xFFFF) as i32, (wd(2) >> 16) as i32));
-            let chance = if rect.is_some() { (spd as i64) << 7 } else { (spd as i64) << 4 };
-            StepRt::Wander(Box::new(Wander { spd, dist: r >> 8, frames: if spd > 0 { (r + spd - 1) / spd } else { 0 }, left: 0, chance, talk: rect.is_none(), rect, old: [0; 4], new: [0; 4], vx: 0, vy: 0, tx: 0, ty: 0, dir: 0 }))
+            let rect = (st.func == 0x0800_A85F).then(|| {
+                Rect::new(
+                    (wd(1) & 0xFFFF) as i32,
+                    (wd(1) >> 16) as i32,
+                    (wd(2) & 0xFFFF) as i32,
+                    (wd(2) >> 16) as i32,
+                )
+            });
+            let chance = if rect.is_some() {
+                (spd as i64) << 7
+            } else {
+                (spd as i64) << 4
+            };
+            StepRt::Wander(Box::new(Wander {
+                spd,
+                dist: r >> 8,
+                frames: if spd > 0 { (r + spd - 1) / spd } else { 0 },
+                left: 0,
+                chance,
+                talk: rect.is_none(),
+                rect,
+                old: [0; 4],
+                new: [0; 4],
+                vx: 0,
+                vy: 0,
+                tx: 0,
+                ty: 0,
+                dir: 0,
+            }))
         }
         // 0x08039F09 -> 0x08039D98: +4 s16 tx, +6 ty, +8 tz, +0xA u16 speed; n = (max |d| << 8) / speed (>= 1)
         0x0803_9F09 => {
@@ -139,13 +208,32 @@ fn create(w: &mut World, i: usize, st: &Step, z: i32) -> StepRt {
             let a = &w.en_ref(i).a;
             let (dx, dy, dz) = (tx - a.px(), ty - a.py(), tz - (z >> 10));
             let m = dx.abs().max(dy.abs()).max(dz.abs()) as i64;
-            let n = if spd > 0 { ((m << 8) / spd as i64) as i32 } else { 1 }.max(1);
+            let n = if spd > 0 {
+                ((m << 8) / spd as i64) as i32
+            } else {
+                1
+            }
+            .max(1);
             // 0x08039E76: atan2 in doubles, then floats: * 1/(2 pi) (0x3E22F984) * 1024.0, truncated
-            let ang = ((dy as f64).atan2(dx as f64) as f32) * f32::from_bits(0x3E22_F984) * 1024.0f32;
-            StepRt::Move3 { tx, ty, tz, n, vx: (dx << 8) / n, vy: (dy << 8) / n, vz: (dz << 10) / n, h: ang as i32 }
+            let ang =
+                ((dy as f64).atan2(dx as f64) as f32) * f32::from_bits(0x3E22_F984) * 1024.0f32;
+            StepRt::Move3 {
+                tx,
+                ty,
+                tz,
+                n,
+                vx: (dx << 8) / n,
+                vy: (dy << 8) / n,
+                vz: (dz << 10) / n,
+                h: ang as i32,
+            }
         }
         // 0x0803A053: +4 s16 centre x, +6 y, +8 s16 radius (and (radius + 0x180)^2, not read by the update)
-        0x0803_A053 => StepRt::Ring { cx: (wd(0) & 0xFFFF) as i16 as i32, cy: (wd(0) >> 16) as i16 as i32, r: (wd(1) & 0xFFFF) as i16 as i32 },
+        0x0803_A053 => StepRt::Ring {
+            cx: (wd(0) & 0xFFFF) as i16 as i32,
+            cy: (wd(0) >> 16) as i16 as i32,
+            r: (wd(1) & 0xFFFF) as i16 as i32,
+        },
         _ => StepRt::Other,
     }
 }
@@ -157,13 +245,21 @@ fn update_step(w: &mut World, i: usize, s: &mut StepRt, z: &mut i32) -> bool {
         // position = centre + radius * d / isqrt(|d|^2) (signed integer divisions), whole pixels; never done.
         // (The heading obj+0x1AC by d's octant is set by the caller, `run`.)
         StepRt::Ring { cx, cy, r } => {
-            let Some(pi) = w.player_idx(0) else { return false };
+            let Some(pi) = w.player_idx(0) else {
+                return false;
+            };
             let (px, py) = (w.pl_ref(pi).a.x >> 8, w.pl_ref(pi).a.y >> 8);
-            if let Some(fz) = w.field.as_ref().and_then(|f| f.flight.as_ref()).map(|fl| fl.z) {
+            if let Some(fz) = w
+                .field
+                .as_ref()
+                .and_then(|f| f.flight.as_ref())
+                .map(|fl| fl.z)
+            {
                 *z = fz;
             }
             let (dx, dy) = (px - *cx, py - *cy);
-            let d = crate::fixed::isqrt((dx as i64) * (dx as i64) + (dy as i64) * (dy as i64)) as i32;
+            let d =
+                crate::fixed::isqrt((dx as i64) * (dx as i64) + (dy as i64) * (dy as i64)) as i32;
             if d != 0 {
                 let a = &mut w.en(i).a;
                 a.x = (*cx + *r * dx / d) << 8;
@@ -171,7 +267,16 @@ fn update_step(w: &mut World, i: usize, s: &mut StepRt, z: &mut i32) -> bool {
             }
             false
         }
-        StepRt::Move3 { tx, ty, tz, n, vx, vy, vz, .. } => {
+        StepRt::Move3 {
+            tx,
+            ty,
+            tz,
+            n,
+            vx,
+            vy,
+            vz,
+            ..
+        } => {
             *n -= 1;
             let a = &mut w.en(i).a;
             if *n <= 0 {
@@ -210,7 +315,14 @@ fn update_step(w: &mut World, i: usize, s: &mut StepRt, z: &mut i32) -> bool {
             *count < 0
         }
         // 0x0800A01C
-        StepRt::WalkTo { tx, ty, dir, n: cnt, vx, vy } => {
+        StepRt::WalkTo {
+            tx,
+            ty,
+            dir,
+            n: cnt,
+            vx,
+            vy,
+        } => {
             let old = foot(w, i);
             {
                 let a = &mut w.en(i).a;
@@ -278,7 +390,9 @@ fn wander(w: &mut World, i: usize, s: &mut Wander) {
         s.new = [o[0] + v.2, o[1] + v.3, o[2] + v.2, o[3] + v.3];
         let new = s.new;
         let ok = match s.rect {
-            Some(r) => !(r.x0 > new[0] || r.y0 > new[1] || r.x1 < new[2] || r.y1 < new[3]) && wtest(w, new),
+            Some(r) => {
+                !(r.x0 > new[0] || r.y0 > new[1] || r.x1 < new[2] || r.y1 < new[3]) && wtest(w, new)
+            }
             None => {
                 emark(w, i, o, 1);
                 let ok = etest(w, i, new);
@@ -330,7 +444,13 @@ fn wander_end(w: &mut World, i: usize, s: &Wander) {
 /// mark at its end / pause): the per-frame mark sync leaves it alone
 pub fn holds_mark(w: &World, i: usize) -> bool {
     let id = w.ents[i].id;
-    let Some(p) = w.field.as_ref().and_then(|f| f.patrols.iter().find(|p| p.entity == id)) else { return false };
+    let Some(p) = w
+        .field
+        .as_ref()
+        .and_then(|f| f.patrols.iter().find(|p| p.entity == id))
+    else {
+        return false;
+    };
     matches!(&p.cur, Some(StepRt::Wander(s)) if s.left != 0 && s.rect.is_none() && w.en_ref(i).marked == Some(s.new))
 }
 
@@ -346,9 +466,23 @@ pub fn run(w: &mut World, i: usize) {
                 if let Some(pi) = w.player_idx(0) {
                     let (dx, dy) = ((w.pl_ref(pi).a.x >> 8) - cx, (w.pl_ref(pi).a.y >> 8) - cy);
                     p.h = if dx.abs() > dy.abs() {
-                        if dx > 0 { if dy > 0 { 0x50 } else { 0x30 } } else if dy > 0 { 0xB0 } else { 0xD0 }
+                        if dx > 0 {
+                            if dy > 0 {
+                                0x50
+                            } else {
+                                0x30
+                            }
+                        } else if dy > 0 {
+                            0xB0
+                        } else {
+                            0xD0
+                        }
                     } else if dy > 0 {
-                        if dx > 0 { 0x70 } else { 0x90 }
+                        if dx > 0 {
+                            0x70
+                        } else {
+                            0x90
+                        }
                     } else if dx > 0 {
                         0x10
                     } else {
@@ -390,20 +524,32 @@ pub fn pause(w: &mut World, i: usize) {
 /// runner index (the recordings' `runner_index`: 255 before the first step)
 pub fn index(w: &World, i: usize) -> Option<i32> {
     let id = w.ents[i].id;
-    w.field.as_ref()?.patrols.iter().find(|p| p.entity == id).map(|p| p.idx)
+    w.field
+        .as_ref()?
+        .patrols
+        .iter()
+        .find(|p| p.entity == id)
+        .map(|p| p.idx)
 }
-
 
 /// an enemy's height obj+0x1A8 (22.10; the runner keeps it, 0 without one)
 pub fn z_of(w: &World, i: usize) -> i32 {
     let id = w.ents[i].id;
-    w.field.as_ref().and_then(|f| f.patrols.iter().find(|p| p.entity == id)).map(|p| p.z).unwrap_or(0)
+    w.field
+        .as_ref()
+        .and_then(|f| f.patrols.iter().find(|p| p.entity == id))
+        .map(|p| p.z)
+        .unwrap_or(0)
 }
 
 /// `set_actor_field_1a8(actor, v)` (native 0xF0): obj+0x1A8 = v << 10 (positive = up)
 pub fn set_z(w: &mut World, i: usize, z: i32) {
     let id = w.ents[i].id;
-    if let Some(p) = w.field.as_mut().and_then(|f| f.patrols.iter_mut().find(|p| p.entity == id)) {
+    if let Some(p) = w
+        .field
+        .as_mut()
+        .and_then(|f| f.patrols.iter_mut().find(|p| p.entity == id))
+    {
         p.z = z;
     }
 }
@@ -411,5 +557,9 @@ pub fn set_z(w: &mut World, i: usize, z: i32) {
 /// the heading (obj+0x1AC) of a patrolling enemy
 pub fn heading(w: &World, i: usize) -> i32 {
     let id = w.ents[i].id;
-    w.field.as_ref().and_then(|f| f.patrols.iter().find(|p| p.entity == id)).map(|p| p.h).unwrap_or(0)
+    w.field
+        .as_ref()
+        .and_then(|f| f.patrols.iter().find(|p| p.entity == id))
+        .map(|p| p.h)
+        .unwrap_or(0)
 }

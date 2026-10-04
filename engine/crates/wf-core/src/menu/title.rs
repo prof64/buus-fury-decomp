@@ -19,7 +19,9 @@
 //! it plays its sound and stays here), the party sprites a saved slot shows (character objects with their
 //! animations, `0x080054BA`) and the arrows around the chosen one (`0x08005E9A`).
 
-use super::kit::{self, Button, Container, Cursor, ItemCtl, Label, Widget, BTN_A, BTN_B, BTN_L, BTN_R};
+use super::kit::{
+    self, Button, Container, Cursor, ItemCtl, Label, Widget, BTN_A, BTN_B, BTN_L, BTN_R,
+};
 use super::save::{GameList, SaveData, Summary, SLOTS};
 use super::text::{Canvas, Pen, TextData};
 use super::{Action, MenuData, Page, Phase, Transition};
@@ -78,12 +80,31 @@ pub const TITLE_FRAMES: u8 = 6;
 pub const SELECT_FRAMES: u8 = 5;
 
 fn item(id: i32, nav: [i32; 4], text: &[u16], y: i32, code: i32) -> Widget {
-    Widget::Item(ItemCtl { id, nav, text: text.to_vec(), x: 0x78, y, code, enabled: true })
+    Widget::Item(ItemCtl {
+        id,
+        nav,
+        text: text.to_vec(),
+        x: 0x78,
+        y,
+        code,
+        enabled: true,
+    })
 }
 
 impl Title {
     pub fn new(w: &World) -> Title {
-        let mut t = Title { page: TPage::Title, c: Container::default(), list: GameList::new(w, 9, 10, true), delete: false, chosen: Vec::new(), confirm: None, a_btn: 0, leaving: Leaving::No, stub: false, held: None };
+        let mut t = Title {
+            page: TPage::Title,
+            c: Container::default(),
+            list: GameList::new(w, 9, 10, true),
+            delete: false,
+            chosen: Vec::new(),
+            confirm: None,
+            a_btn: 0,
+            leaving: Leaving::No,
+            stub: false,
+            held: None,
+        };
         t.set_page(w, TPage::Title);
         t
     }
@@ -106,24 +127,37 @@ impl Title {
             TPage::Select => {
                 self.list = GameList::new(w, 9, 10, true);
                 self.a_btn = 0;
-                self.list.c.add(Widget::Button(Button::new(BTN_L, 8, 8, 6, true, false)));
-                self.list.c.add(Widget::Button(Button::new(BTN_R, 0xD0, 8, 7, true, false)));
-                self.chosen = (0..SLOTS).map(|i| w.saves.slot(i).map(|d| d.story.current).unwrap_or(0)).collect();
+                self.list
+                    .c
+                    .add(Widget::Button(Button::new(BTN_L, 8, 8, 6, true, false)));
+                self.list
+                    .c
+                    .add(Widget::Button(Button::new(BTN_R, 0xD0, 8, 7, true, false)));
+                self.chosen = (0..SLOTS)
+                    .map(|i| w.saves.slot(i).map(|d| d.story.current).unwrap_or(0))
+                    .collect();
                 self.delete = false;
             }
         }
     }
 
     fn summary(&self, k: i32) -> Option<&Summary> {
-        self.list.summaries.get(k.max(0) as usize).filter(|s| s.exists)
+        self.list
+            .summaries
+            .get(k.max(0) as usize)
+            .filter(|s| s.exists)
     }
 
     /// `0x08004C8C` / `0x08004CE0`: the previous / next selectable party member of the slot
     fn cycle(&mut self, w: &World, slot: i32, dir: i32) -> bool {
-        let Some(d) = w.saves.slot(slot.max(0) as usize) else { return false };
+        let Some(d) = w.saves.slot(slot.max(0) as usize) else {
+            return false;
+        };
         let party: Vec<(i32, bool)> = party_of(d);
         let cur = self.chosen.get(slot as usize).copied().unwrap_or(0);
-        let Some(i) = party.iter().position(|p| p.0 == cur) else { return false };
+        let Some(i) = party.iter().position(|p| p.0 == cur) else {
+            return false;
+        };
         let mut j = i as i32 + dir;
         while j >= 0 && (j as usize) < party.len() {
             if party[j as usize].1 {
@@ -147,14 +181,20 @@ impl Title {
                     if self.summary(sel).is_some() {
                         // a nested mode run from the release handler: the list is not redrawn under it (its A prompt
                         // stays pressed) and its objects stop
-                        self.confirm = Some(confirm_kids(&w.data.menu.as_ref().expect("menu content").text));
+                        self.confirm = Some(confirm_kids(
+                            &w.data.menu.as_ref().expect("menu content").text,
+                        ));
                         self.list.c.focus = Some(self.a_btn);
                         self.list.c.drawn = false;
                     }
                     return None;
                 }
                 self.list.c.drawn = false;
-                self.leaving = if self.summary(sel).is_some() { Leaving::Continue(0) } else { Leaving::NewGame };
+                self.leaving = if self.summary(sel).is_some() {
+                    Leaving::Continue(0)
+                } else {
+                    Leaving::NewGame
+                };
                 None
             }
             1 => {
@@ -214,11 +254,27 @@ fn party_of(d: &SaveData) -> Vec<(i32, bool)> {
 /// "Are you sure?" (`0x0803957C`): A + "Delete" at (12, 60) / (28, 72), B + "Cancel" after it
 fn confirm_kids(t: &TextData) -> Container {
     let mut c = Container::default();
-    c.add(Widget::Button(Button::new(BTN_A, 0xC, 0x3C, 0, true, false)));
-    c.add(Widget::Label(Label { x: 0x1C, y: 0x48, text: t.s(25).to_vec(), colour: 5, align: 0, font: kit::Font::Menu }));
+    c.add(Widget::Button(Button::new(
+        BTN_A, 0xC, 0x3C, 0, true, false,
+    )));
+    c.add(Widget::Label(Label {
+        x: 0x1C,
+        y: 0x48,
+        text: t.s(25).to_vec(),
+        colour: 5,
+        align: 0,
+        font: kit::Font::Menu,
+    }));
     let x = t.font(MenuFont::Menu).measure(t.s(25)) + 0x1E;
     c.add(Widget::Button(Button::new(BTN_B, x, 0x3C, 1, true, false)));
-    c.add(Widget::Label(Label { x: x + 0x10, y: 0x48, text: t.s(26).to_vec(), colour: 5, align: 0, font: kit::Font::Menu }));
+    c.add(Widget::Label(Label {
+        x: x + 0x10,
+        y: 0x48,
+        text: t.s(26).to_vec(),
+        colour: 5,
+        align: 0,
+        font: kit::Font::Menu,
+    }));
     c
 }
 
@@ -275,7 +331,9 @@ impl Page for Title {
     fn step(&mut self, w: &mut World) -> Action {
         match self.leaving {
             Leaving::NewGame => {
-                w.saves.pending = Some(Boot::NewGame { slot: self.list.sel });
+                w.saves.pending = Some(Boot::NewGame {
+                    slot: self.list.sel,
+                });
                 return Action::Close;
             }
             Leaving::Continue(l) => {
@@ -297,67 +355,82 @@ impl Page for Title {
             return Action::None;
         }
         if self.confirm.is_some() {
-            let (_, act) = kit::run_step(self, w, |p| p.confirm.as_mut().expect("confirm"), |p, w, _src, code| match code {
-                0 => {
-                    w.sfx(super::SFX_MENU, 64);
-                    let k = p.list.sel.max(0) as usize;
-                    p.held = Some((3, Box::new(p.list.clone())));
-                    w.saves.set(k, None);
-                    if let Some(s) = p.list.summaries.get_mut(k) {
-                        *s = Summary::default();
-                    }
-                    p.confirm = None;
-                    p.list.c.focus = None;
-                    p.stub = true;
-                    // the box's BG0 goes off at once; the erase runs before the list's redraw
-                    if let Some(s) = w.menu.shown.as_mut() {
-                        if let super::Screen::Title(x) = &mut **s {
-                            x.confirm = None;
+            let (_, act) = kit::run_step(
+                self,
+                w,
+                |p| p.confirm.as_mut().expect("confirm"),
+                |p, w, _src, code| match code {
+                    0 => {
+                        w.sfx(super::SFX_MENU, 64);
+                        let k = p.list.sel.max(0) as usize;
+                        p.held = Some((3, Box::new(p.list.clone())));
+                        w.saves.set(k, None);
+                        if let Some(s) = p.list.summaries.get_mut(k) {
+                            *s = Summary::default();
                         }
-                    }
-                    if let Some(Widget::Button(b)) = p.list.c.kids.get_mut(p.a_btn) {
-                        b.enabled = false;
-                    }
-                    p.list.c.drawn = false;
-                    (true, Some(Action::None))
-                }
-                1 => {
-                    w.sfx(super::SFX_MENU, 64);
-                    p.confirm = None;
-                    p.list.c.focus = None;
-                    p.list.c.drawn = false;
-                    p.stub = true;
-                    // the box's BG0 goes off at once (no redraw of the list)
-                    if let Some(s) = w.menu.shown.as_mut() {
-                        if let super::Screen::Title(x) = &mut **s {
-                            x.confirm = None;
+                        p.confirm = None;
+                        p.list.c.focus = None;
+                        p.stub = true;
+                        // the box's BG0 goes off at once; the erase runs before the list's redraw
+                        if let Some(s) = w.menu.shown.as_mut() {
+                            if let super::Screen::Title(x) = &mut **s {
+                                x.confirm = None;
+                            }
                         }
+                        if let Some(Widget::Button(b)) = p.list.c.kids.get_mut(p.a_btn) {
+                            b.enabled = false;
+                        }
+                        p.list.c.drawn = false;
+                        (true, Some(Action::None))
                     }
-                    (true, Some(Action::None))
-                }
-                _ => (false, None),
-            });
+                    1 => {
+                        w.sfx(super::SFX_MENU, 64);
+                        p.confirm = None;
+                        p.list.c.focus = None;
+                        p.list.c.drawn = false;
+                        p.stub = true;
+                        // the box's BG0 goes off at once (no redraw of the list)
+                        if let Some(s) = w.menu.shown.as_mut() {
+                            if let super::Screen::Title(x) = &mut **s {
+                                x.confirm = None;
+                            }
+                        }
+                        (true, Some(Action::None))
+                    }
+                    _ => (false, None),
+                },
+            );
             return act.unwrap_or(Action::None);
         }
         match self.page {
             TPage::Title => {
-                let (_, act) = kit::run_step(self, w, |p| &mut p.c, |p, w, _src, code| {
-                    w.sfx(super::SFX_MENU, 64);
-                    if code == 0 {
-                        p.set_page(w, TPage::Mode);
-                    }
-                    (true, Some(Action::None))
-                });
+                let (_, act) = kit::run_step(
+                    self,
+                    w,
+                    |p| &mut p.c,
+                    |p, w, _src, code| {
+                        w.sfx(super::SFX_MENU, 64);
+                        if code == 0 {
+                            p.set_page(w, TPage::Mode);
+                        }
+                        (true, Some(Action::None))
+                    },
+                );
                 act.unwrap_or(Action::None)
             }
             TPage::Mode => {
-                let (consumed, act) = kit::run_step(self, w, |p| &mut p.c, |p, w, _src, code| {
-                    w.sfx(super::SFX_MENU, 64);
-                    if code == 0 {
-                        p.set_page(w, TPage::Select);
-                    }
-                    (true, Some(Action::None))
-                });
+                let (consumed, act) = kit::run_step(
+                    self,
+                    w,
+                    |p| &mut p.c,
+                    |p, w, _src, code| {
+                        w.sfx(super::SFX_MENU, 64);
+                        if code == 0 {
+                            p.set_page(w, TPage::Select);
+                        }
+                        (true, Some(Action::None))
+                    },
+                );
                 if act.is_some() {
                     return Action::None;
                 }
@@ -368,10 +441,15 @@ impl Page for Title {
                 Action::None
             }
             TPage::Select => {
-                let (consumed, act) = kit::run_step(self, w, |p| &mut p.list.c, |p, w, _src, code| match p.select_event(w, code) {
-                    Some(a) => (true, Some(a)),
-                    None => (false, None),
-                });
+                let (consumed, act) = kit::run_step(
+                    self,
+                    w,
+                    |p| &mut p.list.c,
+                    |p, w, _src, code| match p.select_event(w, code) {
+                        Some(a) => (true, Some(a)),
+                        None => (false, None),
+                    },
+                );
                 if let Some(a) = act {
                     return a;
                 }
@@ -400,9 +478,23 @@ impl Page for Title {
         let mut cv = Canvas::new();
         match self.page {
             TPage::Title | TPage::Mode => {
-                cv.ops.push(MenuOp::Image { path: "ui/images/screen_title.png".into(), frame: 0, fw: 240, fh: 160, x: 0, y: 0, key0: false });
+                cv.ops.push(MenuOp::Image {
+                    path: "ui/images/screen_title.png".into(),
+                    frame: 0,
+                    fw: 240,
+                    fh: 160,
+                    x: 0,
+                    y: 0,
+                    key0: false,
+                });
                 if d.items.title_shade.len() == 256 {
-                    cv.ops.push(MenuOp::Remap { x0: 80, y0: 104, x1: 160, y1: 144, table: d.items.title_shade.clone() });
+                    cv.ops.push(MenuOp::Remap {
+                        x0: 80,
+                        y0: 104,
+                        x1: 160,
+                        y1: 144,
+                        table: d.items.title_shade.clone(),
+                    });
                 }
                 self.c.draw(t, &mut cv);
                 let mut v = super::surface_view(cv);
@@ -415,7 +507,10 @@ impl Page for Title {
                 v.layers[0].priority = 3;
                 if let Leaving::Continue(l) = self.leaving {
                     if l > 0 {
-                        v.fade = Some(wf_view::PaletteFade { level: l, target: 0 });
+                        v.fade = Some(wf_view::PaletteFade {
+                            level: l,
+                            target: 0,
+                        });
                     }
                 }
                 if let Some(c) = &self.confirm {
@@ -424,10 +519,27 @@ impl Page for Title {
                     popup_box(&mut pc, pw, ph);
                     let mut p = Pen::new(MenuFont::Bold, 0x50, 0x14, 1, 3, Some(1));
                     pc.text(t, &mut p, t.s(11));
-                    let mut p = Pen { align: 1, line_h: 12, shadow: Some(1), colour: 2, x: 0x50, y: 0x2C, font: MenuFont::Menu, clip: [0, 0, pw, ph], ..Pen::default() };
+                    let mut p = Pen {
+                        align: 1,
+                        line_h: 12,
+                        shadow: Some(1),
+                        colour: 2,
+                        x: 0x50,
+                        y: 0x2C,
+                        font: MenuFont::Menu,
+                        clip: [0, 0, pw, ph],
+                        ..Pen::default()
+                    };
                     super::shop::text_wrap(&mut pc, t, &mut p, 0x84, t.s(27));
                     c.draw(t, &mut pc);
-                    v.layers.push(MenuLayer { w: pw as u16, h: ph as u16, x: 40, y: 40, priority: 0, ops: pc.ops });
+                    v.layers.push(MenuLayer {
+                        w: pw as u16,
+                        h: ph as u16,
+                        x: 40,
+                        y: 40,
+                        priority: 0,
+                        ops: pc.ops,
+                    });
                 }
                 v
             }
@@ -442,7 +554,11 @@ impl Page for Title {
         }
         // the blinking cursor drawn this time (its OBJ copy): + ~7 k (title 1,351,045 with, 1,343,860 / 1,344,002
         // without; mode page 1,397,808 with, 1,389,795 without; Select Game 454,998 with, 448,222 without)
-        let cursor = self.view(w, d).layers.iter().any(|l| crate::sndsim::ops_summary(&l.ops).contains("cursor"));
+        let cursor = self
+            .view(w, d)
+            .layers
+            .iter()
+            .any(|l| crate::sndsim::ops_summary(&l.ops).contains("cursor"));
         let prev_page = match w.menu.shown.as_deref() {
             Some(super::Screen::Title(t)) => Some(t.page),
             _ => None,
@@ -450,15 +566,36 @@ impl Page for Title {
         let own: i64 = match self.page {
             // (nothing on screen yet: the first draw after the boot screens)
             TPage::Title if w.menu.shown.is_none() => 1_404_063,
-            TPage::Title => if cursor { 1_351_045 } else { 1_343_931 },
-            TPage::Mode => if cursor { 1_397_808 } else { 1_389_795 },
+            TPage::Title => {
+                if cursor {
+                    1_351_045
+                } else {
+                    1_343_931
+                }
+            }
+            TPage::Mode => {
+                if cursor {
+                    1_397_808
+                } else {
+                    1_389_795
+                }
+            }
             // A on an empty slot: the New Game iteration (GameData reset, the prologue's start)
             TPage::Select if self.leaving == Leaving::NewGame => 471_957,
             // the page's enter (its list, the slots' summaries)
             TPage::Select if prev_page != Some(TPage::Select) => 815_222,
-            TPage::Select => if cursor { 454_998 } else { 448_222 },
+            TPage::Select => {
+                if cursor {
+                    454_998
+                } else {
+                    448_222
+                }
+            }
         };
-        Some(crate::sndsim::Redraw { t0: 4_641, base: own - 4_641 })
+        Some(crate::sndsim::Redraw {
+            t0: 4_641,
+            base: own - 4_641,
+        })
     }
     fn redraw_cost(&self) -> u8 {
         match (self.page, self.leaving) {
@@ -475,14 +612,20 @@ impl Page for Title {
 pub const CONTINUE_TICKS: u16 = 16;
 
 /// the title boot: no fade, the title on screen at once
-pub const BOOT: Transition = Transition { fade_out: 0, enter: 1, leave: 1, fade_in: 0 };
+pub const BOOT: Transition = Transition {
+    fade_out: 0,
+    enter: 1,
+    leave: 1,
+    fade_in: 0,
+};
 
 /// show the title (a fresh session): the world under it is frozen until New Game / Continue replaces it
 pub fn open_title(w: &mut World) {
     let t = Title::new(w);
     super::open(w, super::Screen::Title(t), BOOT, false);
     // the enter (`0x080053CC`) starts the title song; the placeholder world's area song never plays
-    w.events.retain(|e| !matches!(e, crate::world::Event::Song { .. }));
+    w.events
+        .retain(|e| !matches!(e, crate::world::Event::Song { .. }));
     w.scene.song = -1;
     crate::scene::play_song(w, TITLE_SONG);
 }
@@ -494,9 +637,14 @@ pub fn open_title(w: &mut World) {
 /// (the real run's recording, `tools/wholerun/record.py`). The title waits under the boot (its song with it).
 pub fn open_title_boot(w: &mut World) {
     open_title(w);
-    w.events.retain(|e| !matches!(e, crate::world::Event::Song { .. }));
+    w.events
+        .retain(|e| !matches!(e, crate::world::Event::Song { .. }));
     w.scene.song = -1;
-    w.menu.boot = if w.opts.no_lag { BOOT_LOGIC as u16 } else { BOOT_FRAMES };
+    w.menu.boot = if w.opts.no_lag {
+        BOOT_LOGIC as u16
+    } else {
+        BOOT_FRAMES
+    };
     w.menu.boot_draw = Some(());
 }
 
@@ -516,7 +664,9 @@ pub const TITLE_SONG: i32 = 45;
 
 /// the title screen is up (its world is a placeholder field: the game keeps no area there)
 pub fn on_title(w: &World) -> bool {
-    super::active(w) && (matches!(w.menu.shown.as_deref(), Some(super::Screen::Title(_))) || matches!(w.menu.stack.first(), Some(super::Screen::Title(_))))
+    super::active(w)
+        && (matches!(w.menu.shown.as_deref(), Some(super::Screen::Title(_)))
+            || matches!(w.menu.stack.first(), Some(super::Screen::Title(_))))
 }
 
 /// `return_to_title` (0x8E: game over after script #0's "You have died!", the ending): a fresh session on the
@@ -554,12 +704,22 @@ pub fn title_world(data: &Arc<crate::content::GameData>, w: &World) -> World {
     // (and its HUD-shown bit, GameData bits & 2: the ending's hide_hud leaves it clear under the title - sb_044_04_20,
     // rsbk_002_04_21 world-state rows)
     nw.scene.hud_hidden = w.scene.hud_hidden;
-    nw.events.retain(|e| !matches!(e, crate::world::Event::Field(crate::field::FieldEvent::Run { .. })));
+    nw.events.retain(|e| {
+        !matches!(
+            e,
+            crate::world::Event::Field(crate::field::FieldEvent::Run { .. })
+        )
+    });
     nw.events.insert(0, crate::world::Event::SongStop);
     open_title(&mut nw);
     // (the title song was requested by return_to_title's own frame (native 0x8E): playing already)
     if w.scene.song == TITLE_SONG {
-        nw.events.retain(|e| !matches!(e, crate::world::Event::Song { .. } | crate::world::Event::SongStop));
+        nw.events.retain(|e| {
+            !matches!(
+                e,
+                crate::world::Event::Song { .. } | crate::world::Event::SongStop
+            )
+        });
     }
     crate::scene::note_events(&mut nw);
     nw
@@ -587,7 +747,15 @@ pub fn boot(data: &Arc<crate::content::GameData>, w: &mut World) -> Option<World
         Boot::NewGame { slot } => {
             saves.current = *slot;
             let story = crate::story::Story::new_game(data);
-            let cfg = crate::field::FieldConfig { world: 0, area: 0, variant: 0, pos: Some((120, 120)), story: Some(story), rng, ..Default::default() };
+            let cfg = crate::field::FieldConfig {
+                world: 0,
+                area: 0,
+                variant: 0,
+                pos: Some((120, 120)),
+                story: Some(story),
+                rng,
+                ..Default::default()
+            };
             let mut nw = crate::field::create(Arc::clone(data), &cfg);
             // the game's state at the prologue hook has no objects but the player
             let pid = nw.players.first().copied();
@@ -596,12 +764,18 @@ pub fn boot(data: &Arc<crate::content::GameData>, w: &mut World) -> Option<World
                 f.placed.clear();
             }
             nw.enemies.clear();
-            nw.events.retain(|e| !matches!(e, crate::world::Event::Field(crate::field::FieldEvent::Run { .. })));
-            nw.events.push(crate::world::Event::Field(crate::field::FieldEvent::Run {
-                run: crate::fieldcontent::Callback::Event("s004".into()),
-                cause: crate::field::Cause::Menu,
-                slot: 0,
-            }));
+            nw.events.retain(|e| {
+                !matches!(
+                    e,
+                    crate::world::Event::Field(crate::field::FieldEvent::Run { .. })
+                )
+            });
+            nw.events
+                .push(crate::world::Event::Field(crate::field::FieldEvent::Run {
+                    run: crate::fieldcontent::Callback::Event("s004".into()),
+                    cause: crate::field::Cause::Menu,
+                    slot: 0,
+                }));
             nw.menu.overlay = shown;
             nw.menu.overlay_until = NEWGAME_OVERLAY;
             // the new field's build is ours only (the game's GameData reset draws nothing): the RNG as the title left
@@ -631,8 +805,17 @@ pub fn boot(data: &Arc<crate::content::GameData>, w: &mut World) -> Option<World
             nw.menu.phase = Phase::Leave { t: 1 };
             // (no lag frames: the slot's load is one long iteration, then two black ones - menu_parity
             // title_continue lf 996 .. 998)
-            let leave = if w.opts.no_lag { CONTINUE_BLACK_ITERS } else { CONTINUE_BLACK };
-            nw.menu.tr = Transition { fade_out: 0, enter: 1, leave, fade_in: CONTINUE_FADE_IN };
+            let leave = if w.opts.no_lag {
+                CONTINUE_BLACK_ITERS
+            } else {
+                CONTINUE_BLACK
+            };
+            nw.menu.tr = Transition {
+                fade_out: 0,
+                enter: 1,
+                leave,
+                fade_in: CONTINUE_FADE_IN,
+            };
             nw
         }
     };
@@ -650,7 +833,10 @@ pub fn boot(data: &Arc<crate::content::GameData>, w: &mut World) -> Option<World
 }
 
 /// a harness opening this screen from JSON: `{"kind": "title", "page": "title", "cursor_t": n, "sel": k}`
-pub fn open_json(w: &World, v: &serde_json::Value) -> Option<(super::Screen, super::Transition, bool)> {
+pub fn open_json(
+    w: &World,
+    v: &serde_json::Value,
+) -> Option<(super::Screen, super::Transition, bool)> {
     if v["kind"].as_str()? != "title" {
         return None;
     }

@@ -28,7 +28,10 @@ impl FontMetrics {
     }
     /// `0x0803FFE8(font, s)`: width up to the terminator
     pub fn measure(&self, s: &[u16]) -> i32 {
-        s.iter().take_while(|&&c| c != 0).map(|&c| self.unit(c)).sum()
+        s.iter()
+            .take_while(|&&c| c != 0)
+            .map(|&c| self.unit(c))
+            .sum()
     }
     fn unit(&self, c: u16) -> i32 {
         if c >= 0xFF {
@@ -95,17 +98,31 @@ pub fn decode_escaped(s: &str) -> Vec<u16> {
 impl TextData {
     pub fn load(src: &dyn ContentSource) -> Option<TextData> {
         let mut t = TextData::default();
-        for f in [MenuFont::Small, MenuFont::Dialog, MenuFont::Digits, MenuFont::Menu, MenuFont::Bold] {
+        for f in [
+            MenuFont::Small,
+            MenuFont::Dialog,
+            MenuFont::Digits,
+            MenuFont::Menu,
+            MenuFont::Bold,
+        ] {
             let b = src.read(&format!("ui/fonts/{}.json", f.id()))?;
             let v: Value = serde_json::from_slice(&b).ok()?;
-            let mut m = FontMetrics { w: vec![0; 256], has: vec![false; 256], wide_w: v["wide_glyphs"]["width"].as_u64().unwrap_or(0) as u32, cols: vec![Vec::new(); 256] };
+            let mut m = FontMetrics {
+                w: vec![0; 256],
+                has: vec![false; 256],
+                wide_w: v["wide_glyphs"]["width"].as_u64().unwrap_or(0) as u32,
+                cols: vec![Vec::new(); 256],
+            };
             if let Some(g) = v["glyphs"].as_object() {
                 for (k, gv) in g {
                     if let Ok(c) = k.parse::<usize>() {
                         if c < 256 {
                             m.w[c] = gv["w"].as_u64().unwrap_or(0) as u8;
                             m.has[c] = true;
-                            m.cols[c] = gv["cols"].as_array().map(|a| a.iter().map(|x| x.as_u64().unwrap_or(0) as u16).collect()).unwrap_or_default();
+                            m.cols[c] = gv["cols"]
+                                .as_array()
+                                .map(|a| a.iter().map(|x| x.as_u64().unwrap_or(0) as u16).collect())
+                                .unwrap_or_default();
                         }
                     }
                 }
@@ -114,7 +131,10 @@ impl TextData {
         }
         if let Some(b) = src.read("text/strings.json") {
             if let Ok(Value::Array(a)) = serde_json::from_slice::<Value>(&b) {
-                t.strings = a.iter().map(|s| decode_escaped(s.as_str().unwrap_or(""))).collect();
+                t.strings = a
+                    .iter()
+                    .map(|s| decode_escaped(s.as_str().unwrap_or("")))
+                    .collect();
             }
         }
         Some(t)
@@ -225,13 +245,31 @@ pub struct Pen {
 
 impl Default for Pen {
     fn default() -> Pen {
-        Pen { align: 0, single: false, line_h: 0, shadow: None, colour: 0, x: 0, y: 0, font: MenuFont::Menu, clip: [0, 0, 240, 160] }
+        Pen {
+            align: 0,
+            single: false,
+            line_h: 0,
+            shadow: None,
+            colour: 0,
+            x: 0,
+            y: 0,
+            font: MenuFont::Menu,
+            clip: [0, 0, 240, 160],
+        }
     }
 }
 
 impl Pen {
     pub fn new(font: MenuFont, x: i32, y: i32, align: u8, colour: u8, shadow: Option<u8>) -> Pen {
-        Pen { align, colour, x, y, font, shadow, ..Pen::default() }
+        Pen {
+            align,
+            colour,
+            x,
+            y,
+            font,
+            shadow,
+            ..Pen::default()
+        }
     }
     pub fn at(mut self, x: i32, y: i32) -> Pen {
         self.x = x;
@@ -259,13 +297,27 @@ impl Canvas {
         self.ops.push(MenuOp::Panel { x0, y0, x1, y1 });
     }
     pub fn fill(&mut self, x0: i32, y0: i32, x1: i32, y1: i32, colour: u8) {
-        self.ops.push(MenuOp::Fill { x0, y0, x1, y1, colour });
+        self.ops.push(MenuOp::Fill {
+            x0,
+            y0,
+            x1,
+            y1,
+            colour,
+        });
     }
     pub fn pixel(&mut self, x: i32, y: i32, colour: u8) {
         self.ops.push(MenuOp::Pixel { x, y, colour });
     }
     pub fn image(&mut self, path: &str, frame: u16, fw: u16, fh: u16, x: i32, y: i32) {
-        self.ops.push(MenuOp::Image { path: path.to_string(), frame, fw, fh, x, y, key0: true });
+        self.ops.push(MenuOp::Image {
+            path: path.to_string(),
+            frame,
+            fw,
+            fh,
+            x,
+            y,
+            key0: true,
+        });
     }
     /// `0x0803DADA(pen, s)`: line by line (0x000A breaks unless single-line); each line aligned with the measure of
     /// its units (control units 1 px); in left mode the pen x advances by the width when the string ends on its
@@ -296,7 +348,15 @@ impl Canvas {
                     _ => pen.x,
                 };
                 // the line as drawn: colour codes are kept for the renderer, the pen's colour follows them
-                self.ops.push(MenuOp::Text { font: pen.font, x, y: pen.y, colour: pen.colour, shadow: pen.shadow, clip: pen.clip, text: line.to_vec() });
+                self.ops.push(MenuOp::Text {
+                    font: pen.font,
+                    x,
+                    y: pen.y,
+                    colour: pen.colour,
+                    shadow: pen.shadow,
+                    clip: pen.clip,
+                    text: line.to_vec(),
+                });
                 let mut k = 0;
                 while k < n {
                     if line[k] == 8 && k + 1 < n {
@@ -372,7 +432,15 @@ impl Canvas {
                     2 => pen.x - w,
                     _ => pen.x,
                 };
-                self.ops.push(MenuOp::Text { font: pen.font, x, y: pen.y, colour: pen.colour, shadow: pen.shadow, clip: pen.clip, text: line.to_vec() });
+                self.ops.push(MenuOp::Text {
+                    font: pen.font,
+                    x,
+                    y: pen.y,
+                    colour: pen.colour,
+                    shadow: pen.shadow,
+                    clip: pen.clip,
+                    text: line.to_vec(),
+                });
                 let mut k = 0;
                 while k < line.len() {
                     if line[k] == 8 && k + 1 < line.len() {
@@ -393,7 +461,12 @@ impl Canvas {
 /// `0x0803DE6A` the line fitter from unit `start`: leading spaces / line breaks / 0x0B skipped, then units up to
 /// the end (done), a new line, 0x0B (done), or the last space before the width passes `max_w` (a longer word is
 /// cut where it stops fitting). Returns (line start, line end, width, done).
-pub fn line_fit(fm: &FontMetrics, s: &[u16], start: usize, max_w: i32) -> (usize, usize, i32, bool) {
+pub fn line_fit(
+    fm: &FontMetrics,
+    s: &[u16],
+    start: usize,
+    max_w: i32,
+) -> (usize, usize, i32, bool) {
     let at = |k: usize| s.get(k).copied().unwrap_or(0);
     let mut p = start;
     while matches!(at(p), 0x20 | 0x0A | 0x0B) {

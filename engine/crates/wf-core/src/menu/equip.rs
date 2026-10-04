@@ -13,7 +13,10 @@
 //! (`status::apply_record`: RecalcStats on the object).
 
 use super::inventory::dialog_frame;
-use super::kit::{self, Button, Container, Cursor, Font, Label, Widget, BTN_A, BTN_B, BTN_DOWN, BTN_L, BTN_R, BTN_UP};
+use super::kit::{
+    self, Button, Container, Cursor, Font, Label, Widget, BTN_A, BTN_B, BTN_DOWN, BTN_L, BTN_R,
+    BTN_UP,
+};
 use super::shop::{hsep, text_trunc, text_wrap, vsep};
 use super::text::{Arg, Canvas, Pen};
 use super::{Action, MenuData, Page, Screen};
@@ -48,13 +51,19 @@ pub fn marks(w: &World) -> Vec<u8> {
 }
 
 fn slot_of(d: &MenuData, item: i32) -> u8 {
-    d.items.equipment.get(item.max(0) as usize).map(|e| e.slot).unwrap_or(0)
+    d.items
+        .equipment
+        .get(item.max(0) as usize)
+        .map(|e| e.slot)
+        .unwrap_or(0)
 }
 
 /// RecalcStats (`0x08013C66`) of character `ci` wearing `equip`: STR, POW, END, SPD (record +0x4C..+0x54); the timed
 /// buff of a live fighter playing it counts
 pub fn eff_with(w: &World, ci: i32, equip: [i32; 4]) -> [i32; 4] {
-    let Some(cs) = w.story.chars.get(ci.max(0) as usize) else { return [0; 4] };
+    let Some(cs) = w.story.chars.get(ci.max(0) as usize) else {
+        return [0; 4];
+    };
     let mut rec = cs.rec.clone();
     let mut boost = None;
     for s in 0..w.players.len() {
@@ -68,7 +77,10 @@ pub fn eff_with(w: &World, ci: i32, equip: [i32; 4]) -> [i32; 4] {
             }
         }
     }
-    let eq: Vec<Option<&crate::content::Equip>> = equip.iter().map(|&e| w.data.equipment.iter().find(|q| q.id == e)).collect();
+    let eq: Vec<Option<&crate::content::Equip>> = equip
+        .iter()
+        .map(|&e| w.data.equipment.iter().find(|q| q.id == e))
+        .collect();
     let e = crate::progression::recalc_stats_with(&rec, &eq, boost);
     [e.str_, e.pow, e.end, e.spd]
 }
@@ -78,7 +90,11 @@ fn cur_char(w: &World) -> i32 {
 }
 
 fn cur_equip(w: &World) -> [i32; 4] {
-    w.story.chars.get(cur_char(w).max(0) as usize).map(|c| c.equip).unwrap_or(NONE_ITEM)
+    w.story
+        .chars
+        .get(cur_char(w).max(0) as usize)
+        .map(|c| c.equip)
+        .unwrap_or(NONE_ITEM)
 }
 
 fn level(w: &World) -> i32 {
@@ -86,18 +102,52 @@ fn level(w: &World) -> i32 {
 }
 
 /// the four page buttons and labels every Equip mode builds (A Select / B Cancel at y `yb`, L / R, the neighbours)
-fn common_children(c: &mut Container, t: &super::text::TextData, yb: i32, lb: i32, lr: bool) -> usize {
+fn common_children(
+    c: &mut Container,
+    t: &super::text::TextData,
+    yb: i32,
+    lb: i32,
+    lr: bool,
+) -> usize {
     let sel_s = t.s(23);
     let a = c.add(Widget::Button(Button::new(BTN_A, 0xC, yb, 0, true, false)));
-    c.add(Widget::Label(Label { x: 0x1C, y: lb, text: sel_s.to_vec(), colour: 5, align: 0, font: Font::Menu }));
+    c.add(Widget::Label(Label {
+        x: 0x1C,
+        y: lb,
+        text: sel_s.to_vec(),
+        colour: 5,
+        align: 0,
+        font: Font::Menu,
+    }));
     let bx = t.font(MenuFont::Menu).measure(sel_s) + 0x1E;
     c.add(Widget::Button(Button::new(BTN_B, bx, yb, 1, true, false)));
-    c.add(Widget::Label(Label { x: bx + 0x10, y: lb, text: t.s(26).to_vec(), colour: 5, align: 0, font: Font::Menu }));
+    c.add(Widget::Label(Label {
+        x: bx + 0x10,
+        y: lb,
+        text: t.s(26).to_vec(),
+        colour: 5,
+        align: 0,
+        font: Font::Menu,
+    }));
     if lr {
         c.add(Widget::Button(Button::new(BTN_L, 8, 8, 6, true, false)));
         c.add(Widget::Button(Button::new(BTN_R, 0xD0, 8, 7, true, false)));
-        c.add(Widget::Label(Label { x: 0x22, y: 0x14, text: t.s(33).to_vec(), colour: 2, align: 0, font: Font::Menu }));
-        c.add(Widget::Label(Label { x: 0xCE, y: 0x14, text: t.s(2).to_vec(), colour: 2, align: 2, font: Font::Menu }));
+        c.add(Widget::Label(Label {
+            x: 0x22,
+            y: 0x14,
+            text: t.s(33).to_vec(),
+            colour: 2,
+            align: 0,
+            font: Font::Menu,
+        }));
+        c.add(Widget::Label(Label {
+            x: 0xCE,
+            y: 0x14,
+            text: t.s(2).to_vec(),
+            colour: 2,
+            align: 2,
+            font: Font::Menu,
+        }));
     }
     a
 }
@@ -182,10 +232,21 @@ impl Equip {
         let mut c = Container::default();
         common_children(&mut c, t, 0x84, 0x90, true);
         c.add(Widget::Cursor(Cursor { t: 0 }));
-        Equip { slots: Some(Slots { c, slot, items: NONE_ITEM, eff: [0; 4] }), list: None }
+        Equip {
+            slots: Some(Slots {
+                c,
+                slot,
+                items: NONE_ITEM,
+                eff: [0; 4],
+            }),
+            list: None,
+        }
     }
     fn list_of(w: &World, slot: i32) -> Equip {
-        Equip { slots: None, list: Some(List::new(w, slot)) }
+        Equip {
+            slots: None,
+            list: Some(List::new(w, slot)),
+        }
     }
 }
 
@@ -199,21 +260,32 @@ impl Slots {
 
     fn step(&mut self, w: &mut World) -> Action {
         let slot = self.slot;
-        let (consumed, act) = kit::run_step(self, w, |p| &mut p.c, |_p, w, _src, code| match code {
-            0 => {
-                w.sfx(super::SFX_MENU, 64);
-                (true, Some(Action::Replace(Screen::Equip(Equip::list_of(w, slot)))))
-            }
-            1 => {
-                w.sfx(super::SFX_MENU, 64);
-                (true, Some(Action::Close))
-            }
-            6 | 7 => {
-                w.sfx(super::SFX_MENU, 64);
-                (true, Some(Action::Replace(super::page_screen(w, 2, code == 7))))
-            }
-            _ => (false, None),
-        });
+        let (consumed, act) = kit::run_step(
+            self,
+            w,
+            |p| &mut p.c,
+            |_p, w, _src, code| match code {
+                0 => {
+                    w.sfx(super::SFX_MENU, 64);
+                    (
+                        true,
+                        Some(Action::Replace(Screen::Equip(Equip::list_of(w, slot)))),
+                    )
+                }
+                1 => {
+                    w.sfx(super::SFX_MENU, 64);
+                    (true, Some(Action::Close))
+                }
+                6 | 7 => {
+                    w.sfx(super::SFX_MENU, 64);
+                    (
+                        true,
+                        Some(Action::Replace(super::page_screen(w, 2, code == 7))),
+                    )
+                }
+                _ => (false, None),
+            },
+        );
         if let Some(a) = act {
             return a;
         }
@@ -258,13 +330,32 @@ impl Slots {
             let it = d.items.equipment.get(self.items[k].max(0) as usize);
             pen.x = 0x22;
             pen.y = 16 * k as i32 + 0x28;
-            text_trunc(&mut cv, t, &mut pen, 0x7A, it.map(|e| e.name.as_slice()).unwrap_or(&[]));
-            cv.image(it.map(|e| e.icon.as_str()).unwrap_or(""), 0, 16, 16, 0x10, 16 * k as i32 + 0x1C);
+            text_trunc(
+                &mut cv,
+                t,
+                &mut pen,
+                0x7A,
+                it.map(|e| e.name.as_slice()).unwrap_or(&[]),
+            );
+            cv.image(
+                it.map(|e| e.icon.as_str()).unwrap_or(""),
+                0,
+                16,
+                16,
+                0x10,
+                16 * k as i32 + 0x1C,
+            );
             if self.slot == k as i32 {
                 pen.x = 0x13;
                 pen.y = 0x6A;
                 pen.line_h = 0xC;
-                text_wrap(&mut cv, t, &mut pen, 0xCC, it.map(|e| e.desc.as_slice()).unwrap_or(&[]));
+                text_wrap(
+                    &mut cv,
+                    t,
+                    &mut pen,
+                    0xCC,
+                    it.map(|e| e.desc.as_slice()).unwrap_or(&[]),
+                );
             }
         }
         super::surface_view(cv)
@@ -289,20 +380,47 @@ impl List {
         let a = common_children(&mut c, t, 0x84, 0x90, true);
         let (mut up, mut down, mut cursor) = (None, None, None);
         if !entries.is_empty() {
-            up = Some(c.add(Widget::Button(Button::new(BTN_UP, 0x9E, 0x1E, 2, true, true))));
-            down = Some(c.add(Widget::Button(Button::new(BTN_DOWN, 0x9E, 0x4B, 3, true, true))));
+            up = Some(c.add(Widget::Button(Button::new(
+                BTN_UP, 0x9E, 0x1E, 2, true, true,
+            ))));
+            down = Some(c.add(Widget::Button(Button::new(
+                BTN_DOWN, 0x9E, 0x4B, 3, true, true,
+            ))));
             cursor = Some(c.add(Widget::Cursor(Cursor { t: 0 })));
         } else if let Some(Widget::Button(b)) = c.kids.get_mut(a) {
             b.enabled = false;
         }
-        let mut l = List { c, slot, entries, top: (cur - 2).max(0), cur, now, preview: now, a, up, down, cursor, level: 0, dialog: None, cant: None, under: None, stub: None, hold: Container { drawn: true, ..Container::default() } };
+        let mut l = List {
+            c,
+            slot,
+            entries,
+            top: (cur - 2).max(0),
+            cur,
+            now,
+            preview: now,
+            a,
+            up,
+            down,
+            cursor,
+            level: 0,
+            dialog: None,
+            cant: None,
+            under: None,
+            stub: None,
+            hold: Container {
+                drawn: true,
+                ..Container::default()
+            },
+        };
         l.preview(w);
         l
     }
 
     /// `0x0801D5F8`: the stats with the selected entry worn
     fn preview(&mut self, w: &World) {
-        let Some(e) = self.entries.get(self.cur.max(0) as usize) else { return };
+        let Some(e) = self.entries.get(self.cur.max(0) as usize) else {
+            return;
+        };
         let mut eq = cur_equip(w);
         eq[self.slot.clamp(0, 3) as usize] = e.item;
         self.preview = eff_with(w, cur_char(w), eq);
@@ -371,45 +489,56 @@ impl List {
             return self.step_dialog(w);
         }
         let slot = self.slot;
-        let (consumed, act) = kit::run_step(self, w, |p| &mut p.c, |p, w, _src, code| match code {
-            0 => {
-                if p.entries.is_empty() {
-                    return (false, None);
+        let (consumed, act) = kit::run_step(
+            self,
+            w,
+            |p| &mut p.c,
+            |p, w, _src, code| match code {
+                0 => {
+                    if p.entries.is_empty() {
+                        return (false, None);
+                    }
+                    w.sfx(super::SFX_MENU, 64);
+                    let e = p.entries[p.cur.max(0) as usize].clone();
+                    p.under = shown_list(w);
+                    p.dialog = Some(Action2::new(w, e.index, e.item, e.mark));
+                    (false, None)
                 }
-                w.sfx(super::SFX_MENU, 64);
-                let e = p.entries[p.cur.max(0) as usize].clone();
-                p.under = shown_list(w);
-                p.dialog = Some(Action2::new(w, e.index, e.item, e.mark));
-                (false, None)
-            }
-            1 => {
-                w.sfx(super::SFX_MENU, 64);
-                (true, Some(Action::Replace(Screen::Equip(Equip::with_slot(w, slot)))))
-            }
-            2 => {
-                if p.cur != 0 {
-                    w.sfx(super::SFX_CURSOR, 64);
-                    p.cur -= 1;
-                    p.preview(w);
-                    p.c.drawn = false;
+                1 => {
+                    w.sfx(super::SFX_MENU, 64);
+                    (
+                        true,
+                        Some(Action::Replace(Screen::Equip(Equip::with_slot(w, slot)))),
+                    )
                 }
-                (false, None)
-            }
-            3 => {
-                if (p.entries.len() as i32) - 1 > p.cur {
-                    w.sfx(super::SFX_CURSOR, 64);
-                    p.cur += 1;
-                    p.preview(w);
-                    p.c.drawn = false;
+                2 => {
+                    if p.cur != 0 {
+                        w.sfx(super::SFX_CURSOR, 64);
+                        p.cur -= 1;
+                        p.preview(w);
+                        p.c.drawn = false;
+                    }
+                    (false, None)
                 }
-                (false, None)
-            }
-            6 | 7 => {
-                w.sfx(super::SFX_MENU, 64);
-                (true, Some(Action::Replace(super::page_screen(w, 2, code == 7))))
-            }
-            _ => (false, None),
-        });
+                3 => {
+                    if (p.entries.len() as i32) - 1 > p.cur {
+                        w.sfx(super::SFX_CURSOR, 64);
+                        p.cur += 1;
+                        p.preview(w);
+                        p.c.drawn = false;
+                    }
+                    (false, None)
+                }
+                6 | 7 => {
+                    w.sfx(super::SFX_MENU, 64);
+                    (
+                        true,
+                        Some(Action::Replace(super::page_screen(w, 2, code == 7))),
+                    )
+                }
+                _ => (false, None),
+            },
+        );
         if let Some(a) = act {
             return a;
         }
@@ -424,41 +553,50 @@ impl List {
         let mut dl = self.dialog.take().expect("dialog");
         let mut result: Option<i32> = None;
         let slot = self.slot;
-        let (consumed, _) = kit::run_step(&mut dl, w, |p| &mut p.c, |p, w, _src, code| {
-            match code {
-                0 => {
-                    w.sfx(super::SFX_MENU, 64);
-                    let mut opt = p.c.sel;
-                    if !p.equip_opt {
-                        opt += 1;
-                    }
-                    if !p.unequip_opt && opt >= 1 {
-                        opt += 1;
-                    }
-                    match opt {
-                        0 => {
-                            if p.can {
-                                equip(w, cur_char(w), p.index, p.item, slot);
-                                result = Some(1);
+        let (consumed, _) = kit::run_step(
+            &mut dl,
+            w,
+            |p| &mut p.c,
+            |p, w, _src, code| {
+                match code {
+                    0 => {
+                        w.sfx(super::SFX_MENU, 64);
+                        let mut opt = p.c.sel;
+                        if !p.equip_opt {
+                            opt += 1;
+                        }
+                        if !p.unequip_opt && opt >= 1 {
+                            opt += 1;
+                        }
+                        match opt {
+                            0 => {
+                                if p.can {
+                                    equip(w, cur_char(w), p.index, p.item, slot);
+                                    result = Some(1);
+                                }
+                            }
+                            1 => {
+                                unequip(
+                                    w,
+                                    p.mark as i32 - 1,
+                                    slot_of(w.data.menu.as_ref().unwrap(), p.item) as i32,
+                                );
+                                result = Some(3);
+                            }
+                            _ => {
+                                result = Some(if drop(w, p.index, p.item) { 2 } else { 4 });
                             }
                         }
-                        1 => {
-                            unequip(w, p.mark as i32 - 1, slot_of(w.data.menu.as_ref().unwrap(), p.item) as i32);
-                            result = Some(3);
-                        }
-                        _ => {
-                            result = Some(if drop(w, p.index, p.item) { 2 } else { 4 });
-                        }
                     }
+                    1 => {
+                        w.sfx(super::SFX_MENU, 64);
+                        result = Some(3);
+                    }
+                    _ => {}
                 }
-                1 => {
-                    w.sfx(super::SFX_MENU, 64);
-                    result = Some(3);
-                }
-                _ => {}
-            }
-            (result.is_some(), None)
-        });
+                (result.is_some(), None)
+            },
+        );
         let Some(r) = result else {
             // done check 0x0801D576: UP / DOWN wrap over the options
             let k = w.menu.pressed;
@@ -504,7 +642,10 @@ impl List {
                     self.cur -= 1;
                 }
                 if n == 0 {
-                    for i in [self.up.take(), self.down.take(), self.cursor.take()].into_iter().flatten() {
+                    for i in [self.up.take(), self.down.take(), self.cursor.take()]
+                        .into_iter()
+                        .flatten()
+                    {
                         self.c.remove(i);
                     }
                     if let Some(Widget::Button(b)) = self.c.kids.get_mut(self.a) {
@@ -538,10 +679,19 @@ impl List {
     /// `0x0801D988`; with a nested mode up: the list as on screen + its BG0 layer
     fn draw(&self, d: &MenuData) -> MenuView {
         if std::env::var("EQ_DEBUG").is_ok() {
-            eprintln!("list view focus {:?} dialog {} under {:?}", self.c.focus, self.dialog.is_some(), self.under.as_ref().map(|u| u.c.focus));
+            eprintln!(
+                "list view focus {:?} dialog {} under {:?}",
+                self.c.focus,
+                self.dialog.is_some(),
+                self.under.as_ref().map(|u| u.c.focus)
+            );
         }
         if self.dialog.is_some() || self.cant.is_some() {
-            let base = self.under.as_deref().map(|u| u.draw_page(d)).unwrap_or_else(|| self.draw_page(d));
+            let base = self
+                .under
+                .as_deref()
+                .map(|u| u.draw_page(d))
+                .unwrap_or_else(|| self.draw_page(d));
             return self.add_nested(d, base);
         }
         self.draw_page(d)
@@ -578,10 +728,20 @@ impl List {
                 cv.textf(t, &mut pen, t.s(s), &[Arg::I(self.preview[k])]);
             }
             let sel = &self.entries[self.cur.max(0) as usize];
-            let rq = d.items.equipment.get(sel.item.max(0) as usize).map(|e| e.level as i32).unwrap_or(0);
+            let rq = d
+                .items
+                .equipment
+                .get(sel.item.max(0) as usize)
+                .map(|e| e.level as i32)
+                .unwrap_or(0);
             pen.x = 0xAF;
             pen.y = 0x58;
-            cv.textf(t, &mut pen, t.s(if self.level >= rq { 67 } else { 68 }), &[Arg::I(rq)]);
+            cv.textf(
+                t,
+                &mut pen,
+                t.s(if self.level >= rq { 67 } else { 68 }),
+                &[Arg::I(rq)],
+            );
             for k in 0..4 {
                 let idx = self.top + k;
                 if idx >= self.entries.len() as i32 {
@@ -595,18 +755,37 @@ impl List {
                     pen.x = 0x13;
                     pen.y = 0x6A;
                     pen.line_h = 0xC;
-                    text_wrap(&mut cv, t, &mut pen, 0xCC, it.map(|e| e.desc.as_slice()).unwrap_or(&[]));
+                    text_wrap(
+                        &mut cv,
+                        t,
+                        &mut pen,
+                        0xCC,
+                        it.map(|e| e.desc.as_slice()).unwrap_or(&[]),
+                    );
                     pen.colour = if self.level >= rq { 6 } else { 0x75 };
                 } else {
                     pen.colour = if self.level >= rq { 2 } else { 0x75 };
                 }
-                cv.image(it.map(|e| e.icon.as_str()).unwrap_or(""), 0, 16, 16, 0x10, 16 * k + 0x1C);
+                cv.image(
+                    it.map(|e| e.icon.as_str()).unwrap_or(""),
+                    0,
+                    16,
+                    16,
+                    0x10,
+                    16 * k + 0x1C,
+                );
                 pen.x = 0x22;
                 pen.y = 16 * k + 0x28;
                 let name = it.map(|e| e.name.as_slice()).unwrap_or(&[]);
                 if e.mark != 0 {
                     let mark = t.s(69);
-                    text_trunc(&mut cv, t, &mut pen, 0x7A - t.font(MenuFont::Menu).measure(mark), name);
+                    text_trunc(
+                        &mut cv,
+                        t,
+                        &mut pen,
+                        0x7A - t.font(MenuFont::Menu).measure(mark),
+                        name,
+                    );
                     pen.colour = WEARER_COLOUR.get(e.mark as usize - 1).copied().unwrap_or(2);
                     cv.text(t, &mut pen, mark);
                 } else {
@@ -621,7 +800,14 @@ impl List {
     fn add_nested(&self, d: &MenuData, mut mv: MenuView) -> MenuView {
         let t = &d.text;
         if let Some(dl) = &self.dialog {
-            mv.layers.push(wf_view::MenuLayer { w: 192, h: 96, x: 24, y: 40, priority: 0, ops: dl.draw(d).ops });
+            mv.layers.push(wf_view::MenuLayer {
+                w: 192,
+                h: 96,
+                x: 24,
+                y: 40,
+                priority: 0,
+                ops: dl.draw(d).ops,
+            });
         }
         if self.cant.is_some() {
             // 0x080397CC: 128x40, "Can't drop here!" centred at (0x40, 0x14), colour 2
@@ -630,7 +816,14 @@ impl List {
             let mut p = Pen::new(MenuFont::Menu, 0x40, 0x14, 1, 2, Some(1));
             p.clip = [0, 0, 128, 40];
             c2.text(t, &mut p, t.s(74));
-            mv.layers.push(wf_view::MenuLayer { w: 128, h: 40, x: 56, y: 64, priority: 0, ops: c2.ops });
+            mv.layers.push(wf_view::MenuLayer {
+                w: 128,
+                h: 40,
+                x: 56,
+                y: 64,
+                priority: 0,
+                ops: c2.ops,
+            });
         }
         mv
     }
@@ -659,7 +852,11 @@ fn entries_of(w: &World, d: &MenuData, slot: i32) -> Vec<Entry> {
         .iter()
         .enumerate()
         .filter(|(_, &it)| slot_of(d, it) as i32 == slot)
-        .map(|(k, &it)| Entry { item: it, mark: m.get(k).copied().unwrap_or(0), index: k as i32 })
+        .map(|(k, &it)| Entry {
+            item: it,
+            mark: m.get(k).copied().unwrap_or(0),
+            index: k as i32,
+        })
         .collect()
 }
 
@@ -669,8 +866,18 @@ impl Action2 {
         let d = w.data.menu.as_ref().expect("menu content");
         let t = &d.text;
         let ci = cur_char(w);
-        let rq = d.items.equipment.get(item.max(0) as usize).map(|e| e.level as i32).unwrap_or(0);
-        let form = w.story.chars.get(ci.max(0) as usize).map(|c| c.form).unwrap_or(0);
+        let rq = d
+            .items
+            .equipment
+            .get(item.max(0) as usize)
+            .map(|e| e.level as i32)
+            .unwrap_or(0);
+        let form = w
+            .story
+            .chars
+            .get(ci.max(0) as usize)
+            .map(|c| c.form)
+            .unwrap_or(0);
         let fused = w.data.form(form).is_some_and(|f| f.fusion);
         let can = level(w) >= rq && !fused;
         let equip_opt = mark as i32 - 1 != ci;
@@ -678,8 +885,27 @@ impl Action2 {
         let mut c = Container::default();
         common_children(&mut c, t, 0x44, 0x50, false);
         c.add(Widget::Cursor(Cursor { t: 0 }));
-        let wearer_form = if mark != 0 { w.story.chars.get(mark as usize - 1).map(|c| c.form).unwrap_or(0) } else { 0 };
-        Action2 { c, index, item, can, equip_opt, unequip_opt, last: equip_opt as i32 + unequip_opt as i32, mark, form, wearer_form }
+        let wearer_form = if mark != 0 {
+            w.story
+                .chars
+                .get(mark as usize - 1)
+                .map(|c| c.form)
+                .unwrap_or(0)
+        } else {
+            0
+        };
+        Action2 {
+            c,
+            index,
+            item,
+            can,
+            equip_opt,
+            unequip_opt,
+            last: equip_opt as i32 + unequip_opt as i32,
+            mark,
+            form,
+            wearer_form,
+        }
     }
 
     /// `0x0801D294`: 192x96
@@ -688,7 +914,14 @@ impl Action2 {
         let mut cv = Canvas::new();
         dialog_frame(&mut cv, 192, 96);
         let it = d.items.equipment.get(self.item.max(0) as usize);
-        cv.image(it.map(|e| e.icon.as_str()).unwrap_or(""), 0, 16, 16, 0x10, 6);
+        cv.image(
+            it.map(|e| e.icon.as_str()).unwrap_or(""),
+            0,
+            16,
+            16,
+            0x10,
+            6,
+        );
         let mut pen = Pen::new(MenuFont::Menu, 0x22, 0x13, 0, 5, Some(1));
         pen.clip = [0, 0, 192, 96];
         cv.text(t, &mut pen, it.map(|e| e.name.as_slice()).unwrap_or(&[]));
@@ -700,19 +933,40 @@ impl Action2 {
             opt += 1;
         }
         let (x, mut y) = (0x12, 0x22);
-        let fname = |f: i32| d.forms.get(f.max(0) as usize).map(|f| f.name.clone()).unwrap_or_default();
+        let fname = |f: i32| {
+            d.forms
+                .get(f.max(0) as usize)
+                .map(|f| f.name.clone())
+                .unwrap_or_default()
+        };
         if self.equip_opt {
             pen.x = x;
             pen.y = y;
-            pen.colour = if !self.can { 0x75 } else if opt == 0 { 6 } else { 2 };
-            cv.textf(t, &mut pen, t.s(70), &[super::text::Arg::S(&fname(self.form))]);
+            pen.colour = if !self.can {
+                0x75
+            } else if opt == 0 {
+                6
+            } else {
+                2
+            };
+            cv.textf(
+                t,
+                &mut pen,
+                t.s(70),
+                &[super::text::Arg::S(&fname(self.form))],
+            );
             y += 0xC;
         }
         if self.unequip_opt {
             pen.x = x;
             pen.y = y;
             pen.colour = if opt == 1 { 6 } else { 2 };
-            cv.textf(t, &mut pen, t.s(71), &[super::text::Arg::S(&fname(self.wearer_form))]);
+            cv.textf(
+                t,
+                &mut pen,
+                t.s(71),
+                &[super::text::Arg::S(&fname(self.wearer_form))],
+            );
             y += 0xC;
         }
         pen.x = x;
@@ -757,11 +1011,15 @@ pub fn equip(w: &mut World, ch: i32, index: i32, item: i32, slot: i32) {
 /// draws them when the deferred object is added at the field's next update, the remake now: the world is frozen
 /// meanwhile, so the RNG stream is the same)
 fn drop(w: &mut World, index: i32, item: i32) -> bool {
-    let Some(f) = w.field.as_ref() else { return false };
+    let Some(f) = w.field.as_ref() else {
+        return false;
+    };
     if f.flight.is_some() {
         return false;
     }
-    let Some(pi) = w.player_idx(0) else { return false };
+    let Some(pi) = w.player_idx(0) else {
+        return false;
+    };
     let dropped = w.ents.iter().filter(|e| !e.removed && matches!(&e.body, crate::world::Body::Pickup(p) if matches!(p.kind, crate::fieldobj::PickupKind::Supply(_) | crate::fieldobj::PickupKind::Equipment(_)))).count();
     if dropped >= 8 {
         return false;
@@ -851,26 +1109,49 @@ impl Page for Equip {
     /// per text line + 0.486 per glyph instruction (within 3.6k); the first draw of a new container + 100,600 for
     /// the slots (entering, back from the list), + 62,600 + 5,000 per line for the list (within 6k)
     fn redraw_time(&self, w: &World, d: &MenuData) -> Option<crate::sndsim::Redraw> {
-        let open = self.list.as_ref().is_some_and(|l| l.dialog.is_some() || l.cant.is_some());
+        let open = self
+            .list
+            .as_ref()
+            .is_some_and(|l| l.dialog.is_some() || l.cant.is_some());
         if !open {
             let v = self.view(w, d);
             let l0 = v.layers.first()?;
-            let (gn, lines) = (crate::sndsim::ops_cost(&d.text, &l0.ops).0, crate::sndsim::text_counts(&d.text, &l0.ops).3);
-            let mut own = 180_382 + crate::sndsim::layer_cycles(&d.text, &l0.ops, 2_428) + gn * 486 / 1000;
+            let (gn, lines) = (
+                crate::sndsim::ops_cost(&d.text, &l0.ops).0,
+                crate::sndsim::text_counts(&d.text, &l0.ops).3,
+            );
+            let mut own =
+                180_382 + crate::sndsim::layer_cycles(&d.text, &l0.ops, 2_428) + gn * 486 / 1000;
             if !self.container_ref().ever {
-                own += if self.slots.is_some() { 100_600 } else { 62_600 + 5_000 * lines };
+                own += if self.slots.is_some() {
+                    100_600
+                } else {
+                    62_600 + 5_000 * lines
+                };
             }
-            return Some(crate::sndsim::Redraw { t0: 4_641, base: own - 4_641 });
+            return Some(crate::sndsim::Redraw {
+                t0: 4_641,
+                base: own - 4_641,
+            });
         }
         let v = self.view(w, d);
         let top = v.layers.get(1)?;
-        let own = 118_700 + crate::sndsim::layer_cycles(&d.text, &top.ops, 0) + crate::sndsim::ops_cost(&d.text, &top.ops).0 * 300 / 1000 + if self.container_ref().ever { 0 } else { 66_400 };
-        Some(crate::sndsim::Redraw { t0: 4_641, base: own - 4_641 })
+        let own = 118_700
+            + crate::sndsim::layer_cycles(&d.text, &top.ops, 0)
+            + crate::sndsim::ops_cost(&d.text, &top.ops).0 * 300 / 1000
+            + if self.container_ref().ever { 0 } else { 66_400 };
+        Some(crate::sndsim::Redraw {
+            t0: 4_641,
+            base: own - 4_641,
+        })
     }
 }
 
 /// a harness opening this screen from JSON (`menu::open_from_json`); None = not this screen's kind
-pub fn open_json(_w: &World, _v: &serde_json::Value) -> Option<(super::Screen, super::Transition, bool)> {
+pub fn open_json(
+    _w: &World,
+    _v: &serde_json::Value,
+) -> Option<(super::Screen, super::Transition, bool)> {
     None
 }
 

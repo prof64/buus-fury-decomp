@@ -14,7 +14,10 @@
 //! changed). A slider move applies at once (`0x0803E42A` SFX master, `0x0803F18C` music master): the frontend
 //! reads [`settings`] each frame (`SetMasterVolumes { music, sfx }` = the raw 0..8 bytes, `wf-audio`'s masters).
 
-use super::kit::{self, Button, Container, Cursor, Font, Label, Slider, TextCtl, Widget, BTN_A, BTN_B, BTN_L, BTN_R};
+use super::kit::{
+    self, Button, Container, Cursor, Font, Label, Slider, TextCtl, Widget, BTN_A, BTN_B, BTN_L,
+    BTN_R,
+};
 use super::text::Canvas;
 use super::{Action, MenuData, Page, Screen};
 use crate::world::World;
@@ -34,7 +37,12 @@ pub struct Settings {
 impl Default for Settings {
     /// `0x08006B36`
     fn default() -> Self {
-        Settings { text_speed: 4, sfx: 6, music: 4, pad: 0 }
+        Settings {
+            text_speed: 4,
+            sfx: 6,
+            music: 4,
+            pad: 0,
+        }
     }
 }
 
@@ -73,7 +81,12 @@ pub struct QuestUi {
 impl OptsData {
     pub fn load(src: &dyn crate::content::ContentSource) -> OptsData {
         let mut d = OptsData::default();
-        let Some(v) = src.read("ui/menu/opts.json").and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok()) else { return d };
+        let Some(v) = src
+            .read("ui/menu/opts.json")
+            .and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok())
+        else {
+            return d;
+        };
         for s in v["skills"].as_array().into_iter().flatten() {
             let i = s["skill"].as_u64().unwrap_or(0) as usize;
             if d.skills.len() <= i {
@@ -86,13 +99,24 @@ impl OptsData {
                 icon: s["icon"].as_str().unwrap_or("").to_string(),
             };
         }
-        let bc = src.read("scripts/bytecode.json").and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok());
+        let bc = src
+            .read("scripts/bytecode.json")
+            .and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok());
         let code = |id: &str| -> Vec<u8> {
-            let h = bc.as_ref().and_then(|b| b["inline"][id]["code"].as_str()).unwrap_or("");
-            (0..h.len() / 2).filter_map(|k| u8::from_str_radix(&h[2 * k..2 * k + 2], 16).ok()).collect()
+            let h = bc
+                .as_ref()
+                .and_then(|b| b["inline"][id]["code"].as_str())
+                .unwrap_or("");
+            (0..h.len() / 2)
+                .filter_map(|k| u8::from_str_radix(&h[2 * k..2 * k + 2], 16).ok())
+                .collect()
         };
         for q in v["quests"].as_array().into_iter().flatten() {
-            let ids = [q["hidden"].as_str().unwrap_or("").to_string(), q["done"].as_str().unwrap_or("").to_string(), q["goal"].as_str().unwrap_or("").to_string()];
+            let ids = [
+                q["hidden"].as_str().unwrap_or("").to_string(),
+                q["done"].as_str().unwrap_or("").to_string(),
+                q["goal"].as_str().unwrap_or("").to_string(),
+            ];
             d.quests.push(QuestUi {
                 star: q["star"].as_u64().unwrap_or(0) as u8,
                 text: q["text"].as_u64().unwrap_or(0) as u16,
@@ -122,15 +146,39 @@ impl Options {
         let t = &w.data.menu.as_ref().expect("menu content").text;
         let st = w.menu.settings;
         let mut c = Container::default();
-        let a_btn = c.add(Widget::Button(Button::new(BTN_A, 0xC, 0x84, 0, true, false)));
-        c.add(Widget::Label(Label { x: 0x1C, y: 0x90, text: t.s(23).to_vec(), colour: 5, align: 0, font: Font::Menu }));
+        let a_btn = c.add(Widget::Button(Button::new(
+            BTN_A, 0xC, 0x84, 0, true, false,
+        )));
+        c.add(Widget::Label(Label {
+            x: 0x1C,
+            y: 0x90,
+            text: t.s(23).to_vec(),
+            colour: 5,
+            align: 0,
+            font: Font::Menu,
+        }));
         let x = t.font(MenuFont::Menu).measure(t.s(23)) + 0x1E;
         c.add(Widget::Button(Button::new(BTN_B, x, 0x84, 1, true, false)));
-        c.add(Widget::Label(Label { x: x + 0x10, y: 0x90, text: t.s(26).to_vec(), colour: 5, align: 0, font: Font::Menu }));
+        c.add(Widget::Label(Label {
+            x: x + 0x10,
+            y: 0x90,
+            text: t.s(26).to_vec(),
+            colour: 5,
+            align: 0,
+            font: Font::Menu,
+        }));
         let vals = [st.sfx, st.music, st.text_speed];
         let mut sliders = [0; 3];
         for (k, y) in [0x21, 0x33, 0x45].iter().enumerate() {
-            sliders[k] = c.add(Widget::Slider(Slider { id: k as i32, x0: 0x6D, y: *y, w: 0xDD - 0x6D - 2, value: vals[k] as i32, max: 8, code: 0x100 + k as i32 }));
+            sliders[k] = c.add(Widget::Slider(Slider {
+                id: k as i32,
+                x0: 0x6D,
+                y: *y,
+                w: 0xDD - 0x6D - 2,
+                value: vals[k] as i32,
+                max: 8,
+                code: 0x100 + k as i32,
+            }));
         }
         for (id, nav, s, x, y, align) in [
             (0, [3, 1, -1, -1], 16, 0x10, 0x28, 0),
@@ -139,21 +187,53 @@ impl Options {
             (3, [2, 0, 4, 4], 20, 0x46, 0x70, 1),
             (4, [2, 0, 3, 3], 19, 0xAA, 0x70, 1),
         ] {
-            c.add(Widget::Text(TextCtl { id, nav, text: t.s(s).to_vec(), x, y, code: -1, align }));
+            c.add(Widget::Text(TextCtl {
+                id,
+                nav,
+                text: t.s(s).to_vec(),
+                x,
+                y,
+                code: -1,
+                align,
+            }));
         }
         c.add(Widget::Button(Button::new(BTN_L, 8, 8, 6, true, false)));
         c.add(Widget::Button(Button::new(BTN_R, 0xD0, 8, 7, true, false)));
-        c.add(Widget::Label(Label { x: 0x22, y: 0x14, text: t.s(36).to_vec(), colour: 2, align: 0, font: Font::Menu }));
-        c.add(Widget::Label(Label { x: 0xCE, y: 0x14, text: t.s(30).to_vec(), colour: 2, align: 2, font: Font::Menu }));
+        c.add(Widget::Label(Label {
+            x: 0x22,
+            y: 0x14,
+            text: t.s(36).to_vec(),
+            colour: 2,
+            align: 0,
+            font: Font::Menu,
+        }));
+        c.add(Widget::Label(Label {
+            x: 0xCE,
+            y: 0x14,
+            text: t.s(30).to_vec(),
+            colour: 2,
+            align: 2,
+            font: Font::Menu,
+        }));
         c.add(Widget::Cursor(Cursor { t: 0 }));
-        Options { c, a_btn, sliders, blank: false }
+        Options {
+            c,
+            a_btn,
+            sliders,
+            blank: false,
+        }
     }
 
     fn event(&mut self, w: &mut World, code: i32) -> (bool, Option<Action>) {
         match code {
             0 => match self.c.sel {
                 // Credits: a nested mode (credits.rs), then the page's VRAM is reset and the page drawn again
-                3 => (true, Some(Action::Push(Screen::Credits(super::credits::Credits::new(w))))),
+                3 => (
+                    true,
+                    Some(Action::Push(Screen::Credits(super::credits::Credits::new(
+                        w,
+                    )))),
+                ),
                 4 => {
                     w.menu.then = Some("s007".to_string());
                     (true, Some(Action::Close))
@@ -166,7 +246,10 @@ impl Options {
             }
             6 | 7 => {
                 w.sfx(super::SFX_MENU, 64);
-                (true, Some(Action::Replace(super::page_screen(w, 3, code == 7))))
+                (
+                    true,
+                    Some(Action::Replace(super::page_screen(w, 3, code == 7))),
+                )
             }
             0x100..=0x102 => {
                 let k = (code - 0x100) as usize;
@@ -182,7 +265,10 @@ impl Options {
                 }
                 if k < 2 {
                     let st = w.menu.settings;
-                    w.events.push(crate::world::Event::MasterVolumes { music: st.music as i32, sfx: st.sfx as i32 });
+                    w.events.push(crate::world::Event::MasterVolumes {
+                        music: st.music as i32,
+                        sfx: st.sfx as i32,
+                    });
                 }
                 (true, None)
             }
@@ -207,7 +293,8 @@ impl Page for Options {
         self.blank = false;
     }
     fn step(&mut self, w: &mut World) -> Action {
-        let (consumed, act) = kit::run_step(self, w, |p| &mut p.c, |p, w, _src, code| p.event(w, code));
+        let (consumed, act) =
+            kit::run_step(self, w, |p| &mut p.c, |p, w, _src, code| p.event(w, code));
         if let Some(a) = act {
             return a;
         }
@@ -225,7 +312,11 @@ impl Page for Options {
     }
     fn view(&self, _w: &World, d: &MenuData) -> MenuView {
         if self.blank {
-            return MenuView { backdrop: 0, palette: vec![(0, 0)], ..Default::default() };
+            return MenuView {
+                backdrop: 0,
+                palette: vec![(0, 0)],
+                ..Default::default()
+            };
         }
         let t = &d.text;
         let mut cv = Canvas::new();
@@ -246,11 +337,23 @@ impl Page for Options {
         if self.blank {
             return None;
         }
-        Some(super::page_time(d, &self.view(w, d), !self.c.ever, 4_524, 232_905, 0, 0, 100_222))
+        Some(super::page_time(
+            d,
+            &self.view(w, d),
+            !self.c.ever,
+            4_524,
+            232_905,
+            0,
+            0,
+            100_222,
+        ))
     }
 }
 
 /// a harness opening this screen from JSON (`menu::open_from_json`): `{"kind": "options"}`
-pub fn open_json(w: &World, v: &serde_json::Value) -> Option<(super::Screen, super::Transition, bool)> {
+pub fn open_json(
+    w: &World,
+    v: &serde_json::Value,
+) -> Option<(super::Screen, super::Transition, bool)> {
     (v["kind"] == "options").then(|| (Screen::Options(Options::new(w)), super::PAUSE, false))
 }

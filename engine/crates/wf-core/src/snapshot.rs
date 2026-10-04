@@ -6,7 +6,9 @@ use crate::battle::{arena_runtime, BattleState};
 use crate::content::GameData;
 use crate::input::InputFrame;
 use crate::rng::Rng;
-use crate::world::{Body, Camera, Collision, Entity, EntityId, Globals, Options, Stats, World, MAX_PLAYERS};
+use crate::world::{
+    Body, Camera, Collision, Entity, EntityId, Globals, Options, Stats, World, MAX_PLAYERS,
+};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -79,7 +81,10 @@ pub fn from_bytes(data: &Arc<GameData>, bytes: &[u8]) -> Option<World> {
     }
     let (arena, _) = arena_runtime(data, &s.arena);
     let mut w = World::new(Arc::clone(data), s.rng, arena);
-    let field_map = s.field.as_ref().and_then(|f| crate::field::rebuild_arena(data, f));
+    let field_map = s
+        .field
+        .as_ref()
+        .and_then(|f| crate::field::rebuild_arena(data, f));
     if let Some((arena, _)) = &field_map {
         w.arena = arena.clone();
     }
@@ -120,7 +125,9 @@ pub fn from_bytes(data: &Arc<GameData>, bytes: &[u8]) -> Option<World> {
     for e in w.ents.iter_mut() {
         if let Body::Enemy(en) = &mut e.body {
             for st in en.ai.stack.iter_mut() {
-                st.tree = data.states.get(&st.state).cloned().unwrap_or_else(|| Arc::new(crate::ai::compile_behaviour(st.state, &Default::default())));
+                st.tree = data.states.get(&st.state).cloned().unwrap_or_else(|| {
+                    Arc::new(crate::ai::compile_behaviour(st.state, &Default::default()))
+                });
             }
         }
     }

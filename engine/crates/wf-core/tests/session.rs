@@ -5,7 +5,16 @@ use wf_core::session::Session;
 use wf_view::{RenderView, Sim};
 
 fn cfg(enemy: &str, arena: &str) -> BattleConfig {
-    BattleConfig { arena: arena.into(), players: vec![FighterSetup::default()], phases: vec![Phase { enemy: enemy.into(), count: 3 }], rng: RngInit::Seed(4242), xp: true }
+    BattleConfig {
+        arena: arena.into(),
+        players: vec![FighterSetup::default()],
+        phases: vec![Phase {
+            enemy: enemy.into(),
+            count: 3,
+        }],
+        rng: RngInit::Seed(4242),
+        xp: true,
+    }
 }
 /// a deterministic input script (pseudo-random buttons, changing every few frames)
 fn keys(f: u32) -> u16 {
@@ -15,7 +24,12 @@ fn keys(f: u32) -> u16 {
 
 #[test]
 fn same_inputs_same_hashes_and_snapshots_replay() {
-    for (enemy, arena) in [("t68", "forest"), ("t18", "demon"), ("t129", "crater"), ("t60", "wasteland")] {
+    for (enemy, arena) in [
+        ("t68", "forest"),
+        ("t18", "demon"),
+        ("t129", "crater"),
+        ("t60", "wasteland"),
+    ] {
         let mut a = Session::new(common::data(), cfg(enemy, arena));
         let mut b = Session::new(common::data(), cfg(enemy, arena));
         let mut hashes = vec![];
@@ -36,14 +50,22 @@ fn same_inputs_same_hashes_and_snapshots_replay() {
         c.restore(snap.as_ref().unwrap());
         for f in 400..900 {
             c.step(&[keys(f)]);
-            assert_eq!(c.hash(), hashes[f as usize], "{enemy} clone-restore frame {f}");
+            assert_eq!(
+                c.hash(),
+                hashes[f as usize],
+                "{enemy} clone-restore frame {f}"
+            );
         }
         // serialized snapshot
         let mut d = Session::new(common::data(), cfg(enemy, arena));
         assert!(d.restore_bytes(bytes.as_ref().unwrap()));
         for f in 400..900 {
             d.step(&[keys(f)]);
-            assert_eq!(d.hash(), hashes[f as usize], "{enemy} bytes-restore frame {f}");
+            assert_eq!(
+                d.hash(),
+                hashes[f as usize],
+                "{enemy} bytes-restore frame {f}"
+            );
         }
     }
 }
@@ -84,7 +106,11 @@ fn native_hash_of_the_wasm_check_scenario() {
 #[test]
 fn two_players_coop() {
     let mut c = cfg("t68", "forest");
-    c.players.push(FighterSetup { fighter: "vegeta".into(), form: 26, ..Default::default() });
+    c.players.push(FighterSetup {
+        fighter: "vegeta".into(),
+        form: 26,
+        ..Default::default()
+    });
     let mut s = Session::new(common::data(), c);
     for f in 0..600 {
         s.step(&[keys(f), keys(f + 77)]);

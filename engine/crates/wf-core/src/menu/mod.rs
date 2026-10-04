@@ -76,12 +76,24 @@ impl MenuData {
             if let Ok(v) = serde_json::from_slice::<serde_json::Value>(&b) {
                 if let Some(a) = v["portraits"].as_array().or_else(|| v.as_array()) {
                     for p in a {
-                        let i = p["portrait_index"].as_u64().or_else(|| p["index"].as_u64()).unwrap_or(portraits.len() as u64) as usize;
-                        let f = p["png"].as_str().or_else(|| p["file"].as_str()).unwrap_or("").to_string();
+                        let i = p["portrait_index"]
+                            .as_u64()
+                            .or_else(|| p["index"].as_u64())
+                            .unwrap_or(portraits.len() as u64)
+                            as usize;
+                        let f = p["png"]
+                            .as_str()
+                            .or_else(|| p["file"].as_str())
+                            .unwrap_or("")
+                            .to_string();
                         if portraits.len() <= i {
                             portraits.resize(i + 1, String::new());
                         }
-                        portraits[i] = if f.starts_with("portraits/") { f } else { format!("portraits/{f}") };
+                        portraits[i] = if f.starts_with("portraits/") {
+                            f
+                        } else {
+                            format!("portraits/{f}")
+                        };
                         if portrait_cycles.len() <= i {
                             portrait_cycles.resize(i + 1, 0);
                         }
@@ -92,9 +104,13 @@ impl MenuData {
         }
         let mut forms = Vec::new();
         let all = src.list();
-        for p in all.iter().filter(|p| p.starts_with("forms/") && p.ends_with(".json") && !p.ends_with("index.json")) {
+        for p in all.iter().filter(|p| {
+            p.starts_with("forms/") && p.ends_with(".json") && !p.ends_with("index.json")
+        }) {
             let Some(b) = src.read(p) else { continue };
-            let Ok(v) = serde_json::from_slice::<serde_json::Value>(&b) else { continue };
+            let Ok(v) = serde_json::from_slice::<serde_json::Value>(&b) else {
+                continue;
+            };
             let i = v["index"].as_u64().unwrap_or(0) as usize;
             if forms.len() <= i {
                 forms.resize(i + 1, FormUi::default());
@@ -107,14 +123,31 @@ impl MenuData {
             }
             // form +4: the upper-case name (content has its text; mod forms without one: the name upper-cased)
             let name = v["name"].as_str().unwrap_or("");
-            let upper = v["upper_name"].as_str().map(text::units).unwrap_or_else(|| text::units(&name.to_uppercase()));
+            let upper = v["upper_name"]
+                .as_str()
+                .map(text::units)
+                .unwrap_or_else(|| text::units(&name.to_uppercase()));
             let name_str = v["name_string"].as_u64().unwrap_or(0) as u16;
-            forms[i] = FormUi { name_str, name: text::units(name), upper, portraits: pb };
+            forms[i] = FormUi {
+                name_str,
+                name: text::units(name),
+                upper,
+                portraits: pb,
+            };
         }
         let items = shop::ItemsUi::load(src);
         let opts = options::OptsData::load(src);
         let inv = inventory::InvData::load(src);
-        Some(Arc::new(MenuData { text, portraits, portrait_cycles, forms, items, opts, inv, maps: mapscreen::MapData::load(src) }))
+        Some(Arc::new(MenuData {
+            text,
+            portraits,
+            portrait_cycles,
+            forms,
+            items,
+            opts,
+            inv,
+            maps: mapscreen::MapData::load(src),
+        }))
     }
 }
 
@@ -168,7 +201,10 @@ pub trait Page {
     }
     /// the page's name in the timing model's log
     fn name(&self) -> &'static str {
-        std::any::type_name::<Self>().rsplit("::").next().unwrap_or("?")
+        std::any::type_name::<Self>()
+            .rsplit("::")
+            .next()
+            .unwrap_or("?")
     }
     /// frames the mode's enter + first update take beyond the first one (its picture shows at once; no
     /// iteration in them): credits / Watch This! 1
@@ -274,7 +310,10 @@ pub fn open_from_json(w: &mut World, v: &serde_json::Value) -> bool {
     for f in tries {
         if let Some((sc, tr, scripted)) = f(w, v) {
             // `"prev": {...}`: the screen was opened mid-redraw; this one's picture is on screen meanwhile
-            let prev = v.get("prev").filter(|p| p.is_object()).and_then(|p| tries.iter().find_map(|g| g(w, p)));
+            let prev = v
+                .get("prev")
+                .filter(|p| p.is_object())
+                .and_then(|p| tries.iter().find_map(|g| g(w, p)));
             open(w, sc, tr, scripted);
             if let Some((mut ps, _, _)) = prev {
                 ps.before_draw(w);
@@ -289,7 +328,11 @@ pub fn open_from_json(w: &mut World, v: &serde_json::Value) -> bool {
 /// the pause page L (`right` = false) / R of page `from` (Status 0, Inventory 1, Equip 2, Options 3, Journal 4)
 pub fn page_screen(w: &World, from: u8, right: bool) -> Screen {
     let n = kit::PAGES.len() as u8;
-    let to = if right { (from + 1) % n } else { (from + n - 1) % n };
+    let to = if right {
+        (from + 1) % n
+    } else {
+        (from + n - 1) % n
+    };
     match to {
         0 => Screen::Status(status::Status::new(w)),
         1 => Screen::Inventory(inventory::Inventory::new(w)),
@@ -307,7 +350,14 @@ pub fn skills_screen(w: &World, ci: i32) -> Screen {
 /// a single 240x160 BG surface from a display list (BG2, priority 0)
 pub fn surface_view(cv: text::Canvas) -> MenuView {
     MenuView {
-        layers: vec![wf_view::MenuLayer { w: 240, h: 160, x: 0, y: 0, priority: 0, ops: cv.ops }],
+        layers: vec![wf_view::MenuLayer {
+            w: 240,
+            h: 160,
+            x: 0,
+            y: 0,
+            priority: 0,
+            ops: cv.ops,
+        }],
         objs: Vec::new(),
         palette: Vec::new(),
         backdrop: 0,
@@ -440,13 +490,25 @@ impl Default for Transition {
 /// fade `0x0805058C` of script-opened screens)
 pub const FADE_HOLD: u16 = 0x8000;
 
-pub const PAUSE: Transition = Transition { fade_out: 16, enter: 5, leave: 25, fade_in: 16 };
+pub const PAUSE: Transition = Transition {
+    fade_out: 16,
+    enter: 5,
+    leave: 25,
+    fade_in: 16,
+};
 
 /// Open a menu screen with a transition (`scripted`: a script waits for `World.menu.result`). The field fades out
 /// from the next frame.
 pub fn open(w: &mut World, screen: Screen, tr: Transition, scripted: bool) {
     let settings = w.menu.settings;
-    w.menu = Menu { phase: Phase::FadeOut { level: 0 }, stack: vec![screen], scripted, tr, settings, ..Menu::default() };
+    w.menu = Menu {
+        phase: Phase::FadeOut { level: 0 },
+        stack: vec![screen],
+        scripted,
+        tr,
+        settings,
+        ..Menu::default()
+    };
     if tr.fade_out == 0 {
         w.menu.phase = Phase::Enter { t: 0 };
     }
@@ -455,7 +517,12 @@ pub fn open(w: &mut World, screen: Screen, tr: Transition, scripted: bool) {
 /// A pause page shown at an import's cut (wf-import: a cut inside the Status / Inventory pages, the world saved):
 /// the page as the game holds it - running, its surface drawn and on screen, the field's sprite blocks freed
 pub fn open_imported(w: &mut World, mut screen: Screen) {
-    w.menu = Menu { phase: Phase::Run, tr: PAUSE, settings: w.menu.settings, ..Menu::default() };
+    w.menu = Menu {
+        phase: Phase::Run,
+        tr: PAUSE,
+        settings: w.menu.settings,
+        ..Menu::default()
+    };
     crate::vram::world_hide(w);
     screen.page_mut().before_draw(w);
     screen.container().drawn = true;
@@ -481,13 +548,20 @@ pub fn check_pause(w: &mut World) -> bool {
     // a closed menu's queued event (options.rs Sleep) runs in the first field frame after it
     if !active(w) {
         if let Some(ev) = w.menu.then.take() {
-            w.events.push(crate::world::Event::Field(crate::field::FieldEvent::Run { run: crate::fieldcontent::Callback::Event(ev), cause: crate::field::Cause::Menu, slot: 0 }));
+            w.events
+                .push(crate::world::Event::Field(crate::field::FieldEvent::Run {
+                    run: crate::fieldcontent::Callback::Event(ev),
+                    cause: crate::field::Cause::Menu,
+                    slot: 0,
+                }));
         }
     }
     if active(w) || w.menu.scripted {
         return false;
     }
-    let Some(f) = w.field.as_ref() else { return false };
+    let Some(f) = w.field.as_ref() else {
+        return false;
+    };
     if f.busy || f.item_get.is_some() || f.held || !matches!(f.mode, crate::field::Mode::Normal) {
         return false;
     }
@@ -536,7 +610,11 @@ pub fn step(w: &mut World) {
     // iterations counted twice)
     if w.field.is_some() && !crate::menu::minigame::world_runs(w) && !w.menu.resume {
         // (no lag frames: every step of the mode loop is one of its iterations)
-        w.g.fc0 += if w.opts.no_lag { 1 } else { w.story.play_frames.wrapping_sub(p0) as i64 };
+        w.g.fc0 += if w.opts.no_lag {
+            1
+        } else {
+            w.story.play_frames.wrapping_sub(p0) as i64
+        };
     }
 }
 
@@ -556,7 +634,11 @@ fn step_inner(w: &mut World) {
             w.g.fc0 = title::BOOT_LOGIC - w.frame as i64 - if w.opts.no_lag { 1 } else { 0 };
         }
         // the logos' mode starts the title song (it plays on into the title, whose enter finds it playing)
-        let (total, song_at) = if w.opts.no_lag { (title::BOOT_LOGIC as u16, title::BOOT_SONG_AT_LOGIC) } else { (title::BOOT_FRAMES, title::BOOT_SONG_AT) };
+        let (total, song_at) = if w.opts.no_lag {
+            (title::BOOT_LOGIC as u16, title::BOOT_SONG_AT_LOGIC)
+        } else {
+            (title::BOOT_FRAMES, title::BOOT_SONG_AT)
+        };
         if w.menu.boot == total - song_at - 1 {
             crate::scene::play_song(w, title::TITLE_SONG);
         }
@@ -576,7 +658,11 @@ fn step_inner(w: &mut World) {
             let step = (w.menu.tr.fade_out & !FADE_HOLD).max(1);
             // (no lag frames: the hold is part of the last fade step's iteration - real run 18-13 r047_002 lf
             // 1,113,367: full black, the hold and the page's draw in one)
-            let end = if w.menu.tr.fade_out & FADE_HOLD != 0 && !w.opts.no_lag { 256 + step } else { 256 };
+            let end = if w.menu.tr.fade_out & FADE_HOLD != 0 && !w.opts.no_lag {
+                256 + step
+            } else {
+                256
+            };
             let l = level + step;
             // the screen black: the mode switch builds the new screen (Switch Character's figures enter idle)
             if level < 256 && l >= 256 {
@@ -588,11 +674,20 @@ fn step_inner(w: &mut World) {
                     }
                 }
             }
-            w.menu.phase = if l >= end { Phase::Enter { t: 0 } } else { Phase::FadeOut { level: l } };
+            w.menu.phase = if l >= end {
+                Phase::Enter { t: 0 }
+            } else {
+                Phase::FadeOut { level: l }
+            };
             // the world is saved (its objects deleted): a page's object world has a fresh allocator (Switch
             // Character does it when it builds its figures; real run 14-2 r057_059: the Status page, every block of
             // the field freed in the first black frame)
-            if l >= end && !matches!(w.menu.stack.last(), Some(Screen::CharSelect(_))) && w.field.as_ref().is_some_and(|f| f.vram.as_ref().is_some_and(|v| v.stashed.is_none())) {
+            if l >= end
+                && !matches!(w.menu.stack.last(), Some(Screen::CharSelect(_)))
+                && w.field
+                    .as_ref()
+                    .is_some_and(|f| f.vram.as_ref().is_some_and(|v| v.stashed.is_none()))
+            {
                 crate::vram::world_hide(w);
             }
             // (no lag frames: the black enter frames are the mode switch's long iteration. The pause menu builds and
@@ -600,8 +695,13 @@ fn step_inner(w: &mut World) {
             // script-opened screen's hold step is the long one and draws the page too (shop_buy lf 9,356); Switch
             // Character's figures, built in the fade's last step, take one more enter iteration before their first
             // tick (charsel_alone lf 9,357: their animation one tick early without it))
-            if l >= end && w.opts.no_lag && matches!(w.menu.stack.last(), Some(Screen::CharSelect(_))) {
-                w.menu.phase = Phase::Enter { t: w.menu.tr.enter.saturating_sub(1) };
+            if l >= end
+                && w.opts.no_lag
+                && matches!(w.menu.stack.last(), Some(Screen::CharSelect(_)))
+            {
+                w.menu.phase = Phase::Enter {
+                    t: w.menu.tr.enter.saturating_sub(1),
+                };
             } else if l >= end && w.opts.no_lag {
                 w.menu.phase = Phase::Run;
                 let first = w.menu.boot_draw.is_none();
@@ -648,7 +748,10 @@ fn step_inner(w: &mut World) {
             // one step further in the last black frame (ship cuts 8-6 / 8-3: closed while the camera eased)
             // (with a screen shake's offset: a heal menu opened mid-shake, db5 12-25 / ship 8-38; when the
             // iteration's last sound update ran over a VBlank the update shows a frame earlier: `Menu.leave_cam`)
-            if t + 2 + w.menu.leave_cam == w.menu.tr.leave && w.menu.tr.fade_in != 0 && w.field.is_some() {
+            if t + 2 + w.menu.leave_cam == w.menu.tr.leave
+                && w.menu.tr.fade_in != 0
+                && w.field.is_some()
+            {
                 w.tick_shakes();
                 crate::field::world_mode_cameras(w);
             }
@@ -659,7 +762,9 @@ fn step_inner(w: &mut World) {
                     w.menu.shown = None;
                     w.menu.resume = w.menu.tr.leave <= 1;
                 } else {
-                    w.menu.phase = Phase::FadeIn { level: 256u16.saturating_sub(st) };
+                    w.menu.phase = Phase::FadeIn {
+                        level: 256u16.saturating_sub(st),
+                    };
                 }
                 w.story.play_frames += 1;
             } else {
@@ -684,10 +789,20 @@ fn step_inner(w: &mut World) {
 /// glyph-routine instructions beyond `sndsim::layer_cycles`' 3.17 each (wrapped text costs more), `enter` the
 /// page's enter when this is its first redraw. Constants: emulator measurements of the menu scenarios
 /// (`re/buu/menu/cycles.py`, fitted by `cycles_fit.py`).
-pub(crate) fn page_time(d: &MenuData, v: &MenuView, fresh: bool, t0: i64, k: i64, line: i64, gn_milli: i64, enter: i64) -> crate::sndsim::Redraw {
+pub(crate) fn page_time(
+    d: &MenuData,
+    v: &MenuView,
+    fresh: bool,
+    t0: i64,
+    k: i64,
+    line: i64,
+    gn_milli: i64,
+    enter: i64,
+) -> crate::sndsim::Redraw {
     let mut own = k + if fresh { enter } else { 0 };
     for l in &v.layers {
-        own += crate::sndsim::layer_cycles(&d.text, &l.ops, line) + crate::sndsim::ops_cost(&d.text, &l.ops).0 * gn_milli / 1000;
+        own += crate::sndsim::layer_cycles(&d.text, &l.ops, line)
+            + crate::sndsim::ops_cost(&d.text, &l.ops).0 * gn_milli / 1000;
     }
     crate::sndsim::Redraw { t0, base: own - t0 }
 }
@@ -719,23 +834,44 @@ fn redraw(w: &mut World, first: bool) {
     if w.menu.exit_stub.is_some() {
         return;
     }
-    let Some(mut top) = w.menu.stack.pop() else { return };
+    let Some(mut top) = w.menu.stack.pop() else {
+        return;
+    };
     top.update(w);
     if !top.container_ref().drawn {
         top.before_draw(w);
         top.container().drawn = true;
         // (no lag frames: the redraw is part of its iteration - `Options::no_lag`)
-        let mut cost = if first || w.opts.no_lag { 1 } else { top.redraw_cost().max(1) };
+        let mut cost = if first || w.opts.no_lag {
+            1
+        } else {
+            top.redraw_cost().max(1)
+        };
         if crate::sndsim::debug() && !first {
             if let Some(d) = w.data.menu.clone() {
                 let timed = top.page().redraw_time(w, &d);
                 let v = top.page().view(w, &d);
-                let l: Vec<String> = v.layers.iter().map(|l| format!("{:?} tc{:?} {}", crate::sndsim::ops_cost(&d.text, &l.ops), crate::sndsim::text_counts(&d.text, &l.ops), crate::sndsim::ops_summary(&l.ops))).collect();
+                let l: Vec<String> = v
+                    .layers
+                    .iter()
+                    .map(|l| {
+                        format!(
+                            "{:?} tc{:?} {}",
+                            crate::sndsim::ops_cost(&d.text, &l.ops),
+                            crate::sndsim::text_counts(&d.text, &l.ops),
+                            crate::sndsim::ops_summary(&l.ops)
+                        )
+                    })
+                    .collect();
                 eprintln!("menu redraw f{} mf{} {} const {} timed {:?} pressed {:#x} released {:#x} objs {} | {}", w.frame, DEBUG_FRAMES.load(std::sync::atomic::Ordering::Relaxed), top.page().name(), cost, timed.map(|t| (t.t0, t.base)), w.menu.pressed, w.menu.released, v.objs.len(), l.join(" || "));
             }
         }
         if cost > 1 && w.data.sound.is_some() {
-            let timed = w.data.menu.clone().and_then(|d| top.page().redraw_time(w, &d));
+            let timed = w
+                .data
+                .menu
+                .clone()
+                .and_then(|d| top.page().redraw_time(w, &d));
             match timed {
                 Some(r) => match crate::sndsim::redraw_frames(w, r) {
                     Some(f) => cost = f,
@@ -794,7 +930,9 @@ pub enum Action {
 }
 
 fn step_screen(w: &mut World) {
-    let Some(mut top) = w.menu.stack.pop() else { return };
+    let Some(mut top) = w.menu.stack.pop() else {
+        return;
+    };
     let mut act = match w.menu.exit_stub.take() {
         // the nested mode's exit stub iteration is over: the parent's handler continues with the result
         Some(r) => match w.menu.stack.pop() {
@@ -843,7 +981,11 @@ fn step_screen(w: &mut World) {
                 w.menu.result = Some(MenuResult { code: r });
                 // (no lag frames: this iteration is the world restore, which ends with a camera update - real run
                 // 18-13 r047_002 lf 1,113,370 after the save)
-                if w.opts.no_lag && w.menu.reload_close && w.menu.tr.fade_in != 0 && w.field.is_some() {
+                if w.opts.no_lag
+                    && w.menu.reload_close
+                    && w.menu.tr.fade_in != 0
+                    && w.field.is_some()
+                {
                     w.tick_shakes();
                     crate::field::world_mode_cameras(w);
                 }
@@ -863,7 +1005,11 @@ fn world_back(w: &mut World) {
         let sprites: Vec<i32> = c.figs.iter().map(|f| f.sprite).collect();
         crate::vram::figures_gone(w, &sprites);
         crate::vram::world_show(w);
-    } else if w.field.as_ref().is_some_and(|f| f.vram.as_ref().is_some_and(|v| v.stashed.is_some())) {
+    } else if w
+        .field
+        .as_ref()
+        .is_some_and(|f| f.vram.as_ref().is_some_and(|v| v.stashed.is_some()))
+    {
         crate::vram::world_show(w);
     }
 }
@@ -888,7 +1034,13 @@ fn close_with(w: &mut World, done: bool) {
         Some(Screen::CharSelect(c)) => {
             let switched = c.switched;
             let mut sprites: Vec<i32> = (0..w.ents.len())
-                .filter(|&i| !w.ents[i].removed && matches!(w.ents[i].body, crate::world::Body::Npc(_) | crate::world::Body::Enemy(_)))
+                .filter(|&i| {
+                    !w.ents[i].removed
+                        && matches!(
+                            w.ents[i].body,
+                            crate::world::Body::Npc(_) | crate::world::Body::Enemy(_)
+                        )
+                })
                 // on screen only (real run 21-14 r064_017: four sprites all off screen, the close costs none of them)
                 .filter(|&i| crate::vram::on_screen(w, i))
                 .filter_map(|i| crate::scene::sprite_id(w, i))
@@ -912,7 +1064,9 @@ fn close_with(w: &mut World, done: bool) {
     // (the script-opened screens - Switch Character, save, shops - restore the world the same way: real route
     // save-point cuts 8-1 / 8-26 / 8-66, 27 black frames against the constant's 25)
     if w.menu.tr == PAUSE || w.menu.tr.leave == 25 && w.menu.tr.fade_out & FADE_HOLD != 0 {
-        let extra = figs.map(|(sw, n)| if sw { CHARSEL_CLOSE_LEADER } else { 0 } + CHARSEL_CLOSE_SPRITE * n).unwrap_or(0);
+        let extra = figs
+            .map(|(sw, n)| if sw { CHARSEL_CLOSE_LEADER } else { 0 } + CHARSEL_CLOSE_SPRITE * n)
+            .unwrap_or(0);
         if crate::sndsim::debug() {
             eprintln!("menu close: figures {figs:?} extra {extra}");
         }
@@ -940,11 +1094,19 @@ fn close_with(w: &mut World, done: bool) {
 /// the screen is black while a page closes (its leave frames; segment comparisons: sb 21-14's Switch Character)
 pub fn screen_black(w: &World) -> bool {
     match w.menu.phase {
-        Phase::Leave { t: 0 } => w.menu.shown.as_deref().is_some_and(|s| s.page().leave_black()),
+        Phase::Leave { t: 0 } => w
+            .menu
+            .shown
+            .as_deref()
+            .is_some_and(|s| s.page().leave_black()),
         Phase::Leave { .. } => true,
         // (no lag frames: the save's write iteration ends black and the close is the next iteration - real run
         // 18-13 r047_002 f1,470)
-        Phase::Run if w.opts.no_lag => w.menu.stack.last().is_some_and(|s| matches!(s, Screen::Save(_)) && s.page().leave_black()),
+        Phase::Run if w.opts.no_lag => w
+            .menu
+            .stack
+            .last()
+            .is_some_and(|s| matches!(s, Screen::Save(_)) && s.page().leave_black()),
         _ => false,
     }
 }
@@ -953,22 +1115,50 @@ pub fn screen_black(w: &World) -> bool {
 pub fn view(w: &World) -> Option<MenuView> {
     match w.menu.phase {
         // the closing iteration still shows the page
-        Phase::Leave { t: 0 } if w.menu.shown.as_deref().is_some_and(|s| s.page().leave_black()) => {
-            return Some(MenuView { backdrop: 0, palette: vec![(0, 0)], ..Default::default() })
+        Phase::Leave { t: 0 }
+            if w.menu
+                .shown
+                .as_deref()
+                .is_some_and(|s| s.page().leave_black()) =>
+        {
+            return Some(MenuView {
+                backdrop: 0,
+                palette: vec![(0, 0)],
+                ..Default::default()
+            })
         }
         Phase::Run | Phase::Leave { t: 0 } => {}
-        Phase::Enter { .. } | Phase::Leave { .. } => return Some(MenuView { backdrop: 0, palette: vec![(0, 0)], ..Default::default() }),
+        Phase::Enter { .. } | Phase::Leave { .. } => {
+            return Some(MenuView {
+                backdrop: 0,
+                palette: vec![(0, 0)],
+                ..Default::default()
+            })
+        }
         Phase::Idle => {
-            let o = w.menu.overlay.as_deref().filter(|_| w.frame < w.menu.overlay_until)?;
+            let o = w
+                .menu
+                .overlay
+                .as_deref()
+                .filter(|_| w.frame < w.menu.overlay_until)?;
             let mut v = o.view(w, w.data.menu.as_ref()?);
             // the script's palette fade (`0x08007074`) darkens the picture still on screen; a step's palette shows from
             // the next frame (title_newgame: the fade's first frame 144 still shows level 0, 145 shows 4)
             let mut dim = w.scene.screen.dim.clamp(0, 256);
-            if let Some(f) = w.scene.screen.fade.as_ref().filter(|f| f.kind == crate::scene::FadeKind::Black && f.out) {
+            if let Some(f) = w
+                .scene
+                .screen
+                .fade
+                .as_ref()
+                .filter(|f| f.kind == crate::scene::FadeKind::Black && f.out)
+            {
                 dim = (256 * f.t.min(f.len) / f.len.max(1)).clamp(0, 256);
             }
             if dim > 0 {
-                v.fade = Some(wf_view::PaletteFade { level: dim as u16, target: 0 });
+                v.fade = Some(wf_view::PaletteFade {
+                    level: dim as u16,
+                    target: 0,
+                });
             }
             return Some(v);
         }
@@ -988,7 +1178,8 @@ pub fn view(w: &World) -> Option<MenuView> {
 /// world frame's start, not a frame of its own (a harness must not spend a lag frame on it)
 pub fn ended_in_world(w: &World) -> bool {
     let credits = matches!(w.menu.shown.as_deref(), Some(Screen::Credits(_)));
-    w.menu.phase == (Phase::Leave { t: 0 }) && (minigame::world_runs(w) || minigame::watch_closing(w) || credits)
+    w.menu.phase == (Phase::Leave { t: 0 })
+        && (minigame::world_runs(w) || minigame::watch_closing(w) || credits)
 }
 
 /// A script-opened menu has finished (the fade-in after it is over): its result code (the native's push / effect
@@ -1015,7 +1206,11 @@ pub fn opened_this_frame(w: &World) -> bool {
 pub fn field_fade(w: &World) -> Option<u16> {
     match w.menu.phase {
         // `FADE_HOLD`: the last level stays one more frame
-        Phase::FadeOut { level } => Some(if level >= 256 { 256 - (w.menu.tr.fade_out & !FADE_HOLD) } else { level }),
+        Phase::FadeOut { level } => Some(if level >= 256 {
+            256 - (w.menu.tr.fade_out & !FADE_HOLD)
+        } else {
+            level
+        }),
         Phase::FadeIn { level } => Some(level),
         Phase::Enter { .. } | Phase::Leave { .. } => None,
         _ => None,
@@ -1030,7 +1225,9 @@ pub fn post(w: &mut World) {
         return;
     }
     w.menu.after_scripts = false;
-    let Some(mut top) = w.menu.stack.pop() else { return };
+    let Some(mut top) = w.menu.stack.pop() else {
+        return;
+    };
     top.page_mut().after_scripts(w);
     if top.container_ref().drawn {
         top.before_draw(w);

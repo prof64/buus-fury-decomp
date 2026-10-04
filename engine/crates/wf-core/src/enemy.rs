@@ -4,7 +4,6 @@
 //! walk), knockback / critical launch / wall splat, and the helpers the AI action nodes use.
 //! Every function takes (world, entity index); the reference is site/src/battle/rulesets/buu/enemy.ts.
 
-use serde::{Deserialize, Serialize};
 use crate::actor::Actor;
 use crate::ai::AiCtl;
 use crate::content::AnimRef;
@@ -14,6 +13,7 @@ use crate::geom::{facing_toward, overlaps, Dir, Rect, DIR_VEC};
 use crate::player::{self, HoldKind};
 use crate::shots::{self, OnHit, Shot, ShotKind, StraightOpts};
 use crate::world::{broadcast, Body, EntityId, Event, Hand, HitMsg, Layer, World};
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 #[derive(Clone, Debug, Hash, Serialize, Deserialize)]
@@ -139,7 +139,19 @@ impl Enemy {
     pub fn new(w: &World, ty: i32) -> Enemy {
         let d = &w.data;
         let t = d.enemy(ty).expect("enemy type");
-        let mut a = Actor { stats: crate::damage::CombatStats { str_: t.str_, pow: t.pow, end: t.end, end2: t.end, res_m: t.res_m, res_e: t.res_e, crit_bonus: 0, block_factor: 0x1000 }, ..Default::default() };
+        let mut a = Actor {
+            stats: crate::damage::CombatStats {
+                str_: t.str_,
+                pow: t.pow,
+                end: t.end,
+                end2: t.end,
+                res_m: t.res_m,
+                res_e: t.res_e,
+                crit_bonus: 0,
+                block_factor: 0x1000,
+            },
+            ..Default::default()
+        };
         a.set_sprite(d, t.sprite);
         let mut e = Enemy {
             a,
@@ -204,13 +216,30 @@ impl Enemy {
             ctl: (0, 0),
         };
         // the constructor's SetAnim(0) runs before the object is in the world: no RNG draw
-        e.set_anim_with(d, &[AnimRef::Name("idle")], true, Some(true), None, None, &mut Vec::new());
+        e.set_anim_with(
+            d,
+            &[AnimRef::Name("idle")],
+            true,
+            Some(true),
+            None,
+            None,
+            &mut Vec::new(),
+        );
         e
     }
     /// SetAnim / SetAnimRaw + SetState: the state rule for the raw comes from the type's recorded rules, else the
     /// enemy SetAnim table, else a generic loop / one-shot; `rule` forces one. Re-entering restarts the state.
     #[allow(clippy::too_many_arguments)]
-    pub fn set_anim_with(&mut self, d: &crate::content::GameData, refs: &[AnimRef], restart: bool, looped: Option<bool>, rule: Option<u32>, rng: Option<&mut crate::rng::Rng>, events: &mut Vec<Event>) {
+    pub fn set_anim_with(
+        &mut self,
+        d: &crate::content::GameData,
+        refs: &[AnimRef],
+        restart: bool,
+        looped: Option<bool>,
+        rule: Option<u32>,
+        rng: Option<&mut crate::rng::Rng>,
+        events: &mut Vec<Event>,
+    ) {
         self.spit_ctl = -1;
         self.hook = Hook::None;
         let prev = self.a.anim;
@@ -228,7 +257,9 @@ impl Enemy {
             None => false,
         };
         self.a.set_anim(d, refs, restart, looped);
-        let Some(raw) = self.a.anim_raw(d) else { return };
+        let Some(raw) = self.a.anim_raw(d) else {
+            return;
+        };
         if self.a.anim == prev && !restart && rule.is_none() {
             return;
         }
@@ -240,19 +271,40 @@ impl Enemy {
         let single = if refs.len() == 1 { Some(refs[0]) } else { None };
         let by_id = match single {
             Some(AnimRef::Name("idle")) | Some(AnimRef::N(0)) if plain => Some(ar.setanim[&1]),
-            Some(AnimRef::Name("walk")) | Some(AnimRef::N(1)) if plain => Some(ar.types.get(&self.ty).and_then(|m| m.get("0x0804A1D0@0x03001B58")).copied().unwrap_or(ar.setanim[&2])),
+            Some(AnimRef::Name("walk")) | Some(AnimRef::N(1)) if plain => Some(
+                ar.types
+                    .get(&self.ty)
+                    .and_then(|m| m.get("0x0804A1D0@0x03001B58"))
+                    .copied()
+                    .unwrap_or(ar.setanim[&2]),
+            ),
             _ => None,
         };
         let r = if missing { Some(ar.hold) } else { None }
             .or(rule)
             .or(by_id)
-            .or_else(|| ar.types.get(&self.ty).and_then(|m| m.get(&raw.to_string())).copied())
+            .or_else(|| {
+                ar.types
+                    .get(&self.ty)
+                    .and_then(|m| m.get(&raw.to_string()))
+                    .copied()
+            })
             .or_else(|| ar.setanim.get(&raw).copied())
-            .unwrap_or(if looped == Some(false) { ar.fallback_once } else { ar.fallback_loop });
+            .unwrap_or(if looped == Some(false) {
+                ar.fallback_once
+            } else {
+                ar.fallback_loop
+            });
         self.anim_ended = false;
         self.own_state = rule.is_some();
         self.anim_seq = self.anim_seq.wrapping_add(1);
-        let mut h = EHost { d, sprite: self.a.sprite, facing: self.a.facing, rng, events };
+        let mut h = EHost {
+            d,
+            sprite: self.a.sprite,
+            facing: self.a.facing,
+            rng,
+            events,
+        };
         self.ea.enter(&ar.rules, raw, r, &mut h);
     }
     /// IsAnim(id) (vfunc +0x34, 0x0800FAC6): the state object is SetAnim(id)'s and the raw matches (a forced rule or a
@@ -267,28 +319,57 @@ impl Enemy {
     /// SetAnimRaw 0x0800ECDA: obj+0x50 only (the state object and its frame / tick stay)
     pub fn set_raw(&mut self, d: &crate::content::GameData, raw: i32) {
         self.ea.pos.raw = raw;
-        if let Some(&k) = self.a.sprite.and_then(|s| d.sprite(s)).and_then(|s| s.by_raw.get(&raw)) {
+        if let Some(&k) = self
+            .a
+            .sprite
+            .and_then(|s| d.sprite(s))
+            .and_then(|s| s.by_raw.get(&raw))
+        {
             self.a.anim = Some(k);
         }
     }
     /// the state's tick before the AI; a one-shot's end callback is SetAnim(0)
-    pub fn tick_anim(&mut self, d: &crate::content::GameData, rng: &mut crate::rng::Rng, events: &mut Vec<Event>) {
+    pub fn tick_anim(
+        &mut self,
+        d: &crate::content::GameData,
+        rng: &mut crate::rng::Rng,
+        events: &mut Vec<Event>,
+    ) {
         self.a.tick_anim();
         if self.a.anim.is_none() {
             return;
         }
         let res = {
-            let mut h = EHost { d, sprite: self.a.sprite, facing: self.a.facing, rng: Some(&mut *rng), events };
+            let mut h = EHost {
+                d,
+                sprite: self.a.sprite,
+                facing: self.a.facing,
+                rng: Some(&mut *rng),
+                events,
+            };
             self.ea.tick(&d.anim.rules, &mut h)
         };
         match res {
             crate::eanim::Tick::Idle => {
-                self.set_anim_with(d, &[AnimRef::Name("idle")], true, Some(true), None, Some(rng), events);
+                self.set_anim_with(
+                    d,
+                    &[AnimRef::Name("idle")],
+                    true,
+                    Some(true),
+                    None,
+                    Some(rng),
+                    events,
+                );
                 self.anim_ended = true;
             }
             crate::eanim::Tick::None => {
                 if self.a.anim_raw(d) != Some(self.ea.pos.raw) {
-                    if let Some(&k) = self.a.sprite.and_then(|s| d.sprite(s)).and_then(|s| s.by_raw.get(&self.ea.pos.raw)) {
+                    if let Some(&k) = self
+                        .a
+                        .sprite
+                        .and_then(|s| d.sprite(s))
+                        .and_then(|s| s.by_raw.get(&self.ea.pos.raw))
+                    {
                         self.a.anim = Some(k);
                     }
                 }
@@ -315,7 +396,9 @@ impl Enemy {
     }
     /// MeleeAttack 0x0802A0C4: the number of punch animations (raw 5 / 6 / 7 present, create fn 0x0802A288)
     pub fn punch_anims(&self, d: &crate::content::GameData) -> u32 {
-        let Some(s) = self.a.sprite.and_then(|s| d.sprite(s)) else { return 0 };
+        let Some(s) = self.a.sprite.and_then(|s| d.sprite(s)) else {
+            return 0;
+        };
         if s.anim_raw(7).is_some() {
             3
         } else if s.anim_raw(6).is_some() {
@@ -340,7 +423,11 @@ struct EHost<'a> {
 }
 impl crate::eanim::Host for EHost<'_> {
     fn nframes(&mut self, raw: i32) -> i32 {
-        self.sprite.and_then(|s| self.d.sprite(s)).and_then(|s| s.anim_raw(raw)).map(|a| a.steps(self.facing).len() as i32).unwrap_or(0)
+        self.sprite
+            .and_then(|s| self.d.sprite(s))
+            .and_then(|s| s.anim_raw(raw))
+            .map(|a| a.steps(self.facing).len() as i32)
+            .unwrap_or(0)
     }
     fn rand(&mut self, n: u32) -> i32 {
         match self.rng.as_mut() {
@@ -366,7 +453,14 @@ pub fn mark_moving(w: &mut World, i: usize) {
     }
 }
 
-pub fn set_anim_rule(w: &mut World, i: usize, refs: &[AnimRef], restart: bool, looped: Option<bool>, rule: Option<u32>) {
+pub fn set_anim_rule(
+    w: &mut World,
+    i: usize,
+    refs: &[AnimRef],
+    restart: bool,
+    looped: Option<bool>,
+    rule: Option<u32>,
+) {
     if w.field.is_some() && !matches!(refs.first(), Some(AnimRef::N(15))) {
         let id = w.ents[i].id;
         crate::shots::drop_charging_ball(w, id);
@@ -374,7 +468,8 @@ pub fn set_anim_rule(w: &mut World, i: usize, refs: &[AnimRef], restart: bool, l
     let d = Arc::clone(&w.data);
     let mut ev = std::mem::take(&mut w.events);
     let mut rng = w.rng;
-    w.en(i).set_anim_with(&d, refs, restart, looped, rule, Some(&mut rng), &mut ev);
+    w.en(i)
+        .set_anim_with(&d, refs, restart, looped, rule, Some(&mut rng), &mut ev);
     w.rng = rng;
     w.events = ev;
 }
@@ -389,7 +484,11 @@ pub fn tick_anim(w: &mut World, i: usize) {
 /// the sound of an accepted melee hit on the player (0x0802A1D4): gfx 0x60 / 0xE5 / 0xDC -> 30, 0xEE / 0xF4 / 0xED
 /// -> 62, else 48 + rand(2)
 pub fn melee_hit_sfx(w: &mut World, i: usize) {
-    let g = w.data.enemy(w.en_ref(i).ty).and_then(|t| t.gfx).unwrap_or(-1);
+    let g = w
+        .data
+        .enemy(w.en_ref(i).ty)
+        .and_then(|t| t.gfx)
+        .unwrap_or(-1);
     if g == 0x60 || g == 0xe5 || g == 0xdc {
         w.sfx(30, 64);
     } else if g == 0xee || g == 0xf4 || g == 0xed {
@@ -445,14 +544,28 @@ pub fn update(w: &mut World, i: usize) {
     // (through the map's arrival fade only: the frame after it the event holds them too - sb 21-25 f64759, the world
     // map after Kid Buu: the patrols stop when the 3D fade-in ends while s-script still runs)
     let own_load = crate::fieldworld::flying(w)
-        && w.field.as_ref().is_some_and(|f| f.load_ids.0 <= id && id < f.load_ids.1 && matches!(f.mode, crate::field::Mode::FadeIn { .. }));
+        && w.field.as_ref().is_some_and(|f| {
+            f.load_ids.0 <= id
+                && id < f.load_ids.1
+                && matches!(f.mode, crate::field::Mode::FadeIn { .. })
+        });
     // (the item-get presentation holds them the same way, all 60 frames: Diablo Desert Express 11-22 - a Mad
     // Bomber's Wait(90) does not count while the player holds a dropped item up; shots fly on)
     // (an event an AI's RunScript queued last frame: its object, at the list's end, runs first in this pass and
     // holds the objects after it - real run 20-6 r062_001 tile +3,000 f59: Super Buu's tree stays in 0x29F until
     // s474 ends)
-    let queued = w.field.as_ref().is_some_and(|f| f.queued_runs.iter().any(|q| q.0 <= w.frame && matches!(q.2, crate::field::Cause::Ai { .. })));
-    if queued || w.field.as_ref().is_some_and(|f| f.busy && !own_load || f.arrival.is_some() || f.item_get.as_ref().is_some_and(|g| g.left > 0)) {
+    let queued = w.field.as_ref().is_some_and(|f| {
+        f.queued_runs
+            .iter()
+            .any(|q| q.0 <= w.frame && matches!(q.2, crate::field::Cause::Ai { .. }))
+    });
+    if queued
+        || w.field.as_ref().is_some_and(|f| {
+            f.busy && !own_load
+                || f.arrival.is_some()
+                || f.item_get.as_ref().is_some_and(|g| g.left > 0)
+        })
+    {
         tick_anim(w, i);
         if w.en_ref(i).part && matches!(w.en_ref(i).ty, 0x34 | 0x35 | 0x37) {
             part_hurt_end(w, i);
@@ -462,7 +575,11 @@ pub fn update(w: &mut World, i: usize) {
     }
     // the player's death script (0x08799D0C) blocks every object update at KO + 199; from KO + 200 an enemy only runs
     // its state tick (caller 0x0800F5E0: no AI)
-    let ko_at = if w.players.len() == 1 { ctx_player(w, i).map(|pi| w.pl_ref(pi).ko_at).unwrap_or(-1) } else { -1 };
+    let ko_at = if w.players.len() == 1 {
+        ctx_player(w, i).map(|pi| w.pl_ref(pi).ko_at).unwrap_or(-1)
+    } else {
+        -1
+    };
     if ko_at >= 0 && w.frame as i64 - ko_at >= 199 {
         if w.frame as i64 - ko_at > 199 {
             tick_anim(w, i);
@@ -539,7 +656,10 @@ fn update_rest(w: &mut World, i: usize) {
     }
     if w.en_ref(i).part {
         let par = w.en_ref(i).parent;
-        let pinfo = w.enemy_by_id(par).filter(|(pi, p)| !w.ents[*pi].removed && !p.defeated).map(|(_, p)| (p.a.x, p.a.y, p.a.z, p.a.facing));
+        let pinfo = w
+            .enemy_by_id(par)
+            .filter(|(pi, p)| !w.ents[*pi].removed && !p.defeated)
+            .map(|(_, p)| (p.a.x, p.a.y, p.a.z, p.a.facing));
         match pinfo {
             None => w.ents[i].removed = true,
             Some((x, y, z, f)) => {
@@ -561,7 +681,10 @@ fn update_rest(w: &mut World, i: usize) {
     let name = e.a.anim_name(&d);
     // a movement step SetAnim(1)s unless already walking (0x0803B9DA: IsAnim(1)); nothing switches back to idle when
     // the movement stops - the next node's own SetAnim does
-    if (e.a.anim.is_none() || matches!(name, Some("idle") | Some("walk"))) && e.walk_due && !e.walking() {
+    if (e.a.anim.is_none() || matches!(name, Some("idle") | Some("walk")))
+        && e.walk_due
+        && !e.walking()
+    {
         set_anim(w, i, &[nm("walk")], true, Some(true));
     }
 }
@@ -600,7 +723,13 @@ fn use_state(w: &mut World, i: usize, h: Hook) {
     let e = w.en(i);
     let raw = e.ea.pos.raw;
     let mut ev = Vec::new();
-    let mut hh = EHost { d: &d, sprite: e.a.sprite, facing: e.a.facing, rng: None, events: &mut ev };
+    let mut hh = EHost {
+        d: &d,
+        sprite: e.a.sprite,
+        facing: e.a.facing,
+        rng: None,
+        events: &mut ev,
+    };
     e.ea.enter(&d.anim.rules, raw, d.anim.keep, &mut hh);
     e.hook = h;
 }
@@ -617,13 +746,22 @@ pub fn latch_enter(w: &mut World, i: usize) {
     {
         let e = w.en(i);
         let mut ev = Vec::new();
-        let mut hh = EHost { d: &d, sprite: e.a.sprite, facing: e.a.facing, rng: None, events: &mut ev };
+        let mut hh = EHost {
+            d: &d,
+            sprite: e.a.sprite,
+            facing: e.a.facing,
+            rng: None,
+            events: &mut ev,
+        };
         e.ea.enter(&d.anim.rules, 1, d.anim.loop3, &mut hh);
     }
     let Some(pi) = player(w, i) else { return };
     let (px, py) = (w.pl_ref(pi).a.x, w.pl_ref(pi).a.y);
     let e = w.en(i);
-    e.hook = Hook::Latch { ox: e.a.x - px, oy: e.a.y - py };
+    e.hook = Hook::Latch {
+        ox: e.a.x - px,
+        oy: e.a.y - py,
+    };
 }
 
 // ---- Buu fragment (type 0x0E): PlayAnim0 / FreezePlayer ---------------------------------------------------------------
@@ -701,7 +839,13 @@ fn frag_think(w: &mut World, i: usize) {
         e.hook = Hook::None;
         let raw = e.ea.pos.raw;
         let mut ev = Vec::new();
-        let mut hh = EHost { d: &d, sprite: e.a.sprite, facing: e.a.facing, rng: None, events: &mut ev };
+        let mut hh = EHost {
+            d: &d,
+            sprite: e.a.sprite,
+            facing: e.a.facing,
+            rng: None,
+            events: &mut ev,
+        };
         e.ea.enter(&d.anim.rules, raw, d.anim.keep, &mut hh);
     }
 }
@@ -762,7 +906,9 @@ fn freeze_tick(w: &mut World, i: usize) {
 /// footprint centre to footprint centre (0x0800FDFA box: the distance conditions 0x08029C90 / 0x08029BE0 compare
 /// dx*dx + dy*dy <= r2)
 pub fn to_player(w: &World, i: usize) -> (i32, i32) {
-    let Some(pi) = player(w, i) else { return (9999, 9999) };
+    let Some(pi) = player(w, i) else {
+        return (9999, 9999);
+    };
     let (px, py) = w.pl_ref(pi).a.foot_center();
     let (x, y) = w.en_ref(i).a.foot_center();
     (px - x, py - y)
@@ -791,7 +937,10 @@ pub fn face_player(w: &mut World, i: usize) {
 /// footprint-pixel rule)
 pub fn face_player_exact(w: &mut World, i: usize) {
     let Some(pi) = player(w, i) else { return };
-    let (dx, dy) = (w.pl_ref(pi).a.x - w.en_ref(i).a.x, w.pl_ref(pi).a.y - w.en_ref(i).a.y);
+    let (dx, dy) = (
+        w.pl_ref(pi).a.x - w.en_ref(i).a.x,
+        w.pl_ref(pi).a.y - w.en_ref(i).a.y,
+    );
     let d = if dx.abs() >= dy.abs() {
         match dx.signum() {
             1 => 3,
@@ -825,10 +974,17 @@ pub fn in_melee_range(w: &mut World, i: usize) -> bool {
     let Some(pi) = player(w, i) else { return false };
     let p = &w.pl_ref(pi).a;
     let b = w.en_ref(i).a.body_box();
-    if !p.hittable || !overlaps(&p.body_box(), &Rect::new(b.x0 - 4, b.y0, b.x1 + 3, b.y1 - 6)) {
+    if !p.hittable
+        || !overlaps(
+            &p.body_box(),
+            &Rect::new(b.x0 - 4, b.y0, b.x1 + 3, b.y1 - 6),
+        )
+    {
         return false;
     }
-    let Some(r) = strike_rect(w, i, true) else { return false };
+    let Some(r) = strike_rect(w, i, true) else {
+        return false;
+    };
     overlaps(&w.pl_ref(pi).a.body_box(), &r)
 }
 /// 0x0800FF44: the shot origin on the body box: down (cx, position y), up (cx, cy), left (x0, cy), right (x1, cy)
@@ -856,10 +1012,15 @@ pub fn player_in_front(w: &mut World, i: usize, _reach: i32) -> bool {
     let Some(pi) = player(w, i) else { return false };
     let p = &w.pl_ref(pi).a;
     let b = w.en_ref(i).a.body_box();
-    if !overlaps(&p.body_box(), &Rect::new(b.x0 - 4, b.y0, b.x1 + 3, b.y1 - 6)) {
+    if !overlaps(
+        &p.body_box(),
+        &Rect::new(b.x0 - 4, b.y0, b.x1 + 3, b.y1 - 6),
+    ) {
         return false;
     }
-    let Some(r) = strike_rect(w, i, true) else { return false };
+    let Some(r) = strike_rect(w, i, true) else {
+        return false;
+    };
     overlaps(&w.pl_ref(pi).a.body_box(), &r)
 }
 fn corridor(b: &Rect, dir: Dir) -> Rect {
@@ -912,13 +1073,20 @@ pub fn blast_incoming(w: &World, i: usize) -> bool {
 
 pub fn attached(w: &World, i: usize) -> bool {
     let e = w.en_ref(i);
-    let held = ctx_player(w, i).is_some_and(|pi| w.pl_ref(pi).held_by == w.ents[i].id && w.ents[i].id != 0);
+    let held = ctx_player(w, i)
+        .is_some_and(|pi| w.pl_ref(pi).held_by == w.ents[i].id && w.ents[i].id != 0);
     // field: the height does not detach (sc_janemba: a hopping Mini-Janemba keeps marking the enemy grid)
     // a field enemy whose death node is Idle stays the object it was (`ko < 0`): still on the enemy grid, so the
     // step it takes in the pass of the killing hit is collision-checked like the ones before (0-21: Majin Buu's
     // slide, blocked at the wall, stays blocked on the killing frame; 8-71: a free slide moves once more)
     let gone = e.defeated && !(w.field.is_some() && e.ko < 0);
-    !e.part && e.prev == 0 && !gone && !e.detached && !w.ents[i].removed && (e.a.z == 0 || w.field.is_some()) && !held
+    !e.part
+        && e.prev == 0
+        && !gone
+        && !e.detached
+        && !w.ents[i].removed
+        && (e.a.z == 0 || w.field.is_some())
+        && !held
 }
 pub fn mark_self(w: &mut World, i: usize) {
     if w.col.is_none() || w.en_ref(i).marked.is_some() || !attached(w, i) {
@@ -952,7 +1120,14 @@ pub fn sync_mark(w: &mut World, i: usize) {
     // by a script re-marks: rdb5_020 12-27; a defeated one's own death slide too: db5_020)
     if w.field.is_some() && w.en_ref(i).defeated && w.en_ref(i).marked.is_some() {
         let id = crate::scene::Owner::Entity(w.ents[i].id);
-        if w.scene.tracks.iter().any(|t| t.owner == id && t.started && matches!(t.queue.first(), Some(crate::scene::Cmd::MoveTo { .. } | crate::scene::Cmd::GlideTo { .. }))) {
+        if w.scene.tracks.iter().any(|t| {
+            t.owner == id
+                && t.started
+                && matches!(
+                    t.queue.first(),
+                    Some(crate::scene::Cmd::MoveTo { .. } | crate::scene::Cmd::GlideTo { .. })
+                )
+        }) {
             return;
         }
     }
@@ -1090,7 +1265,10 @@ pub fn knock_step(w: &mut World, i: usize, kb: &mut KnockState) -> bool {
         }
     } else {
         let a = &w.en_ref(i).a;
-        if kb.anim == 0 || a.anim.map(|x| x as i32 + 1) != Some(kb.anim) || w.en_ref(i).anim_done(&d) {
+        if kb.anim == 0
+            || a.anim.map(|x| x as i32 + 1) != Some(kb.anim)
+            || w.en_ref(i).anim_done(&d)
+        {
             return true;
         }
     }
@@ -1119,7 +1297,22 @@ pub fn knock_step(w: &mut World, i: usize, kb: &mut KnockState) -> bool {
     let was = w.en_ref(i).a.hittable;
     w.en(i).a.hittable = false;
     let id = w.ents[i].id;
-    let mut m = HitMsg { team: 1, rect, dir: w.en_ref(i).last_hit_dir, mult: 409, atk: atk(3), attacker: id, att_stats: w.en_ref(i).a.stats, att_is_player: false, source: id, crit: false, raw: 0, dmg: 0, no_react: false, foot: false };
+    let mut m = HitMsg {
+        team: 1,
+        rect,
+        dir: w.en_ref(i).last_hit_dir,
+        mult: 409,
+        atk: atk(3),
+        attacker: id,
+        att_stats: w.en_ref(i).a.stats,
+        att_is_player: false,
+        source: id,
+        crit: false,
+        raw: 0,
+        dmg: 0,
+        no_react: false,
+        foot: false,
+    };
     broadcast(w, &mut m, false);
     w.en(i).a.hittable = was;
     true
@@ -1138,10 +1331,30 @@ pub fn step_from_player(w: &mut World, i: usize, speed: i32, face_toward: bool) 
         let e = w.en(i);
         if adx > ady {
             m = adx;
-            e.a.facing = if face_toward { if dx < 0 { 2 } else { 3 } } else if dx > 0 { 2 } else { 3 };
+            e.a.facing = if face_toward {
+                if dx < 0 {
+                    2
+                } else {
+                    3
+                }
+            } else if dx > 0 {
+                2
+            } else {
+                3
+            };
         } else {
             m = ady;
-            e.a.facing = if face_toward { if dy < 0 { 1 } else { 0 } } else if dy > 0 { 1 } else { 0 };
+            e.a.facing = if face_toward {
+                if dy < 0 {
+                    1
+                } else {
+                    0
+                }
+            } else if dy > 0 {
+                1
+            } else {
+                0
+            };
         }
     }
     if m == 0 {
@@ -1164,7 +1377,14 @@ pub fn step_from_player(w: &mut World, i: usize, speed: i32, face_toward: bool) 
     }
     let vx = -((dx as i64 * speed as i64) / m as i64) as i32;
     let vy = -((dy as i64 * speed as i64) / m as i64) as i32;
-    try_move(w, i, vx, vy, if dx >= 0 { -speed } else { speed }, if dy >= 0 { -speed } else { speed });
+    try_move(
+        w,
+        i,
+        vx,
+        vy,
+        if dx >= 0 { -speed } else { speed },
+        if dy >= 0 { -speed } else { speed },
+    );
     !w.en_ref(i).stepped
 }
 
@@ -1195,7 +1415,14 @@ pub fn circle_player(w: &mut World, i: usize, speed: i32) -> bool {
     mark_moving(w, i);
     let vx = -((dx as i64 * speed as i64) / m as i64) as i32;
     let vy = -((dy as i64 * speed as i64) / m as i64) as i32;
-    try_move(w, i, vx, vy, if dx >= 0 { -speed } else { speed }, if dy >= 0 { -speed } else { speed });
+    try_move(
+        w,
+        i,
+        vx,
+        vy,
+        if dx >= 0 { -speed } else { speed },
+        if dy >= 0 { -speed } else { speed },
+    );
     !w.en_ref(i).stepped
 }
 
@@ -1336,7 +1563,14 @@ pub fn wander_step(w: &mut World, i: usize, speed: i32, turn_p: i64) {
 }
 
 /// normalised move toward the player (exact integer form of round(d * speed / hypot)); true within `stop` px
-pub fn move_toward(w: &mut World, i: usize, speed: i32, stop: i32, face: bool, ignore_walls: bool) -> bool {
+pub fn move_toward(
+    w: &mut World,
+    i: usize,
+    speed: i32,
+    stop: i32,
+    face: bool,
+    ignore_walls: bool,
+) -> bool {
     if player(w, i).is_none() {
         return false;
     }
@@ -1411,7 +1645,11 @@ pub fn footstep(w: &mut World, i: usize, path: bool) {
         }
     }
     // the game's step SetAnim(1)s before this test: a first walking step counts as walk tick 0
-    let t = if e.moving && e.a.anim_name(&d) != Some("walk") { 0 } else { e.ea.pos.tick };
+    let t = if e.moving && e.a.anim_name(&d) != Some("walk") {
+        0
+    } else {
+        e.ea.pos.tick
+    };
     if (g == 0x4e || g == 0x11 || g == 0x4c) && (t == 0 || t == 16) {
         w.sfx(52, 64);
     } else if path && (g == 0xa4 || g == 0x44 || g == 0xbf) && (t == 8 || t == 24) {
@@ -1422,7 +1660,11 @@ pub fn footstep(w: &mut World, i: usize, path: bool) {
 /// via 0x0800EDF8
 pub fn swap_gfx(w: &mut World, i: usize) {
     let d = Arc::clone(&w.data);
-    let g = if w.en_ref(i).gfx_now >= 0 { Some(w.en_ref(i).gfx_now) } else { d.enemy(w.en_ref(i).ty).and_then(|t| t.gfx) };
+    let g = if w.en_ref(i).gfx_now >= 0 {
+        Some(w.en_ref(i).gfx_now)
+    } else {
+        d.enemy(w.en_ref(i).ty).and_then(|t| t.gfx)
+    };
     let to = match g {
         Some(0xbb) => 0xbc,
         Some(0xbc) => 0xbb,
@@ -1484,7 +1726,11 @@ pub fn align(w: &mut World, i: usize, speed: i32) -> bool {
             set_anim(w, i, &[nm("walk")], true, Some(true));
         }
     };
-    if if dx.abs() > dy.abs() { dy.abs() >= 3 } else { dx.abs() >= 3 } {
+    if if dx.abs() > dy.abs() {
+        dy.abs() >= 3
+    } else {
+        dx.abs() >= 3
+    } {
         footstep(w, i, false);
     }
     if dx.abs() > dy.abs() {
@@ -1517,9 +1763,32 @@ pub fn align(w: &mut World, i: usize, speed: i32) -> bool {
 
 // ---- attacks -------------------------------------------------------------------------------------------------------
 
-fn msg_from(w: &World, i: usize, team: u8, rect: Rect, dir: Dir, mult: i32, a: AttackType) -> HitMsg {
+fn msg_from(
+    w: &World,
+    i: usize,
+    team: u8,
+    rect: Rect,
+    dir: Dir,
+    mult: i32,
+    a: AttackType,
+) -> HitMsg {
     let id = w.ents[i].id;
-    HitMsg { team, rect, dir, mult, atk: a, attacker: id, att_stats: w.actor(i).map(|x| x.stats).unwrap_or_default(), att_is_player: false, source: id, crit: false, raw: 0, dmg: 0, no_react: false, foot: false }
+    HitMsg {
+        team,
+        rect,
+        dir,
+        mult,
+        atk: a,
+        attacker: id,
+        att_stats: w.actor(i).map(|x| x.stats).unwrap_or_default(),
+        att_is_player: false,
+        source: id,
+        crit: false,
+        raw: 0,
+        dmg: 0,
+        no_react: false,
+        foot: false,
+    }
 }
 
 /// 0x0802A0C4: face the player on the dominant axis, the half-box on that side
@@ -1556,7 +1825,14 @@ pub fn strike_rect(w: &mut World, i: usize, face: bool) -> Option<Rect> {
         _ => Rect::new(ff.x0, bb.y0, ff.x1, ff.y0),
     })
 }
-pub fn melee_strike(w: &mut World, i: usize, mult: i32, face: bool, adjacent: bool, a: AttackType) -> bool {
+pub fn melee_strike(
+    w: &mut World,
+    i: usize,
+    mult: i32,
+    face: bool,
+    adjacent: bool,
+    a: AttackType,
+) -> bool {
     let Some(pi) = player(w, i) else { return false };
     if !w.pl_ref(pi).a.hittable {
         return false;
@@ -1584,7 +1860,9 @@ pub fn melee_strike(w: &mut World, i: usize, mult: i32, face: bool, adjacent: bo
 pub fn contact_strike(w: &mut World, i: usize, mult: i32, restore: bool) -> bool {
     let Some(pi) = player(w, i) else { return false };
     let saved = w.en_ref(i).a.facing;
-    let Some(rect) = strike_rect(w, i, true) else { return false };
+    let Some(rect) = strike_rect(w, i, true) else {
+        return false;
+    };
     let dir = w.en_ref(i).a.facing;
     if restore {
         w.en(i).a.facing = saved;
@@ -1608,7 +1886,9 @@ pub fn heavy_strike(w: &mut World, i: usize) -> bool {
     // (`strike_rect`; Northern Wilderness 15-12: a Knight Destroyer, 64 px wide, turns left toward a player its
     // top-left position has above it). Battles keep the reference's rect
     if w.field.is_some() {
-        let Some(rect) = strike_rect(w, i, true) else { return true };
+        let Some(rect) = strike_rect(w, i, true) else {
+            return true;
+        };
         let dir = w.en_ref(i).a.facing;
         let mut m = msg_from(w, i, 0, rect, dir, 0x400, atk(2));
         if player::on_message(w, pi, &mut m) {
@@ -1648,7 +1928,14 @@ fn contact_hit_kind(w: &mut World, i: usize, foot: bool) -> bool {
         return false;
     }
     let bb = w.en_ref(i).a.body_box();
-    if !overlaps(&bb, &if foot { w.pl_ref(pi).a.foot_box() } else { w.pl_ref(pi).a.body_box() }) {
+    if !overlaps(
+        &bb,
+        &if foot {
+            w.pl_ref(pi).a.foot_box()
+        } else {
+            w.pl_ref(pi).a.body_box()
+        },
+    ) {
         return false;
     }
     let mut m = msg_from(w, i, 0, bb, w.en_ref(i).a.facing, 0x400, atk(2));
@@ -1678,12 +1965,32 @@ pub fn area_hit(w: &mut World, i: usize, rect: Rect, a: AttackType, mult: i32) -
 /// launched volleyball: hits the other enemies (attacker: the player)
 pub fn area_hit_enemies(w: &mut World, i: usize, rect: Rect, pi: usize) {
     let pid = w.ents[pi].id;
-    let mut m = HitMsg { team: 1, rect, dir: w.en_ref(i).last_hit_dir, mult: 409, atk: atk(3), attacker: pid, att_stats: w.pl_ref(pi).a.stats, att_is_player: true, source: w.ents[i].id, crit: false, raw: 0, dmg: 0, no_react: false, foot: false };
+    let mut m = HitMsg {
+        team: 1,
+        rect,
+        dir: w.en_ref(i).last_hit_dir,
+        mult: 409,
+        atk: atk(3),
+        attacker: pid,
+        att_stats: w.pl_ref(pi).a.stats,
+        att_is_player: true,
+        source: w.ents[i].id,
+        crit: false,
+        raw: 0,
+        dmg: 0,
+        no_react: false,
+        foot: false,
+    };
     broadcast(w, &mut m, false);
 }
 
 const SHELL_MUZZLE: [(i32, i32); 4] = [(30, 60), (34, -12), (-16, 24), (60, 24)];
-const SHELL_BOX: [[i32; 4]; 4] = [[8, 14, 16, 16], [8, 2, 16, 16], [2, 8, 16, 16], [14, 8, 16, 16]];
+const SHELL_BOX: [[i32; 4]; 4] = [
+    [8, 14, 16, 16],
+    [8, 2, 16, 16],
+    [2, 8, 16, 16],
+    [14, 8, 16, 16],
+];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ShotType {
@@ -1697,9 +2004,19 @@ pub enum ShotType {
 }
 const GUN_MUZZLE: [(i32, i32); 4] = [(4, 4), (13, -24), (-8, -8), (24, -8)];
 const GUN_BOX: [[i32; 4]; 4] = [[3, 10, 8, 16], [3, 5, 8, 16], [5, 4, 16, 8], [10, 4, 16, 8]];
-const RIFLE_BOX: [[i32; 4]; 4] = [[8, 14, 16, 16], [8, 2, 16, 16], [2, 8, 16, 16], [14, 8, 16, 16]];
+const RIFLE_BOX: [[i32; 4]; 4] = [
+    [8, 14, 16, 16],
+    [8, 2, 16, 16],
+    [2, 8, 16, 16],
+    [14, 8, 16, 16],
+];
 /// MummyWrapBurst spawn offsets by facing: straight (x, y), diagonal (x, y) (0x08756AA4)
-const WRAP_BURST_OFF: [[i32; 4]; 4] = [[0, 36, -12, 12], [0, -36, 12, -12], [-36, 0, -12, -12], [36, 0, 12, 12]];
+const WRAP_BURST_OFF: [[i32; 4]; 4] = [
+    [0, 36, -12, 12],
+    [0, -36, 12, -12],
+    [-36, 0, -12, -12],
+    [36, 0, 12, 12],
+];
 
 pub fn shot(w: &mut World, i: usize, kind: ShotType) {
     let a = w.en_ref(i).a.clone();
@@ -1709,23 +2026,115 @@ pub fn shot(w: &mut World, i: usize, kind: ShotType) {
     let (dx, dy) = DIR_VEC[f as usize];
     let owner = w.ents[i].id;
     // the firing node's own sound (gun 0x080264EA / rifle 0x0802676A / tank 0x0801C900: 28; star 61) on the spawn frame
-    let mk = |w: &mut World, dir: Dir, x: i32, y: i32, vx: i32, vy: i32, b: [i32; 4], o: StraightOpts| {
-        let s = Shot::new(owner, dir, 0, x, y, ShotKind::Straight(Box::new(StraightOpts { vx, vy, b, ..o })));
+    let mk = |w: &mut World,
+              dir: Dir,
+              x: i32,
+              y: i32,
+              vx: i32,
+              vy: i32,
+              b: [i32; 4],
+              o: StraightOpts| {
+        let s = Shot::new(
+            owner,
+            dir,
+            0,
+            x,
+            y,
+            ShotKind::Straight(Box::new(StraightOpts { vx, vy, b, ..o })),
+        );
         let id = w.add(Body::Shot(Box::new(s)));
         if let Some(k) = w.find(id) {
             shots::spawn_rng(w, k);
         }
     };
-    let base = StraightOpts { a: atk(1), mult: 1024, ..Default::default() };
+    let base = StraightOpts {
+        a: atk(1),
+        mult: 1024,
+        ..Default::default()
+    };
     match kind {
-        ShotType::Gun => mk(w, f, at.0, at.1, dx * 672, dy * 672, GUN_BOX[f as usize], StraightOpts { sfx_spawn: 28, fragile: true, name: shots::SName::Gun, ..base }),
+        ShotType::Gun => mk(
+            w,
+            f,
+            at.0,
+            at.1,
+            dx * 672,
+            dy * 672,
+            GUN_BOX[f as usize],
+            StraightOpts {
+                sfx_spawn: 28,
+                fragile: true,
+                name: shots::SName::Gun,
+                ..base
+            },
+        ),
         // rifle bullet 0x080276A8: an accepted hit plays 48 + rand(2), the destroy 0x0802770C sound 46
-        ShotType::Rifle => mk(w, f, at.0, at.1, dx * 448, dy * 448, RIFLE_BOX[f as usize], StraightOpts { sfx_spawn: 28, rng_hit: 2, sfx_hit: 48, sfx_end: 46, fragile: true, name: shots::SName::Rifle, trail: Some(shots::Trail { fx: shots::FxId::Fx0874e614, rec: 4, n: 3, rate: 0x2aaa }), ..base }),
+        ShotType::Rifle => mk(
+            w,
+            f,
+            at.0,
+            at.1,
+            dx * 448,
+            dy * 448,
+            RIFLE_BOX[f as usize],
+            StraightOpts {
+                sfx_spawn: 28,
+                rng_hit: 2,
+                sfx_hit: 48,
+                sfx_end: 46,
+                fragile: true,
+                name: shots::SName::Rifle,
+                trail: Some(shots::Trail {
+                    fx: shots::FxId::Fx0874e614,
+                    rec: 4,
+                    n: 3,
+                    rate: 0x2aaa,
+                }),
+                ..base
+            },
+        ),
         // tank shell 0x0801C900 from the tank controller 0x0802E278: the position + 0x08757354 [facing], box = the
         // record's (0x0871E630 + 12 * dir); an accepted hit plays 48 + rand(2) (3-14: the shell that hits Gohan)
-        ShotType::Shell => mk(w, f, (a.px() + SHELL_MUZZLE[f as usize].0) << 8, (a.py() + SHELL_MUZZLE[f as usize].1) << 8, dx * 448, dy * 448, SHELL_BOX[f as usize], StraightOpts { sfx_spawn: 28, rng_hit: 2, sfx_hit: 48, fragile: true, name: shots::SName::Shell, trail: Some(shots::Trail { fx: shots::FxId::Fx0871e630, rec: 4, n: 3, rate: 0x2aaa }), ..base }),
+        ShotType::Shell => mk(
+            w,
+            f,
+            (a.px() + SHELL_MUZZLE[f as usize].0) << 8,
+            (a.py() + SHELL_MUZZLE[f as usize].1) << 8,
+            dx * 448,
+            dy * 448,
+            SHELL_BOX[f as usize],
+            StraightOpts {
+                sfx_spawn: 28,
+                rng_hit: 2,
+                sfx_hit: 48,
+                fragile: true,
+                name: shots::SName::Shell,
+                trail: Some(shots::Trail {
+                    fx: shots::FxId::Fx0871e630,
+                    rec: 4,
+                    n: 3,
+                    rate: 0x2aaa,
+                }),
+                ..base
+            },
+        ),
         // throw controller 0x0802C08A: the star at the position + the muzzle table 0x087548F0, then PlaySfx(61)
-        ShotType::Star => mk(w, f, at.0, at.1, dx * 448, dy * 448, [4, 4, 8, 8], StraightOpts { sfx_spawn: 61, fragile: true, explode: false, name: shots::SName::Star, ..base }),
+        ShotType::Star => mk(
+            w,
+            f,
+            at.0,
+            at.1,
+            dx * 448,
+            dy * 448,
+            [4, 4, 8, 8],
+            StraightOpts {
+                sfx_spawn: 61,
+                fragile: true,
+                explode: false,
+                name: shots::SName::Star,
+                ..base
+            },
+        ),
         // MummyWrapShot 0x0802D0DC: one straight bandage at the position + 0x08756A74 [facing]; MummyWrapBurst
         // 0x0802D214: per facing one straight and one diagonal at the position + 0x08756AA4 [facing]
         ShotType::Wrap => {
@@ -1734,8 +2143,14 @@ pub fn shot(w: &mut World, i: usize, kind: ShotType) {
         ShotType::Burst => {
             for d in 0..4u8 {
                 let o = WRAP_BURST_OFF[d as usize];
-                shots::add(w, shots::mummy_wrap(owner, d, (a.px() + o[0]) << 8, (a.py() + o[1]) << 8, false));
-                shots::add(w, shots::mummy_wrap(owner, d, (a.px() + o[2]) << 8, (a.py() + o[3]) << 8, true));
+                shots::add(
+                    w,
+                    shots::mummy_wrap(owner, d, (a.px() + o[0]) << 8, (a.py() + o[1]) << 8, false),
+                );
+                shots::add(
+                    w,
+                    shots::mummy_wrap(owner, d, (a.px() + o[2]) << 8, (a.py() + o[3]) << 8, true),
+                );
             }
         }
         ShotType::Spit => {
@@ -1760,7 +2175,22 @@ pub fn shot(w: &mut World, i: usize, kind: ShotType) {
             };
             let vx = (ddx * 512) / m;
             let vy = (ddy * 512) / m;
-            mk(w, f, ox << 8, oy << 8, vx, vy, [8, 8, 16, 16], StraightOpts { explode: false, on_hit: OnHit::Stone, name: shots::SName::Spit, sector, ..base });
+            mk(
+                w,
+                f,
+                ox << 8,
+                oy << 8,
+                vx,
+                vy,
+                [8, 8, 16, 16],
+                StraightOpts {
+                    explode: false,
+                    on_hit: OnHit::Stone,
+                    name: shots::SName::Spit,
+                    sector,
+                    ..base
+                },
+            );
         }
     }
 }
@@ -1797,7 +2227,10 @@ pub fn teleport_beside(w: &mut World, i: usize, side: i32) {
     let (pfx, pfy) = w.pl_ref(pi).a.foot_center();
     // field (sc_janemba): the player's whole-pixel position + the side offset; battle keeps the reference's
     // footprint-centred placement
-    let at = w.field.is_some().then(|| (w.pl_ref(pi).a.px(), w.pl_ref(pi).a.py()));
+    let at = w
+        .field
+        .is_some()
+        .then(|| (w.pl_ref(pi).a.px(), w.pl_ref(pi).a.py()));
     {
         let a = &mut w.en(i).a;
         match at {
@@ -1833,7 +2266,9 @@ pub fn teleport_beside(w: &mut World, i: usize, side: i32) {
 /// 0x08009816: a rect that does not fit the walk layer moves to the first free tile-aligned spot of a square spiral
 /// around its tile (sc_janemba: Super Janemba's teleport against the arena's diagonal wall; the scripts' 0xCB / 0xCC)
 pub fn free_rect(w: &World, x: i32, y: i32, rw: i32, rh: i32) -> (i32, i32) {
-    let Some(c) = w.col.as_ref() else { return (x, y) };
+    let Some(c) = w.col.as_ref() else {
+        return (x, y);
+    };
     if c.test(Layer::Walk, x, y, x + rw, y + rh) {
         return (x, y);
     }
@@ -1877,7 +2312,11 @@ pub fn kid_buu_split(w: &mut World, i: usize) {
         let dy = w.rng.rand(192) - 96;
         let (x, y) = (w.en_ref(i).a.x, w.en_ref(i).a.y);
         let (fw, fh) = (w.en_ref(i).a.foot_w, w.en_ref(i).a.foot_h);
-        let ok = |w: &World, px: i32, py: i32| w.col.as_ref().is_none_or(|c| c.test(Layer::Walk, px, py, px + fw, py + fh));
+        let ok = |w: &World, px: i32, py: i32| {
+            w.col
+                .as_ref()
+                .is_none_or(|c| c.test(Layer::Walk, px, py, px + fw, py + fh))
+        };
         if !ok(w, (x + dx) >> 8, (y + dy) >> 8) || !ok(w, (x - dx) >> 8, (y - dy) >> 8) {
             continue;
         }
@@ -1894,7 +2333,9 @@ pub fn kid_buu_split(w: &mut World, i: usize) {
             hp = e.hp1024;
         }
         mark_self(w, i);
-        if let Some(ci) = crate::battle::spawn_enemy(w, 0x3d, (x - dx) >> 8, (y - dy) >> 8, 0, Some(0x12a)) {
+        if let Some(ci) =
+            crate::battle::spawn_enemy(w, 0x3d, (x - dx) >> 8, (y - dy) >> 8, 0, Some(0x12a))
+        {
             // (the copy is created at the PIXEL of the 24.8 position - d: it has no sub-pixel part; the real route,
             // Kid Buu's arena 21-25: original (279.99, 410.37) + (42, 68) / 256, copy at (279, 410) exactly)
             unmark_self(w, ci);
@@ -1911,7 +2352,10 @@ pub fn kid_buu_split(w: &mut World, i: usize) {
 }
 pub fn kid_buu_merge(w: &mut World, i: usize) {
     let me = w.ents[i].id;
-    let other = w.live_enemies().into_iter().find(|&o| w.ents[o].id != me && matches!(w.en_ref(o).ty, 0x3c | 0x3d));
+    let other = w
+        .live_enemies()
+        .into_iter()
+        .find(|&o| w.ents[o].id != me && matches!(w.en_ref(o).ty, 0x3c | 0x3d));
     let Some(o) = other else { return };
     let ohp = w.en_ref(o).hp1024;
     w.en(i).hp1024 += ohp;
@@ -1922,7 +2366,15 @@ pub fn kid_buu_merge(w: &mut World, i: usize) {
     // 0x08009904 on the enemy grid as it stands - both marks still on it: a midpoint on either footprint's tiles
     // fails and the survivor stays where it is (21-25: two halves 0.1 px apart merge in place)
     let (fw, fh) = (w.en_ref(i).a.foot_w, w.en_ref(i).a.foot_h);
-    if w.col.as_ref().is_none_or(|c| c.test(Layer::Enemy, mx >> 8, my >> 8, (mx >> 8) + fw, (my >> 8) + fh)) {
+    if w.col.as_ref().is_none_or(|c| {
+        c.test(
+            Layer::Enemy,
+            mx >> 8,
+            my >> 8,
+            (mx >> 8) + fw,
+            (my >> 8) + fh,
+        )
+    }) {
         let a = &mut w.en(i).a;
         a.x = mx;
         a.y = my;
@@ -1957,7 +2409,19 @@ fn janemba_part_field(w: &mut World, i: usize) {
     let Some((pi, (raw, cel, x, y, z, f))) = w
         .enemy_by_id(par)
         .filter(|(pi, p)| !w.ents[*pi].removed && !p.defeated)
-        .map(|(pi, p)| (pi, (p.ea.pos.raw, p.ea.pos.frame, p.a.x, p.a.y, p.a.z, p.a.facing)))
+        .map(|(pi, p)| {
+            (
+                pi,
+                (
+                    p.ea.pos.raw,
+                    p.ea.pos.frame,
+                    p.a.x,
+                    p.a.y,
+                    p.a.z,
+                    p.a.facing,
+                ),
+            )
+        })
     else {
         w.ents[i].removed = true;
         return;
@@ -2000,7 +2464,11 @@ fn janemba_part_field(w: &mut World, i: usize) {
     // a switch into the ascent's controller animation (raw 20) shows in the table a frame late
     let cur_raw = raw;
     let raw = if raw == 20 && seen != 0 { seen } else { raw };
-    let cel = if (raw == 20 && seen == raw) || (cur_raw == 20 && seen != 20 && seen != 0) { last_cel as usize } else { cel as usize };
+    let cel = if (raw == 20 && seen == raw) || (cur_raw == 20 && seen != 20 && seen != 0) {
+        last_cel as usize
+    } else {
+        cel as usize
+    };
     let table: &[i32] = match raw {
         10 => &[-1, -2, -1],
         20 => &[15, -3, -5],
@@ -2030,7 +2498,12 @@ fn janemba_part_field(w: &mut World, i: usize) {
 /// JanembaPartFlash (on hit): every body part plays the hurt animation (raw 10)
 pub fn janemba_parts_hurt(w: &mut World, i: usize) {
     let me = w.ents[i].id;
-    let parts: Vec<usize> = (0..w.ents.len()).filter(|&k| !w.ents[k].removed && matches!(&w.ents[k].body, Body::Enemy(e) if e.part && e.parent == me)).collect();
+    let parts: Vec<usize> = (0..w.ents.len())
+        .filter(|&k| {
+            !w.ents[k].removed
+                && matches!(&w.ents[k].body, Body::Enemy(e) if e.part && e.parent == me)
+        })
+        .collect();
     for k in parts {
         // field: an arm part in a hand strike - the strike controller's exit puts its hand into the idle controller
         // (SetAnim(0): rand(255)) and destroys it (sc_janemba: Janemba punched in the frame the hand appears)
@@ -2058,7 +2531,10 @@ fn unmark_hand(w: &mut World, k: usize) {
 pub fn janemba_arm(w: &World, i: usize, a: bool) -> Option<usize> {
     let me = w.ents[i].id;
     let t = if a { 0x34 } else { 0x35 };
-    (0..w.ents.len()).find(|&k| !w.ents[k].removed && matches!(&w.ents[k].body, Body::Enemy(e) if e.part && e.parent == me && e.ty == t))
+    (0..w.ents.len()).find(|&k| {
+        !w.ents[k].removed
+            && matches!(&w.ents[k].body, Body::Enemy(e) if e.part && e.parent == me && e.ty == t)
+    })
 }
 pub fn janemba_parts(w: &mut World, i: usize) {
     let me = w.ents[i].id;
@@ -2075,7 +2551,8 @@ pub fn janemba_parts(w: &mut World, i: usize) {
         } else {
             (ox, oy)
         };
-        if let Some(pi) = crate::battle::spawn_enemy_at(w, t, px + sx, py + sy, me, Some(-1), field) {
+        if let Some(pi) = crate::battle::spawn_enemy_at(w, t, px + sx, py + sy, me, Some(-1), field)
+        {
             let p = w.en(pi);
             p.part = true;
             p.part_offset = (ox, oy);
@@ -2106,13 +2583,34 @@ pub fn hand_strike(w: &mut World, i: usize, a_side: bool) -> Option<EntityId> {
         ppx = x >> 8;
         ppy = y >> 8;
     }
-    let mut a = Actor { x: (ppx + if a_side { 4 } else { -20 }) << 8, y: ppy << 8, facing: if a_side { 2 } else { 3 }, ..Default::default() };
-    a.stats = crate::damage::CombatStats { str_: t.str_, pow: t.pow, end: t.end, end2: t.end, res_m: 128, res_e: 128, crit_bonus: 0, block_factor: 0x1000 };
+    let mut a = Actor {
+        x: (ppx + if a_side { 4 } else { -20 }) << 8,
+        y: ppy << 8,
+        facing: if a_side { 2 } else { 3 },
+        ..Default::default()
+    };
+    a.stats = crate::damage::CombatStats {
+        str_: t.str_,
+        pow: t.pow,
+        end: t.end,
+        end2: t.end,
+        res_m: 128,
+        res_e: 128,
+        crit_bonus: 0,
+        block_factor: 0x1000,
+    };
     let d = Arc::clone(&w.data);
     // the strike's spawn record 0x0877B050 gives the hand gfx 0x96 (the type table's 0x97 is the HFIL field hand's;
     // sc_janemba: the strike hand is sprite 150)
     let gfx = 0x96 - crate::content::GFX_OFFSET;
-    a.set_sprite(&d, if w.field.is_some() && d.sprite(gfx).is_some() { Some(gfx) } else { t.sprite });
+    a.set_sprite(
+        &d,
+        if w.field.is_some() && d.sprite(gfx).is_some() {
+            Some(gfx)
+        } else {
+            t.sprite
+        },
+    );
     a.set_anim(&d, &[n(18)], true, Some(false));
     a.hittable = false;
     // field: an enemy object - its constructor marks its footprint on the enemy grid (sc_janemba)
@@ -2125,13 +2623,20 @@ pub fn hand_strike(w: &mut World, i: usize, a_side: bool) -> Option<EntityId> {
     } else {
         None
     };
-    Some(w.add(Body::Hand(Box::new(Hand { a, t: 0, hit: false, marked }))))
+    Some(w.add(Body::Hand(Box::new(Hand {
+        a,
+        t: 0,
+        hit: false,
+        marked,
+    }))))
 }
 /// field: a strike hand is an enemy object (type 0x36, 50 HP, Idle): the player's hits reach it (sc_janemba: a punch
 /// on Janemba and the hand computes both - crit chance and roll each; the hand's reaction is the flash's: see
 /// janemba_parts_hurt)
 pub fn hand_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
-    let Body::Hand(h) = &w.ents[i].body else { return false };
+    let Body::Hand(h) = &w.ents[i].body else {
+        return false;
+    };
     // only until the arm's strike controller ends (it frees the hand's tiles then: `marked`); the fading hand is out
     // of the enemy list (sc_janemba: a blast through it at tick 46 computes nothing)
     if msg.team == 0 || h.marked.is_none() || !overlaps(&msg.rect, &h.a.body_box()) {
@@ -2145,7 +2650,9 @@ pub fn hand_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
 /// Janemba hand (type 0x36): one hit during its frames 16..55, gone after 57
 pub fn hand_update(w: &mut World, i: usize) {
     let (t, hit) = {
-        let Body::Hand(h) = &mut w.ents[i].body else { return };
+        let Body::Hand(h) = &mut w.ents[i].body else {
+            return;
+        };
         h.a.tick_anim();
         h.t += 1;
         (h.t, h.hit)
@@ -2158,9 +2665,26 @@ pub fn hand_update(w: &mut World, i: usize) {
     let pi = w.player_idx(0);
     if let Some(pi) = pi {
         if !hit && !w.pl_ref(pi).dead && (16..40).contains(&t) {
-            let Body::Hand(h) = &w.ents[i].body else { return };
+            let Body::Hand(h) = &w.ents[i].body else {
+                return;
+            };
             let id = w.ents[i].id;
-            let mut m = HitMsg { team: 0, rect: h.a.body_box(), dir: h.a.facing, mult: 0x400, atk: atk(2), attacker: id, att_stats: h.a.stats, att_is_player: false, source: id, crit: false, raw: 0, dmg: 0, no_react: false, foot: false };
+            let mut m = HitMsg {
+                team: 0,
+                rect: h.a.body_box(),
+                dir: h.a.facing,
+                mult: 0x400,
+                atk: atk(2),
+                attacker: id,
+                att_stats: h.a.stats,
+                att_is_player: false,
+                source: id,
+                crit: false,
+                raw: 0,
+                dmg: 0,
+                no_react: false,
+                foot: false,
+            };
             if player::on_message(w, pi, &mut m) {
                 if let Body::Hand(h) = &mut w.ents[i].body {
                     h.hit = true;
@@ -2172,7 +2696,13 @@ pub fn hand_update(w: &mut World, i: usize) {
         }
     }
     if let Body::Hand(h) = &mut w.ents[i].body {
-        h.a.alpha = if t < 12 { t * 256 / 12 } else if t > 50 { ((57 - t) * 256 / 7).max(0) } else { 256 };
+        h.a.alpha = if t < 12 {
+            t * 256 / 12
+        } else if t > 50 {
+            ((57 - t) * 256 / 7).max(0)
+        } else {
+            256
+        };
     }
     if t >= 57 {
         w.ents[i].removed = true;
@@ -2183,7 +2713,11 @@ const MINI_PTS: [(i32, i32); 5] = [(104, 112), (120, 136), (152, 144), (184, 136
 /// returns the missing count, which the top-up 16 frames later creates as it is (sc_janemba: a mini killed in
 /// between is not replaced - 4 new minis with none left)
 pub fn mini_puffs(w: &mut World) -> usize {
-    let live = w.live_enemies().into_iter().filter(|&o| w.en_ref(o).ty == 0x38).count();
+    let live = w
+        .live_enemies()
+        .into_iter()
+        .filter(|&o| w.en_ref(o).ty == 0x38)
+        .count();
     let n = 5usize.saturating_sub(live);
     for &(x, y) in MINI_PTS.iter().take(n) {
         crate::fx::puff_rng(w, x + 8, y + 8);
@@ -2195,16 +2729,34 @@ pub fn mini_create(w: &mut World, i: usize, n: usize) {
     let b = w.arena.bounds;
     let me = w.ents[i].id;
     for &(x, y) in MINI_PTS.iter().take(n) {
-        crate::battle::spawn_enemy(w, 0x38, b.x0.max((b.x1 - 16).min(x)), b.y0.max((b.y1 - 16).min(y)), me, None);
+        crate::battle::spawn_enemy(
+            w,
+            0x38,
+            b.x0.max((b.x1 - 16).min(x)),
+            b.y0.max((b.y1 - 16).min(y)),
+            me,
+            None,
+        );
     }
 }
 pub fn top_up_minis(w: &mut World, i: usize) {
     const PTS: [(i32, i32); 5] = MINI_PTS;
-    let live = w.live_enemies().into_iter().filter(|&o| w.en_ref(o).ty == 0x38).count();
+    let live = w
+        .live_enemies()
+        .into_iter()
+        .filter(|&o| w.en_ref(o).ty == 0x38)
+        .count();
     let b = w.arena.bounds;
     let me = w.ents[i].id;
     for &(x, y) in PTS.iter().take(5usize.saturating_sub(live)) {
-        crate::battle::spawn_enemy(w, 0x38, b.x0.max((b.x1 - 16).min(x)), b.y0.max((b.y1 - 16).min(y)), me, None);
+        crate::battle::spawn_enemy(
+            w,
+            0x38,
+            b.x0.max((b.x1 - 16).min(x)),
+            b.y0.max((b.y1 - 16).min(y)),
+            me,
+            None,
+        );
     }
 }
 pub fn land_on_rock(w: &mut World, i: usize) -> bool {
@@ -2214,7 +2766,9 @@ pub fn land_on_rock(w: &mut World, i: usize) -> bool {
         if w.ents[k].removed {
             continue;
         }
-        let Body::Rock { x, y, .. } = w.ents[k].body else { continue };
+        let Body::Rock { x, y, .. } = w.ents[k].body else {
+            continue;
+        };
         if !overlaps(&Rect::new(x + 16, y + 16, x + 48, y + 48), &fb) {
             continue;
         }
@@ -2237,7 +2791,9 @@ pub fn worm_spawn_body(w: &mut World, i: usize) {
     let mut chain = vec![me];
     for k in 1..=5 {
         let (px, py) = (w.en_ref(i).a.px(), w.en_ref(i).a.py());
-        let Some(si) = crate::battle::spawn_enemy(w, 0x8f, px, py - 12 * k, me, None) else { break };
+        let Some(si) = crate::battle::spawn_enemy(w, 0x8f, px, py - 12 * k, me, None) else {
+            break;
+        };
         // the 12-slot ring (0x0802D650) replays the slot it overwrites when a command arrives: a body moves only on
         // a received command (VERIFIED segment sb 21-9: each segment starts one frame after the one before it)
         let wd = w.en_ref(i).worm_dir;
@@ -2287,7 +2843,9 @@ pub fn worm_head_step(w: &mut World, i: usize) {
 pub fn worm_body_step(w: &mut World, i: usize) {
     // the last segment (no next, 0x0802D674): sprite def 0x12A (Worm Tail) set again every frame (0x0800EDF8: the
     // animation restarts) + SetAnim(1)
-    if w.enemy_by_id(w.en_ref(i).next).is_none_or(|(k, _)| w.ents[k].removed) {
+    if w.enemy_by_id(w.en_ref(i).next)
+        .is_none_or(|(k, _)| w.ents[k].removed)
+    {
         let d = Arc::clone(&w.data);
         let idx = 0x12A - crate::content::GFX_OFFSET;
         if d.sprite(idx).is_some() {
@@ -2321,7 +2879,12 @@ pub fn worm_body_step(w: &mut World, i: usize) {
 pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
     // field: Janemba's parts are enemy objects too - a hit under one computes its damage (crit chance + roll) and
     // nothing else (sc_janemba: a punch under the lowered arm in the ascent)
-    if w.field.is_some() && msg.team != 0 && !w.ents[i].removed && matches!(w.en_ref(i).ty, 0x34 | 0x35 | 0x37) && w.en_ref(i).part {
+    if w.field.is_some()
+        && msg.team != 0
+        && !w.ents[i].removed
+        && matches!(w.en_ref(i).ty, 0x34 | 0x35 | 0x37)
+        && w.en_ref(i).part
+    {
         let e = w.en_ref(i);
         if msg.foot || !overlaps(&msg.rect, &e.a.body_box_ground()) {
             return false;
@@ -2335,12 +2898,21 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
         let e = w.en_ref(i);
         // (the handler `0x0800FBE6` takes sender classes 1 and 2)
         let idle_dead = w.field.is_some() && e.ko == -1;
-        if !matches!(msg.team, 1 | 2) || e.part || (e.defeated && !idle_dead) || w.ents[i].removed || !e.a.hittable {
+        if !matches!(msg.team, 1 | 2)
+            || e.part
+            || (e.defeated && !idle_dead)
+            || w.ents[i].removed
+            || !e.a.hittable
+        {
             return false;
         }
         // field: the body box (0x0800FE78) is at the ground position - the height does not lift it (sc_janemba:
         // a punch lands on Janemba 66 px up in its ascent)
-        let body = if w.field.is_some() { e.a.body_box_ground() } else { e.a.body_box() };
+        let body = if w.field.is_some() {
+            e.a.body_box_ground()
+        } else {
+            e.a.body_box()
+        };
         if !overlaps(&msg.rect, &if msg.foot { e.a.foot_box() } else { body }) {
             return false;
         }
@@ -2348,14 +2920,29 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
     let e = w.en_ref(i);
     let blocking = e.a.blocking && (msg.dir ^ 1) == e.a.facing;
     let def = e.a.stats;
-    let res = compute_damage(msg.atk, msg.mult, &msg.att_stats, &def, blocking, &mut w.rng);
+    let res = compute_damage(
+        msg.atk,
+        msg.mult,
+        &msg.att_stats,
+        &def,
+        blocking,
+        &mut w.rng,
+    );
     msg.crit = res.crit;
     msg.raw = res.raw;
     msg.dmg = res.dmg;
     if res.unblocked != res.dmg {
-        w.events.push(Event::DamageRoll { target: w.ents[i].id, dmg: res.unblocked });
+        w.events.push(Event::DamageRoll {
+            target: w.ents[i].id,
+            dmg: res.unblocked,
+        });
     }
-    w.events.push(Event::Damage { target: w.ents[i].id, attacker: msg.attacker, dmg: res.dmg, crit: res.crit });
+    w.events.push(Event::Damage {
+        target: w.ents[i].id,
+        attacker: msg.attacker,
+        dmg: res.dmg,
+        crit: res.crit,
+    });
     if msg.att_is_player {
         w.events.push(Event::Hit);
         if res.dmg > 0 {
@@ -2444,10 +3031,17 @@ pub fn scripted_defeat(w: &mut World, i: usize) {
 /// type +0x14 node word +8
 fn on_death(w: &mut World, i: usize) {
     let ty = w.en_ref(i).ty;
-    let death = w.data.enemy(ty).map(|t| t.death_name.clone()).unwrap_or_default();
+    let death = w
+        .data
+        .enemy(ty)
+        .map(|t| t.death_name.clone())
+        .unwrap_or_default();
     let me = w.ents[i].id;
     if death == "special" && (ty == 0x3c || ty == 0x3d) {
-        let other = w.live_enemies().into_iter().find(|&o| w.ents[o].id != me && matches!(w.en_ref(o).ty, 0x3c | 0x3d));
+        let other = w
+            .live_enemies()
+            .into_iter()
+            .find(|&o| w.ents[o].id != me && matches!(w.en_ref(o).ty, 0x3c | 0x3d));
         if let Some(o) = other {
             {
                 let e = w.en(i);
@@ -2497,7 +3091,11 @@ fn on_death(w: &mut World, i: usize) {
         let e = w.en_ref(i);
         let (cx, cy) = (e.a.px() + (e.a.foot_w >> 1), e.a.py() + e.a.foot_h);
         let v = crate::geom::DIR_VEC[e.last_hit_dir as usize & 3];
-        if let Some(l) = w.field.as_mut().and_then(|f| f.placed_loot.iter_mut().find(|l| l.0 == me)) {
+        if let Some(l) = w
+            .field
+            .as_mut()
+            .and_then(|f| f.placed_loot.iter_mut().find(|l| l.0 == me))
+        {
             *l = (me, cx, cy, v.0 << 8, v.1 << 8);
         }
     }
@@ -2540,7 +3138,13 @@ fn on_death(w: &mut World, i: usize) {
         }
         w.en(i).ko = -1;
     } else if death == "Idle" {
-        set_anim(w, i, &[nm("knockdown"), nm("ko"), nm("hurt")], true, Some(false));
+        set_anim(
+            w,
+            i,
+            &[nm("knockdown"), nm("ko"), nm("hurt")],
+            true,
+            Some(false),
+        );
         w.en(i).ko = 0;
     } else {
         die(w, i, true);
@@ -2554,7 +3158,10 @@ fn on_death(w: &mut World, i: usize) {
 /// the tanks (death node 0x080333C4, param = def +0xC): Battle Tank variant 0x7F (0), Juggernaut 0x3A (1), 0x8C (2)
 pub const TANKS: [i32; 3] = [0x7f, 0x3a, 0x8c];
 /// crew (enemy type, graphics) per rand(2) and tank (tables 0x087592DC / +0x18)
-const TANK_CREW: [[(i32, i32); 3]; 2] = [[(8, 0x22), (0x43, 0xab), (0x2b, 0x88)], [(0x0f, 0x46), (0x2f, 0x8d), (0x61, 0xeb)]];
+const TANK_CREW: [[(i32, i32); 3]; 2] = [
+    [(8, 0x22), (0x43, 0xab), (0x2b, 0x88)],
+    [(0x0f, 0x46), (0x2f, 0x8d), (0x61, 0xeb)],
+];
 /// A destroyed tank's crew (0x080333C4, field): after the defeat handler, the removal and the puff, four enemies
 /// from the template 0x087592BC (ctor 0x0800FD55, no callback, standing) at the tank's position + (0, 0), (24, 0),
 /// (24, 24), (0, 24), each a rand(2) pick of the tank's two crew types; battles keep the reference (no crew)
@@ -2563,7 +3170,19 @@ fn tank_crew(w: &mut World, i: usize, tank: usize) {
     let (x, y) = (w.en_ref(i).a.px(), w.en_ref(i).a.py());
     for (dx, dy) in [(0, 0), (24, 0), (24, 24), (0, 24)] {
         let (ty, gfx) = TANK_CREW[w.rng.rand(2) as usize & 1][tank];
-        let o = ObjDef { at: ObjRef::List(0xff, ty as u16), cond: Cond::Always, kind: ObjKind::Enemy { ty, x: x + dx, y: y + dy, sprite: gfx, on_defeat: None, behaviour: vec![] }, rom: 0x0875_92bc };
+        let o = ObjDef {
+            at: ObjRef::List(0xff, ty as u16),
+            cond: Cond::Always,
+            kind: ObjKind::Enemy {
+                ty,
+                x: x + dx,
+                y: y + dy,
+                sprite: gfx,
+                on_defeat: None,
+                behaviour: vec![],
+            },
+            rom: 0x0875_92bc,
+        };
         crate::field::spawn_object(w, &o);
     }
 }

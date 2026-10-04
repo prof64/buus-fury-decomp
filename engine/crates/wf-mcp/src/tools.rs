@@ -23,6 +23,9 @@ pub struct Server {
     pub sessions: BTreeMap<String, Agent>,
     next: u32,
     renderer: Option<wf_render::Renderer>,
+    /// the current call is a macro that should hand control back when a story event takes the field (not press /
+    /// wait: they drive dialogue and menus)
+    event_stops: bool,
 }
 
 impl Default for Server {
@@ -201,7 +204,7 @@ pub fn battle_config(d: &GameData, a: &Value) -> Result<(BattleConfig, String), 
 pub fn tool_list() -> Value {
     let sess = json!({"type": "string", "description": "session id from new_battle"});
     let slot = json!({"type": "integer", "description": "player slot you act as (multiplayer; default 0)"});
-    let stop = json!({"type": "array", "items": {"type": "string", "enum": m::STOP_ON}, "description": "return early when: hurt (you lost HP), kill, hit (you dealt damage), no_damage (your hit did nothing), phase, danger (a hit on you is <= 12 frames away if you stand still)"});
+    let stop = json!({"type": "array", "items": {"type": "string", "enum": m::STOP_ON}, "description": "return early when: hurt (you lost HP), kill, hit (you dealt damage), no_damage (your hit did nothing), phase, danger (a hit on you is <= 12 frames away if you stand still), event (story: an event, dialogue box or menu took the field), area (an exit was taken); event and area are the defaults of every macro but press / wait"});
     let btn = json!({"type": "string", "description": "buttons held, e.g. \"RIGHT+A\" (A punch, B skill, L cycle skill, R block, UP/DOWN/LEFT/RIGHT)"});
     let t = |name: &str, desc: &str, props: Value, req: &[&str]| json!({"name": name, "description": desc, "inputSchema": {"type": "object", "properties": props, "required": req}});
     json!([
@@ -225,6 +228,9 @@ pub fn tool_list() -> Value {
             "chars": {"type": "array", "items": {"type": "integer"}, "description": "character per player slot (0 Goku, 1 Gohan, 2 Goten, 3 Trunks, 4 Vegeta, ...); default the new game's"},
             "x": {"type": "integer"}, "y": {"type": "integer"}, "seed": {"type": "integer"},
         }), &["area"]),
+        t("new_game", "Start the story (the whole game with its script host: events, dialogue, NPCs, shops, save points, the title and its New Game / Continue). Default: from the title through New Game into the prologue; title=true stops on the title screen (press START, then A through Single Player / Select Game). Observations gain `story`: the menu screen and its text, the dialogue box, event_running, the save slots. Every action tool, save_state / load_state / rewind and replays work on it; `frame` counts steps (one game logic iteration each).", json!({
+            "seed": {"type": "integer"}, "title": {"type": "boolean", "description": "stop on the title screen"},
+        }), &[]),
         t("list_sessions", "Open sessions.", json!({}), &[]),
         t("close_session", "Close a session.", json!({"session": sess}), &["session"]),
         t("fork_session", "Copy a session (state, inputs, saves) into a new independent session.", json!({"session": sess}), &["session"]),
@@ -234,6 +240,8 @@ pub fn tool_list() -> Value {
         t("press", "Hold buttons for frames (60 frames = 1 s). steps = [{buttons, frames}, ...] for sequences. A press acts on the frame the button goes down: holding A punches once.", json!({"session": sess, "slot": slot, "buttons": btn, "frames": {"type": "integer"}, "steps": {"type": "array", "items": {"type": "object", "properties": {"buttons": btn, "frames": {"type": "integer"}}}}, "stop_on": stop}), &["session"]),
         t("wait", "Release all buttons for frames.", json!({"session": sess, "slot": slot, "frames": {"type": "integer"}, "stop_on": stop}), &["session", "frames"]),
         t("move_to", "Walk to (x, y) (footprint centre, world px, like observation positions) along a path on the walk grid. stop_on defaults to [hurt].", json!({"session": sess, "slot": slot, "x": {"type": "integer"}, "y": {"type": "integer"}, "max_frames": {"type": "integer"}, "stop_on": stop}), &["session", "x", "y"]),
+        t("take_exit", "Field / story: leave the area through an exit (observation field.exits; `to` = its destination \"1-4\" or name, default the first listed = nearest): walks to it and into it (doors sit in walls, edge exits at the map's border) until the area changes.", json!({"session": sess, "slot": slot, "to": {"type": "string"}, "max_frames": {"type": "integer"}, "stop_on": stop}), &["session"]),
+        t("talk", "Field / story: talk to an NPC (observation field.npcs; `npc` = its id, default the nearest that talks), or use a trigger that wants A (`trigger` = its index in field.triggers, e.g. a desk or a sign: activation \"press A inside it\"): walks up to it, turns, presses A; ends when its event starts (then read story.dialog and press A through it).", json!({"session": sess, "slot": slot, "npc": {"type": "integer"}, "trigger": {"type": "integer"}, "max_frames": {"type": "integer"}, "stop_on": stop}), &["session"]),
         t("face", "Turn toward a target enemy or a direction without moving.", json!({"session": sess, "slot": slot, "target": {"type": "string"}, "direction": {"type": "string", "enum": m::DIRS}}), &["session"]),
         t("attack", "Melee macro: walk to a punching spot of the target (default nearest), turn, punch on every new press until the target falls / hits reached / max_frames (300).", json!({"session": sess, "slot": slot, "target": {"type": "string", "description": "enemy id (3 or #3), name, or nearest"}, "hits": {"type": "integer"}, "max_frames": {"type": "integer"}, "stop_on": stop}), &["session"]),
         t("use_skill", "Select a skill (L), optionally line up with and face a target, then hold B for charge_frames, taps times (gap frames apart; Energy Blast refires every ~26 frames). steer = d-pad held while charging (Flame Kamehameha whip, Dragon Fist head, Energy Sword).", json!({"session": sess, "slot": slot, "skill": {"description": "slot number or name"}, "charge_frames": {"type": "integer"}, "taps": {"type": "integer"}, "gap": {"type": "integer"}, "target": {"type": "string"}, "align": {"type": "boolean"}, "steer": btn, "settle": {"type": "integer"}, "max_frames": {"type": "integer"}, "stop_on": stop}), &["session", "skill"]),
@@ -252,7 +260,7 @@ pub fn tool_list() -> Value {
 
 impl Server {
     pub fn new() -> Server {
-        Server { sessions: BTreeMap::new(), next: 1, renderer: None }
+        Server { sessions: BTreeMap::new(), next: 1, renderer: None, event_stops: false }
     }
 
     fn data(&self) -> Result<Arc<GameData>, String> {
@@ -278,6 +286,7 @@ impl Server {
     pub fn call(&mut self, name: &str, a: &Value) -> Result<Out, String> {
         let a = if a.is_null() { &json!({}) } else { a };
         let j = |v: Value| Ok(Out::Json(v));
+        self.event_stops = !matches!(name, "press" | "wait");
         match name {
             "list_fighters" => j(catalog::fighters(&*self.data()?)),
             "list_enemies" => j(catalog::enemies(&*self.data()?, s(a, "search"), s(a, "group"), i(a, "limit").unwrap_or(25).max(1) as usize)),
@@ -347,6 +356,21 @@ impl Server {
                 self.sessions.insert(id.clone(), ag);
                 j(json!({"session": id, "label": label, "config": cfg, "observation": obs}))
             }
+            "new_game" => {
+                let d = self.data()?;
+                let files = story_files()?;
+                let id = self.new_id();
+                let start = crate::env::StoryStart { seed: i(a, "seed").unwrap_or(1) as u32 };
+                let mut ag = Agent::new_story(id.clone(), d, files, start)?;
+                let mut steps = 0;
+                if !b(a, "title").unwrap_or(false) {
+                    steps = title_new_game(&mut ag)?;
+                }
+                let label = "story".to_string();
+                let obs = observe(&mut ag, 0, ObsOpts { full: true, ..Default::default() });
+                self.sessions.insert(id.clone(), ag);
+                j(json!({"session": id, "label": label, "title_steps": steps, "observation": obs}))
+            }
             "list_sessions" => j(Value::Array(
                 self.sessions
                     .values()
@@ -398,6 +422,48 @@ impl Server {
                 let (fw, fh) = (p.a.foot_w, p.a.foot_h);
                 let mf = frames(a, "max_frames", 600, 3600);
                 self.act(a, m::walk_to(x - (fw >> 1), y - (fh >> 1), 1), mf, &["hurt"], json!({}))
+            }
+            "take_exit" => {
+                let slot = i(a, "slot").unwrap_or(0) as usize;
+                let ag = self.sess(a)?;
+                let p = ag.player(slot).ok_or("no such player slot")?;
+                let (fw, fh) = (p.a.foot_w, p.a.foot_h);
+                let f = crate::obs::field_json(ag, slot);
+                let exits = f["exits"].as_array().cloned().unwrap_or_default();
+                let want = s(a, "to").map(String::from).or_else(|| i(a, "to").map(|x| x.to_string()));
+                let e = match &want {
+                    Some(t) => exits.iter().find(|e| e["to"] == t.as_str() || e["to_name"].as_str().is_some_and(|n| catalog::norm(n) == catalog::norm(t))),
+                    None => exits.first(),
+                };
+                let names = exits.iter().map(|e| e["to"].as_str().unwrap_or("?").to_string()).collect::<Vec<_>>().join(", ");
+                let e = e.ok_or_else(|| format!("no such exit here (observation field.exits: {names})"))?;
+                let r: Vec<i32> = e["rect"].as_array().map(|v| v.iter().map(|x| x.as_i64().unwrap_or(0) as i32).collect()).unwrap_or_default();
+                let to = e["to"].clone();
+                let mf = frames(a, "max_frames", 900, 3600);
+                self.act(a, m::take_exit([r[0], r[1], r[2], r[3]], fw, fh), mf, &[], json!({"exit_to": to}))
+            }
+            "talk" => {
+                let slot = i(a, "slot").unwrap_or(0) as usize;
+                let ag = self.sess(a)?;
+                let f = crate::obs::field_json(ag, slot);
+                if let Some(k) = i(a, "trigger") {
+                    let t = f["triggers"].get(k as usize).cloned().ok_or_else(|| format!("no trigger {k} here (observation field.triggers)"))?;
+                    let r: Vec<i32> = t["rect"].as_array().map(|v| v.iter().map(|x| x.as_i64().unwrap_or(0) as i32).collect()).unwrap_or_default();
+                    let act = t["activation"].as_str().unwrap_or("");
+                    let facing = m::DIRS.iter().position(|d| act.ends_with(&format!("facing {d}")));
+                    let mf = frames(a, "max_frames", 900, 3600);
+                    return self.act(a, m::use_trigger([r[0], r[1], r[2], r[3]], facing), mf, &[], json!({"trigger": t}));
+                }
+                let npcs = f["npcs"].as_array().cloned().unwrap_or_default();
+                let id = match i(a, "npc") {
+                    Some(n) => n as u32,
+                    None => npcs.iter().find(|n| n["talks"] == true).or(npcs.first()).and_then(|n| n["id"].as_u64()).ok_or("no NPCs here (observation field.npcs)")? as u32,
+                };
+                if m::npc_pos(ag, id).is_none() {
+                    return Err(format!("no NPC #{id} here (observation field.npcs)"));
+                }
+                let mf = frames(a, "max_frames", 900, 3600);
+                self.act(a, m::talk(id), mf, &[], json!({"npc": id}))
             }
             "face" => {
                 let slot = i(a, "slot").unwrap_or(0) as usize;
@@ -505,9 +571,10 @@ impl Server {
                 let d = self.data()?;
                 let id = self.new_id();
                 let t0 = Instant::now();
-                let mut ag = match &r.field {
-                    Some(f) => Agent::new_field(id.clone(), d, f.clone(), "replay".into(), json!({"replay": true})),
-                    None => Agent::new(id.clone(), d, r.config.clone(), "replay".into(), json!({"replay": true})),
+                let mut ag = match (&r.story, &r.field) {
+                    (Some(st), _) => Agent::new_story(id.clone(), d, story_files()?, st.clone())?,
+                    (None, Some(f)) => Agent::new_field(id.clone(), d, f.clone(), "replay".into(), json!({"replay": true})),
+                    (None, None) => Agent::new(id.clone(), d, r.config.clone(), "replay".into(), json!({"replay": true})),
                 };
                 ag.record = false;
                 for h in r.held() {
@@ -569,9 +636,18 @@ impl Server {
 
     fn act(&mut self, a: &Value, mut p: Box<dyn Policy>, max: u32, default_stop: &[&str], extra: Value) -> Result<Out, String> {
         let slot = i(a, "slot").unwrap_or(0) as usize;
-        let so = stop_on(a, default_stop)?;
+        let mut so = stop_on(a, default_stop)?;
+        let ev = self.event_stops && a.get("stop_on").is_none();
         let ag = self.sess(a)?;
         check_slot(ag, slot)?;
+        // a macro (not press / wait) stops when it takes an exit, and in story sessions when an event / dialogue /
+        // menu takes the field
+        if ev {
+            so.push("area".into());
+            if ag.story.is_some() {
+                so.push("event".into());
+            }
+        }
         let sum = run_policy(ag, slot, p.as_mut(), max, &so);
         let mut r = sum.to_json();
         if let Value::Object(x) = extra {
@@ -700,6 +776,49 @@ impl Server {
             "per_seed": runs, "wall_ms": ms.round(), "frames_simulated": total_frames, "threads": threads,
         })))
     }
+}
+
+/// the content's story scripts (and, once per process, the dialogue font's advances and the event bytecode the
+/// script host reads - as the app's `StorySim`)
+fn story_files() -> Result<Arc<BTreeMap<String, String>>, String> {
+    static F: std::sync::OnceLock<Result<Arc<BTreeMap<String, String>>, String>> = std::sync::OnceLock::new();
+    F.get_or_init(|| {
+        let packs = crate::content::packs()?;
+        if let Ok(f) = wf_render::ui::Font::load(packs, "dialog") {
+            wf_script_core::text::set_dialog_font((0..256u16).map(|c| f.advance(c)).collect());
+        }
+        if let Some(b) = packs.read("scripts/bytecode.json") {
+            wf_import::host::set_step_code(&b);
+        }
+        let files: BTreeMap<String, String> = packs
+            .list()
+            .into_iter()
+            .filter(|p| p.starts_with("scripts/") && p.ends_with(".rhai"))
+            .filter_map(|p| packs.read(&p).and_then(|b| String::from_utf8(b).ok()).map(|s| (p, s)))
+            .collect();
+        if files.is_empty() {
+            return Err("this content has no scripts/ (re-extract with the current extractor)".into());
+        }
+        Ok(Arc::new(files))
+    })
+    .clone()
+}
+
+/// the title screen -> START -> Single Player -> Select Game -> New Game (the first slot): taps (one frame down, one
+/// up) until the title's menu has closed and the prologue's field is up. Returns the steps taken.
+fn title_new_game(ag: &mut Agent) -> Result<u32, String> {
+    let f0 = ag.frame();
+    // the title's intro: START until the menu reacts, then A through the pages
+    let mut k = 0u32;
+    while wf_core::menu::active(ag.w()) {
+        if ag.frame() - f0 > 3000 {
+            return Err("the title did not reach New Game in 3000 steps".into());
+        }
+        let key = if k % 2 == 1 { 0 } else if k < 60 { wf_core::input::START } else { wf_core::input::A };
+        ag.step(0, key);
+        k += 1;
+    }
+    Ok(ag.frame() - f0)
 }
 
 fn target_ref(a: &Value) -> Option<String> {

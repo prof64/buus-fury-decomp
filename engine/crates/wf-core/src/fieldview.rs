@@ -8,8 +8,29 @@ use crate::tables::SIN256;
 use crate::world::{Body, World};
 use wf_view::{FrameSel, RenderView, SpriteDraw, SpriteEffect};
 
-fn put(out: &mut RenderView, entity: u32, sheet: String, index: i32, x: i32, y: i32, priority: u8, effect: SpriteEffect) {
-    out.sprites.push(SpriteDraw { entity, sheet, frame: FrameSel::Frame { index: index.max(0) as u16, flip: false }, x, y, priority, mirror: false, effect });
+fn put(
+    out: &mut RenderView,
+    entity: u32,
+    sheet: String,
+    index: i32,
+    x: i32,
+    y: i32,
+    priority: u8,
+    effect: SpriteEffect,
+) {
+    out.sprites.push(SpriteDraw {
+        entity,
+        sheet,
+        frame: FrameSel::Frame {
+            index: index.max(0) as u16,
+            flip: false,
+        },
+        x,
+        y,
+        priority,
+        mirror: false,
+        effect,
+    });
 }
 
 fn item_frame(item: i32) -> i32 {
@@ -32,21 +53,77 @@ pub fn pickup(w: &World, id: u32, p: &Pickup, out: &mut RenderView) {
             if cel > 3 {
                 cel = 0;
             }
-            put(out, id, format!("effects/coin_{}", s.clamp(0, 3)), cel, p.x >> 8, (p.y >> 8) - (p.z >> 8), 3, SpriteEffect::None);
-            let sh = if s & 1 == 1 { "shadow_10x4" } else { "shadow_4x2" };
-            put(out, id, format!("effects/{sh}"), 0, p.bx[0], p.bx[1], 3, SpriteEffect::SemiTransparent);
+            put(
+                out,
+                id,
+                format!("effects/coin_{}", s.clamp(0, 3)),
+                cel,
+                p.x >> 8,
+                (p.y >> 8) - (p.z >> 8),
+                3,
+                SpriteEffect::None,
+            );
+            let sh = if s & 1 == 1 {
+                "shadow_10x4"
+            } else {
+                "shadow_4x2"
+            };
+            put(
+                out,
+                id,
+                format!("effects/{sh}"),
+                0,
+                p.bx[0],
+                p.bx[1],
+                3,
+                SpriteEffect::SemiTransparent,
+            );
         }
         PickupKind::Supply(i) | PickupKind::Equipment(i) => {
-            let item = if matches!(p.kind, PickupKind::Supply(_)) { i } else { -i };
-            put(out, id, "effects/field_items".into(), item_frame(item), p.bx[0], p.bx[1] - (p.z >> 10), 3, SpriteEffect::None);
-            put(out, id, "effects/shadow_10x4".into(), 0, p.bx[0], p.bx[1] + 10, 3, SpriteEffect::SemiTransparent);
+            let item = if matches!(p.kind, PickupKind::Supply(_)) {
+                i
+            } else {
+                -i
+            };
+            put(
+                out,
+                id,
+                "effects/field_items".into(),
+                item_frame(item),
+                p.bx[0],
+                p.bx[1] - (p.z >> 10),
+                3,
+                SpriteEffect::None,
+            );
+            put(
+                out,
+                id,
+                "effects/shadow_10x4".into(),
+                0,
+                p.bx[0],
+                p.bx[1] + 10,
+                3,
+                SpriteEffect::SemiTransparent,
+            );
         }
-        PickupKind::MapItem { item, .. } => put(out, id, "effects/field_items".into(), item_frame(item), p.bx[0], p.bx[1] - (p.z >> 10), 3, SpriteEffect::None),
+        PickupKind::MapItem { item, .. } => put(
+            out,
+            id,
+            "effects/field_items".into(),
+            item_frame(item),
+            p.bx[0],
+            p.bx[1] - (p.z >> 10),
+            3,
+            SpriteEffect::None,
+        ),
     }
 }
 
 fn prop_visible(w: &World, k: i32) -> bool {
-    w.field.as_ref().and_then(|f| f.props.get(k as usize)).is_some_and(|p| p.visible)
+    w.field
+        .as_ref()
+        .and_then(|f| f.props.get(k as usize))
+        .is_some_and(|p| p.visible)
 }
 
 /// level signs (`0x0800C378`): the label at (x, y + (sine[fc & 0xFF] >> 14)) while its prop is visible
@@ -56,7 +133,16 @@ pub fn map_sprite(w: &World, id: u32, m: &MapSprite, out: &mut RenderView) {
         return;
     }
     let bob = SIN256[(w.frame & 0xFF) as usize] >> 14;
-    put(out, id, "effects/field_labels".into(), frame, m.x, m.y + bob, 3, SpriteEffect::None);
+    put(
+        out,
+        id,
+        "effects/field_labels".into(),
+        frame,
+        m.x,
+        m.y + bob,
+        3,
+        SpriteEffect::None,
+    );
 }
 
 /// map props (`0x0800CF7A`, visible ones, at the rect top-left; a shaking breakable adds its offset)
@@ -73,8 +159,12 @@ pub fn props(w: &World, out: &mut RenderView) {
 /// stand, the counter props (layer 0x38, depth 704) over the girl at 700; Airship 12-17's lift (0x3C) behind the
 /// player. Returned as (prop, our layer = 0x38 - layer, depth on the actors' y scale = bottom - 4)
 pub fn prop_keys(w: &World) -> Vec<(usize, i32, i32)> {
-    let Some(f) = w.field.as_ref() else { return vec![] };
-    let Some(md) = w.data.field.as_ref().and_then(|d| d.maps.get(&f.map)) else { return vec![] };
+    let Some(f) = w.field.as_ref() else {
+        return vec![];
+    };
+    let Some(md) = w.data.field.as_ref().and_then(|d| d.maps.get(&f.map)) else {
+        return vec![];
+    };
     f.props
         .iter()
         .enumerate()
@@ -88,7 +178,9 @@ pub fn prop_keys(w: &World) -> Vec<(usize, i32, i32)> {
 /// one prop (and its breakable's shake)
 pub fn prop(w: &World, k: usize, out: &mut RenderView) {
     let Some(f) = w.field.as_ref() else { return };
-    let Some(md) = w.data.field.as_ref().and_then(|d| d.maps.get(&f.map)) else { return };
+    let Some(md) = w.data.field.as_ref().and_then(|d| d.maps.get(&f.map)) else {
+        return;
+    };
     let Some(p) = f.props.get(k) else { return };
     let Some(def) = md.props.get(k) else { return };
     let Some(frame) = def.frame else { return };
@@ -101,7 +193,16 @@ pub fn prop(w: &World, k: usize, out: &mut RenderView) {
             }
         }
     }
-    put(out, 0, format!("effects/props_{}", f.map), frame, p.rect.x0 + dx, p.rect.y0 + dy, def.priority, SpriteEffect::None);
+    put(
+        out,
+        0,
+        format!("effects/props_{}", f.map),
+        frame,
+        p.rect.x0 + dx,
+        p.rect.y0 + dy,
+        def.priority,
+        SpriteEffect::None,
+    );
 }
 
 /// the debris chips and the item-get icon (priority 2, rising 1 px per 16 frames above the player)
@@ -111,10 +212,28 @@ pub fn front(w: &World, out: &mut RenderView) {
         if let (Some(pi), Some(item)) = (w.player_idx(g.slot as usize), g.item) {
             let a = &w.pl_ref(pi).a;
             let k = (60 - g.left).max(0);
-            put(out, 0, "effects/field_items".into(), item_frame(item), a.px(), a.py() - 40 - ((k + 2) >> 4), 2, SpriteEffect::None);
+            put(
+                out,
+                0,
+                "effects/field_items".into(),
+                item_frame(item),
+                a.px(),
+                a.py() - 40 - ((k + 2) >> 4),
+                2,
+                SpriteEffect::None,
+            );
         }
     }
     for d in f.debris.iter().filter(|d| d.t < 32) {
-        put(out, 0, "effects/debris".into(), 0, d.x >> 8, d.y >> 8, 3, SpriteEffect::None);
+        put(
+            out,
+            0,
+            "effects/debris".into(),
+            0,
+            d.x >> 8,
+            d.y >> 8,
+            3,
+            SpriteEffect::None,
+        );
     }
 }

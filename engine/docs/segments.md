@@ -4207,8 +4207,33 @@ itself now matches.
   runs on it like the tile animations, so `MapView.anim_frame` = `Field.iters` since the load for both
   (`tile_frame` unused now), and **a cut imports it from that counter** (was: the build's load frame - clouds off
   after cuts; rfat 6-1 +45 frames).
-Still to do (coordinator's list): the mid-frame writes above (needs the frame's CPU time; another agent is adding a
-tear rule to pixels.rs), enemy animation logic (the cel tally's 173 segments), the cursor blink.
+**Update 4 (pixel tool + gate lock owner: Super Buu agent): 15,222 / 25,355 (60.0%), 103 segments locked (1,114
+frames); the cel gate holds 454 segments (`cel_exact.json`, was 331); cel differences 173 -> 53 segments (58k ->
+9.5k frames).** Enemy animation, each from the game's state object (`work/superbuu/pix/estate.py SEG K..`: raw, cel,
+tick, the state object at +0x14 and its vtable; `celsum.py` / `celseg.py` group a `SEGMENT_CEL=all` log):
+* **An enemy under a script draws the puppet's animation** (its controller holds still meanwhile): Kid Buu / Super
+  Buu scenes - 38k of the 48k differing frames.
+* **FlameBreath's frames** (tick 0x08023F0E: 0 below tick 4, then (tick >> 2) & 3 shown as 2 for 0), **TurretFire's**
+  (0x0802B5EA: tick >> 3 below 16, 1 to 64, then 2), **NinjaStarThrow shows anim 0x13** (raw 20, was 19 - a frame
+  per 8 ticks; its star / sound / end stay the node's), **the back-off and BackStep set the reversed walk in their
+  step unless it is the state already** (0x08018CE2 / 0x080313EA; was: at enter, restarting the count-down on every
+  re-entry and showing the forward walk for BackStep). Mirrored in the TypeScript reference (ai.ts / enemy.ts; dumps
+  regenerated, cross_ts 0 failures).
+* **The Janemba hand** (field): HandAmbush shows anim 0x12 (raw 19, was the missing 0x11 -> raw 1) a cel per 8 ticks
+  up to 12; HandSink plays it backwards from tick 104 (one per update from its second), cel = tick >> 3.
+* Left (53 segments): the world map's airships' idle ticks after a cut (not imported: rkb_001 0-50), Babidi's ship
+  turrets / Buu bosses' attack anims (rj 18-14 Janemba-type 56, Majin Buu 13), HoverDrift's walk a frame late.
+**Map clocks after cuts:** the camera counter (drift) and the tile animations are separate clocks - a scene's load
+restarts the tiles while the camera counter runs on (rkb 19-3): `Field.drift_iter` (import: 0x030019A4 +0x40) apart
+from `entered_iter`; the tiles' phase from 0x03001A68 when the load is a few ticks old (the descriptors' durations
+are in the ROM, not in the RAM image - otherwise the camera's count); the punch mini-game's frames count for the map
+(sb 1-5 f4230). **The cursor blink** was done by the ship-fixes agent (c7e50aa).
+**Babidi's ship 8-17 label (open):** the game makes the area's level-sign labels at the load (0x08008BE8, area list
++0x20 / count +7: one here) and its message 0x1F handler deletes them; the RAM shows no label object in 8-17 at any
+frame of shipr_238 (from the load frame on), and only prop 0 as an object - prop 1 (the label's prop, visible in the
+v1 map's record) is not one either. No script hides prop 1 or sends 0x1F (`broadcast_1f` is unused). Not resolved:
+the label's prop lookup (0x08011C70 message 8 over the world list) may fail when the prop has no object, and the
+prop's absence itself is unexplained.
 
 **Done (Earth agent): the no-lag title -> Earth soak's crowd-wander stop (row 190,577) - a menu close that never
 gave the field its sprite memory back.** The crowd NPCs' wander draws were right; their *update order* was not: at
@@ -4529,6 +4554,40 @@ power-on (1,568,554 logic steps, `--lag none` inputs):
   app's `no_lag` was lost after a Continue, so its menus and loads modelled lag frames again; `title::boot` /
   `title_world` now carry the session's options (New Game already did).
 Gates green; wf-app / wf-core / wf-net suites (see the coordinator's commit).
+
+**§11 update 23 (B): end-to-end product checks (headless, muted).**
+* **The 8-3 savecheck point (whole-run cut 631,386)** stood inside an area load's long iteration (no leader yet): no
+  save is possible there, and the importer rightly refuses it. `savecheck.py` now saves at a *ready* point: from each
+  cut it runs (no keys) to the first iteration end with the leader in the field, writes that state as an importable
+  cut (`work/wholerun/savecheck_cuts/<cut>.ss/.json`: `segment.record` rows to two iteration ends + `snd_phase`),
+  and the game saves exactly there; `examples/savecheck.rs` imports it and saves without stepping. The "saved" bytes
+  are now read from the EEPROM slot (bytes 0x10.., each 8-byte block reversed), not from GameData in RAM (the call
+  hook finishes the iteration after the save: 11-15 drains HP). The app side stops at the first frame the title's menu
+  is gone with the leader in the field (an area's own event may start right then - 10-31's Pilaf, the game's too).
+  **41 / 41 whole-run cuts equal** (saved and continued: area, position, character, zenie, supplies, flags,
+  equipment, every record).
+* **The agent interface (wf-mcp) had no story at all** - battles and bare field areas only (no script host: no
+  dialogue, NPCs, events, title). Added: `new_game {seed, title?}` - the app's story mode (`StoryHost`, no_lag, the
+  title's New Game); story observations (`story`: menu screen + its text, the dialogue page, event_running, save
+  slots; `field.npcs`, trigger rects and "press A inside it facing up" activations); `take_exit` and `talk {npc |
+  trigger}` macros; macros stop on `event` / `area`. Snapshots / rewind / save / load / fork / replays carry the
+  script host (`env::Snap`). **Found broken for field sessions too: the session frame was `World.frame`**, which stands
+  still in loads / menus while the input log grows - rewind and keyframes indexed the input log wrong after any area
+  load; the frame is now the step count. Played as an agent through MCP (headless): title -> New Game -> prologue ->
+  Snakeway 1-1 -> 1-2 -> 1-5 -> Yemma's Office 1-3 (Yemma's desk, the doorway ogre) -> 1-4; 8,168-step replay
+  re-simulates bit-exact, rewind / load_state / fork hashes equal. `tests/agent.rs` story test; skill doc
+  (`agent/plugin/skills/buu-battle/SKILL.md`) has a Story section. `examples/appcheck.rs`: the agent session vs
+  `launcher::title_app` (the shells' title), world compared every step - one fix (the app's title loads the three
+  empty slot files: its hash covers them); equal through 3,000 steps.
+* **Bring-your-own-ROM**: `buus-fury roms/buu.gba --headless --mute --content <empty> --data <empty> --launcher
+  --launcher-keys Enter,Enter` (Story -> title) extracts (10-30 s), keeps `rom.gba`, boots the title and plays 700
+  steps of START / A taps through New Game into the prologue: **state hash equal to the agent server's session for the
+  same inputs** (`work/byor/run.py`). Fixed: `--data` after `--content` silently moved the content dir to
+  `<data>/content` (now only when `--content` is not given). **Not fixed - a product gap for the shells' owner: story
+  mode in the app has no replays / rewind / save states** - `wf_app::control::Control` enables them only for a
+  `CoreSim` (battles); a story app runs with `ctl.enabled = false` (`--record` says "this simulation does not
+  record"). `StorySim` itself supports them (update 22); Control's recorder / replay header / verify need a story start
+  (title + seed + slot files) to use them.
 **Done (ship fix agent, by the coordinator's decision): the pixel comparison is tear-tolerant; the fade bucket split.**
 `examples/pixels.rs` / `tests/pixels.rs` (Super Buu agent: I edited your tool and the gate - the tear rule only, the
 rest untouched): the tear rule as in core.md's known differences - a frame whose palette state changed since the
@@ -4552,3 +4611,55 @@ mean what they meant). **Board: 15,416 / 27,425 sampled frames exact (935 torn, 
 a trial lock with this rule (`PIX_LOCK`, not committed): 99 segments / 1,052 frames (53 torn), passing the gate.
 The wf-script-core doctest is already fine on this tree (`wf_script_core::Timers` re-exports `wf_core::scene::Timers`;
 the crate's tests and doctests pass).
+
+**Menus against the game's picture (ship fix agent, 2026-10-04).** The menu screens themselves are pixel-exact in
+`menu_parity` (every scenario, STRICT: pause pages, shops, save / Continue, Switch Character, title / mode / Select,
+credits, mini-games, map screen) - that test is their pixel gate. In the real segments (the pixel board's "menu" tag,
+154 frames) the differences were:
+* **The late present (hardware, tear rule):** a page redraw / the pause menu's build is a long iteration whose
+  picture the game shows only at its end - the frames inside it (and the step frame that starts it) still show the
+  picture from before the step; ours (no lag) shows the new one. `examples/pixels.rs` / `tests/pixels.rs`: a line may
+  also equal our render of the view before the running iteration's step (`"v"`), and black (`"k"`) when that view was
+  in a fade to black (the fade's last step written before the long build - rclose_067_071 f1,860). Reported as "torn
+  (hardware)"; core.md's rule covers it. The candidates are drawn by a second renderer (a picture of an earlier
+  state must not touch the main renderer's map-animation caches: with one renderer the board lost ~1,500 frames).
+* **Switch Character's dead members:** the halo is its own object and palette - a silhouette keeps it yellow
+  (`charsel::objs`; dr3_016 f300).
+* **The ending's "Your Dragon Ranking Is :" box:** `%s` with `string_ptr` printed `#1479` - string handles now resolve
+  through the string table (`text::resolve`, wf-script-core): "Trainee" as the game (rsbk_002 f23,790, sb_044
+  f24,030, exact now).
+Board: 16,343 / 27,425 sampled frames exact (1,106 torn); "menu" frames 154 -> 53. Left: Watch This (sb_006 / sb_007
+6-x): a prop (`props_area_06_009`) ours draws 55 px lower than the game's OAM (y 199 = -57) - prop placement, not the
+overlay; rj_049 18-14: two pixels of Super Janemba's cel (sprites, Super Buu agent); rclose_044 f690 Status TIME 4:56
+vs 4:57 (our play time one frame ahead after the second pause menu of the segment - not found yet); rkb_168 14-1 /
+sb_041: sprites. The 19-3 "banner" frames are the Spirit Bomb's white ball the game draws and ours does not (rkb_008
+f30) - Super Buu agent's. **Super Buu agent: the tear rule's "v" / "k" lines are in; please re-lock** (a trial lock:
+101 segments / 1,077 frames, 64 torn, passing tests/pixels.rs; the committed lock passes unchanged).
+
+**Pixels: the fade buckets (Earth agent, 2026-10-04, by the coordinator).** Board on my run of
+`examples/pixels.rs` over the dumped gates (25,355 sampled frames): exact 13,357 -> 15,114, torn 853 -> 1,025,
+`fade (palette changed)` 744 -> 643, `fade (palette steady)` 157 -> 45; no frame exact before is worse.
+* **A fade from black clears a leftover white** (scene.rs `tick_screen`): fade_in writes the palette from the stored
+  colours, so a white left by an earlier fade_out_white is gone (earth_2_2_2 f5,023; sb_006 / sb_007).
+* **The area banner after a `return_to_field` import** (wf-import `build_returned` sets `scene.banner_last` to the
+  area's name): no second banner (rkb_003..012).
+* **The script title text is drawn** (`show_title_text` 0xB2, "Chapter 12 / A New Beginning", "Match 2 Fight!" - the
+  largest non-sprite cause in `palette changed`): each call is its own object (`Scene.titles`, a list; 0xEF and the
+  area load delete them all); `0x0802BECC`: a w x 32 surface, w = (width + 33) rounded down to 32, the title font
+  (record 0x087548DC, new `ui/fonts/title`) outlined, colour 2 on 1, centred at (w / 2, 22), OBJs at (x - w / 2,
+  y - 16), priority 0; pixels carry their OBJ palette entry so the palette fade treats them as the game does.
+  wf-render's font loader now takes a glyph's `cols` from the JSON: glyphs wider than the 16-px atlas cell (the title
+  font's A M O Q W) ran into the next cell. sb_044 / rsbk_002 / rfat_033 / sb_041 / sb_004 / sb_012 title frames exact.
+* **The world-map take-off fade** (`warp_fade_slow`, step 4) scales the palette as it is per 5-bit channel (like the
+  script fade_out), not `0x08007074` from the stored colours: fitted on all 512 entries per frame
+  (`work/earth/timing/palfit.py`, FIT=c5): exact at 4 k every frame (rclose_002 4-1 f1,388-1,446); the doors' step-8
+  fade is the stored-colours routine at 8 k (db5_001 f295-300). view.rs gives the take-off fade `palette_scale`.
+Left in `palette steady` (45): rkb_168 14-1 / sb_041 21-25 (26) are the **BG energy sphere** (show_energy_sphere
+0xF4: `VisualKind::EnergySphere` is in the scene model but not drawn) - **Super Buu agent, renderer**; the rest single
+frames (rkb_011 flash, dbx_002, db5_009 / 012 f30). `palette changed`: HUD 254 frames spread thin (sb 84, db5 38 -
+the 12-x countdown text yellow in the game, light green in ours: **Super Buu agent, the timer's palette** - note
+`MenuRenderer::timer` tags its pixels 0xFF << 24, which the palette fade reads as OBJ entry 255; the title had the
+same bug), BG 241
+(rclose_002's world-map flight frames: mode 7, not fades), sprites 113.
+**Super Buu agent: please re-lock `data/segments/pixels.json`** (102 segments all-exact on my run; the committed lock
+passes unchanged).

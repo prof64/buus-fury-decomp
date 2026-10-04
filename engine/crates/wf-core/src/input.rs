@@ -24,7 +24,11 @@ pub struct InputFrame {
 
 impl InputFrame {
     pub fn from_held(held: u16, prev_held: u16) -> InputFrame {
-        InputFrame { held, pressed: held & !prev_held, released: prev_held & !held }
+        InputFrame {
+            held,
+            pressed: held & !prev_held,
+            released: prev_held & !held,
+        }
     }
 }
 

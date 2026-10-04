@@ -20,7 +20,8 @@ pub fn battle_data(name: &str) -> PathBuf {
 
 pub fn json(name: &str) -> serde_json::Value {
     let p = battle_data(name);
-    serde_json::from_slice(&std::fs::read(&p).unwrap_or_else(|e| panic!("{}: {e}", p.display()))).unwrap()
+    serde_json::from_slice(&std::fs::read(&p).unwrap_or_else(|e| panic!("{}: {e}", p.display())))
+        .unwrap()
 }
 
 fn content_dir() -> PathBuf {
@@ -32,13 +33,20 @@ fn field_content_dir() -> PathBuf {
     if let Ok(d) = std::env::var("WF_FIELD_CONTENT") {
         return PathBuf::from(d);
     }
-    extracted("wf-core-field-content-2", &["tables", "sprites", "effects", "maps", "world", "items", "scripts"])
+    extracted(
+        "wf-core-field-content-2",
+        &[
+            "tables", "sprites", "effects", "maps", "world", "items", "scripts",
+        ],
+    )
 }
 
 pub fn field_data() -> Arc<GameData> {
     static D: OnceLock<Arc<GameData>> = OnceLock::new();
     D.get_or_init(|| {
-        let src = DirSource { root: field_content_dir() };
+        let src = DirSource {
+            root: field_content_dir(),
+        };
         Arc::new(GameData::load(&src).expect("load content"))
     })
     .clone()
@@ -58,7 +66,9 @@ fn extracted(name: &str, only: &[&str]) -> PathBuf {
 pub fn data() -> Arc<GameData> {
     static D: OnceLock<Arc<GameData>> = OnceLock::new();
     D.get_or_init(|| {
-        let src = DirSource { root: content_dir() };
+        let src = DirSource {
+            root: content_dir(),
+        };
         let _ = src.list();
         Arc::new(GameData::load(&src).expect("load content"))
     })

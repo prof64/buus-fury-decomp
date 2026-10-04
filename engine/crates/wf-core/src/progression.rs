@@ -56,7 +56,19 @@ pub fn level_up(rec: &mut Record, g: &[i64; 8], old_l: i32, new_l: i32, rng: &mu
 }
 
 pub fn new_game_record(c: &Character) -> Record {
-    Record { level: c.level, xp: c.xp, hp: c.hp, max_hp: c.hp, ep: c.ep, max_ep: c.ep, str_: c.str_, pow: c.pow, end: c.end, spd: c.spd, points: 0 }
+    Record {
+        level: c.level,
+        xp: c.xp,
+        hp: c.hp,
+        max_hp: c.hp,
+        ep: c.ep,
+        max_ep: c.ep,
+        str_: c.str_,
+        pow: c.pow,
+        end: c.end,
+        spd: c.spd,
+        points: 0,
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -67,7 +79,13 @@ pub enum GrowthMode {
     Max,
 }
 
-pub fn record_at_level(c: &Character, level: i32, xp_table: &[i64], mode: GrowthMode, seed: u32) -> Record {
+pub fn record_at_level(
+    c: &Character,
+    level: i32,
+    xp_table: &[i64],
+    mode: GrowthMode,
+    seed: u32,
+) -> Record {
     let mut rec = new_game_record(c);
     let mut rng = Rng::from_seed(seed);
     let target = c.level.max(level.min(200));
@@ -140,7 +158,11 @@ pub const HOLY_WATER: [i32; 4] = [25, 25, 25, 25];
 
 /// RecalcStats with the running timed buff (`boost_stats` 0xF2 / Holy Water: GD+0x4DC frames left, GD+0x4E0..0x4EC
 /// the STR / POW / END / SPD bonuses, applied by 0x080046AE)
-pub fn recalc_stats_with(rec: &Record, equip: &[Option<&Equip>], boost: Option<[i32; 4]>) -> EffStats {
+pub fn recalc_stats_with(
+    rec: &Record,
+    equip: &[Option<&Equip>],
+    boost: Option<[i32; 4]>,
+) -> EffStats {
     let mut s = EffStats {
         str_: rec.str_,
         pow: rec.pow,
@@ -181,7 +203,11 @@ pub fn recalc_stats_with(rec: &Record, equip: &[Option<&Equip>], boost: Option<[
         }
         s.thorns += e.thorns;
         s.hp_regen256 += e.hp_regen256;
-        s.melee_ep = if e.melee_ep == 2 { 2 } else { s.melee_ep + if e.melee_ep == 1 { 1 } else { 0 } };
+        s.melee_ep = if e.melee_ep == 2 {
+            2
+        } else {
+            s.melee_ep + if e.melee_ep == 1 { 1 } else { 0 }
+        };
         if e.melee_hp_instead {
             s.melee_hp_instead = true;
         }

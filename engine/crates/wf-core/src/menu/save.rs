@@ -15,7 +15,9 @@
 //! plain data in the world (deterministic, snapshotted); the frontend persists a slot whenever
 //! `Saves.generation` changes ([`Saves::slot_bytes`] / [`Saves::set_slot_bytes`]).
 
-use super::kit::{self, Button, Container, Cursor, Font, Label, Widget, BTN_A, BTN_B, BTN_DOWN, BTN_UP};
+use super::kit::{
+    self, Button, Container, Cursor, Font, Label, Widget, BTN_A, BTN_B, BTN_DOWN, BTN_UP,
+};
 use super::text::{Arg, Canvas, Pen, TextData};
 use super::{Action, MenuData, Page, Transition};
 use crate::world::World;
@@ -66,7 +68,9 @@ impl Saves {
     }
     /// a slot as bytes for the frontend's store (postcard; empty = no game)
     pub fn slot_bytes(&self, i: usize) -> Vec<u8> {
-        self.slot(i).map(|d| postcard::to_allocvec(d).unwrap_or_default()).unwrap_or_default()
+        self.slot(i)
+            .map(|d| postcard::to_allocvec(d).unwrap_or_default())
+            .unwrap_or_default()
     }
     /// load a slot from the frontend's store (at session start); bad / empty bytes = no game
     pub fn set_slot_bytes(&mut self, i: usize, b: &[u8]) {
@@ -74,7 +78,11 @@ impl Saves {
             self.slots.resize(SLOTS, None);
         }
         if i < self.slots.len() {
-            self.slots[i] = if b.is_empty() { None } else { postcard::from_bytes(b).ok() };
+            self.slots[i] = if b.is_empty() {
+                None
+            } else {
+                postcard::from_bytes(b).ok()
+            };
         }
     }
 }
@@ -90,8 +98,20 @@ pub fn save_data(w: &World, flag: bool) -> SaveData {
             y = p.a.y >> 8;
         }
     }
-    let (world, area, variant) = w.field.as_ref().map(|f| (f.area.world, f.area.area, f.area.variant)).unwrap_or((0, 0, 0));
-    SaveData { story, world, area, variant, x, y, flag }
+    let (world, area, variant) = w
+        .field
+        .as_ref()
+        .map(|f| (f.area.world, f.area.area, f.area.variant))
+        .unwrap_or((0, 0, 0));
+    SaveData {
+        story,
+        world,
+        area,
+        variant,
+        x,
+        y,
+        flag,
+    }
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -159,22 +179,36 @@ pub fn chapter(code: &[u8], s: &crate::story::Story) -> i32 {
             0x04 | 0x05 => {
                 let b = st.pop().unwrap_or(0);
                 let a = st.pop().unwrap_or(0);
-                st.push(if op == 4 { (a != 0 && b != 0) as i32 } else { (a != 0 || b != 0) as i32 });
+                st.push(if op == 4 {
+                    (a != 0 && b != 0) as i32
+                } else {
+                    (a != 0 || b != 0) as i32
+                });
             }
             0x0B | 0x0C => {
                 let b = st.pop().unwrap_or(0);
                 let a = st.pop().unwrap_or(0);
-                st.push(if op == 0x0B { (a == b) as i32 } else { (a != b) as i32 });
+                st.push(if op == 0x0B {
+                    (a == b) as i32
+                } else {
+                    (a != b) as i32
+                });
             }
             0x11 => break,
             0x12 => {
                 let o = pc;
-                let d = u16::from_be_bytes([code.get(pc).copied().unwrap_or(0), code.get(pc + 1).copied().unwrap_or(0)]) as usize;
+                let d = u16::from_be_bytes([
+                    code.get(pc).copied().unwrap_or(0),
+                    code.get(pc + 1).copied().unwrap_or(0),
+                ]) as usize;
                 pc = o + d;
             }
             0x13 => {
                 let o = pc;
-                let d = u16::from_be_bytes([code.get(pc).copied().unwrap_or(0), code.get(pc + 1).copied().unwrap_or(0)]) as usize;
+                let d = u16::from_be_bytes([
+                    code.get(pc).copied().unwrap_or(0),
+                    code.get(pc + 1).copied().unwrap_or(0),
+                ]) as usize;
                 let v = st.pop().unwrap_or(0);
                 pc = if v == 0 { o + d } else { o + 2 };
             }
@@ -188,13 +222,24 @@ pub fn chapter(code: &[u8], s: &crate::story::Story) -> i32 {
 }
 
 pub fn summary(w: &World, d: &SaveData) -> Summary {
-    let code = w.data.menu.as_ref().map(|m| m.items.chapter_code.clone()).unwrap_or_default();
+    let code = w
+        .data
+        .menu
+        .as_ref()
+        .map(|m| m.items.chapter_code.clone())
+        .unwrap_or_default();
     let area_name = w
         .data
         .field
         .as_ref()
         .and_then(|f| f.areas.get(&(d.world, d.area)))
-        .map(|a| if (0..0x10000).contains(&a.name_id) { a.name_id as i32 } else { 0 })
+        .map(|a| {
+            if (0..0x10000).contains(&a.name_id) {
+                a.name_id as i32
+            } else {
+                0
+            }
+        })
         .unwrap_or(0);
     let s = &d.story;
     let mut party = Vec::new();
@@ -209,7 +254,15 @@ pub fn summary(w: &World, d: &SaveData) -> Summary {
             ids.push(k as i32);
         }
     }
-    Summary { exists: true, chapter: chapter(&code, s), area_name, minutes: (s.play_frames / 3600) as i32, party, ids, chosen: s.current }
+    Summary {
+        exists: true,
+        chapter: chapter(&code, s),
+        area_name,
+        minutes: (s.play_frames / 3600) as i32,
+        party,
+        ids,
+        chosen: s.current,
+    }
 }
 
 /// the game list's state (+0x100..): `sel` (+0x10C), first shown row (+0x128), title / empty strings, arrows flag
@@ -260,23 +313,44 @@ pub const FIG_FROZEN_DIR: u8 = 1;
 /// a form's sprite (the player's rule, `Player::apply_form`)
 pub fn form_sprite(w: &World, form: i32) -> Option<i32> {
     let f = w.data.form(form)?;
-    (0..=3).map(|k| f.gfx - 9 - k).find(|&s| w.data.sprite(s).is_some())
+    (0..=3)
+        .map(|k| f.gfx - 9 - k)
+        .find(|&s| w.data.sprite(s).is_some())
 }
 
 impl GameList {
     /// `0x080054BA`: the figures of the two shown rows (x = 16 k + 18, y = 0x34 row + 0x44)
     pub fn build_figs(&mut self, w: &World) {
-        let key = (self.first, self.summaries.iter().map(|s| s.chosen).collect::<Vec<_>>(), self.summaries.iter().map(|s| s.exists).collect::<Vec<_>>());
+        let key = (
+            self.first,
+            self.summaries.iter().map(|s| s.chosen).collect::<Vec<_>>(),
+            self.summaries.iter().map(|s| s.exists).collect::<Vec<_>>(),
+        );
         if self.figs_key.as_ref() == Some(&key) {
             return;
         }
         self.figs_key = Some(key);
         self.figs.clear();
         for row in 0..2 {
-            let Some(s) = self.summaries.get((self.first + row) as usize).filter(|s| s.exists) else { continue };
+            let Some(s) = self
+                .summaries
+                .get((self.first + row) as usize)
+                .filter(|s| s.exists)
+            else {
+                continue;
+            };
             for (k, &(form, sel)) in s.party.iter().enumerate() {
-                let Some(sprite) = form_sprite(w, form) else { continue };
-                self.figs.push(Fig { sprite, x: 16 * k as i32 + 0x12, y: 0x34 * row + 0x44, frozen: !sel, t: FIG_T0, live: false });
+                let Some(sprite) = form_sprite(w, form) else {
+                    continue;
+                };
+                self.figs.push(Fig {
+                    sprite,
+                    x: 16 * k as i32 + 0x12,
+                    y: 0x34 * row + 0x44,
+                    frozen: !sel,
+                    t: FIG_T0,
+                    live: false,
+                });
             }
         }
     }
@@ -292,30 +366,80 @@ impl GameList {
     /// the figures' OBJs (halo, body, shadow each) and the corner markers around the selected slot's chosen one
     pub fn fig_objs(&self, w: &World) -> Vec<wf_view::MenuObj> {
         let mut out = Vec::new();
-        let Some(d) = w.data.menu.as_ref() else { return out };
+        let Some(d) = w.data.menu.as_ref() else {
+            return out;
+        };
         for f in self.figs.iter().filter(|f| f.live) {
-            let Some(sp) = w.data.sprite(f.sprite) else { continue };
+            let Some(sp) = w.data.sprite(f.sprite) else {
+                continue;
+            };
             // the chosen one walks toward the viewer; the others stand turned away (frozen)
-            let (raw, dir) = if f.frozen { (FIG_FROZEN_ANIM, FIG_FROZEN_DIR) } else { (FIG_ANIM, FIG_DIR) };
+            let (raw, dir) = if f.frozen {
+                (FIG_FROZEN_ANIM, FIG_FROZEN_DIR)
+            } else {
+                (FIG_ANIM, FIG_DIR)
+            };
             let Some(an) = sp.anim_raw(raw) else { continue };
             let t = if f.frozen { 0 } else { f.t.max(0) };
-            let Some(k) = an.step_index_at(dir, t, an.looped) else { continue };
+            let Some(k) = an.step_index_at(dir, t, an.looped) else {
+                continue;
+            };
             let st = &an.steps(dir)[k];
-            let remap = if f.frozen { d.items.silhouette.clone() } else { Vec::new() };
+            let remap = if f.frozen {
+                d.items.silhouette.clone()
+            } else {
+                Vec::new()
+            };
             if let Some((hx, hy)) = st.attach {
-                out.push(wf_view::MenuObj { sheet: "effects/halo".into(), x: f.x + hx, y: f.y + hy, priority: 3, remap: remap.clone(), ..Default::default() });
+                out.push(wf_view::MenuObj {
+                    sheet: "effects/halo".into(),
+                    x: f.x + hx,
+                    y: f.y + hy,
+                    priority: 3,
+                    remap: remap.clone(),
+                    ..Default::default()
+                });
             }
-            out.push(wf_view::MenuObj { sheet: format!("sprites/{}", sp.id), frame: st.frame, hflip: st.flip, x: f.x, y: f.y, priority: 3, remap: remap.clone(), ..Default::default() });
+            out.push(wf_view::MenuObj {
+                sheet: format!("sprites/{}", sp.id),
+                frame: st.frame,
+                hflip: st.flip,
+                x: f.x,
+                y: f.y,
+                priority: 3,
+                remap: remap.clone(),
+                ..Default::default()
+            });
             if let Some(sh) = sp.shadow.as_ref().filter(|sh| sh.as_str() != "shadow_0x0") {
-                out.push(wf_view::MenuObj { sheet: format!("effects/{sh}"), x: f.x, y: f.y, priority: 3, ..Default::default() });
+                out.push(wf_view::MenuObj {
+                    sheet: format!("effects/{sh}"),
+                    x: f.x,
+                    y: f.y,
+                    priority: 3,
+                    ..Default::default()
+                });
             }
         }
         // `0x08005E9A`: around the chosen character of the selected slot
-        if let Some(s) = self.summaries.get(self.sel.max(0) as usize).filter(|s| s.exists && self.figs.iter().any(|f| f.live)) {
+        if let Some(s) = self
+            .summaries
+            .get(self.sel.max(0) as usize)
+            .filter(|s| s.exists && self.figs.iter().any(|f| f.live))
+        {
             if let Some(k) = s.ids.iter().position(|&c| c == s.chosen) {
                 let (bx, by) = (16 * k as i32 + 0x12, 0x34 * (self.sel - self.first) + 0x2C);
                 for (j, o) in d.items.corners.iter().enumerate() {
-                    out.push(wf_view::MenuObj { path: "ui/menu/slot_corner.png".into(), frame: j as u16, fw: 8, fh: 8, x: bx - o[0], y: by - o[1], priority: 3, pal: 256, ..Default::default() });
+                    out.push(wf_view::MenuObj {
+                        path: "ui/menu/slot_corner.png".into(),
+                        frame: j as u16,
+                        fw: 8,
+                        fh: 8,
+                        x: bx - o[0],
+                        y: by - o[1],
+                        priority: 3,
+                        pal: 256,
+                        ..Default::default()
+                    });
                 }
             }
         }
@@ -325,16 +449,51 @@ impl GameList {
     pub fn new(w: &World, title: usize, empty: usize, arrows: bool) -> GameList {
         let t = &w.data.menu.as_ref().expect("menu content").text;
         let mut c = Container::default();
-        c.add(Widget::Button(Button::new(BTN_A, 0xC, 0x84, 0, true, false)));
-        c.add(Widget::Label(Label { x: 0x1C, y: 0x90, text: t.s(23).to_vec(), colour: 5, align: 0, font: Font::Menu }));
+        c.add(Widget::Button(Button::new(
+            BTN_A, 0xC, 0x84, 0, true, false,
+        )));
+        c.add(Widget::Label(Label {
+            x: 0x1C,
+            y: 0x90,
+            text: t.s(23).to_vec(),
+            colour: 5,
+            align: 0,
+            font: Font::Menu,
+        }));
         let bx = t.font(MenuFont::Menu).measure(t.s(23)) + 0x1E;
         c.add(Widget::Button(Button::new(BTN_B, bx, 0x84, 1, true, false)));
-        c.add(Widget::Label(Label { x: bx + 0x10, y: 0x90, text: t.s(26).to_vec(), colour: 5, align: 0, font: Font::Menu }));
-        let up = c.add(Widget::Button(Button::new(BTN_UP, 0xD4, 0x1E, 2, true, false)));
-        let down = c.add(Widget::Button(Button::new(BTN_DOWN, 0xD4, 0x74, 3, true, false)));
+        c.add(Widget::Label(Label {
+            x: bx + 0x10,
+            y: 0x90,
+            text: t.s(26).to_vec(),
+            colour: 5,
+            align: 0,
+            font: Font::Menu,
+        }));
+        let up = c.add(Widget::Button(Button::new(
+            BTN_UP, 0xD4, 0x1E, 2, true, false,
+        )));
+        let down = c.add(Widget::Button(Button::new(
+            BTN_DOWN, 0xD4, 0x74, 3, true, false,
+        )));
         c.add(Widget::Cursor(Cursor { t: 0 }));
-        let summaries = (0..SLOTS).map(|i| w.saves.slot(i).map(|d| summary(w, d)).unwrap_or_default()).collect();
-        GameList { c, title, empty, arrows, sel: 0, first: 0, sel_colour: 6, summaries, up, down, figs: Vec::new(), figs_key: None }
+        let summaries = (0..SLOTS)
+            .map(|i| w.saves.slot(i).map(|d| summary(w, d)).unwrap_or_default())
+            .collect();
+        GameList {
+            c,
+            title,
+            empty,
+            arrows,
+            sel: 0,
+            first: 0,
+            sel_colour: 6,
+            summaries,
+            up,
+            down,
+            figs: Vec::new(),
+            figs_key: None,
+        }
     }
 
     /// base events `0x08005714`: UP / DOWN prompts move (0..2), redraw
@@ -377,7 +536,12 @@ impl GameList {
     pub fn draw(&self, t: &TextData, cv: &mut Canvas) {
         kit::page_frame(t, cv, self.title);
         self.c.draw(t, cv);
-        let mut p = Pen { shadow: Some(1), colour: 5, font: MenuFont::Bold, ..Pen::default() };
+        let mut p = Pen {
+            shadow: Some(1),
+            colour: 5,
+            font: MenuFont::Bold,
+            ..Pen::default()
+        };
         self.row(t, cv, &mut p, self.first, 0x20);
         self.row(t, cv, &mut p, self.first + 1, 0x54);
         crate::menu::shop::hsep(cv, 0x14, 0x50, 0xD0);
@@ -395,7 +559,11 @@ impl GameList {
         p.font = MenuFont::Menu;
         p.x = 0x64;
         p.y = y + 0xE;
-        match self.summaries.get(slot.max(0) as usize).filter(|s| s.exists) {
+        match self
+            .summaries
+            .get(slot.max(0) as usize)
+            .filter(|s| s.exists)
+        {
             Some(s) => {
                 crate::menu::shop::text_trunc(cv, t, p, 0x6C, t.s(s.chapter.max(0) as usize));
                 p.x = 0x64;
@@ -404,7 +572,12 @@ impl GameList {
                 p.x = 0x64;
                 p.y = y + 0x28;
                 let fmt: Vec<u16> = "%d:%02d".encode_utf16().collect();
-                cv.textf(t, p, &fmt, &[Arg::I(s.minutes / 60), Arg::I(s.minutes % 60)]);
+                cv.textf(
+                    t,
+                    p,
+                    &fmt,
+                    &[Arg::I(s.minutes / 60), Arg::I(s.minutes % 60)],
+                );
             }
             None => cv.text(t, p, t.s(self.empty)),
         }
@@ -448,7 +621,12 @@ impl Save {
     pub fn new(w: &World, flag: bool) -> Save {
         let mut list = GameList::new(w, 7, 13, false);
         list.sel = w.saves.current.clamp(0, SLOTS as i32 - 1);
-        Save { list, flag, stage: Stage::List, black: false }
+        Save {
+            list,
+            flag,
+            stage: Stage::List,
+            black: false,
+        }
     }
 }
 
@@ -482,27 +660,36 @@ impl Page for Save {
         if self.stage == Stage::Done {
             // (no lag frames: the close after the write is the restore's iteration itself - no exit stub
             // iteration of its own; menu_parity save_cancel lf 9,359 restores, 9,360 fades in)
-            return if w.opts.no_lag { Action::PopDone(2) } else { Action::Pop(2) };
+            return if w.opts.no_lag {
+                Action::PopDone(2)
+            } else {
+                Action::Pop(2)
+            };
         }
-        let (consumed, act) = kit::run_step(self, w, |p| &mut p.list.c, |p, w, _src, code| match code {
-            0 => {
-                p.save(w);
-                (true, None)
-            }
-            1 => {
-                p.black = true;
-                if let Some(s) = w.menu.shown.as_mut() {
-                    if let super::Screen::Save(x) = &mut **s {
-                        x.black = true;
-                    }
+        let (consumed, act) = kit::run_step(
+            self,
+            w,
+            |p| &mut p.list.c,
+            |p, w, _src, code| match code {
+                0 => {
+                    p.save(w);
+                    (true, None)
                 }
-                (true, Some(Action::Pop(1)))
-            }
-            c => {
-                p.list.event(c);
-                (false, None)
-            }
-        });
+                1 => {
+                    p.black = true;
+                    if let Some(s) = w.menu.shown.as_mut() {
+                        if let super::Screen::Save(x) = &mut **s {
+                            x.black = true;
+                        }
+                    }
+                    (true, Some(Action::Pop(1)))
+                }
+                c => {
+                    p.list.event(c);
+                    (false, None)
+                }
+            },
+        );
         if let Some(a) = act {
             return a;
         }
@@ -514,7 +701,11 @@ impl Page for Save {
     fn view(&self, w: &World, d: &MenuData) -> MenuView {
         let _ = w;
         if self.black || self.stage == Stage::Done {
-            return MenuView { backdrop: 0, palette: vec![(0, 0)], ..Default::default() };
+            return MenuView {
+                backdrop: 0,
+                palette: vec![(0, 0)],
+                ..Default::default()
+            };
         }
         let t = &d.text;
         let mut cv = Canvas::new();
@@ -538,8 +729,15 @@ impl Page for Save {
         }
         let v = self.view(w, d);
         // (the list's surface is drawn again under the popup)
-        let own = 261_163 + v.layers.iter().map(|l| crate::sndsim::layer_cycles(&d.text, &l.ops, 0)).sum::<i64>();
-        Some(crate::sndsim::Redraw { t0: 4_641, base: own - 4_641 })
+        let own = 261_163
+            + v.layers
+                .iter()
+                .map(|l| crate::sndsim::layer_cycles(&d.text, &l.ops, 0))
+                .sum::<i64>();
+        Some(crate::sndsim::Redraw {
+            t0: 4_641,
+            base: own - 4_641,
+        })
     }
     fn redraw_cost(&self) -> u8 {
         match self.stage {
@@ -571,11 +769,23 @@ pub fn popup(t: &TextData, s: usize) -> MenuLayer {
     cv.panel(8, 0, w - 8, h - 8);
     let mut p = Pen::new(MenuFont::Menu, 0x30, 0x14, 1, 2, Some(1));
     cv.text(t, &mut p, t.s(s));
-    MenuLayer { w: w as u16, h: h as u16, x: 72, y: 64, priority: 0, ops: cv.ops }
+    MenuLayer {
+        w: w as u16,
+        h: h as u16,
+        x: 72,
+        y: 64,
+        priority: 0,
+        ops: cv.ops,
+    }
 }
 
 /// the script-opened transition (quick fade; the list shows on the 3rd black frame)
-pub const SCRIPTED: Transition = Transition { fade_out: 16 | super::FADE_HOLD, enter: 3, leave: 25, fade_in: 16 };
+pub const SCRIPTED: Transition = Transition {
+    fade_out: 16 | super::FADE_HOLD,
+    enter: 3,
+    leave: 25,
+    fade_in: 16,
+};
 
 /// native 0x8C `save_menu(flag)`: `World.menu.result` = 2 saved / 1 cancelled (the native pushes result − 1); no
 /// player object = nothing happens and nothing is pushed (the caller checks `w.player_idx(0)`)
@@ -585,9 +795,16 @@ pub fn open_save(w: &mut World, flag: bool) {
 }
 
 /// a harness opening this screen from JSON: `{"kind": "save", "flag": 0}`
-pub fn open_json(w: &World, v: &serde_json::Value) -> Option<(super::Screen, super::Transition, bool)> {
+pub fn open_json(
+    w: &World,
+    v: &serde_json::Value,
+) -> Option<(super::Screen, super::Transition, bool)> {
     if v["kind"].as_str()? != "save" {
         return None;
     }
-    Some((super::Screen::Save(Save::new(w, v["flag"].as_i64().unwrap_or(0) != 0)), SCRIPTED, true))
+    Some((
+        super::Screen::Save(Save::new(w, v["flag"].as_i64().unwrap_or(0) != 0)),
+        SCRIPTED,
+        true,
+    ))
 }

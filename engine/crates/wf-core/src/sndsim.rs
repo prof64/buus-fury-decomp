@@ -89,7 +89,14 @@ fn dump(what: &str, n: u32, d: &Driver) {
         .chain(st.voices.iter())
         .map(|v| format!("{},{},{},{}", v.pos, v.step, v.gain, v.flags))
         .collect();
-    eprintln!("snd {what} n {n} row {} order {} ticks {} cd {} | {}", st.player.row, st.player.order, st.player.ticks_left, st.player.countdown, v.join(" "));
+    eprintln!(
+        "snd {what} n {n} row {} order {} ticks {} cd {} | {}",
+        st.player.row,
+        st.player.order,
+        st.player.ticks_left,
+        st.player.countdown,
+        v.join(" ")
+    );
 }
 
 /// play position at frame time `t` (interrupts at phase, phase + DMA, ...)
@@ -121,7 +128,10 @@ fn apply_events(w: &mut World, d: &mut Driver) {
             Event::Song { id } => {
                 let st = d.state();
                 if debug() {
-                    eprintln!("snd song {id} f{}: playing {} song {:?}", w.frame, st.player.playing, st.player.song);
+                    eprintln!(
+                        "snd song {id} f{}: playing {} song {:?}",
+                        w.frame, st.player.playing, st.player.song
+                    );
                 }
                 if !(st.player.playing && st.player.song == Some(*id as usize)) {
                     d.play_song(*id as usize);
@@ -180,7 +190,11 @@ pub fn end_frame(w: &mut World) {
         } else if load_song {
         } else {
             // a page with its own measured idle step (the DMA interrupts before it delay it by 187 each)
-            let page = if menu { crate::menu::idle_cycles(w) } else { None };
+            let page = if menu {
+                crate::menu::idle_cycles(w)
+            } else {
+                None
+            };
             let at = match page {
                 Some(t) => t + if (w.sound.phase as i64) < t { 187 } else { 0 },
                 None if menu => UPDATE_AT_MENU,
@@ -189,7 +203,10 @@ pub fn end_frame(w: &mut World) {
             let p = pos_at(&w.sound, at);
             let n = p.wrapping_sub(w.sound.last) & 1023;
             if debug() {
-                eprintln!("snd frame f{} pos {} last {}", w.frame, w.sound.pos, w.sound.last);
+                eprintln!(
+                    "snd frame f{} pos {} last {}",
+                    w.frame, w.sound.pos, w.sound.last
+                );
                 dump("upd", n, d);
             }
             if n >= 64 {
@@ -234,7 +251,10 @@ pub fn lag_frame_ex(w: &mut World, last: bool) {
                 let p = pos_at(&w.sound, UPDATE_AT_FIELD);
                 let n = p.wrapping_sub(w.sound.last) & 1023;
                 if debug() {
-                    eprintln!("snd load-end pos {} last {} phase {}", w.sound.pos, w.sound.last, w.sound.phase);
+                    eprintln!(
+                        "snd load-end pos {} last {} phase {}",
+                        w.sound.pos, w.sound.last, w.sound.phase
+                    );
                     dump("upd", n, d);
                 }
                 if n >= 64 {
@@ -282,7 +302,15 @@ fn redraw_frames_irq(w: &mut World, r: Redraw, irq_scale: i64) -> Option<u8> {
         let s = &mut w.sound;
         let phase = s.phase as i64;
         // the DMA interrupts before the redraw delay it (~187 cycles each)
-        let r = Redraw { t0: r.t0 + if phase < r.t0 { 187 * ((r.t0 - phase) / DMA + 1) } else { 0 }, ..r };
+        let r = Redraw {
+            t0: r.t0
+                + if phase < r.t0 {
+                    187 * ((r.t0 - phase) / DMA + 1)
+                } else {
+                    0
+                },
+            ..r
+        };
         // every interrupt after which the play position is IRQ_MIX ahead mixes (one in a redraw, several in a
         // reload); each mix lengthens the iteration by its cycles and the interrupts' entry / exit around it
         let mut t1 = r.t0 + r.base;
@@ -361,8 +389,18 @@ pub fn reload_frames_with(w: &mut World, done: bool, more: i64) -> Option<u8> {
     let (c, extra) = reload_parts(w)?;
     // a close by a prompt (B) restores in the iteration after the event's: less before it (its start varies by
     // ~14 k cycles, not modelled)
-    let rest = if done { RELOAD_REST } else { RELOAD_REST - 13_700 };
-    redraw_frames(w, Redraw { t0: 0, base: (rest + more + extra + c * 10_035 / 10_000) * 100_523 / 100_000 })
+    let rest = if done {
+        RELOAD_REST
+    } else {
+        RELOAD_REST - 13_700
+    };
+    redraw_frames(
+        w,
+        Redraw {
+            t0: 0,
+            base: (rest + more + extra + c * 10_035 / 10_000) * 100_523 / 100_000,
+        },
+    )
 }
 
 /// An area load's main-loop iteration (the frame after the load's logic frame on): the same map rebuild as a
@@ -370,12 +408,29 @@ pub fn reload_frames_with(w: &mut World, done: bool, more: i64) -> Option<u8> {
 /// on-load scripts, the HUD). Returns its video frames (None: unknown map / no sound content / uncalibrated)
 pub fn load_frames(w: &mut World) -> Option<u8> {
     let (c, extra) = reload_parts(w)?;
-    let grids = w.field.as_ref().and_then(|f| w.data.field.as_ref()?.maps.get(&f.map)?.reload.as_ref().map(|r| r.grids)).unwrap_or(0);
+    let grids = w
+        .field
+        .as_ref()
+        .and_then(|f| {
+            w.data
+                .field
+                .as_ref()?
+                .maps
+                .get(&f.map)?
+                .reload
+                .as_ref()
+                .map(|r| r.grids)
+        })
+        .unwrap_or(0);
     let c = c + grids;
     let map = w.field.as_ref().map(|f| f.map.clone()).unwrap_or_default();
     // a load that shows the area-name banner (`scene::banner_load`: the name differs from the last one shown) draws
     // its picture and glyphs in the same iteration (real run 13-32 -> 13-3 vs 13-2 -> 13-3); fitted over all loads
-    let banner = if w.scene.banner.as_ref().is_some_and(|b| b.1 == 0) { load_table().1 } else { 0 };
+    let banner = if w.scene.banner.as_ref().is_some_and(|b| b.1 == 0) {
+        load_table().1
+    } else {
+        0
+    };
     let base = (extra + c * 10_035 / 10_000) * 100_523 / 100_000 + load_rest(&map) + banner;
     if debug() {
         eprintln!("snd load: c {c} extra {extra} banner {banner} base {base}");
@@ -411,13 +466,25 @@ pub fn dialog_frames(w: &mut World, portrait: u8, first_chars: i64) -> Option<u8
     let dec = if portrait == 0 || portrait == 7 {
         0
     } else {
-        w.data.menu.as_ref().and_then(|m| m.portrait_cycles.get(portrait as usize - 8).copied()).unwrap_or(0) as i64
+        w.data
+            .menu
+            .as_ref()
+            .and_then(|m| m.portrait_cycles.get(portrait as usize - 8).copied())
+            .unwrap_or(0) as i64
     };
     let (default, fade_pass, maps) = dialog_table();
-    let rest = w.field.as_ref().and_then(|f| maps.get(&f.map).copied()).unwrap_or(*default);
+    let rest = w
+        .field
+        .as_ref()
+        .and_then(|f| maps.get(&f.map).copied())
+        .unwrap_or(*default);
     // (a fade that ended earlier in this frame also runs its last pass in the iteration - not tracked: sim lag is
     // deprecated, segments.md §9)
-    let fade = if w.scene.screen.fade.is_some() { *fade_pass } else { 0 };
+    let fade = if w.scene.screen.fade.is_some() {
+        *fade_pass
+    } else {
+        0
+    };
     let base = rest + 128 * first_chars + dec + fade;
     if debug() {
         eprintln!(
@@ -430,11 +497,24 @@ pub fn dialog_frames(w: &mut World, portrait: u8, first_chars: i64) -> Option<u8
 
 /// dialog_rest.json: (default, the fade pass, per-map constants)
 fn dialog_table() -> &'static (i64, i64, std::collections::HashMap<String, i64>) {
-    static T: std::sync::OnceLock<(i64, i64, std::collections::HashMap<String, i64>)> = std::sync::OnceLock::new();
+    static T: std::sync::OnceLock<(i64, i64, std::collections::HashMap<String, i64>)> =
+        std::sync::OnceLock::new();
     T.get_or_init(|| {
-        let v: serde_json::Value = serde_json::from_str(include_str!("dialog_rest.json")).unwrap_or_default();
-        let maps = v["maps"].as_object().map(|o| o.iter().map(|(k, x)| (k.clone(), x.as_i64().unwrap_or(0))).collect()).unwrap_or_default();
-        (v["default"].as_i64().unwrap_or(1_928_650), v["fade"].as_i64().unwrap_or(0), maps)
+        let v: serde_json::Value =
+            serde_json::from_str(include_str!("dialog_rest.json")).unwrap_or_default();
+        let maps = v["maps"]
+            .as_object()
+            .map(|o| {
+                o.iter()
+                    .map(|(k, x)| (k.clone(), x.as_i64().unwrap_or(0)))
+                    .collect()
+            })
+            .unwrap_or_default();
+        (
+            v["default"].as_i64().unwrap_or(1_928_650),
+            v["fade"].as_i64().unwrap_or(0),
+            maps,
+        )
     })
 }
 
@@ -461,7 +541,10 @@ pub fn reload_parts(w: &World) -> Option<(i64, i64)> {
         for row in (sy >> 8)..=((sy + 255) >> 8) {
             for col in (sx >> 8)..=((sx + 255) >> 8) {
                 if (0..l.cols as i64).contains(&col) && (0..l.rows as i64).contains(&row) {
-                    let v = l.iw.get((row * l.cols as i64 + col) as usize).copied().unwrap_or(0);
+                    let v =
+                        l.iw.get((row * l.cols as i64 + col) as usize)
+                            .copied()
+                            .unwrap_or(0);
                     if v != 0 {
                         c += v;
                         extra += 5_000;
@@ -497,7 +580,12 @@ pub fn reload_parts(w: &World) -> Option<(i64, i64)> {
     for e in w.ents.iter().filter(|e| !e.removed) {
         if let crate::world::Body::Pickup(p) = &e.body {
             let (x, y) = (p.x >> 8, (p.y >> 8) - (p.z >> 10));
-            if !matches!(p.kind, crate::fieldobj::PickupKind::Zenie(_)) && x < cam.x1 && cam.x0 < x + 16 && y < cam.y1 && cam.y0 < y + 16 {
+            if !matches!(p.kind, crate::fieldobj::PickupKind::Zenie(_))
+                && x < cam.x1
+                && cam.x0 < x + 16
+                && y < cam.y1
+                && cam.y0 < y + 16
+            {
                 frames += 13_900;
             }
         }
@@ -523,11 +611,24 @@ fn load_rest(map: &str) -> i64 {
 }
 /// load_rest.json: (default, banner term, per-map constants without the banner)
 fn load_table() -> &'static (i64, i64, std::collections::HashMap<String, i64>) {
-    static T: std::sync::OnceLock<(i64, i64, std::collections::HashMap<String, i64>)> = std::sync::OnceLock::new();
+    static T: std::sync::OnceLock<(i64, i64, std::collections::HashMap<String, i64>)> =
+        std::sync::OnceLock::new();
     T.get_or_init(|| {
-        let v: serde_json::Value = serde_json::from_str(include_str!("load_rest.json")).unwrap_or_default();
-        let maps = v["maps"].as_object().map(|o| o.iter().map(|(k, x)| (k.clone(), x.as_i64().unwrap_or(0))).collect()).unwrap_or_default();
-        (v["default"].as_i64().unwrap_or(260_000), v["banner"].as_i64().unwrap_or(0), maps)
+        let v: serde_json::Value =
+            serde_json::from_str(include_str!("load_rest.json")).unwrap_or_default();
+        let maps = v["maps"]
+            .as_object()
+            .map(|o| {
+                o.iter()
+                    .map(|(k, x)| (k.clone(), x.as_i64().unwrap_or(0)))
+                    .collect()
+            })
+            .unwrap_or_default();
+        (
+            v["default"].as_i64().unwrap_or(260_000),
+            v["banner"].as_i64().unwrap_or(0),
+            maps,
+        )
     })
 }
 
@@ -547,7 +648,11 @@ pub fn long_iteration(w: &mut World, frames: u8) {
         let ahead = s.pos.wrapping_sub(s.last) & 1023;
         if ahead <= IRQ_MIX {
             let k = ((IRQ_MIX - ahead + 15) / 16) as i64;
-            let t = if k == 0 { 0 } else { s.phase as i64 + (k - 1) * DMA };
+            let t = if k == 0 {
+                0
+            } else {
+                s.phase as i64 + (k - 1) * DMA
+            };
             if t < end {
                 wf_audio::cost::update(d, IRQ_MIX);
                 s.last = s.last.wrapping_add(IRQ_MIX);
@@ -614,7 +719,9 @@ pub fn ops_cost(t: &crate::menu::text::TextData, ops: &[MenuOp]) -> (i64, i64, i
     let mut extra = 0;
     for op in ops {
         match op {
-            MenuOp::Text { font, shadow, text, .. } => {
+            MenuOp::Text {
+                font, shadow, text, ..
+            } => {
                 let fm = t.font(*font);
                 if shadow.is_none() {
                     extra += 990;
@@ -638,7 +745,9 @@ pub fn ops_cost(t: &crate::menu::text::TextData, ops: &[MenuOp]) -> (i64, i64, i
                 }
             }
             MenuOp::Image { fw: 16, fh: 16, .. } => small += 1,
-            MenuOp::Fill { x0, y0, x1, y1, .. } => extra += (y1 - y0).max(0) as i64 * (54 + (x1 - x0).max(0) as i64 * 425 / 100),
+            MenuOp::Fill { x0, y0, x1, y1, .. } => {
+                extra += (y1 - y0).max(0) as i64 * (54 + (x1 - x0).max(0) as i64 * 425 / 100)
+            }
             MenuOp::Pixel { .. } => extra += 45,
             _ => {}
         }
@@ -650,7 +759,13 @@ pub fn ops_cost(t: &crate::menu::text::TextData, ops: &[MenuOp]) -> (i64, i64, i
 pub fn text_counts(t: &crate::menu::text::TextData, ops: &[MenuOp]) -> (i64, i64, i64, i64) {
     let (mut g, mut c, mut b, mut l) = (0, 0, 0, 0);
     for op in ops {
-        if let MenuOp::Text { font, shadow: Some(_), text, .. } = op {
+        if let MenuOp::Text {
+            font,
+            shadow: Some(_),
+            text,
+            ..
+        } = op
+        {
             let fm = t.font(*font);
             l += 1;
             let mut k = 0;
@@ -662,7 +777,11 @@ pub fn text_counts(t: &crate::menu::text::TextData, ops: &[MenuOp]) -> (i64, i64
                 }
                 k += 1;
                 if ch < 0xFF && fm.has.get(ch as usize).copied().unwrap_or(false) {
-                    let cols = fm.cols.get(ch as usize).map(|v| v.as_slice()).unwrap_or(&[]);
+                    let cols = fm
+                        .cols
+                        .get(ch as usize)
+                        .map(|v| v.as_slice())
+                        .unwrap_or(&[]);
                     g += 1;
                     c += cols.len() as i64;
                     b += cols.iter().map(|x| x.count_ones() as i64).sum::<i64>();
@@ -701,14 +820,27 @@ pub fn ops_summary(ops: &[MenuOp]) -> String {
     let mut px = 0;
     for op in ops {
         match op {
-            MenuOp::Text { shadow: Some(_), .. } => {}
+            MenuOp::Text {
+                shadow: Some(_), ..
+            } => {}
             MenuOp::Pixel { .. } => px += 1,
-            MenuOp::Text { font, text, .. } => out.push(format!("text[{}]{}", font.id(), String::from_utf16_lossy(text))),
-            MenuOp::TextOutline { font, text, .. } => out.push(format!("outline[{}]{}", font.id(), String::from_utf16_lossy(text))),
+            MenuOp::Text { font, text, .. } => out.push(format!(
+                "text[{}]{}",
+                font.id(),
+                String::from_utf16_lossy(text)
+            )),
+            MenuOp::TextOutline { font, text, .. } => out.push(format!(
+                "outline[{}]{}",
+                font.id(),
+                String::from_utf16_lossy(text)
+            )),
             MenuOp::Fill { x0, y0, x1, y1, .. } => out.push(format!("fill{}x{}", x1 - x0, y1 - y0)),
             MenuOp::Panel { x0, y0, x1, y1 } => out.push(format!("panel{}x{}", x1 - x0, y1 - y0)),
             MenuOp::Background { w, rows, .. } => out.push(format!("bg{w}x{rows}")),
-            MenuOp::Image { path, fw, fh, .. } => out.push(format!("img{fw}x{fh}:{}", path.rsplit('/').next().unwrap_or(""))),
+            MenuOp::Image { path, fw, fh, .. } => out.push(format!(
+                "img{fw}x{fh}:{}",
+                path.rsplit('/').next().unwrap_or("")
+            )),
             _ => out.push("other".into()),
         }
     }
@@ -718,8 +850,18 @@ pub fn ops_summary(ops: &[MenuOp]) -> String {
 /// The driver from the game's RAM: `ram` = player header + tracks + voices (`0x030038A4`, 0x18 + 15 x 0x60 +
 /// 16 x 0x40), the sound object's counters (`0x03003898` +4 / +8) and the cycles to the next DMA interrupt.
 pub fn import(w: &mut World, ram: &[u8], pos: u32, last: u32, phase: Option<u32>) {
-    let Some(bank) = w.data.sound.clone() else { return };
+    let Some(bank) = w.data.sound.clone() else {
+        return;
+    };
     let mut d = Driver::new(&bank);
     d.seed_ram(ram);
-    w.sound = SoundSim { drv: Some(d.state()), pos, last, phase: phase.unwrap_or(0), uncalibrated: phase.is_none(), loads: w.field.as_ref().map(|f| f.loads).unwrap_or(0), ..Default::default() };
+    w.sound = SoundSim {
+        drv: Some(d.state()),
+        pos,
+        last,
+        phase: phase.unwrap_or(0),
+        uncalibrated: phase.is_none(),
+        loads: w.field.as_ref().map(|f| f.loads).unwrap_or(0),
+        ..Default::default()
+    };
 }

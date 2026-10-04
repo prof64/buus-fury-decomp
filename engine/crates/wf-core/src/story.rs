@@ -62,10 +62,17 @@ impl CharState {
     }
     /// the chosen level of the k-th known skill (record +0x2E + 2k)
     pub fn skill_cur(&self, k: usize) -> i32 {
-        self.skill_cur.get(k).copied().unwrap_or_else(|| self.skill_levels.get(k).copied().unwrap_or(0))
+        self.skill_cur
+            .get(k)
+            .copied()
+            .unwrap_or_else(|| self.skill_levels.get(k).copied().unwrap_or(0))
     }
     pub fn skill_level(&self, skill: i32) -> i32 {
-        self.skills.iter().position(|&s| s == skill).and_then(|k| self.skill_levels.get(k).copied()).unwrap_or(0)
+        self.skills
+            .iter()
+            .position(|&s| s == skill)
+            .and_then(|k| self.skill_levels.get(k).copied())
+            .unwrap_or(0)
     }
 }
 
@@ -140,10 +147,20 @@ impl Story {
     /// a new game: every character's new-game record (characters.json `new_game`), Goku in the party and current
     pub fn new_game(d: &GameData) -> Story {
         let mut s = Story::default();
-        let n_sup = d.field.as_ref().map(|f| f.supplies.iter().map(|x| x.index + 1).max().unwrap_or(0)).unwrap_or(0) as usize;
+        let n_sup = d
+            .field
+            .as_ref()
+            .map(|f| f.supplies.iter().map(|x| x.index + 1).max().unwrap_or(0))
+            .unwrap_or(0) as usize;
         s.supplies = vec![0; n_sup.max(SUPPLIES)];
         // mods may add story characters after the game's nine (characters/*.json `index` 9+)
-        let n = d.chars.iter().map(|c| c.index + 1).max().unwrap_or(0).max(CHARS as i32) as usize;
+        let n = d
+            .chars
+            .iter()
+            .map(|c| c.index + 1)
+            .max()
+            .unwrap_or(0)
+            .max(CHARS as i32) as usize;
         s.chars.resize(n.min(64), CharState::default());
         for c in &d.chars {
             if c.index < 0 || c.index as usize >= s.chars.len() {
@@ -171,7 +188,9 @@ impl Story {
         if f < 0 {
             return false;
         }
-        self.flags.get((f >> 3) as usize).is_some_and(|b| b & (1 << (f & 7)) != 0)
+        self.flags
+            .get((f >> 3) as usize)
+            .is_some_and(|b| b & (1 << (f & 7)) != 0)
     }
     pub fn set_flag(&mut self, f: i32, on: bool) {
         if f < 0 {
@@ -227,7 +246,9 @@ impl Story {
         }
     }
     pub fn party(&self) -> Vec<i32> {
-        (0..self.chars.len() as i32).filter(|&c| self.chars[c as usize].in_party()).collect()
+        (0..self.chars.len() as i32)
+            .filter(|&c| self.chars[c as usize].in_party())
+            .collect()
     }
 }
 
@@ -240,8 +261,12 @@ pub fn char_of_form(d: &GameData, form: i32) -> Option<i32> {
 pub fn sync_from_players(w: &mut World) {
     for &id in &w.players {
         let Some(i) = w.find(id) else { continue };
-        let Body::Player(p) = &w.ents[i].body else { continue };
-        let Some(c) = char_of_form(&w.data, p.form) else { continue };
+        let Body::Player(p) = &w.ents[i].body else {
+            continue;
+        };
+        let Some(c) = char_of_form(&w.data, p.form) else {
+            continue;
+        };
         if c < 0 || c as usize >= w.story.chars.len() {
             continue;
         }
@@ -278,7 +303,11 @@ fn varint(code: &[u8], pc: &mut usize) -> Option<i32> {
     }
     let v = v as i32;
     // zig-zag with arithmetic shifts (odd -> -(v >> 1))
-    Some(if v & 1 != 0 { (v >> 1).wrapping_neg() } else { v >> 1 })
+    Some(if v & 1 != 0 {
+        (v >> 1).wrapping_neg()
+    } else {
+        v >> 1
+    })
 }
 
 /// evaluate a condition script's bytecode on the story state (`current` = the leader's character): Some(stack[0] != 0)
@@ -303,7 +332,14 @@ pub fn run_flag_script(code: &[u8], s: &mut Story, current: i32) -> Option<()> {
 }
 
 fn eval_inner(code: &[u8], s: &Story, current: i32, writes: &mut Vec<(i32, bool)>) -> Option<i32> {
-    let flag = |writes: &Vec<(i32, bool)>, f: i32| writes.iter().rev().find(|w| w.0 == f).map(|w| w.1).unwrap_or_else(|| s.flag(f));
+    let flag = |writes: &Vec<(i32, bool)>, f: i32| {
+        writes
+            .iter()
+            .rev()
+            .find(|w| w.0 == f)
+            .map(|w| w.1)
+            .unwrap_or_else(|| s.flag(f))
+    };
     let mut st: Vec<i32> = Vec::with_capacity(16);
     let mut pc = 0usize;
     let mut steps = 0;

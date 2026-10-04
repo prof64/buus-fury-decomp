@@ -52,7 +52,15 @@ pub struct EAnimRule {
 
 impl EAnimRule {
     pub fn simple(kind: RuleKind, shift: i32, end: Option<End>, swing: bool) -> EAnimRule {
-        EAnimRule { kind, shift, end, swing, fixed: None, seq: vec![], sfx: vec![] }
+        EAnimRule {
+            kind,
+            shift,
+            end,
+            swing,
+            fixed: None,
+            seq: vec![],
+            sfx: vec![],
+        }
     }
     pub fn from_json(v: &Value) -> EAnimRule {
         let kind = match v["rule"].as_str().unwrap_or("") {
@@ -71,12 +79,42 @@ impl EAnimRule {
             "hold" => End::Hold,
             _ => End::None,
         });
-        let seq = v["seq"].as_array().map(|a| a.iter().map(|s| (s[0].as_i64().unwrap_or(0) as i32, s[1].as_i64().unwrap_or(0) as i32, s[2].as_i64().unwrap_or(0) as i32)).collect()).unwrap_or_default();
+        let seq = v["seq"]
+            .as_array()
+            .map(|a| {
+                a.iter()
+                    .map(|s| {
+                        (
+                            s[0].as_i64().unwrap_or(0) as i32,
+                            s[1].as_i64().unwrap_or(0) as i32,
+                            s[2].as_i64().unwrap_or(0) as i32,
+                        )
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
         let sfx = v["sfx"]
             .as_array()
-            .map(|a| a.iter().map(|c| Cue { at: c["at"].as_i64().unwrap_or(0) as i32, id: c["id"].as_i64().unwrap_or(0) as i32, vol: c["vol"].as_i64().unwrap_or(64) as i32, rand: c["rand"].as_u64().unwrap_or(0) as u32 }).collect())
+            .map(|a| {
+                a.iter()
+                    .map(|c| Cue {
+                        at: c["at"].as_i64().unwrap_or(0) as i32,
+                        id: c["id"].as_i64().unwrap_or(0) as i32,
+                        vol: c["vol"].as_i64().unwrap_or(64) as i32,
+                        rand: c["rand"].as_u64().unwrap_or(0) as u32,
+                    })
+                    .collect()
+            })
             .unwrap_or_default();
-        EAnimRule { kind, shift: v["shift"].as_i64().unwrap_or(3) as i32, end, swing: v["swing"].as_bool().unwrap_or(false), fixed: v["fixed"].as_bool(), seq, sfx }
+        EAnimRule {
+            kind,
+            shift: v["shift"].as_i64().unwrap_or(3) as i32,
+            end,
+            swing: v["swing"].as_bool().unwrap_or(false),
+            fixed: v["fixed"].as_bool(),
+            seq,
+            sfx,
+        }
     }
 }
 
@@ -175,10 +213,22 @@ impl AnimRules {
             let i = push(r, &mut rules);
             generic.insert(k.to_string(), i);
         }
-        let keep = push(EAnimRule::simple(RuleKind::Keep, 3, None, false), &mut rules);
-        let reverse = push(EAnimRule::simple(RuleKind::Reverse, 3, None, false), &mut rules);
-        let fallback_loop = push(EAnimRule::simple(RuleKind::Loop, 3, Some(End::None), false), &mut rules);
-        let fallback_once = push(EAnimRule::simple(RuleKind::OnceStop, 3, Some(End::None), false), &mut rules);
+        let keep = push(
+            EAnimRule::simple(RuleKind::Keep, 3, None, false),
+            &mut rules,
+        );
+        let reverse = push(
+            EAnimRule::simple(RuleKind::Reverse, 3, None, false),
+            &mut rules,
+        );
+        let fallback_loop = push(
+            EAnimRule::simple(RuleKind::Loop, 3, Some(End::None), false),
+            &mut rules,
+        );
+        let fallback_once = push(
+            EAnimRule::simple(RuleKind::OnceStop, 3, Some(End::None), false),
+            &mut rules,
+        );
         let idle = setanim[&1];
         let mut types = BTreeMap::new();
         if let Ok(v) = serde_json::from_str::<Value>(sim_json) {
@@ -194,12 +244,42 @@ impl AnimRules {
                 }
             }
         }
-        let hold = push(EAnimRule::simple(RuleKind::Hold, 3, None, false), &mut rules);
-        let loop3 = push(EAnimRule::simple(RuleKind::Loop, 3, None, false), &mut rules);
-        let once_stop3 = push(EAnimRule::simple(RuleKind::OnceStop, 3, Some(End::None), false), &mut rules);
-        let once_hold3 = push(EAnimRule::simple(RuleKind::Once, 3, Some(End::Hold), false), &mut rules);
-        let once_stop2 = push(EAnimRule::simple(RuleKind::OnceStop, 2, Some(End::None), false), &mut rules);
-        AnimRules { rules, setanim, generic, types, keep, reverse, fallback_loop, fallback_once, idle, hold, loop3, once_stop3, once_hold3, once_stop2 }
+        let hold = push(
+            EAnimRule::simple(RuleKind::Hold, 3, None, false),
+            &mut rules,
+        );
+        let loop3 = push(
+            EAnimRule::simple(RuleKind::Loop, 3, None, false),
+            &mut rules,
+        );
+        let once_stop3 = push(
+            EAnimRule::simple(RuleKind::OnceStop, 3, Some(End::None), false),
+            &mut rules,
+        );
+        let once_hold3 = push(
+            EAnimRule::simple(RuleKind::Once, 3, Some(End::Hold), false),
+            &mut rules,
+        );
+        let once_stop2 = push(
+            EAnimRule::simple(RuleKind::OnceStop, 2, Some(End::None), false),
+            &mut rules,
+        );
+        AnimRules {
+            rules,
+            setanim,
+            generic,
+            types,
+            keep,
+            reverse,
+            fallback_loop,
+            fallback_once,
+            idle,
+            hold,
+            loop3,
+            once_stop3,
+            once_hold3,
+            once_stop2,
+        }
     }
     /// the rule of a SetState(controller) for a type (tests): shared object, else the type's recorded rule
     pub fn for_controller(&self, ctl: &str, ty: i32) -> Option<u32> {

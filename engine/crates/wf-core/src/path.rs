@@ -121,7 +121,15 @@ pub fn plan(w: &mut World, i: usize, p: &mut PathRt) -> bool {
 
 /// 0x0803B4FC: probes from (x, y) blocked in direction (dx, dy)
 #[allow(clippy::too_many_arguments)]
-pub fn wall_follow(w: &mut World, i: usize, p: &mut PathRt, x: i32, y: i32, dx: i32, dy: i32) -> bool {
+pub fn wall_follow(
+    w: &mut World,
+    i: usize,
+    p: &mut PathRt,
+    x: i32,
+    y: i32,
+    dx: i32,
+    dy: i32,
+) -> bool {
     let probe = |w: &mut World, side: (i32, i32)| -> (i32, i32, bool) {
         let (mut ax, mut ay) = (x, y);
         let mut s = side;

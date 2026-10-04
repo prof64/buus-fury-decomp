@@ -2,9 +2,9 @@
 //! the object order and some draw from the RNG), so the sim keeps them as entities with the game's lifetimes; the
 //! renderer draws them from this state (record ids / addresses, positions, ticks).
 
-use serde::{Deserialize, Serialize};
 use crate::geom::{Dir, Rect, DIR_VEC};
 use crate::world::{broadcast, HitMsg};
+use serde::{Deserialize, Serialize};
 
 const FLAME_TABLE: u32 = 0x0875_68b4;
 use crate::input;
@@ -28,14 +28,31 @@ pub enum Alive {
 }
 
 pub fn alive(w: &World, a: Alive) -> bool {
-    let pl = |p: EntityId| w.find(p).filter(|&i| matches!(w.ents[i].body, Body::Player(_))).map(|i| w.pl_ref(i));
+    let pl = |p: EntityId| {
+        w.find(p)
+            .filter(|&i| matches!(w.ents[i].body, Body::Player(_)))
+            .map(|i| w.pl_ref(i))
+    };
     match a {
-        Alive::Skill { p, serial } => pl(p).is_some_and(|p| p.sk.as_ref().is_some_and(|s| s.serial == serial)),
-        Alive::SkillTickLt { p, serial, n } => pl(p).is_some_and(|p| p.sk.as_ref().is_some_and(|s| s.serial == serial) && p.ap.tick < n),
-        Alive::SkillUncharged { p, serial } => pl(p).is_some_and(|p| p.sk.as_ref().is_some_and(|s| s.serial == serial && !s.charged)),
-        Alive::Transform { p } => pl(p).is_some_and(|p| p.state == crate::player::PState::Transform),
-        Alive::Beam { id } => w.find(id).is_some_and(|i| !w.ents[i].removed && !crate::shots::beam_done(w, i)),
-        Alive::It { p, serial } => pl(p).is_some_and(|p| p.it_sel.as_ref().is_some_and(|s| s.serial == serial) || p.it.as_ref().is_some_and(|s| s.serial == serial)),
+        Alive::Skill { p, serial } => {
+            pl(p).is_some_and(|p| p.sk.as_ref().is_some_and(|s| s.serial == serial))
+        }
+        Alive::SkillTickLt { p, serial, n } => pl(p)
+            .is_some_and(|p| p.sk.as_ref().is_some_and(|s| s.serial == serial) && p.ap.tick < n),
+        Alive::SkillUncharged { p, serial } => pl(p).is_some_and(|p| {
+            p.sk.as_ref()
+                .is_some_and(|s| s.serial == serial && !s.charged)
+        }),
+        Alive::Transform { p } => {
+            pl(p).is_some_and(|p| p.state == crate::player::PState::Transform)
+        }
+        Alive::Beam { id } => w
+            .find(id)
+            .is_some_and(|i| !w.ents[i].removed && !crate::shots::beam_done(w, i)),
+        Alive::It { p, serial } => pl(p).is_some_and(|p| {
+            p.it_sel.as_ref().is_some_and(|s| s.serial == serial)
+                || p.it.as_ref().is_some_and(|s| s.serial == serial)
+        }),
     }
 }
 
@@ -58,31 +75,108 @@ pub enum BeamSet {
 pub enum Fx {
     /// generic animated effect 0x0802A81C: records start..start+n-1 of run `id`, acc += rate, advance acc >> 16
     /// `id` = ROM address of the effect run (content id `fx_%08x`)
-    Anim { id: u32, x: i32, y: i32, rec: i32, left: i32, rate: i32, acc: i32 },
+    Anim {
+        id: u32,
+        x: i32,
+        y: i32,
+        rec: i32,
+        left: i32,
+        rate: i32,
+        acc: i32,
+    },
     /// looping variant (Super Saiyan aura) until `alive` fails
-    Loop { id: u32, x: i32, y: i32, first: i32, n: i32, rec: i32, rate: i32, acc: i32, alive: Alive },
+    Loop {
+        id: u32,
+        x: i32,
+        y: i32,
+        first: i32,
+        n: i32,
+        rec: i32,
+        rate: i32,
+        acc: i32,
+        alive: Alive,
+    },
     /// debris piece 0x0800C454: 32 ticks
-    Debris { x: i32, y: i32, vx: i32, vy: i32, t: i32 },
+    Debris {
+        x: i32,
+        y: i32,
+        vx: i32,
+        vy: i32,
+        t: i32,
+    },
     /// record object 0x080507A0 (`what` names the record rule for the renderer)
-    RecObj { what: RecWhat, owner: EntityId, t: i32, alive: Alive },
+    RecObj {
+        what: RecWhat,
+        owner: EntityId,
+        t: i32,
+        alive: Alive,
+    },
     /// beam charge sparkle at owner + off[facing]
-    BeamCharge { owner: EntityId, off: [(i32, i32); 4], set: BeamSet, t: i32 },
+    BeamCharge {
+        owner: EntityId,
+        off: [(i32, i32); 4],
+        set: BeamSet,
+        t: i32,
+    },
     /// Dragon Fist Explosion chain (6 segments, 1/256 px)
     /// Dragon Fist Explosion chain: segment 0 = root .. 5 = head (1/256 px), their boxes of the last update, the
     /// head's steering offset, ticks since the launch (-1 flying)
-    DragonFist { owner: EntityId, seg: [[i32; 2]; 6], boxes: [Rect; 6], steer: (i32, i32), dir: Dir, dying: i32, t: i32 },
-    EnergySword { owner: EntityId, slash: i32, t: i32, alive: Alive },
-    BbkFlare { x: i32, y: i32, dir: Dir, t: i32, ended: bool, alive: Alive },
+    DragonFist {
+        owner: EntityId,
+        seg: [[i32; 2]; 6],
+        boxes: [Rect; 6],
+        steer: (i32, i32),
+        dir: Dir,
+        dying: i32,
+        t: i32,
+    },
+    EnergySword {
+        owner: EntityId,
+        slash: i32,
+        t: i32,
+        alive: Alive,
+    },
+    BbkFlare {
+        x: i32,
+        y: i32,
+        dir: Dir,
+        t: i32,
+        ended: bool,
+        alive: Alive,
+    },
     /// Flame Kamehameha links [x, y, t, shift*2]
     /// Flame Kamehameha links [x, y, t, shift*2, box x0, y0, x1, y1 of the previous tick]; hits with attack `a` x `mult`
-    FlameKame { owner: EntityId, dir: Dir, n: i32, links: Vec<[i32; 8]>, alive: Alive, a: crate::damage::AttackType, mult: i32 },
-    ItMarkers { t: i32, alive: Alive },
+    FlameKame {
+        owner: EntityId,
+        dir: Dir,
+        n: i32,
+        links: Vec<[i32; 8]>,
+        alive: Alive,
+        a: crate::damage::AttackType,
+        mult: i32,
+    },
+    ItMarkers {
+        t: i32,
+        alive: Alive,
+    },
     /// Big Bang explosion phase (state 2 of 0x08037650): 60 ticks, an explosion every 8th (RNG)
-    BigBangBoom { n: i32, x0: i32, y0: i32, s: i32 },
+    BigBangBoom {
+        n: i32,
+        x0: i32,
+        y0: i32,
+        s: i32,
+    },
     /// thrown rock 0x08033F28 (vtable 0x0804CE50, Goten's rock drill): 22 updates of two gravity substeps (24.8),
     /// then a 24x24 energy hit (0x086B8090, mult 0) on the player - accepted queues event s120 (header 0x08783084) -
     /// and a puff
-    Rock { owner: EntityId, x: i32, y: i32, vx: i32, vy: i32, n: i32 },
+    Rock {
+        owner: EntityId,
+        x: i32,
+        y: i32,
+        vx: i32,
+        vy: i32,
+        n: i32,
+    },
 }
 
 impl Fx {
@@ -120,7 +214,18 @@ pub fn add(w: &mut World, f: Fx) -> EntityId {
     id
 }
 pub fn fx_anim(w: &mut World, id: u32, x: i32, y: i32, start: i32, n: i32, rate: i32) -> EntityId {
-    add(w, Fx::Anim { id, x, y, rec: start, left: n, rate, acc: 0 })
+    add(
+        w,
+        Fx::Anim {
+            id,
+            x,
+            y,
+            rec: start,
+            left: n,
+            rate,
+            acc: 0,
+        },
+    )
 }
 /// smoke puff 0x086FD9D0 (4 records)
 pub fn puff(w: &mut World, x: i32, y: i32, rate: i32) {
@@ -130,7 +235,17 @@ pub fn puff(w: &mut World, x: i32, y: i32, rate: i32) {
 pub fn rock_throw(w: &mut World, owner: EntityId, sx: i32, sy: i32, tx: i32, ty: i32) -> EntityId {
     let vx = ((tx - sx) * 0x5d3) >> 8;
     let vy = (((ty - sy) * 0x5d3 - 0xba60) >> 8) - 0x200;
-    add(w, Fx::Rock { owner, x: sx << 8, y: sy << 8, vx, vy, n: 0x16 })
+    add(
+        w,
+        Fx::Rock {
+            owner,
+            x: sx << 8,
+            y: sy << 8,
+            vx,
+            vy,
+            n: 0x16,
+        },
+    )
 }
 /// puff with the game's random rate 0x1000 + rand(0x1000)
 pub fn puff_rng(w: &mut World, x: i32, y: i32) {
@@ -142,7 +257,15 @@ pub fn explosion(w: &mut World, x: i32, y: i32, rate: i32) -> EntityId {
     fx_anim(w, 0x0871_2fdc, x, y, 0, 4, rate)
 }
 pub fn beam_charge(w: &mut World, owner: EntityId, off: [(i32, i32); 4], set: BeamSet) -> EntityId {
-    add(w, Fx::BeamCharge { owner, off, set, t: 0 })
+    add(
+        w,
+        Fx::BeamCharge {
+            owner,
+            off,
+            set,
+            t: 0,
+        },
+    )
 }
 
 const DF_ROOT: [(i32, i32); 4] = [(8, 16), (8, -32), (-8, -8), (24, -8)];
@@ -172,11 +295,34 @@ pub fn dragon_fist(w: &World, owner_px: i32, owner_py: i32, dir: Dir, owner: Ent
         seg[k] = [x + dx * DF_OFFS[k] * 256, y + dy * DF_OFFS[k] * 256];
     }
     let boxes = std::array::from_fn(|k| df_box(&seg, k, dir));
-    Fx::DragonFist { owner, seg, boxes, steer: (0, 0), dir, dying: -1, t: 0 }
+    Fx::DragonFist {
+        owner,
+        seg,
+        boxes,
+        steer: (0, 0),
+        dir,
+        dying: -1,
+        t: 0,
+    }
 }
 fn df_msg(w: &World, owner: EntityId, src: EntityId, rect: Rect, dir: Dir, mult: i32) -> HitMsg {
     let stats = w.actor_by_id(owner).map(|a| a.stats).unwrap_or_default();
-    HitMsg { team: 1, rect, dir, mult, atk: crate::damage::atk(18), attacker: owner, att_stats: stats, att_is_player: true, source: src, crit: false, raw: 0, dmg: 0, no_react: false, foot: false }
+    HitMsg {
+        team: 1,
+        rect,
+        dir,
+        mult,
+        atk: crate::damage::atk(18),
+        attacker: owner,
+        att_stats: stats,
+        att_is_player: true,
+        source: src,
+        crit: false,
+        raw: 0,
+        dmg: 0,
+        no_react: false,
+        foot: false,
+    }
 }
 /// 0x08038E8A (the player's control, tick < 90): root by v, each child 0x20 more along the facing
 pub fn dragon_shift(w: &mut World, i: usize, v: i32) {
@@ -190,7 +336,16 @@ pub fn dragon_shift(w: &mut World, i: usize, v: i32) {
 }
 /// 0x08038E42: one x2.5 message with the head's box of this tick; the segments stop sending
 pub fn dragon_launch(w: &mut World, i: usize) {
-    let Fx::DragonFist { owner, boxes, dir, dying, .. } = fx_mut(w, i).clone() else { return };
+    let Fx::DragonFist {
+        owner,
+        boxes,
+        dir,
+        dying,
+        ..
+    } = fx_mut(w, i).clone()
+    else {
+        return;
+    };
     if dying >= 0 {
         return;
     }
@@ -202,7 +357,9 @@ pub fn dragon_launch(w: &mut World, i: usize) {
 }
 /// every segment explodes (rand(0x1000) each): root first at the end, head first on a cancel
 pub fn dragon_explode(w: &mut World, i: usize, cancel: bool) {
-    let Fx::DragonFist { seg, dir, .. } = fx_mut(w, i).clone() else { return };
+    let Fx::DragonFist { seg, dir, .. } = fx_mut(w, i).clone() else {
+        return;
+    };
     for n in 0..6 {
         let k = if cancel { 5 - n } else { n };
         let rec = DF_TABLE + 12 * (dir as u32 * 4 + if k == 5 { 3 } else { 0 });
@@ -225,13 +382,38 @@ fn fx_mut(w: &mut World, i: usize) -> &mut Fx {
 }
 
 fn rock_land(w: &mut World, i: usize, owner: EntityId, x: i32, y: i32) {
-    let pi = w.ents.iter().position(|e| !e.removed && matches!(e.body, Body::Player(_)));
+    let pi = w
+        .ents
+        .iter()
+        .position(|e| !e.removed && matches!(e.body, Body::Player(_)));
     if let Some(pi) = pi {
-        let stats = w.find(owner).and_then(|oi| w.actor(oi).map(|a| a.stats)).unwrap_or_default();
+        let stats = w
+            .find(owner)
+            .and_then(|oi| w.actor(oi).map(|a| a.stats))
+            .unwrap_or_default();
         let id = w.ents[i].id;
-        let mut m = HitMsg { team: 0, rect: Rect::new(x - 12, y - 12, x + 12, y + 12), dir: 0, mult: 0, atk: crate::damage::atk(1), attacker: owner, att_stats: stats, att_is_player: false, source: id, crit: false, raw: 0, dmg: 0, no_react: false, foot: true };
+        let mut m = HitMsg {
+            team: 0,
+            rect: Rect::new(x - 12, y - 12, x + 12, y + 12),
+            dir: 0,
+            mult: 0,
+            atk: crate::damage::atk(1),
+            attacker: owner,
+            att_stats: stats,
+            att_is_player: false,
+            source: id,
+            crit: false,
+            raw: 0,
+            dmg: 0,
+            no_react: false,
+            foot: true,
+        };
         if crate::player::on_message(w, pi, &mut m) {
-            crate::field::queue_run(w, crate::fieldcontent::Callback::Event("header_0x08783084".into()), crate::field::Cause::Ai { entity: owner });
+            crate::field::queue_run(
+                w,
+                crate::fieldcontent::Callback::Event("header_0x08783084".into()),
+                crate::field::Cause::Ai { entity: owner },
+            );
         }
     }
     puff_rng(w, x, y);
@@ -243,11 +425,16 @@ pub fn update(w: &mut World, i: usize) {
     // update, and the event takes the rest of the frame: the older objects are not updated (VERIFIED segment sb
     // 21-5 f552: the break's puff `0x0802A8AA` is not called that frame and so lives one frame longer; the player's
     // skip is player.rs's)
-    if w.field.as_ref().is_some_and(|f| f.busy && f.busy_pre_pass == w.frame && f.busy_since + 1 == w.frame) {
+    if w.field
+        .as_ref()
+        .is_some_and(|f| f.busy && f.busy_pre_pass == w.frame && f.busy_since + 1 == w.frame)
+    {
         return;
     }
     // ... and in the callback's last frame they are updated twice (field.rs `break_owed`)
-    if w.field.as_ref().is_some_and(|f| f.break_owed == w.frame) && matches!(&w.ents[i].body, Body::Fx(f) if matches!(**f, Fx::Anim { .. })) {
+    if w.field.as_ref().is_some_and(|f| f.break_owed == w.frame)
+        && matches!(&w.ents[i].body, Body::Fx(f) if matches!(**f, Fx::Anim { .. }))
+    {
         update_one(w, i);
         if w.ents[i].removed {
             return;
@@ -264,7 +451,14 @@ fn update_one(w: &mut World, i: usize) {
     match f {
         Fx::Anim { .. } => {
             let mut ended = false;
-            if let Fx::Anim { rec, left, rate, acc, .. } = fx_mut(w, i) {
+            if let Fx::Anim {
+                rec,
+                left,
+                rate,
+                acc,
+                ..
+            } = fx_mut(w, i)
+            {
                 *acc += *rate;
                 let adv = *acc >> 16;
                 if adv != 0 {
@@ -286,7 +480,15 @@ fn update_one(w: &mut World, i: usize) {
                 w.ents[i].removed = true;
                 return;
             }
-            if let Fx::Loop { first, n, rec, rate, acc, .. } = fx_mut(w, i) {
+            if let Fx::Loop {
+                first,
+                n,
+                rec,
+                rate,
+                acc,
+                ..
+            } = fx_mut(w, i)
+            {
                 *acc += *rate;
                 let adv = *acc >> 16;
                 if adv != 0 {
@@ -297,7 +499,10 @@ fn update_one(w: &mut World, i: usize) {
         }
         Fx::Rock { owner, .. } => {
             let mut end = None;
-            if let Fx::Rock { x, y, vx, vy, n, .. } = fx_mut(w, i) {
+            if let Fx::Rock {
+                x, y, vx, vy, n, ..
+            } = fx_mut(w, i)
+            {
                 for _ in 0..2 {
                     *vy += 0x20;
                     *x += *vx;
@@ -337,10 +542,22 @@ fn update_one(w: &mut World, i: usize) {
                 *t += 1;
             }
         }
-        Fx::DragonFist { owner, mut seg, mut boxes, mut steer, dir, dying, t, .. } => {
+        Fx::DragonFist {
+            owner,
+            mut seg,
+            mut boxes,
+            mut steer,
+            dir,
+            dying,
+            t,
+            ..
+        } => {
             if dying >= 0 {
                 let d = dying + 1;
-                if let Fx::DragonFist { dying: d0, t: t0, .. } = fx_mut(w, i) {
+                if let Fx::DragonFist {
+                    dying: d0, t: t0, ..
+                } = fx_mut(w, i)
+                {
                     *d0 = d;
                     *t0 = t + 1;
                 }
@@ -384,7 +601,14 @@ fn update_one(w: &mut World, i: usize) {
                 }
                 boxes[k] = df_box(&seg, k, dir);
                 // store before the message (a receiver may look at the chain)
-                if let Fx::DragonFist { seg: s0, boxes: b0, steer: st0, t: t0, .. } = fx_mut(w, i) {
+                if let Fx::DragonFist {
+                    seg: s0,
+                    boxes: b0,
+                    steer: st0,
+                    t: t0,
+                    ..
+                } = fx_mut(w, i)
+                {
                     *s0 = seg;
                     *b0 = boxes;
                     *st0 = steer;
@@ -407,7 +631,9 @@ fn update_one(w: &mut World, i: usize) {
                 }
             }
         }
-        Fx::BbkFlare { alive: al, ended, .. } => {
+        Fx::BbkFlare {
+            alive: al, ended, ..
+        } => {
             let gone = !ended && !alive(w, al);
             if let Fx::BbkFlare { t, ended, .. } = fx_mut(w, i) {
                 *t += 1;
@@ -419,7 +645,15 @@ fn update_one(w: &mut World, i: usize) {
                 }
             }
         }
-        Fx::FlameKame { owner, dir, n, mut links, alive: al, a, mult } => {
+        Fx::FlameKame {
+            owner,
+            dir,
+            n,
+            mut links,
+            alive: al,
+            a,
+            mult,
+        } => {
             if !alive(w, al) {
                 w.ents[i].removed = true;
                 return;
@@ -463,7 +697,22 @@ fn update_one(w: &mut World, i: usize) {
                     *l0 = links.clone();
                 }
                 let stats = w.actor_by_id(owner).map(|x| x.stats).unwrap_or_default();
-                let mut msg = HitMsg { team: 1, rect, dir, mult, atk: a, attacker: owner, att_stats: stats, att_is_player: true, source: me, crit: false, raw: 0, dmg: 0, no_react: false, foot: false };
+                let mut msg = HitMsg {
+                    team: 1,
+                    rect,
+                    dir,
+                    mult,
+                    atk: a,
+                    attacker: owner,
+                    att_stats: stats,
+                    att_is_player: true,
+                    source: me,
+                    crit: false,
+                    raw: 0,
+                    dmg: 0,
+                    no_react: false,
+                    foot: false,
+                };
                 if broadcast(w, &mut msg, true) {
                     let s = 48 + w.rng.rand(2);
                     w.sfx(s, 64);
@@ -484,8 +733,16 @@ fn update_one(w: &mut World, i: usize) {
                     }
                 }
                 let sh = links[k][3] / 2;
-                let (x, y) = (links[k][0] + if dx != 0 { 0 } else { sh }, links[k][1] + if dx != 0 { sh } else { 0 });
-                let b = crate::player::flame_link_box(w, FLAME_TABLE + 0x54 * dir as u32 + 12 * f as u32, x, y);
+                let (x, y) = (
+                    links[k][0] + if dx != 0 { 0 } else { sh },
+                    links[k][1] + if dx != 0 { sh } else { 0 },
+                );
+                let b = crate::player::flame_link_box(
+                    w,
+                    FLAME_TABLE + 0x54 * dir as u32 + 12 * f as u32,
+                    x,
+                    y,
+                );
                 links[k][4] = b.x0;
                 links[k][5] = b.y0;
                 links[k][6] = b.x1;

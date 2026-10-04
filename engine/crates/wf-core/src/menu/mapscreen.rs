@@ -76,8 +76,15 @@ fn arr4(v: &serde_json::Value) -> [i32; 4] {
 
 impl MapData {
     pub fn load(src: &dyn crate::content::ContentSource) -> Option<Arc<MapData>> {
-        let v: serde_json::Value = serde_json::from_slice(&src.read("ui/mapscreen/area_maps.json")?).ok()?;
-        let u16s = |v: &serde_json::Value| -> Vec<u16> { v.as_array().into_iter().flatten().map(|x| x.as_u64().unwrap_or(0) as u16).collect() };
+        let v: serde_json::Value =
+            serde_json::from_slice(&src.read("ui/mapscreen/area_maps.json")?).ok()?;
+        let u16s = |v: &serde_json::Value| -> Vec<u16> {
+            v.as_array()
+                .into_iter()
+                .flatten()
+                .map(|x| x.as_u64().unwrap_or(0) as u16)
+                .collect()
+        };
         let records = v["records"]
             .as_array()?
             .iter()
@@ -89,7 +96,12 @@ impl MapData {
                     .as_array()
                     .into_iter()
                     .flatten()
-                    .map(|e| Entry { rect: arr4(&e["rect"]), attr0: e["attr0"].as_u64().unwrap_or(0) as u16, tile: e["tile"].as_u64().unwrap_or(0) as u16, shown: e["shown"].as_u64().unwrap_or(0) != 0 })
+                    .map(|e| Entry {
+                        rect: arr4(&e["rect"]),
+                        attr0: e["attr0"].as_u64().unwrap_or(0) as u16,
+                        tile: e["tile"].as_u64().unwrap_or(0) as u16,
+                        shown: e["shown"].as_u64().unwrap_or(0) != 0,
+                    })
                     .collect(),
                 rooms: r["rooms"]
                     .as_array()
@@ -108,10 +120,23 @@ impl MapData {
             })
             .collect();
         let mut arrows = [(0u16, 0u16); 4];
-        for (k, a) in v["arrows"].as_array().into_iter().flatten().take(4).enumerate() {
-            arrows[k] = (a["attr0"].as_u64().unwrap_or(0) as u16, a["attr1"].as_u64().unwrap_or(0) as u16);
+        for (k, a) in v["arrows"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .take(4)
+            .enumerate()
+        {
+            arrows[k] = (
+                a["attr0"].as_u64().unwrap_or(0) as u16,
+                a["attr1"].as_u64().unwrap_or(0) as u16,
+            );
         }
-        Some(Arc::new(MapData { records, arrows, scout: super::scouter::ScoutData::load(src) }))
+        Some(Arc::new(MapData {
+            records,
+            arrows,
+            scout: super::scouter::ScoutData::load(src),
+        }))
     }
 }
 
@@ -155,7 +180,13 @@ pub struct Marker {
 
 impl Marker {
     fn new(x: i32, y: i32, anim: bool) -> Marker {
-        Marker { x: x - 4, y: y - 4, anim, t: 0, frame: if anim { 0 } else { 2 } }
+        Marker {
+            x: x - 4,
+            y: y - 4,
+            anim,
+            t: 0,
+            frame: if anim { 0 } else { 2 },
+        }
     }
     fn update(&mut self) {
         if !self.anim {
@@ -225,7 +256,12 @@ pub struct MapScreen {
 
 /// screen change of the map screen (frame 0 = SELECT): the pause menu's 16-frame fade, black while the world is
 /// saved, the page's EVA ramp from the 19th frame; after the closing iteration 24 black frames and the fade-in
-pub const MAPSCREEN: Transition = Transition { fade_out: 16, enter: 2, leave: 24, fade_in: 16 };
+pub const MAPSCREEN: Transition = Transition {
+    fade_out: 16,
+    enter: 2,
+    leave: 24,
+    fade_in: 16,
+};
 
 pub(crate) fn md(w: &World) -> Option<Arc<MapData>> {
     w.data.menu.as_ref().and_then(|d| d.maps.clone())
@@ -266,9 +302,19 @@ impl MapScreen {
         s.l_btn = 1;
         s.r_btn = 1;
         let Some(d) = md(w) else { return s };
-        let (cw, ca) = w.field.as_ref().map(|f| (f.area.world, f.area.area)).unwrap_or((-1, -1));
+        let (cw, ca) = w
+            .field
+            .as_ref()
+            .map(|f| (f.area.world, f.area.area))
+            .unwrap_or((-1, -1));
         // 0x08004B08: the first record with a room of the current area
-        let Some(ri) = d.records.iter().position(|r| r.rooms.iter().any(|m| m.world == cw && m.area == ca)) else { return s };
+        let Some(ri) = d
+            .records
+            .iter()
+            .position(|r| r.rooms.iter().any(|m| m.world == cw && m.area == ca))
+        else {
+            return s;
+        };
         let rec = &d.records[ri];
         s.rec = ri as i32;
         s.tile_bytes = rec.tile_bytes;
@@ -289,7 +335,12 @@ impl MapScreen {
                 b = Some(match b {
                     None => rect,
                     Some(o) if o[0] == o[2] && o[1] == o[3] => rect,
-                    Some(o) => [o[0].min(rect[0]), o[1].min(rect[1]), o[2].max(rect[2]), o[3].max(rect[3])],
+                    Some(o) => [
+                        o[0].min(rect[0]),
+                        o[1].min(rect[1]),
+                        o[2].max(rect[2]),
+                        o[3].max(rect[3]),
+                    ],
                 });
             }
             if m.world == cw && m.area == ca {
@@ -311,7 +362,11 @@ impl MapScreen {
                     _ => None,
                 })
                 .unwrap_or((0, 0));
-            let (mw, mh) = w.col.as_ref().map(|c| (c.map.world_w, c.map.world_h)).unwrap_or((240, 160));
+            let (mw, mh) = w
+                .col
+                .as_ref()
+                .map(|c| (c.map.world_w, c.map.world_h))
+                .unwrap_or((240, 160));
             let r = m.rect1;
             let cx = ((r[2] - r[0]) * 8 * px + (mw >> 1)) / mw.max(1) + r[0] * 8;
             let cy = ((r[3] - r[1]) * 8 * py + (mh >> 1)) / mh.max(1) + r[1] * 8;
@@ -522,13 +577,18 @@ impl Page for MapScreen {
                     1 => Action::Replace(Screen::MapScreen(self.page_to(w, false))),
                     2 => Action::Replace(Screen::MapScreen(self.page_to(w, true))),
                     3 => {
-                        let rec = self.scout.as_ref().and_then(|s| s.sel.map(|k| s.recs[k as usize].clone()));
+                        let rec = self
+                            .scout
+                            .as_ref()
+                            .and_then(|s| s.sel.map(|k| s.recs[k as usize].clone()));
                         match rec {
                             Some(r) => Action::Replace(Screen::MapScreen(MapScreen::info(w, &r))),
                             None => Action::Pop(1),
                         }
                     }
-                    _ if self.info.as_ref().is_some_and(|i| i.back) => Action::Replace(Screen::MapScreen(MapScreen::scouter(w))),
+                    _ if self.info.as_ref().is_some_and(|i| i.back) => {
+                        Action::Replace(Screen::MapScreen(MapScreen::scouter(w)))
+                    }
                     _ => {
                         // the last iteration's registers (EVA 0) stay on screen while the screen ends
                         w.menu.shown = Some(Box::new(Screen::MapScreen(self.clone())));
@@ -539,7 +599,10 @@ impl Page for MapScreen {
             return Action::None;
         }
         // 0x08026360: the Scouter's A on a selection: the info page after the fade (BLDCNT 0x3F5F)
-        if self.page == MapPage::Scouter && pressed & A != 0 && self.scout.as_ref().is_some_and(|s| s.sel.is_some()) {
+        if self.page == MapPage::Scouter
+            && pressed & A != 0
+            && self.scout.as_ref().is_some_and(|s| s.sel.is_some())
+        {
             self.next = 3;
             self.keep_frame = false;
             self.changing = true;
@@ -566,7 +629,12 @@ impl Page for MapScreen {
             v.layers = layers;
             v.objs = objs;
             let first: u32 = 0b11 | 1 << 31;
-            v.blend = Some(MenuBlend { first, second: first | 1 << 30, eva: self.eva.min(16), evb: 0 });
+            v.blend = Some(MenuBlend {
+                first,
+                second: first | 1 << 30,
+                eva: self.eva.min(16),
+                evb: 0,
+            });
             return v;
         }
         // BG3: the grid on the world / scouter pages
@@ -574,23 +642,53 @@ impl Page for MapScreen {
         if self.page != MapPage::Area {
             for ty in 0..20 {
                 for tx in 0..30 {
-                    bg3.push(MenuOp::Tile { path: "ui/mapscreen/grid.png".into(), tile: 0, x: tx * 8, y: ty * 8, hflip: false, vflip: false });
+                    bg3.push(MenuOp::Tile {
+                        path: "ui/mapscreen/grid.png".into(),
+                        tile: 0,
+                        x: tx * 8,
+                        y: ty * 8,
+                        hflip: false,
+                        vflip: false,
+                    });
                 }
             }
         }
-        v.layers.push(MenuLayer { w: 240, h: 160, x: 0, y: 0, priority: 3, ops: bg3 });
+        v.layers.push(MenuLayer {
+            w: 240,
+            h: 160,
+            x: 0,
+            y: 0,
+            priority: 3,
+            ops: bg3,
+        });
         // BG2: the rooms (area) / the world picture
-        let mut bg2 = MenuLayer { w: 240, h: 160, x: 0, y: 0, priority: 3, ops: Vec::new() };
+        let mut bg2 = MenuLayer {
+            w: 240,
+            h: 160,
+            x: 0,
+            y: 0,
+            priority: 3,
+            ops: Vec::new(),
+        };
         let mdat = md(w);
         match self.page {
             MapPage::Area => {
-                if let Some(rec) = mdat.as_ref().and_then(|m| m.records.get(self.rec.max(0) as usize)).filter(|_| self.rec >= 0) {
+                if let Some(rec) = mdat
+                    .as_ref()
+                    .and_then(|m| m.records.get(self.rec.max(0) as usize))
+                    .filter(|_| self.rec >= 0)
+                {
                     let b = self.bounds;
-                    let (tx0, ty0, tw, th) = (b[0] / 8, b[1] / 8, (b[2] - b[0]) / 8, (b[3] - b[1]) / 8);
+                    let (tx0, ty0, tw, th) =
+                        (b[0] / 8, b[1] / 8, (b[2] - b[0]) / 8, (b[3] - b[1]) / 8);
                     let mut grid = vec![0u16; (tw.max(0) * th.max(0)) as usize];
                     for &(k, var) in &self.rooms {
                         let m = &rec.rooms[k as usize];
-                        let (r, map) = if var == 2 { (m.rect2, &m.map2) } else { (m.rect1, &m.map1) };
+                        let (r, map) = if var == 2 {
+                            (m.rect2, &m.map2)
+                        } else {
+                            (m.rect1, &m.map1)
+                        };
                         let mut it = map.iter();
                         for y in r[1]..r[3] {
                             for x in r[0]..r[2] {
@@ -601,26 +699,63 @@ impl Page for MapScreen {
                             }
                         }
                     }
-                    bg2 = MenuLayer { w: (tw * 8).max(0) as u16, h: (th * 8).max(0) as u16, x: b[0] - self.bg_cam.0, y: b[1] - self.bg_cam.1, priority: 3, ops: Vec::new() };
+                    bg2 = MenuLayer {
+                        w: (tw * 8).max(0) as u16,
+                        h: (th * 8).max(0) as u16,
+                        x: b[0] - self.bg_cam.0,
+                        y: b[1] - self.bg_cam.1,
+                        priority: 3,
+                        ops: Vec::new(),
+                    };
                     for y in 0..th {
                         for x in 0..tw {
                             let e = grid[(y * tw + x) as usize];
                             if e != 0 {
-                                bg2.ops.push(MenuOp::Tile { path: rec.tiles.clone(), tile: e & 0x3FF, x: x * 8, y: y * 8, hflip: e & 0x400 != 0, vflip: e & 0x800 != 0 });
+                                bg2.ops.push(MenuOp::Tile {
+                                    path: rec.tiles.clone(),
+                                    tile: e & 0x3FF,
+                                    x: x * 8,
+                                    y: y * 8,
+                                    hflip: e & 0x400 != 0,
+                                    vflip: e & 0x800 != 0,
+                                });
                             }
                         }
                     }
                 }
             }
             MapPage::World => {
-                bg2.ops.push(MenuOp::Image { path: "ui/mapscreen/world_map.png".into(), frame: 0, fw: 240, fh: 160, x: 0, y: 0, key0: true });
+                bg2.ops.push(MenuOp::Image {
+                    path: "ui/mapscreen/world_map.png".into(),
+                    frame: 0,
+                    fw: 240,
+                    fh: 160,
+                    x: 0,
+                    y: 0,
+                    key0: true,
+                });
             }
             MapPage::Scouter | MapPage::Info => {}
         }
         v.layers.push(bg2);
         // BG0: the frame with the L / R prompts
-        let bg0 = MenuOp::Image { path: format!("ui/mapscreen/bg0_{}{}.png", self.l_btn, self.r_btn), frame: 0, fw: 240, fh: 160, x: 0, y: 0, key0: true };
-        v.layers.push(MenuLayer { w: 240, h: 160, x: 0, y: 0, priority: 0, ops: vec![bg0] });
+        let bg0 = MenuOp::Image {
+            path: format!("ui/mapscreen/bg0_{}{}.png", self.l_btn, self.r_btn),
+            frame: 0,
+            fw: 240,
+            fh: 160,
+            x: 0,
+            y: 0,
+            key0: true,
+        };
+        v.layers.push(MenuLayer {
+            w: 240,
+            h: 160,
+            x: 0,
+            y: 0,
+            priority: 0,
+            ops: vec![bg0],
+        });
         // OBJs (OAM of the previous update; tile frames current)
         let o = &self.oam_shown;
         if o.arrows {
@@ -629,7 +764,11 @@ impl Page for MapScreen {
                     let horiz = k < 2;
                     let (fw, fh) = if horiz { (16, 8) } else { (8, 16) };
                     v.objs.push(MenuObj {
-                        path: if horiz { "ui/mapscreen/arrow_h.png".into() } else { "ui/mapscreen/arrow_v.png".into() },
+                        path: if horiz {
+                            "ui/mapscreen/arrow_h.png".into()
+                        } else {
+                            "ui/mapscreen/arrow_v.png".into()
+                        },
                         frame: self.arrows[k].1 as u16,
                         fw,
                         fh,
@@ -646,22 +785,59 @@ impl Page for MapScreen {
         }
         for (i, &(x, y, p)) in o.markers.iter().enumerate() {
             let f = self.markers.get(i).map(|m| m.frame).unwrap_or(0);
-            v.objs.push(MenuObj { path: "ui/mapscreen/marker.png".into(), frame: f as u16, fw: 8, fh: 8, x, y, priority: p, hflip: false, vflip: false, pal: 0, ..Default::default() });
+            v.objs.push(MenuObj {
+                path: "ui/mapscreen/marker.png".into(),
+                frame: f as u16,
+                fw: 8,
+                fh: 8,
+                x,
+                y,
+                priority: p,
+                hflip: false,
+                vflip: false,
+                pal: 0,
+                ..Default::default()
+            });
         }
         if let Some(sc) = self.scout.as_ref() {
             sc.objs(w, &mut v.objs);
         }
-        if let Some(rec) = mdat.as_ref().and_then(|m| m.records.get(self.rec.max(0) as usize)).filter(|_| self.rec >= 0) {
+        if let Some(rec) = mdat
+            .as_ref()
+            .and_then(|m| m.records.get(self.rec.max(0) as usize))
+            .filter(|_| self.rec >= 0)
+        {
             if let Some(op) = rec.objs.as_ref() {
                 for &(k, x, y) in &o.entries {
                     let e = &rec.entries[k as usize];
-                    v.objs.push(MenuObj { path: op.clone(), frame: e.tile / 2, fw: 8, fh: 8, x, y, priority: 3, hflip: false, vflip: false, pal: 0, ..Default::default() });
+                    v.objs.push(MenuObj {
+                        path: op.clone(),
+                        frame: e.tile / 2,
+                        fw: 8,
+                        fh: 8,
+                        x,
+                        y,
+                        priority: 3,
+                        hflip: false,
+                        vflip: false,
+                        pal: 0,
+                        ..Default::default()
+                    });
                 }
             }
         }
-        let first: u32 = if self.keep_frame { 0b011 | 1 << 31 } else { 0b111 | 1 << 31 };
+        let first: u32 = if self.keep_frame {
+            0b011 | 1 << 31
+        } else {
+            0b111 | 1 << 31
+        };
         let second: u32 = first | 1 << 30;
-        v.blend = Some(MenuBlend { first, second, eva: self.eva.min(16), evb: 0 });
+        v.blend = Some(MenuBlend {
+            first,
+            second,
+            eva: self.eva.min(16),
+            evb: 0,
+        });
         v
     }
 }
@@ -686,8 +862,15 @@ pub fn check_select(w: &mut World) -> bool {
     if super::active(w) || w.menu.scripted {
         return false;
     }
-    let Some(f) = w.field.as_ref() else { return false };
-    if f.busy || f.item_get.is_some() || f.held || f.flight.is_some() || !matches!(f.mode, crate::field::Mode::Normal) {
+    let Some(f) = w.field.as_ref() else {
+        return false;
+    };
+    if f.busy
+        || f.item_get.is_some()
+        || f.held
+        || f.flight.is_some()
+        || !matches!(f.mode, crate::field::Mode::Normal)
+    {
         return false;
     }
     if crate::scene::frozen(w) || w.scene.depth > 0 {
@@ -705,7 +888,10 @@ pub fn check_select(w: &mut World) -> bool {
     }
     w.sfx(super::SFX_MENU, 64);
     let s = MapScreen::new(w);
-    let tr = Transition { enter: setup_frames(s.tile_bytes, OPEN_START).max(1) as u16, ..MAPSCREEN };
+    let tr = Transition {
+        enter: setup_frames(s.tile_bytes, OPEN_START).max(1) as u16,
+        ..MAPSCREEN
+    };
     super::open(w, Screen::MapScreen(s), tr, false);
     true
 }
@@ -728,7 +914,10 @@ pub fn setup_frames(tile_bytes: u32, start: u32) -> u8 {
 }
 
 /// a harness opening this screen from JSON (`menu::open_from_json`): `{"kind": "mapscreen"}`
-pub fn open_json(w: &World, v: &serde_json::Value) -> Option<(super::Screen, super::Transition, bool)> {
+pub fn open_json(
+    w: &World,
+    v: &serde_json::Value,
+) -> Option<(super::Screen, super::Transition, bool)> {
     if v["kind"].as_str()? != "mapscreen" {
         return None;
     }

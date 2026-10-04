@@ -520,7 +520,7 @@ pub fn observe(a: &mut Agent, slot: usize, o: ObsOpts) -> Value {
 pub fn observe_ro(a: &Agent, slot: usize, o: ObsOpts) -> Value {
     let w = a.w();
     let mut v = json!({
-        "session": a.id, "frame": w.frame, "outcome": outcome_str(a.outcome()),
+        "session": a.id, "frame": a.frame(), "outcome": outcome_str(a.outcome()),
         "player": player_json(a, slot, o.full),
         "enemies": enemies_json(a, slot),
     });
@@ -564,6 +564,9 @@ pub fn observe_ro(a: &Agent, slot: usize, o: ObsOpts) -> Value {
     if w.field.is_some() {
         v["field"] = field_json(a, slot);
     }
+    if a.story.is_some() {
+        v["story"] = story_json(a);
+    }
     if o.full {
         let b = w.arena.bounds;
         let name = wf_core::battle::ARENAS.iter().find(|x| x.0 == w.arena.id).map(|x| x.2).unwrap_or("");
@@ -605,7 +608,18 @@ pub fn field_json(a: &Agent, slot: usize) -> Value {
                     TriggerKind::Region => "region",
                     _ => "unknown",
                 };
-                others.push((dist, json!({"kind": k, "center": [cx, cy], "dist": dist, "activation": format!("{:?}", t.act)})));
+                let mut v = json!({"kind": k, "rect": [r.x0, r.y0, r.x1, r.y1], "center": [cx, cy], "dist": dist, "dir": compass(cx - px, cy - py), "activation": format!("{:?}", t.act)});
+                match t.act {
+                    wf_core::fieldcontent::Activation::Button(d) => {
+                        v["activation"] = json!(match d {
+                            Some(d) => format!("press A inside it facing {}", DIRS[d as usize & 3]),
+                            None => "press A inside it".to_string(),
+                        })
+                    }
+                    wf_core::fieldcontent::Activation::Touch | wf_core::fieldcontent::Activation::TouchOnce => v["activation"] = json!("walk into it"),
+                    _ => {}
+                }
+                others.push((dist, v));
             }
             _ => {}
         }
@@ -617,9 +631,98 @@ pub fn field_json(a: &Agent, slot: usize) -> Value {
         wf_core::field::Mode::FadeOut { .. } => "leaving the area (fade-out)".to_string(),
         wf_core::field::Mode::FadeIn { .. } => "arriving (fade-in)".to_string(),
     };
+    let mut npcs: Vec<(i64, Value)> = w
+        .ents
+        .iter()
+        .filter(|e| !e.removed)
+        .filter_map(|e| match &e.body {
+            wf_core::world::Body::Npc(n) => {
+                let (nx, ny) = n.a.foot_center();
+                let dist = isqrt(((nx - px) as i64).pow(2) + ((ny - py) as i64).pow(2));
+                let mut v = json!({"id": e.id, "pos": [nx, ny], "dist": dist, "dir": compass(nx - px, ny - py)});
+                if n.talk.is_some() {
+                    v["talks"] = json!(true);
+                }
+                Some((dist, v))
+            }
+            _ => None,
+        })
+        .collect();
+    npcs.sort_by_key(|x| x.0);
     json!({
         "area": format!("{}-{}", f.area.world, f.area.area), "variant": f.area.variant, "name": name_of(f.area.world, f.area.area), "map": f.map, "mode": mode,
+        "npcs": npcs.into_iter().take(10).map(|x| x.1).collect::<Vec<_>>(),
         "busy": f.busy, "exits": exits.into_iter().map(|x| x.1).collect::<Vec<_>>(), "triggers": others.into_iter().take(12).map(|x| x.1).collect::<Vec<_>>(),
-        "note": "scripts, dialogue and NPC events are not run in agent sessions (no script host); exits, enemies, pickups and breakables work",
+        "note": if a.story.is_some() { "story session: scripts, dialogue, NPCs and events run as in the game" } else { "scripts, dialogue and NPC events are not run in field sessions (no script host; new_game runs the story); exits, enemies, pickups and breakables work" },
     })
+}
+
+/// menu / dialogue text as plain characters (colour codes `\u{8}`+n dropped, page breaks as " / ")
+fn plain(t: impl Iterator<Item = u32>) -> String {
+    let mut o = String::new();
+    let mut skip = false;
+    for c in t {
+        if skip {
+            skip = false;
+            continue;
+        }
+        match c {
+            8 => skip = true,
+            10 => o.push(' '),
+            11 => o.push_str(" / "),
+            0x20..=0x7E => o.push(c as u8 as char),
+            _ => {}
+        }
+    }
+    o.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// story sessions: the menu screen up (title, pause menu, shop, save ...) with its text, the dialogue box, whether
+/// an event holds the field, the save slots
+pub fn story_json(a: &Agent) -> Value {
+    let w = a.w();
+    let mut v = json!({"frame": a.frame(), "event_running": w.scene.depth > 0});
+    if wf_core::menu::active(w) {
+        let mut m = json!({"open": true});
+        if let (Some(sc), Some(d)) = (w.menu.stack.last(), w.data.menu.as_ref()) {
+            m["screen"] = json!(sc.page().name());
+            let view = sc.page().view(w, d);
+            let mut texts = Vec::new();
+            for l in &view.layers {
+                for op in &l.ops {
+                    match op {
+                        wf_view::MenuOp::Text { x, y, text, .. } | wf_view::MenuOp::TextOutline { x, y, text, .. } => {
+                            let t = plain(text.iter().map(|&c| c as u32));
+                            if !t.is_empty() {
+                                texts.push((*y + l.y, *x + l.x, t));
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            texts.sort();
+            m["text"] = json!(texts.into_iter().map(|t| t.2).collect::<Vec<_>>());
+        }
+        v["menu"] = m;
+    }
+    if let Some(d) = &w.scene.dialog {
+        let pages: Vec<String> = d.text.split('\u{b}').map(|p| plain(p.chars().map(|c| c as u32))).collect();
+        let mut dj = json!({"text": pages.get(d.page as usize).cloned().unwrap_or_default(), "page": [d.page + 1, d.pages.max(1)]});
+        if d.options > 0 {
+            dj["options"] = json!(d.options);
+            dj["cursor"] = json!(d.cursor);
+        }
+        v["dialog"] = dj;
+        v["hint"] = json!("A advances the text (press, then release); UP / DOWN move a choice's cursor");
+    }
+    let sv = &w.saves;
+    let slots: Vec<Value> = (0..3)
+        .map(|i| match sv.slot(i) {
+            Some(d) => json!({"slot": i + 1, "area": format!("{}-{}", d.world, d.area)}),
+            None => json!({"slot": i + 1, "empty": true}),
+        })
+        .collect();
+    v["save_slots"] = Value::Array(slots);
+    v
 }

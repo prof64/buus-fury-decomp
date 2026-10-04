@@ -35,7 +35,11 @@ pub struct Flight {
 
 impl Flight {
     pub fn arrive() -> Flight {
-        Flight { z: 60 << 10, raw: 16, ..Default::default() }
+        Flight {
+            z: 60 << 10,
+            raw: 16,
+            ..Default::default()
+        }
     }
 }
 
@@ -76,8 +80,13 @@ pub fn flyer_update(w: &mut World, i: usize) -> bool {
     // flyer, its animation ticks; a warp's fade-in and the frame after it do not (s479 / s515: the event ends then)
     let frame = w.frame;
     // (also through an event's `warp_fade` away from the map: s026's fade-out, step 4)
-    let script_fade = |m: &crate::field::Mode| matches!(m, crate::field::Mode::FadeOut { step: 4, .. });
-    if w.field.as_ref().is_some_and(|f| f.busy && (matches!(f.mode, crate::field::Mode::Normal) && f.fade_end + 1 != frame || script_fade(&f.mode))) {
+    let script_fade =
+        |m: &crate::field::Mode| matches!(m, crate::field::Mode::FadeOut { step: 4, .. });
+    if w.field.as_ref().is_some_and(|f| {
+        f.busy
+            && (matches!(f.mode, crate::field::Mode::Normal) && f.fade_end + 1 != frame
+                || script_fade(&f.mode))
+    }) {
         // (its animation keeps ticking)
         let f = w.field.as_mut().unwrap().flight.as_mut().unwrap();
         f.tick = (f.tick + 1) & 0xFFFF;
@@ -178,7 +187,9 @@ pub fn reset_state(w: &mut World) {
 pub fn camera(w: &mut World) {
     let Some(i) = w.player_idx(0) else { return };
     let (x, y) = (w.pl_ref(i).a.x, w.pl_ref(i).a.y);
-    let Some(f) = w.field.as_mut().and_then(|f| f.flight.as_mut()) else { return };
+    let Some(f) = w.field.as_mut().and_then(|f| f.flight.as_mut()) else {
+        return;
+    };
     let s = if f.zc != Some(f.z) {
         f.zc = Some(f.z);
         let s = pitch(f.z);
@@ -205,7 +216,9 @@ pub fn camera(w: &mut World) {
 
 /// LoadArea step 2 (`0x08004A88`): the first map-screen entry of the area sets story flag 0x1C0 + bit
 pub fn mark_visited(w: &mut World, world: i32, area: i32) {
-    let Some(fd) = w.data.field.as_ref() else { return };
+    let Some(fd) = w.data.field.as_ref() else {
+        return;
+    };
     if let Some(&(_, _, bit)) = fd.visited.iter().find(|v| v.0 == world && v.1 == area) {
         w.story.set_flag(0x1C0 + bit, true);
     }
@@ -219,8 +232,13 @@ pub fn view_rect(cam: [i32; 5]) -> [i32; 4] {
     let [cx, cy, hgt, h, p] = cam;
     let a = p.wrapping_add(0x7ef9);
     let (i, fr) = (((a >> 10) & 255) as usize, a & 1023);
-    let t2 = CSC256[i].wrapping_mul(1024 - fr).wrapping_add(CSC256[(i + 1) & 255].wrapping_mul(fr));
-    let cv = SIN256[(i + 0x40) & 255].wrapping_mul(1024 - fr).wrapping_add(SIN256[(i + 0x41) & 255].wrapping_mul(fr)) >> 16;
+    let t2 = CSC256[i]
+        .wrapping_mul(1024 - fr)
+        .wrapping_add(CSC256[(i + 1) & 255].wrapping_mul(fr));
+    let cv = SIN256[(i + 0x40) & 255]
+        .wrapping_mul(1024 - fr)
+        .wrapping_add(SIN256[(i + 0x41) & 255].wrapping_mul(fr))
+        >> 16;
     let r0 = hgt.wrapping_mul(cv) >> 10;
     let d = (r0.wrapping_mul(t2 >> 16) >> 10) - 1024;
     let s = s_i(h) as i32;
@@ -228,13 +246,25 @@ pub fn view_rect(cam: [i32; 5]) -> [i32; 4] {
     let (m00, m01, m10, m11) = (c, -s, s, c);
     let x0 = cx.wrapping_sub(m01.wrapping_mul(d) >> 10) >> 10;
     let y0 = cy.wrapping_sub(m11.wrapping_mul(d) >> 10) >> 10;
-    let mut pts = vec![(x0, y0), (x0 - ((m01 * 224) >> 10), y0 - ((m11 * 224) >> 10)), (x0 - ((m00 * 112) >> 10), y0 - ((m10 * 112) >> 10)), (x0 + ((m00 * 112) >> 10), y0 + ((m10 * 112) >> 10))];
+    let mut pts = vec![
+        (x0, y0),
+        (x0 - ((m01 * 224) >> 10), y0 - ((m11 * 224) >> 10)),
+        (x0 - ((m00 * 112) >> 10), y0 - ((m10 * 112) >> 10)),
+        (x0 + ((m00 * 112) >> 10), y0 + ((m10 * 112) >> 10)),
+    ];
     let hh = h >> 10;
     for dd in [-20, 20] {
         let q = ((hh + dd) & 255) as usize;
-        pts.push((x0 + ((SIN256[q] * 224) >> 16), y0 - ((SIN256[(q + 64) & 255] * 224) >> 16)));
+        pts.push((
+            x0 + ((SIN256[q] * 224) >> 16),
+            y0 - ((SIN256[(q + 64) & 255] * 224) >> 16),
+        ));
     }
-    let r = pts.iter().fold([i32::MAX, i32::MAX, i32::MIN, i32::MIN], |r, &(x, y)| [r[0].min(x), r[1].min(y), r[2].max(x), r[3].max(y)]);
+    let r = pts
+        .iter()
+        .fold([i32::MAX, i32::MAX, i32::MIN, i32::MIN], |r, &(x, y)| {
+            [r[0].min(x), r[1].min(y), r[2].max(x), r[3].max(y)]
+        });
     [r[0], r[1], r[2] + 1, r[3] + 1]
 }
 

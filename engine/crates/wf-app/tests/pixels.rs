@@ -43,9 +43,10 @@ fn with_prev(view: &RenderView, from: &RenderView, pal: bool, scroll: bool) -> R
     o
 }
 
-/// a torn frame from our pictures and the lock's line specs: "" the new line, "o" / "s" / "b" the line with the
+/// a torn frame from our pictures and the lock's line specs: "" the new line, "v" the picture before the running
+/// iteration's step, "k" black (a fade to black's last step before a long iteration), "o" / "s" / "b" the line with the
 /// previous palette / BG scroll / both, else a hex mask of the pixels showing the previous palette ("o"'s picture)
-fn compose(r: &mut Renderer, packs: &Packs, view: &RenderView, prev: &RenderView, new: &[u32], masks: &[String]) -> Vec<u32> {
+fn compose(r: &mut Renderer, packs: &Packs, view: &RenderView, prev: &RenderView, iter: Option<&RenderView>, new: &[u32], masks: &[String]) -> Vec<u32> {
     let mut pics: BTreeMap<&str, Vec<u32>> = BTreeMap::new();
     let mut pic = |r: &mut Renderer, l: &'static str| -> Vec<u32> {
         pics.entry(l)
@@ -53,6 +54,7 @@ fn compose(r: &mut Renderer, packs: &Packs, view: &RenderView, prev: &RenderView
                 let v = match l {
                     "s" => with_prev(view, prev, false, true),
                     "b" => with_prev(view, prev, true, true),
+                    "v" => iter.cloned().unwrap_or_else(|| view.clone()),
                     _ => with_prev(view, prev, true, false),
                 };
                 r.render(packs, &v, 0, 240, 160).to_vec()
@@ -64,10 +66,13 @@ fn compose(r: &mut Renderer, packs: &Packs, view: &RenderView, prev: &RenderView
         let rg = y * 240..(y + 1) * 240;
         match m.as_str() {
             "" => {}
-            "o" | "s" | "b" => {
+            // (the late present of a fade to black's last step: the line black)
+            "k" => out[rg].iter_mut().for_each(|p| *p = 0xFF00_0000),
+            "o" | "s" | "b" | "v" => {
                 let l: &'static str = match m.as_str() {
                     "o" => "o",
                     "s" => "s",
+                    "v" => "v",
                     _ => "b",
                 };
                 let p = pic(r, l);
@@ -110,6 +115,8 @@ fn locked_segments_render_as_the_game() {
     let set = wf_script::ScriptSet::load_all(&rom);
     let (files, _) = wf_script::export::export(&rom, &set);
     let mut renderer = Renderer::new();
+    // (the tear pictures of earlier states have their own renderer: the main one's caches stay the frame's)
+    let mut tear_renderer = Renderer::new();
     let mut fails = vec![];
     let mut checked = 0;
     for (name, frames) in lock["segments"].as_object().unwrap() {
@@ -136,19 +143,26 @@ fn locked_segments_render_as_the_game() {
         let mut bad = vec![];
         let mut seen = 0;
         let mut prev: Option<RenderView> = None;
+        // the late present ("v" lines): the picture before the running iteration's step (as examples/pixels.rs)
+        let mut last_view: Option<RenderView> = None;
+        let mut iter_view: Option<RenderView> = None;
         wf_import::segment::replay_with(&data, &files, &doc, &mut |f| match f {
-            wf_import::segment::Frame::Before(_, w) => presenter.before_step(w),
+            wf_import::segment::Frame::Before(_, w) => {
+                presenter.before_step(w);
+                iter_view = last_view.clone();
+            }
             wf_import::segment::Frame::After(k, w) => {
                 let mut view = RenderView::default();
                 wf_core::view::render_view(w, &mut view);
                 let before = prev.replace(view.clone());
+                presenter.apply(&mut view);
+                last_view = Some(view.clone());
                 let Some(&h) = want.get(&k) else { return };
                 seen += 1;
-                presenter.apply(&mut view);
                 let new = renderer.render(&packs, &view, 0, 240, 160).to_vec();
                 let ok = hash(&new) == h
                     || match (masks.get(&k), before) {
-                        (Some(m), Some(b)) => hash(&compose(&mut renderer, &packs, &view, &b, &new, m)) == h,
+                        (Some(m), Some(b)) => hash(&compose(&mut tear_renderer, &packs, &view, &b, iter_view.as_ref(), &new, m)) == h,
                         _ => false,
                     };
                 if !ok {

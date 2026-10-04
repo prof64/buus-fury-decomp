@@ -31,7 +31,12 @@ pub const BAR_MAX: i32 = 85;
 /// the wait after a finished game (mode `0x08049978` with 30)
 pub const WAIT: i32 = 30;
 /// screens over the field: no fades, no black frames; the world gets the frame the game ends in
-pub const OVERLAY: Transition = Transition { fade_out: 0, enter: 0, leave: 1, fade_in: 0 };
+pub const OVERLAY: Transition = Transition {
+    fade_out: 0,
+    enter: 0,
+    leave: 1,
+    fade_in: 0,
+};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Kind {
@@ -82,15 +87,47 @@ pub struct Minigame {
 
 impl Minigame {
     fn base(kind: Kind, g: Gauge, w: &World) -> Minigame {
-        Minigame { c: Container::default(), kind, g, wait: 0, oam_shown: None, oam_last: None, counter: w.g.clock(w.frame) as u32, watch: None, enter_lag: 0, waited: false }
+        Minigame {
+            c: Container::default(),
+            kind,
+            g,
+            wait: 0,
+            oam_shown: None,
+            oam_last: None,
+            counter: w.g.clock(w.frame) as u32,
+            watch: None,
+            enter_lag: 0,
+            waited: false,
+        }
     }
     /// `0x0803018C`: the gauge at (72, 144), empty, peak 0
     pub fn power(w: &World) -> Minigame {
-        Minigame::base(Kind::Power, Gauge { x: 0x48, y: 0x90, value: 0, peak: 0, ..Default::default() }, w)
+        Minigame::base(
+            Kind::Power,
+            Gauge {
+                x: 0x48,
+                y: 0x90,
+                value: 0,
+                peak: 0,
+                ..Default::default()
+            },
+            w,
+        )
     }
     /// `0x080309F4(mode)`: the full gauge at (72, 128), no marker until the first update, the marker sweeping at `mode * 0x290 >> 8`
     pub fn punch(w: &World, mode: i32) -> Minigame {
-        Minigame::base(Kind::Punch, Gauge { x: 0x48, y: 0x80, value: BAR_MAX, peak: -1, vel: (mode.wrapping_mul(0x290)) >> 8, ..Default::default() }, w)
+        Minigame::base(
+            Kind::Punch,
+            Gauge {
+                x: 0x48,
+                y: 0x80,
+                value: BAR_MAX,
+                peak: -1,
+                vel: (mode.wrapping_mul(0x290)) >> 8,
+                ..Default::default()
+            },
+            w,
+        )
     }
 
     /// the gauge's update (vt +8)
@@ -149,7 +186,11 @@ impl Minigame {
     /// the object's pre-draw (vt +0xC, punch `0x08030A2C`): after the press the marker blinks with the frame counter
     fn pre_draw(&mut self) {
         if self.kind == Kind::Punch && self.g.done {
-            self.g.peak = if self.counter & 4 != 0 { self.g.pos >> 8 } else { -1 };
+            self.g.peak = if self.counter & 4 != 0 {
+                self.g.pos >> 8
+            } else {
+                -1
+            };
         }
     }
 }
@@ -186,7 +227,11 @@ impl Page for Minigame {
         if let Some(wt) = &self.watch {
             // the mode's step returns the verdict: non-zero ends the mode
             let v = wt.verdict;
-            return if v != 0 { self.finish(w, v) } else { Action::None };
+            return if v != 0 {
+                self.finish(w, v)
+            } else {
+                Action::None
+            };
         }
         // a wait iteration: not the press / the step that starts a wait
         self.waited = self.wait > 0 && self.wait <= WAIT;
@@ -219,18 +264,42 @@ impl Page for Minigame {
         if let Some(wt) = &self.watch {
             return wt.view(w, d);
         }
-        let mut v = MenuView { overlay: true, ..Default::default() };
+        let mut v = MenuView {
+            overlay: true,
+            ..Default::default()
+        };
         let Some(peak) = self.oam_shown else { return v };
         let g = &self.g;
         // the bar: 3 OBJs 32x8 (tiles of this frame's draw)
         let mut cv = Canvas::new();
-        cv.image("ui/menu/mg_bar.png", g.value.clamp(0, BAR_MAX) as u16, 96, 8, 0, 0);
-        v.layers.push(MenuLayer { w: 96, h: 8, x: g.x, y: g.y, priority: 1, ops: cv.ops });
+        cv.image(
+            "ui/menu/mg_bar.png",
+            g.value.clamp(0, BAR_MAX) as u16,
+            96,
+            8,
+            0,
+            0,
+        );
+        v.layers.push(MenuLayer {
+            w: 96,
+            h: 8,
+            x: g.x,
+            y: g.y,
+            priority: 1,
+            ops: cv.ops,
+        });
         // the marker OBJ comes first in OAM: on top
         if peak != -1 {
             let mut cv = Canvas::new();
             cv.image("ui/menu/mg_marker.png", 0, 8, 16, 0, 0);
-            v.layers.push(MenuLayer { w: 8, h: 16, x: g.x + peak + 1, y: g.y - 3, priority: 1, ops: cv.ops });
+            v.layers.push(MenuLayer {
+                w: 8,
+                h: 16,
+                x: g.x + peak + 1,
+                y: g.y - 3,
+                priority: 1,
+                ops: cv.ops,
+            });
         }
         if self.kind == Kind::Punch {
             label(d, 152, 0x78, 0x94, &mut v);
@@ -250,8 +319,23 @@ pub fn label(d: &MenuData, s: usize, cx: i32, cy: i32, v: &mut MenuView) {
     let m = t.font(MenuFont::Dialog).measure_n(text, text.len());
     let pen = Pen::new(MenuFont::Dialog, w / 2, 12, 1, 2, Some(1));
     let x = pen.x - ((m + 1) >> 1);
-    cv.ops.push(MenuOp::TextOutline { font: MenuFont::Dialog, x, y: 12, colour: 2, outline: 1, clip: [0, 0, w, 16], text: text.to_vec() });
-    v.layers.push(MenuLayer { w: w as u16, h: 16, x: cx - w / 2, y: cy - 8, priority: 0, ops: cv.ops });
+    cv.ops.push(MenuOp::TextOutline {
+        font: MenuFont::Dialog,
+        x,
+        y: 12,
+        colour: 2,
+        outline: 1,
+        clip: [0, 0, w, 16],
+        text: text.to_vec(),
+    });
+    v.layers.push(MenuLayer {
+        w: w as u16,
+        h: 16,
+        x: cx - w / 2,
+        y: cy - 8,
+        priority: 0,
+        ops: cv.ops,
+    });
 }
 
 /// what the 160x64 surface holds (`+0x34`, the box picture `0x08071758` + text + button icons)
@@ -308,12 +392,22 @@ pub struct Watch {
 /// the code that always wins (`0x0874EA60`): UP B LEFT DOWN A
 pub const WATCH_CODE: [u8; 5] = [4, 1, 3, 5, 0];
 /// the icons' pictures (`0x0874EA68`: the button prompts' first frames)
-const ICONS: [&str; 6] = ["ui/buttons/a.png", "ui/buttons/b.png", "ui/buttons/right.png", "ui/buttons/left.png", "ui/buttons/up.png", "ui/buttons/down.png"];
+const ICONS: [&str; 6] = [
+    "ui/buttons/a.png",
+    "ui/buttons/b.png",
+    "ui/buttons/right.png",
+    "ui/buttons/left.png",
+    "ui/buttons/up.png",
+    "ui/buttons/down.png",
+];
 
 impl Watch {
     /// `0x08028144`: the box surface (uploaded), five rand(6), "Watch This!" drawn (not uploaded yet)
     pub fn new(level: i32, seq: [u8; 5]) -> Watch {
-        let none = Surf { text: 0, icons: [-1; 5] };
+        let none = Surf {
+            text: 0,
+            icons: [-1; 5],
+        };
         Watch {
             level,
             period: (8 - level) * 3,
@@ -324,7 +418,10 @@ impl Watch {
             i: 0,
             cd: 0,
             verdict: 0,
-            surf: Surf { text: 148, icons: [-1; 5] },
+            surf: Surf {
+                text: 148,
+                icons: [-1; 5],
+            },
             vram: none,
             oam_shown: 0,
             oam_last: 0,
@@ -342,7 +439,10 @@ impl Watch {
         self.vram = self.surf.clone();
     }
     fn reset_box(&mut self, text: u16) {
-        self.surf = Surf { text, icons: [-1; 5] };
+        self.surf = Surf {
+            text,
+            icons: [-1; 5],
+        };
     }
     /// the game object's update (the state function at +0x30), once per mode iteration
     pub fn update(&mut self, pressed: u16) {
@@ -412,7 +512,10 @@ impl Watch {
                 }
                 if self.i & 7 == 0 {
                     if self.i & 8 != 0 {
-                        self.vram = Surf { text: 0, icons: [-1; 5] };
+                        self.vram = Surf {
+                            text: 0,
+                            icons: [-1; 5],
+                        };
                     } else {
                         self.upload();
                     }
@@ -421,7 +524,11 @@ impl Watch {
             WState::Close => {
                 self.k -= 1;
                 if self.k == 0 {
-                    self.verdict = if self.input == WATCH_CODE || self.input == self.seq { 2 } else { 1 };
+                    self.verdict = if self.input == WATCH_CODE || self.input == self.seq {
+                        2
+                    } else {
+                        1
+                    };
                 }
             }
         }
@@ -433,7 +540,10 @@ impl Watch {
     /// `0x08028224`: three affine OBJs (64x64, 64x64, 32x64; tiles of the 160x64 surface) at y 48, PA = PD =
     /// 2048 / k, x = (40k - 88(k - 8)) / 8, (104k - 88(k - 8)) / 8, (168k - 104(k - 8)) / 8
     fn view(&self, _w: &World, d: &MenuData) -> MenuView {
-        let mut v = MenuView { overlay: true, ..Default::default() };
+        let mut v = MenuView {
+            overlay: true,
+            ..Default::default()
+        };
         let k = self.oam_shown;
         if k <= 0 {
             return v;
@@ -444,7 +554,15 @@ impl Watch {
         if self.vram.text != 0 {
             let s = t.s(self.vram.text as usize);
             let m = t.font(MenuFont::Bold).measure_n(s, s.len());
-            cv.ops.push(MenuOp::TextOutline { font: MenuFont::Bold, x: 80 - ((m + 1) >> 1), y: 28, colour: 2, outline: 1, clip: [0, 0, 160, 64], text: s.to_vec() });
+            cv.ops.push(MenuOp::TextOutline {
+                font: MenuFont::Bold,
+                x: 80 - ((m + 1) >> 1),
+                y: 28,
+                colour: 2,
+                outline: 1,
+                clip: [0, 0, 160, 64],
+                text: s.to_vec(),
+            });
         }
         for (i, &ic) in self.vram.icons.iter().enumerate() {
             if ic >= 0 {
@@ -455,8 +573,22 @@ impl Watch {
         let x0 = tr(40 * k - 88 * (k - 8));
         let x1 = tr(104 * k - 88 * (k - 8));
         let x2 = tr(168 * k - 104 * (k - 8));
-        cv.ops.push(MenuOp::AffineObjs { pieces: vec![[0, 0, 64, 64, x0, 48], [64, 0, 64, 64, x1, 48], [128, 0, 32, 64, x2, 48]], pa: 2048 / k });
-        v.layers.push(MenuLayer { w: 240, h: 160, x: 0, y: 0, priority: 0, ops: cv.ops });
+        cv.ops.push(MenuOp::AffineObjs {
+            pieces: vec![
+                [0, 0, 64, 64, x0, 48],
+                [64, 0, 64, 64, x1, 48],
+                [128, 0, 32, 64, x2, 48],
+            ],
+            pa: 2048 / k,
+        });
+        v.layers.push(MenuLayer {
+            w: 240,
+            h: 160,
+            x: 0,
+            y: 0,
+            priority: 0,
+            ops: cv.ops,
+        });
         v
     }
 }
@@ -524,7 +656,10 @@ fn open_overlay(w: &mut World, s: Minigame, held: u16) {
 
 /// a harness opening this screen from JSON (`menu::open_from_json`): `{"kind": "power_struggle"}`,
 /// `{"kind": "punch", "mode": n}`, `{"kind": "watch_this", "level": n}`
-pub fn open_json(w: &World, v: &serde_json::Value) -> Option<(super::Screen, super::Transition, bool)> {
+pub fn open_json(
+    w: &World,
+    v: &serde_json::Value,
+) -> Option<(super::Screen, super::Transition, bool)> {
     let m = match v["kind"].as_str()? {
         "power_struggle" => Minigame::power(w),
         "punch" => {
@@ -552,5 +687,12 @@ pub fn open_json(w: &World, v: &serde_json::Value) -> Option<(super::Screen, sup
     };
     // the harness opens before the frame's step: the first draw happens in that frame (Enter -> Run), the first
     // iteration in the next one
-    Some((Screen::Minigame(m), Transition { enter: 1, ..OVERLAY }, true))
+    Some((
+        Screen::Minigame(m),
+        Transition {
+            enter: 1,
+            ..OVERLAY
+        },
+        true,
+    ))
 }

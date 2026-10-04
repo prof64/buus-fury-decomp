@@ -172,16 +172,23 @@ fn parse_args() -> Args {
     }
     let v: Vec<String> = std::env::args().skip(1).collect();
     let mut i = 0;
+    let mut content_given = false;
     while i < v.len() {
         let next = |i: &mut usize| {
             *i += 1;
             v.get(*i).cloned().unwrap_or_default()
         };
         match v[i].as_str() {
-            "--content" => a.content = PathBuf::from(next(&mut i)),
+            "--content" => {
+                a.content = PathBuf::from(next(&mut i));
+                content_given = true;
+            }
             "--data" => {
                 a.data = PathBuf::from(next(&mut i));
-                a.content = a.data.join("content");
+                // (the content dir follows the data dir unless `--content` names one, in either order)
+                if !content_given {
+                    a.content = a.data.join("content");
+                }
             }
             "--launcher" => a.launcher = Some(true),
             "--no-launcher" => a.launcher = Some(false),

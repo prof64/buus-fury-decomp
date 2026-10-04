@@ -16,20 +16,19 @@ for d in ('tools/story_playthrough', 'tools/field', 'tools/segments', 're/buu'):
     sys.path.insert(0, str(ROOT / d))
 from route import start_emu, status, WS, GD, DEPTH  # noqa: E402
 from common_field import player_row  # noqa: E402
-import realrun  # noqa: E402
+sys.path.insert(0, str(ROOT / 'tools' / 'wholerun'))
+import chains  # noqa: E402
 
+# --chain run1|run2 (chains.py): which real run (default run1)
 a = sys.argv[1:]
-out = Path(a[0]) if a and not a[0].startswith('--') else ROOT / 'work' / 'wholerun' / 'master.jsonl'
+chain = chains.chain_arg(a)
+out = Path(a[0]) if a and not a[0].startswith('--') else chains.paths(chain)['master']
 limit = int(a[a.index('--frames') + 1]) if '--frames' in a else None
 out.parent.mkdir(parents=True, exist_ok=True)
 
 LF, RNG = 0x03000F94, 0x03004A5C
 s32 = lambda v: v - (1 << 32) if v & 0x80000000 else v
-parts = [(name, realrun.pre_keys()[part], None) for _, name, part in realrun.PRE]
-man = json.loads((ROOT / 'data' / 'realrun' / 'manifest.json').read_text())
-for m in man:
-    keys = realrun.unrle(json.loads(gzip.open(ROOT / 'data' / 'realrun' / f'{m["n"]:03d}_{m["name"]}.keys.gz', 'rt').read()))
-    parts.append((f'{m["n"]:03d}_{m["name"]}', keys, m['end']))
+parts = chains.parts(chain)
 
 e = start_emu('reset')
 fl = None

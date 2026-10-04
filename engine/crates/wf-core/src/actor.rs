@@ -43,7 +43,12 @@ impl Default for Actor {
             hittable: true,
             foot_w: 16,
             foot_h: 8,
-            body: [[0, -22, 16, 8], [0, -22, 16, 8], [0, -23, 16, 7], [0, -23, 16, 7]],
+            body: [
+                [0, -22, 16, 8],
+                [0, -22, 16, 8],
+                [0, -23, 16, 7],
+                [0, -23, 16, 7],
+            ],
             sprite: None,
             anim: None,
             anim_t: 0,
@@ -65,25 +70,46 @@ impl Actor {
     }
     pub fn body_box(&self) -> Rect {
         let b = self.body[self.facing as usize & 3];
-        Rect::new(self.px() + b[0], self.py() + b[1] + self.z, self.px() + b[2], self.py() + b[3] + self.z)
+        Rect::new(
+            self.px() + b[0],
+            self.py() + b[1] + self.z,
+            self.px() + b[2],
+            self.py() + b[3] + self.z,
+        )
     }
     /// the body box at the ground position (no height)
     pub fn body_box_ground(&self) -> Rect {
         let b = self.body[self.facing as usize & 3];
-        Rect::new(self.px() + b[0], self.py() + b[1], self.px() + b[2], self.py() + b[3])
+        Rect::new(
+            self.px() + b[0],
+            self.py() + b[1],
+            self.px() + b[2],
+            self.py() + b[3],
+        )
     }
     pub fn foot_box(&self) -> Rect {
-        Rect::new(self.px(), self.py(), self.px() + self.foot_w, self.py() + self.foot_h)
+        Rect::new(
+            self.px(),
+            self.py(),
+            self.px() + self.foot_w,
+            self.py() + self.foot_h,
+        )
     }
     pub fn center(&self) -> (i32, i32) {
         self.body_box().center()
     }
     pub fn foot_center(&self) -> (i32, i32) {
-        (self.px() + (self.foot_w >> 1), self.py() + (self.foot_h >> 1))
+        (
+            self.px() + (self.foot_w >> 1),
+            self.py() + (self.foot_h >> 1),
+        )
     }
     /// footprint-rect centre ((x0 + x1) >> 1 of the footprint)
     pub fn fc(&self) -> (i32, i32) {
-        ((self.px() * 2 + self.foot_w) >> 1, (self.py() * 2 + self.foot_h) >> 1)
+        (
+            (self.px() * 2 + self.foot_w) >> 1,
+            (self.py() * 2 + self.foot_h) >> 1,
+        )
     }
     pub fn set_sprite(&mut self, d: &GameData, s: Option<i32>) {
         self.sprite = s;
@@ -94,8 +120,16 @@ impl Actor {
         }
     }
     /// set by engine anim number / name (first that exists, then 'idle')
-    pub fn set_anim(&mut self, d: &GameData, refs: &[AnimRef], restart: bool, looped: Option<bool>) {
-        let Some(sp) = self.sprite.and_then(|i| d.sprite(i)) else { return };
+    pub fn set_anim(
+        &mut self,
+        d: &GameData,
+        refs: &[AnimRef],
+        restart: bool,
+        looped: Option<bool>,
+    ) {
+        let Some(sp) = self.sprite.and_then(|i| d.sprite(i)) else {
+            return;
+        };
         let Some(a) = sp.pick(refs) else { return };
         if Some(a) != self.anim || restart {
             self.anim_t = 0;
@@ -112,7 +146,9 @@ impl Actor {
         sp.anims.get(self.anim? as usize).map(|a| a.raw)
     }
     pub fn anim_length(&self, d: &GameData) -> i32 {
-        let Some(sp) = self.sprite.and_then(|i| d.sprite(i)) else { return 0 };
+        let Some(sp) = self.sprite.and_then(|i| d.sprite(i)) else {
+            return 0;
+        };
         match self.anim.and_then(|a| sp.anims.get(a as usize)) {
             Some(a) => a.length(self.facing) as i32,
             None => 0,
@@ -123,10 +159,16 @@ impl Actor {
     }
     /// the step index shown (obj+0x11)
     pub fn anim_frame(&self, d: &GameData) -> i32 {
-        let Some(sp) = self.sprite.and_then(|i| d.sprite(i)) else { return 0 };
-        let Some(a) = self.anim.and_then(|a| sp.anims.get(a as usize)) else { return 0 };
+        let Some(sp) = self.sprite.and_then(|i| d.sprite(i)) else {
+            return 0;
+        };
+        let Some(a) = self.anim.and_then(|a| sp.anims.get(a as usize)) else {
+            return 0;
+        };
         let looped = self.anim_loop.unwrap_or(a.looped);
-        a.step_index_at(self.facing, self.anim_t, looped).map(|i| i as i32).unwrap_or(0)
+        a.step_index_at(self.facing, self.anim_t, looped)
+            .map(|i| i as i32)
+            .unwrap_or(0)
     }
     pub fn tick_anim(&mut self) {
         self.anim_t += 1;

@@ -28,51 +28,226 @@ macro_rules! kinds {
 }
 
 kinds!(
-    Sequence, Selector, ParallelAll, ParallelAny, GotoState, PushState, PopState, SubState,
+    Sequence,
+    Selector,
+    ParallelAll,
+    ParallelAny,
+    GotoState,
+    PushState,
+    PopState,
+    SubState,
     // Pyramid 14-2: the sidestep out of the player's beam line (state 0x15A)
     BeamDodge,
     // conditions
-    Chance, IfPlayerWithin, IfPlayerWithin2, IfPlayerFarther, IfPlayerInMeleeRange, IfPlayerAttackingMe, IfInPlayerBeamLine,
-    IfTimeInState, IfCooldownOver, IfCooldown2Over, IfCounterEq, IfGlobalFlag, IfBuuPacified, IfAxisAligned, IfHpBelow,
-    IfPlayerInFront, IfPlayerInZone, IfPlayerInRoomZone, IfPlayerBlastIncoming, IfPlayerInLineOfFire, IfContactHit, IfMeleeHit,
-    IfContactExplode, IfLandedOnRock, IfPlayerPetrified, IfPlayerNotPetrified, IfSphereDestroyed, IfPlayerNearAndHittable,
-    IfLastKidBuu, IfChildCount, IfLatchOverlap, IfButtonMashed, IfPlayerOnTop, IfPartnerHolding, IfUnknown,
+    Chance,
+    IfPlayerWithin,
+    IfPlayerWithin2,
+    IfPlayerFarther,
+    IfPlayerInMeleeRange,
+    IfPlayerAttackingMe,
+    IfInPlayerBeamLine,
+    IfTimeInState,
+    IfCooldownOver,
+    IfCooldown2Over,
+    IfCounterEq,
+    IfGlobalFlag,
+    IfBuuPacified,
+    IfAxisAligned,
+    IfHpBelow,
+    IfPlayerInFront,
+    IfPlayerInZone,
+    IfPlayerInRoomZone,
+    IfPlayerBlastIncoming,
+    IfPlayerInLineOfFire,
+    IfContactHit,
+    IfMeleeHit,
+    IfContactExplode,
+    IfLandedOnRock,
+    IfPlayerPetrified,
+    IfPlayerNotPetrified,
+    IfSphereDestroyed,
+    IfPlayerNearAndHittable,
+    IfLastKidBuu,
+    IfChildCount,
+    IfLatchOverlap,
+    IfButtonMashed,
+    IfPlayerOnTop,
+    IfPartnerHolding,
+    IfUnknown,
     // simple actions
-    Succeed, Idle, RunMotionController, PartMirrorAnim, StandStill, FacePlayer, Wait, MarkTime, MarkTime2, SetCounter,
-    IncCounter, SelfMessage11, RunScript, InlineScript, StaggerMinions, SpawnPuff, VampireSummon, VampireSummon2,
-    SelfDestruct, TriggerSelf, Block,
+    Succeed,
+    Idle,
+    RunMotionController,
+    PartMirrorAnim,
+    StandStill,
+    FacePlayer,
+    Wait,
+    MarkTime,
+    MarkTime2,
+    SetCounter,
+    IncCounter,
+    SelfMessage11,
+    RunScript,
+    InlineScript,
+    StaggerMinions,
+    SpawnPuff,
+    VampireSummon,
+    VampireSummon2,
+    SelfDestruct,
+    TriggerSelf,
+    Block,
     // movement
-    ChasePlayer, ChasePlayerThroughRocks, BackOffFacingPlayer, BackOffFacingPlayerThroughRocks, StepAwayFromPlayer,
-    WalkToPlayer, FlyToPlayer, AlignWithPlayer, LineUpForShot, Wander, MoveToPoint, WanderToRandomPoint, CirclePlayer,
-    HoverDrift, BackStep, KnockbackSlide, LungeStep, FollowMajinBuu, TankDrive, RandomStep,
+    ChasePlayer,
+    ChasePlayerThroughRocks,
+    BackOffFacingPlayer,
+    BackOffFacingPlayerThroughRocks,
+    StepAwayFromPlayer,
+    WalkToPlayer,
+    FlyToPlayer,
+    AlignWithPlayer,
+    LineUpForShot,
+    Wander,
+    MoveToPoint,
+    WanderToRandomPoint,
+    CirclePlayer,
+    HoverDrift,
+    BackStep,
+    KnockbackSlide,
+    LungeStep,
+    FollowMajinBuu,
+    TankDrive,
+    RandomStep,
     // melee
-    MeleeAttack, BioMechPunch, HeavyPunch, WindupMelee, HeavyStrike, ChargedPunch, MiniYakonLunge, DriftContact,
+    MeleeAttack,
+    BioMechPunch,
+    HeavyPunch,
+    WindupMelee,
+    HeavyStrike,
+    ChargedPunch,
+    MiniYakonLunge,
+    DriftContact,
     // ranged
-    KiBlast, GunShot, RifleShot, NinjaStarThrow, MummyWrapShot, MummyWrapBurst, TankShoot, SoldierThrow, CyborgShot,
-    TurretFire, TurretOpen, TurretClose, BombThrow, FlameBreath, GrappleArm, EnergyBarrage, FinalFlash, MouthBeamDown,
-    KidBuuKamehameha, StoneSpit, AimAtPlayer,
+    KiBlast,
+    GunShot,
+    RifleShot,
+    NinjaStarThrow,
+    MummyWrapShot,
+    MummyWrapBurst,
+    TankShoot,
+    SoldierThrow,
+    CyborgShot,
+    TurretFire,
+    TurretOpen,
+    TurretClose,
+    BombThrow,
+    FlameBreath,
+    GrappleArm,
+    EnergyBarrage,
+    FinalFlash,
+    MouthBeamDown,
+    KidBuuKamehameha,
+    StoneSpit,
+    AimAtPlayer,
     // teleports
-    NinjaTeleport, TeleportNearPlayer, TeleportChain4, NinjaDisguise, NinjaReveal,
+    NinjaTeleport,
+    TeleportNearPlayer,
+    TeleportChain4,
+    NinjaDisguise,
+    NinjaReveal,
     // grabs
-    VampireGrab, LatchDrain, LatchRelease, GrabWindup, BearHug, EnergyDrain, FreezePlayer, EatCandy,
+    VampireGrab,
+    LatchDrain,
+    LatchRelease,
+    GrabWindup,
+    BearHug,
+    EnergyDrain,
+    FreezePlayer,
+    EatCandy,
     // Buu
-    BuuStretchPunch, CandyBeam, AbsorbStance, AbsorbPose, AbsorbPose2, SuperBuuPowerUp, SuperBuuAnim0C, ThrowBigBall, GlideToWaypoint,
-    SummonMinion, KidBuuSplitAnim, KidBuuSplit, KidBuuMerge, BabidiHover, BabidiGesture,
+    BuuStretchPunch,
+    CandyBeam,
+    AbsorbStance,
+    AbsorbPose,
+    AbsorbPose2,
+    SuperBuuPowerUp,
+    SuperBuuAnim0C,
+    ThrowBigBall,
+    GlideToWaypoint,
+    SummonMinion,
+    KidBuuSplitAnim,
+    KidBuuSplit,
+    KidBuuMerge,
+    BabidiHover,
+    BabidiGesture,
     // Janemba
-    JanembaSpawnParts, JanembaHandStrikeA, JanembaHandStrikeB, JanembaAscend, JanembaDescendSummon, WaitMinisDefeated,
-    MiniHopToward, MiniHopFlee, MiniRollAttack, HandAmbush, HandSink, SuperJanembaWave, JanembaPartFlash,
+    JanembaSpawnParts,
+    JanembaHandStrikeA,
+    JanembaHandStrikeB,
+    JanembaAscend,
+    JanembaDescendSummon,
+    WaitMinisDefeated,
+    MiniHopToward,
+    MiniHopFlee,
+    MiniRollAttack,
+    HandAmbush,
+    HandSink,
+    SuperJanembaWave,
+    JanembaPartFlash,
     // others
-    BrolySpawnRocks, JumpSmash, FinishLandingAnim, StunnedAnim, StunnedAnim21, PlayAnimHold, RecoverAnim, PlayAnim0,
-    PlayAnim12, PlayAnim12b, PlayAnim12Swarm, PlayAnim12Yakon, PlayAnim12Yakon2, PlayAnim13, PlayAnim13Yakon, PlayAnimOnce,
-    PlayAnimTimed, DarkSphere, TauntAnim, Hop, SummonMiniYakons, WaitSummonsDead, SpawnEnzymes, MechTransform, RaiseShield,
-    LowerShield, ShieldBreak, GhostAnimA, GhostAnimB, WaitFormationSlot, MoveToFormationA, MoveToFormationB, WormSpawnBody,
-    WormHeadMove, WormBodyFollow,
+    BrolySpawnRocks,
+    JumpSmash,
+    FinishLandingAnim,
+    StunnedAnim,
+    StunnedAnim21,
+    PlayAnimHold,
+    RecoverAnim,
+    PlayAnim0,
+    PlayAnim12,
+    PlayAnim12b,
+    PlayAnim12Swarm,
+    PlayAnim12Yakon,
+    PlayAnim12Yakon2,
+    PlayAnim13,
+    PlayAnim13Yakon,
+    PlayAnimOnce,
+    PlayAnimTimed,
+    DarkSphere,
+    TauntAnim,
+    Hop,
+    SummonMiniYakons,
+    WaitSummonsDead,
+    SpawnEnzymes,
+    MechTransform,
+    RaiseShield,
+    LowerShield,
+    ShieldBreak,
+    GhostAnimA,
+    GhostAnimB,
+    WaitFormationSlot,
+    MoveToFormationA,
+    MoveToFormationB,
+    WormSpawnBody,
+    WormHeadMove,
+    WormBodyFollow,
     // reaction states
-    StunHold, DeathBlink, ShockStun, VolleyballTransform, VolleyballRestore, VolleyballLaunch,
+    StunHold,
+    DeathBlink,
+    ShockStun,
+    VolleyballTransform,
+    VolleyballRestore,
+    VolleyballLaunch,
     // on-hit only
-    IfAttack, ApplyDamage, TankDamage, IfHitFromFront, SetHitDir, HealFraction, FreezeHelperHit, ShieldHit,
+    IfAttack,
+    ApplyDamage,
+    TankDamage,
+    IfHitFromFront,
+    SetHitDir,
+    HealFraction,
+    FreezeHelperHit,
+    ShieldHit,
     // mods (modkit.rs): a condition / action node whose code is a Rhai function (`call`: "file.rhai:fn")
-    ModCondition, ModAction,
+    ModCondition,
+    ModAction,
 );
 
 /// node names whose content label does not match what the game does (emulator-verified): 0x08018E29 moves AWAY
@@ -87,7 +262,10 @@ fn rename(s: &str) -> &str {
     }
 }
 
-const PARAMS: [&str; 15] = ["state", "speed", "p", "r2", "frames", "n", "frac", "turn_p", "x", "y", "k", "dist", "atk", "gap", "presses"];
+const PARAMS: [&str; 15] = [
+    "state", "speed", "p", "r2", "frames", "n", "frac", "turn_p", "x", "y", "k", "dist", "atk",
+    "gap", "presses",
+];
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum P {
     State,
@@ -164,7 +342,12 @@ fn params_of(v: &Value) -> Params {
     p
 }
 
-fn push_node(out: &mut Vec<CNode>, v: &Value, all: Option<&BTreeMap<u16, Value>>, depth: u32) -> u16 {
+fn push_node(
+    out: &mut Vec<CNode>,
+    v: &Value,
+    all: Option<&BTreeMap<u16, Value>>,
+    depth: u32,
+) -> u16 {
     let raw_name = v.get("name").and_then(|x| x.as_str()).unwrap_or("");
     let name = rename(raw_name);
     let p = params_of(v);
@@ -175,22 +358,57 @@ fn push_node(out: &mut Vec<CNode>, v: &Value, all: Option<&BTreeMap<u16, Value>>
             return push_node(out, t, Some(all), depth + 1);
         }
         let idx = out.len() as u16;
-        out.push(CNode { k: K::Never, name: format!("missing state 0x{st:x}"), addr: 0, p, kids: vec![], script: 0, call: String::new(), args: vec![] });
+        out.push(CNode {
+            k: K::Never,
+            name: format!("missing state 0x{st:x}"),
+            addr: 0,
+            p,
+            kids: vec![],
+            script: 0,
+            call: String::new(),
+            args: vec![],
+        });
         return idx;
     }
     let idx = out.len() as u16;
     let addr = crate::content::int(v.get("addr").unwrap_or(&Value::Null)) as u32;
     // RunScript's <script> param (a header address); InlineScript's bytecode sits at def+0xC
     let script = match name {
-        "RunScript" => v.get("params").and_then(|x| x.get("script")).map(|x| crate::content::int(&x["raw"]) as u32).unwrap_or(0),
+        "RunScript" => v
+            .get("params")
+            .and_then(|x| x.get("script"))
+            .map(|x| crate::content::int(&x["raw"]) as u32)
+            .unwrap_or(0),
         "InlineScript" if addr != 0 => addr + 0xC,
         _ => 0,
     };
-    let call = v.get("call").and_then(|x| x.as_str()).unwrap_or("").to_string();
-    let args = v.get("args").and_then(|x| x.as_array()).map(|a| a.iter().map(|x| crate::content::int(x) as i32).collect()).unwrap_or_default();
-    out.push(CNode { k: K::from_name(name), name: name.to_string(), addr, p, kids: vec![], script, call, args });
+    let call = v
+        .get("call")
+        .and_then(|x| x.as_str())
+        .unwrap_or("")
+        .to_string();
+    let args = v
+        .get("args")
+        .and_then(|x| x.as_array())
+        .map(|a| a.iter().map(|x| crate::content::int(x) as i32).collect())
+        .unwrap_or_default();
+    out.push(CNode {
+        k: K::from_name(name),
+        name: name.to_string(),
+        addr,
+        p,
+        kids: vec![],
+        script,
+        call,
+        args,
+    });
     let mut kids = Vec::new();
-    for c in v.get("children").and_then(|x| x.as_array()).into_iter().flatten() {
+    for c in v
+        .get("children")
+        .and_then(|x| x.as_array())
+        .into_iter()
+        .flatten()
+    {
         kids.push(push_node(out, c, all, depth));
     }
     out[idx as usize].kids = kids;
@@ -203,7 +421,16 @@ pub fn compile_behaviour(id: u16, all: &BTreeMap<u16, Value>) -> BehTree {
         push_node(&mut nodes, v, Some(all), 0);
     }
     if nodes.is_empty() {
-        nodes.push(CNode { k: K::Never, name: format!("missing state 0x{id:x}"), addr: 0, p: Params::default(), kids: vec![], script: 0, call: String::new(), args: vec![] });
+        nodes.push(CNode {
+            k: K::Never,
+            name: format!("missing state 0x{id:x}"),
+            addr: 0,
+            p: Params::default(),
+            kids: vec![],
+            script: 0,
+            call: String::new(),
+            args: vec![],
+        });
     }
     BehTree { state: id, nodes }
 }
@@ -298,7 +525,11 @@ pub fn new_rt(tree: &BehTree) -> Vec<NodeRt> {
                 K::WanderToRandomPoint => 0xb3,
                 _ => n.p.g(P::Speed) as i32,
             };
-            r.path = PathRt { speed, budget: 50, ..Default::default() };
+            r.path = PathRt {
+                speed,
+                budget: 50,
+                ..Default::default()
+            };
             r
         })
         .collect()

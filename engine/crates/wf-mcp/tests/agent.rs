@@ -85,3 +85,61 @@ fn mcp_framing() {
     let r = wf_mcp::mcp::handle(&mut s, &json!({"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "observe", "arguments": {"session": "nope"}}})).unwrap();
     assert_eq!(r["result"]["isError"], true);
 }
+
+fn tap_a(s: &mut Server, id: &str) -> Value {
+    call(s, "press", json!({"session": id, "steps": [{"buttons": "A", "frames": 1}, {"buttons": "", "frames": 5}]}))["observation"].clone()
+}
+
+/// story sessions: the title through New Game, the prologue's dialogue to Snakeway, an exit taken (an area load:
+/// `World.frame` stands still there, the session's frame counts steps), rewind / save / load / replay exact
+#[test]
+fn story_new_game_time_travel_and_replay() {
+    if !content() {
+        return;
+    }
+    let mut s = Server::new();
+    let r = call(&mut s, "new_game", json!({"seed": 1}));
+    let id = r["session"].as_str().unwrap().to_string();
+    assert!(r["title_steps"].as_u64().unwrap() > 0);
+    // the prologue: A through its boxes until the leader is free in Snakeway
+    let mut o = r["observation"].clone();
+    for _ in 0..3000 {
+        let st = &o["story"];
+        if st.get("dialog").is_some() || st.get("menu").is_some() {
+            o = tap_a(&mut s, &id);
+        } else if st["event_running"] == true || o["player"].is_null() {
+            o = call(&mut s, "wait", json!({"session": id, "frames": 10}))["observation"].clone();
+        } else {
+            break;
+        }
+    }
+    assert_eq!(o["field"]["area"], "1-1", "{o}");
+    let f0 = o["frame"].as_u64().unwrap();
+    call(&mut s, "save_state", json!({"session": id, "name": "snakeway"}));
+    let h0 = call(&mut s, "get_replay", json!({"session": id}))["hash"].clone();
+    // the exit east (an event stops the macro first: its boxes, then the exit again)
+    for _ in 0..200 {
+        let r = call(&mut s, "take_exit", json!({"session": id, "to": "1-2"}));
+        if r["observation"]["field"]["area"] == "1-2" {
+            break;
+        }
+        if r["observation"]["story"].get("dialog").is_some() {
+            tap_a(&mut s, &id);
+        } else {
+            call(&mut s, "wait", json!({"session": id, "frames": 10}));
+        }
+    }
+    let o = call(&mut s, "observe", json!({"session": id}));
+    assert_eq!(o["field"]["area"], "1-2");
+    let rep = call(&mut s, "get_replay", json!({"session": id}));
+    assert_eq!(rep["frames"], o["frame"]);
+    let r = call(&mut s, "play_replay", json!({"replay": rep, "keep": false}));
+    assert_eq!(r["deterministic"], true, "{r}");
+    // rewind across the load to the save's step: the saved state's hash
+    let r = call(&mut s, "rewind", json!({"session": id, "to_frame": f0}));
+    assert_eq!(r["frame"].as_u64().unwrap(), f0);
+    assert_eq!(call(&mut s, "get_replay", json!({"session": id}))["hash"], h0);
+    call(&mut s, "press", json!({"session": id, "buttons": "RIGHT", "frames": 100}));
+    call(&mut s, "load_state", json!({"session": id, "name": "snakeway"}));
+    assert_eq!(call(&mut s, "get_replay", json!({"session": id}))["hash"], h0);
+}

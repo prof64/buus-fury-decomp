@@ -3,8 +3,8 @@
 //! NPCs), the A-button interact message (talk, A pickups) and the event start. Spec and verification:
 //! re/buu/notes.md "Field: NPC actors and behaviours", tools/field/npc_model.py, data/field/npc_*.json.
 
-use crate::fieldcontent::{Activation, Callback, ObjDef, ObjKind, ObjRef, Step, StepOp};
 use crate::field::{set_busy, Cause, FieldEvent};
+use crate::fieldcontent::{Activation, Callback, ObjDef, ObjKind, ObjRef, Step, StepOp};
 use crate::geom::{Dir, Rect};
 use crate::scene::Npc;
 use crate::world::{Body, EntityId, Event, World};
@@ -33,9 +33,20 @@ pub struct Behaviour {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum StepRt {
     Stand,
-    Wait { count: i32 },
-    FacePlayer { count: i32 },
-    WalkTo { tx: i32, ty: i32, dir: Dir, n: i32, vx: i32, vy: i32 },
+    Wait {
+        count: i32,
+    },
+    FacePlayer {
+        count: i32,
+    },
+    WalkTo {
+        tx: i32,
+        ty: i32,
+        dir: Dir,
+        n: i32,
+        vx: i32,
+        vy: i32,
+    },
     Wander(Box<Wander>),
     /// `cutscene_move` (0x08039D98, world-map encounter objects): to (tx, ty, tz) in n frames (z 22.10)
     Move3 {
@@ -53,7 +64,11 @@ pub enum StepRt {
     /// world-map marker (step 0x0803A053, update 0x08039F4E): kept on the circle of radius `r` around (cx, cy), on
     /// the side of the leader (0-50's airship marker, s017); never finishes
     #[serde(alias = "ring")]
-    Ring { cx: i32, cy: i32, r: i32 },
+    Ring {
+        cx: i32,
+        cy: i32,
+        r: i32,
+    },
     /// steps not modelled for NPCs (enemy walk_to, cutscene moves): never finish
     Other,
 }
@@ -78,18 +93,43 @@ pub struct Wander {
 
 /// create a map NPC: SetAnim(0) (rand(255)); talk NPCs mark their footprint blocked on the walk grid + enemy layer
 pub fn spawn(w: &mut World, o: &ObjDef) -> Option<EntityId> {
-    let ObjKind::Npc { x, y, sprite, talk, behaviour } = &o.kind else { return None };
+    let ObjKind::Npc {
+        x,
+        y,
+        sprite,
+        talk,
+        behaviour,
+    } = &o.kind
+    else {
+        return None;
+    };
     // the def stores the script sprite id (content sprite index + 9), like `spawn_actor`; 1..=8 are characters
     // 0..7 in their current form (Babidi's ship 8-27 / 8-67: the def's 1 shows Goku)
-    let sid = if (1..=8).contains(sprite) { char_sprite(w, *sprite - 1).unwrap_or(*sprite) } else { *sprite };
+    let sid = if (1..=8).contains(sprite) {
+        char_sprite(w, *sprite - 1).unwrap_or(*sprite)
+    } else {
+        *sprite
+    };
     let mut n = Npc::new(&w.data, sid, *x, *y, 0);
-    n.talk = talk.as_ref().and_then(|t| t.trim_start_matches('s').parse().ok());
+    n.talk = talk
+        .as_ref()
+        .and_then(|t| t.trim_start_matches('s').parse().ok());
     n.tag = match o.at {
         ObjRef::List(_, k) => Some(k as i32),
         _ => None,
     };
     let tick = w.rng.rand(255);
-    n.behaviour = Some(Behaviour { steps: behaviour.clone(), talk: talk.is_some(), idx: -1, cur: None, anim: 0, tick, frame: 0, raw: 1, pose: false });
+    n.behaviour = Some(Behaviour {
+        steps: behaviour.clone(),
+        talk: talk.is_some(),
+        idx: -1,
+        cur: None,
+        anim: 0,
+        tick,
+        frame: 0,
+        raw: 1,
+        pose: false,
+    });
     mirror(&mut n);
     let f = foot(&n);
     let id = w.add(Body::Npc(Box::new(n)));
@@ -176,7 +216,12 @@ fn set_anim(w: &mut World, i: usize, k: u8, force: bool) {
 fn anim_tick(w: &mut World, i: usize) {
     let n = npc_ref(w, i);
     let raw = n.behaviour.as_ref().map(|b| b.raw).unwrap_or(1);
-    let nf = n.a.sprite.and_then(|s| w.data.sprite(s)).and_then(|sp| sp.anim_raw(raw)).map(|a| a.nframes()).unwrap_or(1);
+    let nf =
+        n.a.sprite
+            .and_then(|s| w.data.sprite(s))
+            .and_then(|sp| sp.anim_raw(raw))
+            .map(|a| a.nframes())
+            .unwrap_or(1);
     let b = beh(w, i);
     if b.pose {
         return;
@@ -201,7 +246,9 @@ fn mark(w: &mut World, r: [i32; 4], v: u8) {
     }
 }
 fn test_walk(w: &World, r: [i32; 4]) -> bool {
-    w.col.as_ref().is_none_or(|c| c.test(crate::world::Layer::Walk, r[0], r[1], r[2], r[3]))
+    w.col
+        .as_ref()
+        .is_none_or(|c| c.test(crate::world::Layer::Walk, r[0], r[1], r[2], r[3]))
 }
 fn players_feet(w: &World) -> Vec<[i32; 4]> {
     w.players
@@ -217,7 +264,13 @@ fn players_feet(w: &World) -> Vec<[i32; 4]> {
 /// wf-import (any-frame import): put map NPC `i` on behaviour step `idx`, created as its runner would (the importer
 /// then sets the step's progress and the animation from RAM)
 pub fn import_step(w: &mut World, i: usize, idx: usize) {
-    let Some(st) = npc_ref(w, i).behaviour.as_ref().and_then(|b| b.steps.get(idx).cloned()) else { return };
+    let Some(st) = npc_ref(w, i)
+        .behaviour
+        .as_ref()
+        .and_then(|b| b.steps.get(idx).cloned())
+    else {
+        return;
+    };
     let s = create(w, i, &st);
     let b = beh(w, i);
     b.idx = idx as i32;
@@ -231,33 +284,64 @@ fn create(w: &mut World, i: usize, st: &Step) -> StepRt {
         0x0800_A223 => {
             set_anim(w, i, 0, false);
             npc(w, i).a.facing = ((wd(0) >> 16) & 3) as u8;
-            StepRt::Wait { count: (wd(0) & 0xFFFF) as i16 as i32 }
+            StepRt::Wait {
+                count: (wd(0) & 0xFFFF) as i16 as i32,
+            }
         }
         0x0800_A8E9 | 0x0800_A90F => {
             set_anim(w, i, if st.func == 0x0800_A8E9 { 0 } else { 1 }, true);
-            StepRt::FacePlayer { count: wd(0) as i32 }
+            StepRt::FacePlayer {
+                count: wd(0) as i32,
+            }
         }
         0x0800_A1AF => {
-            let StepOp::WalkTo { x: tx, y: ty, .. } = st.op else { return StepRt::Other };
+            let StepOp::WalkTo { x: tx, y: ty, .. } = st.op else {
+                return StepRt::Other;
+            };
             let n = npc_ref(w, i);
             let (dx, dy) = ((tx << 8) - n.a.x, (ty << 8) - n.a.y);
-            let (d, major) = if dx.abs() >= dy.abs() { (if dx >= 0 { 3 } else { 2 }, dx.abs()) } else { (if dy >= 0 { 0 } else { 1 }, dy.abs()) };
+            let (d, major) = if dx.abs() >= dy.abs() {
+                (if dx >= 0 { 3 } else { 2 }, dx.abs())
+            } else {
+                (if dy >= 0 { 0 } else { 1 }, dy.abs())
+            };
             let spd = (wd(1) & 0xFFFF) as i64;
-            let mut cnt = if spd == 0 { 0 } else { ((((major as i64) << 8) / spd) >> 8) as i32 & 0xFFFF };
+            let mut cnt = if spd == 0 {
+                0
+            } else {
+                ((((major as i64) << 8) / spd) >> 8) as i32 & 0xFFFF
+            };
             npc(w, i).a.facing = d;
             let (vx, vy) = if cnt != 0 {
-                ((((dx as i64) << 8) / ((cnt as i64) << 8)) as i32, (((dy as i64) << 8) / ((cnt as i64) << 8)) as i32)
+                (
+                    (((dx as i64) << 8) / ((cnt as i64) << 8)) as i32,
+                    (((dy as i64) << 8) / ((cnt as i64) << 8)) as i32,
+                )
             } else {
                 cnt = 1;
                 (0, 0)
             };
-            StepRt::WalkTo { tx, ty, dir: d, n: cnt, vx, vy }
+            StepRt::WalkTo {
+                tx,
+                ty,
+                dir: d,
+                n: cnt,
+                vx,
+                vy,
+            }
         }
         0x0800_A75B | 0x0800_A7A1 | 0x0800_A7DF | 0x0800_A811 => {
             set_anim(w, i, 0, true);
             let spd = wd(0) as i32;
             let r = ((spd << 5) + 0x7FF) & !0x7FF;
-            let rect = matches!(st.func, 0x0800_A7A1 | 0x0800_A811).then(|| Rect::new((wd(1) & 0xFFFF) as i32, (wd(1) >> 16) as i32, (wd(2) & 0xFFFF) as i32, (wd(2) >> 16) as i32));
+            let rect = matches!(st.func, 0x0800_A7A1 | 0x0800_A811).then(|| {
+                Rect::new(
+                    (wd(1) & 0xFFFF) as i32,
+                    (wd(1) >> 16) as i32,
+                    (wd(2) & 0xFFFF) as i32,
+                    (wd(2) >> 16) as i32,
+                )
+            });
             let mut chance = (spd as i64) << 4;
             if st.func == 0x0800_A811 {
                 chance <<= 3;
@@ -311,7 +395,14 @@ fn update_step(w: &mut World, i: usize, s: &mut StepRt) -> bool {
             *count -= 1;
             *count < 0
         }
-        StepRt::WalkTo { tx, ty, dir, n: cnt, vx, vy } => {
+        StepRt::WalkTo {
+            tx,
+            ty,
+            dir,
+            n: cnt,
+            vx,
+            vy,
+        } => {
             let old = foot(npc_ref(w, i));
             {
                 let n = npc(w, i);
@@ -461,7 +552,11 @@ fn runner(w: &mut World, i: usize) {
 /// the animation ticks (not in the frame the event started); the frame it ends ticks once more before the update.
 pub fn update(w: &mut World, i: usize) {
     // a load waiting for its on-enter script holds the map NPCs like an event (story playthrough: Grand Kai's 1-15)
-    let (busy, since, ended) = w.field.as_ref().map(|f| (f.busy || f.arrival.is_some(), f.busy_since, f.event_ended)).unwrap_or((false, 0, false));
+    let (busy, since, ended) = w
+        .field
+        .as_ref()
+        .map(|f| (f.busy || f.arrival.is_some(), f.busy_since, f.event_ended))
+        .unwrap_or((false, 0, false));
     // the item-get presentation's loop holds the behaviours too, animations tick (4-30: the scientist's wander draws
     // nothing while Gohan holds the capsule up)
     let item_get = w.field.as_ref().is_some_and(|f| f.item_get.is_some());
@@ -510,7 +605,12 @@ pub fn tick_only(w: &mut World, i: usize) {
 }
 
 /// interact box per player facing (`0x083C340C`), relative to the footprint top-left
-pub const TALK_BOX: [[i32; 4]; 4] = [[0, 0, 16, 24], [0, -16, 16, 8], [-16, -8, 16, 8], [0, -8, 32, 8]];
+pub const TALK_BOX: [[i32; 4]; 4] = [
+    [0, 0, 16, 24],
+    [0, -16, 16, 8],
+    [-16, -8, 16, 8],
+    [0, -8, 32, 8],
+];
 
 /// the A press in the field once the melee hit found nobody (`0x08012A24`): message 3 "interact" to the objects last
 /// to first (a talk NPC or an A pickup under the box accepts), then an A trigger under the point. true = the punch
@@ -532,7 +632,13 @@ pub fn interact(w: &mut World, pi: usize) -> bool {
             continue;
         }
         let talk = match &w.ents[k].body {
-            Body::Npc(n) if n.behaviour.as_ref().is_some_and(|b| b.talk) && n.talk.is_some() && ov(foot(n), bx) => n.talk,
+            Body::Npc(n)
+                if n.behaviour.as_ref().is_some_and(|b| b.talk)
+                    && n.talk.is_some()
+                    && ov(foot(n), bx) =>
+            {
+                n.talk
+            }
             Body::Pickup(p) if p.by_a() && ov(p.rect(), bx) => {
                 crate::fieldobj::collect(w, k, slot);
                 return true;
@@ -545,7 +651,11 @@ pub fn interact(w: &mut World, pi: usize) -> bool {
             set_anim(w, k, 0, true);
             mirror(npc(w, k));
             start_event(w);
-            let pk = (0..w.ents.len()).filter(|&j| !w.ents[j].removed).position(|j| j == pi).unwrap_or(0) + crate::field::props_object(w) as usize;
+            let pk = (0..w.ents.len())
+                .filter(|&j| !w.ents[j].removed)
+                .position(|j| j == pi)
+                .unwrap_or(0)
+                + crate::field::props_object(w) as usize;
             if let Some(f) = w.field.as_mut() {
                 f.talk_pass = Some((pk, f.loads));
             }
@@ -553,12 +663,24 @@ pub fn interact(w: &mut World, pi: usize) -> bool {
             let (nx, ny) = (npc(w, k).a.x, npc(w, k).a.y);
             let pa = &w.pl_ref(pi).a;
             w.scene.talk_anchor = [pa.x - nx, pa.y - ny];
-            w.events.push(Event::Field(FieldEvent::Run { run: Callback::Event(format!("s{ev:03}")), cause: Cause::Talk { npc: id }, slot }));
+            w.events.push(Event::Field(FieldEvent::Run {
+                run: Callback::Event(format!("s{ev:03}")),
+                cause: Cause::Talk { npc: id },
+                slot,
+            }));
             return true;
         }
     }
     let f = w.field.as_ref().unwrap();
-    f.triggers.iter().any(|t| matches!(t.act, Activation::Button(_) | Activation::Unknown(0x0802_266F)) && t.rect.x0 <= px && px < t.rect.x1 && t.rect.y0 <= py && py < t.rect.y1)
+    f.triggers.iter().any(|t| {
+        matches!(
+            t.act,
+            Activation::Button(_) | Activation::Unknown(0x0802_266F)
+        ) && t.rect.x0 <= px
+            && px < t.rect.x1
+            && t.rect.y0 <= py
+            && py < t.rect.y1
+    })
 }
 
 /// an event starts (`0x0801246E`): message 0xF to every object, last to first (walking map NPCs go idle); with a
@@ -572,10 +694,16 @@ pub fn start_event(w: &mut World) {
                 mirror(npc(w, k));
             }
             // (the bored pose too: 12-22, the countdown's hook #9 starts on a player standing bored - idle, one draw)
-            Body::Player(p) if matches!(p.gs, crate::player::Gs::Walk | crate::player::Gs::Bored) => crate::player::set_idle(w, k),
+            Body::Player(p)
+                if matches!(p.gs, crate::player::Gs::Walk | crate::player::Gs::Bored) =>
+            {
+                crate::player::set_idle(w, k)
+            }
             // (a beam skill too: its state stops, idle with one draw - segment sb 6-6 f22178, Gotenks firing when
             // Super Buu's defeat event starts)
-            Body::Player(p) if matches!(p.gs, crate::player::Gs::Skill(15 | 16 | 6 | 1 | 3)) => crate::player::set_idle(w, k),
+            Body::Player(p) if matches!(p.gs, crate::player::Gs::Skill(15 | 16 | 6 | 1 | 3)) => {
+                crate::player::set_idle(w, k)
+            }
             // a walking enemy stops: idle state (story playthrough: a fighter walking when the level-up hook starts
             // goes idle with a fresh idle tick; a hurt one keeps its state)
             // (a defeated enemy that stays for its on-defeat event - ko < 0, a boss - is still an actor: Totenhotep

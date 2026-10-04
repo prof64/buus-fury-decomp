@@ -1,6 +1,6 @@
 ---
 name: buu-battle
-description: Play Dragon Ball Z Buu's Fury through the buu-battle MCP server (the frame-exact deterministic Rust core of the GBA game) - start battles or field areas, read observations, punch / use skills / block / dodge, explore with save_state / rewind, write and evaluate Rhai controllers, verify replays. Use when asked to play, test, beat, benchmark or script a Buu's Fury fight, boss, enemy group or area.
+description: Play Dragon Ball Z Buu's Fury through the buu-battle MCP server (the frame-exact deterministic Rust core of the GBA game) - play the story from the title (New Game, dialogue, NPCs, exits), start battles or field areas, read observations, punch / use skills / block / dodge, explore with save_state / rewind, write and evaluate Rhai controllers, verify replays. Use when asked to play, test, beat, benchmark or script Buu's Fury's story, a fight, boss, enemy group or area.
 ---
 
 # Playing Buu's Fury through the buu-battle tools
@@ -22,9 +22,11 @@ and replayed.
      A Lv80 Goku has 196 EP, so tier 2 gives one beam per fight; check `player.skills[].usable`.
    - `players: 2` (or a list of fighter specs) = co-op: you act as `slot` (default 0) in every action; the other
      slots run their autopilot (`set_autopilot {slot, mode: idle | attack | controller, code}`).
-3. `new_field {area: "8-3"}` starts the overworld instead: walk, take exits (`observation.field.exits`), fight the
-   placed enemies. Story scripts / dialogue are not run in agent sessions.
-4. `save_state {name: "start"}` right away - snapshots are instant.
+3. `new_field {area: "8-3"}` starts a bare overworld area instead: walk, take exits (`observation.field.exits`),
+   fight the placed enemies. Its scripts, dialogue and NPC events are not run - for those play the story (below).
+4. `new_game {seed?}` plays **the story**: the whole game with its script host, from the title through New Game
+   into the prologue (`title: true` stops on the title screen - its menu text is in `story.menu`). See "Story".
+5. `save_state {name: "start"}` right away - snapshots are instant.
 
 ## Controls (GBA buttons)
 
@@ -48,6 +50,8 @@ nothing (`press {steps: [{buttons: "A", frames: 1}, {buttons: "", frames: 1}]}`)
 | `attack {target?, hits?, max_frames?, stop_on?}` | path to a punching spot of the target (default: nearest), turn, punch every other frame |
 | `use_skill {skill, target?, align?, charge_frames?, taps?, gap?, steer?}` | select with L, line up / face, hold B, wait until you can act |
 | `block {frames, shield?}`, `dash {direction, frames}`, `move_to {x, y}`, `face {target or direction}` | |
+| `take_exit {to?}` | field / story: walk to an exit and through it (doors sit in walls, edge exits at the border) |
+| `talk {npc? or trigger?}` | field / story: walk up to an NPC (or into a "press A" trigger: a desk, a sign), turn, press A |
 | `press {buttons, frames}` / `press {steps}` / `wait {frames}` | raw input |
 | `save_state`, `load_state`, `rewind {frames or to_frame}`, `fork_session` | time travel (true snapshots, microseconds) |
 | `screenshot {view: gba / wide / arena, scale?}` | PNG from the game's own renderer; enemy ids in yellow |
@@ -55,8 +59,9 @@ nothing (`press {steps: [{buttons: "A", frames: 1}, {buttons: "", frames: 1}]}`)
 | `get_replay` / `play_replay` | config + input log + state hash; re-simulation must give the same hash |
 
 `stop_on` (every action): `hurt` (you lost HP), `kill`, `hit` (you dealt damage), `no_damage` (a hit of yours did
-nothing), `phase` (next wave), `danger` (a hit on you is <= 12 frames away if you stand still). `move_to` stops on
-`hurt` by default. The `result` says why it stopped (`target_defeated`, `hits_done`, `skill_done`, `arrived`,
+nothing), `phase` (next wave), `danger` (a hit on you is <= 12 frames away if you stand still), `area` (an exit was
+taken), `event` (story: an event, a dialogue box or a menu took the field). `move_to` stops on `hurt` by default;
+every macro but `press` / `wait` stops on `area` and `event` unless you pass your own `stop_on`. The `result` says why it stopped (`target_defeated`, `hits_done`, `skill_done`, `arrived`,
 `battle_won`, `not_usable (EP 16, needs 150)`, `danger: #2 Yakon hits you for 20 in 6 frames ...`) and sums up
 `dealt`, `hp_lost`, `hits_dealt`, `hits_taken`, `kills`, `ep_change`, `hits_without_damage`, `healed_enemy_hp`.
 
@@ -79,12 +84,36 @@ threats:  hostile shots / hands: kind, from, pos, size, vel px/frame, eta (frame
 danger:   the engine's look-ahead (45 frames): {hit_in, by, hp, if_blocking} = standing still you get hit by `by`
           for `hp` in `hit_in` frames; if_blocking = the same with R held ("no HP lost" = blocking saves you)
 walls:    free px in each direction (don't dash toward a small number)
-phase, next_phase_in (multi-phase presets), allies (co-op), field (area, exits with destinations, triggers)
+phase, next_phase_in (multi-phase presets), allies (co-op),
+field:    area, name, mode, exits (to, to_name, rect, centre, dir), triggers (kind, rect, activation: "walk into it" /
+          "press A inside it facing up"), npcs (id, pos, dist, dir, talks)
+story:    (story sessions) frame, event_running, menu {screen, text} (title, pause menu, shop, save ...),
+          dialog {text of the current page, page [n, of], options + cursor for a choice}, save_slots
 events:   structured, since the last observation: hit (by, target, effect damage / healed it / no damage,
           hp_change, target_hp), hurt (by, hp, blocked), defeated, spawn, phase, skill, grabbed, ko, outcome, field
 ```
 `observe {map: true}` adds the ASCII map ('#' wall, 'P' you, letters = enemies in the legend, '*' hostile shot).
 Ids are stable, also across rewinds. Use `screenshot` when the JSON is confusing.
+
+## Story (`new_game`)
+
+The story session runs the game's own scripts: cutscenes, dialogue, NPCs, shops, save points, the title's New Game
+and Continue, game over. It is the app's story mode (the same script host; one step = one game logic iteration,
+no hardware slowdown recreated).
+
+- **The loop**: `observe`; if `story.dialog` or `story.menu` is there, `press {steps: [{buttons: "A", frames: 1},
+  {buttons: "", frames: 5}]}` (A must go down to advance; UP / DOWN move a choice's cursor first); if
+  `story.event_running` (a cutscene, no box yet) `wait {frames: 20}`; otherwise the field is yours: `take_exit`,
+  `talk`, `move_to`, fights as in battles.
+- Macros hand control back when an event starts (`stopped: "event: ..."`) or the area changes - read the
+  observation, deal with the dialogue, then call the macro again.
+- Progress gates are story gates: an NPC in a doorway, a desk to report to. The opening: the prologue's boxes, then
+  Snakeway `1-1` -> `1-2` -> `1-5` -> `1-3` (Yemma's Office): `talk {trigger: 0}` at Yemma's desk, then `talk` the
+  ogre in the doorway, then `take_exit {to: "1-4"}`.
+- `frame` in story sessions counts steps (game logic iterations). `rewind {to_frame}`, `save_state` / `load_state`,
+  `fork_session` and replays restore the script host too (a cutscene or a dialogue box resumes where it was).
+  `danger` forecasts are not computed in story sessions.
+- The in-game save (a save point's menu) writes `story.save_slots`; they live in the session (and its snapshots).
 
 ## Damage basics
 
@@ -125,7 +154,7 @@ Ids are stable, also across rewinds. Use `screenshot` when the JSON is confusing
    `attacking` before the hit; `fork_session` to compare two plans side by side.
 4. **Encode the pattern in a controller** once you know it, iterate with `save_state` / `load_state` /
    `run_controller`, then measure it with `evaluate_controller` over 16-32 seeds.
-5. Done? `get_replay` -> `play_replay` must say `deterministic: true`.
+5. Done? `get_replay` -> `play_replay` must say `deterministic: true` (story sessions too).
 
 ## Controllers in Rhai (`run_controller`, `evaluate_controller`, `set_autopilot`)
 

@@ -6,7 +6,9 @@
 //! starts the allocation (cursor on STR / POW / END, LEFT / RIGHT move points, A accepts = record written +
 //! RecalcStats `0x08013C66`, B cancels); DOWN opens Skills; L / R switch to Journal / Inventory; B or START close.
 
-use super::kit::{self, Button, Container, Cursor, Font, Label, Tabs, TextCtl, Widget, BTN_DOWN, BTN_L, BTN_R};
+use super::kit::{
+    self, Button, Container, Cursor, Font, Label, Tabs, TextCtl, Widget, BTN_DOWN, BTN_L, BTN_R,
+};
 use super::text::{Arg, Canvas, Pen};
 use super::{Action, MenuData, Page};
 use crate::world::World;
@@ -64,22 +66,78 @@ impl Status {
         let mut c = Container::default();
         // "Skills" (right-aligned at 224, 0x90) and its DOWN prompt
         let sk = t.s(29);
-        c.add(Widget::Label(Label { x: 0xE0, y: 0x90, text: sk.to_vec(), colour: 5, align: 2, font: Font::Menu }));
+        c.add(Widget::Label(Label {
+            x: 0xE0,
+            y: 0x90,
+            text: sk.to_vec(),
+            colour: 5,
+            align: 2,
+            font: Font::Menu,
+        }));
         let skx = 0xCE - t.font(MenuFont::Menu).measure(sk);
-        let skills_btn = c.add(Widget::Button(Button::new(BTN_DOWN, skx, 0x84, 3, true, false)));
+        let skills_btn = c.add(Widget::Button(Button::new(
+            BTN_DOWN, skx, 0x84, 3, true, false,
+        )));
         c.add(Widget::Button(Button::new(BTN_L, 8, 8, 6, true, false)));
         c.add(Widget::Button(Button::new(BTN_R, 0xD0, 8, 7, true, false)));
-        c.add(Widget::Label(Label { x: 0x22, y: 0x14, text: t.s(30).to_vec(), colour: 2, align: 0, font: Font::Menu }));
-        c.add(Widget::Label(Label { x: 0xCE, y: 0x14, text: t.s(33).to_vec(), colour: 2, align: 2, font: Font::Menu }));
+        c.add(Widget::Label(Label {
+            x: 0x22,
+            y: 0x14,
+            text: t.s(30).to_vec(),
+            colour: 2,
+            align: 0,
+            font: Font::Menu,
+        }));
+        c.add(Widget::Label(Label {
+            x: 0xCE,
+            y: 0x14,
+            text: t.s(33).to_vec(),
+            colour: 2,
+            align: 2,
+            font: Font::Menu,
+        }));
         // STR / POW / END cycle (ids 1..3); SPD is not selectable
-        for (id, nav, s, y) in [(1, [3, 2, -1, -1], 47, 0x4F), (2, [1, 3, -1, -1], 48, 0x5B), (3, [2, 1, -1, -1], 49, 0x67), (-1, [-1, -1, -1, -1], 50, 0x73)] {
-            c.add(Widget::Text(TextCtl { id, nav, text: t.s(s).to_vec(), x: 0xB2, y, code: -1, align: 0 }));
+        for (id, nav, s, y) in [
+            (1, [3, 2, -1, -1], 47, 0x4F),
+            (2, [1, 3, -1, -1], 48, 0x5B),
+            (3, [2, 1, -1, -1], 49, 0x67),
+            (-1, [-1, -1, -1, -1], 50, 0x73),
+        ] {
+            c.add(Widget::Text(TextCtl {
+                id,
+                nav,
+                text: t.s(s).to_vec(),
+                x: 0xB2,
+                y,
+                code: -1,
+                align: 0,
+            }));
         }
         // party tabs in (16, 30)-(224, 46), event 100; arrows are children after it
         let tabs = c.kids.len();
-        c.add(Widget::Tabs(Tabs::new(0, [0x10, 0x1E, 0xE0, 0x2E], 100, tabs + 1, tabs + 2)));
-        c.add(Widget::Button(Button::new(kit::BTN_LEFT, 0x10, 0x1E, 100, true, false)));
-        c.add(Widget::Button(Button::new(kit::BTN_RIGHT, 0xE0 - 0x10, 0x1E, 100, true, false)));
+        c.add(Widget::Tabs(Tabs::new(
+            0,
+            [0x10, 0x1E, 0xE0, 0x2E],
+            100,
+            tabs + 1,
+            tabs + 2,
+        )));
+        c.add(Widget::Button(Button::new(
+            kit::BTN_LEFT,
+            0x10,
+            0x1E,
+            100,
+            true,
+            false,
+        )));
+        c.add(Widget::Button(Button::new(
+            kit::BTN_RIGHT,
+            0xE0 - 0x10,
+            0x1E,
+            100,
+            true,
+            false,
+        )));
         if let Some(Widget::Tabs(tb)) = c.kids.get_mut(tabs) {
             for i in 0..8 {
                 if w.story.chars.get(i).is_some_and(|s| s.flags & 1 != 0) {
@@ -89,12 +147,29 @@ impl Status {
             // mod party members (characters/*.json index 9+) after the game's eight, named from their content
             for i in 9..w.story.chars.len() {
                 if w.story.chars[i].flags & 1 != 0 {
-                    let name = w.data.chars.iter().find(|c| c.index == i as i32).map(|c| super::text::units(&c.name)).unwrap_or_default();
+                    let name = w
+                        .data
+                        .chars
+                        .iter()
+                        .find(|c| c.index == i as i32)
+                        .map(|c| super::text::units(&c.name))
+                        .unwrap_or_default();
                     tb.push(t, &name, i as i32);
                 }
             }
         }
-        let mut s = Status { c, alloc: false, blink: 0, orig: [0; 4], vals: [0; 4], skills_btn, tabs, cursor: None, prompts: [None; 4], time: w.story.play_frames };
+        let mut s = Status {
+            c,
+            alloc: false,
+            blink: 0,
+            orig: [0; 4],
+            vals: [0; 4],
+            skills_btn,
+            tabs,
+            cursor: None,
+            prompts: [None; 4],
+            time: w.story.play_frames,
+        };
         s.prepare_tabs();
         let cur = w.story.current;
         let arrows = s.arrows_visible();
@@ -120,7 +195,9 @@ impl Status {
     /// draw-time side effects of the tab bar (`0x080160CA`): layout, the arrows' visibility / state
     pub fn prepare_tabs(&mut self) {
         let sel = self.c.sel;
-        let Some(Widget::Tabs(tb)) = self.c.kids.get_mut(self.tabs) else { return };
+        let Some(Widget::Tabs(tb)) = self.c.kids.get_mut(self.tabs) else {
+            return;
+        };
         let mut arrows = None;
         if !tb.laid_out {
             arrows = Some(tb.layout());
@@ -154,7 +231,9 @@ impl Status {
         for i in self.prompts.iter().flatten() {
             self.c.remove(*i);
         }
-        let pts = char_rec(w, self.char_index()).map(|r| r.points).unwrap_or(0);
+        let pts = char_rec(w, self.char_index())
+            .map(|r| r.points)
+            .unwrap_or(0);
         let (a, b) = if self.alloc {
             (24, 26)
         } else if pts != 0 {
@@ -169,17 +248,23 @@ impl Status {
     fn update_blink(&mut self, w: &World) {
         if !self.alloc {
             self.blink = self.blink.wrapping_add(1);
-            if self.blink & 7 == 0 && char_rec(w, self.char_index()).is_some_and(|r| r.points != 0) {
+            if self.blink & 7 == 0 && char_rec(w, self.char_index()).is_some_and(|r| r.points != 0)
+            {
                 self.c.drawn = false;
             }
         }
     }
 
     fn step_page(&mut self, w: &mut World) -> Action {
-        let (consumed, act) = kit::run_step(self, w, |p| &mut p.c, |p, w, src, code| match p.event(w, src, code) {
-            Some(a) => (true, Some(a)),
-            None => (false, None),
-        });
+        let (consumed, act) = kit::run_step(
+            self,
+            w,
+            |p| &mut p.c,
+            |p, w, src, code| match p.event(w, src, code) {
+                Some(a) => (true, Some(a)),
+                None => (false, None),
+            },
+        );
         if let Some(a) = act {
             return a;
         }
@@ -204,7 +289,9 @@ impl Status {
             }
             if p & crate::input::RIGHT != 0 {
                 w.sfx(super::SFX_MENU, 64);
-                let lv = char_rec(w, self.char_index()).map(|r| level(w, r)).unwrap_or(0);
+                let lv = char_rec(w, self.char_index())
+                    .map(|r| level(w, r))
+                    .unwrap_or(0);
                 if lv > self.vals[sel - 1] && self.vals[3] > 0 {
                     self.vals[sel - 1] += 1;
                     self.vals[3] -= 1;
@@ -331,10 +418,19 @@ impl Status {
     fn content(&self, w: &World, d: &MenuData, cv: &mut Canvas) {
         let t = &d.text;
         let ci = self.char_index();
-        let cs = w.story.chars.get(ci.max(0) as usize).cloned().unwrap_or_default();
+        let cs = w
+            .story
+            .chars
+            .get(ci.max(0) as usize)
+            .cloned()
+            .unwrap_or_default();
         let r = &cs.rec;
         let lv = level(w, r);
-        let form = d.forms.get(cs.form.max(0) as usize).cloned().unwrap_or_default();
+        let form = d
+            .forms
+            .get(cs.form.max(0) as usize)
+            .cloned()
+            .unwrap_or_default();
         let mut p = Pen::new(MenuFont::Bold, 0x10, 0x37, 0, 5, Some(1));
         cv.textf(t, &mut p, t.s(40), &[Arg::S(&form.upper), Arg::I(lv)]);
         p.font = MenuFont::Menu;
@@ -374,7 +470,11 @@ impl Status {
                 cv.textf(t, &mut p, &pct_d(), &[Arg::I(r.points)]);
             }
             p.align = 2;
-            for (y, e, b) in [(0x4F, eff[0], r.str_), (0x5B, eff[1], r.pow), (0x67, eff[2], r.end)] {
+            for (y, e, b) in [
+                (0x4F, eff[0], r.str_),
+                (0x5B, eff[1], r.pow),
+                (0x67, eff[2], r.end),
+            ] {
                 p.y = y;
                 p.x = 0xE0;
                 p.colour = stat_colour(e, b);
@@ -392,7 +492,11 @@ impl Status {
             for (k, y) in [(0usize, 0x4F), (1, 0x5B), (2, 0x67)] {
                 p.y = y;
                 p.x = 0xE0;
-                p.colour = if self.vals[k] == self.orig[k + 1] { 2 } else { 6 };
+                p.colour = if self.vals[k] == self.orig[k + 1] {
+                    2
+                } else {
+                    6
+                };
                 cv.textf(t, &mut p, &pct_d(), &[Arg::I(self.vals[k])]);
             }
         }
@@ -450,12 +554,20 @@ pub fn next_level_xp(w: &World, r: &crate::progression::Record) -> i32 {
     if lv >= 200 {
         return 0;
     }
-    w.data.xp_table.get((lv - 49) as usize).map(|&t| (t - r.xp) as i32).unwrap_or(0)
+    w.data
+        .xp_table
+        .get((lv - 49) as usize)
+        .map(|&t| (t - r.xp) as i32)
+        .unwrap_or(0)
 }
 
 /// record +0x4C..+0x54: STR, POW, END, SPD after RecalcStats
 pub fn effective(w: &World, cs: &crate::story::CharState) -> [i32; 4] {
-    let eq: Vec<Option<&crate::content::Equip>> = cs.equip.iter().map(|&e| w.data.equipment.iter().find(|q| q.id == e)).collect();
+    let eq: Vec<Option<&crate::content::Equip>> = cs
+        .equip
+        .iter()
+        .map(|&e| w.data.equipment.iter().find(|q| q.id == e))
+        .collect();
     let e = crate::progression::recalc_stats(&cs.rec, &eq, false);
     [e.str_, e.pow, e.end, e.spd]
 }
@@ -463,10 +575,14 @@ pub fn effective(w: &World, cs: &crate::story::CharState) -> [i32; 4] {
 /// the record changed in the menu: the live fighter playing this character takes it, then RecalcStats on the
 /// object (the field writes fighters back into the story every frame)
 pub fn apply_record(w: &mut World, ci: i32) {
-    let Some(cs) = w.story.chars.get(ci.max(0) as usize).cloned() else { return };
+    let Some(cs) = w.story.chars.get(ci.max(0) as usize).cloned() else {
+        return;
+    };
     for s in 0..w.players.len() {
         let Some(i) = w.player_idx(s) else { continue };
-        let crate::world::Body::Player(p) = &w.ents[i].body else { continue };
+        let crate::world::Body::Player(p) = &w.ents[i].body else {
+            continue;
+        };
         if crate::story::char_of_form(&w.data, p.form) != Some(ci) {
             continue;
         }
@@ -508,10 +624,18 @@ impl Page for Status {
     }
     fn redraw_time(&self, w: &World, d: &MenuData) -> Option<crate::sndsim::Redraw> {
         let v = self.draw(w, d);
-        let (gn, small, extra) = v.layers.first().map(|l| crate::sndsim::ops_cost(&d.text, &l.ops)).unwrap_or((0, 0, 0));
+        let (gn, small, extra) = v
+            .layers
+            .first()
+            .map(|l| crate::sndsim::ops_cost(&d.text, &l.ops))
+            .unwrap_or((0, 0, 0));
         // the step before the redraw (cycles from the VBlank to the redraw; work/earth/timing/pre.py)
         let m = &w.menu;
-        let sfx = |id: i32| w.events.iter().any(|e| matches!(e, crate::world::Event::Sfx { id: i, .. } if *i == id));
+        let sfx = |id: i32| {
+            w.events
+                .iter()
+                .any(|e| matches!(e, crate::world::Event::Sfx { id: i, .. } if *i == id))
+        };
         let dir = crate::input::LEFT | crate::input::RIGHT;
         let nav = crate::input::UP | crate::input::DOWN;
         let t0 = if m.released & crate::input::A != 0 && self.alloc {
@@ -538,11 +662,29 @@ impl Page for Status {
         } else {
             T0_IDLE
         };
-        let base = if self.alloc { REDRAW_BASE_ALLOC } else { REDRAW_BASE };
+        let base = if self.alloc {
+            REDRAW_BASE_ALLOC
+        } else {
+            REDRAW_BASE
+        };
         // the portrait's decompression (every redraw; data dependent)
         let ci = self.char_index();
-        let pb = w.story.chars.get(ci.max(0) as usize).and_then(|cs| d.forms.get(cs.form.max(0) as usize)).map(|f| f.portraits[0] as i32).unwrap_or(0);
-        let dec = if pb >= 8 { d.portrait_cycles.get((pb - 8) as usize).copied().filter(|&c| c != 0).unwrap_or(PORTRAIT_CYCLES) } else { 0 } as i64;
+        let pb = w
+            .story
+            .chars
+            .get(ci.max(0) as usize)
+            .and_then(|cs| d.forms.get(cs.form.max(0) as usize))
+            .map(|f| f.portraits[0] as i32)
+            .unwrap_or(0);
+        let dec = if pb >= 8 {
+            d.portrait_cycles
+                .get((pb - 8) as usize)
+                .copied()
+                .filter(|&c| c != 0)
+                .unwrap_or(PORTRAIT_CYCLES)
+        } else {
+            0
+        } as i64;
         if crate::sndsim::debug() {
             eprintln!(
                 "status redraw: gn {gn} small {small} dec {dec} extra {extra} pressed {:#x} released {:#x} alloc {} focus {:?} events {} img {:?}",
@@ -554,6 +696,9 @@ impl Page for Status {
                 v.layers.first().map(|l| crate::sndsim::ops_summary(&l.ops)).unwrap_or_default()
             );
         }
-        Some(crate::sndsim::Redraw { t0, base: base + dec + extra + gn * REDRAW_GLYPH / 10_000 + small * REDRAW_CURSOR })
+        Some(crate::sndsim::Redraw {
+            t0,
+            base: base + dec + extra + gn * REDRAW_GLYPH / 10_000 + small * REDRAW_CURSOR,
+        })
     }
 }

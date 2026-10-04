@@ -27,6 +27,15 @@ impl ColFont {
             }
             let (x, y, w) = (g["x"].as_u64().unwrap_or(0) as u32, g["y"].as_u64().unwrap_or(0) as u32, g["w"].as_u64().unwrap_or(0) as u32);
             let mut cols = vec![0u32; w as usize];
+            // the glyph's own columns when listed: a glyph wider than its 16-px atlas cell (the title font's A, M,
+            // O, Q, W) runs into the next cell there
+            if let Some(js) = g["cols"].as_array().filter(|a| a.len() == w as usize) {
+                for (col, v) in cols.iter_mut().zip(js) {
+                    *col = v.as_u64().unwrap_or(0) as u32 & 0xFFFF;
+                }
+                glyphs[c] = Some((w, cols));
+                continue;
+            }
             for (dx, col) in cols.iter_mut().enumerate() {
                 for dy in 0..16u32 {
                     let (ax, ay) = (x + dx as u32, y + dy);

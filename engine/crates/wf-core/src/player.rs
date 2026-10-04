@@ -16,8 +16,23 @@ use crate::world::{broadcast, Body, EntityId, Event, HitMsg, World};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-const PUNCH_RECT: [[i32; 4]; 4] = [[0, 0, 16, 16], [0, -24, 16, 0], [-8, -24, 0, 8], [16, -24, 24, 8]];
-const FACE_TBL: [[u8; 4]; 9] = [[0, 1, 2, 3], [2, 2, 2, 2], [3, 3, 3, 3], [1, 1, 1, 1], [1, 1, 2, 2], [1, 1, 3, 3], [0, 0, 0, 0], [0, 0, 2, 2], [0, 0, 3, 3]];
+const PUNCH_RECT: [[i32; 4]; 4] = [
+    [0, 0, 16, 16],
+    [0, -24, 16, 0],
+    [-8, -24, 0, 8],
+    [16, -24, 24, 8],
+];
+const FACE_TBL: [[u8; 4]; 9] = [
+    [0, 1, 2, 3],
+    [2, 2, 2, 2],
+    [3, 3, 3, 3],
+    [1, 1, 1, 1],
+    [1, 1, 2, 2],
+    [1, 1, 3, 3],
+    [0, 0, 0, 0],
+    [0, 0, 2, 2],
+    [0, 0, 3, 3],
+];
 fn skill_raw(id: i32) -> Option<i32> {
     Some(match id {
         1 | 2 | 3 | 6 | 11 | 15 | 16 => 19,
@@ -83,28 +98,73 @@ fn skill_sub(id: i32) -> u8 {
 }
 /// a skill's damage multiplier: the content's `engine.damage` (mods), else the built-in table of its behaviour
 fn skill_mult_of(w: &World, real: i32, lv: i32) -> i32 {
-    w.data.skill_engine(real).and_then(|e| SkillEngine::pick(&e.damage, lv)).unwrap_or_else(|| skill_mult(w.data.skill_kind(real), lv))
+    w.data
+        .skill_engine(real)
+        .and_then(|e| SkillEngine::pick(&e.damage, lv))
+        .unwrap_or_else(|| skill_mult(w.data.skill_kind(real), lv))
 }
 /// a skill's attack sub-type: the content's `engine.attack_sub` (mods), else the built-in one of its behaviour
 fn skill_sub_of(w: &World, real: i32) -> u8 {
-    w.data.skill_engine(real).and_then(|e| e.attack_sub).unwrap_or_else(|| skill_sub(w.data.skill_kind(real)))
+    w.data
+        .skill_engine(real)
+        .and_then(|e| e.attack_sub)
+        .unwrap_or_else(|| skill_sub(w.data.skill_kind(real)))
 }
-const SWORD_BOX: [[i32; 4]; 8] = [[39, 10, 32, 8], [29, 2, 32, 32], [-4, 0, 8, 32], [-13, 2, 32, 32], [-23, 10, 32, 8], [-12, 46, 32, 32], [-4, 46, 8, 32], [28, 46, 32, 32]];
+const SWORD_BOX: [[i32; 4]; 8] = [
+    [39, 10, 32, 8],
+    [29, 2, 32, 32],
+    [-4, 0, 8, 32],
+    [-13, 2, 32, 32],
+    [-23, 10, 32, 8],
+    [-12, 46, 32, 32],
+    [-4, 46, 8, 32],
+    [28, 46, 32, 32],
+];
 const VOLLEY_POS: [(i32, i32); 4] = [(10, 8), (10, -20), (-8, -8), (24, -8)];
 const DASH_VEC: [(i32, i32); 4] = [(0, 1), (0, -1), (-1, 0), (1, 0)];
 const KNOCK_VEC: [(i32, i32); 4] = [(0, 192), (0, -192), (-192, 0), (192, 0)];
 const BLOCK_PUSH: [(i32, i32); 4] = [(0, -512), (0, 512), (512, 0), (-512, 0)];
-const ENERGY_PUNCH_RECT_L3: [[i32; 4]; 4] = [[0, 0, 24, 28], [-4, -36, 20, 0], [-20, -24, 0, 8], [16, -24, 36, 8]];
+const ENERGY_PUNCH_RECT_L3: [[i32; 4]; 4] = [
+    [0, 0, 24, 28],
+    [-4, -36, 20, 0],
+    [-20, -24, 0, 8],
+    [16, -24, 36, 8],
+];
 const BURNING_HOLD: [(i32, i32); 4] = [(8, -2), (12, -2), (19, -6), (-3, -6)];
 const BEAM_CHARGE_KAME: [(i32, i32); 4] = [(8, -2), (12, -2), (12, -2), (4, -2)];
 const BEAM_CHARGE_BANSHEE: [(i32, i32); 4] = [(2, 6), (13, -25), (-8, -6), (24, -6)];
 const BBK_FLARE_POS: [(i32, i32); 4] = [(8, 16), (8, -32), (-16, -6), (32, -6)];
 const FLAME_FIRST: [(i32, i32); 4] = [(8, 16), (8, -32), (0, -6), (16, -6)];
 /// SetAnim id -> raw animation (0x08072670 + 1)
-pub const ANIM_RAW: [i32; 25] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 19, 20, 21, 22, 23, 24, 11, 12];
+pub const ANIM_RAW: [i32; 25] = [
+    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 19, 20, 21, 22, 23, 24, 11, 12,
+];
 const ANIM_STATE: [Gs; 25] = [
-    Gs::Idle, Gs::Walk, Gs::Dash, Gs::Once3, Gs::Punch, Gs::Punch, Gs::Punch, Gs::Hold0, Gs::Bored, Gs::Once3, Gs::LoopC, Gs::LoopC, Gs::Once4, Gs::LoopC, Gs::LoopC,
-    Gs::LoopB, Gs::OnceHold, Gs::Once4, Gs::Once4, Gs::Once4, Gs::Once4, Gs::Once4, Gs::Once4, Gs::SsUp, Gs::SsRevert,
+    Gs::Idle,
+    Gs::Walk,
+    Gs::Dash,
+    Gs::Once3,
+    Gs::Punch,
+    Gs::Punch,
+    Gs::Punch,
+    Gs::Hold0,
+    Gs::Bored,
+    Gs::Once3,
+    Gs::LoopC,
+    Gs::LoopC,
+    Gs::Once4,
+    Gs::LoopC,
+    Gs::LoopC,
+    Gs::LoopB,
+    Gs::OnceHold,
+    Gs::Once4,
+    Gs::Once4,
+    Gs::Once4,
+    Gs::Once4,
+    Gs::Once4,
+    Gs::Once4,
+    Gs::SsUp,
+    Gs::SsRevert,
 ];
 
 /// the game's state object at obj+0x14 (lockstep names)
@@ -417,7 +477,11 @@ impl Player {
             forms_allowed: init.forms_allowed,
             punch_anim: 0,
             gs: Gs::Idle,
-            ap: AnimPos { raw: 1, frame: 0, tick: 0 },
+            ap: AnimPos {
+                raw: 1,
+                frame: 0,
+                tick: 0,
+            },
             s_cnt: 0,
             shield: None,
             resist: 128,
@@ -517,15 +581,31 @@ impl Player {
         self.refresh_stats(w);
     }
     fn equips<'a>(&self, w: &'a World) -> Vec<Option<&'a Equip>> {
-        self.equip.iter().map(|&id| w.data.equipment.iter().find(|e| e.id == id)).collect()
+        self.equip
+            .iter()
+            .map(|&id| w.data.equipment.iter().find(|e| e.id == id))
+            .collect()
     }
     /// RecalcStats 0x08013C66 + the form bonuses
     pub fn refresh_stats(&mut self, w: &World) {
         let eq = self.equips(w);
-        self.eff = crate::progression::recalc_stats_with(&self.rec, &eq, (self.holy_left > 0).then_some(self.boost));
+        self.eff = crate::progression::recalc_stats_with(
+            &self.rec,
+            &eq,
+            (self.holy_left > 0).then_some(self.boost),
+        );
         let b = w.data.form(self.form).expect("form");
         let e = self.eff;
-        self.a.stats = CombatStats { str_: e.str_ + b.b_str, pow: e.pow + b.b_pow, end: e.end + b.b_end, end2: e.end2 + b.b_end2, res_m: self.resist, res_e: self.resist, crit_bonus: e.crit_pct * 656, block_factor: e.block_factor };
+        self.a.stats = CombatStats {
+            str_: e.str_ + b.b_str,
+            pow: e.pow + b.b_pow,
+            end: e.end + b.b_end,
+            end2: e.end2 + b.b_end2,
+            res_m: self.resist,
+            res_e: self.resist,
+            crit_bonus: e.crit_pct * 656,
+            block_factor: e.block_factor,
+        };
         let wv = 5 * e.spd + 102;
         if b.b_walk < 0 && b.id == 24 {
             self.walk = wv >> 2;
@@ -566,13 +646,22 @@ impl Player {
         }
     }
     fn anim_n(&self, w: &World) -> i32 {
-        match self.a.sprite.and_then(|s| w.data.sprite(s)).and_then(|s| s.anim_raw(self.ap.raw)) {
+        match self
+            .a
+            .sprite
+            .and_then(|s| w.data.sprite(s))
+            .and_then(|s| s.anim_raw(self.ap.raw))
+        {
             Some(a) => a.nframes(),
             None => 0,
         }
     }
     fn has_anim(&self, w: &World, raw: i32) -> bool {
-        self.a.sprite.and_then(|s| w.data.sprite(s)).and_then(|s| s.anim_raw(raw)).is_some()
+        self.a
+            .sprite
+            .and_then(|s| w.data.sprite(s))
+            .and_then(|s| s.anim_raw(raw))
+            .is_some()
     }
     fn idle_state(&self, w: &World) -> Gs {
         if self.form_ref(w).controller == 0x3001b64 {
@@ -583,8 +672,14 @@ impl Player {
     }
     /// the sprite shown = obj+0x50 / +0x11
     fn sync_anim(&mut self, w: &World) {
-        let Some(sp) = self.a.sprite.and_then(|s| w.data.sprite(s)) else { return };
-        self.a.anim = sp.by_raw.get(&self.ap.raw).or_else(|| sp.by_raw.get(&1)).copied();
+        let Some(sp) = self.a.sprite.and_then(|s| w.data.sprite(s)) else {
+            return;
+        };
+        self.a.anim = sp
+            .by_raw
+            .get(&self.ap.raw)
+            .or_else(|| sp.by_raw.get(&1))
+            .copied();
     }
     fn skill_lv(&self, w: &World, id: i32) -> i32 {
         match w.data.skills.get(&id) {
@@ -593,9 +688,15 @@ impl Player {
         }
     }
     fn skill_cost(&self, w: &World, id: i32) -> i32 {
-        let Some(s) = w.data.skills.get(&id) else { return 0 };
+        let Some(s) = w.data.skills.get(&id) else {
+            return 0;
+        };
         let lv = self.skill_lv(w, id);
-        if let Some(c) = s.engine.as_ref().and_then(|e| SkillEngine::pick(&e.cost, lv)) {
+        if let Some(c) = s
+            .engine
+            .as_ref()
+            .and_then(|e| SkillEngine::pick(&e.cost, lv))
+        {
             return c;
         }
         let real = id;
@@ -606,7 +707,10 @@ impl Player {
         if matches!(id, 20 | 22 | 18 | 12) {
             return if id == 20 { 10 } else { 0 };
         }
-        s.costs.get((lv as usize).min(s.costs.len().saturating_sub(1))).copied().unwrap_or(s.min_ep)
+        s.costs
+            .get((lv as usize).min(s.costs.len().saturating_sub(1)))
+            .copied()
+            .unwrap_or(s.min_ep)
     }
 }
 
@@ -629,7 +733,11 @@ fn sfx_stop(w: &mut World, id: i32) {
 }
 
 fn spend(w: &mut World, i: usize, cost: i32, scaled_already: bool) {
-    let c = if scaled_already { cost } else { pr(w, i).scaled(cost) };
+    let c = if scaled_already {
+        cost
+    } else {
+        pr(w, i).scaled(cost)
+    };
     if c <= 0 {
         return;
     }
@@ -684,7 +792,9 @@ fn apply_form(w: &mut World, i: usize, id: i32) {
 
 /// Actor.setAnim for the skill code: the named animation (n -> raw n + 1 / name) becomes obj+0x50
 fn set_anim_named(w: &mut World, i: usize, refs: &[AnimRef], restart: bool) {
-    let Some(sp) = pr(w, i).a.sprite.and_then(|s| w.data.sprite(s)) else { return };
+    let Some(sp) = pr(w, i).a.sprite.and_then(|s| w.data.sprite(s)) else {
+        return;
+    };
     let mut found = None;
     for r in refs {
         let a = match r {
@@ -721,7 +831,9 @@ pub fn set_idle(w: &mut World, i: usize) {
 
 /// a player is in Instant Transmission's target pick (the selector's modal loop replaces the frame)
 pub fn it_picking(w: &World) -> bool {
-    (0..w.ents.len()).any(|k| !w.ents[k].removed && matches!(&w.ents[k].body, Body::Player(p) if p.it_sel.is_some()))
+    (0..w.ents.len()).any(|k| {
+        !w.ents[k].removed && matches!(&w.ents[k].body, Body::Player(p) if p.it_sel.is_some())
+    })
 }
 
 /// the item-get pose ends while Instant Transmission's field run waits for the event its arrival fired: the run's
@@ -769,7 +881,11 @@ pub fn import_state(w: &mut World, i: usize, gs: Gs) {
 /// SetAnim(id) (vfunc +0x28 0x0800ECF0)
 fn set_anim_id(w: &mut World, i: usize, id: usize) {
     p(w, i).ap.raw = ANIM_RAW[id];
-    let gs = if id == 0 { pr(w, i).idle_state(w) } else { ANIM_STATE[id] };
+    let gs = if id == 0 {
+        pr(w, i).idle_state(w)
+    } else {
+        ANIM_STATE[id]
+    };
     enter_state(w, i, gs);
 }
 fn coarse(pl: &Player, gs: Gs) -> PState {
@@ -899,7 +1015,20 @@ fn enter_state(w: &mut World, i: usize, gs: Gs) {
             if gs == Gs::SsUp {
                 let (ax, ay) = pr(w, i).a.center();
                 let me = w.ents[i].id;
-                fx::add(w, Fx::Loop { id: 0x0875_2d28, x: ax, y: ay + 1, first: 0, n: 3, rec: 0, rate: 0x4000, acc: 0, alive: Alive::Transform { p: me } });
+                fx::add(
+                    w,
+                    Fx::Loop {
+                        id: 0x0875_2d28,
+                        x: ax,
+                        y: ay + 1,
+                        first: 0,
+                        n: 3,
+                        rec: 0,
+                        rate: 0x4000,
+                        acc: 0,
+                        alive: Alive::Transform { p: me },
+                    },
+                );
             }
             sfx(w, 54, 64);
         }
@@ -1211,13 +1340,22 @@ pub fn gain_xp(w: &mut World, i: usize, exp: i64) {
     // Super Janemba KO adds 20,500 to Goku's and to Vegeta's XP, Gogeta's stays)
     if w.field.is_some() {
         let ch = pr(w, i).form_ref(w).char_;
-        let fu = if pr(w, i).form_ref(w).fusion { w.story.chars.get(ch as usize).map(|c| c.fusion).unwrap_or(0) } else { 0 };
+        let fu = if pr(w, i).form_ref(w).fusion {
+            w.story
+                .chars
+                .get(ch as usize)
+                .map(|c| c.fusion)
+                .unwrap_or(0)
+        } else {
+            0
+        };
         if fu != 0 {
             // 0x08013914: the components one after the other (low nibble first) - add, roll, and on a level the hook
             // #3 as a nested scene with that component current; the second component's XP comes after that hook
             // (real run 6-9 r052_006 f13,077: Goten's level rolls, Trunks' three levels after the popup, f13,315)
             let host = w.field.as_ref().is_some_and(|f| f.host);
-            let comps = [(fu & 15) as i32, ((fu >> 4) & 15) as i32];            let mut leveled = false;
+            let comps = [(fu & 15) as i32, ((fu >> 4) & 15) as i32];
+            let mut leveled = false;
             for (k, &c) in comps.iter().enumerate() {
                 if !component_xp(w, c, g) {
                     continue;
@@ -1244,7 +1382,12 @@ pub fn gain_xp(w: &mut World, i: usize, exp: i64) {
     if nl > pr(w, i).rec.level {
         let old = pr(w, i).rec.level;
         let ch = pr(w, i).form_ref(w).char_;
-        let growth = w.data.chars.iter().find(|c| c.index == ch).map(|c| c.growth);
+        let growth = w
+            .data
+            .chars
+            .iter()
+            .find(|c| c.index == ch)
+            .map(|c| c.growth);
         if let Some(g) = growth {
             let mut rec = pr(w, i).rec.clone();
             level_up(&mut rec, &g, old, nl, &mut w.rng);
@@ -1256,11 +1399,12 @@ pub fn gain_xp(w: &mut World, i: usize, exp: i64) {
         // there; without one the jingle alone stands in
         if w.field.as_ref().is_some_and(|f| f.host) {
             let entity = w.ents[i].id;
-            w.events.push(crate::world::Event::Field(crate::field::FieldEvent::Run {
-                run: crate::fieldcontent::Callback::Event("s003".into()),
-                cause: crate::field::Cause::LevelUp { entity },
-                slot: pr(w, i).slot,
-            }));
+            w.events
+                .push(crate::world::Event::Field(crate::field::FieldEvent::Run {
+                    run: crate::fieldcontent::Callback::Event("s003".into()),
+                    cause: crate::field::Cause::LevelUp { entity },
+                    slot: pr(w, i).slot,
+                }));
         } else {
             sfx(w, 36, 64);
         }
@@ -1272,10 +1416,19 @@ pub fn gain_xp(w: &mut World, i: usize, exp: i64) {
 fn refuse(w: &mut World, i: usize) {
     let fu = {
         let ch = pr(w, i).form_ref(w).char_;
-        w.story.chars.get(ch as usize).map(|c| c.fusion).unwrap_or(0)
+        w.story
+            .chars
+            .get(ch as usize)
+            .map(|c| c.fusion)
+            .unwrap_or(0)
     };
     let (a, b) = ((fu & 15) as usize, ((fu >> 4) & 15) as usize);
-    let (Some(ra), Some(rb)) = (w.story.chars.get(a).map(|c| c.rec.clone()), w.story.chars.get(b).map(|c| c.rec.clone())) else { return };
+    let (Some(ra), Some(rb)) = (
+        w.story.chars.get(a).map(|c| c.rec.clone()),
+        w.story.chars.get(b).map(|c| c.rec.clone()),
+    ) else {
+        return;
+    };
     let old = pr(w, i).rec.clone();
     let mut r = crate::progression::fuse(&ra, &rb);
     r.hp = r.max_hp;
@@ -1306,7 +1459,9 @@ pub fn fusion_levelup_done(w: &mut World) {
 fn component_xp(w: &mut World, c: i32, g: i64) -> bool {
     let growth = w.data.chars.iter().find(|x| x.index == c).map(|x| x.growth);
     let xt = Arc::clone(&w.data);
-    let Some(cs) = w.story.chars.get_mut(c as usize) else { return false };
+    let Some(cs) = w.story.chars.get_mut(c as usize) else {
+        return false;
+    };
     cs.rec.xp += g;
     let nl = level_of(cs.rec.xp, &xt.xp_table);
     if nl <= cs.rec.level {
@@ -1324,11 +1479,12 @@ fn component_xp(w: &mut World, c: i32, g: i64) -> bool {
 fn levelup_hook(w: &mut World, i: usize, c: i32) {
     w.story.levelup_char = Some(c);
     let entity = w.ents[i].id;
-    w.events.push(crate::world::Event::Field(crate::field::FieldEvent::Run {
-        run: crate::fieldcontent::Callback::Event("s003".into()),
-        cause: crate::field::Cause::LevelUp { entity },
-        slot: pr(w, i).slot,
-    }));
+    w.events
+        .push(crate::world::Event::Field(crate::field::FieldEvent::Run {
+            run: crate::fieldcontent::Callback::Event("s003".into()),
+            cause: crate::field::Cause::LevelUp { entity },
+            slot: pr(w, i).slot,
+        }));
 }
 
 /// `give_xp` (0xC2): the kill-XP routine without the hook (the script native runs hook #3 inline itself); true when
@@ -1347,7 +1503,10 @@ pub fn gain_xp_levels(w: &mut World, i: usize, exp: i64) -> bool {
     let up = pr(w, i).rec.level > before;
     if up {
         // the jingle comes from the hook
-        if let Some(k) = (n..w.events.len()).rev().find(|&k| matches!(w.events[k], crate::world::Event::Sfx { id: 36, .. })) {
+        if let Some(k) = (n..w.events.len())
+            .rev()
+            .find(|&k| matches!(w.events[k], crate::world::Event::Sfx { id: 36, .. }))
+        {
             w.events.remove(k);
         }
     }
@@ -1374,7 +1533,10 @@ pub fn update(w: &mut World, i: usize) {
     }
     // an event a broken breakable's callback started at this frame's start (before the object pass): the event holds
     // the frame, the player is not updated (segment sb 21-5: the punch's last tick stays one frame more)
-    if w.field.as_ref().is_some_and(|f| f.busy && f.busy_pre_pass == w.frame && f.busy_since + 1 == w.frame) {
+    if w.field
+        .as_ref()
+        .is_some_and(|f| f.busy && f.busy_pre_pass == w.frame && f.busy_since + 1 == w.frame)
+    {
         return;
     }
     {
@@ -1438,7 +1600,10 @@ pub fn update(w: &mut World, i: usize) {
     // frame the player is let go, then ticks again in that frame)
     // - and the item-get presentation (its loop replaces the player update: Goten's regen count in the Dragon Ball
     // dungeon 11-22, r010_016, stays at 24,310 through the 61 frames of a chest's item-get)
-    let held = w.field.as_ref().is_some_and(|f| f.busy || f.item_get.is_some())
+    let held = w
+        .field
+        .as_ref()
+        .is_some_and(|f| f.busy || f.item_get.is_some())
         || crate::scene::is_puppet(w, w.ents[i].id)
             && w.scene.depth == 0
             && !w.scene.ai_wait.is_empty()
@@ -1447,7 +1612,11 @@ pub fn update(w: &mut World, i: usize) {
     if since_ko < 199 && (!pr(w, i).dead || pr(w, i).story_form(w)) {
         if !held {
             passive(w, i);
-        } else if w.field.as_ref().is_some_and(|f| f.busy && f.item_get.is_none()) {
+        } else if w
+            .field
+            .as_ref()
+            .is_some_and(|f| f.busy && f.item_get.is_none())
+        {
             p(w, i).passive_held = true;
         }
     }
@@ -1481,7 +1650,10 @@ pub fn update(w: &mut World, i: usize) {
     // an inline hook's event (a defeat callback's script: the VM's nested loop too, held path 0x0800F5E0) ticks the
     // state's animation only: a hurt player's knockback does not move in the held frame (13-45: s393 from a
     // Samurai's defeat - tick 5 -> 7 in the exit frame, one knockback step)
-    let nested = w.field.as_ref().is_some_and(|f| f.nested && !f.script_fade_in || f.held_event && f.busy);
+    let nested = w
+        .field
+        .as_ref()
+        .is_some_and(|f| f.nested && !f.script_fade_in || f.held_event && f.busy);
     if !pr(w, i).dead && !puppet && !nested {
         control(w, i);
     }
@@ -1666,7 +1838,10 @@ fn tick_blast(w: &mut World, i: usize) {
     // a modded skill on the Energy Blast behaviour may move the shot frame / the refire window
     let real = pr(w, i).sk.as_ref().map(|s| s.id).unwrap_or(7);
     let eng = w.data.skill_engine(real);
-    let (fire, recovery) = (eng.and_then(|e| e.fire_frame).unwrap_or(16), eng.and_then(|e| e.recovery).unwrap_or(40));
+    let (fire, recovery) = (
+        eng.and_then(|e| e.fire_frame).unwrap_or(16),
+        eng.and_then(|e| e.recovery).unwrap_or(40),
+    );
     if t < recovery {
         if t == fire {
             p(w, i).ap.frame = 1;
@@ -1694,7 +1869,14 @@ fn fire_blast(w: &mut World, i: usize) {
     let dir = pr(w, i).a.facing;
     let me = w.ents[i].id;
     let real = pr(w, i).sk.as_ref().map(|s| s.id).unwrap_or(7);
-    let (a, mult) = if w.data.skill_engine(real).is_none() { (atk(4), 1024) } else { (atk(skill_sub_of(w, real)), skill_mult_of(w, real, pr(w, i).skill_lv(w, real))) };
+    let (a, mult) = if w.data.skill_engine(real).is_none() {
+        (atk(4), 1024)
+    } else {
+        (
+            atk(skill_sub_of(w, real)),
+            skill_mult_of(w, real, pr(w, i).skill_lv(w, real)),
+        )
+    };
     let eng = w.data.skill_engine(real).cloned();
     let id = shots::ki_blast(w, me, dir, 1, mx << 8, my << 8, a, mult, true);
     // the player's blast (vtable 0x0804B454) tests its record's box centred on its position: 16 x 16, thin from tick 16
@@ -1766,12 +1948,24 @@ pub fn levelup_hook_done(w: &mut World) {
     }
     // the kill XP held behind the hook (`Field::xp_after_hook`): added now, one after the other; another level-up
     // queues its own hook and holds the rest again
-    let held = w.field.as_mut().map(|f| std::mem::take(&mut f.xp_after_hook)).unwrap_or_default();
+    let held = w
+        .field
+        .as_mut()
+        .map(|f| std::mem::take(&mut f.xp_after_hook))
+        .unwrap_or_default();
     for (k, &(pid, exp)) in held.iter().enumerate() {
         let Some(pi) = w.find(pid) else { continue };
         let n = w.events.len();
         gain_xp(w, pi, exp);
-        let leveled = w.events[n..].iter().any(|e| matches!(e, crate::world::Event::Field(crate::field::FieldEvent::Run { cause: crate::field::Cause::LevelUp { .. }, .. })));
+        let leveled = w.events[n..].iter().any(|e| {
+            matches!(
+                e,
+                crate::world::Event::Field(crate::field::FieldEvent::Run {
+                    cause: crate::field::Cause::LevelUp { .. },
+                    ..
+                })
+            )
+        });
         if leveled {
             if let Some(f) = w.field.as_mut() {
                 f.xp_after_hook.extend_from_slice(&held[k + 1..]);
@@ -1840,7 +2034,11 @@ fn swap_to_partner(w: &mut World, i: usize) {
         pl.rec.pow = partner.base[1];
         pl.rec.end = partner.base[2];
         pl.rec.spd = partner.base[3];
-        pl.skills = if partner.skills.is_empty() { vec![7] } else { partner.skills.clone() };
+        pl.skills = if partner.skills.is_empty() {
+            vec![7]
+        } else {
+            partner.skills.clone()
+        };
         pl.sel = partner.slot;
         pl.skill_level = partner.level0;
         pl.ss_gauge = partner.ss_gauge;
@@ -1982,9 +2180,19 @@ pub fn sync_skill_level(w: &mut World, i: usize) {
     if w.field.is_none() {
         return;
     }
-    let Some(c) = crate::story::char_of_form(&w.data, pr(w, i).form) else { return };
+    let Some(c) = crate::story::char_of_form(&w.data, pr(w, i).form) else {
+        return;
+    };
     let sel = pr(w, i).sel;
-    let Some(lv) = w.story.chars.get(c as usize).filter(|cs| sel < cs.skills.len()).map(|cs| cs.skill_cur(sel)) else { return };
+    let Some(lv) = w
+        .story
+        .chars
+        .get(c as usize)
+        .filter(|cs| sel < cs.skills.len())
+        .map(|cs| cs.skill_cur(sel))
+    else {
+        return;
+    };
     p(w, i).skill_level = lv;
 }
 
@@ -1995,7 +2203,11 @@ pub fn release_passive(w: &mut World, i: usize) {
         // the player is an object after the event's in the list pass: its own update follows the held tick in the
         // same frame - a second animation tick and the state's control with the frame's input (Kyodai Pyramid
         // 14-21: the idle tick advances by 2 in the frame the bridge switch's event s418 ends)
-        if pr(w, i).it_sel.is_none() && !pr(w, i).gone && pr(w, i).defuse.is_none() && !crate::fieldworld::flying(w) {
+        if pr(w, i).it_sel.is_none()
+            && !pr(w, i).gone
+            && pr(w, i).defuse.is_none()
+            && !crate::fieldworld::flying(w)
+        {
             anim_tick(w, i);
             if !crate::scene::is_puppet(w, w.ents[i].id) {
                 control(w, i);
@@ -2012,7 +2224,10 @@ pub fn release_passive(w: &mut World, i: usize) {
 /// AI: the game's regen count stays, ours stepped)
 pub fn ai_event_started(w: &mut World) {
     let frame = w.frame;
-    if w.field.as_ref().is_some_and(|f| f.busy || f.item_get.is_some() || f.busy_since == frame) {
+    if w.field
+        .as_ref()
+        .is_some_and(|f| f.busy || f.item_get.is_some() || f.busy_since == frame)
+    {
         return;
     }
     for s in 0..w.players.len() {
@@ -2045,7 +2260,10 @@ pub fn passive_after_scripts(w: &mut World) {
         if !std::mem::take(&mut p(w, i).passive_held) {
             continue;
         }
-        if w.field.as_ref().is_some_and(|f| !f.busy && f.item_get.is_none()) {
+        if w.field
+            .as_ref()
+            .is_some_and(|f| !f.busy && f.item_get.is_none())
+        {
             passive(w, i);
         }
     }
@@ -2066,7 +2284,10 @@ fn passive(w: &mut World, i: usize) {
         pl.regen_timer += 110;
         if pl.regen_timer >= 0x10000 {
             pl.regen_timer -= 0x10000;
-            pl.rec.ep = pl.rec.max_ep.min(pl.rec.ep + ((pl.rec.max_ep * 0x7ae) >> 16));
+            pl.rec.ep = pl
+                .rec
+                .max_ep
+                .min(pl.rec.ep + ((pl.rec.max_ep * 0x7ae) >> 16));
             benched = true;
         }
         if pl.eff.hp_regen256 != 0 {
@@ -2360,7 +2581,9 @@ fn ctl_block(w: &mut World, i: usize) {
 }
 fn shield_tick(w: &mut World, i: usize) {
     let pl = p(w, i);
-    let Some((mut pow, on)) = pl.shield else { return };
+    let Some((mut pow, on)) = pl.shield else {
+        return;
+    };
     if on {
         pow += 1;
         if pow >= 0x38 {
@@ -2379,7 +2602,22 @@ fn melee(w: &mut World, i: usize) {
     let a = &pr(w, i).a;
     let rect = Rect::at(PUNCH_RECT[a.facing as usize], a.px(), a.py());
     let me = w.ents[i].id;
-    let mut m = HitMsg { team: 1, rect, dir: a.facing, mult: 0x400, atk: atk(2), attacker: me, att_stats: a.stats, att_is_player: true, source: me, crit: false, raw: 0, dmg: 0, no_react: false, foot: false };
+    let mut m = HitMsg {
+        team: 1,
+        rect,
+        dir: a.facing,
+        mult: 0x400,
+        atk: atk(2),
+        attacker: me,
+        att_stats: a.stats,
+        att_is_player: true,
+        source: me,
+        crit: false,
+        raw: 0,
+        dmg: 0,
+        no_react: false,
+        foot: false,
+    };
     // field: areas without combat (area record +8 = 0) send no hit; a hit nobody accepted becomes the interact
     // message (talk, A pickups), then the A-trigger test — any of them suppresses the punch (field.rs / fieldnpc.rs)
     let combat = w.field.as_ref().is_none_or(|f| f.combat);
@@ -2425,7 +2663,11 @@ pub fn can_use_skill(w: &World, i: usize, id: i32) -> bool {
     }
     let real = id;
     let id = w.data.skill_kind(real);
-    if let Some(c) = w.data.skill_engine(real).and_then(|e| SkillEngine::pick(&e.check, pl.skill_lv(w, real))) {
+    if let Some(c) = w
+        .data
+        .skill_engine(real)
+        .and_then(|e| SkillEngine::pick(&e.check, pl.skill_lv(w, real)))
+    {
         if !pl.can_afford(w, c) {
             return false;
         }
@@ -2459,7 +2701,13 @@ pub fn can_use_skill(w: &World, i: usize, id: i32) -> bool {
             }
             pl.can_afford(w, [10, 33, 100][pl.skill_lv(w, real).min(2) as usize])
         }
-        _ if w.data.skill_engine(real).is_some_and(|e| !e.check.is_empty()) => true,
+        _ if w
+            .data
+            .skill_engine(real)
+            .is_some_and(|e| !e.check.is_empty()) =>
+        {
+            true
+        }
         _ => match skill_check(id) {
             Some(c) => pl.can_afford(w, c[(pl.skill_lv(w, real) as usize).min(c.len() - 1)]),
             None => pl.can_afford(w, pl.skill_cost(w, real)),
@@ -2489,14 +2737,30 @@ pub fn start_skill(w: &mut World, i: usize) {
     }
     let f = pr(w, i).form_ref(w).clone();
     if id == 20 {
-        return if f.ss { revert(w, i) } else { start_transform(w, i, f.up) };
+        return if f.ss {
+            revert(w, i)
+        } else {
+            start_transform(w, i, f.up)
+        };
     }
     if id == 22 {
-        return if f.ss3 { revert(w, i) } else { start_transform(w, i, f.up) };
+        return if f.ss3 {
+            revert(w, i)
+        } else {
+            start_transform(w, i, f.up)
+        };
     }
     if id == 18 {
         p(w, i).ap.raw = if f.up != 255 { 20 } else { 12 };
-        enter_state(w, i, if f.up != 255 { Gs::Skill(18) } else { Gs::Skill18r });
+        enter_state(
+            w,
+            i,
+            if f.up != 255 {
+                Gs::Skill(18)
+            } else {
+                Gs::Skill18r
+            },
+        );
         return;
     }
     if id == 14 {
@@ -2508,7 +2772,13 @@ pub fn start_skill(w: &mut World, i: usize) {
         let pl = p(w, i);
         pl.state = PState::Skill;
         pl.t = 0;
-        pl.sk = Some(SkillInst { id: real, serial, held: true, release: -1, ..Default::default() });
+        pl.sk = Some(SkillInst {
+            id: real,
+            serial,
+            held: true,
+            release: -1,
+            ..Default::default()
+        });
     }
     if let Some(raw) = skill_raw(id) {
         p(w, i).ap.raw = raw;
@@ -2547,7 +2817,10 @@ fn sk_mut(w: &mut World, i: usize) -> Option<&mut SkillInst> {
 /// what each skill state's enter creates (the objects' constructors play the charge sound 3)
 fn skill_enter(w: &mut World, i: usize, id: i32, lv: i32, mult: i32) {
     let me = w.ents[i].id;
-    let a = atk(skill_sub_of(w, pr(w, i).sk.as_ref().map(|s| s.id).unwrap_or(id)));
+    let a = atk(skill_sub_of(
+        w,
+        pr(w, i).sk.as_ref().map(|s| s.id).unwrap_or(id),
+    ));
     let facing = pr(w, i).a.facing;
     let serial = pr(w, i).sk.as_ref().map(|s| s.serial).unwrap_or(0);
     match id {
@@ -2564,7 +2837,10 @@ fn skill_enter(w: &mut World, i: usize, id: i32, lv: i32, mult: i32) {
         2 => {
             let (bx, by) = shots::BIGBANG_POS[facing as usize];
             let (px, py) = (pr(w, i).a.px(), pr(w, i).a.py());
-            let bid = shots::add(w, shots::big_bang(me, facing, (px + bx) << 8, (py + by) << 8, lv));
+            let bid = shots::add(
+                w,
+                shots::big_bang(me, facing, (px + bx) << 8, (py + by) << 8, lv),
+            );
             p(w, i).big_bang = bid;
             if let Some(s) = sk_mut(w, i) {
                 s.proj = bid;
@@ -2581,7 +2857,15 @@ fn skill_enter(w: &mut World, i: usize, id: i32, lv: i32, mult: i32) {
         5 => sfx(w, 24, 64),
         8 => sfx(w, 47, 64),
         9 => {
-            let f = fx::add(w, Fx::EnergySword { owner: me, slash: -1, t: 0, alive: Alive::Skill { p: me, serial } });
+            let f = fx::add(
+                w,
+                Fx::EnergySword {
+                    owner: me,
+                    slash: -1,
+                    t: 0,
+                    alive: Alive::Skill { p: me, serial },
+                },
+            );
             if let Some(s) = sk_mut(w, i) {
                 s.fx = f;
             }
@@ -2591,7 +2875,19 @@ fn skill_enter(w: &mut World, i: usize, id: i32, lv: i32, mult: i32) {
             let (hx, hy) = BURNING_HOLD[facing as usize];
             let (dx, dy) = DIR_VEC[facing as usize];
             let (px, py) = (pr(w, i).a.px(), pr(w, i).a.py());
-            let o = StraightOpts { vx: dx * 768, vy: dy * 768, b: [7, 7, 14, 14], a, mult, name: shots::SName::Burning, delay: 1 << 30, fx_end: 16, rng_hit: 2, sfx_hit: 48, ..Default::default() };
+            let o = StraightOpts {
+                vx: dx * 768,
+                vy: dy * 768,
+                b: [7, 7, 14, 14],
+                a,
+                mult,
+                name: shots::SName::Burning,
+                delay: 1 << 30,
+                fx_end: 16,
+                rng_hit: 2,
+                sfx_hit: 48,
+                ..Default::default()
+            };
             let sid = shots::add_straight(w, me, facing, 1, (px + hx) << 8, (py + hy) << 8, o);
             if let Some(s) = sk_mut(w, i) {
                 s.proj = sid;
@@ -2603,10 +2899,12 @@ fn skill_enter(w: &mut World, i: usize, id: i32, lv: i32, mult: i32) {
 
 fn end_skill(w: &mut World, i: usize) {
     let Some(s) = pr(w, i).sk.clone() else { return };
-    let shot_kind = |w: &World, id: EntityId| w.find(id).and_then(|k| match &w.ents[k].body {
-        Body::Shot(s) => Some((k, s.kind.clone())),
-        _ => None,
-    });
+    let shot_kind = |w: &World, id: EntityId| {
+        w.find(id).and_then(|k| match &w.ents[k].body {
+            Body::Shot(s) => Some((k, s.kind.clone())),
+            _ => None,
+        })
+    };
     match w.data.skill_kind(s.id) {
         crate::modkit::SCRIPTED => crate::modkit::skill_end(w, i),
         15 | 16 | 6 | 1 | 3 => {
@@ -2716,7 +3014,8 @@ fn end_skill(w: &mut World, i: usize) {
     }
     if s.fx != 0 {
         if let Some(k) = w.find(s.fx) {
-            if !matches!(&w.ents[k].body, Body::Fx(f) if matches!(f.as_ref(), Fx::DragonFist { .. })) {
+            if !matches!(&w.ents[k].body, Body::Fx(f) if matches!(f.as_ref(), Fx::DragonFist { .. }))
+            {
                 w.ents[k].removed = true;
             }
         }
@@ -2766,7 +3065,11 @@ fn upd_skill(w: &mut World, i: usize) {
         15 | 16 | 6 | 1 | 3 => {
             let t = tick_up(w);
             if t == 1 && s.fx == 0 {
-                let off = if id == 1 { BEAM_CHARGE_BANSHEE } else { BEAM_CHARGE_KAME };
+                let off = if id == 1 {
+                    BEAM_CHARGE_BANSHEE
+                } else {
+                    BEAM_CHARGE_KAME
+                };
                 let f = fx::beam_charge(w, me, off, fx::BeamSet::Other);
                 sk_mut(w, i).unwrap().fx = f;
             }
@@ -2796,17 +3099,49 @@ fn upd_skill(w: &mut World, i: usize) {
                 };
                 let (fx0, fy0) = vis[facing as usize];
                 let (px, py) = (pr(w, i).a.px(), pr(w, i).a.py());
-                let bid = shots::add(w, shots::kame_beam(me, facing, px + fx0, py + fy0, w.frame as i64 - 23, a, mult, true));
+                let bid = shots::add(
+                    w,
+                    shots::kame_beam(
+                        me,
+                        facing,
+                        px + fx0,
+                        py + fy0,
+                        w.frame as i64 - 23,
+                        a,
+                        mult,
+                        true,
+                    ),
+                );
                 sk_mut(w, i).unwrap().proj = bid;
                 p(w, i).beam_end.push((bid, vec![(true, 32), (false, 33)]));
                 if id == 3 {
                     let (fx0, fy0) = BBK_FLARE_POS[facing as usize];
                     let (px, py) = (pr(w, i).a.px(), pr(w, i).a.py());
-                    fx::add(w, Fx::BbkFlare { x: px + fx0, y: py + fy0, dir: facing, t: 0, ended: false, alive: Alive::Beam { id: bid } });
+                    fx::add(
+                        w,
+                        Fx::BbkFlare {
+                            x: px + fx0,
+                            y: py + fy0,
+                            dir: facing,
+                            t: 0,
+                            ended: false,
+                            alive: Alive::Beam { id: bid },
+                        },
+                    );
                 }
             }
-            let d = if id == 1 || id == 3 { 1174 } else if id == 6 { [128, 427, 1707][lv as usize] } else { [107, 384, 1280][lv as usize] };
-            let d = w.data.skill_engine(real).and_then(|e| SkillEngine::pick(&e.drain, lv)).unwrap_or(d);
+            let d = if id == 1 || id == 3 {
+                1174
+            } else if id == 6 {
+                [128, 427, 1707][lv as usize]
+            } else {
+                [107, 384, 1280][lv as usize]
+            };
+            let d = w
+                .data
+                .skill_engine(real)
+                .and_then(|e| SkillEngine::pick(&e.drain, lv))
+                .unwrap_or(d);
             drain(w, i, d);
             if pr(w, i).energy_left(w) == 0 {
                 return set_state_idle(w, i);
@@ -2819,7 +3154,19 @@ fn upd_skill(w: &mut World, i: usize) {
         11 => {
             let t = tick_up(w);
             if t == 1 && s.fx == 0 {
-                let f = fx::add(w, Fx::RecObj { what: fx::RecWhat::FlameCharge, owner: me, t: 0, alive: Alive::SkillTickLt { p: me, serial: s.serial, n: 24 } });
+                let f = fx::add(
+                    w,
+                    Fx::RecObj {
+                        what: fx::RecWhat::FlameCharge,
+                        owner: me,
+                        t: 0,
+                        alive: Alive::SkillTickLt {
+                            p: me,
+                            serial: s.serial,
+                            n: 24,
+                        },
+                    },
+                );
                 sk_mut(w, i).unwrap().fx = f;
             }
             if t < 24 {
@@ -2842,7 +3189,21 @@ fn upd_skill(w: &mut World, i: usize) {
                 let (px, py) = (pr(w, i).a.px(), pr(w, i).a.py());
                 let (x, y) = (px + ffx, py + ffy);
                 let b0 = flame_link_box(w, 0x0875_68b4, x, y);
-                let fid = fx::add(w, Fx::FlameKame { owner: me, dir: facing, n: lv.min(2) + 3, links: vec![[x, y, 0, 0, b0.x0, b0.y0, b0.x1, b0.y1]], alive: Alive::Skill { p: me, serial: s.serial }, a, mult });
+                let fid = fx::add(
+                    w,
+                    Fx::FlameKame {
+                        owner: me,
+                        dir: facing,
+                        n: lv.min(2) + 3,
+                        links: vec![[x, y, 0, 0, b0.x0, b0.y0, b0.x1, b0.y1]],
+                        alive: Alive::Skill {
+                            p: me,
+                            serial: s.serial,
+                        },
+                        a,
+                        mult,
+                    },
+                );
                 sk_mut(w, i).unwrap().proj = fid;
                 return;
             }
@@ -2870,7 +3231,19 @@ fn upd_skill(w: &mut World, i: usize) {
                 let (ffx, ffy) = shots::FINAL_FLASH_POS[facing as usize];
                 let (px, py) = (pr(w, i).a.px(), pr(w, i).a.py());
                 sfx(w, 32, 64);
-                let bid = shots::add(w, shots::final_flash(me, facing, px + ffx, py + ffy, a, mult, lv.min(2) as u8, w.frame as i64));
+                let bid = shots::add(
+                    w,
+                    shots::final_flash(
+                        me,
+                        facing,
+                        px + ffx,
+                        py + ffy,
+                        a,
+                        mult,
+                        lv.min(2) as u8,
+                        w.frame as i64,
+                    ),
+                );
                 sk_mut(w, i).unwrap().proj = bid;
                 p(w, i).beam_end.push((bid, vec![(true, 32)]));
                 sfx_stop(w, 3);
@@ -2887,7 +3260,9 @@ fn upd_skill(w: &mut World, i: usize) {
             p(w, i).ap.frame = ((t >> 3) & 1) + 3;
         }
         2 => {
-            let Some(bi) = w.find(s.proj).filter(|_| s.proj != 0) else { return };
+            let Some(bi) = w.find(s.proj).filter(|_| s.proj != 0) else {
+                return;
+            };
             if !held {
                 if pr(w, i).ap.tick >= 16 {
                     if let ShotKind::BigBang(b) = &mut w.shot(bi).kind {
@@ -2960,17 +3335,47 @@ fn upd_skill(w: &mut World, i: usize) {
             }
             p(w, i).ap.frame = ((t >> 2) & 1) + 2;
             if t == 8 && lv > 1 {
-                let f = fx::add(w, Fx::RecObj { what: fx::RecWhat::EnergyPunch, owner: me, t: 0, alive: Alive::Skill { p: me, serial: s.serial } });
+                let f = fx::add(
+                    w,
+                    Fx::RecObj {
+                        what: fx::RecWhat::EnergyPunch,
+                        owner: me,
+                        t: 0,
+                        alive: Alive::Skill {
+                            p: me,
+                            serial: s.serial,
+                        },
+                    },
+                );
                 sk_mut(w, i).unwrap().fx = f;
             }
             // one message to every object per frame (no sound / RNG): the melee rect (Lv3 the larger one) from the
             // position before the step
             {
                 let a0 = &pr(w, i).a;
-                let r = if lv > 1 { ENERGY_PUNCH_RECT_L3 } else { PUNCH_RECT }[facing as usize];
+                let r = if lv > 1 {
+                    ENERGY_PUNCH_RECT_L3
+                } else {
+                    PUNCH_RECT
+                }[facing as usize];
                 let rect = Rect::at(r, a0.px(), a0.py());
                 let st = pr(w, i).a.stats;
-                let mut m = HitMsg { team: 1, rect, dir: facing, mult, atk: a, attacker: me, att_stats: st, att_is_player: true, source: me, crit: false, raw: 0, dmg: 0, no_react: false, foot: false };
+                let mut m = HitMsg {
+                    team: 1,
+                    rect,
+                    dir: facing,
+                    mult,
+                    atk: a,
+                    attacker: me,
+                    att_stats: st,
+                    att_is_player: true,
+                    source: me,
+                    crit: false,
+                    raw: 0,
+                    dmg: 0,
+                    no_react: false,
+                    foot: false,
+                };
                 broadcast(w, &mut m, false);
             }
             if lv > 0 {
@@ -2985,7 +3390,18 @@ fn upd_skill(w: &mut World, i: usize) {
         }
         9 => {
             if s.fx == 0 {
-                let f = fx::add(w, Fx::EnergySword { owner: me, slash: -1, t: 0, alive: Alive::Skill { p: me, serial: s.serial } });
+                let f = fx::add(
+                    w,
+                    Fx::EnergySword {
+                        owner: me,
+                        slash: -1,
+                        t: 0,
+                        alive: Alive::Skill {
+                            p: me,
+                            serial: s.serial,
+                        },
+                    },
+                );
                 sk_mut(w, i).unwrap().fx = f;
             }
             if !s.charged {
@@ -3042,14 +3458,33 @@ fn upd_skill(w: &mut World, i: usize) {
             let frame = ((c / 3) & 7) + 2;
             p(w, i).ap.frame = frame;
             let facing = pr(w, i).a.facing;
-            let def = if facing == 3 { [14, 13, 12, 11, 10, 17, 16, 15] } else { [10, 11, 12, 13, 14, 15, 16, 17] }[(frame - 2) as usize];
+            let def = if facing == 3 {
+                [14, 13, 12, 11, 10, 17, 16, 15]
+            } else {
+                [10, 11, 12, 13, 14, 15, 16, 17]
+            }[(frame - 2) as usize];
             let [ox, oy, bw, bh] = SWORD_BOX[def - 10];
             let (px, py) = (pr(w, i).a.px(), pr(w, i).a.py());
             let rect = Rect::new(px - ox, py - oy, px - ox + bw, py - oy + bh);
             // every swing frame: one message to the first receiver; every accepted frame plays 48 + rand(2)
             let st = pr(w, i).a.stats;
             let dir = [2, 0, 0, 0, 3, 1, 1, 1][def - 10];
-            let mut m = HitMsg { team: 1, rect, dir, mult: 0x2800, atk: a, attacker: me, att_stats: st, att_is_player: true, source: me, crit: false, raw: 0, dmg: 0, no_react: false, foot: false };
+            let mut m = HitMsg {
+                team: 1,
+                rect,
+                dir,
+                mult: 0x2800,
+                atk: a,
+                attacker: me,
+                att_stats: st,
+                att_is_player: true,
+                source: me,
+                crit: false,
+                raw: 0,
+                dmg: 0,
+                no_react: false,
+                foot: false,
+            };
             if broadcast(w, &mut m, true) {
                 let r = 48 + w.rng.rand(2);
                 sfx(w, r, 64);
@@ -3138,7 +3573,14 @@ fn upd_skill(w: &mut World, i: usize) {
             if t == 16 {
                 let (gx, gy) = shots::GHOST_SPAWN[facing as usize];
                 let (px, py) = (pr(w, i).a.px(), pr(w, i).a.py());
-                let gid = shots::ghost(w, me, facing, (px + gx) << 8, (py + gy) << 8, s.ghosts.len() as i32);
+                let gid = shots::ghost(
+                    w,
+                    me,
+                    facing,
+                    (px + gx) << 8,
+                    (py + gy) << 8,
+                    s.ghosts.len() as i32,
+                );
                 sk_mut(w, i).unwrap().ghosts.push(gid);
             }
         }
@@ -3204,7 +3646,20 @@ fn start_transform(w: &mut World, i: usize, to: i32) {
     p(w, i).a.blocking = false;
     let (ax, ay) = pr(w, i).a.center();
     let me = w.ents[i].id;
-    fx::add(w, Fx::Loop { id: 0x0875_2d28, x: ax, y: ay + 1, first: 0, n: 3, rec: 0, rate: 0x4000, acc: 0, alive: Alive::Transform { p: me } });
+    fx::add(
+        w,
+        Fx::Loop {
+            id: 0x0875_2d28,
+            x: ax,
+            y: ay + 1,
+            first: 0,
+            n: 3,
+            rec: 0,
+            rate: 0x4000,
+            acc: 0,
+            alive: Alive::Transform { p: me },
+        },
+    );
 }
 /// transformation control 0x0801C4F4
 fn upd_transform(w: &mut World, i: usize) {
@@ -3226,7 +3681,10 @@ fn upd_transform(w: &mut World, i: usize) {
     }
 }
 pub fn aura_form(w: &World, i: usize) -> bool {
-    [0x3001b68, 0x3001b6c, 0x3001b78, 0x3001b7c, 0x3001b80, 0x3001b84, 0x3001b8c].contains(&pr(w, i).form_ref(w).controller)
+    [
+        0x3001b68, 0x3001b6c, 0x3001b78, 0x3001b7c, 0x3001b80, 0x3001b84, 0x3001b8c,
+    ]
+    .contains(&pr(w, i).form_ref(w).controller)
 }
 /// the object world's hide (0xA) / show (0xB) message to the leader: an aura form's loop (sound 54) stops / starts
 /// (`vram::world_hide` / `world_show`: menus, a saved field's scene)
@@ -3278,7 +3736,11 @@ fn finish_transform(w: &mut World, i: usize) {
         pl.ss_cooldown = 0x37fff;
     }
     let f = pr(w, i).form_ref(w).clone();
-    let to = if f.up != 255 { f.up } else { pr(w, i).transform_to };
+    let to = if f.up != 255 {
+        f.up
+    } else {
+        pr(w, i).transform_to
+    };
     form_exit(w, i);
     apply_form(w, i, to);
     form_enter(w, i);
@@ -3342,7 +3804,13 @@ fn start_it(w: &mut World, i: usize, lv: i32) {
         0
     };
     let cam = w.camera(pr(w, i).slot as usize);
-    let mut cand: Vec<(EntityId, bool)> = w.live_enemies().into_iter().filter(|&e| overlaps(&w.en_ref(e).a.body_box(), &cam)).take(16).map(|e| (w.ents[e].id, false)).collect();
+    let mut cand: Vec<(EntityId, bool)> = w
+        .live_enemies()
+        .into_iter()
+        .filter(|&e| overlaps(&w.en_ref(e).a.body_box(), &cam))
+        .take(16)
+        .map(|e| (w.ents[e].id, false))
+        .collect();
     if w.opts.pvp {
         // PvP rule set: the opposing players on this player's camera are targets too (after the enemies, 16 at most)
         let me = w.ents[i].id;
@@ -3350,7 +3818,11 @@ fn start_it(w: &mut World, i: usize, lv: i32) {
             if cand.len() >= 16 || id == me {
                 continue;
             }
-            if let Some(k) = w.find(id).filter(|&k| !w.ents[k].removed && matches!(w.ents[k].body, Body::Player(_)) && pvp_targetable(w, k)) {
+            if let Some(k) = w.find(id).filter(|&k| {
+                !w.ents[k].removed
+                    && matches!(w.ents[k].body, Body::Player(_))
+                    && pvp_targetable(w, k)
+            }) {
                 if overlaps(&pr(w, k).a.body_box(), &cam) {
                     cand.push((id, false));
                 }
@@ -3370,7 +3842,11 @@ fn start_it(w: &mut World, i: usize, lv: i32) {
             // 0x080076F5 for the plain A-button activation 0x0800770D: HFIL 18-10's centre switch is picked by
             // Instant Transmission too, the real route's maze. The A-facing activation's vt+8 (0x08007715) adds a
             // facing test - not seen in a pick yet, left out)
-            if !matches!(t.act, crate::fieldcontent::Activation::Unknown(0x0802_266F) | crate::fieldcontent::Activation::Button(None)) {
+            if !matches!(
+                t.act,
+                crate::fieldcontent::Activation::Unknown(0x0802_266F)
+                    | crate::fieldcontent::Activation::Button(None)
+            ) {
                 continue;
             }
             let r = Rect::new(t.rect.x0 + 15, t.rect.y0 + 7, t.rect.x1, t.rect.y1);
@@ -3381,9 +3857,27 @@ fn start_it(w: &mut World, i: usize, lv: i32) {
     }
     let (cx, cy) = pr(w, i).a.center();
     let serial = w.next_serial();
-    p(w, i).it_sel = Some(ItSel { serial, n: (lv + 1).min(tier), cand, picks: vec![], x: cx << 8, y: cy << 8, vx: 0, vy: 0, cursor: true, tcand, order: vec![] });
+    p(w, i).it_sel = Some(ItSel {
+        serial,
+        n: (lv + 1).min(tier),
+        cand,
+        picks: vec![],
+        x: cx << 8,
+        y: cy << 8,
+        vx: 0,
+        vy: 0,
+        cursor: true,
+        tcand,
+        order: vec![],
+    });
     let me = w.ents[i].id;
-    let f = fx::add(w, Fx::ItMarkers { t: 0, alive: Alive::It { p: me, serial } });
+    let f = fx::add(
+        w,
+        Fx::ItMarkers {
+            t: 0,
+            alive: Alive::It { p: me, serial },
+        },
+    );
     w.modal = Some(vec![me, f]);
 }
 /// the Instant Transmission markers go with the skill's state: the idle it ends in deletes them (their tiles freed in
@@ -3414,7 +3908,15 @@ fn it_select(w: &mut World, i: usize) {
         let (dir, px, py) = (pr(w, i).a.facing, pr(w, i).a.px(), pr(w, i).a.py());
         {
             let pl = p(w, i);
-            pl.it = Some(ItRun { serial: s.serial, dir, idx: 0, targets: s.picks.clone(), origin: (px, py), t: -24, picks: s.order.clone() });
+            pl.it = Some(ItRun {
+                serial: s.serial,
+                dir,
+                idx: 0,
+                targets: s.picks.clone(),
+                origin: (px, py),
+                t: -24,
+                picks: s.order.clone(),
+            });
             pl.a.hittable = false;
             pl.ap.raw = 20;
         }
@@ -3432,7 +3934,13 @@ fn it_select(w: &mut World, i: usize) {
                 })
         });
         // the field's trigger candidates follow the enemies in the selector's list (first match wins)
-        let hitt = if hitk.is_none() { s.tcand.iter().position(|&(_, b, picked)| !picked && px >= b.x0 && px < b.x1 && py >= b.y0 && py < b.y1) } else { None };
+        let hitt = if hitk.is_none() {
+            s.tcand.iter().position(|&(_, b, picked)| {
+                !picked && px >= b.x0 && px < b.x1 && py >= b.y0 && py < b.y1
+            })
+        } else {
+            None
+        };
         if hitk.is_some() || hitt.is_some() {
             // the pick's marker (r062_001 f3,002)
             crate::vram::acquire(w, crate::vram::Owner::ItPick, 0x200);
@@ -3457,8 +3965,10 @@ fn it_select(w: &mut World, i: usize) {
         }
     }
     if s.cursor {
-        s.vx = (s.vx * 3) / 4 + if h & btn::RIGHT != 0 { 256 } else { 0 } - if h & btn::LEFT != 0 { 256 } else { 0 };
-        s.vy = (s.vy * 3) / 4 + if h & btn::DOWN != 0 { 256 } else { 0 } - if h & btn::UP != 0 { 256 } else { 0 };
+        s.vx = (s.vx * 3) / 4 + if h & btn::RIGHT != 0 { 256 } else { 0 }
+            - if h & btn::LEFT != 0 { 256 } else { 0 };
+        s.vy = (s.vy * 3) / 4 + if h & btn::DOWN != 0 { 256 } else { 0 }
+            - if h & btn::UP != 0 { 256 } else { 0 };
         s.x += s.vx;
         s.y += s.vy;
         let cam = w.camera(pr(w, i).slot as usize);
@@ -3479,7 +3989,9 @@ fn it_select(w: &mut World, i: usize) {
 /// back at the origin; t >= 24 checks on: a trigger pick is armed to fire in this frame's check (0x080125FA), the
 /// next pick at t -24; an enemy pick punches like the battle run; no pick left: idle
 fn ctl_it_field(w: &mut World, i: usize) {
-    let Some(mut it) = pr(w, i).it.clone() else { return set_anim_id(w, i, 0) };
+    let Some(mut it) = pr(w, i).it.clone() else {
+        return set_anim_id(w, i, 0);
+    };
     p(w, i).a.hittable = false;
     // the event the arrival fired holds the run (story playthrough: s099's item pose, then the vanish resumes on the
     // frame after the event ends)
@@ -3519,7 +4031,11 @@ fn ctl_it_field(w: &mut World, i: usize) {
             }
             match it.picks[it.idx] {
                 ItPick::Trig(o) => {
-                    let r = w.field.as_ref().and_then(|f| f.triggers.iter().find(|t| t.obj == o)).map(|t| t.rect);
+                    let r = w
+                        .field
+                        .as_ref()
+                        .and_then(|f| f.triggers.iter().find(|t| t.obj == o))
+                        .map(|t| t.rect);
                     if let Some(r) = r {
                         let (cx, cy) = ((r.x0 + r.x1 + 15) >> 1, (r.y0 + r.y1 + 7) >> 1);
                         let pl = p(w, i);
@@ -3554,7 +4070,11 @@ fn ctl_it_field(w: &mut World, i: usize) {
     }
     match it.picks[it.idx] {
         ItPick::Trig(o) => {
-            if let Some(t) = w.field.as_mut().and_then(|f| f.triggers.iter_mut().find(|t| t.obj == o)) {
+            if let Some(t) = w
+                .field
+                .as_mut()
+                .and_then(|f| f.triggers.iter_mut().find(|t| t.obj == o))
+            {
                 t.forced = true;
             }
             it.idx += 1;
@@ -3566,7 +4086,22 @@ fn ctl_it_field(w: &mut World, i: usize) {
                 let a = &pr(w, i).a;
                 let rect = Rect::at(PUNCH_RECT[a.facing as usize], a.px(), a.py());
                 let me = w.ents[i].id;
-                let mut m = HitMsg { team: 1, rect, dir: a.facing, mult: 0x600, atk: atk(2), attacker: me, att_stats: a.stats, att_is_player: true, source: me, crit: false, raw: 0, dmg: 0, no_react: false, foot: false };
+                let mut m = HitMsg {
+                    team: 1,
+                    rect,
+                    dir: a.facing,
+                    mult: 0x600,
+                    atk: atk(2),
+                    attacker: me,
+                    att_stats: a.stats,
+                    att_is_player: true,
+                    source: me,
+                    crit: false,
+                    raw: 0,
+                    dmg: 0,
+                    no_react: false,
+                    foot: false,
+                };
                 if broadcast(w, &mut m, false) {
                     let r = 48 + w.rng.rand(2);
                     sfx(w, r, 64);
@@ -3590,7 +4125,9 @@ fn ctl_it(w: &mut World, i: usize) {
     if w.field.is_some() {
         return ctl_it_field(w, i);
     }
-    let Some(mut it) = pr(w, i).it.clone() else { return set_anim_id(w, i, 0) };
+    let Some(mut it) = pr(w, i).it.clone() else {
+        return set_anim_id(w, i, 0);
+    };
     p(w, i).a.hittable = false;
     it.t += 1;
     let t = it.t;
@@ -3637,7 +4174,22 @@ fn ctl_it(w: &mut World, i: usize) {
         let a = &pr(w, i).a;
         let rect = Rect::at(PUNCH_RECT[a.facing as usize], a.px(), a.py());
         let me = w.ents[i].id;
-        let mut m = HitMsg { team: 1, rect, dir: a.facing, mult: 0x600, atk: atk(2), attacker: me, att_stats: a.stats, att_is_player: true, source: me, crit: false, raw: 0, dmg: 0, no_react: false, foot: false };
+        let mut m = HitMsg {
+            team: 1,
+            rect,
+            dir: a.facing,
+            mult: 0x600,
+            atk: atk(2),
+            attacker: me,
+            att_stats: a.stats,
+            att_is_player: true,
+            source: me,
+            crit: false,
+            raw: 0,
+            dmg: 0,
+            no_react: false,
+            foot: false,
+        };
         if broadcast(w, &mut m, false) {
             let r = 48 + w.rng.rand(2);
             sfx(w, r, 64);
@@ -3734,7 +4286,11 @@ pub fn pvp_targetable(w: &World, i: usize) -> bool {
 }
 
 fn pvp_hit(w: &World, i: usize, msg: &HitMsg) -> bool {
-    w.opts.pvp && msg.att_is_player && msg.attacker != w.ents[i].id && w.find(msg.attacker).is_some_and(|k| matches!(w.ents[k].body, Body::Player(_)))
+    w.opts.pvp
+        && msg.att_is_player
+        && msg.attacker != w.ents[i].id
+        && w.find(msg.attacker)
+            .is_some_and(|k| matches!(w.ents[k].body, Body::Player(_)))
 }
 
 pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
@@ -3751,7 +4307,14 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
             return false;
         }
         // message kind 1 tests the footprint (0x0800FDFA), else the body box
-        if !overlaps(&msg.rect, &if msg.foot { pl.a.foot_box() } else { pl.a.body_box() }) {
+        if !overlaps(
+            &msg.rect,
+            &if msg.foot {
+                pl.a.foot_box()
+            } else {
+                pl.a.body_box()
+            },
+        ) {
             return false;
         }
         // KO: 0x08010F74 skips ComputeDamage but still accepts a box overlapping the body (an enemy wave puffs)
@@ -3767,15 +4330,30 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
     let front = (msg.dir ^ 1) == pl.a.facing;
     let blocking = pl.a.blocking && front;
     let def = pl.a.stats;
-    let res = compute_damage(msg.atk, msg.mult, &msg.att_stats, &def, blocking, &mut w.rng);
+    let res = compute_damage(
+        msg.atk,
+        msg.mult,
+        &msg.att_stats,
+        &def,
+        blocking,
+        &mut w.rng,
+    );
     let dmg = res.dmg;
     msg.crit = res.crit;
     msg.raw = res.raw;
     msg.dmg = dmg;
     if res.unblocked != dmg {
-        w.events.push(Event::DamageRoll { target: w.ents[i].id, dmg: res.unblocked });
+        w.events.push(Event::DamageRoll {
+            target: w.ents[i].id,
+            dmg: res.unblocked,
+        });
     }
-    w.events.push(Event::Damage { target: w.ents[i].id, attacker: msg.attacker, dmg, crit: res.crit });
+    w.events.push(Event::Damage {
+        target: w.ents[i].id,
+        attacker: msg.attacker,
+        dmg,
+        crit: res.crit,
+    });
     crate::vram::damage_number(w, w.ents[i].id);
     if msg.team == 1 {
         // PvP: the attacker's hit cue and on-hit hooks, as when it hits an enemy
@@ -3785,7 +4363,11 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
         }
     }
     let before = pr(w, i).rec.hp;
-    let lost = if dmg > 0 && before > 0 { p(w, i).hp_acc.take(dmg) } else { 0 };
+    let lost = if dmg > 0 && before > 0 {
+        p(w, i).hp_acc.take(dmg)
+    } else {
+        0
+    };
     // 0x0800E8E6 runs for every accepted hit, 0 damage included: the 12-frame flash restarts
     p(w, i).a.flash = 12;
     if dmg == 0 || before == 0 {
@@ -3909,8 +4491,16 @@ pub fn lockstep_view(w: &World, i: usize) -> (String, i32, i32, u32) {
     let state = pl.gs.name();
     // candy: the def is 0x36 (sprite 45)
     let spr = if pl.candy_def { Some(45) } else { pl.a.sprite };
-    let Some(a) = spr.and_then(|s| w.data.sprite(s)).and_then(|s| s.anim_raw(pl.ap.raw)) else { return (state, -1, pl.ap.frame, 0) };
-    let rom = a.dirs[pl.a.facing as usize & 3].get(pl.ap.frame.max(0) as usize).map(|s| s.rom).unwrap_or(0);
+    let Some(a) = spr
+        .and_then(|s| w.data.sprite(s))
+        .and_then(|s| s.anim_raw(pl.ap.raw))
+    else {
+        return (state, -1, pl.ap.frame, 0);
+    };
+    let rom = a.dirs[pl.a.facing as usize & 3]
+        .get(pl.ap.frame.max(0) as usize)
+        .map(|s| s.rom)
+        .unwrap_or(0);
     let rom = if pl.ap.frame < 0 { 0 } else { rom };
     (state, a.canon_raw, pl.ap.frame, rom)
 }
@@ -3942,7 +4532,13 @@ pub(crate) fn mod_enter_skill(w: &mut World, i: usize, real: i32) {
     let pl = p(w, i);
     pl.state = PState::Skill;
     pl.t = 0;
-    pl.sk = Some(SkillInst { id: real, serial, held: true, release: -1, ..Default::default() });
+    pl.sk = Some(SkillInst {
+        id: real,
+        serial,
+        held: true,
+        release: -1,
+        ..Default::default()
+    });
 }
 pub(crate) fn mod_set_anim(w: &mut World, i: usize, names: &[&'static str]) {
     let refs: Vec<AnimRef> = names.iter().map(|n| AnimRef::Name(*n)).collect();

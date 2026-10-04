@@ -106,6 +106,12 @@ fn tear_candidates(renderer: &mut Renderer, packs: &Packs, view: &RenderView, pr
     out
 }
 
+/// a view in a fade toward black (a palette fade / scale with a black target, or the BLDY darken), not yet black
+fn fading_to_black(v: &RenderView) -> bool {
+    let f = |p: &Option<wf_view::PaletteFade>| p.is_some_and(|p| p.target == 0 && p.level > 0);
+    f(&v.palette_fade) || f(&v.palette_scale) || v.fade_black > 0 || v.menu.as_ref().is_some_and(|m| f(&m.fade) || m.fade_black > 0)
+}
+
 fn torn(game: &[u32], new: &[u32], olds: &[(&str, Vec<u32>)]) -> Option<Vec<String>> {
     let mut any_old = false;
     // a whole line may show a previous register state: the candidates in order - "o" the previous palette, "s" the
@@ -245,6 +251,9 @@ fn main() {
     let set = wf_script::ScriptSet::load_all(&rom);
     let (files, _) = wf_script::export::export(&rom, &set);
     let mut renderer = Renderer::new();
+    // (the tear candidates are drawn by their own renderer: a picture of an earlier state must not touch the main
+    // one's caches - the map's animated tiles)
+    let mut tear_renderer = Renderer::new();
     let mut all: BTreeMap<String, (usize, usize)> = BTreeMap::new();
     let mut json_out = vec![];
     let mut lock = serde_json::Map::new();
@@ -271,6 +280,7 @@ fn main() {
         // frame's, presenter applied) and the frame the last step ran in - a sampled frame after it with no step is
         // inside the iteration, whose redraw the game shows only at its end
         let mut last_view: Option<RenderView> = None;
+        let lfs: Vec<i64> = doc["frames"].as_array().map(|a| a.iter().map(|f| f["lf"].as_i64().unwrap_or(0)).collect()).unwrap_or_default();
         let mut iter_view: Option<RenderView> = None;
         let mut stepped = usize::MAX;
         let rep = wf_import::segment::replay_with(&data, &files, &doc, &mut |f| match f {
@@ -328,13 +338,21 @@ fn main() {
                 // hardware's
                 if n > 0 && std::env::var_os("PIX_NOTEAR").is_none() {
                     let mut olds = match old_pal.as_ref().filter(|p| **p != pal_of(&view)) {
-                        Some(op) => tear_candidates(&mut renderer, &packs, &view, op),
+                        Some(op) => tear_candidates(&mut tear_renderer, &packs, &view, op),
                         None => vec![],
                     };
                     // ("v": inside a long iteration, the picture from before its step)
-                    if stepped != k {
+                    // (a step whose iteration runs on: the recording's next row has the same logic counter)
+                    let long = lfs.get(k + 1).is_some_and(|n| Some(n) == lfs.get(k));
+                    if (stepped != k || long) && std::env::var_os("PIX_NOLATE").is_none() {
                         if let Some(v) = iter_view.as_ref() {
-                            olds.push(("v", renderer.render(&packs, v, 0, W, H).to_vec()));
+                            olds.push(("v", tear_renderer.render(&packs, v, 0, W, H).to_vec()));
+                            // ("k": the picture before the step was in a fade to black, whose last step is written at
+                            // the iteration's start - the screen black through the long iteration that follows, the
+                            // pause page's build: rclose_067_071 f1,860)
+                            if fading_to_black(v) {
+                                olds.push(("k", vec![0xFF00_0000; W * H]));
+                            }
                         }
                     }
                     if !olds.is_empty() {

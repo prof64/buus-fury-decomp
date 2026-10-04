@@ -143,8 +143,14 @@ fn field_obs(w: &World) -> Option<FieldObs> {
         };
         let (what, to) = match def.map(|d| &d.kind) {
             Some(ObjKind::Trigger { kind, .. }) => match kind {
-                TriggerKind::Exit { to, .. } => ("exit".to_string(), Some(format!("{}-{}", to.world, to.area))),
-                TriggerKind::EdgeExit { to, .. } => ("edge_exit".to_string(), Some(format!("{}-{}", to.world, to.area))),
+                TriggerKind::Exit { to, .. } => (
+                    "exit".to_string(),
+                    Some(format!("{}-{}", to.world, to.area)),
+                ),
+                TriggerKind::EdgeExit { to, .. } => (
+                    "edge_exit".to_string(),
+                    Some(format!("{}-{}", to.world, to.area)),
+                ),
                 TriggerKind::Script(s) => (format!("script {s}"), None),
                 TriggerKind::Event(s) => (format!("event {s}"), None),
                 TriggerKind::SavePoint(_) => ("save_point".to_string(), None),
@@ -155,17 +161,35 @@ fn field_obs(w: &World) -> Option<FieldObs> {
             _ => ("?".to_string(), None),
         };
         let r = t.rect;
-        objects.push(FieldObjObs { id: 0, kind: "trigger", what: format!("{what} ({:?})", t.act), rect: [r.x0, r.y0, r.x1, r.y1], to });
+        objects.push(FieldObjObs {
+            id: 0,
+            kind: "trigger",
+            what: format!("{what} ({:?})", t.act),
+            rect: [r.x0, r.y0, r.x1, r.y1],
+            to,
+        });
     }
     for e in &w.ents {
         if e.removed {
             continue;
         }
         match &e.body {
-            Body::Pickup(p) => objects.push(FieldObjObs { id: e.id, kind: "pickup", what: format!("{:?}", p.kind), rect: p.bx, to: None }),
+            Body::Pickup(p) => objects.push(FieldObjObs {
+                id: e.id,
+                kind: "pickup",
+                what: format!("{:?}", p.kind),
+                rect: p.bx,
+                to: None,
+            }),
             Body::Breakable(b) => {
                 let r = b.bx;
-                objects.push(FieldObjObs { id: e.id, kind: "breakable", what: format!("hp {} mask {}", b.hp, b.mask), rect: r, to: None });
+                objects.push(FieldObjObs {
+                    id: e.id,
+                    kind: "breakable",
+                    what: format!("hp {} mask {}", b.hp, b.mask),
+                    rect: r,
+                    to: None,
+                });
             }
             _ => {}
         }
@@ -180,7 +204,13 @@ fn field_obs(w: &World) -> Option<FieldObs> {
         busy: f.busy,
         objects,
         zenie: st.zenie,
-        supplies: st.supplies.iter().enumerate().filter(|(_, &n)| n > 0).map(|(i, &n)| (i as i32, n as i32)).collect(),
+        supplies: st
+            .supplies
+            .iter()
+            .enumerate()
+            .filter(|(_, &n)| n > 0)
+            .map(|(i, &n)| (i as i32, n as i32))
+            .collect(),
         equipment: st.equipment.clone(),
         party: st.party(),
         play_frames: st.play_frames,
@@ -190,7 +220,20 @@ fn field_obs(w: &World) -> Option<FieldObs> {
 fn actor_obs(id: u32, kind: &'static str, a: &crate::actor::Actor) -> ActorObs {
     let b = a.body_box();
     let f = a.foot_box();
-    ActorObs { id, kind, x: a.px(), y: a.py(), x256: a.x, y256: a.y, z: a.z, facing: a.facing, body: [b.x0, b.y0, b.x1, b.y1], foot: [f.x0, f.y0, f.x1, f.y1], hittable: a.hittable, blocking: a.blocking }
+    ActorObs {
+        id,
+        kind,
+        x: a.px(),
+        y: a.py(),
+        x256: a.x,
+        y256: a.y,
+        z: a.z,
+        facing: a.facing,
+        body: [b.x0, b.y0, b.x1, b.y1],
+        foot: [f.x0, f.y0, f.x1, f.y1],
+        hittable: a.hittable,
+        blocking: a.blocking,
+    }
 }
 
 pub fn player_obs(w: &World, i: usize) -> PlayerObs {
@@ -230,7 +273,12 @@ pub fn player_obs(w: &World, i: usize) -> PlayerObs {
 }
 
 pub fn observe(w: &World, player: usize) -> Observation {
-    let players: Vec<PlayerObs> = w.players.iter().filter_map(|&id| w.find(id)).map(|i| player_obs(w, i)).collect();
+    let players: Vec<PlayerObs> = w
+        .players
+        .iter()
+        .filter_map(|&id| w.find(id))
+        .map(|i| player_obs(w, i))
+        .collect();
     let me = w.player_idx(player).map(|i| player_obs(w, i));
     let mut enemies = Vec::new();
     let mut projectiles = Vec::new();
@@ -258,7 +306,17 @@ pub fn observe(w: &World, player: usize) -> Observation {
             }
             Body::Shot(s) => {
                 let r = crate::shots::rect(w, i);
-                projectiles.push(ShotObs { id: e.id, kind: s.kind_name(), owner: s.owner, team: s.team, dir: s.dir, x: s.px(), y: s.py(), rect: [r.x0, r.y0, r.x1, r.y1], t: s.t });
+                projectiles.push(ShotObs {
+                    id: e.id,
+                    kind: s.kind_name(),
+                    owner: s.owner,
+                    team: s.team,
+                    dir: s.dir,
+                    x: s.px(),
+                    y: s.py(),
+                    rect: [r.x0, r.y0, r.x1, r.y1],
+                    t: s.t,
+                });
             }
             Body::Rock { x, y, .. } => rocks.push([x + 16, y + 16, x + 48, y + 48]),
             _ => {}
@@ -270,7 +328,11 @@ pub fn observe(w: &World, player: usize) -> Observation {
     let mut walk = String::with_capacity((tw * th) as usize);
     for ty in ty0..ty0 + th {
         for tx in tx0..tx0 + tw {
-            let ok = w.col.as_ref().map(|c| c.tile(crate::world::Layer::Walk, tx, ty)).unwrap_or(true);
+            let ok = w
+                .col
+                .as_ref()
+                .map(|c| c.tile(crate::world::Layer::Walk, tx, ty))
+                .unwrap_or(true);
             walk.push(if ok { '1' } else { '0' });
         }
     }
@@ -283,7 +345,14 @@ pub fn observe(w: &World, player: usize) -> Observation {
         projectiles,
         rocks,
         camera: [cam.x0, cam.y0, cam.x1, cam.y1],
-        arena: ArenaObs { id: w.arena.id.clone(), map: w.arena.map.clone(), bounds: [b.x0, b.y0, b.x1, b.y1], walk_window: walk, window_origin: (tx0 * 8, ty0 * 8), window_tiles: (tw, th) },
+        arena: ArenaObs {
+            id: w.arena.id.clone(),
+            map: w.arena.map.clone(),
+            bounds: [b.x0, b.y0, b.x1, b.y1],
+            walk_window: walk,
+            window_origin: (tx0 * 8, ty0 * 8),
+            window_tiles: (tw, th),
+        },
         rng: w.rng.state(),
         candy: w.g.candy,
         field: field_obs(w),

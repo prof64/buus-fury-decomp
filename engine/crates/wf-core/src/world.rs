@@ -30,7 +30,11 @@ pub enum Body {
     Shot(Box<Shot>),
     Fx(Box<Fx>),
     /// Broly's arena rock (0x08036A44): 32x32 solid block at +16..+48
-    Rock { x: i32, y: i32, hp: i32 },
+    Rock {
+        x: i32,
+        y: i32,
+        hp: i32,
+    },
     /// Janemba hand (type 0x36) rising under the player
     Hand(Box<Hand>),
     /// harness hook: scheduled attack messages injected at the start of a frame (lockstep / tests)
@@ -109,26 +113,50 @@ pub struct Injector {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Event {
     /// PlaySfx(id, volume 0..64)
-    Sfx { id: i32, vol: i32 },
-    SfxStop { id: i32 },
+    Sfx {
+        id: i32,
+        vol: i32,
+    },
+    SfxStop {
+        id: i32,
+    },
     /// StopMatching 0x0803E32C: stop the voices playing that effect
-    SfxStopMatch { id: i32 },
+    SfxStopMatch {
+        id: i32,
+    },
     /// StopAllSfx 0x0803E2EC (script native 0x22)
     SfxStopAll,
     /// the music sequencer stopped (script native 0x24)
     SongStop,
     /// the Options page changed the master volumes (raw 0..8: `0x0803E42A` / `0x0803F18C`)
-    MasterVolumes { music: i32, sfx: i32 },
-    Song { id: i32 },
+    MasterVolumes {
+        music: i32,
+        sfx: i32,
+    },
+    Song {
+        id: i32,
+    },
     /// a player attack connected (the reference's 'hit' cue)
     Hit,
-    SkillStart { id: i32 },
+    SkillStart {
+        id: i32,
+    },
     SkillEnd,
     /// a ComputeDamage result (target entity, 1/1024 HP)
-    Damage { target: EntityId, attacker: EntityId, dmg: i64, crit: bool },
+    Damage {
+        target: EntityId,
+        attacker: EntityId,
+        dmg: i64,
+        crit: bool,
+    },
     /// a blocked hit's ComputeDamage before the block factor (0x0800EABE, what the lockstep logs); precedes its Damage
-    DamageRoll { target: EntityId, dmg: i64 },
-    Info { text: String },
+    DamageRoll {
+        target: EntityId,
+        dmg: i64,
+    },
+    Info {
+        text: String,
+    },
     /// field game: area changes, scripts to run, pickups, defeated placed enemies (field.rs)
     Field(crate::field::FieldEvent),
 }
@@ -230,7 +258,9 @@ impl Globals {
     }
     /// record a frame's new presses (stamped `at`, the counter during that frame's update)
     pub fn note_input(&mut self, slot: usize, at: i64, pressed: u16) {
-        let Some(l) = self.presses.get_mut(slot) else { return };
+        let Some(l) = self.presses.get_mut(slot) else {
+            return;
+        };
         l.pressed = pressed;
         if pressed == 0 {
             return;
@@ -247,7 +277,9 @@ impl Globals {
     /// 0x08040284(input, mask, n, window): a press this frame and, walking the ring back from the newest event, the
     /// last n events with a `mask` key all stamped >= now - window
     pub fn press_run(&self, slot: usize, mask: u16, n: u32, window: i64, frame: u32) -> bool {
-        let Some(l) = self.presses.get(slot) else { return false };
+        let Some(l) = self.presses.get(slot) else {
+            return false;
+        };
         if l.pressed == 0 {
             return false;
         }
@@ -295,7 +327,11 @@ pub enum Layer {
 impl Collision {
     pub fn new(map: Arc<MapCollision>) -> Collision {
         let enemy = map.walk.clone();
-        Collision { map, enemy, walk: None }
+        Collision {
+            map,
+            enemy,
+            walk: None,
+        }
     }
     fn grid(&self, l: Layer) -> &[u8] {
         match l {
@@ -320,7 +356,10 @@ impl Collision {
         let ty1 = (y1 + 7) >> 3;
         for ty in (y0 >> 3)..ty1 {
             for tx in (x0 >> 3)..tx1 {
-                if tx >= GRID as i32 || ty >= GRID as i32 || g[ty as usize * GRID + tx as usize] != 1 {
+                if tx >= GRID as i32
+                    || ty >= GRID as i32
+                    || g[ty as usize * GRID + tx as usize] != 1
+                {
                     return false;
                 }
             }
@@ -332,7 +371,12 @@ impl Collision {
     }
     fn span(x0: i32, y0: i32, x1: i32, y1: i32) -> (i32, i32, i32, i32) {
         let g = GRID as i32;
-        ((x0 >> 3).max(0), (y0 >> 3).max(0), g.min(if x1 >= 2048 { 256 } else { (x1 + 7) >> 3 }), g.min(if y1 >= 2048 { 256 } else { (y1 + 7) >> 3 }))
+        (
+            (x0 >> 3).max(0),
+            (y0 >> 3).max(0),
+            g.min(if x1 >= 2048 { 256 } else { (x1 + 7) >> 3 }),
+            g.min(if y1 >= 2048 { 256 } else { (y1 + 7) >> 3 }),
+        )
     }
     /// 0x08009930: set every enemy-layer tile under the box (clipped)
     pub fn mark_enemy(&mut self, r: [i32; 4], value: u8) {
@@ -384,10 +428,20 @@ impl Collision {
     /// nearest position (8 px spiral) where a w x h footprint is free on `l`, inside `inside` and with its
     /// top-left tile in `region`
     #[allow(clippy::too_many_arguments)]
-    pub fn free_spot(&self, l: Layer, x: i32, y: i32, w: i32, h: i32, inside: Option<&Rect>, region: Option<&[u8]>) -> (i32, i32) {
+    pub fn free_spot(
+        &self,
+        l: Layer,
+        x: i32,
+        y: i32,
+        w: i32,
+        h: i32,
+        inside: Option<&Rect>,
+        region: Option<&[u8]>,
+    ) -> (i32, i32) {
         let ok = |px: i32, py: i32| {
             self.test(l, px, py, px + w, py + h)
-                && inside.is_none_or(|b| px >= b.x0 && py >= b.y0 && px + w <= b.x1 && py + h <= b.y1)
+                && inside
+                    .is_none_or(|b| px >= b.x0 && py >= b.y0 && px + w <= b.x1 && py + h <= b.y1)
                 && region.is_none_or(|m| {
                     let i = (py >> 3) * GRID as i32 + (px >> 3);
                     i >= 0 && (i as usize) < m.len() && m[i as usize] == 1
@@ -430,7 +484,12 @@ pub fn walk_region(m: &MapCollision, x: i32, y: i32) -> Option<(Vec<u8>, Rect)> 
         x1 = x1.max(tx);
         y0 = y0.min(ty);
         y1 = y1.max(ty);
-        let nb = [if tx > 0 { i as i64 - 1 } else { -1 }, if tx < g - 1 { i as i64 + 1 } else { -1 }, if ty > 0 { i as i64 - g as i64 } else { -1 }, if ty < g - 1 { i as i64 + g as i64 } else { -1 }];
+        let nb = [
+            if tx > 0 { i as i64 - 1 } else { -1 },
+            if tx < g - 1 { i as i64 + 1 } else { -1 },
+            if ty > 0 { i as i64 - g as i64 } else { -1 },
+            if ty < g - 1 { i as i64 + g as i64 } else { -1 },
+        ];
         for j in nb {
             if j >= 0 {
                 let j = j as usize;
@@ -651,7 +710,10 @@ impl World {
             input: [InputFrame::default(); MAX_PLAYERS],
             cameras: Default::default(),
             modal: None,
-            g: Globals { last_beep: -1000, ..Default::default() },
+            g: Globals {
+                last_beep: -1000,
+                ..Default::default()
+            },
             col: None,
             arena,
             stats: Stats::default(),
@@ -681,7 +743,11 @@ impl World {
     pub fn add(&mut self, body: Body) -> EntityId {
         let id = self.next_id;
         self.next_id += 1;
-        self.ents.push(Entity { id, removed: false, body });
+        self.ents.push(Entity {
+            id,
+            removed: false,
+            body,
+        });
         id
     }
     pub fn next_serial(&mut self) -> u32 {
@@ -794,7 +860,12 @@ impl World {
 
     /// 0x0800797C screen shake (duration, intensity)
     pub fn shake(&mut self, duration: i32, intensity: i32) {
-        self.g.shakes.push(Shake { left: duration, intensity, period: (100 - intensity) / 16 + 1, cnt: 1 });
+        self.g.shakes.push(Shake {
+            left: duration,
+            intensity,
+            period: (100 - intensity) / 16 + 1,
+            cnt: 1,
+        });
     }
     /// the field camera does not follow while a shake holds its slot, nor in the frame the shake ended (story
     /// playthrough: a 15-frame hit shake holds the camera 16 frames); consumes the end mark
@@ -824,8 +895,10 @@ impl World {
             s.cnt -= 1;
             if s.cnt == 0 {
                 s.cnt = s.period;
-                let dx = ((self.rng.next().wrapping_sub(0x8000) as i32).wrapping_mul(s.intensity)) >> 19;
-                let dy = ((self.rng.next().wrapping_sub(0x8000) as i32).wrapping_mul(s.intensity)) >> 19;
+                let dx =
+                    ((self.rng.next().wrapping_sub(0x8000) as i32).wrapping_mul(s.intensity)) >> 19;
+                let dy =
+                    ((self.rng.next().wrapping_sub(0x8000) as i32).wrapping_mul(s.intensity)) >> 19;
                 self.g.shake_off = (dx, dy);
             }
         }
@@ -867,7 +940,9 @@ impl World {
         if self.scene.dest_label.is_some() {
             crate::field::dest_menu(self);
         }
-        let live = |w: &World| -> Vec<usize> { (0..w.ents.len()).filter(|&k| !w.ents[k].removed).collect() };
+        let live = |w: &World| -> Vec<usize> {
+            (0..w.ents.len()).filter(|&k| !w.ents[k].removed).collect()
+        };
         let start = live(self).len();
         let mut c = start as i64 - 1;
         // an item-get that starts in this pass (a map item / dropped item picked up with A in the player's update)
@@ -882,13 +957,21 @@ impl World {
             };
             // a purge's suspended objects are out of the list (vram.rs); a cutscene actor keeps its animation
             // (the scene drives it: segment sb 4-24, a suspended actor's idle tick runs on)
-            let skip = self.modal.as_ref().is_some_and(|m| !m.contains(&self.ents[i].id))
-                || crate::vram::suspended(self, self.ents[i].id) && !matches!(self.ents[i].body, Body::Npc(_));
+            let skip = self
+                .modal
+                .as_ref()
+                .is_some_and(|m| !m.contains(&self.ents[i].id))
+                || crate::vram::suspended(self, self.ents[i].id)
+                    && !matches!(self.ents[i].body, Body::Npc(_));
             crate::vram::popups_tick(self, Some(self.ents[i].id));
             if !skip {
                 self.update_entity(i);
                 // it destroyed an object before it: the list compacted, the same object is at the next index
-                if self.field.as_mut().is_some_and(|f| std::mem::take(&mut f.list_redo)) {
+                if self
+                    .field
+                    .as_mut()
+                    .is_some_and(|f| std::mem::take(&mut f.list_redo))
+                {
                     if let Some(&j) = live(self).get(c as usize) {
                         self.update_entity(j);
                     }
@@ -914,7 +997,11 @@ impl World {
         crate::vram::reap(self);
         self.ents.retain(|e| !e.removed);
         // a player object created in this pass is the list's newest object
-        if self.field.as_mut().is_some_and(|f| std::mem::take(&mut f.player_new)) {
+        if self
+            .field
+            .as_mut()
+            .is_some_and(|f| std::mem::take(&mut f.player_new))
+        {
             if let Some(k) = self.player_idx(0) {
                 let e = self.ents.remove(k);
                 self.ents.push(e);
@@ -939,7 +1026,18 @@ impl World {
                 let (hits, pid, ai) = match &self.ents[i].body {
                     Body::Injector(j) => {
                         let now = if j.now != 0 { j.now } else { self.frame };
-                        (j.hits.iter().filter(|h| h.at == now).cloned().collect::<Vec<_>>(), j.player, j.ai.iter().filter(|a| a.0 == now).cloned().collect::<Vec<_>>())
+                        (
+                            j.hits
+                                .iter()
+                                .filter(|h| h.at == now)
+                                .cloned()
+                                .collect::<Vec<_>>(),
+                            j.player,
+                            j.ai.iter()
+                                .filter(|a| a.0 == now)
+                                .cloned()
+                                .collect::<Vec<_>>(),
+                        )
                     }
                     _ => unreachable!(),
                 };
@@ -954,7 +1052,16 @@ impl World {
                     if let Some(pi) = self.find(pid) {
                         let a = &self.pl_ref(pi).a;
                         let (px, py) = (a.px(), a.py());
-                        let stats = CombatStats { str_: h.str_, pow: h.pow, end: 0, end2: 0, res_m: 128, res_e: 128, crit_bonus: 0, block_factor: 0x1000 };
+                        let stats = CombatStats {
+                            str_: h.str_,
+                            pow: h.pow,
+                            end: 0,
+                            end2: 0,
+                            res_m: 128,
+                            res_e: 128,
+                            crit_bonus: 0,
+                            block_factor: 0x1000,
+                        };
                         let mut m = HitMsg {
                             team: 0,
                             rect: Rect::new(px - 32, py - 64, px + 48, py + 32),
