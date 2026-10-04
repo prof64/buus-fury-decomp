@@ -74,6 +74,8 @@ pub struct Report {
     pub recs_missing: bool,
     /// `SEGMENT_WORLD`: the world-state comparison (`world.rs`: story flags, game bits, timers, script words)
     pub world: Option<crate::world::Tally>,
+    /// `SEGMENT_AREA`: the area-local comparison (`area.rs`: trigger list + resume nodes, walk-grid changes)
+    pub area: Option<crate::area::Tally>,
 }
 
 impl Report {
@@ -425,6 +427,9 @@ pub fn replay_with(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: 
     // SEGMENT_WORLD: the game's world-state rows (tools/segments/world.py; a gate with "world_exact" always)
     let world_rows = (std::env::var_os("SEGMENT_WORLD").is_some() || doc["world_exact"].as_bool() == Some(true)).then(|| crate::world::load(doc)).flatten();
     let (mut world_i, mut world_tally) = (0usize, crate::world::Tally::default());
+    // SEGMENT_AREA: the game's area-local rows (tools/segments/area.py; a gate with "area_exact" always)
+    let area_rows = (std::env::var_os("SEGMENT_AREA").is_some() || doc["area_exact"].as_bool() == Some(true)).then(|| crate::area::load(doc)).flatten();
+    let (mut area_i, mut area_tally, mut area_g0) = (0usize, crate::area::Tally::default(), None::<Vec<u8>>);
     let mut was_leaving = false;
     for (k, fr) in frames.iter().enumerate() {
         let keys = i(&fr["keys"]) as u16;
@@ -757,6 +762,19 @@ pub fn replay_with(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: 
                     recs_tally.check(k, &sess.world, &rows[recs_i].1);
                 }
             }
+            // SEGMENT_AREA (report only): the area's own lists at the rows where the game's changed, and the last row
+            // (the walk grid's changes relative to ours after row 0, as the game's)
+            if let Some(rows) = area_rows.as_ref() {
+                if k == 0 {
+                    area_g0 = crate::area::walk_grid(&sess.world);
+                }
+                while area_i + 1 < rows.len() && rows[area_i + 1].0 <= k {
+                    area_i += 1;
+                }
+                if rows.get(area_i).is_some_and(|r| r.0 <= k) && (rows[area_i].0 == k || k + 1 == frames.len()) {
+                    area_tally.check(k, &sess.world, area_g0.as_deref(), &rows[area_i].1);
+                }
+            }
             // SEGMENT_WORLD (report only): the world state at the rows where the game's changed, and the last row
             if let Some(rows) = world_rows.as_ref() {
                 while world_i + 1 < rows.len() && rows[world_i + 1].0 <= k {
@@ -770,6 +788,9 @@ pub fn replay_with(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: 
     }
     if world_rows.is_some() {
         rep.world = Some(world_tally);
+    }
+    if area_rows.is_some() {
+        rep.area = Some(area_tally);
     }
     if let Some(_) = recs_rows.as_ref() {
         rep.recs = Some(recs_tally);

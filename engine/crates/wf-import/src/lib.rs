@@ -15,6 +15,7 @@
 
 pub mod host;
 pub mod ram;
+pub mod area;
 pub mod recs;
 pub mod world;
 pub mod segment;
@@ -484,6 +485,15 @@ fn import_ai_rt(w: &mut World, ei: usize, lvl: usize, ram: &GbaRam, r: u32, note
         }
         let node = &tree.nodes[n];
         let mut rt = wf_core::ai::NodeRt::default();
+        // a condition (base vt 0x0804BCA8, update 0x080342AE): +4 its child's runtime, +8 the child entered (`on`;
+        // whole-run cuts 808,709 / 808,776 / 809,325: a MeleeAttack under IfPlayerInMeleeRange entered again in ours
+        // - a second hit)
+        if wf_core::nodes::is_cond(node.k) {
+            rt.on = ram.r32(r + 8) != 0;
+            if let Some(&c) = node.kids.first() {
+                todo.push((c as usize, ram.r32(r + 4)));
+            }
+        }
         match node.k {
             K::Sequence => {
                 rt.i = ram.s32(r + 4);
@@ -536,6 +546,8 @@ fn import_ai_rt(w: &mut World, ei: usize, lvl: usize, ram: &GbaRam, r: u32, note
             // HeavyPunch (a static runtime 0x030032F8; the controller 0x030032F4 counts in the object's tick): set
             // from the animation after the rows (`patch_enemy`)
             K::HeavyPunch => {}
+            // FlameBreath (the controller 0x03002FA8 counts in the object's tick, as HeavyPunch): `patch_enemy`
+            K::FlameBreath => {}
             // BackStep (enter 0x08031388, update 0x080313EA): +4 / +8 the hop step, +0x10 the counter (48 at the enter,
             // one off each update, finished at 0; ours counts the updates up)
             K::BackStep => {
@@ -549,6 +561,8 @@ fn import_ai_rt(w: &mut World, ei: usize, lvl: usize, ram: &GbaRam, r: u32, note
             K::ThrowBigBall | K::StandStill | K::FacePlayer => {}
             // MechTransform: no runtime words - its update waits for the imported animation (raw 20) to end
             K::MechTransform => {}
+            // MeleeAttack (update 0x0802A276 = IsAnim(0)), IncCounter: no runtime words
+            K::MeleeAttack | K::IncCounter => {}
             k => notes.push(format!("ai runtime of {k:?} (state {:#x} node {n}) not imported", tree.state)),
         }
         rts.push((n, rt));
@@ -722,6 +736,31 @@ fn field_from_ram(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
 /// +0x10 the exit value of the event's last run), matched to the load's triggers by rect
 fn import_trigger_resume(w: &mut World, ram: &GbaRam) {
     let n = ram.r32(TRIGS).min(256);
+    // the load's triggers the RAM's list no longer has (a touch-once trigger fired and removed itself - real run
+    // 007 Pilaf's room, whole-run cut 756,163: the room's world-spanning touch-once s364 had run before the cut):
+    // dropped, as many as ours exceed the RAM's (an Instant Transmission's wrapped trigger spans the world in RAM:
+    // the counts match then and nothing goes)
+    let rects: Vec<(i32, i32, i32, i32)> = (0..n).map(|k| ram.r32(TRIGS + 4 + 4 * k)).filter(|&o| ram.valid(o)).map(|o| (ram.s16(o + 4), ram.s16(o + 6), ram.s16(o + 8), ram.s16(o + 0xA))).collect();
+    if let Some(f) = w.field.as_mut().filter(|f| f.triggers.len() > rects.len() && rects.len() == n as usize) {
+        let mut excess = f.triggers.len() - rects.len();
+        let mut left = rects.clone();
+        let mut keep = vec![true; f.triggers.len()];
+        for (k, t) in f.triggers.iter().enumerate() {
+            let r = (t.rect.x0, t.rect.y0, t.rect.x1, t.rect.y1);
+            match left.iter().position(|&x| x == r) {
+                Some(p) => {
+                    left.remove(p);
+                }
+                None if excess > 0 => {
+                    keep[k] = false;
+                    excess -= 1;
+                }
+                None => {}
+            }
+        }
+        let mut it = keep.into_iter();
+        f.triggers.retain(|_| it.next().unwrap());
+    }
     for k in 0..n {
         let o = ram.r32(TRIGS + 4 + 4 * k);
         if !ram.valid(o) || ram.r32(o) != 0x0804_9BD4 {
@@ -732,6 +771,13 @@ fn import_trigger_resume(w: &mut World, ram: &GbaRam) {
         if let Some(t) = w.field.as_mut().and_then(|f| f.triggers.iter_mut().find(|t| (t.rect.x0, t.rect.y0, t.rect.x1, t.rect.y1) == (x0, y0, x1, y1))) {
             t.resume = v;
         }
+    }
+    // a touch-once trigger that fired is gone from the list until the area loads again: ours (the load's, its spawn
+    // condition read before the event's flag) goes too (whole-run cut 887,156: s437's trigger, flag 108 set in the
+    // cut's next frame - ours fired s437 again)
+    let rects: Vec<(i32, i32, i32, i32)> = (0..n).map(|k| ram.r32(TRIGS + 4 + 4 * k)).filter(|&o| ram.valid(o)).map(|o| (ram.s16(o + 4) as i32, ram.s16(o + 6) as i32, ram.s16(o + 8) as i32, ram.s16(o + 0xA) as i32)).collect();
+    if let Some(f) = w.field.as_mut() {
+        f.triggers.retain(|t| t.act != wf_core::fieldcontent::Activation::TouchOnce || rects.contains(&(t.rect.x0 as i32, t.rect.y0 as i32, t.rect.x1 as i32, t.rect.y1 as i32)));
     }
 }
 
@@ -949,6 +995,10 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
     // the state stack as the RAM has it (re-entered: their runtimes come next); the build's own states go without
     // their exits (nothing of them ran in the game: a wander's exit would idle and turn the enemy)
     if let Some(&first) = states.first() {
+        // (the re-entry is bookkeeping, not the game's frame: what the enters do to the players - a MeleeAttack's
+        // strike on enter - is undone; whole-run cuts 808,709 / 808,776 / 809,325: the leader lost 28 HP twice)
+        let players: Vec<(usize, wf_core::world::Entity)> = (0..w.ents.len()).filter(|&k| w.players.contains(&w.ents[k].id)).map(|k| (k, w.ents[k].clone())).collect();
+        let (stats, nev) = (w.stats.clone(), w.events.len());
         let e = w.en(ei);
         let old: Vec<_> = e.ai.stack.drain(..).collect();
         e.ai.orphans.extend(old);
@@ -956,6 +1006,11 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
         for &s in states.iter().skip(1) {
             wf_core::nodes::push(w, ei, s as u16);
         }
+        for (k, ent) in players {
+            w.ents[k] = ent;
+        }
+        w.stats = stats;
+        w.events.truncate(nev);
     }
     for lvl in 0..states.len() {
         let r = ram.r32(o + 0x238 + 8 + 8 * lvl as u32);
@@ -964,6 +1019,7 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
     import_enemy_beam(w, ei, ram, o, notes);
     import_super_ball(w, ei, ram, o, notes);
     import_bombs(w, ei, ram, o);
+    import_flames(w, ei, ram, o);
     let d = Arc::clone(&w.data);
     let e = w.en(ei);
     e.a.x = ram.s32(o + 0x1A0);
@@ -1010,6 +1066,11 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
                 if st.tree.nodes.get(n).is_some_and(|x| x.k == wf_core::ai::K::HeavyPunch) {
                     rt.f = tick;
                     rt.d[0] = 48 + 8 * nf.unwrap_or(2);
+                }
+                // a FlameBreath in progress: its frame count is the controller's tick too (whole-run cut 787,315, Dragon
+                // Ball 2's desert: tick 41, a flame a frame)
+                if st.tree.nodes.get(n).is_some_and(|x| x.k == wf_core::ai::K::FlameBreath) {
+                    rt.f = tick;
                 }
             }
         }
@@ -1087,6 +1148,19 @@ fn import_enemy_beam(w: &mut World, ei: usize, ram: &GbaRam, o: u32, notes: &mut
 /// * thrown: its start the position at the throw (tick 0x3D) = now - step x ticks since, its target start + 43 steps;
 /// * bursting: the ball's own blast animation (6 records x 4 ticks, +0x40 the ticks since the impact) - ours the
 ///   effect the impact made. Their blocks are the ball's (`import_vram`).
+/// this enemy's flames in flight (vt 0x0804BFCC, ctor 0x08024768, update 0x080247C0: +0x10 facing, +0x1C owner,
+/// +0x20 / +0x24 24.8 position, +0x40 the hit-once flag, +0x48 / +0x4C velocity, +0x50 ticks; no tile block) -> our
+/// flame shots, oldest first as the list has them (whole-run cuts 787,315 / 787,345: FlameBreath mid-breath)
+fn import_flames(w: &mut World, ei: usize, ram: &GbaRam, o: u32) {
+    let me = w.ents[ei].id;
+    for b in ram.objects().into_iter().filter(|&b| ram.r32(b) == 0x0804_BFCC && ram.r32(b + 0x1C) == o) {
+        let kind = wf_core::shots::ShotKind::Flame { vx: ram.s32(b + 0x48), vy: ram.s32(b + 0x4C), done: ram.s32(b + 0x40) != 0 };
+        let mut s = wf_core::shots::Shot::new(me, ram.r8(b + 0x10) & 3, 0, ram.s32(b + 0x20), ram.s32(b + 0x24), kind);
+        s.t = ram.s32(b + 0x50) as i64;
+        wf_core::shots::add(w, s);
+    }
+}
+
 fn import_super_ball(w: &mut World, ei: usize, ram: &GbaRam, o: u32, notes: &mut Vec<String>) {
     use wf_core::ai::K;
     const THROW: i32 = 0x3d;
@@ -1134,8 +1208,10 @@ fn import_npc_step(w: &mut World, i: usize, ram: &GbaRam, o: u32, row: Option<(i
     let st = ram.r32(o + 0x1B0);
     // (and the walk-grid wander, vt 0x0804D4E4 / update 0x0800A2A8: the same words, plus the footprint it left at
     // +0x28 and the one it walks to at +0x38, px - real run 4-1, West City's walkers: the r009_006 every-N tiles)
+    // (the plain talk wander 0x0800A75B's object, vt 0x0804B974: the same words and footprints - MEASURED on the
+    // whole-run cuts 885,660 .. 886,110, Nataday Village's walkers)
     let svt = if ram.valid(st) { ram.r32(st) } else { 0 };
-    if svt != 0x0804_D848 && svt != 0x0804_D4E4 {
+    if svt != 0x0804_D848 && svt != 0x0804_D4E4 && svt != 0x0804_B974 {
         return;
     }
     let Body::Npc(n) = &w.ents[i].body else { return };
@@ -1153,7 +1229,7 @@ fn import_npc_step(w: &mut World, i: usize, ram: &GbaRam, o: u32, row: Option<(i
             s.tx = ram.s32(st + 0x20);
             s.ty = ram.s32(st + 0x24);
             s.dir = facing;
-            if svt == 0x0804_D4E4 {
+            if svt == 0x0804_D4E4 || svt == 0x0804_B974 {
                 s.old = [0, 4, 8, 12].map(|k| ram.s32(st + 0x28 + k));
                 s.new = [0, 4, 8, 12].map(|k| ram.s32(st + 0x38 + k));
             }
@@ -1271,6 +1347,24 @@ fn build_mid(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner: &mut St
         w.menu = wf_core::menu::Menu { phase: wf_core::menu::Phase::FadeIn { level }, tr: wf_core::menu::PAUSE, ..Default::default() };
         notes.push(format!("mid-area: a menu's return (fading in, level {level})"));
     }
+    // the pause menu's fade-out (START pressed: the main loop's mode is the base "field drawn, not updated" vt
+    // 0x0804A920 itself, +4 the brightness left, from 256 by +8 = 16 a frame; the Status page next - whole-run cut
+    // 967,072, the world frozen with the leader hurt)
+    if ram.valid(mode) && ram.r32(mode) == 0x0804_A920 && ram.s32(mode + 8) == 16 && fading.is_none() && w.data.menu.is_some() {
+        let level = (256 - ram.s32(mode + 4)).clamp(0, 255) as u16;
+        let page = wf_core::menu::status::Status::new(&w);
+        wf_core::menu::open(&mut w, wf_core::menu::Screen::Status(page), wf_core::menu::PAUSE, false);
+        w.menu.phase = wf_core::menu::Phase::FadeOut { level };
+        w.menu.held = ram.r16(0x0300_3300 + 2) as u16;
+        notes.push(format!("mid-area: the pause menu's fade-out (level {level})"));
+    }
+    // an exit's fade-out under way (the main-loop mode vt 0x0804BB74, ctor 0x08006D98: +4 the brightness from 256, +8
+    // its step, +0xC the player): the exit the leader took (the load reads its def at the end, nothing in RAM says
+    // which) is ours whose rect held the leader where the fade began - autowalked k frames back, 0x80 a frame along
+    // the facing - and the fade k frames in (whole-run cut 886,110: Nataday Village's door, 18 frames in)
+    if ram.valid(mode) && ram.r32(mode) == MODE_FADE_OUT && ram.r32(mode + 0xC) == ram.player() && ram.s32(mode + 8) == 8 {
+        import_exit_fade(&mut w, ram, ram.s32(mode + 4), notes);
+    }
     // an inline script (an area's / a map event's, no event graph) running at the cut outside any event: its
     // interpreter's PC on the context stack lies in its code (r002_006 +20,026: the world map's landing script
     // 0x08073424 for Babidi's ship, stopped in its camera_pan_to after the warp, the screen still black)
@@ -1289,6 +1383,32 @@ fn build_mid(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner: &mut St
     }
     let draws = w.rng.calls.wrapping_sub(calls0);
     Built { world: w, draws, held: 0, finished: true }
+}
+
+/// the exit fade-out at brightness `level` (see `build_mid`): our exit trigger and the fade's frame count
+fn import_exit_fade(w: &mut World, ram: &GbaRam, level: i32, notes: &mut Vec<String>) {
+    use wf_core::fieldcontent::{ObjKind, TriggerKind};
+    let k = (256 - level) / 8;
+    let facing = ram.r8(ram.player() + 0x10) & 3;
+    let (dx, dy) = wf_core::geom::DIR_VEC[facing as usize];
+    let (x0, y0) = ((ram.s32(ram.player() + 0x1A0) - dx * 0x80 * k) >> 8, (ram.s32(ram.player() + 0x1A4) - dy * 0x80 * k) >> 8);
+    let Some(f) = w.field.as_ref() else { return };
+    let hit = f.triggers.iter().find_map(|t| {
+        let d = field::trigger_def(w, t.obj)?;
+        let ObjKind::Trigger { kind: TriggerKind::Exit { to, push } | TriggerKind::EdgeExit { to, push }, .. } = d.kind else { return None };
+        let edge = matches!(d.kind, ObjKind::Trigger { kind: TriggerKind::EdgeExit { .. }, .. });
+        (x0 >= t.rect.x0 as i32 && x0 < t.rect.x1 as i32 && y0 >= t.rect.y0 as i32 && y0 < t.rect.y1 as i32).then_some((to, push, t.rect, edge))
+    });
+    let Some((to, push, rect, edge)) = hit else {
+        notes.push(format!("mid-area: an exit's fade-out ({k} frames in) with no exit of ours at ({x0}, {y0})"));
+        return;
+    };
+    let (x, y) = if edge || to.relative { (x0 - rect.x0 as i32 + to.x, y0 - rect.y0 as i32 + to.y) } else { (to.x, to.y) };
+    let facing = if edge { push } else { to.facing.unwrap_or(push) };
+    if let Some(f) = w.field.as_mut() {
+        f.mode = Mode::FadeOut { k, to: AreaId { world: to.world, area: to.area, variant: to.variant }, x, y, facing: Some(facing), step: 0 };
+    }
+    notes.push(format!("mid-area: an exit's fade-out, {k} frames in, to {}-{}", to.world, to.area));
 }
 
 /// a camera pan in progress (`camera_pan_to`, object vt 0x0804B8C0: +4 / +8 the target px, +0xC speed, +0x10 /
@@ -1376,6 +1496,42 @@ fn import_death_effects(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
             continue;
         }
         let script = ram.r32(o + 0x18);
+        // no drop script, an on-defeat callback (+0x1C, its enemy object +0x20): the enemy's area def's `on_defeat`
+        // after the countdown (`defeat_later`; the enemy is defeated - out of the placed list). Real run 007,
+        // whole-run cut 756,613: Pilaf's machine down, s003's level-up running, s365 to come
+        if script == 0 && ram.r32(o + 0x1C) != 0 {
+            let eo = ram.r32(o + 0x20);
+            let (x, y) = (ram.s32(eo + 0x1A0), ram.s32(eo + 0x1A4));
+            let k = (0..w.ents.len()).find(|&k| !w.ents[k].removed && matches!(w.ents[k].body, Body::Enemy(_)) && w.actor(k).is_some_and(|a| a.x == x && a.y == y));
+            let placed = k.and_then(|k| w.field.as_ref().and_then(|f| f.placed.iter().find(|p| p.0 == w.ents[k].id).cloned()));
+            let cb = placed.and_then(|p| field::area_obj(w, p.1)).and_then(|d| match d.kind {
+                wf_core::fieldcontent::ObjKind::Enemy { on_defeat, .. } => on_defeat,
+                _ => None,
+            });
+            let (Some(k), Some(p), Some(run)) = (k, placed, cb) else {
+                notes.push(format!("mid-area: a death effect's callback {:#x} has no placed enemy with an on-defeat here", ram.r32(o + 0x1C)));
+                continue;
+            };
+            let (id, ty) = (p.0, w.en_ref(k).ty);
+            let (ex, ey) = (w.en_ref(k).a.px(), w.en_ref(k).a.py());
+            let left = ram.s32(o + 4).max(0) as u32;
+            // (an event holding the world update - its call 0x08011A5E on the stack under the VM - with the
+            // countdown's last frame left: the effect's update goes on when the event ends, its callback in that
+            // frame - `death_effects`' wait list; 756,613: s365 starts in the frame s003 ends)
+            let held = (0x0300_7000u32..0x0300_8000).step_by(4).any(|a| ram.r32(a) == 0x0801_1A5F);
+            let wait = held && w.scene.depth > 0 && left <= 1;
+            let due = if wait { u32::MAX } else { w.frame + left };
+            let cause = field::Cause::Defeat { entity: id, ty, x: ex, y: ey, loot: Some((ram.s32(o + 8), ram.s32(o + 0xC), ram.s32(o + 0x10), ram.s32(o + 0x14))) };
+            if let Some(f) = w.field.as_mut() {
+                f.placed.retain(|q| q.0 != id);
+                f.placed_loot.retain(|q| q.0 != id);
+                f.defeat_later.push((due, run, cause));
+                if wait {
+                    f.defeat_wait.push(id);
+                }
+            }
+            continue;
+        }
         let Some(ty) = w.data.enemies.iter().find(|t| t.drop_script == script).map(|t| t.ty) else {
             notes.push(format!("mid-area: a death effect's drop script {script:#x} is no enemy type's"));
             continue;
@@ -1468,9 +1624,20 @@ fn import_player_state(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
             let (kind, o) = (ram.r8(st + 0xC + 8 * k), ram.r32(st + 0x10 + 8 * k));
             let (x, y) = (ram.s32(o + 0x1A0), ram.s32(o + 0x1A4));
             let ent = (kind != 1).then(|| (0..w.ents.len()).find(|&e| !w.ents[e].removed && w.actor(e).is_some_and(|a| a.x == x && a.y == y))).flatten();
-            match ent {
-                Some(e) => picks.push(wf_core::player::ItPick::Ent(w.ents[e].id)),
-                None => {
+            // a trigger pick (kind 1; event trigger +4 rect s16 x0 y0 x1 y1): the load's trigger with that rect
+            let trig = (kind == 1)
+                .then(|| {
+                    let r = (ram.s16(o + 4), ram.s16(o + 6), ram.s16(o + 8), ram.s16(o + 0xA));
+                    w.field.as_ref().and_then(|f| f.triggers.iter().find(|t| (t.rect.x0, t.rect.y0, t.rect.x1, t.rect.y1) == r)).map(|t| t.obj)
+                })
+                .flatten();
+            match (ent, trig) {
+                (Some(e), _) => picks.push(wf_core::player::ItPick::Ent(w.ents[e].id)),
+                (None, Some(t)) => picks.push(wf_core::player::ItPick::Trig(t)),
+                // a pick the run has passed (its object may be gone - whole-run cut 1,107,692, HFIL statues: a
+                // freed enemy): never read again
+                (None, None) if k < ram.r8(st + 5) as u32 => picks.push(wf_core::player::ItPick::Ent(wf_core::world::EntityId::MAX)),
+                (None, None) => {
                     notes.push(format!("mid-area: Instant Transmission pick {k} (kind {kind}, {o:#x}) has no entity / trigger here"));
                     return;
                 }
@@ -1516,6 +1683,10 @@ fn import_player_state(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
         0x0804_C744 => Gs::Block,
         0x0804_D75C => Gs::Hurt,
         0x0804_C768 => Gs::Ko,
+        // the Energy Blast state (vt 0x0804DC14, update 0x0801AF3C: the player's tick +0x12 counts, the blast at 16,
+        // at 40 a refire if +4 (set by a B press, 0x0801AFE2) else idle) - the selected skill's (whole-run cut
+        // 809,832: a blast thrown, refire pending)
+        0x0804_DC14 if w.data.skill_kind(w.pl_ref(pi).skill()) == 7 => Gs::Skill(7),
         vt => {
             notes.push(format!("mid-area: the leader's state vt {vt:#x} is not imported"));
             return;
@@ -1523,6 +1694,13 @@ fn import_player_state(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
     };
     let row = ram.actor_rows.iter().find(|r| r.0 == po).copied();
     wf_core::player::import_state(w, pi, gs);
+    if gs == Gs::Skill(7) {
+        let serial = w.next_serial();
+        let p = w.pl(pi);
+        let id = p.skill();
+        p.t = 0;
+        p.sk = Some(wf_core::player::SkillInst { id, serial, held: false, release: -1, refire: ram.r8(st + 4) != 0, ..Default::default() });
+    }
     let p = w.pl(pi);
     if let Some((_, _, raw, cel, tick)) = row {
         p.ap.raw = raw;
@@ -1530,6 +1708,16 @@ fn import_player_state(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
         p.ap.tick = tick;
     }
     p.a.blocking = gs == Gs::Block;
+    // the idle state's boredom counter (state object +4, `0x08013022`: bored past 1024; whole-run cut 885,660 - the
+    // game's leader got bored 66 frames in)
+    if gs == Gs::Idle {
+        p.s_cnt = ram.s32(st + 4);
+    }
+    // the resist bytes (obj +0x1B8 / +0x1B9: 0 while hurt = the i-frames, 128 otherwise; whole-run cuts 808,776 /
+    // 809,325 / 967,072: a hurt leader hit again in ours)
+    p.resist = ram.r8(po + 0x1B8) as i32;
+    p.a.stats.res_m = ram.r8(po + 0x1B8) as i32;
+    p.a.stats.res_e = ram.r8(po + 0x1B9) as i32;
     // the hit-damage remainder in 1/1024 HP (player object +0x228)
     p.hp_acc.acc = ram.s32(po + 0x228) as i64;
 }
@@ -1558,6 +1746,15 @@ fn build_mid_event(_data: &Arc<GameData>, ram: &GbaRam, runner: &mut StoryHost, 
     field::set_busy(&mut w, true);
     field_from_ram(&mut w, ram, notes);
     import_player_state(&mut w, ram, notes);
+    // a touch-once trigger running its event: the game removes it when the event returns (still in the RAM's list),
+    // ours when it fires - gone (whole-run cut 887,156: s437 fired again after its end)
+    let name = format!("s{:03}", ev.0);
+    let fired: Vec<usize> = w.field.as_ref().map(|f| f.triggers.iter().enumerate().filter(|(_, t)| t.act == wf_core::fieldcontent::Activation::TouchOnce && field::trigger_def(&w, t.obj).is_some_and(|d| matches!(d.kind, wf_core::fieldcontent::ObjKind::Trigger { kind: wf_core::fieldcontent::TriggerKind::Event(ref s), .. } if *s == name))).map(|(k, _)| k).collect()).unwrap_or_default();
+    if let Some(f) = w.field.as_mut() {
+        for k in fired.into_iter().rev() {
+            f.triggers.remove(k);
+        }
+    }
     // an event started from inside the frame's object pass (a defeat callback / hook run inline: the world list's
     // update call 0x08011A5E is on the stack under the VM) holds that frame: when it ends, the frame's remaining
     // updates run (`held_event`; mid_12000: Kid Buu's AI re-evaluates in s459's exit frame)
@@ -1591,7 +1788,10 @@ fn build_mid_event(_data: &Arc<GameData>, ram: &GbaRam, runner: &mut StoryHost, 
                 let now = ram.r32(0x0300_0F94) as i64;
                 if let Some(&(_, at)) = press_ring(ram).iter().rev().find(|e| e.0 & 1 != 0) {
                     let t = now - at;
-                    if (0..wf_core::scene::DIALOG_CLOSE as i64).contains(&t) {
+                    // (the box's open level +0x50 - 8 when shown - counts down from the frame after the press: a
+                    // press still typing the page was not the close - whole-run cut 886,590, s437: A 7 frames before,
+                    // the box at 8)
+                    if (0..wf_core::scene::DIALOG_CLOSE as i64).contains(&t) && ram.s32(o + 0x50) as i64 == 8 - t {
                         d.result = Some(0);
                         d.phase = wf_core::scene::DialogPhase::Closing;
                         d.t = t as i32;
@@ -1599,7 +1799,14 @@ fn build_mid_event(_data: &Arc<GameData>, ram: &GbaRam, runner: &mut StoryHost, 
                 }
             }
         }
-        (None, Some(_)) => notes.push("mid-area: the event's text box is not open in RAM (opening / closing)".into()),
+        (None, Some(d)) => {
+            // (just opened by the node's start: the game makes the box object - its tiles - later in the cut's
+            // iteration; the importer takes them after rebuilding the allocator)
+            if d.phase == wf_core::scene::DialogPhase::Opening && d.t == 0 {
+                runner.text_open_due = Some(d.portrait != 0 && d.portrait != 7);
+            }
+            notes.push("mid-area: the event's text box is not open in RAM (opening / closing)".into())
+        }
         _ => {}
     }
     notes.push(format!("event s{:03} at node {}: mid-node over a standing field (mid-area)", ev.0, ev.1));
@@ -1827,6 +2034,20 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
             w.scene.tracks[k].started = false;
             continue;
         }
+        // so does a walk at the head with no walk object for it and its actor on the target: the walk object went in
+        // its last step (its idle SetAnim drawn), the script goes on in the cut's frame (whole-run cut 887,156:
+        // s437 node 10, the priest's walk back ended, `remove_actor` next)
+        if found.is_none() {
+            if let (Some(Cmd::MoveTo { x, y, .. }), Owner::Entity(id)) = (w.scene.tracks[k].queue.first(), w.scene.tracks[k].owner) {
+                let (x, y) = (*x, *y);
+                let at = w.find(id).and_then(|i| w.actor(i)).is_some_and(|a| a.x == x << 8 && a.y == y << 8);
+                if at && !walks.iter().any(|&o| ram.s32(o + 0x14) == x && ram.s32(o + 0x18) == y) {
+                    w.scene.tracks[k].queue.remove(0);
+                    w.scene.tracks[k].started = false;
+                    continue;
+                }
+            }
+        }
         let Some((pos, o)) = found else { continue };
         if let Some(Cmd::GlideTo { x, y, .. }) = w.scene.tracks[k].queue.get_mut(pos) {
             (*x, *y) = (ram.s32(o + 0x14), ram.s32(o + 0x18));
@@ -1880,6 +2101,17 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
                 (e.ea.pos.raw, e.ea.pos.frame, e.ea.pos.tick) = (raw, cel, tick);
             }
             _ => {}
+        }
+    }
+    // the camera mover (0x31 camera_center_on / 0x32 camera_scroll_to: the camera slot's object vt 0x0804AB24, +4 /
+    // +8 the 22.10 step, +0xC the steps left): the replayed scroll takes the RAM's step and count, the camera the
+    // RAM's position (the replay's start measured its steps from the camera at the cut; real run 007, whole-run cuts
+    // 756,956 .. 756,974: s365's camera_center_on(223, 2))
+    let slot = ram.r32(0x0300_2BE0);
+    if ram.valid(slot) && ram.r32(slot) == 0x0804_AB24 {
+        if let Some(s) = w.scene.cam.scroll.as_mut() {
+            (s.sx, s.sy, s.n, s.t) = (ram.s32(slot + 4), ram.s32(slot + 8), ram.s32(slot + 0xC), 0);
+            wf_core::battle::set_camera(&mut w, 0, ram.s32(CAM), ram.s32(CAM + 4));
         }
     }
     notes.push(format!("event s{:03} at node {}: mid-code, action #{last} {wn:#04x} waiting (replayed from #{from})", ev.0, ev.1));
@@ -2064,6 +2296,7 @@ fn build_event_entry(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner:
 /// replay (its running script / queue are part of the state).
 pub fn import_emulator_state(data: &Arc<GameData>, ram: &GbaRam, runner: &mut StoryHost) -> Result<Imported, ImportError> {
     let info = inspect(ram);
+    runner.text_open_due = None;
     // an area entry inside a running event (a script's warp): the event's position from the scene objects
     // (no leader: a cutscene map the event loaded with the players offstage)
     let in_event = if info.kind != CutKind::MidArea {
@@ -2138,6 +2371,10 @@ pub fn import_emulator_state(data: &Arc<GameData>, ram: &GbaRam, runner: &mut St
     }
     check(&mut world, ram, &mut notes);
     import_vram(&mut world, ram);
+    // a text box opened by the import whose object the game makes later in the cut's iteration: its tiles now
+    if let Some(p) = runner.text_open_due.take() {
+        wf_core::vram::text_open(&mut world, p);
+    }
     // a banner object of an earlier load still showing: its countdown (obj +0x10) -> our age
     {
         world.scene.banner_made = u32::MAX;
@@ -2228,7 +2465,7 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
     let mut owners: Vec<(u16, Owner)> = vec![];
     let mut used_ents: Vec<wf_core::world::EntityId> = vec![];
     let mut signs = 0u32;
-    let mut pops: Vec<(u16, i32)> = vec![];
+    let mut pops: Vec<(u16, i32, u32)> = vec![];
     for o in ram.objects() {
         let vt = ram.r32(o);
         if vt == 0x0804_D1E4 {
@@ -2268,7 +2505,7 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
             let h = ram.r16(o + 0xC);
             if h != 0xFFFF {
                 owners.push((h, Owner::Popup));
-                pops.push((h, ram.s32(o + 0x10)));
+                pops.push((h, ram.s32(o + 0x10), o));
             }
             continue;
         }
@@ -2368,6 +2605,12 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
             owners.push((ram.r16(p + 2), Owner::Shared(k as u8)));
         }
     }
+    // the flames' shared graphic (`0x080246B4`: 0x03002FB8 its users, +2 its handle; `import_flames`)
+    let mut keyed = vec![];
+    if ram.r8(0x0300_2FB8) > 0 && ram.r16(0x0300_2FBA) != 0xFFFF {
+        owners.push((ram.r16(0x0300_2FBA), Owner::Keyed(wf_core::vram::KEY_FLAME)));
+        keyed.push((wf_core::vram::KEY_FLAME, ram.r8(0x0300_2FB8) as u32));
+    }
     for b in &a.e {
         if b.used == 1 && !owners.iter().any(|o| o.0 == b.start << 1) {
             owners.push((b.start << 1, Owner::Foreign));
@@ -2380,13 +2623,33 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
         .filter(|o| matches!(o.1, Owner::Hud | Owner::Banner | Owner::BossBar | Owner::StatMark | Owner::Sign(_) | Owner::Map3d | Owner::Timer))
         .map(|o| (o.1, stamp, a.e[a.idx[(o.0 >> 1) as usize & 511] as usize].size as i32 * 64))
         .collect();
-    if let Some(f) = w.field.as_mut() {
+    {
         let now = w.frame;
-        let popups = pops.iter().map(|&(h, n)| (wf_core::world::EntityId::MAX, 0, h, now + n.max(0) as u32)).collect();
+        // a damage number's target: the actor whose +0x1D8 holds it (+0x1D4 the logic counter of its last new number; `0x0800E8E6`
+        // reuses the number within 8 frames - whole-run cut 787,315: flames hitting the player every frame)
+        let lf = ram.r32(0x0300_0F94);
+        let target = |p: u32| -> (wf_core::world::EntityId, u32) {
+            let Some(a) = ram.objects().into_iter().find(|&a| matches!(ram.r32(a), VT_PLAYER | VT_ENEMY) && ram.r32(a + 0x1D8) == p) else { return (wf_core::world::EntityId::MAX, 0) };
+            let (x, y) = (ram.s32(a + 0x1A0), ram.s32(a + 0x1A4));
+            let ent = if a == ram.player() {
+                w.player_idx(0).map(|pi| w.ents[pi].id)
+            } else {
+                w.ents.iter().find(|e| !e.removed && matches!(&e.body, Body::Enemy(en) if en.a.x == x && en.a.y == y)).map(|e| e.id)
+            };
+            match ent {
+                Some(id) => (id, now.wrapping_sub(lf.wrapping_sub(ram.r32(a + 0x1D4)))),
+                None => (wf_core::world::EntityId::MAX, 0),
+            }
+        };
+        let popups = pops.iter().map(|&(h, n, o)| {
+            let (t, at) = target(o);
+            (t, at, h, now + n.max(0) as u32)
+        }).collect();
+        let Some(f) = w.field.as_mut() else { return };
         // (made before anything the replay makes: a stamp below the next object's)
-        let popup_at = pops.iter().map(|&(h, _)| (h, stamp.saturating_sub(1))).collect();
+        let popup_at = pops.iter().map(|&(h, _, _)| (h, stamp.saturating_sub(1))).collect();
         // the stat-points mark's draw counter (vt 0x0804C070 +0x14)
         let stat_at = ram.objects().into_iter().find(|&o| ram.r32(o) == 0x0804_C070).map(|o| now.wrapping_sub(ram.r32(o + 0x14))).unwrap_or(0);
-        f.vram = Some(VramState { a, owners, shared_rc, suspended: vec![], hud_out: vec![], popups, keyed: vec![], stashed: None, delayed: vec![], objs, susp: vec![], shadow_set: vec![], popup_at, pass_at: 0, stat_at });
+        f.vram = Some(VramState { a, owners, shared_rc, suspended: vec![], hud_out: vec![], popups, keyed, stashed: None, delayed: vec![], objs, susp: vec![], shadow_set: vec![], popup_at, pass_at: 0, stat_at });
     }
 }

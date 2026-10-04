@@ -549,6 +549,9 @@ pub fn title_world(data: &Arc<crate::content::GameData>, w: &World) -> World {
     nw.saves.pending = None;
     nw.menu.settings = w.menu.settings.clone();
     nw.story = old.story;
+    // (and its HUD-shown bit, GameData bits & 2: the ending's hide_hud leaves it clear under the title - sb_044_04_20,
+    // rsbk_002_04_21 world-state rows)
+    nw.scene.hud_hidden = w.scene.hud_hidden;
     nw.events.retain(|e| !matches!(e, crate::world::Event::Field(crate::field::FieldEvent::Run { .. })));
     nw.events.insert(0, crate::world::Event::SongStop);
     open_title(&mut nw);

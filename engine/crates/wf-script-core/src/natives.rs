@@ -197,6 +197,13 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
         0x2f | 0x30 => {
             let was = h.w.scene.hud_hidden;
             h.w.scene.hud_hidden = n == 0x30;
+            // the HUD-shown game bit (GameData bits & 2; the import's `hud_hidden` reads it): show sets, hide clears
+            // (world-state check: after the ending's hide_hud the game's bits read 0x1 / 0x9 - sb_044 / rsbk_002)
+            if n == 0x2f {
+                h.w.story.game_bits |= 2;
+            } else {
+                h.w.story.game_bits &= !2;
+            }
             if was != h.w.scene.hud_hidden {
                 wf_core::vram::hud_shown(h.w, n == 0x2f);
                 if n == 0x2f && h.w.field.is_some() {

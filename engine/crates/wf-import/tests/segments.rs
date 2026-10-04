@@ -80,7 +80,9 @@ fn segments_match_the_game() {
         let recs_ok = !recs_exact || rep.recs.as_ref().is_some_and(|t| t.bad_rows == 0 && t.checks > 0);
         // "world_exact": the world state too (wf_import::world: story flags, game bits, timers, script words)
         let world_ok = doc["world_exact"].as_bool() != Some(true) || rep.world.as_ref().is_some_and(|t| t.bad_rows == 0 && t.checks > 0);
-        let ok = (rep.compared >= need || (gate.is_none() && !all_strict)) && recs_ok && world_ok;
+        // "area_exact": the area's own lists too (wf_import::area: triggers + resume nodes, walk-grid changes)
+        let area_ok = doc["area_exact"].as_bool() != Some(true) || rep.area.as_ref().is_some_and(|t| t.bad_rows == 0 && t.checks > 0);
+        let ok = (rep.compared >= need || (gate.is_none() && !all_strict)) && recs_ok && world_ok && area_ok;
         eprintln!(
             "segment {name}: {} video frames ({} logic), matched {} / {} | first divergence {:?} | import held {} draws {} | {} actor checks | {:.2}s{}",
             rep.frames,
@@ -112,6 +114,9 @@ fn segments_match_the_game() {
             eprintln!("    recs {name}: no game rows (tools/segments/recs.py)");
         }
         // SEGMENT_WORLD=1 (report only): the world state against the game's (tools/segments/world.py; wf_import::world)
+        if let Some(t) = &rep.area {
+            eprintln!("    area {name}: {} checks, {} differ{}{}", t.checks, t.bad_rows, t.first.as_ref().map(|f| format!(" - first at f{} {:?}", f.0, f.1)).unwrap_or_default(), if t.fields.is_empty() { String::new() } else { format!(" fields {:?}", t.fields) });
+        }
         if let Some(t) = &rep.world {
             eprintln!("    world {name}: {} checks, {} differ{}{}", t.checks, t.bad_rows, t.first.as_ref().map(|f| format!(" - first at f{} {:?}", f.0, f.1)).unwrap_or_default(), if t.fields.is_empty() { String::new() } else { format!(" fields {:?}", t.fields) });
         }

@@ -1793,7 +1793,7 @@ pub fn start_cause(w: &mut World, c: &Cause) {
 /// input mask of a push direction (`0x080707D8`): down, up, left, right
 const PUSH_KEY: [u16; 4] = [crate::input::DOWN, crate::input::UP, crate::input::LEFT, crate::input::RIGHT];
 
-fn trigger_def(w: &World, obj: ObjRef) -> Option<ObjDef> {
+pub fn trigger_def(w: &World, obj: ObjRef) -> Option<ObjDef> {
     let fd = field_data(w);
     let f = w.field.as_ref()?;
     let a = fd.area(f.area.world, f.area.area)?;
@@ -1933,6 +1933,8 @@ fn fire(w: &mut World, slot: usize, k: usize, t: &TriggerRt) {
     let host = w.field.as_ref().is_some_and(|f| f.host);
     let obj = t.obj;
     let s8 = slot as u8;
+    let region = matches!(kind, TriggerKind::Region) || (matches!(kind, TriggerKind::Event(_)) && std::env::var_os("T_KEEPEV").is_some());
+    let kdbg = format!("{kind:?}");
     match kind {
         TriggerKind::Exit { to, push } | TriggerKind::EdgeExit { to, push } => {
             if w.input[slot].held & PUSH_KEY[push as usize & 3] == 0 {
@@ -1962,9 +1964,12 @@ fn fire(w: &mut World, slot: usize, k: usize, t: &TriggerRt) {
         TriggerKind::Region | TriggerKind::Unknown(_) => {}
     }
     // touch_once: removed after firing unless an area load happened meanwhile
-    if matches!(t.act, Activation::TouchOnce | Activation::Unknown(0x0800_71A7) | Activation::Unknown(0x0802_266F)) {
+    // (a region (vt 0x080499D4) stays: the game's trigger lists keep it after the player crossed it - 2-8, 14-2,
+    // 15-33 ...; the list's length counts for the drops' "< 45 triggers")
+    if !region && matches!(t.act, Activation::TouchOnce | Activation::Unknown(0x0800_71A7) | Activation::Unknown(0x0802_266F)) {
         if let Some(f) = w.field.as_mut() {
             if f.loads == loads && k < f.triggers.len() && f.triggers[k].obj == t.obj {
+                if std::env::var_os("T_TRDBG").is_some() { eprintln!("TRDBG remove f{} {:?} act {:?} region {} kind {}", w.frame, f.triggers[k].rect, f.triggers[k].act, region, kdbg); }
                 f.triggers.remove(k);
             }
         }
@@ -2130,6 +2135,11 @@ pub fn throw_map_item(w: &mut World, at: ObjRef) -> Option<EntityId> {
 
 /// an event trigger (vt 0x08049BD4, activation `0x080073F0`: passes its +0x10 slot) - not a save point (vt 0x08049794,
 /// activation `0x0800748C`: the scene runner with no slot, s011 always from node 0)
+/// an event trigger (object vt 0x08049BD4: it keeps a resume node) - the harness's area-state check
+pub fn is_event_trigger(w: &World, obj: ObjRef) -> bool {
+    slot_trigger(w, obj)
+}
+
 fn slot_trigger(w: &World, obj: ObjRef) -> bool {
     trigger_def(w, obj).is_some_and(|d| matches!(d.kind, ObjKind::Trigger { kind: TriggerKind::Event(_), .. }))
 }

@@ -58,6 +58,10 @@ pub struct StoryHost {
     /// content's `scripts/bytecode.json`, `set_step_code`): the importer maps a running interpreter's PC to the
     /// natives the node has run
     pub step_code: StepCode,
+    /// a text box the import opened at its node's start while the game's object is not made yet (the cut stands
+    /// inside that iteration: real run 007, whole-run cut 756,613 - s003's node 2 after its first node's box): the
+    /// portrait flag of `vram::text_open`; its tiles are taken after the allocator is rebuilt from RAM (the importer)
+    pub text_open_due: Option<bool>,
 }
 
 /// the cause of an event the import continues: a fusion component's level-up hook (s003 cut while
@@ -192,7 +196,7 @@ impl StoryHost {
         let rt = Runtime::new(files, Box::new(shared.clone()))?;
         let stepped = files.iter().filter(|(_, src)| src.contains("fn step_0()")).map(|(p, _)| p.clone()).collect();
         let hs = HostState { nest_area_enter: true, ..HostState::default() };
-        Ok(StoryHost { rt, shared, hs, queue: VecDeque::new(), running: false, cause: None, outer: vec![], stepped, errors: vec![], started: vec![], prev_held: 0, frame: 0, step_code: STEP_CODE.get().cloned().unwrap_or_default() })
+        Ok(StoryHost { rt, shared, hs, queue: VecDeque::new(), running: false, cause: None, outer: vec![], stepped, errors: vec![], started: vec![], prev_held: 0, frame: 0, step_code: STEP_CODE.get().cloned().unwrap_or_default(), text_open_due: None })
     }
 
     /// a session around an imported / built world (no hook: the host runs the queue itself)
@@ -674,6 +678,12 @@ impl StoryHost {
         let fresh = self.started.len() > before && !new_game;
         let n0 = sess.world.events.len();
         sess.step_update();
+        // the countdown (GD+0x4D4) counts the frames whose object pass sees the field free; our frame order (update,
+        // then the script's resume, then the post step's trigger check) is settled after them below
+        let cd0 = self.hs.timers.countdown;
+        let free_at_tick = wf_script_core::countdown_counts(&sess.world);
+        // (an event the countdown's hook started runs inside the countdown object's update: its frame is counted)
+        let hook_event = self.hs.timer_event;
         wf_script_core::tick_timers(&mut sess.world, &mut self.hs);
         // the running script resumes from its wait (not one this frame's start began: its first wait counts from the
         // next frame), then the scripts the update started (NPC talk)
@@ -683,6 +693,14 @@ impl StoryHost {
         }
         self.collect(&evs);
         self.run_queue(&mut sess.world);
+        // (an event that ended now - at the top of the game's frame - leaves the field free for this frame's count:
+        // Airship db5_023 f569, the level-up popup's last box)
+        let ticked_late = !free_at_tick && !hook_event && self.hs.timers.countdown_on && self.hs.timers.countdown > 1 && wf_script_core::countdown_counts(&sess.world);
+        if ticked_late {
+            self.hs.timers.countdown -= 1;
+        }
+        let cd1 = self.hs.timers.countdown;
+        let free_mid = wf_script_core::countdown_counts(&sess.world);
         // the trigger check (post step) starts its event in this frame too
         let n = sess.world.events.len();
         sess.step_post();
@@ -691,6 +709,11 @@ impl StoryHost {
         let post: Vec<Event> = sess.world.events[n.min(sess.world.events.len())..].to_vec();
         self.collect(&post);
         self.run_queue(&mut sess.world);
+        // ... and not in the frame the trigger check holds the field - a script it starts (Airship db5_022 f51, the
+        // lift's inline trigger) or an exit's walk-out (db5_028 f282): the countdown's object sees the hold
+        if free_mid && !wf_script_core::countdown_counts(&sess.world) && cd1 < cd0 && cd1 > 0 {
+            self.hs.timers.countdown = cd0;
+        }
         // the game runs a frame's scripts before its objects: a HUD a script showed gets its update (the
         // stat-points mark) in the same frame, after the script's own objects (segments sb 20-2 f1574, 20-5 f5212)
         wf_core::vram::stat_mark(&mut sess.world);

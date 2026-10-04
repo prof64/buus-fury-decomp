@@ -157,7 +157,9 @@ fn main() {
                 let Some(&i) = at.get(&k) else { return };
                 let mut view = RenderView::default();
                 wf_core::view::render_view(w, &mut view);
-                presenter.apply(&mut view);
+                if std::env::var_os("PIX_NOPRES").is_none() {
+                    presenter.apply(&mut view);
+                }
                 if std::env::var_os("PIX_NOSPR").is_some() {
                     view.sprites.clear();
                 }
@@ -166,7 +168,8 @@ fn main() {
                 }
                 let ours = renderer.render(&packs, &view, 0, W, H).to_vec();
                 let (class, n) = classify(&view, &game[i], &ours);
-                if n > 0 && pngs < max_png {
+                let at_ok = std::env::var("PIX_AT").map(|v| v.split(',').any(|x| x.parse::<usize>().ok() == Some(k))).unwrap_or(true);
+                if n > 0 && pngs < max_png && at_ok {
                     if let Some(o) = &out_dir {
                         let diff: Vec<u32> = game[i].iter().zip(&ours).map(|(a, b)| if a == b { 0xFF00_0000 } else { 0xFFFF_00FF }).collect();
                         save(&o.join(format!("{name}_f{k}.png")), &[&game[i], &ours, &diff]);

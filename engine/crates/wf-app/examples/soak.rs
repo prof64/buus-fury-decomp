@@ -116,6 +116,11 @@ fn main() {
             if let Some(gr) = rows[k - 1]["rng"].as_array() {
                 w.rng.set_state([gr[0].as_u64().unwrap_or(0) as u32, gr[1].as_u64().unwrap_or(0) as u32]);
             }
+            // ... and the game's logic counter (0x03000F94: `Globals::clock`, the punch machine's blink, enemy state
+            // stamps): the open-loop prologue ran another number of iterations
+            if let Some(l) = rows[k - 1]["lf"].as_i64() {
+                w.g.fc0 = l - w.frame as i64;
+            }
             first_area = None;
             first_pos = None;
             first_rng = None;
@@ -249,7 +254,11 @@ fn main() {
                 app.step(&[keys], &mut ev);
                 wf_core::rng::TRACE.store(false, std::sync::atomic::Ordering::Relaxed);
                 stepped += 1;
-                if nolag_first.is_none() {
+                // (a --sync chain is compared from its sync point: before it the app runs open loop)
+                if nolag_first.is_none() && synced {
+                    // the game's row recorded at the iteration's end: its last video frame (a long iteration - a load,
+                    // a redraw - is still running in its first rows)
+                    let r = rows[k..].iter().take_while(|n| n["lf"].as_i64().unwrap_or(0) == lf).last().unwrap_or(r);
                     let w = app.world();
                     let mut d = vec![];
                     let g = [r["rng"][0].as_u64().unwrap_or(0) as u32, r["rng"][1].as_u64().unwrap_or(0) as u32];
@@ -273,6 +282,10 @@ fn main() {
                         nolag_first = Some(k);
                     }
                 }
+            } else if std::env::var_os("SOAK_NOLAG_SND").is_some() {
+                // (diagnosis: the recording's lag rows as sound-hardware frames, as the segment harness does)
+                let last = rows.get(k + 1).is_some_and(|n| n["lf"].as_i64().unwrap_or(0) != lf);
+                wf_core::sndsim::lag_frame_ex(&mut app.session.world, last);
             }
         } else if sim_lagging {
             if logic && sim_lag_bad.is_none() {

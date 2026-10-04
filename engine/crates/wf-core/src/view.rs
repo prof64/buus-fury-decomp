@@ -117,7 +117,7 @@ pub fn render_view(w: &World, out: &mut RenderView) {
     // the draw order: the world-list objects by (layer, depth) - the actors and the field's props (each prop its own
     // object, `fieldview::prop_keys`); at an equal key a prop is behind
     let mut order: Vec<((i32, i32, u32), Option<usize>, usize)> = (0..w.ents.len()).filter(|&i| !w.ents[i].removed && !crate::vram::suspended(w, w.ents[i].id)).map(|i| (draw_key(w, i), Some(i), 0)).collect();
-    order.extend(crate::fieldview::prop_keys(w).into_iter().map(|(k, d)| ((0, d, 0), None, k)));
+    order.extend(crate::fieldview::prop_keys(w).into_iter().map(|(k, l, d)| ((l, d, 0), None, k)));
     order.sort_by_key(|o| o.0);
     // field: the debris chips, the item-get icon (front-most), then the actors and props
     crate::fieldview::front(w, out);

@@ -152,21 +152,15 @@ fn blend(a: u32, b: u32, eva: u32, evb: u32, m: BlendMath) -> u32 {
 
 /// BLDY brightness decrease.
 #[inline]
-fn darken(a: u32, evy: u32, m: BlendMath) -> u32 {
+fn darken(a: u32, evy: u32, _m: BlendMath) -> u32 {
+    // BLDY brightness decrease on the 5-bit channels, then expanded - mGBA too (its screens show only expanded
+    // values after a darken: real run 11-10 `dr2_007` f450, a scene's black fade at 9: 27 -> 12 = 99, not the
+    // 8-bit 222 -> 98)
     let mut out = 0xFF00_0000;
     for sh in [16, 8, 0] {
-        let v = match m {
-            BlendMath::Mgba => {
-                let x = c5(a, sh);
-                x - ((x * evy) >> 4)
-            }
-            BlendMath::Hardware => {
-                let x = c5(a, sh) >> 3;
-                let v = x - ((x * evy) >> 4);
-                (v << 3) | (v >> 2)
-            }
-        };
-        out |= v << sh;
+        let x = c5(a, sh) >> 3;
+        let v = x - ((x * evy) >> 4);
+        out |= ((v << 3) | (v >> 2)) << sh;
     }
     out
 }

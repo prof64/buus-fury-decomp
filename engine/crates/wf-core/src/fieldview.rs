@@ -61,19 +61,28 @@ pub fn map_sprite(w: &World, id: u32, m: &MapSprite, out: &mut RenderView) {
 
 /// map props (`0x0800CF7A`, visible ones, at the rect top-left; a shaking breakable adds its offset)
 pub fn props(w: &World, out: &mut RenderView) {
-    for (k, _) in prop_keys(w) {
+    for (k, _, _) in prop_keys(w) {
         prop(w, k, out);
     }
 }
 
-/// the visible props with their draw sort depth: each prop is a world-list object of its own (vtable 0x0804D1E4)
-/// sorted with the actors by (layer +8, depth +4) - its depth the rect's bottom (+0x30), an actor's its y + 4
-/// (0x08052EE0's keys, emulator: Earth 7-2's drinks stand, the counter props at depth 704 drawn over the girl at
-/// 700). `view::render_view` merges them into the actors' order (depth here on the actors' y scale: bottom - 4)
-pub fn prop_keys(w: &World) -> Vec<(usize, i32)> {
+/// the visible props with their draw sort key: each prop is a world-list object of its own (vtable 0x0804D1E4)
+/// sorted with the actors by (layer +8, depth +4; 0x08052EE0: a higher layer is further back, then a larger depth
+/// further front) - its layer the record's byte +0x16 (the tile word's bits 16..23: 0x38 like the actors, 0x3C
+/// behind them), its depth the rect's bottom (+0x30); an actor's depth is its y + 4. Emulator: Earth 7-2's drinks
+/// stand, the counter props (layer 0x38, depth 704) over the girl at 700; Airship 12-17's lift (0x3C) behind the
+/// player. Returned as (prop, our layer = 0x38 - layer, depth on the actors' y scale = bottom - 4)
+pub fn prop_keys(w: &World) -> Vec<(usize, i32, i32)> {
     let Some(f) = w.field.as_ref() else { return vec![] };
     let Some(md) = w.data.field.as_ref().and_then(|d| d.maps.get(&f.map)) else { return vec![] };
-    f.props.iter().enumerate().filter(|(k, p)| p.visible && md.props.get(*k).is_some_and(|d| d.frame.is_some())).map(|(k, p)| (k, p.rect.y1 - 4)).collect()
+    f.props
+        .iter()
+        .enumerate()
+        .filter_map(|(k, p)| {
+            let d = md.props.get(k).filter(|d| p.visible && d.frame.is_some())?;
+            Some((k, 0x38 - ((d.tile >> 16) & 0xFF) as i32, p.rect.y1 - 4))
+        })
+        .collect()
 }
 
 /// one prop (and its breakable's shake)

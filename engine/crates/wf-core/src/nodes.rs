@@ -182,7 +182,7 @@ pub fn tick(w: &mut World, i: usize) {
 
 // ---- composites ----------------------------------------------------------------------------------------------------
 
-fn is_cond(k: K) -> bool {
+pub fn is_cond(k: K) -> bool {
     use K::*;
     matches!(
         k,

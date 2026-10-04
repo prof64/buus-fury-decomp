@@ -3864,6 +3864,22 @@ exact, 74 not. A takes the fat-arc / dungeon / Janemba ones from the current mas
 809,325 (012 hp), 809,832 / 809,833 (012 pos), 885,660 .. 887,156 (026 / 027 half pixels, vram, an extra npc),
 967,072 (034 pos), 967,102 .. 967,282 (034, refused: area 0/21's on-enter script blocked), 1,107,692 .. 1,107,830
 (042, the player's anim cel). The older-master cuts (07:xx, ship / Earth rows) are left to their owners.
+*Result (A, all in wf-import; wf-core only makes `field::trigger_def` / `nodes::is_cond` public):* whole-run cuts
+238 -> **272 / 312 exact**, all of A's list fixed except the 034 pause-menu cuts; longer recordings (70 .. 400 rows) from
+756,163 / 756,613 / 756,956 / 787,315 / 787,345 / 808,776 / 809,832 / 885,660 / 886,110 / 886,590 / 887,156 /
+967,072 / 1,107,692 exact. Imported now: touch-once triggers the game already fired (gone from RAM's list, or the
+running event's own); a text box the cut's iteration is about to make (its tiles after the allocator rebuild); a text
+box's close only when its open level (+0x50) agrees; a death effect with an on-defeat callback (+0x1C, Pilaf's
+machine -> s365) instead of a drop script; a running camera move (vt 0x0804AB24 step / steps left); FlameBreath's
+tick, flames in flight (vt 0x0804BFCC) and the flame tile refcount; damage numbers' targets (+0x1D8 / +0x1D4);
+talk-NPC wander vt 0x0804B974; a finished walk at a track's head; the idle boredom counter; an exit's fade-out (main
+mode vt 0x0804BB74; the door exit is checked, edge exits not); the pause menu's opening fade (vt 0x0804A920);
+Energy Blast (vt 0x0804DC14 -> skill 7); condition nodes' child runtime (+4 / +8); enemy re-entry no longer hits the
+player (MeleeAttack on enter); IT runs past a trigger pick / a gone pick; the leader's resist bytes. Area-entry cuts
++ tiles (1,577) unchanged; gates green. `c633276` reads 0 / 2 now only because its 2 rows end before the game makes
+its text box (40 rows: 0 -> 40 / 40). **Not done:** 967,102 .. 967,282 (and 968,262) are the pause menu's Status /
+Inventory / item-use pages with the field torn down (world saved to the heap by 0x08011DB4) - needs page-state
+importers for those menus; resync loses nothing (it resumes at 967,522).
 
 **Claim (dungeon agent B, 2026-10-04): the whole run's Janemba-chapter rule stops** (stretches 035_j00_yemma ..
 the last j / h / HFIL stretch before Super Buu's 051_sb_start), from 1,107,691 (042_h_statues) on. **Super Buu
@@ -3951,3 +3967,23 @@ delta]...]}` - row 0 whole, later rows only the changed fields, each whole (`are
 1,393 trigger-change rows, 724 grid-change rows over the 503 files. **Not extracted (yet):** the NPC talk slots (the
 talk-event pass state lives in the NPC objects - the importer's match; no list of its own found).
 **Earth agent:** the harness side (`SEGMENT_AREA`, the compare, an `area_exact` lock) is yours as agreed.
+
+**§11 update 20 (B): the app soak in no-lag mode, compared per logic frame.** `SOAK_NOLAG=1` on
+`examples/soak.rs` (`work/db57/scratch/soakall.py TAG SOAK_NOLAG=1`): `Options::no_lag`, the app steps on the
+recording's logic rows only (menus included) and is compared **exactly** after each step - RNG, area, leader
+position - against the game's row at the **end** of that iteration (its last video frame: a load's or a redraw's
+first rows show the iteration half done); the first difference is printed (`no-lag first divergence row K`). A
+`--sync` chain is compared from its sync point, where the soak now also takes the game's logic counter (`fc0`;
+the punch machine's blink and the enemies' state stamps read it - the open-loop prologue ran another count).
+**Result: 50 of the 54 runs are exact on every logic row to their end** (all fat-arc, dungeon, Janemba, ship,
+Super / Kid Buu and post-game masters but these):
+* `title_earth` (opening + Earth, 201,926 rows): exact to **190,577** (Earth 7-x, the World Tournament grounds,
+  lf 181,525): the crowd's wander draws - ours 10 `chance` calls, the game's one more / less: one NPC's walk count
+  differs (fieldnpc.rs `wander`); the recorded-lag soak meets it too (RNG at 190,617) -> **Earth agent**.
+* `m_062_m_inside_buu` row 2,401 (s473): the whole run's 1,339,017 -> **Super Buu agent**.
+* `m_pg_g111` row 31: the game's player ignores the d-pad for 67 frames after the cut, then is moved by something
+  (state "hold") - the cut is taken inside a hold the import does not restore; same in recorded-lag mode ->
+  **importer agent** (post-game leg).
+* `m_pg_g131`: refused cut (13-2's on-enter script blocked, no leader) -> **importer agent** (known).
+No menu-related stop: every menu in the 50 runs (pause, heal, save, Switch Character, shops, the punch machine)
+steps per logic frame like the game's. Nothing for the ship-fixes agent from this run.

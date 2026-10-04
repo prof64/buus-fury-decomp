@@ -447,6 +447,11 @@ fn release_field_npcs(w: &mut World, watermark: EntityId) {
 }
 
 /// the field runs free (no event holds it, no transition): None outside the field
+/// the field runs free (the countdown counts this frame): no hold, no item-get pose, no exit / load fade
+pub fn countdown_counts(w: &World) -> bool {
+    self_field_free(w).unwrap_or(true)
+}
+
 fn self_field_free(w: &World) -> Option<bool> {
     let f = w.field.as_ref()?;
     // (the walk-in's last frame counts: the fade-in ends in this frame's post step)
@@ -463,19 +468,21 @@ fn self_field_free(w: &World) -> Option<bool> {
 /// Airship's self destruct - white fade, HP 0) in that frame (MEASURED 12-22: GD+0x4D4 15 on the cut's f1702, `run 9`
 /// on f1717).
 pub fn tick_timers(w: &mut World, s: &mut HostState) {
-    // a countdown switched ON by the last instruction of an event counts in that frame already (Kid Buu's arena
-    // 21-25: 3600 set in the event's exit frame reads 3599 in it; the hook runs 3599 frames later) - our scripts
-    // run after the update, so its first free tick counts twice
+    // the count of a frame whose field is free at this point; the host settles the frames where our order differs
+    // from the game's (an event ending at the frame's top counts, a hold the post step starts does not)
     let fresh = std::mem::take(&mut s.timers.fresh);
     if self_field_free(w).unwrap_or(true) {
         s.timer_event = false;
     }
     if s.timers.countdown_on && s.timers.countdown > 0 && self_field_free(w).unwrap_or(true) {
-        if fresh && s.timers.countdown > 1 {
-            s.timers.countdown -= 1;
-        }
+        // (the frame an event that set it ends in counts through the host's late tick: `StoryHost::step_inputs`;
+        // `Timers.fresh` is kept for old snapshots only)
+        let _ = fresh;
         s.timers.countdown -= 1;
         if s.timers.countdown == 0 && w.field.as_ref().is_some_and(|f| f.host) {
+            // the countdown switches itself off at 0, before its hook (GameData +1 bit 2 clear in the hook's first
+            // frame: Airship db5t_004 f1717, Kid Buu's arena rkb_168 / sb_041)
+            s.timers.countdown_on = false;
             s.timer_event = true;
             w.events.push(wf_core::world::Event::Field(wf_core::field::FieldEvent::Run {
                 run: wf_core::fieldcontent::Callback::Event("s009".into()),
