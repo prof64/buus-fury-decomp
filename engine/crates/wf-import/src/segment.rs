@@ -380,7 +380,8 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
         } else {
             sess.world.events.clear();
             // the game's lag frame: the sound hardware's frame passes without the main loop's update
-            wf_core::sndsim::lag_frame(&mut sess.world);
+            let last = frames.get(k + 1).is_some_and(|n| i(&n["lf"]) != lf);
+            wf_core::sndsim::lag_frame_ex(&mut sess.world, last);
         }
         if let Some((a, b)) = trace {
             if (a..=b).contains(&k) {

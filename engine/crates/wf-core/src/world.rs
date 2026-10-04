@@ -770,11 +770,7 @@ impl World {
     }
 
     /// 0x0800797C screen shake (duration, intensity)
-    #[track_caller]
     pub fn shake(&mut self, duration: i32, intensity: i32) {
-        if std::env::var("DBG_SHAKE").is_ok() {
-            eprintln!("  shake {duration} {intensity} frame {} at {}", self.frame, std::panic::Location::caller());
-        }
         self.g.shakes.push(Shake { left: duration, intensity, period: (100 - intensity) / 16 + 1, cnt: 1 });
     }
     /// the field camera does not follow while a shake holds its slot, nor in the frame the shake ended (story

@@ -1168,6 +1168,16 @@ fn track_index(w: &mut World, owner: Owner) -> usize {
 /// at once (the caller blocks until [`wait_done`]); inside a batch the command waits for `end_parallel`.
 /// Returns true when the caller must block.
 pub fn enqueue(w: &mut World, owner: Owner, cmd: Cmd) -> bool {
+    // field: a walk outside a batch onto the very spot the actor stands on (24.8 position equal) does not wait - the
+    // script goes on in the same frame (post-game Z-Fighter Museum 4-23: s189's walk_to(239, actor_x(0), 48) with the
+    // curator already there, the text box opens in that frame)
+    if w.field.is_some() && !w.scene.director.batch {
+        if let (Cmd::MoveTo { x, y, target: None, .. }, Owner::Entity(id)) = (&cmd, owner) {
+            if w.find(id).and_then(|i| w.actor(i)).is_some_and(|a| a.x == *x << 8 && a.y == *y << 8) {
+                return false;
+            }
+        }
+    }
     let k = track_index(w, owner);
     // a finished head that only holds (face_actor) gives way to the new command
     if w.scene.tracks[k].holding {

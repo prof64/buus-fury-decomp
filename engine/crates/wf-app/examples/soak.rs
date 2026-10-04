@@ -47,6 +47,8 @@ fn main() {
         Some((a.parse().ok()?, b.parse().ok()?))
     });
     let save_at: Option<usize> = opt("--save-at").and_then(|v| v.parse().ok());
+    let save_on_point: Option<u32> = opt("--save-on-point").and_then(|v| v.parse().ok());
+    let (mut point_visits, mut was_on_point) = (0u32, false);
     let mut continued = false;
     let mut continue_row: Option<usize> = None;
     let mut app = match opt("--import") {
@@ -120,9 +122,30 @@ fn main() {
         }
         // --save-at ROW: the player stands in a save point's rect there (the route used it for Switch Character):
         // the app saves through the real screens (A, "-Save", the slot, confirm) on extra frames - no rows consumed
-        if save_at == Some(k) {
+        // --save-on-point N: the N-th time the leader steps into a save point's rect with the field free, save there
+        let mut save_now = save_at == Some(k);
+        if let Some(nth) = save_on_point {
+            let w = app.world();
+            let on = !wf_core::menu::active(w) && w.scene.depth == 0 && w.field.as_ref().is_some_and(|f| !f.busy) && w.player_idx(0).is_some_and(|pi| {
+                let (px, py) = (w.pl_ref(pi).a.px(), w.pl_ref(pi).a.py());
+                wf_core::observe::observe(w, 0).field.is_some_and(|f| f.objects.iter().any(|o| o.what.starts_with("save_point") && o.rect[0] <= px && px < o.rect[2] && o.rect[1] <= py && py < o.rect[3]))
+            });
+            if on && !was_on_point {
+                point_visits += 1;
+                let what: Vec<String> = wf_core::observe::observe(w, 0).field.map(|f| f.objects.iter().filter(|o| o.what.starts_with("save_point")).map(|o| format!("{} {:?}", o.what, o.rect)).collect()).unwrap_or_default();
+                println!("save point visit {point_visits} at row {k}: area {:?} leader {:?} {what:?}", w.field.as_ref().map(|f| (f.area.world, f.area.area)), w.player_idx(0).map(|pi| (w.pl_ref(pi).a.px(), w.pl_ref(pi).a.py(), w.pl_ref(pi).a.facing)));
+                if point_visits == nth {
+                    save_now = true;
+                }
+            }
+            was_on_point = on;
+        }
+        if save_now {
             let gen0 = app.world().saves.generation;
-            for (key, n) in [(0x40u16, 4), (0, 6), (1, 3), (0, 60), (1, 3), (0, 90), (1, 3), (0, 60), (1, 3), (0, 60), (1, 3), (0, 120)] {
+            // (--save-at: UP first, the 8-66 spot's facing; a point found by --save-on-point takes A as it stands -
+            // UP can step out of the rect, 21-14)
+            let up = if save_on_point.is_some() { 0u16 } else { 0x40 };
+            for (key, n) in [(up, 4), (0, 6), (1, 3), (0, 60), (1, 3), (0, 90), (1, 3), (0, 60), (1, 3), (0, 60), (1, 3), (0, 120)] {
                 for _ in 0..n {
                     let mut ev = vec![];
                     app.step(&[key], &mut ev);
@@ -131,7 +154,7 @@ fn main() {
                     break;
                 }
             }
-            println!("save program at row {k}: generation {} -> {}", gen0, app.world().saves.generation);
+            println!("save program at row {k}: generation {} -> {} (menu open {}, depth {}, busy {:?})", gen0, app.world().saves.generation, wf_core::menu::active(app.world()), app.world().scene.depth, app.world().field.as_ref().map(|f| f.busy));
         }
         // --continue-on-save: the app's own Save screen wrote a slot (the route saves at a save point) and the field
         // is free again: a fresh session on the title with that slot file, Continue through the title's menus, the
@@ -143,7 +166,11 @@ fn main() {
             let w = app.world();
             let slot = w.saves.current.max(0) as usize;
             let slots: Vec<Vec<u8>> = (0..3).map(|i| w.saves.slot_bytes(i)).collect();
-            let saved = w.story.clone();
+            // (the story as the Save screen wrote it - the live one has run on through the screen's closing frames:
+            // a benched fighter's Super Saiyan cooldown keeps counting down there)
+            let saved = w.saves.slot(slot).map(|d| d.story.clone()).unwrap_or_else(|| w.story.clone());
+            let live_diff = serde_json::to_string(&w.story).ok() != serde_json::to_string(&saved).ok();
+            println!("  live story vs the slot's at the continue row: {}", if live_diff { "differs (frames since the save)" } else { "same" });
             let pos = w.player_idx(0).map(|pi| (w.pl_ref(pi).a.px(), w.pl_ref(pi).a.py()));
             println!("save written at row {k} (slot {}, {} bytes): area {:?} leader {:?}", slot + 1, slots[slot].len(), w.field.as_ref().map(|f| (f.area.world, f.area.area)), pos);
             let data = wf_app::battle::load_data(&packs).expect("data");
@@ -180,7 +207,11 @@ fn main() {
             if fw.story.current != saved.current { diffs.push("current".into()); }
             if fw.story.g != saved.g || fw.story.l != saved.l { diffs.push("script words".into()); }
             for (c, (a, b)) in fw.story.chars.iter().zip(saved.chars.iter()).enumerate() {
-                if serde_json::to_string(a).ok() != serde_json::to_string(b).ok() { diffs.push(format!("char {c}")); }
+                if serde_json::to_string(a).ok() != serde_json::to_string(b).ok() {
+                    let (ja, jb) = (serde_json::to_value(a).unwrap_or_default(), serde_json::to_value(b).unwrap_or_default());
+                    let keys: Vec<String> = ja.as_object().map(|o| o.iter().filter(|(k, v)| jb.get(k.as_str()) != Some(v)).map(|(k, v)| format!("{k}: continued {v} saved {}", jb[k.as_str()])).collect()).unwrap_or_default();
+                    diffs.push(format!("char {c} {keys:?}"));
+                }
             }
             println!("Continue: ok {ok}, area {:?} leader {cpos:?}, story differences {diffs:?}", fw.field.as_ref().map(|f| (f.area.world, f.area.area)));
             app = fresh;

@@ -323,7 +323,7 @@ are deterministic, but they are other objects' internals (code / heap pointers) 
 whole object heap with real addresses and every class's field writes. Not modelled; `tools/superbuu/heapnode.py`
 prints a new node's leftover words. (The side-content agent's Nosferatu 18-8 case is likely the same kind.)
 
-**6-6 (Gotenks; Super Buu agent, 2026-10-03): 4,694 -> 5,795.**
+**6-6 (Gotenks; Super Buu agent, 2026-10-03): 4,694 -> 11,326.**
 * A screen shake is a camera mode: `0x0800797C` pushes it on the camera object's mode stack (`0x080210D6`), and a
   script camera command sets a new mode (`0x08021094`: the old one's exit) - `camera_pan_to` (via `0x080211A8`)
   and `camera_follow` end a running shake (`scene::camera_mode_set`). The shake is updated with the camera, after
@@ -332,9 +332,15 @@ prints a new node's leftover words. (The side-content agent's Nosferatu 18-8 cas
   (all gates, my 47 + 33 cuts).
 * A scripted beam's object (`0x080206B8`, 0x300 tile bytes) is made when its command starts (`0x0803C1E0`), not at
   the firing (t 24); the shot takes that block (`vram::Owner::BeamObj`, `rekey`). f5770.
-* Open f5795: s228's `fire_beam_alt(222, 1, 120)` (Piccolo) - in the game the beam hurts nobody (no damage draws,
-  no hit sounds); ours hits Super Buu standing below. The command's object gets the record `0x0877C41C` where the
-  player's beams get an attack type - not decoded yet.
+* f5795 (fixed): the beam object's hit message takes its sender class from the owner's +0x1D0 (`0x080208FE`);
+  a map NPC's object has no such field (Piccolo's reads `0x030032EC`) and the enemies' handler (`0x0800FBE6`)
+  takes classes 1 and 2 only - an NPC's scripted beam hurts nobody (`shots::TEAM_NONE`). Its attack comes from
+  the record (`0x0877C41C`: sub = byte 6, mult = u16 +2).
+* f8397 (fixed): an actor's destructor (`0x0800F76E`) deletes the boss bar still showing it first (`0x08052538`) -
+  a script's removal; a defeated enemy's bar fades out on its own (post-game XJ-6 12-27 keeps it).
+* f11137 (fixed, battle too - TS mirrored, dumps regenerated): Super Buu's power-up plays anim 0x0C (raw 13) under
+  the idle controller 0x03001B30 (once, 8 ticks a cel), as the AI data says; both engines had anim 11 at 16 ticks.
+* Now 11,326 (was 4,694): next, random numbers at f11326 - not looked at.
 
 **Claim (dungeon agent A, 2026-10-03, by the coordinator): the Kid Buu fight itself in `sb_041` (21-25).** A works
 with the allocator check off (`SEGMENT_VRAM=0`): the enemy object missing at f21479 and every divergence after it
@@ -1319,6 +1325,11 @@ page's own cycles built from its draw list; opt-in as before (`init.snd_phase`),
     - the segment fails the same with the parallel-block release, the player-control release and the talk-pass
     resume each switched off; the cause is elsewhere in 1a97d5c's or later commits' other files (session.rs,
     world.rs, wf-import lib.rs - not the Earth agent's).
+    **Settled (A, bisect over clean exports, `tools/dungeons/bisect_seg.sh COMMIT DIR SEG`):** exact at a157003,
+    1a97d5c, 639e120; red (f33,890) **only at b522c0c**; exact again from the next commit fa9d7b9 on (3d6c757,
+    e556785, HEAD 90697ba and the current tree). Nothing to fix now; a red seen later is a stale build (note: a
+    `git archive` export keeps commit-time mtimes, older than an earlier build - cargo then reuses it; the script
+    extracts with `tar -m`).
   - `shipr_002` (7-2 pause, then 8-1 Switch Character): with `snd_phase` (work file) it runs to f18,475; the close
     there (game 26 frames, ours 27) has the right own time (6,358,863 vs 6,351,398) but the interrupt mixes cost
     954k in the model vs 787k in the game (7 mixes each) - the sound driver's state, Earth's.
@@ -1334,6 +1345,19 @@ page's own cycles built from its draw list; opt-in as before (`init.snd_phase`),
     413 -> 20,168 frames, r069_024 stays exact. Maps with signs among the larger residuals (11-15 +42k, 8-14 +22k, 2-11
     +20k) are likely the same term.
   - Left: 18-1 (r044_015) -20k with no signs (one sample, inside the per-map spread of +-20k).
+  - (2026-10-04, later) 11-15 (+42k), 8-14 (+22k), 2-11 (+20k) have **no** sign objects (game object census:
+    no vt 0x0804D878) - not the sign term. Their profiles show an IWRAM routine at 0x03000C00..0x03000FFF only in
+    8-14 (42k) and 11-15 (12k) - not identified yet. No map feature (tiles, layers, chunks, fixed) explains the
+    remaining per-map spread (std 20k).
+  - `RELOAD_REST` +2,500 (119,300): the 49 closes' residual mean is +6.6k (median +6.6k); +2.5k is the most the
+    nearest-boundary close allows (real run 2-9 rE2__050, 3.4k) and fixes the board's 18-2 row (r038_002, needed
+    +1.7k). All 49 close cuts keep their result (the ones red now are an NPC facing regression from in-flight
+    edits, the same with the old constant).
+  - **To the Earth agent (sound-driver state):** the soak's Thieves Den row 699 (§11 update 9) is the close at
+    master frame 652: the reload base is identical in the app and the segment harness (7,214,210) but the app's
+    interrupt mixes cost 956,804 + update 101,041 vs the harness's 1,127,537 + 124,251 (30 frames vs 31, the
+    game 31). The harness (m_003, SEGMENT_VRAM=0) runs that close exact - the app's sound state at that point
+    differs from the harness's.
 
 **Side-content catalogue** (data survey 2026-10-02; flags = story flags): Broly turns out to be **mainline** (Dragon
 Ball saga: his defeat s436 sets flag 111, which Dragon Ball #4 s439 needs) — shared with the Super Buu agent, whose main line

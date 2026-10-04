@@ -58,6 +58,8 @@ fn a_load_resets_the_player_objects_accumulators() {
         pl.regen_timer = 0x7000;
         pl.ss_acc = 0x8d43;
         w.field.as_mut().unwrap().script_fade_in = true;
+        // a breakable's instant callback (no event left running) marks the queue flag (HFIL 18-10 -> 18-7)
+        w.field.as_mut().unwrap().queued_event = true;
         wf_core::field::load_area(w, AreaId { world: 1, area: 2, variant: 1 }, 40, 160, Some(3));
         // (the load's on-enter script is the host's to run inside a step; here the arrival is completed directly)
         wf_core::field::finish_arrival(w);
@@ -68,6 +70,7 @@ fn a_load_resets_the_player_objects_accumulators() {
     assert!(pl.regen_timer < 0x1000, "regen count carried across a load: {}", pl.regen_timer);
     assert_eq!(pl.ss_acc, 0, "Super Saiyan drain fraction carried across a load");
     assert!(!w.field.as_ref().unwrap().script_fade_in, "script fade-in flag survived a load");
+    assert!(!w.field.as_ref().unwrap().queued_event, "a stale queued-event flag survived a load (the next event's end gets an extra player tick)");
 }
 
 /// `set_character` takes the new character's own selected skill slot (record +0x15), not the previous leader's.

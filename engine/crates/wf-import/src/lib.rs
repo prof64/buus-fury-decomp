@@ -660,6 +660,11 @@ fn import_objects(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
                         n.anim.raw = raw;
                         n.anim.frame = cel;
                         n.anim.tick = tick;
+                        // a map NPC's behaviour keeps its own animation state (fieldnpc.rs: SetAnim 0 idle / 1 walk)
+                        if let Some(b) = n.behaviour.as_mut() {
+                            (b.raw, b.frame, b.tick) = (raw, cel, tick);
+                            b.anim = if raw == 1 { 0 } else { 1 };
+                        }
                     }
                     // the hold state 0x03001B00 (`set_pose`): frozen on its cel
                     if ram.r32(o + 0x14) == 0x0300_1B00 {
@@ -1144,17 +1149,19 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
     }
     w.scene.tracks.retain(|t| !t.queue.is_empty() || t.holding);
     // each track's running command from its game object (heap objects matched by their target): a walk (vt
-    // 0x0804D0A4: +0xC / +0x10 24.8 step, +0x14 / +0x18 target, +0x1C steps left), a jump (vt 0x0804AE5C: +8 x
+    // 0x0804D0A4; a glide 0x0804AE84 the same: +0xC / +0x10 24.8 step, +0x14 / +0x18 target, +0x1C steps left), a jump (vt 0x0804AE5C: +8 x
     // step, +0xC y velocity after the last step, +0x10 / +0x14 24.8 position, +0x18 / +0x1C target, +0x38 air
     // frames, +0x3C frames run: 8 crouch, `air` of flight, 8 landing). The commands before it in its track are
     // done: dropped, it starts (its start effects: the walk state, the facing) and takes the object's progress
     let walks = ram.ewram_with(0x0804_D0A4);
+    let glides = ram.ewram_with(0x0804_AE84);
     let jumps = ram.ewram_with(0x0804_AE5C);
     let rng = w.rng.clone();
     for k in 0..w.scene.tracks.len() {
         let live = |c: &Cmd| -> Option<u32> {
             match c {
-                Cmd::MoveTo { x, y, .. } | Cmd::GlideTo { x, y, .. } => walks.iter().copied().find(|&o| ram.s32(o + 0x14) == *x && ram.s32(o + 0x18) == *y),
+                Cmd::MoveTo { x, y, .. } => walks.iter().copied().find(|&o| ram.s32(o + 0x14) == *x && ram.s32(o + 0x18) == *y),
+                Cmd::GlideTo { x, y, .. } => glides.iter().copied().find(|&o| ram.s32(o + 0x14) == *x && ram.s32(o + 0x18) == *y),
                 Cmd::JumpTo { x, y, .. } => jumps.iter().copied().find(|&o| ram.s32(o + 0x18) == *x && ram.s32(o + 0x1C) == *y),
                 _ => None,
             }

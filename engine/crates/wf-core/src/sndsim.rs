@@ -56,6 +56,13 @@ pub struct SoundSim {
     /// the state came from a game RAM image without the hardware's timer phase (an emulator state imported
     /// without `snd_phase`): the driver still runs, the pages keep their constant redraw costs
     pub uncalibrated: bool,
+    /// the field's load count at the last frame's end, and a song an area load asked for: the game plays it at the
+    /// load iteration's end (after the map's decompression), so the interrupt mixes of the load's lag frames still
+    /// run without it (ship 8-1: song 28 from video f16,808, not the load's f16,790 - the sequencer was 4 rows ahead)
+    #[serde(default)]
+    pub loads: u32,
+    #[serde(default)]
+    pub pending_song: Option<i32>,
 }
 
 /// the redraw of a page for the time model: the cycles before it in its frame and its own without the mixer
@@ -82,7 +89,7 @@ fn dump(what: &str, n: u32, d: &Driver) {
         .chain(st.voices.iter())
         .map(|v| format!("{},{},{},{}", v.pos, v.step, v.gain, v.flags))
         .collect();
-    eprintln!("snd {what} n {n} row {} order {} | {}", st.player.row, st.player.order, v.join(" "));
+    eprintln!("snd {what} n {n} row {} order {} ticks {} cd {} | {}", st.player.row, st.player.order, st.player.ticks_left, st.player.countdown, v.join(" "));
 }
 
 /// play position at frame time `t` (interrupts at phase, phase + DMA, ...)
@@ -96,6 +103,7 @@ fn pos_at(s: &SoundSim, t: i64) -> u32 {
 }
 
 fn apply_events(w: &mut World, d: &mut Driver) {
+    let loading = w.field.as_ref().is_some_and(|f| f.loads != w.sound.loads);
     let from = (w.sound.seen as usize).min(w.events.len());
     for e in &w.events[from..] {
         match e {
@@ -107,6 +115,9 @@ fn apply_events(w: &mut World, d: &mut Driver) {
             Event::SfxStopAll => d.stop_all_sfx(),
             // the game starts a song only when it is not the one playing (an area change inside the same music:
             // no PlaySong 0x0803F110 call, the sequencer runs on - sb 21-13 -> 21-14)
+            Event::Song { id } if loading => {
+                w.sound.pending_song = Some(*id);
+            }
             Event::Song { id } => {
                 let st = d.state();
                 if debug() {
@@ -145,9 +156,26 @@ fn with_driver<R>(w: &mut World, f: impl FnOnce(&mut World, &mut Driver) -> R) -
 pub fn end_frame(w: &mut World) {
     let menu = crate::menu::active(w);
     with_driver(w, |w, d| {
+        // a load's song: this logic frame comes after the load's iteration
+        let loading = w.field.as_ref().is_some_and(|f| f.loads != w.sound.loads);
+        if !loading {
+            if let Some(id) = w.sound.pending_song.take() {
+                let st = d.state();
+                if !(st.player.playing && st.player.song == Some(id as usize)) {
+                    d.play_song(id as usize);
+                }
+            }
+        }
         apply_events(w, d);
+        if let Some(f) = w.field.as_ref() {
+            w.sound.loads = f.loads;
+        }
+        // an area load with a song (the load iteration runs past this frame's update point: the update is the
+        // load's end, `lag_frame_ex`)
+        let load_song = loading && w.sound.pending_song.is_some();
         if w.sound.skip > 0 {
             w.sound.skip -= 1;
+        } else if load_song {
         } else {
             // a page with its own measured idle step (the DMA interrupts before it delay it by 187 each)
             let page = if menu { crate::menu::idle_cycles(w) } else { None };
@@ -159,6 +187,7 @@ pub fn end_frame(w: &mut World) {
             let p = pos_at(&w.sound, at);
             let n = p.wrapping_sub(w.sound.last) & 1023;
             if debug() {
+                eprintln!("snd frame f{} pos {} last {}", w.frame, w.sound.pos, w.sound.last);
                 dump("upd", n, d);
             }
             if n >= 64 {
@@ -183,7 +212,36 @@ fn hw_frame(s: &mut SoundSim) {
 /// that replays a recording calls this for them): no update, the interrupt mixes when the play position runs
 /// [`IRQ_MIX`] ahead.
 pub fn lag_frame(w: &mut World) {
+    lag_frame_ex(w, false)
+}
+
+/// [`lag_frame`]; `last` = the next video frame is a logic frame: a load's iteration ends in this one - the song
+/// the load asked for starts (PlaySong after the map's decompression) and the main loop's update follows (ship 8-1:
+/// the game's update at the load's last lag frame mixes the new song's first 480 samples)
+pub fn lag_frame_ex(w: &mut World, last: bool) {
     with_driver(w, |w, d| {
+        if last && w.sound.skip == 0 {
+            if let Some(id) = w.sound.pending_song.take() {
+                let st = d.state();
+                if !(st.player.playing && st.player.song == Some(id as usize)) {
+                    d.play_song(id as usize);
+                }
+                if let Some(f) = w.field.as_ref() {
+                    w.sound.loads = f.loads;
+                }
+                let p = pos_at(&w.sound, UPDATE_AT_FIELD);
+                let n = p.wrapping_sub(w.sound.last) & 1023;
+                if debug() {
+                    eprintln!("snd load-end pos {} last {} phase {}", w.sound.pos, w.sound.last, w.sound.phase);
+                    dump("upd", n, d);
+                }
+                if n >= 64 {
+                    wf_audio::cost::update(d, n);
+                    w.sound.last = p;
+                }
+                return;
+            }
+        }
         let s = &mut w.sound;
         if s.skip > 0 {
             return;
@@ -363,7 +421,9 @@ pub fn reload_frames_with(w: &mut World, done: bool, more: i64) -> Option<u8> {
     redraw_frames(w, Redraw { t0: 0, base: (rest + more + extra + c * 10_035 / 10_000) * 100_523 / 100_000 })
 }
 
-const RELOAD_REST: i64 = 116_800;
+/// (+2,500 on 2026-10-04: 49 measured pause / Switch Character closes over the real run, game minus model: mean
+/// +6,563, median +6,610; bounded by real run 2-9 rE2__050, 3.4 k from its boundary, and 18-2 r038_002, 1.7 k)
+const RELOAD_REST: i64 = 119_300;
 const SIGN_LABEL: i64 = 25_300;
 
 /// the iteration makes the VBlank when it ends this many cycles before it at the latest (the wait's own entry)
@@ -556,5 +616,5 @@ pub fn import(w: &mut World, ram: &[u8], pos: u32, last: u32, phase: Option<u32>
     let Some(bank) = w.data.sound.clone() else { return };
     let mut d = Driver::new(&bank);
     d.seed_ram(ram);
-    w.sound = SoundSim { drv: Some(d.state()), pos, last, phase: phase.unwrap_or(0), uncalibrated: phase.is_none(), ..Default::default() };
+    w.sound = SoundSim { drv: Some(d.state()), pos, last, phase: phase.unwrap_or(0), uncalibrated: phase.is_none(), loads: w.field.as_ref().map(|f| f.loads).unwrap_or(0), ..Default::default() };
 }
