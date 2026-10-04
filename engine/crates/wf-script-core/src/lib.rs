@@ -131,6 +131,8 @@ pub struct HostState {
     /// the top of the frame in the game (before the objects update)
     #[serde(default)]
     pub from_wait: bool,
+    #[serde(default)]
+    pub from_fade: bool,
     /// the newest entity when the outermost event started: older objects update after the event's scene object
     /// (the world updates newest first), so only they see a release at the top of the frame
     #[serde(default)]
@@ -332,6 +334,13 @@ impl Host for CoreHost<'_> {
                 if self.s.from_wait && self.w.scene.depth == 0 && !self.s.in_unit {
                     release_field_npcs(self.w, self.s.event_watermark);
                 }
+                let from_fade = std::mem::take(&mut self.s.from_fade);
+                if from_fade && self.w.scene.depth == 0 && std::env::var("FADE_X").is_ok() {
+                    let mode = std::env::var("FADE_X").unwrap_or_default();
+                    if mode != "unit" || self.s.in_unit {
+                        release_field_enemies(self.w, self.s.event_watermark);
+                    }
+                }
                 Ok(NativeResult::Done(None))
             }
         }
@@ -400,6 +409,17 @@ pub fn end_event(w: &mut World) {
 
 /// the field NPCs' catch-up update after an event released the field at the top of the frame (see `from_wait`):
 /// those older than the event (updated after its scene object in the game)
+fn release_field_enemies(w: &mut World, watermark: EntityId) {
+    if w.field.is_none() {
+        return;
+    }
+    for i in (0..w.ents.len()).rev() {
+        if !w.ents[i].removed && matches!(&w.ents[i].body, wf_core::world::Body::Enemy(_)) && w.ents[i].id <= watermark {
+            wf_core::enemy::release_update(w, i);
+        }
+    }
+}
+
 fn release_field_npcs(w: &mut World, watermark: EntityId) {
     if w.field.is_none() {
         return;
