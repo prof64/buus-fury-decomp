@@ -3393,3 +3393,11 @@ mismatches, by cause and owner:
   12,831,115) - the ending / title path (Super Buu agent).
 * `sb_000_18_12` differs at f0 (current 0 vs 4, every record): the import of that HFIL cut (importer agent).
 * `r003_090_8-1` f2,769: equipment list [5, 126] in ours, [5] in the game (ship agent).
+*Allocator free-order claim (A, done):* the allocator itself was right (it reads / keeps the game's lists byte for
+byte, import included); the remaining two West City tiles came from **the order of a bomb's burst**. MEASURED at
+r002_006 7,192 and 17,816: the blast's hit first (its damage number allocates 0x100, `0x0800ABFB` via 0x0800AD3E)
+while the bomb's own block is still held, then the bomb frees (151, 4) (`0x08051193`), the chips' debris graphic
+takes 0x40 (`0x0804E4AD`), the explosion 0x400 (`0x0802A84B`). `shots::bomb_update` (field only; battles keep
+chips-then-hit) now does that. +7,000 192 -> exact, +17,000 816 -> exact (51 tiles: 2 better, 0 worse); +4,000 /
++5,000 / +14,000 were already exact (the Super Buu agent's damage-number free order). Segment gates green on a
+clean export; workspace tests run.

@@ -1,0 +1,72 @@
+{
+ "tree": "77ce73f",
+ "modes": [
+  {
+   "lag": "recorded",
+   "rows": 723849,
+   "exact_to": 153101,
+   "exact_stretch": "E2_earth",
+   "first": "rng: app [ddf7897e, 38c3c1f0] game [234beb00, fbe02e0f]",
+   "lasting": {
+    "area": {
+     "row": 191502,
+     "stretch": "E2_earth",
+     "what": "app (7, 6) game (7, 5)"
+    },
+    "depth": {
+     "row": 157288,
+     "stretch": "E2_earth",
+     "what": "app 0 game 1"
+    },
+    "pos": {
+     "row": 153470,
+     "stretch": "E2_earth",
+     "what": "app (70432, 27568, 2) game (90112, 19987, 0)"
+    },
+    "rng": {
+     "row": 155477,
+     "stretch": "E2_earth",
+     "what": "app [fe64f9df, 2182bc82] game [c4108aa3, b1d2d47c]"
+    }
+   },
+   "sim_lag": 0,
+   "sim_lag_on_logic": 0,
+   "recorded_lag_replayed": 0,
+   "script_errors": 0
+  },
+  {
+   "lag": "sim",
+   "rows": 723849,
+   "exact_to": 4691,
+   "exact_stretch": "E1_opening",
+   "first": "area: app (0, 96) game (1, 1)",
+   "lasting": {
+    "area": {
+     "row": 4691,
+     "stretch": "E1_opening",
+     "what": "app (0, 2) game (1, 1)"
+    },
+    "depth": {
+     "row": 6796,
+     "stretch": "E1_opening",
+     "what": "app 1 game 0"
+    },
+    "pos": {
+     "row": 4691,
+     "stretch": "E1_opening",
+     "what": "app leader None game [2048,42752,0,\"idle\"]"
+    },
+    "rng": {
+     "row": 4691,
+     "stretch": "E1_opening",
+     "what": "app [00000000, 00000000] game [1b2001d2, 96df8700]"
+    }
+   },
+   "sim_lag": 3764,
+   "sim_lag_on_logic": 3653,
+   "recorded_lag_replayed": 19143,
+   "script_errors": 0
+  }
+ ],
+ "note": "The recording follows the real run from the reset through 002_d04_bandana only: replayed from the reset, the key log of 003_d06_thieves leaves the real run (the chain's state at 002's end differs from the local state 003 was packed from - object list, heap, one video frame) and ends in a game over."
+}

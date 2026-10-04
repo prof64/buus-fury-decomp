@@ -373,9 +373,12 @@ pub fn load_frames(w: &mut World) -> Option<u8> {
     let grids = w.field.as_ref().and_then(|f| w.data.field.as_ref()?.maps.get(&f.map)?.reload.as_ref().map(|r| r.grids)).unwrap_or(0);
     let c = c + grids;
     let map = w.field.as_ref().map(|f| f.map.clone()).unwrap_or_default();
-    let base = (extra + c * 10_035 / 10_000) * 100_523 / 100_000 + load_rest(&map);
+    // a load that shows the area-name banner (`scene::banner_load`: the name differs from the last one shown) draws
+    // its picture and glyphs in the same iteration (real run 13-32 -> 13-3 vs 13-2 -> 13-3); fitted over all loads
+    let banner = if w.scene.banner.as_ref().is_some_and(|b| b.1 == 0) { load_table().1 } else { 0 };
+    let base = (extra + c * 10_035 / 10_000) * 100_523 / 100_000 + load_rest(&map) + banner;
     if debug() {
-        eprintln!("snd load: c {c} extra {extra} base {base}");
+        eprintln!("snd load: c {c} extra {extra} banner {banner} base {base}");
     }
     // the iteration started with the load's logic frame (`Session::lag_step` asks one frame later): the sound
     // hardware as it was at that frame's start (Thieves Den 8-2 -> 8-3: the mixes and the end's update - 336
@@ -495,13 +498,17 @@ const SIGN_LABEL: i64 = 25_300;
 /// map, the loads into one map agree within +-16 k std) - no map feature tested (tiles, layers, chunks, actors,
 /// sprites, signs) explains it across maps (std 80 k). Unmeasured maps: the median of all (load_rest.json)
 fn load_rest(map: &str) -> i64 {
-    static T: std::sync::OnceLock<(i64, std::collections::HashMap<String, i64>)> = std::sync::OnceLock::new();
-    let (d, m) = T.get_or_init(|| {
+    let (d, _, m) = load_table();
+    m.get(map).copied().unwrap_or(*d)
+}
+/// load_rest.json: (default, banner term, per-map constants without the banner)
+fn load_table() -> &'static (i64, i64, std::collections::HashMap<String, i64>) {
+    static T: std::sync::OnceLock<(i64, i64, std::collections::HashMap<String, i64>)> = std::sync::OnceLock::new();
+    T.get_or_init(|| {
         let v: serde_json::Value = serde_json::from_str(include_str!("load_rest.json")).unwrap_or_default();
         let maps = v["maps"].as_object().map(|o| o.iter().map(|(k, x)| (k.clone(), x.as_i64().unwrap_or(0))).collect()).unwrap_or_default();
-        (v["default"].as_i64().unwrap_or(260_000), maps)
-    });
-    m.get(map).copied().unwrap_or(*d)
+        (v["default"].as_i64().unwrap_or(260_000), v["banner"].as_i64().unwrap_or(0), maps)
+    })
 }
 
 /// the iteration makes the VBlank when it ends this many cycles before it at the latest (the wait's own entry)

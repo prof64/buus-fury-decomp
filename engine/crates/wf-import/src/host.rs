@@ -649,7 +649,7 @@ impl StoryHost {
         // this first field frame - its scene enter is over now, as the playthrough harness starts it two video
         // frames earlier: the whole run from the reset, f852 / f854)
         let new_game = pre.iter().any(|e| matches!(e, Event::Field(FieldEvent::Run { run: Callback::Event(id), cause: Cause::Menu, .. }) if id == "s004"));
-        let fresh = self.started.len() > before && !new_game;
+        let fresh = self.started.len() > before && (!new_game || std::env::var("NG_OLD_HOOK").is_ok());
         let n0 = sess.world.events.len();
         sess.step_update();
         wf_script_core::tick_timers(&mut sess.world, &mut self.hs);
