@@ -10,15 +10,74 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 use wf_core::world::World;
 
-/// the game's states for a segment document (by its name; a tile reads its parent's rows from its offset)
+/// a tracked sidecar (`data/segments/recs/<name>.json`, `tools/segments/recs_pack.py`): delta rows back to whole
+/// states in the recs.py layout
+fn unpack(v: &Value) -> Option<Vec<(usize, Value)>> {
+    let mut out = vec![];
+    let mut cur: Option<Value> = None;
+    for r in v["rows"].as_array()? {
+        let k = r[0].as_u64()? as usize;
+        let d = &r[1];
+        let mut s = match cur.take() {
+            None => serde_json::json!({ "cur": d["cur"], "zenie": d["zenie"], "equip_list": d["eq"], "supplies": d["sup"], "chars": d["c"] }),
+            Some(mut s) => {
+                if !d["cur"].is_null() {
+                    s["cur"] = d["cur"].clone();
+                }
+                if !d["zenie"].is_null() {
+                    s["zenie"] = d["zenie"].clone();
+                }
+                if !d["eq"].is_null() {
+                    s["equip_list"] = d["eq"].clone();
+                }
+                if let Some(m) = d["sup"].as_object() {
+                    let hex = s["supplies"].as_str().unwrap_or("").to_string();
+                    let mut b: Vec<u8> = (0..hex.len() / 2).filter_map(|j| u8::from_str_radix(&hex[2 * j..2 * j + 2], 16).ok()).collect();
+                    for (idx, val) in m {
+                        if let (Ok(ix), Some(vv)) = (idx.parse::<usize>(), val.as_u64()) {
+                            if ix < b.len() {
+                                b[ix] = vv as u8;
+                            }
+                        }
+                    }
+                    s["supplies"] = Value::String(b.iter().map(|x| format!("{x:02x}")).collect());
+                }
+                if let Some(m) = d["c"].as_object() {
+                    for (c, ch) in m {
+                        let (Ok(c), Some(ch)) = (c.parse::<usize>(), ch.as_array()) else { continue };
+                        for p in ch.chunks(2) {
+                            if let (Some(f), Some(val)) = (p[0].as_u64(), p.get(1)) {
+                                s["chars"][c][f as usize] = val.clone();
+                            }
+                        }
+                    }
+                }
+                s
+            }
+        };
+        out.push((k, s.clone()));
+        cur = Some(std::mem::take(&mut s));
+    }
+    Some(out)
+}
+
+/// the game's states for a segment document (by its name; a tile reads its parent's rows from its offset): the
+/// tracked sidecar data/segments/recs/<name>.json first, else work/recs/<name>.json (`SEGMENT_RECS_DIR`)
 pub fn load(doc: &Value) -> Option<Vec<(usize, Value)>> {
-    let dir = std::env::var("SEGMENT_RECS_DIR").map(PathBuf::from).unwrap_or_else(|_| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../work/recs"));
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    let dir = std::env::var("SEGMENT_RECS_DIR").map(PathBuf::from).unwrap_or_else(|_| root.join("work/recs"));
     let (name, off) = match doc["source"]["kind"].as_str() {
         Some("tile") => (doc["source"]["of"].as_str()?.to_string(), doc["source"]["at"].as_i64()? as usize),
         _ => (doc["name"].as_str()?.to_string(), 0),
     };
-    let v: Value = serde_json::from_str(&std::fs::read_to_string(dir.join(format!("{name}.json"))).ok()?).ok()?;
-    let rows: Vec<(usize, Value)> = v.as_array()?.iter().filter_map(|r| Some((r[0].as_u64()? as usize, r[1].clone()))).collect();
+    let side = root.join("data/segments/recs").join(format!("{name}.json"));
+    let rows: Vec<(usize, Value)> = match std::fs::read_to_string(&side).ok().and_then(|t| serde_json::from_str::<Value>(&t).ok()) {
+        Some(v) => unpack(&v)?,
+        None => {
+            let v: Value = serde_json::from_str(&std::fs::read_to_string(dir.join(format!("{name}.json"))).ok()?).ok()?;
+            v.as_array()?.iter().filter_map(|r| Some((r[0].as_u64()? as usize, r[1].clone()))).collect()
+        }
+    };
     // a tile: the parent's state current at the offset becomes row 0, later changes shift
     if off > 0 {
         let first = rows.iter().rev().find(|r| r.0 <= off)?.1.clone();
@@ -38,7 +97,10 @@ fn ours(w: &World) -> (i64, i64, Vec<u8>, Vec<i64>, Vec<Vec<i64>>) {
     let mut c = w.clone();
     wf_core::story::sync_from_players(&mut c);
     let st = &c.story;
-    let mut eq: Vec<i64> = st.equipment.iter().map(|&x| x as i64).collect();
+    // the game's list marks a worn entry with its wearer (top nibble; recs.py keeps the unmarked ones): ours derives
+    // the marks from the characters' slots
+    let marks = wf_core::menu::equip::marks(&c);
+    let mut eq: Vec<i64> = st.equipment.iter().zip(marks.iter().chain(std::iter::repeat(&0))).filter(|(_, &m)| m == 0).map(|(&x, _)| x as i64).collect();
     eq.sort();
     let chars = st
         .chars
@@ -102,6 +164,10 @@ impl Tally {
     pub fn check(&mut self, k: usize, w: &World, game: &Value) {
         self.checks += 1;
         let d = diff(w, game);
+        // SEGMENT_RECS=all: every differing row
+        if !d.is_empty() && std::env::var("SEGMENT_RECS").is_ok_and(|v| v == "all") {
+            eprintln!("    recs f{k} {d:?}");
+        }
         if d.is_empty() {
             return;
         }

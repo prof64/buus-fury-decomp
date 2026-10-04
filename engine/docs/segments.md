@@ -3401,3 +3401,12 @@ takes 0x40 (`0x0804E4AD`), the explosion 0x400 (`0x0802A84B`). `shots::bomb_upda
 chips-then-hit) now does that. +7,000 192 -> exact, +17,000 816 -> exact (51 tiles: 2 better, 0 worse); +4,000 /
 +5,000 / +14,000 were already exact (the Super Buu agent's damage-number free order). Segment gates green on a
 clean export; workspace tests run.
+
+**Claim (dungeon agent A, 2026-10-04, by the coordinator): the Super Buu agent's two 20-6 mid-event imports** -
+`r062_001_20-6` +1,137 (s473 lands in a fade that freezes our world) and +8,000 (s475's node wait never resumed).
+*menu_parity `title_newgame` red on HEAD (147 / 207 from frame 144): mine - the whole-run work's host rule that
+treated the title's New Game hook (s004, `Cause::Menu`) as already entered in its first field frame
+(`StoryHost::step_inputs` `fresh`). The menu test, which takes the menus' timing from the emulator, shows the game
+starting the prologue's wait from the next frame (fade from frame 145 after the field's first frame 144), so the rule
+was compensating a whole-run timing error elsewhere. Reverted; menu_parity green (bisected by toggling each of my
+three New Game changes: the timed title redraw and the kept RNG are not involved).*

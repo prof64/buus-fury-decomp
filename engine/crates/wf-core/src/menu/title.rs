@@ -437,7 +437,7 @@ impl Page for Title {
     /// the mixer's load decides (whole run from the soft reset, `menu_timing.measure` on video frames 705 .. 800: own
     /// cycles title 1,343,860 .. 1,351,045, its first draw after the boot 1,404,063, mode page 1,389,795 .. 1,406,658)
     fn redraw_time(&self, w: &World, d: &super::MenuData) -> Option<crate::sndsim::Redraw> {
-        if self.confirm.is_some() || matches!(self.leaving, Leaving::Continue(_)) || self.delete || std::env::var("TITLE_UNTIMED").is_ok() {
+        if self.confirm.is_some() || matches!(self.leaving, Leaving::Continue(_)) || self.delete {
             return None;
         }
         // the blinking cursor drawn this time (its OBJ copy): + ~7 k (title 1,351,045 with, 1,343,860 / 1,344,002
@@ -582,7 +582,7 @@ pub fn boot(data: &Arc<crate::content::GameData>, w: &mut World) -> Option<World
             nw.menu.overlay_until = NEWGAME_OVERLAY;
             // the new field's build is ours only (the game's GameData reset draws nothing): the RNG as the title left
             // it (the whole run from the reset: [0, 0] until the prologue's first draw)
-            if std::env::var("NG_OLD_RNG").is_err() { nw.rng = crate::rng::Rng::new(rng0.0, rng0.1); }
+            nw.rng = crate::rng::Rng::new(rng0.0, rng0.1);
             nw
         }
         Boot::Continue { slot, chosen } => {

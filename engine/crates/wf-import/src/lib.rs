@@ -200,6 +200,7 @@ pub fn import_story(data: &GameData, ram: &GbaRam) -> Story {
             flags: r[0],
             skill_cur: (0..n).map(|k| r[0x2E + 2 * k] as i32).collect(),
             fusion: u16le(&r, 2) as u16,
+            fusion_time: u32le(&r, 8) as i32,
         };
     }
     for k in 0..4u32 {

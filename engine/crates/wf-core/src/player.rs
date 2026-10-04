@@ -1733,6 +1733,16 @@ fn new_form_object(w: &mut World, i: usize) {
     if pl.dead && pl.rec.hp == 0 {
         pl.dead = false;
     }
+    // the regen tick's accumulator is the form object's (+0xC): a new object counts from 0 (real route 8-29
+    // shipr_251: the level-up's new object at f838 restarts it, the bench's 5% tick never comes in that segment)
+    pl.regen_timer = 0;
+}
+
+/// the XP routine after its level-up hook #3 has run (`0x08013A7E`): the player gets a new form object (0x0801064C)
+pub fn levelup_hook_done(w: &mut World) {
+    if let Some(i) = w.player_idx(0) {
+        new_form_object(w, i);
+    }
 }
 /// the cutscene fusions' defuse (script s014, run by the form object when its countdown goes negative)
 fn defuse_step(w: &mut World, i: usize) {

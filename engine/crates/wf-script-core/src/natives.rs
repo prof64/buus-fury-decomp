@@ -1238,8 +1238,17 @@ fn fuse(w: &mut World, fused: i32, kind: i32, ma: i32, mb: i32, seconds: i32) {
     f.rec.pow = half(a.rec.pow, b.rec.pow) + 10;
     f.rec.end = half(a.rec.end, b.rec.end) + 10;
     f.rec.spd = half(a.rec.spd, b.rec.spd) + 16;
+    // EXP (+0x24): the members' mean (unsigned); the equipment slots (+0x3C..): each the larger of the members'
+    // (0x0801375E; real run 6-1 r033_002: Gotenks 949,715 = (1,820,165 + 79,265) / 2)
+    f.rec.xp = ((a.rec.xp as u32).wrapping_add(b.rec.xp as u32) >> 1) as i64;
+    f.rec.level = wf_core::progression::level_of(f.rec.xp, &w.data.xp_table);
+    for k in 0..4 {
+        f.equip[k] = a.equip[k].max(b.equip[k]);
+    }
     f.flags |= 3;
-    f.ss_cooldown = if seconds == -1 { -1 } else { seconds * 60 };
+    // the fusion's time (seconds x 60, -1 = no limit) goes to record +0x08 (0x08002F34), not the Super Saiyan cooldown
+    // (+0x04 keeps its value: the game's Gotenks / Gogeta records read 0 there)
+    f.fusion_time = if seconds == -1 { -1 } else { seconds * 60 };
     // the native (0x08002EE2) calls Fusion(fused, record(b), record(a), kind): b's character is the low nibble - the
     // component whose kill XP comes first (`player::gain_xp`; Gotenks = fuse(5, 3, 3, 2): 0x332, Goten first)
     f.fusion = ((mb & 15) | (ma & 15) << 4 | (kind & 0xff) << 8) as u16;

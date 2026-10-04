@@ -74,7 +74,11 @@ fn segments_match_the_game() {
         // a segment is a gate only with "expect" (chapter work in progress reports without failing the suite)
         let gate = doc.get("expect").and_then(|e| e["matched"].as_u64()).map(|n| n as usize);
         let need = gate.unwrap_or(rep.frames).min(rep.frames);
-        let ok = rep.compared >= need || (gate.is_none() && !all_strict);
+        // "recs_exact": the characters' state must match the game's at every check too (wf_import::recs; the gate file's
+        // flag, set once a segment is clean on it - tools/segments/recs_lock.py)
+        let recs_exact = doc["recs_exact"].as_bool() == Some(true);
+        let recs_ok = !recs_exact || rep.recs.as_ref().is_some_and(|t| t.bad_rows == 0 && t.checks > 0);
+        let ok = (rep.compared >= need || (gate.is_none() && !all_strict)) && recs_ok;
         eprintln!(
             "segment {name}: {} video frames ({} logic), matched {} / {} | first divergence {:?} | import held {} draws {} | {} actor checks | {:.2}s{}",
             rep.frames,

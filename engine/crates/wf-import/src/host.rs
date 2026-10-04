@@ -253,6 +253,10 @@ impl StoryHost {
                 // (the second component's XP comes now: its own hook runs next, in this frame)
                 Some(Cause::LevelUp { .. }) => {
                     let from = w.events.len();
+                    // (a plain level-up: the routine's new form object; a fusion component's hook re-fuses below)
+                    if w.story.levelup_char.is_none() {
+                        wf_core::player::levelup_hook_done(w);
+                    }
                     wf_core::player::fusion_levelup_done(w);
                     let evs: Vec<Event> = w.events[from..].to_vec();
                     // (inside the XP routine's call: before the jobs already queued - the kill's on-defeat callback)
@@ -645,11 +649,7 @@ impl StoryHost {
         self.collect(&pre);
         let before = self.started.len();
         self.run_queue(&mut sess.world);
-        // (the title's New Game: the prologue hook #4 ran in the New Game iteration, whose lag frames come before
-        // this first field frame - its scene enter is over now, as the playthrough harness starts it two video
-        // frames earlier: the whole run from the reset, f852 / f854)
-        let new_game = pre.iter().any(|e| matches!(e, Event::Field(FieldEvent::Run { run: Callback::Event(id), cause: Cause::Menu, .. }) if id == "s004"));
-        let fresh = self.started.len() > before && (!new_game || std::env::var("NG_OLD_HOOK").is_ok());
+        let fresh = self.started.len() > before;
         let n0 = sess.world.events.len();
         sess.step_update();
         wf_script_core::tick_timers(&mut sess.world, &mut self.hs);
