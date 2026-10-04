@@ -114,6 +114,38 @@ impl StoryHost {
         });
         self.finish(w, st);
     }
+    /// Import: an event stopped inside a node of an event it runs (`run_event`, a scene depth of 2): the outer node
+    /// starts again with its first `drop_outer` actions dropped, its `run_event` runs (the inner event started before
+    /// the cut: its scene start does not wait the frame a fresh one does), then the inner event's first `drop_inner`
+    /// actions are dropped too. The parameters are the ones at the outer node's `run_event` (it writes the inner's).
+    pub fn continue_mid_nested(&mut self, w: &mut World, outer: (u16, u16, [i32; 4]), drop_outer: usize, drop_inner: usize) {
+        let mut g = self.rt.globals();
+        g.g = w.story.g;
+        self.rt.set_globals(g);
+        self.hs.in_unit = false;
+        self.rt.start_event_at(outer.0, outer.1, outer.2);
+        self.started.push((self.frame, format!("s{:03}@{}", outer.0, outer.1)));
+        self.cause = imported_cause(w, outer.0);
+        self.rt.with_thread(|t| {
+            t.skip = drop_outer + drop_inner;
+            t.queue_instants = true;
+            t.through_events = true;
+        });
+        let mut st = self.with_host(w, |rt| rt.run().map_err(|e| e.to_string()));
+        for _ in 0..4 {
+            let at_enter = self.rt.with_thread(|t| matches!(t.blocked, Some(wf_script_rhai::Act::Scene { .. })));
+            if !at_enter || st.is_err() {
+                break;
+            }
+            self.hs.pending = None;
+            st = self.with_host(w, |rt| rt.resume(None).map_err(|e| e.to_string()));
+        }
+        self.rt.with_thread(|t| {
+            t.queue_instants = false;
+            t.through_events = false;
+        });
+        self.finish(w, st);
+    }
     /// `files` = the exported scripts (`wf_script::export::export(rom, &ScriptSet::load_all(rom))`)
     pub fn new(data: &Arc<GameData>, files: &BTreeMap<String, String>) -> Result<StoryHost, String> {
         let spare = Session::new_field(data.clone(), FieldConfig::default()).world;

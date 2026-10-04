@@ -2234,6 +2234,10 @@ fn bomb_update(w: &mut World, i: usize) {
         let id = w.ents[i].id;
         crate::vram::release(w, crate::vram::Owner::Ent(id));
         let r = rect(w, i);
+        if std::env::var("OLD_BOMB").is_err() {
+            let (px, py) = (w.shot_ref(i).px(), w.shot_ref(i).py());
+            bomb_chips(w, px, py);
+        }
         if w.field.is_some() {
             // field: the blast's message is of sender class 2, which the enemies' handler (0x0800FBE6: class 1 or 2)
             // takes as well as the player's - a Mad Bomber's bomb hurts another bandit (Diablo Desert 11-14: 49 HP and
@@ -2251,16 +2255,23 @@ fn bomb_update(w: &mut World, i: usize) {
             hit(w, i, r, atk(1), 1024, true);
         }
         let (px, py) = (w.shot_ref(i).px(), w.shot_ref(i).py());
-        for k in 0..4 {
-            let (dvx, dvy) = [(96, 0), (-96, 0), (0, 64), (0, -64)][k];
-            fx::add(w, fx::Fx::Debris { x: (px - 4) << 8, y: (py - 4) << 8, vx: dvx, vy: dvy, t: 0 });
-            // each chip takes a reference of the shared debris graphic (0x40), like a breakable's chips (real run
-            // 4-1 tile r002_006+7,000 f192: the bomb's burst allocates (154, 1))
-            crate::vram::keyed_acquire(w, crate::vram::KEY_DEBRIS, 0x40);
+        if std::env::var("OLD_BOMB").is_ok() {
+            bomb_chips(w, px, py);
         }
         let rate = 0x1000 + w.rng.rand(0x1000);
         fx::explosion(w, px, py, rate);
         w.sfx(24, 64);
+    }
+}
+
+/// a bomb's four chips, each a reference of the shared debris graphic (0x40) - made before the blast's hit (real run
+/// 4-1 tile r002_006+7,000 f192: the chips' graphic takes (154, 1) from the bomb's freed block, so the hit's damage
+/// number no longer fits there and goes to (367, 4))
+fn bomb_chips(w: &mut World, px: i32, py: i32) {
+    for k in 0..4 {
+        let (dvx, dvy) = [(96, 0), (-96, 0), (0, 64), (0, -64)][k];
+        fx::add(w, fx::Fx::Debris { x: (px - 4) << 8, y: (py - 4) << 8, vx: dvx, vy: dvy, t: 0 });
+        crate::vram::keyed_acquire(w, crate::vram::KEY_DEBRIS, 0x40);
     }
 }
 

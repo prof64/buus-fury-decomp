@@ -391,6 +391,31 @@ pub fn running_event(ram: &GbaRam, runner: &StoryHost) -> Option<(u16, u16, [i32
     None
 }
 
+/// the event running `ev` with `run_event` (the next event object up the stack, its interpreter standing just
+/// after a `run_event(ev, ..)`): (event, node, params, its actions before that `run_event`)
+fn outer_event(ram: &GbaRam, runner: &StoryHost, ev: (u16, u16, [i32; 4])) -> Option<((u16, u16, [i32; 4]), usize)> {
+    let mut a = 0x0300_7000u32;
+    let mut seen_inner = false;
+    while a < 0x0300_8000 - 0x18 {
+        let h = ram.r32(a);
+        let pp = ram.r32(a + 0x14);
+        if let Some(e) = runner.event_of_header(h).filter(|_| matches!(pp >> 24, 2 | 3) && ram.valid(pp)) {
+            if !seen_inner {
+                seen_inner = e == ev.0;
+            } else if e != ev.0 {
+                let params = [0, 4, 8, 12].map(|o| ram.s32(pp + o));
+                let node = runner.node_before(e, ram.r16(a + 8) as u16).or_else(|| node_of_pc(ram, runner, e))?;
+                let ran = natives_run(ram, runner, (e, node, params))?;
+                let (n, args) = ran.last()?;
+                let runs = (wf_script::natives::RUN_EVENT..=wf_script::natives::RUN_EVENT_P0_P3).contains(n);
+                return (runs && args.as_ref().is_none_or(|x| x.first() == Some(&(ev.0 as i32)))).then(|| ((e, node, params), ran.len() - 1));
+            }
+        }
+        a += 4;
+    }
+    None
+}
+
 /// event `ev`'s node whose code holds the PC of an interpreter on the context stack (`natives_run`'s search)
 fn node_of_pc(ram: &GbaRam, runner: &StoryHost, ev: u16) -> Option<u16> {
     let nodes: Vec<u16> = runner.step_code.keys().filter(|k| k.0 == ev).map(|k| k.1).collect();
@@ -1433,7 +1458,13 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
     let last = idx;
     let from = if wn == 0x3A { queued[..idx.min(queued.len())].iter().rposition(|&n| n == 0x38).unwrap_or(idx) } else { idx };
     let (rng, shakes) = (w.rng.clone(), w.g.shakes.clone());
-    runner.continue_mid_node(&mut w, ev.0, ev.1, ev.2, from, last);
+    match outer_event(ram, runner, ev) {
+        Some((outer, k)) => {
+            notes.push(format!("nested in s{:03} node {} (its run_event after {k} actions)", outer.0, outer.1));
+            runner.continue_mid_nested(&mut w, outer, k, from);
+        }
+        None => runner.continue_mid_node(&mut w, ev.0, ev.1, ev.2, from, last),
+    }
     w.rng = rng;
     // `wait(n)` (0x88): the main loop's mode is the wait object (0x03000F90 -> vt 0x08049978, +4 frames left)
     let mode = ram.r32(0x0300_0F90);

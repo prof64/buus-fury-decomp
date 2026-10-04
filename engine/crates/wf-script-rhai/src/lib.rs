@@ -130,6 +130,10 @@ pub struct ThreadState {
     /// (r062 20-6 +23,000: s477 node 6 `set_p(0, p(0) + 100); walk_to(45, p(0), p(1))` replayed from the walk)
     #[serde(default)]
     pub params_done: Option<usize>,
+    /// importing a nested event mid-node: `skip` passes over the outer node's `run_event` (the inner event was
+    /// started before the cut: it runs, its own actions are the next ones dropped)
+    #[serde(default)]
+    pub through_events: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -387,7 +391,7 @@ impl Runtime {
                 return Ok(Status::Blocked);
             }
             // 1. queued actions first
-            if c.t.skip > 0 && !c.t.queue.is_empty() {
+            if c.t.skip > 0 && !c.t.queue.is_empty() && !(c.t.through_events && matches!(c.t.queue.front(), Some(Act::RunEvent { .. }))) {
                 c.t.skip -= 1;
                 c.t.queue.pop_front();
                 c.t.last = None;

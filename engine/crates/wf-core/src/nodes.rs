@@ -1445,6 +1445,9 @@ fn leaf_exit(w: &mut World, c: &C, n: u16, _r: &mut NodeRt) {
         }
         K::DarkSphere => w.en(i).a.hittable = true,
         K::ShockStun => w.en(i).stunned = false,
+        // exit 0x0803BD06 (vt 0x0804ADC0 +8): SetAnim(0) - the idle enter's rand(255) (real run 20-6 r062_001 tile
+        // +5,000 f45: Vegeta reaches his waypoint)
+        K::WanderToRandomPoint if w.field.is_some() => set_anim(w, i, &[nm("idle")], true, Some(true)),
         _ => {}
     }
 }

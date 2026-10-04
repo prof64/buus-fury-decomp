@@ -388,11 +388,20 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
     sess.world.opts.sim_lag = sim_lag;
     sess.world.g.load_pending = false;
     let (mut own_lag, mut lag_bad, mut replayed) = (0usize, 0usize, 0usize);
+    // (replayed lag: the area loads counted before the last logic frame; the camera's frame of a load iteration - the
+    // count of its lag frames still to come, `Session::lag_step`'s `lag_cam`)
+    let field_loads = |w: &wf_core::world::World| w.field.as_ref().map(|f| f.loads);
+    let mut loads_before = field_loads(&sess.world);
+    let mut load_cam: Option<Option<usize>> = None;
     for (k, fr) in frames.iter().enumerate() {
         let keys = i(&fr["keys"]) as u16;
         let lf = i(&fr["lf"]);
         let logic = lf != lf_prev;
         lf_prev = lf;
+        if logic {
+            loads_before = field_loads(&sess.world);
+            load_cam = None;
+        }
         let starting = sim_lag && sess.world.g.load_pending && !wf_core::menu::active(&sess.world);
         if sim_lag && !wf_core::menu::active(&sess.world) && (sess.world.g.lag > 0 || sess.world.g.load_pending) && sess.lag_step() {
             if starting {
@@ -441,6 +450,20 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
             sess.world.events.clear();
             // the game's lag frame: the sound hardware's frame passes without the main loop's update
             let last = frames.get(k + 1).is_some_and(|n| i(&n["lf"]) != lf);
+            // an area load's iteration (the last logic frame loaded an area): its world restore ends with a camera
+            // update, shown in the iteration's last frame (a frame earlier when the last sound update ran over a
+            // VBlank) - `Session::lag_step`'s rule for the sim's own lag (1-5 f11,575: the arrival camera's shake)
+            let cam_at = *load_cam.get_or_insert_with(|| {
+                let now = field_loads(&sess.world);
+                (now.is_some() && now != loads_before).then_some(sess.world.sound.wrap as usize)
+            });
+            if let Some(c) = cam_at {
+                let left = frames[k + 1..].iter().take_while(|n| i(&n["lf"]) == lf).count();
+                if left == c && sess.world.field.as_ref().is_some_and(|f| f.script_fade_in && matches!(f.mode, wf_core::field::Mode::FadeIn { .. })) && std::env::var_os("T_LC").is_some() {
+                    sess.world.tick_shakes();
+                    wf_core::field::world_mode_cameras(&mut sess.world);
+                }
+            }
             wf_core::sndsim::lag_frame_ex(&mut sess.world, last);
             replayed += 1;
         }
