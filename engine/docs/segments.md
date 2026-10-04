@@ -3034,6 +3034,37 @@ differently; (c) +21,000 f813: an imported coin pickup ends a frame early (picku
 mid-code replay misses an emote (importer); (e) +8,000 f165 (a text box), +1,137 f2 (sprite 280's idle cel tick) open.
 `wf-app` `menu_parity` `title_newgame` is red on the shared tree from uncommitted edits elsewhere (`sndsim.rs`), not
 from these.
+*(e) traced (Super Buu agent): both are mid-event imports, for the importer agent.* +1,137: s473 imported "continues
+at node 12" lands in a `Fade` phase that freezes our world (logic counter held at 1,260,308) while the game's objects
+keep updating (its counter runs 309, 310 ...): Vegeta, just made by `become_map_object`, ticks his idle in the game
+(tick 254 -> 255, cel 1) and not in ours. The full segment plays the same frames exactly, so the engine's phase is
+right and the import's is not. +8,000: s475 imported "mid-node over a standing field" never reaches its next text
+box (the game opens it at f165 while Super Buu plays anim 15; ours starts no script) - the node's wait is not resumed.
+
+**The wander's heap leftovers: deterministic, but they are other objects' bytes (Super Buu agent, 2026-10-04).**
+Yes, deterministic: the emulator replays the real run from power-on with the same keys, and the leftover is the same
+every time. The question is what a model would need to reproduce it. `work/superbuu/vram/heapwho.py` (the last writer
+of each word the new runtime reads, over r062_001 f1,500 .. 4,140, 7 wander creates) shows whose bytes they are:
+| create | block | +0xC / +0x10 waypoint last written by | +0x18 re-plan counter last written by |
+|---|---|---|---|
+| f2,173 | 0x203DEC4 | the text box's glyph writer (0x0800B1DC / B1EC, f1,988) | the text box's character counter (0x0800B092, f2,025) |
+| f2,339 | 0x203DDB4 | an AI node runtime (0x0801891E, f2,327) | the heap's own free-list link (0x0803D4EE, f2,329) |
+| f2,469 | 0x203DD10 | before the segment's start (an earlier area) | before the start |
+| f2,625 | 0x203DD88 | Super Buu's ball (0x080213B8, 0x080212C0) | the heap header on a free (0x0803D64C) |
+| f2,868 | 0x203DCE4 | Super Buu's ball (0x0802142A, 0x08021532) | the ball (0x080213BE) |
+| f3,751 | 0x203DE08 | the heap's alloc / free headers (0x0803D62A / 0x0803D64C) | a node controller (0x08019452) |
+| f3,964 | 0x202EAF8 | the text box's glyph writer again | the text box's character counter |
+So the heap model would have to track: (1) **the allocator itself**: `0x0803D5B8` (exact-size match first, else the
+smallest larger block, split) and `0x0803D63C` (free with coalescing), with its 8-byte block headers and free-list
+links written into the blocks; (2) **every heap allocation of the game in order with its exact size**: every object
+(actors, shots, effects, text boxes, script command objects, menus), every AI node runtime and controller, every
+temporary - one missing or mis-sized allocation moves every later address; (3) **the bytes each of those objects
+writes at the offsets that later get reused** - here a text box's per-character state, the ball's flight words,
+AI runtimes, the allocator's own links; in general any field of any object; (4) **the RAM as it stood at power-on /
+at the run's start** (f2,469 reads bytes from before the segment). (1) is small; (2) and (3) mean a byte-level copy
+of every heap object's layout - in effect emulating the game's memory, not its rules. The cheaper route for exact
+replays is the import side: a wander created mid-run could take its leftover words from a RAM snapshot when one is
+at hand, but a replay from power-on has none. **Not implemented**; the 20-6 tiles keep this as their main stop.
 
 **§11 update 13 (B): claims done this round.**
 * **`r057_066_14-1` exact (7,327 / 7,327, was 3,527), gated `rsb_057_066_14-1`** - IfPlayerInFront (predicate
@@ -3325,3 +3356,40 @@ RAM's. 51 board tiles: 1 better, 0 worse; gates as HEAD (`rfat_010_011_11-13` re
 **Claim (dungeon agent A, 2026-10-04, by the coordinator, from the Super Buu agent's queue): the sprite allocator's
 free / spare list order** (`wf-core` vram.rs `ObjVram` alloc / free, and the importer's reading of the live lists) -
 West City tiles r002_006 +4,000 / +5,000 / +14,000 / +7,000 / +17,000.
+
+**§11 update 18 (B): per-character state in the segment harness (report only).** The harness compared the leader's
+HP only; energy, EXP, stats, cooldowns, forms, inventory drifted unseen (update 17: Gohan's EP through 15,000 rows of
+exact segments). Now:
+* `tools/segments/recs.py SEG.json.. | --dir D [-j N]` replays a segment's keys on the emulator from its start state
+  and writes `work/recs/<name>.json`: the game's state at row 0 and at every row it changes - current character,
+  zenie, supplies, the equipment list, and per character record XP, HP, max HP, EP, max EP, STR / POW / END / SPD,
+  points, Super Saiyan cooldown, form, selected skill, skills, equipment (GameData 0x03001068, records 0x03001560 +
+  0x68 c). Start state: the header's `source.state`, the real-run cut of the same (run, frame), or `<name>.ss` under
+  work/ (the recorders' state folders). Done for every real-run cut (1,519) and 485 of the 498 gates (the 13 `rkb_*`
+  any-frame cuts have no save state).
+* `SEGMENT_RECS=1` (wf-import `recs.rs`, report only - never fails): the replay compares ours (the live fighters
+  written back into their records) at each such row while the segment still matches, and prints `recs NAME: N
+  checks, M differ - first at fK [...] fields {...}`. Every-N tiles use their parent's rows from their offset.
+*First run* (`work/db57/scratch/recs_run.sh`; reports `work/db57/recs_{gates,real,tiles}_report.txt`): gates 469 /
+485 clean, real-route cuts 1,457 / 1,519 clean, tiles 51 / 51. Not a gate condition yet (16 gates differ). The
+mismatches, by cause and owner:
+* **A benched character's HP regen** (HP of a character not on the field, ours ahead of the game's): ship 8-29 / 8-31
+  (`shipr_251` / `shipr_254`, chars 1 and 4), 8-3 / 8-6 (`r003_002` .. `r003_011`, char 4 by 31), 4-1 (`r002_006`),
+  18-2 (`r046_*`, char 0: 1,435 vs 1,363), 20-5 / 20-6 (`r061_*`, char 1 by 76), 14-2 (`r069_001`, `r057_*` char 7),
+  6-9 (`r052_006`) - the bench regen rule (agent A's "bench's 5% tick").
+* **The leader's EP off by 1 .. 20** (regen / cost fractions): Earth Gohan (`earth_2_90_2` / `rE2__087_2-90` from
+  f3,305, `earth_3_3_4`, `earth_3_15_1`, `rE2__090_7-3`) - Earth agent; Goten in the fat arc's dungeons (`dr2_016`,
+  `dr4_006`, `dr4_061`, `r008_009`, `r010_016`, `r017_023`, `r017_027` from f118 by 1, `r023_003`, `r027_008`,
+  `r027_024`) - B (mine, next); Vegeta / Gohan in 14-2 (`r069_027` .. `r069_167`, `r057_*`) - ship fix agent's
+  14-2 cluster; Vegeta in 18-2 (`r046_019` / `033` / `045`) - side-content agent. The import keeps no EP cost
+  fraction (`Player::ep_acc` is always 0 after an import; `r017_027` is off by 1 from f118): a cut that starts with
+  a fraction pending drifts by a point - its RAM place is not known yet (importer agent).
+* **Fusion records** (Gotenks char 5, Gogeta char 7: XP 40,325 and cooldown 18,000 in ours, the game's XP 949,715 ..
+  16,459,727 and cooldown 0): `r033_002_6-1` / `rfat_033_002`, `r049_001_18-14` / `rj_049_001`, `r052_006_6-9` /
+  `rsb_052_006`, `sb_006_06_06`, `sb_007_06_09` - the fused character's record (level-up / fusion code: Super Buu
+  agent).
+* **The credits' return to the title** (`r072_002_4-21`, `rsbk_002_04_21`, `sb_044_04_20`): after the ending ours
+  holds a new game's story (zenie 0, Goku XP 2,200) where the game keeps the cleared one (zenie 24,365, XP
+  12,831,115) - the ending / title path (Super Buu agent).
+* `sb_000_18_12` differs at f0 (current 0 vs 4, every record): the import of that HFIL cut (importer agent).
+* `r003_090_8-1` f2,769: equipment list [5, 126] in ours, [5] in the game (ship agent).
