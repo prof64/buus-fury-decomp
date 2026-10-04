@@ -2343,7 +2343,7 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
         // overlaps the head +- 12 is taken - the sender (an enemy ki blast) bursts on the beam (segment sb 6-6 f18799)
         ShotKind::Kame(b) => {
             let team = w.shot_ref(i).team;
-            if std::env::var("NO_D").is_ok() || msg.foot || msg.source == me || msg.team != team ^ 1 {
+            if msg.foot || msg.source == me || msg.team != team ^ 1 {
                 return false;
             }
             let (hx, hy) = kame_head(w.shot_ref(i), b.len);
@@ -2387,7 +2387,7 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
         // object overlapping its box bursts it (its spark, +0x4C = 16) and is taken (segment sb 6-6 f18799: Super
         // Buu's blast flies into Gotenks' beam head - both stop)
         ShotKind::Straight(o) if o.name == SName::KiBlast && o.fx_end == 16 && !o.fragile => {
-            if std::env::var("NO_D").is_ok() || o.dead >= 0 || msg.foot || msg.source == me || w.ents[i].removed || msg.atk.kind != 1 || msg.atk.sub == 0xd {
+            if o.dead >= 0 || msg.foot || msg.source == me || w.ents[i].removed || msg.atk.kind != 1 || msg.atk.sub == 0xd {
                 return false;
             }
             if !overlaps(&msg.rect, &rect(w, i)) {

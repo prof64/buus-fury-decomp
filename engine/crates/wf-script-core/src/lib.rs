@@ -490,7 +490,9 @@ pub fn poll(w: &mut World, s: &mut HostState) -> Option<Option<i32>> {
             done.then_some(None)
         }
         Pending::Fade => {
-            scene::fade_done(w).then_some(None)
+            let done = scene::fade_done(w);
+            s.from_fade = done;
+            done.then_some(None)
         }
         Pending::Scroll => {
             let done = scene::scroll_done(w);

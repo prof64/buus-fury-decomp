@@ -1916,7 +1916,7 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         // the player's spawner 0x08019858: origin 0x0800FF44 on the body box; the blast tests its record's box (shots::ki_blast_box)
         // (the ki blast is its controller's work too: a hit's hurt state replaced it - after the pop the node is over;
         // segment sb 6-6 f18914)
-        K::KiBlast if std::env::var("NO_C").is_err() && w.field.is_some() && r.d[6] != w.en_ref(i).anim_seq as i32 => true,
+        K::KiBlast if w.field.is_some() && r.d[6] != w.en_ref(i).anim_seq as i32 => true,
         K::KiBlast => {
             if f == 16 {
                 let (mx, my) = en::hand_point(w, i);
@@ -2494,7 +2494,7 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             }
             // field: the arm is the work of the animation's controller; a hit's hurt state replaced it - the node is
             // over after the pop (segment sb 6-6 f19062, as CandyBeam / KiBlast)
-            if std::env::var("NO_C").is_err() && w.field.is_some() && f < 72 && r.d[6] != w.en_ref(i).anim_seq as i32 {
+            if w.field.is_some() && f < 72 && r.d[6] != w.en_ref(i).anim_seq as i32 {
                 return true;
             }
             if f < 72 {
@@ -2530,7 +2530,7 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             }
             // field: the beam is the work of the animation's controller (0x0300304C); a hit's hurt state replaced it
             // meanwhile - the node is over (segment sb 6-6 f18331, like the shot nodes)
-            if std::env::var("NO_C").is_err() && w.field.is_some() && f < 32 && r.d[6] != w.en_ref(i).anim_seq as i32 {
+            if w.field.is_some() && f < 32 && r.d[6] != w.en_ref(i).anim_seq as i32 {
                 return true;
             }
             if f < 32 {

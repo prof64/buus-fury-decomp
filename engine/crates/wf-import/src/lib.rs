@@ -830,6 +830,7 @@ fn import_enemy_beam(w: &mut World, ei: usize, ram: &GbaRam, o: u32, notes: &mut
 /// the runner would, with that progress; the animation as the row shows it (the step's create sets one)
 fn import_npc_step(w: &mut World, i: usize, ram: &GbaRam, o: u32, row: Option<(i32, i32, i32, i32)>) {
     let st = ram.r32(o + 0x1B0);
+    if std::env::var("DBG_NPCSTEP").is_ok() { eprintln!("NPCSTEP obj {o:#x} step {st:#x} vt {:#x} row {row:?} funcs {:?}", if ram.valid(st) { ram.r32(st) } else { 0 }, match &w.ents[i].body { Body::Npc(n) => n.behaviour.as_ref().map(|b| b.steps.iter().map(|s| format!("{:#x}", s.func)).collect::<Vec<_>>()), _ => None }); }
     if !ram.valid(st) || ram.r32(st) != 0x0804_D848 {
         return;
     }

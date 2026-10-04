@@ -2605,3 +2605,8 @@ first steps of the follow camera after a menu closes, at frames the reload model
 The other recurring `cam` rows on the scoreboard (`r002_004/006_4-1`, `r052_004_1-5`, `r064_029_21-26`,
 `r067_071_14-2`) are worth checking against these two cases. Not changed here: the menu-close model is the Earth /
 ship-fix agents' (its latest refit f0e253f).
+
+**Claim (dungeon agent B, 2026-10-04, by the coordinator): the fat chapter's every-N rows** - `r033_002_6-1`
+(Goku vs Majin Buu, 6,910 diverged), `r002_006_4-1` (West City / the Bandana hunt, 7,857 diverged), the tiles of
+`r009_006_4-1` (8,604 diverged; every tile stops at its frame 0 on a half-pixel). Not the Super Buu rows (agent A,
+Super Buu agent, ship fix agent). Others please add a line here before touching one.

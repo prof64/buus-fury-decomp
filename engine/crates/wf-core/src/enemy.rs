@@ -874,7 +874,7 @@ pub fn in_player_beam_line(w: &World, i: usize) -> bool {
     // (vfunc +0x1C), and the enemy's body box overlaps the player's body box stretched 240 px forward (+-4 px
     // across; the player's own box included). VERIFIED segment sb 6-6 f18183: Super Buu facing up beside a
     // Gotenks charging to the left does not dodge
-    if !p.charging() || (std::env::var("NO_B").is_err() && w.en_ref(i).a.facing != (p.a.facing ^ 1)) {
+    if !p.charging() || w.en_ref(i).a.facing != (p.a.facing ^ 1) {
         return false;
     }
     let b = p.a.body_box();
