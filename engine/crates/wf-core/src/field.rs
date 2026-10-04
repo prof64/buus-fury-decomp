@@ -775,9 +775,13 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
     w.g.shake_off = (0, 0);
     // the follow camera's remembered target belongs to the old area
     w.scene.cam.follow_last = None;
-    // 2. map-screen visited bits: story flag 0x1C0 + bit (table 0x0874CA24) — TODO: the table is not exported yet
     // 2. the map-screen visited bit (story flag 0x1C0 + bit)
-    crate::fieldworld::mark_visited(w, to.world, to.area);
+    // (not for a cutscene's scene load - no player objects / the players offstage: the game's world-state rows,
+    // ship 8-16 -> 8-17 sets 8-17's bit 710 at the exit's load (f6,605), not at s319's scene load into it (f2,788);
+    // event warps / warp_fades do mark - with this all 488 gates' story flags match the game's)
+    if objects && w.scene.offstage.is_empty() {
+        crate::fieldworld::mark_visited(w, to.world, to.area);
+    }
     // 3. the map + the camera snap
     let col = fd.collision(m);
     w.arena = arena_of(a, m, &col);
@@ -1048,7 +1052,9 @@ fn arrive(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<Dir>) {
     crate::scene::banner_load(w, a, m.three_d, scene);
     // (the HUD's first update makes the stat-points mark: segment sb 20-4 -> 20-5, after the banner)
     crate::vram::stat_mark(w);
-    w.story.variant_byte = variant;
+    // (the variant byte 0x03002BB0 is not the area's variant: a load leaves it - 0 through all 488 gates' loads in
+    // the game's world-state rows; only the script setter 17 writes it)
+    let _ = variant;
     w.events.push(Event::Field(FieldEvent::AreaEnter { area: to, key: a.key.clone() }));
 }
 

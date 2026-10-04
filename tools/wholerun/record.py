@@ -24,6 +24,7 @@ limit = int(a[a.index('--frames') + 1]) if '--frames' in a else None
 out.parent.mkdir(parents=True, exist_ok=True)
 
 LF, RNG = 0x03000F94, 0x03004A5C
+s32 = lambda v: v - (1 << 32) if v & 0x80000000 else v
 parts = [(name, realrun.pre_keys()[part], None) for _, name, part in realrun.PRE]
 man = json.loads((ROOT / 'data' / 'realrun' / 'manifest.json').read_text())
 for m in man:
@@ -45,7 +46,9 @@ with out.open('w') as fh:
             e.run(1)
             rc = 0x03001560 + 0x68 * e.r8(GD)
             row = {'keys': k, 'lf': e.r32(LF), 'rng': [e.r32(RNG), e.r32(RNG + 4)], 'area': [e.r8(WS), e.r8(WS + 1), e.r8(WS + 2)],
-                   'p': player_row(e), 'depth': e.r32(DEPTH), 'hp': e.r16(rc + 0x16), 'zenie': e.r32(GD + 0x4F4)}
+                   'p': player_row(e), 'depth': e.r32(DEPTH), 'hp': e.r16(rc + 0x16), 'zenie': e.r32(GD + 0x4F4),
+                   # the camera object (as the segment rows' `cam`): the harness's menu-close camera step uses it
+                   'cam': [s32(e.r32(0x030019A4)), s32(e.r32(0x030019A8))]}
             f2 = e.read(GD + 0x55, 0x80).hex()
             if f2 != fl:
                 row['flags'] = f2

@@ -72,6 +72,8 @@ pub struct Report {
     /// `SEGMENT_RECS`: the per-character comparison (`recs.rs`), or no game rows for this segment
     pub recs: Option<crate::recs::Tally>,
     pub recs_missing: bool,
+    /// `SEGMENT_WORLD`: the world-state comparison (`world.rs`: story flags, game bits, timers, script words)
+    pub world: Option<crate::world::Tally>,
 }
 
 impl Report {
@@ -146,7 +148,9 @@ pub fn compare(w: &World, fr: &Value, es: &[String], map: &mut BTreeMap<usize, E
     // player object: a new obj# for the same entity)
     // a menu screen's own objects replace the game's object world (the party menu's character figures: segment sb
     // 21-14); the world's actors are compared again when it closes
-    let menu_screen = wf_core::menu::active(w) && !matches!(w.menu.phase, wf_core::menu::Phase::FadeOut { .. });
+    // (a script-opened screen's held black - fade at its end - has its object world already: Switch Character builds
+    // its figures in the fade's last step, real route shipr_172 lf 356,699)
+    let menu_screen = wf_core::menu::active(w) && !matches!(w.menu.phase, wf_core::menu::Phase::FadeOut { level } if level < 256);
     let present: Vec<usize> = fr["actors"].as_array().into_iter().flatten().map(|a| Row(a).k()).collect();
     if !menu_screen {
         map.retain(|k, _| present.contains(k));
@@ -406,6 +410,9 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
     // (a gate with "recs_exact": its records are checked always - wf-import tests/segments.rs fails it on a difference)
     let recs_rows = (std::env::var_os("SEGMENT_RECS").is_some() || doc["recs_exact"].as_bool() == Some(true)).then(|| crate::recs::load(doc)).flatten();
     let (mut recs_i, mut recs_tally) = (0usize, crate::recs::Tally::default());
+    // SEGMENT_WORLD: the game's world-state rows (tools/segments/world.py; a gate with "world_exact" always)
+    let world_rows = (std::env::var_os("SEGMENT_WORLD").is_some() || doc["world_exact"].as_bool() == Some(true)).then(|| crate::world::load(doc)).flatten();
+    let (mut world_i, mut world_tally) = (0usize, crate::world::Tally::default());
     let mut was_leaving = false;
     for (k, fr) in frames.iter().enumerate() {
         let keys = i(&fr["keys"]) as u16;
@@ -735,7 +742,19 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
                     recs_tally.check(k, &sess.world, &rows[recs_i].1);
                 }
             }
+            // SEGMENT_WORLD (report only): the world state at the rows where the game's changed, and the last row
+            if let Some(rows) = world_rows.as_ref() {
+                while world_i + 1 < rows.len() && rows[world_i + 1].0 <= k {
+                    world_i += 1;
+                }
+                if rows.get(world_i).is_some_and(|r| r.0 <= k) && (rows[world_i].0 == k || k + 1 == frames.len()) {
+                    world_tally.check(k, &sess.world, &host.hs, host.running(), rows[world_i].0 != k, &rows[world_i].1);
+                }
+            }
         }
+    }
+    if world_rows.is_some() {
+        rep.world = Some(world_tally);
     }
     if let Some(_) = recs_rows.as_ref() {
         rep.recs = Some(recs_tally);

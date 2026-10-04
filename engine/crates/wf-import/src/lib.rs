@@ -16,6 +16,7 @@
 pub mod host;
 pub mod ram;
 pub mod recs;
+pub mod world;
 pub mod segment;
 
 pub use host::{HostSnapshot, StoryHost};
@@ -670,6 +671,7 @@ fn field_from_ram(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
         }
     }
     import_death_effects(w, ram, notes);
+    import_player_blasts(w, ram);
     // the camera as the field left it (`return_to_field` puts the saved one back)
     w.scene.cam.mode = wf_core::scene::CamMode::Player;
     wf_core::battle::set_camera(w, 0, ram.s32(CAM), ram.s32(CAM + 4));
@@ -1332,6 +1334,34 @@ fn inline_running(ram: &GbaRam) -> Option<(String, Vec<(u8, Option<Vec<i32>>)>)>
         }
     }
     None
+}
+
+/// the leader's Ki Blasts in flight (vt 0x0804B454, the class 0x080197B4; +0x1C owner, +0x10 facing, +0x20 / +0x24
+/// 24.8 position, +0x40 / +0x44 velocity, +0x48 ticks, +0x54 stopped this frame, +0x4C the end spark's frames left
+/// counting down from 15 - MEASURED on real-run segments r010_001 / r012_014 / r015_006): our straight shot with the
+/// same numbers (its end spark counts up to 16: dead = 16 - left); its tile block goes with it (`import_vram`;
+/// whole-run cut 809,790: a blast in its last spark frame)
+fn import_player_blasts(w: &mut World, ram: &GbaRam) {
+    let po = ram.player();
+    let Some(pi) = w.player_idx(0).filter(|_| po != 0) else { return };
+    let me = w.ents[pi].id;
+    for o in ram.objects().into_iter().filter(|&o| ram.r32(o) == 0x0804_B454 && ram.r32(o + 0x1C) == po) {
+        let dir = ram.r8(o + 0x10) & 3;
+        let id = wf_core::shots::ki_blast(w, me, dir as _, 1, ram.s32(o + 0x20), ram.s32(o + 0x24), wf_core::damage::atk(4), 1024, false);
+        let Some(k) = w.find(id) else { continue };
+        let (left, stopped) = (ram.s32(o + 0x4C), ram.s32(o + 0x54) != 0);
+        let s = w.shot(k);
+        s.t = ram.s32(o + 0x48) as i64;
+        if let wf_core::shots::ShotKind::Straight(st) = &mut s.kind {
+            st.vx = ram.s32(o + 0x40);
+            st.vy = ram.s32(o + 0x44);
+            st.b = [8, 8, 16, 16];
+            st.rec_box = true;
+            st.spawned = true;
+            st.dead = if left > 0 { 16 - left } else if stopped { 0 } else { -1 };
+        }
+        w.pl(pi).blast = id;
+    }
 }
 
 /// a death effect still counting down at the cut (the delayed-call list 0x0300225C: count, then objects; vt
@@ -2246,6 +2276,17 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
         if vt == 0x0804_E41C {
             let h = ram.r16(o + 0xC);
             let ent = (0..w.ents.len()).find(|&k| !used_ents.contains(&w.ents[k].id) && matches!(&w.ents[k].body, Body::Fx(f) if matches!(**f, wf_core::fx::Fx::ItMarkers { .. })));
+            if let (Some(k), true) = (ent, h != 0xFFFF) {
+                used_ents.push(w.ents[k].id);
+                owners.push((h, Owner::Ent(w.ents[k].id)));
+            }
+            continue;
+        }
+        // the leader's Ki Blast (vt 0x0804B454, `import_player_blasts`): its block belongs to the blast at its position
+        if vt == 0x0804_B454 {
+            let h = ram.r16(o + 0xC);
+            let (x, y) = (ram.s32(o + 0x20), ram.s32(o + 0x24));
+            let ent = (0..w.ents.len()).find(|&k| !w.ents[k].removed && !used_ents.contains(&w.ents[k].id) && matches!(&w.ents[k].body, Body::Shot(s) if matches!(s.kind, wf_core::shots::ShotKind::Straight(_)) && s.x == x && s.y == y));
             if let (Some(k), true) = (ent, h != 0xFFFF) {
                 used_ents.push(w.ents[k].id);
                 owners.push((h, Owner::Ent(w.ents[k].id)));

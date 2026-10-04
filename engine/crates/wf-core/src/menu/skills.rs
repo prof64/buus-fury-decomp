@@ -226,6 +226,14 @@ fn set_cur(w: &mut World, ci: i32, k: i32, delta: i32) {
     if let Some(x) = cs.skill_cur.get_mut(k) {
         *x = (*x + delta) & 0xFF;
     }
+    // the leader of that character uses the new level for its selected skill
+    for s in 0..w.players.len() {
+        if let Some(i) = w.player_idx(s) {
+            if crate::story::char_of_form(&w.data, w.pl_ref(i).form) == Some(ci) {
+                crate::player::sync_skill_level(w, i);
+            }
+        }
+    }
 }
 
 impl Page for Skills {

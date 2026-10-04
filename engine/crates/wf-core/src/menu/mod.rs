@@ -561,9 +561,7 @@ fn step_inner(w: &mut World) {
                 w.tick_shakes();
             }
             let step = (w.menu.tr.fade_out & !FADE_HOLD).max(1);
-            // (the hold frame is the mode switch's long iteration - the black frame its build takes: none under
-            // `no_lag`, the switch is the last fade step's iteration; real route shipr_172 8-1, lf 356,699)
-            let end = if w.menu.tr.fade_out & FADE_HOLD != 0 && !w.opts.no_lag { 256 + step } else { 256 };
+            let end = if w.menu.tr.fade_out & FADE_HOLD != 0 { 256 + step } else { 256 };
             let l = level + step;
             // the screen black: the mode switch builds the new screen (Switch Character's figures enter idle)
             if level < 256 && l >= 256 {
@@ -581,6 +579,19 @@ fn step_inner(w: &mut World) {
             // the field freed in the first black frame)
             if l >= end && !matches!(w.menu.stack.last(), Some(Screen::CharSelect(_))) && w.field.as_ref().is_some_and(|f| f.vram.as_ref().is_some_and(|v| v.stashed.is_none())) {
                 crate::vram::world_hide(w);
+            }
+            // (no lag frames: the black enter frames are the mode switch's long iteration. The pause menu builds and
+            // draws its page in the fade's last step, on screen when it ends (menu_parity status_tabs lf 9,355); a
+            // script-opened screen's hold step is the long one and draws the page too (shop_buy lf 9,356); Switch
+            // Character's figures, built in the fade's last step, take one more enter iteration before their first
+            // tick (charsel_alone lf 9,357: their animation one tick early without it))
+            if l >= end && w.opts.no_lag && matches!(w.menu.stack.last(), Some(Screen::CharSelect(_))) {
+                w.menu.phase = Phase::Enter { t: w.menu.tr.enter.saturating_sub(1) };
+            } else if l >= end && w.opts.no_lag {
+                w.menu.phase = Phase::Run;
+                let first = w.menu.boot_draw.is_none();
+                w.menu.boot_draw = None;
+                redraw(w, first);
             }
         }
         Phase::Enter { t } => {
@@ -882,6 +893,12 @@ fn close_with(w: &mut World, done: bool) {
             w.menu.tr.leave = n as u16 + 1;
             w.menu.leave_cam = w.sound.wrap as u16;
         }
+    }
+    // (no lag frames: any close's black frames are its long iteration - a world restore's exit stub and restore
+    // iterations (2, above), another screen's one iteration: the map screen's 24, menu_parity map_left lf 9,555)
+    if w.opts.no_lag {
+        w.menu.tr.leave = w.menu.tr.leave.min(if w.menu.reload_close { 2 } else { 1 });
+        w.menu.leave_cam = 0;
     }
     w.menu.lag = 0;
     w.menu.pending = None;

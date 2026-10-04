@@ -90,6 +90,15 @@ fn main() {
     app.session.world.opts.no_lag = no_lag;
     println!("sound model: driver {} calibrated {} phase {}", app.world().sound.drv.is_some(), !app.world().sound.uncalibrated, app.world().sound.phase);
 
+    // every row's logic counter and camera up front (the menu close's recorded length and camera step look ahead)
+    let (lfs, cams): (Vec<i64>, Vec<serde_json::Value>) = BufReader::new(std::fs::File::open(&master).expect("master"))
+        .lines()
+        .map(|l| {
+            let v: serde_json::Value = serde_json::from_str(&l.expect("line")).expect("row");
+            (v["lf"].as_i64().unwrap_or(0), v["cam"].clone())
+        })
+        .unzip();
+    let mut was_leaving = false;
     let rd = BufReader::new(std::fs::File::open(&master).expect("master"));
     let mut raw = rd.lines();
     // (no lag: row 0 is not an iteration - the counter is 0 there)
@@ -157,7 +166,17 @@ fn main() {
                     println!("sim lag frame on a game logic row {k} ({}): app area {:?} lag left {}", stretch_of(k), app.world().field.as_ref().map(|f| (f.area.world, f.area.area)), app.world().g.lag);
                 }
             }
-        } else if logic || (menu && !no_lag) {
+        } else if logic
+            || (menu
+                && !no_lag
+                // (as the segment harness: the pause menu's opening fade-out is still the field's loop - a lag row
+                // there is a frame without an update; a script-opened menu fades inside its own loop)
+                && !(matches!(app.world().menu.phase, wf_core::menu::Phase::FadeOut { .. }) && !app.world().menu.scripted)
+                // (as the segment harness: a power gauge that ended inside the last world frame - the lag after it is
+                // the script's, the screen's last step is the next world frame's; the ending's Spirit Bomb, whole run
+                // row 1,638,553)
+                && !(wf_core::menu::ended_in_world(app.world()) && wf_core::menu::minigame::world_runs(app.world())))
+        {
             let mut ev = vec![];
             app.step(&[keys], &mut ev);
             stepped += 1;
@@ -169,6 +188,26 @@ fn main() {
             wf_core::sndsim::lag_frame_ex(&mut app.session.world, next_lf.is_some_and(|n| n != lf));
         }
         wf_core::rng::TRACE.store(false, std::sync::atomic::Ordering::Relaxed);
+        // a menu close's black frames (the world restore's long iteration) are alignment, not logic - as the segment
+        // harness (`segment.rs` replay): the close takes the recording's length, the video frames up to the next logic
+        // frame (`Menu.tr.leave`), and the camera's restore step in the frame the recorded camera first moves
+        // (`Menu.leave_cam`). Recorded-lag mode only (no lag: the close is logic-frame compared)
+        {
+            let w = &mut app.session.world;
+            let leaving = matches!(w.menu.phase, wf_core::menu::Phase::Leave { .. }) && w.menu.tr.fade_in != 0;
+            if !no_lag && !sim_lag && leaving && !was_leaving && w.menu.reload_close && w.menu.phase == (wf_core::menu::Phase::Leave { t: 0 }) && k + 1 < lfs.len() {
+                let lf1 = lfs[k + 1];
+                let run = lfs[k + 1..].iter().take_while(|&&n| n == lf1).count();
+                if k + 1 + run < lfs.len() {
+                    let leave = run as u16 + 1;
+                    let cam0 = &cams[k];
+                    let cam = cams[k + 1..k + 1 + run].iter().position(|c| c != cam0).map(|j| (leave as i64 - 2 - j as i64).clamp(0, 3) as u16).unwrap_or(w.menu.leave_cam);
+                    w.menu.tr.leave = leave;
+                    w.menu.leave_cam = cam;
+                }
+            }
+            was_leaving = leaving;
+        }
         if app.errors.len() > errors {
             for e in &app.errors[errors..] {
                 println!("row {k}: script error: {e}");

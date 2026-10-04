@@ -66,7 +66,9 @@ impl StorySim {
             return Err("this content has no scripts/ (re-extract with the current extractor)".into());
         }
         let cfg = FieldConfig { world: area.0, area: area.1, chars, rng: wf_core::battle::RngInit::Seed(seed), ..Default::default() };
-        let session = Session::new_field(Arc::clone(&data), cfg);
+        let mut session = Session::new_field(Arc::clone(&data), cfg);
+        // the app recreates no hardware slowdown: one step per game logic iteration (`Options::no_lag`)
+        session.world.opts.no_lag = true;
         Self::with_session(packs, session)
     }
 

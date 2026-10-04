@@ -480,7 +480,9 @@ impl Page for Save {
             return Action::None;
         }
         if self.stage == Stage::Done {
-            return Action::Pop(2);
+            // (no lag frames: the close after the write is the restore's iteration itself - no exit stub
+            // iteration of its own; menu_parity save_cancel lf 9,359 restores, 9,360 fades in)
+            return if w.opts.no_lag { Action::PopDone(2) } else { Action::Pop(2) };
         }
         let (consumed, act) = kit::run_step(self, w, |p| &mut p.list.c, |p, w, _src, code| match code {
             0 => {

@@ -1202,12 +1202,17 @@ fn skill_edit(w: &mut World, n: u8, c: i32, x: i32, y: i32) {
                 if k < cs.skill_levels.len() {
                     cs.skill_levels[k] = y;
                 }
+                // (the chosen level too: `set_skill_level` writes both record bytes, +0x2E / +0x2F)
+                if let Some(cur) = cs.skill_cur.get_mut(k) {
+                    *cur = y;
+                }
             }
         }
     }
     let skills = cs.skills.clone();
     if let Some(i) = fighter_of(w, c) {
         w.pl(i).skills = skills.clone();
+        wf_core::player::sync_skill_level(w, i);
     }
     // a player out of the world during a cutscene scene (scene::send_offstage) is the same record (story playthrough:
     // the prologue's forget_skill(0, 20) while Goku is offstage)

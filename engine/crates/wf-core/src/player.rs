@@ -1956,6 +1956,21 @@ fn cycle_skill(w: &mut World, i: usize) {
     }
     // the switch's click (story playthrough: L in the Cave of the Ancients)
     sfx(w, 40, 64);
+    sync_skill_level(w, i);
+}
+
+/// field: the selected skill's level is its character record's (chosen level, record +0x2E + 2i) - the live player
+/// keeps it in `skill_level`, so a skill switch or a script's `set_skill_level` refreshes it (whole run 1,107,691,
+/// HFIL statues: Goku switched to Instant Transmission, level 1 in the record, picks 2 targets; ours still had the
+/// level of the skill selected when the player was built, 0, and picked 1). Battles keep the setup's level.
+pub fn sync_skill_level(w: &mut World, i: usize) {
+    if w.field.is_none() {
+        return;
+    }
+    let Some(c) = crate::story::char_of_form(&w.data, pr(w, i).form) else { return };
+    let sel = pr(w, i).sel;
+    let Some(lv) = w.story.chars.get(c as usize).filter(|cs| sel < cs.skills.len()).map(|cs| cs.skill_cur(sel)) else { return };
+    p(w, i).skill_level = lv;
 }
 
 /// the frame an event from the world's event list ended in: the passive part of the update the event held

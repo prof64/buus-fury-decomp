@@ -748,6 +748,8 @@ pub fn story_app(packs: Packs, slots: &[Vec<u8>], slot: Option<usize>, seed: u32
         cfg = FieldConfig { world: sd.world, area: sd.area, variant: sd.variant, pos: Some((sd.x, sd.y)), story: Some(sd.story), ..cfg };
     }
     let mut session = Session::new_field(data, cfg);
+    // the app recreates no hardware slowdown: one step per game logic iteration (`Options::no_lag`)
+    session.world.opts.no_lag = true;
     saves.current = slot.unwrap_or_else(|| (0..SLOTS).find(|&i| saves.slot(i).is_none()).unwrap_or(0)) as i32;
     saves.generation = 0;
     session.world.saves = saves;
@@ -768,6 +770,7 @@ pub fn title_app(packs: Packs, slots: &[Vec<u8>], seed: u32) -> Result<App, Stri
     }
     let cfg = FieldConfig { world: 1, area: 1, rng: RngInit::Seed(seed), ..Default::default() };
     let mut session = Session::new_field(data, cfg);
+    session.world.opts.no_lag = true;
     session.world.saves = saves;
     // before the sim takes the creation events: the title's song replaces the placeholder area's
     wf_core::menu::title::open_title(&mut session.world);

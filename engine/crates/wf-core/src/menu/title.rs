@@ -558,6 +558,8 @@ pub fn title_world(data: &Arc<crate::content::GameData>, w: &World) -> World {
 
 /// Continue: black frames after the switch (the area load) and the fade-in step (`0x080495B4` +8 = 4)
 pub const CONTINUE_BLACK: u16 = 29;
+/// [`CONTINUE_BLACK`] in game iterations (`Options::no_lag`)
+pub const CONTINUE_BLACK_ITERS: u16 = 4;
 pub const CONTINUE_FADE_IN: u16 = 4;
 /// New Game: frames the Select Game picture stays under the prologue's fade-out
 pub const NEWGAME_OVERLAY: u32 = 64;
@@ -618,7 +620,10 @@ pub fn boot(data: &Arc<crate::content::GameData>, w: &mut World) -> Option<World
             };
             let mut nw = crate::field::create(Arc::clone(data), &cfg);
             nw.menu.phase = Phase::Leave { t: 1 };
-            nw.menu.tr = Transition { fade_out: 0, enter: 1, leave: CONTINUE_BLACK, fade_in: CONTINUE_FADE_IN };
+            // (no lag frames: the slot's load is one long iteration, then two black ones - menu_parity
+            // title_continue lf 996 .. 998)
+            let leave = if w.opts.no_lag { CONTINUE_BLACK_ITERS } else { CONTINUE_BLACK };
+            nw.menu.tr = Transition { fade_out: 0, enter: 1, leave, fade_in: CONTINUE_FADE_IN };
             nw
         }
     };

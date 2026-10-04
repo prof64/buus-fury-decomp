@@ -226,6 +226,8 @@ fn run(packs: &Packs, data: &Arc<wf_core::content::GameData>, name: &str) -> Opt
     let mut tears = 0;
     let mut iters = 0usize;
     let mut emu_snd: Vec<i64> = Vec::new();
+    // the previous compared row and our picture's hash there
+    let mut prev_cmp: Option<(usize, String)> = None;
     for (k, row) in rows.iter().enumerate() {
         let keys = i(&row["keys"]) as u16;
         let logic = k == 0 || lf[k] != lf[k - 1];
@@ -322,7 +324,24 @@ fn run(packs: &Packs, data: &Arc<wf_core::content::GameData>, name: &str) -> Opt
         }
         let ours = r.render(packs, &v, 0, 240, 160).to_vec();
         compared += 1;
-        let same = hash(&ours) == hs[k];
+        let oh = hash(&ours);
+        // a long iteration (more than one video frame) whose picture the emulator has not presented by its last
+        // frame - unchanged since the previous iteration's end - while the remake (no lag) shows its draw at once:
+        // the previous picture is the game's here (the status pages' R: the tab highlight is drawn but never shown)
+        let long = k > 0 && lf[k] == lf[k - 1];
+        let stale = long && prev_cmp.as_ref().is_some_and(|(pk, ph): &(usize, String)| hs[*pk] == hs[k] && *ph == hs[k]);
+        // and the other side of the same thing: a step whose redraw is the next iteration's update, a long one - the
+        // game presents this step's picture at that iteration's end (title_delete lf 975 / 976: the confirm's redraw)
+        let next_end = {
+            let mut e = k + 1;
+            while e + 1 < lf.len() && lf[e + 1] == lf[k + 1] {
+                e += 1;
+            }
+            e
+        };
+        let deferred = next_end < lf.len() && next_end > k + 1 && hs[next_end] == oh;
+        let same = oh == hs[k] || stale || deferred;
+        prev_cmp = Some((k, oh));
         let mut diff = 0;
         if same {
             exact += 1;
