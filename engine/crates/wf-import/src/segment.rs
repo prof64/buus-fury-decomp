@@ -229,7 +229,11 @@ pub fn compare(w: &World, fr: &Value, es: &[String], map: &mut BTreeMap<usize, E
                         rep.cel.first = Some((k, format!("{kind} #{} sprite {}: cel {ours:?} vs game {g:?} (raw {} cel {} dir {}) ours shown {:?}", r.k(), r.sprite(), r.raw(), r.frame(), r.dir(), scene::shown_anim(w, i))));
                     }
                     if std::env::var("SEGMENT_CEL").is_ok_and(|v| v == "all") {
-                        eprintln!("    cel f{k} #{} sprite {}: {ours:?} vs game {g:?} (raw {} cel {} dir {})", r.k(), r.sprite(), r.raw(), r.frame(), r.dir());
+                        let ea = match &w.ents[i].body {
+                            Body::Enemy(n) => format!(" ours raw {} cel {} tick {} rule {:#x} ty {}", n.ea.pos.raw, n.ea.pos.frame, n.ea.pos.tick, n.ea.rule, n.ty),
+                            _ => String::new(),
+                        };
+                        eprintln!("    cel f{k} #{} sprite {}: {ours:?} vs game {g:?} (raw {} cel {} dir {} tick {}){ea}", r.k(), r.sprite(), r.raw(), r.frame(), r.dir(), a[8]);
                     }
                 }
             }

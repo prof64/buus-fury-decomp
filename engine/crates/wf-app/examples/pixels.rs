@@ -50,22 +50,33 @@ fn hash(px: &[u32]) -> u64 {
     h
 }
 
-/// the view's palette state (what a palette fade rewrites): the field's fade / scale / BLDY and a menu screen's own
-type Pal = (Option<wf_view::PaletteFade>, Option<wf_view::PaletteFade>, u8, Option<(Option<wf_view::PaletteFade>, u8)>);
+/// the view's register state the game rewrites from its main loop while the screen is drawn: the palette (the
+/// field's fade / scale / BLDY, a menu screen's own) and the BG scroll (the cameras, the map's drift / shake)
+#[derive(Clone, PartialEq)]
+struct Pal {
+    fade: Option<wf_view::PaletteFade>,
+    scale: Option<wf_view::PaletteFade>,
+    black: u8,
+    menu: Option<(Option<wf_view::PaletteFade>, u8)>,
+    cameras: Vec<wf_view::CameraView>,
+    map: Option<wf_view::MapView>,
+}
 
 fn pal_of(v: &RenderView) -> Pal {
-    (v.palette_fade, v.palette_scale, v.fade_black, v.menu.as_ref().map(|m| (m.fade, m.fade_black)))
+    Pal { fade: v.palette_fade, scale: v.palette_scale, black: v.fade_black, menu: v.menu.as_ref().map(|m| (m.fade, m.fade_black)), cameras: v.cameras.clone(), map: v.map.clone() }
 }
 
 fn with_pal(v: &RenderView, p: &Pal) -> RenderView {
     let mut o = v.clone();
-    o.palette_fade = p.0;
-    o.palette_scale = p.1;
-    o.fade_black = p.2;
-    if let (Some(m), Some((f, b))) = (o.menu.as_mut(), p.3) {
+    o.palette_fade = p.fade;
+    o.palette_scale = p.scale;
+    o.fade_black = p.black;
+    if let (Some(m), Some((f, b))) = (o.menu.as_mut(), p.menu) {
         m.fade = f;
         m.fade_black = b;
     }
+    o.cameras = p.cameras.clone();
+    o.map = p.map.clone();
     o
 }
 
@@ -74,22 +85,45 @@ fn with_pal(v: &RenderView, p: &Pal) -> RenderView {
 /// app does not recreate. A frame whose palette state changed since the previous frame is accepted when every line
 /// equals our render with the new palette or with the old one; the per-line hashes of the game's picture are what
 /// the gate locks for it. Returns those hashes when the frame is torn-accepted (some line only matches the old)
-fn torn(game: &[u32], new: &[u32], old: &[u32]) -> Option<Vec<String>> {
+/// our pictures of the frame with the previous frame's register state: "o" palette and scroll, "s" scroll only, "p"
+/// palette only (the ones that differ from the new state)
+fn tear_candidates(renderer: &mut Renderer, packs: &Packs, view: &RenderView, prev: &Pal) -> Vec<(&'static str, Vec<u32>)> {
+    let now = pal_of(view);
+    let scroll_moved = (&prev.cameras, &prev.map) != (&now.cameras, &now.map);
+    let pal_moved = (prev.fade, prev.scale, prev.black, prev.menu) != (now.fade, now.scale, now.black, now.menu);
+    let mut out = vec![("o", renderer.render(packs, &with_pal(view, prev), 0, W, H).to_vec())];
+    if scroll_moved && pal_moved {
+        let s = Pal { fade: now.fade, scale: now.scale, black: now.black, menu: now.menu, ..prev.clone() };
+        out.push(("s", renderer.render(packs, &with_pal(view, &s), 0, W, H).to_vec()));
+        let p = Pal { cameras: now.cameras.clone(), map: now.map.clone(), ..prev.clone() };
+        out.push(("p", renderer.render(packs, &with_pal(view, &p), 0, W, H).to_vec()));
+    }
+    out
+}
+
+fn torn(game: &[u32], new: &[u32], olds: &[(&str, Vec<u32>)]) -> Option<Vec<String>> {
     let mut any_old = false;
-    // the line drawn while the rewrite runs mixes the two per colour (each pixel's entry flips at its own time):
-    // per pixel then - a line's mask of the pixels showing the old palette ("" = the new line, "o" = the old line)
+    // a whole line may show a previous register state: the candidates in order - "o" the previous palette and scroll,
+    // "s" the previous scroll only, "p" the previous palette only. The line drawn while the palette rewrite runs mixes
+    // the two palettes per colour (each pixel's entry flips at its own time): per pixel then against the previous
+    // palette's picture (the candidate "p" when there, else "o") - a hex mask of the pixels showing it
     let mut masks = vec![];
-    for y in 0..H {
-        let (g, nw, od) = (&game[y * W..(y + 1) * W], &new[y * W..(y + 1) * W], &old[y * W..(y + 1) * W]);
+    let px_old = olds.iter().find(|c| c.0 == "p").or_else(|| olds.iter().find(|c| c.0 == "o")).map(|c| &c.1);
+    'line: for y in 0..H {
+        let (g, nw) = (&game[y * W..(y + 1) * W], &new[y * W..(y + 1) * W]);
         if g == nw {
             masks.push(String::new());
             continue;
         }
-        if g == od {
-            any_old = true;
-            masks.push("o".into());
-            continue;
+        for (label, o) in olds {
+            if g == &o[y * W..(y + 1) * W] {
+                any_old = true;
+                masks.push((*label).to_string());
+                continue 'line;
+            }
         }
+        let Some(old) = px_old else { return None };
+        let od = &old[y * W..(y + 1) * W];
         let mut bits = vec![0u8; W / 8];
         for x in 0..W {
             if g[x] == nw[x] {
@@ -274,11 +308,12 @@ fn main() {
                 }
                 let ours = renderer.render(&packs, &view, 0, W, H).to_vec();
                 let (mut class, mut n) = classify(&view, &game[i], &ours);
-                // the tear rule: a palette change this frame - lines matching the old palette are the hardware's
+                // the tear rule: a palette / BG scroll change this frame - lines matching the previous frame's are the
+                // hardware's
                 if n > 0 && std::env::var_os("PIX_NOTEAR").is_none() {
-                    if let Some(op) = old_pal.filter(|p| *p != pal_of(&view)) {
-                        let old = renderer.render(&packs, &with_pal(&view, &op), 0, W, H).to_vec();
-                        if let Some(rows) = torn(&game[i], &ours, &old) {
+                    if let Some(op) = old_pal.as_ref().filter(|p| **p != pal_of(&view)) {
+                        let olds = tear_candidates(&mut renderer, &packs, &view, op);
+                        if let Some(rows) = torn(&game[i], &ours, &olds) {
                             torn_rows.insert(k, rows);
                             class = "torn (hardware)".into();
                             n = 0;
@@ -304,7 +339,9 @@ fn main() {
                     // accept: a line matching neither palette) or steady (the game rewrote the palette, ours did not:
                     // a fade level / timing difference or another palette writer)
                     if sc.black > 0 || sc.dim > 0 || view.palette_fade.is_some() || view.palette_scale.is_some() {
-                        tags.push(if old_pal.is_some_and(|p| p != pal_of(&view)) { "fade (palette changed)" } else { "fade (palette steady)" });
+                        let now = pal_of(&view);
+                        let changed = old_pal.as_ref().is_some_and(|p| (p.fade, p.scale, p.black, p.menu) != (now.fade, now.scale, now.black, now.menu));
+                        tags.push(if changed { "fade (palette changed)" } else { "fade (palette steady)" });
                     }
                     if view.dialog.is_some() { tags.push("dialog"); }
                     if view.menu.is_some() { tags.push("menu"); }
