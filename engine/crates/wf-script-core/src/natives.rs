@@ -1307,7 +1307,20 @@ fn load_scene(w: &mut World, s: &mut HostState, world: i32, map: i32, variant: i
         let to = wf_core::field::AreaId { world, area: map, variant };
         // a cutscene scene has no player object (0x08009030): the players wait offstage
         scene::send_offstage(w);
+        // (a scene load does not start the area's song: the script plays its own - real route s152's
+        // load_scene(3, 4, 1) then play_music(6) as it fades in; with the area's 6 taken here the play was skipped)
+        let from = w.events.len();
+        let song = w.scene.song;
         wf_core::field::load_area_with(w, to, x + 112, y + 76, None, objects);
+        let mut k = from;
+        while k < w.events.len() {
+            if matches!(w.events[k], wf_core::world::Event::Song { .. }) {
+                w.events.remove(k);
+            } else {
+                k += 1;
+            }
+        }
+        w.scene.song = song;
         // a scene's objects are held by its event like the others (not the warp loads' running ones: segment sb
         // s483's 21-4 backdrop, its Blister spawns nothing)
         if let Some(f) = w.field.as_mut() {

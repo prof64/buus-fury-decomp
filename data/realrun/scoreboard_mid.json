@@ -1,33 +1,33 @@
 {
  "chapters": {
   "fat": {
-   "diverged": 7136,
-   "exact_tiles": 28,
-   "frames": 57152,
-   "own": 41155,
+   "diverged": 3490,
+   "exact_tiles": 10,
+   "frames": 20336,
+   "own": 10596,
    "refused": 0,
-   "segments": 2,
-   "tiles": 53,
+   "segments": 1,
+   "tiles": 20,
    "uncovered": 0,
-   "verified": 50016
+   "verified": 16846
   },
   "superbuu": {
-   "diverged": 30168,
-   "exact_tiles": 27,
-   "frames": 73165,
-   "own": 29763,
+   "diverged": 24774,
+   "exact_tiles": 18,
+   "frames": 48676,
+   "own": 14426,
    "refused": 0,
-   "segments": 4,
-   "tiles": 65,
+   "segments": 3,
+   "tiles": 43,
    "uncovered": 0,
-   "verified": 42997
+   "verified": 23902
   }
  },
  "segments": [
   {
    "chapter": "fat",
-   "diverged": 4695,
-   "exact_tiles": 8,
+   "diverged": 3490,
+   "exact_tiles": 10,
    "frames": 20336,
    "own": 10596,
    "own_first": "Some((10623, \"cam: (178.77734375, 237.79296875) vs game (178.9638671875, 237.7021484375)\"))",
@@ -35,16 +35,9 @@
    "segment": "r002_006_4-1",
    "spots": [
     [
-     2079,
+     4077,
      "sprite memory",
-     "Some((94, \"vram: used blocks (start, size) ours only [(12, 16), (28, 16), (44, 16), (60, 16), (76, 16), (92, 16), (108, 197), (305, 1), (306, 1), (307, 16), (323, 16), (339, 32), (371, 1), (496, 16)], game only [(137, 1), (138, 16), (154, 16), (170, 16), (186, 16), (202, 16), (218, 16), (234, 16), (250, 16), (266, 16), (282, 1), (283, 32), (315, 197)]\"))",
-     2000,
-     3000
-    ],
-    [
-     4029,
-     "sprite memory",
-     "Some((29, \"vram: used blocks (start, size) ours only [], game only [(275, 4)]\"))",
+     "Some((77, \"vram: free / spare lists differ (same used blocks): [-1] ours 4 game 12, [4] ours [255,12,255] game [255,13,12], [12] ours [255,13,4] game [255,4,255], [13] ours [255,14,12] game [255,14,4]\"))",
      4000,
      5000
     ],
@@ -63,37 +56,30 @@
      7000
     ],
     [
-     7121,
+     7192,
      "sprite memory",
-     "Some((121, \"vram: used blocks (start, size) ours only [], game only [(151, 4)]\"))",
+     "Some((192, \"vram: used blocks (start, size) ours only [(151, 4), (354, 16), (370, 1)], game only [(154, 1), (351, 16), (367, 4)]\"))",
      7000,
      8000
     ],
     [
-     10302,
-     "sprite memory",
-     "Some((302, \"vram: used blocks (start, size) ours only [], game only [(147, 4)]\"))",
+     10596,
+     "camera",
+     "Some((623, \"cam: (178.77734375, 237.79296875) vs game (178.9638671875, 237.7021484375)\"))",
      10000,
      11000
     ],
     [
-     13066,
+     14128,
      "sprite memory",
-     "Some((81, \"vram: used blocks (start, size) ours only [(158, 16), (174, 197), (371, 1), (383, 1), (384, 16), (400, 16), (416, 16), (432, 16), (448, 16), (464, 16), (480, 32)], game only [(169, 1), (170, 16), (186, 16), (202, 16), (218, 16), (234, 16), (250, 16), (266, 16), (282, 1), (283, 32), (315, 197)]\"))",
-     13000,
-     14000
-    ],
-    [
-     14085,
-     "sprite memory",
-     "Some((85, \"vram: used blocks (start, size) ours only [], game only [(151, 4)]\"))",
+     "Some((128, \"vram: free / spare lists differ (same used blocks): [-1] ours 16 game 15, [4] ours [255,17,15] game [255,16,15], [15] ours [255,4,16] game [255,4,255], [16] ours [255,15,255] game [255,17,4]\"))",
      14000,
      15000
     ],
     [
-     17745,
+     17816,
      "sprite memory",
-     "Some((745, \"vram: used blocks (start, size) ours only [], game only [(151, 4)]\"))",
+     "Some((816, \"vram: used blocks (start, size) ours only [(151, 4), (338, 16), (354, 1)], game only [(154, 1), (335, 16), (351, 4)]\"))",
      17000,
      18000
     ],
@@ -105,9 +91,9 @@
      19000
     ],
     [
-     19135,
+     19292,
      "sprite memory",
-     "Some((135, \"vram: used blocks (start, size) ours only [], game only [(275, 4)]\"))",
+     "Some((292, \"vram: used blocks (start, size) ours only [], game only [(151, 4)]\"))",
      19000,
      20000
     ],
@@ -122,114 +108,7 @@
    "stretch": "002_d04_bandana",
    "tiles": 20,
    "uncovered": 0,
-   "verified": 15641
-  },
-  {
-   "chapter": "fat",
-   "diverged": 2441,
-   "exact_tiles": 20,
-   "frames": 36816,
-   "own": 30559,
-   "own_first": "Some((30559, \"snd: [] vs game [\\\"song 6\\\"]\"))",
-   "refused": 0,
-   "segment": "r033_002_6-1",
-   "spots": [
-    [
-     1100,
-     "sprite memory",
-     "Some((100, \"vram: free / spare lists differ (same used blocks): [4] ours [1,427,1,3,5,0,255] game [1,427,1,3,5,255,255]\"))",
-     1000,
-     2000
-    ],
-    [
-     3994,
-     "sprite memory",
-     "Some((999, \"vram: used blocks (start, size) ours only [(185, 32), (217, 64), (281, 64), (345, 64)], game only []\"))",
-     3000,
-     4000
-    ],
-    [
-     4000,
-     "sprite memory",
-     "Some((2, \"vram: used blocks (start, size) ours only [], game only [(185, 32), (217, 64), (281, 64), (345, 64)]\"))",
-     4000,
-     5000
-    ],
-    [
-     5000,
-     "sprite memory",
-     "Some((5, \"vram: used blocks (start, size) ours only [], game only [(185, 32), (217, 64), (281, 64), (345, 64)]\"))",
-     5000,
-     6000
-    ],
-    [
-     7000,
-     "RNG",
-     "Some((0, \"rng: [50f8e38b, 582be365] vs game [c2c5b6aa, a8e2e3bf]\"))",
-     7000,
-     8000
-    ],
-    [
-     15152,
-     "script / text",
-     "Some((152, \"text: game opens a text box: true, ours: false\"))",
-     15000,
-     16000
-    ],
-    [
-     17000,
-     "animation",
-     "Some((0, \"anim: #21 sprite 123: raw 22 cel 8 tick 69 vs game raw 22 cel 10 tick 68\"))",
-     17000,
-     18000
-    ],
-    [
-     18001,
-     "sprite memory",
-     "Some((1, \"vram: used blocks (start, size) ours only [(316, 1)], game only []\"))",
-     18000,
-     19000
-    ],
-    [
-     19119,
-     "sprite memory",
-     "Some((119, \"vram: used blocks (start, size) ours only [(257, 16)], game only []\"))",
-     19000,
-     20000
-    ],
-    [
-     22000,
-     "position / facing",
-     "Some((0, \"pos: #19 sprite 123: (147, 264) vs game (149.78125, 264)\"))",
-     22000,
-     23000
-    ],
-    [
-     27509,
-     "sprite memory",
-     "Some((509, \"vram: used blocks (start, size) ours only [(375, 4)], game only []\"))",
-     27000,
-     28000
-    ],
-    [
-     31697,
-     "position / facing",
-     "Some((0, \"dir: #2 sprite 138: 0 vs game 1\"))",
-     31697,
-     32000
-    ],
-    [
-     35000,
-     "screen fade",
-     "Some((0, \"fade: black true vs game false\"))",
-     35000,
-     36000
-    ]
-   ],
-   "stretch": "033_x05_s026",
-   "tiles": 33,
-   "uncovered": 0,
-   "verified": 34375
+   "verified": 16846
   },
   {
    "chapter": "superbuu",
@@ -277,108 +156,8 @@
   },
   {
    "chapter": "superbuu",
-   "diverged": 4949,
-   "exact_tiles": 10,
-   "frames": 24489,
-   "own": 15337,
-   "own_first": "Some((15337, \"rng: [9f5a0d30, eb8b0d2e] vs game [522ac42b, 94183eb3]\"))",
-   "refused": 0,
-   "segment": "r052_006_6-9",
-   "spots": [
-    [
-     3019,
-     "position / facing",
-     "Some((19, \"dir: #2 sprite 123: 3 vs game 2\"))",
-     3000,
-     4000
-    ],
-    [
-     4000,
-     "camera",
-     "Some((0, \"cam: (77, 12.8046875) vs game (76.5859375, 15.01953125)\"))",
-     4000,
-     5000
-    ],
-    [
-     6017,
-     "position / facing",
-     "Some((17, \"dir: #2 sprite 126: 0 vs game 1\"))",
-     6000,
-     7000
-    ],
-    [
-     9773,
-     "sprite memory",
-     "Some((773, \"vram: used blocks (start, size) ours only [(468, 8)], game only []\"))",
-     9000,
-     10000
-    ],
-    [
-     10996,
-     "sprite memory",
-     "Some((999, \"vram: used blocks (start, size) ours only [(187, 32), (219, 64), (283, 64), (363, 64)], game only []\"))",
-     10000,
-     11000
-    ],
-    [
-     11000,
-     "sprite memory",
-     "Some((4, \"vram: used blocks (start, size) ours only [], game only [(187, 32), (219, 64), (283, 64), (363, 64)]\"))",
-     11000,
-     12000
-    ],
-    [
-     13555,
-     "sprite memory",
-     "Some((555, \"vram: used blocks (start, size) ours only [(428, 4)], game only []\"))",
-     13000,
-     14000
-    ],
-    [
-     15337,
-     "RNG",
-     "Some((337, \"rng: [9f5a0d30, eb8b0d2e] vs game [522ac42b, 94183eb3]\"))",
-     15000,
-     16000
-    ],
-    [
-     16408,
-     "sprite memory",
-     "Some((408, \"vram: used blocks (start, size) ours only [(375, 4)], game only []\"))",
-     16000,
-     17000
-    ],
-    [
-     17000,
-     "screen fade",
-     "Some((0, \"fade: black true vs game false\"))",
-     17000,
-     18000
-    ],
-    [
-     19005,
-     "object set",
-     "Some((5, \"missing: obj #5 sprite 110 has no entity (ours there: sprite Some(108))\"))",
-     19000,
-     20000
-    ],
-    [
-     24000,
-     "camera",
-     "Some((11, \"cam: (80, 4.013671875) vs game (80, 4.0390625)\"))",
-     24000,
-     24489
-    ]
-   ],
-   "stretch": "052_m_gotenks",
-   "tiles": 22,
-   "uncovered": 0,
-   "verified": 19540
-  },
-  {
-   "chapter": "superbuu",
-   "diverged": 18632,
-   "exact_tiles": 4,
+   "diverged": 18187,
+   "exact_tiles": 5,
    "frames": 26177,
    "own": 2176,
    "own_first": "Some((2176, \"pos: #26 sprite 280: (214.58984375, 289.30078125) vs game (214.484375, 289.30078125)\"))",
@@ -524,19 +303,12 @@
      "Some((403, \"snd: [] vs game [\\\"play 3 64\\\"]\"))",
      21000,
      22000
-    ],
-    [
-     23555,
-     "sprite memory",
-     "Some((573, \"vram: used blocks (start, size) ours only [(279, 60), (339, 16), (355, 16), (371, 8), (379, 8), (387, 8), (395, 16), (411, 16), (427, 1)], game only [(282, 60), (342, 1), (343, 16), (359, 16), (375, 8), (383, 8), (391, 8), (399, 16), (415, 16)]\"))",
-     23000,
-     24000
     ]
    ],
    "stretch": "062_m_inside_buu",
    "tiles": 25,
    "uncovered": 0,
-   "verified": 7545
+   "verified": 7990
   },
   {
    "chapter": "superbuu",
@@ -564,21 +336,21 @@
  ],
  "tile": 1000,
  "total": {
-  "diverged": 37304,
-  "exact_tiles": 55,
-  "frames": 130317,
-  "own": 70918,
+  "diverged": 28264,
+  "exact_tiles": 28,
+  "frames": 69012,
+  "own": 25022,
   "refused": 0,
-  "segments": 6,
-  "tiles": 118,
+  "segments": 4,
+  "tiles": 63,
   "uncovered": 0,
-  "verified": 93013,
+  "verified": 40748,
   "whole_game": {
-   "diverged": 38987,
+   "diverged": 29947,
    "frames": 1668050,
    "uncovered": 38482,
-   "verified": 1590581
+   "verified": 1599621
   }
  },
- "tree": "fe7ec4a"
+ "tree": "fda75a6"
 }

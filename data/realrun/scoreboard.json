@@ -14,13 +14,12 @@
    "cats": {
     "RNG": 1,
     "camera": 1,
-    "screen fade": 1,
-    "sound": 1
+    "screen fade": 1
    },
    "cut_frames": 380206,
-   "exact": 367,
+   "exact": 368,
    "frames": 380206,
-   "matched": 363405,
+   "matched": 369662,
    "run_frames": 388646,
    "segments": 371,
    "stretches": 33
@@ -75,12 +74,12 @@
  "dirty": true,
  "total": {
   "cut_frames": 1622756,
-  "exact": 1510,
+  "exact": 1511,
   "frames": 1622756,
-  "matched": 1570826,
+  "matched": 1577083,
   "run_frames": 1668050,
   "segments": 1519,
   "stretches": 75
  },
- "tree": "fe7ec4a"
+ "tree": "fda75a6"
 }

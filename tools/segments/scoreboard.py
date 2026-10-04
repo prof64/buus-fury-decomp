@@ -67,10 +67,6 @@ NOTES = {
                     'after it) and ~480 of the ship route\'s up to its first entry; first divergence at its frame 6,658: actor #42 '
                     '(sprite 222) raw 1 cel 0 vs the game\'s cel 1, tick 1776 vs 1777 - an NPC idle animation one tick '
                     'behind after ~1,800 frames',
-    'r033_002_6-1': 'Goku vs Majin Buu, 0-21, then Gotenks (fixed: shakes through the pause fade-out 9,545; menu frames '
-                    'advance the clock 9,904; the flyer\'s fresh flight state ticks in the held pass after the 3D '
-                    'fade 24,002; a fusion component\'s level-up hook 27,267). Now at 30,559: the game starts song 6 '
-                    'at s219\'s fade_in(100) after load_scene(6, 1) (3-4), ours plays none - source not found yet',
     'r002_006_4-1': 'West City -> the Bandana hunt (fixed: s509 a frame later 1,763; on-defeat prop show 4,178). Now '
                     'at 10,623: a heal menu closed on the 3D world map 0-55 - the reload estimate predicts 27 black '
                     'frames (margin 58,318 cycles), the game takes 28 (its camera step lands in the 28th): reload '
