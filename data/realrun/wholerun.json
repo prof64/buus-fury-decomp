@@ -1,32 +1,32 @@
 {
- "tree": "55228ff",
+ "tree": "e0fcc5f",
  "modes": [
   {
    "lag": "recorded",
    "rows": 723849,
-   "exact_to": 153101,
+   "exact_to": 153225,
    "exact_stretch": "E2_earth",
-   "first": "rng: app [ddf7897e, 38c3c1f0] game [234beb00, fbe02e0f]",
+   "first": "rng: app [ddf7897e, 38c3c1f0] game [d800841f, 1450638f]",
    "lasting": {
     "area": {
-     "row": 191502,
-     "stretch": "E2_earth",
-     "what": "app (7, 6) game (7, 5)"
+     "row": 218948,
+     "stretch": "000_ship_c14",
+     "what": "app (0, 1) game (7, 6)"
     },
     "depth": {
-     "row": 157288,
-     "stretch": "E2_earth",
+     "row": 215895,
+     "stretch": "000_ship_c14",
      "what": "app 0 game 1"
     },
     "pos": {
-     "row": 153470,
+     "row": 153541,
      "stretch": "E2_earth",
-     "what": "app (70432, 27568, 2) game (90112, 19987, 0)"
+     "what": "app (82486, 24481, 2) game (75106, 26371, 2)"
     },
     "rng": {
-     "row": 155477,
+     "row": 191502,
      "stretch": "E2_earth",
-     "what": "app [fe64f9df, 2182bc82] game [c4108aa3, b1d2d47c]"
+     "what": "app [6f555d36, 5e868b48] game [c1658938, 7a86e4b8]"
     }
    },
    "sim_lag": 0,
@@ -62,9 +62,9 @@
      "what": "app [00000000, 00000000] game [1b2001d2, 96df8700]"
     }
    },
-   "sim_lag": 3514,
-   "sim_lag_on_logic": 3432,
-   "recorded_lag_replayed": 19250,
+   "sim_lag": 3516,
+   "sim_lag_on_logic": 3435,
+   "recorded_lag_replayed": 19251,
    "script_errors": 0
   }
  ],

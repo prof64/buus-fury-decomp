@@ -3547,3 +3547,42 @@ Tiles before / after this round (51): +3,000 / +18,000 better, none worse; gates
 **Claim (dungeon agent A, 2026-10-04, by the coordinator; taken from the Super Buu agent's queue): the three 20-6
 engine items above** - the SuperBuuAnim0C node, the 20-7 camera limit after the IT teleport, the coin's 601-frame
 age. Super Buu agent: leave these to A (you keep the heap per-site rules).
+
+**To the side-content agent (ship agent, 2026-10-04): the real run is continuous from power-on now.** All 73
+stretch logs replay in one emulator from the soft reset to the credits, each stretch ending byte for byte in the
+next one's start (`realrun.py rebuild`; 002 `d04_bandana` and 034 `dbx_end` were one frame short, re-packed in
+e0fcc5f - §"How to replay the real run"). The whole-run reference can be re-recorded past 002
+(`tools/wholerun/board.py --record`) and re-baselined; the per-stretch drift at 003 is gone.
+
+**Claim (ship agent, 2026-10-04, by the coordinator): the menu-close length model as a whole** - handed over from the
+ship-fixes agent: `r002_006_4-1` f10,623, `r067_071_14-2` f693, `r038_001_18-1` f589, `r044_015_18-1` f577,
+`r012_014_12-19` f2,567 (the pause / Switch Character close's reload iteration, `sndsim::reload_frames_with` /
+`reload_parts`). What the game does in a close from the disassembly + emulator timing, no per-case tuning.
+
+**Whole run with resync: the stop queue (side-content agent, 2026-10-04).** `tools/wholerun/resync.py --lag rec|sim`
+runs the app from the reset on the chain's keys; at each stop (the first exact divergence) the game's state is cut
+at the next row on the emulator (RAM + sound timer phase, the importer's any-frame cut) and the app goes on from
+there to the end of the recording (723,849 rows). "rule" = the app left a state it had right; "import" = the cut
+was refused or diverged in its first two rows (the cut then moves on 30, 60, 120 .. rows). Ranked list:
+`.venv/bin/python tools/wholerun/board.py --rank` -> `data/realrun/wholerun_stops.json`, board section in
+`engine/docs/scoreboard.md`. Rows from 630,190 on are stretch 003 replayed from the reset, which is no longer the
+real run (it ends in the game over: game area (1, 1)) - those stops are the chain's, not the engine's, until the
+real-route agent's re-pack lands.
+*Recorded lag: 10 rule stops, 9 of them in the defined chain (rows 0 .. 630,190); everything else exact.*
+* 153,225 / 153,281 rng, 153,389 / 153,470 area - Earth 7-3, inside s266 (depth 1; the World Tournament event after
+  the menu-close draw the soak agent fixed): the app's RNG and then its area run off inside one event, the area
+  flipping 7-3 <-> 7-5 -> **soak agent / Earth agent** (the event the soak's row 152,597 stop sits in).
+* 519,616 pos (y 22,486 vs 22,102), 519,665 rng - ship, stretch 000, inline scripts 0x083BBC34 / 0x087110A7 running
+  -> **ship agent**.
+* 608,823 rng - fat 002 (West City / the Bandana hunt), after s011 (save point) and inline 0x080782FC -> **dungeon
+  agents A / B**.
+* 621,338 pos (x 73,530 vs 73,722) and 621,395 pos + facing (3 vs 0) - fat 002, inline 0x083BBC13 / 0x08072F48 /
+  0x08073EFC -> **dungeon agents A / B** (the r002_006 4-1 cluster).
+* 642,083 depth (stretch 003, past the chain's divergence) - not routed.
+*Recorded-lag import stops:* 621,339 rng (the cut one row after a stop diverges at once) -> **importer agent**;
+643,974 / 645,894 "unsupported cut: 8-6, the load's on-enter script still blocked" are past the chain's divergence.
+*Sim lag: 76 rule + 44 import stops* - ship 33 (18 rng + 15 pos, first at row 208,365), Earth 25 (13 pos from
+48,858, 7 rng, 5 area), fat 12 (rows 609k .. 611k), opening 4 (the first: row 4,691, the first narration box 8 vs
+7). They follow a text box or load one frame off -> **ship fix agent** (the text-box / load-length models,
+`sndsim::dialog_frames` / `load_frames`; per chapter in `wholerun_stops.json`). The 44 import stops in sim mode are
+cuts taken while the sim is in its own lag frames, not importer problems.

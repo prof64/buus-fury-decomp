@@ -1,6 +1,6 @@
 # Parity scoreboard: the real playthrough on wf-core
 
-Tree: `00e82a5` + uncommitted engine changes. Regenerate: `.venv/bin/python tools/segments/scoreboard.py`
+Tree: `e0fcc5f` + uncommitted engine changes. Regenerate: `.venv/bin/python tools/segments/scoreboard.py`
 (the cuts: `scoreboard.py cut`, local under `work/real/`; the run itself: `tools/segments/realrun.py`, §"How to replay
 the real run" in `engine/docs/segments.md`). A segment = the real game from one importable area entry (an exit
 arrival with nothing running) to the next; an entry by a script warp / in a cutscene is not a cut - its frames
@@ -22,6 +22,52 @@ frames are counted where its segments start.
 
 **Whole run, no imports (sim lag): exact to frame 4,691** of 723,849 recorded (E1_opening; first divergence: area: app (0, 96) game (1, 1)). Tree `55228ff`, `tools/wholerun/board.py`.
 The recording follows the real run from the reset through 002_d04_bandana only: replayed from the reset, the key log of 003_d06_thieves leaves the real run (the chain's state at 002's end differs from the local state 003 was packed from - object list, heap, one video frame) and ends in a game over.
+
+## Whole run with resync: every stop, per owner
+
+The app from the reset; at each stop the game's state is cut at the next row and the run goes on (`tools/wholerun/resync.py`). "rule" = the app diverged from a state it had right; "import" = the cut was refused or diverged in its first rows (importer). Each group: count, first stop.
+
+**rec lag:** 19 stops (10 rule, 9 import)
+
+| count | kind | field | chapter | owner | first row | first stop |
+|---|---|---|---|---|---|---|
+| 2 | rule | rng | earth | Earth agent | 153,225 | app [ddf7897e, 38c3c1f0] game [d800841f, 1450638f] |
+| 2 | rule | area | earth | Earth agent | 153,389 | app (7, 5) game (7, 3) |
+| 2 | rule | pos | fat | dungeon agents A / B | 621,338 | app (73530, 81716, 3) game (73722, 81716, 3) |
+| 1 | rule | pos | ship | ship agent | 519,616 | app (23980, 22486, 0) game (23980, 22102, 0) |
+| 1 | rule | rng | ship | ship agent | 519,665 | app [24dbf79b, 815a72e5] game [a6fdc6e9, b7fba9d2] |
+| 1 | rule | rng | fat | dungeon agents A / B | 608,823 | app [2b6668bc, 0ae5d8e3] game [77786984, bc24e457] |
+| 1 | rule | depth | fat | dungeon agents A / B | 642,083 | app 1 game 0 |
+| 6 | import | area | fat | importer agent | 642,084 | app (8, 3) game (1, 1) |
+| 2 | import | import | ? | importer agent | 643,974 | unsupported cut: area AreaId { world: 8, area: 6, variant: 1 }: the load's on-enter script |
+| 1 | import | rng | fat | importer agent | 621,339 | app [2302d396, 28b8d03c] game [40e67a74, 60b0e573] |
+
+**sim lag:** 120 stops (76 rule, 44 import)
+
+| count | kind | field | chapter | owner | first row | first stop |
+|---|---|---|---|---|---|---|
+| 18 | rule | rng | ship | ship agent | 208,396 | app [17d43d9c, abb04a12] game [b12fb01f, d29a98bb] |
+| 15 | rule | pos | ship | ship agent | 208,365 | app (57344, 197632, 1) game (57344, 197504, 1) |
+| 13 | rule | pos | earth | Earth agent | 48,858 | app (24832, 79872, 1) game (24832, 79744, 1) |
+| 7 | rule | rng | earth | Earth agent | 58,432 | app [6724459b, 4a4e8f46] game [23be8d4a, 7b19df0b] |
+| 7 | rule | pos | fat | dungeon agents A / B | 610,699 | app (68608, 75776, 0) game (68608, 75904, 0) |
+| 5 | rule | area | earth | Earth agent | 59,815 | app (4, 20) game (4, 27) |
+| 5 | rule | rng | fat | dungeon agents A / B | 609,360 | app [d762541a, 35a3204f] game [04569d93, 290569ac] |
+| 2 | rule | rng | opening | Earth agent | 21,437 | app [12607523, fe6402b0] game [eb483324, 121adeb2] |
+| 1 | rule | area | opening | Earth agent | 4,691 | app (0, 96) game (1, 1) |
+| 1 | rule | pos | opening | Earth agent | 21,406 | app (75776, 66560, 1) game (75776, 66432, 1) |
+| 1 | rule | area | ship | ship agent | 564,445 | app (8, 71) game (8, 70) |
+| 1 | rule | area | fat | dungeon agents A / B | 639,192 | app (8, 3) game (1, 1) |
+| 13 | import | pos | earth | importer agent | 48,862 | app (24832, 79232, 0) game (24832, 79232, 1) |
+| 7 | import | area | fat | importer agent | 639,193 | app (8, 3) game (1, 1) |
+| 5 | import | import | ? | importer agent | 631,386 | unsupported cut: area AreaId { world: 8, area: 3, variant: 1 }: the load's on-enter script |
+| 4 | import | pos | ship | importer agent | 225,250 | app (49152, 13312, 0) game (49152, 13565, 0) |
+| 4 | import | rng | ship | importer agent | 547,558 | app [4f056e4f, 515cd154] game [5e7e7ff3, a87fca59] |
+| 4 | import | pos | fat | importer agent | 631,416 | app (110592, 130816, 1) game (110592, 130560, 1) |
+| 3 | import | rng | opening | importer agent | 41,536 | app [f2baedee, 3f3f0bf7] game [a784cfbe, 58ea61c1] |
+| 3 | import | rng | earth | importer agent | 72,280 | app [ad37d6f5, ce7018ac] game [e3c98bcb, 4ba29ec9] |
+| 1 | import | rng | fat | importer agent | 621,339 | app [2302d396, 28b8d03c] game [40e67a74, 60b0e573] |
+
 
 ## Non-exact segments by category
 

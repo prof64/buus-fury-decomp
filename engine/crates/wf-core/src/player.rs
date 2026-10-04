@@ -473,8 +473,11 @@ impl Player {
     pub fn is_stone(&self) -> bool {
         self.gs == Gs::Stone || self.hold_kind == Some(HoldKind::Stone)
     }
+    /// Super Buu's glide hit test (`0x0803C08D`): the leader's current animation (obj+0x50) is its set's entry 0x13 -
+    /// raw 20, the Instant Transmission run's (real run 20-6 r062_001 f3,058: the run's punch is taken, state 0x29F and
+    /// s474 follow; a plain punch's raw 5 .. 7 is not)
     pub fn swinging(&self) -> bool {
-        self.state == PState::Punch
+        self.ap.raw == 20
     }
     /// story Trunks: form 24 (0x03001B88) / 25 (0x03001B8C)
     pub fn story_form(&self, w: &World) -> bool {
@@ -860,7 +863,6 @@ fn enter_state(w: &mut World, i: usize, gs: Gs) {
                 pl.ap.tick = 0;
                 pl.ap.frame = 0;
             }
-            if crate::rng::TRACE.load(std::sync::atomic::Ordering::Relaxed) { eprintln!("DBGBT {}", std::backtrace::Backtrace::force_capture()); }
             let s = 50 + w.rng.rand(2);
             sfx(w, s, 64);
         }

@@ -102,6 +102,7 @@ fn main() {
     let mut errors = 0usize;
     let (mut load_watch, mut load_bad): (Option<(usize, usize)>, usize) = (None, 0);
     let mut k = from_row;
+    let mut lfd_last: Option<i64> = None;
     while let Some(r) = lines.next() {
         if k >= limit {
             break;
@@ -231,6 +232,14 @@ fn main() {
                     }
                 }
                 None => l.1 = 0,
+            }
+        }
+        // WR_LFD=1: the rows where the game's logic counter (0x03000F94) and ours (play time + bias) change offset
+        if std::env::var_os("WR_LFD").is_some() {
+            let d = lf - (w.story.play_frames as i64 + w.story.lf_bias);
+            if Some(d) != lfd_last {
+                println!("LFD row {k} ({}) lf {lf} offset {d} (was {:?}) menu {menu} phase {:?} area {aa:?}", stretch_of(k), lfd_last, w.menu.phase);
+                lfd_last = Some(d);
             }
         }
         if show.is_some_and(|(a, b)| a <= k && k <= b) {

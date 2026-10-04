@@ -359,8 +359,10 @@ export class Player extends Actor implements PlayerLike {
   isCandy() {
     return this.ctx.candy > 0
   }
+  /** Super Buu's glide hit test (0x0803C08D): the current animation is its set's entry 0x13 (raw 20, Instant
+   *  Transmission's run; real run 20-6 r062_001 f3,058) */
   swinging() {
-    return this.state === 'punch'
+    return this.ap.raw === 20
   }
   /** `raw`: the animation the holder shows (frame 0); default the hurt animation's first frame (raw 10) */
   hold(w: World, by: import('./actor').Actor, kind: HoldKind, frames: number, raw = 10) {

@@ -111,7 +111,9 @@ fn ours(w: &World) -> (i64, i64, Vec<u8>, Vec<i64>, Vec<Vec<i64>>) {
             vec![r.xp, r.hp as i64, r.max_hp as i64, r.ep as i64, r.max_ep as i64, r.str_ as i64, r.pow as i64, r.end as i64, r.spd as i64, r.points as i64, ch.ss_cooldown as i64, ch.form as i64, ch.sel as i64]
         })
         .collect();
-    (st.current as i64, st.zenie as i64, st.supplies.iter().take(83).copied().collect(), eq, chars)
+    // GameData +0 during a fusion component's level-up hook is the component (`Story::levelup_char`: ours keeps the
+    // fusion as `current` and the component beside it; real run 6-1 r033_002 f27,267 .. 27,508)
+    (st.levelup_char.unwrap_or(st.current) as i64, st.zenie as i64, st.supplies.iter().take(83).copied().collect(), eq, chars)
 }
 
 const FIELDS: [&str; 13] = ["xp", "hp", "max_hp", "ep", "max_ep", "str", "pow", "end", "spd", "points", "ss_cooldown", "form", "sel"];

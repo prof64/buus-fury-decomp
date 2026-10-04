@@ -155,8 +155,8 @@ pieces and the dark sphere disc are not drawn yet.
 **Uninitialised heap reads (by design, bounded).** The game reads heap bytes its objects never wrote at 18 code sites
 over the whole real run (census: `segments.md` "Heap census"). Draw order, voice slots and redraw caches are not
 modelled (no gameplay effect). The two gameplay sites with a fixed outcome are covered: the camera object reading a freed
-actor's last position (`0x080077EC`) eases toward where that actor stood - in all 7 real-run cases the camera is
-already there, which is what ours does by holding the camera while no player exists (a rule that kept easing toward
+actor's last position (`0x080077EC`) eases toward where that actor stood - ours holds the camera while no player
+exists, and the 7 real-run segments with those reads match the game frame by frame (a rule that kept easing toward
 the last target instead broke ~70 gates at loads: not added); a charging enemy beam accepts no message (its team word
 is unset until the fire; `shots::on_message`, Rust + TS). **The one site whose value matters is not modelled: WanderToRandomPoint's path runtime** (`0x0803BD64` sets
 speed, budget and valid = 0 only; the first step reads the heap block's leftover waypoint +0xC / +0x10 and re-plan

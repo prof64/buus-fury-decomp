@@ -835,7 +835,6 @@ impl World {
             return;
         }
         let n = self.ents.len();
-        if std::env::var("DBG_MOD").is_ok() { eprintln!("DBG step_entities modal {:?} frame {}", self.modal, self.frame); }
         for i in (0..n).rev() {
             if self.ents[i].removed {
                 continue;
