@@ -486,10 +486,7 @@ pub fn set_state(w: &mut World, i: usize, id: i32) {
     }
     let mut a = ActAnim::of(id);
     match id {
-        0 => {
-            a.tick = w.rng.rand(255);
-            if std::env::var("DBG95").is_ok() { eprintln!("DBG95 idle f{} idx {} id {} sprite {:?} n {}", w.frame, i, w.ents[i].id, sprite_id(w, i), w.ents.len()); }
-        }
+        0 => a.tick = w.rng.rand(255),
         4..=6 => {
             let s = 50 + w.rng.rand(2);
             w.sfx(s, 64);
@@ -2424,20 +2421,18 @@ fn tick_tracks(w: &mut World) {
     let Some(mode) = w.scene.director.wait.clone() else { return };
     let mut all_idle = true;
     // the actors' tracks tick in the world list's update order (last object first), the camera track first (story
-    // playthrough s103: three NPCs ending their walks in one frame draw their idle ticks newest object first)
+    // playthrough s103: three NPCs ending their walks in one frame draw their idle ticks newest object first).
+    // A group wait (`wait_for_actor`) ticks its members from the director's table (`0x08006CE0`: msg 0x0C to each
+    // member in the world list's order, first object first - dbx_004_6-1 f18,270: the player, then Goten)
     let key = |w: &World, o: Owner| -> i64 {
         match o {
-            Owner::Entity(_) if std::env::var("R95").is_ok() && matches!(&mode, WaitMode::Group(g) if g.contains(&o)) => {
-                let Owner::Entity(id) = o else { unreachable!() };
-                w.find(id).map(|i| i as i64).unwrap_or(-1)
-            }
+            Owner::Entity(id) if matches!(&mode, WaitMode::Group(g) if g.contains(&o)) => w.find(id).map(|i| i as i64).unwrap_or(-1),
             Owner::Entity(id) => -(w.find(id).map(|i| i as i64).unwrap_or(-1)),
             _ => i64::MIN,
         }
     };
     let mut owners: Vec<Owner> = w.scene.tracks.iter().map(|t| t.owner).collect();
     owners.sort_by_key(|&o| key(w, o));
-    if std::env::var("DBG95").is_ok() { eprintln!("DBG95 tick f{} mode {:?} owners {:?} tracks {:?}", w.frame, mode, owners, w.scene.tracks.iter().map(|t| (t.owner, t.queue.len())).collect::<Vec<_>>()); }
     for o in owners {
         let Some(k) = w.scene.tracks.iter().position(|t| t.owner == o) else { continue };
         if !in_mode(&mode, o) {

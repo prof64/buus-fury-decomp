@@ -152,6 +152,8 @@ REGISTRY.update({
                          'vt 0x0804A758 (tick + 1; from tick 8 cel 1 and a 2 px step (table 0x0875021C) through vfunc '
                          '+0x54, a blocked step or tick 24 ends it with vfunc +0x28(0)); finished when the enemy leaves '
                          'that state. VERIFIED real run 14-2 r057_015 f340..'),
+    0x0802F743: dict(name='ParentCountDown', kind='action', status='DISASM',
+                     sem="Enzyme state 0x91 (pushed, before SelfDestruct): the parent object's child count (obj+0x1F4 -> parent +0x204) - 1 when it has a parent; returns 1 (singleton runtime 0x03003114, update 0x0802F724)"),
     0x08018877: dict(name='PushState', kind='transition', params=[(0xC, 'state', 'state')], status='DISASM',
                      sem='push AI state <state> on the enemy AI stack (vfunc +0x6C); returns 0'),
     0x0802D091: dict(name='WalkToPlayer', kind='action', params=[(0xC, 'speed', 'speed256')], status='DISASM',
@@ -448,7 +450,7 @@ def pretty(node, indent=0, out=None):
 
 
 def walk_states(start):
-    """All states reachable from <start> via GotoState / SubState (BFS order)."""
+    """All states reachable from <start> via GotoState / SubState / PushState (BFS order)."""
     seen, order, todo = set(), [], [start]
     while todo:
         s = todo.pop(0)
@@ -464,7 +466,7 @@ def walk_states(start):
                 continue
             vis.add(d)
             fn = u32(d)
-            if fn in (0x0801890B, 0x08019285):
+            if fn in (0x0801890B, 0x08019285, 0x08018877):  # GotoState, SubState, PushState (0x15A: the beam dodge)
                 todo.append(u32(d + 0xC))
                 continue
             stack += [u32(d + o) for o in child_offsets(fn, d)]

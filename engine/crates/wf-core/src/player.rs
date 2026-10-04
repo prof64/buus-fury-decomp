@@ -1201,6 +1201,7 @@ pub fn gain_xp(w: &mut World, i: usize, exp: i64) {
         let ch = pr(w, i).form_ref(w).char_;
         let fu = if pr(w, i).form_ref(w).fusion { w.story.chars.get(ch as usize).map(|c| c.fusion).unwrap_or(0) } else { 0 };
         if fu != 0 {
+            let mut leveled = None;
             for c in [(fu & 15) as usize, ((fu >> 4) & 15) as usize] {
                 let growth = w.data.chars.iter().find(|x| x.index == c as i32).map(|x| x.growth);
                 let xt = Arc::clone(&w.data);
@@ -1213,6 +1214,22 @@ pub fn gain_xp(w: &mut World, i: usize, exp: i64) {
                         level_up(&mut cs.rec, &gr, old, nl, &mut w.rng);
                     }
                     cs.rec.level = nl;
+                    leveled = leveled.or(Some(c as i32));
+                }
+            }
+            // a component levelled: hook #3 runs for it (as the current character), then the fusion re-fuses
+            if let Some(c) = leveled {
+                if w.field.as_ref().is_some_and(|f| f.host) {
+                    w.story.levelup_char = Some(c);
+                    let entity = w.ents[i].id;
+                    w.events.push(crate::world::Event::Field(crate::field::FieldEvent::Run {
+                        run: crate::fieldcontent::Callback::Event("s003".into()),
+                        cause: crate::field::Cause::LevelUp { entity },
+                        slot: pr(w, i).slot,
+                    }));
+                } else {
+                    refuse(w, i);
+                    sfx(w, 36, 64);
                 }
             }
             return;
@@ -1243,6 +1260,35 @@ pub fn gain_xp(w: &mut World, i: usize, exp: i64) {
         } else {
             sfx(w, 36, 64);
         }
+    }
+}
+
+/// a fusion's record from its components' after one of them levelled (`0x08013914`: Fusion `0x0801375E`, then
+/// HP / EP := their maxima)
+fn refuse(w: &mut World, i: usize) {
+    let fu = {
+        let ch = pr(w, i).form_ref(w).char_;
+        w.story.chars.get(ch as usize).map(|c| c.fusion).unwrap_or(0)
+    };
+    let (a, b) = ((fu & 15) as usize, ((fu >> 4) & 15) as usize);
+    let (Some(ra), Some(rb)) = (w.story.chars.get(a).map(|c| c.rec.clone()), w.story.chars.get(b).map(|c| c.rec.clone())) else { return };
+    let old = pr(w, i).rec.clone();
+    let mut r = crate::progression::fuse(&ra, &rb);
+    r.hp = r.max_hp;
+    r.ep = r.max_ep;
+    r.points = old.points;
+    p(w, i).rec = r;
+    refresh(w, i);
+}
+
+/// the level-up hook of a fusion's component ended (`Story::levelup_char`): the fusion is current again, its record
+/// re-fused
+pub fn fusion_levelup_done(w: &mut World) {
+    if w.story.levelup_char.take().is_none() {
+        return;
+    }
+    if let Some(i) = w.player_idx(0) {
+        refuse(w, i);
     }
 }
 

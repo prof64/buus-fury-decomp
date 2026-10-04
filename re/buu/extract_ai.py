@@ -14,7 +14,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from common import *
 from ai_decode import (REGISTRY, UNIT_DESC, N_ENEMIES, STATE_TABLE, ENEMY_TABLE, auto, decode, pretty,
-                       state_root, initial_state, walk_states, convert)
+                       state_root, initial_state, walk_states, convert, is_def)
 
 OUT = Path(__file__).resolve().parents[2] / 'data' / 'buu' / 'enemy_ai.json'
 ENEMIES_JSON = DATA / 'enemies.json'
@@ -131,6 +131,10 @@ def main():
     for t in range(N_ENEMIES):
         s0 = initial_state(t)
         sts = walk_states(s0)
+        # the death node (type +0x14) may be a GotoState (the Enzyme: 0x08710EF4 -> state 0x91): its states too
+        dd = u32(ENEMY_TABLE + 28 * t + 0x14)
+        if is_def(dd) and u32(dd) == 0x0801890B:
+            sts += [s for s in walk_states(u32(dd + 0xC)) if s not in sts]
         for sid in sts:
             if sid not in trees:
                 trees[sid] = decode(state_root(sid))

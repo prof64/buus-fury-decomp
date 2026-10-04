@@ -249,9 +249,14 @@ pub fn compare(w: &World, fr: &Value, es: &[String], map: &mut BTreeMap<usize, E
     }
     // the leader's HP (the row's `hp` = the current character's record HP): the app soak found a 1-HP drift no
     // segment saw (§11). Only while the leader exists and the game shows one (not in scenes / menus).
+    // (a fusion component's level-up hook: the row's record is the component's, `Story::levelup_char`)
     if let (Some(pi), Some(gh)) = (w.player_idx(0), fr.get("hp").and_then(|v| v.as_i64())) {
-        if !fr["p"].is_null() && !wf_core::menu::active(w) && w.pl_ref(pi).rec.hp as i64 != gh {
-            rep.bad(k, "hp", format!("{} vs game {}", w.pl_ref(pi).rec.hp, gh));
+        let hp = match w.story.levelup_char {
+            Some(c) => w.story.chars.get(c as usize).map(|x| x.rec.hp).unwrap_or(0),
+            None => w.pl_ref(pi).rec.hp,
+        };
+        if !fr["p"].is_null() && !wf_core::menu::active(w) && hp as i64 != gh {
+            rep.bad(k, "hp", format!("{} vs game {}", hp, gh));
         }
     }
 }

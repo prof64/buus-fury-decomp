@@ -88,6 +88,19 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
     match n {
         0x00..=0x07 => Err(format!("native 0x{n:02x} is handled by the VM")),
         0x08..=0x0b => done(h.w.story.l[n as usize - 8]),
+        // (a fusion component's level-up hook: the component is the current character - `Story::levelup_char`)
+        0x0c | 0x0d | 0x0e | 0x0f | 0xc3 | 0xc8 if h.w.story.levelup_char.is_some() => {
+            let c = h.w.story.levelup_char.unwrap_or(0) as usize;
+            let r = h.w.story.chars.get(c).map(|x| x.rec.clone()).unwrap_or_default();
+            done(match n {
+                0x0c => r.hp,
+                0x0d => r.max_hp,
+                0x0e => r.ep,
+                0x0f => r.max_ep,
+                0xc3 => r.xp as i32,
+                _ => r.level,
+            })
+        }
         0x0c | 0x0d | 0x0e | 0x0f | 0xc3 | 0xc8 => {
             let i = lead(h.w, n)?;
             let p = h.w.pl_ref(i);
@@ -111,10 +124,13 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
             let (wd, m, v) = area(h);
             done([wd, m, v][(n - 0x12) as usize])
         }
-        0x15 => done(leader_char(h.w)),
+        0x15 => done(h.w.story.levelup_char.unwrap_or_else(|| leader_char(h.w))),
         0x16 | 0x17 => {
             let i = lead(h.w, n)?;
-            let f = h.w.pl_ref(i).form;
+            let f = match h.w.story.levelup_char {
+                Some(c) => h.w.story.chars.get(c as usize).map(|x| x.form).unwrap_or(h.w.pl_ref(i).form),
+                None => h.w.pl_ref(i).form,
+            };
             done(if n == 0x16 { Handle::FormName(f) } else { Handle::FormLabel(f) }.encode())
         }
         0x18 => done(h.s.menu_result),
@@ -558,15 +574,9 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
             unit()
         }
         0x95 => {
+            // set_character keeps the player object in its place of the world list (`0x08010692` changes its sprite
+            // and form in place; e_7_2_1 f1387, dbx_004_6-1 f17398: the game's list order is unchanged)
             switch_character(h.w, arg(a, 0))?;
-            if std::env::var("DBG95").is_ok() { eprintln!("DBG95 f{} c{} leader {:?} n {}", h.w.frame, arg(a,0), leader(h.w), h.w.ents.len()); }
-            // the script's rebuilt player is a new object at the end of the world's list: it updates (and ticks its
-            // script track) before the older ones (s218 -> s501 as Trunks: his walk and Goten's end in one frame,
-            // his idle draw first)
-            if let Some(i) = leader(h.w).filter(|_| std::env::var("R95").is_err()) {
-                let e = h.w.ents.remove(i);
-                h.w.ents.push(e);
-            }
             unit()
         }
         0x96 => done(h.w.story.chars.get(arg(a, 0) as usize).is_some_and(|c| c.flags & 1 != 0) as i32),

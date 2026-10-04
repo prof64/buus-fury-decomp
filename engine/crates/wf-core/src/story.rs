@@ -99,6 +99,12 @@ pub struct Story {
     /// the boot counter (7-3)
     #[serde(default)]
     pub lf_bias: i64,
+    /// a fusion's component that levelled up, while its level-up hook (#3) runs: the game makes it the current
+    /// character (GameData +0) for the hook - its popups, `get_character` / `get_level`, the HUD's record - and
+    /// re-fuses the fusion's record when the hook ends (`player::fusion_levelup_done`; real route 0-15, Gotenks'
+    /// kill levels Trunks: GD+0 5 -> 3 for the hook's 242 frames, then 5 with the re-fused record at full HP)
+    #[serde(default)]
+    pub levelup_char: Option<i32>,
 }
 
 impl Default for Story {
@@ -117,6 +123,7 @@ impl Default for Story {
             quests: vec![Quest::default(); 40],
             play_frames: 0,
             lf_bias: 0,
+            levelup_char: None,
         }
     }
 }

@@ -86,7 +86,8 @@ impl StoryHost {
     /// Import: event `event` stopped inside node `node`'s code: the handler runs with its first `drop` natives
     /// dropped unexecuted (the game ran them before the cut; instant ones are queued so none runs twice), the rest
     /// run as usual (the host blocks on the first that waits)
-    pub fn continue_mid_node(&mut self, w: &mut World, event: u16, node: u16, params: [i32; 4], drop: usize) {
+    /// (`done`: the actions planned before the waiting one - their parameter writes are already in `params`)
+    pub fn continue_mid_node(&mut self, w: &mut World, event: u16, node: u16, params: [i32; 4], drop: usize, done: usize) {
         let mut g = self.rt.globals();
         g.g = w.story.g;
         self.rt.set_globals(g);
@@ -97,9 +98,13 @@ impl StoryHost {
         self.rt.with_thread(|t| {
             t.skip = drop;
             t.queue_instants = true;
+            t.params_done = Some(done);
         });
         let st = self.with_host(w, |rt| rt.run().map_err(|e| e.to_string()));
-        self.rt.with_thread(|t| t.queue_instants = false);
+        self.rt.with_thread(|t| {
+            t.queue_instants = false;
+            t.params_done = None;
+        });
         self.finish(w, st);
     }
     /// `files` = the exported scripts (`wf_script::export::export(rom, &ScriptSet::load_all(rom))`)
@@ -167,6 +172,8 @@ impl StoryHost {
                 Some(Cause::Ai { entity }) => scene::ai_script_done(w, entity),
                 // the load waits for its on-enter script
                 Some(Cause::AreaEnter) => wf_core::field::finish_arrival(w),
+                // a fusion component's level-up hook: the fusion is current again, re-fused
+                Some(Cause::LevelUp { .. }) => wf_core::player::fusion_levelup_done(w),
                 // an on-defeat callback that ran from the death effect and ended without starting an event (13-45's
                 // Samurai once flag 156 is set): nothing held the frame, its update runs (not after the drop script
                 // queued before the callback: that one must not release the hold)

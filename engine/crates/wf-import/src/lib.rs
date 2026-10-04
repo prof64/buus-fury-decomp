@@ -1283,7 +1283,7 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
     let last = idx;
     let from = if wn == 0x3A { queued[..idx.min(queued.len())].iter().rposition(|&n| n == 0x38).unwrap_or(idx) } else { idx };
     let (rng, shakes) = (w.rng.clone(), w.g.shakes.clone());
-    runner.continue_mid_node(&mut w, ev.0, ev.1, ev.2, from);
+    runner.continue_mid_node(&mut w, ev.0, ev.1, ev.2, from, last);
     w.rng = rng;
     // `wait(n)` (0x88): the main loop's mode is the wait object (0x03000F90 -> vt 0x08049978, +4 frames left)
     let mode = ram.r32(0x0300_0F90);
@@ -1321,6 +1321,15 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
         w.g.shakes.push(l);
     }
     w.scene.tracks.retain(|t| !t.queue.is_empty() || t.holding);
+    // `become_map_object` waiting (0x4F, its frame): the RAM already has the map object - the command has started,
+    // its next tick ends it (r062 20-6 +21,000: s476 node 19 exits in the cut's first frame)
+    if wn == 0x4F {
+        for t in w.scene.tracks.iter_mut() {
+            if matches!(t.queue.front(), Some(Cmd::BecomeMapObject { .. })) {
+                t.started = true;
+            }
+        }
+    }
     // each track's running command from its game object (heap objects matched by their target): a walk (vt
     // 0x0804D0A4; a glide 0x0804AE84 the same: +0xC / +0x10 24.8 step, +0x14 / +0x18 target, +0x1C steps left), a jump (vt 0x0804AE5C: +8 x
     // step, +0xC y velocity after the last step, +0x10 / +0x14 24.8 position, +0x18 / +0x1C target, +0x38 air

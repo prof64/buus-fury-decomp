@@ -7236,6 +7236,11 @@
      "    StepAwayFromPlayer(1.0px/f)  @0x86ffcc4",
      "  IfPlayerFarther(r2=56.0px)  @0x8700b54",
      "    GotoState(state 0x8e)  @0x8700a68"
+    ],
+    "0x91": [
+     "Sequence  @0x8700b80",
+     "  ParentCountDown  @0x8757ab0",
+     "  SelfDestruct  @0x86fdde0"
     ]
    },
    "archetype": "latcher (spawned by Blister)",
@@ -10150,6 +10155,13 @@
     }
    ]
   },
+  "0x8018e5f": {
+   "name": "PopState",
+   "kind": "transition",
+   "status": "DISASM",
+   "sem": "pop the enemy AI stack (vfunc +0x70); returns 2 (singleton runtime 0x03002BA4)",
+   "params": []
+  },
   "0x8018f91": {
    "name": "Sequence",
    "kind": "composite",
@@ -10316,6 +10328,13 @@
      "unit": "count"
     }
    ]
+  },
+  "0x8029837": {
+   "name": "BeamDodge",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "Pyramid 14-2 (state 0x15A, pushed by IfInPlayerBeamLine): sidestep out of the player's line - the player faces down/up: left if the player is right of the enemy (obj+0x1A0), else right; faces left/right: up if the player is below (+0x1A4), else down; SetAnim(0x12), controller vt 0x0804A758 (tick + 1; from tick 8 cel 1 and a 2 px step (table 0x0875021C) through vfunc +0x54, a blocked step or tick 24 ends it with vfunc +0x28(0)); finished when the enemy leaves that state. VERIFIED real run 14-2 r057_015 f340..",
+   "params": []
   },
   "0x802995f": {
    "name": "LatchDrain",
@@ -10888,6 +10907,13 @@
    "params": [],
    "timing": "controller 0x03003108: frame 1 spawns the wave (spawn data 0x08757A80); afterwards the controller holds until the wave object is gone AND >= 16 frames elapsed",
    "projectile": "energy_wave"
+  },
+  "0x802f743": {
+   "name": "ParentCountDown",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "Enzyme state 0x91 (pushed, before SelfDestruct): the parent object's child count (obj+0x1F4 -> parent +0x204) - 1 when it has a parent; returns 1 (singleton runtime 0x03003114, update 0x0802F724)",
+   "params": []
   },
   "0x802f919": {
    "name": "HeavyStrike",

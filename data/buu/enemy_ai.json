@@ -534,7 +534,7 @@
   },
   {
    "create_fn": "0x8018f91",
-   "uses": 949,
+   "uses": 956,
    "enemy_types": [
     0,
     1,
@@ -3445,6 +3445,42 @@
    "children": []
   },
   {
+   "create_fn": "0x8029837",
+   "uses": 6,
+   "enemy_types": [
+    22,
+    23,
+    69,
+    103,
+    124,
+    125
+   ],
+   "name": "BeamDodge",
+   "kind": "action",
+   "status": "VERIFIED",
+   "semantics": "Pyramid 14-2 (state 0x15A, pushed by IfInPlayerBeamLine): sidestep out of the player's line - the player faces down/up: left if the player is right of the enemy (obj+0x1A0), else right; faces left/right: up if the player is below (+0x1A4), else down; SetAnim(0x12), controller vt 0x0804A758 (tick + 1; from tick 8 cel 1 and a 2 px step (table 0x0875021C) through vfunc +0x54, a blocked step or tick 24 ends it with vfunc +0x28(0)); finished when the enemy leaves that state. VERIFIED real run 14-2 r057_015 f340..",
+   "params": [],
+   "children": []
+  },
+  {
+   "create_fn": "0x8018e5f",
+   "uses": 6,
+   "enemy_types": [
+    22,
+    23,
+    69,
+    103,
+    124,
+    125
+   ],
+   "name": "PopState",
+   "kind": "transition",
+   "status": "DISASM",
+   "semantics": "pop the enemy AI stack (vfunc +0x70); returns 2 (singleton runtime 0x03002BA4)",
+   "params": [],
+   "children": []
+  },
+  {
    "create_fn": "0x802e09f",
    "uses": 6,
    "enemy_types": [
@@ -3601,6 +3637,23 @@
    "children": []
   },
   {
+   "create_fn": "0x80189e9",
+   "uses": 5,
+   "enemy_types": [
+    9,
+    13,
+    24,
+    65,
+    107
+   ],
+   "name": "SelfDestruct",
+   "kind": "action",
+   "status": "DISASM",
+   "semantics": "death effect (vfunc +0x74 with def+0xC) and removal from the world (0x08011944)",
+   "params": [],
+   "children": []
+  },
+  {
    "create_fn": "0x8039103",
    "uses": 5,
    "enemy_types": [
@@ -3655,22 +3708,6 @@
    "kind": "action",
    "status": "DISASM",
    "semantics": "obj+0x1EC = frame counter; returns 1 (singleton 0x03003000, update 0x0804FFC8)",
-   "params": [],
-   "children": []
-  },
-  {
-   "create_fn": "0x80189e9",
-   "uses": 4,
-   "enemy_types": [
-    9,
-    13,
-    65,
-    107
-   ],
-   "name": "SelfDestruct",
-   "kind": "action",
-   "status": "DISASM",
-   "semantics": "death effect (vfunc +0x74 with def+0xC) and removal from the world (0x08011944)",
    "params": [],
    "children": []
   },
@@ -4840,6 +4877,19 @@
    "children": [
     "0x14"
    ]
+  },
+  {
+   "create_fn": "0x802f743",
+   "uses": 1,
+   "enemy_types": [
+    24
+   ],
+   "name": "ParentCountDown",
+   "kind": "action",
+   "status": "DISASM",
+   "semantics": "Enzyme state 0x91 (pushed, before SelfDestruct): the parent object's child count (obj+0x1F4 -> parent +0x204) - 1 when it has a parent; returns 1 (singleton runtime 0x03003114, update 0x0802F724)",
+   "params": [],
+   "children": []
   },
   {
    "create_fn": "0x8033ee9",
@@ -14358,6 +14408,33 @@
         }
        }
       ]
+     }
+    ]
+   }
+  },
+  "0x91": {
+   "text": [
+    "Sequence  @0x8700b80",
+    "  ParentCountDown  @0x8757ab0",
+    "  SelfDestruct  @0x86fdde0"
+   ],
+   "tree": {
+    "addr": "0x8700b80",
+    "fn": "0x8018f91",
+    "name": "Sequence",
+    "kind": "composite",
+    "children": [
+     {
+      "addr": "0x8757ab0",
+      "fn": "0x802f743",
+      "name": "ParentCountDown",
+      "kind": "action"
+     },
+     {
+      "addr": "0x86fdde0",
+      "fn": "0x80189e9",
+      "name": "SelfDestruct",
+      "kind": "action"
      }
     ]
    }
@@ -29474,6 +29551,33 @@
         "value": 340
        }
       }
+     }
+    ]
+   }
+  },
+  "0x15a": {
+   "text": [
+    "Sequence  @0x8704a04",
+    "  BeamDodge  @0x875023c",
+    "  PopState  @0x86fda30"
+   ],
+   "tree": {
+    "addr": "0x8704a04",
+    "fn": "0x8018f91",
+    "name": "Sequence",
+    "kind": "composite",
+    "children": [
+     {
+      "addr": "0x875023c",
+      "fn": "0x8029837",
+      "name": "BeamDodge",
+      "kind": "action"
+     },
+     {
+      "addr": "0x86fda30",
+      "fn": "0x8018e5f",
+      "name": "PopState",
+      "kind": "transition"
      }
     ]
    }
@@ -72295,7 +72399,8 @@
     "0x157",
     "0x156",
     "0x155",
-    "0x15b"
+    "0x15b",
+    "0x15a"
    ],
    "summary": {
     "aggro_radius_px": [
@@ -72395,7 +72500,8 @@
     "0x157",
     "0x156",
     "0x155",
-    "0x15b"
+    "0x15b",
+    "0x15a"
    ],
    "summary": {
     "aggro_radius_px": [
@@ -72520,7 +72626,8 @@
     "0x8d",
     "0x8e",
     "0x8f",
-    "0x90"
+    "0x90",
+    "0x91"
    ],
    "summary": {
     "aggro_radius_px": [],
@@ -75446,7 +75553,8 @@
     "0x157",
     "0x156",
     "0x155",
-    "0x15b"
+    "0x15b",
+    "0x15a"
    ],
    "summary": {
     "aggro_radius_px": [
@@ -78128,7 +78236,8 @@
     "0x157",
     "0x156",
     "0x155",
-    "0x15b"
+    "0x15b",
+    "0x15a"
    ],
    "summary": {
     "aggro_radius_px": [
@@ -80177,7 +80286,8 @@
     "0x157",
     "0x156",
     "0x155",
-    "0x15b"
+    "0x15b",
+    "0x15a"
    ],
    "summary": {
     "aggro_radius_px": [
@@ -80277,7 +80387,8 @@
     "0x157",
     "0x156",
     "0x155",
-    "0x15b"
+    "0x15b",
+    "0x15a"
    ],
    "summary": {
     "aggro_radius_px": [
@@ -80731,7 +80842,7 @@
   },
   {
    "type": 132,
-   "name": null,
+   "name": "Uub",
    "initial_state": "0x2f9",
    "states": [
     "0x2f9",

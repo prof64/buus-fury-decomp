@@ -292,7 +292,16 @@ pub fn enemy_ai(c: &Ctx, names: &[Value]) -> AiDoc {
     let mut enemy_states = Vec::new();
     for t in 0..N_ENEMY {
         let s0 = initial_state(c, t);
-        let sts = walk_states(c, &reg, s0);
+        let mut sts = walk_states(c, &reg, s0);
+        // the death node (type +0x14) may be a GotoState (the Enzyme: 0x08710EF4 -> state 0x91): its states too
+        let dd = c.u32(ENEMY_TYPES + 28 * t + 0x14);
+        if is_def(c, dd) && c.u32(dd) == GOTO_STATE {
+            for s in walk_states(c, &reg, c.u32(dd + 0xC)) {
+                if !sts.contains(&s) {
+                    sts.push(s);
+                }
+            }
+        }
         for &sid in &sts {
             if !trees.contains_key(&sid) {
                 let tr = decode(c, &reg, state_root(c, sid), 0);

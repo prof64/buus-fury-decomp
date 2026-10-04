@@ -125,6 +125,11 @@ pub struct ThreadState {
     /// the natives the game ran before the cut, none executed twice)
     #[serde(default)]
     pub queue_instants: bool,
+    /// importing a running event mid-node: the parameter writes made while the queue holds at most this many
+    /// actions are dropped - the game ran them before the cut and its parameters (the import's) already hold them
+    /// (r062 20-6 +23,000: s477 node 6 `set_p(0, p(0) + 100); walk_to(45, p(0), p(1))` replayed from the walk)
+    #[serde(default)]
+    pub params_done: Option<usize>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -650,6 +655,9 @@ fn bind_api(e: &mut Engine, ctx: &Rc<RefCell<Ctx>>, lib: &Rc<RefCell<Option<Rc<L
     let c = ctx.clone();
     e.register_fn("set_p", move |i: INT, v: INT| -> R<()> {
         let mut b = c.borrow_mut();
+        if b.t.params_done.is_some_and(|n| b.t.queue.len() <= n) {
+            return Ok(());
+        }
         let (_, p, _) = b.t.cur_unit()?;
         *b.t.params[p].get_mut(i as usize).ok_or("P index")? = v;
         Ok(())

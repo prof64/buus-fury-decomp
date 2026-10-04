@@ -1758,7 +1758,13 @@
    "name": "BeamDodge",
    "kind": "action",
    "status": "VERIFIED",
-   "sem": "Pyramid 14-2 (state 0x15A, pushed by IfInPlayerBeamLine): sidestep out of the player's line (player facing down/up: left if the player's x is greater, else right; left/right: up if the player's y is greater, else down); SetAnim(0x12), controller vt 0x0804A758: tick + 1, from tick 8 cel 1 and a 2 px step (table 0x0875021C, vfunc +0x54), blocked or tick 24 -> vfunc +0x28(0); finished when the enemy leaves that state"
+   "sem": "Pyramid 14-2 (state 0x15A, pushed by IfInPlayerBeamLine): sidestep out of the player's line - the player faces down/up: left if the player is right of the enemy (obj+0x1A0), else right; faces left/right: up if the player is below (+0x1A4), else down; SetAnim(0x12), controller vt 0x0804A758 (tick + 1; from tick 8 cel 1 and a 2 px step (table 0x0875021C) through vfunc +0x54, a blocked step or tick 24 ends it with vfunc +0x28(0)); finished when the enemy leaves that state. VERIFIED real run 14-2 r057_015 f340.."
+  },
+  "0x802f743": {
+   "name": "ParentCountDown",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "Enzyme state 0x91 (pushed, before SelfDestruct): the parent object's child count (obj+0x1F4 -> parent +0x204) - 1 when it has a parent; returns 1 (singleton runtime 0x03003114, update 0x0802F724)"
   }
  },
  "unit_desc": {
