@@ -1605,6 +1605,9 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             en::die(w, i, true);
             true
         }
+        // update 0x0802F724: the latched target (+0x1F4) loses one latch (its +0x204 count - not modelled: the
+        // player's hold ends with LatchDrain's exit), finished at once
+        K::LatchRelease => true,
         K::TriggerSelf => {
             // field (world-map encounters): the defeated handler without loot / removal runs the on-defeat script
             if w.field.is_some() {

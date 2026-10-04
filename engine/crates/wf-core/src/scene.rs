@@ -2428,8 +2428,8 @@ fn tick_tracks(w: &mut World) {
     let key = |w: &World, o: Owner| -> i64 {
         match o {
             Owner::Entity(_) if std::env::var("R95").is_ok() && matches!(&mode, WaitMode::Group(g) if g.contains(&o)) => {
-                let WaitMode::Group(g) = &mode else { unreachable!() };
-                i64::MIN + 1 + g.iter().position(|x| *x == o).unwrap_or(0) as i64
+                let Owner::Entity(id) = o else { unreachable!() };
+                w.find(id).map(|i| i as i64).unwrap_or(-1)
             }
             Owner::Entity(id) => -(w.find(id).map(|i| i as i64).unwrap_or(-1)),
             _ => i64::MIN,

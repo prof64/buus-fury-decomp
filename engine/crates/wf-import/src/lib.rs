@@ -1122,6 +1122,7 @@ fn build_mid_event(_data: &Arc<GameData>, ram: &GbaRam, runner: &mut StoryHost, 
             f.held_event = true;
         }
     }
+    import_talk_pass(ram, runner, &mut w, notes);
     // stopped inside the node's code: the natives its interpreter has run (the PC after the one that blocks)
     if let Some(ran) = natives_run(ram, runner, ev) {
         return build_mid_code(ram, runner, ev, w, calls0, &ran, notes);
@@ -1160,6 +1161,32 @@ fn build_mid_event(_data: &Arc<GameData>, ram: &GbaRam, runner: &mut StoryHost, 
     notes.push(format!("event s{:03} at node {}: mid-node over a standing field (mid-area)", ev.0, ev.1));
     let draws = w.rng.calls.wrapping_sub(calls0);
     Built { world: w, draws, held: 0, finished: true }
+}
+
+/// an event a talk started inside the player's update (the world list's update call returns to 0x08011A87, its
+/// saved loop index - r4 - in the word before; the update it interrupted is the player's, 0x08010BF1) whose area has
+/// been left since: its exit resumes that object pass on the new list (`field::resume_pass_after_load`; the real
+/// run's 7-6, cut e73c_46000: s304's exit at f425 gives every object a second update). The game's index becomes ours
+/// as the actors (and the props object) below it; an index past the list's end is the whole list.
+fn import_talk_pass(ram: &GbaRam, runner: &mut StoryHost, w: &mut World, notes: &mut Vec<String>) {
+    let Some(a) = (0x0300_7008u32..0x0300_8000).step_by(4).find(|&a| ram.r32(a) == 0x0801_1A87 && ram.r32(a - 8) == 0x0801_0BF1) else { return };
+    let (k, obj) = (ram.r32(a - 4) as usize, ram.r32(a - 12));
+    let list = ram.objects();
+    // still in the list it talked in: no load since, nothing resumes
+    if k > 255 || list.contains(&obj) {
+        return;
+    }
+    let leader = ram.r32(0x0300_1C34);
+    let ours = if k >= list.len() {
+        usize::MAX / 2
+    } else {
+        field::props_object(w) as usize + list[..k].iter().filter(|&&o| o == leader || matches!(ram.r32(o), VT_PLAYER | VT_ENEMY | VT_NPC | VT_NPC_TALK)).count()
+    };
+    if let Some(f) = w.field.as_mut() {
+        f.talk_pass = Some((ours, f.loads.wrapping_sub(1)));
+    }
+    runner.hs.talk_event = true;
+    notes.push(format!("mid-area: the event's talk interrupted the object pass at index {k} of an earlier area's list (resumed at its exit)"));
 }
 
 /// the natives (in order) event `ev`'s node has run, from its interpreter's PC: the interpreters on the context

@@ -54,7 +54,7 @@ kinds!(
     // teleports
     NinjaTeleport, TeleportNearPlayer, TeleportChain4, NinjaDisguise, NinjaReveal,
     // grabs
-    VampireGrab, LatchDrain, GrabWindup, BearHug, EnergyDrain, FreezePlayer, EatCandy,
+    VampireGrab, LatchDrain, LatchRelease, GrabWindup, BearHug, EnergyDrain, FreezePlayer, EatCandy,
     // Buu
     BuuStretchPunch, CandyBeam, AbsorbStance, AbsorbPose, AbsorbPose2, SuperBuuPowerUp, ThrowBigBall, GlideToWaypoint,
     SummonMinion, KidBuuSplitAnim, KidBuuSplit, KidBuuMerge, BabidiHover, BabidiGesture,
@@ -81,6 +81,8 @@ fn rename(s: &str) -> &str {
     match s {
         "StepTowardPlayer" => "BackOffFacingPlayer",
         "StepTowardPlayerThroughRocks" => "BackOffFacingPlayerThroughRocks",
+        // the Enzyme's death state 0x91 (IWRAM singleton 0x03003114, update 0x0802F724)
+        "node_0802f743" => "LatchRelease",
         x => x,
     }
 }
