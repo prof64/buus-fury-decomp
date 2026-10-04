@@ -3626,3 +3626,25 @@ cut `rE2__065_3-15` f766 / 778 / 794 (+ the press's at 783) and each holds 4 vid
 `work/db57/scratch/stredraw.py CUT A B` lists the game's Status redraws with cycles), -4 at 133,818 (2-11 Status).
 Now that the minigame reads `Globals::clock`, (2) matters only if `fc0` takes the menus' logic frames the same way
 (`menu::step` adds the menu's play-time frames to `fc0`): the Status redraw phase is then the next thing to check.
+
+**Claim (dungeon agent B, 2026-10-04, by the coordinator): the whole run's fat-arc stops 608,823 (rng) and 621,338 /
+621,395 (pos, facing)** - stretch 002 (West City / Bandana hunt). Dungeon agent A: these are mine unless you mark
+one. Super Buu agent: nothing in stretches 002 .. 072 beyond these three rows. Then: the 3 report-only gates beyond
+the listed 18 (named here when found).
+*20-6 engine items (A, done; in 394d9b1 / this tree):*
+* **SuperBuuAnim0C** (node runtime vtable 0x0804A100, enter 0x0804E5B8): SetAnim(0x0C) under the one-shot controller
+  0x03001B30, done when its animation ends - the power-up's node without its flag (Rust `K::SuperBuuAnim0C`, TS
+  mirror). +8,000 771 -> 920.
+* **The "camera limit" at +3,000 / +18,000 was not a camera rule:** the game ran s474 there (Vegeta's line; the
+  camera follows Super Buu). Super Buu's state 0x29E hit handler is Sequence [GlideToWaypoint's on-hit, GotoState
+  0x29F]; GlideToWaypoint's on-hit (0x0803C08D) accepts a hit only while the leader's current animation is its set's
+  entry 0x13 - raw 20, the **Instant Transmission run** - not a plain punch (`Player::swinging`, Rust + TS). Then:
+  the charging ball belongs to the throw's controller (0x0804D6CC) and goes when another animation state replaces it
+  (a hurt, a script's pose), not with the AI's state change (`shots::drop_charging_ball`, field; battles keep the
+  node-exit rule); and an AI RunScript hands its event the enemy's +0x214 word as p(0) (Super Buu's waypoint index:
+  s474 / s475 / s476 pick their y by it; `Enemy::p214`, set by the glide, imported). +3,000 58 -> 715, +18,000
+  156 -> **exact**.
+* **The coin's age:** MEASURED (f21,213 .. f21,814) the coin's age counts its creation frame's update and it goes
+  when the age reaches 601, not 600 (`fieldobj` pickup update). +21,000 813 -> **exact**.
+Checks: tiles ffdda8f -> HEAD: 3 better, 0 worse; segment gates green (HEAD's data/segments); TS dumps regenerated
+(tools/battle/buu_core_dump.test.ts) and cross_ts 46,800 frames, 0 failures.
