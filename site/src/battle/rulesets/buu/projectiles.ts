@@ -170,6 +170,8 @@ export class StraightShot extends Shot {
     this.y = y
     this.o.delay = 0
   }
+  /** its hit message was taken by a beam's head (+0x54) */
+  beamHit = false
   rect(): Rect {
     const [ox, oy, w, h] = this.o.recBox ? kiBlastBox(this.dir, this.t) : this.o.box
     return { x0: this.px - ox, y0: this.py - oy, x1: this.px - ox + w, y1: this.py - oy + h }
@@ -182,6 +184,8 @@ export class StraightShot extends Shot {
       return
     }
     if (this.o.delay && this.t <= this.o.delay) return
+    // its hit was taken by a beam's head last frame and no beam burst it: it ends now (+0x54)
+    if (this.beamHit) return this.end(w, true)
     this.x += this.o.vx
     this.y += this.o.vy
     const tr = this.o.trail
@@ -199,6 +203,8 @@ export class StraightShot extends Shot {
     if (this.hit(w, this.rect(), this.o.atk, this.o.mult, !this.o.hitAll)) {
       const r = (this.o.rngHit ?? []).map((n) => w.rng.rand(n, `${this.o.name} hit sfx`))
       if (this.o.sfxHit != null) audioEvent('sfx', { id: this.o.sfxHit + (r[0] ?? 0), vol: 64 })
+      // taken by a beam's head: the blast flies on until the beam's message bursts it (0x080199E0: +0x54 only)
+      if (this.beamHit) return
       if (hitP && this.o.onHitPlayer) this.o.onHitPlayer(w)
       this.end(w, true)
     }
@@ -224,6 +230,14 @@ export class StraightShot extends Shot {
         return true
       }
       return false
+    }
+    // the ki blast class's handler 0x080199F6: an energy-type hit message (kind 1, sub != 0xD) of another object
+    // overlapping its box bursts it (its spark) and is taken (segment sb 6-6 f18799: a blast meets a beam head)
+    if (this.o.name === 'kiblast' && this.o.fxEnd?.ticks === 16 && !this.o.fragile) {
+      if (this.dead >= 0 || msg.foot || msg.source === this || this.removed || msg.atk.kind !== 1 || msg.atk.sub === 0xd) return false
+      if (!overlaps(msg.rect, this.rect())) return false
+      this.end(_w, true)
+      return true
     }
     // the bullets' handlers 0x0802764E (gun) / 0x080278E2 (rifle) / 0x0802C8AE (shuriken): the same - any message of
     // kind 0 but its own (msg+0x30) overlapping its box ends it (gun 0x08027516 / rifle 0x0802770C: the wall end's
@@ -653,7 +667,9 @@ export class KameBeam extends Shot {
   onMessage(_w: World, msg: HitMsg): boolean {
     if (msg.foot || msg.source === this || msg.team !== (this.team ^ 1)) return false
     const [hx, hy] = this.head()
-    return overlaps(msg.rect, { x0: hx - 12, y0: hy - 12, x1: hx + 12, y1: hy + 12 })
+    if (!overlaps(msg.rect, { x0: hx - 12, y0: hy - 12, x1: hx + 12, y1: hy + 12 })) return false
+    if (msg.source instanceof StraightShot) msg.source.beamHit = true
+    return true
   }
   update(w: World) {
     this.t++

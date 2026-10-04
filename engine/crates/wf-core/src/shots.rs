@@ -143,6 +143,10 @@ pub struct StraightOpts {
     // state
     pub dead: i32,
     pub spawned: bool,
+    /// its hit message was taken by a beam's head (`+0x54`: the blast flies on; the beam's message bursts it, else
+    /// its next update ends it)
+    #[serde(default)]
+    pub beam_hit: bool,
     pub x0: i32,
     pub y0: i32,
     /// the box is the current record's (the player's blast 0x0804B454: obj+0x18 advances with its frame, the hit
@@ -174,6 +178,7 @@ impl Default for StraightOpts {
             sector: 0,
             dead: -1,
             spawned: false,
+            beam_hit: false,
             x0: 0,
             y0: 0,
             rec_box: false,
@@ -1124,6 +1129,9 @@ fn straight_update(w: &mut World, i: usize) {
     if o.delay != 0 && t <= o.delay {
         return;
     }
+    if o.beam_hit {
+        return straight_end(w, i, true);
+    }
     {
         let s = w.shot(i);
         s.x += o.vx;
@@ -1158,6 +1166,10 @@ fn straight_update(w: &mut World, i: usize) {
         let rr = if o.rng_hit > 0 { w.rng.rand(o.rng_hit) } else { 0 };
         if o.sfx_hit >= 0 {
             w.sfx(o.sfx_hit + rr, 64);
+        }
+        // taken by a beam's head: the blast flies on until the beam's message bursts it (0x080199E0: +0x54 only)
+        if matches!(&w.shot_ref(i).kind, ShotKind::Straight(x) if x.beam_hit) {
+            return;
         }
         if hit_p {
             match o.on_hit {
@@ -2335,7 +2347,17 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
                 return false;
             }
             let (hx, hy) = kame_head(w.shot_ref(i), b.len);
-            overlaps(&msg.rect, &Rect::new(hx - 12, hy - 12, hx + 12, hy + 12))
+            if !overlaps(&msg.rect, &Rect::new(hx - 12, hy - 12, hx + 12, hy + 12)) {
+                return false;
+            }
+            if let Some(k) = w.find(msg.source) {
+                if let Body::Shot(s) = &mut w.ents[k].body {
+                    if let ShotKind::Straight(o) = &mut s.kind {
+                        o.beam_hit = true;
+                    }
+                }
+            }
+            true
         }
         // an Energy Blast message (attack sub 4, another object) overlapping the ball's box and its centre +- size*3/4
         ShotKind::BigBang(b) => {
@@ -2360,6 +2382,19 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
                 return true;
             }
             false
+        }
+        // the ki blast class's handler 0x080199F6: an energy-type hit message (attack kind 1, sub != 0xD) of another
+        // object overlapping its box bursts it (its spark, +0x4C = 16) and is taken (segment sb 6-6 f18799: Super
+        // Buu's blast flies into Gotenks' beam head - both stop)
+        ShotKind::Straight(o) if o.name == SName::KiBlast && o.fx_end == 16 && !o.fragile => {
+            if o.dead >= 0 || msg.foot || msg.source == me || w.ents[i].removed || msg.atk.kind != 1 || msg.atk.sub == 0xd {
+                return false;
+            }
+            if !overlaps(&msg.rect, &rect(w, i)) {
+                return false;
+            }
+            straight_end(w, i, true);
+            true
         }
         // the bullets' handlers 0x0802764E (gun) / 0x080278E2 (rifle) / 0x0802C8AE (shuriken): the same - any message
         // of kind 0 but its own (msg+0x30) overlapping its box ends it (gun 0x08027516 / rifle 0x0802770C: the wall

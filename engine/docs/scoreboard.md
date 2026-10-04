@@ -1,6 +1,6 @@
 # Parity scoreboard: the real playthrough on wf-core
 
-Tree: `e53f369` + uncommitted engine changes. Regenerate: `.venv/bin/python tools/segments/scoreboard.py`
+Tree: `f11daf9` + uncommitted engine changes. Regenerate: `.venv/bin/python tools/segments/scoreboard.py`
 (the cuts: `scoreboard.py cut`, local under `work/real/`; the run itself: `tools/segments/realrun.py`, §"How to replay
 the real run" in `engine/docs/segments.md`). A segment = the real game from one importable area entry (an exit
 arrival with nothing running) to the next; an entry by a script warp / in a cutscene is not a cut - its frames
@@ -11,12 +11,12 @@ frames are counted where its segments start.
 | chapter | owner | run frames | not cut | segments | exact | frames | matched | % |
 |---|---|---|---|---|---|---|---|---|
 | opening | Earth agent (title, New Game, Other World) | 42,275 | 7,898 | 17 | 17 | 34,377 | 34,377 | 100.0 |
-| earth | Earth agent | 160,503 | 2,938 | 90 | 88 | 157,565 | 150,738 | 95.7 |
+| earth | Earth agent | 160,503 | 2,938 | 90 | 88 | 157,565 | 150,907 | 95.8 |
 | ship | ship agent | 398,194 | 2,578 | 338 | 338 | 395,616 | 395,616 | 100.0 |
 | fat | dungeon agents A / B (+ ship agent: Thieves Den, Pilaf) | 388,646 | 8,440 | 371 | 364 | 380,206 | 345,353 | 90.8 |
-| janemba | side-content agent | 199,703 | 12,412 | 255 | 243 | 187,291 | 174,290 | 93.1 |
-| superbuu | Super Buu agent | 478,729 | 11,028 | 448 | 414 | 467,701 | 337,135 | 72.1 |
-| **all** |  | 1,668,050 | 45,294 | 1519 | 1464 | 1,622,756 | 1,437,509 | 88.6 |
+| janemba | side-content agent | 199,703 | 12,412 | 255 | 251 | 187,291 | 184,661 | 98.6 |
+| superbuu | Super Buu agent | 478,729 | 11,028 | 448 | 436 | 467,701 | 351,864 | 75.2 |
+| **all** |  | 1,668,050 | 45,294 | 1519 | 1494 | 1,622,756 | 1,462,778 | 90.1 |
 
 ## Non-exact segments by category
 
@@ -24,18 +24,17 @@ frames are counted where its segments start.
 |---|---|---|---|---|---|---|---|---|
 | sound | Earth agent (sound timing) / audio | 0 | 0 | 0 | 0 | 1 | 1 | 2 |
 | menu timing | Earth agent (redraw / mixer timing) | 0 | 0 | 0 | 0 | 1 | 0 | 1 |
-| RNG | chapter agent (who draws first: enemy AI / hits) | 0 | 1 | 0 | 2 | 6 | 17 | 26 |
+| RNG | chapter agent (who draws first: enemy AI / hits) | 0 | 1 | 0 | 2 | 0 | 2 | 5 |
 | screen fade | cutscene / script-host agent | 0 | 0 | 0 | 1 | 0 | 0 | 1 |
 | camera | chapter agent (camera scroll) | 0 | 0 | 0 | 3 | 1 | 3 | 7 |
 | animation | chapter agent | 0 | 1 | 0 | 1 | 0 | 0 | 2 |
-| position / facing | chapter agent (enemy AI / knockback) | 0 | 0 | 0 | 0 | 2 | 13 | 15 |
-| object set | chapter agent (spawns / removal) | 0 | 0 | 0 | 0 | 1 | 0 | 1 |
+| position / facing | chapter agent (enemy AI / knockback) | 0 | 0 | 0 | 0 | 1 | 6 | 7 |
 
 ## Top items per owner
 
 The five biggest losses each owner can take (unmatched frames; the full list below).
 
-**Super Buu agent** - 33 segments, 119,375 frames lost
+**Super Buu agent** - 11 segments, 104,646 frames lost
 
 * `r069_168_14-1` (069_k05_vegeta150, position / facing): 35,663 lost - Some((20168, "pos: #271 sprite 47: (268.046875, 210.015625) vs game (268.046875, 210.1484375)")) **Known:** Switch Character closed at the 14-1 save point (Vegeta -> Goku): the world restore's black lasts 26 frames, sndsim::reload_frames_with predicts 25 (end 6,961,842 cycles, 60,558 short of the 26th frame)
 * `r062_001_20-6` (062_m_inside_buu, position / facing): 24,001 lost - Some((2176, "pos: #26 sprite 280: (214.58984375, 289.30078125) vs game (214.484375, 289.30078125)"))
@@ -56,18 +55,10 @@ The five biggest losses each owner can take (unmatched frames; the full list bel
 * `r061_004_20-5` (061_g05_goku141, sound): 11,191 lost - Some((5251, "snd: [] vs game [\"play 41 32\"]"))
 * `r049_001_18-14` (049_j_sj2, sound): 1,495 lost - Some((7628, "snd: [] vs game [\"play 41 32\"]"))
 
-**side-content agent** - 10 segments, 10,825 frames lost
-
-* `r040_021_18-10` (040_h_maze, position / facing): 7,058 lost - Some((487, "pos: #97 sprite 229: (386.5, 429) vs game (387, 429.5)"))
-* `r046_045_18-2` (046_h_veg1, RNG): 945 lost - Some((737, "rng: [9acdb4c3, d2a59d42] vs game [cfbf627c, 4846aa2e]"))
-* `r038_045_18-1` (038_j03_goku120, object set): 567 lost - Some((251, "missing: obj #1 sprite 151 has no entity"))
-* `r038_015_18-1` (038_j03_goku120, RNG): 534 lost - Some((417, "rng: [f1a8234d, fbb7c02e] vs game [6f09c5b6, 807da16a]"))
-* `r046_042_18-1` (046_h_veg1, RNG): 528 lost - Some((480, "rng: [0ef0e700, 5b3dbba9] vs game [4437fb22, 49f35093]"))
-
-**Earth agent** - 2 segments, 6,827 frames lost
+**Earth agent** - 2 segments, 6,658 frames lost
 
 * `rE2__090_7-3` (E2_earth, RNG): 5,989 lost - Some((46426, "rng: [528efd5c, 5e494666] vs game [0b13ffab, f36ef4ea]")) **Known:** not the Earth agent's e_7_3_1: the real run's Earth chapter cut at its last importable entry, Papaya Island 7-3 (file work/real/segs/E2_earth/rE2__090_7-3.json, state states/rE2__090_7-3.ss, key frame 108,563 of the Earth keys): 52,416 frames, the Earth keys' last 51,940 (no importable entry after it) and ~480 of the ship route's up to its first entry; first divergence at its frame 6,658: actor #42 (sprite 222) raw 1 cel 0 vs the game's cel 1, tick 1776 vs 1777 - an NPC idle animation one tick behind after ~1,800 frames
-* `rE2__089_7-2` (E2_earth, animation): 838 lost - Some((1432, "anim: #17 sprite 233: raw 1 cel 3 tick 29 vs game raw 1 cel 0 tick 41"))
+* `rE2__089_7-2` (E2_earth, animation): 669 lost - Some((1601, "anim: #39 sprite 112: raw 1 cel 1 vs game raw 1 cel 0 tick 75"))
 
 **Earth agent (redraw / mixer timing)** - 1 segments, 681 frames lost
 
@@ -77,10 +68,15 @@ The five biggest losses each owner can take (unmatched frames; the full list bel
 
 * `r012_014_12-19` (012_db5_a01, screen fade): 555 lost - Some((2567, "fade: black true vs game false"))
 
+**side-content agent** - 2 segments, 454 frames lost
+
+* `r042_001_18-11` (042_h_statues, position / facing): 256 lost - Some((9672, "pos: #5 sprite 151: (144, 208) vs game (177, 132)"))
+* `r038_001_18-1` (038_j03_goku120, camera): 198 lost - Some((589, "cam: (53.080078125, 77.986328125) vs game (53.076171875, 77.986328125)"))
+
 
 ## Where long segments really diverge (every-N board)
 
-From `engine/docs/scoreboard-mid.md` (tree `dd201a8`, tiles of 1,000 frames; the whole run 89.6% verified exact). Each
+From `engine/docs/scoreboard-mid.md` (tree `f11daf9`, tiles of 1,000 frames; the whole run 89.6% verified exact). Each
 divergence below is where a tile (a cut inside a long segment) first differs; "lost" = its frames up to the next
 cut. A divergence at a tile's frame 0 is usually the any-frame import, not the game rule - say so to the importer
 agent.
@@ -152,18 +148,18 @@ agent.
 | `r009_006_4-1` | 009_d16_desert | camera | 9,089 | Some((458, "cam: (36.2890625, 509.953125) vs game (36.3359375, 509.943359375)")) |
 | `r052_004_1-5` | 052_m_gotenks | camera | 8,527 | Some((11575, "cam: (0, 44) vs game (0.375, 43.71875)")) |
 | `r064_029_21-26` | 064_m_kid_buu_saga | camera | 7,777 | Some((12784, "cam: (37.1884765625, 502.986328125) vs game (37.208984375, 502.9853515625)")) |
-| `r040_021_18-10` | 040_h_maze | position / facing | 7,058 | Some((487, "pos: #97 sprite 229: (386.5, 429) vs game (387, 429.5)")) |
 | `rE2__090_7-3` | E2_earth | RNG | 5,989 | Some((46426, "rng: [528efd5c, 5e494666] vs game [0b13ffab, f36ef4ea]")) |
 | `r057_066_14-1` | 057_g03_gohan141 | position / facing | 3,800 | Some((3527, "pos: #243 sprite 49: (270.41015625, 164.78125) vs game (271.91015625, 164.86328125)")) |
-| `r069_125_14-2` | 069_k05_vegeta150 | RNG | 1,922 | Some((90, "rng: [813fb164, 7f5de32b] vs game [f3ec06ce, 8965343e]")) |
 | `r067_071_14-2` | 067_k03_goku158 | camera | 1,722 | Some((693, "cam: (36.1904296875, 126.6875) vs game (36.4619140625, 126.919921875)")) |
 | `r012_020_12-27` | 012_db5_a01 | RNG | 1,555 | Some((1856, "rng: [942926ee, 25aeea64] vs game [de77fbf0, 756a9e8f]")) |
+| `r049_001_18-14` | 049_j_sj2 | sound | 1,495 | Some((7628, "snd: [] vs game [\"play 41 32\"]")) |
+| `r069_077_14-2` | 069_k05_vegeta150 | RNG | 1,402 | Some((264, "rng: [79a2b111, e7df17bd] vs game [9bb17a3f, de9aefc1]")) |
 
 ## Recurring first divergences (3+ segments)
 
-* 26 x `rng`: `r012_020_12-27`, `r017_009_13-45`, `r038_015_18-1`, `r038_054_18-2`, `r038_057_18-1`, `r040_004_18-4`, `r046_042_18-1`, `r046_045_18-2` ...
-* 9 x `pos sprite 256`: `r057_013_14-2`, `r057_059_14-2`, `r069_003_14-2`, `r069_013_14-2`, `r069_117_14-2`, `r069_139_14-2`, `r069_143_14-2`, `r069_151_14-2` ...
 * 7 x `cam`: `r002_004_4-1`, `r002_006_4-1`, `r009_006_4-1`, `r038_001_18-1`, `r052_004_1-5`, `r064_029_21-26`, `r067_071_14-2`
+* 5 x `rng`: `r012_020_12-27`, `r017_009_13-45`, `r052_006_6-9`, `r069_077_14-2`, `rE2__090_7-3`
+* 3 x `pos sprite 280`: `r062_001_20-6`, `r069_101_14-2`, `r069_139_14-2`
 
 ## Every non-exact segment
 
@@ -174,7 +170,7 @@ segment (stretch): matched / frames, category - first divergence
 
 ### earth
 
-* `rE2__089_7-2` (E2_earth): 1,432 / 2,270, **animation** - Some((1432, "anim: #17 sprite 233: raw 1 cel 3 tick 29 vs game raw 1 cel 0 tick 41"))
+* `rE2__089_7-2` (E2_earth): 1,601 / 2,270, **animation** - Some((1601, "anim: #39 sprite 112: raw 1 cel 1 vs game raw 1 cel 0 tick 75"))
 * `rE2__090_7-3` (E2_earth): 46,426 / 52,415, **RNG** - Some((46426, "rng: [528efd5c, 5e494666] vs game [0b13ffab, f36ef4ea]")) **Known:** not the Earth agent's e_7_3_1: the real run's Earth chapter cut at its last importable entry, Papaya Island 7-3 (file work/real/segs/E2_earth/rE2__090_7-3.json, state states/rE2__090_7-3.ss, key frame 108,563 of the Earth keys): 52,416 frames, the Earth keys' last 51,940 (no importable entry after it) and ~480 of the ship route's up to its first entry; first divergence at its frame 6,658: actor #42 (sprite 222) raw 1 cel 0 vs the game's cel 1, tick 1776 vs 1777 - an NPC idle animation one tick behind after ~1,800 frames
 
 ### ship
@@ -193,51 +189,21 @@ segment (stretch): matched / frames, category - first divergence
 ### janemba
 
 * `r038_001_18-1` (038_j03_goku120): 589 / 787, **camera** - Some((589, "cam: (53.080078125, 77.986328125) vs game (53.076171875, 77.986328125)"))
-* `r038_015_18-1` (038_j03_goku120): 417 / 951, **RNG** - Some((417, "rng: [f1a8234d, fbb7c02e] vs game [6f09c5b6, 807da16a]"))
-* `r038_045_18-1` (038_j03_goku120): 251 / 818, **object set** - Some((251, "missing: obj #1 sprite 151 has no entity"))
-* `r038_054_18-2` (038_j03_goku120): 641 / 937, **RNG** - Some((641, "rng: [f49912f0, 3c91521a] vs game [89d8037a, 783aad1b]"))
-* `r038_057_18-1` (038_j03_goku120): 499 / 851, **RNG** - Some((499, "rng: [d26f286a, 7808bf40] vs game [a41e0318, 748697e3]"))
-* `r040_004_18-4` (040_h_maze): 622 / 713, **RNG** - Some((622, "rng: [a6b3c9dc, ec60e896] vs game [cb5c048a, 68940927]"))
-* `r040_021_18-10` (040_h_maze): 487 / 7,545, **position / facing** - Some((487, "pos: #97 sprite 229: (386.5, 429) vs game (387, 429.5)"))
 * `r042_001_18-11` (042_h_statues): 9,672 / 9,928, **position / facing** - Some((9672, "pos: #5 sprite 151: (144, 208) vs game (177, 132)"))
 * `r044_015_18-1` (044_h_back1): 577 / 1,258, **menu timing** - Some((577, "fade: black true vs game false")) **Known:** Switch Character at 18-1 (Goku -> Vegeta): predicted 23 black frames, the game 22 (over by >= 21,578 cycles)
-* `r046_042_18-1` (046_h_veg1): 480 / 1,008, **RNG** - Some((480, "rng: [0ef0e700, 5b3dbba9] vs game [4437fb22, 49f35093]"))
-* `r046_045_18-2` (046_h_veg1): 737 / 1,682, **RNG** - Some((737, "rng: [9acdb4c3, d2a59d42] vs game [cfbf627c, 4846aa2e]"))
 * `r049_001_18-14` (049_j_sj2): 7,628 / 9,123, **sound** - Some((7628, "snd: [] vs game [\"play 41 32\"]"))
 
 ### superbuu
 
 * `r052_004_1-5` (052_m_gotenks): 11,557 / 20,084, **camera** - Some((11575, "cam: (0, 44) vs game (0.375, 43.71875)"))
 * `r052_006_6-9` (052_m_gotenks): 4,688 / 24,489, **RNG** - Some((4688, "rng: [ee2b9523, 199f850f] vs game [e968d49b, 3a47d41c]"))
-* `r057_011_14-2` (057_g03_gohan141): 307 / 678, **RNG** - Some((307, "rng: [d076f832, 03173d0a] vs game [4606e474, 7f5afd2e]"))
-* `r057_013_14-2` (057_g03_gohan141): 677 / 1,575, **position / facing** - Some((677, "pos: #4 sprite 256: (203.1875, 201.15234375) vs game (203.984375, 201.38671875)"))
-* `r057_031_14-2` (057_g03_gohan141): 567 / 864, **RNG** - Some((567, "rng: [0b7b8092, a01ff008] vs game [5333921e, 689c1b81]"))
-* `r057_035_14-2` (057_g03_gohan141): 629 / 914, **RNG** - Some((629, "rng: [eb3ef723, 3dfb1777] vs game [3350d5e7, 0301c52a]"))
-* `r057_059_14-2` (057_g03_gohan141): 650 / 1,800, **position / facing** - Some((650, "pos: #4 sprite 256: (180.078125, 200.984375) vs game (179.28125, 200.984375)"))
 * `r057_066_14-1` (057_g03_gohan141): 3,527 / 7,327, **position / facing** - Some((3527, "pos: #243 sprite 49: (270.41015625, 164.78125) vs game (271.91015625, 164.86328125)"))
 * `r061_004_20-5` (061_g05_goku141): 5,251 / 16,442, **sound** - Some((5251, "snd: [] vs game [\"play 41 32\"]"))
 * `r062_001_20-6` (062_m_inside_buu): 2,176 / 26,177, **position / facing** - Some((2176, "pos: #26 sprite 280: (214.58984375, 289.30078125) vs game (214.484375, 289.30078125)"))
 * `r064_004_21-6` (064_m_kid_buu_saga): 254 / 1,041, **position / facing** - Some((254, "pos: #6 sprite 87: (112.26953125, 36.49609375) vs game (112.26953125, 35.99609375)"))
 * `r064_029_21-26` (064_m_kid_buu_saga): 12,723 / 20,500, **camera** - Some((12784, "cam: (37.1884765625, 502.986328125) vs game (37.208984375, 502.9853515625)"))
 * `r067_071_14-2` (067_k03_goku158): 693 / 2,415, **camera** - Some((693, "cam: (36.1904296875, 126.6875) vs game (36.4619140625, 126.919921875)"))
-* `r069_003_14-2` (069_k05_vegeta150): 1,037 / 1,554, **position / facing** - Some((1037, "pos: #4 sprite 256: (338.703125, 205.96484375) vs game (339.5, 206.046875)"))
-* `r069_011_14-2` (069_k05_vegeta150): 478 / 1,322, **RNG** - Some((478, "rng: [ee21c7f6, 576f1279] vs game [e6299db1, 745a714c]"))
-* `r069_013_14-2` (069_k05_vegeta150): 772 / 1,044, **position / facing** - Some((772, "pos: #3 sprite 256: (66.9375, 202.13671875) vs game (66.140625, 202.13671875)"))
-* `r069_027_14-2` (069_k05_vegeta150): 942 / 1,489, **RNG** - Some((942, "rng: [d9abb81f, 87e10e5f] vs game [e39121fd, 25c7f062]"))
-* `r069_047_14-2` (069_k05_vegeta150): 577 / 1,070, **RNG** - Some((577, "rng: [ea68c802, 80f45380] vs game [baa70008, 4a2d56fc]"))
-* `r069_053_14-2` (069_k05_vegeta150): 1,091 / 1,453, **RNG** - Some((1091, "rng: [6803e85c, 96742087] vs game [36205588, 552688a3]"))
-* `r069_059_14-2` (069_k05_vegeta150): 334 / 1,154, **RNG** - Some((334, "rng: [b9733567, adc950d1] vs game [2939462a, 8bceb245]"))
-* `r069_073_14-2` (069_k05_vegeta150): 713 / 993, **RNG** - Some((713, "rng: [767d7d28, 2df1b4f7] vs game [013d764d, 0a516e15]"))
-* `r069_077_14-2` (069_k05_vegeta150): 249 / 1,666, **RNG** - Some((249, "rng: [c6a9c179, b03716c7] vs game [82a7c2ff, 7925c1e1]"))
-* `r069_085_14-2` (069_k05_vegeta150): 625 / 1,346, **RNG** - Some((625, "rng: [5fa713df, 6f5b12c3] vs game [2c060fb7, 62a28f36]"))
-* `r069_089_14-2` (069_k05_vegeta150): 334 / 1,462, **RNG** - Some((334, "rng: [d54e7330, 47c32efb] vs game [e755122a, d5d4c66d]"))
-* `r069_101_14-2` (069_k05_vegeta150): 786 / 1,406, **RNG** - Some((786, "rng: [f39268ae, 291495b9] vs game [96c0c8b0, 9c3173d6]"))
-* `r069_117_14-2` (069_k05_vegeta150): 738 / 1,793, **position / facing** - Some((738, "pos: #4 sprite 256: (247.90625, 198.87109375) vs game (248.703125, 198.89453125)"))
-* `r069_125_14-2` (069_k05_vegeta150): 90 / 2,012, **RNG** - Some((90, "rng: [813fb164, 7f5de32b] vs game [f3ec06ce, 8965343e]"))
-* `r069_135_14-2` (069_k05_vegeta150): 560 / 876, **RNG** - Some((560, "rng: [1b88efec, f6921a42] vs game [814dd721, 3eab80fe]"))
-* `r069_139_14-2` (069_k05_vegeta150): 225 / 1,252, **position / facing** - Some((225, "pos: #3 sprite 256: (88.24609375, 142.53125) vs game (88.24609375, 143.328125)"))
-* `r069_143_14-2` (069_k05_vegeta150): 633 / 937, **position / facing** - Some((633, "pos: #4 sprite 256: (202.390625, 180.24609375) vs game (203.1875, 180.30078125)"))
-* `r069_151_14-2` (069_k05_vegeta150): 155 / 885, **position / facing** - Some((155, "pos: #3 sprite 256: (89.7265625, 131.375) vs game (89.66796875, 132.171875)"))
-* `r069_161_14-2` (069_k05_vegeta150): 1,541 / 2,174, **position / facing** - Some((1541, "pos: #4 sprite 256: (184.40234375, 135.28515625) vs game (184.40234375, 134.48828125)"))
-* `r069_167_14-2` (069_k05_vegeta150): 626 / 914, **RNG** - Some((626, "rng: [e90d4bf5, e3ab435f] vs game [65645a5b, 581050e2]"))
+* `r069_077_14-2` (069_k05_vegeta150): 264 / 1,666, **RNG** - Some((264, "rng: [79a2b111, e7df17bd] vs game [9bb17a3f, de9aefc1]"))
+* `r069_101_14-2` (069_k05_vegeta150): 862 / 1,406, **position / facing** - Some((862, "pos: #5 sprite 280: (176.57421875, 184.94140625) vs game (175.82421875, 184.94140625)"))
+* `r069_139_14-2` (069_k05_vegeta150): 630 / 1,252, **position / facing** - Some((630, "pos: #5 sprite 280: (162.046875, 176) vs game (161.296875, 176)"))
 * `r069_168_14-1` (069_k05_vegeta150): 20,168 / 55,831, **position / facing** - Some((20168, "pos: #271 sprite 47: (268.046875, 210.015625) vs game (268.046875, 210.1484375)")) **Known:** Switch Character closed at the 14-1 save point (Vegeta -> Goku): the world restore's black lasts 26 frames, sndsim::reload_frames_with predicts 25 (end 6,961,842 cycles, 60,558 short of the 26th frame)

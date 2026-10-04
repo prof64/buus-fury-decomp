@@ -939,6 +939,15 @@ pub fn sync_mark(w: &mut World, i: usize) {
     if w.field.is_some() && w.en_ref(i).jitter && w.en_ref(i).marked.is_some() {
         return;
     }
+    // a script's walk / glide (MoveTo, GlideTo) writes the position only: the enemy's mark stays where it was (the
+    // real run's Kid Buu fight, r069_168 f18,477: a defeated copy walked to (280, 200) by s461, its old cell (30, 27)
+    // stays blocked to f20,000 and on - the chase's re-plan at f20,167 goes around it)
+    if w.field.is_some() && w.en_ref(i).marked.is_some() {
+        let id = crate::scene::Owner::Entity(w.ents[i].id);
+        if w.scene.tracks.iter().any(|t| t.owner == id && t.started && matches!(t.queue.first(), Some(crate::scene::Cmd::GlideTo { .. } | crate::scene::Cmd::MoveTo { .. }))) {
+            return;
+        }
+    }
     let e = w.en_ref(i);
     if let Some(m) = e.marked {
         if attached(w, i) && m[0] == e.a.px() && m[1] == e.a.py() {

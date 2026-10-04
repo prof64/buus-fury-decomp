@@ -1202,9 +1202,12 @@ pub fn pre_step(w: &mut World) {
     }
     // the defeat callback's scene runs inside the death handler (a nested loop): the rest of the frame is held, like
     // the level-up hook below (story playthrough: the player's punch does not animate in the frame the boss's
-    // defeat scene starts)
+    // defeat scene starts). It is not an event start (0x0801246E): no message 0xF to the objects - real route 12-27
+    // (r012_020): a soldier walking when the punch kills it keeps its walk frame through the callback's hold (ours
+    // idled it, one rand(255) the game never draws); all 1,519 real-route cuts and every gate unchanged otherwise
     if any && w.field.as_ref().is_some_and(|f| f.host) {
-        crate::fieldnpc::start_event(w);
+        w.scene.talk_anchor = crate::scene::NO_ANCHOR;
+        set_busy(w, true);
         if let Some(f) = w.field.as_mut() {
             f.held = true;
             f.held_event = true;

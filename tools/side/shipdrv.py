@@ -393,7 +393,10 @@ class ShipDriver(Driver):
                 # spend the level-ups' stat points between rooms (Status page: half STR, half END)
                 c = e.r8(0x03001068)
                 pts = e.r16(0x03001560 + 0x68 * c + 0x2C)
-                if pts >= 6 and not enemies(e):
+                # (side-content copy: a character whose STR / END are at their cap keeps the points - try once per
+                # point count, or the grind reopens the Status page for ever)
+                if pts >= 6 and not enemies(e) and getattr(self, 'alloc_tried', None) != (c, pts):
+                    self.alloc_tried = (c, pts)
                     for m, on, off in alloc_keys([(0, [pts - pts // 2, 0, pts // 2, 0])])[1]:
                         self.prog += [m] * on + [0] * off
                     return self.prog.pop(0)

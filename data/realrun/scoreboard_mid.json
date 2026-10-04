@@ -12,15 +12,15 @@
    "verified": 47841
   },
   "fat": {
-   "diverged": 25119,
+   "diverged": 24637,
    "exact_tiles": 16,
    "frames": 75841,
-   "own": 41039,
+   "own": 42088,
    "refused": 5,
    "segments": 6,
    "tiles": 72,
-   "uncovered": 1747,
-   "verified": 48975
+   "uncovered": 1180,
+   "verified": 50024
   },
   "janemba": {
    "diverged": 1495,
@@ -45,15 +45,15 @@
    "verified": 19859
   },
   "superbuu": {
-   "diverged": 64089,
+   "diverged": 60066,
    "exact_tiles": 68,
    "frames": 190533,
-   "own": 64526,
+   "own": 68582,
    "refused": 16,
    "segments": 18,
    "tiles": 178,
    "uncovered": 14008,
-   "verified": 112436
+   "verified": 116459
   }
  },
  "segments": [
@@ -303,11 +303,11 @@
   },
   {
    "chapter": "fat",
-   "diverged": 604,
+   "diverged": 122,
    "exact_tiles": 0,
    "frames": 3122,
-   "own": 1518,
-   "own_first": "Some((1518, \"rng: [2150ae29, 1e6e620f] vs game [c3a6143a, e7217e82]\"))",
+   "own": 2567,
+   "own_first": "Some((2567, \"fade: black true vs game false\"))",
    "refused": 1,
    "segment": "r012_014_12-19",
    "spots": [
@@ -324,8 +324,8 @@
    ],
    "stretch": "012_db5_a01",
    "tiles": 2,
-   "uncovered": 1000,
-   "verified": 1518
+   "uncovered": 433,
+   "verified": 2567
   },
   {
    "chapter": "fat",
@@ -1055,11 +1055,11 @@
   },
   {
    "chapter": "superbuu",
-   "diverged": 1114,
+   "diverged": 517,
    "exact_tiles": 0,
    "frames": 1554,
-   "own": 413,
-   "own_first": "Some((413, \"pos: #3 sprite 256: (109.453125, 135.74609375) vs game (109.453125, 137.74609375)\"))",
+   "own": 1037,
+   "own_first": "Some((1037, \"pos: #4 sprite 256: (338.703125, 205.96484375) vs game (339.5, 206.046875)\"))",
    "refused": 0,
    "segment": "r069_003_14-2",
    "spots": [
@@ -1072,15 +1072,15 @@
    "stretch": "069_k05_vegeta150",
    "tiles": 1,
    "uncovered": 0,
-   "verified": 440
+   "verified": 1037
   },
   {
    "chapter": "superbuu",
-   "diverged": 1573,
+   "diverged": 0,
    "exact_tiles": 0,
    "frames": 2149,
-   "own": 576,
-   "own_first": "Some((576, \"pos: #3 sprite 256: (103.546875, 116.1015625) vs game (103.546875, 118.1015625)\"))",
+   "own": 2149,
+   "own_first": "None",
    "refused": 0,
    "segment": "r069_021_14-2",
    "spots": [
@@ -1093,15 +1093,15 @@
    "stretch": "069_k05_vegeta150",
    "tiles": 1,
    "uncovered": 0,
-   "verified": 576
+   "verified": 2149
   },
   {
    "chapter": "superbuu",
-   "diverged": 1413,
+   "diverged": 1410,
    "exact_tiles": 0,
    "frames": 1666,
-   "own": 246,
-   "own_first": "Some((246, \"rng: [25d9021b, ee0d7ff5] vs game [c6a9c179, b03716c7]\"))",
+   "own": 249,
+   "own_first": "Some((249, \"rng: [c6a9c179, b03716c7] vs game [82a7c2ff, 7925c1e1]\"))",
    "refused": 0,
    "segment": "r069_077_14-2",
    "spots": [
@@ -1114,15 +1114,15 @@
    "stretch": "069_k05_vegeta150",
    "tiles": 1,
    "uncovered": 0,
-   "verified": 253
+   "verified": 256
   },
   {
    "chapter": "superbuu",
-   "diverged": 1123,
+   "diverged": 1120,
    "exact_tiles": 0,
    "frames": 1462,
-   "own": 331,
-   "own_first": "Some((331, \"rng: [4e913927, 916a3cd0] vs game [c036c948, 51b277db]\"))",
+   "own": 334,
+   "own_first": "Some((334, \"rng: [d54e7330, 47c32efb] vs game [e755122a, d5d4c66d]\"))",
    "refused": 0,
    "segment": "r069_089_14-2",
    "spots": [
@@ -1135,15 +1135,15 @@
    "stretch": "069_k05_vegeta150",
    "tiles": 1,
    "uncovered": 0,
-   "verified": 339
+   "verified": 342
   },
   {
    "chapter": "superbuu",
-   "diverged": 1062,
+   "diverged": 587,
    "exact_tiles": 0,
    "frames": 1406,
-   "own": 311,
-   "own_first": "Some((311, \"pos: #3 sprite 256: (79.37890625, 105.875) vs game (77.37890625, 105.875)\"))",
+   "own": 786,
+   "own_first": "Some((786, \"rng: [f39268ae, 291495b9] vs game [96c0c8b0, 9c3173d6]\"))",
    "refused": 0,
    "segment": "r069_101_14-2",
    "spots": [
@@ -1156,7 +1156,7 @@
    "stretch": "069_k05_vegeta150",
    "tiles": 1,
    "uncovered": 0,
-   "verified": 344
+   "verified": 819
   },
   {
    "chapter": "superbuu",
@@ -1181,11 +1181,11 @@
   },
   {
    "chapter": "superbuu",
-   "diverged": 1925,
+   "diverged": 1922,
    "exact_tiles": 0,
    "frames": 2012,
-   "own": 87,
-   "own_first": "Some((87, \"rng: [5f0fda5a, 018eaccf] vs game [60553a04, 72fd0483]\"))",
+   "own": 90,
+   "own_first": "Some((90, \"rng: [813fb164, 7f5de32b] vs game [f3ec06ce, 8965343e]\"))",
    "refused": 0,
    "segment": "r069_125_14-2",
    "spots": [
@@ -1198,7 +1198,7 @@
    "stretch": "069_k05_vegeta150",
    "tiles": 1,
    "uncovered": 0,
-   "verified": 87
+   "verified": 90
   },
   {
    "chapter": "superbuu",
@@ -1223,11 +1223,11 @@
   },
   {
    "chapter": "superbuu",
-   "diverged": 2002,
+   "diverged": 633,
    "exact_tiles": 0,
    "frames": 2174,
-   "own": 166,
-   "own_first": "Some((166, \"pos: #3 sprite 256: (89.8203125, 130.578125) vs game (91.8203125, 130.578125)\"))",
+   "own": 1541,
+   "own_first": "Some((1541, \"pos: #4 sprite 256: (184.40234375, 135.28515625) vs game (184.40234375, 134.48828125)\"))",
    "refused": 0,
    "segment": "r069_161_14-2",
    "spots": [
@@ -1240,7 +1240,7 @@
    "stretch": "069_k05_vegeta150",
    "tiles": 1,
    "uncovered": 0,
-   "verified": 172
+   "verified": 1541
   },
   {
    "chapter": "superbuu",
@@ -1537,21 +1537,21 @@
  ],
  "tile": 1000,
  "total": {
-  "diverged": 94277,
+  "diverged": 89772,
   "exact_tiles": 120,
   "frames": 347771,
-  "own": 179478,
+  "own": 184583,
   "refused": 24,
   "segments": 27,
   "tiles": 329,
-  "uncovered": 16755,
-  "verified": 236739,
+  "uncovered": 16188,
+  "verified": 241811,
   "whole_game": {
-   "diverged": 111787,
+   "diverged": 111831,
    "frames": 1668050,
-   "uncovered": 62049,
-   "verified": 1494214
+   "uncovered": 61482,
+   "verified": 1494737
   }
  },
- "tree": "dd201a8"
+ "tree": "f11daf9"
 }

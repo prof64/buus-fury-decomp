@@ -283,6 +283,33 @@ class SideDriver(ShipDriver):
                     return self.walk_keys(e, s, g[1], g[2])
                 self._ex_push = True
             return k
+        if g[0] == 'flyalt':
+            # ('flyalt', x, y, w, h, zlo, zhi): on the world map fly into the rect at an altitude inside (zlo, zhi) (a
+            # touch_altitude trigger; the dungeon B agent's goal, tools/db57/routesx.py); done when an event starts /
+            # the area changes
+            import math
+            s = status(e)
+            if s['scene'] > 0 or s['area'][:2] != [0, 50]:
+                self.next_goal()
+                return None
+            p = e.r32(0x03001C34)
+            if not p:
+                return 0
+            sv = lambda v: v - (1 << 32) if v & 0x80000000 else v  # noqa: E731
+            x, y = sv(e.r32(p + 0x1A0)) / 256, sv(e.r32(p + 0x1A4)) / 256
+            z, h = sv(e.r32(p + 0x1A8)) / 1024, sv(e.r32(p + 0x1AC)) / 1024
+            tx, ty = g[1] + g[3] / 2, g[2] + g[4] / 2
+            want = math.degrees(math.atan2(tx - x, -(ty - y))) * 256 / 360
+            diff = (want - h + 128) % 256 - 128
+            k = KEY.RIGHT if diff > 3 else KEY.LEFT if diff < -3 else 0
+            if abs(diff) < 40:
+                k |= KEY.UP
+            mid = (g[5] + g[6]) / 2
+            if z < mid - 4:
+                k |= KEY.B
+            elif z > mid + 4:
+                k |= KEY.A
+            return k
         if g[0] == 'zbuy':
             # ('zbuy', [(row, item, n), ...]) in an open shop list, closed loop. The list cursor ([0x03000F90] + 0x114: the shop's list object on the heap, found through that word in both Z-Marts; 0x03003300 counts moves, clamped ones too - its
             # value at the goal's start = row 0) is written at the menu's next input read, and a press can be dropped

@@ -543,6 +543,12 @@ fn step_inner(w: &mut World) {
                 }
             }
             w.menu.phase = if l >= end { Phase::Enter { t: 0 } } else { Phase::FadeOut { level: l } };
+            // the world is saved (its objects deleted): a page's object world has a fresh allocator (Switch
+            // Character does it when it builds its figures; real run 14-2 r057_059: the Status page, every block of
+            // the field freed in the first black frame)
+            if l >= end && !matches!(w.menu.stack.last(), Some(Screen::CharSelect(_))) && w.field.as_ref().is_some_and(|f| f.vram.as_ref().is_some_and(|v| v.stashed.is_none())) {
+                crate::vram::world_hide(w);
+            }
         }
         Phase::Enter { t } => {
             if t + 1 >= w.menu.tr.enter.max(1) {
@@ -577,6 +583,8 @@ fn step_inner(w: &mut World) {
                 if let Some(Screen::CharSelect(c)) = w.menu.shown.as_deref() {
                     let sprites: Vec<i32> = c.figs.iter().map(|f| f.sprite).collect();
                     crate::vram::figures_gone(w, &sprites);
+                    crate::vram::world_show(w);
+                } else if w.field.as_ref().is_some_and(|f| f.vram.as_ref().is_some_and(|v| v.stashed.is_some())) {
                     crate::vram::world_show(w);
                 }
             }

@@ -169,12 +169,49 @@ def hfil_grind(moves, level):
 LEGS['goten120'] = hfil_grind(2, 120)
 LEGS['vegeta155'] = hfil_grind(4, 155)
 LEGS['trunks110'] = hfil_grind(3, 110)
+LEGS['goku175'] = hfil_grind(0, 175)
+LEGS['gohan165'] = hfil_grind(1, 165)
+LEGS['goten145'] = hfil_grind(2, 145)
+LEGS['trunks135'] = hfil_grind(3, 135)
+LEGS['gotenks140'] = hfil_grind(5, 140)
 # back to Earth: 18-1's pad (A) -> the map (from HFIL: RIGHT = Yemma's Office, UP = Earth) -> 6-14 -> its exit ->
 # 6-1's take-off pad -> the world map
 TO_EARTH = [('goto', '18-1', 190, 262, False), ('keys', [(A_, 3, 200)]), ('keys', [(16, 3, 40), (U_, 3, 40), (A_, 3, 200)]),
             ('wait', 60), ('walk', 114, 208), ('keys', [(D_, 40, 60)]), ('goto', '6-1', 312, 560, False),
             ('keys', [(A_, 3, 240)])]
 # Pilaf's Castle 10-1: the tier-2 gate, Goten L120 (s517, flag 167), facing up at (256, 72)
+# Kyodai Pyramid 14-1: the tier-3 gate, Vegeta L155 (s517, flag 177), facing up at (224, 80)
+# (its condition also wants flag 408 clear - set by opening a tier-2 gate, cleared only by the take-off pads of 8-1,
+# 10-1, 11-1, 15-1, ...: Pilaf's Castle 10-1's pad (A at (90, 75)) first)
+LEGS['g141'] = ('pg_vegeta155.ss', [*TO_EARTH, ('fly', 2289, 1561, 31, 23), ('wait', 200),
+                                    ('goto', '10-1', 90, 75, False), ('keys', [(A_, 3, 240)]),
+                                    ('fly', 2177, 1201, 31, 23), ('wait', 200),
+                                    ('goto', '14-1', 224, 80, False), *GATE, ('keys', [(U_, 60, 10)]), ('wait', 30)])
+# Northern Mountains 13-1: the per-visit gate, Trunks L110 (s518)
+LEGS['g131t'] = ('pg_trunks110.ss', [*TO_EARTH, ('fly', 721, 809, 143, 135), ('wait', 30),
+                                     ('goto', '13-1', 104, 100, False), *GATE, ('keys', [(U_, 60, 10)]), ('wait', 30)])
+# the Wasteland 20-4: the post-game gate, Goku L175 (s517, flag 186; "the Barren gate"): world 20 is the marker under
+# Kami's Lookout at altitude 0 .. 16 (the Lookout itself is 44 .. 76: both triggers share the rect)
+LEGS['g204'] = ('pg_goku175.ss', [*TO_EARTH, ('flyalt', 633, 1065, 31, 23, 0, 16), ('wait', 200),
+                                  ('goto', '20-4', 368, 80, False), *GATE, ('keys', [(U_, 60, 10)]), ('wait', 30)])
+# 10-1's tier 3, Goten L145 (flag 168: wants 167 open and 408 clear): the tier-2 gate first (sets 408), out by
+# 10-1's take-off pad (clears it), back in
+LEGS['g101b'] = ('pg_goten145.ss', [*TO_EARTH, ('fly', 2289, 1561, 31, 23), ('wait', 200),
+                                    ('goto', '10-1', 256, 72, False), *GATE, ('goto', '10-1', 90, 75, False),
+                                    ('keys', [(A_, 3, 240)]), ('fly', 2289, 1561, 31, 23), ('wait', 200),
+                                    ('goto', '10-1', 256, 72, False), *GATE, ('keys', [(U_, 60, 10)]), ('wait', 30)])
+# 11-1's tier 3, Trunks L135 (flag 171: wants 170 open, 408 clear): Gohan opens the tier-2 gate first (8-1's save
+# point: Gohan; 8-1's pad; 11-1's gate; out by 11-1's pad (A at (232, 270)), which clears 408), 8-1's save point:
+# Trunks (from Gohan: two RIGHT), back to 11-1
+LEGS['g111b'] = ('pg_trunks135.ss', [*TO_EARTH, ('fly', 849, 1785, 31, 23), ('wait', 30),
+                                     ('goto', '8-1', 145, 165, False), *hfil.charsel(-2), ('wait', 20),
+                                     ('walk', 280, 262), ('keys', [(A_, 3, 240)]), ('fly', 1505, 985, 143, 159),
+                                     ('wait', 30), ('goto', '11-1', 224, 192, False), *GATE,
+                                     ('goto', '11-1', 232, 270, False), ('keys', [(A_, 3, 240)]),
+                                     ('fly', 849, 1785, 31, 23), ('wait', 30), ('goto', '8-1', 145, 165, False),
+                                     *hfil.charsel(2), ('wait', 20), ('walk', 280, 262), ('keys', [(A_, 3, 240)]),
+                                     ('fly', 1505, 985, 143, 159), ('wait', 30), ('goto', '11-1', 224, 192, False),
+                                     *GATE, ('keys', [(U_, 60, 10)]), ('wait', 30)])
 LEGS['g101'] = ('pg_goten120.ss', [*TO_EARTH, ('fly', 2289, 1561, 31, 23), ('wait', 200),
                                    ('goto', '10-1', 256, 72, False), *GATE, ('keys', [(U_, 60, 10)]), ('wait', 30)])
 

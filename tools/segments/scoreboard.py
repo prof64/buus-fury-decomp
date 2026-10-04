@@ -236,11 +236,13 @@ def mid_section(top=5):
          'agent.', '']
     by, imp = {}, {}
     for sg in m['segments']:
-        for k, cat, t in sg['spots']:
+        for sp in sg['spots']:
+            k, cat, t = sp[:3]
             if cat == 'refused':
                 continue
-            lost = min(sg['frames'], (k // n + 1) * n) - k
-            if k % n == 0:
+            k0, k1 = sp[3:5] if len(sp) > 3 else (k // n * n, min(sg['frames'], (k // n + 1) * n))
+            lost = k1 - k
+            if k == k0:
                 # at the tile's own first frame: what the import rebuilt differs from RAM (not a game rule)
                 kind = re.sub(r'#\d+ |[-\d.]+', '', t.split('"', 2)[1] if '"' in t else t)[:40].strip(' :,()')
                 w = imp.setdefault((cat, kind), [0, 0, set()])
@@ -407,8 +409,18 @@ def mid_cut_one(job):
         # at the first frame the field is back and lit (the import cannot rebuild a saved world; the skipped frames
         # stay not covered - dungeon agent A, scoreboard-mid "on-enter script is still blocked")
         if not frames[k].get('p'):
+            # (a load - the area or the leader's place changed across the gap - starts at the first frame with a
+            # leader: the importer's area-entry point; a menu's return waits for the lit screen)
+            b = next((f for f in reversed(frames[:k]) if f.get('p')), None)
+            nxt = next((f for f in frames[k:k + m] if f.get('p')), None)
+            load = b is None or nxt is None or b.get('area') != nxt.get('area') or b['p'][:2] != nxt['p'][:2]
             j = k
-            while j < k + m and not (frames[j].get('p') and (frames[j].get('io') or [1] * 6)[5] != 0):
+            while j < k + m and not (frames[j].get('p') and (load or (frames[j].get('io') or [1] * 6)[5] != 0)):
+                e.set_keys(frames[j]['keys'])
+                e.run(1)
+                j += 1
+            # (a load: the state at the start is the RAM before the frame - the leader made in it is there one later)
+            if load and j < k + m:
                 e.set_keys(frames[j]['keys'])
                 e.run(1)
                 j += 1
@@ -502,11 +514,13 @@ def mid_board(jobs):
                     for i in range(k, e):
                         if st[i] == 0:
                             st[i] = 1
-                    spots.append((k, 'refused', t['first']))
+                    spots.append((k, 'refused', t['first'], k, e))
                     continue
                 st[k:min(e, k + t['matched'])] = b'\x02' * (min(e, k + t['matched']) - k)
                 if t['matched'] < t['frames']:
-                    spots.append((k + t['matched'], category(t['first']), t['first']))
+                    # (+ the tile's start and end: tiles need not sit on multiples of N - one that would start
+                    # inside a menu starts when the field is back)
+                    spots.append((k + t['matched'], category(t['first']), t['first'], k, e))
             ok, unc = st.count(2), st.count(1)
             div = nf - ok - unc
             s = {'segment': r['segment'], 'stretch': d, 'chapter': cuts.get(d, {}).get('chapter', '?'),
@@ -572,7 +586,7 @@ def mid_board(jobs):
     # refusals: what the importer would gain (frames not covered), by its reason
     why = {}
     for s in segs:
-        for k, cat, t in s['spots']:
+        for k, cat, t, *_ in s['spots']:
             if cat == 'refused':
                 r = re.sub(r'\d+', 'N', t.split('import: ', 1)[-1])[:110]
                 w = why.setdefault(r, [0, 0, set()])
@@ -591,7 +605,7 @@ def mid_board(jobs):
         for s in sorted((s for s in segs if s['chapter'] == ch), key=lambda s: -(s['frames'] - s['verified'])):
             L.append(f"* `{s['segment']}` ({s['stretch']}): {s['own']:,} / {s['frames']:,} ({s['own_first'][:90]}) -> "
                      f"**{s['verified']:,}** / {s['diverged']:,} / {s['uncovered']:,}; {s['exact_tiles']} / {s['tiles']} tiles exact")
-            for k, cat, t in s['spots'][:12]:
+            for k, cat, t, *_ in s['spots'][:12]:
                 L.append(f"  * {k:,}: {cat} - {t[:130]}")
             if len(s['spots']) > 12:
                 L.append(f"  * ... {len(s['spots']) - 12} more")

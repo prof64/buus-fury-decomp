@@ -1,6 +1,6 @@
 # Parity scoreboard, every-N-frames cuts
 
-Tree: `dd201a8`. Tiles of 1,000 frames. Regenerate: `scoreboard.py` (the area-entry board, which lists the
+Tree: `f11daf9`. Tiles of 1,000 frames. Regenerate: `scoreboard.py` (the area-entry board, which lists the
 segments), `scoreboard.py mid cut 1000` (local, under `work/real/mid/`), `scoreboard.py mid`.
 
 Every area-entry segment that loses more than 1,000 frames on the main board, cut again at its frame 1,000,
@@ -12,10 +12,10 @@ tile's first divergence; **not covered** when its tile was refused by the import
 |---|---|---|---|---|---|---|---|---|---|
 | earth | 1 | 52,415 | 46,426 (88.6%) | 47,841 (91.3%) | 3,574 | 1,000 | 52 | 25 | 1 |
 | ship | 1 | 19,859 | 19,859 (100.0%) | 19,859 (100.0%) | 0 | 0 | 19 | 10 | 2 |
-| fat | 6 | 75,841 | 41,039 (54.1%) | 48,975 (64.6%) | 25,119 | 1,747 | 72 | 16 | 5 |
+| fat | 6 | 75,841 | 42,088 (55.5%) | 50,024 (66.0%) | 24,637 | 1,180 | 72 | 16 | 5 |
 | janemba | 1 | 9,123 | 7,628 (83.6%) | 7,628 (83.6%) | 1,495 | 0 | 8 | 1 | 0 |
-| superbuu | 18 | 190,533 | 64,526 (33.9%) | 112,436 (59.0%) | 64,089 | 14,008 | 178 | 68 | 16 |
-| **all** | 27 | 347,771 | 179,478 (51.6%) | 236,739 (68.1%) | 94,277 | 16,755 | 329 | 120 | 24 |
+| superbuu | 18 | 190,533 | 68,582 (36.0%) | 116,459 (61.1%) | 60,066 | 14,008 | 178 | 68 | 16 |
+| **all** | 27 | 347,771 | 184,583 (53.1%) | 241,811 (69.5%) | 89,772 | 16,188 | 329 | 120 | 24 |
 
 ## The whole game
 
@@ -28,10 +28,10 @@ refused tile).
 | opening | 42,275 | 34,377 (81.3%) | 0 | 7,898 (18.7%) |
 | earth | 160,503 | 152,153 (94.8%) | 4,412 | 3,938 (2.5%) |
 | ship | 398,194 | 395,616 (99.4%) | 0 | 2,578 (0.6%) |
-| fat | 388,646 | 352,037 (90.6%) | 26,422 | 10,187 (2.6%) |
-| janemba | 199,703 | 183,067 (91.7%) | 4,224 | 12,412 (6.2%) |
-| superbuu | 478,729 | 376,964 (78.7%) | 76,729 | 25,036 (5.2%) |
-| **all** | 1,668,050 | 1,494,214 (89.6%) | 111,787 | 62,049 (3.7%) |
+| fat | 388,646 | 353,289 (90.9%) | 25,737 | 9,620 (2.5%) |
+| janemba | 199,703 | 174,290 (87.3%) | 13,001 | 12,412 (6.2%) |
+| superbuu | 478,729 | 385,012 (80.4%) | 68,681 | 25,036 (5.2%) |
+| **all** | 1,668,050 | 1,494,737 (89.6%) | 111,831 | 61,482 (3.7%) |
 
 ## Refused tiles by reason (for the importer)
 
@@ -125,13 +125,13 @@ tile divergence (segment frame: category) - a tile that diverges is a separate c
   * 12,014: sprite memory - Some((14, "vram: used blocks (start, size) ours only [(377, 4)], game only []"))
   * 15,152: script / text - Some((152, "text: game opens a text box: true, ours: false"))
   * ... 12 more
-* `r012_014_12-19` (012_db5_a01): 1,518 / 3,122 (Some((1518, "rng: [2150ae29, 1e6e620f] vs game [c3a6143a, e7217e82]"))) -> **1,518** / 604 / 1,000; 0 / 2 tiles exact
-  * 1,000: position / facing - Some((0, "pos: #0 sprite 188: (178.58203125, 126.71875) vs game (179.02734375, 127.1640625)"))
-  * 2,000: refused - Some((0, "import: unsupported cut: area AreaId { world: 12, area: 19, variant: 1 }: the load's on-enter script is still blocked (n
 * `r012_020_12-27` (012_db5_a01): 1,856 / 3,411 (Some((1856, "rng: [942926ee, 25aeea64] vs game [de77fbf0, 756a9e8f]"))) -> **1,856** / 1,144 / 411; 0 / 3 tiles exact
   * 1,044: RNG - Some((44, "rng: [35958795, e1b03d77] vs game [16f88f5d, 4f982150]"))
   * 2,000: position / facing - Some((0, "dir: #2 sprite 31: 2 vs game 0"))
   * 3,000: refused - Some((0, "import: unsupported cut: area AreaId { world: 12, area: 27, variant: 1 }: the load's on-enter script is still blocked (n
+* `r012_014_12-19` (012_db5_a01): 2,567 / 3,122 (Some((2567, "fade: black true vs game false"))) -> **2,567** / 122 / 433; 0 / 2 tiles exact
+  * 1,000: position / facing - Some((0, "pos: #0 sprite 188: (178.58203125, 126.71875) vs game (179.02734375, 127.1640625)"))
+  * 2,000: refused - Some((0, "import: unsupported cut: area AreaId { world: 12, area: 19, variant: 1 }: the load's on-enter script is still blocked (n
 * `r004_022_9-1` (004_d10_map): 2,671 / 2,671 (None) -> **2,671** / 0 / 0; 1 / 2 tiles exact
   * 2,000: refused - Some((0, "import: unsupported cut: event s011 node 3: the waiting native 0x8d is not among the node's actions"))
 
@@ -224,26 +224,26 @@ tile divergence (segment frame: category) - a tile that diverges is a separate c
   * 17,000: screen fade - Some((0, "fade: black true vs game false"))
   * 18,000: position / facing - Some((0, "pos: #2 sprite 123: (192, 88) vs game (185, 0)"))
   * 19,370: script / text - Some((370, "text: game opens a text box: true, ours: false"))
-* `r069_161_14-2` (069_k05_vegeta150): 166 / 2,174 (Some((166, "pos: #3 sprite 256: (89.8203125, 130.578125) vs game (91.8203125, 130.578125)") -> **172** / 2,002 / 0; 0 / 1 tiles exact
-  * 1,006: animation - Some((6, "anim: #3 sprite 280: raw 6 cel 0 vs game raw 5 cel 0 tick 0"))
-* `r069_125_14-2` (069_k05_vegeta150): 87 / 2,012 (Some((87, "rng: [5f0fda5a, 018eaccf] vs game [60553a04, 72fd0483]"))) -> **87** / 1,925 / 0; 0 / 1 tiles exact
+* `r069_125_14-2` (069_k05_vegeta150): 90 / 2,012 (Some((90, "rng: [813fb164, 7f5de32b] vs game [f3ec06ce, 8965343e]"))) -> **90** / 1,922 / 0; 0 / 1 tiles exact
   * 1,000: camera - Some((0, "cam: (54.158203125, 119.0205078125) vs game (53.6259765625, 119.703125)"))
 * `r067_071_14-2` (067_k03_goku158): 693 / 2,415 (Some((693, "cam: (36.1904296875, 126.6875) vs game (36.4619140625, 126.919921875)"))) -> **693** / 1,307 / 415; 0 / 2 tiles exact
   * 1,000: position / facing - Some((0, "pos: #1 sprite 255: (219.17578125, 195.43359375) vs game (219.17578125, 195.4296875)"))
   * 2,000: refused - Some((0, "import: unsupported cut: area AreaId { world: 14, area: 2, variant: 1 }: the load's on-enter script is still blocked (no
-* `r069_021_14-2` (069_k05_vegeta150): 576 / 2,149 (Some((576, "pos: #3 sprite 256: (103.546875, 116.1015625) vs game (103.546875, 118.1015625) -> **576** / 1,573 / 0; 0 / 1 tiles exact
-  * 1,000: animation - Some((0, "anim: #2 sprite 280: raw 5 cel 0 vs game raw 6 cel 0 tick 0"))
-* `r069_077_14-2` (069_k05_vegeta150): 246 / 1,666 (Some((246, "rng: [25d9021b, ee0d7ff5] vs game [c6a9c179, b03716c7]"))) -> **253** / 1,413 / 0; 0 / 1 tiles exact
+* `r069_077_14-2` (069_k05_vegeta150): 249 / 1,666 (Some((249, "rng: [c6a9c179, b03716c7] vs game [82a7c2ff, 7925c1e1]"))) -> **256** / 1,410 / 0; 0 / 1 tiles exact
   * 1,007: animation - Some((7, "anim: #3 sprite 280: raw 6 cel 0 vs game raw 5 cel 0 tick 1"))
 * `r057_059_14-2` (057_g03_gohan141): 650 / 1,800 (Some((650, "pos: #4 sprite 256: (180.078125, 200.984375) vs game (179.28125, 200.984375)")) -> **650** / 350 / 800; 0 / 1 tiles exact
   * 1,000: refused - Some((0, "import: unsupported cut: area AreaId { world: 14, area: 2, variant: 1 }: the load's on-enter script is still blocked (no
-* `r069_089_14-2` (069_k05_vegeta150): 331 / 1,462 (Some((331, "rng: [4e913927, 916a3cd0] vs game [c036c948, 51b277db]"))) -> **339** / 1,123 / 0; 0 / 1 tiles exact
+* `r069_089_14-2` (069_k05_vegeta150): 334 / 1,462 (Some((334, "rng: [d54e7330, 47c32efb] vs game [e755122a, d5d4c66d]"))) -> **342** / 1,120 / 0; 0 / 1 tiles exact
   * 1,008: sprite memory - Some((8, "vram: used blocks (start, size) ours only [(397, 4)], game only []"))
-* `r069_003_14-2` (069_k05_vegeta150): 413 / 1,554 (Some((413, "pos: #3 sprite 256: (109.453125, 135.74609375) vs game (109.453125, 137.746093) -> **440** / 1,114 / 0; 0 / 1 tiles exact
-  * 1,027: position / facing - Some((27, "pos: #1 sprite 256: (333.125, 205.38671875) vs game (333.125, 205.4296875)"))
-* `r069_101_14-2` (069_k05_vegeta150): 311 / 1,406 (Some((311, "pos: #3 sprite 256: (79.37890625, 105.875) vs game (77.37890625, 105.875)"))) -> **344** / 1,062 / 0; 0 / 1 tiles exact
-  * 1,033: animation - Some((33, "anim: #2 sprite 280: raw 6 cel 0 vs game raw 5 cel 0 tick 0"))
 * `r069_117_14-2` (069_k05_vegeta150): 738 / 1,793 (Some((738, "pos: #4 sprite 256: (247.90625, 198.87109375) vs game (248.703125, 198.8945312) -> **738** / 262 / 793; 0 / 1 tiles exact
   * 1,000: refused - Some((0, "import: unsupported cut: area AreaId { world: 14, area: 2, variant: 1 }: the load's on-enter script is still blocked (no
 * `r069_139_14-2` (069_k05_vegeta150): 225 / 1,252 (Some((225, "pos: #3 sprite 256: (88.24609375, 142.53125) vs game (88.24609375, 143.328125)) -> **228** / 1,024 / 0; 0 / 1 tiles exact
   * 1,003: position / facing - Some((3, "pos: #1 sprite 256: (268.796875, 179.77734375) vs game (269.296875, 179.63671875)"))
+* `r069_161_14-2` (069_k05_vegeta150): 1,541 / 2,174 (Some((1541, "pos: #4 sprite 256: (184.40234375, 135.28515625) vs game (184.40234375, 134.4) -> **1,541** / 633 / 0; 0 / 1 tiles exact
+  * 1,006: animation - Some((6, "anim: #3 sprite 280: raw 6 cel 0 vs game raw 5 cel 0 tick 0"))
+* `r069_101_14-2` (069_k05_vegeta150): 786 / 1,406 (Some((786, "rng: [f39268ae, 291495b9] vs game [96c0c8b0, 9c3173d6]"))) -> **819** / 587 / 0; 0 / 1 tiles exact
+  * 1,033: animation - Some((33, "anim: #2 sprite 280: raw 6 cel 0 vs game raw 5 cel 0 tick 0"))
+* `r069_003_14-2` (069_k05_vegeta150): 1,037 / 1,554 (Some((1037, "pos: #4 sprite 256: (338.703125, 205.96484375) vs game (339.5, 206.046875)"))) -> **1,037** / 517 / 0; 0 / 1 tiles exact
+  * 1,027: position / facing - Some((27, "pos: #1 sprite 256: (333.125, 205.38671875) vs game (333.125, 205.4296875)"))
+* `r069_021_14-2` (069_k05_vegeta150): 2,149 / 2,149 (None) -> **2,149** / 0 / 0; 0 / 1 tiles exact
+  * 1,000: animation - Some((0, "anim: #2 sprite 280: raw 5 cel 0 vs game raw 6 cel 0 tick 0"))

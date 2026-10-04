@@ -920,7 +920,10 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             en::unmark_self(w, i);
             w.en(i).detached = true;
         }
-        K::KiBlast => timed_enter(w, i, &[an(3)], true),
+        K::KiBlast => {
+            timed_enter(w, i, &[an(3)], true);
+            r.d[6] = w.en_ref(i).anim_seq as i32;
+        }
         // (r.d[6] = the animation state the shot runs under: see `shot_state_gone`)
         K::GunShot | K::RifleShot | K::MummyWrapShot => {
             timed_enter(w, i, &[an(17), an(3)], true);
@@ -1911,6 +1914,9 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         }
         // ---- ranged
         // the player's spawner 0x08019858: origin 0x0800FF44 on the body box; the blast tests its record's box (shots::ki_blast_box)
+        // (the ki blast is its controller's work too: a hit's hurt state replaced it - after the pop the node is over;
+        // segment sb 6-6 f18914)
+        K::KiBlast if w.field.is_some() && r.d[6] != w.en_ref(i).anim_seq as i32 => true,
         K::KiBlast => {
             if f == 16 {
                 let (mx, my) = en::hand_point(w, i);

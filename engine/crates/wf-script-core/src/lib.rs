@@ -482,7 +482,15 @@ pub fn poll(w: &mut World, s: &mut HostState) -> Option<Option<i32>> {
             s.from_wait = done;
             done.then_some(None)
         }
-        Pending::Fade => scene::fade_done(w).then_some(None),
+        Pending::Fade => {
+            // a talk event's fade wait returns at the top of the frame too, like its text box (the real route 18-11:
+            // Vegeta's s446 ends on fade_out(100) - a Janemba Hand's ambush makes its first update in the exit frame)
+            let done = scene::fade_done(w);
+            if done && s.talk_event {
+                s.from_wait = true;
+            }
+            done.then_some(None)
+        }
         Pending::Scroll => {
             let done = scene::scroll_done(w);
             s.from_scroll = done && s.talk_event;

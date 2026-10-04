@@ -415,7 +415,8 @@ fn import_ai_rt(w: &mut World, ei: usize, lvl: usize, ram: &GbaRam, r: u32, note
                     todo.push((c as usize, ram.r32(r + 0xC + 4 * k as u32)));
                 }
             }
-            K::Selector => {
+            // ParallelAll / ParallelAny (vt 0x0804BDA8: +4 children, +8.. their runtimes) as the Selector
+            K::Selector | K::ParallelAll | K::ParallelAny => {
                 for (k, &c) in node.kids.iter().enumerate() {
                     todo.push((c as usize, ram.r32(r + 8 + 4 * k as u32)));
                 }
@@ -439,6 +440,15 @@ fn import_ai_rt(w: &mut World, ei: usize, lvl: usize, ram: &GbaRam, r: u32, note
                 rt.d[2] = ram.s32(r + 0xC);
                 rt.d[3] = -1;
             }
+            // HoverDrift (vt 0x0804CB80): +4 / +8 the drift velocity (ours: the enemy's vx / vy)
+            K::HoverDrift => {
+                let (vx, vy) = (ram.s32(r + 4), ram.s32(r + 8));
+                let e = w.en(ei);
+                e.vx = vx;
+                e.vy = vy;
+            }
+            // Wait (vt 0x080497D4): +4 the frames counted (ours: the node's frame count)
+            K::Wait => rt.f = ram.s32(r + 4),
             K::PopState | K::PushState => {}
             K::Chance | K::GotoState | K::SubState | K::IfPlayerWithin | K::IfPlayerFarther | K::IfPlayerInMeleeRange | K::IfTimeInState | K::IfCooldownOver | K::IfLastKidBuu => {}
             k => notes.push(format!("ai runtime of {k:?} (state {:#x} node {n}) not imported", tree.state)),
@@ -494,6 +504,7 @@ fn field_from_ram(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
     let (shots, rest): (Vec<_>, Vec<_>) = std::mem::take(&mut w.ents).into_iter().partition(|e| matches!(e.body, Body::Shot(_)));
     w.ents = rest;
     w.ents.extend(shots);
+    import_effects(w, ram);
     let rows: std::collections::BTreeMap<u32, (i32, i32, i32, i32)> = ram.actor_rows.iter().map(|r| (r.0, (r.1, r.2, r.3, r.4))).collect();
     patch_leader(w, ram, notes);
     // the walk and enemy grids as they stand (map object +0xA8 / +0xB0: bitmaps, 32 bytes a row, bit = free)
@@ -845,6 +856,22 @@ fn import_npc_step(w: &mut World, i: usize, ram: &GbaRam, o: u32, row: Option<(i
     }
 }
 
+/// the animated effects in flight (the generic effect `0x0802A81C`, vtable 0x0804CF3C, and the explosion's damaging
+/// variant 0x0804A2C0: +0x10 / +0x14 position, +0x30 first record, +0x34 current record (12 bytes each), +0x38
+/// accumulator, +0x3C records left, +0x40 rate) -> `Fx::Anim`, newest in the list like the game's (real run 14-2
+/// r069_117: an explosion still playing as the pause menu closes frees its block 20 frames later)
+fn import_effects(w: &mut World, ram: &GbaRam) {
+    for o in ram.objects() {
+        let vt = ram.r32(o);
+        if vt != 0x0804_A2C0 && vt != 0x0804_CF3C {
+            continue;
+        }
+        let (first, cur) = (ram.r32(o + 0x30), ram.r32(o + 0x34));
+        let f = wf_core::fx::Fx::Anim { id: first, x: ram.s32(o + 0x10), y: ram.s32(o + 0x14), rec: (cur.wrapping_sub(first) / 12) as i32, left: ram.s32(o + 0x3C), rate: ram.s32(o + 0x40), acc: ram.s32(o + 0x38) };
+        w.add(Body::Fx(Box::new(f)));
+    }
+}
+
 /// a patrol's runner (enemy +0x22C current step object): the world map's 3-D move (`cutscene_move` step, vt
 /// 0x0804A800: +4 s16 target x / y, +8 s16 z / u16 speed, +0xC / +0x10 / +0x14 velocity, +0x18 frames left); the
 /// step's index is the record whose target words are the object's; the height obj+0x1A8, heading +0x1AC
@@ -927,9 +954,13 @@ fn build_mid(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner: &mut St
     }
     // the field's mode with the screen still black and nothing running: a pause menu's return (the world restored,
     // the palette fade-in to come - 16 steps; the objects hold still, the cameras ease: menu `Phase::FadeIn`)
-    if ram.screen_black == Some(true) {
-        w.menu = wf_core::menu::Menu { phase: wf_core::menu::Phase::FadeIn { level: 256 }, tr: wf_core::menu::PAUSE, ..Default::default() };
-        notes.push("mid-area: a menu's return (black, fading in)".into());
+    // (the fade itself is the main-loop mode vt 0x0804A4B8: +4 the level reached, +8 the step)
+    let mode = ram.r32(0x0300_0F90);
+    let fading = (ram.valid(mode) && ram.r32(mode) == 0x0804_A4B8).then(|| ram.s32(mode + 4));
+    if ram.screen_black == Some(true) || fading.is_some() {
+        let level = (256 - fading.unwrap_or(0)).clamp(1, 256) as u16;
+        w.menu = wf_core::menu::Menu { phase: wf_core::menu::Phase::FadeIn { level }, tr: wf_core::menu::PAUSE, ..Default::default() };
+        notes.push(format!("mid-area: a menu's return (fading in, level {level})"));
     }
     let _ = runner;
     let draws = w.rng.calls.wrapping_sub(calls0);
@@ -1573,6 +1604,17 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
             continue;
         }
         // an open text box (0x08012030): its blocks +0x78 / +0x7A / +0x7C, the portrait's +0x7E (mid_3000)
+        // an animated effect in flight (`import_effects`): its block belongs to the effect entity at its position
+        if vt == 0x0804_A2C0 || vt == 0x0804_CF3C {
+            let h = ram.r16(o + 0xC);
+            let (x, y) = (ram.s32(o + 0x10), ram.s32(o + 0x14));
+            let ent = (0..w.ents.len()).find(|&k| !used_ents.contains(&w.ents[k].id) && matches!(&w.ents[k].body, Body::Fx(f) if matches!(**f, wf_core::fx::Fx::Anim { x: fx, y: fy, .. } if fx == x && fy == y)));
+            if let (Some(k), true) = (ent, h != 0xFFFF) {
+                used_ents.push(w.ents[k].id);
+                owners.push((h, Owner::Ent(w.ents[k].id)));
+            }
+            continue;
+        }
         if vt == 0x0804_9F60 {
             for k in 0..4u32 {
                 let h = ram.r16(o + 0x78 + 2 * k);
