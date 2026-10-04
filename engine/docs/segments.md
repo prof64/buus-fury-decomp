@@ -2793,6 +2793,18 @@ driver, incl. the song start at a load's finish; I own the load / close lengths)
   main-loop sound update at its end is 608 samples / 92 k against the game's 336 / 47 k - a sound-position question
   (**Earth agent**: the play position / last update across the load's mixes decides this frame); one lag frame
   long there. r052_004's script loads are right or one off on the same kind of margin.
+  *Done (Earth agent):* two sound-side causes, both in the sim-lag path only (`sndsim::load_frames` / `end_frame`):
+  (1) `Session::lag_step` asks for the load one frame after its logic frame, so the model ran from a sound state one
+  frame late (16-17 DMA periods = the 272 extra samples) and the load's logic frame made its own main-loop update at
+  95 k, which the game does not (its update is the iteration's end): the model now rewinds the hardware to the
+  logic frame's start and that frame skips the update; (2) the mixes inside a load at their bare cost (no +0.65 %:
+  the measured own time carries the interrupts) - nine mixes 1,170,273 vs the game's 1,170,931. Thieves Den 8-2 ->
+  8-3 now: last mix 8,572,011 (game 8,572,046), end update 336 samples / 47,279 (game 336 / 47,314), 31 lag frames
+  as the game. **Sim-lag sweep of every load segment (`work/real/loads`, `SEGMENT_SIMLAG=1`): 1,466 / 1,747 loads
+  right (was 1,291)**; one long 269 -> 47, one short 74 -> 125 (margins of +-15 k: the per-map remainder's spread -
+  `load_rest.json`, ship fix agent's). Replay mode untouched (gates as before). Tools: `work/earth/bin/simlagloads.sh`,
+  `sldbg.sh`. **Ship fix agent / real-route agent:** the `T_CAMDBG` print, `T_LCALL` and the dead `if ... && false`
+  in `segment.rs`'s load-camera block are not mine - if they are yours, drop them (the `cam_now == at` test stays).
 - **The other long iterations (census of every replayed lag frame, `SEGMENT_LAGCENSUS=1`, all 1,519 real cuts:
   36,992 frames in 9,268 runs; work/shipfix/lagcensus.py):** text-box openings are the largest kind (~16k frames:
   runs of 7 / 8 after a `show_text` step), then 1-frame lags with nothing pending (4.6k, 4,086 single frames),
@@ -2990,6 +3002,38 @@ allocator / list-order rules only.
   0x91 never reached SelfDestruct. Mapped both names; the gate is exact (1,041).
 * `sb_005_01_05` f11,395 is the area-load fade-in camera case of `r052_004_1-5` (the camera steps in the load's
   last lag frame, f11,395 with the logic counter unchanged) - left with the ship fix agent's claim.
+* **Two damage numbers made in one pass end newest-made first** (`popups_tick`: stable by stamp, not by handle):
+  West City `r002_006_4-1` tiles +4,000 / +5,000 / +14,000 exact (were f77 / f412 / f128).
+
+**Super Buu agent, 2026-10-04: 20-6 (inside Buu, `r062_001_20-6`) engine rules** (every one from an emulator trace):
+* **Super Buu's ball (ThrowBigBall)**: the builder plays the charge sound 3 (0x080212F2); the throw stops 3 and plays
+  34 (0x0802154E / 0x0802155E) in the update whose tick count reaches **0x3D** (was 60: thrown a frame early); the
+  burst is the **ball object's own animation on its tiles** (records 0x0872A648, 6 x 4 ticks; freed 24 frames after
+  the impact - no separate effect block); the throw's controller ends with SetAnim(0) (an idle draw) in the node's
+  last update; an exit while the ball charges (a hit) removes it and stops sound 3. Rust + TS (sounds Rust only:
+  the TS reference has none), dumps regenerated.
+* **The glide's waypoint table is the ROM's** (0x0877B1BC: (224,104) (344,128) (304,256) (120,264) (112,144) - three
+  entries were wrong). Rust + TS.
+* **WanderToRandomPoint's exit (0x0803BD06): SetAnim(0) (idle draw), then the actor showing sprite def 0x34 (Super
+  Buu) answers message 5 and the wanderer turns to it** (0x0801599C) - field only (Vegeta inside Buu).
+* **Instant Transmission markers take 0x200 bytes** (ctor 0x080222E0) and are deleted by the idle the skill ends in
+  (in the player's update, not the markers' next one). Rust + TS (the battle reference removed them a frame late).
+* Import (`wf-import`): Super Buu's balls in flight (charging / thrown / bursting) with the node's frame count and
+  their blocks; the IT markers' block; the globals (glide index ...) re-read after the enemies' state rebuild (the
+  rebuild's enter had stepped the index); a rebuilt enemy's own states go **without exits**; `Wait` imports its
+  frames left (+4 counts down, update 0x08018BF0).
+Tiles (25): +4,000 14 -> 315, +5,000 21 -> 107, +6,000 36 -> 130, +7,000 21 -> 27, +9,000 2 -> 36, +11,000 6 -> 197,
++12,000 0 -> 35, +13,000 27 -> 127, +14,000 5 -> 117, +15,000 18 -> 162, +16,000 29 -> 31, +17,000 4 -> 85, +18,000
+52 -> 99, +21,000 403 -> 813; +19,000 / +22,000 .. +25,000 stay exact. Also `sb_011_20_05` (20-5) **exact to its end**
+(16,516, was 6,123), `sb_005_01_05` 11,378 -> 13,896, `sb_043_04_01` / `rsbk_000_04_01` exact; no cut or gate worse.
+**What stops the 20-6 tiles now:** (a) most: Vegeta's wander (sprite 280) one sub-pixel off from its first step -
+the WanderToRandomPoint runtime's heap leftovers (+0x18 re-plan counter, +0xC / +0x10 waypoint are whatever the
+freed heap block held; measured: 33, 110, 19, 77, 192, 0, 54 - a different block each time), not modelled; (b) IT
+(importer agent): +3,000 f2 / +18,000 f99 a markers block the game allocates in an IT selection our import holds
+differently; (c) +21,000 f813: an imported coin pickup ends a frame early (pickup import); (d) +20,000 f11: s476's
+mid-code replay misses an emote (importer); (e) +8,000 f165 (a text box), +1,137 f2 (sprite 280's idle cel tick) open.
+`wf-app` `menu_parity` `title_newgame` is red on the shared tree from uncommitted edits elsewhere (`sndsim.rs`), not
+from these.
 
 **§11 update 13 (B): claims done this round.**
 * **`r057_066_14-1` exact (7,327 / 7,327, was 3,527), gated `rsb_057_066_14-1`** - IfPlayerInFront (predicate

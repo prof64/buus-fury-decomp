@@ -1462,11 +1462,10 @@ fn leaf_exit(w: &mut World, c: &C, n: u16, _r: &mut NodeRt) {
         // then the actor showing sprite def 0x34 (`0x08000158(0x34)`: Super Buu's graphics) answers message 5 and the
         // wanderer turns toward it (0x0801599C: 24.8 difference, ties horizontal; real run 20-6 tiles: Vegeta faces
         // Super Buu at each waypoint)
-        K::WanderToRandomPoint if w.field.is_some() && std::env::var("NOWEXIT").is_err() => {
+        K::WanderToRandomPoint if w.field.is_some() => {
             set_anim(w, i, &[nm("idle")], true, Some(true));
             let me = w.ents[i].id;
-            let target = (0..w.ents.len()).find(|&k| !w.ents[k].removed && w.ents[k].id != me && crate::scene::sprite_id(w, k) == Some(0x34)).filter(|_| std::env::var("NOFACE").is_err());
-            if std::env::var("DBGW").is_ok() { eprintln!("DBGW f{} exit en{} target {:?}", w.frame, i, target); }
+            let target = (0..w.ents.len()).find(|&k| !w.ents[k].removed && w.ents[k].id != me && crate::scene::sprite_id(w, k) == Some(0x34));
             if let Some(k) = target {
                 let (tx, ty) = { let a = w.actor(k).unwrap(); (a.x, a.y) };
                 let (dx, dy) = (tx - w.en_ref(i).a.x, ty - w.en_ref(i).a.y);
@@ -2606,7 +2605,7 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         K::ThrowBigBall => {
             // the throw's controller (0x0804D6CC) ends 32 frames after the throw with SetAnim(0) - the idle enter's
             // rand(255) - and the node finishes in the same update (real run 20-6 r062_001 tile +5,000 f52)
-            if f >= 92 && std::env::var("NOTBI").is_err() {
+            if f >= 92 {
                 set_anim(w, i, &[nm("idle")], true, Some(true));
             }
             f >= 92

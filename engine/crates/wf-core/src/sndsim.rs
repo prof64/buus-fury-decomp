@@ -174,7 +174,7 @@ pub fn end_frame(w: &mut World) {
         // load's end, `lag_frame_ex`)
         // (the sim's own load lag, `Options::sim_lag`: every area load's iteration runs past this frame's update
         // point - its update is the iteration's end, `load_frames`)
-        let load_song = loading && (w.sound.pending_song.is_some() || (w.g.load_pending && std::env::var_os("T_SL0").is_none()));
+        let load_song = loading && (w.sound.pending_song.is_some() || w.g.load_pending);
         if w.sound.skip > 0 {
             w.sound.skip -= 1;
         } else if load_song {
@@ -377,9 +377,6 @@ pub fn load_frames(w: &mut World) -> Option<u8> {
     if debug() {
         eprintln!("snd load: c {c} extra {extra} base {base}");
     }
-    if std::env::var_os("T_SL0").is_some() {
-        return redraw_frames(w, Redraw { t0: 0, base });
-    }
     // the iteration started with the load's logic frame (`Session::lag_step` asks one frame later): the sound
     // hardware as it was at that frame's start (Thieves Den 8-2 -> 8-3: the mixes and the end's update - 336
     // samples, not 608 - land where the game's do)
@@ -388,8 +385,9 @@ pub fn load_frames(w: &mut World) -> Option<u8> {
     let k = (phase + FRAME - p0) / DMA;
     w.sound.phase = p0 as u32;
     w.sound.pos = pos.wrapping_sub(16 * k as u32);
-    let sc = std::env::var("T_SLIRQ").ok().and_then(|v| v.parse().ok()).unwrap_or(10_065);
-    let r = redraw_frames_irq(w, Redraw { t0: 0, base }, sc);
+    // (the mixes at their own cost: the load's measured own time carries the interrupts' entry / exit - 8-2 -> 8-3's
+    // nine mixes 1,170,273 vs the game's 1,170,931)
+    let r = redraw_frames_irq(w, Redraw { t0: 0, base }, 10_000);
     w.sound.pos = pos;
     w.sound.phase = phase as u32;
     // (that frame is over: the skip counts the lag frames still to come)

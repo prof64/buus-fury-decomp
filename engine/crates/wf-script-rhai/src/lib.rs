@@ -350,6 +350,9 @@ impl Runtime {
     /// Start a whole event (its scene enter included) at graph node `node`: a trigger / NPC resumes at the exit value
     /// its last run ended with (the scene start `0x0801246E` reads the starter's slot)
     pub fn start_event_from(&self, event: u16, node: u16, params: [i32; 4], who: i32) {
+        // (a resume slot naming a node the graph does not have - a state the run never reaches in the game: from the
+        // start instead of a script error)
+        let node = if node != 0 && !self.lib.graphs.get(&event).is_some_and(|g| g.contains_key(&node)) { 0 } else { node };
         let mut c = self.ctx.borrow_mut();
         c.t = ThreadState { params: vec![params], who, ..Default::default() };
         c.t.frames.push(Frame::Event { event, node, params: 0, in_node: false, entered: false });

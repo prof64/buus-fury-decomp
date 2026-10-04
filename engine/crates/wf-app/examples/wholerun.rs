@@ -73,6 +73,7 @@ fn main() {
     let mut lasting: Vec<(&str, usize, usize, Option<(usize, String)>)> = ["area", "pos", "rng", "depth"].iter().map(|n| (*n, 0, 0, None)).collect();
     let (mut stepped, mut own_lag, mut replayed_lag, mut lag_bad) = (0usize, 0usize, 0usize, 0usize);
     let mut errors = 0usize;
+    let (mut load_watch, mut load_bad): (Option<(usize, usize)>, usize) = (None, 0);
     let mut k = 0usize;
     while let Some(r) = lines.next() {
         if k >= limit {
@@ -89,10 +90,35 @@ fn main() {
             eprintln!("  rng calls of row {k} (app rng before {:08x?}, game after {})", app.world().rng.state(), r["rng"]);
         }
         wf_core::rng::TRACE.store(trace, std::sync::atomic::Ordering::Relaxed);
+        // (the option is the app's: a world the title builds (New Game) starts without it)
+        app.session.world.opts.sim_lag = sim_lag;
+        // (sim lag: each load's lag run against the recording's lag run from the same row)
+        if sim_lag {
+            if logic {
+                if let Some((at, sim)) = load_watch.take() {
+                    let game = k - at;
+                    if game != sim {
+                        load_bad += 1;
+                        if load_bad <= 12 {
+                            println!("sim-lag load at row {at} ({}): sim {sim} lag frames, game {game}", stretch_of(at));
+                        }
+                    }
+                }
+            }
+            if app.world().g.load_pending && !menu {
+                load_watch = Some((k, 0));
+            }
+        }
         if sim_lag && !menu && app.session.lag_step() {
+            if let Some(lw) = load_watch.as_mut() {
+                lw.1 += 1;
+            }
             own_lag += 1;
             if logic {
                 lag_bad += 1;
+                if lag_bad <= 5 || (lag_bad <= 40 && std::env::var("WR_LAG").is_ok()) {
+                    println!("sim lag frame on a game logic row {k} ({}): app area {:?} lag left {}", stretch_of(k), app.world().field.as_ref().map(|f| (f.area.world, f.area.area)), app.world().g.lag);
+                }
             }
         } else if logic || menu {
             let mut ev = vec![];
@@ -119,16 +145,18 @@ fn main() {
         let mut bad: Vec<(&str, String)> = vec![];
         let ga = (r["area"][0].as_i64().unwrap_or(-1), r["area"][1].as_i64().unwrap_or(-1));
         let aa = w.field.as_ref().map(|f| (f.area.world as i64, f.area.area as i64)).unwrap_or((-1, -1));
-        // (a lag row's RAM is the middle of a long iteration - an area load's half-built player and its draws: only
-        // the logic rows are compared)
-        let in_field = ga != (0, 0) && !r["p"].is_null() && logic;
+        // (the game's RAM is a finished main-loop iteration only on the row before the next one starts - the next
+        // row moves the logic counter; a long iteration's rows show it half done: an area load's half-built player,
+        // a draw made in its lag frames. Those rows are compared, the others not)
+        let complete = next_lf.map_or(true, |n| n != lf);
+        let in_field = ga != (0, 0) && !r["p"].is_null() && complete;
         if !menu && in_field && aa != ga {
             bad.push(("area", format!("app {aa:?} game {ga:?}")));
         }
         let ap = w.player_idx(0).map(|pi| (w.pl_ref(pi).a.x as i64, w.pl_ref(pi).a.y as i64, w.pl_ref(pi).a.facing as i64));
         if let (Some(p), Some(g)) = (ap, r["p"].as_array()) {
             let g = (g[0].as_i64().unwrap_or(0), g[1].as_i64().unwrap_or(0), g[2].as_i64().unwrap_or(0));
-            if !menu && logic && p != g {
+            if !menu && complete && p != g {
                 bad.push(("pos", format!("app {p:?} game {g:?}")));
             }
         } else if !menu && in_field && ap.is_none() != r["p"].is_null() {

@@ -378,7 +378,7 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
                 }
             }
             let grids = w.data.field.as_ref().and_then(|d| d.maps.get(&f.map)?.reload.as_ref().map(|r| r.grids)).unwrap_or(0);
-            eprintln!("load-est {} map {} c {} extra {} grids {grids} cam {:?} enemies {en} npcs {npc} other {oth} dec_all {dec_all} sprites {} signs {}", doc["name"].as_str().unwrap_or("?"), f.map, c, extra, (w.cameras[0].rect.x0, w.cameras[0].rect.y0), sprites.len(), f.signs);
+            eprintln!("load-est {} map {} c {} extra {} grids {grids} cam {:?} enemies {en} npcs {npc} other {oth} dec_all {dec_all} sprites {} signs {} banner {}", doc["name"].as_str().unwrap_or("?"), f.map, c, extra, (w.cameras[0].rect.x0, w.cameras[0].rect.y0), sprites.len(), f.signs, w.scene.banner.as_ref().map(|b| b.1 as i64).unwrap_or(-1));
         }
     }
     let mut lf_prev = i(&doc["init"]["lf"]);

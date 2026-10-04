@@ -20,13 +20,16 @@ GD, REC0 = 0x03001068, 0x03001560
 
 
 def header(p):
+    """kind, name and source from the first line (the header line also holds init / objs: not parsed whole)"""
     with open(p) as f:
-        h = f.readline()
-    # the header is the first line up to "frames"
-    i = h.find('"frames"')
+        h = f.read(4000)
+    if '"kind":"segment"' not in h[:200]:
+        return None
+    m = re.search(r'"name":"([^"]+)"', h)
+    s = re.search(r'"source":(\{[^}]*\})', h)
     try:
-        return json.loads(h[:i].rstrip(',') + '}') if i > 0 else json.loads(h)
-    except ValueError:
+        return {'kind': 'segment', 'name': m.group(1), 'source': json.loads(s.group(1)) if s else {}}
+    except (ValueError, AttributeError):
         return None
 
 
@@ -43,7 +46,25 @@ def state_of(p, h):
                 if s.exists():
                     return s
     s = ROOT / 'work' / 'segments' / (h['name'] + '.ss')
-    return s if s.exists() else None
+    if s.exists():
+        return s
+    # the recorders' own state folders (work/db57/segs5/states, work/db/dr1/segs/states, ...): by the cut's name
+    return ss_index().get(h['name'] + '.ss')
+
+
+_SS = None
+
+
+def ss_index():
+    global _SS
+    if _SS is None:
+        import os
+        _SS = {}
+        for d, _, fs in os.walk(ROOT / 'work'):
+            for f in fs:
+                if f.endswith('.ss'):
+                    _SS.setdefault(f, Path(d) / f)
+    return _SS
 
 
 def read_state(e):

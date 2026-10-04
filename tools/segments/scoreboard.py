@@ -321,6 +321,15 @@ def board(jobs):
         pct = 100.0 * c['matched'] / c['frames'] if c['frames'] else 0.0
         L.append(f"| {k} | {CHAPTER_OWNER.get(k, '')} | {c['run_frames']:,} | {c['run_frames'] - c['cut_frames']:,} | {c['segments']} | "
                  f"{c['exact']} | {c['frames']:,} | {c['matched']:,} | {pct:.1f} |")
+    # the end-to-end line: the app from the reset with the run's keys, no import anywhere (tools/wholerun/board.py)
+    wr = ROOT / 'data' / 'realrun' / 'wholerun.json'
+    if wr.exists():
+        w = json.loads(wr.read_text())
+        for m in w.get('modes', []):
+            L.append(f"\n**Whole run, no imports ({m['lag']} lag): exact to frame {m['exact_to']:,}** of {m['rows']:,} recorded "
+                     f"({m['exact_stretch']}; first divergence: {m['first']}). Tree `{w.get('tree', '?')}`, `tools/wholerun/board.py`.")
+        if w.get('note'):
+            L.append(w['note'])
     L += ['', '## Non-exact segments by category', '', '| category | owner | ' + ' | '.join(order) + ' | all |', '|---|---|' + '---|' * (len(order) + 1)]
     names = [n for n, _ in CATS] + ['other']
     for cat in names:
