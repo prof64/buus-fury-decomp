@@ -3176,3 +3176,24 @@ pause / Switch Character reload, `sndsim::reload_frames_with`: 4-1 r002_006 f10,
 r044_015 / r038_001). The one load not exact, `r010_011_11-13`, is not a load miss: the segment itself is red at
 f1,640 (camera) on the current shared tree - uncommitted edits, `T_NOLC=1` does not clear it (it was exact
 on the last main board). Script warps inside events are not measured here (the cutter never cuts inside an event).
+*Instant Transmission import (A, in de485a4):* a run in flight (the leader's state 0x0804E334, update 0x0801BB1A:
++4 facing, +5 the pick it is on, +8 picks, +0xC + 8k {kind, +4 object}, +0x3C / +0x40 the return px, +0x44 its
+frame count) becomes our `ItRun`; a selection in flight (main-loop mode 0x0804D260: +4 picks left, +8 the marker
+object - +0x38 frames, +0x3C / +0x40 cursor 24.8, +0x44 / +0x48 velocity -, +0xC candidates at +0x10 + 0x1C k
+{rect, +0x10 picked, +0x18 object}) becomes `ItSel` + the markers + the modal. `r062_001_20-6` +10,000 0 -> 23,
++3,000 0 -> 2, +12,000 0 -> 20 (63 tiles: 3 better, 0 worse; gates green). **For the Super Buu agent (20-6 engine
+rules, not import):** +3,000 f2 / +12,000 f20 are sprite memory around the IT selection / run - the game allocates
+(369, 8) / (377, 8) blocks we never do: the engine has no sprite-memory model for IT's markers or its run effect;
+with that check off both run to f34 (sprite 280's facing; an RNG draw). +10,000 f23: sprite 280 (the 0x313 small
+enemy) turns to dir 0 on its idle enter, ours keeps 1.
+
+**`r010_011_11-13` f1,640 regression bisected (ship agent, 2026-10-04): commit d6f6a82** ("Notes: nested-cutscene
+import"). It made the replay's lag-run camera rule unconditional: `wf-import/src/segment.rs` `replay`, the
+`cam_at` block - a script `warp_fade`'s fade-in (`script_fade_in` + `Mode::FadeIn`) gets `tick_shakes` +
+`world_mode_cameras` at the lag run's camera frame; d6f6a82 dropped its `T_LC` gate (and added the matching
+`begin_fade_in` black reset in `wf-core/src/field.rs`, still behind `T_LC`). The rule came in with 8be1037 ("replayed
+load iterations end with the camera update", the area-load lag work) - **owner: the ship-fixes agent** (area-load
+length model). Bisect (private copies, every commit rebuilt): 8be1037 exact (5,049), d6f6a82 f1,640, HEAD f1,640;
+d6f6a82 with only that gate restored: exact. At f1,640 (11-13) the camera after that extra step is (240, 34.457), the
+game's (240, 34.719). **Gated now:
+`rfat_010_011_11-13` (expect 5,049) - red until the rule is narrowed.**
