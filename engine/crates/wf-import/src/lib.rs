@@ -532,6 +532,9 @@ fn import_ai_rt(w: &mut World, ei: usize, lvl: usize, ram: &GbaRam, r: u32, note
             // one off each update, finished at 0 (ours counts the updates up: frames - left; real run 20-6 tile
             // +7,000, Vegeta's Wait(60) with 27 left)
             K::Wait => rt.f = (node.p.g(wf_core::ai::P::Frames) as i32 - ram.s32(r + 4)).max(0),
+            // HeavyPunch (a static runtime 0x030032F8; the controller 0x030032F4 counts in the object's tick): set
+            // from the animation after the rows (`patch_enemy`)
+            K::HeavyPunch => {}
             // BackStep (enter 0x08031388, update 0x080313EA): +4 / +8 the hop step, +0x10 the counter (48 at the enter,
             // one off each update, finished at 0; ours counts the updates up)
             K::BackStep => {
@@ -543,6 +546,8 @@ fn import_ai_rt(w: &mut World, ei: usize, lvl: usize, ram: &GbaRam, r: u32, note
             K::Chance | K::GotoState | K::SubState | K::IfPlayerWithin | K::IfPlayerFarther | K::IfPlayerInMeleeRange | K::IfTimeInState | K::IfCooldownOver | K::IfLastKidBuu => {}
             // ThrowBigBall: a singleton runtime (0x030032E8); its frame count comes from the ball (`import_super_ball`)
             K::ThrowBigBall | K::StandStill | K::FacePlayer => {}
+            // MechTransform: no runtime words - its update waits for the imported animation (raw 20) to end
+            K::MechTransform => {}
             k => notes.push(format!("ai runtime of {k:?} (state {:#x} node {n}) not imported", tree.state)),
         }
         rts.push((n, rt));
@@ -972,6 +977,11 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
         // (the sprite the object shows: the world map's circles pick theirs by the place's state)
         if e.a.sprite != Some(sprite - wf_core::scene::SPRITE_BASE) {
             e.a.set_sprite(&d, Some(sprite - wf_core::scene::SPRITE_BASE));
+            // a swapped form (MechTransform / the bat): the next swap starts from the one shown (whole-run cut
+            // 809,790: a Mechanoid already in its 188 form turns back to 187 at f23 - ours swapped 187 -> 188)
+            if d.enemy(e.ty).and_then(|t| t.gfx) != Some(sprite) {
+                e.gfx_now = sprite;
+            }
         }
         e.set_raw(&d, raw);
         e.ea.pos.raw = raw;
@@ -986,7 +996,23 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
             e.ea.done = false;
         }
     }
-    // (a knockback's animation index: the one now showing)
+    // a HeavyPunch in progress: its frame count is the controller's tick (obj+0x12), its end 48 + 8 * the punch
+    // animation's frames as its enter computes (real run 4-1 whole-run cut 621,339: the punch landed a frame before
+    // the cut, tick 49 - the import's fresh node ended at once and idled, a draw the game does not make)
+    {
+        let tick = w.en_ref(ei).ea.pos.tick;
+        let e = w.en_ref(ei);
+        let nf = e.a.anim_raw(&d).and_then(|raw| e.a.sprite.and_then(|s| d.sprite(s)).and_then(|s| s.anim_raw(raw))).map(|a| a.steps(e.a.facing).len() as i32);
+        for st in w.en(ei).ai.stack.iter_mut() {
+            for (n, rt) in st.rt.iter_mut().enumerate() {
+                if st.tree.nodes.get(n).is_some_and(|x| x.k == wf_core::ai::K::HeavyPunch) {
+                    rt.f = tick;
+                    rt.d[0] = 48 + 8 * nf.unwrap_or(2);
+                }
+            }
+        }
+    }
+        // (a knockback's animation index: the one now showing)
     let cur = w.en_ref(ei).a.anim.map(|a| a as i32 + 1).unwrap_or(0);
     for st in w.en(ei).ai.stack.iter_mut() {
         for (n, rt) in st.rt.iter_mut().enumerate() {

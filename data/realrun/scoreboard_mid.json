@@ -1,18 +1,18 @@
 {
  "chapters": {
-  "earth": {
-   "diverged": 2019,
-   "exact_tiles": 6,
-   "frames": 10070,
-   "own": 3690,
+  "janemba": {
+   "diverged": 1220,
+   "exact_tiles": 1,
+   "frames": 2802,
+   "own": 1349,
    "refused": 0,
    "segments": 1,
-   "tiles": 9,
+   "tiles": 2,
    "uncovered": 0,
-   "verified": 8051
+   "verified": 1582
   },
   "superbuu": {
-   "diverged": 12912,
+   "diverged": 12662,
    "exact_tiles": 9,
    "frames": 26177,
    "own": 2176,
@@ -20,13 +20,36 @@
    "segments": 1,
    "tiles": 25,
    "uncovered": 0,
-   "verified": 13265
+   "verified": 13515
   }
  },
  "segments": [
   {
+   "chapter": "janemba",
+   "diverged": 1220,
+   "exact_tiles": 1,
+   "frames": 2802,
+   "own": 1349,
+   "own_first": "Some((1470, \"fade: black false vs game true\"))",
+   "refused": 0,
+   "segment": "r047_002_18-13",
+   "spots": [
+    [
+     1240,
+     "animation",
+     "Some((240, \"anim: #3 sprite 280: raw 1 cel 0 vs game raw 2 cel 0 tick 0\"))",
+     1000,
+     2000
+    ]
+   ],
+   "stretch": "047_h_h13",
+   "tiles": 2,
+   "uncovered": 0,
+   "verified": 1582
+  },
+  {
    "chapter": "superbuu",
-   "diverged": 12912,
+   "diverged": 12662,
    "exact_tiles": 9,
    "frames": 26177,
    "own": 2176,
@@ -42,9 +65,9 @@
      3000
     ],
     [
-     3715,
-     "RNG",
-     "Some((715, \"rng: [67f945bf, 7b2d6d5a] vs game [a261b334, c2d42a1a]\"))",
+     3965,
+     "position / facing",
+     "Some((965, \"pos: #2 sprite 280: (234.79296875, 230.41796875) vs game (233.7890625, 229.03515625)\"))",
      3000,
      4000
     ],
@@ -150,63 +173,26 @@
    "stretch": "062_m_inside_buu",
    "tiles": 25,
    "uncovered": 0,
-   "verified": 13265
-  },
-  {
-   "chapter": "earth",
-   "diverged": 2019,
-   "exact_tiles": 6,
-   "frames": 10070,
-   "own": 3690,
-   "own_first": "Some((3690, \"anim: #11 sprite 113: raw 12 cel 0 vs game raw 1 cel 0 tick 178\"))",
-   "refused": 0,
-   "segment": "rE2__087_2-90",
-   "spots": [
-    [
-     1068,
-     "sprite memory",
-     "Some((68, \"vram: used blocks (start, size) ours only [(439, 16)], game only []\"))",
-     1000,
-     2000
-    ],
-    [
-     5051,
-     "sprite memory",
-     "Some((51, \"vram: used blocks (start, size) ours only [(447, 16)], game only []\"))",
-     5000,
-     6000
-    ],
-    [
-     9000,
-     "camera",
-     "Some((0, \"cam: (40, 442.96875) vs game (40, 442.703125)\"))",
-     9000,
-     10000
-    ]
-   ],
-   "stretch": "E2_earth",
-   "tiles": 9,
-   "uncovered": 0,
-   "verified": 8051
+   "verified": 13515
   }
  ],
  "tile": 1000,
  "total": {
-  "diverged": 14931,
-  "exact_tiles": 15,
-  "frames": 36247,
-  "own": 5866,
+  "diverged": 13882,
+  "exact_tiles": 10,
+  "frames": 28979,
+  "own": 3525,
   "refused": 0,
   "segments": 2,
-  "tiles": 34,
+  "tiles": 27,
   "uncovered": 0,
-  "verified": 21316,
+  "verified": 15097,
   "whole_game": {
-   "diverged": 14931,
+   "diverged": 13882,
    "frames": 1668052,
    "uncovered": 38481,
-   "verified": 1614640
+   "verified": 1615689
   }
  },
- "tree": "78590a3"
+ "tree": "836475d"
 }

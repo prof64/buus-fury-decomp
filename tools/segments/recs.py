@@ -67,6 +67,56 @@ def ss_index():
     return _SS
 
 
+def doc_lf(p):
+    """the logic counter (0x03000F94) in the segment's own start RAM (init.ram.iwram), or None"""
+    import base64
+    import zlib
+    txt = Path(p).read_text().split('\n', 1)[0]
+    i = txt.find('"ram"')
+    if i < 0:
+        return None
+    j = txt.index('{', i)
+    d = 0
+    for k in range(j, len(txt)):
+        if txt[k] == '{':
+            d += 1
+        elif txt[k] == '}':
+            d -= 1
+            if d == 0:
+                break
+    ram = json.loads(txt[j:k + 1])
+    iw = ram.get('iwram')
+    if not isinstance(iw, str):
+        return None
+    b = base64.b64decode(iw)
+    try:
+        b = zlib.decompress(b)
+    except zlib.error:
+        pass
+    return int.from_bytes(b[0xF94:0xF98], 'little')
+
+
+def start_of(p, h, st):
+    """an emulator at the segment's start: its state file when that is the segment's own moment (the logic counter
+    matches the segment's start RAM); else, for a cut, the cut rebuilt from its source recording (a state file under
+    the cut's name can hold a later save - sb_000_18_12's work/segments state); else None"""
+    from route import start_emu
+    want = doc_lf(p)
+    if st is not None:
+        e = start_emu(str(st))
+        if want is None or e.r32(0x03000F94) == want:
+            return e
+    src = h.get('source', {})
+    if src.get('kind') == 'cut' and src.get('from') and src.get('at') is not None and (ROOT / src['from']).exists():
+        sys.path.insert(0, str(ROOT / 'tools' / 'segments'))
+        import segment as sg
+        head, frames = sg.load_doc(ROOT / src['from'])
+        e = sg.replay_to(head, frames, src['at'])
+        if want is None or e.r32(0x03000F94) == want:
+            return e
+    return None
+
+
 def read_state(e):
     gd = e.read(GD, 0x500)
     n = min(int.from_bytes(gd[0xE4:0xE8], 'little'), 250)
@@ -86,16 +136,15 @@ def read_state(e):
 
 
 def one(p):
-    from route import start_emu
     p = Path(p)
     h = header(p)
     if not h or h.get('kind') != 'segment':
         return f'{p.name}: not a segment'
     st = state_of(p, h)
-    if st is None:
-        return f'{p.name}: no start state'
+    e = start_of(p, h, st)
+    if e is None:
+        return f'{p.name}: no start state' if st is None else f'{p.name}: start state is from another moment (logic counter) and no rebuild'
     rows = [json.loads(ln.strip().rstrip(',')) for ln in p.read_text().splitlines()[1:] if ln.startswith('{"keys"')]
-    e = start_emu(str(st))
     out, prev = [], None
     for k, r in enumerate(rows):
         e.set_keys(r['keys'])

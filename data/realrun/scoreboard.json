@@ -11,26 +11,23 @@
    "stretches": 1
   },
   "fat": {
-   "cats": {
-    "object set": 7
-   },
+   "cats": {},
    "cut_frames": 380209,
-   "exact": 364,
+   "exact": 371,
    "frames": 380209,
-   "matched": 365618,
+   "matched": 380209,
    "run_frames": 388648,
    "segments": 371,
    "stretches": 33
   },
   "janemba": {
    "cats": {
-    "position / facing": 1,
     "screen fade": 1
    },
    "cut_frames": 187291,
-   "exact": 253,
+   "exact": 254,
    "frames": 187291,
-   "matched": 184981,
+   "matched": 185838,
    "run_frames": 199703,
    "segments": 255,
    "stretches": 16
@@ -46,27 +43,23 @@
    "stretches": 1
   },
   "ship": {
-   "cats": {
-    "object set": 5,
-    "position / facing": 2
-   },
+   "cats": {},
    "cut_frames": 395616,
-   "exact": 331,
+   "exact": 338,
    "frames": 395616,
-   "matched": 344290,
+   "matched": 395616,
    "run_frames": 398194,
    "segments": 338,
    "stretches": 2
   },
   "superbuu": {
    "cats": {
-    "object set": 2,
-    "position / facing": 3
+    "position / facing": 1
    },
    "cut_frames": 467701,
-   "exact": 443,
+   "exact": 447,
    "frames": 467701,
-   "matched": 379133,
+   "matched": 443700,
    "run_frames": 478729,
    "segments": 448,
    "stretches": 22
@@ -75,12 +68,12 @@
  "dirty": true,
  "total": {
   "cut_frames": 1622759,
-  "exact": 1498,
+  "exact": 1517,
   "frames": 1622759,
-  "matched": 1465964,
+  "matched": 1597305,
   "run_frames": 1668052,
   "segments": 1519,
   "stretches": 75
  },
- "tree": "aba7278"
+ "tree": "836475d"
 }

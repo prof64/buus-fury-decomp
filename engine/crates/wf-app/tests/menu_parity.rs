@@ -4,7 +4,8 @@
 //! sound calls and the sha1 of the emulator's screen per video frame, the GameData block decoded at frame 0 and how
 //! the screen opens). The remake's story session gets that state, then both run the same keys. Compared per video
 //! frame: the sounds and, while the remake shows a menu screen, the sha1 of the 240x160 picture (wf-core menu view
-//! -> wf-render). CPU time is an oracle from the trace (see `run`). Pictures for diffs: `work/buu/menu/<scenario>/`
+//! -> wf-render), one remake step per game logic iteration (`Options::no_lag`: the app recreates no lag), compared
+//! at each iteration's last video frame (see `run`). Pictures for diffs: `work/buu/menu/<scenario>/`
 //! (git-ignored, ROM-derived; `WF_MENU_DIR` overrides): `MENU_PARITY_OUT=<dir>` writes emulator | ours | diff
 //! strips of differing frames; `MENU_PARITY_LOG=1` prints every frame; `MENU_PARITY_ONLY=<substring>` filters.
 //! Scenarios whose names start with a `STRICT` prefix must be exact (sounds and every compared frame).
@@ -216,67 +217,48 @@ fn run(packs: &Packs, data: &Arc<wf_core::content::GameData>, name: &str) -> Opt
     let mut bad_frames = Vec::new();
     let mut ev = Vec::new();
     let mut menu_seen = false;
-    let oracle = std::env::var("MENU_PARITY_FREE").is_err();
+    // the app's pacing (`Options::no_lag`): one step per game logic iteration - the remake steps on the rows where
+    // the emulator's mode-loop counter moved and is compared at each iteration's last video frame (the picture the
+    // long iteration ends with); the rows in between are the hardware's lag frames (a redraw's / a close's CPU time)
+    sim.session.world.opts.no_lag = true;
     let lf: Vec<i64> = rows.iter().map(|r| i(&r["lf"])).collect();
     let hs: Vec<String> = rows.iter().map(|r| r["h"].as_str().unwrap_or("").to_string()).collect();
     let mut tears = 0;
-    let mut lag_pred = (0usize, 0usize);
+    let mut iters = 0usize;
+    let mut emu_snd: Vec<i64> = Vec::new();
     for (k, row) in rows.iter().enumerate() {
         let keys = i(&row["keys"]) as u16;
-        // CPU-time oracle: the emulator's mode loop ran a logic iteration in frame k iff its frame counter moved;
-        // the remake's lag (frames a long redraw takes) is forced to the emulator's (see docs: the sound driver's
-        // IRQ load makes it unpredictable to the frame); MENU_PARITY_FREE=1 runs the remake's own model
-        if k > 0 && sim.world().menu.phase == wf_core::menu::Phase::Run {
-            let ticks = lf[k] > lf[k - 1];
-            let mut quiet = 0u8;
-            while k + (quiet as usize) < lf.len() && k + (quiet as usize) > 0 && lf[k + quiet as usize] == lf[k + quiet as usize - 1] {
-                quiet += 1;
-            }
-            let model = sim.world().menu.lag;
-            if ticks == (model == 0) && (ticks || model == quiet) {
-                lag_pred.0 += 1;
-            }
-            lag_pred.1 += 1;
-            if oracle {
-                let m = &mut sim.session.world.menu;
-                // the display: a finished redraw shows from the frame the emulator's picture changes (a frame whose
-                // picture differs from both neighbours is a VRAM copy racing the scanout: shown from the next one)
-                let changed = hs[k] != hs[k - 1] && !tear(&hs, k);
-                if changed {
-                    // an intermediate picture of the same iteration first (`Menu.pre`)
-                    if let Some(p) = m.pre.take() {
-                        m.shown = Some(p);
-                    } else if let Some(p) = m.pending.take() {
-                        m.shown = Some(p);
-                    }
-                }
-                // the logic: the emulator's mode loop iterations
-                m.lag = if ticks { 0 } else { quiet.saturating_add(1) };
-            }
+        let logic = k == 0 || lf[k] != lf[k - 1];
+        let complete = k + 1 == lf.len() || lf[k + 1] != lf[k];
+        if logic {
+            emu_snd.clear();
         }
-        // the world restore's length is CPU time too: the fade-in starts the frame the emulator's counter moves again
-        if oracle && k > 0 {
-            if let wf_core::menu::Phase::Leave { t } = sim.world().menu.phase {
-                let leave = sim.world().menu.tr.leave;
-                if t >= 1 && lf[k] > lf[k - 1] && t + 1 < leave {
-                    sim.session.world.menu.phase = wf_core::menu::Phase::Leave { t: leave - 1 };
-                }
-            }
+        emu_snd.extend(row["snd"].as_array().map(|a| a.iter().filter(|s| s[0] == "play").map(|s| i(&s[1])).collect::<Vec<_>>()).unwrap_or_default());
+        if !logic && !complete {
+            continue;
         }
-        ev.clear();
-        if k == 0 && meta["open"].is_object() {
+        if logic {
+            iters += 1;
+            ev.clear();
+        }
+        if logic && k == 0 && meta["open"].is_object() {
             if !wf_core::menu::open_from_json(&mut sim.session.world, &meta["open"]) {
                 // the screen is not implemented (yet): nothing to compare (a STRICT scenario then fails: 0 frames)
                 println!("menu {name}: no screen opens {}; skipped", meta["open"]);
                 return Some((0, 0, vec!["not openable".into()], Vec::new()));
             }
         }
-        sim.step(&[keys], &mut ev);
+        if logic {
+            sim.step(&[keys], &mut ev);
+        }
         // the RNG once the screen is open (the field frame before may draw differently)
         if live && k == 0 {
             if let Some(r) = sj["rng"].as_array().filter(|r| r.len() == 2) {
                 sim.session.world.rng.set_state([i(&r[0]) as u32, i(&r[1]) as u32]);
             }
+        }
+        if !complete {
+            continue;
         }
         if std::env::var("MENU_PARITY_STORY").is_ok_and(|v| v.split(',').any(|x| x.parse::<usize>().ok() == Some(k))) {
             let st = &sim.world().story;
@@ -288,8 +270,11 @@ fn run(packs: &Packs, data: &Arc<wf_core::content::GameData>, name: &str) -> Opt
         let in_menu = wf_core::menu::active(sim.world()) || k == 0;
         if in_menu {
             menu_seen = true;
-            let emu: Vec<i64> = row["snd"].as_array().map(|a| a.iter().filter(|s| s[0] == "play").map(|s| i(&s[1])).collect()).unwrap_or_default();
-            let ours: Vec<i64> = ev.iter().filter_map(|e| if let SimEvent::Audio(AudioEvent::PlaySfx { id, .. }) = e { Some(*id as i64) } else { None }).collect();
+            // (the iteration's sounds: its lag frames' play calls belong to it)
+            let mut emu = emu_snd.clone();
+            emu.sort();
+            let mut ours: Vec<i64> = ev.iter().filter_map(|e| if let SimEvent::Audio(AudioEvent::PlaySfx { id, .. }) = e { Some(*id as i64) } else { None }).collect();
+            ours.sort();
             if emu != ours {
                 snd_bad.push(format!("{name} frame {k}: emulator {emu:?} ours {ours:?}"));
             }
@@ -365,7 +350,7 @@ fn run(packs: &Packs, data: &Arc<wf_core::content::GameData>, name: &str) -> Opt
             snd_bad.push(format!("{name}: native push {want}, ours {got:?}"));
         }
     }
-    println!("menu {name}: lag model agrees on {} / {} menu frames; {tears} tear frames skipped", lag_pred.0, lag_pred.1);
+    println!("menu {name}: {iters} logic iterations; {tears} tear frames skipped");
     Some((compared, exact, snd_bad, bad_frames))
 }
 

@@ -561,7 +561,9 @@ fn step_inner(w: &mut World) {
                 w.tick_shakes();
             }
             let step = (w.menu.tr.fade_out & !FADE_HOLD).max(1);
-            let end = if w.menu.tr.fade_out & FADE_HOLD != 0 { 256 + step } else { 256 };
+            // (the hold frame is the mode switch's long iteration - the black frame its build takes: none under
+            // `no_lag`, the switch is the last fade step's iteration; real route shipr_172 8-1, lf 356,699)
+            let end = if w.menu.tr.fade_out & FADE_HOLD != 0 && !w.opts.no_lag { 256 + step } else { 256 };
             let l = level + step;
             // the screen black: the mode switch builds the new screen (Switch Character's figures enter idle)
             if level < 256 && l >= 256 {

@@ -1,6 +1,6 @@
 # Parity scoreboard, every-N-frames cuts
 
-Tree: `78590a3`. Tiles of 1,000 frames. Regenerate: `scoreboard.py` (the area-entry board, which lists the
+Tree: `836475d`. Tiles of 1,000 frames. Regenerate: `scoreboard.py` (the area-entry board, which lists the
 segments), `scoreboard.py mid cut 1000` (local, under `work/real/mid/`), `scoreboard.py mid`.
 
 Every area-entry segment that loses more than 1,000 frames on the main board, cut again at its frame 1,000,
@@ -10,9 +10,9 @@ tile's first divergence; **not covered** when its tile was refused by the import
 
 | chapter | segments | frames | exact on the main board | verified exact | diverged | not covered | tiles | exact tiles | refused |
 |---|---|---|---|---|---|---|---|---|---|
-| earth | 1 | 10,070 | 3,690 (36.6%) | 8,051 (80.0%) | 2,019 | 0 | 9 | 6 | 0 |
-| superbuu | 1 | 26,177 | 2,176 (8.3%) | 13,265 (50.7%) | 12,912 | 0 | 25 | 9 | 0 |
-| **all** | 2 | 36,247 | 5,866 (16.2%) | 21,316 (58.8%) | 14,931 | 0 | 34 | 15 | 0 |
+| janemba | 1 | 2,802 | 1,349 (48.1%) | 1,582 (56.5%) | 1,220 | 0 | 2 | 1 | 0 |
+| superbuu | 1 | 26,177 | 2,176 (8.3%) | 13,515 (51.6%) | 12,662 | 0 | 25 | 9 | 0 |
+| **all** | 2 | 28,979 | 3,525 (12.2%) | 15,097 (52.1%) | 13,882 | 0 | 27 | 10 | 0 |
 
 ## The whole game
 
@@ -24,30 +24,28 @@ story playthrough test (same keys from power-on, every row compared, no import: 
 | chapter | run frames | verified exact | diverged | not covered |
 |---|---|---|---|---|
 | opening | 42,275 | 41,189 (97.4%) | 0 | 1,086 (2.6%) |
-| earth | 160,503 | 155,546 (96.9%) | 2,019 | 2,938 (1.8%) |
+| earth | 160,503 | 157,565 (98.2%) | 0 | 2,938 (1.8%) |
 | ship | 398,194 | 395,616 (99.4%) | 0 | 2,578 (0.6%) |
 | fat | 388,648 | 380,209 (97.8%) | 0 | 8,439 (2.2%) |
-| janemba | 199,703 | 187,291 (93.8%) | 0 | 12,412 (6.2%) |
-| superbuu | 478,729 | 454,789 (95.0%) | 12,912 | 11,028 (2.3%) |
-| **all** | 1,668,052 | 1,614,640 (96.8%) | 14,931 | 38,481 (2.3%) |
+| janemba | 199,703 | 186,071 (93.2%) | 1,220 | 12,412 (6.2%) |
+| superbuu | 478,729 | 455,039 (95.1%) | 12,662 | 11,028 (2.3%) |
+| **all** | 1,668,052 | 1,615,689 (96.9%) | 13,882 | 38,481 (2.3%) |
 
 ## Per segment: where it really diverges
 
 segment: main-board matched / frames (its first divergence) -> verified / diverged / not covered; then each
 tile divergence (segment frame: category) - a tile that diverges is a separate cause from the one before it
 
-### earth
+### janemba
 
-* `rE2__087_2-90` (E2_earth): 3,690 / 10,070 (Some((3690, "anim: #11 sprite 113: raw 12 cel 0 vs game raw 1 cel 0 tick 178"))) -> **8,051** / 2,019 / 0; 6 / 9 tiles exact
-  * 1,068: sprite memory - Some((68, "vram: used blocks (start, size) ours only [(439, 16)], game only []"))
-  * 5,051: sprite memory - Some((51, "vram: used blocks (start, size) ours only [(447, 16)], game only []"))
-  * 9,000: camera - Some((0, "cam: (40, 442.96875) vs game (40, 442.703125)"))
+* `r047_002_18-13` (047_h_h13): 1,349 / 2,802 (Some((1470, "fade: black false vs game true"))) -> **1,582** / 1,220 / 0; 1 / 2 tiles exact
+  * 1,240: animation - Some((240, "anim: #3 sprite 280: raw 1 cel 0 vs game raw 2 cel 0 tick 0"))
 
 ### superbuu
 
-* `r062_001_20-6` (062_m_inside_buu): 2,176 / 26,177 (Some((2176, "pos: #26 sprite 280: (214.58984375, 289.30078125) vs game (214.484375, 289.30) -> **13,265** / 12,912 / 0; 9 / 25 tiles exact
+* `r062_001_20-6` (062_m_inside_buu): 2,176 / 26,177 (Some((2176, "pos: #26 sprite 280: (214.58984375, 289.30078125) vs game (214.484375, 289.30) -> **13,515** / 12,662 / 0; 9 / 25 tiles exact
   * 2,176: position / facing - Some((176, "pos: #5 sprite 280: (214.58984375, 289.30078125) vs game (214.484375, 289.30078125)"))
-  * 3,715: RNG - Some((715, "rng: [67f945bf, 7b2d6d5a] vs game [a261b334, c2d42a1a]"))
+  * 3,965: position / facing - Some((965, "pos: #2 sprite 280: (234.79296875, 230.41796875) vs game (233.7890625, 229.03515625)"))
   * 4,315: position / facing - Some((315, "pos: #2 sprite 280: (182.68359375, 212.33203125) vs game (183.13671875, 211.81640625)"))
   * 5,107: position / facing - Some((107, "pos: #2 sprite 280: (287.90625, 197.44921875) vs game (288.8046875, 196.9375)"))
   * 6,130: position / facing - Some((130, "pos: #2 sprite 280: (224.19921875, 320.34375) vs game (224.36328125, 320.99609375)"))

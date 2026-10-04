@@ -3664,6 +3664,26 @@ the opening / Earth stops of the resync list. Not the fat / Janemba / Super Buu 
 whole-run rows 153,225 - 153,470: the "#%d points???" box, s266 RNG, the 7-3 <-> 7-5 flipping) and `rE2__090_7-3`
 f47,532 (benched HP). **Side-content agent:** the coordinator moved the 7-3 s266 item to me - keep the rest of your
 opening / Earth list; if you already have findings on s266, add them here and I build on them.
+*Earth agent, results:* **(1) the 7-3 s266 stops are the 0x03000F94 counter, nothing in 7-3.** Whole run (recorded
+lag): resetting the app's `fc0` to the game's counter at row 153,000 (before the minigame at 153,049) makes the run
+clean to row 160,000 (no area / pos / rng / depth divergence) - the punch marker's blink (`counter & 4`) decides the
+extra 30-frame waits (game 144 frames, app 82). The app's counter is 22 ahead there, all of it from menu screens:
+**+19 in the 3-15 Status page (rows 99,286 .. 99,510) and +3 in the 2-11 Status page (133,818 .. 133,882)** - the
+menu model's redraw lag gives more iterations than the game's (B's finding above). With lag frames not recreated
+(`--lag none`, `Options::no_lag`: one menu step = one iteration) the counter is iteration-exact by construction, so
+nothing to change in core; the recorded-lag board keeps the stop until its menu rows follow the recording. (`--lag
+none` currently stops at 90,251: the app still in the pause menu's close while the game walks - the close's
+iteration count, ship agent's menu-close claim.) **(2) `rE2__090_7-3` f47,532 fixed**, with **gate `earth_2_90_2` /
+`rE2__087_2-90` f3,690 (red on 6202668)** - both the form object's tick: it runs in the field's callback list after
+the object pass (where the event scene objects and the enemies' AI run), before the trigger / inline scripts. So: an
+event that ends in its scene step ticks in that frame (7-3 f6,622 / f46,426, s289 / s304 - `passive_after_scripts`,
+now for any end, not only a frame wait); an event an AI starts from the pass (2-90 f1,753, s121) holds it - ours
+ticked in the player's update, `player::ai_event_started` skips the next tick (`tick_owed`); a trigger's inline
+script ending holds it (7-2 f1,492, s495 under the trigger: `no_tick_after_scripts`); a new form object / switched
+character is not the held one. The red gate was my earlier partial rule (end-frame tick without the AI-start one)
+plus HEAD's committed experiment. All 503 gates green, all 90 E2 cuts' records clean. Note: while bisecting I ran
+`git checkout` on `wf-core/src/player.rs` (my mistake) and re-applied my hunks; HEAD had just been committed, but an
+uncommitted edit by another agent to that file in the minutes before 6202668 would be lost - check yours.
 *B's findings on the 7-3 punch machine (B drops the item; the Earth agent has it).* The row-153,101 draw was the
 punch marker's blink phase: the mode's counter (0x03000F94) came from play time + `lf_bias`, which (1) never counted
 the boot screens (the game's counter is 697 at the title's first iteration, 8 of the 705 video frames being
@@ -3765,3 +3785,20 @@ is yours: row 90,251, Earth 3-2, the pause menu - the game's enter is one iterat
 (`Phase::Enter` t 0..4), so the field resumes 4 iterations late; the close is already 2 steps under no_lag (yours).
 Also the punch mini-game's blink counter now reads `Globals::clock` (`minigame.rs`), not play time + `lf_bias`
 (one short in a cut taken inside the event: 7-3 `e73 mid_2000` exact; gated `earth_7_3_1` unchanged).
+*A, 2026-10-04 (continued):*
+* **20-6 +3,000 715 -> 965** (in 836475d): an event an AI's RunScript queued runs first in the next frame's pass (its
+  object is at the list's end) and holds the objects after it - our enemies ran their AI in that frame (Super Buu
+  went 0x29F -> 0x2A0 at f59, the game at s474's exit). `enemy::update` holds an enemy in the frame a queued
+  `Cause::Ai` run is due. All 1,519 area-entry cuts + 56 tiles: only this tile changes; gates unchanged. +3,000
+  (f965) and +8,000 (f920) now both stop on sprite 280 (Vegeta's wander) - the Super Buu agent's heap leftovers.
+* **Whole-run import stop 621,339 exact** (the cut, 2 / 2): the cut is the frame the player is hit by a HeavyPunch
+  (state 0x2EA, static runtime 0x030032F8, controller 0x030032F4); the import gave the node a fresh runtime that
+  ended at once and idled (rand(255)). Now its frame count is the controller's tick (obj+0x12, 49 there) and its
+  end 48 + 8 x the punch animation's frames (`patch_enemy`). Tiles unchanged otherwise.
+* **sb_000_18_12 records: 0 differ (271 checks).** `recs.py` now checks the start state's logic counter
+  (0x03000F94) against the segment's own start RAM; a state from another moment is replaced by the cut rebuilt from
+  its source recording (`source.from` / `at`), else reported. Its sidecar regenerated (only that one differed).
+  `rsbk_002_04_21` / `sb_044_04_20` are 0 differ too now.
+* Note: on 836475d these gates are red on a clean export **without** any of A's changes (no-lag commit?):
+  dr3_016_10-30, rclose_044_015_18-1, rkb_168_14-1, rsbi_016_21_14, sb_029_21_13, sb_030_21_14, shipr_056_8-1,
+  shipr_172_8-1 (a player sprite 115 / 117 "has no entity" or far off).
