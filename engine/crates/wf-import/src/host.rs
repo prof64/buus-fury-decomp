@@ -459,7 +459,7 @@ impl StoryHost {
         self.rt.start_event_at(event, node, params);
         self.started.push((self.frame, format!("s{event:03}@{node}")));
         self.cause = imported_cause(w, event);
-        let (hs0, story0) = (self.hs.clone(), w.story.clone());
+        let (hs0, story0, batch0) = (self.hs.clone(), w.story.clone(), w.scene.director.batch);
         if let Some(pending) = blocked {
             // run the handler(s) up to the load action without executing anything, then block on it
             let mut left = skip;
@@ -482,6 +482,9 @@ impl StoryHost {
                     // they were - RAM's)
                     self.hs = hs0;
                     w.story = story0;
+                    // (a `begin_parallel` among them ran its batch open; its `end_parallel` was dropped with the other
+                    // actions the game ran: the batch is closed in RAM - r062_001_20-6 +1,137, s473 node 12's step 0)
+                    w.scene.director.batch = batch0;
                     self.hs.pending = Some(pending);
                     self.running = true;
                     return;
@@ -649,7 +652,12 @@ impl StoryHost {
         self.collect(&pre);
         let before = self.started.len();
         self.run_queue(&mut sess.world);
-        let fresh = self.started.len() > before;
+        // (the title's New Game: the prologue hook #4 starts in the New Game iteration, whose lag frames come before
+        // this first field frame, so its scene enter is over now and its 64-frame fade (mode 0x0804BBA4) runs from
+        // this frame - the whole run from the reset: f854 .. f917, the load at f918; as the playthrough harness. The
+        // Select picture under it shows each level a frame later: menu::view)
+        let new_game = pre.iter().any(|e| matches!(e, Event::Field(FieldEvent::Run { run: Callback::Event(id), cause: Cause::Menu, .. }) if id == "s004"));
+        let fresh = self.started.len() > before && !new_game;
         let n0 = sess.world.events.len();
         sess.step_update();
         wf_script_core::tick_timers(&mut sess.world, &mut self.hs);

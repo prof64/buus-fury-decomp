@@ -2007,7 +2007,7 @@ pub fn import_emulator_state(data: &Arc<GameData>, ram: &GbaRam, runner: &mut St
     let mut guess = target;
     let mut last: Option<Built> = None;
     let mut notes = vec![];
-    for _ in 0..4 {
+    for k in 0..4 {
         let mut n = vec![];
         let probe = runner.snapshot();
         let frame0 = info.lf.wrapping_sub(last.as_ref().map(|b| b.held).unwrap_or(0));
@@ -2023,7 +2023,11 @@ pub fn import_emulator_state(data: &Arc<GameData>, ram: &GbaRam, runner: &mut St
             last = Some(b);
             break;
         }
-        runner.restore(&probe);
+        // (the last build is the one kept: its scripts stay - a mid-area build whose draws never land on the RAM's
+        // generator keeps it, real run 20-6 r062_001 +8,000: s475's text box was dropped with a restored runner)
+        if k < 3 {
+            runner.restore(&probe);
+        }
         guess = next;
         last = Some(b);
     }
