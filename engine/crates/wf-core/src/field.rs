@@ -273,6 +273,10 @@ pub struct Field {
     /// the frame it ends (story playthrough: the fighters move in the frame the level-up popup closes)
     pub held_event: bool,
     pub resume_held: bool,
+    /// the object pass a held event interrupted completed in this frame (`World.frame` after it): a flight
+    /// state reset later in the frame comes before that pass's flyer update in the game
+    #[serde(default)]
+    pub resumed_at: Option<u32>,
     /// the frame's input as it was before an event's hold cleared it (`pre_step`): the pass an inline event
     /// interrupted completes with it (`post_step`, resumed)
     #[serde(default)]
@@ -497,6 +501,7 @@ fn new_field() -> Field {
         held: false,
         held_event: false,
         resume_held: false,
+        resumed_at: None,
         raw_input: None,
         pre_update: false,
         arrival: None,
@@ -729,6 +734,7 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
     crate::vram::release(w, crate::vram::Owner::StatMark);
     crate::vram::signs_gone(w);
     crate::vram::release(w, crate::vram::Owner::Minigame);
+    crate::vram::release(w, crate::vram::Owner::MiniLabel);
     crate::vram::release(w, crate::vram::Owner::Timer);
     crate::vram::release(w, crate::vram::Owner::Hud);
     crate::vram::release(w, crate::vram::Owner::Map3d);
@@ -1431,8 +1437,10 @@ pub fn post_step(w: &mut World) {
         w.step_entities();
         let new = std::mem::replace(&mut w.g.shakes, shakes);
         w.g.shakes.extend(new);
+        let frame = w.frame;
         if let Some(f) = w.field.as_mut() {
             f.event_ended = ended;
+            f.resumed_at = Some(frame);
         }
     }
     // an event that ended in this frame's script phase was still running when the game's trigger check ran (deferred
@@ -1546,6 +1554,13 @@ pub fn post_step(w: &mut World) {
                     let frame = w.frame;
                     if let Some(f) = w.field.as_mut() {
                         f.fade_end = frame;
+                    }
+                } else if w.field.as_ref().is_some_and(|f| f.resumed_at == Some(frame)) {
+                    // the interrupted pass already completed this frame (the event's end, before this): in the game
+                    // it runs after the SetAnim - the fresh flight state's first tick is that pass's (real route
+                    // 6-1 -> 0-50: s026 from Majin Buu's defeat callback, the flyer's cels from the fade's end)
+                    if let Some(fl) = w.field.as_mut().and_then(|f| f.flight.as_mut()) {
+                        fl.tick = 1;
                     }
                 }
             } else if flying {
@@ -2067,11 +2082,17 @@ pub fn throw_map_item(w: &mut World, at: ObjRef) -> Option<EntityId> {
     crate::fieldobj::throw_map_item(w, &o)
 }
 
+/// an event trigger (vt 0x08049BD4, activation `0x080073F0`: passes its +0x10 slot) - not a save point (vt 0x08049794,
+/// activation `0x0800748C`: the scene runner with no slot, s011 always from node 0)
+fn slot_trigger(w: &World, obj: ObjRef) -> bool {
+    trigger_def(w, obj).is_some_and(|d| matches!(d.kind, ObjKind::Trigger { kind: TriggerKind::Event(_), .. }))
+}
+
 /// the resume node an event started by `cause` begins at (`TriggerRt::resume` / `Npc::resume`); 0 for every other
-/// start (the scene runner `0x08012588` passes a zeroed local: callbacks, queued and nested events start at node 0)
+/// start (the scene runner `0x08012588` passes a zeroed local: callbacks, queued and nested events, save points)
 pub fn resume_node(w: &World, cause: &Cause) -> u16 {
     match cause {
-        Cause::Trigger { obj } => w.field.as_ref().and_then(|f| f.triggers.iter().find(|t| t.obj == *obj)).map_or(0, |t| t.resume),
+        Cause::Trigger { obj } if slot_trigger(w, *obj) => w.field.as_ref().and_then(|f| f.triggers.iter().find(|t| t.obj == *obj)).map_or(0, |t| t.resume),
         Cause::Talk { npc } => match w.find(*npc).map(|i| &w.ents[i]) {
             Some(e) if !e.removed => match &e.body {
                 Body::Npc(n) => n.resume,
@@ -2086,7 +2107,7 @@ pub fn resume_node(w: &World, cause: &Cause) -> u16 {
 /// an event's end node `v` writes back to its starter's resume slot (`0x0801254C`; the caller checks the no-save word)
 pub fn set_resume_node(w: &mut World, cause: &Cause, v: u16) {
     match cause {
-        Cause::Trigger { obj } => {
+        Cause::Trigger { obj } if slot_trigger(w, *obj) => {
             if let Some(t) = w.field.as_mut().and_then(|f| f.triggers.iter_mut().find(|t| t.obj == *obj)) {
                 t.resume = v;
             }
@@ -2153,15 +2174,16 @@ pub fn props_object(w: &World) -> bool {
 /// s303; the four NPCs and the player at indices 0..4 tick twice in its exit frame, the rest once).
 pub fn resume_pass_after_load(w: &mut World) {
     let Some((k, loads)) = w.field.as_mut().and_then(|f| f.talk_pass.take()) else { return };
-    if std::env::var("DBG_RESUME").is_ok() { eprintln!("DBG resume k {k} loads {loads} now {:?} live {} props {} ents {:?}", w.field.as_ref().map(|f| f.loads), w.ents.iter().filter(|e| !e.removed).count(), props_object(w), w.ents.iter().filter(|e| !e.removed).map(|e| (e.id, match &e.body { Body::Npc(_) => "npc", Body::Player(_) => "pl", Body::Enemy(_) => "en", _ => "o" })).collect::<Vec<_>>()); }
     if w.field.as_ref().is_some_and(|f| f.loads == loads) {
         return;
     }
     // (list indices as the game's: the props object, when the map has one, is the list's first object)
     let live: Vec<usize> = (0..w.ents.len()).filter(|&i| !w.ents[i].removed).collect();
-    // the resumed index is past the new list's end: the pass ends (4-20 #5: the talk's player at index 12 of 4-20's
-    // list - the props object and its 9 children - and 7-1's list is 2 long; no second update)
-    if k > live.len() + props_object(w) as usize {
+    // the resumed index is past the new list's end: the slots after the count hold the null object (0x03002A4C),
+    // so the pass runs on down to index 0 and every object gets its second update (the real run's 7-6, s304's exit:
+    // the null object's update 9 times, then Spopovich - his idle starts, rand(255) - Hercule and the player). A
+    // text box's exit is the held update instead (`resume_held`, the same pass; 4-20 #5 -> 7-1: the player once).
+    if k > live.len() + props_object(w) as usize && w.field.as_ref().is_some_and(|f| f.held_event || f.resume_held) {
         return;
     }
     let k = k.saturating_sub(props_object(w) as usize);
@@ -2169,6 +2191,7 @@ pub fn resume_pass_after_load(w: &mut World) {
         match &w.ents[i].body {
             Body::Npc(_) => crate::scene::npc_update(w, i),
             Body::Player(_) => crate::player::anim_tick_only(w, i),
+            Body::Enemy(_) => crate::enemy::update(w, i),
             _ => {}
         }
     }

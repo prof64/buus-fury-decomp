@@ -158,6 +158,7 @@ impl StoryHost {
         // warp / refresh_map_triggers / return to title set the no-save word (`0x08012546`)
         if matches!(st, Ok(Status::Finished)) && !self.hs.in_unit && !self.hs.no_resume_save {
             if let (Some(c @ (Cause::Trigger { .. } | Cause::Talk { .. })), Some(v)) = (self.cause.as_ref(), self.rt.with_thread(|t| t.event_result)) {
+                if std::env::var("RESUME_LOG").is_ok() { eprintln!("RESUME save {v} cause {c:?} frame {}", w.frame); }
                 wf_core::field::set_resume_node(w, c, v);
             }
         }
@@ -475,6 +476,7 @@ impl StoryHost {
                             self.hs.no_resume_save = false;
                         }
                         let node = if std::env::var("NO_RESUME").is_ok() { 0 } else { wf_core::field::resume_node(w, &job.cause) };
+                        if std::env::var("RESUME_LOG").is_ok() { eprintln!("RESUME start s{n:03} at {node} cause {:?} frame {}", job.cause, w.frame); }
                         self.rt.start_event_from(n, node, [0; 4], 0)
                     }
                     }

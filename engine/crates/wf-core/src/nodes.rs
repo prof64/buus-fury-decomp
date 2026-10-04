@@ -543,13 +543,12 @@ fn cond(w: &mut World, c: &C, n: u16) -> bool {
             let Some(pi) = en::player(w, i) else { return false };
             let p = w.pl_ref(pi);
             let e = &w.en_ref(i).a;
-            // 0x08037B96: a pure overlap test (no hold on the player: several enzymes can latch)
-            if e.facing != 0 {
-                return false;
-            }
+            // 0x08037B96 (vtable 0x0804B0F8, condition 0x08037B48): a pure overlap test (no hold on the player: several
+            // enzymes can latch) - the player's box (0x0800FE78) narrowed 6 px a side against the enemy's whole box, any
+            // facing (real run 21-6 r064_004 f254: a 1-px overlap at the box's bottom row latches)
             let pb = p.a.body_box();
             let eb = e.body_box();
-            overlaps(&Rect::new(pb.x0 + 6, pb.y0, pb.x1 - 6, pb.y1), &Rect::new(eb.x0, eb.y1 - 8, eb.x0 + 7, eb.y1 - 1))
+            overlaps(&Rect::new(pb.x0 + 6, pb.y0, pb.x1 - 6, pb.y1), &eb)
         }
         // condition 0x080363C4: a new A/B/d-pad press this frame -> stamp = now, count + 1, true once count > presses;
         // no press and now - stamp > gap -> count = 0 (state built with the tree: d[3] count, d[4] stamp)

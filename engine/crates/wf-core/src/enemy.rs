@@ -2501,7 +2501,14 @@ fn on_death(w: &mut World, i: usize) {
     // Kid Buu's death node (`0x08032D44`): the last copy is not destroyed - its defeat handler (vfunc +0x74) runs
     // and it stays as it is (segment sb 19-3 f21479: no explosion, the object lives on into event 458)
     let last_copy = death == "special" && (ty == 0x3c || ty == 0x3d);
-    if (death == "Idle" || last_copy) && w.field.is_some() {
+    if death == "GotoState" && w.field.is_some() {
+        // the death node GotoState (the Enzyme: def 0x08710EF4 -> state 0x91 = node 0x0802F743, SelfDestruct): the
+        // defeated object stays and its AI runs that state (real run 21-6 r064_004 f304: killed while latched, it
+        // self-destructs three frames later)
+        let st = w.data.enemy(ty).map(|t| t.death_param as u16).unwrap_or(0);
+        w.en(i).ko = -1;
+        crate::nodes::reset(w, i, st);
+    } else if (death == "Idle" || last_copy) && w.field.is_some() {
         // field: the death node Idle (0x080716F4) changes nothing - the enemy stays as it is (its defeat scene
         // takes it over; story playthrough: Olibu stays idle at the KO punch). It stays hittable (+0x1CC): the hit
         // handler 0x0800FBE6 tests no HP, so later hits still roll their damage (VERIFIED segment sb 6-6 f22177:

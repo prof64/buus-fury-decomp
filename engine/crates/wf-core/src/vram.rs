@@ -197,6 +197,11 @@ impl ObjVram {
             eprintln!("  free {handle:#x}");
         }
         let i = self.idx[(handle >> 1) as usize & 511];
+        // a handle with no live block (a stale owner): nothing to free - freeing it would link a free block twice and
+        // the free list would loop for ever (the game never frees one; an import could hand us one)
+        if self.e[i as usize].used != 1 || self.e[i as usize].start != handle >> 1 {
+            return;
+        }
         let b = self.e[i as usize];
         self.e[i as usize].used = 0;
         let (hi, lo) = (b.hi, b.lo);
@@ -294,6 +299,9 @@ pub enum Owner {
     /// a mini-game mode's graphics: "Watch This!" (`0x08027DB0`, 0x2800 bytes), the power struggle's gauge
     /// (`0x080301F8`, 0x380)
     Minigame,
+    /// the punch mini-game's label (`0x08030950`: string 0x98, its width rounded x 20 rows = 0xA00 bytes, purging
+    /// first; freed before the gauge)
+    MiniLabel,
     /// the timer HUD (`0x0802FCA0`, 0x400 bytes)
     Timer,
     /// a scripted beam's object (`0x080206B8`, 0x300) before its shot exists: the actor's id

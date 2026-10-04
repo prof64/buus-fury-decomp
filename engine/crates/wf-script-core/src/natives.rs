@@ -563,7 +563,7 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
             // the script's rebuilt player is a new object at the end of the world's list: it updates (and ticks its
             // script track) before the older ones (s218 -> s501 as Trunks: his walk and Goten's end in one frame,
             // his idle draw first)
-            if let Some(i) = leader(h.w).filter(|_| std::env::var("NOMOVE95").is_err()) {
+            if let Some(i) = leader(h.w).filter(|_| std::env::var("R95").is_err()) {
                 let e = h.w.ents.remove(i);
                 h.w.ents.push(e);
             }
@@ -783,6 +783,11 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
             block(h.s, Pending::Menu { native: n, push: false })
         }
         0xc7 => {
+            // the mode object (`0x080303A0`): its gauge (`0x080301F8`, 0x380) and its label (`0x08030950`, string
+            // 0x98: purge, then 0xA00) - real run 7-3 (`x_r73v` f2,211, s288)
+            wf_core::vram::acquire(h.w, wf_core::vram::Owner::Minigame, 0x380);
+            wf_core::vram::purge(h.w, 0xa00);
+            wf_core::vram::acquire(h.w, wf_core::vram::Owner::MiniLabel, 0xa00);
             if h.w.data.menu.is_some() {
                 wf_core::menu::minigame::open_punch(h.w, arg(a, 0));
             } else {

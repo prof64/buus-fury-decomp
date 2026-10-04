@@ -573,6 +573,11 @@ pub fn poll(w: &mut World, s: &mut HostState) -> Option<Option<i32>> {
                 if native == 0xc6 {
                     wf_core::vram::release(w, wf_core::vram::Owner::Minigame);
                 }
+                // the punch mode's label, then its gauge
+                if native == 0xc7 {
+                    wf_core::vram::release(w, wf_core::vram::Owner::MiniLabel);
+                    wf_core::vram::release(w, wf_core::vram::Owner::Minigame);
+                }
                 return {
                     s.pending = None;
                     Some(push.then_some(r - 1))

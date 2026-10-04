@@ -166,8 +166,16 @@ pub fn reload_json(rom: &Rom, h: &Header) -> Value {
             }
         }
     }
+    // an area load also decompresses the walk and shot grids (header +0x34 / +0x38, into EWRAM; real run 18-1 /
+    // 18-2 loads: 75 k each), the close's reload does not
+    let mut grids = 0;
+    for p in [h.walk, h.shot] {
+        if rom.isptr(p) {
+            grids += cyc(p + 8, true);
+        }
+    }
     // `tiles`: the listed tiles, each copied to VRAM (~375 cycles)
-    json!({"fixed": fixed, "tiles": tiles, "layers": layers})
+    json!({"fixed": fixed, "tiles": tiles, "layers": layers, "grids": grids})
 }
 
 /// One map = one distinct map header.

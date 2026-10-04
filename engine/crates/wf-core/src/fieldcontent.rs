@@ -200,6 +200,8 @@ pub struct MapDef {
 #[derive(Clone, Debug, Default)]
 pub struct Reload {
     pub fixed: i64,
+    /// the walk / shot grids' decompression (an area load only)
+    pub grids: i64,
     /// tiles of the tile list (each copied to VRAM)
     pub tiles: i64,
     pub layers: Vec<ReloadLayer>,
@@ -514,6 +516,7 @@ impl FieldData {
                     let pair = |v: &serde_json::Value| (v[0].as_i64().unwrap_or(0), v[1].as_i64().unwrap_or(0));
                     reload = Some(Reload {
                         fixed: c["reload"]["fixed"].as_i64().unwrap_or(0),
+                        grids: c["reload"]["grids"].as_i64().unwrap_or(0),
                         tiles: c["reload"]["tiles"].as_i64().unwrap_or(0),
                         layers: c["reload"]["layers"]
                             .as_array()

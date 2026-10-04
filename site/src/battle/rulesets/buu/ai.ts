@@ -662,11 +662,13 @@ export function create(n: AiNodeJ, c: AiController): RNode {
     case 'IfLatchOverlap':
       return new Cond(n, c, () => {
         const p = e.player
-        // 0x08037B96 (vtable 0x0804B0F8): a pure overlap test (no hold on the player: several enzymes can latch)
-        if (!p || e.facing !== 0) return false
+        // 0x08037B96 (vtable 0x0804B0F8, condition 0x08037B48): a pure overlap test (no hold on the player: several
+        // enzymes can latch) - the player's box (0x0800FE78) narrowed 6 px a side against the enemy's whole box, any
+        // facing (real run 21-6 r064_004 f254: a 1-px overlap at the box's bottom row latches)
+        if (!p) return false
         const pb = p.bodyBox()
         const eb = e.bodyBox()
-        return overlaps({ x0: pb.x0 + 6, y0: pb.y0, x1: pb.x1 - 6, y1: pb.y1 }, { x0: eb.x0, y0: eb.y1 - 8, x1: eb.x0 + 7, y1: eb.y1 - 1 })
+        return overlaps({ x0: pb.x0 + 6, y0: pb.y0, x1: pb.x1 - 6, y1: pb.y1 }, eb)
       })
     case 'IfButtonMashed': {
       // create 0x080363FA (vtable 0x0804A6D0; built with the state's tree): count +0x10 = 0, stamp +0xC = now - gap - 1.

@@ -362,7 +362,10 @@ pub fn reload_frames_with(w: &mut World, done: bool, more: i64) -> Option<u8> {
 /// on-load scripts, the HUD). Returns its video frames (None: unknown map / no sound content / uncalibrated)
 pub fn load_frames(w: &mut World) -> Option<u8> {
     let (c, extra) = reload_parts(w)?;
-    let base = (LOAD_REST + extra + c * 10_035 / 10_000) * 100_523 / 100_000;
+    let grids = w.field.as_ref().and_then(|f| w.data.field.as_ref()?.maps.get(&f.map)?.reload.as_ref().map(|r| r.grids)).unwrap_or(0);
+    let c = c + grids;
+    let tiles = w.field.as_ref().and_then(|f| w.data.field.as_ref()?.maps.get(&f.map)?.reload.as_ref().map(|r| r.tiles)).unwrap_or(0);
+    let base = (LOAD_REST + LOAD_TILE * tiles + extra + c * 10_035 / 10_000) * 100_523 / 100_000;
     if debug() {
         eprintln!("snd load: c {c} extra {extra} base {base}");
     }
@@ -444,8 +447,10 @@ pub fn reload_parts(w: &World) -> Option<(i64, i64)> {
 /// +6,563, median +6,610; bounded by real run 2-9 rE2__050, 3.4 k from its boundary, and 18-2 r038_002, 1.7 k)
 const RELOAD_REST: i64 = 119_300;
 const SIGN_LABEL: i64 = 25_300;
-/// an area load beyond the map rebuild (fitted on measured real-run loads: work/shipfix/loadfit.py)
-const LOAD_REST: i64 = 400_000;
+/// an area load beyond the map rebuild and the walk / shot grids: 231.9 k + 109 per listed tile (115 measured loads
+/// of the real run, 21 maps: std 40 k, the rest per map - work/shipfix/loadfit.py)
+const LOAD_REST: i64 = 231_900;
+const LOAD_TILE: i64 = 109;
 
 /// the iteration makes the VBlank when it ends this many cycles before it at the latest (the wait's own entry)
 const CUTOFF: i64 = 0;

@@ -670,7 +670,7 @@ fn import_objects(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
     // before the player in the list, so the player updates first and Buu's IfPlayerWithin2 sees this frame's step)
     let leader_obj = ram.r32(0x0300_1C34);
     for o in ram.objects() {
-        if o == leader_obj && std::env::var("NOLEAD").is_err() {
+        if o == leader_obj {
             if let Some(&pid) = players.first() {
                 order.push(pid);
             }
@@ -1706,7 +1706,10 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
         if vt == 0x0804_9F60 {
             for k in 0..4u32 {
                 let h = ram.r16(o + 0x78 + 2 * k);
-                if h != 0xFFFF && h != 0 {
+                // (a slot can keep a handle its block no longer has - a live block starts there or it is skipped:
+                // Gotenks 6-9 tile +6,000, a box mid-scroll; freeing a stale handle corrupts the free list)
+                let live = a.e.get(a.idx[(h >> 1) as usize & 511] as usize).is_some_and(|b| b.used == 1 && b.start == h >> 1);
+                if h != 0xFFFF && h != 0 && live {
                     owners.push((h, if k == 3 { Owner::TextPortrait } else { Owner::Text }));
                 }
             }

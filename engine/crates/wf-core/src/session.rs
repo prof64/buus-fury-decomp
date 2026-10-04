@@ -71,7 +71,10 @@ impl Session {
         }
         if std::mem::take(&mut w.g.load_pending) {
             if let Some(n) = crate::sndsim::load_frames(w) {
-                w.g.lag = n as u16;
+                // a script's load (warp / scene load inside an event) runs inside its logic frame's iteration: that
+                // frame is the iteration's first
+                let scripted = w.scene.depth > 0 || w.field.as_ref().is_some_and(|f| f.busy);
+                w.g.lag = (n as u16).saturating_sub(scripted as u16);
                 w.g.lag_cam = w.sound.wrap as u16;
             }
         }

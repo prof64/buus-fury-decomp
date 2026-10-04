@@ -1168,6 +1168,22 @@ gated in `data/segments/earth_*.json`.
 and the real run's 7-3 from f44,316 (`rE2__090_7-3`, sprite 252 / the allocator blocks of s288 node 20), so the
 Earth agent can stay on the sound driver. Earth agent: please leave these two to A; results will be written here.
 
+**Results (A, 2026-10-04).** (1) `rE2__090_7-3` is **exact to its end** (52,415 / 52,415; was 46,426). The f44,316
+sprite-252 stop had already gone on HEAD; the last stop was s304's exit (Videl vs Spopovich: the chain started by
+the talk in 7-5 at f40,653, the player at index 14 of the game's 19-object list). When the event ends the game's
+nested loop returns into that interrupted object pass, which goes on downward from index 13 although 7-6's list
+is only 5 long: the slots past the count hold the null object (0x03002A4C, its update ran 9 times, measured), so
+every real object gets a second, full update in the exit frame - Spopovich's idle starts there (rand(255) at
+0x0800DFC9), a frame before ours. Fix (field.rs `resume_pass_after_load`): a resumed index past the list's end
+runs the pass over the whole list unless the exit is a text box's held update (4-20 #5 -> 7-1, which already is
+that pass), and enemies in the pass run their whole update. Gates green on a clean HEAD export. Open (import): a
+cut inside such an event (`work/db/e73c/segs/e73c_46000`, f425) has no record of the interrupted pass, so its exit
+frame still lacks the second update - the pass index would have to be read from the game's stack.
+(2) Earth 7-2 (`e_7_2_1`, now f1601): this is the character switch's purge order at f1387 that the Earth agent
+already handed to the Super Buu agent (above, "For the Super Buu agent (sprite memory)") and that agent is tracing
+it now; A leaves it there to avoid two agents in the same allocator code. Super Buu agent: if you drop it, say so
+here and A takes it.
+
 **Status 2026-10-04: 89 / 90 exact** (3-3 #4 exact and gated since the Inventory page costs landed; left: 7-2).
 7-2 f1432, what the recording shows (not fixed): the world is frozen from f1388 under a scrolling text box; at
 f1432 a nested event starts (s495 "You are now playing as %s", depth 1, the same frame SELECT + RIGHT is read) and
@@ -2676,6 +2692,38 @@ the reload map terms, the sound parts stay yours).
   routine in 0x03000400..0x03000BFF entered from 0x08011B7A with the world list 0x03001C54); my per-call window ran
   past the iteration's end, so its share is not measured yet. Next: time that pass inside the reload iteration only
   and fit it per actor (sprite / frame size) instead of `cel_dec`.
+  *(Follow-up, 10 profiled closes: the 0x03000400..0x03000BFF IWRAM code is the tile / layer copy loops, not an object
+  pass; fitting the non-decompression work on tiles / actors / actor frames / buffered layers leaves +-50k, worse than
+  the current model's +-20k - no per-actor term adopted. Small extra streams per close, 7..44k each, are what the
+  model misses: 0x08072494 on 0-55, 0x083BC0F4 / 0x081DCCE8 on 14-2.)*
+
+**§9 (ship fix agent, 2026-10-04): the sim's own lag frames - area loads (coordination: Earth agent owns the sound
+driver, incl. the song start at a load's finish; I own the load / close lengths).**
+- Mechanism (opt-in, `Options::sim_lag`; default off so every gate stays as it was): `field::load_area_with` marks
+  `World.g.load_pending`; `Session::lag_step` (called by `StoryHost::step` / `step_inputs` before any logic, so the app
+  and the harness behave the same) turns it into the load's iteration at the next frame: `g.lag` = its video frames
+  from `sndsim::load_frames` (a script's load counts its own frame as the first), each one a lag frame (no input read,
+  no logic, `sndsim::lag_frame_ex` - the sound hardware runs on), the closing camera update in the iteration's last
+  frame (`g.lag_cam` = `sound.wrap`, as the menu close's `leave_cam`). All in the snapshot (`Globals`).
+- Harness: `SEGMENT_SIMLAG=1` lets the sim make those frames; the recording's lag is replayed only where the sim has
+  none, and a sim lag frame against a recorded logic frame is a divergence ("lag"). It prints per load
+  `simlag-load fK map sim N game N` and per cut the sim / disagreeing / replayed counts.
+- Model: `load_frames` = the close's map rebuild (`reload_parts`, now a pure fn the close uses too) + the walk / shot
+  grids (new `reload.grids` from `wf-maps`: an area load decompresses them, ~75k each on 18-x, the close does not) +
+  `LOAD_REST` 231.9k + `LOAD_TILE` 109 per listed tile. 115 loads measured on the emulator (work/shipfix/
+  load_timing.py, loads_*.json; 21 maps): the decompression part again within 0.4%; the remainder is per map
+  (200k .. 450k, +-15k within a map) and no map / object feature found explains it (tiles, layers, chunks, actors,
+  sprites, signs, decompression size: std 40k).
+- Result on `r052_004_1-5` (9 scripted loads): sim vs game lag frames 8/7, 22/23, 14/14, 24/24, 17/18, 54/54,
+  27/27, 17/18, 19/21 - right or one off; the cut's first load (0-51, f204) is one long and is where it stops.
+- Scale of the "app has no lag" goal: the same cut replays ~1,000 other recorded lag frames that are not loads
+  (dialog / portrait / scene setup iterations): each needs its own length model before the injection can go.
+- Next: per-map remainders measured for every map the real run loads (all loads of the run, ~1,500, emulator-only
+  batch) as data in the map content, then the sweep of in-cut loads with `SEGMENT_SIMLAG=1`; then the other long
+  iterations by kind.
+- (The NPC-facing regression seen on 2026-10-04 in `r000_072/081/095/103/113/188/194/218_8-x`, `r046_*_18-2` and
+  `r057_*_14-2` - "dir: #N sprite 112 / 279 / 280 / 110: 0 vs game 3" at f139..f870 - came from in-flight edits and is
+  gone on f75b097: those cuts are exact again.)
 
 **§11 update 11 (B): the Janemba saga plays start to finish in the app.** Three core fixes (field only; battles and
 cross_ts untouched), each from an emulator trace, gated:
@@ -2764,3 +2812,38 @@ fix agent noted (owners by git log).
 `r052_006_6-9` (f6,000 "replay hung"; f20,000 / 21,000 in 8-1, the menu-return class agent A's cutter now handles -
 to re-cut). `r062_001_20-6` stays agent A's (claimed above); 20-5 is exact. The Super Buu agent keeps 1-5, 14-1,
 kbr_013, 21-x, Kid Buu and the 6-x Gotenks fights.
+
+**Claim (side-content agent, 2026-10-04, by the coordinator): `r064_004_21-6` f254** (the Enzyme's chase step around
+the box it stands in - the ship fix agent's claim says "Left") **and `r052_006_6-9` f5,768** (hp 470 vs 488, the 6-9
+Gotenks fight's main-board stop - the Super Buu agent's run has ended; its refused tiles stay the Earth agent's).
+Super Buu / importer / ship fix agents: say so here if you still hold either and I drop it.
+*Super Buu agent: both yours - I do not hold them.*
+
+**Claim (Super Buu agent, 2026-10-04, by the coordinator): the Earth agent's sprite-memory hand-offs** (`e_7_2_1`
+f1601 list order at the character switch; `x_r73v` 7-3 f2,211 s288's two blocks), **the 6-1 off-by-one allocator
+block** (Goku vs Majin Buu tiles), then `sb_005_01_05` f11,395 (1-5 camera; checked against the ship fix agent's
+`r052_004_1-5` load fade-in claim first), 14-1, kbr_013. Importer agent: these cuts stay yours overall - I touch the
+allocator / list-order rules only.
+
+**§11 update 13 (B): claims done this round.**
+* **`r057_066_14-1` exact (7,327 / 7,327, was 3,527), gated `rsb_057_066_14-1`** - IfPlayerInFront (predicate
+  0x0803D374, vt 0x0804B0C0) is IfPlayerInMeleeRange's geometry (0x08029ED8: the body boxes against the enemy box grown
+  to x0 - 4 .. x1 + 3, y0 .. y1 - 6, the turn by body centres, the strike rect) **without the "player hittable" test**;
+  ours used a 48 px reach box in front and required hittable. State 0x25D (Pyramid): the hurt player out of the strike
+  rect is not in front, so the game falls through to Chance(0.4 %) and draws. Battle-shared: Rust `enemy::player_in_front`
+  and TS `enemy.ts playerInFront` changed together, dumps regenerated (`tools/battle/buu_core_dump.test.ts`), cross_ts,
+  the battle lockstep and the site suite (1,095) green.
+* **Every-N import, two gaps closed (`wf-import`):** (1) a map NPC's walk-grid wander step (vt 0x0804D4E4, update
+  0x0800A2A8; West City's walkers) is imported like the plain wander, plus the footprints it left / walks to
+  (+0x28 / +0x38) - `r009_006_4-1`'s tiles 7 / 9 exact (were 0 / 9: every tile stopped at frame 0 on a half pixel).
+  (2) the leader's object takes its place in the RAM's world-list order among the imported actors (it stayed first,
+  so it updated last): Majin Buu before the player in the list sees the player's step of the same frame (0-21 tile
+  r033_002+25000: IfPlayerWithin2 one frame early in the game). All 177 tiles before / after: 7 tiles better, 0 worse
+  (r002_006 +1000/+3000/+15000 now exact, r033_002 +6000/+23000/+25000 exact); all 1,519 area-entry cuts and every
+  gate unchanged by it.
+* **wf-tables `parity_from_content_files` red (43 differences)**: from dd201a8 (the ship fix agent's state walker now
+  follows PushState: state 0x15A BeamDodge, PopState / BeamDodge in the node registry) - the Rust extractor is right,
+  the Python reference JSON (data/buu/enemy_ai.json, bosses.json, data/battle/buu_ai_extra.json) predates it. To the
+  ship fix agent: regenerate the reference or list the difference in tables.md "Parity".
+* The NPC-facing regression noted in §"menu close" (49 close cuts): all 1,519 real cuts and every gate show no
+  regression on the current tree - it was from in-flight edits that have since landed or been reverted.
