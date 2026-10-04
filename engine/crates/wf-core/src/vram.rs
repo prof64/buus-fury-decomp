@@ -1177,7 +1177,8 @@ pub fn popups_tick(w: &mut World, after: Option<EntityId>) {
     let at = |v: &VramState, h: u16| v.popup_at.iter().find(|p| p.0 == h).map(|p| p.1).unwrap_or(0);
     let mut gone: Vec<(u32, u16)> = v.popups.iter().filter(|p| p.3 <= now).map(|p| (at(v, p.2), p.2)).filter(|g| after.is_none_or(|a| g.0 > a)).collect();
     if !gone.is_empty() {
-        gone.sort();
+        // (two numbers made by one object pass share a stamp: the later-made goes first - r002_006 tile +4,000 f77)
+        gone.sort_by_key(|g| g.0);
         // the entry stays for the reuse window's frame stamp only while the object lives
         for (_, h) in gone.into_iter().rev() {
             v.popups.retain(|p| p.2 != h);

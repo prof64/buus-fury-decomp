@@ -1,18 +1,18 @@
 {
  "chapters": {
   "fat": {
-   "diverged": 3490,
-   "exact_tiles": 10,
+   "diverged": 2618,
+   "exact_tiles": 13,
    "frames": 20336,
    "own": 10596,
    "refused": 0,
    "segments": 1,
    "tiles": 20,
    "uncovered": 0,
-   "verified": 16846
+   "verified": 17718
   },
   "superbuu": {
-   "diverged": 24774,
+   "diverged": 24670,
    "exact_tiles": 18,
    "frames": 48676,
    "own": 14426,
@@ -20,34 +20,20 @@
    "segments": 3,
    "tiles": 43,
    "uncovered": 0,
-   "verified": 23902
+   "verified": 24006
   }
  },
  "segments": [
   {
    "chapter": "fat",
-   "diverged": 3490,
-   "exact_tiles": 10,
+   "diverged": 2618,
+   "exact_tiles": 13,
    "frames": 20336,
    "own": 10596,
    "own_first": "Some((10623, \"cam: (178.77734375, 237.79296875) vs game (178.9638671875, 237.7021484375)\"))",
    "refused": 0,
    "segment": "r002_006_4-1",
    "spots": [
-    [
-     4077,
-     "sprite memory",
-     "Some((77, \"vram: free / spare lists differ (same used blocks): [-1] ours 4 game 12, [4] ours [255,12,255] game [255,13,12], [12] ours [255,13,4] game [255,4,255], [13] ours [255,14,12] game [255,14,4]\"))",
-     4000,
-     5000
-    ],
-    [
-     5412,
-     "sprite memory",
-     "Some((412, \"vram: free / spare lists differ (same used blocks): [-1] ours 13 game 12, [12] ours [255,14,13] game [255,13,255], [13] ours [255,12,255] game [255,14,12], [14] ours [255,15,12] game [255,15,13]\"))",
-     5000,
-     6000
-    ],
     [
      6008,
      "RNG",
@@ -68,13 +54,6 @@
      "Some((623, \"cam: (178.77734375, 237.79296875) vs game (178.9638671875, 237.7021484375)\"))",
      10000,
      11000
-    ],
-    [
-     14128,
-     "sprite memory",
-     "Some((128, \"vram: free / spare lists differ (same used blocks): [-1] ours 16 game 15, [4] ours [255,17,15] game [255,16,15], [15] ours [255,4,16] game [255,4,255], [16] ours [255,15,255] game [255,17,4]\"))",
-     14000,
-     15000
     ],
     [
      17816,
@@ -108,7 +87,7 @@
    "stretch": "002_d04_bandana",
    "tiles": 20,
    "uncovered": 0,
-   "verified": 16846
+   "verified": 17718
   },
   {
    "chapter": "superbuu",
@@ -156,7 +135,7 @@
   },
   {
    "chapter": "superbuu",
-   "diverged": 18187,
+   "diverged": 18083,
    "exact_tiles": 5,
    "frames": 26177,
    "own": 2176,
@@ -186,9 +165,9 @@
      4000
     ],
     [
-     4014,
-     "sound",
-     "Some((14, \"snd: [] vs game [\\\"play 3 64\\\"]\"))",
+     4071,
+     "position / facing",
+     "Some((71, \"dir: #2 sprite 280: 0 vs game 3\"))",
      4000,
      5000
     ],
@@ -200,9 +179,9 @@
      6000
     ],
     [
-     6036,
-     "sound",
-     "Some((36, \"snd: [] vs game [\\\"play 3 64\\\"]\"))",
+     6068,
+     "position / facing",
+     "Some((68, \"dir: #2 sprite 280: 2 vs game 1\"))",
      6000,
      7000
     ],
@@ -298,9 +277,9 @@
      21000
     ],
     [
-     21403,
+     21418,
      "sound",
-     "Some((403, \"snd: [] vs game [\\\"play 3 64\\\"]\"))",
+     "Some((418, \"snd: [\\\"play 48 64\\\", \\\"play 50 64\\\"] vs game [\\\"play 48 64\\\", \\\"play 50 64\\\", \\\"stop 3\\\"]\"))",
      21000,
      22000
     ]
@@ -308,7 +287,7 @@
    "stretch": "062_m_inside_buu",
    "tiles": 25,
    "uncovered": 0,
-   "verified": 7990
+   "verified": 8094
   },
   {
    "chapter": "superbuu",
@@ -336,21 +315,21 @@
  ],
  "tile": 1000,
  "total": {
-  "diverged": 28264,
-  "exact_tiles": 28,
+  "diverged": 27288,
+  "exact_tiles": 31,
   "frames": 69012,
   "own": 25022,
   "refused": 0,
   "segments": 4,
   "tiles": 63,
   "uncovered": 0,
-  "verified": 40748,
+  "verified": 41724,
   "whole_game": {
-   "diverged": 29947,
+   "diverged": 28722,
    "frames": 1668050,
    "uncovered": 38482,
-   "verified": 1599621
+   "verified": 1600846
   }
  },
- "tree": "fda75a6"
+ "tree": "90fa3f7"
 }

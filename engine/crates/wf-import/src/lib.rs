@@ -505,6 +505,8 @@ fn import_ai_rt(w: &mut World, ei: usize, lvl: usize, ram: &GbaRam, r: u32, note
             K::Wait => rt.f = ram.s32(r + 4),
             K::PopState | K::PushState => {}
             K::Chance | K::GotoState | K::SubState | K::IfPlayerWithin | K::IfPlayerFarther | K::IfPlayerInMeleeRange | K::IfTimeInState | K::IfCooldownOver | K::IfLastKidBuu => {}
+            // ThrowBigBall: a singleton runtime (0x030032E8); its frame count comes from the ball (`import_super_ball`)
+            K::ThrowBigBall | K::StandStill | K::FacePlayer => {}
             k => notes.push(format!("ai runtime of {k:?} (state {:#x} node {n}) not imported", tree.state)),
         }
         rts.push((n, rt));
@@ -634,8 +636,9 @@ fn field_from_ram(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
     // script before the scene (fixed); with no event running nothing holds it
     let slot = ram.r32(0x0300_2BE0);
     // a screen shake running there (vt 0x0804A720: +4 intensity, +5 period, +6 count, +8 frames left, +0xC / +0x10
-    // the offset): it draws two RNG values each period (r033_002_6-1 +7,000: every 2 frames, 0x080079F2)
-    if ram.valid(slot) && ram.r32(slot) == 0x0804_A720 && ram.s32(slot + 8) > 0 {
+    // the offset): it draws two RNG values each period (r033_002_6-1 +7,000: every 2 frames, 0x080079F2). Not under
+    // an event: the mid-code import takes the running shake with its command (r033_002 +15,000 / +19,000)
+    if w.scene.depth == 0 && ram.valid(slot) && ram.r32(slot) == 0x0804_A720 && ram.s32(slot + 8) > 0 {
         w.g.shakes = vec![wf_core::world::Shake { intensity: ram.r8(slot + 4) as i32, period: ram.r8(slot + 5) as i32, cnt: ram.r8(slot + 6) as i32, left: ram.s32(slot + 8) }];
         w.g.shake_off = (ram.s32(slot + 0xC), ram.s32(slot + 0x10));
     }
@@ -864,6 +867,37 @@ fn ai_states(ram: &GbaRam, o: u32) -> Vec<i32> {
     (0..n).map(|i| (ram.r32(st + 12 + 8 * i).wrapping_sub(0x0870_F514) / 8) as i32).collect()
 }
 
+/// an in-event import (the event's world rebuilt by replaying it from its start): the world map's patrol airships
+/// (enemies running a 3-D move step, vt 0x0804A800 at obj+0x22C) are where the replay's load put them, not where
+/// they have flown since - each RAM patrol patches the nearest of our enemies of its type (real run 0-50 tiles
+/// r002_006 +9,000 / +17,000, s515's arrival: "RAM actor ... has no entity there" for all ten)
+fn patch_patrols(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
+    let rows: std::collections::BTreeMap<u32, (i32, i32, i32, i32)> = ram.actor_rows.iter().map(|r| (r.0, (r.1, r.2, r.3, r.4))).collect();
+    let mut used: Vec<wf_core::world::EntityId> = vec![];
+    for o in ram.objects() {
+        if ram.r32(o) != VT_ENEMY || ram.r32(ram.r32(o + 0x22C)) != 0x0804_A800 {
+            continue;
+        }
+        let ty = ((ram.r32(o + 0x224).wrapping_sub(0x0871_1274)) / 28) as i32;
+        let (ox, oy) = (ram.s32(o + 0x1A0), ram.s32(o + 0x1A4));
+        let pick = (0..w.ents.len())
+            .filter(|&i| !w.ents[i].removed && !used.contains(&w.ents[i].id))
+            .filter(|&i| matches!(&w.ents[i].body, Body::Enemy(e) if e.ty == ty))
+            .filter(|&i| w.field.as_ref().is_some_and(|f| f.patrols.iter().any(|p| p.entity == w.ents[i].id)))
+            .min_by_key(|&i| {
+                let a = w.actor(i).unwrap();
+                ((a.x - ox) as i64).abs() + ((a.y - oy) as i64).abs()
+            });
+        match pick {
+            Some(i) => {
+                used.push(w.ents[i].id);
+                patch_enemy(w, i, ram, o, rows.get(&o).copied(), notes);
+            }
+            None => notes.push(format!("patrol {o:#x} type {ty} has no entity to patch")),
+        }
+    }
+}
+
 /// an enemy entity set to a RAM enemy object's state
 fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32, i32, i32, i32)>, notes: &mut Vec<String>) {
     let states = ai_states(ram, o);
@@ -879,6 +913,7 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
         import_ai_rt(w, ei, lvl, ram, r, notes);
     }
     import_enemy_beam(w, ei, ram, o, notes);
+    import_super_ball(w, ei, ram, o, notes);
     let d = Arc::clone(&w.data);
     let e = w.en(ei);
     e.a.x = ram.s32(o + 0x1A0);
@@ -955,6 +990,45 @@ fn import_enemy_beam(w: &mut World, ei: usize, ram: &GbaRam, o: u32, notes: &mut
         r.f = vt;
     }
 }
+
+/// Super Buu's ball in flight at the cut (the ThrowBigBall node; builder 0x08021280, vt 0x0804A33C, owner +0x1C:
+/// +0x20 / +0x24 24.8 position, +0x40 ticks since it was made, +0x44 thrown, +0x48 / +0x4C the throw's step): the
+/// shot rebuilt with those numbers (thrown: its start the position at the throw = now - step x ticks since, its
+/// target the start + 43 steps), the node's frame count = the ball's ticks (it is made in the node's enter)
+fn import_super_ball(w: &mut World, ei: usize, ram: &GbaRam, o: u32, notes: &mut Vec<String>) {
+    use wf_core::ai::K;
+    if std::env::var("DBGB").is_ok() { eprintln!("DBGB o {o:#x} balls {:x?}", ram.ewram_with(0x0804_A33C).iter().map(|&b| (b, ram.r32(b + 0x1C))).collect::<Vec<_>>()); }
+    let Some(b) = ram.ewram_with(0x0804_A33C).into_iter().find(|&b| ram.r32(b + 0x1C) == o) else { return };
+    let spots: Vec<(usize, usize)> = w.en_ref(ei).ai.stack.iter().enumerate().flat_map(|(l, s)| s.tree.nodes.iter().enumerate().filter(|(_, n)| n.k == K::ThrowBigBall).map(move |(n, _)| (l, n))).collect();
+    let Some(&(lvl, n)) = spots.first() else {
+        notes.push("a ball object of this enemy outside a ThrowBigBall node: not imported".into());
+        return;
+    };
+    let me = w.ents[ei].id;
+    let (x, y, t, thrown) = (ram.s32(b + 0x20), ram.s32(b + 0x24), ram.s32(b + 0x40), ram.r8(b + 0x44) != 0);
+    if std::env::var("DBGB").is_ok() { eprintln!("DBGB ball t {t} thrown {thrown} spots {spots:?}"); }
+    let id = wf_core::shots::add(w, wf_core::shots::super_ball(me));
+    if let Some(k) = w.find(id) {
+        let s = w.shot(k);
+        s.x = x;
+        s.y = y;
+        if thrown {
+            let (vx, vy) = (ram.s32(b + 0x48), ram.s32(b + 0x4C));
+            let since = t - BALL_THROW;
+            let (sx, sy) = (x - vx * since, y - vy * since);
+            let (tx, ty) = (((sx + vx * 43 + 128) >> 8) << 8, ((sy + vy * 43 + 128) >> 8) << 8);
+            s.kind = wf_core::shots::ShotKind::SuperBall { phase: 1, sx, sy, tx, ty };
+            s.t = since as i64;
+        } else {
+            s.t = t as i64 - _env("BT0", 1);
+        }
+    }
+    if let Some(r) = w.en(ei).ai.stack.get_mut(lvl).and_then(|s| s.rt.get_mut(n)) {
+        r.f = t + _env("NT0", 0) as i32;
+    }
+}
+const BALL_THROW: i32 = 0x3d;
+fn _env(k: &str, d: i64) -> i64 { std::env::var(k).ok().and_then(|v| v.parse().ok()).unwrap_or(d) }
 
 /// a map NPC's behaviour step from RAM (talk-NPC object: +0x1B0 the current step object): a wander (vt 0x0804D848:
 /// +8 frames left, +0x18 / +0x1C 24.8 velocity, +0x20 / +0x24 target px) -> the behaviour's wander step, created as
@@ -1748,6 +1822,9 @@ pub fn import_emulator_state(data: &Arc<GameData>, ram: &GbaRam, runner: &mut St
         }
     }
     let mut world = b.world;
+    if in_event.is_some() {
+        patch_patrols(&mut world, ram, &mut notes);
+    }
     if !b.finished {
         notes.push("the load's scripts are still running at the cut (host state carries over)".into());
     }

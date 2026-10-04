@@ -2289,6 +2289,10 @@ fn superball_update(w: &mut World, i: usize) {
             let (x, y) = (s.x, s.y);
             s.kind = ShotKind::SuperBall { phase: 1, sx: x, sy: y, tx: tx << 8, ty: ty << 8 };
             s.t = 0;
+            // the throw (0x080214DA): the charge sound stops, sound 34 (0x0802154E / 0x0802155E; real run 20-6
+            // r062_001 tile +4,000 f75)
+            w.sfx_stop(3);
+            w.sfx(34, 64);
         }
         return;
     }

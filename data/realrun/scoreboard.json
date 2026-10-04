@@ -12,14 +12,13 @@
   },
   "fat": {
    "cats": {
-    "RNG": 1,
     "camera": 1,
     "screen fade": 1
    },
    "cut_frames": 380206,
-   "exact": 368,
+   "exact": 369,
    "frames": 380206,
-   "matched": 369662,
+   "matched": 369911,
    "run_frames": 388646,
    "segments": 371,
    "stretches": 33
@@ -74,12 +73,12 @@
  "dirty": true,
  "total": {
   "cut_frames": 1622756,
-  "exact": 1511,
+  "exact": 1512,
   "frames": 1622756,
-  "matched": 1577083,
+  "matched": 1577332,
   "run_frames": 1668050,
   "segments": 1519,
   "stretches": 75
  },
- "tree": "fda75a6"
+ "tree": "90fa3f7"
 }

@@ -1362,6 +1362,12 @@ fn begin_fade_in(w: &mut World) {
     if let Some(f) = w.field.as_mut() {
         f.mode = Mode::FadeIn { k: 0 };
     }
+    // the fade-in writes the new area's palette from black: a script's black screen from before the load is gone
+    // (1-5 f11,578: s464's fade_to_black, then warp_fade into 6-5 - the arrival brightens with no fade_from_black)
+    if w.scene.screen.fade.is_none() && std::env::var_os("T_NOBLK").is_none() {
+        w.scene.screen.black = 0;
+        w.scene.screen.dim = 0;
+    }
     // the world map's fade-in has no autowalk: the flyer is under control; a script's warp_fade arrival neither
     // (the player the load created stays idle, under control)
     if crate::fieldworld::flying(w) || w.field.as_ref().is_some_and(|f| f.script_fade_in) {

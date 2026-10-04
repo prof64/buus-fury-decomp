@@ -1,6 +1,6 @@
 # Parity scoreboard, every-N-frames cuts
 
-Tree: `fda75a6`. Tiles of 1,000 frames. Regenerate: `scoreboard.py` (the area-entry board, which lists the
+Tree: `90fa3f7`. Tiles of 1,000 frames. Regenerate: `scoreboard.py` (the area-entry board, which lists the
 segments), `scoreboard.py mid cut 1000` (local, under `work/real/mid/`), `scoreboard.py mid`.
 
 Every area-entry segment that loses more than 1,000 frames on the main board, cut again at its frame 1,000,
@@ -10,9 +10,9 @@ tile's first divergence; **not covered** when its tile was refused by the import
 
 | chapter | segments | frames | exact on the main board | verified exact | diverged | not covered | tiles | exact tiles | refused |
 |---|---|---|---|---|---|---|---|---|---|
-| fat | 1 | 20,336 | 10,596 (52.1%) | 16,846 (82.8%) | 3,490 | 0 | 20 | 10 | 0 |
-| superbuu | 3 | 48,676 | 14,426 (29.6%) | 23,902 (49.1%) | 24,774 | 0 | 43 | 18 | 0 |
-| **all** | 4 | 69,012 | 25,022 (36.3%) | 40,748 (59.0%) | 28,264 | 0 | 63 | 28 | 0 |
+| fat | 1 | 20,336 | 10,596 (52.1%) | 17,718 (87.1%) | 2,618 | 0 | 20 | 13 | 0 |
+| superbuu | 3 | 48,676 | 14,426 (29.6%) | 24,006 (49.3%) | 24,670 | 0 | 43 | 18 | 0 |
+| **all** | 4 | 69,012 | 25,022 (36.3%) | 41,724 (60.5%) | 27,288 | 0 | 63 | 31 | 0 |
 
 ## The whole game
 
@@ -26,10 +26,10 @@ story playthrough test (same keys from power-on, every row compared, no import: 
 | opening | 42,275 | 41,189 (97.4%) | 0 | 1,086 (2.6%) |
 | earth | 160,503 | 157,565 (98.2%) | 0 | 2,938 (1.8%) |
 | ship | 398,194 | 395,616 (99.4%) | 0 | 2,578 (0.6%) |
-| fat | 388,646 | 375,912 (96.7%) | 4,294 | 8,440 (2.2%) |
+| fat | 388,646 | 377,033 (97.0%) | 3,173 | 8,440 (2.2%) |
 | janemba | 199,703 | 186,412 (93.3%) | 879 | 12,412 (6.2%) |
-| superbuu | 478,729 | 442,927 (92.5%) | 24,774 | 11,028 (2.3%) |
-| **all** | 1,668,050 | 1,599,621 (95.9%) | 29,947 | 38,482 (2.3%) |
+| superbuu | 478,729 | 443,031 (92.5%) | 24,670 | 11,028 (2.3%) |
+| **all** | 1,668,050 | 1,600,846 (96.0%) | 28,722 | 38,482 (2.3%) |
 
 ## Per segment: where it really diverges
 
@@ -38,13 +38,10 @@ tile divergence (segment frame: category) - a tile that diverges is a separate c
 
 ### fat
 
-* `r002_006_4-1` (002_d04_bandana): 10,596 / 20,336 (Some((10623, "cam: (178.77734375, 237.79296875) vs game (178.9638671875, 237.7021484375)")) -> **16,846** / 3,490 / 0; 10 / 20 tiles exact
-  * 4,077: sprite memory - Some((77, "vram: free / spare lists differ (same used blocks): [-1] ours 4 game 12, [4] ours [255,12,255] game [255,13,12], [12] o
-  * 5,412: sprite memory - Some((412, "vram: free / spare lists differ (same used blocks): [-1] ours 13 game 12, [12] ours [255,14,13] game [255,13,255], [13
+* `r002_006_4-1` (002_d04_bandana): 10,596 / 20,336 (Some((10623, "cam: (178.77734375, 237.79296875) vs game (178.9638671875, 237.7021484375)")) -> **17,718** / 2,618 / 0; 13 / 20 tiles exact
   * 6,008: RNG - Some((8, "rng: [d7559509, b8a479f4] vs game [089b453c, a09338fc]"))
   * 7,192: sprite memory - Some((192, "vram: used blocks (start, size) ours only [(151, 4), (354, 16), (370, 1)], game only [(154, 1), (351, 16), (367, 4)]")
   * 10,596: camera - Some((623, "cam: (178.77734375, 237.79296875) vs game (178.9638671875, 237.7021484375)"))
-  * 14,128: sprite memory - Some((128, "vram: free / spare lists differ (same used blocks): [-1] ours 16 game 15, [4] ours [255,17,15] game [255,16,15], [15] 
   * 17,816: sprite memory - Some((816, "vram: used blocks (start, size) ours only [(151, 4), (338, 16), (354, 1)], game only [(154, 1), (335, 16), (351, 4)]")
   * 18,014: animation - Some((14, "anim: #9 sprite 269: raw 5 cel 0 vs game raw 1 cel 0 tick 62"))
   * 19,292: sprite memory - Some((292, "vram: used blocks (start, size) ours only [], game only [(151, 4)]"))
@@ -52,13 +49,13 @@ tile divergence (segment frame: category) - a tile that diverges is a separate c
 
 ### superbuu
 
-* `r062_001_20-6` (062_m_inside_buu): 2,176 / 26,177 (Some((2176, "pos: #26 sprite 280: (214.58984375, 289.30078125) vs game (214.484375, 289.30) -> **7,990** / 18,187 / 0; 5 / 25 tiles exact
+* `r062_001_20-6` (062_m_inside_buu): 2,176 / 26,177 (Some((2176, "pos: #26 sprite 280: (214.58984375, 289.30078125) vs game (214.484375, 289.30) -> **8,094** / 18,083 / 0; 5 / 25 tiles exact
   * 1,139: animation - Some((2, "anim: #2 sprite 280: raw 1 cel 0 tick 254 vs game raw 1 cel 1 tick 255"))
   * 2,176: position / facing - Some((176, "pos: #5 sprite 280: (214.58984375, 289.30078125) vs game (214.484375, 289.30078125)"))
   * 3,000: position / facing - Some((0, "pos: #0 sprite 52: (116.515625, 212) vs game (116.3828125, 210)"))
-  * 4,014: sound - Some((14, "snd: [] vs game [\"play 3 64\"]"))
+  * 4,071: position / facing - Some((71, "dir: #2 sprite 280: 0 vs game 3"))
   * 5,021: sound - Some((21, "snd: [] vs game [\"play 34 64\", \"stop 3\"]"))
-  * 6,036: sound - Some((36, "snd: [] vs game [\"play 3 64\"]"))
+  * 6,068: position / facing - Some((68, "dir: #2 sprite 280: 2 vs game 1"))
   * 7,021: position / facing - Some((21, "dir: #0 sprite 52: 2 vs game 0"))
   * 8,165: script / text - Some((165, "text: game opens a text box: true, ours: false"))
   * 9,002: sprite memory - Some((2, "vram: used blocks (start, size) ours only [(257, 64)], game only []"))

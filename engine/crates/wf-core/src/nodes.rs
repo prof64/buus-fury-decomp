@@ -1180,6 +1180,8 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             set_anim(w, i, &[an(15)], true, Some(true));
             let id = w.ents[i].id;
             shots::add(w, shots::super_ball(id));
+            // the builder (0x08021280) starts the charge sound (0x080212F2: sound 3)
+            w.sfx(3, 64);
         }
         K::GlideToWaypoint => {
             const WP: [(i32, i32); 5] = [(224, 104), (344, 128), (120, 128), (264, 112), (144, 144)];

@@ -1,6 +1,6 @@
 # Parity scoreboard: the real playthrough on wf-core
 
-Tree: `fda75a6` + uncommitted engine changes. Regenerate: `.venv/bin/python tools/segments/scoreboard.py`
+Tree: `90fa3f7` + uncommitted engine changes. Regenerate: `.venv/bin/python tools/segments/scoreboard.py`
 (the cuts: `scoreboard.py cut`, local under `work/real/`; the run itself: `tools/segments/realrun.py`, §"How to replay
 the real run" in `engine/docs/segments.md`). A segment = the real game from one importable area entry (an exit
 arrival with nothing running) to the next; an entry by a script warp / in a cutscene is not a cut - its frames
@@ -13,17 +13,16 @@ frames are counted where its segments start.
 | opening | Earth agent (title, New Game, Other World) | 42,275 | 7,898 | 17 | 17 | 34,377 | 34,377 | 100.0 |
 | earth | Earth agent | 160,503 | 2,938 | 90 | 90 | 157,565 | 157,565 | 100.0 |
 | ship | ship agent | 398,194 | 2,578 | 338 | 338 | 395,616 | 395,616 | 100.0 |
-| fat | dungeon agents A / B (+ ship agent: Thieves Den, Pilaf) | 388,646 | 8,440 | 371 | 368 | 380,206 | 369,662 | 97.2 |
+| fat | dungeon agents A / B (+ ship agent: Thieves Den, Pilaf) | 388,646 | 8,440 | 371 | 369 | 380,206 | 369,911 | 97.3 |
 | janemba | side-content agent | 199,703 | 12,412 | 255 | 253 | 187,291 | 186,412 | 99.5 |
 | superbuu | Super Buu agent | 478,729 | 11,028 | 448 | 445 | 467,701 | 433,451 | 92.7 |
-| **all** |  | 1,668,050 | 45,294 | 1519 | 1511 | 1,622,756 | 1,577,083 | 97.2 |
+| **all** |  | 1,668,050 | 45,294 | 1519 | 1512 | 1,622,756 | 1,577,332 | 97.2 |
 
 ## Non-exact segments by category
 
 | category | owner | opening | earth | ship | fat | janemba | superbuu | all |
 |---|---|---|---|---|---|---|---|---|
 | menu timing | Earth agent (redraw / mixer timing) | 0 | 0 | 0 | 0 | 1 | 0 | 1 |
-| RNG | chapter agent (who draws first: enemy AI / hits) | 0 | 0 | 0 | 1 | 0 | 0 | 1 |
 | screen fade | cutscene / script-host agent | 0 | 0 | 0 | 1 | 0 | 0 | 1 |
 | camera | chapter agent (camera scroll) | 0 | 0 | 0 | 1 | 1 | 2 | 4 |
 | position / facing | chapter agent (enemy AI / knockback) | 0 | 0 | 0 | 0 | 0 | 1 | 1 |
@@ -38,10 +37,9 @@ The five biggest losses each owner can take (unmatched frames; the full list bel
 * `r052_004_1-5` (052_m_gotenks, camera): 8,527 lost - Some((11575, "cam: (0, 44) vs game (0.375, 43.71875)"))
 * `r067_071_14-2` (067_k03_goku158, camera): 1,722 lost - Some((693, "cam: (36.1904296875, 126.6875) vs game (36.4619140625, 126.919921875)"))
 
-**dungeon agents A / B (+ ship agent: Thieves Den, Pilaf)** - 2 segments, 9,989 frames lost
+**dungeon agents A / B (+ ship agent: Thieves Den, Pilaf)** - 1 segments, 9,740 frames lost
 
 * `r002_006_4-1` (002_d04_bandana, camera): 9,740 lost - Some((10623, "cam: (178.77734375, 237.79296875) vs game (178.9638671875, 237.7021484375)")) **Known:** West City -> the Bandana hunt (fixed: s509 a frame later 1,763; on-defeat prop show 4,178). Now at 10,623: a heal menu closed on the 3D world map 0-55 - the reload estimate predicts 27 black frames (margin 58,318 cycles), the game takes 28 (its camera step lands in the 28th): reload model on a 3D map
-* `r017_009_13-45` (017_db6_fukurou, RNG): 249 lost - Some((270, "rng: [241c8739, 76b433d9] vs game [1824eac4, 5b21630a]"))
 
 **Earth agent (redraw / mixer timing)** - 1 segments, 681 frames lost
 
@@ -58,20 +56,20 @@ The five biggest losses each owner can take (unmatched frames; the full list bel
 
 ## Where long segments really diverge (every-N board)
 
-From `engine/docs/scoreboard-mid.md` (tree `fda75a6`, tiles of 1,000 frames; the whole run 95.9% verified exact). Each
+From `engine/docs/scoreboard-mid.md` (tree `90fa3f7`, tiles of 1,000 frames; the whole run 96.0% verified exact). Each
 divergence below is where a tile (a cut inside a long segment) first differs; "lost" = its frames up to the next
 cut. A divergence at a tile's frame 0 is usually the any-frame import, not the game rule - say so to the importer
 agent.
 
-**fat** (dungeon agents A / B (+ ship agent: Thieves Den, Pilaf)) - 9 divergences inside tiles, 6,465 frames
+**fat** (dungeon agents A / B (+ ship agent: Thieves Den, Pilaf)) - 6 divergences inside tiles, 4,082 frames
 
 * `r002_006_4-1` frame 6,008 (RNG): 992 lost - Some((8, "rng: [d7559509, b8a479f4] vs game [089b453c, a09338fc]"))
 * `r002_006_4-1` frame 18,014 (animation): 986 lost - Some((14, "anim: #9 sprite 269: raw 5 cel 0 vs game raw 1 cel 0 tick 62"))
-* `r002_006_4-1` frame 4,077 (sprite memory): 923 lost - Some((77, "vram: free / spare lists differ (same used blocks): [-1] ours 4 game 12, [4] ours [255,12,255] game [255,13,1
-* `r002_006_4-1` frame 14,128 (sprite memory): 872 lost - Some((128, "vram: free / spare lists differ (same used blocks): [-1] ours 16 game 15, [4] ours [255,17,15] game [255,16,
 * `r002_006_4-1` frame 7,192 (sprite memory): 808 lost - Some((192, "vram: used blocks (start, size) ours only [(151, 4), (354, 16), (370, 1)], game only [(154, 1), (351, 16), (
+* `r002_006_4-1` frame 19,292 (sprite memory): 708 lost - Some((292, "vram: used blocks (start, size) ours only [], game only [(151, 4)]"))
+* `r002_006_4-1` frame 10,596 (camera): 404 lost - Some((623, "cam: (178.77734375, 237.79296875) vs game (178.9638671875, 237.7021484375)"))
 
-**superbuu** (Super Buu agent) - 20 divergences inside tiles, 17,442 frames
+**superbuu** (Super Buu agent) - 20 divergences inside tiles, 17,338 frames
 
 * `r062_001_20-6` frame 9,002 (sprite memory): 998 lost - Some((2, "vram: used blocks (start, size) ours only [(257, 64)], game only []"))
 * `r062_001_20-6` frame 17,004 (RNG): 996 lost - Some((4, "rng: [aef64cec, 580be19f] vs game [e9c9e8c2, 2f580dcb]"))
@@ -97,7 +95,6 @@ agent.
 | `r067_071_14-2` | 067_k03_goku158 | camera | 1,722 | Some((693, "cam: (36.1904296875, 126.6875) vs game (36.4619140625, 126.919921875)")) |
 | `r044_015_18-1` | 044_h_back1 | menu timing | 681 | Some((577, "fade: black true vs game false")) |
 | `r012_014_12-19` | 012_db5_a01 | screen fade | 555 | Some((2567, "fade: black true vs game false")) |
-| `r017_009_13-45` | 017_db6_fukurou | RNG | 249 | Some((270, "rng: [241c8739, 76b433d9] vs game [1824eac4, 5b21630a]")) |
 | `r038_001_18-1` | 038_j03_goku120 | camera | 198 | Some((589, "cam: (53.080078125, 77.986328125) vs game (53.076171875, 77.986328125)")) |
 
 ## Recurring first divergences (3+ segments)
@@ -121,7 +118,6 @@ segment (stretch): matched / frames, category - first divergence
 
 * `r002_006_4-1` (002_d04_bandana): 10,596 / 20,336, **camera** - Some((10623, "cam: (178.77734375, 237.79296875) vs game (178.9638671875, 237.7021484375)")) **Known:** West City -> the Bandana hunt (fixed: s509 a frame later 1,763; on-defeat prop show 4,178). Now at 10,623: a heal menu closed on the 3D world map 0-55 - the reload estimate predicts 27 black frames (margin 58,318 cycles), the game takes 28 (its camera step lands in the 28th): reload model on a 3D map
 * `r012_014_12-19` (012_db5_a01): 2,567 / 3,122, **screen fade** - Some((2567, "fade: black true vs game false"))
-* `r017_009_13-45` (017_db6_fukurou): 270 / 519, **RNG** - Some((270, "rng: [241c8739, 76b433d9] vs game [1824eac4, 5b21630a]"))
 
 ### janemba
 
