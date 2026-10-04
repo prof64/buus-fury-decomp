@@ -2848,6 +2848,54 @@ driver, incl. the song start at a load's finish; I own the load / close lengths)
   the Rust one does; data/buu/enemy_ai.json, bosses.json and data/battle/buu_ai_extra.json regenerated (state 0x15A,
   and state 0x91 - the Enzyme's death state, reached by PushState too); node 0x0802F743 registered in both registries
   (ParentCountDown = the core's `LatchRelease`). Parity test green.
+- **Sim-made lag is deprecated by design (2026-10-04, the user's direction): the app runs a steady 60 fps and never
+  recreates the game's slowdowns.** Recorded lag stays injected by the harnesses (segments, whole run, soak) to line up
+  with emulator recordings. `Options::sim_lag` / `SEGMENT_SIMLAG` and the length models stay in the tree, off by
+  default (not deleted). State of the models when stopped: loads - the area-name banner term (+67.5 k, `banner` in
+  `load_rest.json`) and per-map constants pooled from both measured sets (`work/shipfix/mk_loadrest3.py`: the 745 loads
+  between cuts + 246 in-cut loads, `loadfit3.py`) - load segments 1,545 / 1,748 right (was 1,509), real cuts exact with
+  sim lag 1,466 / 1,519 (was 1,463); text boxes - per-map box constants from 683 measured openings
+  (`dialog_rest.json`, `work/shipfix/dlg_measure2.py` / `mk_dlgrest.py`: the scene's own per-frame work differs by
+  ~25 k between maps; 469 within 5 k against 177 for one constant) + the palette fade's pass (35.7 k) while a screen
+  fade runs; the whole run's first narration box is now 1,924,679 = the game's own cycles. Not done: a fade that ended
+  earlier in the box's frame also pays the pass (11-13 f779, 7-2 f975); in-cut loads into one map differ by the load's
+  path (14-1 from the world map ~570 k vs ~275 k by an exit). Tools for the menu-close work (real-route agent):
+  `work/shipfix/load_timing.py` / `loads_*.json` (every load between cuts, emulator), `load_prof*.py` (profiles),
+  `simlagloads.sh` / `loads_cmp.py` (per-map sweep), `profdiff.py` / `boxdelta.py` (profile diffs).
+- **Does game logic observe lag? No - audit (2026-10-04, ship fix agent).** From the disassembly and a census over
+  the whole recording:
+  * *VBlank interrupt* (`0x0803D784`, table `0x03000FB0`): calls the current mode's vtable +0x10 and the system object
+    `[0x03004A8C]`'s +0x18. Over every video frame of the whole recording (`work/shipfix/vblank_census.py`, 38 mode
+    vtables: field, menus, scenes, title, minigames, world map) both are `bx lr` (`0x0804FDA1` / `0x080501F9`). The
+    other enabled interrupts: DMA2 (`0x03000AE0`, the sound mix) and Game Pak (stub). Nothing else runs per video frame.
+  * *The VBlank wait* `0x0803F3F4` writes a load meter `[0x03000FEC]` (100 when the iteration overran, else the VCOUNT
+    share): no reader in the ROM (`work/shipfix/load_meter.py`). The timer / VCOUNT / serial readers
+    (`work/shipfix/io_refs.py`) are the sound update (`0x0803F296`, timer 0 = the sample clock) and the link library
+    (`0x080409xx`-`0x080459xx`) - no gameplay.
+  * *Input*: KEYINPUT is read once per iteration after the wait (`0x0803D4A0` -> `0x0804023C`, edges between reads,
+    the press ring stamped with the iteration counter). A press and release inside one long iteration is lost in the
+    game; the app (one iteration per frame) sees it - only reachable with live input, never with a recording.
+  * *The clock* `0x03000F94` (mode stack +4) is incremented by the main loop once per **iteration** (`0x0803D81C`),
+    in every mode (field, menus, scenes, title): it does not count lag frames. 29 functions read it
+    (`work/shipfix/clock_readers.py` / `clock_uses.py`). Differences of two stamps (lag-free by construction): hit
+    windows `0x0800E8E6` / `0x0800E97E` (< 8), enemy creation marks and AI cooldowns (`0x0802AA0C`..`0x0802AAA6`,
+    `0x0804ED6C`, `0x0804FF40` / `0x0804FF84`, `0x0803987C`), the press ring (`0x0804023C`), Kamehameha / beam charge
+    stamps (`0x080206B8`, `0x0803710C`), the HUD beep / periodic 60- and 128-iteration checks (`0x0800B99C`,
+    `0x080247BE`), timers `0x08036394` / `0x080363FA`. Absolute phase (`clock & mask`): LatchDrain `0x08029902`
+    (`& 63` -> 1 HP) and the other grab drain (`& 15`, nodes.rs) - **gameplay**; the level sign bob `0x0800C368`
+    (sine[clock & 0xFF]), dropped-item blink `0x0801809E` (`& 4`), the punching-machine marker blink `0x080309F4`
+    (`& 4`) - cosmetic. Play time (`0x080042FC` save, `0x08004962` / `0x0801514A` = clock + base) counts iterations.
+  * *Sound*: the driver runs on the sample clock (DMA2), so in lag the music / SFX run on while logic waits. Logic
+    reads no driver state (play_sfx takes a free voice or drops the sound, play_music skips a playing song: audio only).
+  **Rule for the no-lag app:** keep `Globals::clock` = the number of main-loop iterations, one per app frame in every
+  mode, starting at the game's boot count (697 at the title's first iteration - the boot screens are input-free, so
+  this is a constant). Every stamp-difference reader is then exact by construction; the absolute readers (two grab
+  drains, cosmetics, play time) run on the app's own iteration count - self-consistent, but against a power-on-to-end
+  recording they drift by the iterations the game loses to menu redraws (the 3-15 Status redraws: 20). Tests already
+  import the counter at each cut, so no gate depends on it. **Open decision (user):** the pause menu still models its
+  redraw lag in the app by default (`Menu.lag`, the close's black frames from `reload_frames_with`) - that is lag
+  recreation the new direction rules out, but menu_parity and the menu segments compare video frames against it;
+  dropping it needs those suites re-based on logic frames.
 
 **§11 update 11 (B): the Janemba saga plays start to finish in the app.** Three core fixes (field only; battles and
 cross_ts untouched), each from an emulator trace, gated:
@@ -3631,6 +3679,29 @@ Now that the minigame reads `Globals::clock`, (2) matters only if `fc0` takes th
 621,395 (pos, facing)** - stretch 002 (West City / Bandana hunt). Dungeon agent A: these are mine unless you mark
 one. Super Buu agent: nothing in stretches 002 .. 072 beyond these three rows. Then: the 3 report-only gates beyond
 the listed 18 (named here when found).
+*Result (B):*
+* **608,823 rng and 621,338 pos: no logic difference - one row of a menu close's length.** Both follow a pause / save
+  menu close (s011 save point; the 4-1 heal menu): the game's reload black frames end one video frame earlier than
+  ours (608,743 .. 608,806: 63 black + the fade from 608,807; ours Leave t 0..64, fade from 608,808), then every
+  later row of ours is the game's row before it (608,824's RNG = the game's 608,823, 621,339's position = the game's
+  621,338). Per logic frame the two are the same - under the steady-60fps direction not a stop; if the board keeps
+  comparing rows it is the close-length model (ship agent's claim above).
+* **621,395 pos / facing (+ rng): a bomb on the ground lost by the import - fixed.** The resync cut 621,369 holds a
+  bandit's bomb (class 0x0804A2E8) that bursts 26 frames later and hurts the player (14 HP, knocked up); the importer
+  never rebuilt bombs. `import_bombs` (wf-import, per enemy: +0x1C thrower, +0x10 dir, +0x20/+0x24 position, +0x48
+  counter, +0x4C/+0x50 velocity, MEASURED on the cut) + the bomb's tile block in `import_vram`. The cut is exact
+  (45 / 45, recorded with `segment.py record` from `work/wholerun/cuts/c621369.ss`), and the run from it now goes on
+  to **809,789** (012_db5_a01, Dragon Ball dungeon 5), which is again a menu close one row long: our 809,790 is the
+  game's 809,789 (position and RNG) - no logic difference. So with the bomb fix the recorded-lag run from 621,369 is
+  logic-exact for 188,000 rows; the next logic stop needs the board's per-logic-frame comparison.
+* 621,339 import stop: the cut taken in the frame the player is hit draws one enemy-animation `rand` in its first
+  frame that the game does not (`enemy.rs` EHost) -> **importer agent**.
+* **The other report-only segments:** `rsb_052_004_1-5`, `sb_18_01`, `sb_18_12` (segments without `expect`, so not
+  gates) and the gates `rfat_033_002_6-1`, `rsb_052_006_6-9` are all 0 record differences now -> all five locked
+  (`recs_exact`). Left report-only: `rsbk_002_04_21`, `sb_000_18_12`, `sb_044_04_20` (start state from another
+  moment - recs.py) and the 13 `rkb_*` (no start state).
+* `earth_2_90_2` is red on the shared tree (3,690 / 6,000, `#11 sprite 113` anim) - not the bomb import (same with
+  it off); another agent's in-flight edit.
 *20-6 engine items (A, done; in 394d9b1 / this tree):*
 * **SuperBuuAnim0C** (node runtime vtable 0x0804A100, enter 0x0804E5B8): SetAnim(0x0C) under the one-shot controller
   0x03001B30, done when its animation ends - the power-up's node without its flag (Rust `K::SuperBuuAnim0C`, TS
@@ -3648,3 +3719,15 @@ the listed 18 (named here when found).
   when the age reaches 601, not 600 (`fieldobj` pickup update). +21,000 813 -> **exact**.
 Checks: tiles ffdda8f -> HEAD: 3 better, 0 worse; segment gates green (HEAD's data/segments); TS dumps regenerated
 (tools/battle/buu_core_dump.test.ts) and cross_ts 46,800 frames, 0 failures.
+
+**Load / close length is alignment-only by design (2026-10-04, from the user via the coordinator).** The app does not
+recreate the hardware's slowdowns (the black / lag frames of an area load or a menu close's world restore), so the
+harness takes their length from the recording and judges the logic around them: area loads' lag frames are replayed
+(as before), and **a menu close's black frames now too** - `wf-import` `segment.rs`: at the close (`Menu.reload_close`,
+set by `menu::close_with` for the pause menu and the script-opened screens whose close is the reload), `tr.leave` =
+the recording's frames up to the next logic frame + 1, and `leave_cam` = the black frame where the recorded camera
+first moves (the model's when it does not move). On the exact closes the recorded values equal the model's. The
+menu-close length model (`sndsim::reload_frames_with`) stays for the app's own pacing; its misses are no longer
+judged. **Result: all five close rows exact with nothing else wrong behind them** - `r002_006_4-1` (20,338),
+`r067_071_14-2` (2,415), `r038_001_18-1` (787), `r044_015_18-1` (1,258), `r012_014_12-19` (3,122), gated
+`rclose_*`. My claim on the menu-close length model above is closed with this (no model change).

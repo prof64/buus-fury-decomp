@@ -1440,7 +1440,10 @@ pub fn update(w: &mut World, i: usize) {
             && !script_anim_done(w, i);
     p(w, i).passive_held = false;
     if since_ko < 199 && (!pr(w, i).dead || pr(w, i).story_form(w)) {
-        if !held {
+        let defer = std::env::var_os("T_DEFER").is_some() && w.field.is_some() && !pr(w, i).story_form(w) && !crate::scene::is_puppet(w, w.ents[i].id);
+        if defer && !w.field.as_ref().is_some_and(|f| f.item_get.is_some()) {
+            p(w, i).passive_held = true;
+        } else if !held {
             passive(w, i);
         } else if w.field.as_ref().is_some_and(|f| f.busy && f.item_get.is_none()) {
             p(w, i).passive_held = true;
@@ -1733,6 +1736,8 @@ fn story_tick(w: &mut World, i: usize) {
 /// the new form object after a transformation / revert (0x0801064C): form 24's countdown 120 + rand(180), form 25's
 /// 240 + rand(120), the fusion's 300
 fn new_form_object(w: &mut World, i: usize) {
+    // (a new object: not the one the frame's held pass skipped - `passive_after_scripts`)
+    p(w, i).passive_held = false;
     let c = pr(w, i).form_ref(w).controller;
     if c == 0x3001b88 {
         let r = w.rng.rand(180);
@@ -1970,6 +1975,15 @@ pub fn release_passive(w: &mut World, i: usize) {
     }
 }
 
+/// a script whose end does not release the held form tick in this frame (`passive_after_scripts`)
+pub fn no_tick_after_scripts(w: &mut World) {
+    for s in 0..w.players.len() {
+        if let Some(i) = w.player_idx(s) {
+            p(w, i).passive_held = false;
+        }
+    }
+}
+
 /// the form controller's tick (0x08010BD2, the field's second callback list 0x08011A1E; not run while an event
 /// holds the field) after an event that ended in this frame's script step from a modal frame wait (`run_mode`,
 /// natives 0x88 / 0xEF): the tick runs in that frame (emulator: Earth 7-3 rE2__090 f6,622, s289's last 0xEF -
@@ -1982,14 +1996,15 @@ pub fn passive_after_scripts(w: &mut World) {
         if !std::mem::take(&mut p(w, i).passive_held) {
             continue;
         }
-        let frame = w.frame;
-        if w.field.as_ref().is_some_and(|f| !f.busy && f.item_get.is_none() && f.wait_end == Some(frame)) {
+        if w.field.as_ref().is_some_and(|f| !f.busy && f.item_get.is_none()) {
             passive(w, i);
         }
     }
 }
 
 fn passive(w: &mut World, i: usize) {
+    // (this frame's tick: a held pass's second update in `field::post_step` makes it - none after the scripts)
+    p(w, i).passive_held = false;
     if pr(w, i).story_form(w) {
         return story_tick(w, i);
     }

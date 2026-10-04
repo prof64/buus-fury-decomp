@@ -48,6 +48,7 @@ fn main() {
     if args.iter().any(|a| a == "--no-boot") {
         wf_core::menu::title::open_title(&mut session.world);
     } else {
+        session.world.opts.no_lag = no_lag;
         wf_core::menu::title::open_title_boot(&mut session.world);
     }
     // --power-on FILE (tools/wholerun/power_on.py): the sound hardware at the reset - the driver's RAM as the boot code
@@ -185,6 +186,9 @@ fn main() {
         // row moves the logic counter; a long iteration's rows show it half done: an area load's half-built player,
         // a draw made in its lag frames. Those rows are compared, the others not)
         let complete = next_lf.map_or(true, |n| n != lf);
+        if std::env::var("WR_CLOCK").is_ok() {
+            println!("clock row {k} app {} game {lf} menu {menu} field {} fc0 {} frame {} phase {:?} shown {:?}", w.g.clock(w.frame), w.field.is_some(), w.g.fc0, w.frame, w.menu.phase, w.menu.shown.as_ref().map(|s| format!("{s:?}").chars().take(40).collect::<String>()));
+        }
         // the frame counter 0x03000F94 (`Globals::clock`; the punch marker's blink, enemy state stamps): reported once
         if complete && !clock_reported && !menu && w.field.is_some() && w.g.clock(w.frame) != lf {
             clock_reported = true;

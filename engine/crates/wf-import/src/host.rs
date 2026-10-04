@@ -244,6 +244,7 @@ impl StoryHost {
                 wf_core::field::set_resume_node(w, c, v);
             }
         }
+        let trigger = matches!(self.cause, Some(Cause::Trigger { .. }));
         if !matches!(st, Ok(Status::Blocked)) {
             match self.cause.take() {
                 Some(Cause::Ai { entity }) => scene::ai_script_done(w, entity),
@@ -296,6 +297,11 @@ impl StoryHost {
                 self.running = false;
                 w.story.g = self.rt.globals().g;
                 if self.outer.is_empty() {
+                    // (a map trigger's inline script ends in its own call, not after the scripts: no form tick after
+                    // it - 7-2 rE2__089 f1,492, s495's message in the trigger's run_scene)
+                    if trigger {
+                        wf_core::player::no_tick_after_scripts(w);
+                    }
                     wf_core::field::set_busy(w, false);
                     // the actors a script outside any event commanded go back to their own updates when it ends
                     // (no end_event releases them: real route 1-5 -> 0-51 -> 18-1, the arrival's inline script
@@ -555,6 +561,10 @@ impl StoryHost {
                 Cause::Break { x, y, .. } | Cause::Defeat { x, y, .. } => self.hs.loot_pos = (*x, *y),
                 _ => {}
             }
+            // (the form objects' tick comes before the trigger / talk checks that start these)
+            if matches!(job.cause, Cause::Trigger { .. } | Cause::Talk { .. }) && self.outer.is_empty() {
+                wf_core::player::passive_after_scripts(w);
+            }
             wf_core::field::start_cause(w, &job.cause);
             let mut g = self.rt.globals();
             g.g = w.story.g;
@@ -670,6 +680,10 @@ impl StoryHost {
         // next frame), then the scripts the update started (NPC talk)
         let evs: Vec<Event> = sess.world.events[n0..].to_vec();
         if !fresh {
+            // (a map trigger's inline script runs after the form objects' tick: 7-3 rE2__090 f32, s262's run_scene)
+            if matches!(self.cause, Some(Cause::Trigger { .. })) && self.outer.is_empty() {
+                wf_core::player::passive_after_scripts(&mut sess.world);
+            }
             self.resume_blocked(&mut sess.world);
         }
         self.collect(&evs);

@@ -511,12 +511,6 @@ pub fn poll(w: &mut World, s: &mut HostState) -> Option<Option<i32>> {
     let r = match s.pending.as_mut()? {
         Pending::Frames { left, result } => {
             *left -= 1;
-            if *left <= 0 {
-                let frame = w.frame;
-                if let Some(f) = w.field.as_mut() {
-                    f.wait_end = Some(frame);
-                }
-            }
             (*left <= 0).then_some(*result)
         }
         Pending::Button => (w.scene.keys[0].pressed & A != 0).then_some(None),

@@ -597,7 +597,9 @@ pub fn boot(data: &Arc<crate::content::GameData>, w: &mut World) -> Option<World
             // it (the whole run from the reset: [0, 0] until the prologue's first draw)
             nw.rng = crate::rng::Rng::new(rng0.0, rng0.1);
             // the frame counter 0x03000F94 runs on from the title (it counts since the reset)
-            nw.g.fc0 = clock0 - nw.frame as i64;
+            // (no lag: the menu step already counted this iteration, the new world's first step counts it again)
+            nw.g.fc0 = clock0 - nw.frame as i64 - if w.opts.no_lag { 1 } else { 0 };
+            nw.opts.no_lag = w.opts.no_lag;
             nw
         }
         Boot::Continue { slot, chosen } => {

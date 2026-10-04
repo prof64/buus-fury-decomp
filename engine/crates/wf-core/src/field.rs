@@ -277,9 +277,6 @@ pub struct Field {
     /// state reset later in the frame comes before that pass's flyer update in the game
     #[serde(default)]
     pub resumed_at: Option<u32>,
-    /// the frame a script's modal frame wait (`run_mode`: natives 0x88 / 0xEF) ended (`player::passive_after_scripts`)
-    #[serde(default)]
-    pub wait_end: Option<u32>,
     /// the frame's input as it was before an event's hold cleared it (`pre_step`): the pass an inline event
     /// interrupted completes with it (`post_step`, resumed)
     #[serde(default)]
@@ -505,7 +502,6 @@ fn new_field() -> Field {
         held_event: false,
         resume_held: false,
         resumed_at: None,
-        wait_end: None,
         raw_input: None,
         pre_update: false,
         arrival: None,

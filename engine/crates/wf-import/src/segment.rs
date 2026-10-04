@@ -401,6 +401,7 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
     // (a gate with "recs_exact": its records are checked always - wf-import tests/segments.rs fails it on a difference)
     let recs_rows = (std::env::var_os("SEGMENT_RECS").is_some() || doc["recs_exact"].as_bool() == Some(true)).then(|| crate::recs::load(doc)).flatten();
     let (mut recs_i, mut recs_tally) = (0usize, crate::recs::Tally::default());
+    let mut was_leaving = false;
     for (k, fr) in frames.iter().enumerate() {
         let keys = i(&fr["keys"]) as u16;
         let lf = i(&fr["lf"]);
@@ -524,6 +525,32 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
             wf_core::sndsim::lag_frame_ex(&mut sess.world, last);
             replayed += 1;
         }
+        // a menu close's black frames (the world restore's long iteration) are alignment, not logic: the app does not
+        // recreate the hardware's load time, so the close takes the recording's length - the video frames up to the
+        // next logic frame - as an area load's replayed lag does (`Menu.tr.leave`; the camera's restore step in the
+        // frame the game shows it, `Menu.leave_cam`)
+        let leaving = matches!(sess.world.menu.phase, wf_core::menu::Phase::Leave { .. }) && sess.world.menu.tr.fade_in != 0;
+        if leaving && !was_leaving && sess.world.menu.reload_close && sess.world.menu.phase == (wf_core::menu::Phase::Leave { t: 0 }) && k + 1 < frames.len() {
+            // the frames after the exit stub's logic frame with one logic counter value: the iteration's video frames
+            let lf1 = i(&frames[k + 1]["lf"]);
+            let run = frames[k + 1..].iter().take_while(|n| i(&n["lf"]) == lf1).count();
+            // the end of the recording inside the close: its length unknown - the model's stays
+            if k + 1 + run < frames.len() {
+                let (model, model_cam) = (sess.world.menu.tr.leave, sess.world.menu.leave_cam);
+                let leave = run as u16 + 1;
+                // the restore's camera step: the black frame where the recorded camera first moves (Leave step t at
+                // video frame k + 1 + t steps the camera when t + 2 + leave_cam == leave); a camera that does not move
+                // keeps the model's frame
+                let cam0 = &frames[k]["cam"];
+                let cam = frames[k + 1..k + 1 + run].iter().position(|n| n["cam"] != *cam0).map(|j| (leave as i64 - 2 - j as i64).clamp(0, 3) as u16).unwrap_or(model_cam);
+                sess.world.menu.tr.leave = leave;
+                sess.world.menu.leave_cam = cam;
+                if std::env::var_os("SEGMENT_CLOSEDBG").is_some() {
+                    eprintln!("close f{k}: recorded {leave} (cam {cam}) model {model} (cam {model_cam})");
+                }
+            }
+        }
+        was_leaving = leaving;
         if let Some((a, b)) = trace {
             if (a..=b).contains(&k) {
                 let w = &sess.world;
@@ -564,6 +591,18 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
                     }).collect();
                     let game: Vec<String> = fr["actors"].as_array().into_iter().flatten().map(|a| format!("{}:{}/{}", a[1], a[6], a[8])).collect();
                     eprintln!("  t{k} npcs {} | game {}", npcs.join(" "), game.join(" "));
+                }
+                // SEGMENT_ENTS: every live entity's kind (shots / fx with their debug form)
+                if std::env::var("SEGMENT_ENTS").is_ok() {
+                    let es: Vec<String> = (0..w.ents.len()).filter(|&i| !w.ents[i].removed).map(|i| match &w.ents[i].body {
+                        Body::Player(_) => format!("{}:player", w.ents[i].id),
+                        Body::Enemy(e) => format!("{}:enemy{}@({},{})", w.ents[i].id, e.ty, e.a.x >> 8, e.a.y >> 8),
+                        Body::Shot(s) => format!("{}:shot {:?}", w.ents[i].id, s).chars().take(160).collect(),
+                        Body::Fx(f) => format!("{}:fx {:?}", w.ents[i].id, f).chars().take(80).collect(),
+                        Body::Npc(n) => format!("{}:npc{}", w.ents[i].id, n.sprite_id),
+                        _ => format!("{}:other", w.ents[i].id),
+                    }).collect();
+                    eprintln!("  t{k} ents {}", es.join(" | "));
                 }
                 if std::env::var("SEGMENT_FORM").is_ok() {
                     if let Some(pi) = w.player_idx(0) {

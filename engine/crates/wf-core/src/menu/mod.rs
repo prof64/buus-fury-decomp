@@ -404,6 +404,10 @@ pub struct Menu {
     /// frames the restore's camera update comes before the last black frame (sndsim `wrap`)
     #[serde(default)]
     pub leave_cam: u16,
+    /// this close's black frames are the world restore's reload (the pause menu, the script-opened screens): their
+    /// length is hardware load time - a harness replaying a recording takes it from there (alignment only)
+    #[serde(default)]
+    pub reload_close: bool,
     /// power-on: video frames of the boot screens still to run before the title (title.rs `open_title_boot`; the
     /// screens read no input)
     #[serde(default)]
@@ -515,7 +519,8 @@ pub fn step(w: &mut World) {
     // enemy's state stamp is that much older after a pause menu (real route 0-21, Goku vs Majin Buu: the on-hit
     // IfTimeInState(90) of Buu's state 0xB3 is true after a heal menu - its Chance draws)
     if w.field.is_some() {
-        w.g.fc0 += w.story.play_frames.wrapping_sub(p0) as i64;
+        // (no lag frames: every step of the mode loop is one of its iterations)
+        w.g.fc0 += if w.opts.no_lag { 1 } else { w.story.play_frames.wrapping_sub(p0) as i64 };
     }
 }
 
@@ -531,7 +536,8 @@ fn step_inner(w: &mut World) {
         // the boot screens' iterations count on 0x03000F94 too: the title's first iteration is logic frame
         // BOOT_LOGIC (the reset's recording: 697 at video frame 705)
         if w.menu.boot == 0 {
-            w.g.fc0 = title::BOOT_LOGIC - w.frame as i64;
+            // (no lag: `step` counts this iteration itself)
+            w.g.fc0 = title::BOOT_LOGIC - w.frame as i64 - if w.opts.no_lag { 1 } else { 0 };
         }
         // the logos' mode starts the title song (it plays on into the title, whose enter finds it playing)
         let (total, song_at) = if w.opts.no_lag { (title::BOOT_LOGIC as u16, title::BOOT_SONG_AT_LOGIC) } else { (title::BOOT_FRAMES, title::BOOT_SONG_AT) };
@@ -842,6 +848,7 @@ fn close_with(w: &mut World, done: bool) {
     };
     w.menu.stack.clear();
     w.menu.phase = Phase::Leave { t: 0 };
+    w.menu.reload_close = false;
     // the world restore's message 0x1A: the players' stats are recalculated and their resists reset
     for s in 0..w.players.len() {
         if let Some(i) = w.player_idx(s) {
@@ -857,6 +864,7 @@ fn close_with(w: &mut World, done: bool) {
             eprintln!("menu close: figures {figs:?} extra {extra}");
         }
         w.menu.leave_cam = 0;
+        w.menu.reload_close = true;
         if let Some(n) = crate::sndsim::reload_frames_with(w, done, extra) {
             w.menu.tr.leave = n as u16 + 1;
             w.menu.leave_cam = w.sound.wrap as u16;

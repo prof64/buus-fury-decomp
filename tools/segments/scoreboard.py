@@ -325,8 +325,9 @@ def board(jobs):
     wr = ROOT / 'data' / 'realrun' / 'wholerun.json'
     if wr.exists():
         w = json.loads(wr.read_text())
-        for m in w.get('modes', []):
-            L.append(f"\n**Whole run, no imports ({m['lag']} lag): exact to frame {m['exact_to']:,}** of {m['rows']:,} recorded "
+        title = {'none': 'no lag frames (the target: one step per game logic iteration)', 'recorded': 'recorded lag injected (alignment check)'}
+        for m in sorted(w.get('modes', []), key=lambda m: m['lag'] != 'none'):
+            L.append(f"\n**Whole run, no imports, {title.get(m['lag'], m['lag'] + ' lag')}: exact to frame {m['exact_to']:,}** of {m['rows']:,} recorded "
                      f"({m['exact_stretch']}; first divergence: {m['first']}). Tree `{w.get('tree', '?')}`, `tools/wholerun/board.py`.")
         if w.get('note'):
             L.append(w['note'])

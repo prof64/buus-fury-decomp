@@ -1,32 +1,32 @@
 {
- "tree": "e0fcc5f",
+ "tree": "78590a3",
  "modes": [
   {
    "lag": "recorded",
-   "rows": 723849,
-   "exact_to": 153225,
+   "rows": 1668052,
+   "exact_to": 137895,
    "exact_stretch": "E2_earth",
-   "first": "rng: app [ddf7897e, 38c3c1f0] game [d800841f, 1450638f]",
+   "first": "rng: app [7357c793, a04234d5] game [87ffe884, f99c6366]",
    "lasting": {
     "area": {
-     "row": 218948,
-     "stretch": "000_ship_c14",
-     "what": "app (0, 1) game (7, 6)"
+     "row": 191502,
+     "stretch": "E2_earth",
+     "what": "app (7, 6) game (7, 5)"
     },
     "depth": {
-     "row": 215895,
-     "stretch": "000_ship_c14",
+     "row": 157288,
+     "stretch": "E2_earth",
      "what": "app 0 game 1"
     },
     "pos": {
-     "row": 153541,
+     "row": 153481,
      "stretch": "E2_earth",
-     "what": "app (82486, 24481, 2) game (75106, 26371, 2)"
+     "what": "app (75106, 26371, 2) game (89866, 22591, 2)"
     },
     "rng": {
-     "row": 191502,
+     "row": 155477,
      "stretch": "E2_earth",
-     "what": "app [6f555d36, 5e868b48] game [c1658938, 7a86e4b8]"
+     "what": "app [fe64f9df, 2182bc82] game [c4108aa3, b1d2d47c]"
     }
    },
    "sim_lag": 0,
@@ -35,38 +35,38 @@
    "script_errors": 0
   },
   {
-   "lag": "sim",
-   "rows": 723849,
-   "exact_to": 4691,
-   "exact_stretch": "E1_opening",
-   "first": "area: app (0, 96) game (1, 1)",
+   "lag": "none",
+   "rows": 1668052,
+   "exact_to": 90251,
+   "exact_stretch": "E2_earth",
+   "first": "pos: app (24576, 8192, 0) game (22766, 10002, 0)",
    "lasting": {
     "area": {
-     "row": 4691,
-     "stretch": "E1_opening",
-     "what": "app (0, 2) game (1, 1)"
+     "row": 92259,
+     "stretch": "E2_earth",
+     "what": "app (3, 2) game (3, 14)"
     },
     "depth": {
-     "row": 6796,
-     "stretch": "E1_opening",
-     "what": "app 1 game 0"
+     "row": 91838,
+     "stretch": "E2_earth",
+     "what": "app 0 game 1"
     },
     "pos": {
-     "row": 4691,
-     "stretch": "E1_opening",
-     "what": "app leader None game [2048,42752,0,\"idle\"]"
+     "row": 91838,
+     "stretch": "E2_earth",
+     "what": "app (18422, 14708, 0) game (14336, 30720, 0)"
     },
     "rng": {
-     "row": 4691,
-     "stretch": "E1_opening",
-     "what": "app [00000000, 00000000] game [1b2001d2, 96df8700]"
+     "row": 91838,
+     "stretch": "E2_earth",
+     "what": "app [4d9940e1, 399c5fc4] game [23c327c1, 9891ecc8]"
     }
    },
-   "sim_lag": 3516,
-   "sim_lag_on_logic": 3435,
-   "recorded_lag_replayed": 19251,
+   "sim_lag": 0,
+   "sim_lag_on_logic": 0,
+   "recorded_lag_replayed": 0,
    "script_errors": 0
   }
  ],
- "note": "The recording follows the real run from the reset through 002_d04_bandana only: replayed from the reset, the key log of 003_d06_thieves leaves the real run (the chain's state at 002's end differs from the local state 003 was packed from - object list, heap, one video frame) and ends in a game over."
+ "note": ""
 }

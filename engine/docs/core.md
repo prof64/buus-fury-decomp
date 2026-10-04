@@ -167,6 +167,17 @@ cleared runtime - so **a from-power-on run diverges from the game at Vegeta's fi
 positions, then the re-plan timing and the RNG). Reproducing it needs a byte-level model of every heap object (not
 planned).
 
+**Lag frames are not recreated (by design, 2026-10-04).** The game's main loop runs one iteration per logic frame and
+an iteration that overruns a VBlank leaves video frames without logic (loads, text boxes, menu redraws, busy scenes).
+The app runs a steady 60 fps: one logic frame per video frame. Recorded lag is injected only by the test harnesses
+(segment harness, whole-run replay, soak) to line up with emulator recordings. `Options::sim_lag` (the sim's own
+load / text-box lag lengths, `sndsim::load_frames` / `dialog_frames`, `Session::lag_step`) stays in the tree, off by
+default and unused - deprecated, not deleted. Game logic does not observe lag: the VBlank handler (`0x0803D784`) calls
+only the current mode's +0x10 hook and the system object's +0x18 hook (both `bx lr` in the field), the loop's load
+meter (`[0x03000FEC]`, written by the VBlank wait `0x0803F3F4`) has no reader, the keys are read once per iteration
+(`0x0803D4A0`, after the wait), and every gameplay clock is the iteration counter `0x03000F94` (`Globals::clock`),
+which counts iterations, not video frames. Audit and the reader list: `segments.md` §9 "Does game logic observe lag".
+
 ## 9. Coordination (in progress, 2026-10-02)
 
 Two agents extend `World` concurrently; keep changes additive and re-read before editing.

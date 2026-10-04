@@ -1112,6 +1112,7 @@ pub fn switch_character(w: &mut World, c: i32) -> Result<(), String> {
             p.ss_cooldown = cs.ss_cooldown;
             p.holy_left = 0;
             p.regen_timer = 0;
+            p.passive_held = false;
             p.apply_form(w, form);
             w.scene.offstage[k].body = Body::Player(Box::new(p));
         }
@@ -1147,6 +1148,9 @@ pub fn switch_character(w: &mut World, c: i32) -> Result<(), String> {
     // the new character's form controller starts its regen count (+0xC) at 0 (Kid Buu's arena: after s-script
     // hand-overs the bench's 5% tick comes 596 pass frames after the event that switched)
     p.regen_timer = 0;
+    // (the new character's form object is not the one the frame's held pass skipped: no tick after the scripts -
+    // 7-2 rE2__089 f1,492, the Switch Characters message)
+    p.passive_held = false;
     // the hit-damage remainder stays: set_character keeps the player object (unlike a load or the candy respawn,
     // which rebuild it). The real route's arena, s450 (Goku -> Vegeta): Super Janemba's first hit on Vegeta takes
     // 91 with Goku's remainder, 90 without; with it the whole 6,940-frame cut rj_arena_000_18_14 is exact

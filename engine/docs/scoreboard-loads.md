@@ -1,6 +1,6 @@
 # Area-load board: every area load of the real run on wf-core
 
-Tree: `00e82a5`. Regenerate: `tools/segments/loadboard.py cut` (local, `work/real/loads/`), then
+Tree: `78590a3`. Regenerate: `tools/segments/loadboard.py cut` (local, `work/real/loads/`), then
 `tools/segments/loadboard.py`. Each main-board segment that is exact, recorded again from its start state through
 the area load after it into the next segment's first 60 frames. **load** = the first divergence inside the load's
 frames (its length / black / lag: the area-load length model, `sndsim::load_frames`), **after the load** = in the next
@@ -10,8 +10,8 @@ differs when run on past its usual end (none expected). "off" = consecutive fram
 
 | load kind | loads | exact | load | after the load | before the load |
 |---|---|---|---|---|---|
-| exit | 1512 | 1512 | 0 | 0 | 0 |
-| **all** | 1512 | 1512 | 0 | 0 | 0 |
+| exit | 1516 | 1516 | 0 | 0 | 0 |
+| **all** | 1516 | 1516 | 0 | 0 | 0 |
 
 ## Misses (for the area-load length model's owner)
 

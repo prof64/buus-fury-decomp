@@ -7,8 +7,10 @@ import anywhere, compared row by row with the emulator's recording of the same k
   2. `power_on.py`: the sound hardware at the reset (driver RAM as the boot code sets it + the reset's timer phase and
      play position - the app's power-on sound clock; nothing else of the RAM).
   3. The app (`engine/crates/wf-app/examples/wholerun.rs`, headless, muted, target dir engine/target-wholerun) in both
-     lag modes: `rec` = the recording's lag frames injected, `sim` = the sim's own load / text-box lag
-     (`Options::sim_lag`, as SEGMENT_SIMLAG).
+     lag modes: `none` = the target - the app with no lag frames at all (`Options::no_lag`: hardware slowdowns are
+     not recreated), one step per game logic iteration with the keys the game sampled, compared at each iteration's
+     end; `rec` = the recording's lag frames injected (the alignment check). (`--lag sim`, the sim's own lag, is
+     still in the tool but no longer a target.)
   4. data/realrun/wholerun.json (read by scoreboard.py for its line "Whole run, no imports: exact to frame N").
 """
 import json
@@ -27,7 +29,7 @@ def rank():
     """--rank: the resync runs' stops (work/wholerun/stops_<lag>.jsonl from resync.py) ranked per owner: rule stops
     first (by how many of a kind), then import stops -> data/realrun/wholerun_stops.json"""
     out = {}
-    for lag in ('rec', 'sim'):
+    for lag in ('rec', 'none'):
         p = W / f'stops_{lag}.jsonl'
         if not p.exists():
             continue
@@ -61,7 +63,7 @@ tgt = ROOT / 'engine' / 'target-wholerun'
 subprocess.run(['cargo', 'build', '--release', '--target-dir', str(tgt), '-p', 'wf-app', '--example', 'wholerun'], cwd=ROOT / 'engine', check=True)
 exe = tgt / 'release' / 'examples' / 'wholerun'
 modes = []
-for lag in ('rec', 'sim'):
+for lag in ('rec', 'none'):
     rep = W / f'report_{lag}.json'
     cmd = [str(exe), str(master), '--power-on', str(W / 'power_on.json'), '--lag', lag, '--report', str(rep)]
     if '--frames' in a:

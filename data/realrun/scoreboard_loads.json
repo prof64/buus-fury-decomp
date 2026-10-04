@@ -3,9 +3,9 @@
   "exit": {
    "after the load": 0,
    "before the load": 0,
-   "exact": 1512,
+   "exact": 1516,
    "load": 0,
-   "loads": 1512
+   "loads": 1516
   }
  },
  "loads": [
@@ -6874,6 +6874,26 @@
    "first": "",
    "from": [
     8,
+    1,
+    1
+   ],
+   "gap": 30,
+   "kind": "exit",
+   "logic_gap": 2,
+   "off": null,
+   "result": "exact",
+   "segment": "r002_006_4-1",
+   "to": [
+    8,
+    2,
+    1
+   ]
+  },
+  {
+   "at": null,
+   "first": "",
+   "from": [
+    8,
     2,
     1
    ],
@@ -10386,6 +10406,26 @@
    "to": [
     12,
     19,
+    1
+   ]
+  },
+  {
+   "at": null,
+   "first": "",
+   "from": [
+    12,
+    19,
+    1
+   ],
+   "gap": 19,
+   "kind": "exit",
+   "logic_gap": 2,
+   "off": null,
+   "result": "exact",
+   "segment": "r012_014_12-19",
+   "to": [
+    12,
+    20,
     1
    ]
   },
@@ -16134,6 +16174,26 @@
    "first": "",
    "from": [
     18,
+    1,
+    1
+   ],
+   "gap": 23,
+   "kind": "exit",
+   "logic_gap": 2,
+   "off": null,
+   "result": "exact",
+   "segment": "r038_001_18-1",
+   "to": [
+    18,
+    2,
+    1
+   ]
+  },
+  {
+   "at": null,
+   "first": "",
+   "from": [
+    18,
     2,
     1
    ],
@@ -18026,6 +18086,26 @@
    "to": [
     18,
     1,
+    1
+   ]
+  },
+  {
+   "at": null,
+   "first": "",
+   "from": [
+    18,
+    1,
+    1
+   ],
+   "gap": 27,
+   "kind": "exit",
+   "logic_gap": 6,
+   "off": null,
+   "result": "exact",
+   "segment": "r044_015_18-1",
+   "to": [
+    18,
+    2,
     1
    ]
   },
@@ -23426,6 +23506,26 @@
    "to": [
     14,
     2,
+    1
+   ]
+  },
+  {
+   "at": null,
+   "first": "",
+   "from": [
+    14,
+    2,
+    1
+   ],
+   "gap": 27,
+   "kind": "exit",
+   "logic_gap": 2,
+   "off": null,
+   "result": "exact",
+   "segment": "r067_071_14-2",
+   "to": [
+    14,
+    1,
     1
    ]
   },
@@ -30173,26 +30273,6 @@
    "at": null,
    "first": "",
    "from": [
-    4,
-    1,
-    1
-   ],
-   "gap": 55,
-   "kind": "exit",
-   "logic_gap": 2,
-   "off": null,
-   "result": "exact",
-   "segment": "rE2__087_2-90",
-   "to": [
-    4,
-    20,
-    1
-   ]
-  },
-  {
-   "at": null,
-   "first": "",
-   "from": [
     7,
     1,
     1
@@ -30253,9 +30333,9 @@
  "total": {
   "after the load": 0,
   "before the load": 0,
-  "exact": 1512,
+  "exact": 1516,
   "load": 0,
-  "loads": 1512
+  "loads": 1516
  },
- "tree": "00e82a5"
+ "tree": "78590a3"
 }

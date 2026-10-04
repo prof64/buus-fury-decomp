@@ -949,6 +949,7 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
     }
     import_enemy_beam(w, ei, ram, o, notes);
     import_super_ball(w, ei, ram, o, notes);
+    import_bombs(w, ei, ram, o);
     let d = Arc::clone(&w.data);
     let e = w.en(ei);
     e.a.x = ram.s32(o + 0x1A0);
@@ -992,6 +993,21 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
     // the +0x214 word an AI RunScript hands its event (Super Buu's waypoint index; after the state rebuild, whose
     // glide enter stepped it)
     w.en(ei).p214 = ram.s32(o + 0x214);
+}
+
+/// this enemy's bombs in flight or on the ground (BombThrow; class 0x0804A2E8, MEASURED whole-run cut 621,369: +0x1C
+/// the thrower, +0x10 direction, +0x20 / +0x24 position 24.8, +0x48 the counter (bursts at 71), +0x4C / +0x50
+/// velocity): rebuilt as the shot (West City 4-1: a bomb lying beside the player bursts 26 frames after the cut -
+/// the import had dropped it, the player was not hurt)
+fn import_bombs(w: &mut World, ei: usize, ram: &GbaRam, o: u32) {
+    let me = w.ents[ei].id;
+    for b in ram.ewram_with(0x0804_A2E8).into_iter().filter(|&b| ram.r32(b + 0x1C) == o) {
+        let t = ram.s32(b + 0x48);
+        let mut s = wf_core::shots::bomb(me, ram.r8(b + 0x10) & 3, ram.s32(b + 0x20), ram.s32(b + 0x24), 0, 0);
+        s.t = t as i64;
+        s.kind = wf_core::shots::ShotKind::Bomb { vx: ram.s32(b + 0x4C), vy: ram.s32(b + 0x50), landed: if t >= 40 { 40 } else { -1 } };
+        wf_core::shots::add(w, s);
+    }
 }
 
 /// Kid Buu's beam in flight at the cut (the KidBuuKamehameha node; the beam object vt 0x0804AEF8, owner +0x50:
@@ -2213,6 +2229,17 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
                 Body::Fx(f) => matches!(**f, wf_core::fx::Fx::Anim { id: 0x0872_a5dc, x: fx, y: fy, .. } if fx == x >> 8 && fy == y >> 8),
                 _ => false,
             });
+            if let (Some(k), true) = (ent, h != 0xFFFF) {
+                used_ents.push(w.ents[k].id);
+                owners.push((h, Owner::Ent(w.ents[k].id)));
+            }
+            continue;
+        }
+        // a bomb (vt 0x0804A2E8, `import_bombs`): its block belongs to the bomb shot at its position
+        if vt == 0x0804_A2E8 {
+            let h = ram.r16(o + 0xC);
+            let (x, y) = (ram.s32(o + 0x20), ram.s32(o + 0x24));
+            let ent = (0..w.ents.len()).find(|&k| !used_ents.contains(&w.ents[k].id) && matches!(&w.ents[k].body, Body::Shot(s) if matches!(s.kind, wf_core::shots::ShotKind::Bomb { .. }) && s.x == x && s.y == y));
             if let (Some(k), true) = (ent, h != 0xFFFF) {
                 used_ents.push(w.ents[k].id);
                 owners.push((h, Owner::Ent(w.ents[k].id)));
