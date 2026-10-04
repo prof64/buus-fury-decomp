@@ -2229,16 +2229,19 @@ fn bomb_update(w: &mut World, i: usize) {
     }
     if t >= 71 {
         w.ents[i].removed = true;
-        // the bomb's own block is freed before its burst's chips and explosion allocate (r002_006+7,000 f192: the
-        // chips' shared graphic takes the last unit of the bomb's freed (151, 4), the explosion then (351, 16))
+        // field: the blast's hit comes first (its damage number takes its 0x100 block while the bomb's own is still
+        // held), then the bomb's block is freed, the chips' shared graphic takes the last unit of it and the explosion
+        // allocates (MEASURED r002_006 7,192 / 17,816: alloc 0x100 from 0x0800ABFB, free (151, 4) from 0x08051193,
+        // alloc 0x40 from 0x0804E4AD, alloc 0x400 from 0x0802A84B). Battles: chips first, then the hit (no allocator)
         let id = w.ents[i].id;
-        crate::vram::release(w, crate::vram::Owner::Ent(id));
         let r = rect(w, i);
-        {
+        let field = w.field.is_some();
+        if !field {
+            crate::vram::release(w, crate::vram::Owner::Ent(id));
             let (px, py) = (w.shot_ref(i).px(), w.shot_ref(i).py());
             bomb_chips(w, px, py);
         }
-        if w.field.is_some() {
+        if field {
             // field: the blast's message is of sender class 2, which the enemies' handler (0x0800FBE6: class 1 or 2)
             // takes as well as the player's - a Mad Bomber's bomb hurts another bandit (Diablo Desert 11-14: 49 HP and
             // the knockback). Battles keep the reference (the player only)
@@ -2251,6 +2254,9 @@ fn bomb_update(w: &mut World, i: usize) {
             if !owner_dead(w, owner) {
                 broadcast(w, &mut m, true);
             }
+            crate::vram::release(w, crate::vram::Owner::Ent(id));
+            let (px, py) = (w.shot_ref(i).px(), w.shot_ref(i).py());
+            bomb_chips(w, px, py);
         } else {
             hit(w, i, r, atk(1), 1024, true);
         }

@@ -135,11 +135,6 @@ impl ObjVram {
         let r = self.alloc_inner(bytes);
         if std::env::var("DBG_VRAM").is_ok() {
             eprintln!("  alloc {bytes:#x} -> {r:x?}");
-            if std::env::var("DBG_VRAM_BT").is_ok() {
-                let bt = std::backtrace::Backtrace::force_capture().to_string();
-                let fr: Vec<&str> = bt.lines().filter(|l| l.contains("wf_core::") && !l.contains("vram::ObjVram")).take(6).collect();
-                eprintln!("    {}", fr.join(" | "));
-            }
         }
         r
     }

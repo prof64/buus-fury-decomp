@@ -162,6 +162,9 @@ fn main() {
         }
         if show.is_some_and(|(a, b)| a <= k && k <= b) {
             println!("row {k} keys {keys:x} logic {logic} menu {menu} app area {aa:?} p {ap:?} rng {:08x?} depth {} | game area {ga:?} p {} rng {} depth {gd} lf {lf}", w.rng.state(), w.scene.depth, r["p"], r["rng"]);
+            if std::env::var("WR_HOST").is_ok() {
+                println!("    host started {:?} pending {:?} fade {:?}", app.host().started.iter().rev().take(2).collect::<Vec<_>>(), app.host().hs.pending, w.scene.screen.fade);
+            }
             if menu || std::env::var("WR_MENU").is_ok() {
                 let page = match w.menu.stack.last() {
                     Some(wf_core::menu::Screen::Title(t)) => format!("title {:?} leaving {:?}", t.page, t.leaving),
