@@ -479,6 +479,22 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
                     w.scene.dialog.is_some(),
                     prev_steps.chars().take(160).collect::<String>()
                 );
+                if let Some(d) = w.scene.dialog.as_ref() {
+                    eprintln!(
+                        "lagdlg {} f{k} portrait {} kind {} pos {:?} left {} fades {} pages {} chars {} first {} options {} text {:?}",
+                        doc["name"].as_str().unwrap_or("?"),
+                        d.portrait,
+                        d.kind,
+                        d.pos,
+                        d.portrait_left,
+                        d.fades,
+                        d.pages,
+                        d.text.chars().count(),
+                        d.typing.first().copied().unwrap_or(0),
+                        d.options,
+                        d.text.chars().take(40).collect::<String>()
+                    );
+                }
             }
             wf_core::sndsim::lag_frame_ex(&mut sess.world, last);
             replayed += 1;

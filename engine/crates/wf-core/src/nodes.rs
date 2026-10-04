@@ -1453,8 +1453,8 @@ fn leaf_exit(w: &mut World, c: &C, n: u16, _r: &mut NodeRt) {
         K::WanderToRandomPoint if w.field.is_some() => {
             set_anim(w, i, &[nm("idle")], true, Some(true));
             let me = w.ents[i].id;
-            let target = w.ents.iter().position(|e| !e.removed && e.id != me && w.actor_by_id(e.id).is_some_and(|a| a.sprite == Some(0x34)));
-            if std::env::var("DBGW").is_ok() { eprintln!("DBGW f{} wander exit en {} target {:?} sprites {:?}", w.frame, i, target, w.ents.iter().map(|e| w.actor_by_id(e.id).and_then(|a| a.sprite)).collect::<Vec<_>>()); }
+            let target = (0..w.ents.len()).find(|&k| !w.ents[k].removed && w.ents[k].id != me && crate::scene::sprite_id(w, k) == Some(0x34)).filter(|_| std::env::var("NOFACE").is_err());
+            if std::env::var("DBGW").is_ok() { eprintln!("DBGW f{} exit en{} target {:?}", w.frame, i, target); }
             if let Some(k) = target {
                 let (tx, ty) = { let a = w.actor(k).unwrap(); (a.x, a.y) };
                 let (dx, dy) = (tx - w.en_ref(i).a.x, ty - w.en_ref(i).a.y);

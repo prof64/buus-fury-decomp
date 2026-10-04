@@ -2287,7 +2287,9 @@ fn superball_update(w: &mut World, i: usize) {
             s.x = x;
             s.y = y;
         }
-        if t >= 60 {
+        // (the throw comes in the update whose tick count reaches 0x3D: real run 20-6 r062_001 tile +4,000 - made
+        // f14, thrown f75)
+        if t >= 61 {
             let (px, py) = (w.shot_ref(i).px(), w.shot_ref(i).py());
             let (tx, ty) = match w.player_idx(0) {
                 Some(pi) => w.pl_ref(pi).a.foot_center(),

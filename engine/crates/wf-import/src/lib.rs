@@ -1047,7 +1047,7 @@ fn import_super_ball(w: &mut World, ei: usize, ram: &GbaRam, o: u32, notes: &mut
                 s.kind = wf_core::shots::ShotKind::SuperBall { phase: 1, sx, sy, tx, ty };
                 s.t = since as i64;
             } else {
-                s.t = t as i64 - 1;
+                s.t = t as i64;
             }
         }
         let spots: Vec<(usize, usize)> = w.en_ref(ei).ai.stack.iter().enumerate().flat_map(|(l, s)| s.tree.nodes.iter().enumerate().filter(|(_, n)| n.k == K::ThrowBigBall).map(move |(n, _)| (l, n))).collect();

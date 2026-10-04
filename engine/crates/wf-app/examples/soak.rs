@@ -89,6 +89,7 @@ fn main() {
     let (mut hp_bad, mut hp_reports) = (0usize, 0usize);
     let mut pos_bad = 0usize;
     let (mut stepped, mut first_area, mut first_pos, mut first_rng) = (0usize, None, None, None);
+    let (mut sim_lag_rows, mut sim_lag_bad): (usize, Option<usize>) = (0, None);
     let mut songs: Vec<(usize, i32)> = vec![];
     let mut areas: Vec<(usize, (i32, i32))> = vec![];
     let mut game_areas: Vec<(usize, (i64, i64))> = vec![];
@@ -225,7 +226,21 @@ fn main() {
         let menu = wf_core::menu::active(app.world());
         let logic = lf != prev_lf;
         prev_lf = lf;
-        if logic || menu {
+        // SOAK_SIMLAG=1: the sim makes the load lag itself (`Options::sim_lag`, as the harness's SEGMENT_SIMLAG): a
+        // row where the sim is in a lag frame steps the app (its lag frame) whatever the recording shows; the
+        // recording's other lag rows pass as before
+        let sim_lag = std::env::var_os("SOAK_SIMLAG").is_some();
+        app.session.world.opts.sim_lag = sim_lag;
+        let sim_lagging = sim_lag && !menu && (app.world().g.lag > 0 || app.world().g.load_pending);
+        if sim_lagging {
+            if logic && sim_lag_bad.is_none() {
+                sim_lag_bad = Some(k);
+            }
+            sim_lag_rows += 1;
+            let mut ev = vec![];
+            app.step(&[keys], &mut ev);
+            stepped += 1;
+        } else if logic || menu {
             let mut ev = vec![];
             let trace = rng_rows.is_some_and(|(a, b)| a <= k && k <= b);
             if trace {
@@ -387,6 +402,9 @@ fn main() {
     let s = &app;
     let w = s.world();
     println!("rows {} stepped {} | script errors {}", rows.len().min(limit), stepped, s.errors.len());
+    if std::env::var_os("SOAK_SIMLAG").is_some() {
+        println!("sim lag: {sim_lag_rows} rows, first on a game logic row: {sim_lag_bad:?}");
+    }
     println!("continued at row {continue_row:?}");
     println!("first area divergence: {first_area:?}");
     println!("first position divergence: {first_pos:?}");

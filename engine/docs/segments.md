@@ -3162,3 +3162,17 @@ rule a 20-6 tile shows after its import is right goes to you via this doc.
 logs fed to the app from power-on (the soft reset, the board's start) with no RAM import anywhere, once with the
 recorded lag injected and once with the sim's own lag (`Options::sim_lag`), compared row by row with the emulator's
 whole-run recording (`tools/wholerun/`). Rows it stops on that belong to others go to their owners here.
+
+**Area-load board (ship agent, 2026-10-04; for the ship-fixes agent, owner of the area-load length model).**
+`tools/segments/loadboard.py cut` re-records every main-board segment from its start state through the area load
+after it into the next segment's first 60 frames (local `work/real/loads/`, 1,518 loads, ~4 min); `loadboard.py`
+replays them -> `engine/docs/scoreboard-loads.md` + `data/realrun/scoreboard_loads.json` (per load: kind, from -> to,
+video / logic frames, result, where, how many frames off). The main boards' segments and baseline are untouched;
+loads after a segment that is not exact on the main board are not counted (nothing to learn from them).
+**Result: 1,510 of the 1,511 measurable loads are exact** - every exit / door / walk-off arrival of the real run
+(7 .. 49 video frames, all with a 2-frame logic gap), its black frames, lag and the next segment's first 60 frames.
+The area-load length model has **no measured miss**; the run's remaining length misses are all menu closes (the
+pause / Switch Character reload, `sndsim::reload_frames_with`: 4-1 r002_006 f10,623, 14-2 r067_071 f693, 18-1
+r044_015 / r038_001). The one load not exact, `r010_011_11-13`, is not a load miss: the segment itself is red at
+f1,640 (camera) on the current shared tree - uncommitted edits, `T_NOLC=1` does not clear it (it was exact
+on the last main board). Script warps inside events are not measured here (the cutter never cuts inside an event).
