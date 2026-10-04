@@ -11,7 +11,13 @@ cargo test -p wf-core                                  # parity suites (needs ro
 cargo run --release -p wf-core --example bench         # step / snapshot / hash timings
 cargo build -p wf-wasm --target wasm32-unknown-unknown --profile release-wasm   # extractor + session in one module
 node engine/web/core_check.mjs <wf_wasm.wasm> roms/buu.gba                      # headless wasm session check
+tools/wholerun/check.sh        # IS IT STILL EXACT? the whole real run, power-on -> credits, no lag (~1 min; exit 1 = new stop)
 ```
+
+**`tools/wholerun/check.sh` is the top-level regression check**: the whole real run (1.67M rows) through the app
+from power-on with no import, compared per logic iteration with the emulator (RNG, area, position, script depth,
+story flags, sound requests); the known ranges of `data/realrun/known_stops.json` are skipped by restarting from a
+cut after each. Details: segments.md §0.
 
 ## 1. Design requirements (non-negotiable)
 
@@ -183,6 +189,17 @@ only the current mode's +0x10 hook and the system object's +0x18 hook (both `bx 
 meter (`[0x03000FEC]`, written by the VBlank wait `0x0803F3F4`) has no reader, the keys are read once per iteration
 (`0x0803D4A0`, after the wait), and every gameplay clock is the iteration counter `0x03000F94` (`Globals::clock`),
 which counts iterations, not video frames. Audit and the reader list: `segments.md` §9 "Does game logic observe lag".
+
+**Mid-frame palette tearing is not recreated (by design, 2026-10-04).** The game rewrites the palette from its main
+loop while the screen is being drawn - the fade routine `0x08007074` (512 colours, ~70 cycles each, ~29 scanlines)
+and the IWRAM palette copy (pc `0x03000818..`), starting 30 k .. 90 k cycles after the VBlank depending on the
+frame's work - so the lines drawn before or during the rewrite show the previous frame's palette, mixed per pixel on
+the lines drawn while it runs. That is CPU time, which the app does not model (as the lag frames); the app renders
+each frame with its new palette in full. **The tear rule** (pixel comparison, `examples/pixels.rs` / `tests/pixels.rs`):
+on a frame whose palette state (field fade / scale / BLDY, a menu's fade) changed since the previous frame, a pixel is
+accepted when it equals our render with the new palette or with the previous frame's; such frames are reported as
+"torn (hardware)", and the pixel gate locks them with per-line masks of the old-palette pixels (`""` new line, `"o"`
+old line, else a 240-bit hex mask) next to the game picture's hash.
 
 ## 9. Coordination (in progress, 2026-10-02)
 

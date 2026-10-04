@@ -50,6 +50,62 @@ fn hash(px: &[u32]) -> u64 {
     h
 }
 
+/// the view's palette state (what a palette fade rewrites): the field's fade / scale / BLDY and a menu screen's own
+type Pal = (Option<wf_view::PaletteFade>, Option<wf_view::PaletteFade>, u8, Option<(Option<wf_view::PaletteFade>, u8)>);
+
+fn pal_of(v: &RenderView) -> Pal {
+    (v.palette_fade, v.palette_scale, v.fade_black, v.menu.as_ref().map(|m| (m.fade, m.fade_black)))
+}
+
+fn with_pal(v: &RenderView, p: &Pal) -> RenderView {
+    let mut o = v.clone();
+    o.palette_fade = p.0;
+    o.palette_scale = p.1;
+    o.fade_black = p.2;
+    if let (Some(m), Some((f, b))) = (o.menu.as_mut(), p.3) {
+        m.fade = f;
+        m.fade_black = b;
+    }
+    o
+}
+
+/// The tear rule (core.md, known differences): the game rewrites the palette from its main loop while the screen is
+/// drawn, so the lines drawn before (or during) the rewrite show the frame's old palette - a CPU-time artifact the
+/// app does not recreate. A frame whose palette state changed since the previous frame is accepted when every line
+/// equals our render with the new palette or with the old one; the per-line hashes of the game's picture are what
+/// the gate locks for it. Returns those hashes when the frame is torn-accepted (some line only matches the old)
+fn torn(game: &[u32], new: &[u32], old: &[u32]) -> Option<Vec<String>> {
+    let mut any_old = false;
+    // the line drawn while the rewrite runs mixes the two per colour (each pixel's entry flips at its own time):
+    // per pixel then - a line's mask of the pixels showing the old palette ("" = the new line, "o" = the old line)
+    let mut masks = vec![];
+    for y in 0..H {
+        let (g, nw, od) = (&game[y * W..(y + 1) * W], &new[y * W..(y + 1) * W], &old[y * W..(y + 1) * W]);
+        if g == nw {
+            masks.push(String::new());
+            continue;
+        }
+        if g == od {
+            any_old = true;
+            masks.push("o".into());
+            continue;
+        }
+        let mut bits = vec![0u8; W / 8];
+        for x in 0..W {
+            if g[x] == nw[x] {
+                continue;
+            }
+            if g[x] != od[x] {
+                return None;
+            }
+            bits[x / 8] |= 1 << (x % 8);
+        }
+        any_old = true;
+        masks.push(bits.iter().map(|b| format!("{b:02x}")).collect());
+    }
+    any_old.then_some(masks)
+}
+
 fn save(p: &Path, imgs: &[&[u32]]) {
     let (w, h) = (W * imgs.len(), H);
     let mut rgb = Vec::with_capacity(w * h * 3);
@@ -153,7 +209,7 @@ fn main() {
     let mut all: BTreeMap<String, (usize, usize)> = BTreeMap::new();
     let mut json_out = vec![];
     let mut lock = serde_json::Map::new();
-    let (mut tot_frames, mut tot_exact) = (0usize, 0usize);
+    let (mut tot_frames, mut tot_exact, mut tot_torn) = (0usize, 0usize, 0usize);
     for a in &args {
         let p = PathBuf::from(a);
         let Ok(doc) = wf_import::segment::load(&p) else {
@@ -169,6 +225,9 @@ fn main() {
         let mut presenter = wf_core::view::Presenter::default();
         let mut results: Vec<(usize, String, usize)> = vec![];
         let mut pngs = 0;
+        // the previous video frame's palette state (the tear rule) and the torn-accepted frames' line hashes
+        let mut prev_pal: Option<Pal> = None;
+        let mut torn_rows: BTreeMap<usize, Vec<String>> = BTreeMap::new();
         let rep = wf_import::segment::replay_with(&data, &files, &doc, &mut |f| match f {
             wf_import::segment::Frame::Before(_, w) => presenter.before_step(w),
             wf_import::segment::Frame::After(k, w) => {
@@ -188,9 +247,10 @@ fn main() {
                         eprintln!("trace {k} frame {} fc0 {} play {} menu {} anim {:?} stat {:?} boss {:?} screen {:?} fade_black {} pal {:?}", w.frame, w.g.fc0, w.story.play_frames, view.menu.is_some(), view.map.as_ref().map(|m| (m.anim_frame, m.tile_frame)), (view.hud.first().map(|h| h.stat_mark), w.field.as_ref().and_then(|f| f.vram.as_ref()).map(|v| v.stat_at)), view.boss_bars, w.scene.screen, view.fade_black, view.palette_fade);
                     }
                 }
-                let Some(&i) = at.get(&k) else { return };
                 let mut view = RenderView::default();
                 wf_core::view::render_view(w, &mut view);
+                let old_pal = prev_pal.replace(pal_of(&view));
+                let Some(&i) = at.get(&k) else { return };
                 if std::env::var_os("PIX_NOPRES").is_none() {
                     presenter.apply(&mut view);
                 }
@@ -213,7 +273,18 @@ fn main() {
                     eprintln!("timerfit {name} f{k} t {t} offsets {fit:?}");
                 }
                 let ours = renderer.render(&packs, &view, 0, W, H).to_vec();
-                let (mut class, n) = classify(&view, &game[i], &ours);
+                let (mut class, mut n) = classify(&view, &game[i], &ours);
+                // the tear rule: a palette change this frame - lines matching the old palette are the hardware's
+                if n > 0 && std::env::var_os("PIX_NOTEAR").is_none() {
+                    if let Some(op) = old_pal.filter(|p| *p != pal_of(&view)) {
+                        let old = renderer.render(&packs, &with_pal(&view, &op), 0, W, H).to_vec();
+                        if let Some(rows) = torn(&game[i], &ours, &old) {
+                            torn_rows.insert(k, rows);
+                            class = "torn (hardware)".into();
+                            n = 0;
+                        }
+                    }
+                }
                 // what the world shows that the view may not carry (the picture's likely cause)
                 if n > 0 {
                     let sc = &w.scene.screen;
@@ -229,7 +300,12 @@ fn main() {
                     if sc.layers.offset != dl.offset { tags.push("BG offset"); }
                     if w.scene.boss_bar.is_some() { tags.push("boss bar"); }
                     if vram_has(wf_core::vram::Owner::Timer) { tags.push("timer HUD"); }
-                    if sc.black > 0 || sc.dim > 0 || view.palette_fade.is_some() { tags.push("fade"); }
+                    // a fade: split by what our palette state did this frame - changed (a tear the rule did not
+                    // accept: a line matching neither palette) or steady (the game rewrote the palette, ours did not:
+                    // a fade level / timing difference or another palette writer)
+                    if sc.black > 0 || sc.dim > 0 || view.palette_fade.is_some() || view.palette_scale.is_some() {
+                        tags.push(if old_pal.is_some_and(|p| p != pal_of(&view)) { "fade (palette changed)" } else { "fade (palette steady)" });
+                    }
                     if view.dialog.is_some() { tags.push("dialog"); }
                     if view.menu.is_some() { tags.push("menu"); }
                     if view.banner.is_some() { tags.push("banner"); }
@@ -273,13 +349,25 @@ fn main() {
             counted.iter().find(|r| r.2 > 0).map(|r| (r.0, r.1.clone(), r.2)),
             classes
         );
+        let torn_n = counted.iter().filter(|r| r.1 == "torn (hardware)").count();
+        tot_torn += torn_n;
+        if torn_n > 0 {
+            println!("  {name}: {torn_n} of the exact frames torn (hardware: palette rewritten while drawn)");
+        }
         if !counted.is_empty() && exact == counted.len() {
-            let fr: Vec<serde_json::Value> = counted.iter().map(|r| serde_json::json!([r.0, format!("{:016x}", hash(&game[at[&r.0]]))])).collect();
+            // (a torn frame: its lines' hashes too - each must equal our new- or old-palette line)
+            let fr: Vec<serde_json::Value> = counted
+                .iter()
+                .map(|r| match torn_rows.get(&r.0) {
+                    Some(rows) => serde_json::json!([r.0, format!("{:016x}", hash(&game[at[&r.0]])), rows]),
+                    None => serde_json::json!([r.0, format!("{:016x}", hash(&game[at[&r.0]]))]),
+                })
+                .collect();
             lock.insert(name.clone(), serde_json::Value::Array(fr));
         }
         json_out.push(serde_json::json!({"segment": name, "frames": counted.len(), "exact": exact, "results": counted.iter().map(|r| serde_json::json!([r.0, r.1, r.2])).collect::<Vec<_>>()}));
     }
-    println!("total: {tot_exact} / {tot_frames} sampled frames pixel-exact");
+    println!("total: {tot_exact} / {tot_frames} sampled frames pixel-exact ({tot_torn} of them torn (hardware): accepted by the tear rule)");
     let mut errs = renderer.errors.clone();
     errs.sort();
     errs.dedup();

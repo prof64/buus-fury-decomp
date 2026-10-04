@@ -1958,6 +1958,9 @@ fn build_mid_event(_data: &Arc<GameData>, ram: &GbaRam, runner: &mut StoryHost, 
             d.typed = typed as i32;
             d.phase = wf_core::scene::DialogPhase::Shown;
             d.t = 64;
+            // a choice's cursor object (text box +0x48; its +0x10 counts its draws: the blink)
+            let c = ram.r32(o + 0x48);
+            d.page_t = if ram.valid(c) { d.t - ram.r32(c + 0x10) as i32 + 1 } else { d.t + 1 };
             // the last page typed out and A pressed within the close's frames: closing (the box object shows
             // nothing of it: the press's stamp in the input ring 0x03003300 +0x88 against the counter 0x03000F94; mid_24000)
             let need = d.typing.get(d.page as usize).copied().unwrap_or(0) as i32;
@@ -2758,8 +2761,8 @@ pub fn import_emulator_state(data: &Arc<GameData>, ram: &GbaRam, runner: &mut St
     // the script countdown (GD+0x4D4, running = GD+1 bit 2): the host's timer (12-x: the Airship's self destruct)
     {
         let gd = ram.read(GD, 0x4D8);
-        runner.hs.timers.countdown = u32le(&gd, 0x4D4) as i32;
-        runner.hs.timers.countdown_on = gd[1] & 4 != 0;
+        world.scene.timers.countdown = u32le(&gd, 0x4D4) as i32;
+        world.scene.timers.countdown_on = gd[1] & 4 != 0;
     }
     Ok(Imported { world, prev_keys: ram.r16(INPUT + 2) & 0x3FF, lf: info.lf, kind: info.kind, held_frames: b.held, draws: b.draws, notes })
 }
@@ -2817,42 +2820,10 @@ fn check(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
 /// the object tile allocator (`0x03001C4C`, vram.rs) as the RAM holds it; the actors' blocks (obj +0xC) belong to
 /// their entities (matched by position like `check`), the shadows' to their shared graphics (`0x03002B88` + 4k:
 /// reference count, handle +2); other blocks stay foreign
-/// the map's tile animations (0x03001A68: +4 the count, +8 + 8 i: s16 frame, s16 countdown, descriptor; ticked by
-/// `0x08009CC2`, set up by `0x08009B80` with frame 0 and countdown i + 1) -> the ticks since the load T they imply
-/// (the smallest one all agree on: the pictures repeat with the periods) -> `Field.entered_iter`
+/// the map's clock at the cut: the camera object's counter (0x030019A4 +0x40, 0 at the area load, +1 per map
+/// update) -> `Field.entered_iter` (the tile animations and the wrap layers' drift run on it: `view::render_view`)
 fn import_tile_anims(w: &mut World, ram: &GbaRam) {
-    const A: u32 = 0x0300_1A68;
-    let n = ram.r32(A + 4).min(64);
-    let mut an: Vec<(i32, i32, Vec<u32>)> = vec![];
-    for i in 0..n {
-        let b = A + 8 + 8 * i;
-        let desc = ram.r32(b + 4);
-        let nf = ram.r8(desc) as u32;
-        let durs: Vec<u32> = (0..nf).map(|j| ram.r16(ram.r32(desc + 4 + 4 * j)) as u32).collect();
-        an.push((ram.r16(b) as i16 as i32, ram.r16(b + 2) as i16 as i32, durs));
-    }
-    let fits = |t: u32| {
-        an.iter().enumerate().all(|(i, (f, c, d))| {
-            let first = i as u32 + 1;
-            if d.len() <= 1 || d.iter().any(|&x| x == 0) {
-                return true;
-            }
-            if t < first {
-                return (*f, *c) == (0, (first - t) as i32);
-            }
-            let mut r = (t - first) % d.iter().sum::<u32>();
-            let mut g = 1 % d.len();
-            while r >= d[g] {
-                r -= d[g];
-                g = (g + 1) % d.len();
-            }
-            (*f, *c) == (g as i32, (d[g] - r) as i32)
-        })
-    };
-    if an.iter().all(|a| a.2.len() <= 1) {
-        return;
-    }
-    let Some(t) = (0..200_000u32).find(|&t| fits(t)) else { return };
+    let t = ram.r32(0x0300_19A4 + 0x40);
     if let Some(f) = w.field.as_mut() {
         f.entered_iter = f.iters.wrapping_sub(t);
     }

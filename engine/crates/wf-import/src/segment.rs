@@ -633,7 +633,7 @@ pub fn replay_with(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: 
                     eprintln!("  t{k} host {} screen {:?} {} {}", host.thread_summary(), w.scene.screen.fade, w.scene.screen.black, w.scene.screen.dim);
                 }
                 if std::env::var("SEGMENT_TIMERS").is_ok() {
-                    eprintln!("  t{k} timers {:?}", host.hs.timers);
+                    eprintln!("  t{k} timers {:?}", w.scene.timers);
                 }
                 if std::env::var("SEGMENT_ORDER").is_ok() {
                     let v: Vec<String> = w.ents.iter().filter(|e| !e.removed).map(|e| format!("{}:{}", e.id, w.find(e.id).and_then(|i| w.actor(i)).and_then(|a| a.sprite).unwrap_or(-1))).collect();

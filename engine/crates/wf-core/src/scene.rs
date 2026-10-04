@@ -1104,6 +1104,17 @@ pub struct Prop {
 
 // ---------------------------------------------------------------------------------------------------------------
 
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct Timers {
+    pub countdown: i32,
+    pub countdown_on: bool,
+    pub stopwatch: i32,
+    pub stopwatch_on: bool,
+    /// the countdown was started in the last script phase (see `tick_timers`)
+    #[serde(default)]
+    pub fresh: bool,
+}
+
 #[derive(Clone, Debug, Hash, Serialize, Deserialize)]
 pub struct Scene {
     pub tracks: Vec<Track>,
@@ -1118,10 +1129,10 @@ pub struct Scene {
     pub boss_bar_out: Option<BossBarOut>,
     pub title: Option<TitleText>,
     pub timer_hud: Option<TimerHud>,
-    /// the script host's (countdown, stopwatch) in frames as the display reads them (GameData +0x4D4 / +0x4D8;
-    /// mirrored by wf-script-core after its timer updates - the host keeps the timers)
+    /// the script countdown / stopwatch in frames (GameData +0x4D4 / +0x4D8, running = game bits 2 / 4): set and
+    /// ticked by the script natives / `wf_script_core::tick_timers`, read by the display (`RenderView.timer`)
     #[serde(default)]
-    pub timers_shown: (i32, i32),
+    pub timers: Timers,
     /// destination label set (0xD9) and its 32 entries (0xDA)
     pub dest_label: Option<(i32, Vec<i32>)>,
     /// the travel menu's selection (label entity vt 0x0804BAF4 +0x10): an index into `Field.triggers` (= the label
@@ -1187,7 +1198,7 @@ impl Default for Scene {
             boss_bar_out: None,
             title: None,
             timer_hud: None,
-            timers_shown: (0, 0),
+            timers: Timers::default(),
             dest_label: None,
             dest_sel: 0,
             radar: None,

@@ -714,18 +714,18 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
             unit()
         }
         0xae => {
-            h.s.timers.countdown = arg(a, 0) * 60;
+            h.w.scene.timers.countdown = arg(a, 0) * 60;
             // (a countdown switched on makes its object, whose first update counts at once; one already on - at 0
             // after its hook - is only set: 21-25's second minute reads 3600 in the frame it is set)
             // (not inside the countdown hook's own event: that runs within the field frame's timer update
             // 0x0800425C, so it ends mid-frame and the field frame does not run again in its exit frame - the real
             // route's second minute, s009 -> s461 -> s462, reads 3600 in the set frame)
-            h.s.timers.fresh = !h.s.timers.countdown_on && !h.s.timer_event;
-            h.s.timers.countdown_on = true;
+            h.w.scene.timers.fresh = !h.w.scene.timers.countdown_on && !h.s.timer_event;
+            h.w.scene.timers.countdown_on = true;
             unit()
         }
         0xaf => {
-            h.s.timers.countdown_on = false;
+            h.w.scene.timers.countdown_on = false;
             unit()
         }
         0xb0 | 0xbc => {
@@ -766,14 +766,14 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
             unit()
         }
         0xbe => {
-            h.s.timers.stopwatch = 0;
+            h.w.scene.timers.stopwatch = 0;
             unit()
         }
         0xbf | 0xc0 => {
-            h.s.timers.stopwatch_on = n == 0xbf;
+            h.w.scene.timers.stopwatch_on = n == 0xbf;
             unit()
         }
-        0xc1 => done(h.s.timers.stopwatch),
+        0xc1 => done(h.w.scene.timers.stopwatch),
         0xc2 => {
             // the kill-XP routine; a level-up runs the level-up hook #3 inline (blocks the script while shown)
             let i = lead(h.w, n)?;

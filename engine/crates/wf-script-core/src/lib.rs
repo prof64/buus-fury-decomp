@@ -81,16 +81,8 @@ pub enum Pending {
     Phases { list: Vec<Phase>, k: usize, started: bool },
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct Timers {
-    pub countdown: i32,
-    pub countdown_on: bool,
-    pub stopwatch: i32,
-    pub stopwatch_on: bool,
-    /// the countdown was started in the last script phase (see `tick_timers`)
-    #[serde(default)]
-    pub fresh: bool,
-}
+/// the script timers live in the World (`scene.timers`: the display and saves read them there)
+pub use wf_core::scene::Timers;
 
 /// the field saved by `save_field_on_next_scene` for `return_to_field`
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -107,7 +99,6 @@ pub struct SavedField {
 pub struct HostState {
     /// `get_menu_result` (word 0x03002A60, -1 = cancelled)
     pub menu_result: i32,
-    pub timers: Timers,
     /// equipment-effect accumulator (0x03002B5C) of a running equipment script
     pub eq_accum: [i32; 16],
     /// loot position (0x03001010), set by the dying enemy / breakable
@@ -470,19 +461,19 @@ fn self_field_free(w: &World) -> Option<bool> {
 pub fn tick_timers(w: &mut World, s: &mut HostState) {
     // the count of a frame whose field is free at this point; the host settles the frames where our order differs
     // from the game's (an event ending at the frame's top counts, a hold the post step starts does not)
-    let fresh = std::mem::take(&mut s.timers.fresh);
+    let fresh = std::mem::take(&mut w.scene.timers.fresh);
     if self_field_free(w).unwrap_or(true) {
         s.timer_event = false;
     }
-    if s.timers.countdown_on && s.timers.countdown > 0 && self_field_free(w).unwrap_or(true) {
+    if w.scene.timers.countdown_on && w.scene.timers.countdown > 0 && self_field_free(w).unwrap_or(true) {
         // (the frame an event that set it ends in counts through the host's late tick: `StoryHost::step_inputs`;
         // `Timers.fresh` is kept for old snapshots only)
         let _ = fresh;
-        s.timers.countdown -= 1;
-        if s.timers.countdown == 0 && w.field.as_ref().is_some_and(|f| f.host) {
+        w.scene.timers.countdown -= 1;
+        if w.scene.timers.countdown == 0 && w.field.as_ref().is_some_and(|f| f.host) {
             // the countdown switches itself off at 0, before its hook (GameData +1 bit 2 clear in the hook's first
             // frame: Airship db5t_004 f1717, Kid Buu's arena rkb_168 / sb_041)
-            s.timers.countdown_on = false;
+            w.scene.timers.countdown_on = false;
             s.timer_event = true;
             w.events.push(wf_core::world::Event::Field(wf_core::field::FieldEvent::Run {
                 run: wf_core::fieldcontent::Callback::Event("s009".into()),
@@ -491,7 +482,6 @@ pub fn tick_timers(w: &mut World, s: &mut HostState) {
             }));
         }
     }
-    w.scene.timers_shown = (s.timers.countdown, s.timers.stopwatch);
 }
 
 /// Per-frame poll of the pending action, after the World stepped. `Some(result)` = resume the thread now with
@@ -501,10 +491,9 @@ pub fn poll(w: &mut World, s: &mut HostState) -> Option<Option<i32>> {
     // not while an event / an inline script holds it, nor during an exit's fades and the walk-in (MEASURED 12-28 ..
     // 12-26, the Airship's self destruct: 10781 -> ... one per frame only between the lifts' scripts and the loads)
     // (`tick_timers`, called by the hosts once per logic frame)
-    if s.timers.stopwatch_on {
-        s.timers.stopwatch += 1;
+    if w.scene.timers.stopwatch_on {
+        w.scene.timers.stopwatch += 1;
     }
-    w.scene.timers_shown = (s.timers.countdown, s.timers.stopwatch);
     if s.boost[0] > 0 {
         s.boost[0] -= 1;
     }

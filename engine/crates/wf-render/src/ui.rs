@@ -578,7 +578,8 @@ impl Ui {
     /// still types)
     pub fn dialog_cursor_spot(&self, dv: &DialogView, sel: u8, typed: Option<u32>) -> Option<(i32, i32)> {
         let (_, lines) = self.dialog_layout(dv)?;
-        let vis = |l: &Vec<u16>| (l.len() - 2 * l.iter().filter(|&&c| c == 8).count()) as u32;
+        // (a colour pair ending its line takes a typing frame, as in `dialog_typed`)
+        let vis = |l: &Vec<u16>| (l.len() - 2 * l.iter().filter(|&&c| c == 8).count()) as u32 + (l.len() >= 2 && l[l.len() - 2] == 8) as u32;
         let k = lines.iter().enumerate().filter(|(_, l)| l.3).nth(sel as usize)?.0;
         let before: u32 = lines[..k].iter().map(|l| vis(&l.0)).sum();
         if typed.is_some_and(|t| t <= before) {
@@ -606,6 +607,14 @@ impl Ui {
             let mut k = 0;
             while k < line.len() {
                 if line[k] == 8 {
+                    // a colour pair that ends its line takes a typing frame of its own (wf-script-core `typing`;
+                    // emulator: earth_3_3_2 / sb_005, the next line one character behind ours without it)
+                    if k + 2 >= line.len() {
+                        if left == 0 {
+                            break;
+                        }
+                        left -= 1;
+                    }
                     shown.extend_from_slice(&line[k..(k + 2).min(line.len())]);
                     k += 2;
                     continue;

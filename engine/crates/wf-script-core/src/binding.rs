@@ -108,7 +108,7 @@ pub fn binding(n: u8) -> Binding {
         0xa7 | 0xc6 | 0xc7 => b(Partial, "scene::Menu mini-games (Watch This!, power struggle, punch): deterministic models, not the game's"),
         0xa8 => b(Story, "fusion record (60% of the summed stats), member flags"),
         0xab | 0xac => b(Scene, "scene.radar"),
-        0xae..=0xb1 | 0xbc..=0xc1 => b(Scene, "HostState.timers + scene.timer_hud"),
+        0xae..=0xb1 | 0xbc..=0xc1 => b(Scene, "scene.timers + scene.timer_hud"),
         0xb2 => b(Scene, "scene.title"),
         0xb3 | 0xb4 => b(Core, "scene::SIN_TABLE (0x087B6EEC)"),
         0xb5..=0xb9 | 0xd6..=0xd8 => b(Vm, "run_event / run_script"),

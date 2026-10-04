@@ -23,6 +23,38 @@ fn hash(px: &[u32]) -> u64 {
     h
 }
 
+/// `view` with `from`'s palette state (as `examples/pixels.rs` `with_pal`: the field's fade / scale / BLDY, a menu's)
+fn with_pal(view: &RenderView, from: &RenderView) -> RenderView {
+    let mut o = view.clone();
+    o.palette_fade = from.palette_fade;
+    o.palette_scale = from.palette_scale;
+    o.fade_black = from.fade_black;
+    if let (Some(m), Some(f)) = (o.menu.as_mut(), from.menu.as_ref()) {
+        m.fade = f.fade;
+        m.fade_black = f.fade_black;
+    }
+    o
+}
+
+/// a torn frame from our new- and old-palette pictures and the lock's line masks
+fn compose(new: &[u32], old: &[u32], masks: &[String]) -> Vec<u32> {
+    let mut out = new.to_vec();
+    for (y, m) in masks.iter().enumerate().take(160) {
+        let r = y * 240..(y + 1) * 240;
+        if m == "o" {
+            out[r.clone()].copy_from_slice(&old[r]);
+        } else if !m.is_empty() {
+            for x in 0..240 {
+                let b = u8::from_str_radix(m.get(x / 8 * 2..x / 8 * 2 + 2).unwrap_or("00"), 16).unwrap_or(0);
+                if b >> (x % 8) & 1 != 0 {
+                    out[y * 240 + x] = old[y * 240 + x];
+                }
+            }
+        }
+    }
+    out
+}
+
 #[test]
 fn locked_segments_render_as_the_game() {
     let repo = wf_rom::testutil::repo_root();
@@ -55,6 +87,14 @@ fn locked_segments_render_as_the_game() {
             .iter()
             .map(|f| (f[0].as_u64().unwrap() as usize, u64::from_str_radix(f[1].as_str().unwrap(), 16).unwrap()))
             .collect();
+        // torn frames (the tear rule, core.md known differences): per line "" = our new-palette line, "o" = our
+        // old-palette line (the previous frame's palette state), else a hex mask of the pixels showing the old one
+        let masks: BTreeMap<usize, Vec<String>> = frames
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|f| Some((f[0].as_u64()? as usize, f.get(2)?.as_array()?.iter().map(|m| m.as_str().unwrap_or("").to_string()).collect())))
+            .collect();
         let p: PathBuf = repo.join(format!("data/segments/{name}.json"));
         let Ok(doc) = wf_import::segment::load(&p) else {
             fails.push(format!("{name}: no segment"));
@@ -63,15 +103,26 @@ fn locked_segments_render_as_the_game() {
         let mut presenter = wf_core::view::Presenter::default();
         let mut bad = vec![];
         let mut seen = 0;
+        let mut prev: Option<RenderView> = None;
         wf_import::segment::replay_with(&data, &files, &doc, &mut |f| match f {
             wf_import::segment::Frame::Before(_, w) => presenter.before_step(w),
             wf_import::segment::Frame::After(k, w) => {
-                let Some(&h) = want.get(&k) else { return };
-                seen += 1;
                 let mut view = RenderView::default();
                 wf_core::view::render_view(w, &mut view);
+                let before = prev.replace(view.clone());
+                let Some(&h) = want.get(&k) else { return };
+                seen += 1;
                 presenter.apply(&mut view);
-                if hash(renderer.render(&packs, &view, 0, 240, 160)) != h {
+                let new = renderer.render(&packs, &view, 0, 240, 160).to_vec();
+                let ok = hash(&new) == h
+                    || match (masks.get(&k), before) {
+                        (Some(m), Some(b)) => {
+                            let old = renderer.render(&packs, &with_pal(&view, &b), 0, 240, 160).to_vec();
+                            hash(&compose(&new, &old, m)) == h
+                        }
+                        _ => false,
+                    };
+                if !ok {
                     bad.push(k);
                 }
             }

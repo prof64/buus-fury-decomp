@@ -747,7 +747,7 @@ impl StoryHost {
         sess.step_update();
         // the countdown (GD+0x4D4) counts the frames whose object pass sees the field free; our frame order (update,
         // then the script's resume, then the post step's trigger check) is settled after them below
-        let cd0 = self.hs.timers.countdown;
+        let cd0 = sess.world.scene.timers.countdown;
         let free_at_tick = wf_script_core::countdown_counts(&sess.world);
         // (an event the countdown's hook started runs inside the countdown object's update: its frame is counted)
         let hook_event = self.hs.timer_event;
@@ -762,11 +762,11 @@ impl StoryHost {
         self.run_queue(&mut sess.world);
         // (an event that ended now - at the top of the game's frame - leaves the field free for this frame's count:
         // Airship db5_023 f569, the level-up popup's last box)
-        let ticked_late = !free_at_tick && !hook_event && self.hs.timers.countdown_on && self.hs.timers.countdown > 1 && wf_script_core::countdown_counts(&sess.world);
+        let ticked_late = !free_at_tick && !hook_event && sess.world.scene.timers.countdown_on && sess.world.scene.timers.countdown > 1 && wf_script_core::countdown_counts(&sess.world);
         if ticked_late {
-            self.hs.timers.countdown -= 1;
+            sess.world.scene.timers.countdown -= 1;
         }
-        let cd1 = self.hs.timers.countdown;
+        let cd1 = sess.world.scene.timers.countdown;
         let free_mid = wf_script_core::countdown_counts(&sess.world);
         // the trigger check (post step) starts its event in this frame too
         let n = sess.world.events.len();
@@ -779,7 +779,7 @@ impl StoryHost {
         // ... and not in the frame the trigger check holds the field - a script it starts (Airship db5_022 f51, the
         // lift's inline trigger) or an exit's walk-out (db5_028 f282): the countdown's object sees the hold
         if free_mid && !wf_script_core::countdown_counts(&sess.world) && cd1 < cd0 && cd1 > 0 {
-            self.hs.timers.countdown = cd0;
+            sess.world.scene.timers.countdown = cd0;
         }
         // the game runs a frame's scripts before its objects: a HUD a script showed gets its update (the
         // stat-points mark) in the same frame, after the script's own objects (segments sb 20-2 f1574, 20-5 f5212)

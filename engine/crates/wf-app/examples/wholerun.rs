@@ -166,6 +166,8 @@ fn main() {
     });
     let snd_show: usize = opt("--sounds-show").and_then(|v| v.parse().ok()).unwrap_or(40);
     let (mut snd_bad, mut snd_iters) = (0usize, 0usize);
+    // the first sound difference (row, what): the report's `sounds_first` (tools/wholerun/check.py)
+    let mut snd_first: Option<(usize, String)> = None;
     let mut sup_last: Option<Vec<(usize, u8)>> = None;
     while let Some(r) = lines.next() {
         if k >= limit {
@@ -254,6 +256,9 @@ fn main() {
                 ours.sort();
                 if ours != game {
                     snd_bad += 1;
+                    if snd_first.is_none() {
+                        snd_first = Some((k, format!("app {ours:?} game {game:?}")));
+                    }
                     if snd_bad <= snd_show {
                         println!("SND row {k} ({}) lf {lf} menu {menu}: app {ours:?} game {game:?}", stretch_of(k));
                     }
@@ -460,6 +465,8 @@ fn main() {
             "first": first_exact.as_ref().map(|f| f.1.clone()),
             "lasting": lasting.iter().map(|l| (l.0.to_string(), l.3.as_ref().map(|(r, d)| serde_json::json!({"row": r, "stretch": stretch_of(*r), "what": d})))).collect::<std::collections::BTreeMap<_, _>>(),
             "stepped": stepped, "sim_lag": own_lag, "sim_lag_on_logic": lag_bad, "recorded_lag_replayed": replayed_lag, "script_errors": errors,
+            "sounds_compared": game_snd.is_some(), "sounds_bad": snd_bad, "sounds_iters": snd_iters,
+            "sounds_first": snd_first.as_ref().map(|(r, d)| serde_json::json!({"row": r, "stretch": stretch_of(*r), "what": d})),
         });
         std::fs::write(out, serde_json::to_string_pretty(&rep).unwrap()).expect("report");
     }

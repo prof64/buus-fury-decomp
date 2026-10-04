@@ -69,7 +69,7 @@ pub fn diff(w: &World, hs: &HostState, running: bool, last: bool, game: &BTreeMa
     let st = &w.story;
     let gi = |f: &str| game.get(f).and_then(|x| x.as_i64()).unwrap_or(0);
     // the game bits: HUD shown (bit 1) is the scene's, the countdown / stopwatch running (bits 2 / 4) the host's timers
-    let t = &hs.timers;
+    let t = &w.scene.timers;
     let bits = (st.game_bits as i64 & 0xFF & !0x16) | if w.scene.hud_hidden { 0 } else { 2 } | if t.countdown_on { 4 } else { 0 } | if t.stopwatch_on { 0x10 } else { 0 };
     if bits != gi("bits") {
         out.push(format!("game bits: {bits:#x} vs {:#x}", gi("bits")));

@@ -106,10 +106,11 @@ pub fn render_view(w: &World, out: &mut RenderView) {
         None => w.data.areas.get(&w.arena.map).map(|a| a.0.clone()).unwrap_or_default(),
     };
     let mode7 = w.field.as_ref().and_then(|f| f.flight.as_ref().map(|fl| wf_view::Mode7View { x: fl.cam[0], y: fl.cam[1], height: fl.cam[2], heading: fl.cam[3], pitch: fl.cam[4], label: f.label.map(|l| l as i32) }));
-    // tile animations run on the map's own timers, which start at the area load (field_parity)
-    // (the play clock: they run while a scene holds the world, not while the area loads)
-    let anim_frame = w.field.as_ref().map(|f| w.frame.saturating_sub(f.entered)).unwrap_or(w.frame);
-    let tile_frame = w.field.as_ref().map(|f| f.iters.saturating_sub(f.entered_iter)).filter(|&t| t != anim_frame);
+    // the map's clock: the camera object's counter (0x030019A4 +0x40, +1 per map update 0x080092BC - every field
+    // iteration, a world held by a scene too; 0 at the area load) drives the wrap layers' drift (0x08008924) and
+    // runs with the tile animations' ticks (0x08009CC2): `Field.iters` since the load
+    let anim_frame = w.field.as_ref().map(|f| f.iters.saturating_sub(f.entered_iter)).unwrap_or(w.frame);
+    let tile_frame = None;
     // a script's BG control (hide / priority / blend targets / weights: scene::Layers)
     let sl = &w.scene.screen.layers;
     let layers = (*sl != crate::scene::Layers::default()).then(|| wf_view::BgLayers { visible: sl.visible, priority: sl.priority, blend: sl.blend, alpha: sl.alpha });
@@ -151,8 +152,8 @@ pub fn render_view(w: &World, out: &mut RenderView) {
     }
     // the countdown / stopwatch display (`show_timer_hud` 0xB0 / 0xBC: object 0x0802FCA0)
     out.timer = w.scene.timer_hud.map(|k| match k {
-        crate::scene::TimerHud::Countdown => w.scene.timers_shown.0,
-        crate::scene::TimerHud::Stopwatch => w.scene.timers_shown.1,
+        crate::scene::TimerHud::Countdown => w.scene.timers.countdown,
+        crate::scene::TimerHud::Stopwatch => w.scene.timers.stopwatch,
     });
     // boss HP bars (the shown one, one sliding out)
     if let Some(b) = &w.scene.boss_bar {

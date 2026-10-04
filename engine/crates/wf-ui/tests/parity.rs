@@ -24,7 +24,7 @@ fn fonts_decode() {
     let fs = font::Font::all(&rom);
     let counts: Vec<usize> = fs.iter().map(|f| f.glyphs.iter().flatten().count()).collect();
     println!("fonts: {:?}", fs.iter().map(|f| f.id).zip(counts.iter()).collect::<Vec<_>>());
-    assert_eq!(counts, vec![221, 223, 26, 223, 223]);
+    assert_eq!(counts, vec![221, 223, 26, 223, 223, 32]);
     for f in &fs {
         for g in f.glyphs.iter().flatten() {
             assert!(g.width <= 16 && g.cols.len() == g.width as usize);
