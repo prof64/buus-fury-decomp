@@ -2443,6 +2443,13 @@ pub fn restore_world(w: &mut World, s: SavedWorld) {
             w.scene.puppets.push(p);
         }
     }
+    // the player is back: its form controller starts the aura loop again (as `scene::bring_back`; Other World 0-22's
+    // scene -> 1-20: play 54 in the return's iteration)
+    if let Some(i) = w.player_idx(0) {
+        if crate::player::aura_form(w, i) {
+            w.sfx(54, 64);
+        }
+    }
     for (k, c) in s.cameras.into_iter().enumerate().take(w.cameras.len()) {
         w.cameras[k] = c;
     }

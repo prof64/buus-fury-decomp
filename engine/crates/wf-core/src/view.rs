@@ -39,6 +39,38 @@ fn draw_key(w: &World, i: usize) -> (i32, i32, u32) {
     (layer, depth, e.id)
 }
 
+/// the cel an actor's body shows (sheet frame, flip, halo attach point): what `render_view` draws and what the
+/// segment harness compares with the game's (animation, cel, facing) - a player / NPC by its animation state (a
+/// script's puppet first for a player), an enemy / hand by its animation index and time
+pub fn actor_cel(w: &World, i: usize) -> Option<(u16, bool, Option<(i32, i32)>)> {
+    let pick = |sp: &crate::content::Sprite, raw: i32, frame: i32, facing: u8| {
+        sp.anim_raw(raw).or_else(|| sp.anim_raw(1)).and_then(|an| {
+            let st = an.steps(facing);
+            st.get((frame.max(0) as usize).min(st.len().saturating_sub(1))).map(|s| (s.frame, s.flip, s.attach))
+        })
+    };
+    match &w.ents[i].body {
+        Body::Player(p) => {
+            // a script's puppet plays the scene animation instead of the player state's
+            let (raw, frame) = match crate::scene::scene_anim(w, i) {
+                Some(a) => (a.raw, a.frame),
+                None => (p.ap.raw, p.ap.frame),
+            };
+            let s = if p.candy_def { Some(45) } else { p.a.sprite };
+            s.and_then(|s| w.data.sprite(s)).and_then(|sp| pick(sp, raw, frame, p.a.facing))
+        }
+        Body::Npc(n) => n.a.sprite.and_then(|s| w.data.sprite(s)).and_then(|sp| pick(sp, n.anim.raw, n.anim.frame, n.a.facing)),
+        Body::Enemy(n) => n.a.sprite.and_then(|s| w.data.sprite(s)).and_then(|sp| n.a.anim.and_then(|k| sp.anims.get(k as usize))).and_then(|a| {
+            let looped = n.a.anim_loop.unwrap_or(a.looped);
+            a.step_index_at(n.a.facing, n.a.anim_t, looped).map(|k| (a.steps(n.a.facing)[k].frame, a.steps(n.a.facing)[k].flip, a.steps(n.a.facing)[k].attach))
+        }),
+        Body::Hand(h) => h.a.sprite.and_then(|s| w.data.sprite(s)).and_then(|sp| h.a.anim.and_then(|k| sp.anims.get(k as usize))).and_then(|a| {
+            a.step_index_at(h.a.facing, h.a.anim_t, false).map(|k| (a.steps(h.a.facing)[k].frame, a.steps(h.a.facing)[k].flip, None))
+        }),
+        _ => None,
+    }
+}
+
 fn actor_draw(w: &World, id: u32, a: &crate::actor::Actor, step: Option<(u16, bool, Option<(i32, i32)>)>, out: &mut RenderView) {
     let Some(sp) = a.sprite.and_then(|s| w.data.sprite(s)) else { return };
     let effect = if a.flash > 0 && a.flash & 2 != 0 { SpriteEffect::White } else if a.alpha < 256 { SpriteEffect::Blend { eva: (a.alpha.clamp(0, 256) >> 4) as u8, evb: (16 - (a.alpha.clamp(0, 256) >> 4)) as u8 } } else { SpriteEffect::None };
@@ -143,35 +175,24 @@ pub fn render_view(w: &World, out: &mut RenderView) {
         let id = e.id;
         match &e.body {
             Body::Player(p) => {
-                // a script's puppet plays the scene animation instead of the player state's
-                let (raw, frame) = match crate::scene::scene_anim(w, i) {
-                    Some(a) => (a.raw, a.frame),
-                    None => (p.ap.raw, p.ap.frame),
-                };
                 // Majin Buu's candy: the def is 0x36 (sprite 45, the sweets); eaten: not in the world
                 let mut a = std::borrow::Cow::Borrowed(&p.a);
                 if p.candy_def {
                     a.to_mut().sprite = Some(45);
                 }
-                let step = a.sprite.and_then(|s| w.data.sprite(s)).and_then(|sp| sp.anim_raw(raw).or_else(|| sp.anim_raw(1))).and_then(|an| {
-                    let st = an.steps(a.facing);
-                    st.get((frame.max(0) as usize).min(st.len().saturating_sub(1))).map(|s| (s.frame, s.flip, s.attach))
-                });
+                let step = actor_cel(w, i);
                 if p.a.alpha > 0 && !p.gone {
                     actor_draw(w, id, &a, step, out);
                 }
             }
             Body::Enemy(n) => {
-                let step = n.a.sprite.and_then(|s| w.data.sprite(s)).and_then(|sp| n.a.anim.and_then(|k| sp.anims.get(k as usize))).and_then(|a| {
-                    let looped = n.a.anim_loop.unwrap_or(a.looped);
-                    a.step_index_at(n.a.facing, n.a.anim_t, looped).map(|k| (a.steps(n.a.facing)[k].frame, a.steps(n.a.facing)[k].flip, a.steps(n.a.facing)[k].attach))
-                });
+                let step = actor_cel(w, i);
                 if n.a.alpha > 0 {
                     actor_draw(w, id, &n.a, step, out);
                 }
             }
             Body::Hand(h) => {
-                let step = h.a.sprite.and_then(|s| w.data.sprite(s)).and_then(|sp| h.a.anim.and_then(|k| sp.anims.get(k as usize))).and_then(|a| a.step_index_at(h.a.facing, h.a.anim_t, false).map(|k| (a.steps(h.a.facing)[k].frame, a.steps(h.a.facing)[k].flip, None)));
+                let step = actor_cel(w, i);
                 actor_draw(w, id, &h.a, step, out);
             }
             Body::Rock { x, y, hp } => effect(id, 0x0875_f7ac, if *hp >= 2 { 0 } else { 1 }, *x, *y, out),
@@ -227,10 +248,7 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                 }
             }
             Body::Npc(n) => {
-                let step = n.a.sprite.and_then(|s| w.data.sprite(s)).and_then(|sp| sp.anim_raw(n.anim.raw).or_else(|| sp.anim_raw(1))).and_then(|a| {
-                    let st = a.steps(n.a.facing);
-                    st.get((n.anim.frame.max(0) as usize).min(st.len().saturating_sub(1))).map(|s| (s.frame, s.flip, s.attach))
-                });
+                let step = actor_cel(w, i);
                 actor_draw(w, id, &n.a, step, out);
             }
             Body::Pickup(p) => crate::fieldview::pickup(w, id, p, out),

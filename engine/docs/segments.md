@@ -4197,3 +4197,49 @@ needs the trigger generation counter; next); walk-grid changes in a few 3-x / 4-
   every logic row to the recording's end, 1,668,052 (072_the_end, the credits)** - the rest of Super Buu, Kid Buu and
   the ending need no fix. With the 191,430 run (exact to 1,339,017) and the known range, the no-lag whole run from
   Earth 7-x to the credits has no open stop of B's.
+
+**Claim (dungeon agent A, 2026-10-04, by the coordinator): the rule leftovers of A's import rounds** - (1) the Zenie
+coin picked up a frame late (ship, from whole-run cut 497,351, row 154 of its 300-row run); (2) the 8-56 -> 8-57 load's
+missing 4-block tile set at 492; (3) the other exit-fade misses (14-2 vram x4, 18-10 / 15-23 positions, 21-6 / 21-8
+sprite 87, 4-24 vram); (4) m_pg_g131's 13-2 load RNG (the game 1 draw, ours 4).
+*Area-local harness (Earth agent): done and locked.* `SEGMENT_AREA=1` / `"area_exact"` (wf-import `area.rs`,
+`tools/segments/area_lock.py`; the soak agent's `data/segments/area` rows): **490 gates locked, 496 / 503 clean**.
+* **Trigger order confirmed:** ours is the game's list reversed - the game scans last to first, ours first to last,
+  the same order; the compare reverses ours.
+* **Touch-once rule (core):** an event / save-point trigger with touch-once activation is removed **when its event
+  ends** (the game's activation returns when the event it ran is over), and not if the trigger list was rebuilt
+  meanwhile (list +0xC8: a load / `refresh_map_triggers` - ours drop the pending removal there). `Field.once_pending`,
+  taken in `set_busy(false)`. Fixed dr4_001 15-33 (s437 still running at the cut's end), 2-8 (s110), 14-2 (s400),
+  7-3 (s262), 8-16 (s319), 10-20 ... Region triggers (vt 0x080499D4) are never removed. Gates unchanged.
+* The harness compares the walk grid against ours as imported (before row 0's frame, like the game's start), and
+  only at the game's change rows (a segment's last row is often inside the next load).
+* **Open (report only, 7 gates):** `earth_3_12_1` f3,610 / `earth_3_3_3` f1,342 / `earth_3_3_4` (60 vs 56 tiles):
+  ours marks / unmarks a scripted NPC's footprint on each walk_to / remove_actor (s159's nine NPCs walking to (240, 200)
+  then removed: ours ends with the tile changed, the game's grid never changed through the whole cutscene) - the
+  `script_move_mark` rule for event-spawned map NPCs needs the game's write (`0x08009930` callers) checked; `earth_7_3_1`
+  f468 / `rclose_002_006_4-1` f1,851 / `rj_back1_000_18_10` f54: two triggers in swapped order after a
+  `refresh_map_triggers` (our refresh appends in list order, the game's re-creation order differs); `db5t_004_12-22`
+  f2,169 (the Airship countdown end: list of 2 vs our 0).
+* **rkb_001_0-50 flag 408 (game sets, ours not) - importer item:** the cut starts inside 14-1's trigger script
+  `inline_0x08087498` (`run_event(515, ..)` then `set_flag(408)`): the import continues s515 but not the inline script
+  under it (emulator: set_flag(0x198) at row 64 from VM pc 0x080874A7, that script's step 1) - the outer inline caller
+  is not rebuilt -> **importer agent**.
+* **NPC talk state is located:** a map NPC's (vt 0x0804C92C) talk resume node is object +0x1BC (u16, the exit value of
+  its last talk; the importer already reads it, `import_objects`). **Soak agent:** adding it to area.py (per NPC, by
+  list position or position) would close that gap; I compare it once it is in the rows.
+
+**Whole run, no lag, on HEAD fb38f36 (side-content agent, 2026-10-04).** From the reset with no import: **exact to
+row 848,743 of 1,668,052** in both modes (recorded lag = no-lag stepping + the recording's lag rows as sound frames,
+as the segment harness now). The only lasting divergence is the allow-listed Vegeta wander (rows 1,339,017 ..
+1,354,524, `known_stops.json`); after it the run is exact to the credits. The tool now also compares the story flags
+(every flag, both ways, at each iteration's end) - all the stops below are flag *timing*: one logic frame or a
+transition apart, set / cleared on both sides.
+Resync stop queue (`resync.py --lag none`, allow-list on): 10 stops.
+* 848,743 - flag 187 cleared in the game ~69 rows earlier than ours: 13-1's on-enter script (`inline_0x0807B3C7`,
+  `clear_flag(187)`) runs during the world map's warp transition from 0-50 in the game (area still 0-50), at the
+  load in ours. 848,747 (pos, the cut taken inside that transition) follows from it. -> **Super Buu agent** (fat
+  chapter stops) / world-map warp timing.
+* 1,111,492 and 1,121,863 - flag 284 set one logic frame early in ours: 18-10's breakable statue callback
+  (`inline_0x0808C880`: puff, open_area, set_flag(284), refresh_map_triggers). The rng / import stops at 1,121,864 ..
+  1,122,008 are cuts taken inside that frame difference. -> **side-content agent** (mine, Janemba chapter: next).
+* 1,339,017 - known (Vegeta's wander, allow-listed).

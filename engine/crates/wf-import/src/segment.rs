@@ -76,6 +76,17 @@ pub struct Report {
     pub world: Option<crate::world::Tally>,
     /// `SEGMENT_AREA`: the area-local comparison (`area.rs`: trigger list + resume nodes, walk-grid changes)
     pub area: Option<crate::area::Tally>,
+    /// the cel each actor shows (`wf_core::view::actor_cel`: what the renderer draws) against the game's (animation,
+    /// cel, facing) on the frames matched so far: (checks, differing frames, the first)
+    pub cel: CelTally,
+}
+
+/// the drawn-cel comparison (report only unless the segment's `cel_exact` flag is set)
+#[derive(Default, Debug)]
+pub struct CelTally {
+    pub checks: usize,
+    pub bad_rows: usize,
+    pub first: Option<(usize, String)>,
 }
 
 impl Report {
@@ -138,6 +149,7 @@ pub fn compare(w: &World, fr: &Value, es: &[String], map: &mut BTreeMap<usize, E
     if wf_core::menu::title::on_title(w) {
         return;
     }
+    let mut cel_row: Option<usize> = None;
     let a = &fr["area"];
     if let Some(f) = w.field.as_ref() {
         let ours = (f.area.world as i64, f.area.area as i64, f.area.variant as i64);
@@ -194,6 +206,27 @@ pub fn compare(w: &World, fr: &Value, es: &[String], map: &mut BTreeMap<usize, E
         }
         if ac.facing != r.dir() {
             rep.bad(k, "dir", format!("#{} sprite {}: {} vs game {}", r.k(), r.sprite(), ac.facing, r.dir()));
+        }
+        // the cel drawn (the picture's view of the animation; a puppet left over a player shows here)
+        if rep.first.is_none() && r.raw() >= 0 {
+            let game = ac.sprite.and_then(|s| w.data.sprite(s)).and_then(|sp| sp.anim_raw(r.raw())).and_then(|an| {
+                let st = an.steps(r.dir());
+                st.get((r.frame().max(0) as usize).min(st.len().saturating_sub(1))).map(|s| (s.frame, s.flip))
+            });
+            if let Some(g) = game {
+                rep.cel.checks += 1;
+                let ours = wf_core::view::actor_cel(w, i).map(|c| (c.0, c.1));
+                if ours != Some(g) && cel_row != Some(k) {
+                    cel_row = Some(k);
+                    rep.cel.bad_rows += 1;
+                    if rep.cel.first.is_none() {
+                        rep.cel.first = Some((k, format!("#{} sprite {}: cel {ours:?} vs game {g:?} (raw {} cel {} dir {})", r.k(), r.sprite(), r.raw(), r.frame(), r.dir())));
+                    }
+                    if std::env::var("SEGMENT_CEL").is_ok_and(|v| v == "all") {
+                        eprintln!("    cel f{k} #{} sprite {}: {ours:?} vs game {g:?} (raw {} cel {} dir {})", r.k(), r.sprite(), r.raw(), r.frame(), r.dir());
+                    }
+                }
+            }
         }
         if let Some((raw, frame)) = scene::shown_anim(w, i) {
             let ours = ac.sprite.and_then(|s| w.data.sprite(s)).and_then(|sp| sp.anim_raw(raw)).map(|a| a.canon_raw.min(raw)).unwrap_or(-1);

@@ -21,13 +21,11 @@
    "stretches": 33
   },
   "janemba": {
-   "cats": {
-    "screen fade": 1
-   },
+   "cats": {},
    "cut_frames": 187291,
-   "exact": 254,
+   "exact": 255,
    "frames": 187291,
-   "matched": 185838,
+   "matched": 187291,
    "run_frames": 199703,
    "segments": 255,
    "stretches": 16
@@ -68,12 +66,12 @@
  "dirty": true,
  "total": {
   "cut_frames": 1622759,
-  "exact": 1517,
+  "exact": 1518,
   "frames": 1622759,
-  "matched": 1597305,
+  "matched": 1598758,
   "run_frames": 1668052,
   "segments": 1519,
   "stretches": 75
  },
- "tree": "836475d"
+ "tree": "943752f"
 }

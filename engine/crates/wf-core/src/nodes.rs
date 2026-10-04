@@ -1424,6 +1424,10 @@ fn leaf_exit(w: &mut World, c: &C, n: u16, _r: &mut NodeRt) {
             w.en(i).state_stamp = f;
         }
         K::ChargedPunch => w.en(i).a.hittable = true,
+        // the flame controller (0x03002FA8) goes with an interrupted breath: its sound stops (whole-run sound
+        // requests, post-game: a punched fire-breather - StopMatch(63) in the punch's iteration); a finished one stopped
+        // it in its update (f 128)
+        K::FlameBreath if _r.f < 128 => w.events.push(crate::world::Event::SfxStopMatch { id: 63 }),
         // Babidi can be hit again once he leaves the hover (obj+0x1CC back to 1 with the state change to 0xC6)
         K::BabidiHover => w.en(i).a.hittable = true,
         // (field: the node's own exit is a no-op (vtable 0x0804A6C0 +8 = bx lr); the beam belongs to the actor state

@@ -2331,6 +2331,14 @@ pub fn ai_script_done(w: &mut World, entity: EntityId) {
 /// a cutscene scene load: the player objects leave the world (kept here unchanged)
 pub fn send_offstage(w: &mut World) {
     let players = w.players.clone();
+    // the leader's player object goes (a cutscene scene has none): its form controller's aura loop (sound 54) stops
+    // with it, and `bring_back` starts it again (whole-run sound requests: Other World 1-20's s103 scene load, Babidi's
+    // ship - stop 54 at the scene load, play 54 when the player returns)
+    if let Some(i) = w.player_idx(0) {
+        if crate::player::aura_form(w, i) {
+            w.sfx_stop(54);
+        }
+    }
     let mut k = 0;
     while k < w.ents.len() {
         if players.contains(&w.ents[k].id) && matches!(w.ents[k].body, Body::Player(_)) {
@@ -2345,7 +2353,15 @@ pub fn send_offstage(w: &mut World) {
 /// the players come back (before the field area they return to is loaded)
 pub fn bring_back(w: &mut World) {
     let back = std::mem::take(&mut w.scene.offstage);
+    let had = !back.is_empty();
     w.ents.extend(back);
+    if had {
+        if let Some(i) = w.player_idx(0) {
+            if crate::player::aura_form(w, i) {
+                w.sfx(54, 64);
+            }
+        }
+    }
 }
 
 /// the area banner after a frame (docs/frontend.md §7): the shown one ages and goes after t = 238; a load deletes

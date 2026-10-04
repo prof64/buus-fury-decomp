@@ -1,15 +1,16 @@
 {
  "rec": {
-  "stops": 60,
-  "rule": 60,
-  "import": 0,
+  "stops": 20,
+  "rule": 16,
+  "import": 4,
+  "known": 0,
   "groups": [
    {
     "owner": "Super Buu agent",
     "kind": "rule",
     "field": "rng",
     "chapter": "superbuu",
-    "count": 53,
+    "count": 11,
     "stops": [
      {
       "row": 1339017,
@@ -20,7 +21,7 @@
        "s473",
        "inline_0x08711151"
       ],
-      "from": 813245
+      "from": 1122008
      },
      {
       "row": 1339177,
@@ -103,413 +104,57 @@
       "menu": false,
       "started": [],
       "from": 1342159
-     },
-     {
-      "row": 1342684,
-      "stretch": "062_m_inside_buu",
-      "what": "app [adac706d, b32a0179] game [03522da7, 9cd0ce7b]",
-      "menu": false,
-      "started": [],
-      "from": 1342467
-     },
-     {
-      "row": 1342899,
-      "stretch": "062_m_inside_buu",
-      "what": "app [89b30e84, 19d12d98] game [362b2b74, b145e961]",
-      "menu": false,
-      "started": [],
-      "from": 1342685
-     },
-     {
-      "row": 1343116,
-      "stretch": "062_m_inside_buu",
-      "what": "app [a18cdbe3, 5519fab0] game [3974d65a, 9dcc4928]",
-      "menu": false,
-      "started": [],
-      "from": 1342900
-     },
-     {
-      "row": 1343193,
-      "stretch": "062_m_inside_buu",
-      "what": "app [7eab4517, 9a1ea97f] game [c64dd7ad, 05476479]",
-      "menu": false,
-      "started": [],
-      "from": 1343117
-     },
-     {
-      "row": 1343515,
-      "stretch": "062_m_inside_buu",
-      "what": "app [92636d36, e816db74] game [5b8bccd0, f2761e01]",
-      "menu": false,
-      "started": [],
-      "from": 1343194
-     },
-     {
-      "row": 1343829,
-      "stretch": "062_m_inside_buu",
-      "what": "app [5c981aaa, d34b5f96] game [eae05a9e, b1340da5]",
-      "menu": false,
-      "started": [],
-      "from": 1343516
-     },
-     {
-      "row": 1344134,
-      "stretch": "062_m_inside_buu",
-      "what": "app [521926fd, 23fa1b6c] game [1ca36ddc, 4d760cb0]",
-      "menu": false,
-      "started": [],
-      "from": 1343830
-     },
-     {
-      "row": 1345535,
-      "stretch": "062_m_inside_buu",
-      "what": "app [5fce1f33, 3b421013] game [e53f1b37, 37c86a3b]",
-      "menu": false,
-      "started": [
-       "s475"
-      ],
-      "from": 1344135
-     },
-     {
-      "row": 1345681,
-      "stretch": "062_m_inside_buu",
-      "what": "app [5fad721f, a2591b52] game [7e8983c7, def83227]",
-      "menu": false,
-      "started": [],
-      "from": 1345536
-     },
-     {
-      "row": 1345845,
-      "stretch": "062_m_inside_buu",
-      "what": "app [9811caec, 838bb9f9] game [57f17d1b, c2acf360]",
-      "menu": false,
-      "started": [],
-      "from": 1345682
-     },
-     {
-      "row": 1346027,
-      "stretch": "062_m_inside_buu",
-      "what": "app [79b51a0f, c727d937] game [4bf32af9, 370bfd65]",
-      "menu": false,
-      "started": [],
-      "from": 1345846
-     },
-     {
-      "row": 1346270,
-      "stretch": "062_m_inside_buu",
-      "what": "app [f06d643e, 1cf9773c] game [89d586ef, 7ccc275e]",
-      "menu": false,
-      "started": [],
-      "from": 1346028
-     },
-     {
-      "row": 1346635,
-      "stretch": "062_m_inside_buu",
-      "what": "app [dc932f42, 98c848ee] game [788a8240, a7c511f3]",
-      "menu": false,
-      "started": [],
-      "from": 1346271
-     },
-     {
-      "row": 1346947,
-      "stretch": "062_m_inside_buu",
-      "what": "app [b3695714, 3a60c80f] game [2067d384, 905ad8e1]",
-      "menu": false,
-      "started": [],
-      "from": 1346636
-     },
-     {
-      "row": 1347040,
-      "stretch": "062_m_inside_buu",
-      "what": "app [7e5a3c26, f57b128f] game [2bfc3a84, 509dcad3]",
-      "menu": false,
-      "started": [],
-      "from": 1346948
-     },
-     {
-      "row": 1347274,
-      "stretch": "062_m_inside_buu",
-      "what": "app [fe2468d8, f7323a90] game [dbac4b2e, 205c6f47]",
-      "menu": false,
-      "started": [],
-      "from": 1347041
-     },
-     {
-      "row": 1347743,
-      "stretch": "062_m_inside_buu",
-      "what": "app [755830f3, 65866ce3] game [51418402, 21557080]",
-      "menu": false,
-      "started": [],
-      "from": 1347275
-     },
-     {
-      "row": 1347943,
-      "stretch": "062_m_inside_buu",
-      "what": "app [a1608af6, 989d45f2] game [044e17b7, a6795ede]",
-      "menu": false,
-      "started": [],
-      "from": 1347744
-     },
-     {
-      "row": 1348788,
-      "stretch": "062_m_inside_buu",
-      "what": "app [4b4b807d, b23f90ea] game [5257eafb, 1e682711]",
-      "menu": false,
-      "started": [],
-      "from": 1348486
-     },
-     {
-      "row": 1348872,
-      "stretch": "062_m_inside_buu",
-      "what": "app [a20e654f, e5f4dc9a] game [676add06, c838fc38]",
-      "menu": false,
-      "started": [],
-      "from": 1348789
-     },
-     {
-      "row": 1349100,
-      "stretch": "062_m_inside_buu",
-      "what": "app [93d7eeca, 72a42e2d] game [85f43760, 1b681d1b]",
-      "menu": false,
-      "started": [],
-      "from": 1348873
-     },
-     {
-      "row": 1349211,
-      "stretch": "062_m_inside_buu",
-      "what": "app [531397c0, 0f304cf8] game [76e1fb34, 2abe2065]",
-      "menu": false,
-      "started": [],
-      "from": 1349101
-     },
-     {
-      "row": 1349681,
-      "stretch": "062_m_inside_buu",
-      "what": "app [0649708b, 6e37f748] game [6722dbb4, 10d049e6]",
-      "menu": false,
-      "started": [],
-      "from": 1349212
-     },
-     {
-      "row": 1350004,
-      "stretch": "062_m_inside_buu",
-      "what": "app [994db17f, d6729c1a] game [4a6bf1ea, f3ac490f]",
-      "menu": false,
-      "started": [],
-      "from": 1349682
-     },
-     {
-      "row": 1350235,
-      "stretch": "062_m_inside_buu",
-      "what": "app [ad1b76c4, 9364fc9c] game [8747241c, 27099649]",
-      "menu": false,
-      "started": [],
-      "from": 1350005
-     },
-     {
-      "row": 1350631,
-      "stretch": "062_m_inside_buu",
-      "what": "app [1d472e6a, 7187ca97] game [cecb3386, ccd1c19d]",
-      "menu": false,
-      "started": [],
-      "from": 1350236
-     },
-     {
-      "row": 1350748,
-      "stretch": "062_m_inside_buu",
-      "what": "app [4908ccd1, 1db24118] game [fe0c7df5, 49d0f6b7]",
-      "menu": false,
-      "started": [],
-      "from": 1350632
-     },
-     {
-      "row": 1350993,
-      "stretch": "062_m_inside_buu",
-      "what": "app [abe022aa, 5b77ac41] game [33e0f800, 9d4c96db]",
-      "menu": false,
-      "started": [],
-      "from": 1350749
-     },
-     {
-      "row": 1351264,
-      "stretch": "062_m_inside_buu",
-      "what": "app [be3dde6f, 91c8084c] game [3839c53c, 85385fc2]",
-      "menu": false,
-      "started": [],
-      "from": 1350994
-     },
-     {
-      "row": 1351475,
-      "stretch": "062_m_inside_buu",
-      "what": "app [fa6d538a, f93cf5f6] game [4302cdd6, bfa3d9cd]",
-      "menu": false,
-      "started": [],
-      "from": 1351265
-     },
-     {
-      "row": 1351901,
-      "stretch": "062_m_inside_buu",
-      "what": "app [45e90125, 5975f0cb] game [a45885ad, e2cd433b]",
-      "menu": false,
-      "started": [],
-      "from": 1351476
-     },
-     {
-      "row": 1352061,
-      "stretch": "062_m_inside_buu",
-      "what": "app [51570379, 1de7034e] game [56ccea0b, 08cfa505]",
-      "menu": false,
-      "started": [],
-      "from": 1351902
-     },
-     {
-      "row": 1352305,
-      "stretch": "062_m_inside_buu",
-      "what": "app [14d02487, 39af1b93] game [ad6debf6, a4e98ce0]",
-      "menu": false,
-      "started": [],
-      "from": 1352062
-     },
-     {
-      "row": 1352581,
-      "stretch": "062_m_inside_buu",
-      "what": "app [e280ac91, b1c3bbb8] game [a856ef01, 49a207e3]",
-      "menu": false,
-      "started": [],
-      "from": 1352306
-     },
-     {
-      "row": 1352695,
-      "stretch": "062_m_inside_buu",
-      "what": "app [f2c45990, 5779c5cb] game [5e6944a8, 93f15889]",
-      "menu": false,
-      "started": [],
-      "from": 1352582
-     },
-     {
-      "row": 1352901,
-      "stretch": "062_m_inside_buu",
-      "what": "app [10db4670, 7a61af7f] game [197e87df, 0c910220]",
-      "menu": false,
-      "started": [],
-      "from": 1352696
-     },
-     {
-      "row": 1353408,
-      "stretch": "062_m_inside_buu",
-      "what": "app [f68339d4, aeab383a] game [19f1e07e, ea3ea53b]",
-      "menu": false,
-      "started": [],
-      "from": 1352902
-     },
-     {
-      "row": 1353845,
-      "stretch": "062_m_inside_buu",
-      "what": "app [b36abab0, 16779f40] game [7dec369b, 33dd49bc]",
-      "menu": false,
-      "started": [],
-      "from": 1353409
-     },
-     {
-      "row": 1353945,
-      "stretch": "062_m_inside_buu",
-      "what": "app [cbce3744, 37bf7608] game [723e3df2, bec7cd27]",
-      "menu": false,
-      "started": [],
-      "from": 1353846
-     },
-     {
-      "row": 1354142,
-      "stretch": "062_m_inside_buu",
-      "what": "app [1c928a2a, c75581ee] game [a3544feb, bab28676]",
-      "menu": false,
-      "started": [],
-      "from": 1353946
-     },
-     {
-      "row": 1354390,
-      "stretch": "062_m_inside_buu",
-      "what": "app [16bc88c0, 29ad67c7] game [0edbadae, 071be2df]",
-      "menu": false,
-      "started": [],
-      "from": 1354143
-     },
-     {
-      "row": 1354524,
-      "stretch": "062_m_inside_buu",
-      "what": "app [06e14012, e2a79908] game [7a5803c2, 7bc28021]",
-      "menu": false,
-      "started": [],
-      "from": 1354391
      }
     ]
    },
    {
-    "owner": "Earth agent",
+    "owner": "side-content agent",
     "kind": "rule",
-    "field": "rng",
-    "chapter": "earth",
-    "count": 3,
-    "stops": [
-     {
-      "row": 153132,
-      "stretch": "E2_earth",
-      "what": "app [ddf7897e, 38c3c1f0] game [234beb00, fbe02e0f]",
-      "menu": false,
-      "started": [
-       "s266",
-       "s262"
-      ],
-      "from": 0
-     },
-     {
-      "row": 153226,
-      "stretch": "E2_earth",
-      "what": "app [ddf7897e, 38c3c1f0] game [d800841f, 1450638f]",
-      "menu": false,
-      "started": [
-       "s266@19"
-      ],
-      "from": 153133
-     },
-     {
-      "row": 153281,
-      "stretch": "E2_earth",
-      "what": "app [ce9c231f, 6629d798] game [d800841f, 1450638f]",
-      "menu": false,
-      "started": [
-       "s266@19"
-      ],
-      "from": 153227
-     }
-    ]
-   },
-   {
-    "owner": "Earth agent",
-    "kind": "rule",
-    "field": "area",
-    "chapter": "earth",
+    "field": "flags",
+    "chapter": "janemba",
     "count": 2,
     "stops": [
      {
-      "row": 153389,
-      "stretch": "E2_earth",
-      "what": "app (7, 5) game (7, 3)",
+      "row": 1111492,
+      "stretch": "042_h_statues",
+      "what": "flag 284 app only",
       "menu": false,
       "started": [
-       "s266@24"
+       "inline_0x0808C880",
+       "inline_0x0808C728"
       ],
-      "from": 153282
+      "from": 848748
      },
      {
-      "row": 153470,
-      "stretch": "E2_earth",
-      "what": "app (7, 3) game (7, 5)",
+      "row": 1121863,
+      "stretch": "044_h_back1",
+      "what": "flag 284 app only",
       "menu": false,
       "started": [
-       "s266@29"
+       "inline_0x0808C880",
+       "inline_0x0808C728"
       ],
-      "from": 153390
+      "from": 1111523
+     }
+    ]
+   },
+   {
+    "owner": "dungeon agents A / B",
+    "kind": "rule",
+    "field": "flags",
+    "chapter": "fat",
+    "count": 1,
+    "stops": [
+     {
+      "row": 848743,
+      "stretch": "017_db6_fukurou",
+      "what": "flag 187 app only",
+      "menu": false,
+      "started": [
+       "inline_0x08072A48",
+       "inline_0x0808566C"
+      ],
+      "from": 0
      }
     ]
    },
@@ -521,497 +166,143 @@
     "count": 1,
     "stops": [
      {
-      "row": 813244,
-      "stretch": "012_db5_a01",
-      "what": "app (78214, 23608, 3) game (78022, 23608, 3)",
+      "row": 848747,
+      "stretch": "017_db6_fukurou",
+      "what": "app (30720, 30720, 1) game (204800, 225280, 1)",
       "menu": false,
       "started": [
-       "inline_0x08710F5E",
-       "inline_0x08710FB7"
+       "inline_0x08072A48",
+       "s515@0"
       ],
-      "from": 153471
+      "from": 848744
      }
     ]
    },
    {
-    "owner": "Super Buu agent",
+    "owner": "side-content agent",
     "kind": "rule",
-    "field": "pos",
-    "chapter": "superbuu",
+    "field": "rng",
+    "chapter": "janemba",
     "count": 1,
     "stops": [
      {
-      "row": 1348485,
-      "stretch": "062_m_inside_buu",
-      "what": "app (51200, 59648, 1) game (52480, 58880, 1)",
+      "row": 1121917,
+      "stretch": "044_h_back1",
+      "what": "app [be62dcff, 5b07fbc6] game [e2b8d8a9, 5be649e5]",
       "menu": false,
       "started": [],
-      "from": 1347944
+      "from": 1121894
+     }
+    ]
+   },
+   {
+    "owner": "importer agent",
+    "kind": "import",
+    "field": "rng",
+    "chapter": "janemba",
+    "count": 3,
+    "stops": [
+     {
+      "row": 1121864,
+      "stretch": "044_h_back1",
+      "what": "app [af435554, 21224f53] game [ccb45104, c0b2bf81]",
+      "menu": false,
+      "started": [
+       "inline_0x0808C880"
+      ],
+      "from": 1121864
+     },
+     {
+      "row": 1121919,
+      "stretch": "044_h_back1",
+      "what": "app [bb591593, 75fbf993] game [7f8b5b7c, 390e027e]",
+      "menu": false,
+      "started": [],
+      "from": 1121918
+     },
+     {
+      "row": 1121949,
+      "stretch": "044_h_back1",
+      "what": "app [e86515d2, 7f98e45f] game [3790ba8c, d239632f]",
+      "menu": false,
+      "started": [],
+      "from": 1121948
+     }
+    ]
+   },
+   {
+    "owner": "importer agent",
+    "kind": "import",
+    "field": "flags",
+    "chapter": "janemba",
+    "count": 1,
+    "stops": [
+     {
+      "row": 1111493,
+      "stretch": "042_h_statues",
+      "what": "flag 284 game only",
+      "menu": false,
+      "started": [
+       "inline_0x0808C880"
+      ],
+      "from": 1111493
      }
     ]
    }
   ]
  },
  "none": {
-  "stops": 56,
-  "rule": 56,
-  "import": 0,
+  "stops": 10,
+  "rule": 5,
+  "import": 4,
+  "known": 1,
   "groups": [
    {
-    "owner": "Super Buu agent",
+    "owner": "side-content agent",
     "kind": "rule",
-    "field": "rng",
-    "chapter": "superbuu",
-    "count": 53,
+    "field": "flags",
+    "chapter": "janemba",
+    "count": 2,
     "stops": [
      {
-      "row": 1339017,
-      "stretch": "062_m_inside_buu",
-      "what": "app [b460ebed, 721626b0] game [699cd8d3, d8087ea9]",
+      "row": 1111492,
+      "stretch": "042_h_statues",
+      "what": "flag 284 app only",
       "menu": false,
       "started": [
-       "s473",
-       "inline_0x08711151"
+       "inline_0x0808C880",
+       "inline_0x0808C728"
       ],
-      "from": 813245
+      "from": 848748
      },
      {
-      "row": 1339177,
-      "stretch": "062_m_inside_buu",
-      "what": "app [075f7bd2, 4552fb5d] game [fd587251, 077b5510]",
-      "menu": false,
-      "started": [],
-      "from": 1339018
-     },
-     {
-      "row": 1339418,
-      "stretch": "062_m_inside_buu",
-      "what": "app [241fe664, 8f5fc246] game [4df29375, 74a1a982]",
-      "menu": false,
-      "started": [],
-      "from": 1339178
-     },
-     {
-      "row": 1339637,
-      "stretch": "062_m_inside_buu",
-      "what": "app [73f516da, f2ef07d5] game [79de3589, 0f5ce720]",
-      "menu": false,
-      "started": [],
-      "from": 1339419
-     },
-     {
-      "row": 1340687,
-      "stretch": "062_m_inside_buu",
-      "what": "app [6eee4018, 29f01e28] game [5849e2a1, 0dfa2bf1]",
+      "row": 1121863,
+      "stretch": "044_h_back1",
+      "what": "flag 284 app only",
       "menu": false,
       "started": [
-       "s474"
+       "inline_0x0808C880",
+       "inline_0x0808C728"
       ],
-      "from": 1339638
-     },
-     {
-      "row": 1341068,
-      "stretch": "062_m_inside_buu",
-      "what": "app [7200100b, e25cde53] game [40797251, 31453ec9]",
-      "menu": false,
-      "started": [],
-      "from": 1340688
-     },
-     {
-      "row": 1341250,
-      "stretch": "062_m_inside_buu",
-      "what": "app [7643016b, 73b05615] game [86ef5215, fff80fed]",
-      "menu": false,
-      "started": [],
-      "from": 1341069
-     },
-     {
-      "row": 1341895,
-      "stretch": "062_m_inside_buu",
-      "what": "app [61298198, 65aeb332] game [1c174e5a, 7fca8b53]",
-      "menu": false,
-      "started": [],
-      "from": 1341251
-     },
-     {
-      "row": 1342031,
-      "stretch": "062_m_inside_buu",
-      "what": "app [6ae4a4d1, e3ed753c] game [b7f2bf79, d05adf3b]",
-      "menu": false,
-      "started": [],
-      "from": 1341896
-     },
-     {
-      "row": 1342158,
-      "stretch": "062_m_inside_buu",
-      "what": "app [de6596d0, 05e05eb2] game [a2040c69, 7aaa5e0a]",
-      "menu": false,
-      "started": [],
-      "from": 1342032
-     },
-     {
-      "row": 1342466,
-      "stretch": "062_m_inside_buu",
-      "what": "app [6f78923c, 85b83e2d] game [311d6c4b, 5c91ba80]",
-      "menu": false,
-      "started": [],
-      "from": 1342159
-     },
-     {
-      "row": 1342684,
-      "stretch": "062_m_inside_buu",
-      "what": "app [adac706d, b32a0179] game [03522da7, 9cd0ce7b]",
-      "menu": false,
-      "started": [],
-      "from": 1342467
-     },
-     {
-      "row": 1342899,
-      "stretch": "062_m_inside_buu",
-      "what": "app [89b30e84, 19d12d98] game [362b2b74, b145e961]",
-      "menu": false,
-      "started": [],
-      "from": 1342685
-     },
-     {
-      "row": 1343116,
-      "stretch": "062_m_inside_buu",
-      "what": "app [a18cdbe3, 5519fab0] game [3974d65a, 9dcc4928]",
-      "menu": false,
-      "started": [],
-      "from": 1342900
-     },
-     {
-      "row": 1343193,
-      "stretch": "062_m_inside_buu",
-      "what": "app [7eab4517, 9a1ea97f] game [c64dd7ad, 05476479]",
-      "menu": false,
-      "started": [],
-      "from": 1343117
-     },
-     {
-      "row": 1343515,
-      "stretch": "062_m_inside_buu",
-      "what": "app [92636d36, e816db74] game [5b8bccd0, f2761e01]",
-      "menu": false,
-      "started": [],
-      "from": 1343194
-     },
-     {
-      "row": 1343829,
-      "stretch": "062_m_inside_buu",
-      "what": "app [5c981aaa, d34b5f96] game [eae05a9e, b1340da5]",
-      "menu": false,
-      "started": [],
-      "from": 1343516
-     },
-     {
-      "row": 1344134,
-      "stretch": "062_m_inside_buu",
-      "what": "app [521926fd, 23fa1b6c] game [1ca36ddc, 4d760cb0]",
-      "menu": false,
-      "started": [],
-      "from": 1343830
-     },
-     {
-      "row": 1345535,
-      "stretch": "062_m_inside_buu",
-      "what": "app [5fce1f33, 3b421013] game [e53f1b37, 37c86a3b]",
-      "menu": false,
-      "started": [
-       "s475"
-      ],
-      "from": 1344135
-     },
-     {
-      "row": 1345681,
-      "stretch": "062_m_inside_buu",
-      "what": "app [5fad721f, a2591b52] game [7e8983c7, def83227]",
-      "menu": false,
-      "started": [],
-      "from": 1345536
-     },
-     {
-      "row": 1345845,
-      "stretch": "062_m_inside_buu",
-      "what": "app [9811caec, 838bb9f9] game [57f17d1b, c2acf360]",
-      "menu": false,
-      "started": [],
-      "from": 1345682
-     },
-     {
-      "row": 1346027,
-      "stretch": "062_m_inside_buu",
-      "what": "app [79b51a0f, c727d937] game [4bf32af9, 370bfd65]",
-      "menu": false,
-      "started": [],
-      "from": 1345846
-     },
-     {
-      "row": 1346270,
-      "stretch": "062_m_inside_buu",
-      "what": "app [f06d643e, 1cf9773c] game [89d586ef, 7ccc275e]",
-      "menu": false,
-      "started": [],
-      "from": 1346028
-     },
-     {
-      "row": 1346635,
-      "stretch": "062_m_inside_buu",
-      "what": "app [dc932f42, 98c848ee] game [788a8240, a7c511f3]",
-      "menu": false,
-      "started": [],
-      "from": 1346271
-     },
-     {
-      "row": 1346947,
-      "stretch": "062_m_inside_buu",
-      "what": "app [b3695714, 3a60c80f] game [2067d384, 905ad8e1]",
-      "menu": false,
-      "started": [],
-      "from": 1346636
-     },
-     {
-      "row": 1347040,
-      "stretch": "062_m_inside_buu",
-      "what": "app [7e5a3c26, f57b128f] game [2bfc3a84, 509dcad3]",
-      "menu": false,
-      "started": [],
-      "from": 1346948
-     },
-     {
-      "row": 1347274,
-      "stretch": "062_m_inside_buu",
-      "what": "app [fe2468d8, f7323a90] game [dbac4b2e, 205c6f47]",
-      "menu": false,
-      "started": [],
-      "from": 1347041
-     },
-     {
-      "row": 1347743,
-      "stretch": "062_m_inside_buu",
-      "what": "app [755830f3, 65866ce3] game [51418402, 21557080]",
-      "menu": false,
-      "started": [],
-      "from": 1347275
-     },
-     {
-      "row": 1347943,
-      "stretch": "062_m_inside_buu",
-      "what": "app [a1608af6, 989d45f2] game [044e17b7, a6795ede]",
-      "menu": false,
-      "started": [],
-      "from": 1347744
-     },
-     {
-      "row": 1348788,
-      "stretch": "062_m_inside_buu",
-      "what": "app [4b4b807d, b23f90ea] game [5257eafb, 1e682711]",
-      "menu": false,
-      "started": [],
-      "from": 1348486
-     },
-     {
-      "row": 1348872,
-      "stretch": "062_m_inside_buu",
-      "what": "app [a20e654f, e5f4dc9a] game [676add06, c838fc38]",
-      "menu": false,
-      "started": [],
-      "from": 1348789
-     },
-     {
-      "row": 1349100,
-      "stretch": "062_m_inside_buu",
-      "what": "app [93d7eeca, 72a42e2d] game [85f43760, 1b681d1b]",
-      "menu": false,
-      "started": [],
-      "from": 1348873
-     },
-     {
-      "row": 1349211,
-      "stretch": "062_m_inside_buu",
-      "what": "app [531397c0, 0f304cf8] game [76e1fb34, 2abe2065]",
-      "menu": false,
-      "started": [],
-      "from": 1349101
-     },
-     {
-      "row": 1349681,
-      "stretch": "062_m_inside_buu",
-      "what": "app [0649708b, 6e37f748] game [6722dbb4, 10d049e6]",
-      "menu": false,
-      "started": [],
-      "from": 1349212
-     },
-     {
-      "row": 1350004,
-      "stretch": "062_m_inside_buu",
-      "what": "app [994db17f, d6729c1a] game [4a6bf1ea, f3ac490f]",
-      "menu": false,
-      "started": [],
-      "from": 1349682
-     },
-     {
-      "row": 1350235,
-      "stretch": "062_m_inside_buu",
-      "what": "app [ad1b76c4, 9364fc9c] game [8747241c, 27099649]",
-      "menu": false,
-      "started": [],
-      "from": 1350005
-     },
-     {
-      "row": 1350631,
-      "stretch": "062_m_inside_buu",
-      "what": "app [1d472e6a, 7187ca97] game [cecb3386, ccd1c19d]",
-      "menu": false,
-      "started": [],
-      "from": 1350236
-     },
-     {
-      "row": 1350748,
-      "stretch": "062_m_inside_buu",
-      "what": "app [4908ccd1, 1db24118] game [fe0c7df5, 49d0f6b7]",
-      "menu": false,
-      "started": [],
-      "from": 1350632
-     },
-     {
-      "row": 1350993,
-      "stretch": "062_m_inside_buu",
-      "what": "app [abe022aa, 5b77ac41] game [33e0f800, 9d4c96db]",
-      "menu": false,
-      "started": [],
-      "from": 1350749
-     },
-     {
-      "row": 1351264,
-      "stretch": "062_m_inside_buu",
-      "what": "app [be3dde6f, 91c8084c] game [3839c53c, 85385fc2]",
-      "menu": false,
-      "started": [],
-      "from": 1350994
-     },
-     {
-      "row": 1351475,
-      "stretch": "062_m_inside_buu",
-      "what": "app [fa6d538a, f93cf5f6] game [4302cdd6, bfa3d9cd]",
-      "menu": false,
-      "started": [],
-      "from": 1351265
-     },
-     {
-      "row": 1351901,
-      "stretch": "062_m_inside_buu",
-      "what": "app [45e90125, 5975f0cb] game [a45885ad, e2cd433b]",
-      "menu": false,
-      "started": [],
-      "from": 1351476
-     },
-     {
-      "row": 1352061,
-      "stretch": "062_m_inside_buu",
-      "what": "app [51570379, 1de7034e] game [56ccea0b, 08cfa505]",
-      "menu": false,
-      "started": [],
-      "from": 1351902
-     },
-     {
-      "row": 1352305,
-      "stretch": "062_m_inside_buu",
-      "what": "app [14d02487, 39af1b93] game [ad6debf6, a4e98ce0]",
-      "menu": false,
-      "started": [],
-      "from": 1352062
-     },
-     {
-      "row": 1352581,
-      "stretch": "062_m_inside_buu",
-      "what": "app [e280ac91, b1c3bbb8] game [a856ef01, 49a207e3]",
-      "menu": false,
-      "started": [],
-      "from": 1352306
-     },
-     {
-      "row": 1352695,
-      "stretch": "062_m_inside_buu",
-      "what": "app [f2c45990, 5779c5cb] game [5e6944a8, 93f15889]",
-      "menu": false,
-      "started": [],
-      "from": 1352582
-     },
-     {
-      "row": 1352901,
-      "stretch": "062_m_inside_buu",
-      "what": "app [10db4670, 7a61af7f] game [197e87df, 0c910220]",
-      "menu": false,
-      "started": [],
-      "from": 1352696
-     },
-     {
-      "row": 1353408,
-      "stretch": "062_m_inside_buu",
-      "what": "app [f68339d4, aeab383a] game [19f1e07e, ea3ea53b]",
-      "menu": false,
-      "started": [],
-      "from": 1352902
-     },
-     {
-      "row": 1353845,
-      "stretch": "062_m_inside_buu",
-      "what": "app [b36abab0, 16779f40] game [7dec369b, 33dd49bc]",
-      "menu": false,
-      "started": [],
-      "from": 1353409
-     },
-     {
-      "row": 1353945,
-      "stretch": "062_m_inside_buu",
-      "what": "app [cbce3744, 37bf7608] game [723e3df2, bec7cd27]",
-      "menu": false,
-      "started": [],
-      "from": 1353846
-     },
-     {
-      "row": 1354142,
-      "stretch": "062_m_inside_buu",
-      "what": "app [1c928a2a, c75581ee] game [a3544feb, bab28676]",
-      "menu": false,
-      "started": [],
-      "from": 1353946
-     },
-     {
-      "row": 1354390,
-      "stretch": "062_m_inside_buu",
-      "what": "app [16bc88c0, 29ad67c7] game [0edbadae, 071be2df]",
-      "menu": false,
-      "started": [],
-      "from": 1354143
-     },
-     {
-      "row": 1354524,
-      "stretch": "062_m_inside_buu",
-      "what": "app [06e14012, e2a79908] game [7a5803c2, 7bc28021]",
-      "menu": false,
-      "started": [],
-      "from": 1354391
+      "from": 1111523
      }
     ]
    },
    {
-    "owner": "Earth agent",
+    "owner": "dungeon agents A / B",
     "kind": "rule",
-    "field": "rng",
-    "chapter": "earth",
+    "field": "flags",
+    "chapter": "fat",
     "count": 1,
     "stops": [
      {
-      "row": 191429,
-      "stretch": "E2_earth",
-      "what": "app [86a66828, bd6dac89] game [bd49b949, 46b31d92]",
+      "row": 848743,
+      "stretch": "017_db6_fukurou",
+      "what": "flag 187 app only",
       "menu": false,
       "started": [
-       "s302",
-       "s301"
+       "inline_0x08072A48",
+       "inline_0x0808566C"
       ],
       "from": 0
      }
@@ -1025,32 +316,106 @@
     "count": 1,
     "stops": [
      {
-      "row": 813244,
-      "stretch": "012_db5_a01",
-      "what": "app (78214, 23608, 3) game (78022, 23608, 3)",
+      "row": 848747,
+      "stretch": "017_db6_fukurou",
+      "what": "app (30720, 30720, 1) game (204800, 225280, 1)",
       "menu": false,
       "started": [
-       "inline_0x08710F5E",
-       "inline_0x08710FB7"
+       "inline_0x08072A48",
+       "s515@0"
       ],
-      "from": 191430
+      "from": 848744
+     }
+    ]
+   },
+   {
+    "owner": "side-content agent",
+    "kind": "rule",
+    "field": "rng",
+    "chapter": "janemba",
+    "count": 1,
+    "stops": [
+     {
+      "row": 1121917,
+      "stretch": "044_h_back1",
+      "what": "app [be62dcff, 5b07fbc6] game [e2b8d8a9, 5be649e5]",
+      "menu": false,
+      "started": [],
+      "from": 1121894
+     }
+    ]
+   },
+   {
+    "owner": "importer agent",
+    "kind": "import",
+    "field": "rng",
+    "chapter": "janemba",
+    "count": 3,
+    "stops": [
+     {
+      "row": 1121864,
+      "stretch": "044_h_back1",
+      "what": "app [af435554, 21224f53] game [ccb45104, c0b2bf81]",
+      "menu": false,
+      "started": [
+       "inline_0x0808C880"
+      ],
+      "from": 1121864
+     },
+     {
+      "row": 1121919,
+      "stretch": "044_h_back1",
+      "what": "app [bb591593, 75fbf993] game [7f8b5b7c, 390e027e]",
+      "menu": false,
+      "started": [],
+      "from": 1121918
+     },
+     {
+      "row": 1121949,
+      "stretch": "044_h_back1",
+      "what": "app [e86515d2, 7f98e45f] game [3790ba8c, d239632f]",
+      "menu": false,
+      "started": [],
+      "from": 1121948
+     }
+    ]
+   },
+   {
+    "owner": "importer agent",
+    "kind": "import",
+    "field": "flags",
+    "chapter": "janemba",
+    "count": 1,
+    "stops": [
+     {
+      "row": 1111493,
+      "stretch": "042_h_statues",
+      "what": "flag 284 game only",
+      "menu": false,
+      "started": [
+       "inline_0x0808C880"
+      ],
+      "from": 1111493
      }
     ]
    },
    {
     "owner": "Super Buu agent",
-    "kind": "rule",
-    "field": "pos",
+    "kind": "known",
+    "field": "rng",
     "chapter": "superbuu",
     "count": 1,
     "stops": [
      {
-      "row": 1348485,
+      "row": 1339017,
       "stretch": "062_m_inside_buu",
-      "what": "app (51200, 59648, 1) game (52480, 58880, 1)",
+      "what": "app [b460ebed, 721626b0] game [699cd8d3, d8087ea9]",
       "menu": false,
-      "started": [],
-      "from": 1347944
+      "started": [
+       "s473",
+       "inline_0x08711151"
+      ],
+      "from": 1122008
      }
     ]
    }
