@@ -1394,15 +1394,19 @@ export class EnergyWave extends Shot {
     }
     if (++this.life > 240) this.mode = 1
   }
-  onMessage(w: World, msg: HitMsg): boolean {
-    // destroyed only by a head-on player attack overlapping the head +-12 px
-    if (msg.team !== 1 || this.mode) return false
+  onMessage(_w: World, msg: HitMsg): boolean {
+    // another object's message head-on (the player's punch or energy attack; another wave: two laser turrets facing
+    // each other) overlapping the head +-12 px turns it back (mode 1) without a puff of its own and is accepted: the
+    // sender puffs / sounds on the accepted hit (Babidi's ship 8-36: one rand(0x1000) for two colliding waves; 8-51:
+    // a punch, no draw). A wave already turning back takes it too (Pyramid 14-2, real route r069_077 f264: the punch's
+    // hit sound 48 + rand(2) in the frame the wave hit the player). Mirrors wf-core shots::on_message.
+    if (msg.source === this) return false
     const [dx, dy] = DIR_VEC[this.dir]
     const hx = this.px + dx * this.len
     const hy = this.py + dy * this.len
     if (msg.dir === (this.dir ^ 1) && overlaps(msg.rect, { x0: hx - 12, y0: hy - 12, x1: hx + 12, y1: hy + 12 })) {
       this.mode = 1
-      this.ctx.puffRng(w, hx, hy)
+      return true
     }
     return false
   }

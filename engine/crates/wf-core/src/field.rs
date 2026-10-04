@@ -105,6 +105,11 @@ pub struct TriggerRt {
     /// runs the original activation
     #[serde(default)]
     pub forced: bool,
+    /// the event's resume node (trigger object +0x10, u16): the scene start `0x0801246E` begins at it (`0x080124B6`),
+    /// the event's end node writes its exit value back (`0x0801254C`, unless the no-save word 0x03002A58 is set). The
+    /// trigger's constructor zeroes it (`0x08007450`): a load or `refresh_map_triggers` starts the event over
+    #[serde(default)]
+    pub resume: u16,
 }
 
 /// a map prop's live state (header +0x24 list; breakables and scripts change it)
@@ -612,7 +617,7 @@ pub fn spawn_object(w: &mut World, o: &ObjDef) -> Option<EntityId> {
     match &o.kind {
         ObjKind::Trigger { rect, act, .. } => {
             if let Some(f) = w.field.as_mut() {
-                f.triggers.push(TriggerRt { obj: o.at, rect: *rect, act: *act, last: u32::MAX, forced: false });
+                f.triggers.push(TriggerRt { obj: o.at, rect: *rect, act: *act, last: u32::MAX, forced: false, resume: 0 });
             }
             None
         }

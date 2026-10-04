@@ -306,6 +306,10 @@ pub struct Npc {
     /// only scripts move it
     #[serde(default)]
     pub behaviour: Option<crate::field::Behaviour>,
+    /// a map NPC's talk resume node (object +0x1BC, u16; the talk start `0x08017D66` passes it to the scene start,
+    /// whose end node writes the exit value back - see `TriggerRt::resume`). The constructor zeroes it (`0x08017C56`)
+    #[serde(default)]
+    pub resume: u16,
 }
 
 impl Npc {
@@ -315,7 +319,7 @@ impl Npc {
         a.x = x << 8;
         a.y = y << 8;
         a.facing = dir;
-        Npc { a, sprite_id, tag: None, anim: ActAnim::idle(), tint: None, attach: None, speed: 0, byte8: 0x38, hold_item: None, talk: None, behaviour: None }
+        Npc { a, sprite_id, tag: None, anim: ActAnim::idle(), tint: None, attach: None, speed: 0, byte8: 0x38, hold_item: None, talk: None, behaviour: None, resume: 0 }
     }
 }
 
