@@ -161,7 +161,7 @@ fn main() {
                 if std::env::var_os("PIX_NOSPR").is_some() {
                     view.sprites.clear();
                 }
-                if std::env::var_os("PIX_VIEW").is_some() && k == want[1] {
+                if std::env::var("PIX_VIEW").ok().and_then(|v| v.parse::<usize>().ok()) == Some(k) {
                     eprintln!("{view:#?}");
                 }
                 let ours = renderer.render(&packs, &view, 0, W, H).to_vec();

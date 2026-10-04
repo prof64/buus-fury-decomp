@@ -83,6 +83,7 @@ fn main() {
     let rows = &all;
     let _ = rec;
     let mut prev_lf = -1i64;
+    let mut nolag_first: Option<usize> = None;
     let mut rng_bad = 0usize;
     let mut flag_check: Option<(usize, String)> = None;
     let mut flag_reports = 0usize;
@@ -232,7 +233,48 @@ fn main() {
         let sim_lag = std::env::var_os("SOAK_SIMLAG").is_some();
         app.session.world.opts.sim_lag = sim_lag;
         let sim_lagging = sim_lag && !menu && (app.world().g.lag > 0 || app.world().g.load_pending);
-        if sim_lagging {
+        // SOAK_NOLAG=1: the app's own target (`Options::no_lag`: no lag frames anywhere, one step = one game logic
+        // iteration): the app steps on the recording's logic rows only (menus included - their iterations count on
+        // the logic counter) and is compared exactly there (RNG, area, leader position; the first divergence)
+        let no_lag = std::env::var_os("SOAK_NOLAG").is_some();
+        app.session.world.opts.no_lag = no_lag;
+        if no_lag {
+            if logic {
+                let mut ev = vec![];
+                let trace = rng_rows.is_some_and(|(a, b)| a <= k && k <= b);
+                if trace {
+                    eprintln!("  rng calls of row {k} (app rng before {:08x?}, game after {})", app.world().rng.state(), r["rng"]);
+                }
+                wf_core::rng::TRACE.store(trace, std::sync::atomic::Ordering::Relaxed);
+                app.step(&[keys], &mut ev);
+                wf_core::rng::TRACE.store(false, std::sync::atomic::Ordering::Relaxed);
+                stepped += 1;
+                if nolag_first.is_none() {
+                    let w = app.world();
+                    let mut d = vec![];
+                    let g = [r["rng"][0].as_u64().unwrap_or(0) as u32, r["rng"][1].as_u64().unwrap_or(0) as u32];
+                    if w.rng.state() != g {
+                        d.push(format!("rng: app {:08x?} game {:08x?}", w.rng.state(), g));
+                    }
+                    let a = w.field.as_ref().map(|f| (f.area.world as i64, f.area.area as i64));
+                    let ga = (r["area"][0].as_i64().unwrap_or(-1), r["area"][1].as_i64().unwrap_or(-1));
+                    if !wf_core::menu::active(w) && a.is_some_and(|a| a != ga) {
+                        d.push(format!("area: app {a:?} game {ga:?}"));
+                    }
+                    if let (Some(pi), Some(gp)) = (w.player_idx(0).filter(|_| !wf_core::menu::active(w)), r["p"].as_array()) {
+                        let p = (w.pl_ref(pi).a.x as i64, w.pl_ref(pi).a.y as i64);
+                        let gpos = (gp[0].as_i64().unwrap_or(0), gp[1].as_i64().unwrap_or(0));
+                        if p != gpos {
+                            d.push(format!("pos: app {p:?} game {gpos:?}"));
+                        }
+                    }
+                    if !d.is_empty() {
+                        println!("no-lag first divergence row {k} (lf {lf}, menu {}): {}", wf_core::menu::active(w), d.join("; "));
+                        nolag_first = Some(k);
+                    }
+                }
+            }
+        } else if sim_lagging {
             if logic && sim_lag_bad.is_none() {
                 sim_lag_bad = Some(k);
             }
@@ -411,6 +453,9 @@ fn main() {
     let s = &app;
     let w = s.world();
     println!("rows {} stepped {} | script errors {}", rows.len().min(limit), stepped, s.errors.len());
+    if std::env::var_os("SOAK_NOLAG").is_some() {
+        println!("no-lag: {}", match nolag_first { Some(k) => format!("first divergence at row {k}"), None => "exact on every logic row".into() });
+    }
     if std::env::var_os("SOAK_SIMLAG").is_some() {
         println!("sim lag: {sim_lag_rows} rows, first on a game logic row: {sim_lag_bad:?}");
     }
