@@ -2820,6 +2820,14 @@ Super Buu agent, ship fix agent). Others please add a line here before touching 
 agent's list by the coordinator. Also checking the red wf-tables parity test and the NPC-facing regression the ship
 fix agent noted (owners by git log).
 
+*Done (Earth agent): the 6-9 tile hang.* `r052_006_6-9+006000` never finished: the object-tile allocator's free
+list looped (`ObjVram::alloc` walking a cycle). Cause: the tile starts inside a text box whose object (vt 0x08049F60)
+keeps a handle in one of its four block slots (+0x78..+0x7E) that no live block has any more; the import made it a
+`Text` owner, the box's close freed it - an entry already on the free list was linked again, a cycle. Fixed at both
+ends: the import takes a text-box slot only when a live block starts at its handle, and `ObjVram::free` ignores a
+handle with no live block (the app can never hang on a stale owner). The tile now replays (stops at f0 on the
+player's sprite: game 126 vs our 269 - the leader's form at the cut, the Super Buu agent's Gotenks area); the 8-1
+tile (`+021210`, after agent A's re-cut) is exact (790 / 790).
 **Claim (Earth agent, 2026-10-04, by the coordinator): Super Buu saga, Earth-side areas** - the refused tiles of
 `r052_006_6-9` (f6,000 "replay hung"; f20,000 / 21,000 in 8-1, the menu-return class agent A's cutter now handles -
 to re-cut). `r062_001_20-6` stays agent A's (claimed above); 20-5 is exact. The Super Buu agent keeps 1-5, 14-1,
@@ -2836,6 +2844,25 @@ f1601 list order at the character switch; `x_r73v` 7-3 f2,211 s288's two blocks)
 block** (Goku vs Majin Buu tiles), then `sb_005_01_05` f11,395 (1-5 camera; checked against the ship fix agent's
 `r052_004_1-5` load fade-in claim first), 14-1, kbr_013. Importer agent: these cuts stay yours overall - I touch the
 allocator / list-order rules only.
+*Done (Super Buu agent):*
+* **`set_character` (0x95) keeps the player in its place of the world list** (`0x08010692` swaps sprite / form on the
+  same object; the old "move the rebuilt player to the list's end" was a stand-in for the next rule). **A group wait
+  ticks its members in the world list's order, first object first** (the director's table, `0x08006CE0`: message
+  0x0C to each member, then the camera; emulator: dbx_004 f18,270 the player's idle draw, then Goten's). The
+  all-actors wait keeps its last-object-first order (s103). `e_7_2_1` exact (2,298, was 1,601), `sc_janemba_full`
+  exact (40,688, was 32,612), `dbx_004_6-1` exact (26,635); no cut or gate worse.
+* **The punch mini-game (0xC7) takes its mode's tiles**: the gauge (`0x080301F8`, 0x380) and the label
+  (`0x08030950`: string 0x98, 136 px -> 0xA00, purging first), freed label first when it ends. `x_r73v` exact to its
+  end (44,330, was 2,211).
+* **Damage numbers delete themselves at the world hide (message 0xA, `0x0800AD14` -> `0x08011944`)** - a pause menu
+  right after a hit; newest first, before the actors' shadows. Import (`import_vram`): a damage number in flight
+  (vt 0x0804C904: its updates left at +0x10) and the boss bar (vt 0x0804CE28) are owned, not `Foreign`. The 6-1
+  off-by-one block: `r033_002_6-1` tiles +8,000 .. +12,000 exact (were 8 .. 856).
+* `rkb_004_21-6` (gate from 8c95f1f) red at f307: the regenerated `wf-tables/data/ai.json` names node 0x0802F743
+  `ParentCountDown`; the engine knew it only as `node_0802f743` (-> `LatchRelease`), so the Enzyme's death state
+  0x91 never reached SelfDestruct. Mapped both names; the gate is exact (1,041).
+* `sb_005_01_05` f11,395 is the area-load fade-in camera case of `r052_004_1-5` (the camera steps in the load's
+  last lag frame, f11,395 with the logic counter unchanged) - left with the ship fix agent's claim.
 
 **§11 update 13 (B): claims done this round.**
 * **`r057_066_14-1` exact (7,327 / 7,327, was 3,527), gated `rsb_057_066_14-1`** - IfPlayerInFront (predicate

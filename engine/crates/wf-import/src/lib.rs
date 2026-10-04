@@ -1384,7 +1384,27 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
                 _ => None,
             }
         };
-        let Some((pos, o)) = w.scene.tracks[k].queue.iter().enumerate().find_map(|(j, c)| live(c).map(|o| (j, o))) else { continue };
+        // (a target the script computed from a query before the cut - glide_to(0, actor_x(0), actor_y(0) - 100):
+        // asked again now it is another; the head's command with the only live object of its kind takes that
+        // object's target - real route 4-1, s515's take-off glide, tiles r002_006+2000 / +13000)
+        let found = w.scene.tracks[k].queue.iter().enumerate().find_map(|(j, c)| live(c).map(|o| (j, o))).or_else(|| {
+            let only = |v: &Vec<u32>| (v.len() == 1).then(|| v[0]);
+            match w.scene.tracks[k].queue.first() {
+                Some(Cmd::GlideTo { .. }) => only(&glides).map(|o| (0, o)),
+                _ => None,
+            }
+        });
+        // a glide at the head with no glide object left in RAM has ended (the object goes in its last step; the
+        // script resumes a frame later): done, not glided again from here (tile r002_006+13000)
+        if found.is_none() && glides.is_empty() && matches!(w.scene.tracks[k].queue.first(), Some(Cmd::GlideTo { .. })) {
+            w.scene.tracks[k].queue.remove(0);
+            w.scene.tracks[k].started = false;
+            continue;
+        }
+        let Some((pos, o)) = found else { continue };
+        if let Some(Cmd::GlideTo { x, y, .. }) = w.scene.tracks[k].queue.get_mut(pos) {
+            (*x, *y) = (ram.s32(o + 0x14), ram.s32(o + 0x18));
+        }
         if pos > 0 || !w.scene.tracks[k].started {
             w.scene.tracks[k].queue.drain(..pos);
             wf_core::scene::import_start_head(&mut w, k);
@@ -1500,7 +1520,7 @@ fn build_event_entry(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner:
         // the node has run actions and none of them loads (its warp, if any, is still ahead): the event is running
         // mid-node over the field it started on, not at an area entry (real route 4-1, s515's take-off from a
         // trigger: tiles r002_006+2000 / +13000 cut in its glide, the warp_fade to 0-50 two steps later)
-        if std::env::var_os("XNOMID").is_none() && !ran.is_empty() && !ran.iter().any(|(n, _)| (0x70..=0x77).contains(n)) {
+        if !ran.is_empty() && !ran.iter().any(|(n, _)| (0x70..=0x77).contains(n)) {
             return build_mid_event(data, ram, runner, ev, w, calls0, notes);
         }
     }
@@ -1873,7 +1893,8 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
     if let Some(f) = w.field.as_mut() {
         let now = w.frame;
         let popups = pops.iter().map(|&(h, n)| (wf_core::world::EntityId::MAX, 0, h, now + n.max(0) as u32)).collect();
-        let popup_at = pops.iter().map(|&(h, _)| (h, stamp)).collect();
+        // (made before anything the replay makes: a stamp below the next object's)
+        let popup_at = pops.iter().map(|&(h, _)| (h, stamp.saturating_sub(1))).collect();
         f.vram = Some(VramState { a, owners, shared_rc, suspended: vec![], hud_out: vec![], popups, keyed: vec![], stashed: None, delayed: vec![], objs, susp: vec![], shadow_set: vec![], popup_at, pass_at: 0 });
     }
 }

@@ -620,6 +620,16 @@ pub fn entity_gone(w: &mut World, i: usize) {
             }
             return;
         }
+        // a dropped item (vt 0x0804B428): its icon's tiles and its 10 x 4 shadow, like a big coin's
+        if matches!(p.kind, crate::fieldobj::PickupKind::Supply(_) | crate::fieldobj::PickupKind::Equipment(_)) && std::env::var("NO_ITEMVRAM").is_err() {
+            if st(w).is_some_and(|v| v.owners.iter().any(|o| o.1 == Owner::Ent(id))) {
+                if let Some(k) = coin_shadow(true) {
+                    shared_release(w, k);
+                }
+                release(w, Owner::Ent(id));
+            }
+            return;
+        }
     }
     // a flame shot holds a reference of the shared flame graphic only
     if matches!(&w.ents[i].body, Body::Shot(sh) if matches!(sh.kind, crate::shots::ShotKind::Flame { .. })) {
@@ -1008,7 +1018,7 @@ pub fn world_hide(w: &mut World) {
     // back after the close). The list's end first: the numbers (newest first), then the actors
     if let Some(v) = st(w) {
         let mut gone: Vec<(u32, u16)> = v.popups.iter().map(|p| (v.popup_at.iter().find(|q| q.0 == p.2).map(|q| q.1).unwrap_or(0), p.2)).collect();
-        gone.sort();
+        gone.sort_by_key(|g| g.0);
         for (_, h) in gone.into_iter().rev() {
             v.popups.retain(|p| p.2 != h);
             v.popup_at.retain(|p| p.0 != h);

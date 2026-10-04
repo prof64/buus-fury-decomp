@@ -82,7 +82,7 @@ fn rename(s: &str) -> &str {
         "StepTowardPlayer" => "BackOffFacingPlayer",
         "StepTowardPlayerThroughRocks" => "BackOffFacingPlayerThroughRocks",
         // the Enzyme's death state 0x91 (IWRAM singleton 0x03003114, update 0x0802F724)
-        "node_0802f743" => "LatchRelease",
+        "node_0802f743" | "ParentCountDown" => "LatchRelease",
         x => x,
     }
 }

@@ -1205,9 +1205,7 @@ pub fn gain_xp(w: &mut World, i: usize, exp: i64) {
             // #3 as a nested scene with that component current; the second component's XP comes after that hook
             // (real run 6-9 r052_006 f13,077: Goten's level rolls, Trunks' three levels after the popup, f13,315)
             let host = w.field.as_ref().is_some_and(|f| f.host);
-            let comps = [(fu & 15) as i32, ((fu >> 4) & 15) as i32];
-            if std::env::var("FUXP").is_ok() { eprintln!("FUXP char {ch} fu {fu:#x}"); }
-            let mut leveled = false;
+            let comps = [(fu & 15) as i32, ((fu >> 4) & 15) as i32];            let mut leveled = false;
             for (k, &c) in comps.iter().enumerate() {
                 if !component_xp(w, c, g) {
                     continue;
@@ -1297,7 +1295,6 @@ fn component_xp(w: &mut World, c: i32, g: i64) -> bool {
     let growth = w.data.chars.iter().find(|x| x.index == c).map(|x| x.growth);
     let xt = Arc::clone(&w.data);
     let Some(cs) = w.story.chars.get_mut(c as usize) else { return false };
-    if std::env::var("FUXP").is_ok() { eprintln!("FUXP c {c} xp {} + {g} level {} -> {}", cs.rec.xp, cs.rec.level, level_of(cs.rec.xp + g, &xt.xp_table)); }
     cs.rec.xp += g;
     let nl = level_of(cs.rec.xp, &xt.xp_table);
     if nl <= cs.rec.level {

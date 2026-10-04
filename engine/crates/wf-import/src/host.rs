@@ -178,7 +178,13 @@ impl StoryHost {
                     let from = w.events.len();
                     wf_core::player::fusion_levelup_done(w);
                     let evs: Vec<Event> = w.events[from..].to_vec();
+                    // (inside the XP routine's call: before the jobs already queued - the kill's on-defeat callback)
+                    let n = self.queue.len();
                     self.collect(&evs);
+                    let added: Vec<Job> = self.queue.drain(n..).collect();
+                    for j in added.into_iter().rev() {
+                        self.queue.push_front(j);
+                    }
                 }
                 // an on-defeat callback that ran from the death effect and ended without starting an event (13-45's
                 // Samurai once flag 156 is set): nothing held the frame, its update runs (not after the drop script
