@@ -105,6 +105,15 @@ _k = next(i for i, g in enumerate(_m) if g[0] == 'goto' and g[1] == '2-8')
 LEGS['museums'] = ('pg_hiddens.ss', _m[:_k] + [('goto', '2-33', 226, 60, False), ('keys', [(A_, 3, 60)]), ('events',),
                                              ('wait', 30), ('keys', [(D_, 60, 30)])] + _m[_k:])
 
+# the Lighthouse Keeper's trades (s347, Thieves Den 9-9, the keeper standing at (112, 80)): the first talk asks for a
+# Root Beer (flag 362); each later talk with the asked item takes it and gives a Hercule Exhibit, then asks for the
+# next (Root Beer 15 -> Turkey 6 -> Hercule-ade 16 -> Elixir 17 -> Dinosaur Tail 9 -> Super Elixir 18; flags
+# 363 .. 368). The Hercule City Z-Mart has the first four (the last two: the Z-Marts 0-94 / 0-95).
+LEGS['shopt'] = [('fly', 2441, 1065, 127, 135), ('wait', 30), *zmart([(5, 1), (3, 1), (6, 1), (7, 1)])]
+LEGS['trade'] = ('pg_shopt.ss', [('walk', 120, 200), ('keys', [(D_, 60, 60)]), ('goto', '3-1', 30, 150, False),
+                                 ('keys', [(A_, 3, 240)]), ('fly', 3145, 2001, 95, 79), ('wait', 30),
+                                 ('goto', '9-9', 112, 96), *[('talkto', 112, 96, 'U')] * 5, ('wait', 30)])
+
 
 def start_of(leg):
     v = LEGS[leg]

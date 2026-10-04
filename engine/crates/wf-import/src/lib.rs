@@ -643,8 +643,22 @@ fn import_objects(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
                 w.ents[ei].id
             }
             (None, _) => {
-                let n = wf_core::scene::Npc::new(&w.data, key.1, ox >> 8, oy >> 8, of);
-                w.add(Body::Npc(Box::new(n)))
+                // the area's own NPC of that sprite (its behaviour; the load did not spawn it - its condition), the
+                // nearest; else a bare one
+                let def = w.field.as_ref().map(|f| f.area).and_then(|a| w.data.field.as_ref().and_then(|fd| fd.area(a.world, a.area)).map(|ad| ad.objects.clone())).unwrap_or_default().into_iter().filter(|d| matches!(&d.kind, wf_core::fieldcontent::ObjKind::Npc { sprite, behaviour, .. } if *sprite == key.1 && !behaviour.is_empty())).min_by_key(|d| match &d.kind {
+                    wf_core::fieldcontent::ObjKind::Npc { x, y, .. } => ((*x - (ox >> 8)).abs() + (*y - (oy >> 8)).abs()) as i64,
+                    _ => i64::MAX,
+                });
+                let rng = w.rng.clone();
+                let made = def.and_then(|d| wf_core::fieldnpc::spawn(w, &d));
+                w.rng = rng;
+                match made {
+                    Some(id) => id,
+                    None => {
+                        let n = wf_core::scene::Npc::new(&w.data, key.1, ox >> 8, oy >> 8, of);
+                        w.add(Body::Npc(Box::new(n)))
+                    }
+                }
             }
         };
         let Some(i) = w.find(id) else { continue };

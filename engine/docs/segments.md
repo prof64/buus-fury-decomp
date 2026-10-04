@@ -1609,9 +1609,22 @@ two Python hash seeds, gives identical key logs (13,000 frames); the earlier run
 * Exhibit hand-ins (leg `cafe`, from XJ-6's end): the Hercule Cafe 3-20 (s170, A inside (121, 209, 63, 39)) - the
   first talk only tells the story (flag 19), each later "Yes" takes one exhibit (flag bits 341 count them): the
   real start's exhibit 65 and XJ-6's 58 handed in; 3-2 / 3-20 cuts exact. The Z-Fighter Museum 4-23 (s189, same
-  scheme, bits 346; leg `museum` from the hidden dungeon's end): not done - Gohan, with no supplies, dies on the way
-  back at 2-35 (an Ultra Bio Mech-class beast, type 0x13, 12,248 HP, beside the rock that is back after every
-  reload: punch it again from the east at (282, 136) facing left). Needs heal items bought first.
+  scheme, bits 346): **done** via the supply chain `shop` -> `g233s` -> `hiddens` -> `museums` (pgroute): the Hercule
+  City Z-Mart first (Orange Star 3-1's door -> 0-91, s028; A at the counter (88, 123) facing left, Buy, Items; the
+  post-game list: 0 Onigiri, 1 Curry Plate, 2 Steak, 3 Turkey, 4 Cherry Soda, 5 Root Beer, 6 Hercule-ade, 7 Elixir),
+  out through the door at (120, 224), 3-1's take-off pad (s130, A at (30, 150)), then 2-33 and the hidden dungeon
+  as before; Gohan survives on the Curry Plates (the driver heals from the inventory - it ate the Turkey too); on
+  the way out the 2-33 gate is shut again (per visit) and Gohan opens it from inside (A at (226, 60)); 2-35's rock is
+  punched again from the east (282, 136) facing left. Museum count 1. 39 / 50 cuts exact (`SEGMENT_VRAM=0`); the
+  misses: the inventory heal's menu sounds 39 / 40 (menu timing), world-map landing cuts (any-frame import), and
+  4-23 f467: the game opens s189's text box in the frame the talk's script runs `walk_to(239, actor_x(0), 48)`
+  (the curator already there) + `face(239, 0)` (already facing). Tried: neither command waits when it has nothing
+  to do - the walk half alone changes nothing, the face half breaks ~20 gates (a face onto the current facing does
+  wait elsewhere). Not modelled; open.
+* Shop driving is open loop (`zmart` in pgroute): the same keys bought different rows across runs (inputs eaten
+  while the list redraws). The Lighthouse Keeper chain (legs `shopt` / `trade` written, s347 logic in the comment)
+  needs a closed-loop shop goal reading the list cursor - not done. 9-11's Z-Mart (0-95: Dinosaur Tail, Super
+  Elixir) did not open for UP held under its door (trigger (249, 73, 39, 15), activation 0x080071A7).
 * Instant Transmission picks (shared rule): a trigger answers the pick when its activation's vt+8 says "A pressed" -
   the 0x0802266F activation and the plain A-button one (0x0800770D, vt+8 0x080076F5: the same code). HFIL 18-10's
   centre switch is an A-button trigger: the real route's maze IT (`r040_021_18-10`) picked it, ours went idle. The

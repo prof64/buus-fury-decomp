@@ -17,13 +17,13 @@
    "cats": {
     "RNG": 3,
     "animation": 1,
-    "camera": 5,
+    "camera": 3,
     "position / facing": 1
    },
    "cut_frames": 380206,
-   "exact": 361,
+   "exact": 363,
    "frames": 380206,
-   "matched": 342768,
+   "matched": 344101,
    "run_frames": 388646,
    "segments": 371,
    "stretches": 33
@@ -32,15 +32,15 @@
    "cats": {
     "RNG": 2,
     "camera": 1,
-    "menu timing": 2,
+    "menu timing": 1,
     "object set": 1,
     "position / facing": 1,
     "sound": 1
    },
    "cut_frames": 187291,
-   "exact": 247,
+   "exact": 248,
    "frames": 187291,
-   "matched": 182892,
+   "matched": 183067,
    "run_frames": 199703,
    "segments": 255,
    "stretches": 16
@@ -56,28 +56,26 @@
    "stretches": 1
   },
   "ship": {
-   "cats": {
-    "camera": 1
-   },
+   "cats": {},
    "cut_frames": 395616,
-   "exact": 337,
+   "exact": 338,
    "frames": 395616,
-   "matched": 394207,
+   "matched": 395616,
    "run_frames": 398194,
    "segments": 338,
    "stretches": 2
   },
   "superbuu": {
    "cats": {
-    "RNG": 16,
+    "RNG": 15,
     "camera": 3,
-    "position / facing": 24,
+    "position / facing": 25,
     "sound": 1
    },
    "cut_frames": 467701,
    "exact": 404,
    "frames": 467701,
-   "matched": 329030,
+   "matched": 329054,
    "run_frames": 478729,
    "segments": 448,
    "stretches": 22
@@ -86,12 +84,12 @@
  "dirty": true,
  "total": {
   "cut_frames": 1622756,
-  "exact": 1454,
+  "exact": 1458,
   "frames": 1622756,
-  "matched": 1434012,
+  "matched": 1436953,
   "run_frames": 1668050,
   "segments": 1519,
   "stretches": 75
  },
- "tree": "3d6c757"
+ "tree": "fb96f39"
 }
