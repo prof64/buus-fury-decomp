@@ -1164,6 +1164,10 @@ camera at the load (3-1 / 3-11 / 2-8 #1 / #15 / 4-1 #2 now exact).
 Results (90 segments, 104,026 video frames): **84 exact to their end**, 94,718 frames continuously matched; all 84
 gated in `data/segments/earth_*.json`.
 
+**Claim (dungeon agent A, 2026-10-04, by the coordinator): the two tournament items** - Earth 7-2 f1432 (`e_7_2_1`)
+and the real run's 7-3 from f44,316 (`rE2__090_7-3`, sprite 252 / the allocator blocks of s288 node 20), so the
+Earth agent can stay on the sound driver. Earth agent: please leave these two to A; results will be written here.
+
 **Status 2026-10-04: 89 / 90 exact** (3-3 #4 exact and gated since the Inventory page costs landed; left: 7-2).
 7-2 f1432, what the recording shows (not fixed): the world is frozen from f1388 under a scrolling text box; at
 f1432 a nested event starts (s495 "You are now playing as %s", depth 1, the same frame SELECT + RIGHT is read) and
@@ -2630,7 +2634,15 @@ the reload map terms, the sound parts stay yours).
   still at the load's value; song 21 starts the same frame), ours in the first logic frame (f11576): one step late,
   the same "world restore ends with a camera update" the menu close models with `Menu.leave_cam`, but for the area
   load's long iteration. Owner of the load / arrival code to take; not changed by me.
-- `r057_066_14-1` f3527 and `r069_077_14-2` f264 are the same root, **to the Earth agent (sound driver)**: the game's
+- **Answer from the Earth agent: the sound mixer does not draw the game RNG.** `rngcalls.py`'s `stack` column is
+  a heuristic scan of the stack for code addresses and returns stale words (0x0803E24F / 0x0803E423 / 0x0803E27D are
+  left over from the last PlaySfx); the caller is `lr`. r069_077 f264: lr 0x0802A4E5 = the wave's hit puff
+  rand(0x1000), lr 0x080199C9 = the **player's punch** hit sound 48 + rand(2) - the punch met the energy wave in the
+  frame the wave hit the player; our wave refused messages once it turned back (mode 1). Fixed
+  (`shots::on_message` EnergyWave: a head-on punch is taken in mode 1 too): r069_077_14-2 exact 1,666 / 1,666, all
+  gates green. r057_066 f3526..: every draw is lr 0x0804ED75 = the AI's Chance node (p 0x10000, 0x8000, then 0x106 every
+  frame) - the enemy's state 0x25D path (IfPlayerInFront vs our IfPlayerInMeleeRange), an AI item, not sound.
+  Original note: `r057_066_14-1` f3527 and `r069_077_14-2` f264 are the same root, **to the Earth agent (sound driver)**: the game's
   sound mixer draws the game RNG while a voice plays (rngcalls: callers 0x0803E423 = the 16-voice loop 0x0803E40C ->
   0x0803E152, and 0x0803E24F, the voice's sample callback). In r057_066 that draw happens every frame from 3526 on
   with no sound event recorded (a voice still playing); our two Chance draws at 3526 happened to equal the game's

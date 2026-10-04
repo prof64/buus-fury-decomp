@@ -484,6 +484,26 @@ def replay_tile(p, limit=600):
     return {'segment': p.stem, 'frames': n, 'matched': 0, 'first': f'Some((0, "import: replay failed: {tail}"))'}
 
 
+def playthrough_credit():
+    """frames of E1_opening before its first segment that the playthrough test verifies (0 if the keys differ):
+    from the recording's first compared row (after its `skip` intro frames) to the first cut"""
+    sys.path.insert(0, str(ROOT / 'tools' / 'segments'))
+    sys.path.insert(0, str(ROOT / 'tools' / 'story_playthrough'))
+    sys.path.insert(0, str(ROOT / 'tools' / 'field'))
+    import realrun
+    import segment as sg
+    from route import intro_keys
+    segs = sorted((REAL / 'segs' / 'E1_opening').glob('*.json'))
+    if not segs:
+        return 0
+    f0 = int(re.search(r'"frame":(\d+)', open(segs[0]).readline()).group(1))
+    head, rows = sg.load_doc(ROOT / 'data' / 'story_playthrough' / 'opening.json')
+    keys = [intro_keys(i) for i in range(head['skip'])] + [r['keys'] for r in rows]
+    if realrun.pre_keys()['start'][:f0] != keys[:f0]:
+        return 0
+    return max(0, f0 - head['skip'])
+
+
 def mid_board(jobs):
     build()
     res = json.loads((REAL / 'board_rows.json').read_text())
@@ -573,12 +593,22 @@ def mid_board(jobs):
         # (frames in no segment: the run's start up to its first importable entry; a chapter's are counted where
         # its segments start, as on the main board)
         w['uncovered'] += max(0, w['frames'] - w['cut'])
+    # the opening before its first importable entry (title, New Game, the prologue): the story playthrough test
+    # (wf-replay tests/playthrough.rs, no import: the app from power-on) replays the same keys and matches every row
+    # of data/story_playthrough/opening.json - credited when the real run's opening keys are that recording's
+    pc0 = playthrough_credit()
+    if pc0 and 'opening' in W:
+        c = min(pc0, W['opening']['uncovered'])
+        W['opening']['uncovered'] -= c
+        W['opening']['verified'] += c
     WT = {k: sum(w[k] for w in W.values()) for k in ('frames', 'verified', 'diverged', 'uncovered')}
     tot['whole_game'] = WT
     L += ['', '## The whole game', '',
           'Every frame of the real run: verified exact (an exact segment, a segment\'s matched prefix, or a tile), diverged',
           '(after a first divergence, before the next cut), not covered (no importable cut before it: the run\'s start, a',
-          'refused tile).', '', '| chapter | run frames | verified exact | diverged | not covered |', '|---|---|---|---|---|']
+          'refused tile). The opening\'s title / New Game / prologue before its first area entry count as verified by the',
+          f'story playthrough test (same keys from power-on, every row compared, no import: {pc0:,} frames).', '',
+          '| chapter | run frames | verified exact | diverged | not covered |', '|---|---|---|---|---|']
     for k in [c for c in ('opening', 'earth', 'ship', 'fat', 'janemba', 'superbuu') if c in W] + ['**all**']:
         w = WT if k == '**all**' else W[k]
         L.append(f"| {k} | {w['frames']:,} | {w['verified']:,} ({pc(w['verified'], w['frames'])}%) | {w['diverged']:,} | "
