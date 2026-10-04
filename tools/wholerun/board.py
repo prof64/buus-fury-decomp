@@ -44,8 +44,9 @@ def rank():
         ranked = sorted(groups.items(), key=lambda kv: (kv[0][1] != 'rule', -len(kv[1]), kv[1][0]['row']))
         out[lag] = {'stops': len(stops), 'rule': sum(1 for s in stops if s['kind'] == 'rule'),
                     'import': sum(1 for s in stops if s['kind'] == 'import'),
+                    'known': sum(1 for s in stops if s['kind'] == 'known'),
                     'groups': [{'owner': k[0], 'kind': k[1], 'field': k[2], 'chapter': k[3], 'count': len(v), 'stops': v} for k, v in ranked]}
-        print(f"{lag}: {len(stops)} stops ({out[lag]['rule']} rule, {out[lag]['import']} import)")
+        print(f"{lag}: {len(stops)} stops ({out[lag]['rule']} rule, {out[lag]['import']} import, {out[lag]['known']} known by design)")
         for g in out[lag]['groups'][:20]:
             print(f"  {g['count']:4d} {g['kind']:6s} {g['field']:6s} {g['chapter']:8s} {g['owner']} - first row {g['stops'][0]['row']}: {g['stops'][0]['what'][:80]}")
     (ROOT / 'data' / 'realrun' / 'wholerun_stops.json').write_text(json.dumps(out, indent=1))

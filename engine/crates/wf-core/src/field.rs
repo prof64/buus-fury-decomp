@@ -307,6 +307,11 @@ pub struct Field {
     pub pre_pickups: u32,
     /// frame of the last area load
     pub entered: u32,
+    /// the play clock (`story.play_frames`) at the last area load: the map's tile animations tick with it
+    /// (`0x0800965C` -> `0x08009CC2`, every game iteration the map runs - a frozen world's too: segment sb 21-25
+    /// f4880..4960, a scene holding the world while the flowers keep turning)
+    #[serde(default)]
+    pub entered_play: u64,
     /// number of area loads (touch_once triggers survive only within one)
     pub loads: u32,
     /// a talk started in the player's update: (the player's live list index, `loads`) - the event's nested loop
@@ -516,6 +521,7 @@ fn new_field() -> Field {
         cam_before: None,
         pre_pickups: 0,
         entered: 0,
+        entered_play: 0,
         loads: 0,
         talk_pass: None,
         trig_off: false,
@@ -818,6 +824,7 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
         f.mode = Mode::Normal;
         f.busy = keep_busy;
         f.entered = w.frame;
+        f.entered_play = w.story.play_frames;
         f.loads += 1;
         f.on_enter_queued = false;
         // a script fade-in belongs to the load its `warp_fade` made (set after this returns): any other load ends
@@ -1655,6 +1662,11 @@ pub fn post_step(w: &mut World) {
     }
     story::sync_from_players(w);
     w.story.play_frames += 1;
+    // an area loaded within this field frame: its animations start with the next iteration (segment sb 6-6 f13843)
+    let play = w.story.play_frames;
+    if let Some(f) = w.field.as_mut().filter(|f| f.entered == w.frame && f.entered_play + 1 == play) {
+        f.entered_play = play;
+    }
 }
 
 /// `vfunc+0x74(1, 0)` (TriggerSelf, `0x0800F866`): the defeated handler without loot; the object stays (the event's

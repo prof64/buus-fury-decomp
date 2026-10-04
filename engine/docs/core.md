@@ -167,6 +167,12 @@ cleared runtime - so **a from-power-on run diverges from the game at Vegeta's fi
 positions, then the re-plan timing and the RNG). Reproducing it needs a byte-level model of every heap object (not
 planned).
 
+**Known whole-run stops (allow-list).** Differences accepted by design are listed in `data/realrun/known_stops.json`
+(row range, stretch, reason, the `segments.md` write-up). `tools/wholerun/resync.py` logs a rule stop inside a listed
+range as kind `known` and cuts the run again after the range's end; `board.py --rank` counts them apart from the rule
+and import stops. Listed now: rows 1,339,017 .. 1,354,524 (062, Vegeta's wander above). A new entry needs the
+coordinator's decision and a write-up first.
+
 **Lag frames are not recreated (by design, 2026-10-04).** The game's main loop runs one iteration per logic frame and
 an iteration that overruns a VBlank leaves video frames without logic (loads, text boxes, menu redraws, busy scenes).
 The app runs a steady 60 fps: one logic frame per video frame. Recorded lag is injected only by the test harnesses

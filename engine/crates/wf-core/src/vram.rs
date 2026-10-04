@@ -365,7 +365,8 @@ pub struct VramState {
     #[serde(default)]
     pub popup_at: Vec<(u16, u32)>,
     /// the stat-points mark's draw count base: its counter (+0x14, one per draw, the first in its creation frame) is
-    /// `World.frame - stat_at` (the picture's animation frame, `view::render_view`)
+    /// `story.play_frames - stat_at` (the picture's animation frame, `view::render_view`; it draws in every game
+    /// iteration, a world held by a scene too - real route 14-1 f300..570)
     #[serde(default)]
     pub stat_at: u32,
     /// the entity the object pass is updating (0 outside the pass)
@@ -972,9 +973,10 @@ pub fn stat_mark(w: &mut World) {
         .unwrap_or((false, false));
     if hud && !mark && points != 0 {
         acquire(w, Owner::StatMark, 0x100);
-        let f = w.frame;
+        // (made in the field frame, before its play clock tick)
+        let f = w.story.play_frames as u32;
         if let Some(v) = st(w) {
-            v.stat_at = f.wrapping_sub(1);
+            v.stat_at = f;
         }
     }
 }

@@ -315,6 +315,9 @@ pub struct MapView {
     pub id: String,
     /// Frames since the map was loaded: drives tile animations and wrap-layer drift exactly like the game.
     pub anim_frame: u32,
+    /// The tile animations' own clock when it differs from `anim_frame` (the game ticks them every iteration the
+    /// map runs, a world held by a scene too; `anim_frame` then drives only the layer drift); `None` = `anim_frame`.
+    pub tile_frame: Option<u32>,
     /// Screen shake added to every BG scroll (px), like the game's shake offset.
     pub shake: (i32, i32),
     /// The world map (area 0-50, map header "3D" flag): the mode-7 ground camera; None on 2D maps.

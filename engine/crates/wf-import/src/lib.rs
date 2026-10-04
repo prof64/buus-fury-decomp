@@ -2424,6 +2424,7 @@ pub fn import_emulator_state(data: &Arc<GameData>, ram: &GbaRam, runner: &mut St
     check(&mut world, ram, &mut notes);
     import_vram(&mut world, ram);
     import_boss_bar(&mut world, ram);
+    import_tile_anims(&mut world, ram);
     // a text box opened by the import whose object the game makes later in the cut's iteration: its tiles now
     if let Some(p) = runner.text_open_due.take() {
         wf_core::vram::text_open(&mut world, p);
@@ -2502,6 +2503,48 @@ fn check(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
 /// the object tile allocator (`0x03001C4C`, vram.rs) as the RAM holds it; the actors' blocks (obj +0xC) belong to
 /// their entities (matched by position like `check`), the shadows' to their shared graphics (`0x03002B88` + 4k:
 /// reference count, handle +2); other blocks stay foreign
+/// the map's tile animations (0x03001A68: +4 the count, +8 + 8 i: s16 frame, s16 countdown, descriptor; ticked by
+/// `0x08009CC2`, set up by `0x08009B80` with frame 0 and countdown i + 1) -> the ticks since the load T they imply
+/// (the smallest one all agree on, within one common period of our build's) -> `Field.entered_play`
+fn import_tile_anims(w: &mut World, ram: &GbaRam) {
+    const A: u32 = 0x0300_1A68;
+    let n = ram.r32(A + 4).min(64);
+    let mut an: Vec<(i32, i32, Vec<u32>)> = vec![];
+    for i in 0..n {
+        let b = A + 8 + 8 * i;
+        let desc = ram.r32(b + 4);
+        let nf = ram.r8(desc) as u32;
+        let durs: Vec<u32> = (0..nf).map(|j| ram.r16(ram.r32(desc + 4 + 4 * j)) as u32).collect();
+        an.push((ram.r16(b) as i16 as i32, ram.r16(b + 2) as i16 as i32, durs));
+    }
+    let fits = |t: u32| {
+        an.iter().enumerate().all(|(i, (f, c, d))| {
+            let first = i as u32 + 1;
+            if d.len() <= 1 || d.iter().any(|&x| x == 0) {
+                return true;
+            }
+            if t < first {
+                return (*f, *c) == (0, (first - t) as i32);
+            }
+            let mut r = (t - first) % d.iter().sum::<u32>();
+            let mut g = 1 % d.len();
+            while r >= d[g] {
+                r -= d[g];
+                g = (g + 1) % d.len();
+            }
+            (*f, *c) == (g as i32, (d[g] - r) as i32)
+        })
+    };
+    if an.iter().all(|a| a.2.len() <= 1) {
+        return;
+    }
+    let Some(t) = (0..200_000u32).find(|&t| fits(t)) else { return };
+    let play = w.story.play_frames;
+    if let Some(f) = w.field.as_mut() {
+        f.entered_play = play.saturating_sub(t as u64);
+    }
+}
+
 /// the boss HP bar object (vtable 0x0804CE28) -> `scene.boss_bar` / `boss_bar_out`: +0x10 the enemy (matched by
 /// position), +0x15 / +0x16 the fill's base and span (`a * 53 / 100`, `b * 53 / 100 - base`: a / b recovered as the
 /// smallest percentages giving them), +0x17 the velocity (+1 sliding in, 0 shown, -1 hidden: sliding out with the
@@ -2727,7 +2770,8 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
         // (made before anything the replay makes: a stamp below the next object's)
         let popup_at = pops.iter().map(|&(h, _, _)| (h, stamp.saturating_sub(1))).collect();
         // the stat-points mark's draw counter (vt 0x0804C070 +0x14)
-        let stat_at = ram.objects().into_iter().find(|&o| ram.r32(o) == 0x0804_C070).map(|o| now.wrapping_sub(ram.r32(o + 0x14))).unwrap_or(0);
+        let play = w.story.play_frames as u32;
+        let stat_at = ram.objects().into_iter().find(|&o| ram.r32(o) == 0x0804_C070).map(|o| play.wrapping_sub(ram.r32(o + 0x14))).unwrap_or(0);
         f.vram = Some(VramState { a, owners, shared_rc, suspended: vec![], hud_out: vec![], popups, keyed, stashed: None, delayed: vec![], objs, susp: vec![], shadow_set: vec![], popup_at, pass_at: 0, stat_at });
     }
 }

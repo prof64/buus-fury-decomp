@@ -322,7 +322,7 @@ impl Renderer {
             return &self.fb;
         }
         let (vx, vy, cx, cy) = Self::view_origin(view, player, w, h);
-        let map = view.map.as_ref().and_then(|m| self.map(packs, &m.id).map(|g| (g, m.anim_frame, m.shake)));
+        let map = view.map.as_ref().and_then(|m| self.map(packs, &m.id).map(|g| (g, (m.anim_frame, m.tile_frame.unwrap_or(m.anim_frame)), m.shake)));
         let backdrop = map.as_ref().map(|(m, _, _)| m.backdrop).unwrap_or(0xFF00_0000);
         self.top.fill(backdrop);
         self.top_l.fill(L_BD);
@@ -544,7 +544,7 @@ impl Renderer {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn draw_layer(&mut self, m: &Map, li: usize, anim_frame: u32, cx: i32, cy: i32, vx: i32, vy: i32) {
+    fn draw_layer(&mut self, m: &Map, li: usize, (anim_frame, tile_frame): (u32, u32), cx: i32, cy: i32, vx: i32, vy: i32) {
         let l = &m.layers[li];
         let ts = &m.tileset;
         // tile animation remap for this frame
@@ -557,7 +557,7 @@ impl Renderer {
         // `anim_frame` = logic frames since the area load (the map's animation ticks). Overlapping animations: the
         // tile shows the most recent upload (ties: header order, as the tick loop uploads)
         let mut order: Vec<(u32, usize, usize)> = ts.anims.iter().enumerate().map(|(k, a)| {
-            let (f, at) = a.after_ticks(k, anim_frame);
+            let (f, at) = a.after_ticks(k, tile_frame);
             (at, k, f)
         }).collect();
         order.sort();

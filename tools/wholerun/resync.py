@@ -1,4 +1,4 @@
-"""resync.py [--lag rec|sim] [--max-stops N] [--from ROW]: the whole run's stop list - the app from the reset with
+"""resync.py [--lag rec|sim|none] [--max-stops N] [--from ROW] [--log FILE]: the whole run's stop list - the app from the reset with
 the run's keys (as board.py); at each stop (the first exact divergence) the game's state is cut at the next row on the
 emulator (the importer's any-frame cut: RAM, sound timer phase) and the app goes on from there, until the end of the
 recording. Every stop: row, stretch, chapter, what differs, the likely owner. An import the importer refuses, or one
@@ -108,7 +108,10 @@ def run(from_row, seg):
     return None
 
 
-log = W / f'stops_{lag}.jsonl'
+# known differences by design (each documented in engine/docs/segments.md): a rule stop inside one is not chased -
+# the run is cut again after the range's end
+KNOWN = json.loads((ROOT / 'data' / 'realrun' / 'known_stops.json').read_text())['stops']
+log = Path(a[a.index('--log') + 1]) if '--log' in a else W / f'stops_{lag}.jsonl'
 if start_row == 0:
     log.write_text('')
 seg, row, stops, t0 = None, start_row, 0, time.time()
@@ -123,7 +126,14 @@ while stops < max_stops:
     s['from'] = row
     s['chapter'] = chapter(s.get('stretch', ''))
     # an import refused, or a divergence in the cut's first rows: the importer's, not a rule's - move the cut on
-    if s['field'] == 'import' or (seg is not None and s['row'] - row < 2):
+    known = next((k for k in KNOWN if k['from'] <= s['row'] <= k['to']), None)
+    if known is not None and s['field'] != 'import':
+        # a known difference by design (data/realrun/known_stops.json): logged, and the run is cut again after it
+        s['kind'] = 'known'
+        s['known'] = known['what'][:120]
+        nxt = known['to'] + 1
+        jump = 30
+    elif s['field'] == 'import' or (seg is not None and s['row'] - row < 2):
         s['kind'] = 'import'
         nxt = row + jump
         jump = min(jump * 2, 4000)

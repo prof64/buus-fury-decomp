@@ -67,7 +67,7 @@ struct Scene {
 
 fn view(s: &Scene, packs: &Packs) -> RenderView {
     let mut v = RenderView::default();
-    v.map = Some(MapView { id: s.map.clone(), anim_frame: s.af, shake: (0, 0), mode7: None, layers: None });
+    v.map = Some(MapView { id: s.map.clone(), anim_frame: s.af, tile_frame: None, shake: (0, 0), mode7: None, layers: None });
     v.cameras.push(CameraView { x: s.cam.0, y: s.cam.1 });
     if let Some((key, x, y, dir, raw, step)) = &s.player {
         if let Ok(def) = SpriteDef::load(packs, key) {

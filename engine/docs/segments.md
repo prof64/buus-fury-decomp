@@ -4122,4 +4122,10 @@ needs the trigger generation counter; next); walk-grid changes in a few 3-x / 4-
   x step -132 vs ours -105 from f2,176 of `m_062`), so ours is 7 frames ahead on his path and enters idle (its
   rand(255)) at 2,401. Every no-lag stop in 062 (1,339,017 .. 1,354,524) is this wander. Reproducing it from power-on
   needs a byte-level heap model (every allocation in order with its size and the bytes each object leaves) - the
-  Super Buu agent's recommendation was not to; **decision for the coordinator** (B has not started it).
+  Super Buu agent's recommendation was not to; **decided (coordinator): accepted as a known difference, no heap
+  model.** It is the first entry of the **known-stops allow-list** `data/realrun/known_stops.json` (rows 1,339,017 ..
+  1,354,524; core.md §8): `tools/wholerun/resync.py` logs a rule stop inside a listed range as kind `known` and cuts
+  again after the range (`board.py --rank` counts known stops apart). New entries need a decision and a write-up.
+  `resync.py` also takes `--log FILE` (a private stop log; `--lag none` works as for wholerun.rs). **Side-content
+  agent:** these are targeted edits to your resync.py / board.py - re-check if you have local changes there.
+  **B owns the Super / Kid Buu no-lag stops from 1,354,525 on** (the Super Buu agent is on pixel comparison).
