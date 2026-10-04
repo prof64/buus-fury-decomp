@@ -465,16 +465,15 @@ export class Enemy extends Actor implements EnemyLike {
     const p = this.player
     return !!p && p.attacking() && overlaps(inflate(p.bodyBox(), 8), this.bodyBox())
   }
-  playerInFront(reach: number) {
+  // IfPlayerInFront (predicate 0x0803D374): inMeleeRange's geometry without its "player hittable" test (real run
+  // 14-1 r057_066 f3527: a hurt player outside the strike rect is not in front); `reach` unused
+  playerInFront(_reach: number) {
     const p = this.player
-    if (!p || !p.hittable) return false
-    const [dx, dy] = this.toPlayer()
-    const f = facingToward(dx, dy)
+    if (!p) return false
     const b = this.bodyBox()
-    const r: Rect = f === 3 ? { x0: b.x1, y0: b.y0, x1: b.x1 + reach, y1: b.y1 } : f === 2 ? { x0: b.x0 - reach, y0: b.y0, x1: b.x0, y1: b.y1 } : f === 0 ? { x0: b.x0, y0: b.y1, x1: b.x1, y1: b.y1 + reach } : { x0: b.x0, y0: b.y0 - reach, x1: b.x1, y1: b.y0 }
-    if (!overlaps(r, p.bodyBox())) return false
-    this.facing = f
-    return true
+    if (!overlaps(p.bodyBox(), { x0: b.x0 - 4, y0: b.y0, x1: b.x1 + 3, y1: b.y1 - 6 })) return false
+    const r = this.strikeRect(true)
+    return !!r && overlaps(p.bodyBox(), r)
   }
   inPlayerBeamLine() {
     const p = this.player

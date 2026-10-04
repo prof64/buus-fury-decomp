@@ -31,12 +31,13 @@
   "janemba": {
    "cats": {
     "camera": 1,
-    "menu timing": 1
+    "menu timing": 1,
+    "object set": 1
    },
    "cut_frames": 187291,
-   "exact": 253,
+   "exact": 252,
    "frames": 187291,
-   "matched": 186412,
+   "matched": 185309,
    "run_frames": 199703,
    "segments": 255,
    "stretches": 16
@@ -52,41 +53,38 @@
    "stretches": 1
   },
   "ship": {
-   "cats": {
-    "position / facing": 1
-   },
+   "cats": {},
    "cut_frames": 395616,
-   "exact": 337,
+   "exact": 338,
    "frames": 395616,
-   "matched": 394862,
+   "matched": 395616,
    "run_frames": 398194,
    "segments": 338,
    "stretches": 2
   },
   "superbuu": {
    "cats": {
-    "RNG": 1,
     "camera": 2,
-    "position / facing": 5
+    "position / facing": 3
    },
    "cut_frames": 467701,
-   "exact": 440,
+   "exact": 443,
    "frames": 467701,
-   "matched": 407897,
+   "matched": 413943,
    "run_frames": 478729,
    "segments": 448,
    "stretches": 22
   }
  },
- "dirty": false,
+ "dirty": true,
  "total": {
   "cut_frames": 1622756,
-  "exact": 1502,
+  "exact": 1505,
   "frames": 1622756,
-  "matched": 1531303,
+  "matched": 1537000,
   "run_frames": 1668050,
   "segments": 1519,
   "stretches": 75
  },
- "tree": "32e189d"
+ "tree": "9a26dfd"
 }

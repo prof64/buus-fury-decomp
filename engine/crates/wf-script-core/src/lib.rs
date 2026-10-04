@@ -168,6 +168,11 @@ pub struct HostState {
     /// map-trigger cutscenes do not, 3-3 / 7-3)
     #[serde(default)]
     pub from_scroll: bool,
+    /// the no-save word 0x03002A58: cleared when an outermost event starts (`0x080124B0`), set by the warps, return
+    /// to title, `refresh_map_triggers` and the talker's removal; while set an event's end node does not write its
+    /// exit value to the starter's resume slot (`0x08012546`)
+    #[serde(default)]
+    pub no_resume_save: bool,
 }
 
 /// compatibility name (older tests / docs)

@@ -60,6 +60,36 @@ impl Session {
     pub fn reset(&mut self, config: BattleConfig) {
         *self = Session::new(Arc::clone(&self.data), config);
     }
+    /// A video frame the game spends inside a long main-loop iteration (`World.g.lag`, made by the sim itself with
+    /// `Options::sim_lag`): no logic step - the sound hardware's frame only. The first frame after an area load's
+    /// logic frame starts the load's iteration: its length from the timing model (`sndsim::load_frames`). Returns
+    /// false (nothing done) when the frame is a logic frame; hosts call it before their logic step.
+    pub fn lag_step(&mut self) -> bool {
+        let w = &mut self.world;
+        if !w.opts.sim_lag || crate::menu::active(w) {
+            return false;
+        }
+        if std::mem::take(&mut w.g.load_pending) {
+            if let Some(n) = crate::sndsim::load_frames(w) {
+                w.g.lag = n as u16;
+                w.g.lag_cam = w.sound.wrap as u16;
+            }
+        }
+        if w.g.lag == 0 {
+            return false;
+        }
+        w.events.clear();
+        w.g.lag -= 1;
+        // the load's world restore ends with a camera update: shown in the iteration's last frame (a frame earlier
+        // when its last sound update ran over a VBlank, as the menu close's `leave_cam`)
+        if w.g.lag == w.g.lag_cam && w.field.is_some() {
+            w.tick_shakes();
+            crate::field::world_mode_cameras(w);
+        }
+        let last = w.g.lag == 0;
+        crate::sndsim::lag_frame_ex(w, last);
+        true
+    }
     /// one frame with every player's held buttons (missing players = 0)
     pub fn step(&mut self, held: &[u16]) -> &[Event] {
         let mut inputs = [InputFrame::default(); MAX_PLAYERS];

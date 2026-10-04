@@ -693,6 +693,10 @@ pub fn load_area(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<Dir>)
 /// 0x74 `load_scene_fade_noobj`, 0x08009030 first flag 0). A cutscene scene load calls this after
 /// `scene::send_offstage` (no player object: no player re-creation, no draws).
 pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<Dir>, objects: bool) {
+    // the load's main-loop iteration follows this logic frame (`Session::lag_step`)
+    if w.opts.sim_lag {
+        w.g.load_pending = true;
+    }
     let fd = field_data(w);
     let Some(a) = fd.area(to.world, to.area) else { return };
     let variant = resolve_variant(a, to.variant);
@@ -2063,6 +2067,41 @@ pub fn throw_map_item(w: &mut World, at: ObjRef) -> Option<EntityId> {
     crate::fieldobj::throw_map_item(w, &o)
 }
 
+/// the resume node an event started by `cause` begins at (`TriggerRt::resume` / `Npc::resume`); 0 for every other
+/// start (the scene runner `0x08012588` passes a zeroed local: callbacks, queued and nested events start at node 0)
+pub fn resume_node(w: &World, cause: &Cause) -> u16 {
+    match cause {
+        Cause::Trigger { obj } => w.field.as_ref().and_then(|f| f.triggers.iter().find(|t| t.obj == *obj)).map_or(0, |t| t.resume),
+        Cause::Talk { npc } => match w.find(*npc).map(|i| &w.ents[i]) {
+            Some(e) if !e.removed => match &e.body {
+                Body::Npc(n) => n.resume,
+                _ => 0,
+            },
+            _ => 0,
+        },
+        _ => 0,
+    }
+}
+
+/// an event's end node `v` writes back to its starter's resume slot (`0x0801254C`; the caller checks the no-save word)
+pub fn set_resume_node(w: &mut World, cause: &Cause, v: u16) {
+    match cause {
+        Cause::Trigger { obj } => {
+            if let Some(t) = w.field.as_mut().and_then(|f| f.triggers.iter_mut().find(|t| t.obj == *obj)) {
+                t.resume = v;
+            }
+        }
+        Cause::Talk { npc } => {
+            if let Some(i) = w.find(*npc).filter(|&i| !w.ents[i].removed) {
+                if let Body::Npc(n) = &mut w.ents[i].body {
+                    n.resume = v;
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
 /// script `refresh_map_triggers` (0x8B, 0x08008AA0(area, 0)): clear the trigger list and re-create the area's
 /// triggers whose condition holds now, then the map's exits (the load's order). Used after story flags change.
 /// (The game also re-registers the map layout's props; their script-set visibility is kept here.)
@@ -2114,6 +2153,7 @@ pub fn props_object(w: &World) -> bool {
 /// s303; the four NPCs and the player at indices 0..4 tick twice in its exit frame, the rest once).
 pub fn resume_pass_after_load(w: &mut World) {
     let Some((k, loads)) = w.field.as_mut().and_then(|f| f.talk_pass.take()) else { return };
+    if std::env::var("DBG_RESUME").is_ok() { eprintln!("DBG resume k {k} loads {loads} now {:?} live {} props {} ents {:?}", w.field.as_ref().map(|f| f.loads), w.ents.iter().filter(|e| !e.removed).count(), props_object(w), w.ents.iter().filter(|e| !e.removed).map(|e| (e.id, match &e.body { Body::Npc(_) => "npc", Body::Player(_) => "pl", Body::Enemy(_) => "en", _ => "o" })).collect::<Vec<_>>()); }
     if w.field.as_ref().is_some_and(|f| f.loads == loads) {
         return;
     }

@@ -347,15 +347,69 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
     // recordings with `vram` rows check the object tile allocator too (SEGMENT_VRAM=0 turns it off)
     let vram_check = std::env::var("SEGMENT_VRAM").map(|v| v != "0").unwrap_or(true);
     let mut game_vram = doc["init"].get("vram").cloned().unwrap_or(Value::Null);
+    // SEGMENT_LOADEST: the map rebuild's model parts at the imported arrival (area-load length fit)
+    if std::env::var_os("SEGMENT_LOADEST").is_some() {
+        let w = &sess.world;
+        if let (Some((c, extra)), Some(f)) = (wf_core::sndsim::reload_parts(w), w.field.as_ref()) {
+            let (mut en, mut npc, mut oth, mut dec_all, mut sprites) = (0, 0, 0, 0i64, std::collections::BTreeSet::new());
+            for (k, e) in w.ents.iter().enumerate() {
+                if e.removed {
+                    continue;
+                }
+                match &e.body {
+                    Body::Enemy(_) => en += 1,
+                    Body::Npc(_) => npc += 1,
+                    Body::Player(_) => {}
+                    _ => oth += 1,
+                }
+                if w.actor(k).is_some() {
+                    dec_all += scene::cel_dec(w, k) as i64;
+                    if let Some(sp) = scene::sprite_id(w, k) {
+                        sprites.insert(sp);
+                    }
+                }
+            }
+            eprintln!("load-est {} map {} c {} extra {} cam {:?} enemies {en} npcs {npc} other {oth} dec_all {dec_all} sprites {} signs {}", doc["name"].as_str().unwrap_or("?"), f.map, c, extra, (w.cameras[0].rect.x0, w.cameras[0].rect.y0), sprites.len(), f.signs);
+        }
+    }
     let mut lf_prev = i(&doc["init"]["lf"]);
     let mut presented = host.hs.present.len();
     let mut lf_drift = 0i64;
+    // SEGMENT_SIMLAG=1: the sim makes the load lag itself (`Options::sim_lag`); the recording's lag frames are only
+    // replayed where the sim has none (the rest of the unmodelled long iterations). Counts: the sim's lag frames, the
+    // ones that disagree with the recording, the recording's lag frames still replayed
+    let sim_lag = std::env::var_os("SEGMENT_SIMLAG").is_some();
+    sess.world.opts.sim_lag = sim_lag;
+    sess.world.g.load_pending = false;
+    let (mut own_lag, mut lag_bad, mut replayed) = (0usize, 0usize, 0usize);
     for (k, fr) in frames.iter().enumerate() {
         let keys = i(&fr["keys"]) as u16;
         let lf = i(&fr["lf"]);
         let logic = lf != lf_prev;
         lf_prev = lf;
-        if logic {
+        let starting = sim_lag && sess.world.g.load_pending && !wf_core::menu::active(&sess.world);
+        if sim_lag && !wf_core::menu::active(&sess.world) && (sess.world.g.lag > 0 || sess.world.g.load_pending) && sess.lag_step() {
+            if starting {
+                // the recording's lag run from here
+                let mut n = 0;
+                let mut q = lf_prev;
+                for f2 in frames[k..].iter() {
+                    if i(&f2["lf"]) != q {
+                        break;
+                    }
+                    q = i(&f2["lf"]);
+                    n += 1;
+                }
+                let map = sess.world.field.as_ref().map(|f| f.map.clone()).unwrap_or_default();
+                eprintln!("simlag-load f{k} {map} sim {} game {n}", sess.world.g.lag + 1);
+            }
+            own_lag += 1;
+            if logic {
+                lag_bad += 1;
+                rep.bad(k, "lag", "sim lag frame vs game logic".into());
+            }
+        } else if sim_lag && logic && sess.world.g.lag == 0 && false {
+        } else if logic {
             rep.logic += 1;
             // SEGMENT_TRACE with SEGMENT_RNG=1: every RNG call's source location inside the traced frames
             let rng_trace = trace.is_some_and(|(a, b)| (a..=b).contains(&k)) && std::env::var("SEGMENT_RNG").is_ok();
@@ -382,6 +436,7 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
             // the game's lag frame: the sound hardware's frame passes without the main loop's update
             let last = frames.get(k + 1).is_some_and(|n| i(&n["lf"]) != lf);
             wf_core::sndsim::lag_frame_ex(&mut sess.world, last);
+            replayed += 1;
         }
         if let Some((a, b)) = trace {
             if (a..=b).contains(&k) {
@@ -532,6 +587,9 @@ pub fn replay(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Valu
         if rep.first.is_none() {
             rep.compared = k + 1;
         }
+    }
+    if sim_lag {
+        eprintln!("simlag {}: sim lag frames {own_lag} disagreeing {lag_bad} replayed from the recording {replayed}", doc["name"].as_str().unwrap_or("?"));
     }
     rep.errors = host.errors.clone();
     rep.started = host.started.clone();

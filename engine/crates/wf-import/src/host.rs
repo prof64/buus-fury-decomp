@@ -154,6 +154,13 @@ impl StoryHost {
     }
 
     fn finish(&mut self, w: &mut World, st: Result<Status, String>) {
+        // a trigger's / talking NPC's event ended: its end node's value goes to the starter's resume slot unless a
+        // warp / refresh_map_triggers / return to title set the no-save word (`0x08012546`)
+        if matches!(st, Ok(Status::Finished)) && !self.hs.in_unit && !self.hs.no_resume_save {
+            if let (Some(c @ (Cause::Trigger { .. } | Cause::Talk { .. })), Some(v)) = (self.cause.as_ref(), self.rt.with_thread(|t| t.event_result)) {
+                wf_core::field::set_resume_node(w, c, v);
+            }
+        }
         if !matches!(st, Ok(Status::Blocked)) {
             match self.cause.take() {
                 Some(Cause::Ai { entity }) => scene::ai_script_done(w, entity),
@@ -462,7 +469,13 @@ impl StoryHost {
                         self.started.push((k, format!("s{n:03}")));
                         {
                         self.hs.in_unit = false;
-                        self.rt.start_event(n, [0; 4])
+                        // an outermost event's start clears the no-save word (0x080124B0); a trigger / talking NPC
+                        // starts its event at the exit value of its last run (its resume slot, wf-core `resume_node`)
+                        if self.outer.is_empty() {
+                            self.hs.no_resume_save = false;
+                        }
+                        let node = if std::env::var("NO_RESUME").is_ok() { 0 } else { wf_core::field::resume_node(w, &job.cause) };
+                        self.rt.start_event_from(n, node, [0; 4], 0)
                     }
                     }
                     None => {
@@ -506,6 +519,10 @@ impl StoryHost {
 
     /// one logic frame with the leader's held keys (the playthrough's host order)
     pub fn step(&mut self, sess: &mut Session, keys: u16) {
+        // a lag frame the sim makes itself (`Options::sim_lag`): no input is read, no logic runs
+        if sess.lag_step() {
+            return;
+        }
         let mut inputs = [InputFrame::default(); MAX_PLAYERS];
         inputs[0] = InputFrame::from_held(keys, self.prev_held);
         self.prev_held = keys;
@@ -521,6 +538,9 @@ impl StoryHost {
 
     /// one logic frame with every player's input frame (the app's story mode: wf-app `StorySim`)
     pub fn step_inputs(&mut self, sess: &mut Session, inputs: [InputFrame; MAX_PLAYERS]) {
+        if sess.lag_step() {
+            return;
+        }
         self.frame += 1;
         // the frame's start (deferred calls: drop scripts, kill XP): their scripts run before the objects' update
         sess.step_begin(inputs);

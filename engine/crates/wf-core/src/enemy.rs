@@ -835,25 +835,19 @@ pub fn player_attacking_me(w: &World, i: usize) -> bool {
     let p = w.pl_ref(pi);
     p.attacking() && overlaps(&p.a.body_box().inflate(8), &w.en_ref(i).a.body_box())
 }
-pub fn player_in_front(w: &mut World, i: usize, reach: i32) -> bool {
+/// IfPlayerInFront (predicate 0x0803D374, vt 0x0804B0C0): IfPlayerInMeleeRange's geometry (0x08029ED8: the grown
+/// body-box pre-test, the turn, the strike rect) without its "player hittable" test (+0x1CC) - real run 14-1 r057_066
+/// f3,527: a hurt player out of the strike rect is not "in front"; the old 48 px reach box took him, so the enemy's
+/// Chance(0.4 %) draw was skipped. `_reach` kept for the node table's call
+pub fn player_in_front(w: &mut World, i: usize, _reach: i32) -> bool {
     let Some(pi) = player(w, i) else { return false };
-    if !w.pl_ref(pi).a.hittable {
-        return false;
-    }
-    let (dx, dy) = to_player(w, i);
-    let f = facing_toward(dx, dy);
+    let p = &w.pl_ref(pi).a;
     let b = w.en_ref(i).a.body_box();
-    let r = match f {
-        3 => Rect::new(b.x1, b.y0, b.x1 + reach, b.y1),
-        2 => Rect::new(b.x0 - reach, b.y0, b.x0, b.y1),
-        0 => Rect::new(b.x0, b.y1, b.x1, b.y1 + reach),
-        _ => Rect::new(b.x0, b.y0 - reach, b.x1, b.y0),
-    };
-    if !overlaps(&r, &w.pl_ref(pi).a.body_box()) {
+    if !overlaps(&p.body_box(), &Rect::new(b.x0 - 4, b.y0, b.x1 + 3, b.y1 - 6)) {
         return false;
     }
-    w.en(i).a.facing = f;
-    true
+    let Some(r) = strike_rect(w, i, true) else { return false };
+    overlaps(&w.pl_ref(pi).a.body_box(), &r)
 }
 fn corridor(b: &Rect, dir: Dir) -> Rect {
     let (dx, dy) = DIR_VEC[dir as usize];

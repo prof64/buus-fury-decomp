@@ -80,6 +80,11 @@ fn mv(x: i32, y: i32, speed: i32, state: i32) -> Cmd {
 pub fn call(h: &mut CoreHost, c: &Call) -> R {
     let n = c.native;
     let a = c.args;
+    // the warps, return to title and refresh_map_triggers set the no-save word 0x03002A58 (0x0800232C / 0x080023EA /
+    // 0x0800286A / 0x08002714): the running event's end does not write its exit value to its starter's resume slot
+    if matches!(n, 0x76 | 0x77 | 0x8b | 0x8e) {
+        h.s.no_resume_save = true;
+    }
     match n {
         0x00..=0x07 => Err(format!("native 0x{n:02x} is handled by the VM")),
         0x08..=0x0b => done(h.w.story.l[n as usize - 8]),
@@ -554,10 +559,11 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
         }
         0x95 => {
             switch_character(h.w, arg(a, 0))?;
+            if std::env::var("DBG95").is_ok() { eprintln!("DBG95 f{} c{} leader {:?} n {}", h.w.frame, arg(a,0), leader(h.w), h.w.ents.len()); }
             // the script's rebuilt player is a new object at the end of the world's list: it updates (and ticks its
             // script track) before the older ones (s218 -> s501 as Trunks: his walk and Goten's end in one frame,
             // his idle draw first)
-            if let Some(i) = leader(h.w) {
+            if let Some(i) = leader(h.w).filter(|_| std::env::var("NOMOVE95").is_err()) {
                 let e = h.w.ents.remove(i);
                 h.w.ents.push(e);
             }

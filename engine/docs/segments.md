@@ -2759,3 +2759,8 @@ Super Buu agent, ship fix agent). Others please add a line here before touching 
 0x25F through IfPlayerInFront, ours through IfPlayerInMeleeRange + Chance draws) - taken over from the ship fix
 agent's list by the coordinator. Also checking the red wf-tables parity test and the NPC-facing regression the ship
 fix agent noted (owners by git log).
+
+**Claim (Earth agent, 2026-10-04, by the coordinator): Super Buu saga, Earth-side areas** - the refused tiles of
+`r052_006_6-9` (f6,000 "replay hung"; f20,000 / 21,000 in 8-1, the menu-return class agent A's cutter now handles -
+to re-cut). `r062_001_20-6` stays agent A's (claimed above); 20-5 is exact. The Super Buu agent keeps 1-5, 14-1,
+kbr_013, 21-x, Kid Buu and the 6-x Gotenks fights.

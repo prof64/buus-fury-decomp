@@ -524,6 +524,7 @@ fn import_grids(w: &mut World, ram: &GbaRam) {
 /// flyer and camera, the 2-D camera
 fn field_from_ram(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
     import_objects(w, ram, notes);
+    import_trigger_resume(w, ram);
     // (shots an enemy's node had made - a beam in flight - are newer than every actor: the list's end)
     let (shots, rest): (Vec<_>, Vec<_>) = std::mem::take(&mut w.ents).into_iter().partition(|e| matches!(e.body, Body::Shot(_)));
     w.ents = rest;
@@ -633,6 +634,23 @@ fn field_from_ram(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
 /// that entity is patched to the RAM's state (it keeps what the load attached: patrol runners, placements, talk
 /// events); RAM actors without a match are built; entities no RAM actor claims go. The actors end in the RAM's
 /// world-list order (the update order).
+/// the event triggers' resume nodes (trigger list `TRIGS`, event trigger vt 0x08049BD4: +4 rect s16 x0 y0 x1 y1,
+/// +0x10 the exit value of the event's last run), matched to the load's triggers by rect
+fn import_trigger_resume(w: &mut World, ram: &GbaRam) {
+    let n = ram.r32(TRIGS).min(256);
+    for k in 0..n {
+        let o = ram.r32(TRIGS + 4 + 4 * k);
+        if !ram.valid(o) || ram.r32(o) != 0x0804_9BD4 {
+            continue;
+        }
+        let (x0, y0, x1, y1) = (ram.s16(o + 4), ram.s16(o + 6), ram.s16(o + 8), ram.s16(o + 0xA));
+        let v = ram.r16(o + 0x10);
+        if let Some(t) = w.field.as_mut().and_then(|f| f.triggers.iter_mut().find(|t| (t.rect.x0, t.rect.y0, t.rect.x1, t.rect.y1) == (x0, y0, x1, y1))) {
+            t.resume = v;
+        }
+    }
+}
+
 fn import_objects(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
     let rows: std::collections::BTreeMap<u32, (i32, i32, i32, i32)> = ram.actor_rows.iter().map(|r| (r.0, (r.1, r.2, r.3, r.4))).collect();
     let players = w.players.clone();
@@ -727,6 +745,10 @@ fn import_objects(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
                     // the hold state 0x03001B00 (`set_pose`): frozen on its cel
                     if ram.r32(o + 0x14) == 0x0300_1B00 {
                         n.anim.mode = wf_core::scene::AnimMode::Pose;
+                    }
+                    // a map NPC's talk resume node (+0x1BC: the exit value of its last talk)
+                    if vt == VT_NPC && n.talk.is_some() {
+                        n.resume = ram.r16(o + 0x1BC);
                     }
                 }
                 import_npc_step(w, i, ram, o, rows.get(&o).copied());

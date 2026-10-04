@@ -190,6 +190,15 @@ pub struct Globals {
     /// outside the menu screens counts exactly once on it, whatever object passes ran
     #[serde(default)]
     pub clock_mark: Option<i64>,
+    /// the sim's own lag frames (`Session::lag_step`): an area load asked for its iteration in this logic frame
+    /// (`load_pending`); `lag` = the video frames of that iteration still to come, each without a logic step (the
+    /// sound hardware runs on); `lag_cam` = the remaining count at whose frame the load's closing camera update shows
+    #[serde(default)]
+    pub load_pending: bool,
+    #[serde(default)]
+    pub lag: u16,
+    #[serde(default)]
+    pub lag_cam: u16,
     /// the input object 0x03003300 (0x0804023C) per player slot: this frame's new presses and the press ring
     #[serde(default)]
     pub presses: [PressLog; MAX_PLAYERS],
@@ -538,6 +547,10 @@ pub struct Options {
     /// multiplayer rule set beyond the original: players' attacks hit other players (`battle::set_pvp`)
     #[serde(default)]
     pub pvp: bool,
+    /// the sim makes the game's lag frames itself (`Session::lag_step`: area loads so far) instead of a host
+    /// replaying them from a recording
+    #[serde(default)]
+    pub sim_lag: bool,
 }
 impl Hash for Options {
     fn hash<H: Hasher>(&self, h: &mut H) {
@@ -545,6 +558,9 @@ impl Hash for Options {
         // only hashed when on: single-player / co-op hashes stay what they were
         if self.pvp {
             self.pvp.hash(h);
+        }
+        if self.sim_lag {
+            self.sim_lag.hash(h);
         }
     }
 }

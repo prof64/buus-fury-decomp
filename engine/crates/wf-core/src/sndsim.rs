@@ -350,6 +350,28 @@ pub fn reload_frames(w: &mut World, done: bool) -> Option<u8> {
 
 /// [`reload_frames`] with `more` cycles of other work in the same iteration (a script-opened screen's own close)
 pub fn reload_frames_with(w: &mut World, done: bool, more: i64) -> Option<u8> {
+    let (c, extra) = reload_parts(w)?;
+    // a close by a prompt (B) restores in the iteration after the event's: less before it (its start varies by
+    // ~14 k cycles, not modelled)
+    let rest = if done { RELOAD_REST } else { RELOAD_REST - 13_700 };
+    redraw_frames(w, Redraw { t0: 0, base: (rest + more + extra + c * 10_035 / 10_000) * 100_523 / 100_000 })
+}
+
+/// An area load's main-loop iteration (the frame after the load's logic frame on): the same map rebuild as a
+/// close's reload (`reload_parts` at the arrival) plus the area's own setup (`LOAD_REST`: the object lists, the
+/// on-load scripts, the HUD). Returns its video frames (None: unknown map / no sound content / uncalibrated)
+pub fn load_frames(w: &mut World) -> Option<u8> {
+    let (c, extra) = reload_parts(w)?;
+    let base = (LOAD_REST + extra + c * 10_035 / 10_000) * 100_523 / 100_000;
+    if debug() {
+        eprintln!("snd load: c {c} extra {extra} base {base}");
+    }
+    redraw_frames(w, Redraw { t0: 0, base })
+}
+
+/// The map rebuild's cycles for the current area / camera / actors (pure): (decompression incl. the actors' frames,
+/// the other per-item work). The close's reload and an area load (`load_frames`) both rebuild the map this way
+pub fn reload_parts(w: &World) -> Option<(i64, i64)> {
     let f = w.field.as_ref()?;
     let fd = w.data.field.clone()?;
     let rl = fd.maps.get(&f.map)?.reload.as_ref()?;
@@ -415,16 +437,15 @@ pub fn reload_frames_with(w: &mut World, done: bool, more: i64) -> Option<u8> {
     if debug() {
         eprintln!("snd reload: map {} cam ({cx}, {cy}) decompression {c} ({actors} actors' frames {frames}) + {extra}", f.map);
     }
-    // a close by a prompt (B) restores in the iteration after the event's: less before it (its start varies by
-    // ~14 k cycles, not modelled)
-    let rest = if done { RELOAD_REST } else { RELOAD_REST - 13_700 };
-    redraw_frames(w, Redraw { t0: 0, base: (rest + more + extra + c * 10_035 / 10_000) * 100_523 / 100_000 })
+    Some((c, extra))
 }
 
 /// (+2,500 on 2026-10-04: 49 measured pause / Switch Character closes over the real run, game minus model: mean
 /// +6,563, median +6,610; bounded by real run 2-9 rE2__050, 3.4 k from its boundary, and 18-2 r038_002, 1.7 k)
 const RELOAD_REST: i64 = 119_300;
 const SIGN_LABEL: i64 = 25_300;
+/// an area load beyond the map rebuild (fitted on measured real-run loads: work/shipfix/loadfit.py)
+const LOAD_REST: i64 = 400_000;
 
 /// the iteration makes the VBlank when it ends this many cycles before it at the latest (the wait's own entry)
 const CUTOFF: i64 = 0;
