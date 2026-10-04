@@ -250,6 +250,7 @@ fn main() {
             if menu || std::env::var("WR_MENU").is_ok() {
                 let page = match w.menu.stack.last() {
                     Some(wf_core::menu::Screen::Title(t)) => format!("title {:?} leaving {:?}", t.page, t.leaving),
+                    Some(wf_core::menu::Screen::Status(s)) => format!("status alloc {} vals {:?} orig {:?} blink {} drawn {}", s.alloc, s.vals, s.orig, s.blink, s.c.drawn),
                     Some(wf_core::menu::Screen::Minigame(m)) => format!("minigame counter {} wait {} done {} peak {} pos {} | play_frames+bias {} clock {} ticks {} pf {}", m.counter, m.wait, m.g.done, m.g.peak, m.g.pos, w.story.play_frames as i64 + w.story.lf_bias, w.g.clock(w.frame), w.menu.ticks, w.story.play_frames),
                     Some(s) => format!("other {:?} busy {:?} scripted {}", std::mem::discriminant(s), w.field.as_ref().map(|f| f.busy), w.menu.scripted),
                     None => format!("- busy {:?} raw {:?}", w.field.as_ref().map(|f| f.busy), w.field.as_ref().map(|f| f.raw_input.is_some())),

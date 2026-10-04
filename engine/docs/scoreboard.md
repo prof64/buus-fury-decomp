@@ -1,6 +1,6 @@
 # Parity scoreboard: the real playthrough on wf-core
 
-Tree: `e0fcc5f` + uncommitted engine changes. Regenerate: `.venv/bin/python tools/segments/scoreboard.py`
+Tree: `543b020`. Regenerate: `.venv/bin/python tools/segments/scoreboard.py`
 (the cuts: `scoreboard.py cut`, local under `work/real/`; the run itself: `tools/segments/realrun.py`, §"How to replay
 the real run" in `engine/docs/segments.md`). A segment = the real game from one importable area entry (an exit
 arrival with nothing running) to the next; an entry by a script warp / in a cutscene is not a cut - its frames
@@ -18,9 +18,9 @@ frames are counted where its segments start.
 | superbuu | Super Buu agent | 478,729 | 11,028 | 448 | 446 | 467,701 | 441,978 | 94.5 |
 | **all** |  | 1,668,052 | 45,293 | 1519 | 1513 | 1,622,759 | 1,585,860 | 97.7 |
 
-**Whole run, no imports (recorded lag): exact to frame 153,101** of 723,849 recorded (E2_earth; first divergence: rng: app [ddf7897e, 38c3c1f0] game [234beb00, fbe02e0f]). Tree `55228ff`, `tools/wholerun/board.py`.
+**Whole run, no imports (recorded lag): exact to frame 153,225** of 723,849 recorded (E2_earth; first divergence: rng: app [ddf7897e, 38c3c1f0] game [d800841f, 1450638f]). Tree `e0fcc5f`, `tools/wholerun/board.py`.
 
-**Whole run, no imports (sim lag): exact to frame 4,691** of 723,849 recorded (E1_opening; first divergence: area: app (0, 96) game (1, 1)). Tree `55228ff`, `tools/wholerun/board.py`.
+**Whole run, no imports (sim lag): exact to frame 4,691** of 723,849 recorded (E1_opening; first divergence: area: app (0, 96) game (1, 1)). Tree `e0fcc5f`, `tools/wholerun/board.py`.
 The recording follows the real run from the reset through 002_d04_bandana only: replayed from the reset, the key log of 003_d06_thieves leaves the real run (the chain's state at 002's end differs from the local state 003 was packed from - object list, heap, one video frame) and ends in a game over.
 
 ## Whole run with resync: every stop, per owner
