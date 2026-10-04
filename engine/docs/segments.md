@@ -3438,6 +3438,20 @@ mismatches, by cause and owner:
   open (script-host timing). Also seen: `rfat_033_002_6-1` f27,267 `current: 5 vs 3` - inside a live Gotenks
   level-up hook the game's current character is the component; ours keeps the fusion in `Story.current` (the hook
   uses `levelup_char`) - report-only, Super Buu agent's fusion code.
+  *Done (Earth agent): 7-3 f7,217 and the soak's EP.* The form object's tick after an event's end: emulator (mode
+  0x03000F90 / depth 0x03002A5C / the count, `work/earth/timing/endev.py`) - the count steps in the frame the event
+  ends in 7-3 f6,622 (s289's last native 0xEF, a `run_mode` frame wait), 2-8 f5,748 (a fade's end) and 7-3 f38,560
+  (a dialog's close), but NOT in 7-2 f1,492 (the Switch Characters message's close). Ours: a fade's end and a
+  dialog closing at the top of the frame already tick (the held pass's second update / the event ends before the
+  object pass); the missing case is the modal frame wait: `player::passive_after_scripts` (field `post_step`, after
+  the held pass's completion) ticks a form controller that the object pass held when the event ended in this
+  frame's script step from a `Pending::Frames` wait (`Field.wait_end`). All 90 E2 real cuts' records clean except
+  `rE2__090_7-3` f47,532 (char 3 HP 184 vs 190, open); gates unchanged. **The soak's EP now matches the game row for
+  row** (title -> Earth `--show`: +4 at 136,658, skill cost at 137,083, +1 / +1 at 137,179 / 137,228 - the extra
+  +4 after a skill use is gone; it was the early regen count). **New soak stop: row 152,537** (was 152,597): s266's
+  "#%d points???" text box (rE2__090 offset ~2,396) closes 60 rows earlier in the app than in the game (the import
+  replay is exact there) - the punching machine's printed score / the text's typing length in the app; the area
+  divergence follows from it. Not yet looked at.
 * **Fusion records** (Gotenks char 5, Gogeta char 7: XP 40,325 and cooldown 18,000 in ours, the game's XP 949,715 ..
   16,459,727 and cooldown 0): `r033_002_6-1` / `rfat_033_002`, `r049_001_18-14` / `rj_049_001`, `r052_006_6-9` /
   `rsb_052_006`, `sb_006_06_06`, `sb_007_06_09` - the fused character's record (level-up / fusion code: Super Buu
@@ -3586,3 +3600,15 @@ real-route agent's re-pack lands.
 7). They follow a text box or load one frame off -> **ship fix agent** (the text-box / load-length models,
 `sndsim::dialog_frames` / `load_frames`; per chapter in `wholerun_stops.json`). The 44 import stops in sim mode are
 cuts taken while the sim is in its own lag frames, not importer problems.
+
+**Claim (Super Buu agent, 2026-10-04, by the coordinator): the whole run's resync stops in the fat-Buu, Janemba and
+Super / Kid Buu chapters** (manifest stretches 002 .. 072). Until the side-content agent's ranked list lands I run a
+private resync (`work/superbuu/wholerun/`: its own master recording and stop log, so the shared
+`work/wholerun/` files are untouched) from the Super Buu chapter's first row (`051_sb_start`). Side-content agent:
+I add each stop here as `stop ROW (chapter): field - owner` before working on it; take none marked so, and I take
+none you mark.
+
+**Claim (side-content agent, 2026-10-04, by the coordinator): the whole run's opening / Earth stops** - first Earth
+7-3 inside s266 (the punching machine's "#%d points???" box / RNG, whole-run row 153,225; the soak's row 152,537
+stop, noted "not yet looked at" by soak agent B - B, say so here if you are on it and I drop it), then the rest of
+the opening / Earth stops of the resync list. Not the fat / Janemba / Super Buu chapter stops (Super Buu agent).
