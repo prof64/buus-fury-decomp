@@ -235,8 +235,6 @@ export class StraightShot extends Shot {
     // overlapping its box bursts it (its spark) and is taken (segment sb 6-6 f18799: a blast meets a beam head)
     if (this.o.name === 'kiblast' && this.o.fxEnd?.ticks === 16 && !this.o.fragile) {
       if (this.dead >= 0 || msg.foot || msg.source === this || this.removed || msg.atk.kind !== 1 || msg.atk.sub === 0xd) return false
-      // (a blast still in the player's hand catches nothing: real route 14-2 f862)
-      if (this.o.delay && this.t < this.o.delay) return false
       if (!overlaps(msg.rect, this.rect())) return false
       this.end(_w, true)
       return true
@@ -1383,7 +1381,8 @@ export class EnergyWave extends Shot {
       this.mode = 1
       return
     }
-    if (this.hit(w, this.rect(), ATK[1], 1024)) {
+    // (the wave's message goes to every object, 0x08011C0C: real route 14-2 f862)
+    if (this.hit(w, this.rect(), ATK[1], 1024, false)) {
       this.ctx.puffRng(w, hx, hy)
       this.mode = 1
       return

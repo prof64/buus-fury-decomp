@@ -2572,6 +2572,10 @@ dodge - no state 0x15A in that cut).
   0x08011C0C, lr 0x08011C3B; at 860/861 through 0x08011C70 from something else), so the wave's message never
   reaches the blast. With the rule disabled the row gets past the player's hurt but then our blast pushes the
   enemy 0.375 px the game does not - both point at the wave/blast interaction. Not changed by me.
+  *Fixed (Super Buu agent, 2026-10-04): the energy wave's message is sent to every object (`0x08011C0C`: all, the
+  results ORed - not first-acceptor `0x08011C70`); the blast's handler is called through it (lr 0x08011C3B is that
+  broadcast) and bursts, and the player behind it is still hit. `r069_101_14-2` and `r069_139_14-2` exact
+  (1,406 / 1,252), Rust + TS (the battle wave too), dumps regenerated.*
 
 **Claim (ship fix agent, 2026-10-04, by the coordinator): the camera-at-close rows** - `r038_001_18-1` f589,
 `r009_006_4-1` f458, `r002_004_4-1` f741, `r002_006_4-1` f10623, `r052_004_1-5` f11575, `r064_029_21-26` f12784,

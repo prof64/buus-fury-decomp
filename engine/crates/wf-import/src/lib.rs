@@ -350,10 +350,28 @@ pub fn running_event(ram: &GbaRam, runner: &StoryHost) -> Option<(u16, u16, [i32
                 let params = [0, 4, 8, 12].map(|o| ram.s32(pp + o));
                 return Some((ev, node, params));
             }
+            // (a state word that names no node - a `steps` node's: the node whose code holds a live interpreter's PC)
+            if let Some(node) = node_of_pc(ram, runner, ev) {
+                let params = [0, 4, 8, 12].map(|o| ram.s32(pp + o));
+                return Some((ev, node, params));
+            }
         }
         a += 4;
     }
     None
+}
+
+/// event `ev`'s node whose code holds the PC of an interpreter on the context stack (`natives_run`'s search)
+fn node_of_pc(ram: &GbaRam, runner: &StoryHost, ev: u16) -> Option<u16> {
+    let nodes: Vec<u16> = runner.step_code.keys().filter(|k| k.0 == ev).map(|k| k.1).collect();
+    nodes.into_iter().find(|&n| natives_run(ram, runner, (ev, n, [0; 4])).is_some())
+}
+
+/// a script running at a cut whose scene depth reads 0 (a `run_script` scene, real route Kami's Lookout s512): only
+/// when an interpreter's PC is inside one of its nodes
+fn running_event_live(ram: &GbaRam, runner: &StoryHost) -> Option<(u16, u16, [i32; 4])> {
+    let ev = running_event(ram, runner)?;
+    natives_run(ram, runner, ev).is_some().then_some(ev)
 }
 
 /// a field restored by `return_to_field` inside an event (its objects keep their state from before the scene): the
@@ -1143,7 +1161,8 @@ fn natives_run(ram: &GbaRam, runner: &StoryHost, ev: (u16, u16, [i32; 4])) -> Op
                 None if pc >> 24 == 2 => (0..=code.len().min(pc as usize)).find(|&o| ram.read(pc - o as u32, code.len()) == *code),
                 _ => None,
             };
-            if off.is_some() {
+            // (two interpreter slots can point into the node: the furthest is where it stands - Lookout s512)
+            if off.is_some() && off > pc_off {
                 pc_off = off;
             }
         }
@@ -1478,7 +1497,15 @@ pub fn import_emulator_state(data: &Arc<GameData>, ram: &GbaRam, runner: &mut St
     let info = inspect(ram);
     // an area entry inside a running event (a script's warp): the event's position from the scene objects
     // (no leader: a cutscene map the event loaded with the players offstage)
-    let in_event = (info.kind == CutKind::MidArea && info.depth > 0).then(|| running_event(ram, runner)).flatten();
+    let in_event = if info.kind != CutKind::MidArea {
+        None
+    } else if info.depth > 0 {
+        running_event(ram, runner)
+    } else {
+        // (depth 0: a script still running only when an interpreter stands in one of its nodes - Kami's Lookout's
+        // arrival s512 with a non-Goku leader, waiting in its fade_in_white)
+        running_event_live(ram, runner)
+    };
     match info.kind {
         CutKind::AreaEntry => {}
         CutKind::MidArea if in_event.is_some() => {}

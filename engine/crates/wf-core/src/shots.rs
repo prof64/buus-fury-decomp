@@ -2158,7 +2158,9 @@ fn wave_update(w: &mut World, i: usize) {
         set_kind(w, i, ShotKind::EnergyWave { len, mode: 1, life });
         return;
     }
-    if hit(w, i, r, atk(1), 1024, true) {
+    // (the wave's message goes to every object, 0x08011C0C: a ki blast in its way bursts and the player behind it is
+    // still hit - real route 14-2 f862)
+    if hit(w, i, r, atk(1), 1024, false) {
         fx::puff_rng(w, hx, hy);
         set_kind(w, i, ShotKind::EnergyWave { len, mode: 1, life });
         return;
@@ -2388,11 +2390,6 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
         // Buu's blast flies into Gotenks' beam head - both stop)
         ShotKind::Straight(o) if o.name == SName::KiBlast && o.fx_end == 16 && !o.fragile => {
             if o.dead >= 0 || msg.foot || msg.source == me || w.ents[i].removed || msg.atk.kind != 1 || msg.atk.sub == 0xd {
-                return false;
-            }
-            // (a blast still in the player's hand catches nothing: real route 14-2 f862, a Majin Soldier's wave
-            // spawned beside a player holding a Ki Blast hits the player - ship fix agent's trace)
-            if o.delay > 0 && w.shot_ref(i).t < o.delay {
                 return false;
             }
             if !overlaps(&msg.rect, &rect(w, i)) {
