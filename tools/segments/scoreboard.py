@@ -425,20 +425,25 @@ def mid_board(jobs):
             if r['segment'] not in tiles:
                 continue
             ts = sorted(tiles[r['segment']], key=lambda t: t[0])
-            ok = min(r['matched'], r['frames'], ts[0][0])   # the segment's own prefix (up to the first tile)
-            div = (ts[0][0] - ok)
-            unc = 0
-            first = None
+            # per frame: 2 verified (the segment's own exact prefix, or a tile's), 1 not covered (a refused tile),
+            # 0 diverged
+            nf = r['frames']
+            st = bytearray(nf)
+            st[:min(r['matched'], nf)] = b'\x02' * min(r['matched'], nf)
             spots = []
             for k, t in ts:
+                e = min(nf, k + t['frames'])
                 if t['first'].startswith('Some((0, "import'):
-                    unc += t['frames']
+                    for i in range(k, e):
+                        if st[i] == 0:
+                            st[i] = 1
                     spots.append((k, 'refused', t['first']))
                     continue
-                ok += min(t['matched'], t['frames'])
-                div += t['frames'] - min(t['matched'], t['frames'])
+                st[k:min(e, k + t['matched'])] = b'\x02' * (min(e, k + t['matched']) - k)
                 if t['matched'] < t['frames']:
                     spots.append((k + t['matched'], category(t['first']), t['first']))
+            ok, unc = st.count(2), st.count(1)
+            div = nf - ok - unc
             s = {'segment': r['segment'], 'stretch': d, 'chapter': cuts.get(d, {}).get('chapter', '?'),
                  'frames': r['frames'], 'own': r['matched'], 'own_first': r['first'], 'verified': ok, 'diverged': div,
                  'uncovered': unc, 'tiles': len(ts), 'exact_tiles': sum(t['matched'] >= t['frames'] for _, t in ts),
@@ -473,11 +478,11 @@ def mid_board(jobs):
     tiled = {s['segment']: s for s in segs}
     W = {}
     for d, c in cuts.items():
-        w = W.setdefault(c['chapter'], {'frames': 0, 'verified': 0, 'diverged': 0, 'uncovered': 0})
+        w = W.setdefault(c['chapter'], {'frames': 0, 'verified': 0, 'diverged': 0, 'uncovered': 0, 'cut': 0})
         w['frames'] += c['frames']
-        w['uncovered'] += c['frames'] - c['cut_frames']
         for r in res.get(d, []):
             t = tiled.get(r['segment'])
+            w['cut'] += r['frames']
             if t:
                 w['verified'] += t['verified']
                 w['diverged'] += t['diverged']
@@ -485,6 +490,10 @@ def mid_board(jobs):
             else:
                 w['verified'] += min(r['matched'], r['frames'])
                 w['diverged'] += r['frames'] - min(r['matched'], r['frames'])
+    for w in W.values():
+        # (frames in no segment: the run's start up to its first importable entry; a chapter's are counted where
+        # its segments start, as on the main board)
+        w['uncovered'] += max(0, w['frames'] - w['cut'])
     WT = {k: sum(w[k] for w in W.values()) for k in ('frames', 'verified', 'diverged', 'uncovered')}
     tot['whole_game'] = WT
     L += ['', '## The whole game', '',

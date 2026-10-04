@@ -1621,10 +1621,17 @@ two Python hash seeds, gives identical key logs (13,000 frames); the earlier run
   (the curator already there) + `face(239, 0)` (already facing). Tried: neither command waits when it has nothing
   to do - the walk half alone changes nothing, the face half breaks ~20 gates (a face onto the current facing does
   wait elsewhere). Not modelled; open.
-* Shop driving is open loop (`zmart` in pgroute): the same keys bought different rows across runs (inputs eaten
-  while the list redraws). The Lighthouse Keeper chain (legs `shopt` / `trade` written, s347 logic in the comment)
-  needs a closed-loop shop goal reading the list cursor - not done. 9-11's Z-Mart (0-95: Dinosaur Tail, Super
-  Elixir) did not open for UP held under its door (trigger (249, 73, 39, 15), activation 0x080071A7).
+* Shop driving, closed loop (hfil goal `zbuy`): the Z-Mart list's row is 0x02033B90 (the list object on the heap;
+  0x03003300 counts attempted moves, clamped ones too); a press can be dropped (lag frames, a purchase's redraw)
+  and the row byte / screen show a press only at the menu's next input read, a hold over ~20 frames auto-repeats.
+  So each step = the key held 12 frames, 30 frames, SELECT (a no-op) 12 frames to force the read, 30 frames, then
+  the check (the row; for A the held count GameData + 2 + item). Exact purchases every run.
+* Lighthouse Keeper (s347, Thieves Den 9-9, legs `shopt` -> `trade`): the Hercule City Z-Mart's Root Beer,
+  Turkey, Hercule-ade, Elixir -> four trades, four Hercule Exhibits (52, 60, 51, 56; flags 363 .. 366): the 9-9 cut
+  (2,561 frames, all four trades) exact; gates `pg_trade_000_03_01` (970), `pg_trade_009_09_09` (563, allocator).
+  The last two (Dinosaur Tail 9, Super Elixir 18) are sold only at 9-11's Z-Mart (0-95): its doorway is held by a
+  guard (s355, NPC at (264, 80) after flag 82) who steps aside only for a wearer of the Bandana (`is_equipped(126)`
+  - the real route put it on Goten); also 860 zenie short (10,390 left, 11,250 needed). Open: the Equip menu.
 * Instant Transmission picks (shared rule): a trigger answers the pick when its activation's vt+8 says "A pressed" -
   the 0x0802266F activation and the plain A-button one (0x0800770D, vt+8 0x080076F5: the same code). HFIL 18-10's
   centre switch is an A-button trigger: the real route's maze IT (`r040_021_18-10`) picked it, ours went idle. The
@@ -2341,3 +2348,8 @@ reached: `r036_002_1-5` (f2595 RNG), `r037_084_18-1` (f465 RNG), `r038_045_18-1`
 (f1856 RNG), `r009_006_4-1` (f458 camera). Done: `r017_022_13-47` (Ninja Stronghold, real route) - LungeStep's update
 faces the player each frame (0x08037A56 calls the face_actor routine 0x0801599C before the step; ours stepped on in
 the old facing): exact (428), gated `rdb6_022_13-47`; the app soak of stretch 017-018 now matches all 19,362 rows.
+
+**Claim (ship fix agent, 2026-10-04, by the coordinator): the Pyramid 14-2 cluster** - the real run's 14-2 rows
+with sprite 256 (position / facing / RNG: `r057_005/011/013/015/021/031/035/059_14-2`, `r069_003/011/013/021/027/
+033/041/047/049/053/055/057/059/073/077_14-2`), one enemy rule shared by ~24 short rows. Others please add a line
+here before touching them.

@@ -351,6 +351,13 @@ fn main() {
                     if std::env::var("SOAK_G").is_ok() { println!("  g app {:?}\n  g imp {:?}", w.g, v.g); }
                 }
                 println!("leader at row {k}: rec {:?} equip {:?} skills {:?} form {} eff {:?} story equipment {:?}", pl.rec, pl.equip, pl.skills, pl.form, pl.eff, w.story.equipment);
+                if let Some(f) = w.field.as_ref() {
+                    println!("  field: mode {:?} arrival {:?} busy {} item_get {} modal {:?} entered {} frame {}", f.mode, f.arrival.is_some(), f.busy, f.item_get.is_some(), w.modal, f.entered, w.frame);
+                    println!("    puppets {:?} next_id {} ents {:?}", w.scene.puppets.iter().map(|p| p.id).collect::<Vec<_>>(), w.next_id, w.ents.iter().map(|e| (e.id, e.kind())).collect::<Vec<_>>());
+                    for e in &w.ents {
+                        println!("    ent {} puppet {} suspended {} ai_wait {:?} depth {}", e.id, wf_core::scene::is_puppet(w, e.id), wf_core::vram::suspended(w, e.id), w.scene.ai_wait, w.scene.depth);
+                    }
+                }
             }
         }
         if show.is_some_and(|(a, b)| a <= k && k <= b) {

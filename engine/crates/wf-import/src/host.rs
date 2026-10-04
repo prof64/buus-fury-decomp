@@ -189,6 +189,13 @@ impl StoryHost {
                 w.story.g = self.rt.globals().g;
                 if self.outer.is_empty() {
                     wf_core::field::set_busy(w, false);
+                    // the actors a script outside any event commanded go back to their own updates when it ends
+                    // (no end_event releases them: real route 1-5 -> 0-51 -> 18-1, the arrival's inline script
+                    // play_anim'ed the Ghost and left it a puppet for good - its AI never ran, the game's draws its
+                    // Chance 120 frames later)
+                    if w.scene.depth == 0 && w.scene.ai_wait.is_empty() {
+                        wf_core::scene::release_puppets(w);
+                    }
                 }
             }
             Err(e) => {
