@@ -671,6 +671,7 @@ fn import_objects(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
                         n.anim.mode = wf_core::scene::AnimMode::Pose;
                     }
                 }
+                import_npc_step(w, i, ram, o, rows.get(&o).copied());
             }
         }
     }
@@ -796,6 +797,37 @@ fn import_enemy_beam(w: &mut World, ei: usize, ram: &GbaRam, o: u32, notes: &mut
     if let Some(r) = e.ai.stack.get_mut(lvl).and_then(|s| s.rt.get_mut(n)) {
         r.d[0] = id as i32;
         r.f = vt;
+    }
+}
+
+/// a map NPC's behaviour step from RAM (talk-NPC object: +0x1B0 the current step object): a wander (vt 0x0804D848:
+/// +8 frames left, +0x18 / +0x1C 24.8 velocity, +0x20 / +0x24 target px) -> the behaviour's wander step, created as
+/// the runner would, with that progress; the animation as the row shows it (the step's create sets one)
+fn import_npc_step(w: &mut World, i: usize, ram: &GbaRam, o: u32, row: Option<(i32, i32, i32, i32)>) {
+    let st = ram.r32(o + 0x1B0);
+    if !ram.valid(st) || ram.r32(st) != 0x0804_D848 {
+        return;
+    }
+    let Body::Npc(n) = &w.ents[i].body else { return };
+    let Some(idx) = n.behaviour.as_ref().and_then(|b| b.steps.iter().position(|s| matches!(s.func, 0x0800_A75B | 0x0800_A7A1 | 0x0800_A7DF | 0x0800_A811))) else { return };
+    let rng = w.rng.clone();
+    wf_core::fieldnpc::import_step(w, i, idx);
+    w.rng = rng;
+    let Body::Npc(n) = &mut w.ents[i].body else { return };
+    let facing = n.a.facing;
+    if let Some(b) = n.behaviour.as_mut() {
+        if let Some(wf_core::fieldnpc::StepRt::Wander(s)) = b.cur.as_mut() {
+            s.left = ram.s32(st + 8);
+            s.vx = ram.s32(st + 0x18);
+            s.vy = ram.s32(st + 0x1C);
+            s.tx = ram.s32(st + 0x20);
+            s.ty = ram.s32(st + 0x24);
+            s.dir = facing;
+        }
+        if let Some((_, raw, cel, tick)) = row {
+            (b.raw, b.frame, b.tick) = (raw, cel, tick);
+            b.anim = if raw == 1 { 0 } else { 1 };
+        }
     }
 }
 

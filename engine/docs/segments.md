@@ -1314,13 +1314,20 @@ page's own cycles built from its draw list; opt-in as before (`init.snd_phase`),
     / r069_168 Switch Character +67k / +83k). The scoreboard's 14-1 rows (r067_136, r069_168: one black frame
     short) and 18-1 (r044_015: one long) are this map term; the Switch Character extras are not involved (the
     leader term is 6k).
-  - `shipr_002`, sound state at the Switch Character close (Earth agent, `timing/cmp_irq.py` against a sndlog of
-    the close, savestate `x_ship002` from `mkshipstate.py`): same song (28, started at f16,808 in both), but the
-    core's sequencer is **4 rows ahead** (row 50 vs 46 of order 4 at the first interrupt mix) and the music voices'
-    gains are about **twice** the game's (0x11000F vs 0x80007): the game's music runs quieter and has lost 4 rows
-    by the close - the Switch Character screen (or its fade) lowers the music volume and holds the sequencer for a
-    while, which the core does not model. Next: sndlog over the screen's open / close to see when the rows stop
-    and the master volume changes.
+  - `shipr_002` sound state (Earth agent, solved): **not a pause or a volume change** - the game's music runs on
+    through the Switch Characters screen (`timing/rowtrack.py` over a sndlog of f18,100..18,470: one row per ~5.4
+    frames throughout; the "twice the gain" was the song's own envelope at another row). The core was 4 rows ahead
+    because it started each **area load's song** at the load's logic frame, while the game plays it at the load
+    iteration's end (after the map decompression): f16,808 vs the load at f16,790. Rules (`sndsim`):
+    a Song event in a frame whose field load count changed is kept pending; that frame has no main-loop sound
+    update (the load iteration runs past it); the song starts in the load's last lag frame
+    (`lag_frame_ex(last)`, the harness passes whether the next row is a logic frame) followed by the update that
+    ends the load (the game's n=480 at f16,809), or at the next logic frame when no lag frame comes. play_song
+    keeps the old song's tick countdown as the game does. Results: `shipr_002` (with `snd_phase`) exact to its end
+    (19,859 / 19,859, was 18,450); ship menu list **30 / 30**; db5 39 / 40, db7 41 / 41; Earth unchanged.
+    Note for the ship-fixes agent: with `WF_SND_DEBUG=1` x_ship002 diverges at f991 and without it is exact - a
+    debug branch changes state (the `menu redraw` log line in `menu::redraw` calls `redraw_time` / `view` and
+    `DEBUG_FRAMES` counts; one of them is not side-effect free).
   - `shipr_328` f33,890 (sprite 106 facing during s003's dialogue after its warp 8-70 -> 8-71): not the 4-25 rules
     - the segment fails the same with the parallel-block release, the player-control release and the talk-pass
     resume each switched off; the cause is elsewhere in 1a97d5c's or later commits' other files (session.rs,
@@ -2257,3 +2264,59 @@ chance. Trace: `tools/segments/rngcalls.py work/earth/segs/e_7_2_1.json work/seg
 *Soak tooling:* `--dump-at A..B` (leader record, enemies, `SOAK_AI=1` node runtimes), `--diff-seg FILE` or
 `--diff-seg @LIST` (ROW=FILE,..): the app's world vs a fresh import of that cut (enemy / walk grids, enemies, list
 order, tile allocator owners).
+
+**§11 update 10 (B): "playable start to finish in the app" - checklist.** Every row is the real route (the
+real-run key logs, `data/realrun` + the Earth agent's opening / Earth logs, the side-content agent's post-game legs)
+played by the app (`wf-app` story sim, headless, muted) from a real checkpoint and compared row by row with the game
+(area, leader position, HP, RNG, flags, songs). Masters: `work/db57/scratch/late_masters.py FIRST LAST` (a stretch's
+first cut to its end, extended through the following stretches that have no importable cut; each appended
+stretch's end checked against the manifest - all ok) and `pg_masters.py LEG[:CUT]` (a post-game leg from a cut; the
+cut's state is *after* its `at` row). Soak: `work/db57/scratch/soaks2.sh m_<name>`. "Harness" = the segment harness
+on the cut covering the stop: when it stops at the same spot the cause is a core rule, not the app.
+| chapter / stretch | rows soaked | first stop (row: area, what) | owner |
+|---|---|---|---|
+| Title -> New Game -> Other World -> Earth | 149,694 of 201,926 | 7-2: an NPC's idle re-enter draws one RNG value ours does not (harness `e_7_2_1` f1432/2007) | Earth agent |
+| Babidi's ship, from 7-2 (`ship_master`) | 239,958 | 8-14 pause-menu close timing | Earth agent (menu close model) |
+| ship from 8-15 / to 8-67 / Vegeta vs Buu | 95,000 / 138,275 / 19,591 | none | - |
+| 002 West City | 23,118 | none (exact to the stretch end) | - |
+| 003 Thieves Den | 699 of 92,783 | heal-item menu closes a frame early | Earth agent (menu close model) |
+| 004-006 world map, Pilaf's Castle | 20,251 | none | - |
+| 007 Pilaf won / 008 map | 11,163 / 9,118 | none | - |
+| 009 to Diablo Desert (4-20, 4-1) | 3,194 of 11,524 | 4-1 (depth 1) RNG; harness `r009_006_4-1` f458 camera | scoreboard's 4-1 camera item |
+| 010-011 Diablo Desert | 19,958 | none | - |
+| 012-014 Airship | 8,519 of 16,434 | 12-19 after a heal menu; harness `r012_014_12-19` f1518 RNG | Earth agent (menu) |
+| 015-016 Airship end -> Ninja Stronghold entry | 12,983 | none | - |
+| 017-018 Ninja Stronghold | 10,620 of 19,362 | 13-47 enemy position; harness `r017_022_13-47` f225 | B (next) |
+| 019-026 Kyodai Pyramid (5 masters) | 139 / 8,226 / 4,067 / 12,745 / 7,524 | none | - |
+| 027 Nataday / Broly, 028 after | 37,331 / 13,044 | none | - |
+| 029-033 post-ball: West City, Goku, s026 | 20,885 / 973 | none | - |
+| 034 dbx_end (no real cut; local master) | 46,404 | none | - |
+| 035 j00_yemma | - | no importable cut (6,143 frames) | - |
+| 036 HFIL entry (1-2, 1-5) | 3,295 (RNG from 2,999) | 1-5 RNG; harness `r036_002_1-5` f2595, same frame | Janemba chapter owner |
+| 037 Goku L90 grind | 38,365 of 44,268 | 18-1 RNG; harness `r037_084` f465 | Janemba chapter owner |
+| 038-039 Goku L120 grind | 37,140 of 49,301 | 18-1; harness `r038_045` f251 (an entity missing) | Janemba chapter owner |
+| 040-050 maze, statues, back, Vegeta, 18-13, arena | 10,391 / 9,724 / 10,203 / 44,297 / 3,052 / 9,064 | none | - |
+| 051 Super Buu start | 50 | none | - |
+| 052-056 Gotenks vs Super Buu, Ultimate Gohan | 33,430 of 52,357 | 6-9 RNG; harness `r052_006_6-9` f4688 | Super Buu agent |
+| 057-060 Gohan L141 grind -> wasteland | 2,324 of 45,363 | 14-2; harness `r057_005` f748 | Super Buu agent |
+| 061 Goku L141 grind | 9,742 of 47,948 | 20-5; harness `r061_004` f5251 (a sound first) | Super Buu agent |
+| 062 inside Buu | 2,237 of 25,369 | 20-7 position; harness `r062_001` f2176 | Super Buu agent |
+| 063 21-2 | 41 | none | - |
+| 064-066 Kid Buu saga to 14-1 | 35,874 (RNG from 28,380) | 4-1 RNG only; harness `r064_029` f12784 camera | Kid Buu agent |
+| 067-068 Goku L158 grind | 40,724 of 78,565 | 14-2 after a menu; harness `r067_071` f693 camera | Kid Buu agent |
+| 069-071 Vegeta L150 grind, Kid Buu | 1,640 of 120,553 | 14-2 position; harness `r069_003` f413 | Kid Buu agent |
+| 072 the ending (4-20 -> credits) | 24,287 | none | - |
+| post-game: hidden dungeon / XJ-6 / 8-2 gate / 8-7 gate / 2-9..2-34 | 8,942 / 24,518 / 380 / 3,561 / 2,261 | none | - |
+| post-game: Heaven (6-2 -> 22-1) | 554 of 1,287 | 22-1 RNG (its entry cut is not importable) | side-content agent |
+| post-game: 11-1 / 13-1 gates | - | only world-map-landing cuts (not importable) | side-content agent |
+Every stop above except the three menu ones sits where the harness also stops on the same cut, so they are core
+rules, not app glue. **Save -> Continue** (`soak --save-on-point N --continue-on-save`: the app saves through the
+real Save screen at the N-th save point the route steps on, a fresh title session continues that slot, the
+continued story is compared with the slot's): **story identical** at 3-10 (title -> New Game -> Other World ->
+Earth -> save), 8-66 (ship, update 8), 18-11 and 18-1 (HFIL), 21-14 (inside Buu), 8-1 (post-game). (The comparison
+uses the slot's story: the live one runs on through the screen's closing frames - a benched fighter's Super Saiyan
+cooldown keeps counting, which looked like a Gohan record difference at 3-10.)
+*Fixed (core):* **a stale "event came from the queue" flag** (`Field.queued_event`): a breakable's instant
+callback at 18-10 set it and nothing cleared it, so the hit event at 18-7 three areas later ended with the queued
+exit frame's extra player tick (knockback one frame short). A load outside any event now drops it; regression
+assert in `carried_state::a_load_resets_the_player_objects_accumulators`. HFIL 044 now matches all 10,203 rows.

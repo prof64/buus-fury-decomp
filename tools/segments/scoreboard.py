@@ -67,15 +67,12 @@ NOTES = {
                     'after it) and ~480 of the ship route\'s up to its first entry; first divergence at its frame 6,658: actor #42 '
                     '(sprite 222) raw 1 cel 0 vs the game\'s cel 1, tick 1776 vs 1777 - an NPC idle animation one tick '
                     'behind after ~1,800 frames',
-    'r033_002_6-1': 'Goku vs Majin Buu, 0-21 (was an RNG row at 9,545: the hit\'s screen shake now ticks through the '
-                    'pause fade-out). Now at 9,904: one punch\'s draws come in a different order - game: crit chance, '
-                    'rand(26), two chances (0x080192AB: the hit tree), the punch sfx / anim rands (0x080116DD), then '
-                    'the knockback rands (0x08018B4B: KnockbackSlide enter); ours: one hit-tree chance and the knockback '
-                    'before the punch rands - same count, different values (knock (-152, 44) vs (-144, 7))',
-    'r002_006_4-1': 'West City -> the Bandana hunt (was an animation row at 1,763: a patrol airship\'s s509 now starts '
-                    'a frame later, field.rs trigger_self). Now at 4,178 (0-55): the bandits\' on-defeat bytecode '
-                    '0x08073EFC (run_script(506) -> prop_show, then chance(25)) resumes 2 frames after prop_show in the '
-                    'game, 1 in ours; prop_show from every unit script is not it (breaks the take-off at 1,469)',
+    'r033_002_6-1': 'Goku vs Majin Buu, 0-21 (fixed: the hit\'s screen shake ticks through the pause fade-out, 9,545; '
+                    'a pause menu\'s frames advance the clock 0x03000F94, so Buu\'s on-hit IfTimeInState(90) is true '
+                    'after a heal menu, 9,904 - not a battle rule). Now at 24,002 (an animation cel)',
+    'r002_006_4-1': 'West City -> the Bandana hunt (fixed: a patrol airship\'s s509 starts a frame later, 1,763; an '
+                    'on-defeat unit callback\'s prop show in its first run finishes a frame later, 4,178). Now at '
+                    '10,623 (camera)',
     'r038_002_18-2': 'a heal menu closed in 18-2: predicted 21 black frames 208 cycles before the 22nd',
     'r047_002_18-13': 'heal menu / Switch Character in 18-13: one frame short',
 }
@@ -393,20 +390,35 @@ def do_mid_cut(n, jobs, only):
     (MID / 'tile.json').write_text(json.dumps({'n': n}))
 
 
+def replay_tile(p, limit=600):
+    """one tile on its own (a tile whose replay never ends - an engine loop - is reported, not waited on)"""
+    env = dict(os.environ, SEGMENT_DIR=str(p.parent), SEGMENT=p.stem, SEGMENT_STRICT='0')
+    n = max(1, sum(1 for ln in p.open() if ln.startswith('{"keys"')))
+    try:
+        r = subprocess.run([EXE, '--nocapture'], capture_output=True, text=True, cwd=ROOT / 'engine', env=env,
+                           timeout=limit)
+    except subprocess.TimeoutExpired:
+        return {'segment': p.stem, 'frames': n, 'matched': 0, 'first': f'Some((0, "import: replay hung (> {limit} s)"))'}
+    for ln in r.stderr.splitlines():
+        m = LINE.match(ln)
+        if m:
+            return {'segment': m.group(1), 'frames': int(m.group(2)), 'matched': int(m.group(4)), 'first': m.group(6)}
+    tail = (r.stderr.strip().splitlines() or ['no output'])[-1][:100].replace('"', "'")
+    return {'segment': p.stem, 'frames': n, 'matched': 0, 'first': f'Some((0, "import: replay failed: {tail}"))'}
+
+
 def mid_board(jobs):
     build()
     res = json.loads((REAL / 'board_rows.json').read_text())
     cuts = json.loads((REAL / 'cuts.json').read_text())
     n = json.loads((MID / 'tile.json').read_text())['n']
-    dirs = [d for d in sorted(MID.iterdir()) if d.is_dir() and any(d.glob('*.json'))]
+    paths = sorted(p for d in MID.iterdir() if d.is_dir() for p in d.glob('*.json'))
     tiles = {}
     with ThreadPoolExecutor(jobs) as ex:
-        for name, rows, rc in ex.map(replay_one, dirs):
-            if not rows and rc != 0:
-                raise SystemExit(f'{name}: the replay did not run: rc {rc}')
-            for r in rows:
-                m = TILE.match(r['segment'])
-                tiles.setdefault(m.group(1), []).append((int(m.group(2)), r))
+        for r in ex.map(replay_tile, paths):
+            m = TILE.match(r['segment'])
+            tiles.setdefault(m.group(1), []).append((int(m.group(2)), r))
+            print(r['segment'], r['matched'], '/', r['frames'], r['first'][:80], flush=True)
     segs, chapters = [], {}
     for d, rows in sorted(res.items()):
         for r in rows:
@@ -456,6 +468,33 @@ def mid_board(jobs):
         L.append(f"| {k} | {c['segments']} | {c['frames']:,} | {c['own']:,} ({pc(c['own'], c['frames'])}%) | "
                  f"{c['verified']:,} ({pc(c['verified'], c['frames'])}%) | {c['diverged']:,} | {c['uncovered']:,} | "
                  f"{c['tiles']} | {c['exact_tiles']} | {c['refused']} |")
+    # the whole game: every run frame - verified exact (an exact segment, the matched prefix of a segment not tiled,
+    # or a tile's), diverged, or not covered (before the run's first importable entry, or in a refused tile)
+    tiled = {s['segment']: s for s in segs}
+    W = {}
+    for d, c in cuts.items():
+        w = W.setdefault(c['chapter'], {'frames': 0, 'verified': 0, 'diverged': 0, 'uncovered': 0})
+        w['frames'] += c['frames']
+        w['uncovered'] += c['frames'] - c['cut_frames']
+        for r in res.get(d, []):
+            t = tiled.get(r['segment'])
+            if t:
+                w['verified'] += t['verified']
+                w['diverged'] += t['diverged']
+                w['uncovered'] += t['uncovered']
+            else:
+                w['verified'] += min(r['matched'], r['frames'])
+                w['diverged'] += r['frames'] - min(r['matched'], r['frames'])
+    WT = {k: sum(w[k] for w in W.values()) for k in ('frames', 'verified', 'diverged', 'uncovered')}
+    tot['whole_game'] = WT
+    L += ['', '## The whole game', '',
+          'Every frame of the real run: verified exact (an exact segment, a segment\'s matched prefix, or a tile), diverged',
+          '(after a first divergence, before the next cut), not covered (no importable cut before it: the run\'s start, a',
+          'refused tile).', '', '| chapter | run frames | verified exact | diverged | not covered |', '|---|---|---|---|---|']
+    for k in [c for c in ('opening', 'earth', 'ship', 'fat', 'janemba', 'superbuu') if c in W] + ['**all**']:
+        w = WT if k == '**all**' else W[k]
+        L.append(f"| {k} | {w['frames']:,} | {w['verified']:,} ({pc(w['verified'], w['frames'])}%) | {w['diverged']:,} | "
+                 f"{w['uncovered']:,} ({pc(w['uncovered'], w['frames'])}%) |")
     # refusals: what the importer would gain (frames not covered), by its reason
     why = {}
     for s in segs:

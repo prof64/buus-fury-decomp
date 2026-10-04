@@ -214,6 +214,16 @@ fn players_feet(w: &World) -> Vec<[i32; 4]> {
         .collect()
 }
 
+/// wf-import (any-frame import): put map NPC `i` on behaviour step `idx`, created as its runner would (the importer
+/// then sets the step's progress and the animation from RAM)
+pub fn import_step(w: &mut World, i: usize, idx: usize) {
+    let Some(st) = npc_ref(w, i).behaviour.as_ref().and_then(|b| b.steps.get(idx).cloned()) else { return };
+    let s = create(w, i, &st);
+    let b = beh(w, i);
+    b.idx = idx as i32;
+    b.cur = Some(s);
+}
+
 fn create(w: &mut World, i: usize, st: &Step) -> StepRt {
     let wd = |k: usize| st.words.get(k).copied().unwrap_or(0);
     match st.func {
