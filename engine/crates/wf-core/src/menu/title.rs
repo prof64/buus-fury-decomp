@@ -507,8 +507,9 @@ pub const BOOT_LOGIC: i64 = 696;
 /// the logos' mode starts song 45 in its first frame after the reset's legal screen (song player 0 from video frame
 /// 181 on; the title's enter then finds it playing)
 pub const BOOT_SONG_AT: u16 = 181;
-/// the same in logic frames (no lag: the legal screen's 180 iterations)
-pub const BOOT_SONG_AT_LOGIC: u16 = 180;
+/// the same in logic frames (no lag: requested in the logos' first iteration, the counter's 180th - whole-run sound
+/// requests: PlaySong(45) on the first of the mode switch's rows with counter 180)
+pub const BOOT_SONG_AT_LOGIC: u16 = 179;
 
 /// the title's song (`0x080053CC`)
 pub const TITLE_SONG: i32 = 45;
@@ -555,6 +556,8 @@ pub fn title_world(data: &Arc<crate::content::GameData>, w: &World) -> World {
     nw.events.retain(|e| !matches!(e, crate::world::Event::Field(crate::field::FieldEvent::Run { .. })));
     nw.events.insert(0, crate::world::Event::SongStop);
     open_title(&mut nw);
+    // (the title song was requested by return_to_title's own frame: playing already)
+    nw.events.retain(|e| !matches!(e, crate::world::Event::Song { .. } | crate::world::Event::SongStop));
     crate::scene::note_events(&mut nw);
     nw
 }

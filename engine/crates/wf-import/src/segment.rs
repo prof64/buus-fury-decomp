@@ -216,16 +216,6 @@ pub fn compare(w: &World, fr: &Value, es: &[String], map: &mut BTreeMap<usize, E
             if let Some(g) = game {
                 rep.cel.checks += 1;
                 let ours = wf_core::view::actor_cel(w, i).map(|c| (c.0, c.1));
-                if std::env::var_os("SEGMENT_CELALT").is_some() {
-                    if let Body::Enemy(n) = &w.ents[i].body {
-                        let alt = n.a.sprite.and_then(|s| w.data.sprite(s)).and_then(|sp| n.a.anim.and_then(|k| sp.anims.get(k as usize))).and_then(|a| {
-                            let looped = n.a.anim_loop.unwrap_or(a.looped);
-                            a.step_index_at(n.a.facing, n.a.anim_t, looped).map(|k| (a.steps(n.a.facing)[k].frame, a.steps(n.a.facing)[k].flip))
-                        });
-                        let araw = n.a.anim.and_then(|k| n.a.sprite.and_then(|s| w.data.sprite(s)).and_then(|sp| sp.anims.get(k as usize))).map(|a| a.raw);
-                        eprintln!("    celalt ea {} at {} rawmatch {} game_raw {} ea_raw {} a_raw {:?}", ours == Some(g), alt == Some(g), araw == Some(n.ea.pos.raw), r.raw(), n.ea.pos.raw, araw);
-                    }
-                }
                 if ours != Some(g) && cel_row != Some(k) {
                     cel_row = Some(k);
                     rep.cel.bad_rows += 1;
@@ -775,6 +765,9 @@ pub fn replay_with(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: 
             game_vram = fr["vram"].clone();
         }
         hook(Frame::After(k, &sess.world));
+        // (the recording's last row is taken as an iteration's end: a recording that stops inside a long iteration -
+        // the whole-run 2-row cuts 633,276 / 568,177, a text box / a load still being made - reads a difference there
+        // that a longer recording from the same cut does not have)
         let complete = frames.get(k + 1).is_none_or(|n| i(&n["lf"]) != lf);
         // SEGMENT_LF=1: where `World.frame` leaves the game's logic counter (0x03000F94)
         if logic && std::env::var("SEGMENT_LF").is_ok() {

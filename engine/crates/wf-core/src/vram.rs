@@ -1028,6 +1028,10 @@ pub fn hud_shown(w: &mut World, on: bool) {
 /// their halo's and shadow's shared graphics back (their tiles stay); the message goes through the list from its
 /// end, like the update (the leader first)
 pub fn world_hide(w: &mut World) {
+    // the leader in an aura form answers 0xA by stopping its loop (sound 54), and 0xB by starting it again
+    // (whole-run sound requests: Other World 1-20 s103 save_field + load_scene, Goku SS; the fat arc's pause menus
+    // with Gotenks / SS forms: stop 54 as the menu opens, play 54 as it closes)
+    crate::player::aura_message(w, true);
     if w.field.as_ref().is_none_or(|f| f.vram.is_none()) {
         return;
     }
@@ -1066,6 +1070,7 @@ pub fn world_hide(w: &mut World) {
 }
 /// the object world is back (message 0xB, `0x0800F478`): its allocator, then halo, shadow again
 pub fn world_show(w: &mut World) {
+    crate::player::aura_message(w, false);
     if w.field.as_ref().is_none_or(|f| f.vram.is_none()) {
         return;
     }

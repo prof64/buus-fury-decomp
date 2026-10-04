@@ -66,6 +66,11 @@ fn segments_match_the_game() {
     // SEGMENT_STRICT=all: every segment must match to its end
     let all_strict = std::env::var("SEGMENT_STRICT").is_ok_and(|v| v == "all");
     let mut failed = vec![];
+    let cel_locked: Vec<String> = std::fs::read_to_string(repo().join("data/segments/cel_exact.json"))
+        .ok()
+        .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
+        .and_then(|v| v["segments"].as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect()))
+        .unwrap_or_default();
     for p in &paths {
         let doc = wf_import::segment::load(p).unwrap();
         let name = p.file_stem().unwrap().to_string_lossy().to_string();
@@ -82,8 +87,9 @@ fn segments_match_the_game() {
         let world_ok = doc["world_exact"].as_bool() != Some(true) || rep.world.as_ref().is_some_and(|t| t.bad_rows == 0 && t.checks > 0);
         // "area_exact": the area's own lists too (wf_import::area: triggers + resume nodes, walk-grid changes)
         let area_ok = doc["area_exact"].as_bool() != Some(true) || rep.area.as_ref().is_some_and(|t| t.bad_rows == 0 && t.checks > 0);
-        // "cel_exact": every actor shows the game's cel (the picture's sprite frame: wf_core::view::actor_cel)
-        let cel_ok = doc["cel_exact"].as_bool() != Some(true) || rep.cel.bad_rows == 0;
+        // data/segments/cel_exact.json: every actor shows the game's cel (the picture's sprite frame:
+        // wf_core::view::actor_cel against the recorded animation / cel / facing)
+        let cel_ok = !cel_locked.contains(&name) || rep.cel.bad_rows == 0;
         let ok = (rep.compared >= need || (gate.is_none() && !all_strict)) && recs_ok && world_ok && area_ok && cel_ok;
         eprintln!(
             "segment {name}: {} video frames ({} logic), matched {} / {} | first divergence {:?} | import held {} draws {} | {} actor checks | {:.2}s{}",

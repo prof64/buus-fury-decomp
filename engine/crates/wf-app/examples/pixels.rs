@@ -268,6 +268,12 @@ fn main() {
         json_out.push(serde_json::json!({"segment": name, "frames": counted.len(), "exact": exact, "results": counted.iter().map(|r| serde_json::json!([r.0, r.1, r.2])).collect::<Vec<_>>()}));
     }
     println!("total: {tot_exact} / {tot_frames} sampled frames pixel-exact");
+    let mut errs = renderer.errors.clone();
+    errs.sort();
+    errs.dedup();
+    for e in errs.iter().take(20) {
+        println!("  renderer: {e}");
+    }
     for (c, (frames, firsts)) in &all {
         println!("  {c}: {frames} frames{}", if *firsts > 0 { format!(", first of {firsts} segments") } else { String::new() });
     }

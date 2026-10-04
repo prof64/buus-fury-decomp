@@ -764,6 +764,13 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
     for _ in 0..flames {
         w.events.push(Event::SfxStopMatch { id: 63 });
     }
+    // a sounding beam still out as the area goes: its destructor (0x08020768) stops 32 and plays 33 (whole-run sound
+    // requests, Babidi's ship 7-6 -> 7-7: s313's second beam ends with the load)
+    let beams = w.ents.iter().filter(|e| !e.removed && matches!(&e.body, Body::Shot(s) if matches!(&s.kind, crate::shots::ShotKind::Kame(k) if k.sounds))).count();
+    for _ in 0..beams {
+        w.sfx_stop(32);
+        w.sfx(33, 64);
+    }
     // every object goes; the players are re-created below (same entity ids)
     let players = w.players.clone();
     // a re-created player is a new object: not under the script's control until a command takes it again (6-1's
@@ -931,7 +938,19 @@ pub fn load_area_with(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<
     if had_area {
         w.events.push(Event::Field(FieldEvent::AreaLeave { area: from }));
         if let Some(sc) = fd.area(from.world, from.area).and_then(|a| a.on_leave.clone()) {
-            w.events.push(Event::Field(FieldEvent::Run { run: Callback::Script(sc), cause: Cause::AreaLeave, slot: 0 }));
+            // the three on-leave scripts are flag scripts the load runs at once, also inside an event's warp (whole run,
+            // Fukurou Forest 13-1 -> 0-50 in s518's event: flag 187 cleared in the load's iteration; ours had queued
+            // the script until the event ended)
+            let cur = leader_char(w);
+            let done = fd.cond_code.get(&sc).is_some_and(|code| {
+                let mut st = std::mem::take(&mut w.story);
+                let ok = story::run_flag_script(code, &mut st, cur).is_some();
+                w.story = st;
+                ok
+            });
+            if !done {
+                w.events.push(Event::Field(FieldEvent::Run { run: Callback::Script(sc), cause: Cause::AreaLeave, slot: 0 }));
+            }
         }
     }
     if let Some(sc) = &a.on_enter {
@@ -2457,13 +2476,6 @@ pub fn restore_world(w: &mut World, s: SavedWorld) {
     for p in s.puppets {
         if w.find(p.id).is_some() && !crate::scene::is_puppet(w, p.id) {
             w.scene.puppets.push(p);
-        }
-    }
-    // the player is back: its form controller starts the aura loop again (as `scene::bring_back`; Other World 0-22's
-    // scene -> 1-20: play 54 in the return's iteration)
-    if let Some(i) = w.player_idx(0) {
-        if crate::player::aura_form(w, i) {
-            w.sfx(54, 64);
         }
     }
     for (k, c) in s.cameras.into_iter().enumerate().take(w.cameras.len()) {

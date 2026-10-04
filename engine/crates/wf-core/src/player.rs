@@ -3228,6 +3228,19 @@ fn upd_transform(w: &mut World, i: usize) {
 pub fn aura_form(w: &World, i: usize) -> bool {
     [0x3001b68, 0x3001b6c, 0x3001b78, 0x3001b7c, 0x3001b80, 0x3001b84, 0x3001b8c].contains(&pr(w, i).form_ref(w).controller)
 }
+/// the object world's hide (0xA) / show (0xB) message to the leader: an aura form's loop (sound 54) stops / starts
+/// (`vram::world_hide` / `world_show`: menus, a saved field's scene)
+pub fn aura_message(w: &mut World, hide: bool) {
+    let Some(i) = w.player_idx(0) else { return };
+    if !aura_form(w, i) {
+        return;
+    }
+    if hide {
+        w.sfx_stop(54);
+    } else {
+        w.sfx(54, 64);
+    }
+}
 pub fn form_enter(w: &mut World, i: usize) {
     if aura_form(w, i) {
         sfx(w, 54, 64);

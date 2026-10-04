@@ -288,6 +288,22 @@ pub fn eval_condition(code: &[u8], s: &Story, current: i32) -> Option<bool> {
 
 /// the same bytecode's value (stack[0] at its end: an area song selector's `return 29`)
 pub fn eval_value(code: &[u8], s: &Story, current: i32) -> Option<i32> {
+    eval_inner(code, s, current, &mut Vec::new())
+}
+
+/// run a flag script (an area's on-leave: `clear_flag(187)`, `if get_flag(383) set_flag(384)` ...) on the story state;
+/// None (nothing applied) when it uses anything else
+pub fn run_flag_script(code: &[u8], s: &mut Story, current: i32) -> Option<()> {
+    let mut writes = Vec::new();
+    eval_inner(code, s, current, &mut writes)?;
+    for (f, on) in writes {
+        s.set_flag(f, on);
+    }
+    Some(())
+}
+
+fn eval_inner(code: &[u8], s: &Story, current: i32, writes: &mut Vec<(i32, bool)>) -> Option<i32> {
+    let flag = |writes: &Vec<(i32, bool)>, f: i32| writes.iter().rev().find(|w| w.0 == f).map(|w| w.1).unwrap_or_else(|| s.flag(f));
     let mut st: Vec<i32> = Vec::with_capacity(16);
     let mut pc = 0usize;
     let mut steps = 0;
@@ -317,11 +333,16 @@ pub fn eval_value(code: &[u8], s: &Story, current: i32) -> Option<i32> {
                 match n {
                     0x1B => {
                         let f = st.pop()?;
-                        st.push(s.flag(f) as i32)
+                        st.push(flag(writes, f) as i32)
                     }
                     0x1C => {
                         let f = st.pop()?;
-                        st.push(!s.flag(f) as i32)
+                        st.push(!flag(writes, f) as i32)
+                    }
+                    // set_flag / clear_flag (natives 0x1D / 0x1E): recorded, applied by `run_flag_script`
+                    0x1D | 0x1E => {
+                        let f = st.pop()?;
+                        writes.push((f, n == 0x1D));
                     }
                     0x15 => st.push(current),
                     0x7F => {

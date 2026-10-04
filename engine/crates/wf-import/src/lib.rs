@@ -1088,6 +1088,12 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
         let r = ram.r32(o + 0x238 + 8 + 8 * lvl as u32);
         import_ai_rt(w, ei, lvl, ram, r, notes);
     }
+    // off the enemy grid (obj+0x291, `0x0800F924`: a SpawnPuff / DriftContact / bat enter set it; it never marks
+    // again - whole-run cut 1,121,918, HFIL's wandering souls walk through a wall row)
+    if ram.r8(o + 0x291) != 0 && !w.en_ref(ei).detached {
+        wf_core::enemy::unmark_self(w, ei);
+        w.en(ei).detached = true;
+    }
     import_enemy_beam(w, ei, ram, o, notes);
     import_super_ball(w, ei, ram, o, notes);
     import_bombs(w, ei, ram, o);
@@ -1132,6 +1138,7 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
     {
         let tick = w.en_ref(ei).ea.pos.tick;
         let raw_now = w.en_ref(ei).ea.pos.raw;
+        let field = w.field.is_some();
         let e = w.en_ref(ei);
         let nf = e.a.anim_raw(&d).and_then(|raw| e.a.sprite.and_then(|s| d.sprite(s)).and_then(|s| s.anim_raw(raw))).map(|a| a.steps(e.a.facing).len() as i32);
         for st in w.en(ei).ai.stack.iter_mut() {
@@ -1150,6 +1157,12 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
                 if st.tree.nodes.get(n).is_some_and(|x| x.k == wf_core::ai::K::SoldierThrow) {
                     rt.f = tick;
                     rt.d[2] = raw_now;
+                }
+                // a Janemba Hand's HandAmbush in progress (runtime vt 0x0804C174: +4 entered): placed and striking, its
+                // window counted on the strike animation's tick (field: ours counts updates, the first one places;
+                // whole-run cut 1,121,864, HFIL 18-10: tick 36 - a fresh node jumped the hand to the leader again)
+                if field && st.tree.nodes.get(n).is_some_and(|x| x.k == wf_core::ai::K::HandAmbush) && raw_now >= 0 && tick > 0 {
+                    rt.f = tick + 1;
                 }
             }
         }
@@ -1512,7 +1525,11 @@ fn build_mid(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner: &mut St
                 w.scene.screen.black = 16;
                 w.scene.screen.dim = 256;
             }
-            runner.continue_inline(&mut w, &id, drop);
+            // (a breakable's on-break callback blocking does not hold the field, as `Cause::Break` in play)
+            let on_break = w.field.as_ref().and_then(|f| w.data.field.as_ref()?.area(f.area.world, f.area.area)).is_some_and(|a| {
+                a.objects.iter().any(|o| matches!(&o.kind, wf_core::fieldcontent::ObjKind::Breakable { on_break: Some(wf_core::fieldcontent::Callback::Script(s)), .. } if *s == id))
+            });
+            runner.continue_inline_held(&mut w, &id, drop, !on_break);
             import_cam_pan(&mut w, ram);
             notes.push(format!("mid-area: inline script {id} at its action #{drop} {:#04x}", ran[drop].0));
         }

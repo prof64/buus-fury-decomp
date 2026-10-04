@@ -4280,3 +4280,8 @@ iteration in both. Nothing to change.
   game's list still the old area's until its load rebuilds it later in that iteration; the harness skips the trigger
   check in a frame whose recorded area changed.
 * **NPC talk state:** waiting for the soak agent's area.py to carry it (object +0x1BC, see above).
+
+**Claim (ship fix agent, 2026-10-04, by the coordinator): the non-menu whole-run cut points still off** - 1,121,864 /
+1,121,918 / 1,121,948 (044 sub-pixel), 848,744 (017 sub-pixel), 568,177 (extra NPC), 633,276 (text-box timing; importer
+agent: yours were flag 187 and the 185,000 panic - I take this one), and checking 631,386 / 645,894 (loads past the
+chain's divergence).

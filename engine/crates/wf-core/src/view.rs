@@ -32,7 +32,12 @@ fn draw_key(w: &World, i: usize) -> (i32, i32, u32) {
         },
         Body::Injector(_) | Body::Breakable(_) => (9, 0),
         Body::Pickup(p) => (0, p.bx[3]),
-        Body::MapSprite(m) => (0, m.y),
+        // a level sign's label is keyed to its prop (`0x0800C300`: the prop object's layer, its depth + 1 - in front
+        // of the gate it names; Earth 2-90 f60)
+        Body::MapSprite(m) => match m.label.filter(|l| l.1 >= 0).and_then(|l| crate::fieldview::prop_keys(w).into_iter().find(|p| p.0 == l.1 as usize)) {
+            Some((_, l, d)) => (l, d + 1),
+            None => (0, m.y),
+        },
         Body::Npc(n) => (0, n.a.py()),
         Body::Mod(m) => (1, m.y >> 8),
     };

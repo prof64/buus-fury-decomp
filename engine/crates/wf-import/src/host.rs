@@ -171,6 +171,11 @@ impl StoryHost {
     /// Import: an inline script (an area / map-event script, no event graph) stopped in its code at a cut: it runs
     /// again from its start with its first `drop` actions dropped (the game ran them), the rest as usual
     pub fn continue_inline(&mut self, w: &mut World, id: &str, drop: usize) {
+        self.continue_inline_held(w, id, drop, true)
+    }
+    /// `continue_inline`; `hold` = false: the script is a callback that does not hold the field when it blocks (a
+    /// breakable's on-break, `Cause::Break` - its objects update on: whole-run cut 1,121,864, the HFIL statue's puff)
+    pub fn continue_inline_held(&mut self, w: &mut World, id: &str, drop: usize, hold: bool) {
         let mut g = self.rt.globals();
         g.g = w.story.g;
         self.rt.set_globals(g);
@@ -188,7 +193,7 @@ impl StoryHost {
         self.finish(w, st);
         // (a map trigger's inline script that blocks holds the field like an event, `finish` for `Cause::Trigger`:
         // the landing script's player stands through its pan, wait and jump)
-        if self.running && self.outer.is_empty() {
+        if hold && self.running && self.outer.is_empty() {
             wf_core::field::hold_nested(w);
         }
     }

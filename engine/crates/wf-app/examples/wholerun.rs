@@ -106,9 +106,14 @@ fn main() {
     let mut raw = rd.lines();
     // (no lag: row 0 is not an iteration - the counter is 0 there)
     let mut prev_lf = if no_lag { 0 } else { -1i64 };
-    // (skip to the import's row without parsing; the row before it gives the logic counter)
+    // (skip to the import's row without parsing; the row before it gives the logic counter, the last row with
+    // `flags` the game's story flags at the start)
+    let mut flags0: Option<String> = None;
     for j in 0..from_row {
         let l = raw.next().expect("rows").expect("line");
+        if l.contains("\"flags\"") {
+            flags0 = serde_json::from_str::<serde_json::Value>(&l).expect("row")["flags"].as_str().map(String::from);
+        }
         if j + 1 == from_row {
             prev_lf = serde_json::from_str::<serde_json::Value>(&l).expect("row")["lf"].as_i64().unwrap_or(-1);
         }
@@ -116,7 +121,7 @@ fn main() {
     let mut lines = raw.map(|l| serde_json::from_str::<serde_json::Value>(&l.expect("line")).expect("row")).peekable();
     let mut first_exact: Option<(usize, String)> = None;
     // lasting divergences per field: (count of consecutive bad rows, first row of the run, reported)
-    let mut game_flags: Vec<u8> = Vec::new();
+    let mut game_flags: Vec<u8> = flags0.map(|h| (0..h.len() / 2).filter_map(|j| u8::from_str_radix(&h[2 * j..2 * j + 2], 16).ok()).collect()).unwrap_or_default();
     let mut lasting: Vec<(&str, usize, usize, Option<(usize, String)>)> = ["area", "pos", "rng", "depth", "flags"].iter().map(|n| (*n, 0, 0, None)).collect();
     let (mut stepped, mut own_lag, mut replayed_lag, mut lag_bad) = (0usize, 0usize, 0usize, 0usize);
     let mut errors = 0usize;
