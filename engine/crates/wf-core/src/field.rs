@@ -1875,6 +1875,13 @@ pub fn post_step(w: &mut World) {
         for d in f.pending_drops.iter_mut() {
             d.0 = d.0.saturating_add(1);
         }
+        if std::env::var("B_BREAKHOLD").is_ok() {
+            for d in f.deferred.iter_mut() {
+                if let crate::fieldobj::Deferred::Break { at, .. } = d {
+                    *at = at.saturating_add(1);
+                }
+            }
+        }
     }
     // an inline hook's event ended this frame: the update it interrupted completes now
     // the next queued event of the held frame started at once (story playthrough: s003's level-up ends, Pikkon's
@@ -2370,6 +2377,13 @@ fn defeats(w: &mut World) {
 fn run_due_drops(w: &mut World) {
     // the frame number this update will have (the entities' update advances it)
     let frame = w.frame + 1;
+    if std::env::var("B_DROPS").is_ok() {
+        if let Some(f) = w.field.as_ref() {
+            if !f.pending_drops.is_empty() {
+                eprintln!("B_DROPS wf {} drops {:?} held_event {} held {} busy {} depth {}", w.frame, f.pending_drops.iter().map(|d| (d.0, d.1, d.2)).collect::<Vec<_>>(), f.held_event, f.held, f.busy, w.scene.depth);
+            }
+        }
+    }
     let due: Vec<(u32, EntityId, i32, i32, i32, i32, i32)> = w
         .field
         .as_ref()

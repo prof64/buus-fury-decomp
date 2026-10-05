@@ -414,6 +414,17 @@ fn st(w: &mut World) -> Option<&mut VramState> {
     w.field.as_mut().and_then(|f| f.vram.as_mut())
 }
 
+/// the world list's objects the remake keeps outside its entities (the HUD, the stat-points mark, the banner, the boss
+/// bar, signs, the timer, the damage numbers): each one's place - the entity id the next object got when it was made
+/// (before the first entity with that id or a later one). The object pass counts them: an update that destroys
+/// objects before it compacts the list, and the object now at its index - possibly one of these - is updated again
+pub fn list_marks(w: &World) -> Vec<u32> {
+    let Some(v) = w.field.as_ref().and_then(|f| f.vram.as_ref()) else { return vec![] };
+    let mut m: Vec<u32> = v.objs.iter().map(|o| o.1).collect();
+    m.extend(v.popup_at.iter().map(|p| p.1));
+    m
+}
+
 /// an object is out of the world list (a purge suspended it)
 pub fn suspended(w: &World, id: EntityId) -> bool {
     w.field

@@ -300,6 +300,13 @@ impl Host for CoreHost<'_> {
             SceneCall::Enter { .. } => {
                 if self.w.scene.depth == 0 {
                     self.s.event_watermark = self.w.ents.iter().map(|e| e.id).max().unwrap_or(0);
+                    // an event a deferred call started at the frame's start runs as the game's nested loop: its
+                    // script steps before every object each frame, so its exit releases all of them - the ones it
+                    // spawned too (run 2 row 159,856: s120's become_map_object Goten runs its AI in the exit frame;
+                    // emulator: the depth write, then his tree, then the frame's draw pass)
+                    if self.w.field.as_ref().is_some_and(|f| f.event_started_pre) {
+                        self.s.event_watermark = EntityId::MAX;
+                    }
                 }
                 begin_event(self.w);
                 self.s.pending = Some(Pending::Frames { left: 1, result: None });
@@ -332,6 +339,17 @@ impl Host for CoreHost<'_> {
                 // this frame, so the field's NPCs already ran this frame's update unfrozen
                 if self.s.from_wait && self.w.scene.depth == 0 && !self.s.in_unit {
                     release_field_npcs(self.w, self.s.event_watermark);
+                    // a nested loop's exit (the event a deferred call started) runs the whole frame's pass after it:
+                    // the players' update too - their form controllers (run 2 row 159,856: the Super Saiyan drain
+                    // steps in s120's exit frame, the gauge's revert at 161,733)
+                    if std::env::var("T_REL").is_ok() { eprintln!("EXIT from_wait frame {} wm {}", self.w.frame, self.s.event_watermark); }
+                    if self.s.event_watermark == EntityId::MAX {
+                        for s in 0..self.w.players.len() {
+                            if let Some(pi) = self.w.player_idx(s) {
+                                wf_core::player::release_passive(self.w, pi);
+                            }
+                        }
+                    }
                 }
                 // an event that ends right out of a flash fade's wait (native 0x7E) returns at the top of the frame
                 // too: the enemies older than it run this frame's update (the real route 18-11, Vegeta's s446 - its

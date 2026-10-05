@@ -134,6 +134,9 @@ parts (game over -> Continue paths: Pilaf 10-4, Thieves 9-5, Broly, the arena); 
 of `f_fat` (Lookout / radar / West City / the Bandana hunt / the grinds, Desert 11, Pilaf 10, Thieves 9, Nataday 15,
 the dbx events). Importer refusals go to the importer agent as usual. B starts the resync from 602,566 as soon as the
 side-content agent has appended the parts and re-recorded run 2's master.
+*Confirmed (ship agent = the real-route agent, 2026-10-05):* I take the rest of `f_fat` as proposed (Lookout / radar /
+West City / the Bandana hunt / the grinds, Desert 11, Pilaf 10, Thieves 9, Nataday 15, the dbx events); B the Janemba
+part, dungeons 12 / 13 / 14 and every save / title / Continue stretch.
 
 ## 1. One-command workflow
 
@@ -5272,3 +5275,9 @@ exact to 159,858 (ratchet bumped); gates, pixels, cross_ts green.
   measured (emulator: the text box object's last update vs the VM's resume) before touching it.
 * Tools: `work/earth/bin/mkseg2.py` (segment from any chain row), `work/earth/timing/{rngcalls2,objdump2,objlist,
   memwatch,palfit2,tbcut,speedprobe}.py`; wholerun debug env `WR_ENEMY` / `WR_EDUMP` / `WR_CLK` / `WR_DLG` / `WR_HUD`.
+
+## 12. User bug reports (user-bugs agent, 2026-10-05)
+
+**Claim:** three reports from playing the native app: (1) launcher Quick start gives Goku moves too early
+(`launcher::story_sim`), (2) Kamehameha / Instant Transmission invisible (`wf-core/src/view.rs`), (3) odd animations in
+the zoomed-out PC view (wf-render / view). Results below when done.

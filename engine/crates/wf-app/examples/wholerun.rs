@@ -129,6 +129,7 @@ fn main() {
     let mut clock_reported = false;
     let mut k = from_row;
     let mut clk_last: Option<i64> = None;
+    let mut ss_last: Option<(i32, i32, i32, String)> = None;
     let mut lfd_last: Option<i64> = None;
     let mut hp_bad = false;
     // --sounds FILE: the game's sound requests per row (tools/wholerun/sounds.py; .json or .json.gz) - compared per
@@ -420,6 +421,18 @@ fn main() {
             if bad != hp_bad {
                 println!("HP {} at row {k} ({}): app {ours:?} game {game:?}", if bad { "differs" } else { "equal again" }, stretch_of(k));
                 hp_bad = bad;
+            }
+        }
+        // WR_SS=1: the rows where the leader's form / Super Saiyan gauge / drain accumulator change
+        if std::env::var_os("WR_SS").is_some() {
+            if let Some(pi) = w.player_idx(0) {
+                if let wf_core::world::Body::Player(p) = &w.ents[pi].body {
+                    let v = (p.form, p.ss_gauge, p.ss_acc, format!("{:?}", p.gs));
+                    if Some(&v) != ss_last.as_ref() {
+                        println!("SS row {k} ({}) form {} gauge {} acc {} gs {}", stretch_of(k), v.0, v.1, v.2, v.3);
+                        ss_last = Some(v);
+                    }
+                }
             }
         }
         // WR_CLK=1: the rows where the game's logic counter (0x03000F94) and our clock (`Globals::clock`) change offset

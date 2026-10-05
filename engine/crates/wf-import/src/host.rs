@@ -296,6 +296,9 @@ impl StoryHost {
     pub fn collect(&mut self, evs: &[Event]) {
         for e in evs {
             if let Event::Field(FieldEvent::Run { run, cause, .. }) = e {
+                if std::env::var("B_DROPS").is_ok() {
+                    eprintln!("B_DROPS run {run:?} {cause:?}");
+                }
                 self.queue.push_back(Job { run: run.clone(), cause: cause.clone() });
             }
         }

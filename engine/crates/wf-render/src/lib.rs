@@ -251,6 +251,11 @@ impl Renderer {
         if let Some(m) = self.maps.get(id) {
             return m.clone();
         }
+        // a field with no map (the New Game prologue's area 0-0): nothing to draw, not an error (the browser
+        // console showed "map : missing content file maps//map.json")
+        if id.is_empty() {
+            return None;
+        }
         let m = match Map::load(packs, id) {
             Ok(m) => Some(Arc::new(m)),
             Err(e) => {
@@ -769,9 +774,10 @@ impl Renderer {
             _ => 0,
         };
         let white = eff == SpriteEffect::White;
+        let vflip = eff == SpriteEffect::VFlip;
         let (w, h) = (self.w as i32, self.h as i32);
         for j in 0..f.h as i32 {
-            let sy = y - f.anchor.y + j;
+            let sy = if vflip { y + f.anchor.y - 1 - j } else { y - f.anchor.y + j };
             if sy < 0 || sy >= h {
                 continue;
             }

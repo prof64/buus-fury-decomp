@@ -411,6 +411,9 @@ pub enum SpriteEffect {
     SemiTransparent,
     /// Explicit blend `eva/16 * sprite + evb/16 * below`.
     Blend { eva: u8, evb: u8 },
+    /// OAM vertical flip, mirrored around the frame's anchor row (the Instant Transmission ring's lower half: the
+    /// upper half's record drawn flipped just below it).
+    VFlip,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]

@@ -1,6 +1,6 @@
 {
  "about": "tools/wholerun/check.py's ratchet for run 2 (no-lag, from power-on): the first difference (a compared field or a sound request) must not come earlier than first_diff; a later one is reported as an improvement and this file is bumped. Remove the file once run 2 is exact.",
- "first_diff": 159858,
- "stop": "rng: app [d98eac2d, 33899d12] game [efd3f58c, 4dac352c]",
+ "first_diff": 161796,
+ "stop": "rng: app [0324f88c, 6f63bd58] game [6a9309a5, ebc3cb77]",
  "stretch": "024_e_goten"
 }

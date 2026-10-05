@@ -940,8 +940,25 @@ impl World {
         if self.scene.dest_label.is_some() {
             crate::field::dest_menu(self);
         }
-        let live = |w: &World| -> Vec<usize> {
-            (0..w.ents.len()).filter(|&k| !w.ents[k].removed).collect()
+        // the list as the game holds it: our live entities, and in their places the list objects that are no entities
+        // (`vram::list_marks`, None here: nothing to update) - an update that destroys objects before it shifts the
+        // next update onto whatever object moved into its index, which may be the HUD or the stat-points mark (run 2
+        // Diablo Desert 11-4: a punch destroys two bandits; the game updates the stat mark again, not a bomb)
+        let live = |w: &World| -> Vec<Option<usize>> {
+            let ids: Vec<usize> = (0..w.ents.len()).filter(|&k| !w.ents[k].removed).collect();
+            let mut marks = crate::vram::list_marks(w);
+            marks.sort();
+            let mut out = Vec::with_capacity(ids.len() + marks.len());
+            let mut m = 0;
+            for k in ids {
+                while m < marks.len() && marks[m] <= w.ents[k].id {
+                    out.push(None);
+                    m += 1;
+                }
+                out.push(Some(k));
+            }
+            out.extend(std::iter::repeat_n(None, marks.len() - m));
+            out
         };
         let start = live(self).len();
         let mut c = start as i64 - 1;
@@ -951,7 +968,7 @@ impl World {
         let item_get_before = self.field.as_ref().is_some_and(|f| f.item_get.is_some());
         while c >= 0 {
             let l = live(self);
-            let Some(&i) = l.get(c as usize) else {
+            let Some(&Some(i)) = l.get(c as usize) else {
                 c -= 1;
                 continue;
             };
@@ -972,7 +989,7 @@ impl World {
                     .as_mut()
                     .is_some_and(|f| std::mem::take(&mut f.list_redo))
                 {
-                    if let Some(&j) = live(self).get(c as usize) {
+                    if let Some(&Some(j)) = live(self).get(c as usize) {
                         self.update_entity(j);
                     }
                     if let Some(f) = self.field.as_mut() {

@@ -351,7 +351,7 @@ def goals_run2(e):
         *checkpoint('e00_4-1', 148, 594, 4, 1), ('autoheal', True),
         ('unstick',), ('walk', 410, 356), ('talk', 'U'), ('fly', 648, 1076), ('eventsw', 240), ('wait', 30),
         ('mark', 'e01_kid_buu'), ('luck',),
-        ('boss', 60000, 'timer'), ('eventsw', 240), ('evade', 20000), ('evade', 20000), ('eventsw', 240), ('wait', 30),
+        ('boss', 60000, 'timer'), ('eventsw', 240), ('evade', 60000), ('evade', 60000), ('eventsw', 240), ('wait', 30),
         ('retry_off',), ('autoheal', False), ('mark', 'e02_after_kid_buu'),
         # --- the ending: West City -> Capsule Corp 4-20 -> 4-21 (s190) -> the party, the Tournament, Uub, the
         # credits, the ranking, the title --------------------------------------------------------------------------

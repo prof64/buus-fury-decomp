@@ -25,6 +25,9 @@ const ROM = process.env.WF_ROM || join(REPO, 'roms/buu.gba');
 const TARGET = process.env.CARGO_TARGET_DIR || join(ENGINE, 'target');
 const out = args.includes('--keep') ? args[args.indexOf('--keep') + 1] : mkdtempSync(join(tmpdir(), 'wf-web-check-'));
 mkdirSync(out, { recursive: true });
+// --only 4,6: run those parts (1, the ROM drop, always runs: the profile needs the content)
+const only = args.includes('--only') ? args[args.indexOf('--only') + 1].split(',').map(Number) : null;
+const want = (n) => !only || only.includes(n);
 const results = [];
 const check = (name, ok, detail = '') => {
   results.push({ name, ok, detail });
@@ -55,11 +58,12 @@ const nativeVerify = (file) => {
 const { server, url } = await serve({ rom: ROM });
 const { ctx } = await launch();
 const pages = [];
+const issues = [];
 const open = async (q) => {
   const page = await ctx.newPage();
   pages.push(page);
-  page.on('pageerror', (e) => console.log('[pageerror]', e.message));
-  page.on('console', (m) => m.type() === 'error' && console.log('[console]', m.text().slice(0, 300)));
+  page.on('pageerror', (e) => issues.push(`page error: ${e.message}`));
+  page.on('console', (m) => (m.type() === 'error' || m.type() === 'warning') && issues.push(`console ${m.type()}: ${m.text().slice(0, 300)}`));
   await page.goto(`${url}/app/${q}`);
   return page;
 };
@@ -119,6 +123,7 @@ try {
   check('content cached in browser storage', kinds.length > 0, kinds.join(', '));
 
   // ------------------------------------------------------------------------------ 2. Story -> title -> New Game
+  if (want(2) || want(3) || want(5)) {
   step('2. launcher -> Story -> Title Screen -> New Game, a few thousand frames');
   await launcher(page, ['Enter', 'Enter']); // Story, Title Screen
   await frames(780); // boot screens + title
@@ -188,11 +193,13 @@ try {
     const sp = await status(page);
     check('replay playback in the page', ok && sp.mode === 'playback', JSON.stringify({ mode: sp.mode, frame: sp.frame, desync: sp.desync }));
   }
+  }
   await page.close();
 
   // ------------------------------------------------------------------------- 4. save, reload, Continue
+  if (want(4)) {
   step('4. in-game save at 8-1, page reload, Continue');
-  page = await open('?story=8-1');
+  page = await open('?story=8-1&autostart');
   await waitFor(page, () => window.wf && window.wf.status().frame > 30, null, { what: 'story 8-1' });
   await frames(60);
   const i0 = await story(page);
@@ -219,30 +226,46 @@ try {
   const iSaved = await story(page);
   check('in-game save reached browser storage', gen1 !== gen0 && saved[0] > 0, `generation ${gen0} -> ${gen1}, stored lengths ${saved}, ${JSON.stringify(iSaved)}`);
   check('options block stored with the slots', saved[3] > 0, `wf.save.3 length ${saved[3]}`);
+  // options other than the defaults in the stored block (text speed 6, SFX 4, music 8 - the game's flash record:
+  // 4 bytes, adler32 + 0x12345678 LE): the reloaded game must read them
+  await page.evaluate(() => {
+    const d = [6, 4, 8, 0];
+    let a = 1, b = 0;
+    for (const v of d) { a = (a + v) % 65521; b = (b + a) % 65521; }
+    const c = ((b << 16) | a) + 0x12345678 >>> 0;
+    const bytes = [...d, c & 255, (c >>> 8) & 255, (c >>> 16) & 255, c >>> 24];
+    localStorage.setItem('wf.save.3', bytes.map((x) => x.toString(16).padStart(2, '0')).join(''));
+  });
   await page.close();
   page = await open('');
   await launcher(page, ['Enter', 'ArrowDown', 'Enter']); // Story, slot 1
   await frames(120);
   const iCont = await story(page);
+  check('options from browser storage after a reload', JSON.stringify(iCont?.options) === '[6,4,8]', JSON.stringify(iCont?.options));
   check('Continue from the slot after a reload', !!iCont && JSON.stringify(iCont.area) === JSON.stringify(iSaved.area) && Math.abs(iCont.p[0] - iSaved.p[0]) < 4 && Math.abs(iCont.p[1] - iSaved.p[1]) < 4, `${JSON.stringify(iCont)} vs saved ${JSON.stringify(iSaved)}`);
   await page.close();
 
+  }
+
   // -------------------------------------------------------------------------------------------- 6. a battle
+  if (want(6)) {
   step('6. a battle from the launcher');
   page = await open('');
-  await launcher(page, ['ArrowDown', 'Enter', 'ArrowUp', 'ArrowUp', 'Enter']); // Battle, Fight (last row before Back)
-  for (let i = 0; i < 20; i++) {
+  await launcher(page, ['ArrowDown', 'Enter', 'Enter']); // Battle (the cursor opens on START), START
+  for (let i = 0; i < 60; i++) {
     await hold(page, i % 2 ? 'ArrowRight' : 'ArrowLeft', 30);
     await tap(page, 'KeyX', 10);
   }
   const sb = await status(page);
-  check('battle running', sb.frame > 600, `frame ${sb.frame}`);
+  check('battle running', sb.frame > 2000, `frame ${sb.frame}`);
   const rb = await blobOf(page, 'wf_app_current_replay');
   if (rb) {
     const nv = nativeVerify(save(out, 'battle.wfr', rb));
     check('native replay of the battle matches', nv.ok, nv.line);
   } else check('battle recording exported', false);
   await page.close();
+  }
+  check('no page errors or console warnings', issues.length === 0, issues.slice(0, 5).join(' | '));
 } catch (e) {
   check('harness', false, e.stack || String(e));
 } finally {

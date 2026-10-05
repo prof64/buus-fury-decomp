@@ -160,6 +160,45 @@ impl StorySim {
         self.presenter.reset();
     }
 
+    /// The launcher's Quick start: a New Game already chosen on the title (`saves.pending`) played unseen through
+    /// the prologue (#4 -> #38, text boxes advanced with A) until Goku has control on Snake Way (1-1, no script
+    /// running) - the game's own state there (#38's `forget_skill(0, 20)`: no Super Saiyan; zenie +100; journal,
+    /// flags, party), then the sim restarts its step count. Deterministic: replays rebuild it from the same start.
+    pub fn skip_prologue(&mut self) -> Result<(), String> {
+        let mut ev = Vec::new();
+        let mut started = false;
+        for k in 0..30_000u32 {
+            // A for one frame in four (the text boxes' typing and close)
+            let keys = if k % 4 == 1 { wf_view::buttons::A } else { 0 };
+            self.step(&[keys], &mut ev);
+            ev.clear();
+            let w = &self.session.world;
+            let at = w.field.as_ref().map(|f| (f.area.world, f.area.area));
+            started |= at == Some((0, 0)) || w.scene.depth > 0;
+            if started
+                && at == Some((1, 1))
+                && w.scene.depth == 0
+                && w.scene.dialog.as_ref().map_or(true, |d| d.phase == wf_core::scene::DialogPhase::Closed)
+                && !wf_core::menu::active(w)
+                && w.field.as_ref().is_some_and(|f| matches!(f.mode, wf_core::field::Mode::Normal))
+            {
+                // one idle frame: no A held into the player's control
+                self.step(&[0], &mut ev);
+                self.steps = 0;
+                self.prev = [0; MAX_PLAYERS];
+                self.presenter.reset();
+                // the song the prologue left playing (Snake Way's), emitted with the first step
+                self.init_events.clear();
+                let song = self.session.world.scene.song;
+                if song > 0 {
+                    self.init_events.push(SimEvent::Audio(wf_view::AudioEvent::PlaySong(song as u16)));
+                }
+                return Ok(());
+            }
+        }
+        Err("quick start: the prologue did not reach Snake Way".into())
+    }
+
     /// Story mode around an existing field session (tests / harnesses that build the session themselves).
     pub fn with_session(packs: &Packs, mut session: Session) -> Result<StorySim, String> {
         if let Ok(f) = wf_render::ui::Font::load(packs, "dialog") {

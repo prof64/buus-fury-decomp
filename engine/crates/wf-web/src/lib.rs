@@ -413,7 +413,7 @@ pub extern "C" fn wf_app_reset_bindings() {
 }
 
 /// Story mode's state for tests / tools (string buffer): `{"area": [world, area], "p": [x, y, facing], "zenie",
-/// "play_frames", "menu"}`, or `null` outside story mode.
+/// "play_frames", "menu", "options": [text speed, sfx, music]}`, or `null` outside story mode.
 #[no_mangle]
 pub extern "C" fn wf_app_story_info() {
     let s = with_game(|g| {
@@ -432,6 +432,7 @@ pub extern "C" fn wf_app_story_info() {
             "zenie": w.story.zenie,
             "play_frames": w.story.play_frames,
             "menu": wf_core::menu::active(w),
+            "options": [w.menu.settings.text_speed, w.menu.settings.sfx, w.menu.settings.music],
         })
         .to_string()
     })

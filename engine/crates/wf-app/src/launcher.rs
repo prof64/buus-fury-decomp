@@ -740,6 +740,18 @@ pub fn story_app(packs: Packs, slots: &[Vec<u8>], slot: Option<usize>, seed: u32
 
 /// [`story_app`]'s sim (its start recorded in `StorySim::start`: replays and save states rebuild it)
 pub fn story_sim(packs: &Packs, slots: &[Vec<u8>], slot: Option<usize>, seed: u32) -> Result<crate::story::StorySim, String> {
+    if slot.is_none() {
+        // Quick start: the title's own New Game (GameData reset, prologue #4 -> #38) played unseen up to Goku's
+        // control on Snake Way - the real game's state there (Goku: Energy Blast, Kamehameha, Instant Transmission;
+        // #38 forgets Super Saiyan; zenie 100), not a fresh new-game record dropped into 1-1
+        let mut s = title_sim(packs, slots, seed)?;
+        let first_free = (0..SLOTS).find(|&i| s.session.world.saves.slot(i).is_none()).unwrap_or(0) as i32;
+        s.session.world.saves.pending = Some(wf_core::menu::title::Boot::NewGame { slot: first_free });
+        s.skip_prologue()?;
+        s.session.world.saves.generation = 0;
+        s.start = Some(serde_json::json!({"kind": "slots", "slots": crate::story::hex_slots(slots), "slot": slot, "seed": seed}));
+        return Ok(s);
+    }
     let data = crate::battle::load_data(packs)?;
     if data.field.is_none() {
         return Err("this content has no world/ data (re-extract with the current extractor)".into());
