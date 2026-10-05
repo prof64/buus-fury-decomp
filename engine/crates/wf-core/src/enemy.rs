@@ -544,7 +544,6 @@ pub fn tick_anim(w: &mut World, i: usize) {
     let d = Arc::clone(&w.data);
     let mut ev = std::mem::take(&mut w.events);
     let mut rng = w.rng;
-    if std::env::var_os("TA_DBG").is_some() { eprintln!("TA frame {} id {} anim {:?}", w.frame, w.ents[i].id, w.en_ref(i).ea.pos); }
     w.en(i).tick_anim(&d, &mut rng, &mut ev);
     w.rng = rng;
     w.events = ev;
@@ -1804,11 +1803,12 @@ pub fn swap_gfx(w: &mut World, i: usize) {
     e.a.set_sprite(&d, Some(idx));
     crate::vram::sprite_changed(w, i, old);
 }
-/// message 0xF (0x0800F44A, the death script's freeze): the walk state's vfunc +0x10 SetAnim(0)s (0x0800E050); other
-/// states: INFERRED nothing
+/// message 0xF (0x0800F44A, the death script's freeze): the walk state's vfunc +0x10 SetAnim(0)s (0x0800E050); so
+/// does LatchDrain's controller 0x0804C314 (MEASURED run 2 cut 1,643,450 f214, 21-8: a level-up's popup - the latched
+/// Enzyme re-idles with its rand(255) and stays where it is, unglued); other states: INFERRED nothing
 pub fn stop_msg(w: &mut World, i: usize) {
     let d = Arc::clone(&w.data);
-    if w.en_ref(i).a.anim_name(&d) == Some("walk") {
+    if w.en_ref(i).a.anim_name(&d) == Some("walk") || matches!(w.en_ref(i).hook, Hook::Latch { .. }) {
         set_anim(w, i, &[n(0)], true, Some(true));
     }
 }
