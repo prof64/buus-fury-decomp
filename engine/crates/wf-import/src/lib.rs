@@ -550,11 +550,13 @@ fn import_ai_rt(w: &mut World, ei: usize, lvl: usize, ram: &GbaRam, r: u32, note
                     gy: ram.s32(r + 0x20),
                 };
             }
-            // KnockbackSlide (0x0804A138): +4 / +8 velocity, +0xC frames left; its animation is the one showing
+            // KnockbackSlide (0x0804A138): +4 / +8 velocity, +0xC the frames parameter (16, constant), +0x10 the frames
+            // left of a blocked slide (counts down from 16 - run 2 cut 1,928,000, 19-3: Kid Buu blocking, 9 left, he
+            // stops 8 moves later; ours took the 16); its animation is the one showing
             K::KnockbackSlide => {
                 rt.d[0] = ram.s32(r + 4);
                 rt.d[1] = ram.s32(r + 8);
-                rt.d[2] = ram.s32(r + 0xC);
+                rt.d[2] = ram.s32(r + 0x10);
                 rt.d[3] = -1;
             }
             // HoverDrift (vt 0x0804CB80): +4 / +8 the drift velocity (ours: the enemy's vx / vy)
@@ -1031,7 +1033,7 @@ fn import_objects(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
             0 => {
                 enemy_of.push((o, id));
                 patch_enemy(w, i, ram, o, rows.get(&o).copied(), notes);
-                place_enemy(w, id, key.1, ox, oy, rows.get(&o).map(|r| r.0));
+                place_enemy(w, id, key.1, ox, oy, rows.get(&o).map(|r| r.0), ram.r32(o + 0x228));
             }
             _ => {
                 let mut pup = None;
@@ -1178,7 +1180,7 @@ fn import_worms(w: &mut World, ram: &GbaRam, enemy_of: &[(u32, wf_core::world::E
 /// (`sprite`: the RAM actor's sprite - placements of one type at one spot differ by it and by their callbacks: real
 /// run 7-6, the tournament's two Trunks placements (list 1 #2 sprite 123 -> s300, #3 sprite 124 -> s301, both made by
 /// scripts at (344, 600)); the nearest of the matching sprite first)
-fn place_enemy(w: &mut World, id: wf_core::world::EntityId, ty: i32, ox: i32, oy: i32, sprite: Option<i32>) {
+fn place_enemy(w: &mut World, id: wf_core::world::EntityId, ty: i32, ox: i32, oy: i32, sprite: Option<i32>, def_ptr: u32) {
     let Some(f) = w.field.as_ref() else { return };
     if f.placed.iter().any(|p| p.0 == id) {
         return;
@@ -1186,7 +1188,10 @@ fn place_enemy(w: &mut World, id: wf_core::world::EntityId, ty: i32, ox: i32, oy
     let area = f.area;
     let claimed: Vec<wf_core::fieldcontent::ObjRef> = f.placed.iter().map(|p| p.1).collect();
     let defs = w.data.field.as_ref().and_then(|fd| fd.area(area.world, area.area)).map(|a| a.objects.clone()).unwrap_or_default();
-    let at = defs
+    // (the enemy object's +0x228 points 8 bytes before its def record: the def itself when unclaimed - run 2 cut
+    // 1,928,000, 19-3: four script-spawned Kid Buu defs at one spot, the live one list 1 #2 with on-defeat s460)
+    let by_ptr = defs.iter().find(|d| !claimed.contains(&d.at) && d.rom == def_ptr.wrapping_add(8) && matches!(d.kind, wf_core::fieldcontent::ObjKind::Enemy { .. })).map(|d| d.at);
+    let at = by_ptr.or_else(|| defs
         .iter()
         .filter(|d| !claimed.contains(&d.at))
         .filter_map(|d| match &d.kind {
@@ -1196,7 +1201,7 @@ fn place_enemy(w: &mut World, id: wf_core::world::EntityId, ty: i32, ox: i32, oy
             _ => None,
         })
         .min_by_key(|x| x.1)
-        .map(|x| x.0)
+        .map(|x| x.0))
         .unwrap_or(wf_core::fieldcontent::ObjRef::List(0xff, ty as u16));
     if let Some(f) = w.field.as_mut() {
         f.placed.push((id, at, ox >> 8, oy >> 8));
@@ -1424,6 +1429,11 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
                     rt.f = tick;
                     barrage = Some((st.serial, n as u16));
                 }
+                // Kid Buu's split animation in progress (no runtime words; ours ends at 56 updates): the count is the
+                // one-shot's tick (run 2 cut 1,927,900, 19-3: tick 26 - a fresh count split him 26 frames late)
+                if st.tree.nodes.get(n).is_some_and(|x| x.k == wf_core::ai::K::KidBuuSplitAnim) && tick > 0 {
+                    rt.f = tick;
+                }
             }
         }
     }
@@ -1474,34 +1484,62 @@ fn import_bombs(w: &mut World, ei: usize, ram: &GbaRam, o: u32) {
 /// ticks (it is made in the node's enter)
 fn import_enemy_beam(w: &mut World, ei: usize, ram: &GbaRam, o: u32, notes: &mut Vec<String>) {
     use wf_core::ai::K;
-    // (the enemy can own a second object of this class whose +0x3C is no direction - run 2 cut 1,927,640: Kid Buu's,
-    // +0x3C = 0x5A, +0x18 = 0, beside the beam with direction 2 - only an object with a direction is the beam)
-    let Some(b) = ram.ewram_with(0x0804_AEF8).into_iter().find(|&b| ram.r32(b + 0x50) == o && ram.r8(b + 0x3C) < 4) else { return };
-    let spots: Vec<(usize, usize)> = w.en_ref(ei).ai.stack.iter().enumerate().flat_map(|(l, s)| s.tree.nodes.iter().enumerate().filter(|(_, n)| n.k == K::KidBuuKamehameha).map(move |(n, _)| (l, n))).collect();
-    let Some(&(lvl, n)) = spots.first() else {
-        notes.push("a beam object of this enemy outside a KidBuuKamehameha node: not imported".into());
+    // every beam object of this enemy (+0x10: 0 charging - made in the node's enter, its direction (+0x3C) not set
+    // yet: the enemy's facing -, 1 fired, 2 released and retracting): a released one goes on retracting on its own
+    // (run 2 cut 1,927,800, 19-3: Kid Buu's beam retracts after its node ended, its destructor's stop 32 / sound 33
+    // 81 frames in; it was left a foreign block), the node's own is the newest unreleased one (run 2 cut 1,927,640: a
+    // fresh charging beam beside a retracting one)
+    let bs: Vec<u32> = ram.ewram_with(0x0804_AEF8).into_iter().filter(|&b| ram.r32(b + 0x50) == o).collect();
+    if bs.is_empty() {
         return;
-    };
-    let me = w.ents[ei].id;
-    let (x, y, dir) = (ram.s32(b + 0x20), ram.s32(b + 0x24), ram.r8(b + 0x3C));
-    let vt = ram.s32(b + 0x18);
-    let id = wf_core::shots::add(w, wf_core::shots::kame_beam_enemy(me, dir, x, y, ram.s32(b + 0x14) as i64, wf_core::damage::atk(5), 41));
-    if let Some(k) = w.find(id) {
-        let s = w.shot(k);
-        s.t = vt as i64;
-        if let wf_core::shots::ShotKind::Kame(kb) = &mut s.kind {
-            kb.len = ram.s32(b + 0x38);
-            kb.vt = vt;
-            kb.stopped = ram.r8(b + 0x11) != 0;
-            kb.next = ram.s32(b + 0x14) as i64;
-            kb.charging = ram.r8(b + 0x10) == 0;
-        }
     }
-    let e = w.en(ei);
-    e.beam = id;
-    if let Some(r) = e.ai.stack.get_mut(lvl).and_then(|s| s.rt.get_mut(n)) {
-        r.d[0] = id as i32;
-        r.f = vt;
+    let spots: Vec<(usize, usize)> = w.en_ref(ei).ai.stack.iter().enumerate().flat_map(|(l, s)| s.tree.nodes.iter().enumerate().filter(|(_, n)| n.k == K::KidBuuKamehameha).map(move |(n, _)| (l, n))).collect();
+    let me = w.ents[ei].id;
+    // (the RAM's facing: this runs before the enemy's own is patched)
+    let facing = ram.r8(o + 0x10) & 3;
+    let node_beam = bs.iter().copied().filter(|&b| ram.r8(b + 0x10) != 2).min_by_key(|&b| ram.s32(b + 0x18));
+    for &b in &bs {
+        let state = ram.r8(b + 0x10);
+        let own = Some(b) == node_beam;
+        if own && spots.is_empty() {
+            notes.push("a beam object of this enemy outside a KidBuuKamehameha node: not imported".into());
+            continue;
+        }
+        let dir = if ram.r8(b + 0x3C) < 4 { ram.r8(b + 0x3C) } else { facing };
+        // (a charging beam's object stands at the charge position; ours is made at the fire position, as the node's
+        // enter: the enemy's position + the table per facing (nodes.rs KidBuuKamehameha) - the game moves it there at
+        // the fire: run 2 cut 1,927,640, (253, 381) charging, (229, 385) fired)
+        let (x, y) = if state == 0 {
+            const OFF: [(i32, i32); 4] = [(16, 20), (16, -4), (-12, 2), (44, 2)];
+            let a = &w.en_ref(ei).a;
+            let (ox, oy) = OFF[dir as usize & 3];
+            (a.px() + ox, a.py() + oy)
+        } else {
+            (ram.s32(b + 0x20), ram.s32(b + 0x24))
+        };
+        let vt = ram.s32(b + 0x18);
+        let id = wf_core::shots::add(w, wf_core::shots::kame_beam_enemy(me, dir, x, y, ram.s32(b + 0x14) as i64, wf_core::damage::atk(5), 41));
+        if let Some(k) = w.find(id) {
+            let s = w.shot(k);
+            s.t = vt as i64;
+            if let wf_core::shots::ShotKind::Kame(kb) = &mut s.kind {
+                kb.len = ram.s32(b + 0x38);
+                kb.vt = vt;
+                kb.stopped = ram.r8(b + 0x11) != 0;
+                kb.next = ram.s32(b + 0x14) as i64;
+                kb.charging = state == 0;
+                kb.done = state == 2;
+            }
+        }
+        if own {
+            let (lvl, n) = spots[0];
+            let e = w.en(ei);
+            e.beam = id;
+            if let Some(r) = e.ai.stack.get_mut(lvl).and_then(|s| s.rt.get_mut(n)) {
+                r.d[0] = id as i32;
+                r.f = vt;
+            }
+        }
     }
 }
 
@@ -2031,6 +2069,13 @@ fn import_track_objects(w: &mut World, ram: &GbaRam) {
         });
         // a glide at the head with no glide object left in RAM has ended (the object goes in its last step; the
         // script resumes a frame later): done, not glided again from here (tile r002_006+13000)
+        // (and a jump: the jump object goes at its landing - run 2 cut 1,923,219, s459 node 0: Vegeta's jump_to over
+        // and the group's end_parallel waiting; ours jumped again)
+        if found.is_none() && jumps.is_empty() && matches!(w.scene.tracks[k].queue.first(), Some(Cmd::JumpTo { .. })) {
+            w.scene.tracks[k].queue.remove(0);
+            w.scene.tracks[k].started = false;
+            continue;
+        }
         if found.is_none() && glides.is_empty() && matches!(w.scene.tracks[k].queue.first(), Some(Cmd::GlideTo { .. })) {
             w.scene.tracks[k].queue.remove(0);
             w.scene.tracks[k].started = false;
@@ -4307,6 +4352,20 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
             let h = ram.r16(o + 0xC);
             let (x, y) = (ram.s32(o + 0x20), ram.s32(o + 0x24));
             let ent = (0..w.ents.len()).find(|&k| !w.ents[k].removed && !used_ents.contains(&w.ents[k].id) && matches!(&w.ents[k].body, Body::Shot(s) if matches!(s.kind, wf_core::shots::ShotKind::Straight(_)) && s.x == x && s.y == y));
+            if let (Some(k), true) = (ent, h != 0xFFFF) {
+                used_ents.push(w.ents[k].id);
+                owners.push((h, Owner::Ent(w.ents[k].id)));
+            }
+            continue;
+        }
+        // Kid Buu's beams (vt 0x0804AEF8, `import_enemy_beam`: +0x20 / +0x24 the origin px): a block belongs to the
+        // beam shot at its origin (run 2 cut 1,927,800: a retracting beam's block, freed with its destructor)
+        if vt == 0x0804_AEF8 {
+            let h = ram.r16(o + 0xC);
+            let (x, y) = (ram.s32(o + 0x20) << 8, ram.s32(o + 0x24) << 8);
+            // (a charging one: ours stands at the fire position - the charging Kame shot)
+            let charging = ram.r8(o + 0x10) == 0;
+            let ent = (0..w.ents.len()).find(|&k| !w.ents[k].removed && !used_ents.contains(&w.ents[k].id) && matches!(&w.ents[k].body, Body::Shot(s) if matches!(&s.kind, wf_core::shots::ShotKind::Kame(kb) if if charging { kb.charging } else { s.x == x && s.y == y })));
             if let (Some(k), true) = (ent, h != 0xFFFF) {
                 used_ents.push(w.ents[k].id);
                 owners.push((h, Owner::Ent(w.ents[k].id)));

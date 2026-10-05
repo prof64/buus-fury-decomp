@@ -40,6 +40,9 @@ pub struct Enemy {
     /// step, so a node that sets another animation after it - a GotoState into StandStill - keeps that one)
     #[serde(default)]
     pub walk_due: bool,
+    /// field: the kill XP of a GotoState death (the Enzyme), given when its state's SelfDestruct runs
+    #[serde(default)]
+    pub xp_at_death: i64,
     pub slot: i32,
     pub children: Vec<EntityId>,
     pub parent: EntityId,
@@ -190,6 +193,7 @@ impl Enemy {
             vy: 0,
             moving: false,
             walk_due: false,
+            xp_at_death: 0,
             slot: 0,
             children: vec![],
             parent: 0,
@@ -513,6 +517,14 @@ pub fn set_anim_rule(
     if w.field.is_some() && !matches!(refs.first(), Some(AnimRef::N(15))) {
         let id = w.ents[i].id;
         crate::shots::drop_charging_ball(w, id);
+        // a Kamehameha still charging belongs to the actor state its node set (0x0804C690): a new animation replaces
+        // it, the charging beam goes with its destructor's stop 3 (run 2 row 1,926,265, 19-3: Kid Buu punched in the
+        // frame his charge started - the hurt reaction's animation, play 3 / stop 3 in one frame)
+        let b = w.en_ref(i).beam;
+        if let Some(k) = w.find(b).filter(|&k| matches!(&w.ents[k].body, Body::Shot(s) if s.owner == id && matches!(&s.kind, crate::shots::ShotKind::Kame(kb) if kb.charging))) {
+            crate::shots::beam_stop(w, k);
+            w.en(i).beam = 0;
+        }
     }
     let d = Arc::clone(&w.data);
     let mut ev = std::mem::take(&mut w.events);
@@ -2956,6 +2968,12 @@ pub fn worm_head_step(w: &mut World, i: usize) {
     }
     let wd = w.en_ref(i).worm_dir;
     w.en(i).a.facing = wd;
+    // the head's enemy-grid mark follows its step inside its update (free 0x0802D522, mark 0x0802D5AA): a split
+    // head updated after it tests against the new cells (run 2 cut 1,689,300 f164: the head ahead moved off row 12
+    // first, the split piece's own step went through)
+    if w.field.is_some() {
+        sync_mark(w, i);
+    }
     let next = w.en_ref(i).next;
     if let Some((ni, _)) = w.enemy_by_id(next) {
         w.en(ni).cmds.push(wd);
@@ -3261,6 +3279,11 @@ fn on_death(w: &mut World, i: usize) {
                 // world list without its defeat handler: no defeat, no on-defeat callback; a placed copy hands its
                 // placement (callback, drops) to the survivor - the real route 19-3 f13415: the punched copy was the
                 // placed one, the game starts no s460)
+                // (its destruction frees its enemy-grid cells, as `die` - run 2 row 1,922,651, 19-3: the punched copy's
+                // mark stood in the survivor's chase path, which went around it; the game's grid has it gone - and its
+                // sprite tiles at once: the next allocation of the frame can take them, run 2 cut 1,927,900 f92)
+                unmark_self(w, i);
+                crate::vram::entity_gone(w, i);
                 let oid = w.ents[o].id;
                 if let Some(f) = w.field.as_mut() {
                     if let Some(p) = f.placed.iter_mut().find(|p| p.0 == me) {
@@ -3303,7 +3326,12 @@ fn on_death(w: &mut World, i: usize) {
         }
     }
     let exp = w.data.enemy(ty).map(|t| t.exp).unwrap_or(0);
-    if let (Some(f), Some(pi)) = (w.field.is_some().then_some(()), ctx_player(w, i)) {
+    if death == "GotoState" && w.field.is_some() {
+        // the death node GotoState: the defeat's death effect (its first update gives the XP) is made at the state's
+        // SelfDestruct, not at the hit (MEASURED run 2 21-4, cut 1,599,700: the KO punch f220, ParentCountDown f221,
+        // SelfDestruct's explosion rand f222, the level-up rolls f223)
+        w.en(i).xp_at_death = exp;
+    } else if let (Some(f), Some(pi)) = (w.field.is_some().then_some(()), ctx_player(w, i)) {
         // field: the death effect object gives the kill XP on its first update, at the start of the next frame's
         // update (story playthrough: the level-up rolls come the frame after the KO)
         let _ = f;

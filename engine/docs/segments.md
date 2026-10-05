@@ -191,6 +191,11 @@ the 59 logic iterations in between; ours had held it at 960. **The 3D world map'
 out of sprite memory** (world.rs `step_entities_list`: the suspended-object skip leaves out enemies while flying).
 Cel gate: differing cel frames 975 -> 108 (rkb_168 491 -> 0, sb_041 334 -> 0, rkb_001 35 -> 0); every segment gate,
 the pixel gate and the whole-run check green (run 1 exact; run 2's first difference 1,470,560, others' work).
+*Claim (dungeon agent B, 2026-10-05, by the coordinator): the remaining 108 differing cel frames except the Super Buu
+agent's* - B takes Janemba (`rj_049_001_18-14` 50, `sc_janemba` 20: sprite 149), `db7_010_14-10` (10), and the
+single frames `rj03_045_18-1`, `dr4_061_15-13`, `dr4_006_15-3`, `sb_012_20_06`; **left to the Super Buu agent**:
+`sb_006_06_06` / `sb_007_06_09` (12 each, sprite 49 raw 8 - near its beam work). Super Buu agent: say here if you
+want any of mine or not those two.
 *sound_legs.py re-run on this tree: 70 iterations differ (72 before; the Janemba arena beep pair is gone); the open
 list above is otherwise unchanged.*
 
@@ -5527,6 +5532,10 @@ slot back to "-None-") then `unequip` (0x08004544: clears the wearer mark of tha
 entry -> nothing changes). Ours took the first copy without freeing the slot and 0xF1 pushed a second copy. Both
 natives now follow the game (wf-script-core natives.rs). Gates green; check.sh: run 1 exact both legs with sounds,
 **run 2 from power-on exact in state and sound to 1,470,560** (033_b_superbuu, depth - the Super Buu part).
+*1,345,851's "actors a frame apart" (soak sweep):* not a rule - the app (continuous, from the 1,068,150 cut) keeps the
+player still at (25434, 38177) through s451's start as the game does; only a harness cut inside the run
+(`wr_1345700`, with the EEPROM) diverges at f152: there s451's `walk_to(0, 100, 150)` moves the imported leader
+(sprite 102) at once while the game's stays. Import side - for the importer agent (the leader / actor 0 at that cut).
 *Run 2 Kid Buu -> credits (A), status:* resync from 1,853,852: 37 stops, all in 033_b_superbuu between 1,858,571 and 1,928,108; **from 1,928,109 the app is exact to the end (1,977,866) incl. the credits**. Two tool fixes on the way: (1) **resync.py reported an app crash as 'end of the recording reached'** - a panic now records a stop (the 1,927,640 cut panicked in its first frame: Kid Buu owns a second object of the beam class vt 0x0804AEF8 with +0x3C = 0x5A; `import_enemy_beam` now takes only the one with a direction). Earlier private resyncs that ended 'end of the recording reached' may have hidden a crash - rerun to be sure. (2) **Credits ranking text: matches.** The game's `party_xp_total()` at s312 node 17 (row 1,977,778) = 22,461,657 -> string 1477 (20M .. 25M); ours, running from 1,928,109, gives 22,461,657 at the same row (XP 6,265,520 / 6,490,137 / 2,079,275 / 337,440 / 7,289,285) -> 1477. Run 1's 31.05M -> 1479 unchanged. The 37 stops are with four A helpers.
 
 **Pixels: HUD / text-box residuals (Earth agent, 2026-10-05).** Board on my run (25,551 sampled frames): 11 frames

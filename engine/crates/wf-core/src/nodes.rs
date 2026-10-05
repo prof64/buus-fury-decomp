@@ -1976,6 +1976,16 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             true
         }
         K::SelfDestruct => {
+            // (a GotoState death's kill XP: the death effect made here gives it on its first update, `field::xp_due`)
+            let exp = std::mem::take(&mut w.en(i).xp_at_death);
+            if exp != 0 && w.field.is_some() {
+                if let Some(pi) = en::ctx_player(w, i) {
+                    let pid = w.ents[pi].id;
+                    if let Some(f) = w.field.as_mut() {
+                        f.xp_due.push((pid, exp));
+                    }
+                }
+            }
             en::die(w, i, true);
             true
         }
@@ -2591,8 +2601,12 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         // the beam fires at tick 8 (stop 3, sound 32); the state ends once tick > 90 (SetAnim(0); the exit stops the
         // beam: it retracts)
         K::KidBuuKamehameha => {
-            // (field: the pose is the actor state 0x0804C690's - cels 0, 1, 2 every 8 ticks, then 1 / 2 alternating
-            // until the state ends, never the one-shot's end and its idle: the real route 19-3, a copy's beam)
+            // (field: a new animation replaced the actor state 0x0804C690 while the beam charged - a hit's reaction,
+            // `enemy::set_anim_rule` dropped the beam: the node finds its controller gone and ends, the tree goes on
+            // (run 2 row 1,926,312, 19-3: after the knockback Kid Buu walks, no second charge))
+            if w.field.is_some() && w.en_ref(i).beam == 0 && r.d[0] != 0 {
+                return true;
+            }
             if w.field.is_some() {
                 let c = if f <= 8 { 0 } else { (f - 1) >> 3 };
                 let e = w.en(i);
