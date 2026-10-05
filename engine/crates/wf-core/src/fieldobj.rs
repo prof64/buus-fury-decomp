@@ -118,6 +118,10 @@ pub enum Deferred {
         at: u32,
         run: crate::fieldcontent::Callback,
         cause: crate::field::Cause,
+        /// the game's nested event loop (the rock's hit): that frame has no object pass; otherwise an event object
+        /// (RunScript 0x0803388C) - the newest in the list, it runs first in the pass and the others update held
+        #[serde(default)]
+        nested: bool,
     },
 }
 
@@ -386,9 +390,10 @@ pub fn run_deferred(w: &mut World) {
     for d in due {
         match d {
             Deferred::Break { entity, .. } => break_done(w, entity),
-            Deferred::Run { run, cause, .. } => {
+            Deferred::Run { run, cause, nested, .. } => {
                 if let Some(f) = w.field.as_mut() {
                     f.event_started_pre = true;
+                    f.event_nested = nested;
                 }
                 w.events.push(crate::world::Event::Field(crate::field::FieldEvent::Run { run, cause, slot: 0 }))
             }

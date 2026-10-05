@@ -27,8 +27,16 @@ pub struct Actor {
     pub anim_t: i32,
     pub anim_loop: Option<bool>,
     pub flash: i32,
+    /// the hit flash's colour-index map in force (tick 0x0800DE28: map counter >> 2 after the decrement, -1 = the
+    /// plain tiles once it reaches 0; a counter just set to 12 has not ticked: the earlier map stays)
+    #[serde(default = "no_map")]
+    pub flash_map: i8,
     /// cosmetic opacity in 1/256
     pub alpha: i32,
+}
+
+fn no_map() -> i8 {
+    -1
 }
 
 impl Default for Actor {
@@ -54,6 +62,7 @@ impl Default for Actor {
             anim_t: 0,
             anim_loop: None,
             flash: 0,
+            flash_map: -1,
             alpha: 256,
         }
     }
@@ -172,8 +181,13 @@ impl Actor {
     }
     pub fn tick_anim(&mut self) {
         self.anim_t += 1;
+        self.flash_tick();
+    }
+    /// the hit flash object's tick (0x0800DE28): counter - 1, then map counter >> 2 (none at 0)
+    pub fn flash_tick(&mut self) {
         if self.flash > 0 {
             self.flash -= 1;
         }
+        self.flash_map = if self.flash > 0 { (self.flash >> 2).min(2) as i8 } else { -1 };
     }
 }

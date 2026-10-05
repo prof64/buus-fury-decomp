@@ -1541,9 +1541,7 @@ pub fn update(w: &mut World, i: usize) {
     }
     {
         let pl = p(w, i);
-        if pl.a.flash > 0 {
-            pl.a.flash -= 1;
-        }
+        pl.a.flash_tick();
         pl.t += 1;
     }
     shield_tick(w, i);
@@ -2270,7 +2268,6 @@ pub fn passive_after_scripts(w: &mut World) {
 }
 
 fn passive(w: &mut World, i: usize) {
-    if std::env::var("T_REL").is_ok() && w.frame >= 15306 && w.frame <= 15310 { eprintln!("PASSIVE frame {} owed {} story {} ko {} dead {}", w.frame, pr(w, i).tick_owed, pr(w, i).story_form(w), pr(w, i).ko_at, pr(w, i).dead); }
     // (this frame's tick: a held pass's second update in `field::post_step` makes it - none after the scripts)
     p(w, i).passive_held = false;
     if std::mem::take(&mut p(w, i).tick_owed) {
@@ -3111,6 +3108,7 @@ fn upd_skill(w: &mut World, i: usize) {
                         a,
                         mult,
                         true,
+                        &shots::beam_set(id, lv),
                     ),
                 );
                 sk_mut(w, i).unwrap().proj = bid;

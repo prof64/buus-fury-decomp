@@ -64,6 +64,37 @@ pub fn auto_zoom(win_w: u32, win_h: u32, world: Option<(i32, i32)>) -> u32 {
     z
 }
 
+/// "PC wide (auto)" held between maps: the zoom is picked by [`auto_zoom`] when the shown map changes (an area or a
+/// scene load) or the window does, and kept through frames that show no map (menu screens, black loads, the
+/// prologue). Picking it from every frame's map made it jump between 2x and 4x whenever a menu opened over a small
+/// map or a cutscene left and re-entered one.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct AutoZoom {
+    map: String,
+    win: (u32, u32),
+    zoom: u32,
+}
+
+impl AutoZoom {
+    /// the zoom for this frame: `map` = the shown map's id and world size (None: no map this frame)
+    pub fn zoom(&mut self, win_w: u32, win_h: u32, map: Option<(&str, (i32, i32))>) -> u32 {
+        let win = (win_w, win_h);
+        match map {
+            Some((id, size)) if id != self.map || win != self.win || self.zoom == 0 => {
+                self.zoom = auto_zoom(win_w, win_h, Some(size));
+                self.map = id.to_string();
+                self.win = win;
+            }
+            None if self.zoom == 0 || win != self.win => {
+                self.zoom = auto_zoom(win_w, win_h, None);
+                self.win = win;
+            }
+            _ => {}
+        }
+        self.zoom
+    }
+}
+
 pub fn fit(mode: ViewMode, win_w: u32, win_h: u32, world: Option<(i32, i32)>) -> Fit {
     let (win_w, win_h) = (win_w.max(1), win_h.max(1));
     let max_z = (win_w / GBA_W as u32).min(win_h / GBA_H as u32).max(1);
@@ -109,6 +140,8 @@ pub struct Renderer {
     strings: Option<Vec<String>>,
     /// menu screens (`RenderView.menu`)
     menu: Option<menu::MenuRenderer>,
+    /// the hit flash's colour maps (`ui/hit_flash.json`): colour -> colour per map; `Some(None)` = content missing
+    flash: Option<Option<Vec<HashMap<u32, u32>>>>,
 }
 
 impl Default for Renderer {
@@ -165,6 +198,27 @@ fn darken(a: u32, evy: u32, _m: BlendMath) -> u32 {
     out
 }
 
+/// `ui/hit_flash.json`: per colour-index map, the OBJ palette's colour of index i -> the colour of map[i] (the
+/// first index of a colour wins; sheets carry expanded RGB, not indices)
+fn load_flash(packs: &Packs) -> Option<Vec<HashMap<u32, u32>>> {
+    let j = packs.value("ui/hit_flash.json").ok()?;
+    let pal: Vec<u32> = j["obj_palette"].as_array()?.iter().map(|v| v.as_u64().unwrap_or(0) as u32).collect();
+    let maps = j["maps"].as_array()?;
+    Some(
+        maps.iter()
+            .map(|m| {
+                let mut h = HashMap::new();
+                for (i, v) in m.as_array().into_iter().flatten().enumerate().skip(1) {
+                    if let (Some(&from), Some(&to)) = (pal.get(i), pal.get(v.as_u64().unwrap_or(0) as usize)) {
+                        h.entry(from).or_insert(to);
+                    }
+                }
+                h
+            })
+            .collect(),
+    )
+}
+
 /// `maps/palette.json` (RGB888 as stored) keyed by the expanded colour images carry.
 fn load_orig_palette(packs: &Packs) -> HashMap<u32, u32> {
     let mut m = HashMap::new();
@@ -217,6 +271,7 @@ impl Renderer {
             draw_hud: true,
             ui: None,
             orig_pal: None,
+            flash: None,
             banner: None,
             blend_math: BlendMath::default(),
             mode7: HashMap::new(),
@@ -328,7 +383,10 @@ impl Renderer {
         }
         let (vx, vy, cx, cy) = Self::view_origin(view, player, w, h);
         let map = view.map.as_ref().and_then(|m| self.map(packs, &m.id).map(|g| (g, (m.anim_frame, m.tile_frame.unwrap_or(m.anim_frame)), m.shake)));
-        let backdrop = map.as_ref().map(|(m, _, _)| m.backdrop).unwrap_or(0xFF00_0000);
+        // (the top byte is the colour's palette index for the fades (`put`): the backdrop is BG entry 0, which the
+        // encoding cannot name - 0 = "find it by colour"; the map's 0xFF top byte read as BG entry 255 and faded
+        // the margins of the zoomed-out view to an unrelated colour, e.g. brown in Southwest Forest's fades)
+        let backdrop = map.as_ref().map(|(m, _, _)| m.backdrop).unwrap_or(0) & 0x00FF_FFFF;
         self.top.fill(backdrop);
         self.top_l.fill(L_BD);
         self.top_b.fill(0);
@@ -443,6 +501,9 @@ impl Renderer {
             }
         }
 
+        if self.flash.is_none() {
+            self.flash = Some(load_flash(packs));
+        }
         for prio in (0..4u8).rev() {
             if let Some(f) = &m7 {
                 self.draw_mode7_bgs(f, prio, ox, oy);
@@ -775,6 +836,10 @@ impl Renderer {
         };
         let white = eff == SpriteEffect::White;
         let vflip = eff == SpriteEffect::VFlip;
+        let fmap = match eff {
+            SpriteEffect::Flash(k) => self.flash.as_ref().and_then(|f| f.as_ref()).and_then(|f| f.get(k as usize)).cloned(),
+            _ => None,
+        };
         let (w, h) = (self.w as i32, self.h as i32);
         for j in 0..f.h as i32 {
             let sy = if vflip { y + f.anchor.y - 1 - j } else { y - f.anchor.y + j };
@@ -793,6 +858,10 @@ impl Renderer {
                 }
                 // sheets are RGBA (palette swaps applied): the palette index is unknown (alpha 0, see `put`)
                 let c = if white { 0x00FF_FFFF } else { c & 0xFF_FFFF };
+                let c = match &fmap {
+                    Some(m) => m.get(&c).copied().unwrap_or(c),
+                    None => c,
+                };
                 self.put(sy as usize * self.w + sx as usize, c, L_OBJ, b);
             }
         }

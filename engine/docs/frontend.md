@@ -93,6 +93,24 @@ Build/serve: `engine/web/app/build.sh`, then serve `engine/web/` and open `/app/
 `players=N`, `mode=pc:0|gba:3`, `stats`, `mute`, `sound`, `autostart`; test hooks `devrom=<same-origin url>`,
 `devinput=ArrowRight:60,ArrowUp:30`.
 
+**Browser end-to-end check** (headless Chromium via `playwright-core`, `--mute-audio`, the page mutes itself under
+automation; never a window): `cd engine/web/tests && npm install && node browser_check.mjs [--build] [--only 2,4,6]
+[--keep DIR]`. It serves `engine/web/` plus `roms/buu.gba` as `/rom.gba` (`serve.mjs`) and runs, on a fresh browser
+profile:
+
+1. The ROM drop: extraction in the worker, the content cached in OPFS.
+2. Launcher → Story → Title Screen → New Game, then about 3,200 frames of the prologue.
+3. The session's recording (`wf_app_current_replay`) verified by the native build (`buus-fury --replay`: every
+   checkpoint's state hash from the browser against a native session fed the same inputs) and by the page.
+4. Story mode at 8-1 (`?story=8-1&autostart`): walk to the save point, save, reload the page. Launcher → the slot
+   continues at the saved spot, and options written into the stored block are used.
+5. Rewind, save state / load state, the recording after them verified natively, replay playback in the page.
+6. A battle from the launcher, its recording verified natively.
+
+It finishes with "no page errors or console warnings". `--build` runs `app/build.sh` first, which honours
+`CARGO_TARGET_DIR`. `wf_app_story_info` (area, leader position, zenie, play time, menu, options) is the page's
+probe for these checks. `probe.mjs` is a scratch tool: launcher keys in, screenshots out.
+
 ## 5. Headless, muted, spectator (product features)
 
 * **`--headless`** (native): no window, no event loop, no audio device. `wf_app::session::Session` steps the sim,

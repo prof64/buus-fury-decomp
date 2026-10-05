@@ -417,6 +417,7 @@ fn rock_land(w: &mut World, i: usize, owner: EntityId, x: i32, y: i32) {
                     at,
                     run: crate::fieldcontent::Callback::Event("header_0x08783084".into()),
                     cause: crate::field::Cause::Ai { entity: owner },
+                    nested: true,
                 });
             }
         }

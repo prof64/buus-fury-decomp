@@ -2597,6 +2597,7 @@ fn update_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) -> bool {
                         crate::damage::atk(5),
                         328,
                         true,
+                        "beam_kamehameha_1",
                     );
                     // the beam's hit message takes its sender class from the owner's +0x1D0: a map NPC's object has
                     // no such field there (Piccolo's reads 0x030032EC), and the enemies take classes 1 and 2 only -

@@ -455,6 +455,21 @@ pub const GRID: usize = 256;
 /// enemy / form graphics id -> sprite index
 pub const GFX_OFFSET: i32 = 9;
 
+/// a beam level's graphics (`effects/beam_*/effect.json` "beam" + its piece animations; draw 0x08020DAC)
+#[derive(Clone, Debug, Default)]
+pub struct BeamSet {
+    /// piece variant rule: 2 = phase & 3 (3 -> 1), else phase & 1; the body's: mode 1 = phase & 3
+    pub mode: i32,
+    /// extra pieces: 1 start2, 2 tail2, 4 head2, 8 impact2
+    pub flags: i32,
+    /// body piece spacing (vertical, horizontal); 0 = 32
+    pub step: [i32; 2],
+    /// piece name -> per direction (down, up, left, right) the variants' (frame, flip)
+    pub pieces: BTreeMap<String, [Vec<(u16, bool)>; 4]>,
+    /// the charge sparkle's first record in its run (`charge_fx`, run 0x08721164)
+    pub charge: Option<(String, i32)>,
+}
+
 #[derive(Clone)]
 pub struct GameData {
     pub sprites: BTreeMap<i32, Sprite>,
@@ -464,6 +479,8 @@ pub struct GameData {
     pub effects: std::collections::BTreeSet<String>,
     /// OBJ record by ROM address -> (effect id, frame index): what the renderer draws for a record address
     pub record_frames: BTreeMap<u32, (String, u16)>,
+    /// the beam piece sets (`effects/beam_*`, wf-extract fx_extra.rs): effect id -> pieces and level rules
+    pub beams: BTreeMap<String, BeamSet>,
     /// area key ("8-71") -> (first map id, song)
     pub areas: BTreeMap<String, (String, Option<u16>)>,
     pub enemies: Vec<EnemyType>,
@@ -770,10 +787,34 @@ impl GameData {
         let mut records = BTreeMap::new();
         let mut record_frames = BTreeMap::new();
         let mut effects = std::collections::BTreeSet::new();
+        let mut beams = BTreeMap::new();
         for p in files_under(&all, "effects/", "/effect.json") {
             let s = json(src, &p)?;
             let eid = gets(&s, "id");
             effects.insert(eid.clone());
+            if s["beam"].is_object() {
+                let b = &s["beam"];
+                let mut set = BeamSet {
+                    mode: int(&b["mode"]) as i32,
+                    flags: int(&b["flags"]) as i32,
+                    step: [int(&b["step"][0]) as i32, int(&b["step"][1]) as i32],
+                    pieces: BTreeMap::new(),
+                    charge: b["charge_fx"].as_str().map(|f| (f.to_string(), int(&b["charge_index"]) as i32)),
+                };
+                for (name, a) in s["animations"].as_object().into_iter().flatten() {
+                    let mut dirs: [Vec<(u16, bool)>; 4] = Default::default();
+                    for (k, dn) in ["down", "up", "left", "right"].iter().enumerate() {
+                        dirs[k] = a["directions"][*dn]
+                            .as_array()
+                            .into_iter()
+                            .flatten()
+                            .map(|st| (geti(st, "frame") as u16, st["flip"].as_bool().unwrap_or(false)))
+                            .collect();
+                    }
+                    set.pieces.insert(name.clone(), dirs);
+                }
+                beams.insert(eid.clone(), set);
+            }
             if let Some(anims) = s["animations"].as_object() {
                 for a in anims.values() {
                     if let Some(dirs) = a["directions"].as_object() {
@@ -914,6 +955,7 @@ impl GameData {
             sprites,
             records,
             record_frames,
+            beams,
             areas,
             effects,
             enemies,

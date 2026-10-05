@@ -316,6 +316,9 @@ pub struct KameBeam {
     pub charging: bool,
     /// the object plays its own fire / end sounds (enemy use)
     pub sounds: bool,
+    /// its graphics: the beam level's piece set (`effects/beam_*`; empty = none)
+    #[serde(default)]
+    pub set: String,
 }
 
 /// Kamikaze ghost (skill 13): an actor (sprite 148) with its own animation state and AI (projectiles.ts Ghost)
@@ -2425,6 +2428,21 @@ fn masenko_ball_update(w: &mut World, i: usize) {
     }
 }
 
+/// the beam level's piece set for a player beam skill (ctor callers 0x0801A6A4 Banshee, 0x0801A930 Big Bang, 0x0801ADF0
+/// Electric Kamehameha 0x08725018 + 16 * level, 0x0801BE1A Kamehameha 0x0871DA68 + 16 * level, 0x0801BF86 Kamekameha
+/// 0x087315A8 + 16 * level; reference fx.ts BEAM_SETS)
+pub fn beam_set(skill: i32, lv: i32) -> String {
+    let l = lv.clamp(0, 2) + 1;
+    match skill {
+        1 => "beam_banshee_blast".into(),
+        3 => "beam_big_bang_kamehameha".into(),
+        6 => format!("beam_electric_kamehameha_{l}"),
+        15 => format!("beam_kamehameha_{l}"),
+        16 => format!("beam_kamekameha_{l}"),
+        _ => String::new(),
+    }
+}
+
 /// the player's beam (class 0x080206B8, update 0x0802084C): Kamehameha 15 / Kamekameha 16 / Electric 6 / Banshee 1 /
 /// Big Bang Kamehameha 3, at the fire position, length 8 from the construction. Each firing tick: the head box
 /// (head +- 8) on a projectile wall -> stopped; else the head message: accepted -> stopped + the hit effect, not
@@ -2441,6 +2459,7 @@ pub fn kame_beam(
     a: AttackType,
     mult: i32,
     gfx: bool,
+    set: &str,
 ) -> Shot {
     Shot::new(
         owner,
@@ -2459,6 +2478,7 @@ pub fn kame_beam(
             next: built,
             charging: false,
             sounds: false,
+            set: set.to_string(),
         })),
     )
 }
@@ -2489,6 +2509,8 @@ pub fn kame_beam_enemy(
             next: built,
             charging: true,
             sounds: true,
+            // (the reference's: ai.ts KidBuuKamehameha)
+            set: "beam_kamehameha_1".into(),
         })),
     )
 }
@@ -3029,7 +3051,10 @@ fn bomb_update(w: &mut World, i: usize) {
             // while its bomb is in the air - the blast beside the player does nothing)
             // (to every object: 0x08011C0C ORs the handlers' results, no first-taker stop - run 2 row 118,564: the
             // leader's fresh ki blast takes the blast and the leader is hit too)
-            if !owner_dead(w, owner) {
+            // (a script holding the field: the objects get message 0xC only, whose update still counts and bursts the
+            // bomb - chips, explosion, sound - but sends no blast: run 2 row 884,572, Diablo Desert 11-24, a bomb going
+            // off by the leader during a level-up's popup, s003)
+            if !owner_dead(w, owner) && !w.field.as_ref().is_some_and(|f| f.busy) {
                 broadcast(w, &mut m, false);
             }
             crate::vram::release(w, crate::vram::Owner::Ent(id));

@@ -1081,6 +1081,9 @@ fn actor_mut(w: &mut World, i: usize) -> Option<&mut wf_core::actor::Actor> {
 }
 
 fn area(h: &CoreHost) -> (i32, i32, i32) {
+    if let Some(a) = h.s.area_override {
+        return a;
+    }
     match &h.w.field {
         Some(f) => (f.area.world, f.area.area, f.area.variant),
         None => h.s.area,

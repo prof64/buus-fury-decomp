@@ -5281,3 +5281,51 @@ exact to 159,858 (ratchet bumped); gates, pixels, cross_ts green.
 **Claim:** three reports from playing the native app: (1) launcher Quick start gives Goku moves too early
 (`launcher::story_sim`), (2) Kamehameha / Instant Transmission invisible (`wf-core/src/view.rs`), (3) odd animations in
 the zoomed-out PC view (wf-render / view). Results below when done.
+
+**Claim (dungeon agent A, 2026-10-05, by the coordinator: help the chapter whose run-2 stops pile up): run 2's fat-Buu
+chapter (`031_f_fat`), import and rule stops.** Private resync (`resync.py --chain run2 --lag none --from 159,859`,
+log `/tmp/resync_r2full.jsonl`): 56 stops - 26 fat rule, 19 import (7 fat + 12 at event starts / s418), 10 Janemba
+rule, 1 Earth (159,858, Earth agent). A takes the fat ones and every import stop: 763,327 .. 763,606 (12-25 / 12-26
+positions, area), 788,137 .. 788,152 (rng), 856,025 .. 860,353 (rng, flag 271 app only, s418 imports), 873,656 ..
+873,675, 884,572 .. 884,710, 1,007,984 / 1,008,000, 1,037,012 .. 1,038,551, 1,103,549, and the "event started in the
+cut's frame by no trigger of ours" imports (s418 856,042, s377 884,710, s000 1,037,213 / 1,319,520). Dungeon agent B:
+the 10 Janemba rule stops stay yours (or say if you want fat ones back).
+
+*(1) Quick start - fixed.* Real game (emulator, run 1's own keys from power-on to Snake Way, `work/ub/probe.py`): Goku's
+record at New Game = skills [7 Energy Blast, 20 Super Saiyan, 15 Kamehameha, 14 Instant Transmission], all level 0;
+#38 (`forget_skill(0, 20)`) removes Super Saiyan before control; at control: [7, 15, 14] level 0, zenie 100, Goku at
+(144, 152). Kamehameha and IT ARE usable there in the game (Kamehameha charge seen on the emulator; IT's ring too);
+only Super Saiyan was wrong (and zenie 0). Skills are "learned" by being in the list; `set_skill_level` (s003, level-up
+hook) only upgrades them - already modelled (`skill_edit`). Quick start (`launcher::story_sim`, slot None) now runs the
+title's own New Game (`title_sim` + `Boot::NewGame`) and plays the prologue unseen (`StorySim::skip_prologue`: A one
+frame in four until 1-1, depth 0, no box, no menu), then restarts the step count (replays rebuild it the same way,
+~0.5 s). State at the hand-over equals the game's: skills, zenie, position, flags.
+*(2) Instant Transmission invisible - fixed:* `Fx::ItMarkers` had no draw. `view.rs` `it_ring`: cursor ring (records
+0x0872BF04) on the selection point, target rings (0x0872BF34) on picked actors' centres, record + 12 * ((t >> 2) & 3),
+OAM priority 0, lower half = the record v-flipped (new `wf_view::SpriteEffect::VFlip`, wf-render `draw_obj`). Checked
+by eye against the emulator at Snake Way (`work/ub/probe3.py`); no pixel-gate segment has IT on screen. IT picks of
+field triggers get no ring (position not measured). *Kamehameha* (beam pieces + charge sparkle) is the Super Buu
+agent's per the coordinator: a working port of the reference's `BeamGfx.draw` / `drawCharge` (pixel-exact on
+sb_007 f19380 except the enemy's red tint) is in `work/ub/beam_port.rs` for it to take or drop. Same cause as IT
+(the view never drew those bodies), different code.
+*(3) Zoomed-out PC view - one renderer bug fixed, the rest is by design.* Same frames in both views (1-1, 1-2, 3-3,
+8-9 -> 8-8, a forest battle, the prologue): the wide view's centre 240x160 is pixel-identical to the GBA view (HUD /
+banner placed on purpose); off-screen actors keep updating and animating, props are not culled, parallax / wrap / tile
+animations share the camera and clock. Bug: the map backdrop's colour carried a stray top byte that the palette fade
+read as BG palette entry 255, so the margins outside the map faded to a wrong colour (brown flashes in 8-9 / the
+prologue) - wf-render `Renderer::render` now feeds the backdrop to the fade with no palette index. Left as is: actors
+scripts park just outside the GBA screen are visible in the wide view; "PC wide (auto)" picks the zoom per map (jumps
+between 2x and 4x on small cutscene maps; a fixed zoom avoids it).
+*Cutscene-map cuts, part 2 (A; wf-import lib.rs, wf-script-core lib.rs / natives.rs; uncommitted):* run 1 24 -> 31 / 35,
+run 2 9 -> 12 / 13 exact. A node replayed from before its `load_scene` asks `get_world` / `get_map` / `get_map_variant`
+the room the game left (saved header 0x03001968; `HostState::area_override`, set only during that replay - s415's
+`set_p(0, get_map())`, 14-17 / 14-19 / 14-22); GhostAnimA/B end when the object is back in the normal state (+0x14 ==
+0x03001BA4); props mid `prop_move_to` imported (vt 0x0804B92C: step +0x1C / +0x20, steps left +0x2C; 1-20 sound 55);
+a `load_scene_fade` whose load the game made resumes at its fade-in with RAM's progress (7-2); emote bubbles imported
+(vt 0x0804A298: +0x18 age, +0x1C cels, 8 frames a cel) with their tile block, a replayed `emote(.., wait)` set to the
+bubble's age; the last area name shown is the u16 at **0x03001984** - mid-event imports read it (cut 955,163: no
+banner on 6-1's reload, as the game); a worm head's WormSpawnBody re-entry removes what its enters spawn. Open: 21-11
+(WormBodyFollow's 12-slot command ring not imported, f201), 7-6 c195432 (objects hidden under a text box come back
+a frame late in ours - cause not found), 19-3 c1617636 / 8-71 c594120 (sprite memory), c1639933 (the saved room's
+leader state vt 0x0804DE58 not imported). Gates green; whole-run / exit-fade / run-2 / area-entry sweeps unchanged.
+*Note (A): whole-run cut point c631836 (fat 003, 8-3) went 2 / 2 -> 0 / 2 between 9039360 and 27be6d8, not from A's import change (9039360 + it: still 2 / 2): pos of sprite 269 (an enemy, IfPlayerWithin2 / RunMotionController AI) 436.42 vs game 437.89 at f0. Owner of the enemy-animation / AI commits in that range, please check (`SEGMENT_DIR` with `/tmp/wrcuts/c631836.json`).*

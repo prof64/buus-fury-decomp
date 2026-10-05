@@ -601,6 +601,8 @@ fn import_ai_rt(w: &mut World, ei: usize, lvl: usize, ram: &GbaRam, r: u32, note
             K::MechTransform => {}
             // MeleeAttack (update 0x0802A276 = IsAnim(0)), IncCounter: no runtime words
             K::MeleeAttack | K::IncCounter => {}
+            // GhostAnimA / B: no runtime words (the object's state decides - `patch_enemy`)
+            K::GhostAnimA | K::GhostAnimB => {}
             k => notes.push(format!("ai runtime of {k:?} (state {:#x} node {n}) not imported", tree.state)),
         }
         rts.push((n, rt));
@@ -798,6 +800,7 @@ fn field_from_ram(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
     import_death_effects(w, ram, notes);
     import_player_blasts(w, ram);
     import_coins(w, ram);
+    import_emotes(w, ram);
     // the camera as the field left it (`return_to_field` puts the saved one back)
     w.scene.cam.mode = wf_core::scene::CamMode::Player;
     wf_core::battle::set_camera(w, 0, ram.s32(CAM), ram.s32(CAM + 4));
@@ -1165,6 +1168,7 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
         // strike on enter - is undone; whole-run cuts 808,709 / 808,776 / 809,325: the leader lost 28 HP twice)
         let players: Vec<(usize, wf_core::world::Entity)> = (0..w.ents.len()).filter(|&k| w.players.contains(&w.ents[k].id)).map(|k| (k, w.ents[k].clone())).collect();
         let (stats, nev) = (w.stats.clone(), w.events.len());
+        let n_ents = w.ents.len();
         let e = w.en(ei);
         let old: Vec<_> = e.ai.stack.drain(..).collect();
         e.ai.orphans.extend(old);
@@ -1174,6 +1178,13 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
         }
         for (k, ent) in players {
             w.ents[k] = ent;
+        }
+        // (and what the enters spawned - the RAM's objects are imported on their own: run 1 cut 1,368,272, 21-11's
+        // worm head in WormSpawnBody spawned its five body segments again)
+        for k in n_ents..w.ents.len() {
+            let id = w.ents[k].id;
+            wf_core::vram::release(w, wf_core::vram::Owner::Ent(id));
+            w.ents[k].removed = true;
         }
         w.stats = stats;
         w.events.truncate(nev);
@@ -1288,6 +1299,13 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
                 }
             }
         }
+    }
+    // GhostAnimA / B (update 0x0802DFD8): its end test is `0x0800EE9E` - the object back in the normal state (obj+0x14
+    // == 0x03001BA4); ours waits for the one-shot's end - over already when RAM shows the normal state (a cut inside
+    // a cutscene map at 14-17, s415: the ghost swapped its graphics in the field's first update after the event)
+    let in_ghost = w.en_ref(ei).ai.stack.last().is_some_and(|s| s.tree.nodes.iter().any(|x| matches!(x.k, wf_core::ai::K::GhostAnimA | wf_core::ai::K::GhostAnimB)));
+    if in_ghost && ram.r32(o + 0x14) == 0x0300_1BA4 {
+        w.en(ei).anim_ended = true;
     }
         // (a knockback's animation index: the one now showing)
     let cur = w.en_ref(ei).a.anim.map(|a| a as i32 + 1).unwrap_or(0);
@@ -1611,7 +1629,9 @@ fn build_mid_ids(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner: &mu
     w.scene.song = song(ram);
     w.scene.hud_hidden = w.story.game_bits & 2 == 0;
     w.scene.banner = None;
-    w.scene.banner_last = -1;
+    // the last area name shown (0x03001984, u16: kept across loads - a reload of the same name shows no banner; run 1
+    // cut 955,163: the event reloads 6-1 after its scene map, Kami's Lookout already shown)
+    w.scene.banner_last = ram.r16(0x0300_1984) as i64;
     w.rng = Rng::new(rng0[0], rng0[1]);
     w.events.clear();
     let calls0 = w.rng.calls;
@@ -1738,6 +1758,96 @@ fn import_cam_pan(w: &mut World, ram: &GbaRam) {
     }
     if hit {
         wf_core::battle::set_camera(w, 0, ram.s32(CAM), ram.s32(CAM + 4));
+    }
+}
+
+/// emote bubbles showing at the cut (`emote`, object vt 0x0804A298, ctor 0x08016304: +4 / +8 the bubble's px, +0xC the
+/// tile handle (0x40 bytes), +0x18 the age, +0x1C the emote + 1, +0x24 the actor object; freed when the age reaches
+/// the emote's length - `scene::emote_len`): our emote visual with the frames left (a cut inside a cutscene map at 3-x,
+/// run 1 cut 447,123: the bubble 13 frames old, freed at f11 - ours had none, its block stayed foreign)
+fn import_emotes(w: &mut World, ram: &GbaRam) {
+    use wf_core::scene::{Visual, VisualKind};
+    for o in ram.objects().into_iter().filter(|&o| ram.r32(o) == 0x0804_A298) {
+        // (+0x1C the bubble's cel count = its tile bytes / 0x40; 8 frames a cel: the emote whose length that is)
+        let cels = ram.s32(o + 0x1C);
+        let emote = (0..5).find(|&e| wf_core::scene::emote_len(e) == cels * 8).unwrap_or(0);
+        let age = ram.s32(o + 0x18);
+        let life = cels * 8 - age;
+        if life <= 0 {
+            continue;
+        }
+        let a = ram.r32(o + 0x24);
+        let owner = ram
+            .valid(a)
+            .then(|| (ram.s32(a + 0x1A0), ram.s32(a + 0x1A4)))
+            .and_then(|(x, y)| (0..w.ents.len()).find(|&i| !w.ents[i].removed && w.actor(i).is_some_and(|ac| ac.x == x && ac.y == y)))
+            .map(|i| w.ents[i].id)
+            .unwrap_or(wf_core::world::EntityId::MAX);
+        let vid = w.next_serial();
+        w.scene.visuals.push(Visual { kind: VisualKind::Emote(emote), x: ram.s32(o + 4), y: ram.s32(o + 8), owner, t: age, life, vid });
+    }
+}
+
+/// an `emote(.., wait)` the replay restarted: its count is the bubble's age (vt 0x0804A298 +0x18, the actor at +0x24),
+/// and the bubble the replay made again goes - the RAM's one stays (`import_emotes`; run 1 cut 447,123: s319 node 25
+/// waiting in emote 2, 13 frames in)
+fn import_emote_cmds(w: &mut World, ram: &GbaRam) {
+    use wf_core::scene::{Cmd, Owner, VisualKind};
+    let objs: Vec<u32> = ram.objects().into_iter().filter(|&o| ram.r32(o) == 0x0804_A298).collect();
+    for k in 0..w.scene.tracks.len() {
+        let Owner::Entity(id) = w.scene.tracks[k].owner else { continue };
+        let Some(i) = w.find(id) else { continue };
+        let Some((ax, ay)) = w.actor(i).map(|a| (a.x, a.y)) else { continue };
+        let _ = (ax, ay);
+        // (one bubble showing: it is this emote's - the object's +0x24 is not the actor)
+        let Some(&o) = (objs.len() == 1).then(|| objs.first()).flatten() else { continue };
+        let len_now = ram.s32(o + 0x1C) * 8;
+        let age = ram.s32(o + 0x18);
+        let mut kind_now = None;
+        if let Some(Cmd::Emote { t, emote, .. }) = w.scene.tracks[k].queue.first_mut() {
+            if wf_core::scene::emote_len(*emote) != len_now {
+                continue;
+            }
+            kind_now = Some(*emote);
+            *t = age;
+            w.scene.tracks[k].started = true;
+        } else {
+            continue;
+        }
+        // (the replay's bubble: the newest; the RAM's one becomes this actor's)
+        for v in w.scene.visuals.iter_mut().filter(|v| matches!(v.kind, VisualKind::Emote(_)) && v.t == age && v.life == len_now - age) {
+            v.owner = id;
+            if let Some(e) = kind_now {
+                v.kind = VisualKind::Emote(e);
+            }
+        }
+        // (the RAM's has the fewest frames left)
+        let mine: Vec<(u32, i32)> = w.scene.visuals.iter().filter(|v| matches!(v.kind, VisualKind::Emote(_)) && v.owner == id).map(|v| (v.vid, v.life)).collect();
+        if mine.len() > 1 {
+            let keep = mine.iter().min_by_key(|m| m.1).map(|m| m.0);
+            for (vid, _) in mine.iter().filter(|m| Some(m.0) != keep) {
+                w.scene.visuals.retain(|v| v.vid != *vid);
+                wf_core::vram::release(w, wf_core::vram::Owner::Visual(*vid));
+            }
+        }
+    }
+}
+
+/// props moving at the cut (`prop_move_to`, object vt 0x0804B92C: +8 / +0xC the target px, +0x10 speed, +0x1C /
+/// +0x20 the step in 1/256 px, +0x24 / +0x28 the position 24.8, +0x2C the steps left): the replayed command takes the
+/// RAM's step and count (it restarted from the prop's position: run 1 cut 38,386, s103 node 0's two props over the
+/// 0-22 cutscene map - the group ended 39 frames later in the game, later in ours)
+fn import_prop_moves(w: &mut World, ram: &GbaRam) {
+    use wf_core::scene::{Cmd, Owner};
+    let objs = ram.ewram_with(0x0804_B92C);
+    for t in w.scene.tracks.iter_mut() {
+        let Owner::Prop(_) = t.owner else { continue };
+        if let Some(Cmd::PropMoveTo { x, y, n, t: tt, sx, sy, .. }) = t.queue.first_mut() {
+            if let Some(&o) = objs.iter().find(|&&o| (ram.s32(o + 8), ram.s32(o + 0xC)) == (*x, *y) && ram.s32(o + 0x2C) >= 0) {
+                (*sx, *sy, *n, *tt) = (ram.s32(o + 0x1C), ram.s32(o + 0x20), ram.s32(o + 0x2C), 0);
+                t.started = true;
+            }
+        }
     }
 }
 
@@ -2546,6 +2656,37 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
             }
         }
     }
+    // a `load_scene*` whose load the game already made (the field is its target): the replay restarted it from its
+    // fade-out - it goes on at its fade-in, with the RAM's progress (the fade mode vt 0x0804C588: +4 steps run, +8
+    // length), or past it (run 1 cut 202,593: s260 node 7's load_scene_fade(6, 1, ..) waiting 3 steps into its
+    // fade-in over 6-1 - ours faded out and loaded 6-1 again)
+    if let Some(wf_script_core::Pending::Phases { list, .. }) = runner.hs.pending.clone() {
+        let here = w.field.as_ref().map(|f| (f.area.world, f.area.area));
+        let j = list.iter().position(|p| matches!(p, wf_script_core::Phase::LoadScene { world, map, .. } if Some((*world, *map)) == here));
+        if let Some(j) = j {
+            w.scene.screen.fade = None;
+            w.scene.screen.black = 0;
+            w.scene.screen.dim = 0;
+            let fading = ram.valid(mode) && ram.r32(mode) == 0x0804_C588;
+            match list.get(j + 1).cloned() {
+                Some(wf_script_core::Phase::Fade { kind, out: false, frames }) if fading => {
+                    wf_core::scene::start_fade(&mut w, kind, false, frames);
+                    if let Some(f) = w.scene.screen.fade.as_mut() {
+                        f.t = ram.s32(mode + 4).clamp(0, f.len);
+                        let (t, len) = (f.t, f.len.max(1));
+                        w.scene.screen.black = 16 - (16 * t / len).clamp(0, 16);
+                        w.scene.screen.dim = 256 - (256 * t / len).clamp(0, 256);
+                    }
+                    runner.hs.pending = Some(wf_script_core::Pending::Phases { list, k: j + 1, started: true });
+                }
+                _ => {
+                    let n = list.len();
+                    runner.hs.pending = Some(wf_script_core::Pending::Phases { list, k: n, started: false });
+                }
+            }
+            notes.push(format!("mid-area: a load_scene already made (phase {j}): on at its fade-in"));
+        }
+    }
     // the screen shake (the camera slot 0x03002BE0 -> vt 0x0804A720: +4 intensity, +5 period, +6 count, +8 frames
     // left): the group's shake commands before the running one are done, the running one is the RAM's
     w.g.shakes = shakes;
@@ -2737,6 +2878,8 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
     }
     // a camera pan in progress (run 2 cut 57,831: s103 node 0's camera_pan_to(224, 176, 1000) after its fade_out)
     import_cam_pan(&mut w, ram);
+    import_prop_moves(&mut w, ram);
+    import_emote_cmds(&mut w, ram);
     // an enemy the script holds in a pose (its state +0x14 the hold state 0x03001B00, `set_pose`) whose `set_pose` the
     // replay dropped: our puppet on the RAM's cel (run 2 cuts 57,831 .. 58,560: s103's Pikkon, pose 12 then 16; else
     // ours ran its AI animation, whose script draws)
@@ -2946,7 +3089,9 @@ fn build_event_entry(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner:
     w.scene.song = song(ram);
     w.scene.hud_hidden = w.story.game_bits & 2 == 0;
     w.scene.banner = None;
-    w.scene.banner_last = -1;
+    // the last area name shown (0x03001984, u16: kept across loads - a reload of the same name shows no banner; run 1
+    // cut 955,163: the event reloads 6-1 after its scene map, Kami's Lookout already shown)
+    w.scene.banner_last = ram.r16(0x0300_1984) as i64;
     w.rng = Rng::new(rng0[0], rng0[1]);
     w.events.clear();
     let calls0 = w.rng.calls;
@@ -2989,7 +3134,16 @@ fn build_event_entry(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner:
         // the scene saved is imported for its `return_to_field` (`import_saved_field`)
         if ram.player() == 0 && ran[..ran.len() - 1].iter().any(|(n, _)| *n == 0x71) {
             notes.push("mid-area: inside a load_scene cutscene map".into());
-            return build_mid_event(data, ram, runner, ev, w, calls0, notes);
+            // (the replay of the node's code before its load_scene sees the room it left - the world-state header the
+            // save copied, 0x03001968: s415 node 0's `set_p(0, get_map())` at 14-17 picks its branch by the room)
+            let left = (ram.r8(0x0300_1968) as i32, ram.r8(0x0300_1969) as i32, ram.r8(0x0300_196A) as i32);
+            let saved = ram.valid(ram.r32(OBJW + 0xBF8));
+            if saved {
+                runner.hs.area_override = Some(left);
+            }
+            let b = build_mid_event(data, ram, runner, ev, w, calls0, notes);
+            runner.hs.area_override = None;
+            return b;
         }
         // the node has run actions and none of them loads (its warp, if any, is still ahead): the event is running
         // mid-node over the field it started on, not at an area entry (real route 4-1, s515's take-off from a
@@ -3720,6 +3874,17 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
             if let (Some(k), true) = (ent, h != 0xFFFF) {
                 used_ents.push(w.ents[k].id);
                 owners.push((h, Owner::Ent(w.ents[k].id)));
+            }
+            continue;
+        }
+        // an emote bubble (vt 0x0804A298, `import_emotes`): its block belongs to the emote visual at its position
+        if vt == 0x0804_A298 {
+            let h = ram.r16(o + 0xC);
+            let (x, y) = (ram.s32(o + 4), ram.s32(o + 8));
+            if let Some(vid) = w.scene.visuals.iter().find(|v| matches!(v.kind, wf_core::scene::VisualKind::Emote(_)) && v.vid != 0 && (v.x, v.y) == (x, y) && !owners.iter().any(|ow| ow.1 == Owner::Visual(v.vid))).map(|v| v.vid) {
+                if h != 0xFFFF {
+                    owners.push((h, Owner::Visual(vid)));
+                }
             }
             continue;
         }

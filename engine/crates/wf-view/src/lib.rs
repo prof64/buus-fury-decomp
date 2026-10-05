@@ -407,6 +407,9 @@ pub enum SpriteEffect {
     None,
     /// Hit flash: every opaque pixel white.
     White,
+    /// The game's hit flash (`ui/hit_flash.json`): the colours drawn through colour-index map 0..2 of the OBJ
+    /// palette (2 = the red ramp).
+    Flash(u8),
     /// GBA semi-transparent OBJ: alpha blended over what is below with the map's EVA/EVB.
     SemiTransparent,
     /// Explicit blend `eva/16 * sprite + evb/16 * below`.

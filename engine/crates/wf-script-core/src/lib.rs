@@ -112,6 +112,10 @@ pub struct HostState {
     pub area: (i32, i32, i32),
     pub save_armed: bool,
     pub saved_field: Option<SavedField>,
+    /// `get_world` / `get_map` / `get_map_variant` answer this area instead of the field's (an importer's replay of a
+    /// node's code from before its `load_scene`, cut inside the cutscene map: the natives then saw the room it left)
+    #[serde(default)]
+    pub area_override: Option<(i32, i32, i32)>,
     /// timed stat boost (GD+0x4DC..0x4F0): frames, str, pow, end, spd, special
     pub boost: [i32; 6],
     /// Switch Character's chosen leader was rebuilt at the screen's close (the world restore), not again at the end
@@ -342,10 +346,13 @@ impl Host for CoreHost<'_> {
                     // a nested loop's exit (the event a deferred call started) runs the whole frame's pass after it:
                     // the players' update too - their form controllers (run 2 row 159,856: the Super Saiyan drain
                     // steps in s120's exit frame, the gauge's revert at 161,733)
-                    if std::env::var("T_REL").is_ok() { eprintln!("EXIT from_wait frame {} wm {}", self.w.frame, self.s.event_watermark); }
                     if self.s.event_watermark == EntityId::MAX {
                         for s in 0..self.w.players.len() {
                             if let Some(pi) = self.w.player_idx(s) {
+                                // (the held frame's owed tick is this update)
+                                if let wf_core::world::Body::Player(p) = &mut self.w.ents[pi].body {
+                                    p.tick_owed = false;
+                                }
                                 wf_core::player::release_passive(self.w, pi);
                             }
                         }

@@ -237,7 +237,7 @@ impl Session {
         // rock, s120) runs as the game's nested loop: this frame has no object pass (run 2 rows 159,704 / 159,714: the
         // hit leader does not take its step, Goten's anim misses one update); the players' keys are masked as in
         // `pre_step` for a running one
-        let pre_event = w.field.as_ref().is_some_and(|f| f.busy && f.event_started_pre);
+        let pre_event = w.field.as_ref().is_some_and(|f| f.busy && f.event_started_pre && f.event_nested);
         if w.field.as_ref().is_some_and(|f| f.busy && f.raw_input.is_none() && f.event_started_pre)
             && !crate::field::free_arrival(w)
         {

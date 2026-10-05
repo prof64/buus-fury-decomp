@@ -127,8 +127,12 @@ fn actor_draw(
     let Some(sp) = a.sprite.and_then(|s| w.data.sprite(s)) else {
         return;
     };
-    let effect = if a.flash > 0 && a.flash & 2 != 0 {
-        SpriteEffect::White
+    // the hit flash (0x0800E8E6): the tiles through colour-index map counter >> 2 (2 = the red ramp) while the
+    // counter runs (`ui/hit_flash.json`; sb_007 6-9 f19380: Super Buu red under Gohan's Kamehameha)
+    // (the map the last tick set: a hit's 12 shows the earlier map until its first tick - sb_006 6-6 f24179 ..
+    // f24184: two plain frames, then red for four, then the tint)
+    let effect = if a.flash_map >= 0 {
+        SpriteEffect::Flash(a.flash_map as u8)
     } else if a.alpha < 256 {
         SpriteEffect::Blend {
             eva: (a.alpha.clamp(0, 256) >> 4) as u8,
@@ -201,6 +205,84 @@ fn record(w: &World, id: u32, addr: u32, x: i32, y: i32, out: &mut RenderView) {
         });
     }
 }
+/// a beam (draw 0x08020DAC; reference fx.ts `BeamGfx.draw`): the start piece while firing (the tail while it
+/// retracts), the head (the impact piece once a hit / wall stopped it) at position + dir * len, then the body pieces
+/// from the position: 32-px ones while `len + 7 - step > o`, one 16 while `len - 9 > o`, one 8 while `len - 1 > o`.
+/// Piece variants: phase = t >> 2; mode 2: phase & 3 (3 -> 1), else phase & 1; the body's: mode 1 phase & 3.
+/// The reference paints the pieces in this order, the later on top (its drawing matches the game's screen): pushed
+/// here in the reverse order (the first OAM entry on top).
+#[allow(clippy::too_many_arguments)]
+fn beam(w: &World, id: u32, set: &str, dir: i32, x: i32, y: i32, len: i32, t: i32, firing: bool, stopped: bool, out: &mut RenderView) {
+    let Some(b) = w.data.beams.get(set) else { return };
+    let d = (dir & 3) as usize;
+    let phase = t >> 2;
+    let k = if b.mode == 2 {
+        match phase & 3 {
+            3 => 1,
+            v => v,
+        }
+    } else {
+        phase & 1
+    };
+    let body_v = if b.mode == 1 { phase & 3 } else { k };
+    let (dx, dy) = crate::geom::DIR_VEC[d];
+    let mut ps: Vec<SpriteDraw> = Vec::new();
+    let mut piece = |name: &str, v: i32, px: i32, py: i32| {
+        let Some(vs) = b.pieces.get(name).map(|p| &p[d]) else { return };
+        let Some(&(index, flip)) = vs.get(v as usize).or(vs.first()) else { return };
+        ps.push(SpriteDraw {
+            entity: id,
+            sheet: format!("effects/{set}"),
+            frame: FrameSel::Frame { index, flip },
+            x: px,
+            y: py,
+            priority: 3,
+            mirror: false,
+            effect: SpriteEffect::None,
+        });
+    };
+    if firing {
+        piece("start", k, x, y);
+        if b.flags & 1 != 0 {
+            piece("start2", k, x, y);
+        }
+    } else {
+        piece("tail", k, x, y);
+        if b.flags & 2 != 0 {
+            piece("tail2", k, x, y);
+        }
+    }
+    let (hx, hy) = (x + dx * len, y + dy * len);
+    if stopped {
+        piece("impact", k & 1, hx, hy);
+        if b.flags & 8 != 0 {
+            piece("impact2", k & 1, hx, hy);
+        }
+    } else {
+        piece("head", k, hx, hy);
+        if b.flags & 4 != 0 {
+            piece("head2", k, hx, hy);
+        }
+    }
+    let step = match b.step[d >> 1] {
+        0 => 32,
+        s => s,
+    };
+    let mut o = 0;
+    while len + 7 - step > o {
+        piece("body32", body_v, x + dx * o, y + dy * o);
+        o += step;
+    }
+    if len - 9 > o {
+        piece("body16", body_v, x + dx * o, y + dy * o);
+        o += 16;
+    }
+    if len - 1 > o {
+        piece("body8", body_v, x + dx * o, y + dy * o);
+    }
+    out.sprites.extend(ps.into_iter().rev());
+}
+
 fn effect(id: u32, run: u32, index: i32, x: i32, y: i32, out: &mut RenderView) {
     out.sprites.push(SpriteDraw {
         entity: id,
@@ -215,120 +297,6 @@ fn effect(id: u32, run: u32, index: i32, x: i32, y: i32, out: &mut RenderView) {
         mirror: false,
         effect: SpriteEffect::None,
     });
-}
-
-/// The player beam family's piece sets (`effects/beam_*`, the extractor's `beam` block: piece-variant mode, extra
-/// piece flags, body step per axis (vertical, horizontal), the charge sparkle's first record in run 0x08721164).
-/// The skill / level -> set mapping is the beam constructors' (0x0801A6A4 Banshee, 0x0801A930 BBK, 0x0801ADF0
-/// Electric Kamehameha, 0x0801BE1A Kamehameha, 0x0801BF86 Kamekameha; reference fx.ts `BEAM_SETS`).
-const BEAM_SETS: [(&str, u8, u8, [i32; 2], u32); 11] = [
-    ("beam_banshee_blast", 2, 0, [32, 32], 6),
-    ("beam_big_bang_kamehameha", 0, 8, [16, 16], 3),
-    ("beam_electric_kamehameha_1", 0, 0, [32, 32], 3),
-    ("beam_electric_kamehameha_2", 1, 0, [32, 32], 3),
-    ("beam_electric_kamehameha_3", 0, 9, [16, 16], 12),
-    ("beam_kamehameha_1", 0, 0, [32, 32], 3),
-    ("beam_kamehameha_2", 0, 0, [16, 16], 3),
-    ("beam_kamehameha_3", 0, 8, [16, 16], 12),
-    ("beam_kamekameha_1", 0, 0, [32, 32], 0),
-    ("beam_kamekameha_2", 0, 0, [16, 16], 0),
-    ("beam_kamekameha_3", 0, 8, [16, 16], 12),
-];
-const BEAM_CHARGE_RUN: u32 = 0x0872_1164;
-
-/// the beam set an owner's beam / charge shows: a player's selected beam skill at its level, else (an enemy's beam
-/// of the player's class: Kid Buu) Kamehameha Lv1 (reference ai.ts `KidBuuKamehameha`)
-fn beam_set(w: &World, owner: crate::world::EntityId) -> usize {
-    let p = w.find(owner).and_then(|i| match &w.ents[i].body {
-        Body::Player(p) => Some(p),
-        _ => None,
-    });
-    let Some(p) = p else { return 5 };
-    let lv = p.skill_level.clamp(0, 2) as usize;
-    match w.data.skill_kind(p.skill()) {
-        1 => 0,
-        3 => 1,
-        6 => 2 + lv,
-        16 => 8 + lv,
-        _ => 5 + lv,
-    }
-}
-
-/// the beam object's draw 0x08020DAC (reference fx.ts `BeamGfx.draw`): start (firing) or tail (retracting) piece at
-/// the position, head (or impact once stopped) at position + dir * len, body pieces of `step` / 16 / 8 px between;
-/// piece variant by the tick `t` (obj+0x18). Pushed front-most first (the reference paints in the reverse order).
-#[allow(clippy::too_many_arguments)]
-fn beam_pieces(id: u32, set: usize, dir: i32, x: i32, y: i32, len: i32, t: i32, firing: bool, stopped: bool, out: &mut RenderView) {
-    let (name, mode, flags, step, _) = BEAM_SETS[set.min(BEAM_SETS.len() - 1)];
-    let phase = t >> 2;
-    let k = if mode == 2 {
-        let k = phase & 3;
-        if k == 3 {
-            1
-        } else {
-            k
-        }
-    } else {
-        phase & 1
-    };
-    let body_v = if mode == 1 { phase & 3 } else { k };
-    let d = (dir & 3) as usize;
-    let (dx, dy) = crate::geom::DIR_VEC[d];
-    let mut ps: Vec<(&str, i32, i32, i32)> = Vec::new();
-    if firing {
-        ps.push(("start", k, x, y));
-        if flags & 1 != 0 {
-            ps.push(("start2", k, x, y));
-        }
-    } else {
-        ps.push(("tail", k, x, y));
-        if flags & 2 != 0 {
-            ps.push(("tail2", k, x, y));
-        }
-    }
-    let (hx, hy) = (x + dx * len, y + dy * len);
-    if stopped {
-        ps.push(("impact", k & 1, hx, hy));
-        if flags & 8 != 0 {
-            ps.push(("impact2", k & 1, hx, hy));
-        }
-    } else {
-        ps.push(("head", k, hx, hy));
-        if flags & 4 != 0 {
-            ps.push(("head2", k, hx, hy));
-        }
-    }
-    let st = if step[d >> 1] > 0 { step[d >> 1] } else { 32 };
-    let mut o = 0;
-    while len + 7 - st > o {
-        ps.push(("body32", body_v, x + dx * o, y + dy * o));
-        o += st;
-    }
-    if len - 9 > o {
-        ps.push(("body16", body_v, x + dx * o, y + dy * o));
-        o += 16;
-    }
-    if len - 1 > o {
-        ps.push(("body8", body_v, x + dx * o, y + dy * o));
-    }
-    for (anim, v, px, py) in ps.into_iter().rev() {
-        out.sprites.push(SpriteDraw {
-            entity: id,
-            sheet: format!("effects/{name}"),
-            // every piece step lasts 4 frames: variant v = the step at 4v
-            frame: FrameSel::Anim {
-                anim: anim.into(),
-                dir: d as u8,
-                t: 4 * v.max(0) as u32,
-                looping: true,
-            },
-            x: px,
-            y: py,
-            priority: 3,
-            mirror: false,
-            effect: SpriteEffect::None,
-        });
-    }
 }
 
 /// the Instant Transmission ring (class 0x080222E0, OAM priority 0; reference skillfx.ts `ItMarkersFx`): record
@@ -575,6 +543,33 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                 | Fx::Loop {
                     id: run, x, y, rec, ..
                 } => effect(id, *run, *rec, *x, *y, out),
+                // the beam object in its charge state (0x080206B8 state 0): the sparkle at owner + off[facing], record
+                // charge_index for t < 4, then charge_index + 1 + ((t >> 2) & 1) (reference fx.ts `drawCharge`; the
+                // set: the player's selected beam skill at its level, an enemy's Kamehameha Lv1)
+                Fx::BeamCharge { owner, off, set, t } => {
+                    let who = w.find(*owner);
+                    let a = who.and_then(|k| w.actor(k));
+                    let name = match (set, who.map(|k| &w.ents[k].body)) {
+                        (crate::fx::BeamSet::Other, Some(Body::Player(p))) => {
+                            crate::shots::beam_set(w.data.skill_kind(p.skill()), p.skill_level)
+                        }
+                        _ => "beam_kamehameha_1".to_string(),
+                    };
+                    if let (Some(a), Some((run, ci))) = (a, w.data.beams.get(&name).and_then(|b| b.charge.clone())) {
+                        let r = if *t < 4 { ci } else { ci + 1 + ((t >> 2) & 1) };
+                        let (ox, oy) = off[(a.facing & 3) as usize];
+                        out.sprites.push(SpriteDraw {
+                            entity: id,
+                            sheet: format!("effects/{run}"),
+                            frame: FrameSel::Frame { index: r.max(0) as u16, flip: false },
+                            x: a.px() + ox,
+                            y: a.py() + oy,
+                            priority: 3,
+                            mirror: false,
+                            effect: SpriteEffect::None,
+                        });
+                    }
+                }
                 Fx::Debris { x, y, .. } => out.sprites.push(SpriteDraw {
                     entity: id,
                     sheet: "effects/debris".into(),
@@ -607,25 +602,6 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                             seg[k][1] >> 8,
                             out,
                         );
-                    }
-                }
-                // the beam object in its charge state (0x080206B8 state 0): the sparkle at owner + off[facing],
-                // record charge_index for t < 4, then charge_index + 1 + ((t >> 2) & 1) (fx.ts `drawCharge`)
-                Fx::BeamCharge { owner, off, set, t } => {
-                    let a = w.find(*owner).and_then(|k| match &w.ents[k].body {
-                        Body::Player(p) => Some(&p.a),
-                        Body::Enemy(n) => Some(&n.a),
-                        _ => None,
-                    });
-                    if let Some(a) = a {
-                        let s = match set {
-                            crate::fx::BeamSet::Kamehameha1 => 5,
-                            crate::fx::BeamSet::Other => beam_set(w, *owner),
-                        };
-                        let ci = BEAM_SETS[s].4 as i32;
-                        let r = if *t < 4 { ci } else { ci + 1 + ((t >> 2) & 1) };
-                        let (ox, oy) = off[(a.facing & 3) as usize];
-                        record(w, id, BEAM_CHARGE_RUN + 12 * r as u32, a.px() + ox, a.py() + oy, out);
                     }
                 }
                 // Instant Transmission: the cursor ring (group A 0x0872BF04) on the selection point, the target rings
@@ -729,20 +705,7 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                         out,
                     ),
                     ShotKind::SjWave => record(w, id, 0x0875_a6a8 + 12 * d as u32, x, y, out),
-                    // the player's beam family (Kamehameha, Kamekameha, Electric Kamehameha, Banshee, BBK; Kid
-                    // Buu's Kamehameha)
-                    ShotKind::Kame(b) if b.gfx => beam_pieces(
-                        id,
-                        beam_set(w, s.owner),
-                        d,
-                        x,
-                        y,
-                        b.len,
-                        b.vt,
-                        !b.done,
-                        b.stopped,
-                        out,
-                    ),
+                    ShotKind::Kame(k) if !k.charging => beam(w, id, &k.set, d, x, y, k.len, k.vt, !k.done, k.stopped, out),
                     _ => {}
                 }
             }

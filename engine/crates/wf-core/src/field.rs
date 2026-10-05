@@ -451,6 +451,9 @@ pub struct Field {
     /// a deferred call started an event at this frame's start (`fieldobj::Deferred::Run`): the update holds the players
     #[serde(default)]
     pub event_started_pre: bool,
+    /// ... as the game's nested loop (no object pass in that frame)
+    #[serde(default)]
+    pub event_nested: bool,
 }
 
 /// how a field session starts
@@ -669,6 +672,7 @@ fn new_field() -> Field {
         hud_beep: 0,
         hud_hidden_at: None,
         event_started_pre: false,
+        event_nested: false,
     }
 }
 
@@ -1875,11 +1879,12 @@ pub fn post_step(w: &mut World) {
         for d in f.pending_drops.iter_mut() {
             d.0 = d.0.saturating_add(1);
         }
-        if std::env::var("B_BREAKHOLD").is_ok() {
-            for d in f.deferred.iter_mut() {
-                if let crate::fieldobj::Deferred::Break { at, .. } = d {
-                    *at = at.saturating_add(1);
-                }
+        // ... and so does a breakable broken by the same punch: its break timer (the callback with the loot) waits
+        // too (run 2 row 788,137, Fukurou 13-49: a punch kills a Ninja and breaks a crate, the kill's level-up popup
+        // holds the field; the game's Ninja drop comes 7 frames after the popup closes, the crate's loot 8 later)
+        for d in f.deferred.iter_mut() {
+            if let crate::fieldobj::Deferred::Break { at, .. } = d {
+                *at = at.saturating_add(1);
             }
         }
     }
@@ -2377,13 +2382,6 @@ fn defeats(w: &mut World) {
 fn run_due_drops(w: &mut World) {
     // the frame number this update will have (the entities' update advances it)
     let frame = w.frame + 1;
-    if std::env::var("B_DROPS").is_ok() {
-        if let Some(f) = w.field.as_ref() {
-            if !f.pending_drops.is_empty() {
-                eprintln!("B_DROPS wf {} drops {:?} held_event {} held {} busy {} depth {}", w.frame, f.pending_drops.iter().map(|d| (d.0, d.1, d.2)).collect::<Vec<_>>(), f.held_event, f.held, f.busy, w.scene.depth);
-            }
-        }
-    }
     let due: Vec<(u32, EntityId, i32, i32, i32, i32, i32)> = w
         .field
         .as_ref()

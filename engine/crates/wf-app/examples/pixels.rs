@@ -313,7 +313,7 @@ fn main() {
                         wf_core::view::render_view(w, &mut view);
                         for (i, e) in w.ents.iter().enumerate().filter(|(_, e)| !e.removed) {
                             if let Some(a) = w.actor(i) {
-                                eprintln!("  ent {} sprite {:?} anim {:?} t {} facing {} shown {:?} ea {:?} pos {} {}", e.id, a.sprite, a.anim, a.anim_t, a.facing, wf_core::scene::shown_anim(w, i), match &e.body { wf_core::world::Body::Enemy(n) => Some((n.ea.pos.raw, n.ea.pos.frame, n.ea.pos.tick)), _ => None }, a.x >> 8, a.y >> 8);
+                                eprintln!("  ent {} flash {} {} sprite {:?} anim {:?} t {} facing {} shown {:?} ea {:?} pos {} {}", e.id, a.flash, a.flash_map, a.sprite, a.anim, a.anim_t, a.facing, wf_core::scene::shown_anim(w, i), match &e.body { wf_core::world::Body::Enemy(n) => Some((n.ea.pos.raw, n.ea.pos.frame, n.ea.pos.tick)), _ => None }, a.x >> 8, a.y >> 8);
                             }
                         }
                         eprintln!("  suspended {:?}", w.field.as_ref().and_then(|f| f.vram.as_ref()).map(|v| v.suspended.clone()));
@@ -436,6 +436,19 @@ fn main() {
                     if let Some(o) = &out_dir {
                         let diff: Vec<u32> = game[i].iter().zip(&ours).map(|(a, b)| if a == b { 0xFF00_0000 } else { 0xFFFF_00FF }).collect();
                         save(&o.join(format!("{name}_f{k}.png")), &[&game[i], &ours, &diff]);
+                        // PIX_WIDE=WxH: also the PC zoomed-out view of the frame (the same view, a wider screen)
+                        if let Some((ww, wh)) = std::env::var("PIX_WIDE").ok().and_then(|v| v.split_once('x').and_then(|(a, b)| Some((a.parse::<usize>().ok()?, b.parse::<usize>().ok()?)))) {
+                            let mut wr = Renderer::default();
+                            let px = wr.render(&packs, &view, 0, ww, wh).to_vec();
+                            let mut rgb = Vec::with_capacity(ww * wh * 3);
+                            for c in &px {
+                                rgb.extend_from_slice(&[(c >> 16) as u8, (c >> 8) as u8, *c as u8]);
+                            }
+                            let f = std::fs::File::create(o.join(format!("{name}_f{k}_wide.png"))).unwrap();
+                            let mut e = png::Encoder::new(std::io::BufWriter::new(f), ww as u32, wh as u32);
+                            e.set_color(png::ColorType::Rgb);
+                            e.write_header().unwrap().write_image_data(&rgb).unwrap();
+                        }
                         pngs += 1;
                     }
                 }

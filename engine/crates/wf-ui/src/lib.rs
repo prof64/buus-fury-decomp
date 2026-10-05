@@ -134,6 +134,24 @@ pub fn extract(rom: &Rom, out: &mut Content) -> wf_rom::Result<()> {
     out.put("ui/hud/boss_bar.png", bb.png(&pal, true));
     out.put_json("ui/hud.json", &hud::json(&h));
 
+    // the hit flash (object 0x0800E8E6, vtable 0x0804A7A0, tick 0x0800DE28): a 12-frame counter, decremented each
+    // tick; while > 0 the actor's tiles are drawn through the colour-index map 0x080725AC[counter >> 2] (three
+    // 256-byte maps at 0x08056C2C: a warm tint, the same, a red ramp), at 0 the plain tiles again. The OBJ palette
+    // (0x0805652C) gives the maps' colours.
+    let obj_pal: Vec<u32> = (0..256u32)
+        .map(|i| {
+            let [r, g, b] = bgr555(rom.u16(0x0805_652C + 2 * i));
+            (r as u32) << 16 | (g as u32) << 8 | b as u32
+        })
+        .collect();
+    let maps: Vec<Vec<u8>> = (0..3u32).map(|k| rom.bytes(rom.u32(0x0807_25AC + 4 * k), 256).to_vec()).collect();
+    out.put_json(
+        "ui/hit_flash.json",
+        &json!({"obj_palette": obj_pal, "maps": maps, "counter": 12,
+                "rule": "counter 12 at the hit, -1 per tick; drawn through maps[counter >> 2] while > 0",
+                "rom": {"object": "0x0800E8E6", "tick": "0x0800DE28", "maps": "0x080725AC", "obj_palette": "0x0805652C"}}),
+    );
+
     // area-name banner (layout constants from its object, vt 0x0804B528)
     out.put_json("ui/banner.json", &banner_json());
 
