@@ -167,7 +167,80 @@ def g_pyramid(e):
 
 g_pyramid.chain = True
 
+def dungeons_route(mod, fn, drvmod, drvcls):
+    """an agent A route (tools/dungeons: db2 Diablo Desert, db4 Nataday) as a chain part, built from its state"""
+    def make(e):
+        if str(ROOT / 'tools' / 'dungeons') not in sys.path:
+            sys.path.insert(0, str(ROOT / 'tools' / 'dungeons'))
+        import importlib
+        m = importlib.import_module(mod)
+        drv = getattr(importlib.import_module(drvmod), drvcls)
+        return drv(getattr(m, fn)(e))
+    return make
+
+
+def g_desert(e):
+    """Diablo Desert + Express (11) fourth (run 1: third): Goten's 27 points a third each into STR, END and SPD (run
+    1: never SPD), the flight, agent A's db2 route (the gate, the four switches, the train, the five
+    robbers, the 2-Star Dragon Ball s378)"""
+    pts = e.r16(0x03001560 + 0x68 * 2 + 0x2C)
+    return Chain([ship([alloc_keys([(0, [pts // 3, 0, pts // 3, pts - 2 * (pts // 3)])]), ('wait', 30),
+                        DESERT]),
+                  dungeons_route('db2_route', 'db2', 'db2_driver', 'Db2Driver')])
+
+
+g_desert.chain = True
+
+def g_pilaf(e):
+    """Pilaf's Castle (10) fifth (run 1: second): four Onigiri at West City's Z-Mart, the flight, run 1's goals from 10-1 to the pad (Trunks breaks the
+    rock: s517 (3, 80); Goten through the castle, Pilaf's Guardian s365, the 3-Star Dragon Ball s366), but Goten's
+    points into POW / SPD (run 1: STR / END), a rest + Save at 10-30 before the Guardian"""
+    import ship_route
+    g = ship_route.goals_fatbuu(e)
+    g = g[g.index(('mark', 'd11_pilaf')):g.index(('mark', 'd15_map'))]
+    pts = e.r16(0x03001560 + 0x68 * 2 + 0x2C)
+    out = []
+    for x in g:
+        if x[0] == 'keys' and x is g[g.index(('mark', 'd11b_rock')) - 1]:
+            x = alloc_keys([(0, [0, pts // 2, 0, pts - pts // 2])])
+        out.append(x)
+    k = out.index(('mark', 'd12_pilaf_boss'))
+    # run 2: at 10-30's save point Goten rests (Trunks stands in) and the game is saved; a game over at the
+    # Guardian continues from there
+    return Chain([ship([('wait', 30), WEST_CITY, ('wait', 30), *zmart(3, 4), *take_off(416, 360),
+                        PILAF, ('wait', 200)] + out[:k + 1]),
+                  ship([*rest_at(60, 109), *save_at(10, 30)]),
+                  retry_from(10, 30, [ship(out[k + 1:])])])
+
+
+g_pilaf.chain = True
+
+
+def g_thieves(e):
+    """the Thieves Den (9) sixth (run 1: first): the flight; Trunks breaks 9-1's rock (s517 (3, 80)) and - run 2 -
+    stays the leader with the Bandana on (run 1: Goten wore it): the guards (s350), the hideout, the Bandit King
+    (s357), the 1-Star Dragon Ball (s362) and the gang, out to the pad (ship_route.goals_fatbuu's goals otherwise)"""
+    import ship_route
+    g = ship_route.goals_fatbuu(e)
+    g = g[g.index(('mark', 'd06_thieves')):g.index(('mark', 'd10_map'))]
+    # drop the switch back to Goten after the rock (the second save point visit: walk, charsel(-1)) but keep the equip
+    k = [i for i, x in enumerate(g) if x == ('walk', 68, 188)][1]
+    j = k + 1
+    while g[j][0] != 'keys' or g[j][1][0][0] != KEY.START:
+        j += 1
+    g = g[:k] + g[j:]
+    k = g.index(('nav', 9, 10, True))
+    # a Save at 9-1's save point with the Bandana on; a game over in the den continues from there
+    return Chain([ship([('wait', 30), THIEVES] + g[:k]), ship(save_at(9, 1)), retry_from(9, 1, [ship(g[k:])])])
+
+
+g_thieves.chain = True
+
+
 PIECES = {
+    'thieves': g_thieves,
+    'pilaf': g_pilaf,
+    'desert': g_desert,
     'pyramid': g_pyramid,
     'fukurou': g_fukurou,
     'airship': g_airship,
@@ -200,6 +273,27 @@ class Driver2(ShipDriver):
         g = self.goals[self.k]
         if g[0] == 'talkto':
             return self.talkto(e, status(e), g)
+        if g[0] == 'nav' and getattr(self, 'unjam', 0) > 0:
+            self.unjam -= 1
+            return self.unjam_key
+        if g[0] == 'nav':
+            # run 2: a nav that has stood still in one room for 1,200 frames (the driver's exit approach can loop on
+            # a doorway: 10-27's door up to 10-28, punching the air) walks straight into the next exit for 60 frames
+            s = status(e)
+            pos = (tuple(s['area'][:2]), tuple(s['p'][:2]) if s['p'] else None)
+            if pos == getattr(self, 'jam_pos', None) and s['scene'] == 0 and s['p'] is not None:
+                self.jam_n += 1
+            else:
+                self.jam_pos, self.jam_n = pos, 0
+            if self.jam_n > 1200:
+                import nav as navm
+                hops = navm.route('%d-%d' % (s['area'][0], s['area'][1]), '%d-%d' % (g[1], g[2]))
+                if hops:
+                    push = hops[0][1][2] or 'up'
+                    self.unjam_key = {'up': U, 'down': D, 'left': L, 'right': R}[push]
+                    self.unjam, self.jam_n = 60, 0
+                    print('  unjam', s, push, flush=True)
+                    return self.unjam_key
         if g[0] == 'needflag':
             if not e.r8(0x03001068 + 0x55 + g[1] // 8) >> (g[1] % 8) & 1:
                 raise RuntimeError(f'flag {g[1]} not set')
@@ -309,7 +403,9 @@ def real_pyramid_driver():
                 if g[0] == 'shoot' and 'no event' in str(ex):
                     # run 2: the bridge switch left in the other state (the shot before toggled it once more than
                     # meant): that switch again, then this goal
-                    prev = [x for x in self.goals[:self.k] if x[0] == 'shoot']
+                    # (a shoot goal becomes ('events',) once its event starts: the route's own list)
+                    sh = [x for x in routes7.BRIDGES_21 if x[0] == 'shoot']
+                    prev = sh[:sh.index(g)] if g in sh else []
                     self.reshots = getattr(self, 'reshots', 0) + 1
                     if not prev or self.reshots > 6:
                         raise

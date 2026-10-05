@@ -318,6 +318,15 @@ impl Page for Title {
             self.list.build_figs(w);
         }
     }
+    fn built_imported(&mut self) {
+        self.list.rebuilt = false;
+        self.list.rng_owed = 0;
+    }
+    fn built(&mut self, w: &mut World) {
+        if self.page == TPage::Select {
+            self.list.built(w);
+        }
+    }
     fn objs(&self, w: &World) -> Vec<wf_view::MenuObj> {
         if let Some((_, l)) = &self.held {
             return l.fig_objs(w);
@@ -700,6 +709,12 @@ pub fn title_world(data: &Arc<crate::content::GameData>, w: &World) -> World {
     nw.saves.pending = None;
     nw.menu.settings = w.menu.settings.clone();
     nw.opts = w.opts.clone();
+    // the frame counter 0x03000F94 runs on (it counts since the reset; run 2 row 18,047: the game over's return to
+    // the title - the field enemies' clock-stamped timers after the next New Game, row 33,788)
+    // (+1: this iteration, counted by the menu step of the old world)
+    nw.g.fc0 = w.g.clock(w.frame) + 1 - nw.frame as i64;
+    // ... and so does the path followers' re-plan phase 0x030032E5 (not part of GameData)
+    nw.g.path_stagger = w.g.path_stagger;
     nw.story = old.story;
     // (and its HUD-shown bit, GameData bits & 2: the ending's hide_hud leaves it clear under the title - sb_044_04_20,
     // rsbk_002_04_21 world-state rows)
@@ -799,29 +814,44 @@ pub fn boot(data: &Arc<crate::content::GameData>, w: &mut World) -> Option<World
                 pos: Some((d.x, d.y)),
                 story: Some(story),
                 rng,
+                // an area entry (the player made once - its two idle draws - and the load's camera): the game's load
+                // draws the area's NPC ticks and those two only (run 2 row 35,863: 3 draws)
+                arrive: w.opts.no_lag,
+                slow_fade_in: w.opts.no_lag,
                 ..Default::default()
             };
             let mut nw = crate::field::create(Arc::clone(data), &cfg);
             nw.menu.phase = Phase::Leave { t: 1 };
-            // (no lag frames: the slot's load is one long iteration, then two black ones - menu_parity
-            // title_continue lf 996 .. 998)
-            let leave = if w.opts.no_lag {
-                CONTINUE_BLACK_ITERS
+            if w.opts.no_lag {
+                // the slot's load is one long iteration; from it the field fades in by 4 a frame (`0x080070CC` from
+                // the stored colours: 256 - 4 k, k the iterations since the load) with the world running - the
+                // player under control (run 2 rows 35,865 .. 35,928: walking at level 56)
+                nw.menu.tr = Transition {
+                    fade_out: 0,
+                    enter: 1,
+                    leave: 2,
+                    fade_in: 0,
+                };
+                if let Some(f) = nw.field.as_mut() {
+                    f.mode = crate::field::Mode::FadeIn { k: 1 };
+                }
             } else {
-                CONTINUE_BLACK
-            };
-            nw.menu.tr = Transition {
-                fade_out: 0,
-                enter: 1,
-                leave,
-                fade_in: CONTINUE_FADE_IN,
-            };
+                nw.menu.tr = Transition {
+                    fade_out: 0,
+                    enter: 1,
+                    leave: CONTINUE_BLACK,
+                    fade_in: CONTINUE_FADE_IN,
+                };
+            }
             nw
         }
     };
     // the boot counter (0x03000F94) runs on through the GameData reset / slot read: the new play time's bias is the
     // counter now minus the new play time (whole run 7-3: the punch marker's blink phase, 764 boot + title frames)
     nw.story.lf_bias = w.story.play_frames as i64 + w.story.lf_bias - nw.story.play_frames as i64;
+    // the path followers' re-plan phase (0x030032E5) is not GameData: New Game / Continue leave it (run 2 row 33,788:
+    // after a game over and a new game, an enemy's chase re-plans on the game's phase)
+    nw.g.path_stagger = w.g.path_stagger;
     crate::scene::note_events(&mut nw);
     saves.pending = None;
     nw.saves = saves;

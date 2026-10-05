@@ -1840,7 +1840,7 @@ export function create(n: AiNodeJ, c: AiController): RNode {
     case 'KidBuuSplitAnim':
       // SetAnimRaw(0xC) under the one-shot state 0x03001B30; the node finishes on the 56th update (lockstep
       // f02_vs_enemy_beam: entered at 172, the split state at 229)
-      return wait(n, c, 56, 12, false)
+      return new Act(n, c, () => e.setAnim(12, true, false, { rule: 'once_stop', shift: 3, end: 'none' }), (f) => f >= 56)
     case 'KidBuuSplit':
       return new Instant(n, c, () => e.kidBuuSplit())
     case 'KidBuuMerge':

@@ -399,6 +399,10 @@ pub struct Field {
     /// and under control, no autowalk (6-1 -> 6-13, the tournament grounds' gate)
     #[serde(default)]
     pub script_fade_in: bool,
+    /// ... the title's Continue (`FieldConfig::slow_fade_in`): no script waits on it, its end leaves the players
+    /// as they are (run 2 row 35,928: walking on, no idle draw)
+    #[serde(default)]
+    pub fade_no_idle: bool,
     /// the object being updated destroyed one before it in the world list (Majin Buu's eat removes the player
     /// object): the list compacts and it is updated again in this pass (`World::step_entities_list`)
     #[serde(default)]
@@ -465,6 +469,10 @@ pub struct FieldConfig {
     /// start like an exit arrival: the load's RNG draws, then the 32-frame fade-in with the player autowalking
     #[serde(default)]
     pub arrive: bool,
+    /// with `arrive`: the slow fade-in (by 4) with the player under control, no autowalk (a script's warp_fade
+    /// arrival; the title's Continue)
+    #[serde(default)]
+    pub slow_fade_in: bool,
 }
 fn yes() -> bool {
     true
@@ -482,6 +490,7 @@ impl Default for FieldConfig {
             rng: battle::RngInit::Seed(1),
             xp: true,
             arrive: false,
+            slow_fade_in: false,
         }
     }
 }
@@ -635,6 +644,7 @@ fn new_field() -> Field {
         nest_load: false,
         nest_fade: false,
         script_fade_in: false,
+        fade_no_idle: false,
         list_redo: false,
         player_new: false,
         vram: Some(crate::vram::VramState::default()),
@@ -699,6 +709,12 @@ pub fn create(data: Arc<crate::content::GameData>, cfg: &FieldConfig) -> World {
         // the load frame's camera update (the game eases once before the first fade-in frame)
         for s in 0..w.players.len() {
             camera(&mut w, s);
+        }
+        if cfg.slow_fade_in {
+            if let Some(f) = w.field.as_mut() {
+                f.script_fade_in = true;
+                f.fade_no_idle = true;
+            }
         }
         begin_fade_in(&mut w);
     } else {
@@ -1050,6 +1066,7 @@ pub fn load_area_with(
         // it (app soak: warp_fade to the world map, then a circle's immediate warp into 2-8 left it set, and the
         // door script's nested hold no longer kept the walking player's state)
         f.script_fade_in = false;
+        f.fade_no_idle = false;
         // "the running event came from the queue" belongs to that event: a load outside any event drops it (app
         // soak of the real route, HFIL 18-10 -> 18-7: a breakable's instant callback at 18-10 left it set, and
         // the hit event at 18-7 then ended with the queued exit frame's extra player tick - knockback 1 frame short)
@@ -1535,12 +1552,14 @@ pub fn pre_step(w: &mut World) {
             && matches!(f.mode, Mode::FadeIn { k } if k >= crate::fieldworld::FADE_IN_3D - 1)
     }) && !crate::fieldworld::flying(w)
     {
+        let idle = !w.field.as_ref().is_some_and(|f| f.fade_no_idle);
         if let Some(f) = w.field.as_mut() {
             f.mode = Mode::Normal;
             f.script_fade_in = false;
+            f.fade_no_idle = false;
         }
         for s in 0..w.players.len() {
-            if let Some(i) = w.player_idx(s) {
+            if let Some(i) = w.player_idx(s).filter(|_| idle) {
                 player::set_idle(w, i);
             }
         }

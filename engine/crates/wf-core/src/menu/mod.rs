@@ -171,6 +171,10 @@ pub trait Page {
     }
     /// draw-time side effects and values sampled when the surface is drawn (kept in the shown copy)
     fn before_draw(&mut self, _w: &World) {}
+    /// the world side of the last `before_draw` (objects it made: their sprite memory, the idle state's draw)
+    fn built(&mut self, _w: &mut World) {}
+    /// an imported screen's objects exist already (their draws and sprite memory are in the imported state)
+    fn built_imported(&mut self) {}
     /// draw-time side effects the game applies after the part of the surface that shows them (the state shown
     /// keeps the old values; the live state takes the new ones)
     fn after_draw(&mut self, _w: &World) {}
@@ -525,6 +529,8 @@ pub fn open_imported(w: &mut World, mut screen: Screen) {
     };
     crate::vram::world_hide(w);
     screen.page_mut().before_draw(w);
+    // (the figures of an imported screen exist already: their draws are in the imported generator)
+    screen.page_mut().built_imported();
     screen.container().drawn = true;
     screen.container().ever = true;
     w.menu.shown = Some(Box::new(screen.clone()));
@@ -840,6 +846,7 @@ fn redraw(w: &mut World, first: bool) {
     top.update(w);
     if !top.container_ref().drawn {
         top.before_draw(w);
+        top.page_mut().built(w);
         top.container().drawn = true;
         // (no lag frames: the redraw is part of its iteration - `Options::no_lag`)
         let mut cost = if first || w.opts.no_lag {
@@ -1231,6 +1238,7 @@ pub fn post(w: &mut World) {
     top.page_mut().after_scripts(w);
     if top.container_ref().drawn {
         top.before_draw(w);
+        top.page_mut().built(w);
         let snap = Some(Box::new(top.clone()));
         if w.menu.pending.is_some() {
             w.menu.pending = snap;

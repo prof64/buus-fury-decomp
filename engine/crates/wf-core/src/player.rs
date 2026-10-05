@@ -4327,6 +4327,14 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
         if pl.dead {
             return msg.team != 1;
         }
+        // an exit / area arrival's autowalk (0x08010D7C): the state takes no damage (the handler's state check
+        // 0x08010F74 skips ComputeDamage) but the overlap of a broadcast message (0x08011C0C: waves, blasts) is accepted
+        // - an enemy wave puffs on the arriving player and retracts (run 2 row 544,962, 8-42: a Majin soldier's wave in
+        // the fade-in's last frame). The Destroyer's flame (0x080247C0, the no-reaction hit) tests the player's +0x1CC
+        // itself first: not hittable, no message (Pilaf's Castle 10-4, dr3_025)
+        if pl.gs == Gs::AutoWalk && !msg.no_react {
+            return msg.team != 1;
+        }
         // not hittable (+0x1CC: reverting, Instant Transmission, the cutscene fusions): not accepted
         if !pl.a.hittable {
             return false;

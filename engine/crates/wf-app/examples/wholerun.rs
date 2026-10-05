@@ -128,6 +128,7 @@ fn main() {
     let (mut load_watch, mut load_bad): (Option<(usize, usize)>, usize) = (None, 0);
     let mut clock_reported = false;
     let mut k = from_row;
+    let mut clk_last: Option<i64> = None;
     let mut lfd_last: Option<i64> = None;
     let mut hp_bad = false;
     // --sounds FILE: the game's sound requests per row (tools/wholerun/sounds.py; .json or .json.gz) - compared per
@@ -421,6 +422,14 @@ fn main() {
                 hp_bad = bad;
             }
         }
+        // WR_CLK=1: the rows where the game's logic counter (0x03000F94) and our clock (`Globals::clock`) change offset
+        if std::env::var_os("WR_CLK").is_some() && logic {
+            let d = lf - w.g.clock(w.frame);
+            if Some(d) != clk_last {
+                println!("CLK row {k} ({}) lf {lf} clock {} offset {d} (was {:?}) menu {menu} area {aa:?}", stretch_of(k), w.g.clock(w.frame), clk_last);
+                clk_last = Some(d);
+            }
+        }
         // WR_LFD=1: the rows where the game's logic counter (0x03000F94) and ours (play time + bias) change offset
         if std::env::var_os("WR_LFD").is_some() {
             let d = lf - (w.story.play_frames as i64 + w.story.lf_bias);
@@ -431,6 +440,23 @@ fn main() {
         }
         if show.is_some_and(|(a, b)| a <= k && k <= b) {
             println!("row {k} keys {keys:x} logic {logic} menu {menu} app area {aa:?} p {ap:?} rng {:08x?} depth {} | game area {ga:?} p {} rng {} depth {gd} lf {lf} ourlf {} clock {}", w.rng.state(), w.scene.depth, r["p"], r["rng"], w.story.play_frames as i64 + w.story.lf_bias, w.g.clock(w.frame));
+            // WR_EDUMP=row: every enemy's whole state at that row (pretty Debug, one file per run: WR_EDUMP_OUT)
+            if std::env::var("WR_EDUMP").ok().and_then(|v| v.parse::<usize>().ok()) == Some(k) {
+                let out = std::env::var("WR_EDUMP_OUT").unwrap_or_else(|_| "/tmp/edump.txt".into());
+                let mut txt = String::new();
+                for e in w.ents.iter().filter(|e| !e.removed) {
+                    if true {
+                        txt += &format!("{:#?}\n", e);
+                    }
+                }
+                txt += &format!("{:#?}\n{:#?}\n{:#?}\n", w.g, w.story, w.field.as_ref().map(|f| (&f.mode, f.busy, &f.patrols)));
+                let _ = std::fs::write(out, txt);
+            }
+            // WR_ENEMY=1: every actor's sprite and position (px * 256)
+            if std::env::var("WR_ENEMY").is_ok() {
+                let v: Vec<String> = (0..w.ents.len()).filter(|&i| !w.ents[i].removed).filter_map(|i| w.actor(i).map(|a| format!("{}:{}@({},{}) f{}", w.ents[i].id, a.sprite.unwrap_or(-1), a.x, a.y, a.facing))).collect();
+                println!("    actors {} clock {}", v.join(" "), w.g.clock(w.frame));
+            }
             if std::env::var("WR_DLG").is_ok() {
                 if let Some(d) = &w.scene.dialog {
                     println!("    dialog kind {} phase {:?} page {}/{} typed {} need {:?} t {} options {} c {} speed {}", d.kind, d.phase, d.page, d.pages, d.typed, d.typing, d.t, d.options, d.type_c, w.menu.settings.text_speed);

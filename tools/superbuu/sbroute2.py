@@ -29,8 +29,17 @@ S, E, LS, RS = KEY.START, KEY.SELECT, KEY.L, KEY.R
 
 class SbDriver2(ShipDriver2):
     autoheal = False
+    _calls = 0
+
+    def keys(self, e):
+        self._calls = 0
+        return super().keys(e)
 
     def step(self, e):
+        # a goal that keeps returning None without moving on would spin the frame forever
+        self._calls += 1
+        if self._calls > 2000:
+            raise RuntimeError(f'goal {self.k} {self.goals[self.k]} spins without a key: {status(e)}')
         g = self.goals[self.k]
         kind = g[0]
         if kind == 'fly' and len(g) == 3:
@@ -130,7 +139,7 @@ def goals_run2(e):
         ('allocnow', lambda n: [n // 6, n // 2, n // 6, n - n // 6 - n // 2 - n // 6]),
         # the capsule -> West City 4-1 -> its Z-Mart 0-92 (run 1 never shopped here): Buy -> Items: Rice Balls?
         # rows 2 and 3 (supplies 3 / 4) twice each; back, Sell -> the first row once; out
-        ('walk', 280, 256), ('talk', 'U'), ('fly', 1250, 1200), ('eventsw', 240), ('wait', 30),
+        ('walk', 280, 256), ('talk', 'U'), ('fly', 1250, 1200), ('until', 4, 1), ('wait', 30),
         ('walk', 262, 302), ('hold', U, 40), ('area', 0, 92), ('wait', 30), ('walk', 100, 110), ('hold', L, 20),
         keys((A, 3, 120), (A, 3, 90), (A, 3, 90), (D, 3, 50), (D, 3, 50), (A, 3, 60), (A, 3, 60), (D, 3, 50),
              (A, 3, 60), (A, 3, 60), (B, 3, 60), (B, 3, 60), (D, 3, 30), (A, 3, 90), (A, 3, 60)),

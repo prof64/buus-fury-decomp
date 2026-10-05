@@ -4323,6 +4323,23 @@ prop's absence itself is unexplained.
   entry 255 - the 12-x countdown light green in fades).
 * **A sprite's ground shadow is offset by its header** (bytes 12 / 13: s8 dx, u8 dy; `Sprite.shadow_off`): Super
   Janemba's shadow at (8, 8) - OAM (135, 81) for the actor at screen (127, 73), real route 18-14 (rj_049: 36 -> 130).
+**Update 6: cel differences 43 -> 26 segments (8.7k -> 1.9k frames); the cel gate holds 482 segments.** From the
+game's state objects (`estate.py`) and the controllers' ticks:
+* **Mini Janemba's roll** (controller 0x03003248, tick 0x08034D86): anim 0x12 (raw 19; was the missing 0x11, idle
+  shown), its own frames - 0 below 0x80, then u = t - 0x80: 1 while u < 0x40, else (u >> 5) & 1, SetAnimRaw(0x13) at
+  0xC0 - and **it outlives the roll node** (the AI's Wait after it; until another SetAnim): `Enemy.roll_ctl`.
+  **The hop** (0x0300322C, tick 0x08034630): 0 below 0x80, 1 rising, 2 falling, under a hold rule.
+* **Janemba's portal hand**: the A side's (facing 2) rises with anim 0x13 (raw 20), the B side's with 0x12.
+* **BabidiGesture** (enter 0x0802AE76) acts only while the object already shows anim 0x13 (the descent's); else
+  no animation and the node is done at once (6-1: Babidi keeps idling).
+* **Kid Buu's split animation** is SetAnimRaw(0xC) = raw 13 (was raw 12, missing) under the one-shot 0x03001B30
+  (shift 3).
+* **Cuts take the enemies' animation positions from the RAM rows** (cel, tick of the enemy at the exact position with
+  the same raw; the build's idle start ticks were its own rand(255)).
+All mirrored in the TypeScript reference (cross_ts 0 failures, battle lockstep 709 pass). Left: the world map's
+airship idles drift ~6 % over a long flight (the game ticks them in fewer frames than ours: 780 vs 728+ ticks in 980
+video frames - not found), Babidi's ship / Earth enemies (ship-fixes'), HoverDrift's walk a frame late (11 frames),
+the 8-17 label (above).
 
 **Done (Earth agent): the no-lag title -> Earth soak's crowd-wander stop (row 190,577) - a menu close that never
 gave the field its sprite memory back.** The crowd NPCs' wander draws were right; their *update order* was not: at
@@ -4934,3 +4951,23 @@ Left in my part: earth_2_90_2 (sprite 123 raw 20), shipr_266 (sprite 300 raw 20)
 - **wf-app `launcher_menus_and_save_slots`** was red from 4da515d (`saves_of` now appends the options block after
   the slot files): the test checks the slot files only. All wf-app tests green; gates green; whole-run cut points
   311 / 315 unchanged.
+
+**Run 2 ship stops (ship agent, 2026-10-04):**
+* 219,469 / 220,641 / 459,733 (7-2: an NPC talk, the stall's purchase box, a box closing): **already fixed on HEAD** -
+  the whole-run app (`wholerun --import` from the cuts at 217,993 / 245,991) passes all three; the next stops are
+  240,639 (the Save Game screen RNG, ship-fixes) and 480,403.
+* **544,962 (8-42, fight RNG) - an arrival's autowalk accepts an attack without damage.** A Majin soldier's energy
+  wave (vt 0x08049C98, made by SoldierThrow 0x080266C8 at its tick 8) reaches the arriving player in the fade-in's last
+  frame. The player's message handler (0x08010DDE, message 0 -> 0x08010F40) accepts any sender of team 0 / 2 whose box
+  overlaps the body; only the current state decides ComputeDamage (0x08010F74), and the autowalk state takes none. So
+  the wave puffs (rand(0x1000) when 0x400 sprite tiles are free, 0x0802A4E0) and retracts; the player walks on
+  unhurt. Ours refused a non-hittable autowalking player, the wave flew on and hit him a frame later. `player::
+  on_message`: an autowalking player accepts (team 0 / 2) without damage, as the KO case - for broadcast messages
+  only: the Destroyer's flame (0x080247C0) tests the player's +0x1CC itself and sends nothing to a non-hittable one
+  (Pilaf's Castle 10-4, gate `dr3_025`, stays exact). Cut 544,900 exact (200) and 536,834 exact (8,400); gated
+  `rr2_544900_8-42` (without sprite-memory rows: the game takes 2 tiles for the soldier's wave, ours none - the
+  allocator's owner, dungeon agent A). Note for whoever reads `ship_driver.PICKUP_VT`: 0x08049C98 is the
+  energy wave, not a dropped item - the `hunt` goal's "loot" filter is wrong
+  (it only matters in 0-55's encounter arena, run 1's d03_hunt; left as it is so run 1 replays).
+Tools: `tools/wholerun/cut.py ROW N OUTDIR --chain run2` (segment-harness cuts of run 2); `work/s3test/msgwho.py` /
+`whomade.py` / `objlist.py` / `aiwatch.py` (local: who took a message, who made an object, the world list, AI stacks).

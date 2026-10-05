@@ -23,15 +23,24 @@ import segment as sg  # noqa: E402
 from route import start_emu  # noqa: E402
 
 
+PHASE = '''import sys
+sys.path.insert(0, sys.argv[2] + '/tools/story_playthrough'); sys.path.insert(0, sys.argv[2] + '/tools/field')
+from route import start_emu
+e = start_emu(sys.argv[1])
+c0, p0 = e.cycles(), e.r32(0x0300389C)
+for _ in range(200000):
+    e.step()
+    if e.r32(0x0300389C) != p0:
+        print(e.cycles() - c0)
+        break
+'''
+
+
 def phase(state):
-    """cycles from the state to the next sound-DMA interrupt (tools/segments/snd_phase.py's measure)"""
-    e = start_emu(str(state))
-    c0, p0 = e.cycles(), e.r32(0x0300389C)
-    for _ in range(200000):
-        e.step()
-        if e.r32(0x0300389C) != p0:
-            return e.cycles() - c0
-    return None
+    """cycles from the state to the next sound-DMA interrupt (tools/segments/snd_phase.py's measure) - in a child
+    process: this one loaded the savedata-capable emulator lib (sbemu), which has no cycle counter"""
+    out = subprocess.run([sys.executable, '-c', PHASE, str(state), str(ROOT)], capture_output=True, text=True).stdout.split()
+    return int(out[-1]) if out else None
 
 a = sys.argv[1:]
 lag = a[a.index('--lag') + 1] if '--lag' in a else 'rec'

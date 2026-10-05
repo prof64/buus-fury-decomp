@@ -285,6 +285,17 @@ pub struct GameList {
     pub figs: Vec<Fig>,
     #[serde(default)]
     pub figs_key: Option<(i32, Vec<i32>, Vec<bool>)>,
+    /// generator draws the last figure build owes the world: each figure is made under the idle state
+    /// (0x03001B0C, enter 0x0800DFBE: tick = rand(255)) before a non-chosen one is frozen (run 2 rows 240,639 ...:
+    /// the Save Game screen's one figure, one draw at its first redraw)
+    #[serde(default)]
+    pub rng_owed: u32,
+    /// the figures' sprites whose object tiles are held (vram.rs `figure_created`; freed on a rebuild / the close)
+    #[serde(default)]
+    pub fig_vram: Vec<i32>,
+    /// a rebuild happened since the last `built`
+    #[serde(default)]
+    pub rebuilt: bool,
 }
 
 /// a party figure on a save slot row
@@ -331,6 +342,7 @@ impl GameList {
         }
         self.figs_key = Some(key);
         self.figs.clear();
+        self.rebuilt = true;
         for row in 0..2 {
             let Some(s) = self
                 .summaries
@@ -340,6 +352,7 @@ impl GameList {
                 continue;
             };
             for (k, &(form, sel)) in s.party.iter().enumerate() {
+                self.rng_owed += 1;
                 let Some(sprite) = form_sprite(w, form) else {
                     continue;
                 };
@@ -353,6 +366,28 @@ impl GameList {
                 });
             }
         }
+    }
+    /// the world side of a figure build (`0x080054BA`, after the redraw that made it): the old figures go, each new
+    /// one takes its object tiles (ctor `0x0800EB60`) and enters the idle state (`0x0800DFBE`: rand(255))
+    pub fn built(&mut self, w: &mut World) {
+        if !std::mem::take(&mut self.rebuilt) {
+            self.rng_owed = 0;
+            return;
+        }
+        let old = std::mem::take(&mut self.fig_vram);
+        crate::vram::figures_gone(w, &old);
+        for (k, f) in self.figs.iter().enumerate() {
+            crate::vram::figure_created(w, k as u32, f.sprite);
+            self.fig_vram.push(f.sprite);
+        }
+        for _ in 0..std::mem::take(&mut self.rng_owed) {
+            w.rng.rand(255);
+        }
+    }
+    /// the figures' object tiles go with the screen
+    pub fn figures_gone(&mut self, w: &mut World) {
+        let old = std::mem::take(&mut self.fig_vram);
+        crate::vram::figures_gone(w, &old);
     }
     /// the object world's update (every iteration)
     pub fn tick_figs(&mut self) {
@@ -493,6 +528,9 @@ impl GameList {
             down,
             figs: Vec::new(),
             figs_key: None,
+            rng_owed: 0,
+            fig_vram: Vec::new(),
+            rebuilt: false,
         }
     }
 
@@ -644,6 +682,13 @@ impl Page for Save {
         self.list.prepare();
         self.list.build_figs(w);
     }
+    fn built_imported(&mut self) {
+        self.list.rebuilt = false;
+        self.list.rng_owed = 0;
+    }
+    fn built(&mut self, w: &mut World) {
+        self.list.built(w);
+    }
     fn objs(&self, w: &World) -> Vec<wf_view::MenuObj> {
         if self.black || self.stage == Stage::Done {
             return Vec::new();
@@ -655,9 +700,12 @@ impl Page for Save {
             // the popup's step writes (its CPU time: the long redraw that follows), then the palettes are cleared
             self.stage = Stage::Done;
             self.list.c.drawn = false;
+            // the figures go with it (run 2 row 240,588: their blocks are free at the end of this iteration)
+            self.list.figures_gone(w);
             return Action::None;
         }
         if self.stage == Stage::Done {
+            self.list.figures_gone(w);
             // (no lag frames: the close after the write is the restore's iteration itself - no exit stub
             // iteration of its own; menu_parity save_cancel lf 9,359 restores, 9,360 fades in)
             return if w.opts.no_lag {
@@ -682,6 +730,7 @@ impl Page for Save {
                             x.black = true;
                         }
                     }
+                    p.list.figures_gone(w);
                     (true, Some(Action::Pop(1)))
                 }
                 c => {

@@ -21,7 +21,6 @@ pub const NODE_NOTES: &[(&str, &str)] = &[
     ("IfPlayerInRoomZone", "vampire lair region not decoded: always true"),
     ("MoveToFormationA", "formation offset tables 0x0877AE80/0x0877AECC not decoded: ring of 8 slots at 40/24 px"),
     ("TankDrive", "turn helpers not decoded: axis-aligned drive toward the player at 0.5 px/frame"),
-    ("EnergyBarrage", "barrage flight path not decoded: short 4 px/frame shots, 12 frames"),
     ("IfUnknown", "condition 0x0804EE25: Majin Buu is not pacified (1 - [0x0300302C])"),
     ("ShockStun", "electric-shock stun length not decoded: 48 frames"),
     ("VolleyballLaunch", "launched ball flight not decoded: 4 px/frame for 30 frames, hits other enemies"),
@@ -432,6 +431,7 @@ fn is_controller(k: K) -> bool {
     matches!(
         k,
         K::FlameBreath
+            | K::EnergyBarrage
             | K::SoldierThrow
             | K::TurretFire
             | K::CyborgShot
@@ -1216,9 +1216,13 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             let h = w.data.anim.hold;
             set_anim_r(w, i, &[an(18)], true, h);
         }
+        // enter 0x0802E1D8 (Pikkon): face, anim 3 under the controller 0x030030E0, sound 63 (0x083192A8 + 0xBD * 4)
         K::EnergyBarrage => {
             en::face_player(w, i);
-            set_anim(w, i, &[an(3)], true, Some(true));
+            // (the controller sets the frame: the anim's own steps - a rand(n) one - do not run)
+            let h = w.data.anim.hold;
+            set_anim_r(w, i, &[an(3)], true, h);
+            w.sfx(63, 64);
         }
         K::FinalFlash => timed_enter(w, i, &[an(19), an(3)], true),
         K::MouthBeamDown => set_anim(w, i, &[an(19)], true, Some(true)),
@@ -1431,7 +1435,10 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
         }
         K::SummonMinion => timed_enter(w, i, &[an(17)], false),
         // SetAnimRaw(0xC) = raw 13 (real route 19-3 rkb_008 f2390; was raw 12, missing: idle shown)
-        K::KidBuuSplitAnim => set_anim(w, i, &[an(12)], true, Some(false)),
+        K::KidBuuSplitAnim => {
+            let r0 = w.data.anim.once_stop3;
+            set_anim_r(w, i, &[an(12)], false, r0)
+        }
         // Babidi (real route 8-71, Vegeta vs Majin Buu). Hover enter 0x0802AD88: SetAnimRaw(0x13) under the
         // controller 0x03003014 (no idle draw), Buu is no longer pacified, not hittable (obj+0x1CC = 0)
         K::BabidiHover => {
@@ -1677,6 +1684,9 @@ fn leaf_exit(w: &mut World, c: &C, n: u16, _r: &mut NodeRt) {
         // requests, post-game: a punched fire-breather - StopMatch(63) in the punch's iteration); a finished one stopped
         // it in its update (f 128)
         K::FlameBreath if _r.f < 128 => w.events.push(crate::world::Event::SfxStopMatch { id: 63 }),
+        // ... and Pikkon's barrage controller (0x030030E0, exit 0x0802E1BA: StopMatch(63)) - run 2 row 56,339, the
+        // leader's punch interrupts it; its end at tick 48 goes through the same exit (the update)
+        K::EnergyBarrage if _r.f < 48 => w.events.push(crate::world::Event::SfxStopMatch { id: 63 }),
         // Babidi can be hit again once he leaves the hover (obj+0x1CC back to 1 with the state change to 0xC6)
         K::BabidiHover => w.en(i).a.hittable = true,
         // (field: the node's own exit is a no-op (vtable 0x0804A6C0 +8 = bx lr); the beam belongs to the actor state
@@ -2459,23 +2469,21 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             set_anim(w, i, &[nm("idle")], true, Some(true));
             true
         }
+        // the controller 0x030030E0 (update 0x0802E146): tick + 1; at 48 it ends; else its frame min(tick >> 2, 2) and a
+        // flame (0x080249E0, the class FlameBreath spawns: 2 px/frame + rand(192) - 96 per axis, 20 frames, one
+        // energy hit x51) at the integer position + 0x08757324[dir] (run 2 row 56,304: Pikkon, 2 draws a frame)
         K::EnergyBarrage => {
-            if f <= 48 {
-                let (mx, my) = en::muzzle(w, i, 10);
-                let dir = w.en_ref(i).a.facing;
-                let (dx, dy) = DIR_VEC[dir as usize];
-                let o = shots::StraightOpts {
-                    vx: dx * 1024,
-                    vy: dy * 1024,
-                    b: [4, 4, 8, 8],
-                    a: atk(4),
-                    mult: 51,
-                    life: 12,
-                    explode: false,
-                    name: shots::SName::Barrage,
-                    ..Default::default()
-                };
-                shots::add_straight(w, me, dir, 0, mx << 8, my << 8, o);
+            if f < 48 {
+                w.en(i).ea.pos.frame = (f >> 2).min(2);
+                const OFF: [(i32, i32); 4] = [(4, 4), (13, -24), (-8, -8), (24, -8)];
+                let a = &w.en_ref(i).a;
+                let (ox, oy) = OFF[a.facing as usize];
+                let (dir, x, y) = (a.facing, (a.px() + ox) << 8, (a.py() + oy) << 8);
+                let s = shots::flame(w, me, dir, x, y);
+                shots::add(w, s);
+            }
+            if f == 48 {
+                w.events.push(crate::world::Event::SfxStopMatch { id: 63 });
             }
             f >= 48
         }

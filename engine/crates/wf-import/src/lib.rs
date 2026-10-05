@@ -319,7 +319,7 @@ fn build_area_entry(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner: 
     let story = import_story(data, ram);
     let (x, y, facing) = info.leader.unwrap_or((120, 120, 0));
     let to = info.area;
-    let cfg = FieldConfig { world: to.world, area: to.area, variant: to.variant, pos: Some((x, y)), facing, chars: vec![story.current], story: Some(story.clone()), rng: wf_core::battle::RngInit::State(rng0[0], rng0[1]), xp: true, arrive: false };
+    let cfg = FieldConfig { world: to.world, area: to.area, variant: to.variant, pos: Some((x, y)), facing, chars: vec![story.current], story: Some(story.clone()), rng: wf_core::battle::RngInit::State(rng0[0], rng0[1]), xp: true, arrive: false, slow_fade_in: false };
     let mut w = field::create(data.clone(), &cfg);
     // back to the last fade-out frame before the load: only the players remain (the load deletes the rest)
     let players = w.players.clone();
@@ -1094,6 +1094,30 @@ fn ai_states(ram: &GbaRam, o: u32) -> Vec<i32> {
 /// (enemies running a 3-D move step, vt 0x0804A800 at obj+0x22C) are where the replay's load put them, not where
 /// they have flown since - each RAM patrol patches the nearest of our enemies of its type (real run 0-50 tiles
 /// r002_006 +9,000 / +17,000, s515's arrival: "RAM actor ... has no entity there" for all ten)
+/// the build's enemies run their animation from the load (an idle's start tick is the build's rand(255)); the RAM
+/// rows have the game's: each enemy at a RAM enemy object's exact position showing the same raw takes its cel and
+/// tick (the world map's airships, rkb_001 0-50: idle ticks 6 apart)
+fn enemy_anims_from_rows(w: &mut World, ram: &GbaRam) {
+    let rows: std::collections::BTreeMap<u32, (i32, i32, i32, i32)> = ram.actor_rows.iter().map(|r| (r.0, (r.1, r.2, r.3, r.4))).collect();
+    let mut used: Vec<wf_core::world::EntityId> = vec![];
+    for o in ram.objects() {
+        if ram.r32(o) != VT_ENEMY {
+            continue;
+        }
+        let Some(&(_, raw, cel, tick)) = rows.get(&o) else { continue };
+        let (ox, oy) = (ram.s32(o + 0x1A0), ram.s32(o + 0x1A4));
+        let pick = (0..w.ents.len()).find(|&i| {
+            !w.ents[i].removed && !used.contains(&w.ents[i].id) && matches!(&w.ents[i].body, Body::Enemy(e) if e.a.x == ox && e.a.y == oy && e.ea.pos.raw == raw)
+        });
+        if let Some(i) = pick {
+            used.push(w.ents[i].id);
+            let e = w.en(i);
+            e.ea.pos.frame = cel;
+            e.ea.pos.tick = tick;
+        }
+    }
+}
+
 fn patch_patrols(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
     let rows: std::collections::BTreeMap<u32, (i32, i32, i32, i32)> = ram.actor_rows.iter().map(|r| (r.0, (r.1, r.2, r.3, r.4))).collect();
     let mut used: Vec<wf_core::world::EntityId> = vec![];
@@ -1521,7 +1545,7 @@ fn build_mid(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner: &mut St
     let story = import_story(data, ram);
     let (x, y, facing) = info.leader.unwrap_or((120, 120, 0));
     let to = info.area;
-    let cfg = FieldConfig { world: to.world, area: to.area, variant: to.variant, pos: Some((x, y)), facing, chars: vec![story.current], story: Some(story.clone()), rng: wf_core::battle::RngInit::State(rng0[0], rng0[1]), xp: true, arrive: false };
+    let cfg = FieldConfig { world: to.world, area: to.area, variant: to.variant, pos: Some((x, y)), facing, chars: vec![story.current], story: Some(story.clone()), rng: wf_core::battle::RngInit::State(rng0[0], rng0[1]), xp: true, arrive: false, slow_fade_in: false };
     let mut w = field::create(data.clone(), &cfg);
     let players = w.players.clone();
     w.ents.retain(|e| players.contains(&e.id));
@@ -2674,7 +2698,7 @@ fn build_event_entry(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner:
     let story = import_story(data, ram);
     let (x, y, facing) = info.leader.unwrap_or((120, 120, 0));
     let to = info.area;
-    let cfg = FieldConfig { world: to.world, area: to.area, variant: to.variant, pos: Some((x, y)), facing, chars: vec![story.current], story: Some(story.clone()), rng: wf_core::battle::RngInit::State(rng0[0], rng0[1]), xp: true, arrive: false };
+    let cfg = FieldConfig { world: to.world, area: to.area, variant: to.variant, pos: Some((x, y)), facing, chars: vec![story.current], story: Some(story.clone()), rng: wf_core::battle::RngInit::State(rng0[0], rng0[1]), xp: true, arrive: false, slow_fade_in: false };
     let mut w = field::create(data.clone(), &cfg);
     let players = w.players.clone();
     w.ents.retain(|e| players.contains(&e.id));
@@ -2948,6 +2972,7 @@ pub fn import_emulator_state(data: &Arc<GameData>, ram: &GbaRam, runner: &mut St
     if in_event.is_some() {
         patch_patrols(&mut world, ram, &mut notes);
     }
+    enemy_anims_from_rows(&mut world, ram);
     // the inline script under the event: an interpreter standing just after its `run_event` of the event (or of the
     // outermost event of a nested chain) - it goes on when the event ends (gate rkb_001_0-50: 14-1's trigger script,
     // run_event(515) then set_flag(408))
