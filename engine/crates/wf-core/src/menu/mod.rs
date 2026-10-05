@@ -661,6 +661,14 @@ fn step_inner(w: &mut World) {
             if w.field.is_some() {
                 w.tick_shakes();
             }
+            // a script's menu fades out under the game's own mode step (0x08007041): the object pass runs, the HUD
+            // object with it - its low-HP beep (run 2 row 141,749: s011's save menu at 3-1, lf 131,644)
+            if w.menu.scripted && w.field.is_some() && w.opts.no_lag {
+                let mark = w.g.clock_mark;
+                w.g.clock_mark = Some(w.g.clock(w.frame));
+                crate::field::hud_beep(w);
+                w.g.clock_mark = mark;
+            }
             let step = (w.menu.tr.fade_out & !FADE_HOLD).max(1);
             // (no lag frames: the hold is part of the last fade step's iteration - real run 18-13 r047_002 lf
             // 1,113,367: full black, the hold and the page's draw in one)
@@ -749,6 +757,15 @@ fn step_inner(w: &mut World) {
             // Switch Character's figures go and the object world is back in the 2nd leave frame (segment sb 21-14)
             if t == 0 {
                 world_back(w);
+            }
+            // the restore iteration updates the HUD object (its low-HP beep: run 2 row 141,438, a pause menu closed
+            // at 3-1 with Gohan low - the game beeps at lf 131,400, before the fade-in; the counter is this
+            // iteration's)
+            if t == 0 && w.field.is_some() && w.opts.no_lag {
+                let mark = w.g.clock_mark;
+                w.g.clock_mark = Some(w.g.clock(w.frame));
+                crate::field::hud_beep(w);
+                w.g.clock_mark = mark;
             }
             // the world restore ends with a camera update: a follow camera still easing when the menu opened is
             // one step further in the last black frame (ship cuts 8-6 / 8-3: closed while the camera eased)

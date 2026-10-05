@@ -203,6 +203,8 @@ pub fn import_story(data: &GameData, ram: &GbaRam) -> Story {
             skill_cur: (0..n).map(|k| r[0x2E + 2 * k] as i32).collect(),
             fusion: u16le(&r, 2) as u16,
             fusion_time: u32le(&r, 8) as i32,
+            ss_gauge: u16le(&r, 0x1E) as i32,
+            ss3_gauge: u16le(&r, 0x20) as i32,
         };
     }
     for k in 0..4u32 {
@@ -243,6 +245,14 @@ fn import_globals(w: &mut World, ram: &GbaRam) {
     w.g.waypoint = ram.s32(0x0300_32EC);
     w.g.tele_chain = ram.s32(0x0300_3228);
     w.g.wrap_slot = ram.s32(0x0300_30BC);
+    // the HUD object's (vt 0x08049FEC) last low-HP beep: +0x10, the counter 0x03000F94 when it sounded (update
+    // 0x0800BA4A: again once more than 60 later) - run 2 row 140,866 (0-91, Gohan low on HP: the app beeped from its
+    // own phase, 5 iterations late)
+    if let Some(h) = ram.objects().into_iter().find(|&o| ram.r32(o) == 0x0804_9FEC) {
+        if let Some(f) = w.field.as_mut() {
+            f.hud_beep = ram.r32(h + 0x10);
+        }
+    }
 }
 
 /// the RNG state `n` calls before `s` (the generator 0x0803FAAC is invertible)

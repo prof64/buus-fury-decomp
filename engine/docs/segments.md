@@ -125,6 +125,13 @@ first - run 1 needed 8; a search 0 .. 23: 0 gets through), `j_back` (9,916: run 
 `j_vegeta` (17,722: **Vegeta to 108**, run 1 120), `j_gate` (4,763: the gate, s448, Goku again, his points a quarter
 each STR / POW / END / SPD), `j_arena` (61,460: **a Save at 18-13's save point** - run 1 none - then the arena:
 **five game overs -> Continue** (Janemba twice, Super Janemba's Vegeta round three times) before it is won).
+*Proposed split of run 2's stops after 602,566 (dungeon agent B <-> real-route agent; real-route agent, please
+confirm or amend here):* **B** takes the Janemba part (`j_janemba`: HFIL, the arena) and, in `f_fat`, the dungeons
+5-7 (Airship 12, Fukurou 13, Pyramid 14 - B's dungeons in §10.1) plus every save / title / Continue stretch of both
+parts (game over -> Continue paths: Pilaf 10-4, Thieves 9-5, Broly, the arena); **real-route agent** takes the rest
+of `f_fat` (Lookout / radar / West City / the Bandana hunt / the grinds, Desert 11, Pilaf 10, Thieves 9, Nataday 15,
+the dbx events). Importer refusals go to the importer agent as usual. B starts the resync from 602,566 as soon as the
+side-content agent has appended the parts and re-recorded run 2's master.
 
 ## 1. One-command workflow
 
@@ -5126,3 +5133,32 @@ power-on: first difference 33,788 -> **124,907** (run 1 still exact, both legs; 
 * **Importer agent:** `resync.py` now loads `work/superbuu/libemu_sb.dylib` (sbemu, the EEPROM cuts), built from
   `tools/superbuu/shim_sb.c`, which lacks `emu_cycles` (tools/emu/shim.c has it): every cut's `phase()` fails
   (`dlsym ... emu_cycles`). `work/earth/bin/mkseg2.py` makes segment docs from any chain row with the plain library.
+*Fixed (A, by the coordinator): the save-capable emulator library broke cut making.* `work/superbuu/libemu_sb.dylib`
+was built from a stale full copy of the shim (`tools/superbuu/shim_sb.c`) without `emu_cycles`, so resync.py's sound
+phase failed on every cut. `shim_sb.c` now holds only the savedata accessors; `build_sb.sh` compiles `tools/emu/shim.c`
++ it as one file (built beside and renamed, so running processes keep their copy) - rebuilt. Verified:
+`resync.py --chain run2 --lag none --from 600000` makes its cut with the sound phase and the EEPROM.
+*Done (A, for the ship agent's note): a Majin soldier's energy wave takes its 2 sprite-memory units* (ctor 0x0802A2EC,
+0x80 bytes via the 0x08011732 retry) in `shots::add` (field only; import side `import_waves` already owns the RAM
+block). Run 2 cut 544,900 (`cut.py --chain run2`, 300 rows with sprite-memory rows): 300 / 300. Gate
+`rr2_544900_8-42` can be re-recorded with sprite-memory rows. Gates green; run-2 cut points 97 / 107 and whole-run
+311 / 315 unchanged.
+
+**Run 2: Continue after the soft reset, the low-HP beep (ship fix agent, 2026-10-04).**
+* **143,026** (3-1 Continue after the first soft reset). Two fixes, both in b35a697:
+  - The frame counter now runs on through Continue as it does for New Game. The app had it at 1 instead of 800.
+  - The iteration after the slot load is the world's own (`leave` 1), so 3-1's NPCs draw in it.
+  Run 2 now runs past 143,026 to 159,704, where Gohan's position differs. The first Continue (35,806) is unchanged:
+  the run-2 ratchet still holds 124,907.
+* **The HUD's low-HP beep** (sound 41 at volume 32, the HUD object vt 0x08049FEC, stamp +0x10). This is not the SFX
+  volume: the app beeped on its own phase. Fixes (uncommitted: wf-import lib.rs, menu/mod.rs):
+  - The importer reads the HUD's beep stamp (140,866).
+  - A pause menu's restore iteration updates the HUD, before the fade-in (141,438).
+  - A script's menu fade-out runs the object pass, so the HUD beeps there too (141,749, s011's save menu).
+  140,811 -> 141,971 is now exact with no sound differences.
+* **277,383** (app collects a coin, sound 44, that the game does not have). Not fixed:
+  - A cut at 277,200 runs exact, so the extra coin comes from earlier in the area.
+  - Starting from 260,000 and from 270,000, the run still differs at 277,383.
+  - The bisection stopped there: `data/realrun2/030_s_ship.keys.gz` is being re-recorded (empty in the tree right
+    now). It continues from 274,000 once the stretch is back.
+* All run-2 cuts carry the save memory already (107 / 107); none needed remaking.
