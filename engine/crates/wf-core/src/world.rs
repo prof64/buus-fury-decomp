@@ -949,9 +949,19 @@ impl World {
         // (`vram::list_marks`, None here: nothing to update) - an update that destroys objects before it shifts the
         // next update onto whatever object moved into its index, which may be the HUD or the stat-points mark (run 2
         // Diablo Desert 11-4: a punch destroys two bandits; the game updates the stat mark again, not a bomb)
+        // (a damage number deletes itself in its own update, at its own place: it never shifts another object, so the
+        // pass keeps the slots it started with - ours ages them out from inside other objects' updates; ship 8-3
+        // whole-run cut 631,836: a popup expiring there re-ran a Saibaman's update)
+        let popups0: Vec<u32> = self
+            .field
+            .as_ref()
+            .and_then(|f| f.vram.as_ref())
+            .map(|v| v.popup_at.iter().map(|p| p.1).collect())
+            .unwrap_or_default();
         let live = |w: &World| -> Vec<Option<usize>> {
             let ids: Vec<usize> = (0..w.ents.len()).filter(|&k| !w.ents[k].removed).collect();
-            let mut marks = crate::vram::list_marks(w);
+            let mut marks = crate::vram::list_marks_objs(w);
+            marks.extend(popups0.iter().copied());
             marks.sort();
             let mut out = Vec::with_capacity(ids.len() + marks.len());
             let mut m = 0;
