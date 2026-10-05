@@ -2348,7 +2348,6 @@ fn defeats(w: &mut World) {
         .as_ref()
         .map(|f| (f.area.world, f.area.area))
         .unwrap_or_default();
-    if std::env::var_os("COIN_DBG").is_some() { eprintln!("DEFEATS frame {} placed {:?} enemies {:?}", w.frame, placed.iter().map(|p| (p.0, p.1)).collect::<Vec<_>>(), w.enemies); }
     for (id, obj, lx, ly) in placed {
         match w.enemy_by_id(id) {
             Some((_, e)) if !e.defeated => {
@@ -2383,10 +2382,11 @@ fn defeats(w: &mut World) {
                 let (ty, cb) = match def.map(|d| &d.kind) {
                     Some(ObjKind::Enemy { ty, on_defeat, .. }) => (*ty, on_defeat.clone()),
                     // no area def: a run-time enemy (a tank's crew, `ObjRef::List(0xff, type)`) keeps its type's
-                    // drop script
+                    // drop script - its type as it is now (a worm's body piece split off becomes a head, type 0x8F ->
+                    // 0x8E, and drops the head's coins: run 2 row 1,774,190, 21-11, the coins at 1,774,198)
                     _ => (
                         if let ObjRef::List(0xff, t) = obj {
-                            t as i32
+                            other.map(|(_, e)| e.ty).unwrap_or(t as i32)
                         } else {
                             -1
                         },
@@ -2492,7 +2492,6 @@ fn run_due_drops(w: &mut World) {
         })
         .unwrap_or_default();
     if !due.is_empty() {
-        if std::env::var_os("COIN_DBG").is_some() { eprintln!("DUE frame {} {:?}", w.frame, due); }
         if let Some(f) = w.field.as_mut() {
             f.pending_drops.retain(|d| d.0 > frame);
         }

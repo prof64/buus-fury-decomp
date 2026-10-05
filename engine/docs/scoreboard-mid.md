@@ -1,6 +1,6 @@
 # Parity scoreboard, every-N-frames cuts
 
-Tree: `a024960`. Tiles of 1,000 frames. Regenerate: `scoreboard.py` (the area-entry board, which lists the
+Tree: `5622d08`. Tiles of 1,000 frames. Regenerate: `scoreboard.py` (the area-entry board, which lists the
 segments), `scoreboard.py mid cut 1000` (local, under `work/real/mid/`), `scoreboard.py mid`.
 
 Every area-entry segment that loses more than 1,000 frames on the main board, cut again at its frame 1,000,

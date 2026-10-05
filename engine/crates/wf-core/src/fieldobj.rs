@@ -563,7 +563,6 @@ fn coin_fly(w: &World, p: &mut Pickup) {
         // 0x0801809E: the step is kept only when it reaches a new pixel (and the box there is free); a step
         // within the pixel is dropped, so a coin slower than 1 px per frame that starts on a whole pixel never
         // moves (story playthrough: 3 of the fighters' 4 coins stay where they dropped)
-        if std::env::var_os("COIN_DBG").is_some() { eprintln!("FLY t {} mv {} pos ({},{}) v ({},{}) d ({ddx},{ddy}) free {} bx {:?} live {} tiles {:?} static {:?}", p.t, p.mv, p.x, p.y, p.vx, p.vy, walk_free(w, [p.bx[0] + ddx, p.bx[1] + ddy, p.bx[2] + ddx, p.bx[3] + ddy]), p.bx, w.col.as_ref().unwrap().walk.is_some(), (21..25).map(|tx| (15..18).map(|ty| w.col.as_ref().unwrap().tile(crate::world::Layer::Walk, tx, ty) as u8).collect::<Vec<_>>()).collect::<Vec<_>>(), (21..25).map(|tx| (15..18).map(|ty| w.col.as_ref().unwrap().map.walk[ty*256+tx]).collect::<Vec<_>>()).collect::<Vec<_>>()); }
         if (ddx != 0 || ddy != 0)
             && walk_free(
                 w,
@@ -705,7 +704,6 @@ pub fn coin_check(w: &mut World, px: i32, py: i32, slot: u8) -> bool {
             Some((f, r)) if f == w.frame => r,
             _ => p.coin_rect(),
         };
-        if std::env::var_os("COIN_DBG").is_some() { eprintln!("COIN frame {} pt ({px},{py}) rect {:?} id {}", w.frame, r, w.ents[k].id); }
         if r[0] <= px && px < r[2] && r[1] <= py && py < r[3] {
             collect(w, k, slot);
             return true;

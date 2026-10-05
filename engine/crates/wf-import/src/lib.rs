@@ -2407,7 +2407,10 @@ fn import_player_blasts(w: &mut World, ram: &GbaRam) {
 /// s003 runs at the cut, the drop comes 8 updates after it - B's §11 update 16)
 fn import_death_effects(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
     let n = ram.r32(0x0300_225C).min(32);
-    for k in 0..n {
+    // the list updates newest (last) first: of two effects due in one frame the later-listed one drops first (run 2
+    // cut 1,779,433, 21-9: two Enzymes' drops held by a level-up - the game's first coin draws land at the second
+    // effect's loot (80, 310); ours dropped (96, 313)'s first and missed a coin, sound 44 at 1,779,633)
+    for k in (0..n).rev() {
         let o = ram.r32(0x0300_2260 + 4 * k);
         if !ram.valid(o) || ram.r32(o) != 0x0804_955C {
             continue;

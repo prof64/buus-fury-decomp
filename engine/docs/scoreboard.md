@@ -1,6 +1,6 @@
 # Parity scoreboard: the real playthrough on wf-core
 
-Tree: `a024960` + uncommitted engine changes. Regenerate: `.venv/bin/python tools/segments/scoreboard.py`
+Tree: `5622d08`. Regenerate: `.venv/bin/python tools/segments/scoreboard.py`
 (the cuts: `scoreboard.py cut`, local under `work/real/`; the run itself: `tools/segments/realrun.py`, §"How to replay
 the real run" in `engine/docs/segments.md`). A segment = the real game from one importable area entry (an exit
 arrival with nothing running) to the next; an entry by a script warp / in a cutscene is not a cut - its frames

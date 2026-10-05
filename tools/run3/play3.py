@@ -1,6 +1,6 @@
 """play3.py [--from NAME] [--only NAME] [--cap N] [--shots N]: play run 3 (route3.SEGMENTS) on the real game from
 the soft reset (headless, muted), one continuous emulator session (the cartridge save lives in EEPROM): the segments
-before --from replay their stored keys (work/run3/keys.json), the rest are driven (run3_driver.Run3Driver) and stored.
+before --from replay their stored keys (work/run3/keys.json), the rest are driven (shops3.ShopDriver: run3_driver.Run3Driver + the shop goals) and stored.
 work/run3/seg_<name>.ss at each segment start, work/run3/end.ss (+ end.eeprom) at the end."""
 import json
 import sys
@@ -13,7 +13,7 @@ for d in ('tools/superbuu', 'tools/story_playthrough', 'tools/field', 're/buu', 
     sys.path.insert(0, str(ROOT / d))
 import sbemu  # noqa: E402  (the savedata-capable emulator lib; same core)
 from route import start_emu, status  # noqa: E402
-from run3_driver import Run3Driver  # noqa: E402
+from shops3 import ShopDriver  # noqa: E402  (Run3Driver + the shop goals)
 from route3 import SEGMENTS  # noqa: E402
 
 OUT = ROOT / 'work' / 'run3'
@@ -41,7 +41,7 @@ def main():
                 e.run(1)
             continue
         t0 = time.time()
-        d = Run3Driver(goals)
+        d = ShopDriver(goals)
         log = []
         prev = None
         try:

@@ -66,6 +66,71 @@ SEGMENTS = [
     ('ow3', fights_spun(stressed(ROUTE_GOALS[_i11:]))),
 ]
 
+# ---- Earth (e3_*): run 1's Earth route (tools/story_playthrough/earth_route.py) with the stresses below; the Z-Mart
+# stretch after Videl is the ship fix agent's e3_shops (tools/run3/shops3.py, ShopDriver)
+for _d in ('tools/field', 'tools/run2', 'tools/run3'):
+    if str(ROOT / _d) not in sys.path:
+        sys.path.insert(0, str(ROOT / _d))
+import earth_route  # noqa: E402
+from shops3 import SHOPS3_GOALS  # noqa: E402
+
+# pause menu -> Equip -> Body -> the first item -> Equip to the leader (route2.EQUIP_BODY)
+EQUIP_BODY = ('keys', [(S, 2), (0, 60), (KEY.R, 3), (0, 40), (KEY.R, 3), (0, 40), (A, 3), (0, 40), (A, 3), (0, 40),
+                       (A, 3), (0, 40), (B, 3), (0, 40), (S, 2), (0, 100)])
+
+
+def stressed_exits(goals):
+    """as stressed(), but only a hold followed by an ('area', ..) goal is an exit push (Earth's holds also face NPCs
+    and walls); an expect right after a push is played as events"""
+    out = []
+    pushed = False
+    for j, g in enumerate(goals):
+        if g[0] == 'expect' and pushed:
+            out.append(('events',))
+            continue
+        if g[0] not in ('area', 'expect'):
+            pushed = False
+        nxt = goals[j + 1] if j + 1 < len(goals) else None
+        if g[0] == 'hold' and g[1] in (U, D, L, R) and g[2] >= 10 and nxt is not None and nxt[0] == 'area':
+            out.append(('pushmash', g[1], S, 2, g[2] + 90))
+            pushed = True
+            continue
+        out.append(g)
+    return out
+
+
+def fights_spun_all(goals):
+    """three fast pause spins before every fight / fight2 / herd goal (but a snipe)"""
+    out = []
+    for g in goals:
+        # (not before a 'snipe' fight: the tank's shells keep coming through the spins' unpaused frames)
+        if g[0] in ('fight', 'fight2', 'herd') and 'snipe' not in g[2:]:
+            out.append(('pausespin', 3))
+        out.append(g)
+    return out
+
+
+def _earth3():
+    segs = []
+    for name, goals in earth_route.SEGMENTS:
+        g = stressed_exits(list(goals))
+        if name != 'tournament':    # (the ring refuses the pause)
+            g = fights_spun_all(g)
+        if name == 'house':
+            # the pause pages both ways, then the Cotton Gi on, before leaving the house
+            g = [('wait', 30), ('menutour',), EQUIP_BODY, ('bout',)] + g
+        if name == 'videl':
+            # after Videl (s132 / s133) the Z-Mart stretch is its own segment (e3_shops), then the rest
+            k = g.index(('walk', 40, 150))
+            segs += [('e3_videl', g[:k]), ('e3_shops', list(SHOPS3_GOALS)), ('e3_videl2', g[k:])]
+            continue
+        segs.append(('e3_' + name, g))
+    return segs
+
+
+SEGMENTS += _earth3()
+
+
 def chapter_of(name):
     """a segment's chapter (routing: segments.md's owners)"""
     for pre, ch in (('e3_', 'earth'), ('s3_', 'ship'), ('f3_', 'fat'), ('j3_', 'janemba'), ('b3_', 'superbuu'),
@@ -81,4 +146,8 @@ Opening (Other World):
 - the pause menu opened and closed at the fastest rate it accepts, eight times; every page R then L
 - START on alternate frames through every Snakeway / Yemma / Higher Plane transition (push, fade-out, load, fade-in)
 - the rest of Other World the same way, the pause menu spun three times before every fight
+Earth:
+- START on alternate frames through every exit push; the pause spun three times before every fight
+- the pause pages both ways and the Cotton Gi equipped in the house
+- e3_shops (ship fix agent): every Buy row while affordable, the refusals, Sell, a supply used and one dropped
 """

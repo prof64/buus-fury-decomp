@@ -37,6 +37,11 @@ class Run3Driver(Run2Driver):
         if kind == 'pushmash':
             if self.t == 0:
                 self.push_area = status(e)['area'][:2]
+                # the walk before it already crossed the exit (the area the push is for is reached): no push
+                nxt = self.goals[self.k + 1] if self.k + 1 < len(self.goals) else None
+                if nxt is not None and nxt[0] == 'area' and list(self.push_area) == [nxt[1], nxt[2]]:
+                    self.next_goal()
+                    return None
             if self.t < g[4]:
                 # (the direction only until the area changes: in the new one, just the extra key through the fade-in)
                 moved = status(e)['area'][:2] != self.push_area
@@ -96,6 +101,10 @@ class Run3Driver(Run2Driver):
             if st['w'] > 600:
                 raise RuntimeError(f'pausespin: stuck in phase {st["ph"]} {status(e)}')
             if st['ph'] == 0:
+                if not up and st['w'] > 60 and st['n'] == 0:
+                    # the pause cannot open here (the tournament ring): the refused presses are the stress; done
+                    st['n'] = g[1]
+                    return 0
                 if up:
                     st['ph'], st['w'] = 1, 0
                     return 0

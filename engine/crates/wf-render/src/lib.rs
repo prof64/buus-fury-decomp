@@ -540,7 +540,7 @@ impl Renderer {
                     }
                     // a script's `set_bg_offset` adds to the BG's scroll (real route sb 6-6: s-script's BG2 by (-3, 3))
                     let (bx, by) = sl.and_then(|l| l.offset.get(m.layers[li].bg as usize).copied()).unwrap_or((0, 0));
-                    self.draw_layer(m, li, *af, cx + shake.0 + bx, cy + shake.1 + by, vx, vy);
+                    self.draw_layer(m, li, *af, cx, cy, (shake.0 + bx, shake.1 + by), vx, vy);
                 }
                 // the sphere on BG0 (priority 2: BG0CNT 0x1C82 under it, real route 19-3), over the other BGs of
                 // its priority
@@ -663,7 +663,11 @@ impl Renderer {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn draw_layer(&mut self, m: &Map, li: usize, (anim_frame, tile_frame): (u32, u32), cx: i32, cy: i32, vx: i32, vy: i32) {
+    /// `off`: added to the layer's scroll registers whatever its rate (the screen shake's layer offsets, a script's
+    /// `set_bg_offset`) - not to the camera, which the view's origin cancels (real route sb 6-6 f4,694 on: the
+    /// arena drawn (3, -3) off after Gotenks' crit shake)
+    #[allow(clippy::too_many_arguments)]
+    fn draw_layer(&mut self, m: &Map, li: usize, (anim_frame, tile_frame): (u32, u32), cx: i32, cy: i32, off: (i32, i32), vx: i32, vy: i32) {
         let l = &m.layers[li];
         let ts = &m.tileset;
         // tile animation remap for this frame
@@ -689,6 +693,7 @@ impl Renderer {
             }
         }
         let (sx, sy) = l.scroll(cx, cy, anim_frame);
+        let (sx, sy) = (sx + off.0, sy + off.1);
         // screen pixel (px, py) of this view is camera-relative (vx - cx + px); layer pixel = that + scroll
         let ox = vx - cx + sx;
         let oy = vy - cy + sy;

@@ -3084,6 +3084,14 @@ pub fn worm_shield_hit(w: &mut World, i: usize) {
         e.a.set_sprite(&d, Some(idx));
     }
     w.en(i).ty = 0x8E;
+    // (a run-time placement keeps the type its death drops by: the head's drop script - run 2 row 1,774,190, 21-11)
+    if let Some(f) = w.field.as_mut() {
+        for p in f.placed.iter_mut().filter(|p| p.0 == id) {
+            if let crate::fieldcontent::ObjRef::List(0xff, _) = p.1 {
+                p.1 = crate::fieldcontent::ObjRef::List(0xff, 0x8E);
+            }
+        }
+    }
     // (a body piece is off the enemy grid, obj+0x291: the new head marks itself before its first step)
     w.en(i).worm_remark = true;
     w.en(i).detached = false;

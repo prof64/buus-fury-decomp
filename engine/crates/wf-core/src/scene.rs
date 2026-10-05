@@ -3475,7 +3475,8 @@ fn follow_step(w: &mut World, id: EntityId) {
 pub fn camera_mode_set(w: &mut World) {
     if !w.g.shakes.is_empty() {
         w.g.shakes.clear();
-        if std::env::var_os("TMP_KEEPSHAKE").is_none() { w.g.shake_off = (0, 0); }
+        // (its end routine, which zeroes the layer offsets, does not run: the BGs stay drawn at the last offset
+        // until the next shake - sb 6-6 f4,694 on, the arena (3, -3) off)
     }
 }
 
@@ -4101,7 +4102,6 @@ pub const CREDITS_LEN: i32 = 3600;
 
 /// `open_area` / `block_area` (+ `_alt`): set / clear the 8x8 tiles of [x0>>3, (x1+7)>>3) x [y0>>3, (y1+7)>>3)
 pub fn set_area(w: &mut World, rect: [i32; 4], main: bool, open: bool) {
-    if std::env::var_os("COIN_DBG").is_some() { eprintln!("SETAREA frame {} {:?} main {} open {}", w.frame, rect, main, open); }
     w.scene.area_ops.push(AreaOp { rect, main, open });
     apply_area(w, rect, main, open);
 }
