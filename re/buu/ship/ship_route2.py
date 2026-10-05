@@ -17,7 +17,10 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / 'tools' / 'story_playthrough'))
-from ship_driver import ShipDriver, alloc_keys, enemies, level_of, KEY, status  # noqa: E402
+# the driver (and its nav) as run 1's ship chapter was recorded with (re/buu/ship/r1frozen: the live ship_driver.py
+# changed since and dies in stage 3 even from run 1's own state)
+sys.path.insert(0, str(Path(__file__).resolve().parent / 'r1frozen'))
+from ship_driver import ShipDriver, alloc_keys, enemies, level_of, ai_state, KEY, status  # noqa: E402
 from ship_route import nav, charsel, switch, button, item, panel, rest_at  # noqa: E402,F401
 from earth_driver import EarthDriver  # noqa: E402
 
@@ -36,19 +39,30 @@ class ShipDriver2(ShipDriver):
     blasty = False
     split = staticmethod(split2)
 
-    def in_flame(self, e, px, py, margin=44):
-        """ShipDriver's, but never at the room's left edge: walk_keys waited there for a Destroyer's flames to stop
-        (a step left into the exit stays in their line) while it walked up and burned Gohan (8-59's left exit)"""
-        if px < 40:
-            return False
-        return super().in_flame(e, px, py, margin)
+    GHOSTS = (32,)
 
-    def flame_guard(self, e, s):
-        """ShipDriver's, but not at the room's left edge (as in_flame): with the wall behind, the guard turned Gohan
-        to block the flames instead of stepping out through the exit"""
-        if s['p'] is not None and s['p'][0] < 40:
+    def blast(self, e, s, ens, turn_ok=True):
+        """the live driver's ki blast (B, the selected skill) at an enemy in line; None when none is"""
+        x, y, pf = s['p']
+        rec = 0x03001560 + 0x68 * e.r8(0x03001068)
+        if e.r16(rec + 0x1A) < 23:
             return None
-        return super().flame_guard(e, s)
+        for o in ens:
+            dx, dy = o[1] - x, o[2] - y
+            if not e.r8(o[0] + 0x1CC) or o[4] <= 0:
+                continue
+            if abs(dy) <= 10 and 8 <= abs(dx) <= 90:
+                face, turn = (3, KEY.RIGHT) if dx > 0 else (2, KEY.LEFT)
+            elif abs(dx) <= 10 and 8 <= abs(dy) <= 90:
+                face, turn = (0, KEY.DOWN) if dy > 0 else (1, KEY.UP)
+            else:
+                continue
+            if pf != face:
+                return turn if self.t % 6 < 2 else 0
+            if abs(dx) + abs(dy) <= 34:
+                return KEY.A if self.t % 8 < 2 else 0
+            return KEY.B if self.t % 30 < 3 else 0
+        return None
 
     def heal_step(self, e):
         """ShipDriver's healing menu with the DOWN presses 50 frames apart (20 apart some are dropped: with more than
@@ -84,10 +98,37 @@ class ShipDriver2(ShipDriver):
                         return k
         return super().fightp(e, s, g)
 
+    retry_k = None
+    tries = 0
+
     def step(self, e):
         g = self.goals[self.k]
         kind = g[0]
         s = status(e)
+        if self.retry_k is not None and s['area'][:2] == [0, 2] and self.k not in (self.retry_k, self.retry_k + 1):
+            # a game over inside a retry stretch: the death -> title -> Continue program, then the stretch again from
+            # its save
+            self.tries += 1
+            if self.tries > 10:
+                raise RuntimeError('retry stretch: ten game overs')
+            self.k = self.retry_k - 1
+            self.prog, self.heal, self.nav_area, self.in_nav = [], None, None, False
+            self.next_goal()
+            return None
+        if kind == 'jumpto':
+            self.k += g[1] - 1
+            self.next_goal()
+            return None
+        if kind == 'retry_here':
+            if self.retry_k != self.k - 4:     # (a new stretch; the same one again after a Continue keeps counting)
+                self.tries = 0
+            self.retry_k = self.k - 4          # the DEATH_CONTINUE program (see checkpoint)
+            self.next_goal()
+            return None
+        if kind == 'retry_off':
+            self.retry_k = None
+            self.next_goal()
+            return None
         if kind == 'die':
             if s['area'][:2] == [0, 2]:
                 self.next_goal()
@@ -113,6 +154,17 @@ class ShipDriver2(ShipDriver):
             return self.walk_keys(e, s, g[1], g[2])
         if kind == 'talkto':
             return self.talkto(e, s, g)
+        if kind == 'closemenu':
+            # B (every 20 frames) until the field is back: a menu program that left the pause menu open
+            if s['p'] is not None and s['scene'] == 0 and self.t % 20 == 19 or self.t > 1200:
+                self.next_goal()
+                return None
+            return B if s['p'] is None and s['scene'] == 0 and self.t % 20 < 3 else self.mash_a() if s['scene'] else 0
+        if kind == 'unstick':
+            self.stuck = 0
+            self.path = None
+            self.next_goal()
+            return None
         if kind == 'mode':
             setattr(self, g[1], g[2])
             self.next_goal()
@@ -169,8 +221,10 @@ def stall(x, y, picks):
     """a 7-2 stall (s257 drinks / s258 food / s259 equipment: "Want something?" -Sure): picks = [(rows down from the
     previous pick, buys)], B out, the goodbye text"""
     k = [(A, 3, 60), (A, 3, 100)]
-    for down, n in picks:
-        k += [(D, 3, 50)] * down + [(A, 3, 40)] * n      # (a D soon after the last is not always taken)
+    for i, (down, n) in enumerate(picks):
+        # (DOWN 15 frames apart in the fresh list, as ship_route.shop; after a purchase 50 apart, closer ones are
+        # dropped)
+        k += [(D, 3, 50 if i else 15)] * down + [(A, 3, 60)] * n
     k += [(B, 3, 100), (B, 3, 100)]      # B leaves the list, B closes the goodbye (an A here talks again)
     return [('unstick',), ('walk', x, y), ('face', 'U'), ('keys', k), ('events',), ('wait', 30)]
 
@@ -181,7 +235,7 @@ def equip2(slot):
     # (A on the item: "Equip to <char>" / "Drop"; A equips and returns to the slot list; B closes the menu)
     k = [(S, 2, 60), (RS, 3, 40), (RS, 3, 40)] + [(D, 3, 50)] * slot + [(A, 3, 40), (A, 3, 40), (A, 3, 60),
                                                                        (B, 3, 80)]
-    return ('keys', k)
+    return [('keys', k), ('closemenu',)]
 
 
 def use_item(row):
@@ -237,10 +291,10 @@ def goals_run2(e):
         nav(8, 2, False), ('walk', 104, 56), ('face', 'U'), ('press', A), ('events',),      # s517: the gate
         nav(8, 1, False), ('walk', 148, 186), *charsel(1),                                   # Gohan
         ('mark', 'r03_grind_gohan'),
-        # Gohan carries the ship: his points two thirds END (run 1: half STR, half END; a POW / SPD Gohan ate all
-        # his food by stage 3 and died there)
-        ('mode', 'split', lambda n: [n - 2 * n // 3, 0, 2 * n // 3, 0]),
-        ('grind', 103, [(8, 3), (8, 6)]),
+        # Gohan carries the ship: run 1's half STR, half END (POW / SPD, END-heavy and STR-heavy Gohans all died in
+        # stage 3)
+        ('mode', 'split', lambda n: [n - n // 2, 0, n // 2, 0]),
+        ('grind', 100, [(8, 3), (8, 6)]),          # (as run 1: stage 3's level-ups refill HP; at 110 none came)
         ('mode', 'split', split2),
         nav(8, 1, False), ('walk', 148, 186), *charsel(1),                                   # Vegeta
         ('mark', 'r04_grind_vegeta'),
@@ -248,20 +302,27 @@ def goals_run2(e):
         ('grind', 92, [(8, 3), (8, 6)]),
         ('mode', 'blasty', False),
         nav(8, 1, False), ('walk', 148, 186), *charsel(-1),                                  # Gohan
-        # --- Papaya Island: the equipment stall (run 1 never bought or wore any here): Leather Gloves, Leather
-        # Moccasins, worn by Gohan; then food: four Onigiri, a Miso Soup ---------------------------------
+        # --- Papaya Island: food and the equipment stall (run 1 bought only Onigiri and wore nothing) -------------
         nav(8, 1, False), ('walk', 280, 266), ('face', 'U'), ('press', A), ('wait', 60),
         ('fly', 1953, 2041, 143, 159), ('wait', 30),                                         # Papaya Island 7-1
         nav(7, 2, False), ('mark', 'r05_shop'),
-        *stall(188, 472, [(0, 1), (2, 1)]),
-        equip2(1), equip2(2),
-        *stall(276, 592, [(4, 4)]), *stall(276, 592, [(0, 1)]),     # (a DOWN right after a purchase is dropped)
+        # four Onigiri (run 1's food), Leather Moccasins (worn), a Miso Soup: one visit each (a DOWN after a purchase
+        # lands unpredictably)
+        *stall(276, 592, [(4, 4)]), *stall(188, 472, [(2, 1)]), *equip2(2), *stall(276, 592, [(0, 1)]),
         nav(7, 1, False), ('walk', 224, 340), ('face', 'U'), ('press', A), ('wait', 60),
         ('fly', 849, 1785, 31, 23), ('wait', 30),                                            # Southwest Forest
         nav(8, 16, False), ('wait', 30),
         # --- the ship (run 1's goals from 8-16 on), with a Save + soft reset + Continue at 8-28's save point -------
         *ship_main(e),
     ]
+
+
+def checkpoint(name):
+    """Save at 8-41's save point; a game over after it (until the next checkpoint / retry_off) takes the death ->
+    title -> Continue program and plays on from here (ShipDriver2's retry)"""
+    return [('unstick',), ('walk', 60, 314), ('face', 'U'), SAVE,
+            ('jumpto', 4), DEATH_CONTINUE, ('until', 8, 41), ('wait', 30),
+            ('mark', name), ('retry_here',)]
 
 
 def ship_main(e):
@@ -275,9 +336,13 @@ def ship_main(e):
                       ('unstick',), ('walk', 60, 306), *charsel(-2)]
     k = g.index(('mark', 'c09_8-41'))
     # Gohan, rested full at the save point first (Goten stands in)
-    g[k + 1:k + 1] = [('walk', 60, 314), *charsel(1), ('mark', 'c09b_rest'), *rest_at(60, 314, 1, 1)]
-    # stage 3 walked past the room fights (run 1 fought them): the fight guards kept Gohan blocking a Destroyer's
-    # flames beside 8-59's exit until he died
+    # stage 3 is a coin toss for run 2's Gohan (run 1 got through once): Save at 8-41, and on a game over the death ->
+    # title -> Continue program and stage 3 again from the save (up to six times)
+    g[k + 1:k + 1] = [('walk', 60, 314), *charsel(1), ('mark', 'c09b_rest'), *rest_at(60, 314, 1, 1),
+                      *checkpoint('c09c_try')]
+    # with the three Switch items: back to 8-41, save there, the next retry stretch (the panels)
+    j = g.index(('mark', 'c10_switches')) + 1
+    g[j:j] = [nav(8, 41, True), *rest_at(60, 314, 1, 1), *checkpoint('c10b_try')]
     k1 = g.index(('mark', 'c11_8-66'))
-    g[k:k1] = [('nav', x[1], x[2], False) if x[0] == 'nav' else x for x in g[k:k1]]
+    g[k1:k1] = [('retry_off',)]
     return g
