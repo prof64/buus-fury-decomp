@@ -362,14 +362,110 @@ def hfil_part(frm, to, extra_before=()):
 
 
 def g_j_hfil(e):
-    """HFIL 18-2's switch (Instant Transmission), the corridor 18-3 .. 18-10, the gate maze, the boulder, 18-11's four
-    Vegetas (s446, flag 123) - the side agent's route as run 1, from Goku 116"""
-    return Chain([hfil_part('hfil', 'vegeta')])
+    """HFIL 18-2's switch (Instant Transmission), the corridor 18-3 .. 18-10's entry - the side agent's route as
+    run 1, from Goku 116"""
+    return Chain([hfil_part('hfil', 'maze')])
 
 
 g_j_hfil.chain = True
+MAZE_PUNCHES = 0
+
+
+def g_j_maze(e):
+    """18-10's gate maze (Instant Transmission toggles; its four Poltergeists drain Goku: run 1 punched the air 8 times
+    first, a luck search), the boulder, 18-11's four Vegetas (s446, flag 123). MAZE_PUNCHES = run 2's count"""
+    return Chain([hfil_part('maze', 'vegeta', [('keys', [(A, 2, 34)] * MAZE_PUNCHES + [(0, 1, 1)])])])
+
+
+g_j_maze.chain = True
+
+def side_goals(make_goals, frm):
+    """a SideDriver (run 1's RealSide) on goals `make_goals(hfil_route)`, with the HFIL walls opened before mark
+    `frm` registered (the maze planner's state)"""
+    def make(e):
+        for d in ('tools/side', 're/buu/ship'):
+            if str(ROOT / d) not in sys.path:
+                sys.path.insert(0, str(ROOT / d))
+        import hfil
+        import jan_side  # noqa: F401
+        import maze
+        R = hfil.ROUTE
+        for g in R[:R.index(('mark', frm))]:
+            if g[0] == 'openwall':
+                maze.open_wall(g[1], g[2])
+        return Unjam(hfil.SideDriver(make_goals(R)))
+    return make
+
+
+def g_j_back(e):
+    """back from 18-11 to 18-1's save point (run 1's work/ship/jan/back.py goals: the route's boulder steps, 18-9,
+    18-8's east strip, straight down in 18-7 first, 18-6 .. 18-1 with room fights), Vegeta (four RIGHT; UP 6 frames
+    first to stand in reach)"""
+    def goals(R):
+        i = R.index(('mark', 'vegeta'))
+        k = next(n for n, g in enumerate(R) if g[0] == 'goto' and g[1] == '18-1')
+        return list(R[i + 1:k]) + [('goto', '18-8', 200, 85), ('exitat', 200, 140, 'D'), ('keys', [(128, 70, 0)]),
+                                   ('goto', '18-6', 270, 60), ('goto', '18-1', 104, 272), ('walk', 107, 240),
+                                   ('keys', [(U, 6, 0)]), *R[R.index(('walk', 107, 240)) + 1:R.index(('mark', 'veg1'))]]
+    return Chain([side_goals(goals, 'vegeta')])
+
+
+g_j_back.chain = True
+
+
+def g_j_vegeta(e):
+    """Vegeta's levels for 18-12's gate (100) and Super Janemba's first round: to 108 on 18-2's Living Dead from 18-1
+    (run 1: 120), back to 18-1"""
+    return [('grind', 108, [(18, 2), (18, 1)]), nav(18, 1, False), ('wait', 30)]
+
+
+def g_j_gate(e):
+    """18-12's gate (Vegeta, s517: flag 183), 18-13 (s448, Pikkon), its save point: Goku again (four LEFT), his points
+    a quarter each into STR / POW / END / SPD (run 1: STR / END), a Save there"""
+    def goals(R):
+        return [g for g in R[R.index(('mark', 'veg1')) + 1:R.index(('mark', 'h13'))] if g[0] != 'mark']
+
+    def goku(e):
+        n = e.r16(0x03001560 + 0x2C)
+        q = n // 4
+        return Driver2([*charsel(-4), ('wait', 20), alloc_keys([(0, [q, q, q, n - 3 * q])]), ('wait', 30)])
+    return Chain([side_goals(goals, 'veg1'), goku])
+
+
+g_j_gate.chain = True
+
+ARENA_WAIT = 0
+
+
+def arena_part(wait):
+    """the side agent's arena route (tools/side/jroute.py ARENA, without its first expect: s448 is behind us, as run
+    1's jan_arena.py): 18-14, s449, Janemba, Super Janemba's two rounds (Vegeta's, then Gogeta's after `wait` frames)"""
+    def make(e):
+        for d in ('tools/side', 'tools/superbuu', 'tools/story_playthrough'):
+            if str(ROOT / d) not in sys.path:
+                sys.path.insert(0, str(ROOT / d))
+        import jroute
+        goals = [g if g != ('wait', 'ARENA_WAIT') else ('wait', wait) for i, g in enumerate(jroute.ARENA)
+                 if i not in (1, 2)]
+        return jroute.Driver(goals)
+    return make
+
+
+def g_j_arena(e):
+    """a Save at 18-13's save point (run 1: none), then the arena; a game over continues from the save"""
+    sx, sy = save_spot(18, 13)
+    return Chain([ship([('unstick',), ('walk', sx, sy), ('face', 'U'), SAVE, ('wait', 30)]),
+                  retry_from(18, 13, [arena_part(ARENA_WAIT)])])
+
+
+g_j_arena.chain = True
 
 PIECES = {
+    'j_arena': g_j_arena,
+    'j_back': g_j_back,
+    'j_vegeta': g_j_vegeta,
+    'j_gate': g_j_gate,
+    'j_maze': g_j_maze,
     'j_hfil': g_j_hfil,
     'j_grind': g_j_grind,
     'j_intro': g_j_intro,

@@ -152,6 +152,13 @@ TOUR_SB = keys((S, 2, 60), (D, 3, 50), (U, 3, 40),
                (B, 3, 60))
 
 
+#   West City 4-1 -> its Z-Mart 0-92 -> Buy -> Items: two Curry Plates (the list's first row: 400 HP, 2000 zenie) ->
+#   out -> 4-1
+ZMART_CURRY = [('nav', 0, 92, False), ('wait', 30), ('walk', 100, 110), ('hold', L, 20),
+               keys((A, 3, 120), (A, 3, 90), (A, 3, 90), (A, 3, 60), (A, 3, 60)),
+               ('bout',), ('wait', 30), ('walk', 116, 200), ('hold', D, 30), ('area', 4, 1), ('wait', 30)]
+
+
 def goals_run2(e):
     import sbroute
     r1 = list(sbroute.ROUTE)
@@ -206,10 +213,35 @@ def goals_run2(e):
         *[x for lv in (134, 137, 139, 141) for x in [('nav', 14, 1, False),
                                                        *checkpoint(f'b04_gohan{lv - 3}', 90, 240, 14, 1),
                                                        ('grind', lv, [(14, 1), (14, 2)]), ('retry_off',)]],
-        ('nav', 14, 1, False), *checkpoint('b04_gohan141', 90, 240, 14, 1),
-        # the pad (C, 129,201) -> the Giant Crater: Ultimate Gohan vs Super Buu with the Electric Kamehameha (skill
-        # slot 2, held 120 frames, from 70 px: the route's original plan - run 1's melee Gohan punched)
-        ('unstick',), ('walk', 146, 214), ('talk', 'U'), ('fly', 648, 1076), ('events',), ('wait', 30),
-        ('beam', 40000, 2, 120, 70), ('events',), ('wait', 30),
+        # the grind's zenie -> two more Curry Plates at West City's Z-Mart; the checkpoint at 4-1
+        ('nav', 14, 1, False), ('unstick',), ('walk', 146, 214), ('talk', 'U'), ('fly', 1250, 1200), ('until', 4, 1),
+        ('wait', 30), *ZMART_CURRY,
+        *checkpoint('b04_gohan141', 148, 594, 4, 1),
+        # the pad -> the Giant Crater: Ultimate Gohan vs Super Buu by punches as run 1 (the route's Electric
+        # Kamehameha plan lost ten times in a row here too), but eating Curry Plates when low (run 1 never)
+        ('unstick',), ('walk', 410, 356), ('talk', 'U'), ('fly', 648, 1076), ('events',), ('wait', 30),
+        ('boss', 40000), ('events',), ('wait', 30),
         ('retry_off',), ('autoheal', False), ('mark', 'b05_wasteland'),
+        # --- Barren Wasteland (Gohan): a save at 20-1 (run 1 passed it), the story to 20-5 and Gohan's second fight
+        # with Super Buu (a game over: back to 20-1) ---------------------------------------------------------------
+        use_item(0), ('closemenu',),                     # a Curry Plate (or what is left) before the save
+        *checkpoint('c00_20-1', 231, 234, 20, 1), ('autoheal', True),
+        *seg('wasteland', 'gohan_vs_buu2'),
+        *seg('gohan_vs_buu2', 'fusion_saga'),
+        ('retry_off',), ('autoheal', False), ('mark', 'c01_fusion_saga'),
+        # --- 20-5 as Goku: his points POW / SPD (run 1: STR / END); the 20-6 save point; Goku to level 140 for the
+        # gate with Energy Blasts first, in steps saved at 20-6 (run 1: 141 by punches, no save) ---------------------
+        ('allocnow', lambda n: [0, n // 2, 0, n - n // 2]),
+        ('nav', 20, 6, False), ('wait', 20),
+        ('mode', 'split', lambda n: [n // 4, n // 4, n // 4, n - 3 * (n // 4)]),
+        *[x for lv in (130, 135, 140) for x in [('nav', 20, 6, False), *checkpoint(f'c02_goku{lv}', 56, 124, 20, 6),
+                                                  ('autoheal', True), ('skill', 0), ('mode', 'blasty', True),
+                                                  ('grind', lv, [(20, 6), (20, 5)]),
+                                                  ('mode', 'blasty', False), ('retry_off',)]],
+        ('nav', 20, 6, False), *checkpoint('c03_goku140', 56, 124, 20, 6), ('autoheal', True),
+        # the gate (Goku 140: s473, "confront Majin Buu? Yes") -> 20-7: Goku and Vegeta vs Super Buu (the three
+        # Instant Transmission rounds), Vegito, the absorption -> inside Buu (Vegeta)
+        ('walk', 96, 44), ('talk', 'U'), ('eventsw', 240), ('wait', 20),
+        *seg('goku_vs_buu', 'inside_buu'),
+        ('retry_off',), ('autoheal', False), ('mark', 'c04_inside_buu'),
     ]

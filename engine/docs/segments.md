@@ -5086,3 +5086,32 @@ one gain (rE2__087_2-90+009000 0 -> 1000).
 *Run 2 row 35,930 (Continue, the app's leader idle after it) - checked by the ship agent: **already fixed on HEAD**
 (9039360).* From power-on and from the c33788 cut the app now runs on to 124,907 (019_e_tank, RNG) - the Earth chapter
 (Earth agent). Nothing taken.
+
+**Run 2's Earth / Other World stops (Earth agent, 2026-10-04, by the coordinator).** `check.sh --chain run2` from
+power-on: first difference 33,788 -> **124,907** (run 1 still exact, both legs; gates, menu_parity, cross_ts green).
+* **33,788 (006_die)** - two counters the game keeps across a game over / New Game / Continue that ours restarted:
+  the frame counter 0x03000F94 (`Globals::clock`: `title_world` rebuilt the title world with fc0 = 0 - offset 17,133
+  after the game over, row 18,047) and the path followers' re-plan phase 0x030032E5 (`path_stagger`, not GameData:
+  5 in the game, 0 in ours) - an enemy's chase re-planned on another phase and hit the idle leader 9 frames early.
+  Both carried in `menu::title` (title_world, boot).
+* **35,930 (007_continue)** - the title's Continue (no-lag path): the slot's load is one iteration, then the field
+  fades in by 4 a frame (stored colours, level 256 - 4 k from the load) **with the world running** - the leader walks
+  at level 56 - and no idle at the fade's end (`FieldConfig::slow_fade_in`, `Field::fade_no_idle`); the load draws 3
+  (the player made once, as an area entry: `arrive`), not 4.
+* **56,304 (008_otherworld, Pikkon)** - `EnergyBarrage` was a placeholder: it is FlameBreath's flame (class
+  0x080249E0: 2 px/frame + rand(192) - 96 per axis, 20 frames, one hit x51) from Pikkon's controller 0x030030E0
+  (update 0x0802E146): ticks 1..47 at the position + 0x08757324[dir], frame min(tick >> 2, 2), anim held (its own
+  rand step does not run), sound 63 at the enter, stopped at the end / when a pushed state (a hit's knockback)
+  replaces the controller - the node then finds it gone (no more flames). TS mirrored (ai.ts), dumps regenerated.
+* **118,564 (017_e_circus)** - a bomb's blast goes to **every** object (0x08011C0C ORs the handlers, no first-taker
+  stop): the leader's fresh ki blast took it and the leader was not hit. Field only (battles keep the reference).
+* **124,907 (019_e_tank) - open**: the leader's ki blast hits the tank (124,906, damage roll as ours) and is also taken
+  by the shell the tank fired that frame (blast +0x54 = 1, it bursts on its next update; the shell explodes at
+  124,907, sound 49 with the driver's rand(2) - 0x0803E1E3 via 0x0803E423); ours ends the blast at the tank and the
+  shell flies on. Not done: the shell's handler (0x0801CB38) / the blast's +0x54 path vs our first-taker order.
+  `work/earth/timing/objdump2.py` / `rngcalls2.py` / `objlist.py` reproduce it (save state `work/earth/segs2/r2_124800.ss`;
+  cuts here land inside TankShoot, which the importer does not resume).
+* **141,971** - the ship-fixes agent's Save Game item (per the coordinator).
+* **Importer agent:** `resync.py` now loads `work/superbuu/libemu_sb.dylib` (sbemu, the EEPROM cuts), built from
+  `tools/superbuu/shim_sb.c`, which lacks `emu_cycles` (tools/emu/shim.c has it): every cut's `phase()` fails
+  (`dlsym ... emu_cycles`). `work/earth/bin/mkseg2.py` makes segment docs from any chain row with the plain library.

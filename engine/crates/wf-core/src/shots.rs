@@ -494,6 +494,9 @@ pub fn add(w: &mut World, s: Shot) -> EntityId {
         // a thrown bomb (real run 4-1 tiles r002_006+14,000 f85 / +7,000 / +17,000: the game's allocator takes a
         // 4-unit block, (151, 4), in the frame the bomb is made)
         ShotKind::Bomb { .. } => 0x100,
+        // a Majin soldier's energy wave (ctor 0x0802A2EC: `0x0801124C(.., 0x80)`, the `0x08011732` retry - 2 units;
+        // run 2 cut 544,900 f61, game (325, 2))
+        ShotKind::EnergyWave { .. } => 0x80,
         _ => 0,
     };
     let flame = matches!(s.kind, ShotKind::Flame { .. });

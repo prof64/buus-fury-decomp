@@ -864,15 +864,20 @@ pub fn boot(data: &Arc<crate::content::GameData>, w: &mut World) -> Option<World
                 ..Default::default()
             };
             let mut nw = crate::field::create(Arc::clone(data), &cfg);
+            // the frame counter 0x03000F94 runs on from the title, as for New Game (run 2 row 143,026: the Continue
+            // after the soft reset - the field NPCs' clock-stamped timers drew one frame early with the counter at 1)
+            // (unlike New Game the slot load's iteration is the new world's own: its menu leave counts it)
+            nw.g.fc0 = clock0 - nw.frame as i64;
             nw.menu.phase = Phase::Leave { t: 1 };
             if w.opts.no_lag {
                 // the slot's load is one long iteration; from it the field fades in by 4 a frame (`0x080070CC` from
                 // the stored colours: 256 - 4 k, k the iterations since the load) with the world running - the
                 // player under control (run 2 rows 35,865 .. 35,928: walking at level 56)
+                // (the iteration after the load is the world's own: run 2 row 143,026, 3-1's NPCs draw in it)
                 nw.menu.tr = Transition {
                     fade_out: 0,
                     enter: 1,
-                    leave: 2,
+                    leave: 1,
                     fade_in: 0,
                 };
                 if let Some(f) = nw.field.as_mut() {
