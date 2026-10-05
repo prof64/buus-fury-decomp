@@ -661,6 +661,12 @@ fn step_inner(w: &mut World) {
             if w.field.is_some() {
                 w.tick_shakes();
             }
+            // the coins fly on through a menu's fade-out (their move counter +0x2C, not their age: run 2 row 277,383 -
+            // a pause menu opened 15 frames after a robot's coins dropped, the game's coins 15 moves further, so the
+            // player walked past one ours had left in his way)
+            if w.field.is_some() {
+                crate::fieldobj::held_moves(w);
+            }
             // a script's menu fades out under the game's own mode step (0x08007041): the object pass runs, the HUD
             // object with it - its low-HP beep (run 2 row 141,749: s011's save menu at 3-1, lf 131,644)
             if w.menu.scripted && w.field.is_some() && w.opts.no_lag {

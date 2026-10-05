@@ -710,6 +710,7 @@ pub fn replay_with(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: 
                         Body::Shot(s) => format!("{}:shot {:?}", w.ents[i].id, s).chars().take(160).collect(),
                         Body::Fx(f) => format!("{}:fx {:?}", w.ents[i].id, f).chars().take(80).collect(),
                         Body::Npc(n) => format!("{}:npc{}", w.ents[i].id, n.sprite_id),
+                        Body::Pickup(p) => format!("{}:pickup {:?} age {} mv {} @({},{})", w.ents[i].id, p.kind, p.t, p.mv, p.x >> 8, p.y >> 8),
                         _ => format!("{}:other", w.ents[i].id),
                     }).collect();
                     eprintln!("  t{k} ents {}", es.join(" | "));

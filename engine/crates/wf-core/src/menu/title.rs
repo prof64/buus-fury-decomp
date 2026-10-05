@@ -868,6 +868,13 @@ pub fn boot(data: &Arc<crate::content::GameData>, w: &mut World) -> Option<World
             // after the soft reset - the field NPCs' clock-stamped timers drew one frame early with the counter at 1)
             // (unlike New Game the slot load's iteration is the new world's own: its menu leave counts it)
             nw.g.fc0 = clock0 - nw.frame as i64;
+            // the slot load's iteration creates the HUD and runs its update: a low-HP beep then (run 2 row 142,953:
+            // the 3-1 Continue with Gohan low, sound 41 in the load's iteration, counter 799)
+            if w.opts.no_lag {
+                nw.g.clock_mark = Some(clock0 - 1);
+                crate::field::hud_beep(&mut nw);
+                nw.g.clock_mark = None;
+            }
             nw.menu.phase = Phase::Leave { t: 1 };
             if w.opts.no_lag {
                 // the slot's load is one long iteration; from it the field fades in by 4 a frame (`0x080070CC` from

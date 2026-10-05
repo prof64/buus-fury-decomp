@@ -4387,6 +4387,20 @@ the 8-17 label (above).
   0x0804EB77). Rust + TS (cross_ts 0 failures, battle lockstep 709).
 * **The airships' idle drift** is the vram purge's suspension choice (world map f909: ours suspends entities 16-21,
   the game only some of them) -> importer agent's allocator model.
+**Update 8: pixel board 15,815 -> 17,172 / 25,551 sampled frames exact (67.2 %), HUD class 2,911 -> 1,646; pixel
+gate 109 segments / 1,215 frames.**
+* **The SS / SS3 gauges are the character's** (record +0x1E / +0x20; emulator, rkb_168 14-1: Vegeta's 288 stays in his
+  record when Goku is switched in, Goku's HUD shows his own 0). `CharState.ss_gauge` / `ss3_gauge` (imported from
+  the record, synced from the player every frame), loaded by `make_player` and both `switch_character` paths. Ours
+  carried Vegeta's gauge into Goku's EP bar (yellow) for the rest of the cut.
+* **The skill icon's corner triangle shows the SS cooldown** (HUD draw `0x0800BC8E`): the first
+  `0x08071CA8[cooldown >> 15]` (0, 7, 13, 18, 22, 25, 28) pixels of the list `0x08072410` are cleared to colour 1 -
+  the triangle empties after a transformation and refills as the cooldown runs out. `wf-ui` hud.json gains
+  `steps.cooldown`, `HudView.ss_cooldown` (the frame's own value, not the presenter's late one: shipr_001 7-1 f240).
+* **Pixel tool: the timer's tear** ("t" candidate): the countdown's digits are written into its OBJ tiles during the
+  frame (draw 0x0802FD16), so lines already scanned show the previous value, split at a row that moves with the
+  frame's CPU time (rkb_168 / sb_041: rows 8..12 the old value, the rest the new). Lines may mix the two per pixel
+  like the palette rewrite's. (`PIX_NOTIMERTEAR` turns it off; `PIX_TIMERFIT` also prints per-row value fits.)
 
 **Done (Earth agent): the no-lag title -> Earth soak's crowd-wander stop (row 190,577) - a menu close that never
 gave the field its sprite memory back.** The crowd NPCs' wander draws were right; their *update order* was not: at
@@ -5162,3 +5176,30 @@ block). Run 2 cut 544,900 (`cut.py --chain run2`, 300 rows with sprite-memory ro
   - The bisection stopped there: `data/realrun2/030_s_ship.keys.gz` is being re-recorded (empty in the tree right
     now). It continues from 274,000 once the stretch is back.
 * All run-2 cuts carry the save memory already (107 / 107); none needed remaking.
+*Claim (ship fix agent, by the coordinator):* run 2 row **159,704** (Gohan's position after the 3-1 Continue) and
+**277,383** (the extra coin). **Earth agent:** if you are already on 159,704, say so here and I will drop it.
+
+**Run 2: the extra coin (277,383) and the 3-1 Continue (ship fix agent, 2026-10-04).** Uncommitted: menu/mod.rs,
+title.rs, wf-import segment.rs.
+* **Coins fly on through a menu's fade-out** (menu/mod.rs, FadeOut: `fieldobj::held_moves`):
+  - In the game, the move counter +0x2C runs, but not the age +0x24.
+  - A pause menu opened 15 frames after a robot dropped its coins. The game's coins were 15 moves further along, so
+    Gohan walked past one that ours had left in his path (cut 274,000: exact over 3,500 rows).
+  - Leg 240,640 -> master end (427,817, the master being re-recorded): logic exact.
+  - Sound differences from 423,858 on (punch sounds in the app only); `sounds.json.gz` is from 20:42, older than the
+    re-recording, so re-check after it.
+* **The Continue's slot-load iteration runs the HUD update** (title.rs): the low-HP beep at counter 799 (142,953).
+* **159,713 (2-90, Goten's tag game; not fixed, findings):**
+  - Goten's rock hits Gohan at lf 16,271 and queues s120.
+  - In the app at lf 16,272: Goten's throw controller reaches tick 32 (SetAnim(0): rand(255), enemy.rs), and the
+    player re-enters idle (rand(255), player.rs:959).
+  - In the game at lf 16,272: no draw. At 16,273: one draw, the idle state's enter 0x0800DFBE on Goten's object
+    0x0203DBB0.
+  - So the player's second idle entry should not happen, and Goten's controller is one tick ahead.
+  - Next: the player state on the hit's frame. Is the queued event already holding the player in the iteration the
+    rock hits?
+* Not mine: the pixel gate fails on db5_022 / 024 / 030 / 036 (12-x) with or without my change (someone's in-flight
+  work).
+* Harness: `SEGMENT_ENTS` now lists pickups (kind, age, moves, position).
+* The app's play time after the soft reset runs 696 (`BOOT_LOGIC`) behind the game's (`ourlf`); the clock is right.
+  Mine to fix next.
