@@ -1,4 +1,4 @@
-"""run_sb2.py START.ss OUTDIR [--from MARK] [--to MARK] [--log] [--trace] -- play sbroute2.goals_run2 (run 2's
+"""run_sb2.py START.ss OUTDIR [--sav FILE] [--from MARK] [--to MARK] [--log] [--trace] -- play sbroute2.goals_run2 (run 2's
 Super Buu + Kid Buu part) from a state (headless, muted), saving OUTDIR/<mark>.ss at each ('mark', name) goal and
 OUTDIR/end.ss (+ end.png) at the end; OUTDIR/start.ss = START (the goal list is built from it). --log writes
 OUTDIR/keys.json (per-frame keys from START / the --from mark). The emulator is the savedata-capable one
@@ -15,11 +15,23 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import sbemu  # noqa: E402,F401  (the savedata-capable emulator lib first)
 from sbroute2 import SbDriver2, goals_run2, status  # noqa: E402
-from route import start_emu  # noqa: E402
+from route import start_emu as _start_emu  # noqa: E402
+
+SAV = None
+
+
+def start_emu(path):
+    # --sav FILE: the cartridge save memory (EEPROM: saves + options) loaded before the first frame
+    e = _start_emu(path)
+    if SAV:
+        sbemu.sd_write(e, open(SAV, 'rb').read())
+    return e
 
 
 def main():
+    global SAV
     a = sys.argv[1:]
+    SAV = os.path.abspath(a[a.index('--sav') + 1]) if '--sav' in a else None
     start, out = os.path.abspath(a[0]), Path(os.path.abspath(a[1]))
     frm = a[a.index('--from') + 1] if '--from' in a else None
     to = a[a.index('--to') + 1] if '--to' in a else None

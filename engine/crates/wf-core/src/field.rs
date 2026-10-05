@@ -403,6 +403,9 @@ pub struct Field {
     /// as they are (run 2 row 35,928: walking on, no idle draw)
     #[serde(default)]
     pub fade_no_idle: bool,
+    /// the arrival's idle draw is due after this frame's object pass (`arrival_idle`)
+    #[serde(default)]
+    pub arrival_idle: bool,
     /// the object being updated destroyed one before it in the world list (Majin Buu's eat removes the player
     /// object): the list compacts and it is updated again in this pass (`World::step_entities_list`)
     #[serde(default)]
@@ -659,6 +662,7 @@ fn new_field() -> Field {
         nest_fade: false,
         script_fade_in: false,
         fade_no_idle: false,
+        arrival_idle: false,
         list_redo: false,
         player_new: false,
         vram: Some(crate::vram::VramState::default()),
@@ -1552,6 +1556,20 @@ pub fn free_arrival(w: &World) -> bool {
     }) && !crate::fieldworld::flying(w)
 }
 
+/// the idle draw of a script's warp_fade arrival (`pre_step`): the handler 0x080022E6 sets the built player idle
+/// (vt+0x28(0)) when its nested fade-in loop returns - after that frame's object pass (run 2 row 1,103,549, 0-21
+/// s026: the free player's punch ends in the pass, 1 x rand(255), then the handler's idle, a second)
+pub fn arrival_idle(w: &mut World) {
+    if !w.field.as_mut().is_some_and(|f| std::mem::take(&mut f.arrival_idle)) {
+        return;
+    }
+    for s in 0..w.players.len() {
+        if let Some(i) = w.player_idx(s) {
+            player::set_idle(w, i);
+        }
+    }
+}
+
 /// before the entity update: the deferred calls due (start of the world update); the item-get presentation holds the
 /// players' input
 pub fn pre_step(w: &mut World) {
@@ -1565,8 +1583,8 @@ pub fn pre_step(w: &mut World) {
     if let Some(f) = w.field.as_mut() {
         f.frame_start_pos = pos;
     }
-    // a script's warp_fade arrival in a 2D area ends as its 64th frame starts: the players go idle (1 x rand(255)
-    // each), the script goes on in this frame (6-1 -> 6-13: the walk to the pad starts on the fully lit frame)
+    // a script's warp_fade arrival in a 2D area ends as its 64th frame starts: the players go idle after the pass
+    // (`arrival_idle`, 1 x rand(255) each), the script goes on in this frame (6-1 -> 6-13: the walk to the pad starts on the fully lit frame)
     if w.field.as_ref().is_some_and(|f| {
         f.script_fade_in
             && matches!(f.mode, Mode::FadeIn { k } if k >= crate::fieldworld::FADE_IN_3D - 1)
@@ -1577,11 +1595,7 @@ pub fn pre_step(w: &mut World) {
             f.mode = Mode::Normal;
             f.script_fade_in = false;
             f.fade_no_idle = false;
-        }
-        for s in 0..w.players.len() {
-            if let Some(i) = w.player_idx(s).filter(|_| idle) {
-                player::set_idle(w, i);
-            }
+            f.arrival_idle = idle;
         }
     }
     // an event (nested loop inside the player update) or the item-get holds the players; the raw keys stay in scene.keys

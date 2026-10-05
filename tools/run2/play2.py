@@ -39,6 +39,8 @@ def main():
     e = start_emu('reset')
     for name, goals in SEGMENTS:
         e.save_file(str(OUT / f'seg_{name}.ss'))
+        # the cartridge's save memory (EEPROM: slots + the options block), which a .ss does not carry
+        (OUT / f'seg_{name}.sav').write_bytes(sbemu.sd_read(e))
         if name in keys:
             for k in keys[name]:
                 e.set_keys(k)
@@ -99,6 +101,7 @@ def main():
             break
     e.set_keys(0)
     e.save_file(str(OUT / 'end.ss'))
+    (OUT / 'end.sav').write_bytes(sbemu.sd_read(e))
     print('total frames', sum(len(keys[n]) for n in names if n in keys))
 
 

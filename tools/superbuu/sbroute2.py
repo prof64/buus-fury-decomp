@@ -320,9 +320,8 @@ def goals_run2(e):
         # Energy Blast Goku died to the Power Mechandoid every time)
         ('mode', 'split', lambda n: [n // 3, n // 6, n // 3, n - 2 * (n // 3) - n // 6]),
         # (the first levels as run 1, no save to fall back on: the 20-5 / 20-6 robots by punches)
-        ('autoheal', True), ('grind', 130, [(20, 5), (20, 6)]),
-        # (each step saved at 20-6; the retry stretch runs on until the next save)
-        *[x for lv in (133, 136, 140) for x in [('nav', 20, 6, True), *checkpoint(f'c02_goku{lv - 3}', 56, 124, 20, 6),
+        # (each step saved at 20-6, from the first one on; the retry stretch runs on until the next save)
+        *[x for lv in (127, 130, 133, 136, 140) for x in [('nav', 20, 6, True), *checkpoint(f'c02_goku{lv - 3}', 56, 124, 20, 6),
                                                   ('autoheal', True), ('grind', lv, [(20, 6), (20, 5)])]],
         ('nav', 20, 6, True), *checkpoint('c03_goku140', 56, 124, 20, 6), ('autoheal', True),
         # the gate (Goku 140: s473, "confront Majin Buu? Yes") -> 20-7: Goku and Vegeta vs Super Buu (the three

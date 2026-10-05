@@ -1694,7 +1694,42 @@ fn build_mid_ids(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner: &mu
     // 0x08073424 for Babidi's ship, stopped in its camera_pan_to after the warp, the screen still black)
     if info.depth == 0 {
         if let Some((id, ran)) = inline_running(ram) {
-            let drop = ran.len().saturating_sub(1);
+            let mut drop = ran.len().saturating_sub(1);
+            // (waiting at end_parallel (0x3A): the group replays from its begin_parallel (0x38), its running commands
+            // then take their objects' progress - `import_track_objects`, as `build_mid_code`'s)
+            if ran.get(drop).is_some_and(|r| r.0 == 0x3A) {
+                if let Some(b) = ran[..drop].iter().rposition(|r| r.0 == 0x38) {
+                    drop = b;
+                }
+            }
+            // (the static position counts each action once: a loop or a step split before it ran some several times -
+            // the dynamic index is the n-th queued occurrence of that native in a probe run)
+            if let Some((tn, targs)) = ran.get(drop).cloned() {
+                let nth = ran[..=drop].iter().filter(|(n, a)| *n == tn && (targs.is_none() || *a == targs)).count();
+                // (every queued action of the probe run, in order - the predicate sees each once)
+                let seen: std::cell::RefCell<Vec<(u8, Vec<i32>)>> = Default::default();
+                runner.probe_inline(&mut w, &id, &|n, args| {
+                    seen.borrow_mut().push((n, args.to_vec()));
+                    false
+                });
+                let seen = seen.into_inner();
+                let cands: Vec<usize> = (0..seen.len()).filter(|&k| seen[k].0 == tn && targs.as_ref().is_none_or(|t| *t == seen[k].1)).collect();
+                // (a computed argument - a loop's `set_actor_byte8(g(0), 36)`, g(0) counting down: run 2 cut 763,358 waits in
+                // the pass with g(0) = -3, RAM's word - picks the pass: the occurrence whose first argument is the RAM's
+                // script word, when exactly one is)
+                let ram_g: Vec<i32> = (0..4u32).map(|k| ram.s32(WORDS_G + 4 * k)).collect();
+                let by_word: Vec<usize> = if targs.is_none() && cands.len() > 1 {
+                    cands.iter().copied().filter(|&k| seen[k].1.first().is_some_and(|a| ram_g.contains(a))).collect()
+                } else {
+                    vec![]
+                };
+                if let Some(&k) = (by_word.len() == 1).then(|| &by_word[0]).or_else(|| cands.get(nth.saturating_sub(1))) {
+                    // (an instant native the interpreter stands after has run: the game's frame break follows it - the
+                    // lift script's pass of g(0) = -3 is done at cut 763,358, the glide starts 5 rows later, as from
+                    // an earlier cut)
+                    drop = if wf_script::steps::is_instant(tn) { k + 1 } else { k };
+                }
+            }
             w.menu = Default::default();
             if ram.screen_black == Some(true) {
                 w.scene.screen.black = 16;
@@ -1705,12 +1740,194 @@ fn build_mid_ids(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner: &mu
                 a.objects.iter().any(|o| matches!(&o.kind, wf_core::fieldcontent::ObjKind::Breakable { on_break: Some(wf_core::fieldcontent::Callback::Script(s)), .. } if *s == id))
             });
             runner.continue_inline_held(&mut w, &id, drop, !on_break);
+            // its tracks' running walks / glides from their game objects, as an event's (run 2 cuts 763,328 ..
+            // 763,606: 12-26's lift script inline_0x08085224 - walk_to, then glide_to in a parallel group)
+            let rng = w.rng.clone();
+            import_track_objects(&mut w, ram);
+            w.rng = rng;
+            track_anims_from_rows(&mut w, ram);
             import_cam_pan(&mut w, ram);
-            notes.push(format!("mid-area: inline script {id} at its action #{drop} {:#04x}", ran[drop].0));
+            notes.push(format!("mid-area: inline script {id} at its action #{drop} (static #{}) {:#04x}", ran.len() - 1, ran[ran.len() - 1].0));
         }
     }
     let draws = w.rng.calls.wrapping_sub(calls0);
     Built { world: w, draws, held: 0, finished: true }
+}
+
+/// the track actors' animations (and facing) as the RAM rows show them (a started command restarted its animation):
+/// the RAM object at the entity's 24.8 position (`build_mid_code`; an inline script's tracks too)
+fn track_anims_from_rows(w: &mut World, ram: &GbaRam) {
+    use wf_core::scene::Owner;
+    let rows: std::collections::BTreeMap<u32, (i32, i32, i32, i32)> = ram.actor_rows.iter().map(|r| (r.0, (r.1, r.2, r.3, r.4))).collect();
+    // (and the event's puppets without a track left: an actor whose walk ended - whole-run cut 146,883, s237's Baba)
+    let mut owners: Vec<wf_core::world::EntityId> = w
+        .scene
+        .tracks
+        .iter()
+        .filter_map(|t| match t.owner {
+            Owner::Entity(id) => Some(id),
+            _ => None,
+        })
+        .collect();
+    for p in &w.scene.puppets {
+        if !owners.contains(&p.id) {
+            owners.push(p.id);
+        }
+    }
+    for id in owners {
+        let Some(i) = w.find(id) else { continue };
+        let Some((x, y)) = w.actor(i).map(|a| (a.x, a.y)) else { continue };
+        // (by position, and by sprite when two stand on one spot - run 2 cut 57,951: s103's Goku and Pikkon spawned at
+        // (0, -8))
+        let spr = wf_core::scene::sprite_id(w, i);
+        let at = |o: &u32| ram.s32(o + 0x1A0) == x && ram.s32(o + 0x1A4) == y;
+        let o = if Some(i) == w.player_idx(0) {
+            Some(ram.player())
+        } else {
+            rows.iter().find(|(o, r)| at(o) && Some(r.0) == spr).map(|(o, _)| *o).or_else(|| rows.keys().copied().find(|o| at(o)))
+        };
+        // (and the facing: a walk the replay found already ended is dropped unstarted, so its turn is not made -
+        // whole-run cut 146,883: s237's Baba (222) at the end of her walk up, facing 1 in RAM)
+        if let Some(o) = o {
+            let f = ram.r8(o + 0x10) & 3;
+            match &mut w.ents[i].body {
+                wf_core::world::Body::Player(p) => p.a.facing = f,
+                wf_core::world::Body::Npc(n) => n.a.facing = f,
+                wf_core::world::Body::Enemy(e) => e.a.facing = f,
+                _ => {}
+            }
+        }
+        let Some(&(_, raw, cel, tick)) = o.and_then(|o| rows.get(&o)) else { continue };
+        let d = Arc::clone(&w.data);
+        // (the state's script anim id follows the RAM's state - raw = anim_state(id) + 1 - when ours is another
+        // state's: it picks how the state ticks; whole-run cut 146,883: Baba idle in RAM, ours still the walk's id)
+        let id_for = |cur: i32| -> i32 {
+            if wf_core::scene::anim_state(cur) + 1 == raw {
+                cur
+            } else {
+                (0..25).find(|&a| wf_core::scene::anim_state(a) + 1 == raw).unwrap_or(cur)
+            }
+        };
+        if let Some(pp) = w.scene.puppets.iter_mut().find(|p| p.id == id) {
+            (pp.anim.raw, pp.anim.frame, pp.anim.tick) = (raw, cel, tick);
+            pp.anim.id = id_for(pp.anim.id);
+        }
+        match &mut w.ents[i].body {
+            wf_core::world::Body::Player(p) => {
+                (p.ap.raw, p.ap.frame, p.ap.tick) = (raw, cel, tick);
+            }
+            wf_core::world::Body::Npc(n) => {
+                (n.anim.raw, n.anim.frame, n.anim.tick) = (raw, cel, tick);
+                n.anim.id = id_for(n.anim.id);
+            }
+            wf_core::world::Body::Enemy(e) => {
+                e.set_raw(&d, raw);
+                (e.ea.pos.raw, e.ea.pos.frame, e.ea.pos.tick) = (raw, cel, tick);
+            }
+            _ => {}
+        }
+    }
+}
+
+/// each track's running command from its game object (`build_mid_code`; an inline script's tracks too): walks, glides,
+/// jumps, `actor_wait`s - the commands before it dropped, the object's progress taken
+fn import_track_objects(w: &mut World, ram: &GbaRam) {
+    use wf_core::scene::{Cmd, Owner};
+    let walks = ram.ewram_with(0x0804_D0A4);
+    let glides = ram.ewram_with(0x0804_AE84);
+    let jumps = ram.ewram_with(0x0804_AE5C);
+    // the actors' running `actor_wait` objects (an actor's state +0x18C)
+    let waits: Vec<u32> = ram.objects().into_iter().map(|a| ram.r32(a + 0x18C)).filter(|&s| ram.valid(s) && ram.r32(s) == 0x0804_AB58).collect();
+    for k in 0..w.scene.tracks.len() {
+        let live = |c: &Cmd| -> Option<u32> {
+            match c {
+                Cmd::MoveTo { x, y, .. } => walks.iter().copied().find(|&o| ram.s32(o + 0x14) == *x && ram.s32(o + 0x18) == *y),
+                Cmd::GlideTo { x, y, .. } => glides.iter().copied().find(|&o| ram.s32(o + 0x14) == *x && ram.s32(o + 0x18) == *y),
+                Cmd::JumpTo { x, y, .. } => jumps.iter().copied().find(|&o| ram.s32(o + 0x18) == *x && ram.s32(o + 0x1C) == *y),
+                _ => None,
+            }
+        };
+        // (a target the script computed from a query before the cut - glide_to(0, actor_x(0), actor_y(0) - 100):
+        // asked again now it is another; the head's command with the only live object of its kind takes that
+        // object's target - real route 4-1, s515's take-off glide, tiles r002_006+2000 / +13000)
+        // (or the actor's own movement object: its state +0x18C - two glides at once, each target re-asked: run 2
+        // cut 57,741, s103 node 0 lifts Goku and Pikkon together)
+        let own = match w.scene.tracks[k].owner {
+            Owner::Entity(id) => w.find(id).and_then(|i| {
+                let a = w.actor(i)?;
+                let o = if Some(i) == w.player_idx(0) { ram.player() } else { ram.objects().into_iter().find(|&o| ram.s32(o + 0x1A0) == a.x && ram.s32(o + 0x1A4) == a.y)? };
+                (o != 0).then(|| ram.r32(o + 0x18C))
+            }),
+            _ => None,
+        };
+        let found = w.scene.tracks[k].queue.iter().enumerate().find_map(|(j, c)| live(c).map(|o| (j, o))).or_else(|| {
+            let only = |v: &Vec<u32>| (v.len() == 1).then(|| v[0]);
+            match w.scene.tracks[k].queue.first() {
+                Some(Cmd::GlideTo { .. }) => only(&glides).or_else(|| own.filter(|s| glides.contains(s))).map(|o| (0, o)),
+                // (the glide behind the group's instant commands - set_pose / set_attachment, done in the replay's
+                // first step: the actor's own glide object says it runs)
+                _ => own.filter(|s| glides.contains(s)).and_then(|o| {
+                    let j = w.scene.tracks[k].queue.iter().position(|c| matches!(c, Cmd::GlideTo { .. }))?;
+                    w.scene.tracks[k].queue[..j].iter().all(|c| matches!(c, Cmd::SetPose { .. } | Cmd::SetAttachment { .. } | Cmd::Face { .. })).then_some((j, o))
+                }),
+            }
+        });
+        // a glide at the head with no glide object left in RAM has ended (the object goes in its last step; the
+        // script resumes a frame later): done, not glided again from here (tile r002_006+13000)
+        if found.is_none() && glides.is_empty() && matches!(w.scene.tracks[k].queue.first(), Some(Cmd::GlideTo { .. })) {
+            w.scene.tracks[k].queue.remove(0);
+            w.scene.tracks[k].started = false;
+            continue;
+        }
+        // so does a walk at the head with no walk object for it and its actor on the target: the walk object went in
+        // its last step (its idle SetAnim drawn), the script goes on in the cut's frame (whole-run cut 887,156:
+        // s437 node 10, the priest's walk back ended, `remove_actor` next)
+        // (an `actor_wait` before it ended too: no wait object is left, the walk's object is made by the wait - whole-run
+        // cut 146,883: s237's actor_wait(269, 15) + walk_to(269, 210, 63) both over)
+        if found.is_none() {
+            let skip = w.scene.tracks[k].queue.iter().take_while(|c| matches!(c, Cmd::Wait { .. })).count();
+            if let (Some(Cmd::MoveTo { x, y, .. }), Owner::Entity(id)) = (w.scene.tracks[k].queue.get(skip), w.scene.tracks[k].owner) {
+                let (x, y) = (*x, *y);
+                let at = w.find(id).and_then(|i| w.actor(i)).is_some_and(|a| a.x == x << 8 && a.y == y << 8);
+                if at && !walks.iter().any(|&o| ram.s32(o + 0x14) == x && ram.s32(o + 0x18) == y) {
+                    w.scene.tracks[k].queue.drain(..=skip);
+                    w.scene.tracks[k].started = false;
+                    continue;
+                }
+            }
+        }
+        let Some((pos, o)) = found else { continue };
+        // `actor_wait` before the walk (0x4A: the actor's state +0x18C is the wait object vt 0x0804AB58, +4 the walk
+        // object it starts at the end - already made, not stepped - +8 the frames left): the wait runs, the walk is
+        // the command after it (whole-run cut 142,491: s172 node 0, Vegeta's actor_wait(279, 20) 1 frame in)
+        if let Some(wo) = waits.iter().copied().find(|&a| ram.r32(a + 4) == o) {
+            if pos > 0 && matches!(w.scene.tracks[k].queue.get(pos - 1), Some(Cmd::Wait { .. })) {
+                w.scene.tracks[k].queue.drain(..pos - 1);
+                if let Some(Cmd::Wait { left }) = w.scene.tracks[k].queue.first_mut() {
+                    *left = ram.s32(wo + 8);
+                }
+                w.scene.tracks[k].started = true;
+            }
+            continue;
+        }
+        if let Some(Cmd::GlideTo { x, y, .. }) = w.scene.tracks[k].queue.get_mut(pos) {
+            (*x, *y) = (ram.s32(o + 0x14), ram.s32(o + 0x18));
+        }
+        if pos > 0 || !w.scene.tracks[k].started {
+            w.scene.tracks[k].queue.drain(..pos);
+            wf_core::scene::import_start_head(w, k);
+        }
+        let Some(c) = w.scene.tracks[k].queue.first_mut() else { continue };
+        match c {
+            Cmd::MoveTo { n, t, sx, sy, .. } | Cmd::GlideTo { n, t, sx, sy, .. } => {
+                (*sx, *sy, *n, *t) = (ram.s32(o + 0xC), ram.s32(o + 0x10), ram.s32(o + 0x1C), 0);
+            }
+            Cmd::JumpTo { t, sx, vy, .. } => {
+                (*t, *sx, *vy) = (ram.s32(o + 0x3C), ram.s32(o + 8), ram.s32(o + 0xC));
+            }
+            _ => {}
+        }
+    }
 }
 
 /// the exit fade-out at brightness `level` (see `build_mid`): our exit trigger and the fade's frame count
@@ -2780,102 +2997,8 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
     // step, +0xC y velocity after the last step, +0x10 / +0x14 24.8 position, +0x18 / +0x1C target, +0x38 air
     // frames, +0x3C frames run: 8 crouch, `air` of flight, 8 landing). The commands before it in its track are
     // done: dropped, it starts (its start effects: the walk state, the facing) and takes the object's progress
-    let walks = ram.ewram_with(0x0804_D0A4);
-    let glides = ram.ewram_with(0x0804_AE84);
-    let jumps = ram.ewram_with(0x0804_AE5C);
-    // the actors' running `actor_wait` objects (an actor's state +0x18C)
-    let waits: Vec<u32> = ram.objects().into_iter().map(|a| ram.r32(a + 0x18C)).filter(|&s| ram.valid(s) && ram.r32(s) == 0x0804_AB58).collect();
     let rng = w.rng.clone();
-    for k in 0..w.scene.tracks.len() {
-        let live = |c: &Cmd| -> Option<u32> {
-            match c {
-                Cmd::MoveTo { x, y, .. } => walks.iter().copied().find(|&o| ram.s32(o + 0x14) == *x && ram.s32(o + 0x18) == *y),
-                Cmd::GlideTo { x, y, .. } => glides.iter().copied().find(|&o| ram.s32(o + 0x14) == *x && ram.s32(o + 0x18) == *y),
-                Cmd::JumpTo { x, y, .. } => jumps.iter().copied().find(|&o| ram.s32(o + 0x18) == *x && ram.s32(o + 0x1C) == *y),
-                _ => None,
-            }
-        };
-        // (a target the script computed from a query before the cut - glide_to(0, actor_x(0), actor_y(0) - 100):
-        // asked again now it is another; the head's command with the only live object of its kind takes that
-        // object's target - real route 4-1, s515's take-off glide, tiles r002_006+2000 / +13000)
-        // (or the actor's own movement object: its state +0x18C - two glides at once, each target re-asked: run 2
-        // cut 57,741, s103 node 0 lifts Goku and Pikkon together)
-        let own = match w.scene.tracks[k].owner {
-            Owner::Entity(id) => w.find(id).and_then(|i| {
-                let a = w.actor(i)?;
-                let o = if Some(i) == w.player_idx(0) { ram.player() } else { ram.objects().into_iter().find(|&o| ram.s32(o + 0x1A0) == a.x && ram.s32(o + 0x1A4) == a.y)? };
-                (o != 0).then(|| ram.r32(o + 0x18C))
-            }),
-            _ => None,
-        };
-        let found = w.scene.tracks[k].queue.iter().enumerate().find_map(|(j, c)| live(c).map(|o| (j, o))).or_else(|| {
-            let only = |v: &Vec<u32>| (v.len() == 1).then(|| v[0]);
-            match w.scene.tracks[k].queue.first() {
-                Some(Cmd::GlideTo { .. }) => only(&glides).or_else(|| own.filter(|s| glides.contains(s))).map(|o| (0, o)),
-                // (the glide behind the group's instant commands - set_pose / set_attachment, done in the replay's
-                // first step: the actor's own glide object says it runs)
-                _ => own.filter(|s| glides.contains(s)).and_then(|o| {
-                    let j = w.scene.tracks[k].queue.iter().position(|c| matches!(c, Cmd::GlideTo { .. }))?;
-                    w.scene.tracks[k].queue[..j].iter().all(|c| matches!(c, Cmd::SetPose { .. } | Cmd::SetAttachment { .. } | Cmd::Face { .. })).then_some((j, o))
-                }),
-            }
-        });
-        // a glide at the head with no glide object left in RAM has ended (the object goes in its last step; the
-        // script resumes a frame later): done, not glided again from here (tile r002_006+13000)
-        if found.is_none() && glides.is_empty() && matches!(w.scene.tracks[k].queue.first(), Some(Cmd::GlideTo { .. })) {
-            w.scene.tracks[k].queue.remove(0);
-            w.scene.tracks[k].started = false;
-            continue;
-        }
-        // so does a walk at the head with no walk object for it and its actor on the target: the walk object went in
-        // its last step (its idle SetAnim drawn), the script goes on in the cut's frame (whole-run cut 887,156:
-        // s437 node 10, the priest's walk back ended, `remove_actor` next)
-        // (an `actor_wait` before it ended too: no wait object is left, the walk's object is made by the wait - whole-run
-        // cut 146,883: s237's actor_wait(269, 15) + walk_to(269, 210, 63) both over)
-        if found.is_none() {
-            let skip = w.scene.tracks[k].queue.iter().take_while(|c| matches!(c, Cmd::Wait { .. })).count();
-            if let (Some(Cmd::MoveTo { x, y, .. }), Owner::Entity(id)) = (w.scene.tracks[k].queue.get(skip), w.scene.tracks[k].owner) {
-                let (x, y) = (*x, *y);
-                let at = w.find(id).and_then(|i| w.actor(i)).is_some_and(|a| a.x == x << 8 && a.y == y << 8);
-                if at && !walks.iter().any(|&o| ram.s32(o + 0x14) == x && ram.s32(o + 0x18) == y) {
-                    w.scene.tracks[k].queue.drain(..=skip);
-                    w.scene.tracks[k].started = false;
-                    continue;
-                }
-            }
-        }
-        let Some((pos, o)) = found else { continue };
-        // `actor_wait` before the walk (0x4A: the actor's state +0x18C is the wait object vt 0x0804AB58, +4 the walk
-        // object it starts at the end - already made, not stepped - +8 the frames left): the wait runs, the walk is
-        // the command after it (whole-run cut 142,491: s172 node 0, Vegeta's actor_wait(279, 20) 1 frame in)
-        if let Some(wo) = waits.iter().copied().find(|&a| ram.r32(a + 4) == o) {
-            if pos > 0 && matches!(w.scene.tracks[k].queue.get(pos - 1), Some(Cmd::Wait { .. })) {
-                w.scene.tracks[k].queue.drain(..pos - 1);
-                if let Some(Cmd::Wait { left }) = w.scene.tracks[k].queue.first_mut() {
-                    *left = ram.s32(wo + 8);
-                }
-                w.scene.tracks[k].started = true;
-            }
-            continue;
-        }
-        if let Some(Cmd::GlideTo { x, y, .. }) = w.scene.tracks[k].queue.get_mut(pos) {
-            (*x, *y) = (ram.s32(o + 0x14), ram.s32(o + 0x18));
-        }
-        if pos > 0 || !w.scene.tracks[k].started {
-            w.scene.tracks[k].queue.drain(..pos);
-            wf_core::scene::import_start_head(&mut w, k);
-        }
-        let Some(c) = w.scene.tracks[k].queue.first_mut() else { continue };
-        match c {
-            Cmd::MoveTo { n, t, sx, sy, .. } | Cmd::GlideTo { n, t, sx, sy, .. } => {
-                (*sx, *sy, *n, *t) = (ram.s32(o + 0xC), ram.s32(o + 0x10), ram.s32(o + 0x1C), 0);
-            }
-            Cmd::JumpTo { t, sx, vy, .. } => {
-                (*t, *sx, *vy) = (ram.s32(o + 0x3C), ram.s32(o + 8), ram.s32(o + 0xC));
-            }
-            _ => {}
-        }
-    }
+    import_track_objects(&mut w, ram);
     // a camera pan in progress (run 2 cut 57,831: s103 node 0's camera_pan_to(224, 176, 1000) after its fade_out)
     import_cam_pan(&mut w, ram);
     import_prop_moves(&mut w, ram);
@@ -2964,75 +3087,7 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
     w.rng = rng;
     // the track actors' animations as the RAM rows show them (a started command restarted its animation): the
     // RAM object at the entity's 24.8 position
-    let rows: std::collections::BTreeMap<u32, (i32, i32, i32, i32)> = ram.actor_rows.iter().map(|r| (r.0, (r.1, r.2, r.3, r.4))).collect();
-    // (and the event's puppets without a track left: an actor whose walk ended - whole-run cut 146,883, s237's Baba)
-    let mut owners: Vec<wf_core::world::EntityId> = w
-        .scene
-        .tracks
-        .iter()
-        .filter_map(|t| match t.owner {
-            Owner::Entity(id) => Some(id),
-            _ => None,
-        })
-        .collect();
-    for p in &w.scene.puppets {
-        if !owners.contains(&p.id) {
-            owners.push(p.id);
-        }
-    }
-    for id in owners {
-        let Some(i) = w.find(id) else { continue };
-        let Some((x, y)) = w.actor(i).map(|a| (a.x, a.y)) else { continue };
-        // (by position, and by sprite when two stand on one spot - run 2 cut 57,951: s103's Goku and Pikkon spawned at
-        // (0, -8))
-        let spr = wf_core::scene::sprite_id(&w, i);
-        let at = |o: &u32| ram.s32(o + 0x1A0) == x && ram.s32(o + 0x1A4) == y;
-        let o = if Some(i) == w.player_idx(0) {
-            Some(ram.player())
-        } else {
-            rows.iter().find(|(o, r)| at(o) && Some(r.0) == spr).map(|(o, _)| *o).or_else(|| rows.keys().copied().find(|o| at(o)))
-        };
-        // (and the facing: a walk the replay found already ended is dropped unstarted, so its turn is not made -
-        // whole-run cut 146,883: s237's Baba (222) at the end of her walk up, facing 1 in RAM)
-        if let Some(o) = o {
-            let f = ram.r8(o + 0x10) & 3;
-            match &mut w.ents[i].body {
-                wf_core::world::Body::Player(p) => p.a.facing = f,
-                wf_core::world::Body::Npc(n) => n.a.facing = f,
-                wf_core::world::Body::Enemy(e) => e.a.facing = f,
-                _ => {}
-            }
-        }
-        let Some(&(_, raw, cel, tick)) = o.and_then(|o| rows.get(&o)) else { continue };
-        let d = Arc::clone(&w.data);
-        // (the state's script anim id follows the RAM's state - raw = anim_state(id) + 1 - when ours is another
-        // state's: it picks how the state ticks; whole-run cut 146,883: Baba idle in RAM, ours still the walk's id)
-        let id_for = |cur: i32| -> i32 {
-            if wf_core::scene::anim_state(cur) + 1 == raw {
-                cur
-            } else {
-                (0..25).find(|&a| wf_core::scene::anim_state(a) + 1 == raw).unwrap_or(cur)
-            }
-        };
-        if let Some(pp) = w.scene.puppets.iter_mut().find(|p| p.id == id) {
-            (pp.anim.raw, pp.anim.frame, pp.anim.tick) = (raw, cel, tick);
-            pp.anim.id = id_for(pp.anim.id);
-        }
-        match &mut w.ents[i].body {
-            wf_core::world::Body::Player(p) => {
-                (p.ap.raw, p.ap.frame, p.ap.tick) = (raw, cel, tick);
-            }
-            wf_core::world::Body::Npc(n) => {
-                (n.anim.raw, n.anim.frame, n.anim.tick) = (raw, cel, tick);
-                n.anim.id = id_for(n.anim.id);
-            }
-            wf_core::world::Body::Enemy(e) => {
-                e.set_raw(&d, raw);
-                (e.ea.pos.raw, e.ea.pos.frame, e.ea.pos.tick) = (raw, cel, tick);
-            }
-            _ => {}
-        }
-    }
+    track_anims_from_rows(&mut w, ram);
     // the camera mover (0x31 camera_center_on / 0x32 camera_scroll_to: the camera slot's object vt 0x0804AB24, +4 /
     // +8 the 22.10 step, +0xC the steps left): the replayed scroll takes the RAM's step and count, the camera the
     // RAM's position (the replay's start measured its steps from the camera at the cut; real run 007, whole-run cuts

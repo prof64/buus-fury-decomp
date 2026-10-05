@@ -350,7 +350,12 @@ fn push_node(
 ) -> u16 {
     let raw_name = v.get("name").and_then(|x| x.as_str()).unwrap_or("");
     let name = rename(raw_name);
-    let p = params_of(v);
+    let mut p = params_of(v);
+    // IfMeleeHit's factory 0x08036329 (the jump smash's landing hit, states 0x3E/0x3F) builds the node with power
+    // multiplier node+0xC = 2 in code, where 0x08036303 builds it with 1 (run 2 15-32: 112 HP, not 56)
+    if name == "IfMeleeHit" && v.get("fn").and_then(|x| x.as_str()) == Some("0x8036329") {
+        p.set(P::K, 2);
+    }
     // SubState in a behaviour tree: the referenced state's tree, built in place
     if let (Some(all), true) = (all, name == "SubState") {
         let st = p.g(P::State) as u16;

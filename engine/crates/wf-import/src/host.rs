@@ -474,6 +474,56 @@ impl StoryHost {
         self.probe_queue(w, event, node, params, true, is_load)
     }
 
+    /// Import: an inline script run again from its start with every instant native queued (`continue_inline`'s
+    /// order): the index of the first queued action `is_target(native, args)` accepts - the dynamic count the game's
+    /// interpreter ran before it, loops and step splits included (run 2 cuts 763,364 / 763,394: 12-26's lift script
+    /// loops seven `set_actor_byte8` passes before its glide group; the static scan counts one)
+    pub fn probe_inline(&mut self, w: &mut World, id: &str, is_target: &dyn Fn(u8, &[i32]) -> bool) -> Option<usize> {
+        let saved = self.rt.state();
+        let rng = w.rng.clone();
+        let w0 = w.clone();
+        let (hs0, story0) = (self.hs.clone(), w.story.clone());
+        let mut g = self.rt.globals();
+        g.g = w.story.g;
+        self.rt.set_globals(g);
+        let steps = self.stepped.contains(&format!("scripts/inline/{id}.rhai"));
+        self.hs.in_unit = true;
+        self.rt.start_unit(UnitRef::new(id.to_string(), "", steps), [0; 4]);
+        let mut done = 0usize;
+        let mut out = None;
+        for _ in 0..4096 {
+            self.rt.with_thread(|t| {
+                t.hold_queue = true;
+                t.queue_instants = true;
+            });
+            let st = self.with_host(w, |rt| rt.run().map_err(|e| e.to_string()));
+            let (found, n, held) = self.rt.with_thread(|t| {
+                let f = t.queue.iter().position(|a| matches!(a, wf_script_rhai::Act::Native { native, args, .. } if is_target(*native, args)));
+                (f, t.queue.len(), t.blocked.is_none() && !t.queue.is_empty())
+            });
+            if let Some(k) = found {
+                out = Some(done + k);
+                break;
+            }
+            let in_unit = self.rt.with_thread(|t| t.frames.iter().any(|f| matches!(f, wf_script_rhai::Frame::Unit { .. })));
+            if st.is_err() || !held || !in_unit {
+                break;
+            }
+            done += n;
+            self.rt.with_thread(|t| {
+                t.hold_queue = false;
+                t.skip = n;
+            });
+        }
+        self.rt.with_thread(|t| t.queue_instants = false);
+        self.rt.restore(saved);
+        *w = w0;
+        w.rng = rng;
+        self.hs = hs0;
+        w.story = story0;
+        out
+    }
+
     fn probe_queue(&mut self, w: &mut World, event: u16, node: u16, params: [i32; 4], instants: bool, is_load: &dyn Fn(u8, &[i32]) -> bool) -> Option<(usize, u8)> {
         let saved = self.rt.state();
         // (the probe's queries must not move the generator: the placement run replays them; immediate natives with

@@ -320,6 +320,8 @@ impl Session {
                 // and the coins fly on (fieldobj.rs coin_move)
                 crate::fieldobj::held_moves(w);
             }
+            // a warp_fade arrival's idle draw, after the pass (field.rs `arrival_idle`)
+            crate::field::arrival_idle(w);
             // the leader's KO timer: the death / Lazarus Crystal hook (menu/gameover.rs)
             crate::menu::gameover::tick(w);
             if !ticked {

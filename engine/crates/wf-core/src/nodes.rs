@@ -627,7 +627,8 @@ fn cond(w: &mut World, c: &C, n: u16) -> bool {
         // the field: the game's shared condition 0x080361B8 (IfContactHit restores the facing, IfMeleeHit keeps the
         // turn); battles keep the rule cross_ts pins
         K::IfContactHit if w.field.is_some() => en::contact_strike(w, i, 1024, true),
-        K::IfMeleeHit if w.field.is_some() => en::contact_strike(w, i, 1024, false),
+        // (the power multiplier is node+0xC << 10: 2 for the jump smash's landing hit, `ai::push_node`)
+        K::IfMeleeHit if w.field.is_some() => en::contact_strike(w, i, 1024 * par(c, n, P::K, 1) as i32, false),
         K::IfContactHit | K::IfMeleeHit => en::melee_strike(w, i, 1024, false, false, atk(2)),
         K::IfContactExplode => en::contact_explode(w, i),
         K::IfLandedOnRock => en::land_on_rock(w, i),

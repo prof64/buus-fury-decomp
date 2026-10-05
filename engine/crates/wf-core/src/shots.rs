@@ -1311,6 +1311,12 @@ fn target_player(w: &World, owner: EntityId) -> Option<usize> {
 /// phase 2; else 1. Phase 2 reel: grip -= dir * 4: fits -> the player there, else the player SetAnim(0) and 1; then
 /// like 1. Phase 1 retract: len - 4; <= 0 -> (phase 2: the player SetAnim(0)) removed
 fn grapple_update(w: &mut World, i: usize) {
+    // field: while a script holds the field the arm stands still - no growth, no hit test, no counter (run 2 row
+    // 763,327, 12-26: the lift's inline script holds the field; the game's arm object (vt 0x0804B380) made at 763,309
+    // keeps every word through the script's walk, ours grew and grabbed the walking player; as the energy wave's)
+    if w.field.as_ref().is_some_and(|f| f.busy) {
+        return;
+    }
     w.shot(i).t += 1;
     let ShotKind::GrappleArm { len, phase, gx, gy } = w.shot_ref(i).kind else {
         return;
