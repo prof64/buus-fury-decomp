@@ -5083,3 +5083,6 @@ Note for whoever owns `FieldConfig`: HEAD's `slow_fade_in` field is missing from
 - Energy Barrage (c56305 / c56335) was already fixed in 7d433cd (exact now).
 Checks: gates green; whole-run cut points 311 / 315, exit-fade cuts 151 / 152 unchanged; area-entry cuts + tiles
 one gain (rE2__087_2-90+009000 0 -> 1000).
+*Run 2 row 35,930 (Continue, the app's leader idle after it) - checked by the ship agent: **already fixed on HEAD**
+(9039360).* From power-on and from the c33788 cut the app now runs on to 124,907 (019_e_tank, RNG) - the Earth chapter
+(Earth agent). Nothing taken.

@@ -31,8 +31,21 @@ class SbDriver2(ShipDriver2):
     autoheal = False
     _calls = 0
 
+    _menu_t = 0
+
     def keys(self, e):
         self._calls = 0
+        # a pause menu left open in a fight / grind (a heal program that went wrong: the frozen ShipDriver only backs
+        # out of it in nav / fightp goals): B out after 300 frames
+        if not self.prog and self.heal is None and not self.done() and \
+                self.goals[self.k][0] in ('grind', 'boss', 'beam', 'itbuu', 'evade', 'nav', 'fightp'):
+            st = status(e)
+            if st['p'] is None and st['scene'] == 0 and st['area'][0] != 0 and e.r32(0x03001C34) == 0:
+                self._menu_t += 1
+                if self._menu_t > 300:
+                    return B if self._menu_t % 20 < 3 else 0
+            else:
+                self._menu_t = 0
         return super().keys(e)
 
     def step(self, e):
