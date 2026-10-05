@@ -6178,3 +6178,17 @@ one-frame iteration whose picture is the next one but for one band of <= 8 lines
 title_dojo 171).
 *A takes back (by the coordinator) run 2's last two sound items: 1,640,163 (two punch sounds in another order within one frame) and 1,665,986 (sound 48 game only) - real-route agent: these were handed to you above; A has them now.*
 *Run 2's last two sound rows (A, wf-import lib.rs, uncommitted): 1,640,163 / 1,665,986 fixed - an import gap, not a rule.* An enzyme latched on the leader lets go after enough button presses (IfButtonMashed); the node object (vt 0x0804A6D0: +0xC the last press time, +0x10 the press count) is now imported, so the enzyme lets go on the game's frame and the punch hits two enemies (the second hit's sound 48, the punch's 50 / 51 draw in place). App from cuts 1,640,133 / 1,665,950 with sounds compared: 0 differences. Side effect: whole-run cut c631836 (the earlier 'regression' note) passes again - it was this counter. Gates green; check.sh EXACT (run 1, run 3 to 1,076,596 exact; run 2 as expected).
+**Claim (dungeon agent A, by the coordinator): run 2's remaining difference 1,769,316** (Inside Buu worms, the chain-kill item from 1,767,026's write-up: the game's defeat chain kills every linked piece - six rand(0x1000) puffs - ours stops after two and a second ComputeDamage hits another piece). The real-route agent took the item but is on run 3 now and the side-content agent's fork left it untouched - say here if either of you has edits in flight.
+
+*Done (ship fix agent, 2026-10-05): **in-game menu completeness sweep.*** Every menu mode table in the ROM (80, found
+by their shared base entries: +0x10 = 0x0804FDA1 and +0x18 = 0x0804FCCD) checked against ours: all pause pages, the map
+screen (area / world / Scouter / info), shops, Save / Switch Character, Sleep, credits, mini-games, title paths and
+every script native that opens a screen (0x31/0x32 scroll, 0x7A-0x7E fades, 0x88/0xEF waits, 0x89, 0x8C/0x8D,
+0x8E, 0xA7/0xC6/0xC7, 0xCE/0xCF, 0xD1) are covered and recorded. **One screen was missing: the Computer Room's
+Scouter database** (4-22, the computer: A facing up; vt 0x0804A950) - now built (scouter.rs `Database`, mapscreen.rs
+`open_database`, the field trigger ctor 0x08007543), recordings `computer_map` (empty) / `computer_few` /
+`computer_db` / `computer_variants` all exact and strict (state `work/states/buu_computer.ss`: run 2 row 74,990 via
+the new `tools/run2/state_at.py`, then walked there). Side fix: the Scouter sprites' header shadow offset (signed
+byte; Dabura's -4 was ignored) - map_* still exact. The rest of the tables are link-cable (Dojo / Trading Post)
+flows: documented with a mapping plan onto wf-net in re/buu/menu/NOTES_screens.md "Multiplayer (link cable)"; not
+recordable without two linked emulators. Suites green; check.sh EXACT.
