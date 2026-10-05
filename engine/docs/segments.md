@@ -58,7 +58,13 @@ save has no save slot in the app (the importer does not carry the EEPROM slot) -
 1. Order: opening, Earth, ship (602,566 rows, ends at 8-70 after Majin Buu) -> fat Buu (soak agent, `031_f_fat`,
    522,530) -> Janemba (soak agent, `032_j_janemba`, 222,029, ends in the 18-14 arena) - **in: 1,347,125 rows,
    recorded (record.py / sounds.py --chain run2), check.sh green (run 2 ratchet: first difference row 159,713,
-   024_e_goten)** -> **Super Buu + Kid Buu + credits (side-content agent; its route is being built from
+   024_e_goten)** -> Super Buu + Kid Buu + credits (`033_b_superbuu`, 630,741, `tools/superbuu/sbroute2.py` +
+   `run_sb2.py --sav`, re-driven from the chain's arena state with its save memory) - **run 2 complete: power-on ->
+   title after the credits, 1,977,866 rows, recorded; check.sh green (ratchet: first difference 161,796)**. Its
+   Super / Kid Buu part: Vegeta fights inside Buu, Goku takes the brain fight from 21-25, game overs + Continues in
+   the Gotenks fights / grinds / inside Buu / the brain / Kid Buu, the West City Z-Mart (buy / sell), Options ->
+   Sleep (woken with L+R+SELECT), other stat points; party XP at the ending 22.46M (run 1: 31.05M) -> another
+   ranking string at the credits (the ranking reads characters 0-4's total XP in 5M steps). (Was planned:) **Super Buu + Kid Buu + credits (side-content agent; its route is being built from
    run 1's `work/ship/sb/sb_start.ss` meanwhile, `tools/superbuu/sbroute2.py`)**.
 2. The start state of the next part is **`work/run2/end.ss` + `end.sav`** (written by `tools/run2/play2.py` after
    the last segment; regenerate with `play2.py --from <last segment>` if missing). Play your part from it, input only.
@@ -5330,6 +5336,9 @@ no slot). Cut from one continuous session with the EEPROM (`work/s3test/cute.py`
 c949d11 the app is exact from 787,900 (and from each of 840,100 / 903,790 / 904,500 / 922,150 / 940,245 / 957,212 /
 973,713 / 990,165) to 1,238,866, the first Janemba stop: the fat-Buu chapter has no open stop from 787,900 on. **For
 anyone cutting run 2 by hand: a cut without `init.eeprom` diverges at every save menu / Continue.**
+**Hand-over (coordinator, 2026-10-05) - to the soak agent:** run 2's Janemba part from 1,238,866 on moves to the
+real-route agent while you are rate-limited (your Janemba claim above: please drop it, or say here what you have in
+flight so I skip it). Cuts with the EEPROM (`work/s3test/cute.py`).
 
 *(1) Quick start - fixed.* Real game (emulator, run 1's own keys from power-on to Snake Way, `work/ub/probe.py`): Goku's
 record at New Game = skills [7 Energy Blast, 20 Super Saiyan, 15 Kamehameha, 14 Instant Transmission], all level 0;

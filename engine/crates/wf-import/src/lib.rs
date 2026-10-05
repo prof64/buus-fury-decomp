@@ -603,6 +603,8 @@ fn import_ai_rt(w: &mut World, ei: usize, lvl: usize, ram: &GbaRam, r: u32, note
             K::MeleeAttack | K::IncCounter => {}
             // GhostAnimA / B: no runtime words (the object's state decides - `patch_enemy`)
             K::GhostAnimA | K::GhostAnimB => {}
+            // the worm's ring / links / mailbox (`import_worms`; WormSpawnBody and WormHeadMove keep nothing)
+            K::WormBodyFollow | K::WormHeadMove | K::WormSpawnBody => {}
             k => notes.push(format!("ai runtime of {k:?} (state {:#x} node {n}) not imported", tree.state)),
         }
         rts.push((n, rt));
@@ -922,8 +924,33 @@ fn import_trigger_resume(w: &mut World, ram: &GbaRam) {
     }
 }
 
+/// an object's actor row the recording does not have (an object out of the live list): sprite by its def (+0x58), the
+/// animation raw = the def's entry holding the current frame record (+0x54), cel +0x11, tick +0x12 - as the recorder's
+/// `capture.actors`
+fn actor_row_of(data: &wf_core::content::GameData, ram: &GbaRam, o: u32) -> Option<(u32, i32, i32, i32, i32)> {
+    let d = ram.r32(o + 0x58);
+    let (&sprite, _) = data.sprites.iter().find(|(_, sp)| sp.def_addr == d)?;
+    // (the def's animation table is ROM, which the import does not have: the animation whose steps hold the
+    // object's current frame record, +0x54 - the lowest raw sharing it, as the recorder names a struct)
+    let rec = ram.r32(o + 0x54);
+    // (+0x54 is not always a record - an NPC idle in the shared idle state 0x03001B0C showed another word: raw 1,
+    // the idle's - run 1 cut 1,629,943)
+    let idle = if ram.r32(o + 0x14) == 0x0300_1B0C { 1 } else { -1 };
+    let raw = data.sprites.get(&sprite).and_then(|sp| sp.anims.iter().find(|an| an.dirs.iter().any(|st| st.iter().any(|x| x.rom == rec))).map(|an| an.canon_raw)).unwrap_or(idle);
+    Some((o, sprite + wf_core::content::GFX_OFFSET, raw, ram.r8(o + 0x11) as i32, ram.r16(o + 0x12) as i32))
+}
+
 fn import_objects(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
-    let rows: std::collections::BTreeMap<u32, (i32, i32, i32, i32)> = ram.actor_rows.iter().map(|r| (r.0, (r.1, r.2, r.3, r.4))).collect();
+    let mut rows: std::collections::BTreeMap<u32, (i32, i32, i32, i32)> = ram.actor_rows.iter().map(|r| (r.0, (r.1, r.2, r.3, r.4))).collect();
+    // the objects a purge suspended under a text box (out of the world list - the recording has no rows for them):
+    // built like the list's, then suspended (`import_vram`) - run 1 cut 195,432, 7-6: three crowd NPCs back when the
+    // box closes
+    let susp = ram.suspended_objects();
+    for &o in &susp {
+        if let Some(r) = actor_row_of(&w.data, ram, o).filter(|_| !rows.contains_key(&o)) {
+            rows.insert(o, (r.1, r.2, r.3, r.4));
+        }
+    }
     let players = w.players.clone();
     // our candidates: (entity id, kind key) - enemies by type, NPCs by sprite id
     let key_of = |w: &World, i: usize| -> Option<(u8, i32)> {
@@ -936,11 +963,13 @@ fn import_objects(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
     let mut free: Vec<(wf_core::world::EntityId, (u8, i32))> =
         (0..w.ents.len()).filter(|&i| !w.ents[i].removed && !players.contains(&w.ents[i].id)).filter_map(|i| key_of(w, i).map(|k| (w.ents[i].id, k))).collect();
     let mut order: Vec<wf_core::world::EntityId> = vec![];
+    // (RAM enemy object -> our entity: the worms' links, `import_worms`)
+    let mut enemy_of: Vec<(u32, wf_core::world::EntityId)> = vec![];
     // the world list is updated last to first: RAM order = our entity order
     // (the leader's object takes its place among the actors too: real run 0-21 tile r033_002+25000 - Majin Buu is
     // before the player in the list, so the player updates first and Buu's IfPlayerWithin2 sees this frame's step)
     let leader_obj = ram.r32(0x0300_1C34);
-    for o in ram.objects() {
+    for o in ram.objects().into_iter().chain(susp) {
         if o == leader_obj {
             if let Some(&pid) = players.first() {
                 order.push(pid);
@@ -998,6 +1027,7 @@ fn import_objects(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
         order.push(id);
         match key.0 {
             0 => {
+                enemy_of.push((o, id));
                 patch_enemy(w, i, ram, o, rows.get(&o).copied(), notes);
                 place_enemy(w, id, key.1, ox, oy, rows.get(&o).map(|r| r.0));
             }
@@ -1055,6 +1085,7 @@ fn import_objects(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
         f.placed.retain(|p| !gone.contains(&p.0));
         f.patrols.retain(|p| !gone.contains(&p.entity));
     }
+    import_worms(w, ram, &enemy_of);
     // the actors in the RAM's order, after the other objects
     let mut actors = vec![];
     for id in &order {
@@ -1063,6 +1094,53 @@ fn import_objects(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
         }
     }
     w.ents.extend(actors);
+}
+
+/// the worms (21-x: a head and its body segments, WormHeadMove / WormBodyFollow): the chain is the objects' next
+/// pointer (obj+0x1F0) - the head sends each move's direction to its next one's mailbox (obj+0x1E4 = dir | 0x80,
+/// 0x0802D598) and a body, on a command, takes the oldest of its 12-slot ring (the node's runtime +4.., index
+/// +0x10), stores the new one there and passes the old on (0x0802D6A2) - our `cmds` (oldest first, 12, plus the
+/// pending command); the head's direction is its facing (obj+0x10). Run 1 cut 1,368,272 (21-11's saved room): ours
+/// had no links after the import, the segments stood still (a body 1 px off at f201)
+fn import_worms(w: &mut World, ram: &GbaRam, enemy_of: &[(u32, wf_core::world::EntityId)]) {
+    use wf_core::ai::K;
+    let has = |w: &World, i: usize, k: K| w.en_ref(i).ai.stack.iter().any(|st| st.tree.nodes.iter().any(|n| n.k == k));
+    for &(o, id) in enemy_of {
+        let Some(i) = w.find(id) else { continue };
+        let (head, body) = (has(w, i, K::WormHeadMove), has(w, i, K::WormBodyFollow));
+        if !head && !body {
+            continue;
+        }
+        let facing = ram.r8(o + 0x10) & 3;
+        w.en(i).worm_dir = facing;
+        // (the load's own chain links go: a tail's stale next fed the segment before it - cut 1,368,272 f214)
+        let nx = ram.r32(o + 0x1F0);
+        let nid = enemy_of.iter().find(|e| e.0 == nx).map(|e| e.1).unwrap_or(0);
+        w.en(i).next = nid;
+        if !enemy_of.iter().any(|e| ram.r32(e.0 + 0x1F0) == o) {
+            w.en(i).prev = 0;
+        }
+        if let Some(ni) = w.find(nid).filter(|_| nid != 0) {
+            w.en(ni).prev = id;
+        }
+        if body {
+            // the node's runtime (the state level running WormBodyFollow)
+            let lvl = w.en_ref(i).ai.stack.iter().position(|st| st.tree.nodes.first().is_some_and(|n| n.k == K::WormBodyFollow));
+            let r = lvl.map(|l| ram.r32(o + 0x238 + 8 + 8 * l as u32)).filter(|&r| ram.valid(r));
+            if let Some(r) = r {
+                let idx = ram.s32(r + 0x10).rem_euclid(12) as u32;
+                let mut cmds: Vec<u8> = (0..12).map(|j| ram.r8(r + 4 + (idx + j) % 12) & 3).collect();
+                let mail = ram.r32(o + 0x1E4);
+                if mail & 0x80 != 0 {
+                    cmds.push((mail & 3) as u8);
+                }
+                let e = w.en(i);
+                e.cmds = cmds;
+                // (the mailbox word is the AI counter's slot for other enemies; for a worm it is the command)
+                e.counter = 0;
+            }
+        }
+    }
 }
 
 /// an imported enemy the field does not track as a placement yet (built bare by the mid-area import) becomes one: the
@@ -1826,6 +1904,31 @@ fn track_anims_from_rows(w: &mut World, ram: &GbaRam) {
                 (e.ea.pos.raw, e.ea.pos.frame, e.ea.pos.tick) = (raw, cel, tick);
             }
             _ => {}
+        }
+    }
+    // a script's frame-range controller running an actor - its state +0x14 vt 0x0804DE58: +4 pass, +8 ticks a cel, +0xC
+    // passes, +0x10 loop start, +0x14 last cel (as the leader's, `import_leader`): the NPC / puppet runs it on the RAM's
+    // cel and tick (run 1 cut 1,639,933, s463's three actors looping cels 2..3 at 5 ticks a cel; ours ran the table's
+    // tick and showed cel 2)
+    for (&o, &(sprite, raw, cel, tick)) in rows.iter() {
+        let st = ram.r32(o + 0x14);
+        if o == ram.player() || !ram.valid(st) || ram.r32(st) != 0x0804_DE58 {
+            continue;
+        }
+        let mode = wf_core::scene::AnimMode::Frames { each: ram.s32(st + 8), loops: ram.s32(st + 0xC), loop_start: ram.s32(st + 0x10), last: ram.s32(st + 0x14), pass: ram.s32(st + 4) };
+        let (x, y) = (ram.s32(o + 0x1A0), ram.s32(o + 0x1A4));
+        let Some(i) = (0..w.ents.len()).find(|&i| !w.ents[i].removed && w.actor(i).is_some_and(|a| a.x == x && a.y == y) && wf_core::scene::sprite_id(w, i) == Some(sprite)) else { continue };
+        let id = w.ents[i].id;
+        let set = |an: &mut wf_core::scene::ActAnim| {
+            (an.raw, an.frame, an.tick) = (raw, cel, tick);
+            an.mode = mode.clone();
+            an.ended = false;
+            an.fresh = false;
+        };
+        if let Some(pp) = w.scene.puppets.iter_mut().find(|p| p.id == id) {
+            set(&mut pp.anim);
+        } else if let wf_core::world::Body::Npc(n) = &mut w.ents[i].body {
+            set(&mut n.anim);
         }
     }
 }
@@ -3605,7 +3708,13 @@ pub fn import_emulator_state(data: &Arc<GameData>, ram: &GbaRam, runner: &mut St
     import_tile_anims(&mut world, ram);
     // a text box opened by the import whose object the game makes later in the cut's iteration: its tiles now
     if let Some(p) = runner.text_open_due.take() {
-        wf_core::vram::text_open(&mut world, p);
+        // ... unless the box object is already made, not yet in the world list (its constructor 0x08012030 took the
+        // blocks: +0x78 .. +0x7E, the portrait's last): those blocks are its (cutscene-map cuts 1,617,636 (19-3) /
+        // run 2 594,120 (8-71): the box in the heap at the cut, in the list a frame later - ours allocated a second
+        // set, the purge took the scene actors' blocks)
+        if !adopt_text_blocks(&mut world, ram) {
+            wf_core::vram::text_open(&mut world, p);
+        }
     }
     // a banner object of an earlier load still showing: its countdown (obj +0x10, a byte: the bytes above are heap
     // leftovers - whole-run cut 146,673: word 0x0203DECE, 206 frames left; the object goes the frame after 1) -> our age
@@ -3699,23 +3808,14 @@ fn import_saved_field(data: &Arc<GameData>, ram: &GbaRam, runner: &mut StoryHost
         put(&mut r2, cs + 8, &ram.read(cs + 0x10 + 4 * (cnt - 1), 4));
     }
     r2.screen_black = None;
-    // the saved objects' actor rows (the recording has the live world's only): sprite by its def (+0x58), the
-    // animation raw = the def's entry (+0x50 table) holding the current one (+0x50), cel +0x11, tick +0x12 - as the
-    // recorder's `capture.actors`
+    // the saved objects' actor rows (the recording has the live world's only)
     for &o in &objs {
         if !ram.valid(o) || r2.actor_rows.iter().any(|r| r.0 == o) {
             continue;
         }
-        let d = ram.r32(o + 0x58);
-        let Some((&sprite, _)) = data.sprites.iter().find(|(_, sp)| sp.def_addr == d) else { continue };
-        // (the def's animation table is ROM, which the import does not have: the animation whose steps hold the
-        // object's current frame record, +0x54 - the lowest raw sharing it, as the recorder names a struct)
-        let rec = ram.r32(o + 0x54);
-        // (+0x54 is not always a record - an NPC idle in the shared idle state 0x03001B0C showed another word: raw 1,
-        // the idle's - run 1 cut 1,629,943)
-        let idle = if ram.r32(o + 0x14) == 0x0300_1B0C { 1 } else { -1 };
-        let raw = data.sprites.get(&sprite).and_then(|sp| sp.anims.iter().find(|an| an.dirs.iter().any(|st| st.iter().any(|x| x.rom == rec))).map(|an| an.canon_raw)).unwrap_or(idle);
-        r2.actor_rows.push((o, sprite + wf_core::content::GFX_OFFSET, raw, ram.r8(o + 0x11) as i32, ram.r16(o + 0x12) as i32));
+        if let Some(r) = actor_row_of(data, ram, o) {
+            r2.actor_rows.push(r);
+        }
     }
     let info2 = inspect(&r2);
     let base = world.next_id + 1000;
@@ -3983,6 +4083,31 @@ fn import_boss_bar(w: &mut World, ram: &GbaRam) {
     let pct = |v: i32| (v * 100 + 52) / 53;
     // y = -8 + (frame - at), capped at 8
     w.scene.boss_bar = Some(wf_core::scene::BossBar { entity, a: pct(lo), b: pct(lo + span), at: w.frame.wrapping_sub((y + 8) as u32) });
+}
+
+/// a text box object (vt 0x08049F60) made but not in the world list yet: its blocks (+0x78 / +0x7A / +0x7C, the
+/// portrait's +0x7E) - foreign in our rebuilt allocator - become the dialog's (`vram::text_open`'s owners). False when
+/// there is no such object, or its handles are not all foreign blocks of ours
+fn adopt_text_blocks(w: &mut World, ram: &GbaRam) -> bool {
+    use wf_core::vram::Owner;
+    let listed = ram.objects();
+    let Some(v) = w.field.as_mut().and_then(|f| f.vram.as_mut()) else { return false };
+    for o in ram.ewram_with(0x0804_9F60) {
+        if listed.contains(&o) {
+            continue;
+        }
+        let hs: Vec<(usize, u16)> = (0..4u32).map(|k| (k as usize, ram.r16(o + 0x78 + 2 * k))).filter(|&(_, h)| h != 0 && h != 0xFFFF).collect();
+        if hs.is_empty() || !hs.iter().all(|&(_, h)| v.owners.iter().any(|x| x.0 == h && x.1 == Owner::Foreign)) {
+            continue;
+        }
+        for (k, h) in hs {
+            if let Some(x) = v.owners.iter_mut().find(|x| x.0 == h) {
+                x.1 = if k == 3 { Owner::TextPortrait } else { Owner::Text };
+            }
+        }
+        return true;
+    }
+    false
 }
 
 fn import_vram(w: &mut World, ram: &GbaRam) {
@@ -4262,5 +4387,23 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
         let it = f.iters;
         let stat_at = ram.objects().into_iter().find(|&o| ram.r32(o) == 0x0804_C070).map(|o| it.wrapping_sub(ram.r32(o + 0x14))).unwrap_or(0);
         f.vram = Some(VramState { a, owners, shared_rc, suspended: vec![], hud_out, popups, keyed, stashed: None, delayed: vec![], objs, susp: vec![], shadow_set: vec![], popup_at, pass_at: 0, stat_at });
+    }
+    // the objects a purge suspended (world +0x40C, `GbaRam::suspended_objects`, in suspension order): our entities at
+    // their positions are out of the world too - they come back when the text box closes (run 1 cut 195,432)
+    let ids: Vec<wf_core::world::EntityId> = ram
+        .suspended_objects()
+        .into_iter()
+        .filter_map(|o| {
+            let (x, y) = (ram.s32(o + 0x1A0), ram.s32(o + 0x1A4));
+            (0..w.ents.len()).find(|&k| !w.ents[k].removed && matches!(w.ents[k].body, Body::Npc(_) | Body::Enemy(_)) && w.actor(k).is_some_and(|a| a.x == x && a.y == y)).map(|k| w.ents[k].id)
+        })
+        .collect();
+    if let Some(v) = w.field.as_mut().and_then(|f| f.vram.as_mut()) {
+        for id in ids {
+            if !v.suspended.contains(&id) {
+                v.suspended.push(id);
+                v.susp.push(wf_core::vram::Susp::Ent(id));
+            }
+        }
     }
 }

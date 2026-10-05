@@ -172,6 +172,12 @@ impl GbaRam {
         let n = (self.r32(OBJW + 4) as usize).min(256);
         (0..n).map(|k| self.r32(OBJW + 8 + 4 * k as u32)).filter(|&o| self.valid(o)).collect()
     }
+    /// the objects a purge suspended (`0x0800F516`: out of the world list until a text box closes, `0x08011E94` puts
+    /// them back last first): world +0x40C the count, +0x410.. the objects, in suspension order
+    pub fn suspended_objects(&self) -> Vec<u32> {
+        let n = (self.r32(OBJW + 0x40C) as usize).min(64);
+        (0..n).map(|k| self.r32(OBJW + 0x410 + 4 * k as u32)).filter(|&o| self.valid(o)).collect()
+    }
     /// the player object (0 = none)
     pub fn player(&self) -> u32 {
         let p = self.r32(PLAYER);
