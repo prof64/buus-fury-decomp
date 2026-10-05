@@ -98,6 +98,12 @@ impl Page for Credits {
                 if self.quit {
                     // the mode ends now: the screen keeps this iteration's registers
                     w.menu.shown = Some(Box::new(Screen::Credits(self.clone())));
+                    // nested (the Options page's Credits): the mode returns at once and the page's handler redraws
+                    // it in this iteration (menu_parity title_options: the page on screen at the end of the
+                    // iteration the last credits page fades out in)
+                    if !w.menu.stack.is_empty() {
+                        return Action::PopDone(1);
+                    }
                     return Action::Pop(1);
                 }
                 self.page = self.idx;

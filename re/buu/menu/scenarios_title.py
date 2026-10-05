@@ -75,6 +75,30 @@ SCENARIOS = {
     # a saved slot: its summary, LEFT / RIGHT through the party, Continue
     'title_continue': (TS, None, ['-:7'], ['-:20', 'A:7', '-:40', 'A:7', '-:60', 'RIGHT:7', '-:24', 'RIGHT:7', '-:24', 'LEFT:7',
                                          '-:24', 'A:7', '-:200'], title_open()),
+    # OPTIONS (vt 0x0804A430): each slider down and up (Sound FX, Music, Text Speed), the cursor round the rows and onto
+    # Credits, A there (the credits as a nested mode; START does not skip them, A does), B back to the title, then START / OPTIONS
+    # moves on the title again
+    'title_options': (T, None, ['-:7'],
+                      ['-:20', 'DOWN:7', '-:20', 'A:7', '-:60',
+                       'LEFT:7', '-:20', 'RIGHT:7', '-:20', 'RIGHT:7', '-:20', 'DOWN:7', '-:20',
+                       'LEFT:7', '-:20', 'RIGHT:7', '-:20', 'DOWN:7', '-:20',
+                       'RIGHT:7', '-:20', 'LEFT:7', '-:20', 'DOWN:7', '-:20', 'DOWN:7', '-:20', 'UP:7',
+                       '-:20', 'A:7', '-:120', 'START:7', '-:120', 'UP:7', '-:20', 'A:7', '-:20', 'B:7', '-:60',
+                       'DOWN:7', '-:20', 'UP:7', '-:40'], title_open()),
+    # Delete Game with only empty slots: A on each (nothing to delete), back to Select Game, B to the title
+    'title_delete_empty': (T, None, ['-:7'], ['-:20', 'A:7', '-:40', 'A:7', '-:60', 'R:7', '-:30', 'A:7', '-:40', 'DOWN:7',
+                                             '-:30', 'A:7', '-:40', 'L:7', '-:30', 'B:7', '-:40', 'B:7', '-:66'], title_open()),
+    # New Game into the empty slot 2 beside the saved slot 1
+    'title_newgame2': (TS, None, ['-:7'], ['-:20', 'A:7', '-:40', 'A:7', '-:60', 'DOWN:7', '-:30', 'A:7', '-:200'], title_open()),
+    # Multiplayer with no link cable: its page (Dojo / Trading Post), the cursor, B back, B to the title
+    'title_multi': (T, None, ['-:7'], ['-:20', 'A:7', '-:40', 'DOWN:7', '-:30', 'A:7', '-:60', 'DOWN:7', '-:30', 'UP:7',
+                                      '-:30', 'B:7', '-:60', 'B:7', '-:66'], title_open()),
+    # Multiplayer -> Dojo with no link cable
+    'title_dojo': (T, None, ['-:7'], ['-:20', 'A:7', '-:40', 'DOWN:7', '-:30', 'A:7', '-:60', 'A:7', '-:240', 'B:7', '-:120',
+                                     'B:7', '-:120'], title_open()),
+    # Multiplayer -> Trading Post with no link cable
+    'title_trade': (T, None, ['-:7'], ['-:20', 'A:7', '-:40', 'DOWN:7', '-:30', 'A:7', '-:60', 'DOWN:7', '-:30', 'A:7', '-:240',
+                                      'B:7', '-:120', 'B:7', '-:120'], title_open()),
     # Delete Game on the saved slot: Are you sure? -> Cancel, then Delete
     'title_delete': (TS, None, ['-:7'], ['-:20', 'A:7', '-:40', 'A:7', '-:60', 'R:7', '-:30', 'A:7', '-:40', 'B:7', '-:40',
                                        'A:7', '-:40', 'A:7', '-:60', 'L:7', '-:30', 'B:7', '-:60'], title_open()),

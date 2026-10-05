@@ -9,6 +9,9 @@ Stresses (COVERAGE below):
   and after every world-map landing ('fly')
 - every pause page both ways at the chapter's start and after each Continue
 - START on alternate frames for 60 frames after each 'story' / 'events' goal's end (the frames a script lets go)
+- every row of the three Papaya Island stalls bought once while the zenie lasts, the refusal on the dearest (shops3's
+  'shopenter' / 'buyrefused' / 'listout', 'buyeach' here)
+- the East District game over after the 8-1 Save comes right after a level-up (one level gained first, 'levelup1')
 
 play: tools/run3/ship3.py START.ss START.eeprom OUTDIR [--cap N] - plays goals_run3 from that state (the cartridge
 save loaded first; one session: the Save / Continue stretches need the flash), OUTDIR/keys.json + end.ss / end.eeprom.
@@ -28,6 +31,10 @@ from ship_route2 import ShipDriver2, goals_run2, KEY, DEATH_CONTINUE  # noqa: E4
 from run3_driver import Run3Driver  # noqa: E402
 from run2_driver import Run2Driver  # noqa: E402
 from route import start_emu, status  # noqa: E402
+from ship_driver import level_of  # noqa: E402  (r1frozen's, as ship_route2 imports it)
+from shops3 import ShopDriver, shop_list, zenie, mode_vt, shop_sel, VT_BUY  # noqa: E402
+
+SHOP_KINDS = ('shopenter', 'buyrefused', 'listout')
 
 S, A = KEY.START, KEY.A
 RUN3_KINDS = ('mashkeys', 'pausespin', 'menutour', 'textmash')
@@ -37,6 +44,7 @@ class ShipDriver3(ShipDriver2):
     """ShipDriver2 with Run3Driver's stress goals (its handlers called as plain functions: every other goal stays
     ShipDriver2's, its fallbacks Driver's) and Run2Driver's 'bout' (B until the field runs, which the spins end with)"""
     idle = 0
+    tap = ShopDriver.tap
 
     def step(self, e):
         kind = self.goals[self.k][0]
@@ -60,11 +68,78 @@ class ShipDriver3(ShipDriver2):
             if self.t < 1500:
                 return 0
             return prog[(self.t - 1500) % len(prog)]
+        if kind == 'levelup1':
+            # ('levelup1', areas): the grind until the active character has gained one level (then a 'die' follows:
+            # the game over right after a level-up's popup)
+            self.goals[self.k] = ('grind', level_of(e) + 1, self.goals[self.k][1])
+            self.grind_k = None
+            return None
+        if kind == 'buyeach':
+            # on a stall's Buy screen: every row once, top to bottom, while the zenie covers it (shops3's 'buyall'
+            # first pass only: the zenie is kept for the chapter's later stalls)
+            g = self.goals[self.k]
+            lst = shop_list(e)
+            z = zenie(e)
+            if mode_vt(e) != VT_BUY:
+                raise RuntimeError(f'buyeach: not on the Buy screen {status(e)}')
+            st = getattr(self, 'buy', None)
+            if st is None:
+                st = self.buy = {'i': 0, 'z': z}
+            if z < st['z']:
+                st['z'] = z
+                st['i'] += 1
+                st['mv'] = None
+                self.t = 0
+                return 0
+            while st['i'] < len(lst) and lst[st['i']]['price'] > z:
+                st['i'] += 1
+            if st['i'] >= len(lst):
+                self.buy = None
+                self.next_goal()
+                return None
+            target = st['i']
+            sel = shop_sel(e)
+            mv = st.get('mv')
+            if mv is not None:
+                mv['t'] += 1
+                if mv['t'] <= 3:
+                    return mv['k']
+                if sel == mv['from'] and mv['t'] < 40:
+                    return 0
+                if mv.get('q', 0) < 10:
+                    mv['q'] = mv.get('q', 0) + 1
+                    return 0
+                st['mv'] = None
+                self.t = 0
+                return 0
+            if sel != target:
+                st['mv'] = {'k': KEY.DOWN if sel < target else KEY.UP, 't': 0, 'from': sel}
+                return 0
+            if self.t > 2000:
+                raise RuntimeError(f'buyeach: no purchase {target} {lst[target]} zenie {z} {status(e)}')
+            return KEY.A if self.t % 40 < 3 else 0
+        if kind in SHOP_KINDS:
+            return ShopDriver.step(self, e)
         return ShipDriver2.step(self, e)
+
+
+# the three Papaya Island stalls (s257 drinks 6 rows, s258 food 5, s259 trinkets: 8 equipment + two one-offs at 25,000
+# / 50,000): every row bought once while the zenie lasts, the refusal on the dearest, out
+STALLS = [(188, 712), (276, 592), (188, 472)]
+
+
+def every_stall():
+    out = []
+    for x, y in STALLS:
+        out += [('unstick',), ('walk', x, y), ('face', 'U'), ('shopenter', 0), ('buyeach',), ('buyrefused',),
+                ('listout',), ('bout',), ('wait', 30)]
+    return out
 
 
 def stressed3(goals):
     out = []
+    died = False
+    shop_at = None
     for j, g in enumerate(goals):
         kind = g[0] if isinstance(g, tuple) and g else None
         # the Continue's arrival: closed-loop ('titlecont') instead of a plain wait for the area
@@ -78,12 +153,25 @@ def stressed3(goals):
             continue
         if kind == 'fightp':
             out.append(('pausespin', 3))
+        # the East District death after the 8-1 Save: one level gained first (the game over comes right after a
+        # level-up's popup)
+        if kind == 'die' and not died:
+            died = True
+            # (then out and back in: an area reload brings its enemies back for the death)
+            out += [('levelup1', [(2, 9), (2, 10)]), ('nav', 2, 8, False), ('nav', 2, 9, False)]
         out.append(g)
+        # every stall row once, after run 2's own stall stop (before leaving Papaya Island for the ship)
+        if g == ('mark', 'r05_shop'):
+            shop_at = len(out)
         if kind == 'fly':
             out.append(('pausespin', 2))
         if kind in ('story', 'events'):
             out.append(('mashkeys', S, 2, 60))
             out.append(('bout',))
+        # (after run 2's stall goals: the first nav away from 7-2 once the shop mark passed)
+        if shop_at is not None and kind == 'nav' and g[1:3] == (7, 1):
+            out[-1:-1] = every_stall()
+            shop_at = None
     return out
 
 
@@ -96,7 +184,8 @@ COVERAGE = """
 Ship (s3_ship): run 2's ship chapter (Papaya Island's shops and talkers, the Lookout / Korin, the 8-1 Save -> a death
 in East District -> Continue, the grinds with Energy Blasts, the stalls, the ship with 8-28's Save + soft reset +
 Continue and the 8-41 checkpoints) plus: the pause pages both ways first; the pause spun before every boss / ship
-fight and after every landing; START on alternate frames for 60 frames as every scripted stretch lets go
+fight and after every landing; START on alternate frames for 60 frames as every scripted stretch lets go; every
+Papaya Island stall row bought once + the refusals; the East District game over right after a level-up
 """
 
 

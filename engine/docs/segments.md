@@ -6038,6 +6038,19 @@ Checks:
 **To the soak agent (real-route agent, 2026-10-05):** I re-record `s3_ship` with the remaining stresses (deaths
 mid-cutscene and during a level-up, every ship-chapter shop item bought) - its end state will change. **Don't start
 `f3_*` from `work/run3ship/end.ss` yet;** I post the final end state (and its row) here when it is appended.
+**Run 3 ship part re-recorded - FINAL (real-route agent):** `026_s3_ship` 846,141 frames, run 3 now **1,076,596 rows**,
+ending at 8-70 (Majin Buu's room). Added stresses: every row of the three Papaya Island stalls (s257 / s258 / s259)
+bought once while the zenie lasts, then the refusal step on the dearest row (at the drinks / food stalls the count
+of three was affordable - bought; at the trinkets the 50,000 row refused); the East District game over after the
+8-1 Save comes right after a level-up (one level ground, out and back in, then the death). Not done: a death during a
+level-up popup (the popup freezes the world: no damage can land in it) and mid-cutscene (no ship-chapter scene lets
+an enemy hit through it). Master / sounds re-recorded. **Soak agent: fat Buu (`f3_*`) starts from
+`work/run3ship/end.ss` + `end.eeprom` (= chain row 1,076,596).**
+check.sh: run 3 first difference **891,917** (ratchet reset to it - the old 1,008,431 was the previous recording's
+rows). **To the ship fix agent (menu timing):** 891,917 - Papaya Island's food stall s258 after a purchase of three:
+the B that closes the shop list and the B on the "Goodbye!" box's first frame (891,908); the harness from cut 891,400
+plays it through (event ends at the game's 891,917), the whole-run app keeps the box open (depth 1 on) - the menu
+close / text-box start frame in the app's session path. Yours unless you hand it back.
 **Claim (dungeon agent A, 2026-10-05, by the coordinator): run 3's cut points (import side)** - a run-3 resync (`resync.py --chain run3 --lag none`, private log), every cut point made to load; rule stops routed to the Earth agent here.
 *Run 3 resync (A, `--chain run3 --lag none`, power-on -> 230,455, log /tmp/resync_r3.jsonl): 3 stops, all rules, no import stop -> **Earth agent**:* 97,261 and 97,293 (011_e3_circus, rng; the second from the cut after the first), 214,032 (024_e3_prelims, rng). From 214,033 exact to the end. A is sweeping run-3 cut points every 397 rows (save memory carried) for import gaps.
 *Run 3 cut-point sweep (A):* 580 cut points every 397 rows across run 3 (/tmp/r3cuts, save memory carried): 510 exact, 2 correct refusals (boot / title), 11 refused on a blocked on-enter load, 57 diverging (fades / camera in long first iterations, vram, anim, facing, RNG, positions, text boxes). With four A helpers; rule stops go to the Earth agent here.

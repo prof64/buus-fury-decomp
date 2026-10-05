@@ -294,12 +294,16 @@ impl Options {
         match code {
             0 => match self.c.sel {
                 // Credits: a nested mode (credits.rs), then the page's VRAM is reset and the page drawn again
-                3 => (
-                    true,
-                    Some(Action::Push(Screen::Credits(super::credits::Credits::new(
-                        w,
-                    )))),
-                ),
+                // (the menu sound with it: menu_parity title_options frame 446)
+                3 => {
+                    w.sfx(super::SFX_MENU, 64);
+                    (
+                        true,
+                        Some(Action::Push(Screen::Credits(super::credits::Credits::new(
+                            w,
+                        )))),
+                    )
+                }
                 4 => {
                     w.menu.then = Some("s007".to_string());
                     (true, Some(Action::Close))

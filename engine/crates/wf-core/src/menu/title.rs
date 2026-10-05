@@ -39,6 +39,8 @@ pub enum TPage {
     Select,
     /// the title's OPTIONS page (options.rs `Options::new_title`)
     Options,
+    /// Multiplayer (vt `0x0804B5AC`): Dojo / Trading Post
+    Multi,
 }
 
 /// what the title asks the session to build
@@ -79,6 +81,10 @@ pub struct Title {
     /// the OPTIONS page's controls (`TPage::Options`)
     #[serde(default)]
     pub opts: Option<Box<super::options::Options>>,
+    /// the link box "Waiting for a friend..." open over the Multiplayer page (its kind: 2 Dojo, 1 Trading Post;
+    /// its controls in `confirm`)
+    #[serde(default)]
+    pub wait: Option<u8>,
 }
 
 /// redraw frames (the title picture is decoded each time): measured from the captures
@@ -111,6 +117,7 @@ impl Title {
             stub: false,
             held: None,
             opts: None,
+            wait: None,
         };
         t.set_page(w, TPage::Title);
         t
@@ -147,6 +154,12 @@ impl Title {
             }
             TPage::Options => {
                 self.opts = Some(Box::new(super::options::Options::new_title(w)));
+            }
+            // enter `0x0801E7B4`: Dojo (string 0x5F) / Trading Post (0x4F)
+            TPage::Multi => {
+                self.c.add(item(0, [1, 1, -1, -1], t.s(0x5F), 0x78, 0));
+                self.c.add(item(1, [0, 0, -1, -1], t.s(0x4F), 0x86, 1));
+                self.c.add(Widget::Cursor(Cursor { t: 0 }));
             }
         }
     }
@@ -224,6 +237,9 @@ impl Title {
                         }
                     }
                 }
+                // 0x08005CBA / 0x08005D0A: the figures are made again (`[+0x11C] = -1`, even when the cursor
+                // stays), so only the selected slot's chosen one walks (menu_parity title_newgame2)
+                self.list.figs_key = None;
                 self.list.c.drawn = false;
                 None
             }
@@ -288,6 +304,37 @@ fn confirm_kids(t: &TextData) -> Container {
     c
 }
 
+/// "Waiting for a friend..." (mode vt `0x0804AEBC`, enter `0x08024120`): the state's string (+0x114: 0 -> 90,
+/// 1 -> 92, 2 -> 91, 3 -> 93; the title's Dojo / Trading Post both run it with 0) at (16, 16), B + "Cancel" at
+/// (12, 28) / (28, 40) on a 136x56 surface (redraw `0x0802428E`), BG0 at (56, 64)
+fn wait_kids(t: &TextData, state: u8) -> Container {
+    let mut c = Container::default();
+    c.add(Widget::Button(Button::new(BTN_B, 0xC, 0x1C, 1, true, false)));
+    c.add(Widget::Label(Label {
+        x: 0x1C,
+        y: 0x28,
+        text: t.s(26).to_vec(),
+        colour: 5,
+        align: 0,
+        font: kit::Font::Menu,
+    }));
+    let s = match state {
+        0 => 90,
+        1 => 92,
+        2 => 91,
+        _ => 93,
+    };
+    c.add(Widget::Label(Label {
+        x: 0x10,
+        y: 0x10,
+        text: t.s(s).to_vec(),
+        colour: 5,
+        align: 0,
+        font: kit::Font::Menu,
+    }));
+    c
+}
+
 /// the box of `0x08005096` on a w x h surface
 fn popup_box(cv: &mut Canvas, w: i32, h: i32) {
     cv.background(12, 4, w - 24, h - 16);
@@ -327,6 +374,20 @@ impl Page for Title {
             self.list.prepare();
             self.list.build_figs(w);
         }
+        // the options page's draw-time state (the A prompt only on Credits)
+        if let (TPage::Options, Some(o)) = (self.page, self.opts.as_mut()) {
+            super::Page::before_draw(&mut **o, w);
+        }
+    }
+    fn child_result(&mut self, w: &mut World, _r: i32) -> Action {
+        // back from the Credits (nested from the options page): 0x08014B50 resets VRAM / palettes (black) until
+        // the options page's redraw lands, as on the pause menu's options page
+        if let (TPage::Options, Some(o)) = (self.page, self.opts.as_mut()) {
+            o.c.drawn = false;
+            self.c.drawn = false;
+            w.menu.shown = Some(Box::new(super::Screen::Title(self.clone())));
+        }
+        Action::None
     }
     fn built_imported(&mut self) {
         self.list.rebuilt = false;
@@ -372,6 +433,32 @@ impl Page for Title {
         if self.stub {
             self.stub = false;
             return Action::None;
+        }
+        if self.wait.is_some() {
+            // events `0x080242C2`: B (code 1) ends the mode (no sound); its exit `0x0802426E` turns BG0 off and the
+            // page's handler returns without a redraw (`0x0801E952`)
+            let (_, act) = kit::run_step(
+                self,
+                w,
+                |p| p.confirm.as_mut().expect("wait box"),
+                |p, w, _src, code| match code {
+                    1 => {
+                        p.confirm = None;
+                        p.wait = None;
+                        p.c.focus = None;
+                        p.stub = true;
+                        if let Some(s) = w.menu.shown.as_mut() {
+                            if let super::Screen::Title(x) = &mut **s {
+                                x.confirm = None;
+                                x.wait = None;
+                            }
+                        }
+                        (true, Some(Action::None))
+                    }
+                    _ => (false, None),
+                },
+            );
+            return act.unwrap_or(Action::None);
         }
         if self.confirm.is_some() {
             let (_, act) = kit::run_step(
@@ -472,6 +559,9 @@ impl Page for Title {
                         w.sfx(super::SFX_MENU, 64);
                         if code == 0 {
                             p.set_page(w, TPage::Select);
+                        } else if code == 1 {
+                            // Multiplayer (`0x0801E612`): its page
+                            p.set_page(w, TPage::Multi);
                         }
                         (true, Some(Action::None))
                     },
@@ -482,6 +572,31 @@ impl Page for Title {
                 if !consumed && w.menu.pressed & crate::input::B != 0 {
                     w.sfx(super::SFX_MENU, 64);
                     self.set_page(w, TPage::Title);
+                }
+                Action::None
+            }
+            TPage::Multi => {
+                // events `0x0801E84A`: Dojo / Trading Post run the link box (with no link it only ends with B)
+                let (consumed, act) = kit::run_step(
+                    self,
+                    w,
+                    |p| &mut p.c,
+                    |p, w, _src, code| {
+                        w.sfx(super::SFX_MENU, 64);
+                        let kind = if code == 0 { 2 } else { 1 };
+                        p.confirm = Some(wait_kids(&w.data.menu.as_ref().expect("menu content").text, 0));
+                        p.wait = Some(kind);
+                        p.c.focus = Some(code as usize);
+                        (true, Some(Action::None))
+                    },
+                );
+                if act.is_some() {
+                    return Action::None;
+                }
+                // done check `0x0801E970`: B back to Single / Multiplayer
+                if !consumed && w.menu.pressed & crate::input::B != 0 {
+                    w.sfx(super::SFX_MENU, 64);
+                    self.set_page(w, TPage::Mode);
                 }
                 Action::None
             }
@@ -527,7 +642,7 @@ impl Page for Title {
         }
         match self.page {
             TPage::Options => super::surface_view(cv),
-            TPage::Title | TPage::Mode => {
+            TPage::Title | TPage::Mode | TPage::Multi => {
                 cv.ops.push(MenuOp::Image {
                     path: "ui/images/screen_title.png".into(),
                     frame: 0,
@@ -549,6 +664,20 @@ impl Page for Title {
                 self.c.draw(t, &mut cv);
                 let mut v = super::surface_view(cv);
                 v.layers[0].priority = 3;
+                if let (Some(c), Some(_)) = (&self.confirm, self.wait) {
+                    let (pw, ph) = (136, 56);
+                    let mut pc = Canvas::new();
+                    popup_box(&mut pc, pw, ph);
+                    c.draw(t, &mut pc);
+                    v.layers.push(MenuLayer {
+                        w: pw as u16,
+                        h: ph as u16,
+                        x: 56,
+                        y: 64,
+                        priority: 0,
+                        ops: pc.ops,
+                    });
+                }
                 v
             }
             TPage::Select => {
@@ -627,7 +756,7 @@ impl Page for Title {
                     1_343_931
                 }
             }
-            TPage::Mode => {
+            TPage::Mode | TPage::Multi => {
                 if cursor {
                     1_397_808
                 } else {

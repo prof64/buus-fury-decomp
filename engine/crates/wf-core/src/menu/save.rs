@@ -311,6 +311,9 @@ pub struct Fig {
     /// in OAM: objects made by a redraw show from the next update
     #[serde(default)]
     pub live: bool,
+    /// not the selected slot's chosen character: the idle state's standing pose, no walk
+    #[serde(default)]
+    pub idle: bool,
 }
 
 /// the idle animation and facing of the figures
@@ -356,6 +359,9 @@ impl GameList {
                 let Some(sprite) = form_sprite(w, form) else {
                     continue;
                 };
+                // `0x08005E9A` (after the build): the selected slot's chosen character walks (its vt +0x28 (1));
+                // the others keep the idle state (standing, facing the viewer)
+                let walk = sel && self.first + row == self.sel && s.ids.get(k) == Some(&s.chosen);
                 self.figs.push(Fig {
                     sprite,
                     x: 16 * k as i32 + 0x12,
@@ -363,6 +369,7 @@ impl GameList {
                     frozen: !sel,
                     t: FIG_T0,
                     live: false,
+                    idle: !sel || !walk,
                 });
             }
         }
@@ -411,11 +418,13 @@ impl GameList {
             // the chosen one walks toward the viewer; the others stand turned away (frozen)
             let (raw, dir) = if f.frozen {
                 (FIG_FROZEN_ANIM, FIG_FROZEN_DIR)
+            } else if f.idle {
+                (FIG_FROZEN_ANIM, FIG_DIR)
             } else {
                 (FIG_ANIM, FIG_DIR)
             };
             let Some(an) = sp.anim_raw(raw) else { continue };
-            let t = if f.frozen { 0 } else { f.t.max(0) };
+            let t = if f.frozen || f.idle { 0 } else { f.t.max(0) };
             let Some(k) = an.step_index_at(dir, t, an.looped) else {
                 continue;
             };
