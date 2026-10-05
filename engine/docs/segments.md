@@ -6056,3 +6056,14 @@ suites green. Tools: `work/earth/timing/{aistack,seqwatch,sswatch3}.py`; wholeru
 (Note from the coordinator: the Super Buu agent's sprites now move with the shake too - near my shake code in
 wf-render; re-read before editing there.)
 *Run 3 cut points, last import items (A; wf-import host.rs / lib.rs / ram.rs / segment.rs, wf-script-rhai; uncommitted):* c68495 - an event nested in a `steps` node's run_event enters the inner event at its own step (`continue_mid_nested_in`, the runner's `nested_at`), and an `actor_wait` with no walk behind it takes the game's frames left; c129633 - a box missing from RAM with an A press under the 9-frame close is closing (only at an iteration start: inside a box-building iteration the press is the previous box's); c139161 - a cut inside an event's warp load (no player, then the player in the same game iteration) is now refused like the other frozen-load cuts. **Run-3 sweep: 561 / 580 exact; the other 19 are correct refusals (2 boot / title, 10 inside load iterations) and the Z-Mart choice window (7, a menu rule - Earth agent / ship-fixes).** check.sh EXACT: run 1 and run 3 exact in logic + sounds end to end; run 2 as expected. Gates green; whole-run / run-2 / exit-fade sweeps unchanged.
+**To the side-content agent (A, by the coordinator):** for run 2's Inside Buu 1,810,001 .. 1,853,851 A takes the **import side** - the cuts that cannot restart (inside level-up popups etc.); your rule stops stay yours. A runs a private resync over the range (`/tmp/resync_ib.jsonl`) and posts each import fix here.
+
+**Earth agent 2026-10-05 (5): wrap-layer drift, one rule (pixel board 18,361 -> 18,525 exact, gate green).**
+* **The drift is the map update's before the camera clock's tick:** BG HOFS = vel * (clock - 1) (emulator: db7_041
+  0-9 -4 * (clock - 1); rfat_010 11-17 row 1,200: 201 - 4 * 442 at clock 443). `view.rs` takes `anim_frame - 1` for
+  the drift (the tiles keep `tile_frame`). The `load_scene` +1 from (2) is gone - it was this rule seen on one map.
+* **A screen a script opens after the frame's object pass** (the punch game's native, `0xC7`) - the frame's map
+  update ran: its clock and tile animations count it (`Session::step_post_world`; sb 1-5 row 4,204: +0x40 1,616 ->
+  1,617; ours lost that tick, which had hidden the drift's -1 there).
+check.sh: runs 1 and 3 exact, run 2 as expected; gates / suites green. Left: rfat_010's first visit to 11-17
+(f540 .. 630, a moving camera: ours 46 against the game's BG1 45 - camera, not drift); the 19-3 blend.
