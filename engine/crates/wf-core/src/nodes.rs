@@ -1461,6 +1461,7 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             let h = w.data.anim.hold;
             set_anim_r(w, i, &[an(19)], true, h);
             w.en(i).a.hittable = false;
+            w.en(i).hover_ctl = true;
         }
         // the landing, enter 0x0802AE76: SetAnimRaw(0x13) under the controller 0x03003024
         // enter 0x0802AE76: only while the object already shows anim 0x13 (obj +0x50 = the def's entry 20: the
@@ -3097,16 +3098,8 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             en::kid_buu_merge(w, i);
             true
         }
-        K::BabidiHover => {
-            let z = (w.en_ref(i).a.z - 1).max(-50);
-            w.en(i).a.z = z;
-            // controller tick 0x0802AD58: the tick runs 0..23, then 8..23 again; cel = tick >> 3 (no draw)
-            let t = if f < 24 { f } else { 8 + (f - 8) % 16 };
-            let e = w.en(i);
-            e.ea.pos.tick = t;
-            e.ea.pos.frame = t >> 3;
-            false
-        }
+        // (the rise and the cels are the controller's: `Enemy::hover_ctl`)
+        K::BabidiHover => false,
         // controller tick 0x0802AE3A: down 1 px a frame; on the ground 8 ticks, then SetAnim(0) (the idle's
         // rand(255)) - the node (0x0802AE98) is finished once the controller is gone
         K::BabidiGesture => {

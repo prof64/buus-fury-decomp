@@ -10,6 +10,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 wf-app = { path = "../wf-app" }
+wf-core = { path = "../wf-core" }
 wf-view = { path = "../wf-view" }
 wf-net = { path = "../wf-net" }
 serde_json = { workspace = true }

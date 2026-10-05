@@ -5416,6 +5416,7 @@ version = "0.1.0"
 dependencies = [
  "serde_json",
  "wf-app",
+ "wf-core",
  "wf-net",
  "wf-view",
 ]

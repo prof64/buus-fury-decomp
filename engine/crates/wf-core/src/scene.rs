@@ -688,6 +688,14 @@ pub fn release_puppets(w: &mut World) {
                 b.pose = pose;
             }
         }
+        // an enemy likewise keeps the position the script's animation reached in the state they share (db5 12-27
+        // db5_020 f1361: the Majin fighter's idle runs on at the scene's tick 753, not its own from before the scene)
+        if let Body::Enemy(e) = &mut w.ents[i].body {
+            if e.ea.pos.raw == p.anim.raw && !matches!(p.anim.mode, AnimMode::Pose) {
+                e.ea.pos.frame = p.anim.frame;
+                e.ea.pos.tick = p.anim.tick;
+            }
+        }
     }
     let mut it = keep.into_iter();
     w.scene.puppets.retain(|_| it.next().unwrap_or(false));

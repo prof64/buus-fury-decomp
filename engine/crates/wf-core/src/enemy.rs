@@ -103,6 +103,11 @@ pub struct Enemy {
     /// another SetAnim
     #[serde(default = "minus_one")]
     pub roll_ctl: i32,
+    /// Babidi's hover controller 0x03003014 (tick 0x0802AD58) is the current state: it rises (z down to -50) and
+    /// counts its tick 1..23 then 8..23 (cel = tick >> 3) every frame - also while a scene holds the AI (real route
+    /// 6-1 rfat_033 f12450: the hover cycles on through s-script's punch scene)
+    #[serde(default)]
+    pub hover_ctl: bool,
     /// +1 per state entered through SetAnim (a node can tell its controller was replaced)
     pub anim_seq: u32,
     /// the shown graphics set when MechTransform swapped it (gfx id; -1 = the type's)
@@ -213,6 +218,7 @@ impl Enemy {
             hook: Hook::None,
             spit_ctl: -1,
             roll_ctl: -1,
+            hover_ctl: false,
             anim_seq: 0,
             gfx_now: -1,
             detached: false,
@@ -248,6 +254,7 @@ impl Enemy {
     ) {
         self.spit_ctl = -1;
         self.roll_ctl = -1;
+        self.hover_ctl = false;
         self.hook = Hook::None;
         let prev = self.a.anim;
         // the sprite lacks the requested animation: the game's state object still runs (no idle state, no rand(255));
@@ -361,6 +368,15 @@ impl Enemy {
                 ((t - 0x80) >> 5) & 1
             };
             self.roll_ctl = (t + 8) & 0xffff;
+        }
+        if self.hover_ctl {
+            self.a.z = (self.a.z - 1).max(-50);
+            let mut t = (self.ea.pos.tick + 1) & 0xffff;
+            if t >= 0x18 {
+                t = 8;
+            }
+            self.ea.pos.tick = t;
+            self.ea.pos.frame = t >> 3;
         }
         let res = {
             let mut h = EHost {
@@ -551,6 +567,15 @@ pub fn update(w: &mut World, i: usize) {
     if crate::scene::puppet_update(w, i) {
         return;
     }
+    // a broken breakable's callback event started inside its timer object's update (the list's newest) and took the
+    // rest of the frame: the older objects - the enemies too - are not updated (fx.rs / player.rs; real route 21-6
+    // rkb_004 f322: the enzyme spawners' idle skips that tick)
+    if w.field
+        .as_ref()
+        .is_some_and(|f| f.busy && f.busy_pre_pass == w.frame && f.busy_since + 1 == w.frame)
+    {
+        return;
+    }
     if w.en_ref(i).beam_stop_due > 0 {
         w.en(i).beam_stop_due -= 1;
         if w.en_ref(i).beam_stop_due == 0 {
@@ -642,6 +667,12 @@ pub fn held_update(w: &mut World, i: usize) {
 pub fn release_update(w: &mut World, i: usize) {
     if crate::scene::is_puppet(w, w.ents[i].id) {
         return;
+    }
+    // a breakable callback's end (field.rs `break_owed`, set by this frame's release): the enemies get the nested
+    // loop's held pass and then the whole interrupted pass - its animation tick too (real route 21-6 rkb_004 f665:
+    // the enzyme spawners' idle 24 -> 26, a chasing enzyme's new walk at tick 0)
+    if w.field.as_ref().is_some_and(|f| f.break_owed == w.frame + 1) {
+        tick_anim(w, i);
     }
     update_rest(w, i);
 }

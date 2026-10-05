@@ -1575,11 +1575,19 @@ fn import_patrol(w: &mut World, ei: usize, ram: &GbaRam, o: u32) {
 /// **a cut at any frame with no event running** (mid-area): the area loaded at the leader, the players arrived, the
 /// field's live state from RAM (`field_from_ram`); objects the import does not model yet are listed in notes
 fn build_mid(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner: &mut StoryHost, rng0: [u32; 2], frame0: u32, notes: &mut Vec<String>) -> Built {
+    build_mid_ids(data, ram, info, runner, rng0, frame0, 0, notes)
+}
+
+/// `build_mid`, the entities after the players numbered from `id_base` (the field a cutscene saved: its entities must
+/// not share ids with the scene world's - `import_saved_field`)
+#[allow(clippy::too_many_arguments)]
+fn build_mid_ids(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner: &mut StoryHost, rng0: [u32; 2], frame0: u32, id_base: u32, notes: &mut Vec<String>) -> Built {
     let story = import_story(data, ram);
     let (x, y, facing) = info.leader.unwrap_or((120, 120, 0));
     let to = info.area;
     let cfg = FieldConfig { world: to.world, area: to.area, variant: to.variant, pos: Some((x, y)), facing, chars: vec![story.current], story: Some(story.clone()), rng: wf_core::battle::RngInit::State(rng0[0], rng0[1]), xp: true, arrive: false, slow_fade_in: false };
     let mut w = field::create(data.clone(), &cfg);
+    w.next_id = w.next_id.max(id_base);
     let players = w.players.clone();
     w.ents.retain(|e| players.contains(&e.id));
     w.enemies.clear();
@@ -2732,20 +2740,7 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
     // an enemy the script holds in a pose (its state +0x14 the hold state 0x03001B00, `set_pose`) whose `set_pose` the
     // replay dropped: our puppet on the RAM's cel (run 2 cuts 57,831 .. 58,560: s103's Pikkon, pose 12 then 16; else
     // ours ran its AI animation, whose script draws)
-    for (o, raw, cel, tick) in ram.actor_rows.iter().map(|r| (r.0, r.2, r.3, r.4)).collect::<Vec<_>>() {
-        if ram.r32(o) != VT_ENEMY || ram.r32(o + 0x14) != 0x0300_1B00 {
-            continue;
-        }
-        let (x, y) = (ram.s32(o + 0x1A0), ram.s32(o + 0x1A4));
-        let Some(i) = (0..w.ents.len()).find(|&i| !w.ents[i].removed && matches!(&w.ents[i].body, Body::Enemy(e) if e.a.x == x && e.a.y == y)) else { continue };
-        let id = w.ents[i].id;
-        if w.scene.puppets.iter().any(|p| p.id == id) {
-            continue;
-        }
-        let aid = (0..25).find(|&a| wf_core::scene::anim_state(a) + 1 == raw).unwrap_or(0);
-        let anim = wf_core::scene::ActAnim { raw, frame: cel, tick, mode: wf_core::scene::AnimMode::Pose, ..wf_core::scene::ActAnim::of(aid) };
-        w.scene.puppets.push(wf_core::scene::Puppet { id, anim });
-    }
+    held_enemy_puppets(&mut w, ram);
     // a replayed `play_anim` on the leader that already ended in the game (the RAM's leader is back in the state it
     // imported with: whole-run cut 153,226, s266's punch anim done, the group still waiting on its prop poof): the
     // command is done, the leader's state the RAM's
@@ -2990,11 +2985,10 @@ fn build_event_entry(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner:
             return build_mid_event(data, ram, runner, ev, w, calls0, notes);
         }
         // inside a cutscene map the node loaded (`load_scene` 0x71 run, no `return_to_field` yet, no player object):
-        // the scene map with its actors from RAM (run 2 cut 57,951: s103 node 0's Goku and Pikkon over 0-22). NOT
-        // imported: the field the scene saved (the game's copy of the world struct at [world +0xBF8], 0xE00 bytes:
-        // count +4, objects +8) - its `return_to_field` reloads the area instead of restoring it
+        // the scene map with its actors from RAM (run 2 cut 57,951: s103 node 0's Goku and Pikkon over 0-22); the field
+        // the scene saved is imported for its `return_to_field` (`import_saved_field`)
         if ram.player() == 0 && ran[..ran.len() - 1].iter().any(|(n, _)| *n == 0x71) {
-            notes.push("mid-area: inside a load_scene cutscene map - the saved field is not imported (its return reloads it)".into());
+            notes.push("mid-area: inside a load_scene cutscene map".into());
             return build_mid_event(data, ram, runner, ev, w, calls0, notes);
         }
         // the node has run actions and none of them loads (its warp, if any, is still ahead): the event is running
@@ -3240,6 +3234,13 @@ pub fn import_emulator_state(data: &Arc<GameData>, ram: &GbaRam, runner: &mut St
     }
     check(&mut world, ram, &mut notes);
     import_vram(&mut world, ram);
+    if let Some(ev) = in_event {
+        let mut evs = vec![ev.0];
+        if let Some((o, _)) = outer_event(ram, runner, ev) {
+            evs.push(o.0);
+        }
+        import_saved_field(data, ram, runner, &evs, &mut world, &mut notes);
+    }
     import_boss_bar(&mut world, ram);
     import_tile_anims(&mut world, ram);
     // a text box opened by the import whose object the game makes later in the cut's iteration: its tiles now
@@ -3267,6 +3268,172 @@ pub fn import_emulator_state(data: &Arc<GameData>, ram: &GbaRam, runner: &mut St
     }
     import_options(&mut world, ram);
     Ok(Imported { world, prev_keys: ram.r16(INPUT + 2) & 0x3FF, lf: info.lf, kind: info.kind, held_frames: b.held, draws: b.draws, notes })
+}
+
+/// the enemies the script holds in a pose (state +0x14 the hold state 0x03001B00, `set_pose`): our puppets on the
+/// RAM's cel (see `build_mid_code`; the saved field of a cutscene map too)
+fn held_enemy_puppets(w: &mut World, ram: &GbaRam) {
+    for (o, raw, cel, tick) in ram.actor_rows.iter().map(|r| (r.0, r.2, r.3, r.4)).collect::<Vec<_>>() {
+        if ram.r32(o) != VT_ENEMY || ram.r32(o + 0x14) != 0x0300_1B00 {
+            continue;
+        }
+        let (x, y) = (ram.s32(o + 0x1A0), ram.s32(o + 0x1A4));
+        let Some(i) = (0..w.ents.len()).find(|&i| !w.ents[i].removed && matches!(&w.ents[i].body, Body::Enemy(e) if e.a.x == x && e.a.y == y)) else { continue };
+        let id = w.ents[i].id;
+        if w.scene.puppets.iter().any(|p| p.id == id) {
+            continue;
+        }
+        let aid = (0..25).find(|&a| wf_core::scene::anim_state(a) + 1 == raw).unwrap_or(0);
+        let anim = wf_core::scene::ActAnim { raw, frame: cel, tick, mode: wf_core::scene::AnimMode::Pose, ..wf_core::scene::ActAnim::of(aid) };
+        w.scene.puppets.push(wf_core::scene::Puppet { id, anim });
+    }
+}
+
+/// a cut inside a cutscene map (`load_scene` after `save_field_on_next_scene`, no player object in the live world):
+/// the field the scene saved, for its `return_to_field` (0x75) to restore rather than reload. The game's save
+/// (`0x08009196`): the area descriptor it left (`0x0300197C`, 20 bytes) copied to `0x03001968`; the camera
+/// (`0x030019A4`) copied into a 0xC4-byte buffer at `[0x030019A0]` (`0x080099B6`: +0 0x5C bytes, +0x90 0x34 bytes);
+/// the world struct (`0x03001C4C`, 0xE00 bytes: the object list +4 / +8, the tile allocator) into a buffer at
+/// [world +0xBF8] after the objects answered the hide message 0xA (`0x08011DB4`), the live list emptied. The saved
+/// field is our mid-area build of a RAM with those copies put back (run 2 cut 57,951: Other World 1-20 under s103's
+/// 0-22 scene) -> `SavedWorld` + the host's `SavedField`; its tile allocator is the stash `vram::world_show` takes
+fn import_saved_field(data: &Arc<GameData>, ram: &GbaRam, runner: &mut StoryHost, evs: &[u16], world: &mut World, notes: &mut Vec<String>) {
+    if ram.player() != 0 || world.scene.saved_world.is_some() || runner.hs.saved_field.is_some() || world.field.is_none() {
+        return;
+    }
+    let sv = ram.r32(OBJW + 0xBF8);
+    if !ram.valid(sv) || !ram.valid(sv + 0xDFF) {
+        return;
+    }
+    let n = ram.r32(sv + 4);
+    if n == 0 || n > 0x100 {
+        return;
+    }
+    let objs: Vec<u32> = (0..n).map(|k| ram.r32(sv + 8 + 4 * k)).collect();
+    // (the leader: the player object, or on the 3D world map the flyer, vt 0x0804E1B4)
+    let Some(&pl) = objs.iter().find(|&&o| ram.valid(o) && matches!(ram.r32(o), VT_PLAYER | 0x0804_E1B4)) else { return };
+    let mut r2 = ram.clone();
+    let put = |r: &mut GbaRam, a: u32, b: &[u8]| {
+        for (k, &v) in b.iter().enumerate() {
+            let x = a + k as u32;
+            if (IWRAM..IWRAM + IWRAM_SIZE as u32).contains(&x) {
+                r.iwram[(x - IWRAM) as usize] = v;
+            } else if (EWRAM..EWRAM + EWRAM_SIZE as u32).contains(&x) {
+                r.ewram[(x - EWRAM) as usize] = v;
+            }
+        }
+    };
+    put(&mut r2, OBJW, &ram.read(sv, 0xE00));
+    put(&mut r2, WS, &ram.read(0x0300_1968, 0x14));
+    put(&mut r2, PLAYER, &pl.to_le_bytes());
+    let cb = ram.r32(0x0300_19A0);
+    if ram.valid(cb) {
+        put(&mut r2, CAM, &ram.read(cb, 0x5C));
+        put(&mut r2, CAM + 0x90, &ram.read(cb + 0x90, 0x34));
+    }
+    // the camera controller the save pushed (`0x080210D6`: the slot list 0x03002BD8 - +8 the mode's controller,
+    // +0xC the stack count, +0x10.. the pushed ones; the scene runs on the hold controller 0x03001964): the field's
+    let cs = 0x0300_2BD8u32;
+    let cnt = ram.r32(cs + 0xC);
+    if (1..=8).contains(&cnt) {
+        put(&mut r2, cs + 8, &ram.read(cs + 0x10 + 4 * (cnt - 1), 4));
+    }
+    r2.screen_black = None;
+    // the saved objects' actor rows (the recording has the live world's only): sprite by its def (+0x58), the
+    // animation raw = the def's entry (+0x50 table) holding the current one (+0x50), cel +0x11, tick +0x12 - as the
+    // recorder's `capture.actors`
+    for &o in &objs {
+        if !ram.valid(o) || r2.actor_rows.iter().any(|r| r.0 == o) {
+            continue;
+        }
+        let d = ram.r32(o + 0x58);
+        let Some((&sprite, _)) = data.sprites.iter().find(|(_, sp)| sp.def_addr == d) else { continue };
+        // (the def's animation table is ROM, which the import does not have: the animation whose steps hold the
+        // object's current frame record, +0x54 - the lowest raw sharing it, as the recorder names a struct)
+        let rec = ram.r32(o + 0x54);
+        // (+0x54 is not always a record - an NPC idle in the shared idle state 0x03001B0C showed another word: raw 1,
+        // the idle's - run 1 cut 1,629,943)
+        let idle = if ram.r32(o + 0x14) == 0x0300_1B0C { 1 } else { -1 };
+        let raw = data.sprites.get(&sprite).and_then(|sp| sp.anims.iter().find(|an| an.dirs.iter().any(|st| st.iter().any(|x| x.rom == rec))).map(|an| an.canon_raw)).unwrap_or(idle);
+        r2.actor_rows.push((o, sprite + wf_core::content::GFX_OFFSET, raw, ram.r8(o + 0x11) as i32, ram.r16(o + 0x12) as i32));
+    }
+    let info2 = inspect(&r2);
+    let base = world.next_id + 1000;
+    let mut n2 = vec![];
+    let b = build_mid_ids(data, &r2, &info2, runner, world.rng.state(), world.frame, base, &mut n2);
+    let mut w2 = b.world;
+    held_enemy_puppets(&mut w2, &r2);
+    // (the enemies' animation positions from the rows, as the live world's: the import's last step)
+    enemy_anims_from_rows(&mut w2, &r2);
+    import_vram(&mut w2, &r2);
+    // (the event holds the field it saved, as ours saves it inside the event: busy - its enemies wait until the event
+    // ends; run 2 cut 568,325, 8-70's soldier under the 8-17 scene)
+    // the hold as the scene world has it: busy, and an interrupted frame the event holds (`held_event`: the field's
+    // remaining updates run in the frame the event ends - run 1 cut 557,141, 8-70's s325: the soldier's AI enters
+    // in that frame; ours saves the field with it inside the event)
+    let (busy, held_event, once) = world.field.as_ref().map(|f| (f.busy, f.held_event, f.once_pending)).unwrap_or((false, false, None));
+    field::set_busy(&mut w2, busy);
+    if let Some(f) = w2.field.as_mut() {
+        f.held_event = held_event;
+        // (the touch-once trigger whose activation runs the event goes when it ends: the field's)
+        if f.once_pending.is_none() {
+            f.once_pending = once;
+        }
+    }
+    // the running event's own touch-once trigger (still in the RAM's list: the game removes it when the event
+    // returns) - gone, as the live field's (`build_mid_event`; run 1 cut 789,133: 11-17's room-wide s-trigger under
+    // the 11-24 scene fired again after its end)
+    let names: Vec<String> = evs.iter().map(|e| format!("s{e:03}")).collect();
+    let fired: Vec<usize> = w2.field.as_ref().map(|f| f.triggers.iter().enumerate().filter(|(_, t)| t.act == wf_core::fieldcontent::Activation::TouchOnce && field::trigger_def(&w2, t.obj).is_some_and(|d| matches!(d.kind, wf_core::fieldcontent::ObjKind::Trigger { kind: wf_core::fieldcontent::TriggerKind::Event(ref s), .. } if names.contains(s)))).map(|(k, _)| k).collect()).unwrap_or_default();
+    if let Some(f) = w2.field.as_mut() {
+        for k in fired.into_iter().rev() {
+            f.triggers.remove(k);
+        }
+    }
+    // the objects without a shadow record (+0x5C = 0: run 2 cut 57,951 - Goku and Pikkon after s103's poses) take no
+    // shadow graphic at the show message (`0x0800F478`): our shadow override (`vram::shadow_set`'s list)
+    let no_shadow: Vec<wf_core::world::EntityId> = objs
+        .iter()
+        .filter(|&&o| ram.valid(o) && ram.r32(o + 0x5C) == 0)
+        .filter_map(|&o| {
+            let (x, y) = (ram.s32(o + 0x1A0), ram.s32(o + 0x1A4));
+            (0..w2.ents.len()).find(|&i| !w2.ents[i].removed && w2.actor(i).is_some_and(|a| a.x == x && a.y == y)).map(|i| w2.ents[i].id)
+        })
+        .collect();
+    if let Some(v) = w2.field.as_mut().and_then(|f| f.vram.as_mut()) {
+        for id in no_shadow {
+            v.shadow_set.retain(|o| o.0 != id);
+            v.shadow_set.push((id, None));
+        }
+    }
+    // the tile allocator as the save left it: the stash (the scene has its own); the shared graphics the objects
+    // gave back at the hide message are taken again by `world_show`
+    if let Some(v) = w2.field.as_mut().and_then(|f| f.vram.as_mut()) {
+        let a = std::mem::replace(&mut v.a, wf_core::vram::ObjVram::fresh());
+        let mut o = std::mem::take(&mut v.owners);
+        o.retain(|x| !matches!(x.1, wf_core::vram::Owner::Shared(_)));
+        v.shared_rc = [0; 5];
+        v.stashed = Some(Box::new((a, o, [0; 5])));
+    }
+    let pid = |w: &World| w.players.first().copied();
+    if pid(&w2) != pid(world) {
+        notes.push(format!("saved field: player ids differ ({:?} vs {:?}) - not imported", pid(&w2), pid(world)));
+        return;
+    }
+    let Some((x, y, facing)) = info2.leader else { return };
+    let a = info2.area;
+    runner.hs.saved_field = Some(wf_script_core::SavedField { area: (a.world, a.area, a.variant), x, y, facing, cam: (w2.cameras[0].x, w2.cameras[0].y) });
+    world.scene.saved_world = Some(Box::new(field::save_world(&w2)));
+    // (the last banner shown is the field's: the scene's backdrop load shows none - run 2 cut 540,172, Babidi's ship
+    // 8-66 scene over 8-65: no banner at the walk to 8-64 afterwards)
+    if let Some(name) = data.field.as_ref().and_then(|fd| fd.area(a.world, a.area)).map(|d| d.name_id) {
+        world.scene.banner_last = name;
+    }
+    world.next_id = world.next_id.max(w2.next_id);
+    notes.push(format!("saved field: {}-{} ({} objects) under the cutscene map, for its return_to_field", a.world, a.area, n));
+    for m in n2 {
+        notes.push(format!("saved field: {m}"));
+    }
 }
 
 /// the game options (`0x03001914`: text speed, SFX volume, music volume, 0 - menu/options.rs; global, loaded from the

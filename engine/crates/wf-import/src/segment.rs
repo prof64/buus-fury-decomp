@@ -222,6 +222,12 @@ pub fn compare(w: &World, fr: &Value, es: &[String], map: &mut BTreeMap<usize, E
             if let Some(g) = game {
                 rep.cel.checks += 1;
                 let ours = wf_core::view::actor_cel(w, i).map(|c| (c.0, c.1));
+                // SEGMENT_CELOBJ=k: game object #k's raw / cel / tick against ours on every frame
+                if std::env::var("SEGMENT_CELOBJ").ok().and_then(|v| v.parse::<i64>().ok()) == Some(r.k() as i64) {
+                    if let Body::Enemy(n) = &w.ents[i].body {
+                        eprintln!("    celobj f{k} game raw {} cel {} tick {} | ours raw {} cel {} tick {}", r.raw(), r.frame(), a[8], n.ea.pos.raw, n.ea.pos.frame, n.ea.pos.tick);
+                    }
+                }
                 if ours != Some(g) && cel_row != Some(k) {
                     cel_row = Some(k);
                     rep.cel.bad_rows += 1;
@@ -711,7 +717,7 @@ pub fn replay_with(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: 
                         Body::Fx(f) => format!("{}:fx {:?}", w.ents[i].id, f).chars().take(80).collect(),
                         Body::Npc(n) => format!("{}:npc{}", w.ents[i].id, n.sprite_id),
                         Body::Pickup(p) => format!("{}:pickup {:?} age {} mv {} @({},{})", w.ents[i].id, p.kind, p.t, p.mv, p.x >> 8, p.y >> 8),
-                        _ => format!("{}:other", w.ents[i].id),
+                        b => format!("{}:other {}", w.ents[i].id, format!("{b:?}").chars().take(60).collect::<String>()),
                     }).collect();
                     eprintln!("  t{k} ents {}", es.join(" | "));
                 }

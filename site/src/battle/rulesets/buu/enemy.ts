@@ -142,6 +142,9 @@ export class Enemy extends Actor implements EnemyLike {
   spitCtl = -1
   /** Mini Janemba's roll controller 0x03003248: its counter (+8 per tick), -1 = not the current state */
   rollCtl = -1
+  /** Babidi's hover controller 0x03003014 (tick 0x0802AD58) is the current state: rises to z -50, tick 1..23 then
+   *  8..23 (cel = tick >> 3) every frame, also while a scene holds the AI */
+  hoverCtl = false
   update(w: World) {
     this.w = w
     // the player's death script (0x08799D0C) blocks every object update at KO + 199; from KO + 200 an enemy only
@@ -192,6 +195,7 @@ export class Enemy extends Actor implements EnemyLike {
   setAnim(ref: number | string | (number | string)[], restart = true, loop?: boolean, rule?: EAnimRule) {
     this.spitCtl = -1
     this.rollCtl = -1
+    this.hoverCtl = false
     this.stateHook = null
     const prev = this.anim
     const refs = (Array.isArray(ref) ? ref : [ref]).map((r) => (typeof r === 'number' ? r + 1 : r))
@@ -244,6 +248,13 @@ export class Enemy extends Actor implements EnemyLike {
       if (t === 0xc0 && this.sprite?.anim(20)) this.setRaw(20)
       this.ea.pos.frame = t < 0x80 ? 0 : t - 0x80 < 0x40 ? 1 : ((t - 0x80) >> 5) & 1
       this.rollCtl = (t + 8) & 0xffff
+    }
+    if (this.hoverCtl) {
+      this.z = Math.max(-50, this.z - 1)
+      let t = (this.ea.pos.tick + 1) & 0xffff
+      if (t >= 0x18) t = 8
+      this.ea.pos.tick = t
+      this.ea.pos.frame = t >> 3
     }
     // the state's tick (vtable +4) runs before the AI; a one-shot's end callback is SetAnim(0)
     if (this.ea.tick() === 'idle') {

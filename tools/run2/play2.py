@@ -47,8 +47,17 @@ def main():
         t0 = time.time()
         if isinstance(goals, tuple) and goals[0] == 'KEYS':
             # a part another agent played from the chain's end state (segments.md §0, run 2 hand-off): its key log
-            doc = json.loads((ROOT / goals[1]).read_text())
-            log = doc['keys'] if isinstance(doc, dict) else doc
+            src = ROOT / goals[1]
+            if src.exists():
+                doc = json.loads(src.read_text())
+                log = doc['keys'] if isinstance(doc, dict) else doc
+            else:
+                # work/ is not tracked: the packed copy (data/realrun2/NNN_<name>.keys.gz)
+                import gzip
+                packed = sorted((ROOT / 'data' / 'realrun2').glob(f'*_{name}.keys.gz'))
+                if not packed:
+                    raise SystemExit(f'{name}: no key log ({src} / data/realrun2)')
+                log = [k for k, n in json.loads(gzip.open(packed[0], 'rt').read()) for _ in range(n)]
             for k in log:
                 e.set_keys(k)
                 e.run(1)

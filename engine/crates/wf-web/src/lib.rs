@@ -412,6 +412,33 @@ pub extern "C" fn wf_app_reset_bindings() {
     with_game(|g| g.bindings = Bindings::default());
 }
 
+/// Story mode's state for tests / tools (string buffer): `{"area": [world, area], "p": [x, y, facing], "zenie",
+/// "play_frames", "menu"}`, or `null` outside story mode.
+#[no_mangle]
+pub extern "C" fn wf_app_story_info() {
+    let s = with_game(|g| {
+        let Some(st) = g.app.sim.as_any().and_then(|a| a.downcast_ref::<wf_app::story::StorySim>()) else {
+            return "null".to_string();
+        };
+        let w = st.world();
+        let area = w.field.as_ref().map(|f| [f.area.world, f.area.area]);
+        let p = w.player_idx(0).map(|i| {
+            let a = &w.pl_ref(i).a;
+            [a.px(), a.py(), a.facing as i32]
+        });
+        serde_json::json!({
+            "area": area,
+            "p": p,
+            "zenie": w.story.zenie,
+            "play_frames": w.story.play_frames,
+            "menu": wf_core::menu::active(w),
+        })
+        .to_string()
+    })
+    .unwrap_or_else(|| "null".into());
+    set_str(&s);
+}
+
 /// Stats JSON in the string buffer.
 #[no_mangle]
 pub extern "C" fn wf_app_stats() {

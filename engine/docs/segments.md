@@ -55,8 +55,10 @@ stops). -> **Earth agent** (text boxes: the typewriter's rate from the text spee
 save has no save slot in the app (the importer does not carry the EEPROM slot) -> **importer agent**; s102 node 5
 "waiting native 0x3c" and on-enter-load cuts -> importer. Re-run the resync once text speed lands.
 **Run 2 hand-off: appending chapters (chapters go on in story order, each from the chain's end).**
-1. Order: opening, Earth, ship (in: 602,566 rows, ends at 8-70 after Majin Buu) -> **fat Buu (soak agent)** ->
-   **Janemba (soak agent)** -> **Super Buu + Kid Buu + credits (side-content agent; its route is being built from
+1. Order: opening, Earth, ship (602,566 rows, ends at 8-70 after Majin Buu) -> fat Buu (soak agent, `031_f_fat`,
+   522,530) -> Janemba (soak agent, `032_j_janemba`, 222,029, ends in the 18-14 arena) - **in: 1,347,125 rows,
+   recorded (record.py / sounds.py --chain run2), check.sh green (run 2 ratchet: first difference row 159,713,
+   024_e_goten)** -> **Super Buu + Kid Buu + credits (side-content agent; its route is being built from
    run 1's `work/ship/sb/sb_start.ss` meanwhile, `tools/superbuu/sbroute2.py`)**.
 2. The start state of the next part is **`work/run2/end.ss`** (written by `tools/run2/play2.py` after the last
    segment; regenerate with `play2.py --from <last segment>` if missing). Play your part from it, input only.
@@ -4401,6 +4403,27 @@ gate 109 segments / 1,215 frames.**
   frame (draw 0x0802FD16), so lines already scanned show the previous value, split at a row that moves with the
   frame's CPU time (rkb_168 / sb_041: rows 8..12 the old value, the rest the new). Lines may mix the two per pixel
   like the palette rewrite's. (`PIX_NOTIMERTEAR` turns it off; `PIX_TIMERFIT` also prints per-row value fits.)
+**Update 9: cel gate 490 -> 496 segments; differing cel frames 1,226 -> 975 (860 of them the world map's airship
+idles, the importer agent's).**
+* **Babidi's hover is a controller, not the node** (tick 0x0802AD58: z down to -50, tick +1, from 24 back to 8, cel =
+  tick >> 3): `Enemy::hover_ctl`, run in the animation tick - so it goes on while a scene holds the AI (rfat_033 6-1
+  f12450: s-script's punch scene; ours had frozen at tick 23). Rust + TS.
+* **A breakable's callback frame holds the enemies too** (the event starts inside the break timer's update, the list's
+  newest; the older objects are not updated that frame - the player / effects already had this): rkb_004 21-6 f322,
+  the enzyme spawners' idle skipped a tick. And the callback's end gives them the nested loop's held pass plus the
+  whole interrupted pass: `enemy::release_update` ticks the animation first when `break_owed` was just set (f665:
+  the idle 24 -> 26, a chasing enzyme's new walk at tick 0).
+* **A released enemy puppet keeps the script animation's position** (one animation state in the game, as the map
+  NPCs already did): db5_020 12-27 f1361, the fighter's idle runs on at the scene's tick 753.
+* `SEGMENT_CELOBJ=k`: game object #k's raw / cel / tick against ours on every frame.
+* **Open - a share for the real-route agent (offered):** rj_049 18-14 ty 51 sprite 149 (raw 20 rise / hold / fall:
+  cel = tick >> 3 is one cel ahead from f1078, and the state starts a frame early at f1069) and ty 122 sprite 154
+  (raw 20 vs our 19 at f3963 - the state's raw), sb_006 / sb_007 6-x ty 116 sprite 49 (game raw 8 vs our 19 at
+  f19958), db7_010 14-10 ty 77 (10 frames), rj03_045 18-1 ty 57 (8), singles in dr4_006 / dr4_061 / sb_012.
+* **Next pixel cause: player beams are not drawn in the field** (`view.rs`: "beam piece chains are not drawn yet").
+  The sprites class (4,080 sampled frames) is led by sb_007 / sb_006 / rfat_033 / sb_041 boss fights where Gohan's
+  Kamehameha (`ShotKind::Kame`) is on screen: the game draws the beam and tints the hit enemy red, ours draws neither
+  (sb_007 f19380: 1,528 px).
 
 **Done (Earth agent): the no-lag title -> Earth soak's crowd-wander stop (row 190,577) - a menu close that never
 gave the field its sprite memory back.** The crowd NPCs' wander draws were right; their *update order* was not: at
@@ -5203,3 +5226,49 @@ title.rs, wf-import segment.rs.
 * Harness: `SEGMENT_ENTS` now lists pickups (kind, age, moves, position).
 * The app's play time after the soft reset runs 696 (`BOOT_LOGIC`) behind the game's (`ourlf`); the clock is right.
   Mine to fix next.
+*Ship fix agent, 2026-10-04 (late):*
+* **Play time after the boot** (menu/mod.rs, in 8cdd144): at the boot's end the play-time bias is set from the
+  frame counter (the boot's iterations are no play time). Play time + bias now tracks 0x03000F94 from power-on and
+  after a soft reset: 696 off before, 2..4 now; the rest is a frame per game over / title, diagnostic only.
+* **159,713 (2-90 tag game) - dropped: someone else is fixing it in the tree right now.** The uncommitted
+  `Deferred::Run` + `event_started_pre` work in fx.rs / fieldobj.rs / session.rs ("run 2 rows 159,704 / 159,714").
+  My findings for its owner:
+  - Emulator: in the frame s120 starts (lf 16,271, 0x0801246E from 0x080125A4) neither Gohan nor Goten updates.
+    Goten's tick +0x12 goes 29 (16,269), 30 (16,270), 30 (16,271), then 31 at 16,272 through the held path, whose
+    caller is 0x0800F5E0. The idle state's rand(255) is at 16,273.
+  - The app at that frame: the player walked on (keys not masked yet), Goten's held tick ran, and the next frame's
+    idle entry drew once too often.
+  - My own trial edits for this are reverted; I left that work alone.
+*Done (A, by the coordinator): a cut inside a cutscene map carries its origin room* (wf-import lib.rs, uncommitted).
+The game keeps the left room's object list (world +0xBF8 copy: count +4, objects +8), its area and camera when
+`load_scene` runs; the importer builds our `SavedWorld` from it (actors' sprites / animations from the objects, no
+shadow when the object has none, posed enemies kept posed, the 3D map's flyer as the player; the room's sprite memory
+set aside as our own save does; no banner after the return). After `return_to_field`: the restored room stays held
+while the event runs, the rest of an interrupted object pass runs in the frame the event ends, the event's touch-once
+trigger is gone. Run 2 cut 57,951: 1,399-row replay exact (HEAD went back to 0-22 at row 398). Every cutscene-map
+stretch of both runs cut a third in, through the return: run 1 2 -> 24 / 35, run 2 0 -> 9 / 13 (none worse; the 13
+left fail before the return, as on HEAD: fades at 7-2 / 14-17 / 14-22 / 14-19, sound 55 at 1-20, sprite memory at
+7-6 / 8-16 / 8-71 / 21-4, a cel at 3-3, a missing actor at 7-5, an extra enemy at 21-11). Gates green; whole-run /
+run-2 / exit-fade / area-entry sweeps unchanged. Open: cut 955,163 (an event that reloads its room): ours shows the
+6-1 banner on the reload, the game not - the game's "last banner shown" record not found yet.
+
+**Run 2, 124,907 -> 159,858 (Earth agent, 2026-10-05).** `check.sh`: run 1 exact (both legs), run 2 from power-on
+exact to 159,858 (ratchet bumped); gates, pixels, cross_ts green.
+* **124,907 (tank stretch)** - the ki blast class (update 0x08019888) does not burst on an accepted hit: it marks
+  +0x54 and bursts in its next update (+0x4C = 16, one tick down at once), still taking messages until then (handler
+  0x080199F6 tests only +0x4C). The tank's new shell meets the blast that hit the tank the frame before and bursts on
+  it (its hit sound). `StraightOpts::taken` (field only, the ki blast class; battles keep the reference).
+* **136,351** - the HUD's low-HP beep after `hide_hud`: the HUD slides out from +0x28 = 8 to -16 and deletes itself
+  in its 25th update (`vram::HUD_OUT`); the beep window is that, not 38 (the 18-14 count was video frames with lag).
+  `show_hud`'s new HUD beeps at once (stamp backdated, as an area load's). **Ship-fix agent:** the 142,953 Continue
+  beep (the loaded area's HUD) is yours with the rest of the beep work - check.sh shows it gone on this tree.
+* **159,704 (Goten's tag game)** - the rock's accepted hit (0x08033F28) starts s120 as a deferred call
+  (`fieldobj::Deferred::Run`): the event begins at the next frame's start and that frame has **no object pass** (the
+  hit leader takes no step, Goten's anim misses one update - 159,714); `Field::event_started_pre`, session.rs.
+* **159,858 - open**: Goten's AI after s120 is one frame late (state 230 Sequence[SetCounter, GotoState] -> 231's
+  Chance). The game updates the Goten that node 3's `become_map_object` spawns in that same frame (SetCounter at
+  159,856), so the script resumed before the frame's object pass after the last text box closed; ours resumes it
+  after. Not changed: where scripts resume after a text box is global - needs the dialog close's frame placement
+  measured (emulator: the text box object's last update vs the VM's resume) before touching it.
+* Tools: `work/earth/bin/mkseg2.py` (segment from any chain row), `work/earth/timing/{rngcalls2,objdump2,objlist,
+  memwatch,palfit2,tbcut,speedprobe}.py`; wholerun debug env `WR_ENEMY` / `WR_EDUMP` / `WR_CLK` / `WR_DLG` / `WR_HUD`.

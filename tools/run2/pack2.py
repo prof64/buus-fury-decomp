@@ -41,8 +41,9 @@ def main():
         for k in ks:
             e.set_keys(k)
             e.run(1)
-        with gzip.open(OUT / f'{n:03d}_{name}.keys.gz', 'wt') as fh:
-            fh.write(json.dumps(rle(ks), separators=(',', ':')))
+        # mtime 0: the same keys give the same bytes (no churn in git on a repack)
+        with open(OUT / f'{n:03d}_{name}.keys.gz', 'wb') as raw, gzip.GzipFile(fileobj=raw, mode='wb', mtime=0) as fh:
+            fh.write(json.dumps(rle(ks), separators=(',', ':')).encode())
         man.append({'n': n, 'chapter': chapter_of(name), 'name': name, 'frames': len(ks), 'start': start, 'end': status(e)})
         print(n, name, len(ks), status(e), flush=True)
     (OUT / 'manifest.json').write_text(json.dumps(man, indent=1))

@@ -386,7 +386,12 @@ pub fn run_deferred(w: &mut World) {
     for d in due {
         match d {
             Deferred::Break { entity, .. } => break_done(w, entity),
-            Deferred::Run { run, cause, .. } => w.events.push(crate::world::Event::Field(crate::field::FieldEvent::Run { run, cause, slot: 0 })),
+            Deferred::Run { run, cause, .. } => {
+                if let Some(f) = w.field.as_mut() {
+                    f.event_started_pre = true;
+                }
+                w.events.push(crate::world::Event::Field(crate::field::FieldEvent::Run { run, cause, slot: 0 }))
+            }
         }
     }
 }

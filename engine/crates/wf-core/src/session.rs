@@ -185,25 +185,7 @@ impl Session {
             if let Some(f) = w.field.as_mut().filter(|f| f.raw_input.is_some()) {
                 f.raw_input = Some(inputs);
             }
-            let busy0 = w.field.as_ref().is_some_and(|f| f.busy);
             Self::run_hook(&mut self.hook, &mut self.world, 0);
-            // an event the frame's start began (a deferred call's: Goten's tag rock, s120) holds the players in this
-            // frame's update already, as `pre_step` does for one that was running (run 2 row 159,704: the hit leader
-            // neither walks nor turns idle in the next frame)
-            let w = &mut self.world;
-            if std::env::var("T_HOLD").is_ok() && (busy0 || w.field.as_ref().is_some_and(|f| f.busy)) { eprintln!("HOLD frame {} busy0 {} busy {} raw {} keys {:x}", w.frame, busy0, w.field.as_ref().is_some_and(|f| f.busy), w.field.as_ref().is_some_and(|f| f.raw_input.is_some()), w.input[0].held); }
-            if !busy0 && w.field.as_ref().is_some_and(|f| f.busy && f.raw_input.is_none()) && !crate::field::free_arrival(w) {
-                let raw = w.input;
-                if let Some(f) = w.field.as_mut() {
-                    f.raw_input = Some(raw);
-                }
-                let flying = crate::fieldworld::flying(w);
-                for s in 0..w.input.len() {
-                    if !(flying && s == 0) {
-                        w.input[s] = Default::default();
-                    }
-                }
-            }
         }
     }
     /// the objects' update and the cutscene systems (second part of [`Session::step_world`])
@@ -251,6 +233,25 @@ impl Session {
         if let Some(f) = w.field.as_mut() {
             f.pre_update = false;
         }
+        // an event the host started from this frame's start (after `pre_step`: a deferred call's run - Goten's tag
+        // rock, s120) runs as the game's nested loop: this frame has no object pass (run 2 rows 159,704 / 159,714: the
+        // hit leader does not take its step, Goten's anim misses one update); the players' keys are masked as in
+        // `pre_step` for a running one
+        let pre_event = w.field.as_ref().is_some_and(|f| f.busy && f.event_started_pre);
+        if w.field.as_ref().is_some_and(|f| f.busy && f.raw_input.is_none() && f.event_started_pre)
+            && !crate::field::free_arrival(w)
+        {
+            let raw = w.input;
+            if let Some(f) = w.field.as_mut() {
+                f.raw_input = Some(raw);
+            }
+            for s in 0..w.input.len() {
+                w.input[s] = Default::default();
+            }
+        }
+        if let Some(f) = w.field.as_mut() {
+            f.event_started_pre = false;
+        }
         if w.field.is_some() {
             // Watch This!'s closing frame runs the scene's tracks, the script and the cameras, not the objects
             // a breakable's callback waiting for a track command (field.rs `break_event`): the nested loop's frames
@@ -297,7 +298,7 @@ impl Session {
                         crate::player::release_passive(w, pi);
                     }
                 }
-            } else if !crate::field::frozen(w) && !crate::scene::frozen(w) && !watch_closing {
+            } else if !crate::field::frozen(w) && !crate::scene::frozen(w) && !watch_closing && !pre_event {
                 if w.field
                     .as_mut()
                     .is_some_and(|f| std::mem::take(&mut f.break_extra))
@@ -312,7 +313,7 @@ impl Session {
                 }
                 battle::pre_step(w);
                 w.step_entities();
-            } else if crate::field::frozen(w) && !watch_closing {
+            } else if (crate::field::frozen(w) || pre_event) && !watch_closing {
                 // the task list (screen shakes) keeps running while an inline event holds the objects' update (the
                 // real route, Southwest Forest 8-3: a crit shake draws its offsets through the level-up popup)
                 w.tick_shakes();

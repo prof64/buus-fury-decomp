@@ -124,6 +124,27 @@ class SbDriver2(ShipDriver2):
             return B if self.t % 30 < 3 else 0
         if kind == 'retry_here' and self.retry_k != self.k - 4:
             self.cycles = 0
+        if kind == 'hpok':
+            # ('hpok', frac): the active character below frac of max HP -> soft reset (A+B+START+SELECT) and the
+            # retry stretch again from its save (as after a game over: the title, Continue, one more luck punch)
+            s = status(e)
+            if s['p'] is None or s['scene'] > 0:
+                return self.mash_a() if s['scene'] else 0
+            rec = 0x03001560 + 0x68 * e.r8(0x03001068)
+            hp, mx = e.r16(rec + 0x16), e.r16(rec + 0x18)
+            if hp * 100 >= mx * int(g[1] * 100) or self.retry_k is None:
+                self.next_goal()
+                return None
+            self.tries += 1
+            if self.tries >= 10:
+                self.cycles = getattr(self, 'cycles', 0) + 1
+                self.tries = 0
+                if self.cycles > 3:
+                    raise RuntimeError('hpok: forty resets')
+            self.prog += [A | B | S | E] * 10 + [0] * 5
+            self.k = self.retry_k - 1
+            self.next_goal()
+            return self.prog.pop(0)
         if kind == 'allocfor':
             # ('allocfor', c, tab_moves, fn): character c's unspent points n -> fn(n), spent on the Status page
             # opened on the active character's tab and moved `tab_moves` tabs right
@@ -281,11 +302,13 @@ def goals_run2(e):
         # the pad -> the Giant Crater: Ultimate Gohan vs Super Buu by punches as run 1 (the route's Electric
         # Kamehameha plan lost ten times in a row here too), but eating Curry Plates when low (run 1 never)
         ('unstick',), ('walk', 410, 356), ('talk', 'U'), ('fly', 648, 1076), ('events',), ('wait', 30),
-        ('boss', 40000), ('events',), ('wait', 30),
-        ('retry_off',), ('autoheal', False), ('mark', 'b05_wasteland'),
-        # --- Barren Wasteland (Gohan): a save at 20-1 (run 1 passed it), the story to 20-5 and Gohan's second fight
-        # with Super Buu (a game over: back to 20-1) ---------------------------------------------------------------
-        *[x for _ in range(2) for x in (use_item(0), ('closemenu',), ('wait', 20))],   # up to two Curry Plates before the save
+        ('boss', 40000), ('events',), ('wait', 30), ('mark', 'b05_wasteland'),
+        # --- Barren Wasteland (Gohan) 20-1: the curries; a Gohan left with too little HP for 20-2 .. 20-4 (the Death
+        # Machines killed him forty times in a row from 871) soft-resets and Continues at 4-1 for another crater
+        # fight; then a save at 20-1 (run 1 passed it), the story to 20-5 and Gohan's second fight with Super Buu ---
+        *[x for _ in range(2) for x in (use_item(0), ('closemenu',), ('wait', 20))],   # up to two Curry Plates
+        ('hpok', 0.8),
+        ('retry_off',), ('autoheal', False),
         *checkpoint('c00_20-1', 231, 234, 20, 1), ('autoheal', True),
         *seg('wasteland', 'gohan_vs_buu2'),
         *seg('gohan_vs_buu2', 'fusion_saga'),

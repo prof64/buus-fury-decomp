@@ -45,7 +45,9 @@ const lsSet = (k, v) => {
     localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v));
   } catch {}
 };
-const readSlots = () => [0, 1, 2].map((i) => localStorage.getItem(`wf.save.${i}`) || '');
+// the 3 game slots, then the options block (wf_app::launcher::saves_of / options_of: text speed, volumes) - without
+// it a reload started every game with the default options
+const readSlots = () => [0, 1, 2, 3].map((i) => localStorage.getItem(`wf.save.${i}`) || '');
 
 
 // ------------------------------------------------------------------ ROM check (friendly errors)

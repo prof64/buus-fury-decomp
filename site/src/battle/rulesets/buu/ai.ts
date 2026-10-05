@@ -1874,13 +1874,8 @@ export function create(n: AiNodeJ, c: AiController): RNode {
         e.ctx.buuPacified = 0
         e.setAnim(19, true, true, { rule: 'hold' })
         e.hittable = false
-      }, (f) => {
-        e.z = Math.max(-50, e.z - 1)
-        const t = f < 24 ? f : 8 + ((f - 8) % 16)
-        e.ea.pos.tick = t
-        e.ea.pos.frame = t >> 3
-        return false
-      }, () => (e.hittable = true))
+        e.hoverCtl = true
+      }, () => false, () => (e.hittable = true))
     case 'BabidiGesture':
       // the landing. Enter 0x0802AE76: SetAnimRaw(0x13) under the controller 0x03003024; tick 0x0802AE3A: down 1 px
       // a frame; on the ground 8 ticks, then SetAnim(0) (idle rand(255)) and the node (0x0802AE98) is finished

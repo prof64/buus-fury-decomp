@@ -448,6 +448,9 @@ pub struct Field {
     /// frames with the lag)
     #[serde(default)]
     pub hud_hidden_at: Option<u32>,
+    /// a deferred call started an event at this frame's start (`fieldobj::Deferred::Run`): the update holds the players
+    #[serde(default)]
+    pub event_started_pre: bool,
 }
 
 /// how a field session starts
@@ -665,6 +668,7 @@ fn new_field() -> Field {
         scene_loading: false,
         hud_beep: 0,
         hud_hidden_at: None,
+        event_started_pre: false,
     }
 }
 

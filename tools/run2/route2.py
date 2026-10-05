@@ -109,8 +109,8 @@ SEGMENTS.append(('s_ship', ('KEYS', 'work/run2/parts/s_ship.json')))
 # the parts still to come, in chain order (segments.md §0 "run 2 hand-off"): each is played from the chain's end
 # state (work/run2/end.ss, play2.py) and handed over as work/run2/parts/<name>.json {"keys": [...]}; uncomment as
 # they land
-# SEGMENTS.append(('f_fat', ('KEYS', 'work/run2/parts/f_fat.json')))            # soak agent: fat Buu
-# SEGMENTS.append(('j_janemba', ('KEYS', 'work/run2/parts/j_janemba.json')))    # soak agent: Janemba
+SEGMENTS.append(('f_fat', ('KEYS', 'work/run2/parts/f_fat.json')))            # soak agent: fat Buu
+SEGMENTS.append(('j_janemba', ('KEYS', 'work/run2/parts/j_janemba.json')))    # soak agent: Janemba
 # SEGMENTS.append(('b_superbuu', ('KEYS', 'work/run2/parts/b_superbuu.json')))  # side-content: Super / Kid Buu
 
 
