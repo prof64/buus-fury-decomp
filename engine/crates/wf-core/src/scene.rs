@@ -4101,6 +4101,7 @@ pub const CREDITS_LEN: i32 = 3600;
 
 /// `open_area` / `block_area` (+ `_alt`): set / clear the 8x8 tiles of [x0>>3, (x1+7)>>3) x [y0>>3, (y1+7)>>3)
 pub fn set_area(w: &mut World, rect: [i32; 4], main: bool, open: bool) {
+    if std::env::var_os("COIN_DBG").is_some() { eprintln!("SETAREA frame {} {:?} main {} open {}", w.frame, rect, main, open); }
     w.scene.area_ops.push(AreaOp { rect, main, open });
     apply_area(w, rect, main, open);
 }

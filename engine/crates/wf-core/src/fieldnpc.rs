@@ -672,6 +672,8 @@ pub fn interact(w: &mut World, pi: usize) -> bool {
         }
     }
     let f = w.field.as_ref().unwrap();
+    if std::env::var_os("XRS").is_some() { for t in &f.triggers { eprintln!("XRS trig {:?} {:?} rect {:?} last {} p ({}, {})", t.obj, t.act, t.rect, t.last, px, py); } }
+    let f = w.field.as_ref().unwrap();
     f.triggers.iter().any(|t| {
         matches!(
             t.act,

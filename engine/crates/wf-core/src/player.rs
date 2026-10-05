@@ -1516,6 +1516,7 @@ pub fn gain_xp_levels(w: &mut World, i: usize, exp: i64) -> bool {
 // ---- update -----------------------------------------------------------------------------------------------------------
 
 pub fn update(w: &mut World, i: usize) {
+    if std::env::var_os("XRS").is_some() { eprintln!("XRS player update frame {} input {} gs {:?} busy {:?}", w.frame, w.input[0].held, pr(w, i).gs, w.field.as_ref().map(|f| f.busy)); }
     // the world map's flying player (fieldworld.rs) replaces the 2D player's states
     if crate::fieldworld::flyer_update(w, i) {
         return;
@@ -2054,6 +2055,7 @@ fn swap_to_partner(w: &mut World, i: usize) {
 
 /// the state's control (vtable +8)
 fn control(w: &mut World, i: usize) {
+    if std::env::var_os("XRS").is_some() { eprintln!("XRS control frame {} input {} pressed {} gs {:?} can {:?}", w.frame, w.input[0].held, w.input[0].pressed, pr(w, i).gs, pr(w, i).state); }
     if pr(w, i).gs == Gs::Stone {
         return ctl_stone(w, i);
     }

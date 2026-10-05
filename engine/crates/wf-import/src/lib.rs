@@ -2413,6 +2413,31 @@ fn import_death_effects(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
             continue;
         }
         let script = ram.r32(o + 0x18);
+        // an on-defeat callback (+0x1C) whose enemy (+0x20) is already gone from the object list (not imported): the
+        // callback from its area def (the enemy's +0x228 points 8 bytes before it), after the same countdown; a drop
+        // script goes on below. Run 2 cut 1,682,927 (21-8): a Blister dead at the cut, coins + open_area(172, 120,
+        // 196, 136) to come - ours lost the callback, the walk grid stayed blocked and its coins never flew (sound 44
+        // missing at 1,683,032)
+        if ram.r32(o + 0x1C) != 0 {
+            let eo = ram.r32(o + 0x20);
+            let (x, y) = (ram.s32(eo + 0x1A0), ram.s32(eo + 0x1A4));
+            let alive = (0..w.ents.len()).any(|k| !w.ents[k].removed && matches!(w.ents[k].body, Body::Enemy(_)) && w.actor(k).is_some_and(|a| a.x == x && a.y == y));
+            let rom = ram.r32(eo + 0x228).wrapping_add(8);
+            let def = (!alive)
+                .then(|| w.field.as_ref().and_then(|f| w.data.field.as_ref()?.area(f.area.world, f.area.area)))
+                .flatten()
+                .and_then(|a| a.objects.iter().find(|d| d.rom == rom).cloned());
+            if let Some(wf_core::fieldcontent::ObjKind::Enemy { ty, on_defeat: Some(run), .. }) = def.map(|d| d.kind) {
+                let left = ram.s32(o + 4).max(0) as u32;
+                let cause = field::Cause::Defeat { entity: wf_core::world::EntityId::MAX, ty, x: x >> 8, y: y >> 8, loot: Some((ram.s32(o + 8), ram.s32(o + 0xC), ram.s32(o + 0x10), ram.s32(o + 0x14))) };
+                if let Some(f) = w.field.as_mut() {
+                    f.defeat_later.push((w.frame + left, run, cause));
+                }
+                if script == 0 {
+                    continue;
+                }
+            }
+        }
         // no drop script, an on-defeat callback (+0x1C, its enemy object +0x20): the enemy's area def's `on_defeat`
         // after the countdown (`defeat_later`; the enemy is defeated - out of the placed list). Real run 007,
         // whole-run cut 756,613: Pilaf's machine down, s003's level-up running, s365 to come

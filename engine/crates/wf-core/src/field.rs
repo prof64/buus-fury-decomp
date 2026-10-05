@@ -2012,6 +2012,7 @@ pub fn post_step(w: &mut World) {
         }
     }
     let resumed = w.field.as_ref().is_some_and(|f| f.resume_held);
+    if std::env::var_os("XRS").is_some() { eprintln!("XRS frame {} resumed {} ended {:?} raw_input {:?} input {:?} busy {:?}", w.frame, resumed, w.field.as_ref().map(|f| f.event_ended), w.field.as_ref().and_then(|f| f.raw_input.map(|r| r[0].held)), w.input[0].held, w.field.as_ref().map(|f| f.busy)); }
     if resumed {
         // the held update is the rest of the frame the event interrupted: NPCs run their normal update in it, without
         // the extra tick of an event's last frame (story playthrough: King Kai's idle tick after Pikkon's mid-fight
@@ -2348,6 +2349,7 @@ fn defeats(w: &mut World) {
         .as_ref()
         .map(|f| (f.area.world, f.area.area))
         .unwrap_or_default();
+    if std::env::var_os("COIN_DBG").is_some() { eprintln!("DEFEATS frame {} placed {:?} enemies {:?}", w.frame, placed.iter().map(|p| (p.0, p.1)).collect::<Vec<_>>(), w.enemies); }
     for (id, obj, lx, ly) in placed {
         match w.enemy_by_id(id) {
             Some((_, e)) if !e.defeated => {
