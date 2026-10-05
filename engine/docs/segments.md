@@ -241,14 +241,21 @@ want any of mine or not those two.
   talk - the three enemies go idle with a fresh rand(255) and the game does not tick it that frame; ours had, a tick
   ahead for 400 frames (10 cel frames at the blinks). Every segment's matched count unchanged (811,832), gates and the
   whole-run check green (run 1 exact).
-* Left (single frames): `dr4_006_15-3` f304 / `dr4_061_15-13` f303 - an enemy updated twice in the frame after the
-  player's charge object (vt 0x0804B358) goes (the list compaction's second update, `list_redo`, not modelled for that
-  object); `rj03_045_18-1` f251 (a Janemba hand one cel ahead at its controller's start); `sb_012_20_06` f2015 (the
-  Super Buu agent's chapter).
-*sound_legs.py re-run on this tree (2026-10-05, after the cel fixes and the others' rounds): **12 iterations
-differ**, all in the Super / Kid Buu part (side-content agent): the punch sound pair 48 .. 51 (11 iterations,
-1,605,710 .. 1,917,118) and sound 44 game only (1,683,032). The opening, Earth, credits, beam and `stop 3` items are
-gone. (A leg's first row after a cut no longer counts the import's own song restart - 4 false hits of `song 8`.)*
+* **Done (B): the three single frames left of mine** (cel 28 -> 25: 24 are the Super Buu agent's `sb_006` / `sb_007`,
+  1 `sb_012_20_06` f2015):
+  - `dr4_006_15-3` f301 / `dr4_061_15-13` f303 - **the item-get's end completes the object pass its start
+    interrupted**: the enemies older than the player (not updated in the pickup's frame) tick their animation again
+    when the presentation's loop returns (the object 15 in the recording is the item icon, vt 0x0804B358, not a
+    charge effect). `Field::item_get_rest` (world.rs, at the start), `fieldobj::item_get_step` (at the take, pickups
+    without an event; animation only - a whole second update moved the enemy off the game's: INFERRED).
+  - `rj03_045_18-1` f251 - **HandSink's first update does not rewrite the hand's frame** (tick 104 still, the
+    strike's last cel 12 shows, not 104 >> 3 = 13); from the second update the reverse cel as before.
+  Every segment's matched count unchanged (811,832), gates, the pixel test and the whole-run check green.
+*sound_legs.py re-run on this tree (2026-10-05, latest; 486 legs, 1,964,420 rows replayed exactly): **14 iterations
+differ**, all in the Super / Kid Buu part: the punch sound pair 48 .. 51 (11 iterations, 1,631,398 .. 1,917,118 ->
+importer agent, its fix not in this tree yet) and sound 44 game only (3: 1,683,032, 1,774,198, 1,779,633 ->
+side-content agent). The opening, Earth, credits, beam and `stop 3` items are gone. (A leg's first row after a cut no
+longer counts the import's own song restart.)*
 
 ## 1. One-command workflow
 
