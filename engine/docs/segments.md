@@ -5329,3 +5329,24 @@ banner on 6-1's reload, as the game); a worm head's WormSpawnBody re-entry remov
 a frame late in ours - cause not found), 19-3 c1617636 / 8-71 c594120 (sprite memory), c1639933 (the saved room's
 leader state vt 0x0804DE58 not imported). Gates green; whole-run / exit-fade / run-2 / area-entry sweeps unchanged.
 *Note (A): whole-run cut point c631836 (fat 003, 8-3) went 2 / 2 -> 0 / 2 between 9039360 and 27be6d8, not from A's import change (9039360 + it: still 2 / 2): pos of sprite 269 (an enemy, IfPlayerWithin2 / RunMotionController AI) 436.42 vs game 437.89 at f0. Owner of the enemy-animation / AI commits in that range, please check (`SEGMENT_DIR` with `/tmp/wrcuts/c631836.json`).*
+
+**Run 2, 159,858 -> 161,796 (Earth agent, 2026-10-05).** Gates, full suite and `check.sh` (both runs) green; run 2
+exact from power-on to 161,796. (The coordinator's red earth_2_90_2 / run 1 137,897 was my in-flight RunScript
+experiment below, reverted.)
+* **Measured (emulator, `work/earth/timing/order2.py`):** in s120's exit frame (159,856) the order is: the scene depth
+  write 1 -> 0 (pc 0x080125C4), then Goten's AI tree (0x08018F0C), then the frame's draw pass (0x080115B0). An event
+  started by a deferred call runs as the game's nested loop - the script steps before every object - so its exit frame
+  is a normal pass for all objects, the ones the event spawned too. Not a general "scripts resume before the
+  objects": the ordinary event's exit keeps its watermark rule (only objects older than its scene object).
+* Fix (narrow): such an event's watermark is "everything" (`event_watermark = EntityId::MAX` when
+  `Field::event_started_pre` at its Enter), and its from-wait exit also runs the players' release update (their form
+  controller: the Super Saiyan drain steps in that frame - game RAM 0x3001560 + 0x68 ci + 0x1E / player +0x22C -> +0x14,
+  `work/earth/timing/sswatch.py`), the held frame's owed tick included.
+* **161,796 - open:** the Super Saiyan revert out of the gauge comes a frame late. The drain accumulator still lags
+  one step: (a) the game holds the drain in the frame a RunScript's event object first runs (160,375: s121 from
+  Goten's AI - the event object runs first in the pass, the player after it, held); (b) the game steps the drain in
+  s121's exit frame (161,333: an ordinary from-wait exit - the players are older than the event's scene object).
+  Doing (a) as "RunScript starts at the next frame's start" broke run 1 (135,897) and earth_2_90_2 - reverted; holding
+  only the form controller in that frame matched 160,375 but (a) + (b) together still need the exit frame's player
+  release for ordinary from-wait exits, which earlier changed run 1 / 2-90 (s121's own `queued` rule, field.rs). Next:
+  measure the 2-90 s121 exit with sswatch.py against both run-1 rows before widening either.
