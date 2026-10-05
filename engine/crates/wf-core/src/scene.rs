@@ -3716,6 +3716,19 @@ pub fn open_text(
             d.fades = f;
         }
     }
+    // opened in a menu's last fade-in iteration (the event resumed from the shop native, the object pass still to
+    // come in the game's iteration): the box's first update reads this iteration's B, which closes it at once
+    // (level 1; run 3 row 891,908 - Papaya Island's food stall s258, B on the "Goodbye!" box's first frame, the
+    // event on at 891,917)
+    if kind != 3 && w.menu.faded_in_iter && w.input[0].pressed & B != 0 {
+        if let Some(d) = w.scene.dialog.as_mut() {
+            d.result = Some(if d.options > 0 { -1 } else { 0 });
+            d.phase = DialogPhase::Closing;
+            d.t = DIALOG_CLOSE - 1;
+        }
+        crate::vram::release(w, crate::vram::Owner::Cursor);
+        crate::vram::text_close(w);
+    }
     // the box's creation is a long main-loop iteration (`Options::sim_lag`): `sndsim::dialog_frames`
     if w.opts.sim_lag && kind != 3 {
         let chars = w

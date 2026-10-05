@@ -144,6 +144,7 @@ impl Session {
         w.g.shake_ended = false;
         w.input = inputs;
         w.menu.closing_iter = false;
+        w.menu.faded_in_iter = false;
         // the soft reset (A + B + SELECT + START held): the game from its boot code (menu/title.rs `reset_world`)
         if inputs[0].held & crate::menu::title::RESET_KEYS == crate::menu::title::RESET_KEYS {
             *w = crate::menu::title::reset_world(&self.data, w);

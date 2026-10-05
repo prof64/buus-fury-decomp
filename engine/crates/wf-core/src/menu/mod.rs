@@ -439,6 +439,10 @@ pub struct Menu {
     /// the pause's fade-in; the game reopens it 2 iterations after the fade-in's last one, ours reopened in it)
     #[serde(default)]
     pub closing_iter: bool,
+    /// the fade-in's last step ran in this frame (cleared at the next frame's start): a text box the event opens in
+    /// it (its script resumed from the menu native) has its first update in this iteration (`scene::open_text`)
+    #[serde(default)]
+    pub faded_in_iter: bool,
     /// the game options (`0x03001914`: text speed, SFX volume, music volume, 0; the cartridge's options block,
     /// shared by every save): kept across menus (options.rs)
     #[serde(default)]
@@ -845,6 +849,7 @@ fn step_inner(w: &mut World) {
             if l == 0 {
                 w.menu.phase = Phase::Idle;
                 w.menu.shown = None;
+                w.menu.faded_in_iter = true;
             } else {
                 w.menu.phase = Phase::FadeIn { level: l };
             }

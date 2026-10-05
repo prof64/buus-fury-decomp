@@ -1,0 +1,239 @@
+"""Run 3's fat-Buu chapter (`f3_fat`; engine/docs/segments.md "Run 3"), recorded from the ship part's end (8-70 after
+Majin Buu) with run 2's pieces (tools/run2/fat2.py: their goals and drivers, unchanged) played in a third Dragon Ball
+order and with run 3's stresses between them. Input only.
+
+Order (run 2: radar, bandana, grind_goten, airship, fukurou, pyramid, desert, pilaf, thieves, nataday, dbx): the
+Earth dungeons before the ship-side ones - radar, bandana, grind_goten, desert, pilaf, thieves, airship, pyramid,
+fukurou, nataday, dbx.
+
+Stresses between the pieces (each piece starts in the field or on the world map after its predecessor): the pause
+menu opened and closed as fast as it takes input (three times), every pause page both ways (in a 2D area; the
+skill cursor the pages' L / R move is put back on slot 0 after), START on alternate frames for 60 frames; then B
+until the field runs again.
+
+`python3 tools/run3/fat3.py PIECE START.ss START.eeprom` plays one piece (with its stress interlude first) from a
+state + cartridge save -> work/run3fat/<PIECE>.{ss,eeprom,keys.json}; `--all START.ss START.eeprom` plays them all in
+order (each from the previous one's end); `--part` joins the pieces' logs into work/run3/parts/f3_fat.json."""
+import json
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+for d in ('tools/superbuu', 'tools/run2', 'tools/run3'):
+    if str(ROOT / d) not in sys.path:
+        sys.path.insert(0, str(ROOT / d))
+import fat2  # noqa: E402  (puts the live ship driver first on the path)
+from route import status  # noqa: E402
+
+KEY = fat2.KEY
+ORDER = ['radar', 'bandana', 'grind_goten', 'desert', 'grind_trunks', 'pilaf', 'thieves', 'airship', 'pyramid',
+         'fukurou', 'nataday', 'dbx']
+OUT = ROOT / 'work' / 'run3fat'
+
+
+def menu_open(e):
+    s = status(e)
+    return s['p'] is None and s['scene'] == 0
+
+
+class Interlude:
+    """the stresses between pieces, closed-loop on the emulator state: a field with the leader first (B until then),
+    three pause spins (START, wait for the menu, START, wait for the field), the pause pages R x5 / L x5, START on
+    alternate frames for 60 frames, B until the field runs for 30 frames"""
+
+    def __init__(self):
+        self.ph = 'settle'
+        self.t = 0
+        self.n = 0
+        self.prog = None
+        self.k = 0
+        self.goals = ['interlude']
+        self.idle = 0
+
+    def done(self):
+        return self.ph == 'done'
+
+    def field(self, e):
+        s = status(e)
+        return s['p'] is not None and s['scene'] == 0
+
+    def keys(self, e):
+        self.t += 1
+        if self.t > 20000:
+            raise RuntimeError(f'interlude stuck in {self.ph} {status(e)}')
+        if self.ph == 'settle':
+            if self.field(e):
+                self.idle += 1
+                if self.idle >= 30:
+                    self.ph, self.idle, self.sub = 'spin', 0, 0
+                    # (the pause pages' L / R also move the skill cursor: the piece gets slot 0 - the Energy Blast its
+                    # goals expect, e.g. db2's rocks - after)
+                    self.slot = 0
+                return 0
+            self.idle = 0
+            return KEY.B if self.t % 30 < 3 else 0
+        if self.ph == 'spin':
+            if self.n >= 3:
+                # the pause pages both ways (R / L in the menu) only in a 2D area: there they also move the skill
+                # cursor, which the 'slot' phase puts back; on the world map the flyer has no skill to restore
+                self.prog = []
+                if status(e)['area'][:2] != [0, 50]:
+                    self.prog = [KEY.START] + [0] * 40
+                    for k in [KEY.R] * 5 + [KEY.L] * 5:
+                        self.prog += [k] + [0] * 24
+                    self.prog += [KEY.B] + [0] * 30
+                self.ph = 'tour'
+                return 0
+            up = menu_open(e)
+            self.sub += 1
+            st = getattr(self, 'st', 'open')
+            if st == 'open':
+                if up:
+                    self.st, self.sub = 'close', 0
+                    return 0
+                if self.sub > 240:
+                    # (the pause does not open here: the refused presses were the stress)
+                    self.n, self.sub = 3, 0
+                    return 0
+                return KEY.START if self.sub % 40 == 1 else 0
+            # close as soon as the menu takes input (START every 2 frames until the field is back)
+            if not up:
+                self.st, self.sub = 'open', 0
+                self.n += 1
+                return 0
+            if self.sub > 600:
+                raise RuntimeError(f'interlude: the pause does not close {status(e)}')
+            return KEY.START if self.sub % 2 == 1 else 0
+        if self.ph == 'tour':
+            if self.prog:
+                return self.prog.pop(0)
+            self.ph, self.t2 = 'mash', 0
+            return 0
+        if self.ph == 'mash':
+            self.t2 += 1
+            if self.t2 > 60:
+                self.ph, self.idle = 'out', 0
+                return 0
+            return KEY.START if self.t2 % 2 == 0 else 0
+        if self.ph == 'out':
+            if self.field(e):
+                self.idle += 1
+                if self.idle >= 30:
+                    self.ph, self.t3 = ('slot' if status(e)['area'][:2] != [0, 50] else 'done'), 0
+                return 0
+            self.idle = 0
+            return KEY.B if self.t % 30 < 3 else 0
+        if self.ph == 'slot':
+            # L (2 frames on, 12 off) until the skill slot the piece started with is selected again
+            self.t3 += 1
+            if e.r8(0x03001560 + 0x68 * e.r8(0x03001068) + 0x15) == self.slot and self.t3 % 14 == 0:
+                self.ph = 'done'
+                return 0
+            if self.t3 > 600:
+                raise RuntimeError(f'interlude: skill slot {self.slot} not reached {status(e)}')
+            return KEY.L if self.t3 % 14 < 2 else 0
+        return 0
+
+
+def bandana3(e):
+    """run 2's bandana piece with its hunt made safe to lose: Trunks, the Z-Mart food, then a Save at West City 4-1's
+    save point and the world-map hunt for the Bandana (126) under a Retry - each game over (Trunks dies to the
+    encounters) continues from that save and hunts again (run 2's own hunt also let him die; its stored piece was a
+    lucky search)"""
+    g = fat2.g_bandana(e)
+    k = g.index(('hunt', 126))
+    pre = g[:k - 5]          # up to the take-off walk (take_off = 5 goals)
+    hunt = g[k - 5:]
+    return fat2.Chain([
+        lambda e: fat2.Driver2(pre + fat2.save_at(4, 1)),
+        lambda e: fat2.Retry([lambda e: fat2.Driver2(list(hunt))],
+                             [fat2.DEATH_CONTINUE, ('until', 4, 1), ('wait', 30)], tries=25),
+    ])
+
+
+def grind_trunks3(e):
+    """Pilaf's Castle's gate s517 wants Trunks at level 80 (run 2 got him there in the ship-side dungeons it played
+    first): Southwest Forest 8-1's save point, Trunks, his levels to 80 in 8-6 / 8-3, Goten again, the pad"""
+    return fat2.Driver2([
+        ('wait', 60), fat2.SW_FOREST, ('wait', 30),
+        fat2.nav(8, 1, False), ('unstick',), ('walk', 148, 186), *fat2.charsel(1),
+        ('grind', 80, [(8, 6), (8, 3)]),
+        fat2.nav(8, 1, False), ('unstick',), ('walk', 148, 186), *fat2.charsel(-1),
+        fat2.nav(8, 1, False), ('unstick',), *fat2.take_off(280, 266),
+    ])
+
+
+def driver3(name, e):
+    if name == 'bandana':
+        return bandana3(e)
+    if name == 'grind_trunks':
+        return grind_trunks3(e)
+    return fat2.driver(name, e)
+
+
+def play(drv, e, keys, cap, label):
+    prev = None
+    while not drv.done():
+        if len(keys) >= cap:
+            raise RuntimeError(f'{label}: cap')
+        k = drv.keys(e) or 0
+        e.set_keys(k)
+        e.run(1)
+        keys.append(k)
+        s = status(e)
+        if (s['area'][:2], drv.k) != prev:
+            prev = (s['area'][:2], drv.k)
+            g = drv.goals[drv.k] if not drv.done() and drv.k < len(drv.goals) else None
+            print(label, len(keys), s, 'goal', drv.k, str(g)[:70], flush=True)
+
+
+def one(name, start, eeprom, cap=400000):
+    import sbemu
+    from route import start_emu
+    OUT.mkdir(parents=True, exist_ok=True)
+    e = start_emu(str(Path(start).resolve()))
+    sbemu.sd_write(e, Path(eeprom).read_bytes())
+    keys = []
+    try:
+        play(Interlude(), e, keys, cap, f'{name}/interlude')
+        play(driver3(name, e), e, keys, cap, name)
+    except Exception as ex:  # noqa: BLE001
+        e.save_file(str(OUT / f'{name}.fail.ss'))
+        (OUT / f'{name}.fail.eeprom').write_bytes(sbemu.sd_read(e))
+        e.screenshot(str(OUT / f'{name}.fail.png'), 2)
+        (OUT / f'{name}.fail.keys.json').write_text(json.dumps(keys))
+        print('FAIL', name, len(keys), ex, status(e), flush=True)
+        return False
+    e.set_keys(0)
+    e.save_file(str(OUT / f'{name}.ss'))
+    (OUT / f'{name}.eeprom').write_bytes(sbemu.sd_read(e))
+    (OUT / f'{name}.keys.json').write_text(json.dumps(keys))
+    print('done', name, len(keys), status(e), flush=True)
+    return True
+
+
+def main():
+    a = sys.argv[1:]
+    if a[0] == '--part':
+        keys, sizes = [], {}
+        for p in ORDER:
+            k = json.loads((OUT / f'{p}.keys.json').read_text())
+            keys += k
+            sizes[p] = len(k)
+        (ROOT / 'work' / 'run3' / 'parts' / 'f3_fat.json').write_text(json.dumps(keys))
+        print('f3_fat', len(keys), sizes)
+        return
+    if a[0] == '--all':
+        st, ee = a[1], a[2]
+        i0 = ORDER.index(a[a.index('--from') + 1]) if '--from' in a else 0
+        for name in ORDER[i0:]:
+            if not one(name, st, ee):
+                sys.exit(1)
+            st, ee = str(OUT / f'{name}.ss'), str(OUT / f'{name}.eeprom')
+        return
+    if not one(a[0], a[1], a[2]):
+        sys.exit(1)
+
+
+if __name__ == '__main__':
+    main()

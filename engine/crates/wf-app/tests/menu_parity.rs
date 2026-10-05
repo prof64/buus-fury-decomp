@@ -117,6 +117,19 @@ fn tear(hs: &[String], k: usize) -> bool {
     k > 0 && k + 1 < hs.len() && hs[k] != hs[k - 1] && hs[k] != hs[k + 1] && hs[k - 1] != hs[k + 1]
 }
 
+/// a scanout tear in a one-frame iteration: the capture's picture `k` is the next picture except one band of at
+/// most a tile row (8 lines) still holding older content (a VRAM write that finished during the scanout, e.g. a
+/// nested mode's box drawn from a press handler: title_dojo frame 171, rows 64..67 of its top edge); needs the
+/// work/ PNGs
+fn split_tear(d: &Path, k: usize) -> bool {
+    let png = |j: usize| load_png(&d.join(format!("f{j:04}.png")));
+    let (Some(b), Some(c)) = (png(k), png(k + 1)) else {
+        return false;
+    };
+    let bad: Vec<usize> = (0..160).filter(|&y| b[y * 240..y * 240 + 240] != c[y * 240..y * 240 + 240]).collect();
+    !bad.is_empty() && bad.len() <= 8 && bad[bad.len() - 1] - bad[0] + 1 == bad.len()
+}
+
 fn dir() -> PathBuf {
     std::env::var("WF_MENU_DIR").map(PathBuf::from).unwrap_or_else(|_| wf_rom::testutil::repo_root().join("work/buu/menu"))
 }
@@ -296,7 +309,7 @@ fn run(packs: &Packs, data: &Arc<wf_core::content::GameData>, name: &str) -> Opt
         // a torn picture needs a VRAM copy still running at the scanout: only around a long iteration (frames
         // without a mode-loop tick); screens redrawn every frame (overlays, credits) never tear
         let long_iter = lf[k] == lf[k - 1.min(k)] || (k + 1 < lf.len() && lf[k + 1] == lf[k]);
-        if k > 0 && tear(&hs, k) && long_iter && !v.menu.as_ref().is_some_and(|m| m.overlay) {
+        if k > 0 && tear(&hs, k) && (long_iter || split_tear(&d, k)) && !v.menu.as_ref().is_some_and(|m| m.overlay) {
             tears += 1;
             if log {
                 eprintln!("{name} {k:4} keys {keys:03x} tear frame (VRAM copy during the scanout), not compared");

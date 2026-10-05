@@ -95,7 +95,7 @@ SCENARIOS = {
                                       '-:30', 'B:7', '-:60', 'B:7', '-:66'], title_open()),
     # Multiplayer -> Dojo with no link cable
     'title_dojo': (T, None, ['-:7'], ['-:20', 'A:7', '-:40', 'DOWN:7', '-:30', 'A:7', '-:60', 'A:7', '-:240', 'B:7', '-:120',
-                                     'B:7', '-:120'], title_open()),
+                                     'B:7', '-:126'], title_open()),
     # Multiplayer -> Trading Post with no link cable
     'title_trade': (T, None, ['-:7'], ['-:20', 'A:7', '-:40', 'DOWN:7', '-:30', 'A:7', '-:60', 'DOWN:7', '-:30', 'A:7', '-:240',
                                       'B:7', '-:120', 'B:7', '-:120'], title_open()),

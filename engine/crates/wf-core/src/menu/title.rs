@@ -18,7 +18,10 @@
 //! * OPTIONS → the options page (vt `0x0804A430`, `TPage::Options`, options.rs `Options::new_title`): the three
 //!   sliders and Credits; B back to the title (cursor on START).
 //!
-//! Not reproduced: Multiplayer (link cable), the arrows around a saved slot's chosen character (`0x08005E9A`).
+//! * Multiplayer → Dojo / Trading Post (vt `0x0804B5AC`, `TPage::Multi`; B back to Single / Multiplayer); either
+//!   runs the link box "Waiting for a friend..." (vt `0x0804AEBC`) - with no link cable it only ends with B.
+//!
+//! Not reproduced: the link play itself (no cable).
 
 use super::kit::{
     self, Button, Container, Cursor, ItemCtl, Label, Widget, BTN_A, BTN_B, BTN_L, BTN_R,
