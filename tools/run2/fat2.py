@@ -94,8 +94,10 @@ def g_radar(e):
 
 def g_bandana(e):
     """West City: Trunks at the save point (run 1 the same, he is the one the Stolen Airship's bandits drop the
-    Bandana for: level <= 70), Z-Mart (s030): six of the second food row (run 1: five Hamburgers, the third row),
-    then the world map encounters until the Bandana (equipment 126) drops"""
+    Bandana for: level <= 70), Z-Mart (s030): Chicken Legs, the second food row (run 1: five Hamburgers), then the world
+    map encounters until the Bandana (equipment 126) drops. (The stored piece = these goals' keys to the take-off spot
+    + re/buu/ship/hunt_search.py's 0-punch run from there: its first try that got the Bandana before Trunks passed 70;
+    this goal list's own hunt let him die.)"""
     return [
         nav(4, 1, False), ('unstick',), ('walk', 148, 594), *charsel(1),
         ('unstick',), ('walk', 264, 310), ('hold', U, 40), ('wait', 30),
@@ -735,5 +737,29 @@ def main():
     print('done', name, len(keys), status(e))
 
 
+# the chain's parts (work/run2/parts/<name>.json, segments.md "Run 2 hand-off"), pieces in order of play
+PARTS = {
+    'f_fat': ['radar', 'bandana', 'grind_goten', 'airship', 'fukurou', 'pyramid', 'desert', 'pilaf', 'thieves',
+              'nataday', 'dbx'],
+    'j_janemba': ['j_intro', 'j_grind', 'j_hfil', 'j_maze', 'j_back', 'j_vegeta', 'j_gate', 'j_arena'],
+}
+
+
+def write_parts():
+    """`--parts`: work/run2fat/<piece>.keys.json joined into work/run2/parts/<part>.json"""
+    for part, pieces in PARTS.items():
+        keys, sizes = [], {}
+        for p in pieces:
+            k = json.loads((ROOT / 'work' / 'run2fat' / f'{p}.keys.json').read_text())
+            keys += k
+            sizes[p] = len(k)
+        (ROOT / 'work' / 'run2' / 'parts' / f'{part}.json').write_text(
+            json.dumps({'keys': keys, 'pieces': sizes, 'by': 'dungeon agent B, tools/run2/fat2.py'}))
+        print(part, len(keys), sizes)
+
+
 if __name__ == '__main__':
-    main()
+    if '--parts' in sys.argv:
+        write_parts()
+    else:
+        main()

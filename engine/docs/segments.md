@@ -113,7 +113,18 @@ it (the commented `f_fat` line). Pieces, and how they differ from run 1:
   a Save at 9-1, **two game overs** (9-5's Juggernaut) -> Continue. `nataday` (98,660): a Save at 15-1, **two game
   overs at Broly** -> Continue, Goten's points END / POW. `dbx` (38,458): five Hamburgers (run 1: six Onigiri), Goku's
   points into STR / POW / END (run 1: STR / END).
-Next: `j_janemba` from the end of `f_fat`.
+**Handed over: `work/run2/parts/j_janemba.json` (222,029 frames from the end of `f_fat`; ends at HFIL 18-14 after
+Janemba, flag 125 set, Goku controllable - where run 1's `050_j_arena_end` ends, at (88, 144) instead of (160, 260))**,
+verified in the same session check (`verify_chain.py`, every piece's end equal). Both parts:
+`python3 tools/run2/fat2.py --parts` (from `work/run2fat/<piece>.keys.json`). Side-content agent: please append it
+after `f_fat` (the commented `j_janemba` line). Pieces: `j_intro` (7,027: the prologue, the ogre up into s022,
+Snakeway -> 1-5 s066 -> the Other World map -> 18-1), `j_grind` (95,613: Goku to 92 on 18-12 / 18-1's Hands, to 116
+on 18-2's Living Dead; run 1: 90 / 120), `j_hfil` (10,492: the side agent's route to 18-10 - 18-8's east strip
+needed a diagonal: a stuck-detector `Unjam` around the driver), `j_maze` (15,036: the gate maze with **no** punches
+first - run 1 needed 8; a search 0 .. 23: 0 gets through), `j_back` (9,916: run 1's way back, Vegeta at 18-1),
+`j_vegeta` (17,722: **Vegeta to 108**, run 1 120), `j_gate` (4,763: the gate, s448, Goku again, his points a quarter
+each STR / POW / END / SPD), `j_arena` (61,460: **a Save at 18-13's save point** - run 1 none - then the arena:
+**five game overs -> Continue** (Janemba twice, Super Janemba's Vegeta round three times) before it is won).
 
 ## 1. One-command workflow
 
