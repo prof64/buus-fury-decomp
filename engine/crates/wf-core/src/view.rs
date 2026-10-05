@@ -785,7 +785,9 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                 // areas without combat (towns, offices) grey the icon out (emulator HUD)
                 skill_alt: !crate::player::can_use_skill(w, pi, skill)
                     || w.field.as_ref().is_some_and(|f| !f.combat),
-                hidden: w.scene.hud_hidden,
+                // (a HUD object a text box's purge suspended is out of the world list: not drawn - real route rkb_168
+                // 14-1 f1,622 .. 1,685: show_hud's new HUD, then s-script's text box on the world map)
+                hidden: w.scene.hud_hidden || crate::vram::owner_suspended(w, crate::vram::Owner::Hud),
                 stat_mark: stat_mark_frame(w),
             });
         }
@@ -799,7 +801,6 @@ fn stat_mark_frame(w: &World) -> Option<u8> {
         return None;
     }
     let it = w.field.as_ref().map(|f| f.iters).unwrap_or(0);
-    if std::env::var("T_SM").is_ok() { eprintln!("SM frame {} iters {} stat_at {} count {}", w.frame, it, v.stat_at, it.wrapping_sub(v.stat_at)); }
     Some(((it.wrapping_sub(v.stat_at) >> 3) & 3) as u8)
 }
 
