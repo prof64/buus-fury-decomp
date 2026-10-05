@@ -147,10 +147,21 @@ fn levelup_fusion(data: &GameData, ram: &GbaRam, st: &mut Story) {
     }
     for f in 0..9usize {
         let fus = ram.r16(REC0 + 0x68 * f as u32 + 2);
-        let parts = [(fus & 0xFF) as i32, (fus >> 8) as i32];
+        // (+0x02: bits 0-3 char A, 4-7 char B, 8-15 the fusion's level byte - `Story::fusion`; the old byte split
+        // matched Trunks only through the level byte: run 2 cut 1,374,599, Goten's hook ran unrecognised)
+        let parts = [(fus & 0xF) as i32, ((fus >> 4) & 0xF) as i32];
         if fus != 0 && parts.contains(&comp) && shown(f) {
             st.levelup_char = Some(comp);
             st.current = f as i32;
+            // the first component's hook: the second's XP comes after it (`fusion_xp_left`) - the XP routine
+            // 0x08013914 is suspended in its first recursive call (return 0x08013963 on the stack; that call's push
+            // {r3-r7, lr} saved the caller's r5 = the XP 12 bytes below the return: run 2 cut 1,374,598, Goten's
+            // hook, Trunks' 52,900 XP and its level rolls next)
+            if comp == parts[0] {
+                if let Some(a) = (0x0300_7000u32..0x0300_8000).step_by(4).find(|&a| ram.r32(a) == 0x0801_3963) {
+                    st.fusion_xp_left = Some((parts[1], ram.r32(a - 0xC) as i64));
+                }
+            }
             return;
         }
     }
@@ -609,6 +620,14 @@ fn import_ai_rt(w: &mut World, ei: usize, lvl: usize, ram: &GbaRam, r: u32, note
             K::GhostAnimA | K::GhostAnimB => {}
             // the worm's ring / links / mailbox (`import_worms`; WormSpawnBody and WormHeadMove keep nothing)
             K::WormBodyFollow | K::WormHeadMove | K::WormSpawnBody => {}
+            // DriftContact (create 0x0802C69C, update 0x0802C6EC; vt 0x0804B640): +4 / +8 the drift step (1/256 px),
+            // +0xC done, +0x10 the frames left of a contact's back-off (16) - run 2 cuts 1,633,618 / 1,692,733, 21-x
+            // Blood Cells: ours drew a fresh step at the import
+            K::DriftContact => {
+                rt.d[0] = ram.s32(r + 4);
+                rt.d[1] = ram.s32(r + 8);
+                rt.d[2] = ram.s32(r + 0x10);
+            }
             k => notes.push(format!("ai runtime of {k:?} (state {:#x} node {n}) not imported", tree.state)),
         }
         rts.push((n, rt));
@@ -840,9 +859,8 @@ fn field_from_ram(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
     // a screen shake running there (vt 0x0804A720: +4 intensity, +5 period, +6 count, +8 frames left, +0xC / +0x10
     // the offset): it draws two RNG values each period (r033_002_6-1 +7,000: every 2 frames, 0x080079F2). Not under
     // an event: the mid-code import takes the running shake with its command (r033_002 +15,000 / +19,000)
-    if w.scene.depth == 0 && ram.valid(slot) && ram.r32(slot) == 0x0804_A720 && ram.s32(slot + 8) > 0 {
-        w.g.shakes = vec![wf_core::world::Shake { intensity: ram.r8(slot + 4) as i32, period: ram.r8(slot + 5) as i32, cnt: ram.r8(slot + 6) as i32, left: ram.s32(slot + 8) }];
-        w.g.shake_off = (ram.s32(slot + 0xC), ram.s32(slot + 0x10));
+    if w.scene.depth == 0 {
+        import_field_shake(w, ram);
     }
     match ram.valid(slot).then(|| ram.r32(slot)) {
         Some(0x0804_D300) => {
@@ -867,6 +885,16 @@ fn field_from_ram(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
             }
         }
         _ => {}
+    }
+}
+
+/// a screen shake running in the mode's camera slot (vt 0x0804A720: +4 intensity, +5 period, +6 count, +8 frames
+/// left, +0xC / +0x10 the offset) - the field's, not a script command's
+fn import_field_shake(w: &mut World, ram: &GbaRam) {
+    let slot = ram.r32(0x0300_2BE0);
+    if ram.valid(slot) && ram.r32(slot) == 0x0804_A720 && ram.s32(slot + 8) > 0 {
+        w.g.shakes = vec![wf_core::world::Shake { intensity: ram.r8(slot + 4) as i32, period: ram.r8(slot + 5) as i32, cnt: ram.r8(slot + 6) as i32, left: ram.s32(slot + 8) }];
+        w.g.shake_off = (ram.s32(slot + 0xC), ram.s32(slot + 0x10));
     }
 }
 
@@ -1408,6 +1436,15 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
             e.ea.rule = d.anim.keep;
             e.ea.done = false;
         }
+        // the walk state (the IWRAM singleton 0x03001B58, vt 0x0804A1D0 - SetAnim(1)) is our "walk" animation even
+        // where the sprite's walk shows the idle's raw (the Enzymes' raw 1: `set_raw` picked the idle) - run 2 cut
+        // 1,719,016, 21-x: a level-up's stop message re-idles the walkers (0x0800E050, a rand(255) each), ours took
+        // them for idle
+        if ram.r32(o + 0x14) == 0x0300_1B58 {
+            if let Some(k) = e.a.sprite.and_then(|s| d.sprite(s)).and_then(|s| s.anims.iter().position(|a| a.name == "walk")) {
+                e.a.anim = Some(k as u16);
+            }
+        }
     }
     // Mini Janemba's roll controller (the singleton 0x03003248 as the object's state, obj+0x14): its counter is the
     // animation tick the RAM row shows; the MiniRollAttack node reads it (run 2 rows 1,318,750 .. 1,319,519: a roll
@@ -1848,6 +1885,13 @@ fn import_patrol(w: &mut World, ei: usize, ram: &GbaRam, o: u32) {
     let Some(p) = f.patrols.iter_mut().find(|p| p.entity == id) else { return };
     p.z = ram.s32(o + 0x1A8);
     p.h = ram.s32(o + 0x1AC);
+    // a wander under way (vt 0x0804B318: the runner's current step; run 2 cut 1,254,433 - an enemy switching back to
+    // its patrol state continued the wander, chance(2048); ours created a fresh step, its idle's rand(255) first)
+    if ram.valid(st) && ram.r32(st) == 0x0804_B318 {
+        let q = |k: u32| [0, 4, 8, 12].map(|d| ram.s32(st + k + d));
+        wf_core::fieldpatrol::import_wander(w, ei, ram.s32(st + 8), (ram.s32(st + 0x18), ram.s32(st + 0x1C)), (ram.s32(st + 0x20), ram.s32(st + 0x24)), q(0x28), q(0x38));
+        return;
+    }
     if !ram.valid(st) || ram.r32(st) != 0x0804_A800 {
         return;
     }
@@ -2663,6 +2707,23 @@ fn import_death_effects(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
     // effect's loot (80, 310); ours dropped (96, 313)'s first and missed a coin, sound 44 at 1,779,633)
     for k in (0..n).rev() {
         let o = ram.r32(0x0300_2260 + 4 * k);
+        // a kill's XP still to come (the delayed call vt 0x0804A820: +4 frames left, 1 = the next frame's start, +8 the
+        // XP; RAM's record is still without it): ours gives it from `xp_due` at the next frame's start, where a
+        // level-up starts hook #3 (run 1 cut 83,786, the frame before a level-up popup: the import dropped the XP)
+        // (inserted at the front: `pre_step` gives `xp_due` newest first, this loop walks the list newest first)
+        if ram.valid(o) && ram.r32(o) == 0x0804_A820 {
+            let (left, xp) = (ram.s32(o + 4), ram.s32(o + 8) as i64);
+            match w.player_idx(0) {
+                Some(pi) if left == 1 && xp > 0 => {
+                    let pid = w.ents[pi].id;
+                    if let Some(f) = w.field.as_mut() {
+                        f.xp_due.insert(0, (pid, xp));
+                    }
+                }
+                _ => notes.push(format!("mid-area: a kill-XP call ({xp} XP, {left} frames left) not imported")),
+            }
+            continue;
+        }
         if !ram.valid(o) || ram.r32(o) != 0x0804_955C {
             continue;
         }
@@ -3107,6 +3168,32 @@ fn build_mid_event(_data: &Arc<GameData>, ram: &GbaRam, runner: &mut StoryHost, 
             notes.push(format!("event s{:03}: a death effect's on-defeat callback started in the cut's frame", ev.0));
             let draws = w.rng.calls.wrapping_sub(calls0);
             return Built { world: w, draws, held: 0, finished: true };
+        }
+        // the engine hook #3 (the level-up popups, s003) a kill's XP started inside the frame's object pass (the punch
+        // that killed: XP -> level -> the hook run inline from the player's update, 0x08011A5F on the stack; the
+        // record is already the levelled one in RAM): it starts as `player::give_xp` starts it, holding the frame
+        // (run 2 cut 1,842,712, Inside Buu: a punch kills, Goku levels)
+        if ev.0 == 3 && held && fresh_trig.is_none() {
+            if let Some(pi) = w.player_idx(0) {
+                let entity = w.ents[pi].id;
+                let slot = w.pl_ref(pi).slot;
+                w.scene.depth = 0;
+                field::set_busy(&mut w, false);
+                if let Some(f) = w.field.as_mut() {
+                    f.event_ended = false;
+                }
+                // (the kill punch's screen shake runs on through the hook: the field's, imported - run 1 cut 267,114)
+                import_field_shake(&mut w, ram);
+                let cause = field::Cause::LevelUp { entity };
+                runner.run_events(&mut w, &[Event::Field(field::FieldEvent::Run { run: Callback::Event(name), cause, slot })]);
+                if let Some(f) = w.field.as_mut() {
+                    f.held = true;
+                    f.held_event = true;
+                }
+                notes.push("event s003: the level-up hook a kill's XP started inside the object pass in the cut's frame".into());
+                let draws = w.rng.calls.wrapping_sub(calls0);
+                return Built { world: w, draws, held: 0, finished: true };
+            }
         }
         // the engine hook #0 (the death script) the KO timer started in the cut's frame (`menu::gameover::tick`: its
         // form revert already in RAM): started as the timer starts it, node 0 next frame (run 2 cuts 1,037,213 /

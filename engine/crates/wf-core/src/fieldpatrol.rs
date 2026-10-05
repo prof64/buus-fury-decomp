@@ -169,37 +169,7 @@ fn create(w: &mut World, i: usize, st: &Step, z: i32) -> StepRt {
         }
         0x0800_A82D | 0x0800_A85F => {
             anim(w, i, 0, true);
-            let spd = wd(0) as i32;
-            let r = ((spd << 5) + 0x7FF) & !0x7FF;
-            let rect = (st.func == 0x0800_A85F).then(|| {
-                Rect::new(
-                    (wd(1) & 0xFFFF) as i32,
-                    (wd(1) >> 16) as i32,
-                    (wd(2) & 0xFFFF) as i32,
-                    (wd(2) >> 16) as i32,
-                )
-            });
-            let chance = if rect.is_some() {
-                (spd as i64) << 7
-            } else {
-                (spd as i64) << 4
-            };
-            StepRt::Wander(Box::new(Wander {
-                spd,
-                dist: r >> 8,
-                frames: if spd > 0 { (r + spd - 1) / spd } else { 0 },
-                left: 0,
-                chance,
-                talk: rect.is_none(),
-                rect,
-                old: [0; 4],
-                new: [0; 4],
-                vx: 0,
-                vy: 0,
-                tx: 0,
-                ty: 0,
-                dir: 0,
-            }))
+            StepRt::Wander(wander_rt(st))
         }
         // 0x08039F09 -> 0x08039D98: +4 s16 tx, +6 ty, +8 tz, +0xA u16 speed; n = (max |d| << 8) / speed (>= 1)
         0x0803_9F09 => {
@@ -236,6 +206,65 @@ fn create(w: &mut World, i: usize, st: &Step, z: i32) -> StepRt {
         },
         _ => StepRt::Other,
     }
+}
+
+/// a wander step's runtime as its create makes it (0x0800A82D / 0x0800A85F; no progress yet) - the importer fills in a
+/// wander under way (`patrol_wander_import`)
+pub fn wander_rt(st: &Step) -> Box<Wander> {
+    let wd = |k: usize| st.words.get(k).copied().unwrap_or(0);
+    let spd = wd(0) as i32;
+    let r = ((spd << 5) + 0x7FF) & !0x7FF;
+    let rect = (st.func == 0x0800_A85F).then(|| {
+        Rect::new(
+            (wd(1) & 0xFFFF) as i32,
+            (wd(1) >> 16) as i32,
+            (wd(2) & 0xFFFF) as i32,
+            (wd(2) >> 16) as i32,
+        )
+    });
+    let chance = if rect.is_some() {
+        (spd as i64) << 7
+    } else {
+        (spd as i64) << 4
+    };
+    Box::new(Wander {
+        spd,
+        dist: r >> 8,
+        frames: if spd > 0 { (r + spd - 1) / spd } else { 0 },
+        left: 0,
+        chance,
+        talk: rect.is_none(),
+        rect,
+        old: [0; 4],
+        new: [0; 4],
+        vx: 0,
+        vy: 0,
+        tx: 0,
+        ty: 0,
+        dir: 0,
+    })
+}
+
+/// the importer: a wander step under way on a patrol (the runner's step object, enemy +0x22C -> vt 0x0804B318: +8
+/// frames left, +0x18 / +0x1C 24.8 velocity, +0x20 / +0x24 target px, +0x28 the footprint it left, +0x38 the one it
+/// walks to) - the runner's current step, the step index the first wander step of the list
+#[allow(clippy::too_many_arguments)]
+pub fn import_wander(w: &mut World, i: usize, left: i32, v: (i32, i32), t: (i32, i32), old: [i32; 4], new: [i32; 4]) -> bool {
+    let id = w.ents[i].id;
+    let dir = w.en_ref(i).a.facing;
+    let Some(f) = w.field.as_mut() else { return false };
+    let Some(p) = f.patrols.iter_mut().find(|p| p.entity == id) else { return false };
+    let Some(k) = p.steps.iter().position(|s| matches!(s.func, 0x0800_A82D | 0x0800_A85F)) else { return false };
+    let mut wr = wander_rt(&p.steps[k]);
+    wr.left = left;
+    (wr.vx, wr.vy) = v;
+    (wr.tx, wr.ty) = t;
+    wr.old = old;
+    wr.new = new;
+    wr.dir = dir;
+    p.idx = k as i32;
+    p.cur = Some(StepRt::Wander(wr));
+    true
 }
 
 fn update_step(w: &mut World, i: usize, s: &mut StepRt, z: &mut i32) -> bool {
