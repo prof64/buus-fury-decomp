@@ -660,6 +660,11 @@ fn import_grids(w: &mut World, ram: &GbaRam) {
 const MODE_STATUS: u32 = 0x0804_AC88;
 const MODE_INVENTORY: u32 = 0x0804_9D48;
 const MODE_USE: u32 = 0x0804_ACB4;
+/// the Equip page (slots, +0x114 the slot), a slot's equipment list (+0x114 the slot, +0x138 top, +0x13C selection)
+/// and the list's action dialog (nested; +0x10C its selection) - run 3 cuts 46,263 / 46,660
+const MODE_EQUIP: u32 = 0x0804_9588;
+const MODE_EQUIP_LIST: u32 = 0x0804_A8F4;
+const MODE_EQUIP_ACT: u32 = 0x0804_AFCC;
 /// the mode switch after the pause menu's fade-out (vt 0x080493C8, +4 0x0804956C; whole run 968,262): the world is
 /// saved, this iteration builds and draws the Status page
 const MODE_SWITCH: u32 = 0x0804_93C8;
@@ -669,7 +674,7 @@ fn pause_page(ram: &GbaRam) -> Option<(u32, u32)> {
     let m = ram.r32(MODE);
     let vt = ram.mode_vt();
     let switch = vt == MODE_SWITCH && ram.r32(m + 4) == 0x0804_956C;
-    ([MODE_STATUS, MODE_INVENTORY, MODE_USE].contains(&vt) || switch).then_some((vt, m))
+    ([MODE_STATUS, MODE_INVENTORY, MODE_USE, MODE_EQUIP, MODE_EQUIP_LIST, MODE_EQUIP_ACT].contains(&vt) || switch).then_some((vt, m))
 }
 
 /// the page the cut is in (`pause_page`), opened over the imported field: Status (`+0x130` allocating, `+0x134`
@@ -712,6 +717,21 @@ fn open_pause_page(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
             }
         }
         wf_core::menu::Screen::Status(s)
+    } else if [MODE_EQUIP, MODE_EQUIP_LIST, MODE_EQUIP_ACT].contains(&vt) {
+        let list = if vt == MODE_EQUIP {
+            None
+        } else {
+            let depth = ram.r32(MODE + 8).min(8);
+            (0..depth).map(|k| ram.r32(MODE + 0xC + 4 * k)).chain([m]).find(|&o| ram.valid(o) && ram.r32(o) == MODE_EQUIP_LIST)
+        };
+        let e = match list {
+            Some(l) => {
+                let dialog = (vt == MODE_EQUIP_ACT).then(|| ram.s32(m + 0x10C));
+                wf_core::menu::equip::Equip::imported(w, ram.s32(l + 0x114), 0, Some((ram.s32(l + 0x138), ram.s32(l + 0x13C), dialog)))
+            }
+            None => wf_core::menu::equip::Equip::imported(w, ram.s32(m + 0x114), ram.s32(m + 0x10C), None),
+        };
+        wf_core::menu::Screen::Equip(e)
     } else {
         let inv = if vt == MODE_INVENTORY {
             Some(m)
@@ -1866,10 +1886,23 @@ fn build_mid_ids(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner: &mu
     // (the fade itself is the main-loop mode vt 0x0804A4B8: +4 the level reached, +8 the step)
     let mode = ram.r32(0x0300_0F90);
     let fading = (ram.valid(mode) && ram.r32(mode) == 0x0804_A4B8).then(|| ram.s32(mode + 4));
-    if ram.screen_black == Some(true) || fading.is_some() {
-        let level = (256 - fading.unwrap_or(0)).clamp(1, 256) as u16;
+    if let Some(f) = fading {
+        let level = (256 - f).clamp(1, 256) as u16;
         w.menu = wf_core::menu::Menu { phase: wf_core::menu::Phase::FadeIn { level }, tr: wf_core::menu::PAUSE, ..Default::default() };
         notes.push(format!("mid-area: a menu's return (fading in, level {level})"));
+    } else if ram.screen_black == Some(true) {
+        // the screen still black, no fade mode yet: the cut stands inside the close's world-restore iteration (its
+        // long lag; run 3's pause spins, cuts 8,548 .. 146,704: 7 .. 54 black frames, then the first fade step). Our
+        // close's last leave step (`Phase::Leave`, no-lag model: the exit stub's iteration then the restore's, `tr.leave`
+        // 2) - black until it ends, then the fade-in from 256 - 16. The restore ends with a camera update the game shows
+        // in its last black frame; our model makes it in the exit stub's step, which the cut is past: made here
+        let tr = wf_core::menu::Transition { leave: 2, ..wf_core::menu::PAUSE };
+        w.menu = wf_core::menu::Menu { phase: wf_core::menu::Phase::Leave { t: 1 }, tr, reload_close: true, ..Default::default() };
+        if w.field.is_some() {
+            w.tick_shakes();
+            wf_core::field::world_mode_cameras(&mut w);
+        }
+        notes.push("mid-area: a menu close's world-restore iteration (black, the fade-in next)".into());
     }
     // the pause menu's fade-out (START pressed: the main loop's mode is the base "field drawn, not updated" vt
     // 0x0804A920 itself, +4 the brightness left, from 256 by +8 = 16 a frame; the Status page next - whole-run cut
@@ -1950,6 +1983,7 @@ fn build_mid_ids(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner: &mu
                 a.objects.iter().any(|o| matches!(&o.kind, wf_core::fieldcontent::ObjKind::Breakable { on_break: Some(wf_core::fieldcontent::Callback::Script(s)), .. } if *s == id))
             });
             runner.continue_inline_held(&mut w, &id, drop, !on_break);
+            fade_progress_from_ram(&mut w, ram, ran[ran.len() - 1].0);
             // its tracks' running walks / glides from their game objects, as an event's (run 2 cuts 763,328 ..
             // 763,606: 12-26's lift script inline_0x08085224 - walk_to, then glide_to in a parallel group)
             let rng = w.rng.clone();
@@ -2333,6 +2367,27 @@ fn script_fade_progress(ram: &GbaRam) -> Option<(i32, i32)> {
         0x0804_C588 => Some((ram.s32(mode + 4), ram.s32(mode + 8))),
         0x0804_BBA4 => Some((ram.s32(mode + 0x404), ram.s32(mode + 0x408))),
         _ => None,
+    }
+}
+
+/// a script fade the replay restarted, waiting at the cut (0x78 .. 0x7e): its steps run from the fade mode object
+/// (`script_fade_progress`) - the event's mid-code path and an inline script's (run 3 cut 131,618: 2-x's
+/// inline_0x08073104 waiting 29 steps into its fade_in(30))
+fn fade_progress_from_ram(w: &mut World, ram: &GbaRam, wn: u8) {
+    if let Some((run, len)) = script_fade_progress(ram).filter(|_| (0x78..=0x7E).contains(&wn)) {
+        if let Some(f) = w.scene.screen.fade.as_mut().filter(|f| f.len == len && f.kind == wf_core::scene::FadeKind::Black) {
+            f.t = run.clamp(0, f.len);
+            let (t, len, out) = (f.t, f.len, f.out);
+            let (lvl, fine) = ((16 * t / len.max(1)).clamp(0, 16), (256 * t / len.max(1)).clamp(0, 256));
+            let s = &mut w.scene.screen;
+            if out {
+                s.black = s.black.max(lvl);
+                s.dim = s.dim.max(fine);
+            } else {
+                s.black = 16 - lvl;
+                s.dim = 256 - fine;
+            }
+        }
     }
 }
 
@@ -2756,6 +2811,7 @@ fn import_player_state(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
 /// makes it, the event held, its node started afresh (a text node opens its box) and the text box set to the RAM's
 /// (object vt 0x08049F60: +0x10 text, +0x14 typing pointer; one character a frame, see `text::typed_at`)
 fn build_mid_event(_data: &Arc<GameData>, ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4]), mut w: World, calls0: u32, notes: &mut Vec<String>) -> Built {
+    let mut box_due = false;
     let to = w.field.as_ref().map(|f| f.area).unwrap_or_default();
     let po = ram.player();
     if po == 0 {
@@ -2964,9 +3020,16 @@ fn build_mid_event(_data: &Arc<GameData>, ram: &GbaRam, runner: &mut StoryHost, 
             if d.phase == wf_core::scene::DialogPhase::Opening && d.t == 0 {
                 runner.text_open_due = Some(d.portrait != 0 && d.portrait != 7);
             }
-            notes.push("mid-area: the event's text box is not open in RAM (opening / closing)".into())
+            notes.push("mid-area: the event's text box is not open in RAM (opening / closing)".into());
+            box_due = true;
         }
         _ => {}
+    }
+    // the cut inside the long iteration that makes the box (the recording's first rows still carry the cut's logic
+    // count): that iteration ends with its camera update, shown in its last frame (run 3 cuts 57,493 s193 / 162,866
+    // s289: the camera one step on at the iteration's last row) - ours makes it here
+    if box_due && ram.mid_iteration && w.field.is_some() {
+        wf_core::field::world_mode_cameras(&mut w);
     }
     notes.push(format!("event s{:03} at node {}: mid-node over a standing field (mid-area)", ev.0, ev.1));
     let draws = w.rng.calls.wrapping_sub(calls0);
@@ -3324,21 +3387,7 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
     // the replayed fade restarted from its first step - it takes the RAM's progress
     // (the palette-copy fade object vt 0x0804BBA4 the same, its numbers at +0x404 / +0x408 - run 2 cut 1,853,852: s478
     // node 0's fade_out(50) 49 steps in; ours ran it again, the whole ending 50 frames late)
-    if let Some((run, len)) = script_fade_progress(ram).filter(|_| (0x78..=0x7E).contains(&wn)) {
-        if let Some(f) = w.scene.screen.fade.as_mut().filter(|f| f.len == len && f.kind == wf_core::scene::FadeKind::Black) {
-            f.t = run.clamp(0, f.len);
-            let (t, len, out) = (f.t, f.len, f.out);
-            let (lvl, fine) = ((16 * t / len.max(1)).clamp(0, 16), (256 * t / len.max(1)).clamp(0, 256));
-            let s = &mut w.scene.screen;
-            if out {
-                s.black = s.black.max(lvl);
-                s.dim = s.dim.max(fine);
-            } else {
-                s.black = 16 - lvl;
-                s.dim = 256 - fine;
-            }
-        }
-    }
+    fade_progress_from_ram(&mut w, ram, wn);
     // a `load_scene*` whose load the game already made (the field is its target): the replay restarted it from its
     // fade-out - it goes on at its fade-in, with the RAM's progress (the fade mode vt 0x0804C588: +4 steps run, +8
     // length), or past it (run 1 cut 202,593: s260 node 7's load_scene_fade(6, 1, ..) waiting 3 steps into its
@@ -3476,7 +3525,9 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
     // a replayed `play_anim` on the leader that already ended in the game (the RAM's leader is back in the state it
     // imported with: whole-run cut 153,226, s266's punch anim done, the group still waiting on its prop poof): the
     // command is done, the leader's state the RAM's
-    if let Some((pi, gs)) = leader_gs {
+    // (only when the leader's command list is empty: a play_anim still running in the game keeps its command object
+    // at +0x18C - run 3 cuts 110,180 / 210,621: s003 node 0's level-up pose, the leader imported in the anim's state)
+    if let Some((pi, gs)) = leader_gs.filter(|_| ram.player() != 0 && ram.r32(ram.player() + 0x18C) == 0) {
         let me = w.ents[pi].id;
         if w.pl_ref(pi).gs != gs {
             let mut hit = false;
@@ -3500,11 +3551,14 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
     // command list +0x18C empty: it ended and the wait with it in the frame before the cut - the script goes on in the
     // cut's frame; run-2 cut 50,830: s070 node 23's loop of two play_anim(161, 12), the second starts at f0; 62,068:
     // s110 node 3's give_item(1) done, node 4's text box opens at f0): done, the wait ended, the actor as the RAM has it
-    if matches!(wn, 0x3C | 0x58 | 0x80 | 0x93) {
+    // (a `face` (0x53) the same: its command gone from the actor's list, the turn done - run 3 cut 11,327: s061 node 0's
+    // face(0, 1) ended the frame before, its next action spawns the actor in the cut's frame)
+    if matches!(wn, 0x3C | 0x58 | 0x80 | 0x93 | 0x53) {
         let mut dropped = false;
         for k in 0..w.scene.tracks.len() {
             let Owner::Entity(id) = w.scene.tracks[k].owner else { continue };
-            if !matches!(w.scene.tracks[k].queue.first(), Some(Cmd::PlayAnim { anim }) if *anim != 0) && !matches!(w.scene.tracks[k].queue.first(), Some(Cmd::ItemGet { .. })) {
+            let face = wn == 0x53 && matches!(w.scene.tracks[k].queue.first(), Some(Cmd::Face { .. }));
+            if !face && !matches!(w.scene.tracks[k].queue.first(), Some(Cmd::PlayAnim { anim }) if *anim != 0) && !matches!(w.scene.tracks[k].queue.first(), Some(Cmd::ItemGet { .. })) {
                 continue;
             }
             let Some(i) = w.find(id) else { continue };
@@ -3655,7 +3709,9 @@ fn build_event_entry(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner:
         // inside a cutscene map the node loaded (`load_scene` 0x71 run, no `return_to_field` yet, no player object):
         // the scene map with its actors from RAM (run 2 cut 57,951: s103 node 0's Goku and Pikkon over 0-22); the field
         // the scene saved is imported for its `return_to_field` (`import_saved_field`)
-        if ram.player() == 0 && ran[..ran.len() - 1].iter().any(|(n, _)| *n == 0x71) {
+        // (a scene map loaded without saving the field - `load_scene` / `load_scene_fade` 0x72 .. 0x74 with no 0x71: a
+        // chapter title card, run 3 cuts 3,784 / 4,181, s516's 0-96 mid `fade_in(100)` - is the same: nothing to return to)
+        if ram.player() == 0 && ran[..ran.len() - 1].iter().any(|(n, _)| (0x71..=0x74).contains(n)) {
             notes.push("mid-area: inside a load_scene cutscene map".into());
             // (the replay of the node's code before its load_scene sees the room it left - the world-state header the
             // save copied, 0x03001968: s415 node 0's `set_p(0, get_map())` at 14-17 picks its branch by the room)

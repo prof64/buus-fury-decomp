@@ -372,6 +372,7 @@ pub fn start(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Value
     let mut ram = GbaRam::from_json(&doc["init"]["ram"])?;
     // the display at the cut: the first recorded row's probe (the screen does not change before its logic frame)
     ram.screen_black = doc["frames"].get(0).and_then(|f| f["io"].get(5)).and_then(|v| v.as_i64()).map(|v| v == 0);
+    ram.mid_iteration = doc["frames"].get(0).and_then(|f| f["lf"].as_i64()).is_some_and(|lf| Some(lf) == doc["init"]["lf"].as_i64());
     // the actors' sprite ids / animations at the cut (rows [obj#, sprite, x, y, z, dir, raw, cel, tick])
     if let (Some(objs), Some(rows)) = (doc["init"]["objs"].as_array(), doc["init"]["actors"].as_array()) {
         for r in rows {

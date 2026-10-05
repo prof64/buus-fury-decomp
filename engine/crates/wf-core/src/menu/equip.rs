@@ -242,6 +242,32 @@ impl Equip {
             list: None,
         }
     }
+    /// a cut inside the page (wf-import): the slots page at `slot` (its object +0x114 = the slot, +0x10C the
+    /// selected control), or - `list` = (+0x138 top, +0x13C selection, the action dialog's +0x10C selection when that
+    /// nested mode runs) - the slot's equipment list
+    pub fn imported(w: &World, slot: i32, sel: i32, list: Option<(i32, i32, Option<i32>)>) -> Equip {
+        let Some((top, cur, dialog)) = list else {
+            let mut e = Equip::with_slot(w, slot);
+            if let Some(s) = e.slots.as_mut() {
+                s.c.sel = sel;
+            }
+            return e;
+        };
+        let mut l = List::new(w, slot);
+        l.top = top;
+        l.cur = cur;
+        l.preview(w);
+        if let Some(dsel) = dialog {
+            if let Some(e) = l.entries.get(cur.max(0) as usize).cloned() {
+                l.under = Some(Box::new(l.clone()));
+                let mut dl = Action2::new(w, e.index, e.item, e.mark);
+                dl.c.sel = dsel;
+                l.dialog = Some(dl);
+            }
+        }
+        Equip { slots: None, list: Some(l) }
+    }
+
     fn list_of(w: &World, slot: i32) -> Equip {
         Equip {
             slots: None,
