@@ -3806,11 +3806,13 @@ fn tick_dialog(w: &mut World) {
         return;
     }
     if d.options > 0 && matches!(d.phase, DialogPhase::Opening | DialogPhase::Shown) {
+        // (the cursor stops at the first / last option, no wrap: run 3 row 883,540, Papaya Island 7-2's trinket stall
+        // s259 - DOWN twice on "-Sure / -No thanks" stays on No thanks)
         if k & DOWN != 0 {
-            d.cursor = (d.cursor + 1) % d.options;
+            d.cursor = (d.cursor + 1).min(d.options - 1);
         }
         if k & UP != 0 {
-            d.cursor = (d.cursor + d.options - 1) % d.options;
+            d.cursor = (d.cursor - 1).max(0);
         }
     }
     if d.kind == 3 {

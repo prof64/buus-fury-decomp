@@ -2758,6 +2758,11 @@ pub fn start_skill(w: &mut World, i: usize) {
     if !can_use_skill(w, i, real) {
         return;
     }
+    // areas without combat (towns: the area record +8 = 0; the HUD greys the icon) start no skill on B (run 3 row
+    // 883,623, Papaya Island 7-2: B by the trinket stall, no Energy Blast in the game)
+    if w.field.as_ref().is_some_and(|f| !f.combat) {
+        return;
+    }
     w.events.push(Event::SkillStart { id: real });
     // `id` = the behaviour (state machine) the skill runs: its own id, or a mod skill's `engine.base`
     let id = w.data.skill_kind(real);

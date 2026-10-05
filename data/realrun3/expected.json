@@ -1,0 +1,6 @@
+{
+ "about": "tools/wholerun/check.py's ratchet for run 3 (no-lag, from power-on): the first difference outside the known ranges (a compared field or a sound request, any leg) must not come earlier than first_diff; a later one is reported as an improvement and this file is bumped. Remove the file once run 3 is exact.",
+ "first_diff": 956971,
+ "stop": "flags: flag 65 game only",
+ "stretch": "026_s3_ship"
+}

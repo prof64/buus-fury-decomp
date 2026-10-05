@@ -130,6 +130,11 @@ def _earth3():
 
 SEGMENTS += _earth3()
 
+# ---- the ship chapter (s3_ship, real-route agent): run 2's ship goals with run 3's stresses (tools/run3/ship3.py,
+# ShipDriver3), played from Earth's end (ship3.py work/run3/end.ss end.eeprom OUT) in one session; its verified key
+# log is stored (work/run3/parts/s3_ship.json, into keys.json): play3 replays it
+SEGMENTS.append(('s3_ship', ('KEYS', 'work/run3/parts/s3_ship.json')))
+
 
 def chapter_of(name):
     """a segment's chapter (routing: segments.md's owners)"""
