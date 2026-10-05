@@ -3475,7 +3475,7 @@ fn follow_step(w: &mut World, id: EntityId) {
 pub fn camera_mode_set(w: &mut World) {
     if !w.g.shakes.is_empty() {
         w.g.shakes.clear();
-        w.g.shake_off = (0, 0);
+        if std::env::var_os("TMP_KEEPSHAKE").is_none() { w.g.shake_off = (0, 0); }
     }
 }
 

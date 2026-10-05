@@ -3496,7 +3496,9 @@ pub fn die(w: &mut World, i: usize, explode: bool) {
         w.stats.kills += 1;
     }
     if explode {
-        let (cx, cy) = w.en_ref(i).a.center();
+        // at the centre of the shown frame's record box (0x08018950: 0x0800FE34; real route 4-1 rclose_002 f14187: the
+        // body box's centre was 3 px left of the game's explosion)
+        let (cx, cy) = frame_box(w, i).center();
         let rate = 0x1000 + w.rng.rand(0x1000);
         // the enemy's sprite instance is destroyed first (`0x0800EC34`): the explosion can take its tiles
         // (segments sb 20-6, side 18-2: a dying enemy's block is free before the explosion's is taken)

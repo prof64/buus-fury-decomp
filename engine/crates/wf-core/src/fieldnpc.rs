@@ -672,13 +672,13 @@ pub fn interact(w: &mut World, pi: usize) -> bool {
         }
     }
     let f = w.field.as_ref().unwrap();
-    if std::env::var_os("XRS").is_some() { for t in &f.triggers { eprintln!("XRS trig {:?} {:?} rect {:?} last {} p ({}, {})", t.obj, t.act, t.rect, t.last, px, py); } }
     let f = w.field.as_ref().unwrap();
+    // (a button trigger with a facing counts only when the player faces that way - run 3 row 21,514, 1-15: facing
+    // right on the Character Gate's up-only A trigger, the game punches)
     f.triggers.iter().any(|t| {
-        matches!(
-            t.act,
-            Activation::Button(_) | Activation::Unknown(0x0802_266F)
-        ) && t.rect.x0 <= px
+        (matches!(t.act, Activation::Button(d) if d.is_none_or(|d| d == facing))
+            || matches!(t.act, Activation::Unknown(0x0802_266F)))
+            && t.rect.x0 <= px
             && px < t.rect.x1
             && t.rect.y0 <= py
             && py < t.rect.y1

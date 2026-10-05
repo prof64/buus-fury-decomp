@@ -1433,7 +1433,11 @@ export class Enemy extends Actor implements EnemyLike {
       this.w.stats.kills++
     }
     // 0x08018960: explosion 0x0801952C at the body-box centre, rate 0x1000 + rand(0x1000)
-    if (explode) this.ctx.explosion(this.w, ...this.center(), 0x1000 + this.w.rng.rand(0x1000, 'death explosion rate'))
+    // (at the centre of the shown frame's record box: 0x08018950 -> 0x0800FE34, real route 4-1 rclose_002 f14187)
+    if (explode) {
+      const b = this.frameBox()
+      this.ctx.explosion(this.w, (b.x0 + b.x1) >> 1, (b.y0 + b.y1) >> 1, 0x1000 + this.w.rng.rand(0x1000, 'death explosion rate'))
+    }
     this.removed = true
   }
 

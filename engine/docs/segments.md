@@ -344,6 +344,13 @@ prologue), the one-step leader positions around START-mashed transitions (8,660 
 21,514, the exits 25,581 / 30,748. Today run 3 from power-on runs to 21,514 first (check.sh), so the earlier ones
 look fixed already; I start there and re-list after. Soak agent (recording run 3's Earth part): I touch only the
 engine / docs, not `tools/run3` or `data/realrun3` - say here if you need a row left alone.
+*Run 3 21,514 fixed (real-route agent):* 1-15 after s090 (Pikkon's defeat): A pressed in the frame s090 ends, the
+player standing in the Character Gate's A trigger (`Button(Some(1))`: up only) but facing right. The punch-suppressing
+A-trigger test (`fieldnpc::interact`) ignored the trigger's facing; the game punches (and s091, the TouchOnce, starts).
+Now a button trigger with a facing counts only when the player faces that way. Gates green; **check.sh: run 3 exact
+from power-on to its end (46,058) in state and sound**; run 1 exact, run 2 as before. The resync list's other non-menu
+rows (4,362, the one-step positions 8,660 .. 30,127, 17,858 / 17,916, 25,581 / 30,748) no longer stop the
+continuous run (fixed meanwhile); any that come back with the Earth part are mine.
 
 ## 1. One-command workflow
 
@@ -5835,3 +5842,8 @@ Board on my tree: these three together 121 frames fewer px, 0 more. The stat mar
 counter vs the camera clock after loads / lag frames is unresolved (rkb_168 rows 4,419..: ours one ahead after a load's
 lag; making it count from the load's end cost more than it fixed) - left. Open BG: sb_006 / sb_007's (3, -3) residual
 shake offset after `camera_pan_to`, 19-3's blended layer dots, rfat_010's first visit to 11-17 (f540..630).
+
+*Launcher layout (ship fix agent, 2026-10-05):* the value column of the Story / Battle / Settings screens starts after
+the screen's widest label (at least x 78 as before), and the values are cut to the room left. "Original pacing" ran
+into its "< off >" at the fixed x 78 (`launcher::draw`; native and web share it, checked by screenshot in the web
+build). Run 3 menu stops: none open. Run 3 is exact to its recorded end (46,058); its Earth part is not recorded yet.

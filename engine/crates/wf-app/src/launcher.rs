@@ -697,6 +697,11 @@ impl Launcher {
             tiny::draw_text(fb, w, h, ox + 10, y, note, 0xFF9A_988F);
             y += 11;
         }
+        // the value column starts after the screen's widest label ("Original pacing" ran into its value at the old
+        // fixed x 78), and the values are cut to the room left of the panel's right edge
+        let lw = rows.iter().filter(|&&r| !self.label(r).1.is_empty()).map(|&r| width(&self.label(r).0)).max().unwrap_or(0);
+        let vx = (14 + lw + 8).max(78);
+        let room = (232 - vx - 4).max(40);
         // scroll long lists (mods)
         let visible = ((oy + 140 - y) / 11).max(1) as usize;
         let first = self.cursor.saturating_sub(visible - 1);
@@ -711,12 +716,12 @@ impl Launcher {
             text(fb, &l, ox + 14, y, col);
             if !v.is_empty() {
                 let mut v = v;
-                while width(&v) > 150 && v.chars().count() > 6 {
+                while width(&v) > room && v.chars().count() > 6 {
                     // keep "< ... >": drop characters before the closing bracket
                     let cut = v.char_indices().rev().nth(2).map(|(i, _)| i).unwrap_or(0);
                     v.remove(cut);
                 }
-                text(fb, &v, ox + 78, y, col);
+                text(fb, &v, ox + vx, y, col);
             }
             y += 11;
         }

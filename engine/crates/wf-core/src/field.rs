@@ -2012,7 +2012,6 @@ pub fn post_step(w: &mut World) {
         }
     }
     let resumed = w.field.as_ref().is_some_and(|f| f.resume_held);
-    if std::env::var_os("XRS").is_some() { eprintln!("XRS frame {} resumed {} ended {:?} raw_input {:?} input {:?} busy {:?}", w.frame, resumed, w.field.as_ref().map(|f| f.event_ended), w.field.as_ref().and_then(|f| f.raw_input.map(|r| r[0].held)), w.input[0].held, w.field.as_ref().map(|f| f.busy)); }
     if resumed {
         // the held update is the rest of the frame the event interrupted: NPCs run their normal update in it, without
         // the extra tick of an event's last frame (story playthrough: King Kai's idle tick after Pikkon's mid-fight
@@ -2493,6 +2492,7 @@ fn run_due_drops(w: &mut World) {
         })
         .unwrap_or_default();
     if !due.is_empty() {
+        if std::env::var_os("COIN_DBG").is_some() { eprintln!("DUE frame {} {:?}", w.frame, due); }
         if let Some(f) = w.field.as_mut() {
             f.pending_drops.retain(|d| d.0 > frame);
         }
