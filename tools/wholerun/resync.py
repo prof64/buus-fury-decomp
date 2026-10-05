@@ -125,10 +125,16 @@ def run(from_row, seg):
         cmd += ['--power-on', str(chains.W / 'power_on.json')]
     else:
         cmd += ['--import', str(seg), '--from-row', str(from_row)]
-    out = subprocess.run(cmd, cwd=ROOT / 'engine', capture_output=True, text=True).stdout
-    for line in out.splitlines():
+    p = subprocess.run(cmd, cwd=ROOT / 'engine', capture_output=True, text=True)
+    for line in p.stdout.splitlines():
         if line.startswith('STOP '):
             return json.loads(line[5:])
+    # the app crashed (a panic): a stop at the cut, not the end of the recording (run 2 cut 1,927,640 panicked in its
+    # first frame and was reported as "end of the recording reached")
+    if p.returncode != 0:
+        msg = next((l for l in p.stderr.splitlines() if 'panicked' in l), f'exit {p.returncode}')
+        why = (p.stderr.split('panicked', 1)[-1].splitlines()[1:2] or [''])[0]
+        return {'row': from_row, 'stretch': '', 'field': 'import' if seg is not None else 'crash', 'what': f'app crashed: {msg} {why}'.strip()}
     return None
 
 

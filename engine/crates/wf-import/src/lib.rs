@@ -1434,7 +1434,9 @@ fn import_bombs(w: &mut World, ei: usize, ram: &GbaRam, o: u32) {
 /// ticks (it is made in the node's enter)
 fn import_enemy_beam(w: &mut World, ei: usize, ram: &GbaRam, o: u32, notes: &mut Vec<String>) {
     use wf_core::ai::K;
-    let Some(b) = ram.ewram_with(0x0804_AEF8).into_iter().find(|&b| ram.r32(b + 0x50) == o) else { return };
+    // (the enemy can own a second object of this class whose +0x3C is no direction - run 2 cut 1,927,640: Kid Buu's,
+    // +0x3C = 0x5A, +0x18 = 0, beside the beam with direction 2 - only an object with a direction is the beam)
+    let Some(b) = ram.ewram_with(0x0804_AEF8).into_iter().find(|&b| ram.r32(b + 0x50) == o && ram.r8(b + 0x3C) < 4) else { return };
     let spots: Vec<(usize, usize)> = w.en_ref(ei).ai.stack.iter().enumerate().flat_map(|(l, s)| s.tree.nodes.iter().enumerate().filter(|(_, n)| n.k == K::KidBuuKamehameha).map(move |(n, _)| (l, n))).collect();
     let Some(&(lvl, n)) = spots.first() else {
         notes.push("a beam object of this enemy outside a KidBuuKamehameha node: not imported".into());

@@ -1601,7 +1601,7 @@ pub fn update(w: &mut World, i: usize) {
     let held = w
         .field
         .as_ref()
-        .is_some_and(|f| f.busy || f.item_get.is_some())
+        .is_some_and(|f| f.busy || f.item_get.is_some() || f.passive_hold_at == Some(w.frame))
         || crate::scene::is_puppet(w, w.ents[i].id)
             && w.scene.depth == 0
             && !w.scene.ai_wait.is_empty()
@@ -2268,6 +2268,7 @@ pub fn passive_after_scripts(w: &mut World) {
 }
 
 fn passive(w: &mut World, i: usize) {
+    if std::env::var_os("XSS").is_some() { eprintln!("XSS-P clock {} owed {} story {}", w.g.clock(w.frame), pr(w, i).tick_owed, pr(w, i).story_form(w)); }
     // (this frame's tick: a held pass's second update in `field::post_step` makes it - none after the scripts)
     p(w, i).passive_held = false;
     if std::mem::take(&mut p(w, i).tick_owed) {
@@ -2359,6 +2360,7 @@ fn passive(w: &mut World, i: usize) {
             }
         }
     }
+    if std::env::var_os("XSS").is_some() { let c = w.g.clock(w.frame); let pl = pr(w, i); eprintln!("XSS clock {} acc {} gauge {}", c, pl.ss_acc & 0xffff, pl.ss_gauge); }
     {
         let pl = p(w, i);
         if !f.ss && !f.ss3 && pl.ss_cooldown > 0 {
