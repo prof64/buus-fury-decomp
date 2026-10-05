@@ -823,7 +823,9 @@ pub fn leader_char(w: &World) -> i32 {
 }
 
 /// create one placed object of the object world (not triggers: see `TriggerRt`); returns its entity
+#[track_caller]
 pub fn spawn_object(w: &mut World, o: &ObjDef) -> Option<EntityId> {
+    if std::env::var_os("XSP").is_some() { eprintln!("XSP frame {} {:?} at {}", w.frame, o.at, std::panic::Location::caller()); }
     let nplayers = w.players.len().max(1);
     match &o.kind {
         ObjKind::Trigger { rect, act, .. } => {

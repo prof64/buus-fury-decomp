@@ -25,6 +25,9 @@ pub fn enter(w: &mut World, i: usize, p: &mut PathRt) {
 fn replan(w: &mut World, i: usize, p: &mut PathRt) {
     enemy::unmark_self(w, i);
     let r = plan(w, i, p);
+    if std::env::var_os("PATH_DBG").is_some() {
+        eprintln!("PATH_DBG f{} ent {} at ({},{}) goal ({},{}) -> r {} w ({},{}) valid {} ctr {}", w.frame, w.ents[i].id, w.en_ref(i).a.x >> 8, w.en_ref(i).a.y >> 8, p.gx >> 8, p.gy >> 8, r, p.wx >> 8, p.wy >> 8, p.valid, p.counter);
+    }
     enemy::mark_self(w, i);
     if !r {
         p.valid = 0;

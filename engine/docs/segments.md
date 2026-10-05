@@ -214,8 +214,27 @@ agent's* - B takes Janemba (`rj_049_001_18-14` 50, `sc_janemba` 20: sprite 149),
 single frames `rj03_045_18-1`, `dr4_061_15-13`, `dr4_006_15-3`, `sb_012_20_06`; **left to the Super Buu agent**:
 `sb_006_06_06` / `sb_007_06_09` (12 each, sprite 49 raw 8 - near its beam work). Super Buu agent: say here if you
 want any of mine or not those two.
-*sound_legs.py re-run on this tree: 70 iterations differ (72 before; the Janemba arena beep pair is gone); the open
-list above is otherwise unchanged.*
+*Done (B): 108 -> 28 differing cel frames (24 of them the Super Buu agent's two segments).*
+* **SuperJanembaWave shows anim 0x13** (raw 20, `special_release`), as the node's verified notes say (0x08034BA7);
+  ours set 0x12 (raw 19, the charge pose) - `rj_049` f3963 .. f4002, 40 frames. Rust + TS (`ai.ts` timed [19, 3]);
+  dumps regenerated, cross_ts 0 failures, battle lockstep green.
+* **Field Janemba's body under the ascent's controller (raw 20) is drawn a frame late** - the switch into raw 20 and
+  each of its cel changes (the frame byte the parts already read late, `janemba_part_field`); the switch out of it
+  shows at once. `Enemy::shown_prev` (the animation position at the end of the previous frame) and `view::actor_cel`.
+  `rj_049` 10 + `sc_janemba` 20 frames -> 0.
+* **A talk started in an object's update ends that frame's object pass** (world.rs `step_entities_list`: the talk's
+  event runs as the game's nested loop; the older objects get no update in that frame): `db7_010` 14-10 f258, man 2's
+  talk - the three enemies go idle with a fresh rand(255) and the game does not tick it that frame; ours had, a tick
+  ahead for 400 frames (10 cel frames at the blinks). Every segment's matched count unchanged (811,832), gates and the
+  whole-run check green (run 1 exact).
+* Left (single frames): `dr4_006_15-3` f304 / `dr4_061_15-13` f303 - an enemy updated twice in the frame after the
+  player's charge object (vt 0x0804B358) goes (the list compaction's second update, `list_redo`, not modelled for that
+  object); `rj03_045_18-1` f251 (a Janemba hand one cel ahead at its controller's start); `sb_012_20_06` f2015 (the
+  Super Buu agent's chapter).
+*sound_legs.py re-run on this tree (2026-10-05, after the cel fixes and the others' rounds): **12 iterations
+differ**, all in the Super / Kid Buu part (side-content agent): the punch sound pair 48 .. 51 (11 iterations,
+1,605,710 .. 1,917,118) and sound 44 game only (1,683,032). The opening, Earth, credits, beam and `stop 3` items are
+gone. (A leg's first row after a cut no longer counts the import's own song restart - 4 false hits of `song 8`.)*
 
 ## 1. One-command workflow
 
@@ -5596,3 +5615,4 @@ driver's song from RAM (legs c59477 / c64449: 0 differences). 57,737 (sound 37):
 change already in `place_enemy` (Pikkon after `become_map_object(224, 8)` gets s103, not s102; leg c57017: 0 of 964).
 Also from the BG work: the screen shake offset is 22.10 - the BG layers take `shake_off >> 10` (view.rs). check.sh:
 both runs as expected; core / import / app suites green. Debug: wholerun `WR_SONG=1` prints Scene.song per shown row.
+*Run 2 Kid Buu -> credits: done (A; uncommitted: wf-core enemy.rs / nodes.rs / player.rs / world.rs / menu/mod.rs / session.rs, wf-import lib.rs).* **resync.py --chain run2 --lag none --from 1,853,852: 0 stops - the app is exact (logic) from the end of Inside Buu to the end of run 2 (1,977,866), credits included** (resync now reports crashes). Rules added this round (all field-gated): Sleep from Options starts its script at the top of the next frame and holds it (1,869,664); an absorbed original Kid Buu passes its place to the merged one (the Vegeta cut-in only on the real defeat, 1,880,459); a Ninja's teleport leaves and rejoins the enemy grid inside its own update (1,891,199); a firing Kid Buu beam retracts when a pushed state replaces his pose (1,893,427 sound 33 / stop 32); the field KO freeze at KO + 199 runs before the object pass (`player::ko_freeze`; 1,909,571). Imports: a queued Sleep, a KO'd leader (down, the death timer, the beam's tiles), a cut in the death script's first frame (freeze). Sounds left in A's range: the 50 / 51 punch pair swapped where two cutscene actors' `play_anim` punches end and restart in one frame (1,877,946, 1,888,088 / 104, 1,917,102 / 118) - the game runs each actor's script commands inside that actor's own update, ours in one tick after the object pass (a script-runner change, not made); 1,891,147 a stop 3 missing. Shop 1,860,355 -> ship-fix agent (above). Gates green, wf-app tests green, check.sh EXACT.

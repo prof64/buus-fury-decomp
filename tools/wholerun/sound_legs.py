@@ -72,7 +72,11 @@ with ThreadPoolExecutor(jobs) as ex:
     for (s, e), diffs, stop, err in ex.map(run, legs):
         end = stop if stop is not None else e
         cover += max(0, end - s)
-        allv += [d for d in diffs if stop is None or d['row'] < stop]
+        # (a leg's first row from a cut: the import's own song request - the app restarts the area's song - is not a
+        # game difference)
+        allv += [d for d in diffs if (stop is None or d['row'] < stop) and not (s and d['row'] == s and
+                                                                              d['game'] == [] and
+                                                                              all(x.startswith('song') for x in d['app']))]
         if err:
             print(f'leg {s}: {err}', flush=True)
 allv.sort(key=lambda d: d['row'])
