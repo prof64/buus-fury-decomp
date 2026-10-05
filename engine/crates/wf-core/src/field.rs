@@ -435,6 +435,10 @@ pub struct Field {
     /// the area is a cutscene's backdrop (`load_scene`): its objects are held by the event like any other
     #[serde(default)]
     pub scene_load: bool,
+    /// a `load_scene` load in progress (`0x08009030`): it makes only the area's list 1 (def +0x14, count +4) - no
+    /// level signs, enemies or items (real route 8-17 shipr_238 f2788: no label object; emulator, the loader)
+    #[serde(default)]
+    pub scene_loading: bool,
     /// the HUD object's low-HP beep stamp (hud +0x10: the logic counter at the last beep, the load's at creation)
     #[serde(default)]
     pub hud_beep: u32,
@@ -654,6 +658,7 @@ fn new_field() -> Field {
         pending_objects: None,
         load_ids: (0, 0),
         scene_load: false,
+        scene_loading: false,
         hud_beep: 0,
         hud_hidden_at: None,
     }
@@ -1090,6 +1095,7 @@ pub fn load_area_with(
         f.pending_objects = defer.then_some(to);
     }
     let objects = objects && !defer;
+    let scene = w.field.as_ref().is_some_and(|f| f.scene_loading);
     // the level signs' label objects (area list +0x20, `0x0800C300`: 0x200 tile bytes each) come first
     // (segment sb 20-3 -> 20-4)
     let signs = a
@@ -1097,6 +1103,7 @@ pub fn load_area_with(
         .iter()
         .filter(|o| {
             objects
+                && !scene
                 && matches!(o.kind, ObjKind::MapSprite { label: Some(_), .. })
                 && cond_holds(w, &o.cond)
         })
@@ -1110,7 +1117,7 @@ pub fn load_area_with(
         }
     }
     for list in [4, 2, 3] {
-        for o in a.objects.iter().filter(|o| objects && list_of(o) == list) {
+        for o in a.objects.iter().filter(|o| objects && !scene && list_of(o) == list) {
             if cond_holds(w, &o.cond) {
                 spawn_object(w, o);
             }
@@ -1119,7 +1126,7 @@ pub fn load_area_with(
     for o in a
         .objects
         .iter()
-        .filter(|o| objects && list_of(o) == 0)
+        .filter(|o| objects && !scene && list_of(o) == 0)
         .chain(m.exits.iter())
     {
         if cond_holds(w, &o.cond) {
@@ -1245,7 +1252,8 @@ fn spawn_pending_objects(w: &mut World) {
         return;
     };
     let lo = w.next_id;
-    for list in [4, 2, 3, 0, 1] {
+    // (a `load_scene` makes only list 1 - `0x08009030`)
+    for list in [1] {
         for o in a.objects.iter().filter(|o| list_of(o) == list) {
             if cond_holds(w, &o.cond) {
                 spawn_object(w, o);

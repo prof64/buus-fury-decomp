@@ -62,6 +62,37 @@ class SbDriver2(ShipDriver2):
                     self.prog += [m] * on + [0] * off
                 return self.prog.pop(0)
             return None
+        if kind == 'deathcont':
+            # the game over -> title -> Single Player -> GAME 1 (Continue), closed-loop: A through the death text
+            # until the title has stood still 120 frames, then START / A alternately every 40 frames until a leader
+            # exists, then A until it is controllable
+            s = status(e)
+            ph = getattr(self, 'dc_phase', 0)
+            if ph == 0:
+                if s['p'] is None and s['scene'] == 0 and s['area'][0] == 0:
+                    self.idle += 1
+                    if self.idle > 120:
+                        self.dc_phase, self.idle, self.dc_t = 1, 0, 0
+                    return 0
+                self.idle = 0
+                return A if self.t % 40 < 3 else 0
+            if ph == 1:
+                if s['p'] is not None:
+                    self.dc_phase = 2
+                    return 0
+                self.dc_t += 1
+                if self.dc_t % 40 < 4:
+                    return S if (self.dc_t // 40) % 2 == 0 else A
+                return 0
+            if s['scene'] == 0 and s['p'] is not None:
+                self.idle += 1
+                if self.idle >= 30:
+                    self.dc_phase = 0
+                    self.next_goal()
+                    return None
+                return 0
+            self.idle = 0
+            return A if self.t % 20 < 3 else 0
         if kind == 'bout':
             # B every 30 frames until the field runs again (no event, a leader) for 30 frames (shop lists: an A there
             # would buy)
@@ -96,7 +127,7 @@ def checkpoint(name, x, y, w, a):
     takes the death -> title (Options: music volume) -> Continue program and plays on from here (ShipDriver2's
     retry), punching the air once more per try first ('luck')"""
     return [('unstick',), ('walk', x, y), ('face', 'U'), SAVE,
-            ('jumpto', 4), DEATH_CONTINUE, ('until', w, a), ('wait', 30),
+            ('jumpto', 4), ('deathcont',), ('until', w, a), ('wait', 30),
             ('mark', name), ('retry_here',), ('luck',)]
 
 
@@ -136,21 +167,36 @@ def goals_run2(e):
         *seg('after_gotenks', 'ult_gohan'),
         ('retry_off',), ('mark', 'b00_ult_gohan'),
         # --- Southwest Forest 8-1, Ultimate Gohan: his points POW-heavy (run 1: STR / END, a melee build) -----------
-        ('allocnow', lambda n: [n // 6, n // 2, n // 6, n - n // 6 - n // 2 - n // 6]),
-        # the capsule -> West City 4-1 -> its Z-Mart 0-92 (run 1 never shopped here): Buy -> Items: Rice Balls?
-        # rows 2 and 3 (supplies 3 / 4) twice each; back, Sell -> the first row once; out
+        # (STR / END 2/5 each, POW 1/5: run 1 put half into STR, half into END - a POW-heavy Gohan died in the Pyramid
+        # every few thousand frames)
+        ('allocnow', lambda n: [n * 2 // 5, n // 5, n * 2 // 5, n - 2 * (n * 2 // 5) - n // 5]),
+        # the pad -> West City 4-1 -> its Z-Mart 0-92 (run 1 never shopped here): Buy -> Items: two Curry Plates
+        # (the list's first row now: 400 HP each, 2000 zenie); back, Sell -> the fourth row (the Cotton Gi); out
         ('walk', 280, 256), ('talk', 'U'), ('fly', 1250, 1200), ('until', 4, 1), ('wait', 30),
-        ('walk', 262, 302), ('hold', U, 40), ('area', 0, 92), ('wait', 30), ('walk', 100, 110), ('hold', L, 20),
-        keys((A, 3, 120), (A, 3, 90), (A, 3, 90), (D, 3, 50), (D, 3, 50), (A, 3, 60), (A, 3, 60), (D, 3, 50),
-             (A, 3, 60), (A, 3, 60), (B, 3, 60), (B, 3, 60), (D, 3, 30), (A, 3, 90), (A, 3, 60)),
+        ('nav', 0, 92, False), ('wait', 30), ('walk', 100, 110), ('hold', L, 20),
+        keys((A, 3, 120), (A, 3, 90), (A, 3, 90), (A, 3, 60), (A, 3, 60), (B, 3, 60), (B, 3, 60), (D, 3, 30),
+             (A, 3, 90), (D, 3, 50), (D, 3, 50), (D, 3, 50), (A, 3, 60)),
         ('bout',), ('wait', 30), ('walk', 116, 200), ('hold', D, 30), ('area', 4, 1), ('wait', 30),
         # 4-1's save point: Save, soft reset, Continue (the title's slot load) - then the checkpoint for the crater
         *save_at(148, 594), RESET_CONTINUE, ('until', 4, 1), ('wait', 30), ('mark', 'b01_continued'),
-        *checkpoint('b02_4-1', 148, 594, 4, 1),
-        ('autoheal', True),
-        # the pad (410, 356) -> the Giant Crater: Ultimate Gohan vs Super Buu with the Electric Kamehameha (skill
+        # the pad (410, 356) -> Kyodai Pyramid 14-1: the second gate (Gohan, level 120: s517, flag 176); a save there;
+        # Gohan to level 141 in 14-1 <-> 14-2 with Energy Blasts first (run 1: punches, a STR build) and food from
+        # the Z-Mart when low (run 1 never healed); a game over goes back to this save
+        ('unstick',), ('walk', 410, 356), ('talk', 'U'), ('fly', 2177, 1201, 31, 23), ('until', 14, 1), ('wait', 30),
+        ('walk', 224, 92), ('hold', U, 20), ('press', A), ('events',), ('wait', 30), ('mark', 'b02_gate'),
+        *checkpoint('b03_14-1', 90, 240, 14, 1),
+        ('autoheal', True), ('skill', 0), ('mode', 'blasty', True),
+        ('grind', 131, [(14, 1), (14, 2)]),
+        ('mode', 'blasty', False), ('retry_off',),
+        # (in steps, each saved at 14-1: a game over costs only the step)
+        # (nobody can stand in for Gohan here: Goku, Vegeta dead, Goten / Trunks greyed out)
+        *[x for lv in (134, 137, 139, 141) for x in [('nav', 14, 1, False),
+                                                       *checkpoint(f'b04_gohan{lv - 3}', 90, 240, 14, 1),
+                                                       ('grind', lv, [(14, 1), (14, 2)]), ('retry_off',)]],
+        ('nav', 14, 1, False), *checkpoint('b04_gohan141', 90, 240, 14, 1),
+        # the pad (C, 129,201) -> the Giant Crater: Ultimate Gohan vs Super Buu with the Electric Kamehameha (skill
         # slot 2, held 120 frames, from 70 px: the route's original plan - run 1's melee Gohan punched)
-        ('unstick',), ('walk', 410, 356), ('talk', 'U'), ('fly', 648, 1076), ('events',), ('wait', 30),
+        ('unstick',), ('walk', 146, 214), ('talk', 'U'), ('fly', 648, 1076), ('events',), ('wait', 30),
         ('beam', 40000, 2, 120, 70), ('events',), ('wait', 30),
-        ('retry_off',), ('autoheal', False), ('mark', 'b03_wasteland'),
+        ('retry_off',), ('autoheal', False), ('mark', 'b05_wasteland'),
     ]

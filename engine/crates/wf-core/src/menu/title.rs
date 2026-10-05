@@ -740,6 +740,49 @@ pub fn title_world(data: &Arc<crate::content::GameData>, w: &World) -> World {
     nw
 }
 
+/// The soft reset (A + B + SELECT + START held): the game starts over from its boot code - RAM cleared (the RNG words
+/// [0, 0], the frame counter 0x03000F94 from 0, GameData fresh), the boot screens, then the title. What survives is
+/// the cartridge: the save slots and the options block. The current game's slot word 0x03001910 is cleared with the
+/// RAM. (Run 2 row 480,612: a reset after the Save Game screen at 8-28, then the title's Continue.) The world as the
+/// whole run's power-on builds it (`examples/wholerun.rs`); the sound driver runs on as it was (the power-on's
+/// driver image is not part of the world).
+pub fn reset_world(data: &Arc<crate::content::GameData>, w: &World) -> World {
+    let cfg = crate::field::FieldConfig {
+        world: 1,
+        area: 1,
+        rng: crate::battle::RngInit::State(0, 0),
+        ..Default::default()
+    };
+    let mut nw = crate::field::create(Arc::clone(data), &cfg);
+    crate::scene::note_events(&mut nw);
+    // (the placeholder field under the title is ours only: its build's draws are not the game's)
+    nw.rng = crate::rng::Rng::new(0, 0);
+    // ... and no object holds tiles
+    if let Some(f) = nw.field.as_mut() {
+        if f.vram.is_some() {
+            f.vram = Some(Default::default());
+        }
+    }
+    nw.saves = w.saves.clone();
+    nw.saves.pending = None;
+    nw.saves.current = 0;
+    nw.menu.settings = w.menu.settings.clone();
+    nw.opts = w.opts.clone();
+    nw.sound = w.sound.clone();
+    nw.events.retain(|e| {
+        !matches!(
+            e,
+            crate::world::Event::Field(crate::field::FieldEvent::Run { .. })
+        )
+    });
+    nw.events.insert(0, crate::world::Event::SongStop);
+    open_title_boot(&mut nw);
+    nw
+}
+
+/// the soft reset's keys, all held
+pub const RESET_KEYS: u16 = crate::input::A | crate::input::B | crate::input::SELECT | crate::input::START;
+
 /// Continue: black frames after the switch (the area load) and the fade-in step (`0x080495B4` +8 = 4)
 pub const CONTINUE_BLACK: u16 = 29;
 /// [`CONTINUE_BLACK`] in game iterations (`Options::no_lag`)

@@ -3001,8 +3001,10 @@ fn bomb_update(w: &mut World, i: usize) {
             };
             // a dead thrower's bomb still bursts but hits nobody (as `hit`: real route 2-10, the bomber punched out
             // while its bomb is in the air - the blast beside the player does nothing)
+            // (to every object: 0x08011C0C ORs the handlers' results, no first-taker stop - run 2 row 118,564: the
+            // leader's fresh ki blast takes the blast and the leader is hit too)
             if !owner_dead(w, owner) {
-                broadcast(w, &mut m, true);
+                broadcast(w, &mut m, false);
             }
             crate::vram::release(w, crate::vram::Owner::Ent(id));
             let (px, py) = (w.shot_ref(i).px(), w.shot_ref(i).py());

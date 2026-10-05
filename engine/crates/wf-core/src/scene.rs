@@ -2137,6 +2137,7 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
                 }
                 let (x, y) = actor_pos(w, i);
                 let owner = w.ents[i].id;
+                let vid = w.next_serial();
                 w.scene.visuals.push(Visual {
                     kind: VisualKind::ItemIcon(*item),
                     x,
@@ -2144,8 +2145,11 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
                     owner,
                     t: 0,
                     life: 60,
-                    vid: 0,
+                    vid,
                 });
+                // the icon object's tiles (`0x0802BD4C`, vtable 0x0804B358 over the sprite object `0x0800D960`:
+                // width x height bytes of the item's icon def - run 2 cut 62,000 f7: 0x100, freed 60 updates later)
+                crate::vram::acquire(w, crate::vram::Owner::Visual(vid), item_icon_bytes(*item));
             }
         }
         Cmd::Emote { emote, t, .. } => {
@@ -3212,6 +3216,17 @@ fn tick_track(w: &mut World, k: usize) -> bool {
         w.scene.chaining = false;
     }
     false
+}
+
+/// the item-get icon's tile bytes: width x height of its def (items: 0x083BD2F8 + 0x34 * id + 0xC; equipment, a
+/// negative id: 0x086F82EC + 0x2C * -id + 4 - every equipment icon 16 x 16)
+pub fn item_icon_bytes(item: i32) -> i32 {
+    match item {
+        9 => 0x200,
+        34 | 43..=82 => 0x400,
+        35 | 36 => 0x80,
+        _ => 0x100,
+    }
 }
 
 fn tick_visuals(w: &mut World) {

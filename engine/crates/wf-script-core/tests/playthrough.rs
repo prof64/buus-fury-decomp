@@ -153,7 +153,7 @@ fn build_world(data: &Arc<GameData>, doc: &Value) -> (World, BTreeMap<usize, Ent
     let player_row = rows.iter().find(|r| objs[r.k()]["player"].as_bool() == Some(true));
     let (px, py, pdir) = player_row.map(|r| (r.x() >> 8, r.y() >> 8, r.dir())).unwrap_or((120, 120, 0));
     let rng = init["rng"].as_array().map(|r| wf_core::battle::RngInit::State(i(&r[0]) as u32, i(&r[1]) as u32)).unwrap_or(wf_core::battle::RngInit::Seed(1));
-    let cfg = FieldConfig { world: aw, area: aa, variant: av, pos: Some((px, py)), facing: pdir, chars: vec![story.current], story: Some(story), rng, xp: true, arrive: false };
+    let cfg = FieldConfig { world: aw, area: aa, variant: av, pos: Some((px, py)), facing: pdir, chars: vec![story.current], story: Some(story), rng, xp: true, arrive: false, slow_fade_in: false };
     let mut w = Session::new_field(data.clone(), cfg).world;
     let pid = w.players[0];
     w.ents.retain(|e| e.id == pid);

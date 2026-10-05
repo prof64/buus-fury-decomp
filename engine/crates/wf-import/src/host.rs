@@ -62,6 +62,9 @@ pub struct StoryHost {
     /// inside that iteration: real run 007, whole-run cut 756,613 - s003's node 2 after its first node's box): the
     /// portrait flag of `vram::text_open`; its tiles are taken after the allocator is rebuilt from RAM (the importer)
     pub text_open_due: Option<bool>,
+    /// the last probe's actions in order up to its hit: `Some(native)` for a queued native, `None` for another act
+    /// (an instant the queue holds - `set_energy`): the importer's batch search (`build_mid_code`)
+    pub probe_acts: Vec<Option<u8>>,
     /// a breakable's on-break callback whose command wait ended this frame: it resumes in the next one (`resume_blocked`)
     break_due: Option<Option<i32>>,
     /// `started.len()` when an on-break inline script (`Cause::Break`, `Callback::Script`) started: it is the running
@@ -254,7 +257,7 @@ impl StoryHost {
         let rt = Runtime::new(files, Box::new(shared.clone()))?;
         let stepped = files.iter().filter(|(_, src)| src.contains("fn step_0()")).map(|(p, _)| p.clone()).collect();
         let hs = HostState { nest_area_enter: true, ..HostState::default() };
-        Ok(StoryHost { rt, shared, hs, queue: VecDeque::new(), running: false, cause: None, outer: vec![], stepped, errors: vec![], started: vec![], prev_held: 0, frame: 0, step_code: STEP_CODE.get().cloned().unwrap_or_default(), text_open_due: None, break_due: None, break_inline: None, after_event: None })
+        Ok(StoryHost { rt, shared, hs, queue: VecDeque::new(), running: false, cause: None, outer: vec![], stepped, errors: vec![], started: vec![], prev_held: 0, frame: 0, step_code: STEP_CODE.get().cloned().unwrap_or_default(), text_open_due: None, probe_acts: vec![], break_due: None, break_inline: None, after_event: None })
     }
 
     /// a session around an imported / built world (no hook: the host runs the queue itself)
@@ -484,19 +487,25 @@ impl StoryHost {
         self.rt.start_event_at(event, node, params);
         let mut done = 0usize;
         let mut out = None;
+        let mut acts: Vec<Option<u8>> = vec![];
         for _ in 0..4096 {
             self.rt.with_thread(|t| {
                 t.hold_queue = true;
                 t.queue_instants = instants;
             });
             let st = self.with_host(w, |rt| rt.run().map_err(|e| e.to_string()));
-            let (found, n, held) = self.rt.with_thread(|t| {
+            let (found, n, held, kinds) = self.rt.with_thread(|t| {
                 let f = t.queue.iter().enumerate().find_map(|(k, a)| match a {
                     wf_script_rhai::Act::Native { native, args, .. } if is_load(*native, args) => Some((k, *native)),
                     _ => None,
                 });
-                (f, t.queue.len(), t.blocked.is_none() && !t.queue.is_empty())
+                let kinds: Vec<Option<u8>> = t.queue.iter().map(|a| match a {
+                    wf_script_rhai::Act::Native { native, .. } => Some(*native),
+                    _ => None,
+                }).collect();
+                (f, t.queue.len(), t.blocked.is_none() && !t.queue.is_empty(), kinds)
             });
+            acts.extend(kinds.iter().take(found.map(|(k, _)| k).unwrap_or(kinds.len())));
             if let Some((k, n)) = found {
                 out = Some((done + k, n));
                 break;
@@ -513,6 +522,7 @@ impl StoryHost {
                 t.skip = n;
             });
         }
+        self.probe_acts = acts;
         self.rt.restore(saved);
         // (the world as it was: an instant native at the handler's front ran during the probe - `begin_parallel`
         // left a batch open, `hide_hud` hid the HUD - mid_10000, s459 node 0)

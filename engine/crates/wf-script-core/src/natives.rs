@@ -1355,7 +1355,13 @@ fn load_scene(w: &mut World, s: &mut HostState, world: i32, map: i32, variant: i
         // load_scene(3, 4, 1) then play_music(6) as it fades in; with the area's 6 taken here the play was skipped)
         let from = w.events.len();
         let song = w.scene.song;
+        if let Some(f) = w.field.as_mut() {
+            f.scene_loading = true;
+        }
         wf_core::field::load_area_with(w, to, x + 112, y + 76, None, objects);
+        if let Some(f) = w.field.as_mut() {
+            f.scene_loading = false;
+        }
         let mut k = from;
         while k < w.events.len() {
             if matches!(w.events[k], wf_core::world::Event::Song { .. }) {

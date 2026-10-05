@@ -209,7 +209,13 @@ pub fn compare(w: &World, fr: &Value, es: &[String], map: &mut BTreeMap<usize, E
         }
         // the cel drawn (the picture's view of the animation; a puppet left over a player shows here)
         if rep.first.is_none() && r.raw() >= 0 {
-            let game = ac.sprite.and_then(|s| w.data.sprite(s)).and_then(|sp| sp.anim_raw(r.raw())).and_then(|an| {
+            // (Majin Buu's candy: the player object's def is 0x36, the sweets' sheet 45 - the row's sprite 54 - not the
+            // form's: real route 8-16, shipr_338 f6,873)
+            let sheet = match &w.ents[i].body {
+                Body::Player(p) if p.candy_def => Some(45),
+                _ => ac.sprite,
+            };
+            let game = sheet.and_then(|s| w.data.sprite(s)).and_then(|sp| sp.anim_raw(r.raw())).and_then(|an| {
                 let st = an.steps(r.dir());
                 st.get((r.frame().max(0) as usize).min(st.len().saturating_sub(1))).map(|s| (s.frame, s.flip))
             });

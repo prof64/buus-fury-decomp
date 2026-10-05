@@ -12,7 +12,7 @@ import type { Enemy, KnockState } from './enemy'
 import { ATK } from './damage'
 import { PathMover } from './path'
 import {
-  Bomb, CandyBeam, DarkSphere, EnergyWave, Flame, FullBeam, GrappleArm, KameBeam, Rock, SJWave, StraightShot, StretchArm, SuperBall, VEL, kiBlast,
+  Bomb, CandyBeam, DarkSphere, EnergyWave, Flame, FullBeam, GrappleArm, KameBeam, Rock, SJWave, StretchArm, SuperBall, kiBlast,
 } from './projectiles'
 import { BeamGfx } from './fx'
 import { FINAL_FLASH_TABLES } from './skillfx'
@@ -26,7 +26,6 @@ export const NODE_NOTES: Record<string, string> = {
   MoveToFormationA: 'formation offset tables 0x0877AE80/0x0877AECC not decoded: ring of 8 slots at 40/24 px',
   GhostAnimA: 'cosmetic appear/vanish animation',
   TankDrive: 'turn helpers not decoded: axis-aligned drive toward the player at 0.5 px/frame',
-  EnergyBarrage: 'barrage flight path not decoded: short 4 px/frame shots, 12 frames',
   IfUnknown: 'condition 0x0804EE25 not decoded: false',
   ShockStun: 'electric-shock stun length not decoded: 48 frames',
   VolleyballLaunch: 'launched ball flight not decoded: 4 px/frame for 30 frames, hits other enemies',
@@ -48,6 +47,8 @@ export class AiController {
   stack: { state: number; rt: RNode }[] = []
   gen = 0
   history: { frame: number; state: number }[] = []
+  /** the running EnergyBarrage (its motion controller 0x030030E0) */
+  barrage?: Act
   readonly e: Enemy
   constructor(e: Enemy) {
     this.e = e
@@ -69,6 +70,13 @@ export class AiController {
   }
   push(id: number) {
     if (this.stack.length >= 8) return
+    // the pushed state's animation replaces a running barrage controller (exit 0x0802E1BA stops sound 63): the node
+    // under the push finds it gone when the state pops (wf-core nodes.rs `push`)
+    const b = this.barrage
+    if (b && !b.data.gone && b.f < 48) {
+      b.data.gone = 1
+      audioEvent('sfx_stop_match', { id: 63 })
+    }
     this.gen++
     const rt = this.build(id)
     this.stack.push({ state: id, rt })
@@ -864,9 +872,11 @@ export function create(n: AiNodeJ, c: AiController): RNode {
       // 38) : (v > -128: v -= 38) - no clamp after, so |v| reaches 152 (38 = int(38.4f)); facing by the larger of
       // |vx| / |vy| (ties: y); pos + v, blocked -> x only, then y only. The velocity lives in the node (+4 / +8): a
       // re-entered state starts from 0 (lockstep f02_vs_enemy_t48, after the BackStep state 0x172).
+      // (enter 0x0804EB5C: the velocity 0, then SetAnim(1) - 0x0804EB68, the walk)
       return new Act(n, c, () => {
         e.vx = 0
         e.vy = 0
+        e.setAnim('walk', true, true)
       }, () => {
         if (Math.abs(e.vx) > 0x200 || Math.abs(e.vy) > 0x200) {
           if (e.vx > 128) e.vx = 128
@@ -1363,17 +1373,27 @@ export function create(n: AiNodeJ, c: AiController): RNode {
         return true
       })
     case 'EnergyBarrage':
-      return new Act(n, c, () => {
+      return new Act(n, c, (a) => {
+        // enter 0x0802E1D8 (Pikkon): face, anim 3 held by the controller 0x030030E0, sound 63
         e.facePlayer()
-        e.setAnim(3, true, true)
-      }, (f) => {
-        if (f <= 48) {
-          const [mx, my] = e.muzzle(10)
-          const [vx, vy] = VEL(e.facing, 1024)
-          // Pikkon's barrage uses the flame class 0x080246B4 (records 0x0872D6B8 + 60*dir + 12*(t >> 2))
-          e.w.add(new StraightShot(e.ctx, e, e.facing, 0, mx << 8, my << 8, { vx, vy, box: [4, 4, 8, 8], atk: ATK[4], mult: 51, color: ['#ffffff', '#ffd060'], radius: 2, life: 12, explode: false, name: 'barrage', fx: { id: 'fx_0872d6b8', frame: (d, t) => 5 * d + Math.min(4, t >> 2) } }))
+        e.setAnim(3, true, true, { rule: 'hold' })
+        audioEvent('sfx', { id: 63, vol: 64 })
+        c.barrage = a
+      }, (f, a) => {
+        // the controller (update 0x0802E146): tick + 1; at 48 it ends; else its frame min(tick >> 2, 2) and a flame
+        // (0x080249E0, FlameBreath's class) at the integer position + 0x08757324[dir]
+        if (a.data.gone) return true
+        if (f < 48) {
+          e.ea.pos.frame = Math.min(f >> 2, 2)
+          const OFF = [[4, 4], [13, -24], [-8, -8], [24, -8]]
+          const [ox, oy] = OFF[e.facing]
+          e.w.add(new Flame(e.ctx, e, e.facing, (e.px + ox) << 8, (e.py + oy) << 8, e.w))
         }
+        if (f === 48) audioEvent('sfx_stop_match', { id: 63 })
         return f >= 48
+      }, (a) => {
+        if (a.f < 48 && !a.data.gone) audioEvent('sfx_stop_match', { id: 63 })
+        if (c.barrage === a) c.barrage = undefined
       })
     case 'FinalFlash':
       return timed(n, c, [19, 3], 180, {
@@ -2106,7 +2126,8 @@ export function create(n: AiNodeJ, c: AiController): RNode {
       // node never finishes
       if (e.type.type === 0x1d)
         return new Act(n, c, () => {
-          e.setAnim(20, true, true, { rule: 'hold' })
+          // (the controller ticks with the actor: 4 cels of 8 ticks, looping - also under a knockback; Rust nodes.rs)
+          e.setAnim(20, true, true, { rule: 'loop', shift: 3 })
           e.ctx.buuPacified = 1
         }, (f) => {
           e.ea.pos.tick = f & 0x1f
@@ -2121,7 +2142,8 @@ export function create(n: AiNodeJ, c: AiController): RNode {
         e.setAnim(17, true, true)
       }, () => e.ctx.sphereState === 1 || e.ctx.sphereState === 3, () => (e.hittable = true))
     case 'TauntAnim':
-      return playAnim(n, c, 4, false, 12)
+      // the controller's enter 0x08033D84: SetAnimRaw(0x13) (Rust nodes.rs)
+      return playAnim(n, c, 19, false, 12)
     case 'Hop':
       return new Act(n, c, (a) => (a.data.ph = 0), (_f, a) => {
         a.data.ph = (a.data.ph + 8) & 0xff

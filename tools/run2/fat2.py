@@ -1,16 +1,12 @@
-"""Run 2's fat-Buu (and Janemba) chapters: the pieces after `s_ship` (route2.SEGMENTS entries ('f_<name>',
-('EXT', '<name>'))), each a goal list for a driver built from the state the piece starts in. Owner: dungeon agent B
-(engine/docs/segments.md "Run 2"). Input only - no RAM writes.
+"""Run 2's fat-Buu (and Janemba) chapters, played as pieces from run 2's ship end (8-70 after Majin Buu), each a goal
+list for the ship / dungeon agents' drivers (unchanged) built from the state the piece starts in. Owner: dungeon
+agent B (engine/docs/segments.md "Run 2"). Input only - no RAM writes. The pieces' key logs, in PIECES' order of
+play (radar, bandana, grind_goten, airship, fukurou, pyramid, desert, pilaf, thieves, nataday, dbx), make the chain's
+part `work/run2/parts/f_fat.json`.
 
-Choices that differ from run 1 (ship_route.goals_fatbuu + the dungeon agents' routes):
-- Bulma's Dragon Radar talked to on the first visit (run 1's talk reached nobody: a second trip to West City)
-- other food at West City's Z-Mart, other stat splits
-- dungeon order Airship -> Fukurou Forest -> Kyodai Pyramid -> Diablo Desert -> Pilaf's Castle -> Thieves Den ->
-  Nataday (run 1: Thieves, Pilaf, Desert, Airship, Fukurou, Pyramid, Nataday)
-
-`driver(name, e)` -> a driver (done() / keys(e) / k / goals), as play2.py's loop wants it.
-`python3 tools/run2/fat2.py NAME START.ss [EEPROM]` runs one piece (exploration): work/run2fat/<NAME>.{ss,eeprom,
-keys.json}, a screenshot on failure."""
+`python3 tools/run2/fat2.py NAME START.ss START.eeprom [--cap N]` plays one piece from a state and its cartridge save
+(the .ss does not carry the EEPROM; deaths continue from saves this part makes): work/run2fat/<NAME>.{ss,eeprom,
+keys.json}, a screenshot on failure. `driver(name, e)` -> the piece's driver (done() / keys(e) / k / goals)."""
 import json
 import sys
 from pathlib import Path
@@ -217,18 +213,13 @@ g_pilaf.chain = True
 
 
 def g_thieves(e):
-    """the Thieves Den (9) sixth (run 1: first): the flight; Trunks breaks 9-1's rock (s517 (3, 80)) and - run 2 -
-    stays the leader with the Bandana on (run 1: Goten wore it): the guards (s350), the hideout, the Bandit King
-    (s357), the 1-Star Dragon Ball (s362) and the gang, out to the pad (ship_route.goals_fatbuu's goals otherwise)"""
+    """the Thieves Den (9) sixth (run 1: first): the flight; Trunks breaks 9-1's rock (s517 (3, 80)), Goten with the
+    Bandana on (run 2 tried Trunks as the leader: the 9-5 Juggernaut killed him six times), a Save at 9-1: the guards
+    (s350), the hideout, the Bandit King (s357), the 1-Star Dragon Ball (s362) and the gang, out to the pad
+    (ship_route.goals_fatbuu's goals)"""
     import ship_route
     g = ship_route.goals_fatbuu(e)
     g = g[g.index(('mark', 'd06_thieves')):g.index(('mark', 'd10_map'))]
-    # drop the switch back to Goten after the rock (the second save point visit: walk, charsel(-1)) but keep the equip
-    k = [i for i, x in enumerate(g) if x == ('walk', 68, 188)][1]
-    j = k + 1
-    while g[j][0] != 'keys' or g[j][1][0][0] != KEY.START:
-        j += 1
-    g = g[:k] + g[j:]
     k = g.index(('nav', 9, 10, True))
     # a Save at 9-1's save point with the Bandana on; a game over in the den continues from there
     return Chain([ship([('wait', 30), THIEVES] + g[:k]), ship(save_at(9, 1)), retry_from(9, 1, [ship(g[k:])])])
@@ -237,7 +228,153 @@ def g_thieves(e):
 g_thieves.chain = True
 
 
+def g_nataday(e):
+    """Nataday Village / the Volcano (15) last, as it must be (it appears with the other six balls; the seventh ball's
+    pad flight took us there: s019): a Save at 15-1, agent A's db4 route (the priest, the elder, the gate, the
+    Wilderness, the Volcano, Broly s435 / s436, back down, the 4-Star Dragon Ball s439, the pad; the way back without the flame / block
+    guards, as run 1), Goten's new points into END / POW after Broly (run 1: STR / END)"""
+    def make(e):
+        if str(ROOT / 'tools' / 'dungeons') not in sys.path:
+            sys.path.insert(0, str(ROOT / 'tools' / 'dungeons'))
+        import db4_route
+        from db4_driver import Db4Driver
+        g = db4_route.db4(e)
+        k = g.index(('mark', 'j_down'))
+        n = e.r16(0x03001560 + 0x68 * 2 + 0x2C)
+
+        class Alloc(Db4Driver):
+            # the way back from j_down without the flame / block guards (run 1's db4b: the two Destroyers in the open
+            # in 15-17 kill a Goten who stands behind a guard; running through costs less)
+            back = False
+
+            def flame_guard(self, ee, s):
+                return None if self.back else super().flame_guard(ee, s)
+
+            def block_guard(self, ee, s):
+                return None if self.back else super().block_guard(ee, s)
+
+            def in_flame(self, ee, px, py, margin=44):
+                return False if self.back else super().in_flame(ee, px, py, margin)
+
+            def step(self, ee):
+                gg = self.goals[self.k]
+                if gg == ('alloc_now',):
+                    self.back = True
+                    pts = ee.r16(0x03001560 + 0x68 * ee.r8(0x03001068) + 0x2C)
+                    self.goals[self.k] = alloc_keys([(0, [0, pts // 2, pts - pts // 2, 0])])
+                    return 0
+                return super().step(ee)
+        del n
+        return Alloc(g[:k + 1] + [('wait', 10), ('alloc_now',), ('wait', 30)] + g[k + 1:])
+    return Chain([ship([('until', 15, 1), ('wait', 30), *save_at(15, 1)]), retry_from(15, 1, [make])])
+
+
+g_nataday.chain = True
+
+def g_dbx(e):
+    """the seventh ball's aftermath: West City's Z-Mart (five Hamburgers; run 1: six Onigiri), the flight to the
+    airship marker (s017: Shenron, the fusion training, Goku on the Lookout), Goku's 42 points a third STR / END and
+    the rest POW / SPD (run 1: STR / END only), agent B's dbx route (s026, Goku vs Majin Buu s027, s218 Gotenks,
+    s020 Gotenks vs Buu) to the Janemba saga's prologue (0-96)"""
+    def goku_points(e):
+        n = e.r16(0x03001560 + 0x2C)
+        return Driver2([('wait', 20), alloc_keys([(0, [n // 3, n // 6, n // 3, n - 2 * (n // 3) - n // 6])]), ('wait', 30)])
+    return Chain([ship([('wait', 30), WEST_CITY, ('wait', 30), *zmart(2, 5), *take_off(416, 360),
+                        ('fly', 736 - 15, 1072 - 11, 31, 23, 'near')]),
+                  db57('dbx', frm='x01_map', to='x03_goku'),
+                  goku_points,
+                  db57('dbx', frm='x03_goku', emergency=0.45)])
+
+
+g_dbx.chain = True
+
+def g_j_intro(e):
+    """the Janemba saga's prologue (0-96 -> 0-16 -> s022 ...) played through to Snakeway 1-1, then 1-5 (s066:
+    King Yemma, flag 121), its Instant Transmission pad -> the Other World map (LEFT: HFIL) -> 18-1"""
+    return [('until', 0, 16), ('hold', U, 400), ('until', 1, 1), ('wait', 30),      # the ogre walks up into s022
+            nav(1, 5, False), ('events',), ('wait', 30),
+            ('unstick',), ('walk', 344, 214), ('talk', 'U'), ('wait', 190),
+            ('hold', L, 40), ('wait', 10), ('hold', A, 3), ('until', 18, 1), ('wait', 30)]
+
+
+def g_j_grind(e):
+    """Goku against HFIL's level 116 .. 125 rooms: to 92 on the Janemba Hands of 18-12 / 18-1 (run 1: 90), then to
+    116 on 18-2's Living Dead (run 1: 120)"""
+    return [('grind', 92, [(18, 12), (18, 1)]), ('grind', 116, [(18, 2), (18, 1)]), nav(18, 1, False), ('wait', 30)]
+
+
+class Unjam:
+    """around a driver: standing still in one spot (field, no event) for 900 frames - the driver pushing into a wall
+    beside an exit (HFIL 18-8's east strip: the exit to 18-9 takes the player only higher up the bank) - holds the
+    diagonals in turn (UP/DOWN with RIGHT/LEFT, 60 frames each), then hands back"""
+    PROG = [U | R, D | R, U | L, D | L]
+
+    def __init__(self, inner):
+        self.inner, self.pos, self.n, self.prog, self.tries = inner, None, 0, [], 0
+
+    k = property(lambda self: self.inner.k)
+    goals = property(lambda self: self.inner.goals)
+
+    def done(self):
+        return self.inner.done()
+
+    def keys(self, e):
+        if self.prog:
+            return self.prog.pop(0)
+        s = status(e)
+        # (within 8 px of where it stood still: the driver's own turning and nudging moves a pixel or two)
+        near = (self.pos is not None and s['p'] is not None and s['scene'] == 0 and self.pos[0] == tuple(s['area'])
+                and abs(self.pos[1][0] - s['p'][0]) <= 8 and abs(self.pos[1][1] - s['p'][1]) <= 8)
+        if near:
+            self.n += 1
+        else:
+            self.n = 0
+            self.pos = (tuple(s['area']), tuple(s['p'][:2])) if s['p'] else None
+        if self.n > 900:
+            self.n = 0
+            self.tries += 1
+            if self.tries > 20:
+                raise RuntimeError('unjam: still stuck')
+            m = self.PROG[(self.tries - 1) % 4]
+            print('  unjam (diagonal)', s, flush=True)
+            self.prog = [m] * 60 + [0] * 4
+            return self.prog.pop(0)
+        return self.inner.keys(e)
+
+
+def hfil_part(frm, to, extra_before=()):
+    """the side agent's HFIL route (tools/side/hfil.py ROUTE) from mark `frm` to mark `to`, by re/buu/ship/jan_side's
+    RealSide driver (run 1's), `extra_before` goals first"""
+    def make(e):
+        for d in ('tools/side', 're/buu/ship'):
+            if str(ROOT / d) not in sys.path:
+                sys.path.insert(0, str(ROOT / d))
+        import hfil
+        import jan_side  # noqa: F401  (hfil.SideDriver = RealSide)
+        import maze
+        R = hfil.ROUTE
+        i, j = R.index(('mark', frm)), R.index(('mark', to))
+        for g in R[:i]:
+            if g[0] == 'openwall':
+                maze.open_wall(g[1], g[2])
+        return Unjam(hfil.SideDriver(list(extra_before) + [g for g in R[i + 1:j + 1] if g[0] != 'mark']))
+    return make
+
+
+def g_j_hfil(e):
+    """HFIL 18-2's switch (Instant Transmission), the corridor 18-3 .. 18-10, the gate maze, the boulder, 18-11's four
+    Vegetas (s446, flag 123) - the side agent's route as run 1, from Goku 116"""
+    return Chain([hfil_part('hfil', 'vegeta')])
+
+
+g_j_hfil.chain = True
+
 PIECES = {
+    'j_hfil': g_j_hfil,
+    'j_grind': g_j_grind,
+    'j_intro': g_j_intro,
+    'dbx': g_dbx,
+    'nataday': g_nataday,
     'thieves': g_thieves,
     'pilaf': g_pilaf,
     'desert': g_desert,
@@ -360,7 +497,7 @@ class Retry:
         return self.chain.keys(e)
 
 
-def db57(route, fix=None, frm=None, to=None, real=False):
+def db57(route, fix=None, frm=None, to=None, real=False, emergency=None):
     """a dungeon agent B route (tools/db57: db5 Airship, db6 Fukurou, db7 Pyramid, dbx) as a chain part; `fix(goals)`
     adjusts its goal list (as run 1 did by hand)"""
     def make(e):
@@ -370,6 +507,9 @@ def db57(route, fix=None, frm=None, to=None, real=False):
         mk, drv = db57run.find_route(route)
         if real:
             drv = real_pyramid_driver()
+        if emergency is not None:
+            # (fat_db57's RealXDriver: the real Goku eats before Majin Buu's last hits)
+            drv = type('RealXDriver', (drv,), {'EMERGENCY': emergency})
         g = mk()
         g = fix(g) if fix else g
         if frm:

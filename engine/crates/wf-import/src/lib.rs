@@ -1186,6 +1186,7 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
     import_super_ball(w, ei, ram, o, notes);
     import_bombs(w, ei, ram, o);
     import_flames(w, ei, ram, o);
+    import_waves(w, ei, ram, o);
     let d = Arc::clone(&w.data);
     let e = w.en(ei);
     e.a.x = ram.s32(o + 0x1A0);
@@ -1224,6 +1225,11 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
         let st = format!("0x{:08X}", ram.r32(o + 0x14));
         if let Some(&r) = d.anim.generic.get(&st) {
             e.ea.rule = r;
+            e.ea.done = false;
+        } else if ram.valid(ram.r32(o + 0x14)) && wf_core::eanim::KEEP_VTABLES.contains(&format!("0x{:08X}", ram.r32(ram.r32(o + 0x14))).as_str()) {
+            // a keep state (vt 0x0804985C / 0x0804A214: the pose stays, nothing ticks - run 2 cut 58,350, s103's
+            // return_to_field: the defeated fighter's raw 18 frozen at tick 360; ours ended the pose and idled, a draw)
+            e.ea.rule = d.anim.keep;
             e.ea.done = false;
         }
     }
@@ -1359,6 +1365,20 @@ fn import_flames(w: &mut World, ei: usize, ram: &GbaRam, o: u32) {
     }
 }
 
+/// the enemy's energy waves in flight (vt 0x08049C98, made by SoldierThrow / turrets / cyborgs; +0x4C owner, +0x10
+/// facing, +0x14 ticks, +0x1C the life count, +0x20 / +0x24 the tail in whole px, +0x40 the length, +0x44 the mode -
+/// 1 = retracting; MEASURED run 2 cut 544,963: a Majin Soldier's wave retracting 8 -> 4 -> gone) -> our wave shot (no
+/// constructor sound); its tile block goes with it (`import_vram`)
+fn import_waves(w: &mut World, ei: usize, ram: &GbaRam, o: u32) {
+    let me = w.ents[ei].id;
+    for b in ram.objects().into_iter().filter(|&b| ram.r32(b) == 0x0804_9C98 && ram.r32(b + 0x4C) == o) {
+        let kind = wf_core::shots::ShotKind::EnergyWave { len: ram.s32(b + 0x40), mode: ram.s32(b + 0x44), life: ram.s32(b + 0x1C) };
+        let mut s = wf_core::shots::Shot::new(me, ram.r8(b + 0x10) & 3, 0, ram.s32(b + 0x20) << 8, ram.s32(b + 0x24) << 8, kind);
+        s.t = ram.s32(b + 0x14) as i64;
+        wf_core::shots::add(w, s);
+    }
+}
+
 fn import_super_ball(w: &mut World, ei: usize, ram: &GbaRam, o: u32, notes: &mut Vec<String>) {
     use wf_core::ai::K;
     const THROW: i32 = 0x3d;
@@ -1424,6 +1444,9 @@ fn import_npc_step(w: &mut World, i: usize, ram: &GbaRam, o: u32, row: Option<(i
         wf_core::fieldnpc::import_step(w, i, idx);
         w.rng = rng;
         let Body::Npc(n) = &mut w.ents[i].body else { return };
+        // (the step's create turns the NPC its def's way; the RAM's facing stands - run-2 cut 32,138: s073's Olibu,
+        // walked up by node 0 and waiting, facing 1 in RAM, the wait's create made it 2)
+        n.a.facing = ram.r8(o + 0x10);
         if let Some(b) = n.behaviour.as_mut() {
             if let Some(wf_core::fieldnpc::StepRt::Wait { count }) = b.cur.as_mut() {
                 *count = ram.s32(st + 4);
@@ -2219,6 +2242,64 @@ fn natives_run(ram: &GbaRam, runner: &StoryHost, ev: (u16, u16, [i32; 4])) -> Op
     natives_before(code, pc_off?)
 }
 
+/// the waiting native's occurrences in the loop iterations the game's interpreter already finished: a native inside a
+/// `loop_push` .. `loop` body (the static scan of `natives_before` sees one pass) - the interpreter frame (the context
+/// stack's entry, `0x08004038`'s r4: +0x44 the loop depth, +0x48 the loop counters, innermost last) has the counter
+/// at (the body's start count) - (iterations done); each finished pass queued the body's matching natives once (run-2
+/// cut 50,863: s070 node 23's `loop` of two play_anim(161, 12), the second pass waiting - counter 1 of 2)
+fn loop_extra(ram: &GbaRam, runner: &StoryHost, ev: (u16, u16, [i32; 4]), wn: u8, wargs: &Option<Vec<i32>>) -> usize {
+    use wf_script::bytecode::Op;
+    let Some((addr, code)) = runner.step_code.get(&(ev.0, ev.1)) else { return 0 };
+    let depth = ram.r32(0x0300_1034).min(8);
+    let mut at: Option<(u32, usize)> = None;
+    for k in 1..=depth {
+        let it = ram.r32(0x0300_1034 + 4 * k);
+        for a in (0x0300_7000u32..0x0300_7FFC).step_by(4) {
+            if ram.r32(a) != it {
+                continue;
+            }
+            let pc = ram.r32(a + 4);
+            let off = match addr {
+                Some(base) if pc >= *base && pc <= base + code.len() as u32 => Some((pc - base) as usize),
+                None if pc >> 24 == 2 => (0..=code.len().min(pc as usize)).find(|&o| ram.read(pc - o as u32, code.len()) == *code),
+                _ => None,
+            };
+            if let Some(off) = off {
+                if at.is_none_or(|(_, o)| off > o) {
+                    at = Some((it, off));
+                }
+            }
+        }
+    }
+    let Some((it, pc_off)) = at else { return 0 };
+    let Ok(insns) = wf_script::bytecode::decode_reachable(code) else { return 0 };
+    let insns: Vec<wf_script::bytecode::Insn> = insns.into_values().collect();
+    // the innermost loop whose body holds the PC: its `loop` op (back to `t`) after the PC, the body start `t` before
+    let Some(end) = insns.iter().filter(|i| matches!(i.op, Op::Loop(t) if t < pc_off && i.off >= pc_off.saturating_sub(1))).min_by_key(|i| i.off) else { return 0 };
+    let Op::Loop(t) = end.op else { return 0 };
+    let lp = ram.r32(it + 0x44);
+    if lp == 0 || lp > 4 || !ram.valid(it) {
+        return 0;
+    }
+    let cur = ram.s32(it + 0x48 + 4 * (lp - 1));
+    // the start count: the constant pushed before the body's `loop_push`
+    let Some(push) = insns.iter().position(|i| i.op == Op::LoopPush && i.off + i.len == t) else { return 0 };
+    let start = match insns.get(push.wrapping_sub(1)).map(|i| &i.op) {
+        Some(Op::PushU8(v)) => *v as i32,
+        Some(Op::Push(v)) => *v,
+        _ => return 0,
+    };
+    let done = start - cur;
+    if done <= 0 {
+        return 0;
+    }
+    // the body's matching natives (one pass)
+    let before = natives_before(code, t).map(|v| v.len()).unwrap_or(0);
+    let all = natives_before(code, end.off).unwrap_or_default();
+    let per = all[before.min(all.len())..].iter().filter(|(n, a)| *n == wn && (wargs.is_none() || a == wargs)).count();
+    done as usize * per
+}
+
 /// the natives (in order, with constant arguments) a script's code runs before offset `pc_off` (queries left out)
 fn natives_before(code: &[u8], pc_off: usize) -> Option<Vec<(u8, Option<Vec<i32>>)>> {
     use wf_script::bytecode::Op;
@@ -2264,7 +2345,7 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
     // the waiting native among our queued actions (a branch the script did not take has natives in the bytecode
     // but not in the queue): its k-th occurrence by id and constant arguments
     let (wn, wargs) = ran[ran.len() - 1].clone();
-    let k = ran.iter().filter(|(n, a)| *n == wn && (wargs.is_none() || *a == wargs)).count();
+    let k = ran.iter().filter(|(n, a)| *n == wn && (wargs.is_none() || *a == wargs)).count() + loop_extra(ram, runner, ev, wn, &wargs);
     let seen = std::cell::RefCell::new(vec![]);
     let hits = std::cell::Cell::new(0usize);
     let pred = |n: u8, a: &[i32]| {
@@ -2318,7 +2399,17 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
             // (`idx` counts every action the probe passed, `queued` only the ones it asked about - a node's `run_event` is
             // not among them: s314 node 0, whole-run cuts 225,250 .. 225,340 - the batch's begin_parallel is offset by those)
             let off = idx.saturating_sub(queued.len());
-            let from = if wn == 0x3A { queued[..idx.min(queued.len())].iter().rposition(|&n| n == 0x38).map(|p| p + off).unwrap_or(idx) } else { idx };
+            // (the probe's own act list - natives and the other acts its queue held, `StoryHost::probe_acts` - places
+            // the batch's begin_parallel exactly: an act not asked about may come after it too, run 2 cut 64,449:
+            // s125 node 6's begin_parallel then set_energy)
+            let acts = runner.probe_acts.clone();
+            let from = if wn != 0x3A {
+                idx
+            } else if acts.len() == idx {
+                acts.iter().rposition(|a| *a == Some(0x38)).unwrap_or(idx)
+            } else {
+                queued[..idx.min(queued.len())].iter().rposition(|&n| n == 0x38).map(|p| p + off).unwrap_or(idx)
+            };
             let outer = outer_event(ram, runner, ev);
             if let Some((o, k)) = outer {
                 notes.push(format!("nested in s{:03} node {} (its run_event after {k} actions)", o.0, o.1));
@@ -2467,21 +2558,63 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
         w.g.shakes.retain(|s| *s != l);
         w.g.shakes.push(l);
     }
-    w.scene.tracks.retain(|t| !t.queue.is_empty() || t.holding);
-    // `become_map_object` waiting (0x4F): the RAM already has the map object (imported) - the replayed command is
-    // dropped and its wait ended in the cut's frame: the script goes on in the next (r062 20-6 +21,000: s476 node 19
-    // exits in the cut's first frame)
-    if wn == 0x4F {
+    // a parallel group the cut waits in (end_parallel, 0x3A): the puffs at the head of a track ran when the group
+    // started (instant commands chain in one tick) - their clouds are the RAM's effects (`import_effects`), the
+    // replayed commands are dropped (run 2 cut 58,440: s103 node 0's shake_screen + four puff_offset(224, ..) waiting
+    // at end_parallel - ours made four more clouds, a draw each)
+    if wn == 0x3A {
         for t in w.scene.tracks.iter_mut() {
-            if matches!(t.queue.first(), Some(Cmd::BecomeMapObject { .. })) {
-                t.queue.remove(0);
+            let n = t.queue.iter().take_while(|c| matches!(c, Cmd::Puff { .. })).count();
+            if n > 0 {
+                t.queue.drain(..n);
                 t.started = false;
             }
         }
     }
-    if wn == 0x4F && w.scene.tracks.iter().all(|t| t.queue.is_empty()) {
-        w.scene.director.wait = None;
-        w.scene.director.done = true;
+    w.scene.tracks.retain(|t| !t.queue.is_empty() || t.holding);
+    // `become_map_object` waiting (0x4F): the RAM already has the map object (imported). Its command object (vt
+    // 0x0804DEA0) still on the map object's command list (+0x18C): it ran its start in the frame before the cut and
+    // completes on the track's next tick - the wait ends in the cut's frame, the next command starts a frame later
+    // (run-2 cut 39,582: s088 node 2's four becomes 2 frames apart, 209 made the frame before the cut, 213 at f1) - the
+    // replayed command stays as started, not run again. Gone: the wait ended before the cut, the script goes on in the
+    // cut's frame (r062 20-6 +21,000: s476 node 19 exits in the cut's first frame) - dropped, done
+    // (u2: the map object the command made in the cut's frame - +0x18C -> vt 0x0804DEA0, +8 the map-object index -
+    // owns the started track: run 2 cut 33,448, s086 node 2's become_map_object(209, 1))
+    if wn == 0x4F {
+        let fresh: Vec<(i32, i32, i32)> = ram
+            .objects()
+            .into_iter()
+            .filter(|&o| ram.r32(o) == VT_ENEMY && ram.valid(ram.r32(o + 0x18C)) && ram.r32(ram.r32(o + 0x18C)) == 0x0804_DEA0)
+            .map(|o| (ram.s32(ram.r32(o + 0x18C) + 8), ram.s32(o + 0x1A0), ram.s32(o + 0x1A4)))
+            .collect();
+        let ents: Vec<(wf_core::world::EntityId, i32, i32)> = w
+            .ents
+            .iter()
+            .enumerate()
+            .filter(|(_, e)| !e.removed && matches!(e.body, Body::Enemy(_)))
+            .filter_map(|(i, e)| w.actor(i).map(|a| (e.id, a.x, a.y)))
+            .collect();
+        let pending = ram.objects().into_iter().any(|o| {
+            let c = ram.r32(o + 0x18C);
+            ram.valid(c) && ram.r32(c) == 0x0804_DEA0
+        });
+        for t in w.scene.tracks.iter_mut() {
+            if let Some(Cmd::BecomeMapObject { index }) = t.queue.first() {
+                if pending {
+                    if let Some(&(id, _, _)) = fresh.iter().find(|f| f.0 == *index).and_then(|f| ents.iter().find(|e| e.1 == f.1 && e.2 == f.2)) {
+                        t.owner = Owner::Entity(id);
+                    }
+                    t.started = true;
+                } else {
+                    t.queue.remove(0);
+                    t.started = false;
+                }
+            }
+        }
+        if !pending && w.scene.tracks.iter().all(|t| t.queue.is_empty()) {
+            w.scene.director.wait = None;
+            w.scene.director.done = true;
+        }
     }
     // each track's running command from its game object (heap objects matched by their target): a walk (vt
     // 0x0804D0A4; a glide 0x0804AE84 the same: +0xC / +0x10 24.8 step, +0x14 / +0x18 target, +0x1C steps left), a jump (vt 0x0804AE5C: +8 x
@@ -2506,11 +2639,26 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
         // (a target the script computed from a query before the cut - glide_to(0, actor_x(0), actor_y(0) - 100):
         // asked again now it is another; the head's command with the only live object of its kind takes that
         // object's target - real route 4-1, s515's take-off glide, tiles r002_006+2000 / +13000)
+        // (or the actor's own movement object: its state +0x18C - two glides at once, each target re-asked: run 2
+        // cut 57,741, s103 node 0 lifts Goku and Pikkon together)
+        let own = match w.scene.tracks[k].owner {
+            Owner::Entity(id) => w.find(id).and_then(|i| {
+                let a = w.actor(i)?;
+                let o = if Some(i) == w.player_idx(0) { ram.player() } else { ram.objects().into_iter().find(|&o| ram.s32(o + 0x1A0) == a.x && ram.s32(o + 0x1A4) == a.y)? };
+                (o != 0).then(|| ram.r32(o + 0x18C))
+            }),
+            _ => None,
+        };
         let found = w.scene.tracks[k].queue.iter().enumerate().find_map(|(j, c)| live(c).map(|o| (j, o))).or_else(|| {
             let only = |v: &Vec<u32>| (v.len() == 1).then(|| v[0]);
             match w.scene.tracks[k].queue.first() {
-                Some(Cmd::GlideTo { .. }) => only(&glides).map(|o| (0, o)),
-                _ => None,
+                Some(Cmd::GlideTo { .. }) => only(&glides).or_else(|| own.filter(|s| glides.contains(s))).map(|o| (0, o)),
+                // (the glide behind the group's instant commands - set_pose / set_attachment, done in the replay's
+                // first step: the actor's own glide object says it runs)
+                _ => own.filter(|s| glides.contains(s)).and_then(|o| {
+                    let j = w.scene.tracks[k].queue.iter().position(|c| matches!(c, Cmd::GlideTo { .. }))?;
+                    w.scene.tracks[k].queue[..j].iter().all(|c| matches!(c, Cmd::SetPose { .. } | Cmd::SetAttachment { .. } | Cmd::Face { .. })).then_some((j, o))
+                }),
             }
         });
         // a glide at the head with no glide object left in RAM has ended (the object goes in its last step; the
@@ -2569,6 +2717,25 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
             _ => {}
         }
     }
+    // a camera pan in progress (run 2 cut 57,831: s103 node 0's camera_pan_to(224, 176, 1000) after its fade_out)
+    import_cam_pan(&mut w, ram);
+    // an enemy the script holds in a pose (its state +0x14 the hold state 0x03001B00, `set_pose`) whose `set_pose` the
+    // replay dropped: our puppet on the RAM's cel (run 2 cuts 57,831 .. 58,560: s103's Pikkon, pose 12 then 16; else
+    // ours ran its AI animation, whose script draws)
+    for (o, raw, cel, tick) in ram.actor_rows.iter().map(|r| (r.0, r.2, r.3, r.4)).collect::<Vec<_>>() {
+        if ram.r32(o) != VT_ENEMY || ram.r32(o + 0x14) != 0x0300_1B00 {
+            continue;
+        }
+        let (x, y) = (ram.s32(o + 0x1A0), ram.s32(o + 0x1A4));
+        let Some(i) = (0..w.ents.len()).find(|&i| !w.ents[i].removed && matches!(&w.ents[i].body, Body::Enemy(e) if e.a.x == x && e.a.y == y)) else { continue };
+        let id = w.ents[i].id;
+        if w.scene.puppets.iter().any(|p| p.id == id) {
+            continue;
+        }
+        let aid = (0..25).find(|&a| wf_core::scene::anim_state(a) + 1 == raw).unwrap_or(0);
+        let anim = wf_core::scene::ActAnim { raw, frame: cel, tick, mode: wf_core::scene::AnimMode::Pose, ..wf_core::scene::ActAnim::of(aid) };
+        w.scene.puppets.push(wf_core::scene::Puppet { id, anim });
+    }
     // a replayed `play_anim` on the leader that already ended in the game (the RAM's leader is back in the state it
     // imported with: whole-run cut 153,226, s266's punch anim done, the group still waiting on its prop poof): the
     // command is done, the leader's state the RAM's
@@ -2590,6 +2757,49 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
                     (p.ap.raw, p.ap.frame, p.ap.tick) = (r.2, r.3, r.4);
                 }
             }
+        }
+    }
+    // a replayed `play_anim` / item-get presentation (0x58 / 0x80 / 0x93) whose game command is gone (the actor's
+    // command list +0x18C empty: it ended and the wait with it in the frame before the cut - the script goes on in the
+    // cut's frame; run-2 cut 50,830: s070 node 23's loop of two play_anim(161, 12), the second starts at f0; 62,068:
+    // s110 node 3's give_item(1) done, node 4's text box opens at f0): done, the wait ended, the actor as the RAM has it
+    if matches!(wn, 0x3C | 0x58 | 0x80 | 0x93) {
+        let mut dropped = false;
+        for k in 0..w.scene.tracks.len() {
+            let Owner::Entity(id) = w.scene.tracks[k].owner else { continue };
+            if !matches!(w.scene.tracks[k].queue.first(), Some(Cmd::PlayAnim { anim }) if *anim != 0) && !matches!(w.scene.tracks[k].queue.first(), Some(Cmd::ItemGet { .. })) {
+                continue;
+            }
+            let Some(i) = w.find(id) else { continue };
+            let Some((x, y)) = w.actor(i).map(|a| (a.x, a.y)) else { continue };
+            let leader = w.player_idx(0).filter(|&pi| pi == i);
+            let o = if leader.is_some() {
+                Some(ram.player())
+            } else {
+                ram.objects().into_iter().find(|&o| matches!(ram.r32(o), VT_NPC | VT_NPC_TALK | VT_ENEMY) && ram.s32(o + 0x1A0) == x && ram.s32(o + 0x1A4) == y)
+            };
+            if !o.is_some_and(|o| o != 0 && ram.r32(o + 0x18C) == 0) {
+                continue;
+            }
+            w.scene.tracks[k].queue.remove(0);
+            w.scene.tracks[k].started = false;
+            dropped = true;
+            // (the item icon the replayed start showed, the NPC's held item)
+            w.scene.visuals.retain(|v| !(matches!(v.kind, wf_core::scene::VisualKind::ItemIcon(_)) && v.owner == id));
+            if let Body::Npc(n) = &mut w.ents[i].body {
+                n.hold_item = None;
+            }
+            if let (Some(pi), Some((_, gs))) = (leader, leader_gs) {
+                wf_core::player::import_state(&mut w, pi, gs);
+                if let Some(r) = ram.actor_rows.iter().find(|r| r.0 == ram.player()) {
+                    let p = w.pl(pi);
+                    (p.ap.raw, p.ap.frame, p.ap.tick) = (r.2, r.3, r.4);
+                }
+            }
+        }
+        if dropped && w.scene.tracks.iter().all(|t| t.queue.is_empty()) {
+            w.scene.director.wait = None;
+            w.scene.director.done = true;
         }
     }
     w.scene.tracks.retain(|t| !t.queue.is_empty() || t.holding);
@@ -2625,7 +2835,15 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
     for id in owners {
         let Some(i) = w.find(id) else { continue };
         let Some((x, y)) = w.actor(i).map(|a| (a.x, a.y)) else { continue };
-        let o = if Some(i) == w.player_idx(0) { Some(ram.player()) } else { rows.keys().copied().find(|&o| ram.s32(o + 0x1A0) == x && ram.s32(o + 0x1A4) == y) };
+        // (by position, and by sprite when two stand on one spot - run 2 cut 57,951: s103's Goku and Pikkon spawned at
+        // (0, -8))
+        let spr = wf_core::scene::sprite_id(&w, i);
+        let at = |o: &u32| ram.s32(o + 0x1A0) == x && ram.s32(o + 0x1A4) == y;
+        let o = if Some(i) == w.player_idx(0) {
+            Some(ram.player())
+        } else {
+            rows.iter().find(|(o, r)| at(o) && Some(r.0) == spr).map(|(o, _)| *o).or_else(|| rows.keys().copied().find(|o| at(o)))
+        };
         // (and the facing: a walk the replay found already ended is dropped unstarted, so its turn is not made -
         // whole-run cut 146,883: s237's Baba (222) at the end of her walk up, facing 1 in RAM)
         if let Some(o) = o {
@@ -2747,8 +2965,26 @@ fn build_event_entry(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner:
             return build_mid_event(data, ram, runner, ev, w, calls0, notes);
         }
     }
-    if let Some(ran) = natives_run(ram, runner, ev).filter(|r| ram.screen_black != Some(true) || fade_after_warp(r)) {
-        if ran[..ran.len() - 1].iter().any(|(n, _)| matches!(n, 0x76 | 0x77)) {
+    // (a black screen the node's own fade_out made, no fade_in after it and nothing loaded since: the field stands -
+    // run 2 cut 57,831, s103 node 0's camera_pan_to after its fade_out(25))
+    let black_by_fade_out = |ran: &Vec<(u8, Option<Vec<i32>>)>| {
+        let before = &ran[..ran.len().saturating_sub(1)];
+        let last_fade = before.iter().rposition(|(n, _)| (0x78..=0x79).contains(n));
+        last_fade.is_some_and(|i| before[i].0 == 0x78 && !before[i..].iter().any(|(n, _)| (0x70..=0x77).contains(n)))
+    };
+    if let Some(ran) = natives_run(ram, runner, ev).filter(|r| ram.screen_black != Some(true) || fade_after_warp(r) || black_by_fade_out(r)) {
+        // (a return_to_field (0x75) the node is past - its fade-in over, a later wait: run 2 cut 58,440, s103 node 0 in
+        // its director wait 90 frames after the return; run 2 cuts 58,380 / 58,560: its glide and play_anim after the
+        // return - is mid-node over the restored field too)
+        if ran[..ran.len() - 1].iter().any(|(n, _)| matches!(n, 0x75 | 0x76 | 0x77)) {
+            return build_mid_event(data, ram, runner, ev, w, calls0, notes);
+        }
+        // inside a cutscene map the node loaded (`load_scene` 0x71 run, no `return_to_field` yet, no player object):
+        // the scene map with its actors from RAM (run 2 cut 57,951: s103 node 0's Goku and Pikkon over 0-22). NOT
+        // imported: the field the scene saved (the game's copy of the world struct at [world +0xBF8], 0xE00 bytes:
+        // count +4, objects +8) - its `return_to_field` reloads the area instead of restoring it
+        if ram.player() == 0 && ran[..ran.len() - 1].iter().any(|(n, _)| *n == 0x71) {
+            notes.push("mid-area: inside a load_scene cutscene map - the saved field is not imported (its return reloads it)".into());
             return build_mid_event(data, ram, runner, ev, w, calls0, notes);
         }
         // the node has run actions and none of them loads (its warp, if any, is still ahead): the event is running
@@ -3198,6 +3434,9 @@ fn import_boss_bar(w: &mut World, ram: &GbaRam) {
     if vel < 0 {
         w.scene.boss_bar = None;
         w.scene.boss_bar_out = Some(wf_core::scene::BossBarOut { fill: lo, y, at: w.frame });
+        // its tile block goes with the object: y + 9 updates from here (the object deletes itself below y -8; from a
+        // fresh hide at y 8 that is `BOSS_BAR_OUT`, 17 - run 2 cut 57,741: y 5 at the cut, block 0x35A freed 14 later)
+        wf_core::vram::release_later(w, wf_core::vram::Owner::BossBar, (y + 9).max(0) as u32);
         return;
     }
     let e = ram.r32(o + 0x10);
@@ -3223,6 +3462,7 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
         a.idx[u as usize] = ram.r8(A + 0xC00 + u);
     }
     let mut owners: Vec<(u16, Owner)> = vec![];
+    let mut hud_out: Vec<(u16, i32)> = vec![];
     let mut used_ents: Vec<wf_core::world::EntityId> = vec![];
     let mut signs = 0u32;
     let mut pops: Vec<(u16, i32, u32)> = vec![];
@@ -3294,6 +3534,17 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
                 owners.push((h, Owner::Ent(w.ents[k].id)));
                 continue;
             }
+        }
+        // an enemy's energy wave (vt 0x08049C98, `import_waves`): its block belongs to the wave at its tail
+        if vt == 0x0804_9C98 {
+            let h = ram.r16(o + 0xC);
+            let (x, y) = (ram.s32(o + 0x20) << 8, ram.s32(o + 0x24) << 8);
+            let ent = (0..w.ents.len()).find(|&k| !w.ents[k].removed && !used_ents.contains(&w.ents[k].id) && matches!(&w.ents[k].body, Body::Shot(s) if matches!(s.kind, wf_core::shots::ShotKind::EnergyWave { .. }) && s.x == x && s.y == y));
+            if let (Some(k), true) = (ent, h != 0xFFFF) {
+                used_ents.push(w.ents[k].id);
+                owners.push((h, Owner::Ent(w.ents[k].id)));
+            }
+            continue;
         }
         // the leader's Ki Blast (vt 0x0804B454, `import_player_blasts`): its block belongs to the blast at its position
         if vt == 0x0804_B454 {
@@ -3376,7 +3627,15 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
             let h = ram.r16(o + 0xC);
             if h != 0xFFFF {
                 signs += (vt == 0x0804_D878) as u32;
-                owners.push((h, if vt == VT_HUD { Owner::Hud } else if vt == VT_BANNER { Owner::Banner } else if vt == 0x0804_D878 { Owner::Sign(signs - 1) } else { Owner::StatMark }));
+                // a HUD sliding out (`hide_hud`: +0x14 velocity -1, +0x28 y from 8 down; it deletes itself after y -16,
+                // `HUD_OUT` = 25 updates from a fresh hide): its block goes y + 17 updates from here (run 2 cut 57,741:
+                // s103's hide_hud 3 frames before, y 5)
+                if vt == VT_HUD && ram.s32(o + 0x14) < 0 {
+                    owners.push((h, Owner::HudOut));
+                    hud_out.push((h, ram.s32(o + 0x28) + 17));
+                } else {
+                    owners.push((h, if vt == VT_HUD { Owner::Hud } else if vt == VT_BANNER { Owner::Banner } else if vt == 0x0804_D878 { Owner::Sign(signs - 1) } else { Owner::StatMark }));
+                }
             }
             continue;
         }
@@ -3454,6 +3713,6 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
         // the stat-points mark's draw counter (vt 0x0804C070 +0x14)
         let it = f.iters;
         let stat_at = ram.objects().into_iter().find(|&o| ram.r32(o) == 0x0804_C070).map(|o| it.wrapping_sub(ram.r32(o + 0x14))).unwrap_or(0);
-        f.vram = Some(VramState { a, owners, shared_rc, suspended: vec![], hud_out: vec![], popups, keyed, stashed: None, delayed: vec![], objs, susp: vec![], shadow_set: vec![], popup_at, pass_at: 0, stat_at });
+        f.vram = Some(VramState { a, owners, shared_rc, suspended: vec![], hud_out, popups, keyed, stashed: None, delayed: vec![], objs, susp: vec![], shadow_set: vec![], popup_at, pass_at: 0, stat_at });
     }
 }

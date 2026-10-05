@@ -143,6 +143,13 @@ impl Session {
         w.events.clear();
         w.g.shake_ended = false;
         w.input = inputs;
+        // the soft reset (A + B + SELECT + START held): the game from its boot code (menu/title.rs `reset_world`)
+        if inputs[0].held & crate::menu::title::RESET_KEYS == crate::menu::title::RESET_KEYS {
+            *w = crate::menu::title::reset_world(&self.data, w);
+            w.input = inputs;
+            self.presenter.reset();
+            return;
+        }
         // `return_to_title` (0x8E) last frame: the session restarts on the title screen (menu/title.rs)
         if w.scene
             .requests

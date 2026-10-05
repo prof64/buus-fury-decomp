@@ -89,15 +89,31 @@ stretches between them (245,991 -> 459,733 is 213,742 rows exact).* Routing:
 *Gate meanwhile:* run 1 stays strict; run 2 is a ratchet - `data/realrun2/expected.json` holds its first
 difference row (31,497); check.sh fails only when run 2's first difference (stop or sound) comes earlier, prints
 `IMPROVED` and bumps the file when it comes later. Remove the file once run 2 is exact.
-*Claim (dungeon agent B, 2026-10-04, by the coordinator): run 2's fat-Buu and Janemba chapters* - segments after
-`s_ship` in `route2.SEGMENTS` (names `f_*` fat, `j_*` Janemba), driven by `tools/run2/fat2.py` (my file; it calls the
-dungeon / ship drivers, it does not change them) and appended to `work/run2/keys.json` through `play2.py` (one
-small hook there: a segment whose goals are `('EXT', name)` is driven by `fat2.drive`). Side-content agent: route2.py
-/ play2.py stay yours - I add only the SEGMENTS entries and that hook, and say so here when I touch them. Choices
-(input only, all different from run 1): dungeon order Airship -> Fukurou -> Pyramid -> Desert -> Pilaf -> Thieves ->
-Nataday (run 1: Thieves, Pilaf, Desert, Airship, Fukurou, Pyramid, Nataday), grinding elsewhere, other party
-leaders in the dungeons, supplies bought / used, a death with Continue. Developed on run 1's fat start
-(`work/ship/real4b/c15_after_buu.ss`) until `s_ship` is recorded, then played from run 2's own ship end.
+*Claim (dungeon agent B, 2026-10-04, by the coordinator): run 2's fat-Buu and Janemba chapters* (`f_fat`,
+`j_janemba` in the hand-off below), played by `tools/run2/fat2.py` (my file: pieces = goal lists for the ship /
+dungeon agents' drivers, unchanged, from the state the piece starts in; `python3 tools/run2/fat2.py PIECE START.ss
+START.eeprom` -> `work/run2fat/<piece>.{ss,eeprom,keys.json}`). route2.py / play2.py untouched.
+**Handed over: `work/run2/parts/f_fat.json` (522,530 frames from run 2's ship end, 8-70 -> 0-96 = the Janemba
+prologue, as run 1's `dbx_end`)** - verified in one session from the ship end with its cartridge save
+(`work/run2fat/verify_chain.py`: every piece's end state equal, IWRAM included). Side-content agent: please append
+it (the commented `f_fat` line). Pieces, and how they differ from run 1:
+- `radar` (4,914): Lookout s214, then Bulma's Dragon Radar on the **first** West City visit (run 1's talk reached
+  nobody and it flew back later).
+- `bandana` (18,884): Trunks at West City's save point, the Z-Mart's Chicken Legs (run 1: Hamburgers), the Stolen
+  Airship hunt with no punches first (run 1: 32; a search over 0 .. 47 punches: 0 drops the Bandana at once).
+- `grind_goten` (109,144): Goten to 100 in 8-6 / 8-3 (run 1: Trunks to 80 then Goten to 95, 8-3 first).
+- Dragon Ball order **Airship -> Fukurou -> Pyramid -> Desert -> Pilaf -> Thieves -> Nataday** (run 1: Thieves,
+  Pilaf, Desert, Airship, Fukurou, Pyramid, Nataday). `airship` (40,790): eight Onigiri bought first, **a Save at
+  12-27's save point** (run 1 never saved in the fat chapter), the escape on the self-destruct countdown **rushed
+  without fighting**. `fukurou` (20,644): a Save at 13-1. `pyramid` (72,837): Trunks ground to 85 (run 1: 80) for the
+  gate, a Save at 14-1, Goten with man 2 talked to three times (run 1 had to go back), **a fall into the pit maze**
+  (back up from 14-14) and a bridge switch shot twice. `desert` (18,871): Goten's 27 points a third into SPD.
+  `pilaf` (48,985): four Onigiri, Goten's points POW / SPD, a rest + Save at 10-30 before the Guardian, then **a game
+  over in 10-4 on the way out -> title -> Continue at 10-30** -> the Guardian and the ball again. `thieves` (50,343):
+  a Save at 9-1, **two game overs** (9-5's Juggernaut) -> Continue. `nataday` (98,660): a Save at 15-1, **two game
+  overs at Broly** -> Continue, Goten's points END / POW. `dbx` (38,458): five Hamburgers (run 1: six Onigiri), Goku's
+  points into STR / POW / END (run 1: STR / END).
+Next: `j_janemba` from the end of `f_fat`.
 
 ## 1. One-command workflow
 
@@ -4340,6 +4356,19 @@ All mirrored in the TypeScript reference (cross_ts 0 failures, battle lockstep 7
 airship idles drift ~6 % over a long flight (the game ticks them in fewer frames than ours: 780 vs 728+ ticks in 980
 video frames - not found), Babidi's ship / Earth enemies (ship-fixes'), HoverDrift's walk a frame late (11 frames),
 the 8-17 label (above).
+**Update 7: cel gate 490 segments (19 differ); shipr_238 164 -> 189 exact frames.**
+* **The 8-17 label - solved, not a variant table.** The game's area-definition pointer at the load (0x03001980 =
+  area manager +4) is 0x08090500, the def our content extracted (so no extractor change; the variant sweep is moot).
+  The load at shipr_238 f2788 is a **`load_scene`** (native, loader `0x08009030`, caller 0x08002156): it makes only
+  the area's list 1 (def +0x14, count +4) when its flag is set - never the level signs (list 4), enemies, items or
+  list 0 - unlike the field loader `0x08008B30`. Ours spawned every list on a scene load: `Field.scene_loading`
+  limits `load_area_with` to list 1 (and the deferred objects of a nested scene load likewise). Gates, whole-run
+  check (run 1 exact; run 2 first difference 56,339 -> 124,907, expected bumped by the tool) green.
+* **The Mechanoid's hover walk**: HoverDrift's enter (0x0804EB5C) zeroes the velocity and falls into 0x0804EB68:
+  SetAnim(1), the walk (emulator write watch on the state pointer, db5 12-9 f220 -> SetState from SetAnim(1), caller
+  0x0804EB77). Rust + TS (cross_ts 0 failures, battle lockstep 709).
+* **The airships' idle drift** is the vram purge's suspension choice (world map f909: ours suspends entities 16-21,
+  the game only some of them) -> importer agent's allocator model.
 
 **Done (Earth agent): the no-lag title -> Earth soak's crowd-wander stop (row 190,577) - a menu close that never
 gave the field its sprite memory back.** The crowd NPCs' wander draws were right; their *update order* was not: at
@@ -4971,3 +5000,86 @@ Left in my part: earth_2_90_2 (sprite 123 raw 20), shipr_266 (sprite 300 raw 20)
   (it only matters in 0-55's encounter arena, run 1's d03_hunt; left as it is so run 1 replays).
 Tools: `tools/wholerun/cut.py ROW N OUTDIR --chain run2` (segment-harness cuts of run 2); `work/s3test/msgwho.py` /
 `whomade.py` / `objlist.py` / `aiwatch.py` (local: who took a message, who made an object, the world list, AI stacks).
+
+**To dungeon agent A (sprite allocator), from the ship agent:** an enemy energy wave takes sprite tiles - the game
+allocates **2 tiles** for a Majin soldier's thrown wave (vt 0x08049C98, ctor 0x0802A2EC: `0x801124C(…, 0x80)` /
+`0x8011732` retry, block stored at +0xC) in the frame it is made; ours takes none. Seen in run 2 cut 544,900 (8-42) f61:
+"game only [(325, 2)]", then the next allocations shift (309 vs 311). Gate `rr2_544900_8-42` is recorded without
+sprite-memory rows until this is modelled.
+
+**Claim (ship agent, 2026-10-04, by the coordinator): the Earth + ship-chapter enemy animation-frame (cel) mismatches**
+- taken over from the ship-fixes agent (`cel_exact.json`, the harness's cel comparison). **Ship-fixes agent: you can
+focus on the Save Game screen RNG.** The Super Buu agent keeps fat / Janemba / Super / Kid Buu, and re-locks the cel /
+pixel gates after my changes.
+*Handover (ship fix agent -> real-route agent, by the coordinator):* the Earth / ship enemy-animation work. My edits
+are in the tree, uncommitted: nodes.rs (SoldierThrow frames 0, 1, 2, 1; Gun / Rifle / MummyWrap shots raw 19 under
+once_stop2 / 3) and the same in ai.ts (see the note above). Gated segments green, TS 1,095 green, cross_ts 36. Left:
+earth_2_90_2, shipr_266, shipr_338.
+*Done (ship agent): the Earth + ship cel rows are clean* (`earth_2_90_2` 320 -> 0, `shipr_266_8-38` 96 -> 0,
+`shipr_338_8-16` 152 -> 0):
+* **TauntAnim shows anim 0x13** (raw 20; was anim 4): the controller's enter 0x08033D84 is `SetAnimRaw(0x13)` - Earth
+  2-90's rock thrower (type 38). Battle-shared: mirrored in `ai.ts` (TauntAnim -> 19), TS dumps regenerated, cross_ts 0.
+* **Yakon's PlayAnim13Yakon pose is anim 0x13** (raw 20; was 0x12) in the field (8-38).
+* **Babidi's hit-on-the-ground animation loops** (state 0xC9, PlayAnimTimed type 0x1D: the controller 0x03003030 ticks
+  with the actor - 4 cels of 8 ticks, looping - also while a knockback runs over the node, 8-16): the rule was `hold`.
+  Mirrored in `ai.ts` (`{ rule: 'loop', shift: 3 }`); cross_ts 0.
+* **The harness's cel check took Majin Buu's candy from the form's sheet**: the candy player draws the sweets' sheet
+  (def 0x36, sheet 45 = the row's sprite 54), which ours drew already - only the comparison was wrong (`segment.rs`).
+**Super Buu agent: please re-lock the cel / pixel gates** (`cel_exact.json` and the pixel gate) for these three.
+Note for whoever owns `FieldConfig`: HEAD's `slow_fade_in` field is missing from the test initializers (wf-core
+`field_lockstep`, wf-script-core `lockstep` / `playthrough`, wf-app `field_parity` do not compile on HEAD).
+
+**Run 2: Save Game screen RNG + soft reset (ship fix agent, 2026-10-04).**
+* **The game list's party figures draw the RNG** (save.rs `GameList::built`, a new `Page::built` hook after the
+  redraw):
+  - Each figure is an actor (ctor 0x0800EB60, made by 0x080054BA) made under the idle state 0x03001B0C, whose enter
+    0x0800DFBE is tick = rand(255). That is one draw per figure of the two shown rows, before a non-chosen one is
+    frozen.
+  - The figures also take their object tiles (`vram::figure_created`). Save Game frees them in its popup step: the
+    blocks are free at the end of that iteration, row 240,588.
+  - Run 1 never saved. Run 2's saves at 3-1 / 8-1 / 8-28 / 8-41 diverged here: 141,971, 240,639, 480,403, 508,508
+    and 536,833.
+  - Cuts must carry the EEPROM: a cut without it has empty slots, so no figures and no draws.
+* **The soft reset** (A + B + SELECT + START held; session.rs `step_begin` -> title.rs `reset_world`): the world
+  restarts as the whole run's power-on builds it:
+  - RNG [0, 0], the counter from 0, fresh GameData, current slot 0;
+  - the boot screens, then the title;
+  - the save slots and options kept; the sound driver runs on.
+  - This fixes row 480,611 (8-28: save, reset, Continue).
+* Whole-run app from EEPROM cuts (`work/shipfix/cut_ee.py`, `work/shipfix/r2leg2.sh`): 240,000 -> 459,700 exact
+  (one sound, 277,383, app plays 44, game nothing); 479,800 -> 544,900 exact (reset, title, Continue, the 8-41 save,
+  no sound difference); 141,300 -> 143,026.
+* **Left (not mine):**
+  - 143,026: the 3-1 Continue after run 2's first soft reset. The game draws once in the first world iteration
+    after the Continue (lf 800); ours does not. That is the Continue's area-entry draws, `FieldConfig::arrive`.
+  - 140,866 and later: sound 41 at volume 32 (SFX volume -2) missing in the app; it is there on the old cut too.
+*Run 2 import (A), part 3 - in the shared tree, uncommitted (wf-import lib.rs / host.rs, wf-core scene.rs; resync.py):*
+- **All 107 run-2 cut points re-made with the save memory** (`work/wholerun/run2/cuts`, same RAM, + `init.eeprom`):
+  **97 / 107 exact**; the other 10 are correct refusals (title Continue fade-out x2, boot / title screens x6, inside a
+  load's frozen frames x2). The Continue after the game over now passes in the app (wholerun `--import c33788` on the
+  run-2 master: next stop 35,930, the app's leader idle after Continue - Earth agent / menus).
+- **resync.py fixed (mine):** with the save-capable emulator lib loaded first, `phase()` crashed (that lib has no cycle
+  counter) - the sound phase is now measured in a child process.
+- Import fixes (25 cut points): an NPC wait step keeps RAM's facing; `become_map_object` whose command object
+  (vt 0x0804DEA0) is still on the map object's list (+0x18C) stays started (and owns the map object made in the cut's
+  frame); a play_anim / give_item the game already finished (actor's command list empty) is dropped, the leader's state
+  and the held item back from RAM; a loop's passes counted from the interpreter frame (+0x44 depth, +0x48 counters);
+  the stand-in -> enemy step runs one more frame when the enemy's state object is still there; a frozen pose ("keep"
+  state vt 0x0804985C); a node past `return_to_field` resumes mid-node; puffs a waited parallel group already made are
+  dropped; glides matched through the actor's own movement object (+0x18C); a black screen by the node's own fade_out
+  is mid-event (+ a running camera pan); an enemy held in a pose (state +0x14 = 0x03001B00) is a puppet; a cut inside a
+  `load_scene` cutscene map imports on the scene map (NOT imported: the field the scene saved, world +0xBF8 - its
+  return reloads instead of restoring; c57951 400-row run stops there at f398); the batch start placed from the probe's
+  full action list (`StoryHost::probe_acts`); the boss bar / HUD sliding out free their blocks on time; an enemy's
+  energy wave (vt 0x08049C98) imported.
+- **Item-get icon (rule, `scene.rs`):** `give_item` / `show_item_get` makes an icon object (0x0802BD4C, vt 0x0804B358)
+  with the item's icon size (items 0x083BD2F8 + 0x34 id + 0xC, equipment 0x086F82EC + 0x2C (-id) + 4: 0x100 default,
+  item 9 0x200, 34 / 43..82 0x400, 35 / 36 0x80), freed 60 updates later: ours now takes it (run 2 row 62,000: 7 -> 106
+  / 106). Not yet: a cut while the icon shows does not hand the game's block to it.
+- **rkb_001_0-50 f909 airships (Super Buu agent's report): no rule difference.** Over that one long iteration (logic
+  1,495,744, f909 .. f921) the game suspends the same six objects as ours, in the same order (two purges: 103..100 at
+  f918, then 99 and 98 at f919 - "#99 keeps ticking" is f918, inside the iteration). Ours runs the iteration in one
+  step: a mid-iteration display matter for the pixel side (show the second purge a video frame later).
+- Energy Barrage (c56305 / c56335) was already fixed in 7d433cd (exact now).
+Checks: gates green; whole-run cut points 311 / 315, exit-fade cuts 151 / 152 unchanged; area-entry cuts + tiles
+one gain (rE2__087_2-90+009000 0 -> 1000).

@@ -88,6 +88,7 @@ pub fn config(t: &Value) -> FieldConfig {
         rng: RngInit::State(i(&rng[0]) as u32, i(&rng[1]) as u32),
         xp: true,
         arrive: true,
+        slow_fade_in: false,
     }
 }
 

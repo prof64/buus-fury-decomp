@@ -128,6 +128,18 @@ pub fn push(w: &mut World, i: usize, id: u16) {
     if w.en_ref(i).ai.stack.len() >= 8 {
         return;
     }
+    // the pushed state's animation replaces a running barrage controller (0x030030E0; its exit 0x0802E1BA stops
+    // sound 63): the node under the push finds it gone when the state pops - no more flames (run 2 row 56,339: Pikkon
+    // punched mid-barrage, KnockbackSlide). (Verified for the barrage only; other controllers keep the old rule.)
+    let (serial, n) = w.en_ref(i).ctl;
+    if let Some(c) = ctx_top(w, i).filter(|c| serial != 0 && c.serial == serial && kind(c, n) == K::EnergyBarrage) {
+        if let Some(r) = rt(w, &c, n) {
+            if r.d[7] == 0 && r.f < 48 {
+                r.d[7] = 1;
+                w.events.push(crate::world::Event::SfxStopMatch { id: 63 });
+            }
+        }
+    }
     w.en(i).ai.gen += 1;
     let s = build(w, i, id);
     w.en(i).ai.stack.push(s);
@@ -984,10 +996,13 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             }
         }
         // HoverDrift's velocity lives in the node: a re-entered state starts from 0
+        // enter 0x0804EB5C: the velocity 0, then SetAnim(1) (0x0804EB68: the walk; real route 12-9 db5_006 f220 -
+        // emulator write watch on the state pointer, caller 0x0804EB77)
         K::HoverDrift => {
             let e = w.en(i);
             e.vx = 0;
             e.vy = 0;
+            set_anim(w, i, &[nm("walk")], true, Some(true));
         }
         // enter 0x08031388: first a bump hit (0x0803125C: face, standard melee x1.0, accepted -> 48 + rand(2)), then
         // the hop velocity
@@ -1597,7 +1612,9 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
         // Babidi's state 0xC9 (hit on the ground), enter 0x0802AEDA: SetAnimRaw(0x14) under the controller
         // 0x03003030 (4 cels of 8 ticks, looping) and Majin Buu is pacified (0x0300302C = 1)
         K::PlayAnimTimed if w.en_ref(i).ty == 0x1d => {
-            let h = w.data.anim.hold;
+            // the controller ticks with the actor (not the node): 4 cels of 8 ticks, looping - also while a knockback runs
+            // over the node (real route 8-16, shipr_338 f7,681: ours held the last cel)
+            let h = w.data.anim.loop3;
             set_anim_r(w, i, &[an(20)], true, h);
             w.g.buu_pacified = 1;
         }
@@ -1611,9 +1628,11 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
         }
         // controller 0x0804E030 (enter 0x08033D84): anim 4, frame = tick >> 3, no swing sound; tick 0x20 -> SetAnim(0)
         // (the idle enter's rand(255))
+        // the controller's enter 0x08033D84: SetAnimRaw(0x13) (raw 20; was anim 4 - real route Earth 2-90, earth_2_90_2
+        // f1,250: the rock thrower showed the punch)
         K::TauntAnim => {
             let once = w.data.anim.setanim[&4];
-            en::set_anim_rule(w, i, &[an(4)], true, Some(false), Some(once))
+            en::set_anim_rule(w, i, &[an(19)], true, Some(false), Some(once))
         }
         K::SpawnEnzymes => {
             r.d[0] = 120;
@@ -1686,7 +1705,7 @@ fn leaf_exit(w: &mut World, c: &C, n: u16, _r: &mut NodeRt) {
         K::FlameBreath if _r.f < 128 => w.events.push(crate::world::Event::SfxStopMatch { id: 63 }),
         // ... and Pikkon's barrage controller (0x030030E0, exit 0x0802E1BA: StopMatch(63)) - run 2 row 56,339, the
         // leader's punch interrupts it; its end at tick 48 goes through the same exit (the update)
-        K::EnergyBarrage if _r.f < 48 => w.events.push(crate::world::Event::SfxStopMatch { id: 63 }),
+        K::EnergyBarrage if _r.f < 48 && _r.d[7] == 0 => w.events.push(crate::world::Event::SfxStopMatch { id: 63 }),
         // Babidi can be hit again once he leaves the hover (obj+0x1CC back to 1 with the state change to 0xC6)
         K::BabidiHover => w.en(i).a.hittable = true,
         // (field: the node's own exit is a no-op (vtable 0x0804A6C0 +8 = bx lr); the beam belongs to the actor state
@@ -3491,7 +3510,8 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         // the update after its 32nd tick (real route 8-38: the pose after the combo, then Wait 60)
         K::PlayAnim13Yakon if w.field.is_some() => {
             if f == 1 {
-                set_anim(w, i, &[an(18)], true, Some(false));
+                // (anim 0x13 = raw 20: real route 8-38, shipr_266 f6,062 - the pose showed raw 19)
+                set_anim(w, i, &[an(19)], true, Some(false));
             }
             f >= 33
         }
