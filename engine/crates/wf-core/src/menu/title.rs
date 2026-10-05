@@ -15,9 +15,10 @@
 //!   at (40, 40), Delete / Cancel) and erases it); LEFT / RIGHT on a saved slot pick the character to continue with
 //!   (`0x08004C8C` / `0x08004CE0`: party members that are current or, with the save flag, flagged).
 //!
-//! Not reproduced: Multiplayer (link cable) and the title's OPTIONS page (vt `0x0804A430`: the options and Credits;
-//! it plays its sound and stays here), the party sprites a saved slot shows (character objects with their
-//! animations, `0x080054BA`) and the arrows around the chosen one (`0x08005E9A`).
+//! * OPTIONS → the options page (vt `0x0804A430`, `TPage::Options`, options.rs `Options::new_title`): the three
+//!   sliders and Credits; B back to the title (cursor on START).
+//!
+//! Not reproduced: Multiplayer (link cable), the arrows around a saved slot's chosen character (`0x08005E9A`).
 
 use super::kit::{
     self, Button, Container, Cursor, ItemCtl, Label, Widget, BTN_A, BTN_B, BTN_L, BTN_R,
@@ -36,6 +37,8 @@ pub enum TPage {
     Title,
     Mode,
     Select,
+    /// the title's OPTIONS page (options.rs `Options::new_title`)
+    Options,
 }
 
 /// what the title asks the session to build
@@ -73,6 +76,9 @@ pub struct Title {
     /// update (iterations left)
     #[serde(default)]
     pub held: Option<(u8, Box<GameList>)>,
+    /// the OPTIONS page's controls (`TPage::Options`)
+    #[serde(default)]
+    pub opts: Option<Box<super::options::Options>>,
 }
 
 /// redraw frames (the title picture is decoded each time): measured from the captures
@@ -104,6 +110,7 @@ impl Title {
             leaving: Leaving::No,
             stub: false,
             held: None,
+            opts: None,
         };
         t.set_page(w, TPage::Title);
         t
@@ -137,6 +144,9 @@ impl Title {
                     .map(|i| w.saves.slot(i).map(|d| d.story.current).unwrap_or(0))
                     .collect();
                 self.delete = false;
+            }
+            TPage::Options => {
+                self.opts = Some(Box::new(super::options::Options::new_title(w)));
             }
         }
     }
@@ -421,11 +431,37 @@ impl Page for Title {
                         w.sfx(super::SFX_MENU, 64);
                         if code == 0 {
                             p.set_page(w, TPage::Mode);
+                        } else if code == 1 {
+                            // OPTIONS: the options page (vt 0x0804A430; run 3 row 956,768, a game over's title)
+                            p.set_page(w, TPage::Options);
                         }
                         (true, Some(Action::None))
                     },
                 );
                 act.unwrap_or(Action::None)
+            }
+            TPage::Options => {
+                let Some(mut o) = self.opts.take() else {
+                    self.set_page(w, TPage::Title);
+                    return Action::None;
+                };
+                let (_, act) = kit::run_step(&mut *o, w, |p| &mut p.c, |p, w, _src, code| p.event(w, code));
+                let back = matches!(act, Some(Action::Close));
+                if !back {
+                    self.opts = Some(o);
+                }
+                match act {
+                    // B / Cancel: the title again (its cursor on START)
+                    Some(Action::Close) => {
+                        self.set_page(w, TPage::Title);
+                        Action::None
+                    }
+                    Some(a) => a,
+                    None => {
+                        self.c.drawn = self.opts.as_ref().is_none_or(|o| o.c.drawn);
+                        Action::None
+                    }
+                }
             }
             TPage::Mode => {
                 let (consumed, act) = kit::run_step(
@@ -485,7 +521,12 @@ impl Page for Title {
     fn view(&self, _w: &World, d: &MenuData) -> MenuView {
         let t = &d.text;
         let mut cv = Canvas::new();
+        if let (TPage::Options, Some(o)) = (self.page, self.opts.as_ref()) {
+            // (the options page's frame and controls: heading "Options", string 2)
+            return o.view(_w, d);
+        }
         match self.page {
+            TPage::Options => super::surface_view(cv),
             TPage::Title | TPage::Mode => {
                 cv.ops.push(MenuOp::Image {
                     path: "ui/images/screen_title.png".into(),
@@ -572,7 +613,11 @@ impl Page for Title {
             Some(super::Screen::Title(t)) => Some(t.page),
             _ => None,
         };
+        if self.page == TPage::Options {
+            return None;
+        }
         let own: i64 = match self.page {
+            TPage::Options => return None,
             // (nothing on screen yet: the first draw after the boot screens)
             TPage::Title if w.menu.shown.is_none() => 1_404_063,
             TPage::Title => {
@@ -612,6 +657,7 @@ impl Page for Title {
             (_, Leaving::Continue(0)) => 2,
             (_, Leaving::Continue(_)) => 1,
             (TPage::Select, _) => SELECT_FRAMES,
+            (TPage::Options, _) => super::options::REDRAW_FRAMES,
             _ => TITLE_FRAMES,
         }
     }

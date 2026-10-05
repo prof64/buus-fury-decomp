@@ -166,9 +166,45 @@ pub struct Options {
     pub sliders: [usize; 3],
     /// after the credits: VRAM / palette cleared until the page is drawn again
     pub blank: bool,
+    /// the title's OPTIONS page ([`Options::new_title`])
+    #[serde(default)]
+    pub title: bool,
 }
 
 impl Options {
+    /// the title's OPTIONS page (vt `0x0804A430`): the three sliders and Credits under the heading "Options" (string
+    /// 2); A / "Select", B / "Cancel" (back to the title); no Sleep, no L / R pages
+    pub fn new_title(w: &World) -> Options {
+        let mut o = Options::new(w);
+        let keep: Vec<usize> = (0..o.c.kids.len())
+            .filter(|&i| match &o.c.kids[i] {
+                Widget::Button(b) => b.btn != BTN_L && b.btn != BTN_R,
+                Widget::Text(t) => t.id != 4,
+                // the page names beside L / R (Equip / Journal)
+                Widget::Label(l) => l.y != 0x14,
+                _ => true,
+            })
+            .collect();
+        let mut c = Container::default();
+        let mut map = vec![usize::MAX; o.c.kids.len()];
+        for &i in &keep {
+            let mut k = o.c.kids[i].clone();
+            if let Widget::Text(t) = &mut k {
+                if t.id == 3 {
+                    // Credits: UP to Text Speed, DOWN to Sound FX Volume, centred
+                    t.nav = [2, 0, -1, -1];
+                    t.x = 0x78;
+                }
+            }
+            map[i] = c.add(k);
+        }
+        o.a_btn = map[o.a_btn];
+        o.sliders = o.sliders.map(|i| map[i]);
+        o.c = c;
+        o.title = true;
+        o
+    }
+
     /// `0x080147B8`
     pub fn new(w: &World) -> Options {
         let t = &w.data.menu.as_ref().expect("menu content").text;
@@ -249,10 +285,12 @@ impl Options {
             a_btn,
             sliders,
             blank: false,
+            title: false,
         }
     }
 
-    fn event(&mut self, w: &mut World, code: i32) -> (bool, Option<Action>) {
+    /// the page's events (also the title's OPTIONS page, title.rs)
+    pub fn event(&mut self, w: &mut World, code: i32) -> (bool, Option<Action>) {
         match code {
             0 => match self.c.sel {
                 // Credits: a nested mode (credits.rs), then the page's VRAM is reset and the page drawn again
