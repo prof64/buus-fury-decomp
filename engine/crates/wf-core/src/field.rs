@@ -445,6 +445,11 @@ pub struct Field {
     /// the HUD object's low-HP beep stamp (hud +0x10: the logic counter at the last beep, the load's at creation)
     #[serde(default)]
     pub hud_beep: u32,
+    /// a Continue's load whose on-enter script holds the players out (`create_hosted`): the HUD object is made with
+    /// them, when the arrival completes - its first update's low-HP beep comes then (`finish_arrival`), not in the
+    /// slot load's own frame
+    #[serde(default)]
+    pub arrival_beep: bool,
     /// `hide_hud`'s logic frame: the HUD object slides out (hud +0x14 = -1, its position +0x28 by 1 an update from 8
     /// to -16) and deletes itself in the 25th update (`vram::HUD_OUT`), its low-HP beep running until then (run 2 row
     /// 136,351: hidden at logic frame 126,717, gone at 126,742, no beep at 126,755; the 18-14 count of 38 was video
@@ -674,6 +679,7 @@ fn new_field() -> Field {
         scene_load: false,
         scene_loading: false,
         hud_beep: 0,
+        arrival_beep: false,
         hud_hidden_at: None,
         event_started_pre: false,
         event_nested: false,
@@ -682,6 +688,17 @@ fn new_field() -> Field {
 
 /// build a field world (a new game or a saved story) and load the start area
 pub fn create(data: Arc<crate::content::GameData>, cfg: &FieldConfig) -> World {
+    create_with(data, cfg, false)
+}
+
+/// [`create`] for a field a script host drives from its load on (the title's Continue under the story host: an
+/// on-enter script holds the players out of the world as on any entry - run 2 row 1,007,984, the Continue into
+/// 15-1 whose map event 0x0808986C runs before the player and HUD exist, two iterations after the load)
+pub fn create_hosted(data: Arc<crate::content::GameData>, cfg: &FieldConfig) -> World {
+    create_with(data, cfg, true)
+}
+
+fn create_with(data: Arc<crate::content::GameData>, cfg: &FieldConfig, host: bool) -> World {
     let rng = match cfg.rng {
         battle::RngInit::Seed(s) => crate::rng::Rng::from_seed(s),
         battle::RngInit::State(a, b) => crate::rng::Rng::new(a, b),
@@ -711,6 +728,9 @@ pub fn create(data: Arc<crate::content::GameData>, cfg: &FieldConfig) -> World {
         w.story.current = c;
     }
     w.field = Some(Box::new(new_field()));
+    if let Some(f) = w.field.as_mut() {
+        f.host = host;
+    }
     let fd = field_data(&w);
     let pos = cfg
         .pos
@@ -1312,6 +1332,14 @@ pub fn finish_arrival(w: &mut World) {
         crate::scene::bring_back(w);
     }
     arrive(w, ar.to, ar.x, ar.y, ar.facing);
+    // the HUD made with the players beeps in its first update (a hosted Continue's load: `arrival_beep`)
+    if w.field.as_mut().is_some_and(|f| std::mem::take(&mut f.arrival_beep)) {
+        let now = w.g.clock_mark.map(|c| c + 1).unwrap_or(w.g.clock(w.frame)) as u32;
+        if let Some(f) = w.field.as_mut() {
+            f.hud_beep = now.wrapping_sub(61);
+        }
+        hud_beep(w);
+    }
     if ar.fade_in {
         begin_fade_in(w);
         // a script that blocked finishes as its host resumes it, before this frame's field step: the fade-in's
@@ -1991,12 +2019,23 @@ pub fn post_step(w: &mut World) {
                 crate::enemy::release_update(w, k);
             }
         }
-        // the players' form controllers run too (2-90: the Super Saiyan drain's phase after s121)
+        // the players' form controllers run too (2-90: the Super Saiyan drain's phase after s121), their control with
+        // the frame's own keys, not the cutscene mask's (run 2 row 856,025, Kyodai Pyramid 14-21: A pressed in the
+        // frame the bridge switch's s418 ends - the punch starts there)
         if queued {
+            if let Some(raw) = w.field.as_mut().and_then(|f| f.raw_input.take()) {
+                w.input = raw;
+            }
+            let shakes = w.g.shakes.len();
             for s in 0..w.players.len() {
                 if let Some(pi) = w.player_idx(s) {
                     crate::player::release_passive(w, pi);
                 }
+            }
+            // the task list runs after the objects: a shake the released update started (the punch breaking the
+            // switch block again) draws its first offset in this frame (the held pass already ticked the older ones)
+            if w.g.shakes.len() > shakes {
+                w.tick_shakes();
             }
         }
     }

@@ -798,6 +798,7 @@ fn field_from_ram(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
         }
     }
     import_death_effects(w, ram, notes);
+    import_breakables(w, ram, notes);
     import_player_blasts(w, ram);
     import_coins(w, ram);
     import_emotes(w, ram);
@@ -2052,20 +2053,32 @@ fn import_emote_cmds(w: &mut World, ram: &GbaRam) {
 
 /// props moving at the cut (`prop_move_to`, object vt 0x0804B92C: +8 / +0xC the target px, +0x10 speed, +0x1C /
 /// +0x20 the step in 1/256 px, +0x24 / +0x28 the position 24.8, +0x2C the steps left): the replayed command takes the
-/// RAM's step and count (it restarted from the prop's position: run 1 cut 38,386, s103 node 0's two props over the
-/// 0-22 cutscene map - the group ended 39 frames later in the game, later in ours)
+/// RAM's step and count, the prop the RAM's position (the area load put it where the flags say it ends: run 2 cuts
+/// 859,325 .. 860,353, Kyodai Pyramid 14-21's s418 - the four bridge blocks already at their targets, the group's
+/// wait over in the next frame; run 1 cut 38,386, s103 node 0's two props over the 0-22 cutscene map)
 fn import_prop_moves(w: &mut World, ram: &GbaRam) {
-    use wf_core::scene::{Cmd, Owner};
+    use wf_core::scene::{Cmd, Owner, Prop};
     let objs = ram.ewram_with(0x0804_B92C);
+    let mut at = vec![];
     for t in w.scene.tracks.iter_mut() {
-        let Owner::Prop(_) = t.owner else { continue };
+        let Owner::Prop(id) = t.owner else { continue };
         if let Some(Cmd::PropMoveTo { x, y, n, t: tt, sx, sy, .. }) = t.queue.first_mut() {
             if let Some(&o) = objs.iter().find(|&&o| (ram.s32(o + 8), ram.s32(o + 0xC)) == (*x, *y) && ram.s32(o + 0x2C) >= 0) {
                 (*sx, *sy, *n, *tt) = (ram.s32(o + 0x1C), ram.s32(o + 0x20), ram.s32(o + 0x2C), 0);
                 t.started = true;
+                at.push((id, ram.s32(o + 0x24), ram.s32(o + 0x28)));
             }
         }
     }
+    let Some(load) = w.field.as_ref().map(|f| f.loads) else { return };
+    for (id, x, y) in at {
+        let visible = w.field.as_ref().and_then(|f| f.props.get(id.max(0) as usize)).is_none_or(|p| p.visible);
+        match w.scene.props.iter_mut().find(|p| p.id == id && p.load == load) {
+            Some(p) => (p.x, p.y) = (x, y),
+            None => w.scene.props.push(Prop { id, x, y, visible, frame: 0, vy: 0, load }),
+        }
+    }
+    wf_core::scene::sync_props(w);
 }
 
 /// an inline script stopped in its code: (id, the natives its interpreter has run - the last the waiting one)
@@ -2209,6 +2222,50 @@ fn import_death_effects(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
         let d = (due, wf_core::world::EntityId::MAX, ty, ram.s32(o + 8), ram.s32(o + 0xC), ram.s32(o + 0x10), ram.s32(o + 0x14));
         if let Some(f) = w.field.as_mut() {
             f.pending_drops.push(d);
+        }
+    }
+}
+
+/// the breakables as the cut has them (vt 0x0804CE00: +0xC u8 HP, +0x14..+0x20 the box px, +0x24 the shake's frames
+/// left, +0x2C the bound prop) and their break calls on the delayed-call list (vt 0x08049BB4: +4 updates left, +8 the
+/// breakable; the countdown holds while an event runs - run 2 cut 788,100: the box punched to 0 HP with the kill
+/// that levelled up, shaking 5 more frames and its loot 15 updates after the popup closes)
+fn import_breakables(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
+    let objs: Vec<u32> = ram.objects().into_iter().filter(|&o| ram.r32(o) == 0x0804_CE00).collect();
+    let n = ram.r32(0x0300_225C).min(32);
+    let calls: Vec<(u32, u32)> = (0..n)
+        .map(|k| ram.r32(0x0300_2260 + 4 * k))
+        .filter(|&c| ram.valid(c) && ram.r32(c) == 0x0804_9BB4)
+        .map(|c| (ram.r32(c + 8), ram.s32(c + 4).max(0) as u32))
+        .collect();
+    let bx_of = |o: u32| [ram.s32(o + 0x14), ram.s32(o + 0x18), ram.s32(o + 0x1C), ram.s32(o + 0x20)];
+    for k in 0..w.ents.len() {
+        let Body::Breakable(b) = &w.ents[k].body else { continue };
+        if w.ents[k].removed || b.broken {
+            continue;
+        }
+        let id = w.ents[k].id;
+        let Some(o) = objs.iter().copied().chain(calls.iter().map(|c| c.0)).find(|&o| ram.valid(o) && bx_of(o) == b.bx) else {
+            continue;
+        };
+        let (hp, shake) = (ram.r8(o + 0xC) as i32, ram.s32(o + 0x24).max(0));
+        let call = calls.iter().find(|c| c.0 == o).map(|c| c.1);
+        let Body::Breakable(b) = &mut w.ents[k].body else { continue };
+        b.hp = hp;
+        b.shake = shake;
+        if hp == 0 {
+            b.broken = true;
+        }
+        if let Some(left) = call {
+            // (the call runs in the `left`-th update from here - run 2 cut 788,141: 12 left, the loot at 788,152; an
+            // event holding the field at the cut holds the countdown in the cut's frame and in the frame it ends:
+            // cut 788,100, 15 left, s003 ends at 788,137, the loot at 788,152)
+            let at = w.frame + left + 2 * (w.scene.depth > 0) as u32;
+            if let Some(f) = w.field.as_mut() {
+                f.deferred.push(wf_core::fieldobj::Deferred::Break { at, entity: id });
+            }
+        } else if hp == 0 {
+            notes.push(format!("mid-area: a breakable at {:?} has no HP and no break call", bx_of(o)));
         }
     }
 }
@@ -2478,6 +2535,87 @@ fn build_mid_event(_data: &Arc<GameData>, ram: &GbaRam, runner: &mut StoryHost, 
             let draws = w.rng.calls.wrapping_sub(calls0);
             return Built { world: w, draws, held: 0, finished: true };
         }
+        // a death effect's on-defeat callback started inside the world update (0x08011A5F on the stack): the effect
+        // (vt 0x0804955C, its countdown over: +0x1C the callback, +0x20 its enemy) has left the delayed-call list but
+        // its pointer stays in the list's first slot. It starts as `defeat_later` starts it, holding the frame (run 2
+        // cut 884,710, 11-24: a Majin's drop script, then s377 - the flags of the five Majins - in one frame)
+        let held = (0x0300_7000u32..0x0300_8000).step_by(4).any(|a| ram.r32(a) == 0x0801_1A5F);
+        let de = ram.r32(0x0300_2260);
+        let on_defeat = w.field.as_ref().and_then(|f| w.data.field.as_ref()?.area(f.area.world, f.area.area)).is_some_and(|a| {
+            a.objects.iter().any(|o| matches!(&o.kind, wf_core::fieldcontent::ObjKind::Enemy { on_defeat: Some(Callback::Event(s)), .. } if *s == name))
+        });
+        if held && on_defeat && ram.valid(de) && ram.r32(de) == 0x0804_955C && ram.r32(de + 0x1C) != 0 && ram.valid(ram.r32(de + 0x20)) {
+            let eo = ram.r32(de + 0x20);
+            let (x, y) = (ram.s32(eo + 0x1A0) >> 8, ram.s32(eo + 0x1A4) >> 8);
+            let ty = ((ram.r32(eo + 0x224).wrapping_sub(0x0871_1274)) / 28) as i32;
+            w.scene.depth = 0;
+            field::set_busy(&mut w, false);
+            if let Some(f) = w.field.as_mut() {
+                f.event_ended = false;
+            }
+            let cause = field::Cause::Defeat { entity: wf_core::world::EntityId::MAX, ty, x, y, loot: None };
+            runner.run_events(&mut w, &[Event::Field(field::FieldEvent::Run { run: Callback::Event(name), cause, slot: 0 })]);
+            if let Some(f) = w.field.as_mut() {
+                f.held = true;
+                f.held_event = true;
+            }
+            notes.push(format!("event s{:03}: a death effect's on-defeat callback started in the cut's frame", ev.0));
+            let draws = w.rng.calls.wrapping_sub(calls0);
+            return Built { world: w, draws, held: 0, finished: true };
+        }
+        // the engine hook #0 (the death script) the KO timer started in the cut's frame (`menu::gameover::tick`: its
+        // form revert already in RAM): started as the timer starts it, node 0 next frame (run 2 cuts 1,037,213 /
+        // 1,319,520)
+        // (the KO's own state is over by then - the leader holds at HP 0: down, not hittable)
+        let down = w.player_idx(0).filter(|&i| w.pl_ref(i).rec.hp == 0);
+        if let (None, 0, Some(i)) = (fresh_trig, ev.0, down) {
+            let p = w.pl(i);
+            p.dead = true;
+            p.a.hittable = false;
+            w.scene.depth = 0;
+            field::set_busy(&mut w, false);
+            if let Some(f) = w.field.as_mut() {
+                f.event_ended = false;
+            }
+            let ev_run = Event::Field(field::FieldEvent::Run { run: Callback::Event(name), cause: field::Cause::Menu, slot: 0 });
+            runner.run_events(&mut w, &[ev_run]);
+            notes.push("event s000: the death script the KO timer started in the cut's frame (its first node next frame)".into());
+            let draws = w.rng.calls.wrapping_sub(calls0);
+            return Built { world: w, draws, held: 0, finished: true };
+        }
+        // a breakable's on-break callback (the box broken 16 frames before, its `0x0800C628` in the cut's frame): it
+        // starts as `fieldobj::break_done` starts it (run 2 cut 856,042: Kyodai Pyramid 14-21's switch block, s418)
+        let brk = w.field.as_ref().and_then(|f| {
+            let fd = w.data.field.as_ref()?;
+            let a = fd.area(f.area.world, f.area.area)?;
+            a.objects.iter().find_map(|o| match &o.kind {
+                wf_core::fieldcontent::ObjKind::Breakable { prop, on_break: Some(Callback::Event(e)), .. } if *e == name => {
+                    let r = f.props.get(*prop.max(&0) as usize).map(|p| p.rect)?;
+                    Some((o.at, (r.x0 + r.x1) >> 1, r.y1))
+                }
+                _ => None,
+            })
+        });
+        if let Some((obj, x, y)) = brk {
+            w.scene.depth = 0;
+            field::set_busy(&mut w, false);
+            let ev_run = Event::Field(field::FieldEvent::Run { run: Callback::Event(name), cause: field::Cause::Break { obj, x, y }, slot: 0 });
+            runner.run_events(&mut w, &[ev_run]);
+            // (ours stamps the break a frame before the event's first frame: the players are held in the cut's frame,
+            // updated again from the next - the punch that broke the box ends there)
+            let frame = w.frame;
+            if let Some(f) = w.field.as_mut() {
+                f.event_ended = false;
+                f.busy_since = frame.wrapping_sub(1);
+                f.busy_pre_pass = frame;
+                f.queued_event = true;
+                f.break_event = frame;
+                f.break_cb = true;
+            }
+            notes.push(format!("event s{:03}: started by its breakable's break in the cut's frame (its first node next frame)", ev.0));
+            let draws = w.rng.calls.wrapping_sub(calls0);
+            return Built { world: w, draws, held: 0, finished: true };
+        }
         notes.push(format!("unsupported: event s{:03} started in the cut's frame by no trigger of ours", ev.0));
     }
     runner.continue_event(&mut w, ev.0, ev.1, ev.2, 0, None);
@@ -2690,7 +2828,7 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
     // the waiting native among our queued actions (a branch the script did not take has natives in the bytecode
     // but not in the queue): its k-th occurrence by id and constant arguments
     let (wn, wargs) = ran[ran.len() - 1].clone();
-    let k = ran.iter().filter(|(n, a)| *n == wn && (wargs.is_none() || *a == wargs)).count() + loop_extra(ram, runner, ev, wn, &wargs);
+    let k = std::cell::Cell::new(ran.iter().filter(|(n, a)| *n == wn && (wargs.is_none() || *a == wargs)).count() + loop_extra(ram, runner, ev, wn, &wargs));
     let seen = std::cell::RefCell::new(vec![]);
     let hits = std::cell::Cell::new(0usize);
     let pred = |n: u8, a: &[i32]| {
@@ -2698,13 +2836,26 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
         if m {
             hits.set(hits.get() + 1);
         }
-        let hit = m && hits.get() == k;
+        let hit = m && hits.get() == k.get();
         if !hit {
             seen.borrow_mut().push(n);
         }
         hit
     };
+    let (w_probe, snap_probe) = (w.clone(), runner.snapshot());
     let mut found = runner.probe_queued(&mut w, ev.0, ev.1, ev.2, &pred);
+    // the count above takes every matching native in the bytecode before the PC, a branch the node did not take
+    // included: when the probe's run reached fewer, the waiting one is the last it reached (run 2 cuts 859,325 ..
+    // 860,353: s418 node 0 waits in the flag-272 branch's end_parallel, the flag-271 branch's comes before it)
+    if found.is_none() && (1..k.get()).contains(&hits.get()) {
+        // (from the world before that probe: it ran the node through - s418's flag writes after its wait)
+        w = w_probe;
+        runner.restore(&snap_probe);
+        k.set(hits.get());
+        seen.borrow_mut().clear();
+        hits.set(0);
+        found = runner.probe_queued(&mut w, ev.0, ev.1, ev.2, &pred);
+    }
     // a `play_anim` on the leader that transformed it in the cut's frame (the power-up, script anim 23: the RAM's
     // form is the new one, the wait ends in the next frame): the node's queries before it (`is_super_saiyan`) read
     // the form before - the node is replayed with the leader in that form (its `down`), the RAM's put back after

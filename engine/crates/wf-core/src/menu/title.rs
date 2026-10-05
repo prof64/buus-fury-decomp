@@ -863,17 +863,29 @@ pub fn boot(data: &Arc<crate::content::GameData>, w: &mut World) -> Option<World
                 slow_fade_in: w.opts.no_lag,
                 ..Default::default()
             };
-            let mut nw = crate::field::create(Arc::clone(data), &cfg);
+            let hosted = w.field.as_ref().is_some_and(|f| f.host);
+            let mut nw = if hosted {
+                crate::field::create_hosted(Arc::clone(data), &cfg)
+            } else {
+                crate::field::create(Arc::clone(data), &cfg)
+            };
             // the frame counter 0x03000F94 runs on from the title, as for New Game (run 2 row 143,026: the Continue
             // after the soft reset - the field NPCs' clock-stamped timers drew one frame early with the counter at 1)
             // (unlike New Game the slot load's iteration is the new world's own: its menu leave counts it)
             nw.g.fc0 = clock0 - nw.frame as i64;
             // the slot load's iteration creates the HUD and runs its update: a low-HP beep then (run 2 row 142,953:
             // the 3-1 Continue with Gohan low, sound 41 in the load's iteration, counter 799)
+            // (a hosted load whose on-enter script holds the players out: the HUD comes with them, `arrival_beep`)
             if w.opts.no_lag {
-                nw.g.clock_mark = Some(clock0 - 1);
-                crate::field::hud_beep(&mut nw);
-                nw.g.clock_mark = None;
+                if nw.field.as_ref().is_some_and(|f| f.arrival.is_some()) {
+                    if let Some(f) = nw.field.as_mut() {
+                        f.arrival_beep = true;
+                    }
+                } else {
+                    nw.g.clock_mark = Some(clock0 - 1);
+                    crate::field::hud_beep(&mut nw);
+                    nw.g.clock_mark = None;
+                }
             }
             nw.menu.phase = Phase::Leave { t: 1 };
             if w.opts.no_lag {

@@ -111,7 +111,7 @@ SEGMENTS.append(('s_ship', ('KEYS', 'work/run2/parts/s_ship.json')))
 # they land
 SEGMENTS.append(('f_fat', ('KEYS', 'work/run2/parts/f_fat.json')))            # soak agent: fat Buu
 SEGMENTS.append(('j_janemba', ('KEYS', 'work/run2/parts/j_janemba.json')))    # soak agent: Janemba
-# SEGMENTS.append(('b_superbuu', ('KEYS', 'work/run2/parts/b_superbuu.json')))  # side-content: Super / Kid Buu
+SEGMENTS.append(('b_superbuu', ('KEYS', 'work/run2/parts/b_superbuu.json')))  # side-content: Super / Kid Buu
 
 
 def chapter_of(name):

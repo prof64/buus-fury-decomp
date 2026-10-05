@@ -5303,6 +5303,14 @@ warp_fade arrival's idle draw comes after the frame's object pass - the handler 
 its nested fade-in loop returns; the free player's punch ends in the pass first, so the game draws twice -
 `field::arrival_idle`). From the cut at 1,103,000 the whole-run app now runs exact to 1,238,866 (Janemba, B's).
 1,038,486 (death -> Continue, 15-1) stays B's. Gates, whole-run check (run 1 exact, run 2 ratchet) green.
+*Split check (real-route agent, 2026-10-05):* from a cut after the Continue (1,039,000) the app is exact to 1,238,866
+(Janemba, B's): nothing unclaimed is left in my half of `f_fat` after 1,103,549. 763,327 .. 763,606 is the importer
+agent's (its helper's patch); my helper on it is stopped. Remaining `f_fat` stops are A's (788,137 .. 788,152,
+856,025 .. 860,353) and B's (Continue stretches 1,007,984 / 1,008,000, 1,038,486 .. 1,038,551) - A / importer: say
+here if you want me to take any of 788k / 856k.
+**Hand-over (coordinator, 2026-10-05):** 788,137 .. 788,152 and 856,025 .. 860,353 move from A to the real-route
+agent (A: please drop them). Import-side changes there (wf-import `host.rs` / `lib.rs`) go through the importer agent
+first.
 
 *(1) Quick start - fixed.* Real game (emulator, run 1's own keys from power-on to Snake Way, `work/ub/probe.py`): Goku's
 record at New Game = skills [7 Energy Blast, 20 Super Saiyan, 15 Kamehameha, 14 Instant Transmission], all level 0;
@@ -5364,3 +5372,29 @@ experiment below, reverted.)
   release for ordinary from-wait exits, which earlier changed run 1 / 2-90 (s121's own `queued` rule, field.rs). Next:
   measure the 2-90 s121 exit with sswatch.py against both run-1 rows before widening either.
 *Run 2 fat 763,327 .. 763,606 (A; shots.rs, wf-import host.rs / lib.rs; uncommitted):* the 12-26 lift's inline script holds the field - a grappler arm (vt 0x0804B380) stands still while a script holds the field (no growth, hit test or counter: ours grabbed the walking player); a cut inside a running inline script imports it (`StoryHost::probe_inline`). Gates green, check.sh EXACT (run 1 both legs; run 2 first difference 161,796 as expected - Earth), whole-run 310 / 315, run-2 cut points 97 / 107, exit-fade 151 / 152 unchanged.
+*Run 2 fat 788,137 .. 884,710 (A):* the rule parts duplicated the real-route agent's (break timer held under the
+popup, a bomb bursting under a held field sends no blast - already in the tree, dropped from A's patch). Kept, import
+side (wf-import lib.rs, uncommitted): `import_breakables` (a breakable's HP +0xC, shake frames +0x24, a queued break
+call vt 0x08049BB4 on the delayed-call list 0x0300225C -> our countdown, +2 while an event holds the field; segment
+cut 788,100 37 -> 60 / 60) and an enemy's on-defeat event started by a death effect inside the world update (return
+0x08011A5F on the stack, the death effect in list slot 0) imports as `defeat_later` holding the frame (884,710, s377).
+Gates green.
+*Run 2 fat chapter, merged (A; wf-core field.rs, wf-import lib.rs; uncommitted). Stops fixed by A's helpers:*
+- **856,025 .. 860,353 (14-21, s418):** at an event's exit frame, the leader's update (an event run from the
+  world's event list) takes the frame's real keys, not the cutscene-masked ones (the game punches on that frame), and
+  the shake it starts is ticked after the objects; the flag-271 stops followed from it. Import: a node with two flag
+  branches each ending in `end_parallel` uses the last match the probe reached (world restored before the retry);
+  moving blocks take step, steps left **and position** from the move object (vt 0x0804B92C, `import_prop_moves` -
+  merged with A's earlier version); an event started by a breakable's on-break callback (856,042) starts from that
+  breakable with the app's break stamps, a frame before the cut.
+- **1,007,984 / 1,008,000 (Continue into 15-1):** the map event `inline_0x0808986C` holds the player and HUD out
+  two iterations after the load; our Continue built its world before the host was attached. `field::create_hosted`
+  is in, but **not used yet** - using it for every hosted Continue loses the low-HP beep of the 3-1 Continue (run 2
+  row 142,953); A is on it.
+- **1,037,213 / 1,319,520 (import):** s000 started by the KO timer in the cut's frame (leader HP 0) imports as the
+  timer starts it (300-row cuts exact; from 1,319,520 the app is exact to the end, 1,347,125).
+- 1,036,068 .. 1,037,212, 1,038,535 / 551, 1,103,549, 873,656 .. 884,710 (rules): the real-route agent's fixes.
+Checks (shared tree): gates green; check.sh EXACT (run 1 both legs, run 2 first difference 161,796 = expected);
+whole-run 310 / 315, run-2 cut points 97 / 107, exit-fade 151 / 152, cutscene-map cuts 31 / 35 + 12 / 13; area-entry
+cuts + tiles identical to HEAD.
+*Continue into a held area (A):* the game builds the HUD with the players - on a plain load (3-1, counter 799) in the load's own iteration, where its first update beeps; on a load whose on-enter script holds the players out (15-1's map event) when they arrive. The Continue now builds a hosted world with `field::create_hosted` and, when an arrival is pending, runs the HUD's first low-HP beep check in `finish_arrival` (`Field::arrival_beep`, stamp now - 61). App runs (sounds compared, no-lag) exact with 0 sound differences across the 3-1 Continue (141,300 -> 143,300), 15-1 (1,006,000 -> 1,012,000, row 1,007,984), the Continue after the game over (33,788 -> 37,000), the soft reset -> Continue at 8-28 (480,404 -> 483,000) and B's 1,038,486 Continue (1,037,243 -> 1,040,500). Gates, wf-app tests green; check.sh EXACT (run 2 first difference 161,796 as expected).
