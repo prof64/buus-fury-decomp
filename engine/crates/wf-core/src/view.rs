@@ -372,6 +372,7 @@ pub fn render_view(w: &World, out: &mut RenderView) {
         priority: sl.priority,
         blend: sl.blend,
         alpha: sl.alpha,
+        offset: sl.offset,
     });
     out.map = Some(MapView {
         id: map_id,

@@ -238,6 +238,9 @@ impl Session {
         // hit leader does not take its step, Goten's anim misses one update); the players' keys are masked as in
         // `pre_step` for a running one
         let pre_event = w.field.as_ref().is_some_and(|f| f.busy && f.event_started_pre && f.event_nested);
+        if std::env::var_os("WAVE_DBG").is_some() && w.frame > 3120 && w.frame < 3135 {
+            eprintln!("SESS f{} frozen {} sfrozen {} pre {} break {:?} menu {} modal {:?} susp {:?}", w.frame, crate::field::frozen(w), crate::scene::frozen(w), pre_event, w.field.as_ref().map(|f| f.break_event), crate::menu::active(w), w.modal, w.ents.iter().map(|e| crate::vram::suspended(w, e.id)).collect::<Vec<_>>());
+        }
         if w.field.as_ref().is_some_and(|f| f.busy && f.raw_input.is_none() && f.event_started_pre)
             && !crate::field::free_arrival(w)
         {
@@ -313,6 +316,10 @@ impl Session {
                 }
                 battle::pre_step(w);
                 w.step_entities();
+                // the death script's group wait (modal: the leader) - the other enemies' state ticks go on
+                if w.modal.is_some() {
+                    crate::enemy::ko_state_ticks(w);
+                }
             } else if (crate::field::frozen(w) || pre_event) && !watch_closing {
                 // the task list (screen shakes) keeps running while an inline event holds the objects' update (the
                 // real route, Southwest Forest 8-3: a crit shake draws its offsets through the level-up popup)
@@ -323,6 +330,10 @@ impl Session {
                 // there (run 2 row 1,345,851, HFIL 18-14: a punch's kill, the callback's hold from the next frame's
                 // start - the game beeps in it)
                 crate::field::hud_beep_held(w);
+                // the death script's hold: the enemies' state ticks go on (enemy.rs `ko_state_ticks`)
+                if !pre_event {
+                    crate::enemy::ko_state_ticks(w);
+                }
             }
             // a warp_fade arrival's idle draw, after the pass (field.rs `arrival_idle`)
             crate::field::arrival_idle(w);

@@ -239,12 +239,16 @@ impl Story {
     pub fn equipment_count(&self, id: i32) -> i32 {
         self.equipment.iter().filter(|&&e| e == id).count() as i32
     }
+    #[track_caller]
     pub fn add_equipment(&mut self, id: i32) {
+        if std::env::var_os("XEQ").is_some() { eprintln!("XEQ add {} play_frames {} at {}", id, self.play_frames, std::panic::Location::caller()); }
         if self.equipment.len() < EQUIPMENT_MAX {
             self.equipment.push(id);
         }
     }
+    #[track_caller]
     pub fn take_equipment(&mut self, id: i32) -> bool {
+        if std::env::var_os("XEQ").is_some() { eprintln!("XEQ take {} play_frames {} at {}", id, self.play_frames, std::panic::Location::caller()); }
         match self.equipment.iter().position(|&e| e == id) {
             Some(k) => {
                 self.equipment.remove(k);

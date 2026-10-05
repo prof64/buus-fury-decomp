@@ -841,7 +841,9 @@ impl World {
             .collect()
     }
 
+    #[track_caller]
     pub fn sfx(&mut self, id: i32, vol: i32) {
+        if id == 39 && std::env::var_os("XS39").is_some() { eprintln!("XS39 frame {} clock {} at {}", self.frame, self.g.clock(self.frame), std::panic::Location::caller()); }
         self.events.push(Event::Sfx { id, vol });
     }
     pub fn sfx_stop(&mut self, id: i32) {

@@ -3411,10 +3411,11 @@ fn follow_step(w: &mut World, id: EntityId) {
 /// a script camera command sets the camera object's mode (`0x08021094`: the old mode's exit, the new one's enter).
 /// A screen shake is a mode pushed on that camera (`0x0800797C` -> `0x080210D6`): replaced, it ends - no more
 /// offset draws (VERIFIED segment sb 6-6 f4694: Gotenks' crit shake stops at s228's camera_pan_to)
+/// The BG layers keep the shake's last offset then - only a shake's own end resets them (layer objects +0x34 /
+/// +0x38: (3, -3) from f4,693 to the area's next load, emulator `work/earth/timing/layerwatch.py`)
 pub fn camera_mode_set(w: &mut World) {
     if !w.g.shakes.is_empty() {
         w.g.shakes.clear();
-        w.g.shake_off = (0, 0);
     }
 }
 

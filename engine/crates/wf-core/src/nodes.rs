@@ -496,6 +496,9 @@ pub fn flame_running(w: &World, i: usize) -> bool {
 /// the node finishes on the AI's next update without running again
 pub fn busy_controller(w: &mut World, i: usize) {
     let (serial, n) = w.en_ref(i).ctl;
+    if std::env::var_os("WAVE_DBG").is_some() {
+        eprintln!("BUSYCTL f{} en {} ctl {:?}", w.frame, w.ents[i].id, w.en_ref(i).ctl);
+    }
     if serial == 0 {
         return;
     }

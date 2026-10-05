@@ -426,6 +426,7 @@ impl Shop {
         } else {
             list = w.scene.shop.clone();
         }
+        if std::env::var_os("XS39").is_some() { eprintln!("XSHOP clock {} sell {} {:?} eq {:?} marks {:?} cur {}", w.g.clock(w.frame), sell, list.iter().map(|l| (l.category, l.item, l.flag)).collect::<Vec<_>>(), w.story.equipment, super::equip::marks(w), w.story.current); }
         let mut c = Container::default();
         let up = c.add(Widget::Button(Button::new(
             BTN_UP, 0xD5, 0xC, 2, true, true,

@@ -686,7 +686,7 @@ pub fn replay_with(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: 
                     }
                 }
                 if std::env::var("SEGMENT_FADEDBG").is_ok() {
-                    eprintln!("  t{k} fadedbg {:?} dim {} black {} mode {:?}", w.scene.screen.fade, w.scene.screen.dim, w.scene.screen.black, w.field.as_ref().map(|f| &f.mode));
+                    eprintln!("  t{k} fadedbg {:?} dim {} black {} mode {:?} layers {:?} shake {:?} cam {:?} map {:?}", w.scene.screen.fade, w.scene.screen.dim, w.scene.screen.black, w.field.as_ref().map(|f| &f.mode), w.scene.screen.layers, w.g.shake_off, w.cameras.first().map(|c| (c.x, c.y)), w.field.as_ref().map(|f| f.map.clone()));
                 }
                 if std::env::var("SEGMENT_AIDBG").is_ok() {
                     for i in 0..w.ents.len() {

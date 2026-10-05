@@ -520,7 +520,9 @@ impl Renderer {
                     if view.sphere.is_some() && m.layers[li].bg == 0 {
                         continue;
                     }
-                    self.draw_layer(m, li, *af, cx + shake.0, cy + shake.1, vx, vy);
+                    // a script's `set_bg_offset` adds to the BG's scroll (real route sb 6-6: s-script's BG2 by (-3, 3))
+                    let (bx, by) = sl.and_then(|l| l.offset.get(m.layers[li].bg as usize).copied()).unwrap_or((0, 0));
+                    self.draw_layer(m, li, *af, cx + shake.0 + bx, cy + shake.1 + by, vx, vy);
                 }
                 // the sphere on BG0 (priority 2: BG0CNT 0x1C82 under it, real route 19-3), over the other BGs of
                 // its priority

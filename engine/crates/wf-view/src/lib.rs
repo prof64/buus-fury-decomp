@@ -356,6 +356,8 @@ pub struct BgLayers {
     pub priority: [Option<u8>; 4],
     pub blend: [Option<u8>; 4],
     pub alpha: Option<(u8, u8)>,
+    /// `set_bg_offset` (0x29): px added to a BG's scroll
+    pub offset: [(i32, i32); 4],
 }
 
 /// The world map's 3D camera (map object `0x030019A4`, re/buu/notes.md "Field: world map"): the renderer projects

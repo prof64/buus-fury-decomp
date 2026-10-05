@@ -564,6 +564,10 @@ pub fn ctx_player(w: &World, i: usize) -> Option<usize> {
 // ---- update ----------------------------------------------------------------------------------------------------
 
 pub fn update(w: &mut World, i: usize) {
+    if std::env::var_os("WAVE_DBG").is_some() && w.frame > 3115 {
+        let ko = w.player_idx(0).map(|p| w.pl_ref(p).ko_at);
+        eprintln!("ENUPD f{} id {} ko_at {:?} busy {:?} puppet {}", w.frame, w.ents[i].id, ko, w.field.as_ref().map(|f| (f.busy, f.busy_pre_pass, f.busy_since)), crate::scene::is_puppet(w, w.ents[i].id));
+    }
     if crate::scene::puppet_update(w, i) {
         return;
     }
@@ -631,6 +635,12 @@ pub fn update(w: &mut World, i: usize) {
     if ko_at >= 0 && w.frame as i64 - ko_at >= 199 {
         if w.frame as i64 - ko_at > 199 {
             tick_anim(w, i);
+            // the state tick includes the running motion controller (a state object, as under a held field): a
+            // soldier's throw ends on time and enters idle (its rand(255)) - run 2 row 1,427,333, Pyramid 14-2: the
+            // game's SoldierThrow controller (0x08026618, caller chain 0x0800ED17) at KO + 210 while s000 runs
+            if w.field.is_some() {
+                crate::nodes::busy_controller(w, i);
+            }
         }
         return;
     }
@@ -648,6 +658,33 @@ pub fn smash_dust(w: &mut World, i: usize) {
         let (cx, _) = w.en_ref(i).a.center();
         let py = w.en_ref(i).a.py();
         crate::fx::puff_rng(w, cx + k * 12, py + 4);
+    }
+}
+
+/// the player's death script (s000, from KO + 199) holds the field, but from KO + 200 every enemy still runs its state
+/// tick (caller 0x0800F5E0: the animation and the running motion controller, no AI): a soldier's throw ends on time
+/// and enters idle - its rand(255) (run 2 row 1,427,333, Pyramid 14-2: the SoldierThrow controller 0x08026618 at KO +
+/// 210, measured; session.rs runs this in the held branch)
+pub fn ko_state_ticks(w: &mut World) {
+    if w.field.is_none() || w.players.len() != 1 {
+        return;
+    }
+    let Some(pi) = w.player_idx(0) else { return };
+    let (dead, ko) = (w.pl_ref(pi).dead, w.pl_ref(pi).ko_at);
+    if !dead || ko < 0 || (w.frame as i64 - ko) <= 199 {
+        return;
+    }
+    for k in (0..w.ents.len()).rev() {
+        let id = w.ents[k].id;
+        if w.ents[k].removed
+            || !matches!(w.ents[k].body, Body::Enemy(_))
+            || crate::scene::is_puppet(w, id)
+            || w.modal.as_ref().is_some_and(|m| m.contains(&id))
+        {
+            continue;
+        }
+        tick_anim(w, k);
+        crate::nodes::busy_controller(w, k);
     }
 }
 
