@@ -620,6 +620,14 @@ fn import_ai_rt(w: &mut World, ei: usize, lvl: usize, ram: &GbaRam, r: u32, note
             K::GhostAnimA | K::GhostAnimB => {}
             // the worm's ring / links / mailbox (`import_worms`; WormSpawnBody and WormHeadMove keep nothing)
             K::WormBodyFollow | K::WormHeadMove | K::WormSpawnBody => {}
+            // IfButtonMashed (factory 0x080363FA, vt 0x0804A6D0): +0xC the logic counter at the last counted press (now -
+            // gap - 1 at the create), +0x10 the presses counted, +0x14 / +0x18 the parameters - run 2 row 1,640,163,
+            // 21-x: an enzyme latched on the leader lets go at the 9th press; ours counted from 0 at the import and held
+            // on, the punch then missed it (two ComputeDamage in the game, one in ours: the punch's sound pair swapped)
+            K::IfButtonMashed => {
+                rt.d[3] = ram.s32(r + 0x10);
+                rt.d[4] = ram.s32(r + 0xC);
+            }
             // DriftContact (create 0x0802C69C, update 0x0802C6EC; vt 0x0804B640): +4 / +8 the drift step (1/256 px),
             // +0xC done, +0x10 the frames left of a contact's back-off (16) - run 2 cuts 1,633,618 / 1,692,733, 21-x
             // Blood Cells: ours drew a fresh step at the import

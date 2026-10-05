@@ -125,3 +125,13 @@ in, 160 → 0. A page's draw takes 2 frames when `2·width(heading) + width(line
   new Scouter, vt `0x0804E3C8`, new blips / RNG draws); A closes. Enter CPU time 5–6 frames.
 * Captures: `map_left`, `map_scouter_move`, `map_scouter_info` (scenario extra `live_field`: the test sets the field
   actors, camera, player direction and RNG as captured).
+
+### The Computer Room's database (4-22; ctor `0x08024F3C`, vt `0x0804A950`; remake `scouter.rs` `Database`)
+A field trigger (ctor `0x08007543`, vt `0x0804C11C`, A facing up; activate `0x080074EC`: fade-out 0x080496CC 16,
+world save, this page, `0x0800938C`, world restore, fade-in 0x080495B4 16; no sound). The info page's layout over
+its own picture (record `0x087319E0`); the scouted entries (GD +0xC5 bits) grouped by name: UP / DOWN the name list
+(BG2 window, 7 rows), LEFT / RIGHT the group's variants (wrapping), A = the description (a mode switch behind a
+BLDCNT 0x3E41 fade that blends only the hidden BG0: 16 iterations with nothing changing), A / B back, B closes. The
+sprite is made again on every change (rand(255)); the old one stays in the OAM for that frame, the new one is
+updated from its first iteration. Scenarios `scenarios_computer.py` (state `buu_computer.ss`: run 2 row 74,990 +
+a walk from the Lobby; scouted bits set by the setup).

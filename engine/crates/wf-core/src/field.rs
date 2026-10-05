@@ -2734,6 +2734,11 @@ fn fire(w: &mut World, slot: usize, k: usize, t: &TriggerRt) {
                 f.label = Some(value);
             }
         }
+        // the Computer Room's computer (4-22; ctor 0x08007543, vt 0x0804C11C, activate `0x080074EC`): the
+        // Scouter database between a fade-out and a fade-in
+        TriggerKind::Unknown(crate::menu::mapscreen::CTOR_COMPUTER) => {
+            crate::menu::mapscreen::open_database(w);
+        }
         TriggerKind::Region | TriggerKind::Unknown(_) => {}
     }
     // touch_once: removed after firing unless an area load happened meanwhile

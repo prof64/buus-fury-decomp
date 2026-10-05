@@ -33,3 +33,32 @@ No screen. KO `0x0801070E`: death animation, 200-frame timer → `0x08010588`: f
 run hook #0 (`0x08012588`, header `0x0877C5A4`): flag 281 / Lazarus Crystal (supply 23: revive at 25 % HP, timed
 special 5 s) / flags 282, 283 / else song 8, 120 frames, fade, death scene (0, 2, 1), "You have died!",
 `return_to_title` (0x8E).
+
+## Multiplayer (link cable) - title -> Multiplayer
+Modelled up to the link: the page Dojo / Trading Post (vt `0x0804B5AC`, enter `0x0801E7B4`: strings 0x5F / 0x4F,
+done check `0x0801E970`: B (sound 40) back to Single / Multiplayer) and the link box "Waiting for a friend..."
+(vt `0x0804AEBC`, enter `0x08024120`: string 90 + B Cancel, 136x56 BG0 box at (56, 64); update `0x080240B8`: once
+the link is up ([`0x03002F54`]) it counts 10 updates, `0x08040182`, and the mode returns 2). Scenarios
+`title_multi` / `title_dojo` / `title_trade` (no cable: the box only ends with B, no sound). Not modelled (no
+cable in the emulator either; INFERRED from the code and the strings 79..115):
+* **Connected** (`0x0801E84A`, run_mode returns 2): `0x0804019A`, then a Select Game list (`0x08005460(0x5E "Select
+  Saved Game", 0xD, arrows)`, vt `0x08049B2C`, +0xB38 = 0 Dojo / 1 Trading Post): each player picks one of their
+  saves ("No Saved Games" 91 / "Please select a saved game" 92). Failure / cable pulled: "Disconnected" (93).
+* **Dojo** - "Battle with your friends in the Dojo!" (104): character choice ("Choose your character!" 105, the
+  save's party: strings 116.. Goku / SS Goku / SS3 Goku / Teen Gohan ... Vegeta), "Character Mode:" Balanced Mode /
+  In-Game Mode (97 / 98: fixed stats vs the save's), "Rounds:" 1 / 3 / 5, "Start Fight" (96); a versus fight in
+  rounds ("Round 1".."Round 5", "You Win!!" / "You Lose!!" / "Draw!!"), then "Grab your prize!" (114) / "Go back
+  to training!" (115). Mode tables of the flow (enter / update / events / redraw / done): `0x08049B5C`,
+  `0x0804B604`, `0x0804BC04`, `0x0804CAD4` (built by `0x0801FF04`), `0x0804A60C`, `0x0804C0F0`.
+* **Trading Post** - "Your Trade:" / "Friend's Trade:" (80 / 81), items and "Zenie" (82), "How many to trade?" (83),
+  "Propose Trade" / "Accept" / "Decline" (84..86), "You have accepted trade" (87), "TRADE" "COMPLETE!" (88 / 89).
+  Mode tables: `0x08049450`, `0x0804A3BC`, `0x0804AFA0`, `0x0804B550`, `0x0804CAA8` (built by `0x080232A6`,
+  `0x080237CC`, `0x08023C22`), `0x08049424`, `0x0804A8AC`.
+* **Mapping to the remake (plan, nothing built):** the link maps onto online play (engine/docs/netcode.md: wf-net's
+  lobby + rollback). "Waiting for a friend..." = the lobby's matchmaking (Dojo / Trading Post as two room kinds);
+  the save pick = each peer's local save slot, exchanged at connect. Dojo = a rollback versus match on the battle
+  `Session` (the Buu's Fury battle engine) with the pick / mode / rounds as its config; the prize as a local story
+  write after the result. Trading Post = no realtime need: a two-phase commit over the data channel (both propose,
+  both accept, then each side applies the other's offer to its own save) - needs a confirmation that both sides
+  wrote, or a trade can duplicate / vanish on a disconnect between the two writes. Recording the real flows needs
+  two linked emulator instances (mGBA's link support) - not available in the headless harness today.

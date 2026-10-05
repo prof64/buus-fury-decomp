@@ -26,6 +26,131 @@ import fat2  # noqa: E402  (puts the live ship driver first on the path)
 from route import status  # noqa: E402
 
 KEY = fat2.KEY
+
+
+class Driver3(fat2.Driver2):
+    """fat2's Driver2 with the save point's first A made closed-loop: a ('keys', [(A, ..), ..]) program right after
+    ('face', 'U') (the save point menu: Save / charsel) starts with ('opensave',) - A every 40 frames until a scene
+    opens, a one-pixel nudge left / right between tries (run 3's walks end a pixel off run 2's: at 10-30 the first A
+    met nothing and the program's switch went to the wrong menu) - then the program without its first A"""
+
+    def __init__(self, goals):
+        out = []
+        for g in goals:
+            if (isinstance(g, tuple) and g and g[0] == 'keys' and out and out[-1] == ('face', 'U') and g[1]
+                    and g[1][0][0] == KEY.A):
+                out += [('opensave',), ('keys', list(g[1][1:]))]
+                continue
+            out.append(g)
+        # the Bandana's equip (ship_route.equip(3) = the accessory list's first row): by the item, not the row
+        import ship_route
+        bandana = ship_route.equip(3)
+        k = 0
+        while k + 1 < len(out):
+            if out[k] == bandana[0] and out[k + 1] == bandana[1]:
+                out[k:k + 2] = [('equipitem', 126)]
+            k += 1
+        super().__init__(out)
+
+    def step(self, e):
+        g = self.goals[self.k]
+        if g[0] == 'equipitem':
+            # ('equipitem', item): ship_route.equip(slot, row) with the row of `item` in its slot's list counted from
+            # the owned list (GameData +0xE4: count, then u32 entries item | wearer << 28; an item's slot is its ROM
+            # record's +0x14, records of 0x2C from 0x086F82EC) - run 3 owns more accessories than run 2 (the trinket
+            # stall), so the Bandana is not the first row
+            item = g[1]
+            gd = 0x03001068
+            n = e.r32(gd + 0xE4)
+            ents = [e.r32(gd + 0xE4 + 4 + 4 * k) & 0x0FFFFFFF for k in range(min(n, 64))]
+            slot = e.r8(0x086F82EC + 0x2C * item + 0x14)
+            row = 0
+            for it in ents:
+                if it == item:
+                    break
+                if e.r8(0x086F82EC + 0x2C * it + 0x14) == slot:
+                    row += 1
+            import ship_route
+            self.goals[self.k:self.k + 1] = ship_route.equip(slot, row)
+            self.t = 0
+            return None
+        if g[0] == 'opensave':
+            s = status(e)
+            if s['scene'] > 0 or s['p'] is None:
+                # (the menu's first frames: wait as the program's A did - its 40-frame gap)
+                self.ow = getattr(self, 'ow', 0) + 1
+                if self.ow >= 40:
+                    self.ow = 0
+                    self.next_goal()
+                    return None
+                return 0
+            self.ow = 0
+            if self.t > 2000:
+                raise RuntimeError(f'opensave: no menu {s}')
+            ph = self.t % 80
+            if ph < 3:
+                return KEY.A
+            if 40 <= ph < 41 and self.t > 80:
+                return (KEY.LEFT if (self.t // 160) % 2 else KEY.RIGHT)
+            if 50 <= ph < 53 and self.t > 80:
+                return KEY.UP
+            return 0
+        return super().step(e)
+
+
+fat2.Driver2 = Driver3
+
+_real_pyramid = fat2.real_pyramid_driver
+
+
+def real_pyramid_driver3():
+    """run 2's RealPyramidDriver, but a fall into 14-12 (whose way back up stays shut) is not walked back: a soft
+    reset (A+B+SELECT+START) - the title; the piece's Retry then Continues from 14-1's save and plays the maze again
+    (an adversarial soft reset mid-dungeon besides)"""
+    base = _real_pyramid()
+
+    class Pyr3(base):
+        def __init__(self, goals):
+            super().__init__(goals)
+            self.first = list(goals)
+            self.reset_t = None
+
+        def keys(self, e):
+            if self.reset_t is not None:
+                # the soft reset, then the title -> Single Player -> GAME 1 (Continue) until 14-1's field runs; then
+                # this part's goals from their start (the maze again)
+                self.reset_t += 1
+                t = self.reset_t
+                s = status(e)
+                if t > 400 and s['area'][:2] == [14, 1] and s['p'] is not None and s['scene'] == 0:
+                    self.reset_t = None
+                    self.goals, self.k, self.t = list(self.first), 0, 0
+                    return 0
+                if t > 20000:
+                    raise RuntimeError(f'pyramid: no Continue after the reset {s}')
+                if t <= 10:
+                    return KEY.A | KEY.B | KEY.SELECT | KEY.START
+                ph = (t - 10) % 600
+                if 300 <= ph < 303:
+                    return KEY.START
+                if 420 <= ph < 423 or 540 <= ph < 543:
+                    return KEY.A
+                return 0
+            return super().keys(e)
+
+        def step(self, e):
+            g = self.goals[self.k]
+            s = status(e)
+            if (g[0] == 'path' and self.t > 0 and s['p'] is not None and getattr(self, 'parea', None) == [14, 17]
+                    and s['area'][:2] == [14, 12]):
+                print('  pit fall into 14-12: soft reset -> Continue', s, flush=True)
+                self.reset_t = 0
+                return KEY.A | KEY.B | KEY.SELECT | KEY.START
+            return super().step(e)
+    return Pyr3
+
+
+fat2.real_pyramid_driver = real_pyramid_driver3
 ORDER = ['radar', 'bandana', 'grind_goten', 'desert', 'grind_trunks', 'pilaf', 'thieves', 'airship', 'pyramid',
          'fukurou', 'nataday', 'dbx']
 OUT = ROOT / 'work' / 'run3fat'

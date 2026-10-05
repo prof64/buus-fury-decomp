@@ -44,6 +44,8 @@ pub struct ScoutData {
     pub remaps: Vec<Vec<u8>>,
     /// the info page's scroll arrows: OAM attr0 / attr1 (up, down)
     pub arrows: [(u16, u16); 2],
+    /// the database page's left / right arrows: OAM attr0 / attr1
+    pub lr_arrows: [(u16, u16); 2],
     /// the info page sprite's direction cycle (`0x0874D35C`)
     pub info_dirs: [u8; 4],
 }
@@ -90,6 +92,17 @@ impl ScoutData {
             let w = x.as_u64().unwrap_or(0) as u32;
             arrows[k] = (w as u16, (w >> 16) as u16);
         }
+        let mut lr_arrows = [(0u16, 0u16); 2];
+        for (k, x) in v["arrows"]["lr_oam"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .take(2)
+            .enumerate()
+        {
+            let w = x.as_u64().unwrap_or(0) as u32;
+            lr_arrows[k] = (w as u16, (w >> 16) as u16);
+        }
         let mut info_dirs = [0u8; 4];
         for (k, x) in v["info_dirs"]
             .as_array()
@@ -104,6 +117,7 @@ impl ScoutData {
             db,
             remaps,
             arrows,
+            lr_arrows,
             info_dirs,
         }))
     }
@@ -382,8 +396,8 @@ impl Scout {
             if let Some(sh) = sp.shadow.as_ref().filter(|sh| sh.as_str() != "shadow_0x0") {
                 out.push(MenuObj {
                     sheet: format!("effects/{sh}"),
-                    x: r.x,
-                    y: r.y,
+                    x: r.x + (sp.shadow_off.0 as i8) as i32,
+                    y: r.y + (sp.shadow_off.1 as i8) as i32,
                     priority: prio,
                     ..Default::default()
                 });
@@ -469,23 +483,7 @@ impl Info {
             );
             s.max = (lines * 16 - DESC_H).max(0);
         }
-        s.sprite = e.def - 9;
-        // the actor's idle enter (rand(255)), then vt+0x28(2) (`0x0802735C`): the walk state (0x03001B58) when the
-        // sprite has a walk; the state ticks (8 per cel, looping) the idle's cels, the picture stays the idle's
-        let mut anim = ActAnim::of(0);
-        anim.tick = w.rng.rand(255);
-        if w.data
-            .sprite(s.sprite)
-            .is_some_and(|sp| sp.anim_raw(2).is_some())
-        {
-            anim = ActAnim {
-                raw: 1,
-                id: 1,
-                ..Default::default()
-            };
-        }
-        s.anim = anim;
-        s.place(w);
+        s.set_sprite(w, &e, true);
         s.arrows = [
             Arrow {
                 active: s.scroll > 0,
@@ -496,6 +494,41 @@ impl Info {
                 ..Default::default()
             },
         ];
+        s
+    }
+
+    /// the database sprite `0x080272EC`: the actor's idle enter (rand(255)), then (`walk`) vt+0x28(2)
+    /// (`0x0802735C`): the walk state (0x03001B58) when the sprite has a walk; the state ticks (8 per cel, looping)
+    /// the idle's cels, the picture stays the idle's
+    fn set_sprite(&mut self, w: &mut World, e: &DbEntry, walk: bool) {
+        self.sprite = e.def - 9;
+        let mut anim = ActAnim::of(0);
+        anim.tick = w.rng.rand(255);
+        if walk
+            && w.data
+                .sprite(self.sprite)
+                .is_some_and(|sp| sp.anim_raw(2).is_some())
+        {
+            anim = ActAnim {
+                raw: 1,
+                id: 1,
+                ..Default::default()
+            };
+        }
+        self.anim = anim;
+        self.place(w);
+    }
+
+    /// the database page's sprite of entry `db` (no scouted bit, no description state)
+    pub fn sprite(w: &mut World, db: u16, walk: bool) -> Info {
+        let mut s = Info {
+            db,
+            hp: -1,
+            ..Default::default()
+        };
+        if let Some(e) = data(w).and_then(|d| d.db.get(db as usize).cloned()) {
+            s.set_sprite(w, &e, walk);
+        }
         s
     }
 
@@ -545,13 +578,13 @@ impl Info {
     }
 
     /// the values: HP, STR, POW, END (−1 = `??`)
-    fn values(&self, w: &World, e: &DbEntry) -> [i32; 4] {
+    fn values(w: &World, e: &DbEntry, hp: i32) -> [i32; 4] {
         if e.stats >= 0 {
             let t = e.enemy.unwrap_or([-1; 4]);
-            return [if self.hp == -1 { t[0] } else { self.hp }, t[1], t[2], t[3]];
+            return [if hp == -1 { t[0] } else { hp }, t[1], t[2], t[3]];
         }
         if e.stats == -1 {
-            return [self.hp, -1, -1, -1];
+            return [hp, -1, -1, -1];
         }
         let ci = (-2 - e.stats) as usize;
         let Some(cs) = w.story.chars.get(ci) else {
@@ -559,33 +592,34 @@ impl Info {
         };
         let eff = super::status::effective(w, cs);
         [
-            if self.hp == -1 { cs.rec.hp } else { self.hp },
+            if hp == -1 { cs.rec.hp } else { hp },
             eff[0],
             eff[1],
             eff[2],
         ]
     }
 
-    pub fn view(&self, w: &World, md: &super::MenuData) -> (Vec<wf_view::MenuLayer>, Vec<MenuObj>) {
+    /// BG3: the picture `0x08732384` with the content of `0x08024D94` (entry `e`, none: the labels with `??` and
+    /// "No Portrait Data")
+    pub fn picture(w: &World, md: &super::MenuData, bg: &str, e: Option<&DbEntry>, hp: i32) -> wf_view::MenuLayer {
         use super::text::{Arg, Canvas, Pen};
         use wf_view::{MenuFont, MenuLayer};
         let t = &md.text;
-        let d = data(w);
-        let e = d
-            .as_ref()
-            .and_then(|d| d.db.get(self.db as usize).cloned())
-            .unwrap_or_default();
+        let none = DbEntry::default();
         let mut cv = Canvas::new();
-        cv.image("ui/menu/scouter_info.png", 0, 240, 160, 0, 0);
-        let mut p = Pen::new(MenuFont::Small, 0x38, 0x90, 1, 2, Some(1));
-        p.line_h = 8;
-        cv.text(t, &mut p, t.s(e.name as usize));
+        cv.image(bg, 0, 240, 160, 0, 0);
+        if let Some(e) = e {
+            let mut p = Pen::new(MenuFont::Small, 0x38, 0x90, 1, 2, Some(1));
+            p.line_h = 8;
+            cv.text(t, &mut p, t.s(e.name as usize));
+        }
         for (s, y) in [(190usize, 0x16), (191, 0x20), (192, 0x2A), (193, 0x34)] {
             let mut p = Pen::new(MenuFont::Small, 0x70, y, 0, 2, Some(1));
             p.line_h = 8;
             cv.text(t, &mut p, t.s(s));
         }
-        let vals = self.values(w, &e);
+        let vals = e.map(|e| Info::values(w, e, hp)).unwrap_or([-1; 4]);
+        let e = e.unwrap_or(&none);
         for (k, y) in [0x16, 0x20, 0x2A, 0x34].into_iter().enumerate() {
             let mut p = Pen::new(MenuFont::Small, 0xA0, y, 2, 2, Some(1));
             p.line_h = 8;
@@ -607,14 +641,26 @@ impl Info {
                 cv.text_wrapped(t, &mut p, 0x38, t.s(194));
             }
         }
-        let bg3 = MenuLayer {
+        MenuLayer {
             w: 240,
             h: 160,
             x: 0,
             y: 0,
             priority: 3,
             ops: cv.ops,
-        };
+        }
+    }
+
+    pub fn view(&self, w: &World, md: &super::MenuData) -> (Vec<wf_view::MenuLayer>, Vec<MenuObj>) {
+        use super::text::{Canvas, Pen};
+        use wf_view::{MenuFont, MenuLayer};
+        let t = &md.text;
+        let d = data(w);
+        let e = d
+            .as_ref()
+            .and_then(|d| d.db.get(self.db as usize).cloned())
+            .unwrap_or_default();
+        let bg3 = Info::picture(w, md, "ui/menu/scouter_info.png", Some(&e), self.hp);
         let mut dc = Canvas::new();
         let mut p = Pen::new(MenuFont::Dialog, 0, 0xE - self.scroll, 0, 2, None);
         p.line_h = 16;
@@ -647,6 +693,12 @@ impl Info {
                 });
             }
         }
+        self.sprite_objs(w, &mut objs);
+        (vec![bg3, bg2], objs)
+    }
+
+    /// the database sprite's OBJs (halo, body, shadow) as the screen shows them
+    pub fn sprite_objs(&self, w: &World, objs: &mut Vec<MenuObj>) {
         if let (Some((x, y, dir, frame)), Some(sp)) = (self.oam, w.data.sprite(self.sprite)) {
             if let Some(an) = sp.anim_raw(self.anim.raw) {
                 let steps = an.steps(dir);
@@ -674,14 +726,327 @@ impl Info {
                     if let Some(sh) = sp.shadow.as_ref().filter(|sh| sh.as_str() != "shadow_0x0") {
                         objs.push(MenuObj {
                             sheet: format!("effects/{sh}"),
-                            x,
-                            y,
+                            x: x + (sp.shadow_off.0 as i8) as i32,
+                            y: y + (sp.shadow_off.1 as i8) as i32,
                             priority: 3,
                             ..Default::default()
                         });
                     }
                 }
             }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// the Computer Room's database
+
+/// The Scouter database (the Computer Room's computer, 4-22: ctor `0x08024F3C`, vt `0x0804A950`, enter
+/// `0x080255C4`): the info page's picture and content (`0x08024D94`, the HP from the type) of the selected entry,
+/// its sprite, and in the description window (BG2, (120, 88) 104x56) either the list of the scouted names or the
+/// entry's description.
+/// * Construction: the scouted db ids (GD +0xC5 bits, db 0 .. 0xE7) in db order; groups = runs of consecutive ids
+///   with the same name string (list +0x10 / +0x14.., groups +0x3B4); the first group, its first entry (-1: none).
+/// * Content (`0x08025056`, after every change): the picture with the entry's content; the sprite made again
+///   (`0x080272EC`: idle, rand(255); in the description the walk state, vt+0x28(2)); the list (7 rows from
+///   max(0, group - 3 or n - 7), names centred at x 0x34, y 8k + 7, the selected group colour 2, the others 0x75;
+///   empty: "Database Empty" (string 195) at y 0x20, colour 3) or the description (`0x08025004`: the dialog font
+///   wrapped to 104 px, rows scroll .. scroll + 56); the arrows: up = group > 2 / scroll > 0, down =
+///   group < n - 4 / scroll < max, left / right = the group has more than one entry (list mode).
+/// * Step (`0x08025510`): LEFT / RIGHT pressed cycle the group's entries (wrapping; sound 39); then the list
+///   (`0x08025404`: UP / DOWN pressed move the group (sound 39); A starts the switch to the description: the fade
+///   with BLDCNT 0x3E41 - only BG0, which is off: a pause while EVA runs down) or the description (`0x080254A8`:
+///   UP / DOWN held scroll 1 px; A = the close, vt +0x1C `0x080253EA`: in the description the switch back, else
+///   the screen's close). The done check (`0x08025354`) switches the mode when the switch's fade ends.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct Database {
+    pub list: Vec<u16>,
+    pub groups: Vec<(i32, i32)>,
+    pub group: i32,
+    pub entry: i32,
+    /// +0xE: the description shown
+    pub desc: bool,
+    /// +0xD: a mode switch pending (kept through the description: its close switches back)
+    pub toggle: bool,
+    pub scroll: i32,
+    pub max: i32,
+    /// the entry's sprite (the info page's sprite state)
+    pub spr: Option<Box<Info>>,
+    /// the sprite replaced by this iteration's content: its removal (and the new one's addition) shows from the
+    /// next update - the screen keeps the old one this frame
+    #[serde(default)]
+    pub prev: Option<Box<Info>>,
+    #[serde(default)]
+    pub shown_prev: Option<Box<Info>>,
+    /// the first content's sprite is made at the page's enter (after the fade-out, the world saved)
+    #[serde(default)]
+    pub entered: bool,
+    /// down (type 0), up (1), left (2), right (3)
+    pub arrows: [Arrow; 4],
+}
+
+impl Database {
+    pub fn new(w: &mut World) -> Database {
+        let mut s = Database::default();
+        let Some(d) = data(w) else { return s };
+        for db in 0..d.db.len().min(0xE8) {
+            if w.story.flag(0x380 + db as i32) {
+                s.list.push(db as u16);
+            }
+        }
+        let mut name = 0u16;
+        for (k, &db) in s.list.iter().enumerate() {
+            let n = d.db[db as usize].name;
+            if k == 0 || n != name {
+                name = n;
+                s.groups.push((k as i32, k as i32));
+            } else if let Some(g) = s.groups.last_mut() {
+                g.1 = k as i32;
+            }
+        }
+        s.entry = s.groups.first().map(|g| g.0).unwrap_or(-1);
+        // the arrows start active (+0x20 = 1); the content sets them
+        s.arrows = std::array::from_fn(|_| Arrow {
+            active: true,
+            ..Default::default()
+        });
+        s.content(w, false);
+        s
+    }
+
+    /// the enter's content (`0x080255C4` -> `0x08025056`): the first sprite
+    pub fn enter(&mut self, w: &mut World) {
+        if !self.entered {
+            self.entered = true;
+            self.spr = match self.db() {
+                Some(db) => Some(Box::new(Info::sprite(w, db, self.desc))),
+                None => None,
+            };
+            // its first update runs in this iteration; it is in the OAM from the next one
+            if let Some(s) = self.spr.as_mut() {
+                s.update(w);
+                s.oam = None;
+            }
+        }
+    }
+
+    fn db(&self) -> Option<u16> {
+        if self.entry < 0 {
+            return None;
+        }
+        self.list.get(self.entry as usize).copied()
+    }
+
+    /// `0x08025056`
+    pub fn redraw(&mut self, w: &mut World) {
+        self.content(w, true);
+    }
+
+    fn content(&mut self, w: &mut World, sprite: bool) {
+        let n = self.groups.len() as i32;
+        if !self.desc {
+            if n == 0 {
+                self.arrows[2].active = false;
+                self.arrows[3].active = false;
+            }
+            self.arrows[1].active = self.group > 2;
+            self.arrows[0].active = n - 4 > self.group;
+        }
+        if sprite {
+            let new = match self.db() {
+                Some(db) => Some(Box::new(Info::sprite(w, db, self.desc))),
+                None => None,
+            };
+            let old = std::mem::replace(&mut self.spr, new);
+            if self.prev.is_none() {
+                self.prev = old;
+            }
+        }
+        if self.desc {
+            self.desc_arrows();
+        } else {
+            let more = self
+                .groups
+                .get(self.group.max(0) as usize)
+                .is_some_and(|g| g.0 != g.1);
+            self.arrows[2].active = more;
+            self.arrows[3].active = more;
+        }
+    }
+
+    /// `0x08025004`'s arrows
+    fn desc_arrows(&mut self) {
+        self.arrows[1].active = self.scroll > 0;
+        self.arrows[0].active = self.scroll < self.max;
+    }
+
+    pub fn update(&mut self, w: &World) {
+        self.shown_prev = self.prev.take().map(|mut p| {
+            p.update(w);
+            p
+        });
+        if let Some(s) = self.spr.as_mut() {
+            s.update(w);
+        }
+        for a in self.arrows.iter_mut() {
+            a.update();
+        }
+    }
+
+    /// `0x08025510` (the page's step); true = the mode switch starts (the screen's fade, BLDCNT 0x3E41)
+    pub fn step(&mut self, w: &mut World) -> bool {
+        use crate::input::{A, DOWN, LEFT, RIGHT, UP};
+        let (pressed, held) = (w.menu.pressed, w.menu.held);
+        if let Some(&(f, l)) = self.groups.get(self.group.max(0) as usize) {
+            if f != l {
+                if pressed & LEFT != 0 {
+                    self.entry -= 1;
+                    if f > self.entry {
+                        self.entry = l;
+                    }
+                    self.redraw(w);
+                    w.sfx(super::SFX_CURSOR, 64);
+                }
+                if pressed & RIGHT != 0 {
+                    self.entry += 1;
+                    if l < self.entry {
+                        self.entry = f;
+                    }
+                    self.redraw(w);
+                    w.sfx(super::SFX_CURSOR, 64);
+                }
+            }
+        }
+        if self.desc {
+            if held & UP != 0 && self.scroll > 0 {
+                self.scroll -= 1;
+                self.desc_arrows();
+            }
+            if held & DOWN != 0 && self.scroll < self.max {
+                self.scroll += 1;
+                self.desc_arrows();
+            }
+            return pressed & A != 0;
+        }
+        let n = self.groups.len() as i32;
+        if pressed & UP != 0 && self.group != 0 {
+            self.group -= 1;
+            self.entry = self.groups[self.group as usize].0;
+            self.redraw(w);
+            w.sfx(super::SFX_CURSOR, 64);
+        }
+        if pressed & DOWN != 0 && n - 1 > self.group {
+            self.group += 1;
+            self.entry = self.groups[self.group as usize].0;
+            self.redraw(w);
+            w.sfx(super::SFX_CURSOR, 64);
+        }
+        if n != 0 && pressed & A != 0 {
+            self.toggle = true;
+            return true;
+        }
+        false
+    }
+
+    /// the done check (`0x08025354`) when a fade ended: false = no switch pending (the screen ends)
+    pub fn switch(&mut self, w: &mut World) -> bool {
+        if !self.toggle {
+            return false;
+        }
+        if self.desc {
+            self.desc = false;
+            self.toggle = false;
+        } else {
+            let desc = self
+                .db()
+                .and_then(|db| data(w).map(|d| d.db[db as usize].desc))
+                .unwrap_or(0);
+            let lines = w
+                .data
+                .menu
+                .as_ref()
+                .map(|md| {
+                    super::text::count_lines(
+                        md.text.font(wf_view::MenuFont::Dialog),
+                        md.text.s(desc as usize),
+                        DESC_W,
+                    )
+                })
+                .unwrap_or(0);
+            self.max = (lines * 16 - DESC_H).max(0);
+            self.scroll = 0;
+            self.desc = true;
+        }
+        self.redraw(w);
+        true
+    }
+
+    pub fn view(&self, w: &World, md: &super::MenuData) -> (Vec<wf_view::MenuLayer>, Vec<MenuObj>) {
+        use super::text::{Canvas, Pen};
+        use wf_view::{MenuFont, MenuLayer};
+        let t = &md.text;
+        let d = data(w);
+        let e = self
+            .db()
+            .and_then(|db| d.as_ref().and_then(|d| d.db.get(db as usize).cloned()));
+        let bg3 = Info::picture(w, md, "ui/menu/scouter_db.png", e.as_ref(), -1);
+        let mut dc = Canvas::new();
+        if self.desc {
+            let mut p = Pen::new(MenuFont::Dialog, 0, 0xE - self.scroll, 0, 2, None);
+            p.line_h = 16;
+            p.clip = [0, 0, DESC_W, DESC_H];
+            let s = e.as_ref().map(|e| e.desc).unwrap_or(0) as usize;
+            dc.text_wrapped(t, &mut p, DESC_W, t.s(s));
+        } else if self.groups.is_empty() {
+            let mut p = Pen::new(MenuFont::Small, 0x34, 0x20, 1, 3, Some(1));
+            p.line_h = 8;
+            dc.text(t, &mut p, t.s(195));
+        } else if let Some(d) = d.as_ref() {
+            let n = self.groups.len() as i32;
+            let first = if n > self.group + 4 { self.group - 3 } else { n - 7 }.max(0);
+            for k in 0..7 {
+                let g = first + k;
+                if g >= n {
+                    break;
+                }
+                let db = self.list[self.groups[g as usize].0 as usize];
+                let colour = if g == self.group { 2 } else { 0x75 };
+                let mut p = Pen::new(MenuFont::Small, 0x34, 8 * k + 7, 1, colour, Some(1));
+                p.line_h = 8;
+                dc.text(t, &mut p, t.s(d.db[db as usize].name as usize));
+            }
+        }
+        let bg2 = MenuLayer {
+            w: DESC_W as u16,
+            h: DESC_H as u16,
+            x: 120,
+            y: 88,
+            priority: 3,
+            ops: dc.ops,
+        };
+        let mut objs = Vec::new();
+        if let Some(d) = d.as_ref() {
+            for (k, a) in self.arrows.iter().enumerate() {
+                let ((a0, a1), frame) = match k {
+                    0 | 1 => (d.arrows[k], a.frame),
+                    _ => (d.lr_arrows[k - 2], 2 + a.frame),
+                };
+                objs.push(MenuObj {
+                    path: "ui/menu/scouter_arrows.png".into(),
+                    frame: frame as u16,
+                    fw: 8,
+                    fh: 8,
+                    x: (a1 & 0x1FF) as i32,
+                    y: (a0 & 0xFF) as i32,
+                    priority: 0,
+                    hflip: a1 & 0x1000 != 0,
+                    vflip: a1 & 0x2000 != 0,
+                    ..Default::default()
+                });
+            }
+        }
+        if let Some(s) = self.shown_prev.as_ref().or(self.spr.as_ref()) {
+            s.sprite_objs(w, &mut objs);
         }
         (vec![bg3, bg2], objs)
     }

@@ -70,6 +70,8 @@ pub const SCOUT_CURSOR: u32 = 0x0874_D044;
 /// at +0x14, down at +0x94 of `0x0874D248`; OAM words at +4 / +8)
 pub const SCOUT_INFO_BG: u32 = 0x0873_2384;
 pub const SCOUT_ARROWS: u32 = 0x0874_D248;
+/// the database page's background (240x160 8bpp picture record; the Computer Room, `0x08025056`)
+pub const SCOUT_DB_BG: u32 = 0x0873_19E0;
 /// the info sprite's direction cycle (4 bytes, `0x08027336`)
 pub const SCOUT_DIRS: u32 = 0x0874_D35C;
 
@@ -101,6 +103,10 @@ pub fn scouter(rom: &Rom, out: &mut Content, pal: &[Rgb]) {
     let mut bg = rom.lz(SCOUT_INFO_BG).unwrap_or_default();
     bg.resize(240 * 160, 0);
     out.put("ui/menu/scouter_info.png", Surface::from_vec(240, 160, bg).png(pal, false));
+    // the Computer Room database's picture (`0x08025056`: the record at `0x087319E0`)
+    let mut bg = rom.lz(SCOUT_DB_BG).unwrap_or_default();
+    bg.resize(240 * 160, 0);
+    out.put("ui/menu/scouter_db.png", Surface::from_vec(240, 160, bg).png(pal, false));
     let mut ar = Surface::new(32, 8);
     for (k, off) in [0x14u32, 0x94].iter().enumerate() {
         for f in 0..2u32 {
@@ -111,11 +117,13 @@ pub fn scouter(rom: &Rom, out: &mut Content, pal: &[Rgb]) {
     }
     out.put("ui/menu/scouter_arrows.png", ar.png(pal, true));
     let words: Vec<u32> = (0..2u32).map(|k| rom.u32(SCOUT_ARROWS + 4 + 4 * k)).collect();
+    // the database page's left / right arrows (`0x080271D0` types 2 / 3: OAM words +0xC / +0x10, tiles +0x94)
+    let lr_words: Vec<u32> = (2..4u32).map(|k| rom.u32(SCOUT_ARROWS + 4 + 4 * k)).collect();
     let dirs: Vec<u8> = (0..4u32).map(|k| rom.u8(SCOUT_DIRS + k)).collect();
     out.put_json(
         "ui/menu/scouter.json",
         &serde_json::json!({"db": db, "remaps": remaps, "cursor": "menu/scouter_cursor.png", "info_bg": "menu/scouter_info.png",
-                            "arrows": {"png": "menu/scouter_arrows.png", "oam": words, "note": "frames: up 0 1, down 2 3 (8x8)"},
+                            "arrows": {"png": "menu/scouter_arrows.png", "oam": words, "lr_oam": lr_words, "note": "frames: up 0 1 (tiles +0x14), left / right 2 3 (tiles +0x94; 8x8)"},
                             "info_dirs": dirs,
                             "rom": {"db": format!("0x{SCOUT_DB:08X}"), "enemy_types": format!("0x{ENEMY_TYPES:08X}"), "remaps": format!("0x{SCOUT_REMAPS:08X}"),
                                     "cursor": format!("0x{SCOUT_CURSOR:08X}"), "info_bg": format!("0x{SCOUT_INFO_BG:08X}"), "arrows": format!("0x{SCOUT_ARROWS:08X}")}}),

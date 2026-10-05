@@ -13,6 +13,10 @@
 //! * **Scouter** (`0x080261D4`, vt `0x0804A570`): the live field objects on the grid with a target cursor; A on a
 //!   selection opens its info page (`0x08025E50`; B back to a new Scouter, A closes) — scouter.rs.
 //!
+//! * **Database** (the Computer Room's computer, 4-22: a trigger of ctor `0x08007543`, A facing up; ctor
+//!   `0x08024F3C`, vt `0x0804A950`): every scouted entry by name with its variants - scouter.rs `Database`; opened
+//!   between a 16-step fade-out and fade-in ([`open_database`]), no L / R pages.
+//!
 //! Pages: Scouter <-L- Area -R-> World. Common step `0x08024C54`: the page's own step (+0x40), then the fade: EVA
 //! (BLDALPHA, EVB 0) rises by 1 per iteration to 16; L / R (when that page exists) start a page change (BLDCNT
 //! 0x3E5E: the frame BG0 stays lit, the pressed prompt tiles), B / SELECT / A (area and world pages) close
@@ -164,6 +168,8 @@ pub enum MapPage {
     Scouter,
     /// the Scouter's info page (`0x08025E50`)
     Info,
+    /// the Computer Room's database (`0x08024F3C`, scouter.rs `Database`)
+    Database,
 }
 
 /// a blinking marker (`0x08026DE4`, vt `0x0804D634` / `0x0804D594`): top-left position, the animation counter
@@ -252,6 +258,12 @@ pub struct MapScreen {
     /// the info page
     #[serde(default)]
     pub info: Option<Box<super::scouter::Info>>,
+    /// the database page
+    #[serde(default)]
+    pub db: Option<Box<super::scouter::Database>>,
+    /// BLDCNT 0x3E41 (the database's mode switch: only BG0, which is off, blends - the screen stays lit)
+    #[serde(default)]
+    pub soft: bool,
 }
 
 /// screen change of the map screen (frame 0 = SELECT): the pause menu's 16-frame fade, black while the world is
@@ -293,7 +305,16 @@ impl MapScreen {
             tile_bytes: 0,
             scout: None,
             info: None,
+            db: None,
+            soft: false,
         }
+    }
+
+    /// `0x08024F3C`: the Computer Room's database
+    pub fn database(w: &mut World) -> MapScreen {
+        let mut s = MapScreen::blank(MapPage::Database);
+        s.db = Some(Box::new(super::scouter::Database::new(w)));
+        s
     }
 
     /// `0x080256F0` + `0x0802574C`: the area page
@@ -407,10 +428,10 @@ impl MapScreen {
     }
 
     fn has_prev(&self) -> bool {
-        !matches!(self.page, MapPage::Scouter | MapPage::Info)
+        !matches!(self.page, MapPage::Scouter | MapPage::Info | MapPage::Database)
     }
     fn has_next(&self) -> bool {
-        !matches!(self.page, MapPage::World | MapPage::Info)
+        !matches!(self.page, MapPage::World | MapPage::Info | MapPage::Database)
     }
 
     /// the objects' update + OAM build (`0x08011A1E`, `0x080115B0`)
@@ -420,6 +441,9 @@ impl MapScreen {
         }
         if let Some(i) = self.info.as_mut() {
             i.update(w);
+        }
+        if let Some(d) = self.db.as_mut() {
+            d.update(w);
         }
         for m in self.markers.iter_mut() {
             m.update();
@@ -488,9 +512,15 @@ impl MapScreen {
         }
     }
 
-    /// vt +0x1C
+    /// vt +0x1C (the database's `0x080253EA`: in the description the switch back to the list)
     fn close(&mut self) {
+        if self.db.as_ref().is_some_and(|d| d.desc) {
+            self.soft = true;
+            self.changing = true;
+            return;
+        }
         if self.eva != 0 {
+            self.soft = false;
             self.keep_frame = false;
             self.changing = true;
         }
@@ -512,6 +542,12 @@ impl Page for MapScreen {
     fn after_draw(&mut self, _w: &World) {
         self.entered = true;
     }
+    /// the database's enter: its first sprite (made after the fade-out, as the game's constructor runs then)
+    fn built(&mut self, w: &mut World) {
+        if let Some(d) = self.db.as_mut() {
+            d.enter(w);
+        }
+    }
     /// a page change's enter (decompression, the room composition) delays the next iteration: the world page
     /// (600 tiles) 4 frames, the area page by its setup's CPU time ([`setup_frames`], started early in the
     /// frame); its picture shows at once
@@ -522,6 +558,7 @@ impl Page for MapScreen {
             // the info page: the picture, content, portrait and description surfaces (5-6 frames by the frame phase;
             // Goku: 6 then 5 in map_scouter_info)
             (false, MapPage::Info) => 6,
+            (false, MapPage::Database) => 6,
             (false, _) => 2,
             _ => 1,
         }
@@ -569,10 +606,34 @@ impl Page for MapScreen {
                     self.close();
                 }
             }
+            MapPage::Database => {
+                let mut db = self.db.take();
+                let a = db.as_mut().is_some_and(|d| d.step(w));
+                let desc = db.as_ref().is_some_and(|d| d.desc);
+                self.db = db;
+                if a {
+                    if desc {
+                        self.close();
+                    } else {
+                        // `0x08024BE6` + BLDCNT 0x3E41
+                        self.soft = true;
+                        self.changing = true;
+                    }
+                }
+            }
         }
         if self.changing {
             self.eva = self.eva.wrapping_sub(1);
             if self.eva == 0 {
+                // the database's done check: a mode switch, the screen goes on (EVA 0, ramping up again)
+                let mut db = self.db.take();
+                let switched = db.as_mut().is_some_and(|d| d.switch(w));
+                self.db = db;
+                if switched {
+                    self.changing = false;
+                    self.next = 0;
+                    return Action::None;
+                }
                 return match self.next {
                     1 => Action::Replace(Screen::MapScreen(self.page_to(w, false))),
                     2 => Action::Replace(Screen::MapScreen(self.page_to(w, true))),
@@ -623,6 +684,20 @@ impl Page for MapScreen {
     }
     fn view(&self, w: &World, d: &MenuData) -> MenuView {
         let mut v = MenuView::default();
+        // the database: the info page's screen (DISPCNT 0x1C40)
+        if let Some(db) = self.db.as_ref() {
+            let (layers, objs) = db.view(w, d);
+            v.layers = layers;
+            v.objs = objs;
+            let first: u32 = if self.soft { 0 } else { 0b11 | 1 << 31 };
+            v.blend = Some(MenuBlend {
+                first,
+                second: 0b11 | 1 << 31 | 1 << 30,
+                eva: self.eva.min(16),
+                evb: 0,
+            });
+            return v;
+        }
         // the info page: its own screen (DISPCNT 0x1C40: BG2 the description window over BG3, OBJs)
         if let Some(i) = self.info.as_ref() {
             let (layers, objs) = i.view(w, d);
@@ -735,7 +810,7 @@ impl Page for MapScreen {
                     key0: true,
                 });
             }
-            MapPage::Scouter | MapPage::Info => {}
+            MapPage::Scouter | MapPage::Info | MapPage::Database => {}
         }
         v.layers.push(bg2);
         // BG0: the frame with the L / R prompts
@@ -894,6 +969,27 @@ pub fn check_select(w: &mut World) -> bool {
     };
     super::open(w, Screen::MapScreen(s), tr, false);
     true
+}
+
+/// the Computer Room's computer trigger (ctor `0x08007543`, vt `0x0804C11C`; A facing up)
+pub const CTOR_COMPUTER: u32 = 0x0800_7543;
+
+/// the computer's screen change (`0x080074EC`): the 16-step fade-out (mode 0x080496CC), the world saved, the
+/// database page, the world restored, the 16-step fade-in (0x080495B4); no sound
+pub const DATABASE: Transition = Transition {
+    fade_out: 16,
+    enter: 2,
+    leave: 2,
+    fade_in: 16,
+};
+
+/// the computer's activation (`0x080074EC`): the database page between the fades
+pub fn open_database(w: &mut World) {
+    if super::active(w) || w.data.menu.is_none() {
+        return;
+    }
+    let s = MapScreen::database(w);
+    super::open(w, Screen::MapScreen(s), DATABASE, false);
 }
 
 /// cycles into the frame where the area page's setup starts: after SELECT's fade (16th frame: the world save and
