@@ -826,6 +826,7 @@ fn field_from_ram(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
     import_death_effects(w, ram, notes);
     import_breakables(w, ram, notes);
     import_player_blasts(w, ram);
+    import_rocks(w, ram);
     import_coins(w, ram);
     import_emotes(w, ram);
     // the camera as the field left it (`return_to_field` puts the saved one back)
@@ -1424,6 +1425,7 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
     // the cut, tick 49 - the import's fresh node ended at once and idled, a draw the game does not make)
     let ctl_obj = ram.r32(o + 0x14);
     let mut barrage = None;
+    let mut taunt = false;
     {
         let tick = w.en_ref(ei).ea.pos.tick;
         let raw_now = w.en_ref(ei).ea.pos.raw;
@@ -1435,11 +1437,23 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
                 if st.tree.nodes.get(n).is_some_and(|x| x.k == wf_core::ai::K::HeavyPunch) {
                     rt.f = tick;
                     rt.d[0] = 48 + 8 * nf.unwrap_or(2);
+                    // (its controller as the object's state: the punch counts on through an event, `nodes::is_ctl`)
+                    if field && ctl_obj == 0x0300_32F4 {
+                        barrage = Some((st.serial, n as u16));
+                    }
                 }
                 // a FlameBreath in progress: its frame count is the controller's tick too (whole-run cut 787,315, Dragon
                 // Ball 2's desert: tick 41, a flame a frame)
                 if st.tree.nodes.get(n).is_some_and(|x| x.k == wf_core::ai::K::FlameBreath) {
                     rt.f = tick;
+                }
+                // a TauntAnim in progress (the rock thrower's controller, a heap object vt 0x0804E030 as the enemy's
+                // state, counting in the object's tick: the rock at 8, SetAnim(0) at 0x20): the frame count is the tick
+                // (run 3 cuts 155,835 .. 158,217, Earth 2-90: tick 31 -> the idle's rand(255) at f0; tick 7 -> the rock's
+                // two rand(64) at f0 - a fresh count did neither)
+                if st.tree.nodes.get(n).is_some_and(|x| x.k == wf_core::ai::K::TauntAnim) && ram.valid(ctl_obj) && ram.r32(ctl_obj) == 0x0804_E030 {
+                    rt.f = tick;
+                    taunt = true;
                 }
                 // a HandAmbush past its first update (exit-fade sweep 18-10: the hand already at the player; ours drew
                 // its side again): the count follows the strike animation (set on that first update, tick 0)
@@ -1481,6 +1495,14 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
     }
     if let Some(c) = barrage {
         w.en(ei).ctl = c;
+    }
+    // (and its animation's rule, as its enter set it: the one-shot that ends at the controller's 0x20 - the import's
+    // re-entry did not enter the node)
+    if taunt {
+        let once = d.anim.setanim[&4];
+        let e = w.en(ei);
+        e.ea.rule = once;
+        e.ea.done = false;
     }
     // GhostAnimA / B (update 0x0802DFD8): its end test is `0x0800EE9E` - the object back in the normal state (obj+0x14
     // == 0x03001BA4); ours waits for the one-shot's end - over already when RAM shows the normal state (a cut inside
@@ -1707,6 +1729,31 @@ fn import_npc_step(w: &mut World, i: usize, ram: &GbaRam, o: u32, row: Option<(i
         n.a.facing = ram.r8(o + 0x10);
         if let Some(b) = n.behaviour.as_mut() {
             if let Some(wf_core::fieldnpc::StepRt::Wait { count }) = b.cur.as_mut() {
+                *count = ram.s32(st + 4);
+            }
+            if let Some((_, raw, cel, tick)) = row {
+                (b.raw, b.frame, b.tick) = (raw, cel, tick);
+                b.anim = if raw == 1 { 0 } else { 1 };
+            }
+        }
+        return;
+    }
+    // a face-the-player step (0x0800A8E9 idle / 0x0800A90F walk pose, object vt 0x0804B338: +4 the count left, one off
+    // an update; the NPC's step index obj +0x1B4) - run 3 cut 30,383, 1-16's villager 19 frames into its 50: a fresh
+    // create re-entered its idle (a rand(255) the game does not draw)
+    if svt == 0x0804_B338 {
+        let idx = ram.r8(o + 0x1B4) as usize;
+        let Body::Npc(n) = &w.ents[i].body else { return };
+        if !n.behaviour.as_ref().is_some_and(|b| b.steps.get(idx).is_some_and(|s| matches!(s.func, 0x0800_A8E9 | 0x0800_A90F))) {
+            return;
+        }
+        let rng = w.rng.clone();
+        wf_core::fieldnpc::import_step(w, i, idx);
+        w.rng = rng;
+        let Body::Npc(n) = &mut w.ents[i].body else { return };
+        n.a.facing = ram.r8(o + 0x10);
+        if let Some(b) = n.behaviour.as_mut() {
+            if let Some(wf_core::fieldnpc::StepRt::FacePlayer { count }) = b.cur.as_mut() {
                 *count = ram.s32(st + 4);
             }
             if let Some((_, raw, cel, tick)) = row {
@@ -2000,6 +2047,19 @@ fn build_mid_ids(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner: &mu
 
 /// the track actors' animations (and facing) as the RAM rows show them (a started command restarted its animation):
 /// the RAM object at the entity's 24.8 position (`build_mid_code`; an inline script's tracks too)
+/// every NPC's animation clock as its RAM row (by position and sprite) when the row shows the same animation
+fn npc_anims_from_rows(w: &mut World, ram: &GbaRam) {
+    for &(o, sprite, raw, cel, tick) in ram.actor_rows.iter() {
+        let (x, y) = (ram.s32(o + 0x1A0), ram.s32(o + 0x1A4));
+        let Some(i) = (0..w.ents.len()).find(|&i| !w.ents[i].removed && matches!(w.ents[i].body, Body::Npc(_)) && w.actor(i).is_some_and(|a| a.x == x && a.y == y) && wf_core::scene::sprite_id(w, i) == Some(sprite)) else { continue };
+        if let Body::Npc(n) = &mut w.ents[i].body {
+            if n.anim.raw == raw {
+                (n.anim.frame, n.anim.tick) = (cel, tick);
+            }
+        }
+    }
+}
+
 fn track_anims_from_rows(w: &mut World, ram: &GbaRam) {
     use wf_core::scene::Owner;
     let rows: std::collections::BTreeMap<u32, (i32, i32, i32, i32)> = ram.actor_rows.iter().map(|r| (r.0, (r.1, r.2, r.3, r.4))).collect();
@@ -2016,6 +2076,13 @@ fn track_anims_from_rows(w: &mut World, ram: &GbaRam) {
     for p in &w.scene.puppets {
         if !owners.contains(&p.id) {
             owners.push(p.id);
+        }
+    }
+    // (and the NPCs whose animation command the replay dropped or ended: run 3 cut 135,588, s453's set_anim(260, 17)
+    // before the walk_to it waits in; 220,149, s303's walk_to(18, 390, 242) over - ours had restarted its walk)
+    for e in w.ents.iter().filter(|e| !e.removed) {
+        if matches!(&e.body, Body::Npc(_)) && !owners.contains(&e.id) {
+            owners.push(e.id);
         }
     }
     for id in owners {
@@ -2063,6 +2130,20 @@ fn track_anims_from_rows(w: &mut World, ram: &GbaRam) {
             wf_core::world::Body::Npc(n) => {
                 (n.anim.raw, n.anim.frame, n.anim.tick) = (raw, cel, tick);
                 n.anim.id = id_for(n.anim.id);
+                // (a map NPC showing a script animation - not its behaviour's idle / walk - is under the script's
+                // control as `set_state` puts it: a puppet, the animation the state's own; run 3 cut 137,176, s058's
+                // set_anim(163, 12) 27 ticks in, the replay from its actor_wait - ours ran the behaviour's walk tick)
+                if n.behaviour.is_some() && raw > 2 {
+                    n.anim.mode = wf_core::scene::AnimMode::Table;
+                    if !w.scene.puppets.iter().any(|p| p.id == id) {
+                        w.scene.puppets.push(wf_core::scene::Puppet { id, anim: wf_core::scene::ActAnim::idle() });
+                    }
+                }
+                // (its behaviour's idle / walk on the RAM's clock: the behaviour's animation is what it shows)
+                if let Some(b) = n.behaviour.as_mut().filter(|_| raw <= 2) {
+                    (b.raw, b.frame, b.tick) = (raw, cel, tick);
+                    b.anim = if raw == 1 { 0 } else { 1 };
+                }
             }
             wf_core::world::Body::Enemy(e) => {
                 e.set_raw(&d, raw);
@@ -2103,14 +2184,39 @@ fn track_anims_from_rows(w: &mut World, ram: &GbaRam) {
 fn import_track_objects(w: &mut World, ram: &GbaRam) {
     use wf_core::scene::{Cmd, Owner};
     let walks = ram.ewram_with(0x0804_D0A4);
+    // `walk_to_actor`'s walk (vt 0x0804D4BC, the same words as a walk: +0xC / +0x10 step, +0x14 / +0x18 the target px it
+    // computed at its start, +0x1C steps left)
+    let walks_to = ram.ewram_with(0x0804_D4BC);
     let glides = ram.ewram_with(0x0804_AE84);
     let jumps = ram.ewram_with(0x0804_AE5C);
     // the actors' running `actor_wait` objects (an actor's state +0x18C)
     let waits: Vec<u32> = ram.objects().into_iter().map(|a| ram.r32(a + 0x18C)).filter(|&s| ram.valid(s) && ram.r32(s) == 0x0804_AB58).collect();
     for k in 0..w.scene.tracks.len() {
+        // (several walks to one target - a crowd walking to the same spot, run 3 cut 58,967, s159 node 42: each its own
+        // step - the one whose walker stands nearest this track's actor; the walker is the object whose state +0x18C is
+        // the walk)
+        let me_at = match w.scene.tracks[k].owner {
+            Owner::Entity(id) => w.find(id).and_then(|i| w.actor(i)).map(|a| (a.x, a.y)),
+            _ => None,
+        };
+        // (and only a walker of this track's character: the same sprite as the row's - another character's walk to the
+        // same spot is not this one's command)
+        let me_sprite = match w.scene.tracks[k].owner {
+            Owner::Entity(id) => w.find(id).and_then(|i| wf_core::scene::sprite_id(w, i)),
+            _ => None,
+        };
+        let walker_ok = |o: u32| -> bool {
+            let Some(sp) = me_sprite else { return true };
+            ram.objects().into_iter().find(|&a| ram.r32(a + 0x18C) == o).and_then(|a| ram.actor_rows.iter().find(|r| r.0 == a)).is_none_or(|r| r.1 == sp)
+        };
+        let walker_dist = |o: u32| -> i64 {
+            let Some((mx, my)) = me_at else { return 0 };
+            ram.objects().into_iter().find(|&a| ram.r32(a + 0x18C) == o).map(|a| ((ram.s32(a + 0x1A0) - mx) as i64).abs() + ((ram.s32(a + 0x1A4) - my) as i64).abs()).unwrap_or(i64::MAX)
+        };
         let live = |c: &Cmd| -> Option<u32> {
             match c {
-                Cmd::MoveTo { x, y, .. } => walks.iter().copied().find(|&o| ram.s32(o + 0x14) == *x && ram.s32(o + 0x18) == *y),
+                Cmd::MoveTo { target: Some(_), .. } => walks_to.iter().copied().filter(|&o| walker_ok(o)).min_by_key(|&o| walker_dist(o)),
+                Cmd::MoveTo { x, y, .. } => walks.iter().copied().filter(|&o| ram.s32(o + 0x14) == *x && ram.s32(o + 0x18) == *y && walker_ok(o)).min_by_key(|&o| walker_dist(o)),
                 Cmd::GlideTo { x, y, .. } => glides.iter().copied().find(|&o| ram.s32(o + 0x14) == *x && ram.s32(o + 0x18) == *y),
                 Cmd::JumpTo { x, y, .. } => jumps.iter().copied().find(|&o| ram.s32(o + 0x18) == *x && ram.s32(o + 0x1C) == *y),
                 _ => None,
@@ -2172,6 +2278,26 @@ fn import_track_objects(w: &mut World, ram: &GbaRam) {
                 }
             }
         }
+        // a lone `actor_wait` at the head (0x4A, no walk after it: the wait object vt 0x0804AB58 at the actor's state
+        // +0x18C, +4 = 0, +8 the frames left): that count (run 3 cuts 122,487 / 215,385: 1 frame left); no wait object
+        // left - it went in its last step, the script goes on in the cut's frame: over (run 3 cut 88,742, s003's
+        // level-up spin: the wait done, face(0, 0) in f0)
+        if found.is_none() && matches!(w.scene.tracks[k].queue.first(), Some(Cmd::Wait { .. })) {
+            if let Some(s) = own {
+                if ram.valid(s) && ram.r32(s) == 0x0804_AB58 {
+                    if ram.r32(s + 4) == 0 {
+                        if let Some(Cmd::Wait { left }) = w.scene.tracks[k].queue.first_mut() {
+                            *left = ram.s32(s + 8);
+                        }
+                        w.scene.tracks[k].started = true;
+                    }
+                } else if s == 0 {
+                    w.scene.tracks[k].queue.remove(0);
+                    w.scene.tracks[k].started = false;
+                }
+                continue;
+            }
+        }
         let Some((pos, o)) = found else { continue };
         // `actor_wait` before the walk (0x4A: the actor's state +0x18C is the wait object vt 0x0804AB58, +4 the walk
         // object it starts at the end - already made, not stepped - +8 the frames left): the wait runs, the walk is
@@ -2189,12 +2315,35 @@ fn import_track_objects(w: &mut World, ram: &GbaRam) {
         if let Some(Cmd::GlideTo { x, y, .. }) = w.scene.tracks[k].queue.get_mut(pos) {
             (*x, *y) = (ram.s32(o + 0x14), ram.s32(o + 0x18));
         }
+        let walk_to_actor = matches!(w.scene.tracks[k].queue.get(pos), Some(Cmd::MoveTo { target: Some(_), .. })) && walks_to.contains(&o);
+        // the moving actor stands where RAM has it (the object whose state +0x18C is this movement object): the replay
+        // placed it by its own commands (run 3 cut 36,338, s101 node 2: four walkers 10 steps from their targets,
+        // ours a walk behind)
+        // (the same character: its sprite the row's - a track matched by target alone can hold another actor's object)
+        if let (Owner::Entity(id), Some(a)) = (w.scene.tracks[k].owner, ram.objects().into_iter().find(|&a| ram.r32(a + 0x18C) == o)) {
+            let row_sprite = ram.actor_rows.iter().find(|r| r.0 == a).map(|r| r.1);
+            if let Some(i) = w.find(id).filter(|&i| row_sprite.is_some() && wf_core::scene::sprite_id(w, i) == row_sprite) {
+                let (ax, ay) = (ram.s32(a + 0x1A0), ram.s32(a + 0x1A4));
+                match &mut w.ents[i].body {
+                    Body::Player(p) => (p.a.x, p.a.y) = (ax, ay),
+                    Body::Enemy(e) => (e.a.x, e.a.y) = (ax, ay),
+                    Body::Npc(n) => (n.a.x, n.a.y) = (ax, ay),
+                    _ => {}
+                }
+            }
+        }
         if pos > 0 || !w.scene.tracks[k].started {
             w.scene.tracks[k].queue.drain(..pos);
             wf_core::scene::import_start_head(w, k);
         }
         let Some(c) = w.scene.tracks[k].queue.first_mut() else { continue };
         match c {
+            // (walk_to_actor: the target it computed at its start, not one from where the other actor is now - run 3
+            // cuts 47,851 / 178,464, s110 node 1 / s274 node 4)
+            Cmd::MoveTo { x, y, n, t, sx, sy, .. } if walk_to_actor => {
+                (*x, *y) = (ram.s32(o + 0x14), ram.s32(o + 0x18));
+                (*sx, *sy, *n, *t) = (ram.s32(o + 0xC), ram.s32(o + 0x10), ram.s32(o + 0x1C), 0);
+            }
             Cmd::MoveTo { n, t, sx, sy, .. } | Cmd::GlideTo { n, t, sx, sy, .. } => {
                 (*sx, *sy, *n, *t) = (ram.s32(o + 0xC), ram.s32(o + 0x10), ram.s32(o + 0x1C), 0);
             }
@@ -2449,6 +2598,23 @@ fn import_coins(w: &mut World, ram: &GbaRam) {
             spawn: None,
         };
         w.add(Body::Pickup(Box::new(p)));
+    }
+}
+
+/// an enemy's thrown rocks in flight (the rock thrower's TauntAnim, ctor 0x08033F28, vt 0x0804CE50: +0x1C the
+/// thrower, +0x20 / +0x24 24.8 position, +0x40 / +0x44 velocity, +0x48 the steps left - two physics steps an update,
+/// landing at 0 with its puff): our rock effect with those numbers; its tile block goes with it (`import_vram`; run 3
+/// cut 158,217, Earth 2-90: a rock one step from landing - its puff's rand(0x1000) at f0)
+fn import_rocks(w: &mut World, ram: &GbaRam) {
+    for o in ram.objects().into_iter().filter(|&o| ram.r32(o) == 0x0804_CE50) {
+        let t = ram.r32(o + 0x1C);
+        let (tx, ty) = (ram.s32(t + 0x1A0), ram.s32(t + 0x1A4));
+        let Some(owner) = w.ents.iter().find(|e| !e.removed && matches!(&e.body, Body::Enemy(en) if en.a.x == tx && en.a.y == ty)).map(|e| e.id) else { continue };
+        let n = ram.s32(o + 0x48);
+        if n <= 0 {
+            continue;
+        }
+        wf_core::fx::add(w, wf_core::fx::Fx::Rock { owner, x: ram.s32(o + 0x20), y: ram.s32(o + 0x24), vx: ram.s32(o + 0x40), vy: ram.s32(o + 0x44), n });
     }
 }
 
@@ -2747,7 +2913,12 @@ fn import_player_state(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
         0x0804_C35C => Gs::Punch,
         0x0804_A188 => Gs::Hold0,
         0x0804_985C => Gs::Hold,
-        0x0804_D784 => Gs::Once3,
+        // (the one-pass state's class serves both rates: the animation's own - SetAnim(18), raw 20, 16 ticks a cel; run
+        // 3 cut 68,892, s194's play_anim(0, 18) at tick 27 on cel 1)
+        0x0804_D784 => match ram.actor_rows.iter().find(|r| r.0 == po).and_then(|r| wf_core::player::state_for_raw(r.2)) {
+            Some(Gs::Once4) => Gs::Once4,
+            _ => Gs::Once3,
+        },
         0x0804_C744 => Gs::Block,
         0x0804_D75C => Gs::Hurt,
         0x0804_C768 => Gs::Ko,
@@ -2758,6 +2929,9 @@ fn import_player_state(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
         // at 40 a refire if +4 (set by a B press, 0x0801AFE2) else idle) - the selected skill's (whole-run cut
         // 809,832: a blast thrown, refire pending)
         0x0804_DC14 if w.data.skill_kind(w.pl_ref(pi).skill()) == 7 => Gs::Skill(7),
+        // a beam skill charging (the press's state, vt 0x0804D9F8: +8 the beam object vt 0x0804AEF8, the player's tick
+        // +0x12 the charge count; run 3 cut 30,383, 1-16: Gohan holding B, tick 4) - the selected skill's
+        0x0804_D9F8 if matches!(w.data.skill_kind(w.pl_ref(pi).skill()), 15 | 16 | 6 | 1 | 3) => Gs::Skill(w.data.skill_kind(w.pl_ref(pi).skill()) as u8),
         vt => {
             notes.push(format!("mid-area: the leader's state vt {vt:#x} is not imported"));
             return;
@@ -2777,6 +2951,11 @@ fn import_player_state(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
         if let Some(t) = ram.ewram_with(0x0804_96BC).into_iter().next() {
             w.pl(pi).ko_at = w.frame as i64 + ram.s32(t + 4) as i64 - wf_core::menu::gameover::DEATH_DELAY;
         }
+    }
+    if let Gs::Skill(k @ (15 | 16 | 6 | 1 | 3)) = gs {
+        let tick = row.map(|r| r.4).unwrap_or(0);
+        let held = ram.r16(INPUT + 2) & 2 != 0;
+        wf_core::player::import_beam_charge(w, pi, k as i32, tick, held);
     }
     if gs == Gs::Skill(7) {
         let serial = w.next_serial();
@@ -3732,6 +3911,22 @@ fn build_event_entry(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner:
         }
     }
     let probe = runner.probe_event(&mut w, ev.0, ev.1, ev.2, areat);
+    // no leader in RAM yet (a cut inside the load's frozen frames: the player object is made at the arrival): the
+    // node's own warp places it - its x / y (run 3 cut 139,161, s113 node 0's warp(2, 8, 0, 248, 248); ours put the
+    // leader at the default 120, 120)
+    let (x, y) = if info.leader.is_none() && probe.is_some() {
+        let at = std::cell::Cell::new(None);
+        runner.probe_event_for(&mut w, ev.0, ev.1, ev.2, &|n, args| {
+            let hit = matches!(n, 0x76 | 0x77) && args.len() >= 5 && (args[0], args[1]) == (areat.0, areat.1);
+            if hit {
+                at.set(Some((args[3], args[4])));
+            }
+            hit
+        });
+        at.get().unwrap_or((x, y))
+    } else {
+        (x, y)
+    };
     // a return_to_field (0x75) in the node: the field the scene left, restored - a mid-area state (`build_returned`)
     if probe.is_none() {
         if let Some((k, _)) = runner.probe_event_for(&mut w, ev.0, ev.1, ev.2, &|n, _| n == 0x75) {
@@ -3746,7 +3941,10 @@ fn build_event_entry(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner:
     let fading = match probe {
         Some((_, 0x76)) => true,
         Some(_) => false,
-        None if ev.1 == 0 && !is_3d(data, to) => false,
+        // (the modal scene start a trigger / talk set - vt 0x08049D18, the leader standing, the screen lit - is no load's
+        // on-enter: its event runs over the standing field; run 3 cut 7,357, 1-1's s039: node 0's text box, its scene
+        // object already past its first state)
+        None if ev.1 == 0 && !is_3d(data, to) && !(ram.mode_vt() == MODE_SCENE && ram.player() != 0 && ram.screen_black != Some(true)) => false,
         // no load in the node: the event is running mid-node over a field that has been there (mid-area)
         None => return build_mid_event(data, ram, runner, ev, w, calls0, notes),
     };
@@ -3835,6 +4033,11 @@ fn build_event_entry(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner:
     // after its warp to 8-70, 2 held frames, set_pose waiting)
     if held == 0 {
         field::world_mode_cameras(&mut w);
+    }
+    // (the replayed spawns' idle clocks: the RAM's - an NPC turned by the replay re-entered its idle on another
+    // draw; run 3 cut 169,333, s016's face(279, 2) after the load: tick 276 in RAM)
+    if held == 0 && skipped == 0 {
+        npc_anims_from_rows(&mut w, ram);
     }
     notes.retain(|n| !n.starts_with("event "));
     notes.push(format!("event s{:03} continues at node {} ({} actions before the cut dropped)", ev.0, ev.1, skipped));
@@ -4510,6 +4713,17 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
             }
             continue;
         }
+        // a thrown rock (vt 0x0804CE50, `import_rocks`): its block belongs to the rock effect at its position
+        if vt == 0x0804_CE50 {
+            let h = ram.r16(o + 0xC);
+            let (x, y) = (ram.s32(o + 0x20), ram.s32(o + 0x24));
+            let ent = (0..w.ents.len()).find(|&k| !w.ents[k].removed && !used_ents.contains(&w.ents[k].id) && matches!(&w.ents[k].body, Body::Fx(f) if matches!(**f, wf_core::fx::Fx::Rock { x: rx, y: ry, .. } if rx == x && ry == y)));
+            if let (Some(k), true) = (ent, h != 0xFFFF) {
+                used_ents.push(w.ents[k].id);
+                owners.push((h, Owner::Ent(w.ents[k].id)));
+            }
+            continue;
+        }
         // the leader's Ki Blast (vt 0x0804B454, `import_player_blasts`): its block belongs to the blast at its position
         if vt == 0x0804_B454 || vt == 0x0804_A368 {
             let h = ram.r16(o + 0xC);
@@ -4530,8 +4744,16 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
             if let (Some(k), true) = (ent, h != 0xFFFF) {
                 used_ents.push(w.ents[k].id);
                 owners.push((h, Owner::Ent(w.ents[k].id)));
+                continue;
             }
-            continue;
+            // the leader's beam object still charging (+0x50 the player; built at the press, no shot yet): the
+            // press's `BeamObj` block (run 3 cut 30,383: Gohan's charge, tick 4)
+            if h != 0xFFFF && ram.r32(o + 0x50) == ram.player() && ram.player() != 0 {
+                if let Some(pi) = w.player_idx(0) {
+                    owners.push((h, Owner::BeamObj(w.ents[pi].id)));
+                    continue;
+                }
+            }
         }
         // Kid Buu's beams (vt 0x0804AEF8, `import_enemy_beam`: +0x20 / +0x24 the origin px): a block belongs to the
         // beam shot at its origin (run 2 cut 1,927,800: a retracting beam's block, freed with its destructor)

@@ -242,7 +242,7 @@ pub fn puff(w: &mut World, x: i32, y: i32, rate: i32) {
 pub fn rock_throw(w: &mut World, owner: EntityId, sx: i32, sy: i32, tx: i32, ty: i32) -> EntityId {
     let vx = ((tx - sx) * 0x5d3) >> 8;
     let vy = (((ty - sy) * 0x5d3 - 0xba60) >> 8) - 0x200;
-    add(
+    let id = add(
         w,
         Fx::Rock {
             owner,
@@ -252,7 +252,11 @@ pub fn rock_throw(w: &mut World, owner: EntityId, sx: i32, sy: i32, tx: i32, ty:
             vy,
             n: 0x16,
         },
-    )
+    );
+    // the rock is a projectile (0x08033F28 -> the base ctor 0x08019B04 with 0x40): one unit of sprite memory (run 3
+    // cut 157,820, Earth 2-90: the game's (434, 1) in the throw's frame); field only (the allocator)
+    crate::vram::acquire(w, crate::vram::Owner::Ent(id), 0x40);
+    id
 }
 /// puff with the game's random rate 0x1000 + rand(0x1000)
 pub fn puff_rng(w: &mut World, x: i32, y: i32) {
@@ -430,6 +434,9 @@ fn rock_land(w: &mut World, i: usize, owner: EntityId, x: i32, y: i32) {
         }
     }
     puff_rng(w, x, y);
+    // (its sprite memory goes with it, in the landing update: run 3 cut 158,217)
+    let id = w.ents[i].id;
+    crate::vram::release(w, crate::vram::Owner::Ent(id));
     w.ents[i].removed = true;
 }
 

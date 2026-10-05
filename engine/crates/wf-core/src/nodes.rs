@@ -478,6 +478,10 @@ fn is_ctl(w: &World, k: K) -> bool {
                     | K::WindupMelee
                     | K::HandSink
                     | K::HandAmbush
+                    // HeavyPunch's controller 0x030032F4 (static runtime 0x030032F8) counts in the actor's tick: an
+                    // event frame does not stop it (run 3 row 97,149, 3-3 circus: a one-frame event mid-punch; the
+                    // game's punch ends at its 80th tick, ours a frame later)
+                    | K::HeavyPunch
             ))
 }
 

@@ -1294,6 +1294,9 @@ export class Player extends Actor implements PlayerLike {
     if (msg.source === this && msg.atk.kind === 0) {
       // script #2: +1 EP per damaging melee hit (Armor of Light +2, Talisman +1 more; Darkness / Vampire Cape: HP+1)
       if (this.eff.meleeHpInstead) this.hp = Math.min(this.maxHp, this.hp + 1)
+      // (through the EP accessor: a Super Saiyan form's EP is its gauge - Rust player.rs on_dealt)
+      else if (this.form.ss3) this.ss3Gauge = Math.min(this.maxEp, (this.ss3Gauge >> 16) + this.eff.meleeEp) * 65536
+      else if (this.form.ss) this.ssGauge = Math.min(this.maxEp, this.ssGauge + this.eff.meleeEp)
       else this.ep = Math.min(this.maxEp, this.ep + this.eff.meleeEp)
     }
   }

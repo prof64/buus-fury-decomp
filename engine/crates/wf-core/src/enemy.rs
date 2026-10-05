@@ -2908,8 +2908,9 @@ pub fn mini_puffs(w: &mut World) -> usize {
         .filter(|&o| w.en_ref(o).ty == 0x38)
         .count();
     let n = 5usize.saturating_sub(live);
+    // (at the spot itself: the game's puffs at f5130 are records at (104, 112) .. - emulator OAM, sc_janemba)
     for &(x, y) in MINI_PTS.iter().take(n) {
-        crate::fx::puff_rng(w, x + 8, y + 8);
+        crate::fx::puff_rng(w, x, y);
     }
     n
 }

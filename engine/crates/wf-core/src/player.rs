@@ -870,12 +870,36 @@ pub fn script_anim_done(w: &World, i: usize) -> bool {
     matches!(pr(w, i).gs, Gs::Idle | Gs::Idle2 | Gs::Hold | Gs::Hold0)
 }
 
+/// the state SetAnim enters for the animation `raw` shows (the first id with that raw)
+pub fn state_for_raw(raw: i32) -> Option<Gs> {
+    ANIM_RAW.iter().position(|&r| r == raw).map(|id| ANIM_STATE[id])
+}
+
 /// wf-import (mid-area): put the player in state `gs` as a RAM snapshot shows it - no enter effects (no draws,
 /// no animation reset); the caller sets the animation
 pub fn import_state(w: &mut World, i: usize, gs: Gs) {
     let pl = p(w, i);
     pl.gs = gs;
     pl.state = coarse(pl, gs);
+}
+
+/// a beam skill charging at a cut (the importer): its instance as the press made it (the charge sound playing, the
+/// beam object's 0x300 tile bytes owned by the importer) and the charge flare once the first update made it - the
+/// tick (the player's +0x12) is the charge's count (`upd_skill`: the flare at 1, the firing at 24)
+pub fn import_beam_charge(w: &mut World, i: usize, kind: i32, tick: i32, held: bool) {
+    let serial = w.next_serial();
+    let me = w.ents[i].id;
+    let pl = p(w, i);
+    let id = pl.skill();
+    pl.t = 0;
+    pl.sk = Some(SkillInst { id, serial, held, release: -1, ..Default::default() });
+    if tick >= 1 {
+        let off = if kind == 1 { BEAM_CHARGE_BANSHEE } else { BEAM_CHARGE_KAME };
+        let f = fx::beam_charge(w, me, off, fx::BeamSet::Other);
+        if let Some(s) = sk_mut(w, i) {
+            s.fx = f;
+        }
+    }
 }
 
 /// SetAnim(id) (vfunc +0x28 0x0800ECF0)
@@ -2652,7 +2676,20 @@ pub fn on_dealt(w: &mut World, i: usize, msg: &HitMsg, dmg: i64) {
         if pl.eff.melee_hp_instead {
             pl.rec.hp = pl.rec.max_hp.min(pl.rec.hp + 1);
         } else {
-            pl.rec.ep = pl.rec.max_ep.min(pl.rec.ep + pl.eff.melee_ep);
+            // (through the EP accessor - script variable 14, `0x08003CF4`: a Super Saiyan form's EP is its gauge; run 3
+            // 7-6 prelims row 211,885: Super Saiyan Goku's landed punch, the gauge 106 -> 107)
+            let add = pl.eff.melee_ep;
+            let form = pl.form;
+            let (ss, ss3) = w.data.form(form).map(|f| (f.ss, f.ss3)).unwrap_or((false, false));
+            let pl = p(w, i);
+            if ss3 {
+                let g = ((pl.ss3_gauge >> 16) + add as i64).min(pl.rec.max_ep as i64);
+                pl.ss3_gauge = g << 16;
+            } else if ss {
+                pl.ss_gauge = pl.rec.max_ep.min(pl.ss_gauge + add);
+            } else {
+                pl.rec.ep = pl.rec.max_ep.min(pl.rec.ep + add);
+            }
         }
     }
 }

@@ -4783,6 +4783,16 @@ world-map flight's OBJs (rclose_002 f1620 / f2580: plane, labels - mode 7 OBJs),
 * Flames' overlap order: tried the tie-break by entity id reversed and a sub-pixel depth - neither better overall
   (shipr_300: 25 / 24 / 27 exact, more pixels); left as is.
 
+**Update 15 (Super Buu agent): the world-map plane; Janemba's mini puffs.**
+* The player's plane (4-1 rclose_002 f1740) is right: its texture equals the game's VRAM tile (all 318 pixels of
+  tile 208, colours apart from the expansion), its OAM position and matrix match ((88, 7), PA -443). The pixels left
+  there are the airship's 1 px x offset behind it (ours (79, 4), the game's (80, 4)); truncating the patrol position
+  to whole px fixed f1740 but cost more elsewhere - not changed.
+* **Janemba's mini puffs sit at the minis' spots** (no + 8): the game's records at sc_janemba f5130 (emulator OAM
+  (88, 89) .. with the record origin (16, 16), camera (0, 7)) = (104, 112) ...; 4,300 px less over the cut.
+* Shake on OBJs, actors only (effects not shaken) was tried: worse overall (board 70.3 against 71.6 %) - all OBJs
+  stay shaken.
+
 * Not mine, noticed: ship 8-1 cuts (shipr_056 / shipr_172 f360 ..) lost 11 exact BG frames between two runs of the
   board this session with only other agents' changes in between (the tile clock's `cam_iters` edit is the candidate).
 
@@ -6003,3 +6013,45 @@ check.sh EXACT, sweeps unchanged (run-3 cut points 510 -> 511 / 580).
 - **3-14 sprite allocator (replay from 111,768, f282):** a 4-unit block lands at 375 in ours, 459 in the game - same
   size, the free-list order (allocator rule; A can take it if wanted).
 *Run 3 cut points, group 1 (A; wf-core menu/equip.rs, wf-import lib.rs; uncommitted):* 6 fixed - the pause menu's **Equip page** (vt 0x08049588) and its action dialog (0x0804AFCC) import over the saved world (slot +0x114, list top / selection +0x138 / +0x13C, dialog selection +0x10C; c46263 / c46660, 161 / 149 rows exact); a replayed play_anim the game ended is dropped only when the leader's command list (+0x18C) is empty (text boxes a frame early: c110180 / c210621 / c75641); a finished `face` (0x53) is dropped like play_anim (c11327). 9 correct refusals (inside loads' frozen lag frames: c10930, c132015, c151071, c20458, c28001, c66907, c78420, c8151, c89933). Open: c129633 (the director steps into s134's next node in the cut's own frame - needs 'continue an event at a node from the next frame'; A). **To the Earth agent:** run 3 ~95,531 (2-x, from cut 95,094): the sprite allocator's free / spare list order (same used blocks) - a rule. Run-3 sweep 510 -> 518 / 580 with groups 1 + 2. Gates green, check.sh EXACT.
+*Run 3 cut points, groups 3 + 4 (A; wf-core fx.rs / player.rs, wf-import lib.rs / ram.rs / segment.rs; uncommitted).*
+Run-3 sweep **510 -> 551 / 580** (none worse); **check.sh run 3 now first differs at 214,032** (was 97,261 - the circus
+stops were the rock thrower). Fixed:
+- **Pause close (13 cuts):** a cut inside the close's world-restore iteration (black, 7 .. 54 frames) imports the
+  close's last step (black to the iteration's end) and the restore's camera update in its last black frame.
+- **Chapter title card s516** (`load_scene(0, 96, ..)` + `fade_in(100)`, no `save_field_on_next_scene`): 0x72 .. 0x74
+  count as "inside a cutscene map" too (3 cuts); an inline script waiting in `fade_in` takes the fade's progress
+  (`fade_progress_from_ram`); a node opening its text box in a long iteration gets the iteration-end camera update
+  (`GbaRam::mid_iteration`).
+- **Earth 2-90's rock thrower:** the taunt's frame count from its tick (controller vt 0x0804E030) and the one-shot
+  rule; rocks in flight (vt 0x0804CE50: +0x20 / +0x24 position, +0x40 / +0x44 velocity, +0x48 steps left) with their
+  tile block; **rule:** a thrown rock takes one sprite unit (ctor 0x08033F28 -> 0x08019B04, 0x40) and frees it on
+  landing.
+- The leader charging a beam (vt 0x0804D9F8) imported (skill, flare, the beam object's block); a villager's
+  face-the-player step (vt 0x0804B338, +4 count) imported; a scene start a trigger / talk set (mode 0x08049D18) over a
+  standing field goes on over it; walks matched by sprite + nearest walker, the mover placed at RAM's position,
+  `walk_to_actor`'s walk (vt 0x0804D4BC) imported.
+Open (A): c68495 (s194 nested in s193's `steps` node: `continue_mid_nested` does not resume a run_event inside a steps
+node), c129633 (the director steps into the next node in the cut's own frame), c139161 (inside a load's frozen frames:
+should be a correct refusal - the importer does not refuse it yet), the group-2 animation / facing cuts (helper on it).
+**To the Earth agent (rules, each confirmed from an earlier plain cut):** run 3 129,416 - the area banner counts down
+during the pause menu's fade-in (mode 0x0804A4B8; 120 -> 113 by the 6th step), ours holds it (removed ~16 frames late,
+its sprite memory (351, 60) still held; 131,809 likely the same); 8,647 - after a pause close the game's camera steps
+in the restore iteration's last black frame, ours not (c54997 f119 / c96682 f128 look the same); 63,733 - a West City
+NPC (sprite 41) half a pixel off, then RNG at 63,755.
+Gates green; check.sh EXACT (run 1 logic + sounds, run 2 / run 3 ratchets); whole-run / run-2 / exit-fade sweeps
+unchanged; area-entry `rE2__087_2-90+001000` 258 -> 1000.
+*Run 3 cut points, group 2 part 2 (A; wf-core player.rs, wf-import lib.rs; uncommitted):* an `actor_wait` with its wait object in RAM (vt 0x0804AB58, +4 = 0) resumes with the frames left (+8), with none left it is over (the level-up spin's facing); the leader's play-once state (vt 0x0804D784) takes its rate from the RAM animation (anim 18 / raw 20: 16 ticks a cel, `player::state_for_raw`); a map NPC playing a script animation is a puppet on the script's timing; every NPC's animation / walk clock synced from RAM (the 7-5 / 7-6 crowd NPC no longer re-walks); NPC idle timers synced after a mid-event map load with no replayed actions. **Run-3 sweep 551 -> 559 / 580; check.sh: run 3 now exact from power-on to 230,455 in logic and sounds (212,080 iterations) - its last rule stop (214,032) went with these.** Whole-run / run-2 / exit-fade sweeps unchanged; gates green.
+
+**Earth agent 2026-10-05 (4): run 3 Earth exact to its end (230,455; sounds 0 differences).** Three stops, two causes:
+* **97,261 / 97,293 (circus 3-3):** HeavyPunch's count is its controller's (0x030032F4, static runtime 0x030032F8:
+  the actor's tick), so it runs on through an event frame - a one-frame event at row 97,149 (depth 1) mid-punch held
+  ours, the punch ended a frame late, its Wait and GotoState followed late. `nodes::is_ctl` (field) now has
+  HeavyPunch; a cut mid-punch takes the controller as running (`patch_enemy`, as the barrage).
+* **214,032 (prelims 7-6):** a landed melee hit's EP +1 goes through the EP accessor (script variable 14: the write
+  at `0x08003CF4` from the opponent's on-hit tree 0x08702410 -> SubState(0)) - in a Super Saiyan form that is the
+  **gauge** (row 211,885: 106 -> 107); ours added to the record's EP, so the gauge ran out 13 steps early and Goku
+  reverted mid-hit. `player::on_dealt` (Rust) + `player.ts onDealt` (TS); dumps regenerated, cross_ts green.
+check.sh: run 1 exact, run 2 as expected (the ratchet now at 1,769,316), run 3 exact; gates / core / import / app
+suites green. Tools: `work/earth/timing/{aistack,seqwatch,sswatch3}.py`; wholerun `WR_EANIM=1` (enemy anim + AI rt).
+(Note from the coordinator: the Super Buu agent's sprites now move with the shake too - near my shake code in
+wf-render; re-read before editing there.)
