@@ -1613,6 +1613,12 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
         K::MechTransform => set_anim(w, i, &[an(20)], true, Some(false)),
         // enter 0x0804E5E8 installs the fragment state 0x03003158
         K::PlayAnim0 => en::frag_enter(w, i),
+        // field: the swarm minion's appear is anim 0x12 (raw 19 in the recording, 3 cels of 4 ticks; run 2 row
+        // 1,484,953, 20-5) - an(17) is a raw this sprite does not have, the minion stood in its idle
+        K::PlayAnim12Swarm if w.field.is_some() => {
+            let rule = w.data.anim.once_stop2;
+            set_anim_r(w, i, &[an(18)], false, rule);
+        }
         K::PlayAnim12
         | K::PlayAnim12b
         | K::PlayAnim12Swarm
@@ -3146,6 +3152,23 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             en::clamp_inside(w, i);
             w.field.is_none() && f >= 60
         }
+        // field: the controller 0x030032A0 (update 0x0803926C) ticks from the update after the enter, tick 0 first: the
+        // minion at tick 40 is the node's 41st update, the SetAnim(0) at tick 72 its 73rd (run 2 row 1,484,952, 20-5:
+        // the minion a frame after ours); battles keep the reference's 40 / 72
+        K::SummonMinion if w.field.is_some() => {
+            if f == 41 {
+                const OFF: [(i32, i32); 4] = [(8, 12), (8, -12), (-12, 8), (12, 8)];
+                let a = &w.en_ref(i).a;
+                let (ox, oy) = OFF[a.facing as usize];
+                let (x, y) = (a.px() + ox, a.py() + oy);
+                let dir = a.facing;
+                // (the minion takes the summoner's facing, 0x080392FE)
+                if let Some(k) = crate::battle::spawn_enemy(w, 0x0d, x, y, me, None) {
+                    w.en(k).a.facing = dir;
+                }
+            }
+            timed_end(w, i, f, 73)
+        }
         K::SummonMinion => {
             if f == 40 {
                 const OFF: [(i32, i32); 4] = [(8, 12), (8, -12), (-12, 8), (12, 8)];
@@ -3454,7 +3477,9 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             w.en(i).a.alpha = (256 - f * 256 / 107).max(51);
             // field: the sink's controller plays the strike backwards - tick from 104 down by one from the node's
             // second update, the cel its tick >> 3 (real route 18-1 rj03 f249 .. f355)
-            if w.field.is_some() {
+            // (its first update keeps the tick at 104 and does not rewrite the frame: the strike's last cel 12 stays,
+            // not tick >> 3 = 13 - rj03_045 f251)
+            if w.field.is_some() && f >= 2 {
                 let n = w
                     .en_ref(i)
                     .a
@@ -3597,7 +3622,10 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         | K::PlayAnim13Yakon
         | K::PlayAnimOnce => {
             let d = Arc::clone(&w.data);
-            let done = f >= 16 && w.en_ref(i).anim_done(&d);
+            // (field: the swarm minion's one-shot 0x03001B38 is shorter than 16 updates - it ends when the animation
+            // does: run 2 row 1,484,966, 20-5, Super Buu's minion leaves its state 0x52 after 13)
+            let min = if w.field.is_some() && matches!(kind(c, n), K::PlayAnim12Swarm) { 1 } else { 16 };
+            let done = f >= min && w.en_ref(i).anim_done(&d);
             if done
                 && matches!(kind(c, n), K::PlayAnimOnce)
                 && c.tree.nodes[n as usize].addr != SKELETON_COLLAPSE
@@ -3713,6 +3741,7 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                     .data
                     .sprite(0x57 - crate::content::GFX_OFFSET)
                     .map(|s| s.foot);
+                let field = w.field.is_some();
                 let free = match (foot, w.col.is_some()) {
                     (Some((fw, fh)), true) => {
                         let marked = w.en_ref(i).marked;
@@ -3723,7 +3752,15 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                         }
                         let ok = c.test(crate::world::Layer::Enemy, x, y, x + fw, y + fh);
                         if let Some((m, sv)) = saved {
-                            c.load_enemy(m, &sv);
+                            // field: freed, tested, marked again (+0x48(1), the test, +0x48(0)): the Blister's whole
+                            // footprint is blocked after any try, a hole another enemy's leaving had made there is
+                            // filled (MEASURED run 2 21-6, cut 1,605,500: tile (21, 35) blocked again at the try in
+                            // f100, two frames before the spawn - an Enzyme below re-plans around the Blister)
+                            if field {
+                                c.mark_enemy(m, 0);
+                            } else {
+                                c.load_enemy(m, &sv);
+                            }
                         }
                         ok
                     }

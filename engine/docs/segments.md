@@ -101,6 +101,20 @@ Student, Trainee, ...). Run 1 shows "Trainee" (#1479, party XP 31.05M); by the S
 4-21 rows of run 2's ending at part frames ~611,620 are the lobby's "final sequence" question, not the box; the box
 comes later in the ending, before the credits). Neither run's key log reaches a ranking screen after the credits
 (they go to the title).
+*21-4 / 21-6 fixed (side-content fork; whole run from cut 1,591,711 now exact to 1,643,664 = 21-8, the next fork's;
+no sound difference before it - the 48..51 punch-sound pair at 1,605,710 came from these):* the Blister / Enzyme
+rules, all field-only (MEASURED with write watches / breakpoints on run-2 cuts):
+* **Spawn count:** the Enzyme's death state 0x91's ParentCountDown (0x0802F724, ours `K::LatchRelease`) takes one off
+  the parent's +0x204 (write 0x0802F73C); at 8 SpawnEnzymes holds its timer at 480 (0x0802F590) - the Blister spawns
+  again 480 frames after a death (cut 1,591,712: 8 -> 7 at f7,090, next Enzyme f7,592). Import: the Enzyme's parent
+  (+0x1F4) and the Blister's child list (+0x1F0 first, +0x1F8 next).
+* **A GotoState death's XP** (the Enzyme): the death effect and its XP come at the state's SelfDestruct, not at the
+  KO hit (cut 1,599,700: KO f220, ParentCountDown f221, SelfDestruct's explosion rand f222, level-up rolls f223).
+* **SelfDestruct's death takes the first child along** (f2 0x08018950 loops down +0x1F0): the Blister's KO also blows
+  up its oldest living Enzyme - two explosions, both XPs the next frame (cut 1,602,800 f259: +46,850 +8,750).
+* **The spawn try re-marks the Blister** (+0x48(1), test, +0x48(0)): its footprint is blocked after any try, filling a
+  hole another enemy's leaving had made; ours restored the old tiles (cut 1,605,500: tile (21, 35) refilled at f100,
+  an Enzyme below re-plans around the Blister at f102).
 
 *Ship part resync (rows 217,993 -> 602,566, current tree; `work/run2/stops_ship.jsonl`): 19 stops, long exact
 stretches between them (245,991 -> 459,733 is 213,742 rows exact).* Routing:
@@ -5582,6 +5596,13 @@ in my half - say here what it has in flight (rows / fixes) and I skip those; unt
 0x08030B6D (UP / DOWN, A, B) takes over. B 12 frames after the welcome window opened is ignored in the game (ours
 cancelled the shop there, 29 frames early). `scene::WINDOW_FADE_IN`. Cut wr_1469800 739 -> 800 / 800, gates green,
 check.sh run 1 exact; run 2 first difference now **1,484,951** (20-5, rng).
+*1,484,951 .. 1,485,000 fixed (real-route agent), Super Buu's swarm minions at 20-5 (field only; battles keep the
+reference):* SummonMinion - the controller 0x030032A0 (update 0x0803926C) ticks from the update after the enter,
+tick 0 first: the minion at tick 40 = the node's 41st update, the SetAnim(0) at tick 72 its 73rd; the minion takes
+the summoner's facing (0x080392FE). PlayAnim12Swarm - anim 0x12 = an(18) (raw 19 recorded; an(17) is a raw the
+minion sprite lacks: it stood in its idle) under the one-shot 0x03001B38 (`once_stop2`), done when the animation is
+(12 updates, not 16). IfContactExplode - an accepted hit plays 48 + rand(2) (0x080390D8). Cut wr_1484800 151 ->
+300 / 300; gates green; check.sh run 1 exact; **run 2 first difference now 1,576,199** (20-7, rng).
 *Run 2 Kid Buu -> credits (A), status:* resync from 1,853,852: 37 stops, all in 033_b_superbuu between 1,858,571 and 1,928,108; **from 1,928,109 the app is exact to the end (1,977,866) incl. the credits**. Two tool fixes on the way: (1) **resync.py reported an app crash as 'end of the recording reached'** - a panic now records a stop (the 1,927,640 cut panicked in its first frame: Kid Buu owns a second object of the beam class vt 0x0804AEF8 with +0x3C = 0x5A; `import_enemy_beam` now takes only the one with a direction). Earlier private resyncs that ended 'end of the recording reached' may have hidden a crash - rerun to be sure. (2) **Credits ranking text: matches.** The game's `party_xp_total()` at s312 node 17 (row 1,977,778) = 22,461,657 -> string 1477 (20M .. 25M); ours, running from 1,928,109, gives 22,461,657 at the same row (XP 6,265,520 / 6,490,137 / 2,079,275 / 337,440 / 7,289,285) -> 1477. Run 1's 31.05M -> 1479 unchanged. The 37 stops are with four A helpers.
 
 **Pixels: HUD / text-box residuals (Earth agent, 2026-10-05).** Board on my run (25,551 sampled frames): 11 frames
@@ -5616,3 +5637,4 @@ change already in `place_enemy` (Pikkon after `become_map_object(224, 8)` gets s
 Also from the BG work: the screen shake offset is 22.10 - the BG layers take `shake_off >> 10` (view.rs). check.sh:
 both runs as expected; core / import / app suites green. Debug: wholerun `WR_SONG=1` prints Scene.song per shown row.
 *Run 2 Kid Buu -> credits: done (A; uncommitted: wf-core enemy.rs / nodes.rs / player.rs / world.rs / menu/mod.rs / session.rs, wf-import lib.rs).* **resync.py --chain run2 --lag none --from 1,853,852: 0 stops - the app is exact (logic) from the end of Inside Buu to the end of run 2 (1,977,866), credits included** (resync now reports crashes). Rules added this round (all field-gated): Sleep from Options starts its script at the top of the next frame and holds it (1,869,664); an absorbed original Kid Buu passes its place to the merged one (the Vegeta cut-in only on the real defeat, 1,880,459); a Ninja's teleport leaves and rejoins the enemy grid inside its own update (1,891,199); a firing Kid Buu beam retracts when a pushed state replaces his pose (1,893,427 sound 33 / stop 32); the field KO freeze at KO + 199 runs before the object pass (`player::ko_freeze`; 1,909,571). Imports: a queued Sleep, a KO'd leader (down, the death timer, the beam's tiles), a cut in the death script's first frame (freeze). Sounds left in A's range: the 50 / 51 punch pair swapped where two cutscene actors' `play_anim` punches end and restart in one frame (1,877,946, 1,888,088 / 104, 1,917,102 / 118) - the game runs each actor's script commands inside that actor's own update, ours in one tick after the object pass (a script-runner change, not made); 1,891,147 a stop 3 missing. Shop 1,860,355 -> ship-fix agent (above). Gates green, wf-app tests green, check.sh EXACT.
+**To the ship-fixes agent (menu owner), from A by the coordinator: run 2's West City Z-Mart shop pacing.** Rows 1,860,355 (depth app 0 game 1) / 1,860,384 (app 1 game 0): s030 at 0-92, buy and sell pages; both sides start it at the same row (A at 1,859,792), but over the session the game's logic counter runs 467 iterations against our 308 and ours ends the event early - the shop pages' per-iteration pacing (`menu/shop.rs`). Cuts with save memory at `work/wholerun/run2/cuts` (resync `--chain run2 --from 1859700`).

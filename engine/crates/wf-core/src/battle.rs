@@ -374,7 +374,6 @@ pub fn push_initial(w: &mut World, i: usize, st: u16) -> usize {
     i
 }
 
-#[track_caller]
 pub fn spawn_enemy(
     w: &mut World,
     ty: i32,
@@ -389,7 +388,6 @@ pub fn spawn_enemy(
 /// spawn_enemy; `exact`: at (x, y) as given, no free-spot search (the field's placed enemies: the constructor
 /// 0x0800FD55 takes the def position as it is, VERIFIED Babidi's ship 8-12 / 8-21 / 8-42, where a def overlaps a
 /// marked tile)
-#[track_caller]
 pub fn spawn_enemy_at(
     w: &mut World,
     ty: i32,
@@ -399,7 +397,6 @@ pub fn spawn_enemy_at(
     start: Option<i32>,
     exact: bool,
 ) -> Option<usize> {
-    if std::env::var_os("XSP").is_some() { eprintln!("XSPE frame {} clock {} ty {} at {}", w.frame, w.g.clock(w.frame), ty, std::panic::Location::caller()); }
     w.data.enemy(ty)?;
     let mut e = Enemy::new(w, ty);
     e.a.x = x << 8;

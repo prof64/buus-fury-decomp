@@ -2079,7 +2079,14 @@ pub fn contact_explode(w: &mut World, i: usize) -> bool {
         return false;
     }
     let mut m = msg_from(w, i, 0, bb, w.en_ref(i).a.facing, 0x1000, atk(1));
-    player::on_message(w, pi, &mut m)
+    let hit = player::on_message(w, pi, &mut m);
+    // field: an accepted hit plays sound 48 + rand(2) (0x080390D8; run 2 row 1,485,000, 20-5: a swarm minion's
+    // explosion on the player); battles keep the reference
+    if hit && w.field.is_some() {
+        let s = 48 + w.rng.rand(2);
+        w.sfx(s, 64);
+    }
+    hit
 }
 pub fn area_hit(w: &mut World, i: usize, rect: Rect, a: AttackType, mult: i32) -> bool {
     let Some(pi) = player(w, i) else { return false };

@@ -1017,6 +1017,16 @@ impl World {
             }
             c -= 1;
             if !item_get_before && self.field.as_ref().is_some_and(|f| f.item_get.is_some()) {
+                // (the objects left: their update comes when the presentation's loop returns into this pass)
+                let rest: Vec<EntityId> = live(self)
+                    .into_iter()
+                    .take((c + 1).max(0) as usize)
+                    .flatten()
+                    .map(|k| self.ents[k].id)
+                    .collect();
+                if let Some(f) = self.field.as_mut() {
+                    f.item_get_rest = rest;
+                }
                 break;
             }
         }

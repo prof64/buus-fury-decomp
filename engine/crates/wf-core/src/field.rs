@@ -251,6 +251,10 @@ pub struct Field {
     pub flight: Option<crate::fieldworld::Flight>,
     /// the blocking item-get presentation
     pub item_get: Option<crate::fieldobj::ItemGet>,
+    /// the objects the item-get's start left without their update (older than the player in the interrupted pass):
+    /// the presentation's end completes that pass (`fieldobj::item_get_step`)
+    #[serde(default)]
+    pub item_get_rest: Vec<crate::world::EntityId>,
     /// field enemies' patrol runners (def +0x18 steps; run by the AI node RunMotionController)
     pub patrols: Vec<crate::fieldpatrol::Patrol>,
     /// placed enemies alive: (entity, object, last position px)
@@ -625,6 +629,7 @@ fn new_field() -> Field {
         patrols: vec![],
         loot: (0, 0, 0, 0),
         item_get: None,
+        item_get_rest: Vec::new(),
         debris: vec![],
         label: None,
         flight: None,
@@ -823,9 +828,7 @@ pub fn leader_char(w: &World) -> i32 {
 }
 
 /// create one placed object of the object world (not triggers: see `TriggerRt`); returns its entity
-#[track_caller]
 pub fn spawn_object(w: &mut World, o: &ObjDef) -> Option<EntityId> {
-    if std::env::var_os("XSP").is_some() { eprintln!("XSP frame {} {:?} at {}", w.frame, o.at, std::panic::Location::caller()); }
     let nplayers = w.players.len().max(1);
     match &o.kind {
         ObjKind::Trigger { rect, act, .. } => {
