@@ -1305,6 +1305,8 @@ pub const WINDOW_CLOSE: i32 = 2;
 /// one step a frame from the frame after the press), is gone on the 16th, and the next node runs the frame after
 /// (real game, West City Z-Mart s030 at 0-92: six windows, all 17)
 pub const WINDOW_FADE_CLOSE: i32 = 17;
+/// ... and its fade-in: no input for this many updates (BLDALPHA 0 -> 0x10, one step a frame)
+pub const WINDOW_FADE_IN: i32 = 16;
 
 /// A message window fades in and out (`0x08030ED2`: BLDCNT := 0x3E41, BLDALPHA ramped by the callback 0x08030BF5)
 /// only when the current BLDCNT has no first-target layer (bits 0..5 clear); otherwise it shows and goes at once.
@@ -3735,6 +3737,14 @@ fn tick_dialog(w: &mut World) {
         return;
     };
     d.t += 1;
+    // a fading message window reads no keys while it fades in: its callback ramps BLDALPHA for 16 updates
+    // (0x08030BF5), then the input phase (0x08030B6D: UP / DOWN, A, B) takes over (run 2 row 1,470,522, West City
+    // Z-Mart s030 at 0-92: B 12 frames after the welcome window opened is ignored, the next one 42 after picks)
+    if d.kind == 3 && d.fades && d.t <= WINDOW_FADE_IN && matches!(d.phase, DialogPhase::Opening | DialogPhase::Shown)
+    {
+        d.phase = DialogPhase::Shown;
+        return;
+    }
     if d.options > 0 && matches!(d.phase, DialogPhase::Opening | DialogPhase::Shown) {
         if k & DOWN != 0 {
             d.cursor = (d.cursor + 1) % d.options;

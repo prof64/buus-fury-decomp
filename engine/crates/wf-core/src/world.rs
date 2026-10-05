@@ -936,6 +936,11 @@ impl World {
     /// into the next index): story playthrough, the player's punch that destroys a fighter loaded before it ticks
     /// its animation twice in that frame.
     fn step_entities_list(&mut self) {
+        // the death script's loop (KO + 199) begins before the object pass: no object is updated in that frame but the
+        // player's own (the modal), every actor gets message 0xF first (run 2 row 1,909,571, 19-3: a Kid Buu copy's
+        // beam, newer in the list than the player, hit the KO'd player once more in ours; the game's frame has only
+        // the walking Kid Buu's message-0xF idle draw)
+        crate::player::ko_freeze(self);
         // the travel menu's label entity (the Other World map 0-51; created by a script, alone in the world list)
         if self.scene.dest_label.is_some() {
             crate::field::dest_menu(self);
@@ -989,7 +994,11 @@ impl World {
             let talk_before = self.field.as_ref().is_some_and(|f| f.talk_pass.is_some());
             if !skip {
                 self.update_entity(i);
-                if std::env::var_os("B_TALKBREAK").is_some() && !talk_before && self.field.as_ref().is_some_and(|f| f.talk_pass.is_some()) {
+                // a talk started in this update runs its event as the game's nested loop: the rest of this frame's pass
+                // (the older objects) is not updated (db7_010 14-10 f258: man 2's talk - the room's three enemies go
+                // idle with a fresh rand(255) tick and do not tick it in that frame; ours had, a tick ahead for 400
+                // frames)
+                if !talk_before && self.field.as_ref().is_some_and(|f| f.talk_pass.is_some()) {
                     break;
                 }
                 // it destroyed an object before it: the list compacted, the same object is at the next index

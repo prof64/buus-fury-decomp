@@ -2322,6 +2322,19 @@ pub fn shot(w: &mut World, i: usize, kind: ShotType) {
 // ---- teleports / special ---------------------------------------------------------------------------------------
 
 pub fn ninja_teleport(w: &mut World, i: usize) {
+    // field: the update (0x0802C1DC) takes the enemy off the enemy grid first (vfunc +0x48(1)) and puts it back at
+    // the end (vfunc +0x48(0)) - at the new spot after a jump, in the same update (run 2 row 1,891,199, 0-50's
+    // Ninjas: the one chasing behind it re-plans through the old spot in the same frame)
+    let grid = w.field.is_some();
+    if grid {
+        unmark_self(w, i);
+    }
+    ninja_teleport_tries(w, i);
+    if grid {
+        mark_self(w, i);
+    }
+}
+fn ninja_teleport_tries(w: &mut World, i: usize) {
     for _ in 0..16 {
         let dx = w.rng.rand(201) - 100;
         let dy = w.rng.rand(201) - 100;
@@ -3405,6 +3418,42 @@ fn on_death(w: &mut World, i: usize) {
                 tank_crew(w, i, k);
             }
         }
+        if death == "SelfDestruct" && w.field.is_some() {
+            self_destruct_children(w, i);
+        }
+    }
+}
+
+/// SelfDestruct's death (f2 0x08018950) loops down the first-child links (+0x1F0): the dying object, then its oldest
+/// living child, that one's oldest child ... each with its defeat handler (the death effect: kill XP the next
+/// frame), removal and explosion (MEASURED run 2 21-4, cut 1,602,800 f259: the Blister's KO punch also blows up its
+/// oldest Enzyme - two rand(0x1000), XP 46,850 + 8,750 the next frame)
+fn self_destruct_children(w: &mut World, i: usize) {
+    let mut cur = w.ents[i].id;
+    loop {
+        let Some(ci) = w.find(cur) else { return };
+        let kids = match &w.ents[ci].body {
+            Body::Enemy(e) => e.children.clone(),
+            _ => return,
+        };
+        let next = kids.into_iter().find(|&k| {
+            w.find(k).is_some_and(|j| {
+                !w.ents[j].removed && matches!(&w.ents[j].body, Body::Enemy(e) if !e.defeated && e.parent == cur)
+            })
+        });
+        let Some(kid) = next else { return };
+        let Some(ki) = w.find(kid) else { return };
+        let kty = w.en_ref(ki).ty;
+        let exp = w.data.enemy(kty).map(|t| t.exp).unwrap_or(0);
+        if let Some(pi) = ctx_player(w, ki) {
+            let pid = w.ents[pi].id;
+            if let Some(f) = w.field.as_mut() {
+                f.xp_due.push((pid, exp));
+            }
+        }
+        w.en(ki).a.hittable = false;
+        die(w, ki, true);
+        cur = kid;
     }
 }
 /// the tanks (death node 0x080333C4, param = def +0xC): Battle Tank variant 0x7F (0), Juggernaut 0x3A (1), 0x8C (2)

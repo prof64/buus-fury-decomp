@@ -140,6 +140,12 @@ pub fn push(w: &mut World, i: usize, id: u16) {
             }
         }
     }
+    // field: a firing Kid Buu beam belongs to the actor state KidBuuKamehameha's enter set (0x0804C690) too: the
+    // pushed state's actor state replaces it and the beam retracts from the next update (run 2 row 1,894,422, 19-3:
+    // hit at len 11, then 8, 5, 2, gone - play 33 / stop 32 on time; a charging one: enemy::set_anim_rule)
+    if w.field.is_some() && w.en_ref(i).beam != 0 && w.find(w.en_ref(i).beam).is_some() {
+        stop_enemy_beam(w, i);
+    }
     w.en(i).ai.gen += 1;
     let s = build(w, i, id);
     w.en(i).ai.stack.push(s);

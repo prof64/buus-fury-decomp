@@ -2642,6 +2642,19 @@ fn import_player_state(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
     };
     let row = ram.actor_rows.iter().find(|r| r.0 == po).copied();
     wf_core::player::import_state(w, pi, gs);
+    // a KO'd leader (the KO state, or its held death pose at HP 0) is down as the KO's enter leaves it: not hittable,
+    // and its message handler accepts an overlapping box without damage (`player::on_message`: Kid Buu's beam stops
+    // on it and sparks, 5 draws every 5 .. 7 frames - run 2 rows 1,880,523 .. 1,880,659)
+    if gs == Gs::Ko || (gs == Gs::Hold && w.pl_ref(pi).rec.hp == 0) {
+        let p = w.pl(pi);
+        p.dead = true;
+        p.a.hittable = false;
+        // the KO timer (vt 0x080496BC, +4 the frames left from 200; the death script starts when it ends - run 2 cut
+        // 1,880,460: 200 left, s000 at row 1,880,659): our `ko_at` (`menu::gameover::tick`: KO + DEATH_DELAY)
+        if let Some(t) = ram.ewram_with(0x0804_96BC).into_iter().next() {
+            w.pl(pi).ko_at = w.frame as i64 + ram.s32(t + 4) as i64 - wf_core::menu::gameover::DEATH_DELAY;
+        }
+    }
     if gs == Gs::Skill(7) {
         let serial = w.next_serial();
         let p = w.pl(pi);
@@ -3864,6 +3877,19 @@ pub fn import_emulator_state(data: &Arc<GameData>, ram: &GbaRam, runner: &mut St
         world.scene.timers.countdown_on = gd[1] & 4 != 0;
     }
     import_options(&mut world, ram);
+    // a closed menu's queued event (world +0x610: count, then the deferred-script objects vt 0x08049264, +8 the event's
+    // header - Options -> Sleep's s007, `0x08014B12`): it starts at the next frame's start (`menu::run_then`; run 2
+    // cut 1,869,665)
+    let n = ram.r32(0x0300_1C4C + 0x610);
+    if n > 0 && n < 8 && !wf_core::menu::active(&world) {
+        let o = ram.r32(0x0300_1C4C + 0x614);
+        if ram.valid(o) && ram.r32(o) == 0x0804_9264 {
+            if let Some(e) = runner.event_of_header(ram.r32(o + 8)) {
+                world.menu.then = Some(format!("s{e:03}"));
+                world.menu.then_armed = true;
+            }
+        }
+    }
     Ok(Imported { world, prev_keys: ram.r16(INPUT + 2) & 0x3FF, lf: info.lf, kind: info.kind, held_frames: b.held, draws: b.draws, notes })
 }
 
@@ -4352,6 +4378,18 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
             let h = ram.r16(o + 0xC);
             let (x, y) = (ram.s32(o + 0x20), ram.s32(o + 0x24));
             let ent = (0..w.ents.len()).find(|&k| !w.ents[k].removed && !used_ents.contains(&w.ents[k].id) && matches!(&w.ents[k].body, Body::Shot(s) if matches!(s.kind, wf_core::shots::ShotKind::Straight(_)) && s.x == x && s.y == y));
+            if let (Some(k), true) = (ent, h != 0xFFFF) {
+                used_ents.push(w.ents[k].id);
+                owners.push((h, Owner::Ent(w.ents[k].id)));
+            }
+            continue;
+        }
+        // an enemy's beam (vt 0x0804AEF8, `import_enemy_beam`; the class takes 0x300): its block belongs to the beam
+        // shot from its origin (run 2 1,880,524: Kid Buu's beam on the KO'd leader - the block freed with the beam)
+        if vt == 0x0804_AEF8 {
+            let h = ram.r16(o + 0xC);
+            let (x, y) = (ram.s32(o + 0x20) << 8, ram.s32(o + 0x24) << 8);
+            let ent = (0..w.ents.len()).find(|&k| !w.ents[k].removed && !used_ents.contains(&w.ents[k].id) && matches!(&w.ents[k].body, Body::Shot(s) if matches!(s.kind, wf_core::shots::ShotKind::Kame(_)) && s.x == x && s.y == y));
             if let (Some(k), true) = (ent, h != 0xFFFF) {
                 used_ents.push(w.ents[k].id);
                 owners.push((h, Owner::Ent(w.ents[k].id)));

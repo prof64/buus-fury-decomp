@@ -1103,6 +1103,27 @@ fn import_objects(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
             }
         }
     }
+    // ... and the Blister's child list in its order (first child +0x1F0, next sibling +0x1F8: the oldest first; its
+    // SelfDestruct death takes the first one with it)
+    for &(o, id) in &enemy_of {
+        let mut c = ram.r32(o + 0x1F0);
+        let blister = w.find(id).is_some_and(|i| matches!(&w.ents[i].body, Body::Enemy(e) if e.ai.stack.iter().any(|st| st.tree.nodes.iter().any(|n| n.k == wf_core::ai::K::SpawnEnzymes))));
+        if c == 0 || !blister {
+            continue;
+        }
+        let mut kids = vec![];
+        while c != 0 && kids.len() < 64 {
+            if let Some(&(_, cid)) = enemy_of.iter().find(|e| e.0 == c) {
+                kids.push(cid);
+            }
+            c = ram.r32(c + 0x1F8);
+        }
+        if let Some(i) = w.find(id) {
+            if let Body::Enemy(e) = &mut w.ents[i].body {
+                e.children = kids;
+            }
+        }
+    }
     // the actors in the RAM's order, after the other objects
     let mut actors = vec![];
     for id in &order {
@@ -2803,6 +2824,11 @@ fn build_mid_event(_data: &Arc<GameData>, ram: &GbaRam, runner: &mut StoryHost, 
             let p = w.pl(i);
             p.dead = true;
             p.a.hittable = false;
+            // the death script's loop runs from KO + 199 (`player::ko_freeze`): the player is the only object updated
+            // (run 2 cut 1,909,572: a Kid Buu copy's beam hit the KO'd player once more in ours)
+            if w.field.is_some() && w.players.len() == 1 {
+                w.modal = Some(vec![w.ents[i].id]);
+            }
             w.scene.depth = 0;
             field::set_busy(&mut w, false);
             if let Some(f) = w.field.as_mut() {

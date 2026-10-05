@@ -117,6 +117,18 @@ stretches between them (245,991 -> 459,733 is 213,742 rows exact).* Routing:
   carry the cartridge's EEPROM slot); unsupported cuts at 7-2 mid-area (mode 0x8049d18), on-enter scripts at 0-2 /
   8-1 / the title 0-0.
 
+*Inside Buu 21-9, the worms hit (run 2 Super Buu fork, MEASURED on cut 1,689,300 = run 2 row; harness 400 / 400
+exact after, was 31):* run 1 never punched a worm. **ShieldHit** (a worm piece's on-hit node, 0x0802D328) was a no-op;
+now `enemy::worm_shield_hit`: a head reverses (facing ^= 1) and it and every piece after it turn unhittable (+0x1CC)
+with a 15-frame guard (+0x204); a body piece makes the whole chain unhittable, takes the guard itself and splits the
+chain there - the piece before loses its next (a tail), the hit piece loses its prev and becomes a head (sprite
+0x128, type 0x8E; its on-hit's GotoState(0x319) gives it the head state). Each piece's update counts its guard
+down and at 0 is hittable again (0x0802D4CC / 0x0802D656). A body piece is off the enemy grid (+0x291): the
+split-off head first marks its footprint where it stands (vt+0x54 = 0x0800F9EE, the walk test 0x08009904) and,
+blocked, does nothing more that update (cut f206: the head ahead stood on the same rows for 10 frames). The head's
+grid mark now moves inside its update (free / mark around the step, 0x0802D522 / 0x0802D5AA) so a head updated
+after it sees the new rows (cut f164). Import: a worm piece's guard / hittable / +0x291 come from RAM.
+
 *Gate meanwhile:* run 1 stays strict; run 2 is a ratchet - `data/realrun2/expected.json` holds its first
 difference row (31,497); check.sh fails only when run 2's first difference (stop or sound) comes earlier, prints
 `IMPROVED` and bumps the file when it comes later. Remove the file once run 2 is exact.
@@ -5546,6 +5558,11 @@ player still at (25434, 38177) through s451's start as the game does; only a har
 part, which is yours: I take **1,470,560 .. 1,690,890** (the current first difference through the 20-x stretch, up
 to entering Inside Buu 21-1 at 1,690,891); you keep **1,690,891 .. 1,853,851** (Inside Buu). Your 20-x grind fork is
 in my half - say here what it has in flight (rows / fixes) and I skip those; until then I start at 1,470,560.
+*1,470,560 fixed (real-route agent):* West City Z-Mart s030 at 0-92 - a fading message window (kind 3 with
+`fades`) reads no keys while it fades in: the callback 0x08030BF5 ramps BLDALPHA for 16 updates, then the input phase
+0x08030B6D (UP / DOWN, A, B) takes over. B 12 frames after the welcome window opened is ignored in the game (ours
+cancelled the shop there, 29 frames early). `scene::WINDOW_FADE_IN`. Cut wr_1469800 739 -> 800 / 800, gates green,
+check.sh run 1 exact; run 2 first difference now **1,484,951** (20-5, rng).
 *Run 2 Kid Buu -> credits (A), status:* resync from 1,853,852: 37 stops, all in 033_b_superbuu between 1,858,571 and 1,928,108; **from 1,928,109 the app is exact to the end (1,977,866) incl. the credits**. Two tool fixes on the way: (1) **resync.py reported an app crash as 'end of the recording reached'** - a panic now records a stop (the 1,927,640 cut panicked in its first frame: Kid Buu owns a second object of the beam class vt 0x0804AEF8 with +0x3C = 0x5A; `import_enemy_beam` now takes only the one with a direction). Earlier private resyncs that ended 'end of the recording reached' may have hidden a crash - rerun to be sure. (2) **Credits ranking text: matches.** The game's `party_xp_total()` at s312 node 17 (row 1,977,778) = 22,461,657 -> string 1477 (20M .. 25M); ours, running from 1,928,109, gives 22,461,657 at the same row (XP 6,265,520 / 6,490,137 / 2,079,275 / 337,440 / 7,289,285) -> 1477. Run 1's 31.05M -> 1479 unchanged. The 37 stops are with four A helpers.
 
 **Pixels: HUD / text-box residuals (Earth agent, 2026-10-05).** Board on my run (25,551 sampled frames): 11 frames

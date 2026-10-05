@@ -1575,7 +1575,8 @@ pub fn update(w: &mut World, i: usize) {
     if since_ko == 199 {
         // the death script's loop runs from here on (the original's one player): no other object is updated any
         // more, and every actor gets message 0xF (0x0800F44A: the walk state's vfunc +0x10 SetAnim(0)s)
-        if w.players.len() == 1 {
+        // (field: before the object pass, `ko_freeze`)
+        if w.players.len() == 1 && w.field.is_none() {
             w.modal = Some(vec![w.ents[i].id]);
             for id in w.enemies.clone() {
                 if let Some(k) = w.find(id).filter(|&k| !w.ents[k].removed) {
@@ -4579,4 +4580,23 @@ pub(crate) fn mod_to_idle(w: &mut World, i: usize) {
 }
 pub(crate) fn mod_fits(w: &World, i: usize, x: i32, y: i32) -> bool {
     fits(w, i, x, y)
+}
+
+/// field: the death script's loop starts at KO + 199 before the object pass (0x08799D0C): only the player is updated
+/// from here on, every enemy gets message 0xF (`enemy::stop_msg`)
+pub fn ko_freeze(w: &mut World) {
+    if w.field.is_none() || w.players.len() != 1 {
+        return;
+    }
+    let Some(i) = w.player_idx(0) else { return };
+    let ko = pr(w, i).ko_at;
+    if ko < 0 || w.frame as i64 - ko != 199 {
+        return;
+    }
+    w.modal = Some(vec![w.ents[i].id]);
+    for id in w.enemies.clone() {
+        if let Some(k) = w.find(id).filter(|&k| !w.ents[k].removed) {
+            crate::enemy::stop_msg(w, k);
+        }
+    }
 }
