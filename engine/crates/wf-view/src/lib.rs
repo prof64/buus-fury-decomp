@@ -250,6 +250,9 @@ pub struct WorldMapView {
     pub props_hidden: Vec<u16>,
     /// The mini-map marker box (`spawn_box(x0, y0, x1, y1)`), None = the content default.
     pub minimap_box: Option<[i32; 4]>,
+    /// The other 3D actors (the patrolling enemies: airships, ...): drawn like the flyer (projected, affine, with
+    /// their shadow), x / y 24.8 world px, z their altitude (obj+0x1A8, 22.10).
+    pub actors: Vec<FlyerView>,
 }
 
 #[derive(Clone, Debug, PartialEq, Default)]

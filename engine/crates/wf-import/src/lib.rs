@@ -1341,6 +1341,7 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
     import_bombs(w, ei, ram, o);
     import_flames(w, ei, ram, o);
     import_waves(w, ei, ram, o);
+    import_shells(w, ei, ram, o);
     let d = Arc::clone(&w.data);
     let e = w.en(ei);
     e.a.x = ram.s32(o + 0x1A0);
@@ -1602,6 +1603,17 @@ fn import_waves(w: &mut World, ei: usize, ram: &GbaRam, o: u32) {
         let mut s = wf_core::shots::Shot::new(me, ram.r8(b + 0x10) & 3, 0, ram.s32(b + 0x20) << 8, ram.s32(b + 0x24) << 8, kind);
         s.t = ram.s32(b + 0x14) as i64;
         wf_core::shots::add(w, s);
+    }
+}
+
+/// this tank's shells in flight (vt 0x0804A368, made by 0x0801C900: +0x1C the tank, +0x10 the direction, +0x20 / +0x24
+/// 24.8 position, +0x40 / +0x44 velocity, +0x48 ticks - the ki blast class's layout): our shell with those numbers
+/// (run 3 cut 112,165, 3-14: a shell 3 ticks out puffs its trail in the cut's first frame - its 1-unit puff)
+fn import_shells(w: &mut World, ei: usize, ram: &GbaRam, o: u32) {
+    let me = w.ents[ei].id;
+    for b in ram.objects().into_iter().filter(|&b| ram.r32(b) == 0x0804_A368 && ram.r32(b + 0x1C) == o) {
+        let s = wf_core::enemy::shell_in_flight(me, ram.r8(b + 0x10) & 3, ram.s32(b + 0x20), ram.s32(b + 0x24), ram.s32(b + 0x40), ram.s32(b + 0x44), ram.s32(b + 0x48) as i64);
+        w.add(Body::Shot(Box::new(s)));
     }
 }
 
@@ -4182,14 +4194,14 @@ fn check(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
         notes.push(format!("camera ({}, {}) vs RAM {cam:?}", w.cameras[0].x, w.cameras[0].y));
     }
     // actors: every RAM object with a sprite def vs the World's actors
-    let ours: Vec<(i32, i32, i32, u8)> = w
+    let ours: Vec<(i32, i32, i32, u8, usize)> = w
         .ents
         .iter()
         .enumerate()
         .filter(|(_, e)| !e.removed && matches!(e.body, Body::Npc(_) | Body::Player(_) | Body::Enemy(_)))
         .filter_map(|(i, _)| {
             let a = w.actor(i)?;
-            Some((wf_core::scene::sprite_id(w, i).unwrap_or(-1), a.x, a.y, a.facing))
+            Some((wf_core::scene::sprite_id(w, i).unwrap_or(-1), a.x, a.y, a.facing, i))
         })
         .collect();
     let theirs: Vec<(u32, i32, i32, u8)> = ram
@@ -4206,8 +4218,16 @@ fn check(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
         match (0..ours.len()).find(|&k| !used[k] && ours[k].1 == x && ours[k].2 == y) {
             Some(k) => {
                 used[k] = true;
-                if ours[k].3 != f {
-                    notes.push(format!("actor at ({x}, {y}) facing {} vs RAM {f}", ours[k].3));
+                // (the RAM's facing wins: an event's replayed turn - or a skipped one - left ours another; run 3 cuts
+                // 169,333 / 220,149 / 224,119 / 88,742: actors turned by a node's earlier commands)
+                if ours[k].3 != f && f < 4 {
+                    notes.push(format!("actor at ({x}, {y}) facing {} vs RAM {f} (RAM's taken)", ours[k].3));
+                    match &mut w.ents[ours[k].4].body {
+                        Body::Player(p) => p.a.facing = f,
+                        Body::Npc(n) => n.a.facing = f,
+                        Body::Enemy(e) => e.a.facing = f,
+                        _ => {}
+                    }
                 }
             }
             None => notes.push(format!("RAM actor {o:#x} vt {:#x} at ({}, {}) has no entity there", ram.r32(o), x as f64 / 256.0, y as f64 / 256.0)),
@@ -4435,7 +4455,7 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
             continue;
         }
         // the leader's Ki Blast (vt 0x0804B454, `import_player_blasts`): its block belongs to the blast at its position
-        if vt == 0x0804_B454 {
+        if vt == 0x0804_B454 || vt == 0x0804_A368 {
             let h = ram.r16(o + 0xC);
             let (x, y) = (ram.s32(o + 0x20), ram.s32(o + 0x24));
             let ent = (0..w.ents.len()).find(|&k| !w.ents[k].removed && !used_ents.contains(&w.ents[k].id) && matches!(&w.ents[k].body, Body::Shot(s) if matches!(s.kind, wf_core::shots::ShotKind::Straight(_)) && s.x == x && s.y == y));

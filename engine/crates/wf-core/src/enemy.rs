@@ -1089,8 +1089,6 @@ pub fn in_melee_range(w: &mut World, i: usize) -> bool {
     let Some(pi) = player(w, i) else { return false };
     let p = &w.pl_ref(pi).a;
     let b = w.en_ref(i).a.body_box();
-    if std::env::var_os("TMP_MELEE").is_some() { let (h, pb) = (p.hittable, p.body_box()); let sr = strike_rect(&mut w.clone(), i, false); eprintln!("MELEE f{} hit {} pbox {:?} ebox {:?} strike {:?} facing {}", w.frame, h, pb, b, sr, w.en_ref(i).a.facing); }
-    let p = &w.pl_ref(pi).a;
     if !p.hittable
         || !overlaps(
             &p.body_box(),
@@ -2118,6 +2116,35 @@ const SHELL_BOX: [[i32; 4]; 4] = [
     [14, 8, 16, 16],
 ];
 
+/// a tank shell in flight as `shot(.., ShotType::Shell)` makes it, without its spawn (no sound, no draw): the importer's
+/// (a cut with the shell out: its 24.8 position, velocity and ticks from RAM)
+pub fn shell_in_flight(owner: crate::world::EntityId, dir: crate::geom::Dir, x: i32, y: i32, vx: i32, vy: i32, t: i64) -> Shot {
+    let mut s = Shot::new(
+        owner,
+        dir,
+        0,
+        x,
+        y,
+        ShotKind::Straight(Box::new(StraightOpts {
+            vx,
+            vy,
+            b: SHELL_BOX[dir as usize & 3],
+            a: atk(1),
+            mult: 1024,
+            sfx_spawn: 28,
+            rng_hit: 2,
+            sfx_hit: 48,
+            fragile: true,
+            name: shots::SName::Shell,
+            trail: Some(shots::Trail { fx: shots::FxId::Fx0871e630, rec: 4, n: 3, rate: 0x2aaa }),
+            spawned: true,
+            ..Default::default()
+        })),
+    );
+    s.t = t;
+    s
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ShotType {
     Gun,
@@ -2168,7 +2195,13 @@ pub fn shot(w: &mut World, i: usize, kind: ShotType) {
             y,
             ShotKind::Straight(Box::new(StraightOpts { vx, vy, b, ..o })),
         );
+        let shell = matches!(&s.kind, ShotKind::Straight(o) if o.name == shots::SName::Shell);
         let id = w.add(Body::Shot(Box::new(s)));
+        // the tank shell's object tiles (0x0801C900 through the projectile base: 4 units; run 3 cut 111,768, 3-14:
+        // the game's (471, 4) from the shell's frame)
+        if shell {
+            crate::vram::acquire(w, crate::vram::Owner::Ent(id), 0x100);
+        }
         if let Some(k) = w.find(id) {
             shots::spawn_rng(w, k);
         }

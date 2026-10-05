@@ -326,12 +326,13 @@ fn main() {
                 let mut view = RenderView::default();
                 wf_core::view::render_view(w, &mut view);
                 let old_pal = prev_pal.replace(pal_of(&view));
+                let cur_stat: Vec<Option<u8>> = view.hud.iter().map(|h| h.stat_mark).collect();
                 if std::env::var_os("PIX_NOPRES").is_none() {
                     presenter.apply(&mut view);
                 }
                 last_view = Some(view.clone());
                 if std::env::var_os("TMP_STATROW").is_some() {
-                    eprintln!("ROW {k} iters {} phase {:?} active {} stat {:?}", w.field.as_ref().map(|f| f.cam_iters()).unwrap_or(0), w.menu.phase, wf_core::menu::active(w), view.hud.first().map(|h| h.stat_mark));
+                    eprintln!("ROW {k} iters {} phase {:?} active {} c {:?} stat {:?}", w.field.as_ref().map(|f| f.cam_iters()).unwrap_or(0), w.menu.phase, wf_core::menu::active(w), w.field.as_ref().and_then(|f| f.vram.as_ref().map(|v| f.cam_iters().wrapping_sub(v.stat_at))), view.hud.first().map(|h| h.stat_mark));
                 }
                 let old_timer = std::mem::replace(&mut prev_timer, view.timer);
                 let Some(&i) = at.get(&k) else { return };
@@ -363,8 +364,27 @@ fn main() {
                     };
                     eprintln!("timerrows {name} f{k} {rows:?}");
                 }
-                let ours = renderer.render(&packs, &view, 0, W, H).to_vec();
+                let mut ours = renderer.render(&packs, &view, 0, W, H).to_vec();
                 let (mut class, mut n) = classify(&view, &game[i], &ours);
+                // the stat mark's new cel copied to VRAM by this frame's draw before the beam reached it (the gate's
+                // `stat_now`, tests/pixels.rs): the hardware's
+                if n > 0 {
+                    let mut v2 = view.clone();
+                    let mut changed = false;
+                    for (h, c) in v2.hud.iter_mut().zip(&cur_stat) {
+                        if h.stat_mark.is_some() && c.is_some() && h.stat_mark != *c {
+                            h.stat_mark = *c;
+                            changed = true;
+                        }
+                    }
+                    if changed {
+                        let px = renderer.render(&packs, &v2, 0, W, H).to_vec();
+                        let (c2, n2) = classify(&v2, &game[i], &px);
+                        if n2 < n {
+                            (class, n, ours) = (if n2 == 0 { "torn (hardware)".to_string() } else { c2 }, n2, px);
+                        }
+                    }
+                }
                 // the tear rule: a palette / BG scroll change this frame - lines matching the previous frame's are the
                 // hardware's
                 if n > 0 && std::env::var_os("PIX_NOTEAR").is_none() {

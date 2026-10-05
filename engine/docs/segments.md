@@ -4770,6 +4770,19 @@ world-map flight's OBJs (rclose_002 f1620 / f2580: plane, labels - mode 7 OBJs),
 * Shakes: none of the conclusions above or in updates 10 - 12 depend on screen shake (re-checked after the Earth
   agent's shake drawing: no shake was active in the frames compared).
 
+**Update 14 (Super Buu agent): world-map enemies drawn; the shake moves the world's OBJs too; board 69.7 -> 71.0 %.**
+* **The world map's patrolling enemies (the airships) were never drawn**: the mode-7 renderer drew the flyer and the
+  props only. `WorldMapView::actors` (wf-core view: each enemy's position, cel and its patrol altitude obj+0x1A8)
+  drawn like the flyer (`flyer_group`: projected, affine, with its shadow) on the BG's camera (rclose_002 4-1 f2580:
+  the airship 2 px off on the current one; game OAM at f1740: the airship (80, 4) PA 604, ours (79, 4) 604). The
+  player's plane: its OAM position / matrix match the game's at f1740 ((88, 7), PA -443); the pixels left there are
+  in the sprite itself (cel or affine sampling - not traced).
+* **The screen shake's BG offset applies to the world's OBJs as well** (wf-render: sprites drawn at - shake): sb_006 /
+  sb_007 6-x from f4,694 (Gotenks' cut-short crit shake, (3, -3) kept - the Earth agent's BG fix) had every actor
+  3 px off the game's; sb_007 440 -> 582 exact sampled frames, 325 frames over the board, none lost.
+* Flames' overlap order: tried the tie-break by entity id reversed and a sub-pixel depth - neither better overall
+  (shipr_300: 25 / 24 / 27 exact, more pixels); left as is.
+
 * Not mine, noticed: ship 8-1 cuts (shipr_056 / shipr_172 f360 ..) lost 11 exact BG frames between two runs of the
   board this session with only other agents' changes in between (the tile clock's `cam_iters` edit is the candidate).
 
@@ -5962,3 +5975,30 @@ the dead boss's open_area (1,683,032) were 972b129's (side-content agent's helpe
   pieces, ours 4.
 **Claim (dungeon agent A, 2026-10-05, by the coordinator): run 3's cut points (import side)** - a run-3 resync (`resync.py --chain run3 --lag none`, private log), every cut point made to load; rule stops routed to the Earth agent here.
 *Run 3 resync (A, `--chain run3 --lag none`, power-on -> 230,455, log /tmp/resync_r3.jsonl): 3 stops, all rules, no import stop -> **Earth agent**:* 97,261 and 97,293 (011_e3_circus, rng; the second from the cut after the first), 214,032 (024_e3_prelims, rng). From 214,033 exact to the end. A is sweeping run-3 cut points every 397 rows (save memory carried) for import gaps.
+*Run 3 cut-point sweep (A):* 580 cut points every 397 rows across run 3 (/tmp/r3cuts, save memory carried): 510 exact, 2 correct refusals (boot / title), 11 refused on a blocked on-enter load, 57 diverging (fades / camera in long first iterations, vram, anim, facing, RNG, positions, text boxes). With four A helpers; rule stops go to the Earth agent here.
+
+**Earth agent 2026-10-05 (3): the STAT mark - the counter and the gate.** Measured (statmark.py / statcmp.py): the
+mark's draw counter (+0x14, `0x0800B55C`: +1 then cel = (c >> 3) & 3) equals the camera clock (`Field::cam_iters`:
+field iterations + the menu fades) in every stretch checked (rclose_067 14-2, shipr_227 7-2, dr1_001 9-2, rkb_168
+14-1). What differed was the picture, not the count: **the draw copies the new cel's tiles to VRAM at once** (DMA
+0x08049138), so a cel change shows on the frame of the draw under last frame's OAM when the copy lands before the
+beam reaches y 9..15 - the same kind of tearing as the timer's digits. The pixel gate (`tests/pixels.rs` `stat_now`)
+and the board (`examples/pixels.rs`) now accept the frame with this frame's cel; gate green (shipr_227 f1080 / f1200,
+shipr_056 f360), board 26 STAT frames left (from ~175), 18,299 exact. Re-checked the shake: sign +1 (-1 or 0: 12 exact
+frames fewer, 586 frames worse), the natural end zeroes the offset (removing that: -3,136 exact).
+**Run 3 97,261 (in progress):** Pikkon-type enemy 619 (type 128, 3-3 circus) - state 746 = Sequence [HeavyPunch, Wait,
+GotoState]: the game leaves it at row 97,207, ours at 97,208 (one frame late), the next state's rand draws then split.
+HeavyPunch starts at 97,170 in both; still to find which of the punch / Wait counts runs one long.
+*Run 3 cut points, group 2 (A; wf-core enemy.rs / fx.rs / shots.rs, wf-import lib.rs; uncommitted):* c112165 (3-14 tank
+shell) fixed - a shell in flight (vt 0x0804A368) imported with its tile block (`import_shells`); a fired shell takes
+4 sprite units; a shell's / rifle bullet's trail puff takes 0x40 bytes, not the effect default 0x400 (the effect
+ctor takes the caller's size: `fx::fx_anim_sized`) - continuous replay from 111,768: 52 -> 282 / 420. Gates green,
+check.sh EXACT, sweeps unchanged (run-3 cut points 510 -> 511 / 580).
+**To the Earth agent / ship-fixes agent (menus), from A's run-3 sweep:**
+- **Hercule City Z-Mart choices (run 3 rows ~125,266 .. 128,045):** the shop's choice nodes do not open the normal
+  text box (vt 0x08049F60) - the game shows a 4-unit window (vt 0x0804C974) + a cursor (vt 0x0804ABD8); ours opens
+  a full text box (32 + 64 + 64 units). A continuous replay from 125,266 diverges at f264 when the choice opens - a
+  rule. Also two cuts there stand on shop pages with an empty object list (126,854 / 127,648): the shop-page importer
+  (with the pause pages, ship-fixes).
+- **3-14 sprite allocator (replay from 111,768, f282):** a 4-unit block lands at 375 in ours, 459 in the game - same
+  size, the free-list order (allocator rule; A can take it if wanted).

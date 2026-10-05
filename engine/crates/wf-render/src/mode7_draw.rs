@@ -209,6 +209,18 @@ impl Renderer {
                 }
             }
         }
+        // the other actors (patrolling enemies), drawn the same way
+        if let Some(wm) = wm {
+            for a in &wm.actors {
+                if let Some(sheet) = self.sheet(packs, &a.sheet) {
+                    // (the BG's camera, like the props: real route 4-1 rclose_002 f2580, the airship 2 px off on the
+                    // current one)
+                    if let Some(g) = self.flyer_group(packs, &bg_cam, &sheet, a.frame as usize, a.flip, (a.x, a.y, a.z)) {
+                        world.push(g);
+                    }
+                }
+            }
+        }
         if let Some(props) = self.sheet(packs, &data.props_sheet) {
             for p in &data.props {
                 let i = p.index as u16;

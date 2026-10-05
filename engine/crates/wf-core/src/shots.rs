@@ -1601,7 +1601,7 @@ fn straight_update(w: &mut World, i: usize) {
         if t & 3 == 0 {
             let s = w.shot_ref(i);
             let (x, y) = ((s.x - 8 * o.vx) >> 8, (s.y - 8 * o.vy) >> 8);
-            fx::fx_anim(w, tr.fx.addr(), x, y, tr.rec, tr.n, tr.rate);
+            fx::fx_anim_sized(w, tr.fx.addr(), x, y, tr.rec, tr.n, tr.rate, 0x40);
         }
     }
     if o.life != 0 && t > o.life as i64 {

@@ -440,6 +440,17 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                 wm.props_hidden.push(k as u16);
             }
         }
+        // the patrolling enemies (airships ...): drawn by the renderer like the flyer, at their altitude
+        for (i, e) in w.ents.iter().enumerate() {
+            let Body::Enemy(en) = &e.body else { continue };
+            if e.removed {
+                continue;
+            }
+            let Some((frame, flip, _)) = actor_cel(w, i) else { continue };
+            let Some(s) = en.a.sprite.and_then(|s| w.data.sprite(s)) else { continue };
+            let z = f.patrols.iter().find(|p| p.entity == e.id).map(|p| p.z).unwrap_or(0);
+            wm.actors.push(wf_view::FlyerView { x: en.a.x, y: en.a.y, z, sheet: format!("sprites/{}", s.id), frame, flip });
+        }
         wm.minimap_box = w.scene.visuals.iter().rev().find_map(|v| match v.kind {
             crate::scene::VisualKind::Box { w: bw, h: bh } => Some([v.x, v.y, bw, bh]),
             _ => None,
@@ -857,6 +868,8 @@ fn stat_mark_frame(w: &World) -> Option<u8> {
     if !v.owners.iter().any(|o| o.1 == crate::vram::Owner::StatMark) {
         return None;
     }
+    // (the draw counts +0x14 up once per draw - every field iteration and the menu fades' camera ticks: the camera
+    // clock; measured equal to the game's counter, real route rclose_067 14-2 / shipr_227 7-2 / dr1_001 9-2)
     let it = w.field.as_ref().map(|f| f.cam_iters()).unwrap_or(0);
     Some(((it.wrapping_sub(v.stat_at) >> 3) & 3) as u8)
 }

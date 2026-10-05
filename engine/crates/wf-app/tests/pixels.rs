@@ -108,6 +108,21 @@ fn compose(r: &mut Renderer, packs: &Packs, view: &RenderView, prev: &RenderView
     out
 }
 
+/// the stat-points mark with this frame's cel: its draw (0x0800B55C) copies the new cel's tiles to VRAM at once, so a
+/// draw made before the beam reaches the mark's lines (y 9..15) shows on this frame under last frame's OAM (as the
+/// timer's digits); `None` when the cel did not change
+pub fn stat_now(view: &RenderView, cur: &[Option<u8>]) -> Option<RenderView> {
+    let mut v = view.clone();
+    let mut changed = false;
+    for (h, c) in v.hud.iter_mut().zip(cur) {
+        if h.stat_mark.is_some() && c.is_some() && h.stat_mark != *c {
+            h.stat_mark = *c;
+            changed = true;
+        }
+    }
+    changed.then_some(v)
+}
+
 #[test]
 fn locked_segments_render_as_the_game() {
     let repo = wf_rom::testutil::repo_root();
@@ -171,12 +186,14 @@ fn locked_segments_render_as_the_game() {
                 let mut view = RenderView::default();
                 wf_core::view::render_view(w, &mut view);
                 let before = prev.replace(view.clone());
+                let cur_stat: Vec<Option<u8>> = view.hud.iter().map(|h| h.stat_mark).collect();
                 presenter.apply(&mut view);
                 last_view = Some(view.clone());
                 let Some(&h) = want.get(&k) else { return };
                 seen += 1;
                 let new = renderer.render(&packs, &view, 0, 240, 160).to_vec();
                 let ok = hash(&new) == h
+                    || stat_now(&view, &cur_stat).is_some_and(|v| hash(&renderer.render(&packs, &v, 0, 240, 160).to_vec()) == h)
                     || match (masks.get(&k), before) {
                         (Some(m), Some(b)) => hash(&compose(&mut tear_renderer, &packs, &view, &b, iter_view.as_ref(), &new, m)) == h,
                         _ => false,

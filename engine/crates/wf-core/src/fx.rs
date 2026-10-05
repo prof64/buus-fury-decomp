@@ -227,6 +227,13 @@ pub fn fx_anim(w: &mut World, id: u32, x: i32, y: i32, start: i32, n: i32, rate:
         },
     )
 }
+/// [`fx_anim`] with the caller's tile size (the ctor `0x0802A81C` takes it as an argument: the shots' trail puffs
+/// 0x40 - tank shell 0x0801CA4A, rifle bullet 0x080277F4; run 3 cut 112,165, 3-14: the game's puff takes 1 unit)
+pub fn fx_anim_sized(w: &mut World, id: u32, x: i32, y: i32, start: i32, n: i32, rate: i32, bytes: i32) -> EntityId {
+    let e = w.add(Body::Fx(Box::new(Fx::Anim { id, x, y, rec: start, left: n, rate, acc: 0 })));
+    crate::vram::acquire(w, crate::vram::Owner::Ent(e), bytes);
+    e
+}
 /// smoke puff 0x086FD9D0 (4 records)
 pub fn puff(w: &mut World, x: i32, y: i32, rate: i32) {
     fx_anim(w, 0x086f_d9d0, x, y, 0, 4, rate);
