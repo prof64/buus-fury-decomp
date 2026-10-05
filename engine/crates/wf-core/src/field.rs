@@ -960,15 +960,12 @@ pub fn load_area_with(
     let load_lo = w.next_id;
     // (the HUD's beep stamp is on the game's logic counter, 0x03000F94: `World.g.clock`)
     let now = w.g.clock(w.frame) as u32;
-    // the area's new HUD object beeps in its first update, inside the load's iteration, whatever the last beep
-    // (whole-run sound requests, Earth 2-9 -> 2-8 -> 2-9 with Gohan low on HP: sound 41 at volume 32 in each load's
-    // iteration, the next 61 logic frames later)
-    if had_area && std::env::var_os("NO_LOAD_BEEP").is_none() {
-        if let Some(f) = w.field.as_mut() {
-            f.hud_beep = now.wrapping_sub(61);
-        }
-        hud_beep(w);
-    }
+    // the area's new HUD object beeps in its first update, whatever the last beep (whole-run sound requests, Earth
+    // 2-9 -> 2-8 -> 2-9 with Gohan low on HP: sound 41 at volume 32 in each load's iteration, the next 61 logic frames
+    // later). The HUD is made with the players: in the load's iteration, or - when the area's on-enter script holds
+    // the arrival - when that script ends (`finish_arrival`; run 2 row 1,068,355, the Volcano 15-32 -> 15-19 with
+    // Goten low: the beep two iterations after the load, with the player)
+    let load_beep = had_area && std::env::var_os("NO_LOAD_BEEP").is_none();
     if let Some(f) = w.field.as_mut() {
         f.hud_beep = now;
     }
@@ -1274,11 +1271,21 @@ pub fn load_area_with(
                     fl.cam[1] = y << 10;
                     f.flight = Some(fl);
                 }
+                f.arrival_beep |= load_beep;
             }
             return;
         }
     }
     arrive(w, to, x, y, facing);
+    if load_beep {
+        if let Some(f) = w.field.as_mut() {
+            f.hud_beep = now.wrapping_sub(61);
+        }
+        hud_beep(w);
+        if let Some(f) = w.field.as_mut() {
+            f.hud_beep = now;
+        }
+    }
 }
 
 /// the objects a nested scene load deferred to its on-enter script (`defer_objects`), in the load's list order; made
@@ -2770,6 +2777,17 @@ pub fn hud_tick(w: &mut World) {
 /// frame's object pass after the resumed script - real run 20-5 r061_004 f5,251: s469's last node shows the HUD
 /// and the beep sounds in that frame)
 pub fn hud_beep(w: &mut World) {
+    hud_beep_at(w, None)
+}
+
+/// `hud_beep` in a frame whose object pass does not run (a hold's first frame): `World.frame` stands, the logic
+/// counter is one past its count
+pub fn hud_beep_held(w: &mut World) {
+    let now = w.g.clock(w.frame) as u32 + 1;
+    hud_beep_at(w, Some(now))
+}
+
+fn hud_beep_at(w: &mut World, at: Option<u32>) {
     if w.scene.hud_hidden {
         // (a hidden HUD's object still updates while it slides out)
         let now = w.frame;
@@ -2791,7 +2809,7 @@ pub fn hud_beep(w: &mut World) {
     // 18-14 r049_001 f7,599..7,613 - where `World.frame` stands)
     // (this frame's count: the mark taken at its start + 1 - also from a script that runs before the frame's object
     // pass advanced `World.frame`: `show_hud` in 20-5 r061_004 f5,251)
-    let now = w.g.clock_mark.map(|c| c + 1).unwrap_or(w.g.clock(w.frame)) as u32;
+    let now = at.unwrap_or(w.g.clock_mark.map(|c| c + 1).unwrap_or(w.g.clock(w.frame)) as u32);
     let due = w
         .field
         .as_ref()

@@ -319,6 +319,10 @@ impl Session {
                 w.tick_shakes();
                 // and the coins fly on (fieldobj.rs coin_move)
                 crate::fieldobj::held_moves(w);
+                // the HUD object updates in the hold's first frame too (the nested loop's frame): its low-HP beep comes
+                // there (run 2 row 1,345,851, HFIL 18-14: a punch's kill, the callback's hold from the next frame's
+                // start - the game beeps in it)
+                crate::field::hud_beep_held(w);
             }
             // a warp_fade arrival's idle draw, after the pass (field.rs `arrival_idle`)
             crate::field::arrival_idle(w);

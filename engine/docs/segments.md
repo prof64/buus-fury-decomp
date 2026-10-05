@@ -82,6 +82,20 @@ save has no save slot in the app (the importer does not carry the EEPROM slot) -
 5. Fat Buu / Janemba must end where run 1's `050_j_arena_end` ends (HFIL 18-14 after Janemba) for the Super Buu
    part to start; if your end differs, say where.
 
+*Super Buu part resync (side-content agent, rows 1,347,125 ->, cuts with the save memory,
+`work/run2/stops_sb.jsonl`):* 200 stops (the cap) up to row 1,710,226 (inside Buu); by area: 21-8 78, 21-6 35, 21-4
+34, 20-7 17, 21-9 20, 20-5 4, 0-92 2 (depth, s030), 14-2 1 (1,427,333: Gohan KO'd in the Pyramid grind, an enemy wave -
+the game's extra rand(0x1000) puff at 0x0802A4E5). Most inside-Buu RNG stops come in swapped pairs (two draws of one
+frame in another order). Being chased by three side-content forks (grinds 14-2 / 20-x; 21-4 / 21-6; 21-8 / 21-9 +
+the resync on to the Kid Buu boundary).
+*For the importer agent (Kid Buu -> credits, the ranking):* the ranking is the ending's "Your Dragon Ranking Is :"
+box at Capsule Corp 4-21 (segments rsbk_002_04_21 / sb_044_04_20; strings 1474.. = Monkey, Ape, Chibi, Human,
+Student, Trainee, ...). Run 1 shows "Trainee" (#1479, party XP 31.05M); by the Super Buu fork's reading (characters
+0-4's total XP in 5M steps) run 2's 22.46M should show #1477 "Human" - not yet confirmed on the emulator (the
+4-21 rows of run 2's ending at part frames ~611,620 are the lobby's "final sequence" question, not the box; the box
+comes later in the ending, before the credits). Neither run's key log reaches a ranking screen after the credits
+(they go to the title).
+
 *Ship part resync (rows 217,993 -> 602,566, current tree; `work/run2/stops_ship.jsonl`): 19 stops, long exact
 stretches between them (245,991 -> 459,733 is 213,742 rows exact).* Routing:
 * **Save point menus (the Save Game screen; run 1 never saved) -> ship-fixes agent**: 240,639 (8-1), 480,403
@@ -5470,3 +5484,18 @@ and that skip was still pending and ate it. Fix: no owed skip when the RunScript
 gates green (earth_2_90_2 6000 / 6000), check.sh run 1 exact both legs (137,897 included); **run 2 from power-on is
 exact in state to 1,427,333 (Super Buu)** - its first difference is now a sound at **1,068,325** (031_f_fat: app
 `play 41 32`, game none; expected.json bumped by check.sh).
+*Run 2 Kid Buu -> credits (A), status:* resync from 1,853,852: 37 stops, all in 033_b_superbuu between 1,858,571 and 1,928,108; **from 1,928,109 the app is exact to the end (1,977,866) incl. the credits**. Two tool fixes on the way: (1) **resync.py reported an app crash as 'end of the recording reached'** - a panic now records a stop (the 1,927,640 cut panicked in its first frame: Kid Buu owns a second object of the beam class vt 0x0804AEF8 with +0x3C = 0x5A; `import_enemy_beam` now takes only the one with a direction). Earlier private resyncs that ended 'end of the recording reached' may have hidden a crash - rerun to be sure. (2) **Credits ranking text: matches.** The game's `party_xp_total()` at s312 node 17 (row 1,977,778) = 22,461,657 -> string 1477 (20M .. 25M); ours, running from 1,928,109, gives 22,461,657 at the same row (XP 6,265,520 / 6,490,137 / 2,079,275 / 337,440 / 7,289,285) -> 1477. Run 1's 31.05M -> 1479 unchanged. The 37 stops are with four A helpers.
+
+**Pixels: HUD / text-box residuals (Earth agent, 2026-10-05).** Board on my run (25,551 sampled frames): 11 frames
+better, none worse; gates, suite, check.sh green.
+* **Fixed - a suspended HUD is not drawn:** a text box's purge takes the HUD object out of the world list
+  (`Susp::Own(Owner::Hud)`); `HudView.hidden` now includes `vram::owner_suspended(Owner::Hud)` (emulator, rkb_168 14-1:
+  show_hud's HUD object at f1,614 drops out of the list at 1,622 with the text box, back at 1,685; also rkb_001 0-50,
+  sb_041 21-25 world-map text boxes).
+* **Not HUD / text causes (the tags are area overlap):** sb_041 / rkb_168 "HUD [BG priority, BG blend...]" (~470
+  frames) are single scattered pixels of area 19-3's blended BG layer (Super Buu agent, BG); the big "text box" frames
+  of rfat_033 (cloud layer), db7_041 (BG scroll around the box - the box itself is exact) and sb_006 / sb_007 (the
+  arena's grid BG) are background differences.
+* **Left, small:** the stat-points mark's animation phase (rkb_168: 48 px on scattered frames) - its object keeps its
+  counter (+0x14) through a suspension (rows 328..413 'gone', counter continuing), ours restarts `vram::stat_at` when
+  the mark is re-made (`work/earth/timing/statmark.py` shows the game's counter vs the map clock).

@@ -2914,6 +2914,10 @@ fn wave_update(w: &mut World, i: usize) {
     let (px, py) = (w.shot_ref(i).px(), w.shot_ref(i).py());
     let (hx, hy) = (px + dx * len, py + dy * len);
     let r = rect(w, i);
+    if std::env::var_os("WAVE_DBG").is_some() {
+        let pb = w.player_idx(0).map(|p| (w.pl_ref(p).a.body_box(), w.pl_ref(p).dead, w.pl_ref(p).a.hittable, w.pl_ref(p).gs, w.pl_ref(p).state, w.pl_ref(p).hold_kind, w.pl_ref(p).gone, w.shot_ref(i).team));
+        eprintln!("WAVE f{} t{} rect {:?} wall {} player {:?}", w.frame, w.shot_ref(i).t, r, in_wall(w, i, &r), pb);
+    }
     if in_wall(w, i, &r) {
         set_kind(w, i, ShotKind::EnergyWave { len, mode: 1, life });
         return;

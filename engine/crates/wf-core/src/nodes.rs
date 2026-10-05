@@ -2420,6 +2420,9 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                     w.g.soldier_wave = r.d[0];
                 }
             }
+            if std::env::var_os("WAVE_DBG").is_some() {
+                eprintln!("SOLDIER f{} node f {} wave {} alive {} busy {:?}", w.frame, f, w.g.soldier_wave, alive(w, w.g.soldier_wave), w.field.as_ref().map(|x| x.busy));
+            }
             if if soldier {
                 f >= 32 && !alive(w, w.g.soldier_wave)
             } else {
