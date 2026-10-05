@@ -220,7 +220,10 @@ impl Renderer {
                 if !vis {
                     continue;
                 }
-                let Some((x, y, s, depth)) = billboard(&cam, p) else { continue };
+                // (projected with the BG's camera, the one before the step: the props' OAM is built in the draw
+                // with the matrices the BG shows - real route 4-1 rclose_002 f1590 .. f1650, West City's towers
+                // 2 px a frame off with the current camera)
+                let Some((x, y, s, depth)) = billboard(&bg_cam, p) else { continue };
                 let (a0, a1) = (p.attr & 0xFFFF, p.attr >> 16);
                 let (w, h) = obj_size(a0, a1);
                 let tex = tex_from_frame(&props, p.index, false, w, h, (0, 0), a1 & 0x1000 != 0, a1 & 0x2000 != 0);

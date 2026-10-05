@@ -200,7 +200,7 @@ fn record(w: &World, id: u32, addr: u32, x: i32, y: i32, out: &mut RenderView) {
             sheet: format!("effects/{eff}"),
             frame: FrameSel::Frame {
                 index: *idx,
-                flip: false,
+                flip: w.data.record_flip.contains(&addr),
             },
             x,
             y,
@@ -320,7 +320,7 @@ fn it_ring(w: &World, id: u32, group: u32, t: i32, x: i32, y: i32, out: &mut Ren
         out.sprites.push(SpriteDraw {
             entity: id,
             sheet: format!("effects/{eff}"),
-            frame: FrameSel::Frame { index: *idx, flip: false },
+            frame: FrameSel::Frame { index: *idx, flip: w.data.record_flip.contains(&addr) },
             x,
             y,
             priority: 0,
@@ -857,8 +857,8 @@ fn stat_mark_frame(w: &World) -> Option<u8> {
     if !v.owners.iter().any(|o| o.1 == crate::vram::Owner::StatMark) {
         return None;
     }
-    let it = w.field.as_ref().map(|f| f.iters).unwrap_or(0);
-    Some(((it.wrapping_sub(v.stat_at) >> 3) & 3) as u8)
+    let it = w.field.as_ref().map(|f| f.cam_iters()).unwrap_or(0);
+    let sh: i32 = std::env::var("TMP_STATSHIFT").ok().and_then(|v| v.parse().ok()).unwrap_or(0); Some(((it.wrapping_sub(v.stat_at).wrapping_add(sh as u32) >> 3) & 3) as u8)
 }
 
 /// the script screen fades as the palette writes they make each update (`t` steps of `len`, l = t * 256 / len):
@@ -1000,10 +1000,14 @@ impl Presenter {
             out.sprites = sprites.clone();
             // (the cooldown triangle shows the frame's own value: shipr_001 7-1 f240, the record's 0x7FFF that frame
             // and an empty step-0 triangle)
-            let cds: Vec<i32> = out.hud.iter().map(|h| h.ss_cooldown).collect();
+            let cds: Vec<(i32, Option<u8>)> = out.hud.iter().map(|h| (h.ss_cooldown, h.stat_mark)).collect();
             out.hud = hud.clone();
+            let cur = std::env::var_os("TMP_STATCUR").is_some();
             for (h, c) in out.hud.iter_mut().zip(cds) {
-                h.ss_cooldown = c;
+                h.ss_cooldown = c.0;
+                if cur && h.stat_mark.is_some() && c.1.is_some() {
+                    h.stat_mark = c.1;
+                }
             }
             out.boss_bars = boss_bars.clone();
             // (its OAM a frame late; the digits are drawn into its tiles in the draw itself: the current value)

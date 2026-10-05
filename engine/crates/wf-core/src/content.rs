@@ -479,6 +479,9 @@ pub struct GameData {
     pub effects: std::collections::BTreeSet<String>,
     /// OBJ record by ROM address -> (effect id, frame index): what the renderer draws for a record address
     pub record_frames: BTreeMap<u32, (String, u16)>,
+    /// the records whose `record_frames` frame is stored mirrored (the extractor's dedup: a record drawn as another
+    /// record's image flipped, e.g. the flame-thrower's right-facing flames)
+    pub record_flip: std::collections::BTreeSet<u32>,
     /// the beam piece sets (`effects/beam_*`, wf-extract fx_extra.rs): effect id -> pieces and level rules
     pub beams: BTreeMap<String, BeamSet>,
     /// area key ("8-71") -> (first map id, song)
@@ -786,6 +789,7 @@ impl GameData {
         // ---- effects: record geometry by ROM address
         let mut records = BTreeMap::new();
         let mut record_frames = BTreeMap::new();
+        let mut record_flip = std::collections::BTreeSet::new();
         let mut effects = std::collections::BTreeSet::new();
         let mut beams = BTreeMap::new();
         for p in files_under(&all, "effects/", "/effect.json") {
@@ -822,9 +826,12 @@ impl GameData {
                             for st in steps.as_array().into_iter().flatten() {
                                 if let Some(obj) = st["obj"].as_array() {
                                     let rom = int(&st["rom"]) as u32;
-                                    record_frames
-                                        .entry(rom)
-                                        .or_insert((eid.clone(), geti(st, "frame") as u16));
+                                    if !record_frames.contains_key(&rom) {
+                                        record_frames.insert(rom, (eid.clone(), geti(st, "frame") as u16));
+                                        if st["flip"].as_bool() == Some(true) {
+                                            record_flip.insert(rom);
+                                        }
+                                    }
                                     if rom != 0 && obj.len() >= 4 {
                                         records.entry(rom).or_insert([
                                             int(&obj[0]) as i32,
@@ -955,6 +962,7 @@ impl GameData {
             sprites,
             records,
             record_frames,
+            record_flip,
             beams,
             areas,
             effects,
