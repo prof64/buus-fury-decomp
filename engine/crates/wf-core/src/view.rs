@@ -799,6 +799,7 @@ fn stat_mark_frame(w: &World) -> Option<u8> {
         return None;
     }
     let it = w.field.as_ref().map(|f| f.iters).unwrap_or(0);
+    if std::env::var("T_SM").is_ok() { eprintln!("SM frame {} iters {} stat_at {} count {}", w.frame, it, v.stat_at, it.wrapping_sub(v.stat_at)); }
     Some(((it.wrapping_sub(v.stat_at) >> 3) & 3) as u8)
 }
 

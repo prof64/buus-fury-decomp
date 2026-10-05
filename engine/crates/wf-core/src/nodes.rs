@@ -1873,15 +1873,13 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                 }
                 // RunScript (0x0803388C) appends an event object to the world's list: it runs next frame
                 // (the players' form controllers are held in that frame already in the game - run 2 row 160,375 -
-                // but only together with the drain step of the event's exit frame: segments.md, run 2 161,796)
+                // and nothing is owed for it: `player::ai_event_started`, the exit frame's step at 161,333)
                 if !inline {
                     let run = crate::fieldcontent::Callback::Event(format!("header_0x{sc:08X}"));
                     crate::field::queue_run(w, run, crate::field::Cause::Ai { entity: me });
-                    if std::env::var_os("RUNSCRIPT_HOLD").is_some() {
-                        let at = w.frame + 1;
-                        if let Some(f) = w.field.as_mut() {
-                            f.passive_hold_at = Some(at);
-                        }
+                    let at = w.frame + 1;
+                    if let Some(f) = w.field.as_mut() {
+                        f.passive_hold_at = Some(at);
                     }
                 } else {
                     w.events

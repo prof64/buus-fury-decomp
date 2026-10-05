@@ -2222,10 +2222,12 @@ pub fn release_passive(w: &mut World, i: usize) {
 /// AI: the game's regen count stays, ours stepped)
 pub fn ai_event_started(w: &mut World) {
     let frame = w.frame;
-    if w.field
-        .as_ref()
-        .is_some_and(|f| f.busy || f.item_get.is_some() || f.busy_since == frame)
-    {
+    // the RunScript's frame hold (`Field::passive_hold_at`, nodes.rs) already holds this frame's tick: nothing is
+    // owed - an owed skip would eat the tick of the event's exit frame (run 2 row 161,333, 2-90: s121's last frame
+    // steps the drain in the game)
+    if w.field.as_ref().is_some_and(|f| {
+        f.busy || f.item_get.is_some() || f.busy_since == frame || f.passive_hold_at == Some(frame)
+    }) {
         return;
     }
     for s in 0..w.players.len() {
@@ -2268,7 +2270,6 @@ pub fn passive_after_scripts(w: &mut World) {
 }
 
 fn passive(w: &mut World, i: usize) {
-    if std::env::var_os("XSS").is_some() { eprintln!("XSS-P clock {} owed {} story {}", w.g.clock(w.frame), pr(w, i).tick_owed, pr(w, i).story_form(w)); }
     // (this frame's tick: a held pass's second update in `field::post_step` makes it - none after the scripts)
     p(w, i).passive_held = false;
     if std::mem::take(&mut p(w, i).tick_owed) {
@@ -2360,7 +2361,6 @@ fn passive(w: &mut World, i: usize) {
             }
         }
     }
-    if std::env::var_os("XSS").is_some() { let c = w.g.clock(w.frame); let pl = pr(w, i); eprintln!("XSS clock {} acc {} gauge {}", c, pl.ss_acc & 0xffff, pl.ss_gauge); }
     {
         let pl = p(w, i);
         if !f.ss && !f.ss3 && pl.ss_cooldown > 0 {

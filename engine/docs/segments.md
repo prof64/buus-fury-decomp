@@ -5461,3 +5461,12 @@ frame, and the two cancel there. So the halves must land together: when your exi
 unconditionally (drop the env check in nodes.rs) and verify run 1 (137,897), 2-90 and run 2 161,796 at once. Shared
 code: the from-wait exit's players release in wf-script-core lib.rs (`SceneCall::Exit`, today only for the nested
 loop's watermark) is where a general exit-frame drain step would go; I won't touch it further.
+*Done (real-route agent, 2026-10-05): both halves in, the hold always on.* Measured (game: `sswatch.py`, ours: a
+temporary trace, compared per row by `work/s3test/sscmp.py`): with the hold, ours equals the game through 161,332; in
+s121's exit frame (161,333) the game steps the drain and ours did call the tick (the queued exit's
+`release_passive`) - but `ai_event_started` had set `tick_owed` at the event's start (the old stand-in for the hold),
+and that skip was still pending and ate it. Fix: no owed skip when the RunScript's frame hold covers the start frame
+(`Field::passive_hold_at == frame`, player.rs `ai_event_started`); nodes.rs sets the hold unconditionally. Results:
+gates green (earth_2_90_2 6000 / 6000), check.sh run 1 exact both legs (137,897 included); **run 2 from power-on is
+exact in state to 1,427,333 (Super Buu)** - its first difference is now a sound at **1,068,325** (031_f_fat: app
+`play 41 32`, game none; expected.json bumped by check.sh).

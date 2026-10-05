@@ -2010,7 +2010,6 @@ pub fn post_step(w: &mut World) {
     // back on). A held update (defeat scene) instead completes after its event, check included (s090 -> s091).
     let ended_before = w.field.as_ref().is_some_and(|f| f.event_ended) && !resumed;
     let queued = ended_before && w.field.as_ref().is_some_and(|f| f.queued_event);
-    if std::env::var_os("XSS").is_some() && (ended_before || resumed) { eprintln!("XSS-END clock {} ended_before {} queued {} resumed {} queued_event {:?}", w.g.clock(w.frame), ended_before, queued, resumed, w.field.as_ref().map(|f| f.queued_event)); }
     if ended_before {
         if let Some(f) = w.field.as_mut() {
             f.queued_event = false;
