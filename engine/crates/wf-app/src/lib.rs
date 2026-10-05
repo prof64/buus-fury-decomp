@@ -20,7 +20,7 @@ pub mod session;
 pub mod story;
 
 use wf_content::Packs;
-use wf_render::{fit, Fit, Renderer, ViewMode};
+use wf_render::{fit, AutoZoom, Fit, Renderer, ViewMode};
 use wf_view::{AudioEvent, Buttons, RenderView, Sim, SimEvent, GBA_FPS};
 
 pub use wf_content;
@@ -63,6 +63,8 @@ pub struct App {
     /// an area load) the picture holds for that many steps without stepping the sim. Presentation only.
     pub original_pacing: bool,
     hold: u32,
+    /// "PC wide (auto)": the zoom held per map (`wf_render::AutoZoom`)
+    auto_zoom: AutoZoom,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -92,6 +94,7 @@ impl App {
             stats: Stats::default(),
             original_pacing: false,
             hold: 0,
+            auto_zoom: AutoZoom::default(),
         }
     }
 
@@ -185,7 +188,17 @@ impl App {
     /// `self.renderer.fb` (`fit.view_w` x `fit.view_h`, ARGB), to be shown scaled by `fit.scale`.
     pub fn render(&mut self, player: usize, win_w: u32, win_h: u32) -> Fit {
         let world = self.world_size();
-        let f = fit(self.mode, win_w, win_h, world);
+        // auto zoom: picked when the shown map changes, kept through frames without one (menu screens, black
+        // loads) - see `AutoZoom`
+        let mode = match self.mode {
+            ViewMode::Pc { zoom: 0 } => {
+                let id = self.view.map.as_ref().filter(|_| self.view.menu.is_none()).map(|m| m.id.clone());
+                let shown = id.as_deref().filter(|i| !i.is_empty()).zip(world);
+                ViewMode::Pc { zoom: self.auto_zoom.zoom(win_w.max(1), win_h.max(1), shown) }
+            }
+            m => m,
+        };
+        let f = fit(mode, win_w, win_h, world);
         self.renderer.render(&self.packs, &self.view, player, f.view_w as usize, f.view_h as usize);
         f
     }

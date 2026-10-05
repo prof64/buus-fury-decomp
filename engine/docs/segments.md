@@ -88,12 +88,20 @@ save has no save slot in the app (the importer does not carry the EEPROM slot) -
 the game's extra rand(0x1000) puff at 0x0802A4E5). Most inside-Buu RNG stops come in swapped pairs (two draws of one
 frame in another order). Being chased by three side-content forks (grinds 14-2 / 20-x; 21-4 / 21-6; 21-8 / 21-9 +
 the resync on to the Kid Buu boundary).
-**Split with the real-route agent (side-content agent's proposal, 2026-10-05):** run 2 is exact in state and sound
-from power-on to **1,470,560** (0-92: s030 via inline_0x080782FC, depth app 0 game 1). Side-content keeps: 0-92 / 14-2
-/ 20-5 / 20-7 (1,470,560 .. ~1,599,000), 21-4 / 21-6, 21-8 / 21-9 and the punch-sound pair 48..51 / 44 / 37 in those
-areas. **Real-route agent: inside Buu after 21-9 to the boundary (21-10 .. 21-26, rows ~1,710,000 .. 1,853,851)**,
-whose stops the 21-8/21-9 fork's continued resync lists in `work/run2/stops_sb2.jsonl` (start from those cut points
-or your own); say here if you prefer another cut.
+**Split, as settled (supersedes my first proposal):** real-route agent **1,470,560 .. 1,690,890** (to entering
+Inside Buu 21-1); side-content agent **1,690,891 .. 1,853,851** (Inside Buu 21-1 .. 21-26) + sound 44 (game only) at
+1,683,032 / 1,774,198 / 1,779,633. Already in (committed in 46bfe41): the 21-4 / 21-6 Blister / Enzyme rules (side-content
+fork B: run 2 exact from the 1,591,711 cut to 1,643,664, the next stop in 21-8). Inside Buu continues with fork C
+(`work/run2/stops_sb2.jsonl`, rerun on the current tree). My 20-x grind fork is stopped. **What it had (to the
+real-route agent):** (1) *1,427,333 fixed, in 46bfe41:* from KO + 200 the enemies keep running their state tick
+during the death script, the motion controller included (no AI) - a soldier's energy-wave throw ends on time and
+enters idle with its rand(255); emulator: the SoldierThrow controller 0x08026618 runs at KO + 210 while s000 runs.
+`enemy::ko_state_ticks`, called from session.rs (held branch, and after `step_entities` under a modal); the run
+from the 1,347,125 cut is exact to 1,470,560 with it. Its WAVE_DBG debug prints (session / enemy / nodes / shots) and
+a no-op `busy_controller` call it left in `enemy::update`'s KO branch are removed now. (2) 1,470,560 and 1,484,951:
+it found the same causes you fixed (the shop window's fade-in; the split inside s469 1,481,151 .. 1,484,883) - no
+edits from it. (3) the 20-7 group (from 1,576,199, s473 / s474): not started; s473 makes Vegeta a wandering enemy -
+possibly the same heap-leftover limit as run 1's 20-6 wander (the known range).
 *For the importer agent (Kid Buu -> credits, the ranking):* the ranking is the ending's "Your Dragon Ranking Is :"
 box at Capsule Corp 4-21 (segments rsbk_002_04_21 / sb_044_04_20; strings 1474.. = Monkey, Ape, Chibi, Human,
 Student, Trainee, ...). Run 1 shows "Trainee" (#1479, party XP 31.05M); by the Super Buu fork's reading (characters
@@ -5685,3 +5693,25 @@ Also from the BG work: the screen shake offset is 22.10 - the BG layers take `sh
 both runs as expected; core / import / app suites green. Debug: wholerun `WR_SONG=1` prints Scene.song per shown row.
 *Run 2 Kid Buu -> credits: done (A; uncommitted: wf-core enemy.rs / nodes.rs / player.rs / world.rs / menu/mod.rs / session.rs, wf-import lib.rs).* **resync.py --chain run2 --lag none --from 1,853,852: 0 stops - the app is exact (logic) from the end of Inside Buu to the end of run 2 (1,977,866), credits included** (resync now reports crashes). Rules added this round (all field-gated): Sleep from Options starts its script at the top of the next frame and holds it (1,869,664); an absorbed original Kid Buu passes its place to the merged one (the Vegeta cut-in only on the real defeat, 1,880,459); a Ninja's teleport leaves and rejoins the enemy grid inside its own update (1,891,199); a firing Kid Buu beam retracts when a pushed state replaces his pose (1,893,427 sound 33 / stop 32); the field KO freeze at KO + 199 runs before the object pass (`player::ko_freeze`; 1,909,571). Imports: a queued Sleep, a KO'd leader (down, the death timer, the beam's tiles), a cut in the death script's first frame (freeze). Sounds left in A's range: the 50 / 51 punch pair swapped where two cutscene actors' `play_anim` punches end and restart in one frame (1,877,946, 1,888,088 / 104, 1,917,102 / 118) - the game runs each actor's script commands inside that actor's own update, ours in one tick after the object pass (a script-runner change, not made); 1,891,147 a stop 3 missing. Shop 1,860,355 -> ship-fix agent (above). Gates green, wf-app tests green, check.sh EXACT.
 **To the ship-fixes agent (menu owner), from A by the coordinator: run 2's West City Z-Mart shop pacing.** Rows 1,860,355 (depth app 0 game 1) / 1,860,384 (app 1 game 0): s030 at 0-92, buy and sell pages; both sides start it at the same row (A at 1,859,792), but over the session the game's logic counter runs 467 iterations against our 308 and ours ends the event early - the shop pages' per-iteration pacing (`menu/shop.rs`). Cuts with save memory at `work/wholerun/run2/cuts` (resync `--chain run2 --from 1859700`).
+
+**Wide view: permanent test + auto zoom (ship fix agent, 2026-10-05, by the coordinator, after §12).**
+* **`crates/wf-app/tests/wide_view.rs`** checks every pixel-gate segment's locked frames (1,215):
+  - The wide view's centre 240x160 (400x288 view) equals the GBA view's picture. The corner / edge-anchored overlays
+    are left out of both: HUD, boss bars, timer, area banner, a top / bottom text box.
+  - Every live actor's drawn cel is `actor_cel`'s, on screen or off: 714 off-screen actor checks.
+  - An actor with no sprite fails when it is off the GBA screen; none is.
+  - Green.
+* **Auto zoom held per map** (`wf_render::AutoZoom`, used by `App::render` for `Pc { zoom: 0 }`). The zoom is
+  picked when the shown map changes (or the window does) and kept through frames with no map: menu screens, black
+  loads, the prologue. Same picture whenever a map shows.
+  - Over the 507 data/segments (819,648 frames), `examples/zoom_stats.rs`: zoom changes 376 -> 271 at 1920x1080
+    (1280x800: 377 -> 273, 2560x1440: 318 -> 213).
+* **The 2x <-> 4x / 6x jumps that remain are real map changes:** Kid Buu's chapter cutscenes alternate 240x160
+  scene maps (6x at 1080p) with 480x400 / 720x560 ones (3-4x), sb_041 15 changes.
+  - Proposal, not implemented (a trade-off: black margins around tiny scene maps): cap the auto zoom to the
+    window's base zoom .. base + 1. That gives 70 changes at 1080p / 1440p, 120 at 1280x800.
+  - Coordinator / user decision.
+* *West City Z-Mart shop pacing (run 2 rows 1,860,355 / 1,860,384; ship fix agent, 2026-10-05): already exact on
+  46bfe41 + the tree.* The whole-run app from the run-2 cuts at 1,853,852, 1,858,572 and 1,858,657 runs exact
+  through s030's buy / sell session (game 1,859,792 .. 1,860,384, 494 iterations) up to 1,869,600, with no sound
+  difference. The stop came from an earlier tree; nothing changed in `menu/shop.rs`.

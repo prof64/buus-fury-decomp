@@ -502,9 +502,6 @@ pub fn flame_running(w: &World, i: usize) -> bool {
 /// the node finishes on the AI's next update without running again
 pub fn busy_controller(w: &mut World, i: usize) {
     let (serial, n) = w.en_ref(i).ctl;
-    if std::env::var_os("WAVE_DBG").is_some() {
-        eprintln!("BUSYCTL f{} en {} ctl {:?}", w.frame, w.ents[i].id, w.en_ref(i).ctl);
-    }
     if serial == 0 {
         return;
     }
@@ -992,6 +989,7 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
         K::Block => {
             w.en(i).a.blocking = true;
             set_anim(w, i, &[an(7)], true, Some(true));
+            if std::env::var_os("DBG_BLOCK").is_some() { eprintln!("block enter f{} raw {:?} ea {}", w.frame, w.en_ref(i).a.anim_raw(&w.data), w.en_ref(i).ea.pos.raw); }
         }
         K::ChasePlayer | K::ChasePlayerThroughRocks => {
             let Some(pi) = en::player(w, i) else { return };
@@ -2455,9 +2453,6 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                 if soldier {
                     w.g.soldier_wave = r.d[0];
                 }
-            }
-            if std::env::var_os("WAVE_DBG").is_some() {
-                eprintln!("SOLDIER f{} node f {} wave {} alive {} busy {:?}", w.frame, f, w.g.soldier_wave, alive(w, w.g.soldier_wave), w.field.as_ref().map(|x| x.busy));
             }
             if if soldier {
                 f >= 32 && !alive(w, w.g.soldier_wave)

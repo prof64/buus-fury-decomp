@@ -330,6 +330,9 @@ fn main() {
                     presenter.apply(&mut view);
                 }
                 last_view = Some(view.clone());
+                if std::env::var_os("TMP_STATROW").is_some() {
+                    eprintln!("ROW {k} iters {} phase {:?} active {} stat {:?}", w.field.as_ref().map(|f| f.cam_iters()).unwrap_or(0), w.menu.phase, wf_core::menu::active(w), view.hud.first().map(|h| h.stat_mark));
+                }
                 let old_timer = std::mem::replace(&mut prev_timer, view.timer);
                 let Some(&i) = at.get(&k) else { return };
                 if std::env::var_os("PIX_NOSPR").is_some() {
@@ -451,6 +454,17 @@ fn main() {
                         }
                         pngs += 1;
                     }
+                }
+                // PIX_KINDS: the live shot / effect kinds on a differing frame (which undrawn objects cost pixels)
+                if n > 0 && std::env::var_os("PIX_KINDS").is_some() {
+                    let mut ks: Vec<String> = w.ents.iter().filter(|e| !e.removed).filter_map(|e| match &e.body {
+                        wf_core::world::Body::Shot(s) => Some(format!("shot:{}{}", s.kind_name(), if matches!(s.kind, wf_core::shots::ShotKind::GrowBeam(_)) { "-grow" } else { "" })),
+                        wf_core::world::Body::Fx(f) => Some(format!("fx:{}", format!("{f:?}").split([' ', '{', '(']).next().unwrap_or(""))),
+                        _ => None,
+                    }).collect();
+                    ks.sort();
+                    ks.dedup();
+                    eprintln!("kinds {name} f{k} {n} {}", ks.join(","));
                 }
                 results.push((k, class, n));
             }

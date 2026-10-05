@@ -685,6 +685,12 @@ fn step_inner(w: &mut World) {
             if w.field.is_some() {
                 w.tick_shakes();
             }
+            // the camera's clock (+0x40) runs on through the fade-out, its last step (into the page) too: the
+            // clouds' drift, the stat mark's draw count - not the tile animations (earth 2-11 rows 753..769: 17
+            // counts from START; rkb_168 14-1, rfat_033 6-1)
+            if let Some(f) = w.field.as_mut() {
+                f.cam_extra = f.cam_extra.wrapping_add(1);
+            }
             // the coins fly on through a menu's fade-out (their move counter +0x2C, not their age: run 2 row 277,383 -
             // a pause menu opened 15 frames after a robot's coins dropped, the game's coins 15 moves further, so the
             // player walked past one ours had left in his way)

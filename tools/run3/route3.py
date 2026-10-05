@@ -16,11 +16,27 @@ _i11 = ROUTE_GOALS.index(('walk', 272, 392))       # 1-10 -> down to 1-11
 
 def stressed(goals):
     """run 1's goals with every exit push ('hold' a direction) turned into a push with START pressed on alternate
-    frames through the whole transition (90 frames more: the fade-out, the load, the fade-in)"""
+    frames through the whole transition (90 frames more: the fade-out, the load, the fade-in); run 1's L taps (the
+    skill cursor from slot 0: the n-th tap selects slot n) become closed-loop selections of that slot - the pause tour's
+    early L / R presses move the cursor in the field"""
     out = []
+    taps = 0
+    pushed = False
     for g in goals:
+        # an arrival event the push's START presses already met (or played through behind the closing B): any event
+        # there is played, none is required
+        if g[0] == 'expect' and pushed:
+            out.append(('events',))
+            continue
+        if g[0] not in ('area', 'expect'):
+            pushed = False
         if g[0] == 'hold' and g[1] in (U, D, L, R) and g[2] >= 10:
             out.append(('pushmash', g[1], S, 2, g[2] + 90))
+            pushed = True
+            continue
+        elif g[0] == 'hold' and g[1] == KEY.L and g[2] <= 3:
+            taps += 1
+            out.append(('skillslot', taps))
         else:
             out.append(g)
     return out
@@ -49,6 +65,15 @@ SEGMENTS = [
     # world frozen and released at once)
     ('ow3', fights_spun(stressed(ROUTE_GOALS[_i11:]))),
 ]
+
+def chapter_of(name):
+    """a segment's chapter (routing: segments.md's owners)"""
+    for pre, ch in (('e3_', 'earth'), ('s3_', 'ship'), ('f3_', 'fat'), ('j3_', 'janemba'), ('b3_', 'superbuu'),
+                    ('p3_', 'postgame')):
+        if name.startswith(pre):
+            return ch
+    return 'opening'
+
 
 COVERAGE = """
 Opening (Other World):

@@ -31,7 +31,8 @@ pub enum ViewMode {
     /// The original 240x160 screen, scaled by the largest integer that fits (or `scale` when > 0).
     Gba { scale: u32 },
     /// PC "zoomed out": the view is the window size / an integer zoom (0 = auto: the smallest zoom >= 2 whose
-    /// view the map covers with <= 8 % black margin, max 6), centred on the game's camera.
+    /// view the map covers with <= 8 % black margin, max 6 - picked when the map changes, [`AutoZoom`]), centred
+    /// on the game's camera.
     Pc { zoom: u32 },
 }
 
@@ -897,4 +898,26 @@ pub fn hash_fb(fb: &[u32]) -> u64 {
         }
     }
     h
+}
+
+#[cfg(test)]
+mod auto_zoom_tests {
+    use super::*;
+
+    #[test]
+    fn held_between_maps() {
+        let mut a = AutoZoom::default();
+        let big = Some(("area_00_050", (3584, 2560)));
+        let small = Some(("area_20_009", (240, 160)));
+        assert_eq!(a.zoom(1920, 1080, big), 2);
+        // a menu / a black load over the big map: no map, the zoom stays
+        assert_eq!(a.zoom(1920, 1080, None), 2);
+        // the small map picks its own zoom on entry and keeps it through a menu over it
+        let z = a.zoom(1920, 1080, small);
+        assert_eq!(z, auto_zoom(1920, 1080, Some((240, 160))));
+        assert_eq!(a.zoom(1920, 1080, None), z);
+        assert_eq!(a.zoom(1920, 1080, small), z);
+        // a resized window re-picks
+        assert_eq!(a.zoom(1280, 800, small), auto_zoom(1280, 800, Some((240, 160))));
+    }
 }

@@ -340,6 +340,7 @@ impl Enemy {
             events,
         };
         self.ea.enter(&ar.rules, raw, r, &mut h);
+        if std::env::var_os("DBG_BLOCK").is_some() && raw == 20 { eprintln!("setanim raw20 ty {} bt {}", self.ty, std::backtrace::Backtrace::force_capture().to_string().lines().filter(|l| l.contains("wf_core::")).take(6).collect::<Vec<_>>().join(" <- ")); }
     }
     /// IsAnim(id) (vfunc +0x34, 0x0800FAC6): the state object is SetAnim(id)'s and the raw matches (a forced rule or a
     /// node's own state object is not)
@@ -596,10 +597,6 @@ pub fn update(w: &mut World, i: usize) {
         let e = w.en(i);
         e.shown_prev = (e.ea.pos.raw, e.ea.pos.frame);
     }
-    if std::env::var_os("WAVE_DBG").is_some() && w.frame > 3115 {
-        let ko = w.player_idx(0).map(|p| w.pl_ref(p).ko_at);
-        eprintln!("ENUPD f{} id {} ko_at {:?} busy {:?} puppet {}", w.frame, w.ents[i].id, ko, w.field.as_ref().map(|f| (f.busy, f.busy_pre_pass, f.busy_since)), crate::scene::is_puppet(w, w.ents[i].id));
-    }
     if crate::scene::puppet_update(w, i) {
         return;
     }
@@ -669,12 +666,6 @@ pub fn update(w: &mut World, i: usize) {
     if ko_at >= 0 && w.frame as i64 - ko_at >= 199 {
         if w.frame as i64 - ko_at > 199 {
             tick_anim(w, i);
-            // the state tick includes the running motion controller (a state object, as under a held field): a
-            // soldier's throw ends on time and enters idle (its rand(255)) - run 2 row 1,427,333, Pyramid 14-2: the
-            // game's SoldierThrow controller (0x08026618, caller chain 0x0800ED17) at KO + 210 while s000 runs
-            if w.field.is_some() {
-                crate::nodes::busy_controller(w, i);
-            }
         }
         return;
     }

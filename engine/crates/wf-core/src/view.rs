@@ -288,6 +288,13 @@ fn beam(w: &World, id: u32, set: &str, dir: i32, x: i32, y: i32, len: i32, t: i3
     out.sprites.extend(ps.into_iter().rev());
 }
 
+/// a record placed with its origin added (pieces: reference skillfx.ts `drawRecAdd`, x + 2 * ox)
+fn record_add(w: &World, id: u32, addr: u32, x: i32, y: i32, out: &mut RenderView) {
+    if let Some(g) = w.data.records.get(&addr) {
+        record(w, id, addr, x + 2 * g[0], y + 2 * g[1], out);
+    }
+}
+
 fn effect(id: u32, run: u32, index: i32, x: i32, y: i32, out: &mut RenderView) {
     out.sprites.push(SpriteDraw {
         entity: id,
@@ -361,7 +368,7 @@ pub fn render_view(w: &World, out: &mut RenderView) {
     let anim_frame = w
         .field
         .as_ref()
-        .map(|f| since(f.iters, f.drift_iter.unwrap_or(f.entered_iter)))
+        .map(|f| since(f.cam_iters(), f.drift_iter.unwrap_or(f.entered_iter)))
         .unwrap_or(w.frame);
     // the tile animations' own phase when a cut found it apart from the camera's (rkb 19-3: a scene's area load
     // restarts the tiles, the camera counter runs on)
@@ -713,6 +720,44 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                         out,
                     ),
                     ShotKind::SjWave => record(w, id, 0x0875_a6a8 + 12 * d as u32, x, y, out),
+                    // an energy wave (records 0x0875043C + 36 * dir: muzzle k = (t >> 2) & 1 at the origin while growing in
+                    // mode 0, body record 2 every 8 px) and Majin Buu's candy beam (0x0874ED7C + 60 * dir: muzzle while
+                    // growing, body every 8 px, head 3 + k at dir * len); pieces at position + origin (reference
+                    // projectiles.ts EnergyWave / CandyBeam)
+                    ShotKind::EnergyWave { len, mode, .. } => {
+                        let base = 0x0875_043c + 36 * d as u32;
+                        let (dx, dy) = crate::geom::DIR_VEC[(d & 3) as usize];
+                        let mut ps = vec![];
+                        if *mode == 0 && *len < 48 {
+                            ps.push((base + 12 * ((t >> 2) & 1) as u32, x, y));
+                        }
+                        let mut k = 0;
+                        while k < len - 1 {
+                            ps.push((base + 24, x + dx * k, y + dy * k));
+                            k += 8;
+                        }
+                        for (a, px, py) in ps.into_iter().rev() {
+                            record_add(w, id, a, px, py, out);
+                        }
+                    }
+                    ShotKind::CandyBeam { len, phase, .. } => {
+                        let base = 0x0874_ed7c + 60 * d as u32;
+                        let (dx, dy) = crate::geom::DIR_VEC[(d & 3) as usize];
+                        let k = ((t >> 2) & 1) as u32;
+                        let mut ps = vec![];
+                        if *phase == 0 && *len < 64 {
+                            ps.push((base + 12 * k, x, y));
+                        }
+                        let mut o = 0;
+                        while o < len - 1 {
+                            ps.push((base + 24, x + dx * o, y + dy * o));
+                            o += 8;
+                        }
+                        ps.push((base + 12 * (3 + k), x + dx * len, y + dy * len));
+                        for (a, px, py) in ps.into_iter().rev() {
+                            record_add(w, id, a, px, py, out);
+                        }
+                    }
                     ShotKind::Kame(k) if !k.charging => beam(w, id, &k.set, d, x, y, k.len, k.vt, !k.done, k.stopped, out),
                     _ => {}
                 }

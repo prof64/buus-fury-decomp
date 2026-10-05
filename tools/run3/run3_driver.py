@@ -35,12 +35,48 @@ class Run3Driver(Run2Driver):
                 return None
             return g[1] if self.t % g[2] == 0 else 0
         if kind == 'pushmash':
+            if self.t == 0:
+                self.push_area = status(e)['area'][:2]
             if self.t < g[4]:
-                return g[1] | (g[2] if self.t % g[3] == 0 else 0)
-            # close whatever the presses opened, as 'bout'
-            self.goals[self.k] = ('bout',)
+                # (the direction only until the area changes: in the new one, just the extra key through the fade-in)
+                moved = status(e)['area'][:2] != self.push_area
+                return (0 if moved else g[1]) | (g[2] if self.t % g[3] == 0 else 0)
+            # close whatever the presses opened, as 'bout'; if the pause it opened stopped the walk-in before the exit
+            # (still in the same area), push again without the extra key until the area changes
+            self.goals[self.k:self.k + 1] = [('bout',), ('pushagain', g[1], self.push_area)]
             self.t = 0
             return 0
+        if kind == 'skillnext':
+            # L (2 frames on, 12 off) until the selected skill slot moves on from the one at the goal's start (a single
+            # L press can fall into the frames after a transition / pause that ignore it)
+            rec = 0x03001560 + 0x68 * e.r8(0x03001068)
+            if self.t == 0:
+                self.skill0 = e.r8(rec + 0x15)
+            if e.r8(rec + 0x15) != self.skill0 and self.t % 14 == 0:
+                self.next_goal()
+                return None
+            if self.t > 600:
+                raise RuntimeError(f'skillnext: the slot did not move {status(e)}')
+            return KEY.L if self.t % 14 < 2 else 0
+        if kind == 'skillslot':
+            # L (2 frames on, 12 off) until the selected skill slot is g[1]
+            rec = 0x03001560 + 0x68 * e.r8(0x03001068)
+            if e.r8(rec + 0x15) == g[1] and self.t % 14 == 0:
+                self.next_goal()
+                return None
+            if self.t > 600:
+                raise RuntimeError(f'skillslot: slot {g[1]} not reached {status(e)}')
+            return KEY.L if self.t % 14 < 2 else 0
+        if kind == 'pushagain':
+            s = status(e)
+            if s['area'][:2] != g[2]:
+                self.next_goal()
+                return None
+            if self.t > 600:
+                raise RuntimeError(f'pushagain: no exit {g} {s}')
+            if s['p'] is None or s['scene'] > 0:
+                return 0
+            return g[1]
         if kind == 'pausespin':
             # phases of one spin: press START (open), wait until the menu is up, START (close), wait until the field
             st = getattr(self, 'spin', None)
@@ -51,6 +87,10 @@ class Run3Driver(Run2Driver):
                 self.goals[self.k] = ('bout',)
                 self.t = 0
                 return 0
+            if status(e)['scene'] > 0:
+                # (an event runs: play it through first - the pause cannot open under it)
+                st['w'] = 0
+                return self.mash_a()
             up = menu_open(e)
             st['w'] += 1
             if st['w'] > 600:

@@ -228,6 +228,14 @@ impl Session {
                 // a screen opening over the field: its fade-out leaves the objects still, the cameras keep easing
                 // (segment sb 21-14: the save point's party menu, the follow camera reaches its target under it)
                 crate::field::world_mode_cameras(w);
+                // (the camera's clock, +0x40, runs on under the fade-in - the clouds' drift, the stat mark's draw
+                // count; not the tile animations: rkb_168 14-1 rows 438..453, the pause menu. The fade-out's:
+                // `menu::step`)
+                if matches!(w.menu.phase, crate::menu::Phase::FadeIn { .. }) {
+                    if let Some(f) = w.field.as_mut() {
+                        f.cam_extra = f.cam_extra.wrapping_add(1);
+                    }
+                }
             }
             return;
         }
@@ -239,9 +247,6 @@ impl Session {
         // hit leader does not take its step, Goten's anim misses one update); the players' keys are masked as in
         // `pre_step` for a running one
         let pre_event = w.field.as_ref().is_some_and(|f| f.busy && f.event_started_pre && f.event_nested);
-        if std::env::var_os("WAVE_DBG").is_some() && w.frame > 3120 && w.frame < 3135 {
-            eprintln!("SESS f{} frozen {} sfrozen {} pre {} break {:?} menu {} modal {:?} susp {:?}", w.frame, crate::field::frozen(w), crate::scene::frozen(w), pre_event, w.field.as_ref().map(|f| f.break_event), crate::menu::active(w), w.modal, w.ents.iter().map(|e| crate::vram::suspended(w, e.id)).collect::<Vec<_>>());
-        }
         if w.field.as_ref().is_some_and(|f| f.busy && f.raw_input.is_none() && f.event_started_pre)
             && !crate::field::free_arrival(w)
         {

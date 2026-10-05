@@ -202,6 +202,13 @@ pub enum Mode {
 /// fade length in logic frames (brightness 256 by 8)
 pub const FADE: i32 = 32;
 
+impl Field {
+    /// the camera's iteration count (0x030019A4 +0x40's clock: the clouds' drift, the stat mark's draws)
+    pub fn cam_iters(&self) -> u32 {
+        self.iters.wrapping_add(self.cam_extra)
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Field {
     pub area: AreaId,
@@ -370,6 +377,10 @@ pub struct Field {
     /// object's, not the map's: a scene's load can keep it running - a cut imports it); `None` = `entered_iter`
     #[serde(default)]
     pub drift_iter: Option<u32>,
+    /// the camera's iterations outside the field's (a menu's fade-out and fade-in: the camera object updates, the
+    /// tile animations do not - earth 2-11 rows 753..769 / rkb_168 14-1 rows 438..453): `cam_iters` = `iters` + this
+    #[serde(default)]
+    pub cam_extra: u32,
     /// number of area loads (touch_once triggers survive only within one)
     pub loads: u32,
     /// a talk started in the player's update: (the player's live list index, `loads`) - the event's nested loop
@@ -665,6 +676,7 @@ fn new_field() -> Field {
         iters: 0,
         entered_iter: 0,
         drift_iter: None,
+        cam_extra: 0,
         loads: 0,
         talk_pass: None,
         trig_off: false,
@@ -1106,7 +1118,7 @@ pub fn load_area_with(
         f.entered = w.frame;
         // (a load inside a field frame: the animations start with the next iteration - its tick comes after)
         f.entered_iter = f.iters.wrapping_add(1);
-        f.drift_iter = None;
+        f.drift_iter = Some(f.cam_iters().wrapping_add(1));
         f.loads += 1;
         f.on_enter_queued = false;
         // a script fade-in belongs to the load its `warp_fade` made (set after this returns): any other load ends

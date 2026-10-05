@@ -15,7 +15,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools' / 'segments'))
 W = ROOT / 'work' / 'wholerun'
-NAMES = ('run1', 'run2')
+NAMES = ('run1', 'run2', 'run3')
 
 
 def chain_arg(argv):
@@ -32,9 +32,11 @@ def paths(chain):
                 'manifest': ROOT / 'data' / 'realrun' / 'manifest.json',
                 # run 1 is strict: no ratchet file
                 'expected': ROOT / 'data' / 'realrun' / 'no_expected.json'}
-    d = ROOT / 'data' / 'realrun2'
-    return {'master': W / 'run2' / 'master.jsonl', 'sounds': d / 'sounds.json.gz', 'known': d / 'known_stops.json',
-            'cuts': W / 'run2' / 'cuts', 'dir': W / 'run2', 'manifest': d / 'manifest.json',
+    # run2, run3: the same layout (data/realrun<N>, work/wholerun/run<N>)
+    n = chain[3:]
+    d = ROOT / 'data' / f'realrun{n}'
+    return {'master': W / chain / 'master.jsonl', 'sounds': d / 'sounds.json.gz', 'known': d / 'known_stops.json',
+            'cuts': W / chain / 'cuts', 'dir': W / chain, 'manifest': d / 'manifest.json',
             # check.py's ratchet: fail only if the first difference comes earlier than this
             'expected': d / 'expected.json'}
 
@@ -47,7 +49,7 @@ def parts(chain):
         src = ROOT / 'data' / 'realrun'
     else:
         out = []
-        src = ROOT / 'data' / 'realrun2'
+        src = ROOT / 'data' / f'realrun{chain[3:]}'
     for m in json.loads((src / 'manifest.json').read_text()):
         keys = realrun.unrle(json.loads(gzip.open(src / f'{m["n"]:03d}_{m["name"]}.keys.gz', 'rt').read()))
         out.append((f'{m["n"]:03d}_{m["name"]}', keys, m['end']))

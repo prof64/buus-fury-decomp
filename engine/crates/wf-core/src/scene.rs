@@ -2010,10 +2010,14 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
                     let (bx, by) = box_center(w, i);
                     (bx + *x, by + *y)
                 };
-                // the dust cloud's rate is 0x1000 + rand(0x1000) (0x08019554; story playthrough: the gate's puffs)
-                crate::fx::puff_rng(w, cx, cy);
+                // the cloud is the explosion 0x08712FDC at rate 0x1000 + rand(0x1000) (0x0801952C: its run at
+                // 0x08019564; story playthrough: the gate's puffs; sb_007 6-9 f12392: s232's five clouds are the tan
+                // explosion, not the grey smoke puff 0x086FD9D0)
+                let rate = 0x1000 + w.rng.rand(0x1000);
+                crate::fx::explosion(w, cx, cy, rate);
             } else if *absolute && matches!(owner, Owner::Prop(_)) {
-                crate::fx::puff_rng(w, *x, *y);
+                let rate = 0x1000 + w.rng.rand(0x1000);
+                crate::fx::explosion(w, *x, *y, rate);
             }
         }
         Cmd::HitFlash => {
