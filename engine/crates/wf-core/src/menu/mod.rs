@@ -442,6 +442,10 @@ pub struct Menu {
     /// in the first field frame after the menu
     #[serde(default)]
     pub then: Option<String>,
+    /// `then` waits one field frame: the deferred script runs at the start of the frame after the menu's last
+    /// (run 2 row 1,869,664: Options -> Sleep, s007 one frame after the fade-in's end)
+    #[serde(default)]
+    pub then_armed: bool,
     /// a nested mode ended with this result (`0x0803D876`): its exit stub runs one more iteration (input read, no
     /// draw) before the parent's step resumes
     #[serde(default)]
@@ -548,19 +552,36 @@ pub const SFX_MENU: i32 = 40;
 pub const SFX_CURSOR: i32 = 39;
 pub const SFX_ACCEPT: i32 = 41;
 
+/// a closed menu's queued event (`GD+0x610` deferred scripts: Options -> Sleep = s007) runs at the start of the second
+/// field frame after the menu, before the objects' update - the script holds the field at once (run 2 rows 1,869,664
+/// / 1,869,665: s007 one frame after the fade-in's end, the NPCs not updated in its frame, the leader's idle its draw)
+pub fn run_then(w: &mut World) {
+    if active(w) || !w.menu.then_armed {
+        return;
+    }
+    w.menu.then_armed = false;
+    if let Some(ev) = w.menu.then.take() {
+        // (the deferred-script object updates in the world's object pass (world +0x610): the event holds that frame,
+        // whose remaining updates run in the frame it ends - run 2 row 1,870,437, Sleep Mode's end)
+        if let Some(f) = w.field.as_mut() {
+            f.held_event = true;
+        }
+        w.events
+            .push(crate::world::Event::Field(crate::field::FieldEvent::Run {
+                run: crate::fieldcontent::Callback::Event(ev),
+                cause: crate::field::Cause::Menu,
+                slot: 0,
+            }));
+    }
+}
+
 /// Field main loop `0x08006E3C`: START pressed with the current character's HP != 0 opens the pause menu (sound
 /// 40, then the 16-frame fade). Called after the field rules of a normal field frame.
 pub fn check_pause(w: &mut World) -> bool {
     // a closed menu's queued event (options.rs Sleep) runs in the first field frame after it
-    if !active(w) {
-        if let Some(ev) = w.menu.then.take() {
-            w.events
-                .push(crate::world::Event::Field(crate::field::FieldEvent::Run {
-                    run: crate::fieldcontent::Callback::Event(ev),
-                    cause: crate::field::Cause::Menu,
-                    slot: 0,
-                }));
-        }
+    // (its first field frame after the menu: armed - `run_then` starts it at the next frame's start)
+    if !active(w) && w.menu.then.is_some() {
+        w.menu.then_armed = true;
     }
     if active(w) || w.menu.scripted {
         return false;

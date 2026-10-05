@@ -986,8 +986,12 @@ impl World {
                     // the 860 differing cel frames of the airships in rkb_168, sb_041, rkb_001)
                     && !(matches!(self.ents[i].body, Body::Enemy(_)) && crate::fieldworld::flying(self));
             crate::vram::popups_tick(self, Some(self.ents[i].id));
+            let talk_before = self.field.as_ref().is_some_and(|f| f.talk_pass.is_some());
             if !skip {
                 self.update_entity(i);
+                if std::env::var_os("B_TALKBREAK").is_some() && !talk_before && self.field.as_ref().is_some_and(|f| f.talk_pass.is_some()) {
+                    break;
+                }
                 // it destroyed an object before it: the list compacted, the same object is at the next index
                 if self
                     .field

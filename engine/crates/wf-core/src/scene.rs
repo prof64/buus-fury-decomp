@@ -2936,7 +2936,7 @@ pub fn note_events(w: &mut World) {
     banner_step(w);
     for e in &w.events {
         match e {
-            crate::world::Event::Song { id } => { if std::env::var("TMP_SONGBT").is_ok() { eprintln!("NOTE song {id} {}", std::backtrace::Backtrace::force_capture()); } w.scene.song = *id },
+            crate::world::Event::Song { id } => w.scene.song = *id,
             crate::world::Event::SongStop => w.scene.song = -1,
             _ => {}
         }
@@ -3018,7 +3018,6 @@ pub fn play_song(w: &mut World, id: i32) {
             _ => None,
         }) == Some(true);
     if !playing {
-        if std::env::var("TMP_SONGBT").is_ok() { eprintln!("PLAY song {id} {}", std::backtrace::Backtrace::force_capture()); }
         w.events.push(crate::world::Event::Song { id });
         w.scene.song = id;
     }

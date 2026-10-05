@@ -179,6 +179,7 @@ impl Session {
         }
         crate::scene::pre_step(w);
         if w.field.is_some() {
+            crate::menu::run_then(w);
             crate::field::pre_step(w);
             // the keys a held pass resumes with are the frame's own, not the cutscene mask's (Diablo Desert Express
             // 11-24: A pressed in the frame a one-frame on-defeat event ends - the punch starts in the resumed pass)

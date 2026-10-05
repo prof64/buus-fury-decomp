@@ -2026,7 +2026,7 @@ export function create(n: AiNodeJ, c: AiController): RNode {
 
     // ---- Super Janemba --------------------------------------------------------------------------------------------
     case 'SuperJanembaWave':
-      return timed(n, c, [18, 3], 40, {
+      return timed(n, c, [19, 3], 40, {
         24: () => {
           const OFF = [[4, 4], [13, -24], [-8, -8], [24, -8]]
           const [ox, oy] = OFF[e.facing]

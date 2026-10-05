@@ -94,7 +94,12 @@ pub fn actor_cel(w: &World, i: usize) -> Option<(u16, bool, Option<(i32, i32)>)>
         Body::Enemy(n) => {
             let (raw, frame) = crate::scene::scene_anim(w, i)
                 .map(|a| (a.raw, a.frame))
-                .unwrap_or((n.ea.pos.raw, n.ea.pos.frame));
+                .unwrap_or(if w.field.is_some() && n.ty == 0x33 && !n.part && n.ea.pos.raw == 20 {
+                    // field Janemba's body under the ascent's controller: the frame byte lags a frame
+                    (n.shown_prev.0, n.shown_prev.1)
+                } else {
+                    (n.ea.pos.raw, n.ea.pos.frame)
+                });
             n.a.sprite
                 .and_then(|s| w.data.sprite(s))
                 .and_then(|sp| pick(sp, raw, frame, n.a.facing))

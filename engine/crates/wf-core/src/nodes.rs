@@ -1580,7 +1580,7 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             r.d[0] = 0;
             w.en(i).a.alpha = 256;
         }
-        K::SuperJanembaWave => timed_enter(w, i, &[an(18), an(3)], true),
+        K::SuperJanembaWave => timed_enter(w, i, &[an(19), an(3)], true),
         // field: the jump is SetAnim id 0x13 = raw 20 under its own controller 0x0804D310@0x0300325C (the type's
         // recorded sequence, 249 ticks: Volcano Summit 15-32 - Broly's animation runs to the landing; raw 19 is the
         // ChargedPunch's, whose one-shot ends at tick 148 with an idle draw). Battles keep the reference

@@ -81,6 +81,11 @@ pub struct Enemy {
     pub mirror_cel: i32,
     #[serde(default)]
     pub mirror_prev: i32,
+    /// the animation position (raw, cel) at the end of the previous frame: field Janemba's body under the ascent's
+    /// controller (raw 20) is drawn from the frame byte that lags a frame (rj_049 18-14 f1069 .. f1274: the switch
+    /// into raw 20 and every cel change of it show a frame late; `view::actor_cel`)
+    #[serde(default)]
+    pub shown_prev: (i32, i32),
     /// field Janemba arm part (0x34 / 0x35): the hand strike's controller ticks (0 = none) and its side (A = 0x34)
     #[serde(default)]
     pub strike: (i32, bool),
@@ -219,6 +224,7 @@ impl Enemy {
             mirror_raw: 0,
             mirror_cel: 0,
             mirror_prev: 0,
+            shown_prev: (0, 0),
             strike: (0, false),
             strike_hand: 0,
             script_hits: 0,
@@ -586,6 +592,10 @@ pub fn ctx_player(w: &World, i: usize) -> Option<usize> {
 // ---- update ----------------------------------------------------------------------------------------------------
 
 pub fn update(w: &mut World, i: usize) {
+    {
+        let e = w.en(i);
+        e.shown_prev = (e.ea.pos.raw, e.ea.pos.frame);
+    }
     if std::env::var_os("WAVE_DBG").is_some() && w.frame > 3115 {
         let ko = w.player_idx(0).map(|p| w.pl_ref(p).ko_at);
         eprintln!("ENUPD f{} id {} ko_at {:?} busy {:?} puppet {}", w.frame, w.ents[i].id, ko, w.field.as_ref().map(|f| (f.busy, f.busy_pre_pass, f.busy_since)), crate::scene::is_puppet(w, w.ents[i].id));
@@ -2504,6 +2514,17 @@ pub fn kid_buu_merge(w: &mut World, i: usize) {
     let oe = w.en(o);
     oe.defeated = true;
     oe.primary = false;
+    // the absorbed half is deleted, not defeated: the area's placed-enemy slot (its on-defeat callback) goes on with
+    // the survivor (run 2 row 1,880,459, 19-3: the placed Kid Buu absorbed into its split copy - no s458 cut-in, the
+    // merged Buu goes on hitting)
+    let oid = w.ents[o].id;
+    if let Some(f) = w.field.as_mut() {
+        if !f.placed.iter().any(|p| p.0 == me) {
+            for p in f.placed.iter_mut().filter(|p| p.0 == oid) {
+                p.0 = me;
+            }
+        }
+    }
 }
 /// field Janemba's body parts (sc_janemba segment, emulator: 0x0803D0C4 / 0x0803CE94): part 0x37's AI node
 /// (PartMirrorAnim) places the chain every frame its AI runs (not while an event holds the field: they keep their
