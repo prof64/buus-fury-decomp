@@ -434,6 +434,11 @@ pub struct Menu {
     /// world does not update in it (shop lockstep: the NPCs' idle ticks stop in the frame the fade-in ends)
     #[serde(default)]
     pub closed_this_frame: bool,
+    /// this frame is such a closing iteration (set while it runs, cleared at the next frame's start): no pause check
+    /// in it - the field main loop's START check is not reached (run 3 row 8,581: START on alternate frames through
+    /// the pause's fade-in; the game reopens it 2 iterations after the fade-in's last one, ours reopened in it)
+    #[serde(default)]
+    pub closing_iter: bool,
     /// the game options (`0x03001914`: text speed, SFX volume, music volume, 0; the cartridge's options block,
     /// shared by every save): kept across menus (options.rs)
     #[serde(default)]
@@ -583,7 +588,7 @@ pub fn check_pause(w: &mut World) -> bool {
     if !active(w) && w.menu.then.is_some() {
         w.menu.then_armed = true;
     }
-    if active(w) || w.menu.scripted {
+    if active(w) || w.menu.scripted || w.menu.closing_iter {
         return false;
     }
     let Some(f) = w.field.as_ref() else {
@@ -760,6 +765,10 @@ fn step_inner(w: &mut World) {
             }
         }
         Phase::Enter { t } => {
+            // the input object samples the keys every iteration, the screen's enter too: the first menu read's
+            // edges are relative to it (run 3 row 712: A on alternate frames over the title's first iteration -
+            // lf 697 sampled A up, so A at lf 698 is a press; ours kept the boot's last sample, A down)
+            w.menu.held = held;
             if t + 1 >= w.menu.tr.enter.max(1) {
                 w.menu.phase = Phase::Run;
                 // the first update draws during the black frames: on screen now, no lag after it (the title after the

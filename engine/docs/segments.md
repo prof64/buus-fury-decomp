@@ -319,6 +319,8 @@ row 712). Resync (no lag) stops, owner dungeon agent B unless a chapter owner cl
 - area at 25,581 (app 1-15 / game 1-14) and 30,748 (app 1-16 / game 1-17): an exit taken / not taken under the
   mashed pause.
 Next: the Earth part (`e3_*`).
+*Claim (ship fix agent, menus, by the coordinator, 2026-10-05):* 712 (title menu cursor sound under mashed START),
+16,562 / 20,560 (pausespin's fastest close: menu depth) and 16,782 (facing after a pause).
 
 ## 1. One-command workflow
 
@@ -5763,3 +5765,4 @@ both runs as expected; core / import / app suites green. Debug: wholerun `WR_SON
   through s030's buy / sell session (game 1,859,792 .. 1,860,384, 494 iterations) up to 1,869,600, with no sound
   difference. The stop came from an earlier tree; nothing changed in `menu/shop.rs`.
 *Same-frame cutscene punches (A; wf-core scene.rs / world.rs, uncommitted):* in a cutscene the game sends each object message 0x0C (last object first); each actor's handler updates its animation, then ticks its own command list (0x0800F5C8 -> 0x080193AE) - so an actor whose punch ends draws its idle and its next punch's 50 + rand(2) before the next actor. `scene::track_after_update` (called after each actor's update in `step_entities_list`): when the script waits on all actors, the actor's current command is PlayAnim / PlayAnimFrames ending in this update and the next is an animation command too, its track ticks there and is skipped in the later track tick (narrower than the game's general order: ticking every next command there broke gate sb_005_01_05's four emotes at f17209). Run 2 sound rows 1,877,946 / 1,888,088 / 1,888,104 / 1,917,102 / 1,917,118 fixed. The `stop 3` at 1,891,147 does not reproduce on c03f779 / 46bfe41 (fixed earlier). Still open in the list (other causes, Super Buu part, side-content agent's range): depth-0 field punch rows in 21-x 1,631,398 / 1,640,163 / 1,665,948 / 1,665,986 / 1,679,650 / 1,779,398 (the player's punch hits; the logic diverges a row later) and sound 44 game only 1,683,032 / 1,774,198 / 1,779,633. Gates green; check.sh EXACT (run 1 logic + sounds; run 2 first difference now 1,576,199).
+**Claim (dungeon agent A, by the coordinator) - to the side-content agent:** A takes run 2's remaining Super Buu *sound* items: the field punch rows in 21-x 1,631,398 / 1,640,163 / 1,665,948 / 1,665,986 / 1,679,650 / 1,779,398 (the punch sound, then the logic one row later) and sound 44 game only at 1,683,032 / 1,774,198 / 1,779,633. Your inside-Buu *logic* stops stay yours; if a punch row turns out to be one of your logic stops, I hand it back here.

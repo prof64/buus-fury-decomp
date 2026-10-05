@@ -143,6 +143,7 @@ impl Session {
         w.events.clear();
         w.g.shake_ended = false;
         w.input = inputs;
+        w.menu.closing_iter = false;
         // the soft reset (A + B + SELECT + START held): the game from its boot code (menu/title.rs `reset_world`)
         if inputs[0].held & crate::menu::title::RESET_KEYS == crate::menu::title::RESET_KEYS {
             *w = crate::menu::title::reset_world(&self.data, w);
@@ -206,6 +207,7 @@ impl Session {
     fn step_update_inner(&mut self) {
         let w = &mut self.world;
         if std::mem::take(&mut w.menu.closed_this_frame) {
+            w.menu.closing_iter = true;
             return;
         }
         let watch_closing = w.field.is_some() && crate::menu::minigame::watch_closing(w);
@@ -360,6 +362,22 @@ impl Session {
     /// the rest of the frame: cameras and the field / battle rules after the update
     pub fn step_post(&mut self) -> &[Event] {
         self.step_post_world();
+        if let Some(at) = std::env::var("XDUMP").ok().and_then(|v| v.parse::<i64>().ok()) {
+            let w = &self.world;
+            let c = w.g.clock(w.frame);
+            if c >= at && c <= at + std::env::var("XDUMPN").ok().and_then(|v| v.parse::<i64>().ok()).unwrap_or(2) {
+                for e in w.ents.iter().filter(|e| !e.removed) {
+                    if let Some(a) = w.find(e.id).and_then(|i| w.actor(i)) {
+                        let (raw, fr, tk) = match &e.body {
+                            crate::world::Body::Enemy(en) => (en.ea.pos.raw, en.ea.pos.frame, en.ea.pos.tick),
+                            crate::world::Body::Player(p) => (p.ap.raw, p.ap.frame, p.ap.tick),
+                            _ => (-1, -1, -1),
+                        };
+                        eprintln!("XDUMP clock {} id {} sprite {:?} x {} y {} dir {} raw {} frame {} tick {}", c, e.id, a.sprite, a.x, a.y, a.facing, raw, fr, tk);
+                    }
+                }
+            }
+        }
         // a logic frame whose object pass did not run still counts on the game's logic counter
         if let Some(c0) = self.world.g.clock_mark.take() {
             if !crate::menu::active(&self.world) {

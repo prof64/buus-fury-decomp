@@ -683,9 +683,7 @@ impl Renderer {
                 }
             }
         }
-        // (the drift reaches the scroll registers at the next VBlank: the picture shows the previous update's - db7_041
-        // 0-9, s019's flying scene: BG0 HOFS -4 * (camera clock - 1))
-        let (sx, sy) = l.scroll(cx, cy, anim_frame.saturating_sub(1));
+        let (sx, sy) = l.scroll(cx, cy, anim_frame);
         // screen pixel (px, py) of this view is camera-relative (vx - cx + px); layer pixel = that + scroll
         let ox = vx - cx + sx;
         let oy = vy - cy + sy;

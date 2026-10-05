@@ -1,6 +1,6 @@
 {
  "about": "tools/wholerun/check.py's ratchet for run 3 (the adversarial playthrough; no-lag, from power-on): the first difference (a compared field or a sound request) must not come earlier than first_diff; a later one is reported as an improvement and this file is bumped. Remove the file once run 3 is exact.",
- "first_diff": 712,
- "stop": "sound: app [] game [\"play 40 64\"] (title menus, START on alternate frames); first logic stop row 4,362 (area: app (0, 2) game (1, 1))",
- "stretch": "000_intro3"
+ "first_diff": 8581,
+ "stop": "pos: app (86080, 6144, 1) game (86080, 5440, 1)",
+ "stretch": "001_snakeway3"
 }
