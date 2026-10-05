@@ -1,0 +1,91 @@
+"""Run 3's driver (the adversarial playthrough, engine/docs/segments.md "Run 3"): run 2's Run2Driver plus
+  ('mashkeys', key, period, n)        `key` for 1 frame every `period` frames, nothing in between, for n frames
+  ('pushmash', dir, extra, period, n) hold `dir` (into an exit) and OR `extra` every `period` frames for n frames
+                                      (through the transition), then close whatever opened (B until the field runs)
+  ('pausespin', n)                    open and close the pause menu n times (START, then START as soon as the menu
+                                      takes input again - it ignores a press while it fades)
+  ('menutour',)                       the pause menu's pages: R through all of them and L back, then closed
+  ('textmash', period, until)         A every `period` frames (alternate frames: period 2) until `until` (an area
+                                      key (w, a) reached with the leader controllable)
+All closed-loop on the emulator state (deterministic: the key log replays exactly)."""
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+for d in ('tools/story_playthrough', 'tools/field', 'tools/run2'):
+    if str(ROOT / d) not in sys.path:
+        sys.path.insert(0, str(ROOT / d))
+from run2_driver import Run2Driver  # noqa: E402
+from route import KEY, status  # noqa: E402
+
+
+def menu_open(e):
+    """a menu screen is up (the field's leader is hidden behind it): status p None while the scene is 0"""
+    s = status(e)
+    return s['p'] is None and s['scene'] == 0
+
+
+class Run3Driver(Run2Driver):
+    def step(self, e):
+        g = self.goals[self.k]
+        kind = g[0]
+        if kind == 'mashkeys':
+            if self.t >= g[3]:
+                self.next_goal()
+                return None
+            return g[1] if self.t % g[2] == 0 else 0
+        if kind == 'pushmash':
+            if self.t < g[4]:
+                return g[1] | (g[2] if self.t % g[3] == 0 else 0)
+            # close whatever the presses opened, as 'bout'
+            self.goals[self.k] = ('bout',)
+            self.t = 0
+            return 0
+        if kind == 'pausespin':
+            # phases of one spin: press START (open), wait until the menu is up, START (close), wait until the field
+            st = getattr(self, 'spin', None)
+            if st is None:
+                st = self.spin = {'n': 0, 'ph': 0, 'w': 0}
+            if st['n'] >= g[1]:
+                self.spin = None
+                self.goals[self.k] = ('bout',)
+                self.t = 0
+                return 0
+            up = menu_open(e)
+            st['w'] += 1
+            if st['w'] > 600:
+                raise RuntimeError(f'pausespin: stuck in phase {st["ph"]} {status(e)}')
+            if st['ph'] == 0:
+                if up:
+                    st['ph'], st['w'] = 1, 0
+                    return 0
+                return KEY.START if st['w'] % 2 == 1 else 0
+            if not up:
+                st['ph'], st['w'] = 0, 0
+                st['n'] += 1
+                return 0
+            return KEY.START if st['w'] % 2 == 1 else 0
+        if kind == 'menutour':
+            prog = [KEY.START] + [0] * 40
+            for k in [KEY.R] * 5 + [KEY.L] * 5:
+                prog += [k] + [0] * 24
+            prog += [KEY.B] + [0] * 30
+            if self.t < len(prog):
+                return prog[self.t]
+            self.goals[self.k] = ('bout',)
+            self.t = 0
+            return 0
+        if kind == 'textmash':
+            s = status(e)
+            w, a = g[2]
+            if s['area'][:2] == [w, a] and s['p'] is not None and s['scene'] == 0:
+                self.idle += 1
+                if self.idle >= 60:
+                    self.next_goal()
+                    return None
+                return 0
+            self.idle = 0
+            if self.t > 30000:
+                raise RuntimeError(f'textmash: {g} not reached {s}')
+            return KEY.A if self.t % g[1] == 0 else 0
+        return super().step(e)

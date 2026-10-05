@@ -261,6 +261,42 @@ importer agent, its fix not in this tree yet) and sound 44 game only (3: 1,683,0
 side-content agent). The opening, Earth, credits, beam and `stop 3` items are gone. (A leg's first row after a cut no
 longer counts the import's own song restart.)*
 
+**Run 3: an adversarial playthrough (plan; dungeon agent B, 2026-10-05, by the coordinator).** Runs 1 and 2 play the
+story the way a player does; run 3 goes after the timing edges neither touched - input on the frames the engine is
+busy, deaths and menus where the code has the least coverage, the full item / skill / enemy cross product, the
+post-game. Same tooling shape as run 2: `tools/run3/route3.py` (`SEGMENTS`, `COVERAGE`), `run3_driver.py`
+(Run2Driver + the goals below), `play3.py` (one emulator session from the soft reset, `work/run3/keys.json`),
+`pack3.py` -> `data/realrun3/` + a `run3` entry in `tools/wholerun/chains.py`, then `record.py` / `sounds.py` /
+`resync.py` / `sound_legs.py --chain run3`. Input only, as always. Each chapter's part is the same story as runs 1 / 2
+with these stresses woven in (what each targets, why):
+1. **Opening / Other World** (`intro3`, `snakeway3`, `ow3`): the title and its menus with keys on every other frame
+   (menu input edges, the cursor's key repeat, the Options page cycled through every value); the prologue's text
+   boxes mashed on alternate frames (typewriter skip on its first possible frame, page turn vs close); START pressed
+   every other frame through every area transition (exit push, fade-out, load, fade-in: the pause gate's exact frames;
+   `menu::check_pause` and the load's lag frames); the pause menu opened and closed as fast as it accepts input, every
+   page visited in both directions; a death during a level-up popup (the popup's held frame vs the death script) and
+   a death on the frame a trigger fires; a Save, then a soft reset on the Save screen's first frame of each state.
+2. **Earth** (`e3_*`): every Z-Mart / stall item bought one at a time until the zenie is exactly 0, then a buy attempt
+   at 0 (the refusal text); every supply used from the Inventory, in the field and in the pause menu during an
+   enemy's attack; selling until the inventory's every row was touched; equipment swapped on every slot every few
+   minutes; dying in the middle of a cutscene's walk (an enemy that keeps hitting through `ai_wait`); the world map:
+   pausing in flight, landing on every circle's edge, dying to a patrol encounter; Options changed mid-dialogue (text
+   speed on an open box).
+3. **Ship / fat Buu / Janemba** (`s3_*`, `f3_*`, `j3_*`): character switches at every save point visited, constantly
+   (the switch screen's ins and outs; the forms' timers carried); every skill of every character used on every enemy
+   type met at least once (energy vs melee resistance paths, beams that hit nothing, skills at 0 EP); full inventory
+   (every supply at 9, every equipment picked up) and the pickups refused then; deaths mid-event, during a level-up,
+   on the world map, during a boss's defeat scene's first frame; a game over -> Continue on every save slot state.
+4. **Super / Kid Buu, credits, post-game** (`b3_*`, `p3_*`): the Super Buu fights with Gotenks / Gohan swapped in and
+   out; inputs held through the credits and the post-credits title; the post-game content (side areas, the
+   remaining hidden items and enemies, a second Continue from the cleared save).
+Stresses are expressed as driver goals: `('mashkeys', key, period, n)` (a key every `period` frames for n frames,
+on top of nothing), `('pushmash', dir, extra, period, n)` (walk into an exit holding `dir` and OR `extra` every
+`period` frames through the transition, then close whatever opened), `('pausespin', n)` (open and close the pause
+menu n times at the fastest accepted rate), `('menutour',)` (every pause page both ways). Recording order: opening
+first (now), then each chapter from the previous part's end, appended as run 2 was. Owner: dungeon agent B; stops
+found in the resync go to the chapter owners as usual.
+
 ## 1. One-command workflow
 
 ```
