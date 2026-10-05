@@ -463,6 +463,11 @@ impl Renderer {
                 let mr = self.menu.get_or_insert_with(|| menu::MenuRenderer::load(packs));
                 screen.push((1, w as i32 - 72, 8, 64, 16, mr.timer(packs, t)));
             }
+            // damage numbers: 32x8 OBJs at their world place, priority 1 (draw 0x0800ACB6)
+            for dn in &view.damage_numbers {
+                let mr = self.menu.get_or_insert_with(|| menu::MenuRenderer::load(packs));
+                screen.push((1, dn.x - vx, dn.y - vy, 32, 8, mr.damage_number(packs, dn.value, dn.crit)));
+            }
             // a script's title text (`show_title_text`): OBJs at (x - w / 2, y - 16), priority 0
             for tv in &view.title {
                 let mr = self.menu.get_or_insert_with(|| menu::MenuRenderer::load(packs));

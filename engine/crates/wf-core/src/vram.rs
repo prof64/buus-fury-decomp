@@ -368,6 +368,10 @@ pub struct VramState {
     /// new number, handle, last frame it shows)
     #[serde(default)]
     pub popups: Vec<(crate::world::EntityId, u32, u16, u32)>,
+    /// what the damage numbers show, by handle: (handle, x8, y8 at the creation, frame made, damage in 1/1024 HP,
+    /// crit) - x8 = (box centre x - 16) * 8, y8 = box top * 8; 0.5 px up per update (0x0800AC40)
+    #[serde(default)]
+    pub popup_vis: Vec<(u16, i32, i32, u32, i64, bool)>,
     /// other refcounted shared graphics (`0x0804E490` records): (key, users)
     #[serde(default)]
     pub keyed: Vec<(u32, u32)>,
@@ -1370,6 +1374,17 @@ pub fn keyed_release(w: &mut World, key: u32) {
 /// a damage number over an actor (`0x0800E8E6`): within 8 frames of the actor's last new number the number object
 /// is reused (its 16 frames start again); else a new object, when 0x100 bytes are free (`0x0800AD3E`)
 pub fn damage_number(w: &mut World, target: EntityId) {
+    damage_number_shown(w, target, 0, false);
+}
+
+/// `damage_number` with what it shows: `dmg` (1/1024 HP) adds to a reused number, `crit` picks the style
+pub fn damage_number_shown(w: &mut World, target: EntityId, dmg: i64, crit: bool) {
+    // the number's place: the target's body box, centre x and top (0x0800FE78 at 0x0800E910)
+    let at = w.find(target).and_then(|k| match &w.ents[k].body {
+        crate::world::Body::Enemy(e) => Some(e.a.body_box()),
+        crate::world::Body::Player(p) => Some(p.a.body_box()),
+        _ => None,
+    });
     let now = w.frame;
     let stamp = w.next_id;
     let objects = w.ents.iter().filter(|e| !e.removed).count();
@@ -1390,6 +1405,10 @@ pub fn damage_number(w: &mut World, target: EntityId) {
             .unwrap_or(0);
         let pending = v.pass_at != 0 && at <= v.pass_at;
         v.popups[k].3 = now + POPUP_LIFE - pending as u32;
+        if let Some(p) = v.popup_vis.iter_mut().find(|p| p.0 == h) {
+            p.4 += dmg;
+            p.5 |= crit;
+        }
         return;
     }
     v.popups.retain(|p| p.0 != target || p.3 >= now);
@@ -1401,7 +1420,25 @@ pub fn damage_number(w: &mut World, target: EntityId) {
         v.popups.push((target, now, h, now + POPUP_LIFE));
         v.popup_at.retain(|p| p.0 != h);
         v.popup_at.push((h, stamp));
+        v.popup_vis.retain(|p| p.0 != h);
+        if let Some(r) = at {
+            v.popup_vis.push((h, (((r.x0 + r.x1) >> 1) - 16) * 8, r.y0 * 8, now, dmg, crit));
+        }
     }
+}
+
+/// the damage numbers on show: (top-left x, y, value, crit) - each update moves it up 0.5 px (y8 - 4)
+pub fn damage_numbers(w: &World) -> Vec<(i32, i32, i32, bool)> {
+    let Some(v) = w.field.as_ref().and_then(|f| f.vram.as_ref()) else { return vec![] };
+    v.popups
+        .iter()
+        .filter(|p| p.3 > w.frame)
+        .filter_map(|p| v.popup_vis.iter().find(|q| q.0 == p.2))
+        .map(|q| {
+            let y8 = q.2 - 4 * w.frame.wrapping_sub(q.3) as i32;
+            (q.1 >> 3, y8 >> 3, ((q.4 + 0x3FF) >> 10) as i32, q.5)
+        })
+        .collect()
 }
 /// frames a damage number lives after its (re)start
 pub const POPUP_LIFE: u32 = 16;

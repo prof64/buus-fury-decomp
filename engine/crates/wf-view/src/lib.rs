@@ -59,6 +59,8 @@ pub struct RenderView {
     pub sphere: Option<SphereView>,
     /// The countdown / stopwatch display's value in frames (two 32x16 OBJs at (168, 8), priority 1), if shown.
     pub timer: Option<i32>,
+    /// Damage numbers (object `0x0800AD3E`, vtable 0x0804C904): a 32x8 OBJ at world (x, y), priority 1.
+    pub damage_numbers: Vec<DamageNumberView>,
     /// A script's title text (`show_title_text` 0xB2, "Chapter 12 ..." / "Match 2 Fight!"): the string's units,
     /// centred at (x, y) (object `0x0802BECC`: a 32-px-high surface, the title font outlined, OBJs at (x - w / 2,
     /// y - 16)).
@@ -323,6 +325,7 @@ impl RenderView {
         self.boss_bars.clear();
         self.sphere = None;
         self.timer = None;
+        self.damage_numbers.clear();
         self.title.clear();
         self.banner = None;
         self.world_map = None;
@@ -453,6 +456,17 @@ pub struct HudView {
     /// The stat-points mark ("STAT" + arrow, 16x16 at screen x 92 beside the HUD) while the leader has points to
     /// spend: its animation frame 0..3 (`ui/hud/stat_mark.png`), `None` = no mark.
     pub stat_mark: Option<u8>,
+}
+
+/// A damage number: its OBJ's top-left in world pixels and what it shows.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub struct DamageNumberView {
+    pub x: i32,
+    pub y: i32,
+    /// the number shown (the damage summed in 1/1024 HP, rounded up)
+    pub value: i32,
+    /// the second style (digits font, colour 4): the hit message's +0x10 flag
+    pub crit: bool,
 }
 
 /// A script's title text (see `RenderView::title`).

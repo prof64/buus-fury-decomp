@@ -1074,12 +1074,14 @@ fn world_back(w: &mut World) {
         let sprites: Vec<i32> = c.figs.iter().map(|f| f.sprite).collect();
         crate::vram::figures_gone(w, &sprites);
         crate::vram::world_show(w);
+        crate::field::tile_anims_restart(w);
     } else if w
         .field
         .as_ref()
         .is_some_and(|f| f.vram.as_ref().is_some_and(|v| v.stashed.is_some()))
     {
         crate::vram::world_show(w);
+        crate::field::tile_anims_restart(w);
     }
 }
 

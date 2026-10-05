@@ -375,7 +375,7 @@ pub fn render_view(w: &World, out: &mut RenderView) {
     let tile_frame = w
         .field
         .as_ref()
-        .map(|f| since(f.iters, f.entered_iter))
+        .map(|f| since(f.cam_iters(), f.entered_iter))
         .filter(|&t| t != anim_frame);
     // a script's BG control (hide / priority / blend targets / weights: scene::Layers)
     let sl = &w.scene.screen.layers;
@@ -469,6 +469,10 @@ pub fn render_view(w: &World, out: &mut RenderView) {
             })
             .collect();
     }
+    out.damage_numbers = crate::vram::damage_numbers(w)
+        .into_iter()
+        .map(|(x, y, value, crit)| wf_view::DamageNumberView { x, y, value, crit })
+        .collect();
     out.timer = w.scene.timer_hud.map(|k| match k {
         crate::scene::TimerHud::Countdown => w.scene.timers.countdown,
         crate::scene::TimerHud::Stopwatch => w.scene.timers.stopwatch,
@@ -961,6 +965,7 @@ pub struct Presenter {
         Vec<wf_view::BossBarView>,
         Option<i32>,
         Vec<wf_view::TitleView>,
+        Vec<wf_view::DamageNumberView>,
     )>,
     prev_mode7: Option<wf_view::Mode7View>,
 }
@@ -979,6 +984,7 @@ impl Presenter {
             v.boss_bars,
             v.timer,
             v.title,
+            v.damage_numbers,
         ));
     }
     /// the session started mid-area (harnesses): nothing of the previous build to show
@@ -986,9 +992,11 @@ impl Presenter {
         *self = Presenter::default();
     }
     pub fn apply(&self, out: &mut RenderView) {
-        if let Some((sprites, hud, banner, dialog, anim, boss_bars, timer, title)) = &self.prev {
+        if let Some((sprites, hud, banner, dialog, anim, boss_bars, timer, title, nums)) = &self.prev {
             // (an OBJ: a frame late)
             out.title = title.clone();
+            // (damage numbers too: dr4_009 15-9 f316, made at f315)
+            out.damage_numbers = nums.clone();
             out.sprites = sprites.clone();
             // (the cooldown triangle shows the frame's own value: shipr_001 7-1 f240, the record's 0x7FFF that frame
             // and an empty step-0 triangle)

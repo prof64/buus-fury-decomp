@@ -99,7 +99,8 @@ with ThreadPoolExecutor(max(1, len(legs))) as ex:
         # a chain with an expected.json (a ratchet: run 2 while its stops are being fixed) passes when its first
         # difference (stop or sound) is no earlier than the recorded one; later = an improvement, the file is bumped
         exp_p = chains.paths(chain)['expected']
-        if probs and s == 0 and exp_p.exists() and lag == 'none':
+        # (any leg: with a known range before it, the first difference can sit in the leg cut after the range)
+        if probs and exp_p.exists() and lag == 'none':
             exp = json.loads(exp_p.read_text())
             first = min(r['exact_to'], sf['row'] if sf else e)
             if r['script_errors']:

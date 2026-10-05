@@ -1,0 +1,12 @@
+{
+ "about": "Run 2's whole-run stops that are known differences by design (tools/wholerun/resync.py / check.py: a stop inside a range is logged as kind 'known' and the run is cut again after the range's end). Each entry names its write-up in engine/docs/segments.md.",
+ "stops": [
+  {
+   "from": 1576065,
+   "to": 1593826,
+   "stretch": "033_b_superbuu",
+   "what": "Vegeta's WanderToRandomPoint (20-7, state 0x313 after s473's become_map_object(5, 3), as run 1's 20-6): the node's runtime reads leftover heap bytes (waypoint +0xC/+0x10, re-plan counter +0x18) - other objects' freed bytes; his first step already differs (game up for 8 frames, ours right); reproducing it needs a byte-level heap model (decided: not built). The range ends where 20-7 is left for 21-1.",
+   "doc": "core.md 'Uninitialised heap reads'; segments.md: 'The wander's heap leftovers: deterministic, but they are other objects' bytes' and '1,576,199 (20-7)'"
+  }
+ ]
+}

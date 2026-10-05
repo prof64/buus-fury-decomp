@@ -4230,9 +4230,9 @@ fn import_tile_anims(w: &mut World, ram: &GbaRam) {
         None => Some(cam),
     };
     if let Some(f) = w.field.as_mut() {
-        f.drift_iter = Some(f.iters.wrapping_sub(cam));
+        f.drift_iter = Some(f.cam_iters().wrapping_sub(cam));
         if let Some(t) = tiles {
-            f.entered_iter = f.iters.wrapping_sub(t);
+            f.entered_iter = f.cam_iters().wrapping_sub(t);
         }
     }
 }
@@ -4586,13 +4586,15 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
             let (t, at) = target(o);
             (t, at, h, now + n.max(0) as u32)
         }).collect();
+        // what they show (vt 0x0804C904: +0x14 damage in 1/1024, +0x1C the second style, +0x20 / +0x24 x8 / y8)
+        let popup_vis = pops.iter().map(|&(h, _, o)| (h, ram.s32(o + 0x20), ram.s32(o + 0x24), now, ram.s32(o + 0x14) as i64, ram.r32(o + 0x1C) != 0)).collect();
         let Some(f) = w.field.as_mut() else { return };
         // (made before anything the replay makes: a stamp below the next object's)
         let popup_at = pops.iter().map(|&(h, _, _)| (h, stamp.saturating_sub(1))).collect();
         // the stat-points mark's draw counter (vt 0x0804C070 +0x14)
         let it = f.iters;
         let stat_at = ram.objects().into_iter().find(|&o| ram.r32(o) == 0x0804_C070).map(|o| it.wrapping_sub(ram.r32(o + 0x14))).unwrap_or(0);
-        f.vram = Some(VramState { a, owners, shared_rc, suspended: vec![], hud_out, popups, keyed, stashed: None, delayed: vec![], objs, susp: vec![], shadow_set: vec![], popup_at, pass_at: 0, stat_at });
+        f.vram = Some(VramState { a, owners, shared_rc, suspended: vec![], hud_out, popups, popup_vis, keyed, stashed: None, delayed: vec![], objs, susp: vec![], shadow_set: vec![], popup_at, pass_at: 0, stat_at });
     }
     // the objects a purge suspended (world +0x40C, `GbaRam::suspended_objects`, in suspension order): our entities at
     // their positions are out of the world too - they come back when the text box closes (run 1 cut 195,432)

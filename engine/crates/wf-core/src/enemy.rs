@@ -3091,6 +3091,9 @@ pub fn worm_shield_hit(w: &mut World, i: usize) {
     // body's last step)
     let f = w.en_ref(i).a.facing;
     w.en(i).worm_dir = f;
+    // the head state's runtime is new: its contact counter (+4) starts at 0 - the body's own (+0x14) is gone (run 2
+    // cut 1,688,400 f207: a punched tail's first head update hits Goku in the punch's frame)
+    w.en(i).contact_cd = 0;
     set_anim(w, i, &[n(1)], true, Some(true));
 }
 
@@ -3237,7 +3240,7 @@ pub fn take_hit(w: &mut World, i: usize, msg: &HitMsg) -> bool {
     }
     // the damage number's object is made here (`0x0800E8E6`), not at the hit: an on-hit tree without ApplyDamage
     // shows none (segment sb 19-3: Kid Buu's teleport on a hit)
-    crate::vram::damage_number(w, w.ents[i].id);
+    crate::vram::damage_number_shown(w, w.ents[i].id, msg.dmg, msg.crit);
     let dmg = msg.dmg;
     let before = w.en_ref(i).hp().max(0);
     w.en(i).hp1024 -= dmg;

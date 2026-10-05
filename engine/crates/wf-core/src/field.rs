@@ -942,6 +942,18 @@ pub fn load_area(w: &mut World, to: AreaId, x: i32, y: i32, facing: Option<Dir>)
 /// the area load with `objects` = false: the map's conditional objects are not spawned (script load_scene
 /// 0x74 `load_scene_fade_noobj`, 0x08009030 first flag 0). A cutscene scene load calls this after
 /// `scene::send_offstage` (no player object: no player re-creation, no draws).
+/// the field rebuilt after a screen that saved it: the map's tile animations start over (`0x08009B80`: frame 0,
+/// countdown k + 1), the camera's clock - the wrap layers' drift - runs on (earth 2-11 row 1,021 / ship 8-1 row
+/// 328: animation 0 back to frame 0 countdown 1 at the restore, its next tick with the camera's)
+pub fn tile_anims_restart(w: &mut World) {
+    if let Some(f) = w.field.as_mut() {
+        if f.drift_iter.is_none() {
+            f.drift_iter = Some(f.entered_iter);
+        }
+        f.entered_iter = f.cam_iters();
+    }
+}
+
 pub fn load_area_with(
     w: &mut World,
     to: AreaId,
@@ -1117,7 +1129,7 @@ pub fn load_area_with(
         f.busy = keep_busy;
         f.entered = w.frame;
         // (a load inside a field frame: the animations start with the next iteration - its tick comes after)
-        f.entered_iter = f.iters.wrapping_add(1);
+        f.entered_iter = f.cam_iters().wrapping_add(1);
         f.drift_iter = Some(f.cam_iters().wrapping_add(1));
         f.loads += 1;
         f.on_enter_queued = false;
@@ -2077,8 +2089,12 @@ pub fn post_step(w: &mut World) {
     // Instant Transmission's pick (a modal loop of the game, player.rs `start_it`) replaces the frame: no trigger
     // check, the cameras hold (story playthrough: the camera stops on the frame B is pressed)
     let modal = w.modal.is_some() && crate::player::it_picking(w);
+    // (a menu screen's closing iteration - its fade-in's last step - is the mode loop's: the field's trigger check is
+    // not reached; run 3 row 16,562, 1-12: START mashed through the pause, s086's walk-in trigger fires an iteration
+    // after the fade-in in the game, in it in ours)
+    let closing = w.menu.closing_iter;
     match mode {
-        Mode::Normal if modal || ended_before => {}
+        Mode::Normal if modal || ended_before || closing => {}
         Mode::Normal => trigger_check(w),
         // the load is waiting for its on-enter script: the screen stays black
         Mode::FadeOut { .. } if w.field.as_ref().is_some_and(|f| f.arrival.is_some()) => {}

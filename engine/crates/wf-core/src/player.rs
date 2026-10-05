@@ -4370,7 +4370,7 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
         dmg,
         crit: res.crit,
     });
-    crate::vram::damage_number(w, w.ents[i].id);
+    crate::vram::damage_number_shown(w, w.ents[i].id, dmg, res.crit);
     if msg.team == 1 {
         // PvP: the attacker's hit cue and on-hit hooks, as when it hits an enemy
         w.events.push(Event::Hit);
