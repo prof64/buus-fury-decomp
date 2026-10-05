@@ -1980,8 +1980,19 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             true
         }
         // the Enzyme's death state 0x91 (singleton 0x03003114, update 0x0802F724): the parent (+0x1F4) count +0x204
-        // minus 1 (not modelled), finished at once
-        K::LatchRelease => true,
+        // minus 1, finished at once. Field: the Blister spawns again once one of its eight has died (MEASURED run 2,
+        // inside Buu 21-4: +0x204 8 -> 7 .. 4 at the deaths (write 0x0802F73C), the next Enzyme at row 1,599,304)
+        K::LatchRelease => {
+            if w.field.is_some() {
+                let p = w.en_ref(i).parent;
+                if let Some(pi) = (p != 0).then(|| w.find(p)).flatten() {
+                    if let Body::Enemy(e) = &mut w.ents[pi].body {
+                        e.spawned -= 1;
+                    }
+                }
+            }
+            true
+        }
         K::TriggerSelf => {
             // field (world-map encounters): the defeated handler without loot / removal runs the on-defeat script
             if w.field.is_some() {
@@ -3664,6 +3675,11 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         K::WaitSummonsDead => !w.live_enemies().iter().any(|&o| w.en_ref(o).ty == 0x92),
         K::SpawnEnzymes => {
             if w.en_ref(i).spawned >= 8 {
+                // field: at eight the timer is held at 480 (0x0802F590): the next spawn comes 480 frames after a
+                // death brings the count down (run 2 21-4: the count 7 at f7,090 of cut 1,591,712, Enzyme f7,592)
+                if w.field.is_some() {
+                    w.en(i).enz_timer = 480;
+                }
                 return false;
             }
             w.en(i).enz_timer -= 1;
@@ -4012,6 +4028,11 @@ fn hit_node(w: &mut World, i: usize, t: &Arc<BehTree>, n: u16, msg: &HitMsg) -> 
                 rom: 0x0875_819c,
             };
             crate::field::spawn_object(w, &o);
+            1
+        }
+        // a worm piece hit (0x0802D328): it reverses / the chain splits (`enemy::worm_shield_hit`)
+        K::ShieldHit if w.field.is_some() => {
+            en::worm_shield_hit(w, i);
             1
         }
         K::AbsorbPose | K::AbsorbPose2 | K::FreezeHelperHit | K::ShieldHit => 1,

@@ -579,6 +579,8 @@ fn import_ai_rt(w: &mut World, ei: usize, lvl: usize, ram: &GbaRam, r: u32, note
             K::HeavyPunch => {}
             // FlameBreath (the controller 0x03002FA8 counts in the object's tick, as HeavyPunch): `patch_enemy`
             K::FlameBreath => {}
+            // EnergyBarrage (Pikkon's controller 0x030030E0 as the object's state: obj+0x12 the tick): `patch_enemy`
+            K::EnergyBarrage => {}
             // BackStep (enter 0x08031388, update 0x080313EA): +4 / +8 the hop step, +0x10 the counter (48 at the enter,
             // one off each update, finished at 0; ours counts the updates up)
             K::BackStep => {
@@ -1086,6 +1088,19 @@ fn import_objects(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
         f.patrols.retain(|p| !gone.contains(&p.entity));
     }
     import_worms(w, ram, &enemy_of);
+    // an Enzyme's parent Blister (obj+0x1F4): its death counts the Blister's +0x204 down (`K::LatchRelease`)
+    for &(o, id) in &enemy_of {
+        let po = ram.r32(o + 0x1F4);
+        let Some(&(_, pid)) = enemy_of.iter().find(|e| e.0 == po && po != 0) else { continue };
+        let blister = w.find(pid).is_some_and(|pi| matches!(&w.ents[pi].body, Body::Enemy(e) if e.ai.stack.iter().any(|st| st.tree.nodes.iter().any(|n| n.k == wf_core::ai::K::SpawnEnzymes))));
+        if blister {
+            if let Some(i) = w.find(id) {
+                if let Body::Enemy(e) = &mut w.ents[i].body {
+                    e.parent = pid;
+                }
+            }
+        }
+    }
     // the actors in the RAM's order, after the other objects
     let mut actors = vec![];
     for id in &order {
@@ -1113,6 +1128,19 @@ fn import_worms(w: &mut World, ram: &GbaRam, enemy_of: &[(u32, wf_core::world::E
         }
         let facing = ram.r8(o + 0x10) & 3;
         w.en(i).worm_dir = facing;
+        // a hit's guard (obj+0x204, ShieldHit 15, counted down by the piece's update) and its hittable flag (+0x1CC)
+        w.en(i).worm_guard = ram.s32(o + 0x204);
+        w.en(i).a.hittable = ram.r8(o + 0x1CC) != 0;
+        // a head off the enemy grid (obj+0x291: split off a chain, not marked yet) - not a free-moving "detached"
+        // enemy (`worm_head_step` marks it first)
+        if ram.r8(o + 0x291) != 0 {
+            // (a body piece is off the grid too: ours keeps it unmarked by its prev link; it may become a head)
+            w.en(i).detached = false;
+            if head {
+                w.en(i).worm_remark = true;
+            }
+            wf_core::enemy::unmark_self(w, i);
+        }
         // (the load's own chain links go: a tail's stale next fed the segment before it - cut 1,368,272 f214)
         let nx = ram.r32(o + 0x1F0);
         let nid = enemy_of.iter().find(|e| e.0 == nx).map(|e| e.1).unwrap_or(0);
@@ -1347,6 +1375,8 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
     // a HeavyPunch in progress: its frame count is the controller's tick (obj+0x12), its end 48 + 8 * the punch
     // animation's frames as its enter computes (real run 4-1 whole-run cut 621,339: the punch landed a frame before
     // the cut, tick 49 - the import's fresh node ended at once and idled, a draw the game does not make)
+    let ctl_obj = ram.r32(o + 0x14);
+    let mut barrage = None;
     {
         let tick = w.en_ref(ei).ea.pos.tick;
         let raw_now = w.en_ref(ei).ea.pos.raw;
@@ -1387,8 +1417,18 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
                 if st.tree.nodes.get(n).is_some_and(|x| matches!(x.k, wf_core::ai::K::GhostAnimA | wf_core::ai::K::GhostAnimB)) && tick > 0 {
                     rt.f = tick;
                 }
+                // Pikkon's EnergyBarrage in progress (its controller 0x030030E0 as the object's state, obj+0x14): the
+                // count is the controller's tick, and the controller is the enemy's - a pushed hit state replaces it
+                // (nodes.rs `push`; run 2 cut 56,305: the punch at 56,339 stops its sound 63)
+                if st.tree.nodes.get(n).is_some_and(|x| x.k == wf_core::ai::K::EnergyBarrage) && ctl_obj == 0x0300_30E0 && (1..48).contains(&tick) {
+                    rt.f = tick;
+                    barrage = Some((st.serial, n as u16));
+                }
             }
         }
+    }
+    if let Some(c) = barrage {
+        w.en(ei).ctl = c;
     }
     // GhostAnimA / B (update 0x0802DFD8): its end test is `0x0800EE9E` - the object back in the normal state (obj+0x14
     // == 0x03001BA4); ours waits for the one-shot's end - over already when RAM shows the normal state (a cut inside
@@ -2197,6 +2237,20 @@ fn import_prop_moves(w: &mut World, ram: &GbaRam) {
     wf_core::scene::sync_props(w);
 }
 
+/// a script fade's progress at the cut (the main loop's mode): (steps run, length) - vt 0x0804C588 at +4 / +8, the
+/// palette-copy fade vt 0x0804BBA4 at +0x404 / +0x408
+fn script_fade_progress(ram: &GbaRam) -> Option<(i32, i32)> {
+    let mode = ram.r32(0x0300_0F90);
+    if !ram.valid(mode) {
+        return None;
+    }
+    match ram.r32(mode) {
+        0x0804_C588 => Some((ram.s32(mode + 4), ram.s32(mode + 8))),
+        0x0804_BBA4 => Some((ram.s32(mode + 0x404), ram.s32(mode + 0x408))),
+        _ => None,
+    }
+}
+
 /// an inline script stopped in its code: (id, the natives its interpreter has run - the last the waiting one)
 fn inline_running(ram: &GbaRam) -> Option<(String, Vec<(u8, Option<Vec<i32>>)>)> {
     let depth = ram.r32(0x0300_1034).min(8);
@@ -2587,6 +2641,9 @@ fn build_mid_event(_data: &Arc<GameData>, ram: &GbaRam, runner: &mut StoryHost, 
         field::load_area(&mut w, to, x, y, Some(facing));
     }
     w.events.clear();
+    // the song the driver plays, not the area's (the rebuild's load asked for it: run 2 cut 59,477 - Other World 1-20
+    // under song 16, the area's 25 - then started 16 again at s-script's play_music)
+    w.scene.song = song(ram);
     field::finish_arrival(&mut w);
     if let Some(f) = w.field.as_mut() {
         f.arrival = None;
@@ -3116,6 +3173,15 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
             *left = ram.s32(mode + 4);
         }
     }
+    // `warp_fade` (0x76) waiting in its slow fade-out (the main loop's mode vt 0x0804BBA4: +0x404 the steps run, +0x408
+    // the length 64): the replayed call restarts the fade (k = -1, `field::warp_fade`) - it takes the RAM's steps
+    // (run 2 cut 1,858,572: s479 node 4's warp_fade to 0-50 a step in at the cut - ours loaded a frame late)
+    if wn == 0x76 && ram.valid(mode) && ram.r32(mode) == 0x0804_BBA4 {
+        let run = ram.s32(mode + 0x404);
+        if let Some(Mode::FadeOut { k, step: 4, .. }) = w.field.as_mut().map(|f| &mut f.mode) {
+            *k = run;
+        }
+    }
     // a fade_out (0x78) among the dropped natives, not undone by a fade_in after it: the screen stays black (whole-run
     // cut 568,177: s341 node 0 waits on its set_pos after fade_out(50))
     if ran[..ran.len() - 1].iter().rev().find(|(n, _)| (0x78..=0x79).contains(n)).is_some_and(|(n, _)| *n == 0x78) && w.scene.screen.fade.is_none() {
@@ -3125,9 +3191,11 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
     // a script fade waiting (0x78 .. 0x7e): the main loop's mode is the fade object (vt 0x0804C588: +4 the steps run,
     // +8 the length - opening s103 node 18's fade_in(100), whole-run cuts 41,565 / 41,625; s314's fade_in(50) 225,225):
     // the replayed fade restarted from its first step - it takes the RAM's progress
-    if (0x78..=0x7E).contains(&wn) && ram.valid(mode) && ram.r32(mode) == 0x0804_C588 {
-        if let Some(f) = w.scene.screen.fade.as_mut().filter(|f| f.len == ram.s32(mode + 8) && f.kind == wf_core::scene::FadeKind::Black) {
-            f.t = ram.s32(mode + 4).clamp(0, f.len);
+    // (the palette-copy fade object vt 0x0804BBA4 the same, its numbers at +0x404 / +0x408 - run 2 cut 1,853,852: s478
+    // node 0's fade_out(50) 49 steps in; ours ran it again, the whole ending 50 frames late)
+    if let Some((run, len)) = script_fade_progress(ram).filter(|_| (0x78..=0x7E).contains(&wn)) {
+        if let Some(f) = w.scene.screen.fade.as_mut().filter(|f| f.len == len && f.kind == wf_core::scene::FadeKind::Black) {
+            f.t = run.clamp(0, f.len);
             let (t, len, out) = (f.t, f.len, f.out);
             let (lvl, fine) = ((16 * t / len.max(1)).clamp(0, 16), (256 * t / len.max(1)).clamp(0, 256));
             let s = &mut w.scene.screen;
@@ -3444,7 +3512,9 @@ fn build_event_entry(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner:
         let last_fade = before.iter().rposition(|(n, _)| (0x78..=0x79).contains(n));
         last_fade.is_some_and(|i| before[i].0 == 0x78 && !before[i..].iter().any(|(n, _)| (0x70..=0x77).contains(n)))
     };
-    if let Some(ran) = natives_run(ram, runner, ev).filter(|r| ram.screen_black != Some(true) || fade_after_warp(r) || black_by_fade_out(r)) {
+    // (or black because the fade_out the node waits in is at its end: the field stands - run 2 cut 1,853,852)
+    let waiting_fade_out = |ran: &Vec<(u8, Option<Vec<i32>>)>| ran.last().is_some_and(|(n, _)| *n == 0x78) && script_fade_progress(ram).is_some();
+    if let Some(ran) = natives_run(ram, runner, ev).filter(|r| ram.screen_black != Some(true) || fade_after_warp(r) || black_by_fade_out(r) || waiting_fade_out(r)) {
         // (a return_to_field (0x75) the node is past - its fade-in over, a later wait: run 2 cut 58,440, s103 node 0 in
         // its director wait 90 frames after the return; run 2 cuts 58,380 / 58,560: its glide and play_anim after the
         // return - is mid-node over the restored field too)

@@ -378,7 +378,9 @@ pub fn render_view(w: &World, out: &mut RenderView) {
         id: map_id,
         anim_frame,
         tile_frame,
-        shake: w.g.shake_off,
+        // (`shake_off` is 22.10: the BG layers take its whole px - layer objects +0x34 / +0x38, real route sb 6-6
+        // f4,693: (3790, -2978) -> (3, -3))
+        shake: (w.g.shake_off.0 >> 10, w.g.shake_off.1 >> 10),
         mode7: mode7.clone(),
         layers,
     });

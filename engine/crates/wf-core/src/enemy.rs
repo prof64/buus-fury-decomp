@@ -59,6 +59,14 @@ pub struct Enemy {
     pub cmds: Vec<Dir>,
     pub worm_dir: Dir,
     pub contact_cd: i32,
+    /// a worm piece's guard count (obj+0x204): ShieldHit sets 15; each head / body update counts it down, and at 0
+    /// makes the piece hittable again (+0x1CC = 1, 0x0802D4D2 / 0x0802D660)
+    #[serde(default)]
+    pub worm_guard: i32,
+    /// a worm piece off the enemy grid (obj+0x291; the body pieces are): a split-off head marks itself before it
+    /// moves (`worm_head_step`)
+    #[serde(default)]
+    pub worm_remark: bool,
     pub part_offset: (i32, i32),
     /// field Janemba part 0x37 (PartMirrorAnim): the body animation (raw) it saw on its previous update - its table
     /// follows an animation switch one frame late (sc_janemba)
@@ -201,6 +209,8 @@ impl Enemy {
             cmds: vec![],
             worm_dir: 0,
             contact_cd: 0,
+            worm_guard: 0,
+            worm_remark: false,
             part_offset: (0, 0),
             mirror_raw: 0,
             mirror_cel: 0,
@@ -1175,6 +1185,7 @@ pub fn attached(w: &World, i: usize) -> bool {
         && e.prev == 0
         && !gone
         && !e.detached
+        && !e.worm_remark
         && !w.ents[i].removed
         && (e.a.z == 0 || w.field.is_some())
         && !held
@@ -2909,6 +2920,20 @@ pub fn worm_spawn_body(w: &mut World, i: usize) {
 /// the head and the segments stay in the idle state while they move (no SetAnim(1): VERIFIED segment sb 21-11, only
 /// the tails' walk state takes the event's stop message)
 pub fn worm_head_step(w: &mut World, i: usize) {
+    worm_guard_tick(w, i);
+    // off the enemy grid (obj+0x291: a body piece split off into a head, `worm_shield_hit`): clear it and mark the
+    // footprint where it stands (vt+0x54) - blocked (the old head still on those cells), set it again and do nothing
+    // more this update: no turn draw, no step (0x0802D4EA; run 2 cut 1,689,300 f206: the split piece stands 10
+    // frames until the head before it has moved off)
+    if w.en_ref(i).worm_remark {
+        w.en(i).worm_remark = false;
+        let (px, py) = (w.en_ref(i).a.px(), w.en_ref(i).a.py());
+        if !passable(w, i, px, py) {
+            w.en(i).worm_remark = true;
+            return;
+        }
+        mark_self(w, i);
+    }
     if w.rng.rand(200) == 0 {
         let mut d = w.en_ref(i).worm_dir ^ 2;
         // 0x0802D546: the extra quarter turn when rand(2) == 0
@@ -2937,7 +2962,88 @@ pub fn worm_head_step(w: &mut World, i: usize) {
     }
     contact_hit_foot(w, i);
 }
+/// a worm piece's update start (head 0x0802D4CC, body 0x0802D656): the guard count down, or hittable again at 0
+fn worm_guard_tick(w: &mut World, i: usize) {
+    let e = w.en(i);
+    if e.worm_guard != 0 {
+        e.worm_guard -= 1;
+    } else {
+        e.a.hittable = true;
+    }
+}
+
+/// ShieldHit (a worm piece's on-hit node after ApplyDamage, 0x0802D328), measured on run 2 cut 1,689,300 f28 (21-9:
+/// Goku's punch on a head - it turns back, 3 -> 2, and walks away; ours walked on into him and its contact hit
+/// landed at f31):
+/// * a head (no prev): its direction (facing, obj+0x10) ^= 1 - it reverses; it and every piece after it: not
+///   hittable (+0x1CC = 0), guard 15 (+0x204);
+/// * a body piece: the whole chain from its head not hittable, the hit piece's guard 15, and the chain splits there:
+///   the piece before it loses its next (it becomes a tail, 0x0802D674), the hit piece loses its prev and becomes a
+///   head - the head's sprite (0x128), the head's type (0x8E, `0x0800FA16`), SetAnim(1); its state stays (the
+///   game changes only the type pointer)
+pub fn worm_shield_hit(w: &mut World, i: usize) {
+    let id = w.ents[i].id;
+    let chain_from = |w: &World, start: EntityId| -> Vec<usize> {
+        let mut out = vec![];
+        let mut cur = start;
+        while cur != 0 {
+            let Some((k, _)) = w.enemy_by_id(cur) else { break };
+            if out.contains(&k) {
+                break;
+            }
+            out.push(k);
+            cur = w.en_ref(k).next;
+        }
+        out
+    };
+    let prev = w.en_ref(i).prev;
+    if prev == 0 || w.enemy_by_id(prev).is_none() {
+        let d = w.en_ref(i).worm_dir ^ 1;
+        w.en(i).worm_dir = d;
+        w.en(i).a.facing = d;
+        for k in chain_from(w, id) {
+            w.en(k).a.hittable = false;
+            w.en(k).worm_guard = 15;
+        }
+        return;
+    }
+    // the head: follow prev while the piece before has one
+    let mut head = prev;
+    while let Some((k, _)) = w.enemy_by_id(head) {
+        let p = w.en_ref(k).prev;
+        if p == 0 || w.enemy_by_id(p).is_none() {
+            break;
+        }
+        head = p;
+    }
+    for k in chain_from(w, head) {
+        w.en(k).a.hittable = false;
+    }
+    w.en(i).worm_guard = 15;
+    if let Some((pk, _)) = w.enemy_by_id(prev) {
+        w.en(pk).next = 0;
+    }
+    w.en(i).prev = 0;
+    let d = Arc::clone(&w.data);
+    let idx = 0x128 - crate::content::GFX_OFFSET;
+    if d.sprite(idx).is_some() {
+        let e = w.en(i);
+        e.gfx_now = 0x128;
+        e.a.set_sprite(&d, Some(idx));
+    }
+    w.en(i).ty = 0x8E;
+    // (a body piece is off the enemy grid, obj+0x291: the new head marks itself before its first step)
+    w.en(i).worm_remark = true;
+    w.en(i).detached = false;
+    // (its on-hit's next node, GotoState(0x319), makes it a head; the head moves on its facing, obj+0x10 - the
+    // body's last step)
+    let f = w.en_ref(i).a.facing;
+    w.en(i).worm_dir = f;
+    set_anim(w, i, &[n(1)], true, Some(true));
+}
+
 pub fn worm_body_step(w: &mut World, i: usize) {
+    worm_guard_tick(w, i);
     // the last segment (no next, 0x0802D674): sprite def 0x12A (Worm Tail) set again every frame (0x0800EDF8: the
     // animation restarts) + SetAnim(1)
     if w.enemy_by_id(w.en_ref(i).next)

@@ -89,6 +89,9 @@ fn main() {
     if opt("--import").is_none() {
         app.skip_area_banner();
     }
+    if std::env::var("WR_SONG").is_ok() {
+        println!("import song {} events {:?}", app.world().scene.song, app.world().events);
+    }
     app.session.world.opts.sim_lag = sim_lag;
     app.session.world.opts.no_lag = no_lag;
     println!("sound model: driver {} calibrated {} phase {}", app.world().sound.drv.is_some(), !app.world().sound.uncalibrated, app.world().sound.phase);
@@ -469,6 +472,9 @@ fn main() {
             if std::env::var("WR_ENEMY").is_ok() {
                 let v: Vec<String> = (0..w.ents.len()).filter(|&i| !w.ents[i].removed).filter_map(|i| w.actor(i).map(|a| format!("{}:{}@({},{}) f{}", w.ents[i].id, a.sprite.unwrap_or(-1), a.x, a.y, a.facing))).collect();
                 println!("    actors {} clock {}", v.join(" "), w.g.clock(w.frame));
+            }
+            if std::env::var("WR_SONG").is_ok() {
+                println!("    song {} events {:?}", w.scene.song, w.events.iter().filter(|e| matches!(e, wf_core::world::Event::Song { .. } | wf_core::world::Event::SongStop)).collect::<Vec<_>>());
             }
             if std::env::var("WR_HUD").is_ok() {
                 println!("    hud hidden {} at {:?} frame {} clock {} beep {:?}", w.scene.hud_hidden, w.field.as_ref().and_then(|f| f.hud_hidden_at), w.frame, w.g.clock(w.frame), w.field.as_ref().map(|f| f.hud_beep));

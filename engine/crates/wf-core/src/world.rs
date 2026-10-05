@@ -841,9 +841,7 @@ impl World {
             .collect()
     }
 
-    #[track_caller]
     pub fn sfx(&mut self, id: i32, vol: i32) {
-        if id == 39 && std::env::var_os("XS39").is_some() { eprintln!("XS39 frame {} clock {} at {}", self.frame, self.g.clock(self.frame), std::panic::Location::caller()); }
         self.events.push(Event::Sfx { id, vol });
     }
     pub fn sfx_stop(&mut self, id: i32) {
@@ -981,7 +979,12 @@ impl World {
                 .as_ref()
                 .is_some_and(|m| !m.contains(&self.ents[i].id))
                 || crate::vram::suspended(self, self.ents[i].id)
-                    && !matches!(self.ents[i].body, Body::Npc(_));
+                    && !matches!(self.ents[i].body, Body::Npc(_))
+                    // the 3D world map's patrols are updated while purged out of sprite memory: their idle animation
+                    // ticks on through an event's purge (rkb_168 14-1 f1613 .. f1685: the airships out of the
+                    // recording's actor list for 59 logic iterations come back 60 ticks on; ours had frozen them -
+                    // the 860 differing cel frames of the airships in rkb_168, sb_041, rkb_001)
+                    && !(matches!(self.ents[i].body, Body::Enemy(_)) && crate::fieldworld::flying(self));
             crate::vram::popups_tick(self, Some(self.ents[i].id));
             if !skip {
                 self.update_entity(i);

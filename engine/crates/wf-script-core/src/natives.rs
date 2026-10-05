@@ -590,7 +590,38 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
             enqueue(h, 0, Cmd::ItemGet { item: -arg(a, 0), t: 0 })
         }
         0x94 => {
-            h.w.story.take_equipment(arg(a, 0));
+            // 0x08004468: an unworn copy first; else a worn one, whose wearer's record slot goes back to "-None-"
+            // first (the live fighter keeps its stats until the next recalculation, as 0xF1)
+            let id = arg(a, 0);
+            let m = wf_core::menu::equip::marks(h.w);
+            let eq = &h.w.story.equipment;
+            let free = (0..eq.len()).find(|&k| eq[k] == id && m.get(k).copied().unwrap_or(0) == 0);
+            match free {
+                Some(k) => {
+                    h.w.story.equipment.remove(k);
+                }
+                None => {
+                    if let Some(k) = (0..eq.len()).find(|&k| eq[k] == id) {
+                        let c = m.get(k).copied().unwrap_or(0) as i32 - 1;
+                        let slot = h
+                            .w
+                            .data
+                            .menu
+                            .as_ref()
+                            .and_then(|d| d.items.equipment.get(id.max(0) as usize))
+                            .map(|e| e.slot as usize & 3)
+                            .unwrap_or(0);
+                        let none = wf_core::menu::equip::NONE_ITEM[slot];
+                        if let Some(cs) = h.w.story.chars.get_mut(c.max(0) as usize).filter(|_| c >= 0) {
+                            cs.equip[slot] = none;
+                        }
+                        if let Some(i) = fighter_of(h.w, c).filter(|_| c >= 0) {
+                            h.w.pl(i).equip[slot] = none;
+                        }
+                        h.w.story.equipment.remove(k);
+                    }
+                }
+            }
             unit()
         }
         0x95 => {
@@ -981,20 +1012,27 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
         0xf1 => {
             let (c, slot) = (arg(a, 0), arg(a, 1) as usize & 3);
             const DEFAULT: [i32; 4] = [0, 44, 77, 112];
+            // 0x08004544: the owned list's entry worn by `c` in that slot loses its mark - no copy is added; with no
+            // such entry (a take_equipment already took the worn copy and freed the slot) nothing changes (run 2
+            // row 840,190: an event's take_equipment(126) then this unequip - ours pushed a second copy, which the
+            // sell list showed at 1,405,545)
             if let Some(i) = fighter_of(h.w, c) {
                 let old = h.w.pl_ref(i).equip[slot];
-                if old != DEFAULT[slot] {
-                    h.w.story.equipment.push(old);
+                if old != DEFAULT[slot] && h.w.story.equipment.contains(&old) {
                     // 0x08004544 changes the record's slot and the owned list only: the live fighter keeps its
                     // stats until the next recalculation (Thieves Den 9-15: after s362's monkey takes the Bandana
                     // the player object still has STR 67 / POW 46 / END 53 for the bandits' fight)
                     h.w.pl(i).equip[slot] = DEFAULT[slot];
+                    if let Some(cs) = h.w.story.chars.get_mut(c.max(0) as usize) {
+                        cs.equip[slot] = DEFAULT[slot];
+                    }
                 }
-            } else if let Some(cs) = h.w.story.chars.get_mut(c as usize) {
+            } else if let Some(cs) = h.w.story.chars.get(c as usize) {
                 let old = cs.equip[slot];
-                if old != DEFAULT[slot] {
-                    cs.equip[slot] = DEFAULT[slot];
-                    h.w.story.equipment.push(old);
+                if old != DEFAULT[slot] && h.w.story.equipment.contains(&old) {
+                    if let Some(cs) = h.w.story.chars.get_mut(c as usize) {
+                        cs.equip[slot] = DEFAULT[slot];
+                    }
                 }
             }
             unit()
