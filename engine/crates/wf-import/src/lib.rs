@@ -1482,6 +1482,13 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
     // the +0x214 word an AI RunScript hands its event (Super Buu's waypoint index; after the state rebuild, whose
     // glide enter stepped it)
     w.en(ei).p214 = ram.s32(o + 0x214);
+    // LatchDrain's controller (enemy +0x14 -> vt 0x0804C314; its think 0x080298A2: position = the player's + (+8, +0xC)):
+    // the kept offset, not the one a re-entry measures (run 2 cuts 1,640,133 / 1,665,790 / 1,679,592 / 1,682,927:
+    // inside Buu's cells latched on the leader moved by the leader's step at f0)
+    let st = ram.r32(o + 0x14);
+    if ram.valid(st) && ram.r32(st) == 0x0804_C314 {
+        w.en(ei).hook = wf_core::enemy::Hook::Latch { ox: ram.s32(st + 8), oy: ram.s32(st + 0xC) };
+    }
 }
 
 /// this enemy's bombs in flight or on the ground (BombThrow; class 0x0804A2E8, MEASURED whole-run cut 621,369: +0x1C

@@ -1149,7 +1149,7 @@ pub fn stat_mark(w: &mut World) {
         // (made in the field frame, before its iteration tick)
         let f = w.field.as_ref().map(|f| f.cam_iters()).unwrap_or(0);
         if let Some(v) = st(w) {
-            v.stat_at = f.wrapping_sub(std::env::var("TMP_MK").ok().and_then(|v| v.parse::<u32>().ok()).unwrap_or(0));
+            v.stat_at = f;
         }
     }
 }

@@ -4758,6 +4758,18 @@ frames).** The view never drew them (ROM, all VERIFIED on dr4_009 15-9 f316 .. f
 world-map flight's OBJs (rclose_002 f1620 / f2580: plane, labels - mode 7 OBJs), the flame-thrower's flames
 (shipr_300 8-55 f240: same records, a different arrangement - per-flame positions / OAM order not compared yet).
 
+**Update 13 (Super Buu agent): mirrored effect records; world-map props on the BG's camera.**
+* **A record drawn as another record's mirrored image keeps its flip** (`GameData::record_flip`: the extractor dedups
+  identical images across records, storing the step's `flip`; `record_frames` dropped it, so e.g. the right-facing
+  flame-thrower flames drew facing left). shipr_300 8-55 f240: 541 -> 30 px (what is left: overlap order of
+  overlapping flames). Also applied to the Instant Transmission ring's records.
+* **World-map props (towers, Capsule Corp) are projected with the BG's camera** (the one before the step, as the BG
+  already was) in `mode7_draw.rs`: rclose_002 4-1 f1590 .. f1650 - West City's towers were 2 px a frame off; 207
+  sampled frames better (80,623 px), none worse beyond noise. The flyer (the player's plane) stays on the current
+  camera (the BG camera made it worse); its remaining offsets (f1740 / f2580 / f3000, 250 .. 450 px) are open.
+* Shakes: none of the conclusions above or in updates 10 - 12 depend on screen shake (re-checked after the Earth
+  agent's shake drawing: no shake was active in the frames compared).
+
 * Not mine, noticed: ship 8-1 cuts (shipr_056 / shipr_172 f360 ..) lost 11 exact BG frames between two runs of the
   board this session with only other agents' changes in between (the tile clock's `cam_iters` edit is the candidate).
 
@@ -5935,3 +5947,16 @@ sb_007 a further 321 frames fewer px; wf-app pixel gate green. View-only (logic 
 **STAT arrow, the Super Buu agent's 3 frames** (rclose_012 f3120, rclose_067 f2370, rkb_168 f450): the trade between
 counting the mark on the camera clock (those 3 right) and on `Field.iters` (committed: 4 others right, net +4). The
 true counter is per draw (+0x14) and neither clock fits every stretch - left open, not a regression.
+*Run 2 Super Buu sound items (A, uncommitted: wf-core enemy.rs, wf-import lib.rs).* Merged only what 972b129 did not
+already have: **LatchDrain's kept offset** - an inside-Buu cell latched on the leader keeps its controller's offset
+(enemy +0x14 -> vt 0x0804C314: position = the player's + (+8, +0xC)) on import instead of measuring a new one
+(1,631,398 / 1,679,650); **a worm head killed alone does not blow up a piece that split away** (a worm piece's next
+segment is its live +0x1F0 link, which a split clears, not the pieces it once spawned: 1,779,398). Gates green;
+check.sh EXACT (run 1 logic + sounds; run 2 to the known range exact, after it first difference 1,769,316 as
+expected; run 3 as expected). The split-head coin drop (1,774,198), the newest-first pending drops (1,779,633) and
+the dead boss's open_area (1,683,032) were 972b129's (side-content agent's helper) - dropped from A's patch.
+**Hand-off by the range split (real-route agent to 1,690,890, side-content agent after):**
+- **To the real-route agent:** 1,640,163 / 1,665,948 / 1,665,986 - field punch pairs in 21-x where the logic
+  diverges a row after the punch sound (not the latch offset).
+- **To the side-content agent:** 1,779,400 - the worm pieces' re-idle after the head kill: the game re-idles 6
+  pieces, ours 4.

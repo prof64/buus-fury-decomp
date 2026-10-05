@@ -1089,6 +1089,8 @@ pub fn in_melee_range(w: &mut World, i: usize) -> bool {
     let Some(pi) = player(w, i) else { return false };
     let p = &w.pl_ref(pi).a;
     let b = w.en_ref(i).a.body_box();
+    if std::env::var_os("TMP_MELEE").is_some() { let (h, pb) = (p.hittable, p.body_box()); let sr = strike_rect(&mut w.clone(), i, false); eprintln!("MELEE f{} hit {} pbox {:?} ebox {:?} strike {:?} facing {}", w.frame, h, pb, b, sr, w.en_ref(i).a.facing); }
+    let p = &w.pl_ref(pi).a;
     if !p.hittable
         || !overlaps(
             &p.body_box(),
@@ -3443,13 +3445,18 @@ fn self_destruct_children(w: &mut World, i: usize) {
     let mut cur = w.ents[i].id;
     loop {
         let Some(ci) = w.find(cur) else { return };
+        // (a worm piece's +0x1F0 is its live next segment - a split clears it - not the body pieces it spawned: run 2
+        // row 1,779,398, 21-x: two split-off heads with no segment behind them die alone, ours blew up a body piece
+        // that had split away long before)
+        let worm = matches!(&w.ents[ci].body, Body::Enemy(e) if matches!(e.ty, 0x8E | 0x8F));
         let kids = match &w.ents[ci].body {
+            Body::Enemy(e) if worm => vec![e.next].into_iter().filter(|&n| n != 0).collect::<Vec<_>>(),
             Body::Enemy(e) => e.children.clone(),
             _ => return,
         };
         let next = kids.into_iter().find(|&k| {
             w.find(k).is_some_and(|j| {
-                !w.ents[j].removed && matches!(&w.ents[j].body, Body::Enemy(e) if !e.defeated && e.parent == cur)
+                !w.ents[j].removed && matches!(&w.ents[j].body, Body::Enemy(e) if !e.defeated && (if worm { e.prev == cur } else { e.parent == cur }))
             })
         });
         let Some(kid) = next else { return };
