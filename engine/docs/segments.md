@@ -54,6 +54,23 @@ stops). -> **Earth agent** (text boxes: the typewriter's rate from the text spee
 (import the options word). Also: 35,806 (Continue after the game over: flag 1) - the cut taken after the in-game
 save has no save slot in the app (the importer does not carry the EEPROM slot) -> **importer agent**; s102 node 5
 "waiting native 0x3c" and on-enter-load cuts -> importer. Re-run the resync once text speed lands.
+**Run 2 hand-off: appending chapters (chapters go on in story order, each from the chain's end).**
+1. Order: opening, Earth, ship (in: 602,566 rows, ends at 8-70 after Majin Buu) -> **fat Buu (soak agent)** ->
+   **Janemba (soak agent)** -> **Super Buu + Kid Buu + credits (side-content agent; its route is being built from
+   run 1's `work/ship/sb/sb_start.ss` meanwhile, `tools/superbuu/sbroute2.py`)**.
+2. The start state of the next part is **`work/run2/end.ss`** (written by `tools/run2/play2.py` after the last
+   segment; regenerate with `play2.py --from <last segment>` if missing). Play your part from it, input only.
+3. Hand over the key log as **`work/run2/parts/<name>.json` = {"keys": [per-frame keys from end.ss]}** (names:
+   `f_fat`, `j_janemba`, `b_superbuu`) and say so here; the side-content agent appends it
+   (`route2.SEGMENTS.append((name, ('KEYS', path)))` - the commented lines are waiting), replays the whole chain from
+   the reset (`play2.py`, `pack2.py` check every part's end), re-records (`record.py` / `sounds.py --chain run2`)
+   and runs the check. The tracked copy is `data/realrun2/NNN_<name>.keys.gz`.
+4. The in-game save is the cartridge's EEPROM, which `.ss` files do not carry: `end.ss` has **no save slot**. A
+   planned death -> Continue in your part must come after a save made in your part (in the chain, an older slot from
+   an earlier part would load instead). Verify your part in one continuous session from end.ss.
+5. Fat Buu / Janemba must end where run 1's `050_j_arena_end` ends (HFIL 18-14 after Janemba) for the Super Buu
+   part to start; if your end differs, say where.
+
 *Ship part resync (rows 217,993 -> 602,566, current tree; `work/run2/stops_ship.jsonl`): 19 stops, long exact
 stretches between them (245,991 -> 459,733 is 213,742 rows exact).* Routing:
 * **Save point menus (the Save Game screen; run 1 never saved) -> ship-fixes agent**: 240,639 (8-1), 480,403
@@ -4876,3 +4893,10 @@ the chapter's start reproduces run 1. Check tool: `work/s3test/replaycheck.py li
   from 35,914; the game's own post-Continue cut runs on to 36,493) is the app's Continue / fade-in control timing ->
   **Earth agent / menus**.
 Checks: gates green; whole-run cut points, exit-fade cuts, area-entry cuts + tiles unchanged.
+
+**To the side-content agent (run 2 owner), from the ship agent:** the live `re/buu/ship/ship_driver.py` with
+`ShipDriver.R1 = True` replays run 1's whole ship chapter frame for frame from `work/ship/real4/start.ss` (378,903
+frames checked) - `ship_route2.py` can import the live driver with R1 instead of `r1frozen/` (your call). A driver
+started at a stage-3 mark (`c09_8-41`) cannot reproduce run 1, with either driver: its own state (frame count,
+cooldowns, skipped targets) starts fresh there. Run-2 stops in the ship chapter (8-x) and the camera / import items
+of my earlier work are mine to take: add them here (or on the run-2 board) and I pick them up.
