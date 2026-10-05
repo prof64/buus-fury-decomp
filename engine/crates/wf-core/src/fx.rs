@@ -409,11 +409,16 @@ fn rock_land(w: &mut World, i: usize, owner: EntityId, x: i32, y: i32) {
             foot: true,
         };
         if crate::player::on_message(w, pi, &mut m) {
-            crate::field::queue_run(
-                w,
-                crate::fieldcontent::Callback::Event("header_0x08783084".into()),
-                crate::field::Cause::Ai { entity: owner },
-            );
+            // (the event starts with the next frame's world update, before the objects: the hit leader does not take
+            // its step - run 2 row 159,704, Goten's tag game)
+            let at = w.frame + 1;
+            if let Some(f) = w.field.as_mut() {
+                f.deferred.push(crate::fieldobj::Deferred::Run {
+                    at,
+                    run: crate::fieldcontent::Callback::Event("header_0x08783084".into()),
+                    cause: crate::field::Cause::Ai { entity: owner },
+                });
+            }
         }
     }
     puff_rng(w, x, y);

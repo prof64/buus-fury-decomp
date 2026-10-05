@@ -104,6 +104,8 @@ pub fn story_from(d: &wf_core::content::GameData, s: &Value) -> Story {
                 skill_cur: c["skill_cur"].as_array().map(|a| a.iter().map(|v| i(v) as i32).collect()).unwrap_or_default(),
                 fusion: 0,
                 fusion_time: 0,
+                ss_gauge: 0,
+                ss3_gauge: 0,
             };
         }
     }

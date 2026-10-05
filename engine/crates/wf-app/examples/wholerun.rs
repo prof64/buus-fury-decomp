@@ -457,6 +457,9 @@ fn main() {
                 let v: Vec<String> = (0..w.ents.len()).filter(|&i| !w.ents[i].removed).filter_map(|i| w.actor(i).map(|a| format!("{}:{}@({},{}) f{}", w.ents[i].id, a.sprite.unwrap_or(-1), a.x, a.y, a.facing))).collect();
                 println!("    actors {} clock {}", v.join(" "), w.g.clock(w.frame));
             }
+            if std::env::var("WR_HUD").is_ok() {
+                println!("    hud hidden {} at {:?} frame {} clock {} beep {:?}", w.scene.hud_hidden, w.field.as_ref().and_then(|f| f.hud_hidden_at), w.frame, w.g.clock(w.frame), w.field.as_ref().map(|f| f.hud_beep));
+            }
             if std::env::var("WR_DLG").is_ok() {
                 if let Some(d) = &w.scene.dialog {
                     println!("    dialog kind {} phase {:?} page {}/{} typed {} need {:?} t {} options {} c {} speed {}", d.kind, d.phase, d.page, d.pages, d.typed, d.typing, d.t, d.options, d.type_c, w.menu.settings.text_speed);

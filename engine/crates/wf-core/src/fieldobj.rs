@@ -112,6 +112,13 @@ pub struct MapSprite {
 pub enum Deferred {
     /// a breakable's break callback (`0x0800C628`)
     Break { at: u32, entity: EntityId },
+    /// an event a hit message's acceptor starts (Goten's tag rock, `0x08033F28`: s120 - its run starts with the
+    /// next frame's world update, before the objects: the hit leader is held then)
+    Run {
+        at: u32,
+        run: crate::fieldcontent::Callback,
+        cause: crate::field::Cause,
+    },
 }
 
 /// the blocking item-get presentation (ItemGet command, 60 frames, SFX 45)
@@ -369,7 +376,7 @@ pub fn run_deferred(w: &mut World) {
     let due: Vec<Deferred> = match w.field.as_mut() {
         Some(f) => {
             let (due, keep): (Vec<_>, Vec<_>) = f.deferred.drain(..).partition(|d| match d {
-                Deferred::Break { at, .. } => *at <= now,
+                Deferred::Break { at, .. } | Deferred::Run { at, .. } => *at <= now,
             });
             f.deferred = keep;
             due
@@ -379,6 +386,7 @@ pub fn run_deferred(w: &mut World) {
     for d in due {
         match d {
             Deferred::Break { entity, .. } => break_done(w, entity),
+            Deferred::Run { run, cause, .. } => w.events.push(crate::world::Event::Field(crate::field::FieldEvent::Run { run, cause, slot: 0 })),
         }
     }
 }

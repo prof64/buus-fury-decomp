@@ -119,7 +119,10 @@ fn torn(game: &[u32], new: &[u32], olds: &[(&str, Vec<u32>)]) -> Option<Vec<Stri
     // (each pixel's entry flips at its own time): per pixel then against the previous palette's picture ("o") - a
     // hex mask of the pixels showing it
     let mut masks = vec![];
-    let px_old = olds.iter().find(|c| c.0 == "o").map(|c| &c.1);
+    // (the timer's previous value "t" too: its digits are written tile by tile while the line is drawn - its pixels
+    // in a second mask after ";t")
+    let px_o = olds.iter().find(|c| c.0 == "o").map(|c| &c.1);
+    let px_t = olds.iter().find(|c| c.0 == "t").map(|c| &c.1);
     'line: for y in 0..H {
         let (g, nw) = (&game[y * W..(y + 1) * W], &new[y * W..(y + 1) * W]);
         if g == nw {
@@ -133,20 +136,29 @@ fn torn(game: &[u32], new: &[u32], olds: &[(&str, Vec<u32>)]) -> Option<Vec<Stri
                 continue 'line;
             }
         }
-        let Some(old) = px_old else { return None };
-        let od = &old[y * W..(y + 1) * W];
-        let mut bits = vec![0u8; W / 8];
+        if px_o.is_none() && px_t.is_none() {
+            return None;
+        }
+        let (mut bits, mut tbits) = (vec![0u8; W / 8], vec![0u8; W / 8]);
         for x in 0..W {
             if g[x] == nw[x] {
                 continue;
             }
-            if g[x] != od[x] {
+            if px_o.is_some_and(|o| g[x] == o[y * W + x]) {
+                bits[x / 8] |= 1 << (x % 8);
+            } else if px_t.is_some_and(|o| g[x] == o[y * W + x]) {
+                tbits[x / 8] |= 1 << (x % 8);
+            } else {
                 return None;
             }
-            bits[x / 8] |= 1 << (x % 8);
         }
         any_old = true;
-        masks.push(bits.iter().map(|b| format!("{b:02x}")).collect());
+        let mut m: String = bits.iter().map(|b| format!("{b:02x}")).collect();
+        if tbits.iter().any(|&b| b != 0) {
+            m.push_str(";t");
+            m.extend(tbits.iter().map(|b| format!("{b:02x}")));
+        }
+        masks.push(m);
     }
     any_old.then_some(masks)
 }
@@ -275,6 +287,7 @@ fn main() {
         let mut pngs = 0;
         // the previous video frame's palette state (the tear rule) and the torn-accepted frames' line hashes
         let mut prev_pal: Option<Pal> = None;
+        let mut prev_timer: Option<i32> = None;
         let mut torn_rows: BTreeMap<usize, Vec<String>> = BTreeMap::new();
         // the late present (tear rule): the picture shown before the running iteration's step (the previous video
         // frame's, presenter applied) and the frame the last step ran in - a sampled frame after it with no step is
@@ -317,6 +330,7 @@ fn main() {
                     presenter.apply(&mut view);
                 }
                 last_view = Some(view.clone());
+                let old_timer = std::mem::replace(&mut prev_timer, view.timer);
                 let Some(&i) = at.get(&k) else { return };
                 if std::env::var_os("PIX_NOSPR").is_some() {
                     view.sprites.clear();
@@ -335,6 +349,16 @@ fn main() {
                         })
                         .collect();
                     eprintln!("timerfit {name} f{k} t {t} offsets {fit:?}");
+                    // per row: which offsets match that row of the display (a mid-frame tile upload shows two values)
+                    let rows: Vec<Vec<i32>> = {
+                        let pics: Vec<(i32, Vec<u32>)> = (-8..=8).map(|d| {
+                            let mut v2 = view.clone();
+                            v2.timer = Some(t + d);
+                            (d, renderer.render(&packs, &v2, 0, W, H).to_vec())
+                        }).collect();
+                        (8..24).map(|y| pics.iter().filter(|(_, px)| (168..232).all(|x| px[y * W + x] == game[i][y * W + x])).map(|(d, _)| *d).collect()).collect()
+                    };
+                    eprintln!("timerrows {name} f{k} {rows:?}");
                 }
                 let ours = renderer.render(&packs, &view, 0, W, H).to_vec();
                 let (mut class, mut n) = classify(&view, &game[i], &ours);
@@ -357,6 +381,16 @@ fn main() {
                             if fading_to_black(v) {
                                 olds.push(("k", vec![0xFF00_0000; W * H]));
                             }
+                        }
+                    }
+                    // ("t": the timer's digits are drawn into its OBJ tiles during the frame (draw 0x0802FD16, not in
+                    // VBlank): the lines already scanned show the previous value - rkb_168 14-1, the split line moves
+                    // with the frame's CPU time)
+                    if let (Some(a), Some(b)) = (old_timer, view.timer) {
+                        if a != b && std::env::var_os("PIX_NOTIMERTEAR").is_none() {
+                            let mut v2 = view.clone();
+                            v2.timer = Some(a);
+                            olds.push(("t", tear_renderer.render(&packs, &v2, 0, W, H).to_vec()));
                         }
                     }
                     if !olds.is_empty() {

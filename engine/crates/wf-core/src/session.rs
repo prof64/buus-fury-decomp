@@ -185,7 +185,25 @@ impl Session {
             if let Some(f) = w.field.as_mut().filter(|f| f.raw_input.is_some()) {
                 f.raw_input = Some(inputs);
             }
+            let busy0 = w.field.as_ref().is_some_and(|f| f.busy);
             Self::run_hook(&mut self.hook, &mut self.world, 0);
+            // an event the frame's start began (a deferred call's: Goten's tag rock, s120) holds the players in this
+            // frame's update already, as `pre_step` does for one that was running (run 2 row 159,704: the hit leader
+            // neither walks nor turns idle in the next frame)
+            let w = &mut self.world;
+            if std::env::var("T_HOLD").is_ok() && (busy0 || w.field.as_ref().is_some_and(|f| f.busy)) { eprintln!("HOLD frame {} busy0 {} busy {} raw {} keys {:x}", w.frame, busy0, w.field.as_ref().is_some_and(|f| f.busy), w.field.as_ref().is_some_and(|f| f.raw_input.is_some()), w.input[0].held); }
+            if !busy0 && w.field.as_ref().is_some_and(|f| f.busy && f.raw_input.is_none()) && !crate::field::free_arrival(w) {
+                let raw = w.input;
+                if let Some(f) = w.field.as_mut() {
+                    f.raw_input = Some(raw);
+                }
+                let flying = crate::fieldworld::flying(w);
+                for s in 0..w.input.len() {
+                    if !(flying && s == 0) {
+                        w.input[s] = Default::default();
+                    }
+                }
+            }
         }
     }
     /// the objects' update and the cutscene systems (second part of [`Session::step_world`])

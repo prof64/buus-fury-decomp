@@ -54,6 +54,12 @@ pub struct CharState {
     /// a fusion's time left (+0x08: `fuse_characters`' seconds x 60, -1 = no limit; not counted down here yet)
     #[serde(default)]
     pub fusion_time: i32,
+    /// the Super Saiyan / SS3 gauges (+0x1E / +0x20): the character's own - a switched-in character shows its own
+    /// (rkb_168 14-1: Vegeta's 288 stays in his record, Goku's HUD shows his 0)
+    #[serde(default)]
+    pub ss_gauge: i32,
+    #[serde(default)]
+    pub ss3_gauge: i32,
 }
 
 impl CharState {
@@ -178,6 +184,8 @@ impl Story {
                 skill_cur: Vec::new(),
                 fusion: 0,
                 fusion_time: 0,
+                ss_gauge: 0,
+                ss3_gauge: 0,
             };
         }
         s.chars[0].flags |= 1;
@@ -277,6 +285,8 @@ pub fn sync_from_players(w: &mut World) {
         cs.form = p.form;
         cs.equip = p.equip;
         cs.ss_cooldown = p.ss_cooldown;
+        cs.ss_gauge = p.ss_gauge;
+        cs.ss3_gauge = (p.ss3_gauge >> 16) as i32;
         cs.sel = p.sel as i32;
         if cs.skills != p.skills {
             cs.skills = p.skills.clone();

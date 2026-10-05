@@ -207,6 +207,12 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
             if was != h.w.scene.hud_hidden {
                 wf_core::vram::hud_shown(h.w, n == 0x2f);
                 if n == 0x2f && h.w.field.is_some() {
+                    // a new HUD object: its first update beeps whatever the last beep (as an area load's; run 2 row
+                    // 142,953: show_hud with the leader low on HP, 41 at once)
+                    let now = h.w.g.clock_mark.map(|c| c + 1).unwrap_or(h.w.g.clock(h.w.frame)) as u32;
+                    if let Some(f) = h.w.field.as_mut() {
+                        f.hud_beep = now.wrapping_sub(61);
+                    }
                     wf_core::field::hud_beep(h.w);
                 }
                 let frame = h.w.frame;
@@ -1124,6 +1130,8 @@ pub fn switch_character(w: &mut World, c: i32) -> Result<(), String> {
                 p.forms_allowed = ch.forms.clone();
             }
             p.ss_cooldown = cs.ss_cooldown;
+            p.ss_gauge = cs.ss_gauge;
+            p.ss3_gauge = (cs.ss3_gauge as i64) << 16;
             p.holy_left = 0;
             p.regen_timer = 0;
             p.passive_held = false;
@@ -1158,6 +1166,9 @@ pub fn switch_character(w: &mut World, c: i32) -> Result<(), String> {
         p.forms_allowed = ch.forms.clone();
     }
     p.ss_cooldown = cs.ss_cooldown;
+    // the gauges are the record's too (+0x1E / +0x20; rkb_168 14-1: Goku switched in after Vegeta shows his own 0)
+    p.ss_gauge = cs.ss_gauge;
+    p.ss3_gauge = (cs.ss3_gauge as i64) << 16;
     p.holy_left = 0;
     // the new character's form controller starts its regen count (+0xC) at 0 (Kid Buu's arena: after s-script
     // hand-overs the bench's 5% tick comes 596 pass frames after the event that switched)

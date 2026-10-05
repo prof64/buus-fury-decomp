@@ -442,8 +442,10 @@ pub struct Field {
     /// the HUD object's low-HP beep stamp (hud +0x10: the logic counter at the last beep, the load's at creation)
     #[serde(default)]
     pub hud_beep: u32,
-    /// `hide_hud`'s logic frame: the HUD object slides out and lives on 38 more updates (hud +0x14 = -1), its low-HP
-    /// beep still running (real run 18-14 r049_001: hidden at f7,599, a beep at f7,628, the object gone at f7,638)
+    /// `hide_hud`'s logic frame: the HUD object slides out (hud +0x14 = -1, its position +0x28 by 1 an update from 8
+    /// to -16) and deletes itself in the 25th update (`vram::HUD_OUT`), its low-HP beep running until then (run 2 row
+    /// 136,351: hidden at logic frame 126,717, gone at 126,742, no beep at 126,755; the 18-14 count of 38 was video
+    /// frames with the lag)
     #[serde(default)]
     pub hud_hidden_at: Option<u32>,
 }
@@ -543,6 +545,8 @@ pub fn make_player(w: &World, slot: u8, ch: i32) -> Player {
         },
     );
     p.ss_cooldown = cs.ss_cooldown;
+    p.ss_gauge = cs.ss_gauge;
+    p.ss3_gauge = (cs.ss3_gauge as i64) << 16;
     p
 }
 
@@ -2700,7 +2704,7 @@ pub fn hud_beep(w: &mut World) {
             .field
             .as_ref()
             .and_then(|f| f.hud_hidden_at)
-            .is_some_and(|h| now.wrapping_sub(h) <= 38)
+            .is_some_and(|h| now.wrapping_sub(h) < crate::vram::HUD_OUT as u32)
         {
             return;
         }

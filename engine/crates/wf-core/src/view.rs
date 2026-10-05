@@ -623,6 +623,7 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                 ep_max: p.max_ep(),
                 ss: p.ss_gauge,
                 ss3: (p.ss3_gauge >> 16) as i32,
+                ss_cooldown: p.ss_cooldown,
                 xp72,
                 skill: (skill > 0).then_some(skill as u8),
                 // areas without combat (towns, offices) grey the icon out (emulator HUD)
@@ -778,7 +779,13 @@ impl Presenter {
             // (an OBJ: a frame late)
             out.title = title.clone();
             out.sprites = sprites.clone();
+            // (the cooldown triangle shows the frame's own value: shipr_001 7-1 f240, the record's 0x7FFF that frame
+            // and an empty step-0 triangle)
+            let cds: Vec<i32> = out.hud.iter().map(|h| h.ss_cooldown).collect();
             out.hud = hud.clone();
+            for (h, c) in out.hud.iter_mut().zip(cds) {
+                h.ss_cooldown = c;
+            }
             out.boss_bars = boss_bars.clone();
             // (its OAM a frame late; the digits are drawn into its tiles in the draw itself: the current value)
             out.timer = timer.and(out.timer);

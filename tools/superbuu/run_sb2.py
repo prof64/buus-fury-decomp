@@ -60,9 +60,12 @@ def main():
             e.run(1)
             keys.append(k)
             st['f'] += 1
+            if os.environ.get('SB2_KEYS') and int(os.environ['SB2_KEYS'].split('..')[0]) <= st['f'] <= int(os.environ['SB2_KEYS'].split('..')[1]):
+                print('  f', st['f'], 'goal', d.k, str(d.goals[d.k])[:40], 'key', k, 'prog', len(d.prog), status(e), flush=True)
             if '--trace' in a and d.k != gk:
                 print('  goal', d.k, str(d.goals[d.k] if not d.done() else None)[:90], 'f', st['f'], status(e), flush=True)
-            over = over + 1 if status(e)['area'][:2] == [0, 2] else 0
+            _s = status(e)
+            over = over + 1 if _s['area'][:2] == [0, 2] and _s['hp'] == 0 else 0
             if st['f'] - st['seg'] > 300000 or over > 8000:
                 raise RuntimeError(f'stuck / game over at goal {d.k} {d.goals[d.k]} {status(e)}')
     except Stop:

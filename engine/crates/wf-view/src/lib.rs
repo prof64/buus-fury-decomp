@@ -431,6 +431,9 @@ pub struct HudView {
     /// Super Saiyan / SS3 gauges (character record +0x1E / +0x20), drawn in the EP bar.
     pub ss: i32,
     pub ss3: i32,
+    /// The Super Saiyan cooldown (character record +0x04): `>> 15` picks how much of the skill icon's corner
+    /// triangle is emptied.
+    pub ss_cooldown: i32,
     /// Experience line steps 0..72 (`0x0801363E(player, 72)`).
     pub xp72: u8,
     /// Selected skill id (icon `icons/skills/skill_NN.png`), `None` = empty slot.

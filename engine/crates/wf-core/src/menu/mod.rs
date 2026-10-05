@@ -638,6 +638,9 @@ fn step_inner(w: &mut World) {
         if w.menu.boot == 0 {
             // (no lag: `step` counts this iteration itself)
             w.g.fc0 = title::BOOT_LOGIC - w.frame as i64 - if w.opts.no_lag { 1 } else { 0 };
+            // ... and the play time's bias with it: play time + bias is that counter (the boot's iterations are no
+            // play time; the bias then follows New Game / Continue - `title::boot`)
+            w.story.lf_bias = w.g.clock(w.frame) - w.story.play_frames as i64;
         }
         // the logos' mode starts the title song (it plays on into the title, whose enter finds it playing)
         let (total, song_at) = if w.opts.no_lag {

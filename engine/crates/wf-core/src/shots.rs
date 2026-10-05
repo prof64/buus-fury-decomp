@@ -147,6 +147,10 @@ pub struct StraightOpts {
     /// its next update ends it)
     #[serde(default)]
     pub beam_hit: bool,
+    /// field, the ki blast class: its hit was accepted (`+0x54` from its own update): it bursts in its next update,
+    /// the burst counter already one tick down (16 -> 15 in that update), and takes messages until then
+    #[serde(default)]
+    pub taken: bool,
     pub x0: i32,
     pub y0: i32,
     /// the box is the current record's (the player's blast 0x0804B454: obj+0x18 advances with its frame, the hit
@@ -179,6 +183,7 @@ impl Default for StraightOpts {
             dead: -1,
             spawned: false,
             beam_hit: false,
+            taken: false,
             x0: 0,
             y0: 0,
             rec_box: false,
@@ -1568,6 +1573,13 @@ fn straight_update(w: &mut World, i: usize) {
     if o.delay != 0 && t <= o.delay {
         return;
     }
+    if o.taken {
+        straight_end(w, i, true);
+        if let ShotKind::Straight(x) = &mut w.shot(i).kind {
+            x.dead = 1;
+        }
+        return;
+    }
     if o.beam_hit {
         return straight_end(w, i, true);
     }
@@ -1612,6 +1624,17 @@ fn straight_update(w: &mut World, i: usize) {
         }
         // taken by a beam's head: the blast flies on until the beam's message bursts it (0x080199E0: +0x54 only)
         if matches!(&w.shot_ref(i).kind, ShotKind::Straight(x) if x.beam_hit) {
+            return;
+        }
+        // field: the ki blast class (update 0x08019888) marks any accepted hit the same way (+0x54 = 1 at 0x080199E0)
+        // and bursts in its next update - until then it still takes messages (handler 0x080199F6 tests only its
+        // burst counter +0x4C): run 2 row 124,907, the tank's new shell meets the blast that hit the tank the frame
+        // before - the shell bursts on it (its hit sound) and the blast bursts in its own update. Battles keep the
+        // reference's immediate end.
+        if w.field.is_some() && o.name == SName::KiBlast && o.fx_end == 16 && !o.fragile {
+            if let ShotKind::Straight(x) = &mut w.shot(i).kind {
+                x.taken = true;
+            }
             return;
         }
         if hit_p {

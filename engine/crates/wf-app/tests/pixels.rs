@@ -55,6 +55,14 @@ fn compose(r: &mut Renderer, packs: &Packs, view: &RenderView, prev: &RenderView
                     "s" => with_prev(view, prev, false, true),
                     "b" => with_prev(view, prev, true, true),
                     "v" => iter.cloned().unwrap_or_else(|| view.clone()),
+                    // the timer's previous value (its digits written into the tiles while the screen is drawn)
+                    "t" => {
+                        let mut v = view.clone();
+                        if prev.timer.is_some() {
+                            v.timer = prev.timer;
+                        }
+                        v
+                    }
                     _ => with_prev(view, prev, true, false),
                 };
                 r.render(packs, &v, 0, 240, 160).to_vec()
@@ -68,22 +76,30 @@ fn compose(r: &mut Renderer, packs: &Packs, view: &RenderView, prev: &RenderView
             "" => {}
             // (the late present of a fade to black's last step: the line black)
             "k" => out[rg].iter_mut().for_each(|p| *p = 0xFF00_0000),
-            "o" | "s" | "b" | "v" => {
+            "o" | "s" | "b" | "v" | "t" => {
                 let l: &'static str = match m.as_str() {
                     "o" => "o",
                     "s" => "s",
                     "v" => "v",
+                    "t" => "t",
                     _ => "b",
                 };
                 let p = pic(r, l);
                 out[rg.clone()].copy_from_slice(&p[rg]);
             }
             _ => {
-                let p = pic(r, "o");
-                for x in 0..240 {
-                    let b = u8::from_str_radix(m.get(x / 8 * 2..x / 8 * 2 + 2).unwrap_or("00"), 16).unwrap_or(0);
-                    if b >> (x % 8) & 1 != 0 {
-                        out[y * 240 + x] = p[y * 240 + x];
+                // per pixel: the previous palette's picture, then (after ";t") the timer's previous value
+                let (mo, mt) = m.split_once(";t").unwrap_or((m.as_str(), ""));
+                for (mk, l) in [(mo, "o"), (mt, "t")] {
+                    if mk.is_empty() {
+                        continue;
+                    }
+                    let p = pic(r, l);
+                    for x in 0..240 {
+                        let b = u8::from_str_radix(mk.get(x / 8 * 2..x / 8 * 2 + 2).unwrap_or("00"), 16).unwrap_or(0);
+                        if b >> (x % 8) & 1 != 0 {
+                            out[y * 240 + x] = p[y * 240 + x];
+                        }
                     }
                 }
             }

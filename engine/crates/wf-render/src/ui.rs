@@ -272,6 +272,9 @@ pub struct Ui {
     hp: Vec<Vec<(u32, u32)>>,
     ep: Vec<Vec<(u32, u32)>>,
     xp: Vec<Vec<(u32, u32)>>,
+    /// the SS cooldown's corner-triangle pixels: how many are cleared per step (cooldown >> 15), in clearing order
+    cd_count: Vec<u32>,
+    cd: Vec<(u32, u32)>,
     empty: u8,
     icons: HashMap<String, Option<Indexed>>,
     pub dialog_font: Font,
@@ -417,6 +420,8 @@ impl Ui {
             hp: steps(&h["steps"]["hp"]),
             ep: steps(&h["steps"]["ep"]),
             xp: steps(&h["steps"]["xp"]),
+            cd_count: h["steps"]["cooldown"]["counts"].as_array().into_iter().flatten().map(|v| v.as_u64().unwrap_or(0) as u32).collect(),
+            cd: h["steps"]["cooldown"]["pixels"].as_array().into_iter().flatten().map(|p| (p[0].as_u64().unwrap_or(0) as u32, p[1].as_u64().unwrap_or(0) as u32)).collect(),
             empty: h["empty_colour"].as_u64().unwrap_or(1) as u8,
             icons: HashMap::new(),
             dialog_font: Font::load(packs, &font_id)?,
@@ -526,6 +531,9 @@ impl Ui {
         for i in (h.xp72 as usize).min(72)..self.xp.len() {
             set(&mut out, &self.xp[i], &|_| empty);
         }
+        // the SS cooldown empties the icon's corner triangle (0x0800BC8E)
+        let n = self.cd_count.get((h.ss_cooldown.max(0) >> 15) as usize).copied().unwrap_or(0) as usize;
+        set(&mut out, &self.cd[..n.min(self.cd.len())], &|_| empty);
         out
     }
 

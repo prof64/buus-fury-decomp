@@ -58,9 +58,11 @@ class SbDriver2(ShipDriver2):
         if kind == 'fly' and len(g) == 3:
             return driver.Driver.step(self, e)
         if kind == 'luck':
-            n = self.tries
+            n = self.tries + 10 * getattr(self, 'cycles', 0)
             self.next_goal()
             if n:
+                # (off the save point first: an A on it opens its menu, whatever the facing)
+                self.prog += [D] * 40 + [0] * 12
                 for _ in range(n):
                     self.prog += [A] * 2 + [0] * 34
                 return self.prog.pop(0)
@@ -120,26 +122,60 @@ class SbDriver2(ShipDriver2):
             if self.t > 3000:
                 raise RuntimeError(f'bout: still in a menu after 3000 frames: {s}')
             return B if self.t % 30 < 3 else 0
+        if kind == 'retry_here' and self.retry_k != self.k - 4:
+            self.cycles = 0
+        if kind == 'allocfor':
+            # ('allocfor', c, tab_moves, fn): character c's unspent points n -> fn(n), spent on the Status page
+            # opened on the active character's tab and moved `tab_moves` tabs right
+            n = e.r16(0x03001560 + 0x68 * g[1] + 0x2C)
+            self.next_goal()
+            if n:
+                for m, on, off in alloc_keys([(g[2], g[3](n))])[1]:
+                    self.prog += [m] * on + [0] * off
+                return self.prog.pop(0)
+            return None
         if kind == 'autoheal':
             self.autoheal = g[1]
             self.next_goal()
             return None
+        s = status(e)
+        if self.retry_k is not None and s['area'][:2] == [0, 2] and s['hp'] == 0 and self.tries >= 9 and \
+                self.k not in (self.retry_k, self.retry_k + 1):
+            # (ShipDriver2 gives up after ten game overs in a stretch: up to 40 here, the luck punches go on growing)
+            self.cycles = getattr(self, 'cycles', 0) + 1
+            if self.cycles > 3:
+                raise RuntimeError('retry stretch: forty game overs')
+            self.tries = -1
         if self.autoheal and kind in ('boss', 'itbuu', 'beam', 'evade', 'fightp'):
-            s = status(e)
             self.maybe_heal(e, s)
+        if self.retry_k is not None and s['area'][:2] == [0, 2] and s['hp'] > 0:
+            # area 0-2 with HP left is not a game over (the Spirit Bomb's scene after Kid Buu): no retry
+            rk = self.retry_k
+            self.retry_k = None
+            try:
+                return super().step(e)
+            finally:
+                if self.retry_k is None:
+                    self.retry_k = rk
         return super().step(e)
+
+
+def swap_rest(x, y, c):
+    """Goku <-> Vegeta at a save point (Switch Characters, LEFT once either way: the other three are out in this
+    part): the other stands in until character c (in reserve) is full, then back"""
+    return [('unstick',), ('walk', x, y), *charsel(-1), ('rest', c), ('unstick',), ('walk', x, y), *charsel(-1)]
 
 
 def save_at(x, y):
     """walk to a save point's spot (x, y), face it, Save Game (GAME 1)"""
-    return [('unstick',), ('walk', x, y), ('face', 'U'), SAVE]
+    return [('unstick',), ('walk', x, y), ('face', 'U'), SAVE, ('bout',)]
 
 
 def checkpoint(name, x, y, w, a):
     """Save at the save point (spot x, y in area w-a); a game over after it (until the next checkpoint / retry_off)
     takes the death -> title (Options: music volume) -> Continue program and plays on from here (ShipDriver2's
     retry), punching the air once more per try first ('luck')"""
-    return [('unstick',), ('walk', x, y), ('face', 'U'), SAVE,
+    return [('unstick',), ('walk', x, y), ('face', 'U'), SAVE, ('bout',),
             ('jumpto', 4), ('deathcont',), ('until', w, a), ('wait', 30),
             ('mark', name), ('retry_here',), ('luck',)]
 
@@ -152,6 +188,10 @@ TOUR_SB = keys((S, 2, 60), (D, 3, 50), (U, 3, 40),
                (B, 3, 60))
 
 
+#   pause menu -> Journal (L shoulder) -> Options (L) -> Sleep (DOWN x3, RIGHT, A) -> s007's box -> the sleep mode ->
+#   L + R + SELECT held 20 frames wakes it -> "Sleep Mode ended."
+SLEEP = keys((S, 2, 60), (LS, 3, 40), (LS, 3, 40), (D, 3, 20), (D, 3, 20), (D, 3, 20), (R, 3, 20), (A, 3, 120),
+             (A, 3, 200), (0, 0, 300), (LS | RS | E, 20, 200), (A, 3, 120))
 #   West City 4-1 -> its Z-Mart 0-92 -> Buy -> Items: two Curry Plates (the list's first row: 400 HP, 2000 zenie) ->
 #   out -> 4-1
 ZMART_CURRY = [('nav', 0, 92, False), ('wait', 30), ('walk', 100, 110), ('hold', L, 20),
@@ -173,8 +213,27 @@ def goals_run2(e):
     # 6-7 -> 6-6: the save point there before going down to the fusion (6-6: rect 50,155 40x38)
     k = pre.index(('area', 6, 6)) + 2
     pre[k:k] = checkpoint('a02_6-6', 66, 185, 6, 6)
+
+    def navs(goals):
+        return [('nav', int(x[1].split('-')[0]), int(x[1].split('-')[1]), True) if x[0] == 'exitto' else x for x in goals]
+
+    inside = navs(seg('inside_buu', 'brain'))
+    # 21-14: Vegeta stays (run 1's Switch Characters program to Goku out), a checkpoint there instead
+    k = next(i for i, x in enumerate(inside) if x[0] == 'prog' and 'L:2' in x[1])
+    inside[k - 1:k + 1] = checkpoint('d01_21-14', 166, 236, 21, 14)
+    # 21-25's save point before the brain (21-26)
+    # (Goku, rested since 21-1, takes over there: Vegeta lost the brain fight ten times in a row)
+    k = inside.index(('nav', 21, 26, True))
+    inside[k:k] = [('unstick',), ('walk', 56, 150), *charsel(-1), *checkpoint('d02_21-25', 56, 150, 21, 25)]
+    inside += [('boss', 30000), ('eventsw', 240), ('wait', 20), ('walke', 160, 40), ('eventsw', 240), ('wait', 30),
+               ('retry_off',), ('autoheal', False), ('mark', 'd03_kid_buu_saga')]
+    # a start in the arena 18-14 (run 2's chain: right after Janemba) walks down to 18-13 first (run 1's sb_start
+    # stretch did the same)
+    first = []
+    if [e.r8(0x0300197C), e.r8(0x0300197D)] == [18, 14]:
+        first = [('exitto', '18-13'), ('areaw', 18, 13), ('wait', 30)]
     return [
-        ('mark', 'a00_start'),
+        ('mark', 'a00_start'), *first,
         # --- HFIL 18-13 (Goku): the menu tour, bumping about, the save point ----------------------------------------
         TOUR_SB, ('closemenu',),
         # bumping into the path's walls (LEFT / RIGHT against them), then the save point (rect 105,145 47x55)
@@ -190,9 +249,11 @@ def goals_run2(e):
         # (STR / END 2/5 each, POW 1/5: run 1 put half into STR, half into END - a POW-heavy Gohan died in the Pyramid
         # every few thousand frames)
         ('allocnow', lambda n: [n * 2 // 5, n // 5, n * 2 // 5, n - 2 * (n * 2 // 5) - n // 5]),
+        # the Equip page: Gohan's body slot -> the first item in the list (run 1 wore nothing in this part)
+        ('wait', 30), *equip2(0), ('wait', 30),
         # the pad -> West City 4-1 -> its Z-Mart 0-92 (run 1 never shopped here): Buy -> Items: two Curry Plates
         # (the list's first row now: 400 HP each, 2000 zenie); back, Sell -> the fourth row (the Cotton Gi); out
-        ('walk', 280, 256), ('talk', 'U'), ('fly', 1250, 1200), ('until', 4, 1), ('wait', 30),
+        ('walk', 280, 256), ('talk', 'U'), ('fly', 1250, 1200), ('until', 4, 1), ('areaw', 4, 1), ('wait', 30),
         ('nav', 0, 92, False), ('wait', 30), ('walk', 100, 110), ('hold', L, 20),
         keys((A, 3, 120), (A, 3, 90), (A, 3, 90), (A, 3, 60), (A, 3, 60), (B, 3, 60), (B, 3, 60), (D, 3, 30),
              (A, 3, 90), (D, 3, 50), (D, 3, 50), (D, 3, 50), (A, 3, 60)),
@@ -214,9 +275,9 @@ def goals_run2(e):
                                                        *checkpoint(f'b04_gohan{lv - 3}', 90, 240, 14, 1),
                                                        ('grind', lv, [(14, 1), (14, 2)]), ('retry_off',)]],
         # the grind's zenie -> two more Curry Plates at West City's Z-Mart; the checkpoint at 4-1
-        ('nav', 14, 1, False), ('unstick',), ('walk', 146, 214), ('talk', 'U'), ('fly', 1250, 1200), ('until', 4, 1),
+        ('nav', 14, 1, False), ('unstick',), ('walk', 146, 214), ('talk', 'U'), ('fly', 1250, 1200), ('until', 4, 1), ('areaw', 4, 1),
         ('wait', 30), *ZMART_CURRY,
-        *checkpoint('b04_gohan141', 148, 594, 4, 1),
+        *checkpoint('b04_gohan141', 148, 594, 4, 1), ('autoheal', False),   # (the curries are for 20-1)
         # the pad -> the Giant Crater: Ultimate Gohan vs Super Buu by punches as run 1 (the route's Electric
         # Kamehameha plan lost ten times in a row here too), but eating Curry Plates when low (run 1 never)
         ('unstick',), ('walk', 410, 356), ('talk', 'U'), ('fly', 648, 1076), ('events',), ('wait', 30),
@@ -224,7 +285,7 @@ def goals_run2(e):
         ('retry_off',), ('autoheal', False), ('mark', 'b05_wasteland'),
         # --- Barren Wasteland (Gohan): a save at 20-1 (run 1 passed it), the story to 20-5 and Gohan's second fight
         # with Super Buu (a game over: back to 20-1) ---------------------------------------------------------------
-        use_item(0), ('closemenu',),                     # a Curry Plate (or what is left) before the save
+        *[x for _ in range(2) for x in (use_item(0), ('closemenu',), ('wait', 20))],   # up to two Curry Plates before the save
         *checkpoint('c00_20-1', 231, 234, 20, 1), ('autoheal', True),
         *seg('wasteland', 'gohan_vs_buu2'),
         *seg('gohan_vs_buu2', 'fusion_saga'),
@@ -232,16 +293,46 @@ def goals_run2(e):
         # --- 20-5 as Goku: his points POW / SPD (run 1: STR / END); the 20-6 save point; Goku to level 140 for the
         # gate with Energy Blasts first, in steps saved at 20-6 (run 1: 141 by punches, no save) ---------------------
         ('allocnow', lambda n: [0, n // 2, 0, n - n // 2]),
-        ('nav', 20, 6, False), ('wait', 20),
-        ('mode', 'split', lambda n: [n // 4, n // 4, n // 4, n - 3 * (n // 4)]),
-        *[x for lv in (130, 135, 140) for x in [('nav', 20, 6, False), *checkpoint(f'c02_goku{lv}', 56, 124, 20, 6),
-                                                  ('autoheal', True), ('skill', 0), ('mode', 'blasty', True),
-                                                  ('grind', lv, [(20, 6), (20, 5)]),
-                                                  ('mode', 'blasty', False), ('retry_off',)]],
-        ('nav', 20, 6, False), *checkpoint('c03_goku140', 56, 124, 20, 6), ('autoheal', True),
+        # (level-up points: STR / END a third each, POW / SPD a sixth - run 1: half STR, half END; punches: the
+        # Energy Blast Goku died to the Power Mechandoid every time)
+        ('mode', 'split', lambda n: [n // 3, n // 6, n // 3, n - 2 * (n // 3) - n // 6]),
+        # (the first levels as run 1, no save to fall back on: the 20-5 / 20-6 robots by punches)
+        ('autoheal', True), ('grind', 130, [(20, 5), (20, 6)]),
+        # (each step saved at 20-6; the retry stretch runs on until the next save)
+        *[x for lv in (133, 136, 140) for x in [('nav', 20, 6, True), *checkpoint(f'c02_goku{lv - 3}', 56, 124, 20, 6),
+                                                  ('autoheal', True), ('grind', lv, [(20, 6), (20, 5)])]],
+        ('nav', 20, 6, True), *checkpoint('c03_goku140', 56, 124, 20, 6), ('autoheal', True),
         # the gate (Goku 140: s473, "confront Majin Buu? Yes") -> 20-7: Goku and Vegeta vs Super Buu (the three
         # Instant Transmission rounds), Vegito, the absorption -> inside Buu (Vegeta)
         ('walk', 96, 44), ('talk', 'U'), ('eventsw', 240), ('wait', 20),
         *seg('goku_vs_buu', 'inside_buu'),
         ('retry_off',), ('autoheal', False), ('mark', 'c04_inside_buu'),
+        # --- inside Buu (Vegeta): a save at 21-1 (run 1 passed it); the pods; at 21-14 Vegeta saves and goes on
+        # himself (run 1 switched to Goku there) - the three fakes and Super Buu in the brain are his; 21-25's save
+        # before the brain. (ShipDriver's nav for the exits: the route's exitto stood still in 21-2 in run 1) ------
+        *checkpoint('d00_21-1', 424, 290, 21, 1), ('autoheal', True),
+        *inside,
+        # --- Kid Buu saga (Goku, world map): West City 4-1, Goku's points (POW / SPD: run 1 STR / END), two Curry
+        # Plates, Vegeta stands in at the save point until Goku is full, then Goku back and rested Vegeta too;
+        # no grind (run 1: Goku to 158 and Vegeta to 150 in the Pyramid, 188k frames) - a lower party XP, another
+        # Dragon Ranking; the fight with food and retries from 4-1's save ---------------------------------------
+        ('fly', 1250, 1200), ('until', 4, 1), ('areaw', 4, 1), ('wait', 30),
+        *ZMART_CURRY,
+        ('events',), ('allocnow', lambda n: [n // 4, n // 4, n // 4, n - 3 * (n // 4)]), ('wait', 30),
+        # Vegeta's 87 points from Goku's Status page (his tab: RIGHT four times; he cannot be switched to here),
+        # POW / SPD heavier than run 1's half STR / half END; then both rest full (in reserve: Vegeta)
+        ('allocfor', 4, 4, lambda n: [n // 4, n // 3, n // 4, n - n // 4 - n // 3 - n // 4]), ('closemenu',),
+        ('wait', 30), ('rest', 4),
+        # Options -> Sleep (s007: the console's sleep mode, woken by L + R + SELECT; run 1 never slept)
+        SLEEP, ('events',), ('wait', 30),
+        *checkpoint('e00_4-1', 148, 594, 4, 1), ('autoheal', True),
+        ('unstick',), ('walk', 410, 356), ('talk', 'U'), ('fly', 648, 1076), ('eventsw', 240), ('wait', 30),
+        ('mark', 'e01_kid_buu'), ('luck',),
+        ('boss', 60000, 'timer'), ('eventsw', 240), ('evade', 20000), ('evade', 20000), ('eventsw', 240), ('wait', 30),
+        ('retry_off',), ('autoheal', False), ('mark', 'e02_after_kid_buu'),
+        # --- the ending: West City -> Capsule Corp 4-20 -> 4-21 (s190) -> the party, the Tournament, Uub, the
+        # credits, the ranking, the title --------------------------------------------------------------------------
+        ('fly', 1137, 1137, 71, 119), ('until', 4, 1), ('areaw', 4, 1), ('wait', 30), ('exitto', '4-20'), ('wait', 20),
+        ('exitto', '4-21'), ('wait', 20), ('mark', 'e03_final'),
+        ('walke', 100, 76), ('eventsw', 240), ('wait', 30), ('mark', 'e04_the_end'),
     ]

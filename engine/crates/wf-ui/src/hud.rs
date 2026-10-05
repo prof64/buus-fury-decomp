@@ -11,7 +11,10 @@
 //!    full-HUD image `0x08713FD8`, steps `< ss_41` from `0x08713AD8`, steps `>= max(ep41, …)` are cleared to 1;
 //!    between them the frame's own (EP) pixels stay;
 //! 5. the 72-step line (table `0x080721D0`, 8-byte records of 2 offsets): steps `>= v72` cleared to 1, where
-//!    `v72 = 0x0801363E(player, 72)` (experience progress).
+//!    `v72 = 0x0801363E(player, 72)` (experience progress);
+//! 6. the Super Saiyan cooldown: the first `n` pixels of the icon's corner triangle (table `0x08072410`, buffer
+//!    offsets) are cleared to colour 1, `n = 0x08071CA8[cooldown >> 15]` (record +0x04; 0, 7, 13, .. 28 - the
+//!    triangle empties after a transformation and refills as the cooldown runs out).
 //!
 //! `hp41 = HP·41 / maxHP`, `ep41 = EP·41 / maxEP`, `ss_41 = SS gauge·41 / maxEP`, `ss3_41 = SS3 gauge·41 / maxEP`
 //! (character record +0x16/+0x18/+0x1A/+0x1C/+0x1E/+0x20); then `ss_41 = max(ss_41, ss3_41)`,
@@ -27,6 +30,8 @@ pub const IMG_SS3: u32 = 0x0871_3FD8;
 pub const HP_STEPS: u32 = 0x0807_1CB0;
 pub const EP_STEPS: u32 = 0x0807_1F40;
 pub const XP_STEPS: u32 = 0x0807_21D0;
+pub const CD_COUNT: u32 = 0x0807_1CA8;
+pub const CD_PIXELS: u32 = 0x0807_2410;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Gauges {
@@ -35,6 +40,8 @@ pub struct Gauges {
     pub ss41: u32,
     pub ss3_41: u32,
     pub xp72: u32,
+    /// the SS cooldown's step (record +0x04 >> 15)
+    pub cd: u32,
 }
 
 impl Gauges {
@@ -51,7 +58,7 @@ impl Gauges {
         if ep41 < ss41 {
             ep41 = ss41;
         }
-        Gauges { hp41, ep41, ss41, ss3_41, xp72 }
+        Gauges { hp41, ep41, ss41, ss3_41, xp72, cd: 0 }
     }
 }
 
@@ -62,6 +69,9 @@ pub struct Hud {
     pub hp: Vec<[u32; 3]>,
     pub ep: Vec<[u32; 3]>,
     pub xp: Vec<[u32; 2]>,
+    /// pixels cleared per cooldown step (`CD_COUNT`, 8 entries) and the pixels in clearing order (`CD_PIXELS`)
+    pub cd_count: Vec<u32>,
+    pub cd: Vec<u32>,
 }
 
 impl Hud {
@@ -74,6 +84,8 @@ impl Hud {
             hp: (0..41).map(|i| [0, 4, 8].map(|k| rom.u32(HP_STEPS + 16 * i + k))).collect(),
             ep: (0..41).map(|i| [0, 4, 8].map(|k| rom.u32(EP_STEPS + 16 * i + k))).collect(),
             xp: (0..72).map(|i| [0, 4].map(|k| rom.u32(XP_STEPS + 8 * i + k))).collect(),
+            cd_count: (0..8).map(|i| rom.bytes(CD_COUNT + i, 1)[0] as i8 as i32).map(|n| n.max(0) as u32).collect(),
+            cd: (0..28).map(|i| rom.u32(CD_PIXELS + 4 * i)).collect(),
         }
     }
 
@@ -111,6 +123,10 @@ impl Hud {
             for &o in &self.xp[i as usize] {
                 b[o as usize] = 1;
             }
+        }
+        let n = self.cd_count.get(g.cd as usize).copied().unwrap_or(0) as usize;
+        for &o in self.cd.iter().take(n) {
+            b[o as usize] = 1;
         }
         b
     }
@@ -159,6 +175,9 @@ pub fn json(h: &Hud) -> Value {
                    "rom": hx(EP_STEPS)},
             "xp": {"count": 72, "pixels": h.xp.iter().map(|s| s.iter().map(|&o| json!(off_xy(o))).collect::<Vec<_>>()).collect::<Vec<_>>(),
                    "rule": "steps >= 0x0801363E(player, 72) set to colour 1", "rom": hx(XP_STEPS)},
+            "cooldown": {"counts": h.cd_count, "pixels": h.cd.iter().map(|&o| json!(off_xy(o))).collect::<Vec<_>>(),
+                   "rule": "the first counts[SS cooldown >> 15] pixels set to colour 1 (the icon's corner triangle)",
+                   "rom": {"counts": hx(CD_COUNT), "pixels": hx(CD_PIXELS)}},
         },
         "low_hp_sound": {"condition": "HP*5 <= maxHP", "every_frames": 60, "sound": "0x08319488"},
         "rom": {"frame": hx(FRAME), "gauge_ss": hx(IMG_SS), "gauge_ss3": hx(IMG_SS3), "draw": "0x0800B99C"},
