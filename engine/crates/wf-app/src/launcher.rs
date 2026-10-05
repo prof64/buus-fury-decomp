@@ -756,6 +756,7 @@ pub fn story_sim(packs: &Packs, slots: &[Vec<u8>], slot: Option<usize>, seed: u3
     let mut session = Session::new_field(data, cfg);
     // the app recreates no hardware slowdown: one step per game logic iteration (`Options::no_lag`)
     session.world.opts.no_lag = true;
+    session.world.menu.settings = options_of(slots);
     saves.current = slot.unwrap_or_else(|| (0..SLOTS).find(|&i| saves.slot(i).is_none()).unwrap_or(0)) as i32;
     saves.generation = 0;
     session.world.saves = saves;
@@ -784,6 +785,7 @@ pub fn title_sim(packs: &Packs, slots: &[Vec<u8>], seed: u32) -> Result<crate::s
     let cfg = FieldConfig { world: 1, area: 1, rng: RngInit::Seed(seed), ..Default::default() };
     let mut session = Session::new_field(data, cfg);
     session.world.opts.no_lag = true;
+    session.world.menu.settings = options_of(slots);
     session.world.saves = saves;
     // before the sim takes the creation events: the title's song replaces the placeholder area's
     wf_core::menu::title::open_title(&mut session.world);
@@ -793,11 +795,21 @@ pub fn title_sim(packs: &Packs, slots: &[Vec<u8>], seed: u32) -> Result<crate::s
     Ok(s)
 }
 
-/// A running story app's save slots: (generation, the slot files). None = not story mode.
+/// A running story app's save slots: (generation, the slot files). None = not story mode. After the [`SLOTS`]
+/// games, one more file: the options block (text speed, volumes - the cartridge's flash record 0, shared by every
+/// game; `Settings::to_flash`).
 pub fn saves_of(app: &App) -> Option<(u32, Vec<Vec<u8>>)> {
     let s = app.sim.as_any()?.downcast_ref::<crate::story::StorySim>()?;
-    let sv = &s.session.world.saves;
-    Some((sv.generation, (0..SLOTS).map(|i| sv.slot_bytes(i)).collect()))
+    let w = &s.session.world;
+    let sv = &w.saves;
+    let mut files: Vec<Vec<u8>> = (0..SLOTS).map(|i| sv.slot_bytes(i)).collect();
+    files.push(w.menu.settings.to_flash());
+    Some((sv.generation, files))
+}
+
+/// the options a story app starts with: the block after the slot files ([`saves_of`]), else the game's defaults
+fn options_of(files: &[Vec<u8>]) -> wf_core::menu::options::Settings {
+    files.get(SLOTS).and_then(|b| wf_core::menu::options::Settings::from_flash(b)).unwrap_or_default()
 }
 
 #[cfg(test)]

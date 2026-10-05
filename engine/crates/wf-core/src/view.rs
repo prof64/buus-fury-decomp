@@ -174,8 +174,9 @@ fn actor_draw(
                 index: 0,
                 flip: false,
             },
-            x: a.px(),
-            y: a.py(),
+            // (offset by the header's shadow dx / dy: Super Janemba's at (8, 8) - OAM, real route 18-14)
+            x: a.px() + sp.shadow_off.0,
+            y: a.py() + sp.shadow_off.1,
             priority: 3,
             mirror: false,
             effect: SpriteEffect::None,
@@ -329,6 +330,15 @@ pub fn render_view(w: &World, out: &mut RenderView) {
         });
         out.world_map = Some(wm);
     }
+    // the BG sphere effect (its tiles are drawn in the update, before the objects)
+    out.sphere = w.scene.visuals.iter().find(|v| v.kind == crate::scene::VisualKind::EnergySphere).map(|v| wf_view::SphereView {
+        x: v.x,
+        y: v.y,
+        radius: v.owner as i32,
+        // (the colour: the native's 4th argument, kept in `vid` - `t` counts on)
+        colour: v.vid as u8,
+        jitter: w.scene.sphere_jitter.clone(),
+    });
     // the countdown / stopwatch display (`show_timer_hud` 0xB0 / 0xBC: object 0x0802FCA0)
     // a script's title text (`show_title_text` 0xB2)
     if let Some(d) = w.data.menu.as_ref() {

@@ -55,6 +55,8 @@ pub struct RenderView {
     pub hud: Vec<HudView>,
     /// Boss HP bars (`ui/hud/boss_bar.png`): two 32x8 OBJs at screen x 160 / 192, priority 1.
     pub boss_bars: Vec<BossBarView>,
+    /// The BG sphere effect (`show_energy_sphere` 0xF4, object vtable 0x080493B4): drawn in BG0's place.
+    pub sphere: Option<SphereView>,
     /// The countdown / stopwatch display's value in frames (two 32x16 OBJs at (168, 8), priority 1), if shown.
     pub timer: Option<i32>,
     /// A script's title text (`show_title_text` 0xB2, "Chapter 12 ..." / "Match 2 Fight!"): the string's units,
@@ -319,6 +321,7 @@ impl RenderView {
         self.palette_fade = None;
         self.palette_scale = None;
         self.boss_bars.clear();
+        self.sphere = None;
         self.timer = None;
         self.title.clear();
         self.banner = None;
@@ -448,6 +451,17 @@ pub struct TitleView {
     pub text: Vec<u16>,
     pub x: i32,
     pub y: i32,
+}
+
+/// The BG sphere (`0x0803AA58`): a disc of `radius` at world (x, y), BG palette colour `colour` inside, colour 2 in
+/// the rim; the rim's width per row is `outer - inner(radius - 3) + jitter[row]` (rows from the centre outwards).
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
+pub struct SphereView {
+    pub x: i32,
+    pub y: i32,
+    pub radius: i32,
+    pub colour: u8,
+    pub jitter: Vec<u8>,
 }
 
 /// A boss HP bar (script `show_boss_bar`, object vtable 0x0804CE28).

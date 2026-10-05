@@ -46,6 +46,34 @@ impl Default for Settings {
     }
 }
 
+impl Settings {
+    /// the cartridge's options block as the game writes it (`0x08006B5E`, flash record 0): the 4 bytes, then their
+    /// Adler-32 (`0x0803FC4E`) + 0x12345678, little-endian
+    pub fn to_flash(&self) -> Vec<u8> {
+        let b = [self.text_speed, self.sfx, self.music, self.pad];
+        let mut out = b.to_vec();
+        out.extend_from_slice(&adler32(&b).wrapping_add(0x1234_5678).to_le_bytes());
+        out
+    }
+    /// the block as the game's boot reads it (`0x08006AE8`): None = a wrong checksum or a value over 8 (the game
+    /// then takes the defaults)
+    pub fn from_flash(b: &[u8]) -> Option<Settings> {
+        let (d, c) = (b.get(..4)?, b.get(4..8)?);
+        let ok = u32::from_le_bytes([c[0], c[1], c[2], c[3]]) == adler32(d).wrapping_add(0x1234_5678);
+        (ok && d[..3].iter().all(|&v| v <= 8)).then(|| Settings { text_speed: d[0], sfx: d[1], music: d[2], pad: d[3] })
+    }
+}
+
+/// Adler-32 (`0x0803FC4E`: blocks of 5552, mod 65521)
+fn adler32(b: &[u8]) -> u32 {
+    let (mut a, mut s) = (1u32, 0u32);
+    for &x in b {
+        a = (a + x as u32) % 65521;
+        s = (s + a) % 65521;
+    }
+    s << 16 | a
+}
+
 /// the options (frontend: volumes for the sound driver, text speed for the dialogue typewriter)
 pub fn settings(w: &World) -> Settings {
     w.menu.settings
@@ -263,6 +291,9 @@ impl Options {
                     1 => st.music = v,
                     _ => st.text_speed = v,
                 }
+                // (the game writes the block back to flash when the page closes; the frontend persists it with the
+                // save slots when the generation moves)
+                w.saves.generation = w.saves.generation.wrapping_add(1);
                 if k < 2 {
                     let st = w.menu.settings;
                     w.events.push(crate::world::Event::MasterVolumes {
@@ -356,4 +387,38 @@ pub fn open_json(
     v: &serde_json::Value,
 ) -> Option<(super::Screen, super::Transition, bool)> {
     (v["kind"] == "options").then(|| (Screen::Options(Options::new(w)), super::PAUSE, false))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn options_block_round_trip_and_boot_check() {
+        let s = Settings { text_speed: 1, sfx: 7, music: 2, pad: 0 };
+        let b = s.to_flash();
+        assert_eq!(b.len(), 8);
+        assert_eq!(Settings::from_flash(&b), Some(s));
+        // a wrong checksum or a value over 8: the game's defaults
+        let mut bad = b.clone();
+        bad[4] ^= 1;
+        assert_eq!(Settings::from_flash(&bad), None);
+        let over = Settings { text_speed: 9, ..s }.to_flash();
+        assert_eq!(Settings::from_flash(&over), None);
+        assert_eq!(Settings::from_flash(&[]), None);
+    }
+
+    #[test]
+    fn typewriter_steps_by_speed() {
+        // characters typed in the first 10 updates without a press (emulator, shipr_227 7-2 rows 173-182)
+        let typed = |s: u8| {
+            let mut c = 0;
+            (0..10).map(|_| crate::scene::type_steps(s, false, &mut c)).sum::<i32>()
+        };
+        assert_eq!([0, 1, 2, 3, 4, 5, 6, 8].map(typed), [2, 2, 3, 5, 10, 20, 30, 50]);
+        // a slow speed types one at once on a press, the counter waits
+        let mut c = 0;
+        assert_eq!(crate::scene::type_steps(0, true, &mut c), 1);
+        assert_eq!(c, 0);
+    }
 }

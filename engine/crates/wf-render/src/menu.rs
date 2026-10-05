@@ -436,7 +436,7 @@ impl MenuRenderer {
         put.push((62 - adv(ch[4]), ch[4]));
         let ops: Vec<MenuOp> = put.into_iter().map(|(x, c)| MenuOp::TextOutline { font: MenuFont::Timer, x, y: 12, colour: 5, outline: 1, clip: [0, 0, 64, 16], text: vec![c] }).collect();
         let s = self.surface(packs, &wf_view::MenuLayer { w: 64, h: 16, x: 0, y: 0, priority: 1, ops });
-        s.px.iter().map(|&c| if c == 0 { 0 } else { 0xFF00_0000 | (self.pal.get(c as usize).copied().unwrap_or(0) & 0xFF_FFFF) }).collect()
+        s.px.iter().map(|&c| if c == 0 { 0 } else { (c as u32) << 24 | (self.pal.get(c as usize).copied().unwrap_or(0) & 0xFF_FFFF) }).collect()
     }
 
     /// A script's title text (`0x0802BECC`): (width, 32-px-high ARGB) - w = (the title font's width + 33) rounded

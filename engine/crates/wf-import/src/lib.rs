@@ -2042,6 +2042,8 @@ fn build_mid_event(_data: &Arc<GameData>, ram: &GbaRam, runner: &mut StoryHost, 
             // a choice's cursor object (text box +0x48; its +0x10 counts its draws: the blink)
             let c = ram.r32(o + 0x48);
             d.page_t = if ram.valid(c) { d.t - ram.r32(c + 0x10) as i32 + 1 } else { d.t + 1 };
+            // the slow text speeds' frame counter
+            d.type_c = ram.r32(o + 0x58) as i32;
             // the last page typed out and A pressed within the close's frames: closing (the box object shows
             // nothing of it: the press's stamp in the input ring 0x03003300 +0x88 against the counter 0x03000F94; mid_24000)
             let need = d.typing.get(d.page as usize).copied().unwrap_or(0) as i32;
@@ -2812,6 +2814,12 @@ pub fn import_emulator_state(data: &Arc<GameData>, ram: &GbaRam, runner: &mut St
         }
     }
     let mut world = b.world;
+    // the options (`0x03001914`: text speed, SFX volume, music volume, pad; the game's boot check: any byte over 8 =
+    // the defaults) - the typewriter's speed
+    let o = [0, 1, 2, 3].map(|k| ram.r8(0x0300_1914 + k));
+    if o[..3].iter().all(|&v| v <= 8) {
+        world.menu.settings = wf_core::menu::options::Settings { text_speed: o[0], sfx: o[1], music: o[2], pad: o[3] };
+    }
     if in_event.is_some() {
         patch_patrols(&mut world, ram, &mut notes);
     }

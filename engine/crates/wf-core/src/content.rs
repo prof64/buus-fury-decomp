@@ -181,6 +181,8 @@ pub struct Sprite {
     pub tile_bytes: i32,
     /// the shared shadow graphic's (w, h) (def +0xA / +0xB; `0x08013E38`)
     pub shadow_key: (u8, u8),
+    /// the ground shadow's offset from the actor's point (header bytes 12 / 13: s8 dx, u8 dy; Super Janemba (8, 8))
+    pub shadow_off: (i32, i32),
     /// the sprite has a halo attachment (def +0x50): its instances use the shared halo graphic
     pub halo: bool,
     /// the ROM sprite def (`rom.def`; 0 = unknown): an object's +0x58 points at it (imports)
@@ -1195,6 +1197,8 @@ fn parse_sprite(s: &Value, index: i32, timing: Option<&Value>) -> Sprite {
             )
         })
         .unwrap_or((0, 0));
+    let w12 = h["word12"].as_u64().unwrap_or(0) as u32;
+    let shadow_off = ((w12 & 0xFF) as u8 as i8 as i32, ((w12 >> 8) & 0xFF) as i32);
     let halo = anims.iter().any(|a| {
         a.dirs
             .iter()
@@ -1215,6 +1219,7 @@ fn parse_sprite(s: &Value, index: i32, timing: Option<&Value>) -> Sprite {
         shadow,
         tile_bytes,
         shadow_key,
+        shadow_off,
         halo,
         def_addr,
     }

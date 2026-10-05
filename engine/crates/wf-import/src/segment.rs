@@ -381,6 +381,27 @@ pub fn start(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Value
         let dram = [ram.read(0x0300_38A4, 0x18 + 15 * 0x60), ram.read(0x0300_3898 + 0x5C4, 16 * 0x40)].concat();
         wf_core::sndsim::import(&mut imp.world, &dram, u32_(0x0300_389C), u32_(0x0300_38A0), phase);
     }
+    // a script's blend set before the cut (`set_blend_targets` / `set_blend_alpha`): the IO registers are not in the
+    // RAM image - the first row's probe has BLDCNT / BLDALPHA (io[1] / io[2]); where they differ from the map's
+    // header, they become the scene's (real route 19-3, rkb_008: the Spirit Bomb's sphere blended over the field)
+    if let (Some(bld), Some(alpha)) = (doc["frames"].get(0).and_then(|f| f["io"].get(1)).and_then(|v| v.as_u64()), doc["frames"].get(0).and_then(|f| f["io"].get(2)).and_then(|v| v.as_u64())) {
+        let w = &mut imp.world;
+        let map = w.field.as_ref().and_then(|f| w.data.field.as_ref().and_then(|d| d.maps.get(&f.map)));
+        if let Some(m) = map {
+            let (bld, eva, evb) = (bld as u16, (alpha & 0x1F) as u8, ((alpha >> 8) & 0x1F) as u8);
+            if (bld & 0x3F3F) != (m.bldcnt & 0x3F3F) {
+                let l = &mut w.scene.screen.layers;
+                for b in 0..4 {
+                    if l.blend[b].is_none() {
+                        l.blend[b] = Some(((bld >> b) & 1) as u8 | ((((bld >> (8 + b)) & 1) as u8) << 1));
+                    }
+                }
+                if l.alpha.is_none() {
+                    l.alpha = Some((eva, evb));
+                }
+            }
+        }
+    }
     Ok((imp, host))
 }
 

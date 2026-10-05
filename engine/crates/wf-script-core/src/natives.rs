@@ -1045,7 +1045,7 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
         }
         0xf4 => {
             h.w.scene.visuals.retain(|v| v.kind != VisualKind::EnergySphere);
-            h.w.scene.visuals.push(Visual { kind: VisualKind::EnergySphere, x: arg(a, 0), y: arg(a, 1), owner: arg(a, 2) as u32, t: arg(a, 3), life: -1, vid: 0 });
+            h.w.scene.visuals.push(Visual { kind: VisualKind::EnergySphere, x: arg(a, 0), y: arg(a, 1), owner: arg(a, 2) as u32, t: arg(a, 3), life: -1, vid: arg(a, 3) as u32 });
             unit()
         }
         0xf6 => done(0),

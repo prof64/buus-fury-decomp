@@ -1193,17 +1193,18 @@ export function create(n: AiNodeJ, c: AiController): RNode {
         },
       })
     case 'GunShot':
-      return timed(n, c, [17, 3], 16, { 4: () => e.shot('gun') })
+      // the controllers' enter (0x080264D4 / 0x08026754 / 0x0802D0B0) is SetAnimRaw(0x12): raw 19 (Earth 3-2)
+      return timed(n, c, [18, 3], 16, { 4: () => e.shot('gun') })
     case 'RifleShot':
-      return timed(n, c, [17, 3], 32, { 8: () => e.shot('rifle') })
+      return timed(n, c, [18, 3], 32, { 8: () => e.shot('rifle') })
     case 'NinjaStarThrow':
       // controller 0x03003074: anim 0x13 (raw 20; real route db6 13-32 f117)
       // a frame per 8 ticks; the star, its sound and the end are the node's (not the recorded sequence's cue / end)
       return timed(n, c, [19, 4], 32, { 8: () => e.shot('star') }, true, { rule: 'once_stop', shift: 3, end: 'none' })
     case 'MummyWrapShot':
-      return timed(n, c, [17, 3], 24, { 8: () => e.shot('wrap') })
+      return timed(n, c, [18, 3], 24, { 8: () => e.shot('wrap') })
     case 'MummyWrapBurst':
-      return timed(n, c, [17, 3], 24, { 8: () => e.shot('burst') }, false)
+      return timed(n, c, [18, 3], 24, { 8: () => e.shot('burst') }, false)
     case 'TankShoot': {
       // controller 0x030030EC (tick 0x0802E278): SetAnimRaw(0x13) once, 8 ticks per frame, then SetAnim(0); the shell
       // when the frame reaches 2 (tick 16); finished once the controller is gone (Earth segment 3-14)
@@ -1243,6 +1244,8 @@ export function create(n: AiNodeJ, c: AiController): RNode {
         if (e.ea.pos.raw !== a.data.raw) return true
         // the turret's frame (controller tick 0x0802B5EA): tick >> 3 below 16, 1 up to 64, then 2
         if (!soldier) e.ea.pos.frame = f < 16 ? f >> 3 : f > 64 ? 2 : 1
+        // the soldier's (0x08026618): below 32 tick >> 3, the fourth 8 ticks back on frame 1 (0, 1, 2, 1), then kept
+        else if (f < 32) e.ea.pos.frame = f >> 3 > 2 ? (((f >> 3) + 1) & 1) + 1 : f >> 3
         if (f === 8) {
           a.data.wave = e.w.add(new EnergyWave(e.ctx, e, e.facing, ...e.muzzleFix(soldier ? 'soldier' : 'turret'))).id
           if (soldier) e.ctx.soldierWave = a.data.wave

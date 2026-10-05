@@ -1097,12 +1097,14 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             r.d[6] = w.en_ref(i).anim_seq as i32;
         }
         // (r.d[6] = the animation state the shot runs under: see `shot_state_gone`)
+        // the controllers' enter (0x080264D4 / 0x08026754 / 0x0802D0B0) is SetAnimRaw(0x12): raw 19 (Earth 3-2: a
+        // ninja's rifle shot shows raw 19; with an(17) = raw 18, missing on its sprite, ours held the idle pose)
         K::GunShot | K::RifleShot | K::MummyWrapShot => {
-            timed_enter(w, i, &[an(17), an(3)], true);
+            timed_enter(w, i, &[an(18), an(3)], true);
             r.d[6] = w.en_ref(i).anim_seq as i32;
         }
         K::MummyWrapBurst => {
-            timed_enter(w, i, &[an(17), an(3)], false);
+            timed_enter(w, i, &[an(18), an(3)], false);
             r.d[6] = w.en_ref(i).anim_seq as i32;
         }
         K::NinjaStarThrow => {
@@ -2315,7 +2317,9 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             if w.en_ref(i).ea.pos.raw != r.d[2] {
                 return true;
             }
-            // the turret's frame (controller tick 0x0802B5EA): tick >> 3 below 16, 1 up to 64, then 2
+            // the turret's frame (controller tick 0x0802B5EA): tick >> 3 below 16, 1 up to 64, then 2; the soldier's
+            // (0x08026618): below 32 tick >> 3, its fourth 8 ticks back on frame 1 (0, 1, 2, 1), then kept (Babidi's
+            // ship 8-51 / 8-21 / 8-31 ...: the throw's last 8 frames on cel 1, not 2)
             if !soldier {
                 w.en(i).ea.pos.frame = if f < 16 {
                     f >> 3
@@ -2324,6 +2328,9 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                 } else {
                     1
                 };
+            } else if f < 32 {
+                let k = f >> 3;
+                w.en(i).ea.pos.frame = if k > 2 { ((k + 1) & 1) + 1 } else { k };
             }
             if f == 8 {
                 let (x, y) = en::muzzle_fix(w, i, !soldier);

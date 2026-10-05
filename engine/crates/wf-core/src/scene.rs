@@ -1263,6 +1263,28 @@ pub struct Dialog {
     /// `t` at the current page's first typed character (a choice page's cursor object is made then)
     #[serde(default)]
     pub page_t: i32,
+    /// the slow text speeds' frame counter (text box +0x58: 0 at the box's creation, +1 each update without an A / B
+    /// press while the speed is below 4; see [`type_steps`])
+    #[serde(default)]
+    pub type_c: i32,
+}
+
+/// The typewriter's steps this frame (text box update `0x0800B0A8`), by the options' text speed `s` (0..8,
+/// `0x03001914`): from 4 up, `s - 3` steps every frame (4 = one character a frame); below 4, one step on a frame with
+/// A or B pressed, else one when the counter (+0x58, +1 first) is a multiple of `5 - s` (speed 3: every 2nd frame,
+/// 0: every 5th). A step (`0x0800AE74`) types the page's next character (a colour pair / a skipped new line ride
+/// along), or on a complete page with A / B pressed this frame turns the page / closes the box (emulator, every
+/// speed: shipr_227 7-2 rows 172-186, `work/earth/timing/speedprobe.py`).
+pub fn type_steps(speed: u8, pressed: bool, counter: &mut i32) -> i32 {
+    let s = speed.min(8) as i32;
+    if s >= 4 {
+        s - 3
+    } else if pressed {
+        1
+    } else {
+        *counter += 1;
+        (*counter % (5 - s) == 0) as i32
+    }
 }
 
 /// the first character appears this many frames after the box is created; the event continues this many frames
@@ -1449,6 +1471,9 @@ pub struct Scene {
     pub dest_sel: i32,
     pub radar: Option<Radar>,
     pub visuals: Vec<Visual>,
+    /// the BG sphere's rim jitter of this frame's redraw (rand(4) per row 0 .. radius - 3, `0x0803AA58`)
+    #[serde(default)]
+    pub sphere_jitter: Vec<u8>,
     pub dialog: Option<Dialog>,
     pub menu: Option<Menu>,
     pub shop: Vec<ShopItem>,
@@ -1511,6 +1536,7 @@ impl Default for Scene {
             dest_sel: 0,
             radar: None,
             visuals: Vec::new(),
+            sphere_jitter: Vec::new(),
             dialog: None,
             menu: None,
             shop: Vec::new(),
@@ -2994,8 +3020,10 @@ pub fn sphere_jitter(w: &mut World) {
         .filter(|v| v.kind == VisualKind::EnergySphere)
         .map(|v| (v.owner as i32 - 3).max(0))
         .sum();
+    w.scene.sphere_jitter.clear();
     for _ in 0..jitter {
-        w.rng.rand(4);
+        let r = w.rng.rand(4) as u8;
+        w.scene.sphere_jitter.push(r);
     }
 }
 
@@ -3594,6 +3622,7 @@ pub fn open_text(
         portrait_left,
         fades: false,
         page_t: 0,
+        type_c: 0,
     });
     if kind == 3 {
         let f = window_fades(w);
@@ -3677,6 +3706,7 @@ pub fn dialog_result(w: &mut World) -> Option<i32> {
 /// closes and the event continues [`DIALOG_CLOSE`] frames after the A. A choice cursor moves with UP / DOWN.
 fn tick_dialog(w: &mut World) {
     let k = w.scene.keys[0].pressed;
+    let speed = w.menu.settings.text_speed;
     let Some(d) = w.scene.dialog.as_mut() else {
         return;
     };
@@ -3720,33 +3750,54 @@ fn tick_dialog(w: &mut World) {
         }
         return;
     }
-    let need = d.typing.get(d.page as usize).copied().unwrap_or(0) as i32;
+    let mut first = false;
+    if d.phase == DialogPhase::Opening && d.t >= DIALOG_OPEN {
+        // the box's update runs from this frame (`0x0800B156` -> `0x0800B0A8`)
+        d.phase = DialogPhase::Shown;
+        d.typed = 0;
+        first = true;
+    }
     match d.phase {
-        DialogPhase::Opening => {
-            if d.t >= DIALOG_OPEN {
-                d.phase = DialogPhase::Shown;
-                d.typed = 1.min(need);
-                d.page_t = d.t;
-                // a choice box's cursor object (`0x080178C8`, 0x100 tiles) appears with the text
-                if d.options > 0 {
-                    crate::vram::acquire(w, crate::vram::Owner::Cursor, 0x100);
+        DialogPhase::Opening => {}
+        DialogPhase::Shown => {
+            // A or B pressed this frame (+0x30): a complete page turns / the box closes
+            let mut press = k & (A | B) != 0;
+            let n = type_steps(speed, press, &mut d.type_c);
+            let mut cursor = false;
+            for _ in 0..n {
+                let need = d.typing.get(d.page as usize).copied().unwrap_or(0) as i32;
+                if d.typed < need {
+                    if d.typed == 0 {
+                        d.page_t = d.t;
+                        // a choice box's cursor object (`0x080178C8`, 0x100 tiles) appears with the text
+                        cursor |= d.page == 0 && d.options > 0;
+                    }
+                    d.typed += 1;
+                } else if press {
+                    press = false;
+                    if d.page + 1 < d.pages {
+                        d.page += 1;
+                        d.typed = 0;
+                        d.page_t = d.t + 1;
+                    } else {
+                        // B on a choice cancels (`0x0800AED6`: the result -1)
+                        d.result = Some(if d.options > 0 { if k & B != 0 { -1 } else { d.cursor } } else { 0 });
+                        d.phase = DialogPhase::Closing;
+                        d.t = 0;
+                        break;
+                    }
                 }
             }
-        }
-        DialogPhase::Shown => {
-            if d.typed < need {
-                d.typed += 1;
-            } else if k & A != 0 {
-                if d.page + 1 < d.pages {
-                    d.page += 1;
-                    d.typed = 0;
-                    d.page_t = d.t + 1;
-                } else {
-                    d.result = Some(if d.options > 0 { d.cursor } else { 0 });
-                    d.phase = DialogPhase::Closing;
-                    d.t = 0;
-                    crate::vram::release(w, crate::vram::Owner::Cursor);
-                }
+            // (a page with nothing to type shows at once)
+            if first && d.typing.get(d.page as usize).copied().unwrap_or(0) == 0 {
+                d.page_t = d.t;
+                cursor |= d.options > 0;
+            }
+            if cursor {
+                crate::vram::acquire(w, crate::vram::Owner::Cursor, 0x100);
+            }
+            if w.scene.dialog.as_ref().is_some_and(|d| d.phase == DialogPhase::Closing) {
+                crate::vram::release(w, crate::vram::Owner::Cursor);
             }
         }
         DialogPhase::Closing => {

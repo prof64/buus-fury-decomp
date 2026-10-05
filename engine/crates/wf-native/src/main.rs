@@ -485,12 +485,16 @@ fn save_settings(data: &Path, s: &wf_app::launcher::Settings) {
 }
 
 fn slot_path(data: &Path, i: usize) -> PathBuf {
+    // (after the games: the options block - text speed, volumes)
+    if i == wf_app::launcher::SLOTS {
+        return data.join("saves").join("options.sav");
+    }
     data.join("saves").join(format!("slot{}.sav", i + 1))
 }
 
-/// the story save slots on disk (empty = no game)
+/// the story save slots on disk (empty = no game), then the options block
 fn read_slots(data: &Path) -> Vec<Vec<u8>> {
-    (0..wf_app::launcher::SLOTS).map(|i| std::fs::read(slot_path(data, i)).unwrap_or_default()).collect()
+    (0..=wf_app::launcher::SLOTS).map(|i| std::fs::read(slot_path(data, i)).unwrap_or_default()).collect()
 }
 
 /// write the story save slots when the game saved (the in-game Save screen bumps the generation)

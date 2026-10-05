@@ -450,7 +450,16 @@ impl Renderer {
                 let mut bgs: Vec<usize> = (0..m.layers.len()).filter(|&i| shown(i) && pr(i) == prio).collect();
                 bgs.sort_by(|&a, &b| m.layers[b].bg.cmp(&m.layers[a].bg));
                 for li in bgs {
+                    // BG0 shows the sphere effect's tilemap when one is up (it rewrites screenblock 28 whole)
+                    if view.sphere.is_some() && m.layers[li].bg == 0 {
+                        continue;
+                    }
                     self.draw_layer(m, li, *af, cx + shake.0, cy + shake.1, vx, vy);
+                }
+                // the sphere on BG0 (priority 2: BG0CNT 0x1C82 under it, real route 19-3), over the other BGs of
+                // its priority
+                if let (Some(sp), 2) = (view.sphere.as_ref(), prio) {
+                    self.draw_sphere(m, sp, cx + shake.0, cy + shake.1, vx, vy);
                 }
             }
             // OBJs of this priority, last OAM entry first
@@ -645,6 +654,90 @@ impl Renderer {
                     }
                 }
                 px += run;
+            }
+        }
+    }
+
+    /// The BG sphere (`0x0803AA58`) on BG0: the lower-right quadrant's tiles from the midpoint circle (`0x0803AE10`:
+    /// half-width per row from the centre), mirrored left (h-flip) and up (v-flip) about the centre; a tile whose
+    /// last row's half-width - 3 covers it is a full tile, else per pixel: the colour up to `outer - rim`, colour 2 up
+    /// to `outer` (rim = outer - inner(radius - 3) + jitter; no jitter at radius <= 3: no rim)
+    fn draw_sphere(&mut self, m: &Map, sp: &wf_view::SphereView, cx: i32, cy: i32, vx: i32, vy: i32) {
+        let circle = |r: i32| -> Vec<i32> {
+            let mut b = vec![0i32; 129];
+            let (mut x, mut y, mut d) = (0i32, r, 3 - 2 * r);
+            while x < y {
+                if (x as usize) < b.len() {
+                    b[x as usize] = y;
+                }
+                if y >= 1 && ((y - 1) as usize) < b.len() {
+                    b[(y - 1) as usize] = x;
+                }
+                if d < 0 {
+                    d += 4 * x + 6;
+                } else {
+                    d += 4 * (x - y) + 10;
+                    y -= 1;
+                }
+                x += 1;
+            }
+            b
+        };
+        let r = sp.radius.clamp(0, 128);
+        let outer = circle(r);
+        let mut rim = vec![0i32; 129];
+        if r > 3 && !sp.jitter.is_empty() {
+            let inner = circle(r - 3);
+            for i in 0..r as usize {
+                rim[i] = if i < (r - 3) as usize { sp.jitter.get(i).copied().unwrap_or(0) as i32 + outer[i] - inner[i] } else { outer[i] };
+            }
+        }
+        let pal = |ix: u8| (m.tileset.palette.get(ix as usize).copied().unwrap_or(0) & 0xFF_FFFF) | (ix as u32) << 24;
+        let (fill, edge) = (pal(sp.colour), pal(2));
+        // the quadrant pixel (qx, qy >= 0) -> colour index (0 = none)
+        let at = |qx: i32, qy: i32| -> u8 {
+            if qx >= 128 || qy >= 128 || qy >= r {
+                return 0;
+            }
+            let (tr, tc) = (qy >> 3, qx >> 3);
+            let last = outer[(tr * 8 + 7) as usize];
+            if tc < (last - 3) >> 3 {
+                return sp.colour;
+            }
+            let o = outer[qy as usize] - tc * 8;
+            let x = qx & 7;
+            if o <= 0 {
+                return 0;
+            }
+            let f = o - rim[qy as usize];
+            if x < f {
+                sp.colour
+            } else if x < o.min(8) {
+                2
+            } else {
+                0
+            }
+        };
+        let (w, h) = (self.w, self.h);
+        // the centre on screen: the world point minus the camera
+        let (ox, oy) = (sp.x - cx + vx, sp.y - cy + vy);
+        let _ = vy;
+        for py in 0..h as i32 {
+            let dy = py - (oy - vy);
+            let qy = if dy >= 0 { dy } else { -1 - dy };
+            if qy >= r {
+                continue;
+            }
+            for px in 0..w as i32 {
+                let dx = px - (ox - vx);
+                let qx = if dx >= 0 { dx } else { -1 - dx };
+                if qx >= r + 8 {
+                    continue;
+                }
+                let c = at(qx, qy);
+                if c != 0 {
+                    self.put((py as usize) * w + px as usize, if c == 2 { edge } else { fill }, 0, 0);
+                }
             }
         }
     }
