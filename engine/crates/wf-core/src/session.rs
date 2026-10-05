@@ -379,6 +379,13 @@ impl Session {
             {
                 crate::field::world_mode_cameras(w);
             }
+            // a screen a script opened after this frame's object pass (the punch game's native): the frame's map
+            // update ran - its clock and tile animations count it (sb 1-5 row 4,204: +0x40 1,616 -> 1,617)
+            if w.g.clock_mark.is_some() {
+                if let Some(f) = w.field.as_mut() {
+                    f.iters = f.iters.wrapping_add(1);
+                }
+            }
             crate::menu::post(w);
             return;
         }

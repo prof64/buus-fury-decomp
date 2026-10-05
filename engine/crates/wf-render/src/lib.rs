@@ -696,7 +696,7 @@ impl Renderer {
                 }
             }
         }
-        let (sx, sy) = l.scroll(cx, cy, anim_frame.saturating_sub(std::env::var("TMP_DM").ok().and_then(|v| v.parse::<u32>().ok()).unwrap_or(0)));
+        let (sx, sy) = l.scroll(cx, cy, anim_frame);
         let (sx, sy) = (sx + off.0, sy + off.1);
         // screen pixel (px, py) of this view is camera-relative (vx - cx + px); layer pixel = that + scroll
         let ox = vx - cx + sx;

@@ -332,7 +332,7 @@ fn main() {
                 }
                 last_view = Some(view.clone());
                 if std::env::var_os("TMP_STATROW").is_some() {
-                    eprintln!("ROW {k} iters {} phase {:?} active {} c {:?} stat {:?}", w.field.as_ref().map(|f| f.cam_iters()).unwrap_or(0), w.menu.phase, wf_core::menu::active(w), w.field.as_ref().and_then(|f| f.vram.as_ref().map(|v| f.cam_iters().wrapping_sub(v.stat_at))), view.hud.first().map(|h| h.stat_mark));
+                    eprintln!("ROW {k} top {:?} shown {:?} iters {} phase {:?} active {} c {:?} stat {:?}", w.menu.stack.last().map(std::mem::discriminant), w.menu.shown.as_deref().map(std::mem::discriminant), w.field.as_ref().map(|f| f.cam_iters()).unwrap_or(0), w.menu.phase, wf_core::menu::active(w), w.field.as_ref().and_then(|f| f.vram.as_ref().map(|v| f.cam_iters().wrapping_sub(v.stat_at))), view.hud.first().map(|h| h.stat_mark));
                 }
                 let old_timer = std::mem::replace(&mut prev_timer, view.timer);
                 let Some(&i) = at.get(&k) else { return };

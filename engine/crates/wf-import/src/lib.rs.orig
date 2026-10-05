@@ -2047,6 +2047,19 @@ fn build_mid_ids(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner: &mu
 
 /// the track actors' animations (and facing) as the RAM rows show them (a started command restarted its animation):
 /// the RAM object at the entity's 24.8 position (`build_mid_code`; an inline script's tracks too)
+/// every NPC's animation clock as its RAM row (by position and sprite) when the row shows the same animation
+fn npc_anims_from_rows(w: &mut World, ram: &GbaRam) {
+    for &(o, sprite, raw, cel, tick) in ram.actor_rows.iter() {
+        let (x, y) = (ram.s32(o + 0x1A0), ram.s32(o + 0x1A4));
+        let Some(i) = (0..w.ents.len()).find(|&i| !w.ents[i].removed && matches!(w.ents[i].body, Body::Npc(_)) && w.actor(i).is_some_and(|a| a.x == x && a.y == y) && wf_core::scene::sprite_id(w, i) == Some(sprite)) else { continue };
+        if let Body::Npc(n) = &mut w.ents[i].body {
+            if n.anim.raw == raw {
+                (n.anim.frame, n.anim.tick) = (cel, tick);
+            }
+        }
+    }
+}
+
 fn track_anims_from_rows(w: &mut World, ram: &GbaRam) {
     use wf_core::scene::Owner;
     let rows: std::collections::BTreeMap<u32, (i32, i32, i32, i32)> = ram.actor_rows.iter().map(|r| (r.0, (r.1, r.2, r.3, r.4))).collect();
@@ -2063,6 +2076,13 @@ fn track_anims_from_rows(w: &mut World, ram: &GbaRam) {
     for p in &w.scene.puppets {
         if !owners.contains(&p.id) {
             owners.push(p.id);
+        }
+    }
+    // (and the NPCs whose animation command the replay dropped or ended: run 3 cut 135,588, s453's set_anim(260, 17)
+    // before the walk_to it waits in; 220,149, s303's walk_to(18, 390, 242) over - ours had restarted its walk)
+    for e in w.ents.iter().filter(|e| !e.removed) {
+        if matches!(&e.body, Body::Npc(_)) && !owners.contains(&e.id) {
+            owners.push(e.id);
         }
     }
     for id in owners {
@@ -2110,6 +2130,20 @@ fn track_anims_from_rows(w: &mut World, ram: &GbaRam) {
             wf_core::world::Body::Npc(n) => {
                 (n.anim.raw, n.anim.frame, n.anim.tick) = (raw, cel, tick);
                 n.anim.id = id_for(n.anim.id);
+                // (a map NPC showing a script animation - not its behaviour's idle / walk - is under the script's
+                // control as `set_state` puts it: a puppet, the animation the state's own; run 3 cut 137,176, s058's
+                // set_anim(163, 12) 27 ticks in, the replay from its actor_wait - ours ran the behaviour's walk tick)
+                if n.behaviour.is_some() && raw > 2 {
+                    n.anim.mode = wf_core::scene::AnimMode::Table;
+                    if !w.scene.puppets.iter().any(|p| p.id == id) {
+                        w.scene.puppets.push(wf_core::scene::Puppet { id, anim: wf_core::scene::ActAnim::idle() });
+                    }
+                }
+                // (its behaviour's idle / walk on the RAM's clock: the behaviour's animation is what it shows)
+                if let Some(b) = n.behaviour.as_mut().filter(|_| raw <= 2) {
+                    (b.raw, b.frame, b.tick) = (raw, cel, tick);
+                    b.anim = if raw == 1 { 0 } else { 1 };
+                }
             }
             wf_core::world::Body::Enemy(e) => {
                 e.set_raw(&d, raw);
@@ -2242,6 +2276,26 @@ fn import_track_objects(w: &mut World, ram: &GbaRam) {
                     w.scene.tracks[k].started = false;
                     continue;
                 }
+            }
+        }
+        // a lone `actor_wait` at the head (0x4A, no walk after it: the wait object vt 0x0804AB58 at the actor's state
+        // +0x18C, +4 = 0, +8 the frames left): that count (run 3 cuts 122,487 / 215,385: 1 frame left); no wait object
+        // left - it went in its last step, the script goes on in the cut's frame: over (run 3 cut 88,742, s003's
+        // level-up spin: the wait done, face(0, 0) in f0)
+        if found.is_none() && matches!(w.scene.tracks[k].queue.first(), Some(Cmd::Wait { .. })) {
+            if let Some(s) = own {
+                if ram.valid(s) && ram.r32(s) == 0x0804_AB58 {
+                    if ram.r32(s + 4) == 0 {
+                        if let Some(Cmd::Wait { left }) = w.scene.tracks[k].queue.first_mut() {
+                            *left = ram.s32(s + 8);
+                        }
+                        w.scene.tracks[k].started = true;
+                    }
+                } else if s == 0 {
+                    w.scene.tracks[k].queue.remove(0);
+                    w.scene.tracks[k].started = false;
+                }
+                continue;
             }
         }
         let Some((pos, o)) = found else { continue };
@@ -2859,7 +2913,12 @@ fn import_player_state(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
         0x0804_C35C => Gs::Punch,
         0x0804_A188 => Gs::Hold0,
         0x0804_985C => Gs::Hold,
-        0x0804_D784 => Gs::Once3,
+        // (the one-pass state's class serves both rates: the animation's own - SetAnim(18), raw 20, 16 ticks a cel; run
+        // 3 cut 68,892, s194's play_anim(0, 18) at tick 27 on cel 1)
+        0x0804_D784 => match ram.actor_rows.iter().find(|r| r.0 == po).and_then(|r| wf_core::player::state_for_raw(r.2)) {
+            Some(Gs::Once4) => Gs::Once4,
+            _ => Gs::Once3,
+        },
         0x0804_C744 => Gs::Block,
         0x0804_D75C => Gs::Hurt,
         0x0804_C768 => Gs::Ko,
@@ -3974,6 +4033,11 @@ fn build_event_entry(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner:
     // after its warp to 8-70, 2 held frames, set_pose waiting)
     if held == 0 {
         field::world_mode_cameras(&mut w);
+    }
+    // (the replayed spawns' idle clocks: the RAM's - an NPC turned by the replay re-entered its idle on another
+    // draw; run 3 cut 169,333, s016's face(279, 2) after the load: tick 276 in RAM)
+    if held == 0 && skipped == 0 {
+        npc_anims_from_rows(&mut w, ram);
     }
     notes.retain(|n| !n.starts_with("event "));
     notes.push(format!("event s{:03} continues at node {} ({} actions before the cut dropped)", ev.0, ev.1, skipped));

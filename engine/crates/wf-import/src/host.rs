@@ -75,6 +75,8 @@ pub struct StoryHost {
     /// with that `run_event`) - when the event ends it goes on past them (`continue_inline`), as the game's
     /// interpreter returns into it
     pub after_event: Option<(String, usize)>,
+    /// `continue_mid_nested_in`: the inner event and the graph node its `run_event` enters (consumed by the start)
+    nested_at: Option<(u16, u16)>,
 }
 
 /// the cause of an event the import continues: a fusion component's level-up hook (s003 cut while
@@ -220,6 +222,16 @@ impl StoryHost {
     pub fn continue_mid_nested(&mut self, w: &mut World, outer: (u16, u16, [i32; 4]), drop_outer: usize, drop_inner: usize) {
         self.continue_mid_nested_at(w, outer, drop_outer, drop_inner, true)
     }
+    /// `continue_mid_nested` with the inner event waiting in graph node `inner.1` > 0: the outer node's `run_event`
+    /// enters it at that node (its earlier nodes ran before the cut; `drop_inner` counts that node's actions - run 3
+    /// cut 68,495: s193 node 8's `run_event(194)`, s194 in node 6's walks)
+    pub fn continue_mid_nested_in(&mut self, w: &mut World, outer: (u16, u16, [i32; 4]), drop_outer: usize, drop_inner: usize, inner: (u16, u16)) {
+        if inner.1 == 0 {
+            return self.continue_mid_nested(w, outer, drop_outer, drop_inner);
+        }
+        self.nested_at = Some(inner);
+        self.continue_mid_nested_at(w, outer, drop_outer, drop_inner, false);
+    }
     /// `continue_mid_nested`; `entered` = false: the nested event has not stepped yet (its scene start - the run_event
     /// mode 0x08049D18's frame - still to come: whole-run cut 620,017, s508 -> s494)
     pub fn continue_mid_nested_at(&mut self, w: &mut World, outer: (u16, u16, [i32; 4]), drop_outer: usize, drop_inner: usize, entered: bool) {
@@ -230,10 +242,12 @@ impl StoryHost {
         self.rt.start_event_at(outer.0, outer.1, outer.2);
         self.started.push((self.frame, format!("s{:03}@{}", outer.0, outer.1)));
         self.cause = imported_cause(w, outer.0);
+        let nested_at = self.nested_at.take();
         self.rt.with_thread(|t| {
             t.skip = drop_outer + drop_inner;
             t.queue_instants = true;
             t.through_events = true;
+            t.nested_at = nested_at;
         });
         let mut st = self.with_host(w, |rt| rt.run().map_err(|e| e.to_string()));
         for _ in 0..if entered { 4 } else { 0 } {
@@ -247,6 +261,7 @@ impl StoryHost {
         self.rt.with_thread(|t| {
             t.queue_instants = false;
             t.through_events = false;
+            t.nested_at = None;
         });
         self.finish(w, st);
     }
@@ -257,7 +272,7 @@ impl StoryHost {
         let rt = Runtime::new(files, Box::new(shared.clone()))?;
         let stepped = files.iter().filter(|(_, src)| src.contains("fn step_0()")).map(|(p, _)| p.clone()).collect();
         let hs = HostState { nest_area_enter: true, ..HostState::default() };
-        Ok(StoryHost { rt, shared, hs, queue: VecDeque::new(), running: false, cause: None, outer: vec![], stepped, errors: vec![], started: vec![], prev_held: 0, frame: 0, step_code: STEP_CODE.get().cloned().unwrap_or_default(), text_open_due: None, probe_acts: vec![], break_due: None, break_inline: None, after_event: None })
+        Ok(StoryHost { rt, shared, hs, queue: VecDeque::new(), running: false, cause: None, outer: vec![], stepped, errors: vec![], started: vec![], prev_held: 0, frame: 0, step_code: STEP_CODE.get().cloned().unwrap_or_default(), text_open_due: None, probe_acts: vec![], break_due: None, break_inline: None, after_event: None, nested_at: None })
     }
 
     /// a session around an imported / built world (no hook: the host runs the queue itself)

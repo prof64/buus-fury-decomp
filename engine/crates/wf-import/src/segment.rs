@@ -373,6 +373,11 @@ pub fn start(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Value
     // the display at the cut: the first recorded row's probe (the screen does not change before its logic frame)
     ram.screen_black = doc["frames"].get(0).and_then(|f| f["io"].get(5)).and_then(|v| v.as_i64()).map(|v| v == 0);
     ram.mid_iteration = doc["frames"].get(0).and_then(|f| f["lf"].as_i64()).is_some_and(|lf| Some(lf) == doc["init"]["lf"].as_i64());
+    ram.load_frozen = ram.mid_iteration && {
+        let lf0 = doc["init"]["lf"].as_i64();
+        let rows: Vec<&Value> = doc["frames"].as_array().map(|v| v.iter().take_while(|f| f["lf"].as_i64() == lf0).collect()).unwrap_or_default();
+        rows.first().is_some_and(|f| f["p"].is_null()) && rows.iter().any(|f| !f["p"].is_null())
+    };
     // the actors' sprite ids / animations at the cut (rows [obj#, sprite, x, y, z, dir, raw, cel, tick])
     if let (Some(objs), Some(rows)) = (doc["init"]["objs"].as_array(), doc["init"]["actors"].as_array()) {
         for r in rows {

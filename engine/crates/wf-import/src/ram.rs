@@ -78,6 +78,9 @@ pub struct GbaRam {
     /// the cut stands inside a long game iteration (the recording's first row still has the cut's logic count): the
     /// iteration's remaining work - its camera update - is not in RAM yet (in-event imports)
     pub mid_iteration: bool,
+    /// the cut stands inside a load iteration whose leader is made later in that same iteration (the recording's rows
+    /// show no player, then one, all on the cut's logic count): the load's frozen lag frames, no state the app stands in
+    pub load_frozen: bool,
     /// the recording's actor rows at the cut (object pointer, sprite id, raw animation, cel, tick): sprite ids and
     /// animation indices need the ROM's sprite-def tables, which a work-RAM snapshot does not have (mid-area imports)
     pub actor_rows: Vec<(u32, i32, i32, i32, i32)>,
@@ -85,7 +88,7 @@ pub struct GbaRam {
 
 impl GbaRam {
     pub fn new(iwram: Vec<u8>, ewram: Vec<u8>) -> GbaRam {
-        let mut r = GbaRam { iwram, ewram, screen_black: None, mid_iteration: false, actor_rows: vec![] };
+        let mut r = GbaRam { iwram, ewram, screen_black: None, mid_iteration: false, load_frozen: false, actor_rows: vec![] };
         r.iwram.resize(IWRAM_SIZE, 0);
         r.ewram.resize(EWRAM_SIZE, 0);
         r

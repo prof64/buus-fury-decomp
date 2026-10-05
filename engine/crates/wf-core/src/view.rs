@@ -369,7 +369,10 @@ pub fn render_view(w: &World, out: &mut RenderView) {
         .field
         .as_ref()
         .map(|f| since(f.cam_iters(), f.drift_iter.unwrap_or(f.entered_iter)))
-        .unwrap_or(w.frame);
+        .unwrap_or(w.frame)
+        // (the wrap layers' drift is the update's before the clock's tick: BG HOFS = vel * (clock - 1) - db7_041
+        // 0-9's scene, rfat_010 11-17 row 1,200: 201 - 4 * 442 at clock 443)
+        .saturating_sub(1);
     // the tile animations' own phase when a cut found it apart from the camera's (rkb 19-3: a scene's area load
     // restarts the tiles, the camera counter runs on)
     let tile_frame = w

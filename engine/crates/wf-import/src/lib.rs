@@ -2298,6 +2298,17 @@ fn import_track_objects(w: &mut World, ram: &GbaRam) {
                 continue;
             }
         }
+        // an `actor_wait` at the head with no walk made behind it (the actor's own state is the wait object, its +4
+        // empty): the wait runs with the RAM's frames left (run 3 cut 68,300: s194 node 6's actor_wait(41, 60), 30
+        // left - ours restarted it, the walk after it a frame late)
+        if let (Some(Cmd::Wait { .. }), Some(s)) = (w.scene.tracks[k].queue.first(), own.filter(|s| waits.contains(s) && ram.r32(s + 4) == 0)) {
+            let left = ram.s32(s + 8);
+            if let Some(Cmd::Wait { left: l }) = w.scene.tracks[k].queue.first_mut() {
+                *l = left;
+            }
+            w.scene.tracks[k].started = true;
+            continue;
+        }
         let Some((pos, o)) = found else { continue };
         // `actor_wait` before the walk (0x4A: the actor's state +0x18C is the wait object vt 0x0804AB58, +4 the walk
         // object it starts at the end - already made, not stepped - +8 the frames left): the wait runs, the walk is
@@ -3200,7 +3211,22 @@ fn build_mid_event(_data: &Arc<GameData>, ram: &GbaRam, runner: &mut StoryHost, 
                 runner.text_open_due = Some(d.portrait != 0 && d.portrait != 7);
             }
             notes.push("mid-area: the event's text box is not open in RAM (opening / closing)".into());
-            box_due = true;
+            // (closing, not opening: the box object is gone and the A that closed it is less than the close's
+            // frames old - the node goes on when they are out: run 3 cut 129,633, s134 node 3's "Dad? Is that you?"
+            // closed by an A 8 frames before, node 4's box opens in the cut's frame; ours waited in node 3)
+            let now = ram.r32(0x0300_0F94) as i64;
+            let last = press_ring(ram).iter().rev().find(|e| e.0 & 1 != 0).map(|e| now - e.1);
+            // (not inside the long iteration that makes a new box - the recording's first rows still on the cut's logic
+            // count: a box opening there, its A the previous box's - run 3 cuts 6,166 / 63,334 / 189,183 / 226,104)
+            match last.filter(|&t| !ram.mid_iteration && (0..wf_core::scene::DIALOG_CLOSE as i64).contains(&t)) {
+                Some(t) => {
+                    d.result = Some(0);
+                    d.phase = wf_core::scene::DialogPhase::Closing;
+                    d.t = t as i32;
+                    runner.text_open_due = None;
+                }
+                None => box_due = true,
+            }
         }
         _ => {}
     }
@@ -3467,7 +3493,7 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
                 let mut w2 = w.clone();
                 w2.rng.set_state(rewind(rng.state(), m));
                 match outer {
-                    Some((o, k)) => runner.continue_mid_nested(&mut w2, o, k, from),
+                    Some((o, k)) => runner.continue_mid_nested_in(&mut w2, o, k, from, (ev.0, ev.1)),
                     None => runner.continue_mid_node(&mut w2, ev.0, ev.1, ev.2, from, last),
                 }
                 if w2.story.g[..4] == ram_g[..] {
@@ -3479,7 +3505,7 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
             match chosen {
                 Some(w2) => w = w2,
                 None => match outer {
-                    Some((o, k)) => runner.continue_mid_nested(&mut w, o, k, from),
+                    Some((o, k)) => runner.continue_mid_nested_in(&mut w, o, k, from, (ev.0, ev.1)),
                     None => runner.continue_mid_node(&mut w, ev.0, ev.1, ev.2, from, last),
                 },
             }
@@ -4073,6 +4099,14 @@ pub fn import_emulator_state(data: &Arc<GameData>, ram: &GbaRam, runner: &mut St
     }
     let info = inspect(ram);
     runner.text_open_due = None;
+    // a state saved inside an event's load iteration, its players not made yet (the recording's first rows still
+    // carry the cut's logic count - the load's frozen lag frames): no frame the app stands in (run 3 cut 139,161, s113's
+    // warp to 2-8: the counter still for 41 frames, the leader made in the last)
+    // (`load_frozen`: the recording shows the leader made later in the same iteration - a cutscene map's offstage
+    // players never appear in it, importable)
+    if ram.load_frozen && ram.player() == 0 && info.depth > 0 && info.kind == CutKind::MidArea {
+        return Err(ImportError::Unsupported(format!("area {:?}: inside an event's load iteration (its frozen lag frames, no leader yet); cut at the iteration's end", info.area)));
+    }
     // an area entry inside a running event (a script's warp): the event's position from the scene objects
     // (no leader: a cutscene map the event loaded with the players offstage)
     let in_event = if info.kind != CutKind::MidArea {

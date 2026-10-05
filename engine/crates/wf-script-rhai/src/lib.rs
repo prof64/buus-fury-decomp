@@ -134,6 +134,11 @@ pub struct ThreadState {
     /// started before the cut: it runs, its own actions are the next ones dropped)
     #[serde(default)]
     pub through_events: bool,
+    /// importing a nested event mid-node: the inner event's `run_event` enters it at this graph node (its earlier
+    /// nodes ran before the cut) - `skip` then counts that node's actions only (run 3 cut 68,495: s193 node 8's
+    /// `run_event(194)`, s194 waiting in node 6)
+    #[serde(default)]
+    pub nested_at: Option<(u16, u16)>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -427,7 +432,13 @@ impl Runtime {
                         host.set_var(*var, *value, &mut t.params[*params], globals)?;
                     }
                     Act::RunEvent { event, params } => {
-                        t.frames.push(Frame::Event { event: *event, node: 0, params: *params, in_node: false, entered: false });
+                        match t.nested_at.filter(|n| n.0 == *event) {
+                            Some((_, node)) => {
+                                t.nested_at = None;
+                                t.frames.push(Frame::Event { event: *event, node, params: *params, in_node: false, entered: true });
+                            }
+                            None => t.frames.push(Frame::Event { event: *event, node: 0, params: *params, in_node: false, entered: false }),
+                        }
                     }
                     Act::Ext { name, args, params } => {
                         let who = t.who;

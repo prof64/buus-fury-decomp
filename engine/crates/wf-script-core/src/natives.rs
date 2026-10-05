@@ -1413,9 +1413,6 @@ fn load_scene(w: &mut World, s: &mut HostState, world: i32, map: i32, variant: i
         wf_core::field::load_area_with(w, to, x + 112, y + 76, None, objects);
         if let Some(f) = w.field.as_mut() {
             f.scene_loading = false;
-            // a scene map's wrap layers drift from one camera tick later than an area load's (db7_041, s019's 0-9:
-            // BG0 HOFS = -4 * (clock - 1) from the load on)
-            f.drift_iter = f.drift_iter.map(|d| d.wrapping_add(1));
         }
         let mut k = from;
         while k < w.events.len() {
