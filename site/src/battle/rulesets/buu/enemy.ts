@@ -140,6 +140,8 @@ export class Enemy extends Actor implements EnemyLike {
    *  It belongs to the animation state, not to the AI node: it spits on its first tick even when the AI has
    *  changed state in between (lockstep f02_vs_hold_stone: StoneSpit entered by the old tree at 74, spit at 75) */
   spitCtl = -1
+  /** Mini Janemba's roll controller 0x03003248: its counter (+8 per tick), -1 = not the current state */
+  rollCtl = -1
   update(w: World) {
     this.w = w
     // the player's death script (0x08799D0C) blocks every object update at KO + 199; from KO + 200 an enemy only
@@ -189,6 +191,7 @@ export class Enemy extends Actor implements EnemyLike {
    *  reversed walk). Re-entering restarts the state (idle draws a new start tick). */
   setAnim(ref: number | string | (number | string)[], restart = true, loop?: boolean, rule?: EAnimRule) {
     this.spitCtl = -1
+    this.rollCtl = -1
     this.stateHook = null
     const prev = this.anim
     const refs = (Array.isArray(ref) ? ref : [ref]).map((r) => (typeof r === 'number' ? r + 1 : r))
@@ -234,6 +237,14 @@ export class Enemy extends Actor implements EnemyLike {
   tickAnim() {
     super.tickAnim()
     if (!this.anim) return
+    // Mini Janemba's roll controller 0x03003248 (tick 0x08034D86, t = its counter before the +8): SetAnimRaw(0x13)
+    // at 0xC0; frame 0 below 0x80, then u = t - 0x80: 1 while u < 0x40, else (u >> 5) & 1; it outlives the roll node
+    if (this.rollCtl >= 0) {
+      const t = this.rollCtl
+      if (t === 0xc0 && this.sprite?.anim(20)) this.setRaw(20)
+      this.ea.pos.frame = t < 0x80 ? 0 : t - 0x80 < 0x40 ? 1 : ((t - 0x80) >> 5) & 1
+      this.rollCtl = (t + 8) & 0xffff
+    }
     // the state's tick (vtable +4) runs before the AI; a one-shot's end callback is SetAnim(0)
     if (this.ea.tick() === 'idle') {
       this.setAnim('idle', true, true)

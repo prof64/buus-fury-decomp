@@ -53,6 +53,8 @@ pub const IDLE_COUNT: u32 = 0x0300_2B48;
 pub const MODE_NORMAL: u32 = 0x0804_94AC;
 pub const MODE_FADE_OUT: u32 = 0x0804_BB74;
 pub const MODE_FADE_IN: u32 = 0x0804_B57C;
+/// the modal scene (an event's scene object runs as the main mode; SCRIPT.md mode classes)
+pub const MODE_SCENE: u32 = 0x0804_9D18;
 
 /// object vtables (tools/field/common_field.py VT)
 pub const VT_PLAYER: u32 = 0x0804_C9F0;

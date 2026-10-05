@@ -4900,3 +4900,37 @@ frames checked) - `ship_route2.py` can import the live driver with R1 instead of
 started at a stage-3 mark (`c09_8-41`) cannot reproduce run 1, with either driver: its own state (frame count,
 cooldowns, skipped targets) starts fresh there. Run-2 stops in the ship chapter (8-x) and the camera / import items
 of my earlier work are mine to take: add them here (or on the run-2 board) and I pick them up.
+
+**Claim (ship agent, 2026-10-04, by the coordinator, from the ship-fixes agent's run-2 ship list):** run 2 rows
+219,469 (7-2: RNG during an NPC talk / food stall), 220,641 (7-2: the stall's purchase text box), 459,733 (7-2: a box
+closing - text speed with the Earth agent) and 544,962 (8-42: fight RNG). The ship-fixes agent keeps the Save Game
+screen RNG.
+
+**Enemy animation, ship + Earth (ship fix agent, 2026-10-04).** Gated cel differences, measured with the segments test
+and `cel ... differ`, went from 53 to 28 segments. The fixes are in nodes.rs and mirrored in ai.ts; TS suite 1,095
+green, cross_ts 36:
+* **SoldierThrow** (controller 0x03002FCC, tick 0x08026618): below tick 32, frame = tick >> 3, and the fourth 8 ticks
+  go back to frame 1 (0, 1, 2, 1). Ours held frame 2. This fixes shipr_242 / 251 / 254 / 255 / 257 / 267 / 281 / 301
+  and rclose_067.
+* **GunShot / RifleShot / MummyWrapShot / Burst**: each controller's enter (0x080264D4 / 0x08026754 / 0x0802D0B0) is
+  SetAnimRaw(0x12), which is raw 19, so `an(18)`. Ours used an(17) = raw 18. Raw 18 is missing on these sprites, so ours
+  held the idle pose. The controllers are the node's own state objects: gun frame = tick >> 2, rifle / wrap tick >> 3
+  (once_stop2 / once_stop3, not the type's recorded raw-19 rule, whose cue doubled sound 28). This fixes earth_2_10_2,
+  earth_3_17_1, earth_3_2_7, earth_3_3_4, dr1_019, dr3_004 / 024, db7_009 / 014 / 023 / 025, dr4_028 / 034 / 059 and
+  rfat_010.
+Left in my part: earth_2_90_2 (sprite 123 raw 20), shipr_266 (sprite 300 raw 20), shipr_338 (player cel).
+**Next (by the coordinator): run 2's Save Game screen RNG** (rows 240,639 / 480,403 / 508,508 / 536,833).
+*Run 2 import (A), part 2 - in the shared tree, uncommitted (wf-import lib.rs / ram.rs; wf-app tests/launcher.rs):*
+- **Refused run-2 cuts, 13 checked:** 3 now import and are exact - c49356 (1-17, s100) and c219470 (7-2, s256): an
+  event trigger added at runtime (`spawn_trigger_force`, s099) is rebuilt from RAM's trigger list, and an event
+  whose trigger fired in the cut's frame (scene mode 0x08049D18, its first node not run) starts as its trigger
+  starts it; c56863 (s102 node 5): the cut is the last frame of `play_anim(0, 23)` (Goku's power-up), RAM already in
+  form 4 - the node is replayed with the form before (the game's `is_super_saiyan()` was asked before the change),
+  then RAM's form is put back. Their 1,500-row runs stop on run 2's text speed (the typewriter, Earth agent).
+  **Correct refusals (10):** c35807 / c245901 the title's Continue fade-out and c480612 .. c481542 (6) the boot /
+  title screens after the soft reset - now named as such in the message; c35837 / c245931 inside a load's frozen
+  frames (counter still for 15 .. 30 frames).
+- Run-2 cut points in work/wholerun/run2/cuts: 52 / 80 exact (2-row docs; the rest are text-speed stops).
+- **wf-app `launcher_menus_and_save_slots`** was red from 4da515d (`saves_of` now appends the options block after
+  the slot files): the test checks the slot files only. All wf-app tests green; gates green; whole-run cut points
+  311 / 315 unchanged.

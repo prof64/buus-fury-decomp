@@ -34,7 +34,8 @@ fn launcher_menus_and_save_slots() {
     let app = launcher::story_app(packs(&c.files), &[], None, 1).expect("new game");
     let (gen, files) = launcher::saves_of(&app).expect("story saves");
     assert_eq!(gen, 0);
-    assert!(files.iter().all(|f| f.is_empty()));
+    // (the slot files are empty; the block after them is the options, `saves_of`)
+    assert!(files[..launcher::SLOTS].iter().all(|f| f.is_empty()));
     let s = app.sim.as_any().unwrap().downcast_ref::<wf_app::story::StorySim>().unwrap();
     let mut saves = s.session.world.saves.clone();
     saves.set(1, Some(wf_core_save(s)));

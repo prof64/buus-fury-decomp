@@ -98,6 +98,11 @@ pub struct Enemy {
     pub hook: Hook,
     /// Dabura's spit controller 0x030030C8 (tick 0x0802DE7C): ticks since its SetState, -1 = not the current state
     pub spit_ctl: i32,
+    /// Mini Janemba's roll controller 0x03003248 (tick 0x08034D86): its counter (+8 per tick, from 0 at the enter),
+    /// -1 = not the current state. It outlives the roll node (the AI's Wait after it): the frames go on until
+    /// another SetAnim
+    #[serde(default = "minus_one")]
+    pub roll_ctl: i32,
     /// +1 per state entered through SetAnim (a node can tell its controller was replaced)
     pub anim_seq: u32,
     /// the shown graphics set when MechTransform swapped it (gfx id; -1 = the type's)
@@ -207,6 +212,7 @@ impl Enemy {
             own_state: false,
             hook: Hook::None,
             spit_ctl: -1,
+            roll_ctl: -1,
             anim_seq: 0,
             gfx_now: -1,
             detached: false,
@@ -241,6 +247,7 @@ impl Enemy {
         events: &mut Vec<Event>,
     ) {
         self.spit_ctl = -1;
+        self.roll_ctl = -1;
         self.hook = Hook::None;
         let prev = self.a.anim;
         // the sprite lacks the requested animation: the game's state object still runs (no idle state, no rand(255));
@@ -338,6 +345,22 @@ impl Enemy {
         self.a.tick_anim();
         if self.a.anim.is_none() {
             return;
+        }
+        // the roll controller's frames (t = its counter before the +8): SetAnimRaw(0x13) at 0xC0; frame 0 below 0x80,
+        // then u = t - 0x80: 1 while u < 0x40, else (u >> 5) & 1 (real route 18-14 rj_049 f1329 .. f1407)
+        if self.roll_ctl >= 0 {
+            let t = self.roll_ctl;
+            if t == 0xC0 && self.a.sprite.and_then(|s| d.sprite(s)).is_some_and(|s| s.anim_raw(20).is_some()) {
+                self.set_raw(d, 20);
+            }
+            self.ea.pos.frame = if t < 0x80 {
+                0
+            } else if t - 0x80 < 0x40 {
+                1
+            } else {
+                ((t - 0x80) >> 5) & 1
+            };
+            self.roll_ctl = (t + 8) & 0xffff;
         }
         let res = {
             let mut h = EHost {
@@ -2611,7 +2634,13 @@ pub fn hand_strike(w: &mut World, i: usize, a_side: bool) -> Option<EntityId> {
             t.sprite
         },
     );
-    a.set_anim(&d, &[n(18)], true, Some(false));
+    // (field: the portal hand of the A side (facing 2) rises with anim 0x13 - raw 20 of sprite 150, the B side's
+    // with 0x12; real route 18-14 rj_049 f515 / f572)
+    if w.field.is_some() && a_side && a.sprite.and_then(|s| d.sprite(s)).is_some_and(|s| s.anim_raw(20).is_some()) {
+        a.set_anim(&d, &[n(19)], true, Some(false));
+    } else {
+        a.set_anim(&d, &[n(18)], true, Some(false));
+    }
     a.hittable = false;
     // field: an enemy object - its constructor marks its footprint on the enemy grid (sc_janemba)
     let marked = if w.field.is_some() {
@@ -3209,4 +3238,9 @@ pub fn die(w: &mut World, i: usize, explode: bool) {
 pub fn hold_player(w: &mut World, i: usize, pi: usize, kind: HoldKind, frames: i32) {
     let me = w.ents[i].id;
     player::hold(w, pi, me, kind, frames);
+}
+
+/// serde default of the -1 = "none" fields
+fn minus_one() -> i32 {
+    -1
 }

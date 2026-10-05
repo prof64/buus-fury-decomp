@@ -375,6 +375,7 @@ fn build_area_entry(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner: 
 /// stack (`0x0801246E`: +0 header, +8 u16 next state, +0x14 param block pointer; SCRIPT.md B4)
 pub fn running_event(ram: &GbaRam, runner: &StoryHost) -> Option<(u16, u16, [i32; 4])> {
     let mut a = 0x0300_7000u32;
+    let mut fresh = None;
     while a < 0x0300_8000 - 0x18 {
         let h = ram.r32(a);
         let pp = ram.r32(a + 0x14);
@@ -389,10 +390,22 @@ pub fn running_event(ram: &GbaRam, runner: &StoryHost) -> Option<(u16, u16, [i32
                 let params = [0, 4, 8, 12].map(|o| ram.s32(pp + o));
                 return Some((ev, node, params));
             }
+            // (a scene object that has not stepped - next state 0 - under the modal scene mode: the event a trigger
+            // / talk started in the cut's frame, its first node still to run - when no event runs it (a nested
+            // run_event's not stepped yet is its outer's: whole-run cuts 612,541 / 620,017); run 2 cut 49,356, s100)
+            if next == 0 && fresh_scene(ram, a) && fresh.is_none() {
+                fresh = Some((ev, 0, [0, 4, 8, 12].map(|o| ram.s32(pp + o))));
+            }
         }
         a += 4;
     }
-    None
+    fresh
+}
+
+/// the main mode is the modal scene (vt 0x08049D18) of the scene object at `obj` (its +4) and that object's next
+/// state is 0: the event started in this frame, its first node has not run
+fn fresh_scene(ram: &GbaRam, obj: u32) -> bool {
+    ram.mode_vt() == MODE_SCENE && ram.r32(ram.r32(MODE) + 4) == obj && ram.r16(obj + 8) == 0
 }
 
 /// the event running `ev` with `run_event` (the next event object up the stack, its interpreter standing just
@@ -699,6 +712,7 @@ fn open_pause_page(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
 
 fn field_from_ram(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
     import_objects(w, ram, notes);
+    import_spawned_triggers(w, ram, notes);
     import_trigger_resume(w, ram);
     // (shots an enemy's node had made - a beam in flight - are newer than every actor: the list's end)
     let (shots, rest): (Vec<_>, Vec<_>) = std::mem::take(&mut w.ents).into_iter().partition(|e| matches!(e.body, Body::Shot(_)));
@@ -820,6 +834,31 @@ fn field_from_ram(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
 /// that entity is patched to the RAM's state (it keeps what the load attached: patrol runners, placements, talk
 /// events); RAM actors without a match are built; entities no RAM actor claims go. The actors end in the RAM's
 /// world-list order (the update order).
+/// event triggers a script added (`spawn_trigger_force` 0x8A: an area trigger the load did not make, its condition
+/// false) that stand in the RAM's trigger list (`TRIGS`, event trigger vt 0x08049BD4: +4 rect): ours made again by
+/// rect (run 2 cut 49,356: s099's spawn_trigger_force(4) at 1-17, s100's trigger)
+fn import_spawned_triggers(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
+    use wf_core::fieldcontent::{ObjKind, TriggerKind};
+    let n = ram.r32(TRIGS).min(256);
+    let Some(area) = w.field.as_ref().map(|f| f.area) else { return };
+    let defs = w.data.field.as_ref().and_then(|fd| fd.area(area.world, area.area)).map(|a| a.objects.clone()).unwrap_or_default();
+    for k in 0..n {
+        let o = ram.r32(TRIGS + 4 + 4 * k);
+        if !ram.valid(o) || ram.r32(o) != 0x0804_9BD4 {
+            continue;
+        }
+        let r = (ram.s16(o + 4), ram.s16(o + 6), ram.s16(o + 8), ram.s16(o + 0xA));
+        if w.field.as_ref().is_some_and(|f| f.triggers.iter().any(|t| (t.rect.x0, t.rect.y0, t.rect.x1, t.rect.y1) == r)) {
+            continue;
+        }
+        let def = defs.iter().find(|d| matches!(&d.kind, ObjKind::Trigger { rect, kind: TriggerKind::Event(_), .. } if (rect.x0, rect.y0, rect.x1, rect.y1) == r));
+        if let Some(d) = def {
+            field::spawn_map_object(w, d.at, true);
+            notes.push(format!("mid-area: a script-spawned event trigger {:?} {r:?}", d.at));
+        }
+    }
+}
+
 /// the event triggers' resume nodes (trigger list `TRIGS`, event trigger vt 0x08049BD4: +4 rect s16 x0 y0 x1 y1,
 /// +0x10 the exit value of the event's last run), matched to the load's triggers by rect
 fn import_trigger_resume(w: &mut World, ram: &GbaRam) {
@@ -2001,6 +2040,10 @@ fn build_mid_event(_data: &Arc<GameData>, ram: &GbaRam, runner: &mut StoryHost, 
     // a touch-once trigger running its event: the game removes it when the event returns (still in the RAM's list),
     // ours when it fires - gone (whole-run cut 887,156: s437 fired again after its end)
     let name = format!("s{:03}", ev.0);
+    // (the trigger itself, for an event started in the cut's frame: below)
+    let fresh_trig = w.field.as_ref().and_then(|f| {
+        f.triggers.iter().map(|t| t.obj).find(|&o| field::trigger_def(&w, o).is_some_and(|d| matches!(d.kind, wf_core::fieldcontent::ObjKind::Trigger { kind: wf_core::fieldcontent::TriggerKind::Event(ref s) | wf_core::fieldcontent::TriggerKind::SavePoint(ref s), .. } if *s == name)))
+    });
     let fired: Vec<usize> = w.field.as_ref().map(|f| f.triggers.iter().enumerate().filter(|(_, t)| t.act == wf_core::fieldcontent::Activation::TouchOnce && field::trigger_def(&w, t.obj).is_some_and(|d| matches!(d.kind, wf_core::fieldcontent::ObjKind::Trigger { kind: wf_core::fieldcontent::TriggerKind::Event(ref s), .. } if *s == name))).map(|(k, _)| k).collect()).unwrap_or_default();
     if let Some(f) = w.field.as_mut() {
         for k in fired.into_iter().rev() {
@@ -2025,6 +2068,25 @@ fn build_mid_event(_data: &Arc<GameData>, ram: &GbaRam, runner: &mut StoryHost, 
     // stopped inside the node's code: the natives its interpreter has run (the PC after the one that blocks)
     if let Some(ran) = natives_run(ram, runner, ev) {
         return build_mid_code(ram, runner, ev, w, calls0, &ran, notes);
+    }
+    // an event its trigger started in the cut's frame (`fresh_scene`): it starts as the trigger check starts it, its
+    // scene's first step - node 0 - in the next frame (run 2 cut 49,356: s100's trigger at 1-17)
+    if ev.1 == 0 && ram.mode_vt() == MODE_SCENE && fresh_scene(ram, ram.r32(ram.r32(MODE) + 4)) {
+        use wf_core::fieldcontent::Callback;
+        let name = format!("s{:03}", ev.0);
+        if let Some(obj) = fresh_trig {
+            w.scene.depth = 0;
+            field::set_busy(&mut w, false);
+            if let Some(f) = w.field.as_mut() {
+                f.event_ended = false;
+            }
+            let ev_run = Event::Field(field::FieldEvent::Run { run: Callback::Event(name), cause: field::Cause::Trigger { obj }, slot: 0 });
+            runner.run_events(&mut w, &[ev_run]);
+            notes.push(format!("event s{:03}: started by its trigger in the cut's frame (its first node next frame)", ev.0));
+            let draws = w.rng.calls.wrapping_sub(calls0);
+            return Built { world: w, draws, held: 0, finished: true };
+        }
+        notes.push(format!("unsupported: event s{:03} started in the cut's frame by no trigger of ours", ev.0));
     }
     runner.continue_event(&mut w, ev.0, ev.1, ev.2, 0, None);
     // the text box as the RAM shows it
@@ -2181,7 +2243,7 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
     let k = ran.iter().filter(|(n, a)| *n == wn && (wargs.is_none() || *a == wargs)).count();
     let seen = std::cell::RefCell::new(vec![]);
     let hits = std::cell::Cell::new(0usize);
-    let found = runner.probe_queued(&mut w, ev.0, ev.1, ev.2, &|n, a| {
+    let pred = |n: u8, a: &[i32]| {
         let m = n == wn && wargs.as_ref().is_none_or(|x| x.as_slice() == a);
         if m {
             hits.set(hits.get() + 1);
@@ -2191,7 +2253,29 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
             seen.borrow_mut().push(n);
         }
         hit
-    });
+    };
+    let mut found = runner.probe_queued(&mut w, ev.0, ev.1, ev.2, &pred);
+    // a `play_anim` on the leader that transformed it in the cut's frame (the power-up, script anim 23: the RAM's
+    // form is the new one, the wait ends in the next frame): the node's queries before it (`is_super_saiyan`) read
+    // the form before - the node is replayed with the leader in that form (its `down`), the RAM's put back after
+    // (run 2 cut 56,863: s102 node 5, Goku's power-up to Super Saiyan)
+    let mut form_after = None;
+    if found.is_none() && wn == 0x3C && wargs.as_ref().is_some_and(|a| a.first() == Some(&0)) {
+        if let Some(pi) = w.player_idx(0) {
+            let f = w.pl_ref(pi).form;
+            if let Some(down) = w.data.form(f).map(|d| d.down).filter(|&d| (0..255).contains(&d)) {
+                w.pl(pi).form = down;
+                seen.borrow_mut().clear();
+                hits.set(0);
+                found = runner.probe_queued(&mut w, ev.0, ev.1, ev.2, &pred);
+                if found.is_some() {
+                    form_after = Some((pi, f));
+                } else {
+                    w.pl(pi).form = f;
+                }
+            }
+        }
+    }
     // the probe cannot see the waiting native: (a) a `run_event` whose event object is on the stack but has not
     // stepped yet (its state word 0 - whole-run cut 612,541: s508 node 1 ran `run_event(494, ..)`, s494's node 0
     // runs in the next frame): the node continues past its actions before it, the nested event from its start;
@@ -2270,6 +2354,26 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
             return Built { world: w, draws, held: 0, finished: false };
         }
     };
+    // (the transformation's anim: done in the cut's frame - its command goes, the leader is the RAM's again)
+    if let Some((pi, f)) = form_after {
+        let id = w.ents[pi].id;
+        let mut pl = w.pl_ref(pi).clone();
+        pl.apply_form(&w, f);
+        *w.pl(pi) = pl;
+        for t in w.scene.tracks.iter_mut() {
+            if t.owner == Owner::Entity(id) && matches!(t.queue.first(), Some(Cmd::PlayAnim { .. })) {
+                t.queue.remove(0);
+                t.started = false;
+            }
+        }
+        patch_leader(&mut w, ram, notes);
+        import_player_state(&mut w, ram, notes);
+        if w.scene.tracks.iter().all(|t| t.queue.is_empty()) {
+            w.scene.director.wait = None;
+            w.scene.director.done = true;
+        }
+        notes.push(format!("mid-area: s{:03} node {}: the leader's transformation anim ended in the cut's frame", ev.0, ev.1));
+    }
     w.rng = rng;
     // the script words the replayed part set (`set_g(0, rand(3))` - s508 node 1: its draw replays on the cut's
     // generator, another value) are the RAM's - when the whole replayed part ran before the cut (a run_event not yet
@@ -2612,6 +2716,13 @@ fn build_event_entry(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner:
     let fade_after_warp = |ran: &Vec<(u8, Option<Vec<i32>>)>| {
         ran.last().is_some_and(|(n, _)| (0x78..=0x7E).contains(n)) && ran[..ran.len() - 1].iter().any(|(n, _)| matches!(n, 0x76 | 0x77))
     };
+    // an event its trigger / talk started in the cut's frame (`fresh_scene`): its first node over the standing field
+    if ev.1 == 0 && ram.mode_vt() == MODE_SCENE && natives_run(ram, runner, ev).is_none() {
+        let obj = ram.r32(ram.r32(MODE) + 4);
+        if fresh_scene(ram, obj) {
+            return build_mid_event(data, ram, runner, ev, w, calls0, notes);
+        }
+    }
     if let Some(ran) = natives_run(ram, runner, ev).filter(|r| ram.screen_black != Some(true) || fade_after_warp(r)) {
         if ran[..ran.len() - 1].iter().any(|(n, _)| matches!(n, 0x76 | 0x77)) {
             return build_mid_event(data, ram, runner, ev, w, calls0, notes);
@@ -2746,6 +2857,19 @@ pub fn import_emulator_state(data: &Arc<GameData>, ram: &GbaRam, runner: &mut St
         open_pause_page(&mut imp.world, ram, &mut imp.notes);
         import_options(&mut imp.world, ram);
         return Ok(imp);
+    }
+    // the title's Continue (Select Game, the 16-step fade-out 0x0804BBA4 before the slot's load): a menu of the title,
+    // its save slots in the cartridge's EEPROM - not a field state (run 2 cut 35,807)
+    // (the mode is the generic 16-step fade - the prologue's too: here with no player, no event, the slot list's objects)
+    if ram.mode_vt() == 0x0804_BBA4 && ram.player() == 0 && ram.r32(DEPTH) == 0 && ram.objects().iter().any(|&o| ram.r32(o) == 0x0804_BA50) {
+        return Err(ImportError::Unsupported("the title's Continue fade-out (mode 0x0804bba4): a title menu, not a field (its save slot is in EEPROM)".into()));
+    }
+    // the boot screens and the title's pages (legal 0x08049354, logos 0x080492B8, title 0x0804A404 / 0x080494D8,
+    // Single / Multiplayer 0x08049B00, Select Game 0x0804947C, its "Are you sure?" 0x08049CEC, options 0x0804A430):
+    // menus of the power-on, not a field (run 2 rows 480,612 .. 481,542, after the soft reset at 8-28)
+    let boot = [0x0804_9354, 0x0804_92B8, 0x0804_A404, 0x0804_94D8, 0x0804_9B00, 0x0804_947C, 0x0804_9CEC, 0x0804_A430];
+    if boot.contains(&ram.mode_vt()) && ram.player() == 0 && ram.r32(DEPTH) == 0 {
+        return Err(ImportError::Unsupported(format!("a boot / title screen (mode {:#x}), not a field", ram.mode_vt())));
     }
     let info = inspect(ram);
     runner.text_open_due = None;

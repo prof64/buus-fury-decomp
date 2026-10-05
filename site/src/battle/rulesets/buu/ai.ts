@@ -1840,7 +1840,7 @@ export function create(n: AiNodeJ, c: AiController): RNode {
     case 'KidBuuSplitAnim':
       // SetAnimRaw(0xC) under the one-shot state 0x03001B30; the node finishes on the 56th update (lockstep
       // f02_vs_enemy_beam: entered at 172, the split state at 229)
-      return wait(n, c, 56, 11, false)
+      return wait(n, c, 56, 12, false)
     case 'KidBuuSplit':
       return new Instant(n, c, () => e.kidBuuSplit())
     case 'KidBuuMerge':
@@ -1864,7 +1864,12 @@ export function create(n: AiNodeJ, c: AiController): RNode {
     case 'BabidiGesture':
       // the landing. Enter 0x0802AE76: SetAnimRaw(0x13) under the controller 0x03003024; tick 0x0802AE3A: down 1 px
       // a frame; on the ground 8 ticks, then SetAnim(0) (idle rand(255)) and the node (0x0802AE98) is finished
-      return new Act(n, c, () => e.setAnim(19, true, true, { rule: 'hold' }), (_f, a) => {
+      // (the enter acts only while the object already shows anim 0x13 - the descent's; else the node is done at once)
+      return new Act(n, c, (a) => {
+        a.data.on = e.ea.pos.raw === 20
+        if (a.data.on) e.setAnim(19, true, true, { rule: 'hold' })
+      }, (_f, a) => {
+        if (!a.data.on) return true
         if (e.z < 0) {
           e.z += 1
           return false
@@ -1929,9 +1934,13 @@ export function create(n: AiNodeJ, c: AiController): RNode {
       }
       return new Act(n, c, (a) => {
         a.data.ph = 0
-        e.setAnim(18, true, true)
+        // (the hop controller's own frames: the update below)
+        e.setAnim(18, true, true, { rule: 'hold' })
         aim()
       }, (_f, a) => {
+        // the hop controller's frame (tick 0x08034630, its counter before the +8): 0 below 0x80, 1 rising, 2 falling
+        const c0 = a.data.ph
+        e.ea.pos.frame = c0 < 0x80 ? 0 : c0 - 0x80 < 0x40 ? 1 : 2
         a.data.ph = (a.data.ph + 8) & 0xff
         const air = a.data.ph > 0x80
         e.z = a.data.ph >= 0x80 ? -Math.round(Math.sin(((a.data.ph - 0x80) / 128) * Math.PI) * 8) : 0
@@ -1959,7 +1968,9 @@ export function create(n: AiNodeJ, c: AiController): RNode {
       })
     case 'MiniRollAttack':
       return new Act(n, c, (a) => {
-        e.setAnim(17, true, true)
+        // anim 0x12 (raw 19) under the roll controller (its own frames: the update below)
+        e.setAnim([18, 17], true, true, { rule: 'hold' })
+        e.rollCtl = 0
         // controller 0x03003248 enter 0x08034CF8: the diagonal toward the player from the footprint centres (dx > 0:
         // dy > 0 -> 0 else 3; dx <= 0: dy > 0 -> 2 else 1), velocity 0x0875947C[dir] * 0x80 >> 8 = +-1.5 px per axis
         const [dx, dy] = e.toPlayer()

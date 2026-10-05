@@ -1430,7 +1430,8 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             set_anim(w, i, &[an(14)], true, Some(true));
         }
         K::SummonMinion => timed_enter(w, i, &[an(17)], false),
-        K::KidBuuSplitAnim => set_anim(w, i, &[an(11)], true, Some(false)),
+        // SetAnimRaw(0xC) = raw 13 (real route 19-3 rkb_008 f2390; was raw 12, missing: idle shown)
+        K::KidBuuSplitAnim => set_anim(w, i, &[an(12)], true, Some(false)),
         // Babidi (real route 8-71, Vegeta vs Majin Buu). Hover enter 0x0802AD88: SetAnimRaw(0x13) under the
         // controller 0x03003014 (no idle draw), Buu is no longer pacified, not hittable (obj+0x1CC = 0)
         K::BabidiHover => {
@@ -1440,9 +1441,15 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             w.en(i).a.hittable = false;
         }
         // the landing, enter 0x0802AE76: SetAnimRaw(0x13) under the controller 0x03003024
+        // enter 0x0802AE76: only while the object already shows anim 0x13 (obj +0x50 = the def's entry 20: the
+        // descent's) - SetAnimRaw(0x13) under the controller 0x03003024; else nothing, and the update finds the
+        // state not its controller: done (real route 6-1 rfat_033 f12904: Babidi keeps idling)
         K::BabidiGesture => {
-            let h = w.data.anim.hold;
-            set_anim_r(w, i, &[an(19)], true, h);
+            r.d[1] = (w.en_ref(i).ea.pos.raw == 20) as i32;
+            if r.d[1] != 0 {
+                let h = w.data.anim.hold;
+                set_anim_r(w, i, &[an(19)], true, h);
+            }
         }
         // field (sc_janemba): the arm part plays the strike (raw 19), the body keeps its idle; battle keeps the
         // reference's body animation (cross_ts)
@@ -1475,13 +1482,18 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
         // node 0x03003230 (enter 0x0803467A: SetAnimRaw(0x12), the hop controller, aim)
         K::MiniHopToward => {
             r.d[0] = 0;
-            set_anim(w, i, &[an(18)], true, Some(true));
+            // (the hop controller's own frames: the update below)
+            let h = w.data.anim.hold;
+            set_anim_r(w, i, &[an(18)], true, h);
             mini_aim(w, i);
         }
         K::MiniHopFlee | K::Hop => r.d[0] = 0,
         // controller 0x03003248 enter 0x08034CF8: the diagonal toward the player, velocity 0x0875947C[dir] (+-1.5 px)
+        // anim 0x12 (raw 19) under the roll controller (its own frames: the update below)
         K::MiniRollAttack => {
-            set_anim(w, i, &[an(17)], true, Some(true));
+            let h = w.data.anim.hold;
+            set_anim_r(w, i, &[an(18), an(17)], true, h);
+            w.en(i).roll_ctl = 0;
             let (dx, dy) = en::to_player(w, i);
             let f: u8 = if dx > 0 {
                 if dy > 0 {
@@ -3071,6 +3083,9 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         // controller tick 0x0802AE3A: down 1 px a frame; on the ground 8 ticks, then SetAnim(0) (the idle's
         // rand(255)) - the node (0x0802AE98) is finished once the controller is gone
         K::BabidiGesture => {
+            if r.d[1] == 0 {
+                return true;
+            }
             if w.en_ref(i).a.z < 0 {
                 w.en(i).a.z += 1;
                 return false;
@@ -3181,6 +3196,10 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         // update 0x080346FC: tick + 8 (wraps at 0x100); at 0 re-aim with chance(0x4000); > 0x80: the whole step
         // 0x087593F8[dir] (+-0.5 px per axis), no sliding
         K::MiniHopToward => {
+            // the hop controller's frame (tick 0x08034630, its counter before the +8): 0 below 0x80, 1 for the
+            // rise (u < 0x40), 2 for the fall (real route 18-14 rj_049 f1465 ..)
+            let c0 = r.d[0];
+            w.en(i).ea.pos.frame = if c0 < 0x80 { 0 } else if c0 - 0x80 < 0x40 { 1 } else { 2 };
             r.d[0] = (r.d[0] + 8) & 0xff;
             let ph = r.d[0];
             w.en(i).a.z = if ph >= 0x80 {
