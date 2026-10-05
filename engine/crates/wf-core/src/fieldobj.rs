@@ -793,15 +793,18 @@ pub fn item_get_step(w: &mut World) {
         return;
     }
     let g = f.item_get.take().unwrap();
-    // the presentation's loop returns into the object pass it interrupted: the enemies that pass had not reached tick
-    // their animation a second time in this frame (Nataday 15-3 dr4_006 f301, 15-13 dr4_061 f303: a walking enemy's
-    // tick +2; its position moves once - a whole second update moved it off the game's: INFERRED animation only)
+    // the presentation's loop returns into the object pass it interrupted: the objects that pass had not reached (older
+    // than the player) get their full update now, after this frame's state-only tick of the loop (emulator, Nataday
+    // 15-3 dr4_006 f301: the enemy's tick from lr 0x0800F5E1, the presentation's state tick, then from 0x0800EF29,
+    // the actor update - its AI moves it; objects newer than the player get the state tick only)
     let rest = std::mem::take(&mut f.item_get_rest);
     if g.then.is_none() {
         for id in rest.into_iter().rev() {
             let Some(k) = w.find(id).filter(|&k| !w.ents[k].removed) else { continue };
-            if matches!(w.ents[k].body, Body::Enemy(_)) {
-                crate::enemy::tick_anim(w, k);
+            match w.ents[k].body {
+                Body::Enemy(_) => crate::enemy::update(w, k),
+                Body::Npc(_) => crate::scene::npc_update(w, k),
+                _ => {}
             }
         }
     }

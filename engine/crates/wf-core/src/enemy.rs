@@ -647,7 +647,9 @@ pub fn update(w: &mut World, i: usize) {
         || w.field.as_ref().is_some_and(|f| {
             f.busy && !own_load
                 || f.arrival.is_some()
-                || f.item_get.as_ref().is_some_and(|g| g.left > 0)
+                // (the item-get presentation's loop runs the objects' state ticks only - caller 0x0800F5E0 - through
+                // the frame it ends in; emulator, dr4 15-3: the enemy's tick from lr 0x0800F5E1 every frame of it)
+                || f.item_get.is_some()
         })
     {
         tick_anim(w, i);

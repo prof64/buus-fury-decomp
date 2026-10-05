@@ -244,10 +244,14 @@ want any of mine or not those two.
 * **Done (B): the three single frames left of mine** (cel 28 -> 25: 24 are the Super Buu agent's `sb_006` / `sb_007`,
   1 `sb_012_20_06` f2015):
   - `dr4_006_15-3` f301 / `dr4_061_15-13` f303 - **the item-get's end completes the object pass its start
-    interrupted**: the enemies older than the player (not updated in the pickup's frame) tick their animation again
-    when the presentation's loop returns (the object 15 in the recording is the item icon, vt 0x0804B358, not a
-    charge effect). `Field::item_get_rest` (world.rs, at the start), `fieldobj::item_get_step` (at the take, pickups
-    without an event; animation only - a whole second update moved the enemy off the game's: INFERRED).
+    interrupted - VERIFIED in the emulator** (dr4 15-3, write watch on the enemy's tick / position): every frame of
+    the presentation, the frame it ends in included, each object gets the loop's state tick only (lr 0x0800F5E1,
+    caller 0x0800F5E0 - no AI, no move); in the end frame the objects older than the player then get their full
+    actor update (lr 0x0800EF29: tick again, the AI moves it) as the loop returns into the interrupted pass. Ours: the
+    enemies' state-tick-only branch covers the whole presentation (`item_get.is_some()`, was `left > 0`), and the
+    take (`fieldobj::item_get_step`, pickups without an event) gives the objects in `Field::item_get_rest` (world.rs,
+    recorded at the start) their full update (enemies, NPCs); the item icon (vt 0x0804B358) is the object 15 the
+    recording drops.
   - `rj03_045_18-1` f251 - **HandSink's first update does not rewrite the hand's frame** (tick 104 still, the
     strike's last cel 12 shows, not 104 >> 3 = 13); from the second update the reverse cel as before.
   Every segment's matched count unchanged (811,832), gates, the pixel test and the whole-run check green.
