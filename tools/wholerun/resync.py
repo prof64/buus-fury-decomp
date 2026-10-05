@@ -5,16 +5,19 @@ recording. Every stop: row, stretch, chapter, what differs, the likely owner. An
 that diverges at once, is an "import" stop and the cut moves on (30, 60, 120 .. rows). Output
 work/wholerun/stops_<lag>.jsonl (one line a stop, appended as it goes) - board.py --resync ranks them.
 Headless, muted; needs work/wholerun/master.jsonl (record.py) and the wholerun example built (board.py builds it)."""
+import base64
 import gzip
 import json
 import subprocess
 import sys
 import time
+import zlib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-for d in ('tools/story_playthrough', 'tools/field', 'tools/segments', 'tools/script_lockstep', 're/buu'):
+for d in ('tools/superbuu', 'tools/story_playthrough', 'tools/field', 'tools/segments', 'tools/script_lockstep', 're/buu'):
     sys.path.insert(0, str(ROOT / d))
+from sbemu import sd_read  # noqa: E402  (the savedata-capable emulator lib first: the cuts carry the EEPROM)
 import realrun  # noqa: E402
 import segment as sg  # noqa: E402
 from route import start_emu  # noqa: E402
@@ -107,6 +110,9 @@ def cut_at(r):
     init, objs, rows = sg.record(e2, lambda j, _e: keys[r + j] if r + j < len(keys) else None, CUT_ROWS)
     rows = trim_to_iteration(rows)
     init['snd_phase'] = phase(st)
+    # the cartridge's EEPROM (the in-game saves): a save state does not carry it, the continuous session does - the
+    # importer fills the app's save slots from it (a Continue after a game over, run 2 row 35,806)
+    init['eeprom'] = base64.b64encode(zlib.compress(sd_read(e))).decode()
     doc = {'kind': 'segment', 'name': f'wr_{r}', 'source': {'kind': 'state', 'state': str(st)}, 'init': init, 'objs': objs, 'frames': rows}
     p = CUTS / f'c{r}.json'
     p.write_text(json.dumps(doc, separators=(',', ':')))

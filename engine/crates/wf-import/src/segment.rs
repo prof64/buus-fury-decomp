@@ -373,6 +373,11 @@ pub fn start(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Value
     let mut host = StoryHost::new(data, files)?;
     let mut imp = import_emulator_state(data, &ram, &mut host).map_err(|e| e.to_string())?;
     host.prev_held = imp.prev_keys;
+    // the cartridge's EEPROM at the cut (`init.eeprom`, base64(zlib); tools/wholerun/resync.py): the save slots
+    if let Some(s) = doc["init"]["eeprom"].as_str() {
+        let ee = crate::ram::b64(s).and_then(|z| miniz_oxide::inflate::decompress_to_vec_zlib(&z).map_err(|e| format!("eeprom: inflate {e:?}")))?;
+        crate::import_saves(data, &ram, &ee, &mut imp.world.saves);
+    }
     // the sound driver (wf-core sndsim.rs): its RAM, the play position and the cycles to the next DMA interrupt
     // (`init.snd_phase`, tools/segments/snd_phase.py; without it the redraw timing is approximate)
     if data.sound.is_some() {

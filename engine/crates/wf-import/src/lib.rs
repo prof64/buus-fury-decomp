@@ -2744,6 +2744,7 @@ pub fn import_emulator_state(data: &Arc<GameData>, ram: &GbaRam, runner: &mut St
     if let Some(page_ram) = pause_page(ram).and(ram.with_saved_world()) {
         let mut imp = import_emulator_state(data, &page_ram, runner)?;
         open_pause_page(&mut imp.world, ram, &mut imp.notes);
+        import_options(&mut imp.world, ram);
         return Ok(imp);
     }
     let info = inspect(ram);
@@ -2869,7 +2870,63 @@ pub fn import_emulator_state(data: &Arc<GameData>, ram: &GbaRam, runner: &mut St
         world.scene.timers.countdown = u32le(&gd, 0x4D4) as i32;
         world.scene.timers.countdown_on = gd[1] & 4 != 0;
     }
+    import_options(&mut world, ram);
     Ok(Imported { world, prev_keys: ram.r16(INPUT + 2) & 0x3FF, lf: info.lf, kind: info.kind, held_frames: b.held, draws: b.draws, notes })
+}
+
+/// the game options (`0x03001914`: text speed, SFX volume, music volume, 0 - menu/options.rs; global, loaded from the
+/// cartridge at boot, not part of a save game): the cut's, on every import (run 2: text speed 6, SFX 4 after its
+/// Options visit - every cut after it, whole-run run-2 rows 31,497 ..); and the current game's slot (`0x03001910`:
+/// where Save Game writes, the slot a Continue started from)
+fn import_options(w: &mut World, ram: &GbaRam) {
+    let b = ram.read(0x0300_1914, 4);
+    if b[..3].iter().all(|&v| v <= 8) {
+        w.menu.settings = wf_core::menu::options::Settings { text_speed: b[0], sfx: b[1], music: b[2], pad: b[3] };
+    }
+    let slot = ram.r32(0x0300_1910);
+    if (slot as usize) < wf_core::menu::save::SLOTS {
+        w.saves.current = slot as i32;
+    }
+}
+
+/// The save slots from the cartridge's EEPROM (8 KiB as the emulator holds it: each 8-byte block byte-reversed; a
+/// save state does not carry it - the cut doc's `init.eeprom`, tools/wholerun/resync.py). Slot n at 0x10 + n * 0x8B0
+/// (the slot writer `0x080049F2`): the GameData image (0x8A8 bytes) + a checksum / pad word pair. As `0x08004962`
+/// writes it: +1 bit 0 = a game exists, bit 3 = the save flag; +0x4D0 = the play time (absolute frames; GameData in
+/// RAM holds it as a bias to the frame counter); +0x8A0 world, area, variant (bytes), +0x8A4 / +0x8A6 the leader's
+/// x / y (px, u16). Script words L / G and the variant byte are not in the slot (a Continue starts them fresh).
+/// (The checksum is not checked: a slot counts when its "game exists" bit is set.)
+pub fn import_saves(data: &GameData, ram: &GbaRam, eeprom: &[u8], saves: &mut wf_core::menu::save::Saves) {
+    use wf_core::menu::save::{SaveData, SLOTS};
+    let b: Vec<u8> = eeprom.chunks(8).flat_map(|c| c.iter().rev().copied().collect::<Vec<_>>()).collect();
+    saves.slots.resize(SLOTS, None);
+    for s in 0..SLOTS {
+        let o = 0x10 + s * 0x8B0;
+        let Some(gd) = b.get(o..o + 0x8A8) else { continue };
+        if gd[1] & 1 == 0 || gd.iter().all(|&v| v == 0xFF) {
+            saves.slots[s] = None;
+            continue;
+        }
+        let mut r = ram.clone();
+        let g0 = (GD - IWRAM) as usize;
+        r.iwram[g0..g0 + 0x8A8].copy_from_slice(gd);
+        let mut story = import_story(data, &r);
+        let fresh = Story::new_game(data);
+        story.play_frames = (u32le(gd, 0x4D0) as i32).max(0) as u64;
+        story.lf_bias = 0;
+        story.l = fresh.l;
+        story.g = fresh.g;
+        story.variant_byte = fresh.variant_byte;
+        saves.slots[s] = Some(SaveData {
+            story,
+            world: gd[0x8A0] as i32,
+            area: gd[0x8A1] as i32,
+            variant: gd[0x8A2] as i32,
+            x: u16le(gd, 0x8A4),
+            y: u16le(gd, 0x8A6),
+            flag: gd[1] & 8 != 0,
+        });
+    }
 }
 
 /// the rebuilt World against the RAM: leader, camera, actors (by sprite, nearest first); differences become notes

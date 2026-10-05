@@ -195,7 +195,7 @@ impl GbaRam {
     }
 }
 
-fn b64(s: &str) -> Result<Vec<u8>, String> {
+pub(crate) fn b64(s: &str) -> Result<Vec<u8>, String> {
     let val = |c: u8| -> Option<u32> {
         Some(match c {
             b'A'..=b'Z' => (c - b'A') as u32,

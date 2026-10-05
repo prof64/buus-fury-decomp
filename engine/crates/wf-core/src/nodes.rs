@@ -1097,14 +1097,20 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             r.d[6] = w.en_ref(i).anim_seq as i32;
         }
         // (r.d[6] = the animation state the shot runs under: see `shot_state_gone`)
-        // the controllers' enter (0x080264D4 / 0x08026754 / 0x0802D0B0) is SetAnimRaw(0x12): raw 19 (Earth 3-2: a
-        // ninja's rifle shot shows raw 19; with an(17) = raw 18, missing on its sprite, ours held the idle pose)
-        K::GunShot | K::RifleShot | K::MummyWrapShot => {
-            timed_enter(w, i, &[an(18), an(3)], true);
-            r.d[6] = w.en_ref(i).anim_seq as i32;
-        }
-        K::MummyWrapBurst => {
-            timed_enter(w, i, &[an(18), an(3)], false);
+        // the controllers (0x03002FC4 / 0x03002FD8 / 0x030030A8) are the node's own state objects: enter
+        // (0x080264D4 / 0x08026754 / 0x0802D0B0) SetAnimRaw(0x12) = raw 19, tick: frame = tick >> 2 (gun) / >> 3 (rifle,
+        // wrap) - not the type's recorded raw-19 rule, whose cue is not theirs (Earth 3-2: a ninja's rifle shot shows
+        // raw 19; with an(17) = raw 18, missing on its sprite, ours held the idle pose)
+        K::GunShot | K::RifleShot | K::MummyWrapShot | K::MummyWrapBurst => {
+            if kind(c, n) != K::MummyWrapBurst {
+                en::face_player(w, i);
+            }
+            let r0 = if kind(c, n) == K::GunShot {
+                w.data.anim.once_stop2
+            } else {
+                w.data.anim.once_stop3
+            };
+            set_anim_r(w, i, &[an(18), an(3)], false, r0);
             r.d[6] = w.en_ref(i).anim_seq as i32;
         }
         K::NinjaStarThrow => {

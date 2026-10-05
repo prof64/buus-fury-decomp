@@ -54,6 +54,21 @@ stops). -> **Earth agent** (text boxes: the typewriter's rate from the text spee
 (import the options word). Also: 35,806 (Continue after the game over: flag 1) - the cut taken after the in-game
 save has no save slot in the app (the importer does not carry the EEPROM slot) -> **importer agent**; s102 node 5
 "waiting native 0x3c" and on-enter-load cuts -> importer. Re-run the resync once text speed lands.
+*Ship part resync (rows 217,993 -> 602,566, current tree; `work/run2/stops_ship.jsonl`): 19 stops, long exact
+stretches between them (245,991 -> 459,733 is 213,742 rows exact).* Routing:
+* **Save point menus (the Save Game screen; run 1 never saved) -> ship-fixes agent**: 240,639 (8-1), 480,403
+  (8-28), 508,508 and 536,833 (8-41): depth 1 at a save point, RNG differs - the save screen's frames draw / advance
+  the RNG differently from ours.
+* **7-2 at the chapter's start -> ship-fixes agent**: 219,469 (RNG, an NPC talk / stall event), 220,641 (depth: app
+  1 game 0 - a box closing; zenie 600 -> 300 = the drinks / food stall purchase), 459,733 (depth: app 1 game 0, back
+  at 7-2 - a box closing; text speed was raised again in this part, so check with the Earth agent's text-speed work
+  first).
+* **8-42 -> ship-fixes agent**: 544,962 (RNG, depth 0: a fight in the grind room).
+* **Import -> importer agent**: 245,900 (title -> Continue after the 2-9 death: "flag 1 game only") and 480,611 (soft
+  reset at 8-28 -> title: "flag 1 app only") - the cut before them has no save slot in the app (the importer does not
+  carry the cartridge's EEPROM slot); unsupported cuts at 7-2 mid-area (mode 0x8049d18), on-enter scripts at 0-2 /
+  8-1 / the title 0-0.
+
 *Gate meanwhile:* run 1 stays strict; run 2 is a ratchet - `data/realrun2/expected.json` holds its first
 difference row (31,497); check.sh fails only when run 2's first difference (stop or sound) comes earlier, prints
 `IMPROVED` and bumps the file when it comes later. Remove the file once run 2 is exact.
@@ -4810,8 +4825,12 @@ speed and nothing read it. The game (text box update `0x0800B0A8`, speed byte `0
 * s < 4: one step on a frame with A or B pressed; otherwise the box's counter (+0x58: 0 at creation, +1 on each such
   frame) steps when it is a multiple of 5 - s (3: every 2nd frame, 0: every 5th);
 * a step (`0x0800AE74`) types the page's next character (colour pairs / a skipped new line ride along), or - the page
-  complete and A **or B** pressed this frame - turns the page / closes the box (B on a choice: result -1). So from speed
-  5 up, a press on the frame the page completes turns it that same frame.
+  complete and A pressed this frame - turns the page / closes the box. So from speed 5 up, an A on the frame the page
+  completes turns it that same frame.
+* **B skips the box** (new, any speed): the box's dispatcher (`0x0800B32C`) checks a fresh B before anything - opening,
+  typing or waiting, every page left unread - and sets the result -1 and the close routine (`0x0800AE64`) at once: the
+  open level (+0x50: t + 1 while opening, 8 open) counts down from that frame, the box goes at 0, the event continues the
+  frame after (B + level; an A close starts the frame after the press: A + 9). Run 2 row 140,804 (s132).
 Measured on every speed (`work/earth/timing/speedprobe.py`, shipr_227 7-2 rows 172-186). `scene::type_steps`,
 `Dialog.type_c` (imported from +0x58); the importer now reads the options block from RAM (`0x03001914`).
 **Saved:** the cartridge's flash record 0, global (not per game): text speed, SFX, music, pad, then Adler-32 of those 4
@@ -4819,5 +4838,41 @@ bytes (`0x0803FC4E`) + 0x12345678; the boot (`0x08006AE8`) takes 4 / 6 / 4 when 
 `Settings::to_flash` / `from_flash`; `launcher::saves_of` returns it after the three slots (native: `saves/options.sav`;
 web: the 4th entry of the slots array), the story / title apps read it back; a slider change bumps `Saves.generation`.
 Run 2 (`check.sh --chain run2`, the re-recorded 602,566-row master): first difference 31,497 -> 33,788 (expected.json
-bumped). 33,788 (006_die) is not text: an enemy's next hit on the idle leader lands 9 frames early in ours (the game's
-knockback at ~33,797).
+bumped). The rest of run 2's stops, by cut (`resync.py --chain run2 --from 33788`; none is text now):
+* 33,788 (006_die): an enemy's next hit on the idle leader lands 9 frames early in ours (the game's knockback ~33,797).
+* 35,806 (007_continue, from a cut): the title's Continue - the game loads run 2's own save (flag 1, back to the
+  field), ours runs s004 - **importer agent: a cut does not carry the cartridge's save slots** (from power-on it would).
+* 56,304 (008_otherworld, s101), 118,564 (017_e_circus, a 0.75 px position), 124,907 (019_e_tank, s168): not looked
+  at yet - RNG / position, no text box open.
+* 140,810 (020_e_videl, s132): B skipped a text box - **fixed** (above); the leg is exact to 141,971.
+* 141,971 (020_e_videl): the RNG splits at 141,755 inside the script's save menu (`save_menu` 0x8C, s011) - menus.
+Run 1 stays exact (both legs); all segment gates green.
+
+**`ship_driver.py` and run 1's ship chapter (ship agent, 2026-10-04; for the run-2 ship helper).** The live driver
+no longer replayed run 1's ship chapter because of deliberate behaviour changes made after db3928d for the dungeon
+routes (diagonal steps into wall corners, flame lines, Ghosts / tanks / Vampire grabs, doors at exits, vertical
+punches, blasts, grind stall B, stat-point retry) - the first difference is at frame 732 (a corner step: DOWN where
+run 1 pressed DOWN + RIGHT). The content cache (nav exits) is not involved: exits are identical to db3928d's. Now
+every one of those changes sits behind **`ShipDriver.R1`** (class attribute, default False = today's behaviour): with
+`R1 = True` the live driver plays `ship_route.goals_real` from `work/ship/real4/start.ss` **frame for frame as run 1's
+recording (all 378,903 frames, checked)**; with the default it is unchanged (still the dungeon routes' driver).
+`run_route.py --real` sets it. `re/buu/ship/r1frozen/` can go once run 2 uses `ShipDriver.R1 = True` (its owner's
+call). Note: a driver started at a mark (e.g. `--from c09_8-41`) is not run 1 - the driver's own state (cooldowns,
+skipped targets, its frame count) starts fresh - and dies in stage 3 with the frozen copy too; only the replay from
+the chapter's start reproduces run 1. Check tool: `work/s3test/replaycheck.py live r1` (local).
+*Run 2 import (A), part 1 - in the shared tree, uncommitted (wf-import lib.rs / ram.rs / segment.rs, tools/wholerun/resync.py):*
+- **Options on every cut:** the game's options at 0x03001914 are 4 bytes (text speed, SFX volume, music volume, 0)
+  = our `menu::options::Settings`; `import_options` copies them (pause-page cuts too), with the current save slot
+  (0x03001910). Typewriter rate not touched (Earth agent).
+- **The save slot (EEPROM) in cuts:** `.ss` save states do not carry it and RAM has no copy before a Continue. The
+  emulator's EEPROM image (each 8-byte block reversed) holds slot n at 0x10 + n x 0x8B0 = the 0x8A8-byte GameData +
+  a checksum / pad pair (the writer 0x080049F2; 0x08004962 sets +1 bit 0 "a game exists" and bit 3, the play time
+  at +0x4D0 as absolute frames, the place at +0x8A0: world, area, variant, x, y px). `wf_import::import_saves` makes
+  our `SaveData` from each slot; `segment::start` reads an optional `init.eeprom` (zlib + base64). resync.py's
+  `cut_at` now writes it (the save-capable emulator, `sd_read`), so **cuts must be re-made** to carry it (rows
+  35,806, 245,900, 480,611). Evidence: a re-made 33,478 cut passes the Continue in the app (wholerun --import,
+  run-2 master); the imported slot equals the game's GameData after its Continue byte for byte (but the play-time
+  word). The next stop there, 35,930 (the app's leader stands at the spawn after Continue while the game's walks
+  from 35,914; the game's own post-Continue cut runs on to 36,493) is the app's Continue / fade-in control timing ->
+  **Earth agent / menus**.
+Checks: gates green; whole-run cut points, exit-fade cuts, area-entry cuts + tiles unchanged.

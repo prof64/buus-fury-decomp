@@ -45,6 +45,17 @@ def main():
                 e.run(1)
             continue
         t0 = time.time()
+        if isinstance(goals, tuple) and goals[0] == 'KEYS':
+            # a part another agent played from the chain's end state (segments.md §0, run 2 hand-off): its key log
+            doc = json.loads((ROOT / goals[1]).read_text())
+            log = doc['keys'] if isinstance(doc, dict) else doc
+            for k in log:
+                e.set_keys(k)
+                e.run(1)
+            keys[name] = log
+            keyfile.write_text(json.dumps(keys))
+            print(f'{name}: {len(log)} frames (key log {goals[1]})', status(e), flush=True)
+            continue
         if goals == 'SHIP2':
             # the ship chapter: re/buu/ship/ship_route2.py's goals, built from the state here, its own driver
             sys.path.insert(0, str(ROOT / 're' / 'buu' / 'ship'))

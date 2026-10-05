@@ -1193,18 +1193,19 @@ export function create(n: AiNodeJ, c: AiController): RNode {
         },
       })
     case 'GunShot':
-      // the controllers' enter (0x080264D4 / 0x08026754 / 0x0802D0B0) is SetAnimRaw(0x12): raw 19 (Earth 3-2)
-      return timed(n, c, [18, 3], 16, { 4: () => e.shot('gun') })
+      // the node's own state objects: enter (0x080264D4 / 0x08026754 / 0x0802D0B0) SetAnimRaw(0x12) = raw 19, frame =
+      // tick >> 2 (gun) / >> 3 (rifle, wrap) - not the type's recorded raw-19 rule (Earth 3-2)
+      return timed(n, c, [18, 3], 16, { 4: () => e.shot('gun') }, true, { rule: 'once_stop', shift: 2, end: 'none' })
     case 'RifleShot':
-      return timed(n, c, [18, 3], 32, { 8: () => e.shot('rifle') })
+      return timed(n, c, [18, 3], 32, { 8: () => e.shot('rifle') }, true, { rule: 'once_stop', shift: 3, end: 'none' })
     case 'NinjaStarThrow':
       // controller 0x03003074: anim 0x13 (raw 20; real route db6 13-32 f117)
       // a frame per 8 ticks; the star, its sound and the end are the node's (not the recorded sequence's cue / end)
       return timed(n, c, [19, 4], 32, { 8: () => e.shot('star') }, true, { rule: 'once_stop', shift: 3, end: 'none' })
     case 'MummyWrapShot':
-      return timed(n, c, [18, 3], 24, { 8: () => e.shot('wrap') })
+      return timed(n, c, [18, 3], 24, { 8: () => e.shot('wrap') }, true, { rule: 'once_stop', shift: 3, end: 'none' })
     case 'MummyWrapBurst':
-      return timed(n, c, [18, 3], 24, { 8: () => e.shot('burst') }, false)
+      return timed(n, c, [18, 3], 24, { 8: () => e.shot('burst') }, false, { rule: 'once_stop', shift: 3, end: 'none' })
     case 'TankShoot': {
       // controller 0x030030EC (tick 0x0802E278): SetAnimRaw(0x13) once, 8 ticks per frame, then SetAnim(0); the shell
       // when the frame reaches 2 (tick 16); finished once the controller is gone (Earth segment 3-14)

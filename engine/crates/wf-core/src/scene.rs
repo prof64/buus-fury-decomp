@@ -3750,6 +3750,23 @@ fn tick_dialog(w: &mut World) {
         }
         return;
     }
+    // B (a fresh press) closes the box at once, opening or shown, every page left unread (the box's dispatcher
+    // `0x0800B32C`: the result -1, the close routine `0x0800AE64` from this frame): its open level (+0x50: t + 1 while
+    // opening, 8 open) counts down a step a frame, the box goes at 0 and the event continues the frame after - B +
+    // level (run 2 row 140,804: B at level 6, the box gone at 140,809, the event on at 140,810; an A close starts the
+    // frame after the press: A + 9, [`DIALOG_CLOSE`])
+    if k & B != 0 && matches!(d.phase, DialogPhase::Opening | DialogPhase::Shown) {
+        let level = (d.t + 1).min(8);
+        d.result = Some(if d.options > 0 { -1 } else { 0 });
+        d.phase = DialogPhase::Closing;
+        d.t = DIALOG_CLOSE - level;
+        let gone = d.t == DIALOG_CLOSE - 1;
+        crate::vram::release(w, crate::vram::Owner::Cursor);
+        if gone {
+            crate::vram::text_close(w);
+        }
+        return;
+    }
     let mut first = false;
     if d.phase == DialogPhase::Opening && d.t >= DIALOG_OPEN {
         // the box's update runs from this frame (`0x0800B156` -> `0x0800B0A8`)
@@ -3760,8 +3777,8 @@ fn tick_dialog(w: &mut World) {
     match d.phase {
         DialogPhase::Opening => {}
         DialogPhase::Shown => {
-            // A or B pressed this frame (+0x30): a complete page turns / the box closes
-            let mut press = k & (A | B) != 0;
+            // A pressed this frame (+0x30; B never gets here): a complete page turns / the box closes
+            let mut press = k & A != 0;
             let n = type_steps(speed, press, &mut d.type_c);
             let mut cursor = false;
             for _ in 0..n {
@@ -3780,8 +3797,7 @@ fn tick_dialog(w: &mut World) {
                         d.typed = 0;
                         d.page_t = d.t + 1;
                     } else {
-                        // B on a choice cancels (`0x0800AED6`: the result -1)
-                        d.result = Some(if d.options > 0 { if k & B != 0 { -1 } else { d.cursor } } else { 0 });
+                        d.result = Some(if d.options > 0 { d.cursor } else { 0 });
                         d.phase = DialogPhase::Closing;
                         d.t = 0;
                         break;

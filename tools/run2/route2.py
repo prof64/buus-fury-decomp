@@ -103,9 +103,15 @@ def _earth():
 
 
 SEGMENTS += _earth()
-# the ship chapter (7-2 -> Babidi's ship -> Majin Buu): re/buu/ship/ship_route2.py goals_run2, built from the
-# state reached here (play2.py drives it with its ShipDriver2)
-SEGMENTS.append(('s_ship', 'SHIP2'))
+# the ship chapter (7-2 -> Babidi's ship -> Majin Buu): re/buu/ship/ship_route2.py goals_run2 played from the
+# chain's Earth end (re/buu/ship/run_route2.py --log); its verified key log. ('s_ship', 'SHIP2') drives it again.
+SEGMENTS.append(('s_ship', ('KEYS', 'work/run2/parts/s_ship.json')))
+# the parts still to come, in chain order (segments.md §0 "run 2 hand-off"): each is played from the chain's end
+# state (work/run2/end.ss, play2.py) and handed over as work/run2/parts/<name>.json {"keys": [...]}; uncomment as
+# they land
+# SEGMENTS.append(('f_fat', ('KEYS', 'work/run2/parts/f_fat.json')))            # soak agent: fat Buu
+# SEGMENTS.append(('j_janemba', ('KEYS', 'work/run2/parts/j_janemba.json')))    # soak agent: Janemba
+# SEGMENTS.append(('b_superbuu', ('KEYS', 'work/run2/parts/b_superbuu.json')))  # side-content: Super / Kid Buu
 
 
 def chapter_of(name):
@@ -114,6 +120,12 @@ def chapter_of(name):
         return 'earth'
     if name.startswith('s_'):
         return 'ship'
+    if name.startswith('f_'):
+        return 'fat'
+    if name.startswith('j_'):
+        return 'janemba'
+    if name.startswith('b_'):
+        return 'superbuu'
     return 'opening'
 
 

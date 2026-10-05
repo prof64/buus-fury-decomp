@@ -431,6 +431,11 @@ fn main() {
         }
         if show.is_some_and(|(a, b)| a <= k && k <= b) {
             println!("row {k} keys {keys:x} logic {logic} menu {menu} app area {aa:?} p {ap:?} rng {:08x?} depth {} | game area {ga:?} p {} rng {} depth {gd} lf {lf} ourlf {} clock {}", w.rng.state(), w.scene.depth, r["p"], r["rng"], w.story.play_frames as i64 + w.story.lf_bias, w.g.clock(w.frame));
+            if std::env::var("WR_DLG").is_ok() {
+                if let Some(d) = &w.scene.dialog {
+                    println!("    dialog kind {} phase {:?} page {}/{} typed {} need {:?} t {} options {} c {} speed {}", d.kind, d.phase, d.page, d.pages, d.typed, d.typing, d.t, d.options, d.type_c, w.menu.settings.text_speed);
+                }
+            }
             if std::env::var("WR_HOST").is_ok() {
                 println!("    host started {:?} pending {:?} fade {:?}", app.host().started.iter().rev().take(2).collect::<Vec<_>>(), app.host().hs.pending, w.scene.screen.fade);
             }

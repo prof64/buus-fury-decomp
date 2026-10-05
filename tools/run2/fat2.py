@@ -48,6 +48,16 @@ def take_off(x, y):
     return [('unstick',), ('walk', x, y), ('face', 'U'), ('press', A), ('wait', 60)]
 
 
+def zmart(row, n):
+    """West City 4-1 -> the Z-Mart (s030): Buy -> Items -> row `row` (0 Rice Ball, 1 Chicken Leg, 2 Hamburger, 3
+    Onigiri ...) `n` times, out, back to 4-1"""
+    return [('unstick',), ('walk', 264, 310), ('hold', U, 40), ('wait', 30),
+            ('unstick',), ('walk', 102, 124), ('hold', L, 10),
+            ('keys', [(A, 3, 60), (A, 3, 60), (A, 3, 100)] + [(D, 3, 15)] * row + [(A, 3, 60)] * n +
+             [(B, 3, 80), (B, 3, 60), (D, 3, 15), (D, 3, 15), (A, 3, 60), (A, 3, 60)]), ('events',), ('wait', 30),
+            ('unstick',), ('walk', 112, 212), ('hold', D, 40), ('wait', 30)]
+
+
 def g_radar(e):
     """8-70 -> Kami's Lookout (s214: Goten) -> West City: Bulma's Dragon Radar (s193, flag 77) on the first visit"""
     return [
@@ -77,17 +87,28 @@ def g_bandana(e):
 
 
 def g_grind_goten(e):
-    """Southwest Forest 8-1's save point: Goten; his levels to 92 in 8-6 / 8-3 (run 1: Trunks to 80 first, then Goten
+    """Southwest Forest 8-1's save point: Goten; his levels to 100 in 8-6 / 8-3 (run 1: Trunks to 80 first, then Goten
     to 95, 8-3 first) - the Airship first, which has no gate"""
     return [
         ('wait', 60), SW_FOREST, ('wait', 30),
         nav(8, 1, False), ('unstick',), ('walk', 148, 186), *charsel(-1),
-        ('grind', 92, [(8, 6), (8, 3)]),
+        ('grind', 100, [(8, 6), (8, 3)]),
         nav(8, 1, False), ('unstick',), *take_off(280, 266),
     ]
 
 
+def g_airship(e):
+    """the Airship XJ-5 (12) first: the flight, then agent B's db5 route (the decks, the lift, the Warlord, the 5-Star
+    Dragon Ball s387, out on the self-destruct countdown, the pad)"""
+    return Chain([ship([('wait', 30), WEST_CITY, ('wait', 30), *zmart(3, 5), *take_off(416, 360),
+                        AIRSHIP, ('wait', 200)]),
+                  db57('db5', fix_db5)])
+
+
+g_airship.chain = True
+
 PIECES = {
+    'airship': g_airship,
     'grind_goten': g_grind_goten,
     'radar': g_radar,
     'bandana': g_bandana,
@@ -125,8 +146,62 @@ class Driver2(ShipDriver):
         return super().step(e)
 
 
+class Chain:
+    """drivers one after another: `parts` = [factory(e) -> driver], each built from the state its turn starts in"""
+
+    def __init__(self, parts):
+        self.parts, self.i, self.cur = parts, 0, None
+
+    @property
+    def k(self):
+        return self.cur.k if self.cur else 0
+
+    @property
+    def goals(self):
+        return self.cur.goals if self.cur else [None]
+
+    def done(self):
+        return self.i >= len(self.parts)
+
+    def keys(self, e):
+        if self.cur is None:
+            self.cur = self.parts[self.i](e)
+        if self.cur.done():
+            self.i += 1
+            self.cur = None
+            return 0 if self.done() else self.keys(e)
+        return self.cur.keys(e)
+
+
+def db57(route, fix=None):
+    """a dungeon agent B route (tools/db57: db5 Airship, db6 Fukurou, db7 Pyramid, dbx) as a chain part; `fix(goals)`
+    adjusts its goal list (as run 1 did by hand)"""
+    def make(e):
+        if str(ROOT / 'tools' / 'db57') not in sys.path:
+            sys.path.insert(0, str(ROOT / 'tools' / 'db57'))
+        import run as db57run
+        mk, drv = db57run.find_route(route)
+        g = mk()
+        return drv(fix(g) if fix else g)
+    return make
+
+
+def fix_db5(g):
+    """the Warlord's lift: the route's `trig` stands 1 px left of the pad (run 1 took it by hand the same way)"""
+    k = g.index(('trig', 104, 356, U))
+    g = g[:k] + [('walk', 108, 358), ('hold', U, 280), ('events',)] + g[k + 1:]
+    # run 2: the escape on the self-destruct countdown rushed (no fights at all; run 1 fought what came near)
+    k = g.index(('go', 12, 1, 'near'))
+    return g[:k] + [('go', 12, 1, False)] + g[k + 1:]
+
+
+def ship(goals):
+    return lambda e: Driver2(goals)
+
+
 def driver(name, e):
-    return Driver2(PIECES[name](e))
+    p = PIECES[name]
+    return p(e) if isinstance(p, type(lambda: 0)) and getattr(p, 'chain', False) else Driver2(p(e))
 
 
 def main():
@@ -153,7 +228,7 @@ def main():
             s = status(e)
             if (s['area'][:2], d.k) != prev:
                 prev = (s['area'][:2], d.k)
-                print(len(keys), s, 'goal', d.k, d.goals[d.k] if not d.done() else None, flush=True)
+                print(len(keys), s, 'goal', d.k, d.goals[d.k] if not d.done() and d.k < len(d.goals) else None, flush=True)
     except Exception as ex:  # noqa: BLE001
         e.save_file(str(out / f'{name}.fail.ss'))
         e.screenshot(str(out / f'{name}.fail.png'), 2)

@@ -22,6 +22,8 @@ def main():
     if frm is None:
         shutil.copyfile(start, out / 'start.ss')
     real = '--real' in a
+    # run 1's ship chapter (goals_real) replays with the driver as it was recorded (ShipDriver.R1)
+    ShipDriver.R1 = real
     pick = ship_route.goals_fatbuu if '--fat' in a else ship_route.goals_real if real else ship_route.goals
     gl = pick(start_emu(str(out / 'start.ss')))
     i0 = 0
