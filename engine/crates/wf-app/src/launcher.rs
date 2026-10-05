@@ -139,11 +139,15 @@ pub struct Settings {
     /// story mode: hold the picture for the GBA's measured load lengths ("original pacing"; presentation only)
     #[serde(default)]
     pub original_pacing: bool,
+    /// "PC wide (auto)": false = steady (at most one zoom step above the window's base), true = max (the map fills
+    /// the window; zooms up to 6x on small maps)
+    #[serde(default)]
+    pub auto_zoom_max: bool,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { view: "pc:0".into(), volume: 100, fullscreen: false, disabled_mods: Vec::new(), battle: BattlePrefs::default(), original_pacing: false }
+        Settings { view: "pc:0".into(), volume: 100, fullscreen: false, disabled_mods: Vec::new(), battle: BattlePrefs::default(), original_pacing: false, auto_zoom_max: false }
     }
 }
 
@@ -242,6 +246,8 @@ enum Row {
     Fullscreen,
     /// story mode's "original pacing" (holds the picture for the GBA's load lengths; presentation only)
     Pacing,
+    /// "Auto zoom: steady / max" (`Settings::auto_zoom_max`)
+    AutoZoom,
     Controls,
     Back,
 }
@@ -378,7 +384,7 @@ impl Launcher {
                 v
             }
             Screen::Settings => {
-                let mut v = vec![Row::View, Row::Volume, Row::Pacing];
+                let mut v = vec![Row::View, Row::AutoZoom, Row::Volume, Row::Pacing];
                 if self.native {
                     v.push(Row::Fullscreen);
                 }
@@ -487,6 +493,7 @@ impl Launcher {
             Row::Volume => self.settings.volume = (self.settings.volume as i32 + d.signum() * 10).clamp(0, 100) as u32,
             Row::Fullscreen => self.settings.fullscreen = !self.settings.fullscreen,
             Row::Pacing => self.settings.original_pacing = !self.settings.original_pacing,
+            Row::AutoZoom => self.settings.auto_zoom_max = !self.settings.auto_zoom_max,
             _ => return Choice::None,
         }
         Choice::Settings
@@ -547,7 +554,7 @@ impl Launcher {
                 self.message = "That slot is empty.".into();
             }
             Row::Fight => return Choice::Battle(self.battle_config()),
-            Row::Mod(_) | Row::Kind | Row::Fullscreen | Row::Pacing => return self.change(row, 1),
+            Row::Mod(_) | Row::Kind | Row::Fullscreen | Row::Pacing | Row::AutoZoom => return self.change(row, 1),
             Row::ModsFolder => return if self.native { Choice::OpenModsFolder } else { Choice::AddMod },
             Row::Controls => {
                 self.rebind.toggle();
@@ -602,6 +609,7 @@ impl Launcher {
             Row::Volume => (t("Volume"), format!("< {}% >", self.settings.volume)),
             Row::Fullscreen => (t("Fullscreen"), if self.settings.fullscreen { t("< on >") } else { t("< off >") }),
             Row::Pacing => (t("Original pacing"), if self.settings.original_pacing { t("< on >") } else { t("< off >") }),
+            Row::AutoZoom => (t("Auto zoom"), if self.settings.auto_zoom_max { t("< max >") } else { t("< steady >") }),
             Row::Controls => (t("Controls..."), String::new()),
             Row::Back => (t("Back"), String::new()),
         }

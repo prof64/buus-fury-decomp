@@ -63,8 +63,8 @@ pub struct App {
     /// an area load) the picture holds for that many steps without stepping the sim. Presentation only.
     pub original_pacing: bool,
     hold: u32,
-    /// "PC wide (auto)": the zoom held per map (`wf_render::AutoZoom`)
-    auto_zoom: AutoZoom,
+    /// "PC wide (auto)": the zoom held per map (`wf_render::AutoZoom`); `auto_zoom.max` = Settings "Auto zoom: max"
+    pub auto_zoom: AutoZoom,
 }
 
 #[derive(Clone, Copy, Debug, Default)]

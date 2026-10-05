@@ -989,7 +989,6 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
         K::Block => {
             w.en(i).a.blocking = true;
             set_anim(w, i, &[an(7)], true, Some(true));
-            if std::env::var_os("DBG_BLOCK").is_some() { eprintln!("block enter f{} raw {:?} ea {}", w.frame, w.en_ref(i).a.anim_raw(&w.data), w.en_ref(i).ea.pos.raw); }
         }
         K::ChasePlayer | K::ChasePlayerThroughRocks => {
             let Some(pi) = en::player(w, i) else { return };
@@ -2022,7 +2021,16 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             }
             true
         }
-        K::Block => false,
+        // update 0x080187F0: SetAnim(7) again (and blocking) whenever the state is not IsAnim(7) - a state another
+        // node's enter set in the same pass (sb_006 6-6 f19957: GotoState into the block, then the old tree's
+        // CandyBeam enter; the guard pose is back the next frame)
+        K::Block => {
+            if !w.en_ref(i).is_anim(7) {
+                set_anim(w, i, &[an(7)], true, Some(true));
+                w.en(i).a.blocking = true;
+            }
+            false
+        }
         // ---- movement
         K::ChasePlayer | K::ChasePlayerThroughRocks => {
             let Some(pi) = en::player(w, i) else {

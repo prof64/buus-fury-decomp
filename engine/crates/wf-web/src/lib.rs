@@ -301,6 +301,12 @@ pub extern "C" fn wf_app_set_pacing(on: u32) {
     with_game(|g| g.app.original_pacing = on != 0);
 }
 
+/// "PC wide (auto)": 1 = Settings "Auto zoom: max" (no cap), 0 = steady (the default)
+#[no_mangle]
+pub extern "C" fn wf_app_set_auto_zoom(max: u32) {
+    with_game(|g| g.app.auto_zoom.max = max != 0);
+}
+
 #[no_mangle]
 pub extern "C" fn wf_app_set_paused(p: u32) {
     with_game(|g| g.app.paused = p != 0);

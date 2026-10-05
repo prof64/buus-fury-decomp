@@ -969,6 +969,9 @@ pub struct Track {
     /// follows the Red Shark announcer's walk in the same batch; s084: not in a later one)
     #[serde(default)]
     pub live: bool,
+    /// the frame's tick already ran in the actor's own update (Some(idle)): `track_after_update`
+    #[serde(default)]
+    pub ticked: Option<bool>,
 }
 
 /// the director's wait mode (run_mode on WaitAll 0x0804C0C4 or the group 0x0804DEEC)
@@ -1582,6 +1585,7 @@ fn track_index(w: &mut World, owner: Owner) -> usize {
         started: false,
         holding: false,
         live: false,
+        ticked: None,
     });
     w.scene.tracks.len() - 1
 }
@@ -3087,6 +3091,9 @@ pub fn tick(w: &mut World) {
     tick_visuals(w);
     let blocked = w.scene.director.wait.is_some();
     tick_tracks(w);
+    for t in w.scene.tracks.iter_mut() {
+        t.ticked = None;
+    }
     // An AI InlineScript's parallel block ended: the game runs the script's nested frame loop inside that enemy's
     // update, and when the block ends the update goes on in the same frame - the node returns 1 and the rest of the
     // enemy's AI runs (Earth 4-25 f6646: Vegeta's 0x0870EA28 ends with face_actor / his own jump_to, then
@@ -3125,6 +3132,48 @@ pub fn tick(w: &mut World) {
     w.scene.puppets.retain(|_| it.next().unwrap_or(false));
 }
 
+/// The wait-all mode's actor tick (message 0x0C, 0x08006C18 -> 0x08011C0C to each object of the world list, last
+/// object first): an actor's handler updates its animation and then ticks its own command list (0x0800F5C8: the
+/// anim components' vt+4, then 0x080193AE), so a command that ends with the animation advances and starts the next
+/// one before the next object's update. Run 2 19-3 row 1,877,946: Goku and Kid Buu end their punches in one frame -
+/// the game draws Kid Buu's idle rand(255), his next punch's 50 + rand(2), then Goku's idle and punch; ours had
+/// both idles in the object pass and both punches in the track tick after it (same draws, the punch sounds swapped).
+/// Called after an actor's update in the object pass; the other commands keep the track tick after the objects.
+pub fn track_after_update(w: &mut World, id: EntityId) {
+    if !matches!(w.scene.director.wait, Some(WaitMode::All)) {
+        return;
+    }
+    let owner = Owner::Entity(id);
+    let Some(k) = w.scene.tracks.iter().position(|t| t.owner == owner) else {
+        return;
+    };
+    let t = &w.scene.tracks[k];
+    if !t.started || t.holding || t.ticked.is_some() {
+        return;
+    }
+    let Some(mut cmd) = t.queue.first().cloned() else {
+        return;
+    };
+    // only an animation command next (its start touches the actor alone: a state, its idle draw / swing sound); a
+    // next command that makes an object (an emote's bubble, an effect) keeps the tick after the objects - ours
+    // updates those objects in passes of their own (sb_005 1-5 f17209: four actors' emotes)
+    if !matches!(
+        t.queue.get(1),
+        Some(Cmd::PlayAnim { .. } | Cmd::SetAnim { .. } | Cmd::SetPose { .. } | Cmd::PlayAnimFrames { .. })
+    ) {
+        return;
+    }
+    if !matches!(cmd, Cmd::PlayAnim { .. } | Cmd::PlayAnimFrames { .. })
+        || !update_cmd(w, owner, &mut cmd)
+    {
+        return;
+    }
+    let idle = tick_track(w, k);
+    if let Some(t) = w.scene.tracks.iter_mut().find(|t| t.owner == owner) {
+        t.ticked = Some(idle);
+    }
+}
+
 fn tick_tracks(w: &mut World) {
     let Some(mode) = w.scene.director.wait.clone() else {
         return;
@@ -3150,6 +3199,12 @@ fn tick_tracks(w: &mut World) {
             continue;
         };
         if !in_mode(&mode, o) {
+            continue;
+        }
+        if let Some(idle) = w.scene.tracks[k].ticked.take() {
+            if !idle {
+                all_idle = false;
+            }
             continue;
         }
         if !tick_track(w, k) {

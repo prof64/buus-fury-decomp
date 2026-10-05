@@ -69,11 +69,18 @@ pub fn auto_zoom(win_w: u32, win_h: u32, world: Option<(i32, i32)>) -> u32 {
 /// scene load) or the window does, and kept through frames that show no map (menu screens, black loads, the
 /// prologue). Picking it from every frame's map made it jump between 2x and 4x whenever a menu opened over a small
 /// map or a cutscene left and re-entered one.
+///
+/// "Steady" (the default, `max` false): at most one step above the window's base zoom (`auto_zoom` with no map), so
+/// a tiny cutscene map shows with black margins instead of zooming in to fill the window - the zoom then only moves
+/// between two values (Kid Buu's chapter: 240x160 scene maps between 480x400 ones jumped 3x / 4x / 6x at 1080p).
+/// "Max" (`max` true): the map fills the window as far as the zoom allows (up to 6x).
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct AutoZoom {
     map: String,
     win: (u32, u32),
     zoom: u32,
+    /// "Auto zoom: max" (no cap)
+    pub max: bool,
 }
 
 impl AutoZoom {
@@ -92,7 +99,12 @@ impl AutoZoom {
             }
             _ => {}
         }
-        self.zoom
+        if self.max {
+            self.zoom
+        } else {
+            let base = auto_zoom(win_w, win_h, None);
+            self.zoom.clamp(base, base + 1)
+        }
     }
 }
 
@@ -906,7 +918,7 @@ mod auto_zoom_tests {
 
     #[test]
     fn held_between_maps() {
-        let mut a = AutoZoom::default();
+        let mut a = AutoZoom { max: true, ..Default::default() };
         let big = Some(("area_00_050", (3584, 2560)));
         let small = Some(("area_20_009", (240, 160)));
         assert_eq!(a.zoom(1920, 1080, big), 2);
@@ -919,5 +931,20 @@ mod auto_zoom_tests {
         assert_eq!(a.zoom(1920, 1080, small), z);
         // a resized window re-picks
         assert_eq!(a.zoom(1280, 800, small), auto_zoom(1280, 800, Some((240, 160))));
+    }
+
+    #[test]
+    fn steady_caps_one_step_above_the_base() {
+        let mut a = AutoZoom::default();
+        assert!(!a.max);
+        let base = auto_zoom(1920, 1080, None);
+        assert_eq!(a.zoom(1920, 1080, Some(("big", (3584, 2560)))), base);
+        // a 240x160 scene map: 6x uncapped at 1080p, base + 1 steady
+        assert_eq!(auto_zoom(1920, 1080, Some((240, 160))), 6);
+        assert_eq!(a.zoom(1920, 1080, Some(("tiny", (240, 160)))), base + 1);
+        assert_eq!(a.zoom(1920, 1080, Some(("mid", (480, 400)))), base + 1);
+        assert_eq!(a.zoom(1920, 1080, Some(("big", (3584, 2560)))), base);
+        a.max = true;
+        assert_eq!(a.zoom(1920, 1080, Some(("tiny", (240, 160)))), 6);
     }
 }

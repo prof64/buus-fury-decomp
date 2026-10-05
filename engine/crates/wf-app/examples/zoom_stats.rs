@@ -1,7 +1,7 @@
 //! "PC wide (auto)" zoom over the gated segments (headless): how often each rule changes the zoom, per window size.
-//! `per_frame` = `wf_render::auto_zoom` on every frame's map (the old rule), `held` = `wf_render::AutoZoom` (the
-//! zoom picked when the map changes, kept through frames without a map). Prints the changes and the frames between
-//! them.
+//! `per frame` = `wf_render::auto_zoom` on every frame's map (the first rule), `held max` = `wf_render::AutoZoom`
+//! with `max` (picked when the map changes, kept through frames without a map), `steady` = `AutoZoom`'s default
+//! (held, at most one step above the window's base zoom). ZOOM_TRACE=1 prints the steady rule's changes.
 //!   cargo run --release -p wf-app --example zoom_stats [segment-name-filter]
 
 use std::collections::BTreeMap;
@@ -55,10 +55,10 @@ fn main() {
         for &(ww, wh) in &wins {
             let (mut old_prev, mut new_prev) = (0, 0);
             let (mut co, mut cn) = (0, 0);
-            // a variant for comparison: the held zoom capped to one step above the window's base zoom
-            let base = wf_render::auto_zoom(ww, wh, None);
             let (mut cap_prev, mut cc) = (0, 0);
             let mut az = wf_render::AutoZoom::default();
+            az.max = true;
+            let mut steady = wf_render::AutoZoom::default();
             for m in &maps {
                 let zo = wf_render::auto_zoom(ww, wh, m.as_ref().map(|m| m.1));
                 let zn = az.zoom(ww, wh, m.as_ref().map(|m| (m.0.as_str(), m.1)));
@@ -67,13 +67,13 @@ fn main() {
                 }
                 if new_prev != 0 && zn != new_prev {
                     cn += 1;
-                    if std::env::var_os("ZOOM_TRACE").is_some() && (ww, wh) == wins[0] {
-                        println!("  {name}: held {new_prev} -> {zn} at map {:?}", m);
-                    }
                 }
-                let zc = zn.clamp(base, base + 1);
+                let zc = steady.zoom(ww, wh, m.as_ref().map(|m| (m.0.as_str(), m.1)));
                 if cap_prev != 0 && zc != cap_prev {
                     cc += 1;
+                    if std::env::var_os("ZOOM_TRACE").is_some() && (ww, wh) == wins[0] {
+                        println!("  {name}: steady {cap_prev} -> {zc} at map {:?}", m);
+                    }
                 }
                 cap_prev = zc;
                 old_prev = zo;
@@ -86,11 +86,11 @@ fn main() {
             t.3 += 1;
             t.4 += cc;
             if co > 0 && (ww, wh) == wins[0] {
-                println!("{name}: {} frames, zoom changes per frame rule {co}, held rule {cn}", maps.len());
+                println!("{name}: {} frames, zoom changes per frame {co}, held max {cn}, steady {cc}", maps.len());
             }
         }
     }
     for ((w, h), (co, cn, n, segs, cc)) in tot {
-        println!("window {w}x{h}: {segs} segments, {n} frames: zoom changes per-frame rule {co}, held rule {cn}, held + capped to base..base+1 {cc}");
+        println!("window {w}x{h}: {segs} segments, {n} frames: zoom changes per frame {co}, held max {cn}, steady (default) {cc}");
     }
 }

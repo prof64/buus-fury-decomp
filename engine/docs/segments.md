@@ -266,7 +266,7 @@ want any of mine or not those two.
 *sound_legs.py re-run on this tree (2026-10-05, latest; 486 legs, 1,964,420 rows replayed exactly): **14 iterations
 differ**, all in the Super / Kid Buu part: the punch sound pair 48 .. 51 (11 iterations, 1,631,398 .. 1,917,118 ->
 importer agent, its fix not in this tree yet) and sound 44 game only (3: 1,683,032, 1,774,198, 1,779,633 ->
-side-content agent). The opening, Earth, credits, beam and `stop 3` items are gone. (A leg's first row after a cut no
+side-content agent; re-run again later on 2026-10-05: unchanged, the punch fix has not landed). The opening, Earth, credits, beam and `stop 3` items are gone. (A leg's first row after a cut no
 longer counts the import's own song restart.)*
 
 **Run 3: an adversarial playthrough (plan; dungeon agent B, 2026-10-05, by the coordinator).** Runs 1 and 2 play the
@@ -304,6 +304,21 @@ on top of nothing), `('pushmash', dir, extra, period, n)` (walk into an exit hol
 menu n times at the fastest accepted rate), `('menutour',)` (every pause page both ways). Recording order: opening
 first (now), then each chapter from the previous part's end, appended as run 2 was. Owner: dungeon agent B; stops
 found in the resync go to the chapter owners as usual.
+*Run 3 status (dungeon agent B, 2026-10-05):* recorded and packed: `000_intro3` (6,290 frames), `001_snakeway3`
+(7,340), `002_ow3` (32,428) - 46,058 rows from power-on to Earth 2-1 (`data/realrun3/`, chain `run3`). Driver goals
+added on the way: `pushagain` (a pause opened mid-push stops the walk before the exit: push again), `skillslot n`
+(L until the skill slot is n: menu L/R moves the skill cursor, the 1-16 door needs the Kamehameha), and `pausespin`
+plays an event through first. `check.py` holds run 3 to the ratchet `data/realrun3/expected.json` (first difference
+row 712). Resync (no lag) stops, owner dungeon agent B unless a chapter owner claims one:
+- 712: sound 40 (title menu cursor) game only, START on alternate frames on the title menus.
+- 4,362: area app 0-2 / game 1-1 after the mashed prologue (text boxes A on alternate frames).
+- One walk step (704) of leader position around a START-mashed transition: 8,660, 8,987, 13,889, 18,875 / 18,951,
+  26,829 / 26,887, 30,044 / 30,127 (the pause gate's frames vs the exit push / fade-in).
+- Menu depth app 1 / game 0 at 16,562 and 20,560 (pausespin's fastest close); facing 0 vs 3 at 16,782.
+- rng at 17,858, 17,916, 21,514.
+- area at 25,581 (app 1-15 / game 1-14) and 30,748 (app 1-16 / game 1-17): an exit taken / not taken under the
+  mashed pause.
+Next: the Earth part (`e3_*`).
 
 ## 1. One-command workflow
 
@@ -4595,6 +4610,34 @@ idles, the importer agent's).**
   Kamehameha (`ShotKind::Kame`) is on screen: the game draws the beam and tints the hit enemy red, ours draws neither
   (sb_007 f19380: 1,528 px).
 
+**Update 10 (Super Buu agent): beams drawn, the game's hit flash, enemy energy waves / candy beam; cel gate 508 / 509;
+pixel board 67.2 -> 67.7 % (pixel gate 110 segments, 1,222 frames).** The user's report "Goku's Kamehameha is
+invisible" - fixed in both views (the wide PC view draws the same `RenderView`; checked on sb_007 f19380 with the
+pixel tool's new `PIX_WIDE=WxH`).
+* **The player beam family is drawn** (Kamehameha, Kamekameha, Electric Kamehameha, Banshee, Big Bang; Kid Buu's and
+  the scripted NPC beams): draw 0x08020DAC as the reference's `BeamGfx.draw` (start / tail, head / impact, body
+  pieces), the piece sets from `effects/beam_*` (`GameData::beams`, the extractor's `beam` block; `KameBeam.set` names
+  the level's set - `shots::beam_set(skill, level)`), and the charge sparkle (`Fx::BeamCharge`, the set's
+  `charge_fx`). Started from the user-bug agent's `work/ub/beam_port.rs`; same pixels on sb_007 f19380.
+* **The hit flash is the game's colour-index remap, not white** (object 0x0800E8E6, tick 0x0800DE28: counter 12, -1 a
+  tick, the tiles drawn through map 0x080725AC[counter >> 2] - the red ramp for the first four ticks, then a warm
+  tint, the plain tiles at 0). `ui/hit_flash.json` (wf-ui: the OBJ palette 0x0805652C and the three maps), wf-render
+  `SpriteEffect::Flash(map)` (colour -> index by the OBJ palette -> mapped colour), `Actor::flash_map` (the map the
+  last tick set: a new hit's 12 shows the earlier map until its first tick). Super Buu is red under Gohan's beam,
+  every hit flashes red then warm (sb_006 f24179 ..).
+* **A script's puff (0x3F / 0x40 / 0x48 / 0x65) is the explosion 0x08712FDC** (0x0801952C, run at 0x08019564), not
+  the grey smoke puff: sb_007 f12392, s232's five tan clouds.
+* **Energy waves and Majin Buu's candy beam are drawn** (records 0x0875043C / 0x0874ED7C + dir: muzzle, body every
+  8 px, the candy beam's head; origin added - `record_add`).
+* **Block's update re-applies the guard** (0x080187F0: SetAnim(7) when not IsAnim(7)): a GotoState into the block
+  followed by the old tree's CandyBeam enter in the same pass showed the beam pose for the whole guard (sb_006 /
+  sb_007 6-x f19958: 24 frames). Rust + TS (cross_ts 0 failures, lockstep 709).
+* Pixel tool: `PIX_KINDS=1` lists the live shot / effect kinds on each differing frame (`work/superbuu/pix/kinds.sh`
+  tallies them): after this, no undrawn beam kind is left among the differing frames; the biggest remaining sprite
+  cause by frames is the generic effects (`fx:Anim`, 1,304 frames) and damage numbers.
+* Not mine, noticed: ship 8-1 cuts (shipr_056 / shipr_172 f360 ..) lost 11 exact BG frames between two runs of the
+  board this session with only other agents' changes in between (the tile clock's `cam_iters` edit is the candidate).
+
 **Done (Earth agent): the no-lag title -> Earth soak's crowd-wander stop (row 190,577) - a menu close that never
 gave the field its sprite memory back.** The crowd NPCs' wander draws were right; their *update order* was not: at
 row 190,435 (7-5, s302's text box) our purge suspended and re-appended five NPCs (`vram::restore`), the game's list
@@ -5708,9 +5751,13 @@ both runs as expected; core / import / app suites green. Debug: wholerun `WR_SON
     (1280x800: 377 -> 273, 2560x1440: 318 -> 213).
 * **The 2x <-> 4x / 6x jumps that remain are real map changes:** Kid Buu's chapter cutscenes alternate 240x160
   scene maps (6x at 1080p) with 480x400 / 720x560 ones (3-4x), sb_041 15 changes.
-  - Proposal, not implemented (a trade-off: black margins around tiny scene maps): cap the auto zoom to the
-    window's base zoom .. base + 1. That gives 70 changes at 1080p / 1440p, 120 at 1280x800.
-  - Coordinator / user decision.
+  - **Decided (coordinator), done:** "Auto zoom: steady", the default. The auto zoom is held per map and at most one
+    step above the window's base zoom; tiny scene maps show with black margins. Zoom changes: 70 at 1080p / 1440p,
+    120 at 1280x800 (held, uncapped: 271 / 213 / 273).
+  - "Auto zoom: max" (the launcher's Settings, `Settings::auto_zoom_max`, persisted with the other launcher settings)
+    keeps the uncapped rule.
+  - Native: `App.auto_zoom.max`. Web: `wf_app_set_auto_zoom`, from `wf.prefs.autozoom_max`.
+  - `wf_render::AutoZoom` unit tests: held between maps, the steady cap.
 * *West City Z-Mart shop pacing (run 2 rows 1,860,355 / 1,860,384; ship fix agent, 2026-10-05): already exact on
   46bfe41 + the tree.* The whole-run app from the run-2 cuts at 1,853,852, 1,858,572 and 1,858,657 runs exact
   through s030's buy / sell session (game 1,859,792 .. 1,860,384, 494 iterations) up to 1,869,600, with no sound

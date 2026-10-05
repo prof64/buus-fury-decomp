@@ -340,7 +340,6 @@ impl Enemy {
             events,
         };
         self.ea.enter(&ar.rules, raw, r, &mut h);
-        if std::env::var_os("DBG_BLOCK").is_some() && raw == 20 { eprintln!("setanim raw20 ty {} bt {}", self.ty, std::backtrace::Backtrace::force_capture().to_string().lines().filter(|l| l.contains("wf_core::")).take(6).collect::<Vec<_>>().join(" <- ")); }
     }
     /// IsAnim(id) (vfunc +0x34, 0x0800FAC6): the state object is SetAnim(id)'s and the raw matches (a forced rule or a
     /// node's own state object is not)
@@ -545,6 +544,7 @@ pub fn tick_anim(w: &mut World, i: usize) {
     let d = Arc::clone(&w.data);
     let mut ev = std::mem::take(&mut w.events);
     let mut rng = w.rng;
+    if std::env::var_os("TA_DBG").is_some() { eprintln!("TA frame {} id {} anim {:?}", w.frame, w.ents[i].id, w.en_ref(i).ea.pos); }
     w.en(i).tick_anim(&d, &mut rng, &mut ev);
     w.rng = rng;
     w.events = ev;

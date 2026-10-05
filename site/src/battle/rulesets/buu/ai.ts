@@ -770,10 +770,18 @@ export function create(n: AiNodeJ, c: AiController): RNode {
     case 'TriggerSelf':
       return new Instant(n, c, () => e.die(false))
     case 'Block':
+      // update 0x080187F0: SetAnim(7) again (and blocking) whenever the state is not IsAnim(7) (another node's enter
+      // in the same pass replaced it: segment sb 6-6 f19957)
       return new Act(n, c, () => {
         e.blocking = true
         e.setAnim(7, true, true)
-      }, () => false, () => {
+      }, () => {
+        if (!e.isAnim(7)) {
+          e.setAnim(7, true, true)
+          e.blocking = true
+        }
+        return false
+      }, () => {
         e.blocking = false
         e.stateStamp = e.w.frame
       })

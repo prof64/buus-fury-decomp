@@ -993,7 +993,9 @@ impl World {
             crate::vram::popups_tick(self, Some(self.ents[i].id));
             let talk_before = self.field.as_ref().is_some_and(|f| f.talk_pass.is_some());
             if !skip {
+                let id = self.ents[i].id;
                 self.update_entity(i);
+                crate::scene::track_after_update(self, id);
                 // a talk started in this update runs its event as the game's nested loop: the rest of this frame's pass
                 // (the older objects) is not updated (db7_010 14-10 f258: man 2's talk - the room's three enemies go
                 // idle with a fresh rand(255) tick and do not tick it in that frame; ours had, a tick ahead for 400
@@ -1008,7 +1010,9 @@ impl World {
                     .is_some_and(|f| std::mem::take(&mut f.list_redo))
                 {
                     if let Some(&Some(j)) = live(self).get(c as usize) {
+                        let id = self.ents[j].id;
                         self.update_entity(j);
+                        crate::scene::track_after_update(self, id);
                     }
                     if let Some(f) = self.field.as_mut() {
                         f.list_redo = false;

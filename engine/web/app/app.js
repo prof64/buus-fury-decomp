@@ -262,6 +262,7 @@ async function boot(baseTarBytes) {
         pr.mode = out.settings.view;
         pr.vol = out.settings.volume / 100;
         pr.pacing = !!out.settings.original_pacing;
+        pr.autozoom_max = !!out.settings.auto_zoom_max;
         lsSet('wf.prefs', pr);
         const c = out.choice;
         if (c.kind === 'add_mod') {
@@ -380,6 +381,8 @@ async function boot(baseTarBytes) {
   applyMode();
   // launcher Settings "Original pacing" (story mode; presentation only)
   x.wf_app_set_pacing?.(prefs.pacing ? 1 : 0);
+  // launcher Settings "Auto zoom: steady / max" (PC wide auto)
+  x.wf_app_set_auto_zoom?.(prefs.autozoom_max ? 1 : 0);
   if (qs.get('mode')) {
     prefs.mode = qs.get('mode');
     applyMode();
