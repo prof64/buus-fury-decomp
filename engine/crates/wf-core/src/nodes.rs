@@ -471,6 +471,7 @@ fn is_ctl(w: &World, k: K) -> bool {
                     | K::MummyWrapBurst
                     | K::WindupMelee
                     | K::HandSink
+                    | K::HandAmbush
             ))
 }
 
@@ -521,6 +522,29 @@ pub fn busy_controller(w: &mut World, i: usize) {
     }
     let Some(r) = rt(w, &c, n) else { return };
     if r.d[7] != 0 {
+        return;
+    }
+    // the Janemba Hand's strike (field): its controller 0x0804D714 (installed by the node's first update) plays on
+    // under a held field - the cels and the end at tick 0x68; the jump and the hit test are the AI's (run 2 row
+    // 1,242,217, 18-10: an ambush through an Instant Transmission hold ends 18 frames after it, not 83)
+    if kind(&c, n) == K::HandAmbush {
+        if r.f < 1 {
+            return;
+        }
+        r.f += 1;
+        let f = r.f - 1;
+        if f >= 104 {
+            r.d[7] = 1;
+        }
+        let ncel = w
+            .en_ref(i)
+            .a
+            .sprite
+            .and_then(|s| w.data.sprite(s))
+            .and_then(|s| s.anim_raw(w.en_ref(i).ea.pos.raw))
+            .map(|a| a.steps(w.en_ref(i).a.facing).len() as i32)
+            .unwrap_or(1);
+        w.en(i).ea.pos.frame = (f >> 3).min(12).min(ncel - 1).max(0);
         return;
     }
     r.f += 1;
