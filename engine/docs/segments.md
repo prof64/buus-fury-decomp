@@ -321,6 +321,24 @@ row 712). Resync (no lag) stops, owner dungeon agent B unless a chapter owner cl
 Next: the Earth part (`e3_*`).
 *Claim (ship fix agent, menus, by the coordinator, 2026-10-05):* 712 (title menu cursor sound under mashed START),
 16,562 / 20,560 (pausespin's fastest close: menu depth) and 16,782 (facing after a pause).
+*Done (ship fix agent):* run 3's first difference is now 21,514, up from 712 (check.py bumped
+`data/realrun3/expected.json`). It is an rng stop, not mine. Three menu rules (wf-core):
+- **A menu screen's enter iteration samples the keys** (menu/mod.rs, Phase::Enter: `menu.held`), because the input
+  object reads them every iteration. Row 712: A on alternate frames over the title's first iteration. The game's A
+  at lf 698 is a press; ours still held the boot's last sample (A down) and saw no press until lf 703. This also
+  cleared 4,362 (the mashed prologue's area) on the way.
+- **No pause check in a menu's closing iteration** (`Menu::closing_iter`, set where `closed_this_frame` is taken;
+  `check_pause`). Row 8,581: START on alternate frames through the pause's fade-in. The game reopens 2 iterations
+  after the fade-in's last step; ours reopened in it.
+- **No trigger check in that iteration either** (field.rs post_step). Row 16,562, 1-12: s086's walk-in trigger
+  fired in the fade-in's last iteration in ours, one later in the game. 16,782 (facing) and 20,560 (depth) went
+  with these.
+
+Checks:
+- check.sh: run 1 exact (both legs). run 2 power-on .. 1,576,065 exact. The run-2 leg from the new cut 1,593,827
+  stops at 1,767,026 (033_b_superbuu rng); the same stop shows with these three rules switched off, so it is not
+  from them.
+- verify suites green: gated segments, menu_parity, wf-app incl. wide_view / pixels, ship rsegs 338.
 *Claim (real-route agent, by the coordinator, 2026-10-05):* run 3's non-menu stops - 4,362 (area after the mashed
 prologue), the one-step leader positions around START-mashed transitions (8,660 .. 30,127), rng 17,858 / 17,916 /
 21,514, the exits 25,581 / 30,748. Today run 3 from power-on runs to 21,514 first (check.sh), so the earlier ones
