@@ -3292,6 +3292,15 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             false
         }
         K::MiniRollAttack => {
+            // the node reads the roll controller's counter (0x03003248, +8 a tick from the enter), not a frame count
+            // of its own: dash while it is 0x81 .. 0xFF, the hit and the end at exactly 0x100. A counter already past
+            // 0x100 (a roll whose end was missed - run 2 rows 1,318,750 .. 1,319,519, Janemba's mini at 18-14 rolling
+            // for 600+ frames: its counter 4,968 at the cut) never ends the node until it wraps. Field only (battle
+            // never imports a running roll: there the counter is 8 x f)
+            let f = match w.en_ref(i).roll_ctl {
+                c if w.field.is_some() && c >= 0 => c >> 3,
+                _ => f,
+            };
             if f > 16 && f < 32 {
                 // field (sc_janemba): the dash is a collision-checked step without sliding (a mini blocked by
                 // another stays put); battle keeps the reference's free move
@@ -3488,7 +3497,10 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         // through 0x0800EDF8 - A: the shown set -> the unseen one (0x60 -> 0x5E, 0xDC -> 0xDB, 0xE5 -> 0xE4), B back
         K::GhostAnimA | K::GhostAnimB => {
             let d = Arc::clone(&w.data);
-            if !(f >= 16 && w.en_ref(i).anim_done(&d)) {
+            // (from the node's second update: the one-shot state runs on in the animation tick while a held field
+            // stops the AI, so the node ends on the first update after it - run 2 row 1,238,866, 18-10, a ghost's
+            // appear held 85 frames, the player in Instant Transmission)
+            if !(f >= 1 && w.en_ref(i).anim_done(&d)) {
                 return false;
             }
             if matches!(kind(c, n), K::GhostAnimA) {

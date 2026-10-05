@@ -2205,7 +2205,8 @@ export function create(n: AiNodeJ, c: AiController): RNode {
       // 0x0802E040: once that state is over, the paired graphics set through 0x0800EDF8 - A: the shown set -> the
       // unseen one (0x60 -> 0x5E, 0xDC -> 0xDB, 0xE5 -> 0xE4), B back (Kyodai Pyramid 14-17)
       return new Act(n, c, () => e.setAnim(18, true, false), (f) => {
-        if (!(f >= 16 && e.animDone())) return false
+        // (from the node's second update: the one-shot runs on under a held field - run 2 row 1,238,866, 18-10)
+        if (!(f >= 1 && e.animDone())) return false
         e.ghostGfx(n.name === 'GhostAnimA')
         return true
       })

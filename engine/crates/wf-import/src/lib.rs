@@ -1333,6 +1333,17 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
             e.ea.done = false;
         }
     }
+    // Mini Janemba's roll controller (the singleton 0x03003248 as the object's state, obj+0x14): its counter is the
+    // animation tick the RAM row shows; the MiniRollAttack node reads it (run 2 rows 1,318,750 .. 1,319,519: a roll
+    // whose counter is far past its 0x100 end - the node never ends; the re-entered node restarted it from 0)
+    if ram.r32(o + 0x14) == 0x0300_3248 {
+        let (tick, facing) = (w.en_ref(ei).ea.pos.tick, ram.r8(o + 0x10) & 3);
+        let e = w.en(ei);
+        e.roll_ctl = tick & 0xffff;
+        e.a.facing = facing;
+    } else if w.en_ref(ei).roll_ctl >= 0 {
+        w.en(ei).roll_ctl = -1;
+    }
     // a HeavyPunch in progress: its frame count is the controller's tick (obj+0x12), its end 48 + 8 * the punch
     // animation's frames as its enter computes (real run 4-1 whole-run cut 621,339: the punch landed a frame before
     // the cut, tick 49 - the import's fresh node ended at once and idled, a draw the game does not make)
