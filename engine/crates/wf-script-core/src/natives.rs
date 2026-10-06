@@ -206,6 +206,13 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
             }
             if was != h.w.scene.hud_hidden {
                 wf_core::vram::hud_shown(h.w, n == 0x2f);
+                // the HUD object's slide: a new one at -16 moving down, the old one moving up (`Scene::hud_y`)
+                if n == 0x2f {
+                    h.w.scene.hud_y = -16;
+                    h.w.scene.hud_vel = 1;
+                } else {
+                    h.w.scene.hud_vel = -1;
+                }
                 if n == 0x2f && h.w.field.is_some() {
                     // a new HUD object: its first update beeps whatever the last beep (as an area load's; run 2 row
                     // 142,953: show_hud with the leader low on HP, 41 at once)

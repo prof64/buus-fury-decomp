@@ -462,6 +462,7 @@ impl Renderer {
                     // (`ui/layout.json` may move / re-anchor / hide it; the game's place by default)
                     if !u.layout.hud_hidden {
                         let (hx, hy) = u.layout.hud_at(w as i32, h as i32);
+                        let hy = hy + hv.y_off;
                         screen.push((u.layout.hud_priority, hx, hy, 80, 16, u.hud(packs, hv)));
                         // the stat-points mark beside it (OAM x 92 = the HUD's x + 84, the HUD's y, priority 1)
                         if let Some(px) = hv.stat_mark.and_then(|k| u.stat_mark(k)) {

@@ -1471,6 +1471,13 @@ pub struct Scene {
     pub cam: CamCtl,
     pub screen: Screen,
     pub hud_hidden: bool,
+    /// the HUD object's position (+0x28) and step (+0x14), its update 0x0800B8FC: pos += step; below -16 it is gone,
+    /// past 8 it stops at 8. `show_hud` (0x080046F4) makes it at -16 moving +1, `hide_hud` (0x08004764, message
+    /// 0x15) sets -1 (real route rclose_002 4-1 f1,973 .. 1,981: OAM y 0 .. 8)
+    #[serde(default = "hud_y_rest")]
+    pub hud_y: i32,
+    #[serde(default)]
+    pub hud_vel: i32,
     pub boss_bar: Option<BossBar>,
     /// a hidden boss bar still sliding out
     #[serde(default)]
@@ -1551,6 +1558,8 @@ impl Default for Scene {
             cam: CamCtl::default(),
             screen: Screen::default(),
             hud_hidden: false,
+            hud_y: 8,
+            hud_vel: 0,
             boss_bar: None,
             boss_bar_out: None,
             titles: Vec::new(),
@@ -2051,6 +2060,9 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
         }
         Cmd::Remove => {
             if let Some(i) = i {
+                if matches!(w.ents[i].body, Body::Enemy(_)) {
+                    crate::nodes::exit_on_remove(w, i);
+                }
                 crate::fieldnpc::script_move_mark(w, i, false);
                 // the object is destroyed now: its tiles go (segment sb 7-5)
                 crate::vram::entity_gone(w, i);
@@ -4308,4 +4320,8 @@ pub const SIN_TABLE: [i32; 256] = [
 /// `sin_scale(radius, angle)` = radius * sin_table[angle & 0xFF] >> 16 (`cos_scale`: angle + 64)
 pub fn sin_scale(radius: i32, angle: i32) -> i32 {
     (radius.wrapping_mul(SIN_TABLE[(angle & 0xff) as usize])) >> 16
+}
+
+fn hud_y_rest() -> i32 {
+    8
 }

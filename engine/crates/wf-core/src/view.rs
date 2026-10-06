@@ -872,8 +872,11 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                     || w.field.as_ref().is_some_and(|f| !f.combat),
                 // (a HUD object a text box's purge suspended is out of the world list: not drawn - real route rkb_168
                 // 14-1 f1,622 .. 1,685: show_hud's new HUD, then s-script's text box on the world map)
-                hidden: w.scene.hud_hidden || crate::vram::owner_suspended(w, crate::vram::Owner::Hud),
+                // (a hidden HUD still sliding out is drawn: `Scene::hud_y`)
+                hidden: (w.scene.hud_hidden && !(w.scene.hud_vel < 0 && w.scene.hud_y >= -16))
+                    || crate::vram::owner_suspended(w, crate::vram::Owner::Hud),
                 stat_mark: stat_mark_frame(w),
+                y_off: w.scene.hud_y - 8,
             });
         }
     }

@@ -73,8 +73,11 @@ with ThreadPoolExecutor(jobs) as ex:
         end = stop if stop is not None else e
         cover += max(0, end - s)
         # (a leg's first row from a cut: the import's own song request - the app restarts the area's song - is not a
-        # game difference)
-        allv += [d for d in diffs if (stop is None or d['row'] < stop) and not (s and d['row'] == s and
+        # game difference. A logic stop reported at row N diverged in iteration N - 1 (the state is compared at the
+        # next row): that iteration's sounds belong to the stop - run 3 1,947,900 from the cut 1,947,883 hit two of
+        # Janemba's three parts (an import gap), its punch sounds differed and the RNG stop showed at 1,947,901; from
+        # power-on the row is exact in state and sound)
+        allv += [d for d in diffs if (stop is None or d['row'] < stop - 1) and not (s and d['row'] == s and
                                                                               d['game'] == [] and
                                                                               all(x.startswith('song') for x in d['app']))]
         if err:

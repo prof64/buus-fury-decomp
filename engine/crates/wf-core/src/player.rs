@@ -1540,6 +1540,7 @@ pub fn gain_xp_levels(w: &mut World, i: usize, exp: i64) -> bool {
 // ---- update -----------------------------------------------------------------------------------------------------------
 
 pub fn update(w: &mut World, i: usize) {
+    if std::env::var("XPDBG").is_ok() { eprintln!("XPDBG update frame {} x {} bt {:?}", w.frame, pr(w, i).a.x, 0); }
     // the world map's flying player (fieldworld.rs) replaces the 2D player's states
     if crate::fieldworld::flyer_update(w, i) {
         return;
@@ -2237,6 +2238,7 @@ pub fn sync_skill_level(w: &mut World, i: usize) {
 
 /// the frame an event from the world's event list ended in: the passive part of the update the event held
 pub fn release_passive(w: &mut World, i: usize) {
+    if std::env::var("XPDBG").is_ok() { eprintln!("XPDBG release_passive frame {} x {} t {}", w.frame, pr(w, i).a.x, pr(w, i).t); }
     if pr(w, i).ko_at < 0 && !pr(w, i).dead {
         passive(w, i);
         // the player is an object after the event's in the list pass: its own update follows the held tick in the
@@ -2581,6 +2583,7 @@ fn ctl_bored(w: &mut World, i: usize) {
 }
 /// hurt / bump control 0x0800DF1C
 fn ctl_knock(w: &mut World, i: usize) {
+    if std::env::var("XPDBG").is_ok() { eprintln!("XPDBG knock frame {} x {}", w.frame, pr(w, i).a.x); }
     let (kx, ky) = KNOCK_VEC[pr(w, i).a.facing as usize];
     let (x, y) = (pr(w, i).a.x, pr(w, i).a.y);
     if fits(w, i, (x - kx) >> 8, (y - ky) >> 8) {

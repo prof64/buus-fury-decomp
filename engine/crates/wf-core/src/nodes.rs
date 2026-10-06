@@ -188,6 +188,19 @@ pub fn pop(w: &mut World, i: usize) {
     }
     note(w, i);
 }
+/// the enemy object deleted by a script's `remove_actor` (field): its destructor exits the running state's tree, so a
+/// leaf's exit still runs - WanderToRandomPoint's SetAnim(0) (the idle draw) and its turn toward Super Buu (run 3 cut
+/// 2,176,800 f151, s476 node 15 removes Vegeta mid-wander for the fusion: message 5 from 0x0803BD2C and the rand(255)
+/// in the removal's frame)
+pub fn exit_on_remove(w: &mut World, i: usize) {
+    if w.field.is_none() {
+        return;
+    }
+    if let Some(c) = ctx_top(w, i) {
+        w.en(i).ai.gen += 1;
+        exit(w, &c, 0);
+    }
+}
 pub fn reset(w: &mut World, i: usize, id: u16) {
     while let Some(c) = ctx_top(w, i) {
         exit(w, &c, 0);

@@ -465,6 +465,9 @@ pub struct HudView {
     /// The stat-points mark ("STAT" + arrow, 16x16 at screen x 92 beside the HUD) while the leader has points to
     /// spend: its animation frame 0..3 (`ui/hud/stat_mark.png`), `None` = no mark.
     pub stat_mark: Option<u8>,
+    /// the HUD object's slide (its y - 8: 0 in place, down to -24 while it slides in after `show_hud` / out after
+    /// `hide_hud`); the stat mark rides with it
+    pub y_off: i32,
 }
 
 /// A damage number: its OBJ's top-left in world pixels and what it shows.

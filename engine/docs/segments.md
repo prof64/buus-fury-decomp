@@ -6818,6 +6818,22 @@ after 900 frames without a tile of progress ("an island: a trigger / event has t
 pressing a direction for good (`ShipDriver2.nav_watch`), and sb3's planned 21-1 death goes sphincter -> on toward 21-4
 (`('once', tag, goal)` goals; 21-2 has no enemies) - tested from run 2's 21-1 state: the death comes in 21-3, and a
 death already on the way (`navonce`) now counts as the planned one (it would have replayed ten times).
+*Run 3 range (2) 2,165,000 .. 2,350,000 (side-content agent, uncommitted: wf-core nodes.rs / enemy.rs / scene.rs).*
+Resync from 2,165,000 (`work/run3/stops_b3_2.jsonl`): 13 RNG stops in 20-7 (2,165,041 .. 2,172,330, Vegeta's
+wander), 2,176,951 (s476 fusion), 2,202,504 (21-6) and 2,339,099 (21-4). Two rules, field only:
+- **WanderToRandomPoint's goal pick tests the grid with the wanderer's own mark in place** (vt+0x54 0x0800F9EE: a
+  detached object passes, else 0x08009904 on the enemy grid as it is; ours unmarked itself first, `passable`) - a
+  goal on his own footprint is rejected (cut 2,164,950 f91: the game drew three goals, ours took the first).
+  `enemy::grid_free`. The cut then stops 1 frame later on the step toward the heap's stale waypoint - the known
+  heap-leftover mechanism (2,160,844 above); the coordinator's known range 2,160,129 .. 2,181,463 covers the 20-7 run.
+- **`remove_actor` on an enemy exits its running state's tree** (the destructor): WanderToRandomPoint's exit
+  (SetAnim(0) + the turn toward Super Buu) runs in the removal's frame - s476 node 15 removes Vegeta mid-wander for
+  the fusion (message 5 from 0x0803BD2C and the rand(255), measured). `nodes::exit_on_remove` from `Cmd::Remove`. Cut
+  2,176,800: 151 -> 300 / 300.
+2,202,504 / 2,339,099: on the current tree check.sh's leg from the cut after the known range (2,181,464) runs exact
+to 2,438,792 - both gone (others' Enzyme fixes); **range (2) is exact outside the known heap range**. The next stop,
+2,438,792, is the real-route agent's range (3). Gates, playthrough, lockstep, field_lockstep, menu_parity green;
+check.sh EXACT (run 1, run 2 both legs, run 3 power-on to 2,160,129 and cut 2,181,464 to 2,438,792 as expected).
 *A takes run 3 row 2,024,954 (Super Buu: a low-HP beep only ours plays) - first suspect A's `hud_beep_after_scripts` re-check.*
 *Real-route agent (2026-10-06), product sweep + boards on HEAD 289d7d2: all green, nothing to route.*
 product_check.sh (with --build): browser 17 / 17, savecheck 41 / 41, features / netstory / wide view ok. Boards
