@@ -750,6 +750,7 @@ fn cond(w: &mut World, c: &C, n: u16) -> bool {
             let slot = w.en_ref(i).target as usize;
             let pressed = w.g.pressed(slot) & 0xf3 != 0;
             let Some(r) = rt(w, c, n) else { return false };
+            if std::env::var_os("TMP_MASH").is_some() { eprintln!("MASH now {now} pressed {pressed} count {} stamp {} presses {presses} gap {gap}", r.d[3], r.d[4]); }
             if pressed {
                 r.d[4] = now;
                 r.d[3] += 1;

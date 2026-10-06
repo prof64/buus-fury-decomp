@@ -2865,7 +2865,11 @@ fn hud_beep_at(w: &mut World, at: Option<u32>) {
         f.hud_check_at = Some(now);
     }
     let Some(pi) = w.player_idx(0) else { return };
-    let (hp, max) = (w.pl_ref(pi).rec.hp, w.pl_ref(pi).rec.max_hp);
+    // (the HUD reads the current character's record: while a fusion component's level-up hook runs the component is
+    // current - `Story::levelup_char`, as the HUD's draw - run 3 row 2,024,954: Gotenks at 16 HP, Goten's popup at full
+    // HP, no beep in the game)
+    let comp = w.story.levelup_char.and_then(|c| w.story.chars.get(c.max(0) as usize)).map(|c| (c.rec.hp, c.rec.max_hp));
+    let (hp, max) = comp.unwrap_or((w.pl_ref(pi).rec.hp, w.pl_ref(pi).rec.max_hp));
     if hp == 0 || hp * 5 > max {
         return;
     }

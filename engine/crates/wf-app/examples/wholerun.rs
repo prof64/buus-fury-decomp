@@ -496,7 +496,7 @@ fn main() {
             }
             // WR_EANIM=1: every enemy's animation position (raw, frame, tick) and state time
             if std::env::var("WR_EANIM").is_ok() {
-                let v: Vec<String> = (0..w.ents.len()).filter(|&i| !w.ents[i].removed && matches!(w.ents[i].body, wf_core::world::Body::Enemy(_))).map(|i| { let e = w.en_ref(i); format!("{}:{:?} raw {} f {} tick {} t {}", w.ents[i].id, e.ai.stack.iter().map(|s| (s.serial, s.rt.iter().map(|r| (r.i, r.f)).collect::<Vec<_>>())).collect::<Vec<_>>(), e.ea.pos.raw, e.ea.pos.frame, e.ea.pos.tick, e.ea.t) }).collect();
+                let v: Vec<String> = (0..w.ents.len()).filter(|&i| !w.ents[i].removed && matches!(w.ents[i].body, wf_core::world::Body::Enemy(_))).map(|i| { let e = w.en_ref(i); format!("{}:{:?} raw {} f {} tick {} t {}", w.ents[i].id, e.ai.stack.iter().map(|s| (s.state, s.serial, s.tree.nodes.iter().map(|n| n.name.as_str()).collect::<Vec<_>>().join(","), s.rt.iter().map(|r| (r.i, r.f)).collect::<Vec<_>>())).collect::<Vec<_>>(), e.ea.pos.raw, e.ea.pos.frame, e.ea.pos.tick, e.ea.t) }).collect();
                 println!("    eanim {}", v.join(" | "));
             }
             if std::env::var("WR_SONG").is_ok() {

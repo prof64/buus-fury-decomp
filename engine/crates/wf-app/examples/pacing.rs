@@ -247,6 +247,19 @@ fn main() {
     if hash_on {
         println!("picture hash {pic_hash:016x}");
     }
+    // --repeat-render N: the last frame's picture made N more times (a profiler's steady target), best / mean
+    let rep = num("--repeat-render", 0);
+    if rep > 0 {
+        let (mut best, mut sum) = (f64::MAX, 0.0);
+        for _ in 0..rep {
+            let t = Instant::now();
+            let _ = ctl.render(&mut app, 0, ww, wh);
+            let ms = t.elapsed().as_secs_f64() * 1e3;
+            best = best.min(ms);
+            sum += ms;
+        }
+        println!("repeat render x{rep}: best {best:.3} ms, mean {:.3} ms", sum / rep as f64);
+    }
     let n = frames.len().max(1);
     let wall = t_all.elapsed().as_secs_f64();
     println!("ran {} frames in {wall:.1} s ({:.0} fps unpaced)", frames.len(), frames.len() as f64 / wall);

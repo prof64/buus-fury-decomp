@@ -1190,13 +1190,52 @@ fn import_objects(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
         if body && ram.valid(st) && ram.r32(st) == 0x0804_D738 {
             let hand = ram.r32(st + 4);
             let hid = enemy_of.iter().find(|e| e.0 == hand && hand != 0).map(|e| e.1).unwrap_or(0);
+            let mut set = None;
             if let Body::Enemy(e) = &mut w.ents[i].body {
                 if matches!(e.ty, 0x34 | 0x35) {
                     e.strike = (e.ea.pos.tick + 1, e.ty == 0x34);
                     e.strike_hand = hid;
+                    set = Some(e.strike);
+                }
+            }
+            // ... and the body's JanembaHandStrike node is past its first update (that one gives the arm the controller:
+            // a fresh count re-armed it - run 3 cut 1,945,822, 18-14: the strike restarted at 1 in f1, the game's ended
+            // in f11 with its two idle draws)
+            if let (Some((st, a_side)), Some(bi)) = (set, w.find(pid)) {
+                use wf_core::ai::K;
+                let k = if a_side { K::JanembaHandStrikeA } else { K::JanembaHandStrikeB };
+                if let Body::Enemy(b) = &mut w.ents[bi].body {
+                    for s in b.ai.stack.iter_mut() {
+                        for (n, rt) in s.rt.iter_mut().enumerate() {
+                            if s.tree.nodes.get(n).is_some_and(|x| x.k == k) {
+                                rt.f = st;
+                            }
+                        }
+                    }
                 }
             }
         }
+    }
+    // a strike hand (type 0x36) under its rising controller (obj+0x14 -> vt 0x0804C338) is our `Hand`, not a plain enemy:
+    // its t is the controller's tick (obj+0x12, from the hand's creation at the arm's strike tick 17; the arm's strike
+    // controller ends at the hand's 40 - run 3 cut 1,945,822, 18-14: a hand at tick 29, the strike's end at f11 with its
+    // two idle draws; ours had kept the hand as a plain enemy)
+    for &(o, id) in &enemy_of {
+        let st = ram.r32(o + 0x14);
+        if !(ram.valid(st) && ram.r32(st) == 0x0804_C338) {
+            continue;
+        }
+        let Some(i) = w.find(id) else { continue };
+        let Body::Enemy(e) = &w.ents[i].body else { continue };
+        if e.ty != 0x36 {
+            continue;
+        }
+        let a = e.a.clone();
+        let t = ram.r16(o + 0x12) as i32;
+        // (the arm's strike controller still holding it marks its footprint: `strike_hand` set by the arm import)
+        let held = w.ents.iter().any(|x| matches!(&x.body, Body::Enemy(p) if p.strike_hand == id && p.strike.0 > 0));
+        let marked = held.then(|| [a.px(), a.py(), a.px() + a.foot_w, a.py() + a.foot_h]);
+        w.ents[i].body = Body::Hand(Box::new(wf_core::world::Hand { a, t, hit: t >= 40, marked }));
     }
     // an Enzyme's parent Blister (obj+0x1F4): its death counts the Blister's +0x204 down (`K::LatchRelease`)
     for &(o, id) in &enemy_of {

@@ -79,48 +79,78 @@ def run(leg):
     return leg, json.loads(rep.read_text()), ''
 
 
-bad = 0
 with ThreadPoolExecutor(max(1, len(legs))) as ex:
-    for (chain, s, e), r, err in ex.map(run, legs):
-        name = f'{chain} ' + ('power-on' if s == 0 else f'cut {s:,}')
-        if r is None:
-            print(f'FAIL {name} .. {e:,}: the app did not finish\n{err}')
-            bad += 1
+    results = list(ex.map(run, legs))
+
+
+def problems(chain, r, e):
+    """a leg's differences as text, and its first difference: (row, what, stretch) of the earlier of its stop and its
+    first sound difference, or None (exact)"""
+    probs, first = [], None
+    if r['exact_to'] < e:
+        st = r['exact_stretch']
+        probs.append(f"stop at row {r['exact_to']:,} ({st}, chapter {chains.chapter_of(chain, st)}): {r['first']}")
+        first = (r['exact_to'], r['first'], st)
+    sf = r.get('sounds_first')
+    if sf:
+        probs.append(f"sound at row {sf['row']:,} ({sf['stretch']}): {sf['what'][:160]} ({r['sounds_bad']} iterations)")
+        if first is None or sf['row'] < first[0]:
+            first = (sf['row'], f"sound: {sf['what'][:160]}", sf['stretch'])
+    if r['script_errors']:
+        probs.append(f"{r['script_errors']} script errors")
+    return probs, first
+
+
+# A chain with an expected.json (a ratchet while its stops are being fixed) passes when its first difference - the
+# earliest over ALL its legs, a stop or a sound request - is no earlier than the recorded one; a later one is an
+# improvement and the file is bumped to it. One value per chain, compared and bumped alike (taken per leg, a later
+# leg's difference bumped the file past an earlier leg's, which then failed the next run: run 3 flip-flopped between
+# 2,024,954 and 2,202,504).
+chain_first = {}
+for (chain, s, e), r, err in results:
+    if r is None:
+        continue
+    _, first = problems(chain, r, e)
+    if first is not None and (chain not in chain_first or first[0] < chain_first[chain][0]):
+        chain_first[chain] = first
+verdict = {}
+for chain, (first, what, st) in chain_first.items():
+    exp_p = chains.paths(chain)['expected']
+    if lag != 'none' or not exp_p.exists():
+        continue
+    exp = json.loads(exp_p.read_text())
+    if first < exp['first_diff']:
+        verdict[chain] = f"WORSE than expected (first difference row {first:,} < {exp['first_diff']:,})"
+        continue
+    verdict[chain] = None
+    if first > exp['first_diff']:
+        print(f"IMPROVED {chain}: first difference row {exp['first_diff']:,} -> {first:,} "
+              f"({exp_p.relative_to(ROOT)} bumped)")
+        exp_p.write_text(json.dumps({**exp, 'first_diff': first, 'stop': what, 'stretch': st}, indent=1) + '\n')
+
+bad = 0
+for (chain, s, e), r, err in results:
+    name = f'{chain} ' + ('power-on' if s == 0 else f'cut {s:,}')
+    if r is None:
+        print(f'FAIL {name} .. {e:,}: the app did not finish\n{err}')
+        bad += 1
+        continue
+    probs, first = problems(chain, r, e)
+    if probs and chain in verdict and not r['script_errors']:
+        if verdict[chain] is None:
+            print(f"ok   {name} .. {e:,}: as expected, first difference row {first[0]:,} - " + ' | '.join(probs))
             continue
-        probs = []
-        if r['exact_to'] < e:
-            st = r['exact_stretch']
-            probs.append(f"stop at row {r['exact_to']:,} ({st}, chapter {chains.chapter_of(chain, st)}): {r['first']}")
-        sf = r.get('sounds_first')
-        if sf:
-            probs.append(f"sound at row {sf['row']:,} ({sf['stretch']}): {sf['what'][:160]} ({r['sounds_bad']} iterations)")
-        if r['script_errors']:
-            probs.append(f"{r['script_errors']} script errors")
-        # a chain with an expected.json (a ratchet: run 2 while its stops are being fixed) passes when its first
-        # difference (stop or sound) is no earlier than the recorded one; later = an improvement, the file is bumped
-        exp_p = chains.paths(chain)['expected']
-        # (any leg: with a known range before it, the first difference can sit in the leg cut after the range)
-        if probs and exp_p.exists() and lag == 'none':
-            exp = json.loads(exp_p.read_text())
-            first = min(r['exact_to'], sf['row'] if sf else e)
-            if r['script_errors']:
-                pass
-            elif first < exp['first_diff']:
-                probs.insert(0, f"WORSE than expected (first difference row {first:,} < {exp['first_diff']:,})")
-            else:
-                if first > exp['first_diff']:
-                    print(f"IMPROVED {name}: first difference row {exp['first_diff']:,} -> {first:,} "
-                          f"({exp_p.relative_to(ROOT)} bumped)")
-                    exp_p.write_text(json.dumps({**exp, 'first_diff': first, 'stop': r['first'],
-                                                 'stretch': r['exact_stretch']}, indent=1) + '\n')
-                print(f"ok   {name} .. {e:,}: as expected, first difference row {first:,} - " + ' | '.join(probs))
-                continue
-        if probs:
-            bad += 1
-            print(f'FAIL {name} .. {e:,}: ' + ' | '.join(probs))
-        else:
-            snd = f", sounds {r['sounds_iters']:,} iterations" if r.get('sounds_compared') else ''
-            print(f'ok   {name} .. {e:,}: exact ({r["stepped"]:,} logic iterations{snd})')
+        if first[0] != chain_first[chain][0]:
+            # (the chain fails on another leg's earlier difference; this leg's are later ones)
+            print(f"ok   {name} .. {e:,}: later than the chain's first difference - " + ' | '.join(probs))
+            continue
+        probs.insert(0, verdict[chain])
+    if probs:
+        bad += 1
+        print(f'FAIL {name} .. {e:,}: ' + ' | '.join(probs))
+    else:
+        snd = f", sounds {r['sounds_iters']:,} iterations" if r.get('sounds_compared') else ''
+        print(f'ok   {name} .. {e:,}: exact ({r["stepped"]:,} logic iterations{snd})')
 for chain, (rows, known) in summary.items():
     skipped = ', '.join(f"{k['from']:,}..{k['to']:,} ({k['stretch']})" for k in known)
     print(f'{chain}: {rows:,} rows; known ranges skipped: {skipped or "none"}')

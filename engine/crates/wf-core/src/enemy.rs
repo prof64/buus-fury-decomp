@@ -939,6 +939,7 @@ pub fn latch_enter(w: &mut World, i: usize) {
     }
     let Some(pi) = player(w, i) else { return };
     let (px, py) = (w.pl_ref(pi).a.x, w.pl_ref(pi).a.y);
+    if std::env::var_os("TMP_LATCH").is_some() { eprintln!("LATCHENTER f{} en{} e ({},{}) p ({},{})", w.frame, i, w.en_ref(i).a.x, w.en_ref(i).a.y, px, py); }
     let e = w.en(i);
     e.hook = Hook::Latch {
         ox: e.a.x - px,
@@ -2740,6 +2741,10 @@ fn janemba_part_field(w: &mut World, i: usize) {
             if let Some(hk) = (h != 0).then(|| w.find(h)).flatten() {
                 w.rng.rand(255);
                 unmark_hand(w, hk);
+                // the hand leaves the world list with the controller's end, its tiles freed in that frame (run 3 cut
+                // 1,945,822, 18-14: the game's list and allocator lose the hand at its tick 40)
+                crate::vram::release(w, crate::vram::Owner::Ent(h));
+                w.ents[hk].removed = true;
             }
             set_anim(w, i, &[n(0)], true, Some(true));
         }
