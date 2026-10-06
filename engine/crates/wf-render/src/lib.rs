@@ -819,17 +819,19 @@ impl Renderer {
             }
         };
         let (w, h) = (self.w, self.h);
-        // the centre on screen: the world point minus the camera
-        let (ox, oy) = (sp.x - cx + vx, sp.y - cy + vy);
-        let _ = vy;
+        // the centre on screen: the world point minus the camera (`cx` / `cy` with the shake), placed in this view
+        // like the GBA screen (a wider view's centre 240x160 is the GBA screen: the wide view drew the sphere at the
+        // GBA screen's coordinates - rkb_168 14-1 f2250, wide_view test)
+        let (ox, oy) = (sp.x - cx + (w as i32 - GBA_W) / 2, sp.y - cy + (h as i32 - GBA_H) / 2);
+        let _ = (vx, vy);
         for py in 0..h as i32 {
-            let dy = py - (oy - vy);
+            let dy = py - oy;
             let qy = if dy >= 0 { dy } else { -1 - dy };
             if qy >= r {
                 continue;
             }
             for px in 0..w as i32 {
-                let dx = px - (ox - vx);
+                let dx = px - ox;
                 let qx = if dx >= 0 { dx } else { -1 - dx };
                 if qx >= r + 8 {
                     continue;

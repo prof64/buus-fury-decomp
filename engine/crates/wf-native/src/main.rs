@@ -474,6 +474,11 @@ struct Running {
     online: online::Online,
     /// story mode: the save slots' generation last written to disk
     saves_gen: u32,
+    /// the window size of the picture last presented, and whether an input / window event came since: a redraw
+    /// with no new step and neither of those presents nothing (the loop wakes every 4 ms, the sim steps every
+    /// 16.7 ms - three of four wake-ups had rendered and blitted the same picture again)
+    shown: (u32, u32),
+    dirty: bool,
 }
 
 // ------------------------------------------------------------------ launcher support (settings, save slots)
@@ -768,6 +773,8 @@ impl Shell {
                     bindings_path: bpath.clone(),
                     fps: (0, Instant::now(), 0.0),
                     saves_gen: 0,
+                    shown: (0, 0),
+                    dirty: true,
                 }));
                 if self.args.open_replays {
                     if let Phase::Ready(r) = &mut self.phase {
@@ -876,6 +883,7 @@ impl Shell {
                     *inp = r.keys.buttons(&r.bindings);
                 }
                 r.ctl.now_unix = now_unix();
+                let net = wf_net::netsim::current_status();
                 // the online lobby: pump it; a starting match becomes the app's simulation
                 r.online.frame(&mut r.app, &mut r.ctl);
                 r.online.check_match(&r.app);
@@ -883,7 +891,8 @@ impl Shell {
                     r.app.inputs.iter_mut().for_each(|i| *i = 0);
                 }
                 let live = r.app.inputs.clone();
-                if r.ctl.advance(&mut r.app, dt, &live) > 0 {
+                let stepped = r.ctl.advance(&mut r.app, dt, &live);
+                if stepped > 0 {
                     r.keys.consumed();
                 }
                 persist_saves(&self.args.data, &r.app, &mut r.saves_gen);
@@ -895,14 +904,32 @@ impl Shell {
                     for e in r.app.take_audio() {
                         m.push(e);
                     }
-                    let mut sink = vec![0.0f32; ((dt.min(0.25) * 48_000.0) as usize) * 2];
-                    m.render(&mut sink);
+                    // (the samples go nowhere: one buffer kept for the process, no allocation per frame)
+                    thread_local!(static SINK: std::cell::RefCell<Vec<f32>> = const { std::cell::RefCell::new(Vec::new()) });
+                    SINK.with(|b| {
+                        let mut b = b.borrow_mut();
+                        b.resize(((dt.min(0.25) * 48_000.0) as usize) * 2, 0.0);
+                        m.render(&mut b);
+                    });
                 } else {
                     r.app.take_audio();
                 }
+                let idle = stepped == 0
+                    && !r.dirty
+                    && r.shown == (ww, wh)
+                    && !r.app.paused
+                    && !r.menu.open
+                    && !r.replay_menu.open
+                    && !r.online.menu.open
+                    && net.is_none();
+                if idle {
+                    replays::service(&r.store, &mut r.ctl, &mut r.app, &mut r.replay_menu);
+                    return;
+                }
+                r.shown = (ww, wh);
+                r.dirty = false;
                 let t0 = Instant::now();
                 // netplay: the local player's camera
-                let net = wf_net::netsim::current_status();
                 let me = net.as_ref().and_then(|s| s.borrow().local_slot).unwrap_or(0);
                 let f = r.ctl.render(&mut r.app, me, ww, wh);
                 replays::service(&r.store, &mut r.ctl, &mut r.app, &mut r.replay_menu);
@@ -1023,6 +1050,11 @@ impl ApplicationHandler for Shell {
     }
 
     fn window_event(&mut self, el: &ActiveEventLoop, _id: WindowId, ev: WindowEvent) {
+        if !matches!(ev, WindowEvent::RedrawRequested) {
+            if let Phase::Ready(r) = &mut self.phase {
+                r.dirty = true;
+            }
+        }
         match ev {
             WindowEvent::CloseRequested => {
                 if let Phase::Ready(r) = &mut self.phase {

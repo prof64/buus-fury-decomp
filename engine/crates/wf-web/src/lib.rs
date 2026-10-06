@@ -99,6 +99,11 @@ struct Game {
     /// replays, rewind, save states, training tools (see engine/docs/replays.md)
     ctl: Control,
     requests: VecDeque<Request>,
+    /// what the picture last shown was made from (window size, view mode, sim frame, input generation): a frame
+    /// call with no new step and none of these changed renders nothing (`wf_app_frame` on a 120 / 144 Hz display:
+    /// every other call)
+    shown: Option<(u32, u32, ViewMode, u64, u32)>,
+    input_gen: u32,
 }
 
 thread_local! {
@@ -245,6 +250,8 @@ pub unsafe extern "C" fn wf_app_init(cfg_ptr: *const u8, cfg_len: usize) -> u32 
             fb_scale: 1,
             audio: Vec::new(),
             last_ms: unsafe { now_ms() },
+            shown: None,
+            input_gen: 0,
             ctl,
             requests: VecDeque::new(),
         })
@@ -264,6 +271,7 @@ fn with_game<R>(f: impl FnOnce(&mut Game) -> R) -> Option<R> {
 pub unsafe extern "C" fn wf_app_key(ptr: *const u8, len: usize, down: u32, player: u32) -> u32 {
     let code = unsafe { arg_str(ptr, len) };
     with_game(|g| {
+        g.input_gen = g.input_gen.wrapping_add(1);
         let bound = g.bindings.key(&code) != 0;
         if let Some(k) = g.keys.get_mut(player as usize) {
             k.set(&code, down != 0);
@@ -284,6 +292,9 @@ pub extern "C" fn wf_app_pad(player: u32, pressed: u32, ax: f32, ay: f32) {
     with_game(|g| {
         let v = g.bindings.pad(pressed, ax, ay);
         if let Some(p) = g.pads.get_mut(player as usize) {
+            if *p != v {
+                g.input_gen = g.input_gen.wrapping_add(1);
+            }
             *p = v;
         }
     });
@@ -333,6 +344,14 @@ pub extern "C" fn wf_app_frame(win_w: u32, win_h: u32, player: u32) -> u32 {
         if steps > 0 {
             g.keys.iter_mut().for_each(|k| k.consumed());
         }
+        for e in g.app.take_audio() {
+            g.audio.extend_from_slice(&e.encode());
+        }
+        let key = (win_w, win_h, g.app.mode, g.app.sim.frame(), g.input_gen);
+        if steps == 0 && !g.app.paused && g.shown == Some(key) {
+            return steps;
+        }
+        g.shown = Some(key);
         let t0 = unsafe { now_ms() };
         let f = g.ctl.render(&mut g.app, player as usize, win_w, win_h);
         g.app.stats.last_render_ms = unsafe { now_ms() } - t0;
@@ -347,13 +366,10 @@ pub extern "C" fn wf_app_frame(win_w: u32, win_h: u32, player: u32) -> u32 {
         g.fb_w = f.view_w;
         g.fb_h = f.view_h;
         g.fb_scale = f.scale;
-        for e in g.app.take_audio() {
-            g.audio.extend_from_slice(&e.encode());
-        }
         for e in g.app.renderer.errors.drain(..) {
             host_log(&e);
         }
-        steps
+        steps | 1 << 30
     })
     .unwrap_or(0)
 }
@@ -533,6 +549,7 @@ pub extern "C" fn wf_audio_render(frames: u32) -> *const f32 {
 pub unsafe extern "C" fn wf_app_key2(ptr: *const u8, len: usize, down: u32, player: u32, mods: u32, repeat: u32) -> u32 {
     let code = unsafe { arg_str(ptr, len) };
     with_game(|g| {
+        g.input_gen = g.input_gen.wrapping_add(1);
         let bound = g.bindings.key(&code) != 0;
         if g.ctl.key(&mut g.app, &code, Mods::from_bits(mods), down != 0, repeat != 0, bound) {
             if down == 0 {

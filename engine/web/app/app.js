@@ -475,13 +475,15 @@ async function boot(baseTarBytes) {
     }
   }
 
+  let drawnSize = '';
   function frame() {
     pollPads();
     const dpr = window.devicePixelRatio || 1;
     const W = Math.floor(innerWidth * dpr);
     const H = Math.floor(innerHeight * dpr);
     x.wf_app_set_clock(Date.now() / 1000);
-    x.wf_app_frame(W, H, net ? net.slot() : 0);
+    // bit 30: a new picture was rendered (none when no step ran and nothing changed - a > 60 Hz display)
+    const drawn = (x.wf_app_frame(W, H, net ? net.slot() : 0) & (1 << 30)) !== 0;
     if (net) {
       net.pump();
       net.draw();
@@ -493,14 +495,22 @@ async function boot(baseTarBytes) {
     if (canvas.width !== w || canvas.height !== h) {
       canvas.width = w;
       canvas.height = h;
+      drawnSize = '';
     }
-    canvas.style.width = `${(w * s) / dpr}px`;
-    canvas.style.height = `${(h * s) / dpr}px`;
-    g.putImageData(new ImageData(new Uint8ClampedArray(mem.buffer, x.wf_fb_ptr(), w * h * 4), w, h), 0, 0);
+    const css = `${(w * s) / dpr}px ${(h * s) / dpr}px`;
+    if (css !== drawnSize) {
+      // (style writes only on a change: each one dirties the layout)
+      drawnSize = css;
+      canvas.style.width = `${(w * s) / dpr}px`;
+      canvas.style.height = `${(h * s) / dpr}px`;
+    }
+    if (drawn) g.putImageData(new ImageData(new Uint8ClampedArray(mem.buffer, x.wf_fb_ptr(), w * h * 4), w, h), 0, 0);
     const n = x.wf_app_audio_len();
     if (n) {
       const words = new Int32Array(mem.buffer, x.wf_app_audio_ptr(), n).slice();
       for (let i = 0; i + 3 < words.length; i += 4) window.wfAudioLog.push([x.wf_app_frame_no ? x.wf_app_frame_no() : 0, ...words.subarray(i, i + 4)]);
+      // (a debugging / test log: the last 20,000 events, not the whole session's)
+      if (window.wfAudioLog.length > 24000) window.wfAudioLog.splice(0, window.wfAudioLog.length - 20000);
       x.wf_app_audio_clear();
       if (audio) audio.node.port.postMessage({ type: 'events', words });
       else queued.push(...words);

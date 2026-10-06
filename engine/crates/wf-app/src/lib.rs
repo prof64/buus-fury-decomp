@@ -210,22 +210,89 @@ impl App {
 
 /// Integer nearest-neighbour blit of `src` (`sw` x `sh`) scaled by `scale`, centred in `dst` (`dw` x `dh`),
 /// black borders. Used by hosts that present a CPU buffer (native softbuffer).
+/// Each source row is widened once into its first destination row (runs of `scale` equal pixels); the other
+/// `scale - 1` rows copy it - no per-pixel divide (`examples/pacing.rs`).
 pub fn blit_scaled(src: &[u32], sw: usize, sh: usize, scale: usize, dst: &mut [u32], dw: usize, dh: usize) {
     let scale = scale.max(1);
     let (ow, oh) = (sw * scale, sh * scale);
     let ox = (dw as isize - ow as isize) / 2;
     let oy = (dh as isize - oh as isize) / 2;
+    // the destination columns the picture covers, and the scaled source column of the first one
+    let x0 = ox.clamp(0, dw as isize) as usize;
+    let x1 = (ox + ow as isize).clamp(x0 as isize, dw as isize) as usize;
+    let sx0 = (x0 as isize - ox) as usize;
+    let mut prev: Option<(usize, usize)> = None; // (source row, the destination row it was widened into)
     for y in 0..dh {
-        let row = &mut dst[y * dw..(y + 1) * dw];
         let sy = y as isize - oy;
         if sy < 0 || sy >= oh as isize {
-            row.fill(0);
+            dst[y * dw..(y + 1) * dw].fill(0);
             continue;
         }
-        let srow = &src[(sy as usize / scale) * sw..(sy as usize / scale + 1) * sw];
-        for (x, d) in row.iter_mut().enumerate() {
-            let sx = x as isize - ox;
-            *d = if sx < 0 || sx >= ow as isize { 0 } else { srow[sx as usize / scale] & 0x00FF_FFFF };
+        let r = sy as usize / scale;
+        if let Some((pr, py)) = prev {
+            if pr == r {
+                dst.copy_within(py * dw..(py + 1) * dw, y * dw);
+                continue;
+            }
+        }
+        let row = &mut dst[y * dw..(y + 1) * dw];
+        let srow = &src[r * sw..(r + 1) * sw];
+        row[..x0].fill(0);
+        row[x1..].fill(0);
+        let (mut sx, mut k) = (sx0, x0);
+        while k < x1 {
+            let run = (scale - sx % scale).min(x1 - k);
+            row[k..k + run].fill(srow[sx / scale] & 0x00FF_FFFF);
+            k += run;
+            sx += run;
+        }
+        prev = Some((r, y));
+    }
+}
+
+#[cfg(test)]
+mod blit_tests {
+    /// the plain per-pixel form the fast one must equal
+    fn reference(src: &[u32], sw: usize, sh: usize, scale: usize, dst: &mut [u32], dw: usize, dh: usize) {
+        let scale = scale.max(1);
+        let (ow, oh) = (sw * scale, sh * scale);
+        let ox = (dw as isize - ow as isize) / 2;
+        let oy = (dh as isize - oh as isize) / 2;
+        for y in 0..dh {
+            let row = &mut dst[y * dw..(y + 1) * dw];
+            let sy = y as isize - oy;
+            if sy < 0 || sy >= oh as isize {
+                row.fill(0);
+                continue;
+            }
+            let srow = &src[(sy as usize / scale) * sw..(sy as usize / scale + 1) * sw];
+            for (x, d) in row.iter_mut().enumerate() {
+                let sx = x as isize - ox;
+                *d = if sx < 0 || sx >= ow as isize { 0 } else { srow[sx as usize / scale] & 0x00FF_FFFF };
+            }
+        }
+    }
+
+    #[test]
+    fn blit_equals_reference() {
+        let mut seed = 0x1234_5678u32;
+        for &(sw, sh) in &[(240usize, 160usize), (7, 5), (641, 361), (1, 1)] {
+            let src: Vec<u32> = (0..sw * sh)
+                .map(|_| {
+                    seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+                    seed
+                })
+                .collect();
+            for scale in 1..=7 {
+                let sizes = [(sw * scale, sh * scale), (sw * scale + 13, sh * scale + 6), (sw * scale / 2 + 1, sh * scale / 2 + 1), (3, 2)];
+                for &(dw, dh) in &sizes {
+                    let mut a = vec![0xDEAD_BEEFu32; dw * dh];
+                    let mut b = vec![0x1234_5678u32; dw * dh];
+                    super::blit_scaled(&src, sw, sh, scale, &mut a, dw, dh);
+                    reference(&src, sw, sh, scale, &mut b, dw, dh);
+                    assert_eq!(a, b, "{sw}x{sh} x{scale} into {dw}x{dh}");
+                }
+            }
         }
     }
 }

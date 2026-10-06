@@ -26,6 +26,10 @@ fn strip_overlays(v: &RenderView) -> RenderView {
     o.timer = None;
     // the area banner and a top / bottom text box anchor to the wide view's edges (wf-render), as the HUD
     o.banner = None;
+    // (the world map's bottom label stays at the wide view's bottom edge, as the other corner overlays)
+    if let Some(m7) = o.map.as_mut().and_then(|m| m.mode7.as_mut()) {
+        m7.label = None;
+    }
     if o.dialog.as_ref().is_some_and(|d| d.position != wf_view::DialogPos::Middle) {
         o.dialog = None;
         o.dialog_anim = None;
@@ -80,7 +84,9 @@ fn wide_view_centre_is_the_gba_view_and_nothing_is_culled() {
                 let cam = view.cameras.first().copied().unwrap_or_default();
                 for i in 0..w.ents.len() {
                     let e = &w.ents[i];
-                    if e.removed || !want.contains(&k) {
+                    // (an object the sprite-memory purge took out of the world list is not drawn in the game either -
+                    // `vram::suspended`; the pixel gate's per-frame lock reaches such frames: dr4_042 15-32 f180 ..)
+                    if e.removed || !want.contains(&k) || wf_core::vram::suspended(w, e.id) {
                         continue;
                     }
                     let actor = matches!(e.body, Body::Player(_) | Body::Enemy(_) | Body::Npc(_));
