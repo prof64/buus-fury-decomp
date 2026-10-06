@@ -553,9 +553,13 @@ fn anim_mut(w: &mut World, i: usize) -> Option<&mut ActAnim> {
     if !npc || matches!(&w.ents[i].body, Body::Npc(n) if n.behaviour.is_some()) {
         make_puppet(w, i);
     }
-    // (an enemy's script animation replaces its controller: a charging ball goes - shots::drop_charging_ball)
+    // (an enemy's script animation replaces its controller: a charging ball goes - shots::drop_charging_ball - and a
+    // charging Kamehameha, enemy::drop_charging_kame)
     if matches!(w.ents[i].body, Body::Enemy(_)) {
         crate::shots::drop_charging_ball(w, id);
+        if w.field.is_some() {
+            crate::enemy::drop_charging_kame(w, i);
+        }
     }
     if npc {
         match &mut w.ents[i].body {

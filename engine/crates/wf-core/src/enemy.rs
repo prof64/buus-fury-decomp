@@ -529,6 +529,23 @@ pub fn mark_moving(w: &mut World, i: usize) {
     }
 }
 
+/// A Kamehameha still charging belongs to the actor state its node set (0x0804C690): a new animation replaces it -
+/// the enemy's own (run 2 row 1,926,265, 19-3: Kid Buu punched in the frame his charge started - the hurt reaction's
+/// animation, play 3 / stop 3 in one frame) or a script's (run 3 row 2,606,136, 19-3: s460's first command on Kid
+/// Buu, from the command-list tick 0x0801943D) - and the charging beam goes with its destructor's stop 3
+pub fn drop_charging_kame(w: &mut World, i: usize) {
+    let id = w.ents[i].id;
+    let b = w.en_ref(i).beam;
+    if let Some(k) = w.find(b).filter(|&k| matches!(&w.ents[k].body, Body::Shot(s) if s.owner == id && matches!(&s.kind, crate::shots::ShotKind::Kame(kb) if kb.charging))) {
+        crate::shots::beam_stop(w, k);
+        // (the destructor frees its tiles at once - a script command runs after the frame's reap)
+        if w.ents[k].removed {
+            crate::vram::entity_gone(w, k);
+        }
+        w.en(i).beam = 0;
+    }
+}
+
 pub fn set_anim_rule(
     w: &mut World,
     i: usize,
@@ -540,14 +557,7 @@ pub fn set_anim_rule(
     if w.field.is_some() && !matches!(refs.first(), Some(AnimRef::N(15))) {
         let id = w.ents[i].id;
         crate::shots::drop_charging_ball(w, id);
-        // a Kamehameha still charging belongs to the actor state its node set (0x0804C690): a new animation replaces
-        // it, the charging beam goes with its destructor's stop 3 (run 2 row 1,926,265, 19-3: Kid Buu punched in the
-        // frame his charge started - the hurt reaction's animation, play 3 / stop 3 in one frame)
-        let b = w.en_ref(i).beam;
-        if let Some(k) = w.find(b).filter(|&k| matches!(&w.ents[k].body, Body::Shot(s) if s.owner == id && matches!(&s.kind, crate::shots::ShotKind::Kame(kb) if kb.charging))) {
-            crate::shots::beam_stop(w, k);
-            w.en(i).beam = 0;
-        }
+        drop_charging_kame(w, i);
     }
     let d = Arc::clone(&w.data);
     let mut ev = std::mem::take(&mut w.events);
