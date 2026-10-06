@@ -6813,3 +6813,7 @@ after 900 frames without a tile of progress ("an island: a trigger / event has t
 pressing a direction for good (`ShipDriver2.nav_watch`), and sb3's planned 21-1 death goes sphincter -> on toward 21-4
 (`('once', tag, goal)` goals; 21-2 has no enemies) - tested from run 2's 21-1 state: the death comes in 21-3, and a
 death already on the way (`navonce`) now counts as the planned one (it would have replayed ten times).
+*A takes run 3 row 2,024,954 (Super Buu: a low-HP beep only ours plays) - first suspect A's `hud_beep_after_scripts` re-check.*
+*Real-route agent (2026-10-06), product sweep + boards on HEAD 289d7d2: all green, nothing to route.*
+product_check.sh (with --build): browser 17 / 17, savecheck 41 / 41, features / netstory / wide view ok. Boards
+unchanged: main 1,518 / 1,519, loads 1,517 / 1,517, every-N 96.9% (1,616,909 / 1,668,052 verified).
