@@ -6322,3 +6322,23 @@ Emulator, the world pass's update calls (0x08011A82 -> vt+8, last to first) and 
   game at row 128 (no pass 127-128, the full pass with the walk at 129); ours resumes after 129's update (the
   director's done seen a frame later). Not changed.
 **Run 2 is exact (A; wf-core field.rs, wf-import lib.rs; uncommitted).** 1,837,970 / 1,842,711: a punch that killed a worm head also opened the save point's menu (s011) in the same frame; the game holds the dead enemy's coin-drop countdown while any event holds the field (the coins 8 updates after the Save Game screen closes, row 1,837,978) - ours held it only for the level-up popup. The import's extra held frame for the cut's own frame stays only for a level-up popup started inside the world update (call 0x08011A5F on the stack, as the on-defeat import) - a first version that dropped it broke the tour_castle_* gates. **check.sh: run 1, run 2 (both legs: power-on .. 1,576,065, cut 1,593,827 .. 1,977,866) and run 3 exact in logic + sounds; `data/realrun2/expected.json` removed (staged) - run 2 is now held strict.** Gates green (all tour_* included).
+
+*Ship fix agent, 2026-10-05 - open tour items, measured (no code change kept):*
+- **Breakable with an event callback (desert_a f513 / s369, desert_py5 f451 + f645 / s413):** emulator (segbp.py
+  breakpoints on the ki blast update 0x08019888, rand, SetAnim 0x0800ECF2): the break frame has **no object pass**
+  (no blast update, no RNG draw) in all three; the next frame the objects update first (the punch's end: SetAnim(0)
+  from 0x0800DEA4, rand(255)) and then the event's first node (s413's `play_anim(0, 0)` from 0x08015956: idle again,
+  a second rand(255)); the blast ends in that frame's update (LR 0x08019CF9). Ours: a one-shot no-pass flag gives
+  the break frame right, but our event's first node resumes **before** the object pass in the next frame (the
+  frame-1 wait ends at the frame's start), so py5 f452 draws once where the game draws twice. The rule that covers
+  both: no object pass in the break frame **and** the event's first node after the next frame's object pass - the
+  second half changes when a waiting script resumes, which other events depend on; not done.
+- **Bomb chips vs a rifle trail puff (earth_circus f1381):** our chips end on the game's frame (32 after the burst,
+  both bombs); the game deletes each chip in its update - its debris-graphic reference goes before the older rifle's
+  puff allocates; ours releases at the frame's reap. Freeing at the deletion is the fix, but entity_gone must then
+  not release again at the reap (a double release) - not done.
+- **castle_ship_21 f190:** loot pickup, same used blocks, a free-list link differs (several frees in one frame).
+- **castle_ship_42 f7 - to the importer agent:** an enemy energy wave in flight at the cut (vt 0x08049C98,
+  `import_waves`) ends in the game at f7; ours keeps its 2-unit block (325, 2) - the imported wave's age / end is off.
+- **check.sh (coordinator's note):** run 3 fails with my edits off too (first difference 838,327; the tree has
+  another agent's field.rs / wf-import host.rs edits and run 3's manifest being extended) - not from this work.
