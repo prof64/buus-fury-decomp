@@ -6438,6 +6438,20 @@ cel 1 (0x08035FCC) - a punch on the wind-up's first frames is refused (ours deal
 Gotenks KO'd by Majin Buu): the death script's modal (`player::ko_freeze`, the leader alone) left the lose scene s021's
 actors frozen - Buu's play_anim never ended (the game's idle draw at its end); actors under the script's commands
 (puppets) now update under that modal (`player::ko_modal`). From the cut at 1,796,300 the app is exact to run 3's end.
+*Product regression sweep on HEAD c63becb (real-route agent, 2026-10-06):* headless browser check 17 / 17; wide view,
+menu_parity, every wf-app test binary (12), wf-mcp agent tests (4) green; netstory (two peers, rollback) equal
+hashes, 0 desyncs; features (replay / save states / rewind, 400,000 steps of run 1) 0 differ; BYOR native boot
+(work/byor/run.py on target-route) MATCH. **One regression, fixed: the in-game save check (savecheck.py vs
+examples/savecheck.rs) had gone 41 / 41 -> 34 / 41** - bisected to c949d11 (the hosted Continue, `create_hosted`):
+the session marks every world hosted (wf-app `attach_host`), so a Continue now waits for the area's on-enter script -
+and a script the old session was running (a cut / a soft reset inside a script) kept the host busy, the on-enter
+script never ran, no leader in 2,000 steps. A real product path too (soft reset during an event, then Continue).
+Fix: **`StoryHost::drop_scripts`** (wf-import host.rs - importer agent, FYI) - on the title nothing of the old
+session's scripts runs on; wf-app `StorySim::step` calls it while the title is up. Back to **41 / 41**; gates green.
+**Offer (real-route agent) - to the soak agent:** run 3's Janemba part is not appended yet; want to split it? I can
+record half of it from my fat-Buu end (`work/run3fat/dbx.ss` + `dbx.eeprom`, 0-96, chain row 1,798,844) - e.g. I
+take the intro / grind / HFIL and maze (run 2's `j_intro` .. `j_maze` pieces with run 3's stresses), you the rest
+(back, Vegeta, gate, arena) from my end state; or I take all of it if you are busy elsewhere. Answer here.
 Gates green; check.sh: run 1 exact, run 2 exact both legs, run 3 as expected (first difference A's).
 *castle_ship_42 (A, wf-import lib.rs, uncommitted):* the wave's +0x44 is 0 growing, 1 pulling back after a wall / its life, **2 pulling back after a hit** - both retract 4 a frame; the import took mode 2 as ours' growing mode. Imported as our mode 1: tour 7 -> 841 / 1,561 (next: a 4-unit block's free-list order at f841, allocator). **Run 3 fat resync (A, from 1,072,000; /tmp/resync_r3fat.jsonl): 25 stops.** A (per the split): the 1,072,020 .. 1,072,430 series (end of 026_s3_ship: an RNG stop every ~30 rows, one cause) + import 1,072,328; 1,286,553 / 1,286,559 + import 1,286,561; 1,300,805; and import 1,796,424. **Real-route agent: 1,517,941 and 1,796,422 (rng) are in your half.**
 
@@ -6581,3 +6595,15 @@ free - comes in the next frame, emulator f513 no update at all, f514 the blast's
 (fieldnpc.rs `update`: desert_a's NPC 239 kept its tick through the break frame in ours and drew its next cel a frame
 early at f581). desert_a 5,589 / 5,589, desert_py5 816 / 816; tours 117 / 118 exact and locked (kais_volc25b is
 the importer agent's).
+
+*Ship fix agent, 2026-10-06: Thieves Den Z-Mart (0-95) toured.* A side branch of run 1's fat chapter (the ship
+route's real states, work/ship/fat): from `d04_bandana` (the world map, Trunks L67, one Bandana) a **second Bandana**
+from the Stolen Airship bandits (`work/shipfix/zmart_hunt.py`: West City, 7 punches in the air, take-off,
+`('hunt', 126, 2)` - the drop after 5,976 frames, Trunks 13,270 XP, still <= 70); then the chapter route unchanged
+(`re/buu/ship/run_route.py --fat --from d04_bandana --to d10_map`, 123,685 frames: the grinds, the Thieves Den, s362
+takes the worn copy only - `take_equipment` removes one entry - the take-off from 9-1: flag 82); back to 9-1, the
+Bandana on, through the den to 9-11 (`work/shipfix/zmart_leg.py`, 4,867 frames) -> `work/states/tour_zmart95.ss`.
+Tour `castle_den_zmart95` (tour_goals_castle.py): the doorway guard s355 ("Hey, nice bandana!", walks aside), the
+door (with flag 82: 0-95), the counter's buy menu (down twice, B), back out to 9-11 - **1,027 / 1,027 exact**, locked
+as a gate (data/segments/tour_castle_den_zmart95.json). Work dir: work/zmart (route states, keys).
+*kais_volc25b (A, wf-import lib.rs, uncommitted): 680 / 680 (was f115).* Mummy bandages in flight / stuck at the cut imported (`import_wraps`, builder 0x0802D79C / update 0x0802D940: +0x1C the mummy, +0x20 / +0x24 position, +0x40 / +0x44 velocity (direction, diagonal), +0x48 tick, +0x50 stuck, +0x54 stick delay, +0x58 / +0x5C a stuck one's offset from the player), the player's slow-down from the stuck count, each bandage's tile block. Gates green; check.sh EXACT; sweeps unchanged.
