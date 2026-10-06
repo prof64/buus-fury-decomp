@@ -179,7 +179,8 @@ HERCULE = [
     ('walk', 500, 10), ('hold', U, 30), ('area', 3, 2), ('wait', 30),
     ('talkto', 224, 88, 'D'), ('wait', 20),
     ('walk', 4, 140), ('hold', L, 30), ('area', 3, 14), ('wait', 30),
-    ('walk', 400, 8), ('hold', U, 30), ('area', 3, 15), ('wait', 30), ('pausespin', 2), ('fight2', 2500), ('wait', 30),
+    # (the tank first: its shells knock Goku off the walk round the circus wall)
+    ('fight2', 3000), ('wait', 30), ('walk', 400, 8), ('hold', U, 30), ('area', 3, 15), ('wait', 30), ('pausespin', 2), ('fight2', 2500), ('wait', 30),
     ('walk', 160, 8), ('hold', U, 30), ('area', 3, 17), ('wait', 30), ('fight2', 2500), ('wait', 30),
     ('walk', 160, 290), ('hold', D, 30), ('area', 3, 15), ('wait', 30),
     ('walk', 160, 290), ('hold', D, 30), ('area', 3, 14), ('wait', 30),

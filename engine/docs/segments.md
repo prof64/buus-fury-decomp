@@ -6495,6 +6495,15 @@ progress") - the same code passes on 4b14a76's lock (bisected on clean exports: 
 from (111, 0) / (74, 0) at rkb_001 f1560, rkb_008 f60 / f150 / f300, rkb_168 f2250 / f2280, sb_041 f12120 / f12180
 (+ small ones rkb_007 f30 / f60, rkb_168 f2100, sb_041 f11940), and "entity 23 off-screen at (200, 144) has no
 sprite" at rsbk_002 f1770 .. 1830 and sb_044 f1980 .. 2040 -> whoever extends the pixel gate (the wide view's owner).
+**Rule for everyone who repacks real-run key logs (coordinator, 2026-10-06):** never delete the tracked files in
+`data/realrun*` first. Write the new `NNN_*.keys.gz` + `manifest.json` to a staging dir outside `data/`, and move them
+in only when the whole repack has replayed; then remove the tracked logs the new set no longer has. **Done in
+`tools/run2/pack2.py` and `tools/run3/pack3.py`** (soak agent): staging in `work/pack_stage/realrun{2,3}/`,
+`os.replace` per file at the end, and a repack that stops early (a segment without keys) keeps every tracked log it
+did not reach. Anyone with another packer: do the same. (482713e lost `026_s3_ship` / `027_f3_fat` to a commit taken
+while pack3 was mid-run; restored in 8cfbf2c.)
+**Run 3 Janemba = the soak agent's `j3_janemba` (one version; the real-route agent dropped its re-record, above):**
+repacked into `data/realrun3/028_j3_janemba.keys.gz` (180,005 frames, from `work/run3/parts/j3_janemba.json`).
 *Real-route agent (2026-10-06): already done by the soak agent* - `tools/run3/jan3.py` (committed in 0f776fa) recorded
 all eight pieces from my fat end (Goku to 125, a Save at 18-1, game overs -> Continue in HFIL / the arena) and
 `j3_janemba` (180,005 frames) is in route3. **End state for Super Buu: `work/run3jan/j_arena.ss` + `j_arena.eeprom`**
@@ -6665,3 +6674,30 @@ up) meets nothing; the area's one talk (the counter, buy menu) is covered. Nothi
   is placed in the wide view like the other BG layers (wf-render `draw_sphere` offset by the extra border), the world
   map's bottom label is a bottom-anchored overlay (stripped like the HUD), and an actor the sprite-memory purge took
   out (`vram::suspended`) is not required to have a sprite.
+**Earth agent 2026-10-06 (17): rfat_033's 81k BG item fixed (renderer); run 3 Kid Buu + post-game drivers ready.**
+*BG shake sub-pixel (wf-render / wf-content `Layer::scroll_with`, wf-view `MapView.shake_sub`):* the game adds the 22.10
+shake into a layer's scroll sum before the >> 10 (emulator, rfat_033 0-21 BG0 clouds at rate 1331: camera px y 71,
+shake 3.753 -> BG0VOFS 96 = (71 * 1331 + 3843) >> 10, not 92 + 3; -3.657 -> 88; 15 rows checked). Rate-1 layers are
+unchanged (same floor). Board: 18,644 -> **18,650** exact (rfat_033 BG 147,798 -> 4,536 px; dbx_004 / rj_049 / db5_*
+better; 0 worse). Pixel gate green - **its lock can take the 6 new frames** (re-run the lock on the board).
+*Run 3, Kid Buu -> credits (Earth agent, by the re-split above):* two parts, ready to record once `b3_superbuu` lands.
+- `tools/run3/kb3.py` (**`k3_kidbuu`**, KbDriver = sb3.SbDriver3 + goals): from b3's end (leaving 21-26 for 20-8,
+  run 2's row 1,853,852) - out of Buu, West City curries, Goku / Vegeta points split a third way (STR / END / SPD),
+  Vegeta rested; the Pyramid: a save, one level then a planned game over (`levelup1` / `die1`) -> Continue;
+  **`rankgrind`**: Goku levelled in saved steps until the party XP + Kid Buu's lands outside the brackets runs 1 / 2
+  ended in (5M steps: run 1 #1479, run 2 #1477) - dev run: 22.6M -> 25.66M, **#1478**; Kid Buu with retries (six game
+  overs in the dev run); post-game extras: HP worn down in 14-2, out by the pad onto the nearest **world-map encounter
+  patrol** whose arena has enemies (searched over take-off waits; the Stolen Airship's 0-55 has a group for a level-150
+  leader too), **death there -> Continue at 14-1**; a Save at 4-1, into 4-20. Switch screen browsed (RIGHT x4 / LEFT
+  x4) at every checkpoint, pause spins before fights, START mashed through area changes (sb3's). Dev chain from run 2's
+  state at row 1,853,851 (`work/earth/kb3/dev_row.ss`): 160,575 frames, both planned deaths, replay byte-identical.
+- `tools/run3/post3.py` (**`p3_post`**, the side-content agent's, adapted): West City's four talks with **Text Speed
+  changed between them** (0, 8, 4), the Z-Mart every row, Options cycled, saves, a soft reset -> Continue, Hercule
+  City (the circus tank fought first in 3-14 - its shells knocked the walk off), the ending mashed, the credits held,
+  the title's menus. 56,656 frames from run 2's postgame state, OK.
+- **Not possible / found on the way:** a death on a **level-up popup's** first frame - the level-up refills HP in that
+  frame (240 searched tries in 14-2, all alive at full HP); the **exit pad's script on the killing hit's frame** in an
+  encounter arena - a hit-stunned leader's A does not fire the pad (searched, none; the driver keeps the search and
+  falls back to a plain death). A death by "the hit on a script's first frame" needs a touch trigger with enemies at
+  hand (none found post-game near Earth: 14-1 / 11-1 have no enemies, 8-12's NPC has idle soldiers) - left out.
+- `route3.chapter_of`: `k3_` -> `kidbuu`. SEGMENTS lines get added when recorded (k3 after b3, p3 after k3).

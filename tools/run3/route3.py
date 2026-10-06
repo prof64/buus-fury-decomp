@@ -146,7 +146,7 @@ SEGMENTS.append(('j3_janemba', ('KEYS', 'work/run3/parts/j3_janemba.json')))
 def chapter_of(name):
     """a segment's chapter (routing: segments.md's owners)"""
     for pre, ch in (('e3_', 'earth'), ('s3_', 'ship'), ('f3_', 'fat'), ('j3_', 'janemba'), ('b3_', 'superbuu'),
-                    ('p3_', 'postgame')):
+                    ('k3_', 'kidbuu'), ('p3_', 'postgame')):
         if name.startswith(pre):
             return ch
     return 'opening'

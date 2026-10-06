@@ -12,12 +12,16 @@ Run-3 choices / stresses (COVERAGE below):
   XP in 5M steps (run 1 31.05M -> #1479, run 2 22.46M -> #1477); 'rankgrind' levels Goku in steps saved at 14-1 until
   the total (plus Kid Buu's XP) lands in a bracket neither run had (25M .. 30M -> #1478, or 35M .. 40M)
 - a death right after a level-up (the popup's frames) at the Pyramid -> Continue at 14-1's save
+- post-game: a death in a world-map encounter arena (searched for one with enemies), HP worn down first in 14-2
 - the pause spun before every boss fight, START on alternate frames as every scripted stretch lets go and through
   every area change of a walk between areas (sb3's)
 
   ('rankgrind', areas)   grind steps (3 levels each, a checkpoint at 14-1 before each) until the party's total XP
                          + KB_XP is out of the brackets runs 1 / 2 ended in
-  ('swbrowse', x, y)     at the save point (x, y): Switch Characters, RIGHT x4, LEFT x4, A (the leader again)
+  ('hpdown', frac|'hits', tag)  stand by the nearest enemy until HP <= frac of max (or two of the largest hit)
+  ('subdrop', n, tag)    search a wait before flying onto the nearest encounter patrol for an arena with enemies,
+                         then 'padhp' / 'padgo' / 'paddeath' (the exit pad's A on the killing hit's frame) / 'die1'
+  ('padout',)            from 14-1 or the map: onto the world map
 
 play: python3 tools/run3/kb3.py START.ss START.eeprom OUTDIR [--cap N] -> OUTDIR/keys.json + end.ss / end.eeprom
 (one session, the cartridge save loaded first); --verify OUTDIR replays OUTDIR/keys.json and compares byte for byte.
@@ -69,7 +73,8 @@ def checkpoint_k(name, x, y, w, a):
     return g
 
 
-SUB_GFX = 0x086B43FC      # the Rogue Submarines' world-map patrol (encounter 0-52, s509: 25% an enemy group)
+# the world-map encounter patrols: the Rogue Submarines (0-52, s509: 25 % an enemy group), the Stolen Airships (0-55)
+PATROL_GFX = (0x086B43FC, 0x086A89D0)
 LV_XP = None
 
 
@@ -85,7 +90,7 @@ def hp_of(e, c=0):
     return e.r16(REC + 0x68 * c + 0x16), e.r16(REC + 0x68 * c + 0x18)
 
 
-ONCE = ('xpnear', 'hpdown', 'lvdeath', 'subdrop')
+ONCE = ('hpdown', 'subdrop', 'play', 'padhp', 'padgo', 'paddeath')
 
 
 class KbDriver(SbDriver3):
@@ -95,19 +100,11 @@ class KbDriver(SbDriver3):
             self.next_goal()
             return None
         if g[0] == 'play':
-            # ('play', keys): a searched key sequence, one per frame
+            # ('play', keys, tag): a searched key sequence, one per frame (skipped once `tag` died)
             if self.t >= len(g[1]):
                 self.next_goal()
                 return None
             return g[1][self.t]
-        if g[0] == 'xpnear':
-            # ('xpnear', areas, max_left, tag): grind until the leader's next level is at most max_left XP away
-            # (any kill there levels up)
-            s = status(e)
-            if s['p'] is not None and s['scene'] == 0 and xp_to_next(e) <= g[2]:
-                self.next_goal()
-                return None
-            return self.swapped(e, ('grind', 999, list(g[1])))
         if g[0] == 'hpdown':
             # ('hpdown', frac | 'hits', tag): stand by the nearest enemy (no punches, no food) until HP <= frac of max,
             # or ('hits') at most two of the largest hit seen so far
@@ -139,8 +136,28 @@ class KbDriver(SbDriver3):
             else:
                 self.hd_none = 0
             return self.swapped(e, ('die',))
-        if g[0] == 'lvdeath':
-            return self.lvdeath(e, g)
+        if g[0] == 'padhp':
+            return self.padhp(e, g)
+        if g[0] == 'paddeath':
+            return self.paddeath(e, g)
+        if g[0] == 'padout':
+            # ('padout',): on the world map: done; in 14-1: its pad up to the map first
+            if status(e)['area'][:2] == [0, 50]:
+                self.next_goal()
+                return None
+            self.goals[self.k:self.k] = [('unstick',), ('walk', 146, 214), ('talk', 'U')]
+            self.t = 0
+            return None
+        if g[0] == 'padgo':
+            # ('padgo', tag): onto the arena's exit pad
+            s = status(e)
+            if s['p'] is None or s['scene'] > 0:
+                return 0
+            px, py = self.pad_spot(s)
+            if abs(s['p'][0] - px) <= 4 and abs(s['p'][1] - py) <= 4 or self.t > 600:
+                self.next_goal()
+                return None
+            return self.walk_keys(e, s, px, py)
         if g[0] == 'subdrop':
             return self.subdrop(e, g)
         if g[0] == 'subfly':
@@ -225,66 +242,128 @@ class KbDriver(SbDriver3):
         e.load(base)
         return found
 
-    def lvdeath(self, e, g):
-        """('lvdeath', n, tag): the killing hit on the frame a level-up popup starts - from here (enemies at hand, HP
-        within two hits, the next level within one kill) try w = 0 .. n-1: stand w frames by the nearest enemy, then
-        punch; the first try whose level-up and HP 0 fall in the same frame is played (then the game over)"""
-        def goals(i):
-            return [('standw', i // 3), ('fightp', 4000, 99999, (6, 9, 12)[i % 3])]
-
-        def ok(e, pre, post):
-            if post[0] == 0 and pre[0] > 0:
-                return post[1] > pre[1]
-            if post[1] > pre[1]:
-                return False   # a level-up without the death
-            return None
-        ks = self.search(e, goals, ok, g[1], 6000)
-        if ks is None:
-            print('lvdeath: none found - a plain death instead', flush=True)
-            self.goals[self.k] = ('die1', g[-1])
-            return None
-        print(f'lvdeath: found ({len(ks)} frames)', flush=True)
-        self.died.add(g[-1])
-        self.goals[self.k:self.k + 1] = [('play', ks), ('die',)]
-        self.t = 0
-        return None
-
     def subdrop(self, e, g):
         """('subdrop', n, tag): on the world map, find a wait w (0 .. n-1, 7 frames apart) before flying onto the
-        nearest Rogue Submarine patrol that gives s509's enemy group in 0-52; play it, then stand in it until dead"""
+        nearest patrol (a Rogue Submarine: 0-52, s509 an enemy group 25 %; a Stolen Airship: 0-55) whose encounter
+        arena has enemies; play it, then 'padhp' / 'paddeath' there"""
         def goals(i):
             return [('wait', 1 + 7 * i), ('subfly',), ('sub52',)]
 
         def ok(e, pre, post):
             s = status(e)
-            if s['area'][:2] in ([4, 1], [14, 1]) or s['area'][0] != 0:
+            if s['area'][0] != 0 or s['area'][:2] == [0, 2]:
                 return False
-            if s['area'][:2] == [0, 52] and s['p'] is not None and s['scene'] == 0:
+            if 51 <= s['area'][1] <= 59 and s['p'] is not None and s['scene'] == 0:
                 from ship_route2 import enemies
                 self.s52 = getattr(self, 's52', 0) + 1
                 if self.s52 >= 40:
                     self.s52 = 0
                     return bool([o for o in enemies(e) if o[4] > 0])
+            else:
+                self.s52 = 0
             return None
         ks = self.search(e, goals, ok, g[1], 8000)
         if ks is None:
-            # (no group in n tries: the leader stays on the map - back to 14-1 for the common end)
+            # (no group in n tries: the leader stays on the map - 'padout' goes on from there)
             print('subdrop: no enemy group found - skipped', flush=True)
             self.died.add(g[-1])
-            self.goals[self.k:self.k + 1] = [('fly', 2177, 1201, 31, 23), ('until', 14, 1), ('wait', 30)]
-            self.t = 0
+            self.next_goal()
             return None
         print(f'subdrop: found ({len(ks)} frames)', flush=True)
-        self.died.add(g[-1])
-        self.goals[self.k:self.k + 1] = [('play', ks), ('die',)]
+        # (the tag counts as died from the die1 at the end on: its Continue skips all of these)
+        tag = g[-1]
+        self.goals[self.k:self.k + 1] = [('play', ks, tag), ('padhp', tag), ('padgo', tag), ('paddeath', 120, tag),
+                                         ('die1', tag)]
         self.t = 0
         return None
 
+    def pad_spot(self, s):
+        """the current area's pad back to the world map (re/buu/ship/ship_driver.py map_pad - the r1frozen driver
+        in this class's bases has none)"""
+        import nav as navm
+        key = f"{s['area'][0]}-{s['area'][1]}"
+        o = json.loads((navm.CONTENT / 'maps' / navm.areas()[key]['maps'][0] / 'objects.json').read_text())
+        for ar in o['areas']:
+            for t in ar['objects']:
+                if any(w.get('to') == '0-50' for w in t.get('warps') or []):
+                    r = t['rect']
+                    return r['x'] + r['w'] // 2 - 8, r['y'] + r['h'] - 10
+        raise RuntimeError(f'no map pad in {key}')
+
+    def padhp(self, e, g):
+        """('padhp',): in an encounter arena, stand on its exit pad (no punches, no food) until HP is within two of
+        the largest hit seen (or 6000 frames without a hit); after 400 quiet frames it fetches an enemy"""
+        s = status(e)
+        self.heal_cool = 10 ** 6
+        if s['p'] is None or s['scene'] > 0:
+            return 0
+        hp = s['hp']
+        last = getattr(self, 'ph_last', None)
+        if last is not None and hp < last:
+            self.ph_max = max(getattr(self, 'ph_max', 0), last - hp)
+            self.ph_quiet = 0
+        self.ph_last = hp
+        self.ph_quiet = getattr(self, 'ph_quiet', 0) + 1
+        m = getattr(self, 'ph_max', 0)
+        if (m and hp <= 2 * m) or self.ph_quiet > 6000:
+            print('padhp:', hp, 'largest hit', m, flush=True)
+            self.ph_last = None
+            self.next_goal()
+            return None
+        # (the arena's enemies keep to themselves: after 400 quiet frames on the pad, fetch one - walk up to the
+        # nearest until it hits, then back onto the pad with it following)
+        if self.ph_quiet > 400 and not getattr(self, 'ph_lure', False):
+            self.ph_lure = True
+        if getattr(self, 'ph_lure', False):
+            if self.ph_quiet <= 1:
+                self.ph_lure = False
+            else:
+                return self.swapped(e, ('die',))
+        px, py = self.pad_spot(s)
+        if abs(s['p'][0] - px) > 4 or abs(s['p'][1] - py) > 4:
+            return self.walk_keys(e, s, px, py)
+        return 0
+
+    def paddeath(self, e, g):
+        """('paddeath', n): standing on the arena's exit pad, A after w = 0 .. n-1 frames: the first try where the
+        pad's script starts on the frame an enemy's hit takes the last HP is played (the soak agent's 'death by the
+        hit on a script's first frame'); none: stand until dead ('die' follows)"""
+        def goals(i):
+            return [('play', [0] * i + [A] + [0] * 90, None)]
+
+        def ok(e, pre, post):
+            if post[0] == 0 and pre[0] > 0:
+                return pre[2] == 0 and post[2] > 0
+            if post[2] > 0 and pre[2] == 0:
+                return False
+            return None
+        ks = self.search(e, goals, ok, g[1], g[1] + 100)
+        if ks is None:
+            print('paddeath: no same-frame death found - a plain death', flush=True)
+            self.next_goal()
+            return None
+        print(f'paddeath: found ({len(ks)} frames)', flush=True)
+        self.goals[self.k] = ('play', ks, None)
+        self.t = 0
+        return None
+
+    PADS = None
+
+    def over_pad(self, x, y):
+        """near one of the world map's landing rects (re/buu/ship/ship_driver.py over_pad)"""
+        import nav as navm
+        if KbDriver.PADS is None:
+            o = json.loads((navm.CONTENT / 'maps' / 'area_00_050' / 'objects.json').read_text())
+            KbDriver.PADS = [t['rect'] for ar in o['areas'] for t in ar['objects'] if t.get('warps')]
+        return any(r['x'] - 48 <= x < r['x'] + r['w'] + 48 and r['y'] - 48 <= y < r['y'] + r['h'] + 48
+                   for r in KbDriver.PADS)
+
     def subfly(self, e, s):
-        """fly low onto the nearest Rogue Submarine patrol (ShipDriver.hunt's approach, for SUB_GFX); ends in 0-52"""
+        """fly low onto the nearest encounter patrol (ShipDriver.hunt's approach; Rogue Submarines or Stolen
+        Airships); ends in the encounter arena (0-51 .. 0-59)"""
         import math
         from ship_route2 import enemies
-        if s['area'][:2] == [0, 52]:
+        if s['area'][0] == 0 and 51 <= s['area'][1] <= 59:
             self.next_goal()
             return None
         if s['scene'] > 0 or s['p'] is None or s['area'][:2] != [0, 50]:
@@ -295,7 +374,8 @@ class KbDriver(SbDriver3):
         sv = lambda v: v - (1 << 32) if v & 0x80000000 else v  # noqa: E731
         x, y = sv(e.r32(p + 0x1A0)) / 256, sv(e.r32(p + 0x1A4)) / 256
         z, h = sv(e.r32(p + 0x1A8)) / 1024, sv(e.r32(p + 0x1AC)) / 1024
-        pats = [o for o in enemies(e) if o[5] == 141 and e.r32(o[0] + 0x58) == SUB_GFX and not self.over_pad(o[1], o[2])]
+        pats = [o for o in enemies(e) if o[5] == 141 and e.r32(o[0] + 0x58) in PATROL_GFX
+                and not self.over_pad(o[1], o[2])]
         tx, ty = (1536, 1456) if not pats else min(((o[1], o[2]) for o in pats),
                                                    key=lambda q: math.hypot(q[0] - x, q[1] - y))
         dx, dy = tx - x, ty - y
@@ -309,9 +389,9 @@ class KbDriver(SbDriver3):
         if abs(diff) < 40:
             k |= U
         dist = math.hypot(dx, dy)
-        if dist > 90 and z < 100 or not pats:
+        if dist > 90 or not pats:
             k |= B if z < 100 else 0
-        elif dist <= 90 and z > 2 and not self.over_pad(x, y):
+        elif z > 2 and not self.over_pad(x, y):
             k |= A
         return k
 
@@ -346,21 +426,20 @@ def goals_k3():
         ('boss', 60000, 'timer'), ('eventsw', 240), ('evade', 60000), ('evade', 60000), ('eventsw', 240), ('wait', 30),
         ('retry_off',), ('autoheal', False), ('mark', 'k07_after_kid_buu'),
         # --- post-game extras (engine/docs/segments.md, the soak agent's "Earth extras"): the Kyodai Pyramid from the
-        # map; Goku's next level within one kill, a save at 14-1; in 14-2 HP down to two hits by standing among the
-        # enemies, then the killing hit on the frame a level-up popup starts (searched) -> game over -> Continue at
-        # 14-1; HP down to 15 % again, out to the world map and onto a Rogue Submarine patrol whose encounter (0-52,
-        # s509) is the enemy group (searched: 25 %) -> dead there -> Continue at 14-1
+        # map, a save at 14-1; in 14-2 HP down to 25 % by standing among the enemies; out by the pad onto the nearest
+        # world-map encounter patrol whose arena has enemies (searched); on the arena's exit pad HP down to two hits,
+        # then the pad's A on the frame an enemy's hit kills (searched: the hit on a script's first frame) -> game
+        # over -> Continue at 14-1. (A death on a level-up popup's first frame is impossible: the level-up refills HP
+        # in that frame - 240 tries in 14-2, every one alive at full HP)
         ('fly', 2177, 1201, 31, 23), ('until', 14, 1), ('wait', 30), ('mark', 'k08_extras'),
         ('unstick',), ('walk', 90, 240),     # (off the landing pad: a walk across it takes off again)
-        ('xpnear', PYR, 19000, 'lvdeath'), ('nav', 14, 1, False),
         *checkpoint_k('k09_14-1', 90, 240, 14, 1), ('autoheal', False),
-        ('nav', 14, 2, False), ('hpdown', 'hits', 'lvdeath'), ('lvdeath', 240, 'lvdeath'),
-        ('nav', 14, 2, False), ('hpdown', 0.15, 'mapdeath'), ('nav', 14, 1, False),
+        ('nav', 14, 2, False), ('hpdown', 0.25, 'mapdeath'), ('nav', 14, 1, False),
         ('unstick',), ('walk', 146, 214), ('talk', 'U'), ('subdrop', 120, 'mapdeath'),
         ('retry_off',), ('mark', 'k10_extras_done'),
-        # the end: (back in 14-1 after the Continue) the pad -> West City's save point, then into Capsule Corp 4-20 (the
-        # post-game part starts there)
-        ('unstick',), ('walk', 146, 214), ('talk', 'U'), ('fly', 1137, 1137, 71, 119), ('until', 4, 1), ('areaw', 4, 1),
+        # the end: (in 14-1 after the Continue, or on the map) the pad -> West City's save point, then into Capsule
+        # Corp 4-20 (the post-game part starts there)
+        ('padout',), ('fly', 1137, 1137, 71, 119), ('until', 4, 1), ('areaw', 4, 1),
         ('wait', 30), ('unstick',), ('walk', 148, 594), ('menutour',),
         ('unstick',), ('walk', 148, 594), ('face', 'U'), sbroute2.SAVE, ('bout',),
         ('mark', 'k11_saved_4-1'), ('exitto', '4-20'), ('wait', 60), ('mark', 'k12_end'),
@@ -375,8 +454,11 @@ def goals_k3():
 COVERAGE = """
 Kid Buu (k3_kidbuu): out of Buu -> West City (two Curry Plates, Goku's and Vegeta's points STR / END / SPD - a third
 split), Vegeta rested; the Kyodai Pyramid with Goku: a save, one level then a planned game over -> Continue at 14-1,
-a grind in saved steps until the party's XP lands in a Dragon Ranking bracket runs 1 / 2 did not reach; two more
-curries; Kid Buu (19-3) with food and retries from 4-1's save; a Save at 4-1, into Capsule Corp 4-20. Stresses: the
+a grind in saved steps until the party's XP lands in a Dragon Ranking bracket runs 1 / 2 did not reach (25M .. 30M:
+#1478); two more curries; Kid Buu (19-3) with food and retries from 4-1's save. Post-game extras: the Pyramid again,
+a save at 14-1, HP worn down among 14-2's enemies, the world map's nearest encounter patrol whose arena has enemies
+(searched), there HP down to two hits on the arena's exit pad, the pad's A searched for the frame of the killing hit
+(none found: a plain death) -> game over -> Continue at 14-1; a Save at 4-1, into Capsule Corp 4-20. Stresses: the
 switch screen browsed (RIGHT x4 / LEFT x4) at every checkpoint, the pause pages after every Continue, the pause spun
 before every boss fight, START on alternate frames as every scripted stretch lets go and through every walked area
 change.

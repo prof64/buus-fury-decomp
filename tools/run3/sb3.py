@@ -171,7 +171,7 @@ def stressed(goals):
     out = []
     # (the save points' areas have no enemy at hand: Goku walks into 20-5's robots first; inside Buu the next area)
     deaths = {'b03_14-1': ('levelup', [(14, 1), (14, 2)]), 'c02_goku124': ('nav', (20, 5)),
-              'd00_21-1': ('nav', (21, 2))}
+              'd00_21-1': ('die', None), 'd01_21-14': ('die', None)}
     prev = None
     for j, g in enumerate(goals):
         kind = g[0] if isinstance(g, tuple) and g else None
@@ -200,8 +200,10 @@ def stressed(goals):
             how, areas = deaths[pend]
             if how == 'levelup':
                 res += [('levelup1', areas), ('die1', pend)]
-            else:
+            elif how == 'nav':
                 res += [('navonce', pend, areas[0], areas[1]), ('die1', pend)]
+            else:
+                res += [('die1', pend)]
             pend = None
     return res
 
