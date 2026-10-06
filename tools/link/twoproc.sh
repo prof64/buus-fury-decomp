@@ -14,9 +14,12 @@ BIN=$E/$TARGET/release
 CONTENT=${WF_CONTENT:-$E/target/tmp/wf-core-field-content-2}
 PORT=${PORT:-3591}
 if [ "${1:-}" != "--no-build" ]; then
-  (cd "$E" && cargo build --release --target-dir "$TARGET" -p wf-native -p wf-app --example link_save >/dev/null 2>&1 &&
-    cargo build --release --target-dir "$TARGET" -p wf-net --features server --bin wf-signal >/dev/null 2>&1) ||
-    { echo "build failed"; exit 2; }
+  # (each build's output kept: a failure prints its errors instead of failing silently)
+  BL=$(mktemp /tmp/twoproc-build.XXXXXX)
+  (cd "$E" && cargo build --release --target-dir "$TARGET" -p wf-native >"$BL" 2>&1 &&
+    cargo build --release --target-dir "$TARGET" -p wf-app --example link_save >>"$BL" 2>&1 &&
+    cargo build --release --target-dir "$TARGET" -p wf-net --features server --bin wf-signal >>"$BL" 2>&1) ||
+    { echo "build failed:"; grep -E "^error" -A6 "$BL" | head -40; exit 2; }
 fi
 [ -f "$CONTENT/pack.json" ] || { echo "no extracted content at $CONTENT (set WF_CONTENT)"; exit 2; }
 W=$(mktemp -d /tmp/wf-twoproc.XXXXXX)

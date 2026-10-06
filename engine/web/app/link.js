@@ -173,5 +173,17 @@ export function startLink(api) {
   };
   window.wfLink = link;
   window.wfLinkInfo = () => link.info();
+  // cross-build check (netcode.md "Link play: browser <-> native"): a recorded Dojo match ({def, inputs, hashes})
+  // replayed on this (wasm) build -> {hashes, first} or {error}
+  window.wfDojoReplay = (replay) => {
+    const r = withStr(JSON.stringify(replay), (p, n) => x.wf_dojo_replay(p, n));
+    const s = str();
+    if (r !== 0) return { error: s };
+    try {
+      return JSON.parse(s);
+    } catch (e) {
+      return { error: String(e) };
+    }
+  };
   return link;
 }

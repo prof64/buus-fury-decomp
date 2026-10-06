@@ -274,6 +274,22 @@ the trade Prepared, Committed and Done) - every case: totals of every item and o
 applied, both sides agree, nothing left in doubt. `cargo test -p wf-app --test trade` - the same on real slot files
 with a crash after each WAL write on either side (the store re-opened from disk), the worn item kept.
 
+**The "half-finished" stall (fixed).** Two-process runs (1 in 14) and a randomized two-app sweep (1 in 60 sessions,
+at 88 ms latency and 31 % loss) ended with one side's trade Done and the other's Committed - nothing lost (the
+Committed side turns Done at the next link from the journal), but the session should finish it. Cause: the TRADE
+COMPLETE screen let a player leave as soon as **its own** record was Done. A side turns Done when it sees the
+friend's Committed; the friend turns Done only when it sees this side's Committed / Done in a later snapshot. When
+the side that finished first left (its room closing with it) before one of those snapshots arrived - a loss at the
+wrong moment - the friend heard "Disconnected" while still Committed. Fix: leaving waits for **both** sides' Done -
+`TradePeer::settled(id)` = my record Done and the friend's reported state Done (`friend_state`, what this session
+heard); my Done snapshots keep going out every 200 ms until the friend's Done comes back. The commit rules are
+unchanged (still all-or-nothing; a side still never aborts a prepared trade on its own), so a real disconnect or the
+10 s limit can still leave one side Committed - resolved at the next link as before. Regression test:
+`cargo test -p wf-app --test link trade_stress_both_reach_done` (12 seeds; `TRADE_STRESS=240` for the full sweep):
+per seed a random latency 0..250 ms, jitter 0..120 ms, loss 0..35 %, both players leaving TRADE COMPLETE as early as
+allowed; asserts both journals Done and the totals conserved. Before the fix 1 of 60 failed; after: 0 of 240, and
+20 of 20 real two-process runs (`TARGET=... tools/link/repeat.sh 20 trade`).
+
 ### Link play: playing it (`wf_app::link`, native `--link`)
 
 **Try it** (two copies on one machine, the local signalling server on `ws://127.0.0.1:3536` as for battles):
@@ -386,9 +402,38 @@ COMPLETE, supplies + zenie conserved across the two saves (the trade store's slo
 with `link_save read`), the journal Done on both, and the title slot `wf.save.0` equal to the traded slot. Result on
 this machine: **all checks pass** (Dojo: 111 confirmed frames, the same checksum and inputs on both pages, Won / Lost;
 trade: host 5 x supply 0 + 500 zenie, guest 4 x supply 1 + 100 zenie -> 2 + 30 each way, totals conserved, both
-journals Done). Not checked: a browser page against a native process in one room (the same wire format; not run),
-and native == wasm on the same Dojo inputs (the two runs' inputs differ with timing; a replay of one run's confirmed
-inputs on the other build would settle it).
+journals Done). A browser page against a native process in one room, and native == wasm on the same inputs: next
+section.
+
+### Link play: browser <-> native (`engine/web/tests/link_mixed.mjs`)
+
+A native app and a browser page meet in one room as two natives or two pages do (the same signalling, data channel,
+lobby payloads and wire format). `cd engine/web/tests && node link_mixed.mjs [--build] [--only dojo|trade] [--roles
+nh|bh]` (headless, muted, 127.0.0.1 only): a local `wf-signal` (PORT, default 3595), one `buus-fury --headless --mute
+--realtime --link host|join:ROOM --link-bot ... --link-quick` process with its own `--data` folder and one headless
+Chromium page `/app/?link=join|host:ROOM&bot=...&quick&linkinfo`, in **both role assignments** (native hosts / the
+browser hosts). Native binaries from `CARGO_TARGET_DIR` (default `engine/target-linkmix`, built by the script);
+`--build` builds the web app into the same target dir. Checks per role assignment:
+* **Dojo**: the same confirmed match on both (end frame, checksum, hash of all confirmed inputs), mirrored endings,
+  and **native == wasm per frame**: (1) each side's confirmed game's checksum after every frame (the link report's
+  `match.replay.hashes`, native `--link-report` / the page's `wfLinkInfo().report`) - identical lists; (2) **each
+  side's recording replayed on the other build**: the page's recording through the native example `cargo run -p
+  wf-app --example dojo_replay -- <content> REPORT.json` (exit 0 = identical every frame) and the native recording
+  through the page's `window.wfDojoReplay(replay)` (the wasm export `wf_dojo_replay`). Both call
+  `wf_app::link::dojo_replay`: the `DojoGame` rebuilt from the report's `match.replay.def` (match config, setup,
+  rules), advanced with the recorded confirmed inputs, every frame's checksum compared.
+* **Trading Post**: TRADE COMPLETE on both; supplies + zenie conserved across the native slot file and the browser's
+  saved slot (the trade store's file mirrored in `localStorage`); items changed hands.
+
+**Result on this machine: all checks pass** (both role assignments: Dojo matches of 108 / 110 confirmed frames,
+per-frame checksums identical, both cross-build replays identical on every frame; trades complete and conserved).
+**Fixed on the way - the Dojo checksum was platform dependent:** `DojoGame::checksum` hashed the match state with
+`DefaultHasher`, which writes a `Vec`'s length as a native `usize` (4 bytes on wasm32, 8 natively): a native and a
+browser peer saw the same inputs and states but different checksums (two natives or two pages agree, so the earlier
+tests could not see it). It now uses `wf_core::world::StableHasher` (usize as u64, little-endian), as the world's
+state hash does. Note for replays: `dojo_replay` loads `<content>/base` when the folder has one (as the app does) -
+the test-extracted folder also holds an older flat copy of the base pack, which replayed differently from the first
+fight frame on.
 
 ### Replays
 

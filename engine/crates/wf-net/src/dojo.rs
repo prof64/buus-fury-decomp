@@ -423,7 +423,10 @@ impl Game for DojoGame {
     }
     fn checksum(&self, s: &Self::State) -> u64 {
         use std::hash::{Hash, Hasher};
-        let mut h = std::collections::hash_map::DefaultHasher::new();
+        // the platform-independent hasher (usize lengths as u64): a browser (wasm32) and a native peer in one room
+        // must compute the same checksum - DefaultHasher writes a Vec's length as a native usize (4 bytes on
+        // wasm32, 8 natively): native vs browser peers saw the same inputs and states but different checksums
+        let mut h = wf_core::world::StableHasher::default();
         s.0.hash(&mut h);
         chain_mix(h.finish(), s.1.world.state_hash())
     }

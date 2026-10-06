@@ -41,7 +41,7 @@ use wf_net::lobby::{Lobby, LobbySettings, Role, KIND_DOJO, KIND_TRADE};
 use wf_net::netsim::{content_id, Clock};
 use wf_net::proto::{decode, Msg};
 use wf_net::session::{NetConfig, NetEvent, P2PSession};
-use wf_net::trade::{Offer, TState, TradeEvent, TradePeer, TradeStore};
+use wf_net::trade::{Offer, TradeEvent, TradePeer, TradeStore};
 use wf_net::transport::{PeerChange, Transport};
 use wf_view::{AudioEvent, Buttons, MenuFont, MenuLayer, MenuOp, MenuView, RenderView, Sim, SimEvent};
 
@@ -197,6 +197,10 @@ struct Match {
     sess: P2PSession<DojoGame>,
     /// the game advanced with confirmed inputs only (the result / prize source)
     conf: DojoGame,
+    /// the confirmed game's checksum after each confirmed frame, and the match's definition (config, setup,
+    /// rules) - the record's cross-build replay data (`dojo_replay`: native == wasm per frame)
+    hashes: Vec<u64>,
+    def: serde_json::Value,
     m: DojoMatch,
     /// the last frame whose sounds were played
     audio_at: i32,
@@ -261,6 +265,10 @@ pub struct MatchRecord {
     /// the confirmed inputs per slot up to there
     pub inputs: Vec<Vec<u16>>,
     pub ending: Ending,
+    /// the confirmed game's checksum after each of those frames (index f = after frame f's inputs)
+    pub hashes: Vec<u64>,
+    /// the match's definition: {"config", "setup", "rules"} (`dojo_replay` rebuilds the game from it)
+    pub def: serde_json::Value,
 }
 
 fn sfx(ev: &mut Vec<SimEvent>, id: u8) {
@@ -562,7 +570,8 @@ impl Flow {
         let peers = st.players.iter().enumerate().filter(|(_, s)| s.id != me).map(|(k, s)| (s.id.clone(), vec![k])).collect();
         let sess = P2PSession::new(game, ncfg, vec![slot], peers, Vec::new(), st.host == me, now);
         self.setup = setup;
-        self.set_phase(Phase::Match(Box::new(Match { sess, conf, m: DojoMatch::new(slot as u8), audio_at: 0 })));
+        let def = serde_json::json!({ "config": st.config, "setup": setup, "rules": self.rules });
+        self.set_phase(Phase::Match(Box::new(Match { sess, conf, hashes: Vec::new(), def, m: DojoMatch::new(slot as u8), audio_at: 0 })));
         Out::None
     }
 
@@ -608,6 +617,8 @@ impl Flow {
             let f = m.conf.st.frame as usize;
             let inp: Vec<u16> = (0..m.sess.cfg.slots).map(|s| m.sess.known_inputs().get(s).and_then(|v| v.get(f)).copied().unwrap_or(0)).collect();
             m.conf.advance(&inp, false);
+            let h = m.conf.checksum(&m.conf.save());
+            m.hashes.push(h);
         }
         let Some(mut save) = self.saves.get(self.slot).cloned().flatten() else { return Out::None };
         let before_save = save.clone();
@@ -623,6 +634,8 @@ impl Flow {
             checksum: m.conf.checksum(&m.conf.save()),
             inputs: m.sess.known_inputs().iter().map(|v| v[..(m.conf.st.frame as usize).min(v.len())].to_vec()).collect(),
             ending: e.clone(),
+            hashes: m.hashes.clone(),
+            def: m.def.clone(),
         });
         self.set_phase(Phase::Result(e));
         if save != before_save {
@@ -680,8 +693,10 @@ impl Flow {
         Out::None
     }
 
-    /// "TRADE COMPLETE!": the trade keeps answering the friend; a key leaves once the record is Done (the friend
-    /// committed too), the friend is gone, or after 10 s (the friend then finishes at the next link: the journal)
+    /// "TRADE COMPLETE!": the trade keeps answering the friend; a key leaves once the trade is Done on BOTH sides
+    /// (mine Done and the friend's Done heard - `TradePeer::settled`: leaving on my own Done alone could take with it
+    /// the snapshot the friend still needed to see my commit, leaving the friend Committed until the next link), the
+    /// friend is gone, or after 10 s (the friend then finishes at the next link: the journal)
     fn step_complete(&mut self, now: f64, pressed: u16, ev: &mut Vec<SimEvent>) -> Out {
         let Phase::Complete(Some(u)) = &mut self.phase else { return Out::None };
         trade_io(&mut self.net, u, now);
@@ -694,7 +709,7 @@ impl Flow {
         }
         let Some((id, shown)) = u.done.as_mut() else { return Out::None };
         *shown += 1;
-        let settled = u.store.record(id).is_some_and(|r| r.state == TState::Done);
+        let settled = u.peer.settled(id, &u.store);
         let gone = u.away.is_some() || self.net.t.closed();
         if pressed & (A | B) != 0 && (settled || gone || *shown > 600) {
             sfx(ev, SFX_MENU);
@@ -1138,6 +1153,32 @@ pub fn set_link_info(on: bool) {
 
 /// the last [`LinkSim`]'s state after its last step (JSON: phase, title page / wait, setup, trade cursor / state,
 /// the last flow's end, the last Dojo match's record) - the browser build's test hook; Null while switched off
+/// Replays a Dojo match from a link report's `match.replay` ({def, inputs, hashes}: either build's) on THIS build:
+/// the game rebuilt from the definition, advanced with the recorded confirmed inputs; returns this build's checksum
+/// after each frame and the first frame whose checksum differs from the recorded one (None = identical every frame).
+/// The native `examples/dojo_replay` and the browser's `wf_dojo_replay` call it: native == wasm on the same inputs.
+pub fn dojo_replay(data: Arc<GameData>, replay: &serde_json::Value) -> Result<(Vec<u64>, Option<usize>), String> {
+    let def = &replay["def"];
+    let cfg = serde_json::from_value(def["config"].clone()).map_err(|e| format!("config: {e}"))?;
+    let setup: DojoSetup = serde_json::from_value(def["setup"].clone()).map_err(|e| format!("setup: {e}"))?;
+    let rules: DojoRules = serde_json::from_value(def["rules"].clone()).map_err(|e| format!("rules: {e}"))?;
+    let inputs: Vec<Vec<u16>> = serde_json::from_value(replay["inputs"].clone()).map_err(|e| format!("inputs: {e}"))?;
+    let want: Vec<u64> = replay["hashes"]
+        .as_array()
+        .map(|a| a.iter().filter_map(|x| x.as_str().and_then(|s| u64::from_str_radix(s, 16).ok())).collect())
+        .unwrap_or_default();
+    let mut g = DojoGame::new(data, cfg, setup, rules);
+    let n = inputs.iter().map(|v| v.len()).max().unwrap_or(0);
+    let mut out = Vec::with_capacity(n);
+    for f in 0..n {
+        let inp: Vec<u16> = inputs.iter().map(|v| v.get(f).copied().unwrap_or(0)).collect();
+        g.advance(&inp, false);
+        out.push(g.checksum(&g.save()));
+    }
+    let first = (0..out.len().max(want.len())).find(|&f| out.get(f) != want.get(f));
+    Ok((out, first))
+}
+
 pub fn link_info() -> serde_json::Value {
     INFO.with(|i| i.borrow().clone().unwrap_or(serde_json::Value::Null))
 }
@@ -1311,6 +1352,13 @@ impl LinkSim {
                 "inputs": r.inputs.iter().map(|s| s.len()).collect::<Vec<_>>(),
                 "inputs_hash": format!("{h:016x}"),
                 "ending": format!("{:?}", r.ending),
+                // the cross-build replay data (`dojo_replay`): the definition, every confirmed input, the per-frame
+                // checksums this build computed
+                "replay": {
+                    "def": r.def,
+                    "inputs": r.inputs,
+                    "hashes": r.hashes.iter().map(|x| format!("{x:016x}")).collect::<Vec<_>>(),
+                },
             })
         });
         serde_json::json!({ "last": self.last, "match": m, "steps": self.steps })

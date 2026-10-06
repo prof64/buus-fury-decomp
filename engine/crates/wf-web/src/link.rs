@@ -190,3 +190,34 @@ pub extern "C" fn wf_link_disk_next() -> u32 {
 pub extern "C" fn wf_link_info() {
     set_str(&wf_app::link::link_info().to_string());
 }
+
+/// Cross-build check (engine/docs/netcode.md "Link play: browser <-> native"): replays a Dojo match recorded by
+/// either build (`{def, inputs, hashes}`: a native `--link-report`'s `match.replay`, or a page's) on this (wasm)
+/// build with the page's content - `wf_app::link::dojo_replay`. Returns 0 with JSON `{"hashes": [hex...], "first":
+/// null | frame}` in the string buffer (`first` = the first frame whose checksum differs from the recorded one), or 1
+/// with the error.
+///
+/// # Safety
+/// `ptr`/`len` must describe readable memory.
+#[no_mangle]
+pub unsafe extern "C" fn wf_dojo_replay(ptr: *const u8, len: usize) -> u32 {
+    let replay: serde_json::Value = serde_json::from_str(&unsafe { super::arg_str(ptr, len) }).unwrap_or_default();
+    let data = match super::host_packs().map_err(|e| e.to_string()).and_then(|p| wf_app::battle::game_data(&p)) {
+        Ok(d) => d,
+        Err(e) => {
+            set_str(&e);
+            return 1;
+        }
+    };
+    match wf_app::link::dojo_replay(data, &replay) {
+        Ok((hashes, first)) => {
+            let hex: Vec<String> = hashes.iter().map(|x| format!("{x:016x}")).collect();
+            set_str(&serde_json::json!({ "hashes": hex, "first": first }).to_string());
+            0
+        }
+        Err(e) => {
+            set_str(&e);
+            1
+        }
+    }
+}

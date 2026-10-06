@@ -278,6 +278,8 @@ pub struct TradePeer {
     last_heard: f64,
     away: bool,
     events: Vec<TradeEvent>,
+    /// the friend's last reported state of each trade (memory only: what this session heard)
+    friend_states: BTreeMap<String, TState>,
 }
 
 /// the trade id both sides derive: both (peer id, nonce, rev, offer), ordered by peer id
@@ -316,6 +318,7 @@ impl TradePeer {
             last_heard: 0.0,
             away: false,
             events: Vec::new(),
+            friend_states: BTreeMap::new(),
         };
         if p.pending(store).is_some() {
             p.events.push(TradeEvent::Disconnected { in_doubt: true });
@@ -363,6 +366,21 @@ impl TradePeer {
         self.accepted = None;
         self.agreed = None;
         self.declines += 1;
+    }
+
+    /// the friend's last reported state of trade `id` in this session (None: not heard)
+    pub fn friend_state(&self, id: &str) -> Option<TState> {
+        self.friend_states.get(id).copied()
+    }
+
+    /// trade `id` is settled on both sides as far as this side can know: mine Done **and** the friend has reported
+    /// Done. Leave the session only then (or when the friend is gone): a side that leaves as soon as its own record is
+    /// Done can take the last snapshot the friend needs with it - the friend, still Committed (it has not heard this
+    /// side's commit yet), then waits for the next link (1 in 60 sessions at 31 % loss, 1 in 14 two-process
+    /// runs). My Done snapshots keep going out until the friend's Done comes back, and the friend's Done requires my
+    /// Committed / Done, so both reach Done in the same session unless the connection itself goes.
+    pub fn settled(&self, id: &str, store: &dyn TradeStore) -> bool {
+        store.record(id).is_some_and(|r| r.state == TState::Done) && self.friend_state(id) == Some(TState::Done)
     }
 
     pub fn events(&mut self) -> Vec<TradeEvent> {
@@ -459,6 +477,7 @@ impl TradePeer {
         }
         // the commit (durable state)
         for (id, st) in s.records {
+            self.friend_states.insert(id.clone(), st);
             match store.record(&id) {
                 None => {
                     if self.agreed.as_deref() == Some(id.as_str()) {

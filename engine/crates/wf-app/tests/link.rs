@@ -176,9 +176,13 @@ struct Run {
 }
 
 fn run(name: &str, kind: LinkKind, sa: &SaveData, sb: &SaveData, seed: u64) -> Option<Run> {
+    run_on(name, kind, sa, sb, seed, Conditions { latency_ms: 80.0, jitter_ms: 20.0, loss: 0.05 })
+}
+
+fn run_on(name: &str, kind: LinkKind, sa: &SaveData, sb: &SaveData, seed: u64, cond: Conditions) -> Option<Run> {
     let dir = content_dir()?;
     let p = packs(&dir);
-    let net = SimNet::new(Conditions { latency_ms: 80.0, jitter_ms: 20.0, loss: 0.05 }, seed);
+    let net = SimNet::new(cond, seed);
     let t = Rc::new(Cell::new(0.0f64));
     let tc = t.clone();
     let clock: Clock = Rc::new(move || tc.get());
@@ -527,4 +531,51 @@ fn trade_crash_between_prepare_and_commit() {
 #[test]
 fn trade_crash_between_commit_and_done() {
     trade_crash_at("Committed", 37);
+}
+
+/// The trade's last confirmation (Committed -> Done) under randomized networks: per seed a latency 0..250 ms, jitter
+/// 0..120 ms (reordering) and loss 0..35 %; both scripted players leave TRADE COMPLETE as early as the screen lets
+/// them. Both journals must end the session with the trade Done - a side that left while its friend had not yet
+/// heard its commit left the friend Committed (the rare stall of the two-process runs, 1 in 14). Seeds:
+/// `TRADE_STRESS=N` (default 12; the stall hunt ran 240)
+#[test]
+fn trade_stress_both_reach_done() {
+    let Some(dir) = content_dir() else { return };
+    let d = wf_app::battle::load_data(&packs(&dir)).unwrap();
+    let sa = save(&d, &[(0, 20)], &[(0, 5)], 500);
+    let sb = save(&d, &[(4, 20)], &[(1, 4)], 100);
+    let n: u64 = std::env::var("TRADE_STRESS").ok().and_then(|v| v.parse().ok()).unwrap_or(12);
+    let mut bad = Vec::new();
+    for seed in 0..n {
+        let mut x = seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ 0xD1B5_4A32_D192_ED03;
+        let mut rnd = || {
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            (x % 1000) as f64 / 1000.0
+        };
+        let cond = Conditions { latency_ms: 250.0 * rnd(), jitter_ms: 120.0 * rnd(), loss: 0.35 * rnd() };
+        let Some(mut r) = run_on(&format!("stress{seed}"), LinkKind::Trade, &sa, &sb, 1000 + seed, cond) else { return };
+        r.until(12000, "the trade screens", |r| r.a.sim.phase() == "trade" && r.b.sim.phase() == "trade");
+        r.until(12000, "TRADE COMPLETE on both", |r| {
+            let ok = |p: &Player| p.sim.phase() == "complete" || (p.started() && p.sim.last.as_deref() == Some("complete"));
+            ok(&r.a) && ok(&r.b)
+        });
+        r.until(4000, "back at the title", |r| r.a.done() && r.b.done());
+        let (ja, jb) = (journal(&r.a.dir), journal(&r.b.dir));
+        let done = |j: &[(String, String)]| !j.is_empty() && j.iter().all(|(_, s)| s == "Done");
+        if !done(&ja) || !done(&jb) {
+            bad.push(format!("seed {seed} {:.0} ms / {:.0} / {:.2}: host {ja:?} guest {jb:?}", cond.latency_ms, cond.jitter_ms, cond.loss));
+        }
+        let (a1, b1) = (r.a.slot(), r.b.slot());
+        assert_eq!(a1.story.zenie + b1.story.zenie, sa.story.zenie + sb.story.zenie, "seed {seed}: zenie conserved");
+        for i in 0..sa.story.supplies.len() {
+            assert_eq!(
+                a1.story.supplies[i] as u32 + b1.story.supplies[i] as u32,
+                sa.story.supplies[i] as u32 + sb.story.supplies[i] as u32,
+                "seed {seed}: supply {i}"
+            );
+        }
+    }
+    assert!(bad.is_empty(), "{} of {n} sessions left a trade not Done:\n{}", bad.len(), bad.join("\n"));
 }
