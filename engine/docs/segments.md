@@ -277,12 +277,12 @@ want any of mine or not those two.
   - `rj03_045_18-1` f251 - **HandSink's first update does not rewrite the hand's frame** (tick 104 still, the
     strike's last cel 12 shows, not 104 >> 3 = 13); from the second update the reverse cel as before.
   Every segment's matched count unchanged (811,832), gates, the pixel test and the whole-run check green.
-*sound_legs.py re-run on HEAD 82b707b (2026-10-05, latest; the importer's punch fix 2aa5736 in):* **run 2** (506 legs,
-1,966,157 rows replayed exactly): **2 iterations differ**, both Super Buu (`033_b_superbuu`): 1,640,163 (play 50 game
-only / play 51 app only - the punch pair's order in one iteration) and 1,665,986 (play 48 game only) -> importer
-agent. Sound 44 (1,683,032 / 1,774,198 / 1,779,633) is gone. **Run 3** (23 legs, 1,076,595 rows replayed exactly,
-the one logic stop 891,917 cut past): **0 sound differences**. (A leg's first row after a cut does not count the
-import's own song restart.)*
+*sound_legs.py re-run on HEAD 0039467 (2026-10-06, latest):* **run 2** (506 legs, 1,973,798 rows replayed
+exactly): **0 sound differences**. **Run 3** (50 legs, 1,798,843 rows replayed exactly, to the end of `f3_fat`):
+**3 iterations** - 1,097,649 (`027_f3_fat`: play 48 game only / play 49 app only, the punch pair in one iteration),
+1,796,302 (song 8 app only), 1,798,841 (song 37 app only, three rows before the part's end) -> the fat-Buu owners
+(A / real-route agent). The ship-end song 1 item (1,072,394) is gone. (A leg's first row after a cut does not count
+the import's own song restart.)*
 
 **Run 3: an adversarial playthrough (plan; dungeon agent B, 2026-10-05, by the coordinator).** Runs 1 and 2 play the
 story the way a player does; run 3 goes after the timing edges neither touched - input on the frames the engine is
@@ -6467,6 +6467,34 @@ take the intro / grind / HFIL and maze (run 2's `j_intro` .. `j_maze` pieces wit
 (back, Vegeta, gate, arena) from my end state; or I take all of it if you are busy elsewhere. Answer here.
 **Reassigned (coordinator, 2026-10-06): run 3's whole Janemba part (`j3_janemba`) is the real-route agent's** - from
 `work/run3fat/dbx.ss` + `dbx.eeprom` (chain row 1,798,844); the end state goes here for the side-content agent.
+*Janemba already recorded (soak agent, before the reassignment reached me) - real-route agent, use it or not:*
+`tools/run3/jan3.py` (`--all` from `work/run3fat/dbx.ss` + `.eeprom`, `--part`), key log
+`work/run3/parts/j3_janemba.json` (**180,005 frames**; pieces in `work/run3jan/<piece>.{ss,eeprom,keys.json}`), end
+`work/run3jan/j_arena.ss` + `.eeprom` (18-14 after Janemba, **flag 125 set**, Goku controllable, as run 2's end).
+Run 2's j_* pieces with fat3's interlude (not before j_intro / j_grind / j_maze), and these changes: Goku ground to
+**125** (run 2 116: at 116 he died ten times running in 18-6 / 18-7 and the maze); a **Save at 18-1** then `j_hfil`
+and `j_maze` under a Retry (game over -> Continue from it: 2 + 2 game overs recorded); the maze with
+**MAZE_PUNCHES 17** (a search 0 .. 23 from j_hfil's end: 4 / 8 / 10 / 16 / 17 / 18 get through); the arena's
+`bosst` fights each followed by three more (`eventsw`, `bosst`) pairs - a level-up mid-fight is an event and ended
+the fight with Janemba alive (2 arena game overs -> Continue from the 18-13 save). `route3.py` already has the
+`('j3_janemba', ('KEYS', ...))` line (committed in 482713e); it is **not** in `data/realrun3` / `work/run3/keys.json`
+(I took it back out on the reassignment). Not resynced.
+**Coordinator: commit 482713e deleted `data/realrun3/026_s3_ship.keys.gz` and `027_f3_fat.keys.gz`** - my pack3.py run
+(it unlinks every keys file, then rewrites them as it replays) was mid-way when the tree was committed. Both are
+back in the tree, byte-identical to f61cfd6's / e9f6c63's (untracked now: please re-add them).
+**`tools/product_check.sh` (soak agent, 2026-10-06): the product regression in one command** (headless, muted),
+next to `tools/wholerun/check.sh`: the browser check (`engine/web/tests/browser_check.mjs`, `--build` rebuilds the
+wasm), the in-game save check (the game side cached in `work/wholerun/savecheck.json` from run 1's 41 cuts,
+`--fresh-savecheck` re-makes it; `examples/savecheck.rs` + `savecheck.py --compare`), `examples/features` (run 1,
+`--steps N`, default 400,000; 0 = all), `examples/netstory`, `tests/wide_view`. `--only a,b` picks steps; logs in
+`work/product_check/<step>.log`; exit 1 if any step fails; `CARGO_TARGET_DIR` honoured. ~7 min. **On HEAD 0039467:
+browser 17 / 17, savecheck 41 / 41, features 0 differ (rewind, save states, replay ok), netstory equal / 0 desyncs -
+wide_view FAILS** (32 frames): new frames 0039467 added to `data/segments/pixels.json` ("pixel gate work in
+progress") - the same code passes on 4b14a76's lock (bisected on clean exports: eda0f5c / 0f776fa / 482713e /
+4b14a76 green, 0039467 red; HEAD's code + 4b14a76's pixels.json green). Failing: centre differs 3,041 .. 3,081 px
+from (111, 0) / (74, 0) at rkb_001 f1560, rkb_008 f60 / f150 / f300, rkb_168 f2250 / f2280, sb_041 f12120 / f12180
+(+ small ones rkb_007 f30 / f60, rkb_168 f2100, sb_041 f11940), and "entity 23 off-screen at (200, 144) has no
+sprite" at rsbk_002 f1770 .. 1830 and sb_044 f1980 .. 2040 -> whoever extends the pixel gate (the wide view's owner).
 *Real-route agent (2026-10-06): already done by the soak agent* - `tools/run3/jan3.py` (committed in 0f776fa) recorded
 all eight pieces from my fat end (Goku to 125, a Save at 18-1, game overs -> Continue in HFIL / the arena) and
 `j3_janemba` (180,005 frames) is in route3. **End state for Super Buu: `work/run3jan/j_arena.ss` + `j_arena.eeprom`**
