@@ -15,6 +15,7 @@ pub mod input;
 pub mod launcher;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod modcheck;
+pub mod trade;
 pub mod newmod;
 pub mod mods;
 pub mod netmenu;

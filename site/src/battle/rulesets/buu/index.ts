@@ -39,6 +39,8 @@ const ARENAS: BuuArena[] = [
   { id: 'plateau', map: '19-3', name: 'Rocky Plateau (720x560)', image: '', size: [0, 0], spawn: [240, 280], bounds: { x0: 40, y0: 200, x1: 660, y1: 432 } },
   { id: 'village', map: '15-1', name: 'Nataday Village (800x720)', image: '', size: [0, 0], spawn: [200, 304], bounds: { x0: 96, y0: 120, x1: 760, y1: 560 } },
   { id: 'kamehouse', map: '5-1', name: 'Kame House island (720x640)', image: '', size: [0, 0], spawn: [160, 472], bounds: { x0: 72, y0: 368, x1: 648, y1: 560 } },
+  // the link-play Dojo (area 0-90; Rust wf_core::battle::ARENAS)
+  { id: 'dojo', map: '0-90', name: 'Dojo', image: '', size: [0, 0], spawn: [120, 176], bounds: { x0: 24, y0: 80, x1: 296, y1: 304 } },
 ]
 const ARENA_FOR_MAP: Record<string, string> = Object.fromEntries(ARENAS.map((a) => [a.map, a.id]))
 ARENA_FOR_MAP['20-5'] = 'wasteland'

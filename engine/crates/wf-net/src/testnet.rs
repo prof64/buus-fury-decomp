@@ -13,6 +13,9 @@ pub struct PeerRun<G: Game> {
     pub sess: P2PSession<G>,
     pub ep: SimEndpoint,
     pub input: RandomInput,
+    /// scripted input instead of `input`: f(the tick count of this peer) -> buttons (the Dojo tests' fighters)
+    pub script: Option<Box<dyn FnMut(u64) -> u16>>,
+    ticks: u64,
     /// virtual ticks before this peer starts (start skew)
     pub start_tick: u64,
     /// leave the network at this tick (disconnect test)
@@ -41,7 +44,7 @@ pub fn peers<G: Game>(net: &SimNet, games: Vec<G>, cfg: &NetConfig, spectators: 
         let specs = (0..spectators).map(|k| format!("spec{k}")).collect();
         let ep = net.endpoint(&ids[i]);
         let sess = P2PSession::new(g, NetConfig { slots: n, ..cfg.clone() }, vec![i], others, specs, i == 0, 0.0);
-        out.push(PeerRun { id: ids[i].clone(), sess, ep, input: RandomInput::new(seed * 131 + i as u64), start_tick: 0, leave_tick: None, left: false, period_ms: 1000.0 / cfg.fps, next_ms: 0.0 });
+        out.push(PeerRun { id: ids[i].clone(), sess, ep, input: RandomInput::new(seed * 131 + i as u64), script: None, ticks: 0, start_tick: 0, leave_tick: None, left: false, period_ms: 1000.0 / cfg.fps, next_ms: 0.0 });
     }
     out
 }
@@ -98,7 +101,11 @@ pub fn run_with<G: Game>(net: &SimNet, ps: &mut Vec<PeerRun<G>>, specs: &mut [Sp
                     p.sess.handle(&from, &m, now);
                 }
             }
-            let v = p.input.next();
+            let v = match &mut p.script {
+                Some(f) => f(p.ticks),
+                None => p.input.next(),
+            };
+            p.ticks += 1;
             p.sess.tick(now, &clock, &[v], &mut out);
             for (to, b) in out.drain(..) {
                 p.ep.send(&to, b, now);
@@ -194,5 +201,5 @@ pub fn try_rejoin<G: Game>(net: &SimNet, ps: &mut [PeerRun<G>], host: usize, slo
     let ep = net.endpoint(id);
     let sess = P2PSession::resume(game, NetConfig { slots: cfg.slots.max(g.epochs.len()), ..cfg.clone() }, &g, id, now).expect("snapshot verifies");
     let period = ps[host].period_ms;
-    Some(PeerRun { id: id.to_string(), sess, ep, input: RandomInput::new(seed), start_tick: 0, leave_tick: None, left: false, period_ms: period, next_ms: now })
+    Some(PeerRun { id: id.to_string(), sess, ep, input: RandomInput::new(seed), script: None, ticks: 0, start_tick: 0, leave_tick: None, left: false, period_ms: period, next_ms: now })
 }

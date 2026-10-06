@@ -16,6 +16,13 @@
 //!   secret, hands it the slot (`session::P2PSession::grant_rejoin`) and answers with `grant` (+ the state snapshot
 //!   as a blob, see `blob.rs`).
 //!
+//! * **Room kinds** (link play, engine/docs/netcode.md "Link play: rooms"): every hello / start carries the room's
+//!   `kind` - "match" (the battle rooms above, the default), "dojo", "trade" - and an opaque per-kind `extra` JSON
+//!   payload (a Dojo peer's save summary and pick, the host's mode / rounds, a trade offer ...). A host answers a
+//!   hello of another kind with `full` ("this room is a <kind> room") - the game's "Waiting for a friend..." only
+//!   pairs two players who chose the same thing. The kind owner reads the peers' extras ([`Lobby::peer_extras`])
+//!   and decides when to start (`auto_start` false + [`Lobby::request_start`]).
+//!
 //! All messages are idempotent JSON state, so the unreliable channel is enough.
 
 use std::collections::BTreeMap;
@@ -43,6 +50,16 @@ fn yes() -> bool {
 fn local() -> String {
     "local".into()
 }
+fn match_kind() -> String {
+    KIND_MATCH.into()
+}
+
+/// The room kinds (`LobbySettings::kind`, `Hello::kind`, `StartInfo::kind`).
+pub const KIND_MATCH: &str = "match";
+/// link play: the Dojo (a versus match in rounds, engine/docs/netcode.md "Link play: Dojo")
+pub const KIND_DOJO: &str = "dojo";
+/// link play: the Trading Post (items / zenie between two saves)
+pub const KIND_TRADE: &str = "trade";
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Hello {
@@ -57,6 +74,12 @@ pub struct Hello {
     /// hash of this peer's seat secret (proves a later rejoin)
     #[serde(default)]
     pub key: String,
+    /// the room kind this peer wants ("match", "dojo", "trade")
+    #[serde(default = "match_kind")]
+    pub kind: String,
+    /// the kind's own payload (opaque to the lobby)
+    #[serde(default)]
+    pub extra: serde_json::Value,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -80,6 +103,12 @@ pub struct StartInfo {
     /// "local": a player's menu does not stop the match (default); "shared": any player's menu pauses everyone
     #[serde(default = "local")]
     pub pause: String,
+    /// the room kind
+    #[serde(default = "match_kind")]
+    pub kind: String,
+    /// the host's payload for the kind (the Dojo: the agreed setup)
+    #[serde(default)]
+    pub extra: serde_json::Value,
 }
 
 /// What a rejoining player sends (instead of hellos).
@@ -148,6 +177,12 @@ pub struct LobbySettings {
     pub secret: String,
     /// rejoin a running match instead of joining a lobby
     pub rejoin: Option<RejoinTicket>,
+    /// the room kind (`KIND_MATCH` / `KIND_DOJO` / `KIND_TRADE`)
+    pub kind: String,
+    /// our payload in every hello (the kind's)
+    pub extra: serde_json::Value,
+    /// host: the payload of the `start`
+    pub start_extra: serde_json::Value,
 }
 
 impl Default for LobbySettings {
@@ -166,6 +201,9 @@ impl Default for LobbySettings {
             pause: local(),
             secret: String::new(),
             rejoin: None,
+            kind: match_kind(),
+            extra: serde_json::Value::Null,
+            start_extra: serde_json::Value::Null,
         }
     }
 }
@@ -256,7 +294,27 @@ impl Lobby {
             proto: PROTOCOL,
             ready: self.settings.ready || self.settings.role == Role::Host,
             key: seat_key(&self.settings.secret),
+            kind: self.settings.kind.clone(),
+            extra: self.settings.extra.clone(),
         }
+    }
+
+    /// the kind's payload of every connected peer that said hello (peer id -> extra), in id order
+    pub fn peer_extras(&self) -> Vec<(String, serde_json::Value)> {
+        self.peers.iter().filter(|(_, p)| p.connected).filter_map(|(id, p)| p.hello.as_ref().map(|h| (id.clone(), h.extra.clone()))).collect()
+    }
+    /// lobby UI / kind owner: change our payload (goes out with the next hello)
+    pub fn set_extra(&mut self, v: serde_json::Value) {
+        self.settings.extra = v;
+        self.last_hello = f64::NEG_INFINITY;
+    }
+    /// host: the payload the `start` will carry
+    pub fn set_start_extra(&mut self, v: serde_json::Value) {
+        self.settings.start_extra = v;
+    }
+    /// a seated peer dropped before the start ("Disconnected")
+    pub fn peer_connected(&self, id: &str) -> bool {
+        self.peers.get(id).is_some_and(|p| p.connected)
     }
 
     /// lobby UI: change what we play / our ready state (goes out with the next hello)
@@ -354,7 +412,7 @@ impl Lobby {
                 let p = self.peers.entry(from.to_string()).or_default();
                 p.connected = true;
                 let first = p.hello.is_none();
-                let changed = p.hello.as_ref().is_some_and(|o| o.ready != h.ready || o.fighter != h.fighter);
+                let changed = p.hello.as_ref().is_some_and(|o| o.ready != h.ready || o.fighter != h.fighter || o.extra != h.extra);
                 p.hello = Some(h.clone());
                 if first {
                     self.log.push(format!("{} joined as {:?} ({} form {})", h.name, h.role, h.fighter.fighter, h.fighter.form));
@@ -364,8 +422,14 @@ impl Lobby {
                 if !self.serving() {
                     return None;
                 }
-                if h.proto != PROTOCOL || h.content != self.settings.content {
-                    let reason = if h.proto != PROTOCOL { "different game version".to_string() } else { "different game content (ROM / mods)".to_string() };
+                if h.proto != PROTOCOL || h.content != self.settings.content || h.kind != self.settings.kind {
+                    let reason = if h.proto != PROTOCOL {
+                        "different game version".to_string()
+                    } else if h.kind != self.settings.kind {
+                        format!("this room is a {} room", self.settings.kind)
+                    } else {
+                        "different game content (ROM / mods)".to_string()
+                    };
                     Self::send(out, from, &LobbyMsg::Full { reason });
                     return None;
                 }
@@ -479,6 +543,8 @@ impl Lobby {
             input_delay: self.settings.input_delay,
             max_prediction: self.settings.max_prediction,
             pause: self.settings.pause.clone(),
+            kind: self.settings.kind.clone(),
+            extra: self.settings.start_extra.clone(),
         };
         for id in st.players.iter().skip(1).map(|s| s.id.clone()).chain(st.spectators.iter().cloned()).collect::<Vec<_>>() {
             Self::send(out, &id, &LobbyMsg::Start(st.clone()));

@@ -205,6 +205,7 @@ impl NetArgs {
             pause: self.pause.clone(),
             secret,
             rejoin: None,
+            ..Default::default()
         }
     }
 

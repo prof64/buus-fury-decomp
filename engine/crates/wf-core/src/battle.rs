@@ -109,6 +109,8 @@ pub const ARENAS: &[(&str, &str, &str, (i32, i32), [i32; 4])] = &[
         (160, 472),
         [72, 368, 648, 560],
     ),
+    // the link-play Dojo (title -> Multiplayer -> Dojo; area 0-90, its walled room: walkable 24..296 x 80..304)
+    ("dojo", "0-90", "Dojo", (120, 176), [24, 80, 296, 304]),
 ];
 fn arena_for_map<'a>(d: &'a GameData, map: &str) -> Option<&'a str> {
     if map == "20-5" {

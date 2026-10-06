@@ -132,6 +132,129 @@ and form) and the net settings. Later `hello`s get the same `start` (lost packet
 whose content fingerprint (enemies, characters, forms, skills, equipment, XP table, arena collision) differs from the
 host's are refused (they would desync).
 
+### Link play: rooms (the game's Multiplayer menu)
+
+The game's link-cable Multiplayer (Dojo / Trading Post, `re/buu/menu/NOTES_screens.md`) runs over the same lobby
+as **room kinds** (`wf_net::lobby`): `LobbySettings.kind` = `KIND_MATCH` ("match", the battle rooms above,
+default), `KIND_DOJO` ("dojo") or `KIND_TRADE` ("trade"). Every `hello` and the `start` carry the `kind` and an
+opaque per-kind JSON payload: `LobbySettings.extra` goes out in our hellos (`Lobby::set_extra` changes it),
+`LobbySettings.start_extra` in the host's `start`, and the kind owner reads the others' payloads with
+`Lobby::peer_extras()` (peer id -> extra) and `StartInfo.extra`. A host answers a hello of another kind with `full`
+("this room is a dojo room") - "Waiting for a friend..." pairs only two players who chose the same thing.
+"Disconnected" = `Lobby::peer_connected(id)` false / the transport's disconnect event. A kind that decides itself
+when to begin sets `auto_start: false` and calls `Lobby::request_start()`. Old peers' hellos without the fields
+parse as kind "match" (serde defaults), so the battle rooms are unchanged.
+
+### Link play: Dojo (`wf_net::dojo`)
+
+The game's Dojo ("Battle with your friends in the Dojo!") as a `dojo` room + one rollback match:
+
+1. **Save pick.** Each peer picks one of its local saves; `DojoSave::from_save(slot, &SaveData, &GameData)` turns it
+   into what the other side sees: the party as fighters (fighter id, form, level, STR / POW / END / SPD, equipment).
+   A save with no playable party member is the game's "No Saved Games".
+2. **The room.** Both open a `KIND_DOJO` lobby with `auto_start: false`; their hello's `extra` is a `DojoHello`
+   (save summary, pick = "Choose your character!", setup). The host puts its `DojoSetup` ("Character Mode:"
+   Balanced / In-Game, "Rounds:" 1 / 3 / 5) in its hello and in `start_extra`, and `LobbySettings.base =
+   dojo::base_config(seed)` (PvP, the `dojo` arena = area 0-90, no enemies, no XP). The guest takes the host's
+   setup: its fighter in that mode (`dojo::fighter_setup`) and the setup echoed in its hello, then ready - the
+   confirm step. The host calls `request_start()` once the guest's echo matches ("Start Fight"); the `start`
+   carries the match (both fighters) and the setup.
+3. **The match.** `DojoGame` (a `Game`): per round a PvP battle `Session` in the Dojo (round k's seed = seed + k),
+   "Round N" between rounds (`between_frames`), the round's end = the PvP rule's last fighter standing (200 frames
+   after the KO), both down = a drawn round, or the round timer (`round_frames`): the higher HP fraction wins,
+   equal = drawn. Best of N: a majority of N wins at once; after N rounds equal wins = "Draw!!". The rounds,
+   score and timer are part of the rollback state (and its checksum), so the whole match rolls back and is
+   desync-checked like any battle.
+4. **The end.** `DojoMatch::settle(&confirmed_game, &rules, &mut save)` with the game rebuilt from the
+   **confirmed** inputs (every input of every frame known): the first time it shows the match over, the ending is
+   decided - "You Win!!" + "Grab your prize!" (one prize supply added to *our* save), "You Lose!!" + "Go back to
+   training!", "Draw!!" - exactly once (later calls change nothing). `DojoMatch::disconnected()` before that =
+   "Disconnected": no result, no prize, the save untouched.
+
+**From the ROM vs inferred** (no link cable in the emulator; static reading only): MEASURED - the flow and texts
+(strings 79..139: Select Saved Game, Dojo, Start Fight, Character Mode Balanced / In-Game, Rounds 1 / 3 / 5, Choose
+your character!, Round 1..5, You Win!! / You Lose!! / Draw!!, Grab your prize! / Go back to training!,
+Disconnected), the Dojo page's mode table (0x0804BC04, enter 0x0801ED34: the option widgets), the Dojo map = area
+0-90 (an unnamed walled room). INFERRED (each a `DojoRules` / module constant, easy to correct once decoded): the
+round timer (99 s), the pause between rounds (3 s), best-of-N, a timeout's winner (HP fraction), Balanced = level
+100 / average growth / points spent evenly, In-Game = the save's level and stat points (approximated: the stats
+above the level's average growth), the character list (each party member in its current form), the prize (one
+Senzu Bean, supply 21) and that the host's mode / rounds apply to both. The battle rule tables behind the link
+(mode tables 0x08049B5C, 0x0804B604, 0x0804CAD4 built by 0x0801FF04, 0x0804A60C, 0x0804C0F0) are not decoded.
+
+**Tests** (`cargo test -p wf-net --test dojo`, headless, muted, two in-process peers on the virtual network):
+`dojo_match_over_a_bad_network` - the room (a battle-room peer is refused: "this room is a dojo room"; both peers
+build the same match; Balanced / In-Game levels), then the match over loopback, 80 ms / 120 ms latency + jitter and
+5 % loss in 1, 3 and 5 rounds, random and scripted fighters: equal final state hashes, no desync, the same result
+on both, the winner's prize exactly once (settle called three times + a late drop), nothing for the loser / a draw;
+`dojo_disconnect_mid_match` - a peer drops mid-round: both end "Disconnected", no prize, saves untouched;
+`dojo_synctest` - 4000 frames of 5-round matches with an 8-frame rollback every frame (Balanced, In-Game).
+**Gap:** the in-process tests run the lobby and the match on two virtual networks; the frontends' `NetSim` drives
+a `CoreGame` only, so a playable Dojo needs a `NetSim` over `DojoGame` (and the screens: save pick, character
+list, mode / rounds, the round banners) - not built.
+
+### Link play: Trading Post (`wf_net::trade`, `wf_app::trade`)
+
+The game's link trade ("Your Trade:" / "Friend's Trade:" / "Zenie" / "How many to trade?" / "Propose Trade" /
+"Accept" / "Decline" / "You have accepted trade" / "TRADE COMPLETE!", strings 80..89) between two players' save
+slots. Pairing: a `KIND_TRADE` room (above); once the two are connected the trade runs between their peer ids over
+the same transport (its packets start with `TRD1`; no rollback, no realtime need). Each side writes only its own
+save.
+
+**Flow.** Each side picks a save slot (its inventory is what can be offered) and builds an [`Offer`]: supplies by
+index with a count, equipment copies, zenie. Every 200 ms each side sends one idempotent state snapshot (`Snap`):
+its offer and the offer's revision, its acceptance, and the state of every trade record it holds with this friend.
+The friend's offer shows as "Friend's Trade:". "Accept" (`TradePeer::accept`) names both offers' revisions; changing
+an offer (`set_offer`) bumps its revision and voids both acceptances; "Decline" withdraws. When the two acceptances
+match, both sides derive the same **trade id** (SHA-1 of both peer ids, session nonces, revisions and offers) and
+the commit starts. Loss, delay, duplicates and reordering only delay this (every message is state, sent again).
+
+**Commit (two-phase, durable: [`TradeStore`]).**
+1. *Prepare*: each side checks its side of the trade (the offered items are in its save, unworn, no story item;
+   receiving does not pass a limit) and records the trade `Prepared` - nothing applied, the save locked for other
+   trades. A check that fails records `Aborted` (with the reason) instead.
+2. *Commit*: a side that is `Prepared` and sees the friend `Prepared`, `Committed` or `Done` applies the trade to its
+   save **atomically with** marking it `Committed` ("TRADE COMPLETE!").
+3. *Done*: a `Committed` side that sees the friend `Committed` / `Done` marks it `Done` (kept, so a late question is
+   still answered "committed").
+
+**Recovery rule.** A side records `Aborted` only for a trade it never prepared: its check failed, or the friend
+reports `Prepared` for an id it does not know (a restart lost the negotiation) - it records `Aborted` *before*
+answering, so it can never prepare that id later. A `Prepared` side never decides alone: it commits when the friend
+reports `Prepared` / `Committed` / `Done` and aborts only when the friend reports `Aborted`. Hence both sides end
+committed or both aborted, nothing is applied twice (the record's state is part of the same atomic write as the
+change), and nothing is lost. The price is the classic 2PC one: a side that is `Prepared` while the friend is away
+(crash, dropped connection) stays **in doubt** - the UI says "Disconnected", the slot stays locked, the trade
+finishes when the friend comes back (the journal survives restarts; `TradePeer::new` resumes it). A negotiation
+that never reached Prepared is just memory and ends on a disconnect / restart.
+
+**On disk** (`wf_app::trade::FileStore`): the slot file (`saves/slotN.sav`, `Saves::slot_bytes`) and a journal
+next to it (`slotN.sav.trade.json`), each written temp + rename. The commit is a write-ahead log over the two
+files: (1) the journal stores the slot's post-trade bytes, (2) the slot file is replaced, (3) the journal marks the
+trade Committed and drops the log. `FileStore::open` finishes a commit a crash interrupted (the slot ends with the
+post-trade bytes, once).
+
+**The game's rules** (static disassembly; the emulator has no link cable, so nothing here is recorded from play):
+* MEASURED from the ROM: the trade's apply step (`0x080231AE`, the receiving side, on the selected save's GameData,
+  then the slot writer `0x080049F2`) adds the friend's 83 supply counts to the save's, **saturating at 255** (one
+  byte each), adds the zenie, and appends each equipment entry with `0x08004448` - which **ignores an add at 250
+  entries**; equipment entries are copied without the worn marks (high nibble). Remove equipment (`0x08004468`) only
+  takes entries that are not worn. Here: a trade whose result would pass 255 of a supply or 250 equipment entries is
+  refused at Accept / Prepare instead of losing the excess; worn equipment cannot be offered.
+* INFERRED: story items (key items, `story_item` supplies) cannot be offered (the picker's list was not decoded;
+  trading a key item would break the giver's story); no zenie limit beyond u32 (none found in the apply step).
+* Not built: the Trading Post screens themselves (the menu pages over `TradePeer`); the protocol, storage and
+  recovery are complete and tested.
+
+**Tests** (headless, in-process): `cargo test -p wf-net --test trade` - two peers on the virtual network:
+loopback, 120 ms + 80 ms jitter + 30 % loss (8 seeds), over-limit refusal, decline / changed offer (nothing
+applied), a peer gone while prepared (in doubt, settles when it returns), and **fault injection at every step**:
+each side killed before / after each packet it receives (restarted from its journal 500 ms later, new session) and
+the connection dropped for 3 s, on a clean and a lossy network (300 cases; the faults land before any record, with
+the trade Prepared, Committed and Done) - every case: totals of every item and of zenie conserved, at most one trade
+applied, both sides agree, nothing left in doubt. `cargo test -p wf-app --test trade` - the same on real slot files
+with a crash after each WAL write on either side (the store re-opened from disk), the worn item kept.
+
 ### Replays
 
 Every match is a [wf-replay](replays.md) recording: `NetSim::replay()` builds a `.wfr` (sim `wf-core/battle`, the

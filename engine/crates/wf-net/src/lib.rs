@@ -17,6 +17,7 @@
 pub mod blob;
 pub mod cli;
 pub mod core_game;
+pub mod dojo;
 pub mod game;
 pub mod ice;
 pub mod lobby;
@@ -30,6 +31,7 @@ pub mod session;
 pub mod spectator;
 pub mod synctest;
 pub mod testnet;
+pub mod trade;
 pub mod transport;
 
 pub use core_game::{CoreGame, MatchConfig};
