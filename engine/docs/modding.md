@@ -460,7 +460,11 @@ default is the game's); a mod ships one, every field optional:
   carried over, so a restart is a clean, deterministic start. Dev mode is for local play only: it refuses netplay,
   `--online`, `--replay` and `--record`, and each reload starts a fresh recording (the replay before it was made
   with the old content). Until a reload succeeds, the running scene keeps the game data it started with, but art
-  or areas it loads later are read from the folder as it is on disk.
+  or areas it loads later are read from the folder as it is on disk. Try it headless in real time:
+  `buus-fury --headless --mute --realtime --dev --mod my-mod --story 3-1 --frames 900` and save a mod file while
+  it runs - the console shows `dev reload: mod errors - keeping the running content` (with the checker's
+  messages) or `dev reload: content reloaded, scene restarted` (`tools/mods/devlive.sh` does exactly this with a
+  broken then a fixed edit of story-tweaks' Goku patch).
 * **Look at it headless** (no window, no sound): `buus-fury --headless --mod my-mod --story 90-2 --frames 120
   --input U30,A2 --size 480x320 --shot out.ppm` (battle: `--fighter`, `--arena`, `--enemy`).
 * **Automate it**: copy a test from `crates/wf-app/tests/mods.rs` — load packs with `wf_app::mods::load(base,
