@@ -679,9 +679,9 @@ fn import_grids(w: &mut World, ram: &GbaRam) {
             c.enemy = e;
         }
         if let Some(wk) = walk {
-            if wk != c.map.walk {
-                c.walk = Some(wk);
-            }
+            // (equal to the map's: the live grid has no marks - also none of the load's; tour_kami_htc: the talk
+            // NPC's footprint marked by our load stood under the player, the game's grid has it free)
+            c.walk = if wk != c.map.walk { Some(wk) } else { None };
         }
     }
 }
