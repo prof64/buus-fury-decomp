@@ -1,6 +1,6 @@
 # Parity scoreboard: the real playthrough on wf-core
 
-Tree: `f61cfd6` + uncommitted engine changes. Regenerate: `.venv/bin/python tools/segments/scoreboard.py`
+Tree: `c63becb` + uncommitted engine changes. Regenerate: `.venv/bin/python tools/segments/scoreboard.py`
 (the cuts: `scoreboard.py cut`, local under `work/real/`; the run itself: `tools/segments/realrun.py`, §"How to replay
 the real run" in `engine/docs/segments.md`). A segment = the real game from one importable area entry (an exit
 arrival with nothing running) to the next; an entry by a script warp / in a cutscene is not a cut - its frames
@@ -68,7 +68,7 @@ The five biggest losses each owner can take (unmatched frames; the full list bel
 
 ## Where long segments really diverge (every-N board)
 
-From `engine/docs/scoreboard-mid.md` (tree `5622d08`, tiles of 1,000 frames; the whole run 96.9% verified exact). Each
+From `engine/docs/scoreboard-mid.md` (tree `f61cfd6`, tiles of 1,000 frames; the whole run 96.9% verified exact). Each
 divergence below is where a tile (a cut inside a long segment) first differs; "lost" = its frames up to the next
 cut. A divergence at a tile's frame 0 is usually the any-frame import, not the game rule - say so to the importer
 agent.
