@@ -870,16 +870,22 @@ pub fn render_view(w: &World, out: &mut RenderView) {
 /// position (+0 / +4), its unshaken pixel rect (+0x18 ..) and the shaken pixel position (+0x28 / +0x2C =
 /// (pos + shake) >> 10, `0x080097A6` from the shake's update); an actor's draw (`0x08010240`) takes its screen
 /// position from the shaken one - so the OBJs move by `((pos + shake) >> 10) - (pos >> 10)`, not `shake >> 10` (the
-/// BG layers' whole-pixel offsets). (Leaving the effects unshaken - their draw reads only the rect - scored worse
-/// over the board: 18,220 against 18,573 exact; all OBJs stay shaken.) Baked here, at the sprites' build: their OAM
-/// is a frame late with them
+/// BG layers' whole-pixel offsets). The generic effect objects' draw (`0x0802A912`) reads only the rect: they stay
+/// unshaken (an actor's shadow / halo is part of the actor's draw: shaken with it - leaving every `effects/` sheet
+/// unshaken cost 300+ exact frames, sb_006 / sb_007). Baked here, at the sprites' build: their OAM is a frame late
+/// with them
 fn obj_shake_baked(w: &World, out: &mut RenderView) {
     let Some(c) = w.cameras.first() else { return };
     let (ox, oy) = w.g.shake_off;
     let (dx, dy) = (((c.x + ox) >> 10) - (c.x >> 10), ((c.y + oy) >> 10) - (c.y >> 10));
     for s in out.sprites.iter_mut() {
-        s.x -= dx;
-        s.y -= dy;
+        // (the generic effect objects - Fx::Anim / Loop, class 0x0802A81C - draw from the camera's unshaken rect:
+        // the puffs, explosions; board 105 frames fewer px, 17 more - sc_janemba / rj_049 / sb_041 / rkb_168)
+        let effect = w.find(s.entity).is_some_and(|k| matches!(&w.ents[k].body, Body::Fx(f) if matches!(f.as_ref(), crate::fx::Fx::Anim { .. } | crate::fx::Fx::Loop { .. })));
+        if !effect {
+            s.x -= dx;
+            s.y -= dy;
+        }
     }
     out.obj_shake = Some((0, 0));
 }
@@ -916,7 +922,14 @@ fn script_fade(w: &World, out: &mut RenderView) {
             let l = t * 256 / f.len.max(1);
             match (f.kind, f.out) {
                 (FadeKind::Black, true) => {
-                    out.palette_scale = Some(pf(l, 0));
+                    // (the palette as it was: all white after a finished fade to white - db5t_004 12-22 f2070, the
+                    // white screen scaled toward black, a flat grey 206 at l = 44)
+                    if s.white >= 16 {
+                        out.palette_fade = Some(pf(256, WHITE));
+                    }
+                    // (an already darkened palette stays as dark: the screen's `dim` - a second fade_out after a
+                    // finished one, rkb_012 19-3 f510: black, not the palette scaled from 0 again)
+                    out.palette_scale = Some(pf(l.max(s.dim), 0));
                     out.fade_black = 0;
                 }
                 (FadeKind::Black, false) => {

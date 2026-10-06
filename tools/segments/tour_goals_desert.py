@@ -231,6 +231,14 @@ PYRAMID_16 = [('wait', 60), ('a_at', 144, 192, 'U'), ('wait', 30)]
 PYRAMID_25 = [('wait', 60), ('a_at', 72, 90, 'U'), ('a_at', 152, 90, 'U'), ('a_at', 232, 90, 'U'),
               ('a_at', 312, 90, 'U'), ('wait', 30)]
 
+# 14-8 / 14-9 (never entered by a run; the 14-7 entry ledge doesn't reach 14-8's door - they're reached from the
+# other side): 14-11 (run 1 row 857,480) -> 14-10 -> its top door -> 14-9 -> its top door -> 14-8 -> 14-7's east
+# pocket (36 tiles, not walkable to the 14-5 ledge) and back into 14-8
+PYRAMID_11 = ([('wait', 30)]
+              + go(14, 10, 360, 212, 382, 212, 2500) + go(14, 9, 468, 70, 470, 36, 2500)
+              + go(14, 8, 30, 70, 30, 36, 2500) + go(14, 7, 24, 100, 2, 100, 2500)
+              + go(14, 8, 600, 180, 622, 180, 2500) + [('wait', 30)])
+
 # continuations (to compare past an earlier tour's first divergence): states saved from the tours above at the
 # entry of an area (work/shipfix/desert_mkstate.py TOUR GOAL NAME), the same goals from there on
 CONT = {'desert_a7': ('tour_desert_d7.ss', DESERT_A[18:59] + [('wait', 30)]),
@@ -260,6 +268,7 @@ TOURS = {'desert_a': ('tour_desert_d1.ss', DESERT_A),
          'desert_py1': ('tour_desert_py1.ss', PYRAMID_1),
          'desert_py5': ('tour_desert_py5.ss', PYRAMID_5),
          'desert_py16': ('tour_desert_py16.ss', PYRAMID_16),
-         'desert_py25': ('tour_desert_py25.ss', PYRAMID_25)}
+         'desert_py25': ('tour_desert_py25.ss', PYRAMID_25),
+         'desert_py11': ('tour_desert_py11.ss', PYRAMID_11)}
 
 TOURS.update(CONT)

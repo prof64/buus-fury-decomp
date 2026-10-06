@@ -147,7 +147,7 @@ impl ObjVram {
     pub fn alloc(&mut self, bytes: i32) -> Option<u16> {
         let r = self.alloc_inner(bytes);
         if std::env::var("DBG_VRAM").is_ok() {
-            eprintln!("  alloc {bytes:#x} -> {r:x?}");
+            eprintln!("  alloc {bytes:#x} -> {r:x?}"); if std::env::var_os("DBG_VRAM_BT").is_some() { eprintln!("    BT {}", std::backtrace::Backtrace::force_capture().to_string().lines().filter(|l| l.contains("wf_core::") && !l.contains("vram::")).take(12).map(|l| l.trim()).collect::<Vec<_>>().join(" < ")); }
         }
         r
     }
@@ -207,7 +207,7 @@ impl ObjVram {
     /// `0x0801142A`: free the block of a handle
     pub fn free(&mut self, handle: u16) {
         if std::env::var("DBG_VRAM").is_ok() {
-            eprintln!("  free {handle:#x}");
+            eprintln!("  free {handle:#x}"); if std::env::var_os("DBG_VRAM_BT").is_some() { eprintln!("    BT {}", std::backtrace::Backtrace::force_capture().to_string().lines().filter(|l| l.contains("wf_core::") && !l.contains("vram::")).take(12).map(|l| l.trim()).collect::<Vec<_>>().join(" < ")); }
         }
         let i = self.idx[(handle >> 1) as usize & 511];
         // a handle with no live block (a stale owner): nothing to free - freeing it would link a free block twice and
@@ -826,6 +826,7 @@ pub fn reap(w: &mut World) {
     }
     for i in (0..w.ents.len()).rev() {
         if w.ents[i].removed {
+            if std::env::var_os("DBG_VRAM_BT").is_some() { eprintln!("    REAP {:?} {}", w.ents[i].id, match &w.ents[i].body { Body::Shot(s) => format!("shot t{} owner {:?} {:?} {:?}", s.t, s.owner, std::mem::discriminant(&s.kind), match &s.kind { crate::shots::ShotKind::Straight(o) => format!("{:?} dead {} life {} fx_end {}", o.name, o.dead, o.life, o.fx_end), _ => String::new() }), _ => "other".into() }); }
             entity_gone(w, i);
         }
     }

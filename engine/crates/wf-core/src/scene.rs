@@ -1500,6 +1500,9 @@ pub struct Scene {
     pub shop: Vec<ShopItem>,
     pub requests: Vec<Request>,
     pub area_ops: Vec<AreaOp>,
+    /// an emote object's tile key and the next entity id at its creation (its place in the object list)
+    #[serde(default)]
+    pub emote_stamps: Vec<(u32, u32)>,
     pub props: Vec<Prop>,
     /// event graphs running (run_event nesting, 0x03002A5C): players get no input while > 0
     pub depth: u32,
@@ -1563,6 +1566,7 @@ impl Default for Scene {
             shop: Vec::new(),
             requests: Vec::new(),
             area_ops: Vec::new(),
+            emote_stamps: Vec::new(),
             props: Vec::new(),
             depth: 0,
             freeze: false,
@@ -2195,6 +2199,8 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
                 });
                 // the emote object's tiles (`0x08016304`, vtable 0x0804A298: 0x40)
                 crate::vram::acquire(w, crate::vram::Owner::Visual(vid), 0x40);
+                let stamp = w.next_id;
+                w.scene.emote_stamps.push((vid, stamp));
             }
         }
         Cmd::Beam { kind, dir, t, .. } => {
@@ -3315,6 +3321,29 @@ pub fn item_icon_bytes(item: i32) -> i32 {
     }
 }
 
+/// an emote object that ends this frame frees its tiles in its own update, at its place in the object pass: before
+/// the update of the first older entity (`id`) (emulator, tour_castle_forest_16 f3500: the emote's free from
+/// 0x080163B5 comes before an older effect's from 0x08051157; ours freed it in the scene's tick after the pass)
+pub fn emotes_end_before(w: &mut World, id: u32) {
+    if w.scene.emote_stamps.is_empty() {
+        return;
+    }
+    let ending: Vec<u32> = w
+        .scene
+        .emote_stamps
+        .iter()
+        .filter(|s| s.1 > id && w.scene.visuals.iter().any(|v| v.vid == s.0 && v.life == 1))
+        .map(|s| s.0)
+        .collect();
+    if ending.is_empty() {
+        return;
+    }
+    w.scene.emote_stamps.retain(|s| !ending.contains(&s.0));
+    for o in ending.into_iter().rev() {
+        crate::vram::release(w, crate::vram::Owner::Visual(o));
+    }
+}
+
 fn tick_visuals(w: &mut World) {
     for v in w.scene.visuals.iter_mut() {
         v.t += 1;
@@ -3331,6 +3360,7 @@ fn tick_visuals(w: &mut World) {
         .map(|v| v.vid)
         .collect();
     w.scene.visuals.retain(|v| v.life != 0);
+    w.scene.emote_stamps.retain(|s| ended.iter().all(|&o| o != s.0));
     // (the objects update from the list's end: the later one goes first)
     for o in ended.into_iter().rev() {
         crate::vram::release(w, crate::vram::Owner::Visual(o));

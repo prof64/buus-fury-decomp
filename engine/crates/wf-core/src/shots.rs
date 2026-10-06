@@ -2909,6 +2909,10 @@ fn wave_update(w: &mut World, i: usize) {
             *len -= 4;
             if *len <= 0 {
                 w.ents[i].removed = true;
+                // its tiles go at once (emulator, tour_castle_ship_42 f841: the free from 0x0802A3C3 before a
+                // later object's damage number takes a block)
+                let id = w.ents[i].id;
+                crate::vram::release(w, crate::vram::Owner::Ent(id));
             }
         }
         return;
@@ -3362,8 +3366,14 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
                 && !w.ents[i].removed
                 && overlaps(&msg.rect, &r)
             {
-                let (sfx_end, explode) = (o.sfx_end, o.explode);
+                let (sfx_end, explode, name) = (o.sfx_end, o.explode, o.name);
                 w.ents[i].removed = true;
+                // their tiles go in the handler, before the sender's hit on anything after (tour_desert_nj40 f20:
+                // the punch meets a ninja star, then kills its thrower - emulator: the star's free 0x08051DC3 comes
+                // before the damage number's block 0x0800ABFB)
+                if matches!(name, SName::Gun | SName::Rifle | SName::Star) {
+                    crate::vram::release(w, crate::vram::Owner::Ent(me));
+                }
                 if sfx_end >= 0 {
                     w.sfx(sfx_end, 64);
                 }

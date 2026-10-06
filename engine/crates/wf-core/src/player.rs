@@ -4626,6 +4626,13 @@ pub(crate) fn mod_fits(w: &World, i: usize, x: i32, y: i32) -> bool {
 
 /// field: the death script's loop starts at KO + 199 before the object pass (0x08799D0C): only the player is updated
 /// from here on, every enemy gets message 0xF (`enemy::stop_msg`)
+/// the leader's death script runs (KO + 199 passed: `ko_freeze`'s modal)
+pub fn ko_modal(w: &World) -> bool {
+    w.field.is_some()
+        && w.players.len() == 1
+        && w.player_idx(0).is_some_and(|i| pr(w, i).ko_at >= 0 && w.frame as i64 - pr(w, i).ko_at >= 199)
+}
+
 pub fn ko_freeze(w: &mut World) {
     if w.field.is_none() || w.players.len() != 1 {
         return;

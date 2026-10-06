@@ -1023,10 +1023,13 @@ impl World {
             };
             // a purge's suspended objects are out of the list (vram.rs); a cutscene actor keeps its animation
             // (the scene drives it: segment sb 4-24, a suspended actor's idle tick runs on)
-            let skip = self
-                .modal
-                .as_ref()
-                .is_some_and(|m| !m.contains(&self.ents[i].id))
+            // (the death script's modal - the leader alone, `player::ko_freeze` - leaves the actors a script it runs
+            // commands: run 3 row 1,796,422, 0-15, Gotenks KO'd by Majin Buu - the lose scene s021's play_anim on Buu
+            // ends with his idle draw in the game; ours froze him)
+            let ko_modal = crate::player::ko_modal(self);
+            let skip = self.modal.as_ref().is_some_and(|m| {
+                !m.contains(&self.ents[i].id) && !(ko_modal && crate::scene::is_puppet(self, self.ents[i].id))
+            })
                 || crate::vram::suspended(self, self.ents[i].id)
                     && !matches!(self.ents[i].body, Body::Npc(_))
                     // the 3D world map's patrols are updated while purged out of sprite memory: their idle animation
@@ -1036,6 +1039,7 @@ impl World {
                     && !(matches!(self.ents[i].body, Body::Enemy(_)) && crate::fieldworld::flying(self));
             crate::vram::popups_tick(self, Some(self.ents[i].id));
             crate::fieldobj::debris_end_before(self, self.ents[i].id);
+            crate::scene::emotes_end_before(self, self.ents[i].id);
             let talk_before = self.field.as_ref().is_some_and(|f| f.talk_pass.is_some());
             if !skip {
                 let id = self.ents[i].id;

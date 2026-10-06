@@ -1149,6 +1149,12 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
         K::ChargedPunch => {
             en::face_player(w, i);
             set_anim(w, i, &[an(18)], true, Some(true));
+            // field: the controller's enter (0x08035F8C) clears +0x1CC - no hits for its first cel (ticks 0..3; its
+            // update gives them back at cel 1, 0x08035FCC; run 3 row 1,517,941, Volcano 15-32: a punch on Broly's
+            // wind-up's first frames is refused); battles keep the reference
+            if w.field.is_some() {
+                w.en(i).a.hittable = false;
+            }
         }
         K::MiniYakonLunge => {
             r.d[0] = en::player(w, i).is_some_and(|pi| w.pl_ref(pi).a.hittable) as i32;
@@ -2329,6 +2335,9 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         // controller 0x03003278: at tick 0x8C the MeleeAttack hit (x1.5; accepted -> 48 + rand(2)); its end at 148
         // (one SetAnim(0))
         K::ChargedPunch => {
+            if f == 4 && w.field.is_some() {
+                w.en(i).a.hittable = true;
+            }
             if f == 140 {
                 w.en(i).a.hittable = false;
                 if en::melee_strike(w, i, 0x600, true, false, atk(2)) {
