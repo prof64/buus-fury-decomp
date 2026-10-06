@@ -1,0 +1,19 @@
+{
+  "id": "27_dodon_ray",
+  "skill": 27,
+  "name": "Dodon Ray",
+  "description": "Press the B Button to fire a fast, piercing ray of ki from your fingertip.",
+  "max_level": null,
+  "ep": {
+    "rule": "mod skill: 8 EP (needs 8)"
+  },
+  "engine": {
+    "script": "hooks/skills/dodon_ray.rhai",
+    "check": [8],
+    "cost": [8],
+    "damage": [900],
+    "attack_sub": 4,
+    "cooldown": 20,
+    "anim": ["kiblast"]
+  }
+}

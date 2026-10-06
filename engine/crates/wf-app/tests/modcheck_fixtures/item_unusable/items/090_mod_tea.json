@@ -1,0 +1,10 @@
+{
+ "id": "090_mod_tea",
+ "item": 90,
+ "story_item": false,
+ "name": "Tea",
+ "short_name": "Tea",
+ "price": 50,
+ "description": "x",
+ "icon": "icons/supply/000.png"
+}

@@ -97,7 +97,7 @@ impl StorySim {
         let files: BTreeMap<String, String> = packs
             .list()
             .into_iter()
-            .filter(|p| p.starts_with("scripts/") && p.ends_with(".rhai"))
+            .filter(|p| p.starts_with("scripts/") && (p.ends_with(".rhai") || p.ends_with(".text.json")))
             .filter_map(|p| packs.read(&p).and_then(|b| String::from_utf8(b).ok()).map(|s| (p, s)))
             .collect();
         if files.is_empty() {
@@ -207,7 +207,7 @@ impl StorySim {
         let files: BTreeMap<String, String> = packs
             .list()
             .into_iter()
-            .filter(|p| p.starts_with("scripts/") && p.ends_with(".rhai"))
+            .filter(|p| p.starts_with("scripts/") && (p.ends_with(".rhai") || p.ends_with(".text.json")))
             .filter_map(|p| packs.read(&p).and_then(|b| String::from_utf8(b).ok()).map(|s| (p, s)))
             .collect();
         if files.is_empty() {
@@ -235,7 +235,7 @@ impl StorySim {
         let files: BTreeMap<String, String> = packs
             .list()
             .into_iter()
-            .filter(|p| p.starts_with("scripts/") && p.ends_with(".rhai"))
+            .filter(|p| p.starts_with("scripts/") && (p.ends_with(".rhai") || p.ends_with(".text.json")))
             .filter_map(|p| packs.read(&p).and_then(|b| String::from_utf8(b).ok()).map(|s| (p, s)))
             .collect();
         step_code(packs);
@@ -256,7 +256,7 @@ impl StorySim {
         let files: BTreeMap<String, String> = packs
             .list()
             .into_iter()
-            .filter(|p| p.starts_with("scripts/") && p.ends_with(".rhai"))
+            .filter(|p| p.starts_with("scripts/") && (p.ends_with(".rhai") || p.ends_with(".text.json")))
             .filter_map(|p| packs.read(&p).and_then(|b| String::from_utf8(b).ok()).map(|s| (p, s)))
             .collect();
         step_code(packs);

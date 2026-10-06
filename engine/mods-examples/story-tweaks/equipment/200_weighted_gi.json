@@ -1,0 +1,14 @@
+{
+  "$extends": "equipment/005_cotton_gi.json",
+  "id": "200_weighted_gi",
+  "item": 200,
+  "name": "Weighted Gi",
+  "description": "Training clothes with lead sewn into the seams.",
+  "slot": "body",
+  "required_level": 51,
+  "STR": 6,
+  "END": 4,
+  "SPD": 0,
+  "price": 800,
+  "sold_at": ["s028"]
+}

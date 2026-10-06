@@ -345,13 +345,13 @@ fn new_area_is_reachable_and_its_npc_talks() {
 
 #[test]
 fn all_example_mods_together_are_deterministic() {
-    let all = ["balance-tweak", "new-skill", "new-character", "new-arena-scenario", "new-area", "scripted-skills", "new-boss", "new-party-member"];
+    let all = ["balance-tweak", "new-skill", "new-character", "new-arena-scenario", "new-area", "scripted-skills", "new-boss", "new-party-member", "rhai-story-event"];
     let Some(p) = packs(&all) else { return };
     let d = data(&p);
     let objs = &d.field.as_ref().unwrap().area(8, 3).unwrap().objects;
     let base = packs(&[]).unwrap();
     let base_objs = data(&base).field.as_ref().unwrap().area(8, 3).unwrap().objects.len();
-    assert_eq!(objs.len(), base_objs + 3, "three mods appended to 8-3 (announcer + grove exit + Tien)");
+    assert_eq!(objs.len(), base_objs + 5, "four mods appended to 8-3 (announcer + grove exit + Tien + Chiaotzu and his soldier)");
     let go = |p: &Packs| {
         let mut s = story(p, (8, 3));
         let mut ev = vec![];
@@ -604,6 +604,86 @@ fn new_party_member_joins_and_takes_the_lead() {
     render_ok(&p, &v);
 }
 
+#[test]
+fn rhai_story_event_teaches_a_scripted_move() {
+    let Some(p) = packs(&["rhai-story-event"]) else { return };
+    let d = data(&p);
+    assert_eq!(d.skill_kind(27), wf_core::modkit::SCRIPTED, "skill 27 runs its Rhai behaviour");
+    let mut s = story(&p, (8, 3));
+    run(&mut s, 60, 0, |_| false);
+    let (nx, ny, _) = npcs(&s).into_iter().find(|n| n.2 == Some(930)).expect("Chiaotzu stands in 8-3");
+    let soldier = |s: &StorySim| {
+        w(s).enemies.iter().find_map(|&id| {
+            let (i, e) = w(s).enemy_by_id(id)?;
+            (e.ty == 68 && !e.defeated && (w(s).actor(i)?.px() - 304).abs() < 40 && (w(s).actor(i)?.py() - 448).abs() < 40).then_some(i)
+        })
+    };
+    assert!(soldier(&s).is_none(), "the challenge's soldier is not placed by the load");
+    // talk from below, accept (choice 0): the soldier is spawned
+    place(&mut s, nx, ny + 18, 1);
+    assert!(run(&mut s, 1500, btn::A, |s| s.world().story.flag(1130) && !s.world().field.as_ref().unwrap().busy), "challenge accepted");
+    let i = soldier(&s).expect("spawn_map_object(200) placed the soldier");
+    // his defeat runs s931: the flag, the move for the leader, a Senzu Bean
+    let senzu0 = w(&s).story.supplies[21];
+    wf_core::enemy::die(wm(&mut s), i, false);
+    assert!(run(&mut s, 2000, btn::A, |s| s.world().story.flag(1131) && !s.world().field.as_ref().unwrap().busy), "reward event ran");
+    let c = w(&s).story.current as usize;
+    assert!(w(&s).story.chars[c].skills.contains(&27), "learned: {:?}", w(&s).story.chars[c].skills);
+    assert_eq!(w(&s).story.supplies[21], senzu0 + 1);
+    let pi = player(w(&s));
+    assert!(w(&s).pl_ref(pi).skills.contains(&27), "the fighter has it too");
+    // in the field: L until the Dodon Ray is selected, then B at a forest soldier 60 px to the right
+    let mut ev = vec![];
+    for _ in 0..12 {
+        let pl = w(&s).pl_ref(player(w(&s)));
+        if pl.skills.get(pl.sel) == Some(&27) {
+            break;
+        }
+        ev.clear();
+        s.step(&[btn::L], &mut ev);
+        run(&mut s, 8, 0, |_| false);
+    }
+    let pl = w(&s).pl_ref(player(w(&s)));
+    assert_eq!(pl.skills.get(pl.sel), Some(&27), "L selects the new move");
+    let target = w(&s).enemies.iter().find_map(|&id| w(&s).enemy_by_id(id).filter(|(_, e)| !e.defeated).map(|(i, _)| i)).expect("a forest soldier");
+    let (tx, ty) = {
+        let a = w(&s).actor(target).unwrap();
+        (a.px(), a.py())
+    };
+    place(&mut s, tx - 60, ty, 3);
+    // (the camera catches up with the moved player first: a projectile off every camera is dropped)
+    run(&mut s, 40, 0, |_| false);
+    let (tx, ty) = {
+        let a = w(&s).actor(target).unwrap();
+        (a.px(), a.py())
+    };
+    place(&mut s, tx - 50, ty, 3);
+    let me = w(&s).ents[player(w(&s))].id;
+    let (mut started, mut shots, mut dealt) = (false, 0, false);
+    for f in 0..60u32 {
+        ev.clear();
+        s.step(&[if f < 2 { btn::B } else { 0 }], &mut ev);
+        assert!(s.errors.is_empty(), "script errors: {:?}", s.errors);
+        started |= w(&s).events.contains(&Event::SkillStart { id: 27 });
+        shots = shots.max(mod_shots(w(&s)).len());
+        dealt |= w(&s).events.iter().any(|e| matches!(e, Event::Damage { attacker, .. } if *attacker == me));
+    }
+    assert!(started && shots > 0, "the move fires in the field (started {started}, rays {shots})");
+    assert!(dealt, "the ray hits the soldier");
+    let mut v = RenderView::default();
+    s.view(&mut v);
+    render_ok(&p, &v);
+    // and in a battle (the forest arena, Goku given the move)
+    let mut b = battle(&p, "goku", "t68");
+    let bi = player(&b.world);
+    b.world.pl(bi).skills = vec![27];
+    b.world.pl(bi).sel = 0;
+    let t = tap_b(&mut b, 80, 200);
+    assert_eq!(t.skill, Some(27));
+    assert_eq!(t.ep_spent, 8, "engine.cost");
+    assert!(t.first_damage.is_some_and(|d| d > 0), "the ray deals damage in battle: {t:?}");
+}
+
 /// the box around the pixels the HUD changes (frame rendered with and without it)
 fn hud_box(p: &Packs, v: &RenderView, w: usize, h: usize) -> (usize, usize, usize, usize, Vec<u32>) {
     let mut r = wf_render::Renderer::new();
@@ -650,4 +730,111 @@ fn hud_layout_moves_the_hud_and_swaps_icons() {
     let icon = |r: &(usize, usize, usize, usize, Vec<u32>)| (0..16).flat_map(|y| (0..16).map(move |x| (x, y))).map(|(x, y)| r.4[(r.1 + y) * 240 + r.0 + x]).collect::<Vec<u32>>();
     assert_ne!(icon(&mb), icon(&mm), "recoloured icon");
     assert_eq!(wf_render::ui::Layout::load(&base), wf_render::ui::Layout::default(), "no layout file: the game's");
+}
+
+/// the text box on screen, if any
+fn dialog_text(s: &StorySim) -> Option<String> {
+    let mut v = RenderView::default();
+    s.view(&mut v);
+    v.dialog.map(|d| d.text)
+}
+/// a key tapped once (3 frames down, `gap` up)
+fn tap(s: &mut StorySim, k: u16, gap: u32) {
+    let mut ev = vec![];
+    for f in 0..3 + gap {
+        s.step(&[if f < 3 { k } else { 0 }], &mut ev);
+        assert!(s.errors.is_empty(), "script errors: {:?}", s.errors);
+    }
+}
+/// the open Buy screen's list: (category, item, price)
+fn shop_list(s: &StorySim) -> Option<Vec<(i32, i32, i32)>> {
+    w(s).menu.stack.iter().rev().find_map(|sc| match sc {
+        wf_core::menu::Screen::Shop(sh) if !sh.sell => Some(sh.list.iter().map(|e| (e.category, e.item, e.price)).collect()),
+        _ => None,
+    })
+}
+
+#[test]
+fn story_tweaks_file_only_mod() {
+    let Some(p) = packs(&["story-tweaks"]) else { return };
+    let d = data(&p);
+    // (a) a merge-patched character record and skill
+    let goku = d.chars.iter().find(|c| c.index == 0).unwrap();
+    assert_eq!((goku.str_, goku.spd, goku.pow), (40, 60, 27), "goku.patch.json: STR / SPD changed, the rest kept");
+    let kame = d.skills.get(&15).expect("skill 15");
+    let ke = kame.engine.clone().expect("engine");
+    assert_eq!((ke.check, ke.damage), (vec![10], vec![1600]));
+    // (b) the new supply and equipment
+    let fd = d.field.as_ref().unwrap();
+    assert!(fd.supplies.iter().any(|x| x.index == 90 && x.name == "Senzu Bean" && x.use_script.is_none()));
+    let gi = d.equipment.iter().find(|e| e.id == 200).expect("equipment 200");
+    assert_eq!((gi.slot.as_str(), gi.str_, gi.end, gi.end2), ("body", 6, 4, 1), "$extends kept the Cotton Gi's END_energy");
+    // a new game: Goku's record from the patched file
+    let mut s = story(&p, (0, 91));
+    run(&mut s, 60, 0, |_| false);
+    let pl = w(&s).pl_ref(player(w(&s))).clone();
+    assert_eq!((pl.rec.str_, pl.rec.spd), (40, 60));
+    wm(&mut s).story.zenie = 5000;
+    // the Z-Mart's counter (facing left): the edited welcome line (c), Buy -> Items
+    place(&mut s, 89, 111, 2);
+    tap(&mut s, btn::A, 0);
+    assert!(run(&mut s, 300, 0, |s| dialog_text(s).is_some_and(|t| t.contains("Fresh Senzu Beans today!"))), "the welcome line from s028.text.json");
+    assert!(run(&mut s, 1200, btn::A, |s| shop_list(s).is_some()), "the Buy list opened");
+    let list = shop_list(&s).unwrap();
+    assert_eq!(list.last(), Some(&(0, 90, 500)), "the Senzu Bean appended to the Items list: {list:?}");
+    assert!(list.iter().all(|e| e.0 == 0), "only supplies on the Items list");
+    // buy it: down to the last row, A
+    run(&mut s, 40, 0, |_| false);
+    for _ in 0..list.len() - 1 {
+        tap(&mut s, btn::DOWN, 14);
+    }
+    tap(&mut s, btn::A, 40);
+    assert_eq!(w(&s).story.supplies.get(90).copied(), Some(1), "bought one Senzu Bean");
+    assert_eq!(w(&s).story.zenie, 4500);
+    // out of the list; the shop's next pass: Buy -> Equipment shows the Weighted Gi
+    let mut seen_eq = false;
+    for _ in 0..6 {
+        run(&mut s, 400, btn::B, |s| shop_list(s).is_none());
+        // the choice boxes: A (Buy), DOWN + A (Equipment)
+        if run(&mut s, 120, 0, |s| dialog_text(s).is_some()) {
+            tap(&mut s, btn::A, 60);
+            tap(&mut s, btn::DOWN, 20);
+            tap(&mut s, btn::A, 60);
+        }
+        if run(&mut s, 200, 0, |s| shop_list(s).is_some_and(|l| l.iter().any(|e| e.0 == 1))) {
+            seen_eq = true;
+            break;
+        }
+    }
+    assert!(seen_eq, "the Equipment list opened");
+    let list = shop_list(&s).unwrap();
+    assert_eq!(list.last(), Some(&(1, 200, 800)), "the Weighted Gi appended to the Equipment list: {list:?}");
+    // leave the shop: the edited goodbye
+    let mut bye = false;
+    for k in 0..40 {
+        tap(&mut s, if k % 2 == 0 { btn::B } else { 0 }, 30);
+        if dialog_text(&s).is_some_and(|t| t.contains("Say hi to Korin")) {
+            bye = true;
+            break;
+        }
+    }
+    assert!(bye, "the goodbye line from s028.text.json");
+    assert!(run(&mut s, 1500, btn::A, |s| !w(s).field.as_ref().unwrap().busy && dialog_text(s).is_none()), "shop closed");
+    // (b) use the Senzu Bean from the pause menu's Inventory: HP / EP back by the file's amounts, one taken
+    run(&mut s, 60, 0, |_| false);
+    let i = player(w(&s));
+    wm(&mut s).pl(i).rec.hp = 10;
+    wm(&mut s).pl(i).rec.ep = 5;
+    let (mhp, mep) = (w(&s).pl_ref(i).rec.max_hp, w(&s).pl_ref(i).rec.max_ep);
+    // START (Status), R (Inventory: the Senzu Bean listed after the game's supplies), A (the item), A (Use)
+    for (k, gap) in [(btn::START, 70), (btn::R, 50), (btn::A, 50), (btn::A, 80)] {
+        tap(&mut s, k, gap);
+    }
+    let rec = w(&s).pl_ref(player(w(&s))).rec.clone();
+    assert_eq!(w(&s).story.supplies[90], 0, "the Senzu Bean was used");
+    assert_eq!((rec.hp, rec.ep), ((10 + 300).min(mhp), (5 + 100).min(mep)), "restored by the file's effect");
+    // the Weighted Gi worn: its file's stats in RecalcStats
+    let bare = wf_core::progression::recalc_stats(&rec, &[], false);
+    let worn = wf_core::progression::recalc_stats(&rec, &[Some(gi)], false);
+    assert_eq!((worn.str_ - bare.str_, worn.end - bare.end), (6, 4), "the Weighted Gi's STR / END");
 }

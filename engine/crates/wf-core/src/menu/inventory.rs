@@ -57,6 +57,18 @@ pub struct InvData {
     pub story: Vec<bool>,
     /// the use script (def +0x30) as the script host's id `inline_0xADDR`; None = no script (Use disabled)
     pub script: Vec<Option<String>>,
+    /// a mod supply's data-only use (`items/*.json` `"effect": {"restore_hp", "restore_ep"}` with no `use_script`):
+    /// Use enabled, applied by the engine as the game's healing scripts do (no base supply has one)
+    pub effect: Vec<Option<ItemEffect>>,
+}
+
+/// `effect` of a mod supply without a use script: HP / EP restored to the leader (clamped to the max), one taken,
+/// sound 11 - what the game's own food scripts do (inline_0x083BBBD1: `set_hp(get_hp() + 40); take_item(1);
+/// play_sfx(11)`)
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ItemEffect {
+    pub hp: i32,
+    pub ep: i32,
 }
 
 impl InvData {
@@ -82,6 +94,7 @@ impl InvData {
                 d.icon.resize(n, String::new());
                 d.story.resize(n, false);
                 d.script.resize(n, None);
+                d.effect.resize(n, None);
             }
             let s = |k: &str| super::text::decode_escaped(v[k].as_str().unwrap_or(""));
             d.name[i] = s("name");
@@ -101,6 +114,9 @@ impl InvData {
                 })
                 .unwrap_or(0);
             d.script[i] = (sc != 0).then(|| format!("inline_0x{sc:08X}"));
+            let ef = &v["effect"];
+            let (hp, ep) = (ef["restore_hp"].as_i64().unwrap_or(0) as i32, ef["restore_ep"].as_i64().unwrap_or(0) as i32);
+            d.effect[i] = (sc == 0 && (hp > 0 || ep > 0)).then_some(ItemEffect { hp, ep });
         }
         d
     }
@@ -146,7 +162,9 @@ pub struct Inventory {
 
 fn list_of(w: &World, story: bool) -> Vec<i32> {
     let d = w.data.menu.as_ref();
-    (0..w.story.supplies.len().min(83))
+    // the game's 83 supply defs; a mod's new supplies (`items/*.json` index 83+) list after them
+    let n = d.map(|d| d.inv.name.len()).unwrap_or(0).max(crate::story::SUPPLIES);
+    (0..w.story.supplies.len().min(n))
         .filter(|&i| w.story.supplies[i] != 0)
         .filter(|&i| d.and_then(|d| d.inv.story.get(i)).copied().unwrap_or(false) == story)
         .map(|i| i as i32)
@@ -439,6 +457,14 @@ impl Inventory {
                                     slot: 0,
                                 },
                             ));
+                        } else if let Some(ef) = w
+                            .data
+                            .menu
+                            .as_ref()
+                            .and_then(|m| m.inv.effect.get(p.item as usize).copied())
+                            .flatten()
+                        {
+                            apply_effect(w, p.item, ef);
                         }
                         result = Some(1);
                     }
@@ -582,7 +608,8 @@ impl UseDialog {
         let d = w.data.menu.as_ref().expect("menu content");
         let t = &d.text;
         let mut c = Container::default();
-        let has = d.inv.script.get(item as usize).is_some_and(|s| s.is_some());
+        let has = d.inv.script.get(item as usize).is_some_and(|s| s.is_some())
+            || d.inv.effect.get(item as usize).is_some_and(|e| e.is_some());
         let use_s = t.s(77);
         c.add(Widget::Button(Button::new(BTN_A, 0xC, 0x4C, 0, has, false)));
         c.add(Widget::Label(Label {
@@ -748,4 +775,20 @@ pub fn open_json(
 #[allow(dead_code)]
 fn _units(s: &str) -> Vec<u16> {
     units(s)
+}
+
+/// a mod supply's data-only use (`ItemEffect`): the leader's HP / EP up (clamped), one taken, sound 11
+pub fn apply_effect(w: &mut World, item: i32, ef: ItemEffect) {
+    if let Some(i) = w.player_idx(0) {
+        if ef.hp > 0 {
+            let hp = w.pl_ref(i).rec.hp;
+            crate::player::script_set_hp(w, i, hp + ef.hp);
+        }
+        if ef.ep > 0 {
+            let p = w.pl(i);
+            p.rec.ep = (p.rec.ep + ef.ep).min(p.rec.max_ep);
+        }
+    }
+    w.story.add_supply(item, -1);
+    w.sfx(11, 64);
 }

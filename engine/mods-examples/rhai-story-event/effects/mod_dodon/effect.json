@@ -1,0 +1,6 @@
+{
+  "$extends": "effects/fx_0871370c/effect.json",
+  "id": "mod_dodon",
+  "name": "Dodon Ray (rhai-story-event mod)",
+  "name_confidence": "mod"
+}

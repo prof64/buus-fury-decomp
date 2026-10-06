@@ -1,0 +1,7 @@
+{
+  "description": "Hold the B Button to emit a long beam of energy. (Story tweaks: needs only 10 EP to start and hits harder.)",
+  "engine": {
+    "check": [10],
+    "damage": [1600]
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "id": "090_senzu_bean",
+  "item": 90,
+  "story_item": false,
+  "short_name": "Senzu Bean",
+  "name": "Senzu Bean",
+  "plural": "Senzu Beans",
+  "description": "A magic bean from Korin's tower. Restores 300 hit points and 100 energy points.",
+  "price": 500,
+  "icon": "icons/supply/090.png",
+  "effect": {
+    "restore_hp": 300,
+    "restore_ep": 100
+  },
+  "sold_at": ["s028"]
+}

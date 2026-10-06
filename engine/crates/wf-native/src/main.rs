@@ -13,7 +13,8 @@
 //! replays, B take over, I input display, F4 training overlay, G ghost; rebindable in `<data dir>/hotkeys.json`.
 //! Headless: `--replay FILE` verifies and plays a recording, `--record FILE` writes the run's recording (battles and story mode).
 //! Mods (engine/docs/modding.md): every folder in `<content>/mods/` loads; `--mod DIR` (repeatable) adds a mod
-//! folder from anywhere (e.g. `--mod engine/mods-examples/new-skill`), `--no-mods` loads only those given.
+//! folder from anywhere (e.g. `--mod engine/mods-examples/new-skill`), `--no-mods` loads only those given;
+//! `--modcheck [DIR...]` checks mod folders (default: `<content>/mods/*`) and exits (1 on problems).
 //! Launcher (`wf_app::launcher`): with no mode flag (`--story`, `--arena`/`--enemy`/`--fighter`, `--area`/`--demo`,
 //! `--online`, `--net-*`, `--replay`) the game opens on the launcher (Story / Battle / Online / Replays / Mods /
 //! Settings); `--launcher` forces it, `--no-launcher` skips it. Shift+Esc in a game returns to it. Settings live in
@@ -80,6 +81,8 @@ struct Args {
     mods: Vec<PathBuf>,
     /// `--no-mods`: ignore `<content>/mods/` (only `--mod` folders load)
     no_mods: bool,
+    /// `--modcheck [DIR...]`: check mod folders (default: `<content>/mods/*`) and exit (`wf_app::modcheck`)
+    modcheck: bool,
     arena: String,
     enemy: String,
     count: u32,
@@ -146,6 +149,7 @@ fn parse_args() -> Args {
         story: None,
         mods: Vec::new(),
         no_mods: false,
+        modcheck: false,
         arena: "forest".into(),
         enemy: "t68".into(),
         count: 1,
@@ -269,6 +273,12 @@ fn parse_args() -> Args {
             "--record" => a.record = Some(PathBuf::from(next(&mut i))),
             "--shot" => a.shot = Some(PathBuf::from(next(&mut i))),
             "--mod" => a.mods.push(PathBuf::from(next(&mut i))),
+            "--modcheck" => {
+                a.modcheck = true;
+                while v.get(i + 1).is_some_and(|s| !s.starts_with("--")) {
+                    a.mods.push(PathBuf::from(next(&mut i)));
+                }
+            }
             "--no-mods" => a.no_mods = true,
             "-h" | "--help" => {
                 println!("{}", include_str!("main.rs").lines().take(4).map(|l| l.trim_start_matches("//! ")).collect::<Vec<_>>().join("\n"));
@@ -1488,6 +1498,19 @@ s.textContent=await (await fetch('/state')).text();requestAnimationFrame(f)}f()<
 
 fn main() {
     let mut args = parse_args();
+    if args.modcheck {
+        // `buus-fury --modcheck [DIR...]`: the given mod folders (default: every folder in <content>/mods/) over
+        // the installed base content; exit 1 on problems
+        let base = args.content.join("base");
+        if !base.join("pack.json").exists() {
+            eprintln!("no extracted game content at {} - start the game once with your ROM (or pass --content DIR)", base.display());
+            std::process::exit(2);
+        }
+        let mods = if args.mods.is_empty() { wf_app::mods::mod_dirs(&args.content.join("mods")) } else { args.mods.clone() };
+        let r = wf_app::modcheck::check(&base, &mods);
+        print!("{}", r.text());
+        std::process::exit(if r.ok() { 0 } else { 1 });
+    }
     if args.headless {
         if let Err(e) = headless(&mut args) {
             eprintln!("{e}");

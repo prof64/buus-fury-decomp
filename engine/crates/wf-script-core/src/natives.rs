@@ -6,7 +6,7 @@ use crate::{char_of_form, char_sprite, count_actors, current_form, leader, resol
 use wf_core::input::A;
 use wf_core::scene::{self, BeamKind, Cmd, FadeKind, MenuKind, Owner, ShootKind, Visual, VisualKind};
 use wf_core::world::{Body, Event, World};
-use wf_script::vm::{Call, ExtCall, NativeResult, NodeCall};
+use wf_script::vm::{Call, ExtCall, NativeResult, NodeCall, ScriptKey};
 
 type R = Result<NativeResult, String>;
 
@@ -893,6 +893,26 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
             unit()
         }
         0xce => {
+            // mod items sold here (`"sold_at": ["sNNN"]` in items / equipment files): appended to this shop event's
+            // list of their category (the list `shop_add_item` built: Items or Equipment); none in the base pack
+            if let ScriptKey::Node { event, .. } | ScriptKey::Args { event, .. } = c.script {
+                let cat = h.w.scene.shop.first().map(|x| x.category);
+                let add: Vec<scene::ShopItem> = h
+                    .w
+                    .data
+                    .menu
+                    .as_ref()
+                    .map(|m| {
+                        m.items
+                            .sold_at
+                            .iter()
+                            .filter(|s| s.event == event && cat.is_none_or(|k| k == s.category))
+                            .map(|s| scene::ShopItem { category: s.category, item: s.item, price: s.price, flag: 0 })
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                h.w.scene.shop.extend(add);
+            }
             if h.w.data.menu.is_some() {
                 wf_core::menu::shop::open_shop_buy(h.w);
             } else {

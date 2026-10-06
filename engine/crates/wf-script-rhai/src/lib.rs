@@ -192,7 +192,21 @@ impl Library {
         let mut asts = BTreeMap::new();
         let mut graphs = BTreeMap::new();
         let mut headers = BTreeMap::new();
-        for (path, src) in files {
+        // text overrides (`scripts/events/sNNN.text.json`: {"nodes": {"9": "new text", ..}}): a mod changes what an
+        // event's say / choice nodes show without touching its script - applied below to the event's graph
+        let mut texts: BTreeMap<u16, BTreeMap<u16, String>> = BTreeMap::new();
+        for (path, src) in files.iter().filter(|(p, _)| p.ends_with(".text.json")) {
+            let name = path.rsplit('/').next().unwrap().trim_end_matches(".text.json");
+            let ev = name.strip_prefix('s').and_then(|n| n.parse::<u16>().ok()).ok_or(format!("{path}: not sNNN.text.json"))?;
+            let v: serde_json::Value = serde_json::from_str(src).map_err(|e| format!("{path}: {e}"))?;
+            let nodes = v["nodes"].as_object().ok_or(format!("{path}: no \"nodes\" object"))?;
+            for (k, t) in nodes {
+                let node = k.parse::<u16>().map_err(|_| format!("{path}: node key {k:?} is not a number"))?;
+                let t = t.as_str().ok_or(format!("{path}: node {k}: text is not a string"))?;
+                texts.entry(ev).or_default().insert(node, t.to_string());
+            }
+        }
+        for (path, src) in files.iter().filter(|(p, _)| !p.ends_with(".text.json")) {
             let key = path.rsplit('/').next().unwrap().trim_end_matches(".rhai").to_string();
             let ast = engine.compile(src).map_err(|e| format!("{path}: {e}"))?;
             if let Some(ev) = key.strip_prefix('s').and_then(|n| n.parse::<u16>().ok()) {
@@ -206,6 +220,15 @@ impl Library {
                 }
             }
             asts.insert(key, ast);
+        }
+        for (ev, nodes) in texts {
+            let g = graphs.get_mut(&ev).ok_or(format!("scripts/events/s{ev:03}.text.json: no event s{ev:03}"))?;
+            for (node, t) in nodes {
+                match g.get_mut(&node) {
+                    Some(GNode::Say { text, .. } | GNode::SayArgs { text, .. } | GNode::Choice { text, .. }) => *text = t,
+                    _ => return Err(format!("scripts/events/s{ev:03}.text.json: node {node} is not a say / choice node")),
+                }
+            }
         }
         Ok(Library { asts, graphs, headers })
     }
@@ -854,4 +877,125 @@ fn run_script(nc: &NativeCallContext, c: &Rc<RefCell<Ctx>>, lib: &Rc<RefCell<Opt
         b.t.nested.insert(0, Frame::Unit { unit, step: Some(k), locals, params: p, role: Role::Plain, done: None });
     }
     Ok(())
+}
+
+/// Every function name a story script can call (the bound API: the game's natives, the multiplayer extensions,
+/// the variable setters, the script-variable / graph helpers) - for mod checkers (`wf_app::modcheck`).
+pub fn api_names() -> std::collections::BTreeSet<String> {
+    let mut s: std::collections::BTreeSet<String> =
+        (8..natives::NATIVE_COUNT as u8).filter_map(|n| natives::info(n).map(|i| i.name.clone())).collect();
+    s.extend(EXTENSIONS.iter().map(|&(n, _, _)| n.to_string()));
+    s.extend((8..natives::SETTER_COUNT as u8).map(|v| format!("set_{}", natives::var_name(v).to_lowercase())));
+    for n in ["g", "set_g", "p", "set_p", "local", "set_local", "who", "next", "int", "both", "either"] {
+        s.insert(n.to_string());
+    }
+    s
+}
+
+/// The Rhai keywords, built-ins and standard-package functions a story script may call (the runtime registers
+/// the core, logic, array and map packages).
+pub const RHAI_BUILTINS: &[&str] = &[
+    "if", "while", "for", "loop", "switch", "return", "throw", "fn", "let", "const", "do", "until", "in", "try",
+    "catch", "type_of", "print", "debug", "Fn", "call", "curry", "is_def_var", "is_def_fn", "is_shared", "eval",
+    "len", "push", "pop", "shift", "insert", "remove", "clear", "contains", "index_of", "range", "abs", "min", "max",
+    "sign", "to_string", "keys", "values", "is_empty", "sort", "reverse", "splice", "extract", "filter", "map",
+    "reduce", "all", "some", "get", "set", "append", "truncate", "chop", "drain", "retain", "dedup", "find",
+    "find_map", "zip", "pad", "split", "is_zero", "is_odd", "is_even", "to_int", "to_char",
+];
+
+/// The functions a script source defines (`fn name(`).
+pub fn defined_fns(src: &str) -> std::collections::BTreeSet<String> {
+    src.split("fn ")
+        .skip(1)
+        .filter_map(|r| {
+            let n: String = r.chars().take_while(|c| c.is_ascii_alphanumeric() || *c == '_').collect();
+            (!n.is_empty() && r[n.len()..].trim_start().starts_with('(')).then_some(n)
+        })
+        .collect()
+}
+
+/// Calls in a script's source to names that are neither the API ([`api_names`]), a Rhai built-in nor a function
+/// in `defined`: (line, name). A plain scan - comments and strings skipped, method calls `x.f(` and definitions
+/// `fn f(` not counted; such a name otherwise only fails when its line runs ("Function not found").
+pub fn unknown_calls(
+    src: &str,
+    defined: &std::collections::BTreeSet<String>,
+    api: &std::collections::BTreeSet<String>,
+) -> Vec<(usize, String)> {
+    let b = src.as_bytes();
+    let ident = |c: u8| c.is_ascii_alphanumeric() || c == b'_';
+    let mut out = Vec::new();
+    let (mut i, mut line) = (0usize, 1usize);
+    let mut prev_word = String::new();
+    while i < b.len() {
+        let c = b[i];
+        if c == b'\n' {
+            line += 1;
+            i += 1;
+        } else if c == b'/' && b.get(i + 1) == Some(&b'/') {
+            while i < b.len() && b[i] != b'\n' {
+                i += 1;
+            }
+        } else if c == b'/' && b.get(i + 1) == Some(&b'*') {
+            i += 2;
+            while i + 1 < b.len() && !(b[i] == b'*' && b[i + 1] == b'/') {
+                line += (b[i] == b'\n') as usize;
+                i += 1;
+            }
+            i += 2;
+        } else if c == b'"' || c == b'`' || c == b'\'' {
+            i += 1;
+            while i < b.len() && b[i] != c {
+                if b[i] == b'\\' {
+                    i += 1;
+                }
+                line += (i < b.len() && b[i] == b'\n') as usize;
+                i += 1;
+            }
+            i += 1;
+        } else if c.is_ascii_alphabetic() || c == b'_' {
+            let s = i;
+            while i < b.len() && ident(b[i]) {
+                i += 1;
+            }
+            let name = &src[s..i];
+            let mut j = i;
+            while j < b.len() && (b[j] == b' ' || b[j] == b'\t') {
+                j += 1;
+            }
+            let mut k = s;
+            while k > 0 && (b[k - 1] == b' ' || b[k - 1] == b'\t') {
+                k -= 1;
+            }
+            let method = k > 0 && b[k - 1] == b'.';
+            if b.get(j) == Some(&b'(')
+                && !method
+                && prev_word != "fn"
+                && !api.contains(name)
+                && !defined.contains(name)
+                && !RHAI_BUILTINS.contains(&name)
+            {
+                out.push((line, name.to_string()));
+            }
+            prev_word = name.to_string();
+        } else {
+            if !c.is_ascii_whitespace() {
+                prev_word.clear();
+            }
+            i += 1;
+        }
+    }
+    out
+}
+
+#[cfg(test)]
+mod api_scan_tests {
+    use super::*;
+    #[test]
+    fn unknown_calls_finds_typos_only() {
+        let src = "// give_superpowers(1) in a comment\nfn n0_main() {\n  let s = \"say(x)\";\n  set_flag(3);\n  helper(1);\n  give_superpowers(3);\n  [1].len();\n}\nfn helper(x) { if (x > 0) { return 1; } }\n";
+        let d = defined_fns(src);
+        let got = unknown_calls(src, &d, &api_names());
+        assert_eq!(got, vec![(6, "give_superpowers".to_string())]);
+    }
 }

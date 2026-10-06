@@ -1,0 +1,6 @@
+{
+  "id": "story-tweaks",
+  "name": "Story tweaks: a stronger Goku, a cheaper Kamehameha, a Senzu Bean and a Weighted Gi at the Z-Mart, new shop dialogue",
+  "format_version": 1,
+  "depends": ["base"]
+}

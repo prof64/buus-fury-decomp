@@ -1,0 +1,8 @@
+{
+ "id": "text_bad_node",
+ "name": "text_bad_node",
+ "format_version": 1,
+ "depends": [
+  "base"
+ ]
+}

@@ -11,6 +11,8 @@ pub mod demo;
 pub mod hotkeys;
 pub mod input;
 pub mod launcher;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod modcheck;
 pub mod mods;
 pub mod netmenu;
 pub mod overlay;

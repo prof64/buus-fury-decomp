@@ -55,6 +55,17 @@ pub struct ItemsUi {
     pub silhouette: Vec<u8>,
     /// the save slot corner markers' offsets (`ui/menu/slot_corner.json`)
     pub corners: Vec<[i32; 2]>,
+    /// mod items sold in a shop event (`items` / `equipment` `"sold_at"`; none in the base pack)
+    pub sold_at: Vec<SoldAt>,
+}
+
+/// one mod item on a shop's Buy list: the shop event, category (0 supply, 1 equipment), item, price
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SoldAt {
+    pub event: u16,
+    pub category: i32,
+    pub item: i32,
+    pub price: i32,
 }
 
 fn put(v: &mut Vec<ItemUi>, i: usize, it: ItemUi) {
@@ -84,6 +95,12 @@ impl ItemsUi {
             let _ = &i;
             let icon = v["icon"].as_str().unwrap_or("").to_string();
             let price = v["price"].as_i64().unwrap_or(0) as i32;
+            // a mod item's shops: `"sold_at": ["s028", ..]` (the shop events) - added to that shop's Buy list
+            for ev in v["sold_at"].as_array().into_iter().flatten() {
+                if let Some(e) = ev.as_str().and_then(|t| t.trim_start_matches('s').parse::<u16>().ok()) {
+                    out.sold_at.push(SoldAt { event: e, category: if sup { 0 } else { 1 }, item: i as i32, price });
+                }
+            }
             if sup {
                 // supply def +4 = the short name, +8 = the description
                 let name = if v["short_name"].is_string() {
@@ -112,23 +129,27 @@ impl ItemsUi {
                             .collect()
                     })
                     .unwrap_or_default();
-                let slot = raw
-                    .get(0x14)
-                    .copied()
-                    .unwrap_or_else(|| match v["slot"].as_str() {
-                        Some("hands") => 1,
-                        Some("feet") => 2,
-                        Some("accessory") => 3,
-                        _ => 0,
-                    });
-                let level = raw
-                    .get(0x15)
-                    .copied()
-                    .unwrap_or(v["required_level"].as_u64().unwrap_or(0) as u8);
-                let price = if raw.len() >= 0x24 {
-                    i32::from_le_bytes([raw[0x20], raw[0x21], raw[0x22], raw[0x23]])
-                } else {
+                // the named fields first (the base pack's equal the def bytes `raw` +0x14 / +0x15 / +0x20 for every
+                // item; a mod's patch / `$extends` changes the named ones and keeps the base `raw`), `raw` for a file
+                // without them
+                let slot = match v["slot"].as_str() {
+                    Some("body") => Some(0),
+                    Some("hands") => Some(1),
+                    Some("feet") => Some(2),
+                    Some("accessory") => Some(3),
+                    _ => None,
+                }
+                .or_else(|| raw.get(0x14).copied())
+                .unwrap_or(0);
+                let level = v["required_level"]
+                    .as_u64()
+                    .map(|l| l as u8)
+                    .or_else(|| raw.get(0x15).copied())
+                    .unwrap_or(0);
+                let price = if v.get("price").is_some() || raw.len() < 0x24 {
                     price
+                } else {
+                    i32::from_le_bytes([raw[0x20], raw[0x21], raw[0x22], raw[0x23]])
                 };
                 put(
                     &mut out.equipment,
@@ -396,7 +417,8 @@ impl Shop {
                     p.wrapping_mul(percent) / 100
                 }
             };
-            for i in 0..0x53usize {
+            // the game's 0x53 supply defs / 0xA2 equipment defs; a mod's new ones (higher ids) after them
+            for i in 0..d.supplies.len().max(0x53) {
                 let p = d.supplies.get(i).map(|x| x.price).unwrap_or(0);
                 let n = w.story.supplies.get(i).copied().unwrap_or(0) as i32;
                 if p != 0 && n != 0 {
@@ -408,7 +430,7 @@ impl Shop {
                     });
                 }
             }
-            for i in 0..0xA2usize {
+            for i in 0..d.equipment.len().max(0xA2) {
                 let p = d.equipment.get(i).map(|x| x.price).unwrap_or(0);
                 if p == 0 {
                     continue;

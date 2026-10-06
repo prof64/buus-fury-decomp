@@ -5,7 +5,7 @@ own ROM (`content/base/`, never edited) and any number of **mods** layered on to
 WAV, Tiled maps and [Rhai](https://rhai.rs) scripts with the same layout as the base pack, holding only what it
 adds or changes. No code, no ROM bytes, no rebuild.
 
-Nine complete examples live in [`engine/mods-examples/`](../mods-examples) — each has a README and an automated
+Eleven complete examples live in [`engine/mods-examples/`](../mods-examples) — each has a README and an automated
 test (`crates/wf-app/tests/mods.rs`):
 
 | mod | shows |
@@ -19,6 +19,13 @@ test (`crates/wf-app/tests/mods.rs`):
 | [`new-boss`](../mods-examples/new-boss) | a new enemy *type* (150): recoloured sprite, own stats, an AI tree of the game's node kinds plus scripted nodes (§4c), a phase change at half HP into a volley of homing dark orbs |
 | [`new-party-member`](../mods-examples/new-party-member) | a story-party character (10, Tien): record, growth, form, equipment; joins through an NPC's event and can take the lead (§5b) |
 | [`hud-layout`](../mods-examples/hud-layout) | `ui/layout.json` (§6b): the HUD moved to the bottom-right corner, a recoloured skill-icon set, the area banner at the top |
+| [`story-tweaks`](../mods-examples/story-tweaks) | **plain files only** (§5c): Goku's starting stats and the Kamehameha's EP / damage patched, a new supply (Senzu Bean) and new equipment (Weighted Gi) sold at the Hercule City Z-Mart, the clerk's dialogue rewritten |
+| [`rhai-story-event`](../mods-examples/rhai-story-event) | a story challenge added to a base area (§5d): an NPC's Rhai talk event with a choice spawns a hidden enemy; its on-defeat event sets a flag, gives an item and teaches a new move written in Rhai (§4b) that the player then uses in the field and in battle |
+
+**New here? Start with these three steps:** copy `mods-examples/story-tweaks` into your mods folder (§1), check it
+with `buus-fury --modcheck path/to/story-tweaks` (§7), then play it (`buus-fury --mod path/to/story-tweaks`). Change
+a number, check again, play again. When you want new behaviour rather than new numbers, read
+`mods-examples/rhai-story-event` and §5d.
 
 ## 1. Folder, pack.json, loading
 
@@ -303,6 +310,59 @@ choice (`mods-examples/new-party-member`).
 The example generates its map from ASCII art (`mods-examples/new-area/tools/make_grove.py`); Tiled edits the same
 file.
 
+## 5c. Story tweaks with plain files - stats, moves, items, shops, dialogue
+
+No scripts needed (see `mods-examples/story-tweaks`):
+
+* **Character stats:** `characters/<name>.patch.json` -> `{"new_game": {"STR": 40}}` (applies to a new game;
+  growth: `growth.raw_u32`).
+* **A move's numbers:** `skills/<id>.patch.json` -> `{"engine": {"check": [10], "cost": [10], "damage": [1600]}}` (§4).
+* **A new supply:** `items/<NNN>_<name>.json` with `"item": NNN` (83 or higher), `name` / `short_name` / `plural` /
+  `description` / `price` / `icon`, and what it does when used - either `"effect": {"restore_hp": 300,
+  "restore_ep": 100}` (the engine applies it when the player picks Use in the Inventory: restores the leader, takes
+  one, plays the game's eating sound) or `"use_script"` (an existing use script's hex address, or your own
+  `scripts/inline/inline_0xADDR.rhai`). The icon can be an alias: `icons/supply/NNN.png.derive.json` =
+  `{"from": "icons/supply/004.png"}`.
+* **New equipment:** `equipment/<NNN>_<name>.json` with `"$extends": "equipment/005_cotton_gi.json"` plus `item`
+  (162 or higher), `name`, `slot` (body / hands / feet / accessory), `required_level`, `STR` / `POW` / `END` / `SPD`,
+  `price`.
+* **Selling it in a shop:** `"sold_at": ["s028"]` in the item or equipment file adds it to that shop event's Buy list
+  (Items or Equipment, by its kind) at the file's `price`. Shop events: s028 Hercule City Z-Mart, s030 West City
+  Z-Mart, s031 black market, s033 Planet of the Kais Z-Mart (the rest: `Purpose: shop` in the headers of
+  `scripts/events/*.rhai`).
+* **Dialogue:** `scripts/events/sNNN.text.json` -> `{"nodes": {"9": "Thanks! Say hi to Korin for me!"}}` replaces the
+  text of that event's node 9. Node numbers and the original text are in `scripts/events/sNNN.rhai` (its `say:` /
+  `choice:` entries); keep a choice node's `-Option` lines; control codes as in `text/dialog.json`'s `format` (`\n`
+  a new line, `{page}` a new box). Only say / choice text changes this way - to change what an event *does*,
+  replace its `.rhai` (§6).
+
+## 5d. Walkthrough: a story event that teaches a new move (`mods-examples/rhai-story-event`)
+
+1. **Put someone in the world.** `world/areas/8-3+chiaotzu.json` with `"add_objects"` appends to the base area (the
+   `+name` keeps it from replacing other mods' files for 8-3). An `npc` with `"talk": {"event": "s930"}` runs your
+   event when the player presses A facing him.
+2. **A hidden enemy for the fight.** An `enemy` with `"condition": {"value": 1}` is never placed by the area load;
+   give it an explicit `"list": {"list": 1, "index": 200}` (clear of the base list and of other mods) and create it
+   from the script with `spawn_map_object(200)`. `"on_defeat": {"event": "s931"}` runs when it dies.
+3. **The talk (`scripts/events/s930.rhai`).** An event is a list of nodes: `say` (a text box; `box` = 8 + portrait
+   index), `choice` (`"Question\n-Yes\n-No"`), `code` (calls `nN_main()`; returning a number jumps to that node),
+   `end`. Read the choice with `get_menu_result()` (0 = first option), branch on `get_flag(f)`, remember progress
+   with `set_flag(f)` (mods: flags 900..1143).
+4. **The reward (`s931.rhai`).** `learn_skill(get_character(), 27)` adds skill 27 to the leader's record (and the
+   fighter); `give_item(21)` shows the item-get pose.
+5. **The move.** `skills/27_dodon_ray.json` (name, EP `check` / `cost`, `damage`, `cooldown`) with
+   `engine.script` = `hooks/skills/dodon_ray.rhai`: `on_start` / `on_frame` hooks ask for effects
+   (`fire("dodon_ray")`, `anim`, `sfx`, `spend`); `projectiles/dodon_ray.json` is the ray (speed, life, `pierce`,
+   hit box). Its art reuses a base effect by reference (`$extends` + a recolour `.derive.json`), so the mod ships no
+   game graphics. In game: L selects the new skill, B uses it.
+6. **Check and test.** `buus-fury --modcheck` validates every reference and compiles the scripts; `cargo test -p
+   wf-app --test mods rhai_story_event` plays the whole scenario headless (talk, choice, fight, reward, the move in
+   the field and in a battle).
+
+Gotchas: a projectile off every camera is dropped at once (set `"offscreen": true` in its JSON if it must fly
+unseen); give script-spawned objects in shared base areas an explicit list index so `spawn_map_object(i)` stays
+stable whatever other mods append.
+
 ## 6. Scripts (Rhai)
 
 Story scripts are Rhai files: `scripts/events/sNNN.rhai` (an event graph: dialogue tree + code nodes, run by NPC
@@ -369,7 +429,14 @@ default is the game's); a mod ships one, every field optional:
 
 ## 7. Testing a mod
 
-* **Check it**: `cargo run -p wf-app --example modcheck -- <content/base> path/to/my-mod` lists what the mod adds,
+* **Check it**: `buus-fury --modcheck path/to/my-mod` (several folders allowed; with none it checks every folder
+  in `content/mods/`). It lists what each mod adds, replaces, patches or derives, then reports each problem as
+  `ERROR <mod>/<file>: what is wrong` with a `hint:` line, and exits with code 1. It checks JSON syntax (line and
+  column); patches, `$extends` and derives pointing at missing files, bad `#rrggbb` colours; a missing `pack.json` or
+  dependency; numbers already used by the base game or another mod (§3) and two mods writing the same new file (add
+  `"load_after"` if the override is intended); Rhai syntax and calls to functions that do not exist (line number and
+  similar names); items sold in non-shop events, supplies that do nothing when used, dialogue overrides of non-text
+  nodes. Developers: `cargo run -p wf-app --example modcheck -- <content/base> path/to/my-mod` lists what the mod adds,
   replaces, patches and derives, and checks every reference the engine will follow: fighters → characters / forms →
   sprites + sheets, skills → behaviour + HUD icons, areas → maps (Tiled, tileset, collision) → talk / trigger /
   defeat scripts, and that every Rhai file compiles; scripted content: skill hooks, projectile sheets / cels, AI node
@@ -401,7 +468,11 @@ hashes as nothing while empty, and every new code path is reached only through m
   file bytes (`wf_app::battle::content_id`; headless / web lobbies also hash the loaded game data:
   `wf_net::netsim::content_id`) — and refuses peers that differ ("different game content (ROM / mods)").
   Share the mod folders before playing.
-* Replays and save states record the mod ids and that hash; playing them with other mods is refused.
+* Replays and save states record the mod list and a hash of the mod files. Playing one with different mods, or a
+  changed version of a mod, is refused with both lists named ("made with mods: ...; loaded now: ...") - load the same
+  mod folders first.
+* With identical mods everything stays frame-exact: replays, save states, rollback netplay, native vs browser
+  (`crates/wf-app/tests/mods_determinism.rs`).
 * Mod content changes the content fingerprints too: projectile kinds and the hook scripts' sources are part of
   `wf_net::netsim::content_id`.
 * Dialogue portraits are drawn like the game's (`docs/ui.md` §3; a new one = `portraits/portrait_NNN_<name>.png`,

@@ -618,6 +618,9 @@ impl Control {
         if r.header.sim != SIM_KIND && r.header.sim != STORY_KIND {
             return Err(format!("not a battle or story replay ({})", r.header.sim));
         }
+        if let Some(m) = r.header.content.mods_mismatch(&self.content) {
+            return Err(format!("This replay was {m}"));
+        }
         let mut sim = self.build_sim(app, &r.header.sim, &r.header.config)?;
         if let Some(s) = &r.start_state {
             if !sim.restore(s) {
@@ -712,6 +715,9 @@ impl Control {
         if st.header.sim != SIM_KIND && st.header.sim != STORY_KIND {
             return Err(format!("not a battle or story save state ({})", st.header.sim));
         }
+        if let Some(m) = st.header.content.mods_mismatch(&self.content) {
+            return Err(format!("This save state was {m}"));
+        }
         let same = start_of(app).is_some_and(|(k, c, _, _)| k == st.header.sim && c == st.header.config);
         let mut fresh = None;
         if !same {
@@ -767,6 +773,9 @@ impl Control {
         let r = parse_replay(bytes)?;
         if r.header.sim != SIM_KIND {
             return Err(format!("ghosts are battle replays (this is {})", r.header.sim));
+        }
+        if let Some(m) = r.header.content.mods_mismatch(&self.content) {
+            return Err(format!("This replay was {m}"));
         }
         let mut sim = self.build_core(app, &r.header.config)?;
         if let Some(s) = &r.start_state {

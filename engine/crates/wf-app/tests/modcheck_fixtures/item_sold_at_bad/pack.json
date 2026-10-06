@@ -1,0 +1,8 @@
+{
+ "id": "item_sold_at_bad",
+ "name": "item_sold_at_bad",
+ "format_version": 1,
+ "depends": [
+  "base"
+ ]
+}

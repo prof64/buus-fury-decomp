@@ -52,6 +52,26 @@ impl ContentId {
     }
 }
 
+impl ContentId {
+    /// `Some(message)` when a recording / state made with these mods (`self`) cannot run on `loaded`: other mod ids
+    /// or other mod files (different content = a desync from the first frame it matters). Engine / extractor
+    /// differences stay warnings (`diff`): a newer build may still replay exactly, which the checkpoints decide.
+    pub fn mods_mismatch(&self, loaded: &ContentId) -> Option<String> {
+        if *self == ContentId::default() || *loaded == ContentId::default() {
+            return None;
+        }
+        if self.mods_hash == loaded.mods_hash && self.mods == loaded.mods {
+            return None;
+        }
+        let list = |m: &[String]| if m.is_empty() { "none".to_string() } else { m.join(", ") };
+        Some(if self.mods == loaded.mods {
+            format!("made with the same mods ({}) but other versions of their files - load the exact mod folders it was made with", list(&self.mods))
+        } else {
+            format!("made with mods: {}; loaded now: {} - load the same mods (Mods menu, or --mod / --no-mods) to play it", list(&self.mods), list(&loaded.mods))
+        })
+    }
+}
+
 /// A recording that continues another one from a frame ("take over" a replay, load a save state).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Branch {
