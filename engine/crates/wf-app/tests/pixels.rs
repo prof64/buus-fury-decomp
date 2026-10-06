@@ -158,72 +158,105 @@ fn locked_segments_render_as_the_game() {
     }
     let set = wf_script::ScriptSet::load_all(&rom);
     let (files, _) = wf_script::export::export(&rom, &set);
-    let mut renderer = Renderer::new();
-    // (the tear pictures of earlier states have their own renderer: the main one's caches stay the frame's)
-    let mut tear_renderer = Renderer::new();
-    let mut fails = vec![];
-    let mut checked = 0;
-    for (name, frames) in lock["segments"].as_object().unwrap() {
-        let want: BTreeMap<usize, u64> = frames
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|f| (f[0].as_u64().unwrap() as usize, u64::from_str_radix(f[1].as_str().unwrap(), 16).unwrap()))
-            .collect();
-        // torn frames (the tear rule, core.md known differences): per line "" = our new-palette line, "o" = our
-        // old-palette line (the previous frame's palette state), else a hex mask of the pixels showing the old one
-        let masks: BTreeMap<usize, Vec<String>> = frames
-            .as_array()
-            .unwrap()
-            .iter()
-            .filter_map(|f| Some((f[0].as_u64()? as usize, f.get(2)?.as_array()?.iter().map(|m| m.as_str().unwrap_or("").to_string()).collect())))
-            .collect();
-        let p: PathBuf = repo.join(format!("data/segments/{name}.json"));
-        let Ok(doc) = wf_import::segment::load(&p) else {
-            fails.push(format!("{name}: no segment"));
-            continue;
-        };
-        let mut presenter = wf_core::view::Presenter::default();
-        let mut bad = vec![];
-        let mut seen = 0;
-        let mut prev: Option<RenderView> = None;
-        // the late present ("v" lines): the picture before the running iteration's step (as examples/pixels.rs)
-        let mut last_view: Option<RenderView> = None;
-        let mut iter_view: Option<RenderView> = None;
-        wf_import::segment::replay_with(&data, &files, &doc, &mut |f| match f {
-            wf_import::segment::Frame::Before(_, w) => {
-                presenter.before_step(w);
-                iter_view = last_view.clone();
-            }
-            wf_import::segment::Frame::After(k, w) => {
-                let mut view = RenderView::default();
-                wf_core::view::render_view(w, &mut view);
-                let before = prev.replace(view.clone());
-                let cur_stat: Vec<Option<u8>> = view.hud.iter().map(|h| h.stat_mark).collect();
-                presenter.apply(&mut view);
-                last_view = Some(view.clone());
-                let Some(&h) = want.get(&k) else { return };
-                seen += 1;
-                let new = renderer.render(&packs, &view, 0, 240, 160).to_vec();
-                let ok = hash(&new) == h
-                    || stat_now(&view, &cur_stat).is_some_and(|v| hash(&renderer.render(&packs, &v, 0, 240, 160).to_vec()) == h)
-                    || match (masks.get(&k), before) {
-                        (Some(m), Some(b)) => hash(&compose(&mut tear_renderer, &packs, &view, &b, iter_view.as_ref(), &new, m)) == h,
-                        _ => false,
-                    };
-                if !ok {
-                    bad.push(k);
+    // segments in parallel (each worker its own renderers and pack reader; every exact sampled frame is locked, so the
+    // gate replays most segments: ~18,600 frames)
+    let names: Vec<(&String, &serde_json::Value)> = lock["segments"].as_object().unwrap().iter().collect();
+    let next = std::sync::atomic::AtomicUsize::new(0);
+    let fails = std::sync::Mutex::new(Vec::<String>::new());
+    let checked = std::sync::atomic::AtomicUsize::new(0);
+    let workers = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4).min(12);
+    std::thread::scope(|sc| {
+        for _ in 0..workers {
+            sc.spawn(|| {
+                let packs = Packs::new(vec![Box::new(DirSource(content.clone())) as Box<dyn FileSource>]).unwrap();
+                let mut renderer = Renderer::new();
+                // (the tear pictures of earlier states have their own renderer: the main one's caches stay the frame's)
+                let mut tear_renderer = Renderer::new();
+                loop {
+                    let k0 = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    let Some(&(name, frames)) = names.get(k0) else { break };
+                    let (seen, msgs) = check_segment(&repo, &data, &files, &packs, &mut renderer, &mut tear_renderer, name, frames);
+                    checked.fetch_add(seen, std::sync::atomic::Ordering::Relaxed);
+                    fails.lock().unwrap().extend(msgs);
                 }
-            }
-        });
-        checked += seen;
-        if seen != want.len() {
-            fails.push(format!("{name}: reached {seen} of {} locked frames", want.len()));
+            });
         }
-        if !bad.is_empty() {
-            fails.push(format!("{name}: frames {bad:?} differ from the game's picture"));
-        }
-    }
+    });
+    let checked = checked.into_inner();
+    let mut fails = fails.into_inner().unwrap();
+    fails.sort();
     eprintln!("pixel gate: {checked} frames of {} segments", lock["segments"].as_object().unwrap().len());
     assert!(fails.is_empty(), "{}", fails.join("\n"));
+}
+
+/// one locked segment: (frames reached, failure messages)
+#[allow(clippy::too_many_arguments)]
+fn check_segment(repo: &std::path::Path, data: &std::sync::Arc<wf_core::content::GameData>, files: &BTreeMap<String, String>, packs: &Packs, renderer: &mut Renderer, tear_renderer: &mut Renderer, name: &str, frames: &serde_json::Value) -> (usize, Vec<String>) {
+    let want: BTreeMap<usize, u64> = frames
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|f| (f[0].as_u64().unwrap() as usize, u64::from_str_radix(f[1].as_str().unwrap(), 16).unwrap()))
+        .collect();
+    // torn frames (the tear rule, core.md known differences): per line "" = our new-palette line, "o" = our
+    // old-palette line (the previous frame's palette state), else a hex mask of the pixels showing the old one
+    let masks: BTreeMap<usize, Vec<String>> = frames
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|f| Some((f[0].as_u64()? as usize, f.get(2)?.as_array()?.iter().map(|m| m.as_str().unwrap_or("").to_string()).collect())))
+        .collect();
+    let p: PathBuf = repo.join(format!("data/segments/{name}.json"));
+    let Ok(doc) = wf_import::segment::load(&p) else {
+        return (0, vec![format!("{name}: no segment")]);
+    };
+    let mut presenter = wf_core::view::Presenter::default();
+    let mut bad = vec![];
+    let mut seen = 0;
+    let mut prev: Option<RenderView> = None;
+    // the late present ("v" lines): the picture before the running iteration's step (as examples/pixels.rs)
+    let mut last_view: Option<RenderView> = None;
+    let mut iter_view: Option<RenderView> = None;
+    wf_import::segment::replay_with(&data, &files, &doc, &mut |f| match f {
+        wf_import::segment::Frame::Before(_, w) => {
+            presenter.before_step(w);
+            iter_view = last_view.clone();
+        }
+        wf_import::segment::Frame::After(k, w) => {
+            let mut view = RenderView::default();
+            wf_core::view::render_view(w, &mut view);
+            let before = prev.replace(view.clone());
+            let cur_stat: Vec<Option<u8>> = view.hud.iter().map(|h| h.stat_mark).collect();
+            presenter.apply(&mut view);
+            last_view = Some(view.clone());
+            let Some(&h) = want.get(&k) else { return };
+            seen += 1;
+            let new = renderer.render(packs, &view, 0, 240, 160).to_vec();
+            let ok = hash(&new) == h
+                || stat_now(&view, &cur_stat).is_some_and(|v| hash(&renderer.render(packs, &v, 0, 240, 160).to_vec()) == h)
+                || match (masks.get(&k), before) {
+                    // (the torn lines over our picture - or over the stat mark's early-copy picture, which the board
+                    // takes first when it is closer)
+                    (Some(m), Some(b)) => {
+                        hash(&compose(tear_renderer, packs, &view, &b, iter_view.as_ref(), &new, m)) == h
+                            || stat_now(&view, &cur_stat).is_some_and(|v| {
+                                let sn = renderer.render(packs, &v, 0, 240, 160).to_vec();
+                                hash(&compose(tear_renderer, packs, &view, &b, iter_view.as_ref(), &sn, m)) == h
+                            })
+                    }
+                    _ => false,
+                };
+            if !ok {
+                bad.push(k);
+            }
+        }
+    });
+    let mut fails = vec![];
+    if seen != want.len() {
+        fails.push(format!("{name}: reached {seen} of {} locked frames", want.len()));
+    }
+    if !bad.is_empty() {
+        fails.push(format!("{name}: frames {bad:?} differ from the game's picture"));
+    }
+    (seen, fails)
 }

@@ -551,6 +551,14 @@ fn runner(w: &mut World, i: usize) {
 /// a map NPC's update (vt+8 `0x08011192`): the runner, then the animation tick. While an event holds the field only
 /// the animation ticks (not in the frame the event started); the frame it ends ticks once more before the update.
 pub fn update(w: &mut World, i: usize) {
+    // a broken breakable's callback event takes the rest of the frame: no update (fx.rs / player.rs / shots.rs;
+    // tour_desert_a f513: the NPC's animation tick skips the break frame)
+    if w.field
+        .as_ref()
+        .is_some_and(|f| f.busy && f.busy_pre_pass == w.frame && f.busy_since + 1 == w.frame)
+    {
+        return;
+    }
     // a load waiting for its on-enter script holds the map NPCs like an event (story playthrough: Grand Kai's 1-15)
     let (busy, since, ended) = w
         .field

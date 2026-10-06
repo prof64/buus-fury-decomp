@@ -325,7 +325,7 @@ impl Sim for DemoWorld {
     fn view(&self, out: &mut RenderView) {
         out.clear();
         out.frame = self.frame;
-        out.map = Some(MapView { id: self.map.clone(), anim_frame: self.frame as u32, tile_frame: None, shake: (0, 0), mode7: None, layers: None });
+        out.map = Some(MapView { id: self.map.clone(), anim_frame: self.frame as u32, tile_frame: None, shake: (0, 0), shake_sub: (0, 0), mode7: None, layers: None });
         // OAM: y-sorted (front-most first); per actor: body, then shadow (lower index on top)
         let mut order: Vec<usize> = (0..self.walkers.len()).collect();
         order.sort_by_key(|&i| (-(self.walkers[i].y >> 8), i));

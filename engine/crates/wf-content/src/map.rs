@@ -58,9 +58,16 @@ impl Layer {
 
     /// Layer-space top-left pixel shown at camera (cx, cy) (the game's scroll registers).
     pub fn scroll(&self, cx: i32, cy: i32, anim_frame: u32) -> (i32, i32) {
+        self.scroll_with(cx, cy, anim_frame, (0, 0))
+    }
+
+    /// `scroll` with `sub` (1/1024 px) added into the sum before its >> 10: the screen shake's sub-pixel part (the
+    /// whole px are added after). Emulator, real route rfat_033 0-21 (BG0 clouds, rate 1331): camera px y 71, shake
+    /// 3.753 -> BG0VOFS 96 = (71 * 1331 + 3843) >> 10, not 92 + 3; -3.657 -> 88
+    pub fn scroll_with(&self, cx: i32, cy: i32, anim_frame: u32, sub: (i32, i32)) -> (i32, i32) {
         let f = anim_frame as i64;
-        let sx = (cx as i64 * self.rate_x as i64 + self.offset_x as i64 + self.vel_x as i64 * f) >> 10;
-        let sy = (cy as i64 * self.rate_y as i64 + self.offset_y as i64 + self.vel_y as i64 * f) >> 10;
+        let sx = (cx as i64 * self.rate_x as i64 + self.offset_x as i64 + self.vel_x as i64 * f + sub.0 as i64) >> 10;
+        let sy = (cy as i64 * self.rate_y as i64 + self.offset_y as i64 + self.vel_y as i64 * f + sub.1 as i64) >> 10;
         (sx as i32, sy as i32)
     }
 }

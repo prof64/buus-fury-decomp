@@ -192,6 +192,8 @@ fat2.fix_db7 = fix_db7_3
 ORDER = ['radar', 'bandana', 'grind_goten', 'desert', 'grind_trunks', 'pilaf', 'thieves', 'airship', 'pyramid',
          'fukurou', 'nataday', 'dbx']
 OUT = ROOT / 'work' / 'run3fat'
+# Janemba (j3_janemba): run 2's pieces in their order (the saga's story forces it), run 3's interludes between them
+J_ORDER = ['j_intro', 'j_grind', 'j_hfil', 'j_maze', 'j_back', 'j_vegeta', 'j_gate', 'j_arena']
 
 
 def menu_open(e):
@@ -343,7 +345,16 @@ def dbx3(e):
     return fat2.Chain(parts)
 
 
+def j_grind3(e):
+    """run 2's j_grind, but off 18-1's Instant Transmission pad first: run 3's Goku arrives above level 92, so the
+    grind's first leg (18-12) is skipped and its next one fights from the pad - a punch there opened the Other World
+    travel menu (0-51)"""
+    return fat2.Driver2([('unstick',), ('walk', 300, 160)] + fat2.g_j_grind(e))
+
+
 def driver3(name, e):
+    if name == 'j_grind':
+        return j_grind3(e)
     if name == 'dbx':
         return dbx3(e)
     if name == 'bandana':
@@ -377,7 +388,10 @@ def one(name, start, eeprom, cap=400000):
     sbemu.sd_write(e, Path(eeprom).read_bytes())
     keys = []
     try:
-        play(Interlude(), e, keys, cap, f'{name}/interlude')
+        # (not before the Janemba prologue: it starts inside the 0-96 -> 0-16 cutscene chain, where the interlude's
+        # presses left the ogre standing - its walk-up into s022 never came)
+        if name not in ('j_intro',):
+            play(Interlude(), e, keys, cap, f'{name}/interlude')
         play(driver3(name, e), e, keys, cap, name)
     except Exception as ex:  # noqa: BLE001
         e.save_file(str(OUT / f'{name}.fail.ss'))
@@ -405,10 +419,20 @@ def main():
         (ROOT / 'work' / 'run3' / 'parts' / 'f3_fat.json').write_text(json.dumps(keys))
         print('f3_fat', len(keys), sizes)
         return
-    if a[0] == '--all':
+    if a[0] == '--partj':
+        keys, sizes = [], {}
+        for p in J_ORDER:
+            k = json.loads((OUT / f'{p}.keys.json').read_text())
+            keys += k
+            sizes[p] = len(k)
+        (ROOT / 'work' / 'run3' / 'parts' / 'j3_janemba.json').write_text(json.dumps(keys))
+        print('j3_janemba', len(keys), sizes)
+        return
+    if a[0] in ('--all', '--allj'):
+        order = ORDER if a[0] == '--all' else J_ORDER
         st, ee = a[1], a[2]
-        i0 = ORDER.index(a[a.index('--from') + 1]) if '--from' in a else 0
-        for name in ORDER[i0:]:
+        i0 = order.index(a[a.index('--from') + 1]) if '--from' in a else 0
+        for name in order[i0:]:
             if not one(name, st, ee):
                 sys.exit(1)
             st, ee = str(OUT / f'{name}.ss'), str(OUT / f'{name}.eeprom')

@@ -209,12 +209,11 @@ def stressed(goals):
 def goals_run3(e):
     sbroute2.checkpoint = checkpoint3
     g = sbroute2.goals_run2(e)
-    # the end: after Kid Buu, West City's save point, then into Capsule Corp 4-20 (the post-game starts there)
-    k = g.index(('mark', 'e02_after_kid_buu'))
-    end = [('fly', 1137, 1137, 71, 119), ('until', 4, 1), ('areaw', 4, 1), ('wait', 30),
-           ('menutour',), *charsel(0), ('unstick',), ('walk', 148, 594), ('face', 'U'), SAVE, ('bout',),
-           ('mark', 'e03_saved_4-1'), ('exitto', '4-20'), ('wait', 60), ('mark', 'e04_end')]
-    g = g[:k + 1] + end
+    # the end (scope of 2026-10-06: Kid Buu -> credits -> post-game are the Earth agent's): out of Inside Buu after the
+    # brain fight - the first frames in 20-8 with the leader controllable; the last save is 21-25's checkpoint
+    # (before the brain), the slot the next part Continues
+    k = g.index(('mark', 'd03_kid_buu_saga'))
+    g = g[:k + 1] + [('until', 20, 8), ('wait', 30), ('mark', 'e00_end_20-8')]
     return [('menutour',)] + stressed(g)
 
 

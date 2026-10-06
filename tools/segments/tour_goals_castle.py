@@ -234,6 +234,21 @@ SHIP = {
     '61': BRK_21,
     '66': BRK_26 + save_point(*SAVE_B),
 }
+# the Thieves Den's second Z-Mart 0-95 (state tour_zmart95.ss: a side branch of run 1's fat chapter - from d04_bandana
+# a second Bandana hunted on the world map (work/shipfix/zmart_hunt.py: 7 punches in West City, Trunks L67), the
+# chapter route to the 1-Star ball and the take-off from 9-1 (flag 82; re/buu/ship/run_route.py --fat), back to 9-1,
+# the Bandana on, through the den to 9-11 (work/shipfix/zmart_leg.py)): the doorway guard (s355: "nice bandana",
+# walks aside), the door (with flag 82: 0-95), the counter (s028-like shop: the buy menu opened, the cursor down twice,
+# B), the customer, back out to 9-11
+ZMART95 = ([('wait', 20), ('a_at', 264, 96, 'U'), ('wait', 60)]
+           + [('walk', 268, 96), ('hold', 0x40, 80), ('area', 0, 95), ('wait', 40)]
+           + [('walk', 90, 120), ('hold', 0x20, 3), ('wait', 2), ('hold', 1, 3), ('wait', 120),
+              ('hold', 0x80, 2), ('wait', 40), ('hold', 0x80, 2), ('wait', 40),
+              ('hold', 2, 2), ('wait', 40), ('hold', 2, 2), ('wait', 40), ('hold', 2, 2), ('wait', 40),
+              ('events',),
+              ('walk', 184, 114), ('talk', 'U'), ('wait', 20)]
+           + [('walk', 112, 214), ('area', 9, 11), ('wait', 40)])
+
 SHIP_TOURS = {f'castle_ship_{a}': (f'tour_castle_s{a}.ss', [('wait', 20)] + g) for a, g in SHIP.items()}
 
 
@@ -253,4 +268,5 @@ TOURS = {'castle_forest_w': ('tour_castle_f3b.ss', FOREST_W),
          'castle_pilaf_gate': ('tour_castle_p1.ss', CASTLE_GATE),
          'castle_pilaf_save14': ('tour_castle_p14.ss', CASTLE_SAVE14),
          'castle_forest_16b': ('tour_castle_f16.ss', FOREST_16B),
+         'castle_den_zmart95': ('tour_zmart95.ss', ZMART95),
          **PW_TOURS, **SHIP_TOURS}

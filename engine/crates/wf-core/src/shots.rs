@@ -1158,6 +1158,15 @@ fn wall_dist(w: &World, dir: Dir, x: i32, y: i32, step: i32, max: i32) -> i32 {
 // ---- update -------------------------------------------------------------------------------------------------------------
 
 pub fn update(w: &mut World, i: usize) {
+    // a broken breakable's callback event takes the rest of the frame: the older objects - the shots too - are not
+    // updated (fx.rs / player.rs; emulator, tour_desert_a f513: no object pass, the bursting ki blast's update comes
+    // only in f514)
+    if w.field
+        .as_ref()
+        .is_some_and(|f| f.busy && f.busy_pre_pass == w.frame && f.busy_since + 1 == w.frame)
+    {
+        return;
+    }
     let kind = std::mem::discriminant(&w.shot_ref(i).kind);
     let _ = kind;
     match &w.shot_ref(i).kind {
@@ -3353,12 +3362,13 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
         // end's sound and explosion; the shuriken is just removed) and is accepted, whatever the sender's team or
         // attack kind (the real route, Diablo Desert Express 11-21: Trunks' ki blast meets a gunman's bullet - the
         // bullet bursts, the blast counts the hit, the player is not hit)
-        // The bullet tests the message in its own update, after it moved (rifle 0x08027826 moves, then the message
-        // handler runs; 3-3 #4 f1495: a ki blast created later in the list - updated earlier in the frame - meets
-        // the bullet's box of this frame, emulator write order work/earth/timing/order.py): a bullet that has not
-        // had its update this frame is tested where this frame's move puts it.
+        // Battles: a bullet that has not had its update this frame is tested where this frame's move puts it (the TS
+        // sim's model). The field tests the box the bullet's last update stored (+0x28): a ki blast later in the list
+        // (updated first) misses the bullet still short of it, and the bullet, after its move, bursts the blast with
+        // its own message - no hit draw of the blast's (3-3 #4 f1495, game broadcast 0x080199B6 -> 0; run 3 fat Buu
+        // 1,286,553: Goku's blast and a gunman's bullet, emulator write order)
         ShotKind::Straight(o) => {
-            let ahead = w.find(msg.source).is_some_and(|j| j > i)
+            let ahead = w.field.is_none() && w.find(msg.source).is_some_and(|j| j > i)
                 && !(o.delay > 0 && w.shot_ref(i).t < o.delay);
             let r = if ahead {
                 let s = w.shot_ref(i);

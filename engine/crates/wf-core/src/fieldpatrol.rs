@@ -494,6 +494,17 @@ pub fn holds_mark(w: &World, i: usize) -> bool {
     matches!(&p.cur, Some(StepRt::Wander(s)) if s.left != 0 && s.rect.is_none() && w.en_ref(i).marked == Some(s.new))
 }
 
+/// the enemy where a rect wander (the plain variant, object vt 0x0804D848: the walk test only) put it - a move that
+/// writes the position alone, the enemy grid untouched
+pub fn pos_only(w: &World, i: usize) -> bool {
+    let id = w.ents[i].id;
+    let Some(p) = w.field.as_ref().and_then(|f| f.patrols.iter().find(|p| p.entity == id)) else {
+        return false;
+    };
+    let a = &w.en_ref(i).a;
+    matches!(&p.cur, Some(StepRt::Wander(s)) if s.rect.is_some() && a.x + s.left * s.vx == s.tx << 8 && a.y + s.left * s.vy == s.ty << 8)
+}
+
 /// RunMotionController update: one runner pass (`0x0800A95A`)
 pub fn run(w: &mut World, i: usize) {
     let Some(mut p) = take(w, i) else { return };

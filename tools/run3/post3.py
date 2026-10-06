@@ -6,6 +6,8 @@ below. Input only.
 
   ('optcycle',)       pause -> Options: every slider (Sound FX, Music, Text Speed) to 0, to 8, back to its value,
                       closed-loop on the options word 0x03001914 (text speed, SFX, music), then out
+  ('optcycle', plan)  the same with the rows' targets given: [(byte, [values]) per row in page order; [] = pass]
+                      (textspeed(v): the Text Speed row only)
   ('endmash', n)      A on alternate frames (one frame on, one off) until the credits run (area 0-2 with a scene after
                       the Tournament 7-6 has been seen), at most n frames
   ('credits',)        through the credits a held key in turns (CREDIT_HOLDS, each HOLD frames) until the title is up
@@ -85,8 +87,9 @@ class PostDriver(ShopDriver):
         if st is None:
             vals = [e.r8(OPTS + k) for k in range(3)]
             # the page's rows: Sound FX (byte 1), Music (byte 2), Text Speed (byte 0)
-            st = self.oc = {'ph': 'open', 'w': 0, 'row': 0, 'tgt': 0,
-                            'plan': [(1, [0, 8, vals[1]]), (2, [0, 8, vals[2]]), (0, [0, 8, vals[0]])]}
+            g = self.goals[self.k]
+            plan = g[1] if len(g) > 1 else [(1, [0, 8, vals[1]]), (2, [0, 8, vals[2]]), (0, [0, 8, vals[0]])]
+            st = self.oc = {'ph': 'open', 'w': 0, 'row': 0, 'tgt': 0, 'plan': plan}
         st['w'] += 1
         if st['w'] > 4000:
             raise RuntimeError(f'optcycle stuck {st} {status(e)}')
@@ -150,7 +153,15 @@ class PostDriver(ShopDriver):
 # --- West City 4-1 / Capsule Corp 4-20 / the Z-Mart 0-92 (Earth-route coordinates; the Z-Mart's floor is 0-91's)
 TO_4_1 = [('walk', 4, 390), ('hold', L, 30), ('area', 4, 1), ('wait', 30)]
 TO_4_20 = [('walk', 850, 360), ('hold', R, 30), ('area', 4, 20), ('wait', 30)]
-TALKS_4_1 = [('talkto', x, y, 'D') for x, y in ((320, 360), (416, 128), (784, 360), (664, 544))]
+def textspeed(v):
+    return ('optcycle', [(1, []), (2, []), (0, [v])])
+
+
+# West City's talkers with the Text Speed changed between the talks (slowest, fastest, middle - the pause cannot open
+# under a dialogue: the soak agent's "Options mid-dialogue" became "between two dialogues"); the second and fourth
+# talks' boxes mashed on alternate frames
+TALKS_4_1 = [('talkto', 320, 360, 'D'), textspeed(0), ('talkto', 416, 128, 'D'), textspeed(8),
+             ('talkto', 784, 360, 'D'), textspeed(4), ('talkto', 664, 544, 'D')]
 ZMART_WEST = [
     ('walk', 264, 320), ('hold', U, 40), ('area', 0, 92), ('wait', 30), ('walk', 100, 110), ('hold', L, 20),
     ('shopenter', 0, 0), ('buyall',), ('buyrefused',), ('listout',),

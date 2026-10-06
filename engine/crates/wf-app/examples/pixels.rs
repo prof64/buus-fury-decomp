@@ -547,10 +547,13 @@ fn main() {
         if torn_n > 0 {
             println!("  {name}: {torn_n} of the exact frames torn (hardware: palette rewritten while drawn)");
         }
-        if !counted.is_empty() && exact == counted.len() {
+        // every exact sampled frame is locked (a segment with differences too: what matches today cannot regress
+        // silently); PIX_LOCK_FULL_ONLY keeps the old rule (fully exact segments only)
+        if exact > 0 && (exact == counted.len() || std::env::var_os("PIX_LOCK_FULL_ONLY").is_none()) {
             // (a torn frame: its lines' hashes too - each must equal our new- or old-palette line)
             let fr: Vec<serde_json::Value> = counted
                 .iter()
+                .filter(|r| r.2 == 0)
                 .map(|r| match torn_rows.get(&r.0) {
                     Some(rows) => serde_json::json!([r.0, format!("{:016x}", hash(&game[at[&r.0]])), rows]),
                     None => serde_json::json!([r.0, format!("{:016x}", hash(&game[at[&r.0]]))]),
@@ -572,7 +575,7 @@ fn main() {
     }
     if let Ok(p) = std::env::var("PIX_LOCK") {
         let doc = serde_json::json!({
-            "note": "pixel gate (engine/crates/wf-app/tests/pixels.rs): segments whose sampled frames all render exactly as the game's screen; per segment [video frame, FNV-1a 64 of the game's 240x160 ARGB picture]. Written by `PIX_LOCK=data/segments/pixels.json cargo run --release -p wf-app --example pixels -- data/segments/*.json` (screens: work/superbuu/pix/dump.py)",
+            "note": "pixel gate (engine/crates/wf-app/tests/pixels.rs): every sampled frame that renders exactly as the game's screen (torn frames with their line specs); per segment [video frame, FNV-1a 64 of the game's 240x160 ARGB picture]. Written by `PIX_LOCK=data/segments/pixels.json cargo run --release -p wf-app --example pixels -- data/segments/*.json` (screens: work/superbuu/pix/dump.py)",
             "segments": lock,
         });
         std::fs::write(p, serde_json::to_string_pretty(&doc).unwrap()).unwrap();

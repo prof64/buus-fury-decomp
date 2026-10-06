@@ -396,6 +396,7 @@ impl Renderer {
         }
         let (vx, vy, cx, cy) = Self::view_origin(view, player, w, h);
         let map = view.map.as_ref().and_then(|m| self.map(packs, &m.id).map(|g| (g, (m.anim_frame, m.tile_frame.unwrap_or(m.anim_frame)), m.shake)));
+        let shake_sub = view.map.as_ref().map(|m| m.shake_sub).unwrap_or((0, 0));
         // (the top byte is the colour's palette index for the fades (`put`): the backdrop is BG entry 0, which the
         // encoding cannot name - 0 = "find it by colour"; the map's 0xFF top byte read as BG entry 255 and faded
         // the margins of the zoomed-out view to an unrelated colour, e.g. brown in Southwest Forest's fades)
@@ -540,7 +541,7 @@ impl Renderer {
                     }
                     // a script's `set_bg_offset` adds to the BG's scroll (real route sb 6-6: s-script's BG2 by (-3, 3))
                     let (bx, by) = sl.and_then(|l| l.offset.get(m.layers[li].bg as usize).copied()).unwrap_or((0, 0));
-                    self.draw_layer(m, li, *af, cx, cy, (shake.0 + bx, shake.1 + by), vx, vy);
+                    self.draw_layer(m, li, *af, cx, cy, (shake.0 + bx, shake.1 + by), shake_sub, vx, vy);
                 }
                 // the sphere on BG0, at BG0's priority (2: BG0CNT 0x1C82 under it, real route 19-3; a script's BG
                 // priority moves it - sb_041 21-25 f12,090: BG0CNT priority 3, Kid Buu's OBJs at 3 draw over it,
@@ -672,9 +673,10 @@ impl Renderer {
     #[allow(clippy::too_many_arguments)]
     /// `off`: added to the layer's scroll registers whatever its rate (the screen shake's layer offsets, a script's
     /// `set_bg_offset`) - not to the camera, which the view's origin cancels (real route sb 6-6 f4,694 on: the
-    /// arena drawn (3, -3) off after Gotenks' crit shake)
+    /// arena drawn (3, -3) off after Gotenks' crit shake); `sub`: the shake's sub-pixel part, into the scroll's sum
+    /// (`Layer::scroll_with`: only a layer at another rate than the camera's rounds differently with it)
     #[allow(clippy::too_many_arguments)]
-    fn draw_layer(&mut self, m: &Map, li: usize, (anim_frame, tile_frame): (u32, u32), cx: i32, cy: i32, off: (i32, i32), vx: i32, vy: i32) {
+    fn draw_layer(&mut self, m: &Map, li: usize, (anim_frame, tile_frame): (u32, u32), cx: i32, cy: i32, off: (i32, i32), sub: (i32, i32), vx: i32, vy: i32) {
         let l = &m.layers[li];
         let ts = &m.tileset;
         // tile animation remap for this frame
@@ -699,7 +701,7 @@ impl Renderer {
                 }
             }
         }
-        let (sx, sy) = l.scroll(cx, cy, anim_frame);
+        let (sx, sy) = l.scroll_with(cx, cy, anim_frame, sub);
         let (sx, sy) = (sx + off.0, sy + off.1);
         // screen pixel (px, py) of this view is camera-relative (vx - cx + px); layer pixel = that + scroll
         let ox = vx - cx + sx;

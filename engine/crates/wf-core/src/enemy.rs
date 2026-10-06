@@ -1234,6 +1234,17 @@ pub fn sync_mark(w: &mut World, i: usize) {
     if w.field.is_some() && crate::fieldpatrol::holds_mark(w, i) {
         return;
     }
+    // a rect wander moves the enemy by its position alone: the grid keeps the mark where it was, and the next free
+    // (0x0800F740, the current footprint) frees where the enemy is then (run 3, fat Buu 9-11: an enemy made from an
+    // NPC at (240, 240) wanders off - tiles 30-31 row 30 stay blocked, its back-off at 1,300,759 slides along them)
+    if w.field.is_some() && crate::fieldpatrol::pos_only(w, i) {
+        let e = w.en(i);
+        if e.marked.is_some() {
+            let (x, y) = (e.a.px(), e.a.py());
+            e.marked = Some([x, y, x + e.a.foot_w, y + e.a.foot_h]);
+        }
+        return;
+    }
     // RandomStep (0x0804B1C0) writes the position only: the game's enemy grid keeps the mark of the kept position
     // while the bones rattle (the real route, Volcano 15-14: a Skeleton's pile next to a wall - a mark following the
     // jitter would free the wall's tile when it moves back)

@@ -401,6 +401,10 @@ pub fn render_view(w: &World, out: &mut RenderView) {
             let s = if w.g.shakes_ticked == w.frame { w.g.shake_shown } else { w.g.shake_off };
             (s.0 >> 10, s.1 >> 10)
         },
+        shake_sub: {
+            let s = if w.g.shakes_ticked == w.frame { w.g.shake_shown } else { w.g.shake_off };
+            (s.0 & 1023, s.1 & 1023)
+        },
         mode7: mode7.clone(),
         layers,
     });

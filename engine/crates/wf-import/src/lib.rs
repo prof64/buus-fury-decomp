@@ -1405,6 +1405,7 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
     import_flames(w, ei, ram, o);
     import_waves(w, ei, ram, o);
     import_shells(w, ei, ram, o);
+    import_wraps(w, ei, ram, o);
     let d = Arc::clone(&w.data);
     let e = w.en(ei);
     e.a.x = ram.s32(o + 0x1A0);
@@ -1522,6 +1523,15 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
                 // a NinjaStarThrow in progress (its controller 0x03003074 as the object's state): the count is the tick
                 // (tour desert_nj37: tick 1 at the cut - the star and sound 61 at f7; a fresh count threw 8 late)
                 if st.tree.nodes.get(n).is_some_and(|x| x.k == wf_core::ai::K::NinjaStarThrow) && ctl_obj == 0x0300_3074 {
+                    rt.f = tick;
+                    rt.d[6] = anim_seq;
+                }
+                // the same for a GunShot / RifleShot / MummyWrapShot in progress (controllers 0x03002FC4 / 0x03002FD8 /
+                // 0x030030A8; run 3 cut 1,286,554, fat Buu: a gunman's tick 10 - the fresh node's state did not match
+                // the animation's, it ended at once and his idle's draw came 2 frames early)
+                if st.tree.nodes.get(n).is_some_and(|x| matches!(x.k, wf_core::ai::K::GunShot | wf_core::ai::K::RifleShot | wf_core::ai::K::MummyWrapShot | wf_core::ai::K::MummyWrapBurst))
+                    && matches!(ctl_obj, 0x0300_2FC4 | 0x0300_2FD8 | 0x0300_30A8)
+                {
                     rt.f = tick;
                     rt.d[6] = anim_seq;
                 }
@@ -1707,6 +1717,39 @@ fn import_waves(w: &mut World, ei: usize, ram: &GbaRam, o: u32) {
         let mut s = wf_core::shots::Shot::new(me, ram.r8(b + 0x10) & 3, 0, ram.s32(b + 0x20) << 8, ram.s32(b + 0x24) << 8, kind);
         s.t = ram.s32(b + 0x14) as i64;
         wf_core::shots::add(w, s);
+    }
+}
+
+/// this mummy's bandages (vt 0x0804A830, builder 0x0802D79C / update 0x0802D940: +0x1C the mummy, +0x20 / +0x24 24.8
+/// position, +0x40 / +0x44 velocity, +0x48 the flight tick, +0x50 stuck, +0x54 the stick delay, +0x58 / +0x5C a stuck
+/// one's offset - player minus bandage): our bandage with those numbers - a stuck one follows the player and slows its
+/// walk / dash 48 each (`player::wrap_stats`, reapplied by every bandage update; tour kais_volc25b: one stuck at the
+/// tour's start, ours walked at full speed)
+fn import_wraps(w: &mut World, ei: usize, ram: &GbaRam, o: u32) {
+    let me = w.ents[ei].id;
+    let mut stuck = 0;
+    for b in ram.objects().into_iter().filter(|&b| ram.r32(b) == 0x0804_A830 && ram.r32(b + 0x1C) == o) {
+        let (vx, vy) = (ram.s32(b + 0x40), ram.s32(b + 0x44));
+        let diag = vx != 0 && vy != 0;
+        let dir = match (vx.signum(), vy.signum()) { (0, 1) | (-1, 1) => 0, (0, _) | (1, -1) => 1, (-1, _) => 2, _ => 3 };
+        let mut s = wf_core::shots::mummy_wrap(me, dir, ram.s32(b + 0x20), ram.s32(b + 0x24), diag);
+        if let wf_core::shots::ShotKind::Wrap(m) = &mut s.kind {
+            m.vx = vx;
+            m.vy = vy;
+            m.tick = ram.s32(b + 0x48);
+            m.stuck = ram.s32(b + 0x50) != 0;
+            m.delay = ram.s32(b + 0x54);
+            m.off_x = ram.s32(b + 0x58);
+            m.off_y = ram.s32(b + 0x5C);
+            stuck += m.stuck as i32;
+        }
+        w.add(Body::Shot(Box::new(s)));
+    }
+    // (the walk / dash already slowed by them: the player's stats as the bandages' last update left them)
+    if stuck > 0 {
+        if let Some(pi) = w.player_idx(0) {
+            wf_core::player::wrap_stats(w, pi, stuck);
+        }
     }
 }
 
@@ -4080,6 +4123,41 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
             w.scene.director.done = true;
         }
     }
+    // an `end_parallel` (0x3A) whose batch is over in the game: each track's command an actor's animation or pose
+    // (`play_anim` / `set_pose`) and every actor's command list +0x18C empty - the wait ended in the frame before the
+    // cut and the script goes on in the cut's frame (run 3 cut 1,796,423, fat Buu s021 node 0: the batch's play_anim(4)
+    // over, the next batch's glide of the leader starts at f0 - ours replayed the batch and glided a frame late)
+    if wn == 0x3A && !w.scene.tracks.is_empty() {
+        let over = w.scene.tracks.iter().all(|t| {
+            let Owner::Entity(id) = t.owner else { return false };
+            if !matches!(t.queue.first(), Some(Cmd::PlayAnim { .. } | Cmd::SetPose { .. })) {
+                return false;
+            }
+            let Some(i) = w.find(id) else { return false };
+            let Some((x, y)) = w.actor(i).map(|a| (a.x, a.y)) else { return false };
+            let o = if w.player_idx(0) == Some(i) {
+                Some(ram.player())
+            } else {
+                ram.objects().into_iter().find(|&o| matches!(ram.r32(o), VT_NPC | VT_NPC_TALK | VT_ENEMY) && ram.s32(o + 0x1A0) == x && ram.s32(o + 0x1A4) == y)
+            };
+            o.is_some_and(|o| o != 0 && ram.r32(o + 0x18C) == 0)
+        });
+        if over {
+            for t in w.scene.tracks.iter_mut() {
+                t.queue.clear();
+                t.started = false;
+            }
+            w.scene.director.wait = None;
+            w.scene.director.done = true;
+            if let Some((pi, gs)) = leader_gs {
+                wf_core::player::import_state(&mut w, pi, gs);
+                if let Some(r) = ram.actor_rows.iter().find(|r| r.0 == ram.player()) {
+                    let p = w.pl(pi);
+                    (p.ap.raw, p.ap.frame, p.ap.tick) = (r.2, r.3, r.4);
+                }
+            }
+        }
+    }
     w.scene.tracks.retain(|t| !t.queue.is_empty() || t.holding);
     // a prop's poof playing (the command object vt 0x0804E0FC, +8 its frame count: done at 8 x its steps - whole-run
     // cut 153,226: s266's machine poof 32 frames in): the replayed one at the RAM's count
@@ -5037,6 +5115,17 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
             let h = ram.r16(o + 0xC);
             let (x, y) = (ram.s32(o + 0x20), ram.s32(o + 0x24));
             let ent = (0..w.ents.len()).find(|&k| !w.ents[k].removed && !used_ents.contains(&w.ents[k].id) && matches!(&w.ents[k].body, Body::Fx(f) if matches!(**f, wf_core::fx::Fx::Rock { x: rx, y: ry, .. } if rx == x && ry == y)));
+            if let (Some(k), true) = (ent, h != 0xFFFF) {
+                used_ents.push(w.ents[k].id);
+                owners.push((h, Owner::Ent(w.ents[k].id)));
+            }
+            continue;
+        }
+        // a mummy's bandage (vt 0x0804A830, `import_wraps`): its block belongs to the bandage at its position
+        if vt == 0x0804_A830 {
+            let h = ram.r16(o + 0xC);
+            let (x, y) = (ram.s32(o + 0x20), ram.s32(o + 0x24));
+            let ent = (0..w.ents.len()).find(|&k| !w.ents[k].removed && !used_ents.contains(&w.ents[k].id) && matches!(&w.ents[k].body, Body::Shot(s) if matches!(s.kind, wf_core::shots::ShotKind::Wrap(_)) && s.x == x && s.y == y));
             if let (Some(k), true) = (ent, h != 0xFFFF) {
                 used_ents.push(w.ents[k].id);
                 owners.push((h, Owner::Ent(w.ents[k].id)));

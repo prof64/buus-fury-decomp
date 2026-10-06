@@ -351,6 +351,9 @@ pub struct MapView {
     pub tile_frame: Option<u32>,
     /// Screen shake added to every BG scroll (px), like the game's shake offset.
     pub shake: (i32, i32),
+    /// The shake's sub-pixel part (1/1024 px, 0..1023): the game adds the 22.10 shake into a layer's scroll sum
+    /// before its >> 10, so a layer scrolling at another rate than the camera's rounds with it (`Layer::scroll_with`)
+    pub shake_sub: (i32, i32),
     /// The world map (area 0-50, map header "3D" flag): the mode-7 ground camera; None on 2D maps.
     pub mode7: Option<Mode7View>,
     /// Script BG control over the map's own (DISPCNT / BGxCNT / BLDCNT / BLDALPHA writes); None = the map's.
