@@ -61,6 +61,8 @@ fn compose(r: &mut Renderer, packs: &Packs, view: &RenderView, prev: &RenderView
                         if prev.timer.is_some() {
                             v.timer = prev.timer;
                         }
+                        // (the energy sphere's tilemap is rewritten during the frame too: its previous radius)
+                        v.sphere = prev.sphere.clone();
                         v
                     }
                     _ => with_prev(view, prev, true, false),

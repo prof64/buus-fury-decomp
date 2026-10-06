@@ -6477,7 +6477,7 @@ plus the one computed warp: s512, the Other World map's fixed list), and every n
   no exit, pad, script or native load names them.
 The Dojo / Trading Post / Multiplayer menus load no other area.
 
-*Ship fix agent, 2026-10-06: the last non-matching tours.* 118 tours (with desert_py11 / world_sub): **114 exact**.
+*Ship fix agent, 2026-10-06: the last non-matching tours.* 118 tours (with desert_py11 / world_sub): **115 exact, all locked as gates**.
 Fixed (all measured with `work/shipfix/segbp.py` alloc / free breakpoints, 0x0801124C / 0x0801142A):
 * **kami_htc f1 (import):** the live walk grid read from RAM equal to the map's left our load's marks in place (a talk
   NPC's footprint under the player - the player could not move); the import now drops them (`import_grids`).
@@ -6507,3 +6507,21 @@ MapView.shake takes in a frame the shakes ticked; the OBJs keep the current one 
 rfat_033, sb_041, dbx_004), none more. Pixel gate green, check.sh EXACT (view only).
 The 17 frames (12)'s effect split costs: the effect draw does read only the rect (0x0802A904: screen = pos - rect x0 /
 y0, the effect's own update) - kept; those effects' positions are the open part.
+**Earth agent (14): the remaining rkb_168 / sb_041 background loss is one class - screen_flash frames (measured, not
+fixed).** Re-rank on 0f776fa: rkb_168 BG 741k px / sb_041 608k px; every big frame (~18-19k px: rkb_168 41,820 ..
+51,630, 53 frames; sb_041 12,990 / 53,010 .. 62,460, 46 frames) is a `screen_flash` (0x4C, (200, 200, 255), len 10) or
+the frame it ends in, with the sphere's BG blend up. The **levels match the game per logic frame** (palette RAM, rkb_168
+rows 51,555 .. 51,570, `work/earth/timing/palrows.py`: colour 1 at 72 / 32 / 0 = ours t 8 / 9 / end, the 5-bit fade
+`0x08007074`); the difference is only the **top ~75 lines** (rows 0 .. 74 at 51,570: the game's at the previous
+level, the rest at the new one) - the palette is rewritten while the screen is drawn, on a lag-frame layout (logic every
+2nd row). Our tear rule (old-palette lines) does not accept these lines, so either the old state it compares against
+is not the previous logic frame's level here (the row before is a lag row), or the blend path (BG0 priority 2,
+blend 1/2, alpha (16, 2)) renders the old palette differently. Next step: render our picture with the previous logic
+frame's flash level and compare the top lines.
+**Earth agent (15): board tear candidate "u" (examples/pixels.rs).** A frame where both a palette step (fade / flash)
+and the sphere's tilemap change: the lines above the split show both previous states - a candidate with the old
+palette and the old sphere together (the "o" and "t" candidates had one each). Board 18,604 -> 18,644 exact (sb_041
+21, rkb_168 18). The ~18k-px screen_flash frames stay: their top lines show the map through a weaker flash and the
+sphere's edge at another radius than our previous frame's (the sphere's tilemap rewrite runs on into the picture -
+a line mixes tiles); not modelled. The pixel gate (tests/pixels.rs) has no "u" yet - its locks cover these frames
+only when someone relocks with it.

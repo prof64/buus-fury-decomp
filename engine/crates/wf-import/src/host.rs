@@ -307,6 +307,22 @@ impl StoryHost {
         r
     }
 
+    /// the title is up (a soft reset, a return to the title): no script of the old session goes on - the running one,
+    /// the ones it nested and the queued ones are dropped (the game reboots; a script interrupted by the soft reset
+    /// would otherwise keep the host busy and the Continue's on-enter script never ran: the in-game save check's
+    /// Continue from a cut taken inside a script, whole-run cuts 142,491 / 564,446 / 600,329 / 756,686 ..)
+    pub fn drop_scripts(&mut self) {
+        if !self.running && self.queue.is_empty() && self.outer.is_empty() {
+            return;
+        }
+        self.running = false;
+        self.queue.clear();
+        self.outer.clear();
+        self.cause = None;
+        self.hs.pending = None;
+        self.hs.from_wait = false;
+    }
+
     /// queue the `Run` events of `evs`
     pub fn collect(&mut self, evs: &[Event]) {
         for e in evs {

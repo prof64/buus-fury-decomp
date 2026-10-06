@@ -319,6 +319,10 @@ impl Sim for StorySim {
         // is this host's too (without the mark the core does not hold the field for talk / defeat / level-up events:
         // Yemma's office NPCs kept wandering in the frame s048 started)
         wf_core::field::attach_host(&mut self.session.world, true);
+        // (on the title nothing of the old session's scripts runs on: wf-import `StoryHost::drop_scripts`)
+        if wf_core::menu::title::on_title(&self.session.world) {
+            self.host.drop_scripts();
+        }
         self.host.step_inputs(&mut self.session, frames);
         self.errors.extend(self.host.errors[seen.min(self.host.errors.len())..].iter().cloned());
         wf_core::view::sim_events(&self.session.world, events);

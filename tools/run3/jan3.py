@@ -38,6 +38,10 @@ def maze3(e):
     """run 2's j_maze (18-10's gate maze, the boulder, 18-11's Vegetas) under a Retry: run 3's Goku came in with less
     HP (764; run 2 1,079) and the Poltergeists drained him - a game over continues from 18-1's save (hfil3's), plays
     the corridor again (j_hfil's route) and then the maze"""
+    # (a search 0 .. 23 from j_hfil's end, work/run3/scr/mazesearch.py: 4, 8, 10, 16, 17, 18 get through; 17 leaves
+    # the most HP, 752)
+    fat2.MAZE_PUNCHES = 17
+
     def attempt(e):
         maze = fat2.g_j_maze(e)
         if status(e)['area'][:2] == [18, 10]:
@@ -54,6 +58,29 @@ def grind3(e):
     in the corridor 18-6 / 18-7 and the maze in ten tries running"""
     return fat2.Driver2([('grind', 92, [(18, 12), (18, 1)]), ('grind', GRIND_TO, [(18, 2), (18, 1)]),
                          fat2.nav(18, 1, False), ('wait', 30)])
+
+
+_arena_part = fat2.arena_part
+
+
+def arena_part3(wait):
+    """fat2.arena_part with each boss fight ('bosst') followed by three more (play the events, fight) pairs: 'bosst'
+    ends at the first event, and in run 3 Goku levelled up mid-fight against Janemba (the level-up message is an event:
+    the route went on with Janemba alive); a repeat with none of its types alive ends after 30 frames"""
+    def make(e):
+        d = _arena_part(wait)(e)
+        out = []
+        for g in d.goals:
+            out.append(g)
+            if isinstance(g, tuple) and g and g[0] == 'bosst':
+                # ('eventsw': also plays the Watch This! / power-struggle modes of Super Janemba's handover)
+                out += [('eventsw', 240), g] * 3
+        d.goals[:] = out
+        return d
+    return make
+
+
+fat2.arena_part = arena_part3
 
 
 def driver(name, e):

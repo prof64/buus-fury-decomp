@@ -330,6 +330,7 @@ fn main() {
                 if std::env::var_os("PIX_NOPRES").is_none() {
                     presenter.apply(&mut view);
                 }
+                let prev_view = last_view.clone();
                 last_view = Some(view.clone());
                 if std::env::var_os("TMP_STATROW").is_some() {
                     eprintln!("ROW {k} top {:?} shown {:?} iters {} phase {:?} active {} c {:?} stat {:?}", w.menu.stack.last().map(std::mem::discriminant), w.menu.shown.as_deref().map(std::mem::discriminant), w.field.as_ref().map(|f| f.cam_iters()).unwrap_or(0), w.menu.phase, wf_core::menu::active(w), w.field.as_ref().and_then(|f| f.vram.as_ref().map(|v| f.cam_iters().wrapping_sub(v.stat_at))), view.hud.first().map(|h| h.stat_mark));
@@ -365,6 +366,18 @@ fn main() {
                     eprintln!("timerrows {name} f{k} {rows:?}");
                 }
                 let mut ours = renderer.render(&packs, &view, 0, W, H).to_vec();
+                // PIX_PREVROWS: per screen line, whether the game's line is ours ('.'), the previous frame's ('p'),
+                // both ('='), or neither ('x') - a mid-frame change shows as a 'p' prefix
+                if std::env::var_os("PIX_PREVROWS").is_some() && ours != game[i] {
+                    if let Some(pv) = prev_view.as_ref() {
+                        let prev = tear_renderer.render(&packs, pv, 0, W, H).to_vec();
+                        let rows: String = (0..H).map(|y| {
+                            let (g, c, q) = (&game[i][y * W..(y + 1) * W], &ours[y * W..(y + 1) * W], &prev[y * W..(y + 1) * W]);
+                            match (g == c, g == q) { (true, true) => '=', (true, false) => '.', (false, true) => 'p', _ => 'x' }
+                        }).collect();
+                        eprintln!("prevrows {name} f{k} {rows}");
+                    }
+                }
                 let (mut class, mut n) = classify(&view, &game[i], &ours);
                 // the stat mark's new cel copied to VRAM by this frame's draw before the beam reached it (the gate's
                 // `stat_now`, tests/pixels.rs): the hardware's
@@ -409,11 +422,26 @@ fn main() {
                     // ("t": the timer's digits are drawn into its OBJ tiles during the frame (draw 0x0802FD16, not in
                     // VBlank): the lines already scanned show the previous value - rkb_168 14-1, the split line moves
                     // with the frame's CPU time)
-                    if let (Some(a), Some(b)) = (old_timer, view.timer) {
-                        if a != b && std::env::var_os("PIX_NOTIMERTEAR").is_none() {
+                    // (and the energy sphere's BG0 tilemap, rewritten by the update while the screen is drawn: the lines
+                    // above show the previous radius, a line itself mixes tiles - rkb_168 14-1 f51360 .. f51630)
+                    let prev_sphere = prev_view.as_ref().map(|v| v.sphere.clone());
+                    let sphere_changed = prev_sphere.as_ref().is_some_and(|s| *s != view.sphere) && std::env::var_os("PIX_NOSPHERETEAR").is_none();
+                    let timer_changed = matches!((old_timer, view.timer), (Some(a), Some(b)) if a != b) && std::env::var_os("PIX_NOTIMERTEAR").is_none();
+                    if timer_changed || sphere_changed {
+                        {
                             let mut v2 = view.clone();
-                            v2.timer = Some(a);
+                            if timer_changed {
+                                v2.timer = old_timer;
+                            }
+                            if sphere_changed {
+                                v2.sphere = prev_sphere.clone().flatten();
+                            }
                             olds.push(("t", tear_renderer.render(&packs, &v2, 0, W, H).to_vec()));
+                            // (both at once: a screen_flash's palette step and the sphere's tilemap in the same frame -
+                            // the lines above the split show the previous level and radius, rkb_168 f51,360 ..)
+                            if let Some(op) = old_pal.as_ref().filter(|p| **p != pal_of(&view)) {
+                                olds.push(("u", tear_renderer.render(&packs, &with_pal(&v2, op), 0, W, H).to_vec()));
+                            }
                         }
                     }
                     if !olds.is_empty() {
