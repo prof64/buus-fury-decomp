@@ -6387,3 +6387,11 @@ the camera from **before** this frame's pan step - the camera object copies its 
 tracks step the pan after it (emulator, rfat_010 row 540: BG1 HOFS 45 = the camera of row 539, the camera object at
 46.97). `SceneCam.pan_pre` (the rect before the step) is what the Fixed mode's `shown` takes. Board: 23 frames fewer
 px, none more (rfat_010 f540 .. 630 exact, dr2_011, sb_006 / 007, ...); pixel gate green.
+
+*Done (ship fix agent, 2026-10-05): castle_ship_21 f216 - the item-get presentation and motion controllers.*
+Emulator: through the presentation a soldier's throw animation (raw 20) counts on (tick 35, 36 ..., cel kept) - the
+throw's end belongs to its motion controller, which the presentation's loop does not run; its energy wave
+(0x08049C98) is updated from the held message path (0x0802A725) every frame of it, as under an event. Ours: an
+enemy whose running motion controller drives its animation only counts the animation tick in the presentation
+(`nodes::controller_running`, enemy.rs), and the wave holds (`item_get` with `busy`, shots.rs). castle_ship_21 exact;
+tours 107 / 116 locked; gates, suites, check.sh green.

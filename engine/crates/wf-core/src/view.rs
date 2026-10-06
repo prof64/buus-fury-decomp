@@ -863,6 +863,28 @@ pub fn render_view(w: &World, out: &mut RenderView) {
             });
         }
     }
+    if std::env::var_os("TMP_OBJSHAKE").is_some() {
+        obj_shake_baked(w, out);
+    }
+}
+
+/// the screen shake on the world's OBJs, by how each draw takes the camera (emulator, sc_janemba f5,130: the camera
+/// object 0x030019A4 holds its 22.10 position (+0 / +4), its unshaken pixel rect (+0x18 ..) and the shaken pixel
+/// position (+0x28 / +0x2C = (pos + shake) >> 10, `0x080097A6` from the shake's update): an actor's draw
+/// (`0x08010240`) takes its screen position from the shaken one, the effects' draw (`0x0802A912`) from the rect -
+/// unshaken. The sprites are baked here, at their build (their OAM is a frame late with them)
+fn obj_shake_baked(w: &World, out: &mut RenderView) {
+    let Some(c) = w.cameras.first() else { return };
+    let (ox, oy) = w.g.shake_off;
+    let dx = ((c.x + ox) >> 10) - (c.x >> 10);
+    let dy = ((c.y + oy) >> 10) - (c.y >> 10);
+    for s in out.sprites.iter_mut() {
+        if s.sheet.starts_with("sprites/") {
+            s.x -= dx;
+            s.y -= dy;
+        }
+    }
+    out.obj_shake = Some((0, 0));
 }
 
 /// the stat-points mark's animation frame (draw 0x0800B55C: (counter >> 3) & 3), while it exists
@@ -1019,6 +1041,9 @@ impl Presenter {
             // the OBJs' previous (-4, 0))
             if std::env::var_os("NO_OBJ_SHAKE_LATE").is_none() {
                 out.obj_shake = self.prev_shake;
+            }
+            if std::env::var_os("TMP_OBJSHAKE").is_some() {
+                out.obj_shake = Some((0, 0));
             }
             out.sprites = sprites.clone();
             // (the cooldown triangle shows the frame's own value: shipr_001 7-1 f240, the record's 0x7FFF that frame
