@@ -79,6 +79,7 @@ fn main() {
         let mut n = 0;
         while n < 2000 {
             let w = &app.session.world;
+            if std::env::var_os("XSC").is_some() && n % 200 == 0 { eprintln!("XSC n {} menu {} player {:?} arrival {:?} busy {:?} depth {} area {:?}", n, wf_core::menu::active(w), w.player_idx(0), w.field.as_ref().map(|f| f.arrival.is_some()), w.field.as_ref().map(|f| f.busy), w.scene.depth, w.field.as_ref().map(|f| f.area)); }
             if !wf_core::menu::active(w) && w.player_idx(0).is_some() {
                 break;
             }

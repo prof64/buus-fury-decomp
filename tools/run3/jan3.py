@@ -20,7 +20,7 @@ ORDER = ['j_intro', 'j_grind', 'j_hfil', 'j_maze', 'j_back', 'j_vegeta', 'j_gate
 OUT = ROOT / 'work' / 'run3jan'
 # (j_intro: the prologue runs into it; j_grind: it starts on 18-1's Instant Transmission pad - the interlude's
 # presses there moved Goku and the grind's first walk stepped back onto the pad: the Other World map)
-NO_INTERLUDE = ('j_intro', 'j_grind')
+NO_INTERLUDE = ('j_intro', 'j_grind', 'j_maze')    # (j_maze: 18-10's Poltergeists drain Goku through the spins)
 START = (ROOT / 'work' / 'run3fat' / 'dbx.ss', ROOT / 'work' / 'run3fat' / 'dbx.eeprom')
 
 
@@ -34,9 +34,35 @@ def hfil3(e):
     ])
 
 
+def maze3(e):
+    """run 2's j_maze (18-10's gate maze, the boulder, 18-11's Vegetas) under a Retry: run 3's Goku came in with less
+    HP (764; run 2 1,079) and the Poltergeists drained him - a game over continues from 18-1's save (hfil3's), plays
+    the corridor again (j_hfil's route) and then the maze"""
+    def attempt(e):
+        maze = fat2.g_j_maze(e)
+        if status(e)['area'][:2] == [18, 10]:
+            return maze
+        return fat2.Chain([fat2.hfil_part('hfil', 'maze'), lambda e: fat2.g_j_maze(e)])
+    return fat2.Retry([attempt], [fat2.DEATH_CONTINUE, ('until', 18, 1), ('wait', 30)], tries=10)
+
+
+GRIND_TO = 125
+
+
+def grind3(e):
+    """run 2's j_grind but to level GRIND_TO on 18-2's Living Dead (run 2: 116, run 1: 120): at 116 run 3's Goku died
+    in the corridor 18-6 / 18-7 and the maze in ten tries running"""
+    return fat2.Driver2([('grind', 92, [(18, 12), (18, 1)]), ('grind', GRIND_TO, [(18, 2), (18, 1)]),
+                         fat2.nav(18, 1, False), ('wait', 30)])
+
+
 def driver(name, e):
+    if name == 'j_grind':
+        return grind3(e)
     if name == 'j_hfil':
         return hfil3(e)
+    if name == 'j_maze':
+        return maze3(e)
     return fat3.driver3(name, e)
 
 

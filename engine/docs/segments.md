@@ -6476,3 +6476,34 @@ plus the one computed warp: s512, the Other World map's fixed list), and every n
   types at (152, 112) - a test room), **3-23** (no objects, no exits), **19-6** (one exit out to 19-5, nothing in) -
   no exit, pad, script or native load names them.
 The Dojo / Trading Post / Multiplayer menus load no other area.
+
+*Ship fix agent, 2026-10-06: the last non-matching tours.* 118 tours (with desert_py11 / world_sub): **114 exact**.
+Fixed (all measured with `work/shipfix/segbp.py` alloc / free breakpoints, 0x0801124C / 0x0801142A):
+* **kami_htc f1 (import):** the live walk grid read from RAM equal to the map's left our load's marks in place (a talk
+  NPC's footprint under the player - the player could not move); the import now drops them (`import_grids`).
+* **desert_nj40 f20 / nj36 f3183:** a punch that meets a ninja star (fragile shots: gun / rifle bullet, star) - the
+  star's tiles go in its message handler (free 0x08051DC3) before the punch's next hit takes a damage number's block.
+* **castle_ship_42 f841:** an energy wave that ends its pull-back frees its tiles in that update (0x0802A3C3).
+* **castle_forest_16 f3500:** an emote object ending this frame frees in the object pass at its list place (before the
+  first older entity's update; `scene::emotes_end_before`, `Scene.emote_stamps`), not in the scene tick after it.
+  **f5234:** Dabura's scripted spit (`fire_ball_at`, Cmd::Shoot Ball) takes the projectile base's 0x100 block at tick
+  8 (0x08019B04) and frees it when the ball is gone.
+* **desert_py11 f275 / f3455:** a mummy's bandage frees its tiles at its removal (burst, wall, shaken off;
+  destructor 0x080513E7), before its burst's block. **f4859:** a ki blast's burst end frees in its update (0x080519AF).
+* **castle_forest_late:** re-recorded from row 1,282,520 (tour_castle_f1late2.ss): at 1,282,460 the load's on-enter
+  script still held the field, which the import does not take.
+Left:
+* **kais_volc25b f115 - import (to the importer agent):** mummy bandages (vt 0x0804A830) stuck on the player at the cut
+  are not imported (the "objects of classes {.. 804a830 ..} are not imported" note) - the game's walk is 377 - 48.
+* **desert_a f513 / desert_py5 f645 - mine, blocked:** the breakable-with-event ki blast (no object pass in the
+  break frame, the event's first command after the next frame's pass) - the resume-order rule shared with the Earth
+  agent's end-frame work; unchanged.
+**Earth agent (13): the BG layers show the shake from before this frame's shake update.** rkb_168 14-1 (Gohan's
+repeated hit shakes, rows 3,240 ..): the game's picture at row 3,300 is ours shifted (4, -3) = the BGs at row
+3,299's offset (618, -3589) while the shake object already wrote row 3,300's (-3227, -562) - the layer registers are
+copied before the shake's update, as the pan's (11). `Globals::shake_shown` (the offset `tick_shakes` found) is what
+MapView.shake takes in a frame the shakes ticked; the OBJs keep the current one (taking the earlier for them too:
+150 frames worse). Board 18,603 -> 18,604 exact, 95 frames fewer px (rkb_168 3,270 .. 3,510: 25k -> ~1k px each;
+rfat_033, sb_041, dbx_004), none more. Pixel gate green, check.sh EXACT (view only).
+The 17 frames (12)'s effect split costs: the effect draw does read only the rect (0x0802A904: screen = pos - rect x0 /
+y0, the effect's own update) - kept; those effects' positions are the open part.

@@ -106,6 +106,21 @@ class SbDriver3(SbDriver2):
             self.died.add(g[1])
             self.dying = g[1]
             j = self.k
+            # no enemy to walk into for 900 field frames (a save point's area): the death is skipped (logged)
+            from ship_route2 import enemies
+            s = status(e)
+            if s['p'] is not None and s['scene'] == 0 and not [o for o in enemies(e) if o[4] > 0]:
+                self.no_en = getattr(self, 'no_en', 0) + 1
+                if self.no_en > 900:
+                    print('die1: no enemy, skipped', g[1], s, flush=True)
+                    self.no_en, self.dying = 0, None
+                    self.died.discard(g[1])
+                    self.skipped = getattr(self, 'skipped', set()) | {g[1]}
+                    self.died.add(g[1])
+                    self.next_goal()
+                    return None
+            else:
+                self.no_en = 0
             self.goals[j] = ('die',)
             try:
                 r = super().step(e)
@@ -114,6 +129,17 @@ class SbDriver3(SbDriver2):
             if self.k != j:
                 self.dying = None
             return r
+        if kind == 'navonce':
+            # ('navonce', tag, w, a): into area w-a for the planned death `tag` (skipped once it happened)
+            if g[1] in self.died:
+                self.next_goal()
+                return None
+            j = self.k
+            self.goals[j] = ('nav', g[2], g[3], False)
+            try:
+                return super().step(e)
+            finally:
+                self.goals[j] = g
         if kind == 'levelup1':
             self.goals[self.k] = ('grind', level_of(e) + 1, g[1])
             self.grind_k = None
@@ -143,7 +169,9 @@ class SbDriver3(SbDriver2):
 
 def stressed(goals):
     out = []
-    deaths = {'b03_14-1': ('levelup', [(14, 1), (14, 2)]), 'c02_goku124': ('die', None), 'd00_21-1': ('die', None)}
+    # (the save points' areas have no enemy at hand: Goku walks into 20-5's robots first; inside Buu the next area)
+    deaths = {'b03_14-1': ('levelup', [(14, 1), (14, 2)]), 'c02_goku124': ('nav', (20, 5)),
+              'd00_21-1': ('nav', (21, 2))}
     prev = None
     for j, g in enumerate(goals):
         kind = g[0] if isinstance(g, tuple) and g else None
@@ -173,7 +201,7 @@ def stressed(goals):
             if how == 'levelup':
                 res += [('levelup1', areas), ('die1', pend)]
             else:
-                res += [('die1', pend)]
+                res += [('navonce', pend, areas[0], areas[1]), ('die1', pend)]
             pend = None
     return res
 

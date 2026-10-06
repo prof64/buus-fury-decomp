@@ -1482,7 +1482,7 @@ fn wrap_update(w: &mut World, i: usize) {
         }
         let slot = pi.map(|pi| w.pl_ref(pi).slot as usize).unwrap_or(0);
         if w.g.press_run(slot, 0xf0, 8, 60, w.frame) {
-            w.ents[i].removed = true;
+            wrap_gone(w, i);
             wrap_reapply(w, pi);
             return;
         }
@@ -1520,7 +1520,7 @@ fn wrap_update(w: &mut World, i: usize) {
     }
     let r = rect(w, i);
     if off_camera(w, i) || in_wall(w, i, &r) {
-        w.ents[i].removed = true;
+        wrap_gone(w, i);
         return;
     }
     if !hit(w, i, r, atk(1), 1024, true) {
@@ -1554,8 +1554,16 @@ fn wrap_reapply(w: &mut World, pi: Option<usize>) {
     player::wrap_stats(w, pi, n);
 }
 /// 0x0802D89A: removed + explosion 0x08712FDC rate 0x2000
-fn wrap_burst(w: &mut World, i: usize) {
+/// a bandage's removal frees its tiles at once (its destructor's free 0x080513E7: emulator, tour_desert_py11 f275 -
+/// two bandages meet, each frees before its burst's block; f3455 - one ends at a wall before the player's punch
+/// takes a damage number's block)
+fn wrap_gone(w: &mut World, i: usize) {
     w.ents[i].removed = true;
+    let id = w.ents[i].id;
+    crate::vram::release(w, crate::vram::Owner::Ent(id));
+}
+fn wrap_burst(w: &mut World, i: usize) {
+    wrap_gone(w, i);
     let (px, py) = (w.shot_ref(i).px(), w.shot_ref(i).py());
     fx::explosion(w, px, py, 0x2000);
 }
@@ -1578,6 +1586,12 @@ fn straight_update(w: &mut World, i: usize) {
         }
         if nd >= o.fx_end {
             w.ents[i].removed = true;
+            // a ki blast's burst ends with its tiles freed in this update (emulator, tour_desert_py11 f4859: the
+            // free from 0x080519AF before the player's next blast takes a block)
+            if o.name == SName::KiBlast {
+                let id = w.ents[i].id;
+                crate::vram::release(w, crate::vram::Owner::Ent(id));
+            }
         }
         return;
     }

@@ -59,7 +59,9 @@ NORTH = ([('fight', 5000), ('a_at', 447, 72, 'U')]
 FOREST_N = NORTH
 # late game (state tour_castle_f1late.ss: run 1 row 1,282,460, 8-1, Gohan L141): 8-1's two breakables, 8-2's tier-2
 # gate (A up: "Gohan cannot open this gate!"; it wants Goku L100, dead at this point of the story - post-game only)
-FOREST_LATE = ([('wait', 60)] + brk(233, 88, 263, 104) + brk(273, 112, 303, 128, 'L')
+# (started at row 1,282,520 - tour_castle_f1late2.ss: at 1,282,460 the load's on-enter script still holds the field,
+# which the import does not take)
+FOREST_LATE = ([('wait', 2)] + brk(233, 88, 263, 104) + brk(273, 112, 303, 128, 'L')
                + go([(280, 30), (280, 8)], 8, 2)
                + [('walk', 104, 58), ('hold', UP, 20), ('wait', 5), ('hold', A, 3), ('wait', 60), ('events',)])
 
@@ -237,7 +239,7 @@ SHIP_TOURS = {f'castle_ship_{a}': (f'tour_castle_s{a}.ss', [('wait', 20)] + g) f
 
 TOURS = {'castle_forest_w': ('tour_castle_f3b.ss', FOREST_W),
          'castle_forest_n': ('tour_castle_g87.ss', FOREST_N),
-         'castle_forest_late': ('tour_castle_f1late.ss', FOREST_LATE),
+         'castle_forest_late': ('tour_castle_f1late2.ss', FOREST_LATE),
          'castle_forest_mid': ('tour_castle_f12b.ss', FOREST_MID),
          'castle_forest_16': ('tour_castle_f15.ss', FOREST_16),
          'castle_den_east': ('tour_castle_den6.ss', DEN_EAST),

@@ -2677,12 +2677,23 @@ fn update_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) -> bool {
             let k = (*speed).clamp(0, 4);
             if *n > 0 {
                 *n -= 1;
+                // the ball's tiles go with it
+                if *n == 0 {
+                    if let Some(i) = i {
+                        let id = w.ents[i].id;
+                        crate::vram::release(w, crate::vram::Owner::Blast(id));
+                    }
+                }
             }
             if let Some(i) = i {
                 if *t == 8 {
                     let (px, py) = actor_pos(w, i);
                     let (sx, sy) = (px + OFF[k as usize].0, py + OFF[k as usize].1);
                     *n = (((*x - sx).abs().max((*y - sy).abs())) >> 1) + 1;
+                    // the ball object's tiles (projectile base ctor `0x08019B04`: 0x100; emulator, tour_castle_forest_16
+                    // f5234: Dabura's spit)
+                    let id = w.ents[i].id;
+                    crate::vram::acquire(w, crate::vram::Owner::Blast(id), 0x100);
                 }
                 let cel = if (8..16).contains(t) {
                     2 * k + 2

@@ -201,6 +201,10 @@ pub struct Globals {
     pub last_beep: i64,
     pub shakes: Vec<Shake>,
     pub shake_off: (i32, i32),
+    /// the shake offset before this frame's shake update (`tick_shakes`): the BG layers show it - their registers are
+    /// copied before the shake object's update (rkb_168 14-1 row 3,300: the game's BGs at the row-3,299 offset)
+    #[serde(default)]
+    pub shake_shown: (i32, i32),
     /// a shake ended in this frame's update: the camera slot is still held for the frame (field cameras)
     #[serde(default)]
     pub shake_ended: bool,
@@ -880,6 +884,7 @@ impl World {
         // field: the screen-effect slot holds one shake at a time; a newer one suspends the older until it ends
         // (sc_janemba: the summon shake pauses through a crit shake, then goes on)
         let n = shakes.len();
+        self.g.shake_shown = self.g.shake_off;
         self.g.shakes_ticked = self.frame;
         let stacked = self.field.is_some();
         for (k, s) in shakes.iter_mut().enumerate() {

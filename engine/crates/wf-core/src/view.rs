@@ -395,7 +395,12 @@ pub fn render_view(w: &World, out: &mut RenderView) {
         tile_frame,
         // (`shake_off` is 22.10: the BG layers take its whole px - layer objects +0x34 / +0x38, real route sb 6-6
         // f4,693: (3790, -2978) -> (3, -3))
-        shake: (w.g.shake_off.0 >> 10, w.g.shake_off.1 >> 10),
+        shake: {
+            // (the offset before this frame's shake update: the BG registers are copied before it - the OBJs take
+            // the current one, `obj_shake_baked`)
+            let s = if w.g.shakes_ticked == w.frame { w.g.shake_shown } else { w.g.shake_off };
+            (s.0 >> 10, s.1 >> 10)
+        },
         mode7: mode7.clone(),
         layers,
     });
