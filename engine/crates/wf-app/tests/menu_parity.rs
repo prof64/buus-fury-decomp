@@ -270,6 +270,14 @@ fn run(packs: &Packs, data: &Arc<wf_core::content::GameData>, name: &str) -> Opt
         let opened_fade = k == 0 && meta["open"].is_object() && matches!(sim.world().menu.phase, wf_core::menu::Phase::FadeOut { .. });
         if logic && !opened_fade {
             sim.step(&[keys], &mut ev);
+            // a screen whose fade-out runs the world (the computer's): the field around it is only approximately
+            // imported (NPC timers), so the RNG follows the game's while it fades (captures with per-row `rng`)
+            let w = &mut sim.session.world;
+            if live && w.menu.live_fade && matches!(w.menu.phase, wf_core::menu::Phase::FadeOut { .. }) {
+                if let Some(r) = row["rng"].as_array().filter(|r| r.len() == 2) {
+                    w.rng.set_state([i(&r[0]) as u32, i(&r[1]) as u32]);
+                }
+            }
         }
         // the RNG once the screen is open (the field frame before may draw differently)
         if live && k == 0 {

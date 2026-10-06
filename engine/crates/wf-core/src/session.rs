@@ -209,11 +209,18 @@ impl Session {
         let w = &mut self.world;
         if std::mem::take(&mut w.menu.closed_this_frame) {
             w.menu.closing_iter = true;
-            return;
+            // (a live-fade screen's closing iteration ends with the fade-in mode's first update: the world runs -
+            // tour_capsule row 1,868, the NPC's step)
+            if !w.menu.live_fade {
+                return;
+            }
         }
         let watch_closing = w.field.is_some() && crate::menu::minigame::watch_closing(w);
         if crate::menu::active(w) && !watch_closing {
-            if w.field.is_some() && crate::menu::minigame::world_runs(w) {
+            let live_fade = w.menu.live_fade
+                && (matches!(w.menu.phase, crate::menu::Phase::FadeOut { level } if level < 256)
+                    || matches!(w.menu.phase, crate::menu::Phase::FadeIn { .. } | crate::menu::Phase::Leave { .. }));
+            if w.field.is_some() && (crate::menu::minigame::world_runs(w) || live_fade) {
                 // the players get no input: the mode reads the keys (menu_parity mg_power: no punches)
                 w.input = [InputFrame::default(); MAX_PLAYERS];
                 // (the BG sphere effect redraws before the objects, as in a frame of the field)

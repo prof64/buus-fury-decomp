@@ -234,6 +234,16 @@ fn main() {
             let mut ev = vec![];
             app.step(&[keys], &mut ev);
             stepped += 1;
+            // WR_INTERACT=1: every field interaction this iteration (trigger / talk / pickup / break / defeat runs)
+            if std::env::var_os("WR_INTERACT").is_some() {
+                let w = app.world();
+                let aa = w.field.as_ref().map(|f| (f.area.world, f.area.area, f.area.variant));
+                for e in &w.events {
+                    if let wf_core::world::Event::Field(wf_core::field::FieldEvent::Run { run, cause, .. }) = e {
+                        println!("INT row {k} area {aa:?} cause {cause:?} run {run:?}");
+                    }
+                }
+            }
             // --sounds FILE (tools/wholerun/sounds.py): this iteration's sound requests against the game's - the
             // game's of every row with this logic counter (a request in a long iteration lands on one of its rows)
             if let Some(gs) = game_snd.as_ref().filter(|_| logic && no_lag) {

@@ -618,8 +618,12 @@ fn import_ai_rt(w: &mut World, ei: usize, lvl: usize, ram: &GbaRam, r: u32, note
             K::MeleeAttack | K::IncCounter => {}
             // GhostAnimA / B: no runtime words (the object's state decides - `patch_enemy`)
             K::GhostAnimA | K::GhostAnimB => {}
-            // the worm's ring / links / mailbox (`import_worms`; WormSpawnBody and WormHeadMove keep nothing)
-            K::WormBodyFollow | K::WormHeadMove | K::WormSpawnBody => {}
+            // the worm's ring / links / mailbox (`import_worms`; WormSpawnBody keeps nothing) - and the contact's counter
+            // (`enemy::contact_hit_foot`): the head's at +4, a body piece's at +0x14 (run 2 row 1,769,316, 21-9)
+            K::WormHeadMove | K::WormBodyFollow => {
+                w.en(ei).contact_cd = ram.s32(r + if node.k == K::WormHeadMove { 4 } else { 0x14 }).max(0);
+            }
+            K::WormSpawnBody => {}
             // IfButtonMashed (factory 0x080363FA, vt 0x0804A6D0): +0xC the logic counter at the last counted press (now -
             // gap - 1 at the create), +0x10 the presses counted, +0x14 / +0x18 the parameters - run 2 row 1,640,163,
             // 21-x: an enzyme latched on the leader lets go at the 9th press; ours counted from 0 at the import and held

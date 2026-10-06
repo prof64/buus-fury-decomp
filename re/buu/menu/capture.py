@@ -105,6 +105,10 @@ def run(name):
     c.frames = []
     c.screens = []
     pr = probe
+    if extra.get('live_field'):
+        # the RNG per frame: the world runs under some screens' fades (the computer's), the remake's field around
+        # the screen is only approximately imported - menu_parity.rs resyncs its RNG while it fades
+        pr = lambda e: dict(probe(e), rng=[e.r32(0x03004A5C), e.r32(0x03004A60)])  # noqa: E731
     if extra.get('probe'):
         pr = lambda e: dict(probe(e), **extra['probe'](e))  # noqa: E731
     for k in program(keys):
@@ -125,7 +129,8 @@ def run(name):
     (d / 'meta.json').write_text(json.dumps(meta))
     # the committed trace (no pictures: screen sha1s) for engine/crates/wf-app/tests/menu_parity.rs
     DATA.mkdir(parents=True, exist_ok=True)
-    rows = [dict(keys=f['keys'], lf=f['lf'], snd=f['snd'], h=f['h']) for f in c.frames]
+    rows = [dict(keys=f['keys'], lf=f['lf'], snd=f['snd'], h=f['h'], **({'rng': f['rng']} if 'rng' in f else {}))
+            for f in c.frames]
     (DATA / f'{name}.json').write_text(json.dumps(dict(scenario=name, state=state, meta=meta, story=st, frames=rows), separators=(',', ':')))
     print(name, len(c.frames), 'frames ->', d)
 

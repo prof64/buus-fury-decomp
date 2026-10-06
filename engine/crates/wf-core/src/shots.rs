@@ -495,6 +495,8 @@ pub fn add(w: &mut World, s: Shot) -> EntityId {
         ShotKind::Straight(o) if o.name == SName::KiBlast => 0x100,
         ShotKind::SuperBall { .. } | ShotKind::MasenkoBall(_) => 0x1000,
         ShotKind::Flame { .. } => 0x40,
+        // a mummy's bandage (0x0802D79C, vtable 0x0804A830: 4 units; tour_kais_volc25 f174, game (419, 4))
+        ShotKind::Wrap(_) => 0x100,
         // the beam class `0x080206B8` (segment sb 19-3: Kid Buu's beam)
         ShotKind::Kame(_) => 0x300,
         // Majin Buu's candy beam `0x080286D4` (segment sb 1-3 f6210)
@@ -1673,6 +1675,13 @@ fn straight_end(w: &mut World, i: usize, explode_fx: bool) {
     }
     if explode_fx && sfx_end >= 0 {
         w.sfx(sfx_end, 64);
+    }
+    // the gun / rifle bullet and the ninja star free their tiles (their class's message) before whatever their end
+    // makes (tour_earth_2_20 f369: the gun's explosion at (345, 16) over the bullet's (359, 2); tour_earth_circus
+    // f878 the rifle's; tour_desert_nj36 f3183 the star's)
+    if matches!(&w.shot_ref(i).kind, ShotKind::Straight(o) if matches!(o.name, SName::Gun | SName::Rifle | SName::Star)) {
+        let id = w.ents[i].id;
+        crate::vram::release(w, crate::vram::Owner::Ent(id));
     }
     if explode_fx && explode {
         let (px, py) = (w.shot_ref(i).px(), w.shot_ref(i).py());

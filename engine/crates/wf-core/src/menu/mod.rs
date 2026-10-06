@@ -443,6 +443,11 @@ pub struct Menu {
     /// it (its script resumed from the menu native) has its first update in this iteration (`scene::open_text`)
     #[serde(default)]
     pub faded_in_iter: bool,
+    /// the world keeps running (objects, no player input) under this screen's fade-out: a fade mode whose update is
+    /// the world's (the Computer Room's computer, `0x080074EC` -> mode 0x080496CC; tour_capsule rows 1,720..1,734:
+    /// the NPC walks on through the fade)
+    #[serde(default)]
+    pub live_fade: bool,
     /// the game options (`0x03001914`: text speed, SFX volume, music volume, 0; the cartridge's options block,
     /// shared by every save): kept across menus (options.rs)
     #[serde(default)]

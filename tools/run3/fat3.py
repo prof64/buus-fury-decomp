@@ -141,8 +141,34 @@ def real_pyramid_driver3():
         def step(self, e):
             g = self.goals[self.k]
             s = status(e)
-            if (g[0] == 'path' and self.t > 0 and s['p'] is not None and getattr(self, 'parea', None) == [14, 17]
-                    and s['area'][:2] == [14, 12]):
+            if g[0] == 'talkflag':
+                # ('talkflag', dir, flag): face `dir` and A (the talk played through) until story flag `flag` is set;
+                # a one-pixel nudge left / right between tries (run 3's walk ends off run 2's: man 2's s414, flag
+                # 102, never started and s406 then gave no 7-Star ball)
+                if e.r8(0x03001068 + 0x55 + g[2] // 8) >> (g[2] % 8) & 1 and s['scene'] == 0:
+                    self.next_goal()
+                    return None
+                if s['scene'] > 0:
+                    return self.mash_a()
+                if self.t > 6000:
+                    raise RuntimeError(f'talkflag: flag {g[2]} not set {s}')
+                ph = self.t % 90
+                d = {'U': KEY.UP, 'D': KEY.DOWN, 'L': KEY.LEFT, 'R': KEY.RIGHT}[g[1]]
+                if ph < 2:
+                    return d
+                if 4 <= ph < 7:
+                    return KEY.A
+                if 60 <= ph < 61 and self.t > 90:
+                    return KEY.LEFT if (self.t // 180) % 2 else KEY.RIGHT
+                return 0
+            # (14-12 is on the way (its up exit to 14-16) until the maze's state shuts it: stuck there 600 frames in
+            # one spot = the fall's dead end)
+            pos = (tuple(s['area'][:2]), tuple(s['p'][:2]) if s['p'] else None)
+            if pos == getattr(self, 'p12', None):
+                self.n12 += 1
+            else:
+                self.p12, self.n12 = pos, 0
+            if s['area'][:2] == [14, 12] and self.n12 > 600:
                 print('  pit fall into 14-12: soft reset -> Continue', s, flush=True)
                 self.reset_t = 0
                 return KEY.A | KEY.B | KEY.SELECT | KEY.START
@@ -151,6 +177,19 @@ def real_pyramid_driver3():
 
 
 fat2.real_pyramid_driver = real_pyramid_driver3
+
+_fix_db7 = fat2.fix_db7
+
+
+def fix_db7_3(g):
+    """fat2.fix_db7's three talks to man 2 as one closed-loop talk until flag 102 (s414) is set"""
+    g = _fix_db7(g)
+    k = g.index(('walk', 200, 104))
+    j = g.index(('events',), k)
+    return g[:k + 1] + [('talkflag', 'U', 102)] + g[j + 1:]
+
+
+fat2.fix_db7 = fix_db7_3
 ORDER = ['radar', 'bandana', 'grind_goten', 'desert', 'grind_trunks', 'pilaf', 'thieves', 'airship', 'pyramid',
          'fukurou', 'nataday', 'dbx']
 OUT = ROOT / 'work' / 'run3fat'

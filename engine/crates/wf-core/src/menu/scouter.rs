@@ -818,10 +818,17 @@ impl Database {
     pub fn enter(&mut self, w: &mut World) {
         if !self.entered {
             self.entered = true;
+            // the four arrows' tiles (0x40 each, types 0..3), then the sprite's
+            for k in 0..4 {
+                crate::vram::acquire(w, crate::vram::Owner::DbArrow(k), 0x40);
+            }
             self.spr = match self.db() {
                 Some(db) => Some(Box::new(Info::sprite(w, db, self.desc))),
                 None => None,
             };
+            if let Some(sp) = self.spr.as_ref().map(|s| s.sprite) {
+                crate::vram::figure_created(w, 0, sp);
+            }
             // its first update runs in this iteration; it is in the OAM from the next one
             if let Some(s) = self.spr.as_mut() {
                 s.update(w);
@@ -857,6 +864,13 @@ impl Database {
                 Some(db) => Some(Box::new(Info::sprite(w, db, self.desc))),
                 None => None,
             };
+            // the old object goes (`0x08011944`), the new one takes its tiles (`0x080272EC`)
+            if let Some(sp) = self.spr.as_ref().map(|s| s.sprite) {
+                crate::vram::figures_gone(w, &[sp]);
+            }
+            if let Some(sp) = new.as_ref().map(|s| s.sprite) {
+                crate::vram::figure_created(w, 0, sp);
+            }
             let old = std::mem::replace(&mut self.spr, new);
             if self.prev.is_none() {
                 self.prev = old;

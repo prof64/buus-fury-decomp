@@ -3688,7 +3688,16 @@ pub fn open_text(
         .filter(|l| l.trim_start().starts_with('-'))
         .count() as i32;
     // the box object's tiles (`0x08012030`; a portrait unless the box kind is 0 / 7)
-    crate::vram::text_open(w, portrait != 0 && portrait != 7);
+    if kind == 3 {
+        // a menu / message window (vtable 0x0804ABD8) holds no tiles of its own; its options' cursor (vtable
+        // 0x0804C974, 0x100) does - not the dialogue box's blocks (tour_earth_zmart_thieves f425: Z-Mart 0-93's
+        // welcome window, the game's (375, 4); freed as A / B picks, f630)
+        if options > 0 {
+            crate::vram::acquire(w, crate::vram::Owner::Cursor, 0x100);
+        }
+    } else {
+        crate::vram::text_open(w, portrait != 0 && portrait != 7);
+    }
     let pages = (typing.len().max(1)) as u16;
     w.scene.dialog = Some(Dialog {
         text: body.to_string(),
@@ -3837,10 +3846,12 @@ fn tick_dialog(w: &mut World) {
                     d.result = Some(d.cursor);
                     d.phase = DialogPhase::Closing;
                     d.t = 0;
+                    crate::vram::release(w, crate::vram::Owner::Cursor);
                 } else if k & B != 0 {
                     d.result = Some(-1);
                     d.phase = DialogPhase::Closing;
                     d.t = 0;
+                    crate::vram::release(w, crate::vram::Owner::Cursor);
                 }
             }
             DialogPhase::Closing => {
@@ -3870,9 +3881,11 @@ fn tick_dialog(w: &mut World) {
         d.phase = DialogPhase::Closing;
         d.t = DIALOG_CLOSE - level;
         let gone = d.t == DIALOG_CLOSE - 1;
-        crate::vram::release(w, crate::vram::Owner::Cursor);
+        // (a choice's cursor goes with the box: tour_castle_ship_66 f358, B on the save point's "-Save /
+        // -Switch Characters" - the cursor's block stays until the box is gone)
         if gone {
             crate::vram::text_close(w);
+            crate::vram::release(w, crate::vram::Owner::Cursor);
         }
         return;
     }
@@ -3933,6 +3946,7 @@ fn tick_dialog(w: &mut World) {
             }
             if gone {
                 crate::vram::text_close(w);
+                crate::vram::release(w, crate::vram::Owner::Cursor);
             }
         }
         DialogPhase::Closed => {}

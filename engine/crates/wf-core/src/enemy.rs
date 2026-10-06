@@ -748,7 +748,8 @@ fn update_rest(w: &mut World, i: usize) {
     }
     {
         let e = w.en(i);
-        if e.contact_cd > 0 {
+        // (a worm piece's counter is counted down by its own contact, `contact_hit_foot`)
+        if e.contact_cd > 0 && !matches!(e.ty, 0x8E | 0x8F) {
             e.contact_cd -= 1;
         }
         if e.defeated && e.ko < 0 {
@@ -2035,8 +2036,16 @@ pub fn heavy_strike(w: &mut World, i: usize) -> bool {
 pub fn contact_hit(w: &mut World, i: usize) -> bool {
     contact_hit_kind(w, i, false)
 }
-/// the worm's contact (0x0802D5F2 / 0x0802D756): message kind 1, the body rect against the player's footprint
+/// the worm's contact (0x0802D5F2 / 0x0802D756): message kind 1, the body rect against the player's footprint. Its
+/// counter (the head's runtime +4, a body piece's +0x14) is the piece's own: while non-zero this update counts it down
+/// and tests nothing; at 0 the test runs, an accepted contact sets 20 (0x0802D5B8 / 0x0802D722). It only counts on the
+/// updates that reach the contact - not a head blocked from re-marking itself, not a body piece with no move in its
+/// mailbox (run 2 row 1,769,316, 21-9: ours counted it down every update, a head touched the leader a frame early)
 pub fn contact_hit_foot(w: &mut World, i: usize) -> bool {
+    if w.en_ref(i).contact_cd > 0 {
+        w.en(i).contact_cd -= 1;
+        return false;
+    }
     contact_hit_kind(w, i, true)
 }
 fn contact_hit_kind(w: &mut World, i: usize, foot: bool) -> bool {
@@ -2059,9 +2068,8 @@ fn contact_hit_kind(w: &mut World, i: usize, foot: bool) -> bool {
     m.foot = foot;
     let ok = player::on_message(w, pi, &mut m);
     if ok {
-        // the worm's counter is decremented instead of the contact test (20 frames without a test, segment sb 21-14);
-        // the update's own decrement runs first
-        w.en(i).contact_cd = if foot { 21 } else { 20 };
+        // 20 updates without a test (the worm's counts down in `contact_hit_foot`, segment sb 21-14; others in the update)
+        w.en(i).contact_cd = 20;
     }
     ok
 }
@@ -2195,12 +2203,21 @@ pub fn shot(w: &mut World, i: usize, kind: ShotType) {
             y,
             ShotKind::Straight(Box::new(StraightOpts { vx, vy, b, ..o })),
         );
-        let shell = matches!(&s.kind, ShotKind::Straight(o) if o.name == shots::SName::Shell);
+        let tiles = match &s.kind {
+            // the tank shell's object tiles (0x0801C900 through the projectile base: 4 units; run 3 cut 111,768,
+            // 3-14: the game's (471, 4) from the shell's frame)
+            ShotKind::Straight(o) if o.name == shots::SName::Shell => 0x100,
+            // a gunman's bullet (ctor 0x080274B4: 2 units; tour_earth_2_20 f337, the game's (359, 2))
+            ShotKind::Straight(o) if o.name == shots::SName::Gun => 0x80,
+            // a rifle bullet (ctor 0x080276A8, vtable 0x08049FC0: 4 units; tour_earth_city f1601, game (343, 4))
+            ShotKind::Straight(o) if o.name == shots::SName::Rifle => 0x100,
+            // a ninja star (0x0802C790, vtable 0x0804BAA0: 1 unit; tour_desert_nj36 f136, game (402, 1))
+            ShotKind::Straight(o) if o.name == shots::SName::Star => 0x40,
+            _ => 0,
+        };
         let id = w.add(Body::Shot(Box::new(s)));
-        // the tank shell's object tiles (0x0801C900 through the projectile base: 4 units; run 3 cut 111,768, 3-14:
-        // the game's (471, 4) from the shell's frame)
-        if shell {
-            crate::vram::acquire(w, crate::vram::Owner::Ent(id), 0x100);
+        if tiles != 0 {
+            crate::vram::acquire(w, crate::vram::Owner::Ent(id), tiles);
         }
         if let Some(k) = w.find(id) {
             shots::spawn_rng(w, k);
@@ -2989,6 +3006,16 @@ pub fn worm_spawn_body(w: &mut World, i: usize) {
         let wd = w.en_ref(i).worm_dir;
         w.en(si).cmds = vec![wd; 12];
         chain.push(w.ents[si].id);
+        // a run-time enemy: its death effect runs its type's drop script as any enemy's (a piece split off into a head
+        // drops the head's coins - run 2 row 1,769,316, 21-9: ours had no placement for the spawned pieces, so a split
+        // head's kill dropped nothing; the import places them as `List(0xff, type)` - `patch_enemy`)
+        if w.field.is_some() {
+            let id = w.ents[si].id;
+            let (x, y) = (w.en_ref(si).a.px(), w.en_ref(si).a.py());
+            if let Some(f) = w.field.as_mut() {
+                f.placed.push((id, crate::fieldcontent::ObjRef::List(0xff, 0x8f), x, y));
+            }
+        }
     }
     for k in 1..chain.len() {
         if let Some(a) = w.find(chain[k - 1]) {
@@ -3170,8 +3197,8 @@ pub fn worm_body_step(w: &mut World, i: usize) {
         if let Some((ni, _)) = w.enemy_by_id(next) {
             w.en(ni).cmds.push(d);
         }
+        contact_hit_foot(w, i);
     }
-    contact_hit_foot(w, i);
 }
 
 // ---- damage --------------------------------------------------------------------------------------------------------

@@ -336,6 +336,8 @@ pub enum Owner {
     BossBar,
     /// a menu screen's character figure
     Figure(u32),
+    /// the Computer Room database's scroll arrows (`0x080271D0`: 0x40 each; types 0..3)
+    DbArrow(u8),
     /// a cutscene ki blast (`fire_blast`, class 0x08027CBC: 0x100) of the shooting actor
     Blast(crate::world::EntityId),
     /// a keyed shared graphic (`keyed`)

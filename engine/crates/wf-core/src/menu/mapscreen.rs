@@ -542,6 +542,10 @@ impl Page for MapScreen {
     fn after_draw(&mut self, _w: &World) {
         self.entered = true;
     }
+    /// the database's closing iteration ends at EVA 0: black (tour_capsule rows 1,847..1,869)
+    fn leave_black(&self) -> bool {
+        self.db.is_some() && self.eva == 0
+    }
     /// the database's enter: its first sprite (made after the fade-out, as the game's constructor runs then)
     fn built(&mut self, w: &mut World) {
         if let Some(d) = self.db.as_mut() {
@@ -653,6 +657,11 @@ impl Page for MapScreen {
                     _ => {
                         // the last iteration's registers (EVA 0) stay on screen while the screen ends
                         w.menu.shown = Some(Box::new(Screen::MapScreen(self.clone())));
+                        // the database ends from its done check (`0x08025354` -> `0x08024C04` returns 1): the world
+                        // is restored in this iteration (tour_capsule row 1,869: the field's blocks back)
+                        if self.db.is_some() {
+                            return Action::Done;
+                        }
                         Action::Pop(1)
                     }
                 };
@@ -979,7 +988,7 @@ pub const CTOR_COMPUTER: u32 = 0x0800_7543;
 pub const DATABASE: Transition = Transition {
     fade_out: 16,
     enter: 2,
-    leave: 2,
+    leave: 24,
     fade_in: 16,
 };
 
@@ -990,6 +999,7 @@ pub fn open_database(w: &mut World) {
     }
     let s = MapScreen::database(w);
     super::open(w, Screen::MapScreen(s), DATABASE, false);
+    w.menu.live_fade = true;
 }
 
 /// cycles into the frame where the area page's setup starts: after SELECT's fade (16th frame: the world save and
