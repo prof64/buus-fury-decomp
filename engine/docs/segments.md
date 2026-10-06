@@ -344,6 +344,21 @@ held keys in turns (A, START, directions, START+SELECT, A+B, L+R, diagonals, B, 
 title's menus mashed; 47,260 frames from run 2's equivalent state (`work/run2/postgame.ss` + `.eeprom`), replays
 byte-exact. Found on the way: no chests / map items remain after Kid Buu (all story pickups); pause page switches
 drop an R pressed while a page builds (Equip slowest); START is ignored during an area's walk-in. Use, adapt or drop.
+**Run 3 Super Buu appended (side-content agent, 2026-10-06): `029_b3_superbuu`, 557,673 frames** (`tools/run3/sb3.py`:
+SbDriver3 = SbDriver2 + Run3Driver goals; from `work/run3jan/j_arena.ss` + `.eeprom` in one session, replays
+byte-identical incl. the EEPROM). Run 3 is now **2,536,522 rows**, repacked (staged, pack3), master + sounds
+re-recorded, check.sh EXACT (run 3 ratchet: first difference 2,024,954 - a sound, `play 41 32` app only - state stop
+2,160,844; both in b3, for the Super Buu agent). **End state for the Earth agent's Kid Buu part:
+`work/run3/parts/b3_end.ss` + `b3_end.eeprom`** = the chain's end: area 20-8, p None, scene 1 (the first frame of
+20-8 after Inside Buu, mid-event: the brain fight's end scenes run on 20-8 -> 0-96 -> 19-3 / 19-1 -> 20-8 -> 0-50, the
+leader first controllable on the world map ~6,300 frames later), lf 457,811, hp 477, zenie 29,000; the last in-game
+save is 21-25's checkpoint. Stresses: the switch screen in / out at every checkpoint (one selectable character
+mostly), 7 menutours, the pause spun 3x before 13 fights, START on alternate frames after 49 scripted scenes and
+through every nav area change, planned game overs -> Continue (Pyramid 14-2 right after a level-up; 20-5 after the
+20-6 save), 26 Continues. Not reachable: deaths at 21-1 / 21-14 (no enemy there), a death on a boss's defeat frame.
+Tool notes: ShipDriver2's `die` stands forever without a reachable enemy (sb3 adds a give-up); the checkpoint retry
+index is hard-coded as `retry_here`'s position - 4 (any inserted goal breaks it; sb3 has `retry_here3`); `nav` 21-1 ->
+21-2 never moved.
 
 *Run 3 status (dungeon agent B, 2026-10-05):* recorded and packed: `000_intro3` (6,290 frames), `001_snakeway3`
 (7,340), `002_ow3` (32,428) - 46,058 rows from power-on to Earth 2-1 (`data/realrun3/`, chain `run3`). Driver goals
@@ -6750,3 +6765,28 @@ Not mine, seen on the way: the low-HP beep at 1,852,929 (another agent's `hud_be
 local cut at 1,949,450 still differs in sprite memory at its f134 (ours makes the teleport's two puffs, 16 units each;
 the game's Yemma makes none - Janemba's do).
 *Run 3 Janemba import stops (A; wf-import lib.rs + one field rule in enemy.rs; uncommitted): 1,945,333 / 1,945,413 / 1,945,792 / 1,945,822 / 1,948,395 load and match.* Janemba's arm / head parts linked to the body (+0x1F4); the head's hurt flash under its controller (0x030032BC) ends with the arms' one-shot rule; an arm mid hand-strike (controller vt 0x0804D738: count = tick + 1, the hand it made at +4); **rule:** the strike hand takes its actor sprite memory (16 units); Mini Janemba's hop counter from 0x0300322C; a `camera_center_on` whose mover is gone ends at the cut with RAM's camera; enemy objects without a recorder row get actor rows from the object. Open (A): a hand already in RAM at a cut imports as a plain enemy, not a strike hand (1,945,822 f11). Longer replays from 1,945,792 (f16) / 1,948,395 (f51) stop inside the rule series (owners'). Gates green; check.sh: runs 1, 2 exact, run 3 (now 2,536,522 rows) exact to 1,949,621; sweeps no worse.
+* (Update 22, re-checked on the stable tree) MeleeAttack's "player +0x1CC = 0" is also a KO'd player: 1,949,621 is
+  Yemma landing next to the player he knocked out at 1,949,444 (game +0x1CC 0 from the KO on, `gflag.py`); the rule is
+  `dead || PState::Held` (field). Run 3: 1,949,621 -> 1,966,815.
+* (Update 22) **TeleportNearPlayer's controller is a state object** (`Enemy::tele_ctl`, `enemy::tele_tick`, field): it
+  ticks in the animation tick, so it runs on while an event holds the AI - run 3 row 1,966,815: Yemma's landing ends
+  (SetAnim(0), rand(255)) during the KO scene. The node (field) ends when the controller is gone. Run 3 is now exact in
+  logic through Janemba: 1,966,815 -> the Super Buu chapter (stop 2,160,844; first difference the low-HP beep at
+  2,024,954).
+* **Super Buu stop 2,160,844 (20-7, Vegeta's wander, 0x89) - open: the game reads uninitialised heap memory.**
+  WanderToRandomPoint's path object (create 0x0803BD64: 0x24 bytes from the heap 0x0803D5B8) sets only +0 (vt
+  0x0804ADC0), +4 speed, +8 budget 0x32, +0x14 valid = 0 and the goal (+0x1C / +0x20, enter 0x0803BC2C: same rands as
+  ours). Its waypoint (+0x0C / +0x10) and re-plan counter (+0x18) are whatever the heap block held: run-3 cut
+  `work/superbuu/r3/wr_2160600` f50, block 0x0203D4F0 - waypoint (0xC085, 0xA8), counter 0xE8 -> the first update
+  does not re-plan (counter (0xE8 + 7) & 7 = 7) and steps toward the stale waypoint (up-left) for 8 frames; ours
+  plans at once (down-left). The whole run is already off before that (Vegeta x 75,567 vs the game's 75,479 at row
+  2,160,649 - earlier wanders, same mechanism). Matching it needs a model of the object heap's blocks (which object
+  last held this one) - not attempted; `memseg.py` reads the game's block.
+*Real-route agent (2026-10-06): run 3's Janemba part has no stops left.* On HEAD 289d7d2, check.sh `--chain run3`
+is exact in logic and sound from power-on through the whole of `028_j3_janemba` (to 1,978,849) and on to 2,024,954
+(Super Buu: the first difference is a sound, the first stop 2,160,844). The app also runs exact from the Janemba
+start cut (c1798844) to the part's end. My earlier resync (`work/run3/stops_j3.jsonl`, on the older tree) is
+stale. One finding from it, for A: a cut taken inside Janemba's arena imports his body parts (types 52 / 53 / 55)
+as plain enemies (`part` false, `parent` 0), so `janemba_parts_hurt` finds no parts and a hit doesn't flash them.
+The game sets all of them to the hurt pose in the hit frame, and they go back to idle (rand(255) each) when the
+body does. That gives a false rng stop on a mid-fight cut (seen at 1,936,492 from a cut at 1,936,467).
