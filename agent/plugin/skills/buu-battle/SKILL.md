@@ -115,6 +115,13 @@ no hardware slowdown recreated).
   `danger` forecasts are not computed in story sessions.
 - The in-game save (a save point's menu) writes `story.save_slots`; they live in the session (and its snapshots).
 
+## Mods
+
+To test a mod (engine/docs/modding.md): `modcheck {mods: ["path/to/mod"]}` first (fix every `errors` entry: file,
+what, hint), `list_mod_content {mods}` to see what it adds, then pass the same `mods` to `new_battle` / `new_field`
+/ `new_game` (or set `WF_MODS`). Edit the mod's files and start a new session to test the change. Replays keep the
+mods they were made with.
+
 ## Damage basics
 
 - Melee uses your STR against their END, energy your POW; crits x1.5; small random spread. Enemy resistances

@@ -15,6 +15,7 @@
 //! Mods (engine/docs/modding.md): every folder in `<content>/mods/` loads; `--mod DIR` (repeatable) adds a mod
 //! folder from anywhere (e.g. `--mod engine/mods-examples/new-skill`), `--no-mods` loads only those given;
 //! `--modcheck [DIR...]` checks mod folders (default: `<content>/mods/*`) and exits (1 on problems).
+//! `--new-mod NAME [--dir PARENT]` makes a new, working mod folder to start from (default: `<content>/mods/NAME`).
 //! Launcher (`wf_app::launcher`): with no mode flag (`--story`, `--arena`/`--enemy`/`--fighter`, `--area`/`--demo`,
 //! `--online`, `--net-*`, `--replay`) the game opens on the launcher (Story / Battle / Online / Replays / Mods /
 //! Settings); `--launcher` forces it, `--no-launcher` skips it. Shift+Esc in a game returns to it. Settings live in
@@ -83,6 +84,12 @@ struct Args {
     no_mods: bool,
     /// `--modcheck [DIR...]`: check mod folders (default: `<content>/mods/*`) and exit (`wf_app::modcheck`)
     modcheck: bool,
+    /// `--dev`: hot reload of the loaded mods' files between frames (`wf_app::dev`; modding.md §7)
+    dev: bool,
+    /// `--new-mod NAME [--dir PARENT]`: scaffold a new mod folder (default parent: `<content>/mods/`) and exit
+    /// (`wf_app::newmod`)
+    new_mod: Option<String>,
+    new_mod_dir: Option<PathBuf>,
     arena: String,
     enemy: String,
     count: u32,
@@ -150,6 +157,9 @@ fn parse_args() -> Args {
         mods: Vec::new(),
         no_mods: false,
         modcheck: false,
+        dev: false,
+        new_mod: None,
+        new_mod_dir: None,
         arena: "forest".into(),
         enemy: "t68".into(),
         count: 1,
@@ -280,6 +290,9 @@ fn parse_args() -> Args {
                 }
             }
             "--no-mods" => a.no_mods = true,
+            "--new-mod" => a.new_mod = Some(next(&mut i)),
+            "--dir" => a.new_mod_dir = Some(PathBuf::from(next(&mut i))),
+            "--dev" => a.dev = true,
             "-h" | "--help" => {
                 println!("{}", include_str!("main.rs").lines().take(4).map(|l| l.trim_start_matches("//! ")).collect::<Vec<_>>().join("\n"));
                 println!("{}", wf_net::cli::HELP);
@@ -412,11 +425,51 @@ fn make_app(a: &Args, packs: Packs) -> Result<App, String> {
     App::battle(packs, cfg)
 }
 
-fn load_packs(a: &Args) -> wf_app::wf_content::Result<Packs> {
+/// the mod folders this run loads: `<content>/mods/*` (unless `--no-mods`, minus the ones disabled in Settings), then
+/// the `--mod` folders
+fn mod_list(a: &Args) -> Vec<PathBuf> {
     let off = load_settings(&a.data).disabled_mods;
     let mut mods = if a.no_mods { Vec::new() } else { wf_app::mods::mod_dirs(&a.content.join("mods")) };
     mods.retain(|m| !m.file_name().is_some_and(|n| off.iter().any(|o| o.as_str() == n.to_string_lossy())));
     mods.extend(a.mods.iter().cloned());
+    mods
+}
+
+/// `--dev`: the watcher over this run's mods (None without `--dev`)
+fn dev_watch(a: &Args) -> Option<wf_app::dev::Dev> {
+    a.dev.then(|| {
+        let mods = mod_list(a);
+        eprintln!("dev mode: watching {} mod folder(s) for changes (hot reload between frames)", mods.len());
+        wf_app::dev::Dev::new(&a.content.join("base"), &mods)
+    })
+}
+
+/// `--dev`: a changed mod file -> checked, reloaded and the scene restarted (or the old content kept with the
+/// checker's messages). True when the scene was rebuilt (the caller makes a fresh `Control`).
+fn dev_poll(dev: &mut Option<wf_app::dev::Dev>, a: &Args, app: &mut App) -> bool {
+    let Some(d) = dev else { return false };
+    match d.poll() {
+        wf_app::dev::Reload::Unchanged => false,
+        wf_app::dev::Reload::Rejected(msg) => {
+            eprintln!("dev reload: mod errors - keeping the running content:\n{msg}");
+            false
+        }
+        wf_app::dev::Reload::Reloaded(packs) => match wf_app::dev::restart(app, packs, |p| make_app(a, p)) {
+            Ok(new) => {
+                *app = new;
+                eprintln!("dev reload: content reloaded, scene restarted");
+                true
+            }
+            Err(e) => {
+                eprintln!("dev reload: the scene could not start with the new content ({e}) - keeping the running one");
+                false
+            }
+        },
+    }
+}
+
+fn load_packs(a: &Args) -> wf_app::wf_content::Result<Packs> {
+    let mods = mod_list(a);
     let packs = wf_app::mods::load(&a.content.join("base"), &mods)?;
     if packs.packs.len() > 1 {
         eprintln!("content: {}", wf_app::mods::describe(&packs).join(", "));
@@ -489,6 +542,8 @@ struct Running {
     /// 16.7 ms - three of four wake-ups had rendered and blitted the same picture again)
     shown: (u32, u32),
     dirty: bool,
+    /// `--dev`: the mod file watcher (hot reload between frames)
+    dev: Option<wf_app::dev::Dev>,
 }
 
 // ------------------------------------------------------------------ launcher support (settings, save slots)
@@ -772,6 +827,7 @@ impl Shell {
                     replay_menu: ReplayMenu::default(),
                     store: replays::Store::new(&self.args.data),
                     mods: Mods::default(),
+                    dev: dev_watch(&self.args),
                     app,
                     keys: KeyState::default(),
                     bindings,
@@ -904,6 +960,11 @@ impl Shell {
                 let stepped = r.ctl.advance(&mut r.app, dt, &live);
                 if stepped > 0 {
                     r.keys.consumed();
+                }
+                // (after the frame's steps: a safe point for a dev reload; the restarted scene records afresh)
+                if dev_poll(&mut r.dev, &self.args, &mut r.app) {
+                    r.ctl = Control::new(&mut r.app, load_hotkeys(&self.args.data), now_unix());
+                    r.dirty = true;
                 }
                 persist_saves(&self.args.data, &r.app, &mut r.saves_gen);
                 if let Some((_, tx)) = &r.audio {
@@ -1343,6 +1404,7 @@ fn headless(a: &mut Args) -> Result<(), String> {
         replay_end = Some(wf_app::control::parse_replay(&b)?.end_frame());
     }
     let frames = a.frames.or(replay_end).unwrap_or(if spect.is_some() { u64::MAX } else { 120 });
+    let mut dev = dev_watch(a);
     let realtime = a.realtime || spect.is_some();
     let period = Duration::from_secs_f64(1.0 / wf_view::GBA_FPS);
     let t1 = Instant::now();
@@ -1358,6 +1420,10 @@ fn headless(a: &mut Args) -> Result<(), String> {
             break; // end of the replay
         }
         f += 1;
+        // (between frames: a safe point for a dev reload; the restarted scene records afresh)
+        if dev_poll(&mut dev, a, &mut s.app) {
+            ctl = Control::new(&mut s.app, Hotkeys::default(), now_unix());
+        }
         if let Some(sp) = &spect {
             sp.serve_pending(&mut s);
         }
@@ -1498,6 +1564,26 @@ s.textContent=await (await fetch('/state')).text();requestAnimationFrame(f)}f()<
 
 fn main() {
     let mut args = parse_args();
+    if let Some(name) = args.new_mod.clone() {
+        // `buus-fury --new-mod NAME [--dir PARENT]`: a new mod folder, valid and playable as it is
+        let parent = args.new_mod_dir.clone().unwrap_or_else(|| args.content.join("mods"));
+        match wf_app::newmod::scaffold(&parent, &name) {
+            Ok(m) => {
+                println!("created {}", m.dir.display());
+                for f in &m.files {
+                    println!("  {f}");
+                }
+                println!("next: buus-fury --modcheck {}   (check it)", m.dir.display());
+                println!("      buus-fury --mod {}   (play it: New Game, walk right, talk to the NPC)", m.dir.display());
+                println!("      its README.md and engine/docs/modding.md explain each file");
+                std::process::exit(0);
+            }
+            Err(e) => {
+                eprintln!("{e}");
+                std::process::exit(1);
+            }
+        }
+    }
     if args.modcheck {
         // `buus-fury --modcheck [DIR...]`: the given mod folders (default: every folder in <content>/mods/) over
         // the installed base content; exit 1 on problems
@@ -1510,6 +1596,10 @@ fn main() {
         let r = wf_app::modcheck::check(&base, &mods);
         print!("{}", r.text());
         std::process::exit(if r.ok() { 0 } else { 1 });
+    }
+    if args.dev && (args.net.active() || args.online || args.replay.is_some() || args.record.is_some()) {
+        eprintln!("--dev (hot reload) is for local play: not with netplay, --online, --replay or --record (a reload changes the content mid-run)");
+        std::process::exit(2);
     }
     if args.headless {
         if let Err(e) = headless(&mut args) {

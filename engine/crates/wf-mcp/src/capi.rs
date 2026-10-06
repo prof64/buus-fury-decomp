@@ -54,12 +54,14 @@ fn outcome_code(o: Outcome) -> i32 {
 }
 
 fn make(args: &Value, seed: Option<u32>) -> Result<Agent, String> {
-    let d = crate::content::game_data()?;
+    // (`mods` in the arguments / WF_MODS: the gym plays the modded content too)
+    let (d, set) = crate::tools::content_of(args)?;
     let (mut cfg, label) = battle_config(&d, args)?;
     if let Some(s) = seed {
         cfg.rng = RngInit::Seed(s);
     }
     let mut a = Agent::new("gym".into(), d, cfg, label, args.clone());
+    a.content = set;
     a.record = args.get("record").and_then(|v| v.as_bool()).unwrap_or(false);
     Ok(a)
 }

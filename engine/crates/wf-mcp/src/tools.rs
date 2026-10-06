@@ -12,6 +12,37 @@ use std::sync::Arc;
 use std::time::Instant;
 use wf_core::battle::{BattleConfig, FighterSetup, Phase, RngInit, FIGHTERS};
 use wf_core::content::GameData;
+use crate::content::ModSet;
+use std::path::PathBuf;
+
+/// `mods`: an array of mod folder paths (`[]` = explicitly none); absent = None
+fn mods_arg(a: &Value) -> Result<Option<Vec<PathBuf>>, String> {
+    match a.get("mods") {
+        None | Some(Value::Null) => Ok(None),
+        Some(Value::Array(v)) => v.iter().map(|x| x.as_str().map(PathBuf::from).ok_or_else(|| "mods: an array of mod folder paths".to_string())).collect::<Result<_, _>>().map(Some),
+        Some(Value::String(s)) => Ok(Some(std::env::split_paths(s).filter(|p| !p.as_os_str().is_empty()).collect())),
+        _ => Err("mods: an array of mod folder paths".into()),
+    }
+}
+
+/// The content of a call (tools and the C ABI's gym): `mods` (mod folder paths; `[]` = none) or else `WF_MODS`, else
+/// the base pack. The game data and the mod set (None = no mods).
+pub fn content_of(a: &Value) -> Result<(Arc<GameData>, Option<Arc<ModSet>>), String> {
+    let dirs = mods_arg(a)?.unwrap_or_else(crate::content::default_mods);
+    match crate::content::mod_set(&dirs)? {
+        Some(m) => Ok((Arc::clone(&m.data), Some(m))),
+        None => Ok((crate::content::game_data()?, None)),
+    }
+}
+
+/// the mod list recorded for messages: ids, or "none"
+fn mod_list(m: &[String]) -> String {
+    if m.is_empty() {
+        "none".into()
+    } else {
+        m.join(", ")
+    }
+}
 
 pub enum Out {
     Json(Value),
@@ -206,13 +237,17 @@ pub fn tool_list() -> Value {
     let slot = json!({"type": "integer", "description": "player slot you act as (multiplayer; default 0)"});
     let stop = json!({"type": "array", "items": {"type": "string", "enum": m::STOP_ON}, "description": "return early when: hurt (you lost HP), kill, hit (you dealt damage), no_damage (your hit did nothing), phase, danger (a hit on you is <= 12 frames away if you stand still), event (story: an event, dialogue box or menu took the field), area (an exit was taken); event and area are the defaults of every macro but press / wait"});
     let btn = json!({"type": "string", "description": "buttons held, e.g. \"RIGHT+A\" (A punch, B skill, L cycle skill, R block, UP/DOWN/LEFT/RIGHT)"});
+    let mods = json!({"type": "array", "items": {"type": "string"}, "description": "mod folders to load over the base game (engine/docs/modding.md; e.g. [\"engine/mods-examples/story-tweaks\"]); [] = none; default: the WF_MODS env var (a :-separated path list), else none. Content is cached per mod set and rebuilt when the mod's files change"});
     let t = |name: &str, desc: &str, props: Value, req: &[&str]| json!({"name": name, "description": desc, "inputSchema": {"type": "object", "properties": props, "required": req}});
     json!([
-        t("list_fighters", "Playable fighters: forms, skills with EP cost by skill level, the buttons.", json!({}), &[]),
-        t("list_enemies", "Enemy types: id (t18), group (Boss/Enemy/Helper), HP, stats, resistances, presets and default arena.", json!({"search": {"type": "string"}, "group": {"type": "string"}, "limit": {"type": "integer"}}), &[]),
+        t("list_fighters", "Playable fighters: forms, skills with EP cost by skill level, the buttons.", json!({"mods": mods}), &[]),
+        t("list_enemies", "Enemy types: id (t18), group (Boss/Enemy/Helper), HP, stats, resistances, presets and default arena.", json!({"search": {"type": "string"}, "group": {"type": "string"}, "limit": {"type": "integer"}, "mods": mods}), &[]),
         t("list_arenas", "Arenas (maps) a battle can use.", json!({}), &[]),
-        t("list_presets", "Story fights (multi-phase chains such as Janemba -> Super Janemba) with their arena.", json!({}), &[]),
-        t("new_battle", "Start a battle session (paused at frame 0). Returns the session id, the resolved config and a full observation with an ASCII map. Level 50..200 (Lv80+ comfortable vs regular enemies, bosses want 100+).", json!({
+        t("list_presets", "Story fights (multi-phase chains such as Janemba -> Super Janemba) with their arena.", json!({"mods": mods}), &[]),
+        t("modcheck", "Check mod folders (engine/docs/modding.md §7): every problem with its file, what is wrong and a hint; ok / exit_status (0 ok, 1 errors) and the summary lines (what each mod adds, replaces, patches).", json!({"mods": mods}), &[]),
+        t("list_mod_content", "What the loaded mods add and change, per mod: skills, enemies, characters, items, equipment, areas, events, scripts, art - each file added / replaced / patched / derived / deleted, with the record's id and name.", json!({"mods": mods}), &[]),
+        t("new_battle", "Start a battle session (paused at frame 0). Returns the session id, the resolved config and a full observation with an ASCII map. Level 50..200 (Lv80+ comfortable vs regular enemies, bosses want 100+). `mods`: play with mod folders loaded.", json!({
+            "mods": mods,
             "fighter": {"type": "string", "description": "goku, gohan, goten, trunks, vegeta, gotenks, vegito, gogeta"},
             "form": {"type": "integer"}, "level": {"type": "integer", "description": "default 80"},
             "enemy": {"type": "string", "description": "enemy id (t68) or name"}, "count": {"type": "integer"},
@@ -222,14 +257,15 @@ pub fn tool_list() -> Value {
             "stat_spend": {"type": "string", "description": "even (default) | STR | POW | END | SPD | none"},
             "players": {"description": "co-op: number of players (copies of the fighter) or a list of {fighter, form, level, ...}; you act as `slot`, other slots run their autopilot"},
         }), &[]),
-        t("list_areas", "Field areas (overworld) for new_field: world-area id, name, map variants, placed enemies.", json!({"search": {"type": "string"}, "limit": {"type": "integer"}}), &[]),
+        t("list_areas", "Field areas (overworld) for new_field: world-area id, name, map variants, placed enemies.", json!({"search": {"type": "string"}, "limit": {"type": "integer"}, "mods": mods}), &[]),
         t("new_field", "Start a field (overworld) session in an area: walk, take exits to other areas, fight the placed enemies, break props, collect pickups (scripts / dialogue are not run). Same action tools as battles.", json!({
+            "mods": mods,
             "area": {"type": "string", "description": "\"8-3\" (world-area, list_areas) or a name"}, "variant": {"type": "integer"},
             "chars": {"type": "array", "items": {"type": "integer"}, "description": "character per player slot (0 Goku, 1 Gohan, 2 Goten, 3 Trunks, 4 Vegeta, ...); default the new game's"},
             "x": {"type": "integer"}, "y": {"type": "integer"}, "seed": {"type": "integer"},
         }), &["area"]),
         t("new_game", "Start the story (the whole game with its script host: events, dialogue, NPCs, shops, save points, the title and its New Game / Continue). Default: from the title through New Game into the prologue; title=true stops on the title screen (press START, then A through Single Player / Select Game). Observations gain `story`: the menu screen and its text, the dialogue box, event_running, the save slots. Every action tool, save_state / load_state / rewind and replays work on it; `frame` counts steps (one game logic iteration each).", json!({
-            "seed": {"type": "integer"}, "title": {"type": "boolean", "description": "stop on the title screen"},
+            "seed": {"type": "integer"}, "title": {"type": "boolean", "description": "stop on the title screen"}, "mods": mods,
         }), &[]),
         t("list_sessions", "Open sessions.", json!({}), &[]),
         t("close_session", "Close a session.", json!({"session": sess}), &["session"]),
@@ -251,9 +287,9 @@ pub fn tool_list() -> Value {
         t("load_state", "Restore a named snapshot (later inputs of the current branch are discarded).", json!({"session": sess, "name": {"type": "string"}}), &["session", "name"]),
         t("rewind", "Go back `frames` frames (or `to_frame`) on the current branch.", json!({"session": sess, "frames": {"type": "integer"}, "to_frame": {"type": "integer"}}), &["session"]),
         t("get_replay", "Replay of the session: config + run-length input log + state hash (optionally written to save_to).", json!({"session": sess, "save_to": {"type": "string"}}), &["session"]),
-        t("play_replay", "Re-simulate a replay (object, JSON string or file path) in a new session and check the state hash.", json!({"replay": {"description": "replay object / JSON string"}, "path": {"type": "string"}, "keep": {"type": "boolean"}}), &[]),
+        t("play_replay", "Re-simulate a replay (object, JSON string or file path) in a new session and check the state hash. A replay made with mods records their ids, files hash and folders: it loads those folders (or `mods`) and is refused when the loaded mods differ.", json!({"replay": {"description": "replay object / JSON string"}, "path": {"type": "string"}, "keep": {"type": "boolean"}, "mods": mods}), &[]),
         t("run_controller", "Run your Rhai controller every frame (deterministic sandbox, metered). The script body sees `obs` (observation), `mem` (persistent map), `frame`, and returns buttons (\"RIGHT+A\" / \"\"). Helpers: toward(from, to), away(from, to), dist(a, b), btn(s), names(mask), log(x), stop(). Returns the summary, controller stats/logs and the observation.", json!({"session": sess, "slot": slot, "code": {"type": "string"}, "frames": {"type": "integer"}, "every": {"type": "integer", "description": "decide every N frames (hold between)"}, "max_ops": {"type": "integer", "description": "operation budget per decision (default 200000)"}, "forecast": {"type": "integer", "description": "look-ahead frames for obs.danger (default 20, 0 = off: faster)"}, "stop_on": stop}), &["session", "code", "frames"]),
-        t("evaluate_controller", "Run a controller from frame 0 over many seeds (the session's config, or new_battle args in `battle`) and report win rate, HP lost, time. Runs in parallel, fully deterministic.", json!({"session": sess, "battle": {"type": "object"}, "code": {"type": "string"}, "seeds": {"type": "array", "items": {"type": "integer"}}, "n_seeds": {"type": "integer"}, "frames": {"type": "integer", "description": "max frames per run (default 7200)"}, "every": {"type": "integer"}, "max_ops": {"type": "integer"}, "forecast": {"type": "integer"}}), &["code"]),
+        t("evaluate_controller", "Run a controller from frame 0 over many seeds (the session's config and content, or new_battle args - `mods` included - in `battle`) and report win rate, HP lost, time. Runs in parallel, fully deterministic.", json!({"session": sess, "battle": {"type": "object"}, "code": {"type": "string"}, "seeds": {"type": "array", "items": {"type": "integer"}}, "n_seeds": {"type": "integer"}, "frames": {"type": "integer", "description": "max frames per run (default 7200)"}, "every": {"type": "integer"}, "max_ops": {"type": "integer"}, "forecast": {"type": "integer"}}), &["code"]),
         t("set_autopilot", "Co-op: who drives a player slot when you are not acting as it: idle, attack (melee the nearest enemy), or a Rhai controller (code).", json!({"session": sess, "slot": slot, "mode": {"type": "string", "enum": ["idle", "attack", "controller"]}, "code": {"type": "string"}}), &["session", "slot", "mode"]),
     ])
 }
@@ -265,6 +301,12 @@ impl Server {
 
     fn data(&self) -> Result<Arc<GameData>, String> {
         crate::content::game_data()
+    }
+
+    /// the content of a call: `mods` (mod folder paths; `[]` = none) or else `WF_MODS`, else the base pack.
+    /// Returns the game data and the mod set (None = no mods).
+    fn content(&self, a: &Value) -> Result<(Arc<GameData>, Option<Arc<ModSet>>), String> {
+        content_of(a)
     }
 
     fn sess(&mut self, a: &Value) -> Result<&mut Agent, String> {
@@ -288,21 +330,37 @@ impl Server {
         let j = |v: Value| Ok(Out::Json(v));
         self.event_stops = !matches!(name, "press" | "wait");
         match name {
-            "list_fighters" => j(catalog::fighters(&*self.data()?)),
-            "list_enemies" => j(catalog::enemies(&*self.data()?, s(a, "search"), s(a, "group"), i(a, "limit").unwrap_or(25).max(1) as usize)),
+            "list_fighters" => j(catalog::fighters(&*self.content(a)?.0)),
+            "list_enemies" => j(catalog::enemies(&*self.content(a)?.0, s(a, "search"), s(a, "group"), i(a, "limit").unwrap_or(25).max(1) as usize)),
             "list_arenas" => j(catalog::arenas()),
-            "list_presets" => j(catalog::presets(&*self.data()?)),
+            "list_presets" => j(catalog::presets(&*self.content(a)?.0)),
+            "modcheck" => {
+                let dirs = mods_arg(a)?.unwrap_or_else(crate::content::default_mods);
+                if dirs.is_empty() {
+                    return Err("modcheck: pass `mods` (mod folder paths) or set WF_MODS".into());
+                }
+                let base = crate::content::content_dir()?;
+                let r = wf_app::modcheck::check(&base, &dirs);
+                let errors: Vec<Value> = r.errors.iter().map(|e| json!({"file": e.file, "what": e.what, "hint": e.hint})).collect();
+                j(json!({"ok": r.ok(), "exit_status": if r.ok() { 0 } else { 1 }, "errors": errors, "lines": r.lines}))
+            }
+            "list_mod_content" => {
+                let (_, set) = self.content(a)?;
+                let set = set.ok_or("list_mod_content: pass `mods` (mod folder paths) or set WF_MODS")?;
+                j(catalog::mod_content(&set))
+            }
             "new_battle" => {
-                let d = self.data()?;
+                let (d, set) = self.content(a)?;
                 let (cfg, label) = battle_config(&d, a)?;
                 let id = self.new_id();
                 let mut ag = Agent::new(id.clone(), d, cfg.clone(), label.clone(), a.clone());
+                ag.content = set.clone();
                 let obs = observe(&mut ag, 0, ObsOpts { full: true, map: true, ..Default::default() });
                 self.sessions.insert(id.clone(), ag);
-                j(json!({"session": id, "label": label, "config": cfg, "observation": obs}))
+                j(json!({"session": id, "label": label, "config": cfg, "mods": set.map(|m| m.ids()).unwrap_or_default(), "observation": obs}))
             }
             "list_areas" => {
-                let d = self.data()?;
+                let d = self.content(a)?.0;
                 let fd = d.field.as_ref().ok_or("this content pack has no field data (re-extract with a current wf-extract)")?;
                 let q = s(a, "search").map(catalog::norm).unwrap_or_default();
                 let lim = i(a, "limit").unwrap_or(40).max(1) as usize;
@@ -328,7 +386,7 @@ impl Server {
                 j(json!({"total": all.len(), "areas": all.into_iter().take(lim).collect::<Vec<_>>()}))
             }
             "new_field" => {
-                let d = self.data()?;
+                let (d, set) = self.content(a)?;
                 let fd = d.field.as_ref().ok_or("this content pack has no field data")?;
                 let r = s(a, "area").map(String::from).or_else(|| i(a, "area").map(|x| x.to_string())).ok_or("area required (list_areas)")?;
                 let (wd, ar) = match r.split_once('-').and_then(|(x, y)| Some((x.parse::<i32>().ok()?, y.parse::<i32>().ok()?))) {
@@ -352,16 +410,22 @@ impl Server {
                 let id = self.new_id();
                 let label = format!("field {wd}-{ar} {name}");
                 let mut ag = Agent::new_field(id.clone(), Arc::clone(&d), cfg.clone(), label.clone(), a.clone());
+                ag.content = set.clone();
                 let obs = observe(&mut ag, 0, ObsOpts { full: true, map: true, ..Default::default() });
                 self.sessions.insert(id.clone(), ag);
-                j(json!({"session": id, "label": label, "config": cfg, "observation": obs}))
+                j(json!({"session": id, "label": label, "config": cfg, "mods": set.map(|m| m.ids()).unwrap_or_default(), "observation": obs}))
             }
             "new_game" => {
-                let d = self.data()?;
-                let files = story_files()?;
+                let (d, set) = self.content(a)?;
+                // (the base pack's story files also set the dialogue font and the event bytecode, once per process)
+                let mut files = story_files()?;
+                if let Some(m) = &set {
+                    files = m.story_files()?;
+                }
                 let id = self.new_id();
                 let start = crate::env::StoryStart { seed: i(a, "seed").unwrap_or(1) as u32 };
                 let mut ag = Agent::new_story(id.clone(), d, files, start)?;
+                ag.content = set.clone();
                 let mut steps = 0;
                 if !b(a, "title").unwrap_or(false) {
                     steps = title_new_game(&mut ag)?;
@@ -369,12 +433,13 @@ impl Server {
                 let label = "story".to_string();
                 let obs = observe(&mut ag, 0, ObsOpts { full: true, ..Default::default() });
                 self.sessions.insert(id.clone(), ag);
-                j(json!({"session": id, "label": label, "title_steps": steps, "observation": obs}))
+                let mods = self.sessions.get(&id).and_then(|s| s.content.as_ref()).map(|m| m.ids()).unwrap_or_default();
+                j(json!({"session": id, "label": label, "title_steps": steps, "mods": mods, "observation": obs}))
             }
             "list_sessions" => j(Value::Array(
                 self.sessions
                     .values()
-                    .map(|s| json!({"session": s.id, "label": s.label, "frame": s.frame(), "outcome": outcome_str(s.outcome()), "saves": s.named.keys().collect::<Vec<_>>(), "slots": s.slots()}))
+                    .map(|s| json!({"session": s.id, "label": s.label, "frame": s.frame(), "outcome": outcome_str(s.outcome()), "saves": s.named.keys().collect::<Vec<_>>(), "slots": s.slots(), "mods": s.content.as_ref().map(|m| m.ids()).unwrap_or_default()}))
                     .collect(),
             )),
             "close_session" => {
@@ -568,14 +633,37 @@ impl Server {
                     _ => return Err("pass `replay` (from get_replay) or `path`".into()),
                 };
                 let r: Replay = serde_json::from_value(v).map_err(|e| format!("not a wf-agent-replay/1 object: {e}"))?;
-                let d = self.data()?;
+                // the content: `mods` if given, else the folders the replay was made with (not WF_MODS: a replay
+                // knows its mods); then the recorded mod list / file hash must match the loaded one
+                let dirs = mods_arg(a)?.unwrap_or_else(|| r.mod_dirs.iter().map(PathBuf::from).collect());
+                let set = crate::content::mod_set(&dirs)?;
+                let (rec_mods, rec_hash) = r.content.as_ref().map(|c| (c.mods.clone(), c.mods_hash.clone())).unwrap_or_default();
+                let (now_mods, now_hash) = set.as_ref().map(|m| (m.content_id.mods.clone(), m.content_id.mods_hash.clone())).unwrap_or_default();
+                if rec_mods != now_mods || (!rec_mods.is_empty() && rec_hash != now_hash) {
+                    return Err(if rec_mods == now_mods {
+                        format!("replay refused: made with the same mods ({}) but other versions of their files - load the exact mod folders it was made with", mod_list(&rec_mods))
+                    } else {
+                        format!("replay refused: made with mods: {}; loaded now: {} - pass `mods` with the folders it was made with", mod_list(&rec_mods), mod_list(&now_mods))
+                    });
+                }
+                let d = match &set {
+                    Some(m) => Arc::clone(&m.data),
+                    None => self.data()?,
+                };
                 let id = self.new_id();
                 let t0 = Instant::now();
                 let mut ag = match (&r.story, &r.field) {
-                    (Some(st), _) => Agent::new_story(id.clone(), d, story_files()?, st.clone())?,
+                    (Some(st), _) => {
+                        let mut files = story_files()?;
+                        if let Some(m) = &set {
+                            files = m.story_files()?;
+                        }
+                        Agent::new_story(id.clone(), d, files, st.clone())?
+                    }
                     (None, Some(f)) => Agent::new_field(id.clone(), d, f.clone(), "replay".into(), json!({"replay": true})),
                     (None, None) => Agent::new(id.clone(), d, r.config.clone(), "replay".into(), json!({"replay": true})),
                 };
+                ag.content = set;
                 ag.record = false;
                 for h in r.held() {
                     ag.step_held(h, 0);
@@ -662,9 +750,13 @@ impl Server {
         let slot = i(a, "slot").unwrap_or(0) as usize;
         let view_kind = s(a, "view").unwrap_or("wide").to_string();
         let labels = b(a, "labels").unwrap_or(true);
-        let packs = crate::content::packs()?;
-        let renderer = self.renderer.get_or_insert_with(wf_render::Renderer::new);
         let ag = self.sessions.get(s(a, "session").ok_or("session required")?).ok_or("no such session")?;
+        // (a session with mods draws its mods' art)
+        let packs: &wf_content::Packs = match &ag.content {
+            Some(m) => &m.packs,
+            None => crate::content::packs()?,
+        };
+        let renderer = self.renderer.get_or_insert_with(wf_render::Renderer::new);
         let w = ag.w();
         let mut view = wf_view::RenderView::default();
         wf_core::view::render_view(w, &mut view);
@@ -709,15 +801,19 @@ impl Server {
         let code = load_code(s(a, "code").ok_or("code required")?)?;
         // compile once up front for a clear error
         Controller::new(&code, 1000, 1)?;
-        let d = self.data()?;
-        let cfg = match a.get("battle") {
-            Some(bv) if bv.is_object() => battle_config(&d, bv)?.0,
+        // (`battle`: new_battle arguments, its `mods` included; else the session's config and content)
+        let (d, cfg) = match a.get("battle") {
+            Some(bv) if bv.is_object() => {
+                let d = self.content(bv)?.0;
+                let cfg = battle_config(&d, bv)?.0;
+                (d, cfg)
+            }
             _ => {
                 let ag = self.sess(a).map_err(|e| format!("{e} (or pass `battle`: new_battle arguments)"))?;
                 if ag.field_cfg.is_some() {
                     return Err("evaluate_controller runs battles: pass `battle` (new_battle arguments)".into());
                 }
-                ag.s.config.clone()
+                (Arc::clone(&ag.s.data), ag.s.config.clone())
             }
         };
         let seeds: Vec<u32> = match a.get("seeds").and_then(|v| v.as_array()) {

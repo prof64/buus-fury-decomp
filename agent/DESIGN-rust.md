@@ -41,7 +41,18 @@ or enemy + count, fighter / form / level / skill tier / stat spend, seed, `playe
 overworld area), `list_sessions`, `close_session`, `fork_session`; reading `observe`, `map`, `screenshot` (gba / wide /
 arena view, ids drawn, scale, `save_to`); acting `press`, `wait`, `move_to`, `face`, `attack`, `use_skill`, `block`,
 `dash` (all with `slot` and `stop_on`: hurt, kill, hit, no_damage, phase, danger); time `save_state`, `load_state`,
-`rewind`; replays `get_replay`, `play_replay`; policies `run_controller`, `evaluate_controller`, `set_autopilot`.
+`rewind`; replays `get_replay`, `play_replay`; policies `run_controller`, `evaluate_controller`, `set_autopilot`;
+mods `modcheck`, `list_mod_content`.
+
+**Mods** (engine/docs/modding.md §7): `new_battle` / `new_field` / `new_game`, the `list_*` discovery tools,
+`evaluate_controller`'s `battle` and the C ABI's gym take `mods` (mod folder paths; `[]` = none; default `WF_MODS`,
+a `:`-separated path list). The content (base pack + mods, with the mods' scripted hooks) is cached per mod set and
+rebuilt when a mod's files change, so an agent can edit a mod and start a new session. A session keeps its content
+(forks too); `list_sessions` shows its mods; screenshots draw the mods' art. A replay records the mods' ids, the hash
+of their files and their folders: `play_replay` loads those folders (or `mods`) and refuses other content with both
+lists named. `modcheck` returns the checker's report as JSON (`ok`, `exit_status`, `errors` [{file, what, hint}],
+`lines`); `list_mod_content` lists per mod what it adds / replaces / patches / derives / deletes, grouped by kind
+(skills, enemies, items, equipment, areas, events, scripts, art) with the records' ids and names.
 
 Every action returns `{result: {frames, stopped, dealt, hp_lost, hits_dealt, hits_taken, kills, ep_change,
 hits_without_damage?, healed_enemy_hp?, ...}, observation}`.

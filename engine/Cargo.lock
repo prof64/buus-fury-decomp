@@ -5255,6 +5255,7 @@ dependencies = [
  "wf-extract",
  "wf-import",
  "wf-render",
+ "wf-replay",
  "wf-script-core",
  "wf-view",
 ]

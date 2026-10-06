@@ -22,10 +22,19 @@ test (`crates/wf-app/tests/mods.rs`):
 | [`story-tweaks`](../mods-examples/story-tweaks) | **plain files only** (§5c): Goku's starting stats and the Kamehameha's EP / damage patched, a new supply (Senzu Bean) and new equipment (Weighted Gi) sold at the Hercule City Z-Mart, the clerk's dialogue rewritten |
 | [`rhai-story-event`](../mods-examples/rhai-story-event) | a story challenge added to a base area (§5d): an NPC's Rhai talk event with a choice spawns a hidden enemy; its on-defeat event sets a flag, gives an item and teaches a new move written in Rhai (§4b) that the player then uses in the field and in battle |
 
-**New here? Start with these three steps:** copy `mods-examples/story-tweaks` into your mods folder (§1), check it
-with `buus-fury --modcheck path/to/story-tweaks` (§7), then play it (`buus-fury --mod path/to/story-tweaks`). Change
-a number, check again, play again. When you want new behaviour rather than new numbers, read
-`mods-examples/rhai-story-event` and §5d.
+**New here? Start with three commands:**
+
+```
+buus-fury --new-mod my-first-mod          # a working mod in <content>/mods/my-first-mod (or --dir PARENT)
+buus-fury --modcheck                      # check your mods: OK, or each problem with the file and a hint (§7)
+buus-fury                                 # play: New Game, walk right on Snakeway, talk to the new NPC
+```
+
+The new folder holds one small example of each kind of change, explained in its `README.md`: a plain-file merge
+patch (Goku's starting END), a dialogue override (King Yemma's first line), and an NPC added to Snakeway with a Rhai
+talk event that sets a story flag. Change a number or a line, check again, play again. Bigger examples:
+`mods-examples/story-tweaks` (plain files only, §5c) and `mods-examples/rhai-story-event` (a scripted event and
+move, §5d).
 
 ## 1. Folder, pack.json, loading
 
@@ -442,6 +451,16 @@ default is the game's); a mod ships one, every field optional:
   defeat scripts, and that every Rhai file compiles; scripted content: skill hooks, projectile sheets / cels, AI node
   names and `ModCondition` / `ModAction` functions, new enemy types' AI state and sprite, new characters' forms.
   Exit code 1 on errors.
+* **Dev mode / hot reload**: `buus-fury --dev --mod path/to/my-mod` (plus `--story W-A`, `--fighter` ... as usual)
+  watches the loaded mods' folders (twice a second, file sizes and times; `wf_app::dev`). Save a file and, between
+  two frames, the mods are checked: **errors** -> the running game is left as it is and the checker's messages
+  (`ERROR <mod>/<file>: ...` + hint) are printed to the console - fix and save again; **clean** -> the content is
+  reloaded and the **scene restarts from its start** with it: a battle with the same fighter / arena / enemies,
+  story mode at the `--story` area (or the title / the save slot it was started from). Nothing of the old run is
+  carried over, so a restart is a clean, deterministic start. Dev mode is for local play only: it refuses netplay,
+  `--online`, `--replay` and `--record`, and each reload starts a fresh recording (the replay before it was made
+  with the old content). Until a reload succeeds, the running scene keeps the game data it started with, but art
+  or areas it loads later are read from the folder as it is on disk.
 * **Look at it headless** (no window, no sound): `buus-fury --headless --mod my-mod --story 90-2 --frames 120
   --input U30,A2 --size 480x320 --shot out.ppm` (battle: `--fighter`, `--arena`, `--enemy`).
 * **Automate it**: copy a test from `crates/wf-app/tests/mods.rs` — load packs with `wf_app::mods::load(base,
@@ -449,6 +468,17 @@ default is the game's); a mod ships one, every field optional:
   `SkillStart`, observations) or `wf_app::story::StorySim::new(&packs, (w, a), …)` (story: step with buttons, read
   `world().story.flag(f)`, `field.area`, entities, `errors` for script errors), and render a frame with
   `wf_render::Renderer` to catch missing art. Runs headless and muted; needs only `roms/buu.gba`.
+* **Testing mods with agents (wf-mcp)**: the agent interface (`agent/plugin`, MCP server `crates/wf-mcp`) plays
+  with mods too. Pass `"mods": ["path/to/my-mod", ...]` to `new_battle`, `new_field`, `new_game` (and the `list_*`
+  tools to see the modded fighters / enemies / areas), or set `WF_MODS=path/a:path/b` for every session (`[]` turns
+  them off for one call). `modcheck {mods}` returns the checker's report as JSON (`ok`, `exit_status`, `errors`
+  [{file, what, hint}]); `list_mod_content {mods}` lists what each mod adds or changes (skills, enemies, items,
+  areas, events ... with ids and names). An agent can edit a mod and start a new session: the content is rebuilt when
+  the mod's files change. Replays from `get_replay` record the mods (ids, files hash, folders); `play_replay` loads
+  the same folders and refuses other content. Example loop: `modcheck` -> `new_field {area: "8-3", x, y, mods:
+  [...]}` (the placed NPCs / enemies / exits of the modded area; field sessions run no scripts) -> `screenshot` (the
+  mod's art) -> `new_battle {mods, ...}` for skills and enemies; story events and dialogue need `new_game {mods}`
+  (the script host). Tests: `crates/wf-mcp/tests/mods.rs`.
 
 * **native == wasm**: `cargo run --release -p wf-modcheck --example digest -- <content/base> <mods…> > native.txt`,
   then `cargo build -p wf-modcheck --target wasm32-unknown-unknown --profile release-wasm` and `node

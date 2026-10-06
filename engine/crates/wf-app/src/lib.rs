@@ -8,11 +8,14 @@ pub mod audio;
 pub mod battle;
 pub mod control;
 pub mod demo;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod dev;
 pub mod hotkeys;
 pub mod input;
 pub mod launcher;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod modcheck;
+pub mod newmod;
 pub mod mods;
 pub mod netmenu;
 pub mod overlay;

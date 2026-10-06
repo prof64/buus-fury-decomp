@@ -240,3 +240,59 @@ pub fn preset(r: &str) -> Option<&'static Preset> {
 pub fn preset_phases(p: &Preset) -> Vec<Phase> {
     p.phases.iter().map(|(e, n)| Phase { enemy: e.to_string(), count: *n }).collect()
 }
+
+/// What each loaded mod adds or changes (`list_mod_content`): its files grouped by content kind, each with how it
+/// applies (added / replaced / patch / derived / deleted / dialogue) and, for JSON records, the merged record's id
+/// and name.
+pub fn mod_content(set: &crate::content::ModSet) -> Value {
+    let packs = &set.packs;
+    let base = &packs.packs[0].src;
+    let id_keys = ["skill", "type", "item", "index", "key", "id", "sprite_index", "state"];
+    let mut mods = Vec::new();
+    for p in &packs.packs[1..] {
+        let mut files = p.src.list();
+        files.sort();
+        let mut groups: std::collections::BTreeMap<String, Vec<Value>> = std::collections::BTreeMap::new();
+        for f in files {
+            if f == "pack.json" || f.ends_with("README.md") {
+                continue;
+            }
+            let (how, target) = if let Some(t) = f.strip_suffix(".patch.json") {
+                ("patch", format!("{t}.json"))
+            } else if let Some(t) = f.strip_suffix(".delete") {
+                ("deleted", t.to_string())
+            } else if let Some(t) = f.strip_suffix(".derive.json") {
+                ("derived", t.to_string())
+            } else if f.ends_with(".text.json") {
+                ("dialogue", f.clone())
+            } else if base.read(&f).is_some() {
+                ("replaced", f.clone())
+            } else {
+                ("added", f.clone())
+            };
+            let kind = match target.split('/').next().unwrap_or("") {
+                "world" if target.starts_with("world/areas/") => "areas".to_string(),
+                "scripts" if target.starts_with("scripts/events/") => "events".to_string(),
+                "hooks" => "scripts".to_string(),
+                k => k.to_string(),
+            };
+            let mut e = json!({"file": f, "how": how});
+            if target != f {
+                e["target"] = json!(target);
+            }
+            if target.ends_with(".json") && how != "deleted" && how != "dialogue" {
+                if let Some(v) = packs.read(&target).and_then(|b| serde_json::from_slice::<Value>(&b).ok()) {
+                    if let Some(n) = v.get("name").and_then(|x| x.as_str()) {
+                        e["name"] = json!(n);
+                    }
+                    if let Some((k, x)) = id_keys.iter().find_map(|k| v.get(*k).filter(|x| x.is_number() || x.is_string()).map(|x| (*k, x.clone()))) {
+                        e["id"] = json!({k: x});
+                    }
+                }
+            }
+            groups.entry(kind).or_default().push(e);
+        }
+        mods.push(json!({"id": p.info.id, "name": p.info.name, "files": groups.values().map(|v| v.len()).sum::<usize>(), "content": groups}));
+    }
+    json!({"mods": mods, "mods_hash": set.content_id.mods_hash, "folders": set.dirs.iter().map(|d| d.display().to_string()).collect::<Vec<_>>()})
+}

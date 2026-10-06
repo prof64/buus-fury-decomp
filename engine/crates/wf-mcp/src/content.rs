@@ -104,3 +104,106 @@ pub fn packs() -> Result<&'static wf_content::Packs, String> {
     .as_ref()
     .map_err(|e| e.clone())
 }
+
+// ---------------------------------------------------------------------------------------------------------------
+// mods (engine/docs/modding.md): the base pack + mod folders, per session
+
+/// The base pack plus a list of mod folders, loaded once per (folders, their files' sizes and times): an agent that
+/// edits a mod and starts a new session gets the edited content. Sessions keep the set they were made with.
+pub struct ModSet {
+    /// the folders (canonical paths)
+    pub dirs: Vec<PathBuf>,
+    pub packs: wf_content::Packs,
+    /// the core's data with the mod scripts' hooks attached (scripted skills, projectiles, AI nodes)
+    pub data: Arc<GameData>,
+    /// the mods' ids in load order and the hash of their files (as replays / save states / the lobby record them)
+    pub content_id: wf_replay::ContentId,
+    stamp: u64,
+    files: OnceLock<Result<Arc<std::collections::BTreeMap<String, String>>, String>>,
+}
+
+impl ModSet {
+    /// the story scripts of this content (as `tools::story_files`, over these packs)
+    pub fn story_files(&self) -> Result<Arc<std::collections::BTreeMap<String, String>>, String> {
+        self.files
+            .get_or_init(|| {
+                let files: std::collections::BTreeMap<String, String> = self
+                    .packs
+                    .list()
+                    .into_iter()
+                    .filter(|p| p.starts_with("scripts/") && (p.ends_with(".rhai") || p.ends_with(".text.json")))
+                    .filter_map(|p| self.packs.read(&p).and_then(|b| String::from_utf8(b).ok()).map(|s| (p, s)))
+                    .collect();
+                if files.is_empty() {
+                    return Err("this content has no scripts/ (re-extract with the current extractor)".into());
+                }
+                Ok(Arc::new(files))
+            })
+            .clone()
+    }
+    /// the mod ids in load order
+    pub fn ids(&self) -> Vec<String> {
+        self.content_id.mods.clone()
+    }
+}
+
+/// the default mod folders of new sessions: `WF_MODS` (a path list, `:`-separated like PATH); none when unset
+pub fn default_mods() -> Vec<PathBuf> {
+    std::env::var_os("WF_MODS").map(|v| std::env::split_paths(&v).filter(|p| !p.as_os_str().is_empty()).collect()).unwrap_or_default()
+}
+
+/// sizes + modification times of every file under the folders (a cheap "did the mod change" stamp)
+fn stamp(dirs: &[PathBuf]) -> u64 {
+    fn mix(h: &mut u64, x: u64) {
+        *h = (*h ^ x).wrapping_mul(0x100_0000_01B3);
+    }
+    fn walk(d: &Path, h: &mut u64) {
+        let mut v: Vec<PathBuf> = std::fs::read_dir(d).map(|rd| rd.flatten().map(|e| e.path()).collect()).unwrap_or_default();
+        v.sort();
+        for p in v {
+            mix(h, p.to_string_lossy().bytes().fold(0u64, |a, b| a.wrapping_mul(31).wrapping_add(b as u64)));
+            if p.is_dir() {
+                walk(&p, h);
+            } else if let Ok(m) = std::fs::metadata(&p) {
+                mix(h, m.len());
+                if let Some(t) = m.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()) {
+                    mix(h, t.as_nanos() as u64);
+                }
+            }
+        }
+    }
+    let mut h = 0xCBF2_9CE4_8422_2325u64;
+    for d in dirs {
+        walk(d, &mut h);
+    }
+    h
+}
+
+/// The content for these mod folders (`None` = no mods: the plain base pack, `game_data()` / `packs()`).
+pub fn mod_set(dirs: &[PathBuf]) -> Result<Option<Arc<ModSet>>, String> {
+    use std::sync::Mutex;
+    if dirs.is_empty() {
+        return Ok(None);
+    }
+    let dirs: Vec<PathBuf> = dirs.iter().map(|d| d.canonicalize().map_err(|e| format!("mod folder {}: {e}", d.display()))).collect::<Result<_, _>>()?;
+    let st = stamp(&dirs);
+    static CACHE: OnceLock<Mutex<std::collections::BTreeMap<Vec<PathBuf>, Arc<ModSet>>>> = OnceLock::new();
+    let cache = CACHE.get_or_init(Default::default);
+    if let Some(m) = cache.lock().unwrap().get(&dirs) {
+        if m.stamp == st {
+            return Ok(Some(Arc::clone(m)));
+        }
+    }
+    let base = content_dir()?;
+    let packs = wf_app::mods::load(&base, &dirs).map_err(|e| format!("mods: {e}"))?;
+    let data = wf_app::battle::load_data(&packs)?;
+    let content_id = wf_app::battle::content_id(&packs);
+    let m = Arc::new(ModSet { dirs: dirs.clone(), packs, data, content_id, stamp: st, files: OnceLock::new() });
+    cache.lock().unwrap().insert(dirs, Arc::clone(&m));
+    Ok(Some(m))
+}
+
+/// the content id of the plain base pack (no mods), for replay checks
+pub fn base_content_id() -> Result<wf_replay::ContentId, String> {
+    Ok(wf_app::battle::content_id(packs()?))
+}

@@ -89,6 +89,8 @@ pub struct Agent {
     pub field_cfg: Option<FieldConfig>,
     /// story sessions: the script host (title, New Game, the story's events and dialogue, saves)
     pub story: Option<Story>,
+    /// the mods this session's content was built with (None: the plain base pack)
+    pub content: Option<Arc<crate::content::ModSet>>,
 }
 
 pub fn coarse(s: PState) -> &'static str {
@@ -239,6 +241,7 @@ impl Agent {
             state_since: BTreeMap::new(),
             field_cfg,
             story: None,
+            content: None,
         }
     }
 
@@ -555,6 +558,7 @@ impl Agent {
         a.initial = self.initial.clone();
         a.keyframes = self.keyframes.clone();
         a.named = self.named.clone();
+        a.content = self.content.clone();
         a
     }
 
@@ -604,7 +608,19 @@ impl Agent {
                 _ => rle.push((v, 1)),
             }
         }
-        Replay { format: "wf-agent-replay/1".into(), config: self.s.config.clone(), field: self.field_cfg.clone(), story: self.story.as_ref().map(|st| st.start.clone()), slots: n, inputs: rle, frames: self.inputs.len() as u32, hash: self.hash(), outcome: outcome_str(self.s.outcome).into() }
+        Replay {
+            format: "wf-agent-replay/1".into(),
+            config: self.s.config.clone(),
+            field: self.field_cfg.clone(),
+            story: self.story.as_ref().map(|st| st.start.clone()),
+            slots: n,
+            inputs: rle,
+            frames: self.inputs.len() as u32,
+            hash: self.hash(),
+            outcome: outcome_str(self.s.outcome).into(),
+            content: self.content.as_ref().map(|m| m.content_id.clone()),
+            mod_dirs: self.content.as_ref().map(|m| m.dirs.iter().map(|d| d.display().to_string()).collect()).unwrap_or_default(),
+        }
     }
 }
 
@@ -625,6 +641,13 @@ pub struct Replay {
     pub hash: String,
     #[serde(default)]
     pub outcome: String,
+    /// the mods the session ran with (ids in load order + the hash of their files); absent = no mods. play_replay
+    /// refuses other content (`wf_replay::ContentId::mods_mismatch`'s message)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content: Option<wf_replay::ContentId>,
+    /// the mod folders it was made with (play_replay loads them unless `mods` is given)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub mod_dirs: Vec<String>,
 }
 
 impl Replay {
