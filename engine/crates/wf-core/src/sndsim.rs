@@ -222,7 +222,9 @@ pub fn end_frame(w: &mut World) {
 /// the hardware's frame: its DMA interrupts
 fn hw_frame(s: &mut SoundSim) {
     let p = s.phase as i64;
-    let k = (FRAME - p + DMA - 1) / DMA;
+    // (a phase past a whole frame - an imported cut while the sound DMA did not run, run 2 sweep cut 1,832,774 - has no
+    // interrupt in this frame: it counts down by the frame)
+    let k = ((FRAME - p + DMA - 1) / DMA).max(0);
     s.pos = s.pos.wrapping_add(16 * k as u32);
     s.phase = (p + k * DMA - FRAME) as u32;
 }
@@ -269,7 +271,9 @@ pub fn lag_frame_ex(w: &mut World, last: bool) {
             return;
         }
         let ahead = s.pos.wrapping_sub(s.last) & 1023;
-        let at_end = ahead + 16 * ((FRAME - s.phase as i64 + DMA - 1) / DMA) as u32;
+        // (an imported phase past a whole frame - the sound DMA not running at the cut, run 2 sweep cut 1,832,774: phase
+        // 480,760 - plays no interrupt in this frame instead of underflowing)
+        let at_end = ahead + 16 * ((FRAME - s.phase as i64 + DMA - 1).max(0) / DMA) as u32;
         if ahead < IRQ_MIX && at_end >= IRQ_MIX {
             if debug() {
                 dump("irq", IRQ_MIX, d);

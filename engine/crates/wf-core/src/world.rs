@@ -583,6 +583,9 @@ pub struct World {
     pub cameras: [Camera; MAX_PLAYERS],
     /// a modal loop of the game (Instant Transmission target pick): only these entities update
     pub modal: Option<Vec<EntityId>>,
+    /// a cut's interrupted object pass (wf-import `finish_interrupted_pass`): only these entities - the game's list
+    /// objects below the interrupted one, still to be updated in that pass - are updated by `finish_pass_after`
+    pub pass_only: Option<Vec<EntityId>>,
     pub g: Globals,
     pub col: Option<Collision>,
     pub arena: ArenaRt,
@@ -723,6 +726,7 @@ impl World {
             input: [InputFrame::default(); MAX_PLAYERS],
             cameras: Default::default(),
             modal: None,
+            pass_only: None,
             g: Globals {
                 last_beep: -1000,
                 ..Default::default()
@@ -1019,6 +1023,8 @@ impl World {
         };
         let start = live(self).len();
         let mut c = match from {
+            // (the remaining objects named by the game's list: ours may order them otherwise - the whole list, filtered)
+            Some(_) if self.pass_only.is_some() => start as i64 - 1,
             Some((id, own)) => match live(self).iter().position(|e| e.is_some_and(|k| self.ents[k].id == id)) {
                 Some(p) => p as i64 - if own { 0 } else { 1 },
                 None => return,
@@ -1044,6 +1050,7 @@ impl World {
             let skip = self.modal.as_ref().is_some_and(|m| {
                 !m.contains(&self.ents[i].id) && !(ko_modal && crate::scene::is_puppet(self, self.ents[i].id))
             })
+                || self.pass_only.as_ref().is_some_and(|p| !p.contains(&self.ents[i].id))
                 || crate::vram::suspended(self, self.ents[i].id)
                     && !matches!(self.ents[i].body, Body::Npc(_))
                     // the 3D world map's patrols are updated while purged out of sprite memory: their idle animation

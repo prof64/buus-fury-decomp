@@ -642,6 +642,15 @@ fn import_ai_rt(w: &mut World, ei: usize, lvl: usize, ram: &GbaRam, r: u32, note
                 rt.d[1] = ram.s32(r + 8);
                 rt.d[2] = ram.s32(r + 0x10);
             }
+            // TankDrive (update 0x08032A64): +4 the turn timer (60 at a turn, one off each update) - sweep cuts 983,423 ..
+            // 1,306,960, the tanks' quarter-pixel drive one update off after a fresh 0
+            K::TankDrive => rt.d[0] = ram.s32(r + 4),
+            // RandomStep (vt 0x0804B1C0, update 0x08037BBC): +4 / +8 the kept 24.8 position the jitter is added to (ours
+            // re-entered with 0: the Skeleton's bones at (-1, 0) - sweep cuts 1,046,943 / 998,906 / 1,531,265)
+            K::RandomStep => {
+                rt.d[0] = ram.s32(r + 4);
+                rt.d[1] = ram.s32(r + 8);
+            }
             k => notes.push(format!("ai runtime of {k:?} (state {:#x} node {n}) not imported", tree.state)),
         }
         rts.push((n, rt));
@@ -1562,6 +1571,17 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
         let e = w.en(ei);
         e.roll_ctl = tick & 0xffff;
         e.a.facing = facing;
+        // (and the dash's diagonal is the enter's, by that facing - the re-entered node aimed at the player's position
+        // now: run 2 sweep cut 1,322,629, Inside Buu's mini rolling on its first aim)
+        const V: [(i32, i32); 4] = [(384, 384), (-384, -384), (-384, 384), (384, -384)];
+        for st in e.ai.stack.iter_mut() {
+            for (n, rt) in st.rt.iter_mut().enumerate() {
+                if st.tree.nodes.get(n).is_some_and(|x| x.k == wf_core::ai::K::MiniRollAttack) {
+                    rt.d[0] = V[facing as usize].0;
+                    rt.d[1] = V[facing as usize].1;
+                }
+            }
+        }
     } else if w.en_ref(ei).roll_ctl >= 0 {
         w.en(ei).roll_ctl = -1;
     }
@@ -2159,7 +2179,9 @@ fn build_mid_ids(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner: &mu
         let level = (256 - f).clamp(1, 256) as u16;
         w.menu = wf_core::menu::Menu { phase: wf_core::menu::Phase::FadeIn { level }, tr: wf_core::menu::PAUSE, ..Default::default() };
         notes.push(format!("mid-area: a menu's return (fading in, level {level})"));
-    } else if ram.screen_black == Some(true) {
+    } else if ram.screen_black == Some(true) && !(ram.valid(mode) && matches!(ram.r32(mode), MODE_FADE_OUT | MODE_FADE_IN)) {
+        // (not an exit's fade-out / an arrival's fade-in at their black end: their own modes are imported below - run 2
+        // / run 3 sweep cuts 1,173,983, 1,256,144, 1,719,443, 2,274,018, 2,524,128: 31 steps in, the load next)
         // the screen still black, no fade mode yet: the cut stands inside the close's world-restore iteration (its
         // long lag; run 3's pause spins, cuts 8,548 .. 146,704: 7 .. 54 black frames, then the first fade step). Our
         // close's last leave step (`Phase::Leave`, no-lag model: the exit stub's iteration then the restore's, `tr.leave`
@@ -2247,7 +2269,10 @@ fn build_mid_ids(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner: &mu
                     // (an instant native the interpreter stands after has run: the game's frame break follows it - the
                     // lift script's pass of g(0) = -3 is done at cut 763,358, the glide starts 5 rows later, as from
                     // an earlier cut)
-                    drop = if wf_script::steps::is_instant(tn) { k + 1 } else { k };
+                    // (but a group's begin_parallel the replay starts from runs again: skipped, the group's commands queued
+                    // one after another - run 2 sweep cut 740,856, the 12-6 lift script: its seven prop moves and the
+                    // leader's glide, ours ran the first prop alone)
+                    drop = if wf_script::steps::is_instant(tn) && tn != 0x38 { k + 1 } else { k };
                 }
             }
             w.menu = Default::default();
@@ -3598,7 +3623,29 @@ fn finish_interrupted_pass(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>)
     if !done {
         w.update_one(id);
     }
+    // the rest of the pass is the game's list below index k (the list updates from its end down): ours by position -
+    // our list can order them otherwise (run 2 sweep cut 1,681,517, Inside Buu: the leader above the interrupted worm
+    // in the game's list, already updated, below it in ours - updated twice)
+    let rest: Vec<wf_core::world::EntityId> = list[..k]
+        .iter()
+        .filter_map(|&ob| {
+            let (ox, oy) = (ram.s32(ob + 0x1A0), ram.s32(ob + 0x1A4));
+            (0..w.ents.len()).find(|&i| !w.ents[i].removed && w.ents[i].id != id && w.actor(i).is_some_and(|a| a.x == ox && a.y == oy)).map(|i| w.ents[i].id)
+        })
+        .collect();
+    // (the iteration's input, latched at its start: the input manager's held / pressed / released words +2 / +4 / +6 -
+    // the leader below the cut in the list reads them: 1,681,517, LEFT pressed, the leader turns)
+    let input0 = w.input[0];
+    w.input[0] = wf_core::input::InputFrame { held: ram.r16(INPUT + 2) & 0x3FF, pressed: ram.r16(INPUT + 4) & 0x3FF, released: ram.r16(INPUT + 6) & 0x3FF };
+    w.pass_only = Some(rest);
     w.finish_pass_after(id);
+    w.pass_only = None;
+    w.input[0] = input0;
+    // ... and the cameras the iteration updates after its pass (a field in its normal mode: run 2 sweep cut 1,615,218,
+    // the camera one step behind the leader)
+    if w.field.as_ref().is_some_and(|f| matches!(f.mode, Mode::Normal)) {
+        field::world_mode_cameras(w);
+    }
     // ... and the iteration's step after its pass: an arrival fade-in's brightness step (the fade mode's update follows
     // the objects - kais_hfil5: the fade ended, the leader idle, in the game's iteration 699,645, ours one later)
     if let Some(f) = w.field.as_mut() {
@@ -4684,6 +4731,15 @@ pub fn import_emulator_state(data: &Arc<GameData>, ram: &GbaRam, runner: &mut St
     }
     import_boss_bar(&mut world, ram);
     import_tile_anims(&mut world, ram);
+    // a cut inside a menu close's world-restore iteration: the restore's object updates run the stat-points mark's,
+    // which deletes itself when the points were spent on the closed page (run 2 / run 3 sweep cuts 892,907, 1,102,126,
+    // 1,133,092, 1,245,425: its 4 units free in that iteration in the game; after the allocator's rebuild here)
+    if world.menu.reload_close {
+        let points = world.story.chars.get(world.story.levelup_char.unwrap_or(world.story.current).max(0) as usize).map(|c| c.rec.points).unwrap_or(0);
+        if points == 0 {
+            wf_core::vram::release(&mut world, wf_core::vram::Owner::StatMark);
+        }
+    }
     // a text box opened by the import whose object the game makes later in the cut's iteration: its tiles now
     if let Some(p) = runner.text_open_due.take() {
         // ... unless the box object is already made, not yet in the world list (its constructor 0x08012030 took the
@@ -5355,6 +5411,11 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
             continue;
         }
         if vt == VT_HUD || vt == VT_BANNER || vt == 0x0804_C070 || vt == 0x0804_D878 {
+            // the HUD's slide (its update 0x0800B8FC: +0x28 position, +0x14 step; `Scene::hud_y`)
+            if vt == VT_HUD {
+                w.scene.hud_y = ram.s32(o + 0x28);
+                w.scene.hud_vel = ram.s32(o + 0x14);
+            }
             let h = ram.r16(o + 0xC);
             if h != 0xFFFF {
                 signs += (vt == 0x0804_D878) as u32;
