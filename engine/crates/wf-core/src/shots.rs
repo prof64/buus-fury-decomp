@@ -2917,7 +2917,9 @@ fn wave_update(w: &mut World, i: usize) {
     // with its "live" flag clear (r1 = 0, 0x0802A412): no wall / hit test, no growth or move, no life count - only the
     // animation counter (Flying Mega-Fortress XJ-6 12-3: the lift's inline script freezes a turret's wave short of
     // Goku; sc pg_xj6_001)
-    if w.field.as_ref().is_some_and(|f| f.busy) {
+    // (the item-get presentation's loop sends it the same message: emulator, tour_castle_ship_21 f191 .. f251, the
+    // update from 0x0802A725 every frame of it)
+    if w.field.as_ref().is_some_and(|f| f.busy || f.item_get.is_some()) {
         return;
     }
     let (px, py) = (w.shot_ref(i).px(), w.shot_ref(i).py());

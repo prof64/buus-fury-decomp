@@ -1700,7 +1700,10 @@ fn import_flames(w: &mut World, ei: usize, ram: &GbaRam, o: u32) {
 fn import_waves(w: &mut World, ei: usize, ram: &GbaRam, o: u32) {
     let me = w.ents[ei].id;
     for b in ram.objects().into_iter().filter(|&b| ram.r32(b) == 0x0804_9C98 && ram.r32(b + 0x4C) == o) {
-        let kind = wf_core::shots::ShotKind::EnergyWave { len: ram.s32(b + 0x40), mode: ram.s32(b + 0x44), life: ram.s32(b + 0x1C) };
+        // (+0x44: 0 growing, 1 pulling back after a wall / its life, 2 pulling back after a hit - both retract 4 a
+        // frame from the tail, ours is mode 1: tour castle_ship_42, a wave in mode 2 from 0x20 gone at f8)
+        let mode = if ram.s32(b + 0x44) != 0 { 1 } else { 0 };
+        let kind = wf_core::shots::ShotKind::EnergyWave { len: ram.s32(b + 0x40), mode, life: ram.s32(b + 0x1C) };
         let mut s = wf_core::shots::Shot::new(me, ram.r8(b + 0x10) & 3, 0, ram.s32(b + 0x20) << 8, ram.s32(b + 0x24) << 8, kind);
         s.t = ram.s32(b + 0x14) as i64;
         wf_core::shots::add(w, s);
@@ -2055,6 +2058,14 @@ fn build_mid_ids(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner: &mu
     // 0x08073424 for Babidi's ship, stopped in its camera_pan_to after the warp, the screen still black)
     if info.depth == 0 {
         if let Some((id, ran)) = inline_running(ram) {
+            // run from inside the frame's object pass (an on-defeat hook: the world list's delayed update call
+            // 0x08011A5E under the VM): its end completes that pass (`held_event` -> `resume_held`; castle_ship_28,
+            // the 8-27 boss's defeat script 0x0807CDAC: camera_follow, then the pass with the player's walk)
+            if (0x0300_7000u32..0x0300_8000).step_by(4).any(|a| ram.r32(a) == 0x0801_1A5F) {
+                if let Some(f) = w.field.as_mut() {
+                    f.held_event = true;
+                }
+            }
             let mut drop = ran.len().saturating_sub(1);
             // (waiting at end_parallel (0x3A): the group replays from its begin_parallel (0x38), its running commands
             // then take their objects' progress - `import_track_objects`, as `build_mid_code`'s)

@@ -501,6 +501,19 @@ pub fn flame_running(w: &World, i: usize) -> bool {
     })
 }
 
+/// the enemy's motion controller is running (its node is the AI's current one and has not run out)
+pub fn controller_running(w: &mut World, i: usize) -> bool {
+    let (serial, n) = w.en_ref(i).ctl;
+    if serial == 0 {
+        return false;
+    }
+    let Some(c) = ctx_top(w, i) else { return false };
+    if c.serial != serial || !is_ctl(w, kind(&c, n)) {
+        return false;
+    }
+    rt(w, &c, n).is_some_and(|r| r.d[7] == 0)
+}
+
 /// an event holds the field: the AI does not think, but the running motion controller keeps ticking (a turret's fire
 /// ends on time, a Destroyer keeps breathing flames; Babidi's ship 8-53 / 8-59 door scripts). Once it has run out,
 /// the node finishes on the AI's next update without running again

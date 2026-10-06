@@ -993,6 +993,9 @@ pub struct Director {
     pub done: bool,
     /// the group mode runs only its members' updates (`World.modal` before it)
     pub prev_modal: Option<Option<Vec<EntityId>>>,
+    /// the finished wait was a group mode (`done`): its loop ran before the world's pass
+    #[serde(default)]
+    pub done_group: bool,
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -1037,6 +1040,10 @@ pub struct CamCtl {
     /// after it (a trigger's script) takes its first step at once
     #[serde(default)]
     pub stepped: bool,
+    /// the camera rect before this frame's pan step: the BGs show it (the camera object copies its scroll before the
+    /// director's tracks step the pan - rfat_010 11-17 row 540: BG1 HOFS 45, the camera 46.97 after its 2 px step)
+    #[serde(default)]
+    pub pan_pre: Option<Rect>,
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -2743,6 +2750,7 @@ fn update_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) -> bool {
             if *t >= *n {
                 return true;
             }
+            w.scene.cam.pan_pre = Some(w.cameras[0].rect);
             *t += 1;
             if *t >= *n {
                 cam_put(w, *x << 10, *y << 10);
@@ -3064,6 +3072,7 @@ pub fn pre_step(w: &mut World) {
     sphere_jitter(w);
     w.scene.keys = w.input;
     w.scene.cam.stepped = false;
+    w.scene.cam.pan_pre = None;
     if w.scene.depth == 0 && !w.scene.puppets.is_empty() && w.scene.director.wait.is_none() {
         // outside a scene a player's input ends its leftover frame-range animation
         let held: Vec<(EntityId, bool)> = w
@@ -3221,6 +3230,7 @@ fn tick_tracks(w: &mut World) {
         for t in w.scene.tracks.iter_mut() {
             t.live = false;
         }
+        w.scene.director.done_group = matches!(mode, WaitMode::Group(_));
         w.scene.director.wait = None;
         w.scene.director.done = true;
         if let Some(prev) = w.scene.director.prev_modal.take() {
@@ -3527,8 +3537,9 @@ pub fn camera(w: &mut World) -> bool {
     match w.scene.cam.mode.clone() {
         CamMode::Player => false,
         CamMode::Fixed => {
+            let pre = w.scene.cam.pan_pre.take();
             let c = &mut w.cameras[0];
-            c.shown = c.rect;
+            c.shown = pre.unwrap_or(c.rect);
             true
         }
         CamMode::Follow(id) => {

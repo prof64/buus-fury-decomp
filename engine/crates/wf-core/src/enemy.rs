@@ -648,6 +648,15 @@ pub fn update(w: &mut World, i: usize) {
                 || f.item_get.is_some()
         })
     {
+        // the item-get presentation's state tick counts an animation a running motion controller drives on, without
+        // its end (the controller ends it, and the controller does not run in the presentation's loop): tour_castle_
+        // ship_21 f216, a soldier's throw (raw 20) ticks 35, 36 .. through it - ours had gone idle with a rand(255)
+        if w.field.as_ref().is_some_and(|f| f.item_get.is_some()) && crate::nodes::controller_running(w, i) {
+            let e = w.en(i);
+            e.a.tick_anim();
+            e.ea.pos.tick += 1;
+            return;
+        }
         tick_anim(w, i);
         if w.en_ref(i).part && matches!(w.en_ref(i).ty, 0x34 | 0x35 | 0x37) {
             part_hurt_end(w, i);

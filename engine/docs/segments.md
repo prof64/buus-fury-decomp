@@ -6374,3 +6374,16 @@ releasing again) - earth_circus exact. A breakable's chips (Field.debris, not li
 the object pass by creation stamp (`fieldobj::debris_end_before`, before the first older entity's update): desert_d
 and earth_circus exact, castle_ship_21 past its pickup (f190) to f216 - an enemy animation's rand(255) during the
 item-get presentation in ours (not in the game): enemy / animation, for its owner. Tours **105 / 116 locked** as gates.
+**Earth agent (10): castle_ship_28 vs castle_ship_17 - what gives the end frame a pass.** The stack under the VM at
+the cut: ship_28's script (0x0807CDAC, 8-27's boss **on-defeat** inline, list 1 #4) runs from the object pass's
+delayed-update call (0x08011A5E on the stack - a hook inside the pass); ship_17's (0x0807C1B0, 8-16's **trigger**,
+list 0 #1) from the trigger check (0x080125E9 / 0x080127A1, after the pass). The same rule as (7): the end frame
+goes on where the nested loop was entered - inside the pass, its rest (ours: `held_event` -> `resume_held`'s pass), from
+the trigger check, nothing. Ours had the rule; the import of a running inline script (depth 0) did not set
+`held_event` from the stack as the event imports do. Fixed (wf-import): ship_28 129 -> 766 / 766, ship_42 7 -> 841,
+none worse (106 / 116 exact). check.sh: runs 1 / 2 exact, run 3 as expected.
+**Earth agent (11): rfat_010's 11-17 scroll fixed (view only).** A director pan (`camera_pan_to` track): the BGs show
+the camera from **before** this frame's pan step - the camera object copies its scroll in the pass, the director's
+tracks step the pan after it (emulator, rfat_010 row 540: BG1 HOFS 45 = the camera of row 539, the camera object at
+46.97). `SceneCam.pan_pre` (the rect before the step) is what the Fixed mode's `shown` takes. Board: 23 frames fewer
+px, none more (rfat_010 f540 .. 630 exact, dr2_011, sb_006 / 007, ...); pixel gate green.
