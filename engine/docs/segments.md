@@ -6941,3 +6941,16 @@ check.sh covers k3 / p3. `engine/target-kidbuu` is not mine (I use target-earth,
   renderer; and they are objects of their area: gone with a load (rclose_002 f1,820, the landing). Board 18,758 ->
   18,848 exact, none lost (rclose_002 153 -> 286 of its samples); pixel gate re-locked.
 *Earth agent (by the claim above): run 3 2,606,136 fixed - the whole Kid Buu part (030_k3_kidbuu) is now exact in state and sound.* A script command on an enemy (s460 at 19-3, from the command-list tick 0x0801943D) replaces its animation; the charging Kamehameha belongs to the state that set it (0x0804C690), so it goes with the destructor (stop 3, beam object 0x2031A5C, from 0x080207AD) and its tiles are freed at once. Ours dropped only Super Buu's charging ball there. `enemy::drop_charging_kame` (the old set_anim_rule block, now shared) is called from `scene::anim_mut` too (field only) and frees the beam's VRAM block in that frame (a script runs after the frame's reap). Cut wr_2605900 400 / 400 (was 236). Gates / wf-core / wf-app tests green; check.sh EXACT: runs 1 / 2 exact, run 3 first difference now **2,682,904 in 031_p3_post** (sound 40 ours only; rng stop 2,683,006) - the side-content agent's half of the Kid Buu part has no stops left, so the next items are post-game ones.
+*Real-route agent (2026-10-06): run 3's post-game + credits (2,652,034 .. 2,712,165) - all three stops fixed; run 3
+exact end to end (state + sound) outside the Vegeta range.* (wf-core nodes.rs, field.rs, menu/mod.rs, menu/title.rs)
+- **2,676,434 / 2,677,623** (3-17, rng): `IfPlayerInZone` is not a distance - its predicate (0x080379C8, vt
+  0x08049E08) tests the *enemy's* body box (0x0800FE78) against the camera rect (0x030019A4 +0x18, the logical view):
+  an on-screen test. A gunman above the view stayed in its walk state; ours (within 160 px of the player) went to
+  the aim state. Field only (battles keep the reference's distance; no TS change).
+- **2,683,006** (4-1, rng, after the soft reset -> Continue): the slot load's fade-in is a fade object (0x080070E4,
+  by 4) that runs in place of the field main loop, so START is not checked through the fade's 64th frame - the
+  pause opens from the 65th. Ours ended the fade at the start of the 64th and opened the pause on that frame's START
+  (the 4-1 map object's 5 x rand per frame then stopped 2 frames early). `Field.slot_fade` / `pause_from`.
+check.sh: runs 1, 2, 3 all EXACT (run 3 to 2,712,165; the Kid Buu sound at 2,606,136 no longer shows in this
+tree). Segment gates green; product_check ALL OK (browser after a wasm rebuild - new Field fields change the state
+hash, so the wasm must be rebuilt with this).

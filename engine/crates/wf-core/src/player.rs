@@ -1037,7 +1037,10 @@ fn enter_state(w: &mut World, i: usize, gs: Gs) {
             // the state object's ctor (`0x0801C3EC`) makes the aura effect; a transformation started by the player made
             // it already (segment sb 19-3: s457's play_anim(0, 23) takes the effect's 0x400 tile bytes)
             if gs == Gs::SsUp {
-                let (ax, ay) = pr(w, i).a.center();
+                // (field: at the footprint's centre + (0, 1) - 0x0800FDFA's box halved, the variant byte 0x03002BB0 = 0
+                // branch; emulator sb_006 f9,320: Gotenks' footprint 16 x 8 at (184, 136), the effect object at
+                // (192, 141); battles keep the reference's body-box centre)
+                let (ax, ay) = if w.field.is_some() { pr(w, i).a.fc() } else { pr(w, i).a.center() };
                 let me = w.ents[i].id;
                 fx::add(
                     w,
@@ -3706,7 +3709,8 @@ fn start_transform(w: &mut World, i: usize, to: i32) {
     }
     enter_state(w, i, Gs::Skill(20));
     p(w, i).a.blocking = false;
-    let (ax, ay) = pr(w, i).a.center();
+    // (field: the footprint's centre + (0, 1), as the state ctor 0x0801C3EC)
+    let (ax, ay) = if w.field.is_some() { pr(w, i).a.fc() } else { pr(w, i).a.center() };
     let me = w.ents[i].id;
     fx::add(
         w,

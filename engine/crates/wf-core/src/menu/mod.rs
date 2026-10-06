@@ -606,6 +606,9 @@ pub fn check_pause(w: &mut World) -> bool {
     if f.busy || f.item_get.is_some() || f.held || !matches!(f.mode, crate::field::Mode::Normal) {
         return false;
     }
+    if w.frame < f.pause_from {
+        return false;
+    }
     if crate::scene::frozen(w) || w.scene.depth > 0 {
         return false;
     }

@@ -323,6 +323,13 @@ pub struct Field {
     /// timer object (VERIFIED segment sb 21-11: f236 no update, f237 the chips' update `0x0800C4A6` twice)
     #[serde(default)]
     pub break_owed: u32,
+    /// a Continue's fade-in (the slot load): its fade object (0x080070E4, by 4 a frame) runs in place of the field main
+    /// loop, so START is not checked until the frame after the fade's last (`pause_from`)
+    #[serde(default)]
+    pub slot_fade: bool,
+    /// the first frame the pause menu's START check runs again after a Continue's fade-in (0 = no block)
+    #[serde(default)]
+    pub pause_from: u32,
     /// the frame after the resumed pass: the enemies' animations tick once more before their update
     #[serde(default)]
     pub break_extra: bool,
@@ -667,6 +674,8 @@ fn new_field() -> Field {
         break_modal: false,
         break_cb: false,
         break_owed: 0,
+        slot_fade: false,
+        pause_from: 0,
         break_extra: false,
         held: false,
         held_event: false,
@@ -1680,7 +1689,14 @@ pub fn pre_step(w: &mut World) {
     }) && !crate::fieldworld::flying(w)
     {
         let idle = !w.field.as_ref().is_some_and(|f| f.fade_no_idle);
+        let frame = w.frame;
         if let Some(f) = w.field.as_mut() {
+            // (a Continue's fade: the fade object runs the frames up to the 64th after the slot load - the field main
+            // loop and its START check only from the 65th, here frame + 3; run 3 row 2,682,904: START in the 64th frame
+            // opened ours, the game's pause came with the next START, 2 frames later)
+            if std::mem::take(&mut f.slot_fade) {
+                f.pause_from = frame + 3;
+            }
             f.mode = Mode::Normal;
             f.script_fade_in = false;
             f.fade_no_idle = false;

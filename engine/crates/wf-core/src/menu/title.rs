@@ -1079,6 +1079,7 @@ pub fn boot(data: &Arc<crate::content::GameData>, w: &mut World) -> Option<World
                 };
                 if let Some(f) = nw.field.as_mut() {
                     f.mode = crate::field::Mode::FadeIn { k: 1 };
+                    f.slot_fade = true;
                 }
             } else {
                 nw.menu.tr = Transition {
