@@ -828,7 +828,7 @@ fn one_idle(w: &mut World, i: usize) {
 fn has_raw(w: &World, i: usize, raw: i32) -> bool {
     w.en_ref(i).a.sprite.and_then(|s| w.data.sprite(s)).is_some_and(|s| s.anim_raw(raw).is_some())
 }
-fn hold_pose(w: &mut World, i: usize, raw: i32, frame: i32) {
+pub(crate) fn hold_pose(w: &mut World, i: usize, raw: i32, frame: i32) {
     let d = Arc::clone(&w.data);
     let e = w.en(i);
     e.set_raw(&d, raw);
@@ -1097,10 +1097,10 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
         }
         K::MeleeAttack => {
             // field: the enter (0x0802A0C4) does nothing at all - no hit test, no rand, no punch - while the player's
-            // +0x1CC is 0: a held player (run 3 row 1,949,621, 18-14: King Yemma's teleport lands next to the player
-            // he holds - the Sequence goes on in the idle; ours' `hittable` is off in more states than the game's
-            // flag - run 3 ship 276,926). Battle keeps the reference's
-            if w.field.is_some() && en::player(w, i).is_none_or(|pi| w.pl_ref(pi).state == crate::player::PState::Held) {
+            // +0x1CC is 0: a held or KO'd player (run 3 row 1,949,621, 18-14: King Yemma's teleport lands next to the
+            // player he knocked out at 1,949,444 - the Sequence goes on in the idle; ours' `hittable` is off in more
+            // states than the game's flag - run 3 ship 276,926). Battle keeps the reference's
+            if w.field.is_some() && en::player(w, i).is_none_or(|pi| w.pl_ref(pi).dead || w.pl_ref(pi).state == crate::player::PState::Held) {
                 return;
             }
             // hit test (an accepted hit plays its sound), then SetAnim(4 + rand(punch animations))
@@ -1367,6 +1367,10 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
                 if has_raw(w, i, 19) {
                     hold_pose(w, i, 19, 0);
                 }
+                // the controller (its update in the animation tick: `enemy::tele_tick`)
+                let e = w.en(i);
+                e.tele_ctl = 0;
+                e.tele_side = r.d[0];
             }
         }
         K::TeleportChain4 => {
@@ -2712,28 +2716,13 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             true
         }
         K::TeleportNearPlayer => {
+            // field (sc_janemba): the controller (`enemy::tele_tick`) jumps at 36, takes hits again at 54 and SetAnim(0)s
+            // the boss at 72 - the node's end (the controller gone), MeleeAttack follows
+            if w.field.is_some() {
+                return w.en_ref(i).tele_ctl < 0;
+            }
             if f == 36 {
                 en::teleport_beside(w, i, r.d[0]);
-                // field: the controller's SetAnimRaw(0x14) (raw 21) for the landing
-                if w.field.is_some() && has_raw(w, i, 21) {
-                    hold_pose(w, i, 21, 0);
-                }
-            }
-            if w.field.is_some() {
-                // the controller's frame (update 0x08034BDE): its tick >> 2, from the landing (tick 36) on (tick - 36) >> 2
-                if w.en_ref(i).own_state && matches!(w.en_ref(i).ea.pos.raw, 19 | 21) && f < 72 {
-                    w.en(i).ea.pos.frame = if f < 36 { f >> 2 } else { (f - 36) >> 2 };
-                }
-                // field (sc_janemba): hittable again 18 frames after the landing; the landing animation (0x14) plays
-                // 36 frames and its end SetAnim(0)s the boss - the node's end, MeleeAttack follows
-                if f >= 54 {
-                    w.en(i).a.hittable = true;
-                }
-                if f >= 72 {
-                    en::set_anim(w, i, &[an(0)], true, Some(true));
-                    return true;
-                }
-                return false;
             }
             f >= 54
         }

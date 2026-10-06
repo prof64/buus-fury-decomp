@@ -101,6 +101,31 @@ class ShipDriver2(ShipDriver):
     retry_k = None
     tries = 0
 
+    def retry_target(self, k):
+        """the goal a game over in this retry stretch jumps back to: ('retry_here', n) = n goals back; plain
+        ('retry_here',) = the goal after the nearest ('jumpto', ..) before it - the checkpoint's DEATH_CONTINUE program
+        (it was k - 4 hard-coded: a goal inserted into a checkpoint silently moved the retry; sb3 had to add its own)"""
+        g = self.goals[k]
+        if len(g) > 1 and g[1]:
+            return k - g[1]
+        for j in range(k - 1, -1, -1):
+            if isinstance(self.goals[j], tuple) and self.goals[j] and self.goals[j][0] == 'jumpto':
+                return j + 1
+        return k - 4
+
+    def nav_watch(self, s):
+        """a 'nav' that makes no progress (leader in the field, same tile, same area) for 900 frames raises: the exit
+        may be on another walk-grid island the walk cannot leave (21-1's save point platform: only the sphincter's
+        trigger event moves the player off it; the nav stood there pressing a direction for good)"""
+        key = (tuple(s['area'][:2]), s['p'][0] // 8, s['p'][1] // 8) if s['p'] is not None else None
+        if key is None or s['scene'] > 0 or key != getattr(self, 'nav_key', None):
+            self.nav_key, self.nav_still = key, 0
+            return
+        self.nav_still += 1
+        if self.nav_still > 900:
+            raise RuntimeError(f'nav: no progress for 900 frames at {s} - target unreachable on the walk grid '
+                               f'(an island: a trigger / event has to move the player first)')
+
     def step(self, e):
         g = self.goals[self.k]
         kind = g[0]
@@ -119,10 +144,13 @@ class ShipDriver2(ShipDriver):
             self.k += g[1] - 1
             self.next_goal()
             return None
+        if kind == 'nav':
+            self.nav_watch(s)
         if kind == 'retry_here':
-            if self.retry_k != self.k - 4:     # (a new stretch; the same one again after a Continue keeps counting)
+            t = self.retry_target(self.k)
+            if self.retry_k != t:              # (a new stretch; the same one again after a Continue keeps counting)
                 self.tries = 0
-            self.retry_k = self.k - 4          # the DEATH_CONTINUE program (see checkpoint)
+            self.retry_k = t                   # the DEATH_CONTINUE program (see checkpoint)
             self.next_goal()
             return None
         if kind == 'retry_off':
@@ -131,11 +159,22 @@ class ShipDriver2(ShipDriver):
             return None
         if kind == 'die':
             if s['area'][:2] == [0, 2]:
+                self.die_idle = 0
                 self.next_goal()
                 return None
             if s['scene'] > 0 or s['p'] is None:
                 return 0
             ens = [o for o in enemies(e) if o[4] > 0]
+            # ('die'[, cap]): no enemy at all for 900 field frames, or no game over within `cap` frames (default
+            # 20,000: an enemy the walk cannot reach) - the death is skipped, logged, the route goes on (it stood here
+            # for good before: a save point's area with nothing hostile, sb3's 21-1 / 21-14)
+            self.die_idle = 0 if ens else getattr(self, 'die_idle', 0) + 1
+            cap = g[1] if len(g) > 1 and g[1] else 20000
+            if self.die_idle > 900 or self.t > cap:
+                print(f'die: skipped - {"no enemy" if not ens else "no game over in %d frames" % cap}', s, flush=True)
+                self.die_idle = 0
+                self.next_goal()
+                return None
             if not ens:
                 return 0
             x, y = s['p'][0], s['p'][1]

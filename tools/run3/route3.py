@@ -145,6 +145,14 @@ SEGMENTS.append(('j3_janemba', ('KEYS', 'work/run3/parts/j3_janemba.json')))
 # stresses (tools/run3/sb3.py, SbDriver3), from the Janemba end (work/run3jan/j_arena.ss + .eeprom) to the first frame
 # of 20-8 after Inside Buu (mid-event: the brain fight's end scenes; kb3.py goes on from there)
 SEGMENTS.append(('b3_superbuu', ('KEYS', 'work/run3/parts/b3_superbuu.json')))
+# ---- Kid Buu (k3_kidbuu, Earth agent): run 2's Kid Buu goals with run 3's stresses, a Pyramid level-up death, the
+# ranking check (party XP 27.4M: Dragon Ranking #1478, a bracket runs 1 / 2 did not reach), Kid Buu with retries, a
+# world-map encounter death; ends saved at 4-1, in Capsule Corp 4-20 (tools/run3/kb3.py from work/run3/parts/b3_end.*)
+SEGMENTS.append(('k3_kidbuu', ('KEYS', 'work/run3/parts/k3_kidbuu.json')))
+# ---- the post-game, the ending, the credits (p3_post, Earth agent; tools/run3/post3.py from kb3's end): talks with the
+# Text Speed changed between them, the Z-Mart every row, Options cycled, saves, soft reset -> Continue, Hercule City,
+# the ending mashed, the credits with held keys, the title's menus
+SEGMENTS.append(('p3_post', ('KEYS', 'work/run3/parts/p3_post.json')))
 
 
 def chapter_of(name):

@@ -48,7 +48,7 @@ def checkpoint3(name, x, y, w, a):
     (the retry index counted for the extra goal: 'retry_here3' 5 = the deathcont)"""
     return [('unstick',), ('walk', x, y), *charsel(0), ('unstick',), ('walk', x, y), ('face', 'U'), SAVE, ('bout',),
             ('jumpto', 5), ('deathcont',), ('until', w, a), ('wait', 30), ('menutour',),
-            ('mark', name), ('retry_here3', 5), ('luck',)]
+            ('mark', name), ('retry_here',), ('luck',)]
 
 
 class SbDriver3(SbDriver2):
@@ -90,6 +90,11 @@ class SbDriver3(SbDriver2):
     def step(self, e):
         g = self.goals[self.k]
         kind = g[0]
+        # a planned death that came already on the way there ('navonce': 21-1's into 21-3's enemies) counts as done:
+        # after its Continue the stretch replays past it (else it walked into the same death ten times)
+        if getattr(self, 'nav_tag', None) and status(e)['area'][:2] == [0, 2]:
+            self.died.add(self.nav_tag)
+            self.nav_tag = None
         if kind in RUN3_KINDS:
             return Run3Driver.step(self, e)
         if kind == 'retry_here3':
@@ -131,17 +136,32 @@ class SbDriver3(SbDriver2):
             if self.k != j:
                 self.dying = None
             return r
+        if kind == 'once':
+            # ('once', tag, goal): `goal` while the planned death `tag` has not happened (after its Continue the
+            # stretch replays past it)
+            if g[1] in self.died:
+                self.next_goal()
+                return None
+            j = self.k
+            self.goals[j] = g[2]
+            try:
+                return self.step(e)
+            finally:
+                self.goals[j] = g
         if kind == 'navonce':
             # ('navonce', tag, w, a): into area w-a for the planned death `tag` (skipped once it happened)
             if g[1] in self.died:
                 self.next_goal()
                 return None
             j = self.k
+            self.nav_tag = g[1]
             self.goals[j] = ('nav', g[2], g[3], False)
             try:
                 return super().step(e)
             finally:
                 self.goals[j] = g
+                if self.k != j:
+                    self.nav_tag = None
         if kind == 'levelup1':
             self.goals[self.k] = ('grind', level_of(e) + 1, g[1])
             self.grind_k = None
@@ -173,7 +193,9 @@ def stressed(goals):
     out = []
     # (the save points' areas have no enemy at hand: Goku walks into 20-5's robots first; inside Buu the next area)
     deaths = {'b03_14-1': ('levelup', [(14, 1), (14, 2)]), 'c02_goku124': ('nav', (20, 5)),
-              'd00_21-1': ('die', None), 'd01_21-14': ('die', None)}
+              # 21-1's save point is a walk-grid island: the sphincter's trigger (A facing right at 500, 300)
+              # walks the player off it, then on toward 21-4's (21-2 has none; the nav alone stood on the platform)
+              'd00_21-1': ('sphincter', (21, 4)), 'd01_21-14': ('die', None)}
     prev = None
     for j, g in enumerate(goals):
         kind = g[0] if isinstance(g, tuple) and g else None
@@ -204,6 +226,9 @@ def stressed(goals):
                 res += [('levelup1', areas), ('die1', pend)]
             elif how == 'nav':
                 res += [('navonce', pend, areas[0], areas[1]), ('die1', pend)]
+            elif how == 'sphincter':
+                res += [('once', pend, ('walk', 500, 300)), ('once', pend, ('talk', 'R')), ('once', pend, ('wait', 30)),
+                        ('navonce', pend, areas[0], areas[1]), ('die1', pend)]
             else:
                 res += [('die1', pend)]
             pend = None

@@ -124,6 +124,14 @@ pub struct Enemy {
     /// another SetAnim
     #[serde(default = "minus_one")]
     pub roll_ctl: i32,
+    /// field: TeleportNearPlayer's controller 0x0804D3EC (singleton 0x03003244, update 0x08034BDE) - its tick (+1 a
+    /// frame from 0 at the enter), -1 = not the current state, and the side drawn at the enter. A state object: it
+    /// ticks in the animation tick, also while an event holds the AI (run 3 row 1,966,815, King Yemma in 18-14: the
+    /// landing's end SetAnim(0) - rand(255) - during the KO scene)
+    #[serde(default = "minus_one")]
+    pub tele_ctl: i32,
+    #[serde(default)]
+    pub tele_side: i32,
     /// Babidi's hover controller 0x03003014 (tick 0x0802AD58) is the current state: it rises (z down to -50) and
     /// counts its tick 1..23 then 8..23 (cel = tick >> 3) every frame - also while a scene holds the AI (real route
     /// 6-1 rfat_033 f12450: the hover cycles on through s-script's punch scene)
@@ -244,6 +252,8 @@ impl Enemy {
             hook: Hook::None,
             spit_ctl: -1,
             roll_ctl: -1,
+            tele_ctl: -1,
+            tele_side: 0,
             hover_ctl: false,
             anim_seq: 0,
             gfx_now: -1,
@@ -280,6 +290,7 @@ impl Enemy {
     ) {
         self.spit_ctl = -1;
         self.roll_ctl = -1;
+        self.tele_ctl = -1;
         self.hover_ctl = false;
         self.hook = Hook::None;
         let prev = self.a.anim;
@@ -563,6 +574,35 @@ pub fn tick_anim(w: &mut World, i: usize) {
     }
     w.rng = rng;
     w.events = ev;
+    // (after the copies are back: its SetAnim(0) draws)
+    if w.field.is_some() && w.en_ref(i).tele_ctl >= 0 {
+        tele_tick(w, i);
+    }
+}
+/// TeleportNearPlayer's controller update (0x08034BDE): tick + 1; at 36 SetAnimRaw(0x14) (raw 21), frame 0, the jump
+/// beside the player; frame = tick >> 2, from the landing (tick - 36) >> 2; hittable again from 54; at 72 SetAnim(0)
+/// (vfunc +0x28) - the node's end
+fn tele_tick(w: &mut World, i: usize) {
+    let t = w.en_ref(i).tele_ctl + 1;
+    w.en(i).tele_ctl = t;
+    if t == 36 {
+        let side = w.en_ref(i).tele_side;
+        teleport_beside(w, i, side);
+        w.en(i).tele_ctl = t;
+        if w.en_ref(i).a.sprite.and_then(|s| w.data.sprite(s)).is_some_and(|s| s.anim_raw(21).is_some()) {
+            crate::nodes::hold_pose(w, i, 21, 0);
+        }
+    }
+    if t >= 72 {
+        set_anim(w, i, &[AnimRef::N(0)], true, Some(true));
+        return;
+    }
+    if w.en_ref(i).own_state && matches!(w.en_ref(i).ea.pos.raw, 19 | 21) {
+        w.en(i).ea.pos.frame = if t < 36 { t >> 2 } else { (t - 36) >> 2 };
+    }
+    if t >= 54 {
+        w.en(i).a.hittable = true;
+    }
 }
 /// the sound of an accepted melee hit on the player (0x0802A1D4): gfx 0x60 / 0xE5 / 0xDC -> 30, 0xEE / 0xF4 / 0xED
 /// -> 62, else 48 + rand(2)

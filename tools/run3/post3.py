@@ -34,6 +34,7 @@ U, D, L, R, A, B, S, E = KEY.UP, KEY.DOWN, KEY.LEFT, KEY.RIGHT, KEY.A, KEY.B, KE
 LS, RS = KEY.L, KEY.R
 VT_OPTIONS = 0x080498F0  # the pause menu's Options page (the mode object 0x03000F90)
 OPTS = 0x03001914           # text speed, SFX volume, music volume (0..8)
+ORDER = (1, 2, 0)           # the Options page's slider rows: Sound FX, Music, Text Speed (bytes of OPTS)
 HOLD = 600
 # held through the credits, in turns (never A+B+START+SELECT together: the soft reset)
 CREDIT_HOLDS = [A, S, U, D, L, R, S | E, A | B, LS | RS, U | L, D | R, B, E, 0]
@@ -45,6 +46,14 @@ class PostDriver(ShopDriver):
         kind = g[0]
         if kind == 'optcycle':
             return self.optcycle(e)
+        if kind == 'talkif':
+            # ('talkif', x, y, side): 'talkto' when a live NPC stands within 24 px of (x, y) (4-20's s184 talker
+            # comes and goes with flags 44 / 45), else nothing
+            from common_field import objs
+            near = [o for o in objs(e) if o[0] in ('npc', 'npc_talk') and o[2] is not None
+                    and abs(o[2] - g[1]) + abs(o[3] - g[2]) <= 24]
+            self.goals[self.k] = ('talkto', *g[1:]) if near else ('wait', 1)
+            return None
         if kind == 'endmash':
             s = status(e)
             if s['area'][:2] == [7, 6]:
@@ -125,7 +134,16 @@ class PostDriver(ShopDriver):
             if st['tgt'] >= len(tgts):
                 st['row'] += 1
                 st['tgt'] = 0
-                st['ph'], st['w'] = 'down', 0
+                st['on'] = False
+                st['probes'] = 0
+                st['w'] = 0
+                return 0
+            if not st.get('on'):
+                # (the page keeps its cursor row from the last visit: find it first)
+                st['probes'] = st.get('probes', 0) + 1
+                if st['probes'] > 12:
+                    raise RuntimeError(f'optcycle: row not reached {st}')
+                st['ph'], st['w'], st['snap'] = 'probe', 0, [e.r8(OPTS + k) for k in range(3)]
                 return 0
             v = e.r8(OPTS + byte)
             want = tgts[st['tgt']]
@@ -136,10 +154,33 @@ class PostDriver(ShopDriver):
             if t % 16 == 0:
                 return L if v > want else R
             return 0
-        if st['ph'] == 'down':
-            prog = [D] + [0] * 30
-            if t <= len(prog):
-                return prog[t - 1]
+        if st['ph'] == 'probe':
+            # R, then (no slider moved: at its top) L; the moved byte names the cursor's row; the other key back;
+            # then UP / DOWN to the plan's row
+            if t in (1, 41):
+                return R if t == 1 else L
+            if t in (40, 80):
+                now = [e.r8(OPTS + k) for k in range(3)]
+                moved = [k for k in range(3) if now[k] != st['snap'][k]]
+                if moved:
+                    cur = ORDER.index(moved[0])
+                    back = L if t == 40 else R
+                    d = st['row'] - cur
+                    print('  optcycle probe: cursor row', cur, '-> row', st['row'], now, flush=True)
+                    st['prog'] = [back] + [0] * 40
+                    for _ in range(abs(d)):
+                        st['prog'] += [D if d > 0 else U] + [0] * 40
+                    # (on the row: adjust; else move and probe again - a DOWN can be lost)
+                    st['here'] = d == 0
+                    st['ph'], st['w'] = 'move', 0
+                    return 0
+                if t == 80:
+                    raise RuntimeError(f'optcycle: no slider moves {st} {now}')
+            return 0
+        if st['ph'] == 'move':
+            if t <= len(st['prog']):
+                return st['prog'][t - 1]
+            st['on'] = st['here']
             st['ph'], st['w'] = 'row', 0
             return 0
         if st['ph'] == 'close':
@@ -180,7 +221,8 @@ HERCULE = [
     ('talkto', 224, 88, 'D'), ('wait', 20),
     ('walk', 4, 140), ('hold', L, 30), ('area', 3, 14), ('wait', 30),
     # (the tank first: its shells knock Goku off the walk round the circus wall)
-    ('fight2', 3000), ('wait', 30), ('walk', 400, 8), ('hold', U, 30), ('area', 3, 15), ('wait', 30), ('pausespin', 2), ('fight2', 2500), ('wait', 30),
+    ('fight2', 3000), ('wait', 30), ('walk', 240, 70), ('walk', 400, 72), ('hold', U, 90),
+    ('area', 3, 15), ('wait', 30), ('pausespin', 2), ('fight2', 2500), ('wait', 30),
     ('walk', 160, 8), ('hold', U, 30), ('area', 3, 17), ('wait', 30), ('fight2', 2500), ('wait', 30),
     ('walk', 160, 290), ('hold', D, 30), ('area', 3, 15), ('wait', 30),
     ('walk', 160, 290), ('hold', D, 30), ('area', 3, 14), ('wait', 30),
@@ -195,7 +237,10 @@ FINAL = [
     ('walk', 100, 90), ('hold', U, 60), ('endmash', 30000), ('credits',), ('titlekeys',),
 ]
 
-GOALS = ([('wait', 20), ('menutour',), ('talkto', 232, 248, 'D'), ('wait', 20), ('talkto', 128, 136, 'D'),
+GOALS = ([('wait', 20), ('menutour',),
+          # (from 4-20's west entrance - k3_kidbuu comes in from 4-1 - along the path and up through the gate)
+          ('walk', 240, 385), ('walk', 240, 200),
+          ('talkif', 232, 248, 'D'), ('wait', 20), ('talkif', 128, 136, 'D'),
           ('wait', 20)] + TO_4_1 + TALKS_4_1 + ZMART_WEST + [('optcycle',)] + SAVE_4_1 + HERCULE + SAVE_4_1 +
          [('reset',), ('continue',), ('wait', 30), ('pausespin', 3)] + TO_4_20 + FINAL)
 

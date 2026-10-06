@@ -122,7 +122,7 @@ class SbDriver2(ShipDriver2):
             if self.t > 3000:
                 raise RuntimeError(f'bout: still in a menu after 3000 frames: {s}')
             return B if self.t % 30 < 3 else 0
-        if kind == 'retry_here' and self.retry_k != self.k - 4:
+        if kind == 'retry_here' and self.retry_k != self.retry_target(self.k):
             self.cycles = 0
         if kind == 'hpok':
             # ('hpok', frac): the active character below frac of max HP -> soft reset (A+B+START+SELECT) and the
