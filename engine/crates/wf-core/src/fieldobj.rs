@@ -756,6 +756,8 @@ pub fn collect(w: &mut World, k: usize, slot: u8) {
         None
     };
     w.sfx(45, 64);
+    // the item's icon object (as `show_item_get`'s: the icon's size)
+    crate::vram::acquire(w, crate::vram::Owner::GetIcon, crate::scene::item_icon_bytes(item));
     // the hold pose: raw anim 14, cel 1, facing kept (state 0x0804985C)
     if let Some(pi) = w.player_idx(slot as usize) {
         crate::player::script_pose(w, pi, 13, 1);
@@ -785,6 +787,7 @@ pub fn item_get_step(w: &mut World) {
     if g.left == 0 {
         // the presentation ends: the player leaves the hold pose (SetAnim(0)); the count and the event follow a frame later
         let slot = g.slot as usize;
+        crate::vram::release(w, crate::vram::Owner::GetIcon);
         if let Some(pi) = w.player_idx(slot) {
             if !crate::player::resume_it(w, pi) {
                 crate::player::set_idle(w, pi);

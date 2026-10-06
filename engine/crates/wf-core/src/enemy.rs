@@ -1777,12 +1777,24 @@ pub fn footstep(w: &mut World, i: usize, path: bool) {
 /// via 0x0800EDF8
 pub fn swap_gfx(w: &mut World, i: usize) {
     let d = Arc::clone(&w.data);
+    // (the object's own graphics: a placement's sprite, not the type's - Pilaf's Castle 10-9's Vampire is placed
+    // with gfx 274)
     let g = if w.en_ref(i).gfx_now >= 0 {
         Some(w.en_ref(i).gfx_now)
     } else {
-        d.enemy(w.en_ref(i).ty).and_then(|t| t.gfx)
+        w.en_ref(i)
+            .a
+            .sprite
+            .map(|s| s + crate::content::GFX_OFFSET)
+            .or_else(|| d.enemy(w.en_ref(i).ty).and_then(|t| t.gfx))
     };
     let to = match g {
+        // the vampires' bat forms (VampireSummon's enter 0x08033B4C, VampireSummon2's 0x08033908: 0x112 / 0x114,
+        // 0xCA / 0xCB, 0x120 / 0x121; tour castle_pw_10_9 f75: the Vampire turns bat on its first update)
+        Some(0x112) => 0x114,
+        Some(0x114) => 0x112,
+        Some(0x120) => 0x121,
+        Some(0x121) => 0x120,
         Some(0xbb) => 0xbc,
         Some(0xbc) => 0xbb,
         Some(0xe6) => 0xe7,

@@ -1271,6 +1271,7 @@ pub struct Dialog {
     /// a message window (kind 3) that fades in / out ([`window_fades`], decided when it opens)
     #[serde(default)]
     pub fades: bool,
+
     /// `t` at the current page's first typed character (a choice page's cursor object is made then)
     #[serde(default)]
     pub page_t: i32,
@@ -3002,8 +3003,8 @@ pub fn banner_step(w: &mut World) {
 }
 
 /// a load's banner (the arrival, after the HUD object: segment sb 4-21): the old one went with the old area's
-/// objects; a new one when the area's name id differs from the last one shown and is not 0 (the 3D world map only
-/// records the id; a cutscene's backdrop load has no banner object: segment sb 4-24)
+/// objects; the id is recorded when it differs from the last one (also 0), and a new banner starts when it is not 0 (the 3D world map only records the id; a cutscene's backdrop load has no banner
+/// object: segment sb 4-24)
 pub fn banner_load(w: &mut World, a: &crate::fieldcontent::AreaDef, three_d: bool, scene: bool) {
     if scene {
         return;
@@ -3011,8 +3012,13 @@ pub fn banner_load(w: &mut World, a: &crate::fieldcontent::AreaDef, three_d: boo
     w.scene.banner = None;
     if three_d {
         w.scene.banner_last = a.name_id;
-    } else if a.name_id != 0 && a.name_id != w.scene.banner_last {
+    } else if a.name_id != w.scene.banner_last {
+        // (`0x08008E4E`: a different id is stored even when it is 0 - an unnamed map between two visits of the same
+        // area brings its banner back; tour_kais_pad191 f156)
         w.scene.banner_last = a.name_id;
+        if a.name_id == 0 {
+            return;
+        }
         w.scene.banner = Some((a.banner.clone(), 0));
         w.scene.banner_made = w.frame;
         crate::vram::banner(w, true);
@@ -3827,7 +3833,13 @@ fn tick_dialog(w: &mut World) {
         d.phase = DialogPhase::Shown;
         return;
     }
-    if d.options > 0 && matches!(d.phase, DialogPhase::Opening | DialogPhase::Shown) {
+    // (a text box's choice: the cursor object exists from its last page's text on - UP / DOWN before that do
+    // nothing: tour_kami_grandkai11 f624..636, DOWN on the first page of a 2-page "Yes / No")
+    let cursor_up = d.kind == 3
+        || d.page + 1 >= d.pages
+            && d.phase == DialogPhase::Shown
+            && (d.typed > 0 || d.typing.get(d.page as usize).copied().unwrap_or(0) == 0);
+    if d.options > 0 && cursor_up && matches!(d.phase, DialogPhase::Opening | DialogPhase::Shown) {
         // (the cursor stops at the first / last option, no wrap: run 3 row 883,540, Papaya Island 7-2's trinket stall
         // s259 - DOWN twice on "-Sure / -No thanks" stays on No thanks)
         if k & DOWN != 0 {
@@ -3908,8 +3920,9 @@ fn tick_dialog(w: &mut World) {
                 if d.typed < need {
                     if d.typed == 0 {
                         d.page_t = d.t;
-                        // a choice box's cursor object (`0x080178C8`, 0x100 tiles) appears with the text
-                        cursor |= d.page == 0 && d.options > 0;
+                        // a choice box's cursor object (`0x080178C8`, 0x100 tiles) appears with the text of its last
+                        // page (the options' page: tour_kami_grandkai11 f646, the 2nd page of a 2-page choice)
+                        cursor |= d.page + 1 >= d.pages && d.options > 0;
                     }
                     d.typed += 1;
                 } else if press {

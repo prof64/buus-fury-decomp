@@ -338,6 +338,9 @@ pub enum Owner {
     Figure(u32),
     /// the Computer Room database's scroll arrows (`0x080271D0`: 0x40 each; types 0..3)
     DbArrow(u8),
+    /// a picked-up item's icon over the player (`0x0802BD4C`, vtable 0x0804B358: the icon's size; the item-get
+    /// presentation's, freed with it - tour_castle_ship_48 f167)
+    GetIcon,
     /// a cutscene ki blast (`fire_blast`, class 0x08027CBC: 0x100) of the shooting actor
     Blast(crate::world::EntityId),
     /// a keyed shared graphic (`keyed`)

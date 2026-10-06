@@ -642,6 +642,15 @@ fn cond(w: &mut World, c: &C, n: u16) -> bool {
         }
         K::IfPlayerInFront => en::player_in_front(w, i, 48),
         K::IfPlayerInZone => en::dist2(w, i) <= 160 * 160,
+        // cond 0x0804EE04 (named for the vampire lair, INFERRED before): the enemy's own footprint (0x0800FDFA) lies
+        // wholly on free enemy-grid tiles (map object +0xB0, the test 0x08009324) - a bat over a wall or another
+        // enemy's mark does not turn back (tour castle_pw_10_9 f151); battles keep the player check
+        K::IfPlayerInRoomZone if w.field.is_some() => {
+            let a = &w.en_ref(i).a;
+            let (x0, y0) = (a.px(), a.py());
+            let (x1, y1) = (x0 + a.foot_w, y0 + a.foot_h);
+            w.col.as_ref().is_none_or(|c| c.test(crate::world::Layer::Enemy, x0, y0, x1, y1))
+        }
         K::IfPlayerInRoomZone => en::player(w, i).is_some(),
         K::IfPlayerBlastIncoming => en::blast_incoming(w, i),
         // 0x080331EC: only while IsAnim(0) (3-2: a tank that just started driving does not roll its Chance); the
@@ -1308,9 +1317,13 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
         }
         // field (HFIL's Nosferatu, sc_hfil 18-8): the puff appears in the frame the state is entered, its rate drawn
         // (0x1000 + rand(0x1000), 0x0804E733); battle keeps the reference's fixed-rate puff on the node's update
+        // (enters 0x0804E714 / 0x0804E8xx: only with 0x400 bytes of sprite memory free - else no puff and no rand
+        // (tour castle_pw_10_9 f151) - at the shown frame's record box centre, 0x0800FE34)
         K::VampireSummon | K::VampireSummon2 if w.field.is_some() => {
-            let (cx, cy) = w.en_ref(i).a.center();
-            crate::fx::puff_rng(w, cx, cy);
+            if crate::vram::room_of(w).is_none_or(|r| r >= 0x400) {
+                let (cx, cy) = en::frame_box(w, i).center();
+                crate::fx::puff_rng(w, cx, cy);
+            }
         }
         K::TeleportNearPlayer => {
             r.d[0] = w.rng.rand(4);
@@ -2531,8 +2544,14 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                 let a = &w.en_ref(i).a;
                 let (ox, oy) = NOZ[a.facing as usize];
                 let (dir, x, y) = (a.facing, (a.px() + ox) << 8, (a.py() + oy) << 8);
-                let s = shots::flame(w, me, dir, x, y);
-                shots::add(w, s);
+                // the spawner 0x080249E0 makes a flame only with 0x1400 bytes of sprite memory free and 4 object
+                // slots left (field: a save point's text box holds memory - tour castle_pilaf_save14 f104: no flame,
+                // no rand)
+                let objects = w.ents.iter().filter(|e| !e.removed).count() as i32;
+                if crate::vram::room_of(w).is_none_or(|r| r >= 0x1400 && 0x80 - objects >= 4) {
+                    let s = shots::flame(w, me, dir, x, y);
+                    shots::add(w, s);
+                }
             }
             if f == 128 {
                 set_anim(w, i, &[nm("idle")], true, Some(true));

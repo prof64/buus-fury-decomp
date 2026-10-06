@@ -1,4 +1,4 @@
-"""state_at.py ROW OUT.ss [--chain run2]: the emulator state before chain row ROW, saved to OUT.ss - replayed from
+"""state_at.py ROW OUT.ss [--chain run2] [--from-reset]: the emulator state before chain row ROW, saved to OUT.ss - replayed from
 the chain's nearest cut state (<chain>/cuts/c<N>.ss, N <= ROW) with the recorded keys (headless, muted). For making
 menu_parity / route-planning / tour states somewhere a real run passes (e.g. the Capsule Corp lobby, run 2 row
 74,990). A save state does not carry the cartridge's EEPROM (the in-game saves): it is taken from the cut's segment
@@ -26,12 +26,17 @@ keys = []
 for _, ks, _ in chains.parts(chain):
     keys += ks
 start = cuts[-1] if cuts else 0
-if not start:
-    sys.exit('no cut state at or before the row (power-on replay not supported here)')
-e = start_emu(str(P['cuts'] / f'c{start}.ss'))
+# --from-reset: replay from the soft reset (slow: every row) - the only way to the EEPROM where the chain's cut docs
+# carry none (run 1's)
+if '--from-reset' in a:
+    start = 0
+if start:
+    e = start_emu(str(P['cuts'] / f'c{start}.ss'))
+else:
+    e = start_emu('reset')
 doc = P['cuts'] / f'c{start}.json'
 eeprom = None
-if doc.exists():
+if start and doc.exists():
     # (the doc's head only: the init comes before the frames)
     head = doc.read_text()
     i = head.find('"eeprom":"')

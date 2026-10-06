@@ -394,6 +394,16 @@ impl Session {
                     f.iters = f.iters.wrapping_add(1);
                 }
             }
+            // a script-opened screen's fades (the save point's Save screen): the area banner ages on (tour_kais_volc19:
+            // its end at 534,941 counts the fade-out's and fade-in's iterations)
+            if w.menu.scripted
+                && matches!(
+                    w.menu.phase,
+                    crate::menu::Phase::FadeOut { .. } | crate::menu::Phase::FadeIn { .. } | crate::menu::Phase::Leave { .. }
+                )
+            {
+                crate::scene::banner_step(w);
+            }
             crate::menu::post(w);
             return;
         }

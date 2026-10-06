@@ -763,6 +763,14 @@ pub fn replay_with(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: 
                     })).collect();
                     eprintln!("      order {}", o.join(" "));
                 }
+                // SEGMENT_MARKS: each enemy's enemy-grid mark
+                if std::env::var_os("SEGMENT_MARKS").is_some() {
+                    let ms: Vec<String> = (0..w.ents.len()).filter(|&i| !w.ents[i].removed).filter_map(|i| match &w.ents[i].body {
+                        Body::Enemy(e) => Some(format!("{}:ty{} @({},{}) {:?} det {}", w.ents[i].id, e.ty, e.a.px(), e.a.py(), e.marked, e.detached)),
+                        _ => None,
+                    }).collect();
+                    eprintln!("  t{k} marks {}", ms.join(" | "));
+                }
                 // SEGMENT_GRID=tx0,ty0,tx1,ty1: the enemy-layer grid in those tiles ('#' blocked)
                 if let Some(v) = std::env::var("SEGMENT_GRID").ok() {
                     let t: Vec<i32> = v.split(',').filter_map(|s| s.parse().ok()).collect();

@@ -166,6 +166,12 @@ def record(state, name, goals, frames=20000):
         sd_write(e, ep.read_bytes())
     drv = TourDriver(goals)
     init, ob, rows = sg.record(e, lambda j, ee: None if drv.done() else drv.keys(ee), frames)
+    # the recording ends with complete iterations: rows of a last, unfinished long iteration (an area load's) would
+    # compare a half-built game state (tour_earth_mansion's last rows)
+    while len(rows) > 1 and rows[-1]['lf'] == rows[-2]['lf']:
+        rows.pop()
+    if len(rows) > 1:
+        rows.pop()
     if ep.exists():
         import base64
         import zlib

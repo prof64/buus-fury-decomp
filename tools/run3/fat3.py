@@ -114,6 +114,7 @@ def real_pyramid_driver3():
             super().__init__(goals)
             self.first = list(goals)
             self.reset_t = None
+            self.n12 = 0
 
         def keys(self, e):
             if self.reset_t is not None:
@@ -136,6 +137,15 @@ def real_pyramid_driver3():
                 if 420 <= ph < 423 or 540 <= ph < 543:
                     return KEY.A
                 return 0
+            s = status(e)
+            # (14-12 is on the way (its up exit to 14-16) until the maze's state shuts it: 2,000 frames in it - the
+            # driver jiggling against the shut exit - is the fall's dead end; the way through takes a few hundred)
+            self.n12 = self.n12 + 1 if s['area'][:2] == [14, 12] else 0
+            if self.n12 > 2000:
+                print('  stuck in 14-12: soft reset -> Continue', s, flush=True)
+                self.reset_t = 0
+                self.n12 = 0
+                return KEY.A | KEY.B | KEY.SELECT | KEY.START
             return super().keys(e)
 
         def step(self, e):
@@ -161,17 +171,6 @@ def real_pyramid_driver3():
                 if 60 <= ph < 61 and self.t > 90:
                     return KEY.LEFT if (self.t // 180) % 2 else KEY.RIGHT
                 return 0
-            # (14-12 is on the way (its up exit to 14-16) until the maze's state shuts it: stuck there 600 frames in
-            # one spot = the fall's dead end)
-            pos = (tuple(s['area'][:2]), tuple(s['p'][:2]) if s['p'] else None)
-            if pos == getattr(self, 'p12', None):
-                self.n12 += 1
-            else:
-                self.p12, self.n12 = pos, 0
-            if s['area'][:2] == [14, 12] and self.n12 > 600:
-                print('  pit fall into 14-12: soft reset -> Continue', s, flush=True)
-                self.reset_t = 0
-                return KEY.A | KEY.B | KEY.SELECT | KEY.START
             return super().step(e)
     return Pyr3
 

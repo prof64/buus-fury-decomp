@@ -4809,6 +4809,26 @@ world-map flight's OBJs (rclose_002 f1620 / f2580: plane, labels - mode 7 OBJs),
 * Shake on OBJs, actors only (effects not shaken) was tried: worse overall (board 70.3 against 71.6 %) - all OBJs
   stay shaken.
 
+**Update 16 (Super Buu agent): the ship-fixes agent's tour items (enemy AI) - three tours now exact end to end.**
+* **castle_pilaf_save14** (the flame breath under the save point's text box, f104): the flame spawner 0x080249E0 makes
+  a flame only with 0x1400 bytes of sprite memory free and 4 object slots left (the text box holds memory: no flame,
+  no rand) - `nodes.rs` FlameBreath. 104 -> 239 / 239.
+* **castle_pw_10_9** (the Vampire's sprite, f75): VampireSummon's enter 0x08033B4C / VampireSummon2's 0x08033908 swap
+  the graphics 0x112 / 0x114, 0xCA / 0xCB, 0x120 / 0x121 (`enemy::swap_gfx`, from the object's own graphics - a
+  placement's, not the type's); their puff needs 0x400 bytes free (0x0804E714 / 0x0804E894) and sits at the shown
+  frame's box centre; **IfPlayerInRoomZone is "my footprint lies wholly on free enemy-grid tiles"** (cond 0x0804EE04:
+  0x0800FDFA + 0x08009324 on map object +0xB0; field only - battles keep the TS reference's always-true). 75 ->
+  6,602 / 6,602.
+* **desert_nj37** (the ninja's throw, f7 sound 61): a NinjaStarThrow in progress imported (its controller 0x03003074
+  as the object's state: the count is the object's tick). 7 -> 512 / 512.
+* Tours: 89 / 116 exact end to end with this tree.
+* **Left (not changed): HFIL monsters (kais_hfil5 f1, kais_hfil9 f212).** hfil9: a stale enemy-grid mark (tiles 45-46,
+  row 27) in ours that the game's grid lacks makes a chase's plan wall-follow (waypoint (96256, 57344) against the
+  game's straight plan to the player) - the marks' import / the game's unmark-the-current-footprint rule against our
+  remembered rect (`SEGMENT_MARKS=1` lists each enemy's mark; `work/superbuu/pix/egrid.py` reads the game's grid).
+  hfil5: the cut's first frame - a chasing monster moves in the game's f1 while the logic counter has not advanced
+  (arrival fade-in); ours steps it a frame later. Both look like import / arrival timing (importer agent's?).
+
 * Not mine, noticed: ship 8-1 cuts (shipr_056 / shipr_172 f360 ..) lost 11 exact BG frames between two runs of the
   board this session with only other agents' changes in between (the tile clock's `cam_iters` edit is the candidate).
 
@@ -6228,3 +6248,24 @@ before the on-enter script releases them (earth_mansion: 1010, earth_zmart_city:
 trigger 0x08075394 (kami_grandkai: 44) and 6-20's 0x08079A90 (kami_lookout20: 860); 1-11 an extra 4-unit block in
 ours during a talk (kami_grandkai11: 611). Not reachable from any run state (flags / story points): listed in each
 tour_goals file's notes; 19-6 has no entrance in the data; 3-23 / 3-24 have no exits or objects.
+
+**Earth agent 2026-10-05 (6): the field tours' NPC / animation items (ship fix agent's list).**
+* **Fixed - souls' animation on import (kami_yemma: 2 -> 2,704 / 2,704 exact):** the soul sprite (240, sprite def
+  249) walks in raw 2, whose records are its idle's (raw 1); the recorder names an animation by its first matching
+  slot (`capture.py anim_raw`), so a walking soul's row reads raw 1 and the import restarted its walk. A wander
+  mid-walk (+8 frames left > 0) whose raw 2 aliases raw 1 (`Anim::canon_raw`) is imported in raw 2 (`import_npc_step`).
+  Tours: 89 / 116 exact on this tree, none worse.
+* **Open - "one tick ahead after a dialog" / the wandering NPC's half pixel / the "chest":** all three are the event's
+  end frame, which object runs its update in it:
+  - kami_papaya2 2,798: sprite 217, stopped mid-walk by the talk's start, resumes in our end-frame release
+    (`release_field_npcs`, from_wait) - the game moves it a frame later; the other NPCs released in that frame do
+    match (sprites 302 / 186 / 185 start walks with the game's RNG). Skipping the talked NPC / a stopped walk in the
+    release made 18 other tours worse - not the rule.
+  - kami_lookout 1,953, castle_ship_41 498, castle_forest_16b 163: one NPC's idle a tick ahead in the end frame
+    (the `ended` extra tick or the release).
+  - castle_ship_28 129 / castle_forest_n 2,937: the "chest" is the **player** (sprite 279): after a director wait
+    (the chest's callback, depth 0) the game's player walks in the end frame and ours a frame later; after a talk's
+    text box the game's player stays idle in the end frame and ours walks. The breakable callback's measured one-frame
+    resume (`break_due`, HFIL 18-10) is the nearest rule.
+  Needs the end frame's object order measured in the emulator (which objects update before / after the VM resume,
+  per wait kind) before changing the shared resume code.

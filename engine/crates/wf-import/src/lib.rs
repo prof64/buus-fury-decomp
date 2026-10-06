@@ -592,6 +592,8 @@ fn import_ai_rt(w: &mut World, ei: usize, lvl: usize, ram: &GbaRam, r: u32, note
             K::HeavyPunch => {}
             // FlameBreath (the controller 0x03002FA8 counts in the object's tick, as HeavyPunch): `patch_enemy`
             K::FlameBreath => {}
+            // NinjaStarThrow (the controller 0x03003074 counts in the object's tick): `patch_enemy`
+            K::NinjaStarThrow => {}
             // EnergyBarrage (Pikkon's controller 0x030030E0 as the object's state: obj+0x12 the tick): `patch_enemy`
             K::EnergyBarrage => {}
             // BackStep (enter 0x08031388, update 0x080313EA): +4 / +8 the hop step, +0x10 the counter (48 at the enter,
@@ -1481,6 +1483,7 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
         let field = w.field.is_some();
         let e = w.en_ref(ei);
         let nf = e.a.anim_raw(&d).and_then(|raw| e.a.sprite.and_then(|s| d.sprite(s)).and_then(|s| s.anim_raw(raw))).map(|a| a.steps(e.a.facing).len() as i32);
+        let anim_seq = e.anim_seq as i32;
         for st in w.en(ei).ai.stack.iter_mut() {
             for (n, rt) in st.rt.iter_mut().enumerate() {
                 if st.tree.nodes.get(n).is_some_and(|x| x.k == wf_core::ai::K::HeavyPunch) {
@@ -1514,6 +1517,12 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
                 if st.tree.nodes.get(n).is_some_and(|x| x.k == wf_core::ai::K::SoldierThrow) {
                     rt.f = tick;
                     rt.d[2] = raw_now;
+                }
+                // a NinjaStarThrow in progress (its controller 0x03003074 as the object's state): the count is the tick
+                // (tour desert_nj37: tick 1 at the cut - the star and sound 61 at f7; a fresh count threw 8 late)
+                if st.tree.nodes.get(n).is_some_and(|x| x.k == wf_core::ai::K::NinjaStarThrow) && ctl_obj == 0x0300_3074 {
+                    rt.f = tick;
+                    rt.d[6] = anim_seq;
                 }
                 // a Janemba Hand's HandAmbush in progress (runtime vt 0x0804C174: +4 entered): placed and striking, its
                 // window counted on the strike animation's tick (field: ours counts updates, the first one places;
@@ -1841,6 +1850,10 @@ fn import_npc_step(w: &mut World, i: usize, ram: &GbaRam, o: u32, row: Option<(i
     let rng = w.rng.clone();
     wf_core::fieldnpc::import_step(w, i, idx);
     w.rng = rng;
+    // (a sprite whose walk (raw 2) is its idle's records - the souls, sprite 240: the row names the struct by its first
+    // slot, raw 1 - walks in raw 2 while the wander moves: kami_yemma f0, a soul 6 ticks into its walk)
+    let walk_aliased = match &w.ents[i].body { Body::Npc(n) => n.a.sprite, _ => None }.and_then(|s| w.data.sprite(s)).and_then(|sp| sp.anim_raw(2)).is_some_and(|a| a.canon_raw == 1);
+    let moving = ram.s32(st + 8) > 0;
     let Body::Npc(n) = &mut w.ents[i].body else { return };
     let facing = n.a.facing;
     if let Some(b) = n.behaviour.as_mut() {
@@ -1857,6 +1870,7 @@ fn import_npc_step(w: &mut World, i: usize, ram: &GbaRam, o: u32, row: Option<(i
             }
         }
         if let Some((_, raw, cel, tick)) = row {
+            let raw = if raw == 1 && walk_aliased && moving { 2 } else { raw };
             (b.raw, b.frame, b.tick) = (raw, cel, tick);
             b.anim = if raw == 1 { 0 } else { 1 };
         }
