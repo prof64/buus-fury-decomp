@@ -1684,7 +1684,9 @@ pub fn update(w: &mut World, i: usize) {
     pl.sync_anim(w);
     *p(w, i) = pl;
     let ko = pr(w, i).ko_at;
-    if ko >= 0 && w.frame as i64 - ko == 200 {
+    // (battle; in the field the death script plays it - s000 node 7's `play_music(8)` - and not on its other branches:
+    // run 3 row 1,796,302, 0-15, flag 282 set by s020 - a scripted loss, s000 jumps to s021 with no song)
+    if ko >= 0 && w.frame as i64 - ko == 200 && w.field.is_none() {
         w.events.push(Event::Song { id: 8 });
     }
     // the task list (screen shakes) runs after the objects; the first player is the last object updated

@@ -214,6 +214,11 @@ pub struct Globals {
     /// field: the frame whose shake tick is due after the script phase (session.rs `step_post`)
     #[serde(default)]
     pub shake_due: u32,
+    /// field: a held frame's shake tick, due after the frame's script phase and the rest of an interrupted object pass
+    /// (session.rs: the task list runs after the objects - run 3 row 1,097,649: a drop script's hold ends, the pass
+    /// resumes with an enemy's hit and its 48 + rand(2), then the shake's two draws)
+    #[serde(default)]
+    pub shake_held: bool,
     /// the game's frame counter 0x03000F94 at frame 0 (`clock` = fc0 + frame; nodes that test the counter itself,
     /// e.g. VampireGrab's drain every 16 ticks)
     #[serde(default)]

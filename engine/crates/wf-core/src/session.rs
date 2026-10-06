@@ -339,7 +339,7 @@ impl Session {
             } else if (crate::field::frozen(w) || pre_event) && !watch_closing {
                 // the task list (screen shakes) keeps running while an inline event holds the objects' update (the
                 // real route, Southwest Forest 8-3: a crit shake draws its offsets through the level-up popup)
-                w.tick_shakes();
+                w.g.shake_held = true;
                 // and the coins fly on (fieldobj.rs coin_move)
                 crate::fieldobj::held_moves(w);
                 // the HUD object updates in the hold's first frame too (the nested loop's frame): its low-HP beep comes
@@ -410,7 +410,8 @@ impl Session {
         if w.field.is_some() {
             // the screen shake is a camera mode, updated with the camera after the frame's scripts and commands: a
             // script camera command started this frame replaces it first (scene.rs `camera_mode_set`)
-            if w.g.shake_due == w.frame && w.g.shakes_ticked != w.frame {
+            let held = std::mem::take(&mut w.g.shake_held);
+            if !held && w.g.shake_due == w.frame && w.g.shakes_ticked != w.frame {
                 w.tick_shakes();
             }
             let k = w.events.len();
@@ -420,6 +421,11 @@ impl Session {
             let closed = w.g.clock_mark.is_none();
             let p0 = w.story.play_frames;
             crate::field::post_step(w);
+            // a held frame's task list: after the scripts and the rest of an interrupted pass that completes in this
+            // frame (`field::post_step`'s resume)
+            if held {
+                w.tick_shakes();
+            }
             if closed && w.story.play_frames > p0 {
                 w.story.play_frames -= 1;
             }

@@ -197,6 +197,10 @@ fn main() {
         maps.push(app.view.map.as_ref().map(|m| m.id.clone()).unwrap_or_default());
         frames.push(fr);
     }
+    // the autosave's serialization of the whole session's recording (Control::advance runs it every 30 s of play)
+    let t = Instant::now();
+    ctl.finalize(&app);
+    println!("autosave of the {}-frame recording: {:.2} ms", frames.len(), t.elapsed().as_secs_f64() * 1e3);
     let n = frames.len().max(1);
     let wall = t_all.elapsed().as_secs_f64();
     println!("ran {} frames in {wall:.1} s ({:.0} fps unpaced)", frames.len(), frames.len() as f64 / wall);

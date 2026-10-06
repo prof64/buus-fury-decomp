@@ -313,7 +313,7 @@ fn main() {
                         wf_core::view::render_view(w, &mut view);
                         for (i, e) in w.ents.iter().enumerate().filter(|(_, e)| !e.removed) {
                             if let Some(a) = w.actor(i) {
-                                eprintln!("  ent {} flash {} {} sprite {:?} anim {:?} t {} facing {} shown {:?} ea {:?} pos {} {}", e.id, a.flash, a.flash_map, a.sprite, a.anim, a.anim_t, a.facing, wf_core::scene::shown_anim(w, i), match &e.body { wf_core::world::Body::Enemy(n) => Some((n.ea.pos.raw, n.ea.pos.frame, n.ea.pos.tick)), _ => None }, a.x >> 8, a.y >> 8);
+                                eprintln!("  ent {} flash {} {} sprite {:?} anim {:?} t {} facing {} shown {:?} ea {:?} pos {} {} z {}", e.id, a.flash, a.flash_map, a.sprite, a.anim, a.anim_t, a.facing, wf_core::scene::shown_anim(w, i), match &e.body { wf_core::world::Body::Enemy(n) => Some((n.ea.pos.raw, n.ea.pos.frame, n.ea.pos.tick)), _ => None }, a.x >> 8, a.y >> 8, a.z);
                             }
                         }
                         eprintln!("  suspended {:?}", w.field.as_ref().and_then(|f| f.vram.as_ref()).map(|v| v.suspended.clone()));

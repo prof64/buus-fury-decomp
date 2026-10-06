@@ -86,6 +86,11 @@ pub struct Enemy {
     /// into raw 20 and every cel change of it show a frame late; `view::actor_cel`)
     #[serde(default)]
     pub shown_prev: (i32, i32),
+    /// the height at the end of the previous frame: field Janemba's body is drawn at it (its AI's rise / descent step
+    /// comes after its sprite's position is taken - sc_janemba f1068 / f2338: the body and its arms (which copy the
+    /// body's height in their own earlier update) move together; `view::render_view`)
+    #[serde(default)]
+    pub z_prev: i32,
     /// field Janemba arm part (0x34 / 0x35): the hand strike's controller ticks (0 = none) and its side (A = 0x34)
     #[serde(default)]
     pub strike: (i32, bool),
@@ -225,6 +230,7 @@ impl Enemy {
             mirror_cel: 0,
             mirror_prev: 0,
             shown_prev: (0, 0),
+            z_prev: 0,
             strike: (0, false),
             strike_hand: 0,
             script_hits: 0,
@@ -544,7 +550,17 @@ pub fn tick_anim(w: &mut World, i: usize) {
     let d = Arc::clone(&w.data);
     let mut ev = std::mem::take(&mut w.events);
     let mut rng = w.rng;
+    // the roll controller's height (its update 0x08034D86, t = the counter before the +8): from t = 0x80 the object's
+    // +0x176 = -(sin table 0x087B6EEC[t - 0x80] >> 11) - a 32 px leap over the dash - and 0 from t = 0x100. Field
+    // only (the battle reference draws the roll on the ground). sc_janemba 18-14 f5,150 .. (emulator OAM: the
+    // body 24 + 0, 7, 13 .. 32 px over its shadow)
+    let roll = (w.field.is_some() && w.en_ref(i).a.anim.is_some()).then_some(w.en_ref(i).roll_ctl).filter(|&t| t >= 0x80);
     w.en(i).tick_anim(&d, &mut rng, &mut ev);
+    if let Some(t) = roll {
+        const ROLL_ARC: [i32; 16] = [0, 7, 13, 18, 23, 27, 30, 32, 32, 32, 30, 27, 23, 18, 13, 7];
+        let u = t - 0x80;
+        w.en(i).a.z = if u >= 0x80 { 0 } else { -ROLL_ARC[(u >> 3) as usize & 15] };
+    }
     w.rng = rng;
     w.events = ev;
 }
@@ -595,6 +611,7 @@ pub fn update(w: &mut World, i: usize) {
     {
         let e = w.en(i);
         e.shown_prev = (e.ea.pos.raw, e.ea.pos.frame);
+        e.z_prev = e.a.z;
     }
     if crate::scene::puppet_update(w, i) {
         return;

@@ -568,7 +568,12 @@ pub fn render_view(w: &World, out: &mut RenderView) {
             Body::Enemy(n) => {
                 let step = actor_cel(w, i);
                 if n.a.alpha > 0 {
-                    actor_draw(w, id, &n.a, step, out);
+                    // field Janemba's body: the height before this frame's AI step (`Enemy::z_prev`)
+                    let mut a = std::borrow::Cow::Borrowed(&n.a);
+                    if w.field.is_some() && n.ty == 0x33 && !n.part {
+                        a.to_mut().z = n.z_prev;
+                    }
+                    actor_draw(w, id, &a, step, out);
                 }
             }
             Body::Hand(h) => {

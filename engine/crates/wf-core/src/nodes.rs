@@ -3294,8 +3294,11 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             false
         }
         K::JanembaAscend => {
-            if f >= 8 {
-                w.en(i).a.z = (24 - 3 * f).max(-200);
+            // field: the rise starts a frame later (sc_janemba f1065 / f2335: the arms, which copy the body's height,
+            // first move in the game's picture of f1068 / f2338)
+            let s = if w.field.is_some() { 9 } else { 8 };
+            if f >= s {
+                w.en(i).a.z = (3 * s - 3 * f).max(-200);
             }
             f > 128
         }

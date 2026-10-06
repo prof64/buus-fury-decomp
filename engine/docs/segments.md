@@ -6701,3 +6701,17 @@ better; 0 worse). Pixel gate green - **its lock can take the 6 new frames** (re-
   falls back to a plain death). A death by "the hit on a script's first frame" needs a touch trigger with enemies at
   hand (none found post-game near Earth: 14-1 / 11-1 have no enemies, 8-12's NPC has idle soldiers) - left out.
 - `route3.chapter_of`: `k3_` -> `kidbuu`. SEGMENTS lines get added when recorded (k3 after b3, p3 after k3).
+
+**Update 21 (Super Buu agent, 2026-10-06): Janemba's arena - the minis' roll leap and the body's rise (field only).**
+* **The mini's roll leaps 32 px.** The roll controller's update (0x08034D86, t = its counter before the +8) writes the
+  object's height +0x176 from t = 0x80: -(sin table 0x087B6EEC[t - 0x80] >> 11) = 0, 7, 13, 18, 23, 27, 30, 32, 32,
+  32, 30 .. 7, and 0 from t = 0x100 (emulator OAM, sc_janemba f5,153 ..: the body 0, 7, 13 .. 32 px over its
+  shadow). Ours drew the dash on the ground. `enemy::tick_anim` (field; the battle reference keeps the roll on the
+  ground - no TS change).
+* **Janemba's rise / descent.** In the game's picture the body and its arms move together, the rise first showing at
+  f1,068 / f2,338 (ours: the body at f1,066, the arms - which copy the body's height in their own, earlier, update -
+  at f1,067). The field ascent's rise starts a frame later (`JanembaAscend`: from f 9), and the body is drawn at its
+  height from before this frame's AI step (`Enemy::z_prev`, like the frame byte's `shown_prev`).
+Board 18,650 -> 18,656 exact, none lost; sc_janemba sprites 137k -> 74k px, rj_049 50k -> 36k. Gates, pixel gate
+green. Left in sc_janemba: the minis' cels around a hop's start (sc_janemba f5,160: the game's mini shows its
+frame 1 a frame or two before ours, cel checks exact) and the effect positions the Earth agent's (12) left.

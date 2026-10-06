@@ -3,6 +3,8 @@
 the whole chain from the soft reset once to take each segment's end status (and to prove the logs replay)."""
 import gzip
 import json
+import os
+import shutil
 import sys
 from pathlib import Path
 
@@ -28,13 +30,19 @@ def rle(ks):
 def main():
     keys = json.loads((ROOT / 'work' / 'run2' / 'keys.json').read_text())
     OUT.mkdir(parents=True, exist_ok=True)
-    for p in OUT.glob('*.keys.gz'):
-        p.unlink()
+    # the new files go to a staging dir outside data/ and replace the tracked ones only when the whole repack has
+    # replayed (a commit taken mid-repack must never see data/realrun* half deleted: 482713e lost two key logs so)
+    stage = ROOT / 'work' / 'pack_stage' / OUT.name
+    if stage.exists():
+        shutil.rmtree(stage)
+    stage.mkdir(parents=True)
     e = start_emu('reset')
     man = []
+    stopped = None
     for n, (name, _) in enumerate(SEGMENTS):
         if name not in keys:
             print('stop: no keys for', name)
+            stopped = name
             break
         ks = keys[name]
         start = status(e)
@@ -42,11 +50,20 @@ def main():
             e.set_keys(k)
             e.run(1)
         # mtime 0: the same keys give the same bytes (no churn in git on a repack)
-        with open(OUT / f'{n:03d}_{name}.keys.gz', 'wb') as raw, gzip.GzipFile(fileobj=raw, mode='wb', mtime=0) as fh:
+        with open(stage / f'{n:03d}_{name}.keys.gz', 'wb') as raw, gzip.GzipFile(fileobj=raw, mode='wb', mtime=0) as fh:
             fh.write(json.dumps(rle(ks), separators=(',', ':')).encode())
         man.append({'n': n, 'chapter': chapter_of(name), 'name': name, 'frames': len(ks), 'start': start, 'end': status(e)})
         print(n, name, len(ks), status(e), flush=True)
-    (OUT / 'manifest.json').write_text(json.dumps(man, indent=1))
+    (stage / 'manifest.json').write_text(json.dumps(man, indent=1))
+    # the swap: new files in (os.replace: atomic per file), then the tracked key logs the new set no longer has out
+    new = {f.name for f in stage.iterdir()}
+    for f in sorted(stage.iterdir()):
+        os.replace(f, OUT / f.name)
+    # (a repack that stopped early - a segment without keys - keeps the tracked logs it did not reach)
+    for f in OUT.glob('*.keys.gz'):
+        if f.name not in new and stopped is None:
+            f.unlink()
+    stage.rmdir()
     print('frames', sum(m['frames'] for m in man))
 
 

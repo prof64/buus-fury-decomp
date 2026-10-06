@@ -109,7 +109,8 @@ class SbDriver3(SbDriver2):
             # no enemy to walk into for 900 field frames (a save point's area): the death is skipped (logged)
             from ship_route2 import enemies
             s = status(e)
-            if s['p'] is not None and s['scene'] == 0 and not [o for o in enemies(e) if o[4] > 0]:
+            # (also an enemy the walk cannot reach: 6000 frames in the goal without the game over)
+            if s['p'] is not None and s['scene'] == 0 and (not [o for o in enemies(e) if o[4] > 0] or self.t > 6000):
                 self.no_en = getattr(self, 'no_en', 0) + 1
                 if self.no_en > 900:
                     print('die1: no enemy, skipped', g[1], s, flush=True)
