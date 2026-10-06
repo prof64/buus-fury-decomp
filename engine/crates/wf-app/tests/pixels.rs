@@ -65,6 +65,16 @@ fn compose(r: &mut Renderer, packs: &Packs, view: &RenderView, prev: &RenderView
                         v.sphere = prev.sphere.clone();
                         v
                     }
+                    // both at once: the previous timer / sphere and the previous palette (a screen_flash's step in
+                    // the same frame as the sphere's tilemap - examples/pixels.rs "u")
+                    "u" => {
+                        let mut v = view.clone();
+                        if prev.timer.is_some() {
+                            v.timer = prev.timer;
+                        }
+                        v.sphere = prev.sphere.clone();
+                        with_prev(&v, prev, true, false)
+                    }
                     _ => with_prev(view, prev, true, false),
                 };
                 r.render(packs, &v, 0, 240, 160).to_vec()
@@ -78,12 +88,13 @@ fn compose(r: &mut Renderer, packs: &Packs, view: &RenderView, prev: &RenderView
             "" => {}
             // (the late present of a fade to black's last step: the line black)
             "k" => out[rg].iter_mut().for_each(|p| *p = 0xFF00_0000),
-            "o" | "s" | "b" | "v" | "t" => {
+            "o" | "s" | "b" | "v" | "t" | "u" => {
                 let l: &'static str = match m.as_str() {
                     "o" => "o",
                     "s" => "s",
                     "v" => "v",
                     "t" => "t",
+                    "u" => "u",
                     _ => "b",
                 };
                 let p = pic(r, l);

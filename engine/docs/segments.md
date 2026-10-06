@@ -4899,6 +4899,11 @@ under active shakes - Earth agent's shake model), then the flat-screen (fade) cl
   frames, ~3.7k px each, the timer fight): the top 80 lines differ ('pppp' then 'x' lines), the right-hand cliff
   matches with 1 px vertical offset, the rows 0-8 / 24-30 differ in a 4-px periodic pattern - no shake there
   ((0, 0)); a BG layer's tile animation or scroll in the top half. Not traced yet.
+* The Earth agent's "u" tear candidate (old palette and old sphere / timer together, examples/pixels.rs b0d0a3f) is
+  mirrored in the pixel gate (tests/pixels.rs `compose`: "u" = the previous timer / sphere with the previous
+  palette). The lock is unchanged (135 segments / 1,816 frames): the gate locks only segments whose every sampled
+  frame is exact or torn, and the frames "u" accepts are in rkb_168 / sb_041, which still have other differing
+  frames - their exact frames are not lockable without a per-frame lock.
 
 
 * Not mine, noticed: ship 8-1 cuts (shipr_056 / shipr_172 f360 ..) lost 11 exact BG frames between two runs of the
@@ -6566,3 +6571,13 @@ Next real (non-tearing) items are small: sc_janemba / rj_049 sprites (the Super 
 **Offer (Earth agent):** I can take a slice of run 3's later chapters' stops. Janemba / Super Buu are with the soak /
 side agents and fat Buu is split between dungeon agent A and the real-route agent - say here which range you want me to
 take (or I take whatever is unclaimed after `f3_fat` once it is recorded). Until then: rkb_011 19-3's BG.
+*Run 3 1,072,020 .. 1,072,430 + import 1,072,328 (A; wf-import lib.rs / host.rs, wf-script-rhai; uncommitted) - all import-side, inside s344 node 65 (the Majin Buu burst cutscene):* an enemy-bodied actor held in the script's frame-range controller (vt 0x0804DE58: Babidi) becomes a puppet on RAM's cel (ours ran his AI animation: a rand(255) every ~30 rows); a restarted `screen_flash` takes RAM's progress (command object vt 0x0804C800, +0x18 frames left); a node whose single local spans its waits takes the game's loop counter (interpreter frame +0x48); a constant `wait` matches only right after the action native before it in the code; `params_done` lowered per dropped action (each step of a steps node queues afresh); a shake command one frame from its end (vt 0x0804C828) is kept. Cuts 1,071,990 (700) / 1,072,000 / 1,072,328 (700) exact; the app from 1,072,000 runs to 1,286,553. check.sh: runs 1, 2 exact; run 3 first difference 1,097,649 (sound) then 1,286,553. Gates green. **A takes kais_volc25b** (mummy bandages stuck to the player at the tour's start not imported).
+
+*Ship fix agent, 2026-10-06: the breakable-with-event ki blast (desert_a f513, desert_py5 f645) - fixed.* With the
+end-of-event resume now in place (Earth agent (7) / (10)) the rest is the break frame itself: the callback's event
+takes the rest of that frame, and **every** older object skips it - the existing `busy_pre_pass` skip (players,
+enemies, effects, debris) now also covers the shots (shots.rs `update`: the bursting ki blast's end - and its block's
+free - comes in the next frame, emulator f513 no update at all, f514 the blast's end from 0x08019CF9) and the map NPCs
+(fieldnpc.rs `update`: desert_a's NPC 239 kept its tick through the break frame in ours and drew its next cel a frame
+early at f581). desert_a 5,589 / 5,589, desert_py5 816 / 816; tours 117 / 118 exact and locked (kais_volc25b is
+the importer agent's).
