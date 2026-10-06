@@ -326,7 +326,26 @@ def grind_trunks3(e):
     ])
 
 
+def dbx3(e):
+    """run 2's dbx piece with Goku ground before his fight with Majin Buu (0-21): run 3's Goku reached it at level
+    81 (401 HP) and died - the Continue went back to Nataday's save. After his points (x03): the Lookout's pad, Southwest
+    Forest 8-6 / 8-3 to level 110, back to the Lookout; then the route on"""
+    g = fat2.g_dbx(e)
+    parts = list(g.parts)
+    grind = lambda e: fat2.Driver2([
+        ('unstick',), ('walk', 304, 552), ('face', 'U'), ('press', fat2.A), ('wait', 120),
+        fat2.SW_FOREST, ('wait', 30),
+        fat2.nav(8, 1, False), ('grind', 110, [(8, 6), (8, 3)]),
+        fat2.nav(8, 1, False), *fat2.take_off(280, 266),
+        fat2.LOOKOUT, ('wait', 60),
+    ])
+    parts.insert(3, grind)
+    return fat2.Chain(parts)
+
+
 def driver3(name, e):
+    if name == 'dbx':
+        return dbx3(e)
     if name == 'bandana':
         return bandana3(e)
     if name == 'grind_trunks':

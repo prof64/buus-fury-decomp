@@ -323,6 +323,8 @@ impl Host for CoreHost<'_> {
                     }
                 }
                 end_event(self.w);
+                // (the talk's place in the pass: the player's list index, the update the event's nested loop runs in)
+                let talk_k = self.w.field.as_ref().and_then(|f| f.talk_pass).map(|p| p.0);
                 // (an exit at the end of a frame's held pass - a frame wait, not one of the top-of-frame returns above:
                 // the interrupted pass goes on after it, `resume_pass_after_load`; 4-20 #5's text-box exit does not)
                 if self.w.scene.depth == 0 && self.s.talk_event && !self.s.from_wait {
@@ -342,7 +344,14 @@ impl Host for CoreHost<'_> {
                 // the event ended straight out of a command wait: in the game the wait loop returned at the top of
                 // this frame, so the field's NPCs already ran this frame's update unfrozen
                 if self.s.from_wait && self.w.scene.depth == 0 && !self.s.in_unit {
-                    release_field_npcs(self.w, self.s.event_watermark);
+                    match talk_k.filter(|_| self.s.talk_event && std::env::var_os("TMP_TK").is_some()) {
+                        // a talk's event: the nested loop ran inside the player's update - the pass goes on with the
+                        // objects below the player's list index (older), not the ones above it (kami_papaya2 row
+                        // 2,798: the HUD and the NPC above the player get no update in the exit frame, the NPCs below
+                        // run theirs - emulator, the list pass 0x08011A82 after the scene step)
+                        Some(k) => release_field_below(self.w, k),
+                        None => release_field_npcs(self.w, self.s.event_watermark),
+                    }
                     // a nested loop's exit (the event a deferred call started) runs the whole frame's pass after it:
                     // the players' update too - their form controllers (run 2 row 159,856: the Super Saiyan drain
                     // steps in s120's exit frame, the gauge's revert at 161,733)
@@ -442,6 +451,40 @@ fn release_field_enemies(w: &mut World, watermark: EntityId) {
     for i in (0..w.ents.len()).rev() {
         if !w.ents[i].removed && matches!(&w.ents[i].body, wf_core::world::Body::Enemy(_)) && w.ents[i].id <= watermark {
             wf_core::enemy::release_update(w, i);
+        }
+    }
+}
+
+/// the field objects below list index `k` (the game's list order: the props object first when the map has one) get the
+/// rest of the interrupted pass: NPCs and enemies (`release_field_npcs`' updates)
+fn release_field_below(w: &mut World, k: usize) {
+    if w.field.is_none() {
+        return;
+    }
+    let live: Vec<usize> = (0..w.ents.len()).filter(|&i| !w.ents[i].removed).collect();
+    let k = k.saturating_sub(wf_core::field::props_object(w) as usize);
+    if std::env::var_os("TMP_TKD").is_some() {
+        let names: Vec<String> = live.iter().map(|&i| match &w.ents[i].body { wf_core::world::Body::Npc(n) => format!("n{}", n.sprite_id), wf_core::world::Body::Player(_) => "P".into(), wf_core::world::Body::Enemy(_) => "E".into(), _ => "o".into() }).collect();
+        eprintln!("RELBELOW f{} k {} live {}", w.frame, k, names.join(" "));
+    }
+    for &i in live.iter().take(k).rev() {
+        let id = w.ents[i].id;
+        if matches!(&w.ents[i].body, wf_core::world::Body::Npc(n) if n.behaviour.is_some()) && !scene::is_puppet(w, id) {
+            wf_core::fieldnpc::release_update(w, i);
+        } else if matches!(&w.ents[i].body, wf_core::world::Body::Enemy(_)) {
+            wf_core::enemy::release_update(w, i);
+        } else if matches!(&w.ents[i].body, wf_core::world::Body::Player(_)) && std::env::var_os("TMP_TKP").is_some() {
+            if let wf_core::world::Body::Player(p) = &mut w.ents[i].body {
+                p.tick_owed = false;
+            }
+            // (with the frame's own keys: the event's hold masked them for the pass)
+            let raw = w.field.as_ref().and_then(|f| f.raw_input);
+            let masked = w.input;
+            if let Some(r) = raw {
+                w.input = r;
+            }
+            wf_core::player::release_passive(w, i);
+            w.input = masked;
         }
     }
 }

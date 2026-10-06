@@ -541,9 +541,9 @@ pub fn drop_item(w: &mut World, item: i32) -> Option<EntityId> {
         spawn: None,
     };
     let id = w.add(Body::Pickup(Box::new(p)));
-    // its icon's tiles (0x100 bytes) and the 10 x 4 shadow, like a big coin (real run 4-1 tile r002_006+11,000 f104:
-    // the drop's object takes block (135, 4) in the game's allocator)
-    crate::vram::coin_created(w, id, true);
+    // its icon's tiles (the item's icon size, 0x100 for most: real run 4-1 tile r002_006+11,000 f104, block (135, 4);
+    // item 69 0x400: tour_desert_c f3445, (402, 16)) and the 10 x 4 shadow, like a big coin
+    crate::vram::item_drop_created(w, id, crate::scene::item_icon_bytes(item));
     if !w.field.as_ref().is_some_and(|f| f.pre_update) {
         if let Some(k) = w.find(id) {
             pickup_update(w, k);
@@ -756,6 +756,8 @@ pub fn collect(w: &mut World, k: usize, slot: u8) {
         None
     };
     w.sfx(45, 64);
+    // the item object goes at once (its tiles free before the icon's: tour_castle_ship_48 f167, the icon at (332, 4))
+    crate::vram::entity_gone(w, k);
     // the item's icon object (as `show_item_get`'s: the icon's size)
     crate::vram::acquire(w, crate::vram::Owner::GetIcon, crate::scene::item_icon_bytes(item));
     // the hold pose: raw anim 14, cel 1, facing kept (state 0x0804985C)

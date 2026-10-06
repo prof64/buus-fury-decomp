@@ -706,6 +706,17 @@ pub fn coin_created(w: &mut World, id: EntityId, big: bool) {
     }
 }
 
+/// a dropped item (vt 0x0804B428): its icon's tiles (`bytes`) and the big coin's 10 x 4 shadow
+pub fn item_drop_created(w: &mut World, id: EntityId, bytes: i32) {
+    if w.field.as_ref().is_none_or(|f| f.vram.is_none()) {
+        return;
+    }
+    acquire(w, Owner::Ent(id), bytes);
+    if let Some(k) = coin_shadow(true) {
+        shared_acquire(w, k);
+    }
+}
+
 /// the blocks of entity `i` go (its object is destroyed)
 pub fn entity_gone(w: &mut World, i: usize) {
     if w.field.as_ref().is_none_or(|f| f.vram.is_none()) {
