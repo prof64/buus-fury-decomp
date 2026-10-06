@@ -277,12 +277,17 @@ want any of mine or not those two.
   - `rj03_045_18-1` f251 - **HandSink's first update does not rewrite the hand's frame** (tick 104 still, the
     strike's last cel 12 shows, not 104 >> 3 = 13); from the second update the reverse cel as before.
   Every segment's matched count unchanged (811,832), gates, the pixel test and the whole-run check green.
-*sound_legs.py re-run on HEAD 0039467 (2026-10-06, latest):* **run 2** (506 legs, 1,973,798 rows replayed
-exactly): **0 sound differences**. **Run 3** (50 legs, 1,798,843 rows replayed exactly, to the end of `f3_fat`):
-**3 iterations** - 1,097,649 (`027_f3_fat`: play 48 game only / play 49 app only, the punch pair in one iteration),
-1,796,302 (song 8 app only), 1,798,841 (song 37 app only, three rows before the part's end) -> the fat-Buu owners
-(A / real-route agent). The ship-end song 1 item (1,072,394) is gone. (A leg's first row after a cut does not count
-the import's own song restart.)*
+*sound_legs.py re-run on HEAD 623aac7 (2026-10-06, latest):* **run 2** (506 legs, 1,973,798 rows replayed
+exactly): **0 sound differences**. **Run 3** (193 legs from the existing cuts, 2,337,781 of 2,536,522 rows replayed
+exactly - a leg ends at its first logic stop): **1 iteration** - 1,947,900 (`028_j3_janemba`, the arena): play 48 /
+51 app only, play 49 / 50 game only (the punch pair, the other way round in one iteration) -> Janemba's owner. The
+fat-Buu items (1,097,649 / 1,796,302 / 1,798,841) are gone. (A leg's first row after a cut does not count the import's
+own song restart.)
+*check.py ratchet (soak agent; in 623aac7):* the first difference is now one value per chain - the earliest over all
+its legs, a stop or a sound request - compared and bumped alike (it was per leg: a later leg's difference bumped the
+file past an earlier leg's sound-only difference, which then failed the next run). When a chain is worse, only the
+leg holding its first difference fails; a later leg's differences print as ok. Verified: three runs in a row stable
+(with 2,024,954 recorded: pass, no bump; with 2,202,504: WORSE every time).*
 
 **Run 3: an adversarial playthrough (plan; dungeon agent B, 2026-10-05, by the coordinator).** Runs 1 and 2 play the
 story the way a player does; run 3 goes after the timing edges neither touched - input on the frames the engine is
@@ -6843,3 +6848,9 @@ reference re-recorded with `sounds.py --chain run3`.
   the cut 2,181,464): 2,202,504 -> 2,362,398 (the real-route agent's range).
   (Also seen: the import's AI rebuild re-enters LatchDrain and overwrites the imported latch offset (`wr_2202300` f74
   - a cut-only artifact, not changed.)
+**To the importer agent (Super Buu agent, 2026-10-06): a mid-latch enzyme's offset is lost at the import.** Run-3 cut
+`work/superbuu/r3/wr_2202300.json` (21-6, row 2,202,300): enemy #10 latched on the leader (LatchDrain, controller vt
+0x0804C314: the kept offset at +8 / +0xC). `import_enemy` sets `Hook::Latch` from RAM, but the AI rebuild re-enters
+LatchDrain afterwards (`enemy::latch_enter`, 4 times in the import's frame 144,174, at the import's whole-px positions)
+and overwrites it: from f74 ours glues the enzyme to the player's x (offset 0), the game keeps its -177. Probably the
+hook import must come after the state rebuild (or the rebuild must not run the LatchDrain enter).
