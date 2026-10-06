@@ -1,0 +1,12 @@
+{
+ "about": "Run 3's whole-run stops that are known differences by design (tools/wholerun/resync.py / check.py: a stop inside a range is logged as kind 'known' and the run is cut again after the range's end). Each entry names its write-up in engine/docs/segments.md.",
+ "stops": [
+  {
+   "from": 2160129,
+   "to": 2181463,
+   "stretch": "029_b3_superbuu",
+   "what": "Vegeta's WanderToRandomPoint (20-7, after s473's become_map_object, as runs 1 and 2): the node's path object reads leftover heap bytes (waypoint +0xC/+0x10, re-plan counter +0x18 - run-3 cut wr_2160600 f50: waypoint (0xC085, 0xA8), counter 0xE8, 8 frames toward the stale point); the first wander starts at row 2,160,132, the first stop is 2,160,844; reproducing it needs a byte-level heap model (decided: not built). The range starts where Vegeta becomes the map object and ends where 20-7 is left for 21-1.",
+   "doc": "core.md 'Uninitialised heap reads'; segments.md Update 22: 'Super Buu stop 2,160,844 (20-7, Vegeta's wander, 0x89)'"
+  }
+ ]
+}

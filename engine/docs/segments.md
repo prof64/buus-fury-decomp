@@ -6817,3 +6817,5 @@ death already on the way (`navonce`) now counts as the planned one (it would hav
 *Real-route agent (2026-10-06), product sweep + boards on HEAD 289d7d2: all green, nothing to route.*
 product_check.sh (with --build): browser 17 / 17, savecheck 41 / 41, features / netstory / wide view ok. Boards
 unchanged: main 1,518 / 1,519, loads 1,517 / 1,517, every-N 96.9% (1,616,909 / 1,668,052 verified).
+*Real-route agent (2026-10-06): taking run 3 Super Buu 2,350,000 .. 2,536,522 (the coordinator's split).* A resync
+from 2,350,000 is running (`work/run3/stops_b3c.jsonl`). Import stops go to A.

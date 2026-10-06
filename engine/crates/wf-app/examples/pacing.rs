@@ -83,6 +83,7 @@ struct Frame {
     alloc_b: u64,
     step_n: u64,
     render_n: u64,
+    view: (u32, u32, u32),
 }
 
 fn pct(v: &mut [f64], p: f64) -> f64 {
@@ -147,6 +148,8 @@ fn main() {
     println!("{} steps, window {ww}x{wh}, mode {:?}, audio buffer {buffer} frames ({buf_ms:.2} ms)", inputs.len(), app.mode);
     // --from K: steps before K run untimed (the recorder / timeline as usual), the report covers K ..
     let from = num("--from", 0) as usize;
+    let hash_on = args.iter().any(|a| a == "--hash");
+    let mut pic_hash: u64 = 0xcbf2_9ce4_8422_2325;
     for (k, &keys) in inputs.iter().enumerate() {
         if k < from {
             if !ctl.step(&mut app, &[keys]) {
@@ -177,6 +180,13 @@ fn main() {
         let t = Instant::now();
         let f = ctl.render(&mut app, 0, ww, wh);
         fr.render = t.elapsed().as_secs_f64() * 1e3;
+        fr.view = (f.view_w, f.view_h, f.scale);
+        // --hash: every picture made goes into one FNV-1a hash (a renderer change's before / after check)
+        if hash_on {
+            for &c in &app.renderer.fb[..(f.view_w * f.view_h) as usize] {
+                pic_hash = (pic_hash ^ c as u64).wrapping_mul(0x0100_0000_01b3);
+            }
+        }
         let (n2, _) = allocs();
         fr.render_n = n2 - n1;
         // (the machine is shared: render / blit are pure, so each is timed twice and the faster one kept - a
@@ -234,6 +244,9 @@ fn main() {
     let t = Instant::now();
     ctl.finalize(&app);
     println!("autosave of the {}-frame recording: {:.2} ms", frames.len(), t.elapsed().as_secs_f64() * 1e3);
+    if hash_on {
+        println!("picture hash {pic_hash:016x}");
+    }
     let n = frames.len().max(1);
     let wall = t_all.elapsed().as_secs_f64();
     println!("ran {} frames in {wall:.1} s ({:.0} fps unpaced)", frames.len(), frames.len() as f64 / wall);
@@ -289,7 +302,7 @@ fn main() {
     for &k in idx.iter().take(top) {
         let x = &frames[k];
         println!(
-            "  step {:8} {:7.3} ms = step {:6.3} render {:6.3} blit {:6.3} audio {:6.3}  allocs {:6} ({:8} B)  map {}",
+            "  step {:8} {:7.3} ms = step {:6.3} render {:6.3} blit {:6.3} audio {:6.3}  allocs {:6} ({:8} B)  view {}x{} x{}  map {}",
             k + from,
             x.step + x.render + x.blit + x.audio,
             x.step,
@@ -298,6 +311,9 @@ fn main() {
             x.audio,
             x.alloc_n,
             x.alloc_b,
+            x.view.0,
+            x.view.1,
+            x.view.2,
             maps[k]
         );
     }

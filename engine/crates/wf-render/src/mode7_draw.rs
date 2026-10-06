@@ -328,6 +328,41 @@ impl Renderer {
                     // above the table: the last values written (all -1), PB = PD = -1 per line
                     (-1, -1, -1 - line.max(0), -1 - line.max(0))
                 };
+                // the row's sample positions step by (pa, pc) in 24.8: walked incrementally modulo the world's size
+                // in 24.8 (floor(v / 256) mod gw == floor((v mod 256 gw) / 256)) - no divide per pixel; the same
+                // samples as the per-pixel form whenever that one does not overflow i32 (else it runs as before)
+                let (gx8, gy8) = (gw as i64 * 256, gh as i64 * 256);
+                let s0 = -(ox as i64);
+                let s1 = w as i64 - 1 - ox as i64;
+                let fits = |v: i64| (i32::MIN as i64..=i32::MAX as i64).contains(&v);
+                let fast = gw > 0
+                    && gh > 0
+                    && [s0, s1].iter().all(|&sx| fits(sx * pa as i64) && fits(sx * pc as i64))
+                    && [s0, s1].iter().all(|&sx| fits(x0 as i64 + sx * pa as i64) && fits(y0 as i64 + sx * pc as i64));
+                if fast {
+                    let mut u = (x0 as i64 + s0 * pa as i64).rem_euclid(gx8);
+                    let mut v = (y0 as i64 + s0 * pc as i64).rem_euclid(gy8);
+                    let (du, dv) = ((pa as i64).rem_euclid(gx8), (pc as i64).rem_euclid(gy8));
+                    let gwt = (gw >> 3) as usize;
+                    for px in 0..w {
+                        let (wx, wy) = ((u >> 8) as usize, (v >> 8) as usize);
+                        let t = d.ground[(wy >> 3) * gwt + (wx >> 3)] as usize;
+                        let ix = ts.tiles.get(t * 64 + (wy & 7) * 8 + (wx & 7)).copied().unwrap_or(0);
+                        if ix != 0 {
+                            let c = (ts.palette.get(ix as usize).copied().unwrap_or(0) & 0xFF_FFFF) | (ix as u32) << 24;
+                            self.put(py * w + px, c, layer, 0);
+                        }
+                        u += du;
+                        if u >= gx8 {
+                            u -= gx8;
+                        }
+                        v += dv;
+                        if v >= gy8 {
+                            v -= gy8;
+                        }
+                    }
+                    continue;
+                }
                 for px in 0..w {
                     let sx = px as i32 - ox;
                     let lx = x0.wrapping_add(sx.wrapping_mul(pa)) >> 8;
