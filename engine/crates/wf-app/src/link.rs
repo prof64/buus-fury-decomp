@@ -41,7 +41,7 @@ use wf_net::lobby::{Lobby, LobbySettings, Role, KIND_DOJO, KIND_TRADE};
 use wf_net::netsim::{content_id, Clock};
 use wf_net::proto::{decode, Msg};
 use wf_net::session::{NetConfig, NetEvent, P2PSession};
-use wf_net::trade::{Offer, TradeEvent, TradePeer};
+use wf_net::trade::{Offer, TState, TradeEvent, TradePeer, TradeStore};
 use wf_net::transport::{PeerChange, Transport};
 use wf_view::{AudioEvent, Buttons, MenuFont, MenuLayer, MenuOp, MenuView, RenderView, Sim, SimEvent};
 
@@ -70,6 +70,11 @@ pub struct LinkConfig {
     pub saves_dir: Option<PathBuf>,
     pub rules: DojoRules,
     pub seed: u32,
+    /// a scripted player in place of the shell's buttons (tests, `--link-bot`)
+    pub bot: Option<LinkBot>,
+    /// after each flow, a JSON report here (`--link-report`): the end ("done" / "complete" / the ending / the
+    /// message) and the Dojo match as confirmed (frame, checksum, inputs' hash, ending)
+    pub report: Option<PathBuf>,
 }
 
 /// what a peer says in its hellos
@@ -184,6 +189,8 @@ struct TradeUi {
     note: Vec<u16>,
     /// "Disconnected" with a trade in doubt
     away: Option<bool>,
+    /// the committed trade's id (TRADE COMPLETE) and the frames its page has shown
+    done: Option<(String, u32)>,
 }
 
 struct Match {
@@ -208,7 +215,9 @@ enum Phase {
     Match(Box<Match>),
     Result(Ending),
     Trade(Box<TradeUi>),
-    Complete,
+    /// "TRADE COMPLETE!": the trade's connection keeps answering (the friend may still have to commit) until the
+    /// record is Done or the friend is gone - only then does a key leave (None: nothing left to answer)
+    Complete(Option<Box<TradeUi>>),
     /// a message (string) ended the flow; any key goes back
     Message(Vec<u16>),
 }
@@ -332,7 +341,7 @@ impl Flow {
     fn step(&mut self, now: f64, clock: &Clock, held: u16, pressed: u16, ev: &mut Vec<SimEvent>) -> Out {
         self.t = self.t.wrapping_add(1);
         if let Some(r) = self.net.lobby.rejected.clone() {
-            if !matches!(self.phase, Phase::Message(_) | Phase::Match(_) | Phase::Result(_) | Phase::Complete | Phase::Trade(_)) {
+            if !matches!(self.phase, Phase::Message(_) | Phase::Match(_) | Phase::Result(_) | Phase::Complete(_) | Phase::Trade(_)) {
                 self.set_phase(Phase::Message(units(&r)));
             }
         }
@@ -343,6 +352,9 @@ impl Flow {
         if matches!(self.phase, Phase::Trade(_)) {
             return self.step_trade(now, pressed, ev);
         }
+        if matches!(self.phase, Phase::Complete(Some(_))) {
+            return self.step_complete(now, pressed, ev);
+        }
         let _ = self.net.pump(now);
         if self.friend.is_none() {
             self.friend = self.net.friend();
@@ -351,7 +363,7 @@ impl Flow {
             self.friend = Some(f);
         }
         let lost = self.friend_gone() || self.net.t.closed();
-        if lost && !matches!(self.phase, Phase::Waiting | Phase::Message(_) | Phase::Result(_) | Phase::Complete) {
+        if lost && !matches!(self.phase, Phase::Waiting | Phase::Message(_) | Phase::Result(_) | Phase::Complete(_)) {
             self.set_phase(Phase::Message(Vec::new()));
             return Out::None;
         }
@@ -379,7 +391,7 @@ impl Flow {
                 }
                 Out::None
             }
-            Phase::NoSaves | Phase::Message(_) | Phase::Result(_) | Phase::Complete => {
+            Phase::NoSaves | Phase::Message(_) | Phase::Result(_) | Phase::Complete(_) => {
                 if pressed & (A | B) != 0 {
                     sfx(ev, SFX_MENU);
                     return Out::Done;
@@ -616,8 +628,7 @@ impl Flow {
         if save != before_save {
             self.saves[self.slot] = Some(save.clone());
             if let Some(dir) = &self.saves_dir {
-                let _ = std::fs::create_dir_all(dir);
-                let _ = std::fs::write(slot_file(dir, self.slot), crate::trade::slot_bytes(&save));
+                let _ = crate::trade::disk_write(&slot_file(dir, self.slot), &crate::trade::slot_bytes(&save));
             }
             return Out::Slot(self.slot, save);
         }
@@ -632,10 +643,9 @@ impl Flow {
         let Some((tid, h)) = self.friend.clone() else { return Out::None };
         let path = slot_file(&dir, self.slot);
         // the slot file is the running title's slot (the shell keeps them equal): write it if it is missing
-        if !path.exists() {
+        if crate::trade::disk_read(&path).is_none() {
             if let Some(sd) = self.saves[self.slot].as_ref() {
-                let _ = std::fs::create_dir_all(&dir);
-                let _ = std::fs::write(&path, crate::trade::slot_bytes(sd));
+                let _ = crate::trade::disk_write(&path, &crate::trade::slot_bytes(sd));
             }
         }
         let store = match FileStore::open(&path, story_flags(&self.data)) {
@@ -665,39 +675,37 @@ impl Flow {
             friend_accepted: false,
             note: Vec::new(),
             away: None,
+            done: None,
         })));
         Out::None
     }
 
+    /// "TRADE COMPLETE!": the trade keeps answering the friend; a key leaves once the record is Done (the friend
+    /// committed too), the friend is gone, or after 10 s (the friend then finishes at the next link: the journal)
+    fn step_complete(&mut self, now: f64, pressed: u16, ev: &mut Vec<SimEvent>) -> Out {
+        let Phase::Complete(Some(u)) = &mut self.phase else { return Out::None };
+        trade_io(&mut self.net, u, now);
+        for e in u.peer.events() {
+            match e {
+                TradeEvent::Disconnected { in_doubt } => u.away = Some(in_doubt),
+                TradeEvent::Reconnected => u.away = None,
+                _ => {}
+            }
+        }
+        let Some((id, shown)) = u.done.as_mut() else { return Out::None };
+        *shown += 1;
+        let settled = u.store.record(id).is_some_and(|r| r.state == TState::Done);
+        let gone = u.away.is_some() || self.net.t.closed();
+        if pressed & (A | B) != 0 && (settled || gone || *shown > 600) {
+            sfx(ev, SFX_MENU);
+            return Out::Done;
+        }
+        Out::None
+    }
+
     fn step_trade(&mut self, now: f64, pressed: u16, ev: &mut Vec<SimEvent>) -> Out {
-        let (changes, rest) = self.net.pump(now);
-        let friend = self.net.friend();
         let Phase::Trade(u) = &mut self.phase else { return Out::None };
-        // the friend under its link id; a reconnection (a new transport id, the same link id) takes over
-        if let Some((tid, h)) = &friend {
-            if h.link_id == u.friend_lid && *tid != u.friend_tid {
-                u.friend_tid = tid.clone();
-                u.port.changes.push(PeerChange::Connected(u.friend_lid.clone()));
-            }
-        }
-        for c in changes {
-            if let PeerChange::Disconnected(id) = c {
-                if id == u.friend_tid {
-                    u.port.changes.push(PeerChange::Disconnected(u.friend_lid.clone()));
-                }
-            }
-        }
-        for (from, b) in rest {
-            if from == u.friend_tid {
-                u.port.inbox.push((u.friend_lid.clone(), b));
-            }
-        }
-        u.peer.tick(now, &mut u.port, &mut u.store);
-        for (to, b) in std::mem::take(&mut u.port.outbox) {
-            if to == u.friend_lid {
-                self.net.t.send(&u.friend_tid, b, now);
-            }
-        }
+        trade_io(&mut self.net, u, now);
         let mut done = None;
         for e in u.peer.events() {
             match e {
@@ -713,7 +721,10 @@ impl Flow {
                     u.note = units("Your friend declined");
                 }
                 TradeEvent::Agreed(_) => u.note = units("..."),
-                TradeEvent::Complete(_) => done = Some(true),
+                TradeEvent::Complete(id) => {
+                    u.done = Some((id, 0));
+                    done = Some(true);
+                }
                 TradeEvent::Aborted(_, why) => {
                     u.accepted = false;
                     u.friend_accepted = false;
@@ -726,7 +737,9 @@ impl Flow {
         if done == Some(true) {
             sfx(ev, SFX_ACCEPT);
             let sd = u.store.save();
-            self.set_phase(Phase::Complete);
+            if let Phase::Trade(u) = std::mem::replace(&mut self.phase, Phase::Complete(None)) {
+                self.set_phase(Phase::Complete(Some(u)));
+            }
             if let Some(sd) = sd {
                 self.saves[self.slot] = Some(sd.clone());
                 return Out::Slot(self.slot, sd);
@@ -941,7 +954,7 @@ impl Flow {
                     centre(&mut cv, 86, t.s(b), MenuFont::Menu, 2);
                 }
             }
-            Phase::Complete => {
+            Phase::Complete(_) => {
                 head(&mut cv, t.s(79));
                 centre(&mut cv, 62, t.s(88), MenuFont::Bold, 6);
                 centre(&mut cv, 80, t.s(89), MenuFont::Bold, 6);
@@ -960,6 +973,17 @@ impl Flow {
                     if u.sel == k {
                         cursor(&mut cv, 22, y - 4);
                     }
+                }
+                // a list longer than its five rows scrolls with the cursor: the game's UP / DOWN prompts (the
+                // Inventory's long list, button table `0x086B77A4`) beside its first and last row, greyed (frame 2)
+                // at either end (INFERRED placement: the link pages were never recorded)
+                if u.rows.len() > 5 {
+                    let more_up = first > 0;
+                    let more_down = first + 5 < u.rows.len();
+                    let (_, bw, bh, up) = wf_core::menu::kit::BUTTONS[wf_core::menu::kit::BTN_UP as usize];
+                    let (_, _, _, down) = wf_core::menu::kit::BUTTONS[wf_core::menu::kit::BTN_DOWN as usize];
+                    cv.image(up, if more_up { 0 } else { 2 }, bw, bh, 98, 44);
+                    cv.image(down, if more_down { 0 } else { 2 }, bw, bh, 98, 94);
                 }
                 // the friend's offer
                 if let Some(o) = u.peer.friend_offer() {
@@ -1103,6 +1127,62 @@ fn offer_of(rows: &[Row], counts: &[u32]) -> Offer {
     o
 }
 
+thread_local! {
+    static INFO: std::cell::RefCell<Option<serde_json::Value>> = const { std::cell::RefCell::new(None) };
+}
+
+/// switch the per-step state snapshot of [`link_info`] on / off (off by default: no cost)
+pub fn set_link_info(on: bool) {
+    INFO.with(|i| *i.borrow_mut() = if on { Some(serde_json::Value::Null) } else { None });
+}
+
+/// the last [`LinkSim`]'s state after its last step (JSON: phase, title page / wait, setup, trade cursor / state,
+/// the last flow's end, the last Dojo match's record) - the browser build's test hook; Null while switched off
+pub fn link_info() -> serde_json::Value {
+    INFO.with(|i| i.borrow().clone().unwrap_or(serde_json::Value::Null))
+}
+
+/// the trade's traffic for one frame: the connection's packets for the friend into the trade peer (the friend under
+/// its link id - a reconnection, a new transport id with the same link id, takes over), the peer's tick, its packets
+/// out
+fn trade_io(net: &mut Net, u: &mut TradeUi, now: f64) {
+    let (changes, rest) = net.pump(now);
+    // the friend's connection: the one with its link id that is talking now (a restarted friend comes back on a
+    // new connection while its dead one may still be listed - a network that died tells nobody; the first listed
+    // would keep the dead one)
+    let ours = |tid: &str| net.lobby.peer_extras().into_iter().any(|(id, v)| id == tid && serde_json::from_value::<LinkHello>(v).is_ok_and(|h| h.link_id == u.friend_lid));
+    let talking = rest.iter().map(|(from, _)| from.clone()).find(|from| *from != u.friend_tid && ours(from));
+    let friend = talking.or_else(|| net.friend().filter(|(_, h)| h.link_id == u.friend_lid).map(|(tid, _)| tid).filter(|tid| *tid != u.friend_tid && !net.lobby.peer_connected(&u.friend_tid)));
+    if let Some(tid) = friend {
+        u.friend_tid = tid;
+        u.port.changes.push(PeerChange::Connected(u.friend_lid.clone()));
+    }
+    for c in changes {
+        if let PeerChange::Disconnected(id) = c {
+            if id == u.friend_tid {
+                u.port.changes.push(PeerChange::Disconnected(u.friend_lid.clone()));
+            }
+        }
+    }
+    for (from, b) in rest {
+        if from == u.friend_tid {
+            u.port.inbox.push((u.friend_lid.clone(), b));
+        }
+    }
+    let n_in = u.port.inbox.len();
+    u.peer.tick(now, &mut u.port, &mut u.store);
+    let n_out = u.port.outbox.len();
+    for (to, b) in std::mem::take(&mut u.port.outbox) {
+        if to == u.friend_lid {
+            net.t.send(&u.friend_tid, b, now);
+        }
+    }
+    if std::env::var_os("WF_LINK_DEBUG").is_some() && (n_in > 0 || n_out > 0) {
+        let recs: Vec<_> = u.store.records().iter().map(|r| (r.id[..6].to_string(), r.state)).collect();
+        eprintln!("trade {now:.0} in {n_in} out {n_out} friend {} {} away {:?} recs {recs:?}", u.friend_tid, u.friend_lid, u.away);
+    }
+}
+
 /// The title with link play: see the module doc.
 pub struct LinkSim {
     pub inner: StorySim,
@@ -1149,7 +1229,7 @@ impl LinkSim {
             Some(Phase::Match(_)) => "match",
             Some(Phase::Result(_)) => "result",
             Some(Phase::Trade(_)) => "trade",
-            Some(Phase::Complete) => "complete",
+            Some(Phase::Complete(_)) => "complete",
             Some(Phase::Message(_)) => "message",
         }
     }
@@ -1197,6 +1277,44 @@ impl LinkSim {
             _ => None,
         }
     }
+    /// the trade screen's "Disconnected" (Some(in doubt): the friend is gone; a trade in doubt keeps the save locked)
+    pub fn trade_away(&self) -> Option<bool> {
+        match self.flow.as_ref().map(|f| &f.phase) {
+            Some(Phase::Trade(u)) => u.away,
+            _ => None,
+        }
+    }
+    /// the scripted player (tests: its memory, its choices)
+    pub fn bot(&self) -> Option<&LinkBot> {
+        self.cfg.bot.as_ref()
+    }
+    pub fn bot_mut(&mut self) -> Option<&mut LinkBot> {
+        self.cfg.bot.as_mut()
+    }
+    /// the report of the last flow (as `--link-report` writes it)
+    pub fn report_json(&self) -> serde_json::Value {
+        let m = self.record.as_ref().map(|r| {
+            let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+            for s in &r.inputs {
+                for &b in s {
+                    for x in b.to_le_bytes() {
+                        h ^= x as u64;
+                        h = h.wrapping_mul(0x0100_0000_01b3);
+                    }
+                }
+                h ^= 0xff;
+                h = h.wrapping_mul(0x0100_0000_01b3);
+            }
+            serde_json::json!({
+                "frame": r.frame,
+                "checksum": format!("{:016x}", r.checksum),
+                "inputs": r.inputs.iter().map(|s| s.len()).collect::<Vec<_>>(),
+                "inputs_hash": format!("{h:016x}"),
+                "ending": format!("{:?}", r.ending),
+            })
+        });
+        serde_json::json!({ "last": self.last, "match": m, "steps": self.steps })
+    }
     /// leave the link at once (the shell quits / a test drops a peer): the connection goes with the flow
     pub fn drop_link(&mut self) {
         self.flow = None;
@@ -1207,9 +1325,83 @@ impl LinkSim {
     }
 }
 
+impl LinkSim {
+    fn publish_info(&self) {
+        if INFO.with(|i| i.borrow().is_none()) {
+            return;
+        }
+        let w = &self.inner.session.world;
+        let title = w.menu.stack.iter().rev().find_map(|s| match s {
+            wf_core::menu::Screen::Title(t) => Some(serde_json::json!({ "page": format!("{:?}", t.page), "wait": t.wait })),
+            _ => None,
+        });
+        let setup = self.setup_state().map(|(row, picked, s)| {
+            serde_json::json!({ "row": if row == usize::MAX { -1 } else { row as i64 }, "picked": picked, "mode": format!("{:?}", s.mode), "rounds": s.rounds })
+        });
+        let cursor = self.trade_cursor().map(|(sel, picking, btn, counts)| serde_json::json!({ "sel": sel, "picking": picking, "btn": btn, "counts": counts }));
+        let trade = self.trade_state().map(|(acc, facc, friend)| {
+            serde_json::json!({ "accepted": acc, "friend_accepted": facc, "friend_offer": friend.map(|o| !o.is_empty()) })
+        });
+        let record = self.record.as_ref().map(|r| serde_json::json!({ "frame": r.frame, "checksum": format!("{:016x}", r.checksum), "ending": format!("{:?}", r.ending) }));
+        let v = serde_json::json!({
+            "phase": self.phase(), "title": title, "setup": setup, "cursor": cursor, "trade": trade,
+            "last": self.last, "record": record, "steps": self.steps, "report": self.report_json(),
+        });
+        INFO.with(|i| {
+            if let Some(x) = i.borrow_mut().as_mut() {
+                *x = v;
+            }
+        });
+    }
+}
+
 impl Sim for LinkSim {
     fn step(&mut self, inputs: &[Buttons], events: &mut Vec<SimEvent>) {
+        self.step_inner(inputs, events);
+        self.publish_info();
+    }
+    fn view(&self, out: &mut RenderView) {
+        self.view_inner(out)
+    }
+    fn frame(&self) -> u64 {
+        self.steps
+    }
+    fn state_hash(&self) -> u64 {
+        self.state_hash_inner()
+    }
+    fn snapshot(&self) -> Option<Vec<u8>> {
+        self.snapshot_inner()
+    }
+    fn restore(&mut self, s: &[u8]) -> bool {
+        self.restore_inner(s)
+    }
+    fn as_any(&self) -> Option<&dyn std::any::Any> {
+        // (the shells' save-slot persistence reads the title's StorySim)
+        self.inner.as_any()
+    }
+    fn paused_input(&self) -> Option<Buttons> {
+        // a link flow cannot wait for a local menu
+        self.flow.as_ref().map(|_| 0)
+    }
+}
+
+impl LinkSim {
+    fn step_inner(&mut self, inputs: &[Buttons], events: &mut Vec<SimEvent>) {
         self.steps += 1;
+        // a scripted player plays in place of the shell's buttons
+        let bot_keys = self.cfg.bot.take().map(|mut b| {
+            let k = b.input(self);
+            self.cfg.bot = Some(b);
+            k
+        });
+        let own;
+        let inputs = match bot_keys {
+            Some(k) => {
+                own = [k];
+                &own[..]
+            }
+            None => inputs,
+        };
         let held = inputs.first().copied().unwrap_or(0);
         let pressed = held & !self.prev;
         self.prev = held;
@@ -1269,11 +1461,14 @@ impl Sim for LinkSim {
                     Phase::Message(m) if !m.is_empty() => String::from_utf16_lossy(m),
                     Phase::Message(_) => "disconnected".into(),
                     Phase::Result(e) => format!("{e:?}"),
-                    Phase::Complete => "complete".into(),
+                    Phase::Complete(_) => "complete".into(),
                     _ => "left".into(),
                 });
                 self.flow = None;
                 self.closing = Some(0);
+                if let Some(p) = &self.cfg.report {
+                    let _ = std::fs::write(p, serde_json::to_vec_pretty(&self.report_json()).unwrap_or_default());
+                }
             }
             Out::Slot(i, sd) => {
                 let sv = &mut self.inner.session.world.saves;
@@ -1283,7 +1478,7 @@ impl Sim for LinkSim {
         }
     }
 
-    fn view(&self, out: &mut RenderView) {
+    fn view_inner(&self, out: &mut RenderView) {
         match self.flow.as_ref() {
             Some(f) if !matches!(f.phase, Phase::Waiting) => {
                 let Some(d) = self.inner.session.world.data.menu.clone() else { return self.inner.view(out) };
@@ -1299,36 +1494,25 @@ impl Sim for LinkSim {
             _ => self.inner.view(out),
         }
     }
-    fn frame(&self) -> u64 {
-        self.steps
-    }
-    fn state_hash(&self) -> u64 {
+    fn state_hash_inner(&self) -> u64 {
         if self.flow.is_some() || self.closing.is_some() {
             0
         } else {
             self.inner.state_hash()
         }
     }
-    fn snapshot(&self) -> Option<Vec<u8>> {
+    fn snapshot_inner(&self) -> Option<Vec<u8>> {
         if self.flow.is_some() || self.closing.is_some() {
             None
         } else {
             self.inner.snapshot()
         }
     }
-    fn restore(&mut self, s: &[u8]) -> bool {
+    fn restore_inner(&mut self, s: &[u8]) -> bool {
         if self.flow.is_some() {
             return false;
         }
         self.inner.restore(s)
-    }
-    fn as_any(&self) -> Option<&dyn std::any::Any> {
-        // (the shells' save-slot persistence reads the title's StorySim)
-        self.inner.as_any()
-    }
-    fn paused_input(&self) -> Option<Buttons> {
-        // a link flow cannot wait for a local menu
-        self.flow.as_ref().map(|_| 0)
     }
 }
 
@@ -1336,4 +1520,227 @@ impl Sim for LinkSim {
 pub fn link_title_app(packs: wf_content::Packs, slots: &[Vec<u8>], seed: u32, cfg: LinkConfig) -> Result<crate::App, String> {
     let s = crate::launcher::title_sim(&packs, slots, seed)?;
     Ok(crate::App::new(packs, Box::new(LinkSim::new(s, cfg))))
+}
+
+// -------------------------------------------------------------------------------------------------------------------
+// the scripted player (tests, the native shell's `--link-bot`)
+
+/// A closed-loop scripted player for the link pages: from the title (START, Multiplayer, Dojo / Trading Post) through
+/// the room, the save list, the Dojo's setup / characters / match or the trade screen (an offer, Propose, Accept),
+/// the result / TRADE COMPLETE / Disconnected pages (A after a while), back to the title. Its buttons are a pure
+/// function of what the screens show and its own memory, so two scripted apps meet whatever the network does
+/// (tests/link.rs, `buus-fury --link-bot dojo|trade`, tools/link/twoproc.sh). Set on [`LinkConfig::bot`], the
+/// [`LinkSim`] plays it in place of the shell's buttons.
+#[derive(Clone, Debug)]
+pub struct LinkBot {
+    pub kind: LinkKind,
+    pub host: bool,
+    /// the host's Character Mode / Rounds to set (the guest waits until it sees them)
+    pub mode: DojoMode,
+    pub rounds: u8,
+    /// the offer: this many of the trade list's first row, this much zenie
+    pub first: u32,
+    pub zenie: u32,
+    /// the trade: accept the friend's offer (else only propose)
+    pub accept: bool,
+    /// back at the title after a flow: go into the page again (a test's friend coming back to finish a trade)
+    pub repeat: bool,
+    downs: u32,
+    proposed: bool,
+    in_phase: u32,
+    last_page: Option<wf_core::menu::title::TPage>,
+    last_phase: &'static str,
+    /// a flow started (the title afterwards = done)
+    pub started: bool,
+    k: u64,
+}
+
+impl LinkBot {
+    pub fn new(kind: LinkKind, host: bool) -> LinkBot {
+        LinkBot {
+            kind,
+            host,
+            mode: DojoMode::InGame,
+            rounds: 1,
+            first: 2,
+            zenie: 30,
+            accept: true,
+            repeat: false,
+            downs: 0,
+            proposed: false,
+            in_phase: 0,
+            last_page: None,
+            last_phase: "",
+            started: false,
+            k: 0,
+        }
+    }
+
+    /// the flow ran and the title is back
+    pub fn done(&self, sim: &LinkSim) -> bool {
+        self.started && sim.phase() == "title"
+    }
+
+    /// this frame's buttons: presses on every 4th frame (held 2), the choice from what is shown
+    pub fn input(&mut self, sim: &LinkSim) -> u16 {
+        self.k += 1;
+        let ph = sim.phase();
+        if self.repeat && self.started && ph == "title" {
+            self.started = false;
+            self.proposed = false;
+            self.last_page = None;
+        }
+        if ph != self.last_phase {
+            self.last_phase = ph;
+            self.in_phase = 0;
+            self.downs = 0;
+        }
+        self.in_phase += 1;
+        if ph == "match" {
+            // P1 (the host) walks in and punches, the guest stands still
+            return if self.host { RIGHT | if self.k % 12 < 2 { A } else { 0 } } else { 0 };
+        }
+        if self.k % 4 >= 2 {
+            return 0;
+        }
+        let want = self.decide(sim, ph);
+        if want & (DOWN | UP | LEFT | RIGHT) != 0 {
+            self.downs += 1;
+        }
+        want
+    }
+
+    fn decide(&mut self, sim: &LinkSim, ph: &str) -> u16 {
+        use wf_core::input::START;
+        use wf_core::menu::title::TPage;
+        match ph {
+            "title" => {
+                if self.started {
+                    return 0;
+                }
+                let w = &sim.inner.session.world;
+                let t = w.menu.stack.iter().rev().find_map(|s| match s {
+                    wf_core::menu::Screen::Title(t) => Some(t),
+                    _ => None,
+                });
+                let Some(t) = t else { return START };
+                if self.last_page != Some(t.page) {
+                    self.last_page = Some(t.page);
+                    self.downs = 0;
+                }
+                // (the pages' cursor is the selected control's id: Single 0 / Multiplayer 1, Dojo 0 / Trading Post 1;
+                // a page keeps it when the flow comes back)
+                match t.page {
+                    TPage::Title => START,
+                    TPage::Mode => {
+                        if t.c.sel != 1 {
+                            DOWN
+                        } else {
+                            A
+                        }
+                    }
+                    TPage::Multi => {
+                        let want = if self.kind == LinkKind::Trade { 1 } else { 0 };
+                        if t.wait.is_some() {
+                            0
+                        } else if t.c.sel != want {
+                            DOWN
+                        } else {
+                            A
+                        }
+                    }
+                    _ => 0,
+                }
+            }
+            "waiting" => {
+                self.started = true;
+                0
+            }
+            "saves" => A,
+            "chars" => {
+                let picked = sim.setup_state().map(|s| s.1).unwrap_or(true);
+                if picked {
+                    0
+                } else {
+                    A
+                }
+            }
+            "setup" => {
+                let Some((row, _, s)) = sim.setup_state() else { return 0 };
+                if self.host {
+                    // the mode, the rounds, then Start Fight
+                    if row == 0 && s.mode != self.mode {
+                        RIGHT
+                    } else if row == 0 {
+                        DOWN
+                    } else if row == 1 && s.rounds != self.rounds {
+                        // (1 / 3 / 5: LEFT down, RIGHT up)
+                        if s.rounds > self.rounds {
+                            LEFT
+                        } else {
+                            RIGHT
+                        }
+                    } else if row == 1 {
+                        DOWN
+                    } else {
+                        A
+                    }
+                } else if s.rounds == self.rounds && s.mode == self.mode {
+                    // the guest goes on once the host's setup shows
+                    A
+                } else {
+                    0
+                }
+            }
+            "trade" => {
+                // "Disconnected": a trade in doubt (the save locked) waits for the friend - a key would leave; with
+                // nothing in doubt, A leaves after a while
+                match sim.trade_away() {
+                    Some(true) => return 0,
+                    Some(false) => return if self.in_phase > 40 { A } else { 0 },
+                    None => {}
+                }
+                let Some((sel, picking, btn, counts)) = sim.trade_cursor() else { return 0 };
+                let Some((accepted, _, friend)) = sim.trade_state() else { return 0 };
+                let n = counts.len();
+                let (first, zenie) = (self.first, self.zenie);
+                let target = |k: usize| if k == 0 { first } else if k == n - 1 { zenie } else { 0 };
+                if let Some(k) = (0..n).find(|&k| counts[k] != target(k)) {
+                    if picking && sel == k {
+                        return if counts[k] < target(k) { UP } else { DOWN };
+                    }
+                    if picking {
+                        return A;
+                    }
+                    return if sel == k { A } else if sel < k { DOWN } else { UP };
+                }
+                if picking {
+                    return A;
+                }
+                if sel < n {
+                    return DOWN;
+                }
+                if !self.proposed {
+                    if btn != 0 {
+                        return LEFT;
+                    }
+                    self.proposed = true;
+                    return A;
+                }
+                if self.accept && friend.is_some_and(|o| !o.is_empty()) && !accepted {
+                    return if btn != 1 { RIGHT } else { A };
+                }
+                0
+            }
+            // the result / TRADE COMPLETE / Disconnected: shown a while, then A
+            "result" | "complete" | "message" | "nosaves" => {
+                if self.in_phase > 40 {
+                    A
+                } else {
+                    0
+                }
+            }
+            _ => 0,
+        }
+    }
 }

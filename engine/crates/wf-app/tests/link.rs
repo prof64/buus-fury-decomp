@@ -10,13 +10,10 @@ use std::cell::{Cell, RefCell};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
-use wf_app::link::{title_wait, LinkConfig, LinkKind, LinkSim};
+use wf_app::link::{title_wait, LinkBot, LinkConfig, LinkKind, LinkSim};
 use wf_app::wf_content::{DirSource, FileSource, Packs};
 use wf_core::content::GameData;
-use wf_core::input::{A, DOWN, LEFT, RIGHT, START, UP};
 use wf_core::menu::save::{SaveData, Saves};
-use wf_core::menu::title::TPage;
-use wf_core::menu::Screen;
 use wf_core::story::Story;
 use wf_net::dojo::{DojoMode, DojoRules, Ending};
 use wf_net::lobby::Role;
@@ -97,24 +94,10 @@ fn tmp(name: &str) -> PathBuf {
     d
 }
 
-/// one player: its app (the title with link play), its save folder, its scripted closed-loop driver
+/// one player: its app (the title with link play, the scripted player inside), its save folder
 struct Player {
     sim: LinkSim,
     dir: PathBuf,
-    host: bool,
-    kind: LinkKind,
-    /// the driver's own memory
-    downs: u32,
-    proposed: bool,
-    /// steps in the current link phase
-    in_phase: u32,
-    last_page: Option<TPage>,
-    /// the host's Character Mode
-    mode: DojoMode,
-    last_phase: &'static str,
-    /// whether a flow has started (the title afterwards = done)
-    started: bool,
-    k: u64,
 }
 
 fn player(
@@ -132,170 +115,47 @@ fn player(
     std::fs::create_dir_all(&saves).unwrap();
     let bytes = slot_bytes(sd);
     std::fs::write(saves.join("slot1.sav"), &bytes).unwrap();
+    let _ = std::fs::write(saves.join("slot1.sav"), &bytes);
+    *endpoints.borrow_mut() += 0;
+    open(p, net, clock, &dir, &format!("link-{name}"), name, host, kind, endpoints)
+}
+
+/// a player's app from its folder: the save slot read from disk through the title's own startup (as the native
+/// shell's `--link`: `link_title_app`), its link id; connections as endpoint `endpoint` (then `endpoint#k`)
+#[allow(clippy::too_many_arguments)]
+fn open(p: &Packs, net: &SimNet, clock: &Clock, dir: &Path, link_id: &str, endpoint: &str, host: bool, kind: LinkKind, endpoints: Rc<RefCell<u32>>) -> Player {
+    let saves = dir.join("saves");
+    let bytes = std::fs::read(saves.join("slot1.sav")).unwrap();
     let inner = wf_app::launcher::title_sim(p, &[bytes], 7).unwrap();
     let net = net.clone();
-    let id = name.to_string();
+    let base = endpoint.to_string();
+    let n = Rc::new(Cell::new(0u32));
     let cfg = LinkConfig {
         connect: Box::new(move |_k| {
             *endpoints.borrow_mut() += 1;
+            let k = n.get();
+            n.set(k + 1);
+            let id = if k == 0 { base.clone() } else { format!("{base}#{k}") };
             Ok((Box::new(net.endpoint(&id)), if host { Role::Host } else { Role::Player }))
         }),
         clock: clock.clone(),
-        link_id: format!("link-{name}"),
-        name: name.into(),
+        link_id: link_id.to_string(),
+        name: endpoint.into(),
         saves_dir: Some(saves),
         rules: rules(),
         seed: 11,
+        bot: Some(LinkBot::new(kind, host)),
+        report: None,
     };
-    Player { sim: LinkSim::new(inner, cfg), dir, host, kind, downs: 0, proposed: false, in_phase: 0, last_page: None, mode: DojoMode::InGame, last_phase: "", started: false, k: 0 }
+    Player { sim: LinkSim::new(inner, cfg), dir: dir.to_path_buf() }
 }
 
 impl Player {
-    /// the button this frame: presses on every 4th frame (held 2), the choice from what is shown
-    fn input(&mut self) -> u16 {
-        self.k += 1;
-        let ph = self.sim.phase();
-        if ph != self.last_phase {
-            self.last_phase = ph;
-            self.in_phase = 0;
-            self.downs = 0;
-        }
-        self.in_phase += 1;
-        if ph == "match" {
-            // P1 (the host) walks in and punches, the guest stands still
-            return if self.host { RIGHT | if self.k % 12 < 2 { A } else { 0 } } else { 0 };
-        }
-        if self.k % 4 >= 2 {
-            return 0;
-        }
-        let want = self.decide(ph);
-        if want & (DOWN | UP | LEFT | RIGHT) != 0 {
-            self.downs += 1;
-        }
-        want
-    }
-
-    fn decide(&mut self, ph: &str) -> u16 {
-        match ph {
-            "title" => {
-                if self.started {
-                    return 0;
-                }
-                let w = &self.sim.inner.session.world;
-                let t = w.menu.stack.iter().rev().find_map(|s| match s {
-                    Screen::Title(t) => Some(t),
-                    _ => None,
-                });
-                let Some(t) = t else { return START };
-                if self.last_page != Some(t.page) {
-                    self.last_page = Some(t.page);
-                    self.downs = 0;
-                }
-                match t.page {
-                    TPage::Title => START,
-                    // Single Player / Multiplayer: down once
-                    TPage::Mode => {
-                        if self.downs < 1 {
-                            DOWN
-                        } else {
-                            A
-                        }
-                    }
-                    // Dojo / Trading Post (one down)
-                    TPage::Multi => {
-                        if t.wait.is_some() {
-                            0
-                        } else if self.kind == LinkKind::Trade && self.downs < 1 {
-                            DOWN
-                        } else {
-                            A
-                        }
-                    }
-                    _ => 0,
-                }
-            }
-            "waiting" => {
-                self.started = true;
-                0
-            }
-            "saves" => A,
-            "chars" => {
-                let (_, picked, _) = self.sim.setup_state().unwrap();
-                if picked {
-                    0
-                } else {
-                    A
-                }
-            }
-            "setup" => {
-                let (row, _, s) = self.sim.setup_state().unwrap();
-                if self.host {
-                    // the mode, Rounds: 1, then Start Fight
-                    if row == 0 && s.mode != self.mode {
-                        RIGHT
-                    } else if row == 0 {
-                        DOWN
-                    } else if row == 1 && s.rounds != 1 {
-                        LEFT
-                    } else if row == 1 {
-                        DOWN
-                    } else {
-                        A
-                    }
-                } else if s.rounds == 1 && s.mode == self.mode {
-                    // the guest goes on once the host's setup shows
-                    A
-                } else {
-                    0
-                }
-            }
-            "trade" => {
-                let (sel, picking, btn, counts) = self.sim.trade_cursor().unwrap();
-                let (accepted, _, friend) = self.sim.trade_state().unwrap();
-                let n = counts.len();
-                // offer: 2 of the first row (a supply), 30 zenie (the last row)
-                let target = |k: usize| if k == 0 { 2 } else if k == n - 1 { 30 } else { 0 };
-                if let Some(k) = (0..n).find(|&k| counts[k] != target(k)) {
-                    if picking && sel == k {
-                        return if counts[k] < target(k) { UP } else { DOWN };
-                    }
-                    if picking {
-                        return A;
-                    }
-                    return if sel == k { A } else if sel < k { DOWN } else { UP };
-                }
-                if picking {
-                    return A;
-                }
-                if sel < n {
-                    return DOWN;
-                }
-                if !self.proposed {
-                    if btn != 0 {
-                        return LEFT;
-                    }
-                    self.proposed = true;
-                    return A;
-                }
-                if friend.is_some_and(|o| !o.is_empty()) && !accepted {
-                    return if btn != 1 { RIGHT } else { A };
-                }
-                0
-            }
-            // the result / TRADE COMPLETE / Disconnected: shown a while, then A
-            "result" | "complete" | "message" | "nosaves" => {
-                if self.in_phase > 40 {
-                    A
-                } else {
-                    0
-                }
-            }
-            _ => 0,
-        }
-    }
-
     fn done(&self) -> bool {
-        self.started && self.sim.phase() == "title"
+        self.sim.bot().is_some_and(|b| b.done(&self.sim))
+    }
+    fn started(&self) -> bool {
+        self.sim.bot().is_some_and(|b| b.started)
     }
     fn slot(&self) -> SaveData {
         wf_app::trade::read_slot(&self.dir.join("saves/slot1.sav")).expect("slot file")
@@ -311,6 +171,8 @@ struct Run {
     t: Rc<Cell<f64>>,
     a: Player,
     b: Player,
+    /// the guest's app is running (a test kills it and restarts it from its folder)
+    b_alive: bool,
 }
 
 fn run(name: &str, kind: LinkKind, sa: &SaveData, sb: &SaveData, seed: u64) -> Option<Run> {
@@ -323,19 +185,19 @@ fn run(name: &str, kind: LinkKind, sa: &SaveData, sb: &SaveData, seed: u64) -> O
     let eps = Rc::new(RefCell::new(0));
     let a = player(&p, &net, &clock, &format!("{name}-host"), true, kind, sa, eps.clone());
     let b = player(&p, &net, &clock, &format!("{name}-guest"), false, kind, sb, eps);
-    Some(Run { packs: p, renderer: wf_render::Renderer::new(), drawn: Vec::new(), net, t, a, b })
+    Some(Run { packs: p, renderer: wf_render::Renderer::new(), drawn: Vec::new(), net, t, a, b, b_alive: true })
 }
 
 impl Run {
     fn step(&mut self) {
         self.t.set(self.t.get() + 1000.0 / 59.7275);
         let mut ev = Vec::new();
-        let ia = self.a.input();
-        self.a.sim.step(&[ia], &mut ev);
-        let ib = self.b.input();
-        self.b.sim.step(&[ib], &mut ev);
+        self.a.sim.step(&[0], &mut ev);
+        if self.b_alive {
+            self.b.sim.step(&[0], &mut ev);
+        }
         // every link page renders (the game's window, fonts and cursor over the title picture)
-        for (who, p) in [("host", &self.a), ("guest", &self.b)] {
+        for (who, p) in [("host", &self.a), ("guest", &self.b)].into_iter().take(if self.b_alive { 2 } else { 1 }) {
             let ph = p.sim.phase();
             let key = format!("{who}-{ph}");
             if ph == "title" || ph == "closing" || self.drawn.contains(&key) {
@@ -365,14 +227,14 @@ impl Run {
                 return;
             }
             self.step();
-            if std::env::var("LINK_DEBUG").is_ok() && self.a.k % 500 == 0 {
+            if std::env::var("LINK_DEBUG").is_ok() && self.a.sim.frame() % 500 == 0 {
                 for p in [&self.a, &self.b] {
                     if let Some(s) = p.sim.dojo() {
-                        eprintln!("{} f{} c{} {:?} r{}", p.k, s.frame(), s.confirmed(), s.game.st.phase, s.game.st.round);
+                        eprintln!("{} f{} c{} {:?} r{}", p.sim.frame(), s.frame(), s.confirmed(), s.game.st.phase, s.game.st.round);
                     } else if let Some(c) = p.sim.trade_cursor() {
-                        eprintln!("{} trade {:?} {:?} {:?}", p.k, c, p.sim.trade_state(), p.sim.trade_rows());
+                        eprintln!("{} trade {:?} {:?} {:?}", p.sim.frame(), c, p.sim.trade_state(), p.sim.trade_rows());
                     } else {
-                        eprintln!("{} {}", p.k, p.sim.phase());
+                        eprintln!("{} {}", p.sim.frame(), p.sim.phase());
                     }
                 }
             }
@@ -389,7 +251,7 @@ fn dojo_match_between_two_apps() {
     let sb = save(&d, &[(4, 60)], &[], 0);
     let Some(mut r) = run("dojo", LinkKind::Dojo, &sa, &sb, 3) else { return };
     // through the title into the room, the screens, the match
-    r.until(3000, "both on the link screens", |r| r.a.sim.phase() != "title" && r.b.sim.phase() != "title" && r.a.started && r.b.started);
+    r.until(3000, "both on the link screens", |r| r.a.sim.phase() != "title" && r.b.sim.phase() != "title" && r.a.started() && r.b.started());
     r.until(3000, "the match", |r| r.a.sim.dojo().is_some() && r.b.sim.dojo().is_some());
     // the match runs to its end on both
     r.until(20_000, "the ending", |r| r.a.sim.record.is_some() && r.b.sim.record.is_some());
@@ -432,8 +294,8 @@ fn dojo_disconnect_mid_match() {
     let sb = save(&d, &[(4, 60)], &[], 0);
     let Some(mut r) = run("dojo-drop", LinkKind::Dojo, &sa, &sb, 5) else { return };
     // Balanced: no KO before the drop
-    r.a.mode = DojoMode::Balanced;
-    r.b.mode = DojoMode::Balanced;
+    r.a.sim.bot_mut().unwrap().mode = DojoMode::Balanced;
+    r.b.sim.bot_mut().unwrap().mode = DojoMode::Balanced;
     r.until(6000, "the match", |r| r.a.sim.dojo().is_some_and(|s| s.frame() > 120) && r.b.sim.dojo().is_some());
     // the guest's network dies
     r.net.kill(&format!("{}", "dojo-drop-guest"));
@@ -454,7 +316,7 @@ fn trade_between_two_apps() {
     let Some(mut r) = run("trade", LinkKind::Trade, &sa, &sb, 9) else { return };
     r.until(6000, "the trade screens", |r| r.a.sim.phase() == "trade" && r.b.sim.phase() == "trade");
     r.until(6000, "TRADE COMPLETE on both", |r| {
-        let ok = |p: &Player| p.sim.phase() == "complete" || (p.started && p.sim.last.as_deref() == Some("complete"));
+        let ok = |p: &Player| p.sim.phase() == "complete" || (p.started() && p.sim.last.as_deref() == Some("complete"));
         ok(&r.a) && ok(&r.b)
     });
     r.until(2000, "back at the title", |r| r.a.done() && r.b.done());
@@ -491,4 +353,178 @@ fn trade_disconnect_before_commit() {
     r.until(3000, "host leaves after Disconnected", |r| r.a.done());
     assert_eq!(r.a.slot(), sa, "nothing applied");
     assert_eq!(r.b.slot(), sb, "nothing applied");
+}
+
+/// the arrow prompts the trade list shows (picture, frame) in a player's current view
+fn arrows(p: &Player) -> Vec<(String, u16)> {
+    let mut v = wf_view::RenderView::default();
+    p.sim.view(&mut v);
+    let mut out = Vec::new();
+    for l in v.menu.iter().flat_map(|m| m.layers.iter()) {
+        for op in &l.ops {
+            if let wf_view::MenuOp::Image { path, frame, .. } = op {
+                if path.ends_with("buttons/up.png") || path.ends_with("buttons/down.png") {
+                    out.push((path.rsplit('/').next().unwrap_or("").to_string(), *frame));
+                }
+            }
+        }
+    }
+    out.sort();
+    out
+}
+
+#[test]
+fn trade_list_scrolls_with_arrows() {
+    let Some(dir) = content_dir() else { return };
+    let d = wf_app::battle::load_data(&packs(&dir)).unwrap();
+    // eight supplies + zenie: nine rows, five shown
+    let many: Vec<(usize, u8)> = (0..8).map(|i| (i, 3)).collect();
+    let sa = save(&d, &[(0, 20)], &many, 500);
+    let sb = save(&d, &[(4, 20)], &[(1, 4)], 100);
+    let Some(mut r) = run("trade-scroll", LinkKind::Trade, &sa, &sb, 21) else { return };
+    r.until(6000, "the trade screens", |r| r.a.sim.phase() == "trade" && r.b.sim.phase() == "trade");
+    let n = r.a.sim.trade_cursor().unwrap().3.len();
+    assert!(n > 5, "a long list ({n} rows)");
+    // at the top: up greyed, down live
+    assert_eq!(arrows(&r.a), vec![("down.png".into(), 0), ("up.png".into(), 2)], "top of the list");
+    // the scripted player walks down to the zenie row (the last): the list has scrolled
+    r.until(3000, "the last row", |r| r.a.sim.trade_cursor().is_some_and(|c| c.0 == n - 1));
+    assert_eq!(arrows(&r.a), vec![("down.png".into(), 2), ("up.png".into(), 0)], "bottom of the list");
+    // drawn: the prompts' pixels at their place (the layer at (8, 8) + (98, 44) / (98, 94))
+    let mut v = wf_view::RenderView::default();
+    r.a.sim.view(&mut v);
+    let px = r.renderer.render(&r.packs, &v, 0, 240, 160).to_vec();
+    for (x0, y0) in [(106usize, 52usize), (106, 102)] {
+        let colours: std::collections::BTreeSet<u32> =
+            (0..16).flat_map(|dy| (0..16).map(move |dx| (dx, dy))).map(|(dx, dy)| px[(y0 + dy) * 240 + x0 + dx]).collect();
+        assert!(colours.len() > 2, "an arrow drawn at ({x0}, {y0})");
+    }
+    // a short list shows none (the guest: two rows)
+    assert!(arrows(&r.b).is_empty(), "no arrows on a short list");
+    // and the trade still completes
+    r.until(6000, "TRADE COMPLETE on both", |r| {
+        let ok = |p: &Player| p.sim.phase() == "complete" || (p.started() && p.sim.last.as_deref() == Some("complete"));
+        ok(&r.a) && ok(&r.b)
+    });
+}
+
+/// the trade journal's records next to a player's slot: (id, state)
+fn journal(dir: &Path) -> Vec<(String, String)> {
+    let Ok(b) = std::fs::read(dir.join("saves/slot1.sav.trade.json")) else { return Vec::new() };
+    let v: serde_json::Value = serde_json::from_slice(&b).unwrap();
+    v["records"]
+        .as_object()
+        .map(|m| m.iter().map(|(k, r)| (k.clone(), r["state"].as_str().unwrap_or("").to_string())).collect())
+        .unwrap_or_default()
+}
+
+/// both accepted; the guest's app dies when its journal reaches `at` (between Prepared and Committed, or between
+/// Committed and Done), its network with it; the host goes on alone; the guest restarts from its slot + journal
+/// through the title's startup, goes back into the Trading Post (the host's scripted player comes back too), and the
+/// trade settles: applied exactly once on both sides, nothing lost, the screens in between show the trade in doubt
+/// (the locked save's "Disconnected") and, when the guest commits only after its restart, TRADE COMPLETE
+fn trade_crash_at(at: &str, seed: u64) {
+    let Some(dir) = content_dir() else { return };
+    let d = wf_app::battle::load_data(&packs(&dir)).unwrap();
+    let sa = save(&d, &[(0, 20)], &[(0, 5)], 500);
+    let sb = save(&d, &[(4, 20)], &[(1, 4)], 100);
+    let name = format!("trade-crash-{}", at.to_lowercase());
+    let Some(mut r) = run(&name, LinkKind::Trade, &sa, &sb, seed) else { return };
+    r.until(6000, "the trade screens", |r| r.a.sim.phase() == "trade" && r.b.sim.phase() == "trade");
+    if at == "Prepared" {
+        // the guest accepts last: it agrees and prepares on its own accept, before the host has heard it - a frame
+        // window between its Prepared and its Committed (accepting first, both prepare in one exchange and the guest
+        // prepares and commits in the same tick)
+        r.b.sim.bot_mut().unwrap().accept = false;
+        r.until(6000, "the host accepted", |r| r.b.sim.trade_state().is_some_and(|(_, friend_accepted, _)| friend_accepted));
+        r.b.sim.bot_mut().unwrap().accept = true;
+    }
+    r.until(6000, "the guest's journal at the crash point", |r| journal(&r.b.dir).iter().any(|(_, s)| s == at));
+    // the crash: the guest's app and its network are gone
+    let gdir = r.b.dir.clone();
+    r.net.kill(&format!("{name}-guest"));
+    r.b_alive = false;
+    assert_eq!(journal(&gdir).len(), 1);
+    // the host's scripted player: no new trade, and it comes back if it left
+    {
+        let b = r.a.sim.bot_mut().unwrap();
+        b.repeat = true;
+        b.accept = false;
+        b.first = 0;
+        b.zenie = 0;
+    }
+    // the host alone: the trade in doubt (Prepared: locked, "Disconnected") or already TRADE COMPLETE (it committed)
+    let mut host_saw = std::collections::BTreeSet::new();
+    for _ in 0..900 {
+        r.step();
+        let ph = r.a.sim.phase();
+        host_saw.insert(match r.a.sim.trade_away() {
+            Some(true) => "trade in doubt".to_string(),
+            _ => ph.to_string(),
+        });
+    }
+    assert!(host_saw.contains("trade in doubt") || host_saw.contains("complete"), "the host saw {host_saw:?}");
+    // the guest's app restarts from its folder (slot + journal) through the title's startup
+    let eps = Rc::new(RefCell::new(0));
+    let clock = {
+        let t = r.t.clone();
+        Rc::new(move || t.get()) as Clock
+    };
+    r.b = open(&r.packs, &r.net, &clock, &gdir, &format!("link-{name}-guest"), &format!("{name}-guest-r"), false, LinkKind::Trade, eps);
+    {
+        let b = r.b.sim.bot_mut().unwrap();
+        b.accept = false;
+        b.first = 0;
+        b.zenie = 0;
+    }
+    r.b_alive = true;
+    let mut guest_saw = std::collections::BTreeSet::new();
+    let settled = |dir: &Path| {
+        let j = journal(dir);
+        j.len() == 1 && (j[0].1 == "Committed" || j[0].1 == "Done")
+    };
+    let mut k = 0;
+    // (Prepared: the guest commits after its restart - TRADE COMPLETE on its screen; Committed: it marks the trade
+    // Done once it hears the host)
+    let guest_done = |dir: &Path| journal(dir).first().is_some_and(|(_, s)| s == "Done");
+    while !(guest_saw.contains("trade in doubt")
+        && settled(&r.a.dir)
+        && settled(&gdir)
+        && (if at == "Prepared" { guest_saw.contains("complete") } else { guest_done(&gdir) }))
+    {
+        r.step();
+        guest_saw.insert(match r.b.sim.trade_away() {
+            Some(true) => "trade in doubt".to_string(),
+            _ => r.b.sim.phase().to_string(),
+        });
+        k += 1;
+        assert!(k < 20_000, "not settled: host {:?} {:?} / guest {:?} {:?}, guest saw {guest_saw:?}", r.a.sim.phase(), journal(&r.a.dir), r.b.sim.phase(), journal(&gdir));
+    }
+    // the restarted guest showed the trade in doubt (the save locked) before it settled
+    assert!(guest_saw.contains("trade in doubt"), "the guest saw {guest_saw:?}");
+    // applied exactly once on both sides, nothing lost: the same trade id, both slot files as after one trade
+    let (ja, jb) = (journal(&r.a.dir), journal(&gdir));
+    assert_eq!(ja[0].0, jb[0].0, "one trade");
+    let (a1, b1) = (r.a.slot(), r.b.slot());
+    assert_eq!((a1.story.supplies[0], a1.story.supplies[1], a1.story.zenie), (3, 2, 500));
+    assert_eq!((b1.story.supplies[0], b1.story.supplies[1], b1.story.zenie), (2, 2, 100));
+    for i in 0..sa.story.supplies.len() {
+        assert_eq!(a1.story.supplies[i] as u32 + b1.story.supplies[i] as u32, sa.story.supplies[i] as u32 + sb.story.supplies[i] as u32, "supply {i}");
+    }
+    assert_eq!(a1.story.zenie + b1.story.zenie, sa.story.zenie + sb.story.zenie);
+    // and nothing more happens (a later step applies nothing again)
+    for _ in 0..600 {
+        r.step();
+    }
+    assert_eq!((r.a.slot(), r.b.slot()), (a1, b1));
+}
+
+#[test]
+fn trade_crash_between_prepare_and_commit() {
+    trade_crash_at("Prepared", 31);
+}
+
+#[test]
+fn trade_crash_between_commit_and_done() {
+    trade_crash_at("Committed", 37);
 }

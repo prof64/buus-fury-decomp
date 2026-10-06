@@ -6,8 +6,10 @@
 //! commit a crash interrupted (the slot holds the pre- or the post-trade bytes; either way it ends post-trade,
 //! once) - see engine/docs/netcode.md "Link play: Trading Post".
 
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 
 use serde::{Deserialize, Serialize};
 use wf_core::menu::save::{SaveData, Saves};
@@ -75,8 +77,44 @@ pub fn apply(sd: &SaveData, story: &[bool], give: &Offer, get: &Offer) -> Result
     Ok(out)
 }
 
+/// Where the Trading Post's files live: the file system (native, the default) or the browser's storage (the web
+/// build installs its own with [`set_disk`]). `write` must be durable and atomic per path when it returns - the
+/// commit's write-ahead log is built from those single-path writes (see the module doc).
+pub trait Disk {
+    fn read(&self, path: &Path) -> Option<Vec<u8>>;
+    fn write(&self, path: &Path, bytes: &[u8]) -> Result<(), String>;
+}
+
+thread_local! {
+    static DISK: RefCell<Option<Rc<dyn Disk>>> = const { RefCell::new(None) };
+}
+
+/// install a [`Disk`] for this thread (None = the file system)
+pub fn set_disk(d: Option<Rc<dyn Disk>>) {
+    DISK.with(|x| *x.borrow_mut() = d);
+}
+
+/// read a file through the installed [`Disk`] (default: the file system)
+pub fn disk_read(path: &Path) -> Option<Vec<u8>> {
+    if let Some(d) = DISK.with(|x| x.borrow().clone()) {
+        return d.read(path);
+    }
+    std::fs::read(path).ok()
+}
+
+/// write a file atomically through the installed [`Disk`] (default: a temp file + rename; the folder is made)
+pub fn disk_write(path: &Path, bytes: &[u8]) -> Result<(), String> {
+    if let Some(d) = DISK.with(|x| x.borrow().clone()) {
+        return d.write(path, bytes);
+    }
+    if let Some(dir) = path.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    write_atomic(path, bytes).map_err(|e| e.to_string())
+}
+
 pub fn read_slot(path: &Path) -> Option<SaveData> {
-    let b = std::fs::read(path).ok()?;
+    let b = disk_read(path)?;
     let mut s = Saves::default();
     s.set_slot_bytes(0, &b);
     s.slot(0).cloned()
@@ -126,9 +164,9 @@ impl FileStore {
     /// open (and recover): `story` = the content's story-item flags by supply index
     pub fn open(slot: &Path, story: Vec<bool>) -> Result<FileStore, String> {
         let journal_path = PathBuf::from(format!("{}.trade.json", slot.display()));
-        let j: Journal = match std::fs::read(&journal_path) {
-            Ok(b) => serde_json::from_slice(&b).map_err(|e| format!("{}: {e}", journal_path.display()))?,
-            Err(_) => Journal::default(),
+        let j: Journal = match disk_read(&journal_path) {
+            Some(b) => serde_json::from_slice(&b).map_err(|e| format!("{}: {e}", journal_path.display()))?,
+            None => Journal::default(),
         };
         let mut s = FileStore { slot: slot.to_path_buf(), journal_path, story, j, crash_after: None };
         s.recover()?;
@@ -139,9 +177,9 @@ impl FileStore {
     fn recover(&mut self) -> Result<(), String> {
         let Some((id, post)) = self.j.wal.clone() else { return Ok(()) };
         let post = unhex(&post);
-        let now = std::fs::read(&self.slot).unwrap_or_default();
+        let now = disk_read(&self.slot).unwrap_or_default();
         if now != post {
-            write_atomic(&self.slot, &post).map_err(|e| e.to_string())?;
+            disk_write(&self.slot, &post)?;
         }
         if let Some(r) = self.j.records.get_mut(&id) {
             r.state = TState::Committed;
@@ -151,7 +189,7 @@ impl FileStore {
     }
 
     fn save_journal(&self) -> Result<(), String> {
-        write_atomic(&self.journal_path, &serde_json::to_vec_pretty(&self.j).unwrap_or_default()).map_err(|e| e.to_string())
+        disk_write(&self.journal_path, &serde_json::to_vec_pretty(&self.j).unwrap_or_default())
     }
 
     pub fn save(&self) -> Option<SaveData> {
@@ -186,7 +224,7 @@ impl TradeStore for FileStore {
             return Err("test crash after the WAL".into());
         }
         // (2) the slot
-        write_atomic(&self.slot, &bytes).map_err(|e| e.to_string())?;
+        disk_write(&self.slot, &bytes)?;
         if self.crash_after == Some(2) {
             return Err("test crash after the slot".into());
         }

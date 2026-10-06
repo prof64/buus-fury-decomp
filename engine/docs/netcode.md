@@ -298,7 +298,13 @@ network options, `--net-name`, `--net-key` apply); B (Cancel) leaves as in the g
   **Accept** accepts the friend's current offer with ours ("You have accepted trade"; a new offer from either side
   voids it), **Decline** withdraws. Both accepted -> the two-phase commit on `saves/slotN.sav` (`FileStore`) ->
   "TRADE COMPLETE!"; the running title's slot is updated (the shell persists it). The trade names peers by a stable
-  **link id** (`<data>/link_id`), so a reconnection with a new transport id resumes a pending trade.
+  **link id** (`<data>/link_id`), so a reconnection with a new transport id resumes a pending trade (the friend's
+  connection is the one with its link id that is *talking*: a friend whose network died stays listed until the
+  lobby notices, and the restarted one comes in on a new connection). A list longer than its five rows scrolls with
+  the cursor, the game's UP / DOWN prompts beside it (greyed at either end; the Inventory's button pictures).
+  **TRADE COMPLETE! keeps answering**: the trade's connection stays up on that page until the record is Done (the
+  friend committed too), the friend is gone, or 10 s passed - only then does a key leave (a side that left at once
+  could leave its friend Prepared, in doubt until the next link: found by the two-process test below).
 * A drop at any point after the friend came: "**Disconnected**" (93); in a match: the ending is Disconnected, no
   prize; in a trade before both accepted: nothing applied; with a trade Prepared: "Disconnected - finishing when
   your friend is back" (the slot stays locked; the journal finishes it at the next Trading Post link with that
@@ -314,10 +320,75 @@ virtual network (80 ms + 20 ms jitter + 5 % loss), driven only by scripted close
 title (START, Multiplayer, Dojo / Trading Post) and the link screens: a Dojo match (both peers' confirmed match:
 same end frame, checksum and inputs; complementary endings; the prize once in the winner's slot file and running
 slot); a guest drop mid-match (Disconnected, no prize); a trade (TRADE COMPLETE on both, supplies and zenie conserved
-across both slot files, the running titles updated); a guest leaving mid-trade (nothing applied).
+across both slot files, the running titles updated); a guest leaving mid-trade (nothing applied); **a crash
+mid-commit through the screens** (`trade_crash_between_prepare_and_commit` / `_commit_and_done`: both accepted, the
+guest's app and network die when its journal reaches Prepared - it accepted last, so it prepares before the host
+hears it - or Committed; the host goes on alone and shows the trade in doubt or TRADE COMPLETE; the guest's app
+restarts from its folder through the title's own startup (`title_sim` on the slot read from disk, its link id),
+goes back into the Trading Post, its screen shows the locked trade ("Disconnected - finishing when your friend is
+back") and then TRADE COMPLETE (Prepared) / marks it Done (Committed): one trade id on both sides, both slot files
+as after exactly one trade, supplies / zenie conserved, nothing applied again later); a trade list longer than five
+rows (`trade_list_scrolls_with_arrows`: the prompts at the top / bottom, drawn). The scripted player is the
+library's `wf_app::link::LinkBot` (on `LinkConfig::bot`, played inside the `LinkSim`).
+
+**Two processes** (`tools/link/twoproc.sh`, headless, muted, real time, nothing public): builds `buus-fury`,
+`wf-signal` and the `link_save` helper, starts `wf-signal 127.0.0.1:3591`, writes each player's save slot into its
+own `--data` folder (`cargo run -p wf-app --example link_save -- write CONTENT OUT.sav PARTY SUPPLIES ZENIE`), and runs
+two separate `buus-fury --headless --mute --realtime --link host|join:ROOM --link-bot dojo|trade --link-quick
+--signal ws://127.0.0.1:3591` processes: `--link-bot` plays the pages itself (the same `LinkBot`), `--link-report
+FILE` (default `<data>/link_report.json` with a bot) writes each flow's end, `--link-quick` the Dojo's short test
+rules. Checks: the Dojo - both processes confirm the same match (end frame, checksum, a hash of all confirmed
+inputs) with mirrored endings; the trade - both report TRADE COMPLETE and the items + zenie are conserved across the
+two slot files on disk (`link_save read`). `ONLY=dojo|trade`, `WAIT` (s), `--no-build`; `WF_LINK_DEBUG=1` logs the
+trade's traffic and journal states per frame. Results on this machine: the first run ended with the guest Prepared
+and the host Committed - the host had left TRADE COMPLETE at once (fixed: the page holds, above); of the 14 trade
+runs after that fix (3 with the Dojo too, which passed every time), 13 PASS and **one ended with the host Prepared
+and the guest Committed** (the guest left TRADE COMPLETE by the 10 s limit; the host had stopped hearing it - cause not found:
+that run had no traffic log; with `WF_LINK_DEBUG=1` the next 13 runs passed). The trade stays safe either way (the
+in-doubt side finishes at the next link with that friend), but a stall there is open.
 **Gaps:** the link screens' layouts are INFERRED (the game's strings / fonts / window / cursor; no recording of
-them exists); not in the browser build yet; the native flag was built but not tried over two real processes in
-this change (the in-process tests cover the logic); the trade list shows 5 rows at a time (no scroll arrows).
+them exists).
+
+### Link play: in the browser (`crates/wf-web/src/link.rs`, `engine/web/app/link.js`)
+
+**Play it**: open the web app at `/app/?link=host:ABC12` on one machine and `/app/?link=join:ABC12` on the other
+(`&signal=wss://HOST` for the signalling server, default `ws://127.0.0.1:3536`; `&key=` its key). Each starts on the
+title with link play - the same `wf_app::link` flow and screens as the native `--link` (START -> Multiplayer ->
+Dojo / Trading Post, the link box is the lobby of room `ABC12-DOJO` / `ABC12-TRADE`). The browser's story save slots
+(`localStorage` `wf.save.N`) are the player's saves; native and browser players meet in one room (the same
+signalling and data channel setup).
+* **Connection**: when the title's link box opens, the flow asks for its room: Rust queues the URL (`wf_link_poll`
+  returns 1 with it) and hands the flow a queue transport; link.js opens the Matchbox signalling + WebRTC data
+  channel (as net.js does for battles) and feeds that queue through the `wf_net_*` exports (they serve the link's
+  queue while no online battle is prepared). When a flow ends its transport is dropped and `wf_link_poll` returns 2:
+  link.js closes the WebSocket and peer connections, so the friend sees the link go (as with the native socket).
+* **Saves and the trade journal - atomic as on native.** The Trading Post's `FileStore` writes through a pluggable
+  `wf_app::trade::Disk` (native: the file system, temp file + rename; browser: `WebDisk`). The browser's disk keeps
+  the files in memory and queues every write; each frame link.js takes the queue in order (`wf_link_disk_next`) and
+  mirrors it to `localStorage` (`wf.link.f.<path>`, hex) **before** it sends the frame's outgoing packets
+  (`wf_net_out`). `localStorage.setItem` is synchronous and atomic per key, so every journal / slot write is durable
+  before any message that depends on it leaves the page - the write-ahead log (journal with the post-trade bytes ->
+  slot -> journal Committed) keeps the native store's guarantees; a reload re-reads the mirrored files (`cfg.link.disk`)
+  and `FileStore::open` finishes an interrupted commit. The committed slot also goes to the running title
+  (`Out::Slot`), which app.js persists as the story slot `wf.save.N` like any save. The browser's stable link id is
+  `localStorage` `wf.link.id`.
+* **Test hooks** (URL): `&bot=dojo|trade` (the scripted `LinkBot`, as `--link-bot`), `&quick` (the Dojo's short test
+  rules, as `--link-quick`), `&linkinfo` (`window.wfLinkInfo()`: phase, title page, setup, trade cursor / state, the
+  flow's end and its report - `wf_link_info`).
+
+**Two headless Chromium pages** (`cd engine/web/tests && npm install && node link_check.mjs [--build] [--only
+dojo|trade] [--verbose]`): two separate headless, muted browser processes with their own profiles (each extracts the
+ROM once: `?devrom`), a local `wf-signal` on `127.0.0.1:3593` (PORT), the game served from 127.0.0.1 - nothing public.
+Each page gets a save slot written by `link_save` into its `localStorage`, then opens `?link=host|join:ROOM&bot=...
+&quick&linkinfo`; the test reads `wfLinkInfo()` until both flows end. Checks: the Dojo - both pages confirm the same
+match (end frame, checksum, hash of all confirmed inputs) with mirrored endings; the Trading Post - both report TRADE
+COMPLETE, supplies + zenie conserved across the two saves (the trade store's slot mirrored in `localStorage`, read
+with `link_save read`), the journal Done on both, and the title slot `wf.save.0` equal to the traded slot. Result on
+this machine: **all checks pass** (Dojo: 111 confirmed frames, the same checksum and inputs on both pages, Won / Lost;
+trade: host 5 x supply 0 + 500 zenie, guest 4 x supply 1 + 100 zenie -> 2 + 30 each way, totals conserved, both
+journals Done). Not checked: a browser page against a native process in one room (the same wire format; not run),
+and native == wasm on the same Dojo inputs (the two runs' inputs differ with timing; a replay of one run's confirmed
+inputs on the other build would settle it).
 
 ### Replays
 

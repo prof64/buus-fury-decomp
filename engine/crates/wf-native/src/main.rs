@@ -23,7 +23,10 @@
 //! renders it (`--shot`), `--launcher-keys ArrowDown,Enter` drives it first (a chosen game then runs as usual).
 //! Link play (engine/docs/netcode.md "Link play: playing it"): `--link host:ROOM` / `--link join:ROOM` opens the title
 //! with Multiplayer -> Dojo / Trading Post going online: the "Waiting for a friend..." box joins room ROOM (per page)
-//! on the `--signal` server; `--net-name`, `--net-key` and the `--net-*` network options apply.
+//! on the `--signal` server; `--net-name`, `--net-key` and the `--net-*` network options apply. Scripted (headless
+//! tests, tools/link/twoproc.sh): `--link-bot dojo|trade` plays the pages itself (`wf_app::link::LinkBot`; the
+//! host / guest from `--link`), `--link-report FILE` writes each flow's end as JSON (default with a bot:
+//! `<data>/link_report.json`), `--link-quick` the Dojo's short test rules (40 s rounds, at most 3).
 
 use std::num::NonZeroU32;
 use std::path::{Path, PathBuf};
@@ -128,6 +131,12 @@ struct Args {
     title_launch: bool,
     /// `--link host:ROOM|join:ROOM`: the title with online link play (host?, room)
     link: Option<(bool, String)>,
+    /// `--link-bot dojo|trade`: the scripted link player
+    link_bot: Option<wf_app::link::LinkKind>,
+    /// `--link-report FILE`
+    link_report: Option<PathBuf>,
+    /// `--link-quick`: the Dojo's short test rules
+    link_quick: bool,
 }
 
 /// Running from a macOS `.app` bundle (Finder gives no terminal, which would otherwise mean "automation, headless").
@@ -186,6 +195,9 @@ fn parse_args() -> Args {
         open_replays: false,
         title_launch: false,
         link: None,
+        link_bot: None,
+        link_report: None,
+        link_quick: false,
     };
     if a.headless && in_app_bundle() && std::env::var_os("WF_HEADLESS").is_none() && std::env::var_os("WF_AGENT").is_none() && std::env::var_os("CI").is_none() {
         a.headless = false;
@@ -315,6 +327,11 @@ fn parse_args() -> Args {
                 a.title_launch = true;
                 a.cli_mode = true;
             }
+            "--link-bot" => {
+                a.link_bot = Some(if next(&mut i) == "trade" { wf_app::link::LinkKind::Trade } else { wf_app::link::LinkKind::Dojo });
+            }
+            "--link-report" => a.link_report = Some(PathBuf::from(next(&mut i))),
+            "--link-quick" => a.link_quick = true,
             s if s.starts_with("--net") || matches!(s, "--pvp" | "--pvp-enemies" | "--signal" | "--room") => {
                 a.cli_mode = true;
                 a.signal_given |= s == "--signal";
@@ -600,8 +617,14 @@ fn link_config(a: &Args, host: bool, room: &str) -> wf_app::link::LinkConfig {
         link_id,
         name,
         saves_dir: Some(a.data.join("saves")),
-        rules: Default::default(),
+        rules: if a.link_quick {
+            wf_net::dojo::DojoRules { round_frames: 2400, between_frames: 60, max_rounds: 3, ..Default::default() }
+        } else {
+            Default::default()
+        },
         seed: a.seed,
+        bot: a.link_bot.map(|k| wf_app::link::LinkBot::new(k, host)),
+        report: a.link_report.clone().or_else(|| a.link_bot.map(|_| a.data.join("link_report.json"))),
     }
 }
 

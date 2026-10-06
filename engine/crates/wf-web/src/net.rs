@@ -47,8 +47,19 @@ thread_local! {
     static MENU: RefCell<Option<Menu>> = const { RefCell::new(None) };
 }
 
-fn clock() -> Clock {
+pub(crate) fn clock() -> Clock {
     Rc::new(|| unsafe { now_ms() })
+}
+
+/// the queue the `wf_net_*` transport exports work on: the prepared online match's, else link play's (link.rs)
+fn queue() -> Option<QueueTransport> {
+    NET.with(|n| n.borrow().as_ref().map(|n| n.q.clone())).or_else(|| super::link::LINK_Q.with(|q| q.borrow().clone()))
+}
+
+/// link play's transport on its queue (the signalling failure flag reset: a new room connection)
+pub(crate) fn link_transport(q: &QueueTransport) -> Box<dyn Transport> {
+    CLOSED.with(|c| *c.borrow_mut() = None);
+    Box::new(WebTransport { q: q.clone(), closed: CLOSED.with(|c| c.clone()) })
 }
 
 /// The queue transport the JS glue fills, plus a closed flag for signaling failures.
@@ -225,11 +236,9 @@ pub unsafe extern "C" fn wf_net_lobby(ptr: *const u8, len: usize) -> u32 {
 #[no_mangle]
 pub unsafe extern "C" fn wf_net_set_id(ptr: *const u8, len: usize) {
     let id = unsafe { arg_str(ptr, len) };
-    NET.with(|n| {
-        if let Some(n) = n.borrow().as_ref() {
-            n.q.0.borrow_mut().id = Some(id);
-        }
-    });
+    if let Some(q) = queue() {
+        q.0.borrow_mut().id = Some(id);
+    }
 }
 
 /// A peer's data channel opened (`up` = 1) or closed (0).
@@ -239,11 +248,9 @@ pub unsafe extern "C" fn wf_net_set_id(ptr: *const u8, len: usize) {
 #[no_mangle]
 pub unsafe extern "C" fn wf_net_peer(ptr: *const u8, len: usize, up: u32) {
     let id = unsafe { arg_str(ptr, len) };
-    NET.with(|n| {
-        if let Some(n) = n.borrow().as_ref() {
-            n.q.0.borrow_mut().changes.push(if up != 0 { PeerChange::Connected(id) } else { PeerChange::Disconnected(id) });
-        }
-    });
+    if let Some(q) = queue() {
+        q.0.borrow_mut().changes.push(if up != 0 { PeerChange::Connected(id) } else { PeerChange::Disconnected(id) });
+    }
 }
 
 /// The signaling connection failed / was refused (`msg`: why).
@@ -264,18 +271,16 @@ pub unsafe extern "C" fn wf_net_closed(ptr: *const u8, len: usize) {
 pub unsafe extern "C" fn wf_net_recv(ip: *const u8, il: usize, dp: *const u8, dl: usize) {
     let id = unsafe { arg_str(ip, il) };
     let data = if dl == 0 { Vec::new() } else { unsafe { std::slice::from_raw_parts(dp, dl) }.to_vec() };
-    NET.with(|n| {
-        if let Some(n) = n.borrow().as_ref() {
-            n.q.0.borrow_mut().inbox.push_back((id, data));
-        }
-    });
+    if let Some(q) = queue() {
+        q.0.borrow_mut().inbox.push_back((id, data));
+    }
 }
 
 /// Next datagram to send: returns its total length (0 = none); the string buffer holds `[peer id length u8][peer
 /// id][payload]`.
 #[no_mangle]
 pub extern "C" fn wf_net_out() -> u32 {
-    let next = NET.with(|n| n.borrow().as_ref().and_then(|n| n.q.0.borrow_mut().outbox.pop_front()));
+    let next = queue().and_then(|q| q.0.borrow_mut().outbox.pop_front());
     match next {
         Some((to, d)) => {
             let mut b = Vec::with_capacity(1 + to.len() + d.len());

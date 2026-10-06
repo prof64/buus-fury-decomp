@@ -3,6 +3,7 @@
 import { openStore } from './store.js';
 import { tar, untar, CATEGORIES } from './tar.js';
 import { startNet } from './net.js';
+import { linkConfig, startLink } from './link.js';
 
 const EXTRACTOR_URL = new URL('../wf_wasm.wasm', import.meta.url).href;
 const GAME_URL = new URL('wf_web.wasm', import.meta.url).href;
@@ -230,8 +231,10 @@ async function boot(baseTarBytes) {
     return r;
   };
   // the launcher (wf_app::launcher, drawn by the wasm in the game's font) unless the URL already picks a mode
-  const MODE_QS = ['story', 'demo', 'area', 'arena', 'enemy', 'fighter', 'net', 'autostart', 'nolauncher'];
+  const MODE_QS = ['story', 'demo', 'area', 'arena', 'enemy', 'fighter', 'net', 'autostart', 'nolauncher', 'link'];
   let launch = null;
+  // ?link=host:ROOM / join:ROOM: the title with link play (Multiplayer -> Dojo / Trading Post), link.js
+  if (qs.has('link')) launch = { kind: 'title' };
   if (!MODE_QS.some((k) => qs.has(k))) {
     launch = await runLauncher();
     if (!launch) return; // went to the online lobby (reload)
@@ -324,6 +327,8 @@ async function boot(baseTarBytes) {
   const cfg = { players: Number(qs.get('players') || 1), bindings, hotkeys, now: Date.now() / 1000 };
   // the launcher's pick: story (new game / a save slot) or a battle config; the save slots go along
   if (launch) Object.assign(cfg, { launch, slots: readSlots() });
+  const linkCfg = linkConfig(qs);
+  if (linkCfg) cfg.link = linkCfg;
   // real battle by default (?arena=forest&enemy=t68&count=1&fighter=goku&seed=1); ?demo or ?area=8-3 = demo world
   if (qs.has('demo') || qs.has('area')) Object.assign(cfg, { demo: true, area: qs.get('area') || '8-3' });
   // ?story or ?story=W-A: story mode (new game, field + the game's scripts)
@@ -358,6 +363,8 @@ async function boot(baseTarBytes) {
     return r;
   };
   const replays = replaysUi();
+  // link play's per-frame pump (disk mirror, room connection, packets): link.js
+  const link = linkCfg ? startLink({ x, mem: () => mem, withStr, str }) : null;
   if (launch?.replays) setTimeout(() => replays.show(), 0);
 
   // settings that live in the browser
@@ -484,6 +491,7 @@ async function boot(baseTarBytes) {
     x.wf_app_set_clock(Date.now() / 1000);
     // bit 30: a new picture was rendered (none when no step ran and nothing changed - a > 60 Hz display)
     const drawn = (x.wf_app_frame(W, H, net ? net.slot() : 0) & (1 << 30)) !== 0;
+    if (link) link.pump();
     if (net) {
       net.pump();
       net.draw();
