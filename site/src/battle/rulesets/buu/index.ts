@@ -355,6 +355,14 @@ export class BuuRuleset implements Ruleset {
     }
     for (const k of STAT_KEYS) rec[k] = Math.min(255, rec[k] + spent[k])
     rec.points = free
+    // link play's Dojo (Rust FighterSetup.fixed): a record given as is - HP / EP (current = max), the stats
+    const fixed = setup.options.fixed as { hp: number; ep: number; stats: number[]; skills?: number[] } | undefined
+    if (fixed) {
+      rec.hp = rec.maxHp = fixed.hp
+      rec.ep = rec.maxEp = fixed.ep
+      STAT_KEYS.forEach((k, i) => (rec[k] = fixed.stats[i]))
+      rec.points = 0
+    }
     const equip = SLOTS.map((s) => d.equipment.find((e) => e.id === Number(setup.options['eq_' + s])) ?? d.equipment.find((e) => e.slot === s))
     return { rec, equip, fd, spent, free }
   }
@@ -411,7 +419,8 @@ export class BuuRuleset implements Ruleset {
     const ctx = new BuuCtx(d, { popups: cfg.options.popups !== false, xp: !!cfg.fighter.options.xp })
     const { rec, equip, fd } = this.build(cfg.fighter)
     const formId = fd.forms.includes(cfg.fighter.form) ? cfg.fighter.form : fd.defaultForm
-    const skills = fd.char === 8 ? [7] : d.chars[fd.char].skills
+    const fixedSkills = (cfg.fighter.options.fixed as { skills?: number[] } | undefined)?.skills
+    const skills = fixedSkills ?? (fd.char === 8 ? [7] : d.chars[fd.char].skills)
     const player = new Player(ctx, {
       name: fd.name || d.forms[formId].name,
       form: formId,

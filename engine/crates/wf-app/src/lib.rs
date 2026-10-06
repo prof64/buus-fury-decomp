@@ -13,6 +13,7 @@ pub mod dev;
 pub mod hotkeys;
 pub mod input;
 pub mod launcher;
+pub mod link;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod modcheck;
 pub mod trade;

@@ -57,8 +57,9 @@ impl Offer {
 pub struct Inventory {
     /// supply counts by supply index
     pub supplies: Vec<u32>,
-    /// story items (key items) by supply index: not tradable (INFERRED: the trade's own rules are not decoded, and
-    /// moving a key item would break the giver's story)
+    /// story items (key items) by supply index: not tradable (MEASURED: the trade's item picker `0x0801F44E` lists a
+    /// supply only when bit 0 of its record's first halfword (`0x083BD2F8` + 0x34 x id) is clear - the items table's
+    /// `story_item`: ids 25..82; tradable are the supplies 0..24, the equipment list, and zenie when not 0)
     pub story: Vec<bool>,
     /// the equipment list: (item id, worn) - worn entries cannot be traded (`0x08004468`, remove equipment, skips
     /// entries with the worn marker in the high nibble: MEASURED from the ROM)

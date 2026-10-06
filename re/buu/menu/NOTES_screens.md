@@ -50,10 +50,23 @@ cable in the emulator either; INFERRED from the code and the strings 79..115):
   rounds ("Round 1".."Round 5", "You Win!!" / "You Lose!!" / "Draw!!"), then "Grab your prize!" (114) / "Go back
   to training!" (115). Mode tables of the flow (enter / update / events / redraw / done): `0x08049B5C`,
   `0x0804B604`, `0x0804BC04`, `0x0804CAD4` (built by `0x0801FF04`), `0x0804A60C`, `0x0804C0F0`.
+  **Decoded rules** (static disassembly; table with every address in engine/docs/netcode.md "Link play: Dojo"):
+  fight `0x0802193A` (state `0x03002BFC`: +0 / +1 wins, +4 timer seconds) zeroes the RNG once (`0x0802193E`);
+  area 0-90 (`0x08008E8C`); round = 180 s (`0xB4` at `0x08021C4A`), ends the update a fighter's HP is 0 (one down:
+  the other wins; both: Draw!!) or at time-out with both standing = Draw!! (`0x08021D48`, no HP comparison); result
+  banner 300 updates (`0x08021DC4`); "Round N" = 106 + both wins (draws repeat the number); the match loops until a
+  player has more than rounds / 2 wins (`0x08021B98`: no round cap, never a drawn match); "Grab your prize!" is text
+  only (no save write in the Dojo code). Mode byte 1 = Balanced: a fixed roster of 24 (strings 116..139, list
+  `0x08023120`, so the strings above are the Balanced list, not the save's party) with records from `0x0872BFCC`
+  (HP 15000, EP 100, STR / POW 67, END 25, SPD 50; Hercule 60 / 74; skill 7 only; `0x08022904` / `0x0801339C`);
+  0 = In-Game: the save's party with each record packed whole (`0x08022934` -> `0x080229B0`). INFERRED: the
+  "Round N" banner's length, that the host's settings apply to both, which side is the host.
 * **Trading Post** - "Your Trade:" / "Friend's Trade:" (80 / 81), items and "Zenie" (82), "How many to trade?" (83),
   "Propose Trade" / "Accept" / "Decline" (84..86), "You have accepted trade" (87), "TRADE" "COMPLETE!" (88 / 89).
   Mode tables: `0x08049450`, `0x0804A3BC`, `0x0804AFA0`, `0x0804B550`, `0x0804CAA8` (built by `0x080232A6`,
-  `0x080237CC`, `0x08023C22`), `0x08049424`, `0x0804A8AC`.
+  `0x080237CC`, `0x08023C22`), `0x08049424`, `0x0804A8AC`. Item picker `0x0801F44E`: supplies whose record bit 0
+  (`0x083BD2F8` + 0x34 x id, `story_item`) is clear (ids 0..24), every equipment entry, zenie if not 0; apply
+  `0x080231AE` (supplies saturate at 255, equipment add `0x08004448` / remove `0x08004468`).
 * **Mapping to the remake (plan, nothing built):** the link maps onto online play (engine/docs/netcode.md: wf-net's
   lobby + rollback). "Waiting for a friend..." = the lobby's matchmaking (Dojo / Trading Post as two room kinds);
   the save pick = each peer's local save slot, exchanged at connect. Dojo = a rollback versus match on the battle

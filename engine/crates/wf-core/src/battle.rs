@@ -177,6 +177,22 @@ pub struct FighterSetup {
     pub skill_level: i32,
     #[serde(default)]
     pub holy_water: bool,
+    /// a record given as is (link play's Dojo): replaces what the level / growth / points give (`FixedRecord`)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fixed: Option<FixedRecord>,
+}
+
+/// A fighter record given as is - the link Dojo's fighters (ROM: the Dojo fight's record builders, `0x0801339C` from
+/// the Balanced table `0x0872BFCC` / `0x080229B0` from a save's packed record): HP and EP (current = max), STR, POW,
+/// END, SPD, and (optionally) the skill list.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub struct FixedRecord {
+    pub hp: i32,
+    pub ep: i32,
+    /// STR, POW, END, SPD
+    pub stats: [i32; 4],
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub skills: Option<Vec<i32>>,
 }
 fn d_growth() -> String {
     "average".into()
@@ -203,6 +219,7 @@ impl Default for FighterSetup {
             equip: d_equip(),
             skill_level: 0,
             holy_water: false,
+            fixed: None,
         }
     }
 }
@@ -326,10 +343,24 @@ pub fn build_record(d: &GameData, f: &FighterSetup) -> (Record, Vec<i32>, Vec<i3
     rec.end = 255.min(rec.end + spent[2]);
     rec.spd = 255.min(rec.spd + spent[3]);
     rec.points = free;
-    let skills = fd
+    let mut skills = fd
         .skills
         .clone()
         .unwrap_or_else(|| ch(fd.character).skills.clone());
+    if let Some(fx) = &f.fixed {
+        rec.hp = fx.hp;
+        rec.max_hp = fx.hp;
+        rec.ep = fx.ep;
+        rec.max_ep = fx.ep;
+        rec.str_ = fx.stats[0];
+        rec.pow = fx.stats[1];
+        rec.end = fx.stats[2];
+        rec.spd = fx.stats[3];
+        rec.points = 0;
+        if let Some(s) = &fx.skills {
+            skills = s.clone();
+        }
+    }
     (rec, skills, fd.forms.clone())
 }
 

@@ -159,28 +159,45 @@ The game's Dojo ("Battle with your friends in the Dojo!") as a `dojo` room + one
    setup: its fighter in that mode (`dojo::fighter_setup`) and the setup echoed in its hello, then ready - the
    confirm step. The host calls `request_start()` once the guest's echo matches ("Start Fight"); the `start`
    carries the match (both fighters) and the setup.
-3. **The match.** `DojoGame` (a `Game`): per round a PvP battle `Session` in the Dojo (round k's seed = seed + k),
-   "Round N" between rounds (`between_frames`), the round's end = the PvP rule's last fighter standing (200 frames
-   after the KO), both down = a drawn round, or the round timer (`round_frames`): the higher HP fraction wins,
-   equal = drawn. Best of N: a majority of N wins at once; after N rounds equal wins = "Draw!!". The rounds,
-   score and timer are part of the rollback state (and its checksum), so the whole match rolls back and is
-   desync-checked like any battle.
+3. **The match.** `DojoGame` (a `Game`): per round a PvP battle `Session` in the Dojo; the generator starts at
+   (0, 0) and carries on across rounds. "Round N" between rounds (`between_frames`); a round ends the frame a
+   fighter's HP reaches 0 (one down: the other wins it, both down: drawn) or when the timer (`round_frames`) runs out
+   with both standing: drawn. The match ends once a player has more than rounds / 2 wins; drawn rounds don't count,
+   so the ROM has no round limit (`max_rounds`, 0 = none, exists for tests). The rounds, score and timer are part of
+   the rollback state (and its checksum), so the whole match rolls back and is desync-checked like any battle.
 4. **The end.** `DojoMatch::settle(&confirmed_game, &rules, &mut save)` with the game rebuilt from the
    **confirmed** inputs (every input of every frame known): the first time it shows the match over, the ending is
-   decided - "You Win!!" + "Grab your prize!" (one prize supply added to *our* save), "You Lose!!" + "Go back to
-   training!", "Draw!!" - exactly once (later calls change nothing). `DojoMatch::disconnected()` before that =
-   "Disconnected": no result, no prize, the save untouched.
+   decided - "You Win!!" + "Grab your prize!", "You Lose!!" + "Go back to training!", "Draw!!" - exactly once (later
+   calls change nothing). The ROM's prize is only the banner; `DojoRules::prize` (default None) can add a supply to
+   the winner's save, once. `DojoMatch::disconnected()` before that = "Disconnected": no result, no prize, the save
+   untouched.
 
-**From the ROM vs inferred** (no link cable in the emulator; static reading only): MEASURED - the flow and texts
-(strings 79..139: Select Saved Game, Dojo, Start Fight, Character Mode Balanced / In-Game, Rounds 1 / 3 / 5, Choose
-your character!, Round 1..5, You Win!! / You Lose!! / Draw!!, Grab your prize! / Go back to training!,
-Disconnected), the Dojo page's mode table (0x0804BC04, enter 0x0801ED34: the option widgets), the Dojo map = area
-0-90 (an unnamed walled room). INFERRED (each a `DojoRules` / module constant, easy to correct once decoded): the
-round timer (99 s), the pause between rounds (3 s), best-of-N, a timeout's winner (HP fraction), Balanced = level
-100 / average growth / points spent evenly, In-Game = the save's level and stat points (approximated: the stats
-above the level's average growth), the character list (each party member in its current form), the prize (one
-Senzu Bean, supply 21) and that the host's mode / rounds apply to both. The battle rule tables behind the link
-(mode tables 0x08049B5C, 0x0804B604, 0x0804CAD4 built by 0x0801FF04, 0x0804A60C, 0x0804C0F0) are not decoded.
+**The game's rules, decoded** (static disassembly of the link code; the emulator has no link cable, so nothing here
+is recorded from play). Fight function `0x0802193A`, state block `0x03002BFC` (+0 / +1 round wins, +4 the timer's
+seconds), fight context `0x0872A6B4`.
+
+| Rule | ROM | Status | Here |
+|---|---|---|---|
+| Round timer: 180 s, 60 updates per second | `movs #0xB4` at `0x08021C4A`; 0x3C update counter `0x08021C4E` / `0x08021D2A` | MEASURED | `round_frames` 10800 (was 99 s) |
+| A round ends the update a fighter's HP (record +0x16) is 0: one down -> the other wins, both down -> Draw!! | `0x08021CE4`..`0x08021D1A` | MEASURED | `round_end` (was: 200 frames after the KO) |
+| Timer out with both standing = Draw!! (no HP comparison) | `0x08021D48`..`0x08021D4E` | MEASURED | (was: higher HP share wins) |
+| Result banner (You Win!! / You Lose!! / Draw!!, strings 0x6F..0x73) shown 300 updates before the next round | `0x08021D56`..`0x08021DB4`, `0x12C` at `0x08021DC4` | MEASURED | `between_frames` 300 (was 180) |
+| "Round N" = string 106 + both players' wins: a drawn round repeats its number | `0x08021A90`..`0x08021AA8` | MEASURED | `st.round` |
+| Match: loop while a player's wins <= rounds / 2; draws don't count, no round limit, a match cannot end drawn | `0x08021B98`..`0x08021BAE` | MEASURED | `max_rounds` 0 (was: N rounds max, equal = Draw!!) |
+| RNG words `0x03004A5C` / `0x03004A60` zeroed once when the fight starts, then running on through all rounds | `0x0802193E`..`0x0802194C` | MEASURED | `RngInit::State(0, 0)`, carried (was: seed + round) |
+| Arena area 0-90, fighters at (102, 220) / (202, 220) | `movs #0x5A` at `0x08008E8C` | MEASURED | `dojo` arena |
+| Prize: none. No item / save write in the Dojo code; the only save write of the link code is the trade's | `0x080231AE` | MEASURED | `prize` None (was: one Senzu Bean) |
+| Character Mode byte: 1 = Balanced, 0 = In-Game | `0x0802195A`, `0x0802311A` | MEASURED | `DojoMode` |
+| Balanced roster: a fixed 24 (strings 116..139: Goku, SS Goku, SS3 Goku, Teen Gohan, SS Teen Gohan, Mystic Gohan, Great Saiyaman, Gohan, SS Gohan, Trunks, SS Trunks, Vegeta, SS Vegeta, Goten, SS Goten, Gotenks, SS Gotenks, SS3 Gotenks, Vegito, SS Vegito, SS Gogeta, Hercule, Videl, Pikkon), the same for both players | list builder `0x08023120` | MEASURED | `BALANCED_ROSTER` / `balanced_roster()` (was: the save's party) |
+| Balanced record: HP 15000, EP 100, STR 67, POW 67, END 25, SPD 50 (Hercule STR 60, POW 74); one skill, 7 Energy Blast; level index 0 | table `0x0872BFCC` (28 bytes: sprite, HP, EP, STR, POW, END, SPD), template `0x08022904`, applied by `0x0801339C` | MEASURED | `FighterSetup::fixed` (was: level 100, average growth, even points) |
+| In-Game: the save's party (12-byte list at page +0x584, names string 0x9E + id), each character's whole record packed and unpacked (level, form, skills + levels, max HP / EP as current, STR..SPD, equipment) | pack `0x08022934`, unpack `0x080229B0` | MEASURED | `fixed` from the save's record (was: level + approximated points) |
+| How long "Round N" shows before a round starts | - | INFERRED | folded into `between_frames` |
+| The host's mode / rounds apply to both | config over the link (`0x03002FB0`) not fully traced | INFERRED | host's `DojoSetup` |
+| Which side is the host (left / right) | - | INFERRED | host = slot 0, left |
+
+wf-core's `FighterSetup::fixed` (`FixedRecord`: HP, EP, STR..SPD, skills) replaces what level / growth / points give,
+mirrored in the TS battle reference (`site/src/battle/rulesets/buu/index.ts`, `options.fixed`); without it nothing
+changes.
 
 **Tests** (`cargo test -p wf-net --test dojo`, headless, muted, two in-process peers on the virtual network):
 `dojo_match_over_a_bad_network` - the room (a battle-room peer is refused: "this room is a dojo room"; both peers
@@ -188,10 +205,10 @@ build the same match; Balanced / In-Game levels), then the match over loopback, 
 5 % loss in 1, 3 and 5 rounds, random and scripted fighters: equal final state hashes, no desync, the same result
 on both, the winner's prize exactly once (settle called three times + a late drop), nothing for the loser / a draw;
 `dojo_disconnect_mid_match` - a peer drops mid-round: both end "Disconnected", no prize, saves untouched;
-`dojo_synctest` - 4000 frames of 5-round matches with an 8-frame rollback every frame (Balanced, In-Game).
-**Gap:** the in-process tests run the lobby and the match on two virtual networks; the frontends' `NetSim` drives
-a `CoreGame` only, so a playable Dojo needs a `NetSim` over `DojoGame` (and the screens: save pick, character
-list, mode / rounds, the round banners) - not built.
+`dojo_synctest` - 4000 frames of 5-round matches with an 8-frame rollback every frame (Balanced, In-Game);
+`dojo_rom_rules` - the decoded defaults, the 24 Balanced records, In-Game = the save's record. (The match tests
+shorten rounds, lower Balanced HP, cap rounds at 5 and set a prize, to stay quick and check the prize-once path.)
+Playable in the app: "Link play: playing it" below (the screens and the match on one connection).
 
 ### Link play: Trading Post (`wf_net::trade`, `wf_app::trade`)
 
@@ -241,10 +258,12 @@ post-trade bytes, once).
   entries**; equipment entries are copied without the worn marks (high nibble). Remove equipment (`0x08004468`) only
   takes entries that are not worn. Here: a trade whose result would pass 255 of a supply or 250 equipment entries is
   refused at Accept / Prepare instead of losing the excess; worn equipment cannot be offered.
-* INFERRED: story items (key items, `story_item` supplies) cannot be offered (the picker's list was not decoded;
-  trading a key item would break the giver's story); no zenie limit beyond u32 (none found in the apply step).
-* Not built: the Trading Post screens themselves (the menu pages over `TradePeer`); the protocol, storage and
-  recovery are complete and tested.
+* MEASURED from the ROM: the item picker (`0x0801F44E`) lists a supply only when bit 0 of its record
+  (`0x083BD2F8` + 0x34 x id) is clear - the items table's `story_item` - so supplies 0..24 are tradable and the story
+  items 25..82 are not; every equipment-list entry is listed; zenie only when not 0. Same rule here (`Inventory::story`).
+* INFERRED: worn equipment can't be offered (the picker lists every entry; the remove step skips worn ones); no zenie
+  limit beyond u32 (none found in the apply step).
+* The Trading Post screens over `TradePeer` + `FileStore`: "Link play: playing it" below.
 
 **Tests** (headless, in-process): `cargo test -p wf-net --test trade` - two peers on the virtual network:
 loopback, 120 ms + 80 ms jitter + 30 % loss (8 seeds), over-limit refusal, decline / changed offer (nothing
@@ -254,6 +273,51 @@ the connection dropped for 3 s, on a clean and a lossy network (300 cases; the f
 the trade Prepared, Committed and Done) - every case: totals of every item and of zenie conserved, at most one trade
 applied, both sides agree, nothing left in doubt. `cargo test -p wf-app --test trade` - the same on real slot files
 with a crash after each WAL write on either side (the store re-opened from disk), the worn item kept.
+
+### Link play: playing it (`wf_app::link`, native `--link`)
+
+**Try it** (two copies on one machine, the local signalling server on `ws://127.0.0.1:3536` as for battles):
+```
+buus-fury --link host:ABC12            # player 1 (its own --data folder / save slots)
+buus-fury --link join:ABC12            # player 2
+```
+Both open on the game's title. START -> Multiplayer -> **Dojo** or **Trading Post**: the game's "Waiting for a
+friend..." box opens and *is* the lobby - it joins room `ABC12-DOJO` / `ABC12-TRADE` on `--signal` (the `--net-*`
+network options, `--net-name`, `--net-key` apply); B (Cancel) leaves as in the game. Once the friend is in the room:
+* **Select Saved Game** (the slots; "No Saved Games" when none can be used) ->
+* **Dojo**: the setup page: the host changes "Character Mode:" Balanced / In-Game and "Rounds:" 1 / 3 / 5
+  (left / right), the guest sees them live; **Start Fight** -> "Choose your character!" (Balanced: the game's
+  fixed roster of 24, strings 116..139; In-Game: the save's party at its level); the guest's pick confirms the host's
+  setup (a changed setup sends it back to the setup page) -> the match: `DojoGame` in a rollback
+  `P2PSession` on the same connection (lobby packets still handled), "Round N" between rounds, then "You Win!!" /
+  "You Lose!!" / "Draw!!" and "Grab your prize!" / "Go back to training!". The result and any prize
+  (`DojoRules.prize`, None = the ROM: no item) come from the **confirmed** inputs only (`DojoMatch::settle`, once),
+  into the save's slot file and the running title's slot.
+* **Trading Post**: "Your Trade:" (the save's tradable supplies, unworn equipment, Zenie; A opens "How many to
+  trade?", up / down by 1, L / R by 100 for zenie) and "Friend's Trade:"; **Propose Trade** sends the offer,
+  **Accept** accepts the friend's current offer with ours ("You have accepted trade"; a new offer from either side
+  voids it), **Decline** withdraws. Both accepted -> the two-phase commit on `saves/slotN.sav` (`FileStore`) ->
+  "TRADE COMPLETE!"; the running title's slot is updated (the shell persists it). The trade names peers by a stable
+  **link id** (`<data>/link_id`), so a reconnection with a new transport id resumes a pending trade.
+* A drop at any point after the friend came: "**Disconnected**" (93); in a match: the ending is Disconnected, no
+  prize; in a trade before both accepted: nothing applied; with a trade Prepared: "Disconnected - finishing when
+  your friend is back" (the slot stays locked; the journal finishes it at the next Trading Post link with that
+  friend, as above).
+
+Any key on the result / TRADE COMPLETE / Disconnected page closes the link box with its own B: the Multiplayer page
+is back. Single-player is unchanged (`LinkSim` only acts once the title's link box opens; without `--link` the box
+stays the game's dead end). While a link flow runs the app reports no state hash / snapshot (replays and rewind
+skip it); the match is checked by its session's per-frame hashes.
+
+**Tests** (`cargo test -p wf-app --test link`, headless, muted, needs the ROM): two title apps in-process on the
+virtual network (80 ms + 20 ms jitter + 5 % loss), driven only by scripted closed-loop pad input through the real
+title (START, Multiplayer, Dojo / Trading Post) and the link screens: a Dojo match (both peers' confirmed match:
+same end frame, checksum and inputs; complementary endings; the prize once in the winner's slot file and running
+slot); a guest drop mid-match (Disconnected, no prize); a trade (TRADE COMPLETE on both, supplies and zenie conserved
+across both slot files, the running titles updated); a guest leaving mid-trade (nothing applied).
+**Gaps:** the link screens' layouts are INFERRED (the game's strings / fonts / window / cursor; no recording of
+them exists); not in the browser build yet; the native flag was built but not tried over two real processes in
+this change (the in-process tests cover the logic); the trade list shows 5 rows at a time (no scroll arrows).
 
 ### Replays
 

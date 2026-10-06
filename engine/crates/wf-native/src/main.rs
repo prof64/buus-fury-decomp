@@ -21,6 +21,9 @@
 //! Settings); `--launcher` forces it, `--no-launcher` skips it. Shift+Esc in a game returns to it. Settings live in
 //! `<data dir>/settings.json`, story save slots in `<data dir>/saves/slot{1,2,3}.sav`. Headless: `--launcher`
 //! renders it (`--shot`), `--launcher-keys ArrowDown,Enter` drives it first (a chosen game then runs as usual).
+//! Link play (engine/docs/netcode.md "Link play: playing it"): `--link host:ROOM` / `--link join:ROOM` opens the title
+//! with Multiplayer -> Dojo / Trading Post going online: the "Waiting for a friend..." box joins room ROOM (per page)
+//! on the `--signal` server; `--net-name`, `--net-key` and the `--net-*` network options apply.
 
 use std::num::NonZeroU32;
 use std::path::{Path, PathBuf};
@@ -123,6 +126,8 @@ struct Args {
     open_replays: bool,
     /// launcher: story mode on the game's title screen
     title_launch: bool,
+    /// `--link host:ROOM|join:ROOM`: the title with online link play (host?, room)
+    link: Option<(bool, String)>,
 }
 
 /// Running from a macOS `.app` bundle (Finder gives no terminal, which would otherwise mean "automation, headless").
@@ -180,6 +185,7 @@ fn parse_args() -> Args {
         battle_cfg: None,
         open_replays: false,
         title_launch: false,
+        link: None,
     };
     if a.headless && in_app_bundle() && std::env::var_os("WF_HEADLESS").is_none() && std::env::var_os("WF_AGENT").is_none() && std::env::var_os("CI").is_none() {
         a.headless = false;
@@ -302,6 +308,13 @@ fn parse_args() -> Args {
                 a.online = true;
                 a.cli_mode = true;
             }
+            "--link" => {
+                let v = next(&mut i);
+                let (role, room) = v.split_once(':').unwrap_or(("join", v.as_str()));
+                a.link = Some((role == "host", room.trim().to_ascii_uppercase()));
+                a.title_launch = true;
+                a.cli_mode = true;
+            }
             s if s.starts_with("--net") || matches!(s, "--pvp" | "--pvp-enemies" | "--signal" | "--room") => {
                 a.cli_mode = true;
                 a.signal_given |= s == "--signal";
@@ -398,6 +411,9 @@ fn spawn_extract(rom: Vec<u8>, content: PathBuf, data: PathBuf) -> mpsc::Receive
 
 /// The simulation: `wf-core`'s battle by default, the frontend demo world with `--demo`.
 fn make_app(a: &Args, packs: Packs) -> Result<App, String> {
+    if let (true, Some((host, room))) = (a.title_launch, &a.link) {
+        return wf_app::link::link_title_app(packs, &read_slots(&a.data), a.seed, link_config(a, *host, room));
+    }
     if a.title_launch {
         return wf_app::launcher::title_app(packs, &read_slots(&a.data), a.seed);
     }
@@ -555,6 +571,38 @@ fn load_settings(data: &Path) -> wf_app::launcher::Settings {
 fn save_settings(data: &Path, s: &wf_app::launcher::Settings) {
     let _ = std::fs::create_dir_all(data);
     let _ = std::fs::write(data.join("settings.json"), s.to_json());
+}
+
+/// `--link`: the link pages' rooms on the signalling server (`ROOM-DOJO` / `ROOM-TRADE`), this player's stable link
+/// id (`<data>/link_id`: the Trading Post's peers across reconnections), the save folder
+fn link_config(a: &Args, host: bool, room: &str) -> wf_app::link::LinkConfig {
+    let id_path = a.data.join("link_id");
+    let link_id = match std::fs::read_to_string(&id_path) {
+        Ok(s) if !s.trim().is_empty() => s.trim().to_string(),
+        _ => {
+            let id = format!("{:016x}", wf_net::cli::entropy());
+            let _ = std::fs::create_dir_all(&a.data);
+            let _ = std::fs::write(&id_path, &id);
+            id
+        }
+    };
+    let net = a.net.clone();
+    let room = room.to_string();
+    let name = if a.net.name.is_empty() { if host { "host".to_string() } else { "guest".to_string() } } else { a.net.name.clone() };
+    wf_app::link::LinkConfig {
+        connect: Box::new(move |kind| {
+            let page = if kind == wf_app::link::LinkKind::Dojo { "DOJO" } else { "TRADE" };
+            let url = wf_net::lobby::room_url_auth(&net.signal, &format!("{room}-{page}"), "", &net.key);
+            let t = wf_net::cli::transport(&net, &url)?;
+            Ok((t, if host { wf_net::lobby::Role::Host } else { wf_net::lobby::Role::Player }))
+        }),
+        clock: wf_net::cli::clock(),
+        link_id,
+        name,
+        saves_dir: Some(a.data.join("saves")),
+        rules: Default::default(),
+        seed: a.seed,
+    }
 }
 
 fn slot_path(data: &Path, i: usize) -> PathBuf {

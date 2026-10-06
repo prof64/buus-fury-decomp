@@ -45,6 +45,18 @@ shows the same screen (the state is in `World`, so rollback re-simulates menu fr
 START / SELECT do nothing (a per-player pause would let one player's world time diverge from another's in a shared
 world). Story state the menus change (stats, items, equipment, party) is shared, as in co-op generally.
 
+**Link play screens** (`wf_app::link`, not in wf-core: the title's own screens stay exact). After Multiplayer ->
+Dojo / Trading Post and the game's "Waiting for a friend..." box (title.rs, the lobby under it), `LinkSim` draws:
+Select Saved Game (94; "No Saved Games" 91), Dojo (95): the setup page (104, "Character Mode:" 99 Balanced /
+In-Game 97 / 98, "Rounds:" 100 with 101..103, "Start Fight" 96), "Choose your character!" (105; Balanced: the
+roster 116..139, In-Game: the save's party), the match's
+"Round N" (106..110) and "You Win!!" / "You Lose!!" / "Draw!!" (111..113) banners over the battle, "Grab your
+prize!" / "Go back to training!" (114 / 115), Trading Post (79) "Your Trade:" / "Friend's Trade:" (80 / 81),
+"Zenie" (82), "How many to trade?" (83), "Propose Trade" / "Accept" / "Decline" (84..86), "You have accepted
+trade" (87), "TRADE" "COMPLETE!" (88 / 89), "Disconnected" (93). Layouts are INFERRED (no cable in the emulator, so
+no capture): the title picture behind one game window, the game's fonts, colours and cursor. engine/docs/netcode.md
+"Link play: playing it".
+
 ## 4. Verification (`crates/wf-app/tests/menu_parity.rs`)
 
 Traces `data/menu/<scenario>.json` (recorder `re/buu/menu/capture.py`; scenarios `re/buu/menu/scenarios_*.py`):

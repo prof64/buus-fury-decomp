@@ -36,8 +36,10 @@ fn save(d: &GameData, party: &[(usize, i32)]) -> SaveData {
 }
 
 fn rules() -> DojoRules {
-    // shorter rounds than the game's 99 s keep the test quick (the rule is the same)
-    DojoRules { round_frames: 1500, between_frames: 60, ..Default::default() }
+    // shorter rounds than the game's 180 s and a round cap keep the test quick (the ROM has no cap: draws repeat the
+    // round), Balanced HP a KO fits in, and a prize (the ROM gives none) to check it is written exactly once
+    // (`dojo_rom_rules`: the ROM's values)
+    DojoRules { round_frames: 1500, between_frames: 60, balanced_hp: 300, max_rounds: 5, prize: Some(21) }
 }
 
 /// the lobby part: host (Goku's save, its setup) + guest (Vegeta's save) + a peer from a battle room (refused);
@@ -153,7 +155,8 @@ fn dojo_match_over_a_bad_network() {
         if setup.mode == DojoMode::InGame {
             assert_eq!(hs.config.battle.players[1].level, 110, "In-Game: the save's level");
         } else {
-            assert_eq!(hs.config.battle.players[0].level, 100, "Balanced: the fixed level");
+            let fx = hs.config.battle.players[0].fixed.clone().expect("Balanced: a fixed record");
+            assert_eq!((fx.hp, fx.ep, fx.stats, fx.skills), (rules().balanced_hp, 100, [67, 67, 25, 50], Some(vec![7])), "Balanced: the ROM's record");
         }
         // the match: one rollback session per peer on a (fresh) virtual network
         let net = SimNet::new(cond, seed + 100);
@@ -165,7 +168,7 @@ fn dojo_match_over_a_bad_network() {
             ps[0].script = Some(Box::new(|t: u64| if t % 12 < 2 { b::A } else { b::RIGHT }));
             ps[1].script = Some(Box::new(|_| 0));
         }
-        let total = (rules().between_frames + rules().round_frames + 260) as i32 * setup.rounds as i32;
+        let total = (rules().between_frames + rules().round_frames + 10) as i32 * rules().max_rounds as i32;
         let r = testnet::run(&net, &mut ps, &mut [], total, 3_000_000.0);
         assert!(r.done, "not finished");
         for p in &ps {
@@ -189,7 +192,7 @@ fn dojo_match_over_a_bad_network() {
         }
         assert_eq!(ends[0].0, ends[1].0, "same result on both peers");
         assert_eq!(ends[0].1, ends[1].1, "same rounds");
-        let prize = rules().prize_supply;
+        let prize = rules().prize.unwrap();
         if scripted {
             assert_eq!(ends[0].0, DojoResult::Win(0), "the puncher wins: {:?}", ends[0].1);
         }
@@ -198,7 +201,7 @@ fn dojo_match_over_a_bad_network() {
             match ends[0].0 {
                 DojoResult::Win(w) if w as usize == i => {
                     assert_eq!(got, 1, "the winner's prize once");
-                    assert_eq!(ends[i].2, Ending::Won { prize_supply: prize });
+                    assert_eq!(ends[i].2, Ending::Won { prize: Some(prize) });
                 }
                 DojoResult::Win(_) => {
                     assert_eq!(got, 0);
@@ -260,7 +263,7 @@ fn dojo_synctest() {
     let fd = common::field_data();
     let a = DojoSave::from_save(0, &save(&fd, &[(0, 90)]), &fd).unwrap();
     let b = DojoSave::from_save(1, &save(&fd, &[(4, 110)]), &fd).unwrap();
-    let r = DojoRules { round_frames: 600, between_frames: 30, ..Default::default() };
+    let r = DojoRules { round_frames: 600, between_frames: 30, balanced_hp: 300, max_rounds: 5, ..Default::default() };
     for (mode, bytes) in [(DojoMode::Balanced, false), (DojoMode::InGame, false)] {
         let setup = DojoSetup { mode, rounds: 5 };
         let m = wf_net::dojo::match_config(fighter_setup(&a.party[0], mode, &r, &fd), fighter_setup(&b.party[0], mode, &r, &fd), 77);
@@ -281,5 +284,37 @@ fn dojo_synctest() {
         eprintln!("dojo synctest {mode:?}: 4000 frames x 8 rollback ok; rounds {:?}, over at {over:?}", st.game.st.results);
         assert!(over.is_some(), "a 5-round match of 600-frame rounds ends within 4000 frames");
     }
+}
+
+/// the ROM's rules (engine/docs/netcode.md "Link play: Dojo"): 180 s rounds, 300 updates between, no round cap, no
+/// prize; Balanced = the 24-fighter roster of 0x0872BFCC; In-Game = the save's record as is
+#[test]
+fn dojo_rom_rules() {
+    use wf_net::dojo::{balanced_roster, BALANCED_ROSTER};
+    let fd = common::field_data();
+    let r = DojoRules::default();
+    assert_eq!(r, DojoRules { round_frames: 10800, between_frames: 300, balanced_hp: 15000, max_rounds: 0, prize: None });
+    let roster = balanced_roster();
+    assert_eq!(roster.len(), 24);
+    for c in &roster {
+        let f = fighter_setup(c, DojoMode::Balanced, &r, &fd);
+        let fx = f.fixed.expect("fixed");
+        assert_eq!((f.fighter.as_str(), f.form), (c.fighter.as_str(), c.form), "{}", c.name);
+        assert_eq!((fx.hp, fx.ep, fx.skills), (15000, 100, Some(vec![7])), "{}", c.name);
+        let want = if c.name == "Hercule" { [60, 74, 25, 50] } else { [67, 67, 25, 50] };
+        assert_eq!(fx.stats, want, "{}", c.name);
+    }
+    assert_eq!(BALANCED_ROSTER[0].0, "Goku");
+    // a save character picked in Balanced Mode: its fighter's first roster entry
+    let a = DojoSave::from_save(0, &save(&fd, &[(4, 110)]), &fd).unwrap();
+    let f = fighter_setup(&a.party[0], DojoMode::Balanced, &r, &fd);
+    assert_eq!((f.fighter.as_str(), f.fixed.unwrap().hp), ("vegeta", 15000));
+    // In-Game: the save's own record
+    let c = &a.party[0];
+    let f = fighter_setup(c, DojoMode::InGame, &r, &fd);
+    let fx = f.fixed.expect("fixed");
+    assert_eq!((f.level, fx.hp, fx.ep, fx.stats), (110, c.max_hp, c.max_ep, c.stats));
+    assert!(c.max_hp > 0 && !c.skills.is_empty());
+    assert_eq!(fx.skills.as_ref(), Some(&c.skills));
 }
 
