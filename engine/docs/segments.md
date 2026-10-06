@@ -283,6 +283,16 @@ exactly - a leg ends at its first logic stop): **1 iteration** - 1,947,900 (`028
 51 app only, play 49 / 50 game only (the punch pair, the other way round in one iteration) -> Janemba's owner. The
 fat-Buu items (1,097,649 / 1,796,302 / 1,798,841) are gone. (A leg's first row after a cut does not count the import's
 own song restart.)
+*Run 3 1,947,900 (soak agent): not a game difference.* From power-on the app is exact there in state and sound
+(`wholerun --power-on --frames 1,948,100 --sounds`: 0 of 1,837,596 iterations differ; its 14 RNG draws are the
+game's in order - Goku's punch: hit 48 + rand(2) = 49, SetAnim rand(3), the Punch state's 50 + rand(2) = 50). The
+difference was a **sound_legs artefact of the leg from the cut 1,947,883 (and 1,947,891)**: the imported state's
+punch hits only two of Janemba's three hittable parts (two damage rolls, not three) and lands a critical (the shake's
+two draws), so its punch sounds differ - and the leg's RNG stop is reported at 1,947,901, the row after the
+iteration that diverged. **sound_legs.py now drops a leg's sounds from the iteration before its logic stop on**
+(a stop at row N diverged in iteration N - 1). Re-run: **run 3 0 sound differences** (193 legs, 2,337,783 rows).
+**Dungeon agent A (cut points / import):** the 1,947,883 / 1,947,891 cuts lose a hit target - Janemba's third part
+(the punch at 1,947,900 hits two) - an import gap, only visible from those cuts.
 *check.py ratchet (soak agent; in 623aac7):* the first difference is now one value per chain - the earliest over all
 its legs, a stop or a sound request - compared and bumped alike (it was per leg: a later leg's difference bumped the
 file past an earlier leg's sound-only difference, which then failed the next run). When a chain is worse, only the
@@ -6870,3 +6880,24 @@ reference re-recorded with `sounds.py --chain run3`.
 LatchDrain afterwards (`enemy::latch_enter`, 4 times in the import's frame 144,174, at the import's whole-px positions)
 and overwrites it: from f74 ours glues the enzyme to the player's x (offset 0), the game keeps its -177. Probably the
 hook import must come after the state rebuild (or the rebuild must not run the LatchDrain enter).
+*Real-route agent (2026-10-06): run 3 2,350,000 .. end - both stops fixed (wf-core field.rs, player.rs).*
+- **2,362,398** (21-6, rng; first wrong at 2,361,442): `return_to_field` (s483's 21-4 scene -> 21-6) deletes the
+  scene's enemies after the saved field's grid is back, and each destructor (0x0800F76E) frees its current footprint
+  on that grid unless detached (+0x291) - wall tiles included: (43..45, 12) and (7, 25). A 21-6 enemy's back-off then
+  steps into (7, 25), ours was blocked. `field::restore_world` now frees them. (Committed already in de140d8's tree.)
+- **2,438,792** (21-11, pos; then the hit-sound pair at 2,438,870): a breakable's one-frame loot callback (queued
+  event) holds the player with message 0xC - no control while it runs; the exit frame sends 0xC, 0x10, then one normal
+  update. Ours ran the hurt knockback in the update *and* in `release_passive`: two steps. `player::update` now skips
+  control while a queued event holds the field (`f.busy && f.queued_event`).
+**check.sh: runs 1, 2, 3 all exact in logic and sound outside the known ranges (run 3 to 2,536,522).** Segment gates
+green. Field-only rules, no TS change.
+
+**Update 23 (Super Buu agent, 2026-10-06): the HUD's slide.** The HUD object's update (0x0800B8FC) moves its position
+(+0x28) by its step (+0x14): `show_hud` (0x080046F4) makes it at -16 moving +1 (it settles at 8, OAM y 0 .. 8 over
+the last 9 frames - rclose_002 4-1 f1,973 .. 1,981), `hide_hud` (0x08004764, message 0x15) sets -1 (gone below -16).
+Ours drew the HUD in place at once and dropped it at the hide. Now `Scene::hud_y` / `hud_vel` (ticked in
+`field::hud_tick`), `HudView::y_off` (the renderer moves the HUD and its stat mark); a hidden HUD is drawn while it
+slides out. A sliding-out HUD is an object of its area: gone with a load (sb_006 6-6 f13,844) and at once on the 3D
+world map (the take-off, rclose_002 f4,403). Board 18,666 -> 18,758 exact, none lost; pixel gate re-locked. An import
+mid-slide takes the HUD in place (+0x28 / +0x14 not imported).
+`data/realrun3/expected.json` (the run-3 ratchet) removed: run 3 is held strict now, like run 2 (check.sh still EXACT). Note: the field.rs diff in the tree (HUD slide) is not mine.

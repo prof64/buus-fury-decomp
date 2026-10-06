@@ -1540,7 +1540,6 @@ pub fn gain_xp_levels(w: &mut World, i: usize, exp: i64) -> bool {
 // ---- update -----------------------------------------------------------------------------------------------------------
 
 pub fn update(w: &mut World, i: usize) {
-    if std::env::var("XPDBG").is_ok() { eprintln!("XPDBG update frame {} x {} bt {:?}", w.frame, pr(w, i).a.x, 0); }
     // the world map's flying player (fieldworld.rs) replaces the 2D player's states
     if crate::fieldworld::flyer_update(w, i) {
         return;
@@ -1674,10 +1673,12 @@ pub fn update(w: &mut World, i: usize) {
     // an inline hook's event (a defeat callback's script: the VM's nested loop too, held path 0x0800F5E0) ticks the
     // state's animation only: a hurt player's knockback does not move in the held frame (13-45: s393 from a
     // Samurai's defeat - tick 5 -> 7 in the exit frame, one knockback step)
-    let nested = w
-        .field
-        .as_ref()
-        .is_some_and(|f| f.nested && !f.script_fade_in || f.held_event && f.busy);
+    // a queued event (a breakable's on-break callback, run before the objects update) holds the player with
+    // message 0xC: no control while it runs - its exit frame's control is `release_passive`'s (run 3 row 2,438,792,
+    // 21-11: a knocked-back player under a one-frame loot callback steps once in the exit frame, not twice)
+    let nested = w.field.as_ref().is_some_and(|f| {
+        f.nested && !f.script_fade_in || f.held_event && f.busy || f.busy && f.queued_event
+    });
     if !pr(w, i).dead && !puppet && !nested {
         control(w, i);
     }
@@ -2238,7 +2239,6 @@ pub fn sync_skill_level(w: &mut World, i: usize) {
 
 /// the frame an event from the world's event list ended in: the passive part of the update the event held
 pub fn release_passive(w: &mut World, i: usize) {
-    if std::env::var("XPDBG").is_ok() { eprintln!("XPDBG release_passive frame {} x {} t {}", w.frame, pr(w, i).a.x, pr(w, i).t); }
     if pr(w, i).ko_at < 0 && !pr(w, i).dead {
         passive(w, i);
         // the player is an object after the event's in the list pass: its own update follows the held tick in the
@@ -2583,7 +2583,6 @@ fn ctl_bored(w: &mut World, i: usize) {
 }
 /// hurt / bump control 0x0800DF1C
 fn ctl_knock(w: &mut World, i: usize) {
-    if std::env::var("XPDBG").is_ok() { eprintln!("XPDBG knock frame {} x {}", w.frame, pr(w, i).a.x); }
     let (kx, ky) = KNOCK_VEC[pr(w, i).a.facing as usize];
     let (x, y) = (pr(w, i).a.x, pr(w, i).a.y);
     if fits(w, i, (x - kx) >> 8, (y - ky) >> 8) {

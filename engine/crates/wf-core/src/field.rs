@@ -1068,10 +1068,9 @@ pub fn load_area_with(
     }
     crate::vram::release(w, crate::vram::Owner::Popup);
     crate::vram::visuals_gone(w);
-    // a sliding HUD is an object of the old area: gone with it (rclose_002 4-1 f4,403: the take-off); the new area's
-    // HUD (if shown) is made in place
-    if w.scene.hud_vel != 0 {
-        w.scene.hud_y = if w.scene.hud_vel < 0 { -17 } else { 8 };
+    // a HUD sliding out (`hide_hud`) is an object of the old area: gone with it (sb_006 6-6 f13,844)
+    if w.scene.hud_vel < 0 {
+        w.scene.hud_y = -17;
         w.scene.hud_vel = 0;
     }
     // the BG sphere effect is an object of the old area too (segment sb 20-8 -> 20-9: its redraws stop)
@@ -2844,6 +2843,11 @@ fn exit_to(w: &mut World, slot: usize, to: Dest, push: Dir, rect: Rect, edge: bo
 pub fn hud_tick(w: &mut World) {
     crate::vram::hud_tick(w);
     // its slide (0x0800B8FC)
+    // (the 3D world map has no HUD object: one hidden on the take-off is gone at once - rclose_002 4-1 f4,403)
+    if crate::fieldworld::flying(w) && w.scene.hud_vel < 0 {
+        w.scene.hud_y = -17;
+        w.scene.hud_vel = 0;
+    }
     let s = &mut w.scene;
     if s.hud_vel != 0 {
         s.hud_y += s.hud_vel;
