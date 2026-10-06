@@ -1018,6 +1018,15 @@ fn import_objects(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
             rows.insert(o, (r.1, r.2, r.3, r.4));
         }
     }
+    // ... and an enemy object made in the cut's iteration after the recorder took its rows (run 3 cut 1,948,395,
+    // 18-14: s450's become_map_object(149, 1) made the sprite-154 Janemba - no row: ours took it for the old body's 149)
+    for o in ram.objects() {
+        if ram.r32(o) == VT_ENEMY && !rows.contains_key(&o) {
+            if let Some(r) = actor_row_of(&w.data, ram, o) {
+                rows.insert(o, (r.1, r.2, r.3, r.4));
+            }
+        }
+    }
     let players = w.players.clone();
     // our candidates: (entity id, kind key) - enemies by type, NPCs by sprite id
     let key_of = |w: &World, i: usize| -> Option<(u8, i32)> {
@@ -1153,6 +1162,42 @@ fn import_objects(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
         f.patrols.retain(|p| !gone.contains(&p.entity));
     }
     import_worms(w, ram, &enemy_of);
+    // field Janemba's body parts (types 0x34 / 0x35 / 0x37, the arms and the head part): their body is obj+0x1F4 (a
+    // type 0x33) - our parts follow it (`janemba_part_field`: placed by 0x37's mirror node each frame); without the
+    // link a mid-fight cut's parts stood still (run 3 cuts 1,945,333 / 1,945,413, 18-14: the arms a pixel short of
+    // their next placement)
+    for &(o, id) in &enemy_of {
+        let po = ram.r32(o + 0x1F4);
+        let Some(&(_, pid)) = enemy_of.iter().find(|e| e.0 == po && po != 0) else { continue };
+        let body = w.find(pid).is_some_and(|pi| matches!(&w.ents[pi].body, Body::Enemy(e) if e.ty == 0x33));
+        let Some(i) = w.find(id) else { continue };
+        if let Body::Enemy(e) = &mut w.ents[i].body {
+            if body && matches!(e.ty, 0x34 | 0x35 | 0x37) {
+                e.part = true;
+                e.parent = pid;
+                e.part_offset = match e.ty {
+                    0x34 => (-12, -22),
+                    0x35 => (44, -22),
+                    _ => (16, -41),
+                };
+            }
+        }
+        // an arm in a hand strike: its state is the strike controller (vt 0x0804D738: +4 the hand it made, 0 before
+        // the arm animation's 16th tick) - ours counts the controller in `strike` (the hand at 17 after the frame's
+        // +1): the arm's tick + 1, and the hand the RAM already has (run 3 cut 1,945,792, 18-14: the strike at tick 15,
+        // the hand made in f0 - ours restarted the arm's animation and made no hand)
+        let st = ram.r32(o + 0x14);
+        if body && ram.valid(st) && ram.r32(st) == 0x0804_D738 {
+            let hand = ram.r32(st + 4);
+            let hid = enemy_of.iter().find(|e| e.0 == hand && hand != 0).map(|e| e.1).unwrap_or(0);
+            if let Body::Enemy(e) = &mut w.ents[i].body {
+                if matches!(e.ty, 0x34 | 0x35) {
+                    e.strike = (e.ea.pos.tick + 1, e.ty == 0x34);
+                    e.strike_hand = hid;
+                }
+            }
+        }
+    }
     // an Enzyme's parent Blister (obj+0x1F4): its death counts the Blister's +0x204 down (`K::LatchRelease`)
     for &(o, id) in &enemy_of {
         let po = ram.r32(o + 0x1F4);
@@ -1424,7 +1469,6 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
     if e.detached {
         e.marked = None;
     }
-
     if let Some((sprite, raw, cel, tick)) = row {
         // (the sprite the object shows: the world map's circles pick theirs by the place's state)
         if e.a.sprite != Some(sprite - wf_core::scene::SPRITE_BASE) {
@@ -1451,6 +1495,15 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
             // return_to_field: the defeated fighter's raw 18 frozen at tick 360; ours ended the pose and idled, a draw)
             e.ea.rule = d.anim.keep;
             e.ea.done = false;
+        } else if e.ty == 0x37 && st == "0x030032BC" {
+            // Janemba's head part hurt under its own controller (0x030032BC, vt 0x0804D3A0: raw 10, three cels of 8
+            // ticks, then SetAnim(0)) - the arms' one-shot (0x03001B10, once, shift 3, end idle) in effect: ours has no
+            // node driving that controller after a cut (run 3 cuts 1,945,333 / 1,945,413: the head's flash ends with the
+            // arms' in f0, the idle's rand(255); ours froze it)
+            if let Some(&r) = d.anim.generic.get("0x03001B10") {
+                e.ea.rule = r;
+                e.ea.done = false;
+            }
         }
         // the walk state (the IWRAM singleton 0x03001B58, vt 0x0804A1D0 - SetAnim(1)) is our "walk" animation even
         // where the sprite's walk shows the idle's raw (the Enzymes' raw 1: `set_raw` picked the idle) - run 2 cut
@@ -1472,6 +1525,19 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
         e.a.facing = facing;
     } else if w.en_ref(ei).roll_ctl >= 0 {
         w.en(ei).roll_ctl = -1;
+    }
+    // Mini Janemba's hop controller (the singleton 0x0300322C as the object's state, update 0x080346FC): its counter
+    // is the object's tick (+0x12, +8 an update, re-aim with chance(0x4000) at 0) - MiniHopToward's runtime word
+    // (run 3 cut 1,945,822, 18-14: the re-entered node started from 0, its re-aim draws a frame off the game's)
+    if matches!(ram.r32(o + 0x14), 0x0300_322C | 0x0300_3230) {
+        let tick = w.en_ref(ei).ea.pos.tick & 0xff;
+        for st in w.en(ei).ai.stack.iter_mut() {
+            for (n, rt) in st.rt.iter_mut().enumerate() {
+                if st.tree.nodes.get(n).is_some_and(|x| x.k == wf_core::ai::K::MiniHopToward) {
+                    rt.d[0] = tick;
+                }
+            }
+        }
     }
     // a HeavyPunch in progress: its frame count is the controller's tick (obj+0x12), its end 48 + 8 * the punch
     // animation's frames as its enter computes (real run 4-1 whole-run cut 621,339: the punch landed a frame before
@@ -4183,6 +4249,12 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
             (s.sx, s.sy, s.n, s.t) = (ram.s32(slot + 4), ram.s32(slot + 8), ram.s32(slot + 0xC), 0);
             wf_core::battle::set_camera(&mut w, 0, ram.s32(CAM), ram.s32(CAM + 4));
         }
+    } else if matches!(wn, 0x31 | 0x32) && w.scene.cam.scroll.is_some() {
+        // ... no mover in the slot: the scroll ended in the frame before the cut, the script's wait ends in the cut's
+        // frame (run 3 cut 1,948,395, 18-14: s450 node 0's camera_center_on(p(0), 10) done - become_map_object runs
+        // in f0; the replayed scroll walked on from the cut's camera)
+        w.scene.cam.scroll = None;
+        wf_core::battle::set_camera(&mut w, 0, ram.s32(CAM), ram.s32(CAM + 4));
     }
     notes.push(format!("event s{:03} at node {}: mid-code, action #{last} {wn:#04x} waiting (replayed from #{from})", ev.0, ev.1));
     let draws = w.rng.calls.wrapping_sub(calls0);

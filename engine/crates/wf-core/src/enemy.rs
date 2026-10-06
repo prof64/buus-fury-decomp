@@ -2878,12 +2878,18 @@ pub fn hand_strike(w: &mut World, i: usize, a_side: bool) -> Option<EntityId> {
     } else {
         None
     };
-    Some(w.add(Body::Hand(Box::new(Hand {
+    let id = w.add(Body::Hand(Box::new(Hand {
         a,
         t: 0,
         hit: false,
         marked,
-    }))))
+    })));
+    // field: an actor instance (0x0800EB60) - its tiles, as every enemy object's (run 3 cut 1,945,792, 18-14: the
+    // strike's hand takes (313, 16) in the frame it is made)
+    if let Some(k) = w.find(id) {
+        crate::vram::actor_created(w, k);
+    }
+    Some(id)
 }
 /// field: a strike hand is an enemy object (type 0x36, 50 HP, Idle): the player's hits reach it (sc_janemba: a punch
 /// on Janemba and the hand computes both - crit chance and roll each; the hand's reaction is the flash's: see

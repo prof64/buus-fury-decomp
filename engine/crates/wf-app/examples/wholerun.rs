@@ -440,7 +440,7 @@ fn main() {
         if std::env::var_os("WR_SS").is_some() {
             if let Some(pi) = w.player_idx(0) {
                 if let wf_core::world::Body::Player(p) = &w.ents[pi].body {
-                    let v = (p.form, p.ss_gauge, p.ss_acc, format!("{:?}", p.gs));
+                    let v = (p.form, p.ss_gauge, p.ss_acc, format!("{:?} sel {} skills {:?} xp {} lv {}", p.gs, p.sel, p.skills, p.rec.xp, p.rec.level));
                     if Some(&v) != ss_last.as_ref() {
                         println!("SS row {k} ({}) form {} gauge {} acc {} gs {}", stretch_of(k), v.0, v.1, v.2, v.3);
                         ss_last = Some(v);
@@ -477,6 +477,17 @@ fn main() {
                 }
                 txt += &format!("{:#?}\n{:#?}\n{:#?}\n", w.g, w.story, w.field.as_ref().map(|f| (&f.mode, f.busy, &f.patrols)));
                 let _ = std::fs::write(out, txt);
+            }
+            // WR_GRID=tx0,ty0,tx1,ty1: the walk / enemy collision layers there ('#' blocked)
+            if let Some(v) = std::env::var("WR_GRID").ok() {
+                let t: Vec<i32> = v.split(',').filter_map(|s| s.parse().ok()).collect();
+                if let (Some(c), [tx0, ty0, tx1, ty1]) = (w.col.as_ref(), t.as_slice()) {
+                    for ty in *ty0..*ty1 {
+                        let walk: String = (*tx0..*tx1).map(|tx| if c.tile(wf_core::world::Layer::Walk, tx, ty) { '.' } else { '#' }).collect();
+                        let en: String = (*tx0..*tx1).map(|tx| if c.tile(wf_core::world::Layer::Enemy, tx, ty) { '.' } else { '#' }).collect();
+                        println!("    grid {ty} walk {walk} enemy {en}");
+                    }
+                }
             }
             // WR_ENEMY=1: every actor's sprite and position (px * 256)
             if std::env::var("WR_ENEMY").is_ok() {

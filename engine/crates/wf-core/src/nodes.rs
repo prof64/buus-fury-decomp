@@ -825,6 +825,9 @@ fn one_idle(w: &mut World, i: usize) {
 }
 /// The enemy's pose setter (vt+0x30, 0x0800ED3E, and the nodes that do the same by hand): the raw only (the tick
 /// stays), the given frame, under the hold state 0x03001B00 (nothing ticks)
+fn has_raw(w: &World, i: usize, raw: i32) -> bool {
+    w.en_ref(i).a.sprite.and_then(|s| w.data.sprite(s)).is_some_and(|s| s.anim_raw(raw).is_some())
+}
 fn hold_pose(w: &mut World, i: usize, raw: i32, frame: i32) {
     let d = Arc::clone(&w.data);
     let e = w.en(i);
@@ -1093,6 +1096,13 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             r.d[1] = w.en_ref(i).a.y;
         }
         K::MeleeAttack => {
+            // field: the enter (0x0802A0C4) does nothing at all - no hit test, no rand, no punch - while the player's
+            // +0x1CC is 0: a held player (run 3 row 1,949,621, 18-14: King Yemma's teleport lands next to the player
+            // he holds - the Sequence goes on in the idle; ours' `hittable` is off in more states than the game's
+            // flag - run 3 ship 276,926). Battle keeps the reference's
+            if w.field.is_some() && en::player(w, i).is_none_or(|pi| w.pl_ref(pi).state == crate::player::PState::Held) {
+                return;
+            }
             // hit test (an accepted hit plays its sound), then SetAnim(4 + rand(punch animations))
             if en::melee_strike(w, i, 0x400, true, false, atk(2)) {
                 en::melee_hit_sfx(w, i);
@@ -1351,6 +1361,12 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             // battle keeps the reference's
             if w.field.is_some() {
                 w.en(i).a.hittable = false;
+                // the controller's enter (0x08034BC0) is SetAnimRaw(0x12) - the graphics' own animation 0x12 (raw
+                // 19), not the type's SetAnim table: King Yemma's vanish (run 3 row 1,949,548, 18-14 post-game) is
+                // raw 19; Janemba's raw 19 is its raw 18 (the same animation)
+                if has_raw(w, i, 19) {
+                    hold_pose(w, i, 19, 0);
+                }
             }
         }
         K::TeleportChain4 => {
@@ -2698,8 +2714,16 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         K::TeleportNearPlayer => {
             if f == 36 {
                 en::teleport_beside(w, i, r.d[0]);
+                // field: the controller's SetAnimRaw(0x14) (raw 21) for the landing
+                if w.field.is_some() && has_raw(w, i, 21) {
+                    hold_pose(w, i, 21, 0);
+                }
             }
             if w.field.is_some() {
+                // the controller's frame (update 0x08034BDE): its tick >> 2, from the landing (tick 36) on (tick - 36) >> 2
+                if w.en_ref(i).own_state && matches!(w.en_ref(i).ea.pos.raw, 19 | 21) && f < 72 {
+                    w.en(i).ea.pos.frame = if f < 36 { f >> 2 } else { (f - 36) >> 2 };
+                }
                 // field (sc_janemba): hittable again 18 frames after the landing; the landing animation (0x14) plays
                 // 36 frames and its end SetAnim(0)s the boss - the node's end, MeleeAttack follows
                 if f >= 54 {

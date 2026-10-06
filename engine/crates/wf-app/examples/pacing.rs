@@ -100,6 +100,8 @@ fn main() {
     let num = |name: &str, d: u64| opt(name).and_then(|v| v.parse::<u64>().ok()).unwrap_or(d);
     let limit = num("--steps", u64::MAX);
     let top = num("--top", 12) as usize;
+    // --render-every N: the picture (render + blit + audio) every Nth frame only, the step every frame
+    let every = num("--render-every", 1);
     let buffer = num("--buffer", 512) as usize;
     let (ww, wh) = opt("--size")
         .and_then(|s| s.split_once('x').map(|(a, b)| (a.parse().unwrap_or(1920), b.parse().unwrap_or(1080))))
@@ -143,7 +145,16 @@ fn main() {
     let (mut a_alloc_n, mut a_alloc_b) = (0u64, 0u64);
     let t_all = Instant::now();
     println!("{} steps, window {ww}x{wh}, mode {:?}, audio buffer {buffer} frames ({buf_ms:.2} ms)", inputs.len(), app.mode);
-    for &keys in &inputs {
+    // --from K: steps before K run untimed (the recorder / timeline as usual), the report covers K ..
+    let from = num("--from", 0) as usize;
+    for (k, &keys) in inputs.iter().enumerate() {
+        if k < from {
+            if !ctl.step(&mut app, &[keys]) {
+                break;
+            }
+            app.take_audio();
+            continue;
+        }
         let mut fr = Frame::default();
         let (n0, b0) = allocs();
         let t = Instant::now();
@@ -153,6 +164,16 @@ fn main() {
         fr.step = t.elapsed().as_secs_f64() * 1e3;
         let (n1, _) = allocs();
         fr.step_n = n1 - n0;
+        if every > 1 && (frames.len() as u64) % every != 0 {
+            // (sampled: this frame's picture is not made - render / blit 0)
+            fr.alloc_n = fr.step_n;
+            for e in app.take_audio() {
+                eng.push(e);
+            }
+            maps.push(String::new());
+            frames.push(fr);
+            continue;
+        }
         let t = Instant::now();
         let f = ctl.render(&mut app, 0, ww, wh);
         fr.render = t.elapsed().as_secs_f64() * 1e3;
@@ -197,6 +218,18 @@ fn main() {
         maps.push(app.view.map.as_ref().map(|m| m.id.clone()).unwrap_or_default());
         frames.push(fr);
     }
+    // the rewind timeline's capture (every 30 frames, Control::step): the snapshot and its compression, best of 20
+    {
+        let best = |f: &mut dyn FnMut()| (0..20).map(|_| { let t = Instant::now(); f(); t.elapsed().as_secs_f64() * 1e3 }).fold(f64::MAX, f64::min);
+        let mut len = (0, 0);
+        let snap = best(&mut || len.0 = app.sim.snapshot().map(|v| v.len()).unwrap_or(0));
+        let bytes = app.sim.snapshot().unwrap_or_default();
+        let (a0, _) = allocs();
+        let _ = app.sim.snapshot();
+        let (a1, _) = allocs();
+        let lz = best(&mut || len.1 = wf_app::wf_replay::lz::compress(&bytes).len());
+        println!("timeline capture at the end: snapshot {snap:.3} ms ({} B, {} allocations) + compress {lz:.3} ms ({} B)", len.0, a1 - a0, len.1);
+    }
     // the autosave's serialization of the whole session's recording (Control::advance runs it every 30 s of play)
     let t = Instant::now();
     ctl.finalize(&app);
@@ -204,7 +237,8 @@ fn main() {
     let n = frames.len().max(1);
     let wall = t_all.elapsed().as_secs_f64();
     println!("ran {} frames in {wall:.1} s ({:.0} fps unpaced)", frames.len(), frames.len() as f64 / wall);
-    let col = |f: fn(&Frame) -> f64| -> Vec<f64> { frames.iter().map(f).collect() };
+    // (step: every frame; the rest: the frames whose picture was made)
+    let col = |f: fn(&Frame) -> f64, all: bool| -> Vec<f64> { frames.iter().filter(|x| all || x.render > 0.0).map(f).collect() };
     for (name, f) in [
         ("step", (|x: &Frame| x.step) as fn(&Frame) -> f64),
         ("render", |x: &Frame| x.render),
@@ -212,8 +246,8 @@ fn main() {
         ("audio", |x: &Frame| x.audio),
         ("total", |x: &Frame| x.step + x.render + x.blit + x.audio),
     ] {
-        let mut v = col(f);
-        let mean = v.iter().sum::<f64>() / n as f64;
+        let mut v = col(f, name == "step");
+        let mean = v.iter().sum::<f64>() / v.len().max(1) as f64;
         println!(
             "{name:7} mean {mean:6.3}  p50 {:6.3}  p99 {:6.3}  p99.9 {:6.3}  max {:7.3} ms",
             pct(&mut v, 0.5),
@@ -255,7 +289,8 @@ fn main() {
     for &k in idx.iter().take(top) {
         let x = &frames[k];
         println!(
-            "  step {k:8} {:7.3} ms = step {:6.3} render {:6.3} blit {:6.3} audio {:6.3}  allocs {:6} ({:8} B)  map {}",
+            "  step {:8} {:7.3} ms = step {:6.3} render {:6.3} blit {:6.3} audio {:6.3}  allocs {:6} ({:8} B)  map {}",
+            k + from,
             x.step + x.render + x.blit + x.audio,
             x.step,
             x.render,

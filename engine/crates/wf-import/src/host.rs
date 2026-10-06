@@ -879,6 +879,9 @@ impl StoryHost {
         }
         self.collect(&evs);
         self.run_queue(&mut sess.world);
+        // the HUD's low-HP check sees what the update's scripts did to the HP (a map event's script, which the game
+        // runs before the HUD's update)
+        wf_core::field::hud_beep_after_scripts(&mut sess.world);
         // (an event that ended now - at the top of the game's frame - leaves the field free for this frame's count:
         // Airship db5_023 f569, the level-up popup's last box)
         let ticked_late = !free_at_tick && !hook_event && sess.world.scene.timers.countdown_on && sess.world.scene.timers.countdown > 1 && wf_script_core::countdown_counts(&sess.world);

@@ -463,6 +463,10 @@ pub struct Field {
     /// the HUD object's low-HP beep stamp (hud +0x10: the logic counter at the last beep, the load's at creation)
     #[serde(default)]
     pub hud_beep: u32,
+    /// the logic count of the HUD's last beep check (its update's): the post step's scripts check again with it
+    /// (`hud_beep_after_scripts`)
+    #[serde(default)]
+    pub hud_check_at: Option<u32>,
     /// a Continue's load whose on-enter script holds the players out (`create_hosted`): the HUD object is made with
     /// them, when the arrival completes - its first update's low-HP beep comes then (`finish_arrival`), not in the
     /// slot load's own frame
@@ -703,6 +707,7 @@ fn new_field() -> Field {
         scene_load: false,
         scene_loading: false,
         hud_beep: 0,
+        hud_check_at: None,
         arrival_beep: false,
         hud_hidden_at: None,
         event_started_pre: false,
@@ -1713,9 +1718,13 @@ pub fn pre_step(w: &mut World) {
     let event_held = w.field.as_ref().is_some_and(|f| f.busy);
     // (the newest death effect first: r057_029 f512 - of two kills in one punch the later one's XP levels up, the
     // earlier one's comes after the hook)
+    // (an event holding the field holds the death effect's first update too: its XP waits for the event's end - run
+    // 3 row 1,932,342, 18-13: a talk started in the KO punch's frame, the kill XP goes to the character the event
+    // switched to, at row 1,932,607)
     let mut due = w
         .field
         .as_mut()
+        .filter(|_| !event_held)
         .map(|f| std::mem::take(&mut f.xp_due))
         .unwrap_or_default();
     due.reverse();
@@ -2847,16 +2856,19 @@ fn hud_beep_at(w: &mut World, at: Option<u32>) {
             return;
         }
     }
-    let Some(pi) = w.player_idx(0) else { return };
-    let (hp, max) = (w.pl_ref(pi).rec.hp, w.pl_ref(pi).rec.max_hp);
-    if hp == 0 || hp * 5 > max {
-        return;
-    }
     // (the game's logic counter: it runs on through frames without an object pass - a modal camera scroll, real run
     // 18-14 r049_001 f7,599..7,613 - where `World.frame` stands)
     // (this frame's count: the mark taken at its start + 1 - also from a script that runs before the frame's object
     // pass advanced `World.frame`: `show_hud` in 20-5 r061_004 f5,251)
     let now = at.unwrap_or(w.g.clock_mark.map(|c| c + 1).unwrap_or(w.g.clock(w.frame)) as u32);
+    if let Some(f) = w.field.as_mut() {
+        f.hud_check_at = Some(now);
+    }
+    let Some(pi) = w.player_idx(0) else { return };
+    let (hp, max) = (w.pl_ref(pi).rec.hp, w.pl_ref(pi).rec.max_hp);
+    if hp == 0 || hp * 5 > max {
+        return;
+    }
     let due = w
         .field
         .as_ref()
@@ -2867,6 +2879,19 @@ fn hud_beep_at(w: &mut World, at: Option<u32>) {
         }
         w.sfx(41, 32);
     }
+}
+
+/// the HUD's beep check once more after the frame's post-step scripts, with the count of its update's check: a
+/// map event's script the trigger check ran this frame lowered the HP (the game runs it before the HUD's update -
+/// run 3 row 1,852,929, HFIL 18-7: the damage floor's `inline_0x0808C18C` -> s507 takes 20 HP, the HUD beeps in that
+/// frame). It beeps only where the update's check did not (the stamp is that check's count once it beeps)
+pub fn hud_beep_after_scripts(w: &mut World) {
+    let Some(at) = w.field.as_ref().and_then(|f| f.hud_check_at) else { return };
+    let now = w.g.clock_mark.map(|c| c + 1).unwrap_or(w.g.clock(w.frame)) as u32;
+    if at != now || crate::menu::active(w) {
+        return;
+    }
+    hud_beep_at(w, Some(at));
 }
 
 /// brightness level (0..256 = black) of the fade-in after k frames: the 3D world map's arrival fades by 4 (64

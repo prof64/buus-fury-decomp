@@ -1,9 +1,9 @@
 """Run 3's Super Buu + Kid Buu part (`b3_superbuu`; engine/docs/segments.md "Run 3", claim of 2026-10-06): run 2's
 goals (tools/superbuu/sbroute2.py goals_run2: HFIL 18-13 -> the Lookout / fusion -> Ultimate Gohan's grinds -> the
-crater -> the wasteland -> Goku 20-5 / 20-6 -> 20-7 -> inside Buu -> Kid Buu) with run 3's stresses on top, driven by
-SbDriver3 = SbDriver2 + Run3Driver's stress goals. It ends where the post-game begins: after Kid Buu, a Save at West
-City 4-1's save point, then into Capsule Corp 4-20 - the 4-21 lobby's final-sequence trigger is NOT entered (the
-post-game part Continues this save). Input only.
+crater -> the wasteland -> Goku 20-5 / 20-6 -> 20-7 -> inside Buu -> the brain fight) with run 3's stresses on top,
+driven by SbDriver3 = SbDriver2 + Run3Driver's stress goals. It ends at the Super -> Kid Buu boundary (scope of
+2026-10-06): the first frame the area becomes 20-8 after Inside Buu (mid-event; run 2's split row 1,853,852) -
+`--boundary` cuts a longer log there. The last in-game save is 21-25's checkpoint, before the brain. Input only.
 
 Stresses (COVERAGE below):
 - every checkpoint (save point + Save + the game-over retry stretch) opens the Switch Characters screen and takes
@@ -14,8 +14,9 @@ Stresses (COVERAGE below):
 - START on alternate frames for 60 frames as every scripted stretch lets go ('events' / 'eventsw' ends: the fusion,
   Mystic Gohan, the brain fight, Kid Buu), and on alternate frames through the first 40 frames of every area change a
   'nav' / 'exitto' makes (the exit's load / fade-in)
-- planned game overs -> Continue at three save states: the Pyramid grind right after a level-up (the popup's
-  frames), Goku's 20-6 grind, inside Buu at 21-1 ('die1': walk into the nearest enemy and stand)
+- planned game overs -> Continue: the Pyramid grind right after a level-up, Goku walking into 20-5's robots after
+  the 20-6 save; inside Buu at 21-1 / 21-14 they are skipped (no enemy reachable from the save point; 'die1' gives up
+  after 900 enemy-less frames or 6,000 in the goal)
 - the save point's first A closed-loop ('opensave', as fat3.py: a walk a pixel off the spot meets nothing)
 
 play: python3 tools/run3/sb3.py START.ss START.eeprom OUTDIR [--cap N] -> OUTDIR/keys.json + end.ss / end.eeprom
@@ -275,16 +276,44 @@ def verify(st, ee, out):
         e.set_keys(k)
         e.run(1)
     e.set_keys(0)
-    ref = start_emu(str(out / 'end.ss'))
+    ref = start_emu(str((out / 'end.ss').resolve()))
     same = e.ewram() == ref.ewram() and e.iwram() == ref.iwram() and sbemu.sd_read(e) == (out / 'end.eeprom').read_bytes()
     print('verify:', 'byte-identical' if same else 'DIFFERS', status(e))
     return same
+
+
+def boundary(st, ee, out):
+    """OUTDIR/keys.json (a run that went on past the boundary) cut at the Super -> Kid Buu boundary: the first frame
+    the area becomes 20-8 after Inside Buu (21-x) - run 2's split row 1,853,852 - mid-event (the brain fight's end
+    scenes run on to the world map 0-50); OUTDIR/keys.json, end.ss, end.eeprom rewritten"""
+    e = start_emu(str(Path(st).resolve()))
+    sbemu.sd_write(e, Path(ee).read_bytes())
+    keys = json.loads((out / 'keys.json').read_text())['keys']
+    inside = False
+    for n, k in enumerate(keys):
+        e.set_keys(k)
+        e.run(1)
+        a = status(e)['area'][:2]
+        if a[0] == 21:
+            inside = True
+        elif inside and a == [20, 8]:
+            break
+    else:
+        raise SystemExit('no boundary in the log')
+    keys = keys[:n + 1]
+    (out / 'keys.json').write_text(json.dumps({'keys': keys}))
+    e.save_file(str(out / 'end.ss'))
+    (out / 'end.eeprom').write_bytes(sbemu.sd_read(e))
+    print('b3_superbuu cut at the boundary:', len(keys), 'frames', status(e))
 
 
 def main():
     a = sys.argv[1:]
     st, ee, out = a[0], a[1], Path(a[2])
     out.mkdir(parents=True, exist_ok=True)
+    if '--boundary' in a:
+        boundary(st, ee, out)
+        return
     if '--verify' in a:
         sys.exit(0 if verify(st, ee, out) else 1)
     run(st, ee, out, int(a[a.index('--cap') + 1]) if '--cap' in a else 1500000)

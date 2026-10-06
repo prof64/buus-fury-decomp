@@ -6723,3 +6723,30 @@ agent (coordinator's split) - real-route agent: tell me here if you are already 
 running a Janemba resync from 1,798,844 (`work/run3/stops_j3.jsonl`) and will take the rule stops after it, posting
 each here; I'll point any stop that turns out to come from the same cause as 1,922,799 (Janemba AI) to you. Import
 stops go to A.
+*Run 3 Janemba resync (A, from 1,798,845; /tmp/resync_r3j.jsonl): 118 stops.* **Rules -> real-route agent / Super Buu agent:** 1,922,799, 1,926,983, 1,936,466 / 492, then a dense series 1,944,711 .. 1,948,513 (rng / facing every 10 .. 40 rows - likely one fight cause), 1,949,621, 1,966,815; from 1,966,816 exact to the end. **Imports (A):** 1,945,333, 1,945,413, 1,945,792, 1,945,823, 1,948,395 (rng at f0).
+*Run 3 1,852,929 (A; wf-core field.rs, wf-import host.rs; uncommitted):* HFIL 18-7's damage floor - its map event inline_0x0808C18C runs s507 (-20 HP every 8 frames) **before** the HUD's update in the game, so the HUD beeps in that frame; ours ran it after the object pass (one frame late, and the next beep too). The HUD's check records its counter (`Field::hud_check_at`); `hud_beep_after_scripts` repeats the check once with it right after the host's update scripts (beeps only where the first did not). 0 sound differences from c1796453 to 1,853,000. **check.sh: runs 1, 2 exact; run 3 now exact in logic and sound to 1,949,621** (028_j3_janemba, rng + punch sound - the rule owners'). Gates green, sweeps no worse.
+
+**Update 22 (Super Buu agent, 2026-10-06): run 3's Janemba stops 1,922,799 -> 1,926,320 -> 1,936,466 -> 1,949,621 ->
+past it (with the real-route agent's split).** Each found from the run-3 cut c1,796,453 (`work/superbuu/r3/`: cut3.py
+records a segment from that cut, leg.sh / legx.sh / ss.sh / actors.sh / grid.sh run the app's leg with WR_* traces,
+gsel.py / ggauge.py / gacc.py / bpat.py / wctl.py / rngcalls2.py read the game).
+* **L cycles the skill in any state (field).** The HUD object's update (0x0800B970) cycles on a pressed L
+  (0x08013B34 on the leader's record) whatever the player's state; ours only in idle / walk. Rows 1,905,806 ..
+  1,905,833: three L presses during the Super Saiyan transformation - the later B was the Energy Blast in the game
+  (rand(2) of its sound at 1,922,799), ours the revert. `player::control`.
+* **A new form object restarts the Super Saiyan drain (+0x14).** The level-up's new object (0x08013A7E ->
+  0x0801064C, after hook #3) at row 1,906,631: the game's drain counts from 0; ours kept its count and ran out 2 frames
+  early (revert at 1,926,320). `new_form_object` (field).
+* **An event holding the field holds the kill XP.** The death effect's first update (its XP) waits while an event
+  holds the pass: row 1,932,342, 18-13 - a talk started in the KO punch's frame, the game's XP goes to the character
+  the event switched to (1,932,607); ours gave it to the old one (no level-up at 1,936,466). `field.rs` xp_due.
+* **TeleportNearPlayer's controller (0x08034BC0 / 0x08034BDE).** Enter SetAnimRaw(0x12) (raw 19 - the graphics' own
+  animation, not the SetAnim table), frame = tick >> 2; at tick 36 SetAnimRaw(0x14) (raw 21), frame = (tick - 36) >> 2
+  (King Yemma, 18-14 post-game, row 1,949,548; Janemba's raw 19 / 21 are its 18 / 20 - sc_janemba / rj_049 still exact).
+* **MeleeAttack's enter does nothing while the player is held** (0x0802A0C4: the player's +0x1CC = 0 - no hit test,
+  no rand, no punch): Yemma's landing next to the player he holds (1,949,621). Our `hittable` is off in more states
+  than that flag (taking it cost run 3 ship 276,926), so only `PState::Held`.
+Not mine, seen on the way: the low-HP beep at 1,852,929 (another agent's `hud_beep_after_scripts` is on it); the
+local cut at 1,949,450 still differs in sprite memory at its f134 (ours makes the teleport's two puffs, 16 units each;
+the game's Yemma makes none - Janemba's do).
+*Run 3 Janemba import stops (A; wf-import lib.rs + one field rule in enemy.rs; uncommitted): 1,945,333 / 1,945,413 / 1,945,792 / 1,945,822 / 1,948,395 load and match.* Janemba's arm / head parts linked to the body (+0x1F4); the head's hurt flash under its controller (0x030032BC) ends with the arms' one-shot rule; an arm mid hand-strike (controller vt 0x0804D738: count = tick + 1, the hand it made at +4); **rule:** the strike hand takes its actor sprite memory (16 units); Mini Janemba's hop counter from 0x0300322C; a `camera_center_on` whose mover is gone ends at the cut with RAM's camera; enemy objects without a recorder row get actor rows from the object. Open (A): a hand already in RAM at a cut imports as a plain enemy, not a strike hand (1,945,822 f11). Longer replays from 1,945,792 (f16) / 1,948,395 (f51) stop inside the rule series (owners'). Gates green; check.sh: runs 1, 2 exact, run 3 (now 2,536,522 rows) exact to 1,949,621; sweeps no worse.

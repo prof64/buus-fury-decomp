@@ -1964,6 +1964,11 @@ fn new_form_object(w: &mut World, i: usize) {
     // the regen tick's accumulator is the form object's (+0xC): a new object counts from 0 (real route 8-29
     // shipr_251: the level-up's new object at f838 restarts it, the bench's 5% tick never comes in that segment)
     pl.regen_timer = 0;
+    // and so does the Super Saiyan drain's (+0x14; field - the battle reference keeps its own): run 3 row 1,906,631,
+    // the level-up's new object in Janemba's arena 18-2 - the game's drain restarts from 0 (+0xCCD in that frame)
+    if w.field.is_some() {
+        p(w, i).ss_acc = 0;
+    }
 }
 
 /// the XP routine after its level-up hook #3 has run (`0x08013A7E`): the player gets a new form object (0x0801064C)
@@ -2080,6 +2085,15 @@ fn swap_to_partner(w: &mut World, i: usize) {
 
 /// the state's control (vtable +8)
 fn control(w: &mut World, i: usize) {
+    // field: L cycles the skill in the HUD object's update (0x0800B970: pressed L and 0x08013B34 on the leader's
+    // record), whatever the player's state - the idle / walk controls below keep their own (same frame, same order).
+    // Run 3 rows 1,905,806 .. 1,905,833: three L presses during the Super Saiyan transformation (vt 0x0804E2B0)
+    if w.field.is_some()
+        && !matches!(pr(w, i).gs, Gs::Idle | Gs::Walk)
+        && inp(w, i).pressed & btn::L != 0
+    {
+        cycle_skill(w, i);
+    }
     if pr(w, i).gs == Gs::Stone {
         return ctl_stone(w, i);
     }

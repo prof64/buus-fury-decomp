@@ -71,7 +71,10 @@ class WfAudio extends AudioWorkletProcessor {
     if (!this.x || !out || out.length < 2) return true;
     const n = out[0].length;
     const p = this.x.wf_audio_render(n);
-    const s = new Float32Array(this.mem.buffer, p, n * 2);
+    // one view on the render buffer, re-made only when it moves (memory growth, another size): no garbage per
+    // 128-frame quantum on the audio thread
+    let s = this.view;
+    if (!s || s.buffer !== this.mem.buffer || s.byteOffset !== p || s.length !== n * 2) s = this.view = new Float32Array(this.mem.buffer, p, n * 2);
     const l = out[0];
     const r = out[1];
     for (let i = 0; i < n; i++) {

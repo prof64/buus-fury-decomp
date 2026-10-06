@@ -141,6 +141,10 @@ SEGMENTS.append(('f3_fat', ('KEYS', 'work/run3/parts/f3_fat.json')))
 # them, Goku to 125, a Save at 18-1 and game overs -> Continue in HFIL and the arena (tools/run3/jan3.py --all from
 # the fat end; --part joins the pieces' logs)
 SEGMENTS.append(('j3_janemba', ('KEYS', 'work/run3/parts/j3_janemba.json')))
+# ---- Super Buu (b3_superbuu, side-content agent): run 2's Super Buu goals (tools/superbuu/sbroute2.py) with run 3's
+# stresses (tools/run3/sb3.py, SbDriver3), from the Janemba end (work/run3jan/j_arena.ss + .eeprom) to the first frame
+# of 20-8 after Inside Buu (mid-event: the brain fight's end scenes; kb3.py goes on from there)
+SEGMENTS.append(('b3_superbuu', ('KEYS', 'work/run3/parts/b3_superbuu.json')))
 
 
 def chapter_of(name):
