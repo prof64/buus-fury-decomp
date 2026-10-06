@@ -2820,7 +2820,12 @@ fn import_death_effects(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
             continue;
         };
         // (an event holding the field at the cut holds the countdown in the cut's frame too: it ends in it)
-        let due = w.frame + ram.s32(o + 4).max(0) as u32 + (w.scene.depth > 0) as u32;
+        // (an event that is not an inline hook - a save point's s011 - holds it through the busy-field hold from the
+        // next frame on: run 2 cut 1,837,704, the coins 8 updates after the Save Game screen closes. A hook - the
+        // world update's call 0x08011A5E on the stack under the VM, as a level-up popup after the kill - holds the
+        // cut's frame too: tour_castle_pilaf_save14)
+        let hook = w.field.as_ref().is_some_and(|f| f.held_event) || (0x0300_7000u32..0x0300_8000).step_by(4).any(|a| ram.r32(a) == 0x0801_1A5F);
+        let due = w.frame + ram.s32(o + 4).max(0) as u32 + (w.scene.depth > 0 && hook) as u32;
         let d = (due, wf_core::world::EntityId::MAX, ty, ram.s32(o + 8), ram.s32(o + 0xC), ram.s32(o + 0x10), ram.s32(o + 0x14));
         if let Some(f) = w.field.as_mut() {
             f.pending_drops.push(d);

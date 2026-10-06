@@ -134,6 +134,9 @@ SEGMENTS += _earth3()
 # ShipDriver3), played from Earth's end (ship3.py work/run3/end.ss end.eeprom OUT) in one session; its verified key
 # log is stored (work/run3/parts/s3_ship.json, into keys.json): play3 replays it
 SEGMENTS.append(('s3_ship', ('KEYS', 'work/run3/parts/s3_ship.json')))
+# ---- fat Buu (f3_fat, real-route agent): run 2's fat pieces (tools/run2/fat2.py) in a third Dragon Ball order with
+# run 3's stresses between them (tools/run3/fat3.py --all from the ship end; --part joins the pieces' logs)
+SEGMENTS.append(('f3_fat', ('KEYS', 'work/run3/parts/f3_fat.json')))
 
 
 def chapter_of(name):

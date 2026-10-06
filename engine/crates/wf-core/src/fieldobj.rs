@@ -440,6 +440,7 @@ fn break_done(w: &mut World, id: EntityId) {
             // run before the objects update, like a queued event: the enemies run their update in its last frame
             // (segment sb 21-11)
             f.queued_event = true;
+            f.queued_at = frame;
             f.break_event = frame;
             f.break_cb = true;
         }

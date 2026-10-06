@@ -302,6 +302,9 @@ pub struct Field {
     /// frame it ends the enemies still run their update (2-90: Super Saiyan Goten's AI starts in s121's last frame)
     #[serde(default)]
     pub queued_event: bool,
+    /// the frame the queued event (`queued_event`) runs from: a later event that starts otherwise is not it
+    #[serde(default)]
+    pub queued_at: u32,
     /// the frame a breakable's callback started (fieldobj `break_done`); cleared once it is over. The callback runs
     /// from inside the breakable's own update, as a nested loop of the game: while its script waits for a track
     /// command (HFIL 18-10's boulder: `puff_at`) the frames are the loop's - no object pass (`break_modal`) - and in
@@ -655,6 +658,7 @@ fn new_field() -> Field {
         coins_moved: false,
         queued_runs: vec![],
         queued_event: false,
+        queued_at: 0,
         break_event: 0,
         break_modal: false,
         break_cb: false,
@@ -1946,6 +1950,7 @@ pub fn post_step(w: &mut World) {
     if !due.is_empty() {
         if let Some(f) = w.field.as_mut() {
             f.queued_event = true;
+            f.queued_at = now;
         }
     }
     for (_, run, cause) in due {
@@ -1957,7 +1962,10 @@ pub fn post_step(w: &mut World) {
     }
     // the death effect whose update runs an inline hook is suspended with it: its drop countdown waits (story
     // playthrough: the coins drop 7 frames after the level-up popup closes, 8 updates after the KO)
-    if let Some(f) = w.field.as_mut().filter(|f| f.held_event) {
+    // (and so does any death effect while an event holds the field - run 2 row 1,837,970, Inside Buu 21-14: the punch
+    // that killed a worm head opened the save point's s011 in the same frame; the game's coins come 8 updates after
+    // the Save Game screen closes, ours dropped them as it closed)
+    if let Some(f) = w.field.as_mut().filter(|f| f.held_event || f.busy) {
         for d in f.pending_drops.iter_mut() {
             d.0 = d.0.saturating_add(1);
         }

@@ -59,6 +59,9 @@ pub struct RenderView {
     pub sphere: Option<SphereView>,
     /// The countdown / stopwatch display's value in frames (two 32x16 OBJs at (168, 8), priority 1), if shown.
     pub timer: Option<i32>,
+    /// The shake offset the world's OBJs show (their OAM is a frame late: the previous frame's shake), `None` = the
+    /// map's `shake`.
+    pub obj_shake: Option<(i32, i32)>,
     /// Damage numbers (object `0x0800AD3E`, vtable 0x0804C904): a 32x8 OBJ at world (x, y), priority 1.
     pub damage_numbers: Vec<DamageNumberView>,
     /// A script's title text (`show_title_text` 0xB2, "Chapter 12 ..." / "Match 2 Fight!"): the string's units,

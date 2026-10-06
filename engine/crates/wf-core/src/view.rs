@@ -984,6 +984,7 @@ pub struct Presenter {
         Vec<wf_view::DamageNumberView>,
     )>,
     prev_mode7: Option<wf_view::Mode7View>,
+    prev_shake: Option<(i32, i32)>,
 }
 
 impl Presenter {
@@ -991,6 +992,7 @@ impl Presenter {
         let mut v = RenderView::default();
         render_view(w, &mut v);
         self.prev_mode7 = v.map.as_ref().and_then(|m| m.mode7.clone());
+        self.prev_shake = v.map.as_ref().map(|m| m.shake);
         self.prev = Some((
             v.sprites,
             v.hud,
@@ -1013,6 +1015,11 @@ impl Presenter {
             out.title = title.clone();
             // (damage numbers too: dr4_009 15-9 f316, made at f315)
             out.damage_numbers = nums.clone();
+            // (and their shake offset: the frame before's - sc_janemba f5130, the active shake's (-4, 1) against
+            // the OBJs' previous (-4, 0))
+            if std::env::var_os("NO_OBJ_SHAKE_LATE").is_none() {
+                out.obj_shake = self.prev_shake;
+            }
             out.sprites = sprites.clone();
             // (the cooldown triangle shows the frame's own value: shipr_001 7-1 f240, the record's 0x7FFF that frame
             // and an empty step-0 triangle)

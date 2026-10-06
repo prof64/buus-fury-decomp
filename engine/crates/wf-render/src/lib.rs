@@ -555,7 +555,7 @@ impl Renderer {
                     // the screen shake's offset moves the world's OBJs with the BG layers (real route sb 6-6 / 6-9 f4,694
                     // on: Gotenks' cut-short crit shake leaves (3, -3); the actors drawn 3 px off without it). The
                     // screen-space OBJs (HUD, boss bar, numbers' screen items) stay put
-                    let (shx, shy) = map.as_ref().map(|m| m.2).unwrap_or((0, 0));
+                    let (shx, shy) = view.obj_shake.or(map.as_ref().map(|m| m.2)).unwrap_or((0, 0));
                     self.draw_obj(sheet, *fi, *flip, s.x - vx - shx, s.y - vy - shy, s.effect);
                 }
             }

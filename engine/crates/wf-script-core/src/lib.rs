@@ -344,7 +344,7 @@ impl Host for CoreHost<'_> {
                 // the event ended straight out of a command wait: in the game the wait loop returned at the top of
                 // this frame, so the field's NPCs already ran this frame's update unfrozen
                 if self.s.from_wait && self.w.scene.depth == 0 && !self.s.in_unit {
-                    match talk_k.filter(|_| self.s.talk_event && std::env::var_os("TMP_TK").is_some()) {
+                    match talk_k.filter(|_| self.s.talk_event) {
                         // a talk's event: the nested loop ran inside the player's update - the pass goes on with the
                         // objects below the player's list index (older), not the ones above it (kami_papaya2 row
                         // 2,798: the HUD and the NPC above the player get no update in the exit frame, the NPCs below
@@ -418,6 +418,14 @@ pub fn begin_event(w: &mut World) {
     // (also when a script already holds the field without an event: the event start's world message 0x0F still
     // reaches a map NPC whose walk controller runs - Earth 7-2 f1432: s495 starts under a scroll script and the
     // walking NPC 233 goes idle with its draw, 0x0800F446 -> 0x0800E050)
+    // (a queued event's flag from an earlier one whose end did not clear it - a breakable's loot script: not this
+    // event - castle_forest_n 10-?, the chest's s316 after four pots: its exit released the player)
+    if w.scene.depth == 0 {
+        let frame = w.frame;
+        if let Some(f) = w.field.as_mut().filter(|f| f.queued_event && frame > f.queued_at.wrapping_add(1)) {
+            f.queued_event = false;
+        }
+    }
     if w.scene.depth == 0 && w.field.as_ref().is_some_and(|f| f.host) {
         // (a talk already started its event at the fire and set the speaker anchor: the scene the talk's event
         // begins keeps it - Yemma's Office text box top / portrait left, wf-app dialog_portrait_parity)
@@ -456,24 +464,22 @@ fn release_field_enemies(w: &mut World, watermark: EntityId) {
 }
 
 /// the field objects below list index `k` (the game's list order: the props object first when the map has one) get the
-/// rest of the interrupted pass: NPCs and enemies (`release_field_npcs`' updates)
+/// rest of the interrupted pass: NPCs and enemies (`release_field_npcs`' updates), a player that the event's list
+/// changes put below `k` its full update with the frame's own keys (kami_papaya2 row 3,829: the NPCs a script respawned
+/// moved above the player - the game's pass resumes by index and reaches him; he walks)
 fn release_field_below(w: &mut World, k: usize) {
     if w.field.is_none() {
         return;
     }
     let live: Vec<usize> = (0..w.ents.len()).filter(|&i| !w.ents[i].removed).collect();
     let k = k.saturating_sub(wf_core::field::props_object(w) as usize);
-    if std::env::var_os("TMP_TKD").is_some() {
-        let names: Vec<String> = live.iter().map(|&i| match &w.ents[i].body { wf_core::world::Body::Npc(n) => format!("n{}", n.sprite_id), wf_core::world::Body::Player(_) => "P".into(), wf_core::world::Body::Enemy(_) => "E".into(), _ => "o".into() }).collect();
-        eprintln!("RELBELOW f{} k {} live {}", w.frame, k, names.join(" "));
-    }
     for &i in live.iter().take(k).rev() {
         let id = w.ents[i].id;
         if matches!(&w.ents[i].body, wf_core::world::Body::Npc(n) if n.behaviour.is_some()) && !scene::is_puppet(w, id) {
             wf_core::fieldnpc::release_update(w, i);
         } else if matches!(&w.ents[i].body, wf_core::world::Body::Enemy(_)) {
             wf_core::enemy::release_update(w, i);
-        } else if matches!(&w.ents[i].body, wf_core::world::Body::Player(_)) && std::env::var_os("TMP_TKP").is_some() {
+        } else if matches!(&w.ents[i].body, wf_core::world::Body::Player(_)) {
             if let wf_core::world::Body::Player(p) = &mut w.ents[i].body {
                 p.tick_owed = false;
             }
