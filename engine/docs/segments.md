@@ -6193,3 +6193,38 @@ byte; Dabura's -4 was ignored) - map_* still exact. The rest of the tables are l
 flows: documented with a mapping plan onto wf-net in re/buu/menu/NOTES_screens.md "Multiplayer (link cable)"; not
 recordable without two linked emulators. Suites green; check.sh EXACT.
 *Run 2 1,769,316 fixed (A; wf-core enemy.rs, wf-import lib.rs; uncommitted) - not the chain kill:* run continuously the state before it matched; the difference was (1) worm body pieces spawned in the fight had no placement, so a split-off piece killed as a head never ran its coin drop (its draws at 1,769,316) - `worm_spawn_body` places each as `List(0xff, 0x8f)` as the import does; (2) a worm piece's contact counter counts down only where its contact check is reached (0x0802D5B8 / 0x0802D722: in `contact_hit_foot`, while non-zero it counts and tests nothing, an accepted contact sets 20; the general per-update countdown skips types 0x8E / 0x8F; a body piece checks contact only with a move in its mailbox, 0x0802D69C); (3) the counter is imported (head's node runtime +4, body +0x14). Full cuts at 1,769,100 / 1,769,200 exact. **check.sh: run 2's first difference now 1,837,970** (rule stop, side-content agent's range; then 1,842,711); runs 1, 3 exact. Gates green, sweeps no worse.
+**Takeover (dungeon agent A, by the coordinator): run 2's remaining stops 1,837,970, 1,842,711 and everything after** (the side-content agent is recording run 3's later chapters) - goal run 2 exact, then `data/realrun2/expected.json` removed so check.sh holds it strict.
+
+*Done (ship fix agent, 2026-10-05): **field completeness sweep.*** Inventory of every interactable in the extracted
+area data (1,563 enemies, 356 NPCs, 279 script / 171 event triggers, 44 save points, 129 breakables, 13 items, 839
+exits; all trigger / activation / behaviour kinds are handled in ours - the only unknown one was the computer, now
+built). Runs 1-3 (logged with the new `WR_INTERACT=1` of the wholerun example) never touch 447 interactables in 149
+area variants and never enter 105 of 452 areas (lists: work/shipfix/field_untouched.txt / field_unvisited.txt).
+**Coverage tours** (new: tools/segments/tours.py - a route driver that walks / talks / presses A and records a
+segment; run_tours.py, tour_goals*.py per region; states via tools/run2/state_at.py, which now carries the
+cartridge EEPROM, written as STATE.ss.eeprom and recorded in the segment): **116 tours, 73 exact end to end**
+(work/segs_tours; `sh work/shipfix/mall.sh segs_tours`). Newly reached and exact: Capsule Corp's Lab / Computer
+Room / Exhibit Halls, Roshi's Island + Kame House, Kami's Palace rooms, the Time Chamber rooms, Heaven (via the
+Other World pad's travel menu), Northern Wilderness, Volcano 15-21 / 15-26, Planet of the Kais 19-2..19-5, Z-Mart
+0-94, Goku's house rooms, East District 2-13..2-20, Hercule Café / Mansion / Circus, Pilaf's Castle east and west
+wings, Diablo Desert 11-3 / 7 / 8 / 9 / 12 / 16, Ninja Stronghold 13-37..13-40, Lighthouse 9-9 / 9-17, Southwest
+Forest 8-4..8-10.
+Fixed in the sweep: the computer's screen runs the world under its fades and restores it in its closing iteration
+(`Menu::live_fade`, `Action::Done`), its tiles (arrows, sprite); the gunman's / rifle bullet's and the ninja star's
+object tiles (2 / 4 / 1 units) and their free-before-explosion order; the mummy bandage's tiles; a script's menu /
+message window (node kind 3) holds only its options' cursor (0x100), freed on the pick, not the dialogue box's
+blocks; a text box's choice cursor goes with the box (text blocks first), not on B.
+**Left for owners** (first divergences, tour: frame): enemy AI / anim - the ninja's throw timing (desert_nj37: 7,
+sound 61), Pilaf's Castle 10-9 enemy sprite 276 vs ours 274 (castle_pw_10_9: 75), the ninja star's damage-number
+tile order (desert_nj40: 20), mummies / HFIL enemies' sub-pixel steps (kais_hfil5: 1, kais_hfil9: 212), an enemy's
+flame breath that goes on under the save point's dialog in ours (castle_pilaf_save14: 104); NPCs - wandering NPC
+sub-pixel step (kami_papaya2: 2798), soul NPCs' (sprite 249) animation phase on import (kami_yemma: 2), an actor's
+animation one tick ahead after a dialog (kami_lookout: 1953, castle_ship_41: 498, castle_forest_16b: 163); props -
+the chest prop's opening animation (sprite 279; castle_ship_28: 129, castle_forest_n: 2937); objects' tiles - the
+rock-break event's 4 units (desert_a: 513), a scripted rock's loot (desert_c: 3446), 14-7's pot event (desert_py5:
+645), 8-21 / 8-48 punches (castle_ship_21: 190), the travel screen's label (kais_pad191: 156); the area banner after
+a save menu lasts ~30 iterations longer in ours (kais_volc19: 389); area re-entry draws the player / an NPC a frame
+before the on-enter script releases them (earth_mansion: 1010, earth_zmart_city: 544); a script's RNG at 1-10's
+trigger 0x08075394 (kami_grandkai: 44) and 6-20's 0x08079A90 (kami_lookout20: 860); 1-11 an extra 4-unit block in
+ours during a talk (kami_grandkai11: 611). Not reachable from any run state (flags / story points): listed in each
+tour_goals file's notes; 19-6 has no entrance in the data; 3-23 / 3-24 have no exits or objects.
