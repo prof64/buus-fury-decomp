@@ -1,6 +1,6 @@
 {
  "about": "tools/wholerun/check.py's ratchet for run 3 (no-lag, from power-on): the first difference outside the known ranges (a compared field or a sound request, any leg) must not come earlier than first_diff; a later one is reported as an improvement and this file is bumped. Remove the file once run 3 is exact.",
- "first_diff": 2202504,
- "stop": "rng: app [ee4d0fe4, b413f227] game [26295595, 2bed837e]",
+ "first_diff": 2438792,
+ "stop": "pos: app (69893, 16623, 3) game (70085, 16623, 3)",
  "stretch": "029_b3_superbuu"
 }

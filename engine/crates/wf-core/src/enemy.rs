@@ -939,7 +939,6 @@ pub fn latch_enter(w: &mut World, i: usize) {
     }
     let Some(pi) = player(w, i) else { return };
     let (px, py) = (w.pl_ref(pi).a.x, w.pl_ref(pi).a.y);
-    if std::env::var_os("TMP_LATCH").is_some() { eprintln!("LATCHENTER f{} en{} e ({},{}) p ({},{})", w.frame, i, w.en_ref(i).a.x, w.en_ref(i).a.y, px, py); }
     let e = w.en(i);
     e.hook = Hook::Latch {
         ox: e.a.x - px,
@@ -1353,6 +1352,18 @@ pub fn passable(w: &mut World, i: usize, x: i32, y: i32) -> bool {
             ok
         }
     }
+}
+/// the object's own grid test (vt+0x54, 0x0800F9EE): a detached object (+0x291) passes anywhere, else the footprint
+/// at (x, y) against the enemy grid **as it is - the object's own mark included** (no unmark, unlike `passable`):
+/// WanderToRandomPoint's goal pick (0x0803BC6C) rejects a goal that overlaps where the wanderer stands (run 3 cut
+/// 2,164,950 f91, Vegeta at 20-7: the game drew three goals - (157, 304) on his own footprint, (136, 130) blocked -
+/// ours took the first)
+pub fn grid_free(w: &World, i: usize, x: i32, y: i32) -> bool {
+    if w.col.is_none() || !attached(w, i) {
+        return true;
+    }
+    let (fw, fh) = (w.en_ref(i).a.foot_w, w.en_ref(i).a.foot_h);
+    w.col.as_ref().unwrap().test(Layer::Enemy, x, y, x + fw, y + fh)
 }
 /// footprint inside the arena bounds and passable
 pub fn fits(w: &mut World, i: usize, x: i32, y: i32) -> bool {

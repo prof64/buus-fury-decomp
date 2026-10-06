@@ -2045,6 +2045,17 @@ pub fn post_step(w: &mut World) {
         if let Some(raw) = w.field.as_mut().and_then(|f| f.raw_input.take()) {
             w.input = raw;
         }
+        // the input object records the frame's presses at the frame's start whatever runs after: a frame whose own
+        // pass was held (no `battle::pre_step`) has them for the completed pass (run 3 row 2,202,382, 21-6: an
+        // enzyme latched on the leader counts the A press of that frame - its IfButtonMashed lets go at the 9th)
+        // (the held pass noted them masked by the event: the frame's own keys replace them)
+        let at = w.g.clock(w.frame) + 1;
+        for s in 0..w.players.len().clamp(1, crate::world::MAX_PLAYERS) {
+            let p = w.input[s].pressed;
+            if w.g.presses_at != at || w.g.pressed(s) != p {
+                w.g.note_input(s, at, p);
+            }
+        }
         // the task list (screen shakes) already ran in this frame's held pass (session.rs): the completed pass is
         // only the objects after the hook (13-45: a crit shake draws once in the frame s393 ends)
         let shakes = std::mem::take(&mut w.g.shakes);
@@ -3334,6 +3345,30 @@ pub fn save_world(w: &World) -> SavedWorld {
 
 /// `return_to_field` with a saved field: everything back as it was (the players included)
 pub fn restore_world(w: &mut World, s: SavedWorld) {
+    // the scene's own enemies are deleted after the saved field's grid is back: each destructor (0x0800F76E) frees
+    // its current footprint on that grid unless detached (+0x291) - wall tiles included (run 3 row 2,357,801, s483's
+    // 21-4 scene -> 21-6: three of 21-4's enemies free (43..45, 12) and (7, 25); a 21-6 enemy's back-off then steps
+    // into (7, 25), 2,361,442)
+    let frees: Vec<[i32; 4]> = w
+        .ents
+        .iter()
+        .filter(|e| !e.removed)
+        .filter_map(|e| match &e.body {
+            crate::world::Body::Enemy(en) if !en.detached => {
+                let a = &en.a;
+                Some([a.px(), a.py(), a.px() + a.foot_w, a.py() + a.foot_h])
+            }
+            _ => None,
+        })
+        .collect();
+    restore_world_inner(w, s);
+    if let Some(c) = w.col.as_mut() {
+        for m in frees {
+            c.mark_enemy(m, 1);
+        }
+    }
+}
+fn restore_world_inner(w: &mut World, s: SavedWorld) {
     w.scene.offstage.clear();
     w.scene.cam = s.cam;
     if let Some(l) = s.layers {

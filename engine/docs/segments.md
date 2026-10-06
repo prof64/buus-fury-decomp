@@ -6823,3 +6823,23 @@ from 2,350,000 is running (`work/run3/stops_b3c.jsonl`). Import stops go to A.
 agent - side-content agent: say so here if you are already on it.*
 *Janemba strike hand (A; wf-import lib.rs + a field rule in enemy.rs; uncommitted):* a type 0x36 enemy under its rising controller (+0x14 -> vt 0x0804C338) imports as our `Hand` (t = the controller tick +0x12, held while the arm's strike holds it); the body's JanembaHandStrikeA / B takes the arm's strike count; **rule:** when the arm's strike controller ends the hand leaves the list and frees its tiles that frame (tick 40, ours kept it to 57). 1,945,822 300-row cut 11 -> 300 / 300. 1,936,492's body parts already load (HEAD; 300 / 300 from 1,936,467). Gates green; check.sh: runs 1, 2 exact; run 3 now exact in logic from power-on to the known range (2,160,129), first difference the 2,024,954 beep (A, in progress); second leg first stop 2,202,504 (Super Buu, punch pair).
 *Run 3 2,024,954 (A; wf-core field.rs, field rule, uncommitted):* not the after-scripts re-check - Gotenks at 16 / 947 HP when a level-up popup opens for a fusion half: during the popup the game makes that half the current character and the HUD's beep reads its HP (1,151, full); ours read the fighter's, beeping every 61 frames (7 times to 2,025,341). The beep check now follows `Story::levelup_char` as the HUD's drawing already did. **check.sh: runs 1 and 2 exact; run 3 exact in logic and sound from power-on to its known range (2,160,129)**; after it, first stop 2,202,504 (Super Buu punch pair - Super Buu agent's). Gates green.
+**Run 3 extended through the credits (Earth agent, 2026-10-06): `030_k3_kidbuu` (115,512 frames) + `031_p3_post`
+(60,131) - run 3 now 2,712,165 rows, power-on to the post-credits title.** Recorded from `work/run3/parts/b3_end.*`
+(checked equal to the chain's replayed end: RAM and EEPROM). kb3: run 3's party XP was already 27.29M at Kid Buu, so
+`rankgrind` had nothing to do - the ending's ranking reads 27.37M -> **#1478** (runs 1 / 2: #1479 / #1477); planned
+deaths: the Pyramid after a level-up, the world-map encounter (Stolen Airship arena). kb3 replay byte-identical.
+post3 fixes for run 3's state: the 4-20 start is the west entrance (walk up through the gate first; s184's talker
+only when present - `talkif`); `optcycle` finds the Options cursor's row by probing a slider (the page keeps its row
+between visits and a DOWN can be lost) instead of counting DOWNs; 3-14's circus tank sits in the corridor north - the
+walk goes (240, 70) -> (400, 72) -> up. Packed with pack3 (staging dir swap; ends equal to the recordings'); sound
+reference re-recorded with `sounds.py --chain run3`.
+*A (by the coordinator): `tour_kais_volc25b` locked as a gate (680 frames; 119 tour gates). Interval cut-point sweeps (every 397 rows, save memory carried) running: run 3 1,076,700 .. 2,536,400 (fat, Janemba, Super Buu) and run 2 602,700 .. 1,977,800 (fat on); rule stops go to the range owners (Super Buu: Super Buu agent to 2,165,000, side-content 2,165,000 .. 2,350,000, real-route 2,350,000 .. end).*
+* **Run 3 2,202,504 (21-6, an enzyme latched on the leader lets go late): the input object's presses in a resumed
+  pass.** IfButtonMashed (0x080363C4; object: +0xC stamp, +0x10 count, +0x14 presses 8, +0x18 gap 15 - `vtscan.py`)
+  counts a press at 144,247 that ours missed: that frame's own pass was held (an event's end - `resume_held`), the
+  completed pass ran without `battle::pre_step`'s note of the frame's presses (the held pass had noted them masked).
+  The resumed pass now notes the frame's own presses first (`field::post_step`; `Globals::presses_at`). The enzyme
+  lets go at the 9th press as the game's (f116 of `wr_2202300`), the punch's ComputeDamage pair matches. Run 3 (from
+  the cut 2,181,464): 2,202,504 -> 2,362,398 (the real-route agent's range).
+  (Also seen: the import's AI rebuild re-enters LatchDrain and overwrites the imported latch offset (`wr_2202300` f74
+  - a cut-only artifact, not changed.)

@@ -239,6 +239,9 @@ pub struct Globals {
     /// the input object 0x03003300 (0x0804023C) per player slot: this frame's new presses and the press ring
     #[serde(default)]
     pub presses: [PressLog; MAX_PLAYERS],
+    /// the logic count the input object last recorded presses at (`note_input`)
+    #[serde(default)]
+    pub presses_at: i64,
     /// 0x030030BC: the next stuck mummy bandage's slot (0..7)
     #[serde(default)]
     pub wrap_slot: i32,
@@ -267,6 +270,7 @@ impl Globals {
     }
     /// record a frame's new presses (stamped `at`, the counter during that frame's update)
     pub fn note_input(&mut self, slot: usize, at: i64, pressed: u16) {
+        self.presses_at = at;
         let Some(l) = self.presses.get_mut(slot) else {
             return;
         };

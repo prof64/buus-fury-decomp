@@ -750,7 +750,6 @@ fn cond(w: &mut World, c: &C, n: u16) -> bool {
             let slot = w.en_ref(i).target as usize;
             let pressed = w.g.pressed(slot) & 0xf3 != 0;
             let Some(r) = rt(w, c, n) else { return false };
-            if std::env::var_os("TMP_MASH").is_some() { eprintln!("MASH now {now} pressed {pressed} count {} stamp {} presses {presses} gap {gap}", r.d[3], r.d[4]); }
             if pressed {
                 r.d[4] = now;
                 r.d[3] += 1;
@@ -1041,7 +1040,13 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             for _ in 0..1000 {
                 let gx = (0x60 + w.rng.rand(0x126)) << 8;
                 let gy = (0x70 + w.rng.rand(0xf0)) << 8;
-                if !en::passable(w, i, gx >> 8, gy >> 8) {
+                // field: the game's own-mark-included test (`grid_free`); battles keep the reference's
+                let free = if w.field.is_some() {
+                    en::grid_free(w, i, gx >> 8, gy >> 8)
+                } else {
+                    en::passable(w, i, gx >> 8, gy >> 8)
+                };
+                if !free {
                     continue;
                 }
                 let dx = gx - w.en_ref(i).a.x;

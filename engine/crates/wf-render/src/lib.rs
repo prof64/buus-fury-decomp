@@ -25,6 +25,23 @@ use wf_content::sprite::Sheet;
 use wf_content::Packs;
 use wf_view::{FrameSel, RenderView, SpriteEffect, GBA_H, GBA_W};
 
+/// A multiplicative hasher for the renderer's per-pixel colour caches (u64 keys; not DoS-resistant, not needed)
+#[derive(Default)]
+struct MulHasher(u64);
+impl std::hash::Hasher for MulHasher {
+    fn finish(&self) -> u64 {
+        self.0
+    }
+    fn write(&mut self, b: &[u8]) {
+        for &x in b {
+            self.0 = (self.0 ^ x as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);
+        }
+    }
+    fn write_u64(&mut self, x: u64) {
+        self.0 = (x ^ x >> 29).wrapping_mul(0x9E37_79B9_7F4A_7C15);
+    }
+}
+
 /// How the window maps to world pixels.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ViewMode {
@@ -596,16 +613,40 @@ impl Renderer {
                 self.orig_pal = Some(load_orig_palette(packs));
             }
             let orig = self.orig_pal.as_ref().unwrap();
-            let mut cache: HashMap<u64, u32> = HashMap::new();
+            // (a picture has few distinct colours: a cheap hasher and the last lookup remembered - the default
+            // SipHash map per pixel was ~30 ms of a 4K world-map frame, `examples/pacing.rs`)
+            let mut cache: HashMap<u64, u32, std::hash::BuildHasherDefault<MulHasher>> = HashMap::default();
+            let mut last = (u64::MAX, 0u32);
             // the colour's palette entry when known (top byte), else the first entry of the layer's half (OBJ
             // pixels: OBJ half, BG pixels: BG half) with that colour
+            // colours that carry their palette index resolve by the index alone when the original palette has it:
+            // a 512-entry table (0 = not looked up, 1 = by index, 2 = by colour)
+            let mut by_idx = [(0u8, 0u32); 512];
             let mut f = |e: u32, layer: u8| -> u32 {
                 let half = (layer == L_OBJ) as u32;
-                *cache.entry((half as u64) << 40 | e as u64).or_insert_with(|| {
+                if e >> 24 != 0 {
+                    let slot = &mut by_idx[(half << 8 | e >> 24) as usize];
+                    if slot.0 == 0 {
+                        *slot = match orig.get(&(0x0200_0000 | (half << 8) | (e >> 24))) {
+                            Some(&o) => (1, palette_fade(o, pf.level as u32, pf.target)),
+                            None => (2, 0),
+                        };
+                    }
+                    if slot.0 == 1 {
+                        return slot.1;
+                    }
+                }
+                let key = (half as u64) << 40 | e as u64;
+                if last.0 == key {
+                    return last.1;
+                }
+                let v = *cache.entry(key).or_insert_with(|| {
                     let by_index = (e >> 24 != 0).then(|| orig.get(&(0x0200_0000 | (half << 8) | (e >> 24)))).flatten();
                     let o = by_index.or_else(|| orig.get(&((e & 0xFF_FFFF) | (half << 24)))).or_else(|| orig.get(&((e & 0xFF_FFFF) | 0xFF00_0000))).copied();
                     palette_fade(o.unwrap_or(e & 0xFF_FFFF), pf.level as u32, pf.target)
-                })
+                });
+                last = (key, v);
+                v
             };
             for i in 0..w * h {
                 self.top[i] = f(self.top[i], self.top_l[i]);
