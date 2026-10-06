@@ -263,6 +263,8 @@ pub struct Ui {
     frame: Indexed,
     /// the stat-points mark's four 16x16 frames side by side (`ui/hud/stat_mark.png`; older content has none)
     stat_mark: Option<Indexed>,
+    /// the script markers A / B, 8x8 side by side (`ui/hud/markers.png`; older content has none)
+    markers: Option<Indexed>,
     /// the boss HP bar's 54 fill levels, 64x8 each, stacked (`ui/hud/boss_bar.png`)
     boss_bar: Option<Indexed>,
     /// the choice cursor (`ui/images/cursor.png`)
@@ -413,6 +415,7 @@ impl Ui {
         Ok(Ui {
             frame: png(packs, "ui/hud/frame.png")?,
             stat_mark: png(packs, "ui/hud/stat_mark.png").ok(),
+            markers: png(packs, "ui/hud/markers.png").ok(),
             boss_bar: png(packs, "ui/hud/boss_bar.png").ok(),
             cursor: png(packs, "ui/images/cursor.png").ok(),
             ss: png(packs, "ui/hud/gauge_ss.png")?,
@@ -454,6 +457,21 @@ impl Ui {
                 let c = *im.idx.get((k as usize * 8 + y) * im.w as usize + x)?;
                 if c != 0 {
                     out[y * 64 + x] = (im.palette.get(c as usize).copied().unwrap_or(0) & 0xFF_FFFF) | (c as u32) << 24;
+                }
+            }
+        }
+        Some(out)
+    }
+
+    /// A script marker (0 = A, 1 = B) as 8x8 ARGB (alpha 0 = transparent; OBJ palette)
+    pub fn marker(&self, k: u8) -> Option<Vec<u32>> {
+        let im = self.markers.as_ref()?;
+        let mut out = vec![0u32; 64];
+        for y in 0..8usize {
+            for x in 0..8usize {
+                let c = *im.idx.get(y * im.w as usize + k as usize * 8 + x)?;
+                if c != 0 {
+                    out[y * 8 + x] = (im.palette.get(c as usize).copied().unwrap_or(0) & 0xFF_FFFF) | (c as u32) << 24;
                 }
             }
         }

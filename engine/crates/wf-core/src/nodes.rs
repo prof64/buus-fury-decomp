@@ -667,6 +667,13 @@ fn cond(w: &mut World, c: &C, n: u16) -> bool {
             w.en_ref(i).hp1024 < thr
         }
         K::IfPlayerInFront => en::player_in_front(w, i, 48),
+        // field: the predicate 0x080379C8 (vt 0x08049E08) - the enemy's body box (0x0800FE78) overlaps the camera's
+        // rect (0x030019A4 +0x18, the logical view) - an on-screen test, not the player (run 3 row 2,676,425, 3-17:
+        // a gunman above the view keeps to its walk state, ours took the 160 px distance and went to the aim state);
+        // battles keep the reference's distance
+        K::IfPlayerInZone if w.field.is_some() && !w.cameras.is_empty() => {
+            crate::geom::overlaps(&w.en_ref(i).a.body_box(), &w.cameras[0].rect)
+        }
         K::IfPlayerInZone => en::dist2(w, i) <= 160 * 160,
         // cond 0x0804EE04 (named for the vampire lair, INFERRED before): the enemy's own footprint (0x0800FDFA) lies
         // wholly on free enemy-grid tiles (map object +0xB0, the test 0x08009324) - a bat over a wall or another

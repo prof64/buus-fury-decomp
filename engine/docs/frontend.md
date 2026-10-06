@@ -324,3 +324,67 @@ When `MapView.mode7` is set (area 0-50), the renderer draws the game's mode-1 pi
 * World map: wf-core does not fill `RenderView.world_map` yet (bg camera one frame older, exact flyer + frame, prop
   visibility from `prop_show` / `prop_hide`, the `spawn_box` mini-map rect, the story destination markers
   `spawn_marker_a/b` — the latter are not drawn at all); HBlank-IRQ scanline jitter is not modelled.
+
+## 11. Runtime quality (measured 2026-10-06)
+
+Tools: `examples/pacing.rs` (native, headless: the whole run 1 - 1,568,554 steps - through `Control` + `App` as the
+shell drives them; per frame the step, the render at a window size, the softbuffer blit, the audio engine in 512-frame
+48 kHz callbacks, heap allocations by a counting allocator; `--from`, `--render-every`, `--hash`, `--repeat-render`),
+`examples/blitbench.rs`, `web/tests/perf_check.mjs` (headless Chromium: rAF intervals, long tasks, JS heap, input
+latency). The machine was shared with other agents: render / blit are timed twice per frame (the faster kept), and
+every outlier was re-run alone - the ones that did not reproduce were scheduling stalls.
+
+**Frame pacing, native (Apple silicon, whole run 1, picture every 8th frame):**
+
+| window | step p50 / p99 / max | render p50 / p99 | blit p50 | total p99 | over 16.74 ms |
+|---|---|---|---|---|---|
+| 1920x1080 | 0.004 / 1.4 / 3.5 ms | 0.73 / 2.1 ms | 0.83 ms | 3.8 ms (max 5.7) | 0 |
+| 3840x2160 | 0.006 / 1.6 ms | 2.2 / 9.4 ms | 3.6 ms | 17.4 ms | 0.15 % (re-run alone: stalls, ~7 ms) |
+
+* The heaviest scene is the **world map** (area 0-50, mode 7): at 4K the auto zoom gives a 1920x1080 view, drawn
+  per pixel. Before: 36 - 43 ms render (+ 4 - 8 ms blit) on every world-map frame; now **14.9 ms + 1.2 ms** (1440p:
+  6.6 ms). The one place still near the budget at 4K; the next step would be a capped mode-7 view or a cheaper
+  ground / blend loop.
+* Step spikes: the rewind timeline's capture every 30 frames (`Timeline::on_frame`): 0.5 ms snapshot (625 KB,
+  ~3,250 allocations) + 0.9 ms LZ; the autosave (every 30 s of play) serializes the whole recording: 2.2 ms for
+  1.57 M frames; area loads up to ~30,000 allocations in one step (max step on a quiet machine 3.5 ms).
+* Allocations: ~146 per step and 18 per render on average (27 KB / frame); none in the audio callback.
+
+**Fixed:**
+* `blit_scaled` (native present): each source row widened once, the other rows copied - 1080p 1.0 -> 0.84 ms, 4K x6
+  4.2 -> 1.15 ms, 4K x13 (classic view) 4.0 -> 0.47 ms (`blitbench`); unit test against the old per-pixel form.
+* The palette fade (`Renderer::render`; world map, area fades): a SipHash `HashMap` lookup for two layers of every
+  pixel; now a 512-entry table for colours that carry their palette index, a multiplicative hasher and a last-colour
+  memo for the rest - 36 -> 15 ms for a 4K world-map frame. The picture hash over 3,000 world-map frames is unchanged.
+* The mode-7 ground loop walks its samples incrementally modulo the world (no `rem_euclid` per pixel; the same
+  samples - the old form kept for rows that would overflow i32).
+* Native shell: the loop wakes every 4 ms but the sim steps every 16.7 ms - three of four wake-ups rendered and
+  blitted the same picture again. A wake-up with no step, no input / window event, the same size, not paused and no
+  menu open now presents nothing. `--mute`: the driver's sink buffer is kept, not allocated every frame.
+* Web: `wf_app_frame` renders only when a step ran or the size / view mode / sim frame / inputs changed (bit 30 of
+  its result: a picture was made; `putImageData` only then) - every other call on a 120 Hz display; the canvas CSS
+  size is written only when it changes; the AudioWorklet keeps one `Float32Array` view on the render buffer (no
+  garbage per 128-frame quantum on the audio thread); the `wfAudioLog` test hook keeps its last 20,000 events (it
+  grew for the whole session).
+
+**Web (headless Chromium, rAF at 120 Hz):** story 8-1 and a battle at 960x640 and 3840x2160: no long tasks, JS heap
+flat over 20 s (103 / 109 MB, mostly wasm memory), rAF p99 10.4 ms; at 4K a few 2-vsync frames (render 4.2 ms p50,
+5.0 max). A display at exactly 60 Hz shows one repeated frame every ~3.7 s (the sim's fixed 59.7275 Hz step against
+the display; native the same): inherent to the exact GBA rate, not a hitch.
+
+**Audio:** the driver runs on the audio thread, pulled by the device (cpal callback / AudioWorklet); the sim only
+sends commands (`AudioEvent`s), applied at the next driver update. One 512-frame callback costs 0.005 ms mean,
+0.05 ms max on a quiet machine (a 10.67 ms buffer: < 1 %), with no allocations - no underrun risk from the engine.
+A/V drift: none accumulates - the driver's update rate is the device clock's (MIX_RATE / GBA_FPS samples per
+update, consumed at the device rate) and commands are not queued against frame numbers, so a device clock off by
+e.g. 50 ppm moves music against the game by 50 ppm of continuous play (0.18 s an hour) and sound effects not at all
+(each starts at the next update after its frame: <= 16.7 ms + the device buffer). Pauses / hidden tabs stop the sim
+but not the music (as designed); a host stall longer than 4 steps (`Pacing::max_steps`) drops sim time while the
+music goes on.
+
+**Input latency (key event -> the sim step that reads it):** web, measured (`perf_check.mjs`, keydown at a random
+moment): p50 10 - 13 ms, max 25 ms, 1 - 2 display frames at 120 Hz. Native, from the loop: the key state is set in
+the window event; the next wake-up (<= 4 ms) steps once the accumulator holds a frame - 0 .. 16.7 ms, mean ~8.4 ms,
+max ~21 ms; the picture with its result is presented in the same wake-up (no vsync wait) and shows at the display's
+next refresh. Taps shorter than a frame are latched (3.). The native idle-present change was checked headless only
+(the window loop has no headless mode); the browser / save / feature / netplay / wide-view product checks pass.

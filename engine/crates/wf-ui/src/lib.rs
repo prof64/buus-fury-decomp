@@ -111,6 +111,16 @@ pub fn extract(rom: &Rom, out: &mut Content) -> wf_rom::Result<()> {
         }
     }
     out.put("ui/hud/stat_mark.png", sm.png(&pal, true));
+    // the script markers (`0x9E` / `0x9F`, object 0x08050690, draw 0x080217AC): defs 0x08055000 / 0x0805500C (s8 origin
+    // x / y, w, h, the OAM word, the 8x8 8bpp picture at +8); screen positions; side by side (A, B)
+    let mut mk = Surface::new(16, 8);
+    for (k, def) in [0x0805_5000u32, 0x0805_500C].into_iter().enumerate() {
+        let g = u32::from_le_bytes(rom.bytes(def + 8, 4).try_into().unwrap());
+        for (o, &c) in rom.bytes(g, 64).iter().enumerate() {
+            mk.set((k as u32 * 8 + o as u32 % 8) as i32, (o as u32 / 8) as i32, c);
+        }
+    }
+    out.put("ui/hud/markers.png", mk.png(&pal, true));
     // the boss HP bar (draw 0x08019658): base 0x200 bytes at 0x087196E4 (8 tiles 8x8 8bpp: two 32x8 OBJs); fill f
     // clears steps f..53 to colour 1 (4 byte offsets each at 0x087198E4 + 16 step); row f of the sheet = fill f
     let base = rom.bytes(0x0871_96E4, 0x200).to_vec();

@@ -68,6 +68,9 @@ pub struct RenderView {
     /// centred at (x, y) (object `0x0802BECC`: a 32-px-high surface, the title font outlined, OBJs at (x - w / 2,
     /// y - 16)).
     pub title: Vec<TitleView>,
+    /// A script's markers (`0x9E` / `0x9F`, object 0x08050690): 8x8 OBJs at screen (x, y) (origin applied), priority
+    /// 0; kind 0 = A (def 0x08055000), 1 = B (0x0805500C: the world map's destination star)
+    pub markers: Vec<(u8, i32, i32)>,
     /// Screen brightness fade: 0 = normal, 16 = black (GBA BLDY semantics, applied after composition).
     pub fade_black: u8,
     /// The dialogue box, if one is open (drawn above everything, like the game's priority-0 OBJs).

@@ -471,6 +471,12 @@ impl Renderer {
                     }
                 }
             }
+            // a script's markers: 8x8 OBJs at screen positions, priority 0 (GBA picture coordinates)
+            for &(k, mx, my) in &view.markers {
+                if let Some(px) = u.marker(k) {
+                    screen.push((0, ox + mx, oy + my, 8, 8, px));
+                }
+            }
             // boss HP bars: OAM x 160 (two 32x8 OBJs), priority 1; anchored to the view's top-right corner
             for bb in &view.boss_bars {
                 if let Some(px) = u.boss_bar(bb.fill) {

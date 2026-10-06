@@ -470,6 +470,17 @@ pub fn render_view(w: &World, out: &mut RenderView) {
         out.world_map = Some(wm);
     }
     // the BG sphere effect (its tiles are drawn in the update, before the objects)
+    // the script markers: screen positions less the def's origin ((1, 1) / (3, 3))
+    out.markers = w
+        .scene
+        .visuals
+        .iter()
+        .filter_map(|v| match v.kind {
+            crate::scene::VisualKind::MarkerA => Some((0u8, v.x - 1, v.y - 1)),
+            crate::scene::VisualKind::MarkerB => Some((1u8, v.x - 3, v.y - 3)),
+            _ => None,
+        })
+        .collect();
     out.sphere = w.scene.visuals.iter().find(|v| v.kind == crate::scene::VisualKind::EnergySphere).map(|v| wf_view::SphereView {
         x: v.x,
         y: v.y,
@@ -1031,6 +1042,7 @@ pub struct Presenter {
         Option<i32>,
         Vec<wf_view::TitleView>,
         Vec<wf_view::DamageNumberView>,
+        Vec<(u8, i32, i32)>,
     )>,
     prev_mode7: Option<wf_view::Mode7View>,
     prev_shake: Option<(i32, i32)>,
@@ -1052,6 +1064,7 @@ impl Presenter {
             v.timer,
             v.title,
             v.damage_numbers,
+            v.markers,
         ));
     }
     /// the session started mid-area (harnesses): nothing of the previous build to show
@@ -1059,9 +1072,10 @@ impl Presenter {
         *self = Presenter::default();
     }
     pub fn apply(&self, out: &mut RenderView) {
-        if let Some((sprites, hud, banner, dialog, anim, boss_bars, timer, title, nums)) = &self.prev {
+        if let Some((sprites, hud, banner, dialog, anim, boss_bars, timer, title, nums, marks)) = &self.prev {
             // (an OBJ: a frame late)
             out.title = title.clone();
+            out.markers = marks.clone();
             // (damage numbers too: dr4_009 15-9 f316, made at f315)
             out.damage_numbers = nums.clone();
             // (and their shake offset: the frame before's - sc_janemba f5130, the active shake's (-4, 1) against

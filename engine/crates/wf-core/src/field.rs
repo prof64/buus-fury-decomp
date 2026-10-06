@@ -1074,9 +1074,16 @@ pub fn load_area_with(
         w.scene.hud_vel = 0;
     }
     // the BG sphere effect is an object of the old area too (segment sb 20-8 -> 20-9: its redraws stop)
-    w.scene
-        .visuals
-        .retain(|v| v.kind != crate::scene::VisualKind::EnergySphere);
+    // (and so are a script's markers, `0x9E` / `0x9F`: rclose_002 4-1 f1,820, the destination star goes with the
+    // landing)
+    w.scene.visuals.retain(|v| {
+        !matches!(
+            v.kind,
+            crate::scene::VisualKind::EnergySphere
+                | crate::scene::VisualKind::MarkerA
+                | crate::scene::VisualKind::MarkerB
+        )
+    });
     crate::vram::release(w, crate::vram::Owner::Ending);
     crate::vram::release(w, crate::vram::Owner::BossBar);
     w.scene.boss_bar = None;
