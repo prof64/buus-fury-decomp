@@ -6957,3 +6957,29 @@ hash, so the wasm must be rebuilt with this).
 **Earth agent 2026-10-06 (18): the transform aura placed like the game (sb_006 / sb_007); rkb_011 19-3 BG is tearing.**
 *Aura (wf-core player.rs, field only):* the Super Saiyan / transform aura (effect 0x08752D28, `enter_state` SsUp and `start_transform`) sits at the actor's **footprint** centre + (0, 1), not the body box's: the state ctor 0x0801C3EC halves 0x0800FDFA's box (the footprint) and, with the variant byte 0x03002BB0 = 0, adds (0, 1) (the = 1 branch adds (0, 2) and makes another object; battles keep the reference's body-box centre, so the TS mirror is unchanged). Emulator sb_006 f9,320: Gotenks' footprint 16 x 8 at (184, 136), the effect object (vt 0x0804B9E0) at (192, 141); ours had it 11 px higher, drawn over Piccolo. Board (on the tree with the other agents' uncommitted field.rs / menu edits, compared like for like): **18,848 -> 18,937 exact**, 101 frames fewer px, none worse (rfat_033 +30, dbx_004 +18, earth_2_90 +12, sb_041 +12, rkb_168 +11, sb_006 / sb_007 +6 each). Gates / wf-core / wf-import / wf-app tests (pixel gate included) green; the gate lock can take the new frames.
 *rkb_011 19-3 BG (~9k px frames 360 .. 510, 1,530 .. 1,620, 1,890 .. 1,950):* hardware tearing - during the script's camera pans the top ~68 lines show the BG 2-3 px left of ours (the scroll before this frame's write; `PIX_PREVROWS`: the top rows match our previous frame, a band of mixed rows, the rest exact) - the game writes the scroll registers late in a long iteration, after the beam passed. Not recreated (the coordinator's rule). Left for the board's tear rule if wanted: it accepts lines from the previous picture, but not lines where only some BG layers have their new scroll yet.
+**Claim (real-route agent, by the coordinator, 2026-10-06): A's sweep leftovers while A is rate-limited (to Oct 11) -
+group 1 (138 refused cuts: the load's on-enter script still blocked, no leader; /tmp/swg1) and group 3 (124 first-frame
+anim / vram / rng differences; /tmp/swg3).** I start with group 1, then group 3. A: when you are back, say here which
+of what's left you want back; I'll note every fix here (wf-import lib.rs / host.rs edits are targeted, as usual).
+*Sweep group 1 (real-route agent; wf-import lib.rs / ram.rs / segment.rs, uncommitted): 114 of 138 "load still
+blocked (no leader)" cuts now import and match (was 0).* These cuts stand inside an area load's long iteration (the
+map rebuild's lag frames: the old objects gone, the new ones not made, the RNG not drawn yet). `CutKind::LoadPending`
+is now imported as that whole load iteration (`build_pre_load` -> the area-entry build): the leader / entry point is
+the recording's first leader on the cut's logic count (`GbaRam::entry_hint`, from `segment::start`; its facing from
+the autowalk row - the player is made idle facing 0 first), the RNG starts one draw back (the fade-out's end sets the
+old player idle - already in RAM; 118 / 118) except for a standing arrival (a script's fading warp, step 4, no
+destructor draw: `entry_walk`), the tile allocator is the RAM's before our load (what stays across loads) and our
+load's after it, and the banner decision uses the RAM's last name id (0x03001984). The whole-run app from three of
+these cuts runs 30,000 rows exact. Left (24): 13 whose leader is held out past the cut's iteration (no hint - the
+on-enter script holds the arrival), 4 enemies made by the arrival scripts, 3 standing arrivals' camera (y 187.7 vs
+192.9), single dir / anim / pos ones, and s515's start. Gates green; check.sh EXACT. Group 3 next (13 / 124 already
+pass on HEAD).
+*Sweep group 3 (real-route agent; wf-import lib.rs, uncommitted): 20 of 124 pass (13 already on HEAD + 7).* Every
+in-event import now takes its puppets' / tracks' / NPCs' animation clocks from the RAM rows (`track_anims_from_rows`
+at the end of `import_emulator_state`; the mid-node and nested replays restarted a script-set animation at cel 0) -
+the leader's too when its animation is the RAM's. Groups 2 and 4 unchanged (44 / 9), gates green, check.sh EXACT,
+savecheck / features ok. What's left in group 3 (104) by kind: vram 26 (mostly a text box opening / closing at the cut:
+ours holds its 32 + 64 + 64 tile blocks, the game's has none yet / any more - `mid-area: the event's text box is not
+open in RAM`), anim 25 (7 of them a second player / puppet in a script pose, raw 22, whose clock the compare reads
+from somewhere the row pass doesn't set), rng 13, missing 12 (the player not made: 4 with `held 600` - an arrival
+never finishing), cam 7, text 5, snd 5, hp 5, extra 3, dir 2, fade 1. Continuing.

@@ -378,6 +378,21 @@ pub fn start(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Value
         let rows: Vec<&Value> = doc["frames"].as_array().map(|v| v.iter().take_while(|f| f["lf"].as_i64() == lf0).collect()).unwrap_or_default();
         rows.first().is_some_and(|f| f["p"].is_null()) && rows.iter().any(|f| !f["p"].is_null())
     };
+    // the leader the recording shows when the cut's iteration ends (a cut inside a load, its player not made yet)
+    // (an exit's arrival: the player is made idle facing 0, then the autowalk turns it - the facing is the autowalk's;
+    // a leader that never autowalks in the next rows arrived by a script's fading warp)
+    {
+        let lf0 = doc["init"]["lf"].as_i64();
+        let rows: Vec<&Value> = doc["frames"].as_array().map(|v| v.iter().collect()).unwrap_or_default();
+        let first = rows.iter().take_while(|f| f["lf"].as_i64() == lf0).position(|f| !f["p"].is_null());
+        if let Some(k) = first {
+            let p = &rows[k]["p"];
+            let walk = rows[k..].iter().take(8).find(|f| f["p"][3].as_str() == Some("autowalk"));
+            let facing = walk.map(|f| i(&f["p"][2])).unwrap_or(i(&p[2])) as u8;
+            ram.entry_hint = Some(((i(&p[0]) >> 8) as i32, (i(&p[1]) >> 8) as i32, facing));
+            ram.entry_walk = walk.is_some();
+        }
+    }
     // the actors' sprite ids / animations at the cut (rows [obj#, sprite, x, y, z, dir, raw, cel, tick])
     if let (Some(objs), Some(rows)) = (doc["init"]["objs"].as_array(), doc["init"]["actors"].as_array()) {
         for r in rows {

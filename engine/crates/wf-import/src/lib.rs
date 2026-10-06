@@ -337,6 +337,23 @@ struct Built {
 
 /// one build of the area-entry frame from the load's starting RNG `rng0`
 fn build_area_entry(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner: &mut StoryHost, rng0: [u32; 2], frame0: u32, held_max: u32, notes: &mut Vec<String>) -> Built {
+    build_entry(data, ram, info, runner, rng0, frame0, held_max, false, notes)
+}
+
+/// a cut inside an area load's long iteration (the map rebuild's lag frames, the leader not linked yet - `LoadPending`):
+/// the game is mid-function there; the world the app stands in is the previous frame's end, the fade-out one step
+/// before its last, so the app's next step plays the load iteration (its draws, objects, scripts) itself. The entry
+/// point is the new area's player object (made by the load, not yet the leader)
+fn build_pre_load(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner: &mut StoryHost, rng0: [u32; 2], notes: &mut Vec<String>) -> Built {
+    let mut info = info.clone();
+    if info.leader.is_none() {
+        info.leader = ram.objects().into_iter().find(|&o| ram.r32(o) == VT_PLAYER).map(|p| (ram.s32(p + 0x1A0) >> 8, ram.s32(p + 0x1A4) >> 8, ram.r8(p + 0x10))).or(ram.entry_hint);
+    }
+    build_entry(data, ram, &info, runner, rng0, info.lf, 600, false, notes)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn build_entry(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner: &mut StoryHost, rng0: [u32; 2], frame0: u32, held_max: u32, pre_load: bool, notes: &mut Vec<String>) -> Built {
     let story = import_story(data, ram);
     let (x, y, facing) = info.leader.unwrap_or((120, 120, 0));
     let to = info.area;
@@ -354,7 +371,9 @@ fn build_area_entry(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner: 
         f.patrols.clear();
         f.deferred.clear();
         f.loads = 0;
-        f.mode = Mode::FadeOut { k: field::FADE - 1, to, x, y, facing: Some(facing), step: 0 };
+        // (a cut inside a load whose leader stands at its arrival: a script's fading warp, by 4)
+        let step = if info.kind == CutKind::LoadPending && !ram.entry_walk { 4 } else { 0 };
+        f.mode = Mode::FadeOut { k: field::fade_len(step) - 1, to, x, y, facing: Some(facing), step };
     }
     field::attach_host(&mut w, true);
     patch_leader(&mut w, ram, notes);
@@ -372,8 +391,25 @@ fn build_area_entry(data: &Arc<GameData>, ram: &GbaRam, info: &CutInfo, runner: 
     let name = data.field.as_ref().and_then(|fd| fd.area(to.world, to.area)).map(|a| a.name_id).unwrap_or(0);
     w.scene.banner = None;
     w.scene.banner_last = if banner_obj { -1 } else { name };
+    // (a cut inside the load: its banner is not made yet - the last name id shown is still the RAM's, and our load
+    // decides as the game's will)
+    if info.kind == CutKind::LoadPending {
+        w.scene.banner_last = ram.s32(0x0300_1984) as i64;
+    }
     w.rng = Rng::new(rng0[0], rng0[1]);
     w.events.clear();
+    if pre_load {
+        if let Some(f) = w.field.as_mut() {
+            f.mode = Mode::FadeOut { k: field::FADE - 2, to, x, y, facing: Some(facing), step: 0 };
+        }
+        w.frame = frame0.wrapping_sub(1);
+        return Built { world: w, draws: 0, held: 0, finished: true };
+    }
+    // (a cut inside the load: the tile allocator as the load found it - the old area's objects already gone, what
+    // stays across loads still there - before our load allocates the new area's)
+    if info.kind == CutKind::LoadPending {
+        import_vram(&mut w, ram);
+    }
     let calls0 = w.rng.calls;
     // the load frame's end: the fade-out's last step loads the area (step_post), then its scripts
     let mut sess = Session { data: data.clone(), world: w, config: Default::default(), prev: [0; wf_core::world::MAX_PLAYERS], outcome: wf_core::battle::Outcome::Running, hook: None, presenter: Default::default() };
@@ -4627,7 +4663,11 @@ pub fn import_emulator_state(data: &Arc<GameData>, ram: &GbaRam, runner: &mut St
     }
     // an area entry inside a running event (a script's warp): the event's position from the scene objects
     // (no leader: a cutscene map the event loaded with the players offstage)
-    let in_event = if info.kind != CutKind::MidArea {
+    // (a pending load whose recording shows no leader in the cut's iteration and whose on-enter script stands in a
+    // node: the script holds the arrival across iterations - the in-event import, like a cutscene map's)
+    let in_event = if info.kind == CutKind::LoadPending && ram.entry_hint.is_none() {
+        running_event_live(ram, runner)
+    } else if info.kind != CutKind::MidArea {
         None
     } else if info.depth > 0 {
         running_event(ram, runner)
@@ -4641,7 +4681,8 @@ pub fn import_emulator_state(data: &Arc<GameData>, ram: &GbaRam, runner: &mut St
         CutKind::MidArea if in_event.is_some() => {}
         // (any frame with nothing running: the mid-area import)
         CutKind::MidArea if info.depth == 0 && info.leader.is_some() => {}
-        CutKind::LoadPending => return Err(ImportError::Unsupported(format!("area {:?}: the load's on-enter script is still blocked (no leader); cut at the frame the leader appears", info.area))),
+        // (inside the load's long iteration: imported as the frame before it, `build_pre_load`)
+        CutKind::LoadPending => {}
         CutKind::MidArea => return Err(ImportError::Unsupported(format!("area {:?}: mid-area (mode {:#x} brightness {}, depth {}); only area-entry cuts are importable so far", info.area, info.mode.0, info.mode.1, info.depth))),
     }
     let target = ram.rng();
@@ -4657,8 +4698,18 @@ pub fn import_emulator_state(data: &Arc<GameData>, ram: &GbaRam, runner: &mut St
         let b = match in_event {
             Some(ev) => build_event_entry(data, ram, &info, runner, ev, guess, frame0, &mut n),
             None if info.kind == CutKind::MidArea => build_mid(data, ram, &info, runner, guess, frame0, &mut n),
+            // (the iteration's first draw - the fade-out's end setting the old player idle, rand(255), before the
+            // map rebuild - is in the RAM's generator already: 118 / 118 sweep cuts)
+            None if info.kind == CutKind::LoadPending => build_pre_load(data, ram, &info, runner, rewind(target, ram.entry_walk as u32), &mut n),
             None => build_area_entry(data, ram, &info, runner, guess, frame0, 600, &mut n),
         };
+        // (a cut inside the load's iteration: the RAM's generator is the load's start - the game has not drawn yet;
+        // the build plays the whole iteration from it)
+        if info.kind == CutKind::LoadPending {
+            notes = n;
+            last = Some(b);
+            break;
+        }
         let ok = b.world.rng.state() == target;
         let next = rewind(target, b.draws);
         notes = n;
@@ -4679,7 +4730,7 @@ pub fn import_emulator_state(data: &Arc<GameData>, ram: &GbaRam, runner: &mut St
         return Err(ImportError::Unsupported(n.trim_start_matches("unsupported: ").to_string()));
     }
     let mut b = b;
-    if b.world.rng.state() != target {
+    if b.world.rng.state() != target && info.kind != CutKind::LoadPending {
         // a mid-area build draws only for itself (the area load's spawns, the AI's enters - the game drew nothing at
         // the cut) and how many depends on the seed (rejection loops: WanderToRandomPoint's goal, spawn spots), so
         // the guesses may not converge: the generator is the RAM's (real run 20-6 r062_001 tiles, inside Buu)
@@ -4720,14 +4771,36 @@ pub fn import_emulator_state(data: &Arc<GameData>, ram: &GbaRam, runner: &mut St
     if !b.finished {
         notes.push("the load's scripts are still running at the cut (host state carries over)".into());
     }
-    check(&mut world, ram, &mut notes);
-    import_vram(&mut world, ram);
+    // (a cut inside the load: the RAM is mid-rebuild - the world, its tile allocator included, is our load's)
+    if info.kind != CutKind::LoadPending {
+        check(&mut world, ram, &mut notes);
+        import_vram(&mut world, ram);
+    }
     if let Some(ev) = in_event {
         let mut evs = vec![ev.0];
         if let Some((o, _)) = outer_event(ram, runner, ev) {
             evs.push(o.0);
         }
         import_saved_field(data, ram, runner, &evs, &mut world, &mut notes);
+        // (every in-event build: its puppets' / tracks' animation clocks as the RAM rows show them - the mid-node and
+        // nested replays restart a script-set animation at cel 0; sweep cuts run 2 1,372,651 / run 3 2,022,320 ..)
+        if std::env::var("NO_EV_ANIMS").is_err() {
+            track_anims_from_rows(&mut world, ram);
+            // (the leader too, when its animation is the RAM's: a script-set pose replayed from cel 0 - run 2 cut
+            // 1,372,651, raw 22 at cel 4 tick 264 in RAM)
+            if let (Some(pi), Some(&(_, _, raw, cel, tick))) = (world.player_idx(0), ram.actor_rows.iter().find(|r| r.0 == ram.player())) {
+                if let Body::Player(p) = &mut world.ents[pi].body {
+                    if p.ap.raw == raw {
+                        (p.ap.frame, p.ap.tick) = (cel, tick);
+                    }
+                }
+                if let Some(pp) = world.scene.puppets.iter_mut().find(|p| Some(p.id) == world.players.first().copied()) {
+                    if pp.anim.raw == raw {
+                        (pp.anim.frame, pp.anim.tick) = (cel, tick);
+                    }
+                }
+            }
+        }
     }
     import_boss_bar(&mut world, ram);
     import_tile_anims(&mut world, ram);

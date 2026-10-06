@@ -81,6 +81,11 @@ pub struct GbaRam {
     /// the cut stands inside a load iteration whose leader is made later in that same iteration (the recording's rows
     /// show no player, then one, all on the cut's logic count): the load's frozen lag frames, no state the app stands in
     pub load_frozen: bool,
+    /// a cut inside an area load's iteration before its player object exists (`CutKind::LoadPending`): the leader the
+    /// recording shows at the iteration's end (x, y px, facing) - the load's entry point is in no work-RAM word yet
+    pub entry_hint: Option<(i32, i32, u8)>,
+    /// the hint's leader walks in (an exit's arrival; else it stands - a script's fading warp)
+    pub entry_walk: bool,
     /// the recording's actor rows at the cut (object pointer, sprite id, raw animation, cel, tick): sprite ids and
     /// animation indices need the ROM's sprite-def tables, which a work-RAM snapshot does not have (mid-area imports)
     pub actor_rows: Vec<(u32, i32, i32, i32, i32)>,
@@ -88,7 +93,7 @@ pub struct GbaRam {
 
 impl GbaRam {
     pub fn new(iwram: Vec<u8>, ewram: Vec<u8>) -> GbaRam {
-        let mut r = GbaRam { iwram, ewram, screen_black: None, mid_iteration: false, load_frozen: false, actor_rows: vec![] };
+        let mut r = GbaRam { iwram, ewram, screen_black: None, mid_iteration: false, load_frozen: false, entry_hint: None, entry_walk: true, actor_rows: vec![] };
         r.iwram.resize(IWRAM_SIZE, 0);
         r.ewram.resize(EWRAM_SIZE, 0);
         r
