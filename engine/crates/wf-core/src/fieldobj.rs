@@ -315,7 +315,8 @@ pub fn breakable_message(w: &mut World, k: usize, msg: &mut HitMsg) -> bool {
     b.last_dir = msg.dir;
     b.hp -= 1;
     let (cx, cy) = ((b.bx[0] + b.bx[2]) >> 1, (b.bx[1] + b.bx[3]) >> 1);
-    spawn_debris(w.field.as_mut(), cx, cy);
+    let stamp = w.next_id;
+    spawn_debris(w.field.as_mut(), cx, cy, stamp);
     for _ in 0..4 {
         crate::vram::keyed_acquire(w, crate::vram::KEY_DEBRIS, 0x40);
     }
@@ -860,10 +861,14 @@ pub struct Debris {
     pub vx: i32,
     pub vy: i32,
     pub t: i32,
+    /// its place in the world list: the entity id the next object got when it was made (newer than every entity
+    /// below it); 0 = unknown (imported: the pass's end)
+    #[serde(default)]
+    pub stamp: u32,
 }
 
 /// `0x0800C912`: 4 chips from the box centre - 4 px, velocities (96, 0) (-96, 0) (0, 64) (0, -64) (24.8), no RNG
-fn spawn_debris(f: Option<&mut Box<crate::field::Field>>, cx: i32, cy: i32) {
+fn spawn_debris(f: Option<&mut Box<crate::field::Field>>, cx: i32, cy: i32, stamp: u32) {
     let Some(f) = f else { return };
     for (vx, vy) in [(96, 0), (-96, 0), (0, 64), (0, -64)] {
         f.debris.push(Debris {
@@ -872,7 +877,29 @@ fn spawn_debris(f: Option<&mut Box<crate::field::Field>>, cx: i32, cy: i32) {
             vx,
             vy,
             t: 0,
+            stamp,
         });
+    }
+}
+
+/// the chips on their last update end at their place in the object pass (last to first): before the update of the
+/// first entity older than them (`id` below their stamp; 0 = at the pass's end) - their graphic reference goes
+/// before an older object's allocation (tour_castle_ship_21 f190: the debris graphic freed, then the picked-up item,
+/// then its icon allocated) and after a newer one's (tour_desert_d f3188: a later puff deleted first)
+pub fn debris_end_before(w: &mut World, id: u32) {
+    if w.field
+        .as_ref()
+        .is_some_and(|f| f.busy && f.busy_pre_pass == w.frame && f.busy_since + 1 == w.frame)
+    {
+        return;
+    }
+    let steps = 1 + w.field.as_ref().is_some_and(|f| f.break_owed == w.frame) as i32;
+    let Some(f) = w.field.as_mut() else { return };
+    let ends = |d: &Debris| d.t + steps >= 33 && (id == 0 || d.stamp > id);
+    let gone = f.debris.iter().filter(|d| ends(d)).count();
+    f.debris.retain(|d| !ends(d));
+    for _ in 0..gone {
+        crate::vram::keyed_release(w, crate::vram::KEY_DEBRIS);
     }
 }
 

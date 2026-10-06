@@ -198,6 +198,9 @@ impl Fx {
     }
 }
 
+/// a bomb chip's `t` once its update has deleted it and released its graphic reference
+pub const DEBRIS_RELEASED: i32 = i32::MAX;
+
 pub fn add(w: &mut World, f: Fx) -> EntityId {
     // the generic animated effect object (`0x0802A81C`, vtable 0x0804CF3C) holds 0x400 of object tiles
     let tiles = matches!(f, Fx::Anim { .. } | Fx::Loop { .. });
@@ -545,7 +548,12 @@ fn update_one(w: &mut World, i: usize) {
                 *y += *vy;
                 *t += 1;
                 if *t >= 32 {
+                    // the chip object is deleted in its update: its reference of the shared graphic goes now, before
+                    // the older objects' updates allocate (tour_earth_circus f1381: a rifle trail's puff after a
+                    // bomb's four chips end); `DEBRIS_RELEASED` keeps the reap from releasing it again
+                    *t = DEBRIS_RELEASED;
                     w.ents[i].removed = true;
+                    crate::vram::keyed_release(w, crate::vram::KEY_DEBRIS);
                 }
             }
         }

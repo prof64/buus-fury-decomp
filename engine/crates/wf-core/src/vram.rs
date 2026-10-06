@@ -755,9 +755,14 @@ pub fn entity_gone(w: &mut World, i: usize) {
         return;
     }
     // a bomb's chip holds a reference of the shared debris graphic only (shots.rs `bomb_update`)
-    if matches!(&w.ents[i].body, Body::Fx(f) if matches!(**f, crate::fx::Fx::Debris { .. })) {
-        keyed_release(w, KEY_DEBRIS);
-        return;
+    if let Body::Fx(f) = &w.ents[i].body {
+        if let crate::fx::Fx::Debris { t, .. } = **f {
+            // (a chip its own update deleted has released already: fx.rs)
+            if t != crate::fx::DEBRIS_RELEASED {
+                keyed_release(w, KEY_DEBRIS);
+            }
+            return;
+        }
     }
     // an animated effect's block goes in the update that ends it (`0x0802A8AA` -> `0x08011944`: the object is
     // deleted at once); other effect kinds keep one more frame (not measured apart)

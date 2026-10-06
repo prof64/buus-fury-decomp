@@ -936,6 +936,31 @@ impl World {
     /// into the next index): story playthrough, the player's punch that destroys a fighter loaded before it ticks
     /// its animation twice in that frame.
     fn step_entities_list(&mut self) {
+        self.step_entities_list_pre();
+        self.step_entities_list_rest(None);
+    }
+
+    /// the rest of an object pass a cut interrupted (the game's update loop stood at entity `id`'s list place, its
+    /// update not done: the objects from it down to the list's first are updated, as in the game's iteration the cut stands
+    /// in - wf-import `finish_interrupted_pass`)
+    pub fn finish_pass_from(&mut self, id: EntityId) {
+        self.step_entities_list_rest(Some((id, true)));
+    }
+
+    /// [`finish_pass_from`] without `id`'s own update (the caller ran it)
+    pub fn finish_pass_after(&mut self, id: EntityId) {
+        self.step_entities_list_rest(Some((id, false)));
+    }
+
+    /// one entity's update, as the pass gives it (wf-import: the object a cut interrupted)
+    pub fn update_one(&mut self, id: EntityId) {
+        if let Some(i) = self.find(id) {
+            self.update_entity(i);
+            crate::scene::track_after_update(self, id);
+        }
+    }
+
+    fn step_entities_list_pre(&mut self) {
         // the death script's loop (KO + 199) begins before the object pass: no object is updated in that frame but the
         // player's own (the modal), every actor gets message 0xF first (run 2 row 1,909,571, 19-3: a Kid Buu copy's
         // beam, newer in the list than the player, hit the KO'd player once more in ours; the game's frame has only
@@ -945,6 +970,9 @@ impl World {
         if self.scene.dest_label.is_some() {
             crate::field::dest_menu(self);
         }
+    }
+
+    fn step_entities_list_rest(&mut self, from: Option<(EntityId, bool)>) {
         // the list as the game holds it: our live entities, and in their places the list objects that are no entities
         // (`vram::list_marks`, None here: nothing to update) - an update that destroys objects before it shifts the
         // next update onto whatever object moved into its index, which may be the HUD or the stat-points mark (run 2
@@ -976,7 +1004,13 @@ impl World {
             out
         };
         let start = live(self).len();
-        let mut c = start as i64 - 1;
+        let mut c = match from {
+            Some((id, own)) => match live(self).iter().position(|e| e.is_some_and(|k| self.ents[k].id == id)) {
+                Some(p) => p as i64 - if own { 0 } else { 1 },
+                None => return,
+            },
+            None => start as i64 - 1,
+        };
         // an item-get that starts in this pass (a map item / dropped item picked up with A in the player's update)
         // runs the presentation's loop from there: the objects after it are not updated this frame (4-30's capsule:
         // the scientist's idle tick stops for that frame)
@@ -1001,6 +1035,7 @@ impl World {
                     // the 860 differing cel frames of the airships in rkb_168, sb_041, rkb_001)
                     && !(matches!(self.ents[i].body, Body::Enemy(_)) && crate::fieldworld::flying(self));
             crate::vram::popups_tick(self, Some(self.ents[i].id));
+            crate::fieldobj::debris_end_before(self, self.ents[i].id);
             let talk_before = self.field.as_ref().is_some_and(|f| f.talk_pass.is_some());
             if !skip {
                 let id = self.ents[i].id;
@@ -1045,13 +1080,16 @@ impl World {
             }
         }
         // the HUD (an early object of the area's list: updated after the actors)
-        crate::field::hud_tick(self);
-        // the task list (screen shakes) runs after the objects; field: with the camera after the frame's scripts and
-        // commands (session.rs `step_post`)
-        if self.field.is_none() {
-            self.tick_shakes();
-        } else {
-            self.g.shake_due = self.frame;
+        // (a cut's interrupted pass: the HUD is a later list object here, its update was done - `finish_pass_from`)
+        if from.is_none() {
+            crate::field::hud_tick(self);
+            // the task list (screen shakes) runs after the objects; field: with the camera after the frame's scripts
+            // and commands (session.rs `step_post`)
+            if self.field.is_none() {
+                self.tick_shakes();
+            } else {
+                self.g.shake_due = self.frame;
+            }
         }
         crate::vram::reap(self);
         self.ents.retain(|e| !e.removed);

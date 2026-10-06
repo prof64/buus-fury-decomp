@@ -1423,6 +1423,7 @@ fn patch_enemy(w: &mut World, ei: usize, ram: &GbaRam, o: u32, row: Option<(i32,
     if e.detached {
         e.marked = None;
     }
+
     if let Some((sprite, raw, cel, tick)) = row {
         // (the sprite the object shows: the world map's circles pick theirs by the place's state)
         if e.a.sprite != Some(sprite - wf_core::scene::SPRITE_BASE) {
@@ -3359,6 +3360,60 @@ fn build_mid_event(_data: &Arc<GameData>, ram: &GbaRam, runner: &mut StoryHost, 
     Built { world: w, draws, held: 0, finished: true }
 }
 
+/// a cut inside an object pass (the save state taken while a slow iteration's pass was running - the arrival fade-in
+/// of HFIL's tour kais_hfil5: a chasing monster's path plan): the doc's first rows still carry the cut's logic count
+/// (`GbaRam::mid_iteration`) and the world list's update call is on the stack (return 0x08011A87, the loop index - r4
+/// - in the word before, the object being updated 12 bytes below): the objects from that index down to 0 have not
+/// been updated in the cut's iteration - they are now (the later ones were)
+fn finish_interrupted_pass(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
+    if !ram.mid_iteration || ram.load_frozen || w.field.is_none() || w.scene.depth > 0 || wf_core::menu::active(w) {
+        return;
+    }
+    let list = ram.objects();
+    let Some(a) = (0x0300_7008u32..0x0300_8000).step_by(4).find(|&a| {
+        ram.r32(a) == 0x0801_1A87 && {
+            let k = ram.r32(a - 4) as usize;
+            k < list.len() && list[k] == ram.r32(a - 12)
+        }
+    }) else {
+        return;
+    };
+    let (k, o) = (ram.r32(a - 4) as usize, ram.r32(a - 12));
+    // (our entity at the object's position: list indices differ - the game's list holds objects ours does not)
+    let (x, y) = (ram.s32(o + 0x1A0), ram.s32(o + 0x1A4));
+    let Some(id) = (0..w.ents.len()).find(|&i| !w.ents[i].removed && w.actor(i).is_some_and(|a| a.x == x && a.y == y)).map(|i| w.ents[i].id) else {
+        notes.push(format!("mid-area: the cut stands in an object pass at list index {k}, its object {o:#x} has no entity"));
+        return;
+    };
+    // the interrupted object's own update had run up to the cut - its draws are in the RAM's generator already: ours
+    // runs from the generator rewound by them (found by the update ending on the RAM's state), the rest of the pass
+    // from the RAM's (kais_hfil5: the monster's chase decision drew a chance, its path plan was running)
+    let rng = w.rng.state();
+    let mut done = false;
+    for m in 0..=8u32 {
+        let mut w2 = w.clone();
+        w2.rng.set_state(rewind(rng, m));
+        w2.update_one(id);
+        if w2.rng.state() == rng {
+            *w = w2;
+            done = true;
+            break;
+        }
+    }
+    if !done {
+        w.update_one(id);
+    }
+    w.finish_pass_after(id);
+    // ... and the iteration's step after its pass: an arrival fade-in's brightness step (the fade mode's update follows
+    // the objects - kais_hfil5: the fade ended, the leader idle, in the game's iteration 699,645, ours one later)
+    if let Some(f) = w.field.as_mut() {
+        if let Mode::FadeIn { k } = &mut f.mode {
+            *k += 1;
+        }
+    }
+    notes.push(format!("mid-area: the cut stands in an object pass at list index {k} - the rest of the pass is run"));
+}
+
 /// an event a talk started inside the player's update (the world list's update call returns to 0x08011A87, its
 /// saved loop index - r4 - in the word before; the update it interrupted is the player's, 0x08010BF1) whose area has
 /// been left since: its exit resumes that object pass on the new list (`field::resume_pass_after_load`; the real
@@ -4361,6 +4416,9 @@ pub fn import_emulator_state(data: &Arc<GameData>, ram: &GbaRam, runner: &mut St
         world.scene.timers.countdown_on = gd[1] & 4 != 0;
     }
     import_options(&mut world, ram);
+    if in_event.is_none() {
+        finish_interrupted_pass(&mut world, ram, &mut notes);
+    }
     // a closed menu's queued event (world +0x610: count, then the deferred-script objects vt 0x08049264, +8 the event's
     // header - Options -> Sleep's s007, `0x08014B12`): it starts at the next frame's start (`menu::run_then`; run 2
     // cut 1,869,665)

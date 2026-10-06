@@ -6342,3 +6342,22 @@ Emulator, the world pass's update calls (0x08011A82 -> vt+8, last to first) and 
   `import_waves`) ends in the game at f7; ours keeps its 2-unit block (325, 2) - the imported wave's age / end is off.
 - **check.sh (coordinator's note):** run 3 fails with my edits off too (first difference 838,327; the tree has
   another agent's field.rs / wf-import host.rs edits and run 3's manifest being extended) - not from this work.
+
+**Earth agent 2026-10-05 (8): castle_ship_28 129 - measured, not fixed (patch kept: /tmp/earth_ship28_wip.patch).**
+The tour starts inside 8-28's on-enter script 0x0807CDAC (`jump_to(0, ..)` under a director wait, then
+`camera_follow(0)`, return). Emulator (`work/earth/timing/wwatch.py`: natives 0x45 / 0x33 and the pass 0x08011A82):
+no object pass rows 1 .. 128, then row 129 **camera_follow (native 0x33) and then the pass** (5 objects, the player
+walks). So the VM resumed at the top of 129, before the pass; ours resumes after 129's pass (the player held).
+A free pass after such a script's end (`release_pass`, gated on a director wait ending a depth-0 script) fixes
+ship_28 but breaks 5 tours (castle_ship_17 / 18 / 21, desert_air1 / air27, desert_d): castle_ship_17 has the same
+shape (no pass 1 .. 66, its script's end at 66) but **no pass in its end frame** (the 13-object pass starts at 67) -
+like an A trigger's exit (7). What tells the two apart (where each script's nested loop was entered: ship_28's from
+the load, ship_17's ...) is not found yet. The ship fix agent's breakable-with-event rule (objects first, then the
+event's first command) is the start of an event object's run, not this - two different mechanisms, not one rule.
+Note for check.sh: run 3 with my in-flight edits was as expected (first difference 1,072,394, improved); they were
+not what broke it.
+*HFIL tours (A; wf-core world.rs / fieldpatrol.rs, wf-import lib.rs; uncommitted): kais_hfil5 600 / 600, kais_hfil9 740 / 740.* hfil5: the save state stands inside a slow frame's object pass - the objects after the monster done, the monster mid-update (its chase draw made): the import finishes the pass (the monster with the generator wound back by its draw, the waiting objects, the arrival fade-in's step) - `World::finish_pass_from` / `finish_pass_after` / `update_one` (the pass split into `step_entities_list_pre` / `_rest`, otherwise unchanged). hfil9: not stale - a walking monster reserves its walk's destination tile for the whole walk; an imported walk in progress (position exactly the steps short of its target) holds it. Tours 93 -> 95 / 116. check.sh EXACT (runs 1, 2 exact; run 3 as expected). Note: gate `tour_desert_d` fails on the shared tree with others' uncommitted fieldobj / fx / vram / world edits - it passes on clean HEAD 2343628 and on HEAD + this patch, so it is from those edits, not this.
+**Earth agent (9): 19-3's sphere "blend dots" fixed (wf-render).** The energy sphere is BG0's picture, so it draws at
+**BG0's priority**, not a fixed 2: sb_041 21-25 f12,090 (emulator OAM / BGxCNT): BG0CNT priority 3 under a script's BG
+priority, Kid Buu's OBJs at 3 draw over it un-blended; ours drew the sphere at 2 and alpha-blended it over him. Board:
+177 frames fewer px, 2 more (single pixels); rkb_168 / sb_041 / rkb_001 / rfat_033 most. Pixel gate green.

@@ -542,9 +542,12 @@ impl Renderer {
                     let (bx, by) = sl.and_then(|l| l.offset.get(m.layers[li].bg as usize).copied()).unwrap_or((0, 0));
                     self.draw_layer(m, li, *af, cx, cy, (shake.0 + bx, shake.1 + by), vx, vy);
                 }
-                // the sphere on BG0 (priority 2: BG0CNT 0x1C82 under it, real route 19-3), over the other BGs of
-                // its priority
-                if let (Some(sp), 2) = (view.sphere.as_ref(), prio) {
+                // the sphere on BG0, at BG0's priority (2: BG0CNT 0x1C82 under it, real route 19-3; a script's BG
+                // priority moves it - sb_041 21-25 f12,090: BG0CNT priority 3, Kid Buu's OBJs at 3 draw over it,
+                // not blended), over the other BGs of its priority
+                let bg0 = sl.and_then(|l| l.priority.first().copied().flatten()).unwrap_or(2);
+                if view.sphere.is_some() && prio == bg0 {
+                    let sp = view.sphere.as_ref().unwrap();
                     self.draw_sphere(m, sp, cx + shake.0, cy + shake.1, vx, vy);
                 }
             }

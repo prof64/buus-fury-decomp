@@ -252,6 +252,7 @@ pub fn wander_rt(st: &Step) -> Box<Wander> {
 pub fn import_wander(w: &mut World, i: usize, left: i32, v: (i32, i32), t: (i32, i32), old: [i32; 4], new: [i32; 4]) -> bool {
     let id = w.ents[i].id;
     let dir = w.en_ref(i).a.facing;
+    let (ax, ay) = (w.en_ref(i).a.x, w.en_ref(i).a.y);
     let Some(f) = w.field.as_mut() else { return false };
     let Some(p) = f.patrols.iter_mut().find(|p| p.entity == id) else { return false };
     let Some(k) = p.steps.iter().position(|s| matches!(s.func, 0x0800_A82D | 0x0800_A85F)) else { return false };
@@ -263,7 +264,17 @@ pub fn import_wander(w: &mut World, i: usize, left: i32, v: (i32, i32), t: (i32,
     wr.new = new;
     wr.dir = dir;
     p.idx = k as i32;
+    // (only a walk in progress: the position on the step's line, `left` steps of `v` short of the target - a step
+    // object left over while the AI chases (kais_hfil9's other monster: left 2, the chase moving it elsewhere) holds
+    // nothing; the enemy marks its footprint)
+    let on_line = ax + wr.left * wr.vx == wr.tx << 8 && ay + wr.left * wr.vy == wr.ty << 8;
+    let held = wr.left != 0 && wr.rect.is_none() && on_line;
     p.cur = Some(StepRt::Wander(wr));
+    // the walk reserves its target's footprint on the enemy grid at its start and holds it to the end (`holds_mark`;
+    // HFIL tour kais_hfil9: a monster walking from y 211.5 to 224 holds tiles 45-46 row 28 all the way)
+    if held && w.en_ref(i).marked.is_some() {
+        w.en(i).marked = Some(new);
+    }
     true
 }
 
