@@ -277,12 +277,17 @@ want any of mine or not those two.
   - `rj03_045_18-1` f251 - **HandSink's first update does not rewrite the hand's frame** (tick 104 still, the
     strike's last cel 12 shows, not 104 >> 3 = 13); from the second update the reverse cel as before.
   Every segment's matched count unchanged (811,832), gates, the pixel test and the whole-run check green.
-*sound_legs.py re-run on HEAD 623aac7 (2026-10-06, latest):* **run 2** (506 legs, 1,973,798 rows replayed
-exactly): **0 sound differences**. **Run 3** (193 legs from the existing cuts, 2,337,781 of 2,536,522 rows replayed
-exactly - a leg ends at its first logic stop): **1 iteration** - 1,947,900 (`028_j3_janemba`, the arena): play 48 /
-51 app only, play 49 / 50 game only (the punch pair, the other way round in one iteration) -> Janemba's owner. The
-fat-Buu items (1,097,649 / 1,796,302 / 1,798,841) are gone. (A leg's first row after a cut does not count the import's
-own song restart.)
+*sound_legs.py re-run on HEAD 25429fb (2026-10-06, latest; run 3 complete, 2,712,165 rows):* **run 2** (506 legs,
+1,973,898 rows replayed exactly): **0 sound differences**. **Run 3** (197 legs, 2,513,433 rows replayed exactly - a
+leg ends at its logic stop, the rest waits for cuts past the stops): **16 iterations**, all in the new parts:
+- **2,606,136** (`030_k3_kidbuu`): game `play 6` + `stop 3`, ours `play 6` only -> **Earth agent** (claimed).
+- **2,615,881, 2,617,574, 2,618,621, 2,619,266, 2,621,111, 2,622,446, 2,629,911, 2,630,781, 2,631,936, 2,639,959,
+  2,641,676** (`030_k3_kidbuu`, 11 iterations): ours `play 33` + `stop 32` where the game plays nothing (2,639,959:
+  both `stop 54`, ours also 33 / stop 32) - one cause, in the second half -> **side-content agent**.
+- **2,682,904 / 2,682,906, 2,682,922 / 2,682,930** (`031_p3_post`): `play 40` (menu cursor) ours 2 rows early, twice
+  -> **real-route agent** (p3_post).
+(A leg's first row after a cut does not count the import's own song restart; a leg's sounds from the iteration
+before its logic stop on belong to the stop.)
 *Run 3 1,947,900 (soak agent): not a game difference.* From power-on the app is exact there in state and sound
 (`wholerun --power-on --frames 1,948,100 --sounds`: 0 of 1,837,596 iterations differ; its 14 RNG draws are the
 game's in order - Goku's punch: hit 48 + rand(2) = 49, SetAnim rand(3), the Punch state's 50 + rand(2) = 50). The
