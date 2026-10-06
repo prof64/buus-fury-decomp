@@ -137,6 +137,10 @@ SEGMENTS.append(('s3_ship', ('KEYS', 'work/run3/parts/s3_ship.json')))
 # ---- fat Buu (f3_fat, real-route agent): run 2's fat pieces (tools/run2/fat2.py) in a third Dragon Ball order with
 # run 3's stresses between them (tools/run3/fat3.py --all from the ship end; --part joins the pieces' logs)
 SEGMENTS.append(('f3_fat', ('KEYS', 'work/run3/parts/f3_fat.json')))
+# ---- Janemba (j3_janemba, soak agent): run 2's j_* pieces (tools/run2/fat2.py) with fat3's stress interlude between
+# them, Goku to 125, a Save at 18-1 and game overs -> Continue in HFIL and the arena (tools/run3/jan3.py --all from
+# the fat end; --part joins the pieces' logs)
+SEGMENTS.append(('j3_janemba', ('KEYS', 'work/run3/parts/j3_janemba.json')))
 
 
 def chapter_of(name):

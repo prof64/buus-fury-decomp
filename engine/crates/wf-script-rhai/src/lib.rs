@@ -127,7 +127,8 @@ pub struct ThreadState {
     pub queue_instants: bool,
     /// importing a running event mid-node: the parameter writes made while the queue holds at most this many
     /// actions are dropped - the game ran them before the cut and its parameters (the import's) already hold them
-    /// (r062 20-6 +23,000: s477 node 6 `set_p(0, p(0) + 100); walk_to(45, p(0), p(1))` replayed from the walk)
+    /// (r062 20-6 +23,000: s477 node 6 `set_p(0, p(0) + 100); walk_to(45, p(0), p(1))` replayed from the walk);
+    /// each dropped action lowers it
     #[serde(default)]
     pub params_done: Option<usize>,
     /// importing a nested event mid-node: `skip` passes over the outer node's `run_event` (the inner event was
@@ -401,6 +402,12 @@ impl Runtime {
             // 1. queued actions first
             if c.t.skip > 0 && !c.t.queue.is_empty() && !(c.t.through_events && matches!(c.t.queue.front(), Some(Act::RunEvent { .. }))) {
                 c.t.skip -= 1;
+                // (`params_done` counts from the node's first action: a steps node's later step queues afresh, its
+                // writes compared with what is left - run 3 cut 1,072,328, s344 node 65's step 4 sphere loop, 155
+                // actions in: its `set_p(0, p(0) + 1)` passes after the cut grow the sphere)
+                if let Some(n) = c.t.params_done.as_mut() {
+                    *n = n.saturating_sub(1);
+                }
                 c.t.queue.pop_front();
                 c.t.last = None;
                 continue;

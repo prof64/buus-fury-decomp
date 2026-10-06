@@ -148,6 +148,22 @@ impl StoryHost {
         });
         self.finish(w, st);
     }
+    /// Import: the running unit's only local (a steps node's one loop counter kept across waits) set to `v`;
+    /// false when the unit keeps no local or several
+    pub fn set_single_local(&mut self, v: i32) -> bool {
+        self.rt.with_thread(|t| {
+            for f in t.frames.iter_mut().rev() {
+                if let wf_script_rhai::Frame::Unit { locals, .. } = f {
+                    if locals.len() == 1 {
+                        locals[0] = v;
+                        return true;
+                    }
+                    return false;
+                }
+            }
+            false
+        })
+    }
     /// Import: event `event`'s `steps` node `node` past a modal call that returned (`run_punch_minigame` ..): its
     /// handler continues at `step_<step>(last)` with its first `drop` actions dropped (the game ran them) - the
     /// probe cannot pass the modal (a frame-spanning wait), so the node's later step is entered directly (whole-run

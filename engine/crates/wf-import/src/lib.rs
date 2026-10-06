@@ -2257,6 +2257,13 @@ fn track_anims_from_rows(w: &mut World, ram: &GbaRam) {
             set(&mut pp.anim);
         } else if let wf_core::world::Body::Npc(n) = &mut w.ents[i].body {
             set(&mut n.anim);
+        } else if matches!(w.ents[i].body, wf_core::world::Body::Enemy(_)) {
+            // (an enemy-bodied actor the replay's `play_anim_frames` never reached: its puppet, or its AI animation
+            // runs on and its script draws - run 3 cut 1,071,990, s344 node 65's Babidi looping cels 2..4)
+            let aid = (0..25).find(|&a| wf_core::scene::anim_state(a) + 1 == raw).unwrap_or(0);
+            let mut anim = wf_core::scene::ActAnim::of(aid);
+            set(&mut anim);
+            w.scene.puppets.push(wf_core::scene::Puppet { id, anim });
         }
     }
 }
@@ -2520,6 +2527,35 @@ fn import_emotes(w: &mut World, ram: &GbaRam) {
             .unwrap_or(wf_core::world::EntityId::MAX);
         let vid = w.next_serial();
         w.scene.visuals.push(Visual { kind: VisualKind::Emote(emote), x: ram.s32(o + 4), y: ram.s32(o + 8), owner, t: age, life, vid });
+    }
+}
+
+/// a `screen_flash` the replay restarted: the actor's command object (its +0x18C -> vt 0x0804C800: +8 / +0xC / +0x10
+/// the colour, +0x14 the length, +0x18 the frames left, counted down each update; the command ends on the update after
+/// 1) takes the RAM's progress, and the palette flash with it (run 3 cut 1,071,990: s344 node 65's
+/// `screen_flash(169, 255, 255, 255, 15)` 3 frames from its end - ours restarted it, the next `shake_screen` 12 frames
+/// late)
+fn import_flash_cmds(w: &mut World, ram: &GbaRam) {
+    use wf_core::scene::Cmd;
+    let cmds: Vec<u32> = ram
+        .objects()
+        .into_iter()
+        .map(|o| ram.r32(o + 0x18C))
+        .filter(|&c| ram.valid(c) && ram.r32(c) == 0x0804_C800)
+        .collect();
+    for c in cmds {
+        let (len, left) = (ram.s32(c + 0x14), ram.s32(c + 0x18));
+        for t in w.scene.tracks.iter_mut() {
+            if let Some(Cmd::ScreenFlash { frames, t: tt, .. }) = t.queue.first_mut() {
+                if *frames == len && left > 0 && left <= len {
+                    *tt = len - left;
+                    t.started = true;
+                    if let Some(f) = w.scene.screen.flash.as_mut() {
+                        f.t = len - left;
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -3481,14 +3517,10 @@ fn natives_run(ram: &GbaRam, runner: &StoryHost, ev: (u16, u16, [i32; 4])) -> Op
     natives_before(code, pc_off?)
 }
 
-/// the waiting native's occurrences in the loop iterations the game's interpreter already finished: a native inside a
-/// `loop_push` .. `loop` body (the static scan of `natives_before` sees one pass) - the interpreter frame (the context
-/// stack's entry, `0x08004038`'s r4: +0x44 the loop depth, +0x48 the loop counters, innermost last) has the counter
-/// at (the body's start count) - (iterations done); each finished pass queued the body's matching natives once (run-2
-/// cut 50,863: s070 node 23's `loop` of two play_anim(161, 12), the second pass waiting - counter 1 of 2)
-fn loop_extra(ram: &GbaRam, runner: &StoryHost, ev: (u16, u16, [i32; 4]), wn: u8, wargs: &Option<Vec<i32>>) -> usize {
-    use wf_script::bytecode::Op;
-    let Some((addr, code)) = runner.step_code.get(&(ev.0, ev.1)) else { return 0 };
+/// the game's interpreter frame running event `ev`'s node (the context stack 0x03001034: +0 depth, then the frames;
+/// the one whose PC lies in the node's code, the deepest such) and the PC's offset in that code
+fn node_frame(ram: &GbaRam, runner: &StoryHost, ev: (u16, u16, [i32; 4])) -> Option<(u32, usize)> {
+    let (addr, code) = runner.step_code.get(&(ev.0, ev.1))?;
     let depth = ram.r32(0x0300_1034).min(8);
     let mut at: Option<(u32, usize)> = None;
     for k in 1..=depth {
@@ -3510,7 +3542,26 @@ fn loop_extra(ram: &GbaRam, runner: &StoryHost, ev: (u16, u16, [i32; 4]), wn: u8
             }
         }
     }
-    let Some((it, pc_off)) = at else { return 0 };
+    at
+}
+
+/// the loop counters of the node's running `loop_push` loops (the interpreter frame +0x44 the depth, +0x48 the
+/// counters, innermost last)
+fn node_loop_counters(ram: &GbaRam, runner: &StoryHost, ev: (u16, u16, [i32; 4])) -> Option<Vec<i32>> {
+    let (it, _) = node_frame(ram, runner, ev)?;
+    let lp = ram.r32(it + 0x44);
+    (ram.valid(it) && (1..=4).contains(&lp)).then(|| (0..lp).map(|k| ram.s32(it + 0x48 + 4 * k)).collect())
+}
+
+/// the waiting native's occurrences in the loop iterations the game's interpreter already finished: a native inside a
+/// `loop_push` .. `loop` body (the static scan of `natives_before` sees one pass) - the interpreter frame (the context
+/// stack's entry, `0x08004038`'s r4: +0x44 the loop depth, +0x48 the loop counters, innermost last) has the counter
+/// at (the body's start count) - (iterations done); each finished pass queued the body's matching natives once (run-2
+/// cut 50,863: s070 node 23's `loop` of two play_anim(161, 12), the second pass waiting - counter 1 of 2)
+fn loop_extra(ram: &GbaRam, runner: &StoryHost, ev: (u16, u16, [i32; 4]), wn: u8, wargs: &Option<Vec<i32>>) -> usize {
+    use wf_script::bytecode::Op;
+    let Some((_, code)) = runner.step_code.get(&(ev.0, ev.1)) else { return 0 };
+    let Some((it, pc_off)) = node_frame(ram, runner, ev) else { return 0 };
     let Ok(insns) = wf_script::bytecode::decode_reachable(code) else { return 0 };
     let insns: Vec<wf_script::bytecode::Insn> = insns.into_values().collect();
     // the innermost loop whose body holds the PC: its `loop` op (back to `t`) after the PC, the body start `t` before
@@ -3587,8 +3638,16 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
     let k = std::cell::Cell::new(ran.iter().filter(|(n, a)| *n == wn && (wargs.is_none() || *a == wargs)).count() + loop_extra(ram, runner, ev, wn, &wargs));
     let seen = std::cell::RefCell::new(vec![]);
     let hits = std::cell::Cell::new(0usize);
+    // a constant `wait(n)` (0x88) after an action native: only a wait queued right after that native counts - a
+    // `wait(rand(5) + 1)` elsewhere in the node draws the same n (run 3 cut 1,072,328: s344 node 65 waits in step 4's
+    // `show_energy_sphere(..); wait(1)` loop, pass 5 of 37; step 8's spawn loop's random waits drew 1 too and the
+    // replay stopped there, a `spawn_actor(169)` early)
+    let after: Option<u8> = (wn == 0x88 && wargs.is_some() && ran.len() >= 2)
+        .then(|| ran[ran.len() - 2].0)
+        .filter(|&p| !wf_script::natives::sig(p).pushes && p != 0x88);
+    let use_after = std::cell::Cell::new(after.is_some());
     let pred = |n: u8, a: &[i32]| {
-        let m = n == wn && wargs.as_ref().is_none_or(|x| x.as_slice() == a);
+        let m = n == wn && wargs.as_ref().is_none_or(|x| x.as_slice() == a) && (!use_after.get() || seen.borrow().last().copied() == after);
         if m {
             hits.set(hits.get() + 1);
         }
@@ -3600,6 +3659,14 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
     };
     let (w_probe, snap_probe) = (w.clone(), runner.snapshot());
     let mut found = runner.probe_queued(&mut w, ev.0, ev.1, ev.2, &pred);
+    if found.is_none() && use_after.get() {
+        w = w_probe.clone();
+        runner.restore(&snap_probe);
+        use_after.set(false);
+        seen.borrow_mut().clear();
+        hits.set(0);
+        found = runner.probe_queued(&mut w, ev.0, ev.1, ev.2, &pred);
+    }
     // the count above takes every matching native in the bytecode before the PC, a branch the node did not take
     // included: when the probe's run reached fewer, the waiting one is the last it reached (run 2 cuts 859,325 ..
     // 860,353: s418 node 0 waits in the flag-272 branch's end_parallel, the flag-271 branch's comes before it)
@@ -3692,6 +3759,17 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
                     Some((o, k)) => runner.continue_mid_nested_in(&mut w, o, k, from, (ev.0, ev.1)),
                     None => runner.continue_mid_node(&mut w, ev.0, ev.1, ev.2, from, last),
                 },
+            }
+            // a waiting native under a condition inside a loop (`if rand(100) + 1 > 20 { screen_flash(..) }`): the
+            // k-th occurrence the probe stopped at is not the game's pass - the replay's draws took other branches. A
+            // steps node keeping one local across its waits, that local the one loop's counter (`n0`), takes the RAM's
+            // count (run 3 cut 1,071,990: s344 node 65's 15 puffs, the game at counter 7, the replay 2 passes on)
+            if outer.is_none() {
+                if let Some(&[c]) = node_loop_counters(ram, runner, ev).as_deref() {
+                    if runner.set_single_local(c) {
+                        notes.push(format!("mid-code: the node's loop counter from RAM ({c})"));
+                    }
+                }
             }
             (last, from)
         }
@@ -3813,17 +3891,36 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
     w.g.shakes = shakes;
     let so = ram.r32(0x0300_2BE0);
     let live = (ram.valid(so) && ram.r32(so) == 0x0804_A720).then(|| wf_core::world::Shake { intensity: ram.r8(so + 4) as i32, period: ram.r8(so + 5) as i32, cnt: ram.r8(so + 6) as i32, left: ram.s32(so + 8) });
+    let shake_cmds: Vec<(i32, i32)> = ram
+        .objects()
+        .into_iter()
+        .map(|o| ram.r32(o + 0x18C))
+        .filter(|&c| ram.valid(c) && ram.r32(c) == 0x0804_C828 && ram.s32(c + 0xC) > 0)
+        .map(|c| (ram.s32(c + 8), ram.s32(c + 0xC)))
+        .collect();
     for t in w.scene.tracks.iter_mut() {
         if !t.queue.iter().any(|c| matches!(c, Cmd::Shake { .. })) {
             continue;
         }
         let cur = live.as_ref().and_then(|l| t.queue.iter().position(|c| matches!(c, Cmd::Shake { intensity, .. } if *intensity == l.intensity)));
+        // (the shake object gone, its command still on the actor: the actor's +0x18C -> vt 0x0804C828, +8 the
+        // intensity, +0xC the frames left - the script waits on it, the next command not started: run 3 cut 1,072,000,
+        // s344 node 65's shake_screen(0, 100, 5) one frame from its end, then actor_wait(169, 15))
+        let by_cmd = cur.is_none().then(|| shake_cmds.iter().find_map(|&(i, left)| t.queue.iter().position(|c| matches!(c, Cmd::Shake { intensity, .. } if *intensity == i)).map(|k| (k, left)))).flatten();
         match cur {
             Some(k) => {
                 t.queue.drain(..k);
                 if let (Some(Cmd::Shake { frames, t: tt, .. }), Some(l)) = (t.queue.first_mut(), live.as_ref()) {
                     // (its start frame ticked it once: t = frames - 1 - left)
                     *tt = *frames - 1 - l.left;
+                }
+                t.started = true;
+            }
+            None if by_cmd.is_some() => {
+                let (k, left) = by_cmd.unwrap();
+                t.queue.drain(..k);
+                if let Some(Cmd::Shake { frames, t: tt, .. }) = t.queue.first_mut() {
+                    *tt = (*frames - left).max(0);
                 }
                 t.started = true;
             }
@@ -3907,6 +4004,7 @@ fn build_mid_code(ram: &GbaRam, runner: &mut StoryHost, ev: (u16, u16, [i32; 4])
     import_cam_pan(&mut w, ram);
     import_prop_moves(&mut w, ram);
     import_emote_cmds(&mut w, ram);
+    import_flash_cmds(&mut w, ram);
     // an enemy the script holds in a pose (its state +0x14 the hold state 0x03001B00, `set_pose`) whose `set_pose` the
     // replay dropped: our puppet on the RAM's cel (run 2 cuts 57,831 .. 58,560: s103's Pikkon, pose 12 then 16; else
     // ours ran its AI animation, whose script draws)
