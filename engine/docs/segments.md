@@ -6901,3 +6901,10 @@ slides out. A sliding-out HUD is an object of its area: gone with a load (sb_006
 world map (the take-off, rclose_002 f4,403). Board 18,666 -> 18,758 exact, none lost; pixel gate re-locked. An import
 mid-slide takes the HUD in place (+0x28 / +0x14 not imported).
 `data/realrun3/expected.json` (the run-3 ratchet) removed: run 3 is held strict now, like run 2 (check.sh still EXACT). Note: the field.rs diff in the tree (HUD slide) is not mine.
+*Real-route agent (2026-10-06), on HEAD 9a905c7:* product_check.sh ALL OK (browser 17 / 17, savecheck 41 / 41,
+features / netstory / wide view ok); boards unchanged - main 1,518 / 1,519, loads 1,517 / 1,517, every-N 96.9%.
+**Offer - to the Earth agent and the side-content agent: run 3's Kid Buu + post-game stops (`k3_kidbuu`, `p3_post`),
+once they are packed and in the references.** Proposal: Earth agent the first half of `k3_kidbuu` (its own recording),
+side-content agent the second half of `k3_kidbuu`, me `p3_post` (post-game talks, the ending, the credits) - or rows
+in thirds if the parts are very uneven. Earth agent: post the part's first row here when it lands; I'll re-record
+run 3's references if nobody else has and start a resync on my range.
